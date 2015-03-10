@@ -1,0 +1,11 @@
+= render 'order_filter'
+= render_flash
+= simple_form_for @purchase_order, html: { class: 'span16 form-inline well' } do |f|
+  %legend
+    = "Purchase Order #" + docnolize(@purchase_order.id)
+  = render 'purchase_orders/fields', f: f
+  .form-actions
+    = f.button :submit, 'Save', class: 'btn btn-primary'
+    = link_to 'Cancel', PurchaseOrder.last ? edit_purchase_order_path(PurchaseOrder.last) : root_path, class: 'btn btn-warning'
+    = link_to "New Order", new_purchase_order_path, class: "btn btn-info"
+= render 'orders'

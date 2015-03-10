@@ -1,0 +1,26 @@
+#arrangements
+  %table.table-bordered.table
+    %thead
+      %tr
+        %th.span2  
+        %th.span3  Deliver
+        %th.span9 Customer
+        %th.span9 Product
+        %th.span4  Quantity
+        %th.span9  Supplier
+        %th.span9  Loading
+    %tbody 
+      - for t in @arrangements
+        - k = t.sales_order
+        %tr
+          %th.span2  
+          %td.span3= k.deliver_at
+          %td.span9= k.customer_name1
+          %td.span9= (strip_tags(k.product_name1) + "(" + strip_tags(k.packaging_name) + ")<br/>" + strip_tags(k.note.to_s)).html_safe
+          %td.span4= number_with_precision(k.quantity, precision: 2, delimiter: ',') + " " + k.product.unit
+          %td.span9= assign_or_show_supplier k
+          %td.span9= assign_or_show_loader k
+      - if @arrangements.length == 0
+        %tr
+          %td{colspan: 6}
+            %h2 No Order!

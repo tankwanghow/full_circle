@@ -1,0 +1,29 @@
+.span31#purchase_orders
+  %table.table-bordered.table
+    %thead
+      %tr
+        %th.span5  Date
+        %th.span5  Available
+        %th.span14 Supplier
+        %th.span12 Product
+        %th.span6  Quantity
+        %th.span2  Status
+        %th.span2
+    %tbody
+      - for t in @purchase_orders
+        %tr
+          %td.span5=  t.doc_date
+          %td.span5=  t.available_at
+          %td.span14= t.supplier_name1
+          %td.span12= (strip_tags(t.product_name1) + "(" + strip_tags(t.packaging_name) + ")<br/>" + strip_tags(t.note.to_s)).html_safe
+          %td.span6=  number_with_precision(t.quantity, precision: 2, delimiter: ',') + " " + t.product.unit
+          %td.span2
+            - if t.active
+              .label.label-important A
+            - else
+              .label.label-success U
+          %td.span2= link_to 'E', edit_purchase_order_path(t)
+      - if @purchase_orders.length == 0
+        %tr
+          %td{colspan: 6}
+            %h2 No Record found!

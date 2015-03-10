@@ -1,0 +1,28 @@
+= simple_form_for :arrangement, url: new_arrangement_path, method: :get do |f|
+  .span31#sales_orders
+    %table.table-bordered.table
+      %thead
+        %tr
+          %td.span2
+          %th.span5  Date
+          %th.span5  Deliver
+          %th.span14 Customer
+          %th.span12 Product
+          %th.span6  Quantity
+          %th.span2
+      %tbody 
+        - for t in @sales_orders
+          %tr
+            %td.span2=  check_box_tag "arrangement[sales_orders][]", t.id, nil, id: dom_id(t), class: 'sales_order_row'
+            %td.span5=  t.doc_date
+            %td.span5=  t.deliver_at
+            %td.span14= label_tag dom_id(t), t.customer_name1
+            %td.span12= label_tag dom_id(t), (strip_tags(t.product_name1) + "(" + strip_tags(t.packaging_name) + ")<br/>" + strip_tags(t.note.to_s)).html_safe
+            %td.span6=  label_tag dom_id(t), number_with_precision(t.quantity, precision: 2, delimiter: ',') + " " + t.product.unit
+            %td.span2= link_to 'E', edit_sales_order_path(t)
+        - if @sales_orders.length == 0
+          %tr
+            %td{colspan: 7}
+              %h2 No Record found!
+  .offset16
+    = f.button :submit, 'Arrange for Delivery', class: 'btn btn-danger'

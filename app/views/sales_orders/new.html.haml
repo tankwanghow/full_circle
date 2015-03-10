@@ -1,0 +1,10 @@
+= render 'order_filter'
+= render_flash
+= simple_form_for @sales_order, html: { class: 'span16 form-inline well' } do |f|
+  %legend
+    Sales Order
+  = render 'sales_orders/fields', f: f
+  .form-actions
+    = f.button :submit, 'Save', class: 'btn btn-primary'
+    = link_to 'Cancel', SalesOrder.last ? edit_sales_order_path(SalesOrder.last) : root_path, class: 'btn btn-warning'
+= render 'orders'

@@ -1,0 +1,2 @@
+class LoadingOrdersController < ApplicationController
+end

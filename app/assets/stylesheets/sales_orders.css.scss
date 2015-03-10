@@ -1,0 +1,15 @@
+@import 'bootstrap/mixins';
+#sales_orders, #purchase_orders {
+  max-height: 450px;
+  overflow: auto;
+  border: 2px solid #868686;
+  @include border-radius(4px);
+  margin-bottom: 3px;
+  table {
+    td { vertical-align: middle; padding: 2px; }
+    th { text-align: center; padding: 2px; }
+    thead tr, thead th { background-color: lightgray; }
+    tbody td { text-align: center }
+    tbody tr.active { background-color: lightblue; }
+  }
+}

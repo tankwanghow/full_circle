@@ -1,0 +1,13 @@
+= simple_form_for :sales_orders_find, url: sales_orders_path, html: { class: 'form-search' }, method: :get do |f|
+  = label_tag 'Search Terms', nil, class: :bold
+  = f.input_field :terms, value: session[:sales_orders_find][:terms], class: 'span12'
+  = label_tag 'Order at', nil, class: :bold
+  = f.input_field :order_at, value: session[:sales_orders_find][:order_at], class: 'span4 datepicker'
+  = label_tag 'Deliver at', nil, class: :bold
+  = f.input_field :deliver_at, value: session[:sales_orders_find][:deliver_at], class: 'span4 datepicker'
+  = label_tag '+/- Days', nil, class: :bold
+  = f.input_field :days, value: session[:sales_orders_find][:days], class: 'span3'
+  = label_tag 'Fulfilled', nil, class: :bold
+  = f.input_field :fulfilled, collection: [false, true], selected: session[:sales_orders_find][:fulfilled], class: 'span3'
+  = f.button :submit, 'Find', class: 'btn btn-primary'
+  
