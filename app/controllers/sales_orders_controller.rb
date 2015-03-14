@@ -1,6 +1,4 @@
 class SalesOrdersController < ApplicationController
-  before_filter :fill_orders
-
   def index
     redirect_to new_sales_order_path
   end
@@ -11,6 +9,7 @@ class SalesOrdersController < ApplicationController
 
   def new
     @sales_order = SalesOrder.new(doc_date: Date.today, deliver_at: Date.today + 1)
+    @sales_order.details.build
   end
 
   def create
@@ -33,12 +32,5 @@ class SalesOrdersController < ApplicationController
       flash.now[:error] = "Failed to update SalesOrder."
       render :edit
     end
-  end
-
-private
-
-  def fill_orders
-    store_param :sales_orders_find
-    @sales_orders = SalesOrder.search session[:sales_orders_find]
   end
 end
