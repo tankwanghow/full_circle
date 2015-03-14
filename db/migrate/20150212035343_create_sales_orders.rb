@@ -3,7 +3,7 @@ class CreateSalesOrders < ActiveRecord::Migration
     create_table :orders do |t|
       t.date       :doc_date,     null: false
       t.date       :deliver_at,   null: false
-      t.belongs_to :customer_id,  null: false
+      t.belongs_to :customer,  null: false
       t.text       :note
       t.integer    :lock_version, default: 0
       t.timestamps
