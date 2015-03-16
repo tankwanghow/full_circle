@@ -1,5 +1,5 @@
-class SalesOrderDetail < ActiveRecord::Base
-  belongs_to :sales_order
+class PurchaseOrderDetail < ActiveRecord::Base
+  belongs_to :purchase_order
   belongs_to :product
   belongs_to :product_packaging
   

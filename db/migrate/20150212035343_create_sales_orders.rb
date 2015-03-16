@@ -1,6 +1,6 @@
 class CreateSalesOrders < ActiveRecord::Migration
   def change
-    create_table :orders do |t|
+    create_table :sales_orders do |t|
       t.date       :doc_date,     null: false
       t.date       :deliver_at,   null: false
       t.belongs_to :customer,  null: false
@@ -9,15 +9,15 @@ class CreateSalesOrders < ActiveRecord::Migration
       t.timestamps
     end
 
-    create_table :order_details do |t|
-      t.belongs_to :order,             null: false
+    create_table :sales_order_details do |t|
+      t.belongs_to :sales_order,       null: false
       t.belongs_to :product,           null: false
+      t.belongs_to :product_packaging, null: false
+      t.decimal    :package_qty,       precision: 12, scale: 4, default: 0
       t.decimal    :quantity,          precision: 12, scale: 4, default: 0
       t.decimal    :unit_price,        precision: 12, scale: 4, default: 0
-      t.belongs_to :product_packaging, null: false
       t.boolean    :fulfilled,         default: false
-      t.text       :note
+      t.string     :note
     end
   end
 end
-  

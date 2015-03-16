@@ -10,7 +10,7 @@ class CreateLoadingOrders < ActiveRecord::Migration
     end
 
     create_table :loading_order_detail do |t|
-      t.belongs_to :order_detail
+      t.belongs_to :sales_order_detail
       t.belongs_to :purchase_order_detail
       t.date       :loaded_at
       t.decimal    :load_quantity, precision: 12, scale: 4, default: 0

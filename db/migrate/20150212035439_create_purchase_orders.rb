@@ -12,9 +12,10 @@ class CreatePurchaseOrders < ActiveRecord::Migration
     create_table :purchase_order_details do |t|
       t.belongs_to :purchase_order,    null: false
       t.belongs_to :product,           null: false
+      t.belongs_to :product_packaging, null: false
+      t.decimal    :package_qty,       precision: 12, scale: 4, default: 0
       t.decimal    :quantity,          precision: 12, scale: 4, default: 0
       t.decimal    :unit_price,        precision: 12, scale: 4, default: 0
-      t.belongs_to :product_packaging, null: false
       t.boolean    :fulfilled,         default: false
       t.boolean    :active,            default: false
       t.text       :note

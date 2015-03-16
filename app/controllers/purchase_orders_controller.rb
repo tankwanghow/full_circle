@@ -1,5 +1,4 @@
 class PurchaseOrdersController < ApplicationController
-  before_filter :fill_orders
 
   def index
     redirect_to new_purchase_order_path
@@ -11,6 +10,7 @@ class PurchaseOrdersController < ApplicationController
 
   def new
     @purchase_order = PurchaseOrder.new(doc_date: Date.today, available_at: Date.today + 1)
+    @purchase_order.details.build
   end
 
   def create
@@ -35,10 +35,4 @@ class PurchaseOrdersController < ApplicationController
     end
   end
 
-private
-
-  def fill_orders
-    store_param :purchase_orders_find
-    @purchase_orders = PurchaseOrder.search session[:purchase_orders_find]
-  end
 end
