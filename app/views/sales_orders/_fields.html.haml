@@ -1,15 +1,15 @@
 .row-fluid
-  .span22
+  .span16
     = f.input :customer_name1, input_html: { class: 'span' }, autofocus: true, label: 'Customer'
-  .span9
+  .span6
     = f.input :doc_date, as: :datepicker, input_html: { class: 'span38' }, label: 'Order at'
-  .span9
+  .span6
     = f.input :deliver_at, as: :datepicker, input_html: { class: 'span38' }
 #details
   .row-fluid
     = render_sales_order_details_fields f, :details
 .row-fluid
-  .span24
+  .span16
     = f.input :note, input_html: { rows: 2, class: 'span' }
 
 :coffee

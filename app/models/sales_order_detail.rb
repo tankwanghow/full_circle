@@ -17,6 +17,10 @@ class SalesOrderDetail < ActiveRecord::Base
     product.unit if product
   end
 
+  def balance
+    0
+  end
+
   def packaging_name
     product_packaging.pack_qty_name if product_packaging
   end

@@ -1,14 +1,16 @@
 .row-fluid
-  .span11
+  .span10
     = f.input :product_name1, input_html: { class: 'product span', data: { product_json: f.object.product.to_json } }, wrapper: :table_field
-  .span6
+  .span5
     = f.input :packaging_name, input_html: { class: 'packaging span', data: { package_json: f.object.product_packaging.to_json } }, wrapper: :table_field
-  .span4
+  .span3
     = f.input :package_qty, input_html: { class: 'package_qty span', type: :text }, wrapper: :table_field
   .span10
     = f.input :note, input_html: { class: 'note span' }, wrapper: :table_field
-  .span6
+  .span5
     = f.input :quantity, input_html: { class: 'quantity span', type: :text }, wrapper: :table_field
+  .span5
+    = f.input :balance, input_html: { class: 'balance span', type: :text, readOnly: true, name: 'row_balance' }, wrapper: :table_field
   .span3
     = f.input :unit, input_html: { tabindex: -1, class: 'span', name: 'row_unit', readOnly: true }, wrapper: :table_field
   .span4

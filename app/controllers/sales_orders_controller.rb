@@ -1,6 +1,6 @@
 class SalesOrdersController < ApplicationController
   def index
-    redirect_to new_sales_order_path
+    @sales_orders = SalesOrder.query
   end
 
   def edit
