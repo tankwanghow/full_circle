@@ -1,28 +1,32 @@
 = simple_form_for :arrangement, url: new_arrangement_path, method: :get do |f|
-  .span31#sales_orders
+  #sales_orders
     %table.table-bordered.table
       %thead
         %tr
           %td.span2
-          %th.span5  Date
-          %th.span5  Deliver
-          %th.span14 Customer
-          %th.span12 Product
-          %th.span6  Quantity
-          %th.span2
+          %th.span3 Date
+          %th.span3 Deliver
+          %th.span7 Customer
+          %th.span7 Product
+          %th.span3 Package
+          %th.span4 Quantity
+          %th.span7 Supplier
+          %th.span10 Transport
       %tbody 
         - for t in @sales_orders
           %tr
             %td.span2=  check_box_tag "", t.id, nil, id: dom_id(t), class: 'sales_order_row'
-            %td.span5=  t.doc_date
-            %td.span5=  t.deliver_at
-            %td.span14= label_tag dom_id(t), t.customer_name
-            %td.span12= label_tag dom_id(t), (strip_tags(t.product_name) + "(" + strip_tags(t.packaging_name) + ")<br/>" + strip_tags(t.detail_note.to_s)).html_safe
-            %td.span6=  label_tag dom_id(t), number_with_precision(t.quantity, precision: 2, delimiter: ',') + " " + t.unit
-            %td.span2= link_to 'E', edit_sales_order_path(t.id)
+            %td.span3=  t.doc_date
+            %td.span3=  t.deliver_at
+            %td.span7= label_tag dom_id(t), t.customer_name.first(20)
+            %td.span7= label_tag dom_id(t), t.product_name
+            %td.span3= label_tag dom_id(t), (t.package_qty.to_i == 0 ? '' : t.package_qty.to_i.to_s) + ' ' + t.packaging_name
+            %td.span4=  label_tag dom_id(t), number_with_precision(t.quantity, precision: 2, delimiter: ',') + " " + t.unit
+            %td.span7= label_tag dom_id(t), t.customer_name.first(20)
+            %td.span10= label_tag dom_id(t), t.customer_name.first(20)
         - if @sales_orders.length == 0
           %tr
-            %td{colspan: 7}
+            %td{colspan: 9}
               %h2 No Record found!
   .offset16
-    = f.button :submit, 'Arrange for Delivery', class: 'btn btn-danger'
+    = f.button :submit, 'Arrange Loading', class: 'btn btn-danger'
