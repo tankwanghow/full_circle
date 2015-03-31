@@ -18,7 +18,7 @@ class CreatePurchaseOrders < ActiveRecord::Migration
       t.decimal    :unit_price,        precision: 12, scale: 4, default: 0
       t.boolean    :fulfilled,         default: false
       t.boolean    :active,            default: false
-      t.text       :note
+      t.string     :note
     end
   end
 end
