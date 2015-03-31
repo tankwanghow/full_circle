@@ -5,7 +5,6 @@ class CreateLoadingOrders < ActiveRecord::Migration
       t.belongs_to :transporter
       t.string     :lorry_no
       t.text       :note
-      t.boolean    :cancelled,    default: false
       t.integer    :lock_version, default: 0
       t.timestamps
     end
