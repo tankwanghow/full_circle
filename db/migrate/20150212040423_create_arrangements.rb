@@ -5,6 +5,7 @@ class CreateArrangements < ActiveRecord::Migration
       t.belongs_to :purchase_order_detail
       t.belongs_to :loading_order
       t.string     :note
+      t.decimal    :order_quantity, precision: 12, scale: 4, default: 0
       t.date       :loaded_date
       t.decimal    :load_quantity, precision: 12, scale: 4, default: 0
       t.date       :deliver_date

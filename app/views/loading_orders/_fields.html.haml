@@ -1,0 +1,16 @@
+.row-fluid
+  .span16
+    = f.input :transporter_name1, input_html: { class: 'span' }, autofocus: true, label: 'Transporter'
+  .span6
+    = f.input :doc_date, as: :datepicker, input_html: { class: 'span38' }, label: 'Date'
+  .span6
+    = f.input :lorry_no
+#details
+  .row-fluid
+    = render_loading_order_details_fields f, :details
+.row-fluid
+  .span20
+    = f.input :note, input_html: { rows: 2, class: 'span' }
+
+:coffee
+  ($ document).ready -> purchase_order.init()
