@@ -1,6 +1,6 @@
 class SalesOrdersController < ApplicationController
   def index
-    @sales_orders = SalesOrder.query
+    @sales_orders = SalesOrder.query(params[:term], params[:date])
   end
 
   def edit

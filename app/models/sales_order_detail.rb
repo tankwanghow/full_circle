@@ -2,6 +2,7 @@ class SalesOrderDetail < ActiveRecord::Base
   belongs_to :sales_order
   belongs_to :product
   belongs_to :product_packaging
+  has_many :arrangements
   
   validates_presence_of :product_name1, :unit
   validates_numericality_of :quantity, greater_than: 0
@@ -10,7 +11,7 @@ class SalesOrderDetail < ActiveRecord::Base
   validate_belongs_to :product, :name1
   
   def simple_audit_string
-    [ product.name1, note, quantity, unit_price, discount ].join ' '
+    [ product.name1, packaging_name, note, quantity, unit_price ].join ' '
   end
 
   def unit
