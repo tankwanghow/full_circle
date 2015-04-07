@@ -1,9 +1,9 @@
 = render_flash
-= simple_nested_form_for @purchase_order, html: { class: 'span42 form-inline well' } do |f|
+= simple_nested_form_for @loading_order, html: { class: 'span42 form-inline well' } do |f|
   %legend
-    = "Purchase Order #" + docnolize(@purchase_order.id)
-  = render 'purchase_orders/fields', f: f
+    = "Loading Order #" + docnolize(@loading_order.id)
+  = render 'loading_orders/fields', f: f
   .form-actions
     = f.button :submit, 'Save', class: 'btn btn-primary'
-    = link_to 'Cancel', PurchaseOrder.last ? edit_purchase_order_path(PurchaseOrder.last) : root_path, class: 'btn btn-warning'
-    = link_to "New Order", new_purchase_order_path, class: "btn btn-info"
+    = link_to 'Cancel', LoadingOrder.last ? edit_loading_order_path(LoadingOrder.last) : root_path, class: 'btn btn-warning'
+    = link_to "New Order", new_loading_order_path, class: "btn btn-info"
