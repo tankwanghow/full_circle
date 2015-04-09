@@ -1,29 +1,30 @@
-.span31#purchase_orders
-  %table.table-bordered.table
-    %thead
-      %tr
-        %th.span5  Date
-        %th.span5  Available
-        %th.span14 Supplier
-        %th.span12 Product
-        %th.span6  Quantity
-        %th.span2  Status
-        %th.span2
-    %tbody
-      - for t in @purchase_orders
+= simple_form_for :arrangement, url: new_arrangement_path, method: :get do |f|
+  #purchase_orders
+    %table.table-bordered.table
+      %thead
         %tr
-          %td.span5=  t.doc_date
-          %td.span5=  t.available_at
-          %td.span14= t.supplier_name1
-          %td.span12= (strip_tags(t.product_name1) + "(" + strip_tags(t.packaging_name) + ")<br/>" + strip_tags(t.note.to_s)).html_safe
-          %td.span6=  number_with_precision(t.quantity, precision: 2, delimiter: ',') + " " + t.product.unit
           %td.span2
-            - if t.active
-              .label.label-important A
-            - else
-              .label.label-success U
-          %td.span2= link_to 'E', edit_purchase_order_path(t)
-      - if @purchase_orders.length == 0
-        %tr
-          %td{colspan: 6}
-            %h2 No Record found!
+          %th.span3 Date
+          %th.span3 Available
+          %th.span7 Supplier
+          %th.span7 Product
+          %th.span3 Package
+          %th.span4 Quantity
+          %th.span10 Transport
+      %tbody 
+        - for t in @purchase_orders
+          %tr
+            %td.span2= check_box_tag "", t.id, nil, id: dom_id(t), class: 'purchase_order_row'
+            %td.span3= t.doc_date
+            %td.span3= t.available_at
+            %td.span7= link_to t.supplier_name.first(20), edit_purchase_order_path(t.id)
+            %td.span7= label_tag dom_id(t), t.product_name
+            %td.span3= label_tag dom_id(t), (t.package_qty.to_i == 0 ? '' : t.package_qty.to_i.to_s) + ' ' + t.packaging_name
+            %td.span4= label_tag dom_id(t), number_with_precision(t.quantity, precision: 2, delimiter: ',') + " " + t.unit
+            %td.span10= link_to 'Arrange Transport', '#'
+        - if @purchase_orders.length == 0
+          %tr
+            %td{colspan: 9}
+              %h2 No Record found!
+  = link_to 'New Order', new_purchase_order_path, class: 'btn btn-success'
+  = f.button :submit, 'Multi-Orders Single Transport', class: 'btn btn-danger'

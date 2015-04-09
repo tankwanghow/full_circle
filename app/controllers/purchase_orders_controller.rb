@@ -1,7 +1,8 @@
 class PurchaseOrdersController < ApplicationController
 
   def index
-    redirect_to new_purchase_order_path
+    store_param :purchase_orders_find
+    @purchase_orders = PurchaseOrder.query(session[:purchase_orders_find][:term], session[:purchase_orders_find][:date], session[:purchase_orders_find][:fulfilled])
   end
 
   def edit

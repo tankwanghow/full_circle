@@ -1,6 +1,7 @@
 class SalesOrdersController < ApplicationController
   def index
-    @sales_orders = SalesOrder.query(params[:term], params[:date])
+    store_param :sales_orders_find
+    @sales_orders = SalesOrder.query(session[:sales_orders_find][:term], session[:sales_orders_find][:date], session[:sales_orders_find][:fulfilled])
   end
 
   def edit
@@ -33,4 +34,7 @@ class SalesOrdersController < ApplicationController
       render :edit
     end
   end
+
+private
+
 end

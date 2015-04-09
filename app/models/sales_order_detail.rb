@@ -11,7 +11,7 @@ class SalesOrderDetail < ActiveRecord::Base
   validate_belongs_to :product, :name1
   
   def simple_audit_string
-    [ product.name1, packaging_name, note, quantity, unit_price ].join ' '
+    [ product.name1, packaging_name, note, quantity, unit_price, fulfilled ].join ' '
   end
 
   def unit
@@ -19,7 +19,7 @@ class SalesOrderDetail < ActiveRecord::Base
   end
 
   def balance
-    0
+    quantity - arrangements.sum(:deliver_quantity)
   end
 
   def packaging_name

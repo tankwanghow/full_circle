@@ -9,10 +9,20 @@ class SalesOrder < ActiveRecord::Base
 
   include Searchable
   searchable doc_date: :doc_date, 
-             content: [:id, :customer_name1, :details_audit_string, :delivery_date, :note]
+             content: [:id, :customer_name1, :details_audit_string, :deliver_at, :note]
 
   include AuditString
   audit_string :details
+
+  simple_audit username_method: :username do |r|
+     {
+      doc_date: r.doc_date.to_s,
+      deliver_at: r.deliver_at.to_s,
+      customer: r.customer_name1,
+      details: r.details_audit_string,
+      note: r.note
+     }
+  end
 
   def self.query term=nil, date=nil, fulfilled=nil
     find_by_sql sql(term, date, fulfilled)
@@ -29,7 +39,7 @@ private
       inner join accounts ac on so.customer_id = ac.id
       inner join product_packagings pp on pp.product_id = p.id
       inner join packagings pk on pk.id = pp.packaging_id and sod.product_packaging_id = pp.id
-      where 1 = 1" + terms_condition(term) + date_condition(date) + fulfilled_condition(fulfilled)
+      where 1 = 1 " + terms_condition(term) + date_condition(date) + fulfilled_condition(fulfilled)
   end
 
   def self.terms_condition term=nil
@@ -43,14 +53,14 @@ private
 
   def self.date_condition date=nil
     if date
-      "and (doc_date = '#{date.to_date.to_s(:db)}'or deliver_at = '#{date.to_date.to_s(:db)}')"
+      "and (doc_date >= '#{date.to_date.to_s(:db)}' or deliver_at >= '#{date.to_date.to_s(:db)}')"
     else
       ''
     end
   end
 
   def self.fulfilled_condition fulfilled
-    if fulfilled
+    if fulfilled == "true"
       "and fulfilled = 't'"
     else
       "and fulfilled = 'f'"
