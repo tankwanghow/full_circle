@@ -36,4 +36,11 @@ class PurchaseOrdersController < ApplicationController
     end
   end
 
+  def select
+    @sod = SalesOrderDetail.find(params[:sod])
+    term = @sod.product.name1 + " " + @sod.note
+    date = @sod.sales_order.deliver_at
+    @purchase_orders = PurchaseOrder.query term, date
+  end
+
 end

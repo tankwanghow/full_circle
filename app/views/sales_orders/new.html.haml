@@ -6,3 +6,4 @@
   .form-actions
     = f.button :submit, 'Save', class: 'btn btn-primary'
     = link_to 'Cancel', SalesOrder.last ? edit_sales_order_path(SalesOrder.last) : root_path, class: 'btn btn-warning'
+    = link_to "Index", sales_orders_path, class: "btn btn-inverse"

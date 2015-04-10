@@ -170,7 +170,10 @@ FullCircle::Application.routes.draw do
   resources :gst_accounts, only: [:index, :create]
 
   resources :sales_orders
+  
   resources :purchase_orders
+  match 'purchase_orders_select' => 'purchase_orders#select'
+
   resources :loading_orders
   resources :arrangements
 

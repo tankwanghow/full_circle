@@ -9,6 +9,14 @@ class SalesOrderDetail < ActiveRecord::Base
   
   include ValidateBelongsTo
   validate_belongs_to :product, :name1
+
+  def has_arrangements?
+    arrangements.count > 0 ? true : false
+  end
+
+  def arrangements_count
+    arrangements.count
+  end
   
   def simple_audit_string
     [ product.name1, packaging_name, note, quantity, unit_price, fulfilled ].join ' '

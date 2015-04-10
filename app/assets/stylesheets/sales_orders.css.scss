@@ -11,5 +11,6 @@
     thead tr, thead th { background-color: lightgray; }
     tbody td { text-align: center }
     tbody tr.active { background-color: lightblue; }
+    tbody tr input { margin: 0px; padding: 0px; }
   }
 }

@@ -7,3 +7,5 @@
     = f.button :submit, 'Save', class: 'btn btn-primary'
     = link_to 'Cancel', PurchaseOrder.last ? edit_purchase_order_path(PurchaseOrder.last) : root_path, class: 'btn btn-warning'
     = link_to "New Order", new_purchase_order_path, class: "btn btn-info"
+    = link_to "Index", purchase_orders_path, class: "btn btn-inverse"
+    = link_to_audits_log @purchase_order

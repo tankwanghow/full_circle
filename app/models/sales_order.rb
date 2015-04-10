@@ -31,7 +31,8 @@ class SalesOrder < ActiveRecord::Base
 private
 
   def self.sql term, date, fulfilled
-    "select so.id, so.doc_date, so.deliver_at, ac.name1 as customer_name, p.name1 as product_name, sod.package_qty, 
+    "select so.id, sod.id as sales_order_detail_id, so.doc_date, so.deliver_at, 
+            ac.name1 as customer_name, p.name1 as product_name, sod.package_qty, 
             pk.name as packaging_name, sod.note as detail_note, sod.quantity, p.unit, sod.unit_price
        from sales_orders so 
       inner join sales_order_details sod on so.id = sod.sales_order_id

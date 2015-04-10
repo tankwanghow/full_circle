@@ -31,8 +31,10 @@ class PurchaseOrder < ActiveRecord::Base
 private
 
   def self.sql term, date, fulfilled
-    "select po.id, po.doc_date, po.available_at, ac.name1 as supplier_name, p.name1 as product_name, pod.package_qty, 
-            pk.name as packaging_name, pod.note as detail_note, pod.quantity, p.unit, pod.unit_price
+    "select po.id, pod.id as purchase_order_detail_id, po.doc_date, po.available_at, 
+            ac.name1 as supplier_name, p.name1 as product_name, pod.package_qty, 
+            pk.name as packaging_name, pod.note as detail_note, p.unit, pod.unit_price,
+            pod.quantity - (select COALESCE(sum(ar.load_quantity),0) from arrangements ar where ar.purchase_order_detail_id = pod.id) as balance
        from purchase_orders po 
       inner join purchase_order_details pod on po.id = pod.purchase_order_id
       inner join products p on p.id = pod.product_id
@@ -53,7 +55,7 @@ private
 
   def self.date_condition date=nil
     if date
-      "and (doc_date >= '#{date.to_date.to_s(:db)}' or deliver_at >= '#{date.to_date.to_s(:db)}')"
+      "and (doc_date >= '#{date.to_date.to_s(:db)}' or available_at  >= '#{date.to_date.to_s(:db)}')"
     else
       ''
     end
