@@ -10,7 +10,7 @@
   .span5
     = f.input :quantity, input_html: { class: 'quantity span', type: :text }, wrapper: :table_field
   .span5
-    = f.input :balance, input_html: { class: 'balance span', type: :text, readOnly: true, name: 'row_balance' }, wrapper: :table_field
+    = f.input :balance, input_html: { class: 'balance span numeric', type: :text, readOnly: true, name: 'row_balance' }, wrapper: :table_field
   .span3
     = f.input :unit, input_html: { tabindex: -1, class: 'span', name: 'row_unit', readOnly: true }, wrapper: :table_field
   .span4

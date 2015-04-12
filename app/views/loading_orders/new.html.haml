@@ -1,8 +1,8 @@
 = render_flash
-= simple_nested_form_for @loading_order, html: { class: 'span42 form-inline well' } do |f|
+= simple_nested_form_for @loading_order, html: { class: 'span48 form-inline well' } do |f|
   %legend
     New Loading Order
-  = render 'loading_orders/fields', f: f
+  = render 'fields', f: f
   .form-actions
     = f.button :submit, 'Save', class: 'btn btn-primary'
     = link_to 'Cancel', LoadingOrder.last ? edit_loading_order_path(LoadingOrder.last) : root_path, class: 'btn btn-warning'

@@ -7,10 +7,10 @@
     = f.input :lorry_no
 #details
   .row-fluid
-    = render_loading_order_details_fields f, :details
+    = render_loading_order_details_fields f, :arrangements
 .row-fluid
   .span20
     = f.input :note, input_html: { rows: 2, class: 'span' }
 
 :coffee
-  ($ document).ready -> purchase_order.init()
+  ($ document).ready -> loading_order.init()

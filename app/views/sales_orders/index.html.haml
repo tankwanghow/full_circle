@@ -1,2 +1,31 @@
 = render 'order_filter'
-= render 'orders'
+= simple_form_for :loading_order, url: new_loading_order_path, method: :get do |f|
+  #sales_orders
+    %table.table-bordered.table
+      %thead
+        %tr
+          %td.span2
+          %th.span3 Date
+          %th.span3 Deliver
+          %th.span7 Customer
+          %th.span8 Product
+          %th.span7 Supplier
+          %th.span10 Transport
+      %tbody
+        - for t in @sales_orders
+          %tr
+            %td.span2
+              = hidden_field_tag "sales_order_detail_ids[#{t.sales_order_detail_id}]", 0
+              = check_box_tag "sales_order_detail_ids[#{t.sales_order_detail_id}]", 1, false, id: dom_id(t), class: 'sales_order_row'
+            %td.span3= t.doc_date
+            %td.span3= t.deliver_at
+            %td.span7= link_to t.customer_name.first(20), edit_sales_order_path(t.id)
+            %td.span8= sales_order_product_info(t)
+            %td.span7= manage_loading_orders_link t.sales_order_detail_id
+            %td.span10= link_to 'Arrange Transport', '#'
+        - if @sales_orders.length == 0
+          %tr
+            %td{colspan: 9}
+              %h2 No Record found!
+  = link_to 'New Sales Order', new_sales_order_path, class: 'btn btn-success'
+  = f.button :submit, 'Multi-Orders Single Transport', class: 'btn btn-danger'

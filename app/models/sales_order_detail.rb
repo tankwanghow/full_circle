@@ -3,19 +3,19 @@ class SalesOrderDetail < ActiveRecord::Base
   belongs_to :product
   belongs_to :product_packaging
   has_many :arrangements
-  
+
   validates_presence_of :product_name1, :unit
   validates_numericality_of :quantity, greater_than: 0
-  
+
   include ValidateBelongsTo
   validate_belongs_to :product, :name1
 
-  def has_arrangements?
-    arrangements.count > 0 ? true : false
+  def has_loading_orders?
+    loading_orders_count > 0 ? true : false
   end
 
-  def arrangements_count
-    arrangements.count
+  def loading_orders_count
+    arrangements.map { |t| t.loading_order_id }.uniq.count
   end
   
   def simple_audit_string

@@ -3,4 +3,8 @@ class LoadingOrder < ActiveRecord::Base
   has_many :arrangements
 
   accepts_nested_attributes_for :arrangements, allow_destroy: true
+
+  include ValidateBelongsTo
+  validate_belongs_to :transporter, :name1
+
 end

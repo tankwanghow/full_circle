@@ -4,7 +4,7 @@ class PaymentsController < ApplicationController
   def edit
     begin
       @payment = Payment.not_matched.find(params[:id])
-    rescue ActiveRecord::RecordNotFound 
+    rescue ActiveRecord::RecordNotFound
       redirect_to edit_matching_payment_path
     end
   end
@@ -18,7 +18,7 @@ class PaymentsController < ApplicationController
     begin
       @payment = Payment.not_matched.find(params[:id])
       @static_content = params[:static_content]
-    rescue ActiveRecord::RecordNotFound 
+    rescue ActiveRecord::RecordNotFound
       redirect_to matching_payment_path(params)
     end
   end
@@ -67,4 +67,3 @@ private
     is_matching? ? 'matching_payments/' : 'payments/'
   end
 end
-

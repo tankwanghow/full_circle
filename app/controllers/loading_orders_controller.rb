@@ -5,7 +5,11 @@ class LoadingOrdersController < ApplicationController
   end
 
   def new
+    @sales_order_detail_ids = params[:sales_order_detail_ids].select{ |k, v| v == "1" }.map{|k,v| k }
     @loading_order = LoadingOrder.new(doc_date: Date.today)
+    @sales_order_detail_ids.each do |id|
+      @loading_order.arrangements.build(sales_order_detail_id: id)
+    end
   end
 
   def create

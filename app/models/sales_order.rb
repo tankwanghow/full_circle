@@ -8,7 +8,7 @@ class SalesOrder < ActiveRecord::Base
   accepts_nested_attributes_for :details, allow_destroy: true
 
   include Searchable
-  searchable doc_date: :doc_date, 
+  searchable doc_date: :doc_date,
              content: [:id, :customer_name1, :details_audit_string, :deliver_at, :note]
 
   include AuditString
@@ -32,9 +32,9 @@ private
 
   def self.sql term, date, fulfilled
     "select so.id, sod.id as sales_order_detail_id, so.doc_date, so.deliver_at, 
-            ac.name1 as customer_name, p.name1 as product_name, sod.package_qty, 
+            ac.name1 as customer_name, p.name1 as product_name, sod.package_qty,
             pk.name as packaging_name, sod.note as detail_note, sod.quantity, p.unit, sod.unit_price
-       from sales_orders so 
+       from sales_orders so
       inner join sales_order_details sod on so.id = sod.sales_order_id
       inner join products p on p.id = sod.product_id
       inner join accounts ac on so.customer_id = ac.id
