@@ -1,3 +1,5 @@
-# Place all the behaviors and hooks related to the matching controller here.
-# All this logic will automatically be available in application.js.
-# You can use CoffeeScript in this file: http://jashkenas.github.com/coffee-script/
+window.loading_order = {
+  init: ->
+    app.typeahead_init '#loading_order_transporter_name1', '/account/typeahead_name1'
+    app.typeahead_init '#loading_order_lorry_no', '/loading_order/typeahead_lorry_no'
+}

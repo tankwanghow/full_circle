@@ -2,23 +2,26 @@
   = f.hidden_field :sales_order_detail_id
   = f.hidden_field :purchase_order_detail_id
   .span10
-    = f.input :order_info, input_html: { class: 'order_info span' }, wrapper: :table_field
+    = f.input :order_info, input_html: { class: 'order_info span', name: 'order_info', readOnly: true }, wrapper: :table_field
   .span10
     - if f.object.pur_order_info
-      = f.input :pur_order_info, input_html: { class: 'pur_order_info span' }, wrapper: :table_field
+      = f.input :pur_order_info, input_html: { class: 'pur_order_info span', name: 'pur_order_info', readOnly: true }, wrapper: :table_field
     - else
       = link_to 'Assign PO', '#', class: 'btn btn-warning span'
-  .span4
+  .span5
     = f.input :load_date, as: :datepicker, input_html: { class: 'span38' }, wrapper: :table_field
   .span3
     = f.input :load_quantity, input_html: { class: 'quantity span', type: :text }, wrapper: :table_field
-  .span4
+  .span5
     = f.input :deliver_date, as: :datepicker, input_html: { class: 'span38' }, wrapper: :table_field
   .span3
     = f.input :deliver_quantity, input_html: { class: 'quantity span', type: :text }, wrapper: :table_field
-  .span3
+  .span2
     = f.input :unit, input_html: { tabindex: -1, class: 'span', name: 'row_unit', readOnly: true }, wrapper: :table_field
-  .span9
+  .span8
     = f.input :note, input_html: { class: 'note span' }, wrapper: :table_field
   .span1
     = f.link_to_remove "X", class: "btn btn-danger", tabindex: -1
+
+:coffee
+  ($ document).ready -> loading_order.init()

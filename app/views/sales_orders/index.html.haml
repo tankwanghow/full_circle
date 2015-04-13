@@ -9,8 +9,7 @@
           %th.span3 Deliver
           %th.span7 Customer
           %th.span8 Product
-          %th.span7 Supplier
-          %th.span10 Transport
+          %th.span10 Arrangements
       %tbody
         - for t in @sales_orders
           %tr
@@ -21,11 +20,10 @@
             %td.span3= t.deliver_at
             %td.span7= link_to t.customer_name.first(20), edit_sales_order_path(t.id)
             %td.span8= sales_order_product_info(t)
-            %td.span7= manage_loading_orders_link t.sales_order_detail_id
-            %td.span10= link_to 'Arrange Transport', '#'
+            %td.span10= manage_loading_orders_link t.sales_order_detail_id
         - if @sales_orders.length == 0
           %tr
             %td{colspan: 9}
               %h2 No Record found!
   = link_to 'New Sales Order', new_sales_order_path, class: 'btn btn-success'
-  = f.button :submit, 'Multi-Orders Single Transport', class: 'btn btn-danger'
+  = f.button :submit, 'Arrange Transport', class: 'btn btn-danger'

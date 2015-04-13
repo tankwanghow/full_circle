@@ -1,8 +1,8 @@
 module LoadingOrdersHelper
   def render_loading_order_details_fields builder, xies_name
     render 'share/nested_fields', f: builder, xies_name: xies_name, field: 'arrangement',
-            headers: [['Sales Info', 'span10'], ['Purchase Info', 'span10'], ['Load Date', 'span4'], ['Load Qty', 'span3'],
-                      ['Deliver Date', 'span4'], ['Deliver Qty', 'span3'], ['Unit', 'span2'], ['Note', 'span8']],
+            headers: [['Sales Info', 'span10'], ['Purchase Info', 'span10'], ['Load Date', 'span5'], ['Load Qty', 'span3'],
+                      ['Deliver Date', 'span5'], ['Deliver Qty', 'span3'], ['Unit', 'span2'], ['Note', 'span8']],
             text: 'Add Detail'
 
   end

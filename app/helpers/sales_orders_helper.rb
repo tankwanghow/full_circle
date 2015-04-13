@@ -9,18 +9,14 @@ module SalesOrdersHelper
   def manage_loading_orders_link order_detail_id
     od = SalesOrderDetail.find(order_detail_id)
     if !od.has_loading_orders?
-      link_to_add_loading_order order_detail_id
+      label_tag dom_id(od), "No Arrangement Yet!!"
     else
-      link_to_loading_orders_count(od) + ' ' + link_to_add_loading_order(order_detail_id)
+      link_to_loading_orders_count(od)
     end
   end
 
-  def link_to_add_loading_order order_detail_id
-    link_to "+", new_loading_order_path(sales_order_detail_ids: [order_detail_id]), class: 'label label-success'
-  end
-
   def link_to_loading_orders_count order_detail
-    link_to "#{order_detail.loading_orders_count} Arrangements", '#', class: 'label label-warning'
+    link_to "#{order_detail.loading_orders_count} Loading Orders", '#', class: 'label label-warning'
   end
 
   def sales_order_product_info order_detail

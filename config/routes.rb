@@ -175,6 +175,8 @@ FullCircle::Application.routes.draw do
   match 'purchase_orders_select' => 'purchase_orders#select'
 
   resources :loading_orders
+  get 'loading_order/typeahead_lorry_no' => 'loading_orders#typeahead_lorry_no'
+
   resources :arrangements
 
 end
