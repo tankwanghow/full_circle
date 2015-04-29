@@ -14,16 +14,19 @@
         - for t in @sales_orders
           %tr
             %td.span2
-              = hidden_field_tag "sales_order_detail_ids[#{t.sales_order_detail_id}]", 0
-              = check_box_tag "sales_order_detail_ids[#{t.sales_order_detail_id}]", 1, false, id: dom_id(t), class: 'sales_order_row'
+              = hidden_field_tag "sales_order_detail_ids[#{t.id}]", 0
+              = check_box_tag "sales_order_detail_ids[#{t.id}]", 1, false, id: dom_id(t), class: 'sales_order_detail_index_row'
             %td.span3= t.doc_date
             %td.span3= t.deliver_at
-            %td.span7= link_to t.customer_name.first(20), edit_sales_order_path(t.id)
+            %td.span7= link_to t.customer_name.first(20), edit_sales_order_path(t.sales_order_id)
             %td.span8= sales_order_product_info(t)
-            %td.span10= manage_loading_orders_link t.sales_order_detail_id
+            %td.span10= #manage_loading_orders_link t.id
         - if @sales_orders.length == 0
           %tr
             %td{colspan: 9}
               %h2 No Record found!
   = link_to 'New Sales Order', new_sales_order_path, class: 'btn btn-success'
   = f.button :submit, 'Arrange Transport', class: 'btn btn-danger'
+  
+:coffee
+  ($ document).ready -> sales_order.init()
