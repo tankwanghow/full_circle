@@ -1,0 +1,24 @@
+%table.table-bordered.table
+  %thead
+    %tr
+      %td.span1
+      %th.span7 Transport Info
+      %th.span7 Supply Info
+      %th.span8 LO Info
+      %th.span8 DO Info
+      %th.span8 PI Info
+      %th.span8 SI Info
+  %tbody
+    - for t in @arrangements
+      %tr
+        %td.span1
+        %td.span7= t.transporter_info
+        %td.span7= t.supply_info
+        %th.span8= t.loading_info
+        %th.span8= t.delivery_info
+        %th.span8= t.pur_invoice_info
+        %th.span8= t.invoice_info
+    - if @arrangements.length == 0
+      %tr
+        %td{colspan: 9}
+          %h2 No Record found!

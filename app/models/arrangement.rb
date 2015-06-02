@@ -9,6 +9,30 @@ class Arrangement < ActiveRecord::Base
     sales_order_detail.try(:unit)
   end
 
+  def transporter_info
+    loading_order.transporter.name1.first(20) + ' ' + loading_order.lorry_no
+  end
+
+  def supply_info
+    purchase_order_detail.supplier.name1.first(20) if purchase_order_detail
+  end
+
+  def loading_info
+    load_date.to_s + " " + load_quantity.to_s + unit if load_quantity > 0
+  end
+
+  def delivery_info
+    deliver_date.to_s + " " + deliver_quantity.to_s + unit if deliver_quantity > 0
+  end
+
+  def pur_invoice_info
+    pur_invoice_detail.pur_invoice.reference_no if pur_invoice_detail
+  end
+
+  def invoice_info
+    invoice_detail.invoice.id if invoice_detail
+  end
+
   def order_info
     if sales_order_detail
       sod = sales_order_detail

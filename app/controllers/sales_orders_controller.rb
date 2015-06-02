@@ -1,7 +1,8 @@
 class SalesOrdersController < ApplicationController
   def index
     store_param :sales_orders_find
-    @sales_orders = SalesOrderDetail.query(session[:sales_orders_find][:term], session[:sales_orders_find][:date], session[:sales_orders_find][:fulfilled])
+    @sales_order_details = SalesOrderDetail.query(session[:sales_orders_find][:term], session[:sales_orders_find][:date], session[:sales_orders_find][:fulfilled])
+    @arrangements = []
   end
 
   def edit

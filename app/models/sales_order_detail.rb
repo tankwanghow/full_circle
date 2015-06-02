@@ -10,12 +10,16 @@ class SalesOrderDetail < ActiveRecord::Base
   include ValidateBelongsTo
   validate_belongs_to :product, :name1
 
-  def has_loading_orders?
-    loading_orders_count > 0 ? true : false
+  def arranged
+    arrangements.where('load_quantity = 0')
   end
 
-  def loading_orders_count
-    arrangements.map { |t| t.loading_order_id }.uniq.count
+  def loaded
+    arrangements.where('deliver_quantity = 0')
+  end
+
+  def delivered
+    arrangements.where('deliver_quantity > 0')
   end
   
   def simple_audit_string

@@ -4,29 +4,31 @@
     %table.table-bordered.table
       %thead
         %tr
-          %td.span2
+          %td.span1
           %th.span3 Date
           %th.span3 Deliver
-          %th.span7 Customer
-          %th.span8 Product
+          %th.span10 Customer
+          %th.span10 Product
           %th.span10 Arrangements
       %tbody
-        - for t in @sales_orders
+        - for t in @sales_order_details
           %tr
-            %td.span2
+            %td.span1
               = hidden_field_tag "sales_order_detail_ids[#{t.id}]", 0
               = check_box_tag "sales_order_detail_ids[#{t.id}]", 1, false, id: dom_id(t), class: 'sales_order_detail_index_row'
-            %td.span3= t.doc_date
-            %td.span3= t.deliver_at
-            %td.span7= link_to t.customer_name.first(20), edit_sales_order_path(t.sales_order_id)
-            %td.span8= sales_order_product_info(t)
-            %td.span10= #manage_loading_orders_link t.id
-        - if @sales_orders.length == 0
+            %td.span3=  label_tag dom_id(t), t.doc_date
+            %td.span3=  label_tag dom_id(t), t.deliver_at
+            %td.span10= link_to t.customer_name.first(40), edit_sales_order_path(t.sales_order_id)
+            %td.span10= sales_order_product_info(t)
+            %td.span10= arrangements_info(t)
+        - if @sales_order_details.length == 0
           %tr
             %td{colspan: 9}
               %h2 No Record found!
   = link_to 'New Sales Order', new_sales_order_path, class: 'btn btn-success'
   = f.button :submit, 'Arrange Transport', class: 'btn btn-danger'
-  
+
+#loading_orders
+
 :coffee
   ($ document).ready -> sales_order.init()

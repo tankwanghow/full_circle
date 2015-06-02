@@ -6,6 +6,7 @@ class CreateLoadingOrders < ActiveRecord::Migration
       t.string     :lorry_no
       t.text       :note
       t.integer    :lock_version, default: 0
+      t.string     :status
       t.timestamps
     end
   end

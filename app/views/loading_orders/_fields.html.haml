@@ -11,6 +11,8 @@
 .row-fluid
   .span20
     = f.input :note, input_html: { rows: 2, class: 'span' }
+  .span6
+    = f.input :status, collection: ['Normal', 'Cancel']
 
 :coffee
   ($ document).ready -> loading_order.init()
