@@ -6,17 +6,22 @@ module SalesOrdersHelper
             text: 'Add Detail'
   end
 
-  def manage_loading_orders_link order_detail_id
-    od = SalesOrderDetail.find(order_detail_id)
-    if !od.has_loading_orders?
-      label_tag dom_id(od), "No Arrangement Yet !!"
-    else
-      link_to_loading_orders_count(od)
-    end
+  def arrangements_info order_detail
+    arranged_info(order_detail) +
+    loaded_info(order_detail) +
+    delivered_info(order_detail)
   end
 
-  def link_to_loading_orders_count order_detail
-    link_to "#{order_detail.loading_orders_count} Loading Orders", '#', class: 'label label-warning'
+  def arranged_info order_detail
+    label_tag dom_id(order_detail), "Arranged #{order_detail.arranged.count}", class: 'label label-success'
+  end
+
+  def loaded_info order_detail
+    label_tag dom_id(order_detail), "Loaded #{order_detail.loaded.count} (#{order_detail.loaded.sum(&:load_quantity)}#{order_detail['unit']})", class: 'label label-warning'
+  end
+
+  def delivered_info order_detail
+    label_tag dom_id(order_detail), "Delivered #{order_detail.delivered.sum(&:deliver_quantity)}#{order_detail['unit']})", class: 'label label-info'
   end
 
   def sales_order_product_info order_detail
