@@ -1,24 +1,22 @@
 %table.table-bordered.table
   %thead
     %tr
-      %td.span1
-      %th.span7 Transport Info
-      %th.span7 Supply Info
-      %th.span8 LO Info
-      %th.span8 DO Info
-      %th.span8 PI Info
-      %th.span8 SI Info
+      %th.span9 Transport Info
+      %th.span9 Supply Info
+      %th.span6 LO Info
+      %th.span6 DO Info
+      %th.span6 PI Info
+      %th.span6 SI Info
   %tbody
     - for t in @arrangements
       %tr
-        %td.span1
-        %td.span7= t.transporter_info
-        %td.span7= t.supply_info
-        %th.span8= t.loading_info
-        %th.span8= t.delivery_info
-        %th.span8= t.pur_invoice_info
-        %th.span8= t.invoice_info
+        %td.span9= link_to t.transporter_info, edit_loading_order_path(t.loading_order)
+        %td.span9= link_to t.supply_info,
+        %td.span6= link_to t.loading_info, edit_loading_order_path(t.loading_order)
+        %td.span6= link_to t.delivery_info, edit_loading_order_path(t.loading_order)
+        %td.span6= t.pur_invoice_info
+        %td.span6= t.invoice_info
     - if @arrangements.length == 0
       %tr
-        %td{colspan: 9}
+        %td{colspan: 6}
           %h2 No Record found!

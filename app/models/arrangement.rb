@@ -14,15 +14,27 @@ class Arrangement < ActiveRecord::Base
   end
 
   def supply_info
-    purchase_order_detail.supplier.name1.first(20) if purchase_order_detail
+    if purchase_order_detail
+      purchase_order_detail.supplier.name1.first(20)
+    else
+      "match supplier..."
+    end
   end
 
   def loading_info
-    load_date.to_s + " " + load_quantity.to_s + unit if load_quantity > 0
+    if load_quantity > 0
+      load_date.to_s + " " + load_quantity.to_s + unit
+    else
+      "enter loading info..."
+    end
   end
 
   def delivery_info
-    deliver_date.to_s + " " + deliver_quantity.to_s + unit if deliver_quantity > 0
+    if deliver_quantity > 0
+      deliver_date.to_s + " " + deliver_quantity.to_s + unit
+    else
+      "enter delivery info..."
+    end
   end
 
   def pur_invoice_info

@@ -1,7 +1,7 @@
 = render_flash
 .bold GST Query by Month
 = simple_form_for :gst_accounts, url: gst_accounts_path, method: :get, html: { class: 'form-search'} do |f|
-  = f.input_field :month, collection: [1,2,3,4,5,6,7,8,9,10,11,12], value: session[:gst_accounts][:month], class: 'span4'
+  = f.input_field :month, collection: [1,2,3,4,5,6,7,8,9,10,11,12], class: 'span4'
   = f.input_field :year, value: session[:gst_accounts][:year], class: 'span4'
   = f.button :submit, 'Query', class: 'btn-primary'
 

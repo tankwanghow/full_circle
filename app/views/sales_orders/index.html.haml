@@ -23,7 +23,7 @@
             %td.span10= arrangements_info(t)
         - if @sales_order_details.length == 0
           %tr
-            %td{colspan: 9}
+            %td{colspan: 6}
               %h2 No Record found!
   = link_to 'New Sales Order', new_sales_order_path, class: 'btn btn-success'
   = f.button :submit, 'Arrange Transport', class: 'btn btn-danger'

@@ -10,7 +10,7 @@ class GstAccountsController < ApplicationController
     @accounts = Account.gst_accounts
     @gst_control_account = @accounts.select { |t| t.name1 =~ /Control/ }.first
     @gst_expense_account = @accounts.select { |t| t.name1 =~ /Expense/ }.first
-    
+
     @scn  = gst_debit_and_credit_note_sum 'credit_note', 'GST for Supply', start_date, end_date
     @sdn  = gst_debit_and_credit_note_sum 'debit_note', 'GST for Supply', start_date, end_date
     @cs   = gst_supply_and_acqusition_sum 'cash_sale', 'GST for Supply', start_date, end_date

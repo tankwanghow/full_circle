@@ -15,13 +15,13 @@ class SalesOrderDetail < ActiveRecord::Base
   end
 
   def loaded
-    arrangements.where('deliver_quantity = 0')
+    arrangements.where('load_quantity > 0')
   end
 
   def delivered
     arrangements.where('deliver_quantity > 0')
   end
-  
+
   def simple_audit_string
     [ product.name1, packaging_name, note, quantity, unit_price, fulfilled ].join ' '
   end
@@ -58,7 +58,7 @@ class SalesOrderDetail < ActiveRecord::Base
 private
 
   def self.sql term, date, fulfilled
-    "select sod.id, so.id as sales_order_id, so.doc_date, so.deliver_at, 
+    "select sod.id, so.id as sales_order_id, so.doc_date, so.deliver_at,
             ac.name1 as customer_name, p.name1 as product_name, sod.package_qty,
             pk.name as packaging_name, sod.note as detail_note, sod.quantity, p.unit as unit, sod.unit_price
        from sales_order_details sod
