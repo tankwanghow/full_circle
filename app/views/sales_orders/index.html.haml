@@ -18,7 +18,7 @@
               = check_box_tag "sales_order_detail_ids[#{t.id}]", 1, false, id: dom_id(t), class: 'sales_order_detail_index_row'
             %td.span3=  label_tag dom_id(t), t.doc_date
             %td.span3=  label_tag dom_id(t), t.deliver_at
-            %td.span10= link_to t.customer_name.first(40), edit_sales_order_path(t.sales_order_id)
+            %td.span10= link_to "##{t.sales_order_id} " + t.customer_name.gsub(/\s/, ''), edit_sales_order_path(t.sales_order_id)
             %td.span10= sales_order_product_info(t)
             %td.span10= arrangements_info(t)
         - if @sales_order_details.length == 0

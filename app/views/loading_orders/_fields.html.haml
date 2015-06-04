@@ -12,7 +12,7 @@
   .span20
     = f.input :note, input_html: { rows: 2, class: 'span' }
   .span6
-    = f.input :status, collection: ['Normal', 'Cancel']
+    = f.input :status, collection: ['Customer Own Transport', 'Our Transport', 'Diverted', 'Canceled']
 
 :coffee
   ($ document).ready -> loading_order.init()

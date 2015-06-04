@@ -1,8 +1,9 @@
 %table.table-bordered.table
   %thead
     %tr
-      %th.span9 Transport Info
-      %th.span9 Supply Info
+      %th.span3 Sales Order
+      %th.span8 Transport Info
+      %th.span8 Supply Info
       %th.span6 LO Info
       %th.span6 DO Info
       %th.span6 PI Info
@@ -10,8 +11,9 @@
   %tbody
     - for t in @arrangements
       %tr
-        %td.span9= link_to t.transporter_info, edit_loading_order_path(t.loading_order)
-        %td.span9= link_to t.supply_info,
+        %td.span3= "##{t.sales_order_detail.sales_order.id}"
+        %td.span8= link_to t.transporter_info, edit_loading_order_path(t.loading_order)
+        %td.span8= t.sales_order_detail.product_name1
         %td.span6= link_to t.loading_info, edit_loading_order_path(t.loading_order)
         %td.span6= link_to t.delivery_info, edit_loading_order_path(t.loading_order)
         %td.span6= t.pur_invoice_info

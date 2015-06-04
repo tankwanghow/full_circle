@@ -25,7 +25,7 @@ class Arrangement < ActiveRecord::Base
     if load_quantity > 0
       load_date.to_s + " " + load_quantity.to_s + unit
     else
-      "enter loading info..."
+      "##{loading_order.id} loaded info..."
     end
   end
 
@@ -33,7 +33,7 @@ class Arrangement < ActiveRecord::Base
     if deliver_quantity > 0
       deliver_date.to_s + " " + deliver_quantity.to_s + unit
     else
-      "enter delivery info..."
+      "##{loading_order.id} delivered info..."
     end
   end
 
