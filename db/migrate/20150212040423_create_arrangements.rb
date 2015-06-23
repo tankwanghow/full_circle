@@ -4,6 +4,7 @@ class CreateArrangements < ActiveRecord::Migration
       t.belongs_to :sales_order_detail
       t.belongs_to :purchase_order_detail
       t.belongs_to :loading_order
+      t.belongs_to :loading_location
       t.string     :note
       t.date       :load_date
       t.decimal    :load_quantity, precision: 12, scale: 4, default: 0
@@ -11,6 +12,7 @@ class CreateArrangements < ActiveRecord::Migration
       t.decimal    :deliver_quantity, precision: 12, scale: 4, default: 0
       t.belongs_to :invoice_detail
       t.belongs_to :pur_invoice_detail
+      t.string     :status
       t.integer    :lock_version, default: 0
       t.timestamps
     end

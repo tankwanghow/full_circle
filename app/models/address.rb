@@ -2,6 +2,7 @@ class Address < ActiveRecord::Base
   validates_presence_of :addressable_type, :addressable_id, :address_type
   belongs_to :addressable, polymorphic: true
   validates :address_type, one_mailing_address: true
+  validates_uniqueness_of :nickname, on: :create, message: "must be unique", if: proc { |obj| !obj.nickname.blank? }
 
   simple_audit username_method: :username do |r|
     {
@@ -12,6 +13,9 @@ class Address < ActiveRecord::Base
       tel_no: r.tel_no,
       fax_no: r.fax_no,
       email: r.email,
+      reg_no: r.reg_no,
+      gst_no: r.gst_no,
+      nickname: r.nickname,
       note: r.note
     }
   end
