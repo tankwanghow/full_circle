@@ -1,0 +1,11 @@
+= render_flash
+= simple_form_for @holiday, html: { class: 'form-inline well', id: 'holiday' } do |f|
+  %legend
+    = "Holiday #" + docnolize(@holiday.id)
+  = render 'fields', f: f
+  .form-actions
+    = f.button(:submit, 'Save', class: 'btn btn-primary')
+    = link_to 'New', new_holiday_path, class: 'btn btn-info'
+    = link_to 'Cancel', holiday_path(@holiday), class: 'btn btn-warning'
+    = link_to_index(Holiday)
+    = link_to_audits_log(@holiday)

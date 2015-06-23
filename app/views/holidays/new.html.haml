@@ -1,0 +1,8 @@
+= render_flash
+= simple_form_for @holiday, html: { class: 'form-inline well', id: 'holiday' } do |f|
+  %legend
+    New Holiday
+  = render 'fields', f: f
+  .form-actions
+    = f.button :submit, 'Save', class: 'btn btn-primary'
+    = link_to 'Cancel', Post.last ? holiday_path(Post.last) : root_path, class: 'btn btn-warning'
