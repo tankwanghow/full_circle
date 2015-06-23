@@ -23,7 +23,7 @@ class CreditNote < ActiveRecord::Base
   include ValidateTransactionsBalance
 
   include Searchable
-  searchable doc_date: :doc_date, doc_amount: :in_gst_amount,doc_posted: :posted,
+  searchable doc_date: :doc_date, doc_amount: :in_gst_amount, doc_posted: :posted,
              content: [:id, :account_name1, :in_gst_amount,
                        :particulars_audit_string, :matchers_audit_string, :posted]
 
