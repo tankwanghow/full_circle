@@ -1,0 +1,8 @@
+= render_flash
+= simple_form_for @shift, html: { class: 'form-inline well span30', id: 'shift_form' } do |f|
+  %legend
+    = "Shift #" + docnolize(@shift.id)
+  = render 'fields', f: f
+  .form-actions
+    = f.button :submit, 'Save', class: 'btn btn-primary'
+    = link_to_edit_action_no_journal_buttons @shift, false

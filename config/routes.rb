@@ -174,6 +174,7 @@ FullCircle::Application.routes.draw do
   resources :gst_accounts, only: [:index, :create]
 
   resources :queries
+  resources :shifts, except: [:index, :show]
 
   resources :sales_orders
   resources :purchase_orders

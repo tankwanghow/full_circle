@@ -1,0 +1,8 @@
+= render_flash
+= simple_form_for @shift, html: { class: 'form-inline well span30', id: 'shift_form' } do |f|
+  %legend
+    New Shift
+  = render 'fields', f: f
+  .form-actions
+    = f.button :submit, 'Save', class: 'btn btn-primary'
+    = link_to 'Cancel', Shift.last ? edit_shift_path(Shift.last) : root_path, class: 'btn btn-warning'

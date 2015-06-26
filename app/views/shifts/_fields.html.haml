@@ -1,0 +1,38 @@
+= f.input :name, autofocus: true
+.row-fluid
+  .span4
+  .span8.bold Start
+  .span8.bold End
+  .span8.bold Allowance(+/-)
+.row-fluid
+  .span4.bold Start
+  .span8
+    = f.input :start_s, input_html: { class: :span20 }, label: false
+  .span8
+    = f.input :start_e, input_html: { class: :span20 }, label: false
+  .offset1.span8
+    = f.input :start_allowance, input_html: { class: :span20 }, label: false
+.row-fluid
+  .span4.bold Break
+  .span8
+    = f.input :break_s, input_html: { class: :span20 }, label: false
+  .span8
+    = f.input :break_e, input_html: { class: :span20 }, label: false
+  .offset1.span8
+    = f.input :break_allowance, input_html: { class: :span20 }, label: false
+.row-fluid
+  .span4.bold End
+  .span8
+    = f.input :end_s, input_html: { class: :span20 }, label: false
+  .span8
+    = f.input :end_e, input_html: { class: :span20 }, label: false
+  .offset1.span8
+    = f.input :end_allowance, input_html: { class: :span20 }, label: false
+.row-fluid
+  .span4.bold Overtime
+  .span8
+    = f.input :ot_s, input_html: { class: :span20 }, label: false
+  .span8
+    = f.input :ot_e, input_html: { class: :span20 }, label: false
+  .offset1.span8
+    = f.input :ot_allowance, input_html: { class: :span20 }, label: false

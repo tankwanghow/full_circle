@@ -5,11 +5,11 @@ class ApplicationController < ActionController::Base
   protect_from_forgery
   before_filter :login_required
 
-  rescue_from Exception do |e|
-    msg = "#{e.class.name} -> #{e.message}"
-    flash[:error] = msg.html_safe
-    redirect_to exception_redirection_path
-  end
+  # rescue_from Exception do |e|
+  #   msg = "#{e.class.name} -> #{e.message}"
+  #   flash[:error] = msg.html_safe
+  #   redirect_to exception_redirection_path
+  # end
 
 private
 
