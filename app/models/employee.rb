@@ -4,6 +4,9 @@ class Employee < ActiveRecord::Base
   validates_uniqueness_of :id_no
   has_many :salary_types, class_name: "EmployeeSalaryType"
   has_many :pay_slips
+  has_many :salary_notes
+  has_many :attendence_raws
+  has_many :advances
 
   accepts_nested_attributes_for :salary_types, allow_destroy: true
 
