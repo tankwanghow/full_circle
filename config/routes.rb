@@ -175,6 +175,7 @@ FullCircle::Application.routes.draw do
 
   resources :queries
   resources :shifts, except: [:index, :show]
+  get 'shift/typeahead_name' => 'shifts#typeahead_name'    
 
   resources :sales_orders
   resources :purchase_orders

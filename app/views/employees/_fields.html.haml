@@ -3,15 +3,17 @@
     = f.input :name, input_html: { class: 'span' }, autofocus: true
   .span6
     = f.input :id_no, label: 'Identity No', input_html: { class: 'span' }
-  .span6
+  .span5
     = f.input :birth_date, as: :datepicker, input_html: { class: 'span38' }
   .span6
     = f.input :nationality, input_html: { class: 'span' }
-  .span6
+  .span4
     = f.input :sex, collection: ['not enter', 'Male', 'Female'], include_blank: false, input_html: { class: 'span' }
+  .span9
+    = f.input :shift_name, input_html: { class: 'span' }, label: 'Shift'
+.row-fluid
   .span6
     = f.input :epf_no, input_html: { class: 'span' }, label: 'EPF No'
-.row-fluid
   .span6
     = f.input :socso_no, label: 'SOCSO No', input_html: { class: 'span' }
   .span6
@@ -24,6 +26,7 @@
     = f.input :partner_working, collection: ['true', 'false'], include_blank: false, input_html: { class: 'span' }
   .span4
     = f.input :children, input_html: { class: 'numeric span', type: :text }
+.row-fluid
   .span6
     = f.input :status, collection: ['Active', 'Resigned'], include_blank: false, input_html: { class: 'span' }
 #salary-types
@@ -32,5 +35,6 @@
 
 :coffee
   app.typeahead_init '.salary_type', '/salary_type/typeahead_name'
+  app.typeahead_init '#employee_shift_name', '/shift/typeahead_name'
   app.nestedFormFieldAdded 'form', '.row-fluid', '.show-hide', (field) ->
     app.typeahead_init field.find('.salary_type'), '/salary_type/typeahead_name'

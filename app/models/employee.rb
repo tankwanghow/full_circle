@@ -7,14 +7,18 @@ class Employee < ActiveRecord::Base
   has_many :salary_notes
   has_many :attendence_raws
   has_many :advances
+  belongs_to :shift
 
   accepts_nested_attributes_for :salary_types, allow_destroy: true
 
   include Searchable
-  searchable content: [:name, :id_no, :sex, :birth_date, :nationality, :socso_no, :tax_no, :epf_no, :status, :service_since]
+  searchable content: [:name, :id_no, :sex, :birth_date, :nationality, :socso_no, :tax_no, :epf_no, :status, :service_since, :shift_name]
 
   include AuditString
   audit_string :salary_types
+
+  include ValidateBelongsTo
+  validate_belongs_to :shift, :name
 
   scope :active, -> { where(status: 'Active') }
   
@@ -34,6 +38,7 @@ class Employee < ActiveRecord::Base
       id_no: r.id_no,
       sex: r.sex,
       birth_date: r.birth_date,
+      shift_name: r.shift_name,
       epf_no: r.epf_no,
       socso_no: r.socso_no,
       tax_no: r.tax_no,

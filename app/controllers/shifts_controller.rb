@@ -38,5 +38,9 @@ class ShiftsController < ApplicationController
     end
   end
 
+  def typeahead_name
+    render json: typeahead_result(params[:term], "name", Shift)
+  end
+
 end
 
