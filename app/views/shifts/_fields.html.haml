@@ -1,16 +1,19 @@
 .row-fluid
-  .span20
+  .span16
     = f.input :name, autofocus: true
-  .span24
-    = f.input :overnight, input_html: { class: :span20 }, label: "Is Overnight Shift"
+  .span4
+    = f.input :shift_days, input_html: { class: :span48 }
+  #overnight.span20.offset2
+    .span12 Overnight?
+    = f.input :overnight, label: false
 
 .row-fluid
   .span5
-  .span9.bold Collection Start
-  .span9.bold Actual
-  .span9.bold Collection End
+  .span9 Collection Start
+  .span9 Actual
+  .span9 Collection End
 .row-fluid
-  .span5.bold Shift Start
+  .span5 Shift Start
   .span9
     = f.input :shift_start_start, input_html: { class: :span20 }, label: false
   .span9
@@ -18,11 +21,11 @@
   .span9
     = f.input :shift_start_end, input_html: { class: :span20 }, label: false
   .offset1.span9
-    .span16.bold late in
+    .span16 late in
     = f.input :shift_late_in, input_html: { class: :span23 }, label: false
 
 .row-fluid
-  .span5.bold Shift End
+  .span5 Shift End
   .span9
     = f.input :shift_end_start, input_html: { class: :span20 }, label: false
   .span9
@@ -30,18 +33,18 @@
   .span9
     = f.input :shift_end_end, input_html: { class: :span20 }, label: false
   .span9
-    .span21.bold early out
+    .span21 early out
     = f.input :shift_early_out, input_html: { class: :span23 }, label: false
 %br
 .row-fluid
-  .span5.bold Meal
+  .span5 Meal
   .span9
     = f.input :meal_start, input_html: { class: :span20 }, label: false
   .span9
     = f.input :meal_end, input_html: { class: :span20 }, label: false
   .span9
-    .span24.bold early out
+    .span24 early out
     = f.input :meal_early_out, input_html: { class: :span20 }, label: false
   .offset1.span9
-    .span16.bold late in
+    .span16 late in
     = f.input :meal_late_in, input_html: { class: :span23 }, label: false
