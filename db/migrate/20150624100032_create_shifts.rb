@@ -15,6 +15,7 @@ class CreateShifts < ActiveRecord::Migration
       t.time    :meal_start,         null: false
       t.time    :meal_end,           null: false
       t.integer :meal_late_in,       null: false, default: 0
+      t.integer :shift_days,         null: false, default: 6
       t.integer :lock_version,       default: 0
       t.timestamps
     end
