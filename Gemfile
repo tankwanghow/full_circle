@@ -17,7 +17,7 @@ gem 'aasm'
 gem 'nested_form'
 gem 'prawn'
 gem 'simple_form'
-gem 'haml', '4.0.7'
+gem 'haml', '5.2.1'
 gem 'pg_search', '0.5.7'
 gem 'pjax_rails', '0.3.4'
 

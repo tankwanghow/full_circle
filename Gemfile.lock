@@ -107,7 +107,8 @@ GEM
       railties (>= 3.0.0)
     ffaker (1.15.0)
     ffi (1.12.2)
-    haml (4.0.7)
+    haml (5.2.1)
+      temple (>= 0.8.0)
       tilt
     hike (1.2.3)
     i18n (0.9.5)
@@ -246,6 +247,7 @@ GEM
       activemodel (~> 3.0)
       activesupport (~> 3.0)
       railties (~> 3.0)
+    temple (0.8.2)
     test-unit (3.3.5)
       power_assert
     therubyracer (0.12.3)
@@ -288,7 +290,7 @@ DEPENDENCIES
   dynamic_form
   factory_girl_rails
   ffaker (= 1.15.0)
-  haml (= 4.0.7)
+  haml (= 5.2.1)
   jquery-rails
   jquery-ui-rails
   kaminari
