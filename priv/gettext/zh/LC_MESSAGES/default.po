@@ -1,0 +1,275 @@
+# # "msgid"s in this file come from POT (.pot) files.
+# #
+# # Do not add, change, or remove "msgid"s manually here as
+# # they're tied to the ones in the corresponding POT file
+# # (with the same domain).
+# #
+# # Use "mix gettext.extract --merge" or "mix gettext.merge"
+# # to merge POT files into PO files.
+msgid ""
+msgstr ""
+"Language: zh\n"
+
+#: lib/full_circle_web/components/core_components.ex:449
+#, elixir-autogen, elixir-format
+msgid "Actions"
+msgstr "动作"
+
+#: lib/full_circle_web/components/core_components.ex:76
+#: lib/full_circle_web/components/core_components.ex:128
+#, elixir-autogen, elixir-format
+msgid "close"
+msgstr "关"
+
+#: lib/full_circle_web/live/user_registration_live.ex:13
+#, elixir-autogen, elixir-format, fuzzy
+msgid "Already registered?"
+msgstr "已经登记了？"
+
+#: lib/full_circle_web/live/user_registration_live.ex:38
+#, elixir-autogen, elixir-format
+msgid "Create an account"
+msgstr "创建一个帐户"
+
+#: lib/full_circle_web/live/user_registration_live.ex:38
+#, elixir-autogen, elixir-format
+msgid "Creating account..."
+msgstr "创建帐户..."
+
+#: lib/full_circle_web/live/user_login_live.ex:10
+#, elixir-autogen, elixir-format
+msgid "Don't have an account?"
+msgstr "没有帐户？"
+
+#: lib/full_circle_web/live/user_confirmation_instructions_live.ex:15
+#: lib/full_circle_web/live/user_forgot_password_live.ex:15
+#: lib/full_circle_web/live/user_login_live.ex:19
+#: lib/full_circle_web/live/user_registration_live.ex:34
+#: lib/full_circle_web/live/user_settings_live.ex:21
+#, elixir-autogen, elixir-format, fuzzy
+msgid "Email"
+msgstr "电邮址"
+
+#: lib/full_circle_web/live/user_forgot_password_live.ex:10
+#: lib/full_circle_web/live/user_login_live.ex:25
+#, elixir-autogen, elixir-format
+msgid "Forgot your password?"
+msgstr "忘记密码了吗？"
+
+#: lib/full_circle_web/live/user_login_live.ex:23
+#, elixir-autogen, elixir-format, fuzzy
+msgid "Keep me logged in"
+msgstr "保持登入状态\n"
+
+#: lib/full_circle_web/live/user_confirmation_instructions_live.ex:25
+#: lib/full_circle_web/live/user_confirmation_live.ex:20
+#: lib/full_circle_web/live/user_forgot_password_live.ex:24
+#: lib/full_circle_web/live/user_reset_password_live.ex:37
+#, elixir-autogen, elixir-format, fuzzy
+msgid "Log in"
+msgstr "登入"
+
+#: lib/full_circle_web/live/user_registration_live.ex:31
+#: lib/full_circle_web/live/user_reset_password_live.ex:18
+#, elixir-autogen, elixir-format
+msgid "Oops, something went wrong! Please check the errors below."
+msgstr "哎呀！出事了！请检查以下错误。"
+
+#: lib/full_circle_web/live/user_login_live.ex:20
+#: lib/full_circle_web/live/user_registration_live.ex:35
+#, elixir-autogen, elixir-format
+msgid "Password"
+msgstr "密码"
+
+#: lib/full_circle_web/live/user_confirmation_instructions_live.ex:24
+#: lib/full_circle_web/live/user_confirmation_live.ex:19
+#: lib/full_circle_web/live/user_forgot_password_live.ex:23
+#: lib/full_circle_web/live/user_reset_password_live.ex:36
+#, elixir-autogen, elixir-format
+msgid "Register"
+msgstr "注册"
+
+#: lib/full_circle_web/live/user_registration_live.ex:11
+#, elixir-autogen, elixir-format
+msgid "Register for an account"
+msgstr "注册帐户"
+
+#: lib/full_circle_web/live/user_forgot_password_live.ex:18
+#, elixir-autogen, elixir-format
+msgid "Send password reset instructions"
+msgstr "发送密码重置说明"
+
+#: lib/full_circle_web/live/user_confirmation_instructions_live.ex:17
+#: lib/full_circle_web/live/user_forgot_password_live.ex:17
+#, elixir-autogen, elixir-format
+msgid "Sending..."
+msgstr "发送中..."
+
+#: lib/full_circle_web/live/user_forgot_password_live.ex:11
+#, elixir-autogen, elixir-format
+msgid "We'll send a password reset link to your inbox"
+msgstr "我们将向您的收件箱发送密码重置链接"
+
+#: lib/full_circle_web/live/user_login_live.ex:14
+#, elixir-autogen, elixir-format
+msgid "for an account now."
+msgstr "现在一个帐户。"
+
+#: lib/full_circle_web/live/user_registration_live.ex:17
+#, elixir-autogen, elixir-format
+msgid "to your account now."
+msgstr "现在到你的帐户。"
+
+#: lib/full_circle_web/live/user_settings_live.ex:130
+#, elixir-autogen, elixir-format
+msgid "A link to confirm your email change has been sent to the new address."
+msgstr ""
+
+#: lib/full_circle_web/live/user_settings_live.ex:32
+#, elixir-autogen, elixir-format
+msgid "Change Email"
+msgstr "更改电子邮件"
+
+#: lib/full_circle_web/live/user_settings_live.ex:68
+#, elixir-autogen, elixir-format
+msgid "Change Password"
+msgstr "更改密码"
+
+#: lib/full_circle_web/live/user_settings_live.ex:32
+#, elixir-autogen, elixir-format
+msgid "Changing..."
+msgstr "改变..."
+
+#: lib/full_circle_web/live/user_confirmation_live.ex:9
+#, elixir-autogen, elixir-format
+msgid "Confirm Account"
+msgstr "确认账户"
+
+#: lib/full_circle_web/live/user_confirmation_live.ex:14
+#, elixir-autogen, elixir-format
+msgid "Confirm my account"
+msgstr ""
+
+#: lib/full_circle_web/live/user_reset_password_live.ex:25
+#: lib/full_circle_web/live/user_settings_live.ex:56
+#, elixir-autogen, elixir-format
+msgid "Confirm new password"
+msgstr "确认新密码"
+
+#: lib/full_circle_web/live/user_confirmation_live.ex:14
+#, elixir-autogen, elixir-format
+msgid "Confirming..."
+msgstr ""
+
+#: lib/full_circle_web/live/user_settings_live.ex:27
+#: lib/full_circle_web/live/user_settings_live.ex:62
+#, elixir-autogen, elixir-format
+msgid "Current password"
+msgstr "当前密码"
+
+#: lib/full_circle_web/live/user_settings_live.ex:83
+#, elixir-autogen, elixir-format
+msgid "Email change link is invalid or it has expired."
+msgstr ""
+
+#: lib/full_circle_web/live/user_settings_live.ex:80
+#, elixir-autogen, elixir-format
+msgid "Email changed successfully."
+msgstr ""
+
+#: lib/full_circle_web/live/user_confirmation_instructions_live.ex:44
+#, elixir-autogen, elixir-format
+msgid "If your email is in our system and it has not been confirmed yet, you will receive an email with instructions shortly."
+msgstr ""
+
+#: lib/full_circle_web/live/user_reset_password_live.ex:21
+#: lib/full_circle_web/live/user_settings_live.ex:52
+#, elixir-autogen, elixir-format
+msgid "New password"
+msgstr "新密码"
+
+#: lib/full_circle_web/live/user_reset_password_live.ex:65
+#, elixir-autogen, elixir-format
+msgid "Password reset successfully."
+msgstr ""
+
+#: lib/full_circle_web/live/user_confirmation_instructions_live.ex:18
+#, elixir-autogen, elixir-format
+msgid "Resend confirmation instructions"
+msgstr "重新发送确认说明"
+
+#: lib/full_circle_web/live/user_reset_password_live.ex:9
+#: lib/full_circle_web/live/user_reset_password_live.ex:30
+#, elixir-autogen, elixir-format
+msgid "Reset Password"
+msgstr "重设密码"
+
+#: lib/full_circle_web/live/user_reset_password_live.ex:83
+#, elixir-autogen, elixir-format
+msgid "Reset password link is invalid or it has expired."
+msgstr ""
+
+#: lib/full_circle_web/live/user_reset_password_live.ex:29
+#, elixir-autogen, elixir-format
+msgid "Resetting..."
+msgstr "正在重置..."
+
+#: lib/full_circle_web/live/user_confirmation_live.ex:53
+#, elixir-autogen, elixir-format
+msgid "User confirmation link is invalid or it has expired."
+msgstr ""
+
+#: lib/full_circle_web/live/user_confirmation_live.ex:38
+#, elixir-autogen, elixir-format
+msgid "User confirmed successfully."
+msgstr ""
+
+#: lib/full_circle_web/live/user_settings_live.ex:9
+#, elixir-autogen, elixir-format, fuzzy
+msgid "Account Settings"
+msgstr ""
+
+#: lib/full_circle_web/live/user_forgot_password_live.ex:43
+#, elixir-autogen, elixir-format
+msgid "If your email is in our system, you will receive instructions to reset your password shortly."
+msgstr ""
+
+#: lib/full_circle_web/live/user_settings_live.ex:10
+#, elixir-autogen, elixir-format
+msgid "Manage your account email address and password settings"
+msgstr ""
+
+#: lib/full_circle_web/live/user_confirmation_instructions_live.ex:10
+#, elixir-autogen, elixir-format
+msgid "No confirmation instructions received?"
+msgstr ""
+
+#: lib/full_circle_web/live/user_registration_live.ex:15
+#, elixir-autogen, elixir-format
+msgid "Sign in"
+msgstr "登入"
+
+#: lib/full_circle_web/live/user_login_live.ex:30
+#, elixir-autogen, elixir-format
+msgid "Sign in "
+msgstr "登入"
+
+#: lib/full_circle_web/live/user_login_live.ex:8
+#, elixir-autogen, elixir-format, fuzzy
+msgid "Sign in to account"
+msgstr "登入帐户"
+
+#: lib/full_circle_web/live/user_login_live.ex:12
+#, elixir-autogen, elixir-format
+msgid "Sign up"
+msgstr "注册"
+
+#: lib/full_circle_web/live/user_login_live.ex:29
+#, elixir-autogen, elixir-format, fuzzy
+msgid "Signing in..."
+msgstr "登入中..."
+
+#: lib/full_circle_web/live/user_confirmation_instructions_live.ex:11
+#, elixir-autogen, elixir-format, fuzzy
+msgid "We'll send a new confirmation link to your inbox"
+msgstr "我们将向您的收件箱发送密码重置链接"

@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="csrf-token" content={get_csrf_token()} />
+    <.live_title suffix={" · #{gettext("FullCircle")}"}>
+      <%= assigns[:page_title] || "other pages" %>
+    </.live_title>
+    <link phx-track-static rel="stylesheet" href={~p"/assets/app.css"} />
+    <script defer phx-track-static type="text/javascript" src={~p"/assets/app.js"}>
+    </script>
+  </head>
+  <body class="bg-fuchsia-50">
+    <%= if @current_user do %>
+      <div class="fixed top-0 w-full bg-gray-800 text-white p-2 flex justify-between">
+        <h1 class="text-3xl font-bold">
+          <%= gettext("FullCircle") %>
+          <%= if assigns[:current_company] do %>
+            <span id="active-company" class="font-normal text-2xl">
+              &#8226; <%= @current_company.name %>
+            </span>
+          <% end %>
+        </h1>
+        <div>
+          <div
+            class="rounded float-right hover:bg-blue-500 p-2"
+            phx-click={Phoenix.LiveView.JS.toggle(to: "#menu", in: "fade-in", out: "fade-out")}
+          >
+            <Heroicons.bars_4 class="w-6 h-6" />
+          </div>
+          <%= if assigns[:current_company] do %>
+            <.link
+              navigate={~p"/companies/#{@current_company.id}/dashboard"}
+              class="rounded float-right hover:bg-gray-400 p-2"
+            >
+              <%= gettext("Dashboard") %>
+            </.link>
+          <% end %>
+        </div>
+        <div id="menu" class="m-2 rounded shadow-xl right-1 fixed top-12 hidden">
+          <ul class="border-2 bg-gray-800 border-gray-900 p-2" phx-click={Phoenix.LiveView.JS.hide(to: "#menu", transition: "fade-in-scale")}>
+            <li class="text-xl font-bold mb-2 p-2 bg-gray-400">
+              <%= @current_user.email %>
+              <div class="flex justify-between">
+                <div class="text-base font-normal">
+                  <.link
+                    class="rounded p-2 hover:bg-blue-400"
+                    navigate={~p"/users/settings"}
+                    phx-click={Phoenix.LiveView.JS.hide(to: "#menu", transition: "fade-in-scale")}
+                  >
+                    <%= gettext("User Settings") %>
+                  </.link>
+                </div>
+                <div class="text-base font-normal text-rose-800">
+                  <%= if assigns[:current_company], do: @current_role %>
+                </div>
+              </div>
+            </li>
+            <.link
+              navigate={~p"/companies"}
+              phx-click={Phoenix.LiveView.JS.hide(to: "#menu", transition: "fade-in-scale")}
+            >
+              <li class="mb-2 p-2 hover:bg-emerald-400">
+                <%= gettext("Companies") %>
+              </li>
+            </.link>
+            <%= if assigns[:current_company] do %>
+              <%= if @current_role == "admin" do %>
+                <.link
+                  navigate={~p"/companies/#{@current_company.id}/users"}
+                  phx-click={Phoenix.LiveView.JS.hide(to: "#menu", transition: "fade-in-scale")}
+                >
+                  <li class="mb-2 p-2 hover:bg-emerald-400">
+                    <%= gettext("Users") %>
+                  </li>
+                </.link>
+              <% end %>
+            <% end %>
+            <%= if @locale == "zh" do %>
+              <.link
+                href="?locale=en"
+                phx-click={Phoenix.LiveView.JS.hide(to: "#menu", transition: "fade-in-scale")}
+              >
+                <li class="mb-2 p-3 hover:bg-emerald-400">
+                  English
+                </li>
+              </.link>
+            <% else %>
+              <.link
+                href="?locale=zh"
+                phx-click={Phoenix.LiveView.JS.hide(to: "#menu", transition: "fade-in-scale")}
+              >
+                <li class="mb-2 p-3 hover:bg-emerald-400">
+                  中文
+                </li>
+              </.link>
+            <% end %>
+            <.link
+              href={~p"/users/log_out"}
+              method="delete"
+              phx-click={Phoenix.LiveView.JS.hide(to: "#menu", transition: "fade-in-scale")}
+            >
+              <li class="p-3 hover:bg-rose-400">
+                <%= gettext("Log Out") %>
+              </li>
+            </.link>
+          </ul>
+        </div>
+      </div>
+    <% else %>
+      <%= if assigns[:page_title] != gettext("Home") do %>
+        <div class="grid justify-center w-full">
+          <img src="/images/logo.png" alt="Peggy Logo" class="w-48 h-48" />
+        </div>
+        <h1 class="grid justify-center font-bold text-2xl tracking-widest -mt-2">
+          <%= gettext("FullCircle") %>
+        </h1>
+        <h1 class="grid justify-center text-xl tracking-tighter -mt-1">
+          <%= gettext("Accounting & Payroll Software") %>
+        </h1>
+        <div class="text-gray-400 grid justify-center tracking-tighter">
+          <%= gettext("Version") %> <%= "0.1.0" %>
+        </div>
+        <div class="text-green-600 grid justify-center">
+          <%= if @locale == "zh" do %>
+            <.link href="?locale=en">
+              Change Language to English
+            </.link>
+          <% else %>
+            <.link href="?locale=zh">
+              语言更改为中文
+            </.link>
+          <% end %>
+        </div>
+      <% end %>
+    <% end %>
+    <%= @inner_content %>
+  </body>
+</html>
