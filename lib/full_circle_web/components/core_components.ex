@@ -25,32 +25,35 @@ defmodule FullCircleWeb.CoreComponents do
   ## Examples
 
       <.modal id="confirm-modal">
-        This is a modal.
+        Are you sure?
+        <:confirm>OK</:confirm>
+        <:cancel>Cancel</:cancel>
       </.modal>
 
-  JS commands may be passed to the `:on_cancel` to configure
-  the closing/cancel event, for example:
+  JS commands may be passed to the `:on_cancel` and `on_confirm` attributes
+  for the caller to react to each button press, for example:
 
-      <.modal id="confirm" on_cancel={JS.navigate(~p"/posts")}>
-        This is another modal.
+      <.modal id="confirm" on_confirm={JS.push("delete")} on_cancel={JS.navigate(~p"/posts")}>
+        Are you sure you?
+        <:confirm>OK</:confirm>
+        <:cancel>Cancel</:cancel>
       </.modal>
-
   """
   attr :id, :string, required: true
   attr :show, :boolean, default: false
   attr :on_cancel, JS, default: %JS{}
+  attr :on_confirm, JS, default: %JS{}
+
   slot :inner_block, required: true
+  slot :title
+  slot :subtitle
+  slot :confirm
+  slot :cancel
 
   def modal(assigns) do
     ~H"""
-    <div
-      id={@id}
-      phx-mounted={@show && show_modal(@id)}
-      phx-remove={hide_modal(@id)}
-      data-cancel={JS.exec(@on_cancel, "phx-remove")}
-      class="relative z-50 hidden"
-    >
-      <div id={"#{@id}-bg"} class="bg-zinc-50/90 fixed inset-0 transition-opacity" aria-hidden="true" />
+    <div id={@id} phx-mounted={@show && show_modal(@id)} class="relative z-50 hidden">
+      <div id={"#{@id}-bg"} class="fixed inset-0 bg-zinc-50/90 transition-opacity" aria-hidden="true" />
       <div
         class="fixed inset-0 overflow-y-auto"
         aria-labelledby={"#{@id}-title"}
@@ -63,23 +66,50 @@ defmodule FullCircleWeb.CoreComponents do
           <div class="w-full max-w-3xl p-4 sm:p-6 lg:py-8">
             <.focus_wrap
               id={"#{@id}-container"}
-              phx-window-keydown={JS.exec("data-cancel", to: "##{@id}")}
+              phx-mounted={@show && show_modal(@id)}
+              phx-window-keydown={hide_modal(@on_cancel, @id)}
               phx-key="escape"
-              phx-click-away={JS.exec("data-cancel", to: "##{@id}")}
-              class="shadow-zinc-700/10 ring-zinc-700/10 relative hidden rounded-2xl bg-white p-14 shadow-lg ring-1 transition"
+              phx-click-away={hide_modal(@on_cancel, @id)}
+              class="hidden relative rounded-2xl bg-white p-14 shadow-lg shadow-zinc-700/10 ring-1 ring-zinc-700/10 transition"
             >
               <div class="absolute top-6 right-5">
                 <button
-                  phx-click={JS.exec("data-cancel", to: "##{@id}")}
+                  phx-click={hide_modal(@on_cancel, @id)}
                   type="button"
                   class="-m-3 flex-none p-3 opacity-20 hover:opacity-40"
                   aria-label={gettext("close")}
                 >
-                  <.icon name="hero-x-mark-solid" class="h-5 w-5" />
+                  <Heroicons.x_mark solid class="h-5 w-5 stroke-current" />
                 </button>
               </div>
               <div id={"#{@id}-content"}>
+                <header :if={@title != []}>
+                  <h1 id={"#{@id}-title"} class="text-lg font-semibold leading-8 text-zinc-800">
+                    <%= render_slot(@title) %>
+                  </h1>
+                  <p :if={@subtitle != []} class="mt-2 text-sm leading-6 text-zinc-600">
+                    <%= render_slot(@subtitle) %>
+                  </p>
+                </header>
                 <%= render_slot(@inner_block) %>
+                <div :if={@confirm != [] or @cancel != []} class="mt-2 grid grid-cols-4 gap-1 justify-items-center">
+                  <.button
+                    :for={confirm <- @confirm}
+                    id={"#{@id}-confirm"}
+                    phx-click={@on_confirm}
+                    phx-disable-with
+                    class="col-start-2 py-2 px-3"
+                  >
+                    <%= render_slot(confirm) %>
+                  </.button>
+                  <.link
+                    :for={cancel <- @cancel}
+                    phx-click={hide_modal(@on_cancel, @id)}
+                    class="py-2 px-3 rounded-lg border font-semibold leading-6 bg-blue-200 hover:bg-blue-400 col-start-3"
+                  >
+                    <%= render_slot(cancel) %>
+                  </.link>
+                </div>
               </div>
             </.focus_wrap>
           </div>
@@ -301,7 +331,7 @@ defmodule FullCircleWeb.CoreComponents do
       <select
         id={@id}
         name={@name}
-        class="mt-1 block w-full rounded-md border border-gray-300 bg-white shadow-sm focus:border-zinc-400 focus:ring-0 sm:text-sm"
+        class="block w-full rounded-md border border-gray-300 bg-white shadow-sm focus:border-zinc-400 focus:ring-0"
         multiple={@multiple}
         {@rest}
       >
@@ -321,7 +351,7 @@ defmodule FullCircleWeb.CoreComponents do
         id={@id}
         name={@name}
         class={[
-          "mt-2 block w-full rounded-lg text-zinc-900 focus:ring-0 sm:text-sm sm:leading-6",
+          "block w-full rounded-lg text-zinc-900 focus:ring-0",
           "phx-no-feedback:border-zinc-300 phx-no-feedback:focus:border-zinc-400",
           "min-h-[6rem] border-zinc-300 focus:border-zinc-400",
           @errors != [] && "border-rose-400 focus:border-rose-400"
@@ -344,7 +374,7 @@ defmodule FullCircleWeb.CoreComponents do
         id={@id}
         value={Phoenix.HTML.Form.normalize_value(@type, @value)}
         class={[
-          "mt-2 block w-full rounded-lg text-zinc-900 focus:ring-0 sm:text-sm sm:leading-6",
+          "block w-full rounded-lg text-zinc-900 focus:ring-0",
           "phx-no-feedback:border-zinc-300 phx-no-feedback:focus:border-zinc-400",
           "border-zinc-300 focus:border-zinc-400",
           @errors != [] && "border-rose-400 focus:border-rose-400"
@@ -536,6 +566,17 @@ defmodule FullCircleWeb.CoreComponents do
     """
   end
 
+  attr :navigate, :any, required: true
+  slot :inner_block, required: true
+
+  def link_button(assigns) do
+    ~H"""
+    <.link navigate={@navigate} class={button_css()}>
+      <%= render_slot(@inner_block) %>
+    </.link>
+    """
+  end
+
   @doc """
   Renders a [Hero Icon](https://heroicons.com).
 
@@ -637,4 +678,116 @@ defmodule FullCircleWeb.CoreComponents do
   def translate_errors(errors, field) when is_list(errors) do
     for {^field, {msg, opts}} <- errors, do: translate_error({msg, opts})
   end
+
+  def shake(datetime, seconds) do
+    if Timex.diff(Timex.now(), DateTime.from_naive!(datetime, "Etc/UTC"), :seconds) <= seconds do
+      "shake"
+    else
+      ""
+    end
+  end
+
+  def button_css() do
+    "text-center tracking-tighter rounded-md p-2 transition duration-500 select-none bg-pink-300 hover:bg-pink-500 focus:bg-pink-500"
+  end
+
+  def datalist(list, id) do
+    Phoenix.HTML.Tag.content_tag(:datalist, options(list), id: id)
+  end
+
+  def datalist_with_ids(list, id, value_key, id_key) do
+    Phoenix.HTML.Tag.content_tag(:datalist, option_with_ids(list, value_key, id_key), id: id)
+  end
+
+  def options(list) do
+    Enum.map(list, fn el ->
+      Phoenix.HTML.Tag.content_tag(:option, "", value: el)
+    end)
+  end
+
+  def option_with_ids(list, value_key, id_key) do
+    Enum.map(list, fn el ->
+      Phoenix.HTML.Tag.content_tag(:option, "",
+        value: Map.get(el, value_key),
+        data_id: Map.get(el, id_key)
+      )
+    end)
+  end
+
+  attr :id, :any
+  attr :msg1, :string
+  attr :msg2, :string, default: nil
+  attr :confirm, :any
+  attr :cancel, :any
+
+  def delete_confirm_modal(assigns) do
+    ~H"""
+    <.link
+      id={@id}
+      class={button_css()}
+      phx-click={FullCircleWeb.CoreComponents.show_modal("#{@id}-modal")}
+    >
+      <%= gettext("Delete") %>
+    </.link>
+    <.modal id={"#{@id}-modal"} on_confirm={@confirm} on_cancel={@cancel}>
+      <div class="text-center">
+        <div class="text-rose-600 font-bold text-2xl">
+          <%= @msg1 %>
+        </div>
+        <div class="text-red-600 font-bold text-xl"><%= @msg2 %></div>
+        <div class="text-amber-600 font-bold text-xl"><%= gettext("Are you sure?") %></div>
+      </div>
+      <:confirm><%= gettext("OK") %></:confirm>
+      <:cancel><%= gettext("CANCEL") %></:cancel>
+    </.modal>
+    """
+  end
+
+  attr :search_val, :any
+  def search_form(assigns) do
+    ~H"""
+    <div class="flex justify-center mb-2">
+      <.form
+        for={%{}}
+        id="search-form"
+        phx-submit="search"
+        autocomplete="off"
+        class="w-full"
+      >
+        <div class="grid grid-cols-12 gap-1">
+          <div class="col-span-11">
+            <.input
+              name="search[terms]"
+              type="search"
+              value={@search_val}
+              placeholder={gettext("Search...")}
+            />
+          </div>
+          <.button class={"col-span-1"}>🔍</.button>
+        </div>
+      </.form>
+    </div>
+    """
+  end
+
+  attr :page, :integer
+  attr :count, :integer
+
+  def infinite_scroll_footer(assigns) do
+    ~H"""
+    <div
+      id="footer"
+      phx-hook="InfiniteScroll"
+      data-page-number={@page}
+      class="mt-2 text-center border-2 rounded bg-gray-200 border-gray-400 p-2"
+    >
+      <%= if @count == 0 do %>
+        <%= gettext("No More...") %>
+      <% else %>
+        <%= gettext("Loading More...") %>
+      <% end %>
+    </div>
+    """
+  end
+
 end

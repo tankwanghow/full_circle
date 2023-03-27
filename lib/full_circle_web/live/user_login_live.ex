@@ -5,11 +5,11 @@ defmodule FullCircleWeb.UserLoginLive do
     ~H"""
     <div class="mx-auto max-w-sm">
       <.header class="text-center">
-        <%= gettext("Sign in to account") %>
+        <%= gettext("Log in to account") %>
         <:subtitle>
           <%= gettext("Don't have an account?") %>
           <.link navigate={~p"/users/register"} class="font-semibold text-brand hover:underline">
-            <%= gettext("Sign up") %>
+            <%= gettext("Register") %>
           </.link>
           <%= gettext("for an account now.") %>
         </:subtitle>

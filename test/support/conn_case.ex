@@ -61,4 +61,84 @@ defmodule FullCircleWeb.ConnCase do
     |> Phoenix.ConnTest.init_test_session(%{})
     |> Plug.Conn.put_session(:user_token, token)
   end
+
+  defmacro test_input_feedback(form, field, value, feedback) do
+    quote do
+      test "input feedback #{unquote(form)} #{unquote(field)} = #{unquote(value)}", %{
+        lv: lv
+      } do
+        form = unquote(form)
+        field = unquote(field)
+        value = unquote(value)
+        feedback = unquote(feedback)
+
+        html =
+          lv
+          |> element("##{form}")
+          |> render_change(%{form => %{field => value}})
+          |> Floki.parse_document!()
+
+        text =
+          Floki.find(html, ~s|div[phx-feedback-for="#{form}[#{field}]"] span.text-red-500|)
+          |> Floki.text()
+
+        assert text =~ feedback
+      end
+    end
+  end
+
+  defmacro test_input_value(form, tag, :text, field) do
+    quote do
+      test "input value #{unquote(form)} #{unquote(field)}", %{lv: lv, obj: obj} do
+        form = unquote(form)
+        tag = unquote(tag)
+        field = unquote(field)
+        value = Map.get(obj, String.to_atom(field))
+
+        html = render(lv)
+
+        text =
+          case tag do
+            "select" ->
+              Floki.find(html, ~s|#{tag}[name="#{form}[#{field}]"] option[selected]|)
+              |> Floki.attribute("value")
+              |> Enum.at(0)
+
+            "textarea" ->
+              Floki.find(html, ~s|#{tag}[name="#{form}[#{field}]"]|) |> Floki.text()
+
+            _ ->
+              Floki.find(html, ~s|#{tag}[name="#{form}[#{field}]"]|)
+              |> Floki.attribute("value")
+              |> Enum.at(0)
+          end
+
+        assert text == value
+      end
+    end
+  end
+
+  defmacro test_input_value(form, tag, :number, field) do
+    quote do
+      test "input value #{unquote(form)} #{unquote(field)}", %{lv: lv, comp: comp} do
+        form = unquote(form)
+        tag = unquote(tag)
+        field = unquote(field)
+        value = Map.get(comp, String.to_atom(field))
+
+        html = render(lv)
+
+        selector =
+          if tag != "select" do
+            ~s|#{tag}[name="#{form}[#{field}]"]|
+          else
+            ~s|#{tag}[name="#{form}[#{field}]"] option[selected]|
+          end
+
+        text = Floki.find(html, selector) |> Floki.attribute("value") |> Enum.at(0)
+
+        assert (Decimal.new(text) |> Decimal.to_float()) - value == 0.0
+      end
+    end
+  end
 end

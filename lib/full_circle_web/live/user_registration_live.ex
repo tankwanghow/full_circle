@@ -12,7 +12,7 @@ defmodule FullCircleWeb.UserRegistrationLive do
         <:subtitle>
           <%= gettext("Already registered?") %>
           <.link navigate={~p"/users/log_in"} class="font-semibold text-brand hover:underline">
-            <%= gettext("Sign in") %>
+            <%= gettext("Log in") %>
           </.link>
           <%= gettext("to your account now.") %>
         </:subtitle>

@@ -1,6 +1,8 @@
 defmodule FullCircle.UserAccounts.User do
   use Ecto.Schema
   import Ecto.Changeset
+  import FullCircleWeb.Gettext
+  import Ecto.Query, warn: false
 
   schema "users" do
     field :email, :string
@@ -8,7 +10,12 @@ defmodule FullCircle.UserAccounts.User do
     field :hashed_password, :string, redact: true
     field :confirmed_at, :naive_datetime
 
-    timestamps()
+    many_to_many :companies, FullCircle.Sys.Company,
+      join_through: FullCircle.Sys.CompanyUser,
+      on_replace: :delete
+
+    has_many :company_user, FullCircle.Sys.CompanyUser
+    timestamps(type: :utc_datetime_usec)
   end
 
   @doc """
@@ -39,6 +46,36 @@ defmodule FullCircle.UserAccounts.User do
     |> cast(attrs, [:email, :password])
     |> validate_email(opts)
     |> validate_password(opts)
+  end
+
+  def admin_add_user_changeset(user, attrs, opts \\ []) do
+    now = Elixir.NaiveDateTime.utc_now() |> Elixir.NaiveDateTime.truncate(:second)
+
+    user
+    |> cast(attrs, [:email, :password, :confirmed_at])
+    |> validate_email(opts)
+    |> validate_password(opts)
+    |> validate_unique_user_in_company(attrs["company_id"])
+    |> change(confirmed_at: now)
+  end
+
+  def validate_unique_user_in_company(changeset, company_id) do
+    id = fetch_field!(changeset, :id)
+
+    if is_nil(id) do
+      changeset
+    else
+      if FullCircle.Repo.exists?(
+           from(fu in FullCircle.Sys.CompanyUser,
+             where: fu.user_id == ^id,
+             where: fu.company_id == ^company_id
+           )
+         ) do
+        add_error(changeset, :email, gettext("already in company"))
+      else
+        changeset
+      end
+    end
   end
 
   defp validate_email(changeset, opts) do
@@ -125,7 +162,7 @@ defmodule FullCircle.UserAccounts.User do
   Confirms the account by setting `confirmed_at`.
   """
   def confirm_changeset(user) do
-    now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
+    now = Elixir.NaiveDateTime.utc_now() |> Elixir.NaiveDateTime.truncate(:second)
     change(user, confirmed_at: now)
   end
 

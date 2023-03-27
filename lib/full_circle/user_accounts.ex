@@ -211,7 +211,7 @@ defmodule FullCircle.UserAccounts do
     |> Repo.transaction()
     |> case do
       {:ok, %{user: user}} -> {:ok, user}
-      {:error, :user, changeset, _} -> {:error, changeset}
+      {:error, failed_operation, failed_value, changes_so_far} -> {:error, failed_operation, failed_value, changes_so_far}
     end
   end
 
@@ -347,7 +347,7 @@ defmodule FullCircle.UserAccounts do
     |> Repo.transaction()
     |> case do
       {:ok, %{user: user}} -> {:ok, user}
-      {:error, :user, changeset, _} -> {:error, changeset}
+      {:error, failed_operation, failed_value, changes_so_far} -> {:error, failed_operation, failed_value, changes_so_far}
     end
   end
 end

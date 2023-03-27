@@ -260,7 +260,7 @@ defmodule FullCircle.UserAccountsTest do
     end
 
     test "validates password", %{user: user} do
-      {:error, changeset} =
+      {:error, _, changeset, _} =
         UserAccounts.update_user_password(user, valid_user_password(), %{
           password: "not valid",
           password_confirmation: "another"
@@ -275,14 +275,14 @@ defmodule FullCircle.UserAccountsTest do
     test "validates maximum values for password for security", %{user: user} do
       too_long = String.duplicate("db", 100)
 
-      {:error, changeset} =
+      {:error, _, changeset, _} =
         UserAccounts.update_user_password(user, valid_user_password(), %{password: too_long})
 
       assert "should be at most 72 character(s)" in errors_on(changeset).password
     end
 
     test "validates current password", %{user: user} do
-      {:error, changeset} =
+      {:error, _, changeset, _} =
         UserAccounts.update_user_password(user, "invalid", %{password: valid_user_password()})
 
       assert %{current_password: ["is not valid"]} = errors_on(changeset)
@@ -469,7 +469,7 @@ defmodule FullCircle.UserAccountsTest do
     end
 
     test "validates password", %{user: user} do
-      {:error, changeset} =
+      {:error, _, changeset, _} =
         UserAccounts.reset_user_password(user, %{
           password: "not valid",
           password_confirmation: "another"
@@ -483,7 +483,7 @@ defmodule FullCircle.UserAccountsTest do
 
     test "validates maximum values for password for security", %{user: user} do
       too_long = String.duplicate("db", 100)
-      {:error, changeset} = UserAccounts.reset_user_password(user, %{password: too_long})
+      {:error, _, changeset, _} = UserAccounts.reset_user_password(user, %{password: too_long})
       assert "should be at most 72 character(s)" in errors_on(changeset).password
     end
 

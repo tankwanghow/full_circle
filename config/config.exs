@@ -7,6 +7,8 @@
 # General application configuration
 import Config
 
+config :full_circle, FullCircle.Repo, migration_timestamps: [type: :timestamptz]
+
 config :full_circle,
   ecto_repos: [FullCircle.Repo]
 

@@ -33,7 +33,7 @@ defmodule FullCircleWeb.UserAuth do
     |> renew_session()
     |> put_token_in_session(token)
     |> maybe_write_remember_me_cookie(token, params)
-    |> redirect(to: user_return_to || signed_in_path(conn))
+    |> redirect(to: user_return_to || signed_in_path(user))
   end
 
   defp maybe_write_remember_me_cookie(conn, token, %{"remember_me" => "true"}) do
@@ -166,7 +166,7 @@ defmodule FullCircleWeb.UserAuth do
     socket = mount_current_user(session, socket)
 
     if socket.assigns.current_user do
-      {:halt, Phoenix.LiveView.redirect(socket, to: signed_in_path(socket))}
+      {:halt, Phoenix.LiveView.redirect(socket, to: signed_in_path(socket.assigns.current_user))}
     else
       {:cont, socket}
     end
@@ -186,7 +186,7 @@ defmodule FullCircleWeb.UserAuth do
   def redirect_if_user_is_authenticated(conn, _opts) do
     if conn.assigns[:current_user] do
       conn
-      |> redirect(to: signed_in_path(conn))
+      |> redirect(to: ~p"/")
       |> halt()
     else
       conn
@@ -223,5 +223,19 @@ defmodule FullCircleWeb.UserAuth do
 
   defp maybe_store_return_to(conn), do: conn
 
-  defp signed_in_path(_conn), do: ~p"/"
+  # defp signed_in_path(conn) do: ~p"/"
+
+  defp signed_in_path(user) do
+    default_company = FullCircle.Sys.get_default_company(user)
+
+    if default_company do
+      "/companies/#{default_company.company_id}/dashboard"
+    else
+      if(Enum.count(FullCircle.Sys.list_companies(user)) > 0) do
+        "/companies"
+      else
+        "/companies/new"
+      end
+    end
+  end
 end

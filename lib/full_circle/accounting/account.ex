@@ -1,0 +1,44 @@
+defmodule FullCircle.Accounting.Account do
+  use Ecto.Schema
+  import Ecto.Changeset
+  import FullCircleWeb.Gettext
+
+  schema "accounts" do
+    belongs_to :company, FullCircle.Sys.Company
+    field :descriptions, :string
+    field :account_type, :string
+    field :name, :string
+
+    # has_many :sales_goods, FullCircle.Product.Good, foreign_key: :sales_account_id
+    # has_many :purchase_goods, FullCircle.Product.Good, foreign_key: :purchase_account_id
+    # has_many :invoice_details, FullCircle.CustomerBilling.InvoiceDetail
+
+    timestamps(type: :utc_datetime)
+  end
+
+  @doc false
+  def changeset(account, attrs) do
+    account
+    |> cast(attrs, [:company_id, :account_type, :name, :descriptions])
+    |> validate_required([:company_id, :account_type, :name])
+    |> validate_inclusion(:account_type, FullCircle.Accounting.account_types(),
+      message: gettext("not in list")
+    )
+    |> unsafe_validate_unique([:name, :company_id], FullCircle.Repo,
+      message: gettext("has already been taken")
+    )
+
+    # |> foreign_key_constraint(:name,
+    #   name: :invoice_details_account_id_fkey,
+    #   message: gettext("referenced by invoice details")
+    # )
+    # |> foreign_key_constraint(:name,
+    #   name: :goods_purchase_account_id_fkey,
+    #   message: gettext("referenced by goods")
+    # )
+    # |> foreign_key_constraint(:name,
+    #   name: :goods_sales_account_id_fkey,
+    #   message: gettext("referenced by goods")
+    # )
+  end
+end

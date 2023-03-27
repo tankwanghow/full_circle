@@ -1,0 +1,43 @@
+defmodule FullCircleWeb.ActiveCompany do
+  use FullCircleWeb, :verified_routes
+  import Plug.Conn
+  import Phoenix.Controller
+  require FullCircleWeb.Gettext
+
+  def on_mount(:assign_active_company, _params, session, socket) do
+    {:cont,
+     socket
+     |> Phoenix.Component.assign(:current_company, session["current_company"])
+     |> Phoenix.Component.assign(:current_role, session["current_role"])}
+  end
+
+  def set_active_company(%{params: %{"company_id" => url_company_id}} = conn, _opts) do
+    session_company_id = Util.attempt(get_session(conn, "current_company"), :id) || -1
+
+    if session_company_id != url_company_id do
+      cu = FullCircle.Sys.get_company_user(url_company_id, conn.assigns.current_user.id)
+      if cu == nil do
+        conn
+        |> put_flash(:error, FullCircleWeb.Gettext.gettext("Not Authorise."))
+        |> redirect(to: "/")
+        |> halt()
+      else
+        c = FullCircle.Sys.get_company!(cu.company_id)
+
+        conn
+        |> put_session(:current_role, cu.role)
+        |> put_session(:current_company, c)
+        |> assign(:current_role, cu.role)
+        |> assign(:current_company, c)
+      end
+    else
+      conn
+    end
+  end
+
+  def set_active_company(conn, _opts) do
+    conn
+    |> assign(:current_role, get_session(conn, "current_role"))
+    |> assign(:current_company, get_session(conn, "current_company"))
+  end
+end

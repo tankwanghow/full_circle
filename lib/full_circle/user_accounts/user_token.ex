@@ -19,7 +19,7 @@ defmodule FullCircle.UserAccounts.UserToken do
     field :sent_to, :string
     belongs_to :user, FullCircle.UserAccounts.User
 
-    timestamps(updated_at: false)
+    timestamps(type: :utc_datetime, updated_at: false)
   end
 
   @doc """

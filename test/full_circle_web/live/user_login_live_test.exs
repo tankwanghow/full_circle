@@ -36,7 +36,7 @@ defmodule FullCircleWeb.UserLoginLiveTest do
 
       conn = submit_form(form, conn)
 
-      assert redirected_to(conn) == ~p"/"
+      assert redirected_to(conn) == ~p"/companies/new"
     end
 
     test "redirects to login page with a flash error if there are no valid credentials", %{
@@ -63,7 +63,7 @@ defmodule FullCircleWeb.UserLoginLiveTest do
 
       {:ok, _login_live, login_html} =
         lv
-        |> element(~s|main a:fl-contains("Sign up")|)
+        |> element(~s|main a:fl-contains("Register")|)
         |> render_click()
         |> follow_redirect(conn, ~p"/users/register")
 

@@ -6,11 +6,11 @@ defmodule FullCircleWeb.UserSettingsLive do
   def render(assigns) do
     ~H"""
     <.header class="text-center">
-      <%= gettext("Account Settings") %>
+      <%= gettext("User Settings") %>
       <:subtitle><%= gettext("Manage your account email address and password settings") %></:subtitle>
     </.header>
 
-    <div class="space-y-12 divide-y">
+    <div class="space-y-5 divide-y">
       <div>
         <.simple_form
           for={@email_form}
@@ -160,7 +160,7 @@ defmodule FullCircleWeb.UserSettingsLive do
 
         {:noreply, assign(socket, trigger_submit: true, password_form: password_form)}
 
-      {:error, changeset} ->
+      {:error, _, changeset, _} ->
         {:noreply, assign(socket, password_form: to_form(changeset))}
     end
   end

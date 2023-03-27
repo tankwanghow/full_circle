@@ -55,4 +55,60 @@ defmodule FullCircle.DataCase do
       end)
     end)
   end
+
+  defmacro test_not_authorise_to(action, roles) when is_list(roles) do
+    quote do
+      test "#{Enum.join(unquote(roles), ", ")} is NOT allow to #{unquote(action)}", %{
+        company: company,
+        admin: admin
+      } do
+        roles = unquote(roles)
+        action = unquote(action)
+
+        Enum.each(roles, fn r ->
+          user = FullCircle.UserAccountsFixtures.user_fixture()
+          FullCircle.Sys.allow_user_to_access(company, user, r, admin)
+
+          assert FullCircle.Authorization.can?(user, action, company) == false, "#{r} shouldn't be allowed to #{action}"
+        end)
+
+        FullCircle.Authorization.roles()
+        |> Enum.reject(fn x -> Enum.find(roles, fn q -> q == x end) end)
+        |> Enum.each(fn r ->
+          user = FullCircle.UserAccountsFixtures.user_fixture()
+          FullCircle.Sys.allow_user_to_access(company, user, r, admin)
+
+          assert FullCircle.Authorization.can?(user, action, company) == true, "#{r} should be allowed to #{action}"
+        end)
+      end
+    end
+  end
+
+  defmacro test_authorise_to(action, roles) when is_list(roles) do
+    quote do
+      test "#{Enum.join(unquote(roles), ", ")} is allow to #{unquote(action)}", %{
+        company: company,
+        admin: admin
+      } do
+        roles = unquote(roles)
+        action = unquote(action)
+
+        Enum.each(roles, fn r ->
+          user = FullCircle.UserAccountsFixtures.user_fixture()
+          FullCircle.Sys.allow_user_to_access(company, user, r, admin)
+
+          assert FullCircle.Authorization.can?(user, action, company) == true, "#{r} should be allowed to #{action}"
+        end)
+
+        FullCircle.Authorization.roles()
+        |> Enum.reject(fn x -> Enum.find(roles, fn q -> q == x end) end)
+        |> Enum.each(fn r ->
+          user = FullCircle.UserAccountsFixtures.user_fixture()
+          FullCircle.Sys.allow_user_to_access(company, user, r, admin)
+
+          assert FullCircle.Authorization.can?(user, action, company) == false, "#{r} should't be allowed to #{action}"
+        end)
+      end
+    end
+  end
 end

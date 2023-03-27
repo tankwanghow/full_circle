@@ -65,7 +65,7 @@ defmodule FullCircleWeb.UserResetPasswordLive do
          |> put_flash(:info, gettext("Password reset successfully."))
          |> redirect(to: ~p"/users/log_in")}
 
-      {:error, changeset} ->
+      {:error, _, changeset, _} ->
         {:noreply, assign_form(socket, Map.put(changeset, :action, :insert))}
     end
   end
