@@ -74,13 +74,13 @@ defmodule FullCircleWeb.Router do
     live_session :require_authenticated_user,
       on_mount: [
         {FullCircleWeb.UserAuth, :ensure_authenticated},
-        {FullCircleWeb.Locale, :set_locale},
-        {FullCircleWeb.ActiveCompany, :assign_active_company}
+        {FullCircleWeb.Locale, :set_locale}
       ] do
       live("/users/settings", UserSettingsLive, :edit)
       live("/users/settings/confirm_email/:token", UserSettingsLive, :confirm_email)
       live("/companies", CompanyLiveIndex)
       live("/companies/new", CompanyLive.Form, :new)
+      live("/edit_company/:id", CompanyLive.Form, :edit)
     end
 
     post("/update_active_company", ActiveCompanyController, :create)
@@ -96,13 +96,12 @@ defmodule FullCircleWeb.Router do
         {FullCircleWeb.Locale, :set_locale},
         {FullCircleWeb.ActiveCompany, :assign_active_company}
       ] do
-      live("/edit", CompanyLive.Form, :edit)
       live("/dashboard", DashboardLive)
       live("/users/new", UserLive.New, :new)
       live("/users", UserLive.Index, :index)
       live("/accounts", AccountLive.Index, :index)
-      live("/accounts/new", AccountLive.Form, :new)
-      live("/accounts/:id/edit", AccountLive.Form, :edit)
+      # live("/accounts/new", AccountLive.Form, :new)
+      # live("/accounts/:id/edit", AccountLive.Form, :edit)
     end
   end
 

@@ -170,7 +170,7 @@ defmodule FullCircle.Sys do
         end
 
       false ->
-        {:not_authorise, company, attrs}
+        :not_authorise
     end
   end
 
@@ -189,7 +189,7 @@ defmodule FullCircle.Sys do
         end
 
       false ->
-        {:not_authorise, company, %{}}
+        :not_authorise
     end
   end
 
@@ -234,7 +234,7 @@ defmodule FullCircle.Sys do
         end
 
       false ->
-        {:not_authorise, admin, user}
+        :not_authorise
     end
   end
 
@@ -276,7 +276,7 @@ defmodule FullCircle.Sys do
         end
 
       false ->
-        {:not_authorise, admin, email}
+        :not_authorise
     end
   end
 
@@ -285,17 +285,14 @@ defmodule FullCircle.Sys do
       true ->
         com_user = get_company_user(com.id, user_id)
 
-        case Repo.update(
-               company_user_changeset(com_user, %{
-                 role: role
-               })
-             ) do
-          {:ok, struct} -> {:ok, struct}
-          {:error, changeset} -> {:error, changeset}
-        end
+        Repo.update(
+          company_user_changeset(com_user, %{
+            role: role
+          })
+        )
 
       false ->
-        {:not_authorise, admin, user_id}
+        :not_authorise
     end
   end
 
@@ -324,7 +321,7 @@ defmodule FullCircle.Sys do
         end
 
       false ->
-        {:not_authorise, admin, user}
+        :not_authorise
     end
   end
 

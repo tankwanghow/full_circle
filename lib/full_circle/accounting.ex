@@ -77,12 +77,7 @@ defmodule FullCircle.Accounting do
       where: comuser.role != "disable",
       where: user.id == ^user.id,
       where: com.id == ^company.id,
-      select: %{
-        id: ac.id,
-        name: ac.name,
-        account_type: ac.account_type,
-        descriptions: ac.descriptions
-      }
+      select: ac
     )
   end
 
@@ -102,7 +97,7 @@ defmodule FullCircle.Accounting do
         end
 
       false ->
-        {:not_authorise, user, attrs}
+        :not_authorise
     end
   end
 
@@ -122,7 +117,7 @@ defmodule FullCircle.Accounting do
         end
 
       false ->
-        {:not_authorise, user, attrs}
+        :not_authorise
     end
   end
 
@@ -142,7 +137,7 @@ defmodule FullCircle.Accounting do
         end
 
       false ->
-        {:not_authorise, ac, %{}}
+        :not_authorise
     end
   end
 

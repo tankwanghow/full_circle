@@ -83,7 +83,7 @@ defmodule FullCircle.SysTest do
       {:ok, com1} = Sys.create_company(v1, admin)
       Sys.allow_user_to_access(com1, user, "guest", admin)
       Sys.allow_user_to_access(com1, user1, "manager", admin)
-      assert {:not_authorise, _, _} = Sys.reset_user_password(user, user1, com1)
+      assert :not_authorise = Sys.reset_user_password(user, user1, com1)
     end
 
     test "update user default company" do
@@ -220,7 +220,7 @@ defmodule FullCircle.SysTest do
       admin = user_fixture()
       not_admin = user_fixture()
       {:ok, com} = Sys.create_company(v, admin)
-      {status, _, _} = Sys.update_company(com, %{name: "any"}, not_admin)
+      status = Sys.update_company(com, %{name: "any"}, not_admin)
       assert status == :not_authorise
     end
 
@@ -249,7 +249,7 @@ defmodule FullCircle.SysTest do
       not_admin = user_fixture()
       v1 = valid_company_attributes(%{name: "haha"})
       {:ok, com1} = Sys.create_company(v1, admin)
-      {status, _, _} = Sys.allow_user_to_access(com1, admin, "guest", not_admin)
+      status = Sys.allow_user_to_access(com1, admin, "guest", not_admin)
       assert status == :not_authorise
     end
 
@@ -311,7 +311,7 @@ defmodule FullCircle.SysTest do
       v1 = valid_company_attributes(%{name: "haha"})
       {:ok, com1} = Sys.create_company(v1, admin)
       {:ok, _} = Sys.allow_user_to_access(com1, user, "guest", admin)
-      {status, _, _} = Sys.change_user_role_in(com1, admin.id, "admin", user)
+      status = Sys.change_user_role_in(com1, admin.id, "admin", user)
       assert status == :not_authorise
     end
 
@@ -319,7 +319,7 @@ defmodule FullCircle.SysTest do
       admin = user_fixture()
       v1 = valid_company_attributes(%{name: "haha"})
       {:ok, com1} = Sys.create_company(v1, admin)
-      {status, _, _} = Sys.change_user_role_in(com1, admin.id, "admin", admin)
+      status = Sys.change_user_role_in(com1, admin.id, "admin", admin)
       assert status == :not_authorise
     end
 

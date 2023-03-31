@@ -15,20 +15,25 @@ defmodule FullCircleWeb.ActiveCompany do
     session_company_id = Util.attempt(get_session(conn, "current_company"), :id) || -1
 
     if session_company_id != url_company_id do
-      cu = FullCircle.Sys.get_company_user(url_company_id, conn.assigns.current_user.id)
-      if cu == nil do
-        conn
-        |> put_flash(:error, FullCircleWeb.Gettext.gettext("Not Authorise."))
-        |> redirect(to: "/")
-        |> halt()
-      else
-        c = FullCircle.Sys.get_company!(cu.company_id)
+      if conn.assigns.current_user do
+        cu = FullCircle.Sys.get_company_user(url_company_id, conn.assigns.current_user.id)
 
+        if cu != nil do
+          c = FullCircle.Sys.get_company!(cu.company_id)
+
+          conn
+          |> put_session(:current_role, cu.role)
+          |> put_session(:current_company, c)
+          |> assign(:current_role, cu.role)
+          |> assign(:current_company, c)
+        else
+          conn
+          |> put_flash(:error, FullCircleWeb.Gettext.gettext("Not Authorise."))
+          |> redirect(to: "/")
+          |> halt()
+        end
+      else
         conn
-        |> put_session(:current_role, cu.role)
-        |> put_session(:current_company, c)
-        |> assign(:current_role, cu.role)
-        |> assign(:current_company, c)
       end
     else
       conn

@@ -20,14 +20,14 @@ defmodule FullCircleWeb.CompanyLive.Form do
     >
       <%= live_component(FullCircleWeb.CompanyLive.FieldsComponent, form: @form) %>
       <div class="flex justify-center gap-x-1 mt-2">
-        <.button><%= gettext("Save") %></.button>
+      <.button disabled={!@form.source.valid?}><%= gettext("Save") %></.button>
         <%= if @live_action == :edit and FullCircle.Authorization.can?(@current_user, :delete_company, @company) do %>
           <.delete_confirm_modal
             id="delete-company"
             msg1={gettext("All Company Data, will be LOST!!!")}
             msg2={gettext("Cannot Be Recover!!!")}
             confirm={JS.push("delete")}
-            cancel={JS.navigate(~p"/companies/#{@company.id}/edit")}
+            cancel={JS.navigate(~p"/edit_company/#{@company.id}")}
           />
         <% end %>
         <.link_button navigate="/companies">
@@ -39,7 +39,12 @@ defmodule FullCircleWeb.CompanyLive.Form do
   end
 
   @impl true
-  def mount(params, _session, socket) do
+  def mount(params, session, socket) do
+    socket =
+      socket
+      |> assign(:current_company, session["current_company"])
+      |> assign(:current_role, session["current_role"])
+
     case socket.assigns.live_action do
       :new -> mount_new(socket)
       :edit -> mount_edit(params, socket)
@@ -58,7 +63,7 @@ defmodule FullCircleWeb.CompanyLive.Form do
      |> assign(:trigger_method, nil)}
   end
 
-  defp mount_edit(%{"company_id" => id}, socket) do
+  defp mount_edit(%{"id" => id}, socket) do
     company = Sys.get_company!(id)
     form = to_form(Sys.company_changeset(company, %{}, socket.assigns.current_user))
 
@@ -107,11 +112,11 @@ defmodule FullCircleWeb.CompanyLive.Form do
       {:error, _, changeset, _} ->
         {:noreply,
          assign(socket, form: to_form(changeset))
-         |> put_flash(:error, gettext("Failed to Update Company"))}
+         |> put_flash(:error, gettext("Failed to Delete Company"))}
 
-      {:not_authorise, changeset, _} ->
+      :not_authorise ->
         {:noreply,
-         assign(socket, form: to_form(changeset))
+         socket
          |> put_flash(:error, gettext("No Authorization"))}
     end
   end
@@ -135,9 +140,9 @@ defmodule FullCircleWeb.CompanyLive.Form do
          assign(socket, form: to_form(changeset))
          |> put_flash(:error, gettext("Failed to Update Company"))}
 
-      {:not_authorise, changeset, _} ->
+      :not_authorise ->
         {:noreply,
-         assign(socket, form: to_form(changeset, as: :company))
+         socket
          |> put_flash(:error, gettext("No Authorization"))}
     end
   end

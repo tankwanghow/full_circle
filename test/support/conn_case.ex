@@ -79,7 +79,7 @@ defmodule FullCircleWeb.ConnCase do
           |> Floki.parse_document!()
 
         text =
-          Floki.find(html, ~s|div[phx-feedback-for="#{form}[#{field}]"] span.text-red-500|)
+          Floki.find(html, ~s|div[phx-feedback-for="#{form}[#{field}]"] p.text-rose-600|)
           |> Floki.text()
 
         assert text =~ feedback

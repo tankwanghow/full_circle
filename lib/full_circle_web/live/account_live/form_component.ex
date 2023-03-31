@@ -1,0 +1,145 @@
+defmodule FullCircleWeb.AccountLive.FormComponent do
+  use FullCircleWeb, :live_component
+  alias FullCircle.Accounting
+  alias FullCircle.Accounting.Account
+
+  @impl true
+  def mount(socket) do
+    {:ok, socket}
+  end
+
+  @impl true
+  def update(assigns, socket) do
+    socket = socket |> assign(assigns)
+
+    {:ok, socket}
+  end
+
+  @impl true
+  def handle_event("cancel_delete", _, socket) do
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("validate", %{"account" => params}, socket) do
+    account = if(socket.assigns[:account], do: socket.assigns.account, else: %Account{})
+
+    changeset =
+      account
+      |> Accounting.account_changeset(params, socket.assigns.current_company)
+      |> Map.put(:action, :insert)
+
+    socket = assign(socket, form: to_form(changeset))
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("save", %{"account" => params}, socket) do
+    save_account(socket, socket.assigns.live_action, params)
+  end
+
+  @impl true
+  def handle_event("delete", _params, socket) do
+    case Accounting.delete_account(
+           socket.assigns.account,
+           socket.assigns.current_user,
+           socket.assigns.current_company
+         ) do
+      {:ok, ac} ->
+        send(self(), {:deleted, ac})
+        {:noreply, socket}
+
+      {:error, failed_operation, changeset, _} ->
+        send(self(), {:error, failed_operation, changeset})
+        {:noreply, socket}
+
+      :not_authorise ->
+        {:not_authorise, socket}
+    end
+  end
+
+  defp save_account(socket, :new, params) do
+    case Accounting.create_account(
+           params,
+           socket.assigns.current_user,
+           socket.assigns.current_company
+         ) do
+      {:ok, ac} ->
+        send(self(), {:created, ac})
+        {:noreply, socket}
+
+      {:error, failed_operation, changeset, _} ->
+        send(self(), {:error, failed_operation, changeset})
+        {:noreply, socket}
+
+      :not_authorise ->
+        {:not_authorise, socket}
+    end
+  end
+
+  defp save_account(socket, :edit, params) do
+    case Accounting.update_account(
+           socket.assigns.account,
+           params,
+           socket.assigns.current_user,
+           socket.assigns.current_company
+         ) do
+      {:ok, ac} ->
+        send(self(), {:updated, ac})
+        {:noreply, socket}
+
+      {:error, failed_operation, changeset, _} ->
+        send(self(), {:error, failed_operation, changeset})
+        {:noreply, socket}
+
+      :not_authorise ->
+        {:not_authorise, socket}
+    end
+  end
+
+  @impl true
+  def render(assigns) do
+    ~H"""
+    <div>
+      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
+      <.form
+        for={@form}
+        id="account-form"
+        phx-target={@myself}
+        autocomplete="off"
+        phx-change="validate"
+        phx-submit="save"
+        class="max-w-md mx-auto"
+      >
+        <.input field={@form[:name]} label={gettext("Account Name")} />
+
+        <.input
+          field={@form[:account_type]}
+          label={gettext("Account Type")}
+          type="select"
+          options={FullCircle.Accounting.account_types()}
+        />
+
+        <.input field={@form[:descriptions]} label={gettext("Descriptions")} type="textarea" />
+
+        <div class="flex justify-center gap-x-1 mt-1">
+          <.button disabled={!@form.source.valid?}><%= gettext("Save") %></.button>
+          <%= if @live_action == :edit and FullCircle.Authorization.can?(@current_user, :delete_account, @current_company) do %>
+            <.delete_confirm_modal
+              id="delete-account"
+              msg1={gettext("All Account Transactions, will be LOST!!!")}
+              msg2={gettext("Cannot Be Recover!!!")}
+              confirm={JS.push("delete", target: "#account-form")}
+              cancel={JS.push("cancel_delete", target: "#account-form")}
+            />
+          <% end %>
+          <.link phx-click={JS.push("modal_cancel")} class={button_css()}>
+            <%= gettext("Back") %>
+          </.link>
+        </div>
+      </.form>
+    </div>
+    """
+  end
+end

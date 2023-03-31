@@ -14,7 +14,7 @@ defmodule FullCircleWeb.CompanyLiveIndex do
         >
           <%= if FullCircle.Authorization.can?(@current_user, :update_company, c) do %>
             <.link
-              navigate={~p"/companies/#{c.company_id}/edit"}
+              navigate={~p"/edit_company/#{c.company_id}"}
               class="text-blue-800 text-3xl font-bold"
             >
               <%= c.name %>
@@ -48,7 +48,7 @@ defmodule FullCircleWeb.CompanyLiveIndex do
 
           <%= if Util.attempt(assigns[:current_company], :id) != c.company_id do %>
             <.link
-              class={"#{button_css()} text-xl mx-2"}
+              class={"set-active #{button_css()} text-xl mx-2"}
               phx-value-id={c.company_id}
               navigate={~p"/companies/#{c.company_id}/dashboard"}
             >
@@ -62,7 +62,7 @@ defmodule FullCircleWeb.CompanyLiveIndex do
 
           <%= if !c.default_company do %>
             <.link
-              class={"#{button_css()} text-xl mx-2"}
+              class={"set-default #{button_css()} text-xl mx-2"}
               phx-value-id={c.company_id}
               phx-click="set_default"
             >
@@ -88,10 +88,14 @@ defmodule FullCircleWeb.CompanyLiveIndex do
   end
 
   @impl true
-  def mount(_params, _session, socket) do
+  def mount(_params, session, socket) do
     companies = Sys.list_companies(socket.assigns.current_user)
 
-    socket = socket |> assign(:page_title, gettext("Company Listing"))
+    socket =
+      socket
+      |> assign(:page_title, gettext("Company Listing"))
+      |> assign(:current_company, session["current_company"])
+      |> assign(:current_role, session["current_role"])
 
     {:ok,
      socket
