@@ -1,5 +1,7 @@
 defmodule FullCircle.Helpers do
   import Ecto.Query, warn: false
+  import Ecto.Changeset
+  import FullCircleWeb.Gettext
 
   def gen_temp_id(val \\ 6),
     do:
@@ -38,5 +40,17 @@ defmodule FullCircle.Helpers do
     Enum.reduce(attrs, %{}, fn
       {key, value}, acc -> Map.put(acc, to_string(key), value)
     end)
+  end
+
+  def validate_id(changeset, field_name, field_id) do
+    if Map.has_key?(changeset.changes, field_id) do
+      if is_nil(get_change(changeset, field_id)) do
+        changeset |> add_error(field_name, gettext("not in list"))
+      else
+        changeset
+      end
+    else
+      changeset
+    end
   end
 end

@@ -775,17 +775,18 @@ defmodule FullCircleWeb.CoreComponents do
 
   attr(:page, :integer)
   attr(:count, :integer)
+  attr(:per_page, :integer)
 
   def infinite_scroll_footer(assigns) do
     ~H"""
-    <%= if @count == 0 do %>
+    <%= if @count < @per_page do %>
       <div
         id="footer"
         phx-hook="InfiniteScroll"
         data-page-number={@page}
         class="mt-2 mb-2 text-center border-2 rounded bg-orange-200 border-orange-400 p-2"
       >
-        <%= gettext("No More...") %>
+        <%= gettext("No More.") %>
       </div>
     <% else %>
       <div
@@ -794,9 +795,25 @@ defmodule FullCircleWeb.CoreComponents do
         data-page-number={@page}
         class="mt-2 mb-2 text-center border-2 rounded bg-cyan-200 border-cyan-400 p-2"
       >
-        <%= gettext("Loading More...") %>
+        <%= gettext("Loading More...") %><.icon name="hero-arrow-path" class="ml-1 h-3 w-3 animate-spin" />
       </div>
     <% end %>
     """
+  end
+
+  def list_errors_to_string(errors) do
+    errors
+    |> Enum.map(fn {x, _} ->
+      "#{x} #{FullCircleWeb.CoreComponents.translate_errors(errors, x)}"
+    end)
+    |> Enum.join(" ")
+  end
+
+  def to_fc_time_format(dt) do
+    Phoenix.HTML.Tag.content_tag(
+      :p,
+      Timex.format!(Timex.local(dt), "%Y-%m-%d %H:%M:%S%p", :strftime),
+      class: "text-sm font-light"
+    )
   end
 end

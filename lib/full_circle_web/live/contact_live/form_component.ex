@@ -55,7 +55,8 @@ defmodule FullCircleWeb.ContactLive.FormComponent do
         {:noreply, socket}
 
       :not_authorise ->
-        {:not_authorise, socket}
+        send(self(), :not_authorise)
+        {:noreply, socket}
     end
   end
 
@@ -74,7 +75,8 @@ defmodule FullCircleWeb.ContactLive.FormComponent do
         {:noreply, socket}
 
       :not_authorise ->
-        {:not_authorise, socket}
+        send(self(), :not_authorise)
+        {:noreply, socket}
     end
   end
 
@@ -94,7 +96,8 @@ defmodule FullCircleWeb.ContactLive.FormComponent do
         {:noreply, socket}
 
       :not_authorise ->
-        {:not_authorise, socket}
+        send(self(), :not_authorise)
+        {:noreply, socket}
     end
   end
 

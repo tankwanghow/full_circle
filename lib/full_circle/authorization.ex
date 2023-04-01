@@ -12,6 +12,10 @@ defmodule FullCircle.Authorization do
   def can?(user, :update_account, company), do: allow_roles(["admin", "manager", "supervisor"], company, user)
   def can?(user, :delete_account, company), do: allow_roles(["admin", "manager", "supervisor"], company, user)
 
+  def can?(user, :create_contact, company), do: forbid_roles(["auditor", "guest", "cashier"], company, user)
+  def can?(user, :update_contact, company), do: forbid_roles(["auditor", "guest", "cashier"], company, user)
+  def can?(user, :delete_contact, company), do: forbid_roles(["auditor", "guest", "cashier"], company, user)
+
   def can?(user, :see_user_list, company), do: allow_role("admin", company, user)
   def can?(user, :invite_user, company), do: allow_role("admin", company, user)
   def can?(user, :add_user_to_company, company), do: allow_role("admin", company, user)
@@ -51,13 +55,13 @@ defmodule FullCircle.Authorization do
     if Enum.find(roles, fn r -> r == test_role end), do: @allow, else: @forbid
   end
 
-  # defp forbid_roles(roles, company, user) when is_list(roles) do
-  #   test_role = user_role_in_company(user.id, company.id)
-  #   if Enum.find(roles, fn r -> r == test_role end), do: @forbid, else: @allow
-  # end
+  defp forbid_roles(roles, company, user) when is_list(roles) do
+    test_role = user_role_in_company(user.id, company.id)
+    if Enum.find(roles, fn r -> r == test_role end), do: @forbid, else: @allow
+  end
 
-  # defp forbid_role(role, company, user) when is_binary(role) do
-  #   test_role = user_role_in_company(user.id, company.id)
-  #   if role == test_role, do: @forbid, else: @allow
-  # end
+  defp forbid_role(role, company, user) when is_binary(role) do
+    test_role = user_role_in_company(user.id, company.id)
+    if role == test_role, do: @forbid, else: @allow
+  end
 end

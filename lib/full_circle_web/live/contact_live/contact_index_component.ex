@@ -14,27 +14,19 @@ defmodule FullCircleWeb.ContactLive.ContactIndexComponent do
   @impl true
   def render(assigns) do
     ~H"""
-    <div id={@id} class={"#{@ex_class} contacts text-center grid grid-cols-12 gap-1 mb-1"}>
-      <div class="col-span-4 rounded bg-gray-50 border-gray-400 border p-2 ">
-        <.link
-          id={"edit_contact_#{@contact.id}"}
-          class="text-blue-600"
-          phx-value-contact-id={@contact.id}
-          phx-click={:edit_contact}
-        >
-          <%= @contact.name %>
-        </.link>
-      </div>
-      <div class="col-span-4 rounded bg-gray-50 border-gray-400 border p-2">
-        <p><%= @contact.address1 %>,
-        <%= @contact.address2 %><br/>
-        <%= @contact.city %> <%= @contact.zipcode %><br/>
+    <div
+      id={@id}
+      class={"#{@ex_class} cursor-pointer hover:bg-gray-400 accounts text-center mb-1 bg-gray-200 border-gray-500 border-2 rounded p-2"}
+      phx-value-contact-id={@contact.id}
+      phx-click={:edit_contact}
+    >
+      <p class="text-xl font-bold"><%= @contact.name %></p>
+      <p class="font-light"><%= @contact.address1 %>, <%= @contact.address2 %><br />
+        <%= @contact.city %> <%= @contact.zipcode %><br />
         <%= @contact.state %> <%= @contact.country %></p>
-        <span class="font-light"><%= @contact.contact_info %></span>
-      </div>
-      <div class="col-span-4 rounded bg-gray-50 border-gray-400 border p-2">
-        <%= @contact.descriptions %>
-      </div>
+      <p><%= @contact.contact_info %></p>
+      <%= @contact.descriptions %>
+      <%= to_fc_time_format(@contact.updated_at) %>
     </div>
     """
   end

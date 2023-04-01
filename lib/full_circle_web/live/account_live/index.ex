@@ -4,7 +4,7 @@ defmodule FullCircleWeb.AccountLive.Index do
   alias FullCircle.Accounting
   alias FullCircle.Accounting.Account
 
-  @per_page 20
+  @per_page 5
 
   @impl true
   def render(assigns) do
@@ -17,30 +17,22 @@ defmodule FullCircleWeb.AccountLive.Index do
           <%= gettext("Add New Account") %>
         </.link>
       </div>
-      <div class="text-center grid grid-cols-12 gap-1 mb-1">
-        <div class="col-span-4 rounded bg-amber-200 border border-amber-500 font-bold p-2">
-          <%= gettext("Account Name") %>
-        </div>
+      <div class="text-center mb-1">
         <div class="col-span-3 rounded bg-amber-200 border border-amber-500 font-bold p-2">
-          <%= gettext("Account Type") %>
-        </div>
-        <div class="col-span-5 rounded bg-amber-200 border border-amber-500 font-bold p-2">
-          <%= gettext("Descriptions") %>
+          <%= gettext("Account Information") %>
         </div>
       </div>
       <div id="accounts_list" phx-update={@update}>
-        <%= if @accounts_count > 0 do %>
-          <%= for ac <- @accounts do %>
-            <.live_component
-              module={FullCircleWeb.AccountLive.AccountIndexComponent}
-              id={"accounts-#{ac.id}"}
-              account={ac}
-              ex_class=""
-            />
-          <% end %>
+        <%= for ac <- @accounts do %>
+          <.live_component
+            module={FullCircleWeb.AccountLive.AccountIndexComponent}
+            id={"accounts-#{ac.id}"}
+            account={ac}
+            ex_class=""
+          />
         <% end %>
       </div>
-      <.infinite_scroll_footer page={@page} count={@accounts_count} />
+      <.infinite_scroll_footer page={@page} count={@accounts_count} per_page={@per_page}/>
     </div>
 
     <.modal
@@ -52,7 +44,7 @@ defmodule FullCircleWeb.AccountLive.Index do
       <.live_component
         module={@module}
         id={@id}
-        page_title={@page_title}
+        title={@title}
         live_action={@live_action}
         form={@form}
         account={@account}
@@ -91,7 +83,7 @@ defmodule FullCircleWeb.AccountLive.Index do
      |> assign(live_action: :new)
      |> assign(id: "new")
      |> assign(module: FullCircleWeb.AccountLive.FormComponent)
-     |> assign(page_title: gettext("New Account"))
+     |> assign(title: gettext("New Account"))
      |> assign(current_company: socket.assigns.current_company)
      |> assign(current_user: socket.assigns.current_user)
      |> assign(account: nil)
@@ -110,7 +102,7 @@ defmodule FullCircleWeb.AccountLive.Index do
      |> assign(live_action: :edit)
      |> assign(id: id)
      |> assign(module: FullCircleWeb.AccountLive.FormComponent)
-     |> assign(page_title: gettext("Edit Account"))
+     |> assign(title: gettext("Edit Account"))
      |> assign(current_company: socket.assigns.current_company)
      |> assign(current_user: socket.assigns.current_user)
      |> assign(account: account)
@@ -184,6 +176,25 @@ defmodule FullCircleWeb.AccountLive.Index do
      socket
      |> put_flash(:info, "#{ac.name} #{gettext("Account Deleted")}")
      |> assign(live_action: nil)}
+  end
+
+  @impl true
+  def handle_info({:error, failed_operation, failed_value}, socket) do
+    {:noreply,
+     socket
+     |> assign(live_action: nil)
+     |> put_flash(
+       :error,
+       "#{gettext("Failed")} #{failed_operation}. #{list_errors_to_string(failed_value.errors)}"
+     )}
+  end
+
+  @impl true
+  def handle_info(:not_authorise, socket) do
+    {:noreply,
+     socket
+     |> assign(live_action: nil)
+     |> put_flash(:error, gettext("You are not authorised to perform this action"))}
   end
 
   defp filter_accounts(socket, terms, page) do

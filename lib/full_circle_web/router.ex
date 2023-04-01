@@ -100,8 +100,7 @@ defmodule FullCircleWeb.Router do
       live("/users/new", UserLive.New, :new)
       live("/users", UserLive.Index, :index)
       live("/accounts", AccountLive.Index, :index)
-      # live("/accounts/new", AccountLive.Form, :new)
-      # live("/accounts/:id/edit", AccountLive.Form, :edit)
+      live("/contacts", ContactLive.Index, :index)
     end
   end
 

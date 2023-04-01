@@ -4,7 +4,7 @@ defmodule FullCircleWeb.ContactLive.Index do
   alias FullCircle.Accounting
   alias FullCircle.Accounting.Contact
 
-  @per_page 20
+  @per_page 5
 
   @impl true
   def render(assigns) do
@@ -29,18 +29,16 @@ defmodule FullCircleWeb.ContactLive.Index do
         </div>
       </div>
       <div id="contacts_list" phx-update={@update}>
-        <%!-- <%= if @contacts_count > 0 do %> --%>
-          <%= for cont <- @contacts do %>
-            <.live_component
-              module={FullCircleWeb.ContactLive.ContactIndexComponent}
-              id={"contacts-#{cont.id}"}
-              contact={cont}
-              ex_class=""
-            />
-          <% end %>
-        <%!-- <% end %> --%>
+        <%= for cont <- @contacts do %>
+          <.live_component
+            module={FullCircleWeb.ContactLive.ContactIndexComponent}
+            id={"contacts-#{cont.id}"}
+            contact={cont}
+            ex_class=""
+          />
+        <% end %>
       </div>
-      <.infinite_scroll_footer page={@page} count={@contacts_count} />
+      <.infinite_scroll_footer page={@page} count={@contacts_count} per_page={@per_page} />
     </div>
 
     <.modal
@@ -184,6 +182,25 @@ defmodule FullCircleWeb.ContactLive.Index do
      socket
      |> put_flash(:info, "#{cont.name} #{gettext("Contact Deleted")}")
      |> assign(live_action: nil)}
+  end
+
+  @impl true
+  def handle_info({:error, failed_operation, failed_value}, socket) do
+    {:noreply,
+     socket
+     |> assign(live_action: nil)
+     |> put_flash(
+       :error,
+       "#{gettext("Failed")} #{failed_operation}. #{list_errors_to_string(failed_value.errors)}"
+     )}
+  end
+
+  @impl true
+  def handle_info(:not_authorise, socket) do
+    {:noreply,
+     socket
+     |> assign(live_action: nil)
+     |> put_flash(:error, gettext("You are not authorised to perform this action"))}
   end
 
   defp filter_contacts(socket, terms, page) do

@@ -26,8 +26,8 @@ button[disabled] {
   @apply duration-500;
   @apply select-none;
   @apply bg-pink-300;
-  @apply hover: bg-pink-500;
-  @apply focus: bg-pink-500;
+  @apply hover:bg-pink-500;
+  @apply focus:bg-pink-500;
 }
 
 @keyframes shake {

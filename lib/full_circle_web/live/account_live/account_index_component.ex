@@ -14,23 +14,16 @@ defmodule FullCircleWeb.AccountLive.AccountIndexComponent do
   @impl true
   def render(assigns) do
     ~H"""
-    <div id={@id} class={"#{@ex_class} accounts text-center grid grid-cols-12 gap-1 mb-1"}>
-      <div class="col-span-4 rounded bg-gray-50 border-gray-400 border p-2">
-        <.link
-          id={"edit_account_#{@account.id}"}
-          class="text-blue-600"
-          phx-value-account-id={@account.id}
-          phx-click={:edit_account}
-        >
-          <%= @account.name %>
-        </.link>
-      </div>
-      <div class="col-span-3 rounded bg-gray-50 border-gray-400 border p-2">
-        <%= @account.account_type %>
-      </div>
-      <div class="col-span-5 rounded bg-gray-50 border-gray-400 border p-2">
-        <%= @account.descriptions %>
-      </div>
+    <div
+      id={@id}
+      class={"#{@ex_class} cursor-pointer hover:bg-gray-400 accounts text-center mb-1 bg-gray-200 border-gray-500 border-2 rounded p-2"}
+      phx-value-account-id={@account.id}
+      phx-click={:edit_account}
+    >
+      <span class="text-xl font-bold"><%= @account.name %></span><br/>
+      <p><%= @account.account_type %></p>
+      <p><%= @account.descriptions %></p>
+      <%= to_fc_time_format(@account.updated_at) %>
     </div>
     """
   end

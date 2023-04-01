@@ -15,6 +15,7 @@ defmodule FullCircle.UserAccounts.User do
       on_replace: :delete
 
     has_many :company_user, FullCircle.Sys.CompanyUser
+    
     timestamps(type: :utc_datetime_usec)
   end
 

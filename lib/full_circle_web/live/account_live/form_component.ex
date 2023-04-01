@@ -55,7 +55,8 @@ defmodule FullCircleWeb.AccountLive.FormComponent do
         {:noreply, socket}
 
       :not_authorise ->
-        {:not_authorise, socket}
+        send(self(), :not_authorise)
+        {:noreply, socket}
     end
   end
 
@@ -74,7 +75,8 @@ defmodule FullCircleWeb.AccountLive.FormComponent do
         {:noreply, socket}
 
       :not_authorise ->
-        {:not_authorise, socket}
+        send(self(), :not_authorise)
+        {:noreply, socket}
     end
   end
 
@@ -94,7 +96,8 @@ defmodule FullCircleWeb.AccountLive.FormComponent do
         {:noreply, socket}
 
       :not_authorise ->
-        {:not_authorise, socket}
+        send(self(), :not_authorise)
+        {:noreply, socket}
     end
   end
 
@@ -102,7 +105,7 @@ defmodule FullCircleWeb.AccountLive.FormComponent do
   def render(assigns) do
     ~H"""
     <div>
-      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
+      <p class="w-full text-3xl text-center font-medium"><%= @title %></p>
       <.form
         for={@form}
         id="account-form"

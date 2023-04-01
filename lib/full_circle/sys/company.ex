@@ -23,6 +23,11 @@ defmodule FullCircle.Sys.Company do
     field :closing_month, :integer
     field :closing_day, :integer
 
+    has_many :contacts, FullCicle.Accounting.Contact, on_delete: :delete_all
+    has_many :accounts, FullCicle.Accounting.Account, on_delete: :delete_all
+    has_many :logs, FullCicle.Sys.Log, on_delete: :delete_all
+    has_many :company_users, FullCicle.Sys.CompanyUser, on_delete: :delete_all
+
     timestamps(type: :utc_datetime)
   end
 

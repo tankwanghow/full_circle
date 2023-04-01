@@ -36,6 +36,16 @@ defmodule FullCircle.Sys do
     )
   end
 
+  def user_companies(company, user) do
+    from(c in Company,
+      join: cu in CompanyUser,
+      on: c.id == cu.company_id,
+      where: cu.user_id == ^user.id,
+      where: cu.role != "disable",
+      where: c.id == ^company.id
+    )
+  end
+
   def get_company_user(company_id, user_id) do
     Repo.one(
       from(cu in CompanyUser, where: cu.company_id == ^company_id, where: cu.user_id == ^user_id)
