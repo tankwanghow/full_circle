@@ -52,7 +52,12 @@ defmodule FullCircleWeb.CoreComponents do
 
   def modal(assigns) do
     ~H"""
-    <div id={@id} phx-mounted={@show && show_modal(@id)} class="relative z-50 hidden">
+    <div
+      id={@id}
+      phx-remove={hide_modal(@on_cancel, @id)}
+      phx-mounted={@show && show_modal(@id)}
+      class="relative z-50 hidden"
+    >
       <div id={"#{@id}-bg"} class="fixed inset-0 bg-zinc-50/90 transition-opacity" aria-hidden="true" />
       <div
         class="fixed inset-0 overflow-y-auto"
@@ -67,14 +72,14 @@ defmodule FullCircleWeb.CoreComponents do
             <.focus_wrap
               id={"#{@id}-container"}
               phx-mounted={@show && show_modal(@id)}
-              phx-window-keydown={hide_modal(@on_cancel, @id)}
+              phx-window-keydown={JS.exec("phx-remove", to: "##{@id}")}
               phx-key="escape"
-              phx-click-away={hide_modal(@on_cancel, @id)}
+              phx-click-away={JS.exec("phx-remove", to: "##{@id}")}
               class="hidden relative rounded-2xl bg-white p-14 shadow-lg shadow-zinc-700/10 ring-1 ring-zinc-700/10 transition"
             >
               <div class="absolute top-6 right-5">
                 <button
-                  phx-click={hide_modal(@on_cancel, @id)}
+                  phx-click={JS.exec("phx-remove", to: "##{@id}")}
                   type="button"
                   class="-m-3 flex-none p-3 opacity-20 hover:opacity-40"
                   aria-label={gettext("close")}
@@ -107,7 +112,7 @@ defmodule FullCircleWeb.CoreComponents do
                   </.button>
                   <.link
                     :for={cancel <- @cancel}
-                    phx-click={hide_modal(@on_cancel, @id)}
+                    phx-click={JS.exec("phx-remove", to: "##{@id}")}
                     class="py-2 px-3 rounded-lg border font-semibold leading-6 bg-blue-200 hover:bg-blue-400 col-start-3"
                   >
                     <%= render_slot(cancel) %>
@@ -795,7 +800,10 @@ defmodule FullCircleWeb.CoreComponents do
         data-page-number={@page}
         class="mt-2 mb-2 text-center border-2 rounded bg-cyan-200 border-cyan-400 p-2"
       >
-        <%= gettext("Loading More...") %><.icon name="hero-arrow-path" class="ml-1 h-3 w-3 animate-spin" />
+        <%= gettext("Loading More...") %><.icon
+          name="hero-arrow-path"
+          class="ml-1 h-3 w-3 animate-spin"
+        />
       </div>
     <% end %>
     """
@@ -814,6 +822,21 @@ defmodule FullCircleWeb.CoreComponents do
       :p,
       Timex.format!(Timex.local(dt), "%Y-%m-%d %H:%M:%S%p", :strftime),
       class: "text-sm font-light"
+    )
+  end
+
+  def shake(module, obj, obj_name, id) do
+    Phoenix.LiveView.send_update(
+      self(),
+      module,
+      [{:id, id}, {obj_name, obj}, {:ex_class, "shake"}]
+    )
+
+    Phoenix.LiveView.send_update_after(
+      self(),
+      module,
+      [{:id, id}, {obj_name, obj}, {:ex_class, ""}],
+      2000
     )
   end
 end

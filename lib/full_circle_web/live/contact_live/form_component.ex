@@ -1,6 +1,6 @@
 defmodule FullCircleWeb.ContactLive.FormComponent do
   use FullCircleWeb, :live_component
-  alias FullCircle.Accounting
+  alias FullCircle.StdInterface
   alias FullCircle.Accounting.Contact
 
   @impl true
@@ -25,8 +25,7 @@ defmodule FullCircleWeb.ContactLive.FormComponent do
     contact = if(socket.assigns[:contact], do: socket.assigns.contact, else: %Contact{})
 
     changeset =
-      contact
-      |> Accounting.contact_changeset(params, socket.assigns.current_company)
+      StdInterface.changeset(Contact, contact, params, socket.assigns.current_company)
       |> Map.put(:action, :insert)
 
     socket = assign(socket, form: to_form(changeset))
@@ -41,7 +40,9 @@ defmodule FullCircleWeb.ContactLive.FormComponent do
 
   @impl true
   def handle_event("delete", _params, socket) do
-    case Accounting.delete_contact(
+    case StdInterface.delete(
+           Contact,
+           "contact",
            socket.assigns.contact,
            socket.assigns.current_user,
            socket.assigns.current_company
@@ -61,7 +62,9 @@ defmodule FullCircleWeb.ContactLive.FormComponent do
   end
 
   defp save_contact(socket, :new, params) do
-    case Accounting.create_contact(
+    case StdInterface.create(
+           Contact,
+           "contact",
            params,
            socket.assigns.current_user,
            socket.assigns.current_company
@@ -81,7 +84,9 @@ defmodule FullCircleWeb.ContactLive.FormComponent do
   end
 
   defp save_contact(socket, :edit, params) do
-    case Accounting.update_contact(
+    case StdInterface.update(
+           Contact,
+           "contact",
            socket.assigns.contact,
            params,
            socket.assigns.current_user,
@@ -115,39 +120,39 @@ defmodule FullCircleWeb.ContactLive.FormComponent do
         phx-submit="save"
         class="mx-auto"
       >
-      <div class="grid grid-cols-12 gap-2">
-      <div class="col-span-12">
-        <.input field={@form[:name]} label={gettext("Name")} />
-      </div>
-      <div class="col-span-12">
-        <.input field={@form[:address1]} label={gettext("Address Line 1")} />
-      </div>
-      <div class="col-span-12">
-        <.input field={@form[:address2]} label={gettext("Address Line 2")} />
-      </div>
-      <div class="col-span-6">
-        <.input field={@form[:city]} label={gettext("City")} />
-      </div>
-      <div class="col-span-6">
-        <.input field={@form[:zipcode]} label={gettext("Postal Code")} />
-      </div>
-      <div class="col-span-4  ">
-        <.input field={@form[:state]} label={gettext("State")} />
-      </div>
-      <div class="col-span-4">
-        <.input field={@form[:country]} label={gettext("Country")} list="countries" />
-      </div>
-      <div class="col-span-4">
-        <.input field={@form[:reg_no]} label={gettext("Reg No")} />
-      </div>
-      <div class="col-span-12">
-        <.input field={@form[:contact_info]} label={gettext("Contact")} type="textarea"/>
-      </div>
-      <div class="col-span-12">
-        <.input field={@form[:descriptions]} label={gettext("Descriptions")}  type="textarea"/>
-      </div>
-    </div>
-    <%= datalist(FullCircle.Sys.countries(), "countries") %>
+        <div class="grid grid-cols-12 gap-2">
+          <div class="col-span-12">
+            <.input field={@form[:name]} label={gettext("Name")} />
+          </div>
+          <div class="col-span-12">
+            <.input field={@form[:address1]} label={gettext("Address Line 1")} />
+          </div>
+          <div class="col-span-12">
+            <.input field={@form[:address2]} label={gettext("Address Line 2")} />
+          </div>
+          <div class="col-span-6">
+            <.input field={@form[:city]} label={gettext("City")} />
+          </div>
+          <div class="col-span-6">
+            <.input field={@form[:zipcode]} label={gettext("Postal Code")} />
+          </div>
+          <div class="col-span-4  ">
+            <.input field={@form[:state]} label={gettext("State")} />
+          </div>
+          <div class="col-span-4">
+            <.input field={@form[:country]} label={gettext("Country")} list="countries" />
+          </div>
+          <div class="col-span-4">
+            <.input field={@form[:reg_no]} label={gettext("Reg No")} />
+          </div>
+          <div class="col-span-12">
+            <.input field={@form[:contact_info]} label={gettext("Contact")} type="textarea" />
+          </div>
+          <div class="col-span-12">
+            <.input field={@form[:descriptions]} label={gettext("Descriptions")} type="textarea" />
+          </div>
+        </div>
+        <%= datalist(FullCircle.Sys.countries(), "countries") %>
 
         <div class="flex justify-center gap-x-1 mt-1">
           <.button disabled={!@form.source.valid?}><%= gettext("Save") %></.button>

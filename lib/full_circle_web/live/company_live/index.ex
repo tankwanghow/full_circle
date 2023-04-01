@@ -10,7 +10,7 @@ defmodule FullCircleWeb.CompanyLiveIndex do
       <%= for c <- @companies do %>
         <div
           id={"company-#{c.company_id}"}
-          class={"#{shake(c.updated_at, 3)} border-1 bg-green-200 p-3 m-2 rounded-2xl border-2 border-green-500 text-center"}
+          class={"#{shake(c.updated_at, 2)} border-1 bg-green-200 p-3 m-2 rounded-2xl border-2 border-green-500 text-center"}
         >
           <%= if FullCircle.Authorization.can?(@current_user, :update_company, c) do %>
             <.link

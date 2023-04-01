@@ -1,10 +1,10 @@
 defmodule FullCircleWeb.ContactLive.Index do
   use FullCircleWeb, :live_view
 
-  alias FullCircle.Accounting
+  alias FullCircle.StdInterface
   alias FullCircle.Accounting.Contact
 
-  @per_page 5
+  @per_page 10
 
   @impl true
   def render(assigns) do
@@ -18,14 +18,8 @@ defmodule FullCircleWeb.ContactLive.Index do
         </.link>
       </div>
       <div class="text-center grid grid-cols-12 gap-1 mb-1">
-        <div class="col-span-4 rounded bg-amber-200 border border-amber-500 font-bold p-2">
-          <%= gettext("Name") %>
-        </div>
-        <div class="col-span-4 rounded bg-amber-200 border border-amber-500 font-bold p-2">
-          <%= gettext("Address & Contact") %>
-        </div>
-        <div class="col-span-4 rounded bg-amber-200 border border-amber-500 font-bold p-2">
-          <%= gettext("Descriptions") %>
+      <div class="col-span-3 rounded bg-amber-200 border border-amber-500 font-bold p-2">
+          <%= gettext("Contact Information") %>
         </div>
       </div>
       <div id="contacts_list" phx-update={@update}>
@@ -95,13 +89,18 @@ defmodule FullCircleWeb.ContactLive.Index do
      |> assign(contact: nil)
      |> assign(
        :form,
-       to_form(Accounting.contact_changeset(%Contact{}, %{}, socket.assigns.current_company))
+       to_form(StdInterface.changeset(Contact, %Contact{}, %{}, socket.assigns.current_company))
      )}
   end
 
   @impl true
   def handle_event("edit_contact", %{"contact-id" => id}, socket) do
-    contact = Accounting.get_contact!(id)
+    contact = StdInterface.get!(Contact, id)
+
+    send_update(self(), FullCircleWeb.ContactLive.ContactIndexComponent,
+      id: "contacts-#{contact.id}",
+      ex_class: ""
+    )
 
     {:noreply,
      socket
@@ -114,7 +113,7 @@ defmodule FullCircleWeb.ContactLive.Index do
      |> assign(contact: contact)
      |> assign(
        :form,
-       to_form(Accounting.contact_changeset(contact, %{}, socket.assigns.current_company))
+       to_form(StdInterface.changeset(Contact, contact, %{}, socket.assigns.current_company))
      )}
   end
 
@@ -145,12 +144,7 @@ defmodule FullCircleWeb.ContactLive.Index do
 
   @impl true
   def handle_info({:created, cont}, socket) do
-    send_update_after(
-      self(),
-      FullCircleWeb.ContactLive.ContactIndexComponent,
-      [id: "contacts-#{cont.id}", contact: cont, ex_class: "shake"],
-      400
-    )
+    shake(FullCircleWeb.ContactLive.ContactIndexComponent, cont, :contact, "contacts-#{cont.id}")
 
     {:noreply,
      socket
@@ -160,27 +154,15 @@ defmodule FullCircleWeb.ContactLive.Index do
   end
 
   def handle_info({:updated, cont}, socket) do
-    send_update_after(
-      self(),
-      FullCircleWeb.ContactLive.ContactIndexComponent,
-      [id: "contacts-#{cont.id}", contact: cont, ex_class: "shake"],
-      400
-    )
+    shake(FullCircleWeb.ContactLive.ContactIndexComponent, cont, :contact, "contacts-#{cont.id}")
 
     {:noreply, socket |> assign(live_action: nil)}
   end
 
   def handle_info({:deleted, cont}, socket) do
-    send_update_after(
-      self(),
-      FullCircleWeb.ContactLive.ContactIndexComponent,
-      [id: "contacts-#{cont.id}", ex_class: "hidden"],
-      400
-    )
-
     {:noreply,
      socket
-     |> put_flash(:info, "#{cont.name} #{gettext("Contact Deleted")}")
+     |> push_event("remove-el", %{"id" => "contacts-#{cont.id}"})
      |> assign(live_action: nil)}
   end
 
@@ -204,7 +186,9 @@ defmodule FullCircleWeb.ContactLive.Index do
   end
 
   defp filter_contacts(socket, terms, page) do
-    Accounting.filter_contacts(
+    StdInterface.filter(
+      Contact,
+      [:name, :city, :state, :descriptions],
       terms,
       socket.assigns.current_company,
       socket.assigns.current_user,

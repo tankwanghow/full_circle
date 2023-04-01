@@ -1,10 +1,10 @@
 defmodule FullCircleWeb.AccountLive.Index do
   use FullCircleWeb, :live_view
 
-  alias FullCircle.Accounting
   alias FullCircle.Accounting.Account
+  alias FullCircle.StdInterface
 
-  @per_page 5
+  @per_page 10
 
   @impl true
   def render(assigns) do
@@ -32,7 +32,7 @@ defmodule FullCircleWeb.AccountLive.Index do
           />
         <% end %>
       </div>
-      <.infinite_scroll_footer page={@page} count={@accounts_count} per_page={@per_page}/>
+      <.infinite_scroll_footer page={@page} count={@accounts_count} per_page={@per_page} />
     </div>
 
     <.modal
@@ -89,13 +89,13 @@ defmodule FullCircleWeb.AccountLive.Index do
      |> assign(account: nil)
      |> assign(
        :form,
-       to_form(Accounting.account_changeset(%Account{}, %{}, socket.assigns.current_company))
+       to_form(StdInterface.changeset(Account, %Account{}, %{}, socket.assigns.current_company))
      )}
   end
 
   @impl true
   def handle_event("edit_account", %{"account-id" => id}, socket) do
-    account = Accounting.get_account!(id)
+    account = StdInterface.get!(Account, id)
 
     {:noreply,
      socket
@@ -108,7 +108,7 @@ defmodule FullCircleWeb.AccountLive.Index do
      |> assign(account: account)
      |> assign(
        :form,
-       to_form(Accounting.account_changeset(account, %{}, socket.assigns.current_company))
+       to_form(StdInterface.changeset(Account, account, %{}, socket.assigns.current_company))
      )}
   end
 
@@ -139,12 +139,7 @@ defmodule FullCircleWeb.AccountLive.Index do
 
   @impl true
   def handle_info({:created, ac}, socket) do
-    send_update_after(
-      self(),
-      FullCircleWeb.AccountLive.AccountIndexComponent,
-      [id: "accounts-#{ac.id}", account: ac, ex_class: "shake"],
-      400
-    )
+    shake(FullCircleWeb.AccountLive.AccountIndexComponent, ac, :account, "accounts-#{ac.id}")
 
     {:noreply,
      socket
@@ -154,27 +149,15 @@ defmodule FullCircleWeb.AccountLive.Index do
   end
 
   def handle_info({:updated, ac}, socket) do
-    send_update_after(
-      self(),
-      FullCircleWeb.AccountLive.AccountIndexComponent,
-      [id: "accounts-#{ac.id}", account: ac, ex_class: "shake"],
-      400
-    )
+    shake(FullCircleWeb.AccountLive.AccountIndexComponent, ac, :account, "accounts-#{ac.id}")
 
     {:noreply, socket |> assign(live_action: nil)}
   end
 
   def handle_info({:deleted, ac}, socket) do
-    send_update_after(
-      self(),
-      FullCircleWeb.AccountLive.AccountIndexComponent,
-      [id: "accounts-#{ac.id}", ex_class: "hidden"],
-      400
-    )
-
     {:noreply,
      socket
-     |> put_flash(:info, "#{ac.name} #{gettext("Account Deleted")}")
+     |> push_event("remove-el", %{"id" => "accounts-#{ac.id}"})
      |> assign(live_action: nil)}
   end
 
@@ -198,7 +181,9 @@ defmodule FullCircleWeb.AccountLive.Index do
   end
 
   defp filter_accounts(socket, terms, page) do
-    Accounting.filter_accounts(
+    StdInterface.filter(
+      Account,
+      [:name, :account_type, :descriptions],
       terms,
       socket.assigns.current_company,
       socket.assigns.current_user,

@@ -1,7 +1,8 @@
 defmodule FullCircleWeb.AccountLive.FormComponent do
   use FullCircleWeb, :live_component
-  alias FullCircle.Accounting
+
   alias FullCircle.Accounting.Account
+  alias FullCircle.StdInterface
 
   @impl true
   def mount(socket) do
@@ -25,8 +26,7 @@ defmodule FullCircleWeb.AccountLive.FormComponent do
     account = if(socket.assigns[:account], do: socket.assigns.account, else: %Account{})
 
     changeset =
-      account
-      |> Accounting.account_changeset(params, socket.assigns.current_company)
+      StdInterface.changeset(Account, account, params, socket.assigns.current_company)
       |> Map.put(:action, :insert)
 
     socket = assign(socket, form: to_form(changeset))
@@ -41,7 +41,9 @@ defmodule FullCircleWeb.AccountLive.FormComponent do
 
   @impl true
   def handle_event("delete", _params, socket) do
-    case Accounting.delete_account(
+    case StdInterface.delete(
+           Account,
+           "account",
            socket.assigns.account,
            socket.assigns.current_user,
            socket.assigns.current_company
@@ -61,7 +63,9 @@ defmodule FullCircleWeb.AccountLive.FormComponent do
   end
 
   defp save_account(socket, :new, params) do
-    case Accounting.create_account(
+    case StdInterface.create(
+           Account,
+           "account",
            params,
            socket.assigns.current_user,
            socket.assigns.current_company
@@ -81,7 +85,9 @@ defmodule FullCircleWeb.AccountLive.FormComponent do
   end
 
   defp save_account(socket, :edit, params) do
-    case Accounting.update_account(
+    case StdInterface.update(
+           Account,
+           "account",
            socket.assigns.account,
            params,
            socket.assigns.current_user,
