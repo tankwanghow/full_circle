@@ -9,6 +9,12 @@
   animation-iteration-count: 3;
 }
 
+.slow-hide {
+  @apply opacity-0;
+  @apply transition-opacity;
+  @apply duration-1000;
+}
+
 button[disabled] {
   @apply bg-gray-200;
   @apply hover:bg-gray-200;

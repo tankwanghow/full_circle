@@ -3,6 +3,8 @@ defmodule FullCircleWeb.AccountLive.Index do
 
   alias FullCircle.Accounting.Account
   alias FullCircle.StdInterface
+  alias FullCircleWeb.AccountLive.FormComponent
+  alias FullCircleWeb.AccountLive.IndexComponent
 
   @per_page 10
 
@@ -18,14 +20,14 @@ defmodule FullCircleWeb.AccountLive.Index do
         </.link>
       </div>
       <div class="text-center mb-1">
-        <div class="col-span-3 rounded bg-amber-200 border border-amber-500 font-bold p-2">
+        <div class="rounded bg-amber-200 border border-amber-500 font-bold p-2">
           <%= gettext("Account Information") %>
         </div>
       </div>
       <div id="accounts_list" phx-update={@update}>
         <%= for ac <- @accounts do %>
           <.live_component
-            module={FullCircleWeb.AccountLive.AccountIndexComponent}
+            module={IndexComponent}
             id={"accounts-#{ac.id}"}
             account={ac}
             ex_class=""
@@ -42,7 +44,7 @@ defmodule FullCircleWeb.AccountLive.Index do
       on_cancel={JS.push("modal_cancel")}
     >
       <.live_component
-        module={@module}
+        module={FormComponent}
         id={@id}
         title={@title}
         live_action={@live_action}
@@ -73,6 +75,7 @@ defmodule FullCircleWeb.AccountLive.Index do
 
   @impl true
   def handle_event("modal_cancel", _, socket) do
+    IO.inspect(socket.assigns)
     {:noreply, socket |> assign(live_action: nil)}
   end
 
@@ -82,7 +85,6 @@ defmodule FullCircleWeb.AccountLive.Index do
      socket
      |> assign(live_action: :new)
      |> assign(id: "new")
-     |> assign(module: FullCircleWeb.AccountLive.FormComponent)
      |> assign(title: gettext("New Account"))
      |> assign(current_company: socket.assigns.current_company)
      |> assign(current_user: socket.assigns.current_user)
@@ -101,7 +103,6 @@ defmodule FullCircleWeb.AccountLive.Index do
      socket
      |> assign(live_action: :edit)
      |> assign(id: id)
-     |> assign(module: FullCircleWeb.AccountLive.FormComponent)
      |> assign(title: gettext("Edit Account"))
      |> assign(current_company: socket.assigns.current_company)
      |> assign(current_user: socket.assigns.current_user)
@@ -139,7 +140,7 @@ defmodule FullCircleWeb.AccountLive.Index do
 
   @impl true
   def handle_info({:created, ac}, socket) do
-    shake(FullCircleWeb.AccountLive.AccountIndexComponent, ac, :account, "accounts-#{ac.id}")
+    css_trans(IndexComponent, ac, :account, "accounts-#{ac.id}", "shake")
 
     {:noreply,
      socket
@@ -149,15 +150,16 @@ defmodule FullCircleWeb.AccountLive.Index do
   end
 
   def handle_info({:updated, ac}, socket) do
-    shake(FullCircleWeb.AccountLive.AccountIndexComponent, ac, :account, "accounts-#{ac.id}")
+    css_trans(IndexComponent, ac, :account, "accounts-#{ac.id}", "shake")
 
     {:noreply, socket |> assign(live_action: nil)}
   end
 
   def handle_info({:deleted, ac}, socket) do
+    css_trans(IndexComponent, ac, :account, "accounts-#{ac.id}", "slow-hide", "hidden")
+
     {:noreply,
      socket
-     |> push_event("remove-el", %{"id" => "accounts-#{ac.id}"})
      |> assign(live_action: nil)}
   end
 

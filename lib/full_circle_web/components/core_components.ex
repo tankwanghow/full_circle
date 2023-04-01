@@ -817,26 +817,26 @@ defmodule FullCircleWeb.CoreComponents do
     |> Enum.join(" ")
   end
 
-  def to_fc_time_format(dt) do
+  def to_fc_time_format(dt, class \\ "text-xs font-light") do
     Phoenix.HTML.Tag.content_tag(
       :p,
       Timex.format!(Timex.local(dt), "%Y-%m-%d %H:%M:%S%p", :strftime),
-      class: "text-sm font-light"
+      class: class
     )
   end
 
-  def shake(module, obj, obj_name, id) do
+  def css_trans(module, obj, obj_name, id, ex_class_1, ex_class_2\\"") do
     Phoenix.LiveView.send_update(
       self(),
       module,
-      [{:id, id}, {obj_name, obj}, {:ex_class, "shake"}]
+      [{:id, id}, {obj_name, obj}, {:ex_class, ex_class_1}]
     )
 
     Phoenix.LiveView.send_update_after(
       self(),
       module,
-      [{:id, id}, {obj_name, obj}, {:ex_class, ""}],
-      2000
+      [{:id, id}, {obj_name, obj}, {:ex_class, ex_class_2}],
+      1500
     )
   end
 end

@@ -3,6 +3,8 @@ defmodule FullCircleWeb.ContactLive.Index do
 
   alias FullCircle.StdInterface
   alias FullCircle.Accounting.Contact
+  alias FullCircleWeb.ContactLive.IndexComponent
+  alias FullCircleWeb.ContactLive.FormComponent
 
   @per_page 10
 
@@ -17,15 +19,15 @@ defmodule FullCircleWeb.ContactLive.Index do
           <%= gettext("Add New Contact") %>
         </.link>
       </div>
-      <div class="text-center grid grid-cols-12 gap-1 mb-1">
-      <div class="col-span-3 rounded bg-amber-200 border border-amber-500 font-bold p-2">
+      <div class="text-center mb-1">
+      <div class="rounded bg-amber-200 border border-amber-500 font-bold p-2">
           <%= gettext("Contact Information") %>
         </div>
       </div>
       <div id="contacts_list" phx-update={@update}>
         <%= for cont <- @contacts do %>
           <.live_component
-            module={FullCircleWeb.ContactLive.ContactIndexComponent}
+            module={IndexComponent}
             id={"contacts-#{cont.id}"}
             contact={cont}
             ex_class=""
@@ -42,7 +44,7 @@ defmodule FullCircleWeb.ContactLive.Index do
       on_cancel={JS.push("modal_cancel")}
     >
       <.live_component
-        module={@module}
+        module={FormComponent}
         id={@id}
         title={@title}
         live_action={@live_action}
@@ -82,7 +84,6 @@ defmodule FullCircleWeb.ContactLive.Index do
      socket
      |> assign(live_action: :new)
      |> assign(id: "new")
-     |> assign(module: FullCircleWeb.ContactLive.FormComponent)
      |> assign(title: gettext("New Contact"))
      |> assign(current_company: socket.assigns.current_company)
      |> assign(current_user: socket.assigns.current_user)
@@ -97,16 +98,10 @@ defmodule FullCircleWeb.ContactLive.Index do
   def handle_event("edit_contact", %{"contact-id" => id}, socket) do
     contact = StdInterface.get!(Contact, id)
 
-    send_update(self(), FullCircleWeb.ContactLive.ContactIndexComponent,
-      id: "contacts-#{contact.id}",
-      ex_class: ""
-    )
-
     {:noreply,
      socket
      |> assign(live_action: :edit)
      |> assign(id: id)
-     |> assign(module: FullCircleWeb.ContactLive.FormComponent)
      |> assign(title: gettext("Edit Contact"))
      |> assign(current_company: socket.assigns.current_company)
      |> assign(current_user: socket.assigns.current_user)
@@ -144,7 +139,7 @@ defmodule FullCircleWeb.ContactLive.Index do
 
   @impl true
   def handle_info({:created, cont}, socket) do
-    shake(FullCircleWeb.ContactLive.ContactIndexComponent, cont, :contact, "contacts-#{cont.id}")
+    css_trans(IndexComponent, cont, :contact, "contacts-#{cont.id}", "shake")
 
     {:noreply,
      socket
@@ -154,15 +149,16 @@ defmodule FullCircleWeb.ContactLive.Index do
   end
 
   def handle_info({:updated, cont}, socket) do
-    shake(FullCircleWeb.ContactLive.ContactIndexComponent, cont, :contact, "contacts-#{cont.id}")
+    css_trans(IndexComponent, cont, :contact, "contacts-#{cont.id}", "shake")
 
     {:noreply, socket |> assign(live_action: nil)}
   end
 
   def handle_info({:deleted, cont}, socket) do
+    css_trans(IndexComponent, cont, :contact, "contacts-#{cont.id}", "slow-hide", "hidden")
+
     {:noreply,
      socket
-     |> push_event("remove-el", %{"id" => "contacts-#{cont.id}"})
      |> assign(live_action: nil)}
   end
 
