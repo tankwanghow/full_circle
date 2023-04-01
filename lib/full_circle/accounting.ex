@@ -2,6 +2,7 @@ defmodule FullCircle.Accounting do
   import Ecto.Query, warn: false
   import FullCircle.Authorization
   import FullCircle.Helpers
+  alias ElixirLS.LanguageServer.Providers.CodeLens.TypeSpec.ContractTranslator
   alias FullCircle.Repo
   alias Ecto.Multi
 
@@ -141,6 +142,10 @@ defmodule FullCircle.Accounting do
     Account.changeset(account, Map.merge(attrs, %{company_id: company.id}) |> key_to_string())
   end
 
+  #################
+  # Contact
+  #################
+
   def get_contact!(id), do: Repo.get!(Contact, id)
 
   def filter_contacts(terms, company, user, page: page, per_page: per_page) do
@@ -154,8 +159,7 @@ defmodule FullCircle.Accounting do
       if(terms != "",
         do:
           from(i in q,
-            order_by: ^similarity_order([:name, :city, :state, :descriptions], terms),
-            order_by: i.updated_at
+            order_by: ^similarity_order([:name, :city, :state, :descriptions], terms)
           ),
         else: from(i in q)
       )
@@ -168,7 +172,7 @@ defmodule FullCircle.Accounting do
       join: com in ^subquery(Sys.user_companies(company, user)),
       on: com.id == cont.company_id,
       select: cont,
-      order_by: cont.updated_at
+      order_by: [desc: cont.updated_at]
     )
   end
 
