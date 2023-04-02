@@ -297,7 +297,7 @@ defmodule FullCircleWeb.CoreComponents do
   attr(:multiple, :boolean, default: false, doc: "the multiple flag for select inputs")
 
   attr(:rest, :global,
-    include: ~w(autocomplete cols disabled form list max maxlength min minlength
+    include: ~w(autocomplete cols disabled form list max maxlength min minlength phx-debounce
                 pattern placeholder readonly required rows size step)
   )
 
@@ -708,7 +708,7 @@ defmodule FullCircleWeb.CoreComponents do
     Phoenix.HTML.Tag.content_tag(:datalist, options(list), id: id)
   end
 
-  def datalist_with_ids(list, id, value_key, id_key) do
+  def datalist_with_ids(list, id, value_key\\:value, id_key\\:id) do
     Phoenix.HTML.Tag.content_tag(:datalist, option_with_ids(list, value_key, id_key), id: id)
   end
 
@@ -757,6 +757,7 @@ defmodule FullCircleWeb.CoreComponents do
   end
 
   attr(:search_val, :any)
+  attr(:placeholder, :any)
 
   def search_form(assigns) do
     ~H"""
@@ -768,7 +769,7 @@ defmodule FullCircleWeb.CoreComponents do
               name="search[terms]"
               type="search"
               value={@search_val}
-              placeholder={gettext("Search...")}
+              placeholder={@placeholder}
             />
           </div>
           <.button class="col-span-1">🔍</.button>

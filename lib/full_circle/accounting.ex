@@ -1,6 +1,15 @@
 defmodule FullCircle.Accounting do
+  import Ecto.Query, warn: false
+
   def account_types do
     balance_sheet_account_types() ++ profit_loss_account_types()
+  end
+
+  def tax_types do
+    [
+      "Sales",
+      "Purchase"
+    ]
   end
 
   defp balance_sheet_account_types do
@@ -32,5 +41,43 @@ defmodule FullCircle.Accounting do
       "Declining Balance 200%",
       "Full Depreciation at Purchase"
     ]
+  end
+
+  def get_tax_code!(id, user, company) do
+    from(taxcode in tax_code_query(user, company),
+      where: taxcode.id == ^id
+    )
+    |> FullCircle.Repo.one!()
+  end
+
+  def tax_code_query(user, company) do
+    from(taxcode in FullCircle.Accounting.TaxCode,
+      join: com in subquery(FullCircle.Sys.user_companies(company, user)),
+      on: com.id == taxcode.company_id,
+      left_join: ac in FullCircle.Accounting.Account,
+      on: ac.id == taxcode.account_id,
+      select: %FullCircle.Accounting.TaxCode{
+        id: taxcode.id,
+        code: taxcode.code,
+        rate: taxcode.rate,
+        tax_type: taxcode.tax_type,
+        account_name: ac.name,
+        account_id: ac.id,
+        descriptions: taxcode.descriptions,
+        inserted_at: taxcode.inserted_at,
+        updated_at: taxcode.updated_at
+      }
+    )
+  end
+
+  def account_names(terms, user, company) do
+    from(ac in FullCircle.Accounting.Account,
+      join: com in subquery(FullCircle.Sys.user_companies(company, user)),
+      on: com.id == ac.company_id,
+      where: ilike(ac.name, ^"%#{terms}%"),
+      select: %{id: ac.id, value: ac.name},
+      order_by: ac.name
+    )
+    |> FullCircle.Repo.all()
   end
 end

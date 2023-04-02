@@ -13,7 +13,7 @@ defmodule FullCircleWeb.AccountLive.Index do
     ~H"""
     <div class="max-w-2xl mx-auto">
       <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
-      <.search_form search_val={@search.terms} />
+      <.search_form search_val={@search.terms} placeholder={gettext("Name, AccountType and Descriptions...")}/>
       <div class="text-center mb-2">
         <.link phx-click={:new_account} class={"#{button_css()} text-xl"} id="new_account">
           <%= gettext("Add New Account") %>

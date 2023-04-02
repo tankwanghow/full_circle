@@ -14,10 +14,16 @@ defmodule FullCircle.AccountingFixtures do
   end
 
   def account_fixture(attrs, user, company) do
+    attrs = attrs |> valid_account_attributes()
+
     {:ok, account} =
-      attrs
-      |> valid_account_attributes()
-      |> FullCircle.Accounting.create_account(user, company)
+      FullCircle.StdInterface.create(
+        Account,
+        "account",
+        attrs,
+        user,
+        company
+      )
 
     account
   end

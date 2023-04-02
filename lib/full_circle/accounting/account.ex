@@ -4,7 +4,7 @@ defmodule FullCircle.Accounting.Account do
   import FullCircleWeb.Gettext
 
   schema "accounts" do
-    belongs_to :company, FullCircle.Sys.Company
+    field :company_id, :integer
     field :descriptions, :string
     field :account_type, :string
     field :name, :string

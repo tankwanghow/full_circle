@@ -27,7 +27,7 @@ defmodule FullCircleWeb.CompanyLive.Form do
             msg1={gettext("All Company Data, will be LOST!!!")}
             msg2={gettext("Cannot Be Recover!!!")}
             confirm={JS.push("delete")}
-            cancel={JS.navigate(~p"/edit_company/#{@company.id}")}
+            cancel={JS.push("cancel_delete", target: "#company")}
           />
         <% end %>
         <.link_button navigate="/companies">
@@ -75,6 +75,11 @@ defmodule FullCircleWeb.CompanyLive.Form do
      |> assign(:trigger_action, ~p"/update_active_company?id=#{company.id}")
      |> assign(:trigger_method, "post")
      |> assign(:company, company)}
+  end
+
+  @impl true
+  def handle_event("cancel_delete", _, socket) do
+    {:noreply, socket}
   end
 
   @impl true

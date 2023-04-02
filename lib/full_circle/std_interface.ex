@@ -28,6 +28,25 @@ defmodule FullCircle.StdInterface do
     Repo.all(q)
   end
 
+  def filter(query, fields, terms, page: page, per_page: per_page) do
+    q =
+      from(i in subquery(query),
+        offset: ^((page - 1) * per_page),
+        limit: ^per_page
+      )
+
+    q =
+      if(terms != "",
+        do:
+          from(i in q,
+            order_by: ^similarity_order(fields, terms)
+          ),
+        else: from(i in q)
+      )
+
+    Repo.all(q)
+  end
+
   defp query(klass, company, user) do
     from(obj in klass,
       join: com in subquery(Sys.user_companies(company, user)),
@@ -105,7 +124,6 @@ defmodule FullCircle.StdInterface do
 
   def changeset(klass, obj, attrs \\ %{}, company, changeset_name \\ :changeset) do
     attrs = Map.merge(attrs, %{company_id: company.id}) |> key_to_string()
-
     apply(klass, changeset_name, [obj, attrs])
   end
 end

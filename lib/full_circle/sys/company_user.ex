@@ -6,8 +6,8 @@ defmodule FullCircle.Sys.CompanyUser do
   schema "company_user" do
     field :role, :string
     field :default_company, :boolean, default: false
-    belongs_to :company, FullCircle.Sys.Company
-    belongs_to :user, FullCircle.UserAccounts.User
+    field :company_id, :integer
+    field :user_id, :integer
 
     timestamps(type: :utc_datetime)
   end
