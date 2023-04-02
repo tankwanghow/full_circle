@@ -1,0 +1,30 @@
+defmodule FullCircleWeb.TaxCodeLive.IndexComponent do
+  use FullCircleWeb, :live_component
+
+  @impl true
+  def mount(socket) do
+    {:ok, socket}
+  end
+
+  @impl true
+  def update(assigns, socket) do
+    {:ok, socket |> assign(assigns)}
+  end
+
+  @impl true
+  def render(assigns) do
+    ~H"""
+    <div
+      id={@id}
+      class={"#{@ex_class} cursor-pointer hover:bg-gray-400 accounts text-center mb-1 bg-gray-200 border-gray-500 border-2 rounded p-2"}
+      phx-value-object-id={@obj.id}
+      phx-click={:edit_object}
+    >
+      <span class="text-xl font-bold"><%= @obj.code %></span><br/>
+      <p><%= @obj.tax_type %> - <%= @obj.rate %> - <%= @obj.account_name %></p>
+      <p><%= @obj.descriptions %></p>
+      <%= to_fc_time_format(@obj.updated_at) %>
+    </div>
+    """
+  end
+end
