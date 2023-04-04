@@ -44,6 +44,7 @@ defmodule FullCircle.Accounting.Contact do
     |> unsafe_validate_unique([:name, :company_id], FullCircle.Repo,
       message: gettext("contact already in company")
     )
+
     # |> foreign_key_constraint(:name,
     #   name: :invoices_contact_id_fkey,
     #   message: gettext("referenced by invoices")

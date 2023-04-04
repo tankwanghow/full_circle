@@ -15,7 +15,7 @@ defmodule FullCircleWeb.UserConfirmationInstructionsLive do
         <.input field={@form[:email]} type="email" placeholder={gettext("Email")} required />
         <:actions>
           <.button phx-disable-with={gettext("Sending...")} class="w-full">
-          <%= gettext("Resend confirmation instructions") %>
+            <%= gettext("Resend confirmation instructions") %>
           </.button>
         </:actions>
       </.simple_form>
@@ -41,7 +41,9 @@ defmodule FullCircleWeb.UserConfirmationInstructionsLive do
     end
 
     info =
-      gettext("If your email is in our system and it has not been confirmed yet, you will receive an email with instructions shortly.")
+      gettext(
+        "If your email is in our system and it has not been confirmed yet, you will receive an email with instructions shortly."
+      )
 
     {:noreply,
      socket

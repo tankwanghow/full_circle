@@ -20,10 +20,10 @@ defmodule FullCircleWeb.TaxCodeLive.IndexComponent do
       phx-value-object-id={@obj.id}
       phx-click={:edit_object}
     >
-      <span class="text-xl font-bold"><%= @obj.code %></span><br/>
+      <span class="text-xl font-bold"><%= @obj.code %></span>
       <p><%= @obj.tax_type %> - <%= @obj.rate %> - <%= @obj.account_name %></p>
       <p><%= @obj.descriptions %></p>
-      <%= to_fc_time_format(@obj.updated_at) %>
+      <span class="text-xs font-light"><%= to_fc_time_format(@obj.updated_at) %></span>
     </div>
     """
   end

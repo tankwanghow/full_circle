@@ -8,17 +8,32 @@ defmodule FullCircle.Authorization do
   @allow true
   @forbid false
 
-  def can?(user, :create_account, company), do: allow_roles(["admin", "manager", "supervisor"], company, user)
-  def can?(user, :update_account, company), do: allow_roles(["admin", "manager", "supervisor"], company, user)
-  def can?(user, :delete_account, company), do: allow_roles(["admin", "manager", "supervisor"], company, user)
+  def can?(user, :create_account, company),
+    do: allow_roles(["admin", "manager", "supervisor"], company, user)
 
-  def can?(user, :create_tax_code, company), do: allow_roles(["admin", "manager", "supervisor"], company, user)
-  def can?(user, :update_tax_code, company), do: allow_roles(["admin", "manager", "supervisor"], company, user)
-  def can?(user, :delete_tax_code, company), do: allow_roles(["admin", "manager", "supervisor"], company, user)
+  def can?(user, :update_account, company),
+    do: allow_roles(["admin", "manager", "supervisor"], company, user)
 
-  def can?(user, :create_contact, company), do: forbid_roles(["auditor", "guest", "cashier"], company, user)
-  def can?(user, :update_contact, company), do: forbid_roles(["auditor", "guest", "cashier"], company, user)
-  def can?(user, :delete_contact, company), do: forbid_roles(["auditor", "guest", "cashier"], company, user)
+  def can?(user, :delete_account, company),
+    do: allow_roles(["admin", "manager", "supervisor"], company, user)
+
+  def can?(user, :create_tax_code, company),
+    do: allow_roles(["admin", "manager", "supervisor"], company, user)
+
+  def can?(user, :update_tax_code, company),
+    do: allow_roles(["admin", "manager", "supervisor"], company, user)
+
+  def can?(user, :delete_tax_code, company),
+    do: allow_roles(["admin", "manager", "supervisor"], company, user)
+
+  def can?(user, :create_contact, company),
+    do: forbid_roles(["auditor", "guest", "cashier"], company, user)
+
+  def can?(user, :update_contact, company),
+    do: forbid_roles(["auditor", "guest", "cashier"], company, user)
+
+  def can?(user, :delete_contact, company),
+    do: forbid_roles(["auditor", "guest", "cashier"], company, user)
 
   def can?(user, :see_user_list, company), do: allow_role("admin", company, user)
   def can?(user, :invite_user, company), do: allow_role("admin", company, user)

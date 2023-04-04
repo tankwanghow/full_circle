@@ -12,12 +12,42 @@ defmodule FullCircle.Sys do
 
   def default_accounts do
     [
-      %{name: "General Purchase", account_type: "Expenses"},
-      %{name: "General Sales", account_type: "Sales"},
-      %{name: "Account Payables", account_type: "Current Liability"},
-      %{name: "Account Receivables", account_type: "Current Asset"},
-      %{name: "Sales Tax Payable", account_type: "Current Liability"},
-      %{name: "Purchase Tax Receivale", account_type: "Current Asset"}
+      %{
+        name: "General Purchase",
+        account_type: "Expenses",
+        descriptions:
+          "Account that shows the total amount a business spent on purchasing goods or services during a specific period, including all types of purchases. It helps businesses track their expenses and calculate their cost of goods sold, which is essential for determining their net profit."
+      },
+      %{
+        name: "General Sales",
+        account_type: "Sales",
+        descriptions:
+          "Account that shows the total purchases made by a business during a specific period, including all types of sales. It helps businesses track their revenue and calculate their gross profit."
+      },
+      %{
+        name: "Account Payables",
+        account_type: "Current Liability",
+        descriptions:
+          "Is a liability account in accounting that represents the money a business owes to its creditors for goods or services received but not yet paid for. It helps businesses keep track of outstanding payments owed and manage their relationships with suppliers."
+      },
+      %{
+        name: "Account Receivables",
+        account_type: "Current Asset",
+        descriptions:
+          "Is a asset account in accounting that represents the money a business is owed by its customers for goods or services sold on credit. It helps businesses keep track of outstanding payments owed and manage their cash flow."
+      },
+      %{
+        name: "Sales Tax Payable",
+        account_type: "Current Liability",
+        descriptions:
+          "Is a liability account in accounting that represents the sales tax collected by a business from customers but not yet paid to the government. It helps businesses keep track of outstanding sales tax owed and avoid penalties and interest charges."
+      },
+      %{
+        name: "Purchase Tax Receivable",
+        account_type: "Current Asset",
+        descriptions:
+          "Is an asset account in accounting that represents the amount of tax credit a business can claim for taxes paid on its purchases. It helps businesses reduce their tax liability in the future."
+      }
     ]
   end
 

@@ -46,7 +46,6 @@ defmodule FullCircleWeb.CompanyLive.FieldsComponent do
       </div>
       <div class="col-span-4">
         <.input
-
           field={@form[:closing_month]}
           options={[
             January: 1,

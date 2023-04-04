@@ -170,6 +170,7 @@ defmodule FullCircleWeb.CompanyLiveTest do
     test "save valid company", %{conn: conn, comp: comp, comp1: comp1} do
       conn = conn |> put_session(:current_company, comp1)
       {:ok, lv, _html} = live(conn, ~p"/edit_company/#{comp.id}")
+
       {:ok, _, html} =
         lv
         |> form("#company", company: valid_company_attributes(%{name: "kakak"}))

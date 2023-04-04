@@ -183,6 +183,7 @@ defmodule FullCircleWeb.TaxCodeLive.Index do
 
   defp filter_objects(socket, terms, page) do
     query = Accounting.tax_code_query(socket.assigns.current_user, socket.assigns.current_company)
+
     StdInterface.filter(query, [:code, :tax_type, :account_name, :descriptions], terms,
       page: page,
       per_page: @per_page

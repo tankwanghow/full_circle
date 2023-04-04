@@ -210,8 +210,11 @@ defmodule FullCircle.UserAccounts do
     |> Ecto.Multi.delete_all(:tokens, UserToken.user_and_contexts_query(user, :all))
     |> Repo.transaction()
     |> case do
-      {:ok, %{user: user}} -> {:ok, user}
-      {:error, failed_operation, failed_value, changes_so_far} -> {:error, failed_operation, failed_value, changes_so_far}
+      {:ok, %{user: user}} ->
+        {:ok, user}
+
+      {:error, failed_operation, failed_value, changes_so_far} ->
+        {:error, failed_operation, failed_value, changes_so_far}
     end
   end
 
@@ -346,8 +349,11 @@ defmodule FullCircle.UserAccounts do
     |> Ecto.Multi.delete_all(:tokens, UserToken.user_and_contexts_query(user, :all))
     |> Repo.transaction()
     |> case do
-      {:ok, %{user: user}} -> {:ok, user}
-      {:error, failed_operation, failed_value, changes_so_far} -> {:error, failed_operation, failed_value, changes_so_far}
+      {:ok, %{user: user}} ->
+        {:ok, user}
+
+      {:error, failed_operation, failed_value, changes_so_far} ->
+        {:error, failed_operation, failed_value, changes_so_far}
     end
   end
 end

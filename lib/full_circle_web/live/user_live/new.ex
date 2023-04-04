@@ -75,7 +75,7 @@ defmodule FullCircleWeb.UserLive.New do
     >
       <div class="grid grid-cols-12 gap-2">
         <div class="col-span-8">
-          <.input  field={@form[:email]} label={gettext("Email")} />
+          <.input field={@form[:email]} label={gettext("Email")} />
         </div>
         <div class="col-span-4">
           <.input
@@ -86,12 +86,14 @@ defmodule FullCircleWeb.UserLive.New do
             label={gettext("Role")}
           />
         </div>
-        <.input  field={@form[:password]} type="hidden" value="temp123456789" />
-        <.input  field={@form[:password_confirmation]} type="hidden" value="temp123456789" />
-        <.input  field={@form[:company_id]} type="hidden" value={@current_company.id} />
+        <.input field={@form[:password]} type="hidden" value="temp123456789" />
+        <.input field={@form[:password_confirmation]} type="hidden" value="temp123456789" />
+        <.input field={@form[:company_id]} type="hidden" value={@current_company.id} />
       </div>
       <div class="flex justify-center gap-x-1">
-        <.button disabled={!@form.source.valid?} phx-disable-with={gettext("...")}><%= gettext("Add User") %></.button>
+        <.button disabled={!@form.source.valid?} phx-disable-with={gettext("...")}>
+          <%= gettext("Add User") %>
+        </.button>
         <.link navigate={~p"/companies/#{@current_company.id}/users"} class={button_css()}>
           <%= gettext("Back") %>
         </.link>

@@ -20,7 +20,7 @@ defmodule FullCircleWeb.CompanyLive.Form do
     >
       <%= live_component(FullCircleWeb.CompanyLive.FieldsComponent, form: @form) %>
       <div class="flex justify-center gap-x-1 mt-2">
-      <.button disabled={!@form.source.valid?}><%= gettext("Save") %></.button>
+        <.button disabled={!@form.source.valid?}><%= gettext("Save") %></.button>
         <%= if @live_action == :edit and FullCircle.Authorization.can?(@current_user, :delete_company, @company) do %>
           <.delete_confirm_modal
             id="delete-company"

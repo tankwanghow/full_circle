@@ -708,7 +708,7 @@ defmodule FullCircleWeb.CoreComponents do
     Phoenix.HTML.Tag.content_tag(:datalist, options(list), id: id)
   end
 
-  def datalist_with_ids(list, id, value_key\\:value, id_key\\:id) do
+  def datalist_with_ids(list, id, value_key \\ :value, id_key \\ :id) do
     Phoenix.HTML.Tag.content_tag(:datalist, option_with_ids(list, value_key, id_key), id: id)
   end
 
@@ -765,12 +765,7 @@ defmodule FullCircleWeb.CoreComponents do
       <.form for={%{}} id="search-form" phx-submit="search" autocomplete="off" class="w-full">
         <div class="grid grid-cols-12 gap-1">
           <div class="col-span-11">
-            <.input
-              name="search[terms]"
-              type="search"
-              value={@search_val}
-              placeholder={@placeholder}
-            />
+            <.input name="search[terms]" type="search" value={@search_val} placeholder={@placeholder} />
           </div>
           <.button class="col-span-1">🔍</.button>
         </div>
@@ -818,15 +813,11 @@ defmodule FullCircleWeb.CoreComponents do
     |> Enum.join(" ")
   end
 
-  def to_fc_time_format(dt, class \\ "text-xs font-light") do
-    Phoenix.HTML.Tag.content_tag(
-      :p,
-      Timex.format!(Timex.local(dt), "%Y-%m-%d %H:%M:%S%p", :strftime),
-      class: class
-    )
+  def to_fc_time_format(dt) do
+    Timex.format!(Timex.local(dt), "%Y-%m-%d %H:%M:%S%p", :strftime)
   end
 
-  def css_trans(module, obj, obj_name, id, ex_class_1, ex_class_2\\"") do
+  def css_trans(module, obj, obj_name, id, ex_class_1, ex_class_2 \\ "") do
     Phoenix.LiveView.send_update(
       self(),
       module,

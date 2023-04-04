@@ -6,7 +6,7 @@ defmodule FullCircle.Repo.Migrations.CreateAccountsAndContacts do
       add :name, :string
       add :company_id, references(:companies, on_delete: :delete_all)
       add :account_type, :string
-      add :descriptions, :string
+      add :descriptions, :text
 
       timestamps(type: :timestamptz)
     end

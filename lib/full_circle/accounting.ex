@@ -1,6 +1,9 @@
 defmodule FullCircle.Accounting do
   import Ecto.Query, warn: false
 
+  alias FullCircle.Accounting.{Account, TaxCode}
+  alias FullCircle.{Repo, Sys, StdInterface}
+
   def account_types do
     balance_sheet_account_types() ++ profit_loss_account_types()
   end
@@ -47,16 +50,16 @@ defmodule FullCircle.Accounting do
     from(taxcode in tax_code_query(user, company),
       where: taxcode.id == ^id
     )
-    |> FullCircle.Repo.one!()
+    |> Repo.one!()
   end
 
   def tax_code_query(user, company) do
-    from(taxcode in FullCircle.Accounting.TaxCode,
-      join: com in subquery(FullCircle.Sys.user_companies(company, user)),
+    from(taxcode in TaxCode,
+      join: com in subquery(Sys.user_companies(company, user)),
       on: com.id == taxcode.company_id,
-      left_join: ac in FullCircle.Accounting.Account,
+      left_join: ac in Account,
       on: ac.id == taxcode.account_id,
-      select: %FullCircle.Accounting.TaxCode{
+      select: %TaxCode{
         id: taxcode.id,
         code: taxcode.code,
         rate: taxcode.rate,
@@ -71,13 +74,26 @@ defmodule FullCircle.Accounting do
   end
 
   def account_names(terms, user, company) do
-    from(ac in FullCircle.Accounting.Account,
-      join: com in subquery(FullCircle.Sys.user_companies(company, user)),
+    from(ac in Account,
+      join: com in subquery(Sys.user_companies(company, user)),
       on: com.id == ac.company_id,
       where: ilike(ac.name, ^"%#{terms}%"),
       select: %{id: ac.id, value: ac.name},
       order_by: ac.name
     )
-    |> FullCircle.Repo.all()
+    |> Repo.all()
+  end
+
+  def delete_account(ac, user, company) do
+    if !is_default_account?(ac) do
+      StdInterface.delete(Account, "account", ac, user, company)
+    else
+      {:error, "Cannot delete default account", StdInterface.changeset(Account, ac, %{}, company),
+       ""}
+    end
+  end
+
+  def is_default_account?(ac) do
+    Enum.any?(Sys.default_accounts(), fn a -> a.name == ac.name end)
   end
 end

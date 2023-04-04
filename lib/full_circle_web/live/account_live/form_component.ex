@@ -41,9 +41,7 @@ defmodule FullCircleWeb.AccountLive.FormComponent do
 
   @impl true
   def handle_event("delete", _params, socket) do
-    case StdInterface.delete(
-           Account,
-           "account",
+    case FullCircle.Accounting.delete_account(
            socket.assigns.account,
            socket.assigns.current_user,
            socket.assigns.current_company
@@ -134,7 +132,8 @@ defmodule FullCircleWeb.AccountLive.FormComponent do
 
         <div class="flex justify-center gap-x-1 mt-1">
           <.button disabled={!@form.source.valid?}><%= gettext("Save") %></.button>
-          <%= if @live_action == :edit and FullCircle.Authorization.can?(@current_user, :delete_account, @current_company) do %>
+          <%= if @live_action == :edit and
+                 FullCircle.Authorization.can?(@current_user, :delete_account, @current_company) do %>
             <.delete_confirm_modal
               id="delete-account"
               msg1={gettext("All Account Transactions, will be LOST!!!")}

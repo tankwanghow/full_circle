@@ -170,7 +170,7 @@ defmodule FullCircleWeb.TaxCodeLive.FormComponent do
           type="select"
           options={FullCircle.Accounting.tax_types()}
         />
-        <.input field={@form[:rate]} label={gettext("Rate (example:- 6% = 0.06)")} />
+        <.input field={@form[:rate]} label={gettext("Rate (example:- 6% = 0.06, 10% = 0.1)")} />
         <.input field={@form[:account_id]} type="hidden" />
         <.input
           field={@form[:account_name]}

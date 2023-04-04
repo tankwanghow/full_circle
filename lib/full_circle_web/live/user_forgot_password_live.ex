@@ -7,7 +7,7 @@ defmodule FullCircleWeb.UserForgotPasswordLive do
     ~H"""
     <div class="mx-auto max-w-sm">
       <.header class="text-center">
-      <%= gettext("Forgot your password?") %>
+        <%= gettext("Forgot your password?") %>
         <:subtitle><%= gettext("We'll send a password reset link to your inbox") %></:subtitle>
       </.header>
 

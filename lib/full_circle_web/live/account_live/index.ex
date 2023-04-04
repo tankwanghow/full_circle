@@ -13,7 +13,10 @@ defmodule FullCircleWeb.AccountLive.Index do
     ~H"""
     <div class="max-w-2xl mx-auto">
       <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
-      <.search_form search_val={@search.terms} placeholder={gettext("Name, AccountType and Descriptions...")}/>
+      <.search_form
+        search_val={@search.terms}
+        placeholder={gettext("Name, AccountType and Descriptions...")}
+      />
       <div class="text-center mb-2">
         <.link phx-click={:new_account} class={"#{button_css()} text-xl"} id="new_account">
           <%= gettext("Add New Account") %>
@@ -26,12 +29,7 @@ defmodule FullCircleWeb.AccountLive.Index do
       </div>
       <div id="accounts_list" phx-update={@update}>
         <%= for ac <- @accounts do %>
-          <.live_component
-            module={IndexComponent}
-            id={"accounts-#{ac.id}"}
-            account={ac}
-            ex_class=""
-          />
+          <.live_component module={IndexComponent} id={"accounts-#{ac.id}"} account={ac} ex_class="" />
         <% end %>
       </div>
       <.infinite_scroll_footer page={@page} count={@accounts_count} per_page={@per_page} />
@@ -75,7 +73,6 @@ defmodule FullCircleWeb.AccountLive.Index do
 
   @impl true
   def handle_event("modal_cancel", _, socket) do
-    IO.inspect(socket.assigns)
     {:noreply, socket |> assign(live_action: nil)}
   end
 

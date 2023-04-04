@@ -18,7 +18,7 @@ defmodule FullCircle.AccountingFixtures do
 
     {:ok, account} =
       FullCircle.StdInterface.create(
-        Account,
+        FullCircle.Accounting.Account,
         "account",
         attrs,
         user,

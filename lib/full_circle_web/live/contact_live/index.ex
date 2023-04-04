@@ -13,14 +13,17 @@ defmodule FullCircleWeb.ContactLive.Index do
     ~H"""
     <div class="">
       <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
-      <.search_form search_val={@search.terms}  placeholder={gettext("Name, City, State and Descriptions...")}/>
+      <.search_form
+        search_val={@search.terms}
+        placeholder={gettext("Name, City, State and Descriptions...")}
+      />
       <div class="text-center mb-2">
         <.link phx-click={:new_contact} class={"#{button_css()} text-xl"} id="new_contact">
           <%= gettext("Add New Contact") %>
         </.link>
       </div>
       <div class="text-center mb-1">
-      <div class="rounded bg-amber-200 border border-amber-500 font-bold p-2">
+        <div class="rounded bg-amber-200 border border-amber-500 font-bold p-2">
           <%= gettext("Contact Information") %>
         </div>
       </div>

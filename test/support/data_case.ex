@@ -69,7 +69,8 @@ defmodule FullCircle.DataCase do
           user = FullCircle.UserAccountsFixtures.user_fixture()
           FullCircle.Sys.allow_user_to_access(company, user, r, admin)
 
-          assert FullCircle.Authorization.can?(user, action, company) == false, "#{r} shouldn't be allowed to #{action}"
+          assert FullCircle.Authorization.can?(user, action, company) == false,
+                 "#{r} shouldn't be allowed to #{action}"
         end)
 
         FullCircle.Authorization.roles()
@@ -78,7 +79,8 @@ defmodule FullCircle.DataCase do
           user = FullCircle.UserAccountsFixtures.user_fixture()
           FullCircle.Sys.allow_user_to_access(company, user, r, admin)
 
-          assert FullCircle.Authorization.can?(user, action, company) == true, "#{r} should be allowed to #{action}"
+          assert FullCircle.Authorization.can?(user, action, company) == true,
+                 "#{r} should be allowed to #{action}"
         end)
       end
     end
@@ -97,7 +99,8 @@ defmodule FullCircle.DataCase do
           user = FullCircle.UserAccountsFixtures.user_fixture()
           FullCircle.Sys.allow_user_to_access(company, user, r, admin)
 
-          assert FullCircle.Authorization.can?(user, action, company) == true, "#{r} should be allowed to #{action}"
+          assert FullCircle.Authorization.can?(user, action, company) == true,
+                 "#{r} should be allowed to #{action}"
         end)
 
         FullCircle.Authorization.roles()
@@ -106,7 +109,8 @@ defmodule FullCircle.DataCase do
           user = FullCircle.UserAccountsFixtures.user_fixture()
           FullCircle.Sys.allow_user_to_access(company, user, r, admin)
 
-          assert FullCircle.Authorization.can?(user, action, company) == false, "#{r} should't be allowed to #{action}"
+          assert FullCircle.Authorization.can?(user, action, company) == false,
+                 "#{r} should't be allowed to #{action}"
         end)
       end
     end

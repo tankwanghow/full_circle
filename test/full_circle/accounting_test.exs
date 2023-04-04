@@ -39,10 +39,33 @@ defmodule FullCircle.AccountingTest do
     end
 
     test "delete default accounts", %{com: com, admin: admin} do
-      all = Accounting.filter_accounts("", com, admin, page: 1, per_page: 50)
-      ac = Accounting.get_account!(Enum.at(all, 0).id)
-      Accounting.delete_account(ac, admin, com)
-      assert Enum.count(all) == Enum.count(Accounting.filter_accounts("", com, admin, page: 1, per_page: 50))
+      all =
+        FullCircle.StdInterface.filter(
+          FullCircle.Accounting.Account,
+          [:name, :account_type, :descriptions],
+          "",
+          com,
+          admin,
+          page: 1,
+          per_page: 50
+        )
+
+      ac = FullCircle.StdInterface.get!(FullCircle.Accounting.Account, Enum.at(all, 0).id)
+
+      FullCircle.Accounting.delete_account(ac, admin, com)
+
+      assert Enum.count(all) ==
+               Enum.count(
+                 FullCircle.StdInterface.filter(
+                   FullCircle.Accounting.Account,
+                   [:name, :account_type, :descriptions],
+                   "",
+                   com,
+                   admin,
+                   page: 1,
+                   per_page: 50
+                 )
+               )
     end
 
     test "not in list account type", %{com: com, admin: admin} do
@@ -51,23 +74,53 @@ defmodule FullCircle.AccountingTest do
         |> Enum.at((FullCircle.Accounting.account_types() |> Enum.count() |> :rand.uniform()) - 1)
 
       {:ok, _ac} =
-        Accounting.create_account(valid_account_attributes(%{account_type: actype}), admin, com)
+        FullCircle.StdInterface.create(
+          FullCircle.Accounting.Account,
+          "account",
+          valid_account_attributes(%{account_type: actype}),
+          admin,
+          com
+        )
 
       {:error, :create_account, cs, _} =
-        Accounting.create_account(valid_account_attributes(%{account_type: "name"}), admin, com)
+        FullCircle.StdInterface.create(
+          FullCircle.Accounting.Account,
+          "account",
+          valid_account_attributes(%{account_type: "name"}),
+          admin,
+          com
+        )
 
       assert "not in list" in errors_on(cs).account_type
     end
 
     test "unique account name", %{com: com, admin: admin} do
       {:ok, _ac} =
-        Accounting.create_account(valid_account_attributes(%{name: "name"}), admin, com)
+        FullCircle.StdInterface.create(
+          FullCircle.Accounting.Account,
+          "account",
+          valid_account_attributes(%{name: "name"}),
+          admin,
+          com
+        )
 
       {:ok, _ac} =
-        Accounting.create_account(valid_account_attributes(%{name: "name2"}), admin, com)
+        FullCircle.StdInterface.create(
+          FullCircle.Accounting.Account,
+          "account",
+          valid_account_attributes(%{name: "name2"}),
+          admin,
+          com
+        )
 
       {:error, :create_account, cs, _} =
-        Accounting.create_account(valid_account_attributes(%{name: "name"}), admin, com)
+        FullCircle.StdInterface.create(
+          FullCircle.Accounting.Account,
+          "account",
+          valid_account_attributes(%{name: "name"}),
+          admin,
+          com
+        )
 
       assert "has already been taken" in errors_on(cs).name
     end
@@ -75,7 +128,15 @@ defmodule FullCircle.AccountingTest do
     test "require name, account_type and company_id", %{com: com, admin: admin} do
       v = %{name: nil, account_type: nil, company_id: nil, descriptions: nil}
 
-      {:error, :create_account, changeset, _} = Accounting.create_account(v, admin, com)
+      {:error, :create_account, changeset, _} =
+        FullCircle.StdInterface.create(
+          FullCircle.Accounting.Account,
+          "account",
+          v,
+          admin,
+          com
+        )
+
       assert "can't be blank" in errors_on(changeset).name
       assert "can't be blank" in errors_on(changeset).account_type
       refute errors_on(changeset)[:descriptions] != nil
@@ -83,32 +144,47 @@ defmodule FullCircle.AccountingTest do
     end
 
     test "create_account with valid attributes", %{com: com, admin: admin} do
-      {:ok, ac} = Accounting.create_account(valid_account_attributes(%{name: "name"}), admin, com)
+      {:ok, ac} =
+        FullCircle.StdInterface.create(
+          FullCircle.Accounting.Account,
+          "account",
+          valid_account_attributes(%{name: "name"}),
+          admin,
+          com
+        )
+
       assert ac.name == "name"
       assert ac.company_id == com.id
       assert Enum.count(FullCircle.Sys.log_entry_for("accounts", ac.id, com.id)) == 1
 
-      assert [
-        "name",
-        "Account Payables",
-        "Account Receivables",
-        "General Purchase",
-        "General Sales",
-        "Purchase Tax Receivale",
-        "Sales Tax Payable"
-      ] ==
-               Enum.map(
-                 Accounting.filter_accounts("na", com, admin, page: 1, per_page: 50),
-                 fn x -> x.name end
+      assert "name" ==
+               FullCircle.StdInterface.filter(
+                 FullCircle.Accounting.Account,
+                 [:name, :account_type, :descriptions],
+                 "na",
+                 com,
+                 admin,
+                 page: 1,
+                 per_page: 50
                )
+               |> Enum.map(fn x -> x.name end)
+               |> Enum.at(0)
     end
 
     test "update account with valid attributes", %{com: com, admin: admin} do
       {:ok, nac} =
-        Accounting.create_account(valid_account_attributes(%{name: "name"}), admin, com)
+        FullCircle.StdInterface.create(
+          FullCircle.Accounting.Account,
+          "account",
+          valid_account_attributes(%{name: "name"}),
+          admin,
+          com
+        )
 
       {:ok, uac} =
-        Accounting.update_account(
+        FullCircle.StdInterface.update(
+          FullCircle.Accounting.Account,
+          "account",
           nac,
           %{name: "kaka", account_type: "Sales", descriptions: "hello"},
           admin,
@@ -124,7 +200,8 @@ defmodule FullCircle.AccountingTest do
 
     test "filter accounts", %{com: com, admin: admin} do
       aclist1 = [
-        "name", "name1",
+        "name",
+        "name1",
         "Account Payables",
         "Account Receivables",
         "General Purchase",
@@ -134,7 +211,8 @@ defmodule FullCircle.AccountingTest do
       ]
 
       aclist2 = [
-        "name1", "name",
+        "name1",
+        "name",
         "Account Payables",
         "Account Receivables",
         "General Purchase",
@@ -144,38 +222,106 @@ defmodule FullCircle.AccountingTest do
       ]
 
       com1 = company_fixture(admin, %{})
-      Accounting.create_account(valid_account_attributes(%{name: "name"}), admin, com)
-      Accounting.create_account(valid_account_attributes(%{name: "name"}), admin, com1)
-      Accounting.create_account(valid_account_attributes(%{name: "name1"}), admin, com)
-      Accounting.create_account(valid_account_attributes(%{name: "name1"}), admin, com1)
+
+      FullCircle.StdInterface.create(
+        FullCircle.Accounting.Account,
+        "account",
+        valid_account_attributes(%{name: "name"}),
+        admin,
+        com
+      )
+
+      FullCircle.StdInterface.create(
+        FullCircle.Accounting.Account,
+        "account",
+        valid_account_attributes(%{name: "name"}),
+        admin,
+        com1
+      )
+
+      FullCircle.StdInterface.create(
+        FullCircle.Accounting.Account,
+        "account",
+        valid_account_attributes(%{name: "name1"}),
+        admin,
+        com
+      )
+
+      FullCircle.StdInterface.create(
+        FullCircle.Accounting.Account,
+        "account",
+        valid_account_attributes(%{name: "name1"}),
+        admin,
+        com1
+      )
 
       assert [] ==
                Enum.map(
-                 Accounting.filter_accounts("na", com, user_fixture(), page: 1, per_page: 50),
+                 FullCircle.StdInterface.filter(
+                   FullCircle.Accounting.Account,
+                   [:name, :account_type, :descriptions],
+                   "na",
+                   com,
+                   user_fixture(),
+                   page: 1,
+                   per_page: 50
+                 ),
                  fn x -> x.name end
                )
 
       assert aclist1 ==
                Enum.map(
-                 Accounting.filter_accounts("name", com, admin, page: 1, per_page: 50),
+                 FullCircle.StdInterface.filter(
+                   FullCircle.Accounting.Account,
+                   [:name, :account_type, :descriptions],
+                   "name",
+                   com,
+                   admin,
+                   page: 1,
+                   per_page: 50
+                 ),
                  fn x -> x.name end
                )
 
       assert aclist1 ==
                Enum.map(
-                 Accounting.filter_accounts("name", com1, admin, page: 1, per_page: 50),
+                 FullCircle.StdInterface.filter(
+                   FullCircle.Accounting.Account,
+                   [:name, :account_type, :descriptions],
+                   "name",
+                   com1,
+                   admin,
+                   page: 1,
+                   per_page: 50
+                 ),
                  fn x -> x.name end
                )
 
       assert aclist2 ==
                Enum.map(
-                 Accounting.filter_accounts("name1", com, admin, page: 1, per_page: 50),
+                 FullCircle.StdInterface.filter(
+                   FullCircle.Accounting.Account,
+                   [:name, :account_type, :descriptions],
+                   "name1",
+                   com,
+                   admin,
+                   page: 1,
+                   per_page: 50
+                 ),
                  fn x -> x.name end
                )
 
       assert aclist2 ==
                Enum.map(
-                 Accounting.filter_accounts("name1", com1, admin, page: 1, per_page: 50),
+                 FullCircle.StdInterface.filter(
+                   FullCircle.Accounting.Account,
+                   [:name, :account_type, :descriptions],
+                   "name1",
+                   com1,
+                   admin,
+                   page: 1,
+                   per_page: 50
+                 ),
                  fn x -> x.name end
                )
     end

@@ -20,7 +20,6 @@ defmodule FullCircleWeb.AccountLiveTest do
     end
 
     test "default account", %{conn: conn, lv: lv, html: html} do
-
     end
   end
 

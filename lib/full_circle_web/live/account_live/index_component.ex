@@ -16,14 +16,22 @@ defmodule FullCircleWeb.AccountLive.IndexComponent do
     ~H"""
     <div
       id={@id}
-      class={"#{@ex_class} cursor-pointer hover:bg-gray-400 accounts text-center mb-1 bg-gray-200 border-gray-500 border-2 rounded p-2"}
+      class={
+        ~s(#{@ex_class} text-center mb-1 border-2 rounded p-2
+        #{if(FullCircle.Accounting.is_default_account?(@account),
+        do: "cursor-not-allowed bg-rose-100 border-rose-300",
+        else: "hover:bg-gray-400 cursor-pointer bg-gray-200 border-gray-500")}
+            )
+      }
       phx-value-account-id={@account.id}
-      phx-click={:edit_account}
+      phx-click={
+        if(FullCircle.Accounting.is_default_account?(@account), do: nil, else: :edit_account)
+      }
     >
-      <span class="text-xl font-bold"><%= @account.name %></span><br/>
-      <p><%= @account.account_type %></p>
-      <p><%= @account.descriptions %></p>
-      <%= to_fc_time_format(@account.updated_at) %>
+      <span class="text-xl font-bold"><%= @account.name %></span>
+      <p class="text-sm"><%= @account.descriptions %></p>
+      <span class="text-xs font-bold"><%= @account.account_type %></span>
+      <span class="text-xs font-light"><%= to_fc_time_format(@account.updated_at) %></span>
     </div>
     """
   end

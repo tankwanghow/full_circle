@@ -29,7 +29,7 @@ defmodule FullCircleWeb.ContactLive.IndexComponent do
         <p><%= @contact.contact_info %></p>
       </div>
       <p class="text-green-800"><%= @contact.descriptions %></p>
-      <%= to_fc_time_format(@contact.updated_at) %>
+      <span class="text-xs font-light"><%= to_fc_time_format(@contact.updated_at) %></span>
     </div>
     """
   end

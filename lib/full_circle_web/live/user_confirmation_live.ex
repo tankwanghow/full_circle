@@ -11,7 +11,9 @@ defmodule FullCircleWeb.UserConfirmationLive do
       <.simple_form for={@form} id="confirmation_form" phx-submit="confirm_account">
         <.input field={@form[:token]} type="hidden" />
         <:actions>
-          <.button phx-disable-with={gettext("Confirming...")} class="w-full"><%= gettext("Confirm my account") %></.button>
+          <.button phx-disable-with={gettext("Confirming...")} class="w-full">
+            <%= gettext("Confirm my account") %>
+          </.button>
         </:actions>
       </.simple_form>
 
