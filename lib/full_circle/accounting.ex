@@ -9,10 +9,7 @@ defmodule FullCircle.Accounting do
   end
 
   def tax_types do
-    [
-      "Sales",
-      "Purchase"
-    ]
+    ~w(Sales Purchase)
   end
 
   defp balance_sheet_account_types do
@@ -51,6 +48,14 @@ defmodule FullCircle.Accounting do
       where: taxcode.id == ^id
     )
     |> Repo.one!()
+  end
+
+  def tax_codes(terms, user, company) do
+    from(taxcode in subquery(tax_code_query(user, company)),
+      where: ilike(taxcode.code, ^"%#{terms}%"),
+      select: %{id: taxcode.id, value: taxcode.code}
+    )
+    |> Repo.all()
   end
 
   def tax_code_query(user, company) do

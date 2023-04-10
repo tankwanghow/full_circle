@@ -48,7 +48,6 @@ defmodule FullCircleWeb.TaxCodeLive.Index do
         title={@title}
         live_action={@live_action}
         form={@form}
-        object={@object}
         current_company={@current_company}
         current_user={@current_user}
       />
@@ -86,7 +85,6 @@ defmodule FullCircleWeb.TaxCodeLive.Index do
      |> assign(title: gettext("New TaxCode"))
      |> assign(current_company: socket.assigns.current_company)
      |> assign(current_user: socket.assigns.current_user)
-     |> assign(object: nil)
      |> assign(
        :form,
        to_form(StdInterface.changeset(TaxCode, %TaxCode{}, %{}, socket.assigns.current_company))
@@ -105,7 +103,6 @@ defmodule FullCircleWeb.TaxCodeLive.Index do
      |> assign(title: gettext("Edit TaxCode"))
      |> assign(current_company: socket.assigns.current_company)
      |> assign(current_user: socket.assigns.current_user)
-     |> assign(object: object)
      |> assign(
        :form,
        to_form(StdInterface.changeset(TaxCode, object, %{}, socket.assigns.current_company))

@@ -42,7 +42,7 @@ defmodule FullCircleWeb.TaxCodeLive.FormComponent do
 
     account =
       Enum.find(socket.assigns[:account_names], fn x ->
-        x.value == params["account_name"]
+        x.value == terms
       end)
 
     params = Map.merge(params, %{"account_id" => Util.attempt(account, :id) || -1})
@@ -52,10 +52,13 @@ defmodule FullCircleWeb.TaxCodeLive.FormComponent do
 
   @impl true
   def handle_event("validate", %{"tax_code" => params}, socket) do
-    object = if(socket.assigns[:object], do: socket.assigns.object, else: %TaxCode{})
-
     changeset =
-      StdInterface.changeset(TaxCode, object, params, socket.assigns.current_company)
+      StdInterface.changeset(
+        TaxCode,
+        socket.assigns.form.data,
+        params,
+        socket.assigns.current_company
+      )
       |> Map.put(:action, :insert)
 
     socket = assign(socket, form: to_form(changeset))
@@ -73,7 +76,7 @@ defmodule FullCircleWeb.TaxCodeLive.FormComponent do
     case StdInterface.delete(
            TaxCode,
            "tax_code",
-           socket.assigns.object,
+           socket.assigns.form.data,
            socket.assigns.current_user,
            socket.assigns.current_company
          ) do
@@ -117,7 +120,7 @@ defmodule FullCircleWeb.TaxCodeLive.FormComponent do
     case StdInterface.update(
            TaxCode,
            "tax_code",
-           socket.assigns.object,
+           socket.assigns.form.data,
            params,
            socket.assigns.current_user,
            socket.assigns.current_company
@@ -137,10 +140,13 @@ defmodule FullCircleWeb.TaxCodeLive.FormComponent do
   end
 
   defp validate(params, socket) do
-    object = if(socket.assigns[:object], do: socket.assigns.object, else: %TaxCode{})
-
     changeset =
-      StdInterface.changeset(TaxCode, object, params, socket.assigns.current_company)
+      StdInterface.changeset(
+        TaxCode,
+        socket.assigns.form.data,
+        params,
+        socket.assigns.current_company
+      )
       |> Map.put(:action, :insert)
 
     socket = assign(socket, form: to_form(changeset))
@@ -171,7 +177,7 @@ defmodule FullCircleWeb.TaxCodeLive.FormComponent do
           options={FullCircle.Accounting.tax_types()}
         />
         <.input field={@form[:rate]} label={gettext("Rate (example:- 6% = 0.06, 10% = 0.1)")} />
-        <.input field={@form[:account_id]} type="hidden" />
+        <%= Phoenix.HTML.Form.hidden_input(@form, :account_id) %>
         <.input
           field={@form[:account_name]}
           label={gettext("Account")}

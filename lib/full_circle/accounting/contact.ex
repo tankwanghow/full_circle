@@ -42,7 +42,7 @@ defmodule FullCircle.Accounting.Contact do
     |> validate_required([:name, :company_id])
     |> validate_inclusion(:country, FullCircle.Sys.countries(), message: gettext("not in list"))
     |> unsafe_validate_unique([:name, :company_id], FullCircle.Repo,
-      message: gettext("contact already in company")
+      message: gettext("has already been taken")
     )
 
     # |> foreign_key_constraint(:name,

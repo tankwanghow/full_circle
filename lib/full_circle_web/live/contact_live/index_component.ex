@@ -22,10 +22,10 @@ defmodule FullCircleWeb.ContactLive.IndexComponent do
     >
       <p class="text-xl font-bold"><%= @contact.name %></p>
       <div class="text-sm">
-        <p><%= @contact.address1 %></p>
-        <p><%= @contact.address2 %></p>
-        <p><%= @contact.city %> <%= @contact.zipcode %></p>
-        <p><%= @contact.state %> <%= @contact.country %></p>
+        <p><%= @contact.address1 %>, <%= @contact.address2 %></p>
+        <p>
+          <%= @contact.city %> <%= @contact.zipcode %>, <%= @contact.state %> <%= @contact.country %>
+        </p>
         <p><%= @contact.contact_info %></p>
       </div>
       <p class="text-green-800"><%= @contact.descriptions %></p>

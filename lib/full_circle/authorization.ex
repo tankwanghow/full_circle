@@ -2,38 +2,47 @@ defmodule FullCircle.Authorization do
   import Ecto.Query, warn: false
 
   def roles do
-    ["guest", "admin", "manager", "supervisor", "cashier", "clerk", "disable", "auditor"]
+    ~w(guest admin manager supervisor cashier clerk disable auditor)
   end
 
   @allow true
   @forbid false
 
+  def can?(user, :create_good, company),
+    do: allow_roles(~w(admin manager supervisor clerk), company, user)
+
+  def can?(user, :update_good, company),
+    do: allow_roles(~w(admin manager supervisor clerk), company, user)
+
+  def can?(user, :delete_good, company),
+    do: allow_roles(~w(admin manager supervisor clerk), company, user)
+
   def can?(user, :create_account, company),
-    do: allow_roles(["admin", "manager", "supervisor"], company, user)
+    do: allow_roles(~w(admin manager supervisor), company, user)
 
   def can?(user, :update_account, company),
-    do: allow_roles(["admin", "manager", "supervisor"], company, user)
+    do: allow_roles(~w(admin manager supervisor), company, user)
 
   def can?(user, :delete_account, company),
-    do: allow_roles(["admin", "manager", "supervisor"], company, user)
+    do: allow_roles(~w(admin manager supervisor), company, user)
 
   def can?(user, :create_tax_code, company),
-    do: allow_roles(["admin", "manager", "supervisor"], company, user)
+    do: allow_roles(~w(admin manager supervisor), company, user)
 
   def can?(user, :update_tax_code, company),
-    do: allow_roles(["admin", "manager", "supervisor"], company, user)
+    do: allow_roles(~w(admin manager supervisor), company, user)
 
   def can?(user, :delete_tax_code, company),
-    do: allow_roles(["admin", "manager", "supervisor"], company, user)
+    do: allow_roles(~w(admin manager supervisor), company, user)
 
   def can?(user, :create_contact, company),
-    do: forbid_roles(["auditor", "guest", "cashier"], company, user)
+    do: forbid_roles(~w(auditor guest cashier), company, user)
 
   def can?(user, :update_contact, company),
-    do: forbid_roles(["auditor", "guest", "cashier"], company, user)
+    do: forbid_roles(~w(auditor guest cashier), company, user)
 
   def can?(user, :delete_contact, company),
-    do: forbid_roles(["auditor", "guest", "cashier"], company, user)
+    do: forbid_roles(~w(auditor guest cashier), company, user)
 
   def can?(user, :see_user_list, company), do: allow_role("admin", company, user)
   def can?(user, :invite_user, company), do: allow_role("admin", company, user)
@@ -79,8 +88,8 @@ defmodule FullCircle.Authorization do
     if Enum.find(roles, fn r -> r == test_role end), do: @forbid, else: @allow
   end
 
-  defp forbid_role(role, company, user) when is_binary(role) do
-    test_role = user_role_in_company(user.id, company.id)
-    if role == test_role, do: @forbid, else: @allow
-  end
+  # defp forbid_role(role, company, user) when is_binary(role) do
+  #   test_role = user_role_in_company(user.id, company.id)
+  #   if role == test_role, do: @forbid, else: @allow
+  # end
 end

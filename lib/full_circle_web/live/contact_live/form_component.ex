@@ -22,10 +22,13 @@ defmodule FullCircleWeb.ContactLive.FormComponent do
 
   @impl true
   def handle_event("validate", %{"contact" => params}, socket) do
-    contact = if(socket.assigns[:contact], do: socket.assigns.contact, else: %Contact{})
-
     changeset =
-      StdInterface.changeset(Contact, contact, params, socket.assigns.current_company)
+      StdInterface.changeset(
+        Contact,
+        socket.assigns.form.data,
+        params,
+        socket.assigns.current_company
+      )
       |> Map.put(:action, :insert)
 
     socket = assign(socket, form: to_form(changeset))
@@ -43,7 +46,7 @@ defmodule FullCircleWeb.ContactLive.FormComponent do
     case StdInterface.delete(
            Contact,
            "contact",
-           socket.assigns.contact,
+           socket.assigns.form.data,
            socket.assigns.current_user,
            socket.assigns.current_company
          ) do
@@ -87,7 +90,7 @@ defmodule FullCircleWeb.ContactLive.FormComponent do
     case StdInterface.update(
            Contact,
            "contact",
-           socket.assigns.contact,
+           socket.assigns.form.data,
            params,
            socket.assigns.current_user,
            socket.assigns.current_company

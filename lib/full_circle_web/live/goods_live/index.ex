@@ -1,10 +1,11 @@
-defmodule FullCircleWeb.AccountLive.Index do
+defmodule FullCircleWeb.GoodLive.Index do
   use FullCircleWeb, :live_view
 
-  alias FullCircle.Accounting.Account
+  alias FullCircle.Product.Good
+  alias FullCircle.Product
   alias FullCircle.StdInterface
-  alias FullCircleWeb.AccountLive.FormComponent
-  alias FullCircleWeb.AccountLive.IndexComponent
+  alias FullCircleWeb.GoodLive.FormComponent
+  alias FullCircleWeb.GoodLive.IndexComponent
 
   @per_page 10
 
@@ -15,24 +16,24 @@ defmodule FullCircleWeb.AccountLive.Index do
       <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
       <.search_form
         search_val={@search.terms}
-        placeholder={gettext("Name, AccountType and Descriptions...")}
+        placeholder={gettext("Name, Unit, Account Name, TaxCode and Descriptions...")}
       />
       <div class="text-center mb-2">
-        <.link phx-click={:new_account} class={"#{button_css()} text-xl"} id="new_account">
-          <%= gettext("Add New Account") %>
+        <.link phx-click={:new_object} class={"#{button_css()} text-xl"} id="new_object">
+          <%= gettext("Add New Good") %>
         </.link>
       </div>
       <div class="text-center mb-1">
         <div class="rounded bg-amber-200 border border-amber-500 font-bold p-2">
-          <%= gettext("Account Information") %>
+          <%= gettext("Good Information") %>
         </div>
       </div>
-      <div id="accounts_list" phx-update={@update}>
-        <%= for ac <- @accounts do %>
-          <.live_component module={IndexComponent} id={"accounts-#{ac.id}"} account={ac} ex_class="" />
+      <div id="objects_list" phx-update={@update}>
+        <%= for obj <- @objects do %>
+          <.live_component module={IndexComponent} id={"objects-#{obj.id}"} obj={obj} ex_class="" />
         <% end %>
       </div>
-      <.infinite_scroll_footer page={@page} count={@accounts_count} per_page={@per_page} />
+      <.infinite_scroll_footer page={@page} count={@objects_count} per_page={@per_page} />
     </div>
 
     <.modal
@@ -56,18 +57,18 @@ defmodule FullCircleWeb.AccountLive.Index do
 
   @impl true
   def mount(_params, _session, socket) do
-    accounts = filter_accounts(socket, "", 1)
+    objects = filter_objects(socket, "", 1)
 
     socket =
       socket
-      |> assign(page_title: gettext("Accounts Listing"))
+      |> assign(page_title: gettext("Good Listing"))
       |> assign(page: 1, per_page: @per_page)
       |> assign(search: %{terms: ""})
       |> assign(update: "append")
-      |> assign(accounts_count: Enum.count(accounts))
-      |> assign(accounts: accounts)
+      |> assign(objects_count: Enum.count(objects))
+      |> assign(objects: objects)
 
-    {:ok, socket, temporary_assigns: [accounts: []]}
+    {:ok, socket, temporary_assigns: [objects: []]}
   end
 
   @impl true
@@ -76,81 +77,83 @@ defmodule FullCircleWeb.AccountLive.Index do
   end
 
   @impl true
-  def handle_event("new_account", _, socket) do
+  def handle_event("new_object", _, socket) do
     {:noreply,
      socket
      |> assign(live_action: :new)
      |> assign(id: "new")
-     |> assign(title: gettext("New Account"))
+     |> assign(title: gettext("New Good"))
      |> assign(current_company: socket.assigns.current_company)
      |> assign(current_user: socket.assigns.current_user)
      |> assign(
        :form,
-       to_form(StdInterface.changeset(Account, %Account{}, %{}, socket.assigns.current_company))
+       to_form(
+         StdInterface.changeset(Good, %Good{packagings: []}, %{}, socket.assigns.current_company)
+       )
      )}
   end
 
   @impl true
-  def handle_event("edit_account", %{"account-id" => id}, socket) do
-    account = StdInterface.get!(Account, id)
+  def handle_event("edit_object", %{"object-id" => id}, socket) do
+    object = Product.get_good!(id, socket.assigns.current_user, socket.assigns.current_company)
 
     {:noreply,
      socket
      |> assign(live_action: :edit)
      |> assign(id: id)
-     |> assign(title: gettext("Edit Account"))
+     |> assign(title: gettext("Edit Good"))
      |> assign(current_company: socket.assigns.current_company)
      |> assign(current_user: socket.assigns.current_user)
      |> assign(
        :form,
-       to_form(StdInterface.changeset(Account, account, %{}, socket.assigns.current_company))
+       to_form(StdInterface.changeset(Good, object, %{}, socket.assigns.current_company))
      )}
   end
 
   @impl true
   def handle_event("load-more", _, socket) do
-    accounts = filter_accounts(socket, socket.assigns.search.terms, socket.assigns.page + 1)
+    objects = filter_objects(socket, socket.assigns.search.terms, socket.assigns.page + 1)
 
     {:noreply,
      socket
      |> update(:page, &(&1 + 1))
      |> assign(update: "append")
-     |> assign(accounts: accounts)
-     |> assign(accounts_count: Enum.count(accounts))}
+     |> assign(objects: objects)
+     |> assign(objects_count: Enum.count(objects))}
   end
 
   @impl true
   def handle_event("search", %{"search" => %{"terms" => terms}}, socket) do
-    accounts = filter_accounts(socket, terms, 1)
+    objects = filter_objects(socket, terms, 1)
 
     {:noreply,
      socket
      |> assign(page: 1, per_page: @per_page)
      |> assign(search: %{terms: terms})
      |> assign(update: "replace")
-     |> assign(accounts_count: Enum.count(accounts))
-     |> assign(accounts: accounts)}
+     |> assign(objects_count: Enum.count(objects))
+     |> assign(objects: objects)}
   end
 
   @impl true
-  def handle_info({:created, ac}, socket) do
-    css_trans(IndexComponent, ac, :account, "accounts-#{ac.id}", "shake")
+  def handle_info({:created, obj}, socket) do
+    css_trans(IndexComponent, obj, :obj, "objects-#{obj.id}", "shake")
 
     {:noreply,
      socket
      |> assign(update: "prepend")
      |> assign(live_action: nil)
-     |> assign(accounts: [ac | socket.assigns.accounts])}
+     |> assign(objects: [obj | socket.assigns.objects])}
   end
 
-  def handle_info({:updated, ac}, socket) do
-    css_trans(IndexComponent, ac, :account, "accounts-#{ac.id}", "shake")
+  def handle_info({:updated, obj}, socket) do
+    css_trans(IndexComponent, obj, :obj, "objects-#{obj.id}", "shake")
 
     {:noreply, socket |> assign(live_action: nil)}
   end
 
-  def handle_info({:deleted, ac}, socket) do
-    css_trans(IndexComponent, ac, :account, "accounts-#{ac.id}", "slow-hide", "hidden")
+  def handle_info({:deleted, obj}, socket) do
+    css_trans(IndexComponent, obj, :obj, "objects-#{obj.id}", "slow-hide", "hidden")
 
     {:noreply,
      socket
@@ -176,13 +179,8 @@ defmodule FullCircleWeb.AccountLive.Index do
      |> put_flash(:error, gettext("You are not authorised to perform this action"))}
   end
 
-  defp filter_accounts(socket, terms, page) do
-    StdInterface.filter(
-      Account,
-      [:name, :account_type, :descriptions],
-      terms,
-      socket.assigns.current_company,
-      socket.assigns.current_user,
+  defp filter_objects(socket, terms, page) do
+    Product.good_index_query(terms, socket.assigns.current_user, socket.assigns.current_company,
       page: page,
       per_page: @per_page
     )
