@@ -21,7 +21,7 @@ defmodule FullCircleWeb.TaxCodeLive.IndexComponent do
       phx-click={:edit_object}
     >
       <span class="text-xl font-bold"><%= @obj.code %></span>
-      <p><%= @obj.tax_type %> - <%= @obj.rate %> - <%= @obj.account_name %></p>
+      <p><%= @obj.tax_type %> - <%= @obj.rate |> Decimal.mult(100) |> Number.Percentage.number_to_percentage %> - <%= @obj.account_name %></p>
       <p><%= @obj.descriptions %></p>
       <span class="text-xs font-light"><%= to_fc_time_format(@obj.updated_at) %></span>
     </div>

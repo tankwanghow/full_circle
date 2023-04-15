@@ -22,7 +22,7 @@ defmodule FullCircleWeb.FixedAssetLive.IndexComponent do
     >
       <span class="text-xl font-bold"><%= @obj.name %></span>
       <p><%= @obj.pur_date %> - <%= @obj.pur_price |> Number.Currency.number_to_currency%>
-      <%= @obj.depre_method %> - <%= Decimal.mult(@obj.depre_rate, 100) |> Number.Percentage.number_to_percentage(unit: "RM") %></p>
+      <%= @obj.depre_method %> - <%= Decimal.mult(@obj.depre_rate, 100) |> Number.Percentage.number_to_percentage %></p>
       <p><%= @obj.asset_ac_name %> - <%= @obj.depre_ac_name %></p>
       <p><%= @obj.cume_depre_ac_name %></p>
       <p><%= @obj.descriptions %></p>

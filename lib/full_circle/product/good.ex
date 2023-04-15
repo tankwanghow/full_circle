@@ -68,7 +68,7 @@ defmodule FullCircle.Product.Good do
     |> validate_id(:purchase_account_name, :purchase_account_id)
     |> validate_id(:sales_tax_code_name, :sales_tax_code_id)
     |> validate_id(:purchase_tax_code_name, :purchase_tax_code_id)
-    |> cast_assoc(attrs)
+    |> cast_assoc(:packagings)
 
     # |> foreign_key_constraint(:name,
     #   name: :invoice_details_good_id_fkey,
