@@ -3,19 +3,19 @@ defmodule FullCircle.Repo.Migrations.CreateAccountsAndContacts do
 
   def change do
     create table(:accounts) do
-      add :name, :string
-      add :company_id, references(:companies, on_delete: :delete_all)
-      add :account_type, :string
+      add :name, :string, null: false
+      add :company_id, references(:companies, on_delete: :delete_all), null: false
+      add :account_type, :string, null: false
       add :descriptions, :text
 
       timestamps(type: :timestamptz)
     end
 
-    create unique_index(:accounts, [:company_id, :name])
+    create unique_index(:accounts, [:company_id, :name], name: :accounts_unique_name_in_company)
 
     create table(:contacts) do
-      add :name, :string
-      add :company_id, references(:companies, on_delete: :delete_all)
+      add :name, :string, null: false
+      add :company_id, references(:companies, on_delete: :delete_all), null: false
       add :address1, :string
       add :address2, :string
       add :city, :string
@@ -30,6 +30,6 @@ defmodule FullCircle.Repo.Migrations.CreateAccountsAndContacts do
       timestamps(type: :timestamptz)
     end
 
-    create unique_index(:contacts, [:company_id, :name])
+    create unique_index(:contacts, [:company_id, :name], name: :contacts_unique_name_in_company)
   end
 end
