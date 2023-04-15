@@ -7,8 +7,8 @@ defmodule FullCircle.Sys.Log do
     field :delta, :string
     field :entity, :string
     field :entity_id, :integer
-    field :user_id, :integer
-    field :company_id, :integer
+    belongs_to :user, FullCircle.UserAccounts.User
+    belongs_to :company, FullCircle.Sys.Company
 
     timestamps(updated_at: false, type: :utc_datetime)
   end

@@ -54,9 +54,8 @@ defmodule FullCircleWeb.ContactLive.FormComponent do
         send(self(), {:deleted, cont})
         {:noreply, socket}
 
-      {:error, failed_operation, changeset, _} ->
-        send(self(), {:error, failed_operation, changeset})
-        {:noreply, socket}
+      {:error, _, changeset, _} ->
+        assign(socket, form: to_form(changeset))
 
       :not_authorise ->
         send(self(), :not_authorise)
@@ -76,9 +75,8 @@ defmodule FullCircleWeb.ContactLive.FormComponent do
         send(self(), {:created, cont})
         {:noreply, socket}
 
-      {:error, failed_operation, changeset, _} ->
-        send(self(), {:error, failed_operation, changeset})
-        {:noreply, socket}
+      {:error, _, changeset, _} ->
+        assign(socket, form: to_form(changeset))
 
       :not_authorise ->
         send(self(), :not_authorise)
@@ -99,9 +97,8 @@ defmodule FullCircleWeb.ContactLive.FormComponent do
         send(self(), {:updated, cont})
         {:noreply, socket}
 
-      {:error, failed_operation, changeset, _} ->
-        send(self(), {:error, failed_operation, changeset})
-        {:noreply, socket}
+      {:error, _, changeset, _} ->
+        assign(socket, form: to_form(changeset))
 
       :not_authorise ->
         send(self(), :not_authorise)

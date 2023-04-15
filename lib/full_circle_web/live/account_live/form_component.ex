@@ -75,9 +75,8 @@ defmodule FullCircleWeb.AccountLive.FormComponent do
         send(self(), {:created, ac})
         {:noreply, socket}
 
-      {:error, failed_operation, changeset, _} ->
-        send(self(), {:error, failed_operation, changeset})
-        {:noreply, socket}
+      {:error, _, changeset, _} ->
+        assign(socket, form: to_form(changeset))
 
       :not_authorise ->
         send(self(), :not_authorise)
@@ -99,8 +98,11 @@ defmodule FullCircleWeb.AccountLive.FormComponent do
         {:noreply, socket}
 
       {:error, failed_operation, changeset, _} ->
-        send(self(), {:error, failed_operation, changeset})
-        {:noreply, socket}
+        assign(socket, form: to_form(changeset))
+        |> put_flash(
+          :error,
+          "#{gettext("Failed")} #{failed_operation}. #{list_errors_to_string(changeset.errors)}"
+        )
 
       :not_authorise ->
         send(self(), :not_authorise)

@@ -30,10 +30,13 @@ defmodule FullCircleWeb.GoodLive.IndexComponent do
         |> Enum.map(fn x -> x.name end)
         |> Enum.join(", ") %>
       </p>
-      <p><%= @obj.sales_account_name %> - <%= @obj.sales_tax_code %></p>
-      <p><%= @obj.purchase_account_name %> - <%= @obj.purchase_tax_code %></p>
+      <p><%= @obj.sales_account_name %> - <%= @obj.sales_tax_code_name %></p>
+      <p><%= @obj.purchase_account_name %> - <%= @obj.purchase_tax_code_name %></p>
       <p><%= @obj.descriptions %></p>
       <span class="text-xs font-light"><%= to_fc_time_format(@obj.updated_at) %></span>
+      <span phx-click={:copy_object} class="text-xs hover:bg-orange-400 bg-orange-200 py-1 px-2 rounded-full" phx-value-object-id={@obj.id}>
+        <%= gettext("Copy") %>
+      </span>
     </div>
     """
   end

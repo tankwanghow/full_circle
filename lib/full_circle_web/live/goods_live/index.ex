@@ -111,6 +111,25 @@ defmodule FullCircleWeb.GoodLive.Index do
   end
 
   @impl true
+  def handle_event("copy_object", %{"object-id" => id}, socket) do
+    object = Product.get_good!(id, socket.assigns.current_user, socket.assigns.current_company)
+
+    {:noreply,
+     socket
+     |> assign(live_action: :new)
+     |> assign(id: "new")
+     |> assign(title: gettext("Copying Good"))
+     |> assign(current_company: socket.assigns.current_company)
+     |> assign(current_user: socket.assigns.current_user)
+     |> assign(
+       :form,
+       to_form(
+         StdInterface.changeset(Good, %Good{}, dup_good(object), socket.assigns.current_company)
+       )
+     )}
+  end
+
+  @impl true
   def handle_event("load-more", _, socket) do
     objects = filter_objects(socket, socket.assigns.search.terms, socket.assigns.page + 1)
 
@@ -137,6 +156,11 @@ defmodule FullCircleWeb.GoodLive.Index do
 
   @impl true
   def handle_info({:created, obj}, socket) do
+    obj =
+      if !Ecto.assoc_loaded?(obj.packagings),
+        do: FullCircle.Repo.preload(obj, :packagings),
+        else: obj
+
     css_trans(IndexComponent, obj, :obj, "objects-#{obj.id}", "shake")
 
     {:noreply,
@@ -147,6 +171,11 @@ defmodule FullCircleWeb.GoodLive.Index do
   end
 
   def handle_info({:updated, obj}, socket) do
+    obj =
+      if !Ecto.assoc_loaded?(obj.packagings),
+        do: FullCircle.Repo.preload(obj, :packagings),
+        else: obj
+
     css_trans(IndexComponent, obj, :obj, "objects-#{obj.id}", "shake")
 
     {:noreply, socket |> assign(live_action: nil)}
@@ -184,5 +213,33 @@ defmodule FullCircleWeb.GoodLive.Index do
       page: page,
       per_page: @per_page
     )
+  end
+
+  defp dup_good(object) do
+    %{
+      name: object.name <> " - COPY",
+      purchase_account_name: object.purchase_account_name,
+      sales_account_name: object.sales_account_name,
+      purchase_tax_code_name: object.purchase_tax_code_name,
+      sales_tax_code_name: object.sales_tax_code_name,
+      purchase_account_id: object.purchase_account_id,
+      sales_account_id: object.sales_account_id,
+      purchase_tax_code_id: object.purchase_tax_code_id,
+      sales_tax_code_id: object.sales_tax_code_id,
+      unit: object.unit,
+      descriptions: object.descriptions,
+      packagings: dup_packages(object.packagings)
+    }
+  end
+
+  defp dup_packages(objects) do
+    objects
+    |> Enum.map(fn x ->
+      %{
+        cost_per_package: x.cost_per_package,
+        name: x.name,
+        unit_multiplier: x.unit_multiplier
+      }
+    end)
   end
 end

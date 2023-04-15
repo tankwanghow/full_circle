@@ -9,6 +9,40 @@ defmodule FullCircle.Sys do
   alias FullCircle.Sys.Company
   alias FullCircle.Sys.CompanyUser
   alias FullCircle.Sys.Log
+  alias FullCircle.Accounting.Account
+
+  def default_tax_codes(company_id) do
+    [
+      %{
+        code: "NoSTax",
+        descriptions: "No Sales Tax",
+        rate: 0.0,
+        tax_type: "Sales",
+        account_id:
+          Repo.one!(
+            from(a in Account,
+              where: a.name == "Sales Tax Payable",
+              where: a.company_id == ^company_id,
+              select: a.id
+            )
+          )
+      },
+      %{
+        code: "NoPTax",
+        descriptions: "No Purchase Tax",
+        rate: 0.00,
+        tax_type: "Purchase",
+        account_id:
+          Repo.one!(
+            from(a in Account,
+              where: a.name == "Purchase Tax Receivable",
+              where: a.company_id == ^company_id,
+              select: a.id
+            )
+          )
+      }
+    ]
+  end
 
   def default_accounts do
     [
@@ -180,6 +214,18 @@ defmodule FullCircle.Sys do
         time = DateTime.truncate(Timex.now(), :second)
 
         default_accounts()
+        |> Enum.map(fn x ->
+          Map.merge(x, %{company_id: c.id, inserted_at: time, updated_at: time})
+        end)
+      end
+    )
+    |> Multi.insert_all(
+      :create_default_tax_codes,
+      FullCircle.Accounting.TaxCode,
+      fn %{create_company: c} ->
+        time = DateTime.truncate(Timex.now(), :second)
+
+        default_tax_codes(c.id)
         |> Enum.map(fn x ->
           Map.merge(x, %{company_id: c.id, inserted_at: time, updated_at: time})
         end)

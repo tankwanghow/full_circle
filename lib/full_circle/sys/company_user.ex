@@ -6,8 +6,8 @@ defmodule FullCircle.Sys.CompanyUser do
   schema "company_user" do
     field :role, :string
     field :default_company, :boolean, default: false
-    field :company_id, :integer
-    field :user_id, :integer
+    belongs_to :company, FullCircle.Sys.Company
+    belongs_to :user, FullCircle.UserAccounts.User
 
     timestamps(type: :utc_datetime)
   end
@@ -17,7 +17,7 @@ defmodule FullCircle.Sys.CompanyUser do
     company_user
     |> cast(attrs, [:role, :default_company, :company_id, :user_id])
     |> unique_constraint(:email,
-      name: :company_user_user_id_company_id_index,
+      name: :company_user_unique_user_in_company,
       message: gettext("already in company")
     )
     |> validate_required([:role, :company_id, :user_id])

@@ -52,18 +52,7 @@ defmodule FullCircleWeb.TaxCodeLive.FormComponent do
 
   @impl true
   def handle_event("validate", %{"tax_code" => params}, socket) do
-    changeset =
-      StdInterface.changeset(
-        TaxCode,
-        socket.assigns.form.data,
-        params,
-        socket.assigns.current_company
-      )
-      |> Map.put(:action, :insert)
-
-    socket = assign(socket, form: to_form(changeset))
-
-    {:noreply, socket}
+    validate(params, socket)
   end
 
   @impl true
@@ -84,9 +73,8 @@ defmodule FullCircleWeb.TaxCodeLive.FormComponent do
         send(self(), {:deleted, obj})
         {:noreply, socket}
 
-      {:error, failed_operation, changeset, _} ->
-        send(self(), {:error, failed_operation, changeset})
-        {:noreply, socket}
+      {:error, _, changeset, _} ->
+        assign(socket, form: to_form(changeset))
 
       :not_authorise ->
         send(self(), :not_authorise)
@@ -106,9 +94,8 @@ defmodule FullCircleWeb.TaxCodeLive.FormComponent do
         send(self(), {:created, obj})
         {:noreply, socket}
 
-      {:error, failed_operation, changeset, _} ->
-        send(self(), {:error, failed_operation, changeset})
-        {:noreply, socket}
+      {:error, _, changeset, _} ->
+        assign(socket, form: to_form(changeset))
 
       :not_authorise ->
         send(self(), :not_authorise)
@@ -129,9 +116,8 @@ defmodule FullCircleWeb.TaxCodeLive.FormComponent do
         send(self(), {:updated, obj})
         {:noreply, socket}
 
-      {:error, failed_operation, changeset, _} ->
-        send(self(), {:error, failed_operation, changeset})
-        {:noreply, socket}
+      {:error, _, changeset, _} ->
+        assign(socket, form: to_form(changeset))
 
       :not_authorise ->
         send(self(), :not_authorise)

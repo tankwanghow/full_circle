@@ -68,13 +68,13 @@ defmodule FullCircleWeb.GoodLive.FormComponent do
 
   def handle_event(
         "validate",
-        %{"_target" => ["good", "sales_tax_code"], "good" => params},
+        %{"_target" => ["good", "sales_tax_code_name"], "good" => params},
         socket
       ) do
     fill_tax_codes(
       socket,
       params,
-      "sales_tax_code",
+      "sales_tax_code_name",
       :tax_codes,
       "sales_tax_code_id"
     )
@@ -82,31 +82,20 @@ defmodule FullCircleWeb.GoodLive.FormComponent do
 
   def handle_event(
         "validate",
-        %{"_target" => ["good", "purchase_tax_code"], "good" => params},
+        %{"_target" => ["good", "purchase_tax_code_name"], "good" => params},
         socket
       ) do
     fill_tax_codes(
       socket,
       params,
-      "purchase_tax_code",
+      "purchase_tax_code_name",
       :tax_codes,
       "purchase_tax_code_id"
     )
   end
 
   def handle_event("validate", %{"good" => params}, socket) do
-    changeset =
-      StdInterface.changeset(
-        Good,
-        socket.assigns.form.data,
-        params,
-        socket.assigns.current_company
-      )
-      |> Map.put(:action, :insert)
-
-    socket = assign(socket, form: to_form(changeset))
-
-    {:noreply, socket}
+    validate(params, socket)
   end
 
   @impl true
@@ -119,7 +108,7 @@ defmodule FullCircleWeb.GoodLive.FormComponent do
     case StdInterface.delete(
            Good,
            "good",
-           socket.assigns.from.data,
+           socket.assigns.form.data,
            socket.assigns.current_user,
            socket.assigns.current_company
          ) do
@@ -128,8 +117,12 @@ defmodule FullCircleWeb.GoodLive.FormComponent do
         {:noreply, socket}
 
       {:error, failed_operation, changeset, _} ->
-        send(self(), {:error, failed_operation, changeset})
-        {:noreply, socket}
+        {:noreply,
+         socket
+         |> put_flash(
+           :error,
+           "#{gettext("Failed")} #{failed_operation}. #{list_errors_to_string(changeset.errors)}"
+         )}
 
       :not_authorise ->
         send(self(), :not_authorise)
@@ -150,8 +143,13 @@ defmodule FullCircleWeb.GoodLive.FormComponent do
         {:noreply, socket}
 
       {:error, failed_operation, changeset, _} ->
-        send(self(), {:error, failed_operation, changeset})
-        {:noreply, socket}
+        {:noreply,
+         socket
+         |> assign(form: to_form(changeset))
+         |> put_flash(
+           :error,
+           "#{gettext("Failed")} #{failed_operation}. #{list_errors_to_string(changeset.errors)}"
+         )}
 
       :not_authorise ->
         send(self(), :not_authorise)
@@ -173,7 +171,14 @@ defmodule FullCircleWeb.GoodLive.FormComponent do
         {:noreply, socket}
 
       {:error, failed_operation, changeset, _} ->
-        send(self(), {:error, failed_operation, changeset})
+        socket =
+          socket
+          |> assign(form: to_form(changeset))
+          |> put_flash(
+            :error,
+            "#{gettext("Failed")} #{failed_operation}. #{list_errors_to_string(changeset.errors)}"
+          )
+
         {:noreply, socket}
 
       :not_authorise ->
@@ -226,11 +231,14 @@ defmodule FullCircleWeb.GoodLive.FormComponent do
   end
 
   defp validate(params, socket) do
-    object = if(socket.assigns[:object], do: socket.assigns.object, else: %Good{})
-
     changeset =
-      StdInterface.changeset(Good, object, params, socket.assigns.current_company)
-      |> Map.put(:action, :insert)
+      StdInterface.changeset(
+        Good,
+        socket.assigns.form.data,
+        params,
+        socket.assigns.current_company
+      )
+      |> Map.put(:action, socket.assigns.live_action)
 
     socket = assign(socket, form: to_form(changeset))
 
@@ -272,7 +280,7 @@ defmodule FullCircleWeb.GoodLive.FormComponent do
           <div class="col-span-3">
             <%= Phoenix.HTML.Form.hidden_input(@form, :sales_tax_code_id) %>
             <.input
-              field={@form[:sales_tax_code]}
+              field={@form[:sales_tax_code_name]}
               label={gettext("Sales TaxCode")}
               list="tax_codes"
               phx-debounce={500}
@@ -293,7 +301,7 @@ defmodule FullCircleWeb.GoodLive.FormComponent do
           <div class="col-span-3">
             <%= Phoenix.HTML.Form.hidden_input(@form, :purchase_tax_code_id) %>
             <.input
-              field={@form[:purchase_tax_code]}
+              field={@form[:purchase_tax_code_name]}
               label={gettext("Purchase TaxCode")}
               list="tax_codes"
               phx-debounce={500}
@@ -321,10 +329,10 @@ defmodule FullCircleWeb.GoodLive.FormComponent do
               <.input field={pack[:name]} />
             </div>
             <div class="col-span-3">
-              <.input type="number" field={pack[:unit_multiplier]} />
+              <.input type="number" field={pack[:unit_multiplier]} step="0.0001" />
             </div>
             <div class="col-span-4">
-              <.input type="number" field={pack[:cost_per_package]} />
+              <.input type="number" field={pack[:cost_per_package]} step="0.0001"/>
             </div>
             <div class="col-span-1 mt-2.5 text-rose-500">
               <.link phx-click={:delete_packaging} phx-value-index={pack.index} phx-target={@myself}>

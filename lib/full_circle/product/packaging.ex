@@ -4,16 +4,16 @@ defmodule FullCircle.Product.Packaging do
   import FullCircleWeb.Gettext
 
   schema "packagings" do
-    field :name, :string
-    field :unit_multiplier, :decimal, default: 1
-    field :cost_per_package, :decimal, default: 0
+    field(:name, :string)
+    field(:unit_multiplier, :decimal, default: 0)
+    field(:cost_per_package, :decimal, default: 0)
 
-    field :good_id, :integer
+    belongs_to :good, FullCircle.Product.Good
 
     # has_many :invoice_details, FullCircle.CustomerBilling.InvoiceDetail, foreign_key: :package_id
 
-    field :delete, :boolean, virtual: true, default: false
-    field :temp_id, :string, virtual: true
+    field(:delete, :boolean, virtual: true, default: false)
+    field(:temp_id, :string, virtual: true)
   end
 
   @doc false
@@ -30,11 +30,17 @@ defmodule FullCircle.Product.Packaging do
       :unit_multiplier,
       :cost_per_package
     ])
-    |> unique_constraint(:name, name: :packagings_unique_name_in_goods)
-    |> foreign_key_constraint(:name,
-      name: :invoice_details_package_id_fkey,
-      message: gettext("referenced by invoice details")
+    |> unsafe_validate_unique([:name, :good_id], FullCircle.Repo,
+      message: gettext("has already been taken")
     )
+    |> unique_constraint(:name,
+      name: :packagings_unique_name_in_goods,
+      message: gettext("has already been taken")
+    )
+    # |> foreign_key_constraint(:name,
+    #   name: :invoice_details_package_id_fkey,
+    #   message: gettext("referenced by invoice details")
+    # )
     |> maybe_mark_for_deletion()
   end
 

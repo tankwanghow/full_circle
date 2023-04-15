@@ -4,7 +4,7 @@ defmodule FullCircle.Accounting.Contact do
   import FullCircleWeb.Gettext
 
   schema "contacts" do
-    field :company_id, :integer
+    belongs_to :company, FullCircle.Sys.Company
     field :address1, :string
     field :address2, :string
     field :city, :string
@@ -42,6 +42,9 @@ defmodule FullCircle.Accounting.Contact do
     |> validate_required([:name, :company_id])
     |> validate_inclusion(:country, FullCircle.Sys.countries(), message: gettext("not in list"))
     |> unsafe_validate_unique([:name, :company_id], FullCircle.Repo,
+      message: gettext("has already been taken")
+    )
+    |> unique_constraint(:name, name: :contacts_unique_name_in_company,
       message: gettext("has already been taken")
     )
 

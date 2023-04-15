@@ -4,13 +4,13 @@ defmodule FullCircle.Accounting.Account do
   import FullCircleWeb.Gettext
 
   schema "accounts" do
-    field :company_id, :integer
+    belongs_to :company, FullCircle.Sys.Company
     field :descriptions, :string
     field :account_type, :string
     field :name, :string
 
-    # has_many :sales_goods, FullCircle.Product.Good, foreign_key: :sales_account_id
-    # has_many :purchase_goods, FullCircle.Product.Good, foreign_key: :purchase_account_id
+    has_many :sales_goods, FullCircle.Product.Good, foreign_key: :sales_account_id
+    has_many :purchase_goods, FullCircle.Product.Good, foreign_key: :purchase_account_id
     # has_many :invoice_details, FullCircle.CustomerBilling.InvoiceDetail
 
     timestamps(type: :utc_datetime)
@@ -25,6 +25,9 @@ defmodule FullCircle.Accounting.Account do
       message: gettext("not in list")
     )
     |> unsafe_validate_unique([:name, :company_id], FullCircle.Repo,
+      message: gettext("has already been taken")
+    )
+    |> unique_constraint(:name, name: :accounts_unique_name_in_company,
       message: gettext("has already been taken")
     )
 

@@ -3,7 +3,7 @@ defmodule FullCircle.Product do
   import FullCircle.Helpers
 
   alias FullCircle.Accounting.{Account, TaxCode}
-  alias FullCircle.Product.{Good, Packaging}
+  alias FullCircle.Product.{Good}
   alias FullCircle.{Repo, Sys}
 
   def get_good!(id, user, company) do
@@ -34,8 +34,8 @@ defmodule FullCircle.Product do
         purchase_account_name: pac.name,
         sales_account_id: sac.id,
         purchase_account_id: pac.id,
-        sales_tax_code: stc.code,
-        purchase_tax_code: ptc.code,
+        sales_tax_code_name: stc.code,
+        purchase_tax_code_name: ptc.code,
         sales_tax_code_id: stc.id,
         purchase_tax_code_id: ptc.id,
         descriptions: good.descriptions,
@@ -52,7 +52,7 @@ defmodule FullCircle.Product do
       preload: :packagings,
       order_by:
         ^similarity_order(
-          ~w(name unit purchase_account_name sales_account_name sales_tax_code purchase_tax_code descriptions)a,
+          ~w(name unit purchase_account_name sales_account_name sales_tax_code_name purchase_tax_code_name descriptions)a,
           terms
         )
     )
