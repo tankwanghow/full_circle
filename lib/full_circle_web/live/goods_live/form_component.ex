@@ -332,7 +332,7 @@ defmodule FullCircleWeb.GoodLive.FormComponent do
               <.input type="number" field={pack[:unit_multiplier]} step="0.0001" />
             </div>
             <div class="col-span-4">
-              <.input type="number" field={pack[:cost_per_package]} step="0.0001"/>
+              <.input type="number" field={pack[:cost_per_package]} step="0.0001" />
             </div>
             <div class="col-span-1 mt-2.5 text-rose-500">
               <.link phx-click={:delete_packaging} phx-value-index={pack.index} phx-target={@myself}>

@@ -6,7 +6,7 @@ defmodule FullCircleWeb.UserLive.New do
   def mount(_params, _session, socket) do
     {:ok,
      socket
-     |> assign(:page_title, gettext("Add New User"))
+     |> assign(:page_title, gettext("New User"))
      |> assign(:email, "")
      |> assign(:message, "")
      |> assign(:pwd, "")

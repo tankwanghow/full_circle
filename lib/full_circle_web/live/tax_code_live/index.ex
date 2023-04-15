@@ -20,7 +20,7 @@ defmodule FullCircleWeb.TaxCodeLive.Index do
       />
       <div class="text-center mb-2">
         <.link phx-click={:new_object} class={"#{button_css()} text-xl"} id="new_object">
-          <%= gettext("Add New TaxCode") %>
+          <%= gettext("New TaxCode") %>
         </.link>
       </div>
       <div class="text-center mb-1">

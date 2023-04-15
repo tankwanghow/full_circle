@@ -19,7 +19,7 @@ defmodule FullCircleWeb.ContactLive.Index do
       />
       <div class="text-center mb-2">
         <.link phx-click={:new_contact} class={"#{button_css()} text-xl"} id="new_contact">
-          <%= gettext("Add New Contact") %>
+          <%= gettext("New Contact") %>
         </.link>
       </div>
       <div class="text-center mb-1">

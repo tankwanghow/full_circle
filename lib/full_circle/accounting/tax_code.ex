@@ -30,11 +30,14 @@ defmodule FullCircle.Accounting.TaxCode do
       :account_name
     ])
     |> validate_required([:code, :tax_type, :rate, :account_name, :company_id, :account_id])
-    |> validate_inclusion(:tax_type, FullCircle.Accounting.tax_types(), message: gettext("not in list"))
+    |> validate_inclusion(:tax_type, FullCircle.Accounting.tax_types(),
+      message: gettext("not in list")
+    )
     |> unsafe_validate_unique([:code, :company_id], FullCircle.Repo,
       message: gettext("code already in company")
     )
-    |> unique_constraint(:code, name: :tax_codes_unique_code_in_company,
+    |> unique_constraint(:code,
+      name: :tax_codes_unique_code_in_company,
       message: gettext("code already in company")
     )
     |> validate_id(:account_name, :account_id)

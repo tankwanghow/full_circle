@@ -44,7 +44,8 @@ defmodule FullCircle.Accounting.Contact do
     |> unsafe_validate_unique([:name, :company_id], FullCircle.Repo,
       message: gettext("has already been taken")
     )
-    |> unique_constraint(:name, name: :contacts_unique_name_in_company,
+    |> unique_constraint(:name,
+      name: :contacts_unique_name_in_company,
       message: gettext("has already been taken")
     )
 

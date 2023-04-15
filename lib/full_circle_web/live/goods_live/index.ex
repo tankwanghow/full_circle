@@ -20,7 +20,7 @@ defmodule FullCircleWeb.GoodLive.Index do
       />
       <div class="text-center mb-2">
         <.link phx-click={:new_object} class={"#{button_css()} text-xl"} id="new_object">
-          <%= gettext("Add New Good") %>
+          <%= gettext("New Good") %>
         </.link>
       </div>
       <div class="text-center mb-1">

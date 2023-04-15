@@ -162,7 +162,12 @@ defmodule FullCircleWeb.TaxCodeLive.FormComponent do
           type="select"
           options={FullCircle.Accounting.tax_types()}
         />
-        <.input field={@form[:rate]} label={gettext("Rate (example:- 6% = 0.06, 10% = 0.1)")} />
+        <.input
+          field={@form[:rate]}
+          type="number"
+          step="0.0001"
+          label={gettext("Rate (example:- 6% = 0.06, 10% = 0.1)")}
+        />
         <%= Phoenix.HTML.Form.hidden_input(@form, :account_id) %>
         <.input
           field={@form[:account_name]}

@@ -103,6 +103,7 @@ defmodule FullCircleWeb.Router do
       live("/contacts", ContactLive.Index, :index)
       live("/tax_codes", TaxCodeLive.Index, :index)
       live("/goods", GoodLive.Index, :index)
+      live("/fixed_assets", FixedAssetLive.Index, :index)
     end
   end
 

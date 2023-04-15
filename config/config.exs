@@ -7,6 +7,25 @@
 # General application configuration
 import Config
 
+config :number,
+  currency: [
+    unit: "",
+    precision: 2,
+    delimiter: ",",
+    separator: ".",
+    # "£30.00"
+    format: "%u%n",
+    # "(£30.00)"
+    negative_format: "(%u%n)"
+  ]
+
+config :number,
+  percentage: [
+    delimiter: ",",
+    separator: ".",
+    precision: 2
+  ]
+
 config :full_circle, FullCircle.Repo, migration_timestamps: [type: :timestamptz]
 
 config :full_circle,

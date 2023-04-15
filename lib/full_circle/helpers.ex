@@ -53,4 +53,27 @@ defmodule FullCircle.Helpers do
       changeset
     end
   end
+
+  def get_gapless_doc_id(multi, name, doc, doc_code, com) do
+    Ecto.Multi.run(multi, name, fn repo, _ ->
+      gap =
+        repo.one(
+          from gap in FullCircle.Sys.GaplessDocId,
+            where: gap.company_id == ^com.id,
+            where: gap.doc_type == ^doc,
+            select: gap
+        )
+
+      {:ok, gap} =
+        repo.update(Ecto.Changeset.change(gap, current: gap.current + 1), returning: [:current])
+
+      {:ok, gen_doc_id(gap.current, doc_code, com.id)}
+    end)
+  end
+
+  def gen_doc_id(number, code, company_id) do
+    num = number |> Integer.to_string() |> String.pad_leading(6, "0")
+    com = company_id |> Integer.to_string()
+    Enum.join([code, com, num], "-")
+  end
 end

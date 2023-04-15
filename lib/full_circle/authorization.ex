@@ -8,6 +8,15 @@ defmodule FullCircle.Authorization do
   @allow true
   @forbid false
 
+  def can?(user, :create_fixed_asset, company),
+    do: allow_roles(~w(admin manager supervisor clerk), company, user)
+
+  def can?(user, :update_fixed_asset, company),
+    do: allow_roles(~w(admin manager supervisor clerk), company, user)
+
+  def can?(user, :delete_fixed_asset, company),
+    do: allow_roles(~w(admin manager supervisor clerk), company, user)
+
   def can?(user, :create_good, company),
     do: allow_roles(~w(admin manager supervisor clerk), company, user)
 

@@ -1,7 +1,7 @@
 defmodule FullCircle.Accounting do
   import Ecto.Query, warn: false
 
-  alias FullCircle.Accounting.{Account, TaxCode}
+  alias FullCircle.Accounting.{Account, TaxCode, FixedAsset}
   alias FullCircle.{Repo, Sys, StdInterface}
 
   def account_types do
@@ -74,6 +74,45 @@ defmodule FullCircle.Accounting do
         descriptions: taxcode.descriptions,
         inserted_at: taxcode.inserted_at,
         updated_at: taxcode.updated_at
+      }
+    )
+  end
+
+  def get_fixed_asset!(id, user, company) do
+    from(fa in fixed_asset_query(user, company),
+      where: fa.id == ^id
+    )
+    |> Repo.one!()
+  end
+
+  def fixed_asset_query(user, company) do
+    from(fa in FixedAsset,
+      join: com in subquery(Sys.user_companies(company, user)),
+      on: com.id == fa.company_id,
+      left_join: ac in Account,
+      on: ac.id == fa.asset_ac_id,
+      left_join: ac1 in Account,
+      on: ac1.id == fa.depre_ac_id,
+      left_join: ac2 in Account,
+      on: ac2.id == fa.cume_depre_ac_id,
+      select: %FixedAsset{
+        id: fa.id,
+        name: fa.name,
+        depre_rate: fa.depre_rate,
+        depre_method: fa.depre_method,
+        pur_date: fa.pur_date,
+        pur_price: fa.pur_price,
+        depre_start_date: fa.depre_start_date,
+        residual_value: fa.residual_value,
+        asset_ac_name: ac.name,
+        asset_ac_id: ac.id,
+        depre_ac_name: ac1.name,
+        depre_ac_id: ac1.id,
+        cume_depre_ac_name: ac2.name,
+        cume_depre_ac_id: ac2.id,
+        descriptions: fa.descriptions,
+        inserted_at: fa.inserted_at,
+        updated_at: fa.updated_at
       }
     )
   end
