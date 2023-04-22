@@ -122,7 +122,7 @@ defmodule FullCircleWeb.AccountLive.FormComponent do
         autocomplete="off"
         phx-change="validate"
         phx-submit="save"
-        class="max-w-md mx-auto"
+        class="w-full"
       >
         <.input field={@form[:name]} label={gettext("Account Name")} />
 

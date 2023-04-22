@@ -43,13 +43,17 @@ defmodule FullCircleWeb.GoodLive.FormComponent do
         %{"_target" => ["good", "purchase_account_name"], "good" => params},
         socket
       ) do
-    fill_account_names(
-      socket,
-      params,
-      "purchase_account_name",
-      :account_names,
-      "purchase_account_id"
-    )
+    {params, socket, _} =
+      FullCircleWeb.Helpers.assign_list_n_id(
+        socket,
+        params,
+        "purchase_account_name",
+        :account_names,
+        "purchase_account_id",
+        &FullCircle.Accounting.account_names/3
+      )
+
+    validate(params, socket)
   end
 
   def handle_event(
@@ -57,13 +61,17 @@ defmodule FullCircleWeb.GoodLive.FormComponent do
         %{"_target" => ["good", "sales_account_name"], "good" => params},
         socket
       ) do
-    fill_account_names(
-      socket,
-      params,
-      "sales_account_name",
-      :account_names,
-      "sales_account_id"
-    )
+    {params, socket, _} =
+      FullCircleWeb.Helpers.assign_list_n_id(
+        socket,
+        params,
+        "sales_account_name",
+        :account_names,
+        "sales_account_id",
+        &FullCircle.Accounting.account_names/3
+      )
+
+    validate(params, socket)
   end
 
   def handle_event(
@@ -71,13 +79,17 @@ defmodule FullCircleWeb.GoodLive.FormComponent do
         %{"_target" => ["good", "sales_tax_code_name"], "good" => params},
         socket
       ) do
-    fill_tax_codes(
-      socket,
-      params,
-      "sales_tax_code_name",
-      :tax_codes,
-      "sales_tax_code_id"
-    )
+    {params, socket, _} =
+      FullCircleWeb.Helpers.assign_list_n_id(
+        socket,
+        params,
+        "sales_tax_code_name",
+        :tax_codes,
+        "sales_tax_code_id",
+        &FullCircle.Accounting.tax_codes/3
+      )
+
+    validate(params, socket)
   end
 
   def handle_event(
@@ -85,13 +97,17 @@ defmodule FullCircleWeb.GoodLive.FormComponent do
         %{"_target" => ["good", "purchase_tax_code_name"], "good" => params},
         socket
       ) do
-    fill_tax_codes(
-      socket,
-      params,
-      "purchase_tax_code_name",
-      :tax_codes,
-      "purchase_tax_code_id"
-    )
+    {params, socket, _} =
+      FullCircleWeb.Helpers.assign_list_n_id(
+        socket,
+        params,
+        "purchase_tax_code_name",
+        :tax_codes,
+        "purchase_tax_code_id",
+        &FullCircle.Accounting.tax_codes/3
+      )
+
+    validate(params, socket)
   end
 
   def handle_event("validate", %{"good" => params}, socket) do
@@ -185,49 +201,6 @@ defmodule FullCircleWeb.GoodLive.FormComponent do
         send(self(), :not_authorise)
         {:noreply, socket}
     end
-  end
-
-  def fill_account_names(socket, params, terms_name, assign_names, assign_id) do
-    socket =
-      assign(
-        socket,
-        assign_names,
-        FullCircle.Accounting.account_names(
-          params[terms_name],
-          socket.assigns.current_user,
-          socket.assigns.current_company
-        )
-      )
-
-    account =
-      Enum.find(socket.assigns[assign_names], fn x ->
-        x.value == params[terms_name]
-      end)
-
-    params = Map.merge(params, %{assign_id => Util.attempt(account, :id) || -1})
-    validate(params, socket)
-  end
-
-  def fill_tax_codes(socket, params, terms_name, assign_names, assign_id) do
-    socket =
-      assign(
-        socket,
-        assign_names,
-        FullCircle.Accounting.tax_codes(
-          params[terms_name],
-          socket.assigns.current_user,
-          socket.assigns.current_company
-        )
-      )
-
-    obj =
-      Enum.find(socket.assigns[assign_names], fn x ->
-        x.value == params[terms_name]
-      end)
-
-    params = Map.merge(params, %{assign_id => Util.attempt(obj, :id) || -1})
-
-    validate(params, socket)
   end
 
   defp validate(params, socket) do

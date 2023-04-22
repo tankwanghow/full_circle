@@ -3,7 +3,7 @@ defmodule FullCircle.Product do
   import FullCircle.Helpers
 
   alias FullCircle.Accounting.{Account, TaxCode}
-  alias FullCircle.Product.{Good}
+  alias FullCircle.Product.{Good, Packaging}
   alias FullCircle.{Repo, Sys}
 
   def get_good!(id, user, company) do
@@ -12,6 +12,48 @@ defmodule FullCircle.Product do
       where: good.id == ^id
     )
     |> Repo.one!()
+  end
+
+  def good_names(terms, user, company) do
+    from(good in subquery(good_query(user, company)),
+      left_join: pack in Packaging,
+      on: pack.good_id == good.id,
+      where: ilike(good.name, ^"%#{terms}%"),
+      select: %{
+        id: good.id,
+        value: good.name,
+        unit: good.unit,
+        package_name: pack.name,
+        package_id: pack.id,
+        unit_multiplier: pack.unit_multiplier,
+        sales_account_name: good.sales_account_name,
+        purchase_account_name: good.purchase_account_name,
+        sales_account_id: good.sales_account_id,
+        purchase_account_id: good.purchase_account_id,
+        sales_tax_code_name: good.sales_tax_code_name,
+        purchase_tax_code_name: good.purchase_tax_code_name,
+        sales_tax_code_id: good.sales_tax_code_id,
+        purchase_tax_code_id: good.purchase_tax_code_id,
+        sales_tax_rate: good.sales_tax_rate,
+        purchase_tax_rate: good.purchase_tax_rate
+      },
+      order_by: [good.name, pack.id],
+      distinct: good.id
+    )
+    |> Repo.all()
+  end
+
+  def package_names(terms, good_id) do
+    from(pack in Packaging,
+      where: ilike(pack.name, ^"%#{terms}%"),
+      where: pack.good_id == ^good_id,
+      select: %{
+        id: pack.id,
+        value: pack.name,
+        unit_multiplier: pack.unit_multiplier
+      }
+    )
+    |> Repo.all()
   end
 
   defp good_query(user, company) do
@@ -38,6 +80,8 @@ defmodule FullCircle.Product do
         purchase_tax_code_name: ptc.code,
         sales_tax_code_id: stc.id,
         purchase_tax_code_id: ptc.id,
+        sales_tax_rate: stc.rate,
+        purchase_tax_rate: ptc.rate,
         descriptions: good.descriptions,
         inserted_at: good.inserted_at,
         updated_at: good.updated_at

@@ -27,13 +27,17 @@ defmodule FullCircleWeb.FixedAssetLive.FormComponent do
         %{"_target" => ["fixed_asset", "asset_ac_name"], "fixed_asset" => params},
         socket
       ) do
-    fill_account_names(
-      socket,
-      params,
-      "asset_ac_name",
-      :account_names,
-      "asset_ac_id"
-    )
+    {params, socket, _} =
+      FullCircleWeb.Helpers.assign_list_n_id(
+        socket,
+        params,
+        "asset_ac_name",
+        :account_names,
+        "asset_ac_id",
+        &FullCircle.Accounting.account_names/3
+      )
+
+    validate(params, socket)
   end
 
   @impl true
@@ -42,13 +46,17 @@ defmodule FullCircleWeb.FixedAssetLive.FormComponent do
         %{"_target" => ["fixed_asset", "depre_ac_name"], "fixed_asset" => params},
         socket
       ) do
-    fill_account_names(
-      socket,
-      params,
-      "depre_ac_name",
-      :account_names,
-      "depre_ac_id"
-    )
+    {params, socket, _} =
+      FullCircleWeb.Helpers.assign_list_n_id(
+        socket,
+        params,
+        "depre_ac_name",
+        :account_names,
+        "depre_ac_id",
+        &FullCircle.Accounting.account_names/3
+      )
+
+    validate(params, socket)
   end
 
   @impl true
@@ -57,13 +65,17 @@ defmodule FullCircleWeb.FixedAssetLive.FormComponent do
         %{"_target" => ["fixed_asset", "cume_depre_ac_name"], "fixed_asset" => params},
         socket
       ) do
-    fill_account_names(
-      socket,
-      params,
-      "cume_depre_ac_name",
-      :account_names,
-      "cume_depre_ac_id"
-    )
+    {params, socket, _} =
+      FullCircleWeb.Helpers.assign_list_n_id(
+        socket,
+        params,
+        "cume_depre_ac_name",
+        :account_names,
+        "cume_depre_ac_id",
+        &FullCircle.Accounting.account_names/3
+      )
+
+    validate(params, socket)
   end
 
   @impl true
@@ -139,27 +151,6 @@ defmodule FullCircleWeb.FixedAssetLive.FormComponent do
         send(self(), :not_authorise)
         {:noreply, socket}
     end
-  end
-
-  def fill_account_names(socket, params, terms_name, assign_names, assign_id) do
-    socket =
-      assign(
-        socket,
-        assign_names,
-        FullCircle.Accounting.account_names(
-          params[terms_name],
-          socket.assigns.current_user,
-          socket.assigns.current_company
-        )
-      )
-
-    account =
-      Enum.find(socket.assigns[assign_names], fn x ->
-        x.value == params[terms_name]
-      end)
-
-    params = Map.merge(params, %{assign_id => Util.attempt(account, :id) || -1})
-    validate(params, socket)
   end
 
   defp validate(params, socket) do

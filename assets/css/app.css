@@ -2,6 +2,39 @@
 @import "tailwindcss/components";
 @import "tailwindcss/utilities";
 
+.tribute-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: auto;
+  overflow: auto;
+  display: block;
+  z-index: 999999;
+}
+.tribute-container ul {
+  margin: 0;
+  margin-top: 2px;
+  padding: 0;
+  list-style: none;
+  background: #efefef;
+}
+.tribute-container li {
+  padding: 5px 5px;
+  cursor: pointer;
+}
+.tribute-container li.highlight {
+  background: #ddd;
+}
+.tribute-container li span {
+  font-weight: bold;
+}
+.tribute-container li.no-match {
+  cursor: default;
+}
+.tribute-container .menu-highlighted {
+  font-weight: bold;
+}
+
 /* This file is for your main application CSS */
 
 /* Chrome, Safari, Edge, Opera */
@@ -17,36 +50,30 @@ input[type=number] {
   text-align: right;
 }
 
+.invoice-detail-header {
+  @apply border border-gray-500 rounded bg-gray-200 py-2 grow shrink;
+}
+
+.invoice-detail-header-fixed {
+  @apply border border-gray-500 rounded bg-gray-200 py-2 grow-0 shrink-0;
+}
+
 .shake {
   animation: shake 0.5s;
   animation-iteration-count: 3;
 }
 
 .slow-hide {
-  @apply opacity-0;
-  @apply transition-opacity;
-  @apply duration-1000;
+  @apply opacity-0 transition-opacity duration-1000;
 }
 
 button[disabled] {
-  @apply bg-gray-200;
-  @apply hover:bg-gray-200;
-  @apply cursor-not-allowed;
+  @apply bg-gray-200 hover:bg-gray-200 cursor-not-allowed;
 }
 
 .nav-btn {
-  @apply text-xl;
-  @apply text-center;
-  @apply tracking-tighter;
-  @apply rounded-md;
-  @apply px-5;
-  @apply py-2;
-  @apply transition;
-  @apply duration-500;
-  @apply select-none;
-  @apply bg-pink-300;
-  @apply hover:bg-pink-500;
-  @apply focus:bg-pink-500;
+  @apply text-xl text-center tracking-tighter rounded-md px-5 py-2; 
+  @apply transition duration-500 select-none bg-pink-300 hover:bg-pink-500 focus:bg-pink-500;
 }
 
 @keyframes shake {

@@ -21,9 +21,12 @@ defmodule FullCircleWeb.FixedAssetLive.IndexComponent do
       phx-click={:edit_object}
     >
       <span class="text-xl font-bold"><%= @obj.name %></span>
-      <p><%= @obj.pur_date %> - <%= @obj.pur_price |> Number.Currency.number_to_currency%>
-      <%= @obj.depre_method %> - <%= Decimal.mult(@obj.depre_rate, 100) |> Number.Percentage.number_to_percentage %></p>
-      <p><%= @obj.asset_ac_name %> - <%= @obj.depre_ac_name %></p>
+      <p>
+        <%= @obj.pur_date %> &#11049; <%= @obj.pur_price |> Number.Currency.number_to_currency() %> &#11049; <%= @obj.depre_method %> &#11049; <%= Number.Percentage.number_to_percentage(
+          Decimal.mult(@obj.depre_rate, 100)
+        ) %>
+      </p>
+      <p><%= @obj.asset_ac_name %> &#11049; <%= @obj.depre_ac_name %></p>
       <p><%= @obj.cume_depre_ac_name %></p>
       <p><%= @obj.descriptions %></p>
       <span class="text-xs font-light"><%= to_fc_time_format(@obj.updated_at) %></span>

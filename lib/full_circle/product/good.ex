@@ -20,13 +20,15 @@ defmodule FullCircle.Product.Good do
     belongs_to(:sales_account, FullCircle.Accounting.Account, foreign_key: :sales_account_id)
     belongs_to(:sales_tax_code, FullCircle.Accounting.TaxCode, foreign_key: :sales_tax_code_id)
 
-    # has_many :invoice_details, FullCircle.CustomerBilling.InvoiceDetail
+    has_many :invoice_details, FullCircle.CustomerBilling.InvoiceDetail
     has_many(:packagings, FullCircle.Product.Packaging, on_replace: :delete)
 
     field(:purchase_account_name, :string, virtual: true)
     field(:purchase_tax_code_name, :string, virtual: true)
     field(:sales_account_name, :string, virtual: true)
     field(:sales_tax_code_name, :string, virtual: true)
+    field(:purchase_tax_rate, :decimal, virtual: true)
+    field(:sales_tax_rate, :decimal, virtual: true)
 
     timestamps(type: :utc_datetime)
   end
@@ -46,7 +48,9 @@ defmodule FullCircle.Product.Good do
       :purchase_account_id,
       :purchase_tax_code_id,
       :sales_account_id,
-      :sales_tax_code_id
+      :sales_tax_code_id,
+      :purchase_tax_rate,
+      :sales_tax_rate
     ])
     |> validate_required([
       :name,

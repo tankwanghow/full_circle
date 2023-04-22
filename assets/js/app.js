@@ -22,9 +22,23 @@ import { Socket } from "phoenix"
 import { LiveSocket } from "phoenix_live_view"
 import topbar from "../vendor/topbar"
 import InfiniteScroll from "./infinite_scroll"
+import Tribute from "../vendor/tribute"
 
 let csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 let Hooks = { InfiniteScroll }
+
+Hooks.tributeTextArea = {
+  mounted() {
+    var tribute = new Tribute({
+      trigger: '#',
+      values: [],
+      lookup: "value",
+      fillAttr: "value"
+    });
+    tribute.attach(this.el)
+    tribute.append(0, this.el.getAttribute("tag-data").split(", ").map(x => { return { value: x } }))
+  }
+};
 
 let liveSocket = new LiveSocket("/live", Socket, {
   hooks: Hooks,

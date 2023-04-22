@@ -30,8 +30,9 @@ defmodule FullCircleWeb.GoodLive.IndexComponent do
         |> Enum.map(fn x -> x.name end)
         |> Enum.join(", ") %>
       </p>
-      <p><%= @obj.sales_account_name %> - <%= @obj.sales_tax_code_name %></p>
-      <p><%= @obj.purchase_account_name %> - <%= @obj.purchase_tax_code_name %></p>
+      <p>
+        <%= @obj.sales_account_name %> &#11049; <%= @obj.sales_tax_code_name %> &#8226; <%= @obj.purchase_account_name %> &#11049; <%= @obj.purchase_tax_code_name %>
+      </p>
       <p><%= @obj.descriptions %></p>
       <span class="text-xs font-light"><%= to_fc_time_format(@obj.updated_at) %></span>
       <span

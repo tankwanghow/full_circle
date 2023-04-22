@@ -22,6 +22,9 @@ defmodule FullCircleWeb.DashboardLive do
         <.link navigate={~p"/companies/#{@current_company.id}/goods"} class="nav-btn">
           <%= gettext("Goods") %>
         </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/invoices"} class="nav-btn">
+          <%= gettext("Invoices") %>
+        </.link>
       </div>
     </div>
     """

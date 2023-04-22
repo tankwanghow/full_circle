@@ -43,6 +43,7 @@ defmodule FullCircleWeb.CoreComponents do
   attr(:show, :boolean, default: false)
   attr(:on_cancel, JS, default: %JS{})
   attr(:on_confirm, JS, default: %JS{})
+  attr(:max_w, :string, default: "max-w-3xl")
 
   slot(:inner_block, required: true)
   slot(:title)
@@ -68,13 +69,13 @@ defmodule FullCircleWeb.CoreComponents do
         tabindex="0"
       >
         <div class="flex min-h-full items-center justify-center">
-          <div class="w-full max-w-3xl p-4 sm:p-6 lg:py-8">
+          <div class={"w-full #{@max_w} p-4 sm:p-6 lg:py-8"}>
             <.focus_wrap
               id={"#{@id}-container"}
               phx-mounted={@show && show_modal(@id)}
               phx-window-keydown={JS.exec("phx-remove", to: "##{@id}")}
               phx-key="escape"
-              phx-click-away={JS.exec("phx-remove", to: "##{@id}")}
+
               class="hidden relative rounded-2xl bg-white p-14 shadow-lg shadow-zinc-700/10 ring-1 ring-zinc-700/10 transition"
             >
               <div class="absolute top-6 right-5">
@@ -419,10 +420,10 @@ defmodule FullCircleWeb.CoreComponents do
 
   def error(assigns) do
     ~H"""
-    <p class="mt-3 flex gap-3 text-sm leading-6 text-rose-600 phx-no-feedback:hidden">
-      <.icon name="hero-exclamation-circle-mini" class="mt-0.5 h-5 w-5 flex-none" />
+    <span class="text-sm text-rose-600 phx-no-feedback:hidden tracking-tighter">
+      <.icon name="hero-x-circle-mini" class="h-3 w-3" />
       <%= render_slot(@inner_block) %>
-    </p>
+    </span>
     """
   end
 
@@ -765,7 +766,7 @@ defmodule FullCircleWeb.CoreComponents do
       <.form for={%{}} id="search-form" phx-submit="search" autocomplete="off" class="w-full">
         <div class="grid grid-cols-12 gap-1">
           <div class="col-span-11">
-            <.input name="search[terms]" type="search" value={@search_val} placeholder={@placeholder} />
+            <.input name="search[terms]" type="search" />
           </div>
           <.button class="col-span-1">🔍</.button>
         </div>
@@ -814,7 +815,7 @@ defmodule FullCircleWeb.CoreComponents do
   end
 
   def to_fc_time_format(dt) do
-    Timex.format!(Timex.local(dt), "%Y-%m-%d %H:%M:%S%p", :strftime)
+    Timex.format!(Timex.local(dt), "%Y-%m-%d %I:%M:%S%p", :strftime)
   end
 
   def css_trans(module, obj, obj_name, id, ex_class_1, ex_class_2 \\ "") do

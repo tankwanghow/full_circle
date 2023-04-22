@@ -104,6 +104,16 @@ defmodule FullCircleWeb.Router do
       live("/tax_codes", TaxCodeLive.Index, :index)
       live("/goods", GoodLive.Index, :index)
       live("/fixed_assets", FixedAssetLive.Index, :index)
+      live("/invoices", InvoiceLive.Index, :index)
+    end
+
+    live_session :require_authenticated_user_n_active_company_print,
+      on_mount: [
+        {FullCircleWeb.UserAuth, :ensure_authenticated},
+        {FullCircleWeb.Locale, :set_locale},
+        {FullCircleWeb.ActiveCompany, :assign_active_company}
+      ], root_layout: {FullCircleWeb.Layouts, :print_root} do
+      live "/invoices/:id/print", InvoiceLive.Print, :print
     end
   end
 

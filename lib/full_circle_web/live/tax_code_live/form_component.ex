@@ -27,25 +27,15 @@ defmodule FullCircleWeb.TaxCodeLive.FormComponent do
         %{"_target" => ["tax_code", "account_name"], "tax_code" => params},
         socket
       ) do
-    terms = params["account_name"]
-
-    socket =
-      assign(
+    {params, socket, _} =
+      FullCircleWeb.Helpers.assign_list_n_id(
         socket,
+        params,
+        "account_name",
         :account_names,
-        FullCircle.Accounting.account_names(
-          terms,
-          socket.assigns.current_user,
-          socket.assigns.current_company
-        )
+        "account_id",
+        &FullCircle.Accounting.account_names/3
       )
-
-    account =
-      Enum.find(socket.assigns[:account_names], fn x ->
-        x.value == terms
-      end)
-
-    params = Map.merge(params, %{"account_id" => Util.attempt(account, :id) || -1})
 
     validate(params, socket)
   end
