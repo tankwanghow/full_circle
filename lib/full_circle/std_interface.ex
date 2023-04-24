@@ -104,19 +104,24 @@ defmodule FullCircle.StdInterface do
 
   def delete(klass, klass_name, obj, user, company, multi \\ Multi.new()) do
     action = String.to_atom("delete_" <> klass_name)
+    changeset = changeset(klass, obj, %{}, company)
 
     case can?(user, action, company) do
       true ->
-        multi
-        |> Multi.delete(action, changeset(klass, obj, %{}, company))
-        |> Sys.insert_log_for(action, %{id: obj.id}, company, user)
-        |> FullCircle.Repo.transaction()
-        |> case do
-          {:ok, %{^action => obj}} ->
-            {:ok, obj}
+        try do
+          multi
+          |> Multi.delete(action, changeset)
+          |> Sys.insert_log_for(action, %{"deleted_id_is" => obj.id}, company, user)
+          |> FullCircle.Repo.transaction()
+          |> case do
+            {:ok, %{^action => obj}} ->
+              {:ok, obj}
 
-          {:error, failed_operation, failed_value, changes_of_far} ->
-            {:error, failed_operation, failed_value, changes_of_far}
+            {:error, failed_operation, failed_value, changes_of_far} ->
+              {:error, failed_operation, failed_value, changes_of_far}
+          end
+        rescue
+          e in Postgrex.Error -> {:error, :catched, %{changeset | action: :delete}, e}
         end
 
       false ->
