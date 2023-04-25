@@ -55,7 +55,7 @@ defmodule FullCircleWeb.ContactLive.FormComponent do
         {:noreply, socket}
 
       {:error, _, changeset, _} ->
-        assign(socket, form: to_form(changeset))
+        {:noreply, assign(socket, form: to_form(changeset))}
 
       :not_authorise ->
         send(self(), :not_authorise)
@@ -76,7 +76,7 @@ defmodule FullCircleWeb.ContactLive.FormComponent do
         {:noreply, socket}
 
       {:error, _, changeset, _} ->
-        assign(socket, form: to_form(changeset))
+        {:noreply, assign(socket, form: to_form(changeset))}
 
       :not_authorise ->
         send(self(), :not_authorise)
@@ -98,7 +98,7 @@ defmodule FullCircleWeb.ContactLive.FormComponent do
         {:noreply, socket}
 
       {:error, _, changeset, _} ->
-        assign(socket, form: to_form(changeset))
+        {:noreply, assign(socket, form: to_form(changeset))}
 
       :not_authorise ->
         send(self(), :not_authorise)
@@ -113,7 +113,7 @@ defmodule FullCircleWeb.ContactLive.FormComponent do
       <p class="w-full text-3xl text-center font-medium"><%= @title %></p>
       <.form
         for={@form}
-        id="contact-form"
+        id="object-form"
         phx-target={@myself}
         autocomplete="off"
         phx-change="validate"
@@ -158,14 +158,17 @@ defmodule FullCircleWeb.ContactLive.FormComponent do
           <.button disabled={!@form.source.valid?}><%= gettext("Save") %></.button>
           <%= if @live_action == :edit and FullCircle.Authorization.can?(@current_user, :delete_contact, @current_company) do %>
             <.delete_confirm_modal
-              id="delete-contact"
+              id="delete-object"
               msg1={gettext("All Contact Transactions, will be LOST!!!")}
               msg2={gettext("Cannot Be Recover!!!")}
-              confirm={JS.push("delete", target: "#contact-form")}
-              cancel={JS.push("cancel_delete", target: "#contact-form")}
+              confirm={
+                JS.remove_attribute("class", to: "#phx-feedback-for-contact_name")
+                |> JS.push("delete", target: "#object-form")
+                |> JS.hide(to: "#delete-object-modal")
+              }
             />
           <% end %>
-          <.link phx-click={JS.push("modal_cancel")} class={button_css()}>
+          <.link phx-click={JS.exec("phx-remove", to: "#object-crud-modal")} class={button_css()}>
             <%= gettext("Back") %>
           </.link>
         </div>

@@ -87,6 +87,21 @@ defmodule FullCircle.Sys do
 
   def countries(), do: Enum.sort(Enum.map(Countries.all(), fn x -> "#{x.name}" end))
 
+  def list_logs(entity, entity_id, company, user) do
+    Repo.all(
+      from log in Log,
+        as: :logs,
+        join: com in subquery(user_companies(company, user)),
+        on: com.id == log.company_id,
+        join: user in User,
+        on: user.id == log.user_id,
+        where: log.entity == ^entity and log.entity_id == ^entity_id,
+        select: log,
+        select_merge: %{email: user.email},
+        order_by: [desc: log.inserted_at]
+    )
+  end
+
   def get_company!(id) do
     Repo.get!(Company, id)
   end
@@ -438,16 +453,23 @@ defmodule FullCircle.Sys do
     })
   end
 
-  defp attr_to_string(attrs) do
+  def attr_to_string(attrs) do
+    bl = ["_id", "delete"]
+
     attrs
     |> Enum.map(fn {k, v} ->
-      if !is_map(v) do
-        "#{k}: #{v}"
-      else
-        "#{k}: [" <> attr_to_string(v) <> "]"
+      if !String.ends_with?(k, bl) and k != "id" do
+        if !is_map(v) do
+          if v != "",
+            do: "&^{#{k}}: #{Phoenix.HTML.html_escape(v) |> Phoenix.HTML.safe_to_string()}^&",
+            else: nil
+        else
+          "&^{#{k}}: [" <> attr_to_string(v) <> "]^&"
+        end
       end
     end)
-    |> Enum.join(" | ")
+    |> Enum.reject(fn x -> is_nil(x) end)
+    |> Enum.join(" ")
   end
 
   def company_changeset(company, attrs \\ %{}, user) do

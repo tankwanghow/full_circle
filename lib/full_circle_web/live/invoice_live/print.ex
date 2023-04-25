@@ -72,6 +72,7 @@ defmodule FullCircleWeb.InvoiceLive.Print do
 
   defp invoice_detail(invd, assigns) do
     assigns = assign(assigns, :invd, invd)
+
     ~H"""
     <div class="detail">
       <span class="particular">
@@ -117,6 +118,7 @@ defmodule FullCircleWeb.InvoiceLive.Print do
 
   defp invoice_footer("continue", page, pages, assigns) do
     assigns = assign(assigns, :page, page) |> assign(:pages, pages)
+
     ~H"""
     <div class="is-size-5 descriptions">
       <div class="is-size-7 page-count"><%= "page #{@page} of #{@pages}" %></div>
@@ -127,6 +129,7 @@ defmodule FullCircleWeb.InvoiceLive.Print do
 
   defp invoice_footer(page, pages, assigns) do
     assigns = assign(assigns, :page, page) |> assign(:pages, pages)
+
     ~H"""
     <div class="is-size-5 descriptions">
       <%= insert_new_html_newline(@invoice.descriptions) %>

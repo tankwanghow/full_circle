@@ -75,7 +75,6 @@ defmodule FullCircleWeb.CoreComponents do
               phx-mounted={@show && show_modal(@id)}
               phx-window-keydown={JS.exec("phx-remove", to: "##{@id}")}
               phx-key="escape"
-
               class="hidden relative rounded-2xl bg-white p-14 shadow-lg shadow-zinc-700/10 ring-1 ring-zinc-700/10 transition"
             >
               <div class="absolute top-6 right-5">
@@ -242,7 +241,7 @@ defmodule FullCircleWeb.CoreComponents do
       <.button>Send!</.button>
       <.button phx-click="go" class="ml-2">Send!</.button>
   """
-  attr(:type, :string, default: nil)
+  attr(:type, :string, default: "submit")
   attr(:class, :string, default: nil)
   attr(:rest, :global, include: ~w(disabled form name value))
 
@@ -379,7 +378,7 @@ defmodule FullCircleWeb.CoreComponents do
   # All other inputs text, datetime-local, url, password, etc. are handled here...
   def input(assigns) do
     ~H"""
-    <div phx-feedback-for={@name}>
+    <div id={"phx-feedback-for-#{@id}"} phx-feedback-for={@name}>
       <.label :if={@label} for={@id}><%= @label %></.label>
       <input
         type={@type}
@@ -732,18 +731,18 @@ defmodule FullCircleWeb.CoreComponents do
   attr(:msg1, :string)
   attr(:msg2, :string, default: nil)
   attr(:confirm, :any)
-  attr(:cancel, :any)
+  # attr(:cancel, :any)
 
   def delete_confirm_modal(assigns) do
     ~H"""
     <.link
       id={@id}
       class={button_css()}
-      phx-click={FullCircleWeb.CoreComponents.show_modal("#{@id}-modal")}
+      phx-click={show_modal("#{@id}-modal")}
     >
       <%= gettext("Delete") %>
     </.link>
-    <.modal id={"#{@id}-modal"} on_confirm={@confirm} on_cancel={@cancel}>
+    <.modal id={"#{@id}-modal"} on_confirm={@confirm}>
       <div class="text-center">
         <div class="text-rose-600 font-bold text-2xl">
           <%= @msg1 %>
@@ -766,7 +765,7 @@ defmodule FullCircleWeb.CoreComponents do
       <.form for={%{}} id="search-form" phx-submit="search" autocomplete="off" class="w-full">
         <div class="grid grid-cols-12 gap-1">
           <div class="col-span-11">
-            <.input name="search[terms]" type="search" />
+            <.input name="search[terms]" type="search" value={@search_val} />
           </div>
           <.button class="col-span-1">🔍</.button>
         </div>
@@ -831,5 +830,65 @@ defmodule FullCircleWeb.CoreComponents do
       [{:id, id}, {obj_name, obj}, {:ex_class, ex_class_2}],
       1500
     )
+  end
+
+  attr :entity, :string
+  attr :entity_id, :integer
+  attr :back, :string
+  attr :company, :any
+
+  def log_button(assigns) do
+    ~H"""
+    <.link
+      navigate={"/companies/#{@company.id}/logs/#{@entity}/#{@entity_id}?back=#{@back}"}
+      class="text-xs border rounded-full bg-pink-100 hover:bg-pink-400 px-2 py-1 border-pink-400"
+    >
+      <%= gettext("Logs") %>
+    </.link>
+    """
+  end
+
+  attr :doc_type, :string
+  attr :doc_no, :integer
+  attr :back, :string
+  attr :company, :any
+
+  def journal_button(assigns) do
+    ~H"""
+    <.link
+      navigate={"/companies/#{@company.id}/journal_entries/#{@doc_type}/#{@doc_no}/?back=#{@back}"}
+      class="text-xs border rounded-full bg-pink-100 hover:bg-pink-400 px-2 py-1 border-pink-400"
+    >
+      <%= gettext("Journal") %>
+    </.link>
+    """
+  end
+
+  attr :entity, :string
+  attr :entity_id, :integer
+  attr :company, :any
+  def print_button(assigns) do
+    ~H"""
+    <.link
+      navigate={"/companies/#{@company.id}/#{@entity}/#{@entity_id}/print?pre_print=false"}
+      class="text-xs border rounded-full hover:bg-amber-200 px-2 py-1 border-black"
+    >
+      <%= gettext("Print") %>
+    </.link>
+    """
+  end
+
+  attr :entity, :string
+  attr :entity_id, :integer
+  attr :company, :any
+  def pre_print_button(assigns) do
+    ~H"""
+    <.link
+      navigate={"/companies/#{@company.id}/#{@entity}/#{@entity_id}/print?pre_print=true"}
+      class="border border-black hover:bg-blue-200 text-xs text-white rounded-full px-2 py-1 bg-black"
+    >
+      <%= gettext("Pre Print") %>
+    </.link>
+    """
   end
 end

@@ -55,12 +55,8 @@ defmodule FullCircle.Helpers do
   end
 
   def validate_id(changeset, field_name, field_id) do
-    if Map.has_key?(changeset.changes, field_id) do
-      if get_change(changeset, field_id) == -1 do
-        changeset |> add_error(field_name, gettext("not in list"))
-      else
-        changeset
-      end
+    if fetch_field!(changeset, field_id) == -1 do
+      changeset |> add_error(field_name, gettext("not in list"))
     else
       changeset
     end

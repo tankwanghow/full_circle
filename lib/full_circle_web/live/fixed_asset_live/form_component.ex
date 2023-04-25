@@ -270,11 +270,14 @@ defmodule FullCircleWeb.FixedAssetLive.FormComponent do
               id="delete-object"
               msg1={gettext("All Fixed Asset Transactions, will be LOST!!!")}
               msg2={gettext("Cannot Be Recover!!!")}
-              confirm={JS.push("delete", target: "#object-form")}
-              cancel={JS.push("cancel_delete", target: "#object-form")}
+              confirm={
+                JS.remove_attribute("class", to: "#phx-feedback-for-fixed_asset_name")
+                |> JS.push("delete", target: "#object-form")
+                |> JS.hide(to: "#delete-object-modal")
+              }
             />
           <% end %>
-          <.link phx-click={JS.push("modal_cancel")} class={button_css()}>
+          <.link phx-click={JS.exec("phx-remove", to: "#object-crud-modal")} class={button_css()}>
             <%= gettext("Back") %>
           </.link>
         </div>

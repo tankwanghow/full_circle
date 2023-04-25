@@ -64,7 +64,7 @@ defmodule FullCircleWeb.TaxCodeLive.FormComponent do
         {:noreply, socket}
 
       {:error, _, changeset, _} ->
-        assign(socket, form: to_form(changeset))
+        {:noreply, assign(socket, form: to_form(changeset))}
 
       :not_authorise ->
         send(self(), :not_authorise)
@@ -85,7 +85,7 @@ defmodule FullCircleWeb.TaxCodeLive.FormComponent do
         {:noreply, socket}
 
       {:error, _, changeset, _} ->
-        assign(socket, form: to_form(changeset))
+        {:noreply, assign(socket, form: to_form(changeset))}
 
       :not_authorise ->
         send(self(), :not_authorise)
@@ -107,7 +107,7 @@ defmodule FullCircleWeb.TaxCodeLive.FormComponent do
         {:noreply, socket}
 
       {:error, _, changeset, _} ->
-        assign(socket, form: to_form(changeset))
+        {:noreply, assign(socket, form: to_form(changeset))}
 
       :not_authorise ->
         send(self(), :not_authorise)
@@ -174,11 +174,14 @@ defmodule FullCircleWeb.TaxCodeLive.FormComponent do
               id="delete-object"
               msg1={gettext("All TaxCode Transactions, will be LOST!!!")}
               msg2={gettext("Cannot Be Recover!!!")}
-              confirm={JS.push("delete", target: "#object-form")}
-              cancel={JS.push("cancel_delete", target: "#object-form")}
+              confirm={
+                JS.remove_attribute("class", to: "#phx-feedback-for-tax_code_code")
+                |> JS.push("delete", target: "#object-form")
+                |> JS.hide(to: "#delete-object-modal")
+              }
             />
           <% end %>
-          <.link phx-click={JS.push("modal_cancel")} class={button_css()}>
+          <.link phx-click={JS.exec("phx-remove", to: "#object-crud-modal")} class={button_css()}>
             <%= gettext("Back") %>
           </.link>
         </div>

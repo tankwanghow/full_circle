@@ -17,7 +17,7 @@ defmodule FullCircleWeb.Helpers do
 
     {l, v} = list_n_value(socket, terms, list_func)
 
-    params = Map.merge(params, %{assign_id => Util.attempt(v, :id) || -1})
+    params = Map.merge(params, %{assign_id => Util.attempt(v, :id) || -1})  
     {params, socket |> assign(assign_names, l), v}
   end
 

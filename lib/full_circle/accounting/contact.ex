@@ -17,7 +17,7 @@ defmodule FullCircle.Accounting.Contact do
     field :contact_info, :string
     field :descriptions, :string
 
-    # has_many :invoices, FullCircle.CustomerBilling.Invoice
+    has_many :invoices, FullCircle.CustomerBilling.Invoice
 
     timestamps(type: :utc_datetime)
   end
@@ -48,10 +48,9 @@ defmodule FullCircle.Accounting.Contact do
       name: :contacts_unique_name_in_company,
       message: gettext("has already been taken")
     )
-
-    # |> foreign_key_constraint(:name,
-    #   name: :invoices_contact_id_fkey,
-    #   message: gettext("referenced by invoices")
-    # )
+    |> foreign_key_constraint(:name,
+      name: :invoices_contact_id_fkey,
+      message: gettext("referenced by invoices")
+    )
   end
 end

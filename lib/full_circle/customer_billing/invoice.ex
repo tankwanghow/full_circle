@@ -54,13 +54,14 @@ defmodule FullCircle.CustomerBilling.Invoice do
   end
 
   def compute_fields(changeset) do
-    changeset = if is_nil(get_change(changeset, :invoice_details)) do
-      compute_unchange_fields(changeset)
-    else
-      compute_change_field(changeset)
-    end
+    changeset =
+      if is_nil(get_change(changeset, :invoice_details)) do
+        compute_unchange_fields(changeset)
+      else
+        compute_change_field(changeset)
+      end
 
-    if Decimal.lt?(fetch_field!(changeset, :invoice_amount), 0.01) do
+    if Decimal.lt?(fetch_field!(changeset, :invoice_amount), "0.01") do
       add_error(changeset, :invoice_amount, gettext("must be greater than 0.01"))
     else
       changeset

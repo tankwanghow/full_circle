@@ -41,18 +41,17 @@ defmodule FullCircle.Accounting.TaxCode do
       message: gettext("code already in company")
     )
     |> validate_id(:account_name, :account_id)
-
-    # |> foreign_key_constraint(:code,
-    #   name: :goods_sales_tax_code_id_fkey,
-    #   message: gettext("referenced by goods")
-    # )
-    # |> foreign_key_constraint(:code,
-    #   name: :goods_purchase_tax_code_id_fkey,
-    #   message: gettext("referenced by goods")
-    # )
-    # |> foreign_key_constraint(:code,
-    #   name: :invoice_details_tax_code_id_fkey,
-    #   message: gettext("referenced by invoice details")
-    # )
+    |> foreign_key_constraint(:code,
+      name: :invoice_details_tax_code_id_fkey,
+      message: gettext("referenced by invoice details")
+    )
+    |> foreign_key_constraint(:code,
+      name: :goods_purchase_tax_code_id_fkey,
+      message: gettext("referenced by goods")
+    )
+    |> foreign_key_constraint(:code,
+      name: :goods_sales_tax_code_id_fkey,
+      message: gettext("referenced by goods")
+    )
   end
 end

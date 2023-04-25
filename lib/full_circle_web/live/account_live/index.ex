@@ -37,7 +37,7 @@ defmodule FullCircleWeb.AccountLive.Index do
 
     <.modal
       :if={@live_action in [:new, :edit]}
-      id="any-modal"
+      id="object-crud-modal"
       show
       on_cancel={JS.push("modal_cancel")}
     >

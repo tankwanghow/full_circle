@@ -105,6 +105,8 @@ defmodule FullCircleWeb.Router do
       live("/goods", GoodLive.Index, :index)
       live("/fixed_assets", FixedAssetLive.Index, :index)
       live("/invoices", InvoiceLive.Index, :index)
+      live("/logs/:entity/:entity_id", LogLive.Index, :index)
+      live("/journal_entries/:doc_type/:doc_no", JournalEntryViewLive.Index, :index)
     end
 
     live_session :require_authenticated_user_n_active_company_print,
@@ -112,7 +114,8 @@ defmodule FullCircleWeb.Router do
         {FullCircleWeb.UserAuth, :ensure_authenticated},
         {FullCircleWeb.Locale, :set_locale},
         {FullCircleWeb.ActiveCompany, :assign_active_company}
-      ], root_layout: {FullCircleWeb.Layouts, :print_root} do
+      ],
+      root_layout: {FullCircleWeb.Layouts, :print_root} do
       live "/invoices/:id/print", InvoiceLive.Print, :print
     end
   end

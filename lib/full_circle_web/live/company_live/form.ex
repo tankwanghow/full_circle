@@ -27,7 +27,6 @@ defmodule FullCircleWeb.CompanyLive.Form do
             msg1={gettext("All Company Data, will be LOST!!!")}
             msg2={gettext("Cannot Be Recover!!!")}
             confirm={JS.push("delete")}
-            cancel={JS.push("cancel_delete", target: "#company")}
           />
         <% end %>
         <.link_button navigate="/companies">

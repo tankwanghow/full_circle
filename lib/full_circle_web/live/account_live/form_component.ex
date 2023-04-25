@@ -143,11 +143,14 @@ defmodule FullCircleWeb.AccountLive.FormComponent do
               id="delete-account"
               msg1={gettext("All Account Transactions, will be LOST!!!")}
               msg2={gettext("Cannot Be Recover!!!")}
-              confirm={JS.push("delete", target: "#account-form")}
-              cancel={JS.push("cancel_delete", target: "#account-form")}
+              confirm={
+                JS.remove_attribute("class", to: "#phx-feedback-for-tax_code_code")
+                |> JS.push("delete", target: "#account-form")
+                |> JS.hide(to: "#delete-object-modal")
+              }
             />
           <% end %>
-          <.link phx-click={JS.push("modal_cancel")} class={button_css()}>
+          <.link phx-click={JS.exec("phx-remove", to: "#object-crud-modal")} class={button_css()}>
             <%= gettext("Back") %>
           </.link>
         </div>

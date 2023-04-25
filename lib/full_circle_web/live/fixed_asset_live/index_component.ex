@@ -16,7 +16,7 @@ defmodule FullCircleWeb.FixedAssetLive.IndexComponent do
     ~H"""
     <div
       id={@id}
-      class={"#{@ex_class} cursor-pointer hover:bg-gray-400 accounts text-center mb-1 bg-gray-200 border-gray-500 border-2 rounded p-2"}
+      class={"#{@ex_class} cursor-pointer hover:bg-gray-400 text-center mb-1 bg-gray-200 border-gray-500 border-2 rounded p-2"}
       phx-value-object-id={@obj.id}
       phx-click={:edit_object}
     >

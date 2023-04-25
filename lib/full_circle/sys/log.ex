@@ -10,6 +10,8 @@ defmodule FullCircle.Sys.Log do
     belongs_to :user, FullCircle.UserAccounts.User
     belongs_to :company, FullCircle.Sys.Company
 
+    field :email, :string, virtual: true
+
     timestamps(updated_at: false, type: :utc_datetime)
   end
 

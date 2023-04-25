@@ -43,6 +43,25 @@ defmodule FullCircle.Accounting do
     ]
   end
 
+  alias FullCircle.Accounting.Transaction
+
+  def journal_entries(doc_type, doc_no, company, user) do
+    Repo.all(
+      from txn in Transaction,
+        join: com in subquery(Sys.user_companies(company, user)),
+        on: com.id == txn.company_id,
+        join: acc in Account,
+        on: acc.id == txn.account_id,
+        left_join: con in Contact,
+        on: con.id == txn.contact_id,
+        where: txn.doc_type == ^doc_type,
+        where: txn.doc_no == ^doc_no,
+        select: txn,
+        select_merge: %{account_name: acc.name, contact_name: con.name},
+        order_by: [acc.name, txn.amount]
+    )
+  end
+
   def get_tax_code!(id, user, company) do
     from(taxcode in tax_code_query(user, company),
       where: taxcode.id == ^id

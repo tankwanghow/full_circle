@@ -30,7 +30,7 @@ defmodule FullCircleWeb.GoodLive.Index do
       </div>
       <div id="objects_list" phx-update={@update}>
         <%= for obj <- @objects do %>
-          <.live_component module={IndexComponent} id={"objects-#{obj.id}"} obj={obj} ex_class="" />
+          <.live_component company={@current_company} module={IndexComponent} id={"objects-#{obj.id}"} obj={obj} ex_class="" />
         <% end %>
       </div>
       <.infinite_scroll_footer page={@page} count={@objects_count} per_page={@per_page} />
@@ -38,7 +38,7 @@ defmodule FullCircleWeb.GoodLive.Index do
 
     <.modal
       :if={@live_action in [:new, :edit]}
-      id="any-modal"
+      id="object-crud-modal"
       show
       on_cancel={JS.push("modal_cancel")}
     >

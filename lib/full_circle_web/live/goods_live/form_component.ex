@@ -17,7 +17,6 @@ defmodule FullCircleWeb.GoodLive.FormComponent do
   @impl true
   def update(assigns, socket) do
     socket = socket |> assign(assigns)
-
     {:ok, socket}
   end
 
@@ -132,13 +131,28 @@ defmodule FullCircleWeb.GoodLive.FormComponent do
         send(self(), {:deleted, obj})
         {:noreply, socket}
 
-      {:error, failed_operation, changeset, _} ->
-        {:noreply,
-         socket
-         |> put_flash(
-           :error,
-           "#{gettext("Failed")} #{failed_operation}. #{list_errors_to_string(changeset.errors)}"
-         )}
+      {:error, failed_operation, changeset, e} ->
+        changeset =
+          if failed_operation == :catched do
+            Ecto.Changeset.add_error(
+              changeset,
+              :name,
+              "#{e.postgres.code} #{e.postgres.constraint}"
+            )
+          else
+            changeset
+          end
+
+        socket =
+          socket
+          |> assign(live_action: :edit)
+          |> assign(form: to_form(changeset))
+          |> put_flash(
+            :error,
+            "#{gettext("Failed")} #{failed_operation}. #{list_errors_to_string(changeset.errors)}"
+          )
+
+        {:noreply, socket}
 
       :not_authorise ->
         send(self(), :not_authorise)
@@ -282,10 +296,7 @@ defmodule FullCircleWeb.GoodLive.FormComponent do
           </div>
         </div>
 
-        <div
-          :if={Enum.count(Ecto.Changeset.get_field(@form.source, :packagings, [])) > 0}
-          class="font-bold grid grid-cols-12 gap-2 mt-2"
-        >
+        <div class="font-bold grid grid-cols-12 gap-2 mt-2">
           <div class="col-span-4">
             <%= gettext("Package Name") %>
           </div>
@@ -297,7 +308,7 @@ defmodule FullCircleWeb.GoodLive.FormComponent do
           </div>
         </div>
         <.inputs_for :let={pack} field={@form[:packagings]}>
-          <div class={"grid grid-cols-12 gap-2 #{if(pack[:delete].value == true, do: "hidden", else: "")}"}>
+          <div class={"grid grid-cols-12 gap-2 #{if(pack[:delete].value == true and Enum.count(pack.errors) == 0, do: "hidden", else: "")}"}>
             <div class="col-span-4">
               <.input field={pack[:name]} />
             </div>
@@ -332,11 +343,14 @@ defmodule FullCircleWeb.GoodLive.FormComponent do
               id="delete-object"
               msg1={gettext("All Good Transactions, will be LOST!!!")}
               msg2={gettext("Cannot Be Recover!!!")}
-              confirm={JS.push("delete", target: "#object-form")}
-              cancel={JS.push("cancel_delete", target: "#object-form")}
+              confirm={
+                JS.remove_attribute("class", to: "#phx-feedback-for-good_name")
+                |> JS.push("delete", target: "#object-form")
+                |> JS.hide(to: "#delete-object-modal")
+              }
             />
           <% end %>
-          <.link phx-click={JS.push("modal_cancel")} class={button_css()}>
+          <.link phx-click={JS.exec("phx-remove", to: "#object-crud-modal")} class={button_css()}>
             <%= gettext("Back") %>
           </.link>
         </div>

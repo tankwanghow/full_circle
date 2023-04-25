@@ -30,7 +30,7 @@
   <body>
     <div id="button">
       <a herf="#" onclick="printElement('print-me')">Print</a>
-      <%= live_redirect gettext("Back"), to: @back %>
+      <.link navigate={@back}><%= gettext("Back") %></.link>
     </div>
     <%= @inner_content %>
     <script>

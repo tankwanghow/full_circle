@@ -20,8 +20,8 @@ defmodule FullCircle.Product.Good do
     belongs_to(:sales_account, FullCircle.Accounting.Account, foreign_key: :sales_account_id)
     belongs_to(:sales_tax_code, FullCircle.Accounting.TaxCode, foreign_key: :sales_tax_code_id)
 
-    has_many :invoice_details, FullCircle.CustomerBilling.InvoiceDetail
-    has_many(:packagings, FullCircle.Product.Packaging, on_replace: :delete)
+    has_many(:invoice_details, FullCircle.CustomerBilling.InvoiceDetail)
+    has_many(:packagings, FullCircle.Product.Packaging, on_delete: :delete_all)
 
     field(:purchase_account_name, :string, virtual: true)
     field(:purchase_tax_code_name, :string, virtual: true)
@@ -73,10 +73,9 @@ defmodule FullCircle.Product.Good do
     |> validate_id(:sales_tax_code_name, :sales_tax_code_id)
     |> validate_id(:purchase_tax_code_name, :purchase_tax_code_id)
     |> cast_assoc(:packagings)
-
-    # |> foreign_key_constraint(:name,
-    #   name: :invoice_details_good_id_fkey,
-    #   message: gettext("referenced by invoice details")
-    # )
+    |> foreign_key_constraint(:name,
+      name: :invoice_details_good_id_fkey,
+      message: gettext("referenced by invoice details")
+    )
   end
 end

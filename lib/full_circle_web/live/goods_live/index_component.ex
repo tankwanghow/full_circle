@@ -16,7 +16,7 @@ defmodule FullCircleWeb.GoodLive.IndexComponent do
     ~H"""
     <div
       id={@id}
-      class={"#{@ex_class} cursor-pointer hover:bg-gray-400 accounts text-center mb-1 bg-gray-200 border-gray-500 border-2 rounded p-2"}
+      class={"#{@ex_class} cursor-pointer hover:bg-gray-400 text-center mb-1 bg-gray-200 border-gray-500 border-2 rounded p-2"}
       phx-value-object-id={@obj.id}
       phx-click={:edit_object}
     >
@@ -34,10 +34,11 @@ defmodule FullCircleWeb.GoodLive.IndexComponent do
         <%= @obj.sales_account_name %> &#11049; <%= @obj.sales_tax_code_name %> &#8226; <%= @obj.purchase_account_name %> &#11049; <%= @obj.purchase_tax_code_name %>
       </p>
       <p><%= @obj.descriptions %></p>
+      <.log_button entity="goods" entity_id={@obj.id} company={@company} back={~p"/companies/#{@company.id}/goods"}/>
       <span class="text-xs font-light"><%= to_fc_time_format(@obj.updated_at) %></span>
       <span
         phx-click={:copy_object}
-        class="text-xs hover:bg-orange-400 bg-orange-200 py-1 px-2 rounded-full"
+        class="text-xs hover:bg-orange-400 bg-orange-200 py-1 px-2 rounded-full border-orange-400 border"
         phx-value-object-id={@obj.id}
       >
         <%= gettext("Copy") %>

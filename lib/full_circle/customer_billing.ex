@@ -18,8 +18,8 @@ defmodule FullCircle.CustomerBilling do
   def get_print_invoice!(id, company, user) do
     Repo.one(
       from inv in Invoice,
-      join: com in subquery(Sys.user_companies(company, user)),
-      on: com.id == inv.company_id,
+        join: com in subquery(Sys.user_companies(company, user)),
+        on: com.id == inv.company_id,
         join: invd in InvoiceDetail,
         on: invd.invoice_id == inv.id,
         join: cont in Contact,
@@ -223,6 +223,22 @@ defmodule FullCircle.CustomerBilling do
     |> Repo.all()
   end
 
+  def invoice_index_query("", date_from, "", com, user, page: page, per_page: per_page) do
+    Repo.all(
+      from inv in subquery(invoice_query(com, user, page: page, per_page: per_page)),
+        where: inv.invoice_date >= ^date_from,
+        order_by: inv.invoice_date
+    )
+  end
+
+  def invoice_index_query("", "", due_date_from, com, user, page: page, per_page: per_page) do
+    Repo.all(
+      from inv in subquery(invoice_query(com, user, page: page, per_page: per_page)),
+        where: inv.due_date >= ^due_date_from,
+        order_by: inv.due_date
+    )
+  end
+
   def invoice_index_query(terms, "", "", com, user, page: page, per_page: per_page) do
     from(inv in subquery(invoice_query(com, user, page: page, per_page: per_page)),
       order_by: ^similarity_order([:invoice_no, :contact_name, :goods, :descriptions], terms)
@@ -244,22 +260,6 @@ defmodule FullCircle.CustomerBilling do
       from inv in subquery(invoice_query(com, user, page: page, per_page: per_page)),
         where: inv.due_date >= ^due_date_from,
         order_by: ^similarity_order([:invoice_no, :contact_name, :goods, :descriptions], terms),
-        order_by: inv.due_date
-    )
-  end
-
-  def invoice_index_query("", date_from, "", com, user, page: page, per_page: per_page) do
-    Repo.all(
-      from inv in subquery(invoice_query(com, user, page: page, per_page: per_page)),
-        where: inv.invoice_date >= ^date_from,
-        order_by: inv.invoice_date
-    )
-  end
-
-  def invoice_index_query("", "", due_date_from, com, user, page: page, per_page: per_page) do
-    Repo.all(
-      from inv in subquery(invoice_query(com, user, page: page, per_page: per_page)),
-        where: inv.due_date >= ^due_date_from,
         order_by: inv.due_date
     )
   end

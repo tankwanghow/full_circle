@@ -7,7 +7,7 @@ defmodule FullCircleWeb.InvoiceLive.Index do
   alias FullCircleWeb.InvoiceLive.FormComponent
   alias FullCircleWeb.InvoiceLive.IndexComponent
 
-  @per_page 10
+  @per_page 8
 
   @impl true
   def render(assigns) do
@@ -19,15 +19,31 @@ defmodule FullCircleWeb.InvoiceLive.Index do
           <div class=" flex flex-row flex-wrap tracking-tighter text-sm">
             <div class="grow shrink">
               <label class="">Search Terms</label>
-              <.input name="search[terms]" type="search" value={@search.terms} placeholder={"invoice, contact, goods or descriptions..."} />
+              <.input
+                id="search_terms"
+                name="search[terms]"
+                type="search"
+                value={@search.terms}
+                placeholder="invoice, contact, goods or descriptions..."
+              />
             </div>
             <div class="w-[9rem] grow-0 shrink-0">
-            <label>Invocie Date From</label>
-              <.input name="search[invoice_date]" type="date" value={@search.invoice_date} />
+              <label>Invocie Date From</label>
+              <.input
+                name="search[invoice_date]"
+                type="date"
+                value={@search.invoice_date}
+                id="search_invoice_date"
+              />
             </div>
             <div class="w-[9rem] grow-0 shrink-0">
-            <label>Due Date From</label>
-              <.input name="search[due_date]" type="date" value={@search.due_date} />
+              <label>Due Date From</label>
+              <.input
+                name="search[due_date]"
+                type="date"
+                value={@search.due_date}
+                id="search_due_date"
+              />
             </div>
             <.button class="mt-5 h-10 w-10 grow-0 shrink-0">🔍</.button>
           </div>
@@ -43,9 +59,15 @@ defmodule FullCircleWeb.InvoiceLive.Index do
           <%= gettext("Invoice Information") %>
         </div>
       </div>
-      <div id="objects_list" phx-update={@update}>
+      <div :if={@objects_count > 0 or @update != "replace"} id="objects_list" phx-update={@update}>
         <%= for obj <- @objects do %>
-          <.live_component module={IndexComponent} id={"objects-#{obj.id}"} obj={obj} company={@current_company} ex_class="" />
+          <.live_component
+            module={IndexComponent}
+            id={"objects-#{obj.id}"}
+            obj={obj}
+            company={@current_company}
+            ex_class=""
+          />
         <% end %>
       </div>
       <.infinite_scroll_footer page={@page} count={@objects_count} per_page={@per_page} />
@@ -53,7 +75,7 @@ defmodule FullCircleWeb.InvoiceLive.Index do
 
     <.modal
       :if={@live_action in [:new, :edit]}
-      id="any-modal"
+      id="object-crud-modal"
       show
       max_w="max-w-full"
       on_cancel={JS.push("modal_cancel")}
@@ -163,13 +185,15 @@ defmodule FullCircleWeb.InvoiceLive.Index do
       ) do
     objects = filter_objects(socket, terms, id, dd, 1)
 
-    {:noreply,
-     socket
-     |> assign(page: 1, per_page: @per_page)
-     |> assign(search: %{terms: terms, invoice_date: id, due_date: dd})
-     |> assign(update: "replace")
-     |> assign(objects_count: Enum.count(objects))
-     |> assign(objects: objects)}
+    socket =
+      socket
+      |> assign(page: 1, per_page: @per_page)
+      |> assign(search: %{terms: terms, invoice_date: id, due_date: dd})
+      |> assign(update: "replace")
+      |> assign(:objects_count, Enum.count(objects))
+      |> assign(:objects, objects)
+
+    {:noreply, socket}
   end
 
   @impl true

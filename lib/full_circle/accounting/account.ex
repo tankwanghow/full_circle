@@ -11,7 +11,7 @@ defmodule FullCircle.Accounting.Account do
 
     has_many :sales_goods, FullCircle.Product.Good, foreign_key: :sales_account_id
     has_many :purchase_goods, FullCircle.Product.Good, foreign_key: :purchase_account_id
-    # has_many :invoice_details, FullCircle.CustomerBilling.InvoiceDetail
+    has_many :invoice_details, FullCircle.CustomerBilling.InvoiceDetail
 
     timestamps(type: :utc_datetime)
   end
@@ -31,18 +31,17 @@ defmodule FullCircle.Accounting.Account do
       name: :accounts_unique_name_in_company,
       message: gettext("has already been taken")
     )
-
-    # |> foreign_key_constraint(:name,
-    #   name: :invoice_details_account_id_fkey,
-    #   message: gettext("referenced by invoice details")
-    # )
-    # |> foreign_key_constraint(:name,
-    #   name: :goods_purchase_account_id_fkey,
-    #   message: gettext("referenced by goods")
-    # )
-    # |> foreign_key_constraint(:name,
-    #   name: :goods_sales_account_id_fkey,
-    #   message: gettext("referenced by goods")
-    # )
+    |> foreign_key_constraint(:name,
+      name: :invoice_details_account_id_fkey,
+      message: gettext("referenced by invoice details")
+    )
+    |> foreign_key_constraint(:name,
+      name: :goods_purchase_account_id_fkey,
+      message: gettext("referenced by goods")
+    )
+    |> foreign_key_constraint(:name,
+      name: :goods_sales_account_id_fkey,
+      message: gettext("referenced by goods")
+    )
   end
 end

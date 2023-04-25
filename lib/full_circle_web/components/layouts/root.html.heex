@@ -69,81 +69,85 @@
                 </div>
               </div>
             </li>
-            <.link
-              navigate={~p"/users/settings"}
-              method="delete"
-              phx-click={
-                Phoenix.LiveView.JS.hide(to: "#menu", transition: "fade-in-scale")
-                |> Phoenix.LiveView.JS.show(to: "#menu-button")
-              }
-            >
-              <li class="p-3 hover:bg-emerald-400">
+
+            <li class="mb-2 p-2 hover:bg-emerald-400">
+              <.link
+                navigate={~p"/users/settings"}
+                method="delete"
+                phx-click={
+                  Phoenix.LiveView.JS.hide(to: "#menu", transition: "fade-in-scale")
+                  |> Phoenix.LiveView.JS.show(to: "#menu-button")
+                }
+              >
                 <%= gettext("User Settings") %>
-              </li>
-            </.link>
-            <.link
-              navigate={~p"/companies"}
-              phx-click={
-                Phoenix.LiveView.JS.hide(to: "#menu", transition: "fade-in-scale")
-                |> Phoenix.LiveView.JS.show(to: "#menu-button")
-              }
-            >
-              <li class="mb-2 p-2 hover:bg-emerald-400">
+              </.link>
+            </li>
+
+            <li class="mb-2 p-2 hover:bg-emerald-400">
+              <.link
+                navigate={~p"/companies"}
+                phx-click={
+                  Phoenix.LiveView.JS.hide(to: "#menu", transition: "fade-in-scale")
+                  |> Phoenix.LiveView.JS.show(to: "#menu-button")
+                }
+              >
                 <%= gettext("Companies") %>
-              </li>
-            </.link>
+              </.link>
+            </li>
+
             <%= if assigns[:current_company] do %>
               <%= if @current_role == "admin" do %>
+                <li class="mb-2 p-2 hover:bg-emerald-400">
+                  <.link
+                    navigate={~p"/companies/#{@current_company.id}/users"}
+                    phx-click={
+                      Phoenix.LiveView.JS.hide(to: "#menu", transition: "fade-in-scale")
+                      |> Phoenix.LiveView.JS.show(to: "#menu-button")
+                    }
+                  >
+                    <%= gettext("Users") %>
+                  </.link>
+                </li>
+              <% end %>
+            <% end %>
+            <%= if @locale == "zh" do %>
+              <li class="mb-2 p-3 hover:bg-emerald-400">
                 <.link
-                  navigate={~p"/companies/#{@current_company.id}/users"}
+                  href="?locale=en"
                   phx-click={
                     Phoenix.LiveView.JS.hide(to: "#menu", transition: "fade-in-scale")
                     |> Phoenix.LiveView.JS.show(to: "#menu-button")
                   }
                 >
-                  <li class="mb-2 p-2 hover:bg-emerald-400">
-                    <%= gettext("Users") %>
-                  </li>
-                </.link>
-              <% end %>
-            <% end %>
-            <%= if @locale == "zh" do %>
-              <.link
-                href="?locale=en"
-                phx-click={
-                  Phoenix.LiveView.JS.hide(to: "#menu", transition: "fade-in-scale")
-                  |> Phoenix.LiveView.JS.show(to: "#menu-button")
-                }
-              >
-                <li class="mb-2 p-3 hover:bg-emerald-400">
                   English
-                </li>
-              </.link>
+                </.link>
+              </li>
             <% else %>
+              <li class="mb-2 p-3 hover:bg-emerald-400">
+                <.link
+                  href="?locale=zh"
+                  phx-click={
+                    Phoenix.LiveView.JS.hide(to: "#menu", transition: "fade-in-scale")
+                    |> Phoenix.LiveView.JS.show(to: "#menu-button")
+                  }
+                >
+                  中文 
+                </.link>
+              </li>
+            <% end %>
+
+            <li class="p-3 hover:bg-rose-400">
               <.link
-                href="?locale=zh"
+                href={~p"/users/log_out"}
+                method="delete"
                 phx-click={
                   Phoenix.LiveView.JS.hide(to: "#menu", transition: "fade-in-scale")
                   |> Phoenix.LiveView.JS.show(to: "#menu-button")
                 }
               >
-                <li class="mb-2 p-3 hover:bg-emerald-400">
-                  中文
-                </li>
-              </.link>
-            <% end %>
-            <.link
-              href={~p"/users/log_out"}
-              method="delete"
-              phx-click={
-                Phoenix.LiveView.JS.hide(to: "#menu", transition: "fade-in-scale")
-                |> Phoenix.LiveView.JS.show(to: "#menu-button")
-              }
-            >
-              <li class="p-3 hover:bg-rose-400">
                 <%= gettext("Log out") %>
-              </li>
-            </.link>
+              </.link>
+            </li>
           </ul>
         </div>
       </div>
