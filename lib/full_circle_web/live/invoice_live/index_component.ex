@@ -14,10 +14,7 @@ defmodule FullCircleWeb.InvoiceLive.IndexComponent do
   @impl true
   def render(assigns) do
     ~H"""
-    <div
-      id={@id}
-      class={"#{@ex_class} text-center mb-1 border-gray-500 border-2 rounded"}
-    >
+    <div id={@id} class={"#{@ex_class} text-center mb-1 border-gray-500 border-2 rounded"}>
       <div class="grid grid-cols-12">
         <div class="col-span-4 p-2 bg-gray-200">
           <div class="text-xl font-medium"><%= @obj.invoice_no %></div>

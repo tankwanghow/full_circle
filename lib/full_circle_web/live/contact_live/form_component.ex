@@ -16,11 +16,6 @@ defmodule FullCircleWeb.ContactLive.FormComponent do
   end
 
   @impl true
-  def handle_event("cancel_delete", _, socket) do
-    {:noreply, socket}
-  end
-
-  @impl true
   def handle_event("validate", %{"contact" => params}, socket) do
     changeset =
       StdInterface.changeset(

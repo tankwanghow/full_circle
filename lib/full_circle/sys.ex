@@ -91,7 +91,7 @@ defmodule FullCircle.Sys do
     Repo.all(
       from log in Log,
         as: :logs,
-        join: com in subquery(user_companies(company, user)),
+        join: com in subquery(user_company(company, user)),
         on: com.id == log.company_id,
         join: user in User,
         on: user.id == log.user_id,
@@ -99,6 +99,58 @@ defmodule FullCircle.Sys do
         select: log,
         select_merge: %{email: user.email},
         order_by: [desc: log.inserted_at]
+    )
+  end
+
+  def get_setting(settings, page, code) do
+    setting = Enum.find(settings, fn x -> x.page == page and x.code == code end)
+    Map.get(setting.values, setting.value)
+  end
+
+  def get_setting(id) do
+    Repo.get!(FullCircle.Sys.UserSetting, id)
+  end
+
+  def load_settings(page, user, company) do
+    settings = Repo.all(load_settings_query(page, user, company))
+
+    if Enum.count(settings) == 0 do
+      insert_default_settings(page, user, company)
+      Repo.all(load_settings_query(page, user, company))
+    else
+      settings
+    end
+  end
+
+  def update_setting(setting, value) do
+    cs = Ecto.Changeset.change(setting, %{value: value})
+    IO.inspect(cs)
+    Repo.update!(cs)
+  end
+
+  defp insert_default_settings(page, user, company) do
+    cua =
+      Repo.one!(
+        from cu in CompanyUser,
+          where: cu.user_id == ^user.id,
+          where: cu.company_id == ^company.id
+      )
+
+    settings = FullCircle.Sys.UserSetting.default_settings(page, cua.id)
+
+    Multi.new()
+    |> Multi.insert_all(:insert_invoice_settings, FullCircle.Sys.UserSetting, settings)
+    |> FullCircle.Repo.transaction()
+  end
+
+  defp load_settings_query(page, user, company) do
+    from(st in FullCircle.Sys.UserSetting,
+      join: cu in CompanyUser,
+      on: st.company_user_id == cu.id,
+      on: cu.user_id == ^user.id,
+      on: cu.company_id == ^company.id,
+      where: st.page == ^page,
+      order_by: st.id
     )
   end
 
@@ -115,7 +167,7 @@ defmodule FullCircle.Sys do
     )
   end
 
-  def user_companies(company, user) do
+  def user_company(company, user) do
     from(c in Company,
       join: cu in CompanyUser,
       on: c.id == cu.company_id,

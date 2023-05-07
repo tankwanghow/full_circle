@@ -735,11 +735,7 @@ defmodule FullCircleWeb.CoreComponents do
 
   def delete_confirm_modal(assigns) do
     ~H"""
-    <.link
-      id={@id}
-      class={button_css()}
-      phx-click={show_modal("#{@id}-modal")}
-    >
+    <.link id={@id} class={button_css()} phx-click={show_modal("#{@id}-modal")}>
       <%= gettext("Delete") %>
     </.link>
     <.modal id={"#{@id}-modal"} on_confirm={@confirm}>
@@ -867,6 +863,7 @@ defmodule FullCircleWeb.CoreComponents do
   attr :entity, :string
   attr :entity_id, :integer
   attr :company, :any
+
   def print_button(assigns) do
     ~H"""
     <.link
@@ -881,6 +878,7 @@ defmodule FullCircleWeb.CoreComponents do
   attr :entity, :string
   attr :entity_id, :integer
   attr :company, :any
+
   def pre_print_button(assigns) do
     ~H"""
     <.link
@@ -889,6 +887,41 @@ defmodule FullCircleWeb.CoreComponents do
     >
       <%= gettext("Pre Print") %>
     </.link>
+    """
+  end
+
+  attr(:id, :any)
+  attr(:settings, :any)
+
+  def settings(assigns) do
+    ~H"""
+    <.link id={@id} phx-click={show_modal("#{@id}-modal")}>
+      <.icon name="hero-cog-6-tooth-solid" class="w-5 h-5" />
+    </.link>
+
+    <.modal id={"#{@id}-modal"}>
+      <div class="flex flex-row flex-wrap gap-5 mb-2 text-black">
+        <%= for st <- @settings do %>
+          <div class="">
+            <label><%= st.display_name %></label>
+            <select
+              id="settings_#{st.id}_value"
+              name={"settings[#{st.id}][value]"}
+              class="py-1 rounded-md border border-gray-300 bg-white shadow-sm focus:border-zinc-400 focus:ring-0"
+            >
+              <%= for {v, k} <- st.values do %>
+                <%= if st.value == v do %>
+                  <option value={v} selected><%= k %></option>
+                <% else %>
+                  <option value={v}><%= k %></option>
+                <% end %>
+              <% end %>
+            </select>
+          </div>
+        <% end %>
+      </div>
+      <:cancel><%= gettext("Close") %></:cancel>
+    </.modal>
     """
   end
 end

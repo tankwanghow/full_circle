@@ -17,11 +17,6 @@ defmodule FullCircleWeb.FixedAssetLive.FormComponent do
   end
 
   @impl true
-  def handle_event("cancel_delete", _, socket) do
-    {:noreply, socket}
-  end
-
-  @impl true
   def handle_event(
         "validate",
         %{"_target" => ["fixed_asset", "asset_ac_name"], "fixed_asset" => params},

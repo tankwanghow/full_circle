@@ -21,11 +21,6 @@ defmodule FullCircleWeb.GoodLive.FormComponent do
   end
 
   @impl true
-  def handle_event("cancel_delete", _, socket) do
-    {:noreply, socket}
-  end
-
-  @impl true
   def handle_event("add_packaging", _, socket) do
     {:noreply, socket |> FullCircleWeb.Helpers.add_lines(:packagings, %Packaging{})}
   end

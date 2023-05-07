@@ -77,11 +77,6 @@ defmodule FullCircleWeb.CompanyLive.Form do
   end
 
   @impl true
-  def handle_event("cancel_delete", _, socket) do
-    {:noreply, socket}
-  end
-
-  @impl true
   def handle_event("validate", %{"company" => params}, socket) do
     company = if(socket.assigns[:company], do: socket.assigns.company, else: %Company{})
 

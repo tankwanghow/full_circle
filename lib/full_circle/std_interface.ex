@@ -51,7 +51,7 @@ defmodule FullCircle.StdInterface do
 
   defp query(klass, company, user) do
     from(obj in klass,
-      join: com in subquery(Sys.user_companies(company, user)),
+      join: com in subquery(Sys.user_company(company, user)),
       on: com.id == obj.company_id,
       select: obj,
       order_by: [desc: obj.updated_at]

@@ -17,11 +17,6 @@ defmodule FullCircleWeb.TaxCodeLive.FormComponent do
   end
 
   @impl true
-  def handle_event("cancel_delete", _, socket) do
-    {:noreply, socket}
-  end
-
-  @impl true
   def handle_event(
         "validate",
         %{"_target" => ["tax_code", "account_name"], "tax_code" => params},

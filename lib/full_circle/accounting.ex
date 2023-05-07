@@ -48,7 +48,7 @@ defmodule FullCircle.Accounting do
   def journal_entries(doc_type, doc_no, company, user) do
     Repo.all(
       from txn in Transaction,
-        join: com in subquery(Sys.user_companies(company, user)),
+        join: com in subquery(Sys.user_company(company, user)),
         on: com.id == txn.company_id,
         join: acc in Account,
         on: acc.id == txn.account_id,
@@ -71,7 +71,7 @@ defmodule FullCircle.Accounting do
 
   def tax_codes(terms, user, company) do
     from(taxcode in TaxCode,
-      join: com in subquery(Sys.user_companies(company, user)),
+      join: com in subquery(Sys.user_company(company, user)),
       on: com.id == taxcode.company_id,
       where: ilike(taxcode.code, ^"%#{terms}%"),
       select: %{id: taxcode.id, value: taxcode.code, rate: taxcode.rate}
@@ -81,7 +81,7 @@ defmodule FullCircle.Accounting do
 
   def tax_code_query(user, company) do
     from(taxcode in TaxCode,
-      join: com in subquery(Sys.user_companies(company, user)),
+      join: com in subquery(Sys.user_company(company, user)),
       on: com.id == taxcode.company_id,
       left_join: ac in Account,
       on: ac.id == taxcode.account_id,
@@ -108,7 +108,7 @@ defmodule FullCircle.Accounting do
 
   def fixed_asset_query(user, company) do
     from(fa in FixedAsset,
-      join: com in subquery(Sys.user_companies(company, user)),
+      join: com in subquery(Sys.user_company(company, user)),
       on: com.id == fa.company_id,
       left_join: ac in Account,
       on: ac.id == fa.asset_ac_id,
@@ -141,7 +141,7 @@ defmodule FullCircle.Accounting do
   def get_account_by_name!(name, com, user) do
     Repo.one!(
       from ac in Account,
-        join: com in subquery(Sys.user_companies(com, user)),
+        join: com in subquery(Sys.user_company(com, user)),
         on: com.id == ac.company_id,
         where: ac.name == ^name
     )
@@ -149,7 +149,7 @@ defmodule FullCircle.Accounting do
 
   def account_names(terms, user, company) do
     from(ac in Account,
-      join: com in subquery(Sys.user_companies(company, user)),
+      join: com in subquery(Sys.user_company(company, user)),
       on: com.id == ac.company_id,
       where: ilike(ac.name, ^"%#{terms}%"),
       select: %{id: ac.id, value: ac.name},
@@ -160,7 +160,7 @@ defmodule FullCircle.Accounting do
 
   def contact_names(terms, user, company) do
     from(cont in Contact,
-      join: com in subquery(Sys.user_companies(company, user)),
+      join: com in subquery(Sys.user_company(company, user)),
       on: com.id == cont.company_id,
       where: ilike(cont.name, ^"%#{terms}%"),
       select: %{id: cont.id, value: cont.name},

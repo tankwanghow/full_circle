@@ -26,8 +26,8 @@ defmodule FullCircleWeb.LogLive.Index do
     ~H"""
     <div class="max-w-4xl mx-auto">
       <p class="w-full text-3xl text-center font-medium mb-3">
-      <%= @page_title %>
-      <.link navigate={@back} class={"#{button_css()}"}><%= gettext("Back") %></.link>
+        <%= @page_title %>
+        <.link navigate={@back} class={"#{button_css()}"}><%= gettext("Back") %></.link>
       </p>
       <div id="objects_list">
         <%= for obj <- @logs do %>

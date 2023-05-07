@@ -18,7 +18,7 @@ defmodule FullCircle.CustomerBilling do
   def get_print_invoice!(id, company, user) do
     Repo.one(
       from inv in Invoice,
-        join: com in subquery(Sys.user_companies(company, user)),
+        join: com in subquery(Sys.user_company(company, user)),
         on: com.id == inv.company_id,
         join: invd in InvoiceDetail,
         on: invd.invoice_id == inv.id,
@@ -117,7 +117,7 @@ defmodule FullCircle.CustomerBilling do
   def get_invoice!(id, user, company) do
     Repo.one(
       from inv in Invoice,
-        join: com in subquery(Sys.user_companies(company, user)),
+        join: com in subquery(Sys.user_company(company, user)),
         on: com.id == inv.company_id,
         join: invd in InvoiceDetail,
         on: invd.invoice_id == inv.id,
@@ -287,7 +287,7 @@ defmodule FullCircle.CustomerBilling do
   defp invoice_query(company, user, page: page, per_page: per_page) do
     from inv in Invoice,
       as: :invoices,
-      join: com in subquery(Sys.user_companies(company, user)),
+      join: com in subquery(Sys.user_company(company, user)),
       on: com.id == inv.company_id,
       join: cont in Contact,
       on: cont.id == inv.contact_id,

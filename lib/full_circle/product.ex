@@ -58,7 +58,7 @@ defmodule FullCircle.Product do
 
   defp good_query(user, company) do
     from(good in Good,
-      join: com in subquery(Sys.user_companies(company, user)),
+      join: com in subquery(Sys.user_company(company, user)),
       on: com.id == good.company_id,
       left_join: sac in Account,
       on: sac.id == good.sales_account_id,

@@ -74,7 +74,7 @@ defmodule FullCircle.CustomerBilling.InvoiceDetail do
     price = fetch_field!(changeset, :unit_price)
     disc = fetch_field!(changeset, :discount)
     rate = fetch_field!(changeset, :tax_rate)
-    
+
     qty =
       if Decimal.gt?(pack_qty, "0") and Decimal.gt?(unit_multi, "0") do
         Decimal.mult(pack_qty, unit_multi)

@@ -4,9 +4,17 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
   alias FullCircle.CustomerBilling
   alias FullCircle.CustomerBilling.{Invoice, InvoiceDetail}
   alias FullCircle.StdInterface
+  alias FullCircle.Sys
 
   @impl true
   def mount(socket) do
+    {:ok, socket}
+  end
+
+  @impl true
+  def update(assigns, socket) do
+    socket = socket |> assign(assigns)
+
     {:ok,
      socket
      |> assign(
@@ -14,20 +22,14 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
        contact_names: [],
        tax_codes: [],
        package_names: [],
-       good_names: []
+       good_names: [],
+       settings:
+         FullCircle.Sys.load_settings(
+           "invoice",
+           socket.assigns.current_user,
+           socket.assigns.current_company
+         )
      )}
-  end
-
-  @impl true
-  def update(assigns, socket) do
-    socket = socket |> assign(assigns)
-
-    {:ok, socket}
-  end
-
-  @impl true
-  def handle_event("cancel_delete", _, socket) do
-    {:noreply, socket}
   end
 
   @impl true
@@ -46,6 +48,30 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
       end)
 
     {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event(
+        "validate",
+        %{"_target" => ["settings", id, "value"], "settings" => new_settings},
+        socket
+      ) do
+    settings = socket.assigns.settings
+
+    setting = Enum.find(settings, fn x -> x.id == String.to_integer(id) end)
+
+    %{"value" => value} = Map.get(new_settings, id)
+
+    setting = FullCircle.Sys.update_setting(setting, value)
+
+    settings =
+      Enum.reject(settings, fn x -> x.id == String.to_integer(id) end)
+      |> Enum.concat([setting])
+      |> Enum.sort_by(& &1.id)
+
+    {:noreply,
+     socket
+     |> assign(settings: settings)}
   end
 
   @impl true
@@ -336,70 +362,82 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
         </div>
 
         <div class="font-medium flex flex-row flex-wrap text-center mt-2 tracking-tighter">
-          <div class="invoice-detail-header w-28"><%= gettext("Good") %></div>
-          <div class="invoice-detail-header w-36"><%= gettext("Description") %></div>
-          <div class="invoice-detail-header-fixed w-28"><%= gettext("Package") %></div>
-          <div class="invoice-detail-header-fixed w-20"><%= gettext("Pack Qty") %></div>
-          <div class="invoice-detail-header-fixed w-24"><%= gettext("Quantity") %></div>
-          <div class="invoice-detail-header-fixed w-16"><%= gettext("Unit") %></div>
-          <div class="invoice-detail-header-fixed w-24"><%= gettext("Price") %></div>
-          <div class="invoice-detail-header w-24"><%= gettext("Good Amt") %></div>
-          <div class="invoice-detail-header-fixed w-24"><%= gettext("Discount") %></div>
-          <div class="invoice-detail-header w-28"><%= gettext("Account") %></div>
-          <div class="invoice-detail-header-fixed w-16"><%= gettext("TaxCode") %></div>
-          <div class="invoice-detail-header-fixed w-14"><%= gettext("Tax%") %></div>
-          <div class="invoice-detail-header w-20"><%= gettext("Tax Amt") %></div>
-          <div class="invoice-detail-header w-24"><%= gettext("Amount") %></div>
-          <div class="w-5 py-3 text-blue-500 grow-0 shrink-0">
-            <.link phx-click={:settings} phx-target={@myself}>
-              <.icon name="hero-cog-6-tooth-solid" class="w-5 h-5" />
-            </.link>
+          <div class="invoice-detail-header w-28 shrink-[3] grow-[3]"><%= gettext("Good") %></div>
+          <div class="invoice-detail-header w-36 shrink-[3] grow-[3]">
+            <%= gettext("Description") %>
+          </div>
+          <div class="invoice-detail-header w-28 shrink-[1] grow-[1]"><%= gettext("Package") %></div>
+          <div class="invoice-detail-header w-20 shrink-[1] grow-[1]"><%= gettext("Pack Qty") %></div>
+          <div class="invoice-detail-header w-24 shrink-[1] grow-[1]"><%= gettext("Quantity") %></div>
+          <div class="invoice-detail-header w-16 shrink-[1] grow-[1]"><%= gettext("Unit") %></div>
+          <div class="invoice-detail-header w-24 shrink-[1] grow-[1]"><%= gettext("Price") %></div>
+          <div class={"#{Sys.get_setting(@settings, "invoice", "goodamt-col")} invoice-detail-header w-24"}>
+            <%= gettext("Good Amt") %>
+          </div>
+          <div class={"#{Sys.get_setting(@settings, "invoice", "discount-col")} invoice-detail-header w-24"}>
+            <%= gettext("Discount") %>
+          </div>
+          <div class={"#{Sys.get_setting(@settings, "invoice", "account-col")} invoice-detail-header w-28"}>
+            <%= gettext("Account") %>
+          </div>
+          <div class="invoice-detail-header w-16 shrink-[1] grow-[1]"><%= gettext("TaxCode") %></div>
+          <div class={"#{Sys.get_setting(@settings, "invoice", "taxrate-col")} invoice-detail-header w-14"}>
+            <%= gettext("Tax%") %>
+          </div>
+          <div class={"#{Sys.get_setting(@settings, "invoice", "taxamt-col")} invoice-detail-header w-20"}>
+            <%= gettext("Tax Amt") %>
+          </div>
+          <div class="invoice-detail-header w-24 shrink-[1] grow-[1]"><%= gettext("Amount") %></div>
+          <div class="w-5 mt-1 text-blue-500 grow-0 shrink-0">
+            <.settings id="invoice-settings" settings={@settings} />
           </div>
         </div>
 
         <.inputs_for :let={dtl} field={@form[:invoice_details]}>
           <div class={"flex flex-row flex-wrap #{if(dtl[:delete].value == true, do: "hidden", else: "")}"}>
-            <div class="w-28 grow shrink">
+            <div class="w-28 grow-[3] shrink-[3]">
               <.input field={dtl[:good_name]} list="good_names" phx-debounce={500} />
             </div>
             <%= Phoenix.HTML.Form.hidden_input(dtl, :good_id) %>
-            <div class="w-36 grow shrink"><.input field={dtl[:descriptions]} /></div>
-            <div class="w-28 grow-0 shrink-0">
+            <div class="w-36 grow-[3] shrink-[3]"><.input field={dtl[:descriptions]} /></div>
+            <div class="w-28 grow-[1] shrink-[1]">
               <.input field={dtl[:package_name]} list="package_names" phx-debounce={500} />
             </div>
             <%= Phoenix.HTML.Form.hidden_input(dtl, :unit_multiplier) %>
             <%= Phoenix.HTML.Form.hidden_input(dtl, :package_id) %>
-            <div class="w-20 grow-0 shrink-0"><.input type="number" field={dtl[:package_qty]} /></div>
-            <div class="w-24 grow-0 shrink-0">
+            <div class="w-20 grow-[1] shrink-[1]">
+              <.input type="number" field={dtl[:package_qty]} />
+            </div>
+            <div class="w-24 grow-[1] shrink-[1]">
               <.input type="number" field={dtl[:quantity]} step="0.0001" />
             </div>
-            <div class="w-16 grow-0 shrink-0">
+            <div class="w-16 grow-[1] shrink-[1]">
               <.input field={dtl[:unit]} readonly tabindex="-1" />
             </div>
-            <div class="w-24 grow-0 shrink-0">
+            <div class="w-24 grow-[1] shrink-[1]">
               <.input type="number" field={dtl[:unit_price]} step="0.0001" />
             </div>
-            <div class="w-24 grow shrink">
+            <div class={"#{Sys.get_setting(@settings, "invoice", "goodamt-col")} w-24"}>
               <.input type="number" field={dtl[:good_amount]} readonly tabindex="-1" />
             </div>
-            <div class="w-24 grow-0 shrink-0">
+            <div class={"#{Sys.get_setting(@settings, "invoice", "discount-col")} w-24"}>
               <.input type="number" field={dtl[:discount]} step="0.01" />
             </div>
-            <div class="w-28 grow shrink">
+            <div class={"#{Sys.get_setting(@settings, "invoice", "account-col")} w-28"}>
               <.input field={dtl[:account_name]} list="account_names" phx-debounce={500} />
             </div>
             <%= Phoenix.HTML.Form.hidden_input(dtl, :account_id) %>
-            <div class="w-16 grow-0 shrink-0">
+            <div class="w-16 grow-[1] shrink-[1]">
               <.input field={dtl[:tax_code_name]} list="tax_codes" phx-debounce={500} />
             </div>
             <%= Phoenix.HTML.Form.hidden_input(dtl, :tax_code_id) %>
-            <div class="w-14 grow-0 shrink-0">
+            <div class={"#{Sys.get_setting(@settings, "invoice", "taxrate-col")} w-14"}>
               <.input type="number" field={dtl[:tax_rate]} readonly step="0.0001" />
             </div>
-            <div class="w-20 grow shrink">
+            <div class={"#{Sys.get_setting(@settings, "invoice", "taxamt-col")} w-20"}>
               <.input type="number" field={dtl[:tax_amount]} readonly tabindex="-1" />
             </div>
-            <div class="w-24 grow shrink">
+            <div class="w-24 grow-[1] shrink-[1]">
               <.input type="number" field={dtl[:amount]} readonly tabindex="-1" />
             </div>
             <div class="w-5 mt-2.5 text-rose-500 grow-0 shrink-0">
@@ -412,31 +450,32 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
         </.inputs_for>
 
         <div class="flex flex-row flex-wrap font-medium tracking-tighter">
-          <div class="w-28 grow shrink text-orange-500">
+          <div class="w-28 shrink-[3] grow-[3] text-orange-500">
             <.link phx-click={:add_detail} phx-target={@myself}>
               <.icon name="hero-plus-circle" class="w-5 h-5" /><%= gettext("Add Detail") %>
             </.link>
           </div>
-          <div class="w-36 grow shrink"></div>
-          <div class="w-28 grow-0 shrink-0"></div>
-          <div class="w-20 grow-0 shrink-0"></div>
-          <div class="w-24 grow-0 shrink-0"></div>
-          <div class="w-16 grow-0 shrink-0"></div>
-          <div class="w-24 grow-0 shrink-0"></div>
-          <div class="w-24 grow shrink">
+          <div class="w-36 shrink-[3] grow-[3]" />
+
+          <div class="w-28 shrink-[1] grow-[1]" />
+          <div class="w-20 shrink-[1] grow-[1]" />
+          <div class="w-24 shrink-[1] grow-[1]" />
+          <div class="w-16 shrink-[1] grow-[1]" />
+          <div class="w-24 shrink-[1] grow-[1]" />
+          <div class={"#{Sys.get_setting(@settings, "invoice", "goodamt-col")} w-24"}>
             <.input type="number" field={@form[:invoice_good_amount]} readonly tabindex="-1" />
           </div>
-          <div class="w-24 grow-0 shrink-0"></div>
-          <div class="w-28 grow shrink"></div>
-          <div class="w-16 grow-0 shrink-0"></div>
-          <div class="w-14 grow-0 shrink-0"></div>
-          <div class="w-20 grow shrink">
+          <div class={"#{Sys.get_setting(@settings, "invoice", "discount-col")} w-24"} />
+          <div class={"#{Sys.get_setting(@settings, "invoice", "account-col")} w-28"} />
+          <div class="w-16 shrink-[1] grow-[1]" />
+          <div class={"#{Sys.get_setting(@settings, "invoice", "taxrate-col")} w-14"} />
+          <div class={"#{Sys.get_setting(@settings, "invoice", "taxamt-col")} w-20"}>
             <.input type="number" field={@form[:invoice_tax_amount]} readonly tabindex="-1" />
           </div>
-          <div class="w-24 grow shrink">
+          <div class="w-24 shrink-[1] grow-[1]">
             <.input type="number" field={@form[:invoice_amount]} readonly tabindex="-1" />
           </div>
-          <div class="w-5 mt-2.5 text-rose-500 grow-0 shrink-0"></div>
+          <div class="w-5 grow-0 shrink-0" />
         </div>
 
         <div class="flex flex-row flex-nowrap gap-2">
