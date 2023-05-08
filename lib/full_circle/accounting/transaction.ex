@@ -7,6 +7,7 @@ defmodule FullCircle.Accounting.Transaction do
     field :doc_id, :integer
     field :doc_date, :date
     field :particulars, :string
+    field :contact_particulars, :string
     field :amount, :decimal
     field :doc_no, :string
 
@@ -32,6 +33,7 @@ defmodule FullCircle.Accounting.Transaction do
       :doc_id,
       :doc_date,
       :particulars,
+      :contact_particulars,
       :amount,
       :old_data,
       :closed,

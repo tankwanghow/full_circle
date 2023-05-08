@@ -11,6 +11,21 @@ defmodule FullCircle.Sys do
   alias FullCircle.Sys.Log
   alias FullCircle.Accounting.Account
 
+  def default_gapless_doc(company_id) do
+    [
+      %{
+        doc_type: "invoices",
+        current: 0,
+        company_id: company_id
+      },
+      %{
+        doc_type: "pur_invoice",
+        current: 0,
+        company_id: company_id
+      }
+    ]
+  end
+
   def default_tax_codes(company_id) do
     [
       %{
@@ -124,7 +139,6 @@ defmodule FullCircle.Sys do
 
   def update_setting(setting, value) do
     cs = Ecto.Changeset.change(setting, %{value: value})
-    IO.inspect(cs)
     Repo.update!(cs)
   end
 
@@ -296,6 +310,13 @@ defmodule FullCircle.Sys do
         |> Enum.map(fn x ->
           Map.merge(x, %{company_id: c.id, inserted_at: time, updated_at: time})
         end)
+      end
+    )
+    |> Multi.insert_all(
+      :create_default_gapless_doc,
+      FullCircle.Sys.GaplessDocId,
+      fn %{create_company: c} ->
+        default_gapless_doc(c.id)
       end
     )
     |> FullCircle.Repo.transaction()
@@ -510,6 +531,8 @@ defmodule FullCircle.Sys do
 
     attrs
     |> Enum.map(fn {k, v} ->
+      k = if(is_atom(k), do: Atom.to_string(k), else: k)
+
       if !String.ends_with?(k, bl) and k != "id" do
         if !is_map(v) do
           if v != "",

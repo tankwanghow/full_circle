@@ -22,10 +22,10 @@ defmodule FullCircle.Sys.UserSetting do
     |> validate_required([:page, :code, :values, :value, :company_user_id, :display_name])
   end
 
-  def default_settings("invoice", cuid) do
+  def default_settings("invoices", cuid) do
     [
       %{
-        page: "invoice",
+        page: "invoices",
         code: "goodamt-col",
         display_name: "Good Amount",
         values: %{"show" => "visible", "hide" => "hidden"},
@@ -33,7 +33,7 @@ defmodule FullCircle.Sys.UserSetting do
         company_user_id: cuid
       },
       %{
-        page: "invoice",
+        page: "invoices",
         code: "taxamt-col",
         display_name: "Tax Amount",
         values: %{"show" => "visible", "hide" => "hidden"},
@@ -41,7 +41,7 @@ defmodule FullCircle.Sys.UserSetting do
         company_user_id: cuid
       },
       %{
-        page: "invoice",
+        page: "invoices",
         code: "account-col",
         display_name: "Account",
         values: %{"show" => "visible", "hide" => "hidden"},
@@ -49,7 +49,7 @@ defmodule FullCircle.Sys.UserSetting do
         company_user_id: cuid
       },
       %{
-        page: "invoice",
+        page: "invoices",
         code: "taxrate-col",
         display_name: "Tax Rate",
         values: %{"show" => "visible", "hide" => "hidden"},
@@ -57,7 +57,7 @@ defmodule FullCircle.Sys.UserSetting do
         company_user_id: cuid
       },
       %{
-        page: "invoice",
+        page: "invoices",
         code: "discount-col",
         display_name: "Discount",
         values: %{"show" => "visible", "hide" => "hidden"},

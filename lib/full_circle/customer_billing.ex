@@ -355,7 +355,7 @@ defmodule FullCircle.CustomerBilling do
     invoice_name = :create_invoice
 
     multi
-    |> get_gapless_doc_id(gapless_name, "invoice", "INV", com)
+    |> get_gapless_doc_id(gapless_name, "invoices", "INV", com)
     |> Multi.insert(
       invoice_name,
       fn mty ->
@@ -374,27 +374,14 @@ defmodule FullCircle.CustomerBilling do
     |> Ecto.Multi.run("create_transactions", fn repo, %{^name => invoice} ->
       Invoice.fill_computed_field(invoice)
 
-      repo.insert(%Transaction{
-        doc_type: "invoices",
-        doc_id: invoice.id,
-        doc_no: invoice.invoice_no,
-        doc_date: invoice.invoice_date,
-        contact_id: invoice.contact_id,
-        account_id: ac_rec_id,
-        company_id: com.id,
-        amount: invoice.invoice_amount,
-        particulars: invoice.contact_name
-      })
-
       Enum.each(invoice.invoice_details, fn x ->
         if Decimal.gt?(x.good_amount, 0) do
-          repo.insert(%Transaction{
+          repo.insert!(%Transaction{
             doc_type: "invoices",
             doc_id: invoice.id,
             doc_no: invoice.invoice_no,
             doc_date: invoice.invoice_date,
             account_id: x.account_id,
-            contact_id: invoice.contact_id,
             company_id: com.id,
             amount: Decimal.negate(x.good_amount),
             particulars: "Sold #{x.good_name} to #{invoice.contact_name}"
@@ -404,19 +391,35 @@ defmodule FullCircle.CustomerBilling do
         if Decimal.gt?(x.tax_amount, 0) do
           tax_ac_id = Accounting.get_tax_code!(x.tax_code_id, com, user).account_id
 
-          repo.insert(%Transaction{
+          repo.insert!(%Transaction{
             doc_type: "invoices",
             doc_id: invoice.id,
             doc_no: invoice.invoice_no,
             doc_date: invoice.invoice_date,
             account_id: tax_ac_id,
-            contact_id: invoice.contact_id,
             company_id: com.id,
             amount: Decimal.negate(x.tax_amount),
             particulars: "#{x.tax_code_name} on #{x.good_name}"
           })
         end
       end)
+
+      cont_part =
+        Enum.map(invoice.invoice_details, fn x -> String.slice(x.good_name, 0..14) end)
+        |> Enum.join(", ")
+
+      repo.insert!(%Transaction{
+        doc_type: "invoices",
+        doc_id: invoice.id,
+        doc_no: invoice.invoice_no,
+        doc_date: invoice.invoice_date,
+        contact_id: invoice.contact_id,
+        account_id: ac_rec_id,
+        company_id: com.id,
+        amount: invoice.invoice_amount,
+        particulars: invoice.contact_name,
+        contact_particulars: cont_part
+      })
 
       {:ok, nil}
     end)

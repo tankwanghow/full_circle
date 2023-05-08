@@ -23,7 +23,7 @@ defmodule FullCircle.StdInterface do
             order_by: ^similarity_order(fields, terms),
             order_by: ^fields
           ),
-        else: from(i in q)
+        else: from(i in q, order_by: [desc: i.updated_at])
       )
 
     Repo.all(q)
@@ -43,7 +43,7 @@ defmodule FullCircle.StdInterface do
             order_by: ^similarity_order(fields, terms),
             order_by: ^fields
           ),
-        else: from(i in q)
+        else: from(i in q, order_by: [desc: i.updated_at])
       )
 
     Repo.all(q)

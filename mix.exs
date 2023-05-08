@@ -55,7 +55,8 @@ defmodule FullCircle.MixProject do
       {:tzdata, "~> 1.1.1"},
       {:timex, "~> 3.0"},
       {:number, "~> 1.0"},
-      {:countries, "~> 1.6"}
+      {:countries, "~> 1.6"},
+      {:nimble_csv, "~> 1.2"}
     ]
   end
 

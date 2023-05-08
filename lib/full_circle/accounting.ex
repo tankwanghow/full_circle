@@ -70,10 +70,11 @@ defmodule FullCircle.Accounting do
   end
 
   def tax_codes(terms, user, company) do
+    terms = terms |> String.splitter("") |> Enum.join("%")
     from(taxcode in TaxCode,
       join: com in subquery(Sys.user_company(company, user)),
       on: com.id == taxcode.company_id,
-      where: ilike(taxcode.code, ^"%#{terms}%"),
+      where: ilike(taxcode.code, ^"#{terms}"),
       select: %{id: taxcode.id, value: taxcode.code, rate: taxcode.rate}
     )
     |> Repo.all()
@@ -148,10 +149,11 @@ defmodule FullCircle.Accounting do
   end
 
   def account_names(terms, user, company) do
+    terms = terms |> String.splitter("") |> Enum.join("%")
     from(ac in Account,
       join: com in subquery(Sys.user_company(company, user)),
       on: com.id == ac.company_id,
-      where: ilike(ac.name, ^"%#{terms}%"),
+      where: ilike(ac.name, ^"#{terms}"),
       select: %{id: ac.id, value: ac.name},
       order_by: ac.name
     )
@@ -159,10 +161,11 @@ defmodule FullCircle.Accounting do
   end
 
   def contact_names(terms, user, company) do
+    terms = terms |> String.splitter("") |> Enum.join("%")
     from(cont in Contact,
       join: com in subquery(Sys.user_company(company, user)),
       on: com.id == cont.company_id,
-      where: ilike(cont.name, ^"%#{terms}%"),
+      where: ilike(cont.name, ^"#{terms}"),
       select: %{id: cont.id, value: cont.name},
       order_by: cont.name
     )

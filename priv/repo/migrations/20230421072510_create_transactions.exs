@@ -7,6 +7,7 @@ defmodule FullCircle.Repo.Migrations.CreateTransactions do
       add :doc_id, :integer
       add :doc_date, :date
       add :particulars, :string
+      add :contact_particulars, :string
       add :amount, :decimal
       add :doc_no, :string
 

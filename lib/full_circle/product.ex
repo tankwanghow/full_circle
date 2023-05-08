@@ -15,10 +15,11 @@ defmodule FullCircle.Product do
   end
 
   def good_names(terms, user, company) do
+    terms = terms |> String.splitter("") |> Enum.join("%")
     from(good in subquery(good_query(user, company)),
       left_join: pack in Packaging,
       on: pack.good_id == good.id,
-      where: ilike(good.name, ^"%#{terms}%"),
+      where: ilike(good.name, ^"#{terms}"),
       select: %{
         id: good.id,
         value: good.name,
@@ -44,8 +45,9 @@ defmodule FullCircle.Product do
   end
 
   def package_names(terms, good_id) do
+    terms = terms |> String.splitter("") |> Enum.join("%")
     from(pack in Packaging,
-      where: ilike(pack.name, ^"%#{terms}%"),
+      where: ilike(pack.name, ^"#{terms}"),
       where: pack.good_id == ^good_id,
       select: %{
         id: pack.id,
@@ -89,6 +91,16 @@ defmodule FullCircle.Product do
     )
   end
 
+  def good_index_query("", user, company, page: page, per_page: per_page) do
+    from(good in subquery(good_query(user, company)),
+      offset: ^((page - 1) * per_page),
+      limit: ^per_page,
+      preload: :packagings,
+      order_by: [desc: good.updated_at]
+    )
+    |> Repo.all()
+  end
+
   def good_index_query(terms, user, company, page: page, per_page: per_page) do
     from(good in subquery(good_query(user, company)),
       offset: ^((page - 1) * per_page),
@@ -99,16 +111,6 @@ defmodule FullCircle.Product do
           ~w(name unit purchase_account_name sales_account_name sales_tax_code_name purchase_tax_code_name descriptions)a,
           terms
         )
-    )
-    |> Repo.all()
-  end
-
-  def good_index_query("", user, company, page: page, per_page: per_page) do
-    from(good in subquery(good_query(user, company)),
-      offset: ^((page - 1) * per_page),
-      limit: ^per_page,
-      preload: :packagings,
-      order_by: [desc: good.updated_at]
     )
     |> Repo.all()
   end
