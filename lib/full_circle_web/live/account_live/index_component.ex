@@ -14,24 +14,30 @@ defmodule FullCircleWeb.AccountLive.IndexComponent do
   @impl true
   def render(assigns) do
     ~H"""
-    <div
-      id={@id}
-      class={
-        ~s(#{@ex_class} text-center mb-1 border-2 rounded p-2
+    <div id={@id} class={~s(#{@ex_class} text-center mb-1 bg-gray-200 border-gray-500 border-2 rounded p-2)}>
+      <span
+        class={~s(text-xl font-bold px-2 py-1 rounded-full border
         #{if(FullCircle.Accounting.is_default_account?(@account),
-        do: "cursor-not-allowed bg-rose-100 border-rose-300",
-        else: "hover:bg-gray-400 cursor-pointer bg-gray-200 border-gray-500")}
-            )
-      }
-      phx-value-account-id={@account.id}
-      phx-click={
-        if(FullCircle.Accounting.is_default_account?(@account), do: nil, else: :edit_account)
-      }
-    >
-      <span class="text-xl font-bold"><%= @account.name %></span>
-      <p class="text-sm"><%= @account.descriptions %></p>
-      <span class="text-xs font-bold"><%= @account.account_type %></span>
+        do: "cursor-not-allowed bg-rose-100 border-rose-400",
+        else: "hover:bg-blue-400 cursor-pointer bg-blue-100 border-blue-500")}
+            )}
+        phx-value-account-id={@account.id}
+        phx-click={
+          if(FullCircle.Accounting.is_default_account?(@account), do: nil, else: :edit_account)
+        }
+      >
+        <%= @account.name %>
+      </span>
+      <p class="text-sm mt-2"><%= @account.descriptions %></p>
+      <span class="text-sm font-bold"><%= @account.account_type %></span>
       <span class="text-xs font-light"><%= to_fc_time_format(@account.updated_at) %></span>
+      <.live_component
+        module={FullCircleWeb.LogLive.Component}
+        id={"log_#{@account.id}"}
+        show_log={false}
+        entity="accounts"
+        entity_id={@account.id}
+      />
     </div>
     """
   end

@@ -828,22 +828,6 @@ defmodule FullCircleWeb.CoreComponents do
     )
   end
 
-  attr :entity, :string
-  attr :entity_id, :integer
-  attr :back, :string
-  attr :company, :any
-
-  def log_button(assigns) do
-    ~H"""
-    <.link
-      navigate={"/companies/#{@company.id}/logs/#{@entity}/#{@entity_id}?back=#{@back}"}
-      class="text-xs border rounded-full bg-pink-100 hover:bg-pink-400 px-2 py-1 border-pink-400"
-    >
-      <%= gettext("Logs") %>
-    </.link>
-    """
-  end
-
   attr :doc_type, :string
   attr :doc_no, :integer
   attr :back, :string

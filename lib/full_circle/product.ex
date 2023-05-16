@@ -16,6 +16,7 @@ defmodule FullCircle.Product do
 
   def good_names(terms, user, company) do
     terms = terms |> String.splitter("") |> Enum.join("%")
+
     from(good in subquery(good_query(user, company)),
       left_join: pack in Packaging,
       on: pack.good_id == good.id,
@@ -39,13 +40,14 @@ defmodule FullCircle.Product do
         purchase_tax_rate: good.purchase_tax_rate
       },
       order_by: [good.name, pack.id],
-      distinct: good.id
+      distinct: good.name
     )
     |> Repo.all()
   end
 
   def package_names(terms, good_id) do
     terms = terms |> String.splitter("") |> Enum.join("%")
+
     from(pack in Packaging,
       where: ilike(pack.name, ^"#{terms}"),
       where: pack.good_id == ^good_id,

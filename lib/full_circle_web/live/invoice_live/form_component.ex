@@ -344,7 +344,7 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
       >
         <%= Phoenix.HTML.Form.hidden_input(@form, :invoice_no) %>
         <div class="flex flex-row flex-nowarp">
-          <div class="grow shrink">
+          <div class="w-1/2 grow shrink">
             <%= Phoenix.HTML.Form.hidden_input(@form, :contact_id) %>
             <.input
               field={@form[:contact_name]}
@@ -353,41 +353,41 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
               phx-debounce={500}
             />
           </div>
-          <div class="w-48">
+          <div class="grow shrink w-1/4">
             <.input field={@form[:invoice_date]} label={gettext("Invoice Date")} type="date" />
           </div>
-          <div class="w-48">
+          <div class="grow shrink w-1/4">
             <.input field={@form[:due_date]} label={gettext("Due Date")} type="date" />
           </div>
         </div>
 
         <div class="font-medium flex flex-row flex-wrap text-center mt-2 tracking-tighter">
-          <div class="invoice-detail-header w-28 shrink-[3] grow-[3]"><%= gettext("Good") %></div>
-          <div class="invoice-detail-header w-36 shrink-[3] grow-[3]">
+          <div class="detail-header w-28 shrink-[3] grow-[3]"><%= gettext("Good") %></div>
+          <div class="detail-header w-36 shrink-[3] grow-[3]">
             <%= gettext("Description") %>
           </div>
-          <div class="invoice-detail-header w-28 shrink-[1] grow-[1]"><%= gettext("Package") %></div>
-          <div class="invoice-detail-header w-20 shrink-[1] grow-[1]"><%= gettext("Pack Qty") %></div>
-          <div class="invoice-detail-header w-24 shrink-[1] grow-[1]"><%= gettext("Quantity") %></div>
-          <div class="invoice-detail-header w-16 shrink-0 grow-0"><%= gettext("Unit") %></div>
-          <div class="invoice-detail-header w-24 shrink-[1] grow-[1]"><%= gettext("Price") %></div>
-          <div class={"#{Sys.get_setting(@settings, "invoices", "goodamt-col")} invoice-detail-header w-24"}>
+          <div class="detail-header w-28 shrink-[1] grow-[1]"><%= gettext("Package") %></div>
+          <div class="detail-header w-20 shrink-[1] grow-[1]"><%= gettext("Pack Qty") %></div>
+          <div class="detail-header w-24 shrink-[1] grow-[1]"><%= gettext("Quantity") %></div>
+          <div class="detail-header w-16 shrink-0 grow-0"><%= gettext("Unit") %></div>
+          <div class="detail-header w-24 shrink-[1] grow-[1]"><%= gettext("Price") %></div>
+          <div class={"#{Sys.get_setting(@settings, "invoices", "goodamt-col")} detail-header w-24"}>
             <%= gettext("Good Amt") %>
           </div>
-          <div class={"#{Sys.get_setting(@settings, "invoices", "discount-col")} invoice-detail-header w-24"}>
+          <div class={"#{Sys.get_setting(@settings, "invoices", "discount-col")} detail-header w-24"}>
             <%= gettext("Discount") %>
           </div>
-          <div class={"#{Sys.get_setting(@settings, "invoices", "account-col")} invoice-detail-header w-28"}>
+          <div class={"#{Sys.get_setting(@settings, "invoices", "account-col")} detail-header w-28"}>
             <%= gettext("Account") %>
           </div>
-          <div class="invoice-detail-header w-16 shrink-[1] grow-[1]"><%= gettext("TaxCode") %></div>
-          <div class={"#{Sys.get_setting(@settings, "invoices", "taxrate-col")} invoice-detail-header w-14"}>
+          <div class="detail-header w-16 shrink-[1] grow-[1]"><%= gettext("TaxCode") %></div>
+          <div class={"#{Sys.get_setting(@settings, "invoices", "taxrate-col")} detail-header w-14"}>
             <%= gettext("Tax%") %>
           </div>
-          <div class={"#{Sys.get_setting(@settings, "invoices", "taxamt-col")} invoice-detail-header w-20"}>
+          <div class={"#{Sys.get_setting(@settings, "invoices", "taxamt-col")} detail-header w-20"}>
             <%= gettext("Tax Amt") %>
           </div>
-          <div class="invoice-detail-header w-24 shrink-[1] grow-[1]"><%= gettext("Amount") %></div>
+          <div class="detail-header w-24 shrink-[1] grow-[1]"><%= gettext("Amount") %></div>
           <div class="w-5 mt-1 text-blue-500 grow-0 shrink-0">
             <.settings id="invoice-settings" settings={@settings} />
           </div>

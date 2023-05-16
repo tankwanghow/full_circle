@@ -12,12 +12,12 @@ defmodule FullCircleWeb.InvoiceLive.Index do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="max-w-2xl mx-auto">
+    <div class="max-w-3xl">
       <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
       <div class="flex justify-center mb-2">
         <.form for={%{}} id="search-form" phx-submit="search" autocomplete="off" class="w-full">
           <div class=" flex flex-row flex-wrap tracking-tighter text-sm">
-            <div class="grow shrink">
+            <div class="w-[25rem] grow shrink">
               <label class="">Search Terms</label>
               <.input
                 id="search_terms"
@@ -27,7 +27,7 @@ defmodule FullCircleWeb.InvoiceLive.Index do
                 placeholder="invoice, contact, goods or descriptions..."
               />
             </div>
-            <div class="w-[9rem] grow-0 shrink-0">
+            <div class="w-[9.5rem] grow-0 shrink-0">
               <label>Invocie Date From</label>
               <.input
                 name="search[invoice_date]"
@@ -36,7 +36,7 @@ defmodule FullCircleWeb.InvoiceLive.Index do
                 id="search_invoice_date"
               />
             </div>
-            <div class="w-[9rem] grow-0 shrink-0">
+            <div class="w-[9.5rem] grow-0 shrink-0">
               <label>Due Date From</label>
               <.input
                 name="search[due_date]"

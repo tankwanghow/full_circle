@@ -4,7 +4,7 @@ import Ecto.Query, warn: false
 alias FullCircle.Repo
 
 good_data =
-  File.stream!("/home/tankwanghow/Downloads/tempqry_1.csv")
+  File.stream!("/home/tankwanghow/Projects/elixir/full_circle/priv/repo/goods.csv")
   |> NimbleCSV.RFC4180.parse_stream()
   |> Stream.map(fn [name, desc, unit] ->
     %{name: name, descriptions: desc, unit: unit}

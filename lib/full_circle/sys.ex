@@ -19,7 +19,7 @@ defmodule FullCircle.Sys do
         company_id: company_id
       },
       %{
-        doc_type: "pur_invoice",
+        doc_type: "pur_invoices",
         current: 0,
         company_id: company_id
       }
@@ -102,12 +102,10 @@ defmodule FullCircle.Sys do
 
   def countries(), do: Enum.sort(Enum.map(Countries.all(), fn x -> "#{x.name}" end))
 
-  def list_logs(entity, entity_id, company, user) do
+  def list_logs(entity, entity_id) do
     Repo.all(
       from log in Log,
         as: :logs,
-        join: com in subquery(user_company(company, user)),
-        on: com.id == log.company_id,
         join: user in User,
         on: user.id == log.user_id,
         where: log.entity == ^entity and log.entity_id == ^entity_id,

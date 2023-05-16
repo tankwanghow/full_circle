@@ -50,7 +50,7 @@ input[type=number] {
   text-align: right;
 }
 
-.invoice-detail-header {
+.detail-header {
   @apply border border-gray-500 rounded bg-gray-200 py-1;
 }
 

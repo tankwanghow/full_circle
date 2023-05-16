@@ -16,12 +16,16 @@ defmodule FullCircleWeb.ContactLive.IndexComponent do
     ~H"""
     <div
       id={@id}
-      class={"#{@ex_class} cursor-pointer hover:bg-gray-400 text-center mb-1 bg-gray-200 border-gray-500 border-2 rounded p-2"}
-      phx-value-contact-id={@contact.id}
-      phx-click={:edit_contact}
+      class={"#{@ex_class} text-center mb-1 bg-gray-200 border-gray-500 border-2 rounded p-2"}
     >
-      <p class="text-xl font-bold"><%= @contact.name %></p>
-      <div class="text-sm">
+      <span
+        class="text-xl font-bold hover:bg-blue-400 cursor-pointer bg-blue-100 border-blue-500 px-2 py-1 rounded-full border"
+        phx-value-contact-id={@contact.id}
+        phx-click={:edit_contact}
+      >
+        <%= @contact.name %>
+      </span>
+      <div class="text-sm mt-2">
         <p><%= @contact.address1 %>, <%= @contact.address2 %></p>
         <p>
           <%= @contact.city %> <%= @contact.zipcode %>, <%= @contact.state %> <%= @contact.country %>
@@ -30,6 +34,13 @@ defmodule FullCircleWeb.ContactLive.IndexComponent do
       </div>
       <p class="text-green-800"><%= @contact.descriptions %></p>
       <span class="text-xs font-light"><%= to_fc_time_format(@contact.updated_at) %></span>
+      <.live_component
+        module={FullCircleWeb.LogLive.Component}
+        id={"log_#{@contact.id}"}
+        show_log={false}
+        entity="contacts"
+        entity_id={@contact.id}
+      />
     </div>
     """
   end

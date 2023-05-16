@@ -26,11 +26,12 @@ defmodule FullCircleWeb.InvoiceLive.IndexComponent do
           <div class="flex flex-row flex-wrap tracking-tighter gap-1">
             <.print_button company={@company} entity="invoices" entity_id={@obj.id} />
             <.pre_print_button company={@company} entity="invoices" entity_id={@obj.id} />
-            <.log_button
-              company={@company}
+            <.live_component
+              module={FullCircleWeb.LogLive.Component}
+              id={"log_#{@obj.id}"}
+              show_log={false}
               entity="invoices"
               entity_id={@obj.id}
-              back={~p"/companies/#{@company.id}/invoices"}
             />
             <.journal_button
               company={@company}
