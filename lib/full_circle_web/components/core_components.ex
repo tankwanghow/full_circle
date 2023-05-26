@@ -297,8 +297,8 @@ defmodule FullCircleWeb.CoreComponents do
   attr(:multiple, :boolean, default: false, doc: "the multiple flag for select inputs")
 
   attr(:rest, :global,
-    include: ~w(autocomplete cols disabled form list max maxlength min minlength phx-debounce
-                pattern placeholder readonly required rows size step)
+    include: ~w(autocomplete cols disabled list form max maxlength min minlength phx-debounce
+                required pattern placeholder readonly rows size step tag-url)
   )
 
   slot(:inner_block)
@@ -879,7 +879,7 @@ defmodule FullCircleWeb.CoreComponents do
 
   def settings(assigns) do
     ~H"""
-    <.link id={@id} phx-click={show_modal("#{@id}-modal")}>
+    <.link id={@id} phx-click={show_modal("#{@id}-modal")} tabindex="-1">
       <.icon name="hero-cog-6-tooth-solid" class="w-5 h-5" />
     </.link>
 

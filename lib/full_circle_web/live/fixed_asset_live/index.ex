@@ -6,13 +6,14 @@ defmodule FullCircleWeb.FixedAssetLive.Index do
   alias FullCircle.StdInterface
   alias FullCircleWeb.FixedAssetLive.FormComponent
   alias FullCircleWeb.FixedAssetLive.IndexComponent
+  # alias FullCircleWeb.FixedAssetLive.AdditionComponent
 
   @per_page 10
 
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="mx-auto">
+    <div class="max-w-2xl mx-auto">
       <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
       <.search_form
         search_val={@search.terms}
@@ -40,6 +41,7 @@ defmodule FullCircleWeb.FixedAssetLive.Index do
       :if={@live_action in [:new, :edit]}
       id="object-crud-modal"
       show
+      max_w="max-w-4xl"
       on_cancel={JS.push("modal_cancel")}
     >
       <.live_component

@@ -61,8 +61,8 @@ defmodule FullCircle.CustomerBilling.InvoiceDetail do
       :good_name
     ])
     |> validate_id(:good_name, :good_id)
-    |> validate_id(:package_name, :package_id)
     |> validate_id(:tax_code_name, :tax_code_id)
+    |> validate_id(:package_name, :package_id)
     |> validate_id(:account_name, :account_id)
     |> compute_fields()
     |> maybe_mark_for_deletion()

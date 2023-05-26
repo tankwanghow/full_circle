@@ -31,14 +31,31 @@ Hooks.tributeTextArea = {
   mounted() {
     var tribute = new Tribute({
       trigger: '#',
-      values: [],
+      values: (t, c) => { remoteSearch(this.el, t, c) },
       lookup: "value",
-      fillAttr: "value"
+      fillAttr: "value",
+      menuItemLimit: 5
     });
     tribute.attach(this.el)
-    tribute.append(0, this.el.getAttribute("tag-data").split(", ").map(x => { return { value: x } }))
   }
 };
+
+function remoteSearch(el, text, cb) {
+  var URL = el.getAttribute('tag-url');
+  xhr = new XMLHttpRequest();
+  xhr.onreadystatechange = function() {
+    if (xhr.readyState === 4) {
+      if (xhr.status === 200) {
+        var data = JSON.parse(xhr.responseText);
+        cb(data);
+      } else if (xhr.status === 403) {
+        cb([]);
+      }
+    }
+  };
+  xhr.open("GET", URL + "&tag=" + text, true);
+  xhr.send();
+}
 
 let liveSocket = new LiveSocket("/live", Socket, {
   hooks: Hooks,

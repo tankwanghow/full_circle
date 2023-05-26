@@ -17,6 +17,7 @@ defmodule FullCircle.Repo.Migrations.CreateTransactions do
 
       add :account_id, references(:accounts, on_delete: :nothing)
       add :contact_id, references(:contacts, on_delete: :nothing)
+      add :fixed_asset_id, references(:fixed_assets, on_delete: :nothing)
       add :company_id, references(:companies, on_delete: :delete_all)
 
       timestamps(updated_at: false, type: :timestamptz)

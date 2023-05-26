@@ -1,4 +1,4 @@
-defmodule FullCircle.Accounting.FixedAsset do
+defmodule FullCircle.Accounting.FixedAssetDepreciation do
   use Ecto.Schema
   import Ecto.Changeset
   import FullCircleWeb.Gettext
@@ -17,11 +17,9 @@ defmodule FullCircle.Accounting.FixedAsset do
     belongs_to(:company, FullCircle.Sys.Company)
     belongs_to(:asset_ac, FullCircle.Accounting.Account, foreign_key: :asset_ac_id)
     belongs_to(:depre_ac, FullCircle.Accounting.Account, foreign_key: :depre_ac_id)
-    belongs_to(:disp_fund_ac, FullCircle.Accounting.Account, foreign_key: :disp_fund_ac_id)
 
     field(:asset_ac_name, :string, virtual: true)
     field(:depre_ac_name, :string, virtual: true)
-    field(:disp_fund_ac_name, :string, virtual: true)
 
     timestamps(type: :utc_datetime)
   end
@@ -41,10 +39,9 @@ defmodule FullCircle.Accounting.FixedAsset do
       :company_id,
       :asset_ac_id,
       :depre_ac_id,
-      :disp_fund_ac_id,
+      :cume_depre_ac_id,
       :asset_ac_name,
-      :depre_ac_name,
-      :disp_fund_ac_name
+      :depre_ac_name
     ])
     |> validate_required([
       :name,
@@ -55,12 +52,10 @@ defmodule FullCircle.Accounting.FixedAsset do
       :depre_method,
       :depre_rate,
       :asset_ac_name,
-      :depre_ac_name,
-      :disp_fund_ac_name
+      :depre_ac_name
     ])
     |> validate_id(:asset_ac_name, :asset_ac_id)
     |> validate_id(:depre_ac_name, :depre_ac_id)
-    |> validate_id(:disp_fund_ac_name, :disp_fund_ac_id)
     |> validate_inclusion(:depre_method, FullCircle.Accounting.depreciation_methods(),
       message: gettext("not in list")
     )

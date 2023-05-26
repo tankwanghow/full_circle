@@ -27,6 +27,11 @@ defmodule FullCircleWeb.Router do
     get("/", PageController, :home)
   end
 
+  scope "/api", FullCircleWeb do
+    pipe_through :api
+    get "/companies/:id/tags", TagController, :index
+  end
+
   # Other scopes may use custom stacks.
   # scope "/api", FullCircleWeb do
   #   pipe_through :api

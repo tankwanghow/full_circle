@@ -23,6 +23,7 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
        tax_codes: [],
        package_names: [],
        good_names: [],
+       tagurl: "/api/companies/#{socket.assigns.current_company.id}/tags?klass=FullCircle.CustomerBilling.Invoice",
        settings:
          FullCircle.Sys.load_settings(
            "invoices",
@@ -171,7 +172,7 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
       ) do
     detail = params["invoice_details"][id]
 
-    {detail, socket, ac} =
+    {detail, socket, _} =
       FullCircleWeb.Helpers.assign_list_n_id(
         socket,
         detail,
@@ -180,11 +181,6 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
         "account_id",
         &FullCircle.Accounting.account_names/3
       )
-
-    detail =
-      Map.merge(detail, %{
-        "account_id" => Util.attempt(ac, :id)
-      })
 
     params =
       params
@@ -213,8 +209,7 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
 
     detail =
       Map.merge(detail, %{
-        "tax_code_id" => Util.attempt(taxcode, :id),
-        "tax_rate" => Util.attempt(taxcode, :rate)
+        "tax_rate" => Util.attempt(taxcode, :rate) || 0
       })
 
     params =
@@ -441,7 +436,12 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
               <.input type="number" field={dtl[:amount]} readonly tabindex="-1" />
             </div>
             <div class="w-5 mt-2.5 text-rose-500 grow-0 shrink-0">
-              <.link phx-click={:delete_detail} phx-value-index={dtl.index} phx-target={@myself}>
+              <.link
+                phx-click={:delete_detail}
+                phx-value-index={dtl.index}
+                phx-target={@myself}
+                tabindex="-1"
+              >
                 <.icon name="hero-trash-solid" class="h-5 w-5" />
               </.link>
               <%= Phoenix.HTML.Form.hidden_input(dtl, :delete) %>
@@ -450,7 +450,7 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
         </.inputs_for>
 
         <div class="flex flex-row flex-wrap font-medium tracking-tighter">
-          <div class="w-28 shrink-[3] grow-[3] text-orange-500">
+          <div class="w-28 shrink-[3] grow-[3] text-orange-500 mt-2">
             <.link phx-click={:add_detail} phx-target={@myself}>
               <.icon name="hero-plus-circle" class="w-5 h-5" /><%= gettext("Add Detail") %>
             </.link>
@@ -483,7 +483,13 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
             <.input field={@form[:descriptions]} label={gettext("Descriptions")} type="textarea" />
           </div>
           <div class="grow shrink">
-            <.input field={@form[:tags]} label={gettext("Tags")} type="textarea" />
+            <.input
+              field={@form[:tags]}
+              label={gettext("Tags")}
+              type="textarea"
+              phx-hook="tributeTextArea"
+              tag-url={@tagurl}
+            />
           </div>
         </div>
 

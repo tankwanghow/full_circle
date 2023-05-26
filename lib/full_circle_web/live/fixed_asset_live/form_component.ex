@@ -57,16 +57,16 @@ defmodule FullCircleWeb.FixedAssetLive.FormComponent do
   @impl true
   def handle_event(
         "validate",
-        %{"_target" => ["fixed_asset", "cume_depre_ac_name"], "fixed_asset" => params},
+        %{"_target" => ["fixed_asset", "disp_fund_ac_name"], "fixed_asset" => params},
         socket
       ) do
     {params, socket, _} =
       FullCircleWeb.Helpers.assign_list_n_id(
         socket,
         params,
-        "cume_depre_ac_name",
+        "disp_fund_ac_name",
         :account_names,
-        "cume_depre_ac_id",
+        "disp_fund_ac_id",
         &FullCircle.Accounting.account_names/3
       )
 
@@ -167,7 +167,7 @@ defmodule FullCircleWeb.FixedAssetLive.FormComponent do
   def render(assigns) do
     ~H"""
     <div>
-      <p class="w-full text-3xl text-center font-medium"><%= @title %></p>
+      <p class="w-full text-2xl text-center font-medium"><%= @title %></p>
       <.form
         for={@form}
         id="object-form"
@@ -175,18 +175,18 @@ defmodule FullCircleWeb.FixedAssetLive.FormComponent do
         autocomplete="off"
         phx-change="validate"
         phx-submit="save"
-        class="mx-auto"
+        class=""
       >
-        <div class="grid grid-cols-12 gap-2">
-          <div class="col-span-8">
+        <div class="flex flex-row gap-1">
+          <div class="w-[35rem]">
             <.input field={@form[:name]} label={gettext("Name")} />
           </div>
-          <div class="col-span-4">
-            <.input field={@form[:pur_date]} label={gettext("Purchase Date")} type="date" />
+          <div class="w-[9.5rem]">
+            <.input type="date" field={@form[:pur_date]} label={gettext("Purchase Date")} />
           </div>
         </div>
-        <div class="grid grid-cols-12 gap-2">
-          <div class="col-span-8">
+        <div class="flex flex-row gap-1">
+          <div class="w-[35rem]">
             <%= Phoenix.HTML.Form.hidden_input(@form, :asset_ac_id) %>
             <.input
               field={@form[:asset_ac_name]}
@@ -195,7 +195,8 @@ defmodule FullCircleWeb.FixedAssetLive.FormComponent do
               phx-debounce={500}
             />
           </div>
-          <div class="col-span-4">
+
+          <div class="w-[9.5rem]">
             <.input
               type="number"
               step="0.01"
@@ -204,23 +205,23 @@ defmodule FullCircleWeb.FixedAssetLive.FormComponent do
             />
           </div>
         </div>
-        <div class="grid grid-cols-12 gap-2">
-          <div class="col-span-4">
+        <div class="flex flex-row gap-1">
+          <div class="w-[9.5rem]">
             <.input
-              field={@form[:depre_start_date]}
-              label={gettext("Depreciation Start Date")}
               type="date"
+              field={@form[:depre_start_date]}
+              label={gettext("Depreciation Start")}
             />
           </div>
-          <div class="col-span-4">
+          <div class="w-[9.5rem]">
             <.input
               type="number"
               step="0.01"
               field={@form[:depre_rate]}
-              label={gettext("Depreciation Rate (10% = 0.1)")}
+              label={gettext("Dep Rate(0.1 = 10%)")}
             />
           </div>
-          <div class="col-span-4">
+          <div class="w-[8rem]">
             <.input
               type="number"
               step="0.01"
@@ -228,18 +229,7 @@ defmodule FullCircleWeb.FixedAssetLive.FormComponent do
               label={gettext("Residual Value")}
             />
           </div>
-        </div>
-        <div class="grid grid-cols-12 gap-2">
-          <div class="col-span-7">
-            <%= Phoenix.HTML.Form.hidden_input(@form, :depre_ac_id) %>
-            <.input
-              field={@form[:depre_ac_name]}
-              label={gettext("Depreciation Account")}
-              list="account_names"
-              phx-debounce={500}
-            />
-          </div>
-          <div class="col-span-5">
+          <div class="w-[18rem]">
             <.input
               field={@form[:depre_method]}
               label={gettext("Depreciation Methods")}
@@ -248,15 +238,45 @@ defmodule FullCircleWeb.FixedAssetLive.FormComponent do
             />
           </div>
         </div>
-        <%= Phoenix.HTML.Form.hidden_input(@form, :cume_depre_ac_id) %>
-        <.input
-          field={@form[:cume_depre_ac_name]}
-          label={gettext("Cumalitive Depreciation Account")}
-          list="account_names"
-          phx-debounce={500}
-        />
+        <div class="flex flex-row gap-1">
+          <div class="w-6/12">
+            <%= Phoenix.HTML.Form.hidden_input(@form, :depre_ac_id) %>
+            <.input
+              field={@form[:depre_ac_name]}
+              label={gettext("Depreciation Account")}
+              list="account_names"
+              phx-debounce={500}
+            />
+          </div>
+          <div class="w-6/12">
+            <%= Phoenix.HTML.Form.hidden_input(@form, :disp_fund_ac_id) %>
+            <.input
+              field={@form[:disp_fund_ac_name]}
+              label={gettext("Disposal Fund Account")}
+              list="account_names"
+              phx-debounce={500}
+            />
+          </div>
+        </div>
 
-        <.input field={@form[:descriptions]} label={gettext("Descriptions")} type="textarea" />
+        <.input field={@form[:descriptions]} type="textarea" label={gettext("Descriptions")} />
+
+        <%!-- <div class="font-medium flex flex-row flex-wrap text-center mt-2 tracking-tighter">
+          <div class="detail-header w-3/12 shrink-[3] grow-[3]"><%= gettext("Date") %></div>
+          <div class="detail-header w-3/12 shrink-[3] grow-[3]"><%= gettext("Cost Basis") %></div>
+          <div class="detail-header w-3/12 shrink-[1] grow-[1]">
+            <%= gettext("Cume Depreciation") %>
+          </div>
+          <div class="detail-header w-3/12 shrink-[1] grow-[1]">
+            <%= gettext("YTD Depreciation") %>
+          </div>
+        </div>
+
+        <div class="font-medium flex flex-row flex-wrap text-center mt-2 tracking-tighter">
+          <div class="detail-header w-3/12 shrink-[3] grow-[3]"><%= gettext("Date") %></div>
+          <div class="detail-header w-3/12 shrink-[3] grow-[3]"><%= gettext("Dispose Amount") %></div>
+          <div class="detail-header w-3/12 shrink-[1] grow-[1]"><%= gettext("Disposal Fund Account") %></div>
+        </div> --%>
 
         <div class="flex justify-center gap-x-1 mt-1">
           <.button disabled={!@form.source.valid?}><%= gettext("Save") %></.button>

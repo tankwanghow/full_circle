@@ -70,11 +70,10 @@ defmodule FullCircle.Accounting do
   end
 
   def tax_codes(terms, user, company) do
-    terms = terms |> String.splitter("") |> Enum.join("%")
     from(taxcode in TaxCode,
       join: com in subquery(Sys.user_company(company, user)),
       on: com.id == taxcode.company_id,
-      where: ilike(taxcode.code, ^"#{terms}"),
+      where: ilike(taxcode.code, ^"%#{terms}%"),
       select: %{id: taxcode.id, value: taxcode.code, rate: taxcode.rate}
     )
     |> Repo.all()
@@ -116,22 +115,22 @@ defmodule FullCircle.Accounting do
       left_join: ac1 in Account,
       on: ac1.id == fa.depre_ac_id,
       left_join: ac2 in Account,
-      on: ac2.id == fa.cume_depre_ac_id,
+      on: ac2.id == fa.disp_fund_ac_id,
       select: %FixedAsset{
         id: fa.id,
         name: fa.name,
         depre_rate: fa.depre_rate,
         depre_method: fa.depre_method,
+        depre_start_date: fa.depre_start_date,
         pur_date: fa.pur_date,
         pur_price: fa.pur_price,
-        depre_start_date: fa.depre_start_date,
         residual_value: fa.residual_value,
         asset_ac_name: ac.name,
         asset_ac_id: ac.id,
         depre_ac_name: ac1.name,
         depre_ac_id: ac1.id,
-        cume_depre_ac_name: ac2.name,
-        cume_depre_ac_id: ac2.id,
+        disp_fund_ac_name: ac2.name,
+        disp_fund_ac_id: ac2.id,
         descriptions: fa.descriptions,
         inserted_at: fa.inserted_at,
         updated_at: fa.updated_at
@@ -149,11 +148,10 @@ defmodule FullCircle.Accounting do
   end
 
   def account_names(terms, user, company) do
-    terms = terms |> String.splitter("") |> Enum.join("%")
     from(ac in Account,
       join: com in subquery(Sys.user_company(company, user)),
       on: com.id == ac.company_id,
-      where: ilike(ac.name, ^"#{terms}"),
+      where: ilike(ac.name, ^"%#{terms}%"),
       select: %{id: ac.id, value: ac.name},
       order_by: ac.name
     )
@@ -161,11 +159,10 @@ defmodule FullCircle.Accounting do
   end
 
   def contact_names(terms, user, company) do
-    terms = terms |> String.splitter("") |> Enum.join("%")
     from(cont in Contact,
       join: com in subquery(Sys.user_company(company, user)),
       on: com.id == cont.company_id,
-      where: ilike(cont.name, ^"#{terms}"),
+      where: ilike(cont.name, ^"%#{terms}%"),
       select: %{id: cont.id, value: cont.name},
       order_by: cont.name
     )

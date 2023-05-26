@@ -4,15 +4,15 @@ defmodule FullCircle.Helpers do
   import FullCircleWeb.Gettext
 
   def list_hashtag(tag \\ "", class, key, com) do
-    regexp = "#(#{tag}\\w+)"
+    regexp = "#(\\w+#{tag}\\w+)"
 
     FullCircle.Repo.all(
       from c in class,
-        where: c.company_id == ^com.company_id,
-        select: fragment("distinct regexp_matches(?, ?, 'g')", field(c, ^key), ^regexp)
+        where: c.company_id == ^com.id,
+        select: fragment("distinct regexp_matches(?, ?, 'g')", field(c, ^key), ^regexp),
+        order_by: 1
     )
     |> List.flatten()
-    |> Enum.sort()
   end
 
   def gen_temp_id(val \\ 6),
