@@ -4,11 +4,13 @@ defmodule FullCircle.Helpers do
   import FullCircleWeb.Gettext
 
   def list_hashtag(tag \\ "", class, key, com) do
-    regexp = "#(\\w+#{tag}\\w+)"
+    regexp = "#(\\w+#{tag}$|\\w+)"
+    tag = "#%#{tag}%"
 
     FullCircle.Repo.all(
       from c in class,
         where: c.company_id == ^com.id,
+        where: ilike(field(c, ^key), ^tag),
         select: fragment("distinct regexp_matches(?, ?, 'g')", field(c, ^key), ^regexp),
         order_by: 1
     )

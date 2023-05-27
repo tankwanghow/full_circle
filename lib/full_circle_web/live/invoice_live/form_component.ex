@@ -23,7 +23,8 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
        tax_codes: [],
        package_names: [],
        good_names: [],
-       tagurl: "/api/companies/#{socket.assigns.current_company.id}/tags?klass=FullCircle.CustomerBilling.Invoice",
+       tagurl:
+         "/api/companies/#{socket.assigns.current_company.id}/tags?klass=FullCircle.CustomerBilling.Invoice",
        settings:
          FullCircle.Sys.load_settings(
            "invoices",

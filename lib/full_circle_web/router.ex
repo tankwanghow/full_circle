@@ -32,11 +32,6 @@ defmodule FullCircleWeb.Router do
     get "/companies/:id/tags", TagController, :index
   end
 
-  # Other scopes may use custom stacks.
-  # scope "/api", FullCircleWeb do
-  #   pipe_through :api
-  # end
-
   # Enable LiveDashboard and Swoosh mailbox preview in development
   if Application.compile_env(:full_circle, :dev_routes) do
     # If you want to use the LiveDashboard in production, you should put
@@ -44,12 +39,12 @@ defmodule FullCircleWeb.Router do
     # If your application does not have an admins-only section yet,
     # you can use Plug.BasicAuth to set up some basic authentication
     # as long as you are also using SSL (which you should anyway).
-    import Phoenix.LiveDashboard.Router
+    # import Phoenix.LiveDashboard.Router
 
     scope "/dev" do
       pipe_through(:browser)
 
-      live_dashboard("/dashboard", metrics: FullCircleWeb.Telemetry)
+      # live_dashboard("/dashboard", metrics: FullCircleWeb.Telemetry)
       forward("/mailbox", Plug.Swoosh.MailboxPreview)
     end
   end
