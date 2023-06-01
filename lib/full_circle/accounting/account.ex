@@ -11,7 +11,7 @@ defmodule FullCircle.Accounting.Account do
 
     has_many :sales_goods, FullCircle.Product.Good, foreign_key: :sales_account_id
     has_many :purchase_goods, FullCircle.Product.Good, foreign_key: :purchase_account_id
-    has_many :invoice_details, FullCircle.CustomerBilling.InvoiceDetail
+    has_many :invoice_details, FullCircle.Billing.InvoiceDetail
 
     timestamps(type: :utc_datetime)
   end

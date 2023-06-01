@@ -1,70 +1,36 @@
 defmodule FullCircle.Accounting.FixedAssetDepreciation do
   use Ecto.Schema
   import Ecto.Changeset
-  import FullCircleWeb.Gettext
-  import FullCircle.Helpers
 
-  schema "fixed_assets" do
-    field(:depre_method, :string)
-    field(:depre_rate, :decimal)
-    field(:depre_start_date, :date)
-    field(:descriptions, :string)
-    field(:name, :string)
-    field(:pur_date, :date)
-    field(:pur_price, :decimal)
-    field(:residual_value, :decimal)
+  schema "fixed_asset_depreciations" do
+    field(:cost_basis, :decimal)
+    field(:depre_date, :date)
+    field(:amount, :decimal)
 
-    belongs_to(:company, FullCircle.Sys.Company)
-    belongs_to(:asset_ac, FullCircle.Accounting.Account, foreign_key: :asset_ac_id)
-    belongs_to(:depre_ac, FullCircle.Accounting.Account, foreign_key: :depre_ac_id)
+    belongs_to(:fixed_asset, FullCircle.Accounting.FixedAsset, foreign_key: :fixed_asset_id)
+    belongs_to(:transaction, FullCircle.Accounting.Transaction, foreign_key: :transaction_id)
 
-    field(:asset_ac_name, :string, virtual: true)
-    field(:depre_ac_name, :string, virtual: true)
+    field(:closed, :boolean, virtual: true)
 
     timestamps(type: :utc_datetime)
   end
 
   @doc false
-  def changeset(fixed_asset, attrs) do
-    fixed_asset
+  def changeset(depreciation, attrs) do
+    depreciation
     |> cast(attrs, [
-      :name,
-      :pur_date,
-      :pur_price,
-      :descriptions,
-      :depre_start_date,
-      :residual_value,
-      :depre_method,
-      :depre_rate,
-      :company_id,
-      :asset_ac_id,
-      :depre_ac_id,
-      :cume_depre_ac_id,
-      :asset_ac_name,
-      :depre_ac_name
+      :cost_basis,
+      :depre_date,
+      :amount,
+      :fixed_asset_id,
+      :closed,
+      :transaction_id
     ])
     |> validate_required([
-      :name,
-      :pur_date,
-      :pur_price,
-      :depre_start_date,
-      :residual_value,
-      :depre_method,
-      :depre_rate,
-      :asset_ac_name,
-      :depre_ac_name
+      :cost_basis,
+      :depre_date,
+      :amount,
+      :fixed_asset_id
     ])
-    |> validate_id(:asset_ac_name, :asset_ac_id)
-    |> validate_id(:depre_ac_name, :depre_ac_id)
-    |> validate_inclusion(:depre_method, FullCircle.Accounting.depreciation_methods(),
-      message: gettext("not in list")
-    )
-    |> unsafe_validate_unique([:name, :company_id], FullCircle.Repo,
-      message: gettext("has already been taken")
-    )
-    |> unique_constraint(:name,
-      name: :fixed_assets_unique_name_in_company,
-      message: gettext("has already been taken")
-    )
   end
 end

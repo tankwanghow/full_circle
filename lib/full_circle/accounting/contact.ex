@@ -17,7 +17,7 @@ defmodule FullCircle.Accounting.Contact do
     field :contact_info, :string
     field :descriptions, :string
 
-    has_many :invoices, FullCircle.CustomerBilling.Invoice
+    has_many :invoices, FullCircle.Billing.Invoice
 
     timestamps(type: :utc_datetime)
   end

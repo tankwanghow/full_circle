@@ -8,6 +8,7 @@ defmodule FullCircle.Accounting.FixedAsset do
     field(:depre_method, :string)
     field(:depre_rate, :decimal)
     field(:depre_start_date, :date)
+    field(:depre_interval, :string)
     field(:descriptions, :string)
     field(:name, :string)
     field(:pur_date, :date)
@@ -44,13 +45,15 @@ defmodule FullCircle.Accounting.FixedAsset do
       :disp_fund_ac_id,
       :asset_ac_name,
       :depre_ac_name,
-      :disp_fund_ac_name
+      :disp_fund_ac_name,
+      :depre_interval
     ])
     |> validate_required([
       :name,
       :pur_date,
       :pur_price,
       :depre_start_date,
+      :depre_interval,
       :residual_value,
       :depre_method,
       :depre_rate,
@@ -62,6 +65,9 @@ defmodule FullCircle.Accounting.FixedAsset do
     |> validate_id(:depre_ac_name, :depre_ac_id)
     |> validate_id(:disp_fund_ac_name, :disp_fund_ac_id)
     |> validate_inclusion(:depre_method, FullCircle.Accounting.depreciation_methods(),
+      message: gettext("not in list")
+    )
+    |> validate_inclusion(:depre_interval, FullCircle.Accounting.depreciation_intervals(),
       message: gettext("not in list")
     )
     |> unsafe_validate_unique([:name, :company_id], FullCircle.Repo,

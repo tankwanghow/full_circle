@@ -178,10 +178,10 @@ defmodule FullCircleWeb.FixedAssetLive.FormComponent do
         class=""
       >
         <div class="flex flex-row gap-1">
-          <div class="w-[35rem]">
+          <div class="w-[36rem]">
             <.input field={@form[:name]} label={gettext("Name")} />
           </div>
-          <div class="w-[9.5rem]">
+          <div class="w-[10rem]">
             <.input type="date" field={@form[:pur_date]} label={gettext("Purchase Date")} />
           </div>
         </div>
@@ -196,7 +196,7 @@ defmodule FullCircleWeb.FixedAssetLive.FormComponent do
             />
           </div>
 
-          <div class="w-[9.5rem]">
+          <div class="w-[12rem]">
             <.input
               type="number"
               step="0.01"
@@ -213,7 +213,7 @@ defmodule FullCircleWeb.FixedAssetLive.FormComponent do
               label={gettext("Depreciation Start")}
             />
           </div>
-          <div class="w-[9.5rem]">
+          <div class="w-[8.5rem]">
             <.input
               type="number"
               step="0.01"
@@ -221,7 +221,7 @@ defmodule FullCircleWeb.FixedAssetLive.FormComponent do
               label={gettext("Dep Rate(0.1 = 10%)")}
             />
           </div>
-          <div class="w-[8rem]">
+          <div class="w-[6.5rem]">
             <.input
               type="number"
               step="0.01"
@@ -229,12 +229,20 @@ defmodule FullCircleWeb.FixedAssetLive.FormComponent do
               label={gettext("Residual Value")}
             />
           </div>
-          <div class="w-[18rem]">
+          <div class="w-[12rem]">
             <.input
               field={@form[:depre_method]}
-              label={gettext("Depreciation Methods")}
+              label={gettext("Depreciation Method")}
               type="select"
               options={FullCircle.Accounting.depreciation_methods()}
+            />
+          </div>
+          <div class="w-[9rem]">
+            <.input
+              field={@form[:depre_interval]}
+              label={gettext("Depreciation Interval")}
+              type="select"
+              options={FullCircle.Accounting.depreciation_intervals()}
             />
           </div>
         </div>
@@ -260,23 +268,6 @@ defmodule FullCircleWeb.FixedAssetLive.FormComponent do
         </div>
 
         <.input field={@form[:descriptions]} type="textarea" label={gettext("Descriptions")} />
-
-        <%!-- <div class="font-medium flex flex-row flex-wrap text-center mt-2 tracking-tighter">
-          <div class="detail-header w-3/12 shrink-[3] grow-[3]"><%= gettext("Date") %></div>
-          <div class="detail-header w-3/12 shrink-[3] grow-[3]"><%= gettext("Cost Basis") %></div>
-          <div class="detail-header w-3/12 shrink-[1] grow-[1]">
-            <%= gettext("Cume Depreciation") %>
-          </div>
-          <div class="detail-header w-3/12 shrink-[1] grow-[1]">
-            <%= gettext("YTD Depreciation") %>
-          </div>
-        </div>
-
-        <div class="font-medium flex flex-row flex-wrap text-center mt-2 tracking-tighter">
-          <div class="detail-header w-3/12 shrink-[3] grow-[3]"><%= gettext("Date") %></div>
-          <div class="detail-header w-3/12 shrink-[3] grow-[3]"><%= gettext("Dispose Amount") %></div>
-          <div class="detail-header w-3/12 shrink-[1] grow-[1]"><%= gettext("Disposal Fund Account") %></div>
-        </div> --%>
 
         <div class="flex justify-center gap-x-1 mt-1">
           <.button disabled={!@form.source.valid?}><%= gettext("Save") %></.button>

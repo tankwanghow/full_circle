@@ -1,11 +1,11 @@
-defmodule FullCircleWeb.InvoiceLive.Index do
+defmodule FullCircleWeb.PurInvoiceLive.Index do
   use FullCircleWeb, :live_view
 
-  alias FullCircle.Billing.Invoice
+  alias FullCircle.Billing.PurInvoice
   alias FullCircle.Billing
   alias FullCircle.StdInterface
-  alias FullCircleWeb.InvoiceLive.FormComponent
-  alias FullCircleWeb.InvoiceLive.IndexComponent
+  alias FullCircleWeb.PurInvoiceLive.FormComponent
+  alias FullCircleWeb.PurInvoiceLive.IndexComponent
 
   @per_page 8
 
@@ -24,16 +24,16 @@ defmodule FullCircleWeb.InvoiceLive.Index do
                 name="search[terms]"
                 type="search"
                 value={@search.terms}
-                placeholder="invoice, contact, goods or descriptions..."
+                placeholder="pur_invoice, contact, goods or descriptions..."
               />
             </div>
             <div class="w-[9.5rem] grow-0 shrink-0">
               <label>Invocie Date From</label>
               <.input
-                name="search[invoice_date]"
+                name="search[pur_invoice_date]"
                 type="date"
-                value={@search.invoice_date}
-                id="search_invoice_date"
+                value={@search.pur_invoice_date}
+                id="search_pur_invoice_date"
               />
             </div>
             <div class="w-[9.5rem] grow-0 shrink-0">
@@ -51,12 +51,12 @@ defmodule FullCircleWeb.InvoiceLive.Index do
       </div>
       <div class="text-center mb-2">
         <.link phx-click={:new_object} class={"#{button_css()} text-xl"} id="new_object">
-          <%= gettext("New Invoice") %>
+          <%= gettext("New Purchase Invoice") %>
         </.link>
       </div>
       <div class="text-center mb-1">
         <div class="rounded bg-amber-200 border border-amber-500 font-bold p-2">
-          <%= gettext("Invoice Information") %>
+          <%= gettext("Purchase Invoice Information") %>
         </div>
       </div>
       <div :if={@objects_count > 0 or @update != "replace"} id="objects_list" phx-update={@update}>
@@ -99,9 +99,9 @@ defmodule FullCircleWeb.InvoiceLive.Index do
 
     socket =
       socket
-      |> assign(page_title: gettext("Invoice Listing"))
+      |> assign(page_title: gettext("Purchase Invoice Listing"))
       |> assign(page: 1, per_page: @per_page)
-      |> assign(search: %{terms: "", invoice_date: "", due_date: ""})
+      |> assign(search: %{terms: "", pur_invoice_date: "", due_date: ""})
       |> assign(update: "append")
       |> assign(objects_count: Enum.count(objects))
       |> assign(objects: objects)
@@ -120,16 +120,16 @@ defmodule FullCircleWeb.InvoiceLive.Index do
      socket
      |> assign(live_action: :new)
      |> assign(id: "new")
-     |> assign(title: gettext("New Invoice"))
+     |> assign(title: gettext("New Purchase Invoice"))
      |> assign(current_company: socket.assigns.current_company)
      |> assign(current_user: socket.assigns.current_user)
      |> assign(
        :form,
        to_form(
          StdInterface.changeset(
-           Invoice,
-           %Invoice{invoice_details: []},
-           %{invoice_no: "...new..."},
+           PurInvoice,
+           %PurInvoice{pur_invoice_details: []},
+           %{pur_invoice_no: "...new..."},
            socket.assigns.current_company
          )
        )
@@ -139,7 +139,7 @@ defmodule FullCircleWeb.InvoiceLive.Index do
   @impl true
   def handle_event("edit_object", %{"object-id" => id}, socket) do
     object =
-      Billing.get_invoice!(
+      Billing.get_pur_invoice!(
         id,
         socket.assigns.current_user,
         socket.assigns.current_company
@@ -149,12 +149,12 @@ defmodule FullCircleWeb.InvoiceLive.Index do
      socket
      |> assign(live_action: :edit)
      |> assign(id: id)
-     |> assign(title: gettext("Edit Invoice") <> " " <> object.invoice_no)
+     |> assign(title: gettext("Edit Purchase Invoice") <> " " <> object.pur_invoice_no)
      |> assign(current_company: socket.assigns.current_company)
      |> assign(current_user: socket.assigns.current_user)
      |> assign(
        :form,
-       to_form(StdInterface.changeset(Invoice, object, %{}, socket.assigns.current_company))
+       to_form(StdInterface.changeset(PurInvoice, object, %{}, socket.assigns.current_company))
      )}
   end
 
@@ -164,7 +164,7 @@ defmodule FullCircleWeb.InvoiceLive.Index do
       filter_objects(
         socket,
         socket.assigns.search.terms,
-        socket.assigns.search.invoice_date,
+        socket.assigns.search.pur_invoice_date,
         socket.assigns.search.due_date,
         socket.assigns.page + 1
       )
@@ -180,7 +180,7 @@ defmodule FullCircleWeb.InvoiceLive.Index do
   @impl true
   def handle_event(
         "search",
-        %{"search" => %{"terms" => terms, "invoice_date" => id, "due_date" => dd}},
+        %{"search" => %{"terms" => terms, "pur_invoice_date" => id, "due_date" => dd}},
         socket
       ) do
     objects = filter_objects(socket, terms, id, dd, 1)
@@ -188,7 +188,7 @@ defmodule FullCircleWeb.InvoiceLive.Index do
     socket =
       socket
       |> assign(page: 1, per_page: @per_page)
-      |> assign(search: %{terms: terms, invoice_date: id, due_date: dd})
+      |> assign(search: %{terms: terms, pur_invoice_date: id, due_date: dd})
       |> assign(update: "replace")
       |> assign(:objects_count, Enum.count(objects))
       |> assign(:objects, objects)
@@ -199,7 +199,7 @@ defmodule FullCircleWeb.InvoiceLive.Index do
   @impl true
   def handle_info({:created, obj}, socket) do
     inv =
-      FullCircle.Billing.get_invoice_by_id_index_component_field!(
+      FullCircle.Billing.get_pur_invoice_by_id_index_component_field!(
         obj.id,
         socket.assigns.current_user,
         socket.assigns.current_company
@@ -216,7 +216,7 @@ defmodule FullCircleWeb.InvoiceLive.Index do
 
   def handle_info({:updated, obj}, socket) do
     inv =
-      FullCircle.Billing.get_invoice_by_id_index_component_field!(
+      FullCircle.Billing.get_pur_invoice_by_id_index_component_field!(
         obj.id,
         socket.assigns.current_user,
         socket.assigns.current_company
@@ -254,10 +254,10 @@ defmodule FullCircleWeb.InvoiceLive.Index do
      |> put_flash(:error, gettext("You are not authorised to perform this action"))}
   end
 
-  defp filter_objects(socket, terms, invoice_date, due_date, page) do
-    Billing.invoice_index_query(
+  defp filter_objects(socket, terms, pur_invoice_date, due_date, page) do
+    Billing.pur_invoice_index_query(
       terms,
-      invoice_date,
+      pur_invoice_date,
       due_date,
       socket.assigns.current_user,
       socket.assigns.current_company,

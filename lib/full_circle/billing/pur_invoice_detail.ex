@@ -1,4 +1,4 @@
-defmodule FullCircle.CustomerBilling.InvoiceDetail do
+defmodule FullCircle.Billing.InvoiceDetail do
   use Ecto.Schema
   import Ecto.Changeset
   import FullCircle.Helpers
@@ -11,7 +11,7 @@ defmodule FullCircle.CustomerBilling.InvoiceDetail do
     field :tax_rate, :decimal, default: 0
     field :package_qty, :decimal, default: 0
 
-    belongs_to :invoice, FullCircle.CustomerBilling.Invoice
+    belongs_to :invoice, FullCircle.Billing.Invoice
     belongs_to :good, FullCircle.Product.Good
     belongs_to :account, FullCircle.Accounting.Account
     belongs_to :tax_code, FullCircle.Accounting.TaxCode

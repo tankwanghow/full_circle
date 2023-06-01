@@ -2,7 +2,7 @@ defmodule FullCircleWeb.InvoiceLive.Print do
   use FullCircleWeb, :live_view
 
   import FullCircleWeb.Helpers
-  alias FullCircle.CustomerBilling
+  alias FullCircle.Billing
 
   @impl true
   def mount(%{"id" => id, "pre_print" => pre_print}, _session, socket) do
@@ -11,7 +11,7 @@ defmodule FullCircleWeb.InvoiceLive.Print do
 
   defp fill_assigns(id, socket) do
     invoice =
-      CustomerBilling.get_print_invoice!(
+      Billing.get_print_invoice!(
         id,
         socket.assigns.current_company,
         socket.assigns.current_user

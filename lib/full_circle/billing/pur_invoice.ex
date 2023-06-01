@@ -1,75 +1,78 @@
-defmodule FullCircle.CustomerBilling.Invoice do
+defmodule FullCircle.Billing.PurInvoice do
   use Ecto.Schema
   import Ecto.Changeset
   import FullCircle.Helpers
   import FullCircleWeb.Gettext
 
-  schema "invoices" do
-    field :invoice_no, :string
+  schema "pur_invoices" do
+    field :pur_invoice_no, :string
+    field :supplier_invoice_no, :string
     field :descriptions, :string
     field :due_date, :date
-    field :invoice_date, :date
+    field :pur_invoice_date, :date
     field :tags, :string
 
     belongs_to :company, FullCircle.Sys.Company
     belongs_to :contact, FullCircle.Accounting.Contact
 
-    has_many :invoice_details, FullCircle.CustomerBilling.InvoiceDetail, on_replace: :delete
+    has_many :pur_invoice_details, FullCircle.Billing.PurInvoiceDetail, on_replace: :delete
 
     field :contact_name, :string, virtual: true
-    field :invoice_amount, :decimal, virtual: true, default: 0
-    field :invoice_good_amount, :decimal, virtual: true, default: 0
-    field :invoice_tax_amount, :decimal, virtual: true, default: 0
+    field :pur_invoice_amount, :decimal, virtual: true, default: 0
+    field :pur_invoice_good_amount, :decimal, virtual: true, default: 0
+    field :pur_invoice_tax_amount, :decimal, virtual: true, default: 0
 
     timestamps(type: :utc_datetime)
   end
 
   @doc false
-  def changeset(invoice, attrs) do
-    invoice
+  def changeset(pur_invoice, attrs) do
+    pur_invoice
     |> cast(attrs, [
-      :invoice_date,
+      :pur_invoice_date,
+      :supplier_invoice_no,
       :due_date,
       :descriptions,
       :tags,
       :company_id,
       :contact_id,
       :contact_name,
-      :invoice_no
+      :pur_invoice_no
     ])
     |> fill_default_date()
     |> validate_required([
-      :invoice_date,
+      :pur_invoice_date,
+      :supplier_invoice_no,
       :due_date,
       :company_id,
       :contact_name,
-      :invoice_no
+      :pur_invoice_no
     ])
     |> validate_id(:contact_name, :contact_id)
-    |> unsafe_validate_unique([:invoice_no, :company_id], FullCircle.Repo,
-      message: gettext("invoice no already in company")
+    |> unsafe_validate_unique([:pur_invoice_no, :company_id], FullCircle.Repo,
+      message: gettext("pur_invoice no already in company")
     )
-    |> cast_assoc(:invoice_details)
+    |> cast_assoc(:pur_invoice_details)
     |> compute_fields()
   end
 
   def compute_fields(changeset) do
     changeset =
-      if is_nil(get_change(changeset, :invoice_details)) do
+      if is_nil(get_change(changeset, :pur_invoice_details)) do
         compute_unchange_fields(changeset)
       else
         compute_change_field(changeset)
       end
 
-    if Decimal.lt?(fetch_field!(changeset, :invoice_amount), "0.01") do
-      add_error(changeset, :invoice_amount, gettext("must be greater than 0.01"))
+    if Decimal.lt?(fetch_field!(changeset, :pur_invoice_amount), "0.01") do
+      add_error(changeset, :pur_invoice_amount, gettext("must be greater than 0.01"))
     else
       changeset
     end
   end
 
   defp compute_change_field(changeset) do
-    invds = get_change(changeset, :invoice_details)
+    invds = get_change(changeset, :pur_invoice_details)
 
     iga =
       Enum.reduce(invds, 0, fn x, acc ->
@@ -99,43 +102,43 @@ defmodule FullCircle.CustomerBilling.Invoice do
       end)
 
     changeset
-    |> put_change(:invoice_good_amount, iga)
-    |> put_change(:invoice_tax_amount, ita)
-    |> put_change(:invoice_amount, ia)
+    |> put_change(:pur_invoice_good_amount, iga)
+    |> put_change(:pur_invoice_tax_amount, ita)
+    |> put_change(:pur_invoice_amount, ia)
   end
 
   defp compute_unchange_fields(changeset)
-       when is_struct(changeset.data.invoice_details, Ecto.Association.NotLoaded) do
+       when is_struct(changeset.data.pur_invoice_details, Ecto.Association.NotLoaded) do
     changeset
   end
 
   defp compute_unchange_fields(changeset) do
     iga =
-      Enum.reduce(changeset.data.invoice_details, 0, fn x, acc ->
+      Enum.reduce(changeset.data.pur_invoice_details, 0, fn x, acc ->
         Decimal.add(acc, x.good_amount)
       end)
 
     ita =
-      Enum.reduce(changeset.data.invoice_details, 0, fn x, acc ->
+      Enum.reduce(changeset.data.pur_invoice_details, 0, fn x, acc ->
         Decimal.add(acc, x.tax_amount)
       end)
 
     ia =
-      Enum.reduce(changeset.data.invoice_details, 0, fn x, acc ->
+      Enum.reduce(changeset.data.pur_invoice_details, 0, fn x, acc ->
         Decimal.add(x.tax_amount, x.good_amount) |> Decimal.add(acc)
       end)
 
     changeset
-    |> put_change(:invoice_good_amount, iga)
-    |> put_change(:invoice_tax_amount, ita)
-    |> put_change(:invoice_amount, ia)
+    |> put_change(:pur_invoice_good_amount, iga)
+    |> put_change(:pur_invoice_tax_amount, ita)
+    |> put_change(:pur_invoice_amount, ia)
   end
 
-  def fill_computed_field(invoice) do
-    invoice =
-      Map.merge(invoice, %{
-        invoice_details:
-          Enum.map(invoice.invoice_details, fn x ->
+  def fill_computed_field(pur_invoice) do
+    pur_invoice =
+      Map.merge(pur_invoice, %{
+        pur_invoice_details:
+          Enum.map(pur_invoice.pur_invoice_details, fn x ->
             gamt =
               Decimal.mult(x.quantity, x.unit_price)
               |> Decimal.add(x.discount)
@@ -155,30 +158,30 @@ defmodule FullCircle.CustomerBilling.Invoice do
           end)
       })
 
-    invoice =
-      invoice
+    pur_invoice =
+      pur_invoice
       |> Map.merge(%{
-        invoice_good_amount:
-          Enum.reduce(invoice.invoice_details, 0, fn x, acc ->
+        pur_invoice_good_amount:
+          Enum.reduce(pur_invoice.pur_invoice_details, 0, fn x, acc ->
             Decimal.add(acc, x.good_amount)
           end)
       })
       |> Map.merge(%{
-        invoice_tax_amount:
-          Enum.reduce(invoice.invoice_details, 0, fn x, acc ->
+        pur_invoice_tax_amount:
+          Enum.reduce(pur_invoice.pur_invoice_details, 0, fn x, acc ->
             Decimal.add(acc, x.tax_amount)
           end)
       })
 
-    Map.merge(invoice, %{
-      invoice_amount: Decimal.add(invoice.invoice_good_amount, invoice.invoice_tax_amount)
+    Map.merge(pur_invoice, %{
+      pur_invoice_amount: Decimal.add(pur_invoice.pur_invoice_good_amount, pur_invoice.pur_invoice_tax_amount)
     })
   end
 
   defp fill_default_date(changeset) do
-    if is_nil(fetch_field!(changeset, :invoice_date)) do
+    if is_nil(fetch_field!(changeset, :pur_invoice_date)) do
       changeset
-      |> put_change(:invoice_date, Date.utc_today())
+      |> put_change(:pur_invoice_date, Date.utc_today())
       |> put_change(:due_date, Date.utc_today())
     else
       changeset

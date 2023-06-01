@@ -4,9 +4,7 @@ defmodule FullCircleWeb.FixedAssetLive.Index do
   alias FullCircle.Accounting.FixedAsset
   alias FullCircle.Accounting
   alias FullCircle.StdInterface
-  alias FullCircleWeb.FixedAssetLive.FormComponent
-  alias FullCircleWeb.FixedAssetLive.IndexComponent
-  # alias FullCircleWeb.FixedAssetLive.AdditionComponent
+  alias FullCircleWeb.FixedAssetLive.{FormComponent, IndexComponent, DepreciationComponent}
 
   @per_page 10
 
@@ -54,6 +52,24 @@ defmodule FullCircleWeb.FixedAssetLive.Index do
         current_user={@current_user}
       />
     </.modal>
+
+    <.modal
+      :if={@live_action == :show}
+      id="depreciation-modal"
+      show
+      max_w="max-w-4xl"
+      on_cancel={JS.push("modal_cancel")}
+    >
+      <.live_component
+        module={DepreciationComponent}
+        id={@id}
+        title={@title}
+        live_action={@live_action}
+        current_company={@current_company}
+        current_user={@current_user}
+        object={@fixed_asset}
+      />
+    </.modal>
     """
   end
 
@@ -76,6 +92,21 @@ defmodule FullCircleWeb.FixedAssetLive.Index do
   @impl true
   def handle_event("modal_cancel", _, socket) do
     {:noreply, socket |> assign(live_action: nil)}
+  end
+
+  @impl true
+  def handle_event("show_depreciation", %{"object-id" => id}, socket) do
+    object =
+      Accounting.get_fixed_asset!(id, socket.assigns.current_user, socket.assigns.current_company)
+
+    {:noreply,
+     socket
+     |> assign(live_action: :show)
+     |> assign(id: "depreciation")
+     |> assign(title: gettext("Depreciations for"))
+     |> assign(current_company: socket.assigns.current_company)
+     |> assign(current_user: socket.assigns.current_user)
+     |> assign(fixed_asset: object)}
   end
 
   @impl true

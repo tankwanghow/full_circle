@@ -1,4 +1,4 @@
-defmodule FullCircleWeb.InvoiceLive.IndexComponent do
+defmodule FullCircleWeb.PurInvoiceLive.IndexComponent do
   use FullCircleWeb, :live_component
 
   @impl true
@@ -17,26 +17,24 @@ defmodule FullCircleWeb.InvoiceLive.IndexComponent do
     <div id={@id} class={"#{@ex_class} text-center mb-1 border-gray-500 border-2 rounded"}>
       <div class="grid grid-cols-12">
         <div class="col-span-4 p-2 bg-gray-200">
-          <div class="text-xl font-medium"><%= @obj.invoice_no %></div>
+          <div class="text-xl font-medium"><%= @obj.pur_invoice_no %></div>
           <div class="font-medium">
-            <%= Number.Currency.number_to_currency(@obj.invoice_amount) %>
+            <%= Number.Currency.number_to_currency(@obj.pur_invoice_amount) %>
           </div>
           <div class="text-xs font-light"><%= to_fc_time_format(@obj.updated_at) %></div>
 
-          <.print_button company={@company} entity="invoices" entity_id={@obj.id} />
-          <.pre_print_button company={@company} entity="invoices" entity_id={@obj.id} />
           <.live_component
             module={FullCircleWeb.LogLive.Component}
             id={"log_#{@obj.id}"}
             show_log={false}
-            entity="invoices"
+            entity="pur_invoices"
             entity_id={@obj.id}
           />
           <.journal_button
             company={@company}
-            doc_type="invoices"
-            doc_no={@obj.invoice_no}
-            back={~p"/companies/#{@company.id}/invoices"}
+            doc_type="pur_invoices"
+            doc_no={@obj.pur_invoice_no}
+            back={~p"/companies/#{@company.id}/pur_invoices"}
           />
         </div>
         <div
@@ -44,8 +42,10 @@ defmodule FullCircleWeb.InvoiceLive.IndexComponent do
           phx-value-object-id={@obj.id}
           phx-click={:edit_object}
         >
+          <span class="font-medium text-sm"><%= gettext("Invoice No") %>:</span>
+          <span class="text-sm"><%= @obj.supplier_invoice_no %></span>
           <span class="font-medium text-sm"><%= gettext("Invoice Date") %>:</span>
-          <span class="text-sm"><%= @obj.invoice_date %></span>
+          <span class="text-sm"><%= @obj.pur_invoice_date %></span>
           <span class="font-medium text-sm"><%= gettext("Due Date") %>:</span>
           <span class="text-sm"><%= @obj.due_date %></span>
           <div class="text-xl font-medium"><%= @obj.contact_name %></div>

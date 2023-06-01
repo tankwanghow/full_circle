@@ -1,8 +1,8 @@
-defmodule FullCircleWeb.InvoiceLive.FormComponent do
+defmodule FullCircleWeb.PurInvoiceLive.FormComponent do
   use FullCircleWeb, :live_component
 
   alias FullCircle.Billing
-  alias FullCircle.Billing.{Invoice, InvoiceDetail}
+  alias FullCircle.Billing.{PurInvoice, PurInvoiceDetail}
   alias FullCircle.StdInterface
   alias FullCircle.Sys
 
@@ -24,10 +24,10 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
        package_names: [],
        good_names: [],
        tagurl:
-         "/api/companies/#{socket.assigns.current_company.id}/tags?klass=FullCircle.Billing.Invoice",
+         "/api/companies/#{socket.assigns.current_company.id}/tags?klass=FullCircle.Billing.PurInvoice",
        settings:
          FullCircle.Sys.load_settings(
-           "invoices",
+           "pur_invoices",
            socket.assigns.current_user,
            socket.assigns.current_company
          )
@@ -36,7 +36,7 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
 
   @impl true
   def handle_event("add_detail", _, socket) do
-    socket = socket |> FullCircleWeb.Helpers.add_lines(:invoice_details, %InvoiceDetail{})
+    socket = socket |> FullCircleWeb.Helpers.add_lines(:pur_invoice_details, %PurInvoiceDetail{})
     {:noreply, socket}
   end
 
@@ -44,9 +44,9 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
   def handle_event("delete_detail", %{"index" => index}, socket) do
     socket =
       socket
-      |> FullCircleWeb.Helpers.delete_lines(String.to_integer(index), :invoice_details)
+      |> FullCircleWeb.Helpers.delete_lines(String.to_integer(index), :pur_invoice_details)
       |> update(:form, fn %{source: changeset} ->
-        changeset |> Invoice.compute_fields() |> to_form()
+        changeset |> PurInvoice.compute_fields() |> to_form()
       end)
 
     {:noreply, socket}
@@ -79,7 +79,7 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
   @impl true
   def handle_event(
         "validate",
-        %{"_target" => ["invoice", "contact_name"], "invoice" => params},
+        %{"_target" => ["pur_invoice", "contact_name"], "pur_invoice" => params},
         socket
       ) do
     {params, socket, _} =
@@ -98,10 +98,13 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
   @impl true
   def handle_event(
         "validate",
-        %{"_target" => ["invoice", "invoice_details", id, "good_name"], "invoice" => params},
+        %{
+          "_target" => ["pur_invoice", "pur_invoice_details", id, "good_name"],
+          "pur_invoice" => params
+        },
         socket
       ) do
-    detail = params["invoice_details"][id]
+    detail = params["pur_invoice_details"][id]
 
     {detail, socket, good} =
       FullCircleWeb.Helpers.assign_list_n_id(
@@ -115,11 +118,11 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
 
     detail =
       Map.merge(detail, %{
-        "account_name" => Util.attempt(good, :sales_account_name),
-        "account_id" => Util.attempt(good, :sales_account_id),
-        "tax_code_name" => Util.attempt(good, :sales_tax_code_name),
-        "tax_code_id" => Util.attempt(good, :sales_tax_code_id),
-        "tax_rate" => Util.attempt(good, :sales_tax_rate),
+        "account_name" => Util.attempt(good, :purchase_account_name),
+        "account_id" => Util.attempt(good, :purchase_account_id),
+        "tax_code_name" => Util.attempt(good, :purchase_tax_code_name),
+        "tax_code_id" => Util.attempt(good, :purchase_tax_code_id),
+        "tax_rate" => Util.attempt(good, :purchase_tax_rate),
         "package_name" => Util.attempt(good, :package_name),
         "package_id" => Util.attempt(good, :package_id),
         "unit" => Util.attempt(good, :unit),
@@ -129,7 +132,7 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
 
     params =
       params
-      |> FullCircleWeb.Helpers.merge_detail("invoice_details", id, detail)
+      |> FullCircleWeb.Helpers.merge_detail("pur_invoice_details", id, detail)
 
     validate(params, socket)
   end
@@ -137,10 +140,13 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
   @impl true
   def handle_event(
         "validate",
-        %{"_target" => ["invoice", "invoice_details", id, "package_name"], "invoice" => params},
+        %{
+          "_target" => ["pur_invoice", "pur_invoice_details", id, "package_name"],
+          "pur_invoice" => params
+        },
         socket
       ) do
-    detail = params["invoice_details"][id]
+    detail = params["pur_invoice_details"][id]
     terms = detail["package_name"]
 
     list =
@@ -160,7 +166,7 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
 
     params =
       params
-      |> FullCircleWeb.Helpers.merge_detail("invoice_details", id, detail)
+      |> FullCircleWeb.Helpers.merge_detail("pur_invoice_details", id, detail)
 
     validate(params, socket)
   end
@@ -168,10 +174,13 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
   @impl true
   def handle_event(
         "validate",
-        %{"_target" => ["invoice", "invoice_details", id, "account_name"], "invoice" => params},
+        %{
+          "_target" => ["pur_invoice", "pur_invoice_details", id, "account_name"],
+          "pur_invoice" => params
+        },
         socket
       ) do
-    detail = params["invoice_details"][id]
+    detail = params["pur_invoice_details"][id]
 
     {detail, socket, _} =
       FullCircleWeb.Helpers.assign_list_n_id(
@@ -185,7 +194,7 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
 
     params =
       params
-      |> FullCircleWeb.Helpers.merge_detail("invoice_details", id, detail)
+      |> FullCircleWeb.Helpers.merge_detail("pur_invoice_details", id, detail)
 
     validate(params, socket)
   end
@@ -193,10 +202,13 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
   @impl true
   def handle_event(
         "validate",
-        %{"_target" => ["invoice", "invoice_details", id, "tax_code_name"], "invoice" => params},
+        %{
+          "_target" => ["pur_invoice", "pur_invoice_details", id, "tax_code_name"],
+          "pur_invoice" => params
+        },
         socket
       ) do
-    detail = params["invoice_details"][id]
+    detail = params["pur_invoice_details"][id]
 
     {detail, socket, taxcode} =
       FullCircleWeb.Helpers.assign_list_n_id(
@@ -215,25 +227,25 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
 
     params =
       params
-      |> FullCircleWeb.Helpers.merge_detail("invoice_details", id, detail)
+      |> FullCircleWeb.Helpers.merge_detail("pur_invoice_details", id, detail)
 
     validate(params, socket)
   end
 
-  def handle_event("validate", %{"invoice" => params}, socket) do
+  def handle_event("validate", %{"pur_invoice" => params}, socket) do
     validate(params, socket)
   end
 
   @impl true
-  def handle_event("save", %{"invoice" => params}, socket) do
+  def handle_event("save", %{"pur_invoice" => params}, socket) do
     save(socket, socket.assigns.live_action, params)
   end
 
   @impl true
   def handle_event("delete", _params, socket) do
     case StdInterface.delete(
-           Invoice,
-           "invoice",
+           PurInvoice,
+           "pur_invoice",
            socket.assigns.form.data,
            socket.assigns.current_user,
            socket.assigns.current_company
@@ -257,12 +269,12 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
   end
 
   defp save(socket, :new, params) do
-    case Billing.create_invoice(
+    case Billing.create_pur_invoice(
            params,
            socket.assigns.current_user,
            socket.assigns.current_company
          ) do
-      {:ok, %{create_invoice: obj}} ->
+      {:ok, %{create_pur_invoice: obj}} ->
         send(self(), {:created, obj})
         {:noreply, socket}
 
@@ -282,13 +294,13 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
   end
 
   defp save(socket, :edit, params) do
-    case Billing.update_invoice(
+    case Billing.update_pur_invoice(
            socket.assigns.form.data,
            params,
            socket.assigns.current_user,
            socket.assigns.current_company
          ) do
-      {:ok, %{update_invoice: obj}} ->
+      {:ok, %{update_pur_invoice: obj}} ->
         send(self(), {:updated, obj})
         {:noreply, socket}
 
@@ -312,7 +324,7 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
   defp validate(params, socket) do
     changeset =
       StdInterface.changeset(
-        Invoice,
+        PurInvoice,
         socket.assigns.form.data,
         params,
         socket.assigns.current_company
@@ -338,9 +350,9 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
         phx-submit="save"
         class=""
       >
-        <%= Phoenix.HTML.Form.hidden_input(@form, :invoice_no) %>
+        <%= Phoenix.HTML.Form.hidden_input(@form, :pur_invoice_no) %>
         <div class="flex flex-row flex-nowarp">
-          <div class="w-1/2 grow shrink">
+          <div class="w-5/12 grow shrink">
             <%= Phoenix.HTML.Form.hidden_input(@form, :contact_id) %>
             <.input
               field={@form[:contact_name]}
@@ -349,10 +361,13 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
               phx-debounce={500}
             />
           </div>
-          <div class="grow shrink w-1/4">
-            <.input field={@form[:invoice_date]} label={gettext("Invoice Date")} type="date" />
+          <div class="grow shrink w-3/12">
+            <.input field={@form[:supplier_invoice_no]} label={gettext("Invoice No")} />
           </div>
-          <div class="grow shrink w-1/4">
+          <div class="grow shrink w-2/12">
+            <.input field={@form[:pur_invoice_date]} label={gettext("Invoice Date")} type="date" />
+          </div>
+          <div class="grow shrink w-2/12">
             <.input field={@form[:due_date]} label={gettext("Due Date")} type="date" />
           </div>
         </div>
@@ -367,20 +382,20 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
           <div class="detail-header w-24 shrink-[1] grow-[1]"><%= gettext("Quantity") %></div>
           <div class="detail-header w-16 shrink-0 grow-0"><%= gettext("Unit") %></div>
           <div class="detail-header w-24 shrink-[1] grow-[1]"><%= gettext("Price") %></div>
-          <div class={"#{Sys.get_setting(@settings, "invoices", "goodamt-col")} detail-header w-24"}>
+          <div class={"#{Sys.get_setting(@settings, "pur_invoices", "goodamt-col")} detail-header w-24"}>
             <%= gettext("Good Amt") %>
           </div>
-          <div class={"#{Sys.get_setting(@settings, "invoices", "discount-col")} detail-header w-24"}>
+          <div class={"#{Sys.get_setting(@settings, "pur_invoices", "discount-col")} detail-header w-24"}>
             <%= gettext("Discount") %>
           </div>
-          <div class={"#{Sys.get_setting(@settings, "invoices", "account-col")} detail-header w-28"}>
+          <div class={"#{Sys.get_setting(@settings, "pur_invoices", "account-col")} detail-header w-28"}>
             <%= gettext("Account") %>
           </div>
           <div class="detail-header w-16 shrink-[1] grow-[1]"><%= gettext("TaxCode") %></div>
-          <div class={"#{Sys.get_setting(@settings, "invoices", "taxrate-col")} detail-header w-14"}>
+          <div class={"#{Sys.get_setting(@settings, "pur_invoices", "taxrate-col")} detail-header w-14"}>
             <%= gettext("Tax%") %>
           </div>
-          <div class={"#{Sys.get_setting(@settings, "invoices", "taxamt-col")} detail-header w-20"}>
+          <div class={"#{Sys.get_setting(@settings, "pur_invoices", "taxamt-col")} detail-header w-20"}>
             <%= gettext("Tax Amt") %>
           </div>
           <div class="detail-header w-24 shrink-[1] grow-[1]"><%= gettext("Amount") %></div>
@@ -389,7 +404,7 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
           </div>
         </div>
 
-        <.inputs_for :let={dtl} field={@form[:invoice_details]}>
+        <.inputs_for :let={dtl} field={@form[:pur_invoice_details]}>
           <div class={"flex flex-row flex-wrap #{if(dtl[:delete].value == true, do: "hidden", else: "")}"}>
             <div class="w-28 grow-[3] shrink-[3]">
               <.input field={dtl[:good_name]} list="good_names" phx-debounce={500} />
@@ -413,13 +428,13 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
             <div class="w-24 grow-[1] shrink-[1]">
               <.input type="number" field={dtl[:unit_price]} step="0.0001" />
             </div>
-            <div class={"#{Sys.get_setting(@settings, "invoices", "goodamt-col")} w-24"}>
+            <div class={"#{Sys.get_setting(@settings, "pur_invoices", "goodamt-col")} w-24"}>
               <.input type="number" field={dtl[:good_amount]} readonly tabindex="-1" />
             </div>
-            <div class={"#{Sys.get_setting(@settings, "invoices", "discount-col")} w-24"}>
+            <div class={"#{Sys.get_setting(@settings, "pur_invoices", "discount-col")} w-24"}>
               <.input type="number" field={dtl[:discount]} step="0.01" />
             </div>
-            <div class={"#{Sys.get_setting(@settings, "invoices", "account-col")} w-28"}>
+            <div class={"#{Sys.get_setting(@settings, "pur_invoices", "account-col")} w-28"}>
               <.input field={dtl[:account_name]} list="account_names" phx-debounce={500} />
             </div>
             <%= Phoenix.HTML.Form.hidden_input(dtl, :account_id) %>
@@ -427,10 +442,10 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
               <.input field={dtl[:tax_code_name]} list="tax_codes" phx-debounce={500} />
             </div>
             <%= Phoenix.HTML.Form.hidden_input(dtl, :tax_code_id) %>
-            <div class={"#{Sys.get_setting(@settings, "invoices", "taxrate-col")} w-14"}>
+            <div class={"#{Sys.get_setting(@settings, "pur_invoices", "taxrate-col")} w-14"}>
               <.input type="number" field={dtl[:tax_rate]} readonly step="0.0001" />
             </div>
-            <div class={"#{Sys.get_setting(@settings, "invoices", "taxamt-col")} w-20"}>
+            <div class={"#{Sys.get_setting(@settings, "pur_invoices", "taxamt-col")} w-20"}>
               <.input type="number" field={dtl[:tax_amount]} readonly tabindex="-1" />
             </div>
             <div class="w-24 grow-[1] shrink-[1]">
@@ -463,18 +478,18 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
           <div class="w-24 shrink-[1] grow-[1]" />
           <div class="w-16 shrink-0 grow-0" />
           <div class="w-24 shrink-[1] grow-[1]" />
-          <div class={"#{Sys.get_setting(@settings, "invoices", "goodamt-col")} w-24"}>
-            <.input type="number" field={@form[:invoice_good_amount]} readonly tabindex="-1" />
+          <div class={"#{Sys.get_setting(@settings, "pur_invoices", "goodamt-col")} w-24"}>
+            <.input type="number" field={@form[:pur_invoice_good_amount]} readonly tabindex="-1" />
           </div>
-          <div class={"#{Sys.get_setting(@settings, "invoices", "discount-col")} w-24"} />
-          <div class={"#{Sys.get_setting(@settings, "invoices", "account-col")} w-28"} />
+          <div class={"#{Sys.get_setting(@settings, "pur_invoices", "discount-col")} w-24"} />
+          <div class={"#{Sys.get_setting(@settings, "pur_invoices", "account-col")} w-28"} />
           <div class="w-16 shrink-[1] grow-[1]" />
-          <div class={"#{Sys.get_setting(@settings, "invoices", "taxrate-col")} w-14"} />
-          <div class={"#{Sys.get_setting(@settings, "invoices", "taxamt-col")} w-20"}>
-            <.input type="number" field={@form[:invoice_tax_amount]} readonly tabindex="-1" />
+          <div class={"#{Sys.get_setting(@settings, "pur_invoices", "taxrate-col")} w-14"} />
+          <div class={"#{Sys.get_setting(@settings, "pur_invoices", "taxamt-col")} w-20"}>
+            <.input type="number" field={@form[:pur_invoice_tax_amount]} readonly tabindex="-1" />
           </div>
           <div class="w-24 shrink-[1] grow-[1]">
-            <.input type="number" field={@form[:invoice_amount]} readonly tabindex="-1" />
+            <.input type="number" field={@form[:pur_invoice_amount]} readonly tabindex="-1" />
           </div>
           <div class="w-5 grow-0 shrink-0" />
         </div>
@@ -504,7 +519,7 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
           <%= if @live_action == :edit and FullCircle.Authorization.can?(@current_user, :delete_tax_code, @current_company) do %>
             <.delete_confirm_modal
               id="delete-object"
-              msg1={gettext("All Invoice Transactions, will be LOST!!!")}
+              msg1={gettext("All Purchase Invoice Transactions, will be LOST!!!")}
               msg2={gettext("Cannot Be Recover!!!")}
               confirm={
                 JS.remove_attribute("class", to: "#phx-feedback-for-contact_name")

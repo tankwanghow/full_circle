@@ -18,6 +18,7 @@ defmodule FullCircle.Accounting.Transaction do
     belongs_to :company, FullCircle.Sys.Company
     belongs_to :contact, FullCircle.Accounting.Contact
     belongs_to :account, FullCircle.Accounting.Account
+    belongs_to :fixed_asset, FullCircle.Accounting.FixedAsset
 
     field :account_name, :string, virtual: true
     field :contact_name, :string, virtual: true

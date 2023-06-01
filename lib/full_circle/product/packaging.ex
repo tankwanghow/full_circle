@@ -10,7 +10,7 @@ defmodule FullCircle.Product.Packaging do
 
     belongs_to :good, FullCircle.Product.Good
 
-    has_many :invoice_details, FullCircle.CustomerBilling.InvoiceDetail, foreign_key: :package_id
+    has_many :invoice_details, FullCircle.Billing.InvoiceDetail, foreign_key: :package_id
 
     field(:delete, :boolean, virtual: true, default: false)
     field(:temp_id, :string, virtual: true)

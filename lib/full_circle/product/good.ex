@@ -20,7 +20,7 @@ defmodule FullCircle.Product.Good do
     belongs_to(:sales_account, FullCircle.Accounting.Account, foreign_key: :sales_account_id)
     belongs_to(:sales_tax_code, FullCircle.Accounting.TaxCode, foreign_key: :sales_tax_code_id)
 
-    has_many(:invoice_details, FullCircle.CustomerBilling.InvoiceDetail)
+    has_many(:invoice_details, FullCircle.Billing.InvoiceDetail)
     has_many(:packagings, FullCircle.Product.Packaging, on_delete: :delete_all)
 
     field(:purchase_account_name, :string, virtual: true)

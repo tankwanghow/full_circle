@@ -18,7 +18,8 @@ defmodule FullCircleWeb.FixedAssetLive.IndexComponent do
       <div class="grid grid-cols-12">
         <div class="col-span-4 p-2 bg-gray-200">
           <.link
-            navigate=""
+            phx-value-object-id={@obj.id}
+            phx-click={:show_depreciation}
             class="border bg-red-200 hover:bg-red-500 text-sm text-black rounded-full px-2 py-1 border-red-500 mx-1"
           >
             <%= gettext("Depreciations") %>
@@ -50,19 +51,21 @@ defmodule FullCircleWeb.FixedAssetLive.IndexComponent do
           <span class="text-xl font-bold">
             <%= @obj.name %>
           </span>
-          <p class="my-1">
-            <%= @obj.asset_ac_name %> &#9679; <%= @obj.depre_ac_name %> &#9679; <%= @obj.disp_fund_ac_name %>
+          <p>
+            <span class="font-bold"><%= gettext("Fixed Asset Account:") %></span> <%= @obj.asset_ac_name %>
           </p>
-
+          <p>
+            <span class="font-bold"><%= gettext("Disposal Account:") %></span> <%= @obj.disp_fund_ac_name %>
+          </p>
           <p>
             <span class="font-bold"><%= gettext("Purchase Info:") %></span>
             <%= @obj.pur_date %> &#9679; <%= Number.Currency.number_to_currency(@obj.pur_price) %>
           </p>
           <p>
             <span class="font-bold"><%= gettext("Depreciation info:") %></span>
-            <%= @obj.depre_start_date %> &#9679; <%= @obj.depre_method %> &#9679; <%= Number.Percentage.number_to_percentage(
+            <%= @obj.depre_ac_name %> &#9679; <%= @obj.depre_start_date %> &#9679; <%= @obj.depre_method %> &#9679; <%= Number.Percentage.number_to_percentage(
               Decimal.mult(@obj.depre_rate, 100)
-            ) %>
+            ) %> &#9679; <%= @obj.depre_interval %>
           </p>
           <p><%= @obj.descriptions %></p>
         </div>
