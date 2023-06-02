@@ -254,6 +254,14 @@ defmodule FullCircleWeb.PurInvoiceLive.Index do
      |> put_flash(:error, gettext("You are not authorised to perform this action"))}
   end
 
+  @impl true
+  def handle_info({:sql_error, msg}, socket) do
+    {:noreply,
+     socket
+     |> assign(live_action: nil)
+     |> put_flash(:error, msg)}
+  end
+
   defp filter_objects(socket, terms, pur_invoice_date, due_date, page) do
     Billing.pur_invoice_index_query(
       terms,

@@ -41,6 +41,10 @@ defmodule FullCircle.Product.Packaging do
       name: :invoice_details_package_id_fkey,
       message: gettext("referenced by invoice details")
     )
+    |> foreign_key_constraint(:name,
+      name: :pur_invoice_details_package_id_fkey,
+      message: gettext("referenced by pur_invoice details")
+    )
     |> maybe_mark_for_deletion()
   end
 

@@ -6,11 +6,11 @@ defmodule FullCircle.Repo.Migrations.CreateGoods do
       add :name, :string, null: false
       add :unit, :string, null: false
       add :descriptions, :text
-      add :purchase_account_id, references(:accounts, on_delete: :nothing), null: false
+      add :purchase_account_id, references(:accounts, on_delete: :restrict), null: false
       add :company_id, references(:companies, on_delete: :delete_all), null: false
-      add :purchase_tax_code_id, references(:tax_codes, on_delete: :nothing), null: false
-      add :sales_account_id, references(:accounts, on_delete: :nothing), null: false
-      add :sales_tax_code_id, references(:tax_codes, on_delete: :nothing), null: false
+      add :purchase_tax_code_id, references(:tax_codes, on_delete: :restrict), null: false
+      add :sales_account_id, references(:accounts, on_delete: :restrict), null: false
+      add :sales_tax_code_id, references(:tax_codes, on_delete: :restrict), null: false
 
       timestamps(type: :timestamptz)
     end

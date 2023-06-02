@@ -36,6 +36,10 @@ defmodule FullCircle.Accounting.Account do
       message: gettext("referenced by invoice details")
     )
     |> foreign_key_constraint(:name,
+      name: :pur_invoice_details_account_id_fkey,
+      message: gettext("referenced by pur_invoice details")
+    )
+    |> foreign_key_constraint(:name,
       name: :goods_purchase_account_id_fkey,
       message: gettext("referenced by goods")
     )

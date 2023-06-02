@@ -318,6 +318,10 @@ defmodule FullCircleWeb.PurInvoiceLive.FormComponent do
       :not_authorise ->
         send(self(), :not_authorise)
         {:noreply, socket}
+
+      {:sql_error, msg} ->
+        send(self(), {:sql_error, msg})
+        {:noreply, socket}
     end
   end
 

@@ -15,8 +15,8 @@ defmodule FullCircle.Repo.Migrations.CreateTransactions do
       add :closed, :boolean, default: false
       add :old_data, :boolean, default: false
 
-      add :account_id, references(:accounts, on_delete: :nothing)
-      add :contact_id, references(:contacts, on_delete: :nothing)
+      add :account_id, references(:accounts, on_delete: :restrict)
+      add :contact_id, references(:contacts, on_delete: :restrict)
       add :fixed_asset_id, references(:fixed_assets, on_delete: :nilify_all)
       add :company_id, references(:companies, on_delete: :delete_all)
 

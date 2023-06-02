@@ -8,7 +8,7 @@ defmodule FullCircle.Repo.Migrations.CreateTaxCodes do
       add :rate, :decimal, default: 0
       add :descriptions, :text
       add :company_id, references(:companies, on_delete: :delete_all), null: false
-      add :account_id, references(:accounts, on_delete: :nothing), null: false
+      add :account_id, references(:accounts, on_delete: :restrict), null: false
 
       timestamps(type: :timestamptz)
     end

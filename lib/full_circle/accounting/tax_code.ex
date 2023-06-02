@@ -46,6 +46,10 @@ defmodule FullCircle.Accounting.TaxCode do
       message: gettext("referenced by invoice details")
     )
     |> foreign_key_constraint(:code,
+      name: :pur_invoice_details_tax_code_id_fkey,
+      message: gettext("referenced by pur_invoice details")
+    )
+    |> foreign_key_constraint(:code,
       name: :goods_purchase_tax_code_id_fkey,
       message: gettext("referenced by goods")
     )

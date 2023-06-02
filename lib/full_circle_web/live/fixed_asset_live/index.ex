@@ -21,6 +21,9 @@ defmodule FullCircleWeb.FixedAssetLive.Index do
         <.link phx-click={:new_object} class={"#{button_css()} text-xl"} id="new_object">
           <%= gettext("New Fixed Asset") %>
         </.link>
+        <.link navigate="" class={"#{button_css()} text-xl ml-2"} id="unreg_fixed_assets">
+          <%= gettext("Unregistered Fixed Assets") %>
+        </.link>
       </div>
       <div class="text-center mb-1">
         <div class="rounded bg-amber-200 border border-amber-500 font-bold p-2">

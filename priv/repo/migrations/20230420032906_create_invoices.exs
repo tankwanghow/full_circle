@@ -9,7 +9,7 @@ defmodule FullCircle.Repo.Migrations.CreateInvoices do
       add :descriptions, :text
       add :tags, :text
       add :company_id, references(:companies, on_delete: :delete_all)
-      add :contact_id, references(:contacts, on_delete: :nothing)
+      add :contact_id, references(:contacts, on_delete: :restrict)
 
       timestamps(type: :timestamptz)
     end
@@ -20,16 +20,16 @@ defmodule FullCircle.Repo.Migrations.CreateInvoices do
 
     create table(:invoice_details) do
       add :package_qty, :decimal, default: 0
-      add :package_id, references(:packagings, on_delete: :nothing)
+      add :package_id, references(:packagings, on_delete: :restrict)
       add :quantity, :decimal, default: 0
       add :unit_price, :decimal, default: 0
       add :discount, :decimal, default: 0
       add :tax_rate, :decimal, default: 0
       add :descriptions, :string
       add :invoice_id, references(:invoices, on_delete: :delete_all)
-      add :good_id, references(:goods, on_delete: :nothing)
-      add :account_id, references(:accounts, on_delete: :nothing)
-      add :tax_code_id, references(:tax_codes, on_delete: :nothing)
+      add :good_id, references(:goods, on_delete: :restrict)
+      add :account_id, references(:accounts, on_delete: :restrict)
+      add :tax_code_id, references(:tax_codes, on_delete: :restrict)
     end
 
     create index(:invoice_details, [:invoice_id])

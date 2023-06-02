@@ -431,6 +431,9 @@ defmodule FullCircle.Billing do
       false ->
         :not_authorise
     end
+  rescue
+    e in Postgrex.Error ->
+      {:sql_error, e.postgres.message}
   end
 
   def update_invoice_multi(multi, invoice, attrs, com, user) do
@@ -448,7 +451,6 @@ defmodule FullCircle.Billing do
     |> Sys.insert_log_for(invoice_name, attrs, com, user)
     |> create_invoice_transactions(invoice_name, com, user)
   end
-
 
   ########
   # Purchase Invocie
@@ -755,7 +757,7 @@ defmodule FullCircle.Billing do
             account_id: x.account_id,
             company_id: com.id,
             amount: x.good_amount,
-            particulars: "Purchase #{x.good_name} to #{pur_invoice.contact_name}"
+            particulars: "Purchase #{x.good_name} from #{pur_invoice.contact_name}"
           })
         end
 
@@ -806,6 +808,9 @@ defmodule FullCircle.Billing do
       false ->
         :not_authorise
     end
+  rescue
+    e in Postgrex.Error ->
+      {:sql_error, e.postgres.message}
   end
 
   def update_pur_invoice_multi(multi, pur_invoice, attrs, com, user) do

@@ -11,6 +11,7 @@ defmodule FullCircle.Accounting do
   }
 
   alias FullCircle.{Repo, Sys, StdInterface}
+  alias FullCircle.Sys.Company
 
   def account_types do
     balance_sheet_account_types() ++ profit_loss_account_types()
@@ -211,10 +212,11 @@ defmodule FullCircle.Accounting do
         Date.range(last_dep_date, edate)
         |> Enum.to_list()
         |> Enum.filter(fn x ->
-          x == case Date.new(x.year, x.month, com.closing_day) do
-            {:ok, res} -> res
-            {:error, _} -> Date.end_of_month(x)
-          end
+          x ==
+            case Date.new(x.year, x.month, com.closing_day) do
+              {:ok, res} -> res
+              {:error, _} -> Date.end_of_month(x)
+            end
         end)
       else
         []
@@ -249,13 +251,12 @@ defmodule FullCircle.Accounting do
 
     Enum.reject(depre, fn x -> x == nil end)
     |> Enum.map(fn {y, x} ->
-      # %FixedAssetDepreciation{
-      #   fixed_asset_id: fa.id,
-      #   depre_date: y,
-      #   cost_basis: cost,
-      #   amount: Decimal.new(Float.to_string(x))
-      # }
-      {y, x}
+      %FixedAssetDepreciation{
+        fixed_asset_id: fa.id,
+        depre_date: y,
+        cost_basis: cost,
+        amount: Decimal.new(Float.to_string(x))
+      }
     end)
   end
 
@@ -343,4 +344,27 @@ defmodule FullCircle.Accounting do
   def is_default_account?(ac) do
     Enum.any?(Sys.default_accounts(), fn a -> a.name == ac.name end)
   end
+
+  # def fixed_asset_draft_transactions(com) do
+  #   from(txn if subquery(fixed_asset_txn_query(com)),
+  #   select: txn.
+  #   )
+  # end
+
+  def fixed_asset_txn_query(com) do
+    from(txn in Transaction,
+    join: comp in Company,
+    on: comp.id == txn.company_id,
+    join: acc in Account,
+    on: acc.id == txn.account_id,
+    where: acc.account_type == "Fixed Asset",
+    where: comp.id == ^com.id,
+    select: txn,
+    select_merge: %{account_name: acc.name}
+  )
+  end
+
+  # def unregistered_fixed_assets_count(com) do
+
+  # end
 end
