@@ -360,7 +360,7 @@ defmodule FullCircleWeb.PurInvoiceLive.FormComponent do
             <%= Phoenix.HTML.Form.hidden_input(@form, :contact_id) %>
             <.input
               field={@form[:contact_name]}
-              label={gettext("Customer")}
+              label={gettext("Supplier")}
               list="contact_names"
               phx-debounce={500}
             />
