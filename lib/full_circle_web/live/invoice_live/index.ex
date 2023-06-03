@@ -59,18 +59,33 @@ defmodule FullCircleWeb.InvoiceLive.Index do
           <%= gettext("Invoice Information") %>
         </div>
       </div>
-      <div :if={@objects_count > 0 or @update != "replace"} id="objects_list" phx-update={@update}>
-        <%= for obj <- @objects do %>
+      <div
+        id="objects_list"
+        phx-update={@update}
+        phx-viewport-top={@page > 1 && "prev-page"}
+        phx-viewport-bottom={!@end_of_timeline? && "next-page"}
+        phx-page-loading
+        class={[
+          if(@end_of_timeline?, do: "pb-2", else: "pb-[calc(200vh)]"),
+          if(@page == 1, do: "pt-2", else: "pt-[calc(200vh)]")
+        ]}
+      >
+        <%= for {obj_id, obj} <- @streams.objects do %>
           <.live_component
             module={IndexComponent}
-            id={"objects-#{obj.id}"}
+            id={obj_id}
             obj={obj}
             company={@current_company}
             ex_class=""
           />
         <% end %>
       </div>
-      <.infinite_scroll_footer page={@page} count={@objects_count} per_page={@per_page} />
+      <div
+        :if={@end_of_timeline?}
+        class="mt-2 mb-2 text-center border-2 rounded bg-orange-200 border-orange-400 p-2"
+      >
+        <%= gettext("No More.") %>
+      </div>
     </div>
 
     <.modal
@@ -95,18 +110,12 @@ defmodule FullCircleWeb.InvoiceLive.Index do
 
   @impl true
   def mount(_params, _session, socket) do
-    objects = filter_objects(socket, "", "", "", 1)
-
     socket =
       socket
       |> assign(page_title: gettext("Invoice Listing"))
-      |> assign(page: 1, per_page: @per_page)
-      |> assign(search: %{terms: "", invoice_date: "", due_date: ""})
-      |> assign(update: "append")
-      |> assign(objects_count: Enum.count(objects))
-      |> assign(objects: objects)
+      |> filter_objects("", "stream", "", "", 1)
 
-    {:ok, socket, temporary_assigns: [objects: []]}
+    {:ok, socket}
   end
 
   @impl true
@@ -159,22 +168,46 @@ defmodule FullCircleWeb.InvoiceLive.Index do
   end
 
   @impl true
-  def handle_event("load-more", _, socket) do
-    objects =
-      filter_objects(
-        socket,
-        socket.assigns.search.terms,
-        socket.assigns.search.invoice_date,
-        socket.assigns.search.due_date,
-        socket.assigns.page + 1
-      )
-
+  def handle_event("next-page", _, socket) do
     {:noreply,
      socket
-     |> update(:page, &(&1 + 1))
-     |> assign(update: "append")
-     |> assign(objects: objects)
-     |> assign(objects_count: Enum.count(objects))}
+     |> filter_objects(
+       socket.assigns.search.terms,
+       "stream",
+       socket.assigns.search.invoice_date,
+       socket.assigns.search.due_date,
+       socket.assigns.page + 1
+     )}
+  end
+
+  @impl true
+  def handle_event("prev-page", %{"_overran" => true}, socket) do
+    {:noreply,
+     socket
+     |> filter_objects(
+       socket.assigns.search.terms,
+       socket.assigns.search.invoice_date,
+       socket.assigns.search.due_date,
+       "stream",
+       1
+     )}
+  end
+
+  @impl true
+  def handle_event("prev-page", _, socket) do
+    if socket.assigns.page > 1 do
+      {:noreply,
+       socket
+       |> filter_objects(
+         socket.assigns.search.terms,
+         "stream",
+         socket.assigns.search.invoice_date,
+         socket.assigns.search.due_date,
+         socket.assigns.page - 1
+       )}
+    else
+      {:noreply, socket}
+    end
   end
 
   @impl true
@@ -183,17 +216,9 @@ defmodule FullCircleWeb.InvoiceLive.Index do
         %{"search" => %{"terms" => terms, "invoice_date" => id, "due_date" => dd}},
         socket
       ) do
-    objects = filter_objects(socket, terms, id, dd, 1)
-
-    socket =
-      socket
-      |> assign(page: 1, per_page: @per_page)
-      |> assign(search: %{terms: terms, invoice_date: id, due_date: dd})
-      |> assign(update: "replace")
-      |> assign(:objects_count, Enum.count(objects))
-      |> assign(:objects, objects)
-
-    {:noreply, socket}
+    {:noreply,
+     socket
+     |> filter_objects(terms, "replace", id, dd, 1)}
   end
 
   @impl true
@@ -204,14 +229,12 @@ defmodule FullCircleWeb.InvoiceLive.Index do
         socket.assigns.current_user,
         socket.assigns.current_company
       )
-
     css_trans(IndexComponent, inv, :obj, "objects-#{inv.id}", "shake")
 
     {:noreply,
      socket
-     |> assign(update: "prepend")
      |> assign(live_action: nil)
-     |> assign(objects: [inv | socket.assigns.objects])}
+     |> stream_insert(:objects, obj, at: 0)}
   end
 
   def handle_info({:updated, obj}, socket) do
@@ -221,8 +244,7 @@ defmodule FullCircleWeb.InvoiceLive.Index do
         socket.assigns.current_user,
         socket.assigns.current_company
       )
-
-    css_trans(IndexComponent, inv, :obj, "objects-#{inv.id}", "shake")
+    css_trans(IndexComponent, inv, :obj, "objects-#{obj.id}", "shake")
 
     {:noreply, socket |> assign(live_action: nil)}
   end
@@ -262,15 +284,23 @@ defmodule FullCircleWeb.InvoiceLive.Index do
      |> put_flash(:error, msg)}
   end
 
-  defp filter_objects(socket, terms, invoice_date, due_date, page) do
-    Billing.invoice_index_query(
-      terms,
-      invoice_date,
-      due_date,
-      socket.assigns.current_user,
-      socket.assigns.current_company,
-      page: page,
-      per_page: @per_page
-    )
+  defp filter_objects(socket, terms, update, invoice_date, due_date, page) do
+    objects =
+      Billing.invoice_index_query(
+        terms,
+        invoice_date,
+        due_date,
+        socket.assigns.current_user,
+        socket.assigns.current_company,
+        page: page,
+        per_page: @per_page
+      )
+
+    socket
+    |> assign(page: page, per_page: @per_page)
+    |> assign(search: %{terms: terms, invoice_date: invoice_date, due_date: due_date})
+    |> assign(update: update)
+    |> stream(:objects, objects)
+    |> assign(end_of_timeline?: Enum.count(objects) == 0)
   end
 end

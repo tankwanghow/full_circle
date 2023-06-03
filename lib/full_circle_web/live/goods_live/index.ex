@@ -7,7 +7,7 @@ defmodule FullCircleWeb.GoodLive.Index do
   alias FullCircleWeb.GoodLive.FormComponent
   alias FullCircleWeb.GoodLive.IndexComponent
 
-  @per_page 10
+  @per_page 20
 
   @impl true
   def render(assigns) do
@@ -28,18 +28,33 @@ defmodule FullCircleWeb.GoodLive.Index do
           <%= gettext("Good Information") %>
         </div>
       </div>
-      <div id="objects_list" phx-update={@update}>
-        <%= for obj <- @objects do %>
+      <div
+        id="objects_list"
+        phx-update={@update}
+        phx-viewport-top={@page > 1 && "prev-page"}
+        phx-viewport-bottom={!@end_of_timeline? && "next-page"}
+        phx-page-loading
+        class={[
+          if(@end_of_timeline?, do: "pb-2", else: "pb-[calc(200vh)]"),
+          if(@page == 1, do: "pt-2", else: "pt-[calc(200vh)]")
+        ]}
+      >
+        <%= for {obj_id, obj} <- @streams.objects do %>
           <.live_component
             company={@current_company}
             module={IndexComponent}
-            id={"objects-#{obj.id}"}
+            id={"#{obj_id}"}
             obj={obj}
             ex_class=""
           />
         <% end %>
       </div>
-      <.infinite_scroll_footer page={@page} count={@objects_count} per_page={@per_page} />
+      <div
+        :if={@end_of_timeline?}
+        class="mt-2 mb-2 text-center border-2 rounded bg-orange-200 border-orange-400 p-2"
+      >
+        <%= gettext("No More.") %>
+      </div>
     </div>
 
     <.modal
@@ -63,18 +78,12 @@ defmodule FullCircleWeb.GoodLive.Index do
 
   @impl true
   def mount(_params, _session, socket) do
-    objects = filter_objects(socket, "", 1)
-
     socket =
       socket
       |> assign(page_title: gettext("Good Listing"))
-      |> assign(page: 1, per_page: @per_page)
-      |> assign(search: %{terms: ""})
-      |> assign(update: "append")
-      |> assign(objects_count: Enum.count(objects))
-      |> assign(objects: objects)
+      |> filter_objects("", "stream", 1)
 
-    {:ok, socket, temporary_assigns: [objects: []]}
+    {:ok, socket}
   end
 
   @impl true
@@ -136,28 +145,50 @@ defmodule FullCircleWeb.GoodLive.Index do
   end
 
   @impl true
-  def handle_event("load-more", _, socket) do
-    objects = filter_objects(socket, socket.assigns.search.terms, socket.assigns.page + 1)
-
+  def handle_event("next-page", _, socket) do
     {:noreply,
      socket
-     |> update(:page, &(&1 + 1))
-     |> assign(update: "append")
-     |> assign(objects: objects)
-     |> assign(objects_count: Enum.count(objects))}
+     |> filter_objects(socket.assigns.search.terms, "stream", socket.assigns.page + 1)}
+  end
+
+  @impl true
+  def handle_event("prev-page", %{"_overran" => true}, socket) do
+    {:noreply,
+     socket
+     |> filter_objects(socket.assigns.search.terms, "stream", 1)}
+  end
+
+  @impl true
+  def handle_event("prev-page", _, socket) do
+    if socket.assigns.page > 1 do
+      {:noreply,
+       socket
+       |> filter_objects(socket.assigns.search.terms, "stream", socket.assigns.page - 1)}
+    else
+      {:noreply, socket}
+    end
   end
 
   @impl true
   def handle_event("search", %{"search" => %{"terms" => terms}}, socket) do
-    objects = filter_objects(socket, terms, 1)
-
     {:noreply,
      socket
-     |> assign(page: 1, per_page: @per_page)
-     |> assign(search: %{terms: terms})
-     |> assign(update: "replace")
-     |> assign(objects_count: Enum.count(objects))
-     |> assign(objects: objects)}
+     |> filter_objects(terms, "replace", 1)}
+  end
+
+  defp filter_objects(socket, terms, update, page) do
+    objects =
+      Product.good_index_query(terms, socket.assigns.current_user, socket.assigns.current_company,
+        page: page,
+        per_page: @per_page
+      )
+
+    socket
+    |> assign(page: page, per_page: @per_page)
+    |> assign(search: %{terms: terms})
+    |> assign(update: update)
+    |> stream(:objects, objects)
+    |> assign(end_of_timeline?: Enum.count(objects) == 0)
   end
 
   @impl true
@@ -171,9 +202,8 @@ defmodule FullCircleWeb.GoodLive.Index do
 
     {:noreply,
      socket
-     |> assign(update: "prepend")
      |> assign(live_action: nil)
-     |> assign(objects: [obj | socket.assigns.objects])}
+     |> stream_insert(:objects, obj, at: 0)}
   end
 
   def handle_info({:updated, obj}, socket) do
@@ -184,7 +214,9 @@ defmodule FullCircleWeb.GoodLive.Index do
 
     css_trans(IndexComponent, obj, :obj, "objects-#{obj.id}", "shake")
 
-    {:noreply, socket |> assign(live_action: nil)}
+    {:noreply,
+     socket
+     |> assign(live_action: nil)}
   end
 
   def handle_info({:deleted, obj}, socket) do
@@ -212,13 +244,6 @@ defmodule FullCircleWeb.GoodLive.Index do
      socket
      |> assign(live_action: nil)
      |> put_flash(:error, gettext("You are not authorised to perform this action"))}
-  end
-
-  defp filter_objects(socket, terms, page) do
-    Product.good_index_query(terms, socket.assigns.current_user, socket.assigns.current_company,
-      page: page,
-      per_page: @per_page
-    )
   end
 
   defp dup_good(object) do

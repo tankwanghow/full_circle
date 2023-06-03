@@ -27,17 +27,32 @@ defmodule FullCircleWeb.ContactLive.Index do
           <%= gettext("Contact Information") %>
         </div>
       </div>
-      <div id="contacts_list" phx-update={@update}>
-        <%= for cont <- @contacts do %>
+      <div
+        id="objects_list"
+        phx-update={@update}
+        phx-viewport-top={@page > 1 && "prev-page"}
+        phx-viewport-bottom={!@end_of_timeline? && "next-page"}
+        phx-page-loading
+        class={[
+          if(@end_of_timeline?, do: "pb-2", else: "pb-[calc(200vh)]"),
+          if(@page == 1, do: "pt-2", else: "pt-[calc(200vh)]")
+        ]}
+      >
+        <%= for {obj_id, obj} <- @streams.objects do %>
           <.live_component
             module={IndexComponent}
-            id={"contacts-#{cont.id}"}
-            contact={cont}
+            id={obj_id}
+            contact={obj}
             ex_class=""
           />
         <% end %>
       </div>
-      <.infinite_scroll_footer page={@page} count={@contacts_count} per_page={@per_page} />
+      <div
+        :if={@end_of_timeline?}
+        class="mt-2 mb-2 text-center border-2 rounded bg-orange-200 border-orange-400 p-2"
+      >
+        <%= gettext("No More.") %>
+      </div>
     </div>
 
     <.modal
@@ -62,18 +77,12 @@ defmodule FullCircleWeb.ContactLive.Index do
 
   @impl true
   def mount(_params, _session, socket) do
-    contacts = filter_contacts(socket, "", 1)
-
     socket =
       socket
       |> assign(page_title: gettext("Contacts Listing"))
-      |> assign(page: 1, per_page: @per_page)
-      |> assign(search: %{terms: ""})
-      |> assign(update: "append")
-      |> assign(contacts_count: Enum.count(contacts))
-      |> assign(contacts: contacts)
+      |> filter_objects("", "stream", 1)
 
-    {:ok, socket, temporary_assigns: [contacts: []]}
+    {:ok, socket}
   end
 
   @impl true
@@ -99,7 +108,7 @@ defmodule FullCircleWeb.ContactLive.Index do
 
   @impl true
   def handle_event("edit_contact", %{"contact-id" => id}, socket) do
-    contact = StdInterface.get!(Contact, id)
+    object = StdInterface.get!(Contact, id)
 
     {:noreply,
      socket
@@ -108,57 +117,64 @@ defmodule FullCircleWeb.ContactLive.Index do
      |> assign(title: gettext("Edit Contact"))
      |> assign(current_company: socket.assigns.current_company)
      |> assign(current_user: socket.assigns.current_user)
-     |> assign(contact: contact)
+     |> assign(contact: object)
      |> assign(
        :form,
-       to_form(StdInterface.changeset(Contact, contact, %{}, socket.assigns.current_company))
+       to_form(StdInterface.changeset(Contact, object, %{}, socket.assigns.current_company))
      )}
   end
 
-  @impl true
-  def handle_event("load-more", _, socket) do
-    contacts = filter_contacts(socket, socket.assigns.search.terms, socket.assigns.page + 1)
 
+  @impl true
+  def handle_event("next-page", _, socket) do
     {:noreply,
      socket
-     |> update(:page, &(&1 + 1))
-     |> assign(update: "append")
-     |> assign(contacts: contacts)
-     |> assign(contacts_count: Enum.count(contacts))}
+     |> filter_objects(socket.assigns.search.terms, "stream", socket.assigns.page + 1)}
+  end
+
+  @impl true
+  def handle_event("prev-page", %{"_overran" => true}, socket) do
+    {:noreply,
+     socket
+     |> filter_objects(socket.assigns.search.terms, "stream", 1)}
+  end
+
+  @impl true
+  def handle_event("prev-page", _, socket) do
+    if socket.assigns.page > 1 do
+      {:noreply,
+       socket
+       |> filter_objects(socket.assigns.search.terms, "stream", socket.assigns.page - 1)}
+    else
+      {:noreply, socket}
+    end
   end
 
   @impl true
   def handle_event("search", %{"search" => %{"terms" => terms}}, socket) do
-    contacts = filter_contacts(socket, terms, 1)
-
     {:noreply,
      socket
-     |> assign(page: 1, per_page: @per_page)
-     |> assign(search: %{terms: terms})
-     |> assign(update: "replace")
-     |> assign(contacts_count: Enum.count(contacts))
-     |> assign(contacts: contacts)}
+     |> filter_objects(terms, "replace", 1)}
   end
 
   @impl true
-  def handle_info({:created, cont}, socket) do
-    css_trans(IndexComponent, cont, :contact, "contacts-#{cont.id}", "shake")
+  def handle_info({:created, obj}, socket) do
+    css_trans(IndexComponent, obj, :obj, "objects-#{obj.id}", "shake")
 
     {:noreply,
-     socket
-     |> assign(update: "prepend")
-     |> assign(live_action: nil)
-     |> assign(contacts: [cont | socket.assigns.contacts])}
+    socket
+    |> assign(live_action: nil)
+    |> stream_insert(:objects, obj, at: 0)}
   end
 
-  def handle_info({:updated, cont}, socket) do
-    css_trans(IndexComponent, cont, :contact, "contacts-#{cont.id}", "shake")
+  def handle_info({:updated, obj}, socket) do
+    css_trans(IndexComponent, obj, :obj, "objects-#{obj.id}", "shake")
 
     {:noreply, socket |> assign(live_action: nil)}
   end
 
-  def handle_info({:deleted, cont}, socket) do
-    css_trans(IndexComponent, cont, :contact, "contacts-#{cont.id}", "slow-hide", "hidden")
+  def handle_info({:deleted, obj}, socket) do
+    css_trans(IndexComponent, obj, :obj, "objects-#{obj.id}", "slow-hide", "hidden")
 
     {:noreply,
      socket
@@ -184,8 +200,8 @@ defmodule FullCircleWeb.ContactLive.Index do
      |> put_flash(:error, gettext("You are not authorised to perform this action"))}
   end
 
-  defp filter_contacts(socket, terms, page) do
-    StdInterface.filter(
+  defp filter_objects(socket, terms, update, page) do
+    objects = StdInterface.filter(
       Contact,
       [:name, :city, :state, :descriptions],
       terms,
@@ -194,5 +210,12 @@ defmodule FullCircleWeb.ContactLive.Index do
       page: page,
       per_page: @per_page
     )
+
+    socket
+    |> assign(page: page, per_page: @per_page)
+    |> assign(search: %{terms: terms})
+    |> assign(update: update)
+    |> stream(:objects, objects)
+    |> assign(end_of_timeline?: Enum.count(objects) == 0)
   end
 end

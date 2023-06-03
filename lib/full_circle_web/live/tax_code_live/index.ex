@@ -28,12 +28,27 @@ defmodule FullCircleWeb.TaxCodeLive.Index do
           <%= gettext("TaxCode Information") %>
         </div>
       </div>
-      <div id="objects_list" phx-update={@update}>
-        <%= for obj <- @objects do %>
-          <.live_component module={IndexComponent} id={"objects-#{obj.id}"} obj={obj} ex_class="" />
+      <div
+        id="objects_list"
+        phx-update={@update}
+        phx-viewport-top={@page > 1 && "prev-page"}
+        phx-viewport-bottom={!@end_of_timeline? && "next-page"}
+        phx-page-loading
+        class={[
+          if(@end_of_timeline?, do: "pb-2", else: "pb-[calc(200vh)]"),
+          if(@page == 1, do: "pt-2", else: "pt-[calc(200vh)]")
+        ]}
+      >
+        <%= for {obj_id, obj} <- @streams.objects do %>
+          <.live_component module={IndexComponent} id={"#{obj_id}"} obj={obj} ex_class="" />
         <% end %>
       </div>
-      <.infinite_scroll_footer page={@page} count={@objects_count} per_page={@per_page} />
+      <div
+        :if={@end_of_timeline?}
+        class="mt-2 mb-2 text-center border-2 rounded bg-orange-200 border-orange-400 p-2"
+      >
+        <%= gettext("No More.") %>
+      </div>
     </div>
 
     <.modal
@@ -57,18 +72,12 @@ defmodule FullCircleWeb.TaxCodeLive.Index do
 
   @impl true
   def mount(_params, _session, socket) do
-    objects = filter_objects(socket, "", 1)
-
     socket =
       socket
       |> assign(page_title: gettext("TaxCode Listing"))
-      |> assign(page: 1, per_page: @per_page)
-      |> assign(search: %{terms: ""})
-      |> assign(update: "append")
-      |> assign(objects_count: Enum.count(objects))
-      |> assign(objects: objects)
+      |> filter_objects("", "stream", 1)
 
-    {:ok, socket, temporary_assigns: [objects: []]}
+    {:ok, socket}
   end
 
   @impl true
@@ -110,28 +119,35 @@ defmodule FullCircleWeb.TaxCodeLive.Index do
   end
 
   @impl true
-  def handle_event("load-more", _, socket) do
-    objects = filter_objects(socket, socket.assigns.search.terms, socket.assigns.page + 1)
-
+  def handle_event("next-page", _, socket) do
     {:noreply,
      socket
-     |> update(:page, &(&1 + 1))
-     |> assign(update: "append")
-     |> assign(objects: objects)
-     |> assign(objects_count: Enum.count(objects))}
+     |> filter_objects(socket.assigns.search.terms, "stream", socket.assigns.page + 1)}
+  end
+
+  @impl true
+  def handle_event("prev-page", %{"_overran" => true}, socket) do
+    {:noreply,
+     socket
+     |> filter_objects(socket.assigns.search.terms, "stream", 1)}
+  end
+
+  @impl true
+  def handle_event("prev-page", _, socket) do
+    if socket.assigns.page > 1 do
+      {:noreply,
+       socket
+       |> filter_objects(socket.assigns.search.terms, "stream", socket.assigns.page - 1)}
+    else
+      {:noreply, socket}
+    end
   end
 
   @impl true
   def handle_event("search", %{"search" => %{"terms" => terms}}, socket) do
-    objects = filter_objects(socket, terms, 1)
-
     {:noreply,
      socket
-     |> assign(page: 1, per_page: @per_page)
-     |> assign(search: %{terms: terms})
-     |> assign(update: "replace")
-     |> assign(objects_count: Enum.count(objects))
-     |> assign(objects: objects)}
+     |> filter_objects(terms, "replace", 1)}
   end
 
   @impl true
@@ -139,10 +155,9 @@ defmodule FullCircleWeb.TaxCodeLive.Index do
     css_trans(IndexComponent, obj, :obj, "objects-#{obj.id}", "shake")
 
     {:noreply,
-     socket
-     |> assign(update: "prepend")
-     |> assign(live_action: nil)
-     |> assign(objects: [obj | socket.assigns.objects])}
+    socket
+    |> assign(live_action: nil)
+    |> stream_insert(:objects, obj, at: 0)}
   end
 
   def handle_info({:updated, obj}, socket) do
@@ -178,12 +193,19 @@ defmodule FullCircleWeb.TaxCodeLive.Index do
      |> put_flash(:error, gettext("You are not authorised to perform this action"))}
   end
 
-  defp filter_objects(socket, terms, page) do
+  defp filter_objects(socket, terms, update, page) do
     query = Accounting.tax_code_query(socket.assigns.current_user, socket.assigns.current_company)
 
-    StdInterface.filter(query, [:code, :tax_type, :account_name, :descriptions], terms,
+    objects = StdInterface.filter(query, [:code, :tax_type, :account_name, :descriptions], terms,
       page: page,
       per_page: @per_page
     )
+
+    socket
+    |> assign(page: page, per_page: @per_page)
+    |> assign(search: %{terms: terms})
+    |> assign(update: update)
+    |> stream(:objects, objects)
+    |> assign(end_of_timeline?: Enum.count(objects) == 0)
   end
 end
