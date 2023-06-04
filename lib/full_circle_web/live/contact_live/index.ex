@@ -39,12 +39,7 @@ defmodule FullCircleWeb.ContactLive.Index do
         ]}
       >
         <%= for {obj_id, obj} <- @streams.objects do %>
-          <.live_component
-            module={IndexComponent}
-            id={obj_id}
-            contact={obj}
-            ex_class=""
-          />
+          <.live_component module={IndexComponent} id={obj_id} contact={obj} ex_class="" />
         <% end %>
       </div>
       <div
@@ -124,7 +119,6 @@ defmodule FullCircleWeb.ContactLive.Index do
      )}
   end
 
-
   @impl true
   def handle_event("next-page", _, socket) do
     {:noreply,
@@ -162,9 +156,9 @@ defmodule FullCircleWeb.ContactLive.Index do
     css_trans(IndexComponent, obj, :obj, "objects-#{obj.id}", "shake")
 
     {:noreply,
-    socket
-    |> assign(live_action: nil)
-    |> stream_insert(:objects, obj, at: 0)}
+     socket
+     |> assign(live_action: nil)
+     |> stream_insert(:objects, obj, at: 0)}
   end
 
   def handle_info({:updated, obj}, socket) do
@@ -201,15 +195,16 @@ defmodule FullCircleWeb.ContactLive.Index do
   end
 
   defp filter_objects(socket, terms, update, page) do
-    objects = StdInterface.filter(
-      Contact,
-      [:name, :city, :state, :descriptions],
-      terms,
-      socket.assigns.current_company,
-      socket.assigns.current_user,
-      page: page,
-      per_page: @per_page
-    )
+    objects =
+      StdInterface.filter(
+        Contact,
+        [:name, :city, :state, :descriptions],
+        terms,
+        socket.assigns.current_company,
+        socket.assigns.current_user,
+        page: page,
+        per_page: @per_page
+      )
 
     socket
     |> assign(page: page, per_page: @per_page)

@@ -25,6 +25,8 @@ import Tribute from "../vendor/tribute"
 
 let csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 
+let Hooks = {}
+
 Hooks.tributeTextArea = {
   mounted() {
     var tribute = new Tribute({

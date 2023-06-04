@@ -353,15 +353,15 @@ defmodule FullCircle.Accounting do
 
   def fixed_asset_txn_query(com) do
     from(txn in Transaction,
-    join: comp in Company,
-    on: comp.id == txn.company_id,
-    join: acc in Account,
-    on: acc.id == txn.account_id,
-    where: acc.account_type == "Fixed Asset",
-    where: comp.id == ^com.id,
-    select: txn,
-    select_merge: %{account_name: acc.name}
-  )
+      join: comp in Company,
+      on: comp.id == txn.company_id,
+      join: acc in Account,
+      on: acc.id == txn.account_id,
+      where: acc.account_type == "Fixed Asset",
+      where: comp.id == ^com.id,
+      select: txn,
+      select_merge: %{account_name: acc.name}
+    )
   end
 
   # def unregistered_fixed_assets_count(com) do

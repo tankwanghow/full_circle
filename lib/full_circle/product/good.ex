@@ -78,8 +78,8 @@ defmodule FullCircle.Product.Good do
       message: gettext("referenced by invoice details")
     )
     |> foreign_key_constraint(:name,
-    name: :pur_invoice_details_good_id_fkey,
-    message: gettext("referenced by pur_invoice details")
-  )
+      name: :pur_invoice_details_good_id_fkey,
+      message: gettext("referenced by pur_invoice details")
+    )
   end
 end

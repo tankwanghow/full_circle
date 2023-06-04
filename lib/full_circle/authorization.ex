@@ -9,10 +9,10 @@ defmodule FullCircle.Authorization do
   @forbid false
 
   def can?(user, :create_pur_invoice, company),
-  do: allow_roles(~w(admin manager supervisor clerk), company, user)
+    do: allow_roles(~w(admin manager supervisor clerk), company, user)
 
-def can?(user, :update_pur_invoice, company),
-  do: allow_roles(~w(admin manager supervisor clerk), company, user)
+  def can?(user, :update_pur_invoice, company),
+    do: allow_roles(~w(admin manager supervisor clerk), company, user)
 
   def can?(user, :create_invoice, company),
     do: allow_roles(~w(admin manager supervisor clerk), company, user)

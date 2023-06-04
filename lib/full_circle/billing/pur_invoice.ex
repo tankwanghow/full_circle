@@ -174,7 +174,8 @@ defmodule FullCircle.Billing.PurInvoice do
       })
 
     Map.merge(pur_invoice, %{
-      pur_invoice_amount: Decimal.add(pur_invoice.pur_invoice_good_amount, pur_invoice.pur_invoice_tax_amount)
+      pur_invoice_amount:
+        Decimal.add(pur_invoice.pur_invoice_good_amount, pur_invoice.pur_invoice_tax_amount)
     })
   end
 

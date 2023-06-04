@@ -153,9 +153,9 @@ defmodule FullCircleWeb.AccountLive.Index do
     css_trans(IndexComponent, obj, :obj, "objects-#{obj.id}", "shake")
 
     {:noreply,
-    socket
-    |> assign(live_action: nil)
-    |> stream_insert(:objects, obj, at: 0)}
+     socket
+     |> assign(live_action: nil)
+     |> stream_insert(:objects, obj, at: 0)}
   end
 
   def handle_info({:updated, obj}, socket) do

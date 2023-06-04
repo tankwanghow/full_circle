@@ -230,7 +230,6 @@ defmodule FullCircleWeb.PurInvoiceLive.Index do
         socket.assigns.current_company
       )
 
-    IO.inspect(inv)
     css_trans(IndexComponent, inv, :obj, "objects-#{inv.id}", "shake")
 
     {:noreply,
@@ -246,6 +245,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Index do
         socket.assigns.current_user,
         socket.assigns.current_company
       )
+
     css_trans(IndexComponent, inv, :obj, "objects-#{obj.id}", "shake")
 
     {:noreply, socket |> assign(live_action: nil)}

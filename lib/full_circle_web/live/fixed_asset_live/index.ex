@@ -193,9 +193,9 @@ defmodule FullCircleWeb.FixedAssetLive.Index do
     css_trans(IndexComponent, obj, :obj, "objects-#{obj.id}", "shake")
 
     {:noreply,
-    socket
-    |> assign(live_action: nil)
-    |> stream_insert(:objects, obj, at: 0)}
+     socket
+     |> assign(live_action: nil)
+     |> stream_insert(:objects, obj, at: 0)}
   end
 
   def handle_info({:updated, obj}, socket) do
@@ -235,13 +235,14 @@ defmodule FullCircleWeb.FixedAssetLive.Index do
     query =
       Accounting.fixed_asset_query(socket.assigns.current_user, socket.assigns.current_company)
 
-    objects = StdInterface.filter(
-      query,
-      [:name, :asset_ac_name, :depre_ac_name, :descriptions],
-      terms,
-      page: page,
-      per_page: @per_page
-    )
+    objects =
+      StdInterface.filter(
+        query,
+        [:name, :asset_ac_name, :depre_ac_name, :descriptions],
+        terms,
+        page: page,
+        per_page: @per_page
+      )
 
     socket
     |> assign(page: page, per_page: @per_page)
