@@ -1,5 +1,5 @@
 defmodule FullCircle.Accounting.FixedAssetDepreciation do
-  use Ecto.Schema
+  use FullCircle.Schema
   import Ecto.Changeset
 
   schema "fixed_asset_depreciations" do

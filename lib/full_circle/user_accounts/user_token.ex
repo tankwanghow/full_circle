@@ -1,5 +1,5 @@
 defmodule FullCircle.UserAccounts.UserToken do
-  use Ecto.Schema
+  use FullCircle.Schema
   import Ecto.Query
   alias FullCircle.UserAccounts.UserToken
 

@@ -1,5 +1,5 @@
 defmodule FullCircle.Sys.GaplessDocId do
-  use Ecto.Schema
+  use FullCircle.Schema
   import Ecto.Changeset
 
   schema "gapless_doc_ids" do

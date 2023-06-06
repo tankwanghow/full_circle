@@ -1,5 +1,5 @@
 defmodule FullCircle.Billing.Invoice do
-  use Ecto.Schema
+  use FullCircle.Schema
   import Ecto.Changeset
   import FullCircle.Helpers
   import FullCircleWeb.Gettext

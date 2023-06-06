@@ -56,6 +56,7 @@ defmodule FullCircleWeb.LogLive.Component do
         id={"object-log-modal-#{@id}"}
         show
         on_cancel={JS.push("hide_log", target: "##{@id}")}
+        max_w="max-w-6xl"
       >
         <div class="max-w-full">
           <p class="w-full text-3xl text-center font-medium mb-3">

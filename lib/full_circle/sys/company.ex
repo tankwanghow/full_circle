@@ -1,5 +1,5 @@
 defmodule FullCircle.Sys.Company do
-  use Ecto.Schema
+  use FullCircle.Schema
   import Ecto.Changeset
   import Ecto.Query
   alias FullCircle.Repo

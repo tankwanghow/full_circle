@@ -77,13 +77,12 @@ defmodule FullCircle.Helpers do
       {:ok, gap} =
         repo.update(Ecto.Changeset.change(gap, current: gap.current + 1), returning: [:current])
 
-      {:ok, gen_doc_id(gap.current, doc_code, com.id)}
+      {:ok, gen_doc_id(gap.current, doc_code)}
     end)
   end
 
-  def gen_doc_id(number, code, company_id) do
+  def gen_doc_id(number, code) do
     num = number |> Integer.to_string() |> String.pad_leading(6, "0")
-    com = company_id |> Integer.to_string()
-    Enum.join([code, com, num], "-")
+    Enum.join([code, num], "-")
   end
 end

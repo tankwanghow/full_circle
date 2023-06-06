@@ -1,10 +1,10 @@
 defmodule FullCircle.Sys.UserSetting do
-  use Ecto.Schema
+  use FullCircle.Schema
   import Ecto.Changeset
   import FullCircleWeb.Gettext
 
   schema "user_settings" do
-    field :company_user_id, :integer
+    field :company_user_id, :binary_id
     field :page, :string
     field :code, :string
     field :display_name, :string

@@ -1,5 +1,5 @@
 defmodule FullCircle.Product.Packaging do
-  use Ecto.Schema
+  use FullCircle.Schema
   import Ecto.Changeset
   import FullCircleWeb.Gettext
 

@@ -30,11 +30,13 @@ defmodule FullCircleWeb.PurInvoiceLive.IndexComponent do
             entity="pur_invoices"
             entity_id={@obj.id}
           />
-          <.journal_button
-            company={@company}
+          <.live_component
+            module={FullCircleWeb.JournalEntryViewLive.Component}
+            id={"journal_#{@obj.id}"}
+            show_journal={false}
             doc_type="pur_invoices"
             doc_no={@obj.pur_invoice_no}
-            back={~p"/companies/#{@company.id}/pur_invoices"}
+            company_id={@obj.company_id}
           />
         </div>
         <div

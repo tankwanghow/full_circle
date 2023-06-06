@@ -26,7 +26,9 @@ config :number,
     precision: 2
   ]
 
-config :full_circle, FullCircle.Repo, migration_timestamps: [type: :timestamptz]
+config :full_circle, FullCircle.Repo,
+  migration_timestamps: [type: :timestamptz],
+  migration_primary_key: [name: :id, type: :binary_id]
 
 config :full_circle,
   ecto_repos: [FullCircle.Repo]

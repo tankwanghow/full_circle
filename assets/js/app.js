@@ -68,8 +68,8 @@ window.addEventListener("phx:page-loading-start", _info => topbar.show(300))
 window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
 window.addEventListener("click", _info => document.getElementById("menu").setAttribute('style', 'display: none;'))
 
-window.addEventListener("keydown", zEvent => {
-  if (zEvent.ctrlKey && zEvent.altKey && (zEvent.key === "d" || zEvent.key === "D")) {  // case sensitive
+document.addEventListener("keydown", zEvent => {
+  if (zEvent.ctrlKey && zEvent.altKey && (zEvent.key === "h" || zEvent.key === "H")) {  // case sensitive
     document.getElementById("full_circle_dashboard").click();
   }
 });

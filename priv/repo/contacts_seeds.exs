@@ -4757,6 +4757,9 @@ contact_data = [
 
 alias FullCircle.Accounting.Contact
 
+u = FullCircle.UserAccounts.get_user_by_email("a@a.a")
+c = FullCircle.Sys.get_default_company(%{id: u.id})
+
 Enum.each(contact_data, fn data ->
-  StdInterface.create(Contact, "contact", data, %{id: 1}, %{id: 1})
+  StdInterface.create(Contact, "contact", data, %{id: c.id}, %{id: u.id})
 end)

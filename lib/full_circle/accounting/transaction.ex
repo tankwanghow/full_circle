@@ -1,10 +1,10 @@
 defmodule FullCircle.Accounting.Transaction do
-  use Ecto.Schema
+  use FullCircle.Schema
   import Ecto.Changeset
 
   schema "transactions" do
     field :doc_type, :string
-    field :doc_id, :integer
+    field :doc_id, :binary_id
     field :doc_date, :date
     field :particulars, :string
     field :contact_particulars, :string

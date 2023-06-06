@@ -108,7 +108,8 @@ defmodule FullCircle.Sys do
         as: :logs,
         join: user in User,
         on: user.id == log.user_id,
-        where: log.entity == ^entity and log.entity_id == ^entity_id,
+        where: log.entity == ^entity,
+        where: log.entity_id == ^entity_id,
         select: log,
         select_merge: %{email: user.email},
         order_by: [desc: log.inserted_at]

@@ -831,7 +831,7 @@ defmodule FullCircleWeb.CoreComponents do
   end
 
   attr :entity, :string
-  attr :entity_id, :integer
+  attr :entity_id, :string
   attr :company, :any
 
   def print_button(assigns) do
@@ -846,7 +846,7 @@ defmodule FullCircleWeb.CoreComponents do
   end
 
   attr :entity, :string
-  attr :entity_id, :integer
+  attr :entity_id, :string
   attr :company, :any
 
   def pre_print_button(assigns) do

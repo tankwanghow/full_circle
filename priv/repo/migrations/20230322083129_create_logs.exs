@@ -4,7 +4,7 @@ defmodule FullCircle.Repo.Migrations.CreateLogs do
   def change do
     create table(:logs) do
       add :entity, :string, null: false
-      add :entity_id, :integer, null: false
+      add :entity_id, :binary_id, null: false
       add :action, :string, null: false
       add :delta, :text, null: false
       add :user_id, references(:users, on_delete: :nothing), null: false

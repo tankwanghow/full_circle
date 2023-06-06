@@ -1,5 +1,5 @@
 defmodule FullCircle.UserAccounts.User do
-  use Ecto.Schema
+  use FullCircle.Schema
   import Ecto.Changeset
   import FullCircleWeb.Gettext
   import Ecto.Query, warn: false

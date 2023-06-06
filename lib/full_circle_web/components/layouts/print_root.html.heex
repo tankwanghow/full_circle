@@ -30,7 +30,7 @@
   <body>
     <div id="button">
       <a herf="#" onclick="printElement('print-me')">Print</a>
-      <.link navigate={@back}><%= gettext("Back") %></.link>
+      <.link id="print_back" navigate={@back}><%= gettext("Back") %></.link>
     </div>
     <%= @inner_content %>
     <script>
@@ -57,6 +57,12 @@
         window.print();
         document.body.innerHTML = originalContents;
       }
+      
+      document.addEventListener("keyup", e => {
+        if (e.key === "Escape") { 
+          document.getElementById("print_back").click();
+        }
+      });
     </script>
   </body>
 </html>

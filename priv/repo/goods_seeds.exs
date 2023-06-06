@@ -38,6 +38,9 @@ ptc =
     code: "TX"
   )
 
+  u = FullCircle.UserAccounts.get_user_by_email("a@a.a")
+  c = FullCircle.Sys.get_default_company(%{id: u.id})
+
 Enum.each(good_data, fn data ->
   data =
     Map.merge(data, %{
@@ -52,5 +55,5 @@ Enum.each(good_data, fn data ->
       packagings: %{"0" => %{name: "-", unit_multiplier: 0, cost_per_package: 0}}
     })
 
-  StdInterface.create(Good, "good", data, %{id: 1}, %{id: 1})
+  StdInterface.create(Good, "good", data, %{id: c.id}, %{id: u.id})
 end)

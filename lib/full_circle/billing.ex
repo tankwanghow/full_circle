@@ -305,7 +305,8 @@ defmodule FullCircle.Billing do
         due_date: inv.due_date,
         inserted_at: inv.inserted_at,
         updated_at: inv.updated_at,
-        contact_id: cont.id
+        contact_id: cont.id,
+        company_id: com.id
       },
       select_merge: %{
         contact_name: cont.name,
@@ -331,7 +332,7 @@ defmodule FullCircle.Billing do
             invd.descriptions
           )
       },
-      group_by: [inv.id, cont.name, inv.descriptions, inv.invoice_date, inv.due_date, cont.id]
+      group_by: [inv.id, cont.name, inv.descriptions, inv.invoice_date, inv.due_date, cont.id, com.id]
   end
 
   def create_invoice(attrs, com, user) do
@@ -676,7 +677,8 @@ defmodule FullCircle.Billing do
         due_date: inv.due_date,
         inserted_at: inv.inserted_at,
         updated_at: inv.updated_at,
-        contact_id: cont.id
+        contact_id: cont.id,
+        company_id: com.id
       },
       select_merge: %{
         contact_name: cont.name,
@@ -702,7 +704,7 @@ defmodule FullCircle.Billing do
             invd.descriptions
           )
       },
-      group_by: [inv.id, cont.name, inv.descriptions, inv.pur_invoice_date, inv.due_date, cont.id]
+      group_by: [inv.id, cont.name, inv.descriptions, inv.pur_invoice_date, inv.due_date, cont.id, com.id]
   end
 
   def create_pur_invoice(attrs, com, user) do
