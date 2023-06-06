@@ -171,36 +171,6 @@ defmodule FullCircleWeb.PurInvoiceLive.Index do
   end
 
   @impl true
-  def handle_event("prev-page", %{"_overran" => true}, socket) do
-    {:noreply,
-     socket
-     |> filter_objects(
-       socket.assigns.search.terms,
-       socket.assigns.search.pur_invoice_date,
-       socket.assigns.search.due_date,
-       "stream",
-       1
-     )}
-  end
-
-  @impl true
-  def handle_event("prev-page", _, socket) do
-    if socket.assigns.page > 1 do
-      {:noreply,
-       socket
-       |> filter_objects(
-         socket.assigns.search.terms,
-         "stream",
-         socket.assigns.search.pur_invoice_date,
-         socket.assigns.search.due_date,
-         socket.assigns.page - 1
-       )}
-    else
-      {:noreply, socket}
-    end
-  end
-
-  @impl true
   def handle_event(
         "search",
         %{"search" => %{"terms" => terms, "pur_invoice_date" => id, "due_date" => dd}},
@@ -213,30 +183,30 @@ defmodule FullCircleWeb.PurInvoiceLive.Index do
 
   @impl true
   def handle_info({:created, obj}, socket) do
-    inv =
+    obj =
       FullCircle.Billing.get_pur_invoice_by_id_index_component_field!(
         obj.id,
         socket.assigns.current_company,
         socket.assigns.current_user
       )
 
-    css_trans(IndexComponent, inv, :obj, "objects-#{inv.id}", "shake")
+    css_trans(IndexComponent, obj, :obj, "objects-#{obj.id}", "shake")
 
     {:noreply,
      socket
      |> assign(live_action: nil)
-     |> stream_insert(:objects, inv, at: 0)}
+     |> stream_insert(:objects, obj, at: 0)}
   end
 
   def handle_info({:updated, obj}, socket) do
-    inv =
+    obj =
       FullCircle.Billing.get_pur_invoice_by_id_index_component_field!(
         obj.id,
         socket.assigns.current_company,
         socket.assigns.current_user
       )
 
-    css_trans(IndexComponent, inv, :obj, "objects-#{obj.id}", "shake")
+    css_trans(IndexComponent, obj, :obj, "objects-#{obj.id}", "shake")
 
     {:noreply, socket |> assign(live_action: nil)}
   end

@@ -117,24 +117,6 @@ defmodule FullCircleWeb.ContactLive.Index do
   end
 
   @impl true
-  def handle_event("prev-page", %{"_overran" => true}, socket) do
-    {:noreply,
-     socket
-     |> filter_objects(socket.assigns.search.terms, "stream", 1)}
-  end
-
-  @impl true
-  def handle_event("prev-page", _, socket) do
-    if socket.assigns.page > 1 do
-      {:noreply,
-       socket
-       |> filter_objects(socket.assigns.search.terms, "stream", socket.assigns.page - 1)}
-    else
-      {:noreply, socket}
-    end
-  end
-
-  @impl true
   def handle_event("search", %{"search" => %{"terms" => terms}}, socket) do
     {:noreply,
      socket
