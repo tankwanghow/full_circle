@@ -770,34 +770,20 @@ defmodule FullCircleWeb.CoreComponents do
     """
   end
 
-  attr(:page, :integer)
-  attr(:count, :integer)
-  attr(:per_page, :integer)
+  attr(:ended, :boolean)
 
   def infinite_scroll_footer(assigns) do
     ~H"""
-    <%= if @count < @per_page do %>
-      <div
-        id="footer"
-        phx-hook="InfiniteScroll"
-        data-page-number={@page}
-        class="mt-2 mb-2 text-center border-2 rounded bg-orange-200 border-orange-400 p-2"
-      >
-        <%= gettext("No More.") %>
-      </div>
-    <% else %>
-      <div
-        id="footer"
-        phx-hook="InfiniteScroll"
-        data-page-number={@page}
-        class="mt-2 mb-2 text-center border-2 rounded bg-cyan-200 border-cyan-400 p-2"
-      >
-        <%= gettext("Loading More...") %><.icon
-          name="hero-arrow-path"
-          class="ml-1 h-3 w-3 animate-spin"
-        />
-      </div>
-    <% end %>
+    <div
+      :if={@ended}
+      class="mt-2 mb-2 text-center border-2 rounded bg-orange-200 border-orange-400 p-2"
+    >
+      <%= gettext("No More.") %>
+    </div>
+
+    <div :if={!@ended} class="mt-2 mb-2 text-center border-2 rounded bg-blue-200 border-blue-400 p-2">
+      <%= gettext("Loading...") %><.icon name="hero-arrow-path" class="ml-1 h-3 w-3 animate-spin" />
+    </div>
     """
   end
 
@@ -889,7 +875,7 @@ defmodule FullCircleWeb.CoreComponents do
           <div class="">
             <label><%= st.display_name %></label>
             <select
-              id="settings_#{st.id}_value"
+              id={"settings_#{st.id}_value"}
               name={"settings[#{st.id}][value]"}
               class="py-1 rounded-md border border-gray-300 bg-white shadow-sm focus:border-zinc-400 focus:ring-0"
             >

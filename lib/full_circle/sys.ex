@@ -124,12 +124,12 @@ defmodule FullCircle.Sys do
     Repo.get!(FullCircle.Sys.UserSetting, id)
   end
 
-  def load_settings(page, user, company) do
-    settings = Repo.all(load_settings_query(page, user, company))
+  def load_settings(page, company, user) do
+    settings = Repo.all(load_settings_query(page, company, user))
 
     if Enum.count(settings) == 0 do
-      insert_default_settings(page, user, company)
-      Repo.all(load_settings_query(page, user, company))
+      insert_default_settings(page, company, user)
+      Repo.all(load_settings_query(page, company, user))
     else
       settings
     end
@@ -140,7 +140,7 @@ defmodule FullCircle.Sys do
     Repo.update!(cs)
   end
 
-  defp insert_default_settings(page, user, company) do
+  defp insert_default_settings(page, company, user) do
     cua =
       Repo.one!(
         from cu in CompanyUser,
@@ -155,7 +155,7 @@ defmodule FullCircle.Sys do
     |> FullCircle.Repo.transaction()
   end
 
-  defp load_settings_query(page, user, company) do
+  defp load_settings_query(page, company, user) do
     from(st in FullCircle.Sys.UserSetting,
       join: cu in CompanyUser,
       on: st.company_user_id == cu.id,
@@ -195,7 +195,7 @@ defmodule FullCircle.Sys do
     )
   end
 
-  def get_company_users(user, company) do
+  def get_company_users(company, user) do
     if can?(user, :see_user_list, company) do
       Repo.all(
         from(u in User,

@@ -119,8 +119,8 @@ defmodule FullCircleWeb.GoodLive.FormComponent do
            Good,
            "good",
            socket.assigns.form.data,
-           socket.assigns.current_user,
-           socket.assigns.current_company
+           socket.assigns.current_company,
+           socket.assigns.current_user
          ) do
       {:ok, obj} ->
         send(self(), {:deleted, obj})
@@ -160,8 +160,8 @@ defmodule FullCircleWeb.GoodLive.FormComponent do
            Good,
            "good",
            params,
-           socket.assigns.current_user,
-           socket.assigns.current_company
+           socket.assigns.current_company,
+           socket.assigns.current_user
          ) do
       {:ok, obj} ->
         send(self(), {:created, obj})
@@ -188,8 +188,8 @@ defmodule FullCircleWeb.GoodLive.FormComponent do
            "good",
            socket.assigns.form.data,
            params,
-           socket.assigns.current_user,
-           socket.assigns.current_company
+           socket.assigns.current_company,
+           socket.assigns.current_user
          ) do
       {:ok, obj} ->
         send(self(), {:updated, obj})

@@ -41,8 +41,8 @@ defmodule FullCircleWeb.AccountLive.FormComponent do
   def handle_event("delete", _params, socket) do
     case FullCircle.Accounting.delete_account(
            socket.assigns.form.data,
-           socket.assigns.current_user,
-           socket.assigns.current_company
+           socket.assigns.current_company,
+           socket.assigns.current_user
          ) do
       {:ok, ac} ->
         send(self(), {:deleted, ac})
@@ -63,8 +63,8 @@ defmodule FullCircleWeb.AccountLive.FormComponent do
            Account,
            "account",
            params,
-           socket.assigns.current_user,
-           socket.assigns.current_company
+           socket.assigns.current_company,
+           socket.assigns.current_user
          ) do
       {:ok, ac} ->
         send(self(), {:created, ac})
@@ -85,8 +85,8 @@ defmodule FullCircleWeb.AccountLive.FormComponent do
            "account",
            socket.assigns.form.data,
            params,
-           socket.assigns.current_user,
-           socket.assigns.current_company
+           socket.assigns.current_company,
+           socket.assigns.current_user
          ) do
       {:ok, ac} ->
         send(self(), {:updated, ac})

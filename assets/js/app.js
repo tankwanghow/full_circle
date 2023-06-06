@@ -43,7 +43,7 @@ Hooks.tributeTextArea = {
 function remoteSearch(el, text, cb) {
   var URL = el.getAttribute('tag-url');
   xhr = new XMLHttpRequest();
-  xhr.onreadystatechange = function() {
+  xhr.onreadystatechange = function () {
     if (xhr.readyState === 4) {
       if (xhr.status === 200) {
         var data = JSON.parse(xhr.responseText);
@@ -67,6 +67,12 @@ topbar.config({ barColors: { 0: "#29d" }, shadowColor: "rgba(0, 0, 0, .3)" })
 window.addEventListener("phx:page-loading-start", _info => topbar.show(300))
 window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
 window.addEventListener("click", _info => document.getElementById("menu").setAttribute('style', 'display: none;'))
+
+window.addEventListener("keydown", zEvent => {
+  if (zEvent.ctrlKey && zEvent.altKey && (zEvent.key === "d" || zEvent.key === "D")) {  // case sensitive
+    document.getElementById("full_circle_dashboard").click();
+  }
+});
 
 // connect if there are any LiveViews on the page
 liveSocket.connect()

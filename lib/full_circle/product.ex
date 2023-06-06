@@ -6,16 +6,16 @@ defmodule FullCircle.Product do
   alias FullCircle.Product.{Good, Packaging}
   alias FullCircle.{Repo, Sys}
 
-  def get_good!(id, user, company) do
-    from(good in subquery(good_query(user, company)),
+  def get_good!(id, company, user) do
+    from(good in subquery(good_query(company, user)),
       preload: :packagings,
       where: good.id == ^id
     )
     |> Repo.one!()
   end
 
-  def good_names(terms, user, company) do
-    from(good in subquery(good_query(user, company)),
+  def good_names(terms, company, user) do
+    from(good in subquery(good_query(company, user)),
       left_join: pack in Packaging,
       on: pack.good_id == good.id,
       where: ilike(good.name, ^"%#{terms}%"),
@@ -56,7 +56,7 @@ defmodule FullCircle.Product do
     |> Repo.all()
   end
 
-  defp good_query(user, company) do
+  defp good_query(company, user) do
     from(good in Good,
       join: com in subquery(Sys.user_company(company, user)),
       on: com.id == good.company_id,
@@ -89,8 +89,8 @@ defmodule FullCircle.Product do
     )
   end
 
-  def good_index_query("", user, company, page: page, per_page: per_page) do
-    from(good in subquery(good_query(user, company)),
+  def good_index_query("", company, user, page: page, per_page: per_page) do
+    from(good in subquery(good_query(company, user)),
       offset: ^((page - 1) * per_page),
       limit: ^per_page,
       preload: :packagings,
@@ -99,8 +99,8 @@ defmodule FullCircle.Product do
     |> Repo.all()
   end
 
-  def good_index_query(terms, user, company, page: page, per_page: per_page) do
-    from(good in subquery(good_query(user, company)),
+  def good_index_query(terms, company, user, page: page, per_page: per_page) do
+    from(good in subquery(good_query(company, user)),
       offset: ^((page - 1) * per_page),
       limit: ^per_page,
       preload: :packagings,

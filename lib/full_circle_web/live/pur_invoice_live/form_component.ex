@@ -28,15 +28,18 @@ defmodule FullCircleWeb.PurInvoiceLive.FormComponent do
        settings:
          FullCircle.Sys.load_settings(
            "pur_invoices",
-           socket.assigns.current_user,
-           socket.assigns.current_company
+           socket.assigns.current_company,
+           socket.assigns.current_user
          )
      )}
   end
 
   @impl true
   def handle_event("add_detail", _, socket) do
-    socket = socket |> FullCircleWeb.Helpers.add_lines(:pur_invoice_details, %PurInvoiceDetail{})
+    socket =
+      socket
+      |> FullCircleWeb.Helpers.add_lines(:pur_invoice_details, %PurInvoiceDetail{})
+
     {:noreply, socket}
   end
 
@@ -247,8 +250,8 @@ defmodule FullCircleWeb.PurInvoiceLive.FormComponent do
            PurInvoice,
            "pur_invoice",
            socket.assigns.form.data,
-           socket.assigns.current_user,
-           socket.assigns.current_company
+           socket.assigns.current_company,
+           socket.assigns.current_user
          ) do
       {:ok, obj} ->
         send(self(), {:deleted, obj})
@@ -271,8 +274,8 @@ defmodule FullCircleWeb.PurInvoiceLive.FormComponent do
   defp save(socket, :new, params) do
     case Billing.create_pur_invoice(
            params,
-           socket.assigns.current_user,
-           socket.assigns.current_company
+           socket.assigns.current_company,
+           socket.assigns.current_user
          ) do
       {:ok, %{create_pur_invoice: obj}} ->
         send(self(), {:created, obj})
@@ -297,8 +300,8 @@ defmodule FullCircleWeb.PurInvoiceLive.FormComponent do
     case Billing.update_pur_invoice(
            socket.assigns.form.data,
            params,
-           socket.assigns.current_user,
-           socket.assigns.current_company
+           socket.assigns.current_company,
+           socket.assigns.current_user
          ) do
       {:ok, %{update_pur_invoice: obj}} ->
         send(self(), {:updated, obj})
@@ -386,11 +389,11 @@ defmodule FullCircleWeb.PurInvoiceLive.FormComponent do
           <div class="detail-header w-24 shrink-[1] grow-[1]"><%= gettext("Quantity") %></div>
           <div class="detail-header w-16 shrink-0 grow-0"><%= gettext("Unit") %></div>
           <div class="detail-header w-24 shrink-[1] grow-[1]"><%= gettext("Price") %></div>
-          <div class={"#{Sys.get_setting(@settings, "pur_invoices", "goodamt-col")} detail-header w-24"}>
-            <%= gettext("Good Amt") %>
-          </div>
           <div class={"#{Sys.get_setting(@settings, "pur_invoices", "discount-col")} detail-header w-24"}>
             <%= gettext("Discount") %>
+          </div>
+          <div class={"#{Sys.get_setting(@settings, "pur_invoices", "goodamt-col")} detail-header w-24"}>
+            <%= gettext("Good Amt") %>
           </div>
           <div class={"#{Sys.get_setting(@settings, "pur_invoices", "account-col")} detail-header w-28"}>
             <%= gettext("Account") %>
@@ -432,11 +435,11 @@ defmodule FullCircleWeb.PurInvoiceLive.FormComponent do
             <div class="w-24 grow-[1] shrink-[1]">
               <.input type="number" field={dtl[:unit_price]} step="0.0001" />
             </div>
-            <div class={"#{Sys.get_setting(@settings, "pur_invoices", "goodamt-col")} w-24"}>
-              <.input type="number" field={dtl[:good_amount]} readonly tabindex="-1" />
-            </div>
             <div class={"#{Sys.get_setting(@settings, "pur_invoices", "discount-col")} w-24"}>
               <.input type="number" field={dtl[:discount]} step="0.01" />
+            </div>
+            <div class={"#{Sys.get_setting(@settings, "pur_invoices", "goodamt-col")} w-24"}>
+              <.input type="number" field={dtl[:good_amount]} readonly tabindex="-1" />
             </div>
             <div class={"#{Sys.get_setting(@settings, "pur_invoices", "account-col")} w-28"}>
               <.input field={dtl[:account_name]} list="account_names" phx-debounce={500} />
@@ -482,10 +485,10 @@ defmodule FullCircleWeb.PurInvoiceLive.FormComponent do
           <div class="w-24 shrink-[1] grow-[1]" />
           <div class="w-16 shrink-0 grow-0" />
           <div class="w-24 shrink-[1] grow-[1]" />
+          <div class={"#{Sys.get_setting(@settings, "pur_invoices", "discount-col")} w-24"} />
           <div class={"#{Sys.get_setting(@settings, "pur_invoices", "goodamt-col")} w-24"}>
             <.input type="number" field={@form[:pur_invoice_good_amount]} readonly tabindex="-1" />
           </div>
-          <div class={"#{Sys.get_setting(@settings, "pur_invoices", "discount-col")} w-24"} />
           <div class={"#{Sys.get_setting(@settings, "pur_invoices", "account-col")} w-28"} />
           <div class="w-16 shrink-[1] grow-[1]" />
           <div class={"#{Sys.get_setting(@settings, "pur_invoices", "taxrate-col")} w-14"} />

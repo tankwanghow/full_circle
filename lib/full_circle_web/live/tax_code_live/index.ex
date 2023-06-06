@@ -7,7 +7,7 @@ defmodule FullCircleWeb.TaxCodeLive.Index do
   alias FullCircleWeb.TaxCodeLive.FormComponent
   alias FullCircleWeb.TaxCodeLive.IndexComponent
 
-  @per_page 10
+  @per_page 20
 
   @impl true
   def render(assigns) do
@@ -31,24 +31,14 @@ defmodule FullCircleWeb.TaxCodeLive.Index do
       <div
         id="objects_list"
         phx-update={@update}
-        phx-viewport-top={@page > 1 && "prev-page"}
         phx-viewport-bottom={!@end_of_timeline? && "next-page"}
         phx-page-loading
-        class={[
-          if(@end_of_timeline?, do: "pb-2", else: "pb-[calc(200vh)]"),
-          if(@page == 1, do: "pt-2", else: "pt-[calc(200vh)]")
-        ]}
       >
         <%= for {obj_id, obj} <- @streams.objects do %>
           <.live_component module={IndexComponent} id={"#{obj_id}"} obj={obj} ex_class="" />
         <% end %>
       </div>
-      <div
-        :if={@end_of_timeline?}
-        class="mt-2 mb-2 text-center border-2 rounded bg-orange-200 border-orange-400 p-2"
-      >
-        <%= gettext("No More.") %>
-      </div>
+      <.infinite_scroll_footer ended={@end_of_timeline?} />
     </div>
 
     <.modal
@@ -103,7 +93,7 @@ defmodule FullCircleWeb.TaxCodeLive.Index do
   @impl true
   def handle_event("edit_object", %{"object-id" => id}, socket) do
     object =
-      Accounting.get_tax_code!(id, socket.assigns.current_user, socket.assigns.current_company)
+      Accounting.get_tax_code!(id, socket.assigns.current_company, socket.assigns.current_user)
 
     {:noreply,
      socket
@@ -194,7 +184,7 @@ defmodule FullCircleWeb.TaxCodeLive.Index do
   end
 
   defp filter_objects(socket, terms, update, page) do
-    query = Accounting.tax_code_query(socket.assigns.current_user, socket.assigns.current_company)
+    query = Accounting.tax_code_query(socket.assigns.current_company, socket.assigns.current_user)
 
     objects =
       StdInterface.filter(query, [:code, :tax_type, :account_name, :descriptions], terms,
@@ -207,6 +197,6 @@ defmodule FullCircleWeb.TaxCodeLive.Index do
     |> assign(search: %{terms: terms})
     |> assign(update: update)
     |> stream(:objects, objects)
-    |> assign(end_of_timeline?: Enum.count(objects) == 0)
+    |> assign(end_of_timeline?: Enum.count(objects) < @per_page)
   end
 end

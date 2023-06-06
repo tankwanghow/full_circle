@@ -66,7 +66,7 @@ defmodule FullCircle.Authorization do
     do: forbid_roles(~w(auditor guest cashier), company, user)
 
   def can?(user, :see_user_list, company), do: allow_role("admin", company, user)
-  def can?(user, :invite_user, company), do: allow_role("admin", company, user)
+  def can?(user, :invite_company, company), do: allow_role("admin", company, user)
   def can?(user, :add_user_to_company, company), do: allow_role("admin", company, user)
   def can?(user, :delete_company, company), do: allow_role("admin", company, user)
   def can?(user, :update_company, company), do: allow_role("admin", company, user)

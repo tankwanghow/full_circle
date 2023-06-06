@@ -23,12 +23,6 @@ defmodule FullCircle.Sys.Company do
     field :closing_month, :integer
     field :closing_day, :integer
 
-    # has_many :contacts, FullCicle.Accounting.Contact, on_delete: :delete_all
-    # has_many :accounts, FullCicle.Accounting.Account, on_delete: :delete_all
-    # has_many :tax_codes, FullCicle.Accounting.TaxCode, on_delete: :delete_all
-    # has_many :logs, FullCicle.Sys.Log, on_delete: :delete_all
-    # has_many :company_users, FullCicle.Sys.CompanyUser, on_delete: :delete_all
-
     timestamps(type: :utc_datetime)
   end
 
@@ -73,14 +67,14 @@ defmodule FullCircle.Sys.Company do
     {_, name} = fetch_field(changeset, field)
     {_, id} = fetch_field(changeset, :id)
 
-    if Repo.exists?(company_name_by_user_query(name || "", user, id)) do
+    if Repo.exists?(company_name_by_user_query(name || "", id, user)) do
       add_error(changeset, field, gettext("has already been taken"))
     else
       changeset
     end
   end
 
-  defp company_name_by_user_query(name, user, company_id) when is_nil(company_id) do
+  defp company_name_by_user_query(name, company_id, user) when is_nil(company_id) do
     from f in FullCircle.Sys.Company,
       join: fu in FullCircle.Sys.CompanyUser,
       on: f.id == fu.company_id,
@@ -88,7 +82,7 @@ defmodule FullCircle.Sys.Company do
       select: f
   end
 
-  defp company_name_by_user_query(name, user, company_id) do
+  defp company_name_by_user_query(name, company_id, user) do
     from f in FullCircle.Sys.Company,
       join: fu in FullCircle.Sys.CompanyUser,
       on: f.id == fu.company_id,

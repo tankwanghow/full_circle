@@ -16,7 +16,14 @@ defmodule FullCircleWeb.UserLive.Index do
         </.link>
       </div>
       <%= for u <- @users do %>
-        <.form :let={f} for={%{}} as={:user_list} id={"user-#{u.id}"} phx-change="update_role">
+        <.form
+          :let={f}
+          for={%{}}
+          as={:user_list}
+          id={"user-#{u.id}"}
+          phx-change="update_role"
+          autocomplete="off"
+        >
           <div class="shadow p-4 m-2 rounded bg-indigo-100 text-center text-xl">
             <span id={"new_user_password_#{u.id}"} class="text-gray-500 m-3">
               <%= if u.email != @current_user.email  do %>
@@ -44,7 +51,7 @@ defmodule FullCircleWeb.UserLive.Index do
                 <%= Phoenix.HTML.Form.hidden_input(f, :id, value: u.id) %>
                 <%= Phoenix.HTML.Form.select(f, :role, FullCircle.Authorization.roles(),
                   class: "rounded py-[1px] pl-[2px] pr-[40px] border-0 bg-indigo-50 text-xl",
-                  value: u.role
+                  value: u.role, phx_page_loading: true
                 ) %>
               <% end %>
             </span>
@@ -99,8 +106,8 @@ defmodule FullCircleWeb.UserLive.Index do
 
     case FullCircle.Sys.reset_user_password(
            user,
-           socket.assigns.current_user,
-           socket.assigns.current_company
+           socket.assigns.current_company,
+           socket.assigns.current_user
          ) do
       {:ok, user, pwd} ->
         {:noreply,
@@ -132,7 +139,7 @@ defmodule FullCircleWeb.UserLive.Index do
     socket
     |> assign(
       :users,
-      Sys.get_company_users(socket.assigns.current_user, socket.assigns.current_company)
+      Sys.get_company_users(socket.assigns.current_company, socket.assigns.current_user)
     )
   end
 end

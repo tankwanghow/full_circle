@@ -21,27 +21,25 @@ defmodule FullCircleWeb.AccountLive.IndexComponent do
       <span
         class={
           ~s(text-xl font-bold px-2 py-1 rounded-full border
-        #{if(FullCircle.Accounting.is_default_account?(@account),
+        #{if(FullCircle.Accounting.is_default_account?(@obj),
           do: "cursor-not-allowed bg-rose-100 border-rose-400",
           else: "hover:bg-blue-400 cursor-pointer bg-blue-100 border-blue-500")}
             )
         }
-        phx-value-account-id={@account.id}
-        phx-click={
-          if(FullCircle.Accounting.is_default_account?(@account), do: nil, else: :edit_account)
-        }
+        phx-value-account-id={@obj.id}
+        phx-click={if(FullCircle.Accounting.is_default_account?(@obj), do: nil, else: :edit_account)}
       >
-        <%= @account.name %>
+        <%= @obj.name %>
       </span>
-      <p class="text-sm mt-2"><%= @account.descriptions %></p>
-      <span class="text-sm font-bold"><%= @account.account_type %></span>
-      <span class="text-xs font-light"><%= to_fc_time_format(@account.updated_at) %></span>
+      <p class="text-sm mt-2"><%= @obj.descriptions %></p>
+      <span class="text-sm font-bold"><%= @obj.account_type %></span>
+      <span class="text-xs font-light"><%= to_fc_time_format(@obj.updated_at) %></span>
       <.live_component
         module={FullCircleWeb.LogLive.Component}
-        id={"log_#{@account.id}"}
+        id={"log_#{@obj.id}"}
         show_log={false}
         entity="accounts"
-        entity_id={@account.id}
+        entity_id={@obj.id}
       />
     </div>
     """

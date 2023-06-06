@@ -20,26 +20,26 @@ defmodule FullCircleWeb.ContactLive.IndexComponent do
     >
       <span
         class="text-xl font-bold hover:bg-blue-400 cursor-pointer bg-blue-100 border-blue-500 px-2 py-1 rounded-full border"
-        phx-value-contact-id={@contact.id}
+        phx-value-contact-id={@obj.id}
         phx-click={:edit_contact}
       >
-        <%= @contact.name %>
+        <%= @obj.name %>
       </span>
       <div class="text-sm mt-2">
-        <p><%= @contact.address1 %>, <%= @contact.address2 %></p>
+        <p><%= @obj.address1 %>, <%= @obj.address2 %></p>
         <p>
-          <%= @contact.city %> <%= @contact.zipcode %>, <%= @contact.state %> <%= @contact.country %>
+          <%= @obj.city %> <%= @obj.zipcode %>, <%= @obj.state %> <%= @obj.country %>
         </p>
-        <p><%= @contact.contact_info %></p>
+        <p><%= @obj.contact_info %></p>
       </div>
-      <p class="text-green-800"><%= @contact.descriptions %></p>
-      <span class="text-xs font-light"><%= to_fc_time_format(@contact.updated_at) %></span>
+      <p class="text-green-800"><%= @obj.descriptions %></p>
+      <span class="text-xs font-light"><%= to_fc_time_format(@obj.updated_at) %></span>
       <.live_component
         module={FullCircleWeb.LogLive.Component}
-        id={"log_#{@contact.id}"}
+        id={"log_#{@obj.id}"}
         show_log={false}
         entity="contacts"
-        entity_id={@contact.id}
+        entity_id={@obj.id}
       />
     </div>
     """

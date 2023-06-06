@@ -9,7 +9,7 @@ defmodule FullCircle.Repo.Migrations.CreateUserSettings do
       add :type, :string
       add :values, :map
       add :value, :string
-      add :company_user_id, :integer
+      add :company_user_id, references(:company_user, on_delete: :delete_all)
     end
   end
 end

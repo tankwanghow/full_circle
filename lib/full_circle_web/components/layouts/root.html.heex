@@ -22,22 +22,22 @@
             </span>
           <% end %>
         </h1>
-
-        <%= if assigns[:current_company]  do %>
-          <.link
-            navigate={~p"/companies/#{@current_company.id}/dashboard"}
-            class="rounded hover:bg-gray-400 p-2"
+        <div>
+          <div
+            id="menu-button"
+            class="rounded float-right hover:bg-blue-500 p-2"
+            phx-click={Phoenix.LiveView.JS.toggle(to: "#menu")}
           >
-            <%= gettext("Dashboard") %>
-          </.link>
-        <% end %>
-
-        <div
-          id="menu-button"
-          class="rounded float-right hover:bg-blue-500 p-2"
-          phx-click={Phoenix.LiveView.JS.toggle(to: "#menu")}
-        >
-          <Heroicons.bars_4 class="w-5 h-5" />
+            <Heroicons.bars_4 class="w-5 h-5" />
+          </div>
+          <%= if assigns[:current_company]  do %>
+            <.link id="full_circle_dashboard"
+              navigate={~p"/companies/#{@current_company.id}/dashboard"}
+              class="rounded hover:bg-gray-400 p-2 float-right"
+            >
+              <%= gettext("Dashboard") %>
+            </.link>
+          <% end %>
         </div>
 
         <div id="menu" class="m-2 rounded shadow-xl right-1 fixed top-12 hidden">

@@ -51,8 +51,8 @@ defmodule FullCircleWeb.TaxCodeLive.FormComponent do
            TaxCode,
            "tax_code",
            socket.assigns.form.data,
-           socket.assigns.current_user,
-           socket.assigns.current_company
+           socket.assigns.current_company,
+           socket.assigns.current_user
          ) do
       {:ok, obj} ->
         send(self(), {:deleted, obj})
@@ -72,8 +72,8 @@ defmodule FullCircleWeb.TaxCodeLive.FormComponent do
            TaxCode,
            "tax_code",
            params,
-           socket.assigns.current_user,
-           socket.assigns.current_company
+           socket.assigns.current_company,
+           socket.assigns.current_user
          ) do
       {:ok, obj} ->
         send(self(), {:created, obj})
@@ -94,8 +94,8 @@ defmodule FullCircleWeb.TaxCodeLive.FormComponent do
            "tax_code",
            socket.assigns.form.data,
            params,
-           socket.assigns.current_user,
-           socket.assigns.current_company
+           socket.assigns.current_company,
+           socket.assigns.current_user
          ) do
       {:ok, obj} ->
         send(self(), {:updated, obj})

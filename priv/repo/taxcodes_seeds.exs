@@ -180,5 +180,5 @@ Enum.each(taxcode_data, fn data ->
 
   data = Map.merge(data, %{account_id: ac.id, account_name: ac.name})
 
-  StdInterface.create(TaxCode, "tax_code", data, %{id: 1}, %{id: 1}) |> IO.inspect
+  StdInterface.create(TaxCode, "tax_code", data, %{id: 1}, %{id: 1})
 end)

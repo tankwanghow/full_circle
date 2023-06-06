@@ -89,8 +89,8 @@ defmodule FullCircleWeb.FixedAssetLive.FormComponent do
            FixedAsset,
            "fixed_asset",
            socket.assigns.form.data,
-           socket.assigns.current_user,
-           socket.assigns.current_company
+           socket.assigns.current_company,
+           socket.assigns.current_user
          ) do
       {:ok, obj} ->
         send(self(), {:deleted, obj})
@@ -110,8 +110,8 @@ defmodule FullCircleWeb.FixedAssetLive.FormComponent do
            FixedAsset,
            "fixed_asset",
            params,
-           socket.assigns.current_user,
-           socket.assigns.current_company
+           socket.assigns.current_company,
+           socket.assigns.current_user
          ) do
       {:ok, obj} ->
         send(self(), {:created, obj})
@@ -132,8 +132,8 @@ defmodule FullCircleWeb.FixedAssetLive.FormComponent do
            "fixed_asset",
            socket.assigns.form.data,
            params,
-           socket.assigns.current_user,
-           socket.assigns.current_company
+           socket.assigns.current_company,
+           socket.assigns.current_user
          ) do
       {:ok, obj} ->
         send(self(), {:updated, obj})

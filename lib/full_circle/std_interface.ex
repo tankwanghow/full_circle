@@ -58,7 +58,7 @@ defmodule FullCircle.StdInterface do
     )
   end
 
-  def create(klass, klass_name, attrs, user, company, multi \\ Multi.new()) do
+  def create(klass, klass_name, attrs, company, user, multi \\ Multi.new()) do
     action = String.to_atom("create_" <> klass_name)
 
     case can?(user, action, company) do
@@ -80,7 +80,7 @@ defmodule FullCircle.StdInterface do
     end
   end
 
-  def update(klass, klass_name, obj, attrs, user, company, multi \\ Multi.new()) do
+  def update(klass, klass_name, obj, attrs, company, user, multi \\ Multi.new()) do
     action = String.to_atom("update_" <> klass_name)
 
     case can?(user, action, company) do
@@ -102,7 +102,7 @@ defmodule FullCircle.StdInterface do
     end
   end
 
-  def delete(klass, klass_name, obj, user, company, multi \\ Multi.new()) do
+  def delete(klass, klass_name, obj, company, user, multi \\ Multi.new()) do
     action = String.to_atom("delete_" <> klass_name)
     changeset = changeset(klass, obj, %{}, company)
 

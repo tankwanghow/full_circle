@@ -61,7 +61,7 @@ defmodule FullCircleWeb.LogLive.Component do
           <p class="w-full text-3xl text-center font-medium mb-3">
             <%= @page_title %>
           </p>
-          <div id="objects_list">
+          <div id="logs_list">
             <%= for obj <- @logs do %>
               <div class="grid grid-cols-12 mb-2">
                 <div class="col-span-4 text-center border rounded p-5 bg-blue-100">

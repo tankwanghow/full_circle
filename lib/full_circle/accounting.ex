@@ -73,14 +73,14 @@ defmodule FullCircle.Accounting do
     )
   end
 
-  def get_tax_code!(id, user, company) do
-    from(taxcode in tax_code_query(user, company),
+  def get_tax_code!(id, company, user) do
+    from(taxcode in tax_code_query(company, user),
       where: taxcode.id == ^id
     )
     |> Repo.one!()
   end
 
-  def tax_codes(terms, user, company) do
+  def tax_codes(terms, company, user) do
     from(taxcode in TaxCode,
       join: com in subquery(Sys.user_company(company, user)),
       on: com.id == taxcode.company_id,
@@ -90,7 +90,7 @@ defmodule FullCircle.Accounting do
     |> Repo.all()
   end
 
-  def sale_tax_codes(terms, user, company) do
+  def sale_tax_codes(terms, company, user) do
     from(taxcode in TaxCode,
       join: com in subquery(Sys.user_company(company, user)),
       on: com.id == taxcode.company_id,
@@ -101,7 +101,7 @@ defmodule FullCircle.Accounting do
     |> Repo.all()
   end
 
-  def purchase_tax_codes(terms, user, company) do
+  def purchase_tax_codes(terms, company, user) do
     from(taxcode in TaxCode,
       join: com in subquery(Sys.user_company(company, user)),
       on: com.id == taxcode.company_id,
@@ -112,7 +112,7 @@ defmodule FullCircle.Accounting do
     |> Repo.all()
   end
 
-  def tax_code_query(user, company) do
+  def tax_code_query(company, user) do
     from(taxcode in TaxCode,
       join: com in subquery(Sys.user_company(company, user)),
       on: com.id == taxcode.company_id,
@@ -260,14 +260,14 @@ defmodule FullCircle.Accounting do
     end)
   end
 
-  def get_fixed_asset!(id, user, company) do
-    from(fa in fixed_asset_query(user, company),
+  def get_fixed_asset!(id, company, user) do
+    from(fa in fixed_asset_query(company, user),
       where: fa.id == ^id
     )
     |> Repo.one!()
   end
 
-  def fixed_asset_query(user, company) do
+  def fixed_asset_query(company, user) do
     from(fa in FixedAsset,
       join: com in subquery(Sys.user_company(company, user)),
       on: com.id == fa.company_id,
@@ -310,7 +310,7 @@ defmodule FullCircle.Accounting do
     )
   end
 
-  def account_names(terms, user, company) do
+  def account_names(terms, company, user) do
     from(ac in Account,
       join: com in subquery(Sys.user_company(company, user)),
       on: com.id == ac.company_id,
@@ -321,7 +321,7 @@ defmodule FullCircle.Accounting do
     |> Repo.all()
   end
 
-  def contact_names(terms, user, company) do
+  def contact_names(terms, company, user) do
     from(cont in Contact,
       join: com in subquery(Sys.user_company(company, user)),
       on: com.id == cont.company_id,
@@ -332,9 +332,9 @@ defmodule FullCircle.Accounting do
     |> Repo.all()
   end
 
-  def delete_account(ac, user, company) do
+  def delete_account(ac, company, user) do
     if !is_default_account?(ac) do
-      StdInterface.delete(Account, "account", ac, user, company)
+      StdInterface.delete(Account, "account", ac, company, user)
     else
       {:error, "Cannot delete default account", StdInterface.changeset(Account, ac, %{}, company),
        ""}

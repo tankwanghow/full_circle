@@ -7,7 +7,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Index do
   alias FullCircleWeb.PurInvoiceLive.FormComponent
   alias FullCircleWeb.PurInvoiceLive.IndexComponent
 
-  @per_page 8
+  @per_page 20
 
   @impl true
   def render(assigns) do
@@ -15,7 +15,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Index do
     <div class="max-w-3xl">
       <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
       <div class="flex justify-center mb-2">
-        <.form for={%{}} id="search-form" phx-submit="search" autocomplete="off" class="w-full">
+        <.form for={%{}} id="search-form" phx-submit="search" class="w-full" autocomplete="off">
           <div class=" flex flex-row flex-wrap tracking-tighter text-sm">
             <div class="w-[25rem] grow shrink">
               <label class="">Search Terms</label>
@@ -62,13 +62,8 @@ defmodule FullCircleWeb.PurInvoiceLive.Index do
       <div
         id="objects_list"
         phx-update={@update}
-        phx-viewport-top={@page > 1 && "prev-page"}
         phx-viewport-bottom={!@end_of_timeline? && "next-page"}
         phx-page-loading
-        class={[
-          if(@end_of_timeline?, do: "pb-2", else: "pb-[calc(200vh)]"),
-          if(@page == 1, do: "pt-2", else: "pt-[calc(200vh)]")
-        ]}
       >
         <%= for {obj_id, obj} <- @streams.objects do %>
           <.live_component
@@ -80,12 +75,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Index do
           />
         <% end %>
       </div>
-      <div
-        :if={@end_of_timeline?}
-        class="mt-2 mb-2 text-center border-2 rounded bg-orange-200 border-orange-400 p-2"
-      >
-        <%= gettext("No More.") %>
-      </div>
+      <.infinite_scroll_footer ended={@end_of_timeline?} />
     </div>
 
     <.modal
@@ -150,8 +140,8 @@ defmodule FullCircleWeb.PurInvoiceLive.Index do
     object =
       Billing.get_pur_invoice!(
         id,
-        socket.assigns.current_user,
-        socket.assigns.current_company
+        socket.assigns.current_company,
+        socket.assigns.current_user
       )
 
     {:noreply,
@@ -226,8 +216,8 @@ defmodule FullCircleWeb.PurInvoiceLive.Index do
     inv =
       FullCircle.Billing.get_pur_invoice_by_id_index_component_field!(
         obj.id,
-        socket.assigns.current_user,
-        socket.assigns.current_company
+        socket.assigns.current_company,
+        socket.assigns.current_user
       )
 
     css_trans(IndexComponent, inv, :obj, "objects-#{inv.id}", "shake")
@@ -242,8 +232,8 @@ defmodule FullCircleWeb.PurInvoiceLive.Index do
     inv =
       FullCircle.Billing.get_pur_invoice_by_id_index_component_field!(
         obj.id,
-        socket.assigns.current_user,
-        socket.assigns.current_company
+        socket.assigns.current_company,
+        socket.assigns.current_user
       )
 
     css_trans(IndexComponent, inv, :obj, "objects-#{obj.id}", "shake")
@@ -292,8 +282,8 @@ defmodule FullCircleWeb.PurInvoiceLive.Index do
         terms,
         pur_invoice_date,
         due_date,
-        socket.assigns.current_user,
         socket.assigns.current_company,
+        socket.assigns.current_user,
         page: page,
         per_page: @per_page
       )
@@ -303,6 +293,6 @@ defmodule FullCircleWeb.PurInvoiceLive.Index do
     |> assign(search: %{terms: terms, pur_invoice_date: pur_invoice_date, due_date: due_date})
     |> assign(update: update)
     |> stream(:objects, objects)
-    |> assign(end_of_timeline?: Enum.count(objects) == 0)
+    |> assign(end_of_timeline?: Enum.count(objects) < @per_page)
   end
 end

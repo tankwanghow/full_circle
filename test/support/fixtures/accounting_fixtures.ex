@@ -13,7 +13,7 @@ defmodule FullCircle.AccountingFixtures do
     })
   end
 
-  def account_fixture(attrs, user, company) do
+  def account_fixture(attrs, company, user) do
     attrs = attrs |> valid_account_attributes()
 
     {:ok, account} =
@@ -21,8 +21,8 @@ defmodule FullCircle.AccountingFixtures do
         FullCircle.Accounting.Account,
         "account",
         attrs,
-        user,
-        company
+        company,
+        user
       )
 
     account

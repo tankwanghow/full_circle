@@ -28,8 +28,8 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
        settings:
          FullCircle.Sys.load_settings(
            "invoices",
-           socket.assigns.current_user,
-           socket.assigns.current_company
+           socket.assigns.current_company,
+           socket.assigns.current_user
          )
      )}
   end
@@ -235,8 +235,8 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
            Invoice,
            "invoice",
            socket.assigns.form.data,
-           socket.assigns.current_user,
-           socket.assigns.current_company
+           socket.assigns.current_company,
+           socket.assigns.current_user
          ) do
       {:ok, obj} ->
         send(self(), {:deleted, obj})
@@ -259,8 +259,8 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
   defp save(socket, :new, params) do
     case Billing.create_invoice(
            params,
-           socket.assigns.current_user,
-           socket.assigns.current_company
+           socket.assigns.current_company,
+           socket.assigns.current_user
          ) do
       {:ok, %{create_invoice: obj}} ->
         send(self(), {:created, obj})
@@ -285,8 +285,8 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
     case Billing.update_invoice(
            socket.assigns.form.data,
            params,
-           socket.assigns.current_user,
-           socket.assigns.current_company
+           socket.assigns.current_company,
+           socket.assigns.current_user
          ) do
       {:ok, %{update_invoice: obj}} ->
         send(self(), {:updated, obj})
@@ -340,7 +340,6 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
         autocomplete="off"
         phx-change="validate"
         phx-submit="save"
-        class=""
       >
         <%= Phoenix.HTML.Form.hidden_input(@form, :invoice_no) %>
         <div class="flex flex-row flex-nowarp">

@@ -42,8 +42,8 @@ defmodule FullCircleWeb.ContactLive.FormComponent do
            Contact,
            "contact",
            socket.assigns.form.data,
-           socket.assigns.current_user,
-           socket.assigns.current_company
+           socket.assigns.current_company,
+           socket.assigns.current_user
          ) do
       {:ok, cont} ->
         send(self(), {:deleted, cont})
@@ -63,8 +63,8 @@ defmodule FullCircleWeb.ContactLive.FormComponent do
            Contact,
            "contact",
            params,
-           socket.assigns.current_user,
-           socket.assigns.current_company
+           socket.assigns.current_company,
+           socket.assigns.current_user
          ) do
       {:ok, cont} ->
         send(self(), {:created, cont})
@@ -85,8 +85,8 @@ defmodule FullCircleWeb.ContactLive.FormComponent do
            "contact",
            socket.assigns.form.data,
            params,
-           socket.assigns.current_user,
-           socket.assigns.current_company
+           socket.assigns.current_company,
+           socket.assigns.current_user
          ) do
       {:ok, cont} ->
         send(self(), {:updated, cont})

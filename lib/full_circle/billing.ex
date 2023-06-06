@@ -110,7 +110,7 @@ defmodule FullCircle.Billing do
       }
   end
 
-  def get_invoice!(id, user, company) do
+  def get_invoice!(id, company, user) do
     Repo.one(
       from inv in Invoice,
         join: com in subquery(Sys.user_company(company, user)),
@@ -334,7 +334,7 @@ defmodule FullCircle.Billing do
       group_by: [inv.id, cont.name, inv.descriptions, inv.invoice_date, inv.due_date, cont.id]
   end
 
-  def create_invoice(attrs, user, com) do
+  def create_invoice(attrs, com, user) do
     case can?(user, :create_invoice, com) do
       true ->
         Multi.new()
@@ -456,7 +456,7 @@ defmodule FullCircle.Billing do
   # Purchase Invocie
   ########
 
-  def get_pur_invoice!(id, user, company) do
+  def get_pur_invoice!(id, company, user) do
     Repo.one(
       from inv in PurInvoice,
         join: com in subquery(Sys.user_company(company, user)),
@@ -705,7 +705,7 @@ defmodule FullCircle.Billing do
       group_by: [inv.id, cont.name, inv.descriptions, inv.pur_invoice_date, inv.due_date, cont.id]
   end
 
-  def create_pur_invoice(attrs, user, com) do
+  def create_pur_invoice(attrs, com, user) do
     case can?(user, :create_pur_invoice, com) do
       true ->
         Multi.new()

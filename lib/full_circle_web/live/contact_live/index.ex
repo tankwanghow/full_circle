@@ -6,7 +6,7 @@ defmodule FullCircleWeb.ContactLive.Index do
   alias FullCircleWeb.ContactLive.IndexComponent
   alias FullCircleWeb.ContactLive.FormComponent
 
-  @per_page 10
+  @per_page 20
 
   @impl true
   def render(assigns) do
@@ -30,24 +30,14 @@ defmodule FullCircleWeb.ContactLive.Index do
       <div
         id="objects_list"
         phx-update={@update}
-        phx-viewport-top={@page > 1 && "prev-page"}
         phx-viewport-bottom={!@end_of_timeline? && "next-page"}
         phx-page-loading
-        class={[
-          if(@end_of_timeline?, do: "pb-2", else: "pb-[calc(200vh)]"),
-          if(@page == 1, do: "pt-2", else: "pt-[calc(200vh)]")
-        ]}
       >
         <%= for {obj_id, obj} <- @streams.objects do %>
-          <.live_component module={IndexComponent} id={obj_id} contact={obj} ex_class="" />
+          <.live_component module={IndexComponent} id={obj_id} obj={obj} ex_class="" />
         <% end %>
       </div>
-      <div
-        :if={@end_of_timeline?}
-        class="mt-2 mb-2 text-center border-2 rounded bg-orange-200 border-orange-400 p-2"
-      >
-        <%= gettext("No More.") %>
-      </div>
+      <.infinite_scroll_footer ended={@end_of_timeline?} />
     </div>
 
     <.modal
@@ -211,6 +201,6 @@ defmodule FullCircleWeb.ContactLive.Index do
     |> assign(search: %{terms: terms})
     |> assign(update: update)
     |> stream(:objects, objects)
-    |> assign(end_of_timeline?: Enum.count(objects) == 0)
+    |> assign(end_of_timeline?: Enum.count(objects) < @per_page)
   end
 end
