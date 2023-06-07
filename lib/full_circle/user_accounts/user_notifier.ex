@@ -8,7 +8,7 @@ defmodule FullCircle.UserAccounts.UserNotifier do
     email =
       new()
       |> to(recipient)
-      |> from({"FullCircle", "contact@example.com"})
+      |> from({"FullCircle", "tankwanghow@gmail.com"})
       |> subject(subject)
       |> text_body(body)
 
