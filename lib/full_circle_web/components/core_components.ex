@@ -138,7 +138,7 @@ defmodule FullCircleWeb.CoreComponents do
   attr(:id, :string, default: "flash", doc: "the optional id of flash container")
   attr(:flash, :map, default: %{}, doc: "the map of flash messages to display")
   attr(:title, :string, default: nil)
-  attr(:kind, :atom, values: [:info, :error], doc: "used for styling and flash lookup")
+  attr(:kind, :atom, values: [:info, :warn, :error], doc: "used for styling and flash lookup")
   attr(:rest, :global, doc: "the arbitrary HTML attributes to add to the flash container")
 
   slot(:inner_block, doc: "the optional inner block that renders the flash message")
@@ -153,12 +153,14 @@ defmodule FullCircleWeb.CoreComponents do
       class={[
         "fixed top-2 right-2 w-80 sm:w-96 z-50 rounded-lg p-3 ring-1",
         @kind == :info && "bg-emerald-50 text-emerald-800 ring-emerald-500 fill-cyan-900",
+        @kind == :warn && "bg-amber-50 text-amber-800 ring-amber-500 fill-amber-900",
         @kind == :error && "bg-rose-50 text-rose-900 shadow-md ring-rose-500 fill-rose-900"
       ]}
       {@rest}
     >
       <p :if={@title} class="flex items-center gap-1.5 text-sm font-semibold leading-6">
         <.icon :if={@kind == :info} name="hero-information-circle-mini" class="h-4 w-4" />
+        <.icon :if={@kind == :warn} name="hero-information-circle-mini" class="h-4 w-4" />
         <.icon :if={@kind == :error} name="hero-exclamation-circle-mini" class="h-4 w-4" />
         <%= @title %>
       </p>
@@ -182,6 +184,7 @@ defmodule FullCircleWeb.CoreComponents do
   def flash_group(assigns) do
     ~H"""
     <.flash kind={:info} title="Success!" flash={@flash} />
+    <.flash kind={:warn} title="Warning!" flash={@flash} />
     <.flash kind={:error} title="Error!" flash={@flash} />
     <.flash
       id="disconnected"
