@@ -57,7 +57,7 @@ defmodule FullCircle.Helpers do
   end
 
   def validate_id(changeset, field_name, field_id) do
-    if fetch_field!(changeset, field_id) == -1 do
+    if is_nil(fetch_field!(changeset, field_id)) do
       changeset |> add_error(field_name, gettext("not in list"))
     else
       changeset
