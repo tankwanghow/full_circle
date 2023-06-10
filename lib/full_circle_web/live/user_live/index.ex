@@ -51,7 +51,8 @@ defmodule FullCircleWeb.UserLive.Index do
                 <%= Phoenix.HTML.Form.hidden_input(f, :id, value: u.id) %>
                 <%= Phoenix.HTML.Form.select(f, :role, FullCircle.Authorization.roles(),
                   class: "rounded py-[1px] pl-[2px] pr-[40px] border-0 bg-indigo-50 text-xl",
-                  value: u.role, phx_page_loading: true
+                  value: u.role,
+                  phx_page_loading: true
                 ) %>
               <% end %>
             </span>

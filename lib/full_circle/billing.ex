@@ -332,7 +332,15 @@ defmodule FullCircle.Billing do
             invd.descriptions
           )
       },
-      group_by: [inv.id, cont.name, inv.descriptions, inv.invoice_date, inv.due_date, cont.id, com.id]
+      group_by: [
+        inv.id,
+        cont.name,
+        inv.descriptions,
+        inv.invoice_date,
+        inv.due_date,
+        cont.id,
+        com.id
+      ]
   end
 
   def create_invoice(attrs, com, user) do
@@ -704,7 +712,15 @@ defmodule FullCircle.Billing do
             invd.descriptions
           )
       },
-      group_by: [inv.id, cont.name, inv.descriptions, inv.pur_invoice_date, inv.due_date, cont.id, com.id]
+      group_by: [
+        inv.id,
+        cont.name,
+        inv.descriptions,
+        inv.pur_invoice_date,
+        inv.due_date,
+        cont.id,
+        com.id
+      ]
   end
 
   def create_pur_invoice(attrs, com, user) do

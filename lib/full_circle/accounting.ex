@@ -79,6 +79,13 @@ defmodule FullCircle.Accounting do
     |> Repo.one!()
   end
 
+  def get_tax_code_by_code(code, company, user) do
+    from(taxcode in tax_code_query(company, user),
+      where: taxcode.code == ^code
+    )
+    |> Repo.one()
+  end
+
   def tax_codes(terms, company, user) do
     from(taxcode in TaxCode,
       join: com in subquery(Sys.user_company(company, user)),
@@ -302,6 +309,15 @@ defmodule FullCircle.Accounting do
 
   def get_account_by_name!(name, com, user) do
     Repo.one!(
+      from ac in Account,
+        join: com in subquery(Sys.user_company(com, user)),
+        on: com.id == ac.company_id,
+        where: ac.name == ^name
+    )
+  end
+
+  def get_account_by_name(name, com, user) do
+    Repo.one(
       from ac in Account,
         join: com in subquery(Sys.user_company(com, user)),
         on: com.id == ac.company_id,

@@ -76,12 +76,10 @@ defmodule FullCircleWeb.TaxCodeLive.FormComponent do
            socket.assigns.current_user
          ) do
       {:ok, obj} ->
-        IO.inspect(obj)
         send(self(), {:created, obj})
         {:noreply, socket}
 
       {:error, _, changeset, _} ->
-        IO.inspect(changeset)
         {:noreply, assign(socket, form: to_form(changeset))}
 
       :not_authorise ->

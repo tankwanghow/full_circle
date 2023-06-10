@@ -31,7 +31,8 @@
             <Heroicons.bars_4 class="w-5 h-5" />
           </div>
           <%= if assigns[:current_company]  do %>
-            <.link id="full_circle_dashboard"
+            <.link
+              id="full_circle_dashboard"
               navigate={~p"/companies/#{@current_company.id}/dashboard"}
               class="rounded hover:bg-gray-400 p-2 float-right"
             >

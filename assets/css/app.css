@@ -35,7 +35,7 @@
   font-weight: bold;
 }
 
-input.phx-change-loading {
+input:not([type="file"]).phx-change-loading{
   @apply ring-inset ring-4 ring-amber-300 animate-quick-pulse !important;
 }
 
