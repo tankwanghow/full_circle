@@ -1,5 +1,6 @@
 defmodule FullCircle.Accounting do
   import Ecto.Query, warn: false
+  import FullCircle.Authorization
 
   alias FullCircle.Accounting.{
     Account,

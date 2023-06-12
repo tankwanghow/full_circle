@@ -8,6 +8,12 @@ defmodule FullCircle.Authorization do
   @allow true
   @forbid false
 
+  def can?(user, :seed_taxcodes, company),
+    do: allow_roles(~w(admin), company, user)
+
+    def can?(user, :seed_goods, company),
+    do: allow_roles(~w(admin), company, user)
+
   def can?(user, :create_pur_invoice, company),
     do: allow_roles(~w(admin manager supervisor clerk), company, user)
 

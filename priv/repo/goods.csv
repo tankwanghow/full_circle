@@ -1,282 +1,282 @@
 name,descriptions,unit,purchase_account_name,sales_account_name,purchase_tax_code_name,sales_tax_code_name
 Upkeep Electrical Installation Products or Services,,-,General Purchase,General Sales,NoPTax,NoSTax
-Upkeep Poultry Farm Products or Services,,-,,,,
-Foreign Worker Permit,,-,,,,
-Magtox,,Ml,,,,
-Upkeep Motor Vehicle Products or Services,,-,,,,
-Fixed Assets,,-,,,,
-Electricity Usage,,kWh,,,,
-Electricity Other Charges,,-,,,,
-Telecommunications Services,,-,,,,
-Omega Plus,,-,,,,
-Kryton T1,,kg,,,,
-Fertilizer,,kg,,,,
-Tiotilin,,Kg,,,,
-CTC,,Kg,,,,
-FlorCol Injection,,ML,,,,
-ENRO 0.5%,,ML,,,,
-Sulfarim Powder,,Kgs,,,,
-Baytril,,ML,,,,
-Trimixin 480,,Kg,,,,
-Neosun Soluble Powder 50%,,Kg,,,,
-Mycostatin-20,,kg,,,,
-Lucarotin 10%,,Kg,,,,
-TMP/S-400,,Kg,,,,
-PACOM,,Drum,,,,
-Wheat Pollard,,Mt,,,,
-Corn Powder,,Mt,,,,
-Dried Spent Grain,,Mt,,,,
-Fish Meal 60%,,Kg,,,,
-Full Fat Soybean Meal,,Mt,,,,
-Hifat Canola Meal,,kg,,,,
-Lime Stone Grit,,Kg,,,,
-Upkeep Factory Buildings Products or Services,,-,,,,
-Upkeep Pig Farm Products or Services,,-,,,,
-Lime Stone Powder,,Kg,,,,
-Maize,,Mt,,,,
-MDCP 21%,,Kg,,,,
-MDCP 22%,,Kg,,,,
-N100 (Dabomb-P),,Kg,,,,
-Poultry Layer Feed,,Kg,,,,
-Rice Bran,,Mt,,,,
-Rice Powder,,Mt,,,,
-Salt,,Kg,,,,
-Soybean Hull,,Kg,,,,
-Soybean Meal Hi Pro,,Mt,,,,
-Soybean Meal Low Pro,,Mt,,,,
-Wheat Brans,,Mt,,,,
-CHOLINE CHLORIDE 50% SILICA,,Kg,,,,
-"Bioplex ",,Kg,,,,
-Meriden Fusion Dyad,,Kg,,,,
-Microtech 5000,,KG,,,,
-Biotronic Top 3,,Kg,,,,
-Milk Powder,,Kg,,,,
-Calibrin z,,kg,,,,
-Cholin-H,,Kg,,,,
-Arbocel RC Fine,,Kg,,,,
-Avimix Pan-Cure,,kg,,,,
-Bact-A-Cid,,Kg,,,,
-Sodium Bicarbonate,,Kg,,,,
-eXOLUTION,Livestock Feed Pro-biotic & Bacteriophage,Kg,,,,
-Escent,,Kg,,,,
-Racto-80,,Kg,,,,
-P.Vitamin Con-528,,Kg,,,,
-Nystatin,,Kg,,,,
-L-Lysine,,Kg,,,,
-LTHREONINE,,Kg,,,,
-L-Tryptophan Feed Grade,,Kg,,,,
-Carbovet T,,Kg,,,,
-Lutamix 8188,,Kg,,,,
-Alcandyl Premix 20%,,kg,,,,
-Volvac ND+IB MLV,,Dose,,,,
-Tax Filling Fee,,-,,,,
-Audit Fee,,-,,,,
-Resdox Plus,,KG,,,,
-Oil Palm Fruit,,Mt,,,,
-Trace Min 3806,,Kg,,,,
-Gladron Poutry-Min,,KG,,,,
-Globatiox,,Kg,,,,
-Grainphos 5000 Powder,,Kg,,,,
-Grobig,,kg,,,,
-Dl-Meth,,Kg,,,,
-Premix Pig Starter,,Kg,,,,
-Premix Pig Breeder,,Kg,,,,
-Premix Pig Finisher,,Kg,,,,
-Agita 1GB,,Tin,,,,
-Gumboro D78,,Dose,,,,
-Diftosec,,Dose,,,,
-Olvac A+B+HG,,Ml,,,,
-Ma5+Clone 30,,Dose,,,,
-IBNDKILL,,Ml,,,,
-ILT,,Dose,,,,
-Castran,,ml,,,,
-First Aid Blue,,Ml,,,,
-Intrafer-200,,ml,,,,
-Iodine,,ml,,,,
-BTS,,Bots,,,,
-Lutalyse,,Ml,,,,
-Oxytocin,,ML,,,,
-Betamox LA,,ML,,,,
-Paracetamol BP98,,Kg,,,,
-PG 600,,VIAL,,,,
-B-Complex,,Bots,,,,
-Taktic,,ML,,,,
-Duphafral Ade Forte,,ML,,,,
-Baycox,,ML,,,,
-Ingelvac Circoflex,,Dose,,,,
-Rhiniffa,,Doses,,,,
-Geskypur,,Dose,,,,
-Parvoject,,ML,,,,
-Akipor,,bot,,,,
-Toxin Binder,,kg,,,,
-Vectormune FP MG,,Dose,,,,
-VTM HVT-NDV,,Dose,,,,
-Ingelvac Mycoflex,,Dose,,,,
-Aftopor,,Dose,,,,
-Ingelvac PRRS MLV,,Dose,,,,
-Pestiffa FL,,Dose,,,,
-Needle,,box,,,,
-Norodine 24,,ml,,,,
-Note,,-,,,,
-Entril 20,,Bot,,,,
-Phosphor Mega 5000,,Kg,,,,
-Ritavit H2(Spray Dried Biotin 2%),,KG,,,,
-Vit-Para,,btl,,,,
-Fercobsang,,ml,,,,
-Hinatiamun 200,,kg,,,,
-Alum,,kg,,,,
-Exnursery Banana Plants,,-,,,,
-Upkeep Drainage Products or Services,,-,,,,
-Upkeep Machinery Products or Services,,-,,,,
-Upkeep Road Products or Services,,-,,,,
-AI Tools & Implements,,-,,,,
-Foreign Workers Medical Examination Fee,,-,,,,
-Foreign Workers Insurance,,-,,,,
-Motor Vehicle Insurance,,-,,,,
-Insurance Guarantee,,-,,,,
-Cooper Bind,,kg,,,,
-Pesticide,,kg,,,,
-Petrol or Diesel,,-,,,,
-Fencols 4%,,Kg,,,,
-Veterimoxin LA Clas,,ML,,,,
-Amprol 12%,,ML,,,,
-Colistin Sulphate 10%,,Kg,,,,
-Colmyc-E(SP),,bottle,,,,
-TM-200,,Kg,,,,
-Denagard 10% Coated,,Kg,,,,
-Large Pig unweighted,,Unit,,,,
-Small Pig unweighted,,Unit,,,,
-Large Pig,,Kg,,,,
-Retired Boar,,Kg,,,,
-Shares Investment,,unit,,,,
-Retired Boar unweighted,,Unit,,,,
-Retired Sow,,Kg,,,,
-Duroc Gilt,,Kg,,,,
-Retired Sow unweighted,,Unit,,,,
-Female Duroc,,Unit,,,,
-Second Grade Pig,,Kg,,,,
-Male Duroc,,Unit,,,,
-Small Pig,,Kg,,,,
-Medium Pig unweighted,,Unit,,,,
-Small Pig Extra Charges,,Unit,,,,
-Egg Grade Broken,,pcs,,,,
-Egg Grade A,,pcs,,,,
-Egg Grade AA,,pcs,,,,
-Telur Pidan,,pcs,,,,
-Salted Duck Egg,,box,,,,
-Egg Grade White,,pcs,,,,
-Egg Grade G,,pcs,,,,
-Egg Grade F,,pcs,,,,
-Egg Grade Crack,,pcs,,,,
-Egg Grade C,,pcs,,,,
-Egg Grade B,,pcs,,,,
-Egg Grade Dirty,,pcs,,,,
-Egg Grade D,,pcs,,,,
-Partin Fish,,Kg,,,,
-Egg Tray,,pcs,,,,
-Uni-Tray,,Pcs,,,,
-Duphalyte Injection,,ml,,,,
-Herbicite,,Drum,,,,
-Diluent,,ml,,,,
-Cofacalcium,,ml,,,,
-Nysprofeed-200,,Kg,,,,
-Retired Layer,,-,,,,
-Volvac IBD(INT LUKER),,Dose,,,,
-Messing,,-,,,,
-Foreign Worker Services Fee,,-,,,,
-AA-Tray,,pcs,,,,
-Florfen,,ml,,,,
-Tools & Implement Products,,-,,,,
-Pro-M,Livestock Feed Pro-biotic,kg,,,,
-ND+IB+G,,ML,,,,
-Maladion 84E,,L,,,,
-Kanaprim 24%,,ML,,,,
-AUSKIPRA - GN,,DS,,,,
-STPEN,,DS,,,,
-E-10,,LIT,,,,
-T5 X SD,,KG,,,,
-Gestavet-Prost,,ML,,,,
-NSL Decox,,Liter,,,,
-Amoxicillin Feed,,kg,,,,
-Tributyrin 45%,,kg,,,,
-IVOMECTING,,kg,,,,
-Ceporin 500,,-,,,,
-Tylosin 100 A,,-,,,,
-Sodium Salicylate,,-,,,,
-Protexin SP,,Kg,,,,
-Oil,,Kgs,,,,
-Methanamin Excel,,pkts,,,,
-Vaccine Tools,,-,,,,
-Cygro 1%,,kg,,,,
-FRA C12,,kg,,,,
-Tylan 100 Premix,,kg,,,,
-Betaine Hydrochloride 98%,,kg,,,,
-Catosal 10% Inj,,ml,,,,
-Flunivet 5%,,ml,,,,
-ADE,,g,,,,
-Printing & Stationaries,,-,,,,
-YSP Bio Mix,,Kg,,,,
-Virucidal Extra,,Kg,,,,
-BMD 10% Feed,,Kg,,,,
-Aminovit,,Bot,,,,
-Boar,,Unit,,,,
-Piglet Energy Drink,,ml,,,,
-Protease,,Kg,,,,
-NSP Enzyme,,Kg,,,,
-Butyric Acid,,kg,,,,
-B-Safe HC,,kg,,,,
-SULPTRIM,,L,,,,
-YSP BIO MAX PREMIX POWDER,,Kg,,,,
-OPTICELL C5,,Kg,,,,
-Para 25,,Ml,,,,
-Iron 200,,Ml,,,,
-Olvac B+G,,Ml,,,,
-Axtra Phytase 10000 FTU,,Kg,,,,
-Coryza Oil,,ML,,,,
-Topicure Plus,,ML,,,,
-Poly,,Little,,,,
-Dung,,-,,,,
-YUCOMY PERMIX POWDER,,KG,,,,
-Namflo 5%,,kg,,,,
-Vaksimune IBD D,,Dose,,,,
-Protexin Lifestart,,ML,,,,
-Soyacel,,Mt,,,,
-Vit.C Powder,,-,,,,
-Packing Meterial,,pcs,,,,
-Vit. E 200,,-,,,,
-Starter Day Old  Chick(Hisex),,Chic,,,,
-Medium Pig,,Kg,,,,
-Vitamin E,,Kg,,,,
-Feed Antibactrial AntiFungi,,kg,,,,
-Vitamin ADE,,btl,,,,
-Flusine 20%,,L,,,,
-IVOMECT Injection,,ML,,,,
-VIVA,,kg,,,,
-Virocid,,L,,,,
-Expired Food,,Kg,,,,
-Y.K. Powder 20%,,kg,,,,
-Octocin,,ml,,,,
-Florcol 20% Premix Powder,,Kg,,,,
-"Liquid Vitamin Additive ",,L,,,,
-Nosiheptide 0.5%,,kg,,,,
-Quinocetone 5%,,kg,,,,
-Coxidin 200,,kg,,,,
-MARBOCYL 10% INJ,,ml,,,,
-CHLORIDE LIME,,KG,,,,
-PREVIRON,,ML,,,,
-Uni-Tray Hole,,Pcs,,,,
-CLAMOXYL LA,,ML,,,,
-Liquid Egg,,KG,,,,
-BIHUN (GRADE 2),,KG,,,,
-Fra OX D,,kg,,,,
-ACIDOFAC AP POWDER,,kg,,,,
-Egg Grade E,,pcs,,,,
-Second Grade Pig unweighted,,Unit,,,,
-Used-Tray(Uni-Tray),,Pcs,,,,
-Used-Tray(AA-Tray),,Pcs,,,,
-Mid Size Pig Extra Charges,,Unit,,,,
-OTC,,Kg,,,,
-Distilled Drinking Water,,lit,,,,
-BMD 50% Soluble,,Bag,,,,
-Enflox-100,,lit,,,,
-Disinfectant,,kg,,,,
+Upkeep Poultry Farm Products or Services,,-,General Purchase,General Sales,NoPTax,NoSTax
+Foreign Worker Permit,,-,General Purchase,General Sales,NoPTax,NoSTax
+Magtox,,Ml,General Purchase,General Sales,NoPTax,NoSTax
+Upkeep Motor Vehicle Products or Services,,-,General Purchase,General Sales,NoPTax,NoSTax
+Fixed Assets,,-,General Purchase,General Sales,NoPTax,NoSTax
+Electricity Usage,,kWh,General Purchase,General Sales,NoPTax,NoSTax
+Electricity Other Charges,,-,General Purchase,General Sales,NoPTax,NoSTax
+Telecommunications Services,,-,General Purchase,General Sales,NoPTax,NoSTax
+Omega Plus,,-,General Purchase,General Sales,NoPTax,NoSTax
+Kryton T1,,kg,General Purchase,General Sales,NoPTax,NoSTax
+Fertilizer,,kg,General Purchase,General Sales,NoPTax,NoSTax
+Tiotilin,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+CTC,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+FlorCol Injection,,ML,General Purchase,General Sales,NoPTax,NoSTax
+ENRO 0.5%,,ML,General Purchase,General Sales,NoPTax,NoSTax
+Sulfarim Powder,,Kgs,General Purchase,General Sales,NoPTax,NoSTax
+Baytril,,ML,General Purchase,General Sales,NoPTax,NoSTax
+Trimixin 480,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+Neosun Soluble Powder 50%,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+Mycostatin-20,,kg,General Purchase,General Sales,NoPTax,NoSTax
+Lucarotin 10%,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+TMP/S-400,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+PACOM,,Drum,General Purchase,General Sales,NoPTax,NoSTax
+Wheat Pollard,,Mt,General Purchase,General Sales,NoPTax,NoSTax
+Corn Powder,,Mt,General Purchase,General Sales,NoPTax,NoSTax
+Dried Spent Grain,,Mt,General Purchase,General Sales,NoPTax,NoSTax
+Fish Meal 60%,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+Full Fat Soybean Meal,,Mt,General Purchase,General Sales,NoPTax,NoSTax
+Hifat Canola Meal,,kg,General Purchase,General Sales,NoPTax,NoSTax
+Lime Stone Grit,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+Upkeep Factory Buildings Products or Services,,-,General Purchase,General Sales,NoPTax,NoSTax
+Upkeep Pig Farm Products or Services,,-,General Purchase,General Sales,NoPTax,NoSTax
+Lime Stone Powder,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+Maize,,Mt,General Purchase,General Sales,NoPTax,NoSTax
+MDCP 21%,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+MDCP 22%,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+N100 (Dabomb-P),,Kg,General Purchase,General Sales,NoPTax,NoSTax
+Poultry Layer Feed,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+Rice Bran,,Mt,General Purchase,General Sales,NoPTax,NoSTax
+Rice Powder,,Mt,General Purchase,General Sales,NoPTax,NoSTax
+Salt,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+Soybean Hull,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+Soybean Meal Hi Pro,,Mt,General Purchase,General Sales,NoPTax,NoSTax
+Soybean Meal Low Pro,,Mt,General Purchase,General Sales,NoPTax,NoSTax
+Wheat Brans,,Mt,General Purchase,General Sales,NoPTax,NoSTax
+CHOLINE CHLORIDE 50% SILICA,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+"Bioplex ",,Kg,General Purchase,General Sales,NoPTax,NoSTax
+Meriden Fusion Dyad,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+Microtech 5000,,KG,General Purchase,General Sales,NoPTax,NoSTax
+Biotronic Top 3,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+Milk Powder,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+Calibrin z,,kg,General Purchase,General Sales,NoPTax,NoSTax
+Cholin-H,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+Arbocel RC Fine,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+Avimix Pan-Cure,,kg,General Purchase,General Sales,NoPTax,NoSTax
+Bact-A-Cid,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+Sodium Bicarbonate,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+eXOLUTION,Livestock Feed Pro-biotic & Bacteriophage,Kg,General Purchase,General Sales,NoPTax,NoSTax
+Escent,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+Racto-80,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+P.Vitamin Con-528,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+Nystatin,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+L-Lysine,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+LTHREONINE,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+L-Tryptophan Feed Grade,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+Carbovet T,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+Lutamix 8188,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+Alcandyl Premix 20%,,kg,General Purchase,General Sales,NoPTax,NoSTax
+Volvac ND+IB MLV,,Dose,General Purchase,General Sales,NoPTax,NoSTax
+Tax Filling Fee,,-,General Purchase,General Sales,NoPTax,NoSTax
+Audit Fee,,-,General Purchase,General Sales,NoPTax,NoSTax
+Resdox Plus,,KG,General Purchase,General Sales,NoPTax,NoSTax
+Oil Palm Fruit,,Mt,General Purchase,General Sales,NoPTax,NoSTax
+Trace Min 3806,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+Gladron Poutry-Min,,KG,General Purchase,General Sales,NoPTax,NoSTax
+Globatiox,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+Grainphos 5000 Powder,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+Grobig,,kg,General Purchase,General Sales,NoPTax,NoSTax
+Dl-Meth,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+Premix Pig Starter,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+Premix Pig Breeder,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+Premix Pig Finisher,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+Agita 1GB,,Tin,General Purchase,General Sales,NoPTax,NoSTax
+Gumboro D78,,Dose,General Purchase,General Sales,NoPTax,NoSTax
+Diftosec,,Dose,General Purchase,General Sales,NoPTax,NoSTax
+Olvac A+B+HG,,Ml,General Purchase,General Sales,NoPTax,NoSTax
+Ma5+Clone 30,,Dose,General Purchase,General Sales,NoPTax,NoSTax
+IBNDKILL,,Ml,General Purchase,General Sales,NoPTax,NoSTax
+ILT,,Dose,General Purchase,General Sales,NoPTax,NoSTax
+Castran,,ml,General Purchase,General Sales,NoPTax,NoSTax
+First Aid Blue,,Ml,General Purchase,General Sales,NoPTax,NoSTax
+Intrafer-200,,ml,General Purchase,General Sales,NoPTax,NoSTax
+Iodine,,ml,General Purchase,General Sales,NoPTax,NoSTax
+BTS,,Bots,General Purchase,General Sales,NoPTax,NoSTax
+Lutalyse,,Ml,General Purchase,General Sales,NoPTax,NoSTax
+Oxytocin,,ML,General Purchase,General Sales,NoPTax,NoSTax
+Betamox LA,,ML,General Purchase,General Sales,NoPTax,NoSTax
+Paracetamol BP98,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+PG 600,,VIAL,General Purchase,General Sales,NoPTax,NoSTax
+B-Complex,,Bots,General Purchase,General Sales,NoPTax,NoSTax
+Taktic,,ML,General Purchase,General Sales,NoPTax,NoSTax
+Duphafral Ade Forte,,ML,General Purchase,General Sales,NoPTax,NoSTax
+Baycox,,ML,General Purchase,General Sales,NoPTax,NoSTax
+Ingelvac Circoflex,,Dose,General Purchase,General Sales,NoPTax,NoSTax
+Rhiniffa,,Doses,General Purchase,General Sales,NoPTax,NoSTax
+Geskypur,,Dose,General Purchase,General Sales,NoPTax,NoSTax
+Parvoject,,ML,General Purchase,General Sales,NoPTax,NoSTax
+Akipor,,bot,General Purchase,General Sales,NoPTax,NoSTax
+Toxin Binder,,kg,General Purchase,General Sales,NoPTax,NoSTax
+Vectormune FP MG,,Dose,General Purchase,General Sales,NoPTax,NoSTax
+VTM HVT-NDV,,Dose,General Purchase,General Sales,NoPTax,NoSTax
+Ingelvac Mycoflex,,Dose,General Purchase,General Sales,NoPTax,NoSTax
+Aftopor,,Dose,General Purchase,General Sales,NoPTax,NoSTax
+Ingelvac PRRS MLV,,Dose,General Purchase,General Sales,NoPTax,NoSTax
+Pestiffa FL,,Dose,General Purchase,General Sales,NoPTax,NoSTax
+Needle,,box,General Purchase,General Sales,NoPTax,NoSTax
+Norodine 24,,ml,General Purchase,General Sales,NoPTax,NoSTax
+Note,,-,General Purchase,General Sales,NoPTax,NoSTax
+Entril 20,,Bot,General Purchase,General Sales,NoPTax,NoSTax
+Phosphor Mega 5000,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+Ritavit H2(Spray Dried Biotin 2%),,KG,General Purchase,General Sales,NoPTax,NoSTax
+Vit-Para,,btl,General Purchase,General Sales,NoPTax,NoSTax
+Fercobsang,,ml,General Purchase,General Sales,NoPTax,NoSTax
+Hinatiamun 200,,kg,General Purchase,General Sales,NoPTax,NoSTax
+Alum,,kg,General Purchase,General Sales,NoPTax,NoSTax
+Exnursery Banana Plants,,-,General Purchase,General Sales,NoPTax,NoSTax
+Upkeep Drainage Products or Services,,-,General Purchase,General Sales,NoPTax,NoSTax
+Upkeep Machinery Products or Services,,-,General Purchase,General Sales,NoPTax,NoSTax
+Upkeep Road Products or Services,,-,General Purchase,General Sales,NoPTax,NoSTax
+AI Tools & Implements,,-,General Purchase,General Sales,NoPTax,NoSTax
+Foreign Workers Medical Examination Fee,,-,General Purchase,General Sales,NoPTax,NoSTax
+Foreign Workers Insurance,,-,General Purchase,General Sales,NoPTax,NoSTax
+Motor Vehicle Insurance,,-,General Purchase,General Sales,NoPTax,NoSTax
+Insurance Guarantee,,-,General Purchase,General Sales,NoPTax,NoSTax
+Cooper Bind,,kg,General Purchase,General Sales,NoPTax,NoSTax
+Pesticide,,kg,General Purchase,General Sales,NoPTax,NoSTax
+Petrol or Diesel,,-,General Purchase,General Sales,NoPTax,NoSTax
+Fencols 4%,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+Veterimoxin LA Clas,,ML,General Purchase,General Sales,NoPTax,NoSTax
+Amprol 12%,,ML,General Purchase,General Sales,NoPTax,NoSTax
+Colistin Sulphate 10%,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+Colmyc-E(SP),,bottle,General Purchase,General Sales,NoPTax,NoSTax
+TM-200,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+Denagard 10% Coated,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+Large Pig unweighted,,Unit,General Purchase,General Sales,NoPTax,NoSTax
+Small Pig unweighted,,Unit,General Purchase,General Sales,NoPTax,NoSTax
+Large Pig,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+Retired Boar,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+Shares Investment,,unit,General Purchase,General Sales,NoPTax,NoSTax
+Retired Boar unweighted,,Unit,General Purchase,General Sales,NoPTax,NoSTax
+Retired Sow,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+Duroc Gilt,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+Retired Sow unweighted,,Unit,General Purchase,General Sales,NoPTax,NoSTax
+Female Duroc,,Unit,General Purchase,General Sales,NoPTax,NoSTax
+Second Grade Pig,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+Male Duroc,,Unit,General Purchase,General Sales,NoPTax,NoSTax
+Small Pig,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+Medium Pig unweighted,,Unit,General Purchase,General Sales,NoPTax,NoSTax
+Small Pig Extra Charges,,Unit,General Purchase,General Sales,NoPTax,NoSTax
+Egg Grade Broken,,pcs,General Purchase,General Sales,NoPTax,NoSTax
+Egg Grade A,,pcs,General Purchase,General Sales,NoPTax,NoSTax
+Egg Grade AA,,pcs,General Purchase,General Sales,NoPTax,NoSTax
+Telur Pidan,,pcs,General Purchase,General Sales,NoPTax,NoSTax
+Salted Duck Egg,,box,General Purchase,General Sales,NoPTax,NoSTax
+Egg Grade White,,pcs,General Purchase,General Sales,NoPTax,NoSTax
+Egg Grade G,,pcs,General Purchase,General Sales,NoPTax,NoSTax
+Egg Grade F,,pcs,General Purchase,General Sales,NoPTax,NoSTax
+Egg Grade Crack,,pcs,General Purchase,General Sales,NoPTax,NoSTax
+Egg Grade C,,pcs,General Purchase,General Sales,NoPTax,NoSTax
+Egg Grade B,,pcs,General Purchase,General Sales,NoPTax,NoSTax
+Egg Grade Dirty,,pcs,General Purchase,General Sales,NoPTax,NoSTax
+Egg Grade D,,pcs,General Purchase,General Sales,NoPTax,NoSTax
+Partin Fish,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+Egg Tray,,pcs,General Purchase,General Sales,NoPTax,NoSTax
+Uni-Tray,,Pcs,General Purchase,General Sales,NoPTax,NoSTax
+Duphalyte Injection,,ml,General Purchase,General Sales,NoPTax,NoSTax
+Herbicite,,Drum,General Purchase,General Sales,NoPTax,NoSTax
+Diluent,,ml,General Purchase,General Sales,NoPTax,NoSTax
+Cofacalcium,,ml,General Purchase,General Sales,NoPTax,NoSTax
+Nysprofeed-200,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+Retired Layer,,-,General Purchase,General Sales,NoPTax,NoSTax
+Volvac IBD(INT LUKER),,Dose,General Purchase,General Sales,NoPTax,NoSTax
+Messing,,-,General Purchase,General Sales,NoPTax,NoSTax
+Foreign Worker Services Fee,,-,General Purchase,General Sales,NoPTax,NoSTax
+AA-Tray,,pcs,General Purchase,General Sales,NoPTax,NoSTax
+Florfen,,ml,General Purchase,General Sales,NoPTax,NoSTax
+Tools & Implement Products,,-,General Purchase,General Sales,NoPTax,NoSTax
+Pro-M,Livestock Feed Pro-biotic,kg,General Purchase,General Sales,NoPTax,NoSTax
+ND+IB+G,,ML,General Purchase,General Sales,NoPTax,NoSTax
+Maladion 84E,,L,General Purchase,General Sales,NoPTax,NoSTax
+Kanaprim 24%,,ML,General Purchase,General Sales,NoPTax,NoSTax
+AUSKIPRA - GN,,DS,General Purchase,General Sales,NoPTax,NoSTax
+STPEN,,DS,General Purchase,General Sales,NoPTax,NoSTax
+E-10,,LIT,General Purchase,General Sales,NoPTax,NoSTax
+T5 X SD,,KG,General Purchase,General Sales,NoPTax,NoSTax
+Gestavet-Prost,,ML,General Purchase,General Sales,NoPTax,NoSTax
+NSL Decox,,Liter,General Purchase,General Sales,NoPTax,NoSTax
+Amoxicillin Feed,,kg,General Purchase,General Sales,NoPTax,NoSTax
+Tributyrin 45%,,kg,General Purchase,General Sales,NoPTax,NoSTax
+IVOMECTING,,kg,General Purchase,General Sales,NoPTax,NoSTax
+Ceporin 500,,-,General Purchase,General Sales,NoPTax,NoSTax
+Tylosin 100 A,,-,General Purchase,General Sales,NoPTax,NoSTax
+Sodium Salicylate,,-,General Purchase,General Sales,NoPTax,NoSTax
+Protexin SP,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+Oil,,Kgs,General Purchase,General Sales,NoPTax,NoSTax
+Methanamin Excel,,pkts,General Purchase,General Sales,NoPTax,NoSTax
+Vaccine Tools,,-,General Purchase,General Sales,NoPTax,NoSTax
+Cygro 1%,,kg,General Purchase,General Sales,NoPTax,NoSTax
+FRA C12,,kg,General Purchase,General Sales,NoPTax,NoSTax
+Tylan 100 Premix,,kg,General Purchase,General Sales,NoPTax,NoSTax
+Betaine Hydrochloride 98%,,kg,General Purchase,General Sales,NoPTax,NoSTax
+Catosal 10% Inj,,ml,General Purchase,General Sales,NoPTax,NoSTax
+Flunivet 5%,,ml,General Purchase,General Sales,NoPTax,NoSTax
+ADE,,g,General Purchase,General Sales,NoPTax,NoSTax
+Printing & Stationaries,,-,General Purchase,General Sales,NoPTax,NoSTax
+YSP Bio Mix,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+Virucidal Extra,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+BMD 10% Feed,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+Aminovit,,Bot,General Purchase,General Sales,NoPTax,NoSTax
+Boar,,Unit,General Purchase,General Sales,NoPTax,NoSTax
+Piglet Energy Drink,,ml,General Purchase,General Sales,NoPTax,NoSTax
+Protease,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+NSP Enzyme,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+Butyric Acid,,kg,General Purchase,General Sales,NoPTax,NoSTax
+B-Safe HC,,kg,General Purchase,General Sales,NoPTax,NoSTax
+SULPTRIM,,L,General Purchase,General Sales,NoPTax,NoSTax
+YSP BIO MAX PREMIX POWDER,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+OPTICELL C5,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+Para 25,,Ml,General Purchase,General Sales,NoPTax,NoSTax
+Iron 200,,Ml,General Purchase,General Sales,NoPTax,NoSTax
+Olvac B+G,,Ml,General Purchase,General Sales,NoPTax,NoSTax
+Axtra Phytase 10000 FTU,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+Coryza Oil,,ML,General Purchase,General Sales,NoPTax,NoSTax
+Topicure Plus,,ML,General Purchase,General Sales,NoPTax,NoSTax
+Poly,,Little,General Purchase,General Sales,NoPTax,NoSTax
+Dung,,-,General Purchase,General Sales,NoPTax,NoSTax
+YUCOMY PERMIX POWDER,,KG,General Purchase,General Sales,NoPTax,NoSTax
+Namflo 5%,,kg,General Purchase,General Sales,NoPTax,NoSTax
+Vaksimune IBD D,,Dose,General Purchase,General Sales,NoPTax,NoSTax
+Protexin Lifestart,,ML,General Purchase,General Sales,NoPTax,NoSTax
+Soyacel,,Mt,General Purchase,General Sales,NoPTax,NoSTax
+Vit.C Powder,,-,General Purchase,General Sales,NoPTax,NoSTax
+Packing Meterial,,pcs,General Purchase,General Sales,NoPTax,NoSTax
+Vit. E 200,,-,General Purchase,General Sales,NoPTax,NoSTax
+Starter Day Old  Chick(Hisex),,Chic,General Purchase,General Sales,NoPTax,NoSTax
+Medium Pig,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+Vitamin E,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+Feed Antibactrial AntiFungi,,kg,General Purchase,General Sales,NoPTax,NoSTax
+Vitamin ADE,,btl,General Purchase,General Sales,NoPTax,NoSTax
+Flusine 20%,,L,General Purchase,General Sales,NoPTax,NoSTax
+IVOMECT Injection,,ML,General Purchase,General Sales,NoPTax,NoSTax
+VIVA,,kg,General Purchase,General Sales,NoPTax,NoSTax
+Virocid,,L,General Purchase,General Sales,NoPTax,NoSTax
+Expired Food,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+Y.K. Powder 20%,,kg,General Purchase,General Sales,NoPTax,NoSTax
+Octocin,,ml,General Purchase,General Sales,NoPTax,NoSTax
+Florcol 20% Premix Powder,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+"Liquid Vitamin Additive ",,L,General Purchase,General Sales,NoPTax,NoSTax
+Nosiheptide 0.5%,,kg,General Purchase,General Sales,NoPTax,NoSTax
+Quinocetone 5%,,kg,General Purchase,General Sales,NoPTax,NoSTax
+Coxidin 200,,kg,General Purchase,General Sales,NoPTax,NoSTax
+MARBOCYL 10% INJ,,ml,General Purchase,General Sales,NoPTax,NoSTax
+CHLORIDE LIME,,KG,General Purchase,General Sales,NoPTax,NoSTax
+PREVIRON,,ML,General Purchase,General Sales,NoPTax,NoSTax
+Uni-Tray Hole,,Pcs,General Purchase,General Sales,NoPTax,NoSTax
+CLAMOXYL LA,,ML,General Purchase,General Sales,NoPTax,NoSTax
+Liquid Egg,,KG,General Purchase,General Sales,NoPTax,NoSTax
+BIHUN (GRADE 2),,KG,General Purchase,General Sales,NoPTax,NoSTax
+Fra OX D,,kg,General Purchase,General Sales,NoPTax,NoSTax
+ACIDOFAC AP POWDER,,kg,General Purchase,General Sales,NoPTax,NoSTax
+Egg Grade E,,pcs,General Purchase,General Sales,NoPTax,NoSTax
+Second Grade Pig unweighted,,Unit,General Purchase,General Sales,NoPTax,NoSTax
+Used-Tray(Uni-Tray),,Pcs,General Purchase,General Sales,NoPTax,NoSTax
+Used-Tray(AA-Tray),,Pcs,General Purchase,General Sales,NoPTax,NoSTax
+Mid Size Pig Extra Charges,,Unit,General Purchase,General Sales,NoPTax,NoSTax
+OTC,,Kg,General Purchase,General Sales,NoPTax,NoSTax
+Distilled Drinking Water,,lit,General Purchase,General Sales,NoPTax,NoSTax
+BMD 50% Soluble,,Bag,General Purchase,General Sales,NoPTax,NoSTax
+Enflox-100,,lit,General Purchase,General Sales,NoPTax,NoSTax
+Disinfectant,,kg,General Purchase,General Sales,NoPTax,NoSTax
