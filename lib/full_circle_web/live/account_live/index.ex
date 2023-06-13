@@ -29,7 +29,7 @@ defmodule FullCircleWeb.AccountLive.Index do
       </div>
       <div
         id="objects_list"
-        :if={Enum.count(@streams.objects) > 0 && @update == "replace"}
+        :if={Enum.count(@streams.objects) > 0  or @page > 1}
         phx-update={@update}
         phx-viewport-bottom={!@end_of_timeline? && "next-page"}
         phx-page-loading
