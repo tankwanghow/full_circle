@@ -63,13 +63,13 @@ defmodule FullCircle.Sys do
     [
       %{
         name: "General Purchase",
-        account_type: "Expenses",
+        account_type: "Cost Of Goods Sold",
         descriptions:
           "Account that shows the total amount a business spent on purchasing goods or services during a specific period, including all types of purchases. It helps businesses track their expenses and calculate their cost of goods sold, which is essential for determining their net profit."
       },
       %{
         name: "General Sales",
-        account_type: "Sales",
+        account_type: "Revenue",
         descriptions:
           "Account that shows the total purchases made by a business during a specific period, including all types of sales. It helps businesses track their revenue and calculate their gross profit."
       },

@@ -11,7 +11,19 @@ defmodule FullCircle.Authorization do
   def can?(user, :seed_taxcodes, company),
     do: allow_roles(~w(admin), company, user)
 
-    def can?(user, :seed_goods, company),
+  def can?(user, :seed_goods, company),
+    do: allow_roles(~w(admin), company, user)
+
+  def can?(user, :seed_contacts, company),
+    do: allow_roles(~w(admin), company, user)
+
+  def can?(user, :seed_accounts, company),
+    do: allow_roles(~w(admin), company, user)
+
+  def can?(user, :seed_fixed_assets, company),
+    do: allow_roles(~w(admin), company, user)
+
+  def can?(user, :seed_transactions, company),
     do: allow_roles(~w(admin), company, user)
 
   def can?(user, :create_pur_invoice, company),

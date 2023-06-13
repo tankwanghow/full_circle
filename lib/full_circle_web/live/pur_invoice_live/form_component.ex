@@ -63,14 +63,14 @@ defmodule FullCircleWeb.PurInvoiceLive.FormComponent do
       ) do
     settings = socket.assigns.settings
 
-    setting = Enum.find(settings, fn x -> x.id == String.to_integer(id) end)
+    setting = Enum.find(settings, fn x -> x.id == id end)
 
     %{"value" => value} = Map.get(new_settings, id)
 
     setting = FullCircle.Sys.update_setting(setting, value)
 
     settings =
-      Enum.reject(settings, fn x -> x.id == String.to_integer(id) end)
+      Enum.reject(settings, fn x -> x.id == id end)
       |> Enum.concat([setting])
       |> Enum.sort_by(& &1.id)
 

@@ -1,6 +1,5 @@
 defmodule FullCircle.Accounting do
   import Ecto.Query, warn: false
-  import FullCircle.Authorization
 
   alias FullCircle.Accounting.{
     Account,
@@ -38,22 +37,19 @@ defmodule FullCircle.Accounting do
       "Equity",
       "Current Liability",
       "Liability",
-      "Non-current Liability"
+      "Non-current Liability",
+      "Intangible Asset", "Accrual"
     ]
   end
 
   defp profit_loss_account_types do
-    ["Depreciation", "Direct Costs", "Expenses", "Overhead", "Other Income", "Revenue", "Sales"]
+    ["Depreciation", "Direct Costs", "Expenses", "Overhead", "Other Income", "Revenue", "Cost Of Goods Sold"]
   end
 
   def depreciation_methods do
     [
       "No Depreciation",
-      "Straight-Line",
-      "Declining Balance",
-      "Declining Balance 150%",
-      "Declining Balance 200%",
-      "Full Depreciation at Purchase"
+      "Straight-Line"
     ]
   end
 

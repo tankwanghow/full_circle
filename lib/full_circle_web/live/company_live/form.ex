@@ -18,9 +18,12 @@ defmodule FullCircleWeb.CompanyLive.Form do
       method={@trigger_method}
       class="max-w-2xl mx-auto"
     >
-      <div class="grid grid-cols-12 gap-2">
-        <div class="col-span-12">
+      <div class="grid grid-cols-12 gap-1">
+        <div class="col-span-7">
           <.input field={@form[:name]} label={gettext("Name")} />
+        </div>
+        <div class="col-span-5">
+          <.input field={@form[:reg_no]} label={gettext("Reg No")} />
         </div>
         <div class="col-span-6">
           <.input field={@form[:address1]} label={gettext("Address Line 1")} />
@@ -31,13 +34,13 @@ defmodule FullCircleWeb.CompanyLive.Form do
         <div class="col-span-4">
           <.input field={@form[:city]} label={gettext("City")} />
         </div>
-        <div class="col-span-4">
+        <div class="col-span-2">
           <.input field={@form[:zipcode]} label={gettext("Postal Code")} />
         </div>
-        <div class="col-span-4">
+        <div class="col-span-3">
           <.input field={@form[:state]} label={gettext("State")} />
         </div>
-        <div class="col-span-4">
+        <div class="col-span-3">
           <.input field={@form[:country]} label={gettext("Country")} list="countries" />
         </div>
         <div class="col-span-4">
@@ -52,13 +55,10 @@ defmodule FullCircleWeb.CompanyLive.Form do
         <div class="col-span-4">
           <.input field={@form[:email]} type="email" label={gettext("Email")} />
         </div>
-        <div class="col-span-4">
-          <.input field={@form[:reg_no]} label={gettext("Reg No")} />
-        </div>
-        <div class="col-span-4">
+        <div class="col-span-3">
           <.input field={@form[:tax_id]} label={gettext("Tax No")} />
         </div>
-        <div class="col-span-4">
+        <div class="col-span-3">
           <.input
             field={@form[:closing_month]}
             options={[
@@ -79,7 +79,7 @@ defmodule FullCircleWeb.CompanyLive.Form do
             label={gettext("Closing Month")}
           />
         </div>
-        <div class="col-span-4">
+        <div class="col-span-2">
           <.input
             field={@form[:closing_day]}
             options={Enum.to_list(1..31)}

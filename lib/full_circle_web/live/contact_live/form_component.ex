@@ -115,35 +115,35 @@ defmodule FullCircleWeb.ContactLive.FormComponent do
         phx-submit="save"
         class="mx-auto"
       >
-        <div class="grid grid-cols-12 gap-2">
-          <div class="col-span-12">
+        <div class="grid grid-cols-12 gap-1">
+          <div class="col-span-7">
             <.input field={@form[:name]} label={gettext("Name")} />
           </div>
-          <div class="col-span-12">
-            <.input field={@form[:address1]} label={gettext("Address Line 1")} />
-          </div>
-          <div class="col-span-12">
-            <.input field={@form[:address2]} label={gettext("Address Line 2")} />
-          </div>
-          <div class="col-span-6">
-            <.input field={@form[:city]} label={gettext("City")} />
-          </div>
-          <div class="col-span-6">
-            <.input field={@form[:zipcode]} label={gettext("Postal Code")} />
-          </div>
-          <div class="col-span-4  ">
-            <.input field={@form[:state]} label={gettext("State")} />
-          </div>
-          <div class="col-span-4">
-            <.input field={@form[:country]} label={gettext("Country")} list="countries" />
-          </div>
-          <div class="col-span-4">
+          <div class="col-span-5">
             <.input field={@form[:reg_no]} label={gettext("Reg No")} />
           </div>
-          <div class="col-span-12">
+          <div class="col-span-6">
+            <.input field={@form[:address1]} label={gettext("Address Line 1")} />
+          </div>
+          <div class="col-span-6">
+            <.input field={@form[:address2]} label={gettext("Address Line 2")} />
+          </div>
+          <div class="col-span-4">
+            <.input field={@form[:city]} label={gettext("City")} />
+          </div>
+          <div class="col-span-2">
+            <.input field={@form[:zipcode]} label={gettext("Postal Code")} />
+          </div>
+          <div class="col-span-3  ">
+            <.input field={@form[:state]} label={gettext("State")} />
+          </div>
+          <div class="col-span-3">
+            <.input field={@form[:country]} label={gettext("Country")} list="countries" />
+          </div>
+          <div class="col-span-6">
             <.input field={@form[:contact_info]} label={gettext("Contact")} type="textarea" />
           </div>
-          <div class="col-span-12">
+          <div class="col-span-6">
             <.input field={@form[:descriptions]} label={gettext("Descriptions")} type="textarea" />
           </div>
         </div>

@@ -4,53 +4,43 @@ defmodule FullCircle.Seeding do
 
   alias FullCircle.Repo
   alias FullCircle.Sys.{Log}
-  alias FullCircle.Accounting.{TaxCode}
+  alias FullCircle.Accounting.{TaxCode, Account, Contact, Transaction, FixedAsset}
   alias FullCircle.Product.{Good}
 
-  def seed("TaxCodes", seed_data, company, user) do
-    case can?(user, :seed_taxcodes, company) do
-      true ->
-        Repo.transaction(fn repo ->
-          Enum.map(seed_data, fn x ->
-            {:ok, k} = repo.insert(x)
-
-            repo.insert(
-              Log.changeset(%Log{}, %{
-                entity: %TaxCode{}.__meta__.source,
-                entity_id: k.id,
-                action: "seeding",
-                delta: "N/A",
-                user_id: user.id,
-                company_id: company.id
-              })
-            )
-            k
-          end)
-
-        end)
-        |> case do
-          {:ok, _} ->
-            :ok
-
-          {:error, _} ->
-            :error
-        end
-
-      false ->
-        :not_authorise
-    end
+  def seed("TaxCodes", seed_data, com, user) do
+    save_seed(%TaxCode{}, :seed_taxcodes, seed_data, com, user)
   end
 
-  def seed("Goods", seed_data, company, user) do
-    case can?(user, :seed_goods, company) do
+  def seed("Goods", seed_data, com, user) do
+    save_seed(%Good{}, :seed_goods, seed_data, com, user)
+  end
+
+  def seed("Accounts", seed_data, com, user) do
+    save_seed(%Account{}, :seed_accounts, seed_data, com, user)
+  end
+
+  def seed("Contacts", seed_data, com, user) do
+    save_seed(%Contact{}, :seed_contacts, seed_data, com, user)
+  end
+
+  def seed("FixedAssets", seed_data, com, user) do
+    save_seed(%FixedAsset{}, :seed_fixed_assets, seed_data, com, user)
+  end
+
+  def seed("Transactions", seed_data, com, user) do
+    save_seed(%Transaction{}, :seed_transactions, seed_data, com, user)
+  end
+
+  defp save_seed(klass_struct, action, seed_data, company, user) do
+    case can?(user, action, company) do
       true ->
         Repo.transaction(fn repo ->
-          Enum.map(seed_data, fn x ->
-            {:ok, k} = repo.insert(x)
+          Enum.each(seed_data, fn x ->
+            k = repo.insert!(x)
 
             repo.insert(
               Log.changeset(%Log{}, %{
-                entity: %Good{}.__meta__.source,
+                entity: klass_struct.__meta__.source,
                 entity_id: k.id,
                 action: "seeding",
                 delta: "N/A",
@@ -58,21 +48,15 @@ defmodule FullCircle.Seeding do
                 company_id: company.id
               })
             )
-            k
           end)
-
         end)
-        |> case do
-          {:ok, _} ->
-            :ok
-
-          {:error, _} ->
-            :error
-        end
 
       false ->
         :not_authorise
     end
+  rescue
+    e in Ecto.InvalidChangesetError ->
+      {:error, e}
   end
 
   def fill_changeset("Goods", attr, com, user) do
@@ -133,6 +117,60 @@ defmodule FullCircle.Seeding do
     FullCircle.StdInterface.changeset(
       FullCircle.Accounting.TaxCode,
       FullCircle.Accounting.TaxCode.__struct__(),
+      attr,
+      com
+    )
+  end
+
+  def fill_changeset("Contacts", attr, com, _user) do
+    FullCircle.StdInterface.changeset(
+      FullCircle.Accounting.Contact,
+      FullCircle.Accounting.Contact.__struct__(),
+      attr,
+      com
+    )
+  end
+
+  def fill_changeset("Accounts", attr, com, _user) do
+    FullCircle.StdInterface.changeset(
+      FullCircle.Accounting.Account,
+      FullCircle.Accounting.Account.__struct__(),
+      attr,
+      com
+    )
+  end
+
+  def fill_changeset("FixedAssets", attr, com, user) do
+    asset_ac =
+      FullCircle.Accounting.get_account_by_name(
+        Map.fetch!(attr, "asset_ac_name"),
+        com,
+        user
+      )
+
+    dep_ac =
+      FullCircle.Accounting.get_account_by_name(
+        Map.fetch!(attr, "depre_ac_name"),
+        com,
+        user
+      )
+
+    dis_ac =
+      FullCircle.Accounting.get_account_by_name(
+        Map.fetch!(attr, "disp_fund_ac_name"),
+        com,
+        user
+      )
+
+    attr =
+      attr
+      |> Map.merge(%{"asset_ac_id" => if(asset_ac, do: asset_ac.id, else: nil)})
+      |> Map.merge(%{"depre_ac_id" => if(dep_ac, do: dep_ac.id, else: nil)})
+      |> Map.merge(%{"disp_fund_ac_id" => if(dis_ac, do: dis_ac.id, else: nil)})
+
+    FullCircle.StdInterface.changeset(
+      FullCircle.Accounting.FixedAsset,
+      FullCircle.Accounting.FixedAsset.__struct__(),
       attr,
       com
     )

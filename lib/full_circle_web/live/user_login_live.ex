@@ -4,7 +4,7 @@ defmodule FullCircleWeb.UserLoginLive do
   def render(assigns) do
     ~H"""
     <div class="mx-auto max-w-sm">
-      <.header class="text-center">
+      <.header class="text-center mb-0">
         <%= gettext("Log in to account") %>
         <:subtitle>
           <%= gettext("Don't have an account?") %>

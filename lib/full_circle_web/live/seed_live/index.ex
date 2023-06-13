@@ -4,9 +4,12 @@ defmodule FullCircleWeb.SeedLive.Index do
 
   @seed_tables %{
     "--Select One--" => ~w(),
-    "Accounts" => ~w(),
+    "FixedAssets" =>
+      ~w(name pur_date pur_price descriptions depre_start_date residual_value depre_method depre_rate asset_ac_name depre_ac_name disp_fund_ac_name depre_interval),
+    "Accounts" => ~w(account_type name descriptions),
     "TaxCodes" => ~w(code tax_type rate descriptions account_name),
-    "Contacts" => ~w(),
+    "Contacts" =>
+      ~w(name address1 address2 city zipcode state country reg_no email contact_info descriptions),
     "Goods" =>
       ~w(name descriptions unit purchase_account_name sales_account_name purchase_tax_code_name sales_tax_code_name)
   }
@@ -58,17 +61,17 @@ defmodule FullCircleWeb.SeedLive.Index do
            socket.assigns.current_company,
            socket.assigns.current_user
          ) do
-      :ok ->
+      {:ok, _cs} ->
         {:noreply,
          socket
          |> assign(status: "Seeding #{val} Database Done!!")
          |> assign(status_flag: :success)
          |> reset_form()}
 
-      :error ->
+      {:error, msg} ->
         {:noreply,
          socket
-         |> assign(status: "Seeding #{val} Database Failed!!")
+         |> assign(status: "Seeding #{val} Database Failed!! #{inspect(msg)}")
          |> assign(status_flag: :error)}
 
       :not_authorise ->
@@ -247,7 +250,11 @@ defmodule FullCircleWeb.SeedLive.Index do
         </div>
 
         <div class="border rounded-lg bg-gray-200 border-gray-500 p-2 mb-1">
-          <div class="p-2">CSV file require headers</div>
+          <div class="p-2">
+            CSV file require
+            <headers></headers>
+            below.
+          </div>
           <div class="font-bold font-mono text-amber-600">
             <%= Enum.join(@seed_table_headers, ", ") %>
           </div>

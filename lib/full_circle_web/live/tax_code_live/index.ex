@@ -30,6 +30,7 @@ defmodule FullCircleWeb.TaxCodeLive.Index do
       </div>
       <div
         id="objects_list"
+        :if={Enum.count(@streams.objects) > 0 && @update == "replace"}
         phx-update={@update}
         phx-viewport-bottom={!@end_of_timeline? && "next-page"}
         phx-page-loading
