@@ -26,6 +26,15 @@ defmodule FullCircle.Authorization do
   def can?(user, :seed_transactions, company),
     do: allow_roles(~w(admin), company, user)
 
+    def can?(user, :create_fixed_asset_depreciation, company),
+    do: allow_roles(~w(admin manager supervisor), company, user)
+
+  def can?(user, :update_fixed_asset_depreciation, company),
+    do: allow_roles(~w(admin manager supervisor), company, user)
+
+  def can?(user, :delete_fixed_asset_depreciation, company),
+    do: allow_roles(~w(admin manager supervisor), company, user)
+
   def can?(user, :create_pur_invoice, company),
     do: allow_roles(~w(admin manager supervisor clerk), company, user)
 

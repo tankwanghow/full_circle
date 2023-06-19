@@ -18,8 +18,10 @@ defmodule FullCircleWeb.FixedAssetLive.IndexComponent do
       <div class="grid grid-cols-12">
         <div class="col-span-4 p-2 bg-gray-200">
           <.link
+            :if={@obj.depre_method != "No Depreciation"}
             phx-value-object-id={@obj.id}
-            phx-click={:show_depreciation}
+            phx-value-object-name={@obj.name}
+            navigate={~p"/companies/#{@company.id}/fixed_assets/#{@obj.id}/depreciations"}
             class="border bg-red-200 hover:bg-red-500 text-sm text-black rounded-full px-2 py-1 border-red-500 mx-1"
           >
             <%= gettext("Depreciations") %>

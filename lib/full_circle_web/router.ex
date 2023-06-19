@@ -104,6 +104,7 @@ defmodule FullCircleWeb.Router do
       live("/tax_codes", TaxCodeLive.Index, :index)
       live("/goods", GoodLive.Index, :index)
       live("/fixed_assets", FixedAssetLive.Index, :index)
+      live("/fixed_assets/:id/depreciations", FixedAssetLive.Depreciations, :index)
       live("/seeds", SeedLive.Index, :index)
       live("/invoices", InvoiceLive.Index, :index)
       live("/pur_invoices", PurInvoiceLive.Index, :index)

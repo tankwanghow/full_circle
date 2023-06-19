@@ -62,6 +62,7 @@ defmodule FullCircleWeb.CompanyLive.Form do
           <.input
             field={@form[:closing_month]}
             options={[
+              select_month: -1,
               January: 1,
               February: 2,
               March: 3,
@@ -82,7 +83,7 @@ defmodule FullCircleWeb.CompanyLive.Form do
         <div class="col-span-2">
           <.input
             field={@form[:closing_day]}
-            options={Enum.to_list(1..31)}
+            options={@closing_days}
             type="select"
             label={gettext("Closing Day")}
           />
@@ -118,6 +119,7 @@ defmodule FullCircleWeb.CompanyLive.Form do
       |> assign(:current_company, session["current_company"])
       |> assign(:current_role, session["current_role"])
 
+
     case socket.assigns.live_action do
       :new -> mount_new(socket)
       :edit -> mount_edit(params, socket)
@@ -133,7 +135,8 @@ defmodule FullCircleWeb.CompanyLive.Form do
      |> assign(:form, form)
      |> assign(:trigger_submit, false)
      |> assign(:trigger_action, nil)
-     |> assign(:trigger_method, nil)}
+     |> assign(:trigger_method, nil)
+     |> assign(closing_days: [])}
   end
 
   defp mount_edit(%{"id" => id}, socket) do
@@ -147,7 +150,30 @@ defmodule FullCircleWeb.CompanyLive.Form do
      |> assign(:trigger_submit, false)
      |> assign(:trigger_action, ~p"/update_active_company?id=#{company.id}")
      |> assign(:trigger_method, "post")
-     |> assign(:company, company)}
+     |> assign(:company, company)
+     |> assign(closing_days: closing_days(company.closing_month))}
+  end
+
+  @impl true
+  def handle_event(
+        "validate",
+        %{"_target" => ["company", "closing_month"], "company" => %{"closing_month" => mth}},
+        socket
+      ) do
+
+    {:noreply, assign(socket, closing_days: closing_days(String.to_integer(mth)))}
+  end
+
+  defp closing_days(mth) do
+    th31 = [1, 3, 5, 7, 8, 10, 12]
+    th30 = [4, 6, 9, 11]
+
+    cond do
+      !is_nil(Enum.find(th31, fn x -> x == mth end)) -> Enum.to_list(1..31)
+      !is_nil(Enum.find(th30, fn x -> x == mth end)) -> Enum.to_list(1..30)
+      mth == 2 -> Enum.to_list(1..28)
+      true -> []
+    end
   end
 
   @impl true

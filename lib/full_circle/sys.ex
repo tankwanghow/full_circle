@@ -553,4 +553,10 @@ defmodule FullCircle.Sys do
   def company_user_changeset(company_user, attrs \\ %{}) do
     CompanyUser.changeset(company_user, attrs)
   end
+
+  def get_user_default_company_by_email(email) do
+    u = FullCircle.UserAccounts.get_user_by_email(email)
+    c = get_default_company(u)
+    {u, c}
+  end
 end

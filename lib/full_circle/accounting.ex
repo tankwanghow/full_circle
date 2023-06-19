@@ -38,12 +38,21 @@ defmodule FullCircle.Accounting do
       "Current Liability",
       "Liability",
       "Non-current Liability",
-      "Intangible Asset", "Accrual"
+      "Intangible Asset",
+      "Accrual"
     ]
   end
 
   defp profit_loss_account_types do
-    ["Depreciation", "Direct Costs", "Expenses", "Overhead", "Other Income", "Revenue", "Cost Of Goods Sold"]
+    [
+      "Depreciation",
+      "Direct Costs",
+      "Expenses",
+      "Overhead",
+      "Other Income",
+      "Revenue",
+      "Cost Of Goods Sold"
+    ]
   end
 
   def depreciation_methods do
@@ -141,9 +150,17 @@ defmodule FullCircle.Accounting do
       on: dep.transaction_id == txn.id,
       where: dep.fixed_asset_id == ^fx_id,
       select: %{
+        id: dep.fixed_asset_id,
         cost_basis: dep.cost_basis,
         depre_date: dep.depre_date,
         amount: dep.amount,
+        cume_depre:
+          fragment(
+            "SUM(?) OVER (PARTITION BY ? ORDER BY ?)",
+            dep.amount,
+            dep.fixed_asset_id,
+            dep.depre_date
+          ),
         closed: fragment("COALESCE(?, false)", txn.closed),
         transaction_id: txn.id
       },
@@ -165,65 +182,62 @@ defmodule FullCircle.Accounting do
     end
   end
 
-  defp yearly_deprecaitions(fa, edate, com) do
+  def depreciation_dates(fa, com) when fa.depre_interval == "Yearly" do
     depreciations = depreciations_query(fa.id)
-
-    cume_depre =
-      depreciations
-      |> Enum.reduce(Decimal.new(0), fn cum, dep -> Decimal.add(cum, dep.amount) end)
-      |> Decimal.to_float()
-
     last_depre = depreciations |> List.last()
 
-    last_dep_year =
-      if(last_depre, do: last_depre.depre_date.year + 1, else: fa.depre_start_date.year)
+    dd = if(last_depre, do: last_depre.depre_date, else: fa.depre_start_date)
 
-    yr_list =
-      if edate.year >= last_dep_year do
-        Enum.to_list(last_dep_year..edate.year)
-        |> Enum.map(fn x -> Date.new!(x, com.closing_month, com.closing_day) end)
-      else
-        []
+    last_dep_date =
+      case Date.new(dd.year, com.closing_month, com.closing_day) do
+        {:ok, res} -> res
+        {:error, _} -> Date.end_of_month(dd)
       end
+
+    diff = Timex.diff(last_dep_date, fa.depre_start_date, :year)
+    n = 1 / Decimal.to_float(fa.depre_rate) - diff
+
+    {Enum.to_list(0..trunc(n))
+     |> Enum.map(fn x -> Timex.shift(last_dep_date, years: x) end), last_depre}
+  end
+
+  def depreciation_dates(fa, com) when fa.depre_interval == "Monthly" do
+    depreciations = depreciations_query(fa.id)
+    last_depre = depreciations |> List.last()
+
+    dd = if(last_depre, do: last_depre.depre_date, else: fa.depre_start_date)
+
+    last_dep_date =
+      case Date.new(dd.year, dd.month, com.closing_day) do
+        {:ok, res} -> res
+        {:error, _} -> Date.end_of_month(dd)
+      end
+
+    diff = Timex.diff(last_dep_date, fa.depre_start_date, :month)
+    n = 1 / Decimal.to_float(fa.depre_rate) * 12 - diff
+
+    {Enum.to_list(0..trunc(n))
+     |> Enum.map(fn x -> Timex.shift(last_dep_date, months: x) end), last_depre}
+  end
+
+  defp yearly_deprecaitions(fa, edate, com) do
+    {range, last_depre} = depreciation_dates(fa, com)
+    cume_depre = if(last_depre, do: last_depre.cume_depre, else: 0.0)
+
+    range = Enum.reject(range, fn d -> Date.compare(d, edate) == :gt end)
 
     cost = fa.pur_price |> Decimal.to_float()
     rate = fa.depre_rate |> Decimal.to_float()
     resi = fa.residual_value |> Decimal.to_float()
 
-    depreciations_list(fa, cost, cume_depre, rate, resi, yr_list)
+    depreciations_list(fa, cost, cume_depre, rate, resi, range)
   end
 
   defp monthly_deprecaitions(fa, edate, com) do
-    depreciations = depreciations_query(fa.id)
+    {range, last_depre} = depreciation_dates(fa, com)
+    cume_depre = if(last_depre, do: last_depre.cume_depre, else: 0.0)
 
-    cume_depre =
-      depreciations
-      |> Enum.reduce(Decimal.new(0), fn cum, dep -> Decimal.add(cum, dep.amount) end)
-      |> Decimal.to_float()
-
-    last_depre = depreciations |> List.last()
-
-    last_dep_date =
-      if last_depre do
-        last_depre.depre_date |> Timex.shift(months: 1)
-      else
-        fa.depre_start_date
-      end
-
-    range =
-      if Date.compare(edate, last_dep_date) == :gt do
-        Date.range(last_dep_date, edate)
-        |> Enum.to_list()
-        |> Enum.filter(fn x ->
-          x ==
-            case Date.new(x.year, x.month, com.closing_day) do
-              {:ok, res} -> res
-              {:error, _} -> Date.end_of_month(x)
-            end
-        end)
-      else
-        []
-      end
+    range = Enum.reject(range, fn d -> Date.compare(d, edate) == :gt end)
 
     cost = fa.pur_price |> Decimal.to_float()
     rate = (fa.depre_rate |> Decimal.to_float()) / 12
@@ -236,13 +250,18 @@ defmodule FullCircle.Accounting do
     {depre, _} =
       dates
       |> Enum.map_reduce(cume_depre, fn y, cume_depre ->
-        {cond do
-           Float.round(cume_depre + cost * rate, 2) < Float.round(cost - resi, 2) ->
-             {y, Float.round(cost * rate, 2)}
+        cume = Float.round(cume_depre + cost * rate, 2)
+        depre = Float.round(cost * rate, 2)
+        cost_resi = Float.round(cost - resi, 2)
 
-           Float.round(cume_depre + cost * rate, 2) >= Float.round(cost - resi, 2) ->
-             if Float.round(cume_depre, 2) < Float.round(cost - resi, 2) do
-               {y, Float.round(cost - cume_depre - resi, 2)}
+        {cond do
+           cume < cost_resi ->
+             {y, depre, cume}
+
+           cume >= cost_resi ->
+             if Float.round(cume_depre, 2) < cost_resi do
+               {y, Float.round(cost - cume_depre - resi, 2),
+                cume_depre + Float.round(cost - cume_depre - resi, 2)}
              else
                nil
              end
@@ -253,12 +272,13 @@ defmodule FullCircle.Accounting do
       end)
 
     Enum.reject(depre, fn x -> x == nil end)
-    |> Enum.map(fn {y, x} ->
+    |> Enum.map(fn {dt, dep, cume} ->
       %FixedAssetDepreciation{
         fixed_asset_id: fa.id,
-        depre_date: y,
+        depre_date: dt,
         cost_basis: cost,
-        amount: Decimal.new(Float.to_string(x))
+        amount: dep,
+        cume_depre: cume
       }
     end)
   end
@@ -266,6 +286,13 @@ defmodule FullCircle.Accounting do
   def get_fixed_asset!(id, company, user) do
     from(fa in fixed_asset_query(company, user),
       where: fa.id == ^id
+    )
+    |> Repo.one!()
+  end
+
+  def get_fixed_asset_by_name!(name, company, user) do
+    from(fa in fixed_asset_query(company, user),
+      where: fa.name == ^name
     )
     |> Repo.one!()
   end
@@ -357,12 +384,6 @@ defmodule FullCircle.Accounting do
     Enum.any?(Sys.default_accounts(), fn a -> a.name == ac.name end)
   end
 
-  # def fixed_asset_draft_transactions(com) do
-  #   from(txn if subquery(fixed_asset_txn_query(com)),
-  #   select: txn.
-  #   )
-  # end
-
   def fixed_asset_txn_query(com) do
     from(txn in Transaction,
       join: comp in Company,
@@ -375,8 +396,4 @@ defmodule FullCircle.Accounting do
       select_merge: %{account_name: acc.name}
     )
   end
-
-  # def unregistered_fixed_assets_count(com) do
-
-  # end
 end

@@ -32,7 +32,7 @@ defmodule FullCircleWeb.InvoiceLive.Print do
     socket
     |> assign(:detail_body_height, detail_body_height)
     |> assign(:detail_height, detail_height)
-    |> assign(:back, ~p"/companies/#{socket.assigns.current_company.id}/invoices")
+    |> assign(:back, "/companies/#{socket.assigns.current_company.id}/invoices")
     |> assign(:invoice, invoice)
     |> assign(:company, company)
     |> assign(:contact, contact)

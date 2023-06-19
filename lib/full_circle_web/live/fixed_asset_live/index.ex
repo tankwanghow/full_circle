@@ -38,7 +38,7 @@ defmodule FullCircleWeb.FixedAssetLive.Index do
         phx-page-loading
       >
         <%= for {obj_id, obj} <- @streams.objects do %>
-          <.live_component module={IndexComponent} id={"#{obj_id}"} obj={obj} ex_class="" />
+          <.live_component module={IndexComponent} id={"#{obj_id}"} obj={obj} company={@current_company} ex_class="" />
         <% end %>
       </div>
       <.infinite_scroll_footer ended={@end_of_timeline?} />
