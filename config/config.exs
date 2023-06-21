@@ -35,6 +35,7 @@ config :full_circle,
 
 # Configures the endpoint
 config :full_circle, FullCircleWeb.Endpoint,
+  adapter: Bandit.PhoenixAdapter,
   url: [host: "localhost"],
   render_errors: [
     formats: [html: FullCircleWeb.ErrorHTML, json: FullCircleWeb.ErrorJSON],
