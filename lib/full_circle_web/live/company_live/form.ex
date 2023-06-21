@@ -155,28 +155,6 @@ defmodule FullCircleWeb.CompanyLive.Form do
   end
 
   @impl true
-  def handle_event(
-        "validate",
-        %{"_target" => ["company", "closing_month"], "company" => %{"closing_month" => mth}},
-        socket
-      ) do
-
-    {:noreply, assign(socket, closing_days: closing_days(String.to_integer(mth)))}
-  end
-
-  defp closing_days(mth) do
-    th31 = [1, 3, 5, 7, 8, 10, 12]
-    th30 = [4, 6, 9, 11]
-
-    cond do
-      !is_nil(Enum.find(th31, fn x -> x == mth end)) -> Enum.to_list(1..31)
-      !is_nil(Enum.find(th30, fn x -> x == mth end)) -> Enum.to_list(1..30)
-      mth == 2 -> Enum.to_list(1..28)
-      true -> []
-    end
-  end
-
-  @impl true
   def handle_event("validate", %{"company" => params}, socket) do
     company = if(socket.assigns[:company], do: socket.assigns.company, else: %Company{})
 
@@ -186,6 +164,16 @@ defmodule FullCircleWeb.CompanyLive.Form do
       |> Map.put(:action, :insert)
 
     {:noreply, assign(socket, form: to_form(changeset))}
+  end
+
+  @impl true
+  def handle_event(
+        "validate",
+        %{"_target" => ["company", "closing_month"], "company" => %{"closing_month" => mth}},
+        socket
+      ) do
+
+    {:noreply, assign(socket, closing_days: closing_days(String.to_integer(mth)))}
   end
 
   @impl true
@@ -257,6 +245,18 @@ defmodule FullCircleWeb.CompanyLive.Form do
         {:noreply,
          assign(socket, form: to_form(changeset))
          |> put_flash(:error, gettext("Failed to Create Company"))}
+    end
+  end
+
+  defp closing_days(mth) do
+    th31 = [1, 3, 5, 7, 8, 10, 12]
+    th30 = [4, 6, 9, 11]
+
+    cond do
+      !is_nil(Enum.find(th31, fn x -> x == mth end)) -> Enum.to_list(1..31)
+      !is_nil(Enum.find(th30, fn x -> x == mth end)) -> Enum.to_list(1..30)
+      mth == 2 -> Enum.to_list(1..28)
+      true -> []
     end
   end
 end

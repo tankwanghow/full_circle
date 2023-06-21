@@ -23,6 +23,8 @@ defmodule FullCircle.Accounting.FixedAsset do
     field(:asset_ac_name, :string, virtual: true)
     field(:depre_ac_name, :string, virtual: true)
     field(:disp_fund_ac_name, :string, virtual: true)
+    field(:cume_depre, :decimal, virtual: true)
+    field(:cume_disp, :decimal, virtual: true)
 
     timestamps(type: :utc_datetime)
   end

@@ -1,7 +1,7 @@
 defmodule FullCircleWeb.FixedAssetLive.Depreciations do
   use FullCircleWeb, :live_view
 
-  alias FullCircle.Accounting.{FixedAsset, FixedAssetDepreciation}
+  alias FullCircle.Accounting.{FixedAssetDepreciation}
   alias FullCircle.Accounting
   alias FullCircle.StdInterface
 
@@ -14,30 +14,46 @@ defmodule FullCircleWeb.FixedAssetLive.Depreciations do
         socket.assigns.current_user
       )
 
-    {dates, _} = Accounting.depreciation_dates(ass, socket.assigns.current_company)
-    dates = dates |> Enum.map(fn x -> Date.to_string(x) end)
-
     socket =
       socket
-      |> assign(title: gettext("Depreciations"))
-      |> assign(saved_depreciations: Accounting.depreciations_query(ass.id))
-      |> assign(generated_depreciations: [])
-      |> assign(depre_dates: dates)
       |> assign(ass: ass)
+      |> assign(title: gettext("Depreciations"))
+      |> assign(generated_depreciations: [])
       |> assign(live_action: :new)
-      |> assign(
-        :form,
-        to_form(
-          StdInterface.changeset(
-            FixedAssetDepreciation,
-            %FixedAssetDepreciation{},
-            %{fixed_asset_id: ass.id, cost_basis: ass.pur_price, amount: 0.00},
-            socket.assigns.current_company
-          )
-        )
-      )
+      |> filter_depreciation()
+      |> filter_depre_dates()
+      |> to_form_fap()
 
     {:ok, socket}
+  end
+
+  defp filter_depreciation(socket) do
+    socket |> assign(saved_depreciations: Accounting.depreciations_query(socket.assigns.ass.id))
+  end
+
+  defp filter_depre_dates(socket) do
+    {dates, _} = Accounting.depreciation_dates(socket.assigns.ass, socket.assigns.current_company)
+    dates = dates |> Enum.map(fn x -> Date.to_string(x) end)
+    socket |> assign(depre_dates: dates)
+  end
+
+  defp to_form_fap(
+         socket,
+         obj \\ %FixedAssetDepreciation{},
+         attrs \\ %{cost_basis: 0.00, amount: 0.00}
+       ) do
+    socket
+    |> assign(
+      :form,
+      to_form(
+        StdInterface.changeset(
+          FixedAssetDepreciation,
+          obj,
+          Map.merge(attrs, %{fixed_asset_id: socket.assigns.ass.id}),
+          socket.assigns.current_company
+        )
+      )
+    )
   end
 
   @impl true
@@ -71,6 +87,44 @@ defmodule FullCircleWeb.FixedAssetLive.Depreciations do
   end
 
   @impl true
+  def handle_event("edit_depreciation", %{"id" => id}, socket) do
+    fad = Accounting.get_fixed_asset_depreciation!(id)
+
+    {:noreply,
+     socket
+     |> assign(live_action: :edit)
+     |> assign(
+       :form,
+       to_form(
+         StdInterface.changeset(FixedAssetDepreciation, fad, %{}, socket.assigns.current_company)
+       )
+     )}
+  end
+
+  @impl true
+  def handle_event("delete_depreciation", %{"id" => id}, socket) do
+    fad = Accounting.get_fixed_asset_depreciation!(id)
+
+    case StdInterface.delete(
+           FixedAssetDepreciation,
+           "fixed_asset_depreciation",
+           fad,
+           socket.assigns.current_company,
+           socket.assigns.current_user
+         ) do
+      {:ok, _dep} ->
+        {:noreply,
+         socket |> filter_depreciation() |> filter_depre_dates() |> assign(live_action: :new)}
+
+      {:error, _, changeset, _} ->
+        {:noreply, assign(socket, form: to_form(changeset))}
+
+      :not_authorise ->
+        {:noreply, socket}
+    end
+  end
+
+  @impl true
   def handle_event("save", %{"fixed_asset_depreciation" => params}, socket) do
     save_depreciation(socket, socket.assigns.live_action, params)
   end
@@ -83,15 +137,18 @@ defmodule FullCircleWeb.FixedAssetLive.Depreciations do
            socket.assigns.current_company,
            socket.assigns.current_user
          ) do
-      {:ok, ac} ->
-        send(self(), {:created, ac})
-        {:noreply, socket}
+      {:ok, _dep} ->
+        {:noreply,
+         socket
+         |> filter_depreciation()
+         |> filter_depre_dates()
+         |> assign(live_action: :new)
+         |> to_form_fap()}
 
       {:error, _, changeset, _} ->
         assign(socket, form: to_form(changeset))
 
       :not_authorise ->
-        send(self(), :not_authorise)
         {:noreply, socket}
     end
   end
@@ -105,9 +162,13 @@ defmodule FullCircleWeb.FixedAssetLive.Depreciations do
            socket.assigns.current_company,
            socket.assigns.current_user
          ) do
-      {:ok, ac} ->
-        send(self(), {:updated, ac})
-        {:noreply, socket}
+      {:ok, _dep} ->
+        {:noreply,
+         socket
+         |> filter_depreciation()
+         |> filter_depre_dates()
+         |> assign(live_action: :new)
+         |> to_form_fap()}
 
       {:error, failed_operation, changeset, _} ->
         assign(socket, form: to_form(changeset))
@@ -117,7 +178,6 @@ defmodule FullCircleWeb.FixedAssetLive.Depreciations do
         )
 
       :not_authorise ->
-        send(self(), :not_authorise)
         {:noreply, socket}
     end
   end
@@ -134,7 +194,7 @@ defmodule FullCircleWeb.FixedAssetLive.Depreciations do
       </div>
       <p class="text-center">
         <span class="font-bold"><%= gettext("Depreciation info:") %></span>
-        <%= @ass.depre_ac_name %> &#9679; <%= @ass.depre_start_date %> &#9679; <%= @ass.depre_method %> &#9679; <%= Number.Percentage.number_to_percentage(
+        <%= Number.Currency.number_to_currency(@ass.pur_price) %> &#9679; <%= @ass.depre_start_date %> &#9679; <%= @ass.depre_method %> &#9679; <%= Number.Percentage.number_to_percentage(
           Decimal.mult(@ass.depre_rate, 100)
         ) %> &#9679; <%= @ass.depre_interval %>
       </p>
@@ -155,18 +215,23 @@ defmodule FullCircleWeb.FixedAssetLive.Depreciations do
           <%= Phoenix.HTML.Form.hidden_input(@form, :fixed_asset_id) %>
           <div class="flex flex-row flex-nowarp">
             <div class="w-4/12 grow shrink">
+              <.input type="date" field={@form[:depre_date]} label={gettext("Depreciation Date")} />
+            </div>
+            <div class="w-4/12 grow shrink">
               <.input
-                type="select"
-                options={@depre_dates}
-                field={@form[:depre_date]}
-                label={gettext("Depreciation Date")}
+                type="number"
+                field={@form[:cost_basis]}
+                label={gettext("Cost Basis")}
+                step="0.01"
               />
             </div>
             <div class="w-4/12 grow shrink">
-              <.input type="number" field={@form[:cost_basis]} label={gettext("Cost Basis")} />
-            </div>
-            <div class="w-4/12 grow shrink">
-              <.input type="number" field={@form[:amount]} label={gettext("Depreciation")} />
+              <.input
+                type="number"
+                field={@form[:amount]}
+                label={gettext("Depreciation")}
+                step="0.01"
+              />
             </div>
           </div>
           <div class="flex justify-center gap-x-1 mt-1">
@@ -208,6 +273,16 @@ defmodule FullCircleWeb.FixedAssetLive.Depreciations do
               <div class="w-40 border rounded bg-green-200 border-green-400 text-center px-2 py-1">
                 <%= Decimal.sub(obj.cost_basis, obj.cume_depre)
                 |> Number.Delimit.number_to_delimited() %>
+              </div>
+              <div class="w-5 m-1 text-blue-500">
+                <.link phx-click={:edit_depreciation} phx-value-id={obj.id} tabindex="-1">
+                  <.icon name="hero-pencil-solid" class="h-5 w-5" />
+                </.link>
+              </div>
+              <div class="w-5 m-1 text-rose-500">
+                <.link phx-click={:delete_depreciation} phx-value-id={obj.id} tabindex="-1">
+                  <.icon name="hero-trash-solid" class="h-5 w-5" />
+                </.link>
               </div>
             </div>
           <% end %>

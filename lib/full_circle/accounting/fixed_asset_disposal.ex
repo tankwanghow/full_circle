@@ -1,42 +1,36 @@
-defmodule FullCircle.Accounting.FixedAssetDepreciation do
+defmodule FullCircle.Accounting.FixedAssetDisposal do
   use FullCircle.Schema
   import Ecto.Changeset
 
-  schema "fixed_asset_depreciations" do
-    field(:cost_basis, :decimal)
-    field(:depre_date, :date)
+  schema "fixed_asset_disposals" do
+    field(:disp_date, :date)
     field(:amount, :decimal)
 
     belongs_to(:fixed_asset, FullCircle.Accounting.FixedAsset, foreign_key: :fixed_asset_id)
     belongs_to(:transaction, FullCircle.Accounting.Transaction, foreign_key: :transaction_id)
 
     field(:closed, :boolean, virtual: true)
-    field(:cume_depre, :decimal, virtual: true)
 
     timestamps(type: :utc_datetime)
   end
 
   @doc false
-  def changeset(depreciation, attrs) do
-    depreciation
+  def changeset(disposal, attrs) do
+    disposal
     |> cast(attrs, [
-      :cost_basis,
-      :depre_date,
+      :disp_date,
       :amount,
       :fixed_asset_id,
       :closed,
       :transaction_id
     ])
     |> validate_required([
-      :cost_basis,
-      :depre_date,
+      :disp_date,
       :amount,
       :fixed_asset_id
     ])
-    |> FullCircle.Accounting.validate_depre_date(:depre_date)
-    |> FullCircle.Accounting.validate_earlier_than_depreciation_start_date(:depre_date)
+    |> FullCircle.Accounting.validate_depre_date(:disp_date)
+    |> FullCircle.Accounting.validate_earlier_than_depreciation_start_date(:disp_date)
     |> validate_number(:amount, greater_than: 0)
-    |> validate_number(:cost_basis, greater_than: 0)
   end
-
 end
