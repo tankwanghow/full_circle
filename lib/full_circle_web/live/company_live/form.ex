@@ -155,6 +155,16 @@ defmodule FullCircleWeb.CompanyLive.Form do
   end
 
   @impl true
+  def handle_event(
+        "validate",
+        %{"_target" => ["company", "closing_month"], "company" => %{"closing_month" => mth}},
+        socket
+      ) do
+
+    {:noreply, assign(socket, closing_days: closing_days(String.to_integer(mth)))}
+  end
+
+  @impl true
   def handle_event("validate", %{"company" => params}, socket) do
     company = if(socket.assigns[:company], do: socket.assigns.company, else: %Company{})
 
@@ -164,16 +174,6 @@ defmodule FullCircleWeb.CompanyLive.Form do
       |> Map.put(:action, :insert)
 
     {:noreply, assign(socket, form: to_form(changeset))}
-  end
-
-  @impl true
-  def handle_event(
-        "validate",
-        %{"_target" => ["company", "closing_month"], "company" => %{"closing_month" => mth}},
-        socket
-      ) do
-
-    {:noreply, assign(socket, closing_days: closing_days(String.to_integer(mth)))}
   end
 
   @impl true
