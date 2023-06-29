@@ -4,8 +4,7 @@ defmodule FullCircleWeb.SeedLive.Index do
 
   @seed_tables %{
     "--Select One--" => ~w(),
-    "FixedAssetDepreciations" =>
-      ~w(fixed_asset_name cost_basis depre_date amount),
+    "FixedAssetDepreciations" => ~w(fixed_asset_name cost_basis depre_date amount),
     "FixedAssets" =>
       ~w(name pur_date pur_price descriptions depre_start_date residual_value depre_method depre_rate asset_ac_name cume_depre_ac_name depre_ac_name disp_fund_ac_name depre_interval),
     "Accounts" => ~w(account_type name descriptions),
@@ -13,7 +12,7 @@ defmodule FullCircleWeb.SeedLive.Index do
     "Contacts" =>
       ~w(name address1 address2 city zipcode state country reg_no email contact_info descriptions),
     "Goods" =>
-      ~w(name descriptions unit purchase_account_name sales_account_name purchase_tax_code_name sales_tax_code_name)
+      ~w(name descriptions unit purchase_account_name sales_account_name purchase_tax_code_name sales_tax_code_name package_name unit_multiplier cost_per_package)
   }
 
   @impl true
@@ -282,7 +281,9 @@ defmodule FullCircleWeb.SeedLive.Index do
                 a.errors == [] && "bg-green-200",
                 a.errors != [] && "bg-rose-200"
               ]}>
-                <%= Ecto.Changeset.fetch_field!(a, String.to_atom(h)) %>
+                <%= if Ecto.Changeset.fetch_field(a, String.to_atom(h)) != :error do %>
+                  <%= Ecto.Changeset.fetch_field!(a, String.to_atom(h)) %>
+                <% end %>
               </td>
             <% end %>
             <td class={[

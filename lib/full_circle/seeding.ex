@@ -94,13 +94,27 @@ defmodule FullCircle.Seeding do
         user
       )
 
+    packagings = %{
+      "0" => %{
+        name: Map.fetch!(attr, "package_name"),
+        unit_multiplier: Map.fetch!(attr, "unit_multiplier"),
+        cost_per_package: Map.fetch!(attr, "cost_per_package")
+      }
+    }
+
+    attr =
+      attr
+      |> Map.delete("package_name")
+      |> Map.delete("unit_multiplier")
+      |> Map.delete("cost_per_package")
+
     attr =
       attr
       |> Map.merge(%{"purchase_account_id" => if(pur_ac, do: pur_ac.id, else: nil)})
       |> Map.merge(%{"sales_account_id" => if(sal_ac, do: sal_ac.id, else: nil)})
       |> Map.merge(%{"purchase_tax_code_id" => if(pur_tax, do: pur_tax.id, else: nil)})
       |> Map.merge(%{"sales_tax_code_id" => if(sal_tax, do: sal_tax.id, else: nil)})
-      |> Map.merge(%{packagings: %{"0" => %{name: "-", unit_multiplier: 0, cost_per_package: 0}}})
+      |> Map.merge(%{packagings: packagings})
 
     FullCircle.StdInterface.changeset(
       FullCircle.Product.Good,
