@@ -20,6 +20,7 @@ defmodule FullCircle.Repo.Migrations.CreatePurInvoices do
     create index(:pur_invoices, [:contact_id])
 
     create table(:pur_invoice_details) do
+      add :_persistent_id, :integer
       add :package_qty, :decimal, default: 0
       add :package_id, references(:packagings, on_delete: :restrict)
       add :quantity, :decimal, default: 0

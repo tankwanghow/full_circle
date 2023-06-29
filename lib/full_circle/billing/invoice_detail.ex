@@ -1,17 +1,18 @@
-defmodule FullCircle.Billing.PurInvoiceDetail do
+defmodule FullCircle.Billing.InvoiceDetail do
   use FullCircle.Schema
   import Ecto.Changeset
   import FullCircle.Helpers
 
-  schema "pur_invoice_details" do
+  schema "invoice_details" do
     field :descriptions, :string
     field :discount, :decimal, default: 0
     field :quantity, :decimal, default: 0
     field :unit_price, :decimal, default: 0
     field :tax_rate, :decimal, default: 0
     field :package_qty, :decimal, default: 0
+    field :_persistent_id, :integer
 
-    belongs_to :pur_invoice, FullCircle.Billing.PurInvoice
+    belongs_to :invoice, FullCircle.Billing.Invoice
     belongs_to :good, FullCircle.Product.Good
     belongs_to :account, FullCircle.Accounting.Account
     belongs_to :tax_code, FullCircle.Accounting.TaxCode
@@ -29,9 +30,10 @@ defmodule FullCircle.Billing.PurInvoiceDetail do
     field :delete, :boolean, virtual: true, default: false
   end
 
-  def changeset(pur_invoice_details, attrs) do
-    pur_invoice_details
+  def changeset(invoice_details, attrs) do
+    invoice_details
     |> cast(attrs, [
+      :_persistent_id,
       :quantity,
       :unit_price,
       :discount,

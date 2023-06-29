@@ -72,7 +72,7 @@ defmodule FullCircle.Billing do
       on: tc.id == invd.tax_code_id,
       left_join: pkg in Packaging,
       on: pkg.id == invd.package_id,
-      order_by: invd.id,
+      order_by: invd._persistent_id,
       select: invd,
       select_merge: %{
         unit: good.unit,
@@ -172,7 +172,7 @@ defmodule FullCircle.Billing do
       on: tc.id == invd.tax_code_id,
       left_join: pkg in Packaging,
       on: pkg.id == invd.package_id,
-      order_by: invd.id,
+      order_by: invd._persistent_id,
       select: invd,
       select_merge: %{
         package_name: pkg.name,
@@ -535,7 +535,7 @@ defmodule FullCircle.Billing do
       on: tc.id == invd.tax_code_id,
       left_join: pkg in Packaging,
       on: pkg.id == invd.package_id,
-      order_by: invd.id,
+      order_by: invd._persistent_id,
       select: invd,
       select_merge: %{
         package_name: pkg.name,
