@@ -1,5 +1,5 @@
 <main class={if(@current_user, do: "mt-20", else: "")}>
-  <div class="mx-auto max-w-fit">
+  <div class="mx-auto w-10/12">
     <.flash_group flash={@flash} />
     <%= @inner_content %>
   </div>

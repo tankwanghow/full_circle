@@ -25,11 +25,10 @@ defmodule FullCircleWeb.ContactLive.IndexComponent do
       >
         <%= @obj.name %>
       </span>
-      <div class="text-sm mt-2">
-        <p><%= @obj.address1 %>, <%= @obj.address2 %></p>
-        <p>
-          <%= @obj.city %> <%= @obj.zipcode %>, <%= @obj.state %> <%= @obj.country %>
-        </p>
+      <div class="mt-2">
+        <p><%= @obj.address1 %>, <%= @obj.address2 %>
+
+          <%= @obj.city %> <%= @obj.zipcode %>, <%= @obj.state %> <%= @obj.country %></p>
         <p><%= @obj.contact_info %></p>
       </div>
       <p class="text-green-800"><%= @obj.descriptions %></p>

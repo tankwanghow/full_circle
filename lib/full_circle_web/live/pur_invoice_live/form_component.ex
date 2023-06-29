@@ -535,7 +535,7 @@ defmodule FullCircleWeb.PurInvoiceLive.FormComponent do
               }
             />
           <% end %>
-          <.link phx-click={JS.exec("phx-remove", to: "#object-crud-modal")} class={button_css()}>
+          <.link phx-click={JS.exec("phx-remove", to: "#object-crud-modal")} class="nav-btn">
             <%= gettext("Back") %>
           </.link>
         </div>

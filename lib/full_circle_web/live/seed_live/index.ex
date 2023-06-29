@@ -4,8 +4,10 @@ defmodule FullCircleWeb.SeedLive.Index do
 
   @seed_tables %{
     "--Select One--" => ~w(),
+    "FixedAssetDepreciations" =>
+      ~w(fixed_asset_name cost_basis depre_date amount),
     "FixedAssets" =>
-      ~w(name pur_date pur_price descriptions depre_start_date residual_value depre_method depre_rate asset_ac_name depre_ac_name disp_fund_ac_name depre_interval),
+      ~w(name pur_date pur_price descriptions depre_start_date residual_value depre_method depre_rate asset_ac_name cume_depre_ac_name depre_ac_name disp_fund_ac_name depre_interval),
     "Accounts" => ~w(account_type name descriptions),
     "TaxCodes" => ~w(code tax_type rate descriptions account_name),
     "Contacts" =>
@@ -205,7 +207,7 @@ defmodule FullCircleWeb.SeedLive.Index do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="max-w-full w-full text-center">
+    <div class="mx-auto text-center">
       <p class="text-3xl font-medium"><%= @page_title %></p>
       <.form
         for={%{}}

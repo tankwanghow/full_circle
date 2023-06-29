@@ -2,6 +2,7 @@ defmodule FullCircle.Seeding do
   import Ecto.Query, warn: false
   import FullCircle.Authorization
 
+  alias FullCircle.Accounting.FixedAssetDepreciation
   alias FullCircle.Repo
   alias FullCircle.Sys.{Log}
   alias FullCircle.Accounting.{TaxCode, Account, Contact, Transaction, FixedAsset}
@@ -25,6 +26,11 @@ defmodule FullCircle.Seeding do
 
   def seed("FixedAssets", seed_data, com, user) do
     save_seed(%FixedAsset{}, :seed_fixed_assets, seed_data, com, user)
+    save_seed(%FixedAssetDepreciation{}, :seed_fixed_assets, seed_data, com, user)
+  end
+
+  def seed("FixedAssetDepreciations", seed_data, com, user) do
+    save_seed(%FixedAssetDepreciation{}, :seed_fixed_asset_depreciations, seed_data, com, user)
   end
 
   def seed("Transactions", seed_data, com, user) do
@@ -162,15 +168,45 @@ defmodule FullCircle.Seeding do
         user
       )
 
+    cume_depre_ac =
+      FullCircle.Accounting.get_account_by_name(
+        Map.fetch!(attr, "cume_depre_ac_name"),
+        com,
+        user
+      )
+
     attr =
       attr
       |> Map.merge(%{"asset_ac_id" => if(asset_ac, do: asset_ac.id, else: nil)})
       |> Map.merge(%{"depre_ac_id" => if(dep_ac, do: dep_ac.id, else: nil)})
       |> Map.merge(%{"disp_fund_ac_id" => if(dis_ac, do: dis_ac.id, else: nil)})
+      |> Map.merge(%{"cume_depre_ac_id" => if(cume_depre_ac, do: cume_depre_ac.id, else: nil)})
 
     FullCircle.StdInterface.changeset(
       FullCircle.Accounting.FixedAsset,
       FullCircle.Accounting.FixedAsset.__struct__(),
+      attr,
+      com
+    )
+  end
+
+  def fill_changeset("FixedAssetDepreciations", attr, com, user) do
+    fa =
+      FullCircle.Accounting.get_fixed_asset_by_name(
+        Map.fetch!(attr, "fixed_asset_name"),
+        com,
+        user
+      )
+
+    attr =
+      attr
+      |> Map.merge(%{"is_seed" => true})
+      |> Map.merge(%{"fixed_asset_id" => if(fa, do: fa.id, else: nil)})
+      |> Map.merge(%{"doc_no" => FullCircle.Helpers.gen_temp_id(10)})
+
+    FullCircle.StdInterface.changeset(
+      FullCircle.Accounting.FixedAssetDepreciation,
+      FullCircle.Accounting.FixedAssetDepreciation.__struct__(),
       attr,
       com
     )

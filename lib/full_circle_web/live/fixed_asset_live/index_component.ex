@@ -16,41 +16,8 @@ defmodule FullCircleWeb.FixedAssetLive.IndexComponent do
     ~H"""
     <div id={@id} class={"#{@ex_class} text-center mb-1 bg-gray-200 border-gray-500 border-2 rounded"}>
       <div class="grid grid-cols-12">
-        <div class="col-span-4 p-2 bg-gray-200">
-          <div class="my-4">
-            <.link
-              :if={@obj.depre_method != "No Depreciation"}
-              phx-value-object-id={@obj.id}
-              phx-value-object-name={@obj.name}
-              navigate={~p"/companies/#{@company.id}/fixed_assets/#{@obj.id}/depreciations"}
-              class="border bg-red-200 hover:bg-red-500 text-black rounded-full p-2 border-red-500 mx-1"
-            >
-              <%= gettext("Depreciations") %>
-            </.link>
-          </div>
-          <div class="my-4">
-            <.link
-              phx-value-object-id={@obj.id}
-              phx-value-object-name={@obj.name}
-              navigate={~p"/companies/#{@company.id}/fixed_assets/#{@obj.id}/disposals"}
-              class="border bg-amber-200 hover:bg-amber-500 text-black rounded-full p-2 border-amber-500"
-            >
-              <%= gettext("Disposal") %>
-            </.link>
-          </div>
-          <div class="my-2">
-            <.live_component
-              module={FullCircleWeb.LogLive.Component}
-              id={"log_#{@obj.id}"}
-              show_log={false}
-              entity="fixed_assets"
-              entity_id={@obj.id}
-            />
-          </div>
-          <div class="font-light"><%= to_fc_time_format(@obj.updated_at) %></div>
-        </div>
         <div
-          class="col-span-8 bg-gray-100 p-2 hover:bg-gray-400 cursor-pointer"
+          class="col-span-7 bg-gray-100 p-2 hover:bg-gray-400 cursor-pointer"
           phx-value-object-id={@obj.id}
           phx-click={:edit_object}
         >
@@ -64,21 +31,63 @@ defmodule FullCircleWeb.FixedAssetLive.IndexComponent do
             <span class="font-bold"><%= gettext("Disposal Account:") %></span> <%= @obj.disp_fund_ac_name %>
           </p>
           <p>
-            <span class="font-bold"><%= gettext("Purchase Info:") %></span>
-            <%= @obj.pur_date %> &#9679; <%= Number.Currency.number_to_currency(@obj.pur_price) %>
+            <span class="font-bold"><%= gettext("Depreciation Account:") %></span> <%= @obj.depre_ac_name %>
+          </p>
+          <span class="font-bold"><%= gettext("Cume Depreciation Account:") %></span>
+        <%= @obj.cume_depre_ac_name %>
+          <p><%= @obj.descriptions %></p>
+          <span class="font-light">
+            <%= to_fc_time_format(@obj.updated_at) %>
+
+            <.live_component
+              module={FullCircleWeb.LogLive.Component}
+              id={"log_#{@obj.id}"}
+              show_log={false}
+              entity="fixed_assets"
+              entity_id={@obj.id}
+            />
+          </span>
+        </div>
+        <div class="col-span-5 p-2 bg-gray-200">
+          <p>
+            <%= gettext("Purchase Price:") %> - <%= Number.Currency.number_to_currency(@obj.pur_price) %>
           </p>
           <p>
-            <span class="font-bold"><%= gettext("Cume Depreciations:") %></span>
-            <%= Number.Currency.number_to_currency(@obj.cume_depre) %><br />
-            <span class="font-bold"><%= gettext("Cume Disposals:") %></span>
-            <%= Number.Currency.number_to_currency(@obj.cume_disp) %><br />
-            <span class="font-bold"><%= gettext("Net Book Value:") %></span>
-            <%= @obj.pur_price
+            <.link
+              :if={@obj.depre_method != "No Depreciation"}
+              navigate={
+                ~p"/companies/#{@company.id}/fixed_assets/#{@obj.id}/depreciations?terms=#{@terms}"
+              }
+              class="hover:font-bold text-blue-700"
+            >
+              <%= gettext("Depreciations") %> - <%= Number.Currency.number_to_currency(
+                @obj.cume_depre
+              ) %>
+            </.link>
+          </p>
+
+          <p>
+            <.link
+              navigate={
+                ~p"/companies/#{@company.id}/fixed_assets/#{@obj.id}/disposals?terms=#{@terms}"
+              }
+              class="hover:font-bold text-blue-700"
+            >
+              <%= gettext("Disposal") %> - <%= Number.Currency.number_to_currency(@obj.cume_disp) %>
+            </.link>
+          </p>
+
+          <p>
+            <%= gettext("Net Book Value") %> - <%= @obj.pur_price
             |> Decimal.sub(@obj.cume_disp)
             |> Decimal.sub(@obj.cume_depre)
             |> Number.Currency.number_to_currency() %>
           </p>
-          <p><%= @obj.descriptions %></p>
+          <p>
+            <%= gettext("Depreciation info") %> - <%= Number.Percentage.number_to_percentage(
+              Decimal.mult(@obj.depre_rate, 100)
+            ) %> &#9679; <%= @obj.depre_interval %><br />
+          </p>
         </div>
       </div>
     </div>

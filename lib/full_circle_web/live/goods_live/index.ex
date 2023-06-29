@@ -12,14 +12,14 @@ defmodule FullCircleWeb.GoodLive.Index do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="max-w-2xl mx-auto">
+    <div class="w-6/12 mx-auto">
       <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
       <.search_form
         search_val={@search.terms}
         placeholder={gettext("Name, Unit, Account Name, TaxCode and Descriptions...")}
       />
       <div class="text-center mb-2">
-        <.link phx-click={:new_object} class={"#{button_css()} text-xl"} id="new_object">
+        <.link phx-click={:new_object} class={"nav-btn"} id="new_object">
           <%= gettext("New Good") %>
         </.link>
       </div>

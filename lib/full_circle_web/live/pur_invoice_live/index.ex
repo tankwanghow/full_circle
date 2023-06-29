@@ -12,7 +12,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Index do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="max-w-3xl">
+    <div class="mx-auto w-8/12">
       <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
       <div class="flex justify-center mb-2">
         <.form for={%{}} id="search-form" phx-submit="search" class="w-full" autocomplete="off">
@@ -50,7 +50,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Index do
         </.form>
       </div>
       <div class="text-center mb-2">
-        <.link phx-click={:new_object} class={"#{button_css()} text-xl"} id="new_object">
+        <.link phx-click={:new_object} class={"nav-btn"} id="new_object">
           <%= gettext("New PurInvoice") %>
         </.link>
       </div>

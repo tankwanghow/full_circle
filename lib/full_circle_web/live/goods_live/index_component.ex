@@ -27,7 +27,7 @@ defmodule FullCircleWeb.GoodLive.IndexComponent do
       </span>
       <p
         :if={@obj.packagings |> Enum.filter(fn x -> !is_nil(x) end) |> Enum.count() > 0}
-        class="text-sm font-light"
+        class="text-sm font-light mt-2"
       >
         <span class="font-normal"><%= gettext("Packagings") %></span>
         :- <%= @obj.packagings

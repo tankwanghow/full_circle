@@ -31,8 +31,8 @@ defmodule FullCircleWeb.AccountLive.IndexComponent do
       >
         <%= @obj.name %>
       </span>
-      <p class="text-sm mt-2"><%= @obj.descriptions %></p>
-      <span class="text-sm font-bold"><%= @obj.account_type %></span>
+      <p class="mt-2"><%= @obj.account_type %></p>
+      <p class="text-sm mt-2 text-green-600"><%= @obj.descriptions %></p>
       <span class="text-xs font-light"><%= to_fc_time_format(@obj.updated_at) %></span>
       <.live_component
         module={FullCircleWeb.LogLive.Component}

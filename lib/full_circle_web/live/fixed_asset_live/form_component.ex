@@ -186,7 +186,56 @@ defmodule FullCircleWeb.FixedAssetLive.FormComponent do
           </div>
         </div>
         <div class="flex flex-row gap-1">
-          <div class="w-[35rem]">
+          <div class="w-3/12">
+            <.input
+              type="number"
+              step="0.01"
+              field={@form[:pur_price]}
+              label={gettext("Purchase Price")}
+            />
+          </div>
+          <div class="w-3/12">
+            <.input
+              type="date"
+              field={@form[:depre_start_date]}
+              label={gettext("Depreciation Start")}
+            />
+          </div>
+          <div class="w-3/12">
+            <.input
+              type="number"
+              step="0.01"
+              field={@form[:depre_rate]}
+              label={gettext("Dep Rate(0.1 = 10%)")}
+            />
+          </div>
+          <div class="w-3/12">
+            <.input
+              type="number"
+              step="0.01"
+              field={@form[:residual_value]}
+              label={gettext("Residual Value")}
+            />
+          </div>
+        </div>
+        <div class="flex flex-row gap-1">
+          <div class="w-3/12">
+            <.input
+              field={@form[:depre_method]}
+              label={gettext("Depreciation Method")}
+              type="select"
+              options={FullCircle.Accounting.depreciation_methods()}
+            />
+          </div>
+          <div class="w-3/12">
+            <.input
+              field={@form[:depre_interval]}
+              label={gettext("Depreciation Interval")}
+              type="select"
+              options={FullCircle.Accounting.depreciation_intervals()}
+            />
+          </div>
+          <div class="w-6/12">
             <%= Phoenix.HTML.Form.hidden_input(@form, :asset_ac_id) %>
             <.input
               field={@form[:asset_ac_name]}
@@ -195,59 +244,9 @@ defmodule FullCircleWeb.FixedAssetLive.FormComponent do
               phx-debounce={500}
             />
           </div>
-
-          <div class="w-[12rem]">
-            <.input
-              type="number"
-              step="0.01"
-              field={@form[:pur_price]}
-              label={gettext("Purchase Price")}
-            />
-          </div>
         </div>
         <div class="flex flex-row gap-1">
-          <div class="w-[9.5rem]">
-            <.input
-              type="date"
-              field={@form[:depre_start_date]}
-              label={gettext("Depreciation Start")}
-            />
-          </div>
-          <div class="w-[8.5rem]">
-            <.input
-              type="number"
-              step="0.01"
-              field={@form[:depre_rate]}
-              label={gettext("Dep Rate(0.1 = 10%)")}
-            />
-          </div>
-          <div class="w-[6.5rem]">
-            <.input
-              type="number"
-              step="0.01"
-              field={@form[:residual_value]}
-              label={gettext("Residual Value")}
-            />
-          </div>
-          <div class="w-[12rem]">
-            <.input
-              field={@form[:depre_method]}
-              label={gettext("Depreciation Method")}
-              type="select"
-              options={FullCircle.Accounting.depreciation_methods()}
-            />
-          </div>
-          <div class="w-[9rem]">
-            <.input
-              field={@form[:depre_interval]}
-              label={gettext("Depreciation Interval")}
-              type="select"
-              options={FullCircle.Accounting.depreciation_intervals()}
-            />
-          </div>
-        </div>
-        <div class="flex flex-row gap-1">
-          <div class="w-6/12">
+          <div class="w-4/12">
             <%= Phoenix.HTML.Form.hidden_input(@form, :depre_ac_id) %>
             <.input
               field={@form[:depre_ac_name]}
@@ -256,7 +255,16 @@ defmodule FullCircleWeb.FixedAssetLive.FormComponent do
               phx-debounce={500}
             />
           </div>
-          <div class="w-6/12">
+          <div class="w-4/12">
+            <%= Phoenix.HTML.Form.hidden_input(@form, :cume_depre_ac_id) %>
+            <.input
+              field={@form[:cume_depre_ac_name]}
+              label={gettext("Cume Depreciation Account")}
+              list="account_names"
+              phx-debounce={500}
+            />
+          </div>
+          <div class="w-4/12">
             <%= Phoenix.HTML.Form.hidden_input(@form, :disp_fund_ac_id) %>
             <.input
               field={@form[:disp_fund_ac_name]}
@@ -283,7 +291,7 @@ defmodule FullCircleWeb.FixedAssetLive.FormComponent do
               }
             />
           <% end %>
-          <.link phx-click={JS.exec("phx-remove", to: "#object-crud-modal")} class={button_css()}>
+          <.link phx-click={JS.exec("phx-remove", to: "#object-crud-modal")} class="nav-btn">
             <%= gettext("Back") %>
           </.link>
         </div>

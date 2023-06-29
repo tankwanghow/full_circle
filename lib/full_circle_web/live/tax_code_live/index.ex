@@ -12,14 +12,14 @@ defmodule FullCircleWeb.TaxCodeLive.Index do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="max-w-2xl mx-auto">
+    <div class="mx-auto w-8/12">
       <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
       <.search_form
         search_val={@search.terms}
         placeholder={gettext("Code, Tax Type, Account Name and Descriptions...")}
       />
       <div class="text-center mb-2">
-        <.link phx-click={:new_object} class={"#{button_css()} text-xl"} id="new_object">
+        <.link phx-click={:new_object} class={"nav-btn"} id="new_object">
           <%= gettext("New TaxCode") %>
         </.link>
       </div>
@@ -174,8 +174,6 @@ defmodule FullCircleWeb.TaxCodeLive.Index do
         page: page,
         per_page: @per_page
       )
-
-    IO.inspect(objects |> Enum.count)
 
     socket
     |> assign(page: page, per_page: @per_page)

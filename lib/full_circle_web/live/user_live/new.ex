@@ -94,7 +94,7 @@ defmodule FullCircleWeb.UserLive.New do
         <.button disabled={!@form.source.valid?} phx-disable-with={gettext("...")}>
           <%= gettext("Add User") %>
         </.button>
-        <.link navigate={~p"/companies/#{@current_company.id}/users"} class={button_css()}>
+        <.link navigate={~p"/companies/#{@current_company.id}/users"} class="nav-btn">
           <%= gettext("Back") %>
         </.link>
       </div>

@@ -1,6 +1,9 @@
 defmodule FullCircle.Accounting do
   import Ecto.Query, warn: false
   import FullCircleWeb.Gettext
+  import FullCircle.Authorization
+
+  alias Ecto.Multi
 
   alias FullCircle.Accounting.{
     Account,
@@ -148,23 +151,30 @@ defmodule FullCircle.Accounting do
 
   def depreciations_query(fx_id) do
     from(dep in FixedAssetDepreciation,
+      join: fa in FixedAsset,
+      on: fa.id == dep.fixed_asset_id,
       left_join: txn in Transaction,
-      on: dep.transaction_id == txn.id,
-      where: dep.fixed_asset_id == ^fx_id,
+      on: txn.doc_type == "fixed_asset_depreciations",
+      on: txn.doc_date == dep.depre_date,
+      on: dep.doc_no == txn.doc_no,
+      where: fa.id == ^fx_id,
+      where: coalesce(txn.amount, dep.amount) > 0,
+      distinct: true,
       select: %{
         id: dep.id,
         cost_basis: dep.cost_basis,
         depre_date: dep.depre_date,
         amount: dep.amount,
+        is_seed: dep.is_seed,
+        closed: coalesce(txn.closed, false),
+        doc_no: dep.doc_no,
         cume_depre:
           fragment(
             "SUM(?) OVER (PARTITION BY ? ORDER BY ?)",
             dep.amount,
             dep.fixed_asset_id,
             dep.depre_date
-          ),
-        closed: fragment("COALESCE(?, false)", txn.closed),
-        transaction_id: txn.id
+          )
       },
       order_by: dep.depre_date
     )
@@ -173,19 +183,26 @@ defmodule FullCircle.Accounting do
 
   def disposals_query(fx_id) do
     from(disp in FixedAssetDisposal,
-      left_join: txn in Transaction,
-      on: disp.transaction_id == txn.id,
       where: disp.fixed_asset_id == ^fx_id,
       select: %{
         id: disp.id,
         disp_date: disp.disp_date,
         amount: disp.amount,
-        closed: fragment("COALESCE(?, false)", txn.closed),
-        transaction_id: txn.id
+        is_seed: disp.is_seed,
+        doc_no: disp.doc_no
       },
       order_by: disp.disp_date
     )
     |> Repo.all()
+  end
+
+  def generate_depreciations_for_all_fixed_assets(edate, com, user) do
+    fixed_assets = fixed_asset_query(com, user) |> Repo.all()
+    fixed_assets = Enum.reject(fixed_assets, fn fa -> Decimal.to_float(fa.depre_rate) <= 0 end)
+
+    Enum.flat_map(fixed_assets, fn fa ->
+      generate_depreciations(fa, edate, com)
+    end)
   end
 
   def generate_depreciations(fixed_asset, edate, com) do
@@ -296,9 +313,10 @@ defmodule FullCircle.Accounting do
 
     Enum.reject(depre, fn x -> x == nil end)
     |> Enum.map(fn {dt, cost, dep, cume} ->
-      %FixedAssetDepreciation{
+      %{
         fixed_asset_id: fa.id,
-        depre_date: dt,
+        fixed_asset: fa,
+        depre_date: dt |> Timex.format!("%Y-%m-%d", :strftime),
         cost_basis: cost,
         amount: dep,
         cume_depre: cume
@@ -345,11 +363,11 @@ defmodule FullCircle.Accounting do
     |> Repo.one!()
   end
 
-  def get_fixed_asset_by_name!(name, company, user) do
+  def get_fixed_asset_by_name(name, company, user) do
     from(fa in fixed_asset_query(company, user),
       where: fa.name == ^name
     )
-    |> Repo.one!()
+    |> Repo.one()
   end
 
   def fixed_asset_query(company, user) do
@@ -362,6 +380,8 @@ defmodule FullCircle.Accounting do
       on: ac1.id == fa.depre_ac_id,
       left_join: ac2 in Account,
       on: ac2.id == fa.disp_fund_ac_id,
+      left_join: ac3 in Account,
+      on: ac3.id == fa.cume_depre_ac_id,
       select: %FixedAsset{
         id: fa.id,
         name: fa.name,
@@ -376,6 +396,8 @@ defmodule FullCircle.Accounting do
         asset_ac_id: ac.id,
         depre_ac_name: ac1.name,
         depre_ac_id: ac1.id,
+        cume_depre_ac_name: ac3.name,
+        cume_depre_ac_id: ac3.id,
         disp_fund_ac_name: ac2.name,
         disp_fund_ac_id: ac2.id,
         descriptions: fa.descriptions,
@@ -465,39 +487,242 @@ defmodule FullCircle.Accounting do
   def validate_depre_date(changeset, field) do
     fid = Ecto.Changeset.fetch_field!(changeset, :fixed_asset_id)
 
-    qry =
-      from(fad in "fixed_asset_depreciations",
-        where: fad.fixed_asset_id == ^Ecto.UUID.dump!(fid)
-      )
-
-    id = Ecto.Changeset.fetch_field!(changeset, :id)
-    qry = if(id, do: qry |> where([f], f.id != ^Ecto.UUID.dump!(id)), else: qry)
-
-    dep_date = Ecto.Changeset.fetch_field!(changeset, field)
-    qry = if(dep_date, do: qry |> where([f], f.depre_date >= ^dep_date), else: qry)
-
-    if FullCircle.Repo.exists?(qry) do
-      Ecto.Changeset.add_error(changeset, field, gettext("greated depreciation date existed"))
-    else
+    if is_nil(fid) do
       changeset
+    else
+      qry =
+        from(fad in "fixed_asset_depreciations",
+          where: fad.fixed_asset_id == ^Ecto.UUID.dump!(fid)
+        )
+
+      id = Ecto.Changeset.fetch_field!(changeset, :id)
+      qry = if(id, do: qry |> where([f], f.id != ^Ecto.UUID.dump!(id)), else: qry)
+
+      dep_date = Ecto.Changeset.fetch_field!(changeset, field)
+      qry = if(dep_date, do: qry |> where([f], f.depre_date == ^dep_date), else: qry)
+
+      if FullCircle.Repo.exists?(qry) do
+        Ecto.Changeset.add_error(changeset, field, gettext("same depreciation date existed"))
+      else
+        changeset
+      end
     end
   end
 
   def validate_earlier_than_depreciation_start_date(changeset, field) do
     fid = Ecto.Changeset.fetch_field!(changeset, :fixed_asset_id)
 
-    ass = FullCircle.Accounting.get_fixed_asset!(fid)
-
-    dep_date = Ecto.Changeset.fetch_field!(changeset, field)
-
-    if !is_nil(dep_date) and ass.depre_start_date > dep_date do
-      Ecto.Changeset.add_error(
-        changeset,
-        field,
-        gettext("cannot be earlier than ") <> Date.to_iso8601(ass.depre_start_date)
-      )
-    else
+    if is_nil(fid) do
       changeset
+    else
+      ass = FullCircle.Accounting.get_fixed_asset!(fid)
+
+      dep_date = Ecto.Changeset.fetch_field!(changeset, field)
+
+      if !is_nil(dep_date) and Date.compare(ass.depre_start_date, dep_date) == :gt do
+        Ecto.Changeset.add_error(
+          changeset,
+          field,
+          gettext("cannot be earlier than ") <> Date.to_iso8601(ass.depre_start_date)
+        )
+      else
+        changeset
+      end
+    end
+  end
+
+  def save_generated_all_fixed_asset_depreciation(entries, com, user) do
+    name = "create_fixed_asset_depreciation"
+
+    case can?(user, :create_fixed_asset_depreciation, com) do
+      true ->
+        Enum.reduce(entries, Multi.new(), fn entry, multi ->
+          name_entry = String.to_atom(name <> entry.depre_date <> entry.fixed_asset.name)
+          doc_no = FullCircle.Helpers.gen_temp_id(10)
+
+          multi
+          |> Multi.insert(
+            name_entry,
+            FixedAssetDepreciation.changeset(
+              %FixedAssetDepreciation{},
+              Map.merge(entry, %{doc_no: doc_no})
+            )
+          )
+          |> Sys.insert_log_for(name_entry, Map.delete(entry, :fixed_asset), com, user)
+          |> create_fixed_asset_depreciation_transactions(name_entry, entry.fixed_asset, com)
+        end)
+        |> Repo.transaction()
+
+      false ->
+        :not_authorise
+    end
+  end
+
+  def save_generated_fixed_asset_depreciation(entries, com, user) do
+    name = "create_fixed_asset_depreciation"
+
+    case can?(user, :create_fixed_asset_depreciation, com) do
+      true ->
+        Enum.reduce(entries, Multi.new(), fn entry, multi ->
+          name_entry = String.to_atom(name <> entry.depre_date)
+          doc_no = FullCircle.Helpers.gen_temp_id(10)
+
+          multi
+          |> Multi.insert(
+            name_entry,
+            FixedAssetDepreciation.changeset(
+              %FixedAssetDepreciation{},
+              Map.merge(entry, %{doc_no: doc_no})
+            )
+          )
+          |> Sys.insert_log_for(name_entry, Map.delete(entry, :fixed_asset), com, user)
+          |> create_fixed_asset_depreciation_transactions(name_entry, entry.fixed_asset, com)
+        end)
+        |> Repo.transaction()
+
+      false ->
+        :not_authorise
+    end
+  end
+
+  def create_fixed_asset_depreciation(attrs, fa, com, user) do
+    case can?(user, :create_fixed_asset_depreciation, com) do
+      true ->
+        try do
+          Multi.new()
+          |> create_fixed_asset_depreciation_multi(attrs, fa, com, user)
+          |> Repo.transaction()
+        rescue
+          e in Postgrex.Error -> {:error, :catched, %{}, e}
+        end
+
+      false ->
+        :not_authorise
+    end
+  end
+
+  defp create_fixed_asset_depreciation_multi(multi, attrs, fa, com, user) do
+    name = :create_fixed_asset_depreciation
+    doc_no = FullCircle.Helpers.gen_temp_id(10)
+
+    multi =
+      multi
+      |> Multi.insert(
+        name,
+        FixedAssetDepreciation.changeset(
+          %FixedAssetDepreciation{},
+          Map.merge(attrs, %{"doc_no" => doc_no})
+        )
+      )
+      |> Sys.insert_log_for(name, attrs, com, user)
+
+    if attrs["is_seed"] == "false" do
+      multi
+      |> create_fixed_asset_depreciation_transactions(name, fa, com)
+    else
+      multi
+    end
+  end
+
+  defp create_fixed_asset_depreciation_transactions(multi, name, fa, com) do
+    multi
+    |> Ecto.Multi.run(Atom.to_string(name) <> "transactions", fn repo, %{^name => depre} ->
+      repo.insert!(%Transaction{
+        doc_type: "fixed_asset_depreciations",
+        doc_id: depre.id,
+        doc_no: depre.doc_no,
+        doc_date: depre.depre_date,
+        account_id: fa.depre_ac_id,
+        company_id: com.id,
+        amount: depre.amount,
+        particulars: "Depreciation #{fa.depre_rate} on #{fa.name}"
+      })
+
+      repo.insert!(%Transaction{
+        doc_type: "fixed_asset_depreciations",
+        doc_id: depre.id,
+        doc_no: depre.doc_no,
+        doc_date: depre.depre_date,
+        account_id: fa.cume_depre_ac_id,
+        company_id: com.id,
+        amount: Decimal.negate(depre.amount),
+        particulars: "Depreciation #{fa.depre_rate} on #{fa.name}"
+      })
+
+      {:ok, nil}
+    end)
+  end
+
+  def update_fixed_asset_depreciation(%FixedAssetDepreciation{} = fad, attrs, fa, com, user) do
+    case can?(user, :update_fixed_asset_depreciation, com) do
+      true ->
+        try do
+          Multi.new()
+          |> update_fixed_asset_depreciation_multi(fad, attrs, fa, com, user)
+          |> Repo.transaction()
+        rescue
+          e in Postgrex.Error -> {:error, :catched, %{}, e.postgres}
+        end
+
+      false ->
+        :not_authorise
+    end
+  end
+
+  def update_fixed_asset_depreciation_multi(multi, fad, attrs, fa, com, user) do
+    name = :update_fixed_asset_depreciation
+
+    multi =
+      multi
+      |> Multi.update(name, FixedAssetDepreciation.changeset(fad, attrs))
+      |> Sys.insert_log_for(name, attrs, com, user)
+      |> Multi.delete_all(
+        :delete_transaction,
+        from(txn in Transaction,
+          where: txn.doc_type == "fixed_asset_depreciations",
+          where: txn.doc_no == ^fad.doc_no
+        )
+      )
+
+    if attrs["is_seed"] == "false" do
+      multi
+      |> create_fixed_asset_depreciation_transactions(name, fa, com)
+    else
+      multi
+    end
+  end
+
+  def delete_fixed_asset_depreciation(fad, company, user) do
+    action = :delete_fixed_asset_depreciation
+    changeset = FixedAssetDepreciation.changeset(fad, %{})
+
+    case can?(user, action, company) do
+      true ->
+        try do
+          Multi.new()
+          |> Multi.delete(action, changeset)
+          |> Multi.delete_all(
+            :delete_transaction,
+            from(txn in Transaction,
+              where: txn.doc_type == "fixed_asset_depreciations",
+              where: txn.doc_no == ^fad.doc_no
+            )
+          )
+          |> Sys.insert_log_for(action, %{"deleted_id_is" => fad.id}, company, user)
+          |> FullCircle.Repo.transaction()
+          |> case do
+            {:ok, %{^action => fad}} ->
+              {:ok, fad}
+
+            {:error, failed_operation, failed_value, changes_of_far} ->
+              {:error, failed_operation, failed_value, changes_of_far}
+          end
+        rescue
+          e in Postgrex.Error -> {:error, :catched, %{}, e.postgres}
+        end
+
+      false ->
+        :not_authorise
     end
   end
 end

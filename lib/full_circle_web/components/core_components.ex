@@ -151,7 +151,7 @@ defmodule FullCircleWeb.CoreComponents do
       phx-click={JS.push("lv:clear-flash", value: %{key: @kind}) |> hide("##{@id}")}
       role="alert"
       class={[
-        "fixed top-2 right-2 w-80 sm:w-96 z-50 rounded-lg p-3 ring-1",
+        "fixed top-10 right-72 w-80 sm:w-96 z-50 rounded-lg p-3 ring-1",
         @kind == :info && "bg-emerald-50 text-emerald-800 ring-emerald-500 fill-cyan-900",
         @kind == :warn && "bg-amber-50 text-amber-800 ring-amber-500 fill-amber-900",
         @kind == :error && "bg-rose-50 text-rose-900 shadow-md ring-rose-500 fill-rose-900"
@@ -587,7 +587,7 @@ defmodule FullCircleWeb.CoreComponents do
 
   def link_button(assigns) do
     ~H"""
-    <.link navigate={@navigate} class={button_css()}>
+    <.link navigate={@navigate} class="nav-btn">
       <%= render_slot(@inner_block) %>
     </.link>
     """
@@ -738,7 +738,7 @@ defmodule FullCircleWeb.CoreComponents do
 
   def delete_confirm_modal(assigns) do
     ~H"""
-    <.link id={@id} class={button_css()} phx-click={show_modal("#{@id}-modal")}>
+    <.link id={@id} class="nav-btn" phx-click={show_modal("#{@id}-modal")}>
       <%= gettext("Delete") %>
     </.link>
     <.modal id={"#{@id}-modal"} on_confirm={@confirm}>

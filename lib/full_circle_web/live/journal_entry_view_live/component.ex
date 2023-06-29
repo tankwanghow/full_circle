@@ -5,6 +5,7 @@ defmodule FullCircleWeb.JournalEntryViewLive.Component do
 
   @impl true
   def mount(socket) do
+    socket = if(!Map.has_key?(socket.assigns, :label), do: assign(socket, :label, gettext("Journal")))
     {
       :ok,
       socket
@@ -49,7 +50,7 @@ defmodule FullCircleWeb.JournalEntryViewLive.Component do
         phx-click={:show_journal}
         class="text-xs border rounded-full bg-pink-100 hover:bg-pink-400 px-2 py-1 border-pink-400"
       >
-        <%= gettext("Journal") %>
+        <%=  @label || gettext("Journal") %>
       </.link>
       <.modal
         :if={@show_journal}
@@ -63,6 +64,9 @@ defmodule FullCircleWeb.JournalEntryViewLive.Component do
             <%= @page_title %>
           </p>
           <div class="font-medium flex flex-row text-center mt-2 tracking-tighter">
+          <div class="w-40 border rounded bg-gray-200 border-gray-400 px-2 py-1">
+              <%= gettext("Date") %>
+            </div>
             <div class="w-40 border rounded bg-gray-200 border-gray-400 px-2 py-1">
               <%= gettext("Doc No") %>
             </div>
@@ -82,6 +86,9 @@ defmodule FullCircleWeb.JournalEntryViewLive.Component do
           <div id="journal_list">
             <%= for obj <- @entries do %>
               <div class="flex flex-row text-center tracking-tighter">
+              <div class="w-40 border rounded bg-blue-200 border-blue-400 text-center px-2 py-1">
+                  <%= obj.doc_date %>
+                </div>
                 <div class="w-40 border rounded bg-blue-200 border-blue-400 text-center px-2 py-1">
                   <%= obj.doc_no %>
                 </div>

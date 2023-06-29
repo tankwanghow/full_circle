@@ -17,11 +17,13 @@ defmodule FullCircle.Accounting.FixedAsset do
 
     belongs_to(:company, FullCircle.Sys.Company)
     belongs_to(:asset_ac, FullCircle.Accounting.Account, foreign_key: :asset_ac_id)
+    belongs_to(:cume_depre_ac, FullCircle.Accounting.Account, foreign_key: :cume_depre_ac_id)
     belongs_to(:depre_ac, FullCircle.Accounting.Account, foreign_key: :depre_ac_id)
     belongs_to(:disp_fund_ac, FullCircle.Accounting.Account, foreign_key: :disp_fund_ac_id)
 
     field(:asset_ac_name, :string, virtual: true)
     field(:depre_ac_name, :string, virtual: true)
+    field(:cume_depre_ac_name, :string, virtual: true)
     field(:disp_fund_ac_name, :string, virtual: true)
     field(:cume_depre, :decimal, virtual: true)
     field(:cume_disp, :decimal, virtual: true)
@@ -45,8 +47,10 @@ defmodule FullCircle.Accounting.FixedAsset do
       :asset_ac_id,
       :depre_ac_id,
       :disp_fund_ac_id,
+      :cume_depre_ac_id,
       :asset_ac_name,
       :depre_ac_name,
+      :cume_depre_ac_name,
       :disp_fund_ac_name,
       :depre_interval
     ])
@@ -60,12 +64,15 @@ defmodule FullCircle.Accounting.FixedAsset do
       :depre_method,
       :depre_rate,
       :asset_ac_name,
+      :cume_depre_ac_name,
       :depre_ac_name,
       :disp_fund_ac_name
     ])
     |> validate_id(:asset_ac_name, :asset_ac_id)
     |> validate_id(:depre_ac_name, :depre_ac_id)
     |> validate_id(:disp_fund_ac_name, :disp_fund_ac_id)
+    |> validate_id(:cume_depre_ac_name, :cume_depre_ac_id)
+    |> validate_number(:depre_rate, greater_than_or_equal_to: 0, less_than_or_equal_to: 1)
     |> validate_inclusion(:depre_method, FullCircle.Accounting.depreciation_methods(),
       message: gettext("not in list")
     )

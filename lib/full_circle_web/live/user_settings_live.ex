@@ -10,7 +10,7 @@ defmodule FullCircleWeb.UserSettingsLive do
       <:subtitle><%= gettext("Manage your account email address and password settings") %></:subtitle>
     </.header>
 
-    <div class="space-y-5 divide-y">
+    <div class="w-3/12 mx-auto space-y-5 divide-y">
       <div>
         <.simple_form
           for={@email_form}

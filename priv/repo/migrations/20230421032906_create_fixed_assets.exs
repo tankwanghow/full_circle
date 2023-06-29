@@ -16,6 +16,7 @@ defmodule FullCircle.Repo.Migrations.CreateFixedAssets do
       add :asset_ac_id, references(:accounts, on_delete: :restrict)
       add :depre_ac_id, references(:accounts, on_delete: :restrict)
       add :disp_fund_ac_id, references(:accounts, on_delete: :restrict)
+      add :cume_depre_ac_id, references(:accounts, on_delete: :restrict)
 
       timestamps(type: :timestamptz)
     end

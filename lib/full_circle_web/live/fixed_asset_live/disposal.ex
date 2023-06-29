@@ -9,6 +9,7 @@ defmodule FullCircleWeb.FixedAssetLive.Disposals do
   def mount(params, _session, socket) do
     socket =
       socket
+      |> assign(terms: params["terms"])
       |> load_fixed_asset(params["id"])
       |> assign(title: gettext("Disposals"))
       |> assign(live_action: :new)
@@ -67,6 +68,24 @@ defmodule FullCircleWeb.FixedAssetLive.Disposals do
     socket = assign(socket, form: to_form(changeset))
 
     {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("new_disposal", _, socket) do
+    {:noreply,
+     socket
+     |> assign(live_action: :new)
+     |> assign(
+       :form,
+       to_form(
+         StdInterface.changeset(
+           FixedAssetDisposal,
+           %FixedAssetDisposal{fixed_asset: socket.assigns.ass},
+           %{},
+           socket.assigns.current_company
+         )
+       )
+     )}
   end
 
   @impl true
@@ -171,14 +190,17 @@ defmodule FullCircleWeb.FixedAssetLive.Disposals do
   @impl true
   def render(assigns) do
     ~H"""
-    <div>
+    <div class="w-5/12 mx-auto text-center">
       <p class="w-full text-2xl text-center font-medium"><%= "#{@title} for #{@ass.name}" %></p>
       <div class="text-center m-4">
-        <.link navigate={~p"/companies/#{@current_company.id}/fixed_assets"} class="nav-btn">
+      <.link
+          navigate={~p"/companies/#{@current_company.id}/fixed_assets?terms=#{@terms}"}
+          class="nav-btn"
+        >
           <%= gettext("Back Fixed Assets Listing") %>
         </.link>
       </div>
-      <p class="text-center">
+      <p>
         <span class="font-bold"><%= gettext("Assets info:") %></span>
         <%= Number.Currency.number_to_currency(@ass.pur_price) %> &#9679; <%= @ass.depre_start_date %> &#9679; <%= @ass.depre_method %> &#9679; <%= Number.Percentage.number_to_percentage(
           Decimal.mult(@ass.depre_rate, 100)
@@ -205,7 +227,7 @@ defmodule FullCircleWeb.FixedAssetLive.Disposals do
 
         <.form
           for={@form}
-          id="depre-form"
+          id="disp-form"
           autocomplete="off"
           phx-change="validate"
           phx-submit="save"
@@ -213,15 +235,27 @@ defmodule FullCircleWeb.FixedAssetLive.Disposals do
         >
           <%= Phoenix.HTML.Form.hidden_input(@form, :fixed_asset_id) %>
           <div class="flex flex-row flex-nowarp">
-            <div class="w-6/12 grow shrink">
+            <div class="w-4/12 grow shrink">
               <.input type="date" field={@form[:disp_date]} label={gettext("Disposal Date")} />
             </div>
-            <div class="w-6/12 grow shrink">
+            <div class="w-4/12 grow shrink">
               <.input type="number" field={@form[:amount]} label={gettext("Disposal")} step="0.01" />
             </div>
+            <div class="w-4/12 grow shrink">
+              <.input
+                type="select"
+                field={@form[:is_seed]}
+                label={gettext("Is Seed Data")}
+                options={[true, false]}
+              />
+            </div>
           </div>
+
           <div class="flex justify-center gap-x-1 mt-1">
-            <.button class="mx-auto" disabled={!@form.source.valid?}><%= gettext("Save") %></.button>
+            <.link phx-click={:new_disposal} class="nav-btn" id="new_object">
+              <%= gettext("New") %>
+            </.link>
+            <.button disabled={!@form.source.valid?}><%= gettext("Save") %></.button>
           </div>
         </.form>
       </div>
@@ -243,15 +277,26 @@ defmodule FullCircleWeb.FixedAssetLive.Disposals do
               <div class="w-5/12 border rounded bg-green-200 border-green-400 text-center px-2 py-1">
                 <%= obj.amount |> Number.Delimit.number_to_delimited() %>
               </div>
-              <div class="w-5 m-1 text-blue-500">
+              <div class="w-5 mt-1 text-blue-500 hover:bg-amber-200">
                 <.link phx-click={:edit_disposal} phx-value-id={obj.id} tabindex="-1">
                   <.icon name="hero-pencil-solid" class="h-5 w-5" />
                 </.link>
               </div>
-              <div class="w-5 m-1 text-rose-500">
+              <div class="w-5 mt-1 text-rose-500  hover:bg-blue-200">
                 <.link phx-click={:delete_disposal} phx-value-id={obj.id} tabindex="-1">
                   <.icon name="hero-trash-solid" class="h-5 w-5" />
                 </.link>
+              </div>
+              <div class="mt-1">
+                <.live_component
+                  :if={!obj.is_seed}
+                  module={FullCircleWeb.JournalEntryViewLive.Component}
+                  id={"journal_#{obj.id}"}
+                  show_journal={false}
+                  doc_type="fixed_asset_disposals"
+                  doc_no={obj.disp_date |> Timex.format!("%Y%m%d", :strftime)}
+                  company_id={@ass.company_id}
+                />
               </div>
             </div>
           <% end %>

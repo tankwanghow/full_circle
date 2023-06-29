@@ -48,7 +48,7 @@ defmodule FullCircleWeb.CompanyLiveIndex do
 
           <%= if Util.attempt(assigns[:current_company], :id) != c.company_id do %>
             <.link
-              class={"set-active #{button_css()} text-xl mx-2"}
+              class={"set-active nav-btn mx-2"}
               phx-value-id={c.company_id}
               navigate={~p"/companies/#{c.company_id}/dashboard"}
             >
@@ -62,7 +62,7 @@ defmodule FullCircleWeb.CompanyLiveIndex do
 
           <%= if !c.default_company do %>
             <.link
-              class={"set-default #{button_css()} text-xl mx-2"}
+              class={"set-default nav-btn mx-2"}
               phx-value-id={c.company_id}
               phx-click="set_default"
             >

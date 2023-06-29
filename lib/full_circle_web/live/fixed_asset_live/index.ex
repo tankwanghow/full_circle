@@ -4,25 +4,28 @@ defmodule FullCircleWeb.FixedAssetLive.Index do
   alias FullCircle.Accounting.FixedAsset
   alias FullCircle.Accounting
   alias FullCircle.StdInterface
-  alias FullCircleWeb.FixedAssetLive.{FormComponent, IndexComponent, DepreciationComponent}
+  alias FullCircleWeb.FixedAssetLive.{FormComponent, IndexComponent}
 
   @per_page 20
 
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="max-w-2xl mx-auto">
+    <div class="w-6/12 mx-auto">
       <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
       <.search_form
         search_val={@search.terms}
         placeholder={gettext("Name, Asset Account, Depreciation Account or Descriptions...")}
       />
       <div class="text-center mb-2">
-        <.link phx-click={:new_object} class={"#{button_css()} text-xl"} id="new_object">
+        <.link phx-click={:new_object} class="nav-btn" id="new_object">
           <%= gettext("New Fixed Asset") %>
         </.link>
-        <.link navigate="" class={"#{button_css()} text-xl ml-2"} id="unreg_fixed_assets">
+        <.link navigate="" class="nav-btn" id="unreg_fixed_assets">
           <%= gettext("Unregistered Fixed Assets") %>
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/fixed_assets/calalldepre"} class="nav-btn" id="calculate_depre">
+          <%= gettext("Calculate Depreciations") %>
         </.link>
       </div>
       <div class="text-center mb-1">
@@ -38,7 +41,7 @@ defmodule FullCircleWeb.FixedAssetLive.Index do
         phx-page-loading
       >
         <%= for {obj_id, obj} <- @streams.objects do %>
-          <.live_component module={IndexComponent} id={"#{obj_id}"} obj={obj} company={@current_company} ex_class="" />
+          <.live_component module={IndexComponent} id={"#{obj_id}"} obj={obj} company={@current_company} ex_class="" terms={@search.terms} />
         <% end %>
       </div>
       <.infinite_scroll_footer ended={@end_of_timeline?} />
@@ -61,33 +64,16 @@ defmodule FullCircleWeb.FixedAssetLive.Index do
         current_user={@current_user}
       />
     </.modal>
-
-    <.modal
-      :if={@live_action == :show}
-      id="depreciation-modal"
-      show
-      max_w="max-w-4xl"
-      on_cancel={JS.push("modal_cancel")}
-    >
-      <.live_component
-        module={DepreciationComponent}
-        id={@id}
-        title={@title}
-        live_action={@live_action}
-        current_company={@current_company}
-        current_user={@current_user}
-        object={@fixed_asset}
-      />
-    </.modal>
     """
   end
 
   @impl true
-  def mount(_params, _session, socket) do
+  def mount(params, _session, socket) do
     socket =
       socket
       |> assign(page_title: gettext("Fixed Asset Listing"))
-      |> filter_objects("", "stream", 1)
+      |> assign(search: %{terms: params["terms"] || ""})
+      |> filter_objects(params["terms"] || "", "stream", 1)
 
     {:ok, socket}
   end

@@ -5,8 +5,8 @@ defmodule FullCircleWeb.DashboardLive do
   def render(assigns) do
     ~H"""
     <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
-    <div class="max-w-3xl mx-auto">
-      <div class="flex flex-wrap shrink grow justify-center gap-2">
+    <div class="mx-auto w-8/12">
+      <div class="flex flex-wrap shrink grow justify-center">
         <.link navigate={~p"/companies/#{@current_company.id}/seeds"} class="nav-btn">
           <%= gettext("Seeding") %>
         </.link>
