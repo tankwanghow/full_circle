@@ -370,11 +370,11 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
           <div class="detail-header w-24 shrink-[1] grow-[1]"><%= gettext("Quantity") %></div>
           <div class="detail-header w-16 shrink-0 grow-0"><%= gettext("Unit") %></div>
           <div class="detail-header w-24 shrink-[1] grow-[1]"><%= gettext("Price") %></div>
-          <div class={"#{Sys.get_setting(@settings, "invoices", "goodamt-col")} detail-header w-24"}>
-            <%= gettext("Good Amt") %>
-          </div>
           <div class={"#{Sys.get_setting(@settings, "invoices", "discount-col")} detail-header w-24"}>
             <%= gettext("Discount") %>
+          </div>
+          <div class={"#{Sys.get_setting(@settings, "invoices", "goodamt-col")} detail-header w-24"}>
+            <%= gettext("Good Amt") %>
           </div>
           <div class={"#{Sys.get_setting(@settings, "invoices", "account-col")} detail-header w-28"}>
             <%= gettext("Account") %>
@@ -416,11 +416,11 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
             <div class="w-24 grow-[1] shrink-[1]">
               <.input type="number" field={dtl[:unit_price]} step="0.0001" />
             </div>
-            <div class={"#{Sys.get_setting(@settings, "invoices", "goodamt-col")} w-24"}>
-              <.input type="number" field={dtl[:good_amount]} readonly tabindex="-1" />
-            </div>
             <div class={"#{Sys.get_setting(@settings, "invoices", "discount-col")} w-24"}>
               <.input type="number" field={dtl[:discount]} step="0.01" />
+            </div>
+            <div class={"#{Sys.get_setting(@settings, "invoices", "goodamt-col")} w-24"}>
+              <.input type="number" field={dtl[:good_amount]} readonly tabindex="-1" />
             </div>
             <div class={"#{Sys.get_setting(@settings, "invoices", "account-col")} w-28"}>
               <.input field={dtl[:account_name]} list="account_names" phx-debounce={500} />
@@ -466,10 +466,10 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
           <div class="w-24 shrink-[1] grow-[1]" />
           <div class="w-16 shrink-0 grow-0" />
           <div class="w-24 shrink-[1] grow-[1]" />
+          <div class={"#{Sys.get_setting(@settings, "invoices", "discount-col")} w-24"} />
           <div class={"#{Sys.get_setting(@settings, "invoices", "goodamt-col")} w-24"}>
             <.input type="number" field={@form[:invoice_good_amount]} readonly tabindex="-1" />
           </div>
-          <div class={"#{Sys.get_setting(@settings, "invoices", "discount-col")} w-24"} />
           <div class={"#{Sys.get_setting(@settings, "invoices", "account-col")} w-28"} />
           <div class="w-16 shrink-[1] grow-[1]" />
           <div class={"#{Sys.get_setting(@settings, "invoices", "taxrate-col")} w-14"} />
