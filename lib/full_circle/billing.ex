@@ -368,7 +368,15 @@ defmodule FullCircle.Billing do
         StdInterface.changeset(Invoice, %Invoice{}, Map.merge(attrs, %{"invoice_no" => doc}), com)
       end
     )
-    |> Sys.insert_log_for(invoice_name, attrs, com, user)
+    |> Multi.insert("#{invoice_name}_log", fn %{^invoice_name => entity} ->
+      FullCircle.Sys.log_changeset(
+        invoice_name,
+        entity,
+        Map.merge(attrs, %{"invoice_no" => entity.invoice_no}),
+        com,
+        user
+      )
+    end)
     |> create_invoice_transactions(invoice_name, com, user)
   end
 
@@ -754,7 +762,15 @@ defmodule FullCircle.Billing do
         )
       end
     )
-    |> Sys.insert_log_for(pur_invoice_name, attrs, com, user)
+    |> Multi.insert("#{pur_invoice_name}_log", fn %{^pur_invoice_name => entity} ->
+      FullCircle.Sys.log_changeset(
+        pur_invoice_name,
+        entity,
+        Map.merge(attrs, %{"pur_invoice_no" => entity.pur_invoice_no}),
+        com,
+        user
+      )
+    end)
     |> create_pur_invoice_transactions(pur_invoice_name, com, user)
   end
 

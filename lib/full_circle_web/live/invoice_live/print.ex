@@ -92,7 +92,9 @@ defmodule FullCircleWeb.InvoiceLive.Print do
         </div>
       </span>
       <span class="qty">
-        <%= @invd.quantity %> <%= if @invd.unit == "-", do: "", else: @invd.unit %>
+        <%= if Decimal.integer?(@invd.quantity),
+          do: Decimal.to_integer(@invd.quantity),
+          else: @invd.quantity %> <%= if @invd.unit == "-", do: "", else: @invd.unit %>
       </span>
       <span class="price"><%= format_unit_price(@invd.unit_price) %></span>
       <span class="disc">
@@ -103,14 +105,14 @@ defmodule FullCircleWeb.InvoiceLive.Print do
       </span>
       <span class="total">
         <div><%= Number.Delimit.number_to_delimited(@invd.good_amount) %></div>
-        <span class="is-size-7 is-italic">
-          <%= if(!Decimal.eq?(@invd.tax_rate, 0), do: @invd.tax_code, else: "") %>
-          <%= if(Decimal.eq?(@invd.tax_rate, 0), do: "", else: "#{@invd.tax_rate}%") %>
-        </span>
-        <%= if(Decimal.eq?(@invd.tax_amount, 0),
-          do: "",
-          else: Number.Delimit.number_to_delimited(@invd.tax_amount)
-        ) %>
+
+        <%= if Decimal.gt?(@invd.tax_amount, 0) do %>
+          <span class="is-size-7 is-italic">
+            <%= @invd.tax_code %>
+            <%= "#{@invd.tax_rate}% -> " %>
+          </span>
+          <%= Number.Delimit.number_to_delimited(@invd.tax_amount) %>
+        <% end %>
       </span>
     </div>
     """
@@ -247,9 +249,9 @@ defmodule FullCircleWeb.InvoiceLive.Print do
       .details-header { display: flex; text-align: center; padding-bottom: 2mm; padding-top: 2mm; border-bottom: 0.5mm solid black; }
       .particular { width: 80mm; text-align: left; }
       .qty { width: 32mm; text-align: center; }
-      .price { width: 27mm; text-align: center; }
-      .disc { width: 27mm; text-align: center; }
-      .total { width: 40mm; text-align: right; }
+      .price { width: 25mm; text-align: center; }
+      .disc { width: 24mm; text-align: center; }
+      .total { width: 45mm; text-align: right; }
       .invoice-footer { margin-bottom: 1mm; padding: 3mm 0 3mm 0; text-align: right; border-top: 0.5mm solid black;}
       .invoice-footer span { padding-left: 5mm; }
       .invoice-footer span span { padding-left: 0; }
