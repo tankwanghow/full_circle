@@ -4,7 +4,7 @@ defmodule FullCircle.Seeding do
 
   alias FullCircle.Accounting.FixedAssetDepreciation
   alias FullCircle.Repo
-  alias FullCircle.Sys.{Log}
+  # alias FullCircle.Sys.{Log}
   alias FullCircle.Accounting.{TaxCode, Account, Contact, Transaction, FixedAsset}
   alias FullCircle.Product.{Good}
 
@@ -37,22 +37,23 @@ defmodule FullCircle.Seeding do
     save_seed(%Transaction{}, :seed_transactions, seed_data, com, user)
   end
 
-  defp save_seed(klass_struct, action, seed_data, company, user) do
+  defp save_seed(_klass_struct, action, seed_data, company, user) do
     case can?(user, action, company) do
       true ->
         Repo.transaction(fn repo ->
-          Enum.each(seed_data, fn x ->
-            k = repo.insert!(x)
+          Enum.each(seed_data, fn {cs, attr} ->
+            k = repo.insert!(cs)
 
             repo.insert(
-              Log.changeset(%Log{}, %{
-                entity: klass_struct.__meta__.source,
-                entity_id: k.id,
-                action: "seeding",
-                delta: "N/A",
-                user_id: user.id,
-                company_id: company.id
-              })
+              FullCircle.Sys.log_changeset(:seeding, k, attr, company, user)
+              # Log.changeset(%Log{}, %{
+              #   entity: klass_struct.__meta__.source,
+              #   entity_id: k.id,
+              #   action: "seeding",
+              #   delta: "N/A",
+              #   user_id: user.id,
+              #   company_id: company.id
+              # })
             )
           end)
         end)
@@ -116,12 +117,12 @@ defmodule FullCircle.Seeding do
       |> Map.merge(%{"sales_tax_code_id" => if(sal_tax, do: sal_tax.id, else: nil)})
       |> Map.merge(%{packagings: packagings})
 
-    FullCircle.StdInterface.changeset(
-      FullCircle.Product.Good,
-      FullCircle.Product.Good.__struct__(),
-      attr,
-      com
-    )
+    {FullCircle.StdInterface.changeset(
+       FullCircle.Product.Good,
+       FullCircle.Product.Good.__struct__(),
+       attr,
+       com
+     ), attr}
   end
 
   def fill_changeset("TaxCodes", attr, com, user) do
@@ -134,30 +135,30 @@ defmodule FullCircle.Seeding do
 
     attr = attr |> Map.merge(%{"account_id" => if(account, do: account.id, else: nil)})
 
-    FullCircle.StdInterface.changeset(
-      FullCircle.Accounting.TaxCode,
-      FullCircle.Accounting.TaxCode.__struct__(),
-      attr,
-      com
-    )
+    {FullCircle.StdInterface.changeset(
+       FullCircle.Accounting.TaxCode,
+       FullCircle.Accounting.TaxCode.__struct__(),
+       attr,
+       com
+     ), attr}
   end
 
   def fill_changeset("Contacts", attr, com, _user) do
-    FullCircle.StdInterface.changeset(
-      FullCircle.Accounting.Contact,
-      FullCircle.Accounting.Contact.__struct__(),
-      attr,
-      com
-    )
+    {FullCircle.StdInterface.changeset(
+       FullCircle.Accounting.Contact,
+       FullCircle.Accounting.Contact.__struct__(),
+       attr,
+       com
+     ), attr}
   end
 
   def fill_changeset("Accounts", attr, com, _user) do
-    FullCircle.StdInterface.changeset(
-      FullCircle.Accounting.Account,
-      FullCircle.Accounting.Account.__struct__(),
-      attr,
-      com
-    )
+    {FullCircle.StdInterface.changeset(
+       FullCircle.Accounting.Account,
+       FullCircle.Accounting.Account.__struct__(),
+       attr,
+       com
+     ), attr}
   end
 
   def fill_changeset("FixedAssets", attr, com, user) do
@@ -196,12 +197,12 @@ defmodule FullCircle.Seeding do
       |> Map.merge(%{"disp_fund_ac_id" => if(dis_ac, do: dis_ac.id, else: nil)})
       |> Map.merge(%{"cume_depre_ac_id" => if(cume_depre_ac, do: cume_depre_ac.id, else: nil)})
 
-    FullCircle.StdInterface.changeset(
-      FullCircle.Accounting.FixedAsset,
-      FullCircle.Accounting.FixedAsset.__struct__(),
-      attr,
-      com
-    )
+    {FullCircle.StdInterface.changeset(
+       FullCircle.Accounting.FixedAsset,
+       FullCircle.Accounting.FixedAsset.__struct__(),
+       attr,
+       com
+     ), attr}
   end
 
   def fill_changeset("FixedAssetDepreciations", attr, com, user) do
@@ -218,11 +219,11 @@ defmodule FullCircle.Seeding do
       |> Map.merge(%{"fixed_asset_id" => if(fa, do: fa.id, else: nil)})
       |> Map.merge(%{"doc_no" => FullCircle.Helpers.gen_temp_id(10)})
 
-    FullCircle.StdInterface.changeset(
-      FullCircle.Accounting.FixedAssetDepreciation,
-      FullCircle.Accounting.FixedAssetDepreciation.__struct__(),
-      attr,
-      com
-    )
+    {FullCircle.StdInterface.changeset(
+       FullCircle.Accounting.FixedAssetDepreciation,
+       FullCircle.Accounting.FixedAssetDepreciation.__struct__(),
+       attr,
+       com
+     ), attr}
   end
 end

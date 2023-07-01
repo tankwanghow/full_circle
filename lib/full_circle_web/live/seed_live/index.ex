@@ -142,7 +142,7 @@ defmodule FullCircleWeb.SeedLive.Index do
                 )
               end
 
-              cs =
+              {cs, seed_attrs} =
                 FullCircle.Seeding.fill_changeset(
                   socket.assigns.seed_table,
                   attr,
@@ -150,11 +150,11 @@ defmodule FullCircleWeb.SeedLive.Index do
                   socket.assigns.current_user
                 )
 
-              {cs, acc + 1}
+              {{cs, seed_attrs} , acc + 1}
             end)
 
           cs_has_error =
-            if cs_attrs |> Enum.find(fn x -> !x.valid? end) |> is_nil() do
+            if cs_attrs |> Enum.find(fn {cs, _} -> !cs.valid? end) |> is_nil() do
               false
             else
               true
@@ -273,7 +273,7 @@ defmodule FullCircleWeb.SeedLive.Index do
           <% end %>
         </tr>
 
-        <%= for a <- @attrs do %>
+        <%= for {a, _} <- @attrs do %>
           <tr>
             <%= for h <- @csv_headers do %>
               <td class={[
