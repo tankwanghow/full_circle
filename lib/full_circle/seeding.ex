@@ -44,17 +44,7 @@ defmodule FullCircle.Seeding do
           Enum.each(seed_data, fn {cs, attr} ->
             k = repo.insert!(cs)
 
-            repo.insert(
-              FullCircle.Sys.log_changeset(:seeding, k, attr, company, user)
-              # Log.changeset(%Log{}, %{
-              #   entity: klass_struct.__meta__.source,
-              #   entity_id: k.id,
-              #   action: "seeding",
-              #   delta: "N/A",
-              #   user_id: user.id,
-              #   company_id: company.id
-              # })
-            )
+            repo.insert(FullCircle.Sys.log_changeset(:seeding, k, attr, company, user))
           end)
         end)
 
