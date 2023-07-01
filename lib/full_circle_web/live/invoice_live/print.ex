@@ -25,7 +25,7 @@ defmodule FullCircleWeb.InvoiceLive.Print do
 
     company = FullCircle.Sys.get_company!(socket.assigns.current_company.id)
 
-    detail_body_height = 135
+    detail_body_height = 133
     detail_height = 13
     chunk = (detail_body_height / detail_height) |> floor
 
@@ -122,8 +122,9 @@ defmodule FullCircleWeb.InvoiceLive.Print do
     assigns = assign(assigns, :page, page) |> assign(:pages, pages)
 
     ~H"""
-    <div class="is-size-5 descriptions">
-      <div class="is-size-7 page-count"><%= "page #{@page} of #{@pages}" %></div>
+    <div class="descriptions">
+      ....continue....
+      <div class="page-count"><%= "page #{@page} of #{@pages}" %></div>
     </div>
     <div class="invoice-footer" />
     """
@@ -133,9 +134,9 @@ defmodule FullCircleWeb.InvoiceLive.Print do
     assigns = assign(assigns, :page, page) |> assign(:pages, pages)
 
     ~H"""
-    <div class="is-size-5 descriptions">
+    <div class="descriptions">
       <%= insert_new_html_newline(@invoice.descriptions) %>
-      <div class="is-size-7 page-count"><%= "page #{@page} of #{@pages}" %></div>
+      <div class="page-count"><%= "page #{@page} of #{@pages}" %></div>
     </div>
     <div class="invoice-footer">
       <span>
@@ -199,6 +200,7 @@ defmodule FullCircleWeb.InvoiceLive.Print do
           Pay By: <span class="has-text-weight-bold"><%= format_date(@invoice.due_date) %></span>
         </div>
         <div>Invoice No: <span class="has-text-weight-bold"><%= @invoice.invoice_no %></span></div>
+
       </div>
     </div>
     """
@@ -255,8 +257,8 @@ defmodule FullCircleWeb.InvoiceLive.Print do
       .invoice-footer { margin-bottom: 1mm; padding: 3mm 0 3mm 0; text-align: right; border-top: 0.5mm solid black;}
       .invoice-footer span { padding-left: 5mm; }
       .invoice-footer span span { padding-left: 0; }
-      .descriptions { font-style: italic; height: 13mm;}
-      .page-count { float: right; }
+      .descriptions { position: relative; font-style: italic; height: 15mm; }
+      .page-count { position: absolute; top: 15px; right: 5px; }
     </style>
     """
   end
