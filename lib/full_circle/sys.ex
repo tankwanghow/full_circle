@@ -529,22 +529,28 @@ defmodule FullCircle.Sys do
   def attr_to_string(attrs) do
     bl = ["_id", "delete"]
 
-    attrs
-    |> Enum.map(fn {k, v} ->
-      k = if(is_atom(k), do: Atom.to_string(k), else: k)
+    if Enum.any?(attrs, fn {k, v} ->
+         (k == "delete" or k == :delete) and v == "true"
+       end) do
+      ""
+    else
+      attrs
+      |> Enum.map(fn {k, v} ->
+        k = if(is_atom(k), do: Atom.to_string(k), else: k)
 
-      if !String.ends_with?(k, bl) and k != "id" do
-        if !is_map(v) do
-          if v != "",
-            do: "&^#{k}: #{Phoenix.HTML.html_escape(v) |> Phoenix.HTML.safe_to_string()}^&",
-            else: nil
-        else
-          "&^#{k}: [" <> attr_to_string(v) <> "]^&"
+        if !String.ends_with?(k, bl) and k != "id" do
+          if !is_map(v) do
+            if v != "",
+              do: "&^#{k}: #{Phoenix.HTML.html_escape(v) |> Phoenix.HTML.safe_to_string()}^&",
+              else: nil
+          else
+            "&^#{k}: [" <> attr_to_string(v) <> "]^&"
+          end
         end
-      end
-    end)
-    |> Enum.reject(fn x -> is_nil(x) end)
-    |> Enum.join(" ")
+      end)
+      |> Enum.reject(fn x -> is_nil(x) end)
+      |> Enum.join(" ")
+    end
   end
 
   def company_changeset(company, attrs \\ %{}, user) do
