@@ -25,9 +25,11 @@ defmodule FullCircleWeb.LogLive.Component do
      |> assign(:show_log, true)
      |> assign(
        :logs,
-       Sys.list_logs(
-         socket.assigns.entity,
-         socket.assigns.entity_id
+       make_logs_to_logs_diff(
+         Sys.list_logs(
+           socket.assigns.entity,
+           socket.assigns.entity_id
+         )
        )
      )}
   end
@@ -37,6 +39,24 @@ defmodule FullCircleWeb.LogLive.Component do
     {:noreply,
      socket
      |> assign(:show_log, false)}
+  end
+
+  def make_logs_to_logs_diff(logs) do
+    ([nil] ++ logs)
+    |> Enum.chunk_every(2, 1, :discard)
+    |> Enum.map(fn [o1, o2] ->
+      %{
+        inserted_at: o2.inserted_at,
+        email: o2.email,
+        action: o2.action,
+        delta:
+          FullCircleWeb.Helpers.put_marker_in_diff_log_delta(
+            if(is_nil(o1), do: "", else: o1.delta),
+            o2.delta
+          )
+      }
+    end)
+    |> Enum.reverse()
   end
 
   @impl true
@@ -66,19 +86,17 @@ defmodule FullCircleWeb.LogLive.Component do
             <%= for obj <- @logs do %>
               <div class="grid grid-cols-12 mb-2">
                 <div class="col-span-4 text-center border rounded p-5 bg-blue-100">
-                  <div class="font-medium"><%= obj.action %></div>
+                  <div class="font-medium">
+                    <%= obj.action %>
+                  </div>
                   <div><%= obj.email %></div>
                   <div class="text-sm">
                     <%= FullCircleWeb.CoreComponents.to_fc_time_format(obj.inserted_at) %>
                   </div>
                 </div>
                 <div class="text-left col-span-8 border rounded p-2 bg-rose-100 text-xs font-mono">
-                  <%= String.replace(obj.delta, "&^", "<p>")
-                  |> String.replace("^&", "</p>")
-                  |> String.replace("{", "<strong>")
-                  |> String.replace("}", "</strong>")
-                  |> String.replace("[", "<div class='pl-4'>")
-                  |> String.replace("]", "</div>")
+                  <%= obj.delta
+                  |> FullCircleWeb.Helpers.make_log_delta_to_html()
                   |> Phoenix.HTML.raw() %>
                 </div>
               </div>

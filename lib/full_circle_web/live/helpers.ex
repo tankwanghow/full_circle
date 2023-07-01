@@ -79,6 +79,29 @@ defmodule FullCircleWeb.Helpers do
     |> Phoenix.HTML.raw()
   end
 
+  def make_log_delta_to_html(delta) do
+    delta
+    |> String.replace("&^", "<p>")
+    |> String.replace("^&", "</p>")
+    |> String.replace("[", "<div class='pl-4'>")
+    |> String.replace("]", "</div>")
+    |> String.replace("<!", "<span class='text-red-500 line-through'>")
+    |> String.replace("!>", "</span>")
+    |> String.replace("<$", "<span class='text-green-600'>")
+    |> String.replace("$>", "</span>")
+  end
+
+  def put_marker_in_diff_log_delta(a1, a2) do
+    String.myers_difference(a1, a2)
+    |> Enum.map_join(fn {k, v} ->
+      case k do
+        :del -> "<!#{v}!>"
+        :ins -> "<$#{v}$>"
+        _ -> v
+      end
+    end)
+  end
+
   def format_date(date) do
     Timex.format!(Timex.local(date), "%d-%m-%Y", :strftime)
   end

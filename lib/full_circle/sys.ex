@@ -112,7 +112,7 @@ defmodule FullCircle.Sys do
         where: log.entity_id == ^entity_id,
         select: log,
         select_merge: %{email: user.email},
-        order_by: [desc: log.inserted_at]
+        order_by: log.inserted_at
     )
   end
 
@@ -509,12 +509,13 @@ defmodule FullCircle.Sys do
       from(log in Log,
         where: log.company_id == ^company_id,
         where: log.entity == ^entity,
-        where: log.entity_id == ^entity_id
+        where: log.entity_id == ^entity_id,
+        order_by: log.inserted_at
       )
     )
   end
 
-  defp log_changeset(name, entity, entity_attrs, company, user) do
+  def log_changeset(name, entity, entity_attrs, company, user) do
     Log.changeset(%Log{}, %{
       entity: entity.__meta__.source,
       entity_id: entity.id,
@@ -535,10 +536,10 @@ defmodule FullCircle.Sys do
       if !String.ends_with?(k, bl) and k != "id" do
         if !is_map(v) do
           if v != "",
-            do: "&^{#{k}}: #{Phoenix.HTML.html_escape(v) |> Phoenix.HTML.safe_to_string()}^&",
+            do: "&^#{k}: #{Phoenix.HTML.html_escape(v) |> Phoenix.HTML.safe_to_string()}^&",
             else: nil
         else
-          "&^{#{k}}: [" <> attr_to_string(v) <> "]^&"
+          "&^#{k}: [" <> attr_to_string(v) <> "]^&"
         end
       end
     end)
