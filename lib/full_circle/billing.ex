@@ -391,7 +391,6 @@ defmodule FullCircle.Billing do
         if Decimal.gt?(x.good_amount, 0) do
           repo.insert!(%Transaction{
             doc_type: "invoices",
-            doc_id: invoice.id,
             doc_no: invoice.invoice_no,
             doc_date: invoice.invoice_date,
             account_id: x.account_id,
@@ -406,7 +405,6 @@ defmodule FullCircle.Billing do
 
           repo.insert!(%Transaction{
             doc_type: "invoices",
-            doc_id: invoice.id,
             doc_no: invoice.invoice_no,
             doc_date: invoice.invoice_date,
             account_id: tax_ac_id,
@@ -423,7 +421,6 @@ defmodule FullCircle.Billing do
 
       repo.insert!(%Transaction{
         doc_type: "invoices",
-        doc_id: invoice.id,
         doc_no: invoice.invoice_no,
         doc_date: invoice.invoice_date,
         contact_id: invoice.contact_id,
@@ -785,7 +782,6 @@ defmodule FullCircle.Billing do
         if Decimal.gt?(x.good_amount, 0) do
           repo.insert!(%Transaction{
             doc_type: "pur_invoices",
-            doc_id: pur_invoice.id,
             doc_no: pur_invoice.pur_invoice_no,
             doc_date: pur_invoice.pur_invoice_date,
             account_id: x.account_id,
@@ -800,7 +796,6 @@ defmodule FullCircle.Billing do
 
           repo.insert!(%Transaction{
             doc_type: "pur_invoices",
-            doc_id: pur_invoice.id,
             doc_no: pur_invoice.pur_invoice_no,
             doc_date: pur_invoice.pur_invoice_date,
             account_id: tax_ac_id,
@@ -817,7 +812,6 @@ defmodule FullCircle.Billing do
 
       repo.insert!(%Transaction{
         doc_type: "pur_invoices",
-        doc_id: pur_invoice.id,
         doc_no: pur_invoice.pur_invoice_no,
         doc_date: pur_invoice.pur_invoice_date,
         contact_id: pur_invoice.contact_id,

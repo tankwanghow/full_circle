@@ -12,7 +12,9 @@ defmodule FullCircleWeb.SeedLive.Index do
     "Contacts" =>
       ~w(name address1 address2 city zipcode state country reg_no email contact_info descriptions),
     "Goods" =>
-      ~w(name descriptions unit purchase_account_name sales_account_name purchase_tax_code_name sales_tax_code_name package_name unit_multiplier cost_per_package)
+      ~w(name descriptions unit purchase_account_name sales_account_name purchase_tax_code_name sales_tax_code_name package_name unit_multiplier cost_per_package),
+    "Transactions" =>
+      ~w(doc_date	account_name	doc_no	doc_type	particulars	amount)
   }
 
   @impl true
@@ -33,11 +35,12 @@ defmodule FullCircleWeb.SeedLive.Index do
       |> assign(status: "")
       |> assign(status_flag: :info)
       |> assign(attrs: [])
+      |> assign(err_attrs: [])
       |> assign(csv_headers: [])
       |> assign(cs_has_error?: true)
       |> allow_upload(:csv_file,
         accept: ~w(.csv),
-        max_file_size: 1_000_000,
+        max_file_size: 5_000_000,
         progress: &handle_progress/3,
         auto_upload: true
       )
@@ -50,6 +53,7 @@ defmodule FullCircleWeb.SeedLive.Index do
     |> assign(seed_table: Map.keys(@seed_tables) |> Enum.at(0))
     |> assign(seed_table_headers: Map.fetch!(@seed_tables, Map.keys(@seed_tables) |> Enum.at(0)))
     |> assign(attrs: [])
+    |> assign(err_attrs: [])
     |> assign(csv_headers: [])
     |> assign(cs_has_error?: true)
   end
@@ -90,6 +94,7 @@ defmodule FullCircleWeb.SeedLive.Index do
      |> assign(seed_table: params)
      |> assign(status: "")
      |> assign(attrs: [])
+     |> assign(err_attrs: [])
      |> assign(csv_headers: [])
      |> assign(seed_table_headers: Map.fetch!(@seed_tables, params))}
   end
@@ -112,6 +117,7 @@ defmodule FullCircleWeb.SeedLive.Index do
     {:noreply,
      socket
      |> assign(attrs: data.cs)
+     |> assign(err_attrs: Enum.reject(data.cs, fn {cs, _} -> cs.valid? != false end))
      |> assign(status: if(data.cs_has_error, do: "Seeding CSV file has error!!", else: "Done"))
      |> assign(status_flag: if(data.cs_has_error, do: :error, else: :success))
      |> assign(cs_has_error?: data.cs_has_error)}
@@ -128,9 +134,10 @@ defmodule FullCircleWeb.SeedLive.Index do
 
       if check_header_name?(csv_headers, socket.assigns.seed_table_headers) do
         Task.start(fn ->
+          count_attrs = Enum.count(attrs)
           {cs_attrs, _} =
             Enum.map_reduce(attrs, 0, fn attr, acc ->
-              if(rem(trunc(acc / Enum.count(attrs) * 100), 5) == 0) do
+              if(rem(trunc(acc / count_attrs * 100), 7) == 0) do
                 Phoenix.PubSub.broadcast(
                   FullCircle.PubSub,
                   "seed_data_changeset_generation_progress",
@@ -150,7 +157,7 @@ defmodule FullCircleWeb.SeedLive.Index do
                   socket.assigns.current_user
                 )
 
-              {{cs, seed_attrs} , acc + 1}
+              {{cs, seed_attrs}, acc + 1}
             end)
 
           cs_has_error =
@@ -273,7 +280,7 @@ defmodule FullCircleWeb.SeedLive.Index do
           <% end %>
         </tr>
 
-        <%= for {a, _} <- @attrs do %>
+        <%= for {a, _} <- @err_attrs do %>
           <tr>
             <%= for h <- @csv_headers do %>
               <td class={[

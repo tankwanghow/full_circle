@@ -458,6 +458,16 @@ defmodule FullCircle.Accounting do
     |> Repo.all()
   end
 
+  def get_contact_by_name(name, com, user) do
+    Repo.one(
+      from ct in Contact,
+        join: com in subquery(Sys.user_company(com, user)),
+        on: com.id == ct.company_id,
+        where: ct.name == ^name
+    )
+  end
+
+
   def delete_account(ac, company, user) do
     if !is_default_account?(ac) do
       StdInterface.delete(Account, "account", ac, company, user)
@@ -629,23 +639,23 @@ defmodule FullCircle.Accounting do
     |> Ecto.Multi.run(Atom.to_string(name) <> "transactions", fn repo, %{^name => depre} ->
       repo.insert!(%Transaction{
         doc_type: "fixed_asset_depreciations",
-        doc_id: depre.id,
         doc_no: depre.doc_no,
         doc_date: depre.depre_date,
         account_id: fa.depre_ac_id,
         company_id: com.id,
         amount: depre.amount,
+        fixed_asset_id: fa.id,
         particulars: "Depreciation #{fa.depre_rate} on #{fa.name}"
       })
 
       repo.insert!(%Transaction{
         doc_type: "fixed_asset_depreciations",
-        doc_id: depre.id,
         doc_no: depre.doc_no,
         doc_date: depre.depre_date,
         account_id: fa.cume_depre_ac_id,
         company_id: com.id,
         amount: Decimal.negate(depre.amount),
+        fixed_asset_id: fa.id,
         particulars: "Depreciation #{fa.depre_rate} on #{fa.name}"
       })
 

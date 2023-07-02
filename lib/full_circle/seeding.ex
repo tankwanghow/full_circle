@@ -4,7 +4,6 @@ defmodule FullCircle.Seeding do
 
   alias FullCircle.Accounting.FixedAssetDepreciation
   alias FullCircle.Repo
-  # alias FullCircle.Sys.{Log}
   alias FullCircle.Accounting.{TaxCode, Account, Contact, Transaction, FixedAsset}
   alias FullCircle.Product.{Good}
 
@@ -34,17 +33,19 @@ defmodule FullCircle.Seeding do
   end
 
   def seed("Transactions", seed_data, com, user) do
-    save_seed(%Transaction{}, :seed_transactions, seed_data, com, user)
+    save_seed(%Transaction{}, :seed_transactions, seed_data, com, user, false)
   end
 
-  defp save_seed(_klass_struct, action, seed_data, company, user) do
+  defp save_seed(_klass_struct, action, seed_data, company, user, log? \\ true) do
     case can?(user, action, company) do
       true ->
         Repo.transaction(fn repo ->
           Enum.each(seed_data, fn {cs, attr} ->
             k = repo.insert!(cs)
 
-            repo.insert(FullCircle.Sys.log_changeset(:seeding, k, attr, company, user))
+            if log? do
+              repo.insert(FullCircle.Sys.log_changeset(:seeding, k, attr, company, user))
+            end
           end)
         end)
 
@@ -212,6 +213,49 @@ defmodule FullCircle.Seeding do
     {FullCircle.StdInterface.changeset(
        FullCircle.Accounting.FixedAssetDepreciation,
        FullCircle.Accounting.FixedAssetDepreciation.__struct__(),
+       attr,
+       com
+     ), attr}
+  end
+
+  def fill_changeset("Transactions", attr, com, user) do
+    {ac, ct} =
+      {FullCircle.Accounting.get_account_by_name(
+         Map.fetch!(attr, "account_name"),
+         com,
+         user
+       ),
+       FullCircle.Accounting.get_contact_by_name(
+         Map.fetch!(attr, "account_name"),
+         com,
+         user
+       )}
+
+    ac =
+      if is_nil(ac) do
+        ac_rec = FullCircle.Accounting.get_account_by_name!("Account Receivables", com, user)
+        ac_pay = FullCircle.Accounting.get_account_by_name!("Account Payables", com, user)
+        amt = Map.fetch!(attr, "amount")
+
+        if Decimal.new(amt) |> Decimal.to_float() > 0 do
+          ac_rec
+        else
+          ac_pay
+        end
+      else
+        ac
+      end
+
+    attr =
+      attr
+      |> Map.merge(%{"account_id" => if(ac, do: ac.id, else: nil)})
+      |> Map.merge(%{"contact_id" => if(ct, do: ct.id, else: nil)})
+      |> Map.merge(%{"closed" => "true"})
+      |> Map.merge(%{"old_data" => "true"})
+
+    {FullCircle.StdInterface.changeset(
+       FullCircle.Accounting.Transaction,
+       FullCircle.Accounting.Transaction.__struct__(),
        attr,
        com
      ), attr}

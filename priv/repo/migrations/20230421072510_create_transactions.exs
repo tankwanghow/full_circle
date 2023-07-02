@@ -4,7 +4,6 @@ defmodule FullCircle.Repo.Migrations.CreateTransactions do
   def change do
     create table(:transactions) do
       add :doc_type, :string
-      add :doc_id, :binary_id
       add :doc_date, :date
       add :particulars, :string
       add :contact_particulars, :string

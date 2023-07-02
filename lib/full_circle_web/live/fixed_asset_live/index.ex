@@ -21,9 +21,6 @@ defmodule FullCircleWeb.FixedAssetLive.Index do
         <.link phx-click={:new_object} class="nav-btn" id="new_object">
           <%= gettext("New Fixed Asset") %>
         </.link>
-        <.link navigate="" class="nav-btn" id="unreg_fixed_assets">
-          <%= gettext("Unregistered Fixed Assets") %>
-        </.link>
         <.link navigate={~p"/companies/#{@current_company.id}/fixed_assets/calalldepre"} class="nav-btn" id="calculate_depre">
           <%= gettext("Calculate Depreciations") %>
         </.link>

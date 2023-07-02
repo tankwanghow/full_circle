@@ -86,5 +86,9 @@ defmodule FullCircle.Accounting.FixedAsset do
       name: :fixed_assets_unique_name_in_company,
       message: gettext("has already been taken")
     )
+    |> foreign_key_constraint(:name,
+      name: :transactions_fixed_asset_id_fkey,
+      message: gettext("referenced by transactions")
+    )
   end
 end

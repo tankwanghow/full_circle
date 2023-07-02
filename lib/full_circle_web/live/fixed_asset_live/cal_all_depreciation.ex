@@ -1,9 +1,7 @@
 defmodule FullCircleWeb.FixedAssetLive.CalAllDepre do
   use FullCircleWeb, :live_view
 
-  # alias FullCircle.Accounting.{FixedAssetDepreciation}
   alias FullCircle.Accounting
-  # alias FullCircle.StdInterface
 
   @impl true
   def mount(params, _session, socket) do

@@ -4,7 +4,6 @@ defmodule FullCircle.Accounting.Transaction do
 
   schema "transactions" do
     field :doc_type, :string
-    field :doc_id, :binary_id
     field :doc_date, :date
     field :particulars, :string
     field :contact_particulars, :string
@@ -31,8 +30,8 @@ defmodule FullCircle.Accounting.Transaction do
     transaction
     |> cast(attrs, [
       :doc_type,
-      :doc_id,
       :doc_date,
+      :doc_no,
       :particulars,
       :contact_particulars,
       :amount,
@@ -45,7 +44,7 @@ defmodule FullCircle.Accounting.Transaction do
     ])
     |> validate_required([
       :doc_type,
-      :doc_id,
+      :doc_no,
       :doc_date,
       :particulars,
       :amount,
