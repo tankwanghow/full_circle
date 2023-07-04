@@ -13,8 +13,8 @@ defmodule FullCircleWeb.SeedLive.Index do
       ~w(name address1 address2 city zipcode state country reg_no email contact_info descriptions),
     "Goods" =>
       ~w(name descriptions unit purchase_account_name sales_account_name purchase_tax_code_name sales_tax_code_name package_name unit_multiplier cost_per_package),
-    "Transactions" =>
-      ~w(doc_date	account_name	doc_no	doc_type	particulars	amount)
+    "Balances" => ~w(doc_date	account_name amount),
+    "Transactions" => ~w(doc_date	account_name	doc_no	doc_type particulars	amount)
   }
 
   @impl true
@@ -38,9 +38,10 @@ defmodule FullCircleWeb.SeedLive.Index do
       |> assign(err_attrs: [])
       |> assign(csv_headers: [])
       |> assign(cs_has_error?: true)
+      |> assign(filename: "No File uploaded.")
       |> allow_upload(:csv_file,
         accept: ~w(.csv),
-        max_file_size: 5_000_000,
+        max_file_size: 2_500_000,
         progress: &handle_progress/3,
         auto_upload: true
       )
@@ -53,6 +54,7 @@ defmodule FullCircleWeb.SeedLive.Index do
     |> assign(seed_table: Map.keys(@seed_tables) |> Enum.at(0))
     |> assign(seed_table_headers: Map.fetch!(@seed_tables, Map.keys(@seed_tables) |> Enum.at(0)))
     |> assign(attrs: [])
+    |> assign(filename: "No File uploaded.")
     |> assign(err_attrs: [])
     |> assign(csv_headers: [])
     |> assign(cs_has_error?: true)
@@ -134,20 +136,21 @@ defmodule FullCircleWeb.SeedLive.Index do
 
       if check_header_name?(csv_headers, socket.assigns.seed_table_headers) do
         Task.start(fn ->
-          count_attrs = Enum.count(attrs)
+          # count_attrs = Enum.count(attrs)
           {cs_attrs, _} =
             Enum.map_reduce(attrs, 0, fn attr, acc ->
-              if(rem(trunc(acc / count_attrs * 100), 7) == 0) do
-                Phoenix.PubSub.broadcast(
-                  FullCircle.PubSub,
-                  "seed_data_changeset_generation_progress",
-                  {:update_progress,
-                   %{
-                     progress:
-                       (acc / Enum.count(attrs) * 100) |> Number.Percentage.number_to_percentage()
-                   }}
-                )
-              end
+              # if(rem(trunc(acc / count_attrs * 100), 7) == 0) do
+              Phoenix.PubSub.broadcast(
+                FullCircle.PubSub,
+                "seed_data_changeset_generation_progress",
+                {:update_progress,
+                 %{
+                   progress:
+                     (acc / Enum.count(attrs) * 100) |> Number.Percentage.number_to_percentage()
+                 }}
+              )
+
+              # end
 
               {cs, seed_attrs} =
                 FullCircle.Seeding.fill_changeset(
@@ -176,12 +179,14 @@ defmodule FullCircleWeb.SeedLive.Index do
 
         {:noreply,
          socket
+         |> assign(filename: entry.client_name)
          |> assign(status: "uploaded!")
          |> assign(status_flag: :success)
          |> assign(csv_headers: csv_headers)}
       else
         {:noreply,
          socket
+         |> assign(filename: entry.client_name)
          |> assign(attrs: [])
          |> assign(status: "header error!")
          |> assign(status_flag: :error)}
@@ -234,7 +239,7 @@ defmodule FullCircleWeb.SeedLive.Index do
         </div>
         <div class="mb-1 rounded-lg p-2 bg-yellow-200 border border-yellow-500 font-semibold text-center">
           <p>
-            <%= "Maximum file size is #{(@uploads.csv_file.max_file_size / 1_000_000) |> trunc} MB" %>
+            <%= "Maximum file size is #{@uploads.csv_file.max_file_size / 1_000_000} MB" %>
           </p>
           <span
             :for={{_, msg} <- @uploads.csv_file.errors}
@@ -259,9 +264,8 @@ defmodule FullCircleWeb.SeedLive.Index do
 
         <div class="border rounded-lg bg-gray-200 border-gray-500 p-2 mb-1">
           <div class="p-2">
-            CSV file require
-            <headers></headers>
-            below.
+            <div class="text-xl text-purple-500 font-bold"><%= @filename %></div>
+            CSV file require headers like below.
           </div>
           <div class="font-bold font-mono text-amber-600">
             <%= Enum.join(@seed_table_headers, ", ") %>

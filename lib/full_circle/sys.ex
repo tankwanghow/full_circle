@@ -62,7 +62,7 @@ defmodule FullCircle.Sys do
   def default_accounts do
     [
       %{
-        name: "General Purchase",
+        name: "General Purchases",
         account_type: "Cost Of Goods Sold",
         descriptions:
           "Account that shows the total amount a business spent on purchasing goods or services during a specific period, including all types of purchases. It helps businesses track their expenses and calculate their cost of goods sold, which is essential for determining their net profit."

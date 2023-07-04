@@ -79,8 +79,8 @@ defmodule FullCircleWeb.FixedAssetLive.IndexComponent do
 
           <p>
             <%= gettext("Net Book Value") %> - <%= @obj.pur_price
-            |> Decimal.sub(@obj.cume_disp)
-            |> Decimal.sub(@obj.cume_depre)
+            |> Decimal.sub(@obj.cume_disp || Decimal.new("0"))
+            |> Decimal.sub(@obj.cume_depre || Decimal.new("0"))
             |> Number.Currency.number_to_currency() %>
           </p>
           <p>

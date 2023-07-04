@@ -30,7 +30,7 @@ defmodule FullCircle.Accounting do
     ~w(Sales Purchase)
   end
 
-  defp balance_sheet_account_types do
+  def balance_sheet_account_types do
     [
       "Cash or Equivalent",
       "Bank",
@@ -48,7 +48,7 @@ defmodule FullCircle.Accounting do
     ]
   end
 
-  defp profit_loss_account_types do
+  def profit_loss_account_types do
     [
       "Depreciation",
       "Direct Costs",
@@ -466,7 +466,6 @@ defmodule FullCircle.Accounting do
         where: ct.name == ^name
     )
   end
-
 
   def delete_account(ac, company, user) do
     if !is_default_account?(ac) do

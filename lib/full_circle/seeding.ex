@@ -32,6 +32,10 @@ defmodule FullCircle.Seeding do
     save_seed(%FixedAssetDepreciation{}, :seed_fixed_asset_depreciations, seed_data, com, user)
   end
 
+  def seed("Balances", seed_data, com, user) do
+    save_seed(%Transaction{}, :seed_balances, seed_data, com, user, false)
+  end
+
   def seed("Transactions", seed_data, com, user) do
     save_seed(%Transaction{}, :seed_transactions, seed_data, com, user, false)
   end
@@ -218,7 +222,7 @@ defmodule FullCircle.Seeding do
      ), attr}
   end
 
-  def fill_changeset("Transactions", attr, com, user) do
+  def fill_changeset("Balances", attr, com, user) do
     {ac, ct} =
       {FullCircle.Accounting.get_account_by_name(
          Map.fetch!(attr, "account_name"),
@@ -250,6 +254,34 @@ defmodule FullCircle.Seeding do
       attr
       |> Map.merge(%{"account_id" => if(ac, do: ac.id, else: nil)})
       |> Map.merge(%{"contact_id" => if(ct, do: ct.id, else: nil)})
+      |> Map.merge(%{
+        "old_data" => "true",
+        "closed" => "true",
+        "doc_no" => FullCircle.Helpers.gen_temp_id(10),
+        "doc_type" => "Journal",
+        "particulars" => "Balance B/F"
+      })
+
+    {FullCircle.StdInterface.changeset(
+       FullCircle.Accounting.Transaction,
+       FullCircle.Accounting.Transaction.__struct__(),
+       attr,
+       com
+     ), attr}
+  end
+
+  def fill_changeset("Transactions", attr, com, user) do
+    name = Map.fetch!(attr, "account_name")
+
+    {ac, ct} =
+      get_ac_from_fixed_asset(name, com) ||
+        get_ac_form_attr(attr, com, user)
+
+    attr = if(ac, do: Map.merge(attr, %{"account_id" => ac.id}), else: attr)
+    attr = if(ct, do: Map.merge(attr, %{"contact_id" => ct.id}), else: attr)
+
+    attr =
+      attr
       |> Map.merge(%{"closed" => "true"})
       |> Map.merge(%{"old_data" => "true"})
 
@@ -259,5 +291,50 @@ defmodule FullCircle.Seeding do
        attr,
        com
      ), attr}
+  end
+
+  def get_ac_from_fixed_asset(name, com) do
+    Repo.one(
+      from fa in FixedAsset,
+        join: ac in Account,
+        on: ac.id == fa.asset_ac_id,
+        where: fragment("? like ?", fa.name, ^"#{name}%"),
+        where: fa.company_id == ^com.id,
+        distinct: true,
+        select: {ac, nil}
+    )
+  end
+
+  def get_ac_form_attr(attr, com, user) do
+    name = Map.fetch!(attr, "account_name")
+    ac = FullCircle.Accounting.get_account_by_name(name, com, user)
+    ct = FullCircle.Accounting.get_contact_by_name(name, com, user)
+
+    if is_nil(ac) do
+      ac_rec = FullCircle.Accounting.get_account_by_name!("Account Receivables", com, user)
+      ac_pay = FullCircle.Accounting.get_account_by_name!("Account Payables", com, user)
+      doc_type = Map.fetch!(attr, "doc_type")
+
+      ac = case doc_type do
+        "Invoice" -> ac_rec
+        "PurInvoice" -> ac_pay
+        "Payment" -> ac_pay
+        "Receipt" -> ac_rec
+        "CreditNote" -> ac_rec
+        "DebitNote" -> ac_pay
+        "ReturnCheque" -> ac_rec
+        "Journal" ->
+          if Map.fetch!(attr, "amount") |> Decimal.new |> Decimal.to_float() > 0 do
+            ac_rec
+          else
+            ac_pay
+          end
+
+        _ -> nil
+      end
+      {ac, ct}
+    else
+      {ac, ct}
+    end
   end
 end

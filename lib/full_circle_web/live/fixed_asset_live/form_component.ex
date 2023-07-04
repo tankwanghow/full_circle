@@ -38,6 +38,25 @@ defmodule FullCircleWeb.FixedAssetLive.FormComponent do
   @impl true
   def handle_event(
         "validate",
+        %{"_target" => ["fixed_asset", "cume_depre_ac_name"], "fixed_asset" => params},
+        socket
+      ) do
+    {params, socket, _} =
+      FullCircleWeb.Helpers.assign_list_n_id(
+        socket,
+        params,
+        "cume_depre_ac_name",
+        :account_names,
+        "cume_depre_ac_id",
+        &FullCircle.Accounting.account_names/3
+      )
+
+    validate(params, socket)
+  end
+
+  @impl true
+  def handle_event(
+        "validate",
         %{"_target" => ["fixed_asset", "depre_ac_name"], "fixed_asset" => params},
         socket
       ) do
