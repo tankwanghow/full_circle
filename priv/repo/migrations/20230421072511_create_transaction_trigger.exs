@@ -6,9 +6,12 @@ defmodule FullCircle.Repo.Migrations.CreateTransactionTrigger do
     CREATE OR REPLACE FUNCTION cannot_update_or_delete_closed_transaction()
       RETURNS trigger AS $trigger$
       BEGIN
-        RAISE EXCEPTION 'Cannot update or delete a CLOSED transaction!'
-          USING ERRCODE = 'integrity_constraint_violation';
-        RETURN OLD;
+        IF (OLD.closed = true) AND EXISTS(SELECT 1 FROM companies WHERE id=OLD.company_id) THEN
+          RAISE EXCEPTION 'Cannot update or delete a CLOSED transaction!'
+            USING ERRCODE = 'integrity_constraint_violation';
+        ELSE
+          RETURN OLD;
+        END IF;
       END;
       $trigger$ LANGUAGE plpgsql;
     """
@@ -16,7 +19,6 @@ defmodule FullCircle.Repo.Migrations.CreateTransactionTrigger do
     execute """
     CREATE TRIGGER delete_closed_transaction_trigger
       BEFORE DELETE ON transactions FOR EACH ROW
-      WHEN (OLD.closed = true)
       EXECUTE PROCEDURE cannot_update_or_delete_closed_transaction();
     """
   end
