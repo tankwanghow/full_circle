@@ -13,87 +13,88 @@
   </head>
   <body class="bg-fuchsia-50">
     <%= if @current_user do %>
-      <div class="fixed top-0 w-full bg-gray-800 text-white p-2 flex justify-between">
-        <h1 class="text-3xl font-bold">
+      <div class="flex fixed top-0 z-10 w-full items-center text-white gap-4 bg-gray-800 py-3 px-5 shadow">
+        <span class="text-3xl font-bold cursor-default">
           <%= gettext("FullCircle") %>
           <%= if assigns[:current_company] do %>
             <span id="active-company" class="font-normal text-2xl">
               &#8226; <%= @current_company.name %>
             </span>
           <% end %>
-        </h1>
-        <div>
-          <div
-            id="menu-button"
-            class="rounded float-right hover:bg-blue-500 p-2"
-            phx-click={Phoenix.LiveView.JS.toggle(to: "#menu")}
-          >
-            <Heroicons.bars_4 class="w-5 h-5" />
-          </div>
-          <%= if assigns[:current_company]  do %>
+        </span>
+        <div class="ml-auto flex">
+          <%= if assigns[:current_company] do %>
             <.link
               id="full_circle_dashboard"
               navigate={~p"/companies/#{@current_company.id}/dashboard"}
-              class="rounded hover:bg-gray-400 p-2 float-right"
+              class="rounded hover:bg-gray-400 p-2"
             >
               <%= gettext("Dashboard") %>
             </.link>
           <% end %>
-        </div>
 
-        <div id="menu" class="m-2 rounded shadow-xl right-1 fixed top-12 hidden">
-          <ul class="border-2 bg-gray-800 border-gray-900 p-2">
-            <li class="text-xl font-bold mb-2 text-blue-400">
-              <%= @current_user.email %>
-              <div class="flex justify-between">
-                <div class="text-base font-normal text-rose-800">
-                  <%= if assigns[:current_company], do: @current_role %>
-                </div>
+          <ul class="flex justify-center">
+            <li class="group relative" tabindex="-1">
+              <button class="rounded-md hover:bg-gray-400 p-2">
+                <Heroicons.bars_4 class="w-5 h-5" />
+              </button>
+
+              <div class="p-2 invisible absolute right-0 top-full transform opacity-0 transition-all duration-300 group-focus-within:visible group-focus-within:opacity-100">
+                <ul class="mt-1 rounded-md border border-neutral-50 bg-gray-800 p-2 shadow backdrop-blur-sm">
+                  <li class="text-xl font-bold mb-2 text-blue-400">
+                    <%= @current_user.email %>
+                    <div class="flex justify-between">
+                      <div class="text-base font-normal text-amber-600">
+                        <%= if assigns[:current_company], do: @current_role %>
+                      </div>
+                    </div>
+                  </li>
+
+                  <li class="my-5">
+                    <.link navigate={~p"/users/settings"} class="mb-2 p-3 hover:bg-emerald-400 flex">
+                      <%= gettext("User Settings") %>
+                    </.link>
+                  </li>
+
+                  <li class="my-5">
+                    <.link navigate={~p"/companies"} class="mb-2 p-3 hover:bg-emerald-400 flex">
+                      <%= gettext("Companies") %>
+                    </.link>
+                  </li>
+
+                  <%= if assigns[:current_company] do %>
+                    <%= if @current_role == "admin" do %>
+                      <li class="my-5">
+                        <.link
+                          navigate={~p"/companies/#{@current_company.id}/users"}
+                          class="mb-2 p-3 hover:bg-emerald-400 flex"
+                        >
+                          <%= gettext("Users") %>
+                        </.link>
+                      </li>
+                    <% end %>
+                  <% end %>
+                  <%= if @locale == "zh" do %>
+                    <li class="my-5">
+                      <.link href="?locale=en" class="mb-2 p-3 hover:bg-emerald-400 flex">
+                        English
+                      </.link>
+                    </li>
+                  <% else %>
+                    <li class="my-5">
+                      <.link href="?locale=zh" class="mb-2 p-3 hover:bg-emerald-400 flex">
+                        中文
+                      </.link>
+                    </li>
+                  <% end %>
+
+                  <li class="my-5">
+                    <.link href={~p"/users/log_out"} method="delete" class="p-3 hover:bg-rose-400 flex">
+                      <%= gettext("Log out") %>
+                    </.link>
+                  </li>
+                </ul>
               </div>
-            </li>
-
-            <li class="my-5">
-              <.link navigate={~p"/users/settings"} class="mb-2 p-3 hover:bg-emerald-400">
-                <%= gettext("User Settings") %>
-              </.link>
-            </li>
-
-            <li class="my-5">
-              <.link navigate={~p"/companies"} class="mb-2 p-3 hover:bg-emerald-400">
-                <%= gettext("Companies") %>
-              </.link>
-            </li>
-
-            <%= if assigns[:current_company] do %>
-              <%= if @current_role == "admin" do %>
-                <li class="my-5">
-                  <.link
-                    navigate={~p"/companies/#{@current_company.id}/users"}
-                    class="mb-2 p-3 hover:bg-emerald-400"
-                  >
-                    <%= gettext("Users") %>
-                  </.link>
-                </li>
-              <% end %>
-            <% end %>
-            <%= if @locale == "zh" do %>
-              <li class="my-5">
-                <.link href="?locale=en" class="mb-2 p-3 hover:bg-emerald-400">
-                  English
-                </.link>
-              </li>
-            <% else %>
-              <li class="my-5">
-                <.link href="?locale=zh" class="mb-2 p-3 hover:bg-emerald-400">
-                  中文
-                </.link>
-              </li>
-            <% end %>
-
-            <li class="my-5">
-              <.link href={~p"/users/log_out"} method="delete" class="p-3 hover:bg-rose-400">
-                <%= gettext("Log out") %>
-              </.link>
             </li>
           </ul>
         </div>
