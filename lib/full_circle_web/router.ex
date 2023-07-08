@@ -112,6 +112,7 @@ defmodule FullCircleWeb.Router do
       live("/pur_invoices", PurInvoiceLive.Index, :index)
       live("/logs/:entity/:entity_id", LogLive.Index, :index)
       live("/journal_entries/:doc_type/:doc_no", JournalEntryViewLive.Index, :index)
+      live("/account_transactions", TransactionLive.Account, :index)
     end
 
     live_session :require_authenticated_user_n_active_company_print,

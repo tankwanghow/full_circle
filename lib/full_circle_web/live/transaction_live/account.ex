@@ -1,0 +1,246 @@
+defmodule FullCircleWeb.TransactionLive.Account do
+  use FullCircleWeb, :live_view
+
+  alias FullCircle.{Reporting, Accounting}
+
+  @impl true
+  def mount(_params, _session, socket) do
+    objects = []
+
+    socket =
+      socket
+      |> assign(account_names: [])
+      |> assign(title: "Account Transactions")
+      |> assign(search: %{name: "", f_date: Date.utc_today(), t_date: Date.utc_today()})
+      |> assign(:objects, objects)
+      |> assign(valid?: false)
+      |> assign(objects_count: 0)
+      |> assign(objects_balance: Decimal.new("0"))
+
+    {:ok, socket}
+  end
+
+  @impl true
+  def handle_event("query", %{"search" => params}, socket) do
+    {:noreply,
+     socket
+     |> filter_transacrtions()}
+  end
+
+  @impl true
+  def handle_event("print", _, socket) do
+  end
+
+  @impl true
+  def handle_event("export_csv", _, socket) do
+  end
+
+  @impl true
+  def handle_event(
+        "validate",
+        %{"_target" => ["search", _], "search" => params},
+        socket
+      ) do
+    {l, v} =
+      FullCircleWeb.Helpers.list_n_value(socket, params["name"], &Accounting.account_names/3)
+
+    socket =
+      socket
+      |> assign(
+        account: if(v, do: FullCircle.StdInterface.get!(Accounting.Account, v.id), else: nil)
+      )
+      |> assign(account_names: l)
+      |> assign(
+        search: %{name: params["name"], f_date: params["f_date"], t_date: params["t_date"]}
+      )
+      |> assign(valid?: !is_nil(v) and params["f_date"] != "" and params["t_date"] != "")
+
+    {:noreply, socket}
+  end
+
+  defp filter_transacrtions(socket) do
+    objects =
+      Reporting.account_transactions(
+        socket.assigns.account,
+        Date.from_iso8601!(socket.assigns.search.f_date),
+        Date.from_iso8601!(socket.assigns.search.f_date),
+        socket.assigns.current_company
+      )
+
+    socket
+    |> assign(:objects, objects)
+    |> assign(objects_count: Enum.count(objects))
+    |> assign(
+      objects_balance:
+        Enum.reduce(objects, Decimal.new("0"), fn obj, acc -> Decimal.add(obj.amount, acc) end)
+    )
+  end
+
+  ######################################
+  def handle_info({:updated, obj}, socket) do
+    {:noreply, socket |> assign(live_action: nil) |> filter_transacrtions()}
+  end
+
+  def handle_info({:deleted, obj}, socket) do
+    {:noreply, socket |> assign(live_action: nil)}
+  end
+
+  @impl true
+  def handle_info({:error, failed_operation, failed_value}, socket) do
+    {:noreply,
+     socket
+     |> assign(live_action: nil)
+     |> put_flash(
+       :error,
+       "#{gettext("Failed")} #{failed_operation}. #{list_errors_to_string(failed_value.errors)}"
+     )}
+  end
+
+  @impl true
+  def handle_info(:not_authorise, socket) do
+    {:noreply,
+     socket
+     |> assign(live_action: nil)
+     |> put_flash(:error, gettext("You are not authorised to perform this action"))}
+  end
+
+  @impl true
+  def handle_info({:sql_error, msg}, socket) do
+    {:noreply,
+     socket
+     |> assign(live_action: nil)
+     |> put_flash(:error, msg)}
+  end
+
+  ######################################
+
+  @impl true
+  def render(assigns) do
+    ~H"""
+    <div class="w-11/12 mx-auto">
+      <p class="text-2xl text-center font-medium"><%= "#{@title}" %></p>
+      <div class="border rounded bg-purple-200 text-center p-2">
+        <.form for={%{}} id="search-form" phx-submit="query" autocomplete="off" phx-change="validate">
+          <div class="grid grid-cols-12 tracking-tighter">
+            <div class="col-span-6">
+              <.input
+                label={gettext("Account")}
+                id="search_name"
+                name="search[name]"
+                list="account_names"
+                value={@search.name}
+              />
+            </div>
+            <div class="col-span-2">
+              <.input
+                label={gettext("From")}
+                name="search[f_date]"
+                type="date"
+                id="search_f_date"
+                value={@search.f_date}
+              />
+            </div>
+            <div class="col-span-2">
+              <.input
+                label={gettext("To")}
+                name="search[t_date]"
+                type="date"
+                id="search_t_date"
+                value={@search.t_date}
+              />
+            </div>
+            <div class="col-span-2 mt-6">
+              <.button disabled={!@valid?}>
+                <%= gettext("Query") %>
+              </.button>
+              <.link :if={@objects_count > 0} class={button_css()} phx-click="print">
+                Print
+              </.link>
+              <.link :if={@objects_count > 0} class={button_css()} phx-click="export_csv">
+                CSV
+              </.link>
+            </div>
+          </div>
+        </.form>
+      </div>
+
+      <div class="font-medium flex flex-row text-center tracking-tighter mb-1">
+        <div class="w-[8.9rem] border rounded bg-gray-200 border-gray-400 px-2 py-1">
+          <%= gettext("Date") %>
+        </div>
+        <div class="w-[8.9rem] border rounded bg-gray-200 border-gray-400 px-2 py-1">
+          <%= gettext("Doc No") %>
+        </div>
+        <div class="w-[8.85rem] border rounded bg-gray-200 border-gray-400 px-2 py-1">
+          <%= gettext("Doc Type") %>
+        </div>
+        <div class="w-[44.35rem] border rounded bg-gray-200 border-gray-400 px-2 py-1">
+          <%= gettext("Particulars") %>
+        </div>
+        <div class="w-[9.85rem] border rounded bg-gray-200 border-gray-400 px-2 py-1">
+          <%= gettext("Debit") %>
+        </div>
+        <div class="w-[9.85rem] border rounded bg-gray-200 border-gray-400 px-2 py-1">
+          <%= gettext("Credit") %>
+        </div>
+      </div>
+      <div class="min-h-[40rem] max-h-[40rem] overflow-y-scroll bg-gray-50">
+        <div id="transactions">
+          <%= for obj <- @objects do %>
+            <div class="flex flex-row text-center tracking-tighter">
+              <div class="w-[9rem] border rounded bg-blue-200 border-blue-400 text-center px-2 py-1">
+                <%= obj.doc_date %>
+              </div>
+              <div class="w-[9rem] border rounded bg-blue-200 border-blue-400 text-center px-2 py-1">
+                <%= if obj.old_data do %>
+                  <%= obj.doc_no %>
+                <% else %>
+                  <.live_component
+                    module={FullCircleWeb.EntityFormLive.Component}
+                    id={"#{obj.doc_type}_#{obj.doc_no}"}
+                    entity="invoices"
+                    doc_no={obj.doc_no}
+                    live_action={@live_action}
+                    current_company={@current_company}
+                    current_user={@current_user}
+                  />
+                <% end %>
+              </div>
+              <div class="w-[9rem] border rounded bg-blue-200 border-blue-400 text-center px-2 py-1">
+                <%= obj.doc_type %>
+              </div>
+              <div class="w-[45rem] border rounded bg-blue-200 border-blue-400 px-2 py-1">
+                <%= obj.particulars %>
+              </div>
+              <div class="w-[10rem] border rounded bg-blue-200 border-blue-400 text-center px-2 py-1">
+                <%= if(Decimal.gt?(obj.amount, 0), do: obj.amount, else: nil)
+                |> Number.Delimit.number_to_delimited() %>
+              </div>
+              <div class="w-[10rem] border rounded bg-blue-200 border-blue-400 text-center px-2 py-1">
+                <%= if(Decimal.gt?(obj.amount, 0), do: nil, else: Decimal.abs(obj.amount))
+                |> Number.Delimit.number_to_delimited() %>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+      <div id="footer">
+        <div class="flex flex-row text-center tracking-tighter mb-5 mt-1">
+          <div class="w-[71rem] border px-2 py-1 text-right font-bold rounded bg-cyan-200 border-cyan-400">
+            <%= gettext("Balance") %>
+          </div>
+          <div class="w-[9.85rem] font-bold border rounded bg-cyan-200 border-cyan-400 text-center px-2 py-1">
+            <%= if(Decimal.gt?(@objects_balance, 0), do: @objects_balance, else: nil)
+            |> Number.Delimit.number_to_delimited() %>
+          </div>
+          <div class="w-[9.85rem] font-bold border rounded bg-cyan-200 border-cyan-400 text-center px-2 py-1">
+            <%= if(Decimal.gt?(@objects_balance, 0), do: nil, else: Decimal.abs(@objects_balance))
+            |> Number.Delimit.number_to_delimited() %>
+          </div>
+        </div>
+      </div>
+    </div>
+    <%= datalist_with_ids(@account_names, "account_names") %>
+    """
+  end
+end
