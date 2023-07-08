@@ -12,14 +12,29 @@ defmodule FullCircle.Billing do
   alias Ecto.Multi
 
   def get_invoice_by_invoice_no!(inv_no, com, user) do
-    id = Repo.one(
-      from inv in Invoice,
-        join: com in subquery(Sys.user_company(com, user)),
-        on: com.id == inv.company_id,
-        where: inv.invoice_no == ^inv_no,
-        select: inv.id
-    )
+    id =
+      Repo.one(
+        from inv in Invoice,
+          join: com in subquery(Sys.user_company(com, user)),
+          on: com.id == inv.company_id,
+          where: inv.invoice_no == ^inv_no,
+          select: inv.id
+      )
+
     get_invoice!(id, com, user)
+  end
+
+  def get_pur_invoice_by_pur_invoice_no!(inv_no, com, user) do
+    id =
+      Repo.one(
+        from inv in PurInvoice,
+          join: com in subquery(Sys.user_company(com, user)),
+          on: com.id == inv.company_id,
+          where: inv.pur_invoice_no == ^inv_no,
+          select: inv.id
+      )
+
+    get_pur_invoice!(id, com, user)
   end
 
   def get_print_invoice!(id, company, user) do
