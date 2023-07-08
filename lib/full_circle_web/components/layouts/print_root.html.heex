@@ -30,11 +30,19 @@
   </head>
   <body>
     <div id="button">
-      <a herf="#" onclick="printElement('print-me')">Print</a>
-      <.link id="print_back" navigate={@back}><%= gettext("Back") %></.link>
+      <a href="#" onclick="printElement('print-me')"><%= gettext("Print") %></a>
+      <a href="#" onclick="closeTab()"><%= gettext("Close") %></a>
     </div>
     <%= @inner_content %>
     <script>
+      document.addEventListener("keydown", evt => {
+        if (evt.key === 'Escape') { close(); }
+      });
+
+      function closeTab() {
+        close();
+      }
+
       function printElement(elm) {
         var browser = (function (agent) {
           switch (true) {
@@ -58,12 +66,6 @@
         window.print();
         document.body.innerHTML = originalContents;
       }
-
-      document.addEventListener("keyup", e => {
-        if (e.key === "Escape") { 
-          document.getElementById("print_back").click();
-        }
-      });
     </script>
   </body>
 </html>

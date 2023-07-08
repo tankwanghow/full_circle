@@ -836,12 +836,13 @@ defmodule FullCircleWeb.CoreComponents do
   attr :entity, :string
   attr :entity_id, :string
   attr :company, :any
+  attr :class, :string, default: "text-xs border rounded-full hover:bg-amber-200 px-2 py-1 border-black"
 
   def print_button(assigns) do
     ~H"""
-    <.link
+    <.link target="_blank"
       navigate={"/companies/#{@company.id}/#{@entity}/#{@entity_id}/print?pre_print=false"}
-      class="text-xs border rounded-full hover:bg-amber-200 px-2 py-1 border-black"
+      class={@class}
     >
       <%= gettext("Print") %>
     </.link>
@@ -851,12 +852,13 @@ defmodule FullCircleWeb.CoreComponents do
   attr :entity, :string
   attr :entity_id, :string
   attr :company, :any
+  attr :class, :string, default: "border border-black hover:bg-blue-200 text-xs text-white rounded-full px-2 py-1 bg-black"
 
   def pre_print_button(assigns) do
     ~H"""
-    <.link
+    <.link target="_blank"
       navigate={"/companies/#{@company.id}/#{@entity}/#{@entity_id}/print?pre_print=true"}
-      class="border border-black hover:bg-blue-200 text-xs text-white rounded-full px-2 py-1 bg-black"
+      class={@class}
     >
       <%= gettext("Pre Print") %>
     </.link>
