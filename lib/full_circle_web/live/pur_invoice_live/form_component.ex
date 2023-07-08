@@ -523,18 +523,6 @@ defmodule FullCircleWeb.PurInvoiceLive.FormComponent do
         <%= datalist_with_ids(@package_names, "package_names") %>
         <div class="flex justify-center gap-x-1 mt-1">
           <.button disabled={!@form.source.valid?}><%= gettext("Save") %></.button>
-          <%= if @live_action == :edit and FullCircle.Authorization.can?(@current_user, :delete_tax_code, @current_company) do %>
-            <.delete_confirm_modal
-              id="delete-object"
-              msg1={gettext("All Purchase Invoice Transactions, will be LOST!!!")}
-              msg2={gettext("Cannot Be Recover!!!")}
-              confirm={
-                JS.remove_attribute("class", to: "#phx-feedback-for-contact_name")
-                |> JS.push("delete", target: "#object-form")
-                |> JS.hide(to: "#delete-object-modal")
-              }
-            />
-          <% end %>
           <.link phx-click={JS.exec("phx-remove", to: "#object-crud-modal")} class="nav-btn">
             <%= gettext("Back") %>
           </.link>
