@@ -223,43 +223,28 @@ defmodule FullCircle.Seeding do
   end
 
   def fill_changeset("Balances", attr, com, user) do
-    {ac, ct} =
-      {FullCircle.Accounting.get_account_by_name(
-         Map.fetch!(attr, "account_name"),
-         com,
-         user
-       ),
-       FullCircle.Accounting.get_contact_by_name(
-         Map.fetch!(attr, "account_name"),
-         com,
-         user
-       )}
-
-    ac =
-      if is_nil(ac) do
-        ac_rec = FullCircle.Accounting.get_account_by_name!("Account Receivables", com, user)
-        ac_pay = FullCircle.Accounting.get_account_by_name!("Account Payables", com, user)
-        amt = Map.fetch!(attr, "amount")
-
-        if Decimal.new(amt) |> Decimal.to_float() > 0 do
-          ac_rec
-        else
-          ac_pay
-        end
-      else
-        ac
-      end
+    name = Map.fetch!(attr, "account_name")
 
     attr =
       attr
-      |> Map.merge(%{"account_id" => if(ac, do: ac.id, else: nil)})
-      |> Map.merge(%{"contact_id" => if(ct, do: ct.id, else: nil)})
       |> Map.merge(%{
         "old_data" => "true",
         "closed" => "true",
         "doc_no" => FullCircle.Helpers.gen_temp_id(10),
-        "doc_type" => "Journal",
-        "particulars" => "Balance B/F"
+        "doc_type" => "Journal"
+      })
+
+    {ac, ct} =
+      get_ac_from_fixed_asset(name, com) ||
+        get_ac_form_attr(attr, com, user)
+
+    attr = if(ac, do: Map.merge(attr, %{"account_id" => ac.id}), else: attr)
+    attr = if(ct, do: Map.merge(attr, %{"contact_id" => ct.id}), else: attr)
+
+    attr =
+      attr
+      |> Map.merge(%{
+        "particulars" => if(ct, do: "Balance B/F #{ct.name}", else: "Balance B/F #{ac.name}")
       })
 
     {FullCircle.StdInterface.changeset(
@@ -315,23 +300,40 @@ defmodule FullCircle.Seeding do
       ac_pay = FullCircle.Accounting.get_account_by_name!("Account Payables", com, user)
       doc_type = Map.fetch!(attr, "doc_type")
 
-      ac = case doc_type do
-        "Invoice" -> ac_rec
-        "PurInvoice" -> ac_pay
-        "Payment" -> ac_pay
-        "Receipt" -> ac_rec
-        "CreditNote" -> ac_rec
-        "DebitNote" -> ac_pay
-        "ReturnCheque" -> ac_rec
-        "Journal" ->
-          if Map.fetch!(attr, "amount") |> Decimal.new |> Decimal.to_float() > 0 do
+      ac =
+        case doc_type do
+          "Invoice" ->
             ac_rec
-          else
-            ac_pay
-          end
 
-        _ -> nil
-      end
+          "PurInvoice" ->
+            ac_pay
+
+          "Payment" ->
+            ac_pay
+
+          "Receipt" ->
+            ac_rec
+
+          "CreditNote" ->
+            ac_rec
+
+          "DebitNote" ->
+            ac_pay
+
+          "ReturnCheque" ->
+            ac_rec
+
+          "Journal" ->
+            if Map.fetch!(attr, "amount") |> Decimal.new() |> Decimal.to_float() > 0 do
+              ac_rec
+            else
+              ac_pay
+            end
+
+          _ ->
+            nil
+        end
+
       {ac, ct}
     else
       {ac, ct}
