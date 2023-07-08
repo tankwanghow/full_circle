@@ -200,7 +200,6 @@ defmodule FullCircleWeb.InvoiceLive.Print do
           Pay By: <span class="has-text-weight-bold"><%= format_date(@invoice.due_date) %></span>
         </div>
         <div>Invoice No: <span class="has-text-weight-bold"><%= @invoice.invoice_no %></span></div>
-
       </div>
     </div>
     """

@@ -34,7 +34,7 @@ defmodule FullCircleWeb.FixedAssetLive.IndexComponent do
             <span class="font-bold"><%= gettext("Depreciation Account:") %></span> <%= @obj.depre_ac_name %>
           </p>
           <span class="font-bold"><%= gettext("Cume Depreciation Account:") %></span>
-        <%= @obj.cume_depre_ac_name %>
+          <%= @obj.cume_depre_ac_name %>
           <p><%= @obj.descriptions %></p>
           <span class="font-light">
             <%= to_fc_time_format(@obj.updated_at) %>

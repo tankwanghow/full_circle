@@ -193,7 +193,7 @@ defmodule FullCircleWeb.FixedAssetLive.Disposals do
     <div class="w-5/12 mx-auto text-center">
       <p class="w-full text-2xl text-center font-medium"><%= "#{@title} for #{@ass.name}" %></p>
       <div class="text-center m-4">
-      <.link
+        <.link
           navigate={~p"/companies/#{@current_company.id}/fixed_assets?terms=#{@terms}"}
           class="nav-btn"
         >

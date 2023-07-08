@@ -19,7 +19,7 @@ defmodule FullCircleWeb.GoodLive.Index do
         placeholder={gettext("Name, Unit, Account Name, TaxCode and Descriptions...")}
       />
       <div class="text-center mb-2">
-        <.link phx-click={:new_object} class={"nav-btn"} id="new_object">
+        <.link phx-click={:new_object} class="nav-btn" id="new_object">
           <%= gettext("New Good") %>
         </.link>
       </div>
@@ -29,8 +29,8 @@ defmodule FullCircleWeb.GoodLive.Index do
         </div>
       </div>
       <div
+        :if={Enum.count(@streams.objects) > 0 or @page > 1}
         id="objects_list"
-        :if={Enum.count(@streams.objects) > 0  or @page > 1}
         phx-update={@update}
         phx-viewport-bottom={!@end_of_timeline? && "next-page"}
         phx-page-loading
@@ -90,8 +90,6 @@ defmodule FullCircleWeb.GoodLive.Index do
      |> assign(live_action: :new)
      |> assign(id: "new")
      |> assign(title: gettext("New Good"))
-     |> assign(current_company: socket.assigns.current_company)
-     |> assign(current_user: socket.assigns.current_user)
      |> assign(
        :form,
        to_form(
@@ -109,8 +107,6 @@ defmodule FullCircleWeb.GoodLive.Index do
      |> assign(live_action: :edit)
      |> assign(id: id)
      |> assign(title: gettext("Edit Good"))
-     |> assign(current_company: socket.assigns.current_company)
-     |> assign(current_user: socket.assigns.current_user)
      |> assign(
        :form,
        to_form(StdInterface.changeset(Good, object, %{}, socket.assigns.current_company))

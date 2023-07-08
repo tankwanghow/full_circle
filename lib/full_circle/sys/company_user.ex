@@ -21,6 +21,8 @@ defmodule FullCircle.Sys.CompanyUser do
       message: gettext("already in company")
     )
     |> validate_required([:role, :company_id, :user_id])
-    |> validate_inclusion(:role, FullCircle.Authorization.roles(), message: gettext("not in list"))
+    |> validate_inclusion(:role, FullCircle.Authorization.roles(),
+      message: gettext("not in list")
+    )
   end
 end

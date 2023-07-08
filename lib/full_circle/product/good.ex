@@ -11,7 +11,9 @@ defmodule FullCircle.Product.Good do
 
     belongs_to(:company, FullCircle.Sys.Company)
 
-    belongs_to(:purchase_account, FullCircle.Accounting.Account, foreign_key: :purchase_account_id)
+    belongs_to(:purchase_account, FullCircle.Accounting.Account,
+      foreign_key: :purchase_account_id
+    )
 
     belongs_to(:purchase_tax_code, FullCircle.Accounting.TaxCode,
       foreign_key: :purchase_tax_code_id

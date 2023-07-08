@@ -50,7 +50,7 @@ defmodule FullCircleWeb.InvoiceLive.Index do
         </.form>
       </div>
       <div class="text-center mb-2">
-        <.link phx-click={:new_object} class={"nav-btn"} id="new_object">
+        <.link phx-click={:new_object} class="nav-btn" id="new_object">
           <%= gettext("New Invoice") %>
         </.link>
       </div>
@@ -60,8 +60,8 @@ defmodule FullCircleWeb.InvoiceLive.Index do
         </div>
       </div>
       <div
+        :if={Enum.count(@streams.objects) > 0 or @page > 1}
         id="objects_list"
-        :if={Enum.count(@streams.objects) > 0  or @page > 1}
         phx-update={@update}
         phx-viewport-bottom={!@end_of_timeline? && "next-page"}
         phx-page-loading
@@ -121,8 +121,6 @@ defmodule FullCircleWeb.InvoiceLive.Index do
      |> assign(live_action: :new)
      |> assign(id: "new")
      |> assign(title: gettext("New Invoice"))
-     |> assign(current_company: socket.assigns.current_company)
-     |> assign(current_user: socket.assigns.current_user)
      |> assign(
        :form,
        to_form(
@@ -150,8 +148,6 @@ defmodule FullCircleWeb.InvoiceLive.Index do
      |> assign(live_action: :edit)
      |> assign(id: id)
      |> assign(title: gettext("Edit Invoice") <> " " <> object.invoice_no)
-     |> assign(current_company: socket.assigns.current_company)
-     |> assign(current_user: socket.assigns.current_user)
      |> assign(
        :form,
        to_form(StdInterface.changeset(Invoice, object, %{}, socket.assigns.current_company))

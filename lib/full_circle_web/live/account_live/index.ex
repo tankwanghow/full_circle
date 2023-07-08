@@ -18,7 +18,7 @@ defmodule FullCircleWeb.AccountLive.Index do
         placeholder={gettext("Name, AccountType and Descriptions...")}
       />
       <div class="text-center mb-2">
-        <.link phx-click={:new_account} class={"nav-btn"} id="new_account">
+        <.link phx-click={:new_account} class="nav-btn" id="new_account">
           <%= gettext("New Account") %>
         </.link>
       </div>
@@ -28,8 +28,8 @@ defmodule FullCircleWeb.AccountLive.Index do
         </div>
       </div>
       <div
+        :if={Enum.count(@streams.objects) > 0 or @page > 1}
         id="objects_list"
-        :if={Enum.count(@streams.objects) > 0  or @page > 1}
         phx-update={@update}
         phx-viewport-bottom={!@end_of_timeline? && "next-page"}
         phx-page-loading
@@ -82,8 +82,6 @@ defmodule FullCircleWeb.AccountLive.Index do
      |> assign(live_action: :new)
      |> assign(id: "new")
      |> assign(title: gettext("New Account"))
-     |> assign(current_company: socket.assigns.current_company)
-     |> assign(current_user: socket.assigns.current_user)
      |> assign(
        :form,
        to_form(StdInterface.changeset(Account, %Account{}, %{}, socket.assigns.current_company))
@@ -99,8 +97,6 @@ defmodule FullCircleWeb.AccountLive.Index do
      |> assign(live_action: :edit)
      |> assign(id: id)
      |> assign(title: gettext("Edit Account"))
-     |> assign(current_company: socket.assigns.current_company)
-     |> assign(current_user: socket.assigns.current_user)
      |> assign(
        :form,
        to_form(StdInterface.changeset(Account, account, %{}, socket.assigns.current_company))

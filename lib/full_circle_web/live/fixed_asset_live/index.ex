@@ -21,7 +21,11 @@ defmodule FullCircleWeb.FixedAssetLive.Index do
         <.link phx-click={:new_object} class="nav-btn" id="new_object">
           <%= gettext("New Fixed Asset") %>
         </.link>
-        <.link navigate={~p"/companies/#{@current_company.id}/fixed_assets/calalldepre"} class="nav-btn" id="calculate_depre">
+        <.link
+          navigate={~p"/companies/#{@current_company.id}/fixed_assets/calalldepre"}
+          class="nav-btn"
+          id="calculate_depre"
+        >
           <%= gettext("Calculate Depreciations") %>
         </.link>
       </div>
@@ -31,14 +35,21 @@ defmodule FullCircleWeb.FixedAssetLive.Index do
         </div>
       </div>
       <div
+        :if={Enum.count(@streams.objects) > 0 or @page > 1}
         id="objects_list"
-        :if={Enum.count(@streams.objects) > 0  or @page > 1}
         phx-update={@update}
         phx-viewport-bottom={!@end_of_timeline? && "next-page"}
         phx-page-loading
       >
         <%= for {obj_id, obj} <- @streams.objects do %>
-          <.live_component module={IndexComponent} id={"#{obj_id}"} obj={obj} company={@current_company} ex_class="" terms={@search.terms} />
+          <.live_component
+            module={IndexComponent}
+            id={"#{obj_id}"}
+            obj={obj}
+            company={@current_company}
+            ex_class=""
+            terms={@search.terms}
+          />
         <% end %>
       </div>
       <.infinite_scroll_footer ended={@end_of_timeline?} />
@@ -90,8 +101,6 @@ defmodule FullCircleWeb.FixedAssetLive.Index do
      |> assign(live_action: :show)
      |> assign(id: "depreciation")
      |> assign(title: gettext("Depreciations for"))
-     |> assign(current_company: socket.assigns.current_company)
-     |> assign(current_user: socket.assigns.current_user)
      |> assign(fixed_asset: object)}
   end
 
@@ -102,8 +111,6 @@ defmodule FullCircleWeb.FixedAssetLive.Index do
      |> assign(live_action: :new)
      |> assign(id: "new")
      |> assign(title: gettext("New Fixed Asset"))
-     |> assign(current_company: socket.assigns.current_company)
-     |> assign(current_user: socket.assigns.current_user)
      |> assign(
        :form,
        to_form(
@@ -122,8 +129,6 @@ defmodule FullCircleWeb.FixedAssetLive.Index do
      |> assign(live_action: :edit)
      |> assign(id: id)
      |> assign(title: gettext("Edit Fixed Asset"))
-     |> assign(current_company: socket.assigns.current_company)
-     |> assign(current_user: socket.assigns.current_user)
      |> assign(
        :form,
        to_form(StdInterface.changeset(FixedAsset, object, %{}, socket.assigns.current_company))

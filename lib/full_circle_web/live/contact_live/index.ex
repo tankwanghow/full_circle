@@ -18,7 +18,7 @@ defmodule FullCircleWeb.ContactLive.Index do
         placeholder={gettext("Name, City, State and Descriptions...")}
       />
       <div class="text-center mb-2">
-        <.link phx-click={:new_contact} class={"nav-btn"} id="new_contact">
+        <.link phx-click={:new_contact} class="nav-btn" id="new_contact">
           <%= gettext("New Contact") %>
         </.link>
       </div>
@@ -28,8 +28,8 @@ defmodule FullCircleWeb.ContactLive.Index do
         </div>
       </div>
       <div
+        :if={Enum.count(@streams.objects) > 0 or @page > 1}
         id="objects_list"
-        :if={Enum.count(@streams.objects) > 0  or @page > 1}
         phx-update={@update}
         phx-viewport-bottom={!@end_of_timeline? && "next-page"}
         phx-page-loading
@@ -83,8 +83,6 @@ defmodule FullCircleWeb.ContactLive.Index do
      |> assign(live_action: :new)
      |> assign(id: "new")
      |> assign(title: gettext("New Contact"))
-     |> assign(current_company: socket.assigns.current_company)
-     |> assign(current_user: socket.assigns.current_user)
      |> assign(contact: nil)
      |> assign(
        :form,
@@ -101,8 +99,6 @@ defmodule FullCircleWeb.ContactLive.Index do
      |> assign(live_action: :edit)
      |> assign(id: id)
      |> assign(title: gettext("Edit Contact"))
-     |> assign(current_company: socket.assigns.current_company)
-     |> assign(current_user: socket.assigns.current_user)
      |> assign(contact: object)
      |> assign(
        :form,

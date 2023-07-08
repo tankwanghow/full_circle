@@ -19,7 +19,7 @@ defmodule FullCircleWeb.TaxCodeLive.Index do
         placeholder={gettext("Code, Tax Type, Account Name and Descriptions...")}
       />
       <div class="text-center mb-2">
-        <.link phx-click={:new_object} class={"nav-btn"} id="new_object">
+        <.link phx-click={:new_object} class="nav-btn" id="new_object">
           <%= gettext("New TaxCode") %>
         </.link>
       </div>
@@ -29,8 +29,8 @@ defmodule FullCircleWeb.TaxCodeLive.Index do
         </div>
       </div>
       <div
-        id="objects_list"
         :if={Enum.count(@streams.objects) > 0 or @page > 1}
+        id="objects_list"
         phx-update={@update}
         phx-viewport-bottom={!@end_of_timeline? && "next-page"}
         phx-page-loading
@@ -83,8 +83,6 @@ defmodule FullCircleWeb.TaxCodeLive.Index do
      |> assign(live_action: :new)
      |> assign(id: "new")
      |> assign(title: gettext("New TaxCode"))
-     |> assign(current_company: socket.assigns.current_company)
-     |> assign(current_user: socket.assigns.current_user)
      |> assign(
        :form,
        to_form(StdInterface.changeset(TaxCode, %TaxCode{}, %{}, socket.assigns.current_company))
@@ -101,8 +99,6 @@ defmodule FullCircleWeb.TaxCodeLive.Index do
      |> assign(live_action: :edit)
      |> assign(id: id)
      |> assign(title: gettext("Edit TaxCode"))
-     |> assign(current_company: socket.assigns.current_company)
-     |> assign(current_user: socket.assigns.current_user)
      |> assign(
        :form,
        to_form(StdInterface.changeset(TaxCode, object, %{}, socket.assigns.current_company))

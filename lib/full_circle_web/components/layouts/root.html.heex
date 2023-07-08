@@ -51,7 +51,10 @@
                   </li>
 
                   <li class="my-5">
-                    <.link navigate={~p"/users/settings"} class="mb-2 p-3 hover:bg-emerald-400 flex">
+                    <.link
+                      navigate={~p"/users/settings"}
+                      class="mb-2 p-3 hover:bg-emerald-400 flex"
+                    >
                       <%= gettext("User Settings") %>
                     </.link>
                   </li>
@@ -89,7 +92,11 @@
                   <% end %>
 
                   <li class="my-5">
-                    <.link href={~p"/users/log_out"} method="delete" class="p-3 hover:bg-rose-400 flex">
+                    <.link
+                      href={~p"/users/log_out"}
+                      method="delete"
+                      class="p-3 hover:bg-rose-400 flex"
+                    >
                       <%= gettext("Log out") %>
                     </.link>
                   </li>

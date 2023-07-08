@@ -151,7 +151,7 @@ defmodule FullCircleWeb.CoreComponents do
       phx-click={JS.push("lv:clear-flash", value: %{key: @kind}) |> hide("##{@id}")}
       role="alert"
       class={[
-        "fixed top-10 right-72 w-80 sm:w-96 z-50 rounded-lg p-3 ring-1",
+        "shake fixed top-10 right-72 w-80 sm:w-96 z-50 rounded-lg p-3 ring-1",
         @kind == :info && "bg-emerald-50 text-emerald-800 ring-emerald-500 fill-cyan-900",
         @kind == :warn && "bg-amber-50 text-amber-800 ring-amber-500 fill-amber-900",
         @kind == :error && "bg-rose-50 text-rose-900 shadow-md ring-rose-500 fill-rose-900"
@@ -836,11 +836,14 @@ defmodule FullCircleWeb.CoreComponents do
   attr :entity, :string
   attr :entity_id, :string
   attr :company, :any
-  attr :class, :string, default: "text-xs border rounded-full hover:bg-amber-200 px-2 py-1 border-black"
+
+  attr :class, :string,
+    default: "text-xs border rounded-full hover:bg-amber-200 px-2 py-1 border-black"
 
   def print_button(assigns) do
     ~H"""
-    <.link target="_blank"
+    <.link
+      target="_blank"
       navigate={"/companies/#{@company.id}/#{@entity}/#{@entity_id}/print?pre_print=false"}
       class={@class}
     >
@@ -852,11 +855,15 @@ defmodule FullCircleWeb.CoreComponents do
   attr :entity, :string
   attr :entity_id, :string
   attr :company, :any
-  attr :class, :string, default: "border border-black hover:bg-blue-200 text-xs text-white rounded-full px-2 py-1 bg-black"
+
+  attr :class, :string,
+    default:
+      "border border-black hover:bg-blue-200 text-xs text-white rounded-full px-2 py-1 bg-black"
 
   def pre_print_button(assigns) do
     ~H"""
-    <.link target="_blank"
+    <.link
+      target="_blank"
       navigate={"/companies/#{@company.id}/#{@entity}/#{@entity_id}/print?pre_print=true"}
       class={@class}
     >

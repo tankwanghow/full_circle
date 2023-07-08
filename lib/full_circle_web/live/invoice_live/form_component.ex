@@ -14,7 +14,7 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
   @impl true
   def update(assigns, socket) do
     socket = socket |> assign(assigns)
-    IO.inspect socket.assigns
+
     {:ok,
      socket
      |> assign(
@@ -507,8 +507,13 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
           <.link phx-click={JS.exec("phx-remove", to: "#object-crud-modal")} class="nav-btn">
             <%= gettext("Back") %>
           </.link>
-          <.print_button company={@current_company} entity="invoices" entity_id={@id} class="nav-btn"/>
-          <.pre_print_button company={@current_company} entity="invoices" entity_id={@id} class="nav-btn"/>
+          <.print_button company={@current_company} entity="invoices" entity_id={@id} class="nav-btn" />
+          <.pre_print_button
+            company={@current_company}
+            entity="invoices"
+            entity_id={@id}
+            class="nav-btn"
+          />
         </div>
       </.form>
     </div>

@@ -119,7 +119,6 @@ defmodule FullCircleWeb.CompanyLive.Form do
       |> assign(:current_company, session["current_company"])
       |> assign(:current_role, session["current_role"])
 
-
     case socket.assigns.live_action do
       :new -> mount_new(socket)
       :edit -> mount_edit(params, socket)
@@ -160,7 +159,6 @@ defmodule FullCircleWeb.CompanyLive.Form do
         %{"_target" => ["company", "closing_month"], "company" => %{"closing_month" => mth}},
         socket
       ) do
-
     {:noreply, assign(socket, closing_days: closing_days(String.to_integer(mth)))}
   end
 
