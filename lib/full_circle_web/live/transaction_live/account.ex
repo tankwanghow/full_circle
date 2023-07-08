@@ -16,6 +16,7 @@ defmodule FullCircleWeb.TransactionLive.Account do
       |> assign(valid?: false)
       |> assign(objects_count: 0)
       |> assign(objects_balance: Decimal.new("0"))
+      |> assign(live_action: nil)
 
     {:ok, socket}
   end
@@ -24,7 +25,7 @@ defmodule FullCircleWeb.TransactionLive.Account do
   def handle_event("query", %{"search" => params}, socket) do
     {:noreply,
      socket
-     |> filter_transacrtions()}
+     |> filter_transactions()}
   end
 
   @impl true
@@ -58,12 +59,12 @@ defmodule FullCircleWeb.TransactionLive.Account do
     {:noreply, socket}
   end
 
-  defp filter_transacrtions(socket) do
+  defp filter_transactions(socket) do
     objects =
       Reporting.account_transactions(
         socket.assigns.account,
         Date.from_iso8601!(socket.assigns.search.f_date),
-        Date.from_iso8601!(socket.assigns.search.f_date),
+        Date.from_iso8601!(socket.assigns.search.t_date),
         socket.assigns.current_company
       )
 
@@ -78,11 +79,14 @@ defmodule FullCircleWeb.TransactionLive.Account do
 
   ######################################
   def handle_info({:updated, obj}, socket) do
-    {:noreply, socket |> assign(live_action: nil) |> filter_transacrtions()}
-  end
-
-  def handle_info({:deleted, obj}, socket) do
-    {:noreply, socket |> assign(live_action: nil)}
+    {:noreply,
+     socket
+     |> assign(live_action: nil)
+     |> filter_transactions()
+     |> put_flash(
+       :info,
+       "#{gettext("Updated successfully.")}"
+     )}
   end
 
   @impl true
@@ -187,6 +191,7 @@ defmodule FullCircleWeb.TransactionLive.Account do
       <div class="min-h-[40rem] max-h-[40rem] overflow-y-scroll bg-gray-50">
         <div id="transactions">
           <%= for obj <- @objects do %>
+            <p class="hidden"><%= obj.inserted_at %></p>
             <div class="flex flex-row text-center tracking-tighter">
               <div class="w-[9rem] border rounded bg-blue-200 border-blue-400 text-center px-2 py-1">
                 <%= obj.doc_date %>
@@ -198,9 +203,9 @@ defmodule FullCircleWeb.TransactionLive.Account do
                   <.live_component
                     module={FullCircleWeb.EntityFormLive.Component}
                     id={"#{obj.doc_type}_#{obj.doc_no}"}
-                    entity="invoices"
-                    doc_no={obj.doc_no}
+                    entity={obj.doc_type}
                     live_action={@live_action}
+                    doc_no={obj.doc_no}
                     current_company={@current_company}
                     current_user={@current_user}
                   />

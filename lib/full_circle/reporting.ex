@@ -82,7 +82,8 @@ defmodule FullCircle.Reporting do
           particulars: "Balance Brought Forward",
           amount: coalesce(sum(q.amount), 0),
           reconciled: true,
-          old_data: true
+          old_data: true,
+          inserted_at: ^DateTime.utc_now()
         }
 
     txn_qry =
@@ -96,8 +97,10 @@ defmodule FullCircle.Reporting do
           particulars: q.particulars,
           amount: q.amount,
           reconciled: q.reconciled,
-          old_data: q.old_data
+          old_data: q.old_data,
+          inserted_at: q.inserted_at
         }
-      union_all(bal_qry, ^txn_qry) |> order_by([1, 2, 3])|> Repo.all
+
+    union_all(bal_qry, ^txn_qry) |> order_by([1, 2, 3]) |> Repo.all()
   end
 end
