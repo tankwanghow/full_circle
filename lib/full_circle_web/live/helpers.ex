@@ -81,8 +81,8 @@ defmodule FullCircleWeb.Helpers do
 
   def make_log_delta_to_html(delta) do
     delta
-    |> String.replace("&^", "<p>")
-    |> String.replace("^&", "</p>")
+    |> String.replace("&^", "<span>")
+    |> String.replace("^&", "</span>")
     |> String.replace("[", "<div class='pl-4'>")
     |> String.replace("]", "</div>")
     |> String.replace("<!", "<span class='text-red-500 line-through'>")
