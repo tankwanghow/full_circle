@@ -53,10 +53,8 @@ defmodule FullCircleWeb.FixedAssetLive.CalAllDepre do
 
   @impl true
   def handle_event("validate", %{"ddate" => ddate}, socket) do
-    {_, dd} = Timex.parse(ddate, "%d-%m-%Y", :strftime)
-
     socket =
-      if dd != :invalid_date do
+      if ddate != "" do
         assign(socket, valid?: true)
       else
         assign(socket, valid?: false)
