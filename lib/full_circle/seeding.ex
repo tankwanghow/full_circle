@@ -296,8 +296,8 @@ defmodule FullCircle.Seeding do
     ct = FullCircle.Accounting.get_contact_by_name(name, com, user)
 
     if is_nil(ac) do
-      ac_rec = FullCircle.Accounting.get_account_by_name!("Account Receivables", com, user)
-      ac_pay = FullCircle.Accounting.get_account_by_name!("Account Payables", com, user)
+      ac_rec = FullCircle.Accounting.get_account_by_name("Account Receivables", com, user)
+      ac_pay = FullCircle.Accounting.get_account_by_name("Account Payables", com, user)
       doc_type = Map.fetch!(attr, "doc_type")
 
       ac =

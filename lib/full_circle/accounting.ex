@@ -418,15 +418,6 @@ defmodule FullCircle.Accounting do
     )
   end
 
-  def get_account_by_name!(name, com, user) do
-    Repo.one!(
-      from ac in Account,
-        join: com in subquery(Sys.user_company(com, user)),
-        on: com.id == ac.company_id,
-        where: ac.name == ^name
-    )
-  end
-
   def get_account_by_name(name, com, user) do
     Repo.one(
       from ac in Account,

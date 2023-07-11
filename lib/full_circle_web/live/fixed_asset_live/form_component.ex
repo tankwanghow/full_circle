@@ -310,7 +310,7 @@ defmodule FullCircleWeb.FixedAssetLive.FormComponent do
               }
             />
           <% end %>
-          <.link phx-click={JS.exec("phx-remove", to: "#object-crud-modal")} class="nav-btn">
+          <.link phx-click={JS.exec("phx-remove", to: "#object-crud-modal")} class="link_button">
             <%= gettext("Back") %>
           </.link>
         </div>

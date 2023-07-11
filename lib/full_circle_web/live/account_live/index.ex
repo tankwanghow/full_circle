@@ -18,7 +18,7 @@ defmodule FullCircleWeb.AccountLive.Index do
         placeholder={gettext("Name, AccountType and Descriptions...")}
       />
       <div class="text-center mb-2">
-        <.link phx-click={:new_account} class="nav-btn" id="new_account">
+        <.link phx-click={:new_account} class="link_button" id="new_account">
           <%= gettext("New Account") %>
         </.link>
       </div>

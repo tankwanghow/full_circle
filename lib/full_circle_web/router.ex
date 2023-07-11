@@ -90,6 +90,8 @@ defmodule FullCircleWeb.Router do
   scope "/companies/:company_id", FullCircleWeb do
     pipe_through([:browser, :require_authenticated_user])
 
+    get "/csv", CsvController, :show
+
     live_session :require_authenticated_user_n_active_company,
       on_mount: [
         {FullCircleWeb.UserAuth, :ensure_authenticated},
@@ -113,6 +115,7 @@ defmodule FullCircleWeb.Router do
       live("/logs/:entity/:entity_id", LogLive.Index, :index)
       live("/journal_entries/:doc_type/:doc_no", JournalEntryViewLive.Index, :index)
       live("/account_transactions", TransactionLive.Account, :index)
+      live("/contact_transactions", TransactionLive.Contact, :index)
     end
 
     live_session :require_authenticated_user_n_active_company_print,
@@ -122,7 +125,8 @@ defmodule FullCircleWeb.Router do
         {FullCircleWeb.ActiveCompany, :assign_active_company}
       ],
       root_layout: {FullCircleWeb.Layouts, :print_root} do
-      live "/invoices/:id/print", InvoiceLive.Print, :print
+      live("/invoices/:id/print", InvoiceLive.Print, :print)
+      live("/print_transactions", TransactionLive.Print, :print)
     end
   end
 

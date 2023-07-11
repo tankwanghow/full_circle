@@ -71,7 +71,7 @@ defmodule FullCircleWeb.FixedAssetLive.CalAllDepre do
       <div class="text-center m-4">
         <.link
           navigate={~p"/companies/#{@current_company.id}/fixed_assets?terms=#{@terms}"}
-          class="nav-btn"
+          class="link_button"
         >
           <%= gettext("Back Fixed Assets Listing") %>
         </.link>
@@ -120,7 +120,7 @@ defmodule FullCircleWeb.FixedAssetLive.CalAllDepre do
           <.link
             :if={Enum.count(@generated_depreciations) > 0}
             phx-click={:save_generated_depreciations}
-            class="nav-btn"
+            class="link_button"
           >
             <%= gettext("Save Generated Depreciations") %>
           </.link>

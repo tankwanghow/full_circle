@@ -407,7 +407,7 @@ defmodule FullCircle.Billing do
   end
 
   defp create_invoice_transactions(multi, name, com, user) do
-    ac_rec_id = FullCircle.Accounting.get_account_by_name!("Account Receivables", com, user).id
+    ac_rec_id = FullCircle.Accounting.get_account_by_name("Account Receivables", com, user).id
 
     multi
     |> Ecto.Multi.run("create_transactions", fn repo, %{^name => invoice} ->
@@ -798,7 +798,7 @@ defmodule FullCircle.Billing do
   end
 
   defp create_pur_invoice_transactions(multi, name, com, user) do
-    ac_rec_id = FullCircle.Accounting.get_account_by_name!("Account Payables", com, user).id
+    ac_rec_id = FullCircle.Accounting.get_account_by_name("Account Payables", com, user).id
 
     multi
     |> Ecto.Multi.run("create_transactions", fn repo, %{^name => pur_invoice} ->

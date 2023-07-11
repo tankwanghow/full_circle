@@ -323,7 +323,7 @@ defmodule FullCircleWeb.GoodLive.FormComponent do
         </.inputs_for>
 
         <div class="my-2">
-          <.link phx-click={:add_packaging} phx-target={@myself} class="nav-btn">
+          <.link phx-click={:add_packaging} phx-target={@myself} class="link_button">
             <%= gettext("Add Packaging") %>
           </.link>
         </div>
@@ -345,7 +345,7 @@ defmodule FullCircleWeb.GoodLive.FormComponent do
               }
             />
           <% end %>
-          <.link phx-click={JS.exec("phx-remove", to: "#object-crud-modal")} class="nav-btn">
+          <.link phx-click={JS.exec("phx-remove", to: "#object-crud-modal")} class="link_button">
             <%= gettext("Back") %>
           </.link>
         </div>

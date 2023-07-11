@@ -50,7 +50,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Index do
         </.form>
       </div>
       <div class="text-center mb-2">
-        <.link phx-click={:new_object} class="nav-btn" id="new_object">
+        <.link phx-click={:new_object} class="link_button" id="new_object">
           <%= gettext("New PurInvoice") %>
         </.link>
       </div>

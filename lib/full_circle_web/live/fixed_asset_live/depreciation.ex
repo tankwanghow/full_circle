@@ -226,7 +226,7 @@ defmodule FullCircleWeb.FixedAssetLive.Depreciations do
       <div class="text-center m-4">
         <.link
           navigate={~p"/companies/#{@current_company.id}/fixed_assets?terms=#{@terms}"}
-          class="nav-btn"
+          class="link_button"
         >
           <%= gettext("Back Fixed Assets Listing") %>
         </.link>
@@ -287,7 +287,7 @@ defmodule FullCircleWeb.FixedAssetLive.Depreciations do
             </div>
           </div>
           <div class="flex justify-center gap-x-1 mt-1">
-            <.link phx-click={:new_depreciation} class="nav-btn" id="new_object">
+            <.link phx-click={:new_depreciation} class="link_button" id="new_object">
               <%= gettext("New") %>
             </.link>
             <.button disabled={!@form.source.valid?}><%= gettext("Save") %></.button>
@@ -420,7 +420,7 @@ defmodule FullCircleWeb.FixedAssetLive.Depreciations do
           <.link
             :if={Enum.count(@generated_depreciations) > 0}
             phx-click={:save_generated_depreciations}
-            class={[button_css()]}
+            class={["link_button"]}
           >
             <%= gettext("Save Generated Depreciations") %>
           </.link>

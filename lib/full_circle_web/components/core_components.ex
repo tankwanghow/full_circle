@@ -587,7 +587,7 @@ defmodule FullCircleWeb.CoreComponents do
 
   def link_button(assigns) do
     ~H"""
-    <.link navigate={@navigate} class="nav-btn">
+    <.link navigate={@navigate} class="link_button">
       <%= render_slot(@inner_block) %>
     </.link>
     """
@@ -703,10 +703,6 @@ defmodule FullCircleWeb.CoreComponents do
     end
   end
 
-  def button_css() do
-    "text-center tracking-tighter rounded-md p-2 transition duration-500 select-none bg-pink-300 hover:bg-pink-500 focus:bg-pink-500"
-  end
-
   def datalist(list, id) do
     Phoenix.HTML.Tag.content_tag(:datalist, options(list), id: id)
   end
@@ -738,7 +734,7 @@ defmodule FullCircleWeb.CoreComponents do
 
   def delete_confirm_modal(assigns) do
     ~H"""
-    <.link id={@id} class="nav-btn" phx-click={show_modal("#{@id}-modal")}>
+    <.link id={@id} class="link_button" phx-click={show_modal("#{@id}-modal")}>
       <%= gettext("Delete") %>
     </.link>
     <.modal id={"#{@id}-modal"} on_confirm={@confirm}>

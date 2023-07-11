@@ -523,7 +523,7 @@ defmodule FullCircleWeb.PurInvoiceLive.FormComponent do
         <%= datalist_with_ids(@package_names, "package_names") %>
         <div class="flex justify-center gap-x-1 mt-1">
           <.button disabled={!@form.source.valid?}><%= gettext("Save") %></.button>
-          <.link phx-click={JS.exec("phx-remove", to: "#object-crud-modal")} class="nav-btn">
+          <.link phx-click={JS.exec("phx-remove", to: "#object-crud-modal")} class="link_button">
             <%= gettext("Back") %>
           </.link>
         </div>

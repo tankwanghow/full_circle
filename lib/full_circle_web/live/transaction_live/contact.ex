@@ -1,4 +1,4 @@
-defmodule FullCircleWeb.TransactionLive.Account do
+defmodule FullCircleWeb.TransactionLive.Contact do
   use FullCircleWeb, :live_view
 
   alias FullCircle.{Reporting, Accounting}
@@ -9,8 +9,8 @@ defmodule FullCircleWeb.TransactionLive.Account do
 
     socket =
       socket
-      |> assign(account_names: [])
-      |> assign(page_title: "Account Transactions")
+      |> assign(contact_names: [])
+      |> assign(page_title: "Contact Transactions")
       |> assign(search: %{name: "", f_date: Date.utc_today(), t_date: Date.utc_today()})
       |> assign(:objects, objects)
       |> assign(valid?: false)
@@ -29,20 +29,24 @@ defmodule FullCircleWeb.TransactionLive.Account do
   end
 
   @impl true
+  def handle_event("print", _, socket) do
+  end
+
+  @impl true
   def handle_event(
         "validate",
         %{"_target" => ["search", _], "search" => params},
         socket
       ) do
     {l, v} =
-      FullCircleWeb.Helpers.list_n_value(socket, params["name"], &Accounting.account_names/3)
+      FullCircleWeb.Helpers.list_n_value(socket, params["name"], &Accounting.contact_names/3)
 
     socket =
       socket
       |> assign(
-        account: if(v, do: FullCircle.StdInterface.get!(Accounting.Account, v.id), else: nil)
+        contact: if(v, do: FullCircle.StdInterface.get!(Accounting.Contact, v.id), else: nil)
       )
-      |> assign(account_names: l)
+      |> assign(contact_names: l)
       |> assign(
         search: %{name: params["name"], f_date: params["f_date"], t_date: params["t_date"]}
       )
@@ -53,8 +57,8 @@ defmodule FullCircleWeb.TransactionLive.Account do
 
   defp filter_transactions(socket) do
     objects =
-      Reporting.account_transactions(
-        socket.assigns.account,
+      Reporting.contact_transactions(
+        socket.assigns.contact,
         Date.from_iso8601!(socket.assigns.search.f_date),
         Date.from_iso8601!(socket.assigns.search.t_date),
         socket.assigns.current_company
@@ -115,15 +119,15 @@ defmodule FullCircleWeb.TransactionLive.Account do
     ~H"""
     <div class="w-11/12 mx-auto">
       <p class="text-2xl text-center font-medium"><%= "#{@page_title}" %></p>
-      <div class="border rounded bg-purple-200 text-center p-2">
+      <div class="border rounded bg-amber-200 text-center p-2">
         <.form for={%{}} id="search-form" phx-submit="query" autocomplete="off" phx-change="validate">
           <div class="grid grid-cols-12 tracking-tighter">
             <div class="col-span-6">
               <.input
-                label={gettext("Account")}
+                label={gettext("Contact")}
                 id="search_name"
                 name="search[name]"
-                list="account_names"
+                list="contact_names"
                 value={@search.name}
               />
             </div>
@@ -153,19 +157,18 @@ defmodule FullCircleWeb.TransactionLive.Account do
                 :if={@objects_count > 0}
                 class="link_button mr-1"
                 patch={
-                  ~p"/companies/#{@current_company.id}/print_transactions?report=actrans&name=#{@search.name}&fdate=#{@search.f_date}&tdate=#{@search.t_date}"
+                  ~p"/companies/#{@current_company.id}/print_transactions?report=contacttrans&name=#{@search.name}&fdate=#{@search.f_date}&tdate=#{@search.t_date}"
                 }
                 target="_blank"
               >
                 Print
               </.link>
-
               <.link
                 :if={@objects_count > 0}
                 href={
-                  ~p"/companies/#{@current_company.id}/csv?report=actrans&name=#{@search.name}&fdate=#{@search.f_date}&tdate=#{@search.t_date}"
+                  ~p"/companies/#{@current_company.id}/csv?report=contacttrans&name=#{@search.name}&fdate=#{@search.f_date}&tdate=#{@search.t_date}"
                 }
-                class="link_button"
+                class={"link_button"}
               >
                 CSV
               </.link>
@@ -199,10 +202,10 @@ defmodule FullCircleWeb.TransactionLive.Account do
           <%= for obj <- @objects do %>
             <div class="flex flex-row text-center tracking-tighter">
               <p class="hidden"><%= obj.inserted_at %></p>
-              <div class="w-[9rem] border rounded bg-blue-200 border-blue-400 text-center px-2 py-1">
+              <div class="w-[9rem] border rounded bg-green-200 border-green-400 text-center px-2 py-1">
                 <%= obj.doc_date %>
               </div>
-              <div class="w-[9rem] border rounded bg-blue-200 border-blue-400 text-center px-2 py-1">
+              <div class="w-[9rem] border rounded bg-green-200 border-green-400 text-center px-2 py-1">
                 <%= if obj.old_data do %>
                   <%= obj.doc_no %>
                 <% else %>
@@ -217,17 +220,17 @@ defmodule FullCircleWeb.TransactionLive.Account do
                   />
                 <% end %>
               </div>
-              <div class="w-[9rem] border rounded bg-blue-200 border-blue-400 text-center px-2 py-1">
+              <div class="w-[9rem] border rounded bg-green-200 border-green-400 text-center px-2 py-1">
                 <%= obj.doc_type %>
               </div>
-              <div class="w-[45rem] border rounded bg-blue-200 border-blue-400 px-2 py-1">
+              <div class="w-[45rem] border rounded bg-green-200 border-green-400 px-2 py-1">
                 <%= obj.particulars %>
               </div>
-              <div class="w-[10rem] border rounded bg-blue-200 border-blue-400 text-center px-2 py-1">
+              <div class="w-[10rem] border rounded bg-green-200 border-green-400 text-center px-2 py-1">
                 <%= if(Decimal.gt?(obj.amount, 0), do: obj.amount, else: nil)
                 |> Number.Delimit.number_to_delimited() %>
               </div>
-              <div class="w-[10rem] border rounded bg-blue-200 border-blue-400 text-center px-2 py-1">
+              <div class="w-[10rem] border rounded bg-green-200 border-green-400 text-center px-2 py-1">
                 <%= if(Decimal.gt?(obj.amount, 0), do: nil, else: Decimal.abs(obj.amount))
                 |> Number.Delimit.number_to_delimited() %>
               </div>
@@ -237,21 +240,21 @@ defmodule FullCircleWeb.TransactionLive.Account do
       </div>
       <div id="footer">
         <div class="flex flex-row text-center tracking-tighter mb-5 mt-1">
-          <div class="w-[71rem] border px-2 py-1 text-right font-bold rounded bg-cyan-200 border-cyan-400">
+          <div class="w-[71rem] border px-2 py-1 text-right font-bold rounded bg-lime-200 border-lime-400">
             <%= gettext("Balance") %>
           </div>
-          <div class="w-[9.85rem] font-bold border rounded bg-cyan-200 border-cyan-400 text-center px-2 py-1">
+          <div class="w-[9.85rem] font-bold border rounded bg-lime-200 border-lime-400 text-center px-2 py-1">
             <%= if(Decimal.gt?(@objects_balance, 0), do: @objects_balance, else: nil)
             |> Number.Delimit.number_to_delimited() %>
           </div>
-          <div class="w-[9.85rem] font-bold border rounded bg-cyan-200 border-cyan-400 text-center px-2 py-1">
+          <div class="w-[9.85rem] font-bold border rounded bg-lime-200 border-lime-400 text-center px-2 py-1">
             <%= if(Decimal.gt?(@objects_balance, 0), do: nil, else: Decimal.abs(@objects_balance))
             |> Number.Delimit.number_to_delimited() %>
           </div>
         </div>
       </div>
     </div>
-    <%= datalist_with_ids(@account_names, "account_names") %>
+    <%= datalist_with_ids(@contact_names, "contact_names") %>
     """
   end
 end

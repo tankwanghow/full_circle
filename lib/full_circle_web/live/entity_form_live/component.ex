@@ -1,7 +1,7 @@
 defmodule FullCircleWeb.EntityFormLive.Component do
   use FullCircleWeb, :live_component
 
-  alias FullCircle.{Sys, Billing, StdInterface}
+  alias FullCircle.{Billing, StdInterface}
   alias FullCircle.Billing.{Invoice, PurInvoice}
 
   @impl true
@@ -11,7 +11,6 @@ defmodule FullCircleWeb.EntityFormLive.Component do
 
   @impl true
   def update(assigns, socket) do
-    IO.inspect(socket)
     socket = socket |> assign(assigns)
     {:ok, socket}
   end
@@ -38,7 +37,7 @@ defmodule FullCircleWeb.EntityFormLive.Component do
       )
 
     socket
-    |> assign(id: object.id)
+    # |> assign(id: object.id)
     |> assign(title: gettext("Edit Invoice") <> " " <> object.invoice_no)
     |> assign(module: FullCircleWeb.InvoiceLive.FormComponent)
     |> assign(
@@ -56,7 +55,7 @@ defmodule FullCircleWeb.EntityFormLive.Component do
       )
 
     socket
-    |> assign(id: object.id)
+    # |> assign(id: object.id)
     |> assign(title: gettext("Edit Purchase Invoice") <> " " <> object.pur_invoice_no)
     |> assign(module: FullCircleWeb.PurInvoiceLive.FormComponent)
     |> assign(
