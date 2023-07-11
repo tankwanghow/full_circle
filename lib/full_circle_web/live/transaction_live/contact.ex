@@ -22,17 +22,6 @@ defmodule FullCircleWeb.TransactionLive.Contact do
   end
 
   @impl true
-  def handle_event("query", _, socket) do
-    {:noreply,
-     socket
-     |> filter_transactions()}
-  end
-
-  @impl true
-  def handle_event("print", _, socket) do
-  end
-
-  @impl true
   def handle_event(
         "validate",
         %{"_target" => ["search", _], "search" => params},

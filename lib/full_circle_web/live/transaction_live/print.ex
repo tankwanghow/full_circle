@@ -1,9 +1,6 @@
 defmodule FullCircleWeb.TransactionLive.Print do
   use FullCircleWeb, :live_view
 
-  import FullCircleWeb.Helpers
-  alias FullCircle.Billing
-
   @impl true
   def mount(params, _session, socket) do
     detail_body_height = 245
@@ -25,7 +22,7 @@ defmodule FullCircleWeb.TransactionLive.Print do
      |> assign(:tdate, Date.from_iso8601!(params["tdate"]))}
   end
 
-  def fill_data(socket, "contacttrans", name, fdate, tdate) do
+  defp fill_data(socket, "contacttrans", name, fdate, tdate) do
     ac =
       FullCircle.Accounting.get_contact_by_name(
         name,
@@ -41,7 +38,7 @@ defmodule FullCircleWeb.TransactionLive.Print do
         socket.assigns.current_company
       )
 
-    {data, acc} =
+    {data, _} =
       Enum.map_reduce(data, Decimal.new("0"), fn txn, acc ->
         {
           Map.merge(txn, %{balance: Decimal.add(acc, txn.amount)}),
@@ -52,7 +49,7 @@ defmodule FullCircleWeb.TransactionLive.Print do
     {ac, data}
   end
 
-  def fill_data(socket, "actrans", name, fdate, tdate) do
+  defp fill_data(socket, "actrans", name, fdate, tdate) do
     ac =
       FullCircle.Accounting.get_account_by_name(
         name,
@@ -68,7 +65,7 @@ defmodule FullCircleWeb.TransactionLive.Print do
         socket.assigns.current_company
       )
 
-    {data, acc} =
+    {data, _} =
       Enum.map_reduce(data, Decimal.new("0"), fn txn, acc ->
         {
           Map.merge(txn, %{balance: Decimal.add(acc, txn.amount)}),
@@ -103,19 +100,21 @@ defmodule FullCircleWeb.TransactionLive.Print do
               <span class="debit"> Debit </span>
               <span class="credit"> Credit </span>
             </div>
-            <%= previous_page_balance(@detail_chunks, n, assigns) %>
+            <%= previous_page_balance(n, assigns) %>
             <%= for txn <- Enum.at(@detail_chunks, n - 1) do %>
               <%= txn_detail(txn, assigns) %>
             <% end %>
           </div>
-          <%= footer(@detail_chunks, n, @chunk_number, assigns) %>
+          <%= footer(n, assigns) %>
         </div>
       <% end %>
     </div>
     """
   end
 
-  defp footer(detail_chunks, n, chunk_number, assigns) do
+  defp footer(n, assigns) do
+    assigns = assign(assigns, :n, n)
+
     ~H"""
     <div class="footer has-text-weight-bold">
       <span class="doc_date"></span>
@@ -123,28 +122,30 @@ defmodule FullCircleWeb.TransactionLive.Print do
       <span class="doc_no"></span>
       <span class="particulars"> Balance </span>
       <span class="debit">
-        <%= if(Decimal.gt?((Enum.at(detail_chunks, n - 1) |> List.last()).balance, 0),
-          do: (Enum.at(detail_chunks, n - 1) |> List.last()).balance,
+        <%= if(Decimal.gt?((Enum.at(@detail_chunks, @n - 1) |> List.last()).balance, 0),
+          do: (Enum.at(@detail_chunks, @n - 1) |> List.last()).balance,
           else: nil
         )
         |> Number.Delimit.number_to_delimited() %>
       </span>
 
       <span class="credit">
-        <%= if(Decimal.gt?((Enum.at(detail_chunks, n - 1) |> List.last()).balance, 0),
+        <%= if(Decimal.gt?((Enum.at(@detail_chunks, @n - 1) |> List.last()).balance, 0),
           do: nil,
-          else: Decimal.abs((Enum.at(detail_chunks, n - 1) |> List.last()).balance)
+          else: Decimal.abs((Enum.at(@detail_chunks, @n - 1) |> List.last()).balance)
         )
         |> Number.Delimit.number_to_delimited() %>
       </span>
     </div>
-    <div class="page-count"><%= "page #{n} of #{chunk_number}" %></div>
+    <div class="page-count"><%= "page #{@n} of #{@chunk_number}" %></div>
     """
   end
 
-  defp previous_page_balance(detail_chunks, n, assigns) do
+  defp previous_page_balance(n, assigns) do
+    assigns = assign(assigns, :n, n)
+
     ~H"""
-    <%= if !Decimal.eq?((Enum.at(detail_chunks, n - 1) |> List.first).balance, (Enum.at(detail_chunks, n - 1) |> List.first).amount) do %>
+    <%= if !Decimal.eq?((Enum.at(@detail_chunks, @n - 1) |> List.first).balance, (Enum.at(@detail_chunks, @n - 1) |> List.first).amount) do %>
       <div class="detail">
         <span class="doc_date">-</span>
         <span class="doc_type">-</span>
@@ -152,17 +153,17 @@ defmodule FullCircleWeb.TransactionLive.Print do
         <span class="particulars">Balance Previous Page</span>
 
         <span class="debit">
-          <%= if(Decimal.gt?((Enum.at(detail_chunks, n - 2) |> List.last()).balance, 0),
-            do: (Enum.at(detail_chunks, n - 2) |> List.last()).balance,
+          <%= if(Decimal.gt?((Enum.at(@detail_chunks, @n - 2) |> List.last()).balance, 0),
+            do: (Enum.at(@detail_chunks, @n - 2) |> List.last()).balance,
             else: nil
           )
           |> Number.Delimit.number_to_delimited() %>
         </span>
 
         <span class="credit">
-          <%= if(Decimal.gt?((Enum.at(detail_chunks, n - 2) |> List.last()).balance, 0),
+          <%= if(Decimal.gt?((Enum.at(@detail_chunks, @n - 2) |> List.last()).balance, 0),
             do: nil,
-            else: Decimal.abs((Enum.at(detail_chunks, n - 2) |> List.last()).balance)
+            else: Decimal.abs((Enum.at(@detail_chunks, @n - 2) |> List.last()).balance)
           )
           |> Number.Delimit.number_to_delimited() %>
         </span>
@@ -172,26 +173,28 @@ defmodule FullCircleWeb.TransactionLive.Print do
   end
 
   defp txn_detail(txn, assigns) do
+    assigns = assign(assigns, :txn, txn)
+
     ~H"""
     <div class="detail">
       <span class="doc_date">
-        <%= txn.doc_date %>
+        <%= @txn.doc_date %>
       </span>
       <span class="doc_type">
-        <%= txn.doc_type %>
+        <%= @txn.doc_type %>
       </span>
       <span class="doc_no">
-        <%= txn.doc_no %>
+        <%= @txn.doc_no %>
       </span>
       <span class="particulars">
-        <%= txn.particulars %>
+        <%= @txn.particulars %>
       </span>
       <span class="debit">
-        <%= if(Decimal.gt?(txn.amount, 0), do: txn.amount, else: nil)
+        <%= if(Decimal.gt?(@txn.amount, 0), do: @txn.amount, else: nil)
         |> Number.Delimit.number_to_delimited() %>
       </span>
       <span class="credit">
-        <%= if(Decimal.gt?(txn.amount, 0), do: nil, else: Decimal.abs(txn.amount))
+        <%= if(Decimal.gt?(@txn.amount, 0), do: nil, else: Decimal.abs(@txn.amount))
         |> Number.Delimit.number_to_delimited() %>
       </span>
     </div>
