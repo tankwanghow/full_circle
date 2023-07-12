@@ -23,9 +23,7 @@ defmodule FullCircleWeb.TransactionLive.Account do
 
   @impl true
   def handle_event("query", _, socket) do
-    {:noreply,
-     socket
-     |> filter_transactions()}
+    {:noreply, socket |> filter_transactions()}
   end
 
   @impl true

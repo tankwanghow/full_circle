@@ -22,6 +22,11 @@ defmodule FullCircleWeb.TransactionLive.Contact do
   end
 
   @impl true
+  def handle_event("query", _, socket) do
+    {:noreply, socket |> filter_transactions()}
+  end
+
+  @impl true
   def handle_event(
         "validate",
         %{"_target" => ["search", _], "search" => params},
@@ -157,7 +162,7 @@ defmodule FullCircleWeb.TransactionLive.Contact do
                 href={
                   ~p"/companies/#{@current_company.id}/csv?report=contacttrans&name=#{@search.name}&fdate=#{@search.f_date}&tdate=#{@search.t_date}"
                 }
-                class={"link_button"}
+                class="link_button"
               >
                 CSV
               </.link>

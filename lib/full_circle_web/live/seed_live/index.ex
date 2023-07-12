@@ -19,13 +19,15 @@ defmodule FullCircleWeb.SeedLive.Index do
 
   @impl true
   def mount(_params, _session, socket) do
+    id = FullCircle.Helpers.gen_temp_id(10)
     if connected?(socket) do
-      PubSub.subscribe(FullCircle.PubSub, "seed_data_changeset_generation_progress")
-      PubSub.subscribe(FullCircle.PubSub, "seed_data_changeset_generation_finished")
+      PubSub.subscribe(FullCircle.PubSub, "#{id}_seed_data_generation_progress")
+      PubSub.subscribe(FullCircle.PubSub, "#{id}_seed_data_generation_finished")
     end
 
     socket =
       socket
+      |> assign(pubsub_id: id)
       |> assign(page_title: gettext("Seeding Database"))
       |> assign(seed_tables: Map.keys(@seed_tables))
       |> assign(seed_table: Map.keys(@seed_tables) |> Enum.at(0))
@@ -136,21 +138,17 @@ defmodule FullCircleWeb.SeedLive.Index do
 
       if check_header_name?(csv_headers, socket.assigns.seed_table_headers) do
         Task.start(fn ->
-          # count_attrs = Enum.count(attrs)
           {cs_attrs, _} =
             Enum.map_reduce(attrs, 0, fn attr, acc ->
-              # if(rem(trunc(acc / count_attrs * 100), 7) == 0) do
               Phoenix.PubSub.broadcast(
                 FullCircle.PubSub,
-                "seed_data_changeset_generation_progress",
+                "#{socket.assigns.pubsub_id}_seed_data_generation_progress",
                 {:update_progress,
                  %{
                    progress:
                      (acc / Enum.count(attrs) * 100) |> Number.Percentage.number_to_percentage()
                  }}
               )
-
-              # end
 
               {cs, seed_attrs} =
                 FullCircle.Seeding.fill_changeset(
@@ -172,7 +170,7 @@ defmodule FullCircleWeb.SeedLive.Index do
 
           Phoenix.PubSub.broadcast(
             FullCircle.PubSub,
-            "seed_data_changeset_generation_finished",
+            "#{socket.assigns.pubsub_id}_seed_data_generation_finished",
             {:finish, %{cs: cs_attrs, cs_has_error: cs_has_error}}
           )
         end)
