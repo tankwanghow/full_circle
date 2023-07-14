@@ -12,7 +12,7 @@ defmodule FullCircleWeb.TransactionLive.Account do
       |> assign(account_names: [])
       |> assign(page_title: "Account Transactions")
       |> assign(search: %{name: "", f_date: Date.utc_today(), t_date: Date.utc_today()})
-      |> assign(:objects, objects)
+      |> assign(objects: objects)
       |> assign(valid?: false)
       |> assign(objects_count: 0)
       |> assign(objects_balance: Decimal.new("0"))
@@ -49,6 +49,11 @@ defmodule FullCircleWeb.TransactionLive.Account do
     {:noreply, socket}
   end
 
+  @impl true
+  def handle_event("modal_cancel", _, socket) do
+    {:noreply, socket |> assign(live_action: nil)}
+  end
+
   defp filter_transactions(socket) do
     objects =
       Reporting.account_transactions(
@@ -59,7 +64,7 @@ defmodule FullCircleWeb.TransactionLive.Account do
       )
 
     socket
-    |> assign(:objects, objects)
+    |> assign(objects: objects)
     |> assign(objects_count: Enum.count(objects))
     |> assign(
       objects_balance:
@@ -68,6 +73,11 @@ defmodule FullCircleWeb.TransactionLive.Account do
   end
 
   ######################################
+  def handle_info({:show_form, map}, socket) do
+    socket = socket |> assign(map)
+    {:noreply, socket |> assign(live_action: :edit)}
+  end
+
   def handle_info({:updated, _obj}, socket) do
     {:noreply,
      socket
@@ -206,7 +216,7 @@ defmodule FullCircleWeb.TransactionLive.Account do
                 <% else %>
                   <.live_component
                     module={FullCircleWeb.EntityFormLive.Component}
-                    id={obj.doc_type <> obj.doc_no}
+                    id={obj.id}
                     entity={obj.doc_type}
                     live_action={@live_action}
                     doc_no={obj.doc_no}
@@ -249,6 +259,23 @@ defmodule FullCircleWeb.TransactionLive.Account do
         </div>
       </div>
     </div>
+    <.modal
+      :if={@live_action in [:new, :edit]}
+      id="object-crud-modal"
+      show
+      max_w="max-w-full"
+      on_cancel={JS.push("modal_cancel")}
+    >
+      <.live_component
+        module={@module}
+        id={@id}
+        title={@title}
+        live_action={@live_action}
+        form={@form}
+        current_company={@current_company}
+        current_user={@current_user}
+      />
+    </.modal>
     <%= datalist_with_ids(@account_names, "account_names") %>
     """
   end

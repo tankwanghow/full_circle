@@ -504,7 +504,7 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
         <%= datalist_with_ids(@package_names, "package_names") %>
         <div class="flex justify-center gap-x-1 mt-1">
           <.button disabled={!@form.source.valid?}><%= gettext("Save") %></.button>
-          <.link phx-click={JS.push("modal_cancel", target: "##{@id}")} class="link_button">
+          <.link phx-click={JS.exec("phx-remove", to: "#object-crud-modal")} class="link_button">
             <%= gettext("Back") %>
           </.link>
           <.print_button company={@current_company} entity="invoices" entity_id={@id} class="link_button" />

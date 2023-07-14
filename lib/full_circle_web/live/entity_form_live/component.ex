@@ -16,16 +16,9 @@ defmodule FullCircleWeb.EntityFormLive.Component do
   end
 
   @impl true
-  def handle_event("modal_cancel", _, socket) do
-    {:noreply, socket |> assign(live_action: nil)}
-  end
-
-  @impl true
   def handle_event("show_form", %{"entity" => entity, "doc_no" => doc_no}, socket) do
-    {:noreply,
-     socket
-     |> assign(:live_action, :edit)
-     |> entity_form(entity, doc_no)}
+    send(self(), {:show_form, entity_form(socket, entity, doc_no)})
+    {:noreply, socket}
   end
 
   def entity_form(socket, "invoices", doc_no) do
@@ -36,14 +29,12 @@ defmodule FullCircleWeb.EntityFormLive.Component do
         socket.assigns.current_user
       )
 
-    socket
-    # |> assign(id: object.id)
-    |> assign(title: gettext("Edit Invoice") <> " " <> object.invoice_no)
-    |> assign(module: FullCircleWeb.InvoiceLive.FormComponent)
-    |> assign(
-      :form,
-      to_form(StdInterface.changeset(Invoice, object, %{}, socket.assigns.current_company))
-    )
+    %{
+      id: object.id,
+      title: gettext("Edit Invoice") <> " " <> object.invoice_no,
+      module: FullCircleWeb.InvoiceLive.FormComponent,
+      form: to_form(StdInterface.changeset(Invoice, object, %{}, socket.assigns.current_company))
+    }
   end
 
   def entity_form(socket, "pur_invoices", doc_no) do
@@ -54,14 +45,13 @@ defmodule FullCircleWeb.EntityFormLive.Component do
         socket.assigns.current_user
       )
 
-    socket
-    # |> assign(id: object.id)
-    |> assign(title: gettext("Edit Purchase Invoice") <> " " <> object.pur_invoice_no)
-    |> assign(module: FullCircleWeb.PurInvoiceLive.FormComponent)
-    |> assign(
-      :form,
-      to_form(StdInterface.changeset(PurInvoice, object, %{}, socket.assigns.current_company))
-    )
+    %{
+      id: object.id,
+      title: gettext("Edit Purchase Invoice") <> " " <> object.pur_invoice_no,
+      module: FullCircleWeb.PurInvoiceLive.FormComponent,
+      form:
+        to_form(StdInterface.changeset(PurInvoice, object, %{}, socket.assigns.current_company))
+    }
   end
 
   @impl true
@@ -77,24 +67,6 @@ defmodule FullCircleWeb.EntityFormLive.Component do
       >
         <%= @doc_no %>
       </.link>
-
-      <.modal
-        :if={@live_action == :edit}
-        id="object-crud-modal"
-        show
-        max_w="max-w-full"
-        on_cancel={JS.push("modal_cancel", target: "##{@id}")}
-      >
-        <.live_component
-          module={@module}
-          id={@id}
-          title={@title}
-          live_action={@live_action}
-          form={@form}
-          current_company={@current_company}
-          current_user={@current_user}
-        />
-      </.modal>
     </span>
     """
   end

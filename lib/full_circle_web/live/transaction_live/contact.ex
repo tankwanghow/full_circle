@@ -49,6 +49,11 @@ defmodule FullCircleWeb.TransactionLive.Contact do
     {:noreply, socket}
   end
 
+  @impl true
+  def handle_event("modal_cancel", _, socket) do
+    {:noreply, socket |> assign(live_action: nil)}
+  end
+
   defp filter_transactions(socket) do
     objects =
       Reporting.contact_transactions(
@@ -68,6 +73,13 @@ defmodule FullCircleWeb.TransactionLive.Contact do
   end
 
   ######################################
+  @impl true
+  def handle_info({:show_form, map}, socket) do
+    socket = socket |> assign(map)
+    {:noreply, socket |> assign(live_action: :edit)}
+  end
+
+  @impl true
   def handle_info({:updated, _obj}, socket) do
     {:noreply,
      socket
@@ -205,7 +217,7 @@ defmodule FullCircleWeb.TransactionLive.Contact do
                 <% else %>
                   <.live_component
                     module={FullCircleWeb.EntityFormLive.Component}
-                    id={obj.doc_type <> obj.doc_no}
+                    id={obj.id}
                     entity={obj.doc_type}
                     live_action={@live_action}
                     doc_no={obj.doc_no}
@@ -248,6 +260,23 @@ defmodule FullCircleWeb.TransactionLive.Contact do
         </div>
       </div>
     </div>
+    <.modal
+      :if={@live_action in [:new, :edit]}
+      id="object-crud-modal"
+      show
+      max_w="max-w-full"
+      on_cancel={JS.push("modal_cancel")}
+    >
+      <.live_component
+        module={@module}
+        id={@id}
+        title={@title}
+        live_action={@live_action}
+        form={@form}
+        current_company={@current_company}
+        current_user={@current_user}
+      />
+    </.modal>
     <%= datalist_with_ids(@contact_names, "contact_names") %>
     """
   end
