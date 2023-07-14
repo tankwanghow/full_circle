@@ -62,7 +62,8 @@ defmodule FullCircle.Reporting do
           amount: coalesce(sum(q.amount), 0),
           reconciled: true,
           old_data: true,
-          inserted_at: ^DateTime.utc_now()
+          inserted_at: ^DateTime.utc_now(),
+          id: type(^Ecto.UUID.generate(), :string)
         }
 
     txn_qry =
@@ -77,7 +78,8 @@ defmodule FullCircle.Reporting do
           amount: q.amount,
           reconciled: q.reconciled,
           old_data: q.old_data,
-          inserted_at: q.inserted_at
+          inserted_at: q.inserted_at,
+          id: type(q.id, :string)
         }
 
     union_all(bal_qry, ^txn_qry) |> order_by([1, 2, 3]) |> Repo.all()
@@ -108,7 +110,8 @@ defmodule FullCircle.Reporting do
           amount: coalesce(sum(q.amount), 0),
           reconciled: true,
           old_data: true,
-          inserted_at: ^DateTime.utc_now()
+          inserted_at: ^DateTime.utc_now(),
+          id: type(^Ecto.UUID.generate(), :string)
         }
 
     txn_qry =
@@ -123,7 +126,8 @@ defmodule FullCircle.Reporting do
           amount: q.amount,
           reconciled: q.reconciled,
           old_data: q.old_data,
-          inserted_at: q.inserted_at
+          inserted_at: q.inserted_at,
+          id: type(q.id, :string)
         }
 
     union_all(bal_qry, ^txn_qry) |> order_by([1, 2, 3]) |> Repo.all()
