@@ -75,5 +75,14 @@ config :phoenix, :stacktrace_depth, 20
 # Initialize plugs at runtime for faster development compilation
 config :phoenix, :plug_init_mode, :runtime
 
+# Configures the mailer
+#
+# By default it uses the "Local" adapter which stores the emails
+# locally. You can see the emails in your browser, at "/dev/mailbox".
+#
+# For production it's recommended to configure a different adapter
+# at the `config/runtime.exs`.
+config :full_circle, FullCircle.Mailer, adapter: Swoosh.Adapters.Local
+
 # Disable swoosh api client as it is only required for production adapters.
 config :swoosh, :api_client, false
