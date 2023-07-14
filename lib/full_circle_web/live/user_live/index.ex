@@ -8,7 +8,10 @@ defmodule FullCircleWeb.UserLive.Index do
     <div class="w-6/12 mx-auto">
       <p class="w-full text-2xl text-center font-bold"><%= @page_title %></p>
       <div class="flex justify-center gap-x-1">
-        <.link navigate={~p"/companies/#{@current_company.id}/users/new"} class="text-xl mb-2 link_button">
+        <.link
+          navigate={~p"/companies/#{@current_company.id}/users/new"}
+          class="text-xl mb-2 link_button"
+        >
           🧑<%= gettext("Add User") %>
         </.link>
       </div>

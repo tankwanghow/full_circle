@@ -507,7 +507,12 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
           <.link phx-click={JS.exec("phx-remove", to: "#object-crud-modal")} class="link_button">
             <%= gettext("Back") %>
           </.link>
-          <.print_button company={@current_company} entity="invoices" entity_id={@id} class="link_button" />
+          <.print_button
+            company={@current_company}
+            entity="invoices"
+            entity_id={@id}
+            class="link_button"
+          />
           <.pre_print_button
             company={@current_company}
             entity="invoices"

@@ -20,6 +20,7 @@ defmodule FullCircleWeb.SeedLive.Index do
   @impl true
   def mount(_params, _session, socket) do
     id = FullCircle.Helpers.gen_temp_id(10)
+
     if connected?(socket) do
       PubSub.subscribe(FullCircle.PubSub, "#{id}_seed_data_generation_progress")
       PubSub.subscribe(FullCircle.PubSub, "#{id}_seed_data_generation_finished")
