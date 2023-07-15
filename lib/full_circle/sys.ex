@@ -22,6 +22,56 @@ defmodule FullCircle.Sys do
         doc_type: "pur_invoices",
         current: 0,
         company_id: company_id
+      },
+      %{
+        doc_type: "journals",
+        current: 0,
+        company_id: company_id
+      },
+      %{
+        doc_type: "debit_notes",
+        current: 0,
+        company_id: company_id
+      },
+      %{
+        doc_type: "credit_notes",
+        current: 0,
+        company_id: company_id
+      },
+      %{
+        doc_type: "deposits",
+        current: 0,
+        company_id: company_id
+      },
+      %{
+        doc_type: "withdrawals",
+        current: 0,
+        company_id: company_id
+      },
+      %{
+        doc_type: "return_cheques",
+        current: 0,
+        company_id: company_id
+      },
+      %{
+        doc_type: "payments",
+        current: 0,
+        company_id: company_id
+      },
+      %{
+        doc_type: "payslips",
+        current: 0,
+        company_id: company_id
+      },
+      %{
+        doc_type: "salary_notes",
+        current: 0,
+        company_id: company_id
+      },
+      %{
+        doc_type: "receipts",
+        current: 0,
+        company_id: company_id
       }
     ]
   end
