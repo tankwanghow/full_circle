@@ -206,13 +206,15 @@ defmodule FullCircleWeb.TransactionLive.Print do
     <style>
       .details-body { height: <%= @detail_body_height %>mm; }
       .detail { display: flex; height: <%= @detail_height %>mm; vertical-align: middle; align-items : center; }
-      #page { width: 210mm; min-height: 297mm; }
+      #page { width: 210mm; min-height: 290mm; padding: 5mm; }
+
       @media print {
-        @page { size: A4; margin: 0;}
-        html, body { width: 210mm; height: 297mm; }
-        #page { padding: 5mm; page-break-after: avoid; }
-      }
-      .header { padding-bottom: 2mm; margin-bottom: 2mm; height: 10mm;}
+        @page { size: A4; margin: 0mm; }
+        body { width: 210mm; height: 290mm; margin: 0mm; }
+        html { margin: 0mm; }
+        #page { padding: 5mm; page-break-after: always;} }
+
+      .header { padding-bottom: 2mm;  height: 10mm;}
       .between { float: right;}
 
       .details-header { display: flex; text-align: center; padding-bottom: 2mm; padding-top: 2mm; border-bottom: 1px solid black; border-top: 1px solid black;}
@@ -223,7 +225,7 @@ defmodule FullCircleWeb.TransactionLive.Print do
       .debit { width: 28mm; text-align: right; }
       .credit { width: 28mm; text-align: right; }
 
-      .footer {margin-top: 14mm; display: flex; border-bottom: 1px solid black; border-top: 1px solid black; padding-bottom: 2mm; padding-top: 2mm; }
+      .footer { margin-top: 13mm; display: flex; border-bottom: 1px solid black; border-top: 1px solid black; padding-bottom: 2mm; padding-top: 2mm; }
       .page-count { float: right; }
     </style>
     """
