@@ -196,12 +196,12 @@ defmodule FullCircleWeb.SeedLive.Index do
   end
 
   defp check_header_name?(headers, header_required) do
-    Enum.map(headers, fn h ->
+    (Enum.map(headers, fn h ->
       Enum.find(
         header_required,
         fn x -> x == h end
       )
-    end) == headers
+    end) == headers) and (Enum.count(headers) == Enum.count(header_required))
   end
 
   defp csv_to_attrs(path) do
