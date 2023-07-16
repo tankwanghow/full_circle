@@ -1,0 +1,45 @@
+<.header>
+  Listing Receipts
+  <:actions>
+    <.link patch={~p"/receipts/new"}>
+      <.button>New Receipt</.button>
+    </.link>
+  </:actions>
+</.header>
+
+<.table
+  id="receipts"
+  rows={@streams.receipts}
+  row_click={fn {_id, receipt} -> JS.navigate(~p"/receipts/#{receipt}") end}
+>
+  <:action :let={{_id, receipt}}>
+    <div class="sr-only">
+      <.link navigate={~p"/receipts/#{receipt}"}>Show</.link>
+    </div>
+    <.link patch={~p"/receipts/#{receipt}/edit"}>Edit</.link>
+  </:action>
+  <:action :let={{id, receipt}}>
+    <.link
+      phx-click={JS.push("delete", value: %{id: receipt.id}) |> hide("##{id}")}
+      data-confirm="Are you sure?"
+    >
+      Delete
+    </.link>
+  </:action>
+</.table>
+
+<.modal
+  :if={@live_action in [:new, :edit]}
+  id="receipt-modal"
+  show
+  on_cancel={JS.patch(~p"/receipts")}
+>
+  <.live_component
+    module={FullCircleWeb.ReceiptLive.FormComponent}
+    id={@receipt.id || :new}
+    title={@page_title}
+    action={@live_action}
+    receipt={@receipt}
+    patch={~p"/receipts"}
+  />
+</.modal>
