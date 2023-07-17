@@ -8,7 +8,8 @@ config :full_circle, FullCircle.Repo,
   database: "full_circle_dev",
   stacktrace: true,
   show_sensitive_data_on_connection_error: true,
-  pool_size: 10
+  pool_size: 10,
+  timeout: 60_000
 
 # For development, we disable any cache and enable
 # debugging and code reloading.
