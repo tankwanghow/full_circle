@@ -1,5 +1,5 @@
-defmodule FullCircle.ReceiveFunds.ReceiptDetails do
-  use Ecto.Schema
+defmodule FullCircle.ReceiveFunds.ReceiptDetail do
+  use FullCircle.Schema
   import Ecto.Changeset
   import FullCircle.Helpers
 

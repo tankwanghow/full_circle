@@ -1,5 +1,5 @@
 defmodule FullCircle.ReceiveFunds.Receipt do
-  use Ecto.Schema
+  use FullCircle.Schema
   import Ecto.Changeset
   import FullCircle.Helpers
   import FullCircleWeb.Gettext
@@ -7,9 +7,9 @@ defmodule FullCircle.ReceiveFunds.Receipt do
   schema "receipts" do
     field :receipt_no, :string
     field :receipt_date, :date
-    belongs_to :contact_id, FullCircle.Accounting.Contact
+    belongs_to :contact, FullCircle.Accounting.Contact
     field :descriptions, :string
-    belongs_to :cash_or_bank_id, FullCircle.Accounting.Account
+    belongs_to :cash_or_bank, FullCircle.Accounting.Account
     field :receipt_amount, :decimal, default: 0
     belongs_to :company, FullCircle.Sys.Company
 

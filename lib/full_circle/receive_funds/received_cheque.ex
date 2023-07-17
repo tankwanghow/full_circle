@@ -1,5 +1,5 @@
 defmodule FullCircle.ReceiveFunds.ReceivedCheque do
-  use Ecto.Schema
+  use FullCircle.Schema
   import Ecto.Changeset
 
   schema "received_cheques" do

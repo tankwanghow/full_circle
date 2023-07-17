@@ -1,5 +1,5 @@
 defmodule FullCircle.ReceiveFunds.ReceiptTransactionMatcher do
-  use Ecto.Schema
+  use FullCircle.Schema
   import Ecto.Changeset
 
   schema "receipt_transaction_matchers" do
@@ -17,6 +17,5 @@ defmodule FullCircle.ReceiveFunds.ReceiptTransactionMatcher do
     receipt
     |> cast(attrs, [:_persistent_id, :amount, :transaction_id])
     |> validate_required([:amount, :transaction_id])
-    |> validate_number(:amount, greater_than: 0)
   end
 end
