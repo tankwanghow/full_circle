@@ -19,6 +19,9 @@ defmodule FullCircle.Accounting.Transaction do
     belongs_to :account, FullCircle.Accounting.Account
     belongs_to :fixed_asset, FullCircle.Accounting.FixedAsset
 
+    has_many :seed_transaction_matchers, FullCircle.Accounting.SeedTransactionMatcher
+    has_many :receipt_transaction_matchers, FullCircle.ReceiveFunds.ReceiptTransactionMatcher
+
     field :account_name, :string, virtual: true
     field :contact_name, :string, virtual: true
 

@@ -14,7 +14,9 @@ defmodule FullCircleWeb.SeedLive.Index do
     "Goods" =>
       ~w(name descriptions unit purchase_account_name sales_account_name purchase_tax_code_name sales_tax_code_name package_name unit_multiplier cost_per_package),
     "Balances" => ~w(doc_date	account_name amount),
-    "Transactions" => ~w(doc_date	account_name	doc_no	doc_type particulars	amount)
+    "Transactions" => ~w(doc_date	account_name	doc_no	doc_type particulars	amount),
+    "TransactionMatchers" =>
+      ~w(account_name m_doc_date m_doc_id m_doc_type m_amount n_doc_date n_doc_id n_doc_type n_amount)
   }
 
   @impl true
@@ -113,7 +115,7 @@ defmodule FullCircleWeb.SeedLive.Index do
   def handle_info({:update_progress, data}, socket) do
     {:noreply,
      socket
-     |> assign(status: "Seed Generating...#{data.progress}")
+     |> assign(status: "Processing Seed...#{data.progress}")
      |> assign(status_flag: :loading)}
   end
 
@@ -138,18 +140,21 @@ defmodule FullCircleWeb.SeedLive.Index do
       csv_headers = attrs |> Enum.at(0) |> Map.keys()
 
       if check_header_name?(csv_headers, socket.assigns.seed_table_headers) do
+        count_attrs = Enum.count(attrs)
+        stime = Timex.now
         Task.start(fn ->
           {cs_attrs, _} =
             Enum.map_reduce(attrs, 0, fn attr, acc ->
-              Phoenix.PubSub.broadcast(
-                FullCircle.PubSub,
-                "#{socket.assigns.pubsub_id}_seed_data_generation_progress",
-                {:update_progress,
-                 %{
-                   progress:
-                     (acc / Enum.count(attrs) * 100) |> Number.Percentage.number_to_percentage()
-                 }}
-              )
+              if rem(Timex.diff(Timex.now, stime, :seconds), 3) == 0 do
+                Phoenix.PubSub.broadcast(
+                  FullCircle.PubSub,
+                  "#{socket.assigns.pubsub_id}_seed_data_generation_progress",
+                  {:update_progress,
+                   %{
+                     progress: "#{acc} of #{count_attrs}"
+                   }}
+                )
+              end
 
               {cs, seed_attrs} =
                 FullCircle.Seeding.fill_changeset(
@@ -196,12 +201,12 @@ defmodule FullCircleWeb.SeedLive.Index do
   end
 
   defp check_header_name?(headers, header_required) do
-    (Enum.map(headers, fn h ->
+    Enum.map(headers, fn h ->
       Enum.find(
         header_required,
         fn x -> x == h end
       )
-    end) == headers) and (Enum.count(headers) == Enum.count(header_required))
+    end) == headers and Enum.count(headers) == Enum.count(header_required)
   end
 
   defp csv_to_attrs(path) do
@@ -263,7 +268,7 @@ defmodule FullCircleWeb.SeedLive.Index do
 
         <div class="border rounded-lg bg-gray-200 border-gray-500 p-2 mb-1">
           <div class="p-2">
-            <div class="text-xl text-purple-500 font-bold"><%= @filename %></div>
+            <div class="text-3xl text-purple-500 font-bold"><%= @filename %></div>
             CSV file require headers like below.
           </div>
           <div class="font-bold font-mono text-amber-600">

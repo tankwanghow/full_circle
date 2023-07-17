@@ -4,7 +4,16 @@ defmodule FullCircle.Seeding do
 
   alias FullCircle.Accounting.FixedAssetDepreciation
   alias FullCircle.Repo
-  alias FullCircle.Accounting.{TaxCode, Account, Contact, Transaction, FixedAsset}
+
+  alias FullCircle.Accounting.{
+    TaxCode,
+    Account,
+    Contact,
+    Transaction,
+    FixedAsset,
+    SeedTransactionMatcher
+  }
+
   alias FullCircle.Product.{Good}
 
   def seed("TaxCodes", seed_data, com, user) do
@@ -40,6 +49,10 @@ defmodule FullCircle.Seeding do
     save_seed(%Transaction{}, :seed_transactions, seed_data, com, user, false)
   end
 
+  def seed("TransactionMatchers", seed_data, com, user) do
+    save_seed(%SeedTransactionMatcher{}, :seed_transaction_matchers, seed_data, com, user, false)
+  end
+
   defp save_seed(_klass_struct, action, seed_data, company, user, log? \\ true) do
     case can?(user, action, company) do
       true ->
@@ -59,6 +72,69 @@ defmodule FullCircle.Seeding do
   rescue
     e in Ecto.InvalidChangesetError ->
       {:error, e}
+  end
+
+  defp find_txn(dt, di, ctid, comid) do
+    from(txn in Transaction,
+      where: txn.contact_id == ^ctid,
+      where: txn.company_id == ^comid,
+      where: txn.doc_type == ^dt,
+      where: txn.doc_no == ^di
+    )
+    |> Repo.one()
+  end
+
+  defp find_1st_txn(ctid, comid) do
+    from(txn in Transaction,
+      where: txn.contact_id == ^ctid,
+      where: txn.company_id == ^comid,
+      where: txn.old_data == true,
+      where: txn.closed == true,
+      where: txn.doc_type == "Journal",
+      where: ilike(txn.particulars, "Balance B/F%"),
+      group_by: [txn.id],
+      having: txn.doc_date == min(txn.doc_date)
+    )
+    |> Repo.one!()
+  end
+
+  def fill_changeset("TransactionMatchers", attr, com, user) do
+    name = Map.fetch!(attr, "account_name")
+    n_doc_type = Map.fetch!(attr, "n_doc_type")
+    n_doc_id = Map.fetch!(attr, "n_doc_id")
+    ct = FullCircle.Accounting.get_contact_by_name(name, com, user)
+
+    txn_id =
+      if is_nil(ct) do
+        nil
+      else
+        try do
+          (find_txn(n_doc_type, n_doc_id, ct.id, com.id) ||
+             find_1st_txn(ct.id, com.id)).id
+        rescue
+          Ecto.NoResultsError ->
+            nil
+
+          Ecto.MultipleResultsError ->
+            nil
+        end
+      end
+
+    new_attr = %{
+      m_doc_type: Map.fetch!(attr, "m_doc_type"),
+      m_doc_id: Map.fetch!(attr, "m_doc_id"),
+      n_doc_type: Map.fetch!(attr, "n_doc_type"),
+      n_doc_id: Map.fetch!(attr, "n_doc_id"),
+      amount: Map.fetch!(attr, "m_amount"),
+      transaction_id: txn_id
+    }
+
+    {FullCircle.StdInterface.changeset(
+       FullCircle.Accounting.SeedTransactionMatcher,
+       FullCircle.Accounting.SeedTransactionMatcher.__struct__(),
+       new_attr,
+       com
+     ), new_attr}
   end
 
   def fill_changeset("Goods", attr, com, user) do
