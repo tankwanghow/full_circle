@@ -53,36 +53,12 @@ defmodule FullCircle.Billing do
         select_merge: %{
           contact_name: cont.name,
           invoice_tax_amount:
-            sum(
-              fragment(
-                "round((?*?+?)*?, 2)",
-                invd.quantity,
-                invd.unit_price,
-                invd.discount,
-                invd.tax_rate
-              )
-            ),
-          invoice_good_amount:
-            sum(
-              fragment(
-                "round(((?*?)+?), 2)",
-                invd.quantity,
-                invd.unit_price,
-                invd.discount
-              )
-            ),
+            sum((invd.quantity * invd.unit_price + invd.discount) * invd.tax_rate),
+          invoice_good_amount: sum(invd.quantity * invd.unit_price + invd.discount),
           invoice_amount:
             sum(
-              fragment(
-                "round(((?*?)+?)+(((?*?)+?)*?), 2)",
-                invd.quantity,
-                invd.unit_price,
-                invd.discount,
-                invd.quantity,
-                invd.unit_price,
-                invd.discount,
-                invd.tax_rate
-              )
+              invd.quantity * invd.unit_price + invd.discount +
+                (invd.quantity * invd.unit_price + invd.discount) * invd.tax_rate
             )
         }
     )
@@ -107,32 +83,11 @@ defmodule FullCircle.Billing do
         package_name: pkg.name,
         tax_code: tc.code,
         tax_rate: tc.rate * 100,
-        tax_amount:
-          fragment(
-            "round(((?*?)+?)*?, 2)",
-            invd.quantity,
-            invd.unit_price,
-            invd.discount,
-            invd.tax_rate
-          ),
-        good_amount:
-          fragment(
-            "round(((?*?)+?), 2)",
-            invd.quantity,
-            invd.unit_price,
-            invd.discount
-          ),
+        tax_amount: (invd.quantity * invd.unit_price + invd.discount) * invd.tax_rate,
+        good_amount: invd.quantity * invd.unit_price + invd.discount,
         amount:
-          fragment(
-            "round(((?*?)+?)+(((?*?)+?)*?), 2)",
-            invd.quantity,
-            invd.unit_price,
-            invd.discount,
-            invd.quantity,
-            invd.unit_price,
-            invd.discount,
-            invd.tax_rate
-          )
+          invd.quantity * invd.unit_price + invd.discount +
+            (invd.quantity * invd.unit_price + invd.discount) * invd.tax_rate
       }
   end
 
@@ -153,36 +108,12 @@ defmodule FullCircle.Billing do
           contact_name: cont.name,
           contact_id: cont.id,
           invoice_tax_amount:
-            sum(
-              fragment(
-                "round((?*?+?)*?, 2)",
-                invd.quantity,
-                invd.unit_price,
-                invd.discount,
-                invd.tax_rate
-              )
-            ),
-          invoice_good_amount:
-            sum(
-              fragment(
-                "round(((?*?)+?), 2)",
-                invd.quantity,
-                invd.unit_price,
-                invd.discount
-              )
-            ),
+            sum((invd.quantity * invd.unit_price + invd.discount) * invd.tax_rate),
+          invoice_good_amount: sum(invd.quantity * invd.unit_price + invd.discount),
           invoice_amount:
             sum(
-              fragment(
-                "round(((?*?)+?)+(((?*?)+?)*?), 2)",
-                invd.quantity,
-                invd.unit_price,
-                invd.discount,
-                invd.quantity,
-                invd.unit_price,
-                invd.discount,
-                invd.tax_rate
-              )
+              invd.quantity * invd.unit_price + invd.discount +
+                (invd.quantity * invd.unit_price + invd.discount) * invd.tax_rate
             )
         }
     )
@@ -209,32 +140,11 @@ defmodule FullCircle.Billing do
         unit_multiplier: pkg.unit_multiplier,
         tax_rate: invd.tax_rate,
         tax_code_name: tc.code,
-        tax_amount:
-          fragment(
-            "round(((?*?)+?)*?, 2)",
-            invd.quantity,
-            invd.unit_price,
-            invd.discount,
-            invd.tax_rate
-          ),
-        good_amount:
-          fragment(
-            "round((?*?)+?, 2)",
-            invd.quantity,
-            invd.unit_price,
-            invd.discount
-          ),
+        tax_amount: (invd.quantity * invd.unit_price + invd.discount) * invd.tax_rate,
+        good_amount: invd.quantity * invd.unit_price + invd.discount,
         amount:
-          fragment(
-            "round(((?*?)+?)+(((?*?)+?)*?), 2)",
-            invd.quantity,
-            invd.unit_price,
-            invd.discount,
-            invd.quantity,
-            invd.unit_price,
-            invd.discount,
-            invd.tax_rate
-          )
+          invd.quantity * invd.unit_price + invd.discount +
+            (invd.quantity * invd.unit_price + invd.discount) * invd.tax_rate
       }
   end
 
@@ -308,16 +218,13 @@ defmodule FullCircle.Billing do
 
   defp invoice_query(company, user, page: page, per_page: per_page) do
     from inv in Invoice,
-      as: :invoices,
       join: com in subquery(Sys.user_company(company, user)),
       on: com.id == inv.company_id,
       join: cont in Contact,
       on: cont.id == inv.contact_id,
       join: invd in InvoiceDetail,
-      as: :invoice_details,
       on: invd.invoice_id == inv.id,
       join: good in Good,
-      as: :goods,
       on: good.id == invd.good_id,
       offset: ^((page - 1) * per_page),
       limit: ^per_page,
@@ -332,25 +239,13 @@ defmodule FullCircle.Billing do
         inserted_at: inv.inserted_at,
         updated_at: inv.updated_at,
         contact_id: cont.id,
-        company_id: com.id
-      },
-      select_merge: %{
+        company_id: com.id,
         contact_name: cont.name,
         invoice_amount:
           sum(
-            fragment(
-              "round(((?*?)+?)+(((?*?)+?)*?), 2)",
-              invd.quantity,
-              invd.unit_price,
-              invd.discount,
-              invd.quantity,
-              invd.unit_price,
-              invd.discount,
-              invd.tax_rate
-            )
-          )
-      },
-      select_merge: %{
+            invd.quantity * invd.unit_price + invd.discount +
+              (invd.quantity * invd.unit_price + invd.discount) * invd.tax_rate
+          ),
         goods:
           fragment(
             "string_agg(DISTINCT ? || COALESCE('(' || ? || ')', ''), ', ')",
@@ -521,36 +416,12 @@ defmodule FullCircle.Billing do
           contact_name: cont.name,
           contact_id: cont.id,
           pur_invoice_tax_amount:
-            sum(
-              fragment(
-                "round((?*?+?)*?, 2)",
-                invd.quantity,
-                invd.unit_price,
-                invd.discount,
-                invd.tax_rate
-              )
-            ),
-          pur_invoice_good_amount:
-            sum(
-              fragment(
-                "round(((?*?)+?), 2)",
-                invd.quantity,
-                invd.unit_price,
-                invd.discount
-              )
-            ),
+            sum((invd.quantity * invd.unit_price + invd.discount) * invd.tax_rate),
+          pur_invoice_good_amount: sum(invd.quantity * invd.unit_price + invd.discount),
           pur_invoice_amount:
             sum(
-              fragment(
-                "round(((?*?)+?)+(((?*?)+?)*?), 2)",
-                invd.quantity,
-                invd.unit_price,
-                invd.discount,
-                invd.quantity,
-                invd.unit_price,
-                invd.discount,
-                invd.tax_rate
-              )
+              invd.quantity * invd.unit_price + invd.discount +
+                (invd.quantity * invd.unit_price + invd.discount) * invd.tax_rate
             )
         }
     )
@@ -577,32 +448,11 @@ defmodule FullCircle.Billing do
         unit_multiplier: pkg.unit_multiplier,
         tax_rate: invd.tax_rate,
         tax_code_name: tc.code,
-        tax_amount:
-          fragment(
-            "round(((?*?)+?)*?, 2)",
-            invd.quantity,
-            invd.unit_price,
-            invd.discount,
-            invd.tax_rate
-          ),
-        good_amount:
-          fragment(
-            "round((?*?)+?, 2)",
-            invd.quantity,
-            invd.unit_price,
-            invd.discount
-          ),
+        tax_amount: (invd.quantity * invd.unit_price + invd.discount) * invd.tax_rate,
+        good_amount: invd.quantity * invd.unit_price + invd.discount,
         amount:
-          fragment(
-            "round(((?*?)+?)+(((?*?)+?)*?), 2)",
-            invd.quantity,
-            invd.unit_price,
-            invd.discount,
-            invd.quantity,
-            invd.unit_price,
-            invd.discount,
-            invd.tax_rate
-          )
+          invd.quantity * invd.unit_price + invd.discount +
+            (invd.quantity * invd.unit_price + invd.discount) * invd.tax_rate
       }
   end
 
@@ -692,16 +542,13 @@ defmodule FullCircle.Billing do
 
   defp pur_invoice_query(company, user, page: page, per_page: per_page) do
     from inv in PurInvoice,
-      as: :pur_invoices,
       join: com in subquery(Sys.user_company(company, user)),
       on: com.id == inv.company_id,
       join: cont in Contact,
       on: cont.id == inv.contact_id,
       join: invd in PurInvoiceDetail,
-      as: :pur_invoice_details,
       on: invd.pur_invoice_id == inv.id,
       join: good in Good,
-      as: :goods,
       on: good.id == invd.good_id,
       offset: ^((page - 1) * per_page),
       limit: ^per_page,
@@ -717,25 +564,13 @@ defmodule FullCircle.Billing do
         inserted_at: inv.inserted_at,
         updated_at: inv.updated_at,
         contact_id: cont.id,
-        company_id: com.id
-      },
-      select_merge: %{
+        company_id: com.id,
         contact_name: cont.name,
         pur_invoice_amount:
           sum(
-            fragment(
-              "round(((?*?)+?)+(((?*?)+?)*?), 2)",
-              invd.quantity,
-              invd.unit_price,
-              invd.discount,
-              invd.quantity,
-              invd.unit_price,
-              invd.discount,
-              invd.tax_rate
-            )
-          )
-      },
-      select_merge: %{
+            invd.quantity * invd.unit_price + invd.discount +
+              (invd.quantity * invd.unit_price + invd.discount) * invd.tax_rate
+          ),
         goods:
           fragment(
             "string_agg(DISTINCT ? || COALESCE('(' || ? || ')', ''), ', ')",
