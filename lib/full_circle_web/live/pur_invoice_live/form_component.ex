@@ -220,7 +220,7 @@ defmodule FullCircleWeb.PurInvoiceLive.FormComponent do
         "tax_code_name",
         :tax_codes,
         "tax_code_id",
-        &FullCircle.Accounting.sale_tax_codes/3
+        &FullCircle.Accounting.purchase_tax_codes/3
       )
 
     detail =
