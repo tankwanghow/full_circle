@@ -46,13 +46,12 @@ defmodule FullCircleWeb.JournalEntryViewLive.Component do
   @impl true
   def render(assigns) do
     ~H"""
-    <span id={@id}>
+    <div id={@id}>
       <.link
         phx-target={@myself}
         phx-click={:show_journal}
-        class="text-xs border rounded-full bg-pink-100 hover:bg-pink-400 px-2 py-1 border-pink-400"
       >
-        <%= @label || gettext("Journal") %>
+      <.icon name="hero-queue-list" class="w-5 h-5 text-blue-600" />
       </.link>
       <.modal
         :if={@show_journal}
@@ -61,7 +60,7 @@ defmodule FullCircleWeb.JournalEntryViewLive.Component do
         on_cancel={JS.push("hide_journal", target: "##{@id}")}
         max_w="max-w-6xl"
       >
-        <div class="max-w-full">
+        <div class="max-w-full text-black">
           <p class="w-full text-3xl text-center font-medium mb-3">
             <%= @page_title %>
           </p>
@@ -113,7 +112,7 @@ defmodule FullCircleWeb.JournalEntryViewLive.Component do
           </div>
         </div>
       </.modal>
-    </span>
+    </div>
     """
   end
 end

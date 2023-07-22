@@ -14,8 +14,7 @@ defmodule FullCircleWeb.LogLive.Component do
 
   @impl true
   def update(assigns, socket) do
-    socket = socket |> assign(assigns)
-    {:ok, socket}
+    {:ok, socket |> assign(assigns)}
   end
 
   @impl true
@@ -62,13 +61,12 @@ defmodule FullCircleWeb.LogLive.Component do
   @impl true
   def render(assigns) do
     ~H"""
-    <span id={@id}>
+    <div id={@id}>
       <.link
         phx-target={@myself}
         phx-click={:show_log}
-        class="text-xs border rounded-full bg-pink-100 hover:bg-pink-400 px-2 py-1 border-pink-400"
       >
-        <%= gettext("Logs") %>
+        <.icon name="hero-table-cells-solid" class="w-5 h-5 text-pink-500" />
       </.link>
 
       <.modal
@@ -78,7 +76,7 @@ defmodule FullCircleWeb.LogLive.Component do
         on_cancel={JS.push("hide_log", target: "##{@id}")}
         max_w="max-w-6xl"
       >
-        <div class="max-w-full">
+        <div class="max-w-full text-black">
           <p class="w-full text-3xl text-center font-medium mb-3">
             <%= @page_title %>
           </p>
@@ -104,7 +102,7 @@ defmodule FullCircleWeb.LogLive.Component do
           </div>
         </div>
       </.modal>
-    </span>
+    </div>
     """
   end
 end
