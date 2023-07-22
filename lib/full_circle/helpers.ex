@@ -32,8 +32,8 @@ defmodule FullCircle.Helpers do
 
     x =
       for col <- fields, term <- texts do
-        m = c - Enum.find_index(fields, fn x -> x == col end)
-        dynamic([cont], fragment("COALESCE(SIMILARITY(?,?),0)*?", field(cont, ^col), ^term, ^m))
+        m = (c - Enum.find_index(fields, fn x -> x == col end)) |> :math.pow(3)
+        dynamic([cont], fragment("COALESCE(WORD_SIMILARITY(?,?),0)*?", ^term, field(cont, ^col), ^m))
       end
       |> Enum.reduce(fn a, b -> dynamic(^a + ^b) end)
 
