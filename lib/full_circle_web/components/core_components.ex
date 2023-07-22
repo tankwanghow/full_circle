@@ -813,22 +813,6 @@ defmodule FullCircleWeb.CoreComponents do
     )
   end
 
-  attr :doc_type, :string
-  attr :doc_no, :integer
-  attr :back, :string
-  attr :company, :any
-
-  def journal_button(assigns) do
-    ~H"""
-    <.link
-      navigate={"/companies/#{@company.id}/journal_entries/#{@doc_type}/#{@doc_no}/?back=#{@back}"}
-      class="text-xs border rounded-full bg-pink-100 hover:bg-pink-400 px-2 py-1 border-pink-400"
-    >
-      <%= gettext("Journal") %>
-    </.link>
-    """
-  end
-
   attr :entity, :string
   attr :entity_id, :string
   attr :company, :any
