@@ -141,11 +141,12 @@ defmodule FullCircleWeb.SeedLive.Index do
 
       if check_header_name?(csv_headers, socket.assigns.seed_table_headers) do
         count_attrs = Enum.count(attrs)
-        stime = Timex.now
+        stime = Timex.now()
+
         Task.start(fn ->
           {cs_attrs, _} =
             Enum.map_reduce(attrs, 0, fn attr, acc ->
-              if rem(Timex.diff(Timex.now, stime, :seconds), 3) == 0 do
+              if rem(Timex.diff(Timex.now(), stime, :seconds), 3) == 0 do
                 Phoenix.PubSub.broadcast(
                   FullCircle.PubSub,
                   "#{socket.assigns.pubsub_id}_seed_data_generation_progress",
