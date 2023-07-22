@@ -5,10 +5,11 @@ defmodule FullCircle.Billing do
   import FullCircle.Authorization
 
   alias FullCircle.Billing.{Invoice, InvoiceDetail, PurInvoice, PurInvoiceDetail}
-  alias FullCircle.Accounting.{Contact, Account, Transaction, TaxCode}
+  alias FullCircle.Accounting.{Contact, Account, Transaction, TaxCode, SeedTransactionMatcher}
   alias FullCircle.Product.{Good, Packaging}
   alias FullCircle.StdInterface
   alias FullCircle.{Sys, Accounting}
+  alias FullCircle.ReceiveFunds.ReceiptTransactionMatcher
   alias Ecto.Multi
 
   def get_invoice_by_invoice_no!(inv_no, com, user) do
@@ -37,8 +38,8 @@ defmodule FullCircle.Billing do
     get_pur_invoice!(id, com, user)
   end
 
-  def get_print_invoice!(id, company, user) do
-    Repo.one(
+  def get_print_invoices!(ids, company, user) do
+    Repo.all(
       from inv in Invoice,
         join: com in subquery(Sys.user_company(company, user)),
         on: com.id == inv.company_id,
@@ -46,9 +47,10 @@ defmodule FullCircle.Billing do
         on: invd.invoice_id == inv.id,
         join: cont in Contact,
         on: cont.id == inv.contact_id,
-        where: inv.id == ^id,
-        preload: [invoice_details: ^print_invoice_details()],
-        group_by: [inv.id, inv.invoice_no, inv.descriptions, cont.name],
+        where: inv.id in ^ids,
+        preload: [contact: cont, invoice_details: ^print_invoice_details()],
+        group_by: [inv.id, inv.invoice_no, inv.descriptions, cont.id],
+        order_by: inv.invoice_no,
         select: inv,
         select_merge: %{
           contact_name: cont.name,
@@ -148,119 +150,91 @@ defmodule FullCircle.Billing do
       }
   end
 
-  def invoice_index_query("", "", "", com, user, page: page, per_page: per_page) do
-    from(inv in subquery(invoice_query(com, user, page: page, per_page: per_page)),
-      order_by: [desc: inv.updated_at]
-    )
-    |> Repo.all()
-  end
-
-  def invoice_index_query("", date_from, "", com, user, page: page, per_page: per_page) do
-    Repo.all(
-      from inv in subquery(invoice_query(com, user, page: page, per_page: per_page)),
-        where: inv.invoice_date >= ^date_from,
-        order_by: inv.invoice_date
-    )
-  end
-
-  def invoice_index_query("", "", due_date_from, com, user, page: page, per_page: per_page) do
-    Repo.all(
-      from inv in subquery(invoice_query(com, user, page: page, per_page: per_page)),
-        where: inv.due_date >= ^due_date_from,
-        order_by: inv.due_date
-    )
-  end
-
-  def invoice_index_query(terms, "", "", com, user, page: page, per_page: per_page) do
-    from(inv in subquery(invoice_query(com, user, page: page, per_page: per_page)),
-      order_by: ^similarity_order([:invoice_no, :contact_name, :goods, :descriptions], terms)
-    )
-    |> Repo.all()
-  end
-
-  def invoice_index_query(terms, date_from, "", com, user, page: page, per_page: per_page) do
-    Repo.all(
-      from inv in subquery(invoice_query(com, user, page: page, per_page: per_page)),
-        where: inv.invoice_date >= ^date_from,
-        order_by: ^similarity_order([:invoice_no, :contact_name, :goods, :descriptions], terms),
-        order_by: inv.invoice_date
-    )
-  end
-
-  def invoice_index_query(terms, "", due_date_from, com, user, page: page, per_page: per_page) do
-    Repo.all(
-      from inv in subquery(invoice_query(com, user, page: page, per_page: per_page)),
-        where: inv.due_date >= ^due_date_from,
-        order_by: ^similarity_order([:invoice_no, :contact_name, :goods, :descriptions], terms),
-        order_by: inv.due_date
-    )
-  end
-
-  def invoice_index_query(terms, date_from, due_date_from, com, user,
+  def invoice_index_query(terms, date_from, due_date_from, bal, com, user,
         page: page,
         per_page: per_page
       ) do
-    Repo.all(
-      from inv in subquery(invoice_query(com, user, page: page, per_page: per_page)),
-        where: inv.invoice_date >= ^date_from,
-        where: inv.due_date >= ^due_date_from,
-        order_by: ^similarity_order([:invoice_no, :contact_name, :goods, :descriptions], terms),
-        order_by: [inv.invoice_date, inv.due_date]
-    )
+    qry =
+      from(inv in subquery(invoice_raw_query(com, user)))
+
+    qry =
+      if terms != "" do
+        from inv in subquery(qry),
+          order_by: ^similarity_order([:invoice_no, :contact_name, :particulars], terms)
+      else
+        qry
+      end
+
+    qry =
+      case bal do
+        "Paid" -> from inv in qry, where: inv.balance == 0
+        "Unpaid" -> from inv in qry, where: inv.balance > 0
+        _ -> qry
+      end
+
+    qry =
+      if date_from != "" do
+        from inv in qry, where: inv.invoice_date >= ^date_from, order_by: inv.invoice_date
+      else
+        qry
+      end
+
+    qry =
+      if due_date_from != "" do
+        from inv in qry, where: inv.due_date >= ^due_date_from, order_by: inv.due_date
+      else
+        qry
+      end
+
+    qry |> offset((^page - 1) * ^per_page) |> limit(^per_page) |> Repo.all()
   end
 
   def get_invoice_by_id_index_component_field!(id, com, user) do
-    from(i in subquery(invoice_query(com, user, page: 1, per_page: 10)),
+    from(i in subquery(invoice_raw_query(com, user)),
       where: i.id == ^id
     )
     |> Repo.one!()
   end
 
-  defp invoice_query(company, user, page: page, per_page: per_page) do
-    from inv in Invoice,
+  defp invoice_raw_query(company, user) do
+    from txn in Transaction,
       join: com in subquery(Sys.user_company(company, user)),
-      on: com.id == inv.company_id,
+      on: com.id == txn.company_id and txn.doc_type == "invoices",
       join: cont in Contact,
-      on: cont.id == inv.contact_id,
-      join: invd in InvoiceDetail,
-      on: invd.invoice_id == inv.id,
-      join: good in Good,
-      on: good.id == invd.good_id,
-      offset: ^((page - 1) * per_page),
-      limit: ^per_page,
-      order_by: [desc: inv.updated_at],
+      on: cont.id == txn.contact_id,
+      left_join: inv in Invoice,
+      on:
+        txn.doc_no == inv.invoice_no and
+          txn.contact_id == inv.contact_id,
+      left_join: stxm in SeedTransactionMatcher,
+      on: stxm.transaction_id == txn.id,
+      left_join: rectxm in ReceiptTransactionMatcher,
+      on: rectxm.transaction_id == txn.id,
+      order_by: [desc: txn.inserted_at],
       select: %{
-        id: inv.id,
-        invoice_no: inv.invoice_no,
-        descriptions: inv.descriptions,
-        tags: inv.tags,
-        invoice_date: inv.invoice_date,
-        due_date: inv.due_date,
-        inserted_at: inv.inserted_at,
-        updated_at: inv.updated_at,
-        contact_id: cont.id,
+        id: coalesce(inv.id, txn.id),
+        invoice_no: txn.doc_no,
+        particulars: coalesce(txn.contact_particulars, txn.particulars),
+        invoice_date: txn.doc_date,
+        due_date: coalesce(inv.due_date, txn.doc_date),
+        updated_at: txn.inserted_at,
         company_id: com.id,
         contact_name: cont.name,
-        invoice_amount:
-          sum(
-            invd.quantity * invd.unit_price + invd.discount +
-              (invd.quantity * invd.unit_price + invd.discount) * invd.tax_rate
-          ),
-        goods:
-          fragment(
-            "string_agg(DISTINCT ? || COALESCE('(' || ? || ')', ''), ', ')",
-            good.name,
-            invd.descriptions
-          )
+        invoice_amount: txn.amount,
+        balance: txn.amount + coalesce(sum(stxm.amount), 0) + coalesce(sum(rectxm.amount), 0),
+        checked: false,
+        old_data: txn.old_data
       },
       group_by: [
         inv.id,
+        txn.id,
         cont.name,
-        inv.descriptions,
-        inv.invoice_date,
+        txn.contact_particulars,
+        txn.particulars,
+        txn.doc_date,
         inv.due_date,
-        cont.id,
-        com.id
+        com.id,
+        txn.amount
       ]
   end
 
@@ -337,7 +311,7 @@ defmodule FullCircle.Billing do
       end)
 
       cont_part =
-        Enum.map(invoice.invoice_details, fn x -> String.slice(x.good_name, 0..14) end)
+        Enum.map(invoice.invoice_details, fn x -> x.good_name end)
         |> Enum.join(", ")
 
       repo.insert!(%Transaction{
