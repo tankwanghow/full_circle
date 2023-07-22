@@ -126,6 +126,7 @@ defmodule FullCircleWeb.Router do
       ],
       root_layout: {FullCircleWeb.Layouts, :print_root} do
       live("/invoices/:id/print", InvoiceLive.Print, :print)
+      live("/invoices/print_multi", InvoiceLive.Print, :print)
       live("/print_transactions", TransactionLive.Print, :print)
     end
   end

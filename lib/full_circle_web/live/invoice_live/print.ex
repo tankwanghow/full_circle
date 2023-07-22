@@ -6,38 +6,44 @@ defmodule FullCircleWeb.InvoiceLive.Print do
 
   @impl true
   def mount(%{"id" => id, "pre_print" => pre_print}, _session, socket) do
-    {:ok, fill_assigns(id, socket) |> assign(:pre_print, pre_print)}
+    ids = [id]
+    {:ok, socket |> assign(:pre_print, pre_print) |> set_page_defaults() |> fill_invoices(ids)}
   end
 
-  defp fill_assigns(id, socket) do
-    invoice =
-      Billing.get_print_invoice!(
-        id,
+  @impl true
+  def mount(%{"ids" => ids, "pre_print" => pre_print}, _, socket) do
+    ids = String.split(ids, ",")
+    {:ok, socket |> assign(:pre_print, pre_print) |> set_page_defaults() |> fill_invoices(ids)}
+  end
+
+  defp set_page_defaults(socket) do
+    socket
+    |> assign(:detail_body_height, 133)
+    |> assign(:detail_height, 13)
+    |> assign(:company, FullCircle.Sys.get_company!(socket.assigns.current_company.id))
+  end
+
+  defp fill_invoices(socket, ids) do
+    chunck = (socket.assigns.detail_body_height / socket.assigns.detail_height) |> floor
+
+    invoices =
+      Billing.get_print_invoices!(
+        ids,
         socket.assigns.current_company,
         socket.assigns.current_user
       )
-
-    contact =
-      FullCircle.StdInterface.get!(
-        FullCircle.Accounting.Contact,
-        invoice.contact_id
-      )
-
-    company = FullCircle.Sys.get_company!(socket.assigns.current_company.id)
-
-    detail_body_height = 133
-    detail_height = 13
-    chunk = (detail_body_height / detail_height) |> floor
+      |> Enum.map(fn invoice ->
+        invoice
+        |> Map.merge(%{
+          chunk_number: Enum.chunk_every(invoice.invoice_details, chunck) |> Enum.count()
+        })
+        |> Map.merge(%{
+          detail_chunks: Enum.chunk_every(invoice.invoice_details, chunck)
+        })
+      end)
 
     socket
-    |> assign(:detail_body_height, detail_body_height)
-    |> assign(:detail_height, detail_height)
-    |> assign(:back, "/companies/#{socket.assigns.current_company.id}/invoices")
-    |> assign(:invoice, invoice)
-    |> assign(:company, company)
-    |> assign(:contact, contact)
-    |> assign(:chunk_number, Enum.chunk_every(invoice.invoice_details, chunk) |> Enum.count())
-    |> assign(:detail_chunks, Enum.chunk_every(invoice.invoice_details, chunk))
+    |> assign(:invoices, invoices)
   end
 
   @impl true
@@ -46,31 +52,33 @@ defmodule FullCircleWeb.InvoiceLive.Print do
     <div id="print-me" class="print-here">
       <%= pre_print_style(assigns) %>
       <%= if(@pre_print == "false", do: full_style(assigns)) %>
-      <%= Enum.map 1..@chunk_number, fn n -> %>
-        <div id="page" class="">
-          <div class="letter-head">
-            <%= if(@pre_print == "true", do: "", else: letter_head_data(assigns)) %>
+      <%= for invoice <- @invoices do %>
+        <%= Enum.map 1..invoice.chunk_number, fn n -> %>
+          <div id="page" class="">
+            <div class="letter-head">
+              <%= if(@pre_print == "true", do: "", else: letter_head_data(assigns)) %>
+            </div>
+            <div class="doctype is-size-4 has-text-weight-semibold">INVOICE</div>
+            <%= invoice_header(invoice, assigns) %>
+            <%= detail_header(assigns) %>
+            <div class="details-body is-size-6">
+              <%= for invd <- Enum.at(invoice.detail_chunks, n - 1) do %>
+                <%= invoice_detail(invd, assigns) %>
+              <% end %>
+            </div>
+            <%= if(n == invoice.chunk_number,
+              do: invoice_footer(invoice, n, invoice.chunk_number, assigns),
+              else: invoice_footer("continue", n, invoice.chunk_number, assigns)
+            ) %>
+            <%= if(@pre_print == "true", do: "", else: letter_foot(assigns)) %>
           </div>
-          <div class="doctype is-size-4 has-text-weight-semibold">INVOICE</div>
-          <%= invoice_header(assigns) %>
-          <%= detail_header(assigns) %>
-          <div class="details-body is-size-6">
-            <%= for invd <- Enum.at(@detail_chunks, n - 1) do %>
-              <%= invoice_detail(invd, assigns) %>
-            <% end %>
-          </div>
-          <%= if(n == @chunk_number,
-            do: invoice_footer(n, @chunk_number, assigns),
-            else: invoice_footer("continue", n, @chunk_number, assigns)
-          ) %>
-          <%= if(@pre_print == "true", do: "", else: letter_foot(assigns)) %>
-        </div>
+        <% end %>
       <% end %>
     </div>
     """
   end
 
-  defp invoice_detail(invd, assigns) do
+  def invoice_detail(invd, assigns) do
     assigns = assign(assigns, :invd, invd)
 
     ~H"""
@@ -118,7 +126,7 @@ defmodule FullCircleWeb.InvoiceLive.Print do
     """
   end
 
-  defp invoice_footer("continue", page, pages, assigns) do
+  def invoice_footer("continue", page, pages, assigns) do
     assigns = assign(assigns, :page, page) |> assign(:pages, pages)
 
     ~H"""
@@ -130,8 +138,8 @@ defmodule FullCircleWeb.InvoiceLive.Print do
     """
   end
 
-  defp invoice_footer(page, pages, assigns) do
-    assigns = assign(assigns, :page, page) |> assign(:pages, pages)
+  def invoice_footer(invoice, page, pages, assigns) do
+    assigns = assign(assigns, :page, page) |> assign(:pages, pages) |> assign(:invoice, invoice)
 
     ~H"""
     <div class="descriptions">
@@ -152,7 +160,7 @@ defmodule FullCircleWeb.InvoiceLive.Print do
     """
   end
 
-  defp letter_foot(assigns) do
+  def letter_foot(assigns) do
     ~H"""
     <div class="letter-hoot">
       <div class="terms is-size-7">
@@ -166,7 +174,7 @@ defmodule FullCircleWeb.InvoiceLive.Print do
     """
   end
 
-  defp detail_header(assigns) do
+  def detail_header(assigns) do
     ~H"""
     <div class="details-header has-text-weight-bold">
       <div class="particular">Particulars</div>
@@ -178,18 +186,28 @@ defmodule FullCircleWeb.InvoiceLive.Print do
     """
   end
 
-  defp invoice_header(assigns) do
+  def invoice_header(invoice, assigns) do
+    assigns = assigns |> assign(:invoice, invoice)
+
     ~H"""
     <div class="invoice-header">
       <div class="is-size-6">TO</div>
       <div class="customer">
         <div class="is-size-5 has-text-weight-bold"><%= @invoice.contact_name %></div>
-        <div><%= @contact.address1 %></div>
-        <div><%= @contact.address2 %></div>
+        <div><%= @invoice.contact.address1 %></div>
+        <div><%= @invoice.contact.address2 %></div>
         <div>
-          <%= Enum.join([@contact.city, @contact.zipcode, @contact.state, @contact.country], " ") %>
+          <%= Enum.join(
+            [
+              @invoice.contact.city,
+              @invoice.contact.zipcode,
+              @invoice.contact.state,
+              @invoice.contact.country
+            ],
+            " "
+          ) %>
         </div>
-        <%= @contact.reg_no %>
+        <%= @invoice.contact.reg_no %>
       </div>
       <div class="invoice-info">
         <div>
@@ -205,7 +223,7 @@ defmodule FullCircleWeb.InvoiceLive.Print do
     """
   end
 
-  defp letter_head_data(assigns) do
+  def letter_head_data(assigns) do
     ~H"""
     <div class="is-size-3 has-text-weight-bold"><%= @company.name %></div>
     <div><%= @company.address1 %>, <%= @company.address2 %></div>
@@ -218,7 +236,7 @@ defmodule FullCircleWeb.InvoiceLive.Print do
     """
   end
 
-  defp full_style(assigns) do
+  def full_style(assigns) do
     ~H"""
     <style>
       .letter-head { border-bottom: 0.5mm solid black; }
@@ -230,17 +248,19 @@ defmodule FullCircleWeb.InvoiceLive.Print do
     """
   end
 
-  defp pre_print_style(assigns) do
+  def pre_print_style(assigns) do
     ~H"""
     <style>
       .details-body { height: <%= @detail_body_height %>mm; }
       .detail { display: flex; height: <%= @detail_height %>mm; vertical-align: middle; align-items : center; }
-      #page { width: 210mm; min-height: 297mm; }
+      #page { width: 210mm; min-height: 290mm; padding: 5mm; }
+
       @media print {
-        @page { size: A4; margin: 0;}
-        html, body { width: 210mm; height: 297mm; }
-        #page { padding: 5mm; page-break-after: avoid; }
-      }
+        @page { size: A4; margin: 0mm; }
+        body { width: 210mm; height: 290mm; margin: 0mm; }
+        html { margin: 0mm; }
+        #page { padding: 5mm; page-break-after: always;} }
+
       .letter-head { padding-bottom: 2mm; margin-bottom: 2mm; height: 28mm;}
       .doctype { float: right; margin-top: -20mm; margin-right: 0mm; }
       .invoice-info { float: right; }
