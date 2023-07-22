@@ -508,12 +508,14 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
             <%= gettext("Back") %>
           </.link>
           <.print_button
+            :if={@live_action != :new}
             company={@current_company}
             entity="invoices"
             entity_id={@id}
             class="link_button"
           />
           <.pre_print_button
+            :if={@live_action != :new}
             company={@current_company}
             entity="invoices"
             entity_id={@id}
