@@ -47,11 +47,8 @@ defmodule FullCircleWeb.JournalEntryViewLive.Component do
   def render(assigns) do
     ~H"""
     <div id={@id}>
-      <.link
-        phx-target={@myself}
-        phx-click={:show_journal}
-      >
-      <.icon name="hero-queue-list" class="w-5 h-5 text-blue-600" />
+      <.link phx-target={@myself} phx-click={:show_journal} class="blue_button block">
+        <%= gettext("Journal") %>
       </.link>
       <.modal
         :if={@show_journal}

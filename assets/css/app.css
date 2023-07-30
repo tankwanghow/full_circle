@@ -90,9 +90,19 @@ button[disabled] {
   @apply transition duration-500 select-none bg-pink-300 hover:bg-pink-500 focus:bg-pink-500;
 }
 
-.link_button {
+.blue_button {
   @apply text-center tracking-tighter rounded-md transition px-3 py-2 border border-sky-500;
   @apply duration-500 select-none bg-sky-200 hover:bg-sky-500 focus:bg-sky-500;
+}
+
+.orange_button {
+  @apply text-center tracking-tighter rounded-md transition px-3 py-2 border border-amber-500;
+  @apply duration-500 select-none bg-amber-200 hover:bg-amber-500 focus:bg-amber-500;
+}
+
+.gray_button {
+  @apply text-center tracking-tighter rounded-md transition px-3 py-2 border border-gray-500;
+  @apply duration-500 select-none bg-gray-200 hover:bg-gray-500 focus:bg-gray-500;
 }
 
 @keyframes shake {

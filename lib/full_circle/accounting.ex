@@ -427,6 +427,18 @@ defmodule FullCircle.Accounting do
     )
   end
 
+  def funds_account_names(terms, com, user) do
+    from(ac in Account,
+      join: com in subquery(Sys.user_company(com, user)),
+      on: com.id == ac.company_id,
+      where: ilike(ac.name, ^"%#{terms}%"),
+      where: ac.account_type in ["Cash or Equivalent", "Bank"],
+      select: %{id: ac.id, value: ac.name},
+      order_by: ac.name
+    )
+    |> Repo.all()
+  end
+
   def account_names(terms, company, user) do
     from(ac in Account,
       join: com in subquery(Sys.user_company(company, user)),
@@ -439,6 +451,7 @@ defmodule FullCircle.Accounting do
   end
 
   def contact_names(terms, company, user) do
+    terms = terms |> String.codepoints() |> Enum.join("%")
     from(cont in Contact,
       join: com in subquery(Sys.user_company(company, user)),
       on: com.id == cont.company_id,

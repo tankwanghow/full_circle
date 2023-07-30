@@ -1,9 +1,9 @@
 defmodule FullCircleWeb.InvoiceLive.Index do
   use FullCircleWeb, :live_view
 
-  alias FullCircle.Billing.Invoice
+  # alias FullCircle.Billing.Invoice
   alias FullCircle.Billing
-  alias FullCircle.StdInterface
+  # alias FullCircle.StdInterface
   alias FullCircleWeb.InvoiceLive.FormComponent
   alias FullCircleWeb.InvoiceLive.IndexComponent
 
@@ -60,26 +60,26 @@ defmodule FullCircleWeb.InvoiceLive.Index do
         </.form>
       </div>
       <div class="text-center mb-2">
-        <.link phx-click={:new_object} class="link_button" id="new_object">
+        <.link navigate={~p"/companies/#{@current_company.id}/invoices/new"} class="blue_button" id="new_invoice">
           <%= gettext("New Invoice") %>
         </.link>
         <.link
           :if={@ids != ""}
-          navigate={
+          patch={
             ~p"/companies/#{@current_company.id}/invoices/print_multi?pre_print=false&ids=#{@ids}"
           }
           target="_blank"
-          class="link_button"
+          class="blue_button"
         >
           <%= gettext("Print") %>
         </.link>
         <.link
           :if={@ids != ""}
-          navigate={
+          patch={
             ~p"/companies/#{@current_company.id}/invoices/print_multi?pre_print=true&ids=#{@ids}"
           }
           target="_blank"
-          class="link_button"
+          class="blue_button"
         >
           <%= gettext("Pre Print") %>
         </.link>
@@ -107,9 +107,6 @@ defmodule FullCircleWeb.InvoiceLive.Index do
         <div class="w-[9rem] border-b border-t border-amber-400 py-1">
           <%= gettext("Balance") %>
         </div>
-        <div class="w-[3.6rem] border-b border-t border-amber-400 py-1">
-          <%= gettext("action") %>
-        </div>
       </div>
       <div
         :if={Enum.count(@streams.objects) > 0 or @page > 1}
@@ -130,24 +127,6 @@ defmodule FullCircleWeb.InvoiceLive.Index do
       </div>
       <.infinite_scroll_footer ended={@end_of_timeline?} />
     </div>
-
-    <.modal
-      :if={@live_action in [:new, :edit]}
-      id="object-crud-modal"
-      show
-      max_w="max-w-full"
-      on_cancel={JS.push("modal_cancel")}
-    >
-      <.live_component
-        module={FormComponent}
-        id={@id}
-        title={@title}
-        live_action={@live_action}
-        form={@form}
-        current_company={@current_company}
-        current_user={@current_user}
-      />
-    </.modal>
     """
   end
 
@@ -161,51 +140,6 @@ defmodule FullCircleWeb.InvoiceLive.Index do
       |> filter_objects("", "stream", "", "", "", 1)
 
     {:ok, socket}
-  end
-
-  @impl true
-  def handle_event("modal_cancel", _, socket) do
-    {:noreply, socket |> assign(live_action: nil)}
-  end
-
-  @impl true
-  def handle_event("new_object", _, socket) do
-    {:noreply,
-     socket
-     |> assign(live_action: :new)
-     |> assign(id: "new")
-     |> assign(title: gettext("New Invoice"))
-     |> assign(
-       :form,
-       to_form(
-         StdInterface.changeset(
-           Invoice,
-           %Invoice{invoice_details: []},
-           %{invoice_no: "...new..."},
-           socket.assigns.current_company
-         )
-       )
-     )}
-  end
-
-  @impl true
-  def handle_event("edit_object", %{"object-id" => id}, socket) do
-    object =
-      Billing.get_invoice!(
-        id,
-        socket.assigns.current_company,
-        socket.assigns.current_user
-      )
-
-    {:noreply,
-     socket
-     |> assign(live_action: :edit)
-     |> assign(id: id)
-     |> assign(title: gettext("Edit Invoice") <> " " <> object.invoice_no)
-     |> assign(
-       :form,
-       to_form(StdInterface.changeset(Invoice, object, %{}, socket.assigns.current_company))
-     )}
   end
 
   @impl true
@@ -277,81 +211,6 @@ defmodule FullCircleWeb.InvoiceLive.Index do
     {:noreply,
      socket
      |> filter_objects(terms, "replace", id, dd, bal, 1)}
-  end
-
-  @impl true
-  def handle_info({:created, obj}, socket) do
-    obj =
-      FullCircle.Billing.get_invoice_by_id_index_component_field!(
-        obj.id,
-        socket.assigns.current_company,
-        socket.assigns.current_user
-      )
-
-    css_trans(IndexComponent, obj, :obj, "objects-#{obj.id}", "shake")
-
-    {:noreply,
-     socket
-     |> assign(live_action: nil)
-     |> stream_insert(:objects, obj, at: 0)}
-  end
-
-  def handle_info({:updated, obj}, socket) do
-    obj =
-      FullCircle.Billing.get_invoice_by_id_index_component_field!(
-        obj.id,
-        socket.assigns.current_company,
-        socket.assigns.current_user
-      )
-
-    socket =
-      socket
-      |> assign(
-        selected_invoices:
-          Enum.reject(socket.assigns.selected_invoices, fn sid -> sid == obj.id end)
-      )
-
-    css_trans(IndexComponent, obj, :obj, "objects-#{obj.id}", "shake")
-
-    {:noreply,
-     socket
-     |> assign(live_action: nil)
-     |> assign(ids: Enum.join(socket.assigns.selected_invoices, ","))}
-  end
-
-  def handle_info({:deleted, obj}, socket) do
-    css_trans(IndexComponent, obj, :obj, "objects-#{obj.id}", "slow-hide", "hidden")
-
-    {:noreply,
-     socket
-     |> assign(live_action: nil)}
-  end
-
-  @impl true
-  def handle_info({:error, failed_operation, failed_value}, socket) do
-    {:noreply,
-     socket
-     |> assign(live_action: nil)
-     |> put_flash(
-       :error,
-       "#{gettext("Failed")} #{failed_operation}. #{list_errors_to_string(failed_value.errors)}"
-     )}
-  end
-
-  @impl true
-  def handle_info(:not_authorise, socket) do
-    {:noreply,
-     socket
-     |> assign(live_action: nil)
-     |> put_flash(:error, gettext("You are not authorised to perform this action"))}
-  end
-
-  @impl true
-  def handle_info({:sql_error, msg}, socket) do
-    {:noreply,
-     socket
-     |> assign(live_action: nil)
-     |> put_flash(:error, msg)}
   end
 
   defp filter_objects(socket, terms, update, invoice_date, due_date, bal, page) do

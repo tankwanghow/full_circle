@@ -62,11 +62,8 @@ defmodule FullCircleWeb.LogLive.Component do
   def render(assigns) do
     ~H"""
     <div id={@id}>
-      <.link
-        phx-target={@myself}
-        phx-click={:show_log}
-      >
-        <.icon name="hero-table-cells-solid" class="w-5 h-5 text-pink-500" />
+      <.link phx-target={@myself} phx-click={:show_log} class="blue_button block">
+        <%= gettext("Log") %>
       </.link>
 
       <.modal

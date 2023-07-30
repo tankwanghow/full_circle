@@ -27,21 +27,34 @@ let csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("
 
 let Hooks = {}
 
-Hooks.tributeTextArea = {
+Hooks.tributeTagTextArea = {
   mounted() {
     var tribute = new Tribute({
-      trigger: '#',
+      trigger: "#",
       values: (t, c) => { remoteSearch(this.el, t, c) },
       lookup: "value",
       fillAttr: "value",
-      menuItemLimit: 5
+      menuItemLimit: 8
     });
     tribute.attach(this.el)
   }
 };
 
+Hooks.tributeAutoComplete = {
+  mounted() {
+    var tribute = new Tribute({
+      autocompleteMode: true,
+      values: (t, c) => { remoteSearch(this.el, t, c) },
+      lookup: "value",
+      fillAttr: "value",
+      menuItemLimit: 8
+    });
+    tribute.attach(this.el)
+  }
+}
+
 function remoteSearch(el, text, cb) {
-  var URL = el.getAttribute('tag-url');
+  var URL = el.getAttribute('url');
   xhr = new XMLHttpRequest();
   xhr.onreadystatechange = function () {
     if (xhr.readyState === 4) {
@@ -53,7 +66,7 @@ function remoteSearch(el, text, cb) {
       }
     }
   };
-  xhr.open("GET", URL + "&tag=" + text, true);
+  xhr.open("GET", URL + text, true);
   xhr.send();
 }
 
@@ -66,7 +79,7 @@ let liveSocket = new LiveSocket("/live", Socket, {
 topbar.config({ barColors: { 0: "#29d" }, shadowColor: "rgba(0, 0, 0, .3)" })
 window.addEventListener("phx:page-loading-start", _info => topbar.show(300))
 window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
-window.addEventListener("click", _info => document.getElementById("menu").setAttribute('style', 'display: none;'))
+// window.addEventListener("click", _info => document.getElementById("menu").setAttribute('style', 'display: none;'))
 
 document.addEventListener("keydown", zEvent => {
   if (zEvent.ctrlKey && zEvent.altKey && (zEvent.key === "h" || zEvent.key === "H")) {  // case sensitive

@@ -19,7 +19,7 @@ defmodule FullCircleWeb.TaxCodeLive.Index do
         placeholder={gettext("Code, Tax Type, Account Name and Descriptions...")}
       />
       <div class="text-center mb-2">
-        <.link phx-click={:new_object} class="link_button" id="new_object">
+        <.link phx-click={:new_object} class="blue_button" id="new_object">
           <%= gettext("New TaxCode") %>
         </.link>
       </div>

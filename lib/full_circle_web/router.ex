@@ -28,8 +28,9 @@ defmodule FullCircleWeb.Router do
   end
 
   scope "/api", FullCircleWeb do
-    pipe_through :api
+    pipe_through([:browser, :api])
     get "/companies/:id/tags", TagController, :index
+    get "/companies/:id/autocomplete", AutoCompleteController, :index
   end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development
@@ -110,12 +111,21 @@ defmodule FullCircleWeb.Router do
       live("/fixed_assets/:id/disposals", FixedAssetLive.Disposals, :index)
       live("/fixed_assets/calalldepre", FixedAssetLive.CalAllDepre, :index)
       live("/seeds", SeedLive.Index, :index)
+
       live("/invoices", InvoiceLive.Index, :index)
+      live("/invoices/new", InvoiceLive.Form, :new)
+      live("/invoices/:invoice_id/edit", InvoiceLive.Form, :edit)
+
       live("/pur_invoices", PurInvoiceLive.Index, :index)
+      live("/pur_invoices/new", PurInvoiceLive.Form, :new)
+      live("/pur_invoices/:invoice_id/edit", PurInvoiceLive.Form, :edit)
+
       live("/logs/:entity/:entity_id", LogLive.Index, :index)
       live("/journal_entries/:doc_type/:doc_no", JournalEntryViewLive.Index, :index)
       live("/account_transactions", TransactionLive.Account, :index)
       live("/contact_transactions", TransactionLive.Contact, :index)
+
+      live("/receipts", ReceiptLive.Index, :index)
     end
 
     live_session :require_authenticated_user_n_active_company_print,

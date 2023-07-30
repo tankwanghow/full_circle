@@ -163,7 +163,7 @@ defmodule FullCircleWeb.ContactLive.FormComponent do
               }
             />
           <% end %>
-          <.link phx-click={JS.exec("phx-remove", to: "#object-crud-modal")} class="link_button">
+          <.link phx-click={JS.exec("phx-remove", to: "#object-crud-modal")} class="blue_button">
             <%= gettext("Back") %>
           </.link>
         </div>

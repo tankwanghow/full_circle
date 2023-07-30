@@ -1,4 +1,4 @@
-defmodule FullCircle.ReceiveFunds.ReceivedCheque do
+defmodule FullCircle.ReceiveFund.ReceivedCheque do
   use FullCircle.Schema
   import Ecto.Changeset
 
@@ -11,7 +11,7 @@ defmodule FullCircle.ReceiveFunds.ReceivedCheque do
     field :chq_no, :string
     field :amount, :decimal, default: 0
 
-    belongs_to :receipt, FullCircle.ReceiveFunds.Receipt
+    belongs_to :receipt, FullCircle.ReceiveFund.Receipt
     # has_one :deposit
     # has_one :return_cheque_note
 

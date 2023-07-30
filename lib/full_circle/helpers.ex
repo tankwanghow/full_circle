@@ -33,7 +33,11 @@ defmodule FullCircle.Helpers do
     x =
       for col <- fields, term <- texts do
         m = (c - Enum.find_index(fields, fn x -> x == col end)) |> :math.pow(3)
-        dynamic([cont], fragment("COALESCE(WORD_SIMILARITY(?,?),0)*?", ^term, field(cont, ^col), ^m))
+
+        dynamic(
+          [cont],
+          fragment("COALESCE(WORD_SIMILARITY(?,?),0)*?", ^term, field(cont, ^col), ^m)
+        )
       end
       |> Enum.reduce(fn a, b -> dynamic(^a + ^b) end)
 
@@ -57,7 +61,7 @@ defmodule FullCircle.Helpers do
   end
 
   def validate_id(changeset, field_name, field_id) do
-    if is_nil(fetch_field!(changeset, field_id)) do
+    if is_nil(fetch_field!(changeset, field_id)) and !is_nil(fetch_field!(changeset, field_name)) do
       changeset |> add_error(field_name, gettext("not in list"))
     else
       changeset

@@ -1,5 +1,5 @@
-defmodule FullCircleWeb.InvoiceLive.FormComponent do
-  use FullCircleWeb, :live_component
+defmodule FullCircleWeb.InvoiceLive.Form do
+  use FullCircleWeb, :live_view
 
   alias FullCircle.Billing
   alias FullCircle.Billing.{Invoice, InvoiceDetail}
@@ -7,24 +7,14 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
   alias FullCircle.Sys
 
   @impl true
-  def mount(socket) do
-    {:ok, socket}
-  end
-
-  @impl true
-  def update(assigns, socket) do
-    socket = socket |> assign(assigns)
+  def mount(params, _session, socket) do
+    inv_id = params["invoice_id"]
+    socket = if(is_nil(inv_id), do: mount_new(socket), else: mount_edit(socket, inv_id))
 
     {:ok,
      socket
      |> assign(
-       account_names: [],
-       contact_names: [],
-       tax_codes: [],
-       package_names: [],
-       good_names: [],
-       tagurl:
-         "/api/companies/#{socket.assigns.current_company.id}/tags?klass=FullCircle.Billing.Invoice",
+       changed: false,
        settings:
          FullCircle.Sys.load_settings(
            "invoices",
@@ -34,9 +24,45 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
      )}
   end
 
+  defp mount_new(socket) do
+    socket
+    |> assign(live_action: :new)
+    |> assign(id: "new")
+    |> assign(title: gettext("New Invoice"))
+    |> assign(
+      :form,
+      to_form(
+        StdInterface.changeset(
+          Invoice,
+          %Invoice{invoice_details: []},
+          %{invoice_no: "...new..."},
+          socket.assigns.current_company
+        )
+      )
+    )
+  end
+
+  defp mount_edit(socket, id) do
+    object =
+      Billing.get_invoice!(
+        id,
+        socket.assigns.current_company,
+        socket.assigns.current_user
+      )
+
+    socket
+    |> assign(live_action: :edit)
+    |> assign(id: id)
+    |> assign(title: gettext("Edit Invoice") <> " " <> object.invoice_no)
+    |> assign(
+      :form,
+      to_form(StdInterface.changeset(Invoice, object, %{}, socket.assigns.current_company))
+    )
+  end
+
   @impl true
   def handle_event("add_detail", _, socket) do
-    socket = socket |> FullCircleWeb.Helpers.add_lines(:invoice_details, %InvoiceDetail{})
+    socket = socket |> FullCircleWeb.Helpers.add_line(:invoice_details, %InvoiceDetail{})
     {:noreply, socket}
   end
 
@@ -44,7 +70,7 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
   def handle_event("delete_detail", %{"index" => index}, socket) do
     socket =
       socket
-      |> FullCircleWeb.Helpers.delete_lines(String.to_integer(index), :invoice_details)
+      |> FullCircleWeb.Helpers.delete_line(String.to_integer(index), :invoice_details)
       |> update(:form, fn %{source: changeset} ->
         changeset |> Invoice.compute_fields() |> to_form()
       end)
@@ -59,11 +85,8 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
         socket
       ) do
     settings = socket.assigns.settings
-
     setting = Enum.find(settings, fn x -> x.id == id end)
-
     %{"value" => value} = Map.get(new_settings, id)
-
     setting = FullCircle.Sys.update_setting(setting, value)
 
     settings =
@@ -83,13 +106,12 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
         socket
       ) do
     {params, socket, _} =
-      FullCircleWeb.Helpers.assign_list_n_id(
+      FullCircleWeb.Helpers.assign_autocomplete_id(
         socket,
         params,
         "contact_name",
-        :contact_names,
         "contact_id",
-        &FullCircle.Accounting.contact_names/3
+        &FullCircle.Accounting.get_contact_by_name/3
       )
 
     validate(params, socket)
@@ -104,13 +126,12 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
     detail = params["invoice_details"][id]
 
     {detail, socket, good} =
-      FullCircleWeb.Helpers.assign_list_n_id(
+      FullCircleWeb.Helpers.assign_autocomplete_id(
         socket,
         detail,
         "good_name",
-        :good_names,
         "good_id",
-        &FullCircle.Product.good_names/3
+        &FullCircle.Product.get_good_by_name/3
       )
 
     detail =
@@ -143,18 +164,15 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
     detail = params["invoice_details"][id]
     terms = detail["package_name"]
 
-    list =
-      FullCircle.Product.package_names(
-        terms,
+    pack =
+      FullCircle.Product.get_packaging_by_name(
+        String.trim(terms),
         detail["good_id"]
       )
 
-    pack = Enum.find(list, fn x -> x.value == terms end)
-    socket = assign(socket, package_names: list)
-
     detail =
       Map.merge(detail, %{
-        "package_id" => Util.attempt(pack, :id) || -1,
+        "package_id" => Util.attempt(pack, :id) || nil,
         "unit_multiplier" => Util.attempt(pack, :unit_multiplier) || 0
       })
 
@@ -174,13 +192,12 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
     detail = params["invoice_details"][id]
 
     {detail, socket, _} =
-      FullCircleWeb.Helpers.assign_list_n_id(
+      FullCircleWeb.Helpers.assign_autocomplete_id(
         socket,
         detail,
         "account_name",
-        :account_names,
         "account_id",
-        &FullCircle.Accounting.account_names/3
+        &FullCircle.Accounting.get_account_by_name/3
       )
 
     params =
@@ -199,13 +216,12 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
     detail = params["invoice_details"][id]
 
     {detail, socket, taxcode} =
-      FullCircleWeb.Helpers.assign_list_n_id(
+      FullCircleWeb.Helpers.assign_autocomplete_id(
         socket,
         detail,
         "tax_code_name",
-        :tax_codes,
         "tax_code_id",
-        &FullCircle.Accounting.sale_tax_codes/3
+        &FullCircle.Accounting.get_tax_code_by_code/3
       )
 
     detail =
@@ -229,31 +245,8 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
     save(socket, socket.assigns.live_action, params)
   end
 
-  @impl true
-  def handle_event("delete", _params, socket) do
-    case StdInterface.delete(
-           Invoice,
-           "invoice",
-           socket.assigns.form.data,
-           socket.assigns.current_company,
-           socket.assigns.current_user
-         ) do
-      {:ok, obj} ->
-        send(self(), {:deleted, obj})
-        {:noreply, socket}
-
-      {:error, failed_operation, changeset, _} ->
-        {:noreply,
-         socket
-         |> put_flash(
-           :error,
-           "#{gettext("Failed")} #{failed_operation}. #{list_errors_to_string(changeset.errors)}"
-         )}
-
-      :not_authorise ->
-        send(self(), :not_authorise)
-        {:noreply, socket}
-    end
+  def handle_params(params, uri, socket) do
+    {:noreply, socket |> assign(cancel_url: uri)}
   end
 
   defp save(socket, :new, params) do
@@ -263,8 +256,12 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
            socket.assigns.current_user
          ) do
       {:ok, %{create_invoice: obj}} ->
-        send(self(), {:created, obj})
-        {:noreply, socket}
+        {:noreply,
+         socket
+         |> push_navigate(
+           to: ~p"/companies/#{socket.assigns.current_company.id}/invoices/#{obj.id}/edit"
+         )
+         |> put_flash(:info, "#{gettext("Invoice created successfully.")}")}
 
       {:error, failed_operation, changeset, _} ->
         {:noreply,
@@ -276,8 +273,9 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
          )}
 
       :not_authorise ->
-        send(self(), :not_authorise)
-        {:noreply, socket}
+        {:noreply,
+         socket
+         |> put_flash(:error, gettext("You are not authorised to perform this action"))}
     end
   end
 
@@ -289,8 +287,12 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
            socket.assigns.current_user
          ) do
       {:ok, %{update_invoice: obj}} ->
-        send(self(), {:updated, obj})
-        {:noreply, socket}
+        {:noreply,
+         socket
+         |> push_navigate(
+           to: ~p"/companies/#{socket.assigns.current_company.id}/invoices/#{obj.id}/edit"
+         )
+         |> put_flash(:info, "#{gettext("Invoice updated successfully.")}")}
 
       {:error, failed_operation, changeset, _} ->
         socket =
@@ -325,22 +327,15 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
 
     socket = assign(socket, form: to_form(changeset))
 
-    {:noreply, socket}
+    {:noreply, socket |> assign(changed: Enum.any?(changeset.changes))}
   end
 
   @impl true
   def render(assigns) do
     ~H"""
-    <div>
+    <div class="border rounded-lg border-yellow-500 bg-yellow-100 p-4">
       <p class="w-full text-3xl text-center font-medium"><%= @title %></p>
-      <.form
-        for={@form}
-        id="object-form"
-        phx-target={@myself}
-        autocomplete="off"
-        phx-change="validate"
-        phx-submit="save"
-      >
+      <.form for={@form} id="object-form" autocomplete="off" phx-change="validate" phx-submit="save">
         <%= Phoenix.HTML.Form.hidden_input(@form, :invoice_no) %>
         <div class="flex flex-row flex-nowarp">
           <div class="w-1/2 grow shrink">
@@ -348,8 +343,9 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
             <.input
               field={@form[:contact_name]}
               label={gettext("Customer")}
-              list="contact_names"
-              phx-debounce={500}
+              phx-hook="tributeAutoComplete"
+              phx-debounce="blur"
+              url={"/api/companies/#{@current_company.id}/autocomplete?schema=contact&name="}
             />
           </div>
           <div class="grow shrink w-1/4">
@@ -395,12 +391,22 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
         <.inputs_for :let={dtl} field={@form[:invoice_details]}>
           <div class={"flex flex-row flex-wrap #{if(dtl[:delete].value == true, do: "hidden", else: "")}"}>
             <div class="w-28 grow-[3] shrink-[3]">
-              <.input field={dtl[:good_name]} list="good_names" phx-debounce={500} />
+              <.input
+                field={dtl[:good_name]}
+                phx-hook="tributeAutoComplete"
+                phx-debounce="blur"
+                url={"/api/companies/#{@current_company.id}/autocomplete?schema=good&name="}
+              />
             </div>
             <%= Phoenix.HTML.Form.hidden_input(dtl, :good_id) %>
             <div class="w-36 grow-[3] shrink-[3]"><.input field={dtl[:descriptions]} /></div>
             <div class="w-28 grow-[1] shrink-[1]">
-              <.input field={dtl[:package_name]} list="package_names" phx-debounce={500} />
+              <.input
+                field={dtl[:package_name]}
+                phx-hook="tributeAutoComplete"
+                phx-debounce="blur"
+                url={"/api/companies/#{@current_company.id}/autocomplete?schema=packaging&good_id=#{dtl[:good_id].value}&name="}
+              />
             </div>
             <%= Phoenix.HTML.Form.hidden_input(dtl, :unit_multiplier) %>
             <%= Phoenix.HTML.Form.hidden_input(dtl, :package_id) %>
@@ -423,15 +429,25 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
               <.input type="number" field={dtl[:good_amount]} readonly tabindex="-1" />
             </div>
             <div class={"#{Sys.get_setting(@settings, "invoices", "account-col")} w-28"}>
-              <.input field={dtl[:account_name]} list="account_names" phx-debounce={500} />
+              <.input
+                field={dtl[:account_name]}
+                phx-hook="tributeAutoComplete"
+                phx-debounce="blur"
+                url={"/api/companies/#{@current_company.id}/autocomplete?schema=account&name="}
+              />
             </div>
             <%= Phoenix.HTML.Form.hidden_input(dtl, :account_id) %>
             <div class="w-16 grow-[1] shrink-[1]">
-              <.input field={dtl[:tax_code_name]} list="tax_codes" phx-debounce={500} />
+              <.input
+                field={dtl[:tax_code_name]}
+                phx-hook="tributeAutoComplete"
+                phx-debounce="blur"
+                url={"/api/companies/#{@current_company.id}/autocomplete?schema=saltaxcode&name="}
+              />
             </div>
             <%= Phoenix.HTML.Form.hidden_input(dtl, :tax_code_id) %>
             <div class={"#{Sys.get_setting(@settings, "invoices", "taxrate-col")} w-14"}>
-              <.input type="number" field={dtl[:tax_rate]} readonly step="0.0001" />
+              <.input type="number" field={dtl[:tax_rate]} readonly step="0.0001" tabindex="-1" />
             </div>
             <div class={"#{Sys.get_setting(@settings, "invoices", "taxamt-col")} w-20"}>
               <.input type="number" field={dtl[:tax_amount]} readonly tabindex="-1" />
@@ -440,12 +456,7 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
               <.input type="number" field={dtl[:amount]} readonly tabindex="-1" />
             </div>
             <div class="w-5 mt-2.5 text-rose-500 grow-0 shrink-0">
-              <.link
-                phx-click={:delete_detail}
-                phx-value-index={dtl.index}
-                phx-target={@myself}
-                tabindex="-1"
-              >
+              <.link phx-click={:delete_detail} phx-value-index={dtl.index} tabindex="-1">
                 <.icon name="hero-trash-solid" class="h-5 w-5" />
               </.link>
               <%= Phoenix.HTML.Form.hidden_input(dtl, :delete) %>
@@ -455,7 +466,7 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
 
         <div class="flex flex-row flex-wrap font-medium tracking-tighter">
           <div class="w-28 shrink-[3] grow-[3] text-orange-500 mt-2">
-            <.link phx-click={:add_detail} phx-target={@myself}>
+            <.link phx-click={:add_detail}>
               <.icon name="hero-plus-circle" class="w-5 h-5" /><%= gettext("Add Detail") %>
             </.link>
           </div>
@@ -491,35 +502,56 @@ defmodule FullCircleWeb.InvoiceLive.FormComponent do
               field={@form[:tags]}
               label={gettext("Tags")}
               type="textarea"
-              phx-hook="tributeTextArea"
-              tag-url={@tagurl}
+              phx-hook="tributeTagTextArea"
+              url={"/api/companies/#{@current_company.id}/tags?klass=FullCircle.Billing.Invoice&tag="}
             />
           </div>
         </div>
-
-        <%= datalist_with_ids(@account_names, "account_names") %>
-        <%= datalist_with_ids(@tax_codes, "tax_codes") %>
-        <%= datalist_with_ids(@contact_names, "contact_names") %>
-        <%= datalist_with_ids(@good_names, "good_names") %>
-        <%= datalist_with_ids(@package_names, "package_names") %>
-        <div class="flex justify-center gap-x-1 mt-1">
+        <div class="flex flex-row justify-center gap-x-1 mt-1">
           <.button disabled={!@form.source.valid?}><%= gettext("Save") %></.button>
-          <.link phx-click={JS.exec("phx-remove", to: "#object-crud-modal")} class="link_button">
-            <%= gettext("Back") %>
+          <.link :if={@changed} navigate={@cancel_url} class="orange_button">
+            <%= gettext("Cancel") %>
+          </.link>
+          <.link patch={~p"/companies/#{@current_company.id}/invoices"} class="blue_button">
+            <%= gettext("Index") %>
+          </.link>
+          <.link
+            :if={@live_action == :edit}
+            navigate={~p"/companies/#{@current_company.id}/invoices/new"}
+            class="blue_button"
+          >
+            <%= gettext("New") %>
           </.link>
           <.print_button
-            :if={@live_action != :new}
+            :if={@live_action == :edit}
             company={@current_company}
             entity="invoices"
             entity_id={@id}
-            class="link_button"
+            class="gray_button"
           />
           <.pre_print_button
-            :if={@live_action != :new}
+            :if={@live_action == :edit}
             company={@current_company}
             entity="invoices"
             entity_id={@id}
-            class="link_button"
+            class="gray_button"
+          />
+          <.live_component
+            :if={@live_action == :edit}
+            module={FullCircleWeb.LogLive.Component}
+            id={"log_#{@id}"}
+            show_log={false}
+            entity="invoices"
+            entity_id={@id}
+          />
+          <.live_component
+            :if={@live_action == :edit}
+            module={FullCircleWeb.JournalEntryViewLive.Component}
+            id={"journal_#{@id}"}
+            show_journal={false}
+            doc_type="invoices"
+            doc_no={@form.data.invoice_no}
+            company_id={@current_company.id}
           />
         </div>
       </.form>

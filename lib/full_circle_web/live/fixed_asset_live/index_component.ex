@@ -55,7 +55,7 @@ defmodule FullCircleWeb.FixedAssetLive.IndexComponent do
           <p>
             <.link
               :if={@obj.depre_method != "No Depreciation"}
-              navigate={
+              patch={
                 ~p"/companies/#{@company.id}/fixed_assets/#{@obj.id}/depreciations?terms=#{@terms}"
               }
               class="hover:font-bold text-blue-700"
@@ -68,7 +68,7 @@ defmodule FullCircleWeb.FixedAssetLive.IndexComponent do
 
           <p>
             <.link
-              navigate={
+              patch={
                 ~p"/companies/#{@company.id}/fixed_assets/#{@obj.id}/disposals?terms=#{@terms}"
               }
               class="hover:font-bold text-blue-700"

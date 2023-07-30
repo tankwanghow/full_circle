@@ -7,7 +7,7 @@ defmodule FullCircle.Repo.Migrations.CreateSeedTransactionMatchers do
       add :m_doc_id, :integer
       add :n_doc_type, :string
       add :n_doc_id, :integer
-      add :amount, :decimal, default: 0
+      add :match_amount, :decimal, default: 0
       add :transaction_id, references(:transactions, on_delete: :restrict)
     end
 

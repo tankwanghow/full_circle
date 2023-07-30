@@ -14,11 +14,11 @@ defmodule FullCircle.Product do
     |> Repo.one!()
   end
 
-  def good_names(terms, company, user) do
+  def get_good_by_name(name, company, user) do
     from(good in subquery(good_query(company, user)),
       left_join: pack in Packaging,
       on: pack.good_id == good.id,
-      where: ilike(good.name, ^"%#{terms}%"),
+      where: good.name == ^name,
       select: %{
         id: good.id,
         value: good.name,
@@ -40,7 +40,32 @@ defmodule FullCircle.Product do
       order_by: [good.name, pack.id],
       distinct: good.name
     )
+    |> Repo.one()
+  end
+
+  def good_names(terms, company, user) do
+    from(good in subquery(good_query(company, user)),
+      where: ilike(good.name, ^"%#{terms}%"),
+      select: %{
+        id: good.id,
+        value: good.name,
+      },
+      order_by: good.name
+    )
     |> Repo.all()
+  end
+
+  def get_packaging_by_name(terms, good_id) do
+    from(pack in Packaging,
+      where: pack.name == ^terms,
+      where: pack.good_id == ^good_id,
+      select: %{
+        id: pack.id,
+        value: pack.name,
+        unit_multiplier: pack.unit_multiplier
+      }
+    )
+    |> Repo.one()
   end
 
   def package_names(terms, good_id) do

@@ -43,18 +43,12 @@ defmodule FullCircleWeb.InvoiceLive.IndexComponent do
       <div class="w-[9rem] border-b border-gray-400 py-1">
         <%= @obj.due_date %>
       </div>
-      <div :if={!@obj.old_data}
-        phx-value-object-id={@obj.id}
-        phx-click={:edit_object}
-        class="text-blue-600 w-[10rem] border-b border-gray-400 py-1 hover:cursor-pointer"
-      >
-
-        <%= @obj.invoice_no %>
+      <div :if={!@obj.old_data} class="text-blue-600 w-[10rem] border-b border-gray-400 py-1 hover:cursor-pointer">
+        <.link patch={~p"/companies/#{@obj.company_id}/invoices/#{@obj.id}/edit"}><%= @obj.invoice_no %></.link>
       </div>
       <div :if={@obj.old_data}
         class="w-[10rem] border-b border-gray-400 py-1"
       >
-
         <%= @obj.invoice_no %>
       </div>
       <div class="w-[18.4rem] border-b border-gray-400 py-1 overflow-clip">
@@ -68,26 +62,6 @@ defmodule FullCircleWeb.InvoiceLive.IndexComponent do
       </div>
       <div class="w-[9rem] border-b border-gray-400 py-1">
         <%= Number.Currency.number_to_currency(@obj.balance) %>
-      </div>
-      <div class="w-[1.8rem] border-b border-gray-400 py-1">
-        <.live_component
-        :if={!@obj.old_data}
-          module={FullCircleWeb.LogLive.Component}
-          id={"log_#{@obj.id}"}
-          show_log={false}
-          entity="invoices"
-          entity_id={@obj.id}
-        />
-      </div>
-      <div class="w-[1.8rem] border-b border-gray-400 py-1">
-        <.live_component
-          module={FullCircleWeb.JournalEntryViewLive.Component}
-          id={"journal_#{@obj.id}"}
-          show_journal={false}
-          doc_type="invoices"
-          doc_no={@obj.invoice_no}
-          company_id={@obj.company_id}
-        />
       </div>
     </div>
     """

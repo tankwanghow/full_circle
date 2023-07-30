@@ -282,6 +282,7 @@ defmodule FullCircleWeb.CoreComponents do
   attr(:name, :any)
   attr(:label, :string, default: nil)
   attr(:value, :any)
+  attr(:url, :string, default: nil)
 
   attr(:type, :string,
     default: "text",
@@ -371,6 +372,7 @@ defmodule FullCircleWeb.CoreComponents do
           "min-h-[6rem] border-zinc-300 focus:border-zinc-400",
           @errors != [] && "border-rose-400 focus:border-rose-400"
         ]}
+        url={@url}
         {@rest}
       ><%= Phoenix.HTML.Form.normalize_value("textarea", @value) %></textarea>
       <.error :for={msg <- @errors}><%= msg %></.error>
@@ -388,6 +390,7 @@ defmodule FullCircleWeb.CoreComponents do
         name={@name}
         id={@id}
         value={Phoenix.HTML.Form.normalize_value(@type, @value)}
+        url={@url}
         class={[
           "block w-full rounded-lg text-zinc-900 focus:ring-0",
           "phx-no-feedback:border-zinc-300 phx-no-feedback:focus:border-zinc-400",
@@ -582,17 +585,6 @@ defmodule FullCircleWeb.CoreComponents do
     """
   end
 
-  attr(:navigate, :any, required: true)
-  slot(:inner_block, required: true)
-
-  def link_button(assigns) do
-    ~H"""
-    <.link navigate={@navigate} class="link_button">
-      <%= render_slot(@inner_block) %>
-    </.link>
-    """
-  end
-
   @doc """
   Renders a [Hero Icon](https://heroicons.com).
 
@@ -734,7 +726,7 @@ defmodule FullCircleWeb.CoreComponents do
 
   def delete_confirm_modal(assigns) do
     ~H"""
-    <.link id={@id} class="link_button" phx-click={show_modal("#{@id}-modal")}>
+    <.link id={@id} class="blue_button" phx-click={show_modal("#{@id}-modal")}>
       <%= gettext("Delete") %>
     </.link>
     <.modal id={"#{@id}-modal"} on_confirm={@confirm}>

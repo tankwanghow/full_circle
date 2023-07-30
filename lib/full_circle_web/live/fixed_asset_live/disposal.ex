@@ -194,8 +194,8 @@ defmodule FullCircleWeb.FixedAssetLive.Disposals do
       <p class="w-full text-2xl text-center font-medium"><%= "#{@title} for #{@ass.name}" %></p>
       <div class="text-center m-4">
         <.link
-          navigate={~p"/companies/#{@current_company.id}/fixed_assets?terms=#{@terms}"}
-          class="link_button"
+          patch={~p"/companies/#{@current_company.id}/fixed_assets?terms=#{@terms}"}
+          class="blue_button"
         >
           <%= gettext("Back Fixed Assets Listing") %>
         </.link>
@@ -252,7 +252,7 @@ defmodule FullCircleWeb.FixedAssetLive.Disposals do
           </div>
 
           <div class="flex justify-center gap-x-1 mt-1">
-            <.link phx-click={:new_disposal} class="link_button" id="new_object">
+            <.link phx-click={:new_disposal} class="blue_button" id="new_object">
               <%= gettext("New") %>
             </.link>
             <.button disabled={!@form.source.valid?}><%= gettext("Save") %></.button>

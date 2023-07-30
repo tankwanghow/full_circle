@@ -7,34 +7,39 @@ defmodule FullCircleWeb.DashboardLive do
     <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
     <div class="mx-auto w-8/12">
       <div class="flex flex-wrap shrink grow justify-center">
-        <.link navigate={~p"/companies/#{@current_company.id}/seeds"} class="nav-btn">
+        <.link patch={~p"/companies/#{@current_company.id}/seeds"} class="nav-btn">
           <%= gettext("Seeding") %>
         </.link>
-        <.link navigate={~p"/companies/#{@current_company.id}/accounts"} class="nav-btn">
+        <.link patch={~p"/companies/#{@current_company.id}/accounts"} class="nav-btn">
           <%= gettext("Accounts") %>
         </.link>
-        <.link navigate={~p"/companies/#{@current_company.id}/fixed_assets"} class="nav-btn">
+        <.link patch={~p"/companies/#{@current_company.id}/fixed_assets"} class="nav-btn">
           <%= gettext("Fixed Assets") %>
         </.link>
-        <.link navigate={~p"/companies/#{@current_company.id}/contacts"} class="nav-btn">
+        <.link patch={~p"/companies/#{@current_company.id}/contacts"} class="nav-btn">
           <%= gettext("Contacts") %>
         </.link>
-        <.link navigate={~p"/companies/#{@current_company.id}/tax_codes"} class="nav-btn">
+        <.link patch={~p"/companies/#{@current_company.id}/tax_codes"} class="nav-btn">
           <%= gettext("TaxCodes") %>
         </.link>
-        <.link navigate={~p"/companies/#{@current_company.id}/goods"} class="nav-btn">
+        <.link patch={~p"/companies/#{@current_company.id}/goods"} class="nav-btn">
           <%= gettext("Goods") %>
         </.link>
-        <.link navigate={~p"/companies/#{@current_company.id}/invoices"} class="nav-btn">
+        <.link patch={~p"/companies/#{@current_company.id}/invoices"} class="nav-btn">
           <%= gettext("Invoices") %>
         </.link>
-        <.link navigate={~p"/companies/#{@current_company.id}/pur_invoices"} class="nav-btn">
+
+        <.link patch={~p"/companies/#{@current_company.id}/receipts"} class="nav-btn">
+          <%= gettext("Receipts") %>
+        </.link>
+
+        <.link patch={~p"/companies/#{@current_company.id}/pur_invoices"} class="nav-btn">
           <%= gettext("Purchase Invoices") %>
         </.link>
-        <.link navigate={~p"/companies/#{@current_company.id}/account_transactions"} class="nav-btn">
+        <.link patch={~p"/companies/#{@current_company.id}/account_transactions"} class="nav-btn">
           <%= gettext("Account Transactions") %>
         </.link>
-        <.link navigate={~p"/companies/#{@current_company.id}/contact_transactions"} class="nav-btn">
+        <.link patch={~p"/companies/#{@current_company.id}/contact_transactions"} class="nav-btn">
           <%= gettext("Contact Transactions") %>
         </.link>
       </div>

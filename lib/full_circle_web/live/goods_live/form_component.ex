@@ -22,13 +22,13 @@ defmodule FullCircleWeb.GoodLive.FormComponent do
 
   @impl true
   def handle_event("add_packaging", _, socket) do
-    {:noreply, socket |> FullCircleWeb.Helpers.add_lines(:packagings, %Packaging{})}
+    {:noreply, socket |> FullCircleWeb.Helpers.add_line(:packagings, %Packaging{})}
   end
 
   @impl true
   def handle_event("delete_packaging", %{"index" => index}, socket) do
     {:noreply,
-     socket |> FullCircleWeb.Helpers.delete_lines(String.to_integer(index), :packagings)}
+     socket |> FullCircleWeb.Helpers.delete_line(String.to_integer(index), :packagings)}
   end
 
   @impl true
@@ -323,7 +323,7 @@ defmodule FullCircleWeb.GoodLive.FormComponent do
         </.inputs_for>
 
         <div class="my-2">
-          <.link phx-click={:add_packaging} phx-target={@myself} class="link_button">
+          <.link phx-click={:add_packaging} phx-target={@myself} class="blue_button">
             <%= gettext("Add Packaging") %>
           </.link>
         </div>
@@ -345,7 +345,7 @@ defmodule FullCircleWeb.GoodLive.FormComponent do
               }
             />
           <% end %>
-          <.link phx-click={JS.exec("phx-remove", to: "#object-crud-modal")} class="link_button">
+          <.link phx-click={JS.exec("phx-remove", to: "#object-crud-modal")} class="blue_button">
             <%= gettext("Back") %>
           </.link>
         </div>

@@ -9,7 +9,7 @@ defmodule FullCircle.Billing do
   alias FullCircle.Product.{Good, Packaging}
   alias FullCircle.StdInterface
   alias FullCircle.{Sys, Accounting}
-  alias FullCircle.ReceiveFunds.ReceiptTransactionMatcher
+  alias FullCircle.ReceiveFund.ReceiptTransactionMatcher
   alias Ecto.Multi
 
   def get_invoice_by_invoice_no!(inv_no, com, user) do
@@ -23,19 +23,6 @@ defmodule FullCircle.Billing do
       )
 
     get_invoice!(id, com, user)
-  end
-
-  def get_pur_invoice_by_pur_invoice_no!(inv_no, com, user) do
-    id =
-      Repo.one(
-        from inv in PurInvoice,
-          join: com in subquery(Sys.user_company(com, user)),
-          on: com.id == inv.company_id,
-          where: inv.pur_invoice_no == ^inv_no,
-          select: inv.id
-      )
-
-    get_pur_invoice!(id, com, user)
   end
 
   def get_print_invoices!(ids, company, user) do
@@ -221,7 +208,8 @@ defmodule FullCircle.Billing do
         company_id: com.id,
         contact_name: cont.name,
         invoice_amount: txn.amount,
-        balance: txn.amount + coalesce(sum(stxm.amount), 0) + coalesce(sum(rectxm.amount), 0),
+        balance:
+          txn.amount + coalesce(sum(stxm.match_amount), 0) + coalesce(sum(rectxm.match_amount), 0),
         checked: false,
         old_data: txn.old_data
       },
@@ -365,6 +353,19 @@ defmodule FullCircle.Billing do
   # Purchase Invocie
   ########
 
+  def get_pur_invoice_by_pur_invoice_no!(inv_no, com, user) do
+    id =
+      Repo.one(
+        from inv in PurInvoice,
+          join: com in subquery(Sys.user_company(com, user)),
+          on: com.id == inv.company_id,
+          where: inv.pur_invoice_no == ^inv_no,
+          select: inv.id
+      )
+
+    get_pur_invoice!(id, com, user)
+  end
+
   def get_pur_invoice!(id, company, user) do
     Repo.one(
       from inv in PurInvoice,
@@ -430,136 +431,92 @@ defmodule FullCircle.Billing do
       }
   end
 
-  def pur_invoice_index_query("", "", "", com, user, page: page, per_page: per_page) do
-    from(inv in subquery(pur_invoice_query(com, user, page: page, per_page: per_page)),
-      order_by: [desc: inv.updated_at]
-    )
-    |> Repo.all()
-  end
-
-  def pur_invoice_index_query("", date_from, "", com, user, page: page, per_page: per_page) do
-    Repo.all(
-      from inv in subquery(pur_invoice_query(com, user, page: page, per_page: per_page)),
-        where: inv.pur_invoice_date >= ^date_from,
-        order_by: inv.pur_invoice_date
-    )
-  end
-
-  def pur_invoice_index_query("", "", due_date_from, com, user, page: page, per_page: per_page) do
-    Repo.all(
-      from inv in subquery(pur_invoice_query(com, user, page: page, per_page: per_page)),
-        where: inv.due_date >= ^due_date_from,
-        order_by: inv.due_date
-    )
-  end
-
-  def pur_invoice_index_query(terms, "", "", com, user, page: page, per_page: per_page) do
-    from(inv in subquery(pur_invoice_query(com, user, page: page, per_page: per_page)),
-      order_by:
-        ^similarity_order(
-          [:pur_invoice_no, :supplier_invoice_no, :contact_name, :goods, :descriptions],
-          terms
-        )
-    )
-    |> Repo.all()
-  end
-
-  def pur_invoice_index_query(terms, date_from, "", com, user, page: page, per_page: per_page) do
-    Repo.all(
-      from inv in subquery(pur_invoice_query(com, user, page: page, per_page: per_page)),
-        where: inv.pur_invoice_date >= ^date_from,
-        order_by:
-          ^similarity_order(
-            [:pur_invoice_no, :supplier_invoice_no, :contact_name, :goods, :descriptions],
-            terms
-          ),
-        order_by: inv.pur_invoice_date
-    )
-  end
-
-  def pur_invoice_index_query(terms, "", due_date_from, com, user, page: page, per_page: per_page) do
-    Repo.all(
-      from inv in subquery(pur_invoice_query(com, user, page: page, per_page: per_page)),
-        where: inv.due_date >= ^due_date_from,
-        order_by:
-          ^similarity_order(
-            [:pur_invoice_no, :supplier_invoice_no, :contact_name, :goods, :descriptions],
-            terms
-          ),
-        order_by: inv.due_date
-    )
-  end
-
-  def pur_invoice_index_query(terms, date_from, due_date_from, com, user,
+  def pur_invoice_index_query(terms, date_from, due_date_from, bal, com, user,
         page: page,
         per_page: per_page
       ) do
-    Repo.all(
-      from inv in subquery(pur_invoice_query(com, user, page: page, per_page: per_page)),
-        where: inv.pur_invoice_date >= ^date_from,
-        where: inv.due_date >= ^due_date_from,
-        order_by:
-          ^similarity_order(
-            [:pur_invoice_no, :supplier_invoice_no, :contact_name, :goods, :descriptions],
-            terms
-          ),
-        order_by: [inv.pur_invoice_date, inv.due_date]
-    )
+    qry =
+      from(inv in subquery(pur_invoice_raw_query(com, user)))
+
+    qry =
+      if terms != "" do
+        from inv in subquery(qry),
+          order_by: ^similarity_order([:pur_invoice_no, :contact_name, :particulars], terms)
+      else
+        qry
+      end
+
+    qry =
+      case bal do
+        "Paid" -> from inv in qry, where: inv.balance == 0
+        "Unpaid" -> from inv in qry, where: inv.balance > 0
+        _ -> qry
+      end
+
+    qry =
+      if date_from != "" do
+        from inv in qry, where: inv.pur_invoice_date >= ^date_from, order_by: inv.pur_invoice_date
+      else
+        qry
+      end
+
+    qry =
+      if due_date_from != "" do
+        from inv in qry, where: inv.due_date >= ^due_date_from, order_by: inv.due_date
+      else
+        qry
+      end
+
+    qry |> offset((^page - 1) * ^per_page) |> limit(^per_page) |> Repo.all()
   end
 
   def get_pur_invoice_by_id_index_component_field!(id, com, user) do
-    from(i in subquery(pur_invoice_query(com, user, page: 1, per_page: 10)),
+    from(i in subquery(pur_invoice_raw_query(com, user)),
       where: i.id == ^id
     )
     |> Repo.one!()
   end
 
-  defp pur_invoice_query(company, user, page: page, per_page: per_page) do
-    from inv in PurInvoice,
+  defp pur_invoice_raw_query(company, user) do
+    from txn in Transaction,
       join: com in subquery(Sys.user_company(company, user)),
-      on: com.id == inv.company_id,
+      on: com.id == txn.company_id and txn.doc_type == "pur_invoices",
       join: cont in Contact,
-      on: cont.id == inv.contact_id,
-      join: invd in PurInvoiceDetail,
-      on: invd.pur_invoice_id == inv.id,
-      join: good in Good,
-      on: good.id == invd.good_id,
-      offset: ^((page - 1) * per_page),
-      limit: ^per_page,
-      order_by: [desc: inv.updated_at],
+      on: cont.id == txn.contact_id,
+      left_join: inv in PurInvoice,
+      on:
+        txn.doc_no == inv.pur_invoice_no and
+          txn.contact_id == inv.contact_id,
+      left_join: stxm in SeedTransactionMatcher,
+      on: stxm.transaction_id == txn.id,
+      left_join: rectxm in ReceiptTransactionMatcher,
+      on: rectxm.transaction_id == txn.id,
+      order_by: [desc: txn.inserted_at],
       select: %{
-        id: inv.id,
-        pur_invoice_no: inv.pur_invoice_no,
-        supplier_invoice_no: inv.supplier_invoice_no,
-        descriptions: inv.descriptions,
-        tags: inv.tags,
-        pur_invoice_date: inv.pur_invoice_date,
-        due_date: inv.due_date,
-        inserted_at: inv.inserted_at,
-        updated_at: inv.updated_at,
-        contact_id: cont.id,
+        id: coalesce(inv.id, txn.id),
+        pur_invoice_no: txn.doc_no,
+        particulars: coalesce(txn.contact_particulars, txn.particulars),
+        pur_invoice_date: txn.doc_date,
+        due_date: coalesce(inv.due_date, txn.doc_date),
+        updated_at: txn.inserted_at,
         company_id: com.id,
         contact_name: cont.name,
-        pur_invoice_amount:
-          sum(
-            invd.quantity * invd.unit_price + invd.discount +
-              (invd.quantity * invd.unit_price + invd.discount) * invd.tax_rate
-          ),
-        goods:
-          fragment(
-            "string_agg(DISTINCT ? || COALESCE('(' || ? || ')', ''), ', ')",
-            good.name,
-            invd.descriptions
-          )
+        pur_invoice_amount: txn.amount,
+        balance:
+          txn.amount + coalesce(sum(stxm.match_amount), 0) + coalesce(sum(rectxm.match_amount), 0),
+        checked: false,
+        old_data: txn.old_data
       },
       group_by: [
         inv.id,
+        txn.id,
         cont.name,
-        inv.descriptions,
-        inv.pur_invoice_date,
+        txn.contact_particulars,
+        txn.particulars,
+        txn.doc_date,
         inv.due_date,
-        cont.id,
-        com.id
+        com.id,
+        txn.amount
       ]
   end
 

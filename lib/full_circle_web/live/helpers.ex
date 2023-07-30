@@ -21,6 +21,13 @@ defmodule FullCircleWeb.Helpers do
     {params, socket |> assign(assign_names, l), v}
   end
 
+  def assign_autocomplete_id(socket, params, terms_name, assign_id, get_id_func) do
+    terms = params[terms_name] |> String.trim()
+    rec = get_id_func.(terms, socket.assigns.current_company, socket.assigns.current_user)
+    params = Map.merge(params, %{assign_id => Util.attempt(rec, :id) || nil})
+    {params, socket, rec}
+  end
+
   def merge_detail(attrs, details_key, id, new_detail) do
     details = attrs[details_key] |> Map.merge(%{id => new_detail})
     attrs |> Map.merge(%{details_key => details})
@@ -32,7 +39,7 @@ defmodule FullCircleWeb.Helpers do
     end
   end
 
-  def delete_lines(socket, index, lines_name) do
+  def delete_line(socket, index, lines_name) do
     update(socket, :form, fn %{source: changeset} ->
       existing = get_change_or_field(changeset, lines_name)
       {to_delete, rest} = List.pop_at(existing, index)
@@ -50,11 +57,21 @@ defmodule FullCircleWeb.Helpers do
     end)
   end
 
-  def add_lines(socket, lines_name, line_class_struct) do
+  def add_line(socket, lines_name, line_class_struct) do
     update(socket, :form, fn %{source: changeset} ->
       existing = get_change_or_field(changeset, lines_name)
 
       changeset = Ecto.Changeset.put_assoc(changeset, lines_name, existing ++ [line_class_struct])
+
+      to_form(changeset)
+    end)
+  end
+
+  def add_lines(socket, lines_name, class_struct_lines) do
+    update(socket, :form, fn %{source: changeset} ->
+      existing = get_change_or_field(changeset, lines_name)
+
+      changeset = Ecto.Changeset.put_assoc(changeset, lines_name, existing ++ class_struct_lines)
 
       to_form(changeset)
     end)

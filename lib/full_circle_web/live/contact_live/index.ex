@@ -18,7 +18,7 @@ defmodule FullCircleWeb.ContactLive.Index do
         placeholder={gettext("Name, City, State and Descriptions...")}
       />
       <div class="text-center mb-2">
-        <.link phx-click={:new_contact} class="link_button" id="new_contact">
+        <.link phx-click={:new_contact} class="blue_button" id="new_contact">
           <%= gettext("New Contact") %>
         </.link>
       </div>

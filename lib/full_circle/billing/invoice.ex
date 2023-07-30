@@ -172,7 +172,7 @@ defmodule FullCircle.Billing.Invoice do
 
     Map.merge(invoice, %{
       invoice_amount: Decimal.add(invoice.invoice_good_amount, invoice.invoice_tax_amount)
-    })
+    } )
   end
 
   defp fill_default_date(changeset) do

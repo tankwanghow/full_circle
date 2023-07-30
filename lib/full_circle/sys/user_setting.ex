@@ -67,6 +67,51 @@ defmodule FullCircle.Sys.UserSetting do
     ]
   end
 
+  def default_settings("receipts", cuid) do
+    [
+      %{
+        page: "receipts",
+        code: "goodamt-col",
+        display_name: "Good Amount",
+        values: %{"show" => "visible", "hide" => "hidden"},
+        value: "show",
+        company_user_id: cuid
+      },
+      %{
+        page: "receipts",
+        code: "taxamt-col",
+        display_name: "Tax Amount",
+        values: %{"show" => "visible", "hide" => "hidden"},
+        value: "show",
+        company_user_id: cuid
+      },
+      %{
+        page: "receipts",
+        code: "account-col",
+        display_name: "Account",
+        values: %{"show" => "visible", "hide" => "hidden"},
+        value: "show",
+        company_user_id: cuid
+      },
+      %{
+        page: "receipts",
+        code: "taxrate-col",
+        display_name: "Tax Rate",
+        values: %{"show" => "visible", "hide" => "hidden"},
+        value: "show",
+        company_user_id: cuid
+      },
+      %{
+        page: "receipts",
+        code: "discount-col",
+        display_name: "Discount",
+        values: %{"show" => "visible", "hide" => "hidden"},
+        value: "show",
+        company_user_id: cuid
+      }
+    ]
+  end
+
   def default_settings("pur_invoices", cuid) do
     [
       %{

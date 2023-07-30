@@ -161,7 +161,7 @@ defmodule FullCircleWeb.TransactionLive.Contact do
               </.button>
               <.link
                 :if={@objects_count > 0}
-                class="link_button mr-1"
+                class="blue_button mr-1"
                 patch={
                   ~p"/companies/#{@current_company.id}/print_transactions?report=contacttrans&name=#{@search.name}&fdate=#{@search.f_date}&tdate=#{@search.t_date}"
                 }
@@ -174,7 +174,7 @@ defmodule FullCircleWeb.TransactionLive.Contact do
                 href={
                   ~p"/companies/#{@current_company.id}/csv?report=contacttrans&name=#{@search.name}&fdate=#{@search.f_date}&tdate=#{@search.t_date}"
                 }
-                class="link_button"
+                class="blue_button"
               >
                 CSV
               </.link>
