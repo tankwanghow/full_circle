@@ -15,6 +15,8 @@ defmodule FullCircle.Product do
   end
 
   def get_good_by_name(name, company, user) do
+    name = name |> String.trim()
+
     from(good in subquery(good_query(company, user)),
       left_join: pack in Packaging,
       on: pack.good_id == good.id,
@@ -48,7 +50,7 @@ defmodule FullCircle.Product do
       where: ilike(good.name, ^"%#{terms}%"),
       select: %{
         id: good.id,
-        value: good.name,
+        value: good.name
       },
       order_by: good.name
     )
@@ -56,6 +58,8 @@ defmodule FullCircle.Product do
   end
 
   def get_packaging_by_name(terms, good_id) do
+    terms = terms |> String.trim()
+
     from(pack in Packaging,
       where: pack.name == ^terms,
       where: pack.good_id == ^good_id,
