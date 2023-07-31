@@ -28,9 +28,9 @@ defmodule FullCircleWeb.Router do
   end
 
   scope "/api", FullCircleWeb do
-    pipe_through([:browser, :api])
-    get "/companies/:id/tags", TagController, :index
-    get "/companies/:id/autocomplete", AutoCompleteController, :index
+    pipe_through(:api)
+    get "/companies/:company_id/:user_id/tags", TagController, :index
+    get "/companies/:company_id/:user_id/autocomplete", AutoCompleteController, :index
   end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development

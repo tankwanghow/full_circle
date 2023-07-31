@@ -3,25 +3,25 @@ defmodule FullCircleWeb.AutoCompleteController do
 
   def index(conn, params) do
     schema = params["schema"]
-    name = params["name"]
+    name = params["name"] |> String.codepoints() |> Enum.join("%")
 
     names =
       case schema do
         "contact" ->
           FullCircle.Accounting.contact_names(
             name,
-            %{id: params["id"]},
-            conn.assigns.current_user
+            %{id: params["company_id"]},
+            %{id: params["user_id"]}
           )
 
         "good" ->
-          FullCircle.Product.good_names(name, %{id: params["id"]}, conn.assigns.current_user)
+          FullCircle.Product.good_names(name, %{id: params["company_id"]}, %{id: params["user_id"]})
 
         "account" ->
           FullCircle.Accounting.account_names(
             name,
-            %{id: params["id"]},
-            conn.assigns.current_user
+            %{id: params["company_id"]},
+            %{id: params["user_id"]}
           )
 
         "packaging" ->
@@ -34,15 +34,15 @@ defmodule FullCircleWeb.AutoCompleteController do
         "saltaxcode" ->
           FullCircle.Accounting.sale_tax_codes(
             name,
-            %{id: params["id"]},
-            conn.assigns.current_user
+            %{id: params["company_id"]},
+            %{id: params["user_id"]}
           )
 
         "purtaxcode" ->
           FullCircle.Accounting.purchase_tax_codes(
             name,
-            %{id: params["id"]},
-            conn.assigns.current_user
+            %{id: params["company_id"]},
+            %{id: params["user_id"]}
           )
 
         _ ->
