@@ -183,13 +183,13 @@ defmodule FullCircleWeb.CoreComponents do
 
   def flash_group(assigns) do
     ~H"""
-    <.flash kind={:info} title="Success!" flash={@flash} />
-    <.flash kind={:warn} title="Warning!" flash={@flash} />
-    <.flash kind={:error} title="Error!" flash={@flash} />
+    <.flash kind={:info} title={gettext("Success!")} flash={@flash} />
+    <.flash kind={:warn} title={gettext("Warning!")} flash={@flash} />
+    <.flash kind={:error} title={gettext("Error!")} flash={@flash} />
     <.flash
       id="disconnected"
       kind={:error}
-      title="We can't find the internet"
+      title={gettext("We can't find the internet")}
       phx-disconnected={show("#disconnected")}
       phx-connected={hide("#disconnected")}
       hidden

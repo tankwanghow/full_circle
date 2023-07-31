@@ -10,13 +10,13 @@ msgid ""
 msgstr ""
 "Language: zh\n"
 
-#: lib/full_circle_web/components/core_components.ex:479
+#: lib/full_circle_web/components/core_components.ex:498
 #, elixir-autogen, elixir-format
 msgid "Actions"
 msgstr "动作"
 
-#: lib/full_circle_web/components/core_components.ex:80
-#: lib/full_circle_web/components/core_components.ex:158
+#: lib/full_circle_web/components/core_components.ex:85
+#: lib/full_circle_web/components/core_components.ex:168
 #, elixir-autogen, elixir-format
 msgid "close"
 msgstr "关"
@@ -26,7 +26,7 @@ msgstr "关"
 msgid "Already registered?"
 msgstr "已经登记了？"
 
-#: lib/full_circle_web/live/user_registration_live.ex:38
+#: lib/full_circle_web/live/user_registration_live.ex:39
 #, elixir-autogen, elixir-format
 msgid "Create an account"
 msgstr "创建一个帐户"
@@ -41,9 +41,10 @@ msgstr "创建帐户..."
 msgid "Don't have an account?"
 msgstr "没有帐户？"
 
-#: lib/full_circle_web/live/company_live/fields_component.ex:39
+#: lib/full_circle_web/live/company_live/form.ex:56
 #: lib/full_circle_web/live/user_confirmation_instructions_live.ex:15
 #: lib/full_circle_web/live/user_forgot_password_live.ex:15
+#: lib/full_circle_web/live/user_live/new.ex:78
 #: lib/full_circle_web/live/user_login_live.ex:19
 #: lib/full_circle_web/live/user_registration_live.ex:34
 #: lib/full_circle_web/live/user_settings_live.ex:21
@@ -63,9 +64,9 @@ msgstr "忘记密码了吗？"
 msgid "Keep me logged in"
 msgstr "保持登入状态\n"
 
-#: lib/full_circle_web/controllers/page_html/home.html.heex:33
+#: lib/full_circle_web/controllers/page_html/home.html.heex:21
 #: lib/full_circle_web/live/user_confirmation_instructions_live.ex:25
-#: lib/full_circle_web/live/user_confirmation_live.ex:20
+#: lib/full_circle_web/live/user_confirmation_live.ex:22
 #: lib/full_circle_web/live/user_forgot_password_live.ex:24
 #: lib/full_circle_web/live/user_registration_live.ex:15
 #: lib/full_circle_web/live/user_reset_password_live.ex:37
@@ -79,18 +80,19 @@ msgstr "登入"
 msgid "Oops, something went wrong! Please check the errors below."
 msgstr "哎呀！出事了！请检查以下错误。"
 
+#: lib/full_circle_web/live/user_live/new.ex:111
 #: lib/full_circle_web/live/user_login_live.ex:20
 #: lib/full_circle_web/live/user_registration_live.ex:35
 #, elixir-autogen, elixir-format
 msgid "Password"
 msgstr "密码"
 
-#: lib/full_circle_web/controllers/page_html/home.html.heex:37
+#: lib/full_circle_web/controllers/page_html/home.html.heex:25
 #: lib/full_circle_web/live/user_confirmation_instructions_live.ex:24
-#: lib/full_circle_web/live/user_confirmation_live.ex:19
+#: lib/full_circle_web/live/user_confirmation_live.ex:21
 #: lib/full_circle_web/live/user_forgot_password_live.ex:23
 #: lib/full_circle_web/live/user_login_live.ex:12
-#: lib/full_circle_web/live/user_registration_live.ex:51
+#: lib/full_circle_web/live/user_registration_live.ex:53
 #: lib/full_circle_web/live/user_reset_password_live.ex:36
 #, elixir-autogen, elixir-format
 msgid "Register"
@@ -127,17 +129,17 @@ msgstr "现在一个帐户。"
 msgid "to your account now."
 msgstr "现在到你的帐户。"
 
-#: lib/full_circle_web/live/user_settings_live.ex:130
+#: lib/full_circle_web/live/user_settings_live.ex:137
 #, elixir-autogen, elixir-format
 msgid "A link to confirm your email change has been sent to the new address."
 msgstr ""
 
-#: lib/full_circle_web/live/user_settings_live.ex:32
+#: lib/full_circle_web/live/user_settings_live.ex:33
 #, elixir-autogen, elixir-format
 msgid "Change Email"
 msgstr "更改电子邮件"
 
-#: lib/full_circle_web/live/user_settings_live.ex:68
+#: lib/full_circle_web/live/user_settings_live.ex:75
 #, elixir-autogen, elixir-format
 msgid "Change Password"
 msgstr "更改密码"
@@ -152,13 +154,13 @@ msgstr "改变..."
 msgid "Confirm Account"
 msgstr "确认账户"
 
-#: lib/full_circle_web/live/user_confirmation_live.ex:14
+#: lib/full_circle_web/live/user_confirmation_live.ex:15
 #, elixir-autogen, elixir-format
 msgid "Confirm my account"
 msgstr ""
 
 #: lib/full_circle_web/live/user_reset_password_live.ex:25
-#: lib/full_circle_web/live/user_settings_live.ex:56
+#: lib/full_circle_web/live/user_settings_live.ex:63
 #, elixir-autogen, elixir-format
 msgid "Confirm new password"
 msgstr "确认新密码"
@@ -169,17 +171,17 @@ msgid "Confirming..."
 msgstr ""
 
 #: lib/full_circle_web/live/user_settings_live.ex:27
-#: lib/full_circle_web/live/user_settings_live.ex:62
+#: lib/full_circle_web/live/user_settings_live.ex:69
 #, elixir-autogen, elixir-format
 msgid "Current password"
 msgstr "当前密码"
 
-#: lib/full_circle_web/live/user_settings_live.ex:83
+#: lib/full_circle_web/live/user_settings_live.ex:90
 #, elixir-autogen, elixir-format
 msgid "Email change link is invalid or it has expired."
 msgstr ""
 
-#: lib/full_circle_web/live/user_settings_live.ex:80
+#: lib/full_circle_web/live/user_settings_live.ex:87
 #, elixir-autogen, elixir-format
 msgid "Email changed successfully."
 msgstr ""
@@ -190,7 +192,7 @@ msgid "If your email is in our system and it has not been confirmed yet, you wil
 msgstr ""
 
 #: lib/full_circle_web/live/user_reset_password_live.ex:21
-#: lib/full_circle_web/live/user_settings_live.ex:52
+#: lib/full_circle_web/live/user_settings_live.ex:57
 #, elixir-autogen, elixir-format
 msgid "New password"
 msgstr "新密码"
@@ -205,6 +207,7 @@ msgstr ""
 msgid "Resend confirmation instructions"
 msgstr "重新发送确认说明"
 
+#: lib/full_circle_web/live/user_live/index.ex:40
 #: lib/full_circle_web/live/user_reset_password_live.ex:9
 #: lib/full_circle_web/live/user_reset_password_live.ex:30
 #, elixir-autogen, elixir-format
@@ -221,12 +224,12 @@ msgstr ""
 msgid "Resetting..."
 msgstr "正在重置..."
 
-#: lib/full_circle_web/live/user_confirmation_live.ex:53
+#: lib/full_circle_web/live/user_confirmation_live.ex:55
 #, elixir-autogen, elixir-format
 msgid "User confirmation link is invalid or it has expired."
 msgstr ""
 
-#: lib/full_circle_web/live/user_confirmation_live.ex:38
+#: lib/full_circle_web/live/user_confirmation_live.ex:40
 #, elixir-autogen, elixir-format
 msgid "User confirmed successfully."
 msgstr ""
@@ -271,22 +274,24 @@ msgstr "我们将向您的收件箱发送密码重置链接"
 msgid " in this farm"
 msgstr ""
 
-#: lib/full_circle_web/components/layouts/root.html.heex:159
+#: lib/full_circle_web/components/layouts/root.html.heex:118
 #, elixir-autogen, elixir-format
 msgid "Accounting & Payroll Software"
 msgstr ""
 
-#: lib/full_circle_web/live/company_live/fields_component.ex:12
+#: lib/full_circle_web/live/company_live/form.ex:29
+#: lib/full_circle_web/live/contact_live/form_component.ex:126
 #, elixir-autogen, elixir-format
 msgid "Address Line 1"
 msgstr ""
 
-#: lib/full_circle_web/live/company_live/fields_component.ex:15
+#: lib/full_circle_web/live/company_live/form.ex:32
+#: lib/full_circle_web/live/contact_live/form_component.ex:129
 #, elixir-autogen, elixir-format
 msgid "Address Line 2"
 msgstr ""
 
-#: lib/full_circle_web/live/company_live/form.ex:27
+#: lib/full_circle_web/live/company_live/form.ex:102
 #, elixir-autogen, elixir-format
 msgid "All Company Data, will be LOST!!!"
 msgstr ""
@@ -296,7 +301,16 @@ msgstr ""
 msgid "Are you sure?"
 msgstr ""
 
-#: lib/full_circle_web/live/company_live/form.ex:34
+#: lib/full_circle_web/live/account_live/form_component.ex:149
+#: lib/full_circle_web/live/company_live/form.ex:108
+#: lib/full_circle_web/live/contact_live/form_component.ex:167
+#: lib/full_circle_web/live/fixed_asset_live/form_component.ex:314
+#: lib/full_circle_web/live/goods_live/form_component.ex:349
+#: lib/full_circle_web/live/invoice_live/form.ex:517
+#: lib/full_circle_web/live/pur_invoice_live/form.ex:537
+#: lib/full_circle_web/live/receipt_live/form_component.ex:361
+#: lib/full_circle_web/live/tax_code_live/form_component.ex:180
+#: lib/full_circle_web/live/user_live/new.ex:98
 #, elixir-autogen, elixir-format
 msgid "Back"
 msgstr ""
@@ -306,42 +320,50 @@ msgstr ""
 msgid "CANCEL"
 msgstr ""
 
-#: lib/full_circle_web/live/company_live/form.ex:28
+#: lib/full_circle_web/live/account_live/form_component.ex:140
+#: lib/full_circle_web/live/company_live/form.ex:103
+#: lib/full_circle_web/live/contact_live/form_component.ex:158
+#: lib/full_circle_web/live/fixed_asset_live/form_component.ex:305
+#: lib/full_circle_web/live/goods_live/form_component.ex:340
+#: lib/full_circle_web/live/tax_code_live/form_component.ex:171
 #, elixir-autogen, elixir-format
 msgid "Cannot Be Recover!!!"
 msgstr ""
 
-#: lib/full_circle_web/live/company_live/fields_component.ex:18
+#: lib/full_circle_web/live/company_live/form.ex:35
+#: lib/full_circle_web/live/contact_live/form_component.ex:132
+#: lib/full_circle_web/live/receipt_live/form_component.ex:321
 #, elixir-autogen, elixir-format
 msgid "City"
 msgstr ""
 
-#: lib/full_circle_web/live/company_live/fields_component.ex:74
+#: lib/full_circle_web/live/company_live/form.ex:88
 #, elixir-autogen, elixir-format
 msgid "Closing Day"
 msgstr ""
 
-#: lib/full_circle_web/live/company_live/fields_component.ex:66
+#: lib/full_circle_web/live/company_live/form.ex:80
 #, elixir-autogen, elixir-format
 msgid "Closing Month"
 msgstr ""
 
-#: lib/full_circle_web/components/layouts/root.html.heex:92
+#: lib/full_circle_web/components/layouts/root.html.heex:64
 #, elixir-autogen, elixir-format
 msgid "Companies"
 msgstr ""
 
-#: lib/full_circle_web/live/company_live/form.ex:100
+#: lib/full_circle_web/live/company_live/form.ex:193
 #, elixir-autogen, elixir-format
 msgid "Company Deleted!"
 msgstr ""
 
-#: lib/full_circle_web/live/company_live/index.ex:94
+#: lib/full_circle_web/live/company_live/index.ex:96
 #, elixir-autogen, elixir-format
 msgid "Company Listing"
 msgstr ""
 
-#: lib/full_circle_web/live/company_live/fields_component.ex:27
+#: lib/full_circle_web/live/company_live/form.ex:44
+#: lib/full_circle_web/live/contact_live/form_component.ex:141
 #, elixir-autogen, elixir-format
 msgid "Country"
 msgstr ""
@@ -351,62 +373,69 @@ msgstr ""
 msgid "Create a New Company"
 msgstr ""
 
-#: lib/full_circle_web/live/company_live/form.ex:54
+#: lib/full_circle_web/live/company_live/form.ex:133
 #, elixir-autogen, elixir-format
 msgid "Creating Company"
 msgstr ""
 
-#: lib/full_circle_web/components/layouts/root.html.heex:42
-#: lib/full_circle_web/controllers/page_html/home.html.heex:17
+#: lib/full_circle_web/components/layouts/root.html.heex:32
+#: lib/full_circle_web/controllers/page_html/home.html.heex:5
+#: lib/full_circle_web/live/dashboard_live/dashboard_live.ex:52
 #, elixir-autogen, elixir-format
 msgid "Dashboard"
-msgstr ""
+msgstr "仪表板"
 
 #: lib/full_circle_web/components/core_components.ex:730
 #, elixir-autogen, elixir-format
 msgid "Delete"
 msgstr ""
 
-#: lib/full_circle_web/live/company_live/fields_component.ex:78
+#: lib/full_circle_web/live/account_live/form_component.ex:131
+#: lib/full_circle_web/live/company_live/form.ex:92
+#: lib/full_circle_web/live/contact_live/form_component.ex:147
+#: lib/full_circle_web/live/fixed_asset_live/form_component.ex:297
+#: lib/full_circle_web/live/goods_live/form_component.ex:331
+#: lib/full_circle_web/live/invoice_live/form.ex:499
+#: lib/full_circle_web/live/pur_invoice_live/form.ex:518
+#: lib/full_circle_web/live/receipt_live/form_component.ex:272
+#: lib/full_circle_web/live/tax_code_live/form_component.ex:163
 #, elixir-autogen, elixir-format
 msgid "Descriptions"
 msgstr ""
 
-#: lib/full_circle_web/live/company_live/form.ex:67
+#: lib/full_circle_web/live/company_live/form.ex:147
 #, elixir-autogen, elixir-format
 msgid "Editing Company"
 msgstr ""
 
-#: lib/full_circle_web/live/company_live/form.ex:145
+#: lib/full_circle_web/live/company_live/form.ex:245
 #, elixir-autogen, elixir-format
 msgid "Failed to Create Company"
 msgstr ""
 
-#: lib/full_circle_web/live/company_live/form.ex:106
-#: lib/full_circle_web/live/company_live/form.ex:126
+#: lib/full_circle_web/live/company_live/form.ex:226
 #, elixir-autogen, elixir-format
 msgid "Failed to Update Company"
 msgstr ""
 
-#: lib/full_circle_web/controllers/page_html/home.html.heex:21
+#: lib/full_circle_web/controllers/page_html/home.html.heex:9
 #, elixir-autogen, elixir-format
 msgid "Farms"
 msgstr ""
 
-#: lib/full_circle_web/live/company_live/fields_component.ex:36
+#: lib/full_circle_web/live/company_live/form.ex:53
 #, elixir-autogen, elixir-format
 msgid "Fax"
 msgstr ""
 
-#: lib/full_circle_web/components/layouts/root.html.heex:7
+#: lib/full_circle_web/components/layouts/root.html.heex:8
 #: lib/full_circle_web/components/layouts/root.html.heex:18
-#: lib/full_circle_web/components/layouts/root.html.heex:156
-#: lib/full_circle_web/controllers/page_html/home.html.heex:7
+#: lib/full_circle_web/components/layouts/root.html.heex:115
 #, elixir-autogen, elixir-format
 msgid "FullCircle"
 msgstr "圆环"
 
-#: lib/full_circle_web/components/layouts/root.html.heex:151
+#: lib/full_circle_web/components/layouts/root.html.heex:110
 #, elixir-autogen, elixir-format
 msgid "Home"
 msgstr ""
@@ -426,19 +455,22 @@ msgstr ""
 msgid "Log in to account"
 msgstr "登入帐户"
 
-#: lib/full_circle_web/components/layouts/root.html.heex:144
-#: lib/full_circle_web/controllers/page_html/home.html.heex:25
+#: lib/full_circle_web/components/layouts/root.html.heex:100
+#: lib/full_circle_web/controllers/page_html/home.html.heex:13
 #, elixir-autogen, elixir-format
 msgid "Log out"
 msgstr ""
 
-#: lib/full_circle_web/live/company_live/fields_component.ex:9
+#: lib/full_circle_web/live/company_live/form.ex:23
+#: lib/full_circle_web/live/contact_live/form_component.ex:120
+#: lib/full_circle_web/live/fixed_asset_live/form_component.ex:201
+#: lib/full_circle_web/live/goods_live/form_component.ex:246
 #, elixir-autogen, elixir-format
 msgid "Name"
 msgstr ""
 
-#: lib/full_circle_web/live/company_live/form.ex:111
-#: lib/full_circle_web/live/company_live/form.ex:131
+#: lib/full_circle_web/live/company_live/form.ex:205
+#: lib/full_circle_web/live/company_live/form.ex:231
 #, elixir-autogen, elixir-format
 msgid "No Authorization"
 msgstr ""
@@ -448,17 +480,29 @@ msgstr ""
 msgid "OK"
 msgstr ""
 
-#: lib/full_circle_web/live/company_live/fields_component.ex:21
+#: lib/full_circle_web/live/company_live/form.ex:38
+#: lib/full_circle_web/live/contact_live/form_component.ex:135
 #, elixir-autogen, elixir-format
 msgid "Postal Code"
 msgstr ""
 
-#: lib/full_circle_web/live/company_live/fields_component.ex:42
+#: lib/full_circle_web/live/company_live/form.ex:26
+#: lib/full_circle_web/live/contact_live/form_component.ex:123
 #, elixir-autogen, elixir-format
 msgid "Reg No"
 msgstr ""
 
-#: lib/full_circle_web/live/company_live/form.ex:23
+#: lib/full_circle_web/live/account_live/form_component.ex:134
+#: lib/full_circle_web/live/company_live/form.ex:98
+#: lib/full_circle_web/live/contact_live/form_component.ex:153
+#: lib/full_circle_web/live/fixed_asset_live/depreciation.ex:293
+#: lib/full_circle_web/live/fixed_asset_live/disposal.ex:258
+#: lib/full_circle_web/live/fixed_asset_live/form_component.ex:300
+#: lib/full_circle_web/live/goods_live/form_component.ex:335
+#: lib/full_circle_web/live/invoice_live/form.ex:512
+#: lib/full_circle_web/live/pur_invoice_live/form.ex:532
+#: lib/full_circle_web/live/receipt_live/form_component.ex:359
+#: lib/full_circle_web/live/tax_code_live/form_component.ex:166
 #, elixir-autogen, elixir-format
 msgid "Save"
 msgstr ""
@@ -473,38 +517,40 @@ msgstr ""
 msgid "Set Default"
 msgstr ""
 
-#: lib/full_circle_web/live/company_live/fields_component.ex:24
+#: lib/full_circle_web/live/company_live/form.ex:41
+#: lib/full_circle_web/live/contact_live/form_component.ex:138
+#: lib/full_circle_web/live/receipt_live/form_component.ex:322
 #, elixir-autogen, elixir-format
 msgid "State"
 msgstr ""
 
-#: lib/full_circle_web/live/company_live/fields_component.ex:45
+#: lib/full_circle_web/live/company_live/form.ex:59
 #, elixir-autogen, elixir-format
 msgid "Tax No"
 msgstr ""
 
-#: lib/full_circle_web/live/company_live/fields_component.ex:33
+#: lib/full_circle_web/live/company_live/form.ex:50
 #, elixir-autogen, elixir-format
 msgid "Tel"
 msgstr ""
 
-#: lib/full_circle_web/live/company_live/fields_component.ex:30
+#: lib/full_circle_web/live/company_live/form.ex:47
 #, elixir-autogen, elixir-format
 msgid "Time Zone"
 msgstr ""
 
-#: lib/full_circle_web/components/layouts/root.html.heex:81
+#: lib/full_circle_web/components/layouts/root.html.heex:58
 #: lib/full_circle_web/live/user_settings_live.ex:9
 #, elixir-autogen, elixir-format
 msgid "User Settings"
 msgstr ""
 
-#: lib/full_circle_web/components/layouts/root.html.heex:105
+#: lib/full_circle_web/components/layouts/root.html.heex:75
 #, elixir-autogen, elixir-format
 msgid "Users"
 msgstr ""
 
-#: lib/full_circle_web/components/layouts/root.html.heex:162
+#: lib/full_circle_web/components/layouts/root.html.heex:121
 #, elixir-autogen, elixir-format
 msgid "Version"
 msgstr ""
@@ -515,12 +561,21 @@ msgid "Your are "
 msgstr ""
 
 #: lib/full_circle/sys/company_user.ex:21
-#: lib/full_circle/user_accounts/user.ex:69
+#: lib/full_circle/user_accounts/user.ex:75
 #, elixir-autogen, elixir-format
 msgid "already in company"
 msgstr ""
 
 #: lib/full_circle/accounting/account.ex:28
+#: lib/full_circle/accounting/account.ex:32
+#: lib/full_circle/accounting/contact.ex:45
+#: lib/full_circle/accounting/contact.ex:49
+#: lib/full_circle/accounting/fixed_asset.ex:83
+#: lib/full_circle/accounting/fixed_asset.ex:87
+#: lib/full_circle/product/good.ex:67
+#: lib/full_circle/product/good.ex:71
+#: lib/full_circle/product/packaging.ex:34
+#: lib/full_circle/product/packaging.ex:38
 #: lib/full_circle/sys/company.ex:71
 #, elixir-autogen, elixir-format
 msgid "has already been taken"
@@ -537,9 +592,1242 @@ msgid "must between 1 to 31"
 msgstr ""
 
 #: lib/full_circle/accounting/account.ex:25
+#: lib/full_circle/accounting/contact.ex:43
+#: lib/full_circle/accounting/fixed_asset.ex:77
+#: lib/full_circle/accounting/fixed_asset.ex:80
+#: lib/full_circle/accounting/tax_code.ex:34
+#: lib/full_circle/helpers.ex:65
 #: lib/full_circle/sys/company.ex:61
 #: lib/full_circle/sys/company.ex:62
-#: lib/full_circle/sys/company_user.ex:24
+#: lib/full_circle/sys/company_user.ex:25
 #, elixir-autogen, elixir-format
 msgid "not in list"
 msgstr ""
+
+#: lib/full_circle_web/live/user_live/new.ex:94
+#, elixir-autogen, elixir-format
+msgid "..."
+msgstr ""
+
+#: lib/full_circle_web/live/invoice_live/form.ex:377
+#: lib/full_circle_web/live/journal_entry_view_live/component.ex:72
+#: lib/full_circle_web/live/pur_invoice_live/form.ex:396
+#: lib/full_circle_web/live/tax_code_live/form_component.ex:159
+#: lib/full_circle_web/live/transaction_live/account.ex:82
+#, elixir-autogen, elixir-format
+msgid "Account"
+msgstr ""
+
+#: lib/full_circle_web/live/account_live/index.ex:27
+#, elixir-autogen, elixir-format
+msgid "Account Information"
+msgstr ""
+
+#: lib/full_circle_web/live/account_live/form_component.ex:122
+#, elixir-autogen, elixir-format
+msgid "Account Name"
+msgstr ""
+
+#: lib/full_circle_web/live/dashboard_live/dashboard_live.ex:40
+#, elixir-autogen, elixir-format
+msgid "Account Transactions"
+msgstr ""
+
+#: lib/full_circle_web/live/account_live/form_component.ex:126
+#, elixir-autogen, elixir-format
+msgid "Account Type"
+msgstr ""
+
+#: lib/full_circle_web/live/dashboard_live/dashboard_live.ex:14
+#, elixir-autogen, elixir-format
+msgid "Accounts"
+msgstr ""
+
+#: lib/full_circle_web/live/account_live/index.ex:67
+#, elixir-autogen, elixir-format
+msgid "Accounts Listing"
+msgstr ""
+
+#: lib/full_circle_web/live/receipt_live/form_component.ex:351
+#, elixir-autogen, elixir-format
+msgid "Add Cheque"
+msgstr ""
+
+#: lib/full_circle_web/live/invoice_live/form.ex:471
+#: lib/full_circle_web/live/pur_invoice_live/form.ex:490
+#, elixir-autogen, elixir-format
+msgid "Add Detail"
+msgstr ""
+
+#: lib/full_circle_web/live/goods_live/form_component.ex:327
+#, elixir-autogen, elixir-format
+msgid "Add Packaging"
+msgstr ""
+
+#: lib/full_circle_web/live/user_live/index.ex:15
+#: lib/full_circle_web/live/user_live/new.ex:95
+#, elixir-autogen, elixir-format
+msgid "Add User"
+msgstr ""
+
+#: lib/full_circle_web/live/account_live/form_component.ex:139
+#, elixir-autogen, elixir-format
+msgid "All Account Transactions, will be LOST!!!"
+msgstr ""
+
+#: lib/full_circle_web/live/contact_live/form_component.ex:157
+#, elixir-autogen, elixir-format, fuzzy
+msgid "All Contact Transactions, will be LOST!!!"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/form_component.ex:304
+#, elixir-autogen, elixir-format
+msgid "All Fixed Asset Transactions, will be LOST!!!"
+msgstr ""
+
+#: lib/full_circle_web/live/goods_live/form_component.ex:339
+#, elixir-autogen, elixir-format, fuzzy
+msgid "All Good Transactions, will be LOST!!!"
+msgstr ""
+
+#: lib/full_circle_web/live/tax_code_live/form_component.ex:170
+#, elixir-autogen, elixir-format
+msgid "All TaxCode Transactions, will be LOST!!!"
+msgstr ""
+
+#: lib/full_circle_web/live/invoice_live/form.ex:386
+#: lib/full_circle_web/live/invoice_live/index.ex:102
+#: lib/full_circle_web/live/pur_invoice_live/form.ex:405
+#: lib/full_circle_web/live/pur_invoice_live/index.ex:83
+#: lib/full_circle_web/live/receipt_live/form_component.ex:302
+#: lib/full_circle_web/live/receipt_live/form_component.ex:324
+#: lib/full_circle_web/live/receipt_live/index.ex:86
+#, elixir-autogen, elixir-format
+msgid "Amount"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/cal_all_depreciation.ex:95
+#, elixir-autogen, elixir-format
+msgid "Asset"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/form_component.ex:261
+#, elixir-autogen, elixir-format
+msgid "Asset Account"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/disposal.ex:204
+#, elixir-autogen, elixir-format
+msgid "Assets info:"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/cal_all_depreciation.ex:76
+#: lib/full_circle_web/live/fixed_asset_live/depreciation.ex:231
+#: lib/full_circle_web/live/fixed_asset_live/disposal.ex:200
+#, elixir-autogen, elixir-format
+msgid "Back Fixed Assets Listing"
+msgstr ""
+
+#: lib/full_circle_web/live/invoice_live/index.ex:105
+#: lib/full_circle_web/live/pur_invoice_live/index.ex:86
+#: lib/full_circle_web/live/receipt_live/index.ex:89
+#: lib/full_circle_web/live/transaction_live/account.ex:203
+#: lib/full_circle_web/live/transaction_live/contact.ex:250
+#, elixir-autogen, elixir-format
+msgid "Balance"
+msgstr ""
+
+#: lib/full_circle_web/live/receipt_live/form_component.ex:303
+#, elixir-autogen, elixir-format
+msgid "Banalce"
+msgstr ""
+
+#: lib/full_circle_web/live/receipt_live/form_component.ex:320
+#, elixir-autogen, elixir-format, fuzzy
+msgid "Bank"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/cal_all_depreciation.ex:11
+#, elixir-autogen, elixir-format
+msgid "Calculate All Fixed Assets Depreciations"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/index.ex:29
+#, elixir-autogen, elixir-format
+msgid "Calculate Depreciations"
+msgstr ""
+
+#: lib/full_circle_web/live/invoice_live/form.ex:514
+#: lib/full_circle_web/live/pur_invoice_live/form.ex:534
+#, elixir-autogen, elixir-format
+msgid "Cancel"
+msgstr ""
+
+#: lib/full_circle_web/components/core_components.ex:877
+#: lib/full_circle_web/components/layouts/print_root.html.heex:37
+#, elixir-autogen, elixir-format, fuzzy
+msgid "Close"
+msgstr "关"
+
+#: lib/full_circle_web/live/tax_code_live/form_component.ex:142
+#, elixir-autogen, elixir-format
+msgid "Code"
+msgstr ""
+
+#: lib/full_circle_web/live/tax_code_live/index.ex:19
+#, elixir-autogen, elixir-format
+msgid "Code, Tax Type, Account Name and Descriptions..."
+msgstr ""
+
+#: lib/full_circle_web/live/contact_live/form_component.ex:144
+#: lib/full_circle_web/live/invoice_live/index.ex:96
+#: lib/full_circle_web/live/pur_invoice_live/index.ex:77
+#: lib/full_circle_web/live/receipt_live/index.ex:80
+#: lib/full_circle_web/live/transaction_live/contact.ex:133
+#, elixir-autogen, elixir-format
+msgid "Contact"
+msgstr ""
+
+#: lib/full_circle_web/live/contact_live/index.ex:27
+#, elixir-autogen, elixir-format
+msgid "Contact Information"
+msgstr ""
+
+#: lib/full_circle_web/live/dashboard_live/dashboard_live.ex:43
+#, elixir-autogen, elixir-format
+msgid "Contact Transactions"
+msgstr ""
+
+#: lib/full_circle_web/live/dashboard_live/dashboard_live.ex:20
+#, elixir-autogen, elixir-format
+msgid "Contacts"
+msgstr ""
+
+#: lib/full_circle_web/live/contact_live/index.ex:68
+#, elixir-autogen, elixir-format
+msgid "Contacts Listing"
+msgstr ""
+
+#: lib/full_circle_web/live/goods_live/index_component.ex:54
+#, elixir-autogen, elixir-format
+msgid "Copy"
+msgstr ""
+
+#: lib/full_circle_web/live/goods_live/index.ex:124
+#, elixir-autogen, elixir-format
+msgid "Copying Good"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/cal_all_depreciation.ex:96
+#: lib/full_circle_web/live/fixed_asset_live/depreciation.ex:268
+#: lib/full_circle_web/live/fixed_asset_live/depreciation.ex:302
+#: lib/full_circle_web/live/fixed_asset_live/depreciation.ex:387
+#, elixir-autogen, elixir-format
+msgid "Cost Basis"
+msgstr ""
+
+#: lib/full_circle_web/live/goods_live/form_component.ex:302
+#, elixir-autogen, elixir-format
+msgid "Cost Per Pack"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/disposal.ex:225
+#, elixir-autogen, elixir-format
+msgid "Create Disposal"
+msgstr ""
+
+#: lib/full_circle_web/live/journal_entry_view_live/component.ex:81
+#: lib/full_circle_web/live/transaction_live/account.ex:155
+#: lib/full_circle_web/live/transaction_live/contact.ex:203
+#, elixir-autogen, elixir-format
+msgid "Credit"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/depreciation.ex:307
+#: lib/full_circle_web/live/fixed_asset_live/depreciation.ex:392
+#, elixir-autogen, elixir-format
+msgid "Cume Depreciation"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/depreciation.ex:242
+#, elixir-autogen, elixir-format
+msgid "Cume Depreciation A/C:"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/form_component.ex:281
+#, elixir-autogen, elixir-format
+msgid "Cume Depreciation Account"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/index_component.ex:36
+#, elixir-autogen, elixir-format
+msgid "Cume Depreciation Account:"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/disposal.ex:210
+#, elixir-autogen, elixir-format
+msgid "Cume Depreciations:"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/disposal.ex:212
+#, elixir-autogen, elixir-format
+msgid "Cume Disposals:"
+msgstr ""
+
+#: lib/full_circle_web/live/invoice_live/form.ex:346
+#, elixir-autogen, elixir-format
+msgid "Customer"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/cal_all_depreciation.ex:94
+#: lib/full_circle_web/live/fixed_asset_live/depreciation.ex:301
+#: lib/full_circle_web/live/fixed_asset_live/depreciation.ex:386
+#: lib/full_circle_web/live/fixed_asset_live/disposal.ex:266
+#: lib/full_circle_web/live/invoice_live/index.ex:87
+#: lib/full_circle_web/live/journal_entry_view_live/component.ex:66
+#: lib/full_circle_web/live/pur_invoice_live/index.ex:68
+#: lib/full_circle_web/live/receipt_live/index.ex:71
+#: lib/full_circle_web/live/transaction_live/account.ex:140
+#: lib/full_circle_web/live/transaction_live/contact.ex:188
+#, elixir-autogen, elixir-format
+msgid "Date"
+msgstr ""
+
+#: lib/full_circle_web/live/journal_entry_view_live/component.ex:78
+#: lib/full_circle_web/live/transaction_live/account.ex:152
+#: lib/full_circle_web/live/transaction_live/contact.ex:200
+#, elixir-autogen, elixir-format
+msgid "Debit"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/form_component.ex:228
+#, elixir-autogen, elixir-format
+msgid "Dep Rate(0.1 = 10%)"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/cal_all_depreciation.ex:98
+#: lib/full_circle_web/live/fixed_asset_live/depreciation.ex:276
+#: lib/full_circle_web/live/fixed_asset_live/depreciation.ex:304
+#: lib/full_circle_web/live/fixed_asset_live/depreciation.ex:389
+#, elixir-autogen, elixir-format, fuzzy
+msgid "Depreciation"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/depreciation.ex:240
+#, elixir-autogen, elixir-format
+msgid "Depreciation A/C:"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/form_component.ex:272
+#, elixir-autogen, elixir-format
+msgid "Depreciation Account"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/index_component.ex:34
+#, elixir-autogen, elixir-format
+msgid "Depreciation Account:"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/depreciation.ex:262
+#, elixir-autogen, elixir-format
+msgid "Depreciation Date"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/form_component.ex:252
+#, elixir-autogen, elixir-format
+msgid "Depreciation Interval"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/form_component.ex:244
+#, elixir-autogen, elixir-format
+msgid "Depreciation Method"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/form_component.ex:220
+#, elixir-autogen, elixir-format
+msgid "Depreciation Start"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/index_component.ex:87
+#, elixir-autogen, elixir-format
+msgid "Depreciation info"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/depreciation.ex:235
+#, elixir-autogen, elixir-format
+msgid "Depreciation info:"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/depreciation.ex:21
+#: lib/full_circle_web/live/fixed_asset_live/index_component.ex:63
+#, elixir-autogen, elixir-format, fuzzy
+msgid "Depreciations"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/cal_all_depreciation.ex:50
+#, elixir-autogen, elixir-format
+msgid "Depreciations Saved!!"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/index.ex:103
+#, elixir-autogen, elixir-format
+msgid "Depreciations for"
+msgstr ""
+
+#: lib/full_circle_web/live/invoice_live/form.ex:363
+#: lib/full_circle_web/live/pur_invoice_live/form.ex:382
+#, elixir-autogen, elixir-format, fuzzy
+msgid "Description"
+msgstr ""
+
+#: lib/full_circle_web/live/invoice_live/form.ex:371
+#: lib/full_circle_web/live/pur_invoice_live/form.ex:390
+#, elixir-autogen, elixir-format
+msgid "Discount"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/disposal.ex:242
+#: lib/full_circle_web/live/fixed_asset_live/disposal.ex:268
+#: lib/full_circle_web/live/fixed_asset_live/index_component.ex:76
+#, elixir-autogen, elixir-format
+msgid "Disposal"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/index_component.ex:31
+#, elixir-autogen, elixir-format
+msgid "Disposal Account:"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/disposal.ex:239
+#, elixir-autogen, elixir-format
+msgid "Disposal Date"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/form_component.ex:290
+#, elixir-autogen, elixir-format
+msgid "Disposal Fund Account"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/disposal.ex:14
+#, elixir-autogen, elixir-format
+msgid "Disposals"
+msgstr ""
+
+#: lib/full_circle_web/live/receipt_live/form_component.ex:299
+#, elixir-autogen, elixir-format
+msgid "Doc Date"
+msgstr ""
+
+#: lib/full_circle_web/live/journal_entry_view_live/component.ex:69
+#: lib/full_circle_web/live/receipt_live/form_component.ex:301
+#: lib/full_circle_web/live/transaction_live/account.ex:143
+#: lib/full_circle_web/live/transaction_live/contact.ex:191
+#, elixir-autogen, elixir-format
+msgid "Doc No"
+msgstr ""
+
+#: lib/full_circle_web/live/receipt_live/form_component.ex:300
+#: lib/full_circle_web/live/transaction_live/account.ex:146
+#: lib/full_circle_web/live/transaction_live/contact.ex:194
+#, elixir-autogen, elixir-format
+msgid "Doc Type"
+msgstr ""
+
+#: lib/full_circle_web/live/invoice_live/form.ex:356
+#: lib/full_circle_web/live/invoice_live/index.ex:90
+#: lib/full_circle_web/live/pur_invoice_live/form.ex:375
+#: lib/full_circle_web/live/pur_invoice_live/index.ex:71
+#: lib/full_circle_web/live/receipt_live/form_component.ex:323
+#: lib/full_circle_web/live/receipt_live/index.ex:74
+#, elixir-autogen, elixir-format
+msgid "Due Date"
+msgstr ""
+
+#: lib/full_circle_web/live/account_live/index.ex:99
+#, elixir-autogen, elixir-format
+msgid "Edit Account"
+msgstr ""
+
+#: lib/full_circle_web/live/contact_live/index.ex:101
+#, elixir-autogen, elixir-format
+msgid "Edit Contact"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/index.ex:131
+#, elixir-autogen, elixir-format
+msgid "Edit Fixed Asset"
+msgstr ""
+
+#: lib/full_circle_web/live/goods_live/index.ex:109
+#, elixir-autogen, elixir-format
+msgid "Edit Good"
+msgstr ""
+
+#: lib/full_circle_web/live/invoice_live/form.ex:56
+#, elixir-autogen, elixir-format
+msgid "Edit Invoice"
+msgstr ""
+
+#: lib/full_circle_web/live/pur_invoice_live/form.ex:57
+#, elixir-autogen, elixir-format
+msgid "Edit Purchase Invoice"
+msgstr ""
+
+#: lib/full_circle_web/live/receipt_live/index.ex:185
+#, elixir-autogen, elixir-format
+msgid "Edit Receipt"
+msgstr ""
+
+#: lib/full_circle_web/live/tax_code_live/index.ex:101
+#, elixir-autogen, elixir-format
+msgid "Edit TaxCode"
+msgstr ""
+
+#: lib/full_circle_web/live/account_live/form_component.ex:99
+#: lib/full_circle_web/live/account_live/index.ex:151
+#: lib/full_circle_web/live/contact_live/index.ex:154
+#: lib/full_circle_web/live/fixed_asset_live/depreciation.ex:189
+#: lib/full_circle_web/live/fixed_asset_live/disposal.ex:182
+#: lib/full_circle_web/live/fixed_asset_live/index.ex:183
+#: lib/full_circle_web/live/goods_live/form_component.ex:147
+#: lib/full_circle_web/live/goods_live/form_component.ex:176
+#: lib/full_circle_web/live/goods_live/form_component.ex:204
+#: lib/full_circle_web/live/goods_live/index.ex:207
+#: lib/full_circle_web/live/invoice_live/form.ex:273
+#: lib/full_circle_web/live/invoice_live/form.ex:304
+#: lib/full_circle_web/live/pur_invoice_live/form.ex:289
+#: lib/full_circle_web/live/pur_invoice_live/form.ex:320
+#: lib/full_circle_web/live/receipt_live/form_component.ex:159
+#: lib/full_circle_web/live/receipt_live/form_component.ex:184
+#: lib/full_circle_web/live/receipt_live/form_component.ex:210
+#: lib/full_circle_web/live/receipt_live/index.ex:316
+#: lib/full_circle_web/live/tax_code_live/index.ex:153
+#: lib/full_circle_web/live/transaction_live/contact.ex:101
+#, elixir-autogen, elixir-format
+msgid "Failed"
+msgstr ""
+
+#: lib/full_circle_web/live/user_live/index.ex:124
+#, elixir-autogen, elixir-format
+msgid "Failed Reset Password"
+msgstr ""
+
+#: lib/full_circle_web/live/company_live/form.ex:200
+#, elixir-autogen, elixir-format, fuzzy
+msgid "Failed to Delete Company"
+msgstr ""
+
+#: lib/full_circle_web/live/user_live/new.ex:58
+#, elixir-autogen, elixir-format, fuzzy
+msgid "Failed to add user to company"
+msgstr ""
+
+#: lib/full_circle_web/live/user_live/index.ex:99
+#, elixir-autogen, elixir-format
+msgid "Failed to change user to "
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/cal_all_depreciation.ex:32
+#, elixir-autogen, elixir-format
+msgid "Finish calculating depreciations!!"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/index_component.ex:28
+#, elixir-autogen, elixir-format
+msgid "Fixed Asset Account:"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/index.ex:34
+#, elixir-autogen, elixir-format
+msgid "Fixed Asset Information"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/index.ex:82
+#, elixir-autogen, elixir-format
+msgid "Fixed Asset Listing"
+msgstr ""
+
+#: lib/full_circle_web/live/dashboard_live/dashboard_live.ex:17
+#, elixir-autogen, elixir-format
+msgid "Fixed Assets"
+msgstr ""
+
+#: lib/full_circle_web/live/transaction_live/account.ex:93
+#: lib/full_circle_web/live/transaction_live/contact.ex:142
+#, elixir-autogen, elixir-format
+msgid "From"
+msgstr ""
+
+#: lib/full_circle_web/live/receipt_live/form_component.ex:253
+#, elixir-autogen, elixir-format
+msgid "Funds Account"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/cal_all_depreciation.ex:90
+#: lib/full_circle_web/live/fixed_asset_live/depreciation.ex:382
+#, elixir-autogen, elixir-format
+msgid "Generate Depreciations"
+msgstr ""
+
+#: lib/full_circle_web/live/invoice_live/form.ex:361
+#: lib/full_circle_web/live/pur_invoice_live/form.ex:380
+#, elixir-autogen, elixir-format
+msgid "Good"
+msgstr ""
+
+#: lib/full_circle_web/live/invoice_live/form.ex:374
+#: lib/full_circle_web/live/pur_invoice_live/form.ex:393
+#, elixir-autogen, elixir-format
+msgid "Good Amt"
+msgstr ""
+
+#: lib/full_circle_web/live/goods_live/index.ex:28
+#, elixir-autogen, elixir-format
+msgid "Good Information"
+msgstr ""
+
+#: lib/full_circle_web/live/goods_live/index.ex:74
+#, elixir-autogen, elixir-format
+msgid "Good Listing"
+msgstr ""
+
+#: lib/full_circle_web/live/dashboard_live/dashboard_live.ex:26
+#, elixir-autogen, elixir-format
+msgid "Goods"
+msgstr ""
+
+#: lib/full_circle_web/live/invoice_live/form.ex:353
+#: lib/full_circle_web/live/pur_invoice_live/form.ex:372
+#, elixir-autogen, elixir-format
+msgid "Invoice Date"
+msgstr ""
+
+#: lib/full_circle_web/live/invoice_live/index.ex:135
+#, elixir-autogen, elixir-format
+msgid "Invoice Listing"
+msgstr ""
+
+#: lib/full_circle_web/live/invoice_live/index.ex:93
+#: lib/full_circle_web/live/pur_invoice_live/form.ex:369
+#: lib/full_circle_web/live/pur_invoice_live/index.ex:74
+#, elixir-autogen, elixir-format
+msgid "Invoice No"
+msgstr ""
+
+#: lib/full_circle_web/live/invoice_live/form.ex:265
+#, elixir-autogen, elixir-format
+msgid "Invoice created successfully."
+msgstr ""
+
+#: lib/full_circle_web/live/invoice_live/form.ex:296
+#, elixir-autogen, elixir-format
+msgid "Invoice updated successfully."
+msgstr ""
+
+#: lib/full_circle_web/live/dashboard_live/dashboard_live.ex:29
+#, elixir-autogen, elixir-format
+msgid "Invoices"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/depreciation.ex:284
+#: lib/full_circle_web/live/fixed_asset_live/disposal.ex:248
+#, elixir-autogen, elixir-format
+msgid "Is Seed Data"
+msgstr ""
+
+#: lib/full_circle_web/live/journal_entry_view_live/component.ex:9
+#: lib/full_circle_web/live/journal_entry_view_live/component.ex:51
+#, elixir-autogen, elixir-format
+msgid "Journal"
+msgstr ""
+
+#: lib/full_circle_web/live/journal_entry_view_live/component.ex:14
+#, elixir-autogen, elixir-format
+msgid "Journal Entries"
+msgstr ""
+
+#: lib/full_circle_web/components/core_components.ex:776
+#, elixir-autogen, elixir-format
+msgid "Loading..."
+msgstr ""
+
+#: lib/full_circle_web/live/log_live/component.ex:66
+#, elixir-autogen, elixir-format, fuzzy
+msgid "Log"
+msgstr ""
+
+#: lib/full_circle_web/live/log_live/component.ex:11
+#, elixir-autogen, elixir-format
+msgid "Log Entries"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/depreciation.ex:248
+#, elixir-autogen, elixir-format
+msgid "Manual Create Depreciation"
+msgstr ""
+
+#: lib/full_circle_web/live/receipt_live/form_component.ex:304
+#, elixir-autogen, elixir-format
+msgid "Match"
+msgstr ""
+
+#: lib/full_circle_web/live/account_live/index.ex:18
+#, elixir-autogen, elixir-format
+msgid "Name, AccountType and Descriptions..."
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/index.ex:18
+#, elixir-autogen, elixir-format
+msgid "Name, Asset Account, Depreciation Account or Descriptions..."
+msgstr ""
+
+#: lib/full_circle_web/live/contact_live/index.ex:18
+#, elixir-autogen, elixir-format
+msgid "Name, City, State and Descriptions..."
+msgstr ""
+
+#: lib/full_circle_web/live/goods_live/index.ex:19
+#, elixir-autogen, elixir-format
+msgid "Name, Unit, Account Name, TaxCode and Descriptions..."
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/depreciation.ex:310
+#: lib/full_circle_web/live/fixed_asset_live/depreciation.ex:395
+#: lib/full_circle_web/live/fixed_asset_live/index_component.ex:81
+#, elixir-autogen, elixir-format
+msgid "Net Book Value"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/disposal.ex:215
+#, elixir-autogen, elixir-format
+msgid "Net Book Value:"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/depreciation.ex:291
+#: lib/full_circle_web/live/fixed_asset_live/disposal.ex:256
+#: lib/full_circle_web/live/invoice_live/form.ex:524
+#: lib/full_circle_web/live/pur_invoice_live/form.ex:544
+#, elixir-autogen, elixir-format
+msgid "New"
+msgstr ""
+
+#: lib/full_circle_web/live/account_live/index.ex:22
+#: lib/full_circle_web/live/account_live/index.ex:84
+#, elixir-autogen, elixir-format
+msgid "New Account"
+msgstr ""
+
+#: lib/full_circle_web/live/contact_live/index.ex:22
+#: lib/full_circle_web/live/contact_live/index.ex:85
+#, elixir-autogen, elixir-format
+msgid "New Contact"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/index.ex:22
+#: lib/full_circle_web/live/fixed_asset_live/index.ex:113
+#, elixir-autogen, elixir-format
+msgid "New Fixed Asset"
+msgstr ""
+
+#: lib/full_circle_web/live/goods_live/index.ex:23
+#: lib/full_circle_web/live/goods_live/index.ex:92
+#, elixir-autogen, elixir-format
+msgid "New Good"
+msgstr ""
+
+#: lib/full_circle_web/live/invoice_live/form.ex:31
+#: lib/full_circle_web/live/invoice_live/index.ex:61
+#: lib/full_circle_web/live/pur_invoice_live/index.ex:61
+#, elixir-autogen, elixir-format
+msgid "New Invoice"
+msgstr ""
+
+#: lib/full_circle_web/live/pur_invoice_live/form.ex:32
+#, elixir-autogen, elixir-format
+msgid "New Purchase Invoice"
+msgstr ""
+
+#: lib/full_circle_web/live/receipt_live/index.ex:45
+#: lib/full_circle_web/live/receipt_live/index.ex:158
+#, elixir-autogen, elixir-format
+msgid "New Receipt"
+msgstr ""
+
+#: lib/full_circle_web/live/tax_code_live/index.ex:23
+#: lib/full_circle_web/live/tax_code_live/index.ex:85
+#, elixir-autogen, elixir-format
+msgid "New TaxCode"
+msgstr ""
+
+#: lib/full_circle_web/live/user_live/new.ex:9
+#, elixir-autogen, elixir-format
+msgid "New User"
+msgstr ""
+
+#: lib/full_circle_web/components/core_components.ex:772
+#, elixir-autogen, elixir-format
+msgid "No More."
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/cal_all_depreciation.ex:30
+#, elixir-autogen, elixir-format
+msgid "No depreciation calculated!!"
+msgstr ""
+
+#: lib/full_circle_web/active_company.ex:35
+#, elixir-autogen, elixir-format
+msgid "Not Authorise."
+msgstr ""
+
+#: lib/full_circle_web/live/invoice_live/form.ex:366
+#: lib/full_circle_web/live/pur_invoice_live/form.ex:385
+#, elixir-autogen, elixir-format
+msgid "Pack Qty"
+msgstr ""
+
+#: lib/full_circle_web/live/invoice_live/form.ex:365
+#: lib/full_circle_web/live/pur_invoice_live/form.ex:384
+#, elixir-autogen, elixir-format
+msgid "Package"
+msgstr ""
+
+#: lib/full_circle_web/live/goods_live/form_component.ex:296
+#, elixir-autogen, elixir-format
+msgid "Package Name"
+msgstr ""
+
+#: lib/full_circle_web/live/goods_live/index_component.ex:32
+#, elixir-autogen, elixir-format
+msgid "Packagings"
+msgstr ""
+
+#: lib/full_circle_web/live/invoice_live/index.ex:99
+#: lib/full_circle_web/live/journal_entry_view_live/component.ex:75
+#: lib/full_circle_web/live/pur_invoice_live/index.ex:80
+#: lib/full_circle_web/live/receipt_live/index.ex:83
+#: lib/full_circle_web/live/transaction_live/account.ex:149
+#: lib/full_circle_web/live/transaction_live/contact.ex:197
+#, elixir-autogen, elixir-format
+msgid "Particulars"
+msgstr ""
+
+#: lib/full_circle_web/controllers/user_session_controller.ex:33
+#, elixir-autogen, elixir-format, fuzzy
+msgid "Please Confirm your Account."
+msgstr "确认账户"
+
+#: lib/full_circle_web/live/user_live/new.ex:118
+#, elixir-autogen, elixir-format
+msgid "Please contact your user"
+msgstr ""
+
+#: lib/full_circle_web/components/core_components.ex:842
+#: lib/full_circle_web/live/invoice_live/index.ex:81
+#: lib/full_circle_web/live/receipt_live/index.ex:65
+#, elixir-autogen, elixir-format
+msgid "Pre Print"
+msgstr ""
+
+#: lib/full_circle_web/live/invoice_live/form.ex:369
+#: lib/full_circle_web/live/pur_invoice_live/form.ex:388
+#, elixir-autogen, elixir-format
+msgid "Price"
+msgstr ""
+
+#: lib/full_circle_web/components/core_components.ex:822
+#: lib/full_circle_web/components/layouts/print_root.html.heex:36
+#: lib/full_circle_web/live/invoice_live/index.ex:71
+#: lib/full_circle_web/live/receipt_live/index.ex:55
+#, elixir-autogen, elixir-format
+msgid "Print"
+msgstr ""
+
+#: lib/full_circle_web/live/goods_live/form_component.ex:278
+#, elixir-autogen, elixir-format
+msgid "Purchase Account"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/form_component.ex:204
+#, elixir-autogen, elixir-format
+msgid "Purchase Date"
+msgstr ""
+
+#: lib/full_circle_web/live/pur_invoice_live/index.ex:115
+#, elixir-autogen, elixir-format
+msgid "Purchase Invoice Listing"
+msgstr ""
+
+#: lib/full_circle_web/live/pur_invoice_live/form.ex:281
+#, elixir-autogen, elixir-format
+msgid "Purchase Invoice created successfully."
+msgstr ""
+
+#: lib/full_circle_web/live/pur_invoice_live/form.ex:312
+#, elixir-autogen, elixir-format
+msgid "Purchase Invoice updated successfully."
+msgstr ""
+
+#: lib/full_circle_web/live/dashboard_live/dashboard_live.ex:37
+#, elixir-autogen, elixir-format
+msgid "Purchase Invoices"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/form_component.ex:213
+#, elixir-autogen, elixir-format
+msgid "Purchase Price"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/index_component.ex:53
+#, elixir-autogen, elixir-format
+msgid "Purchase Price:"
+msgstr ""
+
+#: lib/full_circle_web/live/goods_live/form_component.ex:287
+#, elixir-autogen, elixir-format
+msgid "Purchase TaxCode"
+msgstr ""
+
+#: lib/full_circle_web/live/invoice_live/form.ex:367
+#: lib/full_circle_web/live/pur_invoice_live/form.ex:386
+#, elixir-autogen, elixir-format
+msgid "Quantity"
+msgstr ""
+
+#: lib/full_circle_web/live/transaction_live/account.ex:111
+#: lib/full_circle_web/live/transaction_live/contact.ex:160
+#, elixir-autogen, elixir-format
+msgid "Query"
+msgstr ""
+
+#: lib/full_circle_web/live/tax_code_live/form_component.ex:154
+#, elixir-autogen, elixir-format
+msgid "Rate (example:- 6% = 0.06, 10% = 0.1)"
+msgstr ""
+
+#: lib/full_circle_web/live/receipt_live/form_component.ex:261
+#, elixir-autogen, elixir-format
+msgid "Receipt Amount"
+msgstr ""
+
+#: lib/full_circle_web/live/receipt_live/form_component.ex:267
+#, elixir-autogen, elixir-format
+msgid "Receipt Date"
+msgstr ""
+
+#: lib/full_circle_web/live/receipt_live/index.ex:139
+#, elixir-autogen, elixir-format
+msgid "Receipt Listing"
+msgstr ""
+
+#: lib/full_circle_web/live/receipt_live/index.ex:77
+#, elixir-autogen, elixir-format
+msgid "Receipt No"
+msgstr ""
+
+#: lib/full_circle_web/live/dashboard_live/dashboard_live.ex:33
+#, elixir-autogen, elixir-format
+msgid "Receipts"
+msgstr ""
+
+#: lib/full_circle_web/live/receipt_live/form_component.ex:244
+#, elixir-autogen, elixir-format
+msgid "Receive From"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/form_component.ex:236
+#, elixir-autogen, elixir-format
+msgid "Residual Value"
+msgstr ""
+
+#: lib/full_circle_web/live/user_live/new.ex:86
+#, elixir-autogen, elixir-format
+msgid "Role"
+msgstr ""
+
+#: lib/full_circle_web/live/goods_live/form_component.ex:257
+#, elixir-autogen, elixir-format
+msgid "Sales Account"
+msgstr ""
+
+#: lib/full_circle_web/live/goods_live/form_component.ex:266
+#, elixir-autogen, elixir-format
+msgid "Sales TaxCode"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/cal_all_depreciation.ex:125
+#: lib/full_circle_web/live/fixed_asset_live/depreciation.ex:425
+#, elixir-autogen, elixir-format
+msgid "Save Generated Depreciations"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/depreciation.ex:299
+#, elixir-autogen, elixir-format
+msgid "Saved Depreciations"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/disposal.ex:264
+#, elixir-autogen, elixir-format
+msgid "Saved Disposals"
+msgstr ""
+
+#: lib/full_circle_web/live/dashboard_live/dashboard_live.ex:11
+#, elixir-autogen, elixir-format
+msgid "Seeding"
+msgstr ""
+
+#: lib/full_circle_web/live/seed_live/index.ex:34
+#, elixir-autogen, elixir-format
+msgid "Seeding Database"
+msgstr ""
+
+#: lib/full_circle_web/live/seed_live/index.ex:280
+#, elixir-autogen, elixir-format, fuzzy
+msgid "Start Seed"
+msgstr ""
+
+#: lib/full_circle_web/live/user_live/new.ex:50
+#, elixir-autogen, elixir-format
+msgid "Successfully added"
+msgstr ""
+
+#: lib/full_circle_web/live/user_live/index.ex:90
+#, elixir-autogen, elixir-format
+msgid "Successfully updated user role to "
+msgstr ""
+
+#: lib/full_circle_web/live/pur_invoice_live/form.ex:362
+#, elixir-autogen, elixir-format
+msgid "Supplier"
+msgstr ""
+
+#: lib/full_circle_web/live/invoice_live/form.ex:504
+#: lib/full_circle_web/live/pur_invoice_live/form.ex:523
+#, elixir-autogen, elixir-format
+msgid "Tags"
+msgstr ""
+
+#: lib/full_circle_web/live/invoice_live/form.ex:384
+#: lib/full_circle_web/live/pur_invoice_live/form.ex:403
+#, elixir-autogen, elixir-format
+msgid "Tax Amt"
+msgstr ""
+
+#: lib/full_circle_web/live/invoice_live/form.ex:381
+#: lib/full_circle_web/live/pur_invoice_live/form.ex:400
+#, elixir-autogen, elixir-format
+msgid "Tax%"
+msgstr ""
+
+#: lib/full_circle_web/live/invoice_live/form.ex:379
+#: lib/full_circle_web/live/pur_invoice_live/form.ex:398
+#, elixir-autogen, elixir-format
+msgid "TaxCode"
+msgstr ""
+
+#: lib/full_circle_web/live/tax_code_live/index.ex:28
+#, elixir-autogen, elixir-format
+msgid "TaxCode Information"
+msgstr ""
+
+#: lib/full_circle_web/live/tax_code_live/index.ex:68
+#, elixir-autogen, elixir-format
+msgid "TaxCode Listing"
+msgstr ""
+
+#: lib/full_circle_web/live/tax_code_live/form_component.ex:146
+#, elixir-autogen, elixir-format
+msgid "TaxCode Type"
+msgstr ""
+
+#: lib/full_circle_web/live/dashboard_live/dashboard_live.ex:23
+#, elixir-autogen, elixir-format
+msgid "TaxCodes"
+msgstr ""
+
+#: lib/full_circle_web/live/transaction_live/account.ex:102
+#: lib/full_circle_web/live/transaction_live/contact.ex:151
+#, elixir-autogen, elixir-format
+msgid "To"
+msgstr ""
+
+#: lib/full_circle_web/live/goods_live/form_component.ex:249
+#: lib/full_circle_web/live/invoice_live/form.ex:368
+#: lib/full_circle_web/live/pur_invoice_live/form.ex:387
+#, elixir-autogen, elixir-format
+msgid "Unit"
+msgstr ""
+
+#: lib/full_circle_web/live/goods_live/form_component.ex:299
+#, elixir-autogen, elixir-format
+msgid "Unit Multiplier"
+msgstr ""
+
+#: lib/full_circle_web/live/fixed_asset_live/cal_all_depreciation.ex:88
+#, elixir-autogen, elixir-format
+msgid "Until"
+msgstr ""
+
+#: lib/full_circle_web/live/transaction_live/contact.ex:90
+#, elixir-autogen, elixir-format
+msgid "Updated successfully."
+msgstr ""
+
+#: lib/full_circle_web/live/user_live/index.ex:70
+#, elixir-autogen, elixir-format, fuzzy
+msgid "User List"
+msgstr ""
+
+#: lib/full_circle_web/live/account_live/index.ex:160
+#: lib/full_circle_web/live/contact_live/index.ex:163
+#: lib/full_circle_web/live/fixed_asset_live/index.ex:192
+#: lib/full_circle_web/live/goods_live/index.ex:216
+#: lib/full_circle_web/live/invoice_live/form.ex:279
+#: lib/full_circle_web/live/pur_invoice_live/form.ex:295
+#: lib/full_circle_web/live/receipt_live/index.ex:325
+#: lib/full_circle_web/live/tax_code_live/index.ex:162
+#: lib/full_circle_web/live/transaction_live/contact.ex:110
+#, elixir-autogen, elixir-format
+msgid "You are not authorised to perform this action"
+msgstr ""
+
+#: lib/full_circle_web/live/receipt_live/index.ex:92
+#, elixir-autogen, elixir-format, fuzzy
+msgid "action"
+msgstr "动作"
+
+#: lib/full_circle/accounting.ex:538
+#, elixir-autogen, elixir-format
+msgid "cannot be earlier than "
+msgstr ""
+
+#: lib/full_circle/accounting/tax_code.ex:37
+#: lib/full_circle/accounting/tax_code.ex:41
+#, elixir-autogen, elixir-format, fuzzy
+msgid "code already in company"
+msgstr ""
+
+#: lib/full_circle/billing/invoice.ex:50
+#, elixir-autogen, elixir-format
+msgid "invoice no already in company"
+msgstr ""
+
+#: lib/full_circle_web/live/user_live/index.ex:48
+#: lib/full_circle_web/live/user_live/index.ex:50
+#, elixir-autogen, elixir-format
+msgid "is"
+msgstr ""
+
+#: lib/full_circle/billing/invoice.ex:65
+#: lib/full_circle/billing/pur_invoice.ex:68
+#, elixir-autogen, elixir-format
+msgid "must be greater than 0.01"
+msgstr ""
+
+#: lib/full_circle/sys/user_setting.ex:20
+#, elixir-autogen, elixir-format
+msgid "page and code already in setting"
+msgstr ""
+
+#: lib/full_circle/billing/pur_invoice.ex:53
+#, elixir-autogen, elixir-format
+msgid "pur_invoice no already in company"
+msgstr ""
+
+#: lib/full_circle/receive_funds/receipt.ex:53
+#, elixir-autogen, elixir-format
+msgid "receipt no already in company"
+msgstr ""
+
+#: lib/full_circle/accounting/account.ex:44
+#: lib/full_circle/accounting/account.ex:48
+#: lib/full_circle/accounting/tax_code.ex:54
+#: lib/full_circle/accounting/tax_code.ex:58
+#, elixir-autogen, elixir-format
+msgid "referenced by goods"
+msgstr ""
+
+#: lib/full_circle/accounting/account.ex:36
+#: lib/full_circle/accounting/tax_code.ex:46
+#: lib/full_circle/product/good.ex:80
+#: lib/full_circle/product/packaging.ex:42
+#, elixir-autogen, elixir-format
+msgid "referenced by invoice details"
+msgstr ""
+
+#: lib/full_circle/accounting/contact.ex:53
+#, elixir-autogen, elixir-format
+msgid "referenced by invoices"
+msgstr ""
+
+#: lib/full_circle/accounting/account.ex:40
+#: lib/full_circle/accounting/tax_code.ex:50
+#: lib/full_circle/product/good.ex:84
+#: lib/full_circle/product/packaging.ex:46
+#, elixir-autogen, elixir-format
+msgid "referenced by pur_invoice details"
+msgstr ""
+
+#: lib/full_circle/accounting/contact.ex:57
+#, elixir-autogen, elixir-format
+msgid "referenced by pur_invoices"
+msgstr ""
+
+#: lib/full_circle/accounting/fixed_asset.ex:91
+#, elixir-autogen, elixir-format
+msgid "referenced by transactions"
+msgstr ""
+
+#: lib/full_circle/accounting.ex:517
+#, elixir-autogen, elixir-format
+msgid "same depreciation date existed"
+msgstr ""
+
+#: lib/full_circle_web/live/user_live/new.ex:50
+#, elixir-autogen, elixir-format
+msgid "to company"
+msgstr ""
+
+#: lib/full_circle_web/controllers/user_session_controller.ex:8
+#, elixir-autogen, elixir-format
+msgid "Account created successfully!"
+msgstr ""
+
+#: lib/full_circle_web/components/core_components.ex:188
+#, elixir-autogen, elixir-format
+msgid "Error!"
+msgstr "错误！"
+
+#: lib/full_circle_web/controllers/user_session_controller.ex:39
+#, elixir-autogen, elixir-format
+msgid "Invalid email or password"
+msgstr "无效的电子邮件或密码"
+
+#: lib/full_circle_web/controllers/user_session_controller.ex:47
+#, elixir-autogen, elixir-format
+msgid "Logged out successfully."
+msgstr "退出成功。"
+
+#: lib/full_circle_web/controllers/user_session_controller.ex:14
+#, elixir-autogen, elixir-format, fuzzy
+msgid "Password updated successfully!"
+msgstr ""
+
+#: lib/full_circle_web/components/core_components.ex:186
+#, elixir-autogen, elixir-format
+msgid "Success!"
+msgstr "成功!"
+
+#: lib/full_circle_web/components/core_components.ex:187
+#, elixir-autogen, elixir-format
+msgid "Warning!"
+msgstr "警告!"
+
+#: lib/full_circle_web/components/core_components.ex:192
+#, elixir-autogen, elixir-format
+msgid "We can't find the internet"
+msgstr ""
+
+#: lib/full_circle_web/controllers/user_session_controller.ex:18
+#, elixir-autogen, elixir-format
+msgid "Welcome back!"
+msgstr "欢迎回来！"
