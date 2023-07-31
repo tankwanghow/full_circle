@@ -449,7 +449,7 @@ defmodule FullCircle.Billing do
     qry =
       case bal do
         "Paid" -> from inv in qry, where: inv.balance == 0
-        "Unpaid" -> from inv in qry, where: inv.balance > 0
+        "Unpaid" -> from inv in qry, where: inv.balance < 0
         _ -> qry
       end
 
