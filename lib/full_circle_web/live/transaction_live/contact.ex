@@ -5,66 +5,79 @@ defmodule FullCircleWeb.TransactionLive.Contact do
 
   @impl true
   def mount(_params, _session, socket) do
-    objects = []
-
     socket =
       socket
-      |> assign(contact_names: [])
       |> assign(page_title: "Contact Transactions")
-      |> assign(search: %{name: "", f_date: Date.utc_today(), t_date: Date.utc_today()})
-      |> assign(:objects, objects)
-      |> assign(valid?: false)
-      |> assign(objects_count: 0)
-      |> assign(objects_balance: Decimal.new("0"))
-      |> assign(live_action: nil)
 
     {:ok, socket}
   end
 
   @impl true
-  def handle_event("query", _, socket) do
-    {:noreply, socket |> filter_transactions()}
+  def handle_params(params, _uri, socket) do
+    params = params["search"]
+
+    name = params["name"] || ""
+    f_date = params["f_date"] || ""
+    t_date = params["t_date"] || ""
+
+    {:noreply,
+     socket
+     |> assign(search: %{name: name, f_date: f_date, t_date: t_date})
+     |> filter_transactions(name, f_date, t_date)}
   end
 
   @impl true
   def handle_event(
-        "validate",
-        %{"_target" => ["search", _], "search" => params},
+        "query",
+        %{
+          "search" => %{
+            "name" => name,
+            "f_date" => f_date,
+            "t_date" => t_date
+          }
+        },
         socket
       ) do
-    {l, v} =
-      FullCircleWeb.Helpers.list_n_value(socket, params["name"], &Accounting.contact_names/3)
+    qry = %{
+      "search[name]" => name,
+      "search[f_date]" => f_date,
+      "search[t_date]" => t_date
+    }
 
-    socket =
-      socket
-      |> assign(
-        contact: if(v, do: FullCircle.StdInterface.get!(Accounting.Contact, v.id), else: nil)
-      )
-      |> assign(contact_names: l)
-      |> assign(
-        search: %{name: params["name"], f_date: params["f_date"], t_date: params["t_date"]}
-      )
-      |> assign(valid?: !is_nil(v) and params["f_date"] != "" and params["t_date"] != "")
+    url =
+      "/companies/#{socket.assigns.current_company.id}/contact_transactions?#{URI.encode_query(qry)}"
 
-    {:noreply, socket}
+    {:noreply,
+     socket
+     |> push_patch(to: url)}
   end
 
-  @impl true
-  def handle_event("modal_cancel", _, socket) do
-    {:noreply, socket |> assign(live_action: nil)}
-  end
-
-  defp filter_transactions(socket) do
+  defp filter_transactions(socket, name, f_date, t_date) do
     objects =
-      Reporting.contact_transactions(
-        socket.assigns.contact,
-        Date.from_iso8601!(socket.assigns.search.f_date),
-        Date.from_iso8601!(socket.assigns.search.t_date),
-        socket.assigns.current_company
-      )
+      if String.trim(name) == "" or f_date == "" or t_date == "" do
+        []
+      else
+        contact =
+          Accounting.get_contact_by_name(
+            name,
+            socket.assigns.current_company,
+            socket.assigns.current_user
+          )
+
+        if !is_nil(contact) do
+          Reporting.contact_transactions(
+            contact,
+            Date.from_iso8601!(f_date),
+            Date.from_iso8601!(t_date),
+            socket.assigns.current_company
+          )
+        else
+          []
+        end
+      end
 
     socket
-    |> assign(:objects, objects)
+    |> assign(objects: objects)
     |> assign(objects_count: Enum.count(objects))
     |> assign(
       objects_balance:
@@ -72,69 +85,23 @@ defmodule FullCircleWeb.TransactionLive.Contact do
     )
   end
 
-  ######################################
-  @impl true
-  def handle_info({:show_form, map}, socket) do
-    socket = socket |> assign(map)
-    {:noreply, socket |> assign(live_action: :edit)}
-  end
-
-  @impl true
-  def handle_info({:updated, _obj}, socket) do
-    {:noreply,
-     socket
-     |> assign(live_action: nil)
-     |> filter_transactions()
-     |> put_flash(
-       :info,
-       "#{gettext("Updated successfully.")}"
-     )}
-  end
-
-  @impl true
-  def handle_info({:error, failed_operation, failed_value}, socket) do
-    {:noreply,
-     socket
-     |> assign(live_action: nil)
-     |> put_flash(
-       :error,
-       "#{gettext("Failed")} #{failed_operation}. #{list_errors_to_string(failed_value.errors)}"
-     )}
-  end
-
-  @impl true
-  def handle_info(:not_authorise, socket) do
-    {:noreply,
-     socket
-     |> assign(live_action: nil)
-     |> put_flash(:error, gettext("You are not authorised to perform this action"))}
-  end
-
-  @impl true
-  def handle_info({:sql_error, msg}, socket) do
-    {:noreply,
-     socket
-     |> assign(live_action: nil)
-     |> put_flash(:error, msg)}
-  end
-
-  ######################################
-
   @impl true
   def render(assigns) do
     ~H"""
     <div class="w-11/12 mx-auto">
       <p class="text-2xl text-center font-medium"><%= "#{@page_title}" %></p>
       <div class="border rounded bg-amber-200 text-center p-2">
-        <.form for={%{}} id="search-form" phx-submit="query" autocomplete="off" phx-change="validate">
+        <.form for={%{}} id="search-form" phx-submit="query" autocomplete="off">
           <div class="grid grid-cols-12 tracking-tighter">
             <div class="col-span-6">
               <.input
-                label={gettext("Contact")}
+                label={gettext("Account")}
                 id="search_name"
                 name="search[name]"
-                list="contact_names"
                 value={@search.name}
+                phx-hook="tributeAutoComplete"
+                phx-debounce="blur"
+                url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
               />
             </div>
             <div class="col-span-2">
@@ -156,13 +123,13 @@ defmodule FullCircleWeb.TransactionLive.Contact do
               />
             </div>
             <div class="col-span-2 mt-6">
-              <.button disabled={!@valid?}>
+              <.button>
                 <%= gettext("Query") %>
               </.button>
               <.link
                 :if={@objects_count > 0}
                 class="blue_button mr-1"
-                patch={
+                navigate={
                   ~p"/companies/#{@current_company.id}/print_transactions?report=contacttrans&name=#{@search.name}&fdate=#{@search.f_date}&tdate=#{@search.t_date}"
                 }
                 target="_blank"
@@ -260,24 +227,6 @@ defmodule FullCircleWeb.TransactionLive.Contact do
         </div>
       </div>
     </div>
-    <.modal
-      :if={@live_action in [:new, :edit]}
-      id="object-crud-modal"
-      show
-      max_w="max-w-full"
-      on_cancel={JS.push("modal_cancel")}
-    >
-      <.live_component
-        module={@module}
-        id={@id}
-        title={@title}
-        live_action={@live_action}
-        form={@form}
-        current_company={@current_company}
-        current_user={@current_user}
-      />
-    </.modal>
-    <%= datalist_with_ids(@contact_names, "contact_names") %>
     """
   end
 end

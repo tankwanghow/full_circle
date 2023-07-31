@@ -28,7 +28,7 @@ defmodule FullCircleWeb.InvoiceLive.Form do
     socket
     |> assign(live_action: :new)
     |> assign(id: "new")
-    |> assign(title: gettext("New Invoice"))
+    |> assign(page_title: gettext("New Invoice"))
     |> assign(
       :form,
       to_form(
@@ -53,7 +53,7 @@ defmodule FullCircleWeb.InvoiceLive.Form do
     socket
     |> assign(live_action: :edit)
     |> assign(id: id)
-    |> assign(title: gettext("Edit Invoice") <> " " <> object.invoice_no)
+    |> assign(page_title: gettext("Edit Invoice") <> " " <> object.invoice_no)
     |> assign(
       :form,
       to_form(StdInterface.changeset(Invoice, object, %{}, socket.assigns.current_company))
@@ -245,7 +245,8 @@ defmodule FullCircleWeb.InvoiceLive.Form do
     save(socket, socket.assigns.live_action, params)
   end
 
-  def handle_params(params, uri, socket) do
+  @impl true
+  def handle_params(_params, uri, socket) do
     {:noreply, socket |> assign(cancel_url: uri)}
   end
 
@@ -334,7 +335,7 @@ defmodule FullCircleWeb.InvoiceLive.Form do
   def render(assigns) do
     ~H"""
     <div class="border rounded-lg border-yellow-500 bg-yellow-100 p-4">
-      <p class="w-full text-3xl text-center font-medium"><%= @title %></p>
+      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
       <.form for={@form} id="object-form" autocomplete="off" phx-change="validate" phx-submit="save">
         <%= Phoenix.HTML.Form.hidden_input(@form, :invoice_no) %>
         <div class="flex flex-row flex-nowarp">
@@ -345,7 +346,7 @@ defmodule FullCircleWeb.InvoiceLive.Form do
               label={gettext("Customer")}
               phx-hook="tributeAutoComplete"
               phx-debounce="blur"
-              url={"/api/companies/#{@current_company.id}/autocomplete?schema=contact&name="}
+              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
             />
           </div>
           <div class="grow shrink w-1/4">
@@ -395,7 +396,7 @@ defmodule FullCircleWeb.InvoiceLive.Form do
                 field={dtl[:good_name]}
                 phx-hook="tributeAutoComplete"
                 phx-debounce="blur"
-                url={"/api/companies/#{@current_company.id}/autocomplete?schema=good&name="}
+                url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=good&name="}
               />
             </div>
             <%= Phoenix.HTML.Form.hidden_input(dtl, :good_id) %>
@@ -405,7 +406,7 @@ defmodule FullCircleWeb.InvoiceLive.Form do
                 field={dtl[:package_name]}
                 phx-hook="tributeAutoComplete"
                 phx-debounce="blur"
-                url={"/api/companies/#{@current_company.id}/autocomplete?schema=packaging&good_id=#{dtl[:good_id].value}&name="}
+                url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=packaging&good_id=#{dtl[:good_id].value}&name="}
               />
             </div>
             <%= Phoenix.HTML.Form.hidden_input(dtl, :unit_multiplier) %>
@@ -433,7 +434,7 @@ defmodule FullCircleWeb.InvoiceLive.Form do
                 field={dtl[:account_name]}
                 phx-hook="tributeAutoComplete"
                 phx-debounce="blur"
-                url={"/api/companies/#{@current_company.id}/autocomplete?schema=account&name="}
+                url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=account&name="}
               />
             </div>
             <%= Phoenix.HTML.Form.hidden_input(dtl, :account_id) %>
@@ -442,7 +443,7 @@ defmodule FullCircleWeb.InvoiceLive.Form do
                 field={dtl[:tax_code_name]}
                 phx-hook="tributeAutoComplete"
                 phx-debounce="blur"
-                url={"/api/companies/#{@current_company.id}/autocomplete?schema=saltaxcode&name="}
+                url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=saltaxcode&name="}
               />
             </div>
             <%= Phoenix.HTML.Form.hidden_input(dtl, :tax_code_id) %>
@@ -503,7 +504,7 @@ defmodule FullCircleWeb.InvoiceLive.Form do
               label={gettext("Tags")}
               type="textarea"
               phx-hook="tributeTagTextArea"
-              url={"/api/companies/#{@current_company.id}/tags?klass=FullCircle.Billing.Invoice&tag="}
+              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/tags?klass=FullCircle.Billing.Invoice&tag="}
             />
           </div>
         </div>
@@ -512,9 +513,7 @@ defmodule FullCircleWeb.InvoiceLive.Form do
           <.link :if={@changed} navigate={@cancel_url} class="orange_button">
             <%= gettext("Cancel") %>
           </.link>
-          <.link patch={~p"/companies/#{@current_company.id}/invoices"} class="blue_button">
-            <%= gettext("Index") %>
-          </.link>
+          <a onclick="history.back();" class="blue_button"><%= gettext("Back") %></a>
           <.link
             :if={@live_action == :edit}
             navigate={~p"/companies/#{@current_company.id}/invoices/new"}

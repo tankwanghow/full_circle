@@ -1,10 +1,7 @@
 defmodule FullCircleWeb.InvoiceLive.Index do
   use FullCircleWeb, :live_view
 
-  # alias FullCircle.Billing.Invoice
   alias FullCircle.Billing
-  # alias FullCircle.StdInterface
-  alias FullCircleWeb.InvoiceLive.FormComponent
   alias FullCircleWeb.InvoiceLive.IndexComponent
 
   @per_page 25
@@ -60,12 +57,16 @@ defmodule FullCircleWeb.InvoiceLive.Index do
         </.form>
       </div>
       <div class="text-center mb-2">
-        <.link navigate={~p"/companies/#{@current_company.id}/invoices/new"} class="blue_button" id="new_invoice">
+        <.link
+          navigate={~p"/companies/#{@current_company.id}/invoices/new"}
+          class="blue_button"
+          id="new_invoice"
+        >
           <%= gettext("New Invoice") %>
         </.link>
         <.link
           :if={@ids != ""}
-          patch={
+          navigate={
             ~p"/companies/#{@current_company.id}/invoices/print_multi?pre_print=false&ids=#{@ids}"
           }
           target="_blank"
@@ -75,7 +76,7 @@ defmodule FullCircleWeb.InvoiceLive.Index do
         </.link>
         <.link
           :if={@ids != ""}
-          patch={
+          navigate={
             ~p"/companies/#{@current_company.id}/invoices/print_multi?pre_print=true&ids=#{@ids}"
           }
           target="_blank"
@@ -135,11 +136,27 @@ defmodule FullCircleWeb.InvoiceLive.Index do
     socket =
       socket
       |> assign(page_title: gettext("Invoice Listing"))
-      |> assign(selected_invoices: [])
-      |> assign(ids: "")
-      |> filter_objects("", "stream", "", "", "", 1)
 
     {:ok, socket}
+  end
+
+  @impl true
+  def handle_params(params, _uri, socket) do
+    params = params["search"]
+
+    terms = params["terms"] || ""
+    bal = params["balance"] || ""
+    invoice_date = params["invoice_date"] || ""
+    due_date = params["due_date"] || ""
+
+    {:noreply,
+     socket
+     |> assign(
+       search: %{terms: terms, balance: bal, invoice_date: invoice_date, due_date: due_date}
+     )
+     |> assign(selected_invoices: [])
+     |> assign(ids: "")
+     |> filter_objects(terms, "replace", invoice_date, due_date, bal, 1)}
   end
 
   @impl true
@@ -205,12 +222,26 @@ defmodule FullCircleWeb.InvoiceLive.Index do
   @impl true
   def handle_event(
         "search",
-        %{"search" => %{"terms" => terms, "invoice_date" => id, "due_date" => dd, "balance" => bal}},
+        %{
+          "search" => %{
+            "terms" => terms,
+            "invoice_date" => id,
+            "due_date" => dd,
+            "balance" => bal
+          }
+        },
         socket
       ) do
-    {:noreply,
-     socket
-     |> filter_objects(terms, "replace", id, dd, bal, 1)}
+    qry = %{
+      "search[terms]" => terms,
+      "search[balance]" => bal,
+      "search[invoice_date]" => id,
+      "search[due_date]" => dd
+    }
+
+    url = "/companies/#{socket.assigns.current_company.id}/invoices?#{URI.encode_query(qry)}"
+
+    {:noreply, socket |> push_patch(to: url)}
   end
 
   defp filter_objects(socket, terms, update, invoice_date, due_date, bal, page) do
@@ -230,11 +261,8 @@ defmodule FullCircleWeb.InvoiceLive.Index do
 
     socket
     |> assign(page: page, per_page: @per_page)
-    |> assign(search: %{terms: terms, balance: bal, invoice_date: invoice_date, due_date: due_date})
     |> assign(update: update)
     |> stream(:objects, objects, reset: obj_count == 0)
-    |> assign(selected_invoices: [])
-    |> assign(ids: "")
     |> assign(end_of_timeline?: obj_count < @per_page)
   end
 end

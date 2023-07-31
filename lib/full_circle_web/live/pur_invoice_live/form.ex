@@ -61,6 +61,11 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
   end
 
   @impl true
+  def handle_params(params, uri, socket) do
+    {:noreply, socket |> assign(cancel_url: uri)}
+  end
+
+  @impl true
   def handle_event("add_detail", _, socket) do
     socket = socket |> FullCircleWeb.Helpers.add_line(:pur_invoice_details, %PurInvoiceDetail{})
     {:noreply, socket}
@@ -338,7 +343,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
 
     socket = assign(socket, form: to_form(changeset))
 
-    {:noreply, socket}
+    {:noreply, socket |> assign(changed: Enum.any?(changeset.changes))}
   end
 
   @impl true
@@ -356,7 +361,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
               label={gettext("Supplier")}
               phx-hook="tributeAutoComplete"
               phx-debounce="blur"
-              url={"/api/companies/#{@current_company.id}/autocomplete?schema=contact&name="}
+              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
             />
           </div>
           <div class="grow shrink w-3/12">
@@ -409,7 +414,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
                 field={dtl[:good_name]}
                 phx-hook="tributeAutoComplete"
                 phx-debounce="blur"
-                url={"/api/companies/#{@current_company.id}/autocomplete?schema=good&name="}
+                url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=good&name="}
               />
             </div>
             <%= Phoenix.HTML.Form.hidden_input(dtl, :good_id) %>
@@ -419,7 +424,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
                 field={dtl[:package_name]}
                 phx-hook="tributeAutoComplete"
                 phx-debounce="blur"
-                url={"/api/companies/#{@current_company.id}/autocomplete?schema=packaging&good_id=#{dtl[:good_id].value}&name="}
+                url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=packaging&good_id=#{dtl[:good_id].value}&name="}
               />
             </div>
             <%= Phoenix.HTML.Form.hidden_input(dtl, :unit_multiplier) %>
@@ -447,7 +452,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
                 field={dtl[:account_name]}
                 phx-hook="tributeAutoComplete"
                 phx-debounce="blur"
-                url={"/api/companies/#{@current_company.id}/autocomplete?schema=account&name="}
+                url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=account&name="}
               />
             </div>
             <%= Phoenix.HTML.Form.hidden_input(dtl, :account_id) %>
@@ -456,7 +461,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
                 field={dtl[:tax_code_name]}
                 phx-hook="tributeAutoComplete"
                 phx-debounce="blur"
-                url={"/api/companies/#{@current_company.id}/autocomplete?schema=purtaxcode&name="}
+                url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=purtaxcode&name="}
               />
             </div>
             <%= Phoenix.HTML.Form.hidden_input(dtl, :tax_code_id) %>
@@ -517,22 +522,20 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
               label={gettext("Tags")}
               type="textarea"
               phx-hook="tributeTagTextArea"
-              url={"/api/companies/#{@current_company.id}/tags?klass=FullCircle.Billing.PurInvoice&tag="}
+              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/tags?klass=FullCircle.Billing.PurInvoice&tag="}
             />
           </div>
         </div>
 
         <div class="flex flex-row justify-center gap-x-1 mt-1">
           <.button disabled={!@form.source.valid?}><%= gettext("Save") %></.button>
+          <a onclick="history.back();" class="blue_button"><%= gettext("Back") %></a>
           <.link :if={@changed} navigate={@cancel_url} class="orange_button">
             <%= gettext("Cancel") %>
           </.link>
-          <.link patch={~p"/companies/#{@current_company.id}/pur_invoices"} class="blue_button">
-            <%= gettext("Index") %>
-          </.link>
           <.link
             :if={@live_action == :edit}
-            patch={~p"/companies/#{@current_company.id}/pur_invoices/new"}
+            navigate={~p"/companies/#{@current_company.id}/pur_invoices/new"}
             class="blue_button"
           >
             <%= gettext("New") %>
