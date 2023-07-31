@@ -1,8 +1,8 @@
 defmodule FullCircleWeb.EntityFormLive.Component do
   use FullCircleWeb, :live_component
 
-  alias FullCircle.{Billing, StdInterface}
-  alias FullCircle.Billing.{Invoice, PurInvoice}
+  alias FullCircle.{Billing}
+  # alias FullCircle.Billing.{Invoice, PurInvoice}
 
   @impl true
   def mount(socket) do
@@ -17,8 +17,7 @@ defmodule FullCircleWeb.EntityFormLive.Component do
 
   @impl true
   def handle_event("show_form", %{"entity" => entity, "doc_no" => doc_no}, socket) do
-    send(self(), {:show_form, entity_form(socket, entity, doc_no)})
-    {:noreply, socket}
+    entity_form(socket, entity, doc_no)
   end
 
   def entity_form(socket, "invoices", doc_no) do
@@ -29,12 +28,11 @@ defmodule FullCircleWeb.EntityFormLive.Component do
         socket.assigns.current_user
       )
 
-    %{
-      id: object.id,
-      title: gettext("Edit Invoice") <> " " <> object.invoice_no,
-      module: FullCircleWeb.InvoiceLive.FormComponent,
-      form: to_form(StdInterface.changeset(Invoice, object, %{}, socket.assigns.current_company))
-    }
+    {:noreply,
+     socket
+     |> push_navigate(
+       to: ~p"/companies/#{socket.assigns.current_company.id}/invoices/#{object.id}/edit"
+     )}
   end
 
   def entity_form(socket, "pur_invoices", doc_no) do
@@ -45,13 +43,11 @@ defmodule FullCircleWeb.EntityFormLive.Component do
         socket.assigns.current_user
       )
 
-    %{
-      id: object.id,
-      title: gettext("Edit Purchase Invoice") <> " " <> object.pur_invoice_no,
-      module: FullCircleWeb.PurInvoiceLive.FormComponent,
-      form:
-        to_form(StdInterface.changeset(PurInvoice, object, %{}, socket.assigns.current_company))
-    }
+    {:noreply,
+     socket
+     |> push_navigate(
+       to: ~p"/companies/#{socket.assigns.current_company.id}/pur_invoices/#{object.id}/edit"
+     )}
   end
 
   @impl true

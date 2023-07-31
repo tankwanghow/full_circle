@@ -104,7 +104,7 @@ defmodule FullCircleWeb.CompanyLive.Form do
             confirm={JS.push("delete")}
           />
         <% end %>
-        <.link patch="/companies" class="blue_button">
+        <.link navigate="/companies" class="blue_button">
           <%= gettext("Back") %>
         </.link>
       </div>

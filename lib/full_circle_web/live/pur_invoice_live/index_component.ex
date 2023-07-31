@@ -47,7 +47,7 @@ defmodule FullCircleWeb.PurInvoiceLive.IndexComponent do
         :if={!@obj.old_data}
         class="text-blue-600 w-[10rem] border-b border-gray-400 py-1 hover:cursor-pointer"
       >
-        <.link patch={~p"/companies/#{@obj.company_id}/pur_invoices/#{@obj.id}/edit"}>
+        <.link navigate={~p"/companies/#{@obj.company_id}/pur_invoices/#{@obj.id}/edit"}>
           <%= @obj.pur_invoice_no %>
         </.link>
       </div>

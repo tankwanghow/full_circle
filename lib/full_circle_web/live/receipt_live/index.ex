@@ -46,7 +46,7 @@ defmodule FullCircleWeb.ReceiptLive.Index do
         </.link>
         <.link
           :if={@ids != ""}
-          patch={
+          navigate={
             ~p"/companies/#{@current_company.id}/receipts/print_multi?pre_print=false&ids=#{@ids}"
           }
           target="_blank"
@@ -56,7 +56,7 @@ defmodule FullCircleWeb.ReceiptLive.Index do
         </.link>
         <.link
           :if={@ids != ""}
-          patch={
+          navigate={
             ~p"/companies/#{@current_company.id}/receipts/print_multi?pre_print=true&ids=#{@ids}"
           }
           target="_blank"

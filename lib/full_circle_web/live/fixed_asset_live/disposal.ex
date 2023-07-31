@@ -194,7 +194,7 @@ defmodule FullCircleWeb.FixedAssetLive.Disposals do
       <p class="w-full text-2xl text-center font-medium"><%= "#{@title} for #{@ass.name}" %></p>
       <div class="text-center m-4">
         <.link
-          patch={~p"/companies/#{@current_company.id}/fixed_assets?terms=#{@terms}"}
+          navigate={~p"/companies/#{@current_company.id}/fixed_assets?terms=#{@terms}"}
           class="blue_button"
         >
           <%= gettext("Back Fixed Assets Listing") %>

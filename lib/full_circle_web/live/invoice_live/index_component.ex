@@ -44,7 +44,7 @@ defmodule FullCircleWeb.InvoiceLive.IndexComponent do
         <%= @obj.due_date %>
       </div>
       <div :if={!@obj.old_data} class="text-blue-600 w-[10rem] border-b border-gray-400 py-1 hover:cursor-pointer">
-        <.link patch={~p"/companies/#{@obj.company_id}/invoices/#{@obj.id}/edit"}><%= @obj.invoice_no %></.link>
+        <.link navigate={~p"/companies/#{@obj.company_id}/invoices/#{@obj.id}/edit"}><%= @obj.invoice_no %></.link>
       </div>
       <div :if={@obj.old_data}
         class="w-[10rem] border-b border-gray-400 py-1"

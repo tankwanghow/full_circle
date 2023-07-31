@@ -22,7 +22,7 @@ defmodule FullCircleWeb.FixedAssetLive.Index do
           <%= gettext("New Fixed Asset") %>
         </.link>
         <.link
-          patch={~p"/companies/#{@current_company.id}/fixed_assets/calalldepre"}
+          navigate={~p"/companies/#{@current_company.id}/fixed_assets/calalldepre"}
           class="blue_button"
           id="calculate_depre"
         >

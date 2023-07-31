@@ -14,7 +14,7 @@ defmodule FullCircleWeb.CompanyLiveIndex do
         >
           <%= if FullCircle.Authorization.can?(@current_user, :update_company, c) do %>
             <.link
-              patch={~p"/edit_company/#{c.company_id}"}
+              navigate={~p"/edit_company/#{c.company_id}"}
               class="text-blue-800 text-3xl font-bold"
             >
               <%= c.name %>
@@ -50,7 +50,7 @@ defmodule FullCircleWeb.CompanyLiveIndex do
             <.link
               class="set-active blue_button mx-2"
               phx-value-id={c.company_id}
-              patch={~p"/companies/#{c.company_id}/dashboard"}
+              navigate={~p"/companies/#{c.company_id}/dashboard"}
             >
               <%= gettext("Set Active") %>
             </.link>
@@ -78,7 +78,7 @@ defmodule FullCircleWeb.CompanyLiveIndex do
     </div>
     <div class="text-center">
       <.link
-        patch={~p"/companies/new"}
+        navigate={~p"/companies/new"}
         class="border-2 border-amber-500 rounded-md text-center text-2xl px-2 py-1 bg-amber-200"
       >
         <%= gettext("Create a New Company") %>
