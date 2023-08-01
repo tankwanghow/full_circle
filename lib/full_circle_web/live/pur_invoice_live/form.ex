@@ -60,11 +60,6 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
   end
 
   @impl true
-  def handle_params(params, uri, socket) do
-    {:noreply, socket |> assign(cancel_url: uri)}
-  end
-
-  @impl true
   def handle_event("add_detail", _, socket) do
     socket = socket |> FullCircleWeb.Helpers.add_line(:pur_invoice_details, %PurInvoiceDetail{})
     {:noreply, socket}

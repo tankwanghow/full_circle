@@ -1,10 +1,9 @@
 defmodule FullCircleWeb.FixedAssetLive.Index do
   use FullCircleWeb, :live_view
 
-  alias FullCircle.Accounting.FixedAsset
   alias FullCircle.Accounting
   alias FullCircle.StdInterface
-  alias FullCircleWeb.FixedAssetLive.{FormComponent, IndexComponent}
+  alias FullCircleWeb.FixedAssetLive.IndexComponent
 
   @per_page 20
 

@@ -131,7 +131,7 @@ defmodule FullCircleWeb.FixedAssetLive.Form do
            socket.assigns.current_company,
            socket.assigns.current_user
          ) do
-      {:ok, ac} ->
+      {:ok, _ac} ->
         {:noreply,
          socket
          |> push_navigate(to: "/companies/#{socket.assigns.current_company.id}/fixed_assets")

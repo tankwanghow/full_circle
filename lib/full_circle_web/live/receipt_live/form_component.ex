@@ -4,7 +4,6 @@ defmodule FullCircleWeb.ReceiptLive.FormComponent do
   alias FullCircle.ReceiveFund
   alias FullCircle.ReceiveFund.{Receipt, ReceivedCheque}
   alias FullCircle.StdInterface
-  alias FullCircle.Sys
 
   @impl true
   def mount(socket) do
