@@ -34,7 +34,6 @@ defmodule FullCircle.Seeding do
 
   def seed("FixedAssets", seed_data, com, user) do
     save_seed(%FixedAsset{}, :seed_fixed_assets, seed_data, com, user)
-    save_seed(%FixedAssetDepreciation{}, :seed_fixed_assets, seed_data, com, user)
   end
 
   def seed("FixedAssetDepreciations", seed_data, com, user) do
