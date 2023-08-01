@@ -56,5 +56,9 @@ defmodule FullCircle.Accounting.Contact do
       name: :pur_invoices_contact_id_fkey,
       message: gettext("referenced by pur_invoices")
     )
+    |> foreign_key_constraint(:name,
+      name: :transactions_contact_id_fkey,
+      message: gettext("referenced by pur_invoices")
+    )
   end
 end
