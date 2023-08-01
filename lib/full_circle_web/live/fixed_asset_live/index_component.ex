@@ -16,14 +16,13 @@ defmodule FullCircleWeb.FixedAssetLive.IndexComponent do
     ~H"""
     <div id={@id} class={"#{@ex_class} text-center mb-1 bg-gray-200 border-gray-500 border-2 rounded"}>
       <div class="grid grid-cols-12">
-        <div
-          class="col-span-7 bg-gray-100 p-2 hover:bg-gray-400 cursor-pointer"
-          phx-value-object-id={@obj.id}
-          phx-click={:edit_object}
-        >
-          <span class="text-xl font-bold">
+        <div class="col-span-7 bg-gray-100 p-2">
+          <.link
+            navigate={~p"/companies/#{@current_company.id}/fixed_assets/#{@obj.id}/edit"}
+            class="text-xl font-bold text-blue-600"
+          >
             <%= @obj.name %>
-          </span>
+          </.link>
           <p>
             <span class="font-bold"><%= gettext("Fixed Asset Account:") %></span> <%= @obj.asset_ac_name %>
           </p>
@@ -36,17 +35,6 @@ defmodule FullCircleWeb.FixedAssetLive.IndexComponent do
           <span class="font-bold"><%= gettext("Cume Depreciation Account:") %></span>
           <%= @obj.cume_depre_ac_name %>
           <p><%= @obj.descriptions %></p>
-          <span class="font-light">
-            <%= to_fc_time_format(@obj.updated_at) %>
-
-            <.live_component
-              module={FullCircleWeb.LogLive.Component}
-              id={"log_#{@obj.id}"}
-              show_log={false}
-              entity="fixed_assets"
-              entity_id={@obj.id}
-            />
-          </span>
         </div>
         <div class="col-span-5 p-2 bg-gray-200">
           <p>
@@ -56,7 +44,7 @@ defmodule FullCircleWeb.FixedAssetLive.IndexComponent do
             <.link
               :if={@obj.depre_method != "No Depreciation"}
               navigate={
-                ~p"/companies/#{@company.id}/fixed_assets/#{@obj.id}/depreciations?terms=#{@terms}"
+                ~p"/companies/#{@current_company.id}/fixed_assets/#{@obj.id}/depreciations?terms=#{@terms}"
               }
               class="hover:font-bold text-blue-700"
             >
@@ -69,7 +57,7 @@ defmodule FullCircleWeb.FixedAssetLive.IndexComponent do
           <p>
             <.link
               navigate={
-                ~p"/companies/#{@company.id}/fixed_assets/#{@obj.id}/disposals?terms=#{@terms}"
+                ~p"/companies/#{@current_company.id}/fixed_assets/#{@obj.id}/disposals?terms=#{@terms}"
               }
               class="hover:font-bold text-blue-700"
             >

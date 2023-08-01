@@ -18,7 +18,7 @@ defmodule FullCircleWeb.PurInvoiceLive.IndexComponent do
       id={@id}
       class={"#{@ex_class} max-h-8 flex flex-row text-center tracking-tighter bg-gray-200 hover:bg-gray-400"}
     >
-      <div class="w-[2rem] border-b border-gray-400 py-1">
+      <div class="w-[2%] border-b border-gray-400 py-1">
         <input
           :if={@obj.checked}
           id={"checkbox_invoice_#{@obj.id}"}
@@ -37,33 +37,33 @@ defmodule FullCircleWeb.PurInvoiceLive.IndexComponent do
           phx-value-object-id={@obj.id}
         />
       </div>
-      <div class="w-[9rem] border-b border-gray-400 py-1">
+      <div class="w-[9%] border-b border-gray-400 py-1">
         <%= @obj.pur_invoice_date %>
       </div>
-      <div class="w-[9rem] border-b border-gray-400 py-1">
+      <div class="w-[9%] border-b border-gray-400 py-1">
         <%= @obj.due_date %>
       </div>
       <div
         :if={!@obj.old_data}
-        class="text-blue-600 w-[10rem] border-b border-gray-400 py-1 hover:cursor-pointer"
+        class="text-blue-600 w-[10%] border-b border-gray-400 py-1 hover:cursor-pointer"
       >
         <.link navigate={~p"/companies/#{@obj.company_id}/pur_invoices/#{@obj.id}/edit"}>
           <%= @obj.pur_invoice_no %>
         </.link>
       </div>
-      <div :if={@obj.old_data} class="w-[10rem] border-b border-gray-400 py-1">
+      <div :if={@obj.old_data} class="w-[10%] border-b border-gray-400 py-1">
         <%= @obj.pur_invoice_no %>
       </div>
-      <div class="w-[18.4rem] border-b border-gray-400 py-1 overflow-clip">
+      <div class="w-[20%] border-b border-gray-400 py-1 overflow-clip">
         <%= @obj.contact_name %>
       </div>
-      <div class="w-[30rem] border-b text-center border-gray-400 py-1 overflow-clip">
+      <div class="w-[30%] border-b text-center border-gray-400 py-1 overflow-clip">
         <span class="font-light"><%= @obj.particulars %></span>
       </div>
-      <div class="w-[9rem] border-b border-gray-400 py-1">
+      <div class="w-[10%] border-b border-gray-400 py-1">
         <%= Number.Currency.number_to_currency(@obj.pur_invoice_amount) %>
       </div>
-      <div class="w-[9rem] border-b border-gray-400 py-1">
+      <div class="w-[10%] border-b border-gray-400 py-1">
         <%= Number.Currency.number_to_currency(@obj.balance) %>
       </div>
     </div>

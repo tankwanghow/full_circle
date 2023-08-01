@@ -752,7 +752,7 @@ defmodule FullCircleWeb.CoreComponents do
       <.form for={%{}} id="search-form" phx-submit="search" autocomplete="off" class="w-full">
         <div class="grid grid-cols-12 gap-1">
           <div class="col-span-11">
-            <.input name="search[terms]" type="search" value={@search_val} />
+            <.input name="search[terms]" type="search" value={@search_val} placeholder={@placeholder}/>
           </div>
           <.button class="col-span-1">🔍</.button>
         </div>

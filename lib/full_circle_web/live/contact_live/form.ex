@@ -1,18 +1,38 @@
-defmodule FullCircleWeb.ContactLive.FormComponent do
-  use FullCircleWeb, :live_component
+defmodule FullCircleWeb.ContactLive.Form do
+  use FullCircleWeb, :live_view
   alias FullCircle.StdInterface
   alias FullCircle.Accounting.Contact
 
   @impl true
-  def mount(socket) do
+  def mount(params, _session, socket) do
+    id = params["contact_id"]
+    socket = if(is_nil(id), do: mount_new(socket), else: mount_edit(socket, id))
+
     {:ok, socket}
   end
 
-  @impl true
-  def update(assigns, socket) do
-    socket = socket |> assign(assigns)
+  defp mount_new(socket) do
+    socket
+    |> assign(live_action: :new)
+    |> assign(id: "new")
+    |> assign(title: gettext("New Contact"))
+    |> assign(
+      :form,
+      to_form(StdInterface.changeset(Contact, %Contact{}, %{}, socket.assigns.current_company))
+    )
+  end
 
-    {:ok, socket}
+  defp mount_edit(socket, id) do
+    account = StdInterface.get!(Contact, id)
+
+    socket
+    |> assign(live_action: :edit)
+    |> assign(id: id)
+    |> assign(title: gettext("Edit Contact"))
+    |> assign(
+      :form,
+      to_form(StdInterface.changeset(Contact, account, %{}, socket.assigns.current_company))
+    )
   end
 
   @impl true
@@ -33,7 +53,7 @@ defmodule FullCircleWeb.ContactLive.FormComponent do
 
   @impl true
   def handle_event("save", %{"contact" => params}, socket) do
-    save_contact(socket, socket.assigns.live_action, params)
+    save_account(socket, socket.assigns.live_action, params)
   end
 
   @impl true
@@ -45,20 +65,29 @@ defmodule FullCircleWeb.ContactLive.FormComponent do
            socket.assigns.current_company,
            socket.assigns.current_user
          ) do
-      {:ok, cont} ->
-        send(self(), {:deleted, cont})
-        {:noreply, socket}
+      {:ok, ac} ->
+        {:noreply,
+         socket
+         |> push_navigate(to: "/companies/#{socket.assigns.current_company.id}/contacts")
+         |> put_flash(:info, "#{gettext("Contact deleted successfully.")}")}
 
-      {:error, _, changeset, _} ->
-        {:noreply, assign(socket, form: to_form(changeset))}
+      {:error, failed_operation, changeset, _} ->
+        {:noreply,
+         socket
+         |> assign(form: to_form(changeset))
+         |> put_flash(
+           :error,
+           "#{gettext("Failed")} #{failed_operation}. #{list_errors_to_string(changeset.errors)}"
+         )}
 
       :not_authorise ->
-        send(self(), :not_authorise)
-        {:noreply, socket}
+        {:noreply,
+         socket
+         |> put_flash(:error, gettext("You are not authorised to perform this action"))}
     end
   end
 
-  defp save_contact(socket, :new, params) do
+  defp save_account(socket, :new, params) do
     case StdInterface.create(
            Contact,
            "contact",
@@ -66,20 +95,31 @@ defmodule FullCircleWeb.ContactLive.FormComponent do
            socket.assigns.current_company,
            socket.assigns.current_user
          ) do
-      {:ok, cont} ->
-        send(self(), {:created, cont})
-        {:noreply, socket}
+      {:ok, ac} ->
+        {:noreply,
+         socket
+         |> push_navigate(
+           to: ~p"/companies/#{socket.assigns.current_company.id}/contacts/#{ac.id}/edit"
+         )
+         |> put_flash(:info, "#{gettext("Contact created successfully.")}")}
 
-      {:error, _, changeset, _} ->
-        {:noreply, assign(socket, form: to_form(changeset))}
+      {:error, failed_operation, changeset, _} ->
+        {:noreply,
+         socket
+         |> assign(form: to_form(changeset))
+         |> put_flash(
+           :error,
+           "#{gettext("Failed")} #{failed_operation}. #{list_errors_to_string(changeset.errors)}"
+         )}
 
       :not_authorise ->
-        send(self(), :not_authorise)
-        {:noreply, socket}
+        {:noreply,
+         socket
+         |> put_flash(:error, gettext("You are not authorised to perform this action"))}
     end
   end
 
-  defp save_contact(socket, :edit, params) do
+  defp save_account(socket, :edit, params) do
     case StdInterface.update(
            Contact,
            "contact",
@@ -88,28 +128,38 @@ defmodule FullCircleWeb.ContactLive.FormComponent do
            socket.assigns.current_company,
            socket.assigns.current_user
          ) do
-      {:ok, cont} ->
-        send(self(), {:updated, cont})
-        {:noreply, socket}
+      {:ok, ac} ->
+        {:noreply,
+         socket
+         |> push_navigate(
+           to: ~p"/companies/#{socket.assigns.current_company.id}/contacts/#{ac.id}/edit"
+         )
+         |> put_flash(:info, "#{gettext("Contact updated successfully.")}")}
 
-      {:error, _, changeset, _} ->
-        {:noreply, assign(socket, form: to_form(changeset))}
+      {:error, failed_operation, changeset, _} ->
+        {:noreply,
+         socket
+         |> assign(form: to_form(changeset))
+         |> put_flash(
+           :error,
+           "#{gettext("Failed")} #{failed_operation}. #{list_errors_to_string(changeset.errors)}"
+         )}
 
       :not_authorise ->
-        send(self(), :not_authorise)
-        {:noreply, socket}
+        {:noreply,
+         socket
+         |> put_flash(:error, gettext("You are not authorised to perform this action"))}
     end
   end
 
   @impl true
   def render(assigns) do
     ~H"""
-    <div>
+    <div class="w-6/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
       <p class="w-full text-3xl text-center font-medium"><%= @title %></p>
       <.form
         for={@form}
         id="object-form"
-        phx-target={@myself}
         autocomplete="off"
         phx-change="validate"
         phx-submit="save"
@@ -151,21 +201,33 @@ defmodule FullCircleWeb.ContactLive.FormComponent do
 
         <div class="flex justify-center gap-x-1 mt-1">
           <.button disabled={!@form.source.valid?}><%= gettext("Save") %></.button>
+          <.link
+            :if={Enum.any?(@form.source.changes) and @live_action != :new}
+            navigate=""
+            class="orange_button"
+          >
+            <%= gettext("Cancel") %>
+          </.link>
+          <a onclick="history.back();" class="blue_button"><%= gettext("Back") %></a>
           <%= if @live_action == :edit and FullCircle.Authorization.can?(@current_user, :delete_contact, @current_company) do %>
             <.delete_confirm_modal
               id="delete-object"
               msg1={gettext("All Contact Transactions, will be LOST!!!")}
               msg2={gettext("Cannot Be Recover!!!")}
               confirm={
-                JS.remove_attribute("class", to: "#phx-feedback-for-contact_name")
-                |> JS.push("delete", target: "#object-form")
+                JS.push("delete", target: "#object-form")
                 |> JS.hide(to: "#delete-object-modal")
               }
             />
           <% end %>
-          <.link phx-click={JS.exec("phx-remove", to: "#object-crud-modal")} class="blue_button">
-            <%= gettext("Back") %>
-          </.link>
+          <.live_component
+            :if={@live_action == :edit}
+            module={FullCircleWeb.LogLive.Component}
+            id={"log_#{@id}"}
+            show_log={false}
+            entity="contacts"
+            entity_id={@id}
+          />
         </div>
       </.form>
     </div>

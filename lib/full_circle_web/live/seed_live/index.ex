@@ -223,7 +223,7 @@ defmodule FullCircleWeb.SeedLive.Index do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="mx-auto text-center">
+    <div class="w-10/12 mx-auto text-center">
       <p class="text-3xl font-medium"><%= @page_title %></p>
       <.form
         for={%{}}

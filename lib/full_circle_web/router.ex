@@ -102,11 +102,25 @@ defmodule FullCircleWeb.Router do
       live("/dashboard", DashboardLive)
       live("/users/new", UserLive.New, :new)
       live("/users", UserLive.Index, :index)
+
       live("/accounts", AccountLive.Index, :index)
+      live("/accounts/new", AccountLive.Form, :new)
+      live("/accounts/:account_id/edit", AccountLive.Form, :edit)
+
       live("/contacts", ContactLive.Index, :index)
+      live("/contacts/new", ContactLive.Form, :new)
+      live("/contacts/:contact_id/edit", ContactLive.Form, :edit)
+
       live("/tax_codes", TaxCodeLive.Index, :index)
+      live("/tax_codes/new", TaxCodeLive.Form, :new)
+      live("/tax_codes/:asset_id/edit", TaxCodeLive.Form, :edit)
+
       live("/goods", GoodLive.Index, :index)
+
+
       live("/fixed_assets", FixedAssetLive.Index, :index)
+      live("/fixed_assets/new", FixedAssetLive.Form, :new)
+      live("/fixed_assets/:asset_id/edit", FixedAssetLive.Form, :edit)
       live("/fixed_assets/:id/depreciations", FixedAssetLive.Depreciations, :index)
       live("/fixed_assets/:id/disposals", FixedAssetLive.Disposals, :index)
       live("/fixed_assets/calalldepre", FixedAssetLive.CalAllDepre, :index)

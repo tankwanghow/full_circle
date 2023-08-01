@@ -9,7 +9,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Index do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="mx-auto w-12/12">
+    <div class="mx-auto w-10/12">
       <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
       <div class="flex justify-center mb-2">
         <.form for={%{}} id="search-form" phx-submit="search" class="w-full" autocomplete="off">
@@ -63,26 +63,26 @@ defmodule FullCircleWeb.PurInvoiceLive.Index do
       </div>
 
       <div class="font-medium flex flex-row text-center tracking-tighter bg-amber-200">
-        <div class="w-[2rem] border-b border-t border-amber-400 py-1"></div>
-        <div class="w-[9rem] border-b border-t border-amber-400 py-1">
+        <div class="w-[2%] border-b border-t border-amber-400 py-1"></div>
+        <div class="w-[9%] border-b border-t border-amber-400 py-1">
           <%= gettext("Date") %>
         </div>
-        <div class="w-[9rem] border-b border-t border-amber-400 py-1">
+        <div class="w-[9%] border-b border-t border-amber-400 py-1">
           <%= gettext("Due Date") %>
         </div>
-        <div class="w-[10rem] border-b border-t border-amber-400 py-1">
+        <div class="w-[10%] border-b border-t border-amber-400 py-1">
           <%= gettext("Invoice No") %>
         </div>
-        <div class="w-[18.4rem] border-b border-t border-amber-400 py-1">
+        <div class="w-[20%] border-b border-t border-amber-400 py-1">
           <%= gettext("Contact") %>
         </div>
-        <div class="w-[30rem] border-b border-t border-amber-400 py-1">
+        <div class="w-[30%] border-b border-t border-amber-400 py-1">
           <%= gettext("Particulars") %>
         </div>
-        <div class="w-[9rem] border-b border-t border-amber-400 py-1">
+        <div class="w-[10%] border-b border-t border-amber-400 py-1">
           <%= gettext("Amount") %>
         </div>
-        <div class="w-[9rem] border-b border-t border-amber-400 py-1">
+        <div class="w-[10%] border-b border-t border-amber-400 py-1">
           <%= gettext("Balance") %>
         </div>
       </div>

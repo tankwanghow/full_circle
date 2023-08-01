@@ -14,7 +14,6 @@ defmodule FullCircleWeb.InvoiceLive.Form do
     {:ok,
      socket
      |> assign(
-       changed: false,
        settings:
          FullCircle.Sys.load_settings(
            "invoices",
@@ -307,12 +306,9 @@ defmodule FullCircleWeb.InvoiceLive.Form do
         {:noreply, socket}
 
       :not_authorise ->
-        send(self(), :not_authorise)
-        {:noreply, socket}
-
-      {:sql_error, msg} ->
-        send(self(), {:sql_error, msg})
-        {:noreply, socket}
+        {:noreply,
+         socket
+         |> put_flash(:error, gettext("You are not authorised to perform this action"))}
     end
   end
 
@@ -328,13 +324,13 @@ defmodule FullCircleWeb.InvoiceLive.Form do
 
     socket = assign(socket, form: to_form(changeset))
 
-    {:noreply, socket |> assign(changed: Enum.any?(changeset.changes))}
+    {:noreply, socket}
   end
 
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="border rounded-lg border-yellow-500 bg-yellow-100 p-4">
+    <div class="w-10/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
       <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
       <.form for={@form} id="object-form" autocomplete="off" phx-change="validate" phx-submit="save">
         <%= Phoenix.HTML.Form.hidden_input(@form, :invoice_no) %>
@@ -510,7 +506,11 @@ defmodule FullCircleWeb.InvoiceLive.Form do
         </div>
         <div class="flex flex-row justify-center gap-x-1 mt-1">
           <.button disabled={!@form.source.valid?}><%= gettext("Save") %></.button>
-          <.link :if={@changed} navigate={@cancel_url} class="orange_button">
+          <.link
+            :if={Enum.any?(@form.source.changes) and @live_action != :new}
+            navigate=""
+            class="orange_button"
+          >
             <%= gettext("Cancel") %>
           </.link>
           <a onclick="history.back();" class="blue_button"><%= gettext("Back") %></a>

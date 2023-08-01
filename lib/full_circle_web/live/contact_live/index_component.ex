@@ -18,28 +18,19 @@ defmodule FullCircleWeb.ContactLive.IndexComponent do
       id={@id}
       class={"#{@ex_class} text-center mb-1 bg-gray-200 border-gray-500 border-2 rounded p-2"}
     >
-      <span
-        class="text-xl font-bold hover:bg-blue-400 cursor-pointer bg-blue-100 border-blue-500 px-2 py-1 rounded-full border"
-        phx-value-contact-id={@obj.id}
-        phx-click={:edit_contact}
+    <.link
+        :if={!FullCircle.Accounting.is_default_account?(@obj)}
+        class="font-bold text-blue-600"
+        navigate={~p"/companies/#{@current_company.id}/contacts/#{@obj.id}/edit"}
       >
         <%= @obj.name %>
-      </span>
-      <div class="mt-2">
+      </.link>
+      <div>
         <p><%= @obj.address1 %>, <%= @obj.address2 %>
-
           <%= @obj.city %> <%= @obj.zipcode %>, <%= @obj.state %> <%= @obj.country %></p>
         <p><%= @obj.contact_info %></p>
       </div>
       <p class="text-green-800"><%= @obj.descriptions %></p>
-      <span class="text-xs font-light"><%= to_fc_time_format(@obj.updated_at) %></span>
-      <.live_component
-        module={FullCircleWeb.LogLive.Component}
-        id={"log_#{@obj.id}"}
-        show_log={false}
-        entity="contacts"
-        entity_id={@obj.id}
-      />
     </div>
     """
   end

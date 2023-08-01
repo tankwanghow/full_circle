@@ -1,19 +1,43 @@
-defmodule FullCircleWeb.FixedAssetLive.FormComponent do
-  use FullCircleWeb, :live_component
+defmodule FullCircleWeb.FixedAssetLive.Form do
+  use FullCircleWeb, :live_view
 
   alias FullCircle.Accounting.FixedAsset
+  alias FullCircle.Accounting
   alias FullCircle.StdInterface
 
   @impl true
-  def mount(socket) do
-    {:ok, socket |> assign(:account_names, [])}
-  end
-
-  @impl true
-  def update(assigns, socket) do
-    socket = socket |> assign(assigns)
+  def mount(params, _session, socket) do
+    id = params["asset_id"]
+    socket = if(is_nil(id), do: mount_new(socket), else: mount_edit(socket, id))
 
     {:ok, socket}
+  end
+
+  defp mount_new(socket) do
+    socket
+    |> assign(live_action: :new)
+    |> assign(id: "new")
+    |> assign(title: gettext("New Fixed Asset"))
+    |> assign(
+      :form,
+      to_form(
+        StdInterface.changeset(FixedAsset, %FixedAsset{}, %{}, socket.assigns.current_company)
+      )
+    )
+  end
+
+  defp mount_edit(socket, id) do
+    obj =
+      Accounting.get_fixed_asset!(id, socket.assigns.current_company, socket.assigns.current_user)
+
+    socket
+    |> assign(live_action: :edit)
+    |> assign(id: id)
+    |> assign(title: gettext("Edit Fixed Asset"))
+    |> assign(
+      :form,
+      to_form(StdInterface.changeset(FixedAsset, obj, %{}, socket.assigns.current_company))
+    )
   end
 
   @impl true
@@ -23,13 +47,12 @@ defmodule FullCircleWeb.FixedAssetLive.FormComponent do
         socket
       ) do
     {params, socket, _} =
-      FullCircleWeb.Helpers.assign_list_n_id(
+      FullCircleWeb.Helpers.assign_autocomplete_id(
         socket,
         params,
         "asset_ac_name",
-        :account_names,
         "asset_ac_id",
-        &FullCircle.Accounting.account_names/3
+        &FullCircle.Accounting.get_account_by_name/3
       )
 
     validate(params, socket)
@@ -42,13 +65,12 @@ defmodule FullCircleWeb.FixedAssetLive.FormComponent do
         socket
       ) do
     {params, socket, _} =
-      FullCircleWeb.Helpers.assign_list_n_id(
+      FullCircleWeb.Helpers.assign_autocomplete_id(
         socket,
         params,
         "cume_depre_ac_name",
-        :account_names,
         "cume_depre_ac_id",
-        &FullCircle.Accounting.account_names/3
+        &FullCircle.Accounting.get_account_by_name/3
       )
 
     validate(params, socket)
@@ -61,13 +83,12 @@ defmodule FullCircleWeb.FixedAssetLive.FormComponent do
         socket
       ) do
     {params, socket, _} =
-      FullCircleWeb.Helpers.assign_list_n_id(
+      FullCircleWeb.Helpers.assign_autocomplete_id(
         socket,
         params,
         "depre_ac_name",
-        :account_names,
         "depre_ac_id",
-        &FullCircle.Accounting.account_names/3
+        &FullCircle.Accounting.get_account_by_name/3
       )
 
     validate(params, socket)
@@ -80,13 +101,12 @@ defmodule FullCircleWeb.FixedAssetLive.FormComponent do
         socket
       ) do
     {params, socket, _} =
-      FullCircleWeb.Helpers.assign_list_n_id(
+      FullCircleWeb.Helpers.assign_autocomplete_id(
         socket,
         params,
         "disp_fund_ac_name",
-        :account_names,
         "disp_fund_ac_id",
-        &FullCircle.Accounting.account_names/3
+        &FullCircle.Accounting.get_account_by_name/3
       )
 
     validate(params, socket)
@@ -111,16 +131,25 @@ defmodule FullCircleWeb.FixedAssetLive.FormComponent do
            socket.assigns.current_company,
            socket.assigns.current_user
          ) do
-      {:ok, obj} ->
-        send(self(), {:deleted, obj})
-        {:noreply, socket}
+      {:ok, ac} ->
+        {:noreply,
+         socket
+         |> push_navigate(to: "/companies/#{socket.assigns.current_company.id}/fixed_assets")
+         |> put_flash(:info, "#{gettext("Fixed Asset deleted successfully.")}")}
 
-      {:error, _, changeset, _} ->
-        assign(socket, form: to_form(changeset))
+      {:error, failed_operation, changeset, _} ->
+        {:noreply,
+         socket
+         |> assign(form: to_form(changeset))
+         |> put_flash(
+           :error,
+           "#{gettext("Failed")} #{failed_operation}. #{list_errors_to_string(changeset.errors)}"
+         )}
 
       :not_authorise ->
-        send(self(), :not_authorise)
-        {:noreply, socket}
+        {:noreply,
+         socket
+         |> put_flash(:error, gettext("You are not authorised to perform this action"))}
     end
   end
 
@@ -132,16 +161,27 @@ defmodule FullCircleWeb.FixedAssetLive.FormComponent do
            socket.assigns.current_company,
            socket.assigns.current_user
          ) do
-      {:ok, obj} ->
-        send(self(), {:created, obj})
-        {:noreply, socket}
+      {:ok, ac} ->
+        {:noreply,
+         socket
+         |> push_navigate(
+           to: ~p"/companies/#{socket.assigns.current_company.id}/fixed_assets/#{ac.id}/edit"
+         )
+         |> put_flash(:info, "#{gettext("Fixed Asset created successfully.")}")}
 
-      {:error, _, changeset, _} ->
-        assign(socket, form: to_form(changeset))
+      {:error, failed_operation, changeset, _} ->
+        {:noreply,
+         socket
+         |> assign(form: to_form(changeset))
+         |> put_flash(
+           :error,
+           "#{gettext("Failed")} #{failed_operation}. #{list_errors_to_string(changeset.errors)}"
+         )}
 
       :not_authorise ->
-        send(self(), :not_authorise)
-        {:noreply, socket}
+        {:noreply,
+         socket
+         |> put_flash(:error, gettext("You are not authorised to perform this action"))}
     end
   end
 
@@ -154,16 +194,27 @@ defmodule FullCircleWeb.FixedAssetLive.FormComponent do
            socket.assigns.current_company,
            socket.assigns.current_user
          ) do
-      {:ok, obj} ->
-        send(self(), {:updated, obj})
-        {:noreply, socket}
+      {:ok, ac} ->
+        {:noreply,
+         socket
+         |> push_navigate(
+           to: ~p"/companies/#{socket.assigns.current_company.id}/fixed_assets/#{ac.id}/edit"
+         )
+         |> put_flash(:info, "#{gettext("Fixed Asset updated successfully.")}")}
 
-      {:error, _, changeset, _} ->
-        assign(socket, form: to_form(changeset))
+      {:error, failed_operation, changeset, _} ->
+        {:noreply,
+         socket
+         |> assign(form: to_form(changeset))
+         |> put_flash(
+           :error,
+           "#{gettext("Failed")} #{failed_operation}. #{list_errors_to_string(changeset.errors)}"
+         )}
 
       :not_authorise ->
-        send(self(), :not_authorise)
-        {:noreply, socket}
+        {:noreply,
+         socket
+         |> put_flash(:error, gettext("You are not authorised to perform this action"))}
     end
   end
 
@@ -185,23 +236,48 @@ defmodule FullCircleWeb.FixedAssetLive.FormComponent do
   @impl true
   def render(assigns) do
     ~H"""
-    <div>
+    <div class="w-8/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
       <p class="w-full text-2xl text-center font-medium"><%= @title %></p>
       <.form
         for={@form}
         id="object-form"
-        phx-target={@myself}
         autocomplete="off"
         phx-change="validate"
         phx-submit="save"
         class=""
       >
         <div class="flex flex-row gap-1">
-          <div class="w-[36rem]">
+          <div class="w-[50%]">
             <.input field={@form[:name]} label={gettext("Name")} />
           </div>
-          <div class="w-[10rem]">
+          <div class="w-[20%]">
             <.input type="date" field={@form[:pur_date]} label={gettext("Purchase Date")} />
+          </div>
+          <div class="w-[30%] text-center" :if={@live_action != :new}>
+          <p>
+            <.link
+              :if={@form.data.depre_method != "No Depreciation"}
+              navigate={
+                ~p"/companies/#{@current_company.id}/fixed_assets/#{@form.data.id}/depreciations"
+              }
+              class="hover:font-bold text-blue-700"
+            >
+
+              <%= gettext("Depreciations") %> - <%= Number.Currency.number_to_currency(
+                @form.data.cume_depre
+              ) %>
+            </.link>
+            </p>
+            <p>
+            <.link
+              navigate={
+                ~p"/companies/#{@current_company.id}/fixed_assets/#{@form.data.id}/disposals"
+              }
+              class="hover:font-bold text-blue-700"
+            >
+              <%= gettext("Disposal") %> - <%= Number.Currency.number_to_currency(@form.data.cume_disp) %>
+            </.link>
+            </p>
           </div>
         </div>
         <div class="flex flex-row gap-1">
@@ -259,8 +335,9 @@ defmodule FullCircleWeb.FixedAssetLive.FormComponent do
             <.input
               field={@form[:asset_ac_name]}
               label={gettext("Asset Account")}
-              list="account_names"
-              phx-debounce={500}
+              phx-hook="tributeAutoComplete"
+              phx-debounce="blur"
+              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=account&name="}
             />
           </div>
         </div>
@@ -270,8 +347,9 @@ defmodule FullCircleWeb.FixedAssetLive.FormComponent do
             <.input
               field={@form[:depre_ac_name]}
               label={gettext("Depreciation Account")}
-              list="account_names"
-              phx-debounce={500}
+              phx-hook="tributeAutoComplete"
+              phx-debounce="blur"
+              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=account&name="}
             />
           </div>
           <div class="w-4/12">
@@ -279,8 +357,9 @@ defmodule FullCircleWeb.FixedAssetLive.FormComponent do
             <.input
               field={@form[:cume_depre_ac_name]}
               label={gettext("Cume Depreciation Account")}
-              list="account_names"
-              phx-debounce={500}
+              phx-hook="tributeAutoComplete"
+              phx-debounce="blur"
+              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=account&name="}
             />
           </div>
           <div class="w-4/12">
@@ -288,8 +367,9 @@ defmodule FullCircleWeb.FixedAssetLive.FormComponent do
             <.input
               field={@form[:disp_fund_ac_name]}
               label={gettext("Disposal Fund Account")}
-              list="account_names"
-              phx-debounce={500}
+              phx-hook="tributeAutoComplete"
+              phx-debounce="blur"
+              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=account&name="}
             />
           </div>
         </div>
@@ -298,24 +378,35 @@ defmodule FullCircleWeb.FixedAssetLive.FormComponent do
 
         <div class="flex justify-center gap-x-1 mt-1">
           <.button disabled={!@form.source.valid?}><%= gettext("Save") %></.button>
+          <.link
+            :if={Enum.any?(@form.source.changes) and @live_action != :new}
+            navigate=""
+            class="orange_button"
+          >
+            <%= gettext("Cancel") %>
+          </.link>
+          <a onclick="history.back();" class="blue_button"><%= gettext("Back") %></a>
           <%= if @live_action == :edit and FullCircle.Authorization.can?(@current_user, :delete_fixed_asset, @current_company) do %>
             <.delete_confirm_modal
               id="delete-object"
               msg1={gettext("All Fixed Asset Transactions, will be LOST!!!")}
               msg2={gettext("Cannot Be Recover!!!")}
               confirm={
-                JS.remove_attribute("class", to: "#phx-feedback-for-fixed_asset_name")
-                |> JS.push("delete", target: "#object-form")
+                JS.push("delete", target: "#object-form")
                 |> JS.hide(to: "#delete-object-modal")
               }
             />
           <% end %>
-          <.link phx-click={JS.exec("phx-remove", to: "#object-crud-modal")} class="blue_button">
-            <%= gettext("Back") %>
-          </.link>
+          <.live_component
+            :if={@live_action != :new}
+            module={FullCircleWeb.LogLive.Component}
+            id={"log_#{@id}"}
+            show_log={false}
+            entity="fixed_assets"
+            entity_id={@id}
+          />
         </div>
       </.form>
-      <%= datalist_with_ids(@account_names, "account_names") %>
     </div>
     """
   end
