@@ -1,5 +1,5 @@
 <main class={if(assigns[:current_user], do: "mt-20", else: "")}>
-  <div class="mx-auto w-10/12">
+  <div>
     <.flash_group flash={@flash} />
     <%= @inner_content %>
   </div>
