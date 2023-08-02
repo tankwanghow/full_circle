@@ -18,27 +18,21 @@ defmodule FullCircleWeb.TaxCodeLive.IndexComponent do
       id={@id}
       class={"#{@ex_class} accounts text-center mb-1 bg-gray-200 border-gray-500 border-2 rounded p-2"}
     >
-      <span
-        class="text-xl font-bold border rounded-full bg-blue-100 hover:bg-blue-400 px-2 py-1 border-blue-400 cursor-pointer"
-        phx-value-object-id={@obj.id}
-        phx-click={:edit_object}
+      <.link
+        :if={!FullCircle.Accounting.is_default_tax_code?(@obj)}
+        class="font-bold text-blue-600"
+        navigate={~p"/companies/#{@current_company.id}/tax_codes/#{@obj.id}/edit"}
       >
-        <%= @obj.code %>
-      </span>
-      <p class="mt-2">
-        <%= @obj.tax_type %> &#11049; <%= @obj.rate
+        <%= @obj.code %> (<%= @obj.tax_type %> &#11049; <%= @obj.rate
         |> Decimal.mult(100)
-        |> Number.Percentage.number_to_percentage() %> &#11049; <%= @obj.account_name %>
-      </p>
-      <p><%= @obj.descriptions %></p>
-      <span class="text-xs font-light"><%= to_fc_time_format(@obj.updated_at) %></span>
-      <.live_component
-        module={FullCircleWeb.LogLive.Component}
-        id={"log_#{@obj.id}"}
-        show_log={false}
-        entity="tax_codes"
-        entity_id={@obj.id}
-      />
+        |> Number.Percentage.number_to_percentage() %> &#11049; <%= @obj.account_name %>)
+      </.link>
+      <span :if={FullCircle.Accounting.is_default_tax_code?(@obj)} class="font-bold text-rose-600">
+        <%= @obj.code %> (<%= @obj.tax_type %> &#11049; <%= @obj.rate
+        |> Decimal.mult(100)
+        |> Number.Percentage.number_to_percentage() %> &#11049; <%= @obj.account_name %>)
+      </span>
+      <p class="tracking-tighter font-light text-amber-800 leading-5"><%= @obj.descriptions %></p>
     </div>
     """
   end

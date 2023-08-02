@@ -1,10 +1,8 @@
 defmodule FullCircleWeb.TaxCodeLive.Index do
   use FullCircleWeb, :live_view
 
-  alias FullCircle.Accounting.TaxCode
   alias FullCircle.Accounting
   alias FullCircle.StdInterface
-  alias FullCircleWeb.TaxCodeLive.FormComponent
   alias FullCircleWeb.TaxCodeLive.IndexComponent
 
   @per_page 20
@@ -19,7 +17,11 @@ defmodule FullCircleWeb.TaxCodeLive.Index do
         placeholder={gettext("Code, Tax Type, Account Name and Descriptions...")}
       />
       <div class="text-center mb-2">
-        <.link phx-click={:new_object} class="blue_button" id="new_object">
+        <.link
+          navigate={~p"/companies/#{@current_company.id}/tax_codes/new"}
+          class="blue_button"
+          id="new_object"
+        >
           <%= gettext("New TaxCode") %>
         </.link>
       </div>
@@ -36,28 +38,17 @@ defmodule FullCircleWeb.TaxCodeLive.Index do
         phx-page-loading
       >
         <%= for {obj_id, obj} <- @streams.objects do %>
-          <.live_component module={IndexComponent} id={"#{obj_id}"} obj={obj} ex_class="" />
+          <.live_component
+            current_company={@current_company}
+            module={IndexComponent}
+            id={"#{obj_id}"}
+            obj={obj}
+            ex_class=""
+          />
         <% end %>
       </div>
       <.infinite_scroll_footer ended={@end_of_timeline?} />
     </div>
-
-    <.modal
-      :if={@live_action in [:new, :edit]}
-      id="object-crud-modal"
-      show
-      on_cancel={JS.push("modal_cancel")}
-    >
-      <.live_component
-        module={FormComponent}
-        id={@id}
-        title={@title}
-        live_action={@live_action}
-        form={@form}
-        current_company={@current_company}
-        current_user={@current_user}
-      />
-    </.modal>
     """
   end
 
@@ -66,43 +57,20 @@ defmodule FullCircleWeb.TaxCodeLive.Index do
     socket =
       socket
       |> assign(page_title: gettext("TaxCode Listing"))
-      |> filter_objects("", "stream", 1)
 
     {:ok, socket}
   end
 
   @impl true
-  def handle_event("modal_cancel", _, socket) do
-    {:noreply, socket |> assign(live_action: nil)}
-  end
+  def handle_params(params, _uri, socket) do
+    params = params["search"]
 
-  @impl true
-  def handle_event("new_object", _, socket) do
-    {:noreply,
-     socket
-     |> assign(live_action: :new)
-     |> assign(id: "new")
-     |> assign(title: gettext("New TaxCode"))
-     |> assign(
-       :form,
-       to_form(StdInterface.changeset(TaxCode, %TaxCode{}, %{}, socket.assigns.current_company))
-     )}
-  end
-
-  @impl true
-  def handle_event("edit_object", %{"object-id" => id}, socket) do
-    object =
-      Accounting.get_tax_code!(id, socket.assigns.current_company, socket.assigns.current_user)
+    terms = params["terms"] || ""
 
     {:noreply,
      socket
-     |> assign(live_action: :edit)
-     |> assign(id: id)
-     |> assign(title: gettext("Edit TaxCode"))
-     |> assign(
-       :form,
-       to_form(StdInterface.changeset(TaxCode, object, %{}, socket.assigns.current_company))
-     )}
+     |> assign(search: %{terms: terms})
+     |> filter_objects(terms, "replace", 1)}
   end
 
   @impl true
@@ -114,52 +82,13 @@ defmodule FullCircleWeb.TaxCodeLive.Index do
 
   @impl true
   def handle_event("search", %{"search" => %{"terms" => terms}}, socket) do
-    {:noreply,
-     socket
-     |> filter_objects(terms, "replace", 1)}
-  end
+    qry = %{
+      "search[terms]" => terms
+    }
 
-  @impl true
-  def handle_info({:created, obj}, socket) do
-    css_trans(IndexComponent, obj, :obj, "objects-#{obj.id}", "shake")
+    url = "/companies/#{socket.assigns.current_company.id}/tax_codes?#{URI.encode_query(qry)}"
 
-    {:noreply,
-     socket
-     |> assign(live_action: nil)
-     |> stream_insert(:objects, obj, at: 0)}
-  end
-
-  def handle_info({:updated, obj}, socket) do
-    css_trans(IndexComponent, obj, :obj, "objects-#{obj.id}", "shake")
-
-    {:noreply, socket |> assign(live_action: nil)}
-  end
-
-  def handle_info({:deleted, obj}, socket) do
-    css_trans(IndexComponent, obj, :obj, "objects-#{obj.id}", "slow-hide", "hidden")
-
-    {:noreply,
-     socket
-     |> assign(live_action: nil)}
-  end
-
-  @impl true
-  def handle_info({:error, failed_operation, failed_value}, socket) do
-    {:noreply,
-     socket
-     |> assign(live_action: nil)
-     |> put_flash(
-       :error,
-       "#{gettext("Failed")} #{failed_operation}. #{list_errors_to_string(failed_value.errors)}"
-     )}
-  end
-
-  @impl true
-  def handle_info(:not_authorise, socket) do
-    {:noreply,
-     socket
-     |> assign(live_action: nil)
-     |> put_flash(:error, gettext("You are not authorised to perform this action"))}
+    {:noreply, socket |> push_patch(to: url)}
   end
 
   defp filter_objects(socket, terms, update, page) do
@@ -171,11 +100,12 @@ defmodule FullCircleWeb.TaxCodeLive.Index do
         per_page: @per_page
       )
 
+    obj_count = Enum.count(objects)
+
     socket
     |> assign(page: page, per_page: @per_page)
-    |> assign(search: %{terms: terms})
     |> assign(update: update)
-    |> stream(:objects, objects)
+    |> stream(:objects, objects, reset: obj_count == 0)
     |> assign(end_of_timeline?: Enum.count(objects) < @per_page)
   end
 end
