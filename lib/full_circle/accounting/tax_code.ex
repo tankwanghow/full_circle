@@ -33,6 +33,7 @@ defmodule FullCircle.Accounting.TaxCode do
     |> validate_inclusion(:tax_type, FullCircle.Accounting.tax_types(),
       message: gettext("not in list")
     )
+    |> validate_number(:rate, greater_than_or_equal_to: 0, less_than_or_equal_to: 1)
     |> unsafe_validate_unique([:code, :company_id], FullCircle.Repo,
       message: gettext("code already in company")
     )
