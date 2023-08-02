@@ -487,6 +487,10 @@ defmodule FullCircle.Accounting do
     Enum.any?(Sys.default_accounts(), fn a -> a.name == ac.name end)
   end
 
+  def is_default_tax_code?(tx) do
+    Enum.any?(Sys.default_tax_codes(), fn a -> a.code == tx.code end)
+  end
+
   def fixed_asset_txn_query(com) do
     from(txn in Transaction,
       join: comp in Company,

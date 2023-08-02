@@ -76,6 +76,10 @@ defmodule FullCircle.Sys do
     ]
   end
 
+  def default_tax_codes() do
+    [%{code: "NoSTax"}, %{code: "NoPTax"}]
+  end
+
   def default_tax_codes(company_id) do
     [
       %{
