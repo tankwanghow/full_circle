@@ -44,7 +44,6 @@ defmodule FullCircleWeb.GoodLive.Form do
     )
   end
 
-  @impl true
   defp mount_copy(socket, id) do
     obj = Product.get_good!(id, socket.assigns.current_company, socket.assigns.current_user)
 
@@ -243,36 +242,6 @@ defmodule FullCircleWeb.GoodLive.Form do
         {:noreply,
          socket
          |> put_flash(:error, gettext("You are not authorised to perform this action"))}
-    end
-  end
-
-  defp save(socket, :edit, params) do
-    case StdInterface.update(
-           Good,
-           "good",
-           socket.assigns.form.data,
-           params,
-           socket.assigns.current_company,
-           socket.assigns.current_user
-         ) do
-      {:ok, obj} ->
-        send(self(), {:updated, obj})
-        {:noreply, socket}
-
-      {:error, failed_operation, changeset, _} ->
-        socket =
-          socket
-          |> assign(form: to_form(changeset))
-          |> put_flash(
-            :error,
-            "#{gettext("Failed")} #{failed_operation}. #{list_errors_to_string(changeset.errors)}"
-          )
-
-        {:noreply, socket}
-
-      :not_authorise ->
-        send(self(), :not_authorise)
-        {:noreply, socket}
     end
   end
 

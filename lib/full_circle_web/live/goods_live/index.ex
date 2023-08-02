@@ -1,9 +1,7 @@
 defmodule FullCircleWeb.GoodLive.Index do
   use FullCircleWeb, :live_view
 
-  alias FullCircle.Product.Good
   alias FullCircle.Product
-  alias FullCircle.StdInterface
   alias FullCircleWeb.GoodLive.IndexComponent
 
   @per_page 20
