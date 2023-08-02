@@ -53,7 +53,7 @@ defmodule FullCircleWeb.ContactLive.Form do
 
   @impl true
   def handle_event("save", %{"contact" => params}, socket) do
-    save_account(socket, socket.assigns.live_action, params)
+    save(socket, socket.assigns.live_action, params)
   end
 
   @impl true
@@ -87,7 +87,7 @@ defmodule FullCircleWeb.ContactLive.Form do
     end
   end
 
-  defp save_account(socket, :new, params) do
+  defp save(socket, :new, params) do
     case StdInterface.create(
            Contact,
            "contact",
@@ -119,7 +119,7 @@ defmodule FullCircleWeb.ContactLive.Form do
     end
   end
 
-  defp save_account(socket, :edit, params) do
+  defp save(socket, :edit, params) do
     case StdInterface.update(
            Contact,
            "contact",

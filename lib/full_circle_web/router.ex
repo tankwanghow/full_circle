@@ -113,7 +113,7 @@ defmodule FullCircleWeb.Router do
 
       live("/tax_codes", TaxCodeLive.Index, :index)
       live("/tax_codes/new", TaxCodeLive.Form, :new)
-      live("/tax_codes/:asset_id/edit", TaxCodeLive.Form, :edit)
+      live("/tax_codes/:tax_code_id/edit", TaxCodeLive.Form, :edit)
 
       live("/goods", GoodLive.Index, :index)
 

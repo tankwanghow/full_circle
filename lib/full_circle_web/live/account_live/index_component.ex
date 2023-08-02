@@ -28,7 +28,6 @@ defmodule FullCircleWeb.AccountLive.IndexComponent do
       <span
         :if={FullCircle.Accounting.is_default_account?(@obj)}
         class="font-bold text-rose-600"
-        navigate={~p"/companies/#{@current_company.id}/accounts/#{@obj.id}/edit"}
       >
         <%= @obj.name %>
       </span>
