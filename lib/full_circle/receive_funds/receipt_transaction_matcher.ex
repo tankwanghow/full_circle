@@ -22,6 +22,7 @@ defmodule FullCircle.ReceiveFund.ReceiptTransactionMatcher do
     receipt
     |> cast(attrs, [:_persistent_id, :match_amount, :transaction_id])
     |> validate_required([:transaction_id])
+
     # |> compute_balance()
   end
 

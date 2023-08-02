@@ -193,7 +193,7 @@ defmodule FullCircleWeb.FixedAssetLive.Disposals do
     <div class="w-5/12 mx-auto text-center">
       <p class="w-full text-2xl text-center font-medium"><%= "#{@title} for #{@ass.name}" %></p>
       <div class="text-center m-4">
-      <a onclick="history.back();" class="blue_button"><%= gettext("Back") %></a>
+        <a onclick="history.back();" class="blue_button"><%= gettext("Back") %></a>
       </div>
       <p>
         <span class="font-bold"><%= gettext("Assets info:") %></span>

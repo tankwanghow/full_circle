@@ -250,7 +250,14 @@ defmodule FullCircleWeb.ReceiptLive.Index do
   @impl true
   def handle_event(
         "search",
-        %{"search" => %{"terms" => terms, "receipt_date" => id, "due_date" => dd, "balance" => bal}},
+        %{
+          "search" => %{
+            "terms" => terms,
+            "receipt_date" => id,
+            "due_date" => dd,
+            "balance" => bal
+          }
+        },
         socket
       ) do
     {:noreply,

@@ -8,7 +8,12 @@ defmodule FullCircleWeb.FixedAssetLive.Form do
   @impl true
   def mount(params, _session, socket) do
     id = params["asset_id"]
-    socket = if(is_nil(id), do: mount_new(socket), else: mount_edit(socket, id))
+
+    socket =
+      case socket.assigns.live_action do
+        :new -> mount_new(socket)
+        :edit -> mount_edit(socket, id)
+      end
 
     {:ok, socket}
   end
@@ -253,30 +258,31 @@ defmodule FullCircleWeb.FixedAssetLive.Form do
           <div class="w-[20%]">
             <.input type="date" field={@form[:pur_date]} label={gettext("Purchase Date")} />
           </div>
-          <div class="w-[30%] text-center" :if={@live_action != :new}>
-          <p>
-            <.link
-              :if={@form.data.depre_method != "No Depreciation"}
-              navigate={
-                ~p"/companies/#{@current_company.id}/fixed_assets/#{@form.data.id}/depreciations"
-              }
-              class="hover:font-bold text-blue-700"
-            >
-
-              <%= gettext("Depreciations") %> - <%= Number.Currency.number_to_currency(
-                @form.data.cume_depre
-              ) %>
-            </.link>
+          <div :if={@live_action != :new} class="w-[30%] text-center">
+            <p>
+              <.link
+                :if={@form.data.depre_method != "No Depreciation"}
+                navigate={
+                  ~p"/companies/#{@current_company.id}/fixed_assets/#{@form.data.id}/depreciations"
+                }
+                class="hover:font-bold text-blue-700"
+              >
+                <%= gettext("Depreciations") %> - <%= Number.Currency.number_to_currency(
+                  @form.data.cume_depre
+                ) %>
+              </.link>
             </p>
             <p>
-            <.link
-              navigate={
-                ~p"/companies/#{@current_company.id}/fixed_assets/#{@form.data.id}/disposals"
-              }
-              class="hover:font-bold text-blue-700"
-            >
-              <%= gettext("Disposal") %> - <%= Number.Currency.number_to_currency(@form.data.cume_disp) %>
-            </.link>
+              <.link
+                navigate={
+                  ~p"/companies/#{@current_company.id}/fixed_assets/#{@form.data.id}/disposals"
+                }
+                class="hover:font-bold text-blue-700"
+              >
+                <%= gettext("Disposal") %> - <%= Number.Currency.number_to_currency(
+                  @form.data.cume_disp
+                ) %>
+              </.link>
             </p>
           </div>
         </div>

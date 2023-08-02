@@ -8,7 +8,12 @@ defmodule FullCircleWeb.TaxCodeLive.Form do
   @impl true
   def mount(params, _session, socket) do
     id = params["tax_code_id"]
-    socket = if(is_nil(id), do: mount_new(socket), else: mount_edit(socket, id))
+
+    socket =
+      case socket.assigns.live_action do
+        :new -> mount_new(socket)
+        :edit -> mount_edit(socket, id)
+      end
 
     {:ok, socket}
   end

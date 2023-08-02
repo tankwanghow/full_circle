@@ -14,6 +14,7 @@ defmodule FullCircle.ReceiveFund.Receipt do
     belongs_to :company, FullCircle.Sys.Company
 
     has_many :received_cheques, FullCircle.ReceiveFund.ReceivedCheque, on_replace: :delete
+
     has_many :receipt_transaction_matchers, FullCircle.ReceiveFund.ReceiptTransactionMatcher,
       on_replace: :delete
 
@@ -50,9 +51,11 @@ defmodule FullCircle.ReceiveFund.Receipt do
     |> validate_id(:contact_name, :contact_id)
     |> validate_id(:funds_account_name, :funds_account_id)
     |> unsafe_validate_unique([:receipt_no, :company_id], FullCircle.Repo,
-      message: gettext("receipt no already in company"))
+      message: gettext("receipt no already in company")
+    )
     |> validate_number(:receipt_amount, greater_than: 0)
     |> cast_assoc(:receipt_transaction_matchers)
+
     # |> compute_fields()
   end
 

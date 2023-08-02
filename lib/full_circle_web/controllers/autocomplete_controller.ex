@@ -15,7 +15,9 @@ defmodule FullCircleWeb.AutoCompleteController do
           )
 
         "good" ->
-          FullCircle.Product.good_names(name, %{id: params["company_id"]}, %{id: params["user_id"]})
+          FullCircle.Product.good_names(name, %{id: params["company_id"]}, %{
+            id: params["user_id"]
+          })
 
         "account" ->
           FullCircle.Accounting.account_names(

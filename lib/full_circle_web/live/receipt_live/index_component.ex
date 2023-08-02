@@ -43,18 +43,15 @@ defmodule FullCircleWeb.ReceiptLive.IndexComponent do
       <div class="w-[9rem] border-b border-gray-400 py-1">
         <%= @obj.due_date %>
       </div>
-      <div :if={!@obj.old_data}
+      <div
+        :if={!@obj.old_data}
         phx-value-object-id={@obj.id}
         phx-click={:edit_object}
         class="text-blue-600 w-[10rem] border-b border-gray-400 py-1 hover:cursor-pointer"
       >
-
         <%= @obj.invoice_no %>
       </div>
-      <div :if={@obj.old_data}
-        class="w-[10rem] border-b border-gray-400 py-1"
-      >
-
+      <div :if={@obj.old_data} class="w-[10rem] border-b border-gray-400 py-1">
         <%= @obj.invoice_no %>
       </div>
       <div class="w-[18.4rem] border-b border-gray-400 py-1 overflow-clip">
@@ -71,7 +68,7 @@ defmodule FullCircleWeb.ReceiptLive.IndexComponent do
       </div>
       <div class="w-[1.8rem] border-b border-gray-400 py-1">
         <.live_component
-        :if={!@obj.old_data}
+          :if={!@obj.old_data}
           module={FullCircleWeb.LogLive.Component}
           id={"log_#{@obj.id}"}
           show_log={false}

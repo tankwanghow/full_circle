@@ -25,13 +25,10 @@ defmodule FullCircleWeb.AccountLive.IndexComponent do
       >
         <%= @obj.name %>
       </.link>
-      <span
-        :if={FullCircle.Accounting.is_default_account?(@obj)}
-        class="font-bold text-rose-600"
-      >
+      <span :if={FullCircle.Accounting.is_default_account?(@obj)} class="font-bold text-rose-600">
         <%= @obj.name %>
       </span>
-      <span >(<%= @obj.account_type %>)</span>
+      <span>(<%= @obj.account_type %>)</span>
       <p class="text-sm text-green-600"><%= @obj.descriptions %></p>
     </div>
     """

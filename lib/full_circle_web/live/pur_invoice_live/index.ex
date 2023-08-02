@@ -57,7 +57,11 @@ defmodule FullCircleWeb.PurInvoiceLive.Index do
         </.form>
       </div>
       <div class="text-center mb-2">
-      <.link navigate={~p"/companies/#{@current_company.id}/pur_invoices/new"} class="blue_button" id="new_purinvoice">
+        <.link
+          navigate={~p"/companies/#{@current_company.id}/pur_invoices/new"}
+          class="blue_button"
+          id="new_purinvoice"
+        >
           <%= gettext("New Invoice") %>
         </.link>
       </div>
@@ -129,7 +133,12 @@ defmodule FullCircleWeb.PurInvoiceLive.Index do
     {:noreply,
      socket
      |> assign(
-       search: %{terms: terms, balance: bal, pur_invoice_date: pur_invoice_date, due_date: due_date}
+       search: %{
+         terms: terms,
+         balance: bal,
+         pur_invoice_date: pur_invoice_date,
+         due_date: due_date
+       }
      )
      |> assign(selected_invoices: [])
      |> assign(ids: "")

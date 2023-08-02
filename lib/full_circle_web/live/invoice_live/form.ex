@@ -8,8 +8,13 @@ defmodule FullCircleWeb.InvoiceLive.Form do
 
   @impl true
   def mount(params, _session, socket) do
-    inv_id = params["invoice_id"]
-    socket = if(is_nil(inv_id), do: mount_new(socket), else: mount_edit(socket, inv_id))
+    id = params["invoice_id"]
+
+    socket =
+      case socket.assigns.live_action do
+        :new -> mount_new(socket)
+        :edit -> mount_edit(socket, id)
+      end
 
     {:ok,
      socket

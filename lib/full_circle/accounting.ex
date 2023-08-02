@@ -91,7 +91,8 @@ defmodule FullCircle.Accounting do
   end
 
   def get_tax_code_by_code(code, company, user) do
-    code = code |> String.trim
+    code = code |> String.trim()
+
     from(taxcode in tax_code_query(company, user),
       where: taxcode.code == ^code
     )
@@ -365,7 +366,8 @@ defmodule FullCircle.Accounting do
   end
 
   def get_fixed_asset_by_name(name, company, user) do
-    name = name  |> String.trim
+    name = name |> String.trim()
+
     from(fa in fixed_asset_query(company, user),
       where: fa.name == ^name
     )
@@ -421,7 +423,8 @@ defmodule FullCircle.Accounting do
   end
 
   def get_account_by_name(name, com, user) do
-    name = name  |> String.trim
+    name = name |> String.trim()
+
     Repo.one(
       from ac in Account,
         join: com in subquery(Sys.user_company(com, user)),
@@ -465,7 +468,8 @@ defmodule FullCircle.Accounting do
   end
 
   def get_contact_by_name(name, com, user) do
-    name = name |> String.trim
+    name = name |> String.trim()
+
     Repo.one(
       from ct in Contact,
         join: com in subquery(Sys.user_company(com, user)),

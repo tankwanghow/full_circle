@@ -42,7 +42,10 @@ defmodule FullCircleWeb.ReceiptLive.FormComponent do
   def handle_event("delete_tran", %{"index" => index}, socket) do
     socket =
       socket
-      |> FullCircleWeb.Helpers.delete_line(String.to_integer(index), :receipt_transaction_matchers)
+      |> FullCircleWeb.Helpers.delete_line(
+        String.to_integer(index),
+        :receipt_transaction_matchers
+      )
 
     {:noreply, socket}
   end
@@ -111,11 +114,10 @@ defmodule FullCircleWeb.ReceiptLive.FormComponent do
         socket.assigns.current_company
       )
 
-      socket = socket |> FullCircleWeb.Helpers.add_lines(:receipt_transaction_matchers, trans)
+    socket = socket |> FullCircleWeb.Helpers.add_lines(:receipt_transaction_matchers, trans)
 
-      {:noreply, socket}
+    {:noreply, socket}
   end
-
 
   defp validate(params, socket) do
     changeset =
@@ -303,7 +305,7 @@ defmodule FullCircleWeb.ReceiptLive.FormComponent do
             <div class="detail-header w-[11.1rem]"><%= gettext("Match") %></div>
           </div>
           <.inputs_for :let={dtl} field={@form[:receipt_transaction_matchers]}>
-            <div class={"flex flex-row flex-wrap"}>
+            <div class="flex flex-row flex-wrap">
               <div class="w-[11.1rem]"><.input field={dtl[:doc_date]} /></div>
               <div class="w-[11.1rem]"><.input field={dtl[:doc_type]} /></div>
               <div class="w-[11.1rem]"><.input field={dtl[:doc_no]} /></div>

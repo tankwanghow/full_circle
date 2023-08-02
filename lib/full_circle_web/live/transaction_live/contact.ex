@@ -151,7 +151,7 @@ defmodule FullCircleWeb.TransactionLive.Contact do
       </div>
 
       <div class="font-medium flex flex-row text-center tracking-tighter mb-1">
-      <div class="w-[10%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
+        <div class="w-[10%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
           <%= gettext("Date") %>
         </div>
         <div class="w-[12%] border rounded bg-gray-200 border-gray-400 px-2 py-1">

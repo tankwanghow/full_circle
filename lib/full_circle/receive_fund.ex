@@ -70,10 +70,21 @@ defmodule FullCircle.ReceiveFund do
           doc_type: txn.doc_type,
           doc_no: txn.doc_no,
           amount: txn.amount,
-          balance: txn.amount + coalesce(sum(stxm.match_amount), 0) + coalesce(sum(rectxm.match_amount), 0),
+          balance:
+            txn.amount + coalesce(sum(stxm.match_amount), 0) +
+              coalesce(sum(rectxm.match_amount), 0),
           match_amount: coalesce(rectxm.match_amount, 0)
         },
-        group_by: [txn.id, txn.doc_type, txn.doc_no, txn.doc_date, txn.amount, rectxm.match_amount, rectxm.id]
-        qry |> Repo.all
+        group_by: [
+          txn.id,
+          txn.doc_type,
+          txn.doc_no,
+          txn.doc_date,
+          txn.amount,
+          rectxm.match_amount,
+          rectxm.id
+        ]
+
+    qry |> Repo.all()
   end
 end

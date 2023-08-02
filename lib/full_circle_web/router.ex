@@ -116,7 +116,9 @@ defmodule FullCircleWeb.Router do
       live("/tax_codes/:tax_code_id/edit", TaxCodeLive.Form, :edit)
 
       live("/goods", GoodLive.Index, :index)
-
+      live("/goods/new", GoodLive.Form, :new)
+      live("/goods/:good_id/copy", GoodLive.Form, :copy)
+      live("/goods/:good_id/edit", GoodLive.Form, :edit)
 
       live("/fixed_assets", FixedAssetLive.Index, :index)
       live("/fixed_assets/new", FixedAssetLive.Form, :new)
@@ -124,7 +126,6 @@ defmodule FullCircleWeb.Router do
       live("/fixed_assets/:id/depreciations", FixedAssetLive.Depreciations, :index)
       live("/fixed_assets/:id/disposals", FixedAssetLive.Disposals, :index)
       live("/fixed_assets/calalldepre", FixedAssetLive.CalAllDepre, :index)
-      live("/seeds", SeedLive.Index, :index)
 
       live("/invoices", InvoiceLive.Index, :index)
       live("/invoices/new", InvoiceLive.Form, :new)
@@ -138,6 +139,7 @@ defmodule FullCircleWeb.Router do
       live("/journal_entries/:doc_type/:doc_no", JournalEntryViewLive.Index, :index)
       live("/account_transactions", TransactionLive.Account, :index)
       live("/contact_transactions", TransactionLive.Contact, :index)
+      live("/seeds", SeedLive.Index, :index)
 
       live("/receipts", ReceiptLive.Index, :index)
     end
