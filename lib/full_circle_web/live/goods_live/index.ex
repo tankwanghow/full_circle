@@ -18,7 +18,11 @@ defmodule FullCircleWeb.GoodLive.Index do
         placeholder={gettext("Name, Unit, Account Name, TaxCode and Descriptions...")}
       />
       <div class="text-center mb-2">
-        <.link navigate={~p"/companies/#{@current_company.id}/goods/new"} class="blue_button" id="new_object">
+        <.link
+          navigate={~p"/companies/#{@current_company.id}/goods/new"}
+          class="blue_button"
+          id="new_object"
+        >
           <%= gettext("New Good") %>
         </.link>
       </div>
