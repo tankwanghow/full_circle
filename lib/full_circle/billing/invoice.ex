@@ -56,7 +56,7 @@ defmodule FullCircle.Billing.Invoice do
   def compute_fields(changeset) do
     changeset =
       if is_nil(get_change(changeset, :invoice_details)) do
-        compute_unchange_fields(changeset)
+        changeset
       else
         compute_change_field(changeset)
       end
@@ -102,77 +102,6 @@ defmodule FullCircle.Billing.Invoice do
     |> put_change(:invoice_good_amount, iga)
     |> put_change(:invoice_tax_amount, ita)
     |> put_change(:invoice_amount, ia)
-  end
-
-  defp compute_unchange_fields(changeset)
-       when is_struct(changeset.data.invoice_details, Ecto.Association.NotLoaded) do
-    changeset
-  end
-
-  defp compute_unchange_fields(changeset) do
-    iga =
-      Enum.reduce(changeset.data.invoice_details, 0, fn x, acc ->
-        Decimal.add(acc, x.good_amount)
-      end)
-
-    ita =
-      Enum.reduce(changeset.data.invoice_details, 0, fn x, acc ->
-        Decimal.add(acc, x.tax_amount)
-      end)
-
-    ia =
-      Enum.reduce(changeset.data.invoice_details, 0, fn x, acc ->
-        Decimal.add(x.tax_amount, x.good_amount) |> Decimal.add(acc)
-      end)
-
-    changeset
-    |> put_change(:invoice_good_amount, iga)
-    |> put_change(:invoice_tax_amount, ita)
-    |> put_change(:invoice_amount, ia)
-  end
-
-  def fill_computed_field(invoice) do
-    invoice =
-      Map.merge(invoice, %{
-        invoice_details:
-          Enum.map(invoice.invoice_details, fn x ->
-            gamt =
-              Decimal.mult(x.quantity, x.unit_price)
-              |> Decimal.add(x.discount)
-              |> Decimal.round(2)
-
-            tamt =
-              Decimal.mult(x.quantity, x.unit_price)
-              |> Decimal.add(x.discount)
-              |> Decimal.mult(x.tax_rate)
-              |> Decimal.round(2)
-
-            Map.merge(x, %{
-              good_amount: gamt,
-              tax_amount: tamt,
-              amount: Decimal.add(tamt, gamt)
-            })
-          end)
-      })
-
-    invoice =
-      invoice
-      |> Map.merge(%{
-        invoice_good_amount:
-          Enum.reduce(invoice.invoice_details, 0, fn x, acc ->
-            Decimal.add(acc, x.good_amount)
-          end)
-      })
-      |> Map.merge(%{
-        invoice_tax_amount:
-          Enum.reduce(invoice.invoice_details, 0, fn x, acc ->
-            Decimal.add(acc, x.tax_amount)
-          end)
-      })
-
-    Map.merge(invoice, %{
-      invoice_amount: Decimal.add(invoice.invoice_good_amount, invoice.invoice_tax_amount)
-    })
   end
 
   defp fill_default_date(changeset) do

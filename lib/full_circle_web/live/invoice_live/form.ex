@@ -2,7 +2,7 @@ defmodule FullCircleWeb.InvoiceLive.Form do
   use FullCircleWeb, :live_view
 
   alias FullCircle.Billing
-  alias FullCircle.Billing.{Invoice, InvoiceDetail}
+  alias FullCircle.Billing.{Invoice}
   alias FullCircle.StdInterface
   alias FullCircle.Sys
 
@@ -66,7 +66,7 @@ defmodule FullCircleWeb.InvoiceLive.Form do
 
   @impl true
   def handle_event("add_detail", _, socket) do
-    socket = socket |> FullCircleWeb.Helpers.add_line(:invoice_details, %InvoiceDetail{})
+    socket = socket |> FullCircleWeb.Helpers.add_line(:invoice_details)
     {:noreply, socket}
   end
 
@@ -74,10 +74,11 @@ defmodule FullCircleWeb.InvoiceLive.Form do
   def handle_event("delete_detail", %{"index" => index}, socket) do
     socket =
       socket
-      |> FullCircleWeb.Helpers.delete_line(String.to_integer(index), :invoice_details)
-      |> update(:form, fn %{source: changeset} ->
-        changeset |> Invoice.compute_fields() |> to_form()
-      end)
+      |> FullCircleWeb.Helpers.delete_line(
+        index,
+        :invoice_details,
+        &Invoice.compute_fields/1
+      )
 
     {:noreply, socket}
   end
@@ -335,7 +336,7 @@ defmodule FullCircleWeb.InvoiceLive.Form do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="w-10/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
+    <div class="w-12/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
       <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
       <.form for={@form} id="object-form" autocomplete="off" phx-change="validate" phx-submit="save">
         <%= Phoenix.HTML.Form.hidden_input(@form, :invoice_no) %>
@@ -416,7 +417,7 @@ defmodule FullCircleWeb.InvoiceLive.Form do
               <.input type="number" field={dtl[:package_qty]} />
             </div>
             <div class="w-24 grow-[1] shrink-[1]">
-              <.input type="number" field={dtl[:quantity]} step="0.0001" />
+              <.input type="number" field={dtl[:quantity]} step="0.0001" readonly={Phoenix.HTML.Form.input_value(dtl, :unit_multiplier) |> Decimal.gt?(0)}/>
             </div>
             <div class="w-16 grow-0 shrink-0">
               <.input field={dtl[:unit]} readonly tabindex="-1" />

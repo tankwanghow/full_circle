@@ -24,6 +24,7 @@ defmodule FullCircle.Repo.Migrations.CreateGoods do
     create index(:goods, [:sales_tax_code_id])
 
     create table(:packagings) do
+      add :_persistent_id, :integer
       add :good_id, references(:goods, on_delete: :delete_all), null: false
       add :name, :string, null: false
       add :unit_multiplier, :decimal, default: 1

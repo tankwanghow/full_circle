@@ -15,13 +15,16 @@ defmodule FullCircle.ReceiveFund.Receipt do
 
     has_many :received_cheques, FullCircle.ReceiveFund.ReceivedCheque, on_replace: :delete
 
-    has_many :receipt_transaction_matchers, FullCircle.ReceiveFund.ReceiptTransactionMatcher,
-      on_replace: :delete
+    has_many :transaction_matchers, FullCircle.Accounting.TransactionMatcher,
+      where: [entity: "receipts"],
+      on_replace: :delete,
+      foreign_key: "entity_id",
+      references: :id
 
     field :contact_name, :string, virtual: true
     field :funds_account_name, :string, virtual: true
-    field :receipt_good_amount, :decimal, virtual: true, default: 0
-    field :receipt_tax_amount, :decimal, virtual: true, default: 0
+    field :cheques_amount, :decimal, virtual: true, default: 0
+    field :matched_amount, :decimal, virtual: true, default: 0
 
     timestamps(type: :utc_datetime)
   end
@@ -38,7 +41,9 @@ defmodule FullCircle.ReceiveFund.Receipt do
       :receipt_no,
       :funds_account_name,
       :funds_account_id,
-      :receipt_amount
+      :receipt_amount,
+      :cheques_amount,
+      :matched_amount
     ])
     |> fill_default_date()
     |> validate_required([
@@ -54,9 +59,36 @@ defmodule FullCircle.ReceiveFund.Receipt do
       message: gettext("receipt no already in company")
     )
     |> validate_number(:receipt_amount, greater_than: 0)
-    |> cast_assoc(:receipt_transaction_matchers)
+    |> cast_assoc(:transaction_matchers)
+    |> cast_assoc(:received_cheques)
+    |> sum_field(:received_cheques, :amount, :cheques_amount)
+  end
 
-    # |> compute_fields()
+  def sum_field(changeset, detail_name, field_name, result_field) do
+    # if is_nil(get_change(changeset, detail_name)) do
+    # sum_change_fields(changeset, detail_name, field_name, result_field)
+    # else
+    changeset =
+      sum_change_field(changeset, detail_name, field_name, result_field)
+
+    # end
+  end
+
+  defp sum_change_field(changeset, detail_name, field_name, result_field) do
+    dtls = get_change(changeset, detail_name) || Map.fetch!(changeset.data, detail_name)
+
+    sum =
+      Enum.reduce(dtls, 0, fn x, acc ->
+        Decimal.add(
+          acc,
+          if(!fetch_field!(x, :delete),
+            do: fetch_field!(x, field_name),
+            else: 0
+          )
+        )
+      end)
+
+    changeset |> put_change(result_field, sum)
   end
 
   defp fill_default_date(changeset) do

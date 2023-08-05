@@ -34,14 +34,5 @@ defmodule FullCircle.Repo.Migrations.CreateReceipts do
 
     create index(:received_cheques, [:due_date])
     create index(:received_cheques, [:receipt_id])
-
-    create table(:receipt_transaction_matchers) do
-      add :_persistent_id, :integer
-      add :match_amount, :decimal, default: 0
-      add :transaction_id, references(:transactions, on_delete: :restrict)
-      add :receipt_id, references(:receipts, on_delete: :delete_all)
-    end
-
-    create index(:receipt_transaction_matchers, [:transaction_id])
   end
 end

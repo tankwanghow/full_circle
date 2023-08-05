@@ -2,7 +2,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
   use FullCircleWeb, :live_view
 
   alias FullCircle.Billing
-  alias FullCircle.Billing.{PurInvoice, PurInvoiceDetail}
+  alias FullCircle.Billing.{PurInvoice}
   alias FullCircle.StdInterface
   alias FullCircle.Sys
 
@@ -66,7 +66,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
 
   @impl true
   def handle_event("add_detail", _, socket) do
-    socket = socket |> FullCircleWeb.Helpers.add_line(:pur_invoice_details, %PurInvoiceDetail{})
+    socket = socket |> FullCircleWeb.Helpers.add_line(:pur_invoice_details)
     {:noreply, socket}
   end
 
@@ -74,10 +74,11 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
   def handle_event("delete_detail", %{"index" => index}, socket) do
     socket =
       socket
-      |> FullCircleWeb.Helpers.delete_line(String.to_integer(index), :pur_invoice_details)
-      |> update(:form, fn %{source: changeset} ->
-        changeset |> PurInvoice.compute_fields() |> to_form()
-      end)
+      |> FullCircleWeb.Helpers.delete_line(
+        index,
+        :pur_invoice_details,
+        &PurInvoice.compute_fields/1
+      )
 
     {:noreply, socket}
   end
@@ -429,7 +430,12 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
               <.input type="number" field={dtl[:package_qty]} />
             </div>
             <div class="w-24 grow-[1] shrink-[1]">
-              <.input type="number" field={dtl[:quantity]} step="0.0001" />
+              <.input
+                type="number"
+                field={dtl[:quantity]}
+                step="0.0001"
+                readonly={Phoenix.HTML.Form.input_value(dtl, :unit_multiplier) |> Decimal.gt?(0)}
+              />
             </div>
             <div class="w-16 grow-0 shrink-0">
               <.input field={dtl[:unit]} readonly tabindex="-1" />

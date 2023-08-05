@@ -153,7 +153,7 @@ defmodule FullCircle.Sys do
       },
       %{
         name: "Post Dated Cheques Received",
-        account_type: "Current Asset",
+        account_type: "Post Dated Cheques",
         descriptions:
           "An Account in accounting that records the value of post-dated cheques received by a business but not yet deposited or cashed."
       }

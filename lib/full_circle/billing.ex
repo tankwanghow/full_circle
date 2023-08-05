@@ -5,11 +5,10 @@ defmodule FullCircle.Billing do
   import FullCircle.Authorization
 
   alias FullCircle.Billing.{Invoice, InvoiceDetail, PurInvoice, PurInvoiceDetail}
-  alias FullCircle.Accounting.{Contact, Account, Transaction, TaxCode, SeedTransactionMatcher}
+  alias FullCircle.Accounting.{TransactionMatcher, Contact, Account, Transaction, TaxCode, SeedTransactionMatcher}
   alias FullCircle.Product.{Good, Packaging}
   alias FullCircle.StdInterface
   alias FullCircle.{Sys, Accounting}
-  alias FullCircle.ReceiveFund.ReceiptTransactionMatcher
   alias Ecto.Multi
 
   def get_invoice_by_invoice_no!(inv_no, com, user) do
@@ -97,12 +96,19 @@ defmodule FullCircle.Billing do
           contact_name: cont.name,
           contact_id: cont.id,
           invoice_tax_amount:
-            sum((invd.quantity * invd.unit_price + invd.discount) * invd.tax_rate),
-          invoice_good_amount: sum(invd.quantity * invd.unit_price + invd.discount),
+            fragment(
+              "round(?, 2)",
+              sum((invd.quantity * invd.unit_price + invd.discount) * invd.tax_rate)
+            ),
+          invoice_good_amount:
+            fragment("round(?, 2)", sum(invd.quantity * invd.unit_price + invd.discount)),
           invoice_amount:
-            sum(
-              invd.quantity * invd.unit_price + invd.discount +
-                (invd.quantity * invd.unit_price + invd.discount) * invd.tax_rate
+            fragment(
+              "round(?, 2)",
+              sum(
+                invd.quantity * invd.unit_price + invd.discount +
+                  (invd.quantity * invd.unit_price + invd.discount) * invd.tax_rate
+              )
             )
         }
     )
@@ -129,11 +135,22 @@ defmodule FullCircle.Billing do
         unit_multiplier: pkg.unit_multiplier,
         tax_rate: invd.tax_rate,
         tax_code_name: tc.code,
-        tax_amount: (invd.quantity * invd.unit_price + invd.discount) * invd.tax_rate,
-        good_amount: invd.quantity * invd.unit_price + invd.discount,
-        amount:
-          invd.quantity * invd.unit_price + invd.discount +
+        tax_amount:
+          fragment(
+            "round(?, 2)",
             (invd.quantity * invd.unit_price + invd.discount) * invd.tax_rate
+          ),
+        good_amount:
+          fragment(
+            "round(?, 2)",
+            invd.quantity * invd.unit_price + invd.discount
+          ),
+        amount:
+          fragment(
+            "round(?, 2)",
+            invd.quantity * invd.unit_price + invd.discount +
+              (invd.quantity * invd.unit_price + invd.discount) * invd.tax_rate
+          )
       }
   end
 
@@ -195,8 +212,8 @@ defmodule FullCircle.Billing do
           txn.contact_id == inv.contact_id,
       left_join: stxm in SeedTransactionMatcher,
       on: stxm.transaction_id == txn.id,
-      left_join: rectxm in ReceiptTransactionMatcher,
-      on: rectxm.transaction_id == txn.id,
+      left_join: atxm in TransactionMatcher,
+      on: atxm.transaction_id == txn.id,
       order_by: [desc: txn.inserted_at],
       select: %{
         id: coalesce(inv.id, txn.id),
@@ -209,7 +226,7 @@ defmodule FullCircle.Billing do
         contact_name: cont.name,
         invoice_amount: txn.amount,
         balance:
-          txn.amount + coalesce(sum(stxm.match_amount), 0) + coalesce(sum(rectxm.match_amount), 0),
+          txn.amount + coalesce(sum(stxm.match_amount), 0) + coalesce(sum(atxm.match_amount), 0),
         checked: false,
         old_data: txn.old_data
       },
@@ -268,7 +285,6 @@ defmodule FullCircle.Billing do
 
     multi
     |> Ecto.Multi.run("create_transactions", fn repo, %{^name => invoice} ->
-      Invoice.fill_computed_field(invoice)
 
       Enum.each(invoice.invoice_details, fn x ->
         if Decimal.gt?(x.good_amount, 0) do
@@ -391,12 +407,22 @@ defmodule FullCircle.Billing do
           contact_name: cont.name,
           contact_id: cont.id,
           pur_invoice_tax_amount:
-            sum((invd.quantity * invd.unit_price + invd.discount) * invd.tax_rate),
-          pur_invoice_good_amount: sum(invd.quantity * invd.unit_price + invd.discount),
+            fragment(
+              "round(?, 2)",
+              sum((invd.quantity * invd.unit_price + invd.discount) * invd.tax_rate)
+            ),
+          pur_invoice_good_amount:
+            fragment(
+              "round(?, 2)",
+              sum(invd.quantity * invd.unit_price + invd.discount)
+            ),
           pur_invoice_amount:
-            sum(
-              invd.quantity * invd.unit_price + invd.discount +
-                (invd.quantity * invd.unit_price + invd.discount) * invd.tax_rate
+            fragment(
+              "round(?, 2)",
+              sum(
+                invd.quantity * invd.unit_price + invd.discount +
+                  (invd.quantity * invd.unit_price + invd.discount) * invd.tax_rate
+              )
             )
         }
     )
@@ -423,11 +449,22 @@ defmodule FullCircle.Billing do
         unit_multiplier: pkg.unit_multiplier,
         tax_rate: invd.tax_rate,
         tax_code_name: tc.code,
-        tax_amount: (invd.quantity * invd.unit_price + invd.discount) * invd.tax_rate,
-        good_amount: invd.quantity * invd.unit_price + invd.discount,
-        amount:
-          invd.quantity * invd.unit_price + invd.discount +
+        tax_amount:
+          fragment(
+            "round(?, 2)",
             (invd.quantity * invd.unit_price + invd.discount) * invd.tax_rate
+          ),
+        good_amount:
+          fragment(
+            "round(?, 2)",
+            invd.quantity * invd.unit_price + invd.discount
+          ),
+        amount:
+          fragment(
+            "round(?, 2)",
+            invd.quantity * invd.unit_price + invd.discount +
+              (invd.quantity * invd.unit_price + invd.discount) * invd.tax_rate
+          )
       }
   end
 
@@ -489,8 +526,8 @@ defmodule FullCircle.Billing do
           txn.contact_id == inv.contact_id,
       left_join: stxm in SeedTransactionMatcher,
       on: stxm.transaction_id == txn.id,
-      left_join: rectxm in ReceiptTransactionMatcher,
-      on: rectxm.transaction_id == txn.id,
+      left_join: atxm in TransactionMatcher,
+      on: atxm.transaction_id == txn.id,
       order_by: [desc: txn.inserted_at],
       select: %{
         id: coalesce(inv.id, txn.id),
@@ -503,7 +540,7 @@ defmodule FullCircle.Billing do
         contact_name: cont.name,
         pur_invoice_amount: txn.amount,
         balance:
-          txn.amount + coalesce(sum(stxm.match_amount), 0) + coalesce(sum(rectxm.match_amount), 0),
+          txn.amount + coalesce(sum(stxm.match_amount), 0) + coalesce(sum(atxm.match_amount), 0),
         checked: false,
         old_data: txn.old_data
       },
@@ -568,7 +605,6 @@ defmodule FullCircle.Billing do
 
     multi
     |> Ecto.Multi.run("create_transactions", fn repo, %{^name => pur_invoice} ->
-      PurInvoice.fill_computed_field(pur_invoice)
 
       Enum.each(pur_invoice.pur_invoice_details, fn x ->
         if Decimal.gt?(x.good_amount, 0) do

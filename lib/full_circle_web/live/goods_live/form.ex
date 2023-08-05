@@ -1,7 +1,7 @@
 defmodule FullCircleWeb.GoodLive.Form do
   use FullCircleWeb, :live_view
 
-  alias FullCircle.Product.{Good, Packaging}
+  alias FullCircle.Product.{Good}
   alias FullCircle.Product
   alias FullCircle.StdInterface
 
@@ -63,7 +63,7 @@ defmodule FullCircleWeb.GoodLive.Form do
 
   @impl true
   def handle_event("add_packaging", _, socket) do
-    {:noreply, socket |> FullCircleWeb.Helpers.add_line(:packagings, %Packaging{})}
+    {:noreply, socket |> FullCircleWeb.Helpers.add_line(:packagings)}
   end
 
   @impl true

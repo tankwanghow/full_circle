@@ -26,6 +26,13 @@ defmodule FullCircleWeb.AutoCompleteController do
             %{id: params["user_id"]}
           )
 
+        "fundsaccount" ->
+          FullCircle.Accounting.funds_account_names(
+            name,
+            %{id: params["company_id"]},
+            %{id: params["user_id"]}
+          )
+
         "packaging" ->
           if params["good_id"] == "" do
             []

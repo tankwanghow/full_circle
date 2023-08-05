@@ -44,7 +44,8 @@ defmodule FullCircle.Accounting do
       "Liability",
       "Non-current Liability",
       "Intangible Asset",
-      "Accrual"
+      "Accrual",
+      "Post Dated Cheques"
     ]
   end
 
@@ -65,6 +66,72 @@ defmodule FullCircle.Accounting do
       "No Depreciation",
       "Straight-Line"
     ]
+  end
+
+  def query_transactions_for_matching(ctid, sdate, edate, com, user) do
+    qry =
+      from txn in subquery(transaction_with_balance_query(com, user)),
+        where: txn.contact_id == ^ctid,
+        where: txn.doc_date >= ^sdate,
+        where: txn.doc_date <= ^edate,
+        where: txn.amount > 0,
+        order_by: txn.doc_date,
+        select: %{
+          transaction_id: txn.id,
+          doc_date: txn.doc_date,
+          doc_type: txn.doc_type,
+          doc_no: txn.doc_no,
+          amount: txn.amount,
+          particulars: txn.particulars,
+          all_matched_amount: txn.all_matched_amount,
+          balance: txn.amount + txn.all_matched_amount,
+          match_amount: 0
+        }
+
+    qry |> Repo.all()
+  end
+
+  defp transaction_with_balance_query(com, user) do
+    from txn in Transaction,
+      join: comp in subquery(Sys.user_company(com, user)),
+      on: txn.company_id == comp.id,
+      left_join: stxm in FullCircle.Accounting.SeedTransactionMatcher,
+      on: stxm.transaction_id == txn.id,
+      left_join: atxm in FullCircle.Accounting.TransactionMatcher,
+      on: atxm.transaction_id == txn.id,
+      select: %{
+        id: txn.id,
+        account_id: txn.account_id,
+        contact_id: txn.contact_id,
+        fixed_asset_id: txn.fixed_asset_id,
+        doc_date: txn.doc_date,
+        doc_type: txn.doc_type,
+        doc_no: txn.doc_no,
+        amount:
+          fragment(
+            "round(?, 2)",
+            txn.amount
+          ),
+        particulars: coalesce(txn.contact_particulars, txn.particulars),
+        all_matched_amount:
+          fragment(
+            "round(?, 2)",
+            coalesce(sum(stxm.match_amount), 0) +
+              coalesce(sum(atxm.match_amount), 0)
+          )
+      },
+      group_by: [
+        txn.id,
+        txn.account_id,
+        txn.contact_id,
+        txn.fixed_asset_id,
+        txn.doc_type,
+        txn.doc_no,
+        txn.doc_date,
+        txn.amount,
+        txn.particulars,
+        txn.contact_particulars
+      ]
   end
 
   def journal_entries(doc_type, doc_no, company_id) do
@@ -438,7 +505,7 @@ defmodule FullCircle.Accounting do
       join: com in subquery(Sys.user_company(com, user)),
       on: com.id == ac.company_id,
       where: ilike(ac.name, ^"%#{terms}%"),
-      where: ac.account_type in ["Cash or Equivalent", "Bank"],
+      where: ac.account_type in ["Cash or Equivalent", "Bank", "Post Dated Cheques"],
       select: %{id: ac.id, value: ac.name},
       order_by: ac.name
     )

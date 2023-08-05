@@ -7,19 +7,20 @@ defmodule FullCircle.Product.Packaging do
     field(:name, :string)
     field(:unit_multiplier, :decimal, default: 0)
     field(:cost_per_package, :decimal, default: 0)
+    field(:_persistent_id, :integer)
 
     belongs_to :good, FullCircle.Product.Good
 
     has_many :invoice_details, FullCircle.Billing.InvoiceDetail, foreign_key: :package_id
 
     field(:delete, :boolean, virtual: true, default: false)
-    field(:temp_id, :string, virtual: true)
   end
 
   @doc false
   def changeset(packaging, attrs) do
     packaging
     |> cast(attrs, [
+      :_persistent_id,
       :name,
       :unit_multiplier,
       :cost_per_package,

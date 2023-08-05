@@ -46,7 +46,7 @@ defmodule FullCircleWeb.SeedLive.Index do
       |> assign(filename: "No File uploaded.")
       |> allow_upload(:csv_file,
         accept: ~w(.csv),
-        max_file_size: 2_500_000,
+        max_file_size: 6_000_000,
         progress: &handle_progress/3,
         auto_upload: true
       )

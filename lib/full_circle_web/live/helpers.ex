@@ -33,35 +33,66 @@ defmodule FullCircleWeb.Helpers do
     attrs |> Map.merge(%{details_key => details})
   end
 
-  defp get_change_or_field(changeset, field) do
-    with nil <- Ecto.Changeset.get_change(changeset, field) do
-      Ecto.Changeset.get_field(changeset, field, [])
-    end
+  def delete_line(socket, index, lines_name) do
+    cs = socket |> delete_line_std(index, lines_name)
+    socket |> assign(form: to_form(cs))
   end
 
-  def delete_line(socket, index, lines_name) do
+  def delete_line(socket, index, lines_name, after_delete_func) do
+    cs = socket |> delete_line_std(index, lines_name) |> after_delete_func.()
+    socket |> assign(form: to_form(cs))
+  end
+
+  defp delete_line_std(socket, index, lines_name) do
+    changeset = socket.assigns.form.source
+    existing = Ecto.Changeset.get_assoc(changeset, lines_name)
+    {to_delete, rest} = List.pop_at(existing, String.to_integer(index))
+
+    lines =
+      if Ecto.Changeset.change(to_delete).data.id do
+        List.replace_at(
+          existing,
+          String.to_integer(index),
+          Ecto.Changeset.change(to_delete, delete: true)
+        )
+      else
+        rest
+      end
+
+    changeset
+    |> Ecto.Changeset.put_assoc(lines_name, lines)
+
+    # update(socket, :form, fn %{source: changeset} ->
+    #   existing = Ecto.Changeset.get_assoc(changeset, lines_name)
+    #   {to_delete, rest} = List.pop_at(existing, index)
+
+    #   lines =
+    #     if Ecto.Changeset.change(to_delete).data.id do
+    #       List.replace_at(existing, index, Ecto.Changeset.change(to_delete, delete: true))
+    #     else
+    #       rest
+    #     end
+
+    #   changeset
+    #   |> Ecto.Changeset.put_assoc(lines_name, lines)
+    # end)
+  end
+
+  def add_line(socket, lines_name) do
     update(socket, :form, fn %{source: changeset} ->
-      existing = get_change_or_field(changeset, lines_name)
-      {to_delete, rest} = List.pop_at(existing, index)
+      existing = Ecto.Changeset.get_assoc(changeset, lines_name)
 
-      lines =
-        if Ecto.Changeset.change(to_delete).data.id do
-          List.replace_at(existing, index, Ecto.Changeset.change(to_delete, delete: true))
-        else
-          rest
-        end
+      changeset = Ecto.Changeset.put_assoc(changeset, lines_name, existing ++ [%{}])
 
-      changeset
-      |> Ecto.Changeset.put_assoc(lines_name, lines)
-      |> to_form()
+      to_form(changeset)
     end)
   end
 
-  def add_line(socket, lines_name, line_class_struct) do
+  def add_line(socket, lines_name, params) do
     update(socket, :form, fn %{source: changeset} ->
-      existing = get_change_or_field(changeset, lines_name)
+      existing = Ecto.Changeset.get_assoc(changeset, lines_name)
 
-      changeset = Ecto.Changeset.put_assoc(changeset, lines_name, existing ++ [line_class_struct])
+      changeset = Ecto.Changeset.put_assoc(changeset, lines_name, existing ++ [params])
 
       to_form(changeset)
     end)
@@ -69,7 +100,7 @@ defmodule FullCircleWeb.Helpers do
 
   def add_lines(socket, lines_name, class_struct_lines) do
     update(socket, :form, fn %{source: changeset} ->
-      existing = get_change_or_field(changeset, lines_name)
+      existing = Ecto.Changeset.get_assoc(changeset, lines_name)
 
       changeset = Ecto.Changeset.put_assoc(changeset, lines_name, existing ++ class_struct_lines)
 
