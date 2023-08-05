@@ -417,7 +417,12 @@ defmodule FullCircleWeb.InvoiceLive.Form do
               <.input type="number" field={dtl[:package_qty]} />
             </div>
             <div class="w-24 grow-[1] shrink-[1]">
-              <.input type="number" field={dtl[:quantity]} step="0.0001" readonly={Phoenix.HTML.Form.input_value(dtl, :unit_multiplier) |> Decimal.gt?(0)}/>
+              <.input
+                type="number"
+                field={dtl[:quantity]}
+                step="0.0001"
+                readonly={Phoenix.HTML.Form.input_value(dtl, :unit_multiplier) |> Decimal.gt?(0)}
+              />
             </div>
             <div class="w-16 grow-0 shrink-0">
               <.input field={dtl[:unit]} readonly tabindex="-1" />

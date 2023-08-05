@@ -5,7 +5,16 @@ defmodule FullCircle.Billing do
   import FullCircle.Authorization
 
   alias FullCircle.Billing.{Invoice, InvoiceDetail, PurInvoice, PurInvoiceDetail}
-  alias FullCircle.Accounting.{TransactionMatcher, Contact, Account, Transaction, TaxCode, SeedTransactionMatcher}
+
+  alias FullCircle.Accounting.{
+    TransactionMatcher,
+    Contact,
+    Account,
+    Transaction,
+    TaxCode,
+    SeedTransactionMatcher
+  }
+
   alias FullCircle.Product.{Good, Packaging}
   alias FullCircle.StdInterface
   alias FullCircle.{Sys, Accounting}
@@ -285,7 +294,6 @@ defmodule FullCircle.Billing do
 
     multi
     |> Ecto.Multi.run("create_transactions", fn repo, %{^name => invoice} ->
-
       Enum.each(invoice.invoice_details, fn x ->
         if Decimal.gt?(x.good_amount, 0) do
           repo.insert!(%Transaction{
@@ -605,7 +613,6 @@ defmodule FullCircle.Billing do
 
     multi
     |> Ecto.Multi.run("create_transactions", fn repo, %{^name => pur_invoice} ->
-
       Enum.each(pur_invoice.pur_invoice_details, fn x ->
         if Decimal.gt?(x.good_amount, 0) do
           repo.insert!(%Transaction{
