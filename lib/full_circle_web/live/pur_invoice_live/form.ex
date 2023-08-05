@@ -500,16 +500,16 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
           <div class="w-24 shrink-[1] grow-[1]" />
           <div class={"#{Sys.get_setting(@settings, "pur_invoices", "discount-col")} w-24"} />
           <div class={"#{Sys.get_setting(@settings, "pur_invoices", "goodamt-col")} w-24"}>
-            <.input type="number" field={@form[:invoice_good_amount]} readonly tabindex="-1" />
+            <.input type="number" field={@form[:pur_invoice_good_amount]} readonly tabindex="-1" />
           </div>
           <div class={"#{Sys.get_setting(@settings, "pur_invoices", "account-col")} w-28"} />
           <div class="w-16 shrink-[1] grow-[1]" />
           <div class={"#{Sys.get_setting(@settings, "pur_invoices", "taxrate-col")} w-14"} />
           <div class={"#{Sys.get_setting(@settings, "pur_invoices", "taxamt-col")} w-20"}>
-            <.input type="number" field={@form[:invoice_tax_amount]} readonly tabindex="-1" />
+            <.input type="number" field={@form[:pur_invoice_tax_amount]} readonly tabindex="-1" />
           </div>
           <div class="w-24 shrink-[1] grow-[1]">
-            <.input type="number" field={@form[:invoice_amount]} readonly tabindex="-1" />
+            <.input type="number" field={@form[:pur_invoice_amount]} readonly tabindex="-1" />
           </div>
           <div class="w-5 grow-0 shrink-0" />
         </div>

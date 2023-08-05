@@ -61,7 +61,10 @@ defmodule FullCircle.Billing.PurInvoice do
       if is_nil(get_change(changeset, :pur_invoice_details)) do
         changeset
       else
-        compute_change_field(changeset)
+        changeset
+        |> sum_field_to(:pur_invoice_details, :good_amount, :pur_invoice_good_amount)
+        |> sum_field_to(:pur_invoice_details, :tax_amount, :pur_invoice_tax_amount)
+        |> sum_field_to(:pur_invoice_details, :amount, :pur_invoice_amount)
       end
 
     if Decimal.lt?(fetch_field!(changeset, :pur_invoice_amount), "0.01") do
@@ -69,42 +72,6 @@ defmodule FullCircle.Billing.PurInvoice do
     else
       changeset
     end
-  end
-
-  defp compute_change_field(changeset) do
-    invds = get_change(changeset, :pur_invoice_details)
-
-    iga =
-      Enum.reduce(invds, 0, fn x, acc ->
-        Decimal.add(
-          acc,
-          if(!fetch_field!(x, :delete),
-            do: fetch_field!(x, :good_amount),
-            else: 0
-          )
-        )
-      end)
-
-    ita =
-      Enum.reduce(invds, 0, fn x, acc ->
-        Decimal.add(
-          acc,
-          if(!fetch_field!(x, :delete), do: fetch_field!(x, :tax_amount), else: 0)
-        )
-      end)
-
-    ia =
-      Enum.reduce(invds, 0, fn x, acc ->
-        Decimal.add(
-          acc,
-          if(!fetch_field!(x, :delete), do: fetch_field!(x, :amount), else: 0)
-        )
-      end)
-
-    changeset
-    |> put_change(:pur_invoice_good_amount, iga)
-    |> put_change(:pur_invoice_tax_amount, ita)
-    |> put_change(:pur_invoice_amount, ia)
   end
 
   defp fill_default_date(changeset) do

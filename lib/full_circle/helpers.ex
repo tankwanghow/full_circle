@@ -68,6 +68,23 @@ defmodule FullCircle.Helpers do
     end
   end
 
+  def sum_field_to(changeset, detail_name, field_name, result_field) do
+    dtls = get_change(changeset, detail_name)
+
+    sum =
+      Enum.reduce(dtls, 0, fn x, acc ->
+        Decimal.add(
+          acc,
+          if(!fetch_field!(x, :delete),
+            do: fetch_field!(x, field_name),
+            else: 0
+          )
+        )
+      end)
+
+    changeset |> put_change(result_field, sum)
+  end
+
   def get_gapless_doc_id(multi, name, doc, doc_code, com) do
     Ecto.Multi.run(multi, name, fn repo, _ ->
       gap =
