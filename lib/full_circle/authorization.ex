@@ -53,6 +53,12 @@ defmodule FullCircle.Authorization do
   def can?(user, :delete_fixed_asset_disposal, company),
     do: allow_roles(~w(admin manager supervisor), company, user)
 
+  def can?(user, :create_receipt, company),
+    do: allow_roles(~w(admin manager supervisor clerk), company, user)
+
+  def can?(user, :update_receipt, company),
+    do: allow_roles(~w(admin manager supervisor clerk), company, user)
+
   def can?(user, :create_pur_invoice, company),
     do: allow_roles(~w(admin manager supervisor clerk), company, user)
 

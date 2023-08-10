@@ -4,13 +4,14 @@ defmodule FullCircle.Accounting.TransactionMatcher do
 
   schema "transaction_matchers" do
     field :_persistent_id, :integer
-    field :entity, :string
     field :entity_id, :binary_id
+    field :entity, :string
     field :match_amount, :decimal, default: 0
 
     belongs_to :transaction, FullCircle.Accounting.Transaction
 
     field :delete, :boolean, virtual: true, default: false
+    field :account_id, :binary_id, virtual: true
     field :doc_type, :string, virtual: true
     field :doc_date, :date, virtual: true
     field :doc_no, :string, virtual: true
@@ -26,6 +27,7 @@ defmodule FullCircle.Accounting.TransactionMatcher do
     |> cast(attrs, [
       :_persistent_id,
       :match_amount,
+      :account_id,
       :transaction_id,
       :entity,
       :entity_id,
@@ -38,6 +40,7 @@ defmodule FullCircle.Accounting.TransactionMatcher do
       :all_matched_amount
     ])
     |> validate_required([:transaction_id, :entity])
+    |> validate_number(:match_amount, not_equal_to: 0)
     |> compute_balance()
   end
 
@@ -54,6 +57,6 @@ defmodule FullCircle.Accounting.TransactionMatcher do
     balance = amt + all_match_amt + match_amt
 
     changeset
-    |> put_change(:balance, balance |> Decimal.from_float() |> Decimal.round(2))
+    |> force_change(:balance, balance |> Decimal.from_float() |> Decimal.round(2))
   end
 end
