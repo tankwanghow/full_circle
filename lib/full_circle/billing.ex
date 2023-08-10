@@ -1,6 +1,5 @@
 defmodule FullCircle.Billing do
   import Ecto.Query, warn: false
-  alias FullCircle.Repo
   import FullCircle.Helpers
   import FullCircle.Authorization
 
@@ -16,8 +15,7 @@ defmodule FullCircle.Billing do
   }
 
   alias FullCircle.Product.{Good, Packaging}
-  alias FullCircle.StdInterface
-  alias FullCircle.{Sys, Accounting}
+  alias FullCircle.{Repo, Sys, Accounting, StdInterface}
   alias Ecto.Multi
 
   def get_invoice_by_invoice_no!(inv_no, com, user) do
@@ -219,6 +217,8 @@ defmodule FullCircle.Billing do
       on:
         txn.doc_no == inv.invoice_no and
           txn.contact_id == inv.contact_id,
+      left_join: invd in InvoiceDetail,
+      on: inv.id == invd.invoice_id,
       left_join: stxm in SeedTransactionMatcher,
       on: stxm.transaction_id == txn.id,
       left_join: atxm in TransactionMatcher,
@@ -233,9 +233,28 @@ defmodule FullCircle.Billing do
         updated_at: txn.inserted_at,
         company_id: com.id,
         contact_name: cont.name,
-        invoice_amount: txn.amount,
+        invoice_amount:
+          fragment(
+            "abs(?)",
+            coalesce(
+              sum(
+                invd.quantity * invd.unit_price + invd.discount +
+                  (invd.tax_rate * (invd.quantity * invd.unit_price) + invd.discount)
+              ),
+              txn.amount
+            )
+          ),
         balance:
-          txn.amount + coalesce(sum(stxm.match_amount), 0) + coalesce(sum(atxm.match_amount), 0),
+          fragment(
+            "abs(?)",
+            coalesce(
+              sum(
+                invd.quantity * invd.unit_price + invd.discount +
+                  (invd.tax_rate * (invd.quantity * invd.unit_price) + invd.discount)
+              ),
+              txn.amount
+            ) + coalesce(sum(stxm.match_amount), 0) + coalesce(sum(atxm.match_amount), 0)
+          ),
         checked: false,
         old_data: txn.old_data
       },
@@ -290,16 +309,23 @@ defmodule FullCircle.Billing do
   end
 
   defp create_invoice_transactions(multi, name, com, user) do
-    ac_rec_id = FullCircle.Accounting.get_account_by_name("Account Receivables", com, user).id
+    ac_rec_id = Accounting.get_account_by_name("Account Receivables", com, user).id
 
     multi
     |> Ecto.Multi.run("create_transactions", fn repo, %{^name => invoice} ->
       Enum.each(invoice.invoice_details, fn x ->
-        if Decimal.gt?(x.good_amount, 0) do
+        x = FullCircle.Repo.preload(x, [:account, :tax_code])
+
+        if !Decimal.eq?(x.good_amount, 0) do
           repo.insert!(%Transaction{
             doc_type: "invoices",
             doc_no: invoice.invoice_no,
             doc_date: invoice.invoice_date,
+            contact_id:
+              if(Accounting.is_balance_sheet_account?(x.account),
+                do: invoice.contact_id,
+                else: nil
+              ),
             account_id: x.account_id,
             company_id: com.id,
             amount: Decimal.negate(x.good_amount),
@@ -307,14 +333,12 @@ defmodule FullCircle.Billing do
           })
         end
 
-        if Decimal.gt?(x.tax_amount, 0) do
-          tax_ac_id = Accounting.get_tax_code!(x.tax_code_id, com, user).account_id
-
+        if !Decimal.eq?(x.tax_amount, 0) do
           repo.insert!(%Transaction{
             doc_type: "invoices",
             doc_no: invoice.invoice_no,
             doc_date: invoice.invoice_date,
-            account_id: tax_ac_id,
+            account_id: x.tax_code.account_id,
             company_id: com.id,
             amount: Decimal.negate(x.tax_amount),
             particulars: "#{x.tax_code_name} on #{x.good_name}"
@@ -322,21 +346,23 @@ defmodule FullCircle.Billing do
         end
       end)
 
-      cont_part =
-        Enum.map(invoice.invoice_details, fn x -> x.good_name end)
-        |> Enum.join(", ")
+      if !Decimal.eq?(invoice.invoice_amount, 0) do
+        cont_part =
+          Enum.map(invoice.invoice_details, fn x -> x.good_name end)
+          |> Enum.join(", ")
 
-      repo.insert!(%Transaction{
-        doc_type: "invoices",
-        doc_no: invoice.invoice_no,
-        doc_date: invoice.invoice_date,
-        contact_id: invoice.contact_id,
-        account_id: ac_rec_id,
-        company_id: com.id,
-        amount: invoice.invoice_amount,
-        particulars: invoice.contact_name,
-        contact_particulars: cont_part
-      })
+        repo.insert!(%Transaction{
+          doc_type: "invoices",
+          doc_no: invoice.invoice_no,
+          doc_date: invoice.invoice_date,
+          contact_id: invoice.contact_id,
+          account_id: ac_rec_id,
+          company_id: com.id,
+          amount: invoice.invoice_amount,
+          particulars: invoice.contact_name,
+          contact_particulars: cont_part
+        })
+      end
 
       {:ok, nil}
     end)
@@ -532,6 +558,8 @@ defmodule FullCircle.Billing do
       on:
         txn.doc_no == inv.pur_invoice_no and
           txn.contact_id == inv.contact_id,
+      left_join: invd in PurInvoiceDetail,
+      on: inv.id == invd.pur_invoice_id,
       left_join: stxm in SeedTransactionMatcher,
       on: stxm.transaction_id == txn.id,
       left_join: atxm in TransactionMatcher,
@@ -546,9 +574,28 @@ defmodule FullCircle.Billing do
         updated_at: txn.inserted_at,
         company_id: com.id,
         contact_name: cont.name,
-        pur_invoice_amount: txn.amount,
+        pur_invoice_amount:
+          fragment(
+            "abs(?)",
+            coalesce(
+              sum(
+                invd.quantity * invd.unit_price + invd.discount +
+                  (invd.tax_rate * (invd.quantity * invd.unit_price) + invd.discount)
+              ),
+              txn.amount
+            )
+          ),
         balance:
-          txn.amount + coalesce(sum(stxm.match_amount), 0) + coalesce(sum(atxm.match_amount), 0),
+          fragment(
+            "abs(?)",
+            coalesce(
+              sum(
+                invd.quantity * invd.unit_price + invd.discount +
+                  (invd.tax_rate * (invd.quantity * invd.unit_price) + invd.discount)
+              ),
+              txn.amount
+            ) + coalesce(sum(stxm.match_amount), 0) + coalesce(sum(atxm.match_amount), 0)
+          ),
         checked: false,
         old_data: txn.old_data
       },
@@ -609,16 +656,23 @@ defmodule FullCircle.Billing do
   end
 
   defp create_pur_invoice_transactions(multi, name, com, user) do
-    ac_rec_id = FullCircle.Accounting.get_account_by_name("Account Payables", com, user).id
+    ac_rec_id = Accounting.get_account_by_name("Account Payables", com, user).id
 
     multi
     |> Ecto.Multi.run("create_transactions", fn repo, %{^name => pur_invoice} ->
       Enum.each(pur_invoice.pur_invoice_details, fn x ->
-        if Decimal.gt?(x.good_amount, 0) do
+        x = FullCircle.Repo.preload(x, [:account, :tax_code])
+
+        if !Decimal.eq?(x.good_amount, 0) do
           repo.insert!(%Transaction{
             doc_type: "pur_invoices",
             doc_no: pur_invoice.pur_invoice_no,
             doc_date: pur_invoice.pur_invoice_date,
+            contact_id:
+              if(Accounting.is_balance_sheet_account?(x.account),
+                do: pur_invoice.contact_id,
+                else: nil
+              ),
             account_id: x.account_id,
             company_id: com.id,
             amount: x.good_amount,
@@ -626,14 +680,12 @@ defmodule FullCircle.Billing do
           })
         end
 
-        if Decimal.gt?(x.tax_amount, 0) do
-          tax_ac_id = Accounting.get_tax_code!(x.tax_code_id, com, user).account_id
-
+        if !Decimal.eq?(x.tax_amount, 0) do
           repo.insert!(%Transaction{
             doc_type: "pur_invoices",
             doc_no: pur_invoice.pur_invoice_no,
             doc_date: pur_invoice.pur_invoice_date,
-            account_id: tax_ac_id,
+            account_id: x.tax_code.account_id,
             company_id: com.id,
             amount: x.tax_amount,
             particulars: "#{x.tax_code_name} on #{x.good_name}"
@@ -641,21 +693,23 @@ defmodule FullCircle.Billing do
         end
       end)
 
-      cont_part =
-        Enum.map(pur_invoice.pur_invoice_details, fn x -> String.slice(x.good_name, 0..14) end)
-        |> Enum.join(", ")
+      if !Decimal.eq?(pur_invoice.pur_invoice_amount, 0) do
+        cont_part =
+          Enum.map(pur_invoice.pur_invoice_details, fn x -> String.slice(x.good_name, 0..14) end)
+          |> Enum.join(", ")
 
-      repo.insert!(%Transaction{
-        doc_type: "pur_invoices",
-        doc_no: pur_invoice.pur_invoice_no,
-        doc_date: pur_invoice.pur_invoice_date,
-        contact_id: pur_invoice.contact_id,
-        account_id: ac_rec_id,
-        company_id: com.id,
-        amount: Decimal.negate(pur_invoice.pur_invoice_amount),
-        particulars: pur_invoice.contact_name,
-        contact_particulars: cont_part
-      })
+        repo.insert!(%Transaction{
+          doc_type: "pur_invoices",
+          doc_no: pur_invoice.pur_invoice_no,
+          doc_date: pur_invoice.pur_invoice_date,
+          contact_id: pur_invoice.contact_id,
+          account_id: ac_rec_id,
+          company_id: com.id,
+          amount: Decimal.negate(pur_invoice.pur_invoice_amount),
+          particulars: pur_invoice.contact_name,
+          contact_particulars: cont_part
+        })
+      end
 
       {:ok, nil}
     end)
