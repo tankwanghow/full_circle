@@ -283,6 +283,7 @@ defmodule FullCircleWeb.CoreComponents do
   attr(:label, :string, default: nil)
   attr(:value, :any)
   attr(:url, :string, default: nil)
+  attr(:feedback, :boolean, default: false)
 
   attr(:type, :string,
     default: "text",
@@ -347,7 +348,7 @@ defmodule FullCircleWeb.CoreComponents do
       <select
         id={@id}
         name={@name}
-        class="block w-full rounded-md border border-gray-300 bg-white shadow-sm focus:border-zinc-400 focus:ring-0"
+        class="p-1 block w-full rounded border border-gray-300 bg-white shadow-sm focus:border-zinc-400 focus:ring-0"
         multiple={@multiple}
         {@rest}
       >
@@ -367,14 +368,39 @@ defmodule FullCircleWeb.CoreComponents do
         id={@id}
         name={@name}
         class={[
-          "block w-full rounded-lg text-zinc-900 focus:ring-0",
+          "block w-full rounded text-zinc-900 focus:ring-0",
           "phx-no-feedback:border-zinc-300 phx-no-feedback:focus:border-zinc-400",
-          "min-h-[6rem] border-zinc-300 focus:border-zinc-400",
+          "min-h-[6rem] border-zinc-300 focus:border-zinc-400 p-1",
           @errors != [] && "border-rose-400 focus:border-rose-400"
         ]}
         url={@url}
         {@rest}
       ><%= Phoenix.HTML.Form.normalize_value("textarea", @value) %></textarea>
+      <.error :for={msg <- @errors}><%= msg %></.error>
+    </div>
+    """
+  end
+
+  # Always Show Feedback
+  # All other inputs text, datetime-local, url, password, etc. are handled here...
+  def input(%{feedback: true} = assigns) do
+    ~H"""
+    <div id={"phx-feedback-for-#{@id}"}>
+      <.label :if={@label} for={@id}><%= @label %></.label>
+      <input
+        type={@type}
+        name={@name}
+        id={@id}
+        value={Phoenix.HTML.Form.normalize_value(@type, @value)}
+        url={@url}
+        class={[
+          "block w-full rounded text-zinc-900 focus:ring-0",
+          "phx-no-feedback:border-zinc-300 phx-no-feedback:focus:border-zinc-400",
+          "border-zinc-300 focus:border-zinc-400 p-1",
+          @errors != [] && "border-rose-400 focus:border-rose-400"
+        ]}
+        {@rest}
+      />
       <.error :for={msg <- @errors}><%= msg %></.error>
     </div>
     """
@@ -392,9 +418,9 @@ defmodule FullCircleWeb.CoreComponents do
         value={Phoenix.HTML.Form.normalize_value(@type, @value)}
         url={@url}
         class={[
-          "block w-full rounded-lg text-zinc-900 focus:ring-0",
+          "block w-full rounded text-zinc-900 focus:ring-0",
           "phx-no-feedback:border-zinc-300 phx-no-feedback:focus:border-zinc-400",
-          "border-zinc-300 focus:border-zinc-400",
+          "border-zinc-300 focus:border-zinc-400 p-1",
           @errors != [] && "border-rose-400 focus:border-rose-400"
         ]}
         {@rest}
