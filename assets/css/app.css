@@ -105,6 +105,82 @@ button[disabled] {
   @apply duration-500 select-none bg-gray-200 hover:bg-gray-500 focus:bg-gray-500;
 }
 
+.tab {
+  @apply rounded-lg border-b-2 border-gray-400 font-medium text-lg py-2;
+  @apply hover:border-b-2 hover:border-blue-800 hover:font-extrabold hover:cursor-pointer;
+}
+
+.tab.active {
+  @apply border-b-2 border-blue-800 font-extrabold bg-gray-300;
+}
+
+.detail-good-col {
+  @apply grow shrink;
+  width: 9%;
+}
+
+.detail-desc-col {
+  @apply grow shrink;
+  width: 10%;
+}
+
+.detail-pack-col {
+  @apply grow shrink;
+  width: 6%;
+}
+
+.detail-packqty-col {
+  width: 7%;
+}
+
+.detail-qty-col {
+  width: 7%;
+}
+
+.detail-unit-col {
+  width: 4%;
+}
+
+.detail-price-col {
+  width: 7%;
+}
+
+.detail-goodamt-col {
+  width: 8%;
+}
+
+.detail-discount-col {
+  width: 7%;
+}
+
+.detail-account-col {
+  @apply grow shrink;
+  width: 9%;
+}
+
+.detail-taxcode-col {
+  width: 5%;
+}
+
+.detail-taxrate-col {
+  width: 4%;
+}
+
+.detail-taxamt-col {
+  width: 8%;
+}
+
+.detail-amt-col {
+  width: 8%;
+}
+
+.detail-setting-col {
+  width: 1%;
+}
+
+
+
+
 @keyframes shake {
   0% {
     transform: translate(1px, 1px);

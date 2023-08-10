@@ -4,7 +4,6 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
   alias FullCircle.Billing
   alias FullCircle.Billing.{PurInvoice}
   alias FullCircle.StdInterface
-  alias FullCircle.Sys
 
   @impl true
   def mount(params, _session, socket) do
@@ -346,7 +345,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="w-10/12 mx-auto border rounded-lg border-pink-500 bg-pink-100 p-4">
+    <div class="w-11/12 mx-auto border rounded-lg border-pink-500 bg-pink-100 p-4">
       <p class="w-full text-3xl text-center font-medium"><%= @title %></p>
       <.form for={@form} id="object-form" autocomplete="off" phx-change="validate" phx-submit="save">
         <%= Phoenix.HTML.Form.hidden_input(@form, :pur_invoice_no) %>
@@ -371,148 +370,21 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
             <.input field={@form[:due_date]} label={gettext("Due Date")} type="date" />
           </div>
         </div>
-
-        <div class="font-medium flex flex-row flex-wrap text-center mt-2 tracking-tighter">
-          <div class="detail-header w-28 shrink-[3] grow-[3]"><%= gettext("Good") %></div>
-          <div class="detail-header w-36 shrink-[3] grow-[3]">
-            <%= gettext("Description") %>
-          </div>
-          <div class="detail-header w-28 shrink-[1] grow-[1]"><%= gettext("Package") %></div>
-          <div class="detail-header w-20 shrink-[1] grow-[1]"><%= gettext("Pack Qty") %></div>
-          <div class="detail-header w-24 shrink-[1] grow-[1]"><%= gettext("Quantity") %></div>
-          <div class="detail-header w-16 shrink-0 grow-0"><%= gettext("Unit") %></div>
-          <div class="detail-header w-24 shrink-[1] grow-[1]"><%= gettext("Price") %></div>
-          <div class={"#{Sys.get_setting(@settings, "pur_invoices", "discount-col")} detail-header w-24"}>
-            <%= gettext("Discount") %>
-          </div>
-          <div class={"#{Sys.get_setting(@settings, "pur_invoices", "goodamt-col")} detail-header w-24"}>
-            <%= gettext("Good Amt") %>
-          </div>
-          <div class={"#{Sys.get_setting(@settings, "pur_invoices", "account-col")} detail-header w-28"}>
-            <%= gettext("Account") %>
-          </div>
-          <div class="detail-header w-16 shrink-[1] grow-[1]"><%= gettext("TaxCode") %></div>
-          <div class={"#{Sys.get_setting(@settings, "pur_invoices", "taxrate-col")} detail-header w-14"}>
-            <%= gettext("Tax%") %>
-          </div>
-          <div class={"#{Sys.get_setting(@settings, "pur_invoices", "taxamt-col")} detail-header w-20"}>
-            <%= gettext("Tax Amt") %>
-          </div>
-          <div class="detail-header w-24 shrink-[1] grow-[1]"><%= gettext("Amount") %></div>
-          <div class="w-5 mt-1 text-blue-500 grow-0 shrink-0">
-            <.settings id="invoice-settings" settings={@settings} />
-          </div>
-        </div>
-
-        <.inputs_for :let={dtl} field={@form[:pur_invoice_details]}>
-          <div class={"flex flex-row flex-wrap #{if(dtl[:delete].value == true, do: "hidden", else: "")}"}>
-            <div class="w-28 grow-[3] shrink-[3]">
-              <.input
-                field={dtl[:good_name]}
-                phx-hook="tributeAutoComplete"
-                phx-debounce="blur"
-                url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=good&name="}
-              />
-            </div>
-            <%= Phoenix.HTML.Form.hidden_input(dtl, :good_id) %>
-            <div class="w-36 grow-[3] shrink-[3]"><.input field={dtl[:descriptions]} /></div>
-            <div class="w-28 grow-[1] shrink-[1]">
-              <.input
-                field={dtl[:package_name]}
-                phx-hook="tributeAutoComplete"
-                phx-debounce="blur"
-                url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=packaging&good_id=#{dtl[:good_id].value}&name="}
-              />
-            </div>
-            <%= Phoenix.HTML.Form.hidden_input(dtl, :unit_multiplier) %>
-            <%= Phoenix.HTML.Form.hidden_input(dtl, :package_id) %>
-            <div class="w-20 grow-[1] shrink-[1]">
-              <.input type="number" field={dtl[:package_qty]} />
-            </div>
-            <div class="w-24 grow-[1] shrink-[1]">
-              <.input
-                type="number"
-                field={dtl[:quantity]}
-                step="0.0001"
-                readonly={Phoenix.HTML.Form.input_value(dtl, :unit_multiplier) |> Decimal.gt?(0)}
-              />
-            </div>
-            <div class="w-16 grow-0 shrink-0">
-              <.input field={dtl[:unit]} readonly tabindex="-1" />
-            </div>
-            <div class="w-24 grow-[1] shrink-[1]">
-              <.input type="number" field={dtl[:unit_price]} step="0.0001" />
-            </div>
-            <div class={"#{Sys.get_setting(@settings, "pur_invoices", "discount-col")} w-24"}>
-              <.input type="number" field={dtl[:discount]} step="0.01" />
-            </div>
-            <div class={"#{Sys.get_setting(@settings, "pur_invoices", "goodamt-col")} w-24"}>
-              <.input type="number" field={dtl[:good_amount]} readonly tabindex="-1" />
-            </div>
-            <div class={"#{Sys.get_setting(@settings, "pur_invoices", "account-col")} w-28"}>
-              <.input
-                field={dtl[:account_name]}
-                phx-hook="tributeAutoComplete"
-                phx-debounce="blur"
-                url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=account&name="}
-              />
-            </div>
-            <%= Phoenix.HTML.Form.hidden_input(dtl, :account_id) %>
-            <div class="w-16 grow-[1] shrink-[1]">
-              <.input
-                field={dtl[:tax_code_name]}
-                phx-hook="tributeAutoComplete"
-                phx-debounce="blur"
-                url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=purtaxcode&name="}
-              />
-            </div>
-            <%= Phoenix.HTML.Form.hidden_input(dtl, :tax_code_id) %>
-            <div class={"#{Sys.get_setting(@settings, "pur_invoices", "taxrate-col")} w-14"}>
-              <.input type="number" field={dtl[:tax_rate]} readonly step="0.0001" tabindex="-1" />
-            </div>
-            <div class={"#{Sys.get_setting(@settings, "pur_invoices", "taxamt-col")} w-20"}>
-              <.input type="number" field={dtl[:tax_amount]} readonly tabindex="-1" />
-            </div>
-            <div class="w-24 grow-[1] shrink-[1]">
-              <.input type="number" field={dtl[:amount]} readonly tabindex="-1" />
-            </div>
-            <div class="w-5 mt-2.5 text-rose-500 grow-0 shrink-0">
-              <.link phx-click={:delete_detail} phx-value-index={dtl.index} tabindex="-1">
-                <.icon name="hero-trash-solid" class="h-5 w-5" />
-              </.link>
-              <%= Phoenix.HTML.Form.hidden_input(dtl, :delete) %>
-            </div>
-          </div>
-        </.inputs_for>
-
-        <div class="flex flex-row flex-wrap font-medium tracking-tighter">
-          <div class="w-28 shrink-[3] grow-[3] text-orange-500 mt-2">
-            <.link phx-click={:add_detail}>
-              <.icon name="hero-plus-circle" class="w-5 h-5" /><%= gettext("Add Detail") %>
-            </.link>
-          </div>
-          <div class="w-36 shrink-[3] grow-[3]" />
-
-          <div class="w-28 shrink-[1] grow-[1]" />
-          <div class="w-20 shrink-[1] grow-[1]" />
-          <div class="w-24 shrink-[1] grow-[1]" />
-          <div class="w-16 shrink-0 grow-0" />
-          <div class="w-24 shrink-[1] grow-[1]" />
-          <div class={"#{Sys.get_setting(@settings, "pur_invoices", "discount-col")} w-24"} />
-          <div class={"#{Sys.get_setting(@settings, "pur_invoices", "goodamt-col")} w-24"}>
-            <.input type="number" field={@form[:pur_invoice_good_amount]} readonly tabindex="-1" />
-          </div>
-          <div class={"#{Sys.get_setting(@settings, "pur_invoices", "account-col")} w-28"} />
-          <div class="w-16 shrink-[1] grow-[1]" />
-          <div class={"#{Sys.get_setting(@settings, "pur_invoices", "taxrate-col")} w-14"} />
-          <div class={"#{Sys.get_setting(@settings, "pur_invoices", "taxamt-col")} w-20"}>
-            <.input type="number" field={@form[:pur_invoice_tax_amount]} readonly tabindex="-1" />
-          </div>
-          <div class="w-24 shrink-[1] grow-[1]">
-            <.input type="number" field={@form[:pur_invoice_amount]} readonly tabindex="-1" />
-          </div>
-          <div class="w-5 grow-0 shrink-0" />
-        </div>
+        <.live_component
+          module={FullCircleWeb.InvoiceLive.DetailComponent}
+          id="pur_invoice_details"
+          klass=""
+          settings={@settings}
+          doc_name="pur_invoices"
+          detail_name={:pur_invoice_details}
+          form={@form}
+          doc_good_amount={:pur_invoice_good_amount}
+          doc_tax_amount={:pur_invoice_tax_amount}
+          doc_detail_amount={:pur_invoice_amount}
+          taxcodetype="purtaxcode"
+          current_company={@current_company}
+          current_user={@current_user}
+        />
 
         <div class="flex flex-row flex-nowrap gap-2">
           <div class="grow shrink">
