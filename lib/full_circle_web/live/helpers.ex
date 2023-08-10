@@ -61,51 +61,22 @@ defmodule FullCircleWeb.Helpers do
 
     changeset
     |> Ecto.Changeset.put_assoc(lines_name, lines)
-
-    # update(socket, :form, fn %{source: changeset} ->
-    #   existing = Ecto.Changeset.get_assoc(changeset, lines_name)
-    #   {to_delete, rest} = List.pop_at(existing, index)
-
-    #   lines =
-    #     if Ecto.Changeset.change(to_delete).data.id do
-    #       List.replace_at(existing, index, Ecto.Changeset.change(to_delete, delete: true))
-    #     else
-    #       rest
-    #     end
-
-    #   changeset
-    #   |> Ecto.Changeset.put_assoc(lines_name, lines)
-    # end)
   end
 
-  def add_line(socket, lines_name) do
-    update(socket, :form, fn %{source: changeset} ->
-      existing = Ecto.Changeset.get_assoc(changeset, lines_name)
-
-      changeset = Ecto.Changeset.put_assoc(changeset, lines_name, existing ++ [%{}])
-
-      to_form(changeset)
-    end)
+  def add_line(socket, lines_name, params \\ %{}) do
+    cs = socket |> add_line_std(lines_name, params)
+    socket |> assign(form: to_form(cs))
   end
 
-  def add_line(socket, lines_name, params) do
-    update(socket, :form, fn %{source: changeset} ->
-      existing = Ecto.Changeset.get_assoc(changeset, lines_name)
-
-      changeset = Ecto.Changeset.put_assoc(changeset, lines_name, existing ++ [params])
-
-      to_form(changeset)
-    end)
+  def add_line(socket, lines_name, params, after_add_func) do
+    cs = socket |> add_line_std(lines_name, params) |> after_add_func.()
+    socket |> assign(form: to_form(cs))
   end
 
-  def add_lines(socket, lines_name, class_struct_lines) do
-    update(socket, :form, fn %{source: changeset} ->
-      existing = Ecto.Changeset.get_assoc(changeset, lines_name)
-
-      changeset = Ecto.Changeset.put_assoc(changeset, lines_name, existing ++ class_struct_lines)
-
-      to_form(changeset)
-    end)
+  defp add_line_std(socket, lines_name, params) do
+    changeset = socket.assigns.form.source
+    existing = Ecto.Changeset.get_assoc(changeset, lines_name)
+    Ecto.Changeset.put_assoc(changeset, lines_name, existing ++ [params])
   end
 
   def format_unit_price(number) do
