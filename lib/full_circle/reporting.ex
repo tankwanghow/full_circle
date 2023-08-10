@@ -2,15 +2,10 @@ defmodule FullCircle.Reporting do
   import Ecto.Query, warn: false
 
   alias FullCircle.Accounting.{Account, Transaction}
-  alias FullCircle.Repo
+  alias FullCircle.{Repo, Accounting}
 
   def prev_close_date(at_date, com) do
     Date.new!(at_date.year - 1, com.closing_month, com.closing_day)
-  end
-
-  defp is_balance_sheet_account?(ac) do
-    bst = FullCircle.Accounting.balance_sheet_account_types()
-    Enum.any?(bst, fn x -> x == ac.account_type end)
   end
 
   def balance_sheet_query(at_date, com) do
@@ -92,7 +87,7 @@ defmodule FullCircle.Reporting do
         where: txn.company_id == ^com.id
 
     bal_qry =
-      if is_balance_sheet_account?(ac) do
+      if Accounting.is_balance_sheet_account?(ac) do
         from q in qry, where: q.doc_date < ^sdate
       else
         from q in qry,

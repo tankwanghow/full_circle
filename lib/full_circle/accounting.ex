@@ -68,15 +68,21 @@ defmodule FullCircle.Accounting do
     ]
   end
 
+  def is_balance_sheet_account?(ac) do
+    bst = balance_sheet_account_types()
+    Enum.any?(bst, fn x -> x == ac.account_type end)
+  end
+
   def query_transactions_for_matching(ctid, sdate, edate, com, user) do
     qry =
       from txn in subquery(transaction_with_balance_query(com, user)),
         where: txn.contact_id == ^ctid,
         where: txn.doc_date >= ^sdate,
         where: txn.doc_date <= ^edate,
-        where: txn.amount > 0,
+        # where: txn.amount > 0,
         order_by: txn.doc_date,
         select: %{
+          account_id: txn.account_id,
           transaction_id: txn.id,
           doc_date: txn.doc_date,
           doc_type: txn.doc_type,
@@ -91,7 +97,7 @@ defmodule FullCircle.Accounting do
     qry |> Repo.all()
   end
 
-  defp transaction_with_balance_query(com, user) do
+  def transaction_with_balance_query(com, user) do
     from txn in Transaction,
       join: comp in subquery(Sys.user_company(com, user)),
       on: txn.company_id == comp.id,
@@ -505,7 +511,7 @@ defmodule FullCircle.Accounting do
       join: com in subquery(Sys.user_company(com, user)),
       on: com.id == ac.company_id,
       where: ilike(ac.name, ^"%#{terms}%"),
-      where: ac.account_type in ["Cash or Equivalent", "Bank", "Post Dated Cheques"],
+      where: ac.account_type in ["Cash or Equivalent", "Bank"],
       select: %{id: ac.id, value: ac.name},
       order_by: ac.name
     )
