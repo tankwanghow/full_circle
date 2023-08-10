@@ -82,7 +82,7 @@ defmodule FullCircle.Helpers do
         )
       end)
 
-    changeset |> put_change(result_field, sum)
+    changeset |> force_change(result_field, sum)
   end
 
   def get_gapless_doc_id(multi, name, doc, doc_code, com) do

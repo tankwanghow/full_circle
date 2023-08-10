@@ -56,7 +56,16 @@ defmodule FullCircle.Billing.Invoice do
   def compute_fields(changeset) do
     changeset =
       if is_nil(get_change(changeset, :invoice_details)) do
-        changeset
+        case Map.fetch!(changeset.data, :invoice_details) do
+          [] ->
+            changeset
+            |> force_change(:invoice_amount, Decimal.new("0"))
+            |> force_change(:invoice_good_amount, Decimal.new("0"))
+            |> force_change(:invoice_tax_amount, Decimal.new("0"))
+
+          _ ->
+            changeset
+        end
       else
         changeset
         |> sum_field_to(:invoice_details, :good_amount, :invoice_good_amount)
@@ -64,8 +73,8 @@ defmodule FullCircle.Billing.Invoice do
         |> sum_field_to(:invoice_details, :amount, :invoice_amount)
       end
 
-    if Decimal.lt?(fetch_field!(changeset, :invoice_amount), "0.01") do
-      add_error(changeset, :invoice_amount, gettext("must be greater than 0.01"))
+    if Decimal.lt?(fetch_field!(changeset, :invoice_amount), 0) do
+      add_error(changeset, :invoice_amount, gettext("must be +ve"))
     else
       changeset
     end
@@ -74,8 +83,8 @@ defmodule FullCircle.Billing.Invoice do
   defp fill_default_date(changeset) do
     if is_nil(fetch_field!(changeset, :invoice_date)) do
       changeset
-      |> put_change(:invoice_date, Date.utc_today())
-      |> put_change(:due_date, Date.utc_today())
+      |> force_change(:invoice_date, Date.utc_today())
+      |> force_change(:due_date, Date.utc_today())
     else
       changeset
     end

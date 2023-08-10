@@ -89,10 +89,10 @@ defmodule FullCircle.Billing.InvoiceDetail do
     amount = Decimal.add(good_amount, tax_amount)
 
     changeset
-    |> put_change(:good_amount, good_amount)
-    |> put_change(:tax_amount, tax_amount)
-    |> put_change(:amount, amount)
-    |> put_change(:quantity, qty)
+    |> force_change(:good_amount, good_amount)
+    |> force_change(:tax_amount, tax_amount)
+    |> force_change(:amount, amount)
+    |> force_change(:quantity, qty)
   end
 
   defp maybe_mark_for_deletion(%{data: %{id: nil}} = changeset), do: changeset

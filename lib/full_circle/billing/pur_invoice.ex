@@ -67,8 +67,8 @@ defmodule FullCircle.Billing.PurInvoice do
         |> sum_field_to(:pur_invoice_details, :amount, :pur_invoice_amount)
       end
 
-    if Decimal.lt?(fetch_field!(changeset, :pur_invoice_amount), "0.01") do
-      add_error(changeset, :pur_invoice_amount, gettext("must be greater than 0.01"))
+    if Decimal.lt?(fetch_field!(changeset, :pur_invoice_amount), 0) do
+      add_error(changeset, :pur_invoice_amount, gettext("must be +ve"))
     else
       changeset
     end
@@ -77,8 +77,8 @@ defmodule FullCircle.Billing.PurInvoice do
   defp fill_default_date(changeset) do
     if is_nil(fetch_field!(changeset, :pur_invoice_date)) do
       changeset
-      |> put_change(:pur_invoice_date, Date.utc_today())
-      |> put_change(:due_date, Date.utc_today())
+      |> force_change(:pur_invoice_date, Date.utc_today())
+      |> force_change(:due_date, Date.utc_today())
     else
       changeset
     end
