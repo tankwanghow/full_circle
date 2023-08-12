@@ -1,10 +1,7 @@
 defmodule FullCircleWeb.ReceiptLive.Index do
   use FullCircleWeb, :live_view
 
-  alias FullCircle.ReceiveFund.{Receipt, ReceivedCheque}
   alias FullCircle.ReceiveFund
-  alias FullCircle.StdInterface
-  alias FullCircleWeb.ReceiptLive.Form
   alias FullCircleWeb.ReceiptLive.IndexComponent
 
   @per_page 25

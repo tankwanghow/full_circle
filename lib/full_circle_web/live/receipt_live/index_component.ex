@@ -20,7 +20,7 @@ defmodule FullCircleWeb.ReceiptLive.IndexComponent do
     >
       <div class="w-[2%] border-b border-gray-400 py-1">
         <input
-          :if={@obj.checked}
+          :if={@obj.checked and !@obj.old_data}
           id={"checkbox_#{@obj.id}"}
           name={"checkbox[#{@obj.id}]"}
           type="checkbox"
@@ -29,7 +29,7 @@ defmodule FullCircleWeb.ReceiptLive.IndexComponent do
           checked
         />
         <input
-          :if={!@obj.checked}
+          :if={!@obj.checked and !@obj.old_data}
           id={"checkbox_#{@obj.id}"}
           name={"checkbox[#{@obj.id}]"}
           type="checkbox"
@@ -42,11 +42,11 @@ defmodule FullCircleWeb.ReceiptLive.IndexComponent do
       </div>
       <div
         :if={!@obj.old_data}
-        phx-value-object-id={@obj.id}
-        phx-click={:edit_object}
         class="text-blue-600 w-[10%] border-b border-gray-400 py-1 hover:cursor-pointer"
       >
-        <%= @obj.receipt_no %>
+        <.link navigate={~p"/companies/#{@obj.company_id}/receipts/#{@obj.id}/edit"}>
+          <%= @obj.receipt_no %>
+        </.link>
       </div>
       <div :if={@obj.old_data} class="w-[10%] border-b border-gray-400 py-1">
         <%= @obj.receipt_no %>
@@ -58,7 +58,7 @@ defmodule FullCircleWeb.ReceiptLive.IndexComponent do
         <span class="font-light"><%= @obj.particulars %></span>
       </div>
       <div class="w-[10%] border-b border-gray-400 py-1">
-        <%= Number.Currency.number_to_currency(@obj.receipt_amount) %>
+        <%= Number.Currency.number_to_currency(@obj.amount |> Decimal.abs) %>
       </div>
     </div>
     """
