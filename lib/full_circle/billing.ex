@@ -101,22 +101,7 @@ defmodule FullCircle.Billing do
         select: inv,
         select_merge: %{
           contact_name: cont.name,
-          contact_id: cont.id,
-          invoice_tax_amount:
-            fragment(
-              "round(?, 2)",
-              sum((invd.quantity * invd.unit_price + invd.discount) * invd.tax_rate)
-            ),
-          invoice_good_amount:
-            fragment("round(?, 2)", sum(invd.quantity * invd.unit_price + invd.discount)),
-          invoice_amount:
-            fragment(
-              "round(?, 2)",
-              sum(
-                invd.quantity * invd.unit_price + invd.discount +
-                  (invd.quantity * invd.unit_price + invd.discount) * invd.tax_rate
-              )
-            )
+          contact_id: cont.id
         }
     )
   end
@@ -211,6 +196,8 @@ defmodule FullCircle.Billing do
     from txn in Transaction,
       join: com in subquery(Sys.user_company(company, user)),
       on: com.id == txn.company_id and txn.doc_type == "invoices",
+      join: acc in Account,
+      on: acc.id == txn.account_id and acc.name == "Account Receivables",
       join: cont in Contact,
       on: cont.id == txn.contact_id,
       left_join: inv in Invoice,
@@ -258,17 +245,7 @@ defmodule FullCircle.Billing do
         checked: false,
         old_data: txn.old_data
       },
-      group_by: [
-        inv.id,
-        txn.id,
-        cont.name,
-        txn.contact_particulars,
-        txn.particulars,
-        txn.doc_date,
-        inv.due_date,
-        com.id,
-        txn.amount
-      ]
+      group_by: [inv.id, txn.id, cont.name, com.id]
   end
 
   def create_invoice(attrs, com, user) do
@@ -329,7 +306,7 @@ defmodule FullCircle.Billing do
             account_id: x.account_id,
             company_id: com.id,
             amount: Decimal.negate(x.good_amount),
-            particulars: "Sold #{x.good_name} to #{invoice.contact_name}"
+            particulars: "#{invoice.contact_name}, #{x.good_name}"
           })
         end
 
@@ -439,25 +416,7 @@ defmodule FullCircle.Billing do
         select: inv,
         select_merge: %{
           contact_name: cont.name,
-          contact_id: cont.id,
-          pur_invoice_tax_amount:
-            fragment(
-              "round(?, 2)",
-              sum((invd.quantity * invd.unit_price + invd.discount) * invd.tax_rate)
-            ),
-          pur_invoice_good_amount:
-            fragment(
-              "round(?, 2)",
-              sum(invd.quantity * invd.unit_price + invd.discount)
-            ),
-          pur_invoice_amount:
-            fragment(
-              "round(?, 2)",
-              sum(
-                invd.quantity * invd.unit_price + invd.discount +
-                  (invd.quantity * invd.unit_price + invd.discount) * invd.tax_rate
-              )
-            )
+          contact_id: cont.id
         }
     )
   end
@@ -552,6 +511,8 @@ defmodule FullCircle.Billing do
     from txn in Transaction,
       join: com in subquery(Sys.user_company(company, user)),
       on: com.id == txn.company_id and txn.doc_type == "pur_invoices",
+      join: acc in Account,
+      on: acc.id == txn.account_id and acc.name == "Account Payables",
       join: cont in Contact,
       on: cont.id == txn.contact_id,
       left_join: inv in PurInvoice,
@@ -599,17 +560,7 @@ defmodule FullCircle.Billing do
         checked: false,
         old_data: txn.old_data
       },
-      group_by: [
-        inv.id,
-        txn.id,
-        cont.name,
-        txn.contact_particulars,
-        txn.particulars,
-        txn.doc_date,
-        inv.due_date,
-        com.id,
-        txn.amount
-      ]
+      group_by: [inv.id, txn.id, cont.name, com.id]
   end
 
   def create_pur_invoice(attrs, com, user) do
@@ -676,7 +627,7 @@ defmodule FullCircle.Billing do
             account_id: x.account_id,
             company_id: com.id,
             amount: x.good_amount,
-            particulars: "Purchase #{x.good_name} from #{pur_invoice.contact_name}"
+            particulars: "#{pur_invoice.contact_name}, #{x.good_name}"
           })
         end
 
