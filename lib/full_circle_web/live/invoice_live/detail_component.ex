@@ -71,7 +71,7 @@ defmodule FullCircleWeb.InvoiceLive.DetailComponent do
           <%= Phoenix.HTML.Form.hidden_input(dtl, :unit_multiplier) %>
           <%= Phoenix.HTML.Form.hidden_input(dtl, :package_id) %>
           <div class="detail-packqty-col">
-            <.input type="number" phx-debounce="blur" field={dtl[:package_qty]} />
+            <.input type="number" field={dtl[:package_qty]} />
           </div>
           <div class="detail-qty-col">
             <.input

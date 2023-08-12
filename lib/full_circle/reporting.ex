@@ -77,7 +77,7 @@ defmodule FullCircle.Reporting do
           id: type(q.id, :string)
         }
 
-    union_all(bal_qry, ^txn_qry) |> order_by([1, 2, 3]) |> Repo.all()
+    union_all(bal_qry, ^txn_qry) |> order_by([1, 8, 2]) |> Repo.all()
   end
 
   def account_transactions(ac, sdate, edate, com) do
@@ -125,6 +125,6 @@ defmodule FullCircle.Reporting do
           id: type(q.id, :string)
         }
 
-    union_all(bal_qry, ^txn_qry) |> order_by([1, 2, 3]) |> Repo.all()
+    union_all(bal_qry, ^txn_qry) |> order_by([1, 8, 2]) |> Repo.all()
   end
 end

@@ -58,14 +58,10 @@ defmodule FullCircle.Billing.PurInvoice do
 
   def compute_fields(changeset) do
     changeset =
-      if is_nil(get_change(changeset, :pur_invoice_details)) do
-        changeset
-      else
-        changeset
-        |> sum_field_to(:pur_invoice_details, :good_amount, :pur_invoice_good_amount)
-        |> sum_field_to(:pur_invoice_details, :tax_amount, :pur_invoice_tax_amount)
-        |> sum_field_to(:pur_invoice_details, :amount, :pur_invoice_amount)
-      end
+      changeset
+      |> sum_field_to(:pur_invoice_details, :good_amount, :pur_invoice_good_amount)
+      |> sum_field_to(:pur_invoice_details, :tax_amount, :pur_invoice_tax_amount)
+      |> sum_field_to(:pur_invoice_details, :amount, :pur_invoice_amount)
 
     if Decimal.lt?(fetch_field!(changeset, :pur_invoice_amount), 0) do
       add_error(changeset, :pur_invoice_amount, gettext("must be +ve"))

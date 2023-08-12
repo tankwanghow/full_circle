@@ -55,23 +55,10 @@ defmodule FullCircle.Billing.Invoice do
 
   def compute_fields(changeset) do
     changeset =
-      if is_nil(get_change(changeset, :invoice_details)) do
-        case Map.fetch!(changeset.data, :invoice_details) do
-          [] ->
-            changeset
-            |> force_change(:invoice_amount, Decimal.new("0"))
-            |> force_change(:invoice_good_amount, Decimal.new("0"))
-            |> force_change(:invoice_tax_amount, Decimal.new("0"))
-
-          _ ->
-            changeset
-        end
-      else
-        changeset
-        |> sum_field_to(:invoice_details, :good_amount, :invoice_good_amount)
-        |> sum_field_to(:invoice_details, :tax_amount, :invoice_tax_amount)
-        |> sum_field_to(:invoice_details, :amount, :invoice_amount)
-      end
+      changeset
+      |> sum_field_to(:invoice_details, :good_amount, :invoice_good_amount)
+      |> sum_field_to(:invoice_details, :tax_amount, :invoice_tax_amount)
+      |> sum_field_to(:invoice_details, :amount, :invoice_amount)
 
     if Decimal.lt?(fetch_field!(changeset, :invoice_amount), 0) do
       add_error(changeset, :invoice_amount, gettext("must be +ve"))

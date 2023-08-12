@@ -68,7 +68,7 @@ defmodule FullCircleWeb.GoodLive.Form do
 
   @impl true
   def handle_event("delete_packaging", %{"index" => index}, socket) do
-    {:noreply, socket |> FullCircleWeb.Helpers.delete_line(String.to_integer(index), :packagings)}
+    {:noreply, socket |> FullCircleWeb.Helpers.delete_line(index, :packagings)}
   end
 
   @impl true
