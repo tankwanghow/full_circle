@@ -69,20 +69,41 @@ defmodule FullCircle.Helpers do
   end
 
   def sum_field_to(changeset, detail_name, field_name, result_field) do
-    dtls = get_change(changeset, detail_name)
+    dtls = get_change_or_data(changeset, detail_name)
 
     sum =
-      Enum.reduce(dtls, 0, fn x, acc ->
-        Decimal.add(
-          acc,
-          if(!fetch_field!(x, :delete),
-            do: fetch_field!(x, field_name),
-            else: 0
-          )
-        )
-      end)
+      cond do
+        is_struct(dtls, Ecto.Association.NotLoaded) ->
+          Decimal.new("0")
+
+        true ->
+          Enum.reduce(dtls, Decimal.new("0"), fn x, acc ->
+            func =
+              if is_struct(x, Ecto.Changeset) do
+                &fetch_field!/2
+              else
+                &Map.fetch!/2
+              end
+
+            Decimal.add(
+              acc,
+              if(!func.(x, :delete),
+                do: func.(x, field_name),
+                else: Decimal.new("0")
+              )
+            )
+          end)
+      end
 
     changeset |> force_change(result_field, sum)
+  end
+
+  def get_change_or_data(changeset, detail_name) do
+    if is_nil(get_change(changeset, detail_name)) do
+      Map.fetch!(changeset.data, detail_name)
+    else
+      get_change(changeset, detail_name)
+    end
   end
 
   def get_gapless_doc_id(multi, name, doc, doc_code, com) do
