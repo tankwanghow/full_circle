@@ -291,7 +291,8 @@ defmodule FullCircleWeb.ReceiptLive.Print do
 
     ~H"""
     <div class="receipt-footer">
-      <span class="continue">....continue....</span>
+      <div class="continue">....continue....</div>
+      <div class="empty-footer"/>
     </div>
     <span class="page-count"><%= "page #{@page} of #{@pages}" %></span>
     """
@@ -494,6 +495,7 @@ defmodule FullCircleWeb.ReceiptLive.Print do
       .details-footer span { padding-left: 5mm; }
       .details-footer span span { padding-left: 0; }
 
+      .empty-footer { mix-height: 15px; }
       .descriptions { width: 60%;}
       .receipt-amount { width: 40%; text-align: right; font-size: 1.25rem; }
       .page-count { float: right; padding-top: 15px;}

@@ -44,7 +44,8 @@ defmodule FullCircle.Billing do
         preload: [contact: cont, invoice_details: ^print_invoice_details()],
         order_by: inv.invoice_no,
         select: inv
-    ) |> Enum.map(fn x -> Invoice.compute_struct_fields(x) end)
+    )
+    |> Enum.map(fn x -> Invoice.compute_struct_fields(x) end)
   end
 
   defp print_invoice_details do
@@ -184,8 +185,6 @@ defmodule FullCircle.Billing do
     from txn in Transaction,
       join: com in subquery(Sys.user_company(company, user)),
       on: com.id == txn.company_id and txn.doc_type == "invoices",
-      join: acc in Account,
-      on: acc.id == txn.account_id and acc.name == "Account Receivables",
       join: cont in Contact,
       on: cont.id == txn.contact_id,
       left_join: inv in Invoice,
@@ -208,28 +207,15 @@ defmodule FullCircle.Billing do
         updated_at: txn.inserted_at,
         company_id: com.id,
         contact_name: cont.name,
-        invoice_amount:
-          fragment(
-            "abs(?)",
-            coalesce(
-              sum(
-                invd.quantity * invd.unit_price + invd.discount +
-                  (invd.tax_rate * (invd.quantity * invd.unit_price) + invd.discount)
-              ),
-              txn.amount
-            )
-          ),
+        invoice_amount: txn.amount,
         balance:
-          fragment(
-            "abs(?)",
-            coalesce(
-              sum(
-                invd.quantity * invd.unit_price + invd.discount +
-                  (invd.tax_rate * (invd.quantity * invd.unit_price) + invd.discount)
-              ),
-              txn.amount
-            ) + coalesce(sum(stxm.match_amount), 0) + coalesce(sum(atxm.match_amount), 0)
-          ),
+          coalesce(
+            sum(
+              invd.quantity * invd.unit_price + invd.discount +
+                invd.tax_rate * (invd.quantity * invd.unit_price + invd.discount)
+            ),
+            txn.amount
+          ) + coalesce(sum(stxm.match_amount), 0) + coalesce(sum(atxm.match_amount), 0),
         checked: false,
         old_data: txn.old_data
       },
@@ -499,8 +485,6 @@ defmodule FullCircle.Billing do
     from txn in Transaction,
       join: com in subquery(Sys.user_company(company, user)),
       on: com.id == txn.company_id and txn.doc_type == "pur_invoices",
-      join: acc in Account,
-      on: acc.id == txn.account_id and acc.name == "Account Payables",
       join: cont in Contact,
       on: cont.id == txn.contact_id,
       left_join: inv in PurInvoice,
@@ -523,24 +507,14 @@ defmodule FullCircle.Billing do
         updated_at: txn.inserted_at,
         company_id: com.id,
         contact_name: cont.name,
-        pur_invoice_amount:
-          fragment(
-            "abs(?)",
-            coalesce(
-              sum(
-                invd.quantity * invd.unit_price + invd.discount +
-                  (invd.tax_rate * (invd.quantity * invd.unit_price) + invd.discount)
-              ),
-              txn.amount
-            )
-          ),
+        pur_invoice_amount: fragment("abs(?)", txn.amount),
         balance:
           fragment(
             "abs(?)",
             coalesce(
               sum(
                 invd.quantity * invd.unit_price + invd.discount +
-                  (invd.tax_rate * (invd.quantity * invd.unit_price) + invd.discount)
+                  invd.tax_rate * (invd.quantity * invd.unit_price + invd.discount)
               ),
               txn.amount
             ) + coalesce(sum(stxm.match_amount), 0) + coalesce(sum(atxm.match_amount), 0)

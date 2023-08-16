@@ -18,13 +18,13 @@ defmodule FullCircleWeb.InvoiceLive.Print do
 
   defp set_page_defaults(socket) do
     socket
-    |> assign(:detail_body_height, 133)
-    |> assign(:detail_height, 13)
+    |> assign(:detail_body_height, 145)
+    |> assign(:detail_height, 10)
     |> assign(:company, FullCircle.Sys.get_company!(socket.assigns.current_company.id))
   end
 
   defp fill_invoices(socket, ids) do
-    chunck = (socket.assigns.detail_body_height / socket.assigns.detail_height) |> floor
+    chunk = (socket.assigns.detail_body_height / socket.assigns.detail_height) |> floor
 
     invoices =
       Billing.get_print_invoices!(
@@ -35,10 +35,10 @@ defmodule FullCircleWeb.InvoiceLive.Print do
       |> Enum.map(fn invoice ->
         invoice
         |> Map.merge(%{
-          chunk_number: Enum.chunk_every(invoice.invoice_details, chunck) |> Enum.count()
+          chunk_number: Enum.chunk_every(invoice.invoice_details, chunk) |> Enum.count()
         })
         |> Map.merge(%{
-          detail_chunks: Enum.chunk_every(invoice.invoice_details, chunck)
+          detail_chunks: Enum.chunk_every(invoice.invoice_details, chunk)
         })
       end)
 
@@ -117,9 +117,9 @@ defmodule FullCircleWeb.InvoiceLive.Print do
         <%= if Decimal.gt?(@invd.tax_amount, 0) do %>
           <span class="is-size-7 is-italic">
             <%= @invd.tax_code %>
-            <%= "#{@invd.tax_rate}% -> " %>
+            <%= Number.Percentage.number_to_percentage(@invd.tax_rate) %>
+            <%= Number.Delimit.number_to_delimited(@invd.tax_amount) %>
           </span>
-          <%= Number.Delimit.number_to_delimited(@invd.tax_amount) %>
         <% end %>
       </span>
     </div>
@@ -130,11 +130,11 @@ defmodule FullCircleWeb.InvoiceLive.Print do
     assigns = assign(assigns, :page, page) |> assign(:pages, pages)
 
     ~H"""
-    <div class="descriptions">
-      ....continue....
-      <div class="page-count"><%= "page #{@page} of #{@pages}" %></div>
+    <div class="descriptions">....continue....</div>
+    <div class="invoice-footer">
+      <div class="empty-footer"/>
     </div>
-    <div class="invoice-footer" />
+    <span class="page-count"><%= "page #{@page} of #{@pages}" %></span>
     """
   end
 
@@ -144,19 +144,27 @@ defmodule FullCircleWeb.InvoiceLive.Print do
     ~H"""
     <div class="descriptions">
       <%= insert_new_html_newline(@invoice.descriptions) %>
-      <div class="page-count"><%= "page #{@page} of #{@pages}" %></div>
     </div>
     <div class="invoice-footer">
-      <span>
-        Goods Amount: <%= Number.Delimit.number_to_delimited(@invoice.invoice_good_amount) %>
-      </span>
-      <span>
-        Tax Amount: <%= Number.Delimit.number_to_delimited(@invoice.invoice_tax_amount) %>
-      </span>
-      <span class="has-text-weight-bold">
-        Invoice Amount: <%= Number.Delimit.number_to_delimited(@invoice.invoice_amount) %>
-      </span>
+      <div class="invoice-amount">
+        <div class="goodamt">
+          Goods Amount: <%= Number.Delimit.number_to_delimited(
+            @invoice.invoice_good_amount
+          ) %>
+        </div>
+        <div class="taxamt">
+          Tax Amount: <%= Number.Delimit.number_to_delimited(
+            @invoice.invoice_tax_amount
+          ) %>
+        </div>
+        <div class="invamt has-text-weight-semibold">
+          Invoice Amount:  <%= Number.Delimit.number_to_delimited(
+            @invoice.invoice_amount
+          ) %>
+        </div>
+      </div>
     </div>
+    <span class="page-count"><%= "page #{@page} of #{@pages}" %></span>
     """
   end
 
@@ -240,8 +248,9 @@ defmodule FullCircleWeb.InvoiceLive.Print do
     ~H"""
     <style>
       .letter-head { border-bottom: 0.5mm solid black; }
+      .letter-foot { border-top: 0.5mm solid black; }
       .invoice-header { border-bottom: 0.5mm solid black; }
-      .invoice-footer { border-bottom: 0.5mm solid black; }
+      .invoice-footer {  }
       .terms { height: 15mm; }
       .sign { padding: 3mm; border-top: 2px dotted black; width: 30%; text-align: center; float: right; margin-left: 2mm; margin-top: 15mm;}
     </style>
@@ -252,7 +261,7 @@ defmodule FullCircleWeb.InvoiceLive.Print do
     ~H"""
     <style>
       .details-body { height: <%= @detail_body_height %>mm; }
-      .detail { display: flex; height: <%= @detail_height %>mm; vertical-align: middle; align-items : center; }
+      .detail { display: flex; height: <%= @detail_height %>mm; vertical-align: middle; align-items : center; line-height: 14px;}
       #page { width: 210mm; min-height: 290mm; padding: 5mm; }
 
       @media print {
@@ -273,11 +282,16 @@ defmodule FullCircleWeb.InvoiceLive.Print do
       .price { width: 25mm; text-align: center; }
       .disc { width: 24mm; text-align: center; }
       .total { width: 45mm; text-align: right; }
-      .invoice-footer { margin-bottom: 1mm; padding: 3mm 0 3mm 0; text-align: right; border-top: 0.5mm solid black;}
-      .invoice-footer span { padding-left: 5mm; }
-      .invoice-footer span span { padding-left: 0; }
-      .descriptions { position: relative; font-style: italic; height: 15mm; }
-      .page-count { position: absolute; top: 15px; right: 5px; }
+
+      .invoice-footer { margin-bottom: 1mm; padding: 1mm 0 1mm 0; }
+
+      .descriptions { }
+      .empty-footer { min-height: 30px; }
+      .invoice-amount { display: flex; padding-top: 7px; border-top: 0.5mm solid black;  }
+      .invoice-amount div  { width: 33%; text-align: right; }
+      .invoice-amount .taxamt { width: 33%; text-align: right; }
+      .invoice-amount .invamt { width: 33%; text-align: right; }
+      .page-count { float: right; padding-top: 5px;}
     </style>
     """
   end
