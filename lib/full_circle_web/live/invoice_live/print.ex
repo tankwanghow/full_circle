@@ -162,7 +162,7 @@ defmodule FullCircleWeb.InvoiceLive.Print do
 
   def letter_foot(assigns) do
     ~H"""
-    <div class="letter-hoot">
+    <div class="letter-foot">
       <div class="terms is-size-7">
         <div>The above goods are delivered in good order and condition.</div>
         <div>Please make payment before the "Pay Due Date"</div>
@@ -193,7 +193,7 @@ defmodule FullCircleWeb.InvoiceLive.Print do
     <div class="invoice-header">
       <div class="is-size-6">TO</div>
       <div class="customer">
-        <div class="is-size-5 has-text-weight-bold"><%= @invoice.contact_name %></div>
+        <div class="is-size-5 has-text-weight-bold"><%= @invoice.contact.name %></div>
         <div><%= @invoice.contact.address1 %></div>
         <div><%= @invoice.contact.address2 %></div>
         <div>

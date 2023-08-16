@@ -53,6 +53,13 @@ defmodule FullCircle.Billing.Invoice do
     |> compute_fields()
   end
 
+  def compute_struct_fields(inval) do
+    inval
+    |> sum_struct_field_to(:invoice_details, :good_amount, :invoice_good_amount)
+    |> sum_struct_field_to(:invoice_details, :tax_amount, :invoice_tax_amount)
+    |> sum_struct_field_to(:invoice_details, :amount, :invoice_amount)
+  end
+
   def compute_fields(changeset) do
     changeset =
       changeset

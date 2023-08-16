@@ -65,13 +65,25 @@ defmodule FullCircle.ReceiveFund.Receipt do
     |> cast_assoc(:transaction_matchers)
     |> cast_assoc(:received_cheques)
     |> cast_assoc(:receipt_details)
-    |> compute_cheques_amount()
-    |> compute_match_transactions_amount()
-    |> compute_details_amount()
     |> compute_balance()
   end
 
+  def compute_struct_balance(inval) do
+    inval
+    |> sum_struct_field_to(:receipt_details, :good_amount, :receipt_good_amount)
+    |> sum_struct_field_to(:receipt_details, :tax_amount, :receipt_tax_amount)
+    |> sum_struct_field_to(:receipt_details, :amount, :receipt_detail_amount)
+    |> sum_struct_field_to(:transaction_matchers, :match_amount, :matched_amount)
+    |> sum_struct_field_to(:received_cheques, :amount, :cheques_amount)
+  end
+
   def compute_balance(changeset) do
+    changeset =
+      changeset
+      |> compute_cheques_amount()
+      |> compute_match_transactions_amount()
+      |> compute_details_amount()
+
     pos =
       (fetch_field!(changeset, :cheques_amount) |> Decimal.to_float()) +
         (fetch_field!(changeset, :funds_amount) |> Decimal.to_float())

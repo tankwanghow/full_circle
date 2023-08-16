@@ -82,7 +82,7 @@ defmodule FullCircleWeb.ReceiptLive.Form do
       |> FullCircleWeb.Helpers.delete_line(
         index,
         :receipt_details,
-        &Receipt.compute_details_amount/1
+        &Receipt.compute_balance/1
       )
 
     {:noreply, socket}
@@ -101,7 +101,7 @@ defmodule FullCircleWeb.ReceiptLive.Form do
       |> FullCircleWeb.Helpers.delete_line(
         index,
         :received_cheques,
-        &Receipt.compute_cheques_amount/1
+        &Receipt.compute_balance/1
       )
 
     {:noreply, socket}
@@ -144,7 +144,7 @@ defmodule FullCircleWeb.ReceiptLive.Form do
       |> FullCircleWeb.Helpers.add_line(
         :transaction_matchers,
         match_tran,
-        &Receipt.compute_match_transactions_amount/1
+        &Receipt.compute_balance/1
       )
 
     {:noreply, socket}
@@ -157,7 +157,7 @@ defmodule FullCircleWeb.ReceiptLive.Form do
       |> FullCircleWeb.Helpers.delete_line(
         index,
         :transaction_matchers,
-        &Receipt.compute_match_transactions_amount/1
+        &Receipt.compute_balance/1
       )
 
     {:noreply, socket}
@@ -705,7 +705,7 @@ defmodule FullCircleWeb.ReceiptLive.Form do
             <div class="detail-header w-[16%]"><%= gettext("Match") %></div>
           </div>
           <.inputs_for :let={dtl} field={@form[:transaction_matchers]}>
-            <div class="flex flex-row flex-wrap">
+            <div class={"flex flex-row flex-wrap #{if(dtl[:delete].value == true, do: "hidden", else: "")}"}>
               <.input type="hidden" field={dtl[:transaction_id]} />
               <.input type="hidden" field={dtl[:all_matched_amount]} />
               <.input type="hidden" field={dtl[:account_id]} />

@@ -68,6 +68,23 @@ defmodule FullCircle.Helpers do
     end
   end
 
+  def sum_struct_field_to(inval, detail_name, field_name, result_field) do
+    dtls = Map.fetch!(inval, detail_name)
+
+    sum =
+      cond do
+        is_struct(dtls, Ecto.Association.NotLoaded) ->
+          Decimal.new("0")
+
+        true ->
+          Enum.reduce(dtls, Decimal.new("0"), fn x, acc ->
+            Decimal.add(acc, Map.fetch!(x, field_name))
+          end)
+      end
+
+      inval |> Map.replace!(result_field, sum)
+  end
+
   def sum_field_to(changeset, detail_name, field_name, result_field) do
     dtls = get_change_or_data(changeset, detail_name)
 

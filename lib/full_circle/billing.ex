@@ -42,21 +42,9 @@ defmodule FullCircle.Billing do
         on: cont.id == inv.contact_id,
         where: inv.id in ^ids,
         preload: [contact: cont, invoice_details: ^print_invoice_details()],
-        group_by: [inv.id, inv.invoice_no, inv.descriptions, cont.id],
         order_by: inv.invoice_no,
-        select: inv,
-        select_merge: %{
-          contact_name: cont.name,
-          invoice_tax_amount:
-            sum((invd.quantity * invd.unit_price + invd.discount) * invd.tax_rate),
-          invoice_good_amount: sum(invd.quantity * invd.unit_price + invd.discount),
-          invoice_amount:
-            sum(
-              invd.quantity * invd.unit_price + invd.discount +
-                (invd.quantity * invd.unit_price + invd.discount) * invd.tax_rate
-            )
-        }
-    )
+        select: inv
+    ) |> Enum.map(fn x -> Invoice.compute_struct_fields(x) end)
   end
 
   defp print_invoice_details do

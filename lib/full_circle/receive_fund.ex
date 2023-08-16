@@ -19,6 +19,21 @@ defmodule FullCircle.ReceiveFund do
   alias FullCircle.StdInterface
   alias Ecto.Multi
 
+  def get_print_receipts!(ids, company, user) do
+    Repo.all(
+      from rec in Receipt,
+        join: com in subquery(Sys.user_company(company, user)),
+        on: com.id == rec.company_id,
+        where: rec.id in ^ids,
+        preload: [:contact, :funds_account],
+        preload: [:received_cheques],
+        preload: [transaction_matchers: ^receipt_match_trans(company, user)],
+        preload: [receipt_details: ^receipt_details()],
+        select: rec
+    )
+    |> Enum.map(fn x -> Receipt.compute_struct_balance(x) end)
+  end
+
   def get_receipt!(id, company, user) do
     Repo.one(
       from rec in Receipt,
@@ -134,19 +149,21 @@ defmodule FullCircle.ReceiveFund do
     from txn in Transaction,
       join: com in subquery(Sys.user_company(company, user)),
       on: com.id == txn.company_id and txn.doc_type == "receipts",
-      join: cont in Contact,
-      on: cont.id == txn.contact_id,
       left_join: rec in Receipt,
-      on:
-        txn.doc_no == rec.receipt_no and
-          txn.contact_id == rec.contact_id,
+      on: txn.doc_no == rec.receipt_no,
+      join: cont in Contact,
+      on: cont.id == rec.contact_id or cont.id == txn.contact_id,
       order_by: [desc: txn.inserted_at],
       where: txn.amount < 0,
       select: %{
         id: coalesce(rec.id, txn.id),
         receipt_no: txn.doc_no,
         particulars:
-          fragment("string_agg(distinct coalesce(?, ?), ', ')", txn.contact_particulars, txn.particulars),
+          fragment(
+            "string_agg(distinct coalesce(?, ?), ', ')",
+            txn.contact_particulars,
+            txn.particulars
+          ),
         receipt_date: txn.doc_date,
         updated_at: txn.inserted_at,
         company_id: com.id,
@@ -251,7 +268,10 @@ defmodule FullCircle.ReceiveFund do
 
       # follow matched amount
       if receipt.transaction_matchers != Ecto.Association.NotLoaded do
-        Enum.group_by(receipt.transaction_matchers, fn m -> m.account_id end)
+        Enum.group_by(receipt.transaction_matchers, fn m ->
+          m = FullCircle.Repo.preload(m, :transaction)
+          m.transaction.account_id
+        end)
         |> Enum.map(fn {k, v} ->
           %{
             account_id: k,

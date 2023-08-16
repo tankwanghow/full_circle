@@ -37,10 +37,12 @@ defmodule FullCircle.Accounting.TransactionMatcher do
       :amount,
       :balance,
       :particulars,
-      :all_matched_amount
+      :all_matched_amount,
+      :delete
     ])
     |> validate_required([:transaction_id, :entity])
     |> validate_number(:match_amount, not_equal_to: 0)
+    |> maybe_mark_for_deletion()
     |> compute_balance()
   end
 
@@ -58,5 +60,15 @@ defmodule FullCircle.Accounting.TransactionMatcher do
 
     changeset
     |> force_change(:balance, balance |> Decimal.from_float() |> Decimal.round(2))
+  end
+
+  defp maybe_mark_for_deletion(%{data: %{id: nil}} = changeset), do: changeset
+
+  defp maybe_mark_for_deletion(changeset) do
+    if get_change(changeset, :delete) do
+      %{changeset | action: :delete}
+    else
+      changeset
+    end
   end
 end

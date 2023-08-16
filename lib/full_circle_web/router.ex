@@ -155,8 +155,8 @@ defmodule FullCircleWeb.Router do
       root_layout: {FullCircleWeb.Layouts, :print_root} do
       live("/invoices/:id/print", InvoiceLive.Print, :print)
       live("/invoices/print_multi", InvoiceLive.Print, :print)
-      live("/receipts/:id/print", InvoiceLive.Print, :print)
-      live("/receipts/print_multi", InvoiceLive.Print, :print)
+      live("/receipts/:id/print", ReceiptLive.Print, :print)
+      live("/receipts/print_multi", ReceiptLive.Print, :print)
       live("/print_transactions", TransactionLive.Print, :print)
     end
   end
