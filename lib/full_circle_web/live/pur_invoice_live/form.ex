@@ -37,7 +37,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
       to_form(
         StdInterface.changeset(
           PurInvoice,
-          %PurInvoice{pur_invoice_details: []},
+          %PurInvoice{},
           %{pur_invoice_no: "...new..."},
           socket.assigns.current_company
         )

@@ -132,7 +132,7 @@ defmodule FullCircleWeb.InvoiceLive.Print do
     ~H"""
     <div class="descriptions">....continue....</div>
     <div class="invoice-footer">
-      <div class="empty-footer"/>
+      <div class="empty-footer" />
     </div>
     <span class="page-count"><%= "page #{@page} of #{@pages}" %></span>
     """
@@ -148,19 +148,13 @@ defmodule FullCircleWeb.InvoiceLive.Print do
     <div class="invoice-footer">
       <div class="invoice-amount">
         <div class="goodamt">
-          Goods Amount: <%= Number.Delimit.number_to_delimited(
-            @invoice.invoice_good_amount
-          ) %>
+          Goods Amount: <%= Number.Delimit.number_to_delimited(@invoice.invoice_good_amount) %>
         </div>
         <div class="taxamt">
-          Tax Amount: <%= Number.Delimit.number_to_delimited(
-            @invoice.invoice_tax_amount
-          ) %>
+          Tax Amount: <%= Number.Delimit.number_to_delimited(@invoice.invoice_tax_amount) %>
         </div>
         <div class="invamt has-text-weight-semibold">
-          Invoice Amount:  <%= Number.Delimit.number_to_delimited(
-            @invoice.invoice_amount
-          ) %>
+          Invoice Amount: <%= Number.Delimit.number_to_delimited(@invoice.invoice_amount) %>
         </div>
       </div>
     </div>

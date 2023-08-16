@@ -53,6 +53,7 @@ defmodule FullCircle.BillPay.Payment do
       :company_id,
       :contact_name,
       :payment_no,
+      :funds_account_name,
       :funds_amount
     ])
     |> validate_id(:contact_name, :contact_id)
@@ -79,13 +80,13 @@ defmodule FullCircle.BillPay.Payment do
       |> compute_match_transactions_amount()
       |> compute_details_amount()
 
-    pos = (fetch_field!(changeset, :funds_amount) |> Decimal.to_float())
+    pos = fetch_field!(changeset, :funds_amount) |> Decimal.to_float()
 
     neg =
-      (fetch_field!(changeset, :matched_amount) |> Decimal.to_float()) -
+      (fetch_field!(changeset, :matched_amount) |> Decimal.to_float()) +
         (fetch_field!(changeset, :payment_detail_amount) |> Decimal.to_float())
 
-    bal = Decimal.from_float(pos + neg)
+    bal = Decimal.from_float(pos - neg)
 
     changeset =
       changeset

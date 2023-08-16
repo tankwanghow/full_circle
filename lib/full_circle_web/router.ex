@@ -144,6 +144,10 @@ defmodule FullCircleWeb.Router do
       live("/receipts", ReceiptLive.Index, :index)
       live("/receipts/new", ReceiptLive.Form, :new)
       live("/receipts/:receipt_id/edit", ReceiptLive.Form, :edit)
+
+      live("/payments", PaymentLive.Index, :index)
+      live("/payments/new", PaymentLive.Form, :new)
+      live("/payments/:payment_id/edit", PaymentLive.Form, :edit)
     end
 
     live_session :require_authenticated_user_n_active_company_print,
@@ -155,8 +159,13 @@ defmodule FullCircleWeb.Router do
       root_layout: {FullCircleWeb.Layouts, :print_root} do
       live("/invoices/:id/print", InvoiceLive.Print, :print)
       live("/invoices/print_multi", InvoiceLive.Print, :print)
+
       live("/receipts/:id/print", ReceiptLive.Print, :print)
       live("/receipts/print_multi", ReceiptLive.Print, :print)
+
+      live("/payments/:id/print", PaymentLive.Print, :print)
+      live("/payments/print_multi", PaymentLive.Print, :print)
+
       live("/print_transactions", TransactionLive.Print, :print)
     end
   end

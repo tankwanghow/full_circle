@@ -58,7 +58,7 @@ defmodule FullCircleWeb.ReceiptLive.IndexComponent do
         <span class="font-light"><%= @obj.particulars %></span>
       </div>
       <div class="w-[10%] border-b border-gray-400 py-1">
-        <%= Number.Currency.number_to_currency(@obj.amount |> Decimal.abs) %>
+        <%= Number.Currency.number_to_currency(@obj.amount |> Decimal.abs()) %>
       </div>
     </div>
     """

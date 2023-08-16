@@ -82,7 +82,7 @@ defmodule FullCircle.Helpers do
           end)
       end
 
-      inval |> Map.replace!(result_field, sum)
+    inval |> Map.replace!(result_field, sum)
   end
 
   def sum_field_to(changeset, detail_name, field_name, result_field) do

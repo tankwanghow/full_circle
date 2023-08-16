@@ -37,7 +37,7 @@ defmodule FullCircleWeb.InvoiceLive.Form do
       to_form(
         StdInterface.changeset(
           Invoice,
-          %Invoice{invoice_details: []},
+          %Invoice{},
           %{invoice_no: "...new..."},
           socket.assigns.current_company
         )

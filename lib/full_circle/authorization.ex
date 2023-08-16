@@ -59,6 +59,12 @@ defmodule FullCircle.Authorization do
   def can?(user, :update_receipt, company),
     do: allow_roles(~w(admin manager supervisor clerk), company, user)
 
+  def can?(user, :create_payment, company),
+    do: allow_roles(~w(admin manager supervisor clerk), company, user)
+
+  def can?(user, :update_payment, company),
+    do: allow_roles(~w(admin manager supervisor clerk), company, user)
+
   def can?(user, :create_pur_invoice, company),
     do: allow_roles(~w(admin manager supervisor clerk), company, user)
 

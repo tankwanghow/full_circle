@@ -1,19 +1,19 @@
-defmodule FullCircleWeb.ReceiptLive.Print do
+defmodule FullCircleWeb.PaymentLive.Print do
   use FullCircleWeb, :live_view
 
   import FullCircleWeb.Helpers
-  alias FullCircle.{ReceiveFund, Accounting}
+  alias FullCircle.{BillPay, Accounting}
 
   @impl true
   def mount(%{"id" => id, "pre_print" => pre_print}, _session, socket) do
     ids = [id]
-    {:ok, socket |> assign(:pre_print, pre_print) |> set_page_defaults() |> fill_receipts(ids)}
+    {:ok, socket |> assign(:pre_print, pre_print) |> set_page_defaults() |> fill_payments(ids)}
   end
 
   @impl true
   def mount(%{"ids" => ids, "pre_print" => pre_print}, _, socket) do
     ids = String.split(ids, ",")
-    {:ok, socket |> assign(:pre_print, pre_print) |> set_page_defaults() |> fill_receipts(ids)}
+    {:ok, socket |> assign(:pre_print, pre_print) |> set_page_defaults() |> fill_payments(ids)}
   end
 
   defp set_page_defaults(socket) do
@@ -23,33 +23,29 @@ defmodule FullCircleWeb.ReceiptLive.Print do
     |> assign(:company, FullCircle.Sys.get_company!(socket.assigns.current_company.id))
   end
 
-  defp fill_receipts(socket, ids) do
+  defp fill_payments(socket, ids) do
     chunk = (socket.assigns.detail_body_height / socket.assigns.detail_height) |> floor
 
-    receipts =
-      ReceiveFund.get_print_receipts!(
+    payments =
+      BillPay.get_print_payments!(
         ids,
         socket.assigns.current_company,
         socket.assigns.current_user
       )
       |> Enum.map(fn r ->
-        fill_head_foot_for(r, :receipt_details, "detail_head", "detail_foot")
-      end)
-      |> Enum.map(fn r ->
-        fill_head_foot_for(r, :received_cheques, "cheque_head", "cheque_foot")
+        fill_head_foot_for(r, :payment_details, "detail_head", "detail_foot")
       end)
       |> Enum.map(fn r ->
         fill_head_foot_for(r, :transaction_matchers, "match_head", "match_foot")
       end)
-      |> Enum.map(fn receipt ->
-        receipt
+      |> Enum.map(fn payment ->
+        payment
         |> Map.merge(%{
           chunk_number:
             Enum.chunk_every(
-              receipt.receipt_details ++
-                receipt.transaction_matchers ++
-                receipt.received_cheques ++
-                [%{__struct__: "funds_head"}, receipt, %{__struct__: "funds_foot"}],
+              payment.payment_details ++
+                payment.transaction_matchers ++
+                [%{__struct__: "funds_head"}, payment, %{__struct__: "funds_foot"}],
               chunk
             )
             |> Enum.count()
@@ -57,17 +53,16 @@ defmodule FullCircleWeb.ReceiptLive.Print do
         |> Map.merge(%{
           all_chunks:
             Enum.chunk_every(
-              receipt.receipt_details ++
-                receipt.transaction_matchers ++
-                receipt.received_cheques ++
-                [%{__struct__: "funds_head"}, receipt, %{__struct__: "funds_foot"}],
+              payment.payment_details ++
+                payment.transaction_matchers ++
+                [%{__struct__: "funds_head"}, payment, %{__struct__: "funds_foot"}],
               chunk
             )
         })
       end)
 
     socket
-    |> assign(:receipts, receipts)
+    |> assign(:payments, payments)
   end
 
   defp fill_head_foot_for(map, list_atom, header, footer) do
@@ -90,35 +85,29 @@ defmodule FullCircleWeb.ReceiptLive.Print do
     <div id="print-me" class="print-here">
       <%= pre_print_style(assigns) %>
       <%= if(@pre_print == "false", do: full_style(assigns)) %>
-      <%= for receipt  <- @receipts do %>
-        <%= Enum.map 1..receipt.chunk_number, fn n -> %>
+      <%= for payment  <- @payments do %>
+        <%= Enum.map 1..payment.chunk_number, fn n -> %>
           <div id="page" class="">
             <div class="letter-head">
               <%= if(@pre_print == "true", do: "", else: letter_head(assigns)) %>
             </div>
             <div class="doctype is-size-4 has-text-weight-semibold">RECEIPT</div>
-            <%= receipt_header(receipt, assigns) %>
+            <%= payment_header(payment, assigns) %>
 
             <div class="details-body is-size-6">
-              <%= for recd <- Enum.at(receipt.all_chunks, n - 1) do %>
+              <%= for recd <- Enum.at(payment.all_chunks, n - 1) do %>
                 <%= detail_header(recd, assigns) %>
-                <%= detail_footer(recd, receipt, assigns) %>
-                <%= receipt_detail(recd, assigns) %>
+                <%= detail_footer(recd, payment, assigns) %>
+                <%= payment_detail(recd, assigns) %>
                 <%= match_tran_header(recd, assigns) %>
-                <%= match_tran_footer(recd, receipt, assigns) %>
-                <%= receipt_match_tran(recd, assigns) %>
-                <%= cheque_header(recd, assigns) %>
-                <%= cheque_footer(recd, receipt, assigns) %>
-                <%= receipt_cheque(recd, assigns) %>
-                <%= funds_header(recd, receipt, assigns) %>
-                <%= funds_footer(recd, receipt, assigns) %>
-                <%= receipt_funds(recd, assigns) %>
+                <%= match_tran_footer(recd, payment, assigns) %>
+                <%= payment_match_tran(recd, assigns) %>
               <% end %>
             </div>
 
-            <%= if(n == receipt.chunk_number,
-              do: receipt_footer(receipt, n, receipt.chunk_number, assigns),
-              else: receipt_footer("continue", n, receipt.chunk_number, assigns)
+            <%= if(n == payment.chunk_number,
+              do: payment_footer(payment, n, payment.chunk_number, assigns),
+              else: payment_footer("continue", n, payment.chunk_number, assigns)
             ) %>
             <div class="letter-foot">
               <%= if(@pre_print == "true", do: "", else: letter_foot(assigns)) %>
@@ -130,12 +119,12 @@ defmodule FullCircleWeb.ReceiptLive.Print do
     """
   end
 
-  def receipt_funds(recd, assigns) do
+  def payment_funds(recd, assigns) do
     assigns = assign(assigns, :recd, recd)
 
     ~H"""
     <div
-      :if={@recd.__struct__ == ReceiveFund.Receipt and Decimal.gt?(@recd.funds_amount, 0)}
+      :if={@recd.__struct__ == BillPay.Payment and Decimal.gt?(@recd.funds_amount, 0)}
       class="funds"
     >
       <div class="account">To <%= @recd.funds_account.name %></div>
@@ -146,22 +135,7 @@ defmodule FullCircleWeb.ReceiptLive.Print do
     """
   end
 
-  def receipt_cheque(recd, assigns) do
-    assigns = assign(assigns, :recd, recd)
-
-    ~H"""
-    <div :if={@recd.__struct__ == ReceiveFund.ReceivedCheque} class="cheque">
-      <div class="bank"><%= @recd.bank %></div>
-      <div class="city"><%= @recd.city %></div>
-      <div class="state"><%= @recd.state %></div>
-      <div class="chqno"><%= @recd.cheque_no %></div>
-      <div class="duedate"><%= format_date(@recd.due_date) %></div>
-      <div class="chqamt"><%= Number.Delimit.number_to_delimited(@recd.amount) %></div>
-    </div>
-    """
-  end
-
-  def receipt_match_tran(recd, assigns) do
+  def payment_match_tran(recd, assigns) do
     assigns = assign(assigns, :recd, recd)
 
     ~H"""
@@ -178,11 +152,11 @@ defmodule FullCircleWeb.ReceiptLive.Print do
     """
   end
 
-  def receipt_detail(recd, assigns) do
+  def payment_detail(recd, assigns) do
     assigns = assign(assigns, :recd, recd)
 
     ~H"""
-    <div :if={@recd.__struct__ == ReceiveFund.ReceiptDetail} class="detail">
+    <div :if={@recd.__struct__ == BillPay.PaymentDetail} class="detail">
       <span class="particular">
         <div>
           <%= if(@recd.good_name != "Note", do: @recd.good_name, else: "") %>
@@ -226,14 +200,14 @@ defmodule FullCircleWeb.ReceiptLive.Print do
     """
   end
 
-  def match_tran_footer(recd, receipt, assigns) do
-    assigns = assigns |> assign(:receipt, receipt) |> assign(:recd, recd)
+  def match_tran_footer(recd, payment, assigns) do
+    assigns = assigns |> assign(:payment, payment) |> assign(:recd, recd)
 
     ~H"""
     <div :if={@recd.__struct__ == "match_foot"} class="details-footer">
       <span class="has-text-weight-semibold">
         Matched Amount: <%= Number.Delimit.number_to_delimited(
-          @receipt.matched_amount
+          @payment.matched_amount
           |> Decimal.abs()
         ) %>
       </span>
@@ -241,56 +215,29 @@ defmodule FullCircleWeb.ReceiptLive.Print do
     """
   end
 
-  def detail_footer(recd, receipt, assigns) do
-    assigns = assigns |> assign(:receipt, receipt) |> assign(:recd, recd)
+  def detail_footer(recd, payment, assigns) do
+    assigns = assigns |> assign(:payment, payment) |> assign(:recd, recd)
 
     ~H"""
     <div :if={@recd.__struct__ == "detail_foot"} class="details-footer">
       <span>
-        Particular Amount: <%= Number.Delimit.number_to_delimited(@receipt.receipt_good_amount) %>
+        Particular Amount: <%= Number.Delimit.number_to_delimited(@payment.payment_good_amount) %>
       </span>
       <span>
-        Tax Amount: <%= Number.Delimit.number_to_delimited(@receipt.receipt_tax_amount) %>
+        Tax Amount: <%= Number.Delimit.number_to_delimited(@payment.payment_tax_amount) %>
       </span>
       <span class="has-text-weight-semibold">
-        Detail Amount: <%= Number.Delimit.number_to_delimited(@receipt.receipt_detail_amount) %>
+        Detail Amount: <%= Number.Delimit.number_to_delimited(@payment.payment_detail_amount) %>
       </span>
     </div>
     """
   end
 
-  def funds_footer(recd, receipt, assigns) do
-    assigns = assigns |> assign(:receipt, receipt) |> assign(:recd, recd)
-
-    ~H"""
-    <div
-      :if={@recd.__struct__ == "funds_foot" and Decimal.gt?(@receipt.funds_amount, 0)}
-      class="details-footer"
-    >
-      <span class="has-text-weight-semibold">
-        Funds Amount: <%= Number.Delimit.number_to_delimited(@receipt.funds_amount) %>
-      </span>
-    </div>
-    """
-  end
-
-  def cheque_footer(recd, receipt, assigns) do
-    assigns = assigns |> assign(:receipt, receipt) |> assign(:recd, recd)
-
-    ~H"""
-    <div :if={@recd.__struct__ == "cheque_foot"} class="details-footer">
-      <span class="has-text-weight-semibold">
-        Cheques Amount: <%= Number.Delimit.number_to_delimited(@receipt.cheques_amount) %>
-      </span>
-    </div>
-    """
-  end
-
-  def receipt_footer("continue", page, pages, assigns) do
+  def payment_footer("continue", page, pages, assigns) do
     assigns = assign(assigns, :page, page) |> assign(:pages, pages)
 
     ~H"""
-    <div class="receipt-footer">
+    <div class="payment-footer">
       <div class="continue">....continue....</div>
       <div class="empty-footer" />
     </div>
@@ -298,16 +245,13 @@ defmodule FullCircleWeb.ReceiptLive.Print do
     """
   end
 
-  def receipt_footer(receipt, page, pages, assigns) do
-    assigns = assign(assigns, :page, page) |> assign(:pages, pages) |> assign(:receipt, receipt)
+  def payment_footer(payment, page, pages, assigns) do
+    assigns = assign(assigns, :page, page) |> assign(:pages, pages) |> assign(:payment, payment)
 
     ~H"""
-    <div class="receipt-footer">
-      <div class="descriptions"><%= @receipt.descriptions %></div>
-      <div class="receipt-amount has-text-weight-bold">
-        Receipt Amount: <%= Number.Delimit.number_to_delimited(
-          Decimal.add(@receipt.cheques_amount, @receipt.funds_amount)
-        ) %>
+    <div class="payment-footer">
+      <div class="payment-amount has-text-weight-bold">
+        Payment Amount: <%= Number.Delimit.number_to_delimited(@payment.funds_amount) %>
       </div>
     </div>
     <span class="page-count"><%= "page #{@page} of #{@pages}" %></span>
@@ -316,9 +260,6 @@ defmodule FullCircleWeb.ReceiptLive.Print do
 
   def letter_foot(assigns) do
     ~H"""
-    <div class="terms is-size-7">
-      <div>This receipt is only valid subject to cheque or cheques honoured by the bank.</div>
-    </div>
     <div class="sign">Collector Signature</div>
     <div class="sign">Manager/Cashier Signature</div>
     """
@@ -338,26 +279,8 @@ defmodule FullCircleWeb.ReceiptLive.Print do
     """
   end
 
-  def cheque_header(recd, assigns) do
-    assigns = assigns |> assign(:recd, recd)
-
-    ~H"""
-    <div
-      :if={@recd.__struct__ == "cheque_head"}
-      class="cheque has-text-weight-semibold details-header"
-    >
-      <div class="bank">Bank</div>
-      <div class="city">City</div>
-      <div class="state">State</div>
-      <div class="chqno">Chq No</div>
-      <div class="duedate">Chq Date</div>
-      <div class="chqamt ">Amount</div>
-    </div>
-    """
-  end
-
-  def funds_header(recd, receipt, assigns) do
-    assigns = assigns |> assign(:recd, recd) |> assign(:receipt, receipt)
+  def funds_header(recd, payment, assigns) do
+    assigns = assigns |> assign(:recd, recd) |> assign(:payment, payment)
 
     ~H"""
 
@@ -382,36 +305,42 @@ defmodule FullCircleWeb.ReceiptLive.Print do
     """
   end
 
-  def receipt_header(receipt, assigns) do
-    assigns = assigns |> assign(:receipt, receipt)
+  def payment_header(payment, assigns) do
+    assigns = assigns |> assign(:payment, payment)
 
     ~H"""
-    <div class="receipt-header">
+    <div class="payment-header">
       <div class="is-size-6">Receive From</div>
       <div class="customer">
-        <div class="is-size-5 has-text-weight-semibold"><%= @receipt.contact.name %></div>
-        <div><%= @receipt.contact.address1 %></div>
-        <div><%= @receipt.contact.address2 %></div>
+        <div class="is-size-5 has-text-weight-semibold"><%= @payment.contact.name %></div>
+        <div><%= @payment.contact.address1 %></div>
+        <div><%= @payment.contact.address2 %></div>
         <div>
           <%= Enum.join(
             [
-              @receipt.contact.city,
-              @receipt.contact.zipcode,
-              @receipt.contact.state,
-              @receipt.contact.country
+              @payment.contact.city,
+              @payment.contact.zipcode,
+              @payment.contact.state,
+              @payment.contact.country
             ],
             " "
           ) %>
         </div>
-        <%= @receipt.contact.reg_no %>
+        <%= @payment.contact.reg_no %>
       </div>
-      <div class="receipt-info">
+      <div class="payment-info">
         <div>
-          Receipt Date:
-          <span class="has-text-weight-semibold"><%= format_date(@receipt.receipt_date) %></span>
+          Payment Date:
+          <span class="has-text-weight-semibold"><%= format_date(@payment.payment_date) %></span>
         </div>
         <div>
-          Receipt No: <span class="has-text-weight-semibold"><%= @receipt.receipt_no %></span>
+          Payment No: <span class="has-text-weight-semibold"><%= @payment.payment_no %></span>
+        </div>
+        <div>
+          Pay By: <span class="has-text-weight-semibold"><%= @payment.funds_account.name %></span>
+        </div>
+        <div :if={String.trim(@payment.descriptions || "") != ""}>
+          Note: <span class="has-text-weight-semibold"><%= @payment.descriptions %></span>
         </div>
       </div>
     </div>
@@ -436,8 +365,8 @@ defmodule FullCircleWeb.ReceiptLive.Print do
     <style>
       .letter-head { border-bottom: 0.5mm solid black; }
       .letter-foot { border-top: 0.5mm solid black; }
-      .receipt-header { border-bottom: 0.5mm solid black; }
-      .receipt-footer { display: flex; }
+      .payment-header { border-bottom: 0.5mm solid black; }
+      .payment-footer { display: flex; }
       .terms { height: 15mm; }
       .sign { padding: 3mm; border-top: 2px dotted black; width: 30%; text-align: center; float: right; margin-left: 2mm; margin-top: 10mm;}
     </style>
@@ -449,7 +378,6 @@ defmodule FullCircleWeb.ReceiptLive.Print do
     <style>
       .details-body { min-height: <%= @detail_body_height %>mm; max-height: <%= @detail_body_height %>mm; }
       .detail { display: flex; height: <%= @detail_height %>mm; vertical-align: middle; align-items: center; line-height: 14px; margin-top: 5px; margin-bottom: 5px;}
-      .cheque { display: flex; height: <%= @detail_height %>mm; vertical-align: middle;  align-items: center; }
       .funds { display: flex; height: <%= @detail_height %>mm; vertical-align: middle;  align-items: center; }
       .matched { display: flex; height: <%= @detail_height %>mm; vertical-align: middle;  align-items: center; }
       #page { width: 210mm; min-height: 290mm; padding: 5mm; }
@@ -464,23 +392,16 @@ defmodule FullCircleWeb.ReceiptLive.Print do
       .letter-foot { padding-top: 2mm; margin-top: 2mm; height: 28mm;}
 
       .doctype { float: right; margin-top: -20mm; margin-right: 0mm; }
-      .receipt-info { float: right; }
-      .receipt-header { width: 100%; height: 40mm; border-bottom: 0.5mm solid black; }
+      .payment-info { float: right; }
+      .payment-header { width: 100%; height: 40mm; border-bottom: 0.5mm solid black; }
       .customer { padding-left: 2mm; float: left;}
-      .receipt-info div { margin-bottom: 2mm; text-align: right; }
+      .payment-info div { margin-bottom: 2mm; text-align: right; }
       .details-header { display: flex; padding-bottom: 1mm; padding-top: 1mm; border-bottom: 0.5mm dotted black; margin-bottom: 3px;}
       .particular { width: 80mm; text-align: left;}
       .qty { width: 32mm; text-align: center; }
       .price { width: 25mm; text-align: center; }
       .disc { width: 24mm; text-align: center; }
       .total { width: 45mm; text-align: right; }
-
-      .cheque .bank { width: 17%;}
-      .cheque .city {width: 21%;}
-      .cheque .state {width: 20%;}
-      .cheque .duedate {width: 14%;}
-      .cheque .chqno {width: 10%; }
-      .cheque .chqamt {width: 18%; text-align: right;}
 
       .matched .date {width: 14%;}
       .matched .matchdoctype {width: 16%;}
@@ -497,8 +418,7 @@ defmodule FullCircleWeb.ReceiptLive.Print do
       .details-footer span span { padding-left: 0; }
 
       .empty-footer { mix-height: 15px; }
-      .descriptions { width: 60%;}
-      .receipt-amount { width: 40%; text-align: right; font-size: 1.25rem; }
+      .payment-amount { width: 100%; text-align: right; font-size: 1.25rem; }
       .page-count { float: right; padding-top: 15px;}
     </style>
     """

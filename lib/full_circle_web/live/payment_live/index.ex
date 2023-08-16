@@ -1,55 +1,36 @@
-defmodule FullCircleWeb.PurInvoiceLive.Index do
+defmodule FullCircleWeb.PaymentLive.Index do
   use FullCircleWeb, :live_view
 
-  alias FullCircle.Billing
-  alias FullCircleWeb.PurInvoiceLive.IndexComponent
+  alias FullCircle.BillPay
+  alias FullCircleWeb.PaymentLive.IndexComponent
 
   @per_page 25
 
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="mx-auto w-10/12">
+    <div class="mx-auto w-8/12">
       <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
       <div class="flex justify-center mb-2">
-        <.form for={%{}} id="search-form" phx-submit="search" class="w-full" autocomplete="off">
+        <.form for={%{}} id="search-form" phx-submit="search" autocomplete="off" class="w-full">
           <div class=" flex flex-row flex-wrap tracking-tighter text-sm">
-            <div class="w-[25rem] grow shrink">
+            <div class="w-[15.5rem] grow shrink">
               <label class="">Search Terms</label>
               <.input
                 id="search_terms"
                 name="search[terms]"
                 type="search"
                 value={@search.terms}
-                placeholder="pur_invoice, contact, goods or descriptions..."
-              />
-            </div>
-            <div class="w-[7rem] grow-0 shrink-0">
-              <label>Balance</label>
-              <.input
-                name="search[balance]"
-                type="select"
-                options={~w(All Paid Unpaid)}
-                value={@search.balance}
-                id="search_balance"
+                placeholder="payment, contact or account..."
               />
             </div>
             <div class="w-[9.5rem] grow-0 shrink-0">
-              <label>PurInvoice Date From</label>
+              <label>Payment Date From</label>
               <.input
-                name="search[pur_invoice_date]"
+                name="search[payment_date]"
                 type="date"
-                value={@search.pur_invoice_date}
-                id="search_pur_invoice_date"
-              />
-            </div>
-            <div class="w-[9.5rem] grow-0 shrink-0">
-              <label>Due Date From</label>
-              <.input
-                name="search[due_date]"
-                type="date"
-                value={@search.due_date}
-                id="search_due_date"
+                value={@search.payment_date}
+                id="search_payment_date"
               />
             </div>
             <.button class="mt-5 h-10 w-10 grow-0 shrink-0">🔍</.button>
@@ -58,36 +39,49 @@ defmodule FullCircleWeb.PurInvoiceLive.Index do
       </div>
       <div class="text-center mb-2">
         <.link
-          navigate={~p"/companies/#{@current_company.id}/pur_invoices/new"}
+          navigate={~p"/companies/#{@current_company.id}/payments/new"}
           class="blue_button"
-          id="new_purinvoice"
+          id="new_object"
         >
-          <%= gettext("New Invoice") %>
+          <%= gettext("New Payment") %>
+        </.link>
+        <.link
+          :if={@ids != ""}
+          navigate={
+            ~p"/companies/#{@current_company.id}/payments/print_multi?pre_print=false&ids=#{@ids}"
+          }
+          target="_blank"
+          class="blue_button"
+        >
+          <%= gettext("Print") %>
+        </.link>
+        <.link
+          :if={@ids != ""}
+          navigate={
+            ~p"/companies/#{@current_company.id}/payments/print_multi?pre_print=true&ids=#{@ids}"
+          }
+          target="_blank"
+          class="blue_button"
+        >
+          <%= gettext("Pre Print") %>
         </.link>
       </div>
-
       <div class="font-medium flex flex-row text-center tracking-tighter bg-amber-200">
         <div class="w-[2%] border-b border-t border-amber-400 py-1"></div>
-        <div class="w-[9%] border-b border-t border-amber-400 py-1">
+        <div class="w-[10%] border-b border-t border-amber-400 py-1">
           <%= gettext("Date") %>
         </div>
-        <div class="w-[9%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Due Date") %>
-        </div>
         <div class="w-[10%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Invoice No") %>
+          <%= gettext("Payment No") %>
         </div>
-        <div class="w-[20%] border-b border-t border-amber-400 py-1">
+        <div class="w-[28%] border-b border-t border-amber-400 py-1">
           <%= gettext("Contact") %>
         </div>
-        <div class="w-[30%] border-b border-t border-amber-400 py-1">
+        <div class="w-[40%] border-b border-t border-amber-400 py-1">
           <%= gettext("Particulars") %>
         </div>
         <div class="w-[10%] border-b border-t border-amber-400 py-1">
           <%= gettext("Amount") %>
-        </div>
-        <div class="w-[10%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Balance") %>
         </div>
       </div>
       <div
@@ -116,7 +110,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Index do
   def mount(_params, _session, socket) do
     socket =
       socket
-      |> assign(page_title: gettext("Purchase Invoice Listing"))
+      |> assign(page_title: gettext("Payment Listing"))
 
     {:ok, socket}
   end
@@ -124,31 +118,21 @@ defmodule FullCircleWeb.PurInvoiceLive.Index do
   @impl true
   def handle_params(params, _uri, socket) do
     params = params["search"]
-
     terms = params["terms"] || ""
-    bal = params["balance"] || ""
-    pur_invoice_date = params["pur_invoice_date"] || ""
-    due_date = params["due_date"] || ""
+    payment_date = params["payment_date"] || ""
 
     {:noreply,
      socket
-     |> assign(
-       search: %{
-         terms: terms,
-         balance: bal,
-         pur_invoice_date: pur_invoice_date,
-         due_date: due_date
-       }
-     )
-     |> assign(selected_invoices: [])
+     |> assign(search: %{terms: terms, payment_date: payment_date})
+     |> assign(selected: [])
      |> assign(ids: "")
-     |> filter_objects(terms, "replace", pur_invoice_date, due_date, bal, 1)}
+     |> filter_objects(terms, "replace", payment_date, 1)}
   end
 
   @impl true
   def handle_event("check_click", %{"object-id" => id, "value" => "on"}, socket) do
     obj =
-      FullCircle.Billing.get_pur_invoice_by_id_index_component_field!(
+      BillPay.get_payment_by_id_index_component_field!(
         id,
         socket.assigns.current_company,
         socket.assigns.current_user
@@ -162,15 +146,15 @@ defmodule FullCircleWeb.PurInvoiceLive.Index do
 
     socket =
       socket
-      |> assign(selected_invoices: [id | socket.assigns.selected_invoices])
+      |> assign(selected: [id | socket.assigns.selected])
 
-    {:noreply, socket |> assign(ids: Enum.join(socket.assigns.selected_invoices, ","))}
+    {:noreply, socket |> assign(ids: Enum.join(socket.assigns.selected, ","))}
   end
 
   @impl true
   def handle_event("check_click", %{"object-id" => id}, socket) do
     obj =
-      FullCircle.Billing.get_invoice_by_id_index_component_field!(
+      BillPay.get_payment_by_id_index_component_field!(
         id,
         socket.assigns.current_company,
         socket.assigns.current_user
@@ -184,11 +168,9 @@ defmodule FullCircleWeb.PurInvoiceLive.Index do
 
     socket =
       socket
-      |> assign(
-        selected_invoices: Enum.reject(socket.assigns.selected_invoices, fn sid -> sid == id end)
-      )
+      |> assign(selected: Enum.reject(socket.assigns.selected, fn sid -> sid == id end))
 
-    {:noreply, socket |> assign(ids: Enum.join(socket.assigns.selected_invoices, ","))}
+    {:noreply, socket |> assign(ids: Enum.join(socket.assigns.selected, ","))}
   end
 
   @impl true
@@ -198,9 +180,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Index do
      |> filter_objects(
        socket.assigns.search.terms,
        "stream",
-       socket.assigns.search.pur_invoice_date,
-       socket.assigns.search.due_date,
-       socket.assigns.search.balance,
+       socket.assigns.search.payment_date,
        socket.assigns.page + 1
      )}
   end
@@ -211,32 +191,26 @@ defmodule FullCircleWeb.PurInvoiceLive.Index do
         %{
           "search" => %{
             "terms" => terms,
-            "pur_invoice_date" => id,
-            "due_date" => dd,
-            "balance" => bal
+            "payment_date" => id
           }
         },
         socket
       ) do
     qry = %{
       "search[terms]" => terms,
-      "search[balance]" => bal,
-      "search[pur_invoice_date]" => id,
-      "search[due_date]" => dd
+      "search[payment_date]" => id
     }
 
-    url = "/companies/#{socket.assigns.current_company.id}/pur_invoices?#{URI.encode_query(qry)}"
+    url = "/companies/#{socket.assigns.current_company.id}/payments?#{URI.encode_query(qry)}"
 
     {:noreply, socket |> push_patch(to: url)}
   end
 
-  defp filter_objects(socket, terms, update, pur_invoice_date, due_date, bal, page) do
+  defp filter_objects(socket, terms, update, payment_date, page) do
     objects =
-      Billing.pur_invoice_index_query(
+      BillPay.payment_index_query(
         terms,
-        pur_invoice_date,
-        due_date,
-        bal,
+        payment_date,
         socket.assigns.current_company,
         socket.assigns.current_user,
         page: page,
