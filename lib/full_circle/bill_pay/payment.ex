@@ -90,9 +90,12 @@ defmodule FullCircle.BillPay.Payment do
 
     changeset =
       changeset
-      |> force_change(:payment_balance, bal)
+      |> put_change(:payment_balance, bal)
 
-    if !Decimal.eq?(bal, 0) do
+    if !Decimal.eq?(bal, 0) and
+         !Enum.any?(changeset.errors, fn x ->
+           {:payment_balance, {gettext("must be ZERO"), []}} == x
+         end) do
       add_error(changeset, :payment_balance, gettext("must be ZERO"))
     else
       changeset
@@ -113,7 +116,7 @@ defmodule FullCircle.BillPay.Payment do
   defp fill_default_date(changeset) do
     if is_nil(fetch_field!(changeset, :payment_date)) do
       changeset
-      |> force_change(:payment_date, Timex.today())
+      |> put_change(:payment_date, Timex.today())
     else
       changeset
     end

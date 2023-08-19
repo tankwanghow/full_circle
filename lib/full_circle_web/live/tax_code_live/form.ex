@@ -216,7 +216,7 @@ defmodule FullCircleWeb.TaxCodeLive.Form do
               field={@form[:account_name]}
               label={gettext("Account")}
               phx-hook="tributeAutoComplete"
-              phx-debounce="blur"
+              phx-debounce="500"
               url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=account&name="}
             />
           </div>

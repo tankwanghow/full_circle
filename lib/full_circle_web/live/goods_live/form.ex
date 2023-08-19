@@ -316,7 +316,7 @@ defmodule FullCircleWeb.GoodLive.Form do
               field={@form[:sales_account_name]}
               label={gettext("Sales Account")}
               phx-hook="tributeAutoComplete"
-              phx-debounce="blur"
+              phx-debounce="500"
               url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=account&name="}
             />
           </div>
@@ -326,7 +326,7 @@ defmodule FullCircleWeb.GoodLive.Form do
               field={@form[:sales_tax_code_name]}
               label={gettext("Sales TaxCode")}
               phx-hook="tributeAutoComplete"
-              phx-debounce="blur"
+              phx-debounce="500"
               url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=saltaxcode&name="}
             />
           </div>
@@ -339,7 +339,7 @@ defmodule FullCircleWeb.GoodLive.Form do
               field={@form[:purchase_account_name]}
               label={gettext("Purchase Account")}
               phx-hook="tributeAutoComplete"
-              phx-debounce="blur"
+              phx-debounce="500"
               url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=account&name="}
             />
           </div>
@@ -349,7 +349,7 @@ defmodule FullCircleWeb.GoodLive.Form do
               field={@form[:purchase_tax_code_name]}
               label={gettext("Purchase TaxCode")}
               phx-hook="tributeAutoComplete"
-              phx-debounce="blur"
+              phx-debounce="500"
               url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=purtaxcode&name="}
             />
           </div>

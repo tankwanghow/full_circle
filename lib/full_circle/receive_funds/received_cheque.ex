@@ -1,6 +1,7 @@
 defmodule FullCircle.ReceiveFund.ReceivedCheque do
   use FullCircle.Schema
   import Ecto.Changeset
+  import FullCircleWeb.Gettext
 
   schema "received_cheques" do
     field :_persistent_id, :integer
@@ -13,15 +14,23 @@ defmodule FullCircle.ReceiveFund.ReceivedCheque do
 
     belongs_to :receipt, FullCircle.ReceiveFund.Receipt
 
-    # has_one :deposit
-    # has_one :return_cheque_note
+    field :deposit_date, :date
+    belongs_to :deposit_account, FullCircle.Accounting.Account
+
+    field :return_cheque_date, :date
+    belongs_to :return_from_account, FullCircle.Accounting.Account
+    belongs_to :return_to_account, FullCircle.Accounting.Account
+
+    field :deposit_to_account_name, :string, virtual: true
+    field :return_from_account_name, :string, virtual: true
+    field :return_to_account_name, :string, virtual: true
 
     field :delete, :boolean, virtual: true, default: false
   end
 
   @doc false
-  def changeset(receipt, attrs) do
-    receipt
+  def changeset(cheque, attrs) do
+    cheque
     |> cast(attrs, [
       :_persistent_id,
       :bank,
@@ -44,6 +53,27 @@ defmodule FullCircle.ReceiveFund.ReceivedCheque do
       %{changeset | action: :delete}
     else
       changeset
+    end
+  end
+
+  def deposit_changeset(cheque, attrs) do
+    cheque
+    |> cast(attrs, [
+      :deposit_date,
+      :deposit_account_name
+    ])
+    |> validate_required([:deposit_date, :deposit_account_name])
+    |> validate_deposit_date()
+  end
+
+  defp validate_deposit_date(changeset) do
+    due = fetch_field!(changeset, :due_date)
+    dep = fetch_field!(changeset, :deposit_date)
+
+    if Timex.diff(due, dep, :days) <= 0 do
+      changeset
+    else
+      add_error(changeset, :deposit_date, gettext("must be greater than due_date"))
     end
   end
 end

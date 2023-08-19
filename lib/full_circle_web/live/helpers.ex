@@ -35,12 +35,12 @@ defmodule FullCircleWeb.Helpers do
 
   def delete_line(socket, index, lines_name) do
     cs = socket |> delete_line_std(index, lines_name)
-    socket |> assign(form: to_form(cs))
+    socket |> assign(form: to_form(cs |> Map.put(:action, socket.assigns.live_action)))
   end
 
   def delete_line(socket, index, lines_name, after_delete_func) do
     cs = socket |> delete_line_std(index, lines_name) |> after_delete_func.()
-    socket |> assign(form: to_form(cs))
+    socket |> assign(form: to_form(cs |> Map.put(:action, socket.assigns.live_action)))
   end
 
   defp delete_line_std(socket, index, lines_name) do
@@ -65,12 +65,12 @@ defmodule FullCircleWeb.Helpers do
 
   def add_line(socket, lines_name, params \\ %{}) do
     cs = socket |> add_line_std(lines_name, params)
-    socket |> assign(form: to_form(cs))
+    socket |> assign(form: to_form(cs |> Map.put(:action, socket.assigns.live_action)))
   end
 
   def add_line(socket, lines_name, params, after_add_func) do
     cs = socket |> add_line_std(lines_name, params) |> after_add_func.()
-    socket |> assign(form: to_form(cs))
+    socket |> assign(form: to_form(cs |> Map.put(:action, socket.assigns.live_action)))
   end
 
   defp add_line_std(socket, lines_name, params) do

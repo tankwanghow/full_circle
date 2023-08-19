@@ -62,7 +62,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Index do
           class="blue_button"
           id="new_purinvoice"
         >
-          <%= gettext("New Invoice") %>
+          <%= gettext("New Purchase Invoice") %>
         </.link>
       </div>
 

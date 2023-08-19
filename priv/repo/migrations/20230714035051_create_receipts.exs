@@ -48,11 +48,19 @@ defmodule FullCircle.Repo.Migrations.CreateReceipts do
       add :cheque_no, :string
       add :amount, :decimal, default: 0
       add :receipt_id, references(:receipts, on_delete: :delete_all)
-      # add :deposit_id, references(:deposits, on_delete: :nilify_all)
-      # add :return_cheque_id, references(return_cheque_notes: :nilify_all)
+      add :deposit_date, :date
+      add :deposit_account_id, references(:accounts, on_delete: :restrict)
+      add :return_cheque_date, :date
+      add :return_from_account_id, references(:accounts, on_delete: :restrict)
+      add :return_to_account_id, references(:accounts, on_delete: :restrict)
     end
 
     create index(:received_cheques, [:due_date])
     create index(:received_cheques, [:receipt_id])
+    create index(:received_cheques, [:deposit_date])
+    create index(:received_cheques, [:deposit_account_id])
+    create index(:received_cheques, [:return_cheque_date])
+    create index(:received_cheques, [:return_from_account_id])
+    create index(:received_cheques, [:return_to_account_id])
   end
 end

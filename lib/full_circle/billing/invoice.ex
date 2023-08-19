@@ -20,6 +20,7 @@ defmodule FullCircle.Billing.Invoice do
     field :invoice_amount, :decimal, virtual: true, default: 0
     field :invoice_good_amount, :decimal, virtual: true, default: 0
     field :invoice_tax_amount, :decimal, virtual: true, default: 0
+    field :sum_qty, :decimal, virtual: true, default: 0
 
     timestamps(type: :utc_datetime)
   end
@@ -66,19 +67,25 @@ defmodule FullCircle.Billing.Invoice do
       |> sum_field_to(:invoice_details, :good_amount, :invoice_good_amount)
       |> sum_field_to(:invoice_details, :tax_amount, :invoice_tax_amount)
       |> sum_field_to(:invoice_details, :amount, :invoice_amount)
+      |> sum_field_to(:invoice_details, :quantity, :sum_qty)
 
-    if Decimal.lt?(fetch_field!(changeset, :invoice_amount), 0) do
-      add_error(changeset, :invoice_amount, gettext("must be +ve"))
-    else
-      changeset
+    cond do
+      Decimal.lt?(fetch_field!(changeset, :invoice_amount), 0) ->
+        add_error(changeset, :invoice_amount, gettext("must be +ve"))
+
+      Decimal.eq?(fetch_field!(changeset, :sum_qty), 0) ->
+        add_error(changeset, :invoice_amount, gettext("need detail"))
+
+      true ->
+        changeset
     end
   end
 
   defp fill_default_date(changeset) do
     if is_nil(fetch_field!(changeset, :invoice_date)) do
       changeset
-      |> force_change(:invoice_date, Date.utc_today())
-      |> force_change(:due_date, Date.utc_today())
+      |> put_change(:invoice_date, Date.utc_today())
+      |> put_change(:due_date, Date.utc_today())
     else
       changeset
     end

@@ -19,6 +19,19 @@ defmodule FullCircle.BillPay do
   alias FullCircle.StdInterface
   alias Ecto.Multi
 
+  def get_payment_by_no!(no, com, user) do
+    id =
+      Repo.one(
+        from obj in Payment,
+          join: com in subquery(Sys.user_company(com, user)),
+          on: com.id == obj.company_id,
+          where: obj.payment_no == ^no,
+          select: obj.id
+      )
+
+    get_payment!(id, com, user)
+  end
+
   def get_print_payments!(ids, company, user) do
     Repo.all(
       from pay in Payment,
@@ -45,10 +58,53 @@ defmodule FullCircle.BillPay do
         where: pay.id == ^id,
         preload: [transaction_matchers: ^payment_match_trans(company, user)],
         preload: [payment_details: ^payment_details()],
-        group_by: [pay.id, pay.payment_no, pay.descriptions, funds.name, cont.name],
         select: pay,
-        select_merge: %{contact_name: cont.name, funds_account_name: funds.name}
+        select_merge: %{contact_name: cont.name, funds_account_name: funds.name},
+        select_merge: %{matched_amount: coalesce(subquery(matched_amount(id)), 0)},
+        select_merge: %{payment_tax_amount: coalesce(subquery(payment_tax_amount(id)), 0)},
+        select_merge: %{payment_good_amount: coalesce(subquery(payment_good_amount(id)), 0)},
+        select_merge: %{payment_detail_amount: coalesce(subquery(payment_detail_amount(id)), 0)}
     )
+  end
+
+  defp matched_amount(id) do
+    from mat in TransactionMatcher,
+      where: mat.entity == "payments",
+      where: mat.entity_id == ^id,
+      select: sum(mat.match_amount)
+  end
+
+  defp payment_tax_amount(id) do
+    from dtl in PaymentDetail,
+      where: dtl.payment_id == ^id,
+      select:
+        fragment(
+          "round(?, 2)",
+          sum((dtl.quantity * dtl.unit_price + dtl.discount) * dtl.tax_rate)
+        )
+  end
+
+  defp payment_good_amount(id) do
+    from dtl in PaymentDetail,
+      where: dtl.payment_id == ^id,
+      select:
+        fragment(
+          "round(?, 2)",
+          sum(dtl.quantity * dtl.unit_price + dtl.discount)
+        )
+  end
+
+  defp payment_detail_amount(id) do
+    from dtl in PaymentDetail,
+      where: dtl.payment_id == ^id,
+      select:
+        fragment(
+          "round(?, 2)",
+          sum(
+            dtl.quantity * dtl.unit_price + dtl.discount +
+              (dtl.quantity * dtl.unit_price + dtl.discount) * dtl.tax_rate
+          )
+        )
   end
 
   defp payment_details do
@@ -234,6 +290,7 @@ defmodule FullCircle.BillPay do
             repo.insert!(%Transaction{
               doc_type: "payments",
               doc_no: payment.payment_no,
+              doc_id: payment.id,
               doc_date: payment.payment_date,
               contact_id:
                 if(Accounting.is_balance_sheet_account?(x.account),
@@ -251,6 +308,7 @@ defmodule FullCircle.BillPay do
             repo.insert!(%Transaction{
               doc_type: "payments",
               doc_no: payment.payment_no,
+              doc_id: payment.id,
               doc_date: payment.payment_date,
               account_id: x.tax_code.account_id,
               company_id: com.id,
@@ -278,6 +336,7 @@ defmodule FullCircle.BillPay do
           repo.insert!(%Transaction{
             doc_type: "payments",
             doc_no: payment.payment_no,
+            doc_id: payment.id,
             doc_date: payment.payment_date,
             contact_id: payment.contact_id,
             account_id: x.account_id,
@@ -293,6 +352,7 @@ defmodule FullCircle.BillPay do
         repo.insert!(%Transaction{
           doc_type: "payments",
           doc_no: payment.payment_no,
+          doc_id: payment.id,
           doc_date: payment.payment_date,
           account_id: payment.funds_account_id,
           company_id: com.id,

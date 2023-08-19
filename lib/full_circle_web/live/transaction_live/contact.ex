@@ -17,8 +17,8 @@ defmodule FullCircleWeb.TransactionLive.Contact do
     params = params["search"]
 
     name = params["name"] || ""
-    f_date = params["f_date"] || ""
-    t_date = params["t_date"] || ""
+    f_date = params["f_date"] || Timex.shift(Timex.today(), months: -1)
+    t_date = params["t_date"] || Timex.today()
 
     {:noreply,
      socket
@@ -100,7 +100,7 @@ defmodule FullCircleWeb.TransactionLive.Contact do
                 name="search[name]"
                 value={@search.name}
                 phx-hook="tributeAutoComplete"
-                phx-debounce="blur"
+                phx-debounce="500"
                 url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
               />
             </div>
@@ -182,15 +182,14 @@ defmodule FullCircleWeb.TransactionLive.Contact do
                 <%= if obj.old_data do %>
                   <%= obj.doc_no %>
                 <% else %>
-                  <.live_component
-                    module={FullCircleWeb.EntityFormLive.Component}
-                    id={obj.id}
-                    entity={obj.doc_type}
-                    live_action={@live_action}
-                    doc_no={obj.doc_no}
-                    current_company={@current_company}
-                    current_user={@current_user}
-                  />
+                  <.link
+                    class="text-blue-600 hover:font-bold"
+                    navigate={
+                      "/companies/#{@current_company.id}/#{obj.doc_type}/#{obj.doc_id}/edit"
+                    }
+                  >
+                    <%= obj.doc_no %>
+                  </.link>
                 <% end %>
               </div>
               <div class="w-[12%] border rounded bg-green-200 border-green-400 text-center px-2 py-1">

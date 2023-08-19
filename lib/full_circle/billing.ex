@@ -18,7 +18,7 @@ defmodule FullCircle.Billing do
   alias FullCircle.{Repo, Sys, Accounting, StdInterface}
   alias Ecto.Multi
 
-  def get_invoice_by_invoice_no!(inv_no, com, user) do
+  def get_invoice_by_no!(inv_no, com, user) do
     id =
       Repo.one(
         from inv in Invoice,
@@ -90,7 +90,25 @@ defmodule FullCircle.Billing do
         select: inv,
         select_merge: %{
           contact_name: cont.name,
-          contact_id: cont.id
+          contact_id: cont.id,
+          invoice_tax_amount:
+            fragment(
+              "round(?, 2)",
+              sum((invd.quantity * invd.unit_price + invd.discount) * invd.tax_rate)
+            ),
+          invoice_good_amount:
+            fragment(
+              "round(?, 2)",
+              sum(invd.quantity * invd.unit_price + invd.discount)
+            ),
+          invoice_amount:
+            fragment(
+              "round(?, 2)",
+              sum(
+                invd.quantity * invd.unit_price + invd.discount +
+                  (invd.quantity * invd.unit_price + invd.discount) * invd.tax_rate
+              )
+            )
         }
     )
   end
@@ -145,9 +163,10 @@ defmodule FullCircle.Billing do
     qry =
       if terms != "" do
         from inv in subquery(qry),
-          order_by: ^similarity_order([:invoice_no, :contact_name, :particulars], terms)
+          order_by: ^similarity_order([:invoice_no, :contact_name, :particulars], terms),
+          order_by: [desc: 6]
       else
-        qry
+        qry |> order_by(desc: 6)
       end
 
     qry =
@@ -182,44 +201,81 @@ defmodule FullCircle.Billing do
   end
 
   defp invoice_raw_query(company, user) do
+    union_all(invoice_transactions(company, user), ^invoice_old_transactions(company, user))
+  end
+
+  defp invoice_transactions(company, user) do
+    from inv in Invoice,
+      join: cont in Contact,
+      on: cont.id == inv.contact_id,
+      join: invd in InvoiceDetail,
+      on: inv.id == invd.invoice_id,
+      join: good in Good,
+      on: invd.good_id == good.id,
+      join: com in subquery(Sys.user_company(company, user)),
+      on: com.id == inv.company_id,
+      left_join: txn in Transaction,
+      on: com.id == txn.company_id,
+      on: txn.doc_type == "invoices",
+      on: txn.doc_no == inv.invoice_no,
+      on: txn.contact_id == cont.id,
+      left_join: stxm in SeedTransactionMatcher,
+      on: stxm.transaction_id == txn.id,
+      left_join: atxm in TransactionMatcher,
+      on: atxm.transaction_id == txn.id,
+      select: %{
+        id: inv.id,
+        invoice_no: inv.invoice_no,
+        particulars: fragment("string_agg(distinct ?, ', ')", good.name),
+        invoice_date: inv.invoice_date,
+        due_date: inv.due_date,
+        updated_at: inv.updated_at,
+        company_id: com.id,
+        contact_name: cont.name,
+        invoice_amount:
+          sum(
+            invd.quantity * invd.unit_price + invd.discount +
+              invd.tax_rate * (invd.quantity * invd.unit_price + invd.discount)
+          ),
+        balance:
+          sum(
+            invd.quantity * invd.unit_price + invd.discount +
+              invd.tax_rate * (invd.quantity * invd.unit_price + invd.discount)
+          ) +
+            coalesce(sum(stxm.match_amount), 0) + coalesce(sum(atxm.match_amount), 0),
+        checked: false,
+        old_data: false
+      },
+      group_by: [inv.id, cont.name, com.id]
+  end
+
+  defp invoice_old_transactions(company, user) do
     from txn in Transaction,
       join: com in subquery(Sys.user_company(company, user)),
       on: com.id == txn.company_id and txn.doc_type == "invoices",
       join: cont in Contact,
       on: cont.id == txn.contact_id,
-      left_join: inv in Invoice,
-      on:
-        txn.doc_no == inv.invoice_no and
-          txn.contact_id == inv.contact_id,
-      left_join: invd in InvoiceDetail,
-      on: inv.id == invd.invoice_id,
       left_join: stxm in SeedTransactionMatcher,
       on: stxm.transaction_id == txn.id,
       left_join: atxm in TransactionMatcher,
       on: atxm.transaction_id == txn.id,
-      order_by: [desc: txn.inserted_at],
+      where: txn.old_data == true,
       select: %{
-        id: coalesce(inv.id, txn.id),
+        id: txn.id,
         invoice_no: txn.doc_no,
         particulars: coalesce(txn.contact_particulars, txn.particulars),
         invoice_date: txn.doc_date,
-        due_date: coalesce(inv.due_date, txn.doc_date),
+        due_date: txn.doc_date,
         updated_at: txn.inserted_at,
         company_id: com.id,
         contact_name: cont.name,
         invoice_amount: txn.amount,
         balance:
-          coalesce(
-            sum(
-              invd.quantity * invd.unit_price + invd.discount +
-                invd.tax_rate * (invd.quantity * invd.unit_price + invd.discount)
-            ),
-            txn.amount
-          ) + coalesce(sum(stxm.match_amount), 0) + coalesce(sum(atxm.match_amount), 0),
+          txn.amount + coalesce(sum(stxm.match_amount), 0) + coalesce(sum(atxm.match_amount), 0),
         checked: false,
         old_data: txn.old_data
       },
-      group_by: [inv.id, txn.id, cont.name, com.id]
+      group_by: [txn.id, cont.name, com.id]
   end
 
   def create_invoice(attrs, com, user) do
@@ -271,6 +327,7 @@ defmodule FullCircle.Billing do
           repo.insert!(%Transaction{
             doc_type: "invoices",
             doc_no: invoice.invoice_no,
+            doc_id: invoice.id,
             doc_date: invoice.invoice_date,
             contact_id:
               if(Accounting.is_balance_sheet_account?(x.account),
@@ -288,6 +345,7 @@ defmodule FullCircle.Billing do
           repo.insert!(%Transaction{
             doc_type: "invoices",
             doc_no: invoice.invoice_no,
+            doc_id: invoice.id,
             doc_date: invoice.invoice_date,
             account_id: x.tax_code.account_id,
             company_id: com.id,
@@ -305,6 +363,7 @@ defmodule FullCircle.Billing do
         repo.insert!(%Transaction{
           doc_type: "invoices",
           doc_no: invoice.invoice_no,
+          doc_id: invoice.id,
           doc_date: invoice.invoice_date,
           contact_id: invoice.contact_id,
           account_id: ac_rec_id,
@@ -354,7 +413,7 @@ defmodule FullCircle.Billing do
   # Purchase Invocie
   ########
 
-  def get_pur_invoice_by_pur_invoice_no!(inv_no, com, user) do
+  def get_pur_invoice_by_no!(inv_no, com, user) do
     id =
       Repo.one(
         from inv in PurInvoice,
@@ -390,7 +449,25 @@ defmodule FullCircle.Billing do
         select: inv,
         select_merge: %{
           contact_name: cont.name,
-          contact_id: cont.id
+          contact_id: cont.id,
+          pur_invoice_tax_amount:
+            fragment(
+              "round(?, 2)",
+              sum((invd.quantity * invd.unit_price + invd.discount) * invd.tax_rate)
+            ),
+          pur_invoice_good_amount:
+            fragment(
+              "round(?, 2)",
+              sum(invd.quantity * invd.unit_price + invd.discount)
+            ),
+          pur_invoice_amount:
+            fragment(
+              "round(?, 2)",
+              sum(
+                invd.quantity * invd.unit_price + invd.discount +
+                  (invd.quantity * invd.unit_price + invd.discount) * invd.tax_rate
+              )
+            )
         }
     )
   end
@@ -445,9 +522,10 @@ defmodule FullCircle.Billing do
     qry =
       if terms != "" do
         from inv in subquery(qry),
-          order_by: ^similarity_order([:pur_invoice_no, :contact_name, :particulars], terms)
+          order_by: ^similarity_order([:pur_invoice_no, :contact_name, :particulars], terms),
+          order_by: [desc: 6]
       else
-        qry
+        qry |> order_by(desc: 6)
       end
 
     qry =
@@ -482,47 +560,84 @@ defmodule FullCircle.Billing do
   end
 
   defp pur_invoice_raw_query(company, user) do
+    union_all(
+      pur_invoice_transactions(company, user),
+      ^pur_invoice_old_transactions(company, user)
+    )
+  end
+
+  defp pur_invoice_transactions(company, user) do
+    from inv in PurInvoice,
+      join: cont in Contact,
+      on: cont.id == inv.contact_id,
+      join: invd in PurInvoiceDetail,
+      on: inv.id == invd.pur_invoice_id,
+      join: good in Good,
+      on: invd.good_id == good.id,
+      join: com in subquery(Sys.user_company(company, user)),
+      on: com.id == inv.company_id,
+      left_join: txn in Transaction,
+      on: com.id == txn.company_id,
+      on: txn.doc_type == "pur_invoices",
+      on: txn.doc_no == inv.pur_invoice_no,
+      on: txn.contact_id == cont.id,
+      left_join: stxm in SeedTransactionMatcher,
+      on: stxm.transaction_id == txn.id,
+      left_join: atxm in TransactionMatcher,
+      on: atxm.transaction_id == txn.id,
+      select: %{
+        id: inv.id,
+        pur_invoice_no: inv.pur_invoice_no,
+        particulars: fragment("string_agg(distinct ?, ', ')", good.name),
+        pur_invoice_date: inv.pur_invoice_date,
+        due_date: inv.due_date,
+        updated_at: inv.updated_at,
+        company_id: com.id,
+        contact_name: cont.name,
+        pur_invoice_amount:
+          sum(
+            invd.quantity * invd.unit_price + invd.discount +
+              invd.tax_rate * (invd.quantity * invd.unit_price + invd.discount)
+          ),
+        balance:
+          sum(
+            invd.quantity * invd.unit_price + invd.discount +
+              invd.tax_rate * (invd.quantity * invd.unit_price + invd.discount)
+          ) +
+            coalesce(sum(stxm.match_amount), 0) + coalesce(sum(atxm.match_amount), 0),
+        checked: false,
+        old_data: false
+      },
+      group_by: [inv.id, cont.name, com.id]
+  end
+
+  defp pur_invoice_old_transactions(company, user) do
     from txn in Transaction,
       join: com in subquery(Sys.user_company(company, user)),
       on: com.id == txn.company_id and txn.doc_type == "pur_invoices",
       join: cont in Contact,
       on: cont.id == txn.contact_id,
-      left_join: inv in PurInvoice,
-      on:
-        txn.doc_no == inv.pur_invoice_no and
-          txn.contact_id == inv.contact_id,
-      left_join: invd in PurInvoiceDetail,
-      on: inv.id == invd.pur_invoice_id,
       left_join: stxm in SeedTransactionMatcher,
       on: stxm.transaction_id == txn.id,
       left_join: atxm in TransactionMatcher,
       on: atxm.transaction_id == txn.id,
-      order_by: [desc: txn.inserted_at],
+      where: txn.old_data == true,
       select: %{
-        id: coalesce(inv.id, txn.id),
+        id: txn.id,
         pur_invoice_no: txn.doc_no,
         particulars: coalesce(txn.contact_particulars, txn.particulars),
         pur_invoice_date: txn.doc_date,
-        due_date: coalesce(inv.due_date, txn.doc_date),
+        due_date: txn.doc_date,
         updated_at: txn.inserted_at,
         company_id: com.id,
         contact_name: cont.name,
-        pur_invoice_amount: fragment("abs(?)", txn.amount),
+        pur_invoice_amount: txn.amount,
         balance:
-          fragment(
-            "abs(?)",
-            coalesce(
-              sum(
-                invd.quantity * invd.unit_price + invd.discount +
-                  invd.tax_rate * (invd.quantity * invd.unit_price + invd.discount)
-              ),
-              txn.amount
-            ) + coalesce(sum(stxm.match_amount), 0) + coalesce(sum(atxm.match_amount), 0)
-          ),
+          txn.amount + coalesce(sum(stxm.match_amount), 0) + coalesce(sum(atxm.match_amount), 0),
         checked: false,
         old_data: txn.old_data
       },
-      group_by: [inv.id, txn.id, cont.name, com.id]
+      group_by: [txn.id, cont.name, com.id]
   end
 
   def create_pur_invoice(attrs, com, user) do
@@ -580,6 +695,7 @@ defmodule FullCircle.Billing do
           repo.insert!(%Transaction{
             doc_type: "pur_invoices",
             doc_no: pur_invoice.pur_invoice_no,
+            doc_id: pur_invoice.id,
             doc_date: pur_invoice.pur_invoice_date,
             contact_id:
               if(Accounting.is_balance_sheet_account?(x.account),
@@ -597,6 +713,7 @@ defmodule FullCircle.Billing do
           repo.insert!(%Transaction{
             doc_type: "pur_invoices",
             doc_no: pur_invoice.pur_invoice_no,
+            doc_id: pur_invoice.id,
             doc_date: pur_invoice.pur_invoice_date,
             account_id: x.tax_code.account_id,
             company_id: com.id,
@@ -614,6 +731,7 @@ defmodule FullCircle.Billing do
         repo.insert!(%Transaction{
           doc_type: "pur_invoices",
           doc_no: pur_invoice.pur_invoice_no,
+          doc_id: pur_invoice.id,
           doc_date: pur_invoice.pur_invoice_date,
           contact_id: pur_invoice.contact_id,
           account_id: ac_rec_id,

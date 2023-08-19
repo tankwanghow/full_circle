@@ -17,10 +17,18 @@ defmodule FullCircle.Billing.PurInvoice do
 
     has_many :pur_invoice_details, FullCircle.Billing.PurInvoiceDetail, on_replace: :delete
 
+    has_many :transaction_matchers, FullCircle.Accounting.TransactionMatcher,
+      where: [entity: "pur_invoices"],
+      on_replace: :delete,
+      foreign_key: :entity_id,
+      references: :id
+
     field :contact_name, :string, virtual: true
     field :pur_invoice_amount, :decimal, virtual: true, default: 0
     field :pur_invoice_good_amount, :decimal, virtual: true, default: 0
     field :pur_invoice_tax_amount, :decimal, virtual: true, default: 0
+    field :matched_amount, :decimal, virtual: true, default: Decimal.new("0")
+    field :sum_qty, :decimal, virtual: true, default: 0
 
     timestamps(type: :utc_datetime)
   end
@@ -53,6 +61,7 @@ defmodule FullCircle.Billing.PurInvoice do
       message: gettext("pur_invoice no already in company")
     )
     |> cast_assoc(:pur_invoice_details)
+    |> cast_assoc(:transaction_matchers)
     |> compute_fields()
   end
 
@@ -62,19 +71,29 @@ defmodule FullCircle.Billing.PurInvoice do
       |> sum_field_to(:pur_invoice_details, :good_amount, :pur_invoice_good_amount)
       |> sum_field_to(:pur_invoice_details, :tax_amount, :pur_invoice_tax_amount)
       |> sum_field_to(:pur_invoice_details, :amount, :pur_invoice_amount)
+      |> sum_field_to(:pur_invoice_details, :quantity, :sum_qty)
 
-    if Decimal.lt?(fetch_field!(changeset, :pur_invoice_amount), 0) do
-      add_error(changeset, :pur_invoice_amount, gettext("must be +ve"))
-    else
-      changeset
+    cond do
+      Decimal.lt?(fetch_field!(changeset, :pur_invoice_amount), 0) ->
+        add_error(changeset, :pur_invoice_amount, gettext("must be +ve"))
+
+      Decimal.eq?(fetch_field!(changeset, :sum_qty), 0) ->
+        add_error(changeset, :pur_invoice_amount, gettext("need detail"))
+
+      true ->
+        changeset
     end
+  end
+
+  def compute_match_transactions_amount(changeset) do
+    changeset |> sum_field_to(:transaction_matchers, :match_amount, :matched_amount)
   end
 
   defp fill_default_date(changeset) do
     if is_nil(fetch_field!(changeset, :pur_invoice_date)) do
       changeset
-      |> force_change(:pur_invoice_date, Date.utc_today())
-      |> force_change(:due_date, Date.utc_today())
+      |> put_change(:pur_invoice_date, Date.utc_today())
+      |> put_change(:due_date, Date.utc_today())
     else
       changeset
     end

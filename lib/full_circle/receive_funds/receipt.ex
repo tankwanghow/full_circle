@@ -31,6 +31,7 @@ defmodule FullCircle.ReceiveFund.Receipt do
     field :receipt_tax_amount, :decimal, virtual: true, default: Decimal.new("0")
 
     field :receipt_balance, :decimal, virtual: true, default: Decimal.new("0")
+    field :receipt_amount, :decimal, virtual: true, default: Decimal.new("0")
 
     timestamps(type: :utc_datetime)
   end
@@ -57,6 +58,7 @@ defmodule FullCircle.ReceiveFund.Receipt do
       :receipt_no,
       :funds_amount
     ])
+    |> validate_funds_account_name()
     |> validate_id(:contact_name, :contact_id)
     |> validate_id(:funds_account_name, :funds_account_id)
     |> unsafe_validate_unique([:receipt_no, :company_id], FullCircle.Repo,
@@ -66,6 +68,14 @@ defmodule FullCircle.ReceiveFund.Receipt do
     |> cast_assoc(:received_cheques)
     |> cast_assoc(:receipt_details)
     |> compute_balance()
+  end
+
+  defp validate_funds_account_name(changeset) do
+    if fetch_field!(changeset, :funds_amount) |> Decimal.gt?(0) do
+      validate_required(changeset, :funds_account_name)
+    else
+      changeset
+    end
   end
 
   def compute_struct_balance(inval) do
@@ -96,12 +106,21 @@ defmodule FullCircle.ReceiveFund.Receipt do
 
     changeset =
       changeset
-      |> force_change(:receipt_balance, bal)
+      |> put_change(:receipt_balance, bal)
+      |> put_change(:receipt_amount, Decimal.from_float(pos))
 
-    if !Decimal.eq?(bal, 0) do
+    if !Decimal.eq?(bal, 0) and
+         !Enum.any?(changeset.errors, fn x ->
+           {:receipt_balance, {gettext("must be ZERO"), []}} == x
+         end) do
       add_error(changeset, :receipt_balance, gettext("must be ZERO"))
     else
-      changeset
+      if(pos > 0.0,
+        do: changeset,
+        else:
+          changeset
+          |> add_error(:receipt_amount, gettext("receipt amount need +ve value"))
+      )
     end
   end
 
@@ -123,7 +142,7 @@ defmodule FullCircle.ReceiveFund.Receipt do
   defp fill_default_date(changeset) do
     if is_nil(fetch_field!(changeset, :receipt_date)) do
       changeset
-      |> force_change(:receipt_date, Timex.today())
+      |> put_change(:receipt_date, Timex.today())
     else
       changeset
     end

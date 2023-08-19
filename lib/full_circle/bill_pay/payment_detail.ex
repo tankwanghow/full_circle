@@ -66,6 +66,7 @@ defmodule FullCircle.BillPay.PaymentDetail do
     |> validate_id(:tax_code_name, :tax_code_id)
     |> validate_id(:package_name, :package_id)
     |> validate_id(:account_name, :account_id)
+    |> validate_number(:quantity, greater_than: 0)
     |> compute_fields()
     |> maybe_mark_for_deletion()
   end
@@ -89,10 +90,10 @@ defmodule FullCircle.BillPay.PaymentDetail do
     amount = Decimal.add(good_amount, tax_amount)
 
     changeset
-    |> force_change(:good_amount, good_amount)
-    |> force_change(:tax_amount, tax_amount)
-    |> force_change(:amount, amount)
-    |> force_change(:quantity, qty)
+    |> put_change(:good_amount, good_amount)
+    |> put_change(:tax_amount, tax_amount)
+    |> put_change(:amount, amount)
+    |> put_change(:quantity, qty)
   end
 
   defp maybe_mark_for_deletion(%{data: %{id: nil}} = changeset), do: changeset

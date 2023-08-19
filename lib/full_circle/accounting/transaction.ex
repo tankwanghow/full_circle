@@ -9,6 +9,7 @@ defmodule FullCircle.Accounting.Transaction do
     field :contact_particulars, :string
     field :amount, :decimal
     field :doc_no, :string
+    field :doc_id, :binary_id
 
     field :old_data, :boolean, default: false
     field :closed, :boolean, default: false

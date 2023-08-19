@@ -4,7 +4,7 @@ defmodule FullCircle.ReceiveFund do
   import FullCircle.Helpers
   import FullCircle.Authorization
 
-  alias FullCircle.ReceiveFund.{Receipt, ReceiptDetail}
+  alias FullCircle.ReceiveFund.{Receipt, ReceiptDetail, ReceivedCheque}
 
   alias FullCircle.Accounting.{
     Contact,
@@ -18,6 +18,19 @@ defmodule FullCircle.ReceiveFund do
   alias FullCircle.Accounting.Account
   alias FullCircle.StdInterface
   alias Ecto.Multi
+
+  def get_receipt_by_no!(no, com, user) do
+    id =
+      Repo.one(
+        from obj in Receipt,
+          join: com in subquery(Sys.user_company(com, user)),
+          on: com.id == obj.company_id,
+          where: obj.receipt_no == ^no,
+          select: obj.id
+      )
+
+    get_receipt!(id, com, user)
+  end
 
   def get_print_receipts!(ids, company, user) do
     Repo.all(
@@ -47,10 +60,60 @@ defmodule FullCircle.ReceiveFund do
         preload: [:received_cheques],
         preload: [transaction_matchers: ^receipt_match_trans(company, user)],
         preload: [receipt_details: ^receipt_details()],
-        group_by: [rec.id, rec.receipt_no, rec.descriptions, funds.name, cont.name],
         select: rec,
-        select_merge: %{contact_name: cont.name, funds_account_name: funds.name}
+        select_merge: %{contact_name: cont.name, funds_account_name: funds.name},
+        select_merge: %{cheques_amount: coalesce(subquery(cheques_amount(id)), 0)},
+        select_merge: %{matched_amount: coalesce(subquery(matched_amount(id)), 0)},
+        select_merge: %{receipt_tax_amount: coalesce(subquery(receipt_tax_amount(id)), 0)},
+        select_merge: %{receipt_good_amount: coalesce(subquery(receipt_good_amount(id)), 0)},
+        select_merge: %{receipt_detail_amount: coalesce(subquery(receipt_detail_amount(id)), 0)}
     )
+  end
+
+  defp matched_amount(id) do
+    from mat in TransactionMatcher,
+      where: mat.entity == "receipts",
+      where: mat.entity_id == ^id,
+      select: sum(mat.match_amount)
+  end
+
+  defp cheques_amount(id) do
+    from chq in ReceivedCheque,
+      where: chq.receipt_id == ^id,
+      select: sum(chq.amount)
+  end
+
+  defp receipt_tax_amount(id) do
+    from dtl in ReceiptDetail,
+      where: dtl.receipt_id == ^id,
+      select:
+        fragment(
+          "round(?, 2)",
+          sum((dtl.quantity * dtl.unit_price + dtl.discount) * dtl.tax_rate)
+        )
+  end
+
+  defp receipt_good_amount(id) do
+    from dtl in ReceiptDetail,
+      where: dtl.receipt_id == ^id,
+      select:
+        fragment(
+          "round(?, 2)",
+          sum(dtl.quantity * dtl.unit_price + dtl.discount)
+        )
+  end
+
+  defp receipt_detail_amount(id) do
+    from dtl in ReceiptDetail,
+      where: dtl.receipt_id == ^id,
+      select:
+        fragment(
+          "round(?, 2)",
+          sum(
+            dtl.quantity * dtl.unit_price + dtl.discount +
+              (dtl.quantity * dtl.unit_price + dtl.discount) * dtl.tax_rate
+          )
+        )
   end
 
   defp receipt_details do
@@ -239,6 +302,7 @@ defmodule FullCircle.ReceiveFund do
             repo.insert!(%Transaction{
               doc_type: "receipts",
               doc_no: receipt.receipt_no,
+              doc_id: receipt.id,
               doc_date: receipt.receipt_date,
               contact_id:
                 if(Accounting.is_balance_sheet_account?(x.account),
@@ -256,6 +320,7 @@ defmodule FullCircle.ReceiveFund do
             repo.insert!(%Transaction{
               doc_type: "receipts",
               doc_no: receipt.receipt_no,
+              doc_id: receipt.id,
               doc_date: receipt.receipt_date,
               account_id: x.tax_code.account_id,
               company_id: com.id,
@@ -283,6 +348,7 @@ defmodule FullCircle.ReceiveFund do
           repo.insert!(%Transaction{
             doc_type: "receipts",
             doc_no: receipt.receipt_no,
+            doc_id: receipt.id,
             doc_date: receipt.receipt_date,
             contact_id: receipt.contact_id,
             account_id: x.account_id,
@@ -298,6 +364,7 @@ defmodule FullCircle.ReceiveFund do
         repo.insert!(%Transaction{
           doc_type: "receipts",
           doc_no: receipt.receipt_no,
+          doc_id: receipt.id,
           doc_date: receipt.receipt_date,
           account_id: receipt.funds_account_id,
           company_id: com.id,
@@ -311,6 +378,7 @@ defmodule FullCircle.ReceiveFund do
           repo.insert!(%Transaction{
             doc_type: "receipts",
             doc_no: receipt.receipt_no,
+            doc_id: receipt.id,
             doc_date: receipt.receipt_date,
             account_id: pdc_id,
             company_id: com.id,

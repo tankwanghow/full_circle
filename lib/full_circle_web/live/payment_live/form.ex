@@ -453,7 +453,7 @@ defmodule FullCircleWeb.PaymentLive.Form do
               field={@form[:contact_name]}
               label={gettext("Pay To")}
               phx-hook="tributeAutoComplete"
-              phx-debounce="blur"
+              phx-debounce="500"
               url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
             />
           </div>
@@ -463,7 +463,7 @@ defmodule FullCircleWeb.PaymentLive.Form do
               field={@form[:funds_account_name]}
               label={gettext("Funds Account")}
               phx-hook="tributeAutoComplete"
-              phx-debounce="blur"
+              phx-debounce="500"
               url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=fundsaccount&name="}
             />
           </div>
@@ -471,7 +471,7 @@ defmodule FullCircleWeb.PaymentLive.Form do
             <.input
               field={@form[:funds_amount]}
               label={gettext("Funds Amount")}
-              phx-debounce="blur"
+              phx-debounce="500"
               type="number"
               step="0.01"
             />
@@ -491,6 +491,7 @@ defmodule FullCircleWeb.PaymentLive.Form do
               readonly
               field={@form[:payment_balance]}
               label={gettext("Payment Balance")}
+              value={Ecto.Changeset.fetch_field!(@form.source, :payment_balance)}
             />
           </div>
         </div>
@@ -552,10 +553,11 @@ defmodule FullCircleWeb.PaymentLive.Form do
           >
             <%= gettext("Matchers") %> =
             <span
-              :if={!Decimal.eq?(Phoenix.HTML.Form.input_value(@form, :matched_amount), 0)}
+              :if={!Decimal.eq?(Ecto.Changeset.fetch_field!(@form.source, :matched_amount), 0)}
               class="font-normal text-rose-700"
             >
-              <%= Phoenix.HTML.Form.input_value(@form, :matched_amount)
+              <%= Ecto.Changeset.fetch_field!(@form.source, :matched_amount)
+              |> Decimal.new()
               |> Decimal.abs()
               |> Number.Delimit.number_to_delimited() %>
             </span>
@@ -574,10 +576,10 @@ defmodule FullCircleWeb.PaymentLive.Form do
           >
             <%= gettext("Details") %> =
             <span
-              :if={!Decimal.eq?(Phoenix.HTML.Form.input_value(@form, :payment_detail_amount), 0)}
+              :if={!Decimal.eq?(Ecto.Changeset.fetch_field!(@form.source, :payment_detail_amount), 0)}
               class="font-normal text-rose-700"
             >
-              <%= Phoenix.HTML.Form.input_value(@form, :payment_detail_amount)
+              <%= Ecto.Changeset.fetch_field!(@form.source, :payment_detail_amount)
               |> Number.Delimit.number_to_delimited() %>
             </span>
           </div>
@@ -627,7 +629,7 @@ defmodule FullCircleWeb.PaymentLive.Form do
                 <.input readonly type="number" field={dtl[:balance]} tabindex={-1} />
               </div>
               <div class="w-[16%]">
-                <.input type="number" phx-debounce="blur" step="0.01" field={dtl[:match_amount]} />
+                <.input type="number" phx-debounce="500" step="0.01" field={dtl[:match_amount]} />
               </div>
               <div class="w-[3%] mt-2.5 text-rose-500">
                 <.link phx-click={:delete_match_tran} phx-value-index={dtl.index} tabindex="-1">
@@ -640,7 +642,13 @@ defmodule FullCircleWeb.PaymentLive.Form do
           <div class="flex flex-row flex-wrap">
             <div class="w-[81%] pt-2 pr-2 font-semibold text-right">Matched Total</div>
             <div class="w-[16%] font-semi bold">
-              <.input type="number" readonly field={@form[:matched_amount]} tabindex={-1} />
+              <.input
+                type="number"
+                readonly
+                field={@form[:matched_amount]}
+                tabindex={-1}
+                value={Ecto.Changeset.fetch_field!(@form.source, :matched_amount)}
+              />
             </div>
           </div>
         </div>

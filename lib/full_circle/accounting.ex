@@ -91,7 +91,8 @@ defmodule FullCircle.Accounting do
           particulars: txn.particulars,
           all_matched_amount: txn.all_matched_amount,
           balance: txn.amount + txn.all_matched_amount,
-          match_amount: 0
+          match_amount: 0,
+          old_data: txn.old_data
         }
 
     qry |> Repo.all()
@@ -113,6 +114,7 @@ defmodule FullCircle.Accounting do
         doc_date: txn.doc_date,
         doc_type: txn.doc_type,
         doc_no: txn.doc_no,
+        old_data: txn.old_data,
         amount:
           fragment(
             "round(?, 2)",
@@ -127,16 +129,7 @@ defmodule FullCircle.Accounting do
           )
       },
       group_by: [
-        txn.id,
-        txn.account_id,
-        txn.contact_id,
-        txn.fixed_asset_id,
-        txn.doc_type,
-        txn.doc_no,
-        txn.doc_date,
-        txn.amount,
-        txn.particulars,
-        txn.contact_particulars
+        txn.id
       ]
   end
 

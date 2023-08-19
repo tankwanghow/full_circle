@@ -59,7 +59,7 @@ defmodule FullCircle.Accounting.TransactionMatcher do
     balance = amt + all_match_amt + match_amt
 
     changeset
-    |> force_change(:balance, balance |> Decimal.from_float() |> Decimal.round(2))
+    |> put_change(:balance, balance |> Decimal.from_float() |> Decimal.round(2))
   end
 
   defp maybe_mark_for_deletion(%{data: %{id: nil}} = changeset), do: changeset

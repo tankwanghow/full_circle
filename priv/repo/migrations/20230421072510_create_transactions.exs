@@ -9,6 +9,7 @@ defmodule FullCircle.Repo.Migrations.CreateTransactions do
       add :contact_particulars, :string
       add :amount, :decimal
       add :doc_no, :string
+      add :doc_id, :binary_id
 
       add :reconciled, :boolean, default: false
       add :closed, :boolean, default: false
