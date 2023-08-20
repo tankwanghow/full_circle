@@ -4,22 +4,22 @@ defmodule FullCircle.Accounting.TransactionMatcher do
 
   schema "transaction_matchers" do
     field :_persistent_id, :integer
-    field :entity_id, :binary_id
-    field :entity, :string
+    field :doc_id, :binary_id
+    field :doc_type, :string
     field :match_amount, :decimal, default: 0
 
     belongs_to :transaction, FullCircle.Accounting.Transaction
 
     field :delete, :boolean, virtual: true, default: false
     field :account_id, :binary_id, virtual: true
-    field :doc_type, :string, virtual: true
-    field :doc_date, :date, virtual: true
-    field :doc_no, :string, virtual: true
+    field :t_doc_type, :string, virtual: true
+    field :t_doc_date, :date, virtual: true
+    field :t_doc_no, :string, virtual: true
+    field :t_doc_id, :string, virtual: true
     field :amount, :decimal, virtual: true
     field :balance, :decimal, virtual: true
     field :particulars, :string, virtual: true
     field :all_matched_amount, :decimal, virtual: true
-    field :doc_id, :string, virtual: true
     field :old_data, :boolean, virtual: true
   end
 
@@ -31,18 +31,19 @@ defmodule FullCircle.Accounting.TransactionMatcher do
       :match_amount,
       :account_id,
       :transaction_id,
-      :entity,
-      :entity_id,
-      :doc_no,
       :doc_type,
-      :doc_date,
+      :doc_id,
+      :t_doc_no,
+      :t_doc_type,
+      :t_doc_date,
+      :t_doc_id,
       :amount,
       :balance,
       :particulars,
       :all_matched_amount,
       :delete
     ])
-    |> validate_required([:transaction_id, :entity])
+    |> validate_required([:transaction_id, :doc_type])
     |> validate_number(:match_amount, not_equal_to: 0)
     |> maybe_mark_for_deletion()
     |> compute_balance()

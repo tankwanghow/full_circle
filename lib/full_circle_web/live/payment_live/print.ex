@@ -91,7 +91,7 @@ defmodule FullCircleWeb.PaymentLive.Print do
             <div class="letter-head">
               <%= if(@pre_print == "true", do: "", else: letter_head(assigns)) %>
             </div>
-            <div class="doctype is-size-4 has-text-weight-semibold">RECEIPT</div>
+            <div class="doctype is-size-4 has-text-weight-semibold">PAYMENT VOUCHER</div>
             <%= payment_header(payment, assigns) %>
 
             <div class="details-body is-size-6">
@@ -260,8 +260,11 @@ defmodule FullCircleWeb.PaymentLive.Print do
 
   def letter_foot(assigns) do
     ~H"""
-    <div class="sign">Collector Signature</div>
-    <div class="sign">Manager/Cashier Signature</div>
+    <div class="terms is-size-7">
+      <div>This receipt is only valid subject to cheque or cheques honoured by the bank.</div>
+    </div>
+    <div class="sign">Receiver Signature</div>
+    <div class="sign">Manager Signature</div>
     """
   end
 
@@ -310,7 +313,7 @@ defmodule FullCircleWeb.PaymentLive.Print do
 
     ~H"""
     <div class="payment-header">
-      <div class="is-size-6">Receive From</div>
+      <div class="is-size-6">Pay To</div>
       <div class="customer">
         <div class="is-size-5 has-text-weight-semibold"><%= @payment.contact.name %></div>
         <div><%= @payment.contact.address1 %></div>
@@ -339,9 +342,7 @@ defmodule FullCircleWeb.PaymentLive.Print do
         <div>
           Pay By: <span class="has-text-weight-semibold"><%= @payment.funds_account.name %></span>
         </div>
-        <div :if={String.trim(@payment.descriptions || "") != ""}>
-          Note: <span class="has-text-weight-semibold"><%= @payment.descriptions %></span>
-        </div>
+        <div class="descriptions has-text-weight-light"><%= @payment.descriptions %></div>
       </div>
     </div>
     """
@@ -392,10 +393,12 @@ defmodule FullCircleWeb.PaymentLive.Print do
       .letter-foot { padding-top: 2mm; margin-top: 2mm; height: 28mm;}
 
       .doctype { float: right; margin-top: -20mm; margin-right: 0mm; }
-      .payment-info { float: right; }
+
       .payment-header { width: 100%; height: 40mm; border-bottom: 0.5mm solid black; }
       .customer { padding-left: 2mm; float: left;}
-      .payment-info div { margin-bottom: 2mm; text-align: right; }
+      .payment-info div { float: right; margin-bottom: 1px; text-align: right; }
+      .payment-info div.descriptions { text-align: left; }
+
       .details-header { display: flex; padding-bottom: 1mm; padding-top: 1mm; border-bottom: 0.5mm dotted black; margin-bottom: 3px;}
       .particular { width: 80mm; text-align: left;}
       .qty { width: 32mm; text-align: center; }

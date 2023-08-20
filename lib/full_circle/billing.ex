@@ -219,10 +219,6 @@ defmodule FullCircle.Billing do
       on: txn.doc_type == "Invoice",
       on: txn.doc_no == inv.invoice_no,
       on: txn.contact_id == cont.id,
-      left_join: stxm in SeedTransactionMatcher,
-      on: stxm.transaction_id == txn.id,
-      left_join: atxm in TransactionMatcher,
-      on: atxm.transaction_id == txn.id,
       select: %{
         id: inv.id,
         invoice_no: inv.invoice_no,
@@ -242,11 +238,18 @@ defmodule FullCircle.Billing do
             invd.quantity * invd.unit_price + invd.discount +
               invd.tax_rate * (invd.quantity * invd.unit_price + invd.discount)
           ) +
-            coalesce(sum(stxm.match_amount), 0) + coalesce(sum(atxm.match_amount), 0),
+            fragment(
+              "select coalesce(sum(match_amount),0) from transaction_matchers where transaction_id = ?",
+              txn.id
+            ) +
+            fragment(
+              "select coalesce(sum(match_amount), 0) from seed_transaction_matchers where transaction_id = ?",
+              txn.id
+            ),
         checked: false,
         old_data: false
       },
-      group_by: [inv.id, cont.name, com.id]
+      group_by: [inv.id, txn.id, cont.name, com.id]
   end
 
   defp invoice_old_transactions(company, user) do
@@ -581,10 +584,6 @@ defmodule FullCircle.Billing do
       on: txn.doc_type == "PurInvoice",
       on: txn.doc_no == inv.pur_invoice_no,
       on: txn.contact_id == cont.id,
-      left_join: stxm in SeedTransactionMatcher,
-      on: stxm.transaction_id == txn.id,
-      left_join: atxm in TransactionMatcher,
-      on: atxm.transaction_id == txn.id,
       select: %{
         id: inv.id,
         pur_invoice_no: inv.pur_invoice_no,
@@ -595,20 +594,27 @@ defmodule FullCircle.Billing do
         company_id: com.id,
         contact_name: cont.name,
         pur_invoice_amount:
-          sum(
+          -sum(
             invd.quantity * invd.unit_price + invd.discount +
               invd.tax_rate * (invd.quantity * invd.unit_price + invd.discount)
           ),
         balance:
-          sum(
+          -sum(
             invd.quantity * invd.unit_price + invd.discount +
               invd.tax_rate * (invd.quantity * invd.unit_price + invd.discount)
           ) +
-            coalesce(sum(stxm.match_amount), 0) + coalesce(sum(atxm.match_amount), 0),
+            fragment(
+              "select coalesce(sum(match_amount),0) from transaction_matchers where transaction_id = ?",
+              txn.id
+            ) +
+            fragment(
+              "select coalesce(sum(match_amount), 0) from seed_transaction_matchers where transaction_id = ?",
+              txn.id
+            ),
         checked: false,
         old_data: false
       },
-      group_by: [inv.id, cont.name, com.id]
+      group_by: [inv.id, txn.id, cont.name, com.id]
   end
 
   defp pur_invoice_old_transactions(company, user) do

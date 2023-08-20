@@ -904,4 +904,20 @@ defmodule FullCircleWeb.CoreComponents do
     </.modal>
     """
   end
+
+  attr(:doc_obj, :any)
+  attr(:current_company, :any)
+  attr(:klass, :string, default: "")
+
+  def doc_link(assigns) do
+    ~H"""
+    <.link
+      target="_blank"
+      class={["text-blue-600 hover:font-bold", @klass]}
+      navigate={"/companies/#{@current_company.id}/#{@doc_obj.doc_type}/#{@doc_obj.doc_id}/edit"}
+    >
+      <%= @doc_obj.doc_no %>
+    </.link>
+    """
+  end
 end

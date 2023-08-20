@@ -433,12 +433,6 @@ defmodule FullCircleWeb.PaymentLive.Form do
     {:noreply, socket}
   end
 
-  defp found_in_matched_trans?(source, id) do
-    Enum.any?(Ecto.Changeset.fetch_field!(source, :transaction_matchers), fn x ->
-      x.transaction_id == id
-    end)
-  end
-
   @impl true
   def render(assigns) do
     ~H"""
@@ -608,140 +602,27 @@ defmodule FullCircleWeb.PaymentLive.Form do
           current_user={@current_user}
         />
 
-        <div
+        <.live_component
+          module={FullCircleWeb.ReceiptLive.MatcherComponent}
           id="match-trans"
-          class="active text-center border bg-green-100 mt-2 p-3 rounded-lg border-green-400"
-        >
-          <div class="flex flex-row flex-wrap font-medium text-center mt-2 tracking-tighter">
-            <div class="detail-header w-[16%]"><%= gettext("Doc Date") %></div>
-            <div class="detail-header w-[17%]"><%= gettext("Doc Type") %></div>
-            <div class="detail-header w-[16%]"><%= gettext("Doc No") %></div>
-            <div class="detail-header w-[16%]"><%= gettext("Amount") %></div>
-            <div class="detail-header w-[16%]"><%= gettext("Balance") %></div>
-            <div class="detail-header w-[16%]"><%= gettext("Match") %></div>
-          </div>
-          <.inputs_for :let={dtl} field={@form[:transaction_matchers]}>
-            <div class={"flex flex-row flex-wrap #{if(dtl[:delete].value == true, do: "hidden", else: "")}"}>
-              <.input type="hidden" field={dtl[:transaction_id]} />
-              <.input type="hidden" field={dtl[:all_matched_amount]} />
-              <.input type="hidden" field={dtl[:account_id]} />
-              <.input type="hidden" field={dtl[:entity]} />
-              <div class="w-[16%]"><.input readonly field={dtl[:doc_date]} tabindex={-1} /></div>
-              <div class="w-[17%]"><.input readonly field={dtl[:doc_type]} tabindex={-1} /></div>
-              <div class="w-[16%]"><.input readonly field={dtl[:doc_no]} tabindex={-1} /></div>
-              <div class="w-[16%]">
-                <.input readonly type="number" field={dtl[:amount]} tabindex={-1} />
-              </div>
-              <div class="w-[16%]">
-                <.input readonly type="number" field={dtl[:balance]} tabindex={-1} />
-              </div>
-              <div class="w-[16%]">
-                <.input type="number" phx-debounce="500" step="0.01" field={dtl[:match_amount]} />
-              </div>
-              <div class="w-[3%] mt-2.5 text-rose-500">
-                <.link phx-click={:delete_match_tran} phx-value-index={dtl.index} tabindex="-1">
-                  <.icon name="hero-trash-solid" class="h-5 w-5" />
-                </.link>
-                <%= Phoenix.HTML.Form.hidden_input(dtl, :delete) %>
-              </div>
-            </div>
-          </.inputs_for>
-          <div class="flex flex-row flex-wrap">
-            <div class="w-[81%] pt-2 pr-2 font-semibold text-right">Matched Total</div>
-            <div class="w-[16%] font-semi bold">
-              <.input
-                type="number"
-                readonly
-                field={@form[:matched_amount]}
-                tabindex={-1}
-                value={Ecto.Changeset.fetch_field!(@form.source, :matched_amount)}
-              />
-            </div>
-          </div>
-        </div>
-      </.form>
-    </div>
-
-    <div
-      id="query-match-trans"
-      class="active w-8/12 mx-auto text-center border bg-teal-200 mt-2 p-3 rounded-lg border-teal-400"
-    >
-      <.form
-        for={%{}}
-        id="query-match-trans-form"
-        phx-submit="get_trans"
-        autocomplete="off"
-        class="w-full"
-      >
-        Select Transactions from
-        <input
-          type="date"
-          id="query_from"
-          name="query[from]"
-          value={@query.from}
-          class="py-1 rounded-md border border-gray-300 bg-white shadow-sm focus:border-zinc-400 focus:ring-0"
-        /> to
-        <input
-          type="date"
-          id="query_to"
-          name="query[to]"
-          value={@query.to}
-          class="py-1 rounded-md border border-gray-300 bg-white shadow-sm focus:border-zinc-400 focus:ring-0"
+          klass="text-center border bg-green-100 mt-2 p-3 rounded-lg border-green-400"
+          form={@form}
+          current_company={@current_company}
+          current_user={@current_user}
         />
-        <.button><%= gettext("Query") %></.button>
       </.form>
-      <div
-        :if={Enum.count(@query_match_trans) == 0}
-        class="mt-2 p-4 border rounded-lg border-orange-600 bg-orange-200 text-center"
-      >
-        <%= gettext("No Data!") %>
-      </div>
 
-      <div
-        :if={Enum.count(@query_match_trans) > 0}
-        class="flex flex-row flex-wrap font-medium text-center mt-2 tracking-tighter"
-      >
-        <div class="detail-header w-[13%]"><%= gettext("Doc Date") %></div>
-        <div class="detail-header w-[13%]"><%= gettext("Doc Type") %></div>
-        <div class="detail-header w-[14%]"><%= gettext("Doc No") %></div>
-        <div class="detail-header w-[27%]"><%= gettext("Particulars") %></div>
-        <div class="detail-header w-[15%]"><%= gettext("Amount") %></div>
-        <div class="detail-header w-[15%]"><%= gettext("Balance") %></div>
-        <div class="w-[3%]"></div>
-      </div>
-      <%= for obj <- @query_match_trans do %>
-        <div class="flex flex-row flex-wrap">
-          <div class="max-h-8 w-[13%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
-            <%= obj.doc_date %>
-          </div>
-          <div class="max-h-8 w-[13%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
-            <%= obj.doc_type %>
-          </div>
-          <div class="max-h-8 w-[14%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
-            <%= obj.doc_no %>
-          </div>
-          <div class="max-h-8 w-[27%] border rounded bg-blue-200 border-blue-400 px-2 py-1 overflow-clip">
-            <%= obj.particulars %>
-          </div>
-          <div class="max-h-8 w-[15%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
-            <%= obj.amount |> Number.Delimit.number_to_delimited() %>
-          </div>
-          <div class="max-h-8 w-[15%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
-            <%= obj.balance |> Number.Delimit.number_to_delimited() %>
-          </div>
-          <div
-            :if={
-              !found_in_matched_trans?(@form.source, obj.transaction_id) and
-                Decimal.negative?(obj.balance) and obj.doc_no != @form.data.payment_no
-            }
-            class="w-[3%] text-green-500 cursor-pointer"
-          >
-            <.link phx-click={:add_match_tran} phx-value-trans-id={obj.transaction_id} tabindex="-1">
-              <.icon name="hero-plus-circle-solid" class="h-7 w-7" />
-            </.link>
-          </div>
-        </div>
-      <% end %>
+      <.live_component
+        module={FullCircleWeb.ReceiptLive.QryMatcherComponent}
+        id="query-match-trans"
+        klass="text-center border bg-green-100 mt-2 p-3 rounded-lg border-green-400"
+        query={@query}
+        query_match_trans={@query_match_trans}
+        form={@form}
+        doc_no_field={:payment_no}
+        current_company={@current_company}
+        current_user={@current_user}
+      />
     </div>
     """
   end

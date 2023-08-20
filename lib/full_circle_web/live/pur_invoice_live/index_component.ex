@@ -43,16 +43,15 @@ defmodule FullCircleWeb.PurInvoiceLive.IndexComponent do
       <div class="w-[9%] border-b border-gray-400 py-1">
         <%= @obj.due_date %>
       </div>
-      <div
-        :if={!@obj.old_data}
-        class="text-blue-600 w-[10%] border-b border-gray-400 py-1 hover:cursor-pointer"
-      >
-        <.link navigate={~p"/companies/#{@obj.company_id}/PurInvoice/#{@obj.id}/edit"}>
+      <div class="w-[10%] border-b border-gray-400 py-1">
+        <%= if @obj.old_data do %>
           <%= @obj.pur_invoice_no %>
-        </.link>
-      </div>
-      <div :if={@obj.old_data} class="w-[10%] border-b border-gray-400 py-1">
-        <%= @obj.pur_invoice_no %>
+        <% else %>
+          <.doc_link
+            current_company={@company}
+            doc_obj={%{doc_type: "PurInvoice", doc_id: @obj.id, doc_no: @obj.pur_invoice_no}}
+          />
+        <% end %>
       </div>
       <div class="w-[20%] border-b border-gray-400 py-1 overflow-clip">
         <%= @obj.contact_name %>

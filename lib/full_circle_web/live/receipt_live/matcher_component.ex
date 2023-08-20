@@ -29,9 +29,9 @@ defmodule FullCircleWeb.ReceiptLive.MatcherComponent do
           <.input type="hidden" field={dtl[:all_matched_amount]} />
           <.input type="hidden" field={dtl[:account_id]} />
           <.input type="hidden" field={dtl[:entity]} />
-          <div class="w-[16%]"><.input readonly field={dtl[:doc_date]} /></div>
-          <div class="w-[17%]"><.input readonly field={dtl[:doc_type]} /></div>
-          <div class="w-[16%]"><.input readonly field={dtl[:doc_no]} /></div>
+          <div class="w-[16%]"><.input readonly field={dtl[:t_doc_date]} /></div>
+          <div class="w-[17%]"><.input readonly field={dtl[:t_doc_type]} /></div>
+          <div class="w-[16%]"><.input readonly field={dtl[:t_doc_no]} /></div>
           <div class="w-[16%]"><.input readonly type="number" field={dtl[:amount]} /></div>
           <div class="w-[16%]">
             <.input readonly type="number" field={dtl[:balance]} />

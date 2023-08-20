@@ -131,7 +131,7 @@ defmodule FullCircleWeb.ReceiptLive.Form do
       match_tran
       |> Map.merge(%{
         account_id: match_tran.account_id,
-        entity: "Receipt",
+        doc_type: "Receipt",
         all_matched_amount: match_tran.all_matched_amount,
         balance: 0.00,
         match_amount: Decimal.negate(match_tran.balance) |> Decimal.round(2)
@@ -723,11 +723,12 @@ defmodule FullCircleWeb.ReceiptLive.Form do
 
       <.live_component
         module={FullCircleWeb.ReceiptLive.QryMatcherComponent}
-        id="match-trans"
+        id="query-match-trans"
         klass="hidden text-center border bg-green-100 mt-2 p-3 rounded-lg border-green-400"
         query={@query}
         query_match_trans={@query_match_trans}
         form={@form}
+        doc_no_field={:receipt_no}
         current_company={@current_company}
         current_user={@current_user}
       />

@@ -183,14 +183,7 @@ defmodule FullCircleWeb.TransactionLive.Account do
                 <%= if obj.old_data do %>
                   <%= obj.doc_no %>
                 <% else %>
-                  <.link
-                    class="text-blue-600 hover:font-bold"
-                    navigate={
-                      "/companies/#{@current_company.id}/#{obj.doc_type}/#{obj.doc_id}/edit"
-                    }
-                  >
-                    <%= obj.doc_no %>
-                  </.link>
+                  <.doc_link current_company={@current_company} doc_obj={obj} />
                 <% end %>
               </div>
               <div class="w-[12%] border rounded bg-blue-200 border-blue-400 px-2 py-1">

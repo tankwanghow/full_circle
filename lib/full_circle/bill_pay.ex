@@ -69,8 +69,8 @@ defmodule FullCircle.BillPay do
 
   defp matched_amount(id) do
     from mat in TransactionMatcher,
-      where: mat.entity == "Payment",
-      where: mat.entity_id == ^id,
+      where: mat.doc_type == "Payment",
+      where: mat.doc_id == ^id,
       select: sum(mat.match_amount)
   end
 
@@ -151,14 +151,14 @@ defmodule FullCircle.BillPay do
     from paymt in TransactionMatcher,
       join: txn in subquery(Accounting.transaction_with_balance_query(com, user)),
       on: txn.id == paymt.transaction_id,
-      where: paymt.entity == "Payment",
+      where: paymt.doc_type == "Payment",
       order_by: paymt._persistent_id,
       select: paymt,
       select_merge: %{
         transaction_id: txn.id,
-        doc_date: txn.doc_date,
-        doc_type: txn.doc_type,
-        doc_no: txn.doc_no,
+        t_doc_date: txn.doc_date,
+        t_doc_type: txn.doc_type,
+        t_doc_no: txn.doc_no,
         amount: txn.amount,
         all_matched_amount: txn.all_matched_amount - paymt.match_amount,
         particulars: txn.particulars,

@@ -17,9 +17,9 @@ defmodule FullCircle.ReceiveFund.Receipt do
     has_many :receipt_details, FullCircle.ReceiveFund.ReceiptDetail, on_replace: :delete
 
     has_many :transaction_matchers, FullCircle.Accounting.TransactionMatcher,
-      where: [entity: "Receipt"],
+      where: [doc_type: "Receipt"],
       on_replace: :delete,
-      foreign_key: :entity_id,
+      foreign_key: :doc_id,
       references: :id
 
     field :contact_name, :string, virtual: true

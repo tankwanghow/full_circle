@@ -246,7 +246,8 @@ defmodule FullCircle.Sys do
       on: c.id == cu.company_id,
       where: cu.user_id == ^user.id,
       where: cu.role != "disable",
-      where: c.id == ^company.id
+      where: c.id == ^company.id,
+      select: %{id: c.id}
     )
   end
 
