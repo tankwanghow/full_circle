@@ -166,9 +166,9 @@ defmodule FullCircleWeb.ReceiptLive.Print do
 
     ~H"""
     <div :if={@recd.__struct__ == Accounting.TransactionMatcher} class="matched">
-      <div class="date"><%= format_date(@recd.doc_date) %></div>
-      <div class="matchdoctype"><%= @recd.doc_type %></div>
-      <div class="docno"><%= @recd.doc_no %></div>
+      <div class="date"><%= format_date(@recd.t_doc_date) %></div>
+      <div class="matchdoctype"><%= @recd.t_doc_type %></div>
+      <div class="docno"><%= @recd.t_doc_no %></div>
       <div class="amount"><%= @recd.amount |> Number.Delimit.number_to_delimited() %></div>
       <div class="balance"><%= @recd.balance |> Number.Delimit.number_to_delimited() %></div>
       <div class="matchamt">

@@ -521,56 +521,6 @@ defmodule FullCircleWeb.ReceiptLive.Form do
           </div>
         </div>
 
-        <div class="flex justify-center gap-x-1 mt-1">
-          <.button disabled={!@form.source.valid?}><%= gettext("Save") %></.button>
-          <.link
-            :if={Enum.any?(@form.source.changes) and @live_action != :new}
-            navigate=""
-            class="orange_button"
-          >
-            <%= gettext("Cancel") %>
-          </.link>
-          <a onclick="history.back();" class="blue_button"><%= gettext("Back") %></a>
-          <.link
-            :if={@live_action == :edit}
-            navigate={~p"/companies/#{@current_company.id}/Receipt/new"}
-            class="blue_button"
-          >
-            <%= gettext("New") %>
-          </.link>
-          <.print_button
-            :if={@live_action != :new}
-            company={@current_company}
-            doc_type="Receipt"
-            doc_id={@id}
-            class="blue_button"
-          />
-          <.pre_print_button
-            :if={@live_action != :new}
-            company={@current_company}
-            doc_type="Receipt"
-            doc_id={@id}
-            class="blue_button"
-          />
-          <.live_component
-            :if={@live_action == :edit}
-            module={FullCircleWeb.LogLive.Component}
-            id={"log_#{@id}"}
-            show_log={false}
-            entity="receipts"
-            entity_id={@id}
-          />
-          <.live_component
-            :if={@live_action == :edit}
-            module={FullCircleWeb.JournalEntryViewLive.Component}
-            id={"journal_#{@id}"}
-            show_journal={false}
-            doc_type="Receipt"
-            doc_no={@form.data.receipt_no}
-            company_id={@current_company.id}
-          />
-        </div>
-
         <div class="flex flex-row gap-2 flex-nowrap w-2/3 mx-auto text-center mt-5">
           <div
             id="receipt-cheques-tab"
@@ -719,20 +669,69 @@ defmodule FullCircleWeb.ReceiptLive.Form do
           current_company={@current_company}
           current_user={@current_user}
         />
+        <div class="flex justify-center gap-x-1 mt-1">
+          <.button disabled={!@form.source.valid?}><%= gettext("Save") %></.button>
+          <.link
+            :if={Enum.any?(@form.source.changes) and @live_action != :new}
+            navigate=""
+            class="orange_button"
+          >
+            <%= gettext("Cancel") %>
+          </.link>
+          <a onclick="history.back();" class="blue_button"><%= gettext("Back") %></a>
+          <.link
+            :if={@live_action == :edit}
+            navigate={~p"/companies/#{@current_company.id}/Receipt/new"}
+            class="blue_button"
+          >
+            <%= gettext("New") %>
+          </.link>
+          <.print_button
+            :if={@live_action != :new}
+            company={@current_company}
+            doc_type="Receipt"
+            doc_id={@id}
+            class="blue_button"
+          />
+          <.pre_print_button
+            :if={@live_action != :new}
+            company={@current_company}
+            doc_type="Receipt"
+            doc_id={@id}
+            class="blue_button"
+          />
+          <.live_component
+            :if={@live_action == :edit}
+            module={FullCircleWeb.LogLive.Component}
+            id={"log_#{@id}"}
+            show_log={false}
+            entity="receipts"
+            entity_id={@id}
+          />
+          <.live_component
+            :if={@live_action == :edit}
+            module={FullCircleWeb.JournalEntryViewLive.Component}
+            id={"journal_#{@id}"}
+            show_journal={false}
+            doc_type="Receipt"
+            doc_no={@form.data.receipt_no}
+            company_id={@current_company.id}
+          />
+        </div>
       </.form>
-
-      <.live_component
+    </div>
+    <.live_component
         module={FullCircleWeb.ReceiptLive.QryMatcherComponent}
         id="query-match-trans"
         klass="hidden text-center border bg-green-100 mt-2 p-3 rounded-lg border-green-400"
         query={@query}
         query_match_trans={@query_match_trans}
         form={@form}
+        balance_ve="+ve"
         doc_no_field={:receipt_no}
         current_company={@current_company}
         current_user={@current_user}
       />
-    </div>
     """
   end
 end

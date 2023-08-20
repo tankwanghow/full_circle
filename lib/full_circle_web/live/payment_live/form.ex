@@ -112,7 +112,7 @@ defmodule FullCircleWeb.PaymentLive.Form do
       match_tran
       |> Map.merge(%{
         account_id: match_tran.account_id,
-        entity: "Payment",
+        doc_type: "Payment",
         all_matched_amount: match_tran.all_matched_amount,
         balance: 0.00,
         match_amount: Decimal.negate(match_tran.balance) |> Decimal.round(2)
@@ -428,6 +428,8 @@ defmodule FullCircleWeb.PaymentLive.Form do
       )
       |> Map.put(:action, socket.assigns.live_action)
 
+    IO.inspect changeset
+
     socket = assign(socket, form: to_form(changeset))
 
     {:noreply, socket}
@@ -488,56 +490,6 @@ defmodule FullCircleWeb.PaymentLive.Form do
               value={Ecto.Changeset.fetch_field!(@form.source, :payment_balance)}
             />
           </div>
-        </div>
-
-        <div class="flex justify-center gap-x-1 mt-1">
-          <.button disabled={!@form.source.valid?}><%= gettext("Save") %></.button>
-          <.link
-            :if={Enum.any?(@form.source.changes) and @live_action != :new}
-            navigate=""
-            class="orange_button"
-          >
-            <%= gettext("Cancel") %>
-          </.link>
-          <.link
-            :if={@live_action == :edit}
-            navigate={~p"/companies/#{@current_company.id}/Payment/new"}
-            class="blue_button"
-          >
-            <%= gettext("New") %>
-          </.link>
-          <a onclick="history.back();" class="blue_button"><%= gettext("Back") %></a>
-          <.print_button
-            :if={@live_action != :new}
-            company={@current_company}
-            doc_type="Payment"
-            doc_id={@id}
-            class="blue_button"
-          />
-          <.pre_print_button
-            :if={@live_action != :new}
-            company={@current_company}
-            doc_type="Payment"
-            doc_id={@id}
-            class="blue_button"
-          />
-          <.live_component
-            :if={@live_action == :edit}
-            module={FullCircleWeb.LogLive.Component}
-            id={"log_#{@id}"}
-            show_log={false}
-            entity="payments"
-            entity_id={@id}
-          />
-          <.live_component
-            :if={@live_action == :edit}
-            module={FullCircleWeb.JournalEntryViewLive.Component}
-            id={"journal_#{@id}"}
-            show_journal={false}
-            doc_type="Payment"
-            doc_no={@form.data.payment_no}
-            company_id={@current_company.id}
-          />
         </div>
 
         <div class="flex flex-row gap-2 flex-nowrap w-2/3 mx-auto text-center mt-5">
@@ -610,20 +562,70 @@ defmodule FullCircleWeb.PaymentLive.Form do
           current_company={@current_company}
           current_user={@current_user}
         />
-      </.form>
 
-      <.live_component
-        module={FullCircleWeb.ReceiptLive.QryMatcherComponent}
-        id="query-match-trans"
-        klass="text-center border bg-green-100 mt-2 p-3 rounded-lg border-green-400"
-        query={@query}
-        query_match_trans={@query_match_trans}
-        form={@form}
-        doc_no_field={:payment_no}
-        current_company={@current_company}
-        current_user={@current_user}
-      />
+        <div class="flex justify-center gap-x-1 mt-1">
+          <.button disabled={!@form.source.valid?}><%= gettext("Save") %></.button>
+          <.link
+            :if={Enum.any?(@form.source.changes) and @live_action != :new}
+            navigate=""
+            class="orange_button"
+          >
+            <%= gettext("Cancel") %>
+          </.link>
+          <.link
+            :if={@live_action == :edit}
+            navigate={~p"/companies/#{@current_company.id}/Payment/new"}
+            class="blue_button"
+          >
+            <%= gettext("New") %>
+          </.link>
+          <a onclick="history.back();" class="blue_button"><%= gettext("Back") %></a>
+          <.print_button
+            :if={@live_action != :new}
+            company={@current_company}
+            doc_type="Payment"
+            doc_id={@id}
+            class="blue_button"
+          />
+          <.pre_print_button
+            :if={@live_action != :new}
+            company={@current_company}
+            doc_type="Payment"
+            doc_id={@id}
+            class="blue_button"
+          />
+          <.live_component
+            :if={@live_action == :edit}
+            module={FullCircleWeb.LogLive.Component}
+            id={"log_#{@id}"}
+            show_log={false}
+            entity="payments"
+            entity_id={@id}
+          />
+          <.live_component
+            :if={@live_action == :edit}
+            module={FullCircleWeb.JournalEntryViewLive.Component}
+            id={"journal_#{@id}"}
+            show_journal={false}
+            doc_type="Payment"
+            doc_no={@form.data.payment_no}
+            company_id={@current_company.id}
+          />
+        </div>
+      </.form>
     </div>
+    <.live_component
+      module={FullCircleWeb.ReceiptLive.QryMatcherComponent}
+      id="query-match-trans"
+      klass="text-center border bg-green-100 mt-2 p-3 rounded-lg border-green-400"
+      query={@query}
+      query_match_trans={@query_match_trans}
+      form={@form}
+      balance_ve="-ve"
+      doc_no_field={:payment_no}
+      current_company={@current_company}
+      current_user={@current_user}
+    />
     """
   end
 end

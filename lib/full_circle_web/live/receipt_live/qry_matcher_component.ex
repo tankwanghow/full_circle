@@ -79,6 +79,7 @@ defmodule FullCircleWeb.ReceiptLive.QryMatcherComponent do
               <%= obj.t_doc_no %>
             <% else %>
               <.doc_link
+                target="_blank"
                 current_company={@current_company}
                 doc_obj={%{doc_id: obj.t_doc_id, doc_type: obj.t_doc_type, doc_no: obj.t_doc_no}}
               />
@@ -95,8 +96,21 @@ defmodule FullCircleWeb.ReceiptLive.QryMatcherComponent do
           </div>
           <div
             :if={
-              !found_in_matched_trans?(@form.source, obj.transaction_id) and
-                Decimal.positive?(obj.balance) and obj.t_doc_no != Map.fetch!(@form.data, :payment_no)
+              @balance_ve == "+ve" and
+                !found_in_matched_trans?(@form.source, obj.transaction_id) and
+                Decimal.positive?(obj.balance) and obj.t_doc_no != Map.fetch!(@form.data, @doc_no_field)
+            }
+            class="w-[3%] text-green-500 cursor-pointer"
+          >
+            <.link phx-click={:add_match_tran} phx-value-trans-id={obj.transaction_id} tabindex="-1">
+              <.icon name="hero-plus-circle-solid" class="h-7 w-7" />
+            </.link>
+          </div>
+          <div
+            :if={
+              @balance_ve == "-ve" and
+                !found_in_matched_trans?(@form.source, obj.transaction_id) and
+                Decimal.negative?(obj.balance) and obj.t_doc_no != Map.fetch!(@form.data, @doc_no_field)
             }
             class="w-[3%] text-green-500 cursor-pointer"
           >
