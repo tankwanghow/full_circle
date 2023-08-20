@@ -20,7 +20,7 @@ defmodule FullCircleWeb.InvoiceLive.Form do
      |> assign(
        settings:
          FullCircle.Sys.load_settings(
-           "invoices",
+           "Invoice",
            socket.assigns.current_company,
            socket.assigns.current_user
          )
@@ -264,7 +264,7 @@ defmodule FullCircleWeb.InvoiceLive.Form do
         {:noreply,
          socket
          |> push_navigate(
-           to: ~p"/companies/#{socket.assigns.current_company.id}/invoices/#{obj.id}/edit"
+           to: ~p"/companies/#{socket.assigns.current_company.id}/Invoice/#{obj.id}/edit"
          )
          |> put_flash(:info, "#{gettext("Invoice created successfully.")}")}
 
@@ -295,7 +295,7 @@ defmodule FullCircleWeb.InvoiceLive.Form do
         {:noreply,
          socket
          |> push_navigate(
-           to: ~p"/companies/#{socket.assigns.current_company.id}/invoices/#{obj.id}/edit"
+           to: ~p"/companies/#{socket.assigns.current_company.id}/Invoice/#{obj.id}/edit"
          )
          |> put_flash(:info, "#{gettext("Invoice updated successfully.")}")}
 
@@ -363,7 +363,7 @@ defmodule FullCircleWeb.InvoiceLive.Form do
           id="invoice_details"
           klass=""
           settings={@settings}
-          doc_name="invoices"
+          doc_name="Invoice"
           detail_name={:invoice_details}
           form={@form}
           taxcodetype="saltaxcode"
@@ -400,7 +400,7 @@ defmodule FullCircleWeb.InvoiceLive.Form do
           <a onclick="history.back();" class="blue_button"><%= gettext("Back") %></a>
           <.link
             :if={@live_action == :edit}
-            navigate={~p"/companies/#{@current_company.id}/invoices/new"}
+            navigate={~p"/companies/#{@current_company.id}/Invoice/new"}
             class="blue_button"
           >
             <%= gettext("New") %>
@@ -408,15 +408,15 @@ defmodule FullCircleWeb.InvoiceLive.Form do
           <.print_button
             :if={@live_action == :edit}
             company={@current_company}
-            entity="invoices"
-            entity_id={@id}
+            doc_type="Invoice"
+            doc_id={@id}
             class="gray_button"
           />
           <.pre_print_button
             :if={@live_action == :edit}
             company={@current_company}
-            entity="invoices"
-            entity_id={@id}
+            doc_type="Invoice"
+            doc_id={@id}
             class="gray_button"
           />
           <.live_component
@@ -432,7 +432,7 @@ defmodule FullCircleWeb.InvoiceLive.Form do
             module={FullCircleWeb.JournalEntryViewLive.Component}
             id={"journal_#{@id}"}
             show_journal={false}
-            doc_type="invoices"
+            doc_type="Invoice"
             doc_no={@form.data.invoice_no}
             company_id={@current_company.id}
           />

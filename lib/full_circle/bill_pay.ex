@@ -69,7 +69,7 @@ defmodule FullCircle.BillPay do
 
   defp matched_amount(id) do
     from mat in TransactionMatcher,
-      where: mat.entity == "payments",
+      where: mat.entity == "Payment",
       where: mat.entity_id == ^id,
       select: sum(mat.match_amount)
   end
@@ -151,7 +151,7 @@ defmodule FullCircle.BillPay do
     from paymt in TransactionMatcher,
       join: txn in subquery(Accounting.transaction_with_balance_query(com, user)),
       on: txn.id == paymt.transaction_id,
-      where: paymt.entity == "payments",
+      where: paymt.entity == "Payment",
       order_by: paymt._persistent_id,
       select: paymt,
       select_merge: %{
@@ -202,7 +202,7 @@ defmodule FullCircle.BillPay do
   defp payment_raw_query(company, user) do
     from txn in Transaction,
       join: com in subquery(Sys.user_company(company, user)),
-      on: com.id == txn.company_id and txn.doc_type == "payments",
+      on: com.id == txn.company_id and txn.doc_type == "Payment",
       left_join: pay in Payment,
       on: txn.doc_no == pay.payment_no,
       join: cont in Contact,
@@ -254,7 +254,7 @@ defmodule FullCircle.BillPay do
     payment_name = :create_payment
 
     multi
-    |> get_gapless_doc_id(gapless_name, "payments", "PV", com)
+    |> get_gapless_doc_id(gapless_name, "Payment", "PV", com)
     |> Multi.insert(
       payment_name,
       fn mty ->
@@ -288,7 +288,7 @@ defmodule FullCircle.BillPay do
 
           if !Decimal.eq?(x.good_amount, 0) do
             repo.insert!(%Transaction{
-              doc_type: "payments",
+              doc_type: "Payment",
               doc_no: payment.payment_no,
               doc_id: payment.id,
               doc_date: payment.payment_date,
@@ -306,7 +306,7 @@ defmodule FullCircle.BillPay do
 
           if !Decimal.eq?(x.tax_amount, 0) do
             repo.insert!(%Transaction{
-              doc_type: "payments",
+              doc_type: "Payment",
               doc_no: payment.payment_no,
               doc_id: payment.id,
               doc_date: payment.payment_date,
@@ -334,7 +334,7 @@ defmodule FullCircle.BillPay do
         end)
         |> Enum.each(fn x ->
           repo.insert!(%Transaction{
-            doc_type: "payments",
+            doc_type: "Payment",
             doc_no: payment.payment_no,
             doc_id: payment.id,
             doc_date: payment.payment_date,
@@ -350,7 +350,7 @@ defmodule FullCircle.BillPay do
 
       if Decimal.gt?(payment.funds_amount, 0) do
         repo.insert!(%Transaction{
-          doc_type: "payments",
+          doc_type: "Payment",
           doc_no: payment.payment_no,
           doc_id: payment.id,
           doc_date: payment.payment_date,
@@ -388,7 +388,7 @@ defmodule FullCircle.BillPay do
     |> Multi.delete_all(
       :delete_transaction,
       from(txn in Transaction,
-        where: txn.doc_type == "payments",
+        where: txn.doc_type == "Payment",
         where: txn.doc_no == ^payment.payment_no
       )
     )

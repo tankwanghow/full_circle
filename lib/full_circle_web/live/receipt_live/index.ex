@@ -39,7 +39,7 @@ defmodule FullCircleWeb.ReceiptLive.Index do
       </div>
       <div class="text-center mb-2">
         <.link
-          navigate={~p"/companies/#{@current_company.id}/receipts/new"}
+          navigate={~p"/companies/#{@current_company.id}/Receipt/new"}
           class="blue_button"
           id="new_object"
         >
@@ -48,7 +48,7 @@ defmodule FullCircleWeb.ReceiptLive.Index do
         <.link
           :if={@ids != ""}
           navigate={
-            ~p"/companies/#{@current_company.id}/receipts/print_multi?pre_print=false&ids=#{@ids}"
+            ~p"/companies/#{@current_company.id}/Receipt/print_multi?pre_print=false&ids=#{@ids}"
           }
           target="_blank"
           class="blue_button"
@@ -58,7 +58,7 @@ defmodule FullCircleWeb.ReceiptLive.Index do
         <.link
           :if={@ids != ""}
           navigate={
-            ~p"/companies/#{@current_company.id}/receipts/print_multi?pre_print=true&ids=#{@ids}"
+            ~p"/companies/#{@current_company.id}/Receipt/print_multi?pre_print=true&ids=#{@ids}"
           }
           target="_blank"
           class="blue_button"
@@ -201,7 +201,7 @@ defmodule FullCircleWeb.ReceiptLive.Index do
       "search[receipt_date]" => id
     }
 
-    url = "/companies/#{socket.assigns.current_company.id}/receipts?#{URI.encode_query(qry)}"
+    url = "/companies/#{socket.assigns.current_company.id}/Receipt?#{URI.encode_query(qry)}"
 
     {:noreply, socket |> push_patch(to: url)}
   end

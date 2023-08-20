@@ -22,10 +22,10 @@ defmodule FullCircle.Sys.UserSetting do
     |> validate_required([:page, :code, :values, :value, :company_user_id, :display_name])
   end
 
-  def default_settings("invoices", cuid) do
+  def default_settings("Invoice", cuid) do
     [
       %{
-        page: "invoices",
+        page: "Invoice",
         code: "goodamt-col",
         display_name: "Good Amount",
         values: %{"show" => "visible", "hide" => "hidden"},
@@ -33,7 +33,7 @@ defmodule FullCircle.Sys.UserSetting do
         company_user_id: cuid
       },
       %{
-        page: "invoices",
+        page: "Invoice",
         code: "taxamt-col",
         display_name: "Tax Amount",
         values: %{"show" => "visible", "hide" => "hidden"},
@@ -41,7 +41,7 @@ defmodule FullCircle.Sys.UserSetting do
         company_user_id: cuid
       },
       %{
-        page: "invoices",
+        page: "Invoice",
         code: "account-col",
         display_name: "Account",
         values: %{"show" => "visible", "hide" => "hidden"},
@@ -49,7 +49,7 @@ defmodule FullCircle.Sys.UserSetting do
         company_user_id: cuid
       },
       %{
-        page: "invoices",
+        page: "Invoice",
         code: "taxrate-col",
         display_name: "Tax Rate",
         values: %{"show" => "visible", "hide" => "hidden"},
@@ -57,7 +57,7 @@ defmodule FullCircle.Sys.UserSetting do
         company_user_id: cuid
       },
       %{
-        page: "invoices",
+        page: "Invoice",
         code: "discount-col",
         display_name: "Discount",
         values: %{"show" => "visible", "hide" => "hidden"},
@@ -67,10 +67,10 @@ defmodule FullCircle.Sys.UserSetting do
     ]
   end
 
-  def default_settings("payments", cuid) do
+  def default_settings("Payment", cuid) do
     [
       %{
-        page: "payments",
+        page: "Payment",
         code: "goodamt-col",
         display_name: "Good Amount",
         values: %{"show" => "visible", "hide" => "hidden"},
@@ -78,7 +78,7 @@ defmodule FullCircle.Sys.UserSetting do
         company_user_id: cuid
       },
       %{
-        page: "payments",
+        page: "Payment",
         code: "taxamt-col",
         display_name: "Tax Amount",
         values: %{"show" => "visible", "hide" => "hidden"},
@@ -86,7 +86,7 @@ defmodule FullCircle.Sys.UserSetting do
         company_user_id: cuid
       },
       %{
-        page: "payments",
+        page: "Payment",
         code: "account-col",
         display_name: "Account",
         values: %{"show" => "visible", "hide" => "hidden"},
@@ -94,7 +94,7 @@ defmodule FullCircle.Sys.UserSetting do
         company_user_id: cuid
       },
       %{
-        page: "payments",
+        page: "Payment",
         code: "taxrate-col",
         display_name: "Tax Rate",
         values: %{"show" => "visible", "hide" => "hidden"},
@@ -102,7 +102,7 @@ defmodule FullCircle.Sys.UserSetting do
         company_user_id: cuid
       },
       %{
-        page: "payments",
+        page: "Payment",
         code: "discount-col",
         display_name: "Discount",
         values: %{"show" => "visible", "hide" => "hidden"},
@@ -112,10 +112,10 @@ defmodule FullCircle.Sys.UserSetting do
     ]
   end
 
-  def default_settings("receipts", cuid) do
+  def default_settings("Receipt", cuid) do
     [
       %{
-        page: "receipts",
+        page: "Receipt",
         code: "goodamt-col",
         display_name: "Good Amount",
         values: %{"show" => "visible", "hide" => "hidden"},
@@ -123,7 +123,7 @@ defmodule FullCircle.Sys.UserSetting do
         company_user_id: cuid
       },
       %{
-        page: "receipts",
+        page: "Receipt",
         code: "taxamt-col",
         display_name: "Tax Amount",
         values: %{"show" => "visible", "hide" => "hidden"},
@@ -131,7 +131,7 @@ defmodule FullCircle.Sys.UserSetting do
         company_user_id: cuid
       },
       %{
-        page: "receipts",
+        page: "Receipt",
         code: "account-col",
         display_name: "Account",
         values: %{"show" => "visible", "hide" => "hidden"},
@@ -139,7 +139,7 @@ defmodule FullCircle.Sys.UserSetting do
         company_user_id: cuid
       },
       %{
-        page: "receipts",
+        page: "Receipt",
         code: "taxrate-col",
         display_name: "Tax Rate",
         values: %{"show" => "visible", "hide" => "hidden"},
@@ -147,7 +147,7 @@ defmodule FullCircle.Sys.UserSetting do
         company_user_id: cuid
       },
       %{
-        page: "receipts",
+        page: "Receipt",
         code: "discount-col",
         display_name: "Discount",
         values: %{"show" => "visible", "hide" => "hidden"},
@@ -157,10 +157,10 @@ defmodule FullCircle.Sys.UserSetting do
     ]
   end
 
-  def default_settings("pur_invoices", cuid) do
+  def default_settings("PurInvoice", cuid) do
     [
       %{
-        page: "pur_invoices",
+        page: "PurInvoice",
         code: "goodamt-col",
         display_name: "Good Amount",
         values: %{"show" => "visible", "hide" => "hidden"},
@@ -168,7 +168,7 @@ defmodule FullCircle.Sys.UserSetting do
         company_user_id: cuid
       },
       %{
-        page: "pur_invoices",
+        page: "PurInvoice",
         code: "taxamt-col",
         display_name: "Tax Amount",
         values: %{"show" => "visible", "hide" => "hidden"},
@@ -176,7 +176,7 @@ defmodule FullCircle.Sys.UserSetting do
         company_user_id: cuid
       },
       %{
-        page: "pur_invoices",
+        page: "PurInvoice",
         code: "account-col",
         display_name: "Account",
         values: %{"show" => "visible", "hide" => "hidden"},
@@ -184,7 +184,7 @@ defmodule FullCircle.Sys.UserSetting do
         company_user_id: cuid
       },
       %{
-        page: "pur_invoices",
+        page: "PurInvoice",
         code: "taxrate-col",
         display_name: "Tax Rate",
         values: %{"show" => "visible", "hide" => "hidden"},
@@ -192,7 +192,7 @@ defmodule FullCircle.Sys.UserSetting do
         company_user_id: cuid
       },
       %{
-        page: "pur_invoices",
+        page: "PurInvoice",
         code: "discount-col",
         display_name: "Discount",
         values: %{"show" => "visible", "hide" => "hidden"},

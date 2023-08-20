@@ -39,7 +39,7 @@ defmodule FullCircleWeb.PaymentLive.Index do
       </div>
       <div class="text-center mb-2">
         <.link
-          navigate={~p"/companies/#{@current_company.id}/payments/new"}
+          navigate={~p"/companies/#{@current_company.id}/Payment/new"}
           class="blue_button"
           id="new_object"
         >
@@ -48,7 +48,7 @@ defmodule FullCircleWeb.PaymentLive.Index do
         <.link
           :if={@ids != ""}
           navigate={
-            ~p"/companies/#{@current_company.id}/payments/print_multi?pre_print=false&ids=#{@ids}"
+            ~p"/companies/#{@current_company.id}/Payment/print_multi?pre_print=false&ids=#{@ids}"
           }
           target="_blank"
           class="blue_button"
@@ -58,7 +58,7 @@ defmodule FullCircleWeb.PaymentLive.Index do
         <.link
           :if={@ids != ""}
           navigate={
-            ~p"/companies/#{@current_company.id}/payments/print_multi?pre_print=true&ids=#{@ids}"
+            ~p"/companies/#{@current_company.id}/Payment/print_multi?pre_print=true&ids=#{@ids}"
           }
           target="_blank"
           class="blue_button"
@@ -201,7 +201,7 @@ defmodule FullCircleWeb.PaymentLive.Index do
       "search[payment_date]" => id
     }
 
-    url = "/companies/#{socket.assigns.current_company.id}/payments?#{URI.encode_query(qry)}"
+    url = "/companies/#{socket.assigns.current_company.id}/Payment?#{URI.encode_query(qry)}"
 
     {:noreply, socket |> push_patch(to: url)}
   end

@@ -87,6 +87,7 @@ defmodule FullCircle.Accounting do
           doc_date: txn.doc_date,
           doc_type: txn.doc_type,
           doc_no: txn.doc_no,
+          doc_id: txn.doc_id,
           amount: txn.amount,
           particulars: txn.particulars,
           all_matched_amount: txn.all_matched_amount,
@@ -114,6 +115,7 @@ defmodule FullCircle.Accounting do
         doc_date: txn.doc_date,
         doc_type: txn.doc_type,
         doc_no: txn.doc_no,
+        doc_id: txn.doc_id,
         old_data: txn.old_data,
         amount:
           fragment(

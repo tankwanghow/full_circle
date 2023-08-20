@@ -214,8 +214,11 @@ defmodule FullCircleWeb.SeedLive.Index do
     File.stream!(path)
     |> NimbleCSV.RFC4180.parse_stream(skip_headers: false)
     |> Stream.transform(nil, fn
-      headers, nil -> {[], headers}
-      row, headers -> {[Enum.zip(headers, row) |> Map.new()], headers}
+      headers, nil ->
+        {[], headers}
+
+      row, headers ->
+        {[Enum.zip(headers, row) |> Map.new(fn {k, v} -> {k, String.trim(v)} end)], headers}
     end)
     |> Enum.to_list()
   end

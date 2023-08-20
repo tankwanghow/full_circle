@@ -89,7 +89,7 @@ defmodule FullCircle.Seeding do
       where: txn.company_id == ^comid,
       where: txn.old_data == true,
       where: txn.closed == true,
-      where: txn.doc_type == "journals",
+      where: txn.doc_type == "Journal",
       where: ilike(txn.particulars, "Balance B/F%"),
       group_by: [txn.id],
       having: txn.doc_date == min(txn.doc_date)
@@ -125,7 +125,8 @@ defmodule FullCircle.Seeding do
       n_doc_type: Map.fetch!(attr, "n_doc_type"),
       n_doc_id: Map.fetch!(attr, "n_doc_id"),
       match_amount: Map.fetch!(attr, "m_amount"),
-      transaction_id: txn_id
+      transaction_id: txn_id,
+      contact_name: name
     }
 
     {FullCircle.StdInterface.changeset(
@@ -306,7 +307,7 @@ defmodule FullCircle.Seeding do
         "old_data" => "true",
         "closed" => "true",
         "doc_no" => FullCircle.Helpers.gen_temp_id(10),
-        "doc_type" => "journals"
+        "doc_type" => "Journal"
       })
 
     {ac, ct} =
@@ -377,28 +378,28 @@ defmodule FullCircle.Seeding do
 
       ac =
         case doc_type do
-          "invocies" ->
+          "Invoice" ->
             ac_rec
 
-          "pur_invocies" ->
+          "PurInvoice" ->
             ac_pay
 
-          "payments" ->
+          "Payment" ->
             ac_pay
 
-          "receipts" ->
+          "Receipt" ->
             ac_rec
 
-          "credit_notes" ->
+          "CreditNote" ->
             ac_rec
 
-          "debit_notes" ->
+          "DebitNote" ->
             ac_pay
 
-          "return_cheques" ->
+          "ReturnCheque" ->
             ac_rec
 
-          "journals" ->
+          "Journal" ->
             if Map.fetch!(attr, "amount") |> Decimal.new() |> Decimal.to_float() > 0 do
               ac_rec
             else

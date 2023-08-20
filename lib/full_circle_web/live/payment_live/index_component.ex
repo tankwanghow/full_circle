@@ -44,7 +44,7 @@ defmodule FullCircleWeb.PaymentLive.IndexComponent do
         :if={!@obj.old_data}
         class="text-blue-600 w-[10%] border-b border-gray-400 py-1 hover:cursor-pointer"
       >
-        <.link navigate={~p"/companies/#{@obj.company_id}/payments/#{@obj.id}/edit"}>
+        <.link navigate={~p"/companies/#{@obj.company_id}/Payment/#{@obj.id}/edit"}>
           <%= @obj.payment_no %>
         </.link>
       </div>

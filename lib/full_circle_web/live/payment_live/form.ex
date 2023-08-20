@@ -24,7 +24,7 @@ defmodule FullCircleWeb.PaymentLive.Form do
      |> assign(
        settings:
          FullCircle.Sys.load_settings(
-           "payments",
+           "Payment",
            socket.assigns.current_company,
            socket.assigns.current_user
          )
@@ -112,7 +112,7 @@ defmodule FullCircleWeb.PaymentLive.Form do
       match_tran
       |> Map.merge(%{
         account_id: match_tran.account_id,
-        entity: "payments",
+        entity: "Payment",
         all_matched_amount: match_tran.all_matched_amount,
         balance: 0.00,
         match_amount: Decimal.negate(match_tran.balance) |> Decimal.round(2)
@@ -365,7 +365,7 @@ defmodule FullCircleWeb.PaymentLive.Form do
         {:noreply,
          socket
          |> push_navigate(
-           to: ~p"/companies/#{socket.assigns.current_company.id}/payments/#{obj.id}/edit"
+           to: ~p"/companies/#{socket.assigns.current_company.id}/Payment/#{obj.id}/edit"
          )
          |> put_flash(:info, gettext("Payment created successfully."))}
 
@@ -396,7 +396,7 @@ defmodule FullCircleWeb.PaymentLive.Form do
         {:noreply,
          socket
          |> push_navigate(
-           to: ~p"/companies/#{socket.assigns.current_company.id}/payments/#{obj.id}/edit"
+           to: ~p"/companies/#{socket.assigns.current_company.id}/Payment/#{obj.id}/edit"
          )
          |> put_flash(:info, gettext("Payment updated successfully."))}
 
@@ -505,19 +505,26 @@ defmodule FullCircleWeb.PaymentLive.Form do
           >
             <%= gettext("Cancel") %>
           </.link>
+          <.link
+            :if={@live_action == :edit}
+            navigate={~p"/companies/#{@current_company.id}/Payment/new"}
+            class="blue_button"
+          >
+            <%= gettext("New") %>
+          </.link>
           <a onclick="history.back();" class="blue_button"><%= gettext("Back") %></a>
           <.print_button
             :if={@live_action != :new}
             company={@current_company}
-            entity="payments"
-            entity_id={@id}
+            doc_type="Payment"
+            doc_id={@id}
             class="blue_button"
           />
           <.pre_print_button
             :if={@live_action != :new}
             company={@current_company}
-            entity="payments"
-            entity_id={@id}
+            doc_type="Payment"
+            doc_id={@id}
             class="blue_button"
           />
           <.live_component
@@ -533,7 +540,7 @@ defmodule FullCircleWeb.PaymentLive.Form do
             module={FullCircleWeb.JournalEntryViewLive.Component}
             id={"journal_#{@id}"}
             show_journal={false}
-            doc_type="payments"
+            doc_type="Payment"
             doc_no={@form.data.payment_no}
             company_id={@current_company.id}
           />
@@ -590,7 +597,7 @@ defmodule FullCircleWeb.PaymentLive.Form do
           id="payment-details"
           klass="hidden text-center border bg-purple-100 mt-2 p-3 rounded-lg border-purple-400"
           settings={@settings}
-          doc_name="payments"
+          doc_name="Payment"
           detail_name={:payment_details}
           form={@form}
           taxcodetype="saltaxcode"

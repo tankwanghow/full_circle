@@ -25,19 +25,19 @@ defmodule FullCircleWeb.DashboardLive do
         <.link navigate={~p"/companies/#{@current_company.id}/goods"} class="nav-btn">
           <%= gettext("Goods") %>
         </.link>
-        <.link navigate={~p"/companies/#{@current_company.id}/invoices"} class="nav-btn">
+        <.link navigate={~p"/companies/#{@current_company.id}/Invoice"} class="nav-btn">
           <%= gettext("Invoices") %>
         </.link>
 
-        <.link navigate={~p"/companies/#{@current_company.id}/receipts"} class="nav-btn">
+        <.link navigate={~p"/companies/#{@current_company.id}/Receipt"} class="nav-btn">
           <%= gettext("Receipts") %>
         </.link>
 
-        <.link navigate={~p"/companies/#{@current_company.id}/payments"} class="nav-btn">
+        <.link navigate={~p"/companies/#{@current_company.id}/Payment"} class="nav-btn">
           <%= gettext("Payments") %>
         </.link>
 
-        <.link navigate={~p"/companies/#{@current_company.id}/pur_invoices"} class="nav-btn">
+        <.link navigate={~p"/companies/#{@current_company.id}/PurInvoice"} class="nav-btn">
           <%= gettext("Purchase Invoices") %>
         </.link>
         <.link navigate={~p"/companies/#{@current_company.id}/account_transactions"} class="nav-btn">

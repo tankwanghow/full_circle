@@ -72,7 +72,7 @@ defmodule FullCircle.ReceiveFund do
 
   defp matched_amount(id) do
     from mat in TransactionMatcher,
-      where: mat.entity == "receipts",
+      where: mat.entity == "Receipt",
       where: mat.entity_id == ^id,
       select: sum(mat.match_amount)
   end
@@ -160,7 +160,7 @@ defmodule FullCircle.ReceiveFund do
     from recmt in TransactionMatcher,
       join: txn in subquery(Accounting.transaction_with_balance_query(com, user)),
       on: txn.id == recmt.transaction_id,
-      where: recmt.entity == "receipts",
+      where: recmt.entity == "Receipt",
       order_by: recmt._persistent_id,
       select: recmt,
       select_merge: %{
@@ -211,7 +211,7 @@ defmodule FullCircle.ReceiveFund do
   defp receipt_raw_query(company, user) do
     from txn in Transaction,
       join: com in subquery(Sys.user_company(company, user)),
-      on: com.id == txn.company_id and txn.doc_type == "receipts",
+      on: com.id == txn.company_id and txn.doc_type == "Receipt",
       left_join: rec in Receipt,
       on: txn.doc_no == rec.receipt_no,
       join: cont in Contact,
@@ -263,7 +263,7 @@ defmodule FullCircle.ReceiveFund do
     receipt_name = :create_receipt
 
     multi
-    |> get_gapless_doc_id(gapless_name, "receipts", "RC", com)
+    |> get_gapless_doc_id(gapless_name, "Receipt", "RC", com)
     |> Multi.insert(
       receipt_name,
       fn mty ->
@@ -300,7 +300,7 @@ defmodule FullCircle.ReceiveFund do
 
           if !Decimal.eq?(x.good_amount, 0) do
             repo.insert!(%Transaction{
-              doc_type: "receipts",
+              doc_type: "Receipt",
               doc_no: receipt.receipt_no,
               doc_id: receipt.id,
               doc_date: receipt.receipt_date,
@@ -318,7 +318,7 @@ defmodule FullCircle.ReceiveFund do
 
           if !Decimal.eq?(x.tax_amount, 0) do
             repo.insert!(%Transaction{
-              doc_type: "receipts",
+              doc_type: "Receipt",
               doc_no: receipt.receipt_no,
               doc_id: receipt.id,
               doc_date: receipt.receipt_date,
@@ -346,7 +346,7 @@ defmodule FullCircle.ReceiveFund do
         end)
         |> Enum.each(fn x ->
           repo.insert!(%Transaction{
-            doc_type: "receipts",
+            doc_type: "Receipt",
             doc_no: receipt.receipt_no,
             doc_id: receipt.id,
             doc_date: receipt.receipt_date,
@@ -362,7 +362,7 @@ defmodule FullCircle.ReceiveFund do
 
       if Decimal.gt?(receipt.funds_amount, 0) do
         repo.insert!(%Transaction{
-          doc_type: "receipts",
+          doc_type: "Receipt",
           doc_no: receipt.receipt_no,
           doc_id: receipt.id,
           doc_date: receipt.receipt_date,
@@ -376,7 +376,7 @@ defmodule FullCircle.ReceiveFund do
       if receipt.received_cheques != Ecto.Association.NotLoaded do
         Enum.each(receipt.received_cheques, fn x ->
           repo.insert!(%Transaction{
-            doc_type: "receipts",
+            doc_type: "Receipt",
             doc_no: receipt.receipt_no,
             doc_id: receipt.id,
             doc_date: receipt.receipt_date,
@@ -415,7 +415,7 @@ defmodule FullCircle.ReceiveFund do
     |> Multi.delete_all(
       :delete_transaction,
       from(txn in Transaction,
-        where: txn.doc_type == "receipts",
+        where: txn.doc_type == "Receipt",
         where: txn.doc_no == ^receipt.receipt_no
       )
     )

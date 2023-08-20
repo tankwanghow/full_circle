@@ -19,6 +19,8 @@ defmodule FullCircle.Accounting.TransactionMatcher do
     field :balance, :decimal, virtual: true
     field :particulars, :string, virtual: true
     field :all_matched_amount, :decimal, virtual: true
+    field :doc_id, :string, virtual: true
+    field :old_data, :boolean, virtual: true
   end
 
   @doc false

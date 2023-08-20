@@ -24,7 +24,7 @@ defmodule FullCircleWeb.ReceiptLive.Form do
      |> assign(
        settings:
          FullCircle.Sys.load_settings(
-           "receipts",
+           "Receipt",
            socket.assigns.current_company,
            socket.assigns.current_user
          )
@@ -131,7 +131,7 @@ defmodule FullCircleWeb.ReceiptLive.Form do
       match_tran
       |> Map.merge(%{
         account_id: match_tran.account_id,
-        entity: "receipts",
+        entity: "Receipt",
         all_matched_amount: match_tran.all_matched_amount,
         balance: 0.00,
         match_amount: Decimal.negate(match_tran.balance) |> Decimal.round(2)
@@ -384,7 +384,7 @@ defmodule FullCircleWeb.ReceiptLive.Form do
         {:noreply,
          socket
          |> push_navigate(
-           to: ~p"/companies/#{socket.assigns.current_company.id}/receipts/#{obj.id}/edit"
+           to: ~p"/companies/#{socket.assigns.current_company.id}/Receipt/#{obj.id}/edit"
          )
          |> put_flash(:info, gettext("Receipt created successfully."))}
 
@@ -415,7 +415,7 @@ defmodule FullCircleWeb.ReceiptLive.Form do
         {:noreply,
          socket
          |> push_navigate(
-           to: ~p"/companies/#{socket.assigns.current_company.id}/receipts/#{obj.id}/edit"
+           to: ~p"/companies/#{socket.assigns.current_company.id}/Receipt/#{obj.id}/edit"
          )
          |> put_flash(:info, gettext("Receipt updated successfully."))}
 
@@ -531,18 +531,25 @@ defmodule FullCircleWeb.ReceiptLive.Form do
             <%= gettext("Cancel") %>
           </.link>
           <a onclick="history.back();" class="blue_button"><%= gettext("Back") %></a>
+          <.link
+            :if={@live_action == :edit}
+            navigate={~p"/companies/#{@current_company.id}/Receipt/new"}
+            class="blue_button"
+          >
+            <%= gettext("New") %>
+          </.link>
           <.print_button
             :if={@live_action != :new}
             company={@current_company}
-            entity="receipts"
-            entity_id={@id}
+            doc_type="Receipt"
+            doc_id={@id}
             class="blue_button"
           />
           <.pre_print_button
             :if={@live_action != :new}
             company={@current_company}
-            entity="receipts"
-            entity_id={@id}
+            doc_type="Receipt"
+            doc_id={@id}
             class="blue_button"
           />
           <.live_component
@@ -558,7 +565,7 @@ defmodule FullCircleWeb.ReceiptLive.Form do
             module={FullCircleWeb.JournalEntryViewLive.Component}
             id={"journal_#{@id}"}
             show_journal={false}
-            doc_type="receipts"
+            doc_type="Receipt"
             doc_no={@form.data.receipt_no}
             company_id={@current_company.id}
           />
@@ -693,7 +700,7 @@ defmodule FullCircleWeb.ReceiptLive.Form do
           id="receipt-details"
           klass="hidden text-center border bg-purple-100 mt-2 p-3 rounded-lg border-purple-400"
           settings={@settings}
-          doc_name="receipts"
+          doc_name="Receipt"
           detail_name={:receipt_details}
           form={@form}
           taxcodetype="saltaxcode"

@@ -16,7 +16,7 @@ defmodule FullCircle.BillPay.Payment do
     has_many :payment_details, FullCircle.BillPay.PaymentDetail, on_replace: :delete
 
     has_many :transaction_matchers, FullCircle.Accounting.TransactionMatcher,
-      where: [entity: "payments"],
+      where: [entity: "Payment"],
       on_replace: :delete,
       foreign_key: :entity_id,
       references: :id

@@ -58,7 +58,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Index do
       </div>
       <div class="text-center mb-2">
         <.link
-          navigate={~p"/companies/#{@current_company.id}/pur_invoices/new"}
+          navigate={~p"/companies/#{@current_company.id}/PurInvoice/new"}
           class="blue_button"
           id="new_purinvoice"
         >
@@ -225,7 +225,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Index do
       "search[due_date]" => dd
     }
 
-    url = "/companies/#{socket.assigns.current_company.id}/pur_invoices?#{URI.encode_query(qry)}"
+    url = "/companies/#{socket.assigns.current_company.id}/PurInvoice?#{URI.encode_query(qry)}"
 
     {:noreply, socket |> push_patch(to: url)}
   end

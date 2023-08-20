@@ -20,7 +20,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
      |> assign(
        settings:
          FullCircle.Sys.load_settings(
-           "pur_invoices",
+           "PurInvoice",
            socket.assigns.current_company,
            socket.assigns.current_user
          )
@@ -274,7 +274,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
         {:noreply,
          socket
          |> push_navigate(
-           to: ~p"/companies/#{socket.assigns.current_company.id}/pur_invoices/#{obj.id}/edit"
+           to: ~p"/companies/#{socket.assigns.current_company.id}/PurInvoice/#{obj.id}/edit"
          )
          |> put_flash(:info, "#{gettext("Purchase Invoice created successfully.")}")}
 
@@ -305,7 +305,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
         {:noreply,
          socket
          |> push_navigate(
-           to: ~p"/companies/#{socket.assigns.current_company.id}/pur_invoices/#{obj.id}/edit"
+           to: ~p"/companies/#{socket.assigns.current_company.id}/PurInvoice/#{obj.id}/edit"
          )
          |> put_flash(:info, "#{gettext("Purchase Invoice updated successfully.")}")}
 
@@ -375,7 +375,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
           id="pur_invoice_details"
           klass=""
           settings={@settings}
-          doc_name="pur_invoices"
+          doc_name="PurInvoice"
           detail_name={:pur_invoice_details}
           form={@form}
           doc_good_amount={:pur_invoice_good_amount}
@@ -413,7 +413,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
           </.link>
           <.link
             :if={@live_action == :edit}
-            navigate={~p"/companies/#{@current_company.id}/pur_invoices/new"}
+            navigate={~p"/companies/#{@current_company.id}/PurInvoice/new"}
             class="blue_button"
           >
             <%= gettext("New") %>
@@ -431,7 +431,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
             module={FullCircleWeb.JournalEntryViewLive.Component}
             id={"journal_#{@id}"}
             show_journal={false}
-            doc_type="pur_invoices"
+            doc_type="PurInvoice"
             doc_no={@form.data.pur_invoice_no}
             company_id={@current_company.id}
           />

@@ -58,7 +58,7 @@ defmodule FullCircleWeb.InvoiceLive.Index do
       </div>
       <div class="text-center mb-2">
         <.link
-          navigate={~p"/companies/#{@current_company.id}/invoices/new"}
+          navigate={~p"/companies/#{@current_company.id}/Invoice/new"}
           class="blue_button"
           id="new_invoice"
         >
@@ -67,7 +67,7 @@ defmodule FullCircleWeb.InvoiceLive.Index do
         <.link
           :if={@ids != ""}
           navigate={
-            ~p"/companies/#{@current_company.id}/invoices/print_multi?pre_print=false&ids=#{@ids}"
+            ~p"/companies/#{@current_company.id}/Invoice/print_multi?pre_print=false&ids=#{@ids}"
           }
           target="_blank"
           class="blue_button"
@@ -77,7 +77,7 @@ defmodule FullCircleWeb.InvoiceLive.Index do
         <.link
           :if={@ids != ""}
           navigate={
-            ~p"/companies/#{@current_company.id}/invoices/print_multi?pre_print=true&ids=#{@ids}"
+            ~p"/companies/#{@current_company.id}/Invoice/print_multi?pre_print=true&ids=#{@ids}"
           }
           target="_blank"
           class="blue_button"
@@ -239,7 +239,7 @@ defmodule FullCircleWeb.InvoiceLive.Index do
       "search[due_date]" => dd
     }
 
-    url = "/companies/#{socket.assigns.current_company.id}/invoices?#{URI.encode_query(qry)}"
+    url = "/companies/#{socket.assigns.current_company.id}/Invoice?#{URI.encode_query(qry)}"
 
     {:noreply, socket |> push_patch(to: url)}
   end

@@ -18,7 +18,7 @@ defmodule FullCircle.Billing.PurInvoice do
     has_many :pur_invoice_details, FullCircle.Billing.PurInvoiceDetail, on_replace: :delete
 
     has_many :transaction_matchers, FullCircle.Accounting.TransactionMatcher,
-      where: [entity: "pur_invoices"],
+      where: [entity: "PurInvoice"],
       on_replace: :delete,
       foreign_key: :entity_id,
       references: :id

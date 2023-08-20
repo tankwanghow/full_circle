@@ -82,14 +82,14 @@ defmodule FullCircleWeb.ReceiptLive.QryMatcherComponent do
               <%= if obj.old_data do %>
                 <%= obj.doc_no %>
               <% else %>
-                <.live_component
-                  module={FullCircleWeb.EntityFormLive.Component}
-                  id={obj.transaction_id}
-                  entity={obj.doc_type}
-                  doc_no={obj.doc_no}
-                  current_company={@current_company}
-                  current_user={@current_user}
-                />
+                <.link
+                  class="text-blue-600 hover:font-bold"
+                  navigate={
+                      "/companies/#{@current_company.id}/#{obj.doc_type}/#{obj.doc_id}/edit"
+                    }
+                >
+                  <%= obj.doc_no %>
+                </.link>
               <% end %>
             </div>
             <div class="max-h-8 w-[27%] border rounded bg-blue-200 border-blue-400 px-2 py-1 overflow-clip">

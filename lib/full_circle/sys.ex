@@ -14,62 +14,62 @@ defmodule FullCircle.Sys do
   def default_gapless_doc(company_id) do
     [
       %{
-        doc_type: "invoices",
+        doc_type: "Invoice",
         current: 0,
         company_id: company_id
       },
       %{
-        doc_type: "pur_invoices",
+        doc_type: "PurInvoice",
         current: 0,
         company_id: company_id
       },
       %{
-        doc_type: "journals",
+        doc_type: "Journal",
         current: 0,
         company_id: company_id
       },
       %{
-        doc_type: "debit_notes",
+        doc_type: "DebitNote",
         current: 0,
         company_id: company_id
       },
       %{
-        doc_type: "credit_notes",
+        doc_type: "CreditNote",
         current: 0,
         company_id: company_id
       },
       %{
-        doc_type: "deposits",
+        doc_type: "Deposit",
         current: 0,
         company_id: company_id
       },
       %{
-        doc_type: "withdrawals",
+        doc_type: "Withdrawals",
         current: 0,
         company_id: company_id
       },
       %{
-        doc_type: "return_cheques",
+        doc_type: "ReturnCheque",
         current: 0,
         company_id: company_id
       },
       %{
-        doc_type: "payments",
+        doc_type: "Payment",
         current: 0,
         company_id: company_id
       },
       %{
-        doc_type: "payslips",
+        doc_type: "PaySlip",
         current: 0,
         company_id: company_id
       },
       %{
-        doc_type: "salary_notes",
+        doc_type: "SalaryNote",
         current: 0,
         company_id: company_id
       },
       %{
-        doc_type: "receipts",
+        doc_type: "Receipt",
         current: 0,
         company_id: company_id
       }

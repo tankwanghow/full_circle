@@ -216,7 +216,7 @@ defmodule FullCircle.Billing do
       on: com.id == inv.company_id,
       left_join: txn in Transaction,
       on: com.id == txn.company_id,
-      on: txn.doc_type == "invoices",
+      on: txn.doc_type == "Invoice",
       on: txn.doc_no == inv.invoice_no,
       on: txn.contact_id == cont.id,
       left_join: stxm in SeedTransactionMatcher,
@@ -252,7 +252,7 @@ defmodule FullCircle.Billing do
   defp invoice_old_transactions(company, user) do
     from txn in Transaction,
       join: com in subquery(Sys.user_company(company, user)),
-      on: com.id == txn.company_id and txn.doc_type == "invoices",
+      on: com.id == txn.company_id and txn.doc_type == "Invoice",
       join: cont in Contact,
       on: cont.id == txn.contact_id,
       left_join: stxm in SeedTransactionMatcher,
@@ -295,7 +295,7 @@ defmodule FullCircle.Billing do
     invoice_name = :create_invoice
 
     multi
-    |> get_gapless_doc_id(gapless_name, "invoices", "INV", com)
+    |> get_gapless_doc_id(gapless_name, "Invoice", "INV", com)
     |> Multi.insert(
       invoice_name,
       fn mty ->
@@ -325,7 +325,7 @@ defmodule FullCircle.Billing do
 
         if !Decimal.eq?(x.good_amount, 0) do
           repo.insert!(%Transaction{
-            doc_type: "invoices",
+            doc_type: "Invoice",
             doc_no: invoice.invoice_no,
             doc_id: invoice.id,
             doc_date: invoice.invoice_date,
@@ -343,7 +343,7 @@ defmodule FullCircle.Billing do
 
         if !Decimal.eq?(x.tax_amount, 0) do
           repo.insert!(%Transaction{
-            doc_type: "invoices",
+            doc_type: "Invoice",
             doc_no: invoice.invoice_no,
             doc_id: invoice.id,
             doc_date: invoice.invoice_date,
@@ -361,7 +361,7 @@ defmodule FullCircle.Billing do
           |> Enum.join(", ")
 
         repo.insert!(%Transaction{
-          doc_type: "invoices",
+          doc_type: "Invoice",
           doc_no: invoice.invoice_no,
           doc_id: invoice.id,
           doc_date: invoice.invoice_date,
@@ -401,7 +401,7 @@ defmodule FullCircle.Billing do
     |> Multi.delete_all(
       :delete_transaction,
       from(txn in Transaction,
-        where: txn.doc_type == "invoices",
+        where: txn.doc_type == "Invoice",
         where: txn.doc_no == ^invoice.invoice_no
       )
     )
@@ -578,7 +578,7 @@ defmodule FullCircle.Billing do
       on: com.id == inv.company_id,
       left_join: txn in Transaction,
       on: com.id == txn.company_id,
-      on: txn.doc_type == "pur_invoices",
+      on: txn.doc_type == "PurInvoice",
       on: txn.doc_no == inv.pur_invoice_no,
       on: txn.contact_id == cont.id,
       left_join: stxm in SeedTransactionMatcher,
@@ -614,7 +614,7 @@ defmodule FullCircle.Billing do
   defp pur_invoice_old_transactions(company, user) do
     from txn in Transaction,
       join: com in subquery(Sys.user_company(company, user)),
-      on: com.id == txn.company_id and txn.doc_type == "pur_invoices",
+      on: com.id == txn.company_id and txn.doc_type == "PurInvoice",
       join: cont in Contact,
       on: cont.id == txn.contact_id,
       left_join: stxm in SeedTransactionMatcher,
@@ -657,7 +657,7 @@ defmodule FullCircle.Billing do
     pur_invoice_name = :create_pur_invoice
 
     multi
-    |> get_gapless_doc_id(gapless_name, "pur_invoices", "PINV", com)
+    |> get_gapless_doc_id(gapless_name, "PurInvoice", "PINV", com)
     |> Multi.insert(
       pur_invoice_name,
       fn mty ->
@@ -693,7 +693,7 @@ defmodule FullCircle.Billing do
 
         if !Decimal.eq?(x.good_amount, 0) do
           repo.insert!(%Transaction{
-            doc_type: "pur_invoices",
+            doc_type: "PurInvoice",
             doc_no: pur_invoice.pur_invoice_no,
             doc_id: pur_invoice.id,
             doc_date: pur_invoice.pur_invoice_date,
@@ -711,7 +711,7 @@ defmodule FullCircle.Billing do
 
         if !Decimal.eq?(x.tax_amount, 0) do
           repo.insert!(%Transaction{
-            doc_type: "pur_invoices",
+            doc_type: "PurInvoice",
             doc_no: pur_invoice.pur_invoice_no,
             doc_id: pur_invoice.id,
             doc_date: pur_invoice.pur_invoice_date,
@@ -729,7 +729,7 @@ defmodule FullCircle.Billing do
           |> Enum.join(", ")
 
         repo.insert!(%Transaction{
-          doc_type: "pur_invoices",
+          doc_type: "PurInvoice",
           doc_no: pur_invoice.pur_invoice_no,
           doc_id: pur_invoice.id,
           doc_date: pur_invoice.pur_invoice_date,
@@ -769,7 +769,7 @@ defmodule FullCircle.Billing do
     |> Multi.delete_all(
       :delete_transaction,
       from(txn in Transaction,
-        where: txn.doc_type == "pur_invoices",
+        where: txn.doc_type == "PurInvoice",
         where: txn.doc_no == ^pur_invoice.pur_invoice_no
       )
     )

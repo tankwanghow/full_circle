@@ -831,8 +831,8 @@ defmodule FullCircleWeb.CoreComponents do
     )
   end
 
-  attr :entity, :string
-  attr :entity_id, :string
+  attr :doc_type, :string
+  attr :doc_id, :string
   attr :company, :any
 
   attr :class, :string,
@@ -842,7 +842,7 @@ defmodule FullCircleWeb.CoreComponents do
     ~H"""
     <.link
       target="_blank"
-      navigate={"/companies/#{@company.id}/#{@entity}/#{@entity_id}/print?pre_print=false"}
+      navigate={"/companies/#{@company.id}/#{@doc_type}/#{@doc_id}/print?pre_print=false"}
       class={@class}
     >
       <%= gettext("Print") %>
@@ -850,8 +850,8 @@ defmodule FullCircleWeb.CoreComponents do
     """
   end
 
-  attr :entity, :string
-  attr :entity_id, :string
+  attr :doc_type, :string
+  attr :doc_id, :string
   attr :company, :any
 
   attr :class, :string,
@@ -862,7 +862,7 @@ defmodule FullCircleWeb.CoreComponents do
     ~H"""
     <.link
       target="_blank"
-      navigate={"/companies/#{@company.id}/#{@entity}/#{@entity_id}/print?pre_print=true"}
+      navigate={"/companies/#{@company.id}/#{@doc_type}/#{@doc_id}/print?pre_print=true"}
       class={@class}
     >
       <%= gettext("Pre Print") %>
