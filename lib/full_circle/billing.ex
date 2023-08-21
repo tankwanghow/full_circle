@@ -18,6 +18,21 @@ defmodule FullCircle.Billing do
   alias FullCircle.{Repo, Sys, Accounting, StdInterface}
   alias Ecto.Multi
 
+  def get_matcher_by(doc_type, doc_id) do
+    from(txn in Transaction,
+      join: txm in TransactionMatcher,
+      on: txm.transaction_id == txn.id,
+      where: txn.doc_type == ^doc_type,
+      where: txn.doc_id == ^doc_id,
+      select:
+        %{
+          doc_type: txm.doc_type,
+          doc_id: txm.doc_id,
+          match_amount: txm.match_amount
+        })
+        |> Repo.all()
+  end
+
   def get_invoice_by_no!(inv_no, com, user) do
     id =
       Repo.one(

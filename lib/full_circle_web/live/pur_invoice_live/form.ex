@@ -32,6 +32,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
     |> assign(live_action: :new)
     |> assign(id: "new")
     |> assign(title: gettext("New Purchase Invoice"))
+    |> assign(matched_trans: [])
     |> assign(
       :form,
       to_form(
@@ -56,6 +57,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
     socket
     |> assign(live_action: :edit)
     |> assign(id: id)
+    |> assign(matched_trans: Billing.get_matcher_by("PurInvoice", id))
     |> assign(title: gettext("Edit Purchase Invoice") <> " " <> object.pur_invoice_no)
     |> assign(
       :form,
@@ -287,6 +289,11 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
            "#{gettext("Failed")} #{failed_operation}. #{list_errors_to_string(changeset.errors)}"
          )}
 
+      {:sql_error, msg} ->
+        {:noreply,
+         socket
+         |> put_flash(:error, "#{gettext("Failed")} #{msg}")}
+
       :not_authorise ->
         {:noreply,
          socket
@@ -310,15 +317,18 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
          |> put_flash(:info, "#{gettext("Purchase Invoice updated successfully.")}")}
 
       {:error, failed_operation, changeset, _} ->
-        socket =
-          socket
-          |> assign(form: to_form(changeset))
-          |> put_flash(
-            :error,
-            "#{gettext("Failed")} #{failed_operation}. #{list_errors_to_string(changeset.errors)}"
-          )
+        {:noreply,
+         socket
+         |> assign(form: to_form(changeset))
+         |> put_flash(
+           :error,
+           "#{gettext("Failed")} #{failed_operation}. #{list_errors_to_string(changeset.errors)}"
+         )}
 
-        {:noreply, socket}
+      {:sql_error, msg} ->
+        {:noreply,
+         socket
+         |> put_flash(:error, "#{gettext("Failed")} #{msg}")}
 
       :not_authorise ->
         {:noreply,
@@ -370,6 +380,20 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
             <.input field={@form[:due_date]} label={gettext("Due Date")} type="date" />
           </div>
         </div>
+        <div class="flex flex-row flex-nowrap gap-2">
+          <div class="grow shrink">
+            <.input field={@form[:descriptions]} label={gettext("Descriptions")} />
+          </div>
+          <div class="grow shrink">
+            <.input
+              field={@form[:tags]}
+              label={gettext("Tags")}
+              phx-hook="tributeTagText"
+              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/tags?klass=FullCircle.Billing.PurInvoice&tag="}
+            />
+          </div>
+        </div>
+
         <.live_component
           module={FullCircleWeb.InvoiceLive.DetailComponent}
           id="pur_invoice_details"
@@ -384,22 +408,8 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
           taxcodetype="purtaxcode"
           current_company={@current_company}
           current_user={@current_user}
+          matched_trans={@matched_trans}
         />
-
-        <div class="flex flex-row flex-nowrap gap-2">
-          <div class="grow shrink">
-            <.input field={@form[:descriptions]} label={gettext("Descriptions")} type="textarea" />
-          </div>
-          <div class="grow shrink">
-            <.input
-              field={@form[:tags]}
-              label={gettext("Tags")}
-              type="textarea"
-              phx-hook="tributeTagTextArea"
-              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/tags?klass=FullCircle.Billing.PurInvoice&tag="}
-            />
-          </div>
-        </div>
 
         <div class="flex flex-row justify-center gap-x-1 mt-1">
           <.button disabled={!@form.source.valid?}><%= gettext("Save") %></.button>

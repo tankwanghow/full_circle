@@ -6,7 +6,7 @@ defmodule FullCircle.Helpers do
   def list_hashtag(tag \\ "", class, key, com) do
     regexp = "#(\\w+#{tag}$|\\w+)"
     tag = "#%#{tag}%"
-
+    IO.inspect {regexp, tag, class, key, com}
     FullCircle.Repo.all(
       from c in class,
         where: c.company_id == ^com.id,

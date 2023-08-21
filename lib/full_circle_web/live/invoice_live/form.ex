@@ -32,6 +32,7 @@ defmodule FullCircleWeb.InvoiceLive.Form do
     |> assign(live_action: :new)
     |> assign(id: "new")
     |> assign(page_title: gettext("New Invoice"))
+    |> assign(matched_trans: [])
     |> assign(
       :form,
       to_form(
@@ -57,6 +58,7 @@ defmodule FullCircleWeb.InvoiceLive.Form do
     |> assign(live_action: :edit)
     |> assign(id: id)
     |> assign(page_title: gettext("Edit Invoice") <> " " <> object.invoice_no)
+    |> assign(matched_trans: Billing.get_matcher_by("Invoice", id))
     |> assign(
       :form,
       to_form(StdInterface.changeset(Invoice, object, %{}, socket.assigns.current_company))
@@ -277,6 +279,11 @@ defmodule FullCircleWeb.InvoiceLive.Form do
            "#{gettext("Failed")} #{failed_operation}. #{list_errors_to_string(changeset.errors)}"
          )}
 
+      {:sql_error, msg} ->
+        {:noreply,
+         socket
+         |> put_flash(:error, "#{gettext("Failed")} #{msg}")}
+
       :not_authorise ->
         {:noreply,
          socket
@@ -300,15 +307,18 @@ defmodule FullCircleWeb.InvoiceLive.Form do
          |> put_flash(:info, "#{gettext("Invoice updated successfully.")}")}
 
       {:error, failed_operation, changeset, _} ->
-        socket =
-          socket
-          |> assign(form: to_form(changeset))
-          |> put_flash(
-            :error,
-            "#{gettext("Failed")} #{failed_operation}. #{list_errors_to_string(changeset.errors)}"
-          )
+        {:noreply,
+         socket
+         |> assign(form: to_form(changeset))
+         |> put_flash(
+           :error,
+           "#{gettext("Failed")} #{failed_operation}. #{list_errors_to_string(changeset.errors)}"
+         )}
 
-        {:noreply, socket}
+      {:sql_error, msg} ->
+        {:noreply,
+         socket
+         |> put_flash(:error, "#{gettext("Failed")} #{msg}")}
 
       :not_authorise ->
         {:noreply,
@@ -358,6 +368,20 @@ defmodule FullCircleWeb.InvoiceLive.Form do
           </div>
         </div>
 
+        <div class="flex flex-row flex-nowrap gap-2">
+          <div class="grow shrink">
+            <.input field={@form[:descriptions]} label={gettext("Descriptions")} />
+          </div>
+          <div class="grow shrink">
+            <.input
+              field={@form[:tags]}
+              label={gettext("Tags")}
+              phx-hook="tributeTagText"
+              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/tags?klass=FullCircle.Billing.Invoice&tag="}
+            />
+          </div>
+        </div>
+
         <.live_component
           module={FullCircleWeb.InvoiceLive.DetailComponent}
           id="invoice_details"
@@ -370,24 +394,11 @@ defmodule FullCircleWeb.InvoiceLive.Form do
           doc_good_amount={:invoice_good_amount}
           doc_tax_amount={:invoice_tax_amount}
           doc_detail_amount={:invoice_amount}
+          matched_trans={@matched_trans}
           current_company={@current_company}
           current_user={@current_user}
         />
 
-        <div class="flex flex-row flex-nowrap gap-2">
-          <div class="grow shrink">
-            <.input field={@form[:descriptions]} label={gettext("Descriptions")} type="textarea" />
-          </div>
-          <div class="grow shrink">
-            <.input
-              field={@form[:tags]}
-              label={gettext("Tags")}
-              type="textarea"
-              phx-hook="tributeTagTextArea"
-              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/tags?klass=FullCircle.Billing.Invoice&tag="}
-            />
-          </div>
-        </div>
         <div class="flex flex-row justify-center gap-x-1 mt-1">
           <.button disabled={!@form.source.valid?}><%= gettext("Save") %></.button>
           <.link

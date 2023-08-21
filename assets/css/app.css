@@ -116,7 +116,7 @@ button[disabled] {
 
 .detail-good-col {
   @apply grow shrink;
-  width: 9%;
+  width: 10%;
 }
 
 .detail-desc-col {
@@ -130,7 +130,7 @@ button[disabled] {
 }
 
 .detail-packqty-col {
-  width: 7%;
+  width: 6%;
 }
 
 .detail-qty-col {
@@ -150,7 +150,7 @@ button[disabled] {
 }
 
 .detail-discount-col {
-  width: 7%;
+  width: 6%;
 }
 
 .detail-account-col {
@@ -171,7 +171,7 @@ button[disabled] {
 }
 
 .detail-amt-col {
-  width: 8%;
+  width: 9%;
 }
 
 .detail-setting-col {

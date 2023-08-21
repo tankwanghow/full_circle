@@ -378,6 +378,11 @@ defmodule FullCircleWeb.PaymentLive.Form do
            "#{gettext("Failed")} #{failed_operation}. #{list_errors_to_string(changeset.errors)}"
          )}
 
+      {:sql_error, msg} ->
+        {:noreply,
+         socket
+         |> put_flash(:error, "#{gettext("Failed")} #{msg}")}
+
       :not_authorise ->
         {:noreply,
          socket
@@ -401,15 +406,18 @@ defmodule FullCircleWeb.PaymentLive.Form do
          |> put_flash(:info, gettext("Payment updated successfully."))}
 
       {:error, failed_operation, changeset, _} ->
-        socket =
-          socket
-          |> assign(form: to_form(changeset))
-          |> put_flash(
-            :error,
-            "#{gettext("Failed")} #{failed_operation}. #{list_errors_to_string(changeset.errors)}"
-          )
+        {:noreply,
+         socket
+         |> assign(form: to_form(changeset))
+         |> put_flash(
+           :error,
+           "#{gettext("Failed")} #{failed_operation}. #{list_errors_to_string(changeset.errors)}"
+         )}
 
-        {:noreply, socket}
+      {:sql_error, msg} ->
+        {:noreply,
+         socket
+         |> put_flash(:error, "#{gettext("Failed")} #{msg}")}
 
       :not_authorise ->
         {:noreply,
@@ -428,7 +436,7 @@ defmodule FullCircleWeb.PaymentLive.Form do
       )
       |> Map.put(:action, socket.assigns.live_action)
 
-    IO.inspect changeset
+    IO.inspect(changeset)
 
     socket = assign(socket, form: to_form(changeset))
 
@@ -438,7 +446,7 @@ defmodule FullCircleWeb.PaymentLive.Form do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="w-11/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
+    <div class="w-11/12 mx-auto border rounded-lg border-pink-500 bg-pink-100 p-4">
       <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
       <.form for={@form} id="object-form" autocomplete="off" phx-change="validate" phx-submit="save">
         <%= Phoenix.HTML.Form.hidden_input(@form, :payment_no) %>
@@ -552,6 +560,7 @@ defmodule FullCircleWeb.PaymentLive.Form do
           doc_detail_amount={:payment_detail_amount}
           current_company={@current_company}
           current_user={@current_user}
+          matched_trans={[]}
         />
 
         <.live_component
@@ -617,7 +626,7 @@ defmodule FullCircleWeb.PaymentLive.Form do
     <.live_component
       module={FullCircleWeb.ReceiptLive.QryMatcherComponent}
       id="query-match-trans"
-      klass="text-center border bg-green-100 mt-2 p-3 rounded-lg border-green-400"
+      klass="w-11/12 mx-auto text-center border bg-green-100 mt-2 p-3 rounded-lg border-green-400"
       query={@query}
       query_match_trans={@query_match_trans}
       form={@form}

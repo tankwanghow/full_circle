@@ -397,6 +397,11 @@ defmodule FullCircleWeb.ReceiptLive.Form do
            "#{gettext("Failed")} #{failed_operation}. #{list_errors_to_string(changeset.errors)}"
          )}
 
+      {:sql_error, msg} ->
+        {:noreply,
+         socket
+         |> put_flash(:error, "#{gettext("Failed")} #{msg}")}
+
       :not_authorise ->
         {:noreply,
          socket
@@ -420,15 +425,18 @@ defmodule FullCircleWeb.ReceiptLive.Form do
          |> put_flash(:info, gettext("Receipt updated successfully."))}
 
       {:error, failed_operation, changeset, _} ->
-        socket =
-          socket
-          |> assign(form: to_form(changeset))
-          |> put_flash(
-            :error,
-            "#{gettext("Failed")} #{failed_operation}. #{list_errors_to_string(changeset.errors)}"
-          )
+        {:noreply,
+         socket
+         |> assign(form: to_form(changeset))
+         |> put_flash(
+           :error,
+           "#{gettext("Failed")} #{failed_operation}. #{list_errors_to_string(changeset.errors)}"
+         )}
 
-        {:noreply, socket}
+      {:sql_error, msg} ->
+        {:noreply,
+         socket
+         |> put_flash(:error, "#{gettext("Failed")} #{msg}")}
 
       :not_authorise ->
         {:noreply,
@@ -659,6 +667,7 @@ defmodule FullCircleWeb.ReceiptLive.Form do
           doc_detail_amount={:receipt_detail_amount}
           current_company={@current_company}
           current_user={@current_user}
+          matched_trans={[]}
         />
 
         <.live_component
@@ -721,17 +730,17 @@ defmodule FullCircleWeb.ReceiptLive.Form do
       </.form>
     </div>
     <.live_component
-        module={FullCircleWeb.ReceiptLive.QryMatcherComponent}
-        id="query-match-trans"
-        klass="hidden text-center border bg-green-100 mt-2 p-3 rounded-lg border-green-400"
-        query={@query}
-        query_match_trans={@query_match_trans}
-        form={@form}
-        balance_ve="+ve"
-        doc_no_field={:receipt_no}
-        current_company={@current_company}
-        current_user={@current_user}
-      />
+      module={FullCircleWeb.ReceiptLive.QryMatcherComponent}
+      id="query-match-trans"
+      klass="hidden w-11/12 mx-auto text-center border bg-green-100 mt-2 p-3 rounded-lg border-green-400"
+      query={@query}
+      query_match_trans={@query_match_trans}
+      form={@form}
+      balance_ve="+ve"
+      doc_no_field={:receipt_no}
+      current_company={@current_company}
+      current_user={@current_user}
+    />
     """
   end
 end

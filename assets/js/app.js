@@ -27,7 +27,7 @@ let csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("
 
 let Hooks = {}
 
-Hooks.tributeTagTextArea = {
+Hooks.tributeTagText = {
   mounted() {
     var tribute = new Tribute({
       trigger: "#",

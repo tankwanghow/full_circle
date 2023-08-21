@@ -1,15 +1,13 @@
+<main class={if(assigns[:current_user], do: "mt-20", else: "")}>
 <%= if @current_user do %>
   <div class="grid justify-center w-full">
     <span>
-      <.link navigate={~p"/users/log_out"} class="font-semibold text-brand hover:underline">
-        <%= gettext("Dashboard") %>
+      <.link navigate={~p"/companies"} class="font-semibold text-brand hover:underline">
+        <%= gettext("Companies") %>
       </.link>
       |
-      <.link navigate={~p"/users/log_out"} class="font-semibold text-brand hover:underline">
-        <%= gettext("Farms") %>
-      </.link>
-      |
-      <.link navigate={~p"/users/log_out"} class="font-semibold text-brand hover:underline">
+      <.link href={~p"/users/log_out"}
+                      method="delete" class="font-semibold text-brand hover:underline">
         <%= gettext("Log out") %>
       </.link>
     </span>
@@ -27,9 +25,4 @@
     </span>
   </div>
 <% end %>
-
-<main class={if(@current_user, do: "mt-20", else: "")}>
-  <div class="mx-auto max-w-2xl">
-    <.flash_group flash={@flash} />
-  </div>
 </main>

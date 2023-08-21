@@ -130,49 +130,81 @@ defmodule FullCircleWeb.InvoiceLive.DetailComponent do
         </div>
       </.inputs_for>
 
-      <div class="flex flex-row font-medium tracking-tighter">
-        <div class="mt-1 detail-good-col text-orange-500 text-center">
-          <.link phx-click={:add_detail}>
+      <div class="flex flex-row">
+        <div class="mt-1 detail-good-col text-orange-500 text-left">
+          <.link phx-click={:add_detail} class="hover:font-bold focus:font-bold">
             <.icon name="hero-plus-circle" class="w-5 h-5" /><%= gettext("Add Detail") %>
           </.link>
         </div>
-        <div class="detail-desc-col" />
-        <div class="detail-pack-col" />
-        <div class="detail-packqty-col" />
-        <div class="detail-qty-col" />
-        <div class="detail-unit-col" />
-        <div class="detail-price-col" />
-        <div class={"detail-discount-col #{Sys.get_setting(@settings, @doc_name, "discount-col")}"} />
-        <div class={"detail-goodamt-col #{Sys.get_setting(@settings, @doc_name, "goodamt-col")}"}>
-          <.input
-            type="number"
-            field={@form[@doc_good_amount]}
-            readonly
-            tabindex="-1"
-            value={Ecto.Changeset.fetch_field!(@form.source, @doc_good_amount)}
-          />
+        <div class="w-[10%] text-right px-1 pt-1">
+          <%= gettext("Good Total") %>
         </div>
-        <div class={"detail-account-col #{Sys.get_setting(@settings, @doc_name, "account-col")}"} />
-        <div class="detail-taxcode-col" />
-        <div class={"detail-taxrate-col #{Sys.get_setting(@settings, @doc_name, "taxrate-col")}"} />
-        <div class={"detail-taxamt-col #{Sys.get_setting(@settings, @doc_name, "taxamt-col")}"}>
-          <.input
-            type="number"
-            field={@form[@doc_tax_amount]}
-            readonly
-            tabindex="-1"
-            value={Ecto.Changeset.fetch_field!(@form.source, @doc_tax_amount)}
-          />
+        <div class="detail-amt-col text-right px-1 pt-1">
+          <%= Ecto.Changeset.fetch_field!(@form.source, @doc_good_amount)
+          |> Number.Delimit.number_to_delimited() %>
         </div>
-        <div class="detail-amt-col">
-          <.input
-            feedback={true}
-            type="number"
-            field={@form[@doc_detail_amount]}
-            readonly
-            tabindex="-1"
-            value={Ecto.Changeset.fetch_field!(@form.source, @doc_detail_amount)}
-          />
+        <div class="detail-setting-col" />
+      </div>
+
+      <div class="flex flex-row">
+        <div class="w-[82%]"></div>
+        <div class="w-[10%] text-right px-1">
+          <%= gettext("Tax Total") %>
+        </div>
+        <div class="detail-amt-col text-right px-1">
+          <%= Ecto.Changeset.fetch_field!(@form.source, @doc_tax_amount)
+          |> Number.Delimit.number_to_delimited() %>
+        </div>
+        <div class="detail-setting-col" />
+      </div>
+
+      <div class="flex flex-row">
+        <div class="w-[82%]"></div>
+        <div class={"w-[10%] text-right px-1 border-t #{if(@matched_trans == [], do: "font-semibold border-b-4 border-double")} border-black"}>
+          <%= gettext("Invoice Total") %>
+        </div>
+        <div class={"detail-amt-col text-right px-1 border-t #{if(@matched_trans == [], do: "font-semibold border-b-4 border-double")} border-black"}>
+          <%= Ecto.Changeset.fetch_field!(@form.source, @doc_detail_amount)
+          |> Number.Delimit.number_to_delimited() %>
+        </div>
+        <div class="detail-setting-col" />
+      </div>
+
+      <%= for obj <- @matched_trans do %>
+        <div class="flex flex-row">
+          <div class="w-[82%]"></div>
+          <div class="w-[10%] text-right px-1">
+            <.link
+              class="text-red-600 hover:font-bold"
+              target="_blank"
+              navigate={"/companies/#{@current_company.id}/#{obj.doc_type}/#{obj.doc_id}/edit"}
+            >
+              <%= gettext("Less") %> <%= obj.doc_type %>
+            </.link>
+          </div>
+          <div class="text-red-600 detail-amt-col text-right px-1">
+            <%= Number.Delimit.number_to_delimited(obj.match_amount |> Decimal.abs()) %>
+          </div>
+          <div class="detail-setting-col" />
+        </div>
+      <% end %>
+
+      <div :if={@matched_trans != []} class="flex flex-row">
+        <div class="w-[82%]"></div>
+        <div class="w-[10%] font-bold text-right px-1 border-t border-b-4 border-double border-black">
+          <%= gettext("Balance") %>
+        </div>
+        <div class="detail-amt-col font-bold text-right px-1 border-t border-b-4 border-double border-black">
+          <%= Decimal.add(
+            Ecto.Changeset.fetch_field!(@form.source, @doc_detail_amount),
+            Enum.reduce(@matched_trans, 0, fn obj, acc ->
+              if(obj.doc_type == "Receipt" or obj.doc_type == "CreditNote",
+                do: Decimal.add(acc, obj.match_amount),
+                else: Decimal.add(acc, Decimal.negate(obj.match_amount))
+              )
+            end)
+          )
+          |> Number.Delimit.number_to_delimited() %>
         </div>
         <div class="detail-setting-col" />
       </div>

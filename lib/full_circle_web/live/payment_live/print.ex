@@ -396,7 +396,8 @@ defmodule FullCircleWeb.PaymentLive.Print do
 
       .payment-header { width: 100%; height: 40mm; border-bottom: 0.5mm solid black; }
       .customer { padding-left: 2mm; float: left;}
-      .payment-info div { float: right; margin-bottom: 1px; text-align: right; }
+
+      .payment-info div { display: block; margin-bottom: 1px; text-align: right; }
       .payment-info div.descriptions { text-align: left; }
 
       .details-header { display: flex; padding-bottom: 1mm; padding-top: 1mm; border-bottom: 0.5mm dotted black; margin-bottom: 3px;}
