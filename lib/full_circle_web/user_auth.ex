@@ -229,14 +229,11 @@ defmodule FullCircleWeb.UserAuth do
     default_company = FullCircle.Sys.get_default_company(user)
 
     if default_company do
-      IO.inspect("1111111111")
       "/companies/#{default_company.company_id}/dashboard"
     else
       if(Enum.count(FullCircle.Sys.list_companies(user)) > 0) do
-        IO.inspect("2222222222")
         "/companies"
       else
-        IO.inspect("3333333333")
         "/companies/new"
       end
     end
