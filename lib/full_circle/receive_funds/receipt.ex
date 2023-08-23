@@ -50,7 +50,7 @@ defmodule FullCircle.ReceiveFund.Receipt do
       :funds_account_id,
       :funds_amount
     ])
-    |> fill_default_date()
+    |> fill_today(:receipt_date)
     |> validate_required([
       :receipt_date,
       :company_id,
@@ -137,14 +137,5 @@ defmodule FullCircle.ReceiveFund.Receipt do
 
   def compute_cheques_amount(changeset) do
     changeset |> sum_field_to(:received_cheques, :amount, :cheques_amount)
-  end
-
-  defp fill_default_date(changeset) do
-    if is_nil(fetch_field!(changeset, :receipt_date)) do
-      changeset
-      |> put_change(:receipt_date, Timex.today())
-    else
-      changeset
-    end
   end
 end

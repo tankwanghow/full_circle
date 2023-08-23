@@ -416,7 +416,8 @@ defmodule FullCircle.ReceiveFund do
       :delete_transaction,
       from(txn in Transaction,
         where: txn.doc_type == "Receipt",
-        where: txn.doc_no == ^receipt.receipt_no
+        where: txn.doc_no == ^receipt.receipt_no,
+        where: txn.company_id == ^com.id
       )
     )
     |> Sys.insert_log_for(receipt_name, attrs, com, user)

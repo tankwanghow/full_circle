@@ -20,7 +20,7 @@ defmodule FullCircleWeb.InvoiceLive.IndexComponent do
     >
       <div class="w-[2%] border-b border-gray-400 py-1">
         <input
-          :if={@obj.checked}
+          :if={@obj.checked and !@obj.old_data}
           id={"checkbox_invoice_#{@obj.id}"}
           name={"checkbox_invoice[#{@obj.id}]"}
           type="checkbox"
@@ -29,7 +29,7 @@ defmodule FullCircleWeb.InvoiceLive.IndexComponent do
           checked
         />
         <input
-          :if={!@obj.checked}
+          :if={!@obj.checked and !@obj.old_data}
           id={"checkbox_invoice_#{@obj.id}"}
           name={"checkbox_invoice[#{@obj.id}]"}
           type="checkbox"

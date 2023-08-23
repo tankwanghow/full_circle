@@ -20,7 +20,7 @@ defmodule FullCircle.Billing.PurInvoice do
     has_many :transaction_matchers, FullCircle.Accounting.TransactionMatcher,
       where: [entity: "PurInvoice"],
       on_replace: :delete,
-      foreign_key: :entity_id,
+      foreign_key: :doc_id,
       references: :id
 
     field :contact_name, :string, virtual: true
@@ -47,7 +47,8 @@ defmodule FullCircle.Billing.PurInvoice do
       :contact_name,
       :pur_invoice_no
     ])
-    |> fill_default_date()
+    |> fill_today(:pur_invoice_date)
+    |> fill_today(:due_date)
     |> validate_required([
       :pur_invoice_date,
       :supplier_invoice_no,
@@ -87,15 +88,5 @@ defmodule FullCircle.Billing.PurInvoice do
 
   def compute_match_transactions_amount(changeset) do
     changeset |> sum_field_to(:transaction_matchers, :match_amount, :matched_amount)
-  end
-
-  defp fill_default_date(changeset) do
-    if is_nil(fetch_field!(changeset, :pur_invoice_date)) do
-      changeset
-      |> put_change(:pur_invoice_date, Date.utc_today())
-      |> put_change(:due_date, Date.utc_today())
-    else
-      changeset
-    end
   end
 end

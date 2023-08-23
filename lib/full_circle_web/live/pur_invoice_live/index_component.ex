@@ -19,8 +19,8 @@ defmodule FullCircleWeb.PurInvoiceLive.IndexComponent do
       class={"#{@ex_class} max-h-8 flex flex-row text-center tracking-tighter bg-gray-200 hover:bg-gray-400"}
     >
       <div class="w-[2%] border-b border-gray-400 py-1">
-        <%!-- <input
-          :if={@obj.checked}
+        <input
+          :if={@obj.checked and !@obj.old_data}
           id={"checkbox_invoice_#{@obj.id}"}
           name={"checkbox_invoice[#{@obj.id}]"}
           type="checkbox"
@@ -29,13 +29,13 @@ defmodule FullCircleWeb.PurInvoiceLive.IndexComponent do
           checked
         />
         <input
-          :if={!@obj.checked}
+          :if={!@obj.checked and !@obj.old_data}
           id={"checkbox_invoice_#{@obj.id}"}
           name={"checkbox_invoice[#{@obj.id}]"}
           type="checkbox"
           phx-click="check_click"
           phx-value-object-id={@obj.id}
-        /> --%>
+        />
       </div>
       <div class="w-[9%] border-b border-gray-400 py-1">
         <%= @obj.pur_invoice_date %>

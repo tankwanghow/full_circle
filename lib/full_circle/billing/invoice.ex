@@ -38,7 +38,8 @@ defmodule FullCircle.Billing.Invoice do
       :contact_name,
       :invoice_no
     ])
-    |> fill_default_date()
+    |> fill_today(:invoice_date)
+    |> fill_today(:due_date)
     |> validate_required([
       :invoice_date,
       :due_date,
@@ -78,16 +79,6 @@ defmodule FullCircle.Billing.Invoice do
 
       true ->
         changeset
-    end
-  end
-
-  defp fill_default_date(changeset) do
-    if is_nil(fetch_field!(changeset, :invoice_date)) do
-      changeset
-      |> put_change(:invoice_date, Date.utc_today())
-      |> put_change(:due_date, Date.utc_today())
-    else
-      changeset
     end
   end
 end

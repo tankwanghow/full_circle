@@ -6,6 +6,7 @@ defmodule FullCircle.Helpers do
   def list_hashtag(tag \\ "", class, key, com) do
     regexp = "#(\\w+#{tag}$|\\w+)"
     tag = "#%#{tag}%"
+
     FullCircle.Repo.all(
       from c in class,
         where: c.company_id == ^com.id,
@@ -139,5 +140,14 @@ defmodule FullCircle.Helpers do
   def gen_doc_id(number, code) do
     num = number |> Integer.to_string() |> String.pad_leading(6, "0")
     Enum.join([code, num], "-")
+  end
+
+  def fill_today(changeset, date_field) do
+    if is_nil(fetch_field!(changeset, date_field)) do
+      changeset
+      |> put_change(date_field, Timex.today())
+    else
+      changeset
+    end
   end
 end

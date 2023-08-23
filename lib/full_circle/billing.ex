@@ -24,13 +24,13 @@ defmodule FullCircle.Billing do
       on: txm.transaction_id == txn.id,
       where: txn.doc_type == ^doc_type,
       where: txn.doc_id == ^doc_id,
-      select:
-        %{
-          doc_type: txm.doc_type,
-          doc_id: txm.doc_id,
-          match_amount: txm.match_amount
-        })
-        |> Repo.all()
+      select: %{
+        doc_type: txm.doc_type,
+        doc_id: txm.doc_id,
+        match_amount: txm.match_amount
+      }
+    )
+    |> Repo.all()
   end
 
   def get_invoice_by_no!(inv_no, com, user) do
@@ -420,7 +420,8 @@ defmodule FullCircle.Billing do
       :delete_transaction,
       from(txn in Transaction,
         where: txn.doc_type == "Invoice",
-        where: txn.doc_no == ^invoice.invoice_no
+        where: txn.doc_no == ^invoice.invoice_no,
+        where: txn.company_id == ^com.id
       )
     )
     |> Sys.insert_log_for(invoice_name, attrs, com, user)
@@ -791,7 +792,8 @@ defmodule FullCircle.Billing do
       :delete_transaction,
       from(txn in Transaction,
         where: txn.doc_type == "PurInvoice",
-        where: txn.doc_no == ^pur_invoice.pur_invoice_no
+        where: txn.doc_no == ^pur_invoice.pur_invoice_no,
+        where: txn.company_id == ^com.id
       )
     )
     |> Sys.insert_log_for(pur_invoice_name, attrs, com, user)

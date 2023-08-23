@@ -772,7 +772,8 @@ defmodule FullCircle.Accounting do
         :delete_transaction,
         from(txn in Transaction,
           where: txn.doc_type == "fixed_asset_depreciations",
-          where: txn.doc_no == ^fad.doc_no
+          where: txn.doc_no == ^fad.doc_no,
+          where: txn.company_id == ^com.id
         )
       )
 
@@ -797,7 +798,8 @@ defmodule FullCircle.Accounting do
             :delete_transaction,
             from(txn in Transaction,
               where: txn.doc_type == "fixed_asset_depreciations",
-              where: txn.doc_no == ^fad.doc_no
+              where: txn.doc_no == ^fad.doc_no,
+              where: txn.company_id == ^company.id
             )
           )
           |> Sys.insert_log_for(action, %{"deleted_id_is" => fad.id}, company, user)

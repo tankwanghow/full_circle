@@ -1,4 +1,4 @@
-defmodule FullCircleWeb.PaymentLive.IndexComponent do
+defmodule FullCircleWeb.JournalLive.IndexComponent do
   use FullCircleWeb, :live_component
 
   @impl true
@@ -20,7 +20,7 @@ defmodule FullCircleWeb.PaymentLive.IndexComponent do
     >
       <div class="w-[2%] border-b border-gray-400 py-1">
         <input
-          :if={@obj.checked and !@obj.old_data and !@obj.old_data}
+          :if={@obj.checked and !@obj.old_data}
           id={"checkbox_#{@obj.id}"}
           name={"checkbox[#{@obj.id}]"}
           type="checkbox"
@@ -29,7 +29,7 @@ defmodule FullCircleWeb.PaymentLive.IndexComponent do
           checked
         />
         <input
-          :if={!@obj.checked and !@obj.old_data and !@obj.old_data}
+          :if={!@obj.checked and !@obj.old_data}
           id={"checkbox_#{@obj.id}"}
           name={"checkbox[#{@obj.id}]"}
           type="checkbox"
@@ -37,28 +37,24 @@ defmodule FullCircleWeb.PaymentLive.IndexComponent do
           phx-value-object-id={@obj.id}
         />
       </div>
-      <div class="w-[10%] border-b border-gray-400 py-1">
-        <%= @obj.payment_date %>
+      <div class="w-[9%] border-b border-gray-400 py-1">
+        <%= @obj.journal_date %>
       </div>
-      <div
-        :if={!@obj.old_data}
-        class="text-blue-600 w-[10%] border-b border-gray-400 py-1 hover:cursor-pointer"
-      >
-        <.link navigate={~p"/companies/#{@obj.company_id}/Payment/#{@obj.id}/edit"}>
-          <%= @obj.payment_no %>
-        </.link>
+      <div class="w-[9%] border-b border-gray-400 py-1">
+        <%= if @obj.old_data do %>
+          <%= @obj.journal_no %>
+        <% else %>
+          <.doc_link
+            current_company={@company}
+            doc_obj={%{doc_type: "Journal", doc_id: @obj.id, doc_no: @obj.journal_no}}
+          />
+        <% end %>
       </div>
-      <div :if={@obj.old_data} class="w-[10%] border-b border-gray-400 py-1">
-        <%= @obj.payment_no %>
-      </div>
-      <div class="w-[28%] border-b border-gray-400 py-1 overflow-clip">
-        <%= @obj.contact_name %>
+      <div class="w-[40%] border-b border-gray-400 py-1 overflow-clip">
+        <%= @obj.account_info %>
       </div>
       <div class="w-[40%] border-b text-center border-gray-400 py-1 overflow-clip">
         <span class="font-light"><%= @obj.particulars %></span>
-      </div>
-      <div class="w-[10%] border-b border-gray-400 py-1">
-        <%= Number.Currency.number_to_currency(@obj.amount |> Decimal.abs()) %>
       </div>
     </div>
     """

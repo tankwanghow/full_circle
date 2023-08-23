@@ -148,6 +148,10 @@ defmodule FullCircleWeb.Router do
       live("/Payment", PaymentLive.Index, :index)
       live("/Payment/new", PaymentLive.Form, :new)
       live("/Payment/:payment_id/edit", PaymentLive.Form, :edit)
+
+      live("/Journal", JournalLive.Index, :index)
+      live("/Journal/new", JournalLive.Form, :new)
+      live("/Journal/:journal_id/edit", JournalLive.Form, :edit)
     end
 
     live_session :require_authenticated_user_n_active_company_print,
@@ -165,6 +169,9 @@ defmodule FullCircleWeb.Router do
 
       live("/Payment/:id/print", PaymentLive.Print, :print)
       live("/Payment/print_multi", PaymentLive.Print, :print)
+
+      live("/Journal/:id/print", JournalLive.Print, :print)
+      live("/Journal/print_multi", JournalLive.Print, :print)
 
       live("/print_transactions", TransactionLive.Print, :print)
     end

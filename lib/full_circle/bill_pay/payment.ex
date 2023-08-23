@@ -34,8 +34,8 @@ defmodule FullCircle.BillPay.Payment do
   end
 
   @doc false
-  def changeset(receipt, attrs) do
-    receipt
+  def changeset(payment, attrs) do
+    payment
     |> cast(attrs, [
       :payment_date,
       :descriptions,
@@ -47,7 +47,7 @@ defmodule FullCircle.BillPay.Payment do
       :funds_account_id,
       :funds_amount
     ])
-    |> fill_default_date()
+    |> fill_today(:payment_date)
     |> validate_required([
       :payment_date,
       :company_id,
@@ -59,7 +59,7 @@ defmodule FullCircle.BillPay.Payment do
     |> validate_id(:contact_name, :contact_id)
     |> validate_id(:funds_account_name, :funds_account_id)
     |> unsafe_validate_unique([:payment_no, :company_id], FullCircle.Repo,
-      message: gettext("receipt no already in company")
+      message: gettext("payment no already in company")
     )
     |> cast_assoc(:transaction_matchers)
     |> cast_assoc(:payment_details)
@@ -111,14 +111,5 @@ defmodule FullCircle.BillPay.Payment do
 
   def compute_match_transactions_amount(changeset) do
     changeset |> sum_field_to(:transaction_matchers, :match_amount, :matched_amount)
-  end
-
-  defp fill_default_date(changeset) do
-    if is_nil(fetch_field!(changeset, :payment_date)) do
-      changeset
-      |> put_change(:payment_date, Timex.today())
-    else
-      changeset
-    end
   end
 end

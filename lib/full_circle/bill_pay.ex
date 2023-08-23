@@ -389,7 +389,8 @@ defmodule FullCircle.BillPay do
       :delete_transaction,
       from(txn in Transaction,
         where: txn.doc_type == "Payment",
-        where: txn.doc_no == ^payment.payment_no
+        where: txn.doc_no == ^payment.payment_no,
+        where: txn.company_id == ^com.id
       )
     )
     |> Sys.insert_log_for(payment_name, attrs, com, user)

@@ -182,11 +182,7 @@ defmodule FullCircleWeb.AccountLive.Form do
 
         <div class="flex justify-center gap-x-1 mt-1">
           <.button disabled={!@form.source.valid?}><%= gettext("Save") %></.button>
-          <.link
-            :if={Enum.any?(@form.source.changes) and @live_action != :new}
-            navigate=""
-            class="orange_button"
-          >
+          <.link :if={@live_action != :new} navigate="" class="orange_button">
             <%= gettext("Cancel") %>
           </.link>
           <a onclick="history.back();" class="blue_button"><%= gettext("Back") %></a>

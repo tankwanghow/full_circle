@@ -98,7 +98,8 @@ defmodule FullCircleWeb.ReceiptLive.QryMatcherComponent do
             :if={
               @balance_ve == "+ve" and
                 !found_in_matched_trans?(@form.source, obj.transaction_id) and
-                Decimal.positive?(obj.balance) and obj.t_doc_no != Map.fetch!(@form.data, @doc_no_field)
+                Decimal.positive?(obj.balance) and
+                obj.t_doc_no != Map.fetch!(@form.data, @doc_no_field)
             }
             class="w-[3%] text-green-500 cursor-pointer"
           >
@@ -110,7 +111,8 @@ defmodule FullCircleWeb.ReceiptLive.QryMatcherComponent do
             :if={
               @balance_ve == "-ve" and
                 !found_in_matched_trans?(@form.source, obj.transaction_id) and
-                Decimal.negative?(obj.balance) and obj.t_doc_no != Map.fetch!(@form.data, @doc_no_field)
+                Decimal.negative?(obj.balance) and
+                obj.t_doc_no != Map.fetch!(@form.data, @doc_no_field)
             }
             class="w-[3%] text-green-500 cursor-pointer"
           >
