@@ -318,6 +318,20 @@ defmodule FullCircleWeb.JournalLive.Form do
           >
             <%= gettext("New") %>
           </.link>
+          <.print_button
+            :if={@live_action == :edit}
+            company={@current_company}
+            doc_type="Journal"
+            doc_id={@id}
+            class="gray_button"
+          />
+          <.pre_print_button
+            :if={@live_action == :edit}
+            company={@current_company}
+            doc_type="Journal"
+            doc_id={@id}
+            class="gray_button"
+          />
           <.live_component
             :if={@live_action == :edit}
             module={FullCircleWeb.LogLive.Component}

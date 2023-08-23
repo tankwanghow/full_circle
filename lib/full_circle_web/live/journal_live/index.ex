@@ -45,6 +45,26 @@ defmodule FullCircleWeb.JournalLive.Index do
         >
           <%= gettext("New Journal") %>
         </.link>
+        <.link
+          :if={@ids != ""}
+          navigate={
+            ~p"/companies/#{@current_company.id}/Journal/print_multi?pre_print=false&ids=#{@ids}"
+          }
+          target="_blank"
+          class="blue_button"
+        >
+          <%= gettext("Print") %>
+        </.link>
+        <.link
+          :if={@ids != ""}
+          navigate={
+            ~p"/companies/#{@current_company.id}/Journal/print_multi?pre_print=true&ids=#{@ids}"
+          }
+          target="_blank"
+          class="blue_button"
+        >
+          <%= gettext("Pre Print") %>
+        </.link>
       </div>
 
       <div class="font-medium flex flex-row text-center tracking-tighter bg-amber-200">

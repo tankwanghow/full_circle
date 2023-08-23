@@ -11,7 +11,7 @@ defmodule FullCircle.JournalEntry do
     Transaction
   }
 
-  alias FullCircle.{Sys, Accounting}
+  alias FullCircle.{Sys}
   alias FullCircle.Accounting.Account
   alias FullCircle.StdInterface
   alias Ecto.Multi
@@ -38,6 +38,18 @@ defmodule FullCircle.JournalEntry do
         preload: [transactions: ^journal_transactions()],
         select: jl
     )
+  end
+
+  def get_print_journals!(ids, company, user) do
+    Repo.all(
+      from obj in Journal,
+        join: com in subquery(Sys.user_company(company, user)),
+        on: com.id == obj.company_id,
+        where: obj.id in ^ids,
+        preload: [transactions: ^journal_transactions()],
+        select: obj
+    )
+    |> Enum.map(fn x -> Journal.compute_struct_balance(x) end)
   end
 
   defp journal_transactions() do
