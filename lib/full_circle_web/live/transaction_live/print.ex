@@ -225,7 +225,7 @@ defmodule FullCircleWeb.TransactionLive.Print do
       .debit { width: 28mm; text-align: right; }
       .credit { width: 28mm; text-align: right; }
 
-      .footer { margin-top: 13mm; display: flex; border-bottom: 1px solid black; border-top: 1px solid black; padding-bottom: 2mm; padding-top: 2mm; }
+      .footer { margin-top: 13mm; display: flex; min-height: 8mm; border-bottom: 1px solid black; border-top: 1px solid black; padding-top: 1.5mm;}
       .page-count { float: right; }
     </style>
     """

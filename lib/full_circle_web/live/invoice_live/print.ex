@@ -19,7 +19,7 @@ defmodule FullCircleWeb.InvoiceLive.Print do
   defp set_page_defaults(socket) do
     socket
     |> assign(:detail_body_height, 145)
-    |> assign(:detail_height, 10)
+    |> assign(:detail_height, 9)
     |> assign(:company, FullCircle.Sys.get_company!(socket.assigns.current_company.id))
   end
 
@@ -132,7 +132,7 @@ defmodule FullCircleWeb.InvoiceLive.Print do
     ~H"""
     <div class="descriptions">....continue....</div>
     <div class="invoice-footer">
-      <div class="empty-footer" />
+
     </div>
     <span class="page-count"><%= "page #{@page} of #{@pages}" %></span>
     """
@@ -255,7 +255,7 @@ defmodule FullCircleWeb.InvoiceLive.Print do
     ~H"""
     <style>
       .details-body { height: <%= @detail_body_height %>mm; }
-      .detail { display: flex; height: <%= @detail_height %>mm; vertical-align: middle; align-items : center; line-height: 14px;}
+      .detail { display: flex; height: <%= @detail_height %>mm; vertical-align: middle; align-items : center;  line-height: 4mm;}
       #page { width: 210mm; min-height: 290mm; padding: 5mm; }
 
       @media print {
@@ -277,15 +277,15 @@ defmodule FullCircleWeb.InvoiceLive.Print do
       .disc { width: 24mm; text-align: center; }
       .total { width: 45mm; text-align: right; }
 
-      .invoice-footer { margin-bottom: 1mm; padding: 1mm 0 1mm 0; }
+      .invoice-footer { min-height: 10mm; }
+      .descriptions { min-height: 6mm; }
 
-      .descriptions { }
-      .empty-footer { min-height: 30px; }
-      .invoice-amount { display: flex; padding-top: 7px; border-top: 0.5mm solid black;  }
-      .invoice-amount div  { width: 33%; text-align: right; }
+      .invoice-amount { display: flex; border-top: 0.5mm solid black;  }
+
+      .invoice-amount div  { width: 33%; text-align: right; padding-top: 2mm;}
       .invoice-amount .taxamt { width: 33%; text-align: right; }
       .invoice-amount .invamt { width: 33%; text-align: right; }
-      .page-count { float: right; padding-top: 5px;}
+      .page-count { float: right; padding-top: 1mm;}
     </style>
     """
   end

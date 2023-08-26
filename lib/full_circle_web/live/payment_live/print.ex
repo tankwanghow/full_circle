@@ -19,7 +19,7 @@ defmodule FullCircleWeb.PaymentLive.Print do
   defp set_page_defaults(socket) do
     socket
     |> assign(:detail_body_height, 160)
-    |> assign(:detail_height, 6)
+    |> assign(:detail_height, 9)
     |> assign(:company, FullCircle.Sys.get_company!(socket.assigns.current_company.id))
   end
 
@@ -378,7 +378,7 @@ defmodule FullCircleWeb.PaymentLive.Print do
     ~H"""
     <style>
       .details-body { min-height: <%= @detail_body_height %>mm; max-height: <%= @detail_body_height %>mm; }
-      .detail { display: flex; height: <%= @detail_height %>mm; vertical-align: middle; align-items: center; line-height: 14px; margin-top: 5px; margin-bottom: 5px;}
+      .detail { display: flex; height: <%= @detail_height %>mm; vertical-align: middle; align-items: center; line-height: 3.5mm;}
       .funds { display: flex; height: <%= @detail_height %>mm; vertical-align: middle;  align-items: center; }
       .matched { display: flex; height: <%= @detail_height %>mm; vertical-align: middle;  align-items: center; }
       #page { width: 210mm; min-height: 290mm; padding: 5mm; }

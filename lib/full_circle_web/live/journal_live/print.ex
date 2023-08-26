@@ -19,7 +19,7 @@ defmodule FullCircleWeb.JournalLive.Print do
   defp set_page_defaults(socket) do
     socket
     |> assign(:detail_body_height, 55)
-    |> assign(:detail_height, 10)
+    |> assign(:detail_height, 9)
     |> assign(:company, FullCircle.Sys.get_company!(socket.assigns.current_company.id))
   end
 
@@ -188,7 +188,7 @@ defmodule FullCircleWeb.JournalLive.Print do
     ~H"""
     <style>
       .details-body { height: <%= @detail_body_height %>mm; }
-      .detail { display: flex; height: <%= @detail_height %>mm; vertical-align: middle; align-items : center; line-height: 15px;}
+      .detail { display: flex; height: <%= @detail_height %>mm; vertical-align: middle; align-items : center;}
       #page { width: 210mm; min-height: 145mm; padding: 5mm; }
 
       @media print {

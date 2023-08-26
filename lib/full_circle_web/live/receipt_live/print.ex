@@ -448,7 +448,7 @@ defmodule FullCircleWeb.ReceiptLive.Print do
     ~H"""
     <style>
       .details-body { min-height: <%= @detail_body_height %>mm; max-height: <%= @detail_body_height %>mm; }
-      .detail { display: flex; height: <%= @detail_height %>mm; vertical-align: middle; align-items: center; line-height: 14px; margin-top: 5px; margin-bottom: 5px;}
+      .detail { display: flex; height: <%= @detail_height %>mm; vertical-align: middle; align-items: center; line-height: 3.5mm; margin-top: 3mm; margin-bottom: 2mm; }
       .cheque { display: flex; height: <%= @detail_height %>mm; vertical-align: middle;  align-items: center; }
       .funds { display: flex; height: <%= @detail_height %>mm; vertical-align: middle;  align-items: center; }
       .matched { display: flex; height: <%= @detail_height %>mm; vertical-align: middle;  align-items: center; }
