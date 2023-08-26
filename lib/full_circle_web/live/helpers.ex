@@ -33,19 +33,12 @@ defmodule FullCircleWeb.Helpers do
     attrs |> Map.merge(%{details_key => details})
   end
 
-  def delete_line(socket, index, lines_name) do
-    cs = socket |> delete_line_std(index, lines_name)
-    socket |> assign(form: to_form(cs |> Map.put(:action, socket.assigns.live_action)))
+  def delete_line(cs, index, lines_name) do
+    cs |> delete_line_std(index, lines_name)
   end
 
-  def delete_line(socket, index, lines_name, after_delete_func) do
-    cs = socket |> delete_line_std(index, lines_name) |> after_delete_func.()
-    socket |> assign(form: to_form(cs |> Map.put(:action, socket.assigns.live_action)))
-  end
-
-  defp delete_line_std(socket, index, lines_name) do
-    changeset = socket.assigns.form.source
-    existing = Ecto.Changeset.get_assoc(changeset, lines_name)
+  defp delete_line_std(cs, index, lines_name) do
+    existing = Ecto.Changeset.get_assoc(cs, lines_name)
     {to_delete, rest} = List.pop_at(existing, String.to_integer(index))
 
     lines =
@@ -59,24 +52,16 @@ defmodule FullCircleWeb.Helpers do
         rest
       end
 
-    changeset
-    |> Ecto.Changeset.put_assoc(lines_name, lines)
+    cs |> Ecto.Changeset.put_assoc(lines_name, lines)
   end
 
-  def add_line(socket, lines_name, params \\ %{}) do
-    cs = socket |> add_line_std(lines_name, params)
-    socket |> assign(form: to_form(cs |> Map.put(:action, socket.assigns.live_action)))
+  def add_line(cs, lines_name, params \\ %{}) do
+    cs |> add_line_std(lines_name, params)
   end
 
-  def add_line(socket, lines_name, params, after_add_func) do
-    cs = socket |> add_line_std(lines_name, params) |> after_add_func.()
-    socket |> assign(form: to_form(cs |> Map.put(:action, socket.assigns.live_action)))
-  end
-
-  defp add_line_std(socket, lines_name, params) do
-    changeset = socket.assigns.form.source
-    existing = Ecto.Changeset.get_assoc(changeset, lines_name)
-    Ecto.Changeset.put_assoc(changeset, lines_name, existing ++ [params])
+  defp add_line_std(cs, lines_name, params) do
+    existing = Ecto.Changeset.get_assoc(cs, lines_name)
+    Ecto.Changeset.put_assoc(cs, lines_name, existing ++ [params])
   end
 
   def format_unit_price(number) do

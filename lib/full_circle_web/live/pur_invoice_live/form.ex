@@ -67,21 +67,24 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
 
   @impl true
   def handle_event("add_detail", _, socket) do
-    socket = socket |> FullCircleWeb.Helpers.add_line(:pur_invoice_details)
-    {:noreply, socket}
+    cs =
+      socket.assigns.form.source
+      |> FullCircleWeb.Helpers.add_line(:pur_invoice_details)
+      |> Map.put(:action, socket.assigns.live_action)
+      |> PurInvoice.compute_fields
+
+    {:noreply, socket |> assign(form: to_form(cs))}
   end
 
   @impl true
   def handle_event("delete_detail", %{"index" => index}, socket) do
-    socket =
-      socket
-      |> FullCircleWeb.Helpers.delete_line(
-        index,
-        :pur_invoice_details,
-        &PurInvoice.compute_fields/1
-      )
+    cs =
+      socket.assigns.form.source
+      |> FullCircleWeb.Helpers.delete_line(index, :pur_invoice_details)
+      |> Map.put(:action, socket.assigns.live_action)
+      |> PurInvoice.compute_fields
 
-    {:noreply, socket}
+    {:noreply, socket |> assign(form: to_form(cs))}
   end
 
   @impl true

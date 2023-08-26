@@ -56,27 +56,27 @@ defmodule FullCircleWeb.JournalLive.Form do
 
   @impl true
   def handle_event("add_trans", _, socket) do
-    socket =
-      socket
+    cs =
+      socket.assigns.form.source
       |> FullCircleWeb.Helpers.add_line(:transactions, %{
         doc_type: "Journal",
         company_id: socket.assigns.current_company.id
       })
+      |> Map.put(:action, socket.assigns.live_action)
+      |> Journal.compute_balance()
 
-    {:noreply, socket}
+    {:noreply, socket |> assign(form: to_form(cs))}
   end
 
   @impl true
-  def handle_event("delete_detail", %{"index" => index}, socket) do
-    socket =
-      socket
-      |> FullCircleWeb.Helpers.delete_line(
-        index,
-        :journal_details,
-        &Journal.compute_balance/1
-      )
+  def handle_event("delete_trans", %{"index" => index}, socket) do
+    cs =
+      socket.assigns.form.source
+      |> FullCircleWeb.Helpers.delete_line(index, :transactions)
+      |> Map.put(:action, socket.assigns.live_action)
+      |> Journal.compute_balance()
 
-    {:noreply, socket}
+    {:noreply, socket |> assign(form: to_form(cs))}
   end
 
   @impl true

@@ -10,7 +10,7 @@ defmodule FullCircle.ReceiveFund.Receipt do
     belongs_to :contact, FullCircle.Accounting.Contact
     field :descriptions, :string
     belongs_to :funds_account, FullCircle.Accounting.Account
-    field :funds_amount, :decimal, default: Decimal.new("0")
+    field :funds_amount, :decimal, default: 0
     belongs_to :company, FullCircle.Sys.Company
 
     has_many :received_cheques, FullCircle.ReceiveFund.ReceivedCheque, on_replace: :delete
@@ -24,14 +24,14 @@ defmodule FullCircle.ReceiveFund.Receipt do
 
     field :contact_name, :string, virtual: true
     field :funds_account_name, :string, virtual: true
-    field :cheques_amount, :decimal, virtual: true, default: Decimal.new("0")
-    field :matched_amount, :decimal, virtual: true, default: Decimal.new("0")
-    field :receipt_detail_amount, :decimal, virtual: true, default: Decimal.new("0")
-    field :receipt_good_amount, :decimal, virtual: true, default: Decimal.new("0")
-    field :receipt_tax_amount, :decimal, virtual: true, default: Decimal.new("0")
+    field :cheques_amount, :decimal, virtual: true, default: 0
+    field :matched_amount, :decimal, virtual: true, default: 0
+    field :receipt_detail_amount, :decimal, virtual: true, default: 0
+    field :receipt_good_amount, :decimal, virtual: true, default: 0
+    field :receipt_tax_amount, :decimal, virtual: true, default: 0
 
-    field :receipt_balance, :decimal, virtual: true, default: Decimal.new("0")
-    field :receipt_amount, :decimal, virtual: true, default: Decimal.new("0")
+    field :receipt_balance, :decimal, virtual: true, default: Decimal.new("0.00")
+    field :receipt_amount, :decimal, virtual: true, default: Decimal.new("0.00")
 
     timestamps(type: :utc_datetime)
   end
@@ -68,6 +68,8 @@ defmodule FullCircle.ReceiveFund.Receipt do
     |> cast_assoc(:received_cheques)
     |> cast_assoc(:receipt_details)
     |> compute_balance()
+    |> validate_number(:receipt_amount, greater_than: Decimal.new("0.00"))
+    |> validate_number(:receipt_balance, equal_to: Decimal.new("0.00"))
   end
 
   defp validate_funds_account_name(changeset) do
@@ -87,41 +89,43 @@ defmodule FullCircle.ReceiveFund.Receipt do
     |> sum_struct_field_to(:received_cheques, :amount, :cheques_amount)
   end
 
-  def compute_balance(changeset) do
-    changeset =
-      changeset
+  def compute_balance(cs) do
+    cs =
+      Map.replace(
+        cs,
+        :errors,
+        Enum.filter(cs.errors, fn {k, _} -> k != :receipt_balance and k != :receipt_amount end)
+      )
+
+    cs = if(Enum.count(cs.errors) == 0, do: Map.replace(cs, :valid?, true), else: cs)
+
+    cs =
+      cs
       |> compute_cheques_amount()
       |> compute_match_transactions_amount()
       |> compute_details_amount()
 
     pos =
-      (fetch_field!(changeset, :cheques_amount) |> Decimal.to_float()) +
-        (fetch_field!(changeset, :funds_amount) |> Decimal.to_float())
+      Decimal.add(
+        fetch_field!(cs, :cheques_amount),
+        fetch_field!(cs, :funds_amount)
+      )
 
     neg =
-      (fetch_field!(changeset, :matched_amount) |> Decimal.to_float()) -
-        (fetch_field!(changeset, :receipt_detail_amount) |> Decimal.to_float())
-
-    bal = Decimal.from_float(pos + neg)
-
-    changeset =
-      changeset
-      |> put_change(:receipt_balance, bal)
-      |> put_change(:receipt_amount, Decimal.from_float(pos))
-
-    if !Decimal.eq?(bal, 0) and
-         !Enum.any?(changeset.errors, fn x ->
-           {:receipt_balance, {gettext("must be ZERO"), []}} == x
-         end) do
-      add_error(changeset, :receipt_balance, gettext("must be ZERO"))
-    else
-      if(pos > 0.0,
-        do: changeset,
-        else:
-          changeset
-          |> add_error(:receipt_amount, gettext("receipt amount need +ve value"))
+      Decimal.sub(
+        fetch_field!(cs, :matched_amount),
+        fetch_field!(cs, :receipt_detail_amount)
       )
-    end
+
+    bal = Decimal.add(pos, neg)
+
+    cs
+    |> cast(%{"receipt_balance" => bal, "receipt_amount" => pos}, [
+      :receipt_balance,
+      :receipt_amount
+    ])
+    |> validate_number(:receipt_amount, greater_than: Decimal.new("0.00"))
+    |> validate_number(:receipt_balance, equal_to: Decimal.new("0.00"))
   end
 
   def compute_details_amount(changeset) do

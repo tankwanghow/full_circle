@@ -163,9 +163,14 @@ defmodule FullCircleWeb.InvoiceLive.DetailComponent do
         <div class={"w-[10%] text-right px-1 border-t #{if(@matched_trans == [], do: "font-semibold border-b-4 border-double")} border-black"}>
           <%= gettext("Invoice Total") %>
         </div>
-        <div class={"detail-amt-col text-right px-1 border-t #{if(@matched_trans == [], do: "font-semibold border-b-4 border-double")} border-black"}>
-          <%= Ecto.Changeset.fetch_field!(@form.source, @doc_detail_amount)
-          |> Number.Delimit.number_to_delimited() %>
+        <div class={"detail-amt-col text-right border-t #{if(@matched_trans == [], do: "font-semibold border-b-4 border-double")} border-black"}>
+          <div>
+            <%= Ecto.Changeset.fetch_field!(@form.source, @doc_detail_amount)
+            |> Number.Delimit.number_to_delimited() %>
+          </div>
+          <.error :for={msg <- Enum.map(@form[@doc_detail_amount].errors, &translate_error(&1))}>
+            <%= msg %>
+          </.error>
         </div>
         <div class="detail-setting-col" />
       </div>

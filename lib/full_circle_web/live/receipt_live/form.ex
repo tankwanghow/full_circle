@@ -69,40 +69,44 @@ defmodule FullCircleWeb.ReceiptLive.Form do
 
   @impl true
   def handle_event("add_detail", _, socket) do
-    socket = socket |> FullCircleWeb.Helpers.add_line(:receipt_details)
-    {:noreply, socket}
+    cs =
+      socket.assigns.form.source
+      |> FullCircleWeb.Helpers.add_line(:receipt_details)
+      |> Map.put(:action, socket.assigns.live_action)
+
+    {:noreply, socket |> assign(form: to_form(cs))}
   end
 
   @impl true
   def handle_event("delete_detail", %{"index" => index}, socket) do
-    socket =
-      socket
-      |> FullCircleWeb.Helpers.delete_line(
-        index,
-        :receipt_details,
-        &Receipt.compute_balance/1
-      )
+    cs =
+      socket.assigns.form.source
+      |> FullCircleWeb.Helpers.delete_line(index, :receipt_details)
+      |> Receipt.compute_balance
+      |> Map.put(:action, socket.assigns.live_action)
 
-    {:noreply, socket}
+    {:noreply, socket |> assign(form: to_form(cs))}
   end
 
   @impl true
   def handle_event("add_cheque", _, socket) do
-    socket = socket |> FullCircleWeb.Helpers.add_line(:received_cheques)
-    {:noreply, socket}
+    cs =
+      socket.assigns.form.source
+      |> FullCircleWeb.Helpers.add_line(:received_cheques)
+      |> Map.put(:action, socket.assigns.live_action)
+
+    {:noreply, socket |> assign(form: to_form(cs))}
   end
 
   @impl true
   def handle_event("delete_cheque", %{"index" => index}, socket) do
-    socket =
-      socket
-      |> FullCircleWeb.Helpers.delete_line(
-        index,
-        :received_cheques,
-        &Receipt.compute_balance/1
-      )
+    cs =
+      socket.assigns.form.source
+      |> FullCircleWeb.Helpers.delete_line(index, :received_cheques)
+      |> Map.put(:action, socket.assigns.live_action)
+      |> Receipt.compute_balance
 
-    {:noreply, socket}
+    {:noreply, socket |> assign(form: to_form(cs))}
   end
 
   @impl true
@@ -137,28 +141,24 @@ defmodule FullCircleWeb.ReceiptLive.Form do
         match_amount: Decimal.negate(match_tran.balance) |> Decimal.round(2)
       })
 
-    socket =
-      socket
-      |> FullCircleWeb.Helpers.add_line(
-        :transaction_matchers,
-        match_tran,
-        &Receipt.compute_balance/1
-      )
+    cs =
+      socket.assigns.form.source
+      |> FullCircleWeb.Helpers.add_line(:transaction_matchers, match_tran)
+      |> Map.put(:action, socket.assigns.live_action)
+      |> Receipt.compute_balance
 
-    {:noreply, socket}
+    {:noreply, socket |> assign(form: to_form(cs))}
   end
 
   @impl true
   def handle_event("delete_match_tran", %{"index" => index}, socket) do
-    socket =
-      socket
-      |> FullCircleWeb.Helpers.delete_line(
-        index,
-        :transaction_matchers,
-        &Receipt.compute_balance/1
-      )
+    cs =
+      socket.assigns.form.source
+      |> FullCircleWeb.Helpers.delete_line(index, :transaction_matchers)
+      |> Map.put(:action, socket.assigns.live_action)
+      |> Receipt.compute_balance
 
-    {:noreply, socket}
+    {:noreply, socket |> assign(form: to_form(cs))}
   end
 
   @impl true

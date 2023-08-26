@@ -64,6 +64,8 @@ defmodule FullCircle.BillPay.Payment do
     |> cast_assoc(:transaction_matchers)
     |> cast_assoc(:payment_details)
     |> compute_balance()
+    |> validate_number(:funds_amount, greater_than: Decimal.new("0.00"))
+    |> validate_number(:payment_balance, equal_to: Decimal.new("0.00"))
   end
 
   def compute_struct_balance(inval) do
@@ -74,32 +76,32 @@ defmodule FullCircle.BillPay.Payment do
     |> sum_struct_field_to(:transaction_matchers, :match_amount, :matched_amount)
   end
 
-  def compute_balance(changeset) do
-    changeset =
-      changeset
+  def compute_balance(cs) do
+    cs =
+      Map.replace(
+        cs,
+        :errors,
+        Enum.filter(cs.errors, fn {k, _} -> k != :payment_balance end)
+      )
+
+    cs = if(Enum.count(cs.errors) == 0, do: Map.replace(cs, :valid?, true), else: cs)
+
+    cs =
+      cs
       |> compute_match_transactions_amount()
       |> compute_details_amount()
 
-    pos = fetch_field!(changeset, :funds_amount) |> Decimal.to_float()
+    pos = fetch_field!(cs, :funds_amount) |> Decimal.to_float()
 
     neg =
-      (fetch_field!(changeset, :matched_amount) |> Decimal.to_float()) +
-        (fetch_field!(changeset, :payment_detail_amount) |> Decimal.to_float())
+      (fetch_field!(cs, :matched_amount) |> Decimal.to_float()) +
+        (fetch_field!(cs, :payment_detail_amount) |> Decimal.to_float())
 
     bal = Decimal.from_float(pos - neg)
 
-    changeset =
-      changeset
-      |> put_change(:payment_balance, bal)
-
-    if !Decimal.eq?(bal, 0) and
-         !Enum.any?(changeset.errors, fn x ->
-           {:payment_balance, {gettext("must be ZERO"), []}} == x
-         end) do
-      add_error(changeset, :payment_balance, gettext("must be ZERO"))
-    else
-      changeset
-    end
+    cs
+    |> cast(%{"payment_balance" => bal}, [:payment_balance])
+    |> validate_number(:payment_balance, equal_to: Decimal.new("0.00"))
   end
 
   def compute_details_amount(changeset) do
