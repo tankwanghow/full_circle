@@ -69,21 +69,24 @@ defmodule FullCircleWeb.PaymentLive.Form do
 
   @impl true
   def handle_event("add_detail", _, socket) do
-    socket = socket |> FullCircleWeb.Helpers.add_line(:payment_details)
-    {:noreply, socket}
+    cs =
+      socket.assigns.form.source
+      |> FullCircleWeb.Helpers.add_line(:payment_details)
+      |> Map.put(:action, socket.assigns.live_action)
+      |> Payment.compute_balance
+
+    {:noreply, socket |> assign(form: to_form(cs))}
   end
 
   @impl true
   def handle_event("delete_detail", %{"index" => index}, socket) do
-    socket =
-      socket
-      |> FullCircleWeb.Helpers.delete_line(
-        index,
-        :payment_details,
-        &Payment.compute_balance/1
-      )
+    cs =
+      socket.assigns.form.source
+      |> FullCircleWeb.Helpers.delete_line(index, :payment_details)
+      |> Map.put(:action, socket.assigns.live_action)
+      |> Payment.compute_balance
 
-    {:noreply, socket}
+    {:noreply, socket |> assign(form: to_form(cs))}
   end
 
   @impl true
@@ -118,28 +121,24 @@ defmodule FullCircleWeb.PaymentLive.Form do
         match_amount: Decimal.negate(match_tran.balance) |> Decimal.round(2)
       })
 
-    socket =
-      socket
-      |> FullCircleWeb.Helpers.add_line(
-        :transaction_matchers,
-        match_tran,
-        &Payment.compute_balance/1
-      )
+    cs =
+      socket.assigns.form.source
+      |> FullCircleWeb.Helpers.add_line(:transaction_matchers, match_tran)
+      |> Map.put(:action, socket.assigns.live_action)
+      |> Payment.compute_balance
 
-    {:noreply, socket}
+    {:noreply, socket |> assign(form: to_form(cs))}
   end
 
   @impl true
   def handle_event("delete_match_tran", %{"index" => index}, socket) do
-    socket =
-      socket
-      |> FullCircleWeb.Helpers.delete_line(
-        index,
-        :transaction_matchers,
-        &Payment.compute_balance/1
-      )
+    cs =
+      socket.assigns.form.source
+      |> FullCircleWeb.Helpers.delete_line(index, :transaction_matchers)
+      |> Map.put(:action, socket.assigns.live_action)
+      |> Payment.compute_balance
 
-    {:noreply, socket}
+    {:noreply, socket |> assign(form: to_form(cs))}
   end
 
   @impl true
