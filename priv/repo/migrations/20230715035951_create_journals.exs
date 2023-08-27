@@ -1,4 +1,4 @@
-defmodule FullCircle.Repo.Migrations.CreatePayments do
+defmodule FullCircle.Repo.Migrations.CreateJournals do
   use Ecto.Migration
 
   def change do

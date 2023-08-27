@@ -15,5 +15,6 @@ defmodule FullCircle.Repo.Migrations.CreateLogs do
 
     create index(:logs, [:user_id])
     create index(:logs, [:company_id])
+    create index(:logs, [:company_id, :entity_id, :entity])
   end
 end

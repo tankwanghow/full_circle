@@ -16,7 +16,9 @@ defmodule FullCircle.Repo.Migrations.CreateInvoices do
 
     create unique_index(:invoices, [:company_id, :invoice_no])
     create index(:invoices, [:company_id])
-    create index(:invoices, [:contact_id])
+    create index(:invoices, [:company_id, :contact_id])
+    create index(:invoices, [:company_id, :invoice_date])
+    create index(:invoices, [:company_id, :due_date])
 
     create table(:invoice_details) do
       add :_persistent_id, :integer

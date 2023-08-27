@@ -22,5 +22,7 @@ defmodule FullCircle.Repo.Migrations.CreateTransactions do
 
       timestamps(updated_at: false, type: :timestamptz)
     end
+
+    
   end
 end

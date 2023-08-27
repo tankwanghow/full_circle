@@ -17,7 +17,11 @@ defmodule FullCircle.Repo.Migrations.CreatePurInvoices do
 
     create unique_index(:pur_invoices, [:company_id, :pur_invoice_no])
     create index(:pur_invoices, [:company_id])
-    create index(:pur_invoices, [:contact_id])
+    create index(:pur_invoices, [:company_id, :contact_id])
+    create index(:pur_invoices, [:company_id, :pur_invoice_date])
+    create index(:pur_invoices, [:company_id, :due_date])
+    create index(:pur_invoices, [:company_id, :supplier_invoice_no])
+
 
     create table(:pur_invoice_details) do
       add :_persistent_id, :integer

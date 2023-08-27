@@ -16,8 +16,9 @@ defmodule FullCircle.Repo.Migrations.CreatePayments do
 
     create unique_index(:payments, [:company_id, :payment_no])
     create index(:payments, [:company_id])
-    create index(:payments, [:contact_id])
-    create index(:payments, [:funds_account_id])
+    create index(:payments, [:company_id, :contact_id])
+    create index(:payments, [:company_id, :funds_account_id])
+    create index(:payments, [:company_id, :payment_date])
 
     create table(:payment_details) do
       add :_persistent_id, :integer

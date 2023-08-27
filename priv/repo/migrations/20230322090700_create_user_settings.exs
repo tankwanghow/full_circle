@@ -11,5 +11,7 @@ defmodule FullCircle.Repo.Migrations.CreateUserSettings do
       add :value, :string
       add :company_user_id, references(:company_user, on_delete: :delete_all)
     end
+
+    create index(:user_settings, [:page, :company_user_id])
   end
 end
