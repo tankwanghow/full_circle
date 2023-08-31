@@ -98,6 +98,11 @@ defmodule FullCircleWeb.UserLive.Index do
            :error,
            gettext("Failed to change user to ") <> params["role"]
          )}
+
+      :not_authorise ->
+        {:noreply,
+         socket
+         |> put_flash(:error, gettext("You are not authorised to perform this action"))}
     end
   end
 
@@ -107,8 +112,8 @@ defmodule FullCircleWeb.UserLive.Index do
 
     case FullCircle.Sys.reset_user_password(
            user,
-           socket.assigns.current_company,
-           socket.assigns.current_user
+           socket.assigns.current_user,
+           socket.assigns.current_company
          ) do
       {:ok, user, pwd} ->
         {:noreply,
@@ -123,6 +128,11 @@ defmodule FullCircleWeb.UserLive.Index do
            :error,
            gettext("Failed Reset Password")
          )}
+
+      :not_authorise ->
+        {:noreply,
+         socket
+         |> put_flash(:error, gettext("You are not authorised to perform this action"))}
     end
   end
 
