@@ -71,7 +71,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
       socket.assigns.form.source
       |> FullCircleWeb.Helpers.add_line(:pur_invoice_details)
       |> Map.put(:action, socket.assigns.live_action)
-      |> PurInvoice.compute_fields
+      |> PurInvoice.compute_fields()
 
     {:noreply, socket |> assign(form: to_form(cs))}
   end
@@ -82,7 +82,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
       socket.assigns.form.source
       |> FullCircleWeb.Helpers.delete_line(index, :pur_invoice_details)
       |> Map.put(:action, socket.assigns.live_action)
-      |> PurInvoice.compute_fields
+      |> PurInvoice.compute_fields()
 
     {:noreply, socket |> assign(form: to_form(cs))}
   end

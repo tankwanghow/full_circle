@@ -73,7 +73,7 @@ defmodule FullCircleWeb.PaymentLive.Form do
       socket.assigns.form.source
       |> FullCircleWeb.Helpers.add_line(:payment_details)
       |> Map.put(:action, socket.assigns.live_action)
-      |> Payment.compute_balance
+      |> Payment.compute_balance()
 
     {:noreply, socket |> assign(form: to_form(cs))}
   end
@@ -84,7 +84,7 @@ defmodule FullCircleWeb.PaymentLive.Form do
       socket.assigns.form.source
       |> FullCircleWeb.Helpers.delete_line(index, :payment_details)
       |> Map.put(:action, socket.assigns.live_action)
-      |> Payment.compute_balance
+      |> Payment.compute_balance()
 
     {:noreply, socket |> assign(form: to_form(cs))}
   end
@@ -125,7 +125,7 @@ defmodule FullCircleWeb.PaymentLive.Form do
       socket.assigns.form.source
       |> FullCircleWeb.Helpers.add_line(:transaction_matchers, match_tran)
       |> Map.put(:action, socket.assigns.live_action)
-      |> Payment.compute_balance
+      |> Payment.compute_balance()
 
     {:noreply, socket |> assign(form: to_form(cs))}
   end
@@ -136,7 +136,7 @@ defmodule FullCircleWeb.PaymentLive.Form do
       socket.assigns.form.source
       |> FullCircleWeb.Helpers.delete_line(index, :transaction_matchers)
       |> Map.put(:action, socket.assigns.live_action)
-      |> Payment.compute_balance
+      |> Payment.compute_balance()
 
     {:noreply, socket |> assign(form: to_form(cs))}
   end

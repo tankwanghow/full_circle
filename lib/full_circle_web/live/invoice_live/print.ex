@@ -131,9 +131,7 @@ defmodule FullCircleWeb.InvoiceLive.Print do
 
     ~H"""
     <div class="descriptions">....continue....</div>
-    <div class="invoice-footer">
-
-    </div>
+    <div class="invoice-footer"></div>
     <span class="page-count"><%= "page #{@page} of #{@pages}" %></span>
     """
   end

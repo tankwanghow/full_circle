@@ -134,7 +134,7 @@ defmodule FullCircle.Authorization do
   def can?(user, :delete_company, company), do: allow_role("admin", company, user)
   def can?(user, :update_company, company), do: allow_role("admin", company, user)
   def can?(user, :reset_user_password, company), do: allow_role("admin", company, user)
-  
+
   def can?(admin, :change_user_role, company, user) do
     if user_role_in_company(admin.id, company.id) == "admin" do
       if admin.id == user.id do

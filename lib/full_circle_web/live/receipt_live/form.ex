@@ -82,7 +82,7 @@ defmodule FullCircleWeb.ReceiptLive.Form do
     cs =
       socket.assigns.form.source
       |> FullCircleWeb.Helpers.delete_line(index, :receipt_details)
-      |> Receipt.compute_balance
+      |> Receipt.compute_balance()
       |> Map.put(:action, socket.assigns.live_action)
 
     {:noreply, socket |> assign(form: to_form(cs))}
@@ -104,7 +104,7 @@ defmodule FullCircleWeb.ReceiptLive.Form do
       socket.assigns.form.source
       |> FullCircleWeb.Helpers.delete_line(index, :received_cheques)
       |> Map.put(:action, socket.assigns.live_action)
-      |> Receipt.compute_balance
+      |> Receipt.compute_balance()
 
     {:noreply, socket |> assign(form: to_form(cs))}
   end
@@ -145,7 +145,7 @@ defmodule FullCircleWeb.ReceiptLive.Form do
       socket.assigns.form.source
       |> FullCircleWeb.Helpers.add_line(:transaction_matchers, match_tran)
       |> Map.put(:action, socket.assigns.live_action)
-      |> Receipt.compute_balance
+      |> Receipt.compute_balance()
 
     {:noreply, socket |> assign(form: to_form(cs))}
   end
@@ -156,7 +156,7 @@ defmodule FullCircleWeb.ReceiptLive.Form do
       socket.assigns.form.source
       |> FullCircleWeb.Helpers.delete_line(index, :transaction_matchers)
       |> Map.put(:action, socket.assigns.live_action)
-      |> Receipt.compute_balance
+      |> Receipt.compute_balance()
 
     {:noreply, socket |> assign(form: to_form(cs))}
   end
