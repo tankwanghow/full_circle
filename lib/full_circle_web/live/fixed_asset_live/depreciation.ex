@@ -293,15 +293,15 @@ defmodule FullCircleWeb.FixedAssetLive.Depreciations do
       <div class="mt-4 border rounded bg-rose-200 p-5">
         <p class="w-full text-xl text-center font-medium"><%= gettext("Saved Depreciations") %></p>
         <div class="font-medium flex flex-row flex-wrap text-center mt-2 tracking-tighter">
-          <div class="detail-header w-32"><%= gettext("Date") %></div>
-          <div class="detail-header w-32"><%= gettext("Cost Basis") %></div>
-          <div class="detail-header w-36">
+          <div class="detail-header w-[17%]"><%= gettext("Date") %></div>
+          <div class="detail-header w-[20%]"><%= gettext("Cost Basis") %></div>
+          <div class="detail-header w-[20%]">
             <%= gettext("Depreciation") %>
           </div>
-          <div class="detail-header w-36">
+          <div class="detail-header w-[20%]">
             <%= gettext("Cume Depreciation") %>
           </div>
-          <div class="detail-header w-36">
+          <div class="detail-header w-[20%]">
             <%= gettext("Net Book Value") %>
           </div>
         </div>
@@ -316,38 +316,38 @@ defmodule FullCircleWeb.FixedAssetLive.Depreciations do
               phx-value-id={obj.id}
             >
               <div class={[
-                "w-32 border rounded bg-green-200 border-green-400 text-center px-2 py-1",
+                "w-[17%] border rounded bg-green-200 border-green-400 text-center px-2 py-1",
                 !obj.closed && "hover:bg-green-300"
               ]}>
                 <%= obj.depre_date %>
               </div>
               <div class={[
-                "w-32 border rounded bg-green-200 border-green-400 text-center px-2 py-1",
+                "w-[20%] border rounded bg-green-200 border-green-400 text-center px-2 py-1",
                 !obj.closed && "hover:bg-green-300"
               ]}>
                 <%= obj.cost_basis |> Number.Delimit.number_to_delimited() %>
               </div>
               <div class={[
-                "w-36 border rounded bg-green-200 border-green-400 text-center px-2 py-1",
+                "w-[20%] border rounded bg-green-200 border-green-400 text-center px-2 py-1",
                 !obj.closed && "hover:bg-green-300"
               ]}>
                 <%= obj.amount |> Number.Delimit.number_to_delimited() %>
               </div>
               <div class={[
-                "w-36 border rounded bg-green-200 border-green-400 text-center px-2 py-1",
+                "w-[20%] border rounded bg-green-200 border-green-400 text-center px-2 py-1",
                 !obj.closed && "hover:bg-green-300"
               ]}>
                 <%= obj.cume_depre |> Number.Delimit.number_to_delimited() %>
               </div>
               <div class={[
-                "w-36 border rounded bg-green-200 border-green-400 text-center px-2 py-1",
+                "w-[20%] border rounded bg-green-200 border-green-400 text-center px-2 py-1",
                 !obj.closed && "hover:bg-green-300"
               ]}>
                 <%= Decimal.sub(obj.cost_basis, obj.cume_depre)
                 |> Number.Delimit.number_to_delimited() %>
               </div>
 
-              <div :if={!obj.closed} class="w-5 mt-1 text-rose-500  hover:bg-blue-200">
+              <div :if={!obj.closed} class="w-[3%] mt-1 text-rose-500  hover:bg-blue-200">
                 <.link phx-click={:delete_depreciation} phx-value-id={obj.id} tabindex="-1">
                   <.icon name="hero-trash-solid" class="h-5 w-5" />
                 </.link>
@@ -378,34 +378,34 @@ defmodule FullCircleWeb.FixedAssetLive.Depreciations do
         </.form>
 
         <div class="font-medium flex flex-row flex-wrap text-center mt-2 tracking-tighter">
-          <div class="detail-header w-36"><%= gettext("Date") %></div>
-          <div class="detail-header w-36"><%= gettext("Cost Basis") %></div>
-          <div class="detail-header w-36">
+          <div class="detail-header w-[20%]"><%= gettext("Date") %></div>
+          <div class="detail-header w-[20%]"><%= gettext("Cost Basis") %></div>
+          <div class="detail-header w-[20%]">
             <%= gettext("Depreciation") %>
           </div>
-          <div class="detail-header w-36">
+          <div class="detail-header w-[20%]">
             <%= gettext("Cume Depreciation") %>
           </div>
-          <div class="detail-header w-40">
+          <div class="detail-header w-[20%]">
             <%= gettext("Net Book Value") %>
           </div>
         </div>
         <div id="generated_depreciation_list">
           <%= for obj <- @generated_depreciations do %>
             <div class="flex flex-row text-center tracking-tighter">
-              <div class="w-36 border rounded bg-amber-200 border-amber-400 text-center px-2 py-1">
+              <div class="w-[20%] border rounded bg-amber-200 border-amber-400 text-center px-2 py-1">
                 <%= obj.depre_date %>
               </div>
-              <div class="w-36 border rounded bg-amber-200 border-amber-400 text-center px-2 py-1">
+              <div class="w-[20%] border rounded bg-amber-200 border-amber-400 text-center px-2 py-1">
                 <%= obj.cost_basis |> Number.Delimit.number_to_delimited() %>
               </div>
-              <div class="w-36 border rounded bg-amber-200 border-amber-400 text-center px-2 py-1">
+              <div class="w-[20%] border rounded bg-amber-200 border-amber-400 text-center px-2 py-1">
                 <%= obj.amount |> Number.Delimit.number_to_delimited() %>
               </div>
-              <div class="w-36 border rounded bg-amber-200 border-amber-400 text-center px-2 py-1">
+              <div class="w-[20%] border rounded bg-amber-200 border-amber-400 text-center px-2 py-1">
                 <%= obj.cume_depre |> Number.Delimit.number_to_delimited() %>
               </div>
-              <div class="w-40 border rounded bg-amber-200 border-amber-400 text-center px-2 py-1">
+              <div class="w-[20%] border rounded bg-amber-200 border-amber-400 text-center px-2 py-1">
                 <%= (obj.cost_basis - obj.cume_depre) |> Number.Delimit.number_to_delimited() %>
               </div>
             </div>
