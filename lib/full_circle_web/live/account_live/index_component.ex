@@ -18,16 +18,27 @@ defmodule FullCircleWeb.AccountLive.IndexComponent do
       id={@id}
       class={~s(#{@ex_class} text-center mb-1 bg-gray-200 border-gray-500 border-2 rounded p-2)}
     >
-      <.link
-        :if={!FullCircle.Accounting.is_default_account?(@obj)}
-        class="font-bold text-blue-600"
-        navigate={~p"/companies/#{@current_company.id}/accounts/#{@obj.id}/edit"}
-      >
-        <%= @obj.name %>
-      </.link>
-      <span :if={FullCircle.Accounting.is_default_account?(@obj)} class="font-bold text-rose-600">
-        <%= @obj.name %>
-      </span>
+      <%= if !FullCircle.Accounting.is_default_account?(@obj) do %>
+        <.link
+          class="font-bold text-blue-600"
+          navigate={~p"/companies/#{@current_company.id}/accounts/#{@obj.id}/edit"}
+        >
+          <%= @obj.name %>
+        </.link>
+      <% else %>
+        <%= if @current_role == "admin" do %>
+          <.link
+            class="font-bold text-purple-600"
+            navigate={~p"/companies/#{@current_company.id}/accounts/#{@obj.id}/edit"}
+          >
+            <%= @obj.name %>
+          </.link>
+        <% else %>
+          <span class="font-bold text-rose-600">
+            <%= @obj.name %>
+          </span>
+        <% end %>
+      <% end %>
       <span>(<%= @obj.account_type %>)</span>
       <p class="text-sm text-green-600"><%= @obj.descriptions %></p>
     </div>

@@ -547,11 +547,15 @@ defmodule FullCircle.Accounting do
   end
 
   def delete_account(ac, company, user) do
-    if !is_default_account?(ac) do
-      StdInterface.delete(Account, "account", ac, company, user)
+    if is_default_account?(ac) do
+      if Sys.get_company_user(company.id, user.id).role == "admin" do
+        StdInterface.delete(Account, "account", ac, company, user)
+      else
+        {:error, "Cannot delete default account",
+         StdInterface.changeset(Account, ac, %{}, company), ""}
+      end
     else
-      {:error, "Cannot delete default account", StdInterface.changeset(Account, ac, %{}, company),
-       ""}
+      StdInterface.delete(Account, "account", ac, company, user)
     end
   end
 

@@ -40,6 +40,7 @@ defmodule FullCircleWeb.AccountLive.Index do
         <%= for {obj_id, obj} <- @streams.objects do %>
           <.live_component
             current_company={@current_company}
+            current_role={@current_role}
             module={IndexComponent}
             id={obj_id}
             obj={obj}
