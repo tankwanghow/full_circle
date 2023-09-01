@@ -17,11 +17,11 @@ defmodule FullCircle.Repo.Migrations.CreateTransactionMatchers do
       add :_persistent_id, :integer
       add :match_amount, :decimal, default: 0
       add :transaction_id, references(:transactions, on_delete: :restrict)
-      add :entity_id, :binary_id
-      add :entity, :string
+      add :doc_id, :binary_id
+      add :doc_type, :string
     end
 
     create index(:transaction_matchers, [:transaction_id])
-    create index(:transaction_matchers, [:entity_id, :entity])
+    create index(:transaction_matchers, [:doc_id, :doc_type])
   end
 end
