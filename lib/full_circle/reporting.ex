@@ -1,8 +1,82 @@
 defmodule FullCircle.Reporting do
   import Ecto.Query, warn: false
 
-  alias FullCircle.Accounting.{Account, Transaction}
+  alias FullCircle.Accounting.{Account, Transaction, Contact}
   alias FullCircle.{Repo, Accounting}
+  alias FullCircle.ReceiveFund.{ReceivedCheque, Receipt}
+  import FullCircle.Helpers
+
+  def post_dated_cheques(terms, flag, rdate, ddate, com) do
+    IO.inspect {terms, flag, rdate, ddate}
+    qry = from(q in subquery(post_dated_chq_raw_query(com)))
+
+    qry =
+      if terms != "" do
+        from rec in qry,
+          order_by: ^similarity_order([:cheque_no, :contact_name, :bank, :deposit_to, :return_reason], terms)
+      else
+        qry
+      end
+
+    qry =
+      if rdate != "" do
+        from rec in qry, where: rec.receipt_date >= ^rdate, order_by: rec.receipt_date
+      else
+        qry
+      end
+
+    qry =
+      if ddate != "" do
+        from rec in qry, where: rec.due_date <= ^ddate, order_by: rec.due_date
+      else
+        qry
+      end
+
+    qry =
+      cond do
+        flag == "Banked-In" ->
+          from rec in qry, where: not(is_nil(rec.deposit_to))
+
+        flag == "In-Hand" ->
+          from rec in qry,
+            where: is_nil(rec.deposit_to),
+            where: is_nil(rec.return_to)
+
+        true ->
+          qry
+      end
+
+    qry |> Repo.all()
+  end
+
+  defp post_dated_chq_raw_query(com) do
+    from chq in ReceivedCheque,
+      join: rec in Receipt,
+      on: rec.id == chq.receipt_id,
+      join: cont in Contact,
+      on: cont.id == rec.contact_id,
+      left_join: cont1 in Contact,
+      on: cont1.id == chq.return_to_id,
+      left_join: bank in Account,
+      on: bank.id == chq.deposit_to_id,
+      where: rec.company_id == ^com.id,
+      select: %{
+        id: chq.id,
+        contact_name: cont.name,
+        receipt_date: rec.receipt_date,
+        receipt_id: rec.id,
+        bank: chq.bank,
+        due_date: chq.due_date,
+        amount: chq.amount,
+        cheque_no: chq.cheque_no,
+        deposit_date: chq.deposit_date,
+        return_date: chq.return_date,
+        return_to: cont1.name,
+        deposit_to: bank.name,
+        return_reason: chq.return_reason,
+        checked: false
+      }
+  end
 
   def prev_close_date(at_date, com) do
     Date.new!(at_date.year - 1, com.closing_month, com.closing_day)

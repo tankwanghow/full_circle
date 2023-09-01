@@ -15,15 +15,14 @@ defmodule FullCircle.ReceiveFund.ReceivedCheque do
     belongs_to :receipt, FullCircle.ReceiveFund.Receipt
 
     field :deposit_date, :date
-    belongs_to :deposit_account, FullCircle.Accounting.Account
+    belongs_to :deposit_to, FullCircle.Accounting.Account
 
-    field :return_cheque_date, :date
-    belongs_to :return_from_account, FullCircle.Accounting.Account
-    belongs_to :return_to_account, FullCircle.Accounting.Account
+    field :return_date, :date
+    field :return_reason, :string
+    belongs_to :return_to, FullCircle.Accounting.Account
 
     field :deposit_to_account_name, :string, virtual: true
-    field :return_from_account_name, :string, virtual: true
-    field :return_to_account_name, :string, virtual: true
+    field :return_to_contact_name, :string, virtual: true
 
     field :delete, :boolean, virtual: true, default: false
   end
