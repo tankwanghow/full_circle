@@ -618,7 +618,7 @@ defmodule FullCircleWeb.ReceiptLive.Form do
 
           <.inputs_for :let={dtl} field={@form[:received_cheques]}>
             <div class={"flex flex-row flex-wrap #{if(dtl[:delete].value == true, do: "hidden", else: "")}"}>
-              <div class="w-[16%]"><.input field={dtl[:bank]} /></div>
+              <div feedback={true} class="w-[16%]"><.input field={dtl[:bank]} /></div>
               <div class="w-[16%]"><.input field={dtl[:cheque_no]} /></div>
               <div class="w-[16%]"><.input field={dtl[:city]} /></div>
               <div class="w-[17%]"><.input field={dtl[:state]} /></div>

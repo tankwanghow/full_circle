@@ -34,10 +34,6 @@ defmodule FullCircleWeb.Helpers do
   end
 
   def delete_line(cs, index, lines_name) do
-    cs |> delete_line_std(index, lines_name)
-  end
-
-  defp delete_line_std(cs, index, lines_name) do
     existing = Ecto.Changeset.get_assoc(cs, lines_name)
     {to_delete, rest} = List.pop_at(existing, String.to_integer(index))
 
@@ -56,10 +52,6 @@ defmodule FullCircleWeb.Helpers do
   end
 
   def add_line(cs, lines_name, params \\ %{}) do
-    cs |> add_line_std(lines_name, params)
-  end
-
-  defp add_line_std(cs, lines_name, params) do
     existing = Ecto.Changeset.get_assoc(cs, lines_name)
     Ecto.Changeset.put_assoc(cs, lines_name, existing ++ [params])
   end
@@ -107,6 +99,10 @@ defmodule FullCircleWeb.Helpers do
   end
 
   def format_date(date) do
-    Timex.format!(Timex.local(date), "%d-%m-%Y", :strftime)
+    if is_nil(date) do
+      nil
+    else
+      Timex.format!(Timex.local(date), "%d-%m-%Y", :strftime)
+    end
   end
 end

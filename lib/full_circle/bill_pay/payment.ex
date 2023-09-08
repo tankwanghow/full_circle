@@ -58,6 +58,8 @@ defmodule FullCircle.BillPay.Payment do
     ])
     |> validate_id(:contact_name, :contact_id)
     |> validate_id(:funds_account_name, :funds_account_id)
+    |> validate_date(:payment_date, before: Timex.shift(Timex.today, days: 1))
+    |> validate_date(:payment_date, after: Timex.shift(Timex.today, days: -60))
     |> unsafe_validate_unique([:payment_no, :company_id], FullCircle.Repo,
       message: gettext("payment no already in company")
     )

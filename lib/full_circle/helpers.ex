@@ -150,4 +150,20 @@ defmodule FullCircle.Helpers do
       changeset
     end
   end
+
+  def validate_date(cs, field, before: bdate) do
+    if Timex.compare(fetch_field!(cs, field) || bdate, bdate) == -1 do
+      cs
+    else
+      add_error(cs, field, "#{gettext("before")} #{bdate}")
+    end
+  end
+
+  def validate_date(cs, field, after: bdate) do
+    if Timex.compare(fetch_field!(cs, field) || bdate, bdate) == 1 do
+      cs
+    else
+      add_error(cs, field, "#{gettext("after")} #{bdate}")
+    end
+  end
 end

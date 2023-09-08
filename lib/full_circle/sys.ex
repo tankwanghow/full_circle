@@ -588,7 +588,7 @@ defmodule FullCircle.Sys do
   end
 
   def attr_to_string(attrs) do
-    bl = ["_id", "delete"]
+    bl = ["_id", "delete", "__meta__"]
 
     if Enum.any?(attrs, fn {k, v} ->
          (k == "delete" or k == :delete) and v == "true"
@@ -601,7 +601,7 @@ defmodule FullCircle.Sys do
 
         if !String.ends_with?(k, bl) and k != "id" do
           if !is_map(v) do
-            if v != "",
+            if v != "" and !is_nil(v),
               do: "&^#{k}: #{Phoenix.HTML.html_escape(v) |> Phoenix.HTML.safe_to_string()}^&",
               else: nil
           else

@@ -282,14 +282,6 @@ defmodule FullCircleWeb.PaymentLive.Print do
     """
   end
 
-  def funds_header(recd, payment, assigns) do
-    assigns = assigns |> assign(:recd, recd) |> assign(:payment, payment)
-
-    ~H"""
-
-    """
-  end
-
   def match_tran_header(recd, assigns) do
     assigns = assigns |> assign(:recd, recd)
 
@@ -398,7 +390,6 @@ defmodule FullCircleWeb.PaymentLive.Print do
       .customer { padding-left: 2mm; float: left;}
 
       .payment-info div { display: block; margin-bottom: 1px; text-align: right; }
-      .payment-info div.descriptions { text-align: left; }
 
       .details-header { display: flex; padding-bottom: 1mm; padding-top: 1mm; border-bottom: 0.5mm dotted black; margin-bottom: 3px;}
       .particular { width: 80mm; text-align: left;}

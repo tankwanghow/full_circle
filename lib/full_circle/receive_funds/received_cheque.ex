@@ -1,6 +1,7 @@
 defmodule FullCircle.ReceiveFund.ReceivedCheque do
   use FullCircle.Schema
   import Ecto.Changeset
+  import FullCircle.Helpers
   import FullCircleWeb.Gettext
 
   schema "received_cheques" do
@@ -13,16 +14,8 @@ defmodule FullCircle.ReceiveFund.ReceivedCheque do
     field :amount, :decimal, default: 0
 
     belongs_to :receipt, FullCircle.ReceiveFund.Receipt
-
-    field :deposit_date, :date
-    belongs_to :deposit_to, FullCircle.Accounting.Account
-
-    field :return_date, :date
-    field :return_reason, :string
-    belongs_to :return_to, FullCircle.Accounting.Account
-
-    field :deposit_to_account_name, :string, virtual: true
-    field :return_to_contact_name, :string, virtual: true
+    belongs_to :deposit, FullCircle.Cheque.Deposit
+    belongs_to :return_cheque, FullCircle.Cheque.ReturnCheque
 
     field :delete, :boolean, virtual: true, default: false
   end
@@ -32,16 +25,23 @@ defmodule FullCircle.ReceiveFund.ReceivedCheque do
     cheque
     |> cast(attrs, [
       :_persistent_id,
+      :id,
       :bank,
       :due_date,
       :state,
       :city,
       :cheque_no,
       :amount,
+      :deposit_id,
+      :return_cheque_id,
       :delete
     ])
     |> validate_required([:bank, :due_date, :cheque_no, :amount])
+    |> validate_date(:due_date, before: Timex.shift(Timex.today, days: 90))
+    |> validate_date(:due_date, after: Timex.shift(Timex.today, days: -90))
     |> validate_number(:amount, greater_than: 0)
+    |> validate_cannot_update_deposited()
+    |> validate_cannot_update_returned()
     |> maybe_mark_for_deletion()
   end
 
@@ -55,24 +55,19 @@ defmodule FullCircle.ReceiveFund.ReceivedCheque do
     end
   end
 
-  def deposit_changeset(cheque, attrs) do
-    cheque
-    |> cast(attrs, [
-      :deposit_date,
-      :deposit_account_name
-    ])
-    |> validate_required([:deposit_date, :deposit_account_name])
-    |> validate_deposit_date()
+  defp validate_cannot_update_deposited(cs) do
+    if is_nil(fetch_field!(cs, :deposit_id)) do
+      cs
+    else
+      add_error(cs, :bank, gettext("Deposited!"))
+    end
   end
 
-  defp validate_deposit_date(changeset) do
-    due = fetch_field!(changeset, :due_date)
-    dep = fetch_field!(changeset, :deposit_date)
-
-    if Timex.diff(due, dep, :days) <= 0 do
-      changeset
+  defp validate_cannot_update_returned(cs) do
+    if is_nil(fetch_field!(cs, :return_cheque_id)) do
+      cs
     else
-      add_error(changeset, :deposit_date, gettext("must be greater than due_date"))
+      add_error(cs, :bank, gettext("Returned!"))
     end
   end
 end

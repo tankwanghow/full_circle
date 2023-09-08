@@ -139,7 +139,11 @@ defmodule FullCircleWeb.Router do
       live("/journal_entries/:doc_type/:doc_no", JournalEntryViewLive.Index, :index)
       live("/account_transactions", TransactionLive.Account, :index)
       live("/contact_transactions", TransactionLive.Contact, :index)
-      live("/pd_chqs", TransactionLive.PostDatedChq, :index)
+
+      live("/Deposit", ChequeLive.DepositIndex, :index)
+      live("/Deposit/new", ChequeLive.DepositForm, :new)
+      live("/Deposit/:deposit_id/edit", ChequeLive.DepositForm, :edit)
+
       live("/seeds", SeedLive.Index, :index)
 
       live("/Receipt", ReceiptLive.Index, :index)

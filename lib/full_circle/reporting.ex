@@ -3,17 +3,17 @@ defmodule FullCircle.Reporting do
 
   alias FullCircle.Accounting.{Account, Transaction, Contact}
   alias FullCircle.{Repo, Accounting}
+  alias FullCircle.Cheque.{Deposit, ReturnCheque}
   alias FullCircle.ReceiveFund.{ReceivedCheque, Receipt}
   import FullCircle.Helpers
 
   def post_dated_cheques(terms, flag, rdate, ddate, com) do
-    IO.inspect {terms, flag, rdate, ddate}
     qry = from(q in subquery(post_dated_chq_raw_query(com)))
 
     qry =
       if terms != "" do
         from rec in qry,
-          order_by: ^similarity_order([:cheque_no, :contact_name, :bank, :deposit_to, :return_reason], terms)
+          order_by: ^similarity_order([:cheque_no, :contact_name, :bank, :deposit_bank_name, :return_reason], terms)
       else
         qry
       end
@@ -35,12 +35,12 @@ defmodule FullCircle.Reporting do
     qry =
       cond do
         flag == "Banked-In" ->
-          from rec in qry, where: not(is_nil(rec.deposit_to))
+          from rec in qry, where: not(is_nil(rec.deposit_id))
 
         flag == "In-Hand" ->
           from rec in qry,
-            where: is_nil(rec.deposit_to),
-            where: is_nil(rec.return_to)
+            where: is_nil(rec.deposit_id),
+            where: is_nil(rec.return_id)
 
         true ->
           qry
@@ -55,10 +55,12 @@ defmodule FullCircle.Reporting do
       on: rec.id == chq.receipt_id,
       join: cont in Contact,
       on: cont.id == rec.contact_id,
-      left_join: cont1 in Contact,
-      on: cont1.id == chq.return_to_id,
+      left_join: dep in Deposit,
+      on: dep.id == chq.deposit_id,
       left_join: bank in Account,
-      on: bank.id == chq.deposit_to_id,
+      on: bank.id == dep.bank_id,
+      left_join: rtn in ReturnCheque,
+      on: rtn.id == chq.return_cheque_id,
       where: rec.company_id == ^com.id,
       select: %{
         id: chq.id,
@@ -66,14 +68,19 @@ defmodule FullCircle.Reporting do
         receipt_date: rec.receipt_date,
         receipt_id: rec.id,
         bank: chq.bank,
+        city: chq.city,
+        state: chq.state,
         due_date: chq.due_date,
         amount: chq.amount,
         cheque_no: chq.cheque_no,
-        deposit_date: chq.deposit_date,
-        return_date: chq.return_date,
-        return_to: cont1.name,
-        deposit_to: bank.name,
-        return_reason: chq.return_reason,
+        deposit_date: dep.deposit_date,
+        deposit_bank_name: bank.name,
+        deposit_id: dep.id,
+        deposit_no: dep.deposit_no,
+        return_date: rtn.return_date,
+        return_id: rtn.id,
+        return_no: rtn.return_cheque_no,
+        return_reason: rtn.return_reason,
         checked: false
       }
   end

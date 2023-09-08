@@ -15,9 +15,16 @@ defmodule FullCircle.ReceiveFund do
 
   alias FullCircle.{Sys, Accounting}
   alias FullCircle.Product.{Good, Packaging}
-  alias FullCircle.Accounting.Account
+  alias FullCircle.Accounting.{Account, Contact}
   alias FullCircle.StdInterface
   alias Ecto.Multi
+
+  def get_cheque_by_id!(id) do
+    Repo.one(
+      from obj in FullCircle.ReceiveFund.ReceivedCheque,
+        where: obj.id == ^id
+    )
+  end
 
   def get_receipt_by_no!(no, com, user) do
     id =
@@ -417,6 +424,7 @@ defmodule FullCircle.ReceiveFund do
       from(txn in Transaction,
         where: txn.doc_type == "Receipt",
         where: txn.doc_no == ^receipt.receipt_no,
+        where: txn.doc_id == ^receipt.id,
         where: txn.company_id == ^com.id
       )
     )

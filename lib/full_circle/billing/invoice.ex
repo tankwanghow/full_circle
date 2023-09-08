@@ -47,6 +47,8 @@ defmodule FullCircle.Billing.Invoice do
       :contact_name,
       :invoice_no
     ])
+    |> validate_date(:invoice_date, before: Timex.shift(Timex.today, days: 2))
+    |> validate_date(:invoice_date, after: Timex.shift(Timex.today, days: -60))
     |> validate_id(:contact_name, :contact_id)
     |> unsafe_validate_unique([:invoice_no, :company_id], FullCircle.Repo,
       message: gettext("invoice no already in company")

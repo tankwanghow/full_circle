@@ -37,6 +37,10 @@ defmodule FullCircleWeb.DashboardLive do
           <%= gettext("Payments") %>
         </.link>
 
+        <.link navigate={~p"/companies/#{@current_company.id}/Deposit"} class="nav-btn">
+          <%= gettext("Deposits") %>
+        </.link>
+
         <.link navigate={~p"/companies/#{@current_company.id}/PurInvoice"} class="nav-btn">
           <%= gettext("Purchase Invoices") %>
         </.link>
@@ -49,10 +53,6 @@ defmodule FullCircleWeb.DashboardLive do
 
         <.link navigate={~p"/companies/#{@current_company.id}/Journal"} class="nav-btn">
           <%= gettext("Journal Entries") %>
-        </.link>
-
-        <.link navigate={~p"/companies/#{@current_company.id}/pd_chqs"} class="nav-btn">
-          <%= gettext("Post Dated Cheques") %>
         </.link>
       </div>
     </div>

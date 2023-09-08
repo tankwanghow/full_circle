@@ -15,7 +15,7 @@ defmodule FullCircle.Repo.Migrations.CreateReceipts do
     end
 
     create unique_index(:receipts, [:company_id, :receipt_no])
-    create index(:receipts, [:company_id, :company_id])
+    create index(:receipts, [:company_id])
     create index(:receipts, [:company_id, :contact_id])
     create index(:receipts, [:company_id, :funds_account_id])
     create index(:receipts, [:company_id, :receipt_date])
@@ -51,7 +51,6 @@ defmodule FullCircle.Repo.Migrations.CreateReceipts do
       add :receipt_id, references(:receipts, on_delete: :delete_all)
       add :deposit_id, references(:deposits, on_delete: :delete_all)
       add :return_cheque_id, references(:return_cheques, on_delete: :delete_all)
-      add :return_cheque_reason, :string
     end
 
     create index(:received_cheques, [:due_date])

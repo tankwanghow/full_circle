@@ -59,6 +59,8 @@ defmodule FullCircle.ReceiveFund.Receipt do
       :funds_amount
     ])
     |> validate_funds_account_name()
+    |> validate_date(:receipt_date, before: (Timex.shift(Timex.today(), days: 1)))
+    |> validate_date(:receipt_date, after: (Timex.shift(Timex.today(), days: -60)))
     |> validate_id(:contact_name, :contact_id)
     |> validate_id(:funds_account_name, :funds_account_id)
     |> unsafe_validate_unique([:receipt_no, :company_id], FullCircle.Repo,
