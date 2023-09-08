@@ -1,0 +1,17 @@
+# Deposit Cheques
+
+```elixir
+alias FullCircle.{Sys, Reporting}
+alias FullCircle.Cheque.Deposit
+alias FullCircle.Cheque
+alias FullCircle.ReceiveFund.ReceivedCheque
+
+{u, c} = Sys.get_user_default_company_by_email("a@a.a")
+chqs = Reporting.post_dated_cheques("", "All", "", "2023-12-31", c)
+```
+
+## Depositing Cheques
+
+```elixir
+Cheque.deposit_index_query("", "", c, u, page: 1, per_page: 50)
+```
