@@ -38,8 +38,8 @@ defmodule FullCircle.Cheque.Deposit do
     |> validate_id(:bank_name, :bank_id)
     |> validate_id(:funds_from_name, :funds_from_id)
     |> put_assoc_cheques(attrs)
-    |> validate_date(:deposit_date, before: Timex.shift(Timex.today, days: 4))
-    |> validate_date(:deposit_date, after: Timex.shift(Timex.today, days: -60))
+    |> validate_date(:deposit_date, before: Timex.shift(Timex.today(), days: 4))
+    |> validate_date(:deposit_date, after: Timex.shift(Timex.today(), days: -60))
     |> validate_deposit_date()
   end
 

@@ -131,7 +131,13 @@ defmodule FullCircle.Authorization do
   def can?(user, :create_deposit, company),
     do: forbid_roles(~w(auditor guest), company, user)
 
-    def can?(user, :update_deposit, company),
+  def can?(user, :update_deposit, company),
+    do: forbid_roles(~w(auditor guest), company, user)
+
+  def can?(user, :create_return_cheque, company),
+    do: forbid_roles(~w(auditor guest), company, user)
+
+  def can?(user, :update_return_cheque, company),
     do: forbid_roles(~w(auditor guest), company, user)
 
   def can?(user, :see_user_list, company), do: allow_role("admin", company, user)

@@ -13,7 +13,11 @@ defmodule FullCircle.Reporting do
     qry =
       if terms != "" do
         from rec in qry,
-          order_by: ^similarity_order([:cheque_no, :contact_name, :bank, :deposit_bank_name, :return_reason], terms)
+          order_by:
+            ^similarity_order(
+              [:cheque_no, :contact_name, :bank, :deposit_bank_name, :return_reason],
+              terms
+            )
       else
         qry
       end
@@ -35,7 +39,7 @@ defmodule FullCircle.Reporting do
     qry =
       cond do
         flag == "Banked-In" ->
-          from rec in qry, where: not(is_nil(rec.deposit_id))
+          from rec in qry, where: not is_nil(rec.deposit_id)
 
         flag == "In-Hand" ->
           from rec in qry,
@@ -65,6 +69,7 @@ defmodule FullCircle.Reporting do
       select: %{
         id: chq.id,
         contact_name: cont.name,
+        contact_id: cont.id,
         receipt_date: rec.receipt_date,
         receipt_id: rec.id,
         bank: chq.bank,
@@ -75,11 +80,12 @@ defmodule FullCircle.Reporting do
         cheque_no: chq.cheque_no,
         deposit_date: dep.deposit_date,
         deposit_bank_name: bank.name,
+        deposit_bank_id: bank.id,
         deposit_id: dep.id,
         deposit_no: dep.deposit_no,
         return_date: rtn.return_date,
         return_id: rtn.id,
-        return_no: rtn.return_cheque_no,
+        return_no: rtn.return_no,
         return_reason: rtn.return_reason,
         checked: false
       }

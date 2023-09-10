@@ -144,6 +144,10 @@ defmodule FullCircleWeb.Router do
       live("/Deposit/new", ChequeLive.DepositForm, :new)
       live("/Deposit/:deposit_id/edit", ChequeLive.DepositForm, :edit)
 
+      live("/ReturnCheque", ChequeLive.ReturnChequeIndex, :index)
+      live("/ReturnCheque/new", ChequeLive.ReturnChequeForm, :new)
+      live("/ReturnCheque/:return_id/edit", ChequeLive.ReturnChequeForm, :edit)
+
       live("/seeds", SeedLive.Index, :index)
 
       live("/Receipt", ReceiptLive.Index, :index)

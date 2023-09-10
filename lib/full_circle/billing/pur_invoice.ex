@@ -57,8 +57,8 @@ defmodule FullCircle.Billing.PurInvoice do
       :contact_name,
       :pur_invoice_no
     ])
-    |> validate_date(:pur_invoice_date, before: Timex.shift(Timex.today, days: 1))
-    |> validate_date(:pur_invoice_date, after: Timex.shift(Timex.today, days: -60))
+    |> validate_date(:pur_invoice_date, before: Timex.shift(Timex.today(), days: 1))
+    |> validate_date(:pur_invoice_date, after: Timex.shift(Timex.today(), days: -60))
     |> validate_id(:contact_name, :contact_id)
     |> unsafe_validate_unique([:pur_invoice_no, :company_id], FullCircle.Repo,
       message: gettext("pur_invoice no already in company")

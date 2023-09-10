@@ -1,4 +1,4 @@
-defmodule FullCircleWeb.ChequeLive.DepositIndexComponent do
+defmodule FullCircleWeb.ChequeLive.ReturnChequeIndexComponent do
   use FullCircleWeb, :live_component
 
   @impl true
@@ -18,27 +18,28 @@ defmodule FullCircleWeb.ChequeLive.DepositIndexComponent do
       id={@id}
       class={"#{@ex_class} max-h-8 flex flex-row text-center tracking-tighter bg-gray-200 hover:bg-gray-400"}
     >
-      <div class="w-[15%] border-b border-gray-400 py-1">
-        <%= @obj.deposit_date %>
+      <div class="w-[13%] border-b border-gray-400 py-1">
+        <%= @obj.doc_date %>
       </div>
 
       <div
         :if={!@obj.old_data}
-        class="text-blue-600 w-[15%] border-b border-gray-400 py-1 hover:cursor-pointer"
+        class="text-blue-600 w-[12%] border-b border-gray-400 py-1 hover:cursor-pointer"
       >
-        <.link navigate={~p"/companies/#{@company.id}/Deposit/#{@obj.deposit_id}/edit"}>
-          <%= @obj.deposit_no %>
+        <.link navigate={~p"/companies/#{@company.id}/ReturnCheque/#{@obj.return_id}/edit"}>
+          <%= @obj.doc_no %>
         </.link>
       </div>
 
-      <div :if={@obj.old_data} class="w-[15%] border-b border-gray-400 py-1">
-        <%= @obj.deposit_no %>
+      <div :if={@obj.old_data} class="w-[12%] border-b border-gray-400 py-1">
+        <%= @obj.doc_no %>
       </div>
 
-      <div class="w-[28%] border-b border-gray-400 py-1">
-        <%= @obj.deposit_bank_name %>
+      <div class="w-[30%] border-b border-gray-400 py-1 overflow-clip">
+        <%= @obj.cheque_owner_name %>
       </div>
-      <div class="w-[27%] border-b text-center border-gray-400 py-1 overflow-clip">
+
+      <div class="w-[30%] border-b text-center border-gray-400 py-1 overflow-clip">
         <span class="font-light"><%= @obj.particulars %></span>
       </div>
       <div class="w-[15%] border-b border-gray-400 py-1">
