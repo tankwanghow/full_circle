@@ -359,7 +359,7 @@ defmodule FullCircleWeb.ChequeLive.ReturnChequeForm do
             <div class="border w-[18%] px-1 py-1">
               <%= obj.amount |> Number.Delimit.number_to_delimited() %>
             </div>
-            <div class="border w-[3%]  cursor-pointer">
+            <div class="border w-[3%] cursor-pointer">
               <.link
                 :if={!found_in_chqs?(@form.source, obj.id)}
                 phx-click={:select_chq}

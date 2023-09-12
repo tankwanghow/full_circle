@@ -7,6 +7,7 @@ defmodule FullCircle.Product.Packaging do
     field(:name, :string)
     field(:unit_multiplier, :decimal, default: 0)
     field(:cost_per_package, :decimal, default: 0)
+    field(:default, :boolean, default: false)
     field(:_persistent_id, :integer)
 
     belongs_to :good, FullCircle.Product.Good
@@ -24,6 +25,7 @@ defmodule FullCircle.Product.Packaging do
       :name,
       :unit_multiplier,
       :cost_per_package,
+      :default,
       :delete
     ])
     |> validate_required([

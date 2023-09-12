@@ -39,7 +39,9 @@ defmodule FullCircle.Product do
         sales_tax_rate: good.sales_tax_rate,
         purchase_tax_rate: good.purchase_tax_rate
       },
-      order_by: [good.name, pack.id],
+      order_by: good.name,
+      order_by: [desc: pack.default],
+      order_by: pack.id,
       distinct: good.name
     )
     |> Repo.one()
@@ -66,7 +68,8 @@ defmodule FullCircle.Product do
       select: %{
         id: pack.id,
         value: pack.name,
-        unit_multiplier: pack.unit_multiplier
+        unit_multiplier: pack.unit_multiplier,
+        default: pack.default
       }
     )
     |> Repo.one()
@@ -79,7 +82,8 @@ defmodule FullCircle.Product do
       select: %{
         id: pack.id,
         value: pack.name,
-        unit_multiplier: pack.unit_multiplier
+        unit_multiplier: pack.unit_multiplier,
+        default: pack.default
       }
     )
     |> Repo.all()

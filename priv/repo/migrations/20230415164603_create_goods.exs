@@ -29,6 +29,7 @@ defmodule FullCircle.Repo.Migrations.CreateGoods do
       add :name, :string, null: false
       add :unit_multiplier, :decimal, default: 1
       add :cost_per_package, :decimal, default: 0
+      add :default, :boolean, default: false
     end
 
     create unique_index(:packagings, [:good_id, :name], name: :packagings_unique_name_in_goods)

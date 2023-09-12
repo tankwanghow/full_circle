@@ -63,12 +63,22 @@ defmodule FullCircleWeb.GoodLive.Form do
 
   @impl true
   def handle_event("add_packaging", _, socket) do
-    {:noreply, socket |> FullCircleWeb.Helpers.add_line(:packagings)}
+    cs =
+      socket.assigns.form.source
+      |> FullCircleWeb.Helpers.add_line(:packagings)
+      |> Map.put(:action, socket.assigns.live_action)
+
+    {:noreply, socket |> assign(form: to_form(cs))}
   end
 
   @impl true
   def handle_event("delete_packaging", %{"index" => index}, socket) do
-    {:noreply, socket |> FullCircleWeb.Helpers.delete_line(index, :packagings)}
+    cs =
+      socket.assigns.form.source
+      |> FullCircleWeb.Helpers.delete_line(index, :invoice_details)
+      |> Map.put(:action, socket.assigns.live_action)
+
+    {:noreply, socket |> assign(form: to_form(cs))}
   end
 
   @impl true
@@ -283,7 +293,8 @@ defmodule FullCircleWeb.GoodLive.Form do
       %{
         cost_per_package: x.cost_per_package,
         name: x.name,
-        unit_multiplier: x.unit_multiplier
+        unit_multiplier: x.unit_multiplier,
+        default: x.default
       }
     end)
   end
@@ -291,7 +302,7 @@ defmodule FullCircleWeb.GoodLive.Form do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="w-4/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
+    <div class="w-6/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
       <p class="w-full text-3xl text-center font-medium"><%= @title %></p>
       <.form
         for={@form}
@@ -356,28 +367,36 @@ defmodule FullCircleWeb.GoodLive.Form do
         </div>
 
         <div class="font-bold grid grid-cols-12 gap-2 mt-2">
-          <div class="col-span-4">
+          <div class="col-span-1 text-center" />
+          <div class="col-span-3">
             <%= gettext("Package Name") %>
           </div>
           <div class="col-span-3">
             <%= gettext("Unit Multiplier") %>
           </div>
-          <div class="col-span-4">
+          <div class="col-span-3">
             <%= gettext("Cost Per Pack") %>
           </div>
         </div>
         <.inputs_for :let={pack} field={@form[:packagings]}>
-          <div class={"grid grid-cols-12 gap-2 #{if(pack[:delete].value == true and Enum.count(pack.errors) == 0, do: "hidden", else: "")}"}>
+          <div class={"grid grid-cols-12 gap-1 #{if(pack[:delete].value == true and Enum.count(pack.errors) == 0, do: "hidden", else: "")}"}>
             <div class="col-span-4">
-              <.input field={pack[:name]} />
+              <div class="grid grid-cols-12">
+                <div class="col-span-1 pt-2 pl-1">
+                  <.input type="checkbox" field={pack[:default]} />
+                </div>
+                <div class="col-span-11">
+                  <.input field={pack[:name]} />
+                </div>
+              </div>
             </div>
             <div class="col-span-3">
               <.input type="number" field={pack[:unit_multiplier]} step="0.0001" />
             </div>
-            <div class="col-span-4">
+            <div class="col-span-3">
               <.input type="number" field={pack[:cost_per_package]} step="0.0001" />
             </div>
-            <div class="col-span-1 mt-2.5 text-rose-500">
+            <div class="col-span-1 mt-1.5 text-rose-500">
               <.link phx-click={:delete_packaging} phx-value-index={pack.index}>
                 <Heroicons.trash solid class="h-5 w-5" />
               </.link>
@@ -387,8 +406,8 @@ defmodule FullCircleWeb.GoodLive.Form do
         </.inputs_for>
 
         <div class="my-2">
-          <.link phx-click={:add_packaging} class="blue_button">
-            <%= gettext("Add Packaging") %>
+          <.link phx-click={:add_packaging} class="text-orange-500 hover:font-bold focus:font-bold">
+            <.icon name="hero-plus-circle" class="w-5 h-5" /><%= gettext("Add Packaging") %>
           </.link>
         </div>
 
