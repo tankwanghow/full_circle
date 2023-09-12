@@ -37,8 +37,8 @@ defmodule FullCircle.ReceiveFund.ReceivedCheque do
       :delete
     ])
     |> validate_required([:bank, :due_date, :cheque_no, :amount])
-    |> validate_date(:due_date, before: Timex.shift(Timex.today(), days: 90))
-    |> validate_date(:due_date, after: Timex.shift(Timex.today(), days: -90))
+    |> validate_date(:due_date, days_before: 45)
+    |> validate_date(:due_date, days_after: 45)
     |> validate_number(:amount, greater_than: 0)
     |> validate_cannot_update_deposited()
     |> validate_cannot_update_returned()

@@ -13,5 +13,5 @@ chqs = Reporting.post_dated_cheques("", "All", "", "2023-12-31", c)
 ## Depositing Cheques
 
 ```elixir
-Cheque.return_cheque_index_query("", "", c, u, page: 1, per_page: 10)
+Cheque.get_print_return_cheque!(["1d04afdc-aaeb-4dbf-b21c-5f36d07ad79a"], c, u)
 ```

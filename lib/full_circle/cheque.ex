@@ -8,6 +8,32 @@ defmodule FullCircle.Cheque do
   alias FullCircle.{Repo, Sys, StdInterface}
   alias Ecto.Multi
 
+  def get_print_return_cheque!(ids, company, user) do
+    Repo.all(
+      from rtnq in ReturnCheque,
+        join: com in subquery(Sys.user_company(company, user)),
+        on: com.id == rtnq.company_id,
+        join: chq in FullCircle.ReceiveFund.ReceivedCheque,
+        on: chq.return_cheque_id == rtnq.id,
+        left_join: owner in FullCircle.Accounting.Contact,
+        on: owner.id == rtnq.cheque_owner_id,
+        left_join: bank in Account,
+        on: bank.id == rtnq.return_from_bank_id,
+        where: rtnq.id in ^ids,
+        preload: [:cheque, :cheque_owner],
+        select: rtnq,
+        select_merge: %{
+          return_from_bank_name: bank.name,
+          return_from_bank_id: bank.id,
+          cheque_owner_name: owner.name,
+          cheque_owner_id: owner.id,
+          cheque_no: chq.cheque_no,
+          cheque_due_date: chq.due_date,
+          cheque_amount: chq.amount
+        }
+    )
+  end
+
   def get_return_cheque!(id, company, user) do
     Repo.one(
       from rtnq in ReturnCheque,

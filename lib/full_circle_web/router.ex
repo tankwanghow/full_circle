@@ -179,6 +179,9 @@ defmodule FullCircleWeb.Router do
       live("/Payment/:id/print", PaymentLive.Print, :print)
       live("/Payment/print_multi", PaymentLive.Print, :print)
 
+      live("/ReturnCheque/:id/print", ChequeLive.ReturnChequePrint, :print)
+      live("/ReturnCheque/print_multi", ChequeLive.ReturnChequePrint, :print)
+
       live("/Journal/:id/print", JournalLive.Print, :print)
       live("/Journal/print_multi", JournalLive.Print, :print)
 

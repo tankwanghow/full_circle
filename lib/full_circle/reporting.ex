@@ -30,7 +30,7 @@ defmodule FullCircle.Reporting do
       end
 
     qry =
-      if ddate != "" do
+      if ddate != "" and flag != "Can-Be-Return" do
         from rec in qry, where: rec.due_date <= ^ddate, order_by: rec.due_date
       else
         qry
@@ -45,6 +45,12 @@ defmodule FullCircle.Reporting do
           from rec in qry,
             where: is_nil(rec.deposit_id),
             where: is_nil(rec.return_id)
+
+        flag == "Can-Be-Return" ->
+          ddate = ddate |> Timex.parse!("{YYYY}-{0M}-{0D}") |> NaiveDateTime.to_date |> Timex.shift(days: -14)
+
+          from rec in qry,
+            where: (rec.deposit_date >= ^ddate or is_nil(rec.deposit_id))
 
         true ->
           qry

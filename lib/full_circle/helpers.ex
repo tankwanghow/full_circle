@@ -151,19 +151,19 @@ defmodule FullCircle.Helpers do
     end
   end
 
-  def validate_date(cs, field, before: bdate) do
-    if Timex.compare(fetch_field!(cs, field) || bdate, bdate) == -1 do
+  def validate_date(cs, field, days_before: days) do
+    if Timex.diff(Timex.today(), fetch_field!(cs, field) || Timex.today(), :days) <= days do
       cs
     else
-      add_error(cs, field, "#{gettext("before")} #{bdate}")
+      add_error(cs, field, "#{gettext("at or after")} #{Timex.shift(Timex.today(), days: -days)}")
     end
   end
 
-  def validate_date(cs, field, after: bdate) do
-    if Timex.compare(fetch_field!(cs, field) || bdate, bdate) == 1 do
+  def validate_date(cs, field, days_after: days) do
+    if Timex.diff(fetch_field!(cs, field) || Timex.today(), Timex.today(), :days) <= days do
       cs
     else
-      add_error(cs, field, "#{gettext("after")} #{bdate}")
+      add_error(cs, field, "#{gettext("at or before")} #{Timex.shift(Timex.today(), days: days)}")
     end
   end
 end

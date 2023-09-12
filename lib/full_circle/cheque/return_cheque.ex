@@ -2,7 +2,6 @@ defmodule FullCircle.Cheque.ReturnCheque do
   use FullCircle.Schema
   import Ecto.Changeset
   import FullCircle.Helpers
-  import FullCircleWeb.Gettext
 
   schema "return_cheques" do
     field :return_no, :string
@@ -53,14 +52,14 @@ defmodule FullCircle.Cheque.ReturnCheque do
     ])
     |> validate_id(:return_from_bank_name, :return_from_bank_id)
     |> validate_id(:cheque_owner_name, :cheque_owner_id)
-    |> validate_return_date()
+    |> validate_date(:return_date, days_after: 0)
+    |> validate_date(:return_date, days_before: 60)
     |> put_cheque_assoc(attrs)
   end
 
   defp put_cheque_assoc(cs, attrs) do
     chq_attrs = attrs["cheque"] || %{}
-
-    if chq_attrs != %{} do
+    if chq_attrs != %{} and chq_attrs["id"] != "" do
       put_assoc(
         cs,
         :cheque,
@@ -68,23 +67,6 @@ defmodule FullCircle.Cheque.ReturnCheque do
       )
     else
       cs
-    end
-  end
-
-  defp validate_return_date(cs) do
-    r_date = fetch_field!(cs, :return_date) || Timex.today()
-    d_date = fetch_field!(cs, :cheque_due_date) || Timex.today()
-    diff = Timex.diff(r_date, d_date, :days)
-
-    cond do
-      diff < 0 ->
-        add_error(cs, :return_date, "#{gettext("later than")} #{d_date}")
-
-      diff > 60 ->
-        add_error(cs, :return_date, "#{gettext("earlier than")} #{Timex.shift(d_date, days: 45)}")
-
-      true ->
-        cs
     end
   end
 end

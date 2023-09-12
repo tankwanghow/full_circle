@@ -166,7 +166,7 @@ defmodule FullCircleWeb.ChequeLive.ReturnChequeForm do
     qry_cheques =
       Reporting.post_dated_cheques(
         "",
-        "All",
+        "Can-Be-Return",
         "",
         d_date,
         socket.assigns.current_company
@@ -186,8 +186,6 @@ defmodule FullCircleWeb.ChequeLive.ReturnChequeForm do
       |> Map.merge(%{action: socket.assigns.live_action})
 
     socket = assign(socket, form: to_form(dep_cs))
-
-    IO.inspect(dep_cs)
 
     {:noreply, socket}
   end
@@ -264,6 +262,20 @@ defmodule FullCircleWeb.ChequeLive.ReturnChequeForm do
           >
             <%= gettext("New") %>
           </.link>
+          <.print_button
+            :if={@live_action == :edit}
+            company={@current_company}
+            doc_type="ReturnCheque"
+            doc_id={@id}
+            class="gray_button"
+          />
+          <.pre_print_button
+            :if={@live_action == :edit}
+            company={@current_company}
+            doc_type="ReturnCheque"
+            doc_id={@id}
+            class="gray_button"
+          />
           <.live_component
             :if={@live_action == :edit}
             module={FullCircleWeb.LogLive.Component}
@@ -292,7 +304,7 @@ defmodule FullCircleWeb.ChequeLive.ReturnChequeForm do
           phx-value-d_date={Ecto.Changeset.fetch_field!(@form.source, :return_date)}
           class="text-lg hover:font-bold text-blue-600"
         >
-          <%= gettext("Show Cheques Due Date until") %>
+          <%= gettext("Show Returnable Cheques") %>
           <%= Ecto.Changeset.fetch_field!(@form.source, :return_date)
           |> FullCircleWeb.Helpers.format_date() %>
         </.link>
