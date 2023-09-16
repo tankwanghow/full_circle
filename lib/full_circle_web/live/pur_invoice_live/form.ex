@@ -415,7 +415,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
         />
 
         <div class="flex flex-row justify-center gap-x-1 mt-1">
-          <.button disabled={!@form.source.valid?}><%= gettext("Save") %></.button>
+          <.save_button form={@form} />
           <a onclick="history.back();" class="blue_button"><%= gettext("Back") %></a>
           <.link :if={@live_action != :new} navigate="" class="orange_button">
             <%= gettext("Cancel") %>

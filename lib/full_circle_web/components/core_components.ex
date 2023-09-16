@@ -831,6 +831,24 @@ defmodule FullCircleWeb.CoreComponents do
     )
   end
 
+  attr :form, :any
+
+  def save_button(assigns) do
+    ~H"""
+    <button
+      type="submit"
+      disabled={!@form.source.valid?}
+      class={[
+        "phx-submit-loading:opacity-75 rounded-lg py-2 px-3 leading-6 border",
+        @form.source.valid? && "bg-green-200 hover:bg-green-600 border-green-600",
+        !@form.source.valid? && "bg-rose-400 hover:bg-rose-200 border-rose-400 text-white active:text-white/80"
+      ]}
+    >
+      <%= if @form.source.valid?, do: gettext("Save"), else: gettext("Form Invalid! Please Check Data Entered!") %>
+    </button>
+    """
+  end
+
   attr :doc_type, :string
   attr :doc_id, :string
   attr :company, :any

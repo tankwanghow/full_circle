@@ -43,8 +43,8 @@ Hooks.tributeTagText = {
 Hooks.tributeAutoComplete = {
   mounted() {
     var tribute = new Tribute({
-      autocompleteMode: true,
       values: (t, c) => { remoteSearch(this.el, t, c) },
+      autocompleteMode: true,
       lookup: "value",
       fillAttr: "value",
       menuItemLimit: 8

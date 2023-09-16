@@ -285,7 +285,7 @@ defmodule FullCircleWeb.FixedAssetLive.Depreciations do
             <.link phx-click={:new_depreciation} class="blue_button" id="new_object">
               <%= gettext("New") %>
             </.link>
-            <.button disabled={!@form.source.valid?}><%= gettext("Save") %></.button>
+            <.save_button form={@form} />
           </div>
         </.form>
       </div>

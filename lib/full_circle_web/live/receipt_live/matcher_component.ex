@@ -29,12 +29,14 @@ defmodule FullCircleWeb.ReceiptLive.MatcherComponent do
           <.input type="hidden" field={dtl[:all_matched_amount]} />
           <.input type="hidden" field={dtl[:account_id]} />
           <.input type="hidden" field={dtl[:doc_type]} />
-          <div class="w-[16%]"><.input readonly field={dtl[:t_doc_date]} /></div>
-          <div class="w-[17%]"><.input readonly field={dtl[:t_doc_type]} /></div>
-          <div class="w-[16%]"><.input readonly field={dtl[:t_doc_no]} /></div>
-          <div class="w-[16%]"><.input readonly type="number" field={dtl[:amount]} /></div>
+          <div class="w-[16%]"><.input readonly field={dtl[:t_doc_date]} tabindex="-1" /></div>
+          <div class="w-[17%]"><.input readonly field={dtl[:t_doc_type]} tabindex="-1" /></div>
+          <div class="w-[16%]"><.input readonly field={dtl[:t_doc_no]} tabindex="-1" /></div>
           <div class="w-[16%]">
-            <.input readonly type="number" field={dtl[:balance]} />
+            <.input readonly type="number" field={dtl[:amount]} tabindex="-1" />
+          </div>
+          <div class="w-[16%]">
+            <.input readonly type="number" field={dtl[:balance]} tabindex="-1" />
           </div>
           <div class="w-[16%]">
             <.input type="number" phx-debounce="500" step="0.01" field={dtl[:match_amount]} />

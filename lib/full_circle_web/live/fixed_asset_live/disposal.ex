@@ -250,7 +250,7 @@ defmodule FullCircleWeb.FixedAssetLive.Disposals do
             <.link phx-click={:new_disposal} class="blue_button" id="new_object">
               <%= gettext("New") %>
             </.link>
-            <.button disabled={!@form.source.valid?}><%= gettext("Save") %></.button>
+            <.save_button form={@form} />
           </div>
         </.form>
       </div>

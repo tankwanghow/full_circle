@@ -95,7 +95,7 @@ defmodule FullCircleWeb.CompanyLive.Form do
       <%= datalist(FullCircle.Sys.countries(), "countries") %>
       <%= datalist(Tzdata.zone_list(), "timezones") %>
       <div class="flex justify-center gap-x-1 mt-2">
-        <.button disabled={!@form.source.valid?}><%= gettext("Save") %></.button>
+        <.save_button form={@form} />
         <%= if @live_action == :edit and FullCircle.Authorization.can?(@current_user, :delete_company, @company) do %>
           <.delete_confirm_modal
             id="delete-company"

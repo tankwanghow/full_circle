@@ -229,7 +229,7 @@ defmodule FullCircleWeb.TaxCodeLive.Form do
         />
 
         <div class="flex justify-center gap-x-1 mt-1">
-          <.button disabled={!@form.source.valid?}><%= gettext("Save") %></.button>
+          <.save_button form={@form} />
           <.link :if={@live_action != :new} navigate="" class="orange_button">
             <%= gettext("Cancel") %>
           </.link>
