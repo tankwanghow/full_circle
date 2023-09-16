@@ -10,7 +10,7 @@ defmodule FullCircleWeb.UserLive.Index do
       <div class="flex justify-center gap-x-1">
         <.link
           navigate={~p"/companies/#{@current_company.id}/users/new"}
-          class="text-xl mb-2 blue_button"
+          class="text-xl mb-2 blue button"
         >
           🧑<%= gettext("Add User") %>
         </.link>
@@ -35,7 +35,7 @@ defmodule FullCircleWeb.UserLive.Index do
                     id={"reset_user_password_#{u.id}"}
                     phx-click="reset_password"
                     phx-value-id={u.id}
-                    class="blue_button"
+                    class="blue button"
                   >
                     🔏<span class="font-bold"><%= gettext("Reset Password") %></span>
                   </.link>

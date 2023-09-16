@@ -17,7 +17,7 @@ defmodule FullCircleWeb.ContactLive.Index do
         placeholder={gettext("Name, City, State and Descriptions...")}
       />
       <div class="text-center mb-2">
-        <.link navigate={~p"/companies/#{@current_company.id}/contacts/new"} class="blue_button">
+        <.link navigate={~p"/companies/#{@current_company.id}/contacts/new"} class="blue button">
           <%= gettext("New Contact") %>
         </.link>
       </div>

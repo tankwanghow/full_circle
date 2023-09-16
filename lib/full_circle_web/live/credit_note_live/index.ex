@@ -40,7 +40,7 @@ defmodule FullCircleWeb.CreditNoteLive.Index do
       <div class="text-center mb-2">
         <.link
           navigate={~p"/companies/#{@current_company.id}/Payment/new"}
-          class="blue_button"
+          class="blue button"
           id="new_object"
         >
           <%= gettext("New Payment") %>
@@ -51,7 +51,7 @@ defmodule FullCircleWeb.CreditNoteLive.Index do
             ~p"/companies/#{@current_company.id}/Payment/print_multi?pre_print=false&ids=#{@ids}"
           }
           target="_blank"
-          class="blue_button"
+          class="blue button"
         >
           <%= gettext("Print") %>
         </.link>
@@ -61,7 +61,7 @@ defmodule FullCircleWeb.CreditNoteLive.Index do
             ~p"/companies/#{@current_company.id}/Payment/print_multi?pre_print=true&ids=#{@ids}"
           }
           target="_blank"
-          class="blue_button"
+          class="blue button"
         >
           <%= gettext("Pre Print") %>
         </.link>

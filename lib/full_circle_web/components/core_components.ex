@@ -752,7 +752,7 @@ defmodule FullCircleWeb.CoreComponents do
 
   def delete_confirm_modal(assigns) do
     ~H"""
-    <.link id={@id} class="blue_button" phx-click={show_modal("#{@id}-modal")}>
+    <.link id={@id} class="red button" phx-click={show_modal("#{@id}-modal")}>
       <%= gettext("Delete") %>
     </.link>
     <.modal id={"#{@id}-modal"} on_confirm={@confirm}>
@@ -841,11 +841,31 @@ defmodule FullCircleWeb.CoreComponents do
       class={[
         "phx-submit-loading:opacity-75 rounded-lg py-2 px-3 leading-6 border",
         @form.source.valid? && "bg-green-200 hover:bg-green-600 border-green-600",
-        !@form.source.valid? && "bg-rose-400 hover:bg-rose-200 border-rose-400 text-white active:text-white/80"
+        !@form.source.valid? &&
+          "bg-rose-400 hover:bg-rose-200 border-rose-400 text-white active:text-white/80"
       ]}
     >
-      <%= if @form.source.valid?, do: gettext("Save"), else: gettext("Form Invalid! Please Check Data Entered!") %>
+      <%= if @form.source.valid?,
+        do: gettext("Save"),
+        else: gettext("Cannot Save!! Form Invalid!") %>
     </button>
+    """
+  end
+
+  attr :form, :any
+  attr :live_action, :atom
+  attr :new_url, :any
+
+  def form_action_button(assigns) do
+    ~H"""
+    <.save_button form={@form} />
+    <.link :if={@live_action != :new} navigate="" class="orange button">
+      <%= gettext("Cancel") %>
+    </.link>
+    <.link :if={@live_action == :edit} navigate={@new_url} class="blue button">
+      <%= gettext("New") %>
+    </.link>
+    <a onclick="history.back();" class="blue button"><%= gettext("Back") %></a>
     """
   end
 

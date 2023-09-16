@@ -47,7 +47,7 @@ defmodule FullCircleWeb.JournalEntryViewLive.Component do
   def render(assigns) do
     ~H"""
     <div id={@id}>
-      <.link phx-target={@myself} phx-click={:show_journal} class="blue_button block">
+      <.link phx-target={@myself} phx-click={:show_journal} class="blue button block">
         <%= gettext("Journal") %>
       </.link>
       <.modal

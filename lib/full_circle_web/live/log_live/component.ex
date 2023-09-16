@@ -62,7 +62,7 @@ defmodule FullCircleWeb.LogLive.Component do
   def render(assigns) do
     ~H"""
     <div id={@id}>
-      <.link phx-target={@myself} phx-click={:show_log} class="blue_button block">
+      <.link phx-target={@myself} phx-click={:show_log} class="blue button block">
         <%= gettext("Log") %>
       </.link>
 

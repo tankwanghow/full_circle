@@ -81,28 +81,36 @@ input[type=number] {
   @apply opacity-0 transition-opacity duration-1000;
 }
 
-button[disabled] {
-  @apply cursor-not-allowed;
-}
-
 .nav-btn {
   @apply ml-1 mb-1 text-center tracking-tighter rounded-md px-3 py-2 border border-pink-500; 
   @apply transition duration-500 select-none bg-pink-300 hover:bg-pink-500 focus:bg-pink-500;
 }
 
-.blue_button {
-  @apply text-center tracking-tighter rounded-md transition px-3 py-2 border border-sky-500;
-  @apply duration-500 select-none bg-sky-200 hover:bg-sky-500 focus:bg-sky-500;
+button[disabled] {
+  @apply cursor-not-allowed;
 }
 
-.orange_button {
-  @apply text-center tracking-tighter rounded-md transition px-3 py-2 border border-amber-500;
-  @apply duration-500 select-none bg-amber-200 hover:bg-amber-500 focus:bg-amber-500;
+.button {
+  @apply text-center tracking-tighter rounded-md transition px-3 py-2 border duration-500;
+  @apply select-none hover:cursor-pointer;
 }
 
-.gray_button {
-  @apply text-center tracking-tighter rounded-md transition px-3 py-2 border border-gray-500;
-  @apply duration-500 select-none bg-gray-200 hover:bg-gray-500 focus:bg-gray-500;
+.button[disabled] {@apply cursor-not-allowed;}
+
+.blue.button {
+  @apply border-sky-500 bg-sky-200 hover:bg-sky-500 focus:bg-sky-500;
+}
+
+.orange.button {
+  @apply border-amber-500 bg-amber-200 hover:bg-amber-500 focus:bg-amber-500;
+}
+
+.gray.button {
+  @apply border-gray-500 bg-gray-200 hover:bg-gray-500 focus:bg-gray-500;
+}
+
+.red.button {
+  @apply border-red-500 bg-red-200 hover:bg-red-500 focus:bg-red-500;
 }
 
 .tab {

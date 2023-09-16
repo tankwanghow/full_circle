@@ -306,15 +306,15 @@ defmodule FullCircleWeb.JournalLive.Form do
         </div>
 
         <div class="flex flex-row justify-center gap-x-1 mt-1">
-          <.save_button form={@form} />
-          <a onclick="history.back();" class="blue_button"><%= gettext("Back") %></a>
-          <.link :if={@live_action != :new} navigate="" class="orange_button">
-            <%= gettext("Cancel") %>
-          </.link>
+          <.form_action_button
+            form={@form}
+            live_action={@live_action}
+            new_url={~p"/companies/#{@current_company.id}/Journal/new"}
+          />
           <.link
             :if={@live_action == :edit}
             navigate={~p"/companies/#{@current_company.id}/Journal/new"}
-            class="blue_button"
+            class="blue button"
           >
             <%= gettext("New") %>
           </.link>
@@ -323,14 +323,14 @@ defmodule FullCircleWeb.JournalLive.Form do
             company={@current_company}
             doc_type="Journal"
             doc_id={@id}
-            class="gray_button"
+            class="gray button"
           />
           <.pre_print_button
             :if={@live_action == :edit}
             company={@current_company}
             doc_type="Journal"
             doc_id={@id}
-            class="gray_button"
+            class="gray button"
           />
           <.live_component
             :if={@live_action == :edit}

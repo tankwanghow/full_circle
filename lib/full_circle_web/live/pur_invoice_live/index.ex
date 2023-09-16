@@ -59,7 +59,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Index do
       <div class="text-center mb-2">
         <.link
           navigate={~p"/companies/#{@current_company.id}/PurInvoice/new"}
-          class="blue_button"
+          class="blue button"
           id="new_purinvoice"
         >
           <%= gettext("New Purchase Invoice") %>

@@ -570,31 +570,24 @@ defmodule FullCircleWeb.PaymentLive.Form do
         />
 
         <div class="flex justify-center gap-x-1 mt-1">
-          <.save_button form={@form} />
-          <.link :if={@live_action != :new} navigate="" class="orange_button">
-            <%= gettext("Cancel") %>
-          </.link>
-          <.link
-            :if={@live_action == :edit}
-            navigate={~p"/companies/#{@current_company.id}/Payment/new"}
-            class="blue_button"
-          >
-            <%= gettext("New") %>
-          </.link>
-          <a onclick="history.back();" class="blue_button"><%= gettext("Back") %></a>
+          <.form_action_button
+            form={@form}
+            live_action={@live_action}
+            new_url={~p"/companies/#{@current_company.id}/Payment/new"}
+          />
           <.print_button
             :if={@live_action != :new}
             company={@current_company}
             doc_type="Payment"
             doc_id={@id}
-            class="blue_button"
+            class="blue button"
           />
           <.pre_print_button
             :if={@live_action != :new}
             company={@current_company}
             doc_type="Payment"
             doc_id={@id}
-            class="blue_button"
+            class="blue button"
           />
           <.live_component
             :if={@live_action == :edit}

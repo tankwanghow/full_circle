@@ -415,18 +415,11 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
         />
 
         <div class="flex flex-row justify-center gap-x-1 mt-1">
-          <.save_button form={@form} />
-          <a onclick="history.back();" class="blue_button"><%= gettext("Back") %></a>
-          <.link :if={@live_action != :new} navigate="" class="orange_button">
-            <%= gettext("Cancel") %>
-          </.link>
-          <.link
-            :if={@live_action == :edit}
-            navigate={~p"/companies/#{@current_company.id}/PurInvoice/new"}
-            class="blue_button"
-          >
-            <%= gettext("New") %>
-          </.link>
+          <.form_action_button
+            form={@form}
+            live_action={@live_action}
+            new_url={~p"/companies/#{@current_company.id}/PurInvoice/new"}
+          />
           <.live_component
             :if={@live_action == :edit}
             module={FullCircleWeb.LogLive.Component}

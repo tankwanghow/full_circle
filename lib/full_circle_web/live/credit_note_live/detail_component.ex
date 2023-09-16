@@ -1,6 +1,5 @@
 defmodule FullCircleWeb.CreditNoteLive.DetailComponent do
   use FullCircleWeb, :live_component
-  alias FullCircle.Sys
 
   @impl true
   def mount(socket) do
@@ -36,19 +35,14 @@ defmodule FullCircleWeb.CreditNoteLive.DetailComponent do
           <%= gettext("TaxAmt") %>
         </div>
         <div class="detail-header w-[14%]"><%= gettext("Amount") %></div>
-        <div class="detail-setting-col  mt-1 text-blue-500 grow-0 shrink-0"> </div>
+        <div class="detail-setting-col  mt-1 text-blue-500 grow-0 shrink-0"></div>
       </div>
 
       <.inputs_for :let={dtl} field={@form[@detail_name]}>
         <div class={"flex flex-row #{if(dtl[:delete].value == true, do: "hidden", else: "")}"}>
           <div class="w-[30%]"><.input field={dtl[:descriptions]} /></div>
           <div class="w-[10%]">
-            <.input
-              type="number"
-              field={dtl[:quantity]}
-              step="0.0001"
-              phx-debounce="500"
-            />
+            <.input type="number" field={dtl[:quantity]} step="0.0001" phx-debounce="500" />
           </div>
           <div class="w-[8%]">
             <.input type="number" phx-debounce="500" field={dtl[:unit_price]} step="0.0001" />

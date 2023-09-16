@@ -128,7 +128,7 @@ defmodule FullCircleWeb.TransactionLive.Account do
               </.button>
               <.link
                 :if={@objects_count > 0}
-                class="blue_button mr-1"
+                class="blue button mr-1"
                 navigate={
                   ~p"/companies/#{@current_company.id}/print_transactions?report=actrans&name=#{@search.name}&fdate=#{@search.f_date}&tdate=#{@search.t_date}"
                 }
@@ -142,7 +142,7 @@ defmodule FullCircleWeb.TransactionLive.Account do
                 href={
                   ~p"/companies/#{@current_company.id}/csv?report=actrans&name=#{@search.name}&fdate=#{@search.f_date}&tdate=#{@search.t_date}"
                 }
-                class="blue_button"
+                class="blue button"
               >
                 CSV
               </.link>

@@ -250,31 +250,24 @@ defmodule FullCircleWeb.ChequeLive.ReturnChequeForm do
         </div>
 
         <div class="flex justify-center gap-x-1 mt-1">
-          <.save_button form={@form} />
-          <.link :if={@live_action != :new} navigate="" class="orange_button">
-            <%= gettext("Cancel") %>
-          </.link>
-          <a onclick="history.back();" class="blue_button"><%= gettext("Back") %></a>
-          <.link
-            :if={@live_action == :edit}
-            navigate={~p"/companies/#{@current_company.id}/ReturnCheque/new"}
-            class="blue_button"
-          >
-            <%= gettext("New") %>
-          </.link>
+          <.form_action_button
+            form={@form}
+            live_action={@live_action}
+            new_url={~p"/companies/#{@current_company.id}/ReturnCheque/new"}
+          />
           <.print_button
             :if={@live_action == :edit}
             company={@current_company}
             doc_type="ReturnCheque"
             doc_id={@id}
-            class="gray_button"
+            class="gray button"
           />
           <.pre_print_button
             :if={@live_action == :edit}
             company={@current_company}
             doc_type="ReturnCheque"
             doc_id={@id}
-            class="gray_button"
+            class="gray button"
           />
           <.live_component
             :if={@live_action == :edit}

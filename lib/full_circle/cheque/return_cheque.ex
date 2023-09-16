@@ -59,6 +59,7 @@ defmodule FullCircle.Cheque.ReturnCheque do
 
   defp put_cheque_assoc(cs, attrs) do
     chq_attrs = attrs["cheque"] || %{}
+
     if chq_attrs != %{} and chq_attrs["id"] != "" do
       put_assoc(
         cs,

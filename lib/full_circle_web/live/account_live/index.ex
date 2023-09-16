@@ -19,7 +19,7 @@ defmodule FullCircleWeb.AccountLive.Index do
       <div class="text-center mb-2">
         <.link
           navigate={~p"/companies/#{@current_company.id}/accounts/new"}
-          class="blue_button"
+          class="blue button"
           id="new_account"
         >
           <%= gettext("New Account") %>

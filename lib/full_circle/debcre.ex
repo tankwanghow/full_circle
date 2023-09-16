@@ -17,5 +17,4 @@ defmodule FullCircle.DebCre do
 
   alias FullCircle.{Repo, Sys, StdInterface}
   alias FullCircle.Sys.Company
-
 end

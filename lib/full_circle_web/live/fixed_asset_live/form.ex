@@ -383,11 +383,11 @@ defmodule FullCircleWeb.FixedAssetLive.Form do
         <.input field={@form[:descriptions]} type="textarea" label={gettext("Descriptions")} />
 
         <div class="flex justify-center gap-x-1 mt-1">
-          <.save_button form={@form} />
-          <.link :if={@live_action != :new} navigate="" class="orange_button">
-            <%= gettext("Cancel") %>
-          </.link>
-          <a onclick="history.back();" class="blue_button"><%= gettext("Back") %></a>
+          <.form_action_button
+            form={@form}
+            live_action={@live_action}
+            new_url={~p"/companies/#{@current_company.id}/fixed_assets/new"}
+          />
           <%= if @live_action == :edit and FullCircle.Authorization.can?(@current_user, :delete_fixed_asset, @current_company) do %>
             <.delete_confirm_modal
               id="delete-object"

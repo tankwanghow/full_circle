@@ -17,12 +17,12 @@ defmodule FullCircleWeb.FixedAssetLive.Index do
         placeholder={gettext("Name, Asset Account, Depreciation Account or Descriptions...")}
       />
       <div class="text-center mb-2">
-        <.link navigate={~p"/companies/#{@current_company.id}/fixed_assets/new"} class="blue_button">
+        <.link navigate={~p"/companies/#{@current_company.id}/fixed_assets/new"} class="blue button">
           <%= gettext("New Fixed Asset") %>
         </.link>
         <.link
           navigate={~p"/companies/#{@current_company.id}/fixed_assets/calalldepre"}
-          class="blue_button"
+          class="blue button"
           id="calculate_depre"
         >
           <%= gettext("Calculate Depreciations") %>

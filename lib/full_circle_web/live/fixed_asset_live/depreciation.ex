@@ -224,7 +224,7 @@ defmodule FullCircleWeb.FixedAssetLive.Depreciations do
     <div class="w-6/12 mx-auto">
       <p class="w-full text-2xl text-center font-medium"><%= "#{@title} for #{@ass.name}" %></p>
       <div class="text-center m-4">
-        <a onclick="history.back();" class="blue_button"><%= gettext("Back") %></a>
+        <a onclick="history.back();" class="blue button"><%= gettext("Back") %></a>
       </div>
       <p class="text-center">
         <span class="font-bold"><%= gettext("Depreciation info:") %></span>
@@ -282,7 +282,7 @@ defmodule FullCircleWeb.FixedAssetLive.Depreciations do
             </div>
           </div>
           <div class="flex justify-center gap-x-1 mt-1">
-            <.link phx-click={:new_depreciation} class="blue_button" id="new_object">
+            <.link phx-click={:new_depreciation} class="blue button" id="new_object">
               <%= gettext("New") %>
             </.link>
             <.save_button form={@form} />
@@ -415,7 +415,7 @@ defmodule FullCircleWeb.FixedAssetLive.Depreciations do
           <.link
             :if={Enum.count(@generated_depreciations) > 0}
             phx-click={:save_generated_depreciations}
-            class={["blue_button"]}
+            class={["blue button"]}
           >
             <%= gettext("Save Generated Depreciations") %>
           </.link>

@@ -59,7 +59,7 @@ defmodule FullCircleWeb.InvoiceLive.Index do
       <div class="text-center mb-2">
         <.link
           navigate={~p"/companies/#{@current_company.id}/Invoice/new"}
-          class="blue_button"
+          class="blue button"
           id="new_invoice"
         >
           <%= gettext("New Invoice") %>
@@ -70,7 +70,7 @@ defmodule FullCircleWeb.InvoiceLive.Index do
             ~p"/companies/#{@current_company.id}/Invoice/print_multi?pre_print=false&ids=#{@ids}"
           }
           target="_blank"
-          class="blue_button"
+          class="blue button"
         >
           <%= gettext("Print") %>
         </.link>
@@ -80,7 +80,7 @@ defmodule FullCircleWeb.InvoiceLive.Index do
             ~p"/companies/#{@current_company.id}/Invoice/print_multi?pre_print=true&ids=#{@ids}"
           }
           target="_blank"
-          class="blue_button"
+          class="blue button"
         >
           <%= gettext("Pre Print") %>
         </.link>

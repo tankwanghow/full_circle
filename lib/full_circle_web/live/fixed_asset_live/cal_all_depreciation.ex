@@ -69,7 +69,7 @@ defmodule FullCircleWeb.FixedAssetLive.CalAllDepre do
     <div class="w-6/12 mx-auto">
       <p class="w-full text-2xl text-center font-medium"><%= "#{@title}" %></p>
       <div class="text-center m-4">
-        <a onclick="history.back();" class="blue_button"><%= gettext("Back") %></a>
+        <a onclick="history.back();" class="blue button"><%= gettext("Back") %></a>
       </div>
 
       <div class="my-4 border rounded bg-purple-200 p-5 text-center">
@@ -115,7 +115,7 @@ defmodule FullCircleWeb.FixedAssetLive.CalAllDepre do
           <.link
             :if={Enum.count(@generated_depreciations) > 0}
             phx-click={:save_generated_depreciations}
-            class="blue_button"
+            class="blue button"
           >
             <%= gettext("Save Generated Depreciations") %>
           </.link>

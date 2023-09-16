@@ -125,7 +125,7 @@ defmodule FullCircleWeb.ChequeLive.ReturnChequeIndex do
       <div class="text-center mb-2">
         <.link
           navigate={~p"/companies/#{@current_company.id}/ReturnCheque/new"}
-          class="blue_button"
+          class="blue button"
           id="new_return_cheque"
         >
           <%= gettext("New Return Cheque") %>

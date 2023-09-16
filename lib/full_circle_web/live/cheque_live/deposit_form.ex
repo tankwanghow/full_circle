@@ -308,18 +308,11 @@ defmodule FullCircleWeb.ChequeLive.DepositForm do
         </.inputs_for>
 
         <div class="flex justify-center gap-x-1 mt-1">
-          <.save_button form={@form} />
-          <.link :if={@live_action != :new} navigate="" class="orange_button">
-            <%= gettext("Cancel") %>
-          </.link>
-          <a onclick="history.back();" class="blue_button"><%= gettext("Back") %></a>
-          <.link
-            :if={@live_action == :edit}
-            navigate={~p"/companies/#{@current_company.id}/Deposit/new"}
-            class="blue_button"
-          >
-            <%= gettext("New") %>
-          </.link>
+          <.form_action_button
+            form={@form}
+            live_action={@live_action}
+            new_url={~p"/companies/#{@current_company.id}/Deposit/new"}
+          />
           <.live_component
             :if={@live_action == :edit}
             module={FullCircleWeb.LogLive.Component}

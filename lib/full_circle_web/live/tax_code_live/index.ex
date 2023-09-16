@@ -19,7 +19,7 @@ defmodule FullCircleWeb.TaxCodeLive.Index do
       <div class="text-center mb-2">
         <.link
           navigate={~p"/companies/#{@current_company.id}/tax_codes/new"}
-          class="blue_button"
+          class="blue button"
           id="new_object"
         >
           <%= gettext("New TaxCode") %>

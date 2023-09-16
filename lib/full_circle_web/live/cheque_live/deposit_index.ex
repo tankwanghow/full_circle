@@ -125,7 +125,7 @@ defmodule FullCircleWeb.ChequeLive.DepositIndex do
       <div class="text-center mb-2">
         <.link
           navigate={~p"/companies/#{@current_company.id}/Deposit/new"}
-          class="blue_button"
+          class="blue button"
           id="new_invoice"
         >
           <%= gettext("New Deposit") %>
