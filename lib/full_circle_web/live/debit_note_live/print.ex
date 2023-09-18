@@ -1,4 +1,4 @@
-defmodule FullCircleWeb.CreditNoteLive.Print do
+defmodule FullCircleWeb.DebitNoteLive.Print do
   use FullCircleWeb, :live_view
 
   import FullCircleWeb.Helpers
@@ -7,13 +7,13 @@ defmodule FullCircleWeb.CreditNoteLive.Print do
   @impl true
   def mount(%{"id" => id, "pre_print" => pre_print}, _session, socket) do
     ids = [id]
-    {:ok, socket |> assign(:pre_print, pre_print) |> set_page_defaults() |> fill_credit_notes(ids)}
+    {:ok, socket |> assign(:pre_print, pre_print) |> set_page_defaults() |> fill_debit_notes(ids)}
   end
 
   @impl true
   def mount(%{"ids" => ids, "pre_print" => pre_print}, _, socket) do
     ids = String.split(ids, ",")
-    {:ok, socket |> assign(:pre_print, pre_print) |> set_page_defaults() |> fill_credit_notes(ids)}
+    {:ok, socket |> assign(:pre_print, pre_print) |> set_page_defaults() |> fill_debit_notes(ids)}
   end
 
   defp set_page_defaults(socket) do
@@ -23,28 +23,28 @@ defmodule FullCircleWeb.CreditNoteLive.Print do
     |> assign(:company, FullCircle.Sys.get_company!(socket.assigns.current_company.id))
   end
 
-  defp fill_credit_notes(socket, ids) do
+  defp fill_debit_notes(socket, ids) do
     chunk = (socket.assigns.detail_body_height / socket.assigns.detail_height) |> floor
 
-    crnotes =
-      DebCre.get_print_credit_notes!(
+    notes =
+      DebCre.get_print_debit_notes!(
         ids,
         socket.assigns.current_company,
         socket.assigns.current_user
       )
       |> Enum.map(fn r ->
-        fill_head_foot_for(r, :credit_note_details, "detail_head", "detail_foot")
+        fill_head_foot_for(r, :debit_note_details, "detail_head", "detail_foot")
       end)
       |> Enum.map(fn r ->
         fill_head_foot_for(r, :transaction_matchers, "match_head", "match_foot")
       end)
-      |> Enum.map(fn crnote ->
-        crnote
+      |> Enum.map(fn note ->
+        note
         |> Map.merge(%{
           chunk_number:
             Enum.chunk_every(
-              crnote.credit_note_details ++
-                crnote.transaction_matchers,
+              note.debit_note_details ++
+                note.transaction_matchers,
               chunk
             )
             |> Enum.count()
@@ -52,15 +52,15 @@ defmodule FullCircleWeb.CreditNoteLive.Print do
         |> Map.merge(%{
           all_chunks:
             Enum.chunk_every(
-              crnote.credit_note_details ++
-                crnote.transaction_matchers,
+              note.debit_note_details ++
+                note.transaction_matchers,
               chunk
             )
         })
       end)
 
     socket
-    |> assign(:crnotes, crnotes)
+    |> assign(:notes, notes)
   end
 
   defp fill_head_foot_for(map, list_atom, header, footer) do
@@ -83,29 +83,29 @@ defmodule FullCircleWeb.CreditNoteLive.Print do
     <div id="print-me" class="print-here">
       <%= pre_print_style(assigns) %>
       <%= if(@pre_print == "false", do: full_style(assigns)) %>
-      <%= for crnote  <- @crnotes do %>
-        <%= Enum.map 1..crnote.chunk_number, fn n -> %>
+      <%= for note  <- @notes do %>
+        <%= Enum.map 1..note.chunk_number, fn n -> %>
           <div id="page" class="">
             <div class="letter-head">
               <%= if(@pre_print == "true", do: "", else: letter_head(assigns)) %>
             </div>
-            <div class="doctype is-size-4 has-text-weight-semibold">CREDIT NOTE</div>
-            <%= crnote_header(crnote, assigns) %>
+            <div class="doctype is-size-4 has-text-weight-semibold">DEBIT NOTE</div>
+            <%= note_header(note, assigns) %>
 
             <div class="details-body is-size-6">
-              <%= for recd <- Enum.at(crnote.all_chunks, n - 1) do %>
+              <%= for recd <- Enum.at(note.all_chunks, n - 1) do %>
                 <%= detail_header(recd, assigns) %>
-                <%= detail_footer(recd, crnote, assigns) %>
-                <%= crnote_detail(recd, assigns) %>
+                <%= detail_footer(recd, note, assigns) %>
+                <%= note_detail(recd, assigns) %>
                 <%= match_tran_header(recd, assigns) %>
-                <%= match_tran_footer(recd, crnote, assigns) %>
-                <%= crnote_match_tran(recd, assigns) %>
+                <%= match_tran_footer(recd, note, assigns) %>
+                <%= note_match_tran(recd, assigns) %>
               <% end %>
             </div>
 
-            <%= if(n == crnote.chunk_number,
-              do: crnote_footer(crnote, n, crnote.chunk_number, assigns),
-              else: crnote_footer("continue", n, crnote.chunk_number, assigns)
+            <%= if(n == note.chunk_number,
+              do: note_footer(note, n, note.chunk_number, assigns),
+              else: note_footer("continue", n, note.chunk_number, assigns)
             ) %>
             <div class="letter-foot">
               <%= if(@pre_print == "true", do: "", else: letter_foot(assigns)) %>
@@ -117,7 +117,7 @@ defmodule FullCircleWeb.CreditNoteLive.Print do
     """
   end
 
-  def crnote_match_tran(recd, assigns) do
+  def note_match_tran(recd, assigns) do
     assigns = assign(assigns, :recd, recd)
 
     ~H"""
@@ -134,11 +134,11 @@ defmodule FullCircleWeb.CreditNoteLive.Print do
     """
   end
 
-  def crnote_detail(recd, assigns) do
+  def note_detail(recd, assigns) do
     assigns = assign(assigns, :recd, recd)
 
     ~H"""
-    <div :if={@recd.__struct__ == DebCre.CreditNoteDetail} class="detail">
+    <div :if={@recd.__struct__ == DebCre.DebitNoteDetail} class="detail">
       <span class="particular">
         <%= @recd.descriptions %>
       </span>
@@ -162,14 +162,14 @@ defmodule FullCircleWeb.CreditNoteLive.Print do
     """
   end
 
-  def match_tran_footer(recd, crnote, assigns) do
-    assigns = assigns |> assign(:crnote, crnote) |> assign(:recd, recd)
+  def match_tran_footer(recd, note, assigns) do
+    assigns = assigns |> assign(:note, note) |> assign(:recd, recd)
 
     ~H"""
     <div :if={@recd.__struct__ == "match_foot"} class="details-footer">
       <span class="has-text-weight-semibold">
         Matched Amount: <%= Number.Delimit.number_to_delimited(
-          @crnote.matched_amount
+          @note.matched_amount
           |> Decimal.abs()
         ) %>
       </span>
@@ -177,25 +177,25 @@ defmodule FullCircleWeb.CreditNoteLive.Print do
     """
   end
 
-  def detail_footer(recd, crnote, assigns) do
-    assigns = assigns |> assign(:crnote, crnote) |> assign(:recd, recd)
+  def detail_footer(recd, note, assigns) do
+    assigns = assigns |> assign(:note, note) |> assign(:recd, recd)
 
     ~H"""
     <div :if={@recd.__struct__ == "detail_foot"} class="details-footer">
       <span>
-        Desc Amount: <%= Number.Delimit.number_to_delimited(@crnote.note_desc_amount) %>
+        Desc Amount: <%= Number.Delimit.number_to_delimited(@note.note_desc_amount) %>
       </span>
       <span>
-        Tax Amount: <%= Number.Delimit.number_to_delimited(@crnote.note_tax_amount) %>
+        Tax Amount: <%= Number.Delimit.number_to_delimited(@note.note_tax_amount) %>
       </span>
       <span class="has-text-weight-semibold">
-        Detail Amount: <%= Number.Delimit.number_to_delimited(@crnote.note_amount) %>
+        Detail Amount: <%= Number.Delimit.number_to_delimited(@note.note_amount) %>
       </span>
     </div>
     """
   end
 
-  def crnote_footer("continue", page, pages, assigns) do
+  def note_footer("continue", page, pages, assigns) do
     assigns = assign(assigns, :page, page) |> assign(:pages, pages)
 
     ~H"""
@@ -207,13 +207,13 @@ defmodule FullCircleWeb.CreditNoteLive.Print do
     """
   end
 
-  def crnote_footer(crnote, page, pages, assigns) do
-    assigns = assign(assigns, :page, page) |> assign(:pages, pages) |> assign(:crnote, crnote)
+  def note_footer(note, page, pages, assigns) do
+    assigns = assign(assigns, :page, page) |> assign(:pages, pages) |> assign(:note, note)
 
     ~H"""
     <div class="footer">
       <div class="payment-amount has-text-weight-bold">
-        Note Amount: <%= Number.Delimit.number_to_delimited(@crnote.note_amount) %>
+        Note Amount: <%= Number.Delimit.number_to_delimited(@note.note_amount) %>
       </div>
     </div>
     <span class="page-count"><%= "page #{@page} of #{@pages}" %></span>
@@ -261,36 +261,36 @@ defmodule FullCircleWeb.CreditNoteLive.Print do
     """
   end
 
-  def crnote_header(crnote, assigns) do
-    assigns = assigns |> assign(:crnote, crnote)
+  def note_header(note, assigns) do
+    assigns = assigns |> assign(:note, note)
 
     ~H"""
     <div class="header">
       <div class="is-size-6">Credit Note To</div>
       <div class="customer">
-        <div class="is-size-5 has-text-weight-semibold"><%= @crnote.contact.name %></div>
-        <div><%= @crnote.contact.address1 %></div>
-        <div><%= @crnote.contact.address2 %></div>
+        <div class="is-size-5 has-text-weight-semibold"><%= @note.contact.name %></div>
+        <div><%= @note.contact.address1 %></div>
+        <div><%= @note.contact.address2 %></div>
         <div>
           <%= Enum.join(
             [
-              @crnote.contact.city,
-              @crnote.contact.zipcode,
-              @crnote.contact.state,
-              @crnote.contact.country
+              @note.contact.city,
+              @note.contact.zipcode,
+              @note.contact.state,
+              @note.contact.country
             ],
             " "
           ) %>
         </div>
-        <%= @crnote.contact.reg_no %>
+        <%= @note.contact.reg_no %>
       </div>
       <div class="payment-info">
         <div>
           Note Date:
-          <span class="has-text-weight-semibold"><%= format_date(@crnote.note_date) %></span>
+          <span class="has-text-weight-semibold"><%= format_date(@note.note_date) %></span>
         </div>
         <div>
-          Note No: <span class="has-text-weight-semibold"><%= @crnote.note_no %></span>
+          Note No: <span class="has-text-weight-semibold"><%= @note.note_no %></span>
         </div>
       </div>
     </div>

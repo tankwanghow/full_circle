@@ -103,8 +103,8 @@ defmodule FullCircleWeb.ReceiptLive.Form do
     cs =
       socket.assigns.form.source
       |> FullCircleWeb.Helpers.delete_line(index, :received_cheques)
-      |> Map.put(:action, socket.assigns.live_action)
       |> Receipt.compute_balance()
+      |> Map.put(:action, socket.assigns.live_action)
 
     {:noreply, socket |> assign(form: to_form(cs))}
   end
@@ -144,8 +144,8 @@ defmodule FullCircleWeb.ReceiptLive.Form do
     cs =
       socket.assigns.form.source
       |> FullCircleWeb.Helpers.add_line(:transaction_matchers, match_tran)
-      |> Map.put(:action, socket.assigns.live_action)
       |> Receipt.compute_balance()
+      |> Map.put(:action, socket.assigns.live_action)
 
     {:noreply, socket |> assign(form: to_form(cs))}
   end
@@ -155,8 +155,8 @@ defmodule FullCircleWeb.ReceiptLive.Form do
     cs =
       socket.assigns.form.source
       |> FullCircleWeb.Helpers.delete_line(index, :transaction_matchers)
-      |> Map.put(:action, socket.assigns.live_action)
       |> Receipt.compute_balance()
+      |> Map.put(:action, socket.assigns.live_action)
 
     {:noreply, socket |> assign(form: to_form(cs))}
   end
@@ -481,6 +481,7 @@ defmodule FullCircleWeb.ReceiptLive.Form do
           <div class="w-5/12 grow shrink">
             <%= Phoenix.HTML.Form.hidden_input(@form, :funds_account_id) %>
             <.input
+              feedback={true}
               field={@form[:funds_account_name]}
               label={gettext("Funds Account")}
               phx-hook="tributeAutoComplete"

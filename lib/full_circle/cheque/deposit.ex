@@ -16,6 +16,7 @@ defmodule FullCircle.Cheque.Deposit do
 
     field :bank_name, :string, virtual: true
     field :funds_from_name, :string, virtual: true
+    field :cheques_amount, :decimal, virtual: true, default: 0
 
     timestamps(type: :utc_datetime)
   end
@@ -41,6 +42,32 @@ defmodule FullCircle.Cheque.Deposit do
     |> validate_date(:deposit_date, days_before: 60)
     |> validate_date(:deposit_date, days_after: 4)
     |> validate_deposit_date()
+    |> compute_fields()
+  end
+
+  def compute_fields(cs) do
+    cs |> sum_field_to(:cheques, :amount, :cheques_amount) |> validate_deposit_amount()
+  end
+
+  defp validate_deposit_amount(cs) do
+    # cs =
+    #   Map.replace(
+    #     cs,
+    #     :errors,
+    #     Enum.filter(cs.errors, fn {k, _} -> k != :cheques_amount end)
+    #   )
+
+    # cs = if(Enum.count(cs.errors) == 0, do: Map.replace(cs, :valid?, true), else: cs)
+
+    fa = fetch_field!(cs, :funds_amount)
+    ca = fetch_field!(cs, :cheques_amount)
+
+    if Decimal.add(fa, ca) |> Decimal.eq?(0) do
+      add_error(cs, :cheques_amount, gettext("deposit amount zero"))
+    else
+      cs
+    end
+
   end
 
   defp validate_funds_from_name(changeset) do

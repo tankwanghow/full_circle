@@ -1,8 +1,8 @@
-defmodule FullCircleWeb.CreditNoteLive.Form do
+defmodule FullCircleWeb.DebitNoteLive.Form do
   use FullCircleWeb, :live_view
 
   alias FullCircle.{Accounting, DebCre}
-  alias FullCircle.DebCre.{CreditNote}
+  alias FullCircle.DebCre.{DebitNote}
   alias FullCircle.StdInterface
 
   @impl true
@@ -27,13 +27,13 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
     socket
     |> assign(live_action: :new)
     |> assign(id: "new")
-    |> assign(page_title: gettext("New Credit Note"))
+    |> assign(page_title: gettext("New Debit Note"))
     |> assign(
       :form,
       to_form(
         StdInterface.changeset(
-          CreditNote,
-          %CreditNote{},
+          DebitNote,
+          %DebitNote{},
           %{note_no: "...new..."},
           socket.assigns.current_company
         )
@@ -43,19 +43,19 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
 
   defp mount_edit(socket, id) do
     object =
-      DebCre.get_credit_note!(
+      DebCre.get_debit_note!(
         id,
         socket.assigns.current_company,
         socket.assigns.current_user
       )
 
     cs =
-      StdInterface.changeset(CreditNote, object, %{}, socket.assigns.current_company)
+      StdInterface.changeset(DebitNote, object, %{}, socket.assigns.current_company)
 
     socket
     |> assign(live_action: :edit)
     |> assign(id: id)
-    |> assign(page_title: gettext("Edit Credit Note") <> " " <> object.note_no)
+    |> assign(page_title: gettext("Edit Debit Note") <> " " <> object.note_no)
     |> assign(:form, to_form(cs))
   end
 
@@ -63,9 +63,9 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
   def handle_event("add_detail", _, socket) do
     cs =
       socket.assigns.form.source
-      |> FullCircleWeb.Helpers.add_line(:credit_note_details)
+      |> FullCircleWeb.Helpers.add_line(:debit_note_details)
       |> Map.put(:action, socket.assigns.live_action)
-      |> CreditNote.compute_balance()
+      |> DebitNote.compute_balance()
 
     {:noreply, socket |> assign(form: to_form(cs))}
   end
@@ -74,9 +74,9 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
   def handle_event("delete_detail", %{"index" => index}, socket) do
     cs =
       socket.assigns.form.source
-      |> FullCircleWeb.Helpers.delete_line(index, :credit_note_details)
+      |> FullCircleWeb.Helpers.delete_line(index, :debit_note_details)
       |> Map.put(:action, socket.assigns.live_action)
-      |> CreditNote.compute_balance()
+      |> DebitNote.compute_balance()
 
     {:noreply, socket |> assign(form: to_form(cs))}
   end
@@ -107,7 +107,7 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
       match_tran
       |> Map.merge(%{
         account_id: match_tran.account_id,
-        doc_type: "CreditNote",
+        doc_type: "DebitNote",
         all_matched_amount: match_tran.all_matched_amount,
         balance: 0.00,
         match_amount: Decimal.negate(match_tran.balance) |> Decimal.round(2)
@@ -117,7 +117,7 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
       socket.assigns.form.source
       |> FullCircleWeb.Helpers.add_line(:transaction_matchers, match_tran)
       |> Map.put(:action, socket.assigns.live_action)
-      |> CreditNote.compute_balance()
+      |> DebitNote.compute_balance()
 
     {:noreply, socket |> assign(form: to_form(cs))}
   end
@@ -128,7 +128,7 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
       socket.assigns.form.source
       |> FullCircleWeb.Helpers.delete_line(index, :transaction_matchers)
       |> Map.put(:action, socket.assigns.live_action)
-      |> CreditNote.compute_balance()
+      |> DebitNote.compute_balance()
 
     {:noreply, socket |> assign(form: to_form(cs))}
   end
@@ -136,7 +136,7 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
   @impl true
   def handle_event(
         "validate",
-        %{"_target" => ["credit_note", "contact_name"], "credit_note" => params},
+        %{"_target" => ["debit_note", "contact_name"], "debit_note" => params},
         socket
       ) do
     {params, socket, _} =
@@ -155,12 +155,12 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
   def handle_event(
         "validate",
         %{
-          "_target" => ["credit_note", "credit_note_details", id, "account_name"],
-          "credit_note" => params
+          "_target" => ["debit_note", "debit_note_details", id, "account_name"],
+          "debit_note" => params
         },
         socket
       ) do
-    detail = params["credit_note_details"][id]
+    detail = params["debit_note_details"][id]
 
     {detail, socket, _} =
       FullCircleWeb.Helpers.assign_autocomplete_id(
@@ -173,7 +173,7 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
 
     params =
       params
-      |> FullCircleWeb.Helpers.merge_detail("credit_note_details", id, detail)
+      |> FullCircleWeb.Helpers.merge_detail("debit_note_details", id, detail)
 
     validate(params, socket)
   end
@@ -182,12 +182,12 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
   def handle_event(
         "validate",
         %{
-          "_target" => ["credit_note", "credit_note_details", id, "tax_code_name"],
-          "credit_note" => params
+          "_target" => ["debit_note", "debit_note_details", id, "tax_code_name"],
+          "debit_note" => params
         },
         socket
       ) do
-    detail = params["credit_note_details"][id]
+    detail = params["debit_note_details"][id]
 
     {detail, socket, taxcode} =
       FullCircleWeb.Helpers.assign_autocomplete_id(
@@ -205,34 +205,34 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
 
     params =
       params
-      |> FullCircleWeb.Helpers.merge_detail("credit_note_details", id, detail)
+      |> FullCircleWeb.Helpers.merge_detail("debit_note_details", id, detail)
 
     validate(params, socket)
   end
 
   @impl true
-  def handle_event("validate", %{"credit_note" => params}, socket) do
+  def handle_event("validate", %{"debit_note" => params}, socket) do
     validate(params, socket)
   end
 
   @impl true
-  def handle_event("save", %{"credit_note" => params}, socket) do
+  def handle_event("save", %{"debit_note" => params}, socket) do
     save(socket, socket.assigns.live_action, params)
   end
 
   defp save(socket, :new, params) do
-    case DebCre.create_credit_note(
+    case DebCre.create_debit_note(
            params,
            socket.assigns.current_company,
            socket.assigns.current_user
          ) do
-      {:ok, %{create_credit_note: obj}} ->
+      {:ok, %{create_debit_note: obj}} ->
         {:noreply,
          socket
          |> push_navigate(
-           to: ~p"/companies/#{socket.assigns.current_company.id}/CreditNote/#{obj.id}/edit"
+           to: ~p"/companies/#{socket.assigns.current_company.id}/DebitNote/#{obj.id}/edit"
          )
-         |> put_flash(:info, gettext("Credit Note created successfully."))}
+         |> put_flash(:info, gettext("Debit Note created successfully."))}
 
       {:error, failed_operation, changeset, _} ->
         {:noreply,
@@ -256,19 +256,19 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
   end
 
   defp save(socket, :edit, params) do
-    case DebCre.update_credit_note(
+    case DebCre.update_debit_note(
            socket.assigns.form.data,
            params,
            socket.assigns.current_company,
            socket.assigns.current_user
          ) do
-      {:ok, %{update_credit_note: obj}} ->
+      {:ok, %{update_debit_note: obj}} ->
         {:noreply,
          socket
          |> push_navigate(
-           to: ~p"/companies/#{socket.assigns.current_company.id}/CreditNote/#{obj.id}/edit"
+           to: ~p"/companies/#{socket.assigns.current_company.id}/DebitNote/#{obj.id}/edit"
          )
-         |> put_flash(:info, gettext("Credit Note updated successfully."))}
+         |> put_flash(:info, gettext("Debit Note updated successfully."))}
 
       {:error, failed_operation, changeset, _} ->
         {:noreply,
@@ -294,7 +294,7 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
   defp validate(params, socket) do
     changeset =
       StdInterface.changeset(
-        CreditNote,
+        DebitNote,
         socket.assigns.form.data,
         params,
         socket.assigns.current_company
@@ -309,7 +309,7 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="w-9/12 mx-auto border rounded-lg border-cyan-500 bg-cyan-100 p-4">
+    <div class="w-9/12 mx-auto border rounded-lg border-emerald-500 bg-emerald-100 p-4">
       <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
       <.form for={@form} id="object-form" autocomplete="off" phx-change="validate" phx-submit="save">
         <%= Phoenix.HTML.Form.hidden_input(@form, :note_no) %>
@@ -318,14 +318,14 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
             <%= Phoenix.HTML.Form.hidden_input(@form, :contact_id) %>
             <.input
               field={@form[:contact_name]}
-              label={gettext("Credit Note To")}
+              label={gettext("Debit Note To")}
               phx-hook="tributeAutoComplete"
               phx-debounce="500"
               url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
             />
           </div>
           <div class="grow shrink w-3/12">
-            <.input field={@form[:note_date]} label={gettext("Credit Note Date")} type="date" />
+            <.input field={@form[:note_date]} label={gettext("Debit Note Date")} type="date" />
           </div>
           <div class="grow shrink w-3/12">
             <.input
@@ -333,19 +333,19 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
               type="number"
               readonly
               field={@form[:note_balance]}
-              label={gettext("Credit Note Balance")}
+              label={gettext("Debit Note Balance")}
               value={Ecto.Changeset.fetch_field!(@form.source, :note_balance)}
             />
           </div>
         </div>
         <div class="flex flex-row gap-2 flex-nowrap w-2/3 mx-auto text-center mt-5">
           <div
-            id="credit-note-details-tab"
+            id="debit-note-details-tab"
             phx-click={
               JS.hide(to: "#match-trans")
               |> JS.hide(to: "#query-match-trans")
               |> JS.remove_class("active", to: "#match-trans-tab")
-              |> JS.show(to: "#credit-note-details")
+              |> JS.show(to: "#debit-note-details")
               |> JS.add_class("active")
             }
             class="active basis-1/2 tab"
@@ -365,8 +365,8 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
             phx-click={
               JS.show(to: "#match-trans")
               |> JS.add_class("active")
-              |> JS.hide(to: "#credit-note-details")
-              |> JS.remove_class("active", to: "#credit-note-details-tab")
+              |> JS.hide(to: "#debit-note-details")
+              |> JS.remove_class("active", to: "#debit-note-details-tab")
               |> JS.show(to: "#query-match-trans")
             }
             class="basis-1/2 tab"
@@ -386,10 +386,10 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
 
         <.live_component
           module={FullCircleWeb.CreditNoteLive.DetailComponent}
-          id="credit-note-details"
+          id="debit-note-details"
           klass="text-center border bg-purple-100 mt-2 p-3 rounded-lg border-purple-400"
-          doc_name="CreditNote"
-          detail_name={:credit_note_details}
+          doc_name="DebitNote"
+          detail_name={:debit_note_details}
           form={@form}
           taxcodetype="taxcode"
           doc_desc_amount={:note_desc_amount}
@@ -413,19 +413,19 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
           <.form_action_button
             form={@form}
             live_action={@live_action}
-            new_url={~p"/companies/#{@current_company.id}/CreditNote/new"}
+            new_url={~p"/companies/#{@current_company.id}/DebitNote/new"}
           />
           <.print_button
             :if={@live_action != :new}
             company={@current_company}
-            doc_type="CreditNote"
+            doc_type="DebitNote"
             doc_id={@id}
             class="blue button"
           />
           <.pre_print_button
             :if={@live_action != :new}
             company={@current_company}
-            doc_type="CreditNote"
+            doc_type="DebitNote"
             doc_id={@id}
             class="blue button"
           />
@@ -434,7 +434,7 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
             module={FullCircleWeb.LogLive.Component}
             id={"log_#{@id}"}
             show_log={false}
-            entity="credit_notes"
+            entity="debit_notes"
             entity_id={@id}
           />
           <.live_component
@@ -442,7 +442,7 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
             module={FullCircleWeb.JournalEntryViewLive.Component}
             id={"journal_#{@id}"}
             show_journal={false}
-            doc_type="CreditNote"
+            doc_type="DebitNote"
             doc_no={@form.data.note_no}
             company_id={@current_company.id}
           />
@@ -456,7 +456,7 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
       query={@query}
       query_match_trans={@query_match_trans}
       form={@form}
-      balance_ve="+ve"
+      balance_ve="-ve"
       doc_no_field={:note_no}
       current_company={@current_company}
       current_user={@current_user}

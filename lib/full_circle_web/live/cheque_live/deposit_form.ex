@@ -119,6 +119,7 @@ defmodule FullCircleWeb.ChequeLive.DepositForm do
       socket.assigns.form.source
       |> FullCircleWeb.Helpers.add_line(:cheques, chq)
       |> Map.put(:action, socket.assigns.live_action)
+      |> Deposit.compute_fields()
 
     {:noreply, socket |> assign(form: to_form(cs))}
   end
@@ -129,6 +130,7 @@ defmodule FullCircleWeb.ChequeLive.DepositForm do
       socket.assigns.form.source
       |> FullCircleWeb.Helpers.delete_line(index, :cheques)
       |> Map.put(:action, socket.assigns.live_action)
+      |> Deposit.compute_fields()
 
     {:noreply, socket |> assign(form: to_form(cs))}
   end
@@ -240,7 +242,7 @@ defmodule FullCircleWeb.ChequeLive.DepositForm do
       <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
       <.form for={@form} id="object-form" autocomplete="off" phx-change="validate" phx-submit="save">
         <%= Phoenix.HTML.Form.hidden_input(@form, :deposit_no) %>
-        <div class="flex flex-row flex-nowarp gap-5">
+        <div class="flex flex-row flex-nowarp gap-1">
           <div class="w-2/12">
             <.input field={@form[:deposit_date]} label={gettext("Deposit Date")} type="date" />
           </div>
@@ -269,6 +271,7 @@ defmodule FullCircleWeb.ChequeLive.DepositForm do
               phx-debounce="500"
               type="number"
               step="0.01"
+              feedback={true}
             />
           </div>
 
@@ -296,7 +299,7 @@ defmodule FullCircleWeb.ChequeLive.DepositForm do
             <div class="w-[17%]"><.input field={dtl[:state]} readonly /></div>
             <div class="w-[16%]"><.input type="date" field={dtl[:due_date]} readonly /></div>
             <div class="w-[16%]">
-              <.input phx-debounce="500" type="number" step="0.01" field={dtl[:amount]} readonly />
+              <.input type="number" step="0.01" field={dtl[:amount]} readonly />
             </div>
             <div class="w-[3%] mt-1 text-rose-500">
               <.link phx-click={:delete_chq} phx-value-index={dtl.index} tabindex="-1">
@@ -306,6 +309,13 @@ defmodule FullCircleWeb.ChequeLive.DepositForm do
             </div>
           </div>
         </.inputs_for>
+        <div class="flex flex-row flex-wrap">
+            <div class="w-[81%]" />
+            <div class="w-[16%]">
+              <.input feedback={true} type="number" step="0.01" field={@form[:cheques_amount]} readonly />
+            </div>
+            <div class="w-[3%] mt-1 text-rose-500" />
+          </div>
 
         <div class="flex justify-center gap-x-1 mt-1">
           <.form_action_button

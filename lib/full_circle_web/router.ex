@@ -152,6 +152,10 @@ defmodule FullCircleWeb.Router do
       live("/CreditNote/new", CreditNoteLive.Form, :new)
       live("/CreditNote/:note_id/edit", CreditNoteLive.Form, :edit)
 
+      live("/DebitNote", DebitNoteLive.Index, :index)
+      live("/DebitNote/new", DebitNoteLive.Form, :new)
+      live("/DebitNote/:note_id/edit", DebitNoteLive.Form, :edit)
+
       live("/seeds", SeedLive.Index, :index)
 
       live("/Receipt", ReceiptLive.Index, :index)
@@ -185,6 +189,12 @@ defmodule FullCircleWeb.Router do
 
       live("/ReturnCheque/:id/print", ChequeLive.ReturnChequePrint, :print)
       live("/ReturnCheque/print_multi", ChequeLive.ReturnChequePrint, :print)
+
+      live("/CreditNote/:id/print", CreditNoteLive.Print, :print)
+      live("/CreditNote/print_multi", CreditNoteLive.Print, :print)
+
+      live("/DebitNote/:id/print", DebitNoteLive.Print, :print)
+      live("/DebitNote/print_multi", DebitNoteLive.Print, :print)
 
       live("/Journal/:id/print", JournalLive.Print, :print)
       live("/Journal/print_multi", JournalLive.Print, :print)

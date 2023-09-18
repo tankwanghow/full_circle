@@ -1,8 +1,8 @@
-defmodule FullCircleWeb.CreditNoteLive.Index do
+defmodule FullCircleWeb.DebitNoteLive.Index do
   use FullCircleWeb, :live_view
 
   alias FullCircle.DebCre
-  alias FullCircleWeb.CreditNoteLive.IndexComponent
+  alias FullCircleWeb.DebitNoteLive.IndexComponent
 
   @per_page 25
 
@@ -21,11 +21,11 @@ defmodule FullCircleWeb.CreditNoteLive.Index do
                 name="search[terms]"
                 type="search"
                 value={@search.terms}
-                placeholder="credit note, contact or account..."
+                placeholder="debit note, contact or account..."
               />
             </div>
             <div class="w-[9.5rem] grow-0 shrink-0">
-              <label>Credit Note Date From</label>
+              <label>Debit Note Date From</label>
               <.input
                 name="search[note_date]"
                 type="date"
@@ -39,11 +39,11 @@ defmodule FullCircleWeb.CreditNoteLive.Index do
       </div>
       <div class="text-center mb-2">
         <.link
-          navigate={~p"/companies/#{@current_company.id}/CreditNote/new"}
+          navigate={~p"/companies/#{@current_company.id}/DebitNote/new"}
           class="blue button"
           id="new_object"
         >
-          <%= gettext("New Credit Note") %>
+          <%= gettext("New Debit Note") %>
         </.link>
         <.link
           :if={@ids != ""}
@@ -110,7 +110,7 @@ defmodule FullCircleWeb.CreditNoteLive.Index do
   def mount(_params, _session, socket) do
     socket =
       socket
-      |> assign(page_title: gettext("Credit Note Listing"))
+      |> assign(page_title: gettext("Debit Note Listing"))
 
     {:ok, socket}
   end
@@ -132,7 +132,7 @@ defmodule FullCircleWeb.CreditNoteLive.Index do
   @impl true
   def handle_event("check_click", %{"object-id" => id, "value" => "on"}, socket) do
     obj =
-      DebCre.get_credit_note_by_id_index_component_field!(
+      DebCre.get_debit_note_by_id_index_component_field!(
         id,
         socket.assigns.current_company,
         socket.assigns.current_user
@@ -154,7 +154,7 @@ defmodule FullCircleWeb.CreditNoteLive.Index do
   @impl true
   def handle_event("check_click", %{"object-id" => id}, socket) do
     obj =
-      DebCre.get_credit_note_by_id_index_component_field!(
+      DebCre.get_debit_note_by_id_index_component_field!(
         id,
         socket.assigns.current_company,
         socket.assigns.current_user
@@ -208,7 +208,7 @@ defmodule FullCircleWeb.CreditNoteLive.Index do
 
   defp filter_objects(socket, terms, update, note_date, page) do
     objects =
-      DebCre.credit_note_index_query(
+      DebCre.debit_note_index_query(
         terms,
         note_date,
         socket.assigns.current_company,

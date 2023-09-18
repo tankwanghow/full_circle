@@ -261,7 +261,7 @@ defmodule FullCircleWeb.PaymentLive.Print do
   def letter_foot(assigns) do
     ~H"""
     <div class="terms is-size-7">
-      <div>This receipt is only valid subject to cheque or cheques honoured by the bank.</div>
+      <%!-- <div>This receipt is only valid subject to cheque or cheques honoured by the bank.</div> --%>
     </div>
     <div class="sign">Receiver Signature</div>
     <div class="sign">Manager Signature</div>

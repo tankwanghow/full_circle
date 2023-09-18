@@ -1,4 +1,4 @@
-defmodule FullCircleWeb.CreditNoteLive.IndexComponent do
+defmodule FullCircleWeb.DebitNoteLive.IndexComponent do
   use FullCircleWeb, :live_component
 
   @impl true
@@ -44,7 +44,7 @@ defmodule FullCircleWeb.CreditNoteLive.IndexComponent do
         :if={!@obj.old_data}
         class="text-blue-600 w-[10%] border-b border-gray-400 py-1 hover:cursor-pointer"
       >
-        <.link navigate={~p"/companies/#{@obj.company_id}/CreditNote/#{@obj.id}/edit"}>
+        <.link navigate={~p"/companies/#{@obj.company_id}/DebitNote/#{@obj.id}/edit"}>
           <%= @obj.note_no %>
         </.link>
       </div>

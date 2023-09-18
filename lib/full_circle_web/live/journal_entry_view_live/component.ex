@@ -55,7 +55,7 @@ defmodule FullCircleWeb.JournalEntryViewLive.Component do
         id={"object-journal-modal-#{@id}"}
         show
         on_cancel={JS.push("hide_journal", target: "##{@id}")}
-        max_w="max-w-6xl"
+        max_w="w-10/12"
       >
         <div class="max-w-full text-black">
           <p class="w-full text-3xl text-center font-medium mb-3">
@@ -65,19 +65,22 @@ defmodule FullCircleWeb.JournalEntryViewLive.Component do
             <div class="w-[9%] border rounded bg-gray-100 border-gray-400 px-2 py-1">
               <%= gettext("Date") %>
             </div>
-            <div class="w-[11%] border rounded bg-gray-100 border-gray-400 px-2 py-1">
+            <div class="w-[9%] border rounded bg-gray-100 border-gray-400 px-2 py-1">
               <%= gettext("Doc No") %>
             </div>
-            <div class="w-[24%] border rounded bg-gray-100 border-gray-400 px-2 py-1">
+            <div class="w-[20%] border rounded bg-gray-100 border-gray-400 px-2 py-1">
               <%= gettext("Account") %>
             </div>
-            <div class="w-[29%] border rounded bg-gray-100 border-gray-400 px-2 py-1">
+            <div class="w-[21%] border rounded bg-gray-100 border-gray-400 px-2 py-1">
               <%= gettext("Particulars") %>
             </div>
-            <div class="w-[13.5%] border rounded bg-gray-100 border-gray-400 px-2 py-1">
+            <div class="w-[21%] border rounded bg-gray-100 border-gray-400 px-2 py-1">
+              <%= gettext("Contact Particulars") %>
+            </div>
+            <div class="w-[10%] border rounded bg-gray-100 border-gray-400 px-2 py-1">
               <%= gettext("Debit") %>
             </div>
-            <div class="w-[13.5%] border rounded bg-gray-100 border-gray-400 px-2 py-1">
+            <div class="w-[10%] border rounded bg-gray-100 border-gray-400 px-2 py-1">
               <%= gettext("Credit") %>
             </div>
           </div>
@@ -87,28 +90,31 @@ defmodule FullCircleWeb.JournalEntryViewLive.Component do
                 <div class="w-[9%] border rounded bg-blue-100 border-blue-400 text-center px-2 py-1">
                   <%= obj.doc_date %>
                 </div>
-                <div class="w-[11%] border rounded bg-blue-100 border-blue-400 text-center px-2 py-1">
+                <div class="w-[9%] border rounded bg-blue-100 border-blue-400 text-center px-2 py-1">
                   <%= obj.doc_no %>
                 </div>
-                <div class="w-[24%] border rounded bg-blue-100 border-blue-400 text-center px-2 py-1">
+                <div class="w-[20%] border rounded bg-blue-100 border-blue-400 text-center px-2 py-1">
                   <%= obj.account_name %>
                 </div>
-                <div class="w-[29%] border rounded bg-blue-100 border-blue-400 px-2 py-1">
+                <div class="w-[21%] border rounded bg-blue-100 border-blue-400 px-2 py-1">
                   <%= obj.particulars %>
                 </div>
-                <div class="w-[13.5%] border rounded bg-blue-100 border-blue-400 text-center px-2 py-1">
+                <div class="w-[21%] border rounded bg-blue-100 border-blue-400 px-2 py-1">
+                  <%= obj.contact_particulars %>
+                </div>
+                <div class="w-[10%] border rounded bg-blue-100 border-blue-400 text-center px-2 py-1">
                   <%= if(Decimal.gt?(obj.amount, 0), do: obj.amount, else: 0)
                   |> Number.Delimit.number_to_delimited() %>
                 </div>
-                <div class="w-[13.5%] border rounded bg-blue-100 border-blue-400 text-center px-2 py-1">
+                <div class="w-[10%] border rounded bg-blue-100 border-blue-400 text-center px-2 py-1">
                   <%= if(Decimal.gt?(obj.amount, 0), do: 0, else: Decimal.abs(obj.amount))
                   |> Number.Delimit.number_to_delimited() %>
                 </div>
               </div>
             <% end %>
             <div class="flex flex-row text-center tracking-tighter font-semibold">
-              <div class="w-[73%]"></div>
-              <div class="w-[13.5%] border rounded bg-blue-100 border-blue-400 text-center px-2 py-1">
+              <div class="w-[80%]"></div>
+              <div class="w-[10%] border rounded bg-blue-100 border-blue-400 text-center px-2 py-1">
                 <%= Enum.reduce(@entries, Decimal.new("0"), fn x, acc ->
                   Decimal.add(
                     acc,
@@ -117,7 +123,7 @@ defmodule FullCircleWeb.JournalEntryViewLive.Component do
                 end)
                 |> Number.Delimit.number_to_delimited() %>
               </div>
-              <div class="w-[13.5%] border rounded bg-blue-100 border-blue-400 text-center px-2 py-1">
+              <div class="w-[10%] border rounded bg-blue-100 border-blue-400 text-center px-2 py-1">
                 <%= Enum.reduce(@entries, Decimal.new("0"), fn x, acc ->
                   Decimal.add(
                     acc,

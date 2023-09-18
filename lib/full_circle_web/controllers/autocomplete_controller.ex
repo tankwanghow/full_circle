@@ -54,6 +54,13 @@ defmodule FullCircleWeb.AutoCompleteController do
             %{id: params["user_id"]}
           )
 
+        "taxcode" ->
+          FullCircle.Accounting.tax_codes(
+            name,
+            %{id: params["company_id"]},
+            %{id: params["user_id"]}
+          )
+
         _ ->
           []
       end
