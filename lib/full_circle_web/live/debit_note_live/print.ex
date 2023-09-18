@@ -286,8 +286,7 @@ defmodule FullCircleWeb.DebitNoteLive.Print do
       </div>
       <div class="payment-info">
         <div>
-          Note Date:
-          <span class="has-text-weight-semibold"><%= format_date(@note.note_date) %></span>
+          Note Date: <span class="has-text-weight-semibold"><%= format_date(@note.note_date) %></span>
         </div>
         <div>
           Note No: <span class="has-text-weight-semibold"><%= @note.note_no %></span>

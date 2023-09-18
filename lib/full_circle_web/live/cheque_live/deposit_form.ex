@@ -310,12 +310,12 @@ defmodule FullCircleWeb.ChequeLive.DepositForm do
           </div>
         </.inputs_for>
         <div class="flex flex-row flex-wrap">
-            <div class="w-[81%]" />
-            <div class="w-[16%]">
-              <.input feedback={true} type="number" step="0.01" field={@form[:cheques_amount]} readonly />
-            </div>
-            <div class="w-[3%] mt-1 text-rose-500" />
+          <div class="w-[81%]" />
+          <div class="w-[16%]">
+            <.input feedback={true} type="number" step="0.01" field={@form[:cheques_amount]} readonly />
           </div>
+          <div class="w-[3%] mt-1 text-rose-500" />
+        </div>
 
         <div class="flex justify-center gap-x-1 mt-1">
           <.form_action_button

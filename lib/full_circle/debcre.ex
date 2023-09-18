@@ -744,5 +744,4 @@ defmodule FullCircle.DebCre do
     |> Sys.insert_log_for(note_name, attrs, com, user)
     |> create_debit_note_transactions(note_name, com, user)
   end
-
 end

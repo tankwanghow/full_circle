@@ -67,7 +67,6 @@ defmodule FullCircle.Cheque.Deposit do
     else
       cs
     end
-
   end
 
   defp validate_funds_from_name(changeset) do
