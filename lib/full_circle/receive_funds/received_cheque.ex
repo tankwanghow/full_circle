@@ -59,7 +59,7 @@ defmodule FullCircle.ReceiveFund.ReceivedCheque do
     if is_nil(fetch_field!(cs, :deposit_id)) do
       cs
     else
-      add_error(cs, :bank, gettext("Deposited!"))
+      add_unique_error(cs, :bank, gettext("Deposited!"))
     end
   end
 
@@ -67,7 +67,7 @@ defmodule FullCircle.ReceiveFund.ReceivedCheque do
     if is_nil(fetch_field!(cs, :return_cheque_id)) do
       cs
     else
-      add_error(cs, :bank, gettext("Returned!"))
+      add_unique_error(cs, :bank, gettext("Returned!"))
     end
   end
 end

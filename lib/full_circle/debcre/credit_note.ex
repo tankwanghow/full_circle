@@ -109,10 +109,10 @@ defmodule FullCircle.DebCre.CreditNote do
 
     cond do
       Decimal.lt?(fetch_field!(changeset, :note_amount), 0) ->
-        add_error(changeset, :note_amount, gettext("must be +ve"))
+        add_unique_error(changeset, :note_amount, gettext("must be +ve"))
 
       Decimal.eq?(fetch_field!(changeset, :sum_qty), 0) ->
-        add_error(changeset, :note_amount, gettext("need detail"))
+        add_unique_error(changeset, :note_amount, gettext("need detail"))
 
       true ->
         changeset

@@ -54,7 +54,7 @@ defmodule FullCircleWeb.ChequeLive.ReturnChequePrint do
       <%= if(@pre_print == "false", do: full_style(assigns)) %>
       <%= for rtq <- @rtqs do %>
         <%= Enum.map 1..rtq.chunk_number, fn n -> %>
-          <div id="page" class="">
+          <div class="page">
             <div class="letter-head">
               <%= if(@pre_print == "true", do: "", else: letter_head_data(assigns)) %>
             </div>
@@ -207,13 +207,13 @@ defmodule FullCircleWeb.ChequeLive.ReturnChequePrint do
     <style>
       .details-body { height: <%= @detail_body_height %>mm; }
       .detail { display: flex; height: <%= @detail_height %>mm; vertical-align: middle; text-align : center;}
-      #page { width: 210mm; min-height: 145mm; padding: 5mm; }
+      .page { width: 210mm; min-height: 145mm; padding: 5mm; }
 
       @media print {
         @page { size: A5; margin: 0mm; }
         body { width: 210mm; height: 145mm; margin: 0mm; }
         html { margin: 0mm; }
-        #page { padding: 5mm; page-break-after: always; } }
+        .page { padding: 5mm; page-break-after: always; } }
 
       .letter-head { padding-bottom: 2mm; margin-bottom: 2mm; height: 28mm;}
       .doctype { float: right; margin-top: -20mm; margin-right: 0mm; }

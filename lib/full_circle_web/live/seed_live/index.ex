@@ -4,6 +4,10 @@ defmodule FullCircleWeb.SeedLive.Index do
 
   @seed_tables %{
     "--Select One--" => ~w(),
+    "EmployeeSalaryTypes" => ~w(employee_name salary_type_name amount),
+    "SalaryTypes" => ~w(name type db_ac_name cr_ac_name),
+    "Employees" =>
+      ~w(name id_no dob epf_no socso_no tax_no nationality marital_status partner_working service_since children status gender),
     "FixedAssetDepreciations" => ~w(fixed_asset_name cost_basis depre_date amount),
     "FixedAssets" =>
       ~w(name pur_date pur_price descriptions depre_start_date residual_value depre_method depre_rate asset_ac_name cume_depre_ac_name depre_ac_name disp_fund_ac_name depre_interval),

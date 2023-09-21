@@ -92,7 +92,7 @@ defmodule FullCircleWeb.ReceiptLive.Print do
       <%= if(@pre_print == "false", do: full_style(assigns)) %>
       <%= for receipt  <- @receipts do %>
         <%= Enum.map 1..receipt.chunk_number, fn n -> %>
-          <div id="page" class="">
+          <div class="page">
             <div class="letter-head">
               <%= if(@pre_print == "true", do: "", else: letter_head(assigns)) %>
             </div>
@@ -452,13 +452,13 @@ defmodule FullCircleWeb.ReceiptLive.Print do
       .cheque { display: flex; height: <%= @detail_height %>mm; vertical-align: middle;  align-items: center; }
       .funds { display: flex; height: <%= @detail_height %>mm; vertical-align: middle;  align-items: center; }
       .matched { display: flex; height: <%= @detail_height %>mm; vertical-align: middle;  align-items: center; }
-      #page { width: 210mm; min-height: 290mm; padding: 5mm; }
+      .page { width: 210mm; min-height: 290mm; padding: 5mm; }
 
       @media print {
         @page { size: A4; margin: 0mm; }
         body { width: 210mm; height: 290mm; margin: 0mm; }
         html { margin: 0mm; }
-        #page { padding: 5mm; page-break-after: always;} }
+        .page { padding: 5mm; page-break-after: always;} }
 
       .letter-head { padding-bottom: 2mm; margin-bottom: 2mm; height: 28mm;}
       .letter-foot { padding-top: 2mm; margin-top: 2mm; height: 28mm;}

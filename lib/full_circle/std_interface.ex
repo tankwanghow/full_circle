@@ -9,6 +9,29 @@ defmodule FullCircle.StdInterface do
 
   def get!(klass, id), do: Repo.get!(klass, id)
 
+  def get_one_by(klass, field, value, com, user) do
+    Repo.one(
+      from obj in subquery(query(klass, com, user)),
+        where: fragment("? = ?", field(obj, ^field), ^value)
+    )
+  end
+
+  def get_all_by(klass, fields_values, com, user) do
+    filter =
+      for {f, v} <- fields_values do
+        dynamic(
+          [cont],
+          fragment("? = ?", field(cont, ^f), ^v)
+        )
+      end
+      |> Enum.reduce(fn a, b -> dynamic(^a and ^b) end)
+
+    Repo.all(
+      from obj in subquery(query(klass, com, user)),
+        where: ^filter
+    )
+  end
+
   def filter(klass, fields, terms, company, user, page: page, per_page: per_page) do
     q =
       from(i in subquery(query(klass, company, user)),

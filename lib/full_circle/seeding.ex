@@ -4,6 +4,7 @@ defmodule FullCircle.Seeding do
 
   alias FullCircle.Accounting.FixedAssetDepreciation
   alias FullCircle.Repo
+  alias FullCircle.HR.{Employee, SalaryType, EmployeeSalaryType}
 
   alias FullCircle.Accounting.{
     TaxCode,
@@ -15,6 +16,18 @@ defmodule FullCircle.Seeding do
   }
 
   alias FullCircle.Product.{Good}
+
+  def seed("Employees", seed_data, com, user) do
+    save_seed(%Employee{}, :seed_employees, seed_data, com, user)
+  end
+
+  def seed("SalaryTypes", seed_data, com, user) do
+    save_seed(%SalaryType{}, :seed_salary_types, seed_data, com, user)
+  end
+
+  def seed("EmployeeSalaryTypes", seed_data, com, user) do
+    save_seed(%EmployeeSalaryType{}, :seed_employee_salary_types, seed_data, com, user, false)
+  end
 
   def seed("TaxCodes", seed_data, com, user) do
     save_seed(%TaxCode{}, :seed_taxcodes, seed_data, com, user)
@@ -60,7 +73,7 @@ defmodule FullCircle.Seeding do
             k = repo.insert!(cs)
 
             if log? do
-              repo.insert(FullCircle.Sys.log_changeset(:seeding, k, attr, company, user))
+              repo.insert!(FullCircle.Sys.log_changeset(:seeding, k, attr, company, user))
             end
           end)
         end)
@@ -227,6 +240,76 @@ defmodule FullCircle.Seeding do
     {FullCircle.StdInterface.changeset(
        FullCircle.Accounting.Account,
        FullCircle.Accounting.Account.__struct__(),
+       attr,
+       com
+     ), attr}
+  end
+
+  def fill_changeset("Employees", attr, com, _user) do
+    {FullCircle.StdInterface.changeset(
+       FullCircle.HR.Employee,
+       FullCircle.HR.Employee.__struct__(),
+       attr,
+       com
+     ), attr}
+  end
+
+  def fill_changeset("SalaryTypes", attr, com, user) do
+    db_ac =
+      FullCircle.Accounting.get_account_by_name(
+        Map.fetch!(attr, "db_ac_name"),
+        com,
+        user
+      )
+
+    cr_ac =
+      FullCircle.Accounting.get_account_by_name(
+        Map.fetch!(attr, "cr_ac_name"),
+        com,
+        user
+      )
+
+    attr =
+      attr
+      |> Map.merge(%{"db_ac_id" => if(db_ac, do: db_ac.id, else: nil)})
+      |> Map.merge(%{"cr_ac_id" => if(cr_ac, do: cr_ac.id, else: nil)})
+
+    {FullCircle.StdInterface.changeset(
+       FullCircle.HR.SalaryType,
+       FullCircle.HR.SalaryType.__struct__(),
+       attr,
+       com
+     ), attr}
+  end
+
+  def fill_changeset("EmployeeSalaryTypes", attr, com, user) do
+    emp =
+      FullCircle.StdInterface.get_one_by(
+        Employee,
+        :name,
+        Map.fetch!(attr, "employee_name"),
+        com,
+        user
+      )
+
+    st =
+      FullCircle.StdInterface.get_one_by(
+        SalaryType,
+        :name,
+        Map.fetch!(attr, "salary_type_name"),
+        com,
+        user
+      )
+
+    attr =
+      attr
+      |> Map.merge(%{"employee_id" => if(emp, do: emp.id, else: nil)})
+      |> Map.merge(%{"salary_type_id" => if(st, do: st.id, else: nil)})
+      |> Map.merge(%{"_persistent_id" => 1})
+
+    {FullCircle.StdInterface.changeset(
+       FullCircle.HR.EmployeeSalaryType,
+       FullCircle.HR.EmployeeSalaryType.__struct__(),
        attr,
        com
      ), attr}

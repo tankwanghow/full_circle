@@ -63,7 +63,7 @@ defmodule FullCircle.Cheque.Deposit do
     ca = fetch_field!(cs, :cheques_amount)
 
     if Decimal.add(fa, ca) |> Decimal.eq?(0) do
-      add_error(cs, :cheques_amount, gettext("deposit amount zero"))
+      add_unique_error(cs, :cheques_amount, gettext("deposit amount zero"))
     else
       cs
     end
@@ -100,7 +100,7 @@ defmodule FullCircle.Cheque.Deposit do
 
       if cs.changes.cheques
          |> Enum.any?(fn c -> Timex.compare(d_date, c.data.due_date) == -1 end) do
-        add_error(cs, :deposit_date, gettext("cheque due date error"))
+        add_unique_error(cs, :deposit_date, gettext("cheque due date error"))
       else
         cs
       end

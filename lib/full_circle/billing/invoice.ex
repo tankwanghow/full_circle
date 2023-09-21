@@ -74,10 +74,10 @@ defmodule FullCircle.Billing.Invoice do
 
     cond do
       Decimal.lt?(fetch_field!(changeset, :invoice_amount), 0) ->
-        add_error(changeset, :invoice_amount, gettext("must be +ve"))
+        add_unique_error(changeset, :invoice_amount, gettext("must be +ve"))
 
       Decimal.eq?(fetch_field!(changeset, :sum_qty), 0) ->
-        add_error(changeset, :invoice_amount, gettext("need detail"))
+        add_unique_error(changeset, :invoice_amount, gettext("need detail"))
 
       true ->
         changeset

@@ -62,7 +62,7 @@ defmodule FullCircle.Helpers do
 
   def validate_id(changeset, field_name, field_id) do
     if is_nil(fetch_field!(changeset, field_id)) and !is_nil(fetch_field!(changeset, field_name)) do
-      changeset |> add_error(field_name, gettext("not in list"))
+      changeset |> add_unique_error(field_name, gettext("not in list"))
     else
       changeset
     end
@@ -155,7 +155,11 @@ defmodule FullCircle.Helpers do
     if Timex.diff(Timex.today(), fetch_field!(cs, field) || Timex.today(), :days) <= days do
       cs
     else
-      add_error(cs, field, "#{gettext("at or after")} #{Timex.shift(Timex.today(), days: -days)}")
+      add_unique_error(
+        cs,
+        field,
+        "#{gettext("at or after")} #{Timex.shift(Timex.today(), days: -days)}"
+      )
     end
   end
 
@@ -163,7 +167,19 @@ defmodule FullCircle.Helpers do
     if Timex.diff(fetch_field!(cs, field) || Timex.today(), Timex.today(), :days) <= days do
       cs
     else
-      add_error(cs, field, "#{gettext("at or before")} #{Timex.shift(Timex.today(), days: days)}")
+      add_unique_error(
+        cs,
+        field,
+        "#{gettext("at or before")} #{Timex.shift(Timex.today(), days: days)}"
+      )
+    end
+  end
+
+  def add_unique_error(cs, field, msg) do
+    if !Enum.any?(cs.errors, fn {k, {m, _}} -> k == field and msg == m end) do
+      Ecto.Changeset.add_error(cs, field, msg)
+    else
+      cs
     end
   end
 end

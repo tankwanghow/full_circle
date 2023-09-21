@@ -82,7 +82,7 @@ defmodule FullCircleWeb.TransactionLive.Print do
     <div id="print-me" class="print-here">
       <%= style(assigns) %>
       <%= Enum.map 1..@chunk_number, fn n -> %>
-        <div id="page" class="">
+        <div class="page">
           <span class="header">Transactions: </span>
           <span class="header has-text-weight-bold"><%= @account.name %></span>
           <div class="between">
@@ -206,13 +206,13 @@ defmodule FullCircleWeb.TransactionLive.Print do
     <style>
       .details-body { height: <%= @detail_body_height %>mm; }
       .detail { display: flex; height: <%= @detail_height %>mm; vertical-align: middle; align-items : center; }
-      #page { width: 210mm; min-height: 290mm; padding: 5mm; }
+      .page { width: 210mm; min-height: 290mm; padding: 5mm; }
 
       @media print {
         @page { size: A4; margin: 0mm; }
         body { width: 210mm; height: 290mm; margin: 0mm; }
         html { margin: 0mm; }
-        #page { padding: 5mm; page-break-after: always;} }
+        .page { padding: 5mm; page-break-after: always;} }
 
       .header { padding-bottom: 2mm;  height: 10mm;}
       .between { float: right;}
