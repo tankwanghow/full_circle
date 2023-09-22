@@ -4,7 +4,7 @@ defmodule FullCircleWeb.GoodLive.Index do
   alias FullCircle.Product
   alias FullCircleWeb.GoodLive.IndexComponent
 
-  @per_page 20
+  @per_page 30
 
   @impl true
   def render(assigns) do
@@ -13,7 +13,7 @@ defmodule FullCircleWeb.GoodLive.Index do
       <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
       <.search_form
         search_val={@search.terms}
-        placeholder={gettext("Name, Unit, Account Name, TaxCode and Descriptions...")}
+        placeholder={gettext("Name, Unit, Account Name and TaxCode...")}
       />
       <div class="text-center mb-2">
         <.link

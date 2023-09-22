@@ -61,6 +61,20 @@ defmodule FullCircleWeb.AutoCompleteController do
             %{id: params["user_id"]}
           )
 
+        "salarytype" ->
+          FullCircle.HR.salary_types(
+            name,
+            %{id: params["company_id"]},
+            %{id: params["user_id"]}
+          )
+
+        "employee" ->
+          FullCircle.HR.employees(
+            name,
+            %{id: params["company_id"]},
+            %{id: params["user_id"]}
+          )
+
         _ ->
           []
       end

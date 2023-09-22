@@ -115,10 +115,19 @@ defmodule FullCircleWeb.Router do
       live("/tax_codes/new", TaxCodeLive.Form, :new)
       live("/tax_codes/:tax_code_id/edit", TaxCodeLive.Form, :edit)
 
+      live("/salary_types", SalaryTypeLive.Index, :index)
+      live("/salary_types/new", SalaryTypeLive.Form, :new)
+      live("/salary_types/:type_id/edit", SalaryTypeLive.Form, :edit)
+
       live("/goods", GoodLive.Index, :index)
       live("/goods/new", GoodLive.Form, :new)
       live("/goods/:good_id/copy", GoodLive.Form, :copy)
       live("/goods/:good_id/edit", GoodLive.Form, :edit)
+
+      live("/employees", EmployeeLive.Index, :index)
+      live("/employees/new", EmployeeLive.Form, :new)
+      live("/employees/:employee_id/copy", EmployeeLive.Form, :copy)
+      live("/employees/:employee_id/edit", EmployeeLive.Form, :edit)
 
       live("/fixed_assets", FixedAssetLive.Index, :index)
       live("/fixed_assets/new", FixedAssetLive.Form, :new)

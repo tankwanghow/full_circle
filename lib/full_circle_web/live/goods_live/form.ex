@@ -75,7 +75,7 @@ defmodule FullCircleWeb.GoodLive.Form do
   def handle_event("delete_packaging", %{"index" => index}, socket) do
     cs =
       socket.assigns.form.source
-      |> FullCircleWeb.Helpers.delete_line(index, :invoice_details)
+      |> FullCircleWeb.Helpers.delete_line(index, :packagings)
       |> Map.put(:action, socket.assigns.live_action)
 
     {:noreply, socket |> assign(form: to_form(cs))}

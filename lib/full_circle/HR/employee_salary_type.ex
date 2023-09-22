@@ -30,7 +30,6 @@ defmodule FullCircle.HR.EmployeeSalaryType do
     ])
     |> validate_required([
       :amount,
-      :employee_id,
       :salary_type_id,
       :salary_type_name
     ])

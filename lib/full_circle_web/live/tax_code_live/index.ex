@@ -5,7 +5,7 @@ defmodule FullCircleWeb.TaxCodeLive.Index do
   alias FullCircle.StdInterface
   alias FullCircleWeb.TaxCodeLive.IndexComponent
 
-  @per_page 20
+  @per_page 30
 
   @impl true
   def render(assigns) do

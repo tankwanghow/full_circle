@@ -5,7 +5,7 @@ defmodule FullCircleWeb.AccountLive.Index do
   alias FullCircle.StdInterface
   alias FullCircleWeb.AccountLive.IndexComponent
 
-  @per_page 20
+  @per_page 30
 
   @impl true
   def render(assigns) do

@@ -1,36 +1,33 @@
-defmodule FullCircleWeb.FixedAssetLive.Index do
+defmodule FullCircleWeb.SalaryTypeLive.Index do
   use FullCircleWeb, :live_view
 
-  alias FullCircle.Accounting
+  alias FullCircle.HR
   alias FullCircle.StdInterface
-  alias FullCircleWeb.FixedAssetLive.IndexComponent
+  alias FullCircleWeb.SalaryTypeLive.IndexComponent
 
   @per_page 30
 
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="w-6/12 mx-auto">
+    <div class="w-5/12 mx-auto">
       <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
       <.search_form
         search_val={@search.terms}
-        placeholder={gettext("Name, Asset Account, Depreciation Account or Descriptions...")}
+        placeholder={gettext("Name, Debit Account or Credit Account...")}
       />
       <div class="text-center mb-2">
-        <.link navigate={~p"/companies/#{@current_company.id}/fixed_assets/new"} class="blue button">
-          <%= gettext("New Fixed Asset") %>
-        </.link>
         <.link
-          navigate={~p"/companies/#{@current_company.id}/fixed_assets/calalldepre"}
+          navigate={~p"/companies/#{@current_company.id}/salary_types/new"}
           class="blue button"
-          id="calculate_depre"
+          id="new_object"
         >
-          <%= gettext("Calculate Depreciations") %>
+          <%= gettext("New Salary Type") %>
         </.link>
       </div>
       <div class="text-center mb-1">
         <div class="rounded bg-amber-200 border border-amber-500 font-bold p-2">
-          <%= gettext("Fixed Asset Information") %>
+          <%= gettext("Salary Type Information") %>
         </div>
       </div>
       <div
@@ -42,12 +39,11 @@ defmodule FullCircleWeb.FixedAssetLive.Index do
       >
         <%= for {obj_id, obj} <- @streams.objects do %>
           <.live_component
+            current_company={@current_company}
             module={IndexComponent}
             id={"#{obj_id}"}
             obj={obj}
-            current_company={@current_company}
             ex_class=""
-            terms={@search.terms}
           />
         <% end %>
       </div>
@@ -60,7 +56,7 @@ defmodule FullCircleWeb.FixedAssetLive.Index do
   def mount(_params, _session, socket) do
     socket =
       socket
-      |> assign(page_title: gettext("Fixed Asset Listing"))
+      |> assign(page_title: gettext("Salary Type Listing"))
 
     {:ok, socket}
   end
@@ -90,19 +86,19 @@ defmodule FullCircleWeb.FixedAssetLive.Index do
       "search[terms]" => terms
     }
 
-    url = "/companies/#{socket.assigns.current_company.id}/fixed_assets?#{URI.encode_query(qry)}"
+    url = "/companies/#{socket.assigns.current_company.id}/salary_types?#{URI.encode_query(qry)}"
 
     {:noreply, socket |> push_patch(to: url)}
   end
 
-  defp filter_objects(socket, terms, update, page) do
-    query =
-      Accounting.fixed_asset_query(socket.assigns.current_company, socket.assigns.current_user)
+  defp filter_objects(socket, terms, update, page) when page >= 1 do
+    query = HR.salary_type_query(socket.assigns.current_company, socket.assigns.current_user)
+
 
     objects =
       StdInterface.filter(
         query,
-        [:name, :asset_ac_name, :depre_ac_name, :descriptions],
+        [:name, :db_ac_name, :cr_ac_name],
         terms,
         page: page,
         per_page: @per_page

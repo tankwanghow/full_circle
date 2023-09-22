@@ -5,7 +5,7 @@ defmodule FullCircleWeb.ContactLive.Index do
   alias FullCircle.Accounting.Contact
   alias FullCircleWeb.ContactLive.IndexComponent
 
-  @per_page 20
+  @per_page 30
 
   @impl true
   def render(assigns) do

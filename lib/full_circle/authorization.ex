@@ -137,6 +137,24 @@ defmodule FullCircle.Authorization do
   def can?(user, :delete_contact, company),
     do: forbid_roles(~w(auditor guest cashier), company, user)
 
+  def can?(user, :create_salary_type, company),
+    do: forbid_roles(~w(auditor guest cashier), company, user)
+
+  def can?(user, :update_salary_type, company),
+    do: forbid_roles(~w(auditor guest cashier), company, user)
+
+  def can?(user, :delete_salary_type, company),
+    do: forbid_roles(~w(auditor guest cashier), company, user)
+
+  def can?(user, :create_employee, company),
+    do: allow_roles(~w(admin manager supervisor), company, user)
+
+  def can?(user, :update_employee, company),
+    do: allow_roles(~w(admin manager supervisor), company, user)
+
+  def can?(user, :delete_employee, company),
+    do: allow_roles(~w(admin manager supervisor), company, user)
+
   def can?(user, :create_deposit, company),
     do: forbid_roles(~w(auditor guest), company, user)
 

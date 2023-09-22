@@ -18,6 +18,7 @@ defmodule FullCircle.HR.Employee do
     field(:service_since, :date)
     field(:contract_expire_date, :date)
     field(:status, :string)
+    field(:note, :string)
     belongs_to(:company, FullCircle.Sys.Company)
 
     has_many(:employee_salary_types, FullCircle.HR.EmployeeSalaryType, on_delete: :delete_all)
@@ -43,6 +44,7 @@ defmodule FullCircle.HR.Employee do
       :service_since,
       :contract_expire_date,
       :status,
+      :note,
       :company_id
     ])
     |> validate_required([

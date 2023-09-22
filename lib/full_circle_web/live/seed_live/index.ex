@@ -232,8 +232,8 @@ defmodule FullCircleWeb.SeedLive.Index do
     ~H"""
     <div class="w-10/12 mx-auto text-center">
       <p class="text-3xl font-medium"><%= @page_title %></p>
-      <div class="shake p-2 border-4 border-amber-600 bg-amber-200 rounded-lg mb-2">
-        Seeding Order - Accounts, Contacts, Balance, TaxCodes, FixedAssets, FixedAssetsDepreciations, Goods, Transactions, TransactionMatchers
+      <div class="shake p-2 border-4 border-cyan-600 bg-cyan-200 rounded-lg mb-2">
+        Seeding Order - Accounts, Contacts, Balance, TaxCodes, FixedAssets, FixedAssetsDepreciations, Goods, Transactions, TransactionMatchers, Employee, SalaryTypes, EmployeeSalaryTypes
       </div>
       <.form
         for={%{}}

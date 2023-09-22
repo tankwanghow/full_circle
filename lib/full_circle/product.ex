@@ -139,7 +139,7 @@ defmodule FullCircle.Product do
       preload: :packagings,
       order_by:
         ^similarity_order(
-          ~w(name unit purchase_account_name sales_account_name sales_tax_code_name purchase_tax_code_name descriptions)a,
+          ~w(name unit purchase_account_name sales_account_name sales_tax_code_name purchase_tax_code_name)a,
           terms
         )
     )
