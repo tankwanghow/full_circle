@@ -4,10 +4,41 @@ defmodule FullCircle.HR do
   import FullCircle.Authorization
   alias Ecto.Multi
 
-  alias FullCircle.HR.{Employee, SalaryType, EmployeeSalaryType, Advance, PaySlip, SalaryNote}
+  alias FullCircle.HR.{
+    Employee,
+    SalaryType,
+    EmployeeSalaryType,
+    Advance,
+    PaySlip,
+    SalaryNote,
+    Recurring
+  }
+
   alias FullCircle.Accounting.{Account, Transaction}
   alias FullCircle.Accounting
   alias FullCircle.{Repo, Sys, StdInterface}
+
+  def get_recurring!(id, company, user) do
+    from(note in recurring_query(company, user),
+      where: note.id == ^id,
+    )
+    |> Repo.one!()
+  end
+
+  def recurring_query(company, user) do
+    from(note in Recurring,
+      join: com in subquery(Sys.user_company(company, user)),
+      on: com.id == note.company_id,
+      join: emp in Employee,
+      on: emp.id == note.employee_id,
+      join: st in SalaryType,
+      on: st.id == note.salary_type_id,
+      select: note,
+      select_merge: %{
+        employee_name: emp.name,
+        salary_type_name: st.name
+      })
+  end
 
   def get_print_advances!(ids, company, user) do
     Repo.all(
@@ -175,7 +206,7 @@ defmodule FullCircle.HR do
     |> create_salary_note_transactions(note_name, com, user)
   end
 
-  defp create_salary_note_transactions(multi, name, com, _user) do
+  def create_salary_note_transactions(multi, name, com, _user) do
     multi
     |> Ecto.Multi.run("create_transactions", fn repo, %{^name => note} ->
       note = note |> FullCircle.Repo.preload(:salary_type)

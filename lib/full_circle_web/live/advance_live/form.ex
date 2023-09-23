@@ -43,7 +43,7 @@ defmodule FullCircleWeb.AdvanceLive.Form do
     socket
     |> assign(live_action: :edit)
     |> assign(id: id)
-    |> assign(title: gettext("Edit Advance"))
+    |> assign(title: gettext("Edit Advance") <> " " <> obj.slip_no)
     |> assign(
       :form,
       to_form(StdInterface.changeset(Advance, obj, %{}, socket.assigns.current_company))

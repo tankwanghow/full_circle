@@ -179,6 +179,10 @@ defmodule FullCircleWeb.Router do
       live("/Receipt/new", ReceiptLive.Form, :new)
       live("/Receipt/:receipt_id/edit", ReceiptLive.Form, :edit)
 
+      live("/recurrings", RecurringLive.Index, :index)
+      live("/recurrings/new", RecurringLive.Form, :new)
+      live("/recurrings/:recur_id/edit", RecurringLive.Form, :edit)
+
       live("/Payment", PaymentLive.Index, :index)
       live("/Payment/new", PaymentLive.Form, :new)
       live("/Payment/:payment_id/edit", PaymentLive.Form, :edit)
