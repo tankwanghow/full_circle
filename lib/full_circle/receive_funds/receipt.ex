@@ -92,15 +92,6 @@ defmodule FullCircle.ReceiveFund.Receipt do
   end
 
   def compute_balance(cs) do
-    # cs =
-    #   Map.replace(
-    #     cs,
-    #     :errors,
-    #     Enum.filter(cs.errors, fn {k, _} -> k != :receipt_balance and k != :receipt_amount end)
-    #   )
-
-    # cs = if(Enum.count(cs.errors) == 0, do: Map.replace(cs, :valid?, true), else: cs)
-
     cs =
       cs
       |> compute_cheques_amount()

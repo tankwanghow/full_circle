@@ -69,6 +69,11 @@ defmodule FullCircle.Sys do
         company_id: company_id
       },
       %{
+        doc_type: "Advance",
+        current: 0,
+        company_id: company_id
+      },
+      %{
         doc_type: "Receipt",
         current: 0,
         company_id: company_id
@@ -156,6 +161,12 @@ defmodule FullCircle.Sys do
         account_type: "Post Dated Cheques",
         descriptions:
           "An Account in accounting that records the value of post-dated cheques received by a business but not yet deposited or cashed."
+      },
+      %{
+        name: "Salaries and Wages Payable",
+        account_type: "Current Liability",
+        descriptions:
+          "Salaries and Wages Payable is a liability account on a company's balance sheet that represents the amount of compensation owed to employees but has not yet been paid."
       }
     ]
   end

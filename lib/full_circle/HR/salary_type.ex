@@ -2,6 +2,7 @@ defmodule FullCircle.HR.SalaryType do
   use FullCircle.Schema
   import Ecto.Changeset
   import FullCircleWeb.Gettext
+  import FullCircle.Helpers
 
   schema "salary_types" do
     field(:name, :string)
@@ -38,6 +39,8 @@ defmodule FullCircle.HR.SalaryType do
       :db_ac_name,
       :cr_ac_name
     ])
+    |> validate_id(:db_ac_name, :db_ac_id)
+    |> validate_id(:cr_ac_name, :cr_ac_id)
     |> unsafe_validate_unique([:name, :company_id], FullCircle.Repo,
       message: gettext("has already been taken")
     )

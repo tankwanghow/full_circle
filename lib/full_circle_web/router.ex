@@ -140,6 +140,14 @@ defmodule FullCircleWeb.Router do
       live("/Invoice/new", InvoiceLive.Form, :new)
       live("/Invoice/:invoice_id/edit", InvoiceLive.Form, :edit)
 
+      live("/Advance", AdvanceLive.Index, :index)
+      live("/Advance/new", AdvanceLive.Form, :new)
+      live("/Advance/:slip_id/edit", AdvanceLive.Form, :edit)
+
+      live("/SalaryNote", SalaryNoteLive.Index, :index)
+      live("/SalaryNote/new", SalaryNoteLive.Form, :new)
+      live("/SalaryNote/:slip_id/edit", SalaryNoteLive.Form, :edit)
+
       live("/PurInvoice", PurInvoiceLive.Index, :index)
       live("/PurInvoice/new", PurInvoiceLive.Form, :new)
       live("/PurInvoice/:invoice_id/edit", PurInvoiceLive.Form, :edit)
@@ -204,6 +212,12 @@ defmodule FullCircleWeb.Router do
 
       live("/DebitNote/:id/print", DebitNoteLive.Print, :print)
       live("/DebitNote/print_multi", DebitNoteLive.Print, :print)
+
+      live("/Advance/:id/print", AdvanceLive.Print, :print)
+      live("/Advance/print_multi", AdvanceLive.Print, :print)
+
+      live("/SalaryNote/:id/print", SalaryNoteLive.Print, :print)
+      live("/SalaryNote/print_multi", SalaryNoteLive.Print, :print)
 
       live("/Journal/:id/print", JournalLive.Print, :print)
       live("/Journal/print_multi", JournalLive.Print, :print)
