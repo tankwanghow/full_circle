@@ -245,14 +245,14 @@ defmodule FullCircleWeb.SalaryNoteLive.Form do
           <.print_button
             :if={@live_action == :edit}
             company={@current_company}
-            doc_type="Salary Note"
+            doc_type="SalaryNote"
             doc_id={@id}
             class="gray button"
           />
           <.pre_print_button
             :if={@live_action == :edit}
             company={@current_company}
-            doc_type="Salary Note"
+            doc_type="SalaryNote"
             doc_id={@id}
             class="gray button"
           />

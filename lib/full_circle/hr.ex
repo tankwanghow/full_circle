@@ -9,6 +9,28 @@ defmodule FullCircle.HR do
   alias FullCircle.Accounting
   alias FullCircle.{Repo, Sys, StdInterface}
 
+  def get_print_advances!(ids, company, user) do
+    Repo.all(
+      from rec in Advance,
+        join: com in subquery(Sys.user_company(company, user)),
+        on: com.id == rec.company_id,
+        where: rec.id in ^ids,
+        preload: [:employee, :funds_account],
+        select: rec
+    )
+  end
+
+  def get_print_salary_notes!(ids, company, user) do
+    Repo.all(
+      from rec in SalaryNote,
+        join: com in subquery(Sys.user_company(company, user)),
+        on: com.id == rec.company_id,
+        where: rec.id in ^ids,
+        preload: [:employee, :salary_type],
+        select: rec
+    )
+  end
+
   def get_salary_note!(id, com, user) do
     from(note in salary_note_query(com, user),
       where: note.id == ^id
