@@ -228,6 +228,17 @@ defmodule FullCircleWeb.Router do
 
       live("/print_transactions", TransactionLive.Print, :print)
     end
+
+    live_session :require_authenticated_user_n_active_company_punch,
+      on_mount: [
+        {FullCircleWeb.UserAuth, :ensure_authenticated},
+        {FullCircleWeb.Locale, :set_locale},
+        {FullCircleWeb.ActiveCompany, :assign_active_company}
+      ],
+      root_layout: {FullCircleWeb.Layouts, :punch} do
+      live("/Punch", TimeAttendLive.PunchCamera)
+      live("/Punch/:employee_id", TimeAttendLive.PunchCamera)
+    end
   end
 
   scope "/", FullCircleWeb do

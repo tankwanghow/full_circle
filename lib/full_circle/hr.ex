@@ -20,7 +20,7 @@ defmodule FullCircle.HR do
 
   def get_recurring!(id, company, user) do
     from(note in recurring_query(company, user),
-      where: note.id == ^id,
+      where: note.id == ^id
     )
     |> Repo.one!()
   end

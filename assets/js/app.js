@@ -22,36 +22,80 @@ import { Socket } from "phoenix"
 import { LiveSocket } from "phoenix_live_view"
 import topbar from "../vendor/topbar"
 import Tribute from "../vendor/tribute"
+import { Html5QrcodeScanner } from "html5-qrcode"
 
 let csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
-
 let Hooks = {}
 
-Hooks.tributeTagText = {
-  mounted() {
-    var tribute = new Tribute({
-      trigger: "#",
-      values: (t, c) => { remoteSearch(this.el, t, c) },
-      lookup: "value",
-      fillAttr: "value",
-      menuItemLimit: 8
-    });
-    tribute.attach(this.el)
-  }
-};
+let html5QrcodeScanner;
 
-Hooks.tributeAutoComplete = {
+Hooks.QR_Reply = {
   mounted() {
-    var tribute = new Tribute({
-      values: (t, c) => { remoteSearch(this.el, t, c) },
-      autocompleteMode: true,
-      lookup: "value",
-      fillAttr: "value",
-      menuItemLimit: 8
-    });
-    tribute.attach(this.el)
+    this.el.innerHTML = "Scan Employee QR";
+    this.el.className += " bg-amber-200 border-amber-600";
+  },
+  updated() {
+    if (this.el.innerText != "Scan Employee QR") {
+      reader = document.getElementById("qr-reader");
+      reader_class = reader.className;
+      reader.className = "hidden";
+      this.el.className += " bg-green-200 border-green-600";
+      setTimeout(() => {
+        this.pushEvent("qr-code-scan-resume", "");
+        reader.className = reader_class;
+        html5QrcodeScanner.resume();
+      }, 2000);
+    } else {
+      this.el.className += " bg-amber-200 border-amber-600";
+    }
   }
 }
+
+Hooks.QR_Scanner = {
+    onScanFailure(error) {
+    },
+
+    mounted() {
+      html5QrcodeScanner = new Html5QrcodeScanner(
+        "qr-reader",
+        { fps: 40, qrbox: { width: 600, height: 600 } },
+        false
+      )
+
+      onScanSuccess = (decodedText, decodedResult) => {
+        this.pushEvent("qr-code-scanned", decodedResult);
+        html5QrcodeScanner.pause();
+      }
+
+      html5QrcodeScanner.render(onScanSuccess, this.onScanFailure);
+    }
+  }
+
+Hooks.tributeTagText = {
+    mounted() {
+      var tribute = new Tribute({
+        trigger: "#",
+        values: (t, c) => { remoteSearch(this.el, t, c) },
+        lookup: "value",
+        fillAttr: "value",
+        menuItemLimit: 8
+      });
+      tribute.attach(this.el)
+    }
+  };
+
+  Hooks.tributeAutoComplete = {
+    mounted() {
+      var tribute = new Tribute({
+        values: (t, c) => { remoteSearch(this.el, t, c) },
+        autocompleteMode: true,
+        lookup: "value",
+        fillAttr: "value",
+        menuItemLimit: 8
+      });
+      tribute.attach(this.el)
+    }
+  }
 
 function remoteSearch(el, text, cb) {
   var URL = el.getAttribute('url');
@@ -79,12 +123,6 @@ let liveSocket = new LiveSocket("/live", Socket, {
 topbar.config({ barColors: { 0: "#29d" }, shadowColor: "rgba(0, 0, 0, .3)" })
 window.addEventListener("phx:page-loading-start", _info => topbar.show(300))
 window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
-
-document.addEventListener("keydown", zEvent => {
-  if (zEvent.ctrlKey && zEvent.altKey && (zEvent.key === "h" || zEvent.key === "H")) {  // case sensitive
-    document.getElementById("full_circle_dashboard").click();
-  }
-});
 
 // connect if there are any LiveViews on the page
 liveSocket.connect()
