@@ -24,6 +24,16 @@ defmodule FullCircleWeb.EmployeeLive.Index do
         >
           <%= gettext("New Employee") %>
         </.link>
+        <.link
+          :if={@ids != ""}
+          navigate={
+            ~p"/companies/#{@current_company.id}/employees/print_multi?pre_print=false&ids=#{@ids}"
+          }
+          target="_blank"
+          class="blue button"
+        >
+          <%= gettext("Print") %>
+        </.link>
       </div>
       <div class="text-center mb-1">
         <div class="rounded bg-amber-200 border border-amber-500 font-bold p-2">
@@ -69,6 +79,8 @@ defmodule FullCircleWeb.EmployeeLive.Index do
 
     {:noreply,
      socket
+     |> assign(selected_employees: [])
+     |> assign(ids: "")
      |> assign(search: %{terms: terms})
      |> filter_objects(terms, "replace", 1)}
   end
@@ -91,14 +103,62 @@ defmodule FullCircleWeb.EmployeeLive.Index do
     {:noreply, socket |> push_patch(to: url)}
   end
 
+
+  @impl true
+  def handle_event("check_click", %{"object-id" => id, "value" => "on"}, socket) do
+    obj =
+      FullCircle.HR.get_employee_by_id_index_component_field!(
+        id,
+        socket.assigns.current_company,
+        socket.assigns.current_user
+      )
+
+    Phoenix.LiveView.send_update(
+      self(),
+      IndexComponent,
+      [{:id, "objects-#{id}"}, {:obj, Map.merge(obj, %{checked: true})}]
+    )
+
+    socket =
+      socket
+      |> assign(selected_employees: [id | socket.assigns.selected_employees])
+
+    {:noreply, socket |> assign(ids: Enum.join(socket.assigns.selected_employees, ","))}
+  end
+
+  @impl true
+  def handle_event("check_click", %{"object-id" => id}, socket) do
+    obj =
+      FullCircle.HR.get_employee_by_id_index_component_field!(
+        id,
+        socket.assigns.current_company,
+        socket.assigns.current_user
+      )
+
+    Phoenix.LiveView.send_update(
+      self(),
+      IndexComponent,
+      [{:id, "objects-#{id}"}, {:obj, Map.merge(obj, %{checked: false})}]
+    )
+
+    socket =
+      socket
+      |> assign(
+        selected_employees: Enum.reject(socket.assigns.selected_employees, fn sid -> sid == id end)
+      )
+
+    {:noreply, socket |> assign(ids: Enum.join(socket.assigns.selected_employees, ","))}
+  end
+
   defp filter_objects(socket, terms, update, page) when page >= 1 do
+    query =
+      FullCircle.HR.employee_query(socket.assigns.current_company, socket.assigns.current_user)
+
     objects =
       StdInterface.filter(
-        Employee,
-        [:name, :id_no, :nationality, :status],
+        query,
+        [:name, :status, :id_no, :nationality],
         terms,
-        socket.assigns.current_company,
-        socket.assigns.current_user,
         page: page,
         per_page: @per_page
       )

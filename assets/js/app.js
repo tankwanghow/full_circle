@@ -39,63 +39,61 @@ Hooks.QR_Reply = {
       reader = document.getElementById("qr-reader");
       reader_class = reader.className;
       reader.className = "hidden";
-      this.el.className += " bg-green-200 border-green-600";
+
       setTimeout(() => {
-        this.pushEvent("qr-code-scan-resume", "");
+        this.pushEvent("qr-code-scan-resume");
         reader.className = reader_class;
         html5QrcodeScanner.resume();
-      }, 2000);
-    } else {
-      this.el.className += " bg-amber-200 border-amber-600";
+      }, 3000);
     }
   }
 }
 
 Hooks.QR_Scanner = {
-    onScanFailure(error) {
-    },
+  onScanFailure(error) {
+  },
 
-    mounted() {
-      html5QrcodeScanner = new Html5QrcodeScanner(
-        "qr-reader",
-        { fps: 40, qrbox: { width: 600, height: 600 } },
-        false
-      )
+  mounted() {
+    html5QrcodeScanner = new Html5QrcodeScanner(
+      "qr-reader",
+      { fps: 10, qrbox: { width: 600, height: 600 } },
+      false
+    )
 
-      onScanSuccess = (decodedText, decodedResult) => {
-        this.pushEvent("qr-code-scanned", decodedResult);
-        html5QrcodeScanner.pause();
-      }
-
-      html5QrcodeScanner.render(onScanSuccess, this.onScanFailure);
+    onScanSuccess = (decodedText, decodedResult) => {
+      this.pushEvent("qr-code-scanned", decodedResult);
+      html5QrcodeScanner.pause();
     }
+
+    html5QrcodeScanner.render(onScanSuccess, this.onScanFailure);
   }
+}
 
 Hooks.tributeTagText = {
-    mounted() {
-      var tribute = new Tribute({
-        trigger: "#",
-        values: (t, c) => { remoteSearch(this.el, t, c) },
-        lookup: "value",
-        fillAttr: "value",
-        menuItemLimit: 8
-      });
-      tribute.attach(this.el)
-    }
-  };
-
-  Hooks.tributeAutoComplete = {
-    mounted() {
-      var tribute = new Tribute({
-        values: (t, c) => { remoteSearch(this.el, t, c) },
-        autocompleteMode: true,
-        lookup: "value",
-        fillAttr: "value",
-        menuItemLimit: 8
-      });
-      tribute.attach(this.el)
-    }
+  mounted() {
+    var tribute = new Tribute({
+      trigger: "#",
+      values: (t, c) => { remoteSearch(this.el, t, c) },
+      lookup: "value",
+      fillAttr: "value",
+      menuItemLimit: 8
+    });
+    tribute.attach(this.el)
   }
+};
+
+Hooks.tributeAutoComplete = {
+  mounted() {
+    var tribute = new Tribute({
+      values: (t, c) => { remoteSearch(this.el, t, c) },
+      autocompleteMode: true,
+      lookup: "value",
+      fillAttr: "value",
+      menuItemLimit: 8
+    });
+    tribute.attach(this.el)
+  }
+}
 
 function remoteSearch(el, text, cb) {
   var URL = el.getAttribute('url');

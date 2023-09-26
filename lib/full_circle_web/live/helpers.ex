@@ -105,4 +105,12 @@ defmodule FullCircleWeb.Helpers do
       Timex.format!(Timex.local(date), "%d-%m-%Y", :strftime)
     end
   end
+
+  def format_datetime(datetime) do
+    if is_nil(datetime) do
+      nil
+    else
+      Timex.format!(Timex.local(datetime), "%d-%m-%Y %H:%M:%S", :strftime)
+    end
+  end
 end

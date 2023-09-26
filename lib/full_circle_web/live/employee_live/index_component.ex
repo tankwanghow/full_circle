@@ -18,6 +18,23 @@ defmodule FullCircleWeb.EmployeeLive.IndexComponent do
       id={@id}
       class={"#{@ex_class} text-center mb-1 bg-gray-200 border-gray-500 border-2 rounded p-2"}
     >
+    <input
+          :if={@obj.checked}
+          id={"checkbox_#{@obj.id}"}
+          name={"checkbox[#{@obj.id}]"}
+          type="checkbox"
+          phx-click="check_click"
+          phx-value-object-id={@obj.id}
+          checked
+        />
+        <input
+          :if={!@obj.checked}
+          id={"checkbox_#{@obj.id}"}
+          name={"checkbox[#{@obj.id}]"}
+          type="checkbox"
+          phx-click="check_click"
+          phx-value-object-id={@obj.id}
+        />
       <.link
         class="text-blue-600 hover:font-bold"
         navigate={~p"/companies/#{@current_company}/employees/#{@obj.id}/edit"}

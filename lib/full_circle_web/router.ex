@@ -226,6 +226,9 @@ defmodule FullCircleWeb.Router do
       live("/Journal/:id/print", JournalLive.Print, :print)
       live("/Journal/print_multi", JournalLive.Print, :print)
 
+      live("/employees/:id/print", EmployeeLive.Print, :print)
+      live("/employees/print_multi", EmployeeLive.Print, :print)
+
       live("/print_transactions", TransactionLive.Print, :print)
     end
 
@@ -237,7 +240,6 @@ defmodule FullCircleWeb.Router do
       ],
       root_layout: {FullCircleWeb.Layouts, :punch} do
       live("/Punch", TimeAttendLive.PunchCamera)
-      live("/Punch/:employee_id", TimeAttendLive.PunchCamera)
     end
   end
 

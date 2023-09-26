@@ -405,6 +405,13 @@ defmodule FullCircleWeb.EmployeeLive.Form do
               }
             />
           <% end %>
+          <.print_button
+            :if={@live_action != :new}
+            company={@current_company}
+            doc_type="employees"
+            doc_id={@id}
+            class="blue button"
+          />
           <.live_component
             :if={@live_action != :new}
             module={FullCircleWeb.LogLive.Component}

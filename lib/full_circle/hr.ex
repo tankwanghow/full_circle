@@ -11,12 +11,23 @@ defmodule FullCircle.HR do
     Advance,
     PaySlip,
     SalaryNote,
-    Recurring
+    Recurring,
+    TimeAttend
   }
 
   alias FullCircle.Accounting.{Account, Transaction}
   alias FullCircle.Accounting
   alias FullCircle.{Repo, Sys, StdInterface}
+
+  def create_time_attendence(attrs, com, user) do
+    case can?(user, :create_time_attendence, com) do
+      true ->
+        Repo.insert(TimeAttend.changeset(%TimeAttend{}, attrs))
+
+      false ->
+        :not_authorise
+    end
+  end
 
   def get_recurring!(id, company, user) do
     from(note in recurring_query(company, user),
@@ -37,7 +48,18 @@ defmodule FullCircle.HR do
       select_merge: %{
         employee_name: emp.name,
         salary_type_name: st.name
-      })
+      }
+    )
+  end
+
+  def get_print_employees!(ids, company, user) do
+    Repo.all(
+      from emp in Employee,
+        join: com in subquery(Sys.user_company(company, user)),
+        on: com.id == emp.company_id,
+        where: emp.id in ^ids,
+        select: emp
+    )
   end
 
   def get_print_advances!(ids, company, user) do
@@ -534,8 +556,10 @@ defmodule FullCircle.HR do
     |> Repo.one()
   end
 
-  def get_employee!(id, com, user) do
-    from(emp in employee_query(com, user),
+  def get_employee!(id, company, user) do
+    from(emp in Employee,
+      join: com in subquery(Sys.user_company(company, user)),
+      on: com.id == emp.company_id,
       preload: [employee_salary_types: ^employee_salary_types()],
       where: emp.id == ^id
     )
@@ -543,7 +567,9 @@ defmodule FullCircle.HR do
   end
 
   def employees(terms, company, user) do
-    from(emp in employee_query(company, user),
+    from(emp in Employee,
+      join: com in subquery(Sys.user_company(company, user)),
+      on: com.id == emp.company_id,
       where: ilike(emp.name, ^"%#{terms}%"),
       select: %{id: emp.id, value: emp.name},
       order_by: emp.name
@@ -551,10 +577,19 @@ defmodule FullCircle.HR do
     |> Repo.all()
   end
 
-  defp employee_query(company, user) do
+  def get_employee_by_id_index_component_field!(id, com, user) do
+    from(i in subquery(employee_query(com, user)),
+      where: i.id == ^id
+    )
+    |> Repo.one!()
+  end
+
+  def employee_query(company, user) do
     from(emp in Employee,
       join: com in subquery(Sys.user_company(company, user)),
-      on: com.id == emp.company_id
+      on: com.id == emp.company_id,
+      select: emp,
+      select_merge: %{checked: false}
     )
   end
 end
