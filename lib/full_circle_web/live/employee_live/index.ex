@@ -1,7 +1,7 @@
 defmodule FullCircleWeb.EmployeeLive.Index do
   use FullCircleWeb, :live_view
 
-  alias FullCircle.HR.Employee
+  # alias FullCircle.HR.Employee
   alias FullCircle.StdInterface
   alias FullCircleWeb.EmployeeLive.IndexComponent
 
@@ -152,7 +152,7 @@ defmodule FullCircleWeb.EmployeeLive.Index do
 
   defp filter_objects(socket, terms, update, page) when page >= 1 do
     query =
-      FullCircle.HR.employee_query(socket.assigns.current_company, socket.assigns.current_user)
+      FullCircle.HR.employee_checked_query(socket.assigns.current_company, socket.assigns.current_user)
 
     objects =
       StdInterface.filter(

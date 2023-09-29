@@ -1,6 +1,11 @@
-<main class={if(assigns[:current_user], do: "mt-20", else: "")}>
-  <div>
-    <.flash_group flash={@flash} />
-    <%= @inner_content %>
-  </div>
+<main
+  :if={@page_title != "Attendence Camera"}
+  class={if(assigns[:current_user], do: "mt-20", else: "")}
+>
+  <.flash_group flash={@flash} />
+  <%= @inner_content %>
+</main>
+
+<main :if={@page_title == "Attendence Camera"} class="mt-10">
+  <%= @inner_content %>
 </main>

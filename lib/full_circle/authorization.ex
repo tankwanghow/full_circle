@@ -161,7 +161,13 @@ defmodule FullCircle.Authorization do
   def can?(user, :update_recurring, company),
     do: allow_roles(~w(admin manager supervisor), company, user)
 
-    def can?(user, :create_time_attendence, company),
+  def can?(user, :create_time_attendence, company),
+    do: forbid_roles(~w(auditor guest), company, user)
+
+  def can?(user, :update_time_attendence, company),
+    do: forbid_roles(~w(auditor guest), company, user)
+
+  def can?(user, :delete_time_attendence, company),
     do: forbid_roles(~w(auditor guest), company, user)
 
   def can?(user, :create_deposit, company),

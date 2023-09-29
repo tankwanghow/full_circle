@@ -4,9 +4,13 @@ defmodule FullCircle.Repo.Migrations.CreateTimeAttends do
   def change do
     create table(:time_attendences) do
       add :employee_id, references(:employees, on_delete: :restrict)
+      add :user_id, references(:users)
       add :company_id, references(:companies, on_delete: :delete_all)
       add :flag, :string
-      add :punch_time, :utc_datetime
+      add :input_medium, :string
+      add :punch_time, :timestamptz
+
+      timestamps(type: :timestamptz)
     end
     create index(:time_attendences, [:company_id, :employee_id])
   end

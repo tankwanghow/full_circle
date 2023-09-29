@@ -19,10 +19,90 @@ defmodule FullCircle.HR do
   alias FullCircle.Accounting
   alias FullCircle.{Repo, Sys, StdInterface}
 
-  def create_time_attendence(attrs, com, user) do
+  def timeattend_index_query(terms, date_from, com, user,
+        page: page,
+        per_page: per_page
+      ) do
+    qry =
+      from(inv in subquery(timeattend_raw_query(com, user)))
+
+    qry =
+      if terms != "" do
+        from inv in subquery(qry),
+          order_by:
+            ^similarity_order(
+              [:employee_name, :flag, :input_medium],
+              terms
+            )
+      else
+        qry
+      end
+
+    qry =
+      if date_from != "" do
+        date_from = "#{date_from} 00:00:00"
+        from inv in qry, where: inv.punch_time >= ^date_from
+      else
+        qry
+      end
+
+    qry |> offset((^page - 1) * ^per_page) |> limit(^per_page) |> Repo.all()
+  end
+
+  def get_time_attendence!(id, company, user) do
+    from(ta in timeattend_raw_query(company, user),
+      where: ta.id == ^id
+    )
+    |> Repo.one!() |> FullCircle.HR.TimeAttend.set_punch_time_local(company)
+  end
+
+  defp timeattend_raw_query(company, _user) do
+    from(ta in TimeAttend,
+      join: emp in Employee,
+      on: emp.id == ta.employee_id,
+      join: user in FullCircle.UserAccounts.User,
+      on: user.id == ta.user_id,
+      where: ta.company_id == ^company.id,
+      select: ta,
+      select_merge: %{employee_name: emp.name, email: user.email},
+      order_by: ta.punch_time
+    )
+  end
+
+  def create_time_attendence_by_punch(attrs, com, user) do
     case can?(user, :create_time_attendence, com) do
       true ->
         Repo.insert(TimeAttend.changeset(%TimeAttend{}, attrs))
+
+      false ->
+        :not_authorise
+    end
+  end
+
+  def create_time_attendence_by_entry(attrs, com, user) do
+    case can?(user, :create_time_attendence, com) do
+      true ->
+        Repo.insert(TimeAttend.data_entry_changeset(%TimeAttend{}, attrs))
+
+      false ->
+        :not_authorise
+    end
+  end
+
+  def update_time_attendence(ta, attrs, com, user) do
+    case can?(user, :update_time_attendence, com) do
+      true ->
+        Repo.update(TimeAttend.data_entry_changeset(ta, attrs))
+
+      false ->
+        :not_authorise
+    end
+  end
+
+  def delete_time_attendence(ta, com, user) do
+    case can?(user, :delete_time_attendence, com) do
+      true ->
+        Repo.delete(ta)
 
       false ->
         :not_authorise
@@ -585,6 +665,14 @@ defmodule FullCircle.HR do
   end
 
   def employee_query(company, user) do
+    from(emp in Employee,
+      join: com in subquery(Sys.user_company(company, user)),
+      on: com.id == emp.company_id,
+      select: emp
+    )
+  end
+
+  def employee_checked_query(company, user) do
     from(emp in Employee,
       join: com in subquery(Sys.user_company(company, user)),
       on: com.id == emp.company_id,

@@ -1,12 +1,21 @@
 defmodule FullCircleWeb.EmployeeLive.Print do
   use FullCircleWeb, :live_view
 
-  import FullCircleWeb.Helpers
-  alias QRCode.QR
   alias FullCircle.HR
 
   @impl true
-  def mount(%{"ids" => ids, "pre_print" => pre_print}, _session, socket) do
+  def mount(%{"id" => id}, _session, socket) do
+    ids = [id]
+    {:ok, socket |> fill_employee(ids)}
+  end
+
+  @impl true
+  def mount(%{"ids" => ids}, _session, socket) do
+    ids = String.split(ids, ",")
+    {:ok, socket |> fill_employee(ids)}
+  end
+
+  def fill_employee(socket, ids) do
     detail_body_height = 290
     detail_height = 55
     chunk = (detail_body_height / detail_height) |> floor
@@ -15,7 +24,7 @@ defmodule FullCircleWeb.EmployeeLive.Print do
 
     emps =
       HR.get_print_employees!(
-        String.split(ids, ","),
+        ids,
         socket.assigns.current_company,
         socket.assigns.current_user
       )

@@ -5,7 +5,11 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCamera do
 
   @impl true
   def mount(_params, _session, socket) do
-    {:ok, socket |> assign(status: :waiting) |> assign(flag: "IN")}
+    {:ok,
+     socket
+     |> assign(status: :waiting)
+     |> assign(flag: "IN")
+     |> assign(page_title: gettext("Attendence Camera"))}
   end
 
   @impl true
@@ -27,19 +31,21 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCamera do
       socket =
         cond do
           is_nil(emp) ->
-            socket |> assign(status: :error) |> assign(qr_code: employee_id)
+            socket |> assign(status: :not_found) |> assign(qr_code: employee_id)
 
           emp.status != "Active" ->
-            socket |> assign(status: :error) |> assign(qr_code: employee_id)
+            socket |> assign(status: :error) |> assign(qr_code: emp.status)
 
           true ->
-            punch_in(emp, socket)
-            socket |> assign(employee: emp) |> assign(status: :success)
+            {status, msg} = punch_in(emp, socket)
+            socket |> assign(employee: emp) |> assign(status: status) |> assign(qr_code: msg)
         end
 
       {:noreply, socket}
     rescue
-      _e -> {:noreply, socket |> assign(status: :error) |> assign(qr_code: employee_id)}
+      e ->
+        IO.inspect(e)
+        {:noreply, socket |> assign(status: :error) |> assign(qr_code: employee_id)}
     end
   end
 
@@ -58,24 +64,29 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCamera do
   end
 
   defp punch_in(employee, socket) do
-    case HR.create_time_attendence(
+    case HR.create_time_attendence_by_punch(
            %{
              employee_id: employee.id,
              punch_time: Timex.now(),
              flag: socket.assigns.flag,
-             company_id: socket.assigns.current_company.id
+             company_id: socket.assigns.current_company.id,
+             user_id: socket.assigns.current_user.id,
+             input_medium: "PunchCamera"
            },
            socket.assigns.current_company,
            socket.assigns.current_user
          ) do
       {:ok, _ac} ->
-        :good
+        {:success, ""}
 
-      {:error, _failed_operation, changeset, _} ->
-        changeset
+      {:error, changeset} ->
+        {:error,
+         Enum.map_join(changeset.errors, fn {field, {msg, _}} ->
+           "#{Atom.to_string(field)}: #{msg}"
+         end)}
 
       :not_authorise ->
-        :not
+        {:not_authorise, ""}
     end
   end
 
@@ -109,8 +120,8 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCamera do
       </audio>
       <%= @employee.name %>
       <%= @employee.id_no %>
-      <div :if={@flag=="IN"} class="text-6xl text-green-500">&#128512;<%= @flag %>&#128512;</div>
-      <div :if={@flag=="OUT"} class="text-6xl text-red-500">&#128513;<%= @flag %>&#128513;</div>
+      <div :if={@flag == "IN"} class="text-6xl text-green-500">&#128512;<%= @flag %>&#128512;</div>
+      <div :if={@flag == "OUT"} class="text-6xl text-red-500">&#128513;<%= @flag %>&#128513;</div>
     </div>
     <div
       :if={@status == :waiting}
@@ -130,7 +141,22 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCamera do
         <source src="/assets/beep-error.mp3" type="audio/mpeg" />
       </audio>
       QR ERROR!!
-      <div class="text-sm"><%= @qr_code %></div>
+      <div><%= @qr_code %></div>
+    </div>
+    <div
+      :if={@status == :not_found}
+      id="qr-reply"
+      phx-hook="QR_Reply"
+      class="w-[80%] text-center text-3xl mx-auto border rounded-lg bg-rose-200 border-rose-600"
+    >
+      <audio autoplay>
+        <source src="/assets/beep-error.mp3" type="audio/mpeg" />
+      </audio>
+      Employee Not Found!!!
+      <div class="text-lg"><%= @qr_code %></div>
+    </div>
+    <div class="text-center mt-5">
+      <a onclick="history.back();" class="red button"><%= gettext("Back") %></a>
     </div>
 
     <script>
