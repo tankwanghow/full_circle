@@ -11,7 +11,7 @@ defmodule FullCircleWeb.FixedAssetLive.Disposals do
       socket
       |> assign(terms: params["terms"])
       |> load_fixed_asset(params["id"])
-      |> assign(title: gettext("Disposals"))
+      |> assign(page_title: gettext("Disposals"))
       |> assign(live_action: :new)
       |> filter_disposal()
       |> to_form_fap()
@@ -191,7 +191,7 @@ defmodule FullCircleWeb.FixedAssetLive.Disposals do
   def render(assigns) do
     ~H"""
     <div class="w-5/12 mx-auto text-center">
-      <p class="w-full text-2xl text-center font-medium"><%= "#{@title} for #{@ass.name}" %></p>
+      <p class="w-full text-2xl text-center font-medium"><%= "#{@page_title} for #{@ass.name}" %></p>
       <div class="text-center m-4">
         <a onclick="history.back();" class="blue button"><%= gettext("Back") %></a>
       </div>

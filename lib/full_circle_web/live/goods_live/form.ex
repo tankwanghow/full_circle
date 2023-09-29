@@ -23,7 +23,7 @@ defmodule FullCircleWeb.GoodLive.Form do
     socket
     |> assign(live_action: :new)
     |> assign(id: "new")
-    |> assign(title: gettext("New Good"))
+    |> assign(page_title: gettext("New Good"))
     |> assign(
       :form,
       to_form(StdInterface.changeset(Good, %Good{}, %{}, socket.assigns.current_company))
@@ -37,7 +37,7 @@ defmodule FullCircleWeb.GoodLive.Form do
     socket
     |> assign(live_action: :edit)
     |> assign(id: id)
-    |> assign(title: gettext("Edit Good"))
+    |> assign(page_title: gettext("Edit Good"))
     |> assign(
       :form,
       to_form(StdInterface.changeset(Good, obj, %{}, socket.assigns.current_company))
@@ -50,7 +50,7 @@ defmodule FullCircleWeb.GoodLive.Form do
     socket
     |> assign(live_action: :new)
     |> assign(id: "new")
-    |> assign(title: gettext("Copying Good"))
+    |> assign(page_title: gettext("Copying Good"))
     |> assign(current_company: socket.assigns.current_company)
     |> assign(current_user: socket.assigns.current_user)
     |> assign(
@@ -303,7 +303,7 @@ defmodule FullCircleWeb.GoodLive.Form do
   def render(assigns) do
     ~H"""
     <div class="w-6/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
-      <p class="w-full text-3xl text-center font-medium"><%= @title %></p>
+      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
       <.form
         for={@form}
         id="object-form"

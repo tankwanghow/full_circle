@@ -8,7 +8,7 @@ defmodule FullCircleWeb.FixedAssetLive.CalAllDepre do
     socket =
       socket
       |> assign(terms: params["terms"] || "")
-      |> assign(title: gettext("Calculate All Fixed Assets Depreciations"))
+      |> assign(page_title: gettext("Calculate All Fixed Assets Depreciations"))
       |> assign(generated_depreciations: [])
       |> assign(live_action: :new)
       |> assign(valid?: false)
@@ -67,7 +67,7 @@ defmodule FullCircleWeb.FixedAssetLive.CalAllDepre do
   def render(assigns) do
     ~H"""
     <div class="w-6/12 mx-auto">
-      <p class="w-full text-2xl text-center font-medium"><%= "#{@title}" %></p>
+      <p class="w-full text-2xl text-center font-medium"><%= "#{@page_title}" %></p>
       <div class="text-center m-4">
         <a onclick="history.back();" class="blue button"><%= gettext("Back") %></a>
       </div>

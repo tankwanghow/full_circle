@@ -31,7 +31,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
     socket
     |> assign(live_action: :new)
     |> assign(id: "new")
-    |> assign(title: gettext("New Purchase Invoice"))
+    |> assign(page_title: gettext("New Purchase Invoice"))
     |> assign(matched_trans: [])
     |> assign(
       :form,
@@ -58,7 +58,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
     |> assign(live_action: :edit)
     |> assign(id: id)
     |> assign(matched_trans: Billing.get_matcher_by("PurInvoice", id))
-    |> assign(title: gettext("Edit Purchase Invoice") <> " " <> object.pur_invoice_no)
+    |> assign(page_title: gettext("Edit Purchase Invoice") <> " " <> object.pur_invoice_no)
     |> assign(
       :form,
       to_form(StdInterface.changeset(PurInvoice, object, %{}, socket.assigns.current_company))
@@ -359,7 +359,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
   def render(assigns) do
     ~H"""
     <div class="w-11/12 mx-auto border rounded-lg border-pink-500 bg-pink-100 p-4">
-      <p class="w-full text-3xl text-center font-medium"><%= @title %></p>
+      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
       <.form for={@form} id="object-form" autocomplete="off" phx-change="validate" phx-submit="save">
         <%= Phoenix.HTML.Form.hidden_input(@form, :pur_invoice_no) %>
         <div class="flex flex-row flex-nowarp">

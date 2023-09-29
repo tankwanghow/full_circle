@@ -21,7 +21,7 @@ defmodule FullCircleWeb.AccountLive.Form do
     socket
     |> assign(live_action: :new)
     |> assign(id: "new")
-    |> assign(title: gettext("New Account"))
+    |> assign(page_title: gettext("New Account"))
     |> assign(
       :form,
       to_form(StdInterface.changeset(Account, %Account{}, %{}, socket.assigns.current_company))
@@ -34,7 +34,7 @@ defmodule FullCircleWeb.AccountLive.Form do
     socket
     |> assign(live_action: :edit)
     |> assign(id: id)
-    |> assign(title: gettext("Edit Account"))
+    |> assign(page_title: gettext("Edit Account"))
     |> assign(
       :form,
       to_form(StdInterface.changeset(Account, account, %{}, socket.assigns.current_company))
@@ -160,7 +160,7 @@ defmodule FullCircleWeb.AccountLive.Form do
   def render(assigns) do
     ~H"""
     <div class="w-4/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
-      <p class="w-full text-3xl text-center font-medium"><%= @title %></p>
+      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
       <.form
         for={@form}
         id="account-form"

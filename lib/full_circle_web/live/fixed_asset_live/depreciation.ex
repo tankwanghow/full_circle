@@ -18,7 +18,7 @@ defmodule FullCircleWeb.FixedAssetLive.Depreciations do
       socket
       |> assign(ass: ass)
       |> assign(terms: params["terms"])
-      |> assign(title: gettext("Depreciations"))
+      |> assign(page_title: gettext("Depreciations"))
       |> assign(generated_depreciations: [])
       |> assign(live_action: :new)
       |> filter_depreciation()
@@ -222,7 +222,7 @@ defmodule FullCircleWeb.FixedAssetLive.Depreciations do
   def render(assigns) do
     ~H"""
     <div class="w-6/12 mx-auto">
-      <p class="w-full text-2xl text-center font-medium"><%= "#{@title} for #{@ass.name}" %></p>
+      <p class="w-full text-2xl text-center font-medium"><%= "#{@page_title} for #{@ass.name}" %></p>
       <div class="text-center m-4">
         <a onclick="history.back();" class="blue button"><%= gettext("Back") %></a>
       </div>

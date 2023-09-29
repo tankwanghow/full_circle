@@ -20,7 +20,7 @@ defmodule FullCircleWeb.ContactLive.Form do
     socket
     |> assign(live_action: :new)
     |> assign(id: "new")
-    |> assign(title: gettext("New Contact"))
+    |> assign(page_title: gettext("New Contact"))
     |> assign(
       :form,
       to_form(StdInterface.changeset(Contact, %Contact{}, %{}, socket.assigns.current_company))
@@ -33,7 +33,7 @@ defmodule FullCircleWeb.ContactLive.Form do
     socket
     |> assign(live_action: :edit)
     |> assign(id: id)
-    |> assign(title: gettext("Edit Contact"))
+    |> assign(page_title: gettext("Edit Contact"))
     |> assign(
       :form,
       to_form(StdInterface.changeset(Contact, account, %{}, socket.assigns.current_company))
@@ -161,7 +161,7 @@ defmodule FullCircleWeb.ContactLive.Form do
   def render(assigns) do
     ~H"""
     <div class="w-6/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
-      <p class="w-full text-3xl text-center font-medium"><%= @title %></p>
+      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
       <.form
         for={@form}
         id="object-form"

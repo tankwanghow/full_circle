@@ -22,7 +22,7 @@ defmodule FullCircleWeb.SalaryNoteLive.Form do
     socket
     |> assign(live_action: :new)
     |> assign(id: "new")
-    |> assign(title: gettext("New Salary Note"))
+    |> assign(page_title: gettext("New Salary Note"))
     |> assign(
       :form,
       to_form(
@@ -43,7 +43,7 @@ defmodule FullCircleWeb.SalaryNoteLive.Form do
     socket
     |> assign(live_action: :edit)
     |> assign(id: id)
-    |> assign(title: gettext("Edit Salary Note") <> " " <> obj.note_no)
+    |> assign(page_title: gettext("Edit Salary Note") <> " " <> obj.note_no)
     |> assign(
       :form,
       to_form(StdInterface.changeset(SalaryNote, obj, %{}, socket.assigns.current_company))
@@ -175,7 +175,7 @@ defmodule FullCircleWeb.SalaryNoteLive.Form do
   def render(assigns) do
     ~H"""
     <div class="w-6/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
-      <p class="w-full text-3xl text-center font-medium"><%= @title %></p>
+      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
       <p :if={!is_nil(@form.source.data.pay_slip_no)} class="w-full text-xl text-center font-bold">
         <%= @form.source.data.pay_slip_no %>
       </p>

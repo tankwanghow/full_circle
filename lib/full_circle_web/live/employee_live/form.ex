@@ -23,7 +23,7 @@ defmodule FullCircleWeb.EmployeeLive.Form do
     socket
     |> assign(live_action: :new)
     |> assign(id: "new")
-    |> assign(title: gettext("New Employee"))
+    |> assign(page_title: gettext("New Employee"))
     |> assign(
       :form,
       to_form(StdInterface.changeset(Employee, %Employee{}, %{}, socket.assigns.current_company))
@@ -37,7 +37,7 @@ defmodule FullCircleWeb.EmployeeLive.Form do
     socket
     |> assign(live_action: :edit)
     |> assign(id: id)
-    |> assign(title: gettext("Edit Employee"))
+    |> assign(page_title: gettext("Edit Employee"))
     |> assign(
       :form,
       to_form(StdInterface.changeset(Employee, obj, %{}, socket.assigns.current_company))
@@ -51,7 +51,7 @@ defmodule FullCircleWeb.EmployeeLive.Form do
     socket
     |> assign(live_action: :new)
     |> assign(id: "new")
-    |> assign(title: gettext("Copying Employee"))
+    |> assign(page_title: gettext("Copying Employee"))
     |> assign(current_company: socket.assigns.current_company)
     |> assign(current_user: socket.assigns.current_user)
     |> assign(
@@ -266,7 +266,7 @@ defmodule FullCircleWeb.EmployeeLive.Form do
   def render(assigns) do
     ~H"""
     <div class="w-7/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
-      <p class="w-full text-3xl text-center font-medium"><%= @title %></p>
+      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
       <.form
         for={@form}
         id="object-form"

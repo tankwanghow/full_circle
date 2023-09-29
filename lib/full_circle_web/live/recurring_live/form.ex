@@ -22,7 +22,7 @@ defmodule FullCircleWeb.RecurringLive.Form do
     socket
     |> assign(live_action: :new)
     |> assign(id: "new")
-    |> assign(title: gettext("New Recurring"))
+    |> assign(page_title: gettext("New Recurring"))
     |> assign(
       :form,
       to_form(
@@ -38,7 +38,7 @@ defmodule FullCircleWeb.RecurringLive.Form do
     socket
     |> assign(live_action: :edit)
     |> assign(id: id)
-    |> assign(title: gettext("Edit Recurring") <> " " <> obj.recur_no)
+    |> assign(page_title: gettext("Edit Recurring") <> " " <> obj.recur_no)
     |> assign(
       :form,
       to_form(StdInterface.changeset(Recurring, obj, %{}, socket.assigns.current_company))
@@ -172,7 +172,7 @@ defmodule FullCircleWeb.RecurringLive.Form do
   def render(assigns) do
     ~H"""
     <div class="w-6/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
-      <p class="w-full text-3xl text-center font-medium"><%= @title %></p>
+      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
       <.form
         for={@form}
         id="object-form"

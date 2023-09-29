@@ -22,7 +22,7 @@ defmodule FullCircleWeb.JournalLive.Form do
     socket
     |> assign(live_action: :new)
     |> assign(id: "new")
-    |> assign(title: gettext("New Journal"))
+    |> assign(page_title: gettext("New Journal"))
     |> assign(
       :form,
       to_form(
@@ -47,7 +47,7 @@ defmodule FullCircleWeb.JournalLive.Form do
     socket
     |> assign(live_action: :edit)
     |> assign(id: id)
-    |> assign(title: gettext("Edit Journal") <> " " <> object.journal_no)
+    |> assign(page_title: gettext("Edit Journal") <> " " <> object.journal_no)
     |> assign(
       :form,
       to_form(StdInterface.changeset(Journal, object, %{}, socket.assigns.current_company))
@@ -232,7 +232,7 @@ defmodule FullCircleWeb.JournalLive.Form do
   def render(assigns) do
     ~H"""
     <div class="w-6/12 mx-auto border rounded-lg border-pink-500 bg-pink-100 p-4">
-      <p class="w-full text-3xl text-center font-medium"><%= @title %></p>
+      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
       <.form for={@form} id="object-form" autocomplete="off" phx-change="validate" phx-submit="save">
         <%= Phoenix.HTML.Form.hidden_input(@form, :journal_no) %>
         <div class="flex flex-row flex-nowarp">

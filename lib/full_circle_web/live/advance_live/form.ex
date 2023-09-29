@@ -22,7 +22,7 @@ defmodule FullCircleWeb.AdvanceLive.Form do
     socket
     |> assign(live_action: :new)
     |> assign(id: "new")
-    |> assign(title: gettext("New Advance"))
+    |> assign(page_title: gettext("New Advance"))
     |> assign(
       :form,
       to_form(
@@ -43,7 +43,7 @@ defmodule FullCircleWeb.AdvanceLive.Form do
     socket
     |> assign(live_action: :edit)
     |> assign(id: id)
-    |> assign(title: gettext("Edit Advance") <> " " <> obj.slip_no)
+    |> assign(page_title: gettext("Edit Advance") <> " " <> obj.slip_no)
     |> assign(
       :form,
       to_form(StdInterface.changeset(Advance, obj, %{}, socket.assigns.current_company))
@@ -175,7 +175,7 @@ defmodule FullCircleWeb.AdvanceLive.Form do
   def render(assigns) do
     ~H"""
     <div class="w-7/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
-      <p class="w-full text-3xl text-center font-medium"><%= @title %></p>
+      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
       <p :if={!is_nil(@form.source.data.pay_slip_no)} class="w-full text-xl text-center font-bold">
         <%= @form.source.data.pay_slip_no %>
       </p>
