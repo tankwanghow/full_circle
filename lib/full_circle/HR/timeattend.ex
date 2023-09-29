@@ -42,7 +42,6 @@ defmodule FullCircle.HR.TimeAttend do
     ])
     |> fill_punch_time()
     |> validate_id(:employee_name, :employee_id)
-    |> validate_punch_time()
   end
 
   @doc false

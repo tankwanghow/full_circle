@@ -1,6 +1,7 @@
 defmodule FullCircleWeb.TimeAttendLive.Form do
   use FullCircleWeb, :live_view
 
+  alias ElixirLS.Utils.MinimumVersion
   alias FullCircle.HR.{TimeAttend}
   alias FullCircle.HR
   alias FullCircle.StdInterface
@@ -196,6 +197,8 @@ defmodule FullCircleWeb.TimeAttendLive.Form do
 
     socket = assign(socket, form: to_form(changeset))
 
+    IO.inspect(changeset)
+
     {:noreply, socket}
   end
 
@@ -204,6 +207,9 @@ defmodule FullCircleWeb.TimeAttendLive.Form do
     ~H"""
     <div class="w-7/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
       <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
+      <p class="w-full text-center text-xl border-2 border-orange-400 bg-orange-200 rounded-lg p-3 mb-3">
+        <%= gettext("Warning! Minimum Data Integrity is Impose! Make sure your data is correct.") %>
+      </p>
       <.form
         for={@form}
         id="object-form"
@@ -213,25 +219,26 @@ defmodule FullCircleWeb.TimeAttendLive.Form do
         class="mx-auto"
       >
         <div class="grid grid-cols-12 gap-1">
-          <div class="col-span-4">
-            <.input
-              feedback={true}
-              field={@form[:punch_time_local]}
-              label={gettext("Punch Date Time")}
-              type="datetime-local"
-            />
-          </div>
           <%= Phoenix.HTML.Form.hidden_input(@form, :input_medium) %>
           <%= Phoenix.HTML.Form.hidden_input(@form, :user_id) %>
           <%= Phoenix.HTML.Form.hidden_input(@form, :company_id) %>
           <div class="col-span-6">
             <%= Phoenix.HTML.Form.hidden_input(@form, :employee_id) %>
             <.input
+              feedback={true}
               field={@form[:employee_name]}
               label={gettext("Employee")}
               phx-hook="tributeAutoComplete"
               phx-debounce="500"
               url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=employee&name="}
+            />
+          </div>
+          <div class="col-span-4">
+            <.input
+              feedback={true}
+              field={@form[:punch_time_local]}
+              label={gettext("Punch Date Time")}
+              type="datetime-local"
             />
           </div>
           <div class="col-span-2">
