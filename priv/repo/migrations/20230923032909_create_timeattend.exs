@@ -9,9 +9,13 @@ defmodule FullCircle.Repo.Migrations.CreateTimeAttends do
       add :flag, :string
       add :input_medium, :string
       add :punch_time, :timestamptz
+      add :marker, :string
 
       timestamps(type: :timestamptz)
     end
     create index(:time_attendences, [:company_id, :employee_id])
+    create index(:time_attendences, [:company_id, :employee_id, :flag])
+    create index(:time_attendences, [:company_id, :employee_id, :punch_time])
+    create index(:time_attendences, [:company_id, :employee_id, :marker])
   end
 end
