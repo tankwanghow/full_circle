@@ -71,7 +71,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCamera do
              flag: socket.assigns.flag,
              company_id: socket.assigns.current_company.id,
              user_id: socket.assigns.current_user.id,
-             input_medium: "WebCam"
+             input_medium: "PunchCamera"
            },
            socket.assigns.current_company,
            socket.assigns.current_user

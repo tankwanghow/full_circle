@@ -8,7 +8,6 @@ defmodule FullCircle.HR.TimeAttend do
     field(:flag, :string)
     field(:input_medium, :string)
     field(:punch_time, :utc_datetime)
-    field(:marker, :string)
 
     field(:employee_name, :string, virtual: true)
     field(:email, :string, virtual: true)

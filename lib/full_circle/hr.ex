@@ -53,8 +53,7 @@ defmodule FullCircle.HR do
     from(ta in timeattend_raw_query(company, user),
       where: ta.id == ^id
     )
-    |> Repo.one!()
-    |> FullCircle.HR.TimeAttend.set_punch_time_local(company)
+    |> Repo.one!() |> FullCircle.HR.TimeAttend.set_punch_time_local(company)
   end
 
   defp timeattend_raw_query(company, _user) do
@@ -680,57 +679,5 @@ defmodule FullCircle.HR do
       select: emp,
       select_merge: %{checked: false}
     )
-  end
-
-  defp punch_query_by_company_id(com_id) do
-    "with
-    punches as (select pui.company_id, pui.employee_id, pui.id as in_id,
-                       (select puo.id from time_attendences puo
-                         where pui.employee_id = puo.employee_id
-                           and pui.punch_time < puo.punch_time
-                           and puo.flag = 'OUT'
-                           order by puo.punch_time limit 1) as out_id
-                  from time_attendences pui where pui.flag = 'IN')
-
-    select ta.id as id, e.name, e.id_no, ta.punch_time::date as p_date, ta.punch_time as in_time,
-           ta2.punch_time as out_time, ta.id as in_id, ta2.id as out_id,
-           e.id as employee_id, ta.company_id, ta.input_medium as in_medium,
-           ta2.input_medium as out_medium,
-           coalesce(extract(hour from ta2.punch_time - ta.punch_time)* 60 +
-           extract(minute from ta2.punch_time - ta.punch_time),0) as wh
-      from punches inner join employees e
-        on e.id = punches.employee_id inner join time_attendences ta
-        on punches.in_id = ta.id left outer join time_attendences ta2
-        on punches.out_id = ta2.id where ta.company_id = '#{com_id}'"
-  end
-
-  def punch_query(sdate, edate, empname, com_id,
-        page: page,
-        per_page: per_page
-      ) do
-    (punch_query_by_company_id(com_id) <>
-       if(sdate != "", do: " and ta.punch_time >= '#{sdate}'", else: "") <>
-       if(edate != "", do: " and ta.punch_time <= '#{edate}'", else: "") <>
-       if(empname != "", do: " and (e.name ilike '%#{empname}%' or e.id_no ilike '%#{empname}%')", else: "") <>
-       " order by p_date desc, in_time desc" <>
-       " limit #{per_page} offset (#{page} - 1) * #{per_page} ")
-    |> exec_punch_query()
-  end
-
-  defp exec_punch_query(qry) do
-    k = FullCircle.Repo.query!(qry)
-
-    Enum.map(k.rows, fn r ->
-      Enum.zip(k.columns |> Enum.map(fn x -> String.to_atom(x) end), r)
-    end)
-    |> Enum.map(fn x ->
-      Map.new(x, fn {kk, vv} ->
-        {kk,
-         if(Atom.to_string(kk) |> String.ends_with?("id") and !is_nil(vv),
-           do: Ecto.UUID.cast!(vv),
-           else: vv
-         )}
-      end)
-    end)
   end
 end

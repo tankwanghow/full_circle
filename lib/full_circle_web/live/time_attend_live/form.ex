@@ -1,6 +1,7 @@
 defmodule FullCircleWeb.TimeAttendLive.Form do
   use FullCircleWeb, :live_view
 
+  alias ElixirLS.Utils.MinimumVersion
   alias FullCircle.HR.{TimeAttend}
   alias FullCircle.HR
   alias FullCircle.StdInterface
@@ -217,7 +218,7 @@ defmodule FullCircleWeb.TimeAttendLive.Form do
         phx-submit="save"
         class="mx-auto"
       >
-        <div class="grid grid-cols-12 gap-1 mb-2">
+        <div class="grid grid-cols-12 gap-1">
           <%= Phoenix.HTML.Form.hidden_input(@form, :input_medium) %>
           <%= Phoenix.HTML.Form.hidden_input(@form, :user_id) %>
           <%= Phoenix.HTML.Form.hidden_input(@form, :company_id) %>
@@ -251,14 +252,7 @@ defmodule FullCircleWeb.TimeAttendLive.Form do
           </div>
         </div>
 
-        <p class="text-center mt-2 text-sm text-gray-500">
-          last touch using <%= @form.source.data.input_medium %> by <%= @form.source.data.email %> at <%= FullCircleWeb.Helpers.format_datetime(
-            @form.source.data.updated_at,
-            @current_company
-          ) %>
-        </p>
-
-        <div class="flex justify-center gap-x-1 mt-2">
+        <div class="flex justify-center gap-x-1 mt-1">
           <.form_action_button
             form={@form}
             live_action={@live_action}
