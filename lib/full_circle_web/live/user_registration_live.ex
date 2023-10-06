@@ -6,7 +6,7 @@ defmodule FullCircleWeb.UserRegistrationLive do
 
   def render(assigns) do
     ~H"""
-    <div class="mx-auto max-w-sm">
+    <div class="mx-auto max-w-xs">
       <.header class="text-center">
         <%= gettext("Register for an account") %>
         <:subtitle>

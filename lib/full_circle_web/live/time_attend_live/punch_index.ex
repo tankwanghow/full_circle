@@ -1,8 +1,8 @@
-defmodule FullCircleWeb.TimeAttendLive.Index do
+defmodule FullCircleWeb.TimeAttendLive.PunchIndex do
   use FullCircleWeb, :live_view
 
   alias FullCircle.HR
-  alias FullCircleWeb.TimeAttendLive.IndexComponent
+  alias FullCircleWeb.TimeAttendLive.PunchIndexComponent
 
   @per_page 25
 
@@ -14,23 +14,31 @@ defmodule FullCircleWeb.TimeAttendLive.Index do
       <div class="flex justify-center mb-2">
         <.form for={%{}} id="search-form" phx-submit="search" autocomplete="off" class="w-full">
           <div class=" flex flex-row flex-wrap tracking-tighter text-sm">
-            <div class="w-[15.5rem] grow shrink">
-              <label class="">Search Terms</label>
+            <div class="w-[50%]">
               <.input
-                id="search_terms"
-                name="search[terms]"
+                id="search_employee"
+                name="search[employee]"
                 type="search"
-                value={@search.terms}
-                placeholder="employee, flag or input medium..."
+                value={@search.employee}
+                label={gettext("Employee Name")}
               />
             </div>
-            <div class="w-[9.5rem] grow-0 shrink-0">
-              <label>Punch Date From</label>
+            <div class="w-[20%]">
               <.input
-                name="search[punch_date]"
+                name="search[sdate]"
                 type="date"
-                value={@search.punch_date}
-                id="search_punch_date"
+                value={@search.sdate}
+                id="search_sdate"
+                label={gettext("Start Date")}
+              />
+            </div>
+            <div class="w-[20%]">
+              <.input
+                name="search[edate]"
+                type="date"
+                value={@search.edate}
+                id="search_sdate"
+                label={gettext("End Date")}
               />
             </div>
             <.button class="mt-5 h-10 w-10 grow-0 shrink-0">🔍</.button>
@@ -47,26 +55,29 @@ defmodule FullCircleWeb.TimeAttendLive.Index do
         </.link>
       </div>
       <div class="font-medium flex flex-row text-center tracking-tighter bg-amber-200">
-        <div class="w-[30%] border-b border-t border-amber-400 py-1">
+        <div class="w-[25%] border-b border-t border-amber-400 py-1">
           <%= gettext("Employee") %>
+        </div>
+        <div class="w-[10%] border-b border-t border-amber-400 py-1">
+          <%= gettext("Date") %>
+        </div>
+        <div class="w-[12%] border-b border-t border-amber-400 py-1">
+          <%= gettext("Year/Week") %>
         </div>
         <div class="w-[10%] border-b border-t border-amber-400 py-1">
           <%= gettext("Shift") %>
         </div>
-        <div class="w-[15%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Punch Date Time") %>
+        <div class="w-[25%] border-b border-t border-amber-400 py-1">
+          <%= gettext("Punches") %>
         </div>
-        <div class="w-[5%] border-b border-t border-amber-400 py-1">
-          <%= gettext("IN/OUT") %>
+        <div class="w-[6%] border-b border-t border-amber-400 py-1">
+          <%= gettext("HW") %>
         </div>
-        <div class="w-[10%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Medium") %>
+        <div class="w-[6%] border-b border-t border-amber-400 py-1">
+          <%= gettext("NH") %>
         </div>
-        <div class="w-[15%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Touch By") %>
-        </div>
-        <div class="w-[15%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Touch At") %>
+        <div class="w-[6%] border-b border-t border-amber-400 py-1">
+          <%= gettext("OT") %>
         </div>
       </div>
       <div
@@ -78,11 +89,10 @@ defmodule FullCircleWeb.TimeAttendLive.Index do
       >
         <%= for {obj_id, obj} <- @streams.objects do %>
           <.live_component
-            module={IndexComponent}
+            module={PunchIndexComponent}
             id={obj_id}
             obj={obj}
             company={@current_company}
-            ex_class=""
           />
         <% end %>
       </div>
@@ -95,7 +105,7 @@ defmodule FullCircleWeb.TimeAttendLive.Index do
   def mount(_params, _session, socket) do
     socket =
       socket
-      |> assign(page_title: gettext("Punch RAW Listing"))
+      |> assign(page_title: gettext("Punch In/Out Listing"))
 
     {:ok, socket}
   end
@@ -103,17 +113,15 @@ defmodule FullCircleWeb.TimeAttendLive.Index do
   @impl true
   def handle_params(params, _uri, socket) do
     params = params["search"]
-    terms = params["terms"] || ""
-    punch_date = params["punch_date"] || ""
+    employee = params["employee"] || ""
+    sdate = params["sdate"] || Timex.today()
+    edate = params["edate"] || Timex.today() |> Timex.shift(days: 1)
 
     {:noreply,
      socket
-     |> assign(
-       search: %{terms: terms, punch_date: punch_date}
-     )
-     |> assign(selected_timeattends: [])
+     |> assign(search: %{employee: employee, sdate: sdate, edate: edate})
      |> assign(ids: "")
-     |> filter_objects(terms, "replace", punch_date, 1)}
+     |> filter_objects(employee, "replace", sdate, edate, 1)}
   end
 
   @impl true
@@ -121,9 +129,10 @@ defmodule FullCircleWeb.TimeAttendLive.Index do
     {:noreply,
      socket
      |> filter_objects(
-       socket.assigns.search.terms,
+       socket.assigns.search.employee,
        "stream",
-       socket.assigns.search.punch_date,
+       socket.assigns.search.sdate,
+       socket.assigns.search.edate,
        socket.assigns.page + 1
      )}
   end
@@ -133,32 +142,38 @@ defmodule FullCircleWeb.TimeAttendLive.Index do
         "search",
         %{
           "search" => %{
-            "terms" => terms,
-            "punch_date" => id
+            "employee" => employee,
+            "sdate" => sd,
+            "edate" => ed
           }
         },
         socket
       ) do
     qry = %{
-      "search[terms]" => terms,
-      "search[punch_date]" => id
+      "search[employee]" => employee,
+      "search[sdate]" => sd,
+      "search[edate]" => ed
     }
 
-    url = "/companies/#{socket.assigns.current_company.id}/TimeAttend?#{URI.encode_query(qry)}"
+    url = "/companies/#{socket.assigns.current_company.id}/PunchIndex?#{URI.encode_query(qry)}"
 
     {:noreply, socket |> push_patch(to: url)}
   end
 
-  defp filter_objects(socket, terms, update, punch_date, page) do
+  defp filter_objects(socket, employee, update, sdate, edate, page) do
     objects =
-      HR.timeattend_index_query(
-        terms,
-        punch_date,
-        socket.assigns.current_company,
-        socket.assigns.current_user,
-        page: page,
-        per_page: @per_page
-      )
+      if sdate == "" or edate == "" do
+        []
+      else
+        HR.punch_query(
+          sdate,
+          edate,
+          employee,
+          socket.assigns.current_company.id,
+          page: page,
+          per_page: @per_page
+        )
+      end
 
     obj_count = Enum.count(objects)
 

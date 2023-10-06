@@ -56,7 +56,7 @@ Hooks.QR_Scanner = {
   mounted() {
     html5QrcodeScanner = new Html5QrcodeScanner(
       "qr-reader",
-      { fps: 10, qrbox: { width: 600, height: 600 } },
+      { fps: 2, qrbox: { width: 220, height: 280 } },
       false
     )
 

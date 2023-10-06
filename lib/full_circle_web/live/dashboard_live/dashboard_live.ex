@@ -73,11 +73,17 @@ defmodule FullCircleWeb.DashboardLive do
         <.link navigate={~p"/companies/#{@current_company.id}/recurrings"} class="nav-btn">
           <%= gettext("Recurrings") %>
         </.link>
-        <.link navigate={~p"/companies/#{@current_company.id}/Punch"} class="nav-btn">
-          <%= gettext("Punch") %>
+        <.link navigate={~p"/companies/#{@current_company.id}/PunchCamera"} class="nav-btn">
+          <%= gettext("Punch Camera") %>
         </.link>
         <.link navigate={~p"/companies/#{@current_company.id}/TimeAttend"} class="nav-btn">
-          <%= gettext("Attendences") %>
+          <%= gettext("Punching RAW Listing") %>
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/PunchIndex"} class="nav-btn">
+          <%= gettext("Punch IO index") %>
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/PunchCard"} class="nav-btn">
+          <%= gettext("Punch Card") %>
         </.link>
       </div>
     </div>

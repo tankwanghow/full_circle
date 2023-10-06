@@ -1,184 +1,142 @@
-defmodule FullCircleWeb.TimeAttendLive.PunchCamera do
+defmodule FullCircleWeb.TimeAttendLive.PunchCard do
   use FullCircleWeb, :live_view
 
   alias FullCircle.HR
-
-  @impl true
-  def mount(_params, _session, socket) do
-    {:ok,
-     socket
-     |> assign(status: :waiting)
-     |> assign(flag: "IN")
-     |> assign(page_title: gettext("Attendence Camera"))}
-  end
-
-  @impl true
-  def handle_event("qr-code-scanned", params, socket) do
-    employee_id = params["decodedText"] || "Not Found!!"
-
-    try do
-      emp =
-        if(is_nil(employee_id),
-          do: nil,
-          else:
-            HR.get_employee!(
-              employee_id,
-              socket.assigns.current_company,
-              socket.assigns.current_user
-            )
-        )
-
-      socket =
-        cond do
-          is_nil(emp) ->
-            socket |> assign(status: :not_found) |> assign(qr_code: employee_id)
-
-          emp.status != "Active" ->
-            socket |> assign(status: :error) |> assign(qr_code: emp.status)
-
-          true ->
-            {status, msg} = punch_in(emp, socket)
-            socket |> assign(employee: emp) |> assign(status: status) |> assign(qr_code: msg)
-        end
-
-      {:noreply, socket}
-    rescue
-      e ->
-        IO.inspect(e)
-        {:noreply, socket |> assign(status: :error) |> assign(qr_code: employee_id)}
-    end
-  end
-
-  @impl true
-  def handle_event("qr-code-scan-resume", _params, socket) do
-    {:noreply, socket |> assign(status: :waiting)}
-  end
-
-  @impl true
-  def handle_event("in_out", _params, socket) do
-    if(socket.assigns.flag == "IN") do
-      {:noreply, socket |> assign(flag: "OUT")}
-    else
-      {:noreply, socket |> assign(flag: "IN")}
-    end
-  end
-
-  defp punch_in(employee, socket) do
-    case HR.create_time_attendence_by_punch(
-           %{
-             employee_id: employee.id,
-             punch_time: Timex.now(),
-             flag: socket.assigns.flag,
-             company_id: socket.assigns.current_company.id,
-             user_id: socket.assigns.current_user.id,
-             input_medium: "PunchCamera"
-           },
-           socket.assigns.current_company,
-           socket.assigns.current_user
-         ) do
-      {:ok, _ac} ->
-        {:success, ""}
-
-      {:error, changeset} ->
-        {:error,
-         Enum.map_join(changeset.errors, fn {field, {msg, _}} ->
-           "#{Atom.to_string(field)}: #{msg}"
-         end)}
-
-      :not_authorise ->
-        {:not_authorise, ""}
-    end
-  end
+  alias FullCircleWeb.TimeAttendLive.PunchCardComponent
 
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="text-2xl text-center mx-auto">
-      <%= @current_company.name %>
+    <div class="mx-auto w-8/12">
+      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
+      <div class="flex justify-center mb-2">
+        <.form for={%{}} id="search-form" phx-submit="search" autocomplete="off" class="w-full">
+          <div class=" flex flex-row flex-wrap tracking-tighter text-sm">
+            <div class="w-[50%]">
+              <.input
+                id="search_employee"
+                name="search[employee]"
+                type="search"
+                value={@search.employee}
+                label={gettext("Employee")}
+                phx-hook="tributeAutoComplete"
+                phx-debounce="500"
+                url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=employee&name="}
+              />
+            </div>
+            <div class="w-[20%]">
+              <.input
+                name="search[month]"
+                type="number"
+                value={@search.month}
+                id="search_month"
+                label={gettext("Month")}
+              />
+            </div>
+            <div class="w-[20%]">
+              <.input
+                name="search[year]"
+                type="number"
+                value={@search.year}
+                id="search_year"
+                label={gettext("Year")}
+              />
+            </div>
+            <.button class="mt-5 h-10 w-10 grow-0 shrink-0">🔍</.button>
+          </div>
+        </.form>
+      </div>
+      <div class="text-center mb-2">
+        <.link
+          navigate={~p"/companies/#{@current_company.id}/TimeAttend/new"}
+          class="blue button"
+          id="new_timeattend"
+        >
+          <%= gettext("New Time Attendence") %>
+        </.link>
+      </div>
+      <div class="font-medium flex flex-row text-center tracking-tighter bg-amber-200">
+      <div class="w-[15%] border-b border-t border-amber-400 py-1">
+          <%= gettext("Date") %>
+        </div>
+        <div class="w-[15%] border-b border-t border-amber-400 py-1">
+          <%= gettext("Year/Week") %>
+        </div>
+        <div class="w-[10%] border-b border-t border-amber-400 py-1">
+          <%= gettext("Shift") %>
+        </div>
+        <div class="w-[36%] border-b border-t border-amber-400 py-1">
+          <%= gettext("Punches") %>
+        </div>
+        <div class="w-[8%] border-b border-t border-amber-400 py-1">
+          <%= gettext("HW") %>
+        </div>
+        <div class="w-[8%] border-b border-t border-amber-400 py-1">
+          <%= gettext("NH") %>
+        </div>
+        <div class="w-[8%] border-b border-t border-amber-400 py-1">
+          <%= gettext("OT") %>
+        </div>
+      </div>
+      <div id="objects_list" class="mb-5">
+        <%= for obj <- @objects do %>
+          <.live_component
+            module={PunchCardComponent}
+            id={"object_#{obj.id}"}
+            obj={obj}
+            company={@current_company}
+          />
+        <% end %>
+      </div>
     </div>
-
-    <div
-      class={"mx-auto w-[80%] text-2xl text-center #{if(@flag == "IN", do: "blue", else: "red")} button mb-2"}
-      phx-click="in_out"
-    >
-      Punch <%= @flag %>
-    </div>
-
-    <div class="mx-auto w-[80%] text-2xl text-center">
-      <span id="date" /> <span id="clock" />
-    </div>
-
-    <div id="qr-reader" phx-update="ignore" class="w-[80%] mx-auto mb-2" phx-hook="QR_Scanner"></div>
-    <div
-      :if={@status == :success}
-      id="qr-reply"
-      phx-hook="QR_Reply"
-      class="w-[80%] text-center text-3xl mx-auto border rounded-lg bg-green-200 border-green-600"
-    >
-      <audio autoplay>
-        <source src="/assets/beep.mp3" type="audio/mpeg" />
-      </audio>
-      <%= @employee.name %>
-      <%= @employee.id_no %>
-      <div :if={@flag == "IN"} class="text-6xl text-green-500">&#128512;<%= @flag %>&#128512;</div>
-      <div :if={@flag == "OUT"} class="text-6xl text-red-500">&#128513;<%= @flag %>&#128513;</div>
-    </div>
-    <div
-      :if={@status == :waiting}
-      id="qr-reply"
-      phx-hook="QR_Reply"
-      class="w-[80%] text-center text-3xl mx-auto border rounded-lg bg-amber-200 border-amber-600"
-    >
-      Scan Employee QR
-    </div>
-    <div
-      :if={@status == :error}
-      id="qr-reply"
-      phx-hook="QR_Reply"
-      class="w-[80%] text-center text-3xl mx-auto border rounded-lg bg-rose-200 border-rose-600"
-    >
-      <audio autoplay>
-        <source src="/assets/beep-error.mp3" type="audio/mpeg" />
-      </audio>
-      QR ERROR!!
-      <div><%= @qr_code %></div>
-    </div>
-    <div
-      :if={@status == :not_found}
-      id="qr-reply"
-      phx-hook="QR_Reply"
-      class="w-[80%] text-center text-3xl mx-auto border rounded-lg bg-rose-200 border-rose-600"
-    >
-      <audio autoplay>
-        <source src="/assets/beep-error.mp3" type="audio/mpeg" />
-      </audio>
-      Employee Not Found!!!
-      <div class="text-lg"><%= @qr_code %></div>
-    </div>
-    <div class="text-center mt-5">
-      <a onclick="history.back();" class="red button"><%= gettext("Back") %></a>
-    </div>
-
-    <script>
-      function display_ct6() {
-        var x = new Date()
-        var ampm = x.getHours( ) >= 12 ? ' PM' : ' AM';
-        hours = x.getHours( ) % 12;
-        hours = hours ? hours : 12;
-        var date = x.getDate() + "-" + (x.getMonth() + 1) + "-" + x.getFullYear();
-        clock = hours + ":" +  x.getMinutes() + ":" +  x.getSeconds() + ampm;
-        document.getElementById('clock').innerHTML = clock;
-        document.getElementById('date').innerHTML = date;
-        display_c6();
-      }
-
-      function display_c6(){
-        var refresh = 500; // Refresh rate in milli seconds
-        setTimeout('display_ct6()', refresh);
-      }
-
-      display_c6();
-    </script>
     """
+  end
+
+  @impl true
+  def mount(_params, _session, socket) do
+    socket =
+      socket
+      |> assign(page_title: gettext("Punch Card"))
+      |> assign(objects: [])
+      |> assign(search: %{employee: "", month: Timex.today().month, year: Timex.today().year})
+
+    {:ok, socket}
+  end
+
+  @impl true
+  def handle_event(
+        "search",
+        %{
+          "search" => %{
+            "employee" => employee,
+            "month" => month,
+            "year" => year
+          }
+        },
+        socket
+      ) do
+    emp =
+      FullCircle.HR.get_employee_by_name(
+        employee,
+        socket.assigns.current_company,
+        socket.assigns.current_user
+      )
+
+    emp_id = if emp, do: emp.id, else: nil
+
+    {:noreply, socket |> filter_objects(month, year, emp_id)}
+  end
+
+  defp filter_objects(socket, month, year, emp_id) do
+    objects =
+      HR.punch_card_query(
+        month,
+        year,
+        emp_id,
+        socket.assigns.current_company.id
+      )
+
+    socket
+    |> assign(objects: objects)
   end
 end

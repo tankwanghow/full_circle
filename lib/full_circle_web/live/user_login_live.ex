@@ -3,31 +3,33 @@ defmodule FullCircleWeb.UserLoginLive do
 
   def render(assigns) do
     ~H"""
-    <div class="mx-auto max-w-sm">
+    <div class="mx-auto max-w-xs">
       <.header class="text-center mb-0">
         <%= gettext("Log in to account") %>
-        <:subtitle>
-          <%= gettext("Don't have an account?") %>
-          <.link navigate={~p"/users/register"} class="font-semibold text-brand hover:underline">
-            <%= gettext("Register") %>
-          </.link>
-          <%= gettext("for an account now.") %>
-        </:subtitle>
       </.header>
 
+      <div class="text-center -mb-4">
+        <.link navigate={~p"/users/register"} class="font-semibold text-brand hover:underline">
+          <%= gettext("Register for an account") %>
+        </.link>
+      </div>
       <.simple_form for={@form} id="login_form" action={~p"/users/log_in"} phx-update="ignore">
         <.input field={@form[:email]} type="email" label={gettext("Email")} required />
         <.input field={@form[:password]} type="password" label={gettext("Password")} required />
 
-        <:actions>
-          <.input field={@form[:remember_me]} type="checkbox" label={gettext("Keep me logged in")} />
-          <.link href={~p"/users/reset_password"} class="text-sm font-semibold">
-            <%= gettext("Forgot your password?") %>
-          </.link>
-        </:actions>
+        <div class="flex flex-row flex-warp gap-2">
+          <div class="w-[50%]">
+            <.input field={@form[:remember_me]} type="checkbox" label={gettext("Keep me logged in")} />
+          </div>
+          <div class="w-[50%]">
+            <.link href={~p"/users/reset_password"} class="text-sm font-semibold">
+              <%= gettext("Forgot your password?") %>
+            </.link>
+          </div>
+        </div>
         <:actions>
           <.button phx-disable-with={gettext("Signing in...")} class="w-full">
-            <%= gettext("Sign in ") %><span aria-hidden="true">→</span>
+            <%= gettext("Sign in") %>
           </.button>
         </:actions>
       </.simple_form>

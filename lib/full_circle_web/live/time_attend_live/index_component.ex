@@ -21,21 +21,27 @@ defmodule FullCircleWeb.TimeAttendLive.IndexComponent do
       <div class="w-[30%] border-b border-gray-400 py-1">
         <%= @obj.employee_name %>
       </div>
+      <div class="w-[10%] border-b border-gray-400 py-1">
+        <%= @obj.shift_id %>
+      </div>
       <div class="w-[15%] border-b border-gray-400 py-1">
         <.link
           class="text-blue-600 hover:font-bold"
           navigate={~p"/companies/#{@company}/TimeAttend/#{@obj.id}/edit"}
         >
-          <%= FullCircleWeb.Helpers.format_datetime(@obj.punch_time, @company) %>
+          <%= @obj.punch_time |> Timex.weekday() |> Timex.day_shortname() %>, <%= FullCircleWeb.Helpers.format_datetime(
+            @obj.punch_time,
+            @company
+          ) %>
         </.link>
       </div>
-      <div class="w-[10%] border-b text-center border-gray-400 py-1 overflow-clip">
+      <div class="w-[5%] border-b text-center border-gray-400 py-1 overflow-clip">
         <%= @obj.flag %>
       </div>
       <div class="w-[10%] border-b text-center border-gray-400 py-1 overflow-clip">
         <%= @obj.input_medium %>
       </div>
-      <div class="w-[20%] border-b text-center border-gray-400 py-1 overflow-clip">
+      <div class="w-[15%] border-b text-center border-gray-400 py-1 overflow-clip">
         <%= @obj.email %>
       </div>
       <div class="w-[15%] border-b text-center border-gray-400 py-1 overflow-clip">

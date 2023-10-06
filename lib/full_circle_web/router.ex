@@ -191,6 +191,9 @@ defmodule FullCircleWeb.Router do
       live("/TimeAttend/new", TimeAttendLive.Form, :new)
       live("/TimeAttend/:attend_id/edit", TimeAttendLive.Form, :edit)
 
+      live("/PunchIndex", TimeAttendLive.PunchIndex, :index)
+      live("/PunchCard", TimeAttendLive.PunchCard, :index)
+
       live("/Journal", JournalLive.Index, :index)
       live("/Journal/new", JournalLive.Form, :new)
       live("/Journal/:journal_id/edit", JournalLive.Form, :edit)
@@ -243,7 +246,7 @@ defmodule FullCircleWeb.Router do
         {FullCircleWeb.ActiveCompany, :assign_active_company}
       ],
       root_layout: {FullCircleWeb.Layouts, :punch} do
-      live("/Punch", TimeAttendLive.PunchCamera)
+      live("/PunchCamera", TimeAttendLive.PunchCamera)
     end
   end
 

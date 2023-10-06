@@ -5,7 +5,7 @@ defmodule FullCircleWeb.UserForgotPasswordLive do
 
   def render(assigns) do
     ~H"""
-    <div class="mx-auto max-w-sm">
+    <div class="mx-auto max-w-xs">
       <.header class="text-center">
         <%= gettext("Forgot your password?") %>
         <:subtitle><%= gettext("We'll send a password reset link to your inbox") %></:subtitle>
@@ -19,9 +19,14 @@ defmodule FullCircleWeb.UserForgotPasswordLive do
           </.button>
         </:actions>
       </.simple_form>
-      <p class="text-center text-sm mt-4">
-        <.link href={~p"/users/register"}><%= gettext("Register") %></.link>
-        | <.link href={~p"/users/log_in"}><%= gettext("Log in") %></.link>
+      <p class="text-center text-brand mt-4">
+        <.link href={~p"/users/register"} class="hover:underline hover:font-bold">
+          <%= gettext("Register") %>
+        </.link>
+        |
+        <.link href={~p"/users/log_in"} class="hover:underline hover:font-bold">
+          <%= gettext("Log in") %>
+        </.link>
       </p>
     </div>
     """

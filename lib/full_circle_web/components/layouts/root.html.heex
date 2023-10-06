@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content={get_csrf_token()} />
     <link phx-track-static rel="stylesheet" href={~p"/assets/app.css"} />
     <script defer phx-track-static type="text/javascript" src={~p"/assets/app.js"}>
@@ -106,18 +106,18 @@
     <% else %>
       <%= if assigns[:page_title] != gettext("Home") do %>
         <div class="grid justify-center w-full">
-          <img src="/images/logo.png" alt="Peggy Logo" class="w-48 h-48" />
+          <img src="/images/logo.png" alt="Peggy Logo" class="w-36 h-36" />
         </div>
-        <h1 class="grid justify-center font-bold text-2xl tracking-widest -mt-2">
+        <h1 class="text-center font-bold text-2xl tracking-widest -mt-2">
           <%= gettext("FullCircle") %>
         </h1>
-        <h1 class="grid justify-center text-xl tracking-tighter -mt-1">
+        <h1 class="text-center text-xl tracking-tighter -mt-1">
           <%= gettext("Accounting & Payroll Software") %>
         </h1>
-        <div class="text-gray-400 grid justify-center tracking-tighter">
+        <div class="text-gray-400 text-center tracking-tighter">
           <%= gettext("Version") %> <%= "0.1.0" %>
         </div>
-        <div class="text-green-600 grid justify-center">
+        <div class="text-green-600 text-center">
           <%= if @locale == "zh" do %>
             <.link href="?locale=en">
               Change Language to English

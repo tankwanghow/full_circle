@@ -1,7 +1,6 @@
 defmodule FullCircleWeb.TimeAttendLive.Form do
   use FullCircleWeb, :live_view
 
-  alias ElixirLS.Utils.MinimumVersion
   alias FullCircle.HR.{TimeAttend}
   alias FullCircle.HR
   alias FullCircle.StdInterface
@@ -218,11 +217,11 @@ defmodule FullCircleWeb.TimeAttendLive.Form do
         phx-submit="save"
         class="mx-auto"
       >
-        <div class="grid grid-cols-12 gap-1">
+        <div class="grid grid-cols-12 gap-1 mb-2">
           <%= Phoenix.HTML.Form.hidden_input(@form, :input_medium) %>
           <%= Phoenix.HTML.Form.hidden_input(@form, :user_id) %>
           <%= Phoenix.HTML.Form.hidden_input(@form, :company_id) %>
-          <div class="col-span-6">
+          <div class="col-span-4">
             <%= Phoenix.HTML.Form.hidden_input(@form, :employee_id) %>
             <.input
               feedback={true}
@@ -233,7 +232,14 @@ defmodule FullCircleWeb.TimeAttendLive.Form do
               url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=employee&name="}
             />
           </div>
-          <div class="col-span-4">
+          <div class="col-span-2">
+            <.input
+              feedback={true}
+              field={@form[:shift_id]}
+              label={gettext("shift_id")}
+            />
+          </div>
+          <div class="col-span-3">
             <.input
               feedback={true}
               field={@form[:punch_time_local]}
@@ -241,7 +247,7 @@ defmodule FullCircleWeb.TimeAttendLive.Form do
               type="datetime-local"
             />
           </div>
-          <div class="col-span-2">
+          <div class="col-span-1">
             <.input
               feedback={true}
               field={@form[:flag]}
@@ -250,9 +256,25 @@ defmodule FullCircleWeb.TimeAttendLive.Form do
               options={["IN", "OUT"]}
             />
           </div>
+          <div class="col-span-2">
+            <.input
+              feedback={true}
+              field={@form[:status]}
+              label={gettext("Status")}
+              type="select"
+              options={["Draft", "Approved", "Paid"]}
+            />
+          </div>
         </div>
 
-        <div class="flex justify-center gap-x-1 mt-1">
+        <p class="text-center mt-2 text-sm text-gray-500">
+          last touch using <%= @form.source.data.input_medium %> by <%= @form.source.data.email %> at <%= FullCircleWeb.Helpers.format_datetime(
+            @form.source.data.updated_at,
+            @current_company
+          ) %>
+        </p>
+
+        <div class="flex justify-center gap-x-1 mt-2">
           <.form_action_button
             form={@form}
             live_action={@live_action}
