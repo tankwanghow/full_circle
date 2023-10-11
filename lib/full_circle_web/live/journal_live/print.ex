@@ -7,19 +7,31 @@ defmodule FullCircleWeb.JournalLive.Print do
   @impl true
   def mount(%{"id" => id, "pre_print" => pre_print}, _session, socket) do
     ids = [id]
-    {:ok, socket |> assign(:pre_print, pre_print) |> set_page_defaults() |> fill_journals(ids)}
+
+    {:ok,
+     socket
+     |> assign(page_title: gettext("Print"))
+     |> assign(:pre_print, pre_print)
+     |> set_page_defaults()
+     |> fill_journals(ids)}
   end
 
   @impl true
   def mount(%{"ids" => ids, "pre_print" => pre_print}, _, socket) do
     ids = String.split(ids, ",")
-    {:ok, socket |> assign(:pre_print, pre_print) |> set_page_defaults() |> fill_journals(ids)}
+
+    {:ok,
+     socket
+     |> assign(page_title: gettext("Print"))
+     |> assign(:pre_print, pre_print)
+     |> set_page_defaults()
+     |> fill_journals(ids)}
   end
 
   defp set_page_defaults(socket) do
     socket
     |> assign(:detail_body_height, 55)
-    |> assign(:detail_height, 9)
+    |> assign(:detail_height, 15)
     |> assign(:company, FullCircle.Sys.get_company!(socket.assigns.current_company.id))
   end
 

@@ -18,6 +18,7 @@ defmodule FullCircleWeb.TransactionLive.Print do
      |> assign(:detail_chunks, Enum.chunk_every(data, chunk))
      |> assign(:data, data)
      |> assign(:account, ac)
+     |> assign(page_title: gettext("Print"))
      |> assign(:fdate, Date.from_iso8601!(params["fdate"]))
      |> assign(:tdate, Date.from_iso8601!(params["tdate"]))}
   end

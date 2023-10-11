@@ -87,7 +87,7 @@ defmodule FullCircleWeb.CreditNoteLive.Index do
       <div
         :if={Enum.count(@streams.objects) > 0 or @page > 1}
         id="objects_list"
-        phx-update={@update}
+        phx-update="stream"
         phx-viewport-bottom={!@end_of_timeline? && "next-page"}
         phx-page-loading
       >
@@ -126,7 +126,7 @@ defmodule FullCircleWeb.CreditNoteLive.Index do
      |> assign(search: %{terms: terms, note_date: note_date})
      |> assign(selected: [])
      |> assign(ids: "")
-     |> filter_objects(terms, "replace", note_date, 1)}
+     |> filter_objects(terms, true, note_date, 1)}
   end
 
   @impl true
@@ -179,7 +179,7 @@ defmodule FullCircleWeb.CreditNoteLive.Index do
      socket
      |> filter_objects(
        socket.assigns.search.terms,
-       "stream",
+       false,
        socket.assigns.search.note_date,
        socket.assigns.page + 1
      )}
@@ -206,7 +206,7 @@ defmodule FullCircleWeb.CreditNoteLive.Index do
     {:noreply, socket |> push_patch(to: url)}
   end
 
-  defp filter_objects(socket, terms, update, note_date, page) do
+  defp filter_objects(socket, terms, reset, note_date, page) do
     objects =
       DebCre.credit_note_index_query(
         terms,
@@ -221,8 +221,7 @@ defmodule FullCircleWeb.CreditNoteLive.Index do
 
     socket
     |> assign(page: page, per_page: @per_page)
-    |> assign(update: update)
-    |> stream(:objects, objects, reset: obj_count == 0)
+    |> stream(:objects, objects, reset: reset)
     |> assign(end_of_timeline?: obj_count < @per_page)
   end
 end

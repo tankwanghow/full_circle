@@ -23,12 +23,8 @@ defmodule FullCircleWeb.RecurringLive.IndexComponent do
         navigate={~p"/companies/#{@current_company}/recurrings/#{@obj.id}/edit"}
       >
         <%= @obj.recur_no %>
-      </.link> &#8226;
-      <%= @obj.recur_date %> &#8226;
-      <%= @obj.employee_name %> &#8226;
-      <%= @obj.salary_type_name %> &#8226;
-      <%= @obj.start_date %> &#8226;
-      <%= @obj.status %>
+      </.link>
+      &#8226; <%= @obj.recur_date %> &#8226; <%= @obj.employee_name %> &#8226; <%= @obj.salary_type_name %> &#8226; <%= @obj.start_date %> &#8226; <%= @obj.status %>
     </div>
     """
   end

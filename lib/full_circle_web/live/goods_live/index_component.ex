@@ -19,11 +19,12 @@ defmodule FullCircleWeb.GoodLive.IndexComponent do
       class={"#{@ex_class} text-center mb-1 bg-gray-200 border-gray-500 border-2 rounded p-2"}
     >
       <.link
-      class="text-blue-600 hover:font-bold"
+        class="text-blue-600 hover:font-bold"
         navigate={~p"/companies/#{@current_company}/goods/#{@obj.id}/edit"}
       >
         <%= @obj.name %> (<%= @obj.unit %>)
-      </.link> &#11049;
+      </.link>
+      &#11049;
       <span
         :if={@obj.packagings |> Enum.filter(fn x -> !is_nil(x) end) |> Enum.count() > 0}
         class="text-sm font-light"

@@ -23,9 +23,8 @@ defmodule FullCircleWeb.SalaryTypeLive.IndexComponent do
         navigate={~p"/companies/#{@current_company}/salary_types/#{@obj.id}/edit"}
       >
         <%= @obj.name %>
-      </.link> &#8226;
-      <%= @obj.db_ac_name %> &#8226;
-      <%= @obj.cr_ac_name %>
+      </.link>
+      &#8226; <%= @obj.type %> &#8226; <%= @obj.db_ac_name %> &#8226; <%= @obj.cr_ac_name %>
     </div>
     """
   end

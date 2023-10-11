@@ -93,7 +93,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Index do
       <div
         :if={Enum.count(@streams.objects) > 0 or @page > 1}
         id="objects_list"
-        phx-update={@update}
+        phx-update="stream"
         phx-viewport-bottom={!@end_of_timeline? && "next-page"}
         phx-page-loading
       >
@@ -142,7 +142,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Index do
      )
      |> assign(selected_invoices: [])
      |> assign(ids: "")
-     |> filter_objects(terms, "replace", pur_invoice_date, due_date, bal, 1)}
+     |> filter_objects(terms, true, pur_invoice_date, due_date, bal, 1)}
   end
 
   @impl true
@@ -197,7 +197,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Index do
      socket
      |> filter_objects(
        socket.assigns.search.terms,
-       "stream",
+       false,
        socket.assigns.search.pur_invoice_date,
        socket.assigns.search.due_date,
        socket.assigns.search.balance,
@@ -230,7 +230,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Index do
     {:noreply, socket |> push_patch(to: url)}
   end
 
-  defp filter_objects(socket, terms, update, pur_invoice_date, due_date, bal, page) do
+  defp filter_objects(socket, terms, reset, pur_invoice_date, due_date, bal, page) do
     objects =
       Billing.pur_invoice_index_query(
         terms,
@@ -247,8 +247,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Index do
 
     socket
     |> assign(page: page, per_page: @per_page)
-    |> assign(update: update)
-    |> stream(:objects, objects, reset: obj_count == 0)
+    |> stream(:objects, objects, reset: reset)
     |> assign(end_of_timeline?: obj_count < @per_page)
   end
 end

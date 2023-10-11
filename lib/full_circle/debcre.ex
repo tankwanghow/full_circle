@@ -261,6 +261,10 @@ defmodule FullCircle.DebCre do
 
     multi
     |> Ecto.Multi.run("create_transactions", fn repo, %{^name => cn} ->
+      cn =
+        cn
+        |> FullCircle.Repo.preload([:credit_note_details, :transaction_matchers])
+
       Enum.each(cn.credit_note_details, fn x ->
         x = FullCircle.Repo.preload(x, [:account, :tax_code])
 
@@ -626,6 +630,10 @@ defmodule FullCircle.DebCre do
 
     multi
     |> Ecto.Multi.run("create_transactions", fn repo, %{^name => cn} ->
+      cn =
+        cn
+        |> FullCircle.Repo.preload([:debit_note_details, :transaction_matchers])
+
       Enum.each(cn.debit_note_details, fn x ->
         x = FullCircle.Repo.preload(x, [:account, :tax_code])
 

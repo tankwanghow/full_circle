@@ -12,9 +12,10 @@ defmodule FullCircle.Repo.Migrations.CreateTimeAttends do
       add :shift_id, :string
       add :status, :string
 
-
       timestamps(type: :timestamptz)
     end
+
+    create index(:time_attendences, [:company_id])
     create index(:time_attendences, [:company_id, :employee_id])
     create index(:time_attendences, [:company_id, :employee_id, :flag])
     create index(:time_attendences, [:company_id, :employee_id, :punch_time])

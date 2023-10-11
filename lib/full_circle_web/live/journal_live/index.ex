@@ -85,7 +85,7 @@ defmodule FullCircleWeb.JournalLive.Index do
       <div
         :if={Enum.count(@streams.objects) > 0 or @page > 1}
         id="objects_list"
-        phx-update={@update}
+        phx-update="stream"
         phx-viewport-bottom={!@end_of_timeline? && "next-page"}
         phx-page-loading
       >
@@ -135,7 +135,7 @@ defmodule FullCircleWeb.JournalLive.Index do
      )
      |> assign(selected_journals: [])
      |> assign(ids: "")
-     |> filter_objects(terms, "replace", journal_date, 1)}
+     |> filter_objects(terms, true, journal_date, 1)}
   end
 
   @impl true
@@ -190,7 +190,7 @@ defmodule FullCircleWeb.JournalLive.Index do
      socket
      |> filter_objects(
        socket.assigns.search.terms,
-       "stream",
+       false,
        socket.assigns.search.journal_date,
        socket.assigns.page + 1
      )}
@@ -217,7 +217,7 @@ defmodule FullCircleWeb.JournalLive.Index do
     {:noreply, socket |> push_patch(to: url)}
   end
 
-  defp filter_objects(socket, terms, update, journal_date, page) do
+  defp filter_objects(socket, terms, reset, journal_date, page) do
     objects =
       JournalEntry.journal_index_query(
         terms,
@@ -232,8 +232,7 @@ defmodule FullCircleWeb.JournalLive.Index do
 
     socket
     |> assign(page: page, per_page: @per_page)
-    |> assign(update: update)
-    |> stream(:objects, objects, reset: obj_count == 0)
+    |> stream(:objects, objects, reset: reset)
     |> assign(end_of_timeline?: obj_count < @per_page)
   end
 end

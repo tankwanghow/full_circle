@@ -12,7 +12,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCamera do
      |> assign(page_title: gettext("Attendence Camera"))
      |> assign(shift_id: "")
      |> assign(valid?: false)
-     |> assign(last_10_shifts: HR.last_10_shift(socket.assigns.current_company.id))}
+     |> assign(last_shifts: HR.last_shift(6, socket.assigns.current_company.id))}
   end
 
   @impl true
@@ -80,7 +80,13 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCamera do
 
   @impl true
   def handle_event("shift_submit", %{"shift_form" => %{"shift_id" => id}}, socket) do
-    {:noreply, socket |> assign(shift_id: (Timex.today |> Timex.format!("%Y%m%d-", :strftime)) <> id)}
+    {:noreply,
+     socket |> assign(shift_id: (Timex.today() |> Timex.format!("%Y%m%d-", :strftime)) <> id)}
+  end
+
+  @impl true
+  def handle_event("continue_shift", %{"shift" => shift_id}, socket) do
+    {:noreply, socket |> assign(shift_id: shift_id)}
   end
 
   defp punch_in(employee, socket) do
@@ -115,11 +121,11 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCamera do
   def render(assigns) do
     ~H"""
     <div id="punch-camera" class="max-w-xs mx-auto">
-      <div class="text-xl text-center font-bold">
+      <div class="text-xl text-center font-bold mb-4">
         <%= @current_company.name %>
       </div>
-      <div class="mx-auto w-[80%] text-2xl text-center mb-3">
-        <span id="date" /> <span id="clock" />
+      <div class="mx-auto rounded-lg p-2 w-[80%] text-2xl text-center mb-2 border-4 border-green-800 bg-green-200">
+        <span class="text-blue-600" id="date" /> <span class="text-amber-800" id="clock" />
       </div>
       <div :if={@shift_id == ""}>
         <.form
@@ -131,41 +137,52 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCamera do
           class="max-w-2xl mx-auto"
         >
           <div class="grid grid-cols-12 gap-1 mx-5">
-          <div class="col-span-4 text-xl mt-1"><%= (Timex.today |> Timex.format!("%Y%m%d-", :strftime)) %></div>
+            <div class="col-span-4 text-xl mt-1 font-mono tracking-tighter">
+              <%= Timex.today() |> Timex.format!("%Y%m%d", :strftime) %>
+            </div>
             <div class="col-span-3">
-              <.input
-                name="shift_form[shift_id]"
-                type="text"
-                id="shift_form_shift_id"
-                value=""
-              />
+              <.input name="shift_form[shift_id]" type="text" id="shift_form_shift_id" value="" />
             </div>
             <div class="col-span-4 -mt-1.5">
               <.button disabled={!@valid?}>Start Shift</.button>
             </div>
           </div>
         </.form>
-        <div class="text-center mt-5 text-red-500 font-bold text-xl">
-          Please Double Check The Shift Id
+        <div class="text-center mt-5 text-red-500 font-bold text-2xl">
+          Last 6 Shifts
         </div>
-        <%= for obj <- @last_10_shifts do %>
-          <div class="text-center">
-            <%= obj.shift %>
+        <%= for obj <- @last_shifts do %>
+          <div class="mt-5 text-center text-2xl">
+            <.link
+              phx-value-shift={obj.shift}
+              phx-click={:continue_shift}
+              class="blue button"
+              id={"continue_#{obj.shift}"}
+            >
+              Continue <span class="font-bold font-mono"><%= obj.shift %></span>
+            </.link>
           </div>
         <% end %>
       </div>
 
       <div :if={@shift_id != ""}>
-        <div :if={@flag=="OUT"} phx-click="in_out" class="mb-2 font-bold text-2xl mx-auto w-[50%] button blue">
+        <div
+          :if={@flag == "OUT"}
+          phx-click="in_out"
+          class="mb-2 font-bold text-2xl mx-auto w-[50%] button blue"
+        >
           IN <span aria-hidden="true">→</span> OUT
         </div>
-        <div :if={@flag=="IN"} phx-click="in_out"class="mb-2 font-bold text-2xl mx-auto text-center w-[50%] button red">
+        <div
+          :if={@flag == "IN"}
+          phx-click="in_out"
+          class="mb-2 font-bold text-2xl mx-auto text-center w-[50%] button red"
+        >
           OUT <span aria-hidden="true">→</span> IN
         </div>
-        <div
-          class={"mx-auto w-[80%] text-xl text-center border-4 #{if(@flag == "IN", do: "bg-blue-200 border-blue-400", else: "bg-red-200 border-red-600")} mb-2"}>
+        <div class={"mx-auto w-[80%] text-2xl text-center rounded-lg border-4 #{if(@flag == "IN", do: "bg-blue-200 border-blue-400", else: "bg-red-200 border-red-600")} mb-2"}>
           <div class="text-3xl font-bold"><%= @flag %></div>
-          <div :if={@flag == "IN"} class="font-bold text-cyan-600"><%= @shift_id %></div>
+          <div :if={@flag == "IN"} class="font-bold font-mono text-cyan-600"><%= @shift_id %></div>
         </div>
 
         <div id="qr-reader" phx-update="ignore" class="w-[80%] mx-auto mb-2" phx-hook="QR_Scanner">
@@ -182,10 +199,12 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCamera do
           <%= @employee.name %>
           <%= @employee.id_no %>
           <div :if={@flag == "IN"} class="text-2xl text-green-500">
-            Punched <span class="font-bold"><%= @flag %></span> Shift <span class="font-bold"><%= @msg %></span>
+            Punched <span class="font-bold"><%= @flag %></span>
+            Shift <span class="font-bold"><%= @msg %></span>
           </div>
           <div :if={@flag == "OUT"} class="text-2xl text-red-500">
-            Punched <span class="font-bold"><%= @flag %></span> Shift <span class="font-bold"><%= @msg %></span>
+            Punched <span class="font-bold"><%= @flag %></span>
+            Shift <span class="font-bold"><%= @msg %></span>
           </div>
         </div>
         <div

@@ -1,27 +1,4 @@
 defmodule FullCircleWeb.Helpers do
-    # INSERT INTO public.time_attendences
-  # (id, employee_id, user_id, company_id, flag, input_medium, punch_time, shift_id, status, inserted_at, updated_at)
-  # select
-  #   gen_random_uuid(),
-  #   e.id,
-  #   'ebc7770b-940f-47a1-82d5-d38ea5c80eb3',
-  #   '66abd687-cfb8-47a7-827d-f8c39b2f8df5',
-  #   'IN',
-  #   'WebCamT',
-  #   it1.punch_time,
-  #   extract(year from it1.punch_time)::varchar || extract(month from it1.punch_time)::varchar || extract(day from it1.punch_time)::varchar || '-A',
-  #   'normal', now(), now()
-  # from
-  #   employees e,
-  #   (
-  #   select
-  #     (generate_series::date || ' ' || '17:' || (random() * 30)::integer::varchar || ' +08')::timestamptz as punch_time
-  #   from
-  #     generate_series('2023-10-01',
-  #     '2023-10-31',db
-  #     interval '1 day')) it1
-  #     where e.status = 'Active'
-
   use Phoenix.Component
 
   def list_n_value(socket, terms, list_fn) do
@@ -94,7 +71,7 @@ defmodule FullCircleWeb.Helpers do
   def work_week(stamp) do
     {y, w} = stamp |> Timex.iso_week()
     y = "#{y}"
-    w = String.reverse("0#{w}") |> String.slice(0..1) |> String.reverse
+    w = String.reverse("0#{w}") |> String.slice(0..1) |> String.reverse()
     "#{y}/#{w}"
   end
 

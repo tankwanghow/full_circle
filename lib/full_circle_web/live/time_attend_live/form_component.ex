@@ -1,68 +1,35 @@
-defmodule FullCircleWeb.TimeAttendLive.Form do
-  use FullCircleWeb, :live_view
+defmodule FullCircleWeb.TimeAttendLive.FormComponent do
+  use FullCircleWeb, :live_component
 
   alias FullCircle.HR.{TimeAttend}
   alias FullCircle.HR
   alias FullCircle.StdInterface
 
   @impl true
-  def mount(params, _session, socket) do
-    id = params["attend_id"]
-
-    socket =
-      case socket.assigns.live_action do
-        :new -> mount_new(socket)
-        :edit -> mount_edit(socket, id)
-      end
-
+  def mount(socket) do
     {:ok, socket}
   end
 
-  defp mount_new(socket) do
-    socket
-    |> assign(live_action: :new)
-    |> assign(id: "new")
-    |> assign(page_title: gettext("New Attendence"))
-    |> assign(
-      :form,
-      to_form(
-        StdInterface.changeset(
-          TimeAttend,
-          %TimeAttend{},
-          %{
-            company_id: socket.assigns.current_company.id,
-            input_medium: "UserEntry",
-            user_id: socket.assigns.current_user.id
-          },
-          socket.assigns.current_company
-        )
-      )
-    )
-  end
-
-  defp mount_edit(socket, id) do
-    obj =
-      HR.get_time_attendence!(id, socket.assigns.current_company, socket.assigns.current_user)
-
-    socket
-    |> assign(live_action: :edit)
-    |> assign(id: id)
-    |> assign(page_title: gettext("Edit Attendence"))
-    |> assign(
-      :form,
-      to_form(
-        StdInterface.changeset(
-          TimeAttend,
-          obj,
-          %{
-            company_id: socket.assigns.current_company.id,
-            input_medium: "UserEntry",
-            user_id: socket.assigns.current_user.id
-          },
-          socket.assigns.current_company
-        )
-      )
-    )
+  @impl true
+  def update(assigns, socket) do
+    {:ok,
+     socket
+     |> assign(assigns)
+     |> assign(
+       :form,
+       to_form(
+         StdInterface.changeset(
+           TimeAttend,
+           assigns.obj,
+           %{
+             company_id: assigns.current_company.id,
+             input_medium: "UserEntry",
+             user_id: assigns.current_user.id
+           },
+           assigns.current_company
+         )
+       )
+     )}
   end
 
   def handle_event(
@@ -98,25 +65,17 @@ defmodule FullCircleWeb.TimeAttendLive.Form do
            socket.assigns.current_company,
            socket.assigns.current_user
          ) do
-      {:ok, _obj} ->
-        {:noreply,
-         socket
-         |> push_navigate(to: ~p"/companies/#{socket.assigns.current_company.id}/TimeAttend")
-         |> put_flash(:info, "#{gettext("Attendence Deleted successfully.")}")}
+      {:ok, obj} ->
+        send(self(), {:deleted, obj})
+        {:noreply, socket}
 
       {:error, changeset} ->
-        {:noreply,
-         socket
-         |> assign(form: to_form(changeset))
-         |> put_flash(
-           :error,
-           "#{gettext("Failed")} #{list_errors_to_string(changeset.errors)}"
-         )}
+        send(self(), {:error, changeset})
+        {:noreply, socket}
 
       :not_authorise ->
-        {:noreply,
-         socket
-         |> put_flash(:error, gettext("You are not authorised to perform this action"))}
+        send(self(), {:not_authorise})
+        {:noreply, socket}
     end
   end
 
@@ -129,26 +88,16 @@ defmodule FullCircleWeb.TimeAttendLive.Form do
       )
     ) do
       {:ok, obj} ->
-        {:noreply,
-         socket
-         |> push_navigate(
-           to: ~p"/companies/#{socket.assigns.current_company.id}/TimeAttend/#{obj.id}/edit"
-         )
-         |> put_flash(:info, "#{gettext("Attendence created successfully.")}")}
+        send(self(), {:created, obj})
+        {:noreply, socket}
 
       {:error, changeset} ->
-        {:noreply,
-         socket
-         |> assign(form: to_form(changeset))
-         |> put_flash(
-           :error,
-           "#{gettext("Failed")} #{list_errors_to_string(changeset.errors)}"
-         )}
+        send(self(), {:error, changeset})
+        {:noreply, socket}
 
       :not_authorise ->
-        {:noreply,
-         socket
-         |> put_flash(:error, gettext("You are not authorised to perform this action"))}
+        send(self(), {:not_authorise})
+        {:noreply, socket}
     end
   end
 
@@ -160,26 +109,16 @@ defmodule FullCircleWeb.TimeAttendLive.Form do
            socket.assigns.current_user
          ) do
       {:ok, obj} ->
-        {:noreply,
-         socket
-         |> push_navigate(
-           to: ~p"/companies/#{socket.assigns.current_company.id}/TimeAttend/#{obj.id}/edit"
-         )
-         |> put_flash(:info, "#{gettext("Attendence updated successfully.")}")}
+        send(self(), {:updated, obj})
+        {:noreply, socket}
 
       {:error, changeset} ->
-        {:noreply,
-         socket
-         |> assign(form: to_form(changeset))
-         |> put_flash(
-           :error,
-           "#{gettext("Failed")} #{list_errors_to_string(changeset.errors)}"
-         )}
+        send(self(), {:error, changeset})
+        {:noreply, socket}
 
       :not_authorise ->
-        {:noreply,
-         socket
-         |> put_flash(:error, gettext("You are not authorised to perform this action"))}
+        send(self(), {:not_authorise})
+        {:noreply, socket}
     end
   end
 
@@ -196,27 +135,25 @@ defmodule FullCircleWeb.TimeAttendLive.Form do
 
     socket = assign(socket, form: to_form(changeset))
 
-    IO.inspect(changeset)
-
     {:noreply, socket}
   end
 
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="w-7/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
-      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
-      <p class="w-full text-center text-xl border-2 border-orange-400 bg-orange-200 rounded-lg p-3 mb-3">
-        <%= gettext("Warning! Minimum Data Integrity is Impose! Make sure your data is correct.") %>
-      </p>
+    <div class="">
       <.form
         for={@form}
         id="object-form"
         autocomplete="off"
         phx-change="validate"
         phx-submit="save"
-        class="mx-auto"
+        phx-target={@myself}
       >
+        <p class="w-full text-3xl text-center font-medium"><%= @title %></p>
+        <p class="w-full text-center text-xl border-2 border-orange-400 bg-orange-200 rounded-lg p-3 mb-3">
+          <%= gettext("Warning! Minimum Data Integrity is Impose! Make sure your data is correct.") %>
+        </p>
         <div class="grid grid-cols-12 gap-1 mb-2">
           <%= Phoenix.HTML.Form.hidden_input(@form, :input_medium) %>
           <%= Phoenix.HTML.Form.hidden_input(@form, :user_id) %>
@@ -224,6 +161,7 @@ defmodule FullCircleWeb.TimeAttendLive.Form do
           <div class="col-span-4">
             <%= Phoenix.HTML.Form.hidden_input(@form, :employee_id) %>
             <.input
+              :if={@live_action == :new}
               feedback={true}
               field={@form[:employee_name]}
               label={gettext("Employee")}
@@ -231,13 +169,17 @@ defmodule FullCircleWeb.TimeAttendLive.Form do
               phx-debounce="500"
               url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=employee&name="}
             />
+            <.input
+              :if={@live_action == :edit}
+              feedback={true}
+              field={@form[:employee_name]}
+              label={gettext("Employee")}
+              readonly
+              tabindex="-1"
+            />
           </div>
           <div class="col-span-2">
-            <.input
-              feedback={true}
-              field={@form[:shift_id]}
-              label={gettext("shift_id")}
-            />
+            <.input feedback={true} field={@form[:shift_id]} label={gettext("shift_id")} />
           </div>
           <div class="col-span-3">
             <.input
@@ -275,20 +217,16 @@ defmodule FullCircleWeb.TimeAttendLive.Form do
         </p>
 
         <div class="flex justify-center gap-x-1 mt-2">
-          <.form_action_button
-            form={@form}
-            live_action={@live_action}
-            new_url={~p"/companies/#{@current_company.id}/TimeAttend/new"}
-          />
+          <.save_button form={@form} />
+          <.link phx-click={:modal_cancel} class="orange button">
+            <%= gettext("Cancel") %>
+          </.link>
           <%= if @live_action == :edit and FullCircle.Authorization.can?(@current_user, :delete_time_attendence, @current_company) do %>
             <.delete_confirm_modal
               id="delete-object"
               msg1={gettext("Deleting Time Attendence")}
               msg2={gettext("Cannot Be Recover!!!")}
-              confirm={
-                JS.push("delete", target: "#object-form")
-                |> JS.hide(to: "#delete-object-modal")
-              }
+              confirm={JS.push("delete", target: "#object-form")}
             />
           <% end %>
         </div>

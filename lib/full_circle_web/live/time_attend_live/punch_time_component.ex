@@ -14,18 +14,23 @@ defmodule FullCircleWeb.TimeAttendLive.PunchTimeComponent do
   @impl true
   def render(assigns) do
     ~H"""
-    <div>
-    <%= if !is_nil(@obj) do %>
-      <%= for {ti, id, st} <- @obj do %>
-        <.link
-          :if={ti != ""}
-          class="text-blue-600 hover:font-bold"
-          navigate={~p"/companies/#{@company}/TimeAttend/#{id}/edit"}
-        >
-          <span class="mr-3"><%= ti %><span :if={st == "Draft"} class="text-xs"> D</span></span>
-        </.link>
+    <div class="">
+      <%= if !is_nil(@obj) do %>
+        <%= for {ti, id, _st, fl} <- @obj do %>
+          <.link
+            :if={ti != ""}
+            id={id}
+            class="#text-blue-600 hover:font-bold"
+            phx-value-id={id}
+            phx-value-comp-id={@id}
+            phx-click={:edit_timeattend}
+          >
+            <span class={["mr-1", if(fl == "IN", do: "text-green-800", else: "text-amber-800")]}>
+              <%= ti %>
+            </span>
+          </.link>
+        <% end %>
       <% end %>
-    <% end %>
     </div>
     """
   end

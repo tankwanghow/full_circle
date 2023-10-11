@@ -18,7 +18,6 @@ config :full_circle, FullCircle.Repo,
 # watchers to your application. For example, we use it
 # with esbuild to bundle .js and .css sources.
 
-
 config :full_circle, FullCircleWeb.Endpoint,
   # Binding to loopback ipv4 address prevents access from other machines.
   # Change to `ip: {0, 0, 0, 0}` to allow access from other machines.

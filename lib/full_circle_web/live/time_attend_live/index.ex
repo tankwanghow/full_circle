@@ -4,7 +4,7 @@ defmodule FullCircleWeb.TimeAttendLive.Index do
   alias FullCircle.HR
   alias FullCircleWeb.TimeAttendLive.IndexComponent
 
-  @per_page 25
+  @per_page 60
 
   @impl true
   def render(assigns) do
@@ -38,11 +38,7 @@ defmodule FullCircleWeb.TimeAttendLive.Index do
         </.form>
       </div>
       <div class="text-center mb-2">
-        <.link
-          navigate={~p"/companies/#{@current_company.id}/TimeAttend/new"}
-          class="blue button"
-          id="new_timeattend"
-        >
+        <.link phx-click={:new_timeattend} class="blue button" id="new_timeattend">
           <%= gettext("New Time Attendence") %>
         </.link>
       </div>
@@ -72,7 +68,7 @@ defmodule FullCircleWeb.TimeAttendLive.Index do
       <div
         :if={Enum.count(@streams.objects) > 0 or @page > 1}
         id="objects_list"
-        phx-update={@update}
+        phx-update="stream"
         phx-viewport-bottom={!@end_of_timeline? && "next-page"}
         phx-page-loading
       >
@@ -88,6 +84,25 @@ defmodule FullCircleWeb.TimeAttendLive.Index do
       </div>
       <.infinite_scroll_footer ended={@end_of_timeline?} />
     </div>
+
+    <.modal
+      :if={@live_action in [:new, :edit]}
+      id="timeattend-modal"
+      show
+      on_cancel={JS.push("modal_cancel")}
+      max_w="max-w-5xl"
+    >
+      <.live_component
+        module={FullCircleWeb.TimeAttendLive.FormComponent}
+        live_action={@live_action}
+        id={@obj.id || :new}
+        obj={@obj}
+        title={@title}
+        action={@live_action}
+        current_company={@current_company}
+        current_user={@current_user}
+      />
+    </.modal>
     """
   end
 
@@ -96,24 +111,10 @@ defmodule FullCircleWeb.TimeAttendLive.Index do
     socket =
       socket
       |> assign(page_title: gettext("Punch RAW Listing"))
+      |> assign(search: %{terms: "", punch_date: ""})
+      |> filter_objects("", true, "", 1)
 
     {:ok, socket}
-  end
-
-  @impl true
-  def handle_params(params, _uri, socket) do
-    params = params["search"]
-    terms = params["terms"] || ""
-    punch_date = params["punch_date"] || ""
-
-    {:noreply,
-     socket
-     |> assign(
-       search: %{terms: terms, punch_date: punch_date}
-     )
-     |> assign(selected_timeattends: [])
-     |> assign(ids: "")
-     |> filter_objects(terms, "replace", punch_date, 1)}
   end
 
   @impl true
@@ -122,7 +123,7 @@ defmodule FullCircleWeb.TimeAttendLive.Index do
      socket
      |> filter_objects(
        socket.assigns.search.terms,
-       "stream",
+       false,
        socket.assigns.search.punch_date,
        socket.assigns.page + 1
      )}
@@ -134,22 +135,115 @@ defmodule FullCircleWeb.TimeAttendLive.Index do
         %{
           "search" => %{
             "terms" => terms,
-            "punch_date" => id
+            "punch_date" => pd
           }
         },
         socket
       ) do
-    qry = %{
-      "search[terms]" => terms,
-      "search[punch_date]" => id
-    }
-
-    url = "/companies/#{socket.assigns.current_company.id}/TimeAttend?#{URI.encode_query(qry)}"
-
-    {:noreply, socket |> push_patch(to: url)}
+    {:noreply,
+     socket
+     |> assign(search: %{terms: terms, punch_date: pd})
+     |> filter_objects(terms, true, pd, 1)}
   end
 
-  defp filter_objects(socket, terms, update, punch_date, page) do
+  @impl true
+  def handle_event("new_timeattend", _, socket) do
+    {:noreply,
+     socket
+     |> assign(live_action: :new)
+     |> assign(obj: %FullCircle.HR.TimeAttend{})
+     |> assign(title: gettext("New Attendence"))}
+  end
+
+  @impl true
+  def handle_event("edit_timeattend", params, socket) do
+    ta =
+      HR.get_time_attendence!(
+        params["id"],
+        socket.assigns.current_company,
+        socket.assigns.current_user
+      )
+
+    {:noreply,
+     socket
+     |> assign(live_action: :edit)
+     |> assign(obj: ta)
+     |> assign(title: gettext("Edit Attendence"))}
+  end
+
+  @impl true
+  def handle_event("modal_cancel", _, socket) do
+    {:noreply, socket |> assign(live_action: nil)}
+  end
+
+  @impl true
+  def handle_info({:deleted, obj}, socket) do
+    send_update(self(), FullCircleWeb.TimeAttendLive.IndexComponent,
+      id: "objects-#{obj.id}",
+      ex_class: "hidden"
+    )
+
+    {:noreply,
+     socket
+     |> assign(live_action: nil)
+     |> put_flash(:success, "#{gettext("Deleted!!")}")}
+  end
+
+  @impl true
+  def handle_info({:created, obj}, socket) do
+    obj =
+      HR.get_time_attendence!(
+        obj.id,
+        socket.assigns.current_company,
+        socket.assigns.current_user
+      )
+
+    send_update_after(
+      self(),
+      FullCircleWeb.TimeAttendLive.IndexComponent,
+      [id: "objects-#{obj.id}", obj: obj, ex_class: "shake"],
+      1000
+    )
+
+    send_update_after(
+      self(),
+      FullCircleWeb.TimeAttendLive.IndexComponent,
+      [id: "objects-#{obj.id}", obj: obj, ex_class: ""],
+      2000
+    )
+
+    {:noreply,
+     socket
+     |> assign(live_action: nil)
+     |> stream_insert(:objects, obj, at: 0)}
+  end
+
+  @impl true
+  def handle_info({:updated, obj}, socket) do
+    obj =
+      HR.get_time_attendence!(
+        obj.id,
+        socket.assigns.current_company,
+        socket.assigns.current_user
+      )
+
+    send_update(self(), FullCircleWeb.TimeAttendLive.IndexComponent,
+      id: "objects-#{obj.id}",
+      obj: obj,
+      ex_class: "shake"
+    )
+
+    send_update_after(
+      self(),
+      FullCircleWeb.TimeAttendLive.IndexComponent,
+      [id: "objects-#{obj.id}", obj: obj, ex_class: ""],
+      1000
+    )
+
+    {:noreply, socket |> assign(live_action: nil)}
+  end
+
+  defp filter_objects(socket, terms, reset, punch_date, page) do
     objects =
       HR.timeattend_index_query(
         terms,
@@ -164,8 +258,7 @@ defmodule FullCircleWeb.TimeAttendLive.Index do
 
     socket
     |> assign(page: page, per_page: @per_page)
-    |> assign(update: update)
-    |> stream(:objects, objects, reset: obj_count == 0)
+    |> stream(:objects, objects, reset: reset)
     |> assign(end_of_timeline?: obj_count < @per_page)
   end
 end

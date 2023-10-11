@@ -24,7 +24,7 @@ defmodule FullCircleWeb.ChequeLive.DepositIndex do
     {:noreply,
      socket
      |> assign(search: %{terms: terms, d_date: d_date})
-     |> filter_objects(terms, "replace", d_date, 1)}
+     |> filter_objects(terms, true, d_date, 1)}
   end
 
   @impl true
@@ -33,7 +33,7 @@ defmodule FullCircleWeb.ChequeLive.DepositIndex do
      socket
      |> filter_objects(
        socket.assigns.search.terms,
-       "stream",
+       false,
        socket.assigns.search.d_date,
        socket.assigns.page + 1
      )}
@@ -59,7 +59,7 @@ defmodule FullCircleWeb.ChequeLive.DepositIndex do
      |> push_patch(to: url_from_search(socket))}
   end
 
-  defp filter_objects(socket, terms, update, d_date, page) do
+  defp filter_objects(socket, terms, reset, d_date, page) do
     objects =
       Cheque.deposit_index_query(
         terms,
@@ -74,8 +74,7 @@ defmodule FullCircleWeb.ChequeLive.DepositIndex do
 
     socket
     |> assign(page: page, per_page: @per_page)
-    |> assign(update: update)
-    |> stream(:objects, objects, reset: obj_count == 0)
+    |> stream(:objects, objects, reset: reset)
     |> assign(end_of_timeline?: obj_count < @per_page)
   end
 
@@ -153,7 +152,7 @@ defmodule FullCircleWeb.ChequeLive.DepositIndex do
       <div
         :if={Enum.count(@streams.objects) > 0 or @page > 1}
         id="objects_list"
-        phx-update={@update}
+        phx-update="stream"
         phx-viewport-bottom={!@end_of_timeline? && "next-page"}
         phx-page-loading
       >

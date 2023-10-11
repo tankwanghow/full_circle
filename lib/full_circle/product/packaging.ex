@@ -15,6 +15,7 @@ defmodule FullCircle.Product.Packaging do
     has_many :invoice_details, FullCircle.Billing.InvoiceDetail, foreign_key: :package_id
 
     field(:delete, :boolean, virtual: true, default: false)
+    field :count, :decimal, virtual: true, default: 1
   end
 
   @doc false

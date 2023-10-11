@@ -361,14 +361,14 @@ defmodule FullCircleWeb.EmployeeLive.Form do
         <.inputs_for :let={st} field={@form[:employee_salary_types]}>
           <div class={"grid grid-cols-12 gap-1 #{if(st[:delete].value == true and Enum.count(st.errors) == 0, do: "hidden", else: "")}"}>
             <div class="col-span-6">
-            <%= Phoenix.HTML.Form.hidden_input(st, :employee_id) %>
-            <%= Phoenix.HTML.Form.hidden_input(st, :salary_type_id) %>
+              <%= Phoenix.HTML.Form.hidden_input(st, :employee_id) %>
+              <%= Phoenix.HTML.Form.hidden_input(st, :salary_type_id) %>
               <.input
-              field={st[:salary_type_name]}
-              phx-hook="tributeAutoComplete"
-              phx-debounce="500"
-              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=salarytype&name="}
-            />
+                field={st[:salary_type_name]}
+                phx-hook="tributeAutoComplete"
+                phx-debounce="500"
+                url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=salarytype&name="}
+              />
             </div>
             <div class="col-span-5">
               <.input type="number" field={st[:amount]} step="0.0001" />

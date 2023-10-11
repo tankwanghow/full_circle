@@ -67,6 +67,7 @@ defmodule FullCircleWeb.GoodLive.Form do
       socket.assigns.form.source
       |> FullCircleWeb.Helpers.add_line(:packagings)
       |> Map.put(:action, socket.assigns.live_action)
+      |> Good.validate_has_packaging()
 
     {:noreply, socket |> assign(form: to_form(cs))}
   end
@@ -77,6 +78,7 @@ defmodule FullCircleWeb.GoodLive.Form do
       socket.assigns.form.source
       |> FullCircleWeb.Helpers.delete_line(index, :packagings)
       |> Map.put(:action, socket.assigns.live_action)
+      |> Good.validate_has_packaging()
 
     {:noreply, socket |> assign(form: to_form(cs))}
   end
@@ -314,7 +316,7 @@ defmodule FullCircleWeb.GoodLive.Form do
       >
         <div class="grid grid-cols-12 gap-2">
           <div class="col-span-9">
-            <.input field={@form[:name]} label={gettext("Name")} />
+            <.input feedback field={@form[:name]} label={gettext("Name")} />
           </div>
           <div class="col-span-3">
             <.input field={@form[:unit]} label={gettext("Unit")} />

@@ -14,7 +14,6 @@ defmodule FullCircleWeb.SalaryNoteLive.IndexComponent do
   @impl true
   def render(assigns) do
     ~H"""
-
     <div
       id={@id}
       class={"#{@ex_class} max-h-8 flex flex-row text-center tracking-tighter bg-gray-200 hover:bg-gray-400"}

@@ -15,7 +15,7 @@ defmodule FullCircleWeb.EmployeeLive.Print do
     {:ok, socket |> fill_employee(ids)}
   end
 
-  def fill_employee(socket, ids) do
+  defp fill_employee(socket, ids) do
     detail_body_height = 290
     detail_height = 55
     chunk = (detail_body_height / detail_height) |> floor
@@ -36,13 +36,13 @@ defmodule FullCircleWeb.EmployeeLive.Print do
       end)
       |> Enum.chunk_every(2)
 
-    {:ok,
-     socket
-     |> assign(:detail_body_height, detail_body_height)
-     |> assign(:detail_height, detail_height)
-     |> assign(:chunk_number, Enum.chunk_every(emps, chunk) |> Enum.count())
-     |> assign(:detail_chunks, Enum.chunk_every(emps, chunk))
-     |> assign(:emps, emps)}
+    socket
+    |> assign(page_title: gettext("Print"))
+    |> assign(:detail_body_height, detail_body_height)
+    |> assign(:detail_height, detail_height)
+    |> assign(:chunk_number, Enum.chunk_every(emps, chunk) |> Enum.count())
+    |> assign(:detail_chunks, Enum.chunk_every(emps, chunk))
+    |> assign(:emps, emps)
   end
 
   @impl true

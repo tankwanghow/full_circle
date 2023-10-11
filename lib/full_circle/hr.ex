@@ -34,7 +34,7 @@ defmodule FullCircle.HR do
               [:employee_name, :shift_id, :flag, :input_medium],
               terms
             ),
-          order_by: inv.punch_time
+          order_by: [inv.punch_time]
       else
         qry
       end
@@ -45,7 +45,7 @@ defmodule FullCircle.HR do
 
         from inv in qry,
           where: inv.punch_time >= ^date_from,
-          order_by: inv.punch_time
+          order_by: [inv.punch_time]
       else
         qry
       end
@@ -685,77 +685,71 @@ defmodule FullCircle.HR do
     )
   end
 
-
   defp punch_query_by_company_id(sdate, edate, com_id) do
-    "
-    with
-      punches as (select pui.company_id, pui.employee_id, pui.shift_id, pui.id as in_id,
-                         (select puo.id from time_attendences puo
-                           where pui.employee_id = puo.employee_id
-                             and puo.company_id = '#{com_id}'
-                             and pui.punch_time < puo.punch_time
-                             and pui.shift_id = puo.shift_id
-                             and puo.flag = 'OUT'
-                             order by puo.punch_time limit 1) as out_id
-                    from time_attendences pui where pui.flag = 'IN'),
-      datelist as (select dd::date, e.* from employees e, generate_series('#{sdate}'::date, '#{edate}'::date, '1 day') as dd),
-
-      p2 as (select ta.employee_id, ta.shift_id as shift, min(ta.punch_time)::date as pt, min(ta.punch_time) as punch_time,
-             string_agg(ta.punch_time::varchar || '|' || coalesce(ta2.punch_time::varchar, ''), '|' order by ta.punch_time) time_list,
-             string_agg(ta.id || '|' || coalesce(ta2.id, gen_random_uuid()), '|' order by ta.punch_time) as id_list,
-             string_agg(ta.status || '|' || coalesce(ta2.status, 'Null'), '|' order by ta.punch_time) as st_list,
-             sum(coalesce(extract(hour from ta2.punch_time - ta.punch_time)* 60 +
-             extract(minute from ta2.punch_time - ta.punch_time),0)) as wh
-        from punches p inner join time_attendences ta
-          on p.in_id = ta.id left outer join time_attendences ta2
-          on p.out_id = ta2.id
-          where ta.company_id = '#{com_id}'
-          group by ta.employee_id, ta.shift_id)
-
-   select gen_random_uuid() as id, dl.dd, dl.name, dl.id as employee_id, dl.id_no, p2.shift,
-          p2.time_list, p2.id_list, p2.st_list, coalesce(p2.wh, 0)/60 as wh,
-          case when coalesce(p2.wh, 0)/60 >= 8 then 8 else coalesce(p2.wh, 0)/60 end as nh,
-          case when coalesce(p2.wh, 0)/60 > 8 then (coalesce(p2.wh, 0))/60 - 8 else 0 end as ot
-     from datelist dl
-     left outer join p2
-       on p2.pt = dl.dd
-      and dl.id = p2.employee_id
-    where dl.status = 'Active'"
+    "select d2.id::varchar || d2.dd::varchar as idg, d2.dd, d2.name,
+            d2.id as employee_id, p2.shift, p2.time_list, holi_list, sholi_list
+       from (select d1.dd, d1.name, d1.id, d1.status, d1.id_no,
+                    string_agg(hl.name, ', ' order by hl.name) as holi_list,
+                    string_agg(hl.short_name, ', ' order by hl.short_name) as sholi_list
+               from (select dd::date, e.name, e.id, e.status, e.id_no from employees e,
+                            generate_series('#{sdate}'::date, '#{edate}'::date, '1 day') as dd
+                      where e.status = 'Active' and e.company_id = '#{com_id}') d1 left outer join holidays hl
+                         on hl.holidate = d1.dd and hl.company_id = '#{com_id}'
+                      group by d1.dd, d1.name, d1.id, d1.status, d1.id_no) d2 left outer join
+              (select ta.employee_id, ta.shift_id as shift, min(ta.punch_time)::date as pt, min(ta.punch_time) as punch_time,
+                      array_agg(ta.punch_time::varchar || '|' || ta.id::varchar || '|' || ta.status || '|' || ta.flag order by ta.punch_time) time_list
+                 from time_attendences ta
+                where ta.company_id = '#{com_id}'
+                  and ta.punch_time::date >= '#{sdate}'
+                  and ta.punch_time::date <= '#{edate}'
+                group by ta.employee_id, ta.shift_id) p2
+         on p2.pt = d2.dd
+        and d2.id = p2.employee_id
+      where true"
   end
 
   def punch_card_query(month, year, emp_id, com_id) do
     edate = Timex.end_of_month(String.to_integer(year), String.to_integer(month))
     sdate = Timex.beginning_of_month(String.to_integer(year), String.to_integer(month))
+
     (punch_query_by_company_id(sdate, edate, com_id) <>
-       " and dl.dd >= '#{sdate}'" <>
-       " and dl.dd <= '#{edate}'" <>
-       " and dl.id = '#{emp_id || com_id}'" <>
-       " order by dl.name, 2, p2.shift")
+       " and d2.id = '#{emp_id}'" <>
+       " order by d2.dd, p2.shift")
     |> exec_punch_query()
+    |> unzip_all_time_list()
   end
 
-  def punch_query(sdate, edate, empname, com_id,
+  def punch_query_by_id(empid, dd, com_id) do
+    dd = Timex.to_date(dd)
+
+    (punch_query_by_company_id(dd, dd, com_id) <>
+       " and d2.id::varchar || d2.dd::varchar = '#{empid}#{dd}'")
+    |> exec_punch_query()
+    |> unzip_all_time_list()
+    |> Enum.at(0)
+  end
+
+  def punch_query(sdate, edate, terms, com_id,
         page: page,
         per_page: per_page
       ) do
     (punch_query_by_company_id(sdate, edate, com_id) <>
-    if(empname != "",
-         do: " and (dl.name ilike '%#{empname}%' or dl.id_no ilike '%#{empname}%')",
+       if(terms != "",
+         do: " and (d2.name ilike '%#{terms}%' or d2.id_no ilike '%#{terms}%')",
          else: ""
        ) <>
-       " and dl.dd >= '#{sdate}'" <>
-       " and dl.dd <= '#{edate}'" <>
-       " order by dl.dd, p2.shift" <>
+       " order by d2.name, d2.dd, p2.shift" <>
        " limit #{per_page} offset (#{page} - 1) * #{per_page} ")
     |> exec_punch_query()
+    |> unzip_all_time_list()
   end
 
-  def last_10_shift(com_id) do
+  def last_shift(number, com_id) do
     from(ta in TimeAttend,
       join: com in FullCircle.Sys.Company,
       on: ta.company_id == com.id,
       where: com.id == ^com_id,
-      limit: 10,
+      limit: ^number,
       distinct: [desc: ta.shift_id],
       order_by: [desc: ta.shift_id],
       select: %{shift: ta.shift_id}
@@ -778,5 +772,64 @@ defmodule FullCircle.HR do
          )}
       end)
     end)
+  end
+
+  defp count_hours_work(tl) when is_nil(tl) do
+    0
+  end
+
+  defp count_hours_work(tl) do
+    tl
+    |> Enum.chunk_every(2)
+    |> Enum.map(fn t ->
+      try do
+        [[ti, _, _, "IN"], [to, _, _, "OUT"]] = t
+        Timex.diff(to, ti, :minute) / 60
+      rescue
+        MatchError ->
+          0
+
+        e ->
+          reraise e, __STACKTRACE__
+      end
+    end)
+  end
+
+  defp unzip_all_time_list(ps) when is_nil(ps) do
+    nil
+  end
+
+  defp unzip_all_time_list(ps) do
+    ps
+    |> Enum.map(fn t ->
+      ut = Map.get(t, :time_list) |> unzip_time_list()
+      # change key to id
+      idg = Map.get(t, :idg)
+      wh = Enum.sum(count_hours_work(ut))
+
+      nh =
+        cond do
+          wh >= 8 -> 8.0
+          true -> wh
+        end
+
+      ot =
+        cond do
+          wh > 8 -> wh - 8
+          true -> 0
+        end
+
+      Map.merge(t, %{time_list: ut, wh: wh, nh: nh, ot: ot, id: idg})
+    end)
+  end
+
+  defp unzip_time_list(tl) do
+    if is_nil(tl) do
+      []
+    else
+      tl
+      |> Enum.map(fn x -> String.split(x, "|") end)
+      |> Enum.map(fn [t, i, s, f] -> [Timex.parse!(t, "{RFC3339}"), i, s, f] end)
+    end
   end
 end

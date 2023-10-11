@@ -129,6 +129,11 @@ defmodule FullCircleWeb.Router do
       live("/employees/:employee_id/copy", EmployeeLive.Form, :copy)
       live("/employees/:employee_id/edit", EmployeeLive.Form, :edit)
 
+      live("/holidays", HolidayLive.Index, :index)
+      live("/holidays/new", HolidayLive.Form, :new)
+      live("/holidays/:holiday_id/copy", HolidayLive.Form, :copy)
+      live("/holidays/:holiday_id/edit", HolidayLive.Form, :edit)
+
       live("/fixed_assets", FixedAssetLive.Index, :index)
       live("/fixed_assets/new", FixedAssetLive.Form, :new)
       live("/fixed_assets/:asset_id/edit", FixedAssetLive.Form, :edit)

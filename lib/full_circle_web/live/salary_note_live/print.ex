@@ -7,13 +7,25 @@ defmodule FullCircleWeb.SalaryNoteLive.Print do
   @impl true
   def mount(%{"id" => id, "pre_print" => pre_print}, _session, socket) do
     ids = [id]
-    {:ok, socket |> assign(:pre_print, pre_print) |> set_page_defaults() |> fill_journals(ids)}
+
+    {:ok,
+     socket
+     |> assign(page_title: gettext("Print"))
+     |> assign(:pre_print, pre_print)
+     |> set_page_defaults()
+     |> fill_journals(ids)}
   end
 
   @impl true
   def mount(%{"ids" => ids, "pre_print" => pre_print}, _, socket) do
     ids = String.split(ids, ",")
-    {:ok, socket |> assign(:pre_print, pre_print) |> set_page_defaults() |> fill_journals(ids)}
+
+    {:ok,
+     socket
+     |> assign(page_title: gettext("Print"))
+     |> assign(:pre_print, pre_print)
+     |> set_page_defaults()
+     |> fill_journals(ids)}
   end
 
   defp set_page_defaults(socket) do
@@ -87,7 +99,9 @@ defmodule FullCircleWeb.SalaryNoteLive.Print do
       <div class="desc"><%= @adv.descriptions %></div>
       <div class="qty"><%= Number.Delimit.number_to_delimited(@adv.quantity) %></div>
       <div class="price"><%= Number.Delimit.number_to_delimited(@adv.unit_price) %></div>
-      <div class="amount"><%= Number.Delimit.number_to_delimited(Decimal.mult(@adv.quantity, @adv.unit_price)) %></div>
+      <div class="amount">
+        <%= Number.Delimit.number_to_delimited(Decimal.mult(@adv.quantity, @adv.unit_price)) %>
+      </div>
     </div>
     """
   end

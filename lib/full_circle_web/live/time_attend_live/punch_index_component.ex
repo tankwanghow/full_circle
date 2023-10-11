@@ -11,27 +11,15 @@ defmodule FullCircleWeb.TimeAttendLive.PunchIndexComponent do
     yw = FullCircleWeb.Helpers.work_week(assigns.obj.dd)
 
     tis =
-      if(!is_nil(assigns.obj.time_list)) do
-        tls =
-          assigns.obj.time_list
-          |> String.split("|")
-          |> Enum.map(fn x -> if(x != "", do: Timex.parse!(x, "{RFC3339}"), else: "") end)
-          |> Enum.map(fn x ->
-            if(x != "",
-              do:
-                Timex.format!(
-                  Timex.to_datetime(x, assigns.company.timezone),
-                  "%H:%M",
-                  :strftime
-                ),
-              else: ""
-            )
-          end)
-
-        ids = assigns.obj.id_list |> String.split("|")
-
-        Enum.zip(tls, ids)
-        |> Enum.zip_with(String.split(assigns.obj.st_list, "|"), fn {x, y}, z -> {x, y, z} end)
+      if(assigns.obj.time_list != []) do
+        assigns.obj.time_list
+        |> Enum.map(fn [t, i, s, f] ->
+          {Timex.format!(
+             Timex.to_datetime(t, assigns.company.timezone),
+             "%H:%M",
+             :strftime
+           ), i, s, f}
+        end)
       else
         nil
       end
@@ -42,35 +30,41 @@ defmodule FullCircleWeb.TimeAttendLive.PunchIndexComponent do
   @impl true
   def render(assigns) do
     ~H"""
-    <div id={@id} class="max-h-8 flex flex-row text-center tracking-tighter bg-gray-200">
-      <div class="w-[25%] border border-gray-400 py-1">
+    <div id={@id} class={"#{@ex_class} flex flex-row text-center bg-gray-200 hover:bg-gray-300"}>
+      <div class="w-[25%] border-b border-gray-400">
         <%= @obj.name %>
       </div>
-      <div class="w-[10%] border border-gray-400 py-1">
+      <div class="w-[15%] border-b border-gray-400">
         <%= FullCircleWeb.Helpers.format_date(@obj.dd) %>
+        <span :if={!is_nil(@obj.sholi_list)} class="group relative w-max">
+          <span class="text-rose-500"><%= @obj.sholi_list %></span>
+          <span class="pointer-events-none absolute -top-2 left-2 w-max opacity-0 transition-opacity group-hover:opacity-100 bg-white rounded-xl px-2 py-1 text-sm">
+            <%= @obj.holi_list %>
+          </span>
+        </span>
       </div>
-      <div class="w-[12%] border border-gray-400 py-1">
+      <div class="w-[10%] border-b border-gray-400">
         <%= @yw %>, <%= @obj.dd |> Timex.weekday() |> Timex.day_shortname() %>
       </div>
-      <div class="w-[10%] border border-gray-400 py-1">
+      <div class="w-[10%] border-b border-gray-400">
         <%= @obj.shift %>
       </div>
-      <div class="w-[25%] border border-gray-400 py-1">
+      <div class="w-[25%] border-b border-gray-400">
         <.live_component
-            module={FullCircleWeb.TimeAttendLive.PunchTimeComponent}
-            id={FullCircle.Helpers.gen_temp_id(6)}
-            obj={@tis}
-            company={@company}
-          />
+          module={FullCircleWeb.TimeAttendLive.PunchTimeComponent}
+          id={@id}
+          comp_id={@id}
+          obj={@tis}
+          company={@company}
+        />
       </div>
-
-      <div class="w-[6%] border text-center border-gray-400 py-1 overflow-clip">
+      <div class="w-[5%] border-b text-center border-gray-400">
         <%= Number.Delimit.number_to_delimited(@obj.wh) %>
       </div>
-      <div class="w-[6%] border text-center border-gray-400 py-1 overflow-clip">
+      <div class="w-[5%] border-b text-center border-gray-400">
         <%= Number.Delimit.number_to_delimited(@obj.nh) %>
       </div>
-      <div class="w-[6%] border text-center border-gray-400 py-1 overflow-clip">
+      <div class="w-[5%] border-b text-center border-gray-400">
         <%= Number.Delimit.number_to_delimited(@obj.ot) %>
       </div>
     </div>

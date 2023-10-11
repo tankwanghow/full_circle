@@ -202,8 +202,8 @@ defmodule FullCircleWeb.SalaryNoteLive.Form do
               url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=employee&name="}
             />
           </div>
-          </div>
-          <div class="grid grid-cols-12 gap-1">
+        </div>
+        <div class="grid grid-cols-12 gap-1">
           <div class="col-span-6">
             <%= Phoenix.HTML.Form.hidden_input(@form, :salary_type_id) %>
             <.input
@@ -217,8 +217,8 @@ defmodule FullCircleWeb.SalaryNoteLive.Form do
           <div class="col-span-6">
             <.input field={@form[:descriptions]} label={gettext("Descriptions")} />
           </div>
-          </div>
-          <div class="grid grid-cols-12 gap-1">
+        </div>
+        <div class="grid grid-cols-12 gap-1">
           <div class="col-span-4">
             <.input field={@form[:quantity]} label={gettext("Quantity")} type="number" step="0.0001" />
           </div>

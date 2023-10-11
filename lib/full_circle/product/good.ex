@@ -31,6 +31,7 @@ defmodule FullCircle.Product.Good do
     field(:sales_tax_code_name, :string, virtual: true)
     field(:purchase_tax_rate, :decimal, virtual: true)
     field(:sales_tax_rate, :decimal, virtual: true)
+    field(:packaging_count, :decimal, virtual: true, default: 0)
 
     timestamps(type: :utc_datetime)
   end
@@ -83,5 +84,20 @@ defmodule FullCircle.Product.Good do
       name: :pur_invoice_details_good_id_fkey,
       message: gettext("referenced by pur_invoice details")
     )
+    |> validate_has_packaging()
+  end
+
+  def validate_has_packaging(cs) do
+    cs =
+      cs
+      |> sum_field_to(:packagings, :count, :packaging_count)
+
+    cond do
+      Decimal.eq?(fetch_field!(cs, :packaging_count), 0) ->
+        add_unique_error(cs, :name, gettext("need packaging"))
+
+      true ->
+        cs
+    end
   end
 end

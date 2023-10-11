@@ -26,7 +26,12 @@ defmodule FullCircleWeb.RecurringLive.Form do
     |> assign(
       :form,
       to_form(
-        StdInterface.changeset(Recurring, %Recurring{}, %{recur_no: "RECU-#{FullCircle.Helpers.gen_temp_id(6)}"}, socket.assigns.current_company)
+        StdInterface.changeset(
+          Recurring,
+          %Recurring{},
+          %{recur_no: "RECU-#{FullCircle.Helpers.gen_temp_id(6)}"},
+          socket.assigns.current_company
+        )
       )
     )
   end
@@ -224,7 +229,7 @@ defmodule FullCircleWeb.RecurringLive.Form do
           </div>
         </div>
         <div class="grid grid-cols-12 gap-1">
-        <div class="col-span-4">
+          <div class="col-span-4">
             <.input
               field={@form[:target_amount]}
               label={gettext("Target Amount")}
@@ -233,7 +238,12 @@ defmodule FullCircleWeb.RecurringLive.Form do
             />
           </div>
           <div class="col-span-4">
-            <.input field={@form[:status]} label={gettext("Status")} type="select" options={["Active", "Finish", "Hold"]} />
+            <.input
+              field={@form[:status]}
+              label={gettext("Status")}
+              type="select"
+              options={["Active", "Finish", "Hold"]}
+            />
           </div>
         </div>
 

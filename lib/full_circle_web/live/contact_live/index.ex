@@ -29,7 +29,7 @@ defmodule FullCircleWeb.ContactLive.Index do
       <div
         :if={Enum.count(@streams.objects) > 0 or @page > 1}
         id="objects_list"
-        phx-update={@update}
+        phx-update="stream"
         phx-viewport-bottom={!@end_of_timeline? && "next-page"}
         phx-page-loading
       >
@@ -66,14 +66,14 @@ defmodule FullCircleWeb.ContactLive.Index do
     {:noreply,
      socket
      |> assign(search: %{terms: terms})
-     |> filter_objects(terms, "replace", 1)}
+     |> filter_objects(terms, true, 1)}
   end
 
   @impl true
   def handle_event("next-page", _, socket) do
     {:noreply,
      socket
-     |> filter_objects(socket.assigns.search.terms, "stream", socket.assigns.page + 1)}
+     |> filter_objects(socket.assigns.search.terms, false, socket.assigns.page + 1)}
   end
 
   @impl true
@@ -87,7 +87,7 @@ defmodule FullCircleWeb.ContactLive.Index do
     {:noreply, socket |> push_patch(to: url)}
   end
 
-  defp filter_objects(socket, terms, update, page) do
+  defp filter_objects(socket, terms, reset, page) do
     objects =
       StdInterface.filter(
         Contact,
@@ -99,12 +99,9 @@ defmodule FullCircleWeb.ContactLive.Index do
         per_page: @per_page
       )
 
-    obj_count = Enum.count(objects)
-
     socket
     |> assign(page: page, per_page: @per_page)
-    |> assign(update: update)
-    |> stream(:objects, objects, reset: obj_count == 0)
+    |> stream(:objects, objects, reset: reset)
     |> assign(end_of_timeline?: Enum.count(objects) < @per_page)
   end
 end

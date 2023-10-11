@@ -99,11 +99,12 @@ defmodule FullCircle.HR.TimeAttend do
 
     lpr = last_punch_record(id, emp_id, com_id)
 
-    cs = if flag == "OUT" and lpr.flag == "IN" do
-      put_change(cs, :shift_id, lpr.shift_id)
-    else
-      cs
-    end
+    cs =
+      if flag == "OUT" and lpr.flag == "IN" do
+        put_change(cs, :shift_id, lpr.shift_id)
+      else
+        cs
+      end
 
     cond do
       is_nil(lpr) and flag == "OUT" ->

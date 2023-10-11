@@ -9,7 +9,11 @@ defmodule FullCircleWeb.CreditNoteLive.Print do
     ids = [id]
 
     {:ok,
-     socket |> assign(:pre_print, pre_print) |> set_page_defaults() |> fill_credit_notes(ids)}
+     socket
+     |> assign(page_title: gettext("Print"))
+     |> assign(:pre_print, pre_print)
+     |> set_page_defaults()
+     |> fill_credit_notes(ids)}
   end
 
   @impl true
@@ -17,7 +21,11 @@ defmodule FullCircleWeb.CreditNoteLive.Print do
     ids = String.split(ids, ",")
 
     {:ok,
-     socket |> assign(:pre_print, pre_print) |> set_page_defaults() |> fill_credit_notes(ids)}
+     socket
+     |> assign(page_title: gettext("Print"))
+     |> assign(:pre_print, pre_print)
+     |> set_page_defaults()
+     |> fill_credit_notes(ids)}
   end
 
   defp set_page_defaults(socket) do
