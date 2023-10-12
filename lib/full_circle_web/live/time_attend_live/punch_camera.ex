@@ -169,14 +169,14 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCamera do
         <div
           :if={@flag == "OUT"}
           phx-click="in_out"
-          class="mb-2 font-bold text-2xl mx-auto w-[50%] button blue"
+          class="mb-2 font-bold text-xl mx-auto w-[50%] button blue"
         >
           IN <span aria-hidden="true">→</span> OUT
         </div>
         <div
           :if={@flag == "IN"}
           phx-click="in_out"
-          class="mb-2 font-bold text-2xl mx-auto text-center w-[50%] button red"
+          class="mb-2 font-bold text-xl mx-auto text-center w-[50%] button red"
         >
           OUT <span aria-hidden="true">→</span> IN
         </div>
@@ -241,7 +241,9 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCamera do
         </div>
       </div>
       <div class="text-center mt-5">
-        <a onclick="history.back();" class="red button"><%= gettext("Back") %></a>
+        <.link navigate={~p"/companies/#{@current_company.id}/dashboard"} class="red button">
+          <%= gettext("Back") %>
+        </.link>
       </div>
     </div>
 

@@ -56,7 +56,7 @@
                     </.link>
                   </li>
 
-                  <li class="my-5">
+                  <li :if={@current_role != "punch_camera"} class="my-5">
                     <.link navigate={~p"/companies"} class="mb-2 p-3 hover:bg-emerald-400 flex">
                       <%= gettext("Companies") %>
                     </.link>
