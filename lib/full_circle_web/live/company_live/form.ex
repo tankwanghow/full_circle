@@ -88,7 +88,10 @@ defmodule FullCircleWeb.CompanyLive.Form do
             label={gettext("Closing Day")}
           />
         </div>
-        <div class="col-span-12">
+        <div class="col-span-2">
+          <.input type="number" field={@form[:normal_work_hours]} label={gettext("Working Hours")} />
+        </div>
+        <div class="col-span-10">
           <.input field={@form[:descriptions]} label={gettext("Descriptions")} />
         </div>
       </div>

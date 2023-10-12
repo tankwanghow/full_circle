@@ -74,7 +74,7 @@ defmodule FullCircle.HR do
   end
 
   def create_time_attendence_by_punch(attrs, com, user) do
-    case can?(user, :create_time_attendence_by_camera, com) do
+    case can?(user, :create_time_attendence, com) do
       true ->
         Repo.insert(TimeAttend.changeset(%TimeAttend{}, attrs))
 
@@ -686,7 +686,7 @@ defmodule FullCircle.HR do
   end
 
   defp punch_query_by_company_id(sdate, edate, com_id) do
-    "select d2.id::varchar || d2.dd::varchar as idg, d2.dd, d2.name,
+    "select d2.id::varchar || d2.dd::varchar as idg, d2.dd, d2.name, normal_work_hours,
             d2.id as employee_id, p2.shift, p2.time_list, holi_list, sholi_list
        from (select d1.dd, d1.name, d1.id, d1.status, d1.id_no,
                     string_agg(hl.name, ', ' order by hl.name) as holi_list,
@@ -696,13 +696,13 @@ defmodule FullCircle.HR do
                       where e.status = 'Active' and e.company_id = '#{com_id}') d1 left outer join holidays hl
                          on hl.holidate = d1.dd and hl.company_id = '#{com_id}'
                       group by d1.dd, d1.name, d1.id, d1.status, d1.id_no) d2 left outer join
-              (select ta.employee_id, ta.shift_id as shift, min(ta.punch_time)::date as pt, min(ta.punch_time) as punch_time,
+              (select ta.employee_id, c.normal_work_hours, ta.shift_id as shift, min(ta.punch_time)::date as pt, min(ta.punch_time) as punch_time,
                       array_agg(ta.punch_time::varchar || '|' || ta.id::varchar || '|' || ta.status || '|' || ta.flag order by ta.punch_time) time_list
-                 from time_attendences ta
+                 from time_attendences ta inner join companies c on c.id = ta.company_id
                 where ta.company_id = '#{com_id}'
                   and ta.punch_time::date >= '#{sdate}'
                   and ta.punch_time::date <= '#{edate}'
-                group by ta.employee_id, ta.shift_id) p2
+                group by ta.employee_id, ta.shift_id, c.normal_work_hours) p2
          on p2.pt = d2.dd
         and d2.id = p2.employee_id
       where true"
@@ -805,17 +805,18 @@ defmodule FullCircle.HR do
       ut = Map.get(t, :time_list) |> unzip_time_list()
       # change key to id
       idg = Map.get(t, :idg)
+      nwh = Decimal.to_float(Map.get(t, :normal_work_hours))
       wh = Enum.sum(count_hours_work(ut))
 
       nh =
         cond do
-          wh >= 8 -> 8.0
+          wh >= nwh -> nwh
           true -> wh
         end
 
       ot =
         cond do
-          wh > 8 -> wh - 8
+          wh > nwh -> wh - nwh
           true -> 0
         end
 

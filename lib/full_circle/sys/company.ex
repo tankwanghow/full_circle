@@ -22,6 +22,7 @@ defmodule FullCircle.Sys.Company do
     field :tax_id, :string
     field :closing_month, :integer
     field :closing_day, :integer
+    field :normal_work_hours, :decimal
 
     timestamps(type: :utc_datetime)
   end
@@ -45,9 +46,10 @@ defmodule FullCircle.Sys.Company do
       :tel,
       :fax,
       :descriptions,
-      :tax_id
+      :tax_id,
+      :normal_work_hours
     ])
-    |> validate_required([:name, :country, :timezone, :closing_day, :closing_month])
+    |> validate_required([:normal_work_hours, :name, :country, :timezone, :closing_day, :closing_month])
     |> validate_number(:closing_day,
       greater_than: 0,
       less_than: 32,

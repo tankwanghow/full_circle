@@ -63,52 +63,52 @@ defmodule FullCircle.Authorization do
     do: allow_roles(~w(admin manager supervisor), company, user)
 
   def can?(user, :create_receipt, company),
-    do: allow_roles(~w(admin manager supervisor clerk), company, user)
+    do: allow_roles(~w(admin manager supervisor clerk cashier), company, user)
 
   def can?(user, :update_receipt, company),
-    do: allow_roles(~w(admin manager supervisor clerk), company, user)
+    do: allow_roles(~w(admin manager supervisor clerk cashier), company, user)
 
   def can?(user, :create_payment, company),
-    do: allow_roles(~w(admin manager supervisor clerk), company, user)
+    do: allow_roles(~w(admin manager supervisor clerk cashier), company, user)
 
   def can?(user, :update_payment, company),
-    do: allow_roles(~w(admin manager supervisor clerk), company, user)
+    do: allow_roles(~w(admin manager supervisor clerk cashier), company, user)
 
   def can?(user, :create_journal, company),
-    do: allow_roles(~w(admin manager supervisor clerk), company, user)
+    do: allow_roles(~w(admin manager supervisor), company, user)
 
   def can?(user, :update_journal, company),
-    do: allow_roles(~w(admin manager supervisor clerk), company, user)
+    do: allow_roles(~w(admin manager supervisor), company, user)
 
   def can?(user, :create_pur_invoice, company),
-    do: allow_roles(~w(admin manager supervisor clerk), company, user)
+    do: allow_roles(~w(admin manager supervisor clerk cashier), company, user)
 
   def can?(user, :update_pur_invoice, company),
-    do: allow_roles(~w(admin manager supervisor clerk), company, user)
+    do: allow_roles(~w(admin manager supervisor clerk cashier), company, user)
 
   def can?(user, :create_invoice, company),
-    do: allow_roles(~w(admin manager supervisor clerk), company, user)
+    do: allow_roles(~w(admin manager supervisor clerk cashier), company, user)
 
   def can?(user, :update_invoice, company),
-    do: allow_roles(~w(admin manager supervisor clerk), company, user)
+    do: allow_roles(~w(admin manager supervisor clerk cashier), company, user)
 
   def can?(user, :create_fixed_asset, company),
-    do: allow_roles(~w(admin manager supervisor clerk), company, user)
+    do: allow_roles(~w(admin manager supervisor), company, user)
 
   def can?(user, :update_fixed_asset, company),
-    do: allow_roles(~w(admin manager supervisor clerk), company, user)
+    do: allow_roles(~w(admin manager supervisor), company, user)
 
   def can?(user, :delete_fixed_asset, company),
-    do: allow_roles(~w(admin manager supervisor clerk), company, user)
+    do: allow_roles(~w(admin manager supervisor), company, user)
 
   def can?(user, :create_good, company),
-    do: allow_roles(~w(admin manager supervisor clerk), company, user)
+    do: allow_roles(~w(admin manager supervisor), company, user)
 
   def can?(user, :update_good, company),
-    do: allow_roles(~w(admin manager supervisor clerk), company, user)
+    do: allow_roles(~w(admin manager supervisor), company, user)
 
   def can?(user, :delete_good, company),
-    do: allow_roles(~w(admin manager supervisor clerk), company, user)
+    do: allow_roles(~w(admin manager supervisor), company, user)
 
   def can?(user, :create_account, company),
     do: allow_roles(~w(admin manager supervisor), company, user)
@@ -138,7 +138,7 @@ defmodule FullCircle.Authorization do
     do: allow_roles(~w(admin manager supervisor), company, user)
 
   def can?(user, :create_contact, company),
-    do: forbid_roles(~w(auditor guest cashier), company, user)
+    do: forbid_roles(~w(auditor guest), company, user)
 
   def can?(user, :update_contact, company),
     do: forbid_roles(~w(auditor guest cashier), company, user)
@@ -147,34 +147,34 @@ defmodule FullCircle.Authorization do
     do: forbid_roles(~w(auditor guest cashier), company, user)
 
   def can?(user, :create_salary_type, company),
-    do: forbid_roles(~w(auditor guest cashier), company, user)
+    do: forbid_roles(~w(auditor guest cashier clerk), company, user)
 
   def can?(user, :update_salary_type, company),
-    do: forbid_roles(~w(auditor guest cashier), company, user)
+    do: forbid_roles(~w(auditor guest cashier clerk), company, user)
 
   def can?(user, :delete_salary_type, company),
-    do: forbid_roles(~w(auditor guest cashier), company, user)
+    do: forbid_roles(~w(auditor guest cashier clerk), company, user)
 
   def can?(user, :create_employee, company),
-    do: allow_roles(~w(admin manager supervisor), company, user)
+    do: allow_roles(~w(admin manager supervisor clerk), company, user)
 
   def can?(user, :update_employee, company),
-    do: allow_roles(~w(admin manager supervisor), company, user)
+    do: allow_roles(~w(admin manager supervisor clerk), company, user)
 
   def can?(user, :delete_employee, company),
-    do: allow_roles(~w(admin manager supervisor), company, user)
+    do: allow_roles(~w(admin manager supervisor clerk), company, user)
 
   def can?(user, :create_recurring, company),
-    do: allow_roles(~w(admin manager supervisor), company, user)
+    do: allow_roles(~w(admin manager supervisor clerk), company, user)
 
   def can?(user, :update_recurring, company),
-    do: allow_roles(~w(admin manager supervisor), company, user)
+    do: allow_roles(~w(admin manager supervisor clerk), company, user)
 
   def can?(user, :manage_rouge_user, company),
     do: allow_roles(~w(admin), company, user)
 
   def can?(user, :create_time_attendence, company),
-    do: allow_roles(~w(admin manager supervisor), company, user)
+    do: allow_roles(~w(admin manager supervisor punch_camera), company, user)
 
   def can?(user, :update_time_attendence, company),
     do: allow_roles(~w(admin manager supervisor), company, user)
@@ -201,22 +201,22 @@ defmodule FullCircle.Authorization do
     do: forbid_roles(~w(auditor guest), company, user)
 
   def can?(user, :create_credit_note, company),
-    do: forbid_roles(~w(auditor guest), company, user)
+    do: forbid_roles(~w(auditor guest cashier), company, user)
 
   def can?(user, :update_credit_note, company),
-    do: forbid_roles(~w(auditor guest), company, user)
+    do: forbid_roles(~w(auditor guest cashier), company, user)
 
   def can?(user, :create_debit_note, company),
-    do: forbid_roles(~w(auditor guest), company, user)
+    do: forbid_roles(~w(auditor guest cashier), company, user)
 
   def can?(user, :update_debit_note, company),
-    do: forbid_roles(~w(auditor guest), company, user)
+    do: forbid_roles(~w(auditor guest cashier), company, user)
 
   def can?(user, :create_return_cheque, company),
-    do: forbid_roles(~w(auditor guest), company, user)
+    do: forbid_roles(~w(auditor guest cashier), company, user)
 
   def can?(user, :update_return_cheque, company),
-    do: forbid_roles(~w(auditor guest), company, user)
+    do: forbid_roles(~w(auditor guest cashier), company, user)
 
   def can?(user, :see_user_list, company), do: allow_role("admin", company, user)
   def can?(user, :invite_company, company), do: allow_role("admin", company, user)
