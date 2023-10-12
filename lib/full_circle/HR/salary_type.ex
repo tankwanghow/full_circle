@@ -35,12 +35,9 @@ defmodule FullCircle.HR.SalaryType do
     |> validate_required([
       :name,
       :type,
-      :company_id,
-      :db_ac_name,
-      :cr_ac_name
+      :company_id
     ])
-    |> validate_id(:db_ac_name, :db_ac_id)
-    |> validate_id(:cr_ac_name, :cr_ac_id)
+    |> validate_ac_names()
     |> unsafe_validate_unique([:name, :company_id], FullCircle.Repo,
       message: gettext("has already been taken")
     )
@@ -48,5 +45,19 @@ defmodule FullCircle.HR.SalaryType do
       name: :salary_types_unique_name_in_company,
       message: gettext("has already been taken")
     )
+  end
+
+  defp validate_ac_names(cs) do
+    if fetch_field!(cs, :type) != "Recording" do
+      cs
+      |> validate_required([
+        :db_ac_name,
+        :cr_ac_name
+      ])
+      |> validate_id(:db_ac_name, :db_ac_id)
+      |> validate_id(:cr_ac_name, :cr_ac_id)
+    else
+      cs
+    end
   end
 end

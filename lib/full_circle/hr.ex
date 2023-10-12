@@ -317,27 +317,31 @@ defmodule FullCircle.HR do
     |> Ecto.Multi.run("create_transactions", fn repo, %{^name => note} ->
       note = note |> FullCircle.Repo.preload(:salary_type)
 
-      repo.insert!(%Transaction{
-        doc_type: "SalaryNote",
-        doc_no: note.note_no,
-        doc_id: note.id,
-        doc_date: note.note_date,
-        account_id: note.salary_type.cr_ac_id,
-        company_id: com.id,
-        amount: Decimal.negate(note.amount),
-        particulars: "#{note.salary_type_name} to #{note.employee_name}"
-      })
+      if !is_nil(note.salary_type.cr_ac_id) do
+        repo.insert!(%Transaction{
+          doc_type: "SalaryNote",
+          doc_no: note.note_no,
+          doc_id: note.id,
+          doc_date: note.note_date,
+          account_id: note.salary_type.cr_ac_id,
+          company_id: com.id,
+          amount: Decimal.negate(note.amount),
+          particulars: "#{note.salary_type_name} to #{note.employee_name}"
+        })
+      end
 
-      repo.insert!(%Transaction{
-        doc_type: "SalaryNote",
-        doc_no: note.note_no,
-        doc_id: note.id,
-        doc_date: note.note_date,
-        account_id: note.salary_type.db_ac_id,
-        company_id: com.id,
-        amount: note.amount,
-        particulars: "#{note.salary_type_name} to #{note.employee_name}"
-      })
+      if !is_nil(note.salary_type.db_ac_id) do
+        repo.insert!(%Transaction{
+          doc_type: "SalaryNote",
+          doc_no: note.note_no,
+          doc_id: note.id,
+          doc_date: note.note_date,
+          account_id: note.salary_type.db_ac_id,
+          company_id: com.id,
+          amount: note.amount,
+          particulars: "#{note.salary_type_name} to #{note.employee_name}"
+        })
+      end
 
       {:ok, nil}
     end)
@@ -613,9 +617,9 @@ defmodule FullCircle.HR do
     from(st in SalaryType,
       join: com in subquery(Sys.user_company(company, user)),
       on: com.id == st.company_id,
-      join: dbac in Account,
+      left_join: dbac in Account,
       on: dbac.id == st.db_ac_id,
-      join: crac in Account,
+      left_join: crac in Account,
       on: crac.id == st.cr_ac_id,
       select: st,
       select_merge: %{db_ac_name: dbac.name, cr_ac_name: crac.name}
