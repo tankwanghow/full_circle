@@ -62,18 +62,6 @@
                     </.link>
                   </li>
 
-                  <%= if assigns[:current_company] do %>
-                    <%= if @current_role == "admin" do %>
-                      <li class="my-5">
-                        <.link
-                          navigate={~p"/companies/#{@current_company.id}/users"}
-                          class="mb-2 p-3 hover:bg-emerald-400 flex"
-                        >
-                          <%= gettext("Users") %>
-                        </.link>
-                      </li>
-                    <% end %>
-                  <% end %>
                   <%= if @locale == "zh" do %>
                     <li class="my-5">
                       <.link href="?locale=en" class="mb-2 p-3 hover:bg-emerald-400 flex">

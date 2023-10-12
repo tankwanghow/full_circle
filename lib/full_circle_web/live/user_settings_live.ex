@@ -100,6 +100,7 @@ defmodule FullCircleWeb.UserSettingsLive do
 
     socket =
       socket
+      |> assign(page_title: gettext("User Settings"))
       |> assign(:current_password, nil)
       |> assign(:email_form_current_password, nil)
       |> assign(:current_email, user.email)

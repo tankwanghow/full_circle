@@ -84,8 +84,8 @@ input[type=number] {
 }
 
 .nav-btn {
-  @apply ml-1 mb-1 text-center tracking-tighter rounded-md px-3 py-2 border border-pink-500; 
-  @apply transition duration-500 select-none bg-pink-300 hover:bg-pink-500 focus:bg-pink-500;
+  @apply ml-1 mb-1 rounded-md px-2 py-2 border border-pink-500; 
+  @apply transition duration-200 select-none bg-pink-300 hover:bg-pink-500 focus:bg-pink-500;
 }
 
 button[disabled] {

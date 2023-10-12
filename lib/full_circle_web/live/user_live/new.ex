@@ -71,7 +71,7 @@ defmodule FullCircleWeb.UserLive.New do
       phx-submit="create_user"
       phx-change="validate"
       autocomplete="off"
-      class="max-w-2xl mx-auto"
+      class="w-6/12 mx-auto"
     >
       <div class="grid grid-cols-12 gap-2">
         <div class="col-span-8">
@@ -102,7 +102,7 @@ defmodule FullCircleWeb.UserLive.New do
     <%= if @message != "" do %>
       <div
         id="add-user-message"
-        class={"border-2 border-#{@color}-600 bg-#{@color}-200 rounded text-center"}
+        class={"border-2 border-#{@color}-600 bg-#{@color}-200 rounded text-center w-6/12 mx-auto"}
       >
         <span class="text-2xl m-2">
           <div><%= @message %></div>

@@ -2,7 +2,7 @@ defmodule FullCircle.Authorization do
   import Ecto.Query, warn: false
 
   def roles do
-    ~w(guest admin manager supervisor cashier clerk disable auditor)
+    ~w(guest admin manager supervisor cashier clerk disable auditor punch_camera)
   end
 
   @allow true
@@ -170,6 +170,9 @@ defmodule FullCircle.Authorization do
   def can?(user, :update_recurring, company),
     do: allow_roles(~w(admin manager supervisor), company, user)
 
+  def can?(user, :manage_rouge_user, company),
+    do: allow_roles(~w(admin), company, user)
+
   def can?(user, :create_time_attendence, company),
     do: allow_roles(~w(admin manager supervisor), company, user)
 
@@ -218,6 +221,7 @@ defmodule FullCircle.Authorization do
   def can?(user, :see_user_list, company), do: allow_role("admin", company, user)
   def can?(user, :invite_company, company), do: allow_role("admin", company, user)
   def can?(user, :add_user_to_company, company), do: allow_role("admin", company, user)
+  def can?(user, :delete_user_from_company, company), do: allow_role("admin", company, user)
   def can?(user, :delete_company, company), do: allow_role("admin", company, user)
   def can?(user, :update_company, company), do: allow_role("admin", company, user)
   def can?(user, :reset_user_password, company), do: allow_role("admin", company, user)

@@ -102,6 +102,7 @@ defmodule FullCircleWeb.Router do
       live("/dashboard", DashboardLive)
       live("/users/new", UserLive.New, :new)
       live("/users", UserLive.Index, :index)
+      live("/rouge_users", UserLive.RougeUserIndex, :index)
 
       live("/accounts", AccountLive.Index, :index)
       live("/accounts/new", AccountLive.Form, :new)

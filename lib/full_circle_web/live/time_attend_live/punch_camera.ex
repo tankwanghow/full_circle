@@ -121,7 +121,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCamera do
   def render(assigns) do
     ~H"""
     <div id="punch-camera" class="max-w-xs mx-auto">
-      <div class="text-xl text-center font-bold mb-4">
+      <div class="text-xl text-center font-bold">
         <%= @current_company.name %>
       </div>
       <div class="mx-auto rounded-lg p-2 w-[80%] text-2xl text-center mb-2 border-4 border-green-800 bg-green-200">

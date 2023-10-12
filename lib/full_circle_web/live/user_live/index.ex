@@ -24,20 +24,28 @@ defmodule FullCircleWeb.UserLive.Index do
           phx-change="update_role"
           autocomplete="off"
         >
-          <div class="shadow p-4 m-2 rounded bg-indigo-100 text-center text-xl">
+          <div class="shadow py-3 m-2 rounded bg-indigo-100 text-center">
+            <.delete_confirm_modal
+              id={"delete-object_#{u.id}"}
+              msg1={gettext("Remove User from Company.") <> " #{u.email}"}
+              msg2={gettext("Cannot be recover.")}
+              confirm={
+                JS.push("delete_user", value: %{user_id: u.id})
+                |> JS.hide(to: "#delete-object-modal")
+              }
+            />
             <span id={"new_user_password_#{u.id}"} class="text-gray-500 m-3">
               <%= if u.email != @current_user.email  do %>
                 <%= if @new_password_id == u.id do %>
                   <span>Password reset to </span><span class="font-bold text-emerald-600"><%= @new_password %></span>
                 <% else %>
                   <.link
-                    href="#"
                     id={"reset_user_password_#{u.id}"}
                     phx-click="reset_password"
                     phx-value-id={u.id}
                     class="blue button"
                   >
-                    🔏<span class="font-bold"><%= gettext("Reset Password") %></span>
+                    <span class="font-bold"><%= gettext("Reset Password") %></span>
                   </.link>
                 <% end %>
               <% end %>
@@ -50,7 +58,7 @@ defmodule FullCircleWeb.UserLive.Index do
                 <%= gettext("is") %>
                 <%= Phoenix.HTML.Form.hidden_input(f, :id, value: u.id) %>
                 <%= Phoenix.HTML.Form.select(f, :role, FullCircle.Authorization.roles(),
-                  class: "rounded py-[1px] pl-[2px] pr-[40px] border-0 bg-indigo-50 text-xl",
+                  class: "rounded py-[1px] pl-[2px] pr-[40px] border-0 bg-indigo-50",
                   value: u.role,
                   phx_page_loading: true
                 ) %>
@@ -128,6 +136,33 @@ defmodule FullCircleWeb.UserLive.Index do
            :error,
            gettext("Failed Reset Password")
          )}
+
+      :not_authorise ->
+        {:noreply,
+         socket
+         |> put_flash(:error, gettext("You are not authorised to perform this action"))}
+    end
+  end
+
+  @impl true
+  def handle_event("delete_user", %{"user_id" => id}, socket) do
+    user = FullCircle.UserAccounts.get_user!(id)
+
+    case FullCircle.Sys.delete_user_from_company(
+           socket.assigns.current_company,
+           user,
+           socket.assigns.current_user
+         ) do
+      {:ok, _user} ->
+        {:noreply,
+         socket
+         |> push_navigate(to: ~p"/companies/#{socket.assigns.current_company.id}/users")
+         |> put_flash(:info, gettext("User Deleted!!"))}
+
+      {:error, _} ->
+        {:noreply,
+         socket
+         |> put_flash(:error, gettext("Failed to Delete User"))}
 
       :not_authorise ->
         {:noreply,

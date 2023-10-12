@@ -225,8 +225,6 @@ defmodule FullCircleWeb.JournalLive.Form do
 
     socket = assign(socket, form: to_form(changeset))
 
-    IO.inspect(changeset)
-
     {:noreply, socket}
   end
 

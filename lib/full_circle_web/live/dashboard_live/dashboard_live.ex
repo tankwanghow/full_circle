@@ -5,28 +5,31 @@ defmodule FullCircleWeb.DashboardLive do
   def render(assigns) do
     ~H"""
     <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
-    <div class="mx-auto w-8/12">
-      <div class="flex flex-wrap shrink grow justify-center">
+    <div :if={@current_role != "punch_camera"} class="mx-auto w-6/12 text-center">
+      <div :if={@current_role == "admin"} class="font-medium text-xl">
+        Administrator Functions
+      </div>
+      <div :if={@current_role == "admin"} class="mb-4 flex flex-wrap justify-center">
         <.link navigate={~p"/companies/#{@current_company.id}/seeds"} class="nav-btn">
           <%= gettext("Seeding") %>
         </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/users"} class="nav-btn">
+          <%= gettext("Users") %>
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/rouge_users"} class="nav-btn">
+          <%= gettext("Rouge Users") %>
+        </.link>
+      </div>
+      <div class="font-medium text-xl">Accounting</div>
+      <div class="mb-4 flex flex-wrap justify-center">
         <.link navigate={~p"/companies/#{@current_company.id}/accounts"} class="nav-btn">
           <%= gettext("Accounts") %>
-        </.link>
-        <.link navigate={~p"/companies/#{@current_company.id}/fixed_assets"} class="nav-btn">
-          <%= gettext("Fixed Assets") %>
         </.link>
         <.link navigate={~p"/companies/#{@current_company.id}/contacts"} class="nav-btn">
           <%= gettext("Contacts") %>
         </.link>
-        <.link navigate={~p"/companies/#{@current_company.id}/tax_codes"} class="nav-btn">
-          <%= gettext("TaxCodes") %>
-        </.link>
-        <.link navigate={~p"/companies/#{@current_company.id}/goods"} class="nav-btn">
-          <%= gettext("Goods") %>
-        </.link>
-        <.link navigate={~p"/companies/#{@current_company.id}/Invoice"} class="nav-btn">
-          <%= gettext("Invoices") %>
+        <.link navigate={~p"/companies/#{@current_company.id}/fixed_assets"} class="nav-btn">
+          <%= gettext("Fixed Assets") %>
         </.link>
         <.link navigate={~p"/companies/#{@current_company.id}/Receipt"} class="nav-btn">
           <%= gettext("Receipts") %>
@@ -37,29 +40,43 @@ defmodule FullCircleWeb.DashboardLive do
         <.link navigate={~p"/companies/#{@current_company.id}/Deposit"} class="nav-btn">
           <%= gettext("Deposits") %>
         </.link>
-        <.link navigate={~p"/companies/#{@current_company.id}/ReturnCheque"} class="nav-btn">
-          <%= gettext("Return Cheques") %>
-        </.link>
-        <.link navigate={~p"/companies/#{@current_company.id}/PurInvoice"} class="nav-btn">
-          <%= gettext("Purchase Invoices") %>
-        </.link>
-        <.link navigate={~p"/companies/#{@current_company.id}/account_transactions"} class="nav-btn">
-          <%= gettext("Account Transactions") %>
-        </.link>
-        <.link navigate={~p"/companies/#{@current_company.id}/contact_transactions"} class="nav-btn">
-          <%= gettext("Contact Transactions") %>
-        </.link>
-        <.link navigate={~p"/companies/#{@current_company.id}/Journal"} class="nav-btn">
-          <%= gettext("Journal Entries") %>
-        </.link>
         <.link navigate={~p"/companies/#{@current_company.id}/CreditNote"} class="nav-btn">
           <%= gettext("Credit Notes") %>
         </.link>
         <.link navigate={~p"/companies/#{@current_company.id}/DebitNote"} class="nav-btn">
           <%= gettext("Debit Notes") %>
         </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/ReturnCheque"} class="nav-btn">
+          <%= gettext("Return Cheques") %>
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/Journal"} class="nav-btn">
+          <%= gettext("Journal Entries") %>
+        </.link>
+      </div>
+
+      <div class="font-medium text-xl">Sales Purchase</div>
+      <div class="mb-4 flex flex-wrap justify-center">
+        <.link navigate={~p"/companies/#{@current_company.id}/goods"} class="nav-btn">
+          <%= gettext("Goods") %>
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/tax_codes"} class="nav-btn">
+          <%= gettext("TaxCodes") %>
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/Invoice"} class="nav-btn">
+          <%= gettext("Invoices") %>
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/PurInvoice"} class="nav-btn">
+          <%= gettext("Purchase Invoices") %>
+        </.link>
+      </div>
+
+      <div class="font-medium text-xl">Payroll</div>
+      <div class="mb-4 flex flex-wrap justify-center">
         <.link navigate={~p"/companies/#{@current_company.id}/employees"} class="nav-btn">
           <%= gettext("Employees") %>
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/holidays"} class="nav-btn">
+          <%= gettext("Holiday") %>
         </.link>
         <.link navigate={~p"/companies/#{@current_company.id}/salary_types"} class="nav-btn">
           <%= gettext("Salary Types") %>
@@ -73,9 +90,7 @@ defmodule FullCircleWeb.DashboardLive do
         <.link navigate={~p"/companies/#{@current_company.id}/recurrings"} class="nav-btn">
           <%= gettext("Recurrings") %>
         </.link>
-        <.link navigate={~p"/companies/#{@current_company.id}/PunchCamera"} class="nav-btn">
-          <%= gettext("Punch Camera") %>
-        </.link>
+
         <.link navigate={~p"/companies/#{@current_company.id}/TimeAttend"} class="nav-btn">
           <%= gettext("Punching RAW Listing") %>
         </.link>
@@ -85,8 +100,22 @@ defmodule FullCircleWeb.DashboardLive do
         <.link navigate={~p"/companies/#{@current_company.id}/PunchCard"} class="nav-btn">
           <%= gettext("Punch Card") %>
         </.link>
-        <.link navigate={~p"/companies/#{@current_company.id}/holidays"} class="nav-btn">
-          <%= gettext("Holiday") %>
+      </div>
+
+      <div class="font-medium text-xl">Reporting</div>
+      <div class="mb-4 flex flex-wrap justify-center">
+        <.link navigate={~p"/companies/#{@current_company.id}/account_transactions"} class="nav-btn">
+          <%= gettext("Account Transactions") %>
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/contact_transactions"} class="nav-btn">
+          <%= gettext("Contact Transactions") %>
+        </.link>
+      </div>
+    </div>
+    <div class="mx-auto text-center">
+      <div class="mt-20 text-2xl font-bold">
+        <.link navigate={~p"/companies/#{@current_company.id}/PunchCamera"} class="orange button">
+          <%= gettext("Start Punch Camera") %>
         </.link>
       </div>
     </div>

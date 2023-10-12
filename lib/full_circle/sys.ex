@@ -483,6 +483,20 @@ defmodule FullCircle.Sys do
     end
   end
 
+  def delete_user_from_company(com, user, admin) do
+    case can?(admin, :delete_user_from_company, com) do
+      true ->
+        uc = get_company_user(com.id, user.id)
+
+        if uc do
+          Repo.delete(uc)
+        end
+
+      false ->
+        :not_authorise
+    end
+  end
+
   def add_user_to_company(com, email, role, admin) do
     case can?(admin, :add_user_to_company, com) do
       true ->
@@ -637,5 +651,32 @@ defmodule FullCircle.Sys do
     u = FullCircle.UserAccounts.get_user_by_email(email)
     c = get_default_company(u)
     {u, c}
+  end
+
+  def get_rouge_users(com, user) do
+    if can?(user, :manage_rouge_user, com) do
+      td = Timex.today()
+
+      from(u in User,
+        where: u.id not in subquery(from(cu in CompanyUser, select: cu.user_id)),
+        where: fragment("(?::date - ?::date) >= 5", ^td, u.inserted_at),
+        where: is_nil(u.confirmed_at)
+      )
+      |> Repo.all()
+    else
+      []
+    end
+  end
+
+  def delete_rouge_user(com, rouge_user, user) do
+    if can?(user, :manage_rouge_user, com) do
+      u = Repo.get!(User, rouge_user.id)
+
+      if u do
+        Repo.delete(u)
+      end
+    else
+      :not_authorise
+    end
   end
 end
