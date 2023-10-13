@@ -7,12 +7,18 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="mx-auto w-7/12">
+    <div class="mx-auto w-8/12">
       <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
       <div class="flex justify-center mb-2">
-        <.form for={%{}} id="search-form" phx-submit="search" autocomplete="off" class="w-full">
-          <div class=" flex flex-row flex-wrap tracking-tighter text-sm">
-            <div class="w-[50%]">
+        <.form
+          for={%{}}
+          id="search-form"
+          phx-submit="search"
+          autocomplete="off"
+          class="mx-auto w-11/12"
+        >
+          <div class="flex flex-row flex-wrap gap-1">
+            <div class="w-[40%]">
               <.input
                 id="search_employee"
                 name="search[employee]"
@@ -24,7 +30,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
                 url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=employee&name="}
               />
             </div>
-            <div class="w-[20%]">
+            <div class="w-[10%]">
               <.input
                 name="search[month]"
                 type="number"
@@ -33,7 +39,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
                 label={gettext("Month")}
               />
             </div>
-            <div class="w-[20%]">
+            <div class="w-[10%]">
               <.input
                 name="search[year]"
                 type="number"
@@ -42,15 +48,57 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
                 label={gettext("Year")}
               />
             </div>
-            <.button class="mt-5 h-10 w-10 grow-0 shrink-0">🔍</.button>
+            <.button class="w-[6%] mt-5 h-10 grow-0 shrink-0">🔍</.button>
+            <.link
+              phx-click={:new_timeattend}
+              class="w-[30%] h-10 mt-5 blue button"
+              id="new_timeattend"
+            >
+              <%= gettext("New Time Attendence") %>
+            </.link>
           </div>
         </.form>
       </div>
-      <div class="text-center mb-2">
-        <.link phx-click={:new_timeattend} class="blue button" id="new_timeattend">
-          <%= gettext("New Time Attendence") %>
-        </.link>
+
+      <div class="flex flex-row justify-center gap-2">
+        <div class="h-8 w-5/12 mb-2 border-y border-orange-600 bg-orange-200">
+          <span class="mt-1 ml-2 float-left font-light">
+            Normal:
+            <span class="font-medium">
+              <%= Enum.map(@objects, fn x -> x.nh end)
+              |> Enum.sum()
+              |> Number.Delimit.number_to_delimited() %>(hours)
+            </span>
+          </span>
+          <span class="mr-2 mt-1 font-light float-right">
+            Overtime:
+            <span class="font-medium">
+              <%= Enum.map(@objects, fn x -> x.ot end)
+              |> Enum.sum()
+              |> Number.Delimit.number_to_delimited() %>(hours)
+            </span>
+          </span>
+        </div>
+        <div class="h-8 w-5/12 mb-2 border-y border-purple-600 bg-purple-200">
+          <span class="mt-1 ml-2 float-left font-light">
+            Normal:
+            <span class="font-medium">
+              <%= Enum.map(@objects, fn x -> x.nh / x.normal_work_hours end)
+              |> Enum.sum()
+              |> Number.Delimit.number_to_delimited() %>(days)
+            </span>
+          </span>
+          <span class="mr-2 mt-1 font-light float-right">
+            Overtime:
+            <span class="font-medium">
+              <%= Enum.map(@objects, fn x -> x.ot / x.normal_work_hours end)
+              |> Enum.sum()
+              |> Number.Delimit.number_to_delimited() %>(days)
+            </span>
+          </span>
+        </div>
       </div>
+
       <div class="font-medium flex flex-row text-center tracking-tighter bg-amber-200">
         <div class="w-[20%] border-b border-t border-amber-400 py-1">
           <%= gettext("Date") %>

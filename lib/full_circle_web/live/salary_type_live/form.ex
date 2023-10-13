@@ -221,7 +221,7 @@ defmodule FullCircleWeb.SalaryTypeLive.Form do
               field={@form[:type]}
               label={gettext("Type")}
               type="select"
-              options={["Addition", "Deduction", "Contribution", "Recording"]}
+              options={FullCircle.HR.salary_type_types}
             />
           </div>
           <div class="col-span-4">

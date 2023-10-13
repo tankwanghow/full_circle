@@ -19,6 +19,89 @@ defmodule FullCircle.HR do
   alias FullCircle.Accounting
   alias FullCircle.{Repo, Sys, StdInterface}
 
+  def salary_type_types() do
+    ["Addition", "Deduction", "Contribution", "Recording"]
+  end
+
+  def default_salary_types(company_id) do
+    [
+      %{
+        name: "Monthly Salary",
+        type: "Addition",
+        company_id: company_id,
+        db_ac_name: "Salaries and Wages",
+        cr_ac_name: "Salaries and Wages Payable"
+      },
+      %{
+        name: "Daily Salary",
+        type: "Addition",
+        company_id: company_id,
+        db_ac_name: "Salaries and Wages",
+        cr_ac_name: "Salaries and Wages Payable"
+      },
+      %{
+        name: "Hourly Salary",
+        type: "Addition",
+        company_id: company_id,
+        db_ac_name: "Salaries and Wages",
+        cr_ac_name: "Salaries and Wages Payable"
+      },
+      %{
+        name: "Overtime Salary",
+        type: "Addition",
+        company_id: company_id,
+        db_ac_name: "Salaries and Wages",
+        cr_ac_name: "Salaries and Wages Payable"
+      },
+      %{
+        name: "Sunday Salary",
+        type: "Addition",
+        company_id: company_id,
+        db_ac_name: "Salaries and Wages",
+        cr_ac_name: "Salaries and Wages Payable"
+      },
+      %{
+        name: "Holiday Salary",
+        type: "Addition",
+        company_id: company_id,
+        db_ac_name: "Salaries and Wages",
+        cr_ac_name: "Salaries and Wages Payable"
+      },
+      %{
+        name: "Annual Leave Taken",
+        type: "Recording",
+        company_id: company_id,
+        db_ac_name: "",
+        cr_ac_name: ""
+      },
+      %{
+        name: "Sick Leave Taken",
+        type: "Recording",
+        company_id: company_id,
+        db_ac_name: "",
+        cr_ac_name: ""
+      },
+      %{
+        name: "Hospitalize Leave Taken",
+        type: "Recording",
+        company_id: company_id,
+        db_ac_name: "",
+        cr_ac_name: ""
+      },
+      %{
+        name: "Maternity Leave Taken",
+        type: "Recording",
+        company_id: company_id,
+        db_ac_name: "",
+        cr_ac_name: ""
+      }
+    ]
+  end
+
+  def is_default_salary_type?(st) do
+    Enum.any?(FullCircle.HR.default_salary_types(st.company_id), fn a -> a.name == st.name end)
+  end
+
   def timeattend_index_query(terms, date_from, com, user,
         page: page,
         per_page: per_page
@@ -824,7 +907,7 @@ defmodule FullCircle.HR do
           true -> 0
         end
 
-      Map.merge(t, %{time_list: ut, wh: wh, nh: nh, ot: ot, id: idg})
+      Map.merge(t, %{time_list: ut, wh: wh, nh: nh, ot: ot, id: idg, normal_work_hours: nwh})
     end)
   end
 

@@ -16,7 +16,7 @@ defmodule FullCircleWeb.GoodLive.IndexComponent do
     ~H"""
     <div
       id={@id}
-      class={"#{@ex_class} text-center mb-1 bg-gray-200 border-gray-500 border-2 rounded p-2"}
+      class={"#{@ex_class} text-center bg-gray-200 border-gray-500 border-b p-2"}
     >
       <.link
         class="text-blue-600 hover:font-bold"

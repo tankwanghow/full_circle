@@ -24,7 +24,7 @@ defmodule FullCircleWeb.ChequeLive.ReturnChequeIndexComponent do
 
       <div
         :if={!@obj.old_data}
-        class="text-blue-600 w-[12%] border-b border-gray-400 py-1 hover:cursor-pointer"
+        class="text-blue-600 hover:font-bold w-[12%] border-b border-gray-400 py-1 hover:cursor-pointer"
       >
         <.link navigate={~p"/companies/#{@company.id}/ReturnCheque/#{@obj.return_id}/edit"}>
           <%= @obj.doc_no %>

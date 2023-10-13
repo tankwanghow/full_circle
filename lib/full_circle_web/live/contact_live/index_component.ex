@@ -16,11 +16,11 @@ defmodule FullCircleWeb.ContactLive.IndexComponent do
     ~H"""
     <div
       id={@id}
-      class={"#{@ex_class} text-center mb-1 bg-gray-200 border-gray-500 border-2 rounded p-2"}
+      class={"#{@ex_class} p-1 text-center bg-gray-200 border-gray-500 border-b"}
     >
       <.link
         :if={!FullCircle.Accounting.is_default_account?(@obj)}
-        class="font-bold text-blue-600"
+        class="hover:font-bold text-blue-600"
         navigate={~p"/companies/#{@current_company.id}/contacts/#{@obj.id}/edit"}
       >
         <%= @obj.name %>

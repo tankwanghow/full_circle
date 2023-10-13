@@ -793,12 +793,12 @@ defmodule FullCircleWeb.CoreComponents do
     ~H"""
     <div
       :if={@ended}
-      class="mt-2 mb-2 text-center border-2 rounded bg-orange-200 border-orange-400 p-2"
+      class="mt-2 mb-2 text-center border-y-2 bg-orange-200 border-orange-400 p-2"
     >
       <%= gettext("No More.") %>
     </div>
 
-    <div :if={!@ended} class="mt-2 mb-2 text-center border-2 rounded bg-blue-200 border-blue-400 p-2">
+    <div :if={!@ended} class="mt-2 mb-2 text-center border-y-2 bg-blue-200 border-blue-400 p-2">
       <%= gettext("Loading...") %><.icon name="hero-arrow-path" class="ml-1 h-3 w-3 animate-spin" />
     </div>
     """

@@ -16,8 +16,9 @@ defmodule FullCircleWeb.EmployeeLive.IndexComponent do
     ~H"""
     <div
       id={@id}
-      class={"#{@ex_class} text-center mb-1 bg-gray-200 border-gray-500 border-2 rounded p-2"}
+      class={"#{@ex_class} text-center bg-gray-200 border-gray-500 border-b p-1"}
     >
+    <div class="float-left ml-5">
       <input
         :if={@obj.checked}
         id={"checkbox_#{@obj.id}"}
@@ -35,6 +36,7 @@ defmodule FullCircleWeb.EmployeeLive.IndexComponent do
         phx-click="check_click"
         phx-value-object-id={@obj.id}
       />
+      </div>
       <.link
         class="text-blue-600 hover:font-bold"
         tabindex="-1"

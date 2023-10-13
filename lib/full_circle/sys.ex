@@ -167,6 +167,12 @@ defmodule FullCircle.Sys do
         account_type: "Current Liability",
         descriptions:
           "Salaries and Wages Payable is a liability account on a company's balance sheet that represents the amount of compensation owed to employees but has not yet been paid."
+      },
+      %{
+        name: "Salaries and Wages",
+        account_type: "Expenses",
+        descriptions:
+          "Is an Expense Account used to record the payments made by a company to its employees for their services."
       }
     ]
   end
@@ -388,6 +394,26 @@ defmodule FullCircle.Sys do
       FullCircle.Sys.GaplessDocId,
       fn %{create_company: c} ->
         default_gapless_doc(c.id)
+      end
+    )
+    |> Multi.insert_all(
+      :create_default_salary_types,
+      FullCircle.HR.SalaryType,
+      fn %{create_company: c} ->
+        time = DateTime.truncate(Timex.now(), :second)
+
+        FullCircle.HR.default_salary_types(c.id)
+        |> Enum.map(fn x ->
+          db_ac = FullCircle.Accounting.get_account_by_name(x.db_ac_name, c, user)
+          cr_ac = FullCircle.Accounting.get_account_by_name(x.cr_ac_name, c, user)
+          x = x |> Map.delete(:db_ac_name) |> Map.delete(:cr_ac_name)
+          Map.merge(x, %{
+            db_ac_id: if(db_ac, do: db_ac.id, else: nil),
+            cr_ac_id: if(cr_ac, do: cr_ac.id, else: nil),
+            inserted_at: time,
+            updated_at: time
+          })
+        end)
       end
     )
     |> FullCircle.Repo.transaction()

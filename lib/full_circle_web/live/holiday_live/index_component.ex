@@ -16,10 +16,10 @@ defmodule FullCircleWeb.HolidayLive.IndexComponent do
     ~H"""
     <div
       id={@id}
-      class={"#{@ex_class} text-center mb-1 bg-gray-200 border-gray-500 border-2 rounded p-2"}
+      class={"#{@ex_class} text-center bg-gray-200 border-gray-500 border-b p-1"}
     >
       <.link
-        class="font-bold text-blue-600"
+        class="hover:font-bold text-blue-600"
         navigate={~p"/companies/#{@current_company.id}/holidays/#{@obj.id}/edit"}
       >
         <%= @obj.name %>

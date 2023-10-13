@@ -124,7 +124,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCamera do
       <div class="text-xl text-center font-bold">
         <%= @current_company.name %>
       </div>
-      <div class="mx-auto rounded-lg p-2 w-[80%] text-2xl text-center mb-2 border-4 border-green-800 bg-green-200">
+      <div class="mx-auto p-2 w-[80%] text-2xl text-center mb-2 border-y-4 border-green-800 bg-green-200">
         <span class="text-blue-600" id="date" /> <span class="text-amber-800" id="clock" />
       </div>
       <div :if={@shift_id == ""}>
@@ -143,7 +143,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCamera do
             <div class="col-span-3">
               <.input name="shift_form[shift_id]" type="text" id="shift_form_shift_id" value="" />
             </div>
-            <div class="col-span-4 -mt-1.5">
+            <div class="col-span-4 -mt-1">
               <.button disabled={!@valid?}>Start Shift</.button>
             </div>
           </div>
@@ -180,7 +180,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCamera do
         >
           OUT <span aria-hidden="true">→</span> IN
         </div>
-        <div class={"mx-auto w-[80%] text-2xl text-center rounded-lg border-4 #{if(@flag == "IN", do: "bg-blue-200 border-blue-400", else: "bg-red-200 border-red-600")} mb-2"}>
+        <div class={"mx-auto w-[80%] text-2xl text-center border-y-4 #{if(@flag == "IN", do: "bg-blue-200 border-blue-400", else: "bg-red-200 border-red-600")} mb-2"}>
           <div class="text-3xl font-bold"><%= @flag %></div>
           <div :if={@flag == "IN"} class="font-bold font-mono text-cyan-600"><%= @shift_id %></div>
         </div>
@@ -191,7 +191,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCamera do
           :if={@status == :success}
           id="qr-reply"
           phx-hook="QR_Reply"
-          class="w-[80%] text-center text-3xl mx-auto border rounded-lg bg-green-200 border-green-600"
+          class="w-[80%] text-center text-2xl mx-auto border-y-4 bg-green-200 border-green-600"
         >
           <audio autoplay>
             <source src="/assets/beep.mp3" type="audio/mpeg" />
@@ -211,7 +211,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCamera do
           :if={@status == :waiting}
           id="qr-reply"
           phx-hook="QR_Reply"
-          class="w-[80%] text-center text-3xl mx-auto border rounded-lg bg-amber-200 border-amber-600"
+          class="w-[80%] text-center text-2xl mx-auto border-y-4 bg-amber-200 border-amber-600"
         >
           Scan Employee QR
         </div>
@@ -219,7 +219,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCamera do
           :if={@status == :error}
           id="qr-reply"
           phx-hook="QR_Reply"
-          class="w-[80%] text-center text-3xl mx-auto border rounded-lg bg-rose-200 border-rose-600"
+          class="w-[80%] text-center text-2xl mx-auto border-y-4 bg-rose-200 border-rose-600"
         >
           <audio autoplay>
             <source src="/assets/beep-error.mp3" type="audio/mpeg" />
@@ -231,7 +231,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCamera do
           :if={@status == :not_found}
           id="qr-reply"
           phx-hook="QR_Reply"
-          class="w-[80%] text-center text-3xl mx-auto border rounded-lg bg-rose-200 border-rose-600"
+          class="w-[80%] text-center text-2xl mx-auto border-y-4 bg-rose-200 border-rose-600"
         >
           <audio autoplay>
             <source src="/assets/beep-error.mp3" type="audio/mpeg" />

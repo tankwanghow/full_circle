@@ -16,11 +16,11 @@ defmodule FullCircleWeb.AccountLive.IndexComponent do
     ~H"""
     <div
       id={@id}
-      class={~s(#{@ex_class} text-center mb-1 bg-gray-200 border-gray-500 border-2 rounded p-2)}
+      class={~s(#{@ex_class} text-center bg-gray-200 border-gray-500 border-b p-1)}
     >
       <%= if !FullCircle.Accounting.is_default_account?(@obj) do %>
         <.link
-          class="font-bold text-blue-600"
+          class="hover:font-bold text-blue-600"
           navigate={~p"/companies/#{@current_company.id}/accounts/#{@obj.id}/edit"}
         >
           <%= @obj.name %>
@@ -28,7 +28,7 @@ defmodule FullCircleWeb.AccountLive.IndexComponent do
       <% else %>
         <%= if @current_role == "admin" do %>
           <.link
-            class="font-bold text-purple-600"
+            class="hover:font-bold text-purple-600"
             navigate={~p"/companies/#{@current_company.id}/accounts/#{@obj.id}/edit"}
           >
             <%= @obj.name %>

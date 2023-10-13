@@ -14,12 +14,12 @@ defmodule FullCircleWeb.FixedAssetLive.IndexComponent do
   @impl true
   def render(assigns) do
     ~H"""
-    <div id={@id} class={"#{@ex_class} text-center mb-1 bg-gray-200 border-gray-500 border-2 rounded"}>
+    <div id={@id} class={"#{@ex_class} text-center bg-gray-200 border-gray-500 border-b"}>
       <div class="grid grid-cols-12">
         <div class="col-span-7 bg-gray-100 p-2">
           <.link
             navigate={~p"/companies/#{@current_company.id}/fixed_assets/#{@obj.id}/edit"}
-            class="text-xl font-bold text-blue-600"
+            class="text-xl hover:font-bold text-blue-600"
           >
             <%= @obj.name %>
           </.link>

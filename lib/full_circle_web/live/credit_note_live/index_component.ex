@@ -42,7 +42,7 @@ defmodule FullCircleWeb.CreditNoteLive.IndexComponent do
       </div>
       <div
         :if={!@obj.old_data}
-        class="text-blue-600 w-[10%] border-b border-gray-400 py-1 hover:cursor-pointer"
+        class="text-blue-600 hover:font-bold w-[10%] border-b border-gray-400 py-1 hover:cursor-pointer"
       >
         <.link navigate={~p"/companies/#{@obj.company_id}/CreditNote/#{@obj.id}/edit"}>
           <%= @obj.note_no %>

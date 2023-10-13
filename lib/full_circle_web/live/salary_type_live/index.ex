@@ -25,8 +25,8 @@ defmodule FullCircleWeb.SalaryTypeLive.Index do
           <%= gettext("New Salary Type") %>
         </.link>
       </div>
-      <div class="text-center mb-1">
-        <div class="rounded bg-amber-200 border border-amber-500 font-bold p-2">
+      <div class="text-center">
+        <div class="bg-amber-200 border-y-2 border-amber-500 font-bold p-2">
           <%= gettext("Salary Type Information") %>
         </div>
       </div>
@@ -40,6 +40,7 @@ defmodule FullCircleWeb.SalaryTypeLive.Index do
         <%= for {obj_id, obj} <- @streams.objects do %>
           <.live_component
             current_company={@current_company}
+            current_role={@current_role}
             module={IndexComponent}
             id={"#{obj_id}"}
             obj={obj}

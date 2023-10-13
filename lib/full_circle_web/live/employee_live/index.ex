@@ -35,8 +35,8 @@ defmodule FullCircleWeb.EmployeeLive.Index do
           <%= gettext("Print QRCode") %>
         </.link>
       </div>
-      <div class="text-center mb-1">
-        <div class="rounded bg-amber-200 border border-amber-500 font-bold p-2">
+      <div class="text-center">
+        <div class="bg-amber-200 border-y-2 border-amber-500 font-bold p-1">
           <%= gettext("Employee Information") %>
         </div>
       </div>

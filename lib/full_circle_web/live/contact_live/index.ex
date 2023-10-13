@@ -21,8 +21,8 @@ defmodule FullCircleWeb.ContactLive.Index do
           <%= gettext("New Contact") %>
         </.link>
       </div>
-      <div class="text-center mb-1">
-        <div class="rounded bg-amber-200 border border-amber-500 font-bold p-2">
+      <div class="text-center">
+        <div class=" bg-amber-200 border-y-2 border-amber-500 font-bold p-2">
           <%= gettext("Contact Information") %>
         </div>
       </div>

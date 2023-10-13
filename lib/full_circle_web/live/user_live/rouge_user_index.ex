@@ -7,7 +7,7 @@ defmodule FullCircleWeb.UserLive.RougeUserIndex do
     ~H"""
     <div class="w-6/12 mx-auto">
       <p class="w-full text-2xl text-center font-bold"><%= @page_title %></p>
-      <div :if={@users == []} class="shadow py-3 m-2 rounded bg-indigo-100 text-center">
+      <div :if={@users == []} class="border-b border-indigo-400 py-3 m-2 bg-indigo-100 text-center">
         No Rouge User Found!!
       </div>
       <%= for u <- @users do %>

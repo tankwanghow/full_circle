@@ -24,7 +24,7 @@ defmodule FullCircleWeb.UserLive.Index do
           phx-change="update_role"
           autocomplete="off"
         >
-          <div class="shadow py-3 m-2 rounded bg-indigo-100 text-center">
+          <div class="border-b-2 border-indigo-400 py-3 bg-indigo-100 text-center">
             <.delete_confirm_modal
               id={"delete-object_#{u.id}"}
               msg1={gettext("Remove User from Company.") <> " #{u.email}"}

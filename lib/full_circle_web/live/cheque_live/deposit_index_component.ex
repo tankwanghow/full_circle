@@ -24,7 +24,7 @@ defmodule FullCircleWeb.ChequeLive.DepositIndexComponent do
 
       <div
         :if={!@obj.old_data}
-        class="text-blue-600 w-[15%] border-b border-gray-400 py-1 hover:cursor-pointer"
+        class="hover:font-bold text-blue-600 w-[15%] border-b border-gray-400 py-1 hover:cursor-pointer"
       >
         <.link navigate={~p"/companies/#{@company.id}/Deposit/#{@obj.deposit_id}/edit"}>
           <%= @obj.deposit_no %>
