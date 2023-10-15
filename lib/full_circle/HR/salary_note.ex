@@ -7,7 +7,7 @@ defmodule FullCircle.HR.SalaryNote do
   schema "salary_notes" do
     field(:note_no, :string)
     field(:note_date, :date)
-    field(:quantity, :decimal, default: 0)
+    field(:quantity, :decimal, default: 1)
     field(:unit_price, :decimal, default: 0)
     field(:descriptions, :string)
 
@@ -54,8 +54,8 @@ defmodule FullCircle.HR.SalaryNote do
     |> fill_today(:note_date)
     |> validate_id(:employee_name, :employee_id)
     |> validate_id(:salary_type_name, :salary_type_id)
-    |> validate_date(:note_date, days_before: 5)
-    |> validate_date(:note_date, days_after: 5)
+    |> validate_date(:note_date, days_before: 8)
+    |> validate_date(:note_date, days_after: 14)
     |> unsafe_validate_unique([:note_no, :company_id], FullCircle.Repo,
       message: gettext("has already been taken")
     )
@@ -67,7 +67,9 @@ defmodule FullCircle.HR.SalaryNote do
   end
 
   def compute_fields(cs) do
-    amt = Decimal.mult(fetch_field!(cs, :quantity), fetch_field!(cs, :unit_price))
+    amt =
+      Decimal.mult(fetch_field!(cs, :quantity), fetch_field!(cs, :unit_price)) |> Decimal.round(2)
+
     cs = put_change(cs, :amount, amt)
 
     if Decimal.eq?(amt, 0) do

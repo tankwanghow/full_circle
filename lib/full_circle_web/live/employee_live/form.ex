@@ -326,10 +326,17 @@ defmodule FullCircleWeb.EmployeeLive.Form do
           </div>
         </div>
         <div class="grid grid-cols-12 gap-1">
-          <div class="col-span-3">
+          <div class="col-span-2">
+            <.input
+              field={@form[:work_days_per_week]}
+              label={gettext("Work Days Per Week")}
+              type="number"
+            />
+          </div>
+          <div class="col-span-2">
             <.input field={@form[:id_no]} label={gettext("Id No")} />
           </div>
-          <div class="col-span-3">
+          <div class="col-span-2">
             <.input field={@form[:epf_no]} label={gettext("EPF No")} />
           </div>
           <div class="col-span-2">

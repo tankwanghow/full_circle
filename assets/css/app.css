@@ -71,7 +71,7 @@ input[type=number] {
 }
 
 .detail-header {
-  @apply border border-gray-500 rounded bg-gray-200 py-1;
+  @apply border border-gray-500 bg-gray-200 py-1;
 }
 
 .shake {

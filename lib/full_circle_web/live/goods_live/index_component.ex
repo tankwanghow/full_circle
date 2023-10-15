@@ -14,10 +14,7 @@ defmodule FullCircleWeb.GoodLive.IndexComponent do
   @impl true
   def render(assigns) do
     ~H"""
-    <div
-      id={@id}
-      class={"#{@ex_class} text-center bg-gray-200 border-gray-500 border-b p-2"}
-    >
+    <div id={@id} class={"#{@ex_class} text-center bg-gray-200 border-gray-500 border-b p-2"}>
       <.link
         class="text-blue-600 hover:font-bold"
         navigate={~p"/companies/#{@current_company}/goods/#{@obj.id}/edit"}
@@ -25,15 +22,6 @@ defmodule FullCircleWeb.GoodLive.IndexComponent do
         <%= @obj.name %> (<%= @obj.unit %>)
       </.link>
       &#11049;
-      <span
-        :if={@obj.packagings |> Enum.filter(fn x -> !is_nil(x) end) |> Enum.count() > 0}
-        class="text-sm font-light"
-      >
-        <span class="font-normal"><%= gettext("Packagings") %></span>
-        :- <%= @obj.packagings
-        |> Enum.map(fn x -> x.name end)
-        |> Enum.join(", ") %>
-      </span>
       <span>
         <%= @obj.sales_account_name %> &#11049; <%= @obj.sales_tax_code_name %> &#8226; <%= @obj.purchase_account_name %> &#11049; <%= @obj.purchase_tax_code_name %>
       </span>
@@ -43,6 +31,17 @@ defmodule FullCircleWeb.GoodLive.IndexComponent do
       >
         <%= gettext("Copy") %>
       </.link>
+      <div>
+        <span
+          :if={@obj.packagings |> Enum.filter(fn x -> !is_nil(x) end) |> Enum.count() > 0}
+          class="text-sm font-light"
+        >
+          <span class="font-normal"><%= gettext("Packagings") %></span>
+          :- <%= @obj.packagings
+          |> Enum.map(fn x -> x.name end)
+          |> Enum.join(", ") %>
+        </span>
+      </div>
     </div>
     """
   end

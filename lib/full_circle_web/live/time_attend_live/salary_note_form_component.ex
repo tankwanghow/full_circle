@@ -1,53 +1,31 @@
-defmodule FullCircleWeb.SalaryNoteLive.Form do
-  use FullCircleWeb, :live_view
+defmodule FullCircleWeb.TimeAttendLive.SalaryNoteFormComponent do
+  use FullCircleWeb, :live_component
 
   alias FullCircle.HR.{SalaryNote}
   alias FullCircle.HR
   alias FullCircle.StdInterface
 
   @impl true
-  def mount(params, _session, socket) do
-    id = params["slip_id"]
-
-    socket =
-      case socket.assigns.live_action do
-        :new -> mount_new(socket)
-        :edit -> mount_edit(socket, id)
-      end
-
+  def mount(socket) do
     {:ok, socket}
   end
 
-  defp mount_new(socket) do
-    socket
-    |> assign(live_action: :new)
-    |> assign(id: "new")
-    |> assign(page_title: gettext("New Salary Note"))
-    |> assign(
-      :form,
-      to_form(
-        StdInterface.changeset(
-          SalaryNote,
-          %SalaryNote{},
-          %{note_no: "...new..."},
-          socket.assigns.current_company
-        )
-      )
-    )
-  end
-
-  defp mount_edit(socket, id) do
-    obj =
-      HR.get_salary_note!(id, socket.assigns.current_company, socket.assigns.current_user)
-
-    socket
-    |> assign(live_action: :edit)
-    |> assign(id: id)
-    |> assign(page_title: gettext("Edit Salary Note") <> " " <> obj.note_no)
-    |> assign(
-      :form,
-      to_form(StdInterface.changeset(SalaryNote, obj, %{}, socket.assigns.current_company))
-    )
+  @impl true
+  def update(assigns, socket) do
+    {:ok,
+     socket
+     |> assign(assigns)
+     |> assign(
+       :form,
+       to_form(
+         StdInterface.changeset(
+           SalaryNote,
+           assigns.obj,
+           %{},
+           assigns.current_company
+         )
+       )
+     )}
   end
 
   def handle_event(
@@ -108,25 +86,17 @@ defmodule FullCircleWeb.SalaryNoteLive.Form do
            socket.assigns.current_company,
            socket.assigns.current_user
          ) do
-      {:ok, %{delete_salary_note: _obj}} ->
-        {:noreply,
-         socket
-         |> push_navigate(to: ~p"/companies/#{socket.assigns.current_company.id}/SalaryNote")
-         |> put_flash(:info, "#{gettext("Salary Note Deleted successfully.")}")}
+      {:ok, %{delete_salary_note: obj}} ->
+        send(self(), {:deleted_sn, obj})
+        {:noreply, socket}
 
-      {:error, failed_operation, changeset} ->
-        {:noreply,
-         socket
-         |> assign(form: to_form(changeset))
-         |> put_flash(
-           :error,
-           "#{gettext("Failed")} #{failed_operation}. #{list_errors_to_string(changeset.errors)}"
-         )}
+      {:error, _failed_operation, changeset} ->
+        send(self(), {:error, changeset})
+        {:noreply, socket}
 
       :not_authorise ->
-        {:noreply,
-         socket
-         |> put_flash(:error, gettext("You are not authorised to perform this action"))}
+        send(self(), {:not_authorise})
+        {:noreply, socket}
     end
   end
 
@@ -139,26 +109,16 @@ defmodule FullCircleWeb.SalaryNoteLive.Form do
       )
     ) do
       {:ok, %{create_salary_note: obj}} ->
-        {:noreply,
-         socket
-         |> push_navigate(
-           to: ~p"/companies/#{socket.assigns.current_company.id}/SalaryNote/#{obj.id}/edit"
-         )
-         |> put_flash(:info, "#{gettext("Salary Note created successfully.")}")}
+        send(self(), {:created_sn, obj})
+        {:noreply, socket}
 
-      {:error, failed_operation, changeset, _} ->
-        {:noreply,
-         socket
-         |> assign(form: to_form(changeset))
-         |> put_flash(
-           :error,
-           "#{gettext("Failed")} #{failed_operation}. #{list_errors_to_string(changeset.errors)}"
-         )}
+      {:error, _failed_operation, changeset, _} ->
+        send(self(), {:error, changeset})
+        {:noreply, socket}
 
       :not_authorise ->
-        {:noreply,
-         socket
-         |> put_flash(:error, gettext("You are not authorised to perform this action"))}
+        send(self(), {:not_authorise})
+        {:noreply, socket}
     end
   end
 
@@ -170,26 +130,16 @@ defmodule FullCircleWeb.SalaryNoteLive.Form do
            socket.assigns.current_user
          ) do
       {:ok, %{update_salary_note: obj}} ->
-        {:noreply,
-         socket
-         |> push_navigate(
-           to: ~p"/companies/#{socket.assigns.current_company.id}/SalaryNote/#{obj.id}/edit"
-         )
-         |> put_flash(:info, "#{gettext("Salary Note updated successfully.")}")}
+        send(self(), {:updated_sn, obj})
+        {:noreply, socket}
 
-      {:error, failed_operation, changeset, _} ->
-        {:noreply,
-         socket
-         |> assign(form: to_form(changeset))
-         |> put_flash(
-           :error,
-           "#{gettext("Failed")} #{failed_operation}. #{list_errors_to_string(changeset.errors)}"
-         )}
+      {:error, _failed_operation, changeset, _} ->
+        send(self(), {:error, changeset})
+        {:noreply, socket}
 
       :not_authorise ->
-        {:noreply,
-         socket
-         |> put_flash(:error, gettext("You are not authorised to perform this action"))}
+        send(self(), {:not_authorise})
+        {:noreply, socket}
     end
   end
 
@@ -205,25 +155,27 @@ defmodule FullCircleWeb.SalaryNoteLive.Form do
 
     socket = assign(socket, form: to_form(changeset))
 
+    IO.inspect(changeset)
+
     {:noreply, socket}
   end
 
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="w-6/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
-      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
-      <p :if={!is_nil(@form.source.data.pay_slip_no)} class="w-full text-xl text-center font-bold">
-        <%= @form.source.data.pay_slip_no %>
-      </p>
+    <div class="">
       <.form
         for={@form}
         id="object-form"
         autocomplete="off"
         phx-change="validate"
         phx-submit="save"
-        class="mx-auto"
+        phx-target={@myself}
       >
+        <p class="w-full text-3xl text-center font-medium"><%= @title %></p>
+        <p :if={!is_nil(@form.source.data.pay_slip_no)} class="w-full text-xl text-center font-bold">
+          <%= @form.source.data.pay_slip_no %>
+        </p>
         <%= Phoenix.HTML.Form.hidden_input(@form, :note_no) %>
         <div class="grid grid-cols-12 gap-1">
           <div class="col-span-3">
@@ -274,11 +226,10 @@ defmodule FullCircleWeb.SalaryNoteLive.Form do
         </div>
 
         <div class="flex justify-center gap-x-1 mt-1">
-          <.form_action_button
-            form={@form}
-            live_action={@live_action}
-            new_url={~p"/companies/#{@current_company.id}/SalaryNote/new"}
-          />
+          <.save_button form={@form} />
+          <.link phx-click={:modal_cancel} class="orange button">
+            <%= gettext("Cancel") %>
+          </.link>
           <%= if @live_action == :edit and FullCircle.Authorization.can?(@current_user, :delete_salary_note, @current_company) do %>
             <.delete_confirm_modal
               id="delete-object"

@@ -258,6 +258,31 @@ defmodule FullCircle.HR do
     |> Repo.one!()
   end
 
+  def get_salary_notes(emp_id, month, year, com, user) do
+    edate = Timex.end_of_month(String.to_integer(year), String.to_integer(month))
+    sdate = Timex.beginning_of_month(String.to_integer(year), String.to_integer(month))
+
+    from(note in salary_note_query(com, user),
+      where: note.employee_id == ^emp_id,
+      where: note.note_date >= ^sdate,
+      where: note.note_date <= ^edate,
+      order_by: note.note_date
+    )
+    |> Repo.all()
+  end
+
+  def get_employee_salary_type(emp_id \\ "", type_id \\ "") do
+    if emp_id == "" or type_id == "" do
+      nil
+    else
+      from(et in EmployeeSalaryType,
+        where: et.employee_id == ^emp_id,
+        where: et.salary_type_id == ^type_id
+      )
+      |> Repo.one()
+    end
+  end
+
   def salary_note_query(company, user) do
     from(note in SalaryNote,
       join: com in subquery(Sys.user_company(company, user)),
@@ -460,6 +485,37 @@ defmodule FullCircle.HR do
     )
     |> Sys.insert_log_for(salary_note_name, attrs, com, user)
     |> create_salary_note_transactions(salary_note_name, com, user)
+  end
+
+  def delete_salary_note(%SalaryNote{} = salary_note, com, user) do
+    case can?(user, :delete_salary_note, com) do
+      true ->
+        Multi.new()
+        |> delete_salary_note_multi(salary_note, com, user)
+        |> Repo.transaction()
+
+      false ->
+        :not_authorise
+    end
+  rescue
+    e in Postgrex.Error ->
+      {:sql_error, e.postgres.message}
+  end
+
+  def delete_salary_note_multi(multi, salary_note, com, user) do
+    salary_note_name = :delete_salary_note
+
+    multi
+    |> Multi.delete(salary_note_name, StdInterface.changeset(SalaryNote, salary_note, %{}, com))
+    |> Multi.delete_all(
+      :delete_transaction,
+      from(txn in Transaction,
+        where: txn.doc_type == "SalaryNote",
+        where: txn.doc_no == ^salary_note.note_no,
+        where: txn.company_id == ^com.id
+      )
+    )
+    |> Sys.insert_log_for(salary_note_name, %{"deleted_id_is" => salary_note.id}, com, user)
   end
 
   def get_advance!(id, com, user) do
@@ -773,7 +829,7 @@ defmodule FullCircle.HR do
   end
 
   defp punch_query_by_company_id(sdate, edate, com_id) do
-    "select d2.id::varchar || d2.dd::varchar as idg, d2.dd, d2.name, normal_work_hours,
+    "select d2.id::varchar || d2.dd::varchar as idg, d2.dd, d2.name, p2.normal_work_hours,
             d2.id as employee_id, p2.shift, p2.time_list, holi_list, sholi_list
        from (select d1.dd, d1.name, d1.id, d1.status, d1.id_no,
                     string_agg(hl.name, ', ' order by hl.name) as holi_list,
@@ -793,6 +849,15 @@ defmodule FullCircle.HR do
          on p2.pt = d2.dd
         and d2.id = p2.employee_id
       where true"
+  end
+
+  def punch_by_date(emp_id, pdate, com_id) do
+    (punch_query_by_company_id(pdate, pdate, com_id) <>
+       " and d2.id = '#{emp_id}'" <>
+       " order by d2.dd, p2.shift")
+    |> exec_punch_query()
+    |> unzip_all_time_list()
+    |> Enum.at(0)
   end
 
   def punch_card_query(month, year, emp_id, com_id) do
@@ -892,7 +957,7 @@ defmodule FullCircle.HR do
       ut = Map.get(t, :time_list) |> unzip_time_list()
       # change key to id
       idg = Map.get(t, :idg)
-      nwh = Decimal.to_float(Map.get(t, :normal_work_hours))
+      nwh = Decimal.to_float(Map.get(t, :normal_work_hours) || Decimal.new("0.00001"))
       wh = Enum.sum(count_hours_work(ut))
 
       nh =

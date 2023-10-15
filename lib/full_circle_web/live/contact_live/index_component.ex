@@ -14,10 +14,7 @@ defmodule FullCircleWeb.ContactLive.IndexComponent do
   @impl true
   def render(assigns) do
     ~H"""
-    <div
-      id={@id}
-      class={"#{@ex_class} p-1 text-center bg-gray-200 border-gray-500 border-b"}
-    >
+    <div id={@id} class={"#{@ex_class} p-1 text-center bg-gray-200 border-gray-500 border-b"}>
       <.link
         :if={!FullCircle.Accounting.is_default_account?(@obj)}
         class="hover:font-bold text-blue-600"

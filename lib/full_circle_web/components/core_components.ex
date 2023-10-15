@@ -791,10 +791,7 @@ defmodule FullCircleWeb.CoreComponents do
 
   def infinite_scroll_footer(assigns) do
     ~H"""
-    <div
-      :if={@ended}
-      class="mt-2 mb-2 text-center border-y-2 bg-orange-200 border-orange-400 p-2"
-    >
+    <div :if={@ended} class="mt-2 mb-2 text-center border-y-2 bg-orange-200 border-orange-400 p-2">
       <%= gettext("No More.") %>
     </div>
 

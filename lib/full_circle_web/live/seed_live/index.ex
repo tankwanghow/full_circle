@@ -18,7 +18,7 @@ defmodule FullCircleWeb.SeedLive.Index do
     "Goods" =>
       ~w(name descriptions unit purchase_account_name sales_account_name purchase_tax_code_name sales_tax_code_name package_name unit_multiplier cost_per_package),
     "Balances" => ~w(doc_date	account_name amount),
-    "Transactions" => ~w(doc_date	account_name	doc_no	doc_type particulars	amount),
+    "Transactions" => ~w(doc_date	account_name	doc_no doc_type particulars	amount),
     "TransactionMatchers" =>
       ~w(account_name m_doc_date m_doc_id m_doc_type m_amount n_doc_date n_doc_id n_doc_type n_amount)
   }

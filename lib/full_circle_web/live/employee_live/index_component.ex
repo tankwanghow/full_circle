@@ -14,28 +14,25 @@ defmodule FullCircleWeb.EmployeeLive.IndexComponent do
   @impl true
   def render(assigns) do
     ~H"""
-    <div
-      id={@id}
-      class={"#{@ex_class} text-center bg-gray-200 border-gray-500 border-b p-1"}
-    >
-    <div class="float-left ml-5">
-      <input
-        :if={@obj.checked}
-        id={"checkbox_#{@obj.id}"}
-        name={"checkbox[#{@obj.id}]"}
-        type="checkbox"
-        phx-click="check_click"
-        phx-value-object-id={@obj.id}
-        checked
-      />
-      <input
-        :if={!@obj.checked}
-        id={"checkbox_#{@obj.id}"}
-        name={"checkbox[#{@obj.id}]"}
-        type="checkbox"
-        phx-click="check_click"
-        phx-value-object-id={@obj.id}
-      />
+    <div id={@id} class={"#{@ex_class} text-center bg-gray-200 border-gray-500 border-b p-1"}>
+      <div class="float-left ml-5">
+        <input
+          :if={@obj.checked}
+          id={"checkbox_#{@obj.id}"}
+          name={"checkbox[#{@obj.id}]"}
+          type="checkbox"
+          phx-click="check_click"
+          phx-value-object-id={@obj.id}
+          checked
+        />
+        <input
+          :if={!@obj.checked}
+          id={"checkbox_#{@obj.id}"}
+          name={"checkbox[#{@obj.id}]"}
+          type="checkbox"
+          phx-click="check_click"
+          phx-value-object-id={@obj.id}
+        />
       </div>
       <.link
         class="text-blue-600 hover:font-bold"

@@ -22,7 +22,9 @@ defmodule FullCircleWeb.UserLive.RougeUserIndex do
             }
           />
           <span class="email font-mono font-bold"><%= u.email %></span>
-          <span>created at <%= FullCircleWeb.Helpers.format_datetime(u.inserted_at, @current_company) %></span>
+          <span>
+            created at <%= FullCircleWeb.Helpers.format_datetime(u.inserted_at, @current_company) %>
+          </span>
         </div>
       <% end %>
     </div>

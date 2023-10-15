@@ -49,7 +49,14 @@ defmodule FullCircle.Sys.Company do
       :tax_id,
       :normal_work_hours
     ])
-    |> validate_required([:normal_work_hours, :name, :country, :timezone, :closing_day, :closing_month])
+    |> validate_required([
+      :normal_work_hours,
+      :name,
+      :country,
+      :timezone,
+      :closing_day,
+      :closing_month
+    ])
     |> validate_number(:closing_day,
       greater_than: 0,
       less_than: 32,

@@ -17,6 +17,7 @@ defmodule FullCircle.HR.Employee do
     field(:children, :integer)
     field(:service_since, :date)
     field(:contract_expire_date, :date)
+    field(:work_days_per_week, :integer, default: 6)
     field(:status, :string)
     field(:note, :string)
     belongs_to(:company, FullCircle.Sys.Company)
@@ -45,7 +46,8 @@ defmodule FullCircle.HR.Employee do
       :contract_expire_date,
       :status,
       :note,
-      :company_id
+      :company_id,
+      :work_days_per_week
     ])
     |> validate_required([
       :name,
@@ -58,7 +60,8 @@ defmodule FullCircle.HR.Employee do
       :children,
       :service_since,
       :status,
-      :company_id
+      :company_id,
+      :work_days_per_week
     ])
     |> unsafe_validate_unique([:name, :company_id], FullCircle.Repo,
       message: gettext("has already been taken")

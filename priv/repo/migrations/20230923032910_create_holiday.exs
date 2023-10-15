@@ -11,10 +11,8 @@ defmodule FullCircle.Repo.Migrations.CreateHolidays do
       timestamps(type: :timestamptz)
     end
 
-    create unique_index(:holidays, [:company_id, :name, :holidate],
-             name: :holidays_unique_name_holidate_in_company
+    create unique_index(:holidays, [:company_id, :holidate],
+             name: :holidays_unique_holidate_in_company
            )
-
-    create index(:holidays, [:company_id, :holidate])
   end
 end

@@ -28,11 +28,11 @@ defmodule FullCircle.HR.Holiday do
       :company_id,
       :holidate
     ])
-    |> unsafe_validate_unique([:name, :holidate, :company_id], FullCircle.Repo,
+    |> unsafe_validate_unique([:holidate, :company_id], FullCircle.Repo,
       message: gettext("has already been taken")
     )
-    |> unique_constraint(:name,
-      name: :holidays_unique_name_holidate_in_company,
+    |> unique_constraint(:holidate,
+      name: :holidays_unique_holidate_in_company,
       message: gettext("has already been taken")
     )
   end

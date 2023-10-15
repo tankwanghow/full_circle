@@ -384,10 +384,10 @@ defmodule FullCircleWeb.GoodLive.Form do
           <div class={"grid grid-cols-12 gap-1 #{if(pack[:delete].value == true and Enum.count(pack.errors) == 0, do: "hidden", else: "")}"}>
             <div class="col-span-4">
               <div class="grid grid-cols-12">
-                <div class="col-span-1 pt-2 pl-1">
+                <div class="col-span-2 pt-2 pl-1">
                   <.input type="checkbox" field={pack[:default]} />
                 </div>
-                <div class="col-span-11">
+                <div class="col-span-10">
                   <.input field={pack[:name]} />
                 </div>
               </div>

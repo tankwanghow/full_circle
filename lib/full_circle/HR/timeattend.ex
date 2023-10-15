@@ -47,6 +47,8 @@ defmodule FullCircle.HR.TimeAttend do
       :user_id
     ])
     |> fill_punch_time()
+    |> validate_date(:punch_time_local, days_before: 38)
+    |> validate_date(:punch_time_local, days_after: 0)
     |> validate_id(:employee_name, :employee_id)
   end
 

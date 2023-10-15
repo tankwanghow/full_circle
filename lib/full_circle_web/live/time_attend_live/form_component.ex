@@ -66,7 +66,7 @@ defmodule FullCircleWeb.TimeAttendLive.FormComponent do
            socket.assigns.current_user
          ) do
       {:ok, obj} ->
-        send(self(), {:deleted, obj})
+        send(self(), {:deleted_ta, obj})
         {:noreply, socket}
 
       {:error, changeset} ->
@@ -88,7 +88,7 @@ defmodule FullCircleWeb.TimeAttendLive.FormComponent do
       )
     ) do
       {:ok, obj} ->
-        send(self(), {:created, obj})
+        send(self(), {:created_ta, obj})
         {:noreply, socket}
 
       {:error, changeset} ->
@@ -109,7 +109,7 @@ defmodule FullCircleWeb.TimeAttendLive.FormComponent do
            socket.assigns.current_user
          ) do
       {:ok, obj} ->
-        send(self(), {:updated, obj})
+        send(self(), {:updated_ta, obj})
         {:noreply, socket}
 
       {:error, changeset} ->
