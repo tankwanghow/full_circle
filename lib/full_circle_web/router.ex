@@ -203,6 +203,8 @@ defmodule FullCircleWeb.Router do
       live("/Journal", JournalLive.Index, :index)
       live("/Journal/new", JournalLive.Form, :new)
       live("/Journal/:journal_id/edit", JournalLive.Form, :edit)
+
+      live("/PayRun", PayRunLive.Index, :index)
     end
 
     live_session :require_authenticated_user_n_active_company_print,

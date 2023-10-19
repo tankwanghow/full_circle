@@ -48,7 +48,7 @@ defmodule FullCircle.HR.SalaryType do
   end
 
   defp validate_ac_names(cs) do
-    if fetch_field!(cs, :type) != "Recording" do
+    if fetch_field!(cs, :type) != "Recording" and fetch_field!(cs, :type) != "LeaveTaken" do
       cs
       |> validate_required([
         :db_ac_name,

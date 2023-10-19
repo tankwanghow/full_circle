@@ -37,7 +37,8 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCardComponent do
     <div
       id={@id}
       class={[
-        "#{@ex_class} flex flex-row text-center",
+        "flex flex-row text-center",
+        if(@obj.id == @shake_obj.id, do: "shake", else: ""),
         if(@obj.dd |> is_sunday(),
           do: "bg-rose-200 hover:bg-rose-300",
           else: "bg-gray-200 hover:bg-gray-300"

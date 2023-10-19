@@ -275,11 +275,11 @@ defmodule FullCircleWeb.EmployeeLive.Form do
         phx-submit="save"
         class="mx-auto"
       >
-        <div class="grid grid-cols-12 gap-1">
-          <div class="col-span-5">
+        <div class="flex flex-nowrap gap-1">
+          <div class="w-[35%]">
             <.input field={@form[:name]} label={gettext("Name")} />
           </div>
-          <div class="col-span-2">
+          <div class="w-[13%]">
             <.input
               field={@form[:gender]}
               label={gettext("Gender")}
@@ -287,10 +287,15 @@ defmodule FullCircleWeb.EmployeeLive.Form do
               options={["Male", "Female"]}
             />
           </div>
-          <div class="col-span-3">
+          <div class="w-[20%]">
+            <.input field={@form[:nationality]} label={gettext("Nationality")} list="countries" />
+          </div>
+          <div class="w-[17%]">
             <.input field={@form[:dob]} label={gettext("DOB")} type="date" />
           </div>
-          <div class="col-span-2">
+        </div>
+        <div class="flex flex-nowrap gap-1">
+        <div class="w-[14%]">
             <.input
               field={@form[:marital_status]}
               label={gettext("Married")}
@@ -298,54 +303,101 @@ defmodule FullCircleWeb.EmployeeLive.Form do
               options={["Single", "Married"]}
             />
           </div>
-        </div>
-        <div class="grid grid-cols-12 gap-1">
-          <div class="col-span-2">
-            <.input field={@form[:nationality]} label={gettext("Nationality")} list="countries" />
-          </div>
-          <div class="col-span-2">
+          <div class="w-[15%]">
             <.input
               field={@form[:partner_working]}
-              label={gettext("Both Working")}
+              label={gettext("Spouse Working")}
               type="select"
               options={["Yes", "No"]}
             />
           </div>
-          <div class="col-span-2">
+          <div class="w-[8%]">
             <.input field={@form[:children]} label={gettext("Children")} type="number" step="1" />
           </div>
-          <div class="col-span-3">
+          <div class="w-[18%]">
             <.input field={@form[:service_since]} label={gettext("Service Since")} type="date" />
           </div>
-          <div class="col-span-3">
+          <div class="w-[18%]">
             <.input
               field={@form[:contract_expire_date]}
               label={gettext("Contract Expire")}
               type="date"
             />
           </div>
-        </div>
-        <div class="grid grid-cols-12 gap-1">
-          <div class="col-span-2">
+          <div class="w-[15%]">
             <.input
-              field={@form[:work_days_per_week]}
-              label={gettext("Work Days Per Week")}
+              field={@form[:work_hours_per_day]}
+              label={gettext("Work Hours Daily")}
               type="number"
             />
           </div>
-          <div class="col-span-2">
+        </div>
+        <div class="flex flex-nowrap gap-1">
+
+          <div class="w-[16%]">
+            <.input
+              field={@form[:work_days_per_week]}
+              label={gettext("Work Days Weekly")}
+              type="number"
+            />
+          </div>
+          <div class="w-[16%]">
+            <.input
+              field={@form[:work_days_per_month]}
+              label={gettext("Work Days Monthly")}
+              type="number"
+            />
+          </div>
+          <div class="w-[12%]">
+            <.input
+              field={@form[:annual_leave]}
+              label={gettext("Annual Leave")}
+              type="number"
+            />
+          </div>
+          <div class="w-[10%]">
+            <.input
+              field={@form[:sick_leave]}
+              label={gettext("Sick Leave")}
+              type="number"
+            />
+          </div>
+          <div class="w-[15%]">
+            <.input
+              field={@form[:hospital_leave]}
+              label={gettext("Hopistalize Leave")}
+              type="number"
+            />
+          </div>
+          <div class="w-[14%]">
+            <.input
+              field={@form[:maternity_leave]}
+              label={gettext("Maternity Leave")}
+              type="number"
+            />
+          </div>
+          <div class="w-[13%]">
+            <.input
+              field={@form[:paternity_leave]}
+              label={gettext("Paternity Leave")}
+              type="number"
+            />
+          </div>
+        </div>
+        <div class="flex flex-nowrap gap-1">
+          <div class="w-[21%]">
             <.input field={@form[:id_no]} label={gettext("Id No")} />
           </div>
-          <div class="col-span-2">
+          <div class="w-[21%]">
             <.input field={@form[:epf_no]} label={gettext("EPF No")} />
           </div>
-          <div class="col-span-2">
+          <div class="w-[21%]">
             <.input field={@form[:socso_no]} label={gettext("SOCSO No")} />
           </div>
-          <div class="col-span-2">
+          <div class="w-[21%]">
             <.input field={@form[:tax_no]} label={gettext("Tax No")} />
           </div>
-          <div class="col-span-2">
+          <div class="w-[15%]">
             <.input
               field={@form[:status]}
               label={gettext("Status")}

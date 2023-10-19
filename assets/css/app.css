@@ -115,6 +115,10 @@ button[disabled] {
   @apply border-red-500 bg-red-200 hover:bg-red-500 focus:bg-red-500;
 }
 
+.teal.button {
+  @apply border-teal-500 bg-teal-200 hover:bg-teal-500 focus:bg-teal-500;
+}
+
 .tab {
   @apply rounded-lg border-b-2 border-gray-400 font-medium text-lg py-2;
   @apply hover:border-b-2 hover:border-blue-800 hover:font-extrabold hover:cursor-pointer;

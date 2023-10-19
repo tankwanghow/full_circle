@@ -33,7 +33,14 @@ defmodule FullCircle.Repo.Migrations.CreateEmployees do
       add :contract_expire_date, :date
       add :status, :string
       add :note, :text
-      add :work_days_per_week, :integer
+      add :work_hours_per_day, :decimal, default: 7.5
+      add :work_days_per_week, :decimal, default: 6
+      add :work_days_per_month, :decimal, default: 26
+      add :annual_leave, :integer, default: 8
+      add :sick_leave, :integer, default: 14
+      add :hospital_leave, :integer, default: 60
+      add :maternity_leave, :integer, default: 98
+      add :paternity_leave, :integer, default: 7
       add :company_id, references(:companies, on_delete: :delete_all)
 
       timestamps(type: :timestamptz)

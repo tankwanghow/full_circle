@@ -5,6 +5,7 @@ defmodule FullCircle.HR.Employee do
 
   schema "employees" do
     field(:name, :string)
+    field(:department, :string)
     field(:id_no, :string)
     field(:dob, :date)
     field(:gender, :string)
@@ -17,7 +18,14 @@ defmodule FullCircle.HR.Employee do
     field(:children, :integer)
     field(:service_since, :date)
     field(:contract_expire_date, :date)
-    field(:work_days_per_week, :integer, default: 6)
+    field(:work_hours_per_day, :decimal, default: 7.5)
+    field(:work_days_per_week, :decimal, default: 6)
+    field(:work_days_per_month, :decimal, default: 26)
+    field(:annual_leave, :integer, default: 8)
+    field(:sick_leave, :integer, default: 14)
+    field(:hospital_leave, :integer, default: 60)
+    field(:maternity_leave, :integer, default: 98)
+    field(:paternity_leave, :integer, default: 7)
     field(:status, :string)
     field(:note, :string)
     belongs_to(:company, FullCircle.Sys.Company)
@@ -33,6 +41,7 @@ defmodule FullCircle.HR.Employee do
     |> cast(attrs, [
       :name,
       :id_no,
+      :department,
       :dob,
       :gender,
       :epf_no,
@@ -47,7 +56,14 @@ defmodule FullCircle.HR.Employee do
       :status,
       :note,
       :company_id,
-      :work_days_per_week
+      :work_hours_per_day,
+      :work_days_per_week,
+      :work_days_per_month,
+      :annual_leave,
+      :sick_leave,
+      :hospital_leave,
+      :maternity_leave,
+      :paternity_leave
     ])
     |> validate_required([
       :name,
@@ -61,7 +77,14 @@ defmodule FullCircle.HR.Employee do
       :service_since,
       :status,
       :company_id,
-      :work_days_per_week
+      :work_hours_per_day,
+      :work_days_per_week,
+      :work_days_per_month,
+      :annual_leave,
+      :sick_leave,
+      :hospital_leave,
+      :maternity_leave,
+      :paternity_leave
     ])
     |> unsafe_validate_unique([:name, :company_id], FullCircle.Repo,
       message: gettext("has already been taken")
@@ -70,6 +93,9 @@ defmodule FullCircle.HR.Employee do
       name: :employees_unique_name_in_company,
       message: gettext("has already been taken")
     )
+    |> validate_number(:work_hours_per_day, less_than_or_equal_to: 12)
+    |> validate_number(:work_days_per_week, less_than_or_equal_to: 7)
+    |> validate_number(:work_days_per_month, less_than_or_equal_to: 26)
     |> cast_assoc(:employee_salary_types)
   end
 end

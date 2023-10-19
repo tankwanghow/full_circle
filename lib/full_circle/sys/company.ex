@@ -22,7 +22,6 @@ defmodule FullCircle.Sys.Company do
     field :tax_id, :string
     field :closing_month, :integer
     field :closing_day, :integer
-    field :normal_work_hours, :decimal
 
     timestamps(type: :utc_datetime)
   end
@@ -46,11 +45,9 @@ defmodule FullCircle.Sys.Company do
       :tel,
       :fax,
       :descriptions,
-      :tax_id,
-      :normal_work_hours
+      :tax_id
     ])
     |> validate_required([
-      :normal_work_hours,
       :name,
       :country,
       :timezone,
@@ -61,11 +58,6 @@ defmodule FullCircle.Sys.Company do
       greater_than: 0,
       less_than: 32,
       message: gettext("must between 1 to 31")
-    )
-    |> validate_number(:closing_month,
-      greater_than: 0,
-      less_than: 13,
-      message: gettext("must between 1 to 12")
     )
     |> validate_inclusion(:country, FullCircle.Sys.countries(), message: gettext("not in list"))
     |> validate_inclusion(:timezone, Tzdata.zone_list(), message: gettext("not in list"))

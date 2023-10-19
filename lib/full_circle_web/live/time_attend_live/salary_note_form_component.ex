@@ -87,7 +87,7 @@ defmodule FullCircleWeb.TimeAttendLive.SalaryNoteFormComponent do
            socket.assigns.current_user
          ) do
       {:ok, %{delete_salary_note: obj}} ->
-        send(self(), {:deleted_sn, obj})
+        send(self(), {:refresh_page_sn, obj})
         {:noreply, socket}
 
       {:error, _failed_operation, changeset} ->
@@ -109,7 +109,7 @@ defmodule FullCircleWeb.TimeAttendLive.SalaryNoteFormComponent do
       )
     ) do
       {:ok, %{create_salary_note: obj}} ->
-        send(self(), {:created_sn, obj})
+        send(self(), {:refresh_page_sn, obj})
         {:noreply, socket}
 
       {:error, _failed_operation, changeset, _} ->
@@ -130,7 +130,7 @@ defmodule FullCircleWeb.TimeAttendLive.SalaryNoteFormComponent do
            socket.assigns.current_user
          ) do
       {:ok, %{update_salary_note: obj}} ->
-        send(self(), {:updated_sn, obj})
+        send(self(), {:refresh_page_sn, obj})
         {:noreply, socket}
 
       {:error, _failed_operation, changeset, _} ->
@@ -203,18 +203,16 @@ defmodule FullCircleWeb.TimeAttendLive.SalaryNoteFormComponent do
           </div>
         </div>
         <div class="grid grid-cols-12 gap-1">
-          <div class="col-span-12">
+          <div class="col-span-6">
             <.input field={@form[:descriptions]} label={gettext("Descriptions")} />
           </div>
-        </div>
-        <div class="grid grid-cols-12 gap-1">
-          <div class="col-span-4">
+          <div class="col-span-2">
             <.input field={@form[:quantity]} label={gettext("Quantity")} type="number" step="0.0001" />
           </div>
-          <div class="col-span-4">
+          <div class="col-span-2">
             <.input field={@form[:unit_price]} label={gettext("Price")} type="number" step="0.0001" />
           </div>
-          <div class="col-span-4">
+          <div class="col-span-2">
             <.input
               feedback={true}
               field={@form[:amount]}

@@ -17,10 +17,11 @@ defmodule FullCircle.HR do
 
   alias FullCircle.Accounting.{Account, Transaction}
   alias FullCircle.Accounting
+  alias FullCircle.Sys.Company
   alias FullCircle.{Repo, Sys, StdInterface}
 
   def salary_type_types() do
-    ["Addition", "Deduction", "Contribution", "Recording"]
+    ["Addition", "Deduction", "Contribution", "Recording", "LeaveTaken"]
   end
 
   def default_salary_types(company_id) do
@@ -259,8 +260,8 @@ defmodule FullCircle.HR do
   end
 
   def get_salary_notes(emp_id, month, year, com, user) do
-    edate = Timex.end_of_month(String.to_integer(year), String.to_integer(month))
-    sdate = Timex.beginning_of_month(String.to_integer(year), String.to_integer(month))
+    edate = Timex.end_of_month(year, month)
+    sdate = Timex.beginning_of_month(year, month)
 
     from(note in salary_note_query(com, user),
       where: note.employee_id == ^emp_id,
@@ -280,6 +281,20 @@ defmodule FullCircle.HR do
         where: et.salary_type_id == ^type_id
       )
       |> Repo.one()
+    end
+  end
+
+  def get_employee_salary_types(emp_id \\ "") do
+    if emp_id == "" do
+      nil
+    else
+      from(et in EmployeeSalaryType,
+        join: st in SalaryType,
+        on: st.id == et.salary_type_id,
+        where: et.employee_id == ^emp_id,
+        select: %{id: st.id, name: st.name, amount: et.amount}
+      )
+      |> Repo.all()
     end
   end
 
@@ -339,42 +354,60 @@ defmodule FullCircle.HR do
   end
 
   defp salary_note_raw_query(company, user) do
-    from txn in Transaction,
-      join: com in subquery(Sys.user_company(company, user)),
-      on: com.id == txn.company_id and txn.doc_type == "SalaryNote",
-      left_join: note in SalaryNote,
-      on: txn.doc_no == note.note_no,
-      left_join: emp in Employee,
-      on: emp.id == note.employee_id,
-      left_join: st in SalaryType,
-      on: st.id == note.salary_type_id,
-      order_by: [desc: txn.inserted_at],
-      where: txn.amount > 0,
-      select: %{
-        id: coalesce(note.id, txn.id),
-        note_no: txn.doc_no,
-        employee_name: emp.name,
-        salary_type_name: st.name,
-        particulars: coalesce(note.descriptions, txn.particulars),
-        note_date: txn.doc_date,
-        updated_at: txn.inserted_at,
-        company_id: com.id,
-        amount: txn.amount,
-        checked: false,
-        old_data: txn.old_data
-      },
-      group_by: [
-        coalesce(note.id, txn.id),
-        txn.doc_no,
-        txn.doc_date,
-        com.id,
-        txn.old_data,
-        txn.inserted_at,
-        txn.amount,
-        emp.name,
-        st.name,
-        coalesce(note.descriptions, txn.particulars)
-      ]
+    a =
+      from(txn in Transaction,
+        join: com in Company,
+        on: com.id == txn.company_id and txn.doc_type == "SalaryNote",
+        on: com.id == ^company.id,
+        left_join: note in SalaryNote,
+        on: txn.doc_no == note.note_no,
+        left_join: emp in Employee,
+        on: emp.id == note.employee_id,
+        left_join: st in SalaryType,
+        on: st.id == note.salary_type_id,
+        where: txn.amount > 0,
+        select: %{
+          id: coalesce(note.id, txn.id),
+          note_no: txn.doc_no,
+          employee_name: emp.name,
+          salary_type_name: st.name,
+          particulars: coalesce(note.descriptions, txn.particulars),
+          note_date: txn.doc_date,
+          updated_at: txn.inserted_at,
+          company_id: com.id,
+          amount: txn.amount,
+          checked: false,
+          old_data: txn.old_data
+        }
+      )
+
+    b =
+      from(sn in SalaryNote,
+        join: com in Company,
+        on: com.id == ^company.id,
+        on: com.id == sn.company_id,
+        join: emp in Employee,
+        on: emp.id == sn.employee_id,
+        join: st in SalaryType,
+        on: st.id == sn.salary_type_id,
+        on: is_nil(st.db_ac_id),
+        on: is_nil(st.cr_ac_id),
+        select: %{
+          id: sn.id,
+          note_no: sn.note_no,
+          employee_name: emp.name,
+          salary_type_name: st.name,
+          particulars: sn.descriptions,
+          note_date: sn.note_date,
+          updated_at: sn.inserted_at,
+          company_id: com.id,
+          amount: sn.quantity * sn.unit_price,
+          checked: false,
+          old_data: false
+        }
+      )
+
+    union_all(a, ^b)
   end
 
   def create_salary_note(attrs, com, user) do
@@ -604,19 +637,7 @@ defmodule FullCircle.HR do
         amount: txn.amount,
         checked: false,
         old_data: txn.old_data
-      },
-      group_by: [
-        coalesce(adv.id, txn.id),
-        txn.doc_no,
-        txn.doc_date,
-        com.id,
-        txn.old_data,
-        txn.inserted_at,
-        txn.amount,
-        emp.name,
-        funds.name,
-        coalesce(adv.note, txn.particulars)
-      ]
+      }
   end
 
   def create_advance(attrs, com, user) do
@@ -798,6 +819,7 @@ defmodule FullCircle.HR do
       join: com in subquery(Sys.user_company(company, user)),
       on: com.id == emp.company_id,
       where: ilike(emp.name, ^"%#{terms}%"),
+      where: emp.status == "Active",
       select: %{id: emp.id, value: emp.name},
       order_by: emp.name
     )
@@ -829,23 +851,29 @@ defmodule FullCircle.HR do
   end
 
   defp punch_query_by_company_id(sdate, edate, com_id) do
-    "select d2.id::varchar || d2.dd::varchar as idg, d2.dd, d2.name, p2.normal_work_hours,
-            d2.id as employee_id, p2.shift, p2.time_list, holi_list, sholi_list
-       from (select d1.dd, d1.name, d1.id, d1.status, d1.id_no,
+    "select d2.id::varchar || d2.dd::varchar as idg, d2.dd, d2.name, d2.work_hours_per_day,
+            d2.work_days_per_week, d2.work_days_per_month, d2.id as employee_id,
+            p2.shift, p2.time_list, holi_list, sholi_list
+       from (select d1.dd, d1.name, d1.id, d1.status, d1.id_no, d1.work_hours_per_day,
+                    d1.work_days_per_week, d1.work_days_per_month,
                     string_agg(hl.name, ', ' order by hl.name) as holi_list,
                     string_agg(hl.short_name, ', ' order by hl.short_name) as sholi_list
-               from (select dd::date, e.name, e.id, e.status, e.id_no from employees e,
+               from (select dd::date, e.name, e.id, e.status, e.id_no, e.work_hours_per_day,
+                            e.work_days_per_week, e.work_days_per_month
+                            from employees e,
                             generate_series('#{sdate}'::date, '#{edate}'::date, '1 day') as dd
                       where e.status = 'Active' and e.company_id = '#{com_id}') d1 left outer join holidays hl
                          on hl.holidate = d1.dd and hl.company_id = '#{com_id}'
-                      group by d1.dd, d1.name, d1.id, d1.status, d1.id_no) d2 left outer join
-              (select ta.employee_id, c.normal_work_hours, ta.shift_id as shift, min(ta.punch_time)::date as pt, min(ta.punch_time) as punch_time,
+                      group by d1.dd, d1.name, d1.id, d1.status, d1.id_no,
+                               d1.work_hours_per_day, d1.work_days_per_week,
+                               d1.work_days_per_month) d2 left outer join
+              (select ta.employee_id, ta.shift_id as shift, min(ta.punch_time)::date as pt, min(ta.punch_time) as punch_time,
                       array_agg(ta.punch_time::varchar || '|' || ta.id::varchar || '|' || ta.status || '|' || ta.flag order by ta.punch_time) time_list
                  from time_attendences ta inner join companies c on c.id = ta.company_id
                 where ta.company_id = '#{com_id}'
                   and ta.punch_time::date >= '#{sdate}'
                   and ta.punch_time::date <= '#{edate}'
-                group by ta.employee_id, ta.shift_id, c.normal_work_hours) p2
+                group by ta.employee_id, ta.shift_id) p2
          on p2.pt = d2.dd
         and d2.id = p2.employee_id
       where true"
@@ -855,19 +883,19 @@ defmodule FullCircle.HR do
     (punch_query_by_company_id(pdate, pdate, com_id) <>
        " and d2.id = '#{emp_id}'" <>
        " order by d2.dd, p2.shift")
-    |> exec_punch_query()
+    |> exec_query()
     |> unzip_all_time_list()
     |> Enum.at(0)
   end
 
   def punch_card_query(month, year, emp_id, com_id) do
-    edate = Timex.end_of_month(String.to_integer(year), String.to_integer(month))
-    sdate = Timex.beginning_of_month(String.to_integer(year), String.to_integer(month))
+    edate = Timex.end_of_month(year, month)
+    sdate = Timex.beginning_of_month(year, month)
 
     (punch_query_by_company_id(sdate, edate, com_id) <>
        " and d2.id = '#{emp_id}'" <>
        " order by d2.dd, p2.shift")
-    |> exec_punch_query()
+    |> exec_query()
     |> unzip_all_time_list()
   end
 
@@ -876,7 +904,7 @@ defmodule FullCircle.HR do
 
     (punch_query_by_company_id(dd, dd, com_id) <>
        " and d2.id::varchar || d2.dd::varchar = '#{empid}#{dd}'")
-    |> exec_punch_query()
+    |> exec_query()
     |> unzip_all_time_list()
     |> Enum.at(0)
   end
@@ -892,7 +920,7 @@ defmodule FullCircle.HR do
        ) <>
        " order by d2.name, d2.dd, p2.shift" <>
        " limit #{per_page} offset (#{page} - 1) * #{per_page} ")
-    |> exec_punch_query()
+    |> exec_query()
     |> unzip_all_time_list()
   end
 
@@ -909,7 +937,7 @@ defmodule FullCircle.HR do
     |> Repo.all()
   end
 
-  defp exec_punch_query(qry) do
+  def exec_query(qry) do
     k = FullCircle.Repo.query!(qry)
 
     Enum.map(k.rows, fn r ->
@@ -957,7 +985,7 @@ defmodule FullCircle.HR do
       ut = Map.get(t, :time_list) |> unzip_time_list()
       # change key to id
       idg = Map.get(t, :idg)
-      nwh = Decimal.to_float(Map.get(t, :normal_work_hours) || Decimal.new("0.00001"))
+      nwh = Decimal.to_float(Map.get(t, :work_hours_per_day) || Decimal.new("0.00001"))
       wh = Enum.sum(count_hours_work(ut))
 
       nh =
@@ -972,7 +1000,7 @@ defmodule FullCircle.HR do
           true -> 0
         end
 
-      Map.merge(t, %{time_list: ut, wh: wh, nh: nh, ot: ot, id: idg, normal_work_hours: nwh})
+      Map.merge(t, %{time_list: ut, wh: wh, nh: nh, ot: ot, id: idg, work_hours_per_day: nwh})
     end)
   end
 
