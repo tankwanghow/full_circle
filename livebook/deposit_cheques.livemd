@@ -13,23 +13,35 @@ chqs = Reporting.post_dated_cheques("", "All", "", "2023-12-31", c)
 ## Depositing Cheques
 
 ```elixir
-a = FullCircle.PayRun.pay_run_index(10, 2023, c)
+# a = FullCircle.PayRun.pay_run_index(10, 2023, c)
 
-Enum.at(a, 1).pay_list |> Enum.map(fn {_, _, y, m} -> "#{m}/#{y}" end)
+# Enum.at(a, 1).pay_list |> Enum.map(fn {_,_,y,m} -> "#{m}/#{y}" end)
 
 # FullCircle.HR.get_employee_salary_types("04833330-5721-48ea-b696-501c5bd38ca0")
+emp = FullCircle.HR.get_employee_by_name("Tan Kwang How", c, u)
 
-# FullCircle.PaySlip.generate_new_changeset_for(
-#   "04833330-5721-48ea-b696-501c5bd38ca0",
-#   10,
-#   2023,
-#   c,
-#   u
-# )
+cs =
+  FullCircle.PaySlipOp.generate_new_changeset_for(
+    emp,
+    10,
+    2023,
+    c
+  )
+
+# FullCircle.PaySlipOp.calculate_pay(cs)
+
+# FullCircle.PaySlipOp.get_uncount_recurrings(emp.id, 10, 2023, c)
+
+# FullCircle.DebCre.get_debit_note!("2113ecd3-814e-4e37-9b20-fb19611a8447", c, u)
 
 # FullCircle.PayRun.employee_leave_summary("e55f919a-df17-4833-a9ad-1621a3f36171", 2023, c)
 ```
 
 ```elixir
-[ps, ps_id, yr, mth] = "||2023|10" |> String.split("|")
+# sns = FullCircle.PaySlipOp.get_uncount_salary_notes("e55f919a-df17-4833-a9ad-1621a3f36171", c)
+# adv = FullCircle.PaySlipOp.get_uncount_advances("e55f919a-df17-4833-a9ad-1621a3f36171", c)
+
+# sns |> Enum.filter(fn x -> x.salary_type_type == "" end)
+
+Decimal.new("300") |> Decimal.compare(Decimal.new("299"))
 ```

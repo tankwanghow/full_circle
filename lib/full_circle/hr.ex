@@ -292,7 +292,7 @@ defmodule FullCircle.HR do
         join: st in SalaryType,
         on: st.id == et.salary_type_id,
         where: et.employee_id == ^emp_id,
-        select: %{id: st.id, name: st.name, amount: et.amount}
+        select: %{id: st.id, name: st.name, cal_func: st.cal_func, type: st.type, amount: et.amount}
       )
       |> Repo.all()
     end
@@ -353,7 +353,7 @@ defmodule FullCircle.HR do
     |> Repo.one!()
   end
 
-  defp salary_note_raw_query(company, user) do
+  defp salary_note_raw_query(company, _user) do
     a =
       from(txn in Transaction,
         join: com in Company,

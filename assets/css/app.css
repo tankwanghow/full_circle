@@ -41,6 +41,18 @@ input:not([type="file"]).phx-change-loading{
 
 input[readonly] { @apply cursor-not-allowed bg-gray-200; }
 
+div.SalaryType_Addition input {
+  @apply text-green-600;
+}
+
+div.SalaryType_Deduction input, div.SalaryType_Advance input {
+  @apply text-red-600;
+}
+
+div.SalaryType_Contribution input {
+  @apply text-amber-600;
+}
+
 .phx-click-loading {
   @apply animate-quick-pulse !important;
 }

@@ -36,7 +36,7 @@ defmodule FullCircleWeb.SalaryTypeLive.IndexComponent do
           </span>
         <% end %>
       <% end %>
-      &#8226; <%= @obj.type %> &#8226; <%= @obj.db_ac_name %> &#8226; <%= @obj.cr_ac_name %>
+      &#8226; <%= @obj.type %> &#8226; <%= @obj.db_ac_name %> &#8226; <%= @obj.cr_ac_name %> &#8226; <%= @obj.cal_func %>
     </div>
     """
   end

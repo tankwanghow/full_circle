@@ -19,10 +19,44 @@ defmodule FullCircle.HR.SalaryNote do
 
     field(:employee_name, :string, virtual: true)
     field(:salary_type_name, :string, virtual: true)
+    field(:salary_type_type, :string, virtual: true)
     field(:amount, :decimal, virtual: true, default: 0)
     field(:pay_slip_no, :string, virtual: true)
+    field(:delete, :boolean, virtual: true, default: false)
+    field(:cal_func, :string, virtual: true)
 
     timestamps(type: :utc_datetime)
+  end
+
+  def changeset_on_payslip(sn, attrs) do
+    sn
+    |> cast(attrs, [
+      :note_no,
+      :note_date,
+      :quantity,
+      :unit_price,
+      :employee_name,
+      :employee_id,
+      :pay_slip_id,
+      :salary_type_id,
+      :salary_type_type,
+      :salary_type_name,
+      :recurring_id,
+      :descriptions,
+      :company_id,
+      :delete,
+      :cal_func
+    ])
+    |> validate_required([
+      :note_date,
+      :quantity,
+      :unit_price,
+      :salary_type_name
+    ])
+    |> validate_id(:salary_type_name, :salary_type_id)
+    |> validate_date(:note_date, days_before: 8)
+    |> validate_date(:note_date, days_after: 14)
+    |> compute_fields()
   end
 
   @doc false

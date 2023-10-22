@@ -14,10 +14,18 @@ defmodule FullCircle.HR.PaySlip do
     belongs_to(:employee, FullCircle.HR.Employee)
     belongs_to(:funds_account, FullCircle.Accounting.Account)
 
-    has_many(:salary_notes, FullCircle.HR.SalaryNote, on_delete: :delete_all)
+    has_many(:additions, FullCircle.HR.SalaryNote, on_delete: :delete_all)
+    has_many(:deductions, FullCircle.HR.SalaryNote, on_delete: :delete_all)
+    has_many(:contributions, FullCircle.HR.SalaryNote, on_delete: :delete_all)
+    has_many(:advances, FullCircle.HR.Advance, on_delete: :nothing)
 
     field(:employee_name, :string, virtual: true)
     field(:funds_account_name, :string, virtual: true)
+    field(:addition_amount, :decimal, virtual: true, default: 0)
+    field(:deduction_amount, :decimal, virtual: true, default: 0)
+    field(:contribution_amount, :decimal, virtual: true, default: 0)
+    field(:advance_amount, :decimal, virtual: true, default: 0)
+    field(:pay_slip_amount, :decimal, virtual: true, default: 0)
 
     timestamps(type: :utc_datetime)
   end
@@ -57,7 +65,44 @@ defmodule FullCircle.HR.PaySlip do
       name: :pay_slips_unique_slip_no_in_company,
       message: gettext("has already been taken")
     )
-    |> cast_assoc(:salary_notes)
+    |> unsafe_validate_unique([:employee_id, :pay_month, :pay_year, :company_id], FullCircle.Repo,
+      message: gettext("same pay period exists")
+    )
+    |> unique_constraint(:employee_name,
+      name: :pay_slips_unique_employee_id_pay_month_pay_year_in_company,
+      message: gettext("same pay period exists")
+    )
+    |> cast_assoc(:additions, with: &FullCircle.HR.SalaryNote.changeset_on_payslip/2)
+    |> cast_assoc(:deductions, with: &FullCircle.HR.SalaryNote.changeset_on_payslip/2)
+    |> cast_assoc(:contributions, with: &FullCircle.HR.SalaryNote.changeset_on_payslip/2)
+    |> cast_assoc(:advances, with: &FullCircle.HR.Advance.changeset_on_payslip/2)
+    |> compute_fields()
+  end
+
+  def compute_struct_fields(sn) do
+    sn
+    |> sum_struct_field_to(:additions, :amount, :addition_amount)
+    |> sum_struct_field_to(:deductions, :amount, :deduction_amount)
+    |> sum_struct_field_to(:contributions, :amount, :contribution_amount)
+    |> sum_struct_field_to(:advances, :amount, :advance_amount)
+
+  end
+
+  def compute_fields(changeset) do
+    changeset =
+      changeset
+      |> sum_field_to(:additions, :amount, :addition_amount)
+      |> sum_field_to(:deductions, :amount, :deduction_amount)
+      |> sum_field_to(:contributions, :amount, :contribution_amount)
+      |> sum_field_to(:advances, :amount, :advance_amount)
+
+    cond do
+      Decimal.lt?(fetch_field!(changeset, :pay_slip_amount), 0) ->
+        add_unique_error(changeset, :pay_slip_amount, gettext("must be +ve"))
+
+      true ->
+        changeset
+    end
   end
 
   defp validate_pay_month_year(cs) do

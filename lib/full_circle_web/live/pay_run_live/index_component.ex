@@ -21,6 +21,16 @@ defmodule FullCircleWeb.PayRunLive.IndexComponent do
     "/companies/#{com.id}/PunchCard?#{URI.encode_query(qry)}"
   end
 
+  defp new_payslip_url(id, yr, mth, com) do
+    qry = %{
+      "emp_id" => id,
+      "month" => mth,
+      "year" => yr
+    }
+
+    "/companies/#{com.id}/PaySlip/new?#{URI.encode_query(qry)}"
+  end
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -38,10 +48,17 @@ defmodule FullCircleWeb.PayRunLive.IndexComponent do
         >
           Card
         </.link>
-        <.link :if={is_nil(ps)} class="w-[15%] text-blue-600 border-b border-r border-gray-600 hover:font-bold">
+        <.link
+          :if={is_nil(ps)}
+          navigate={new_payslip_url(@obj.id, yr, mth, @company)}
+          class="w-[15%] text-blue-600 border-b border-r border-gray-600 hover:font-bold"
+        >
           New Pay
         </.link>
-        <.link :if={!is_nil(ps)} class="w-[15%] text-green-600 border-b border-r border-gray-600 hover:font-bold">
+        <.link
+          :if={!is_nil(ps)}
+          class="w-[15%] text-green-600 border-b border-r border-gray-600 hover:font-bold"
+        >
           Edit Pay <%= ps %>
         </.link>
       <% end %>

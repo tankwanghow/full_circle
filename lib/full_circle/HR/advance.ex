@@ -19,8 +19,35 @@ defmodule FullCircle.HR.Advance do
     field(:employee_name, :string, virtual: true)
     field(:funds_account_name, :string, virtual: true)
     field(:pay_slip_no, :string, virtual: true)
+    field(:delete, :boolean, virtual: true, default: false)
 
     timestamps(type: :utc_datetime)
+  end
+
+  def changeset_on_payslip(slip, attrs) do
+    slip
+    |> cast(attrs, [
+      :slip_no,
+      :slip_date,
+      :employee_name,
+      :employee_id,
+      :funds_account_name,
+      :funds_account_id,
+      :company_id,
+      :note,
+      :amount,
+      :pay_slip_id,
+      :delete
+    ])
+    |> validate_required([
+      :slip_no,
+      :slip_date,
+      :employee_name,
+      :funds_account_name,
+      :company_id,
+      :amount
+    ])
+    |> validate_number(:amount, greater_than: 0)
   end
 
   @doc false
