@@ -209,6 +209,12 @@ defmodule FullCircle.Authorization do
   def can?(user, :update_credit_note, company),
     do: forbid_roles(~w(auditor guest cashier), company, user)
 
+  def can?(user, :create_pay_slip, company),
+    do: forbid_roles(~w(auditor guest cashier), company, user)
+
+  def can?(user, :update_pay_slip, company),
+    do: forbid_roles(~w(auditor guest cashier), company, user)
+
   def can?(user, :create_debit_note, company),
     do: forbid_roles(~w(auditor guest cashier), company, user)
 

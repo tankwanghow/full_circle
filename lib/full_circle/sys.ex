@@ -629,14 +629,18 @@ defmodule FullCircle.Sys do
   end
 
   def log_changeset(name, entity, entity_attrs, company, user) do
-    Log.changeset(%Log{}, %{
+    Log.changeset(%Log{}, log_attrs(name, entity, entity_attrs, company, user))
+  end
+
+  def log_attrs(name, entity, entity_attrs, company, user) do
+    %{
       entity: entity.__meta__.source,
       entity_id: entity.id,
       action: Atom.to_string(name),
       delta: attr_to_string(entity_attrs),
       user_id: user.id,
       company_id: company.id
-    })
+    }
   end
 
   def attr_to_string(attrs) do

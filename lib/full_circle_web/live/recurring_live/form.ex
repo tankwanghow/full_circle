@@ -85,7 +85,6 @@ defmodule FullCircleWeb.RecurringLive.Form do
   end
 
   def handle_event("validate", %{"recurring" => params}, socket) do
-    IO.inspect socket.assigns.form.source
     validate(params, socket)
   end
 

@@ -152,8 +152,8 @@ defmodule FullCircle.StdInterface do
     end
   end
 
-  def changeset(klass, obj, attrs \\ %{}, company, changeset_name \\ :changeset) do
+  def changeset(klass, obj, attrs \\ %{}, company, changeset_func \\ :changeset) do
     attrs = Map.merge(attrs, %{company_id: company.id}) |> key_to_string()
-    apply(klass, changeset_name, [obj, attrs])
+    apply(klass, changeset_func, [obj, attrs])
   end
 end

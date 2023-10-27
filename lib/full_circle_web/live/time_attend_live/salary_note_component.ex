@@ -18,14 +18,20 @@ defmodule FullCircleWeb.TimeAttendLive.SalaryNoteComponent do
       id={@id}
       class={[
         "flex flex-row text-center bg-gray-200 hover:bg-gray-300",
-        if(@obj.id == @shake_obj.id, do: "shake", else: "")
+        if(@obj.id == @shake_obj.id, do: "shake", else: ""),
+        cond do
+          @obj.salary_type_type == "Deduction" -> "text-red-600"
+          @obj.salary_type_type == "Contribution" -> "text-amber-600"
+          @obj.salary_type_type == "Addition" -> "text-green-600"
+          true -> ""
+        end
       ]}
     >
       <div class="w-[10%] border-b border-gray-400 py-1">
         <%= @obj.note_date |> FullCircleWeb.Helpers.format_date() %>
       </div>
       <div class="w-[10%] border-b border-gray-400 py-1">
-        <.link class="text-blue-600 hover:font-bold" phx-value-id={@id} phx-click={:edit_salarynote}>
+        <.link class="hover:font-bold" phx-value-id={@id} phx-click={:edit_salarynote}>
           <%= @obj.note_no %>
         </.link>
       </div>

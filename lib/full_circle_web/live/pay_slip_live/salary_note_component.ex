@@ -17,53 +17,42 @@ defmodule FullCircleWeb.PaySlipLive.SalaryNoteComponent do
     <div id={@id} class={"SalaryType_#{@klass}"}>
       <.inputs_for :let={sn} field={@types}>
         <div class={[
-          "flex flex-row",
-          if(sn[:delete].value == true, do: "hidden", else: "")
+          "flex flex-row"
         ]}>
-          <%= Phoenix.HTML.Form.hidden_input(sn, :id) %>
+          <%= Phoenix.HTML.Form.hidden_input(sn, :_id) %>
           <%= Phoenix.HTML.Form.hidden_input(sn, :cal_func) %>
           <%= Phoenix.HTML.Form.hidden_input(sn, :salary_type_type) %>
+          <%= Phoenix.HTML.Form.hidden_input(sn, :recurring_id) %>
+          <%= Phoenix.HTML.Form.hidden_input(sn, :employee_id) %>
           <div class="w-[14%]">
-            <.input field={sn[:note_date]} type="date" />
+            <.input field={sn[:note_date]} type="date" readonly tabindex="-1" />
           </div>
-          <div class="w-[11%]">
+          <div class="w-[13%]">
             <.input field={sn[:note_no]} readonly tabindex="-1" />
           </div>
           <div class="w-[21%]">
             <%= Phoenix.HTML.Form.hidden_input(sn, :salary_type_id) %>
-            <.input
-              field={sn[:salary_type_name]}
-              phx-hook="tributeAutoComplete"
-              phx-debounce="blur"
-              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=salarytype&name="}
-            />
+            <.input readonly tabindex="-1" field={sn[:salary_type_name]} />
           </div>
           <div class="w-[24%]">
-            <.input field={sn[:descriptions]} />
+            <.input field={sn[:descriptions]} readonly tabindex="-1" />
           </div>
           <div class="w-[8%]">
-            <.input field={sn[:quantity]} type="number" />
+            <.input field={sn[:quantity]} type="number" readonly tabindex="-1" />
           </div>
           <div class="w-[9%]">
-            <.input field={sn[:unit_price]} type="number" />
+            <.input field={sn[:unit_price]} type="number" readonly tabindex="-1" />
           </div>
           <div class="w-[11%]">
             <.input field={sn[:amount]} type="number" readonly tabindex="-1" />
           </div>
-          <div class="w-[2%] mt-1 text-rose-500">
-            <.link phx-click={:delete_note} phx-value-index={sn.index} tabindex="-1">
-              <.icon name="hero-trash-solid" class="h-5 w-5" />
-            </.link>
-            <%= Phoenix.HTML.Form.hidden_input(sn, :delete) %>
-          </div>
         </div>
       </.inputs_for>
-      <div class="flex flex-row font-bold mb-1">
-        <div class="w-[87%] text-right mr-3 mt-1"><%= @total_label %></div>
+      <div :if={!is_nil(@total_label)} class="flex flex-row font-bold mb-1">
+        <div class="w-[89%] text-right mr-3 mt-1"><%= @total_label %></div>
         <div class="w-[11%]">
-          <.input readonly tabindex="-1" name="ignore" value={@total} type="number" />
+          <.input readonly tabindex="-1" field={@total_field} type="number" />
         </div>
-        <div class="w-[2%]"></div>
       </div>
     </div>
     """

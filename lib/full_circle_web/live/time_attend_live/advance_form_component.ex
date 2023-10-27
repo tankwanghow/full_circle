@@ -1,7 +1,7 @@
-defmodule FullCircleWeb.TimeAttendLive.SalaryNoteFormComponent do
+defmodule FullCircleWeb.TimeAttendLive.AdvanceFormComponent do
   use FullCircleWeb, :live_component
 
-  alias FullCircle.HR.{SalaryNote}
+  alias FullCircle.HR.{Advance}
   alias FullCircle.HR
   alias FullCircle.StdInterface
 
@@ -19,7 +19,7 @@ defmodule FullCircleWeb.TimeAttendLive.SalaryNoteFormComponent do
        :form,
        to_form(
          StdInterface.changeset(
-           SalaryNote,
+           Advance,
            assigns.obj,
            %{},
            assigns.current_company
@@ -30,7 +30,7 @@ defmodule FullCircleWeb.TimeAttendLive.SalaryNoteFormComponent do
 
   def handle_event(
         "validate",
-        %{"_target" => ["salary_note", "employee_name"], "salary_note" => params},
+        %{"_target" => ["advance", "employee_name"], "advance" => params},
         socket
       ) do
     {params, socket, _} =
@@ -42,73 +42,44 @@ defmodule FullCircleWeb.TimeAttendLive.SalaryNoteFormComponent do
         &FullCircle.HR.get_employee_by_name/3
       )
 
-    st = HR.get_employee_salary_type(params["employee_id"], params["salary_type_id"])
-
-    params = if(st, do: Map.merge(params, %{"unit_price" => st.amount}), else: params)
-
     validate(params, socket)
   end
 
   def handle_event(
         "validate",
-        %{"_target" => ["salary_note", "salary_type_name"], "salary_note" => params},
+        %{"_target" => ["advance", "funds_account_name"], "advance" => params},
         socket
       ) do
     {params, socket, _} =
       FullCircleWeb.Helpers.assign_autocomplete_id(
         socket,
         params,
-        "salary_type_name",
-        "salary_type_id",
-        &FullCircle.HR.get_salary_type_by_name/3
+        "funds_account_name",
+        "funds_account_id",
+        &FullCircle.Accounting.get_account_by_name/3
       )
 
-    st = HR.get_employee_salary_type(params["employee_id"], params["salary_type_id"])
-
-    params = if(st, do: Map.merge(params, %{"unit_price" => st.amount}), else: params)
-
     validate(params, socket)
   end
 
-  def handle_event("validate", %{"salary_note" => params}, socket) do
+  def handle_event("validate", %{"advance" => params}, socket) do
     validate(params, socket)
   end
 
   @impl true
-  def handle_event("save", %{"salary_note" => params}, socket) do
+  def handle_event("save", %{"advance" => params}, socket) do
     save(socket, socket.assigns.live_action, params)
-  end
-
-  @impl true
-  def handle_event("delete", _params, socket) do
-    case HR.delete_salary_note(
-           socket.assigns.form.data,
-           socket.assigns.current_company,
-           socket.assigns.current_user
-         ) do
-      {:ok, %{delete_salary_note: obj}} ->
-        send(self(), {:refresh_page_sn, obj})
-        {:noreply, socket}
-
-      {:error, _failed_operation, changeset} ->
-        send(self(), {:error, changeset})
-        {:noreply, socket}
-
-      :not_authorise ->
-        send(self(), {:not_authorise})
-        {:noreply, socket}
-    end
   end
 
   defp save(socket, :new, params) do
     case(
-      HR.create_salary_note(
+      HR.create_advance(
         params,
         socket.assigns.current_company,
         socket.assigns.current_user
       )
     ) do
-      {:ok, %{create_salary_note: obj}} ->
+      {:ok, %{create_advance: obj}} ->
         send(self(), {:refresh_page_sn, obj})
         {:noreply, socket}
 
@@ -123,13 +94,13 @@ defmodule FullCircleWeb.TimeAttendLive.SalaryNoteFormComponent do
   end
 
   defp save(socket, :edit, params) do
-    case HR.update_salary_note(
+    case HR.update_advance(
            socket.assigns.form.data,
            params,
            socket.assigns.current_company,
            socket.assigns.current_user
          ) do
-      {:ok, %{update_salary_note: obj}} ->
+      {:ok, %{update_advance: obj}} ->
         send(self(), {:refresh_page_sn, obj})
         {:noreply, socket}
 
@@ -146,7 +117,7 @@ defmodule FullCircleWeb.TimeAttendLive.SalaryNoteFormComponent do
   defp validate(params, socket) do
     changeset =
       StdInterface.changeset(
-        SalaryNote,
+        Advance,
         socket.assigns.form.data,
         params,
         socket.assigns.current_company
@@ -174,10 +145,10 @@ defmodule FullCircleWeb.TimeAttendLive.SalaryNoteFormComponent do
         <p :if={!is_nil(@form.source.data.pay_slip_no)} class="w-full text-xl text-center font-bold">
           <%= @form.source.data.pay_slip_no %>
         </p>
-        <%= Phoenix.HTML.Form.hidden_input(@form, :note_no) %>
+        <%= Phoenix.HTML.Form.hidden_input(@form, :slip_no) %>
         <div class="grid grid-cols-12 gap-1">
           <div class="col-span-3">
-            <.input feedback field={@form[:note_date]} label={gettext("Date")} type="date" />
+            <.input feedback={true} field={@form[:slip_date]} label={gettext("Date")} type="date" />
           </div>
           <div class="col-span-5">
             <%= Phoenix.HTML.Form.hidden_input(@form, :employee_id) %>
@@ -185,39 +156,27 @@ defmodule FullCircleWeb.TimeAttendLive.SalaryNoteFormComponent do
               field={@form[:employee_name]}
               label={gettext("Employee")}
               phx-hook="tributeAutoComplete"
-              phx-debounce="blur"
+              phx-debounce="500"
               url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=employee&name="}
             />
           </div>
           <div class="col-span-4">
-            <%= Phoenix.HTML.Form.hidden_input(@form, :salary_type_id) %>
+            <%= Phoenix.HTML.Form.hidden_input(@form, :funds_account_id) %>
             <.input
-              field={@form[:salary_type_name]}
-              label={gettext("Salary Type")}
+              field={@form[:funds_account_name]}
+              label={gettext("Funds From")}
               phx-hook="tributeAutoComplete"
-              phx-debounce="blur"
-              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=salarytype&name="}
+              phx-debounce="500"
+              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=fundsaccount&name="}
             />
           </div>
         </div>
         <div class="grid grid-cols-12 gap-1">
-          <div class="col-span-6">
-            <.input field={@form[:descriptions]} label={gettext("Descriptions")} />
+          <div class="col-span-9">
+            <.input field={@form[:note]} label={gettext("Note")} />
           </div>
-          <div class="col-span-2">
-            <.input field={@form[:quantity]} label={gettext("Quantity")} type="number" step="0.0001" />
-          </div>
-          <div class="col-span-2">
-            <.input field={@form[:unit_price]} label={gettext("Price")} type="number" step="0.0001" />
-          </div>
-          <div class="col-span-2">
-            <.input
-              feedback={true}
-              field={@form[:amount]}
-              label={gettext("Amount")}
-              type="number"
-              readonly
-            />
+          <div class="col-span-3">
+            <.input field={@form[:amount]} label={gettext("Amount")} type="number" step="0.0001" />
           </div>
         </div>
 
@@ -226,25 +185,17 @@ defmodule FullCircleWeb.TimeAttendLive.SalaryNoteFormComponent do
           <.link phx-click={:modal_cancel} class="orange button">
             <%= gettext("Cancel") %>
           </.link>
-          <%= if @live_action == :edit and FullCircle.Authorization.can?(@current_user, :delete_salary_note, @current_company) do %>
-            <.delete_confirm_modal
-              id="delete-object"
-              msg1={gettext("Deleting Salary Note")}
-              msg2={gettext("Cannot Be Recover!!!")}
-              confirm={JS.push("delete", target: "#object-form")}
-            />
-          <% end %>
           <.print_button
             :if={@live_action == :edit}
             company={@current_company}
-            doc_type="SalaryNote"
+            doc_type="Advance"
             doc_id={@id}
             class="gray button"
           />
           <.pre_print_button
             :if={@live_action == :edit}
             company={@current_company}
-            doc_type="SalaryNote"
+            doc_type="Advance"
             doc_id={@id}
             class="gray button"
           />
@@ -253,7 +204,7 @@ defmodule FullCircleWeb.TimeAttendLive.SalaryNoteFormComponent do
             module={FullCircleWeb.LogLive.Component}
             id={"log_#{@id}"}
             show_log={false}
-            entity="salary_notes"
+            entity="advances"
             entity_id={@id}
           />
           <.live_component
@@ -261,8 +212,8 @@ defmodule FullCircleWeb.TimeAttendLive.SalaryNoteFormComponent do
             module={FullCircleWeb.JournalEntryViewLive.Component}
             id={"journal_#{@id}"}
             show_journal={false}
-            doc_type="SalaryNote"
-            doc_no={@form.data.note_no}
+            doc_type="Advance"
+            doc_no={@form.data.slip_no}
             company_id={@current_company.id}
           />
         </div>

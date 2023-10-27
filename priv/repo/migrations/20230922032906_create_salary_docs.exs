@@ -62,8 +62,8 @@ defmodule FullCircle.Repo.Migrations.CreateSalaryDoc do
            )
 
     create unique_index(:pay_slips, [:company_id, :employee_id, :pay_month, :pay_year],
-           name: :pay_slips_unique_employee_id_pay_month_pay_year_in_company
-         )
+             name: :pay_slips_unique_employee_id_pay_month_pay_year_in_company
+           )
 
     create unique_index(:advances, [:company_id, :slip_no],
              name: :advances_unique_slip_no_in_company

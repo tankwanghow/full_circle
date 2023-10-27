@@ -337,62 +337,67 @@ defmodule FullCircle.Billing do
     ac_rec_id = Accounting.get_account_by_name("Account Receivables", com, user).id
 
     multi
-    |> Ecto.Multi.run("create_transactions", fn repo, %{^name => invoice} ->
-      Enum.each(invoice.invoice_details, fn x ->
-        x = FullCircle.Repo.preload(x, [:account, :tax_code])
+    |> Multi.insert_all(:create_transactions, Transaction, fn %{^name => invoice} ->
+      (Enum.map(invoice.invoice_details, fn x ->
+         x = FullCircle.Repo.preload(x, [:account, :tax_code])
 
-        if !Decimal.eq?(x.good_amount, 0) do
-          repo.insert!(%Transaction{
-            doc_type: "Invoice",
-            doc_no: invoice.invoice_no,
-            doc_id: invoice.id,
-            doc_date: invoice.invoice_date,
-            contact_id:
-              if(Accounting.is_balance_sheet_account?(x.account),
-                do: invoice.contact_id,
-                else: nil
-              ),
-            account_id: x.account_id,
-            company_id: com.id,
-            amount: Decimal.negate(x.good_amount),
-            particulars: "#{invoice.contact_name}, #{x.good_name}"
-          })
-        end
+         [
+           if !Decimal.eq?(x.good_amount, 0) do
+             %{
+               doc_type: "Invoice",
+               doc_no: invoice.invoice_no,
+               doc_id: invoice.id,
+               doc_date: invoice.invoice_date,
+               contact_id:
+                 if(Accounting.is_balance_sheet_account?(x.account),
+                   do: invoice.contact_id,
+                   else: nil
+                 ),
+               account_id: x.account_id,
+               company_id: com.id,
+               amount: Decimal.negate(x.good_amount),
+               particulars: "#{invoice.contact_name}, #{x.good_name}",
+               inserted_at: Timex.now() |> DateTime.truncate(:second)
+             }
+           end,
+           if !Decimal.eq?(x.tax_amount, 0) do
+             %{
+               doc_type: "Invoice",
+               doc_no: invoice.invoice_no,
+               doc_id: invoice.id,
+               doc_date: invoice.invoice_date,
+               account_id: x.tax_code.account_id,
+               company_id: com.id,
+               amount: Decimal.negate(x.tax_amount),
+               particulars: "#{x.tax_code_name} on #{x.good_name}",
+               inserted_at: Timex.now() |> DateTime.truncate(:second)
+             }
+           end
+         ]
+       end) ++
+         [
+           if !Decimal.eq?(invoice.invoice_amount, 0) do
+             cont_part =
+               Enum.map(invoice.invoice_details, fn x -> x.good_name end)
+               |> Enum.join(", ")
 
-        if !Decimal.eq?(x.tax_amount, 0) do
-          repo.insert!(%Transaction{
-            doc_type: "Invoice",
-            doc_no: invoice.invoice_no,
-            doc_id: invoice.id,
-            doc_date: invoice.invoice_date,
-            account_id: x.tax_code.account_id,
-            company_id: com.id,
-            amount: Decimal.negate(x.tax_amount),
-            particulars: "#{x.tax_code_name} on #{x.good_name}"
-          })
-        end
-      end)
-
-      if !Decimal.eq?(invoice.invoice_amount, 0) do
-        cont_part =
-          Enum.map(invoice.invoice_details, fn x -> x.good_name end)
-          |> Enum.join(", ")
-
-        repo.insert!(%Transaction{
-          doc_type: "Invoice",
-          doc_no: invoice.invoice_no,
-          doc_id: invoice.id,
-          doc_date: invoice.invoice_date,
-          contact_id: invoice.contact_id,
-          account_id: ac_rec_id,
-          company_id: com.id,
-          amount: invoice.invoice_amount,
-          particulars: invoice.contact_name,
-          contact_particulars: cont_part
-        })
-      end
-
-      {:ok, nil}
+             %{
+               doc_type: "Invoice",
+               doc_no: invoice.invoice_no,
+               doc_id: invoice.id,
+               doc_date: invoice.invoice_date,
+               contact_id: invoice.contact_id,
+               account_id: ac_rec_id,
+               company_id: com.id,
+               amount: invoice.invoice_amount,
+               particulars: invoice.contact_name,
+               contact_particulars: cont_part,
+               inserted_at: Timex.now() |> DateTime.truncate(:second)
+             }
+           end
+         ])
+      |> List.flatten()
+      |> Enum.reject(fn x -> is_nil(x) end)
     end)
   end
 
@@ -706,65 +711,72 @@ defmodule FullCircle.Billing do
   end
 
   defp create_pur_invoice_transactions(multi, name, com, user) do
-    ac_rec_id = Accounting.get_account_by_name("Account Payables", com, user).id
+    ac_id = Accounting.get_account_by_name("Account Payables", com, user).id
 
     multi
-    |> Ecto.Multi.run("create_transactions", fn repo, %{^name => pur_invoice} ->
-      Enum.each(pur_invoice.pur_invoice_details, fn x ->
-        x = FullCircle.Repo.preload(x, [:account, :tax_code])
+    |> Multi.insert_all(:create_transactions, Transaction, fn %{^name => pur_invoice} ->
+      (Enum.map(pur_invoice.pur_invoice_details, fn x ->
+         x = FullCircle.Repo.preload(x, [:account, :tax_code])
 
-        if !Decimal.eq?(x.good_amount, 0) do
-          repo.insert!(%Transaction{
-            doc_type: "PurInvoice",
-            doc_no: pur_invoice.pur_invoice_no,
-            doc_id: pur_invoice.id,
-            doc_date: pur_invoice.pur_invoice_date,
-            contact_id:
-              if(Accounting.is_balance_sheet_account?(x.account),
-                do: pur_invoice.contact_id,
-                else: nil
-              ),
-            account_id: x.account_id,
-            company_id: com.id,
-            amount: x.good_amount,
-            particulars: "#{pur_invoice.contact_name}, #{x.good_name}"
-          })
-        end
+         [
+           if !Decimal.eq?(x.good_amount, 0) do
+             %{
+               doc_type: "PurInvoice",
+               doc_no: pur_invoice.pur_invoice_no,
+               doc_id: pur_invoice.id,
+               doc_date: pur_invoice.pur_invoice_date,
+               contact_id:
+                 if(Accounting.is_balance_sheet_account?(x.account),
+                   do: pur_invoice.contact_id,
+                   else: nil
+                 ),
+               account_id: x.account_id,
+               company_id: com.id,
+               amount: x.good_amount,
+               particulars: "#{pur_invoice.contact_name}, #{x.good_name}",
+               inserted_at: Timex.now() |> DateTime.truncate(:second)
+             }
+           end,
+           if !Decimal.eq?(x.tax_amount, 0) do
+             %{
+               doc_type: "PurInvoice",
+               doc_no: pur_invoice.pur_invoice_no,
+               doc_id: pur_invoice.id,
+               doc_date: pur_invoice.pur_invoice_date,
+               account_id: x.tax_code.account_id,
+               company_id: com.id,
+               amount: x.tax_amount,
+               particulars: "#{x.tax_code_name} on #{x.good_name}",
+               inserted_at: Timex.now() |> DateTime.truncate(:second)
+             }
+           end
+         ]
+       end) ++
+         [
+           if !Decimal.eq?(pur_invoice.pur_invoice_amount, 0) do
+             cont_part =
+               Enum.map(pur_invoice.pur_invoice_details, fn x ->
+                 String.slice(x.good_name, 0..14)
+               end)
+               |> Enum.join(", ")
 
-        if !Decimal.eq?(x.tax_amount, 0) do
-          repo.insert!(%Transaction{
-            doc_type: "PurInvoice",
-            doc_no: pur_invoice.pur_invoice_no,
-            doc_id: pur_invoice.id,
-            doc_date: pur_invoice.pur_invoice_date,
-            account_id: x.tax_code.account_id,
-            company_id: com.id,
-            amount: x.tax_amount,
-            particulars: "#{x.tax_code_name} on #{x.good_name}"
-          })
-        end
-      end)
-
-      if !Decimal.eq?(pur_invoice.pur_invoice_amount, 0) do
-        cont_part =
-          Enum.map(pur_invoice.pur_invoice_details, fn x -> String.slice(x.good_name, 0..14) end)
-          |> Enum.join(", ")
-
-        repo.insert!(%Transaction{
-          doc_type: "PurInvoice",
-          doc_no: pur_invoice.pur_invoice_no,
-          doc_id: pur_invoice.id,
-          doc_date: pur_invoice.pur_invoice_date,
-          contact_id: pur_invoice.contact_id,
-          account_id: ac_rec_id,
-          company_id: com.id,
-          amount: Decimal.negate(pur_invoice.pur_invoice_amount),
-          particulars: pur_invoice.contact_name,
-          contact_particulars: cont_part
-        })
-      end
-
-      {:ok, nil}
+             %{
+               doc_type: "PurInvoice",
+               doc_no: pur_invoice.pur_invoice_no,
+               doc_id: pur_invoice.id,
+               doc_date: pur_invoice.pur_invoice_date,
+               contact_id: pur_invoice.contact_id,
+               account_id: ac_id,
+               company_id: com.id,
+               amount: Decimal.negate(pur_invoice.pur_invoice_amount),
+               particulars: pur_invoice.contact_name,
+               contact_particulars: cont_part,
+               inserted_at: Timex.now() |> DateTime.truncate(:second)
+             }
+           end
+         ])
+      |> List.flatten()
+      |> Enum.reject(fn x -> is_nil(x) end)
     end)
   end
 

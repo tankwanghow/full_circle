@@ -24,6 +24,7 @@ defmodule FullCircle.HR.SalaryNote do
     field(:pay_slip_no, :string, virtual: true)
     field(:delete, :boolean, virtual: true, default: false)
     field(:cal_func, :string, virtual: true)
+    field(:_id, :string, virtual: true)
 
     timestamps(type: :utc_datetime)
   end
@@ -31,6 +32,7 @@ defmodule FullCircle.HR.SalaryNote do
   def changeset_on_payslip(sn, attrs) do
     sn
     |> cast(attrs, [
+      :_id,
       :note_no,
       :note_date,
       :quantity,
@@ -44,8 +46,8 @@ defmodule FullCircle.HR.SalaryNote do
       :recurring_id,
       :descriptions,
       :company_id,
-      :delete,
-      :cal_func
+      :cal_func,
+      :delete
     ])
     |> validate_required([
       :note_date,
@@ -53,15 +55,13 @@ defmodule FullCircle.HR.SalaryNote do
       :unit_price,
       :salary_type_name
     ])
-    |> validate_id(:salary_type_name, :salary_type_id)
-    |> validate_date(:note_date, days_before: 8)
-    |> validate_date(:note_date, days_after: 14)
+    |> validate_number(:amount, greater_than: 0)
     |> compute_fields()
   end
 
   @doc false
-  def changeset(recur, attrs) do
-    recur
+  def changeset(sn, attrs) do
+    sn
     |> cast(attrs, [
       :note_no,
       :note_date,
@@ -88,7 +88,7 @@ defmodule FullCircle.HR.SalaryNote do
     |> fill_today(:note_date)
     |> validate_id(:employee_name, :employee_id)
     |> validate_id(:salary_type_name, :salary_type_id)
-    |> validate_date(:note_date, days_before: 8)
+    |> validate_date(:note_date, days_before: 31)
     |> validate_date(:note_date, days_after: 14)
     |> unsafe_validate_unique([:note_no, :company_id], FullCircle.Repo,
       message: gettext("has already been taken")

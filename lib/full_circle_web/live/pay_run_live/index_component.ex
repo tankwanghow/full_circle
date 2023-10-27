@@ -41,7 +41,7 @@ defmodule FullCircleWeb.PayRunLive.IndexComponent do
       >
         <%= @obj.employee_name %>
       </.link>
-      <%= for {ps, _ps_id, yr, mth} <- @obj.pay_list do %>
+      <%= for {ps, ps_id, yr, mth} <- @obj.pay_list do %>
         <.link
           class="w-[8.3%] hover:font-bold text-orange-600 border-b border-gray-600"
           navigate={card_url(yr, mth, @obj.employee_name, @company)}
@@ -57,6 +57,7 @@ defmodule FullCircleWeb.PayRunLive.IndexComponent do
         </.link>
         <.link
           :if={!is_nil(ps)}
+          navigate={"/companies/#{@company.id}/PaySlip/#{ps_id}/edit"}
           class="w-[15%] text-green-600 border-b border-r border-gray-600 hover:font-bold"
         >
           Edit Pay <%= ps %>

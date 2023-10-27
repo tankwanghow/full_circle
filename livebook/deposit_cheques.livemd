@@ -43,5 +43,18 @@ cs =
 
 # sns |> Enum.filter(fn x -> x.salary_type_type == "" end)
 
-Decimal.new("300") |> Decimal.compare(Decimal.new("299"))
+adv = FullCircle.HR.get_advance!("1142af82-f6e7-4f11-9fb0-10c811a3f601", c, u)
+
+IO.inspect(adv)
+
+keep = [:employee_name, :funds_account_name, :amount, :slip_no, :slip_date, :note, :pay_slip_no]
+
+adv =
+  Map.reject(adv, fn {k, _} ->
+    is_nil(
+      Enum.find_index(keep, fn x ->
+        k == x
+      end)
+    )
+  end)
 ```

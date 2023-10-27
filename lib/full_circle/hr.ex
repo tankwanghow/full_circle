@@ -272,8 +272,21 @@ defmodule FullCircle.HR do
     |> Repo.all()
   end
 
-  def get_employee_salary_type(emp_id \\ "", type_id \\ "") do
-    if emp_id == "" or type_id == "" do
+  def get_advances(emp_id, month, year, com, user) do
+    edate = Timex.end_of_month(year, month)
+    sdate = Timex.beginning_of_month(year, month)
+
+    from(adv in advance_query(com, user),
+      where: adv.employee_id == ^emp_id,
+      where: adv.slip_date >= ^sdate,
+      where: adv.slip_date <= ^edate,
+      order_by: adv.slip_date
+    )
+    |> Repo.all()
+  end
+
+  def get_employee_salary_type(emp_id, type_id) do
+    if emp_id == "" or type_id == "" or is_nil(emp_id) or is_nil(type_id) do
       nil
     else
       from(et in EmployeeSalaryType,
@@ -292,7 +305,13 @@ defmodule FullCircle.HR do
         join: st in SalaryType,
         on: st.id == et.salary_type_id,
         where: et.employee_id == ^emp_id,
-        select: %{id: st.id, name: st.name, cal_func: st.cal_func, type: st.type, amount: et.amount}
+        select: %{
+          id: st.id,
+          name: st.name,
+          cal_func: st.cal_func,
+          type: st.type,
+          amount: et.amount
+        }
       )
       |> Repo.all()
     end
@@ -312,6 +331,7 @@ defmodule FullCircle.HR do
       select_merge: %{
         employee_name: emp.name,
         salary_type_name: st.name,
+        salary_type_type: st.type,
         pay_slip_no: pay.slip_no
       }
     )
@@ -422,69 +442,69 @@ defmodule FullCircle.HR do
     end
   end
 
-  def create_salary_note_multi(multi, attrs, com, user) do
-    gapless_name = String.to_atom("update_gapless_doc" <> gen_temp_id())
-    note_name = :create_salary_note
+  def create_salary_note_multi(multi, attrs, com, user, changeset_func \\ :changeset, name \\ nil) do
+    gapless_name =
+      String.to_atom(
+        if(
+          name,
+          do: "update_gapless_doc_#{name}_#{gen_temp_id()}",
+          else: "update_gapless_doc_#{gen_temp_id()}"
+        )
+      )
+
+    name = name || :create_salary_note
 
     multi
     |> get_gapless_doc_id(gapless_name, "SalaryNote", "SN", com)
-    |> Multi.insert(
-      note_name,
-      fn mty ->
-        doc = Map.get(mty, gapless_name)
-
-        StdInterface.changeset(
-          SalaryNote,
-          %SalaryNote{},
-          Map.merge(attrs, %{"note_no" => doc}),
-          com
-        )
-      end
-    )
-    |> Multi.insert("#{note_name}_log", fn %{^note_name => entity} ->
-      FullCircle.Sys.log_changeset(
-        note_name,
-        entity,
-        Map.merge(attrs, %{"note_no" => entity.note_no}),
+    |> Multi.insert(name, fn %{^gapless_name => doc} ->
+      StdInterface.changeset(
+        SalaryNote,
+        %SalaryNote{},
+        Map.merge(attrs, %{"note_no" => doc}),
         com,
-        user
+        changeset_func
       )
     end)
-    |> create_salary_note_transactions(note_name, com, user)
+    |> Multi.insert("#{name}_log", fn %{^name => entity} ->
+      Sys.log_changeset(name, entity, Map.merge(attrs, %{"note_no" => entity.note_no}), com, user)
+    end)
+    |> create_salary_note_transactions(name, com, user)
   end
 
   def create_salary_note_transactions(multi, name, com, _user) do
     multi
-    |> Ecto.Multi.run("create_transactions", fn repo, %{^name => note} ->
+    |> Multi.insert_all("#{name}_create_transactions", Transaction, fn %{^name => note} ->
       note = note |> FullCircle.Repo.preload(:salary_type)
 
-      if !is_nil(note.salary_type.cr_ac_id) do
-        repo.insert!(%Transaction{
-          doc_type: "SalaryNote",
-          doc_no: note.note_no,
-          doc_id: note.id,
-          doc_date: note.note_date,
-          account_id: note.salary_type.cr_ac_id,
-          company_id: com.id,
-          amount: Decimal.negate(note.amount),
-          particulars: "#{note.salary_type_name} to #{note.employee_name}"
-        })
-      end
-
-      if !is_nil(note.salary_type.db_ac_id) do
-        repo.insert!(%Transaction{
-          doc_type: "SalaryNote",
-          doc_no: note.note_no,
-          doc_id: note.id,
-          doc_date: note.note_date,
-          account_id: note.salary_type.db_ac_id,
-          company_id: com.id,
-          amount: note.amount,
-          particulars: "#{note.salary_type_name} to #{note.employee_name}"
-        })
-      end
-
-      {:ok, nil}
+      [
+        if !is_nil(note.salary_type.cr_ac_id) do
+          %{
+            doc_type: "SalaryNote",
+            doc_no: note.note_no,
+            doc_id: note.id,
+            doc_date: note.note_date,
+            account_id: note.salary_type.cr_ac_id,
+            company_id: com.id,
+            amount: Decimal.negate(note.amount),
+            particulars: "#{note.salary_type_name} to #{note.employee_name}",
+            inserted_at: Timex.now() |> DateTime.truncate(:second)
+          }
+        end,
+        if !is_nil(note.salary_type.db_ac_id) do
+          %{
+            doc_type: "SalaryNote",
+            doc_no: note.note_no,
+            doc_id: note.id,
+            doc_date: note.note_date,
+            account_id: note.salary_type.db_ac_id,
+            company_id: com.id,
+            amount: note.amount,
+            particulars: "#{note.salary_type_name} to #{note.employee_name}",
+            inserted_at: Timex.now() |> DateTime.truncate(:second)
+          }
+        end
+      ]
+      |> Enum.reject(fn x -> is_nil(x) end)
     end)
   end
 
@@ -503,21 +523,32 @@ defmodule FullCircle.HR do
       {:sql_error, e.postgres.message}
   end
 
-  def update_salary_note_multi(multi, salary_note, attrs, com, user) do
-    salary_note_name = :update_salary_note
+  def update_salary_note_multi(
+        multi,
+        salary_note,
+        attrs,
+        com,
+        user,
+        changeset_func \\ :changeset,
+        name \\ nil
+      ) do
+    name = name || :update_salary_note
 
     multi
-    |> Multi.update(salary_note_name, StdInterface.changeset(SalaryNote, salary_note, attrs, com))
+    |> Multi.update(
+      name,
+      StdInterface.changeset(SalaryNote, salary_note, attrs, com, changeset_func)
+    )
     |> Multi.delete_all(
-      :delete_transaction,
+      String.to_atom("#{name}_delete_transactions"),
       from(txn in Transaction,
         where: txn.doc_type == "SalaryNote",
         where: txn.doc_no == ^salary_note.note_no,
         where: txn.company_id == ^com.id
       )
     )
-    |> Sys.insert_log_for(salary_note_name, attrs, com, user)
-    |> create_salary_note_transactions(salary_note_name, com, user)
+    |> Sys.insert_log_for(name, attrs, com, user)
+    |> create_salary_note_transactions(name, com, user)
   end
 
   def delete_salary_note(%SalaryNote{} = salary_note, com, user) do
@@ -558,6 +589,13 @@ defmodule FullCircle.HR do
     |> Repo.one!()
   end
 
+  def get_advance_by_no!(no, com, user) do
+    from(adv in advance_query(com, user),
+      where: adv.slip_no == ^no
+    )
+    |> Repo.one!()
+  end
+
   def advance_query(company, user) do
     from(adv in Advance,
       join: com in subquery(Sys.user_company(company, user)),
@@ -568,11 +606,19 @@ defmodule FullCircle.HR do
       on: ac.id == adv.funds_account_id,
       left_join: pay in PaySlip,
       on: pay.id == adv.pay_slip_id,
-      select: adv,
-      select_merge: %{
+      select: %Advance{
+        id: adv.id,
+        slip_no: adv.slip_no,
+        slip_date: adv.slip_date,
+        amount: adv.amount,
+        note: adv.note,
         employee_name: emp.name,
         funds_account_name: ac.name,
-        pay_slip_no: pay.slip_no
+        pay_slip_no: pay.slip_no,
+        pay_slip_id: pay.id,
+        company_id: com.id,
+        employee_id: emp.id,
+        funds_account_id: adv.funds_account_id
       }
     )
   end
@@ -654,63 +700,48 @@ defmodule FullCircle.HR do
 
   def create_advance_multi(multi, attrs, com, user) do
     gapless_name = String.to_atom("update_gapless_doc" <> gen_temp_id())
-    note_name = :create_advance
+    name = :create_advance
 
     multi
     |> get_gapless_doc_id(gapless_name, "Advance", "ADV", com)
-    |> Multi.insert(
-      note_name,
-      fn mty ->
-        doc = Map.get(mty, gapless_name)
-
-        StdInterface.changeset(
-          Advance,
-          %Advance{},
-          Map.merge(attrs, %{"slip_no" => doc}),
-          com
-        )
-      end
-    )
-    |> Multi.insert("#{note_name}_log", fn %{^note_name => entity} ->
-      FullCircle.Sys.log_changeset(
-        note_name,
-        entity,
-        Map.merge(attrs, %{"slip_no" => entity.slip_no}),
-        com,
-        user
-      )
+    |> Multi.insert(name, fn %{^gapless_name => doc} ->
+      StdInterface.changeset(Advance, %Advance{}, Map.merge(attrs, %{"slip_no" => doc}), com)
     end)
-    |> create_advance_transactions(note_name, com, user)
+    |> Multi.insert("#{name}_log", fn %{^name => entity} ->
+      Sys.log_changeset(name, entity, Map.merge(attrs, %{"slip_no" => entity.slip_no}), com, user)
+    end)
+    |> create_advance_transactions(name, com, user)
   end
 
   defp create_advance_transactions(multi, name, com, user) do
     paya_id = Accounting.get_account_by_name("Salaries and Wages Payable", com, user).id
 
     multi
-    |> Ecto.Multi.run("create_transactions", fn repo, %{^name => adv} ->
-      repo.insert!(%Transaction{
-        doc_type: "Advance",
-        doc_no: adv.slip_no,
-        doc_id: adv.id,
-        doc_date: adv.slip_date,
-        account_id: paya_id,
-        company_id: com.id,
-        amount: adv.amount,
-        particulars: "From #{adv.funds_account_name} to #{adv.employee_name}"
-      })
-
-      repo.insert!(%Transaction{
-        doc_type: "Advance",
-        doc_no: adv.slip_no,
-        doc_id: adv.id,
-        doc_date: adv.slip_date,
-        account_id: adv.funds_account_id,
-        company_id: com.id,
-        amount: Decimal.negate(adv.amount),
-        particulars: "From #{adv.funds_account_name} to #{adv.employee_name}"
-      })
-
-      {:ok, nil}
+    |> Multi.insert_all("create_transactions", Transaction, fn %{^name => adv} ->
+      [
+        %{
+          doc_type: "Advance",
+          doc_no: adv.slip_no,
+          doc_id: adv.id,
+          doc_date: adv.slip_date,
+          account_id: paya_id,
+          company_id: com.id,
+          amount: adv.amount,
+          particulars: "From #{adv.funds_account_name} to #{adv.employee_name}",
+          inserted_at: Timex.now() |> DateTime.truncate(:second)
+        },
+        %{
+          doc_type: "Advance",
+          doc_no: adv.slip_no,
+          doc_id: adv.id,
+          doc_date: adv.slip_date,
+          account_id: adv.funds_account_id,
+          company_id: com.id,
+          amount: Decimal.negate(adv.amount),
+          particulars: "From #{adv.funds_account_name} to #{adv.employee_name}",
+          inserted_at: Timex.now() |> DateTime.truncate(:second)
+        }
+      ]
     end)
   end
 

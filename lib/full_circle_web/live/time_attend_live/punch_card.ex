@@ -1,8 +1,9 @@
 defmodule FullCircleWeb.TimeAttendLive.PunchCard do
+  alias FullCircle.HR.PaySlip
   use FullCircleWeb, :live_view
 
-  alias FullCircle.HR
-  alias FullCircleWeb.TimeAttendLive.{PunchCardComponent, SalaryNoteComponent}
+  alias FullCircle.{HR, PaySlipOp}
+  alias FullCircleWeb.TimeAttendLive.{PunchCardComponent, AdvanceComponent, SalaryNoteComponent}
 
   @impl true
   def render(assigns) do
@@ -18,7 +19,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
         class="mx-auto w-11/12 mb-2"
       >
         <div class=" flex flex-row gap-1 justify-center">
-          <div class="w-[35%]">
+          <div class="w-[30%]">
             <.input
               id="search_employee_name"
               name="search[employee_name]"
@@ -52,26 +53,60 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
               label={gettext("Year")}
             />
           </div>
-          <.button class="w-[7%] mt-5 h-10 grow-0 shrink-0">🔍</.button>
-          <.link
-            :if={@search.employee_name != ""}
-            phx-click={:new_timeattend}
-            class="w-[17%] h-10 mt-5 blue button"
-            id="new_timeattend"
-          >
-            <%= gettext("New Attendence") %>
-          </.link>
-          <.link
-            :if={@search.employee_name != ""}
-            phx-click={:new_salarynote}
-            class="w-[12%] h-10 mt-5 blue button"
-            id="new_salarynote"
-          >
-            <%= gettext("New Note") %>
-          </.link>
+          <.button class="w-[5%] mt-5 h-10 grow-0 shrink-0">🔍</.button>
           <a onclick="history.back();" class="w-[7%] h-10 mt-5 blue button"><%= gettext("Back") %></a>
         </div>
       </.form>
+      <div class="text-center my-4">
+      <.link
+          :if={@search.employee_name != ""}
+          navigate={"/companies/#{@current_company.id}/employees/#{@employee.id}/edit"}
+          class="w-[14%] h-10 mt-5 blue button ml-2"
+          id="new_timeattend"
+        >
+          <%= gettext("Edit Employee") %>
+        </.link>
+        <.link
+          :if={@search.employee_name != ""}
+          phx-click={:new_timeattend}
+          class="w-[14%] h-10 mt-5 blue button ml-2"
+          id="new_timeattend"
+        >
+          <%= gettext("+ Attendence") %>
+        </.link>
+        <.link
+          :if={@search.employee_name != ""}
+          phx-click={:new_salarynote}
+          class="w-[9%] h-10 mt-5 blue button ml-2"
+          id="new_salarynote"
+        >
+          <%= gettext("+ Note") %>
+        </.link>
+        <.link
+          :if={@search.employee_name != ""}
+          phx-click={:new_advance}
+          class="w-[9%] h-10 mt-5 blue button ml-2"
+          id="new_advance"
+        >
+          <%= gettext("+ Advance") %>
+        </.link>
+        <.link
+          :if={is_nil(@pay_slip)}
+          navigate={@new_pay_slip_url}
+          class="w-[10%] h-10 mt-5 blue button ml-2"
+          id="new_payslip"
+        >
+          <%= gettext("+ Pay") %>
+        </.link>
+        <.link
+          :if={!is_nil(@pay_slip)}
+          navigate={"/companies/#{@current_company.id}/PaySlip/#{@pay_slip.id}/recal"}
+          class="w-[11%] h-10 mt-5 blue button ml-2"
+          id="recal_payslip"
+        >
+          <%= gettext("Recal Pay") %>
+        </.link>
+      </div>
 
       <div :if={@employee} class="text-center">
         <span class="font-medium"><%= @employee.name %></span>
@@ -194,6 +229,16 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
             shake_obj={@shake_obj}
           />
         <% end %>
+
+        <%= for obj <- @advances do %>
+          <.live_component
+            module={AdvanceComponent}
+            id={obj.id}
+            obj={obj}
+            company={@current_company}
+            shake_obj={@shake_obj}
+          />
+        <% end %>
       </div>
 
       <div class="font-medium flex flex-row text-center tracking-tighter bg-amber-200">
@@ -267,6 +312,24 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
         current_user={@current_user}
       />
     </.modal>
+    <.modal
+      :if={@live_action_adv in [:new, :edit]}
+      id="advancenote-modal"
+      show
+      on_cancel={JS.push("modal_cancel")}
+      max_w="max-w-3xl"
+    >
+      <.live_component
+        module={FullCircleWeb.TimeAttendLive.AdvanceFormComponent}
+        live_action={@live_action_adv}
+        id={@obj.id || :new}
+        obj={@obj}
+        title={@title}
+        action={@live_action_adv}
+        current_company={@current_company}
+        current_user={@current_user}
+      />
+    </.modal>
     """
   end
 
@@ -279,18 +342,9 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
     socket =
       socket
       |> assign(page_title: gettext("Punch Card"))
-      |> assign(punches: [])
-      |> assign(salary_notes: [])
-      |> assign(employee: nil)
-      |> assign(days_in_month: 0)
-      |> assign(sunday_count: 0)
-      |> assign(total_day_worked: 0)
-      |> assign(ot_day_worked: 0)
-      |> assign(normal_pay_days: 0)
-      |> assign(sunday_pay_days: 0)
-      |> assign(holiday_pay_days: 0)
       |> assign(live_action_ta: :index)
       |> assign(live_action_sn: :index)
+      |> assign(live_action_adv: :index)
       |> assign(shake_obj: %{id: ""})
       |> assign(search: %{employee_name: emp_name, month: month, year: year})
       |> filter_punches(month, year, emp_name)
@@ -310,11 +364,19 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
         },
         socket
       ) do
+    qry = %{
+      "search[employee_name]" => name,
+      "search[month]" => month,
+      "search[year]" => year
+    }
+
     {:noreply,
      socket
      |> assign(search: %{employee_name: name, month: month, year: year})
      |> assign(shake_obj: %{id: ""})
-     |> filter_punches(month, year, name)}
+     |> push_navigate(
+       to: "/companies/#{socket.assigns.current_company.id}/PunchCard?#{URI.encode_query(qry)}"
+     )}
   end
 
   def handle_event("new_salarynote", _, socket) do
@@ -330,6 +392,29 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
          employee_name: socket.assigns.employee.name,
          employee_id: socket.assigns.employee.id,
          note_date:
+           Timex.parse!(
+             "#{socket.assigns.search.year}-#{socket.assigns.search.month}-01",
+             "{YYYY}-{M}-{0D}"
+           )
+           |> Timex.end_of_month()
+           |> Timex.to_date()
+       }
+     )}
+  end
+
+  def handle_event("new_advance", _, socket) do
+    {:noreply,
+     socket
+     |> assign(live_action_adv: :new)
+     |> assign(id: "new")
+     |> assign(shake_obj: %{id: ""})
+     |> assign(title: gettext("New Advance"))
+     |> assign(
+       obj: %FullCircle.HR.Advance{
+         slip_no: "...new...",
+         employee_name: socket.assigns.employee.name,
+         employee_id: socket.assigns.employee.id,
+         slip_date:
            Timex.parse!(
              "#{socket.assigns.search.year}-#{socket.assigns.search.month}-01",
              "{YYYY}-{M}-{0D}"
@@ -362,6 +447,23 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
            |> Timex.to_date()
        }
      )}
+  end
+
+  def handle_event("edit_advance", params, socket) do
+    obj =
+      HR.get_advance!(
+        params["id"],
+        socket.assigns.current_company,
+        socket.assigns.current_user
+      )
+
+    {:noreply,
+     socket
+     |> assign(live_action_adv: :edit)
+     |> assign(id: params["id"])
+     |> assign(shake_obj: %{id: ""})
+     |> assign(title: gettext("Edit Advance") <> " " <> obj.slip_no)
+     |> assign(obj: obj)}
   end
 
   def handle_event("edit_salarynote", params, socket) do
@@ -410,7 +512,11 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
 
   @impl true
   def handle_event("modal_cancel", _, socket) do
-    {:noreply, socket |> assign(live_action_ta: nil) |> assign(live_action_sn: nil)}
+    {:noreply,
+     socket
+     |> assign(live_action_ta: nil)
+     |> assign(live_action_sn: nil)
+     |> assign(live_action_adv: nil)}
   end
 
   @impl true
@@ -431,6 +537,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
     {:noreply,
      socket
      |> assign(live_action_sn: nil)
+     |> assign(live_action_adv: nil)
      |> assign(shake_obj: obj)
      |> filter_punches(
        socket.assigns.search.month,
@@ -465,6 +572,15 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
           socket.assigns.current_user
         )
 
+      advances =
+        HR.get_advances(
+          emp.id,
+          month |> String.to_integer(),
+          year |> String.to_integer(),
+          socket.assigns.current_company,
+          socket.assigns.current_user
+        )
+
       leaves =
         FullCircle.PayRun.employee_leave_summary(
           emp.id,
@@ -472,12 +588,32 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
           socket.assigns.current_company
         )
 
+      ps =
+        PaySlipOp.get_pay_slip_by_period(
+          emp,
+          month |> String.to_integer(),
+          year |> String.to_integer(),
+          socket.assigns.current_company
+        )
+
+      qry = %{
+        "emp_id" => emp.id,
+        "month" => month,
+        "year" => year
+      }
+
       socket =
         socket
         |> assign(punches: punches)
         |> assign(employee: emp)
         |> assign(salary_notes: salary_notes)
+        |> assign(advances: advances)
         |> assign(leaves: leaves)
+        |> assign(pay_slip: ps)
+        |> assign(
+          new_pay_slip_url:
+            "/companies/#{socket.assigns.current_company.id}/PaySlip/new?#{URI.encode_query(qry)}"
+        )
         |> assign(total_day_worked: total_day_worked(punches))
         |> assign(ot_day_worked: ot_day_worked(punches))
         |> assign(days_in_month: days_in_month(punches))
@@ -505,6 +641,20 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
       )
     else
       socket
+      |> assign(punches: [])
+      |> assign(salary_notes: [])
+      |> assign(advances: [])
+      |> assign(employee: nil)
+      |> assign(pay_slip: nil)
+      |> assign(days_in_month: 0)
+      |> assign(sunday_count: 0)
+      |> assign(total_day_worked: 0)
+      |> assign(ot_day_worked: 0)
+      |> assign(normal_pay_days: 0)
+      |> assign(sunday_pay_days: 0)
+      |> assign(holiday_pay_days: 0)
+      |> assign(new_pay_slip_url: nil)
+      |> assign(search: %{employee_name: emp_name, month: month, year: year})
     end
   end
 

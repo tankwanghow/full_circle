@@ -295,7 +295,7 @@ defmodule FullCircleWeb.EmployeeLive.Form do
           </div>
         </div>
         <div class="flex flex-nowrap gap-1">
-        <div class="w-[14%]">
+          <div class="w-[14%]">
             <.input
               field={@form[:marital_status]}
               label={gettext("Married")}
@@ -333,7 +333,6 @@ defmodule FullCircleWeb.EmployeeLive.Form do
           </div>
         </div>
         <div class="flex flex-nowrap gap-1">
-
           <div class="w-[16%]">
             <.input
               field={@form[:work_days_per_week]}
@@ -349,39 +348,19 @@ defmodule FullCircleWeb.EmployeeLive.Form do
             />
           </div>
           <div class="w-[12%]">
-            <.input
-              field={@form[:annual_leave]}
-              label={gettext("Annual Leave")}
-              type="number"
-            />
+            <.input field={@form[:annual_leave]} label={gettext("Annual Leave")} type="number" />
           </div>
           <div class="w-[10%]">
-            <.input
-              field={@form[:sick_leave]}
-              label={gettext("Sick Leave")}
-              type="number"
-            />
+            <.input field={@form[:sick_leave]} label={gettext("Sick Leave")} type="number" />
           </div>
           <div class="w-[15%]">
-            <.input
-              field={@form[:hospital_leave]}
-              label={gettext("Hopistalize Leave")}
-              type="number"
-            />
+            <.input field={@form[:hospital_leave]} label={gettext("Hopistalize Leave")} type="number" />
           </div>
           <div class="w-[14%]">
-            <.input
-              field={@form[:maternity_leave]}
-              label={gettext("Maternity Leave")}
-              type="number"
-            />
+            <.input field={@form[:maternity_leave]} label={gettext("Maternity Leave")} type="number" />
           </div>
           <div class="w-[13%]">
-            <.input
-              field={@form[:paternity_leave]}
-              label={gettext("Paternity Leave")}
-              type="number"
-            />
+            <.input field={@form[:paternity_leave]} label={gettext("Paternity Leave")} type="number" />
           </div>
         </div>
         <div class="flex flex-nowrap gap-1">
