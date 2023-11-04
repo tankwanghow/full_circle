@@ -328,6 +328,7 @@ defmodule FullCircleWeb.ReceiptLive.Print do
 
   def letter_foot(recd, assigns) do
     assigns = assigns |> assign(:recd, recd)
+
     ~H"""
     <div class="terms is-size-7">
       <div>This receipt is only valid subject to cheque or cheques honoured by the bank.</div>

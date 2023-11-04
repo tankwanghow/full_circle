@@ -174,12 +174,17 @@ defmodule FullCircleWeb.InvoiceLive.Print do
 
   def letter_foot(inv, assigns) do
     assigns = assigns |> assign(:inv, inv)
+
     ~H"""
     <div class="letter-foot">
       <div class="terms is-size-7">
-        <div>The above goods are delivered in good order and condition. Please make payment before the "Pay Due Date"</div>
+        <div>
+          The above goods are delivered in good order and condition. Please make payment before the "Pay Due Date"
+        </div>
         <div>All cheques should be made payable to the company & crossed "A/C Payee only"</div>
-        <div class="is-size-6 has-text-weight-light is-italic">Issued By: <%= @inv.issued_by.user.email %></div>
+        <div class="is-size-6 has-text-weight-light is-italic">
+          Issued By: <%= @inv.issued_by.user.email %>
+        </div>
       </div>
       <div class="sign">Authorise Signature</div>
       <div class="sign">Reciver Signature</div>

@@ -234,9 +234,10 @@ defmodule FullCircleWeb.DebitNoteLive.Print do
 
   def letter_foot(recd, assigns) do
     assigns = assigns |> assign(:recd, recd)
+
     ~H"""
     <div class="terms">
-    <div class="has-text-weight-light is-italic">
+      <div class="has-text-weight-light is-italic">
         Issued By: <%= @recd.issued_by.user.email %>
       </div>
     </div>
