@@ -29,6 +29,9 @@ defmodule FullCircle.DebCre do
         select: rec
     )
     |> Enum.map(fn x -> CreditNote.compute_struct_fields(x) end)
+    |> Enum.map(fn x ->
+      Map.merge(x, %{issued_by: last_log_record_for("credit_notes", x.id, x.company_id)})
+    end)
   end
 
   def get_credit_note!(id, company, user) do
@@ -398,6 +401,9 @@ defmodule FullCircle.DebCre do
         select: rec
     )
     |> Enum.map(fn x -> DebitNote.compute_struct_fields(x) end)
+    |> Enum.map(fn x ->
+      Map.merge(x, %{issued_by: last_log_record_for("debit_notes", x.id, x.company_id)})
+    end)
   end
 
   def get_debit_note!(id, company, user) do

@@ -50,15 +50,6 @@ defmodule FullCircle.Cheque.Deposit do
   end
 
   defp validate_deposit_amount(cs) do
-    # cs =
-    #   Map.replace(
-    #     cs,
-    #     :errors,
-    #     Enum.filter(cs.errors, fn {k, _} -> k != :cheques_amount end)
-    #   )
-
-    # cs = if(Enum.count(cs.errors) == 0, do: Map.replace(cs, :valid?, true), else: cs)
-
     fa = fetch_field!(cs, :funds_amount)
     ca = fetch_field!(cs, :cheques_amount)
 

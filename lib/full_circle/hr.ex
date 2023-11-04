@@ -21,7 +21,7 @@ defmodule FullCircle.HR do
   alias FullCircle.{Repo, Sys, StdInterface}
 
   def salary_type_types() do
-    ["Addition", "Deduction", "Contribution", "Recording", "LeaveTaken"]
+    ["Addition", "Deduction", "Contribution", "Bonus", "Recording", "LeaveTaken"]
   end
 
   def default_salary_types(company_id) do
@@ -70,27 +70,48 @@ defmodule FullCircle.HR do
       },
       %{
         name: "Annual Leave Taken",
-        type: "Recording",
+        type: "LeaveTaken",
         company_id: company_id,
         db_ac_name: "",
         cr_ac_name: ""
       },
       %{
         name: "Sick Leave Taken",
-        type: "Recording",
+        type: "LeaveTaken",
         company_id: company_id,
         db_ac_name: "",
         cr_ac_name: ""
       },
       %{
         name: "Hospitalize Leave Taken",
-        type: "Recording",
+        type: "LeaveTaken",
         company_id: company_id,
         db_ac_name: "",
         cr_ac_name: ""
       },
       %{
         name: "Maternity Leave Taken",
+        type: "LeaveTaken",
+        company_id: company_id,
+        db_ac_name: "",
+        cr_ac_name: ""
+      },
+      %{
+        name: "Employee Current Year Income",
+        type: "Recording",
+        company_id: company_id,
+        db_ac_name: "",
+        cr_ac_name: ""
+      },
+      %{
+        name: "EPF By Employee Current Year",
+        type: "Recording",
+        company_id: company_id,
+        db_ac_name: "",
+        cr_ac_name: ""
+      },
+      %{
+        name: "Zakat and PCB Current Year",
         type: "Recording",
         company_id: company_id,
         db_ac_name: "",
@@ -239,6 +260,9 @@ defmodule FullCircle.HR do
         preload: [:employee, :funds_account],
         select: rec
     )
+    |> Enum.map(fn x ->
+      Map.merge(x, %{issued_by: last_log_record_for("advances", x.id, x.company_id)})
+    end)
   end
 
   def get_print_salary_notes!(ids, company, user) do
@@ -250,6 +274,9 @@ defmodule FullCircle.HR do
         preload: [:employee, :salary_type],
         select: rec
     )
+    |> Enum.map(fn x ->
+      Map.merge(x, %{issued_by: last_log_record_for("salary_notes", x.id, x.company_id)})
+    end)
   end
 
   def get_salary_note!(id, com, user) do
@@ -342,7 +369,9 @@ defmodule FullCircle.HR do
         per_page: per_page
       ) do
     qry =
-      from(inv in subquery(salary_note_raw_query(com, user)))
+      from(inv in subquery(salary_note_raw_query(com, user)),
+        order_by: [desc: inv.note_date]
+      )
 
     qry =
       if terms != "" do
@@ -358,7 +387,7 @@ defmodule FullCircle.HR do
 
     qry =
       if date_from != "" do
-        from inv in qry, where: inv.note_date >= ^date_from, order_by: inv.note_date
+        from inv in qry, where: inv.note_date >= ^date_from
       else
         qry
       end
@@ -385,6 +414,8 @@ defmodule FullCircle.HR do
         on: emp.id == note.employee_id,
         left_join: st in SalaryType,
         on: st.id == note.salary_type_id,
+        left_join: ps in FullCircle.HR.PaySlip,
+        on: ps.id == note.pay_slip_id,
         where: txn.amount > 0,
         select: %{
           id: coalesce(note.id, txn.id),
@@ -392,6 +423,7 @@ defmodule FullCircle.HR do
           employee_name: emp.name,
           salary_type_name: st.name,
           particulars: coalesce(note.descriptions, txn.particulars),
+          pay_slip_no: ps.slip_no,
           note_date: txn.doc_date,
           updated_at: txn.inserted_at,
           company_id: com.id,
@@ -412,12 +444,15 @@ defmodule FullCircle.HR do
         on: st.id == sn.salary_type_id,
         on: is_nil(st.db_ac_id),
         on: is_nil(st.cr_ac_id),
+        left_join: ps in FullCircle.HR.PaySlip,
+        on: ps.id == sn.pay_slip_id,
         select: %{
           id: sn.id,
           note_no: sn.note_no,
           employee_name: emp.name,
           salary_type_name: st.name,
           particulars: sn.descriptions,
+          pay_slip_no: ps.slip_no,
           note_date: sn.note_date,
           updated_at: sn.inserted_at,
           company_id: com.id,
@@ -474,36 +509,40 @@ defmodule FullCircle.HR do
   def create_salary_note_transactions(multi, name, com, _user) do
     multi
     |> Multi.insert_all("#{name}_create_transactions", Transaction, fn %{^name => note} ->
-      note = note |> FullCircle.Repo.preload(:salary_type)
+      if Decimal.eq?(note.amount, Decimal.new(0)) do
+        []
+      else
+        note = note |> FullCircle.Repo.preload(:salary_type)
 
-      [
-        if !is_nil(note.salary_type.cr_ac_id) do
-          %{
-            doc_type: "SalaryNote",
-            doc_no: note.note_no,
-            doc_id: note.id,
-            doc_date: note.note_date,
-            account_id: note.salary_type.cr_ac_id,
-            company_id: com.id,
-            amount: Decimal.negate(note.amount),
-            particulars: "#{note.salary_type_name} to #{note.employee_name}",
-            inserted_at: Timex.now() |> DateTime.truncate(:second)
-          }
-        end,
-        if !is_nil(note.salary_type.db_ac_id) do
-          %{
-            doc_type: "SalaryNote",
-            doc_no: note.note_no,
-            doc_id: note.id,
-            doc_date: note.note_date,
-            account_id: note.salary_type.db_ac_id,
-            company_id: com.id,
-            amount: note.amount,
-            particulars: "#{note.salary_type_name} to #{note.employee_name}",
-            inserted_at: Timex.now() |> DateTime.truncate(:second)
-          }
-        end
-      ]
+        [
+          if !is_nil(note.salary_type.cr_ac_id) do
+            %{
+              doc_type: "SalaryNote",
+              doc_no: note.note_no,
+              doc_id: note.id,
+              doc_date: note.note_date,
+              account_id: note.salary_type.cr_ac_id,
+              company_id: com.id,
+              amount: Decimal.negate(note.amount),
+              particulars: "#{note.salary_type_name} to #{note.employee_name}",
+              inserted_at: Timex.now() |> DateTime.truncate(:second)
+            }
+          end,
+          if !is_nil(note.salary_type.db_ac_id) do
+            %{
+              doc_type: "SalaryNote",
+              doc_no: note.note_no,
+              doc_id: note.id,
+              doc_date: note.note_date,
+              account_id: note.salary_type.db_ac_id,
+              company_id: com.id,
+              amount: note.amount,
+              particulars: "#{note.salary_type_name} to #{note.employee_name}",
+              inserted_at: Timex.now() |> DateTime.truncate(:second)
+            }
+          end
+        ]
+      end
       |> Enum.reject(fn x -> is_nil(x) end)
     end)
   end

@@ -50,6 +50,9 @@ defmodule FullCircle.JournalEntry do
         select: obj
     )
     |> Enum.map(fn x -> Journal.compute_struct_balance(x) end)
+    |> Enum.map(fn x ->
+      Map.merge(x, %{issued_by: last_log_record_for("journals", x.id, x.company_id)})
+    end)
   end
 
   defp journal_transactions() do

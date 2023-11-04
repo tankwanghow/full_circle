@@ -1,5 +1,4 @@
 defmodule FullCircleWeb.TimeAttendLive.PunchCard do
-  alias FullCircle.HR.PaySlip
   use FullCircleWeb, :live_view
 
   alias FullCircle.{HR, PaySlipOp}
@@ -58,7 +57,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
         </div>
       </.form>
       <div class="text-center my-4">
-      <.link
+        <.link
           :if={@search.employee_name != ""}
           navigate={"/companies/#{@current_company.id}/employees/#{@employee.id}/edit"}
           class="w-[14%] h-10 mt-5 blue button ml-2"
@@ -533,12 +532,47 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
   end
 
   @impl true
+  def handle_info({:error_refresh_page_ta, cs}, socket) do
+    {:noreply,
+     socket
+     |> assign(live_action_ta: nil)
+     |> put_flash(
+       :error,
+       Enum.map(cs.errors, fn {f, {msg, _}} -> "#{Atom.to_string(f)} #{msg}" end)
+     )
+     |> filter_punches(
+       socket.assigns.search.month,
+       socket.assigns.search.year,
+       socket.assigns.employee.name
+     )}
+  end
+
+  @impl true
   def handle_info({:refresh_page_sn, obj}, socket) do
     {:noreply,
      socket
      |> assign(live_action_sn: nil)
      |> assign(live_action_adv: nil)
      |> assign(shake_obj: obj)
+     |> filter_punches(
+       socket.assigns.search.month,
+       socket.assigns.search.year,
+       socket.assigns.employee.name
+     )}
+  end
+
+  @impl true
+  def handle_info({:error_refresh_page_sn, cs}, socket) do
+    IO.inspect(cs)
+
+    {:noreply,
+     socket
+     |> assign(live_action_sn: nil)
+     |> assign(live_action_adv: nil)
+     |> put_flash(
+       :error,
+       Enum.map(cs.errors, fn {f, {msg, _}} -> "#{Atom.to_string(f)} #{msg}" end)
+     )
      |> filter_punches(
        socket.assigns.search.month,
        socket.assigns.search.year,

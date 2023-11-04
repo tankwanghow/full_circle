@@ -31,7 +31,7 @@ defmodule FullCircleWeb.JournalLive.Print do
   defp set_page_defaults(socket) do
     socket
     |> assign(:detail_body_height, 55)
-    |> assign(:detail_height, 15)
+    |> assign(:detail_height, 10)
     |> assign(:company, FullCircle.Sys.get_company!(socket.assigns.current_company.id))
   end
 
@@ -82,7 +82,7 @@ defmodule FullCircleWeb.JournalLive.Print do
               do: journal_footer(journal, n, journal.chunk_number, assigns),
               else: journal_footer("continue", n, journal.chunk_number, assigns)
             ) %>
-            <%= if(@pre_print == "true", do: "", else: letter_foot(assigns)) %>
+            <%= if(@pre_print == "true", do: "", else: letter_foot(journal, assigns)) %>
           </div>
         <% end %>
       <% end %>
@@ -95,16 +95,10 @@ defmodule FullCircleWeb.JournalLive.Print do
 
     ~H"""
     <div class="detail">
-      <span class="account">
-        <div>
-          <%= @txn.account_name %>
-        </div>
-        <div class="has-text-weight-light is-size-7">
-          <%= @txn.contact_name %>
-        </div>
-      </span>
       <span class="particulars">
-        <%= @txn.particulars %>
+        <span><%= @txn.account_name %></span>
+        <span class="is-italic is-underlined"><%= @txn.contact_name %></span>
+        <span class="has-text-weight-light"><%= @txn.particulars %></span>
       </span>
       <span class="amount"><%= Number.Delimit.number_to_delimited(@txn.amount) %></span>
     </div>
@@ -133,9 +127,14 @@ defmodule FullCircleWeb.JournalLive.Print do
     """
   end
 
-  def letter_foot(assigns) do
+  def letter_foot(journal, assigns) do
+    assigns = assigns |> assign(:journal, journal)
+
     ~H"""
     <div class="letter-foot">
+      <div class="has-text-weight-light is-italic is-size-6">
+        Issued By: <%= @journal.issued_by.user.email %>
+      </div>
       <div class="sign">Entry By</div>
       <div class="sign">Approved By</div>
     </div>
@@ -145,7 +144,6 @@ defmodule FullCircleWeb.JournalLive.Print do
   def detail_header(assigns) do
     ~H"""
     <div class="details-header has-text-weight-bold">
-      <div class="account">Account</div>
       <div class="particulars">Particular</div>
       <div class="amount">Amount</div>
     </div>
@@ -191,7 +189,7 @@ defmodule FullCircleWeb.JournalLive.Print do
       .journal-header { border-bottom: 0.5mm solid black; }
       .journal-footer {  }
       .terms { height: 15mm; }
-      .sign { padding: 3mm; border-top: 2px dotted black; width: 30%; text-align: center; float: left; margin-left: 2mm; margin-top: 15mm;}
+      .sign { padding: 3mm; border-top: 2px dotted black; width: 30%; text-align: center; float: left; margin-left: 2mm; margin-top: 10mm;}
     </style>
     """
   end
@@ -217,9 +215,8 @@ defmodule FullCircleWeb.JournalLive.Print do
       .journal-info .journal-date { float: left; }
       .details-header { display: flex; text-align: center; padding-bottom: 2mm; padding-top: 2mm; border-bottom: 0.5mm solid black; }
 
-      .particulars { width: 50%; text-align: left; }
-      .account { width: 30%; text-align: left; }
-      .amount { width: 20%; text-align: center; }
+      .particulars { width: 82%; text-align: left; }
+      .amount { width: 18%; text-align: right; border: 1px solid red;}
 
       .journal-footer { margin-bottom: 1mm; padding: 1mm 0 1mm 0; }
 

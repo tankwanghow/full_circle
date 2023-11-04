@@ -18,8 +18,8 @@ defmodule FullCircleWeb.PaySlipLive.Form do
         :new ->
           mount_new(socket, emp_id, month |> String.to_integer(), year |> String.to_integer())
 
-        :edit ->
-          mount_edit(socket, id)
+        :view ->
+          mount_view(socket, id)
 
         :recal ->
           mount_recal(socket, id)
@@ -41,7 +41,8 @@ defmodule FullCircleWeb.PaySlipLive.Form do
         emp,
         month,
         year,
-        socket.assigns.current_company
+        socket.assigns.current_company,
+        socket.assigns.current_user
       )
       |> PaySlipOp.calculate_pay(emp)
 
@@ -53,7 +54,7 @@ defmodule FullCircleWeb.PaySlipLive.Form do
     |> assign(form: to_form(cs))
   end
 
-  defp mount_edit(socket, id) do
+  defp mount_view(socket, id) do
     obj =
       PaySlipOp.get_pay_slip!(id, socket.assigns.current_company)
 
@@ -67,7 +68,7 @@ defmodule FullCircleWeb.PaySlipLive.Form do
     cs = PaySlip.changeset(obj, %{})
 
     socket
-    |> assign(live_action: :edit)
+    |> assign(live_action: :view)
     |> assign(id: id)
     |> assign(employee: emp)
     |> assign(page_title: gettext("Edit Pay Slip") <> " " <> obj.slip_no)
@@ -76,7 +77,11 @@ defmodule FullCircleWeb.PaySlipLive.Form do
 
   defp mount_recal(socket, id) do
     obj =
-      PaySlipOp.get_recal_pay_slip(id, socket.assigns.current_company)
+      PaySlipOp.get_recal_pay_slip(
+        id,
+        socket.assigns.current_company,
+        socket.assigns.current_user
+      )
 
     emp =
       FullCircle.HR.get_employee!(
@@ -98,6 +103,8 @@ defmodule FullCircleWeb.PaySlipLive.Form do
   @impl true
   def handle_event("exec_cal_func", _, socket) do
     cs = PaySlipOp.calculate_pay(socket.assigns.form.source, socket.assigns.employee)
+
+    IO.inspect(cs)
 
     socket = assign(socket, form: to_form(cs))
 
@@ -142,7 +149,7 @@ defmodule FullCircleWeb.PaySlipLive.Form do
         {:noreply,
          socket
          |> push_navigate(
-           to: ~p"/companies/#{socket.assigns.current_company.id}/PaySlip/#{obj.id}/edit"
+           to: ~p"/companies/#{socket.assigns.current_company.id}/PaySlip/#{obj.id}/view"
          )
          |> put_flash(:info, "#{gettext("Pay Slip created successfully.")}")}
 
@@ -178,7 +185,7 @@ defmodule FullCircleWeb.PaySlipLive.Form do
         {:noreply,
          socket
          |> push_navigate(
-           to: ~p"/companies/#{socket.assigns.current_company.id}/PaySlip/#{obj.id}/edit"
+           to: ~p"/companies/#{socket.assigns.current_company.id}/PaySlip/#{obj.id}/view"
          )
          |> put_flash(:info, "#{gettext("Pay Slip Updated successfully.")}")}
 
@@ -238,7 +245,7 @@ defmodule FullCircleWeb.PaySlipLive.Form do
             <.input field={@form[:employee_name]} label={gettext("Employee")} readonly tabindex="-1" />
           </div>
           <div class="w-[15%]">
-            <.input feedback field={@form[:slip_date]} label={gettext("Date")} type="date" />
+            <.input feedback={true} field={@form[:slip_date]} label={gettext("Date")} type="date" />
           </div>
           <div class="w-[7%]">
             <.input
@@ -269,7 +276,11 @@ defmodule FullCircleWeb.PaySlipLive.Form do
               url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=fundsaccount&name="}
             />
           </div>
-          <.link :if={@live_action != :new} phx-click={:exec_cal_func} class="mt-4 blue button">
+          <.link
+            :if={@live_action == :edit}
+            phx-click={JS.push("exec_cal_func")}
+            class="mt-4 blue button"
+          >
             <%= gettext("Calculate") %>
           </.link>
         </div>
@@ -292,6 +303,17 @@ defmodule FullCircleWeb.PaySlipLive.Form do
           types={@form[:additions]}
           total_field={@form[:addition_amount]}
           total_label={gettext("Addition Amount")}
+          current_company={@current_company}
+          current_user={@current_user}
+        />
+
+        <.live_component
+          module={SalaryNoteComponent}
+          id="bonuses"
+          klass="Bonus"
+          types={@form[:bonuses]}
+          total_field={@form[:bonus_amount]}
+          total_label={nil}
           current_company={@current_company}
           current_user={@current_user}
         />
@@ -349,24 +371,26 @@ defmodule FullCircleWeb.PaySlipLive.Form do
         />
 
         <div class="flex flex-row justify-center gap-x-1 mt-1">
-          <.save_button form={@form} />
+          <%= if @live_action != :view do %>
+            <.save_button form={@form} />
+          <% end %>
           <a onclick="history.back();" class="blue button"><%= gettext("Back") %></a>
           <.print_button
-            :if={@live_action == :edit}
+            :if={@live_action == :view}
             company={@current_company}
             doc_type="PaySlip"
             doc_id={@id}
             class="gray button"
           />
           <.pre_print_button
-            :if={@live_action == :edit}
+            :if={@live_action == :view}
             company={@current_company}
             doc_type="PaySlip"
             doc_id={@id}
             class="gray button"
           />
           <.live_component
-            :if={@live_action == :edit}
+            :if={@live_action == :view}
             module={FullCircleWeb.LogLive.Component}
             id={"log_#{@id}"}
             show_log={false}
@@ -374,7 +398,7 @@ defmodule FullCircleWeb.PaySlipLive.Form do
             entity_id={@id}
           />
           <.live_component
-            :if={@live_action == :edit}
+            :if={@live_action == :view}
             module={FullCircleWeb.JournalEntryViewLive.Component}
             id={"journal_#{@id}"}
             show_journal={false}

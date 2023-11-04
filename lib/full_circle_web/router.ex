@@ -206,10 +206,9 @@ defmodule FullCircleWeb.Router do
 
       live("/PayRun", PayRunLive.Index, :index)
 
-      # live("/PaySlip", PaySlipLive.Index, :index)
       live("/PaySlip/new", PaySlipLive.Form, :new)
       live("/PaySlip/:pay_slip_id/recal", PaySlipLive.Form, :recal)
-      live("/PaySlip/:pay_slip_id/edit", PaySlipLive.Form, :edit)
+      live("/PaySlip/:pay_slip_id/view", PaySlipLive.Form, :view)
     end
 
     live_session :require_authenticated_user_n_active_company_print,
@@ -248,6 +247,9 @@ defmodule FullCircleWeb.Router do
 
       live("/employees/:id/print", EmployeeLive.Print, :print)
       live("/employees/print_multi", EmployeeLive.Print, :print)
+
+      live("/PaySlip/:id/print", PaySlipLive.Print, :print)
+      live("/PaySlip/print_multi", PaySlipLive.Print, :print)
 
       live("/print_transactions", TransactionLive.Print, :print)
     end

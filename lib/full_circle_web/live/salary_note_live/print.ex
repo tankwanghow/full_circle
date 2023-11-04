@@ -30,8 +30,8 @@ defmodule FullCircleWeb.SalaryNoteLive.Print do
 
   defp set_page_defaults(socket) do
     socket
-    |> assign(:detail_body_height, 10)
-    |> assign(:detail_height, 9)
+    |> assign(:detail_body_height, 8)
+    |> assign(:detail_height, 8)
     |> assign(:company, FullCircle.Sys.get_company!(socket.assigns.current_company.id))
   end
 
@@ -82,7 +82,7 @@ defmodule FullCircleWeb.SalaryNoteLive.Print do
               do: footer(adv, n, adv.chunk_number, assigns),
               else: footer("continue", n, adv.chunk_number, assigns)
             ) %>
-            <%= if(@pre_print == "true", do: "", else: letter_foot(assigns)) %>
+            <%= if(@pre_print == "true", do: "", else: letter_foot(adv, assigns)) %>
           </div>
         <% end %>
       <% end %>
@@ -128,9 +128,12 @@ defmodule FullCircleWeb.SalaryNoteLive.Print do
     """
   end
 
-  def letter_foot(assigns) do
+  def letter_foot(adv, assigns) do
+    assigns = assigns |> assign(:adv, adv)
+
     ~H"""
     <div class="letter-foot">
+      <div class="has-text-weight-light is-italic">Issued By: <%= @adv.issued_by.user.email %></div>
       <div class="sign">Entry By</div>
       <div class="sign">Employee Sign</div>
     </div>

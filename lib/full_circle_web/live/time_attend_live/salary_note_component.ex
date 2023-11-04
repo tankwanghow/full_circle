@@ -36,7 +36,12 @@ defmodule FullCircleWeb.TimeAttendLive.SalaryNoteComponent do
         </.link>
       </div>
       <div class="w-[10%] border-b border-gray-400 py-1">
-        <%= @obj.pay_slip_no %>
+        <.link
+          class="hover:font-bold"
+          navigate={"/companies/#{@company.id}/PaySlip/#{@obj.pay_slip_id}/view"}
+        >
+          <%= @obj.pay_slip_no %>
+        </.link>
       </div>
       <div class="w-[20%] border-b text-center border-gray-400 py-1">
         <span class="font-light"><%= @obj.salary_type_name %></span>

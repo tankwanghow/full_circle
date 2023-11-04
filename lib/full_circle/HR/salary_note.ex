@@ -3,6 +3,7 @@ defmodule FullCircle.HR.SalaryNote do
   import Ecto.Changeset
   import FullCircleWeb.Gettext
   import FullCircle.Helpers
+  # import Ecto.Query, warn: false
 
   schema "salary_notes" do
     field(:note_no, :string)
@@ -55,7 +56,6 @@ defmodule FullCircle.HR.SalaryNote do
       :unit_price,
       :salary_type_name
     ])
-    |> validate_number(:amount, greater_than: 0)
     |> compute_fields()
   end
 
@@ -86,6 +86,7 @@ defmodule FullCircle.HR.SalaryNote do
       :company_id
     ])
     |> fill_today(:note_date)
+    |> validate_has_pay_slip_no_cannot_change_after_days(4)
     |> validate_id(:employee_name, :employee_id)
     |> validate_id(:salary_type_name, :salary_type_id)
     |> validate_date(:note_date, days_before: 31)
@@ -100,16 +101,31 @@ defmodule FullCircle.HR.SalaryNote do
     |> compute_fields()
   end
 
+  defp validate_has_pay_slip_no_cannot_change_after_days(cs, days) do
+    psid = fetch_field!(cs, :pay_slip_id)
+    com_id = fetch_field!(cs, :company_id)
+
+    if !is_nil(psid) do
+      ps = FullCircle.PaySlipOp.get_pay_slip!(psid, %{id: com_id})
+
+      if Timex.diff(Timex.today(), ps.slip_date, :days) <= days do
+        cs
+      else
+        add_unique_error(
+          cs,
+          :note_date,
+          "over #{days} days from pay date"
+        )
+      end
+    else
+      cs
+    end
+  end
+
   def compute_fields(cs) do
     amt =
       Decimal.mult(fetch_field!(cs, :quantity), fetch_field!(cs, :unit_price)) |> Decimal.round(2)
 
-    cs = put_change(cs, :amount, amt)
-
-    if Decimal.eq?(amt, 0) do
-      add_unique_error(cs, :amount, gettext("cannot be zero"))
-    else
-      cs
-    end
+    put_change(cs, :amount, amt)
   end
 end

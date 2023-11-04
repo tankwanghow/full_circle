@@ -44,6 +44,9 @@ defmodule FullCircle.BillPay do
         select: pay
     )
     |> Enum.map(fn x -> Payment.compute_struct_balance(x) end)
+    |> Enum.map(fn x ->
+      Map.merge(x, %{issued_by: last_log_record_for("payments", x.id, x.company_id)})
+    end)
   end
 
   def get_payment!(id, company, user) do

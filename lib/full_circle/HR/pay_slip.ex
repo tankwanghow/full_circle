@@ -15,6 +15,7 @@ defmodule FullCircle.HR.PaySlip do
     belongs_to(:funds_account, FullCircle.Accounting.Account)
 
     has_many(:additions, FullCircle.HR.SalaryNote, on_delete: :delete_all)
+    has_many(:bonuses, FullCircle.HR.SalaryNote, on_delete: :delete_all)
     has_many(:deductions, FullCircle.HR.SalaryNote, on_delete: :delete_all)
     has_many(:contributions, FullCircle.HR.SalaryNote, on_delete: :delete_all)
     has_many(:leaves, FullCircle.HR.SalaryNote, on_delete: :delete_all)
@@ -25,13 +26,14 @@ defmodule FullCircle.HR.PaySlip do
     field(:addition_amount, :decimal, virtual: true, default: 0)
     field(:deduction_amount, :decimal, virtual: true, default: 0)
     field(:advance_amount, :decimal, virtual: true, default: 0)
+    field(:bonus_amount, :decimal, virtual: true, default: 0)
     field(:pay_slip_amount, :decimal, virtual: true, default: 0)
 
     timestamps(type: :utc_datetime)
   end
 
   @doc false
-  def changeset(slip, attrs) do
+  defp std_changeset(slip, attrs) do
     slip
     |> cast(attrs, [
       :slip_no,
@@ -55,8 +57,8 @@ defmodule FullCircle.HR.PaySlip do
     ])
     |> validate_id(:employee_name, :employee_id)
     |> validate_id(:funds_account_name, :funds_account_id)
-    |> validate_date(:slip_date, days_before: 5)
-    |> validate_date(:slip_date, days_after: 5)
+    |> validate_date(:slip_date, days_before: 3)
+    |> validate_date(:slip_date, days_after: 3)
     |> validate_pay_month_year()
     |> unsafe_validate_unique([:slip_no, :company_id], FullCircle.Repo,
       message: gettext("has already been taken")
@@ -73,18 +75,37 @@ defmodule FullCircle.HR.PaySlip do
       message: gettext("same pay period exists")
     )
     |> cast_assoc(:additions, with: &FullCircle.HR.SalaryNote.changeset_on_payslip/2)
+    |> cast_assoc(:bonuses, with: &FullCircle.HR.SalaryNote.changeset_on_payslip/2)
     |> cast_assoc(:deductions, with: &FullCircle.HR.SalaryNote.changeset_on_payslip/2)
     |> cast_assoc(:contributions, with: &FullCircle.HR.SalaryNote.changeset_on_payslip/2)
     |> cast_assoc(:leaves, with: &FullCircle.HR.SalaryNote.changeset_on_payslip/2)
     |> cast_assoc(:advances, with: &FullCircle.HR.Advance.changeset_on_payslip/2)
-    |> compute_fields()
+  end
+
+  def changeset_no_compute(slip, attrs) do
+    slip |> std_changeset(attrs)
+  end
+
+  def changeset(slip, attrs) do
+    slip |> std_changeset(attrs) |> compute_fields()
   end
 
   def compute_struct_fields(sn) do
-    sn
-    |> sum_struct_field_to(:additions, :amount, :addition_amount)
-    |> sum_struct_field_to(:deductions, :amount, :deduction_amount)
-    |> sum_struct_field_to(:advances, :amount, :advance_amount)
+    sn =
+      sn
+      |> sum_struct_field_to(:additions, :amount, :addition_amount)
+      |> sum_struct_field_to(:deductions, :amount, :deduction_amount)
+      |> sum_struct_field_to(:advances, :amount, :advance_amount)
+      |> sum_struct_field_to(:bonuses, :amount, :bonus_amount)
+
+    Map.replace!(
+      sn,
+      :pay_slip_amount,
+      sn.addition_amount
+      |> Decimal.add(sn.bonus_amount)
+      |> Decimal.sub(sn.advance_amount)
+      |> Decimal.sub(sn.deduction_amount)
+    )
   end
 
   def compute_fields(changeset) do
@@ -93,12 +114,14 @@ defmodule FullCircle.HR.PaySlip do
       |> sum_field_to(:additions, :amount, :addition_amount)
       |> sum_field_to(:deductions, :amount, :deduction_amount)
       |> sum_field_to(:advances, :amount, :advance_amount)
+      |> sum_field_to(:bonuses, :amount, :bonus_amount)
 
     changeset =
-      put_change(
+      force_change(
         changeset,
         :pay_slip_amount,
         fetch_field!(changeset, :addition_amount)
+        |> Decimal.add(fetch_field!(changeset, :bonus_amount))
         |> Decimal.sub(fetch_field!(changeset, :deduction_amount))
         |> Decimal.sub(fetch_field!(changeset, :advance_amount))
       )
@@ -108,7 +131,7 @@ defmodule FullCircle.HR.PaySlip do
         add_unique_error(changeset, :pay_slip_amount, gettext("must be +ve"))
 
       true ->
-        changeset
+        changeset |> clear_error(:pay_slip_amount)
     end
   end
 

@@ -3,6 +3,19 @@ defmodule FullCircle.Helpers do
   import Ecto.Changeset
   import FullCircleWeb.Gettext
 
+  def last_log_record_for(entity, id, com_id) do
+    from(log in FullCircle.Sys.Log,
+      where: log.entity == ^entity,
+      where: log.entity_id == ^id,
+      where: log.company_id == ^com_id,
+      preload: [:user],
+      order_by: [desc: log.inserted_at],
+      limit: 1,
+      select: log
+    )
+    |> FullCircle.Repo.one()
+  end
+
   def list_hashtag(tag \\ "", class, key, com) do
     regexp = "#(\\w+#{tag}$|\\w+)"
     tag = "#%#{tag}%"
@@ -120,7 +133,7 @@ defmodule FullCircle.Helpers do
     if is_struct(list, Ecto.Association.NotLoaded), do: [], else: list
   end
 
-  def get_gapless_doc_id(multi, name, doc, doc_code, com) do
+  def get_gapless_doc_id(multi, name, doc, doc_code, com, extra_code \\ nil) do
     Ecto.Multi.run(multi, name, fn repo, _ ->
       gap =
         repo.one(
@@ -133,13 +146,18 @@ defmodule FullCircle.Helpers do
       {:ok, gap} =
         repo.update(Ecto.Changeset.change(gap, current: gap.current + 1), returning: [:current])
 
-      {:ok, gen_doc_id(gap.current, doc_code)}
+      {:ok, gen_doc_id(gap.current, doc_code, extra_code)}
     end)
   end
 
-  def gen_doc_id(number, code) do
+  def gen_doc_id(number, code, extra_code) do
     num = number |> Integer.to_string() |> String.pad_leading(6, "0")
-    Enum.join([code, num], "-")
+
+    if extra_code do
+      Enum.join([code, extra_code, num], "-")
+    else
+      Enum.join([code, num], "-")
+    end
   end
 
   def fill_today(changeset, date_field) do
@@ -181,5 +199,16 @@ defmodule FullCircle.Helpers do
     else
       cs
     end
+  end
+
+  def clear_error(cs, field) do
+    cs =
+      Map.replace(
+        cs,
+        :errors,
+        Enum.filter(cs.errors, fn {k, _} -> k != field end)
+      )
+
+    if(Enum.count(cs.errors) == 0, do: Map.replace(cs, :valid?, true), else: cs)
   end
 end

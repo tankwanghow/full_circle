@@ -74,13 +74,16 @@ defmodule FullCircleWeb.SalaryNoteLive.Index do
         <div class="w-[10%] border-b border-t border-amber-400 py-1">
           <%= gettext("Note No") %>
         </div>
-        <div class="w-[19%] border-b border-t border-amber-400 py-1">
+        <div class="w-[10%] border-b border-t border-amber-400 py-1">
+          <%= gettext("Slip No") %>
+        </div>
+        <div class="w-[16%] border-b border-t border-amber-400 py-1">
           <%= gettext("Employee") %>
         </div>
-        <div class="w-[19%] border-b border-t border-amber-400 py-1">
+        <div class="w-[16%] border-b border-t border-amber-400 py-1">
           <%= gettext("Salary Type") %>
         </div>
-        <div class="w-[30%] border-b border-t border-amber-400 py-1">
+        <div class="w-[26%] border-b border-t border-amber-400 py-1">
           <%= gettext("Descriptions") %>
         </div>
         <div class="w-[10%] border-b border-t border-amber-400 py-1">

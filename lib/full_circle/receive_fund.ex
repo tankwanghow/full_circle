@@ -52,6 +52,9 @@ defmodule FullCircle.ReceiveFund do
         select: rec
     )
     |> Enum.map(fn x -> Receipt.compute_struct_balance(x) end)
+    |> Enum.map(fn x ->
+      Map.merge(x, %{issued_by: last_log_record_for("receipts", x.id, x.company_id)})
+    end)
   end
 
   def get_receipt!(id, company, user) do

@@ -90,8 +90,8 @@ defmodule FullCircleWeb.TimeAttendLive.SalaryNoteFormComponent do
         send(self(), {:refresh_page_sn, obj})
         {:noreply, socket}
 
-      {:error, _failed_operation, changeset} ->
-        send(self(), {:error, changeset})
+      {:error, _failed_operation, changeset, _} ->
+        send(self(), {:error_refresh_page_sn, changeset})
         {:noreply, socket}
 
       :not_authorise ->
@@ -113,7 +113,7 @@ defmodule FullCircleWeb.TimeAttendLive.SalaryNoteFormComponent do
         {:noreply, socket}
 
       {:error, _failed_operation, changeset, _} ->
-        send(self(), {:error, changeset})
+        send(self(), {:error_refresh_page_sn, changeset})
         {:noreply, socket}
 
       :not_authorise ->
@@ -134,7 +134,7 @@ defmodule FullCircleWeb.TimeAttendLive.SalaryNoteFormComponent do
         {:noreply, socket}
 
       {:error, _failed_operation, changeset, _} ->
-        send(self(), {:error, changeset})
+        send(self(), {:error_refresh_page_sn, changeset})
         {:noreply, socket}
 
       :not_authorise ->

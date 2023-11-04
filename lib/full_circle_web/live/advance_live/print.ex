@@ -82,7 +82,7 @@ defmodule FullCircleWeb.AdvanceLive.Print do
               do: footer(adv, n, adv.chunk_number, assigns),
               else: footer("continue", n, adv.chunk_number, assigns)
             ) %>
-            <%= if(@pre_print == "true", do: "", else: letter_foot(assigns)) %>
+            <%= if(@pre_print == "true", do: "", else: letter_foot(adv, assigns)) %>
           </div>
         <% end %>
       <% end %>
@@ -125,9 +125,12 @@ defmodule FullCircleWeb.AdvanceLive.Print do
     """
   end
 
-  def letter_foot(assigns) do
+  def letter_foot(adv, assigns) do
+    assigns = assigns |> assign(:adv, adv)
+
     ~H"""
     <div class="letter-foot">
+      <div class="has-text-weight-light is-italic">Issued By: <%= @adv.issued_by.user.email %></div>
       <div class="sign">Entry By</div>
       <div class="sign">Employee Sign</div>
     </div>

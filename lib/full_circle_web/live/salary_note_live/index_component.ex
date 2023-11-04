@@ -50,13 +50,16 @@ defmodule FullCircleWeb.SalaryNoteLive.IndexComponent do
           />
         <% end %>
       </div>
-      <div class="w-[19%] border-b text-center border-gray-400 py-1 overflow-clip">
+      <div class="w-[10%] border-b border-gray-400 py-1">
+        <%= @obj.pay_slip_no %>
+      </div>
+      <div class="w-[16%] border-b text-center border-gray-400 py-1 overflow-clip">
         <span class="font-light"><%= @obj.employee_name %></span>
       </div>
-      <div class="w-[19%] border-b text-center border-gray-400 py-1 overflow-clip">
+      <div class="w-[16%] border-b text-center border-gray-400 py-1 overflow-clip">
         <span class="font-light"><%= @obj.salary_type_name %></span>
       </div>
-      <div class="w-[30%] border-b text-center border-gray-400 py-1 overflow-clip">
+      <div class="w-[26%] border-b text-center border-gray-400 py-1 overflow-clip">
         <span class="font-light"><%= @obj.particulars %></span>
       </div>
       <div class="w-[10%] border-b border-gray-400 py-1">

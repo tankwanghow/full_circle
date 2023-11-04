@@ -57,10 +57,10 @@ defmodule FullCircleWeb.PayRunLive.IndexComponent do
         </.link>
         <.link
           :if={!is_nil(ps)}
-          navigate={"/companies/#{@company.id}/PaySlip/#{ps_id}/edit"}
+          navigate={"/companies/#{@company.id}/PaySlip/#{ps_id}/view"}
           class="w-[15%] text-green-600 border-b border-r border-gray-600 hover:font-bold"
         >
-          Edit Pay <%= ps %>
+          View Pay <%= ps %>
         </.link>
       <% end %>
     </div>

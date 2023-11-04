@@ -122,7 +122,7 @@ defmodule FullCircleWeb.PaymentLive.Print do
               else: payment_footer("continue", n, payment.chunk_number, assigns)
             ) %>
             <div class="letter-foot">
-              <%= if(@pre_print == "true", do: "", else: letter_foot(assigns)) %>
+              <%= if(@pre_print == "true", do: "", else: letter_foot(payment, assigns)) %>
             </div>
           </div>
         <% end %>
@@ -270,10 +270,14 @@ defmodule FullCircleWeb.PaymentLive.Print do
     """
   end
 
-  def letter_foot(assigns) do
+  def letter_foot(recd, assigns) do
+    assigns = assigns |> assign(:recd, recd)
+
     ~H"""
-    <div class="terms is-size-7">
-      <%!-- <div>This receipt is only valid subject to cheque or cheques honoured by the bank.</div> --%>
+    <div class="terms is-size-6">
+      <div class="has-text-weight-light is-italic">
+        Issued By: <%= @recd.issued_by.user.email %>
+      </div>
     </div>
     <div class="sign">Receiver Signature</div>
     <div class="sign">Manager Signature</div>

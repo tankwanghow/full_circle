@@ -32,6 +32,9 @@ defmodule FullCircle.Cheque do
           cheque_amount: chq.amount
         }
     )
+    |> Enum.map(fn x ->
+      Map.merge(x, %{issued_by: last_log_record_for("return_cheques", x.id, x.company_id)})
+    end)
   end
 
   def get_return_cheque!(id, company, user) do

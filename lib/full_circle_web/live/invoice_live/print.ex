@@ -82,7 +82,7 @@ defmodule FullCircleWeb.InvoiceLive.Print do
               do: invoice_footer(invoice, n, invoice.chunk_number, assigns),
               else: invoice_footer("continue", n, invoice.chunk_number, assigns)
             ) %>
-            <%= if(@pre_print == "true", do: "", else: letter_foot(assigns)) %>
+            <%= if(@pre_print == "true", do: "", else: letter_foot(invoice, assigns)) %>
           </div>
         <% end %>
       <% end %>
@@ -172,13 +172,14 @@ defmodule FullCircleWeb.InvoiceLive.Print do
     """
   end
 
-  def letter_foot(assigns) do
+  def letter_foot(inv, assigns) do
+    assigns = assigns |> assign(:inv, inv)
     ~H"""
     <div class="letter-foot">
       <div class="terms is-size-7">
-        <div>The above goods are delivered in good order and condition.</div>
-        <div>Please make payment before the "Pay Due Date"</div>
+        <div>The above goods are delivered in good order and condition. Please make payment before the "Pay Due Date"</div>
         <div>All cheques should be made payable to the company & crossed "A/C Payee only"</div>
+        <div class="is-size-6 has-text-weight-light is-italic">Issued By: <%= @inv.issued_by.user.email %></div>
       </div>
       <div class="sign">Authorise Signature</div>
       <div class="sign">Reciver Signature</div>

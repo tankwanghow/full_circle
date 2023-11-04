@@ -30,7 +30,7 @@ defmodule FullCircleWeb.ChequeLive.ReturnChequePrint do
 
   defp set_page_defaults(socket) do
     socket
-    |> assign(:detail_body_height, 20)
+    |> assign(:detail_body_height, 15)
     |> assign(:detail_height, 9)
     |> assign(:company, FullCircle.Sys.get_company!(socket.assigns.current_company.id))
   end
@@ -82,7 +82,7 @@ defmodule FullCircleWeb.ChequeLive.ReturnChequePrint do
               do: footer(rtq, n, rtq.chunk_number, assigns),
               else: footer("continue", n, rtq.chunk_number, assigns)
             ) %>
-            <%= if(@pre_print == "true", do: "", else: letter_foot(assigns)) %>
+            <%= if(@pre_print == "true", do: "", else: letter_foot(rtq, assigns)) %>
           </div>
         <% end %>
       <% end %>
@@ -127,10 +127,14 @@ defmodule FullCircleWeb.ChequeLive.ReturnChequePrint do
     """
   end
 
-  def letter_foot(assigns) do
+  def letter_foot(rtq, assigns) do
+    assigns = assigns |> assign(:rtq, rtq)
+
     ~H"""
     <div class="letter-foot">
-      <div class="sign">Entry By</div>
+      <div class="has-text-weight-light is-italic issued">
+        Issued By: <%= @rtq.issued_by.user.email %>
+      </div>
       <div class="sign">Approved By</div>
     </div>
     """
@@ -209,7 +213,8 @@ defmodule FullCircleWeb.ChequeLive.ReturnChequePrint do
       .header { border-bottom: 0.5mm solid black; }
       .footer {  }
       .terms { height: 15mm; }
-      .sign { padding: 3mm; border-top: 2px dotted black; width: 30%; text-align: center; float: left; margin-left: 2mm; margin-top: 15mm;}
+      .issued { height: 8mm; }
+      .sign { padding: 3mm; border-top: 2px dotted black; width: 30%; text-align: center; float: right; margin-left: 2mm; margin-top: 15mm;}
     </style>
     """
   end
@@ -244,7 +249,6 @@ defmodule FullCircleWeb.ChequeLive.ReturnChequePrint do
 
       .footer { margin-bottom: 1mm; padding: 1mm 0 1mm 0; }
 
-      .descriptions { }
       .empty-footer { min-height: 19px; }
       .page-count { float: right; padding-top: 5px;}
     </style>

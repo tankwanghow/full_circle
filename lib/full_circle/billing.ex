@@ -61,6 +61,9 @@ defmodule FullCircle.Billing do
         select: inv
     )
     |> Enum.map(fn x -> Invoice.compute_struct_fields(x) end)
+    |> Enum.map(fn x ->
+      Map.merge(x, %{issued_by: last_log_record_for("invoices", x.id, x.company_id)})
+    end)
   end
 
   defp print_invoice_details do
