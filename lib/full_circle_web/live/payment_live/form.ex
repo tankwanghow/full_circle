@@ -580,14 +580,14 @@ defmodule FullCircleWeb.PaymentLive.Form do
             company={@current_company}
             doc_type="Payment"
             doc_id={@id}
-            class="blue button"
+            class="gray button"
           />
           <.pre_print_button
             :if={@live_action != :new}
             company={@current_company}
             doc_type="Payment"
             doc_id={@id}
-            class="blue button"
+            class="gray button"
           />
           <.live_component
             :if={@live_action == :edit}

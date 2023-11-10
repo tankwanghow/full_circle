@@ -226,7 +226,10 @@ defmodule FullCircleWeb.TimeAttendLive.FormComponent do
               id="delete-object"
               msg1={gettext("Deleting Time Attendence")}
               msg2={gettext("Cannot Be Recover!!!")}
-              confirm={JS.push("delete", target: "#object-form")}
+              confirm={
+                JS.push("delete", target: "#object-form")
+                |> JS.exec("phx-remove", to: "#delete-object-modal")
+              }
             />
           <% end %>
         </div>

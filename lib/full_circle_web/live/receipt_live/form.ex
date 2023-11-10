@@ -690,14 +690,14 @@ defmodule FullCircleWeb.ReceiptLive.Form do
             company={@current_company}
             doc_type="Receipt"
             doc_id={@id}
-            class="blue button"
+            class="gray button"
           />
           <.pre_print_button
             :if={@live_action != :new}
             company={@current_company}
             doc_type="Receipt"
             doc_id={@id}
-            class="blue button"
+            class="gray button"
           />
           <.live_component
             :if={@live_action == :edit}

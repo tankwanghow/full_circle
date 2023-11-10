@@ -114,7 +114,7 @@ defmodule FullCircleWeb.SalaryNoteLive.Form do
          |> push_navigate(to: ~p"/companies/#{socket.assigns.current_company.id}/SalaryNote")
          |> put_flash(:info, "#{gettext("Salary Note Deleted successfully.")}")}
 
-      {:error, failed_operation, changeset} ->
+      {:error, failed_operation, changeset, _} ->
         {:noreply,
          socket
          |> assign(form: to_form(changeset))
@@ -213,9 +213,16 @@ defmodule FullCircleWeb.SalaryNoteLive.Form do
     ~H"""
     <div class="w-6/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
       <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
-      <p :if={!is_nil(@form.source.data.pay_slip_no)} class="w-full text-xl text-center font-bold">
-        <%= @form.source.data.pay_slip_no %>
-      </p>
+      <div class="text-center">
+      <span class="text-xl">PaySlip Info:- </span>
+      <.link
+        :if={!is_nil(@form.source.data.pay_slip_no)}
+        navigate={"/companies/#{@current_company.id}/PaySlip/#{@form.source.data.pay_slip_id}/view"}
+        class="text-xl text-blue-600 hover:cursor-pointer hover:font-bold"
+      >
+        <%= @form.source.data.pay_slip_no %> <%= FullCircleWeb.Helpers.format_date(@form.source.data.pay_slip_date) %>
+      </.link>
+      </div>
       <.form
         for={@form}
         id="object-form"
@@ -284,7 +291,10 @@ defmodule FullCircleWeb.SalaryNoteLive.Form do
               id="delete-object"
               msg1={gettext("Deleting Salary Note")}
               msg2={gettext("Cannot Be Recover!!!")}
-              confirm={JS.push("delete", target: "#object-form")}
+              confirm={
+                JS.push("delete", target: "#object-form")
+                |> JS.exec("phx-remove", to: "#delete-object-modal")
+              }
             />
           <% end %>
           <.print_button

@@ -31,7 +31,7 @@ defmodule FullCircleWeb.PaySlipLive.Print do
 
   defp set_page_defaults(socket) do
     socket
-    |> assign(:detail_body_height, 160)
+    |> assign(:detail_body_height, 155)
     |> assign(:detail_height, 6)
     |> assign(:company, FullCircle.Sys.get_company!(socket.assigns.current_company.id))
   end
@@ -220,7 +220,11 @@ defmodule FullCircleWeb.PaySlipLive.Print do
     assigns = assign(assigns, :psd, psd)
 
     ~H"""
-    <div :if={@psd.no != "session_total" and @psd.no != "pay_total"} class={"detail #{@psd.type}"}>
+    <div
+      :if={@psd.no != "session_total" and @psd.no != "pay_total" and @psd.type != "contribution"}
+      }
+      class={"detail #{@psd.type}"}
+    >
       <span class="date">
         <%= format_date(@psd.dt) %>
       </span>
@@ -230,6 +234,18 @@ defmodule FullCircleWeb.PaySlipLive.Print do
       <span class="qty"><%= @psd.qty %></span>
       <span class="price"><%= Number.Delimit.number_to_delimited(@psd.price) %></span>
       <span class="total">
+        <%= Number.Delimit.number_to_delimited(@psd.amount) %>
+      </span>
+    </div>
+
+    <div
+      :if={@psd.no != "session_total" and @psd.no != "pay_total" and @psd.type == "contribution"}
+      class={"detail #{@psd.type} is-italic"}
+    >
+      <span class="con-item">
+        <%= @psd.item %> <%= @psd.note %>
+      </span>
+      <span class="con-total">
         <%= Number.Delimit.number_to_delimited(@psd.amount) %>
       </span>
     </div>
@@ -388,9 +404,17 @@ defmodule FullCircleWeb.PaySlipLive.Print do
       .qty { width: 21mm; text-align: center; }
       .price { width: 25mm; text-align: right; }
       .total { width: 30mm; text-align: right; }
+
+      .con-item { width: 50mm; }
+      .con-total { width: 20mm; text-align: right;}
+
+      .detail.contribution { width: 80mm; padding-left: 3mm; }
+
+      .detail.contribution { border-bottom: 2px solid green; }
+
       .session-total { text-align: right; border-top: 0.5mm solid black; border-bottom: 4px double black; height: 8mm;}
 
-      .pay-total { font-size: 1.25rem; text-align: right; border-bottom: 4px double black; height: 10mm; }
+      .pay-total { font-size: 1.25rem; text-align: right; border-bottom: 4px double black; height: 10mm; margin-bottom: 2mm;}
 
       .pay-slip-footer { min-height: 10mm; }
 

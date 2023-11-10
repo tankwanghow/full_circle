@@ -448,7 +448,7 @@ defmodule FullCircleWeb.EmployeeLive.Form do
             company={@current_company}
             doc_type="employees"
             doc_id={@id}
-            class="blue button"
+            class="gray button"
           />
           <.live_component
             :if={@live_action != :new}

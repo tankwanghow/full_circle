@@ -359,7 +359,8 @@ defmodule FullCircle.HR do
         employee_name: emp.name,
         salary_type_name: st.name,
         salary_type_type: st.type,
-        pay_slip_no: pay.slip_no
+        pay_slip_no: pay.slip_no,
+        pay_slip_date: pay.slip_date
       }
     )
   end

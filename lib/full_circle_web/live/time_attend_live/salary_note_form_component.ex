@@ -171,8 +171,8 @@ defmodule FullCircleWeb.TimeAttendLive.SalaryNoteFormComponent do
         phx-target={@myself}
       >
         <p class="w-full text-3xl text-center font-medium"><%= @title %></p>
-        <p :if={!is_nil(@form.source.data.pay_slip_no)} class="w-full text-xl text-center font-bold">
-          <%= @form.source.data.pay_slip_no %>
+        <p :if={!is_nil(@form.source.data.pay_slip_no)} class="w-full text-xl text-center">
+          <%= @form.source.data.pay_slip_no %> <%= FullCircleWeb.Helpers.format_date(@form.source.data.pay_slip_date) %>
         </p>
         <%= Phoenix.HTML.Form.hidden_input(@form, :note_no) %>
         <div class="grid grid-cols-12 gap-1">
@@ -231,7 +231,10 @@ defmodule FullCircleWeb.TimeAttendLive.SalaryNoteFormComponent do
               id="delete-object"
               msg1={gettext("Deleting Salary Note")}
               msg2={gettext("Cannot Be Recover!!!")}
-              confirm={JS.push("delete", target: "#object-form")}
+              confirm={
+                JS.push("delete", target: "#object-form")
+                |> JS.exec("phx-remove", to: "#delete-object-modal")
+              }
             />
           <% end %>
           <.print_button

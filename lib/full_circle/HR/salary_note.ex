@@ -23,6 +23,7 @@ defmodule FullCircle.HR.SalaryNote do
     field(:salary_type_type, :string, virtual: true)
     field(:amount, :decimal, virtual: true, default: 0)
     field(:pay_slip_no, :string, virtual: true)
+    field(:pay_slip_date, :date, virtual: true)
     field(:delete, :boolean, virtual: true, default: false)
     field(:cal_func, :string, virtual: true)
     field(:_id, :string, virtual: true)
@@ -86,7 +87,7 @@ defmodule FullCircle.HR.SalaryNote do
       :company_id
     ])
     |> fill_today(:note_date)
-    |> validate_has_pay_slip_no_cannot_change_after_days(4)
+    |> validate_has_pay_slip_no_cannot_change_after_days(7)
     |> validate_id(:employee_name, :employee_id)
     |> validate_id(:salary_type_name, :salary_type_id)
     |> validate_date(:note_date, days_before: 31)
@@ -114,7 +115,7 @@ defmodule FullCircle.HR.SalaryNote do
         add_unique_error(
           cs,
           :note_date,
-          "over #{days} days from pay date"
+          "update period over. #{days} days"
         )
       end
     else
