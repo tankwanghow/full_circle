@@ -93,7 +93,7 @@ defmodule FullCircleWeb.SalaryNoteLive.Index do
       <div
         :if={Enum.count(@streams.objects) > 0 or @page > 1}
         id="objects_list"
-        phx-update="stream"
+        phx-update={@update_action}
         phx-viewport-bottom={!@end_of_timeline? && "next-page"}
         phx-page-loading
       >
@@ -117,6 +117,7 @@ defmodule FullCircleWeb.SalaryNoteLive.Index do
     socket =
       socket
       |> assign(page_title: gettext("Salary Note Listing"))
+      |> assign(update_action: "replace")
 
     {:ok, socket}
   end
@@ -132,6 +133,7 @@ defmodule FullCircleWeb.SalaryNoteLive.Index do
      |> assign(search: %{terms: terms, note_date: note_date})
      |> assign(selected_notes: [])
      |> assign(ids: "")
+     |> assign(update_action: "replace")
      |> filter_objects(terms, true, note_date, 1)}
   end
 
@@ -185,6 +187,7 @@ defmodule FullCircleWeb.SalaryNoteLive.Index do
   def handle_event("next-page", _, socket) do
     {:noreply,
      socket
+     |> assign(update_action: "append")
      |> filter_objects(
        socket.assigns.search.terms,
        false,

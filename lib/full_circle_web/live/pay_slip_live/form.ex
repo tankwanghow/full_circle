@@ -104,8 +104,6 @@ defmodule FullCircleWeb.PaySlipLive.Form do
   def handle_event("exec_cal_func", _, socket) do
     cs = PaySlipOp.calculate_pay(socket.assigns.form.source, socket.assigns.employee)
 
-    IO.inspect(cs)
-
     socket = assign(socket, form: to_form(cs))
 
     {:noreply, socket}

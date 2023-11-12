@@ -90,7 +90,7 @@ defmodule FullCircleWeb.AdvanceLive.Index do
       <div
         :if={Enum.count(@streams.objects) > 0 or @page > 1}
         id="objects_list"
-        phx-update="stream"
+        phx-update={@update_action}
         phx-viewport-bottom={!@end_of_timeline? && "next-page"}
         phx-page-loading
       >
@@ -113,6 +113,7 @@ defmodule FullCircleWeb.AdvanceLive.Index do
   def mount(_params, _session, socket) do
     socket =
       socket
+      |> assign(update_action: "replace")
       |> assign(page_title: gettext("Advance Listing"))
 
     {:ok, socket}
@@ -126,6 +127,7 @@ defmodule FullCircleWeb.AdvanceLive.Index do
 
     {:noreply,
      socket
+     |> assign(update_action: "replace")
      |> assign(search: %{terms: terms, slip_date: slip_date})
      |> assign(selected_advances: [])
      |> assign(ids: "")
@@ -182,6 +184,7 @@ defmodule FullCircleWeb.AdvanceLive.Index do
   def handle_event("next-page", _, socket) do
     {:noreply,
      socket
+     |> assign(update_action: "append")
      |> filter_objects(
        socket.assigns.search.terms,
        false,

@@ -172,7 +172,9 @@ defmodule FullCircleWeb.TimeAttendLive.SalaryNoteFormComponent do
       >
         <p class="w-full text-3xl text-center font-medium"><%= @title %></p>
         <p :if={!is_nil(@form.source.data.pay_slip_no)} class="w-full text-xl text-center">
-          <%= @form.source.data.pay_slip_no %> <%= FullCircleWeb.Helpers.format_date(@form.source.data.pay_slip_date) %>
+          <%= @form.source.data.pay_slip_no %> <%= FullCircleWeb.Helpers.format_date(
+            @form.source.data.pay_slip_date
+          ) %>
         </p>
         <%= Phoenix.HTML.Form.hidden_input(@form, :note_no) %>
         <div class="grid grid-cols-12 gap-1">

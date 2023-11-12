@@ -541,9 +541,10 @@ defmodule FullCircle.PaySlipOp do
       multi,
       fn %{^name => ps} ->
         Enum.reduce(notes, Multi.new(), fn {_, note}, reduce_multi ->
-          HR.create_salary_note_multi(
+          HR.create_salary_note_multi_with_note_no(
             reduce_multi,
             note |> Map.merge(%{"pay_slip_id" => ps.id, "pay_slip_no" => ps.slip_no}),
+            "#{ps.slip_no}-#{gen_temp_id(3)}",
             com,
             user,
             :changeset_on_payslip,

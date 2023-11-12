@@ -144,7 +144,8 @@ defmodule FullCircle.SalaryNoteCalFunc do
   @pcb_name "Employee PCB"
   @income_cy "Employee Current Year Income"
   @epf_cy "EPF By Employee Current Year"
-  @pcb_cy "Zakat and PCB Current Year"
+  @pcb_cy "PCB Current Year"
+  @zkt_cy "Zakat Current Year"
   @qualify_children_deduction 2000.0
   @invidual_deduction 9000.0
   @spouse_deduction 4000.0
@@ -173,7 +174,7 @@ defmodule FullCircle.SalaryNoteCalFunc do
       join: st in SalaryType,
       on: st.id == sn.salary_type_id,
       where: sn.employee_id == ^emp.id,
-      where: not is_nil(sn.pay_slip_id),
+      # where: not is_nil(sn.pay_slip_id),
       where: fragment("extract(year from ?) = ?", sn.note_date, ^yr),
       where: fragment("extract(month from ?) < ?", sn.note_date, ^mth),
       where: st.name == ^@pcb_name or st.name == ^@pcb_cy,
@@ -188,10 +189,10 @@ defmodule FullCircle.SalaryNoteCalFunc do
       join: st in SalaryType,
       on: st.id == sn.salary_type_id,
       where: sn.employee_id == ^emp.id,
-      where: not is_nil(sn.pay_slip_id),
+      # where: not is_nil(sn.pay_slip_id),
       where: fragment("extract(year from ?) = ?", sn.note_date, ^yr),
       where: fragment("extract(month from ?) < ?", sn.note_date, ^mth),
-      where: st.name == ^@zakat_name or st.name == ^@pcb_cy,
+      where: st.name == ^@zakat_name or st.name == ^@zkt_cy,
       select: coalesce(sum(sn.quantity * sn.unit_price), 0)
     )
     |> Repo.one()
@@ -229,7 +230,7 @@ defmodule FullCircle.SalaryNoteCalFunc do
       join: st in SalaryType,
       on: st.id == sn.salary_type_id,
       where: sn.employee_id == ^emp.id,
-      where: not is_nil(sn.pay_slip_id),
+      # where: not is_nil(sn.pay_slip_id),
       where: fragment("extract(year from ?) = ?", sn.note_date, ^yr),
       where: fragment("extract(month from ?) < ?", sn.note_date, ^mth),
       where: st.type == "Addition" or st.name == ^@income_cy,
@@ -247,8 +248,8 @@ defmodule FullCircle.SalaryNoteCalFunc do
         join: st in SalaryType,
         on: st.id == sn.salary_type_id,
         where: sn.employee_id == ^emp.id,
-        where: not is_nil(sn.pay_slip_id),
-        where: fragment("extract(year from ?)= ?", sn.note_date, ^yr),
+        # where: not is_nil(sn.pay_slip_id),
+        where: fragment("extract(year from ?) = ?", sn.note_date, ^yr),
         where: fragment("extract(month from ?) < ?", sn.note_date, ^mth),
         where: st.name == ^@epf_name or st.name == @epf_cy,
         select: coalesce(sum(sn.quantity * sn.unit_price), 0)
@@ -379,6 +380,7 @@ defmodule FullCircle.SalaryNoteCalFunc do
     [m, r, b] = mrb(p, emp)
 
     pcb = ((p - m) * r + b - (z + x)) / (n + 1)
+
     if pcb > 0, do: Float.round(pcb, 2), else: 0
   end
 

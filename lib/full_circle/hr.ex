@@ -111,7 +111,14 @@ defmodule FullCircle.HR do
         cr_ac_name: ""
       },
       %{
-        name: "Zakat and PCB Current Year",
+        name: "PCB Current Year",
+        type: "Recording",
+        company_id: company_id,
+        db_ac_name: "",
+        cr_ac_name: ""
+      },
+      %{
+        name: "Zakat Current Year",
         type: "Recording",
         company_id: company_id,
         db_ac_name: "",
@@ -507,13 +514,41 @@ defmodule FullCircle.HR do
     |> create_salary_note_transactions(name, com, user)
   end
 
+  def create_salary_note_multi_with_note_no(
+        multi,
+        attrs,
+        note_no,
+        com,
+        user,
+        changeset_func \\ :changeset,
+        name \\ nil
+      ) do
+    name = name || :create_salary_note
+
+    multi
+    |> Multi.insert(
+      name,
+      StdInterface.changeset(
+        SalaryNote,
+        %SalaryNote{},
+        Map.merge(attrs, %{"note_no" => note_no}),
+        com,
+        changeset_func
+      )
+    )
+    |> Multi.insert("#{name}_log", fn %{^name => entity} ->
+      Sys.log_changeset(name, entity, Map.merge(attrs, %{"note_no" => entity.note_no}), com, user)
+    end)
+    |> create_salary_note_transactions(name, com, user)
+  end
+
   def create_salary_note_transactions(multi, name, com, _user) do
     multi
     |> Multi.insert_all("#{name}_create_transactions", Transaction, fn %{^name => note} ->
       if Decimal.eq?(note.amount, Decimal.new(0)) do
         []
       else
-        note = note |> FullCircle.Repo.preload(:salary_type)
+        note = note |> FullCircle.Repo.preload([:salary_type, :employee])
 
         [
           if !is_nil(note.salary_type.cr_ac_id) do
@@ -525,7 +560,7 @@ defmodule FullCircle.HR do
               account_id: note.salary_type.cr_ac_id,
               company_id: com.id,
               amount: Decimal.negate(note.amount),
-              particulars: "#{note.salary_type_name} to #{note.employee_name}",
+              particulars: "#{note.salary_type.name}, #{note.employee.name}",
               inserted_at: Timex.now() |> DateTime.truncate(:second)
             }
           end,
@@ -538,7 +573,7 @@ defmodule FullCircle.HR do
               account_id: note.salary_type.db_ac_id,
               company_id: com.id,
               amount: note.amount,
-              particulars: "#{note.salary_type_name} to #{note.employee_name}",
+              particulars: "#{note.salary_type.name}, #{note.employee.name}",
               inserted_at: Timex.now() |> DateTime.truncate(:second)
             }
           end

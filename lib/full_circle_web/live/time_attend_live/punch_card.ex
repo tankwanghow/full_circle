@@ -563,8 +563,6 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
 
   @impl true
   def handle_info({:error_refresh_page_sn, cs}, socket) do
-    IO.inspect(cs)
-
     {:noreply,
      socket
      |> assign(live_action_sn: nil)

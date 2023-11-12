@@ -214,14 +214,16 @@ defmodule FullCircleWeb.SalaryNoteLive.Form do
     <div class="w-6/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
       <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
       <div class="text-center">
-      <span class="text-xl">PaySlip Info:- </span>
-      <.link
-        :if={!is_nil(@form.source.data.pay_slip_no)}
-        navigate={"/companies/#{@current_company.id}/PaySlip/#{@form.source.data.pay_slip_id}/view"}
-        class="text-xl text-blue-600 hover:cursor-pointer hover:font-bold"
-      >
-        <%= @form.source.data.pay_slip_no %> <%= FullCircleWeb.Helpers.format_date(@form.source.data.pay_slip_date) %>
-      </.link>
+        <span class="text-xl">PaySlip Info:- </span>
+        <.link
+          :if={!is_nil(@form.source.data.pay_slip_no)}
+          navigate={"/companies/#{@current_company.id}/PaySlip/#{@form.source.data.pay_slip_id}/view"}
+          class="text-xl text-blue-600 hover:cursor-pointer hover:font-bold"
+        >
+          <%= @form.source.data.pay_slip_no %> <%= FullCircleWeb.Helpers.format_date(
+            @form.source.data.pay_slip_date
+          ) %>
+        </.link>
       </div>
       <.form
         for={@form}

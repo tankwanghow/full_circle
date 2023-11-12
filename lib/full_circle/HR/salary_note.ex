@@ -90,8 +90,7 @@ defmodule FullCircle.HR.SalaryNote do
     |> validate_has_pay_slip_no_cannot_change_after_days(7)
     |> validate_id(:employee_name, :employee_id)
     |> validate_id(:salary_type_name, :salary_type_id)
-    |> validate_date(:note_date, days_before: 31)
-    |> validate_date(:note_date, days_after: 14)
+    |> validate_date_by_type()
     |> unsafe_validate_unique([:note_no, :company_id], FullCircle.Repo,
       message: gettext("has already been taken")
     )
@@ -100,6 +99,22 @@ defmodule FullCircle.HR.SalaryNote do
       message: gettext("has already been taken")
     )
     |> compute_fields()
+  end
+
+  defp validate_date_by_type(cs) do
+    note = cs.data |> FullCircle.Repo.preload([:salary_type])
+
+    if note.salary_type do
+      if note.salary_type.type != "Recording" and note.salary_type.type != "LeaveTaken" do
+        cs
+        |> validate_date(:note_date, days_before: 31)
+        |> validate_date(:note_date, days_after: 14)
+      else
+        cs
+      end
+    else
+      cs
+    end
   end
 
   defp validate_has_pay_slip_no_cannot_change_after_days(cs, days) do

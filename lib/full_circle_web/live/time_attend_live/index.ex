@@ -68,7 +68,7 @@ defmodule FullCircleWeb.TimeAttendLive.Index do
       <div
         :if={Enum.count(@streams.objects) > 0 or @page > 1}
         id="objects_list"
-        phx-update="stream"
+        phx-update={@update_action}
         phx-viewport-bottom={!@end_of_timeline? && "next-page"}
         phx-page-loading
       >
@@ -111,6 +111,7 @@ defmodule FullCircleWeb.TimeAttendLive.Index do
     socket =
       socket
       |> assign(page_title: gettext("Punch RAW Listing"))
+      |> assign(update_action: "replace")
       |> assign(search: %{terms: "", punch_date: ""})
       |> filter_objects("", true, "", 1)
 
@@ -121,6 +122,7 @@ defmodule FullCircleWeb.TimeAttendLive.Index do
   def handle_event("next-page", _, socket) do
     {:noreply,
      socket
+     |> assign(update_action: "append")
      |> filter_objects(
        socket.assigns.search.terms,
        false,
@@ -143,6 +145,7 @@ defmodule FullCircleWeb.TimeAttendLive.Index do
     {:noreply,
      socket
      |> assign(search: %{terms: terms, punch_date: pd})
+     |> assign(update_action: "replace")
      |> filter_objects(terms, true, pd, 1)}
   end
 
