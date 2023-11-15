@@ -33,7 +33,7 @@ defmodule FullCircleWeb.TaxCodeLive.Index do
       <div
         :if={Enum.count(@streams.objects) > 0 or @page > 1}
         id="objects_list"
-        phx-update={@update_action}
+        phx-update="stream"
         phx-viewport-bottom={!@end_of_timeline? && "next-page"}
         phx-page-loading
       >
@@ -56,7 +56,7 @@ defmodule FullCircleWeb.TaxCodeLive.Index do
   def mount(_params, _session, socket) do
     socket =
       socket
-      |> assign(update_action: "replace")
+
       |> assign(page_title: gettext("TaxCode Listing"))
 
     {:ok, socket}
@@ -71,7 +71,7 @@ defmodule FullCircleWeb.TaxCodeLive.Index do
     {:noreply,
      socket
      |> assign(search: %{terms: terms})
-     |> assign(update_action: "replace")
+
      |> filter_objects(terms, true, 1)}
   end
 
@@ -79,7 +79,7 @@ defmodule FullCircleWeb.TaxCodeLive.Index do
   def handle_event("next-page", _, socket) do
     {:noreply,
      socket
-     |> assign(update_action: "append")
+
      |> filter_objects(socket.assigns.search.terms, false, socket.assigns.page + 1)}
   end
 

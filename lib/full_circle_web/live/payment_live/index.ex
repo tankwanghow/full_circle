@@ -87,7 +87,7 @@ defmodule FullCircleWeb.PaymentLive.Index do
       <div
         :if={Enum.count(@streams.objects) > 0 or @page > 1}
         id="objects_list"
-        phx-update={@update_action}
+        phx-update="stream"
         phx-viewport-bottom={!@end_of_timeline? && "next-page"}
         phx-page-loading
       >
@@ -110,7 +110,7 @@ defmodule FullCircleWeb.PaymentLive.Index do
   def mount(_params, _session, socket) do
     socket =
       socket
-      |> assign(update_action: "replace")
+
       |> assign(page_title: gettext("Payment Listing"))
 
     {:ok, socket}
@@ -126,7 +126,7 @@ defmodule FullCircleWeb.PaymentLive.Index do
      socket
      |> assign(search: %{terms: terms, payment_date: payment_date})
      |> assign(selected: [])
-     |> assign(update_action: "replace")
+
      |> assign(ids: "")
      |> filter_objects(terms, true, payment_date, 1)}
   end
@@ -179,7 +179,7 @@ defmodule FullCircleWeb.PaymentLive.Index do
   def handle_event("next-page", _, socket) do
     {:noreply,
      socket
-     |> assign(update_action: "append")
+
      |> filter_objects(
        socket.assigns.search.terms,
        false,

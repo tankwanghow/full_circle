@@ -112,7 +112,7 @@ defmodule FullCircleWeb.InvoiceLive.Index do
       <div
         :if={Enum.count(@streams.objects) > 0 or @page > 1}
         id="objects_list"
-        phx-update={@update_action}
+        phx-update="stream"
         phx-viewport-bottom={!@end_of_timeline? && "next-page"}
         phx-page-loading
       >
@@ -135,7 +135,7 @@ defmodule FullCircleWeb.InvoiceLive.Index do
   def mount(_params, _session, socket) do
     socket =
       socket
-      |> assign(update_action: "replace")
+
       |> assign(page_title: gettext("Invoice Listing"))
 
     {:ok, socket}
@@ -156,7 +156,7 @@ defmodule FullCircleWeb.InvoiceLive.Index do
        search: %{terms: terms, balance: bal, invoice_date: invoice_date, due_date: due_date}
      )
      |> assign(selected_invoices: [])
-     |> assign(update_action: "replace")
+
      |> assign(ids: "")
      |> filter_objects(terms, true, invoice_date, due_date, bal, 1)}
   end
@@ -211,7 +211,7 @@ defmodule FullCircleWeb.InvoiceLive.Index do
   def handle_event("next-page", _, socket) do
     {:noreply,
      socket
-     |> assign(update_action: "append")
+
      |> filter_objects(
        socket.assigns.search.terms,
        false,

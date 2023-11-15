@@ -1,30 +1,47 @@
-defmodule FullCircleWeb.HolidayLive.Index do
+defmodule FullCircleWeb.LayerLive.HouseIndex do
   use FullCircleWeb, :live_view
 
-  alias FullCircleWeb.HolidayLive.IndexComponent
-  alias FullCircle.HR.Holiday
   alias FullCircle.StdInterface
 
-  @per_page 60
+  @per_page 50
 
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="mx-auto w-6/12">
+    <div class="mx-auto w-10/12">
       <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
-      <.search_form search_val={@search.terms} placeholder={gettext("Name or Short Name...")} />
+      <div class="flex justify-center mb-2">
+        <.form for={%{}} id="search-form" phx-submit="search" autocomplete="off" class="w-full">
+          <div class=" flex flex-row flex-wrap tracking-tighter text-sm">
+            <div class="w-[15.5rem] grow shrink">
+              <label class="">Search Terms</label>
+              <.input
+                id="search_terms"
+                name="search[terms]"
+                type="search"
+                value={@search.terms}
+                placeholder="house no..."
+              />
+            </div>
+            <.button class="mt-5 h-10 w-10 grow-0 shrink-0">🔍</.button>
+          </div>
+        </.form>
+      </div>
       <div class="text-center mb-2">
         <.link
-          navigate={~p"/companies/#{@current_company.id}/holidays/new"}
+          navigate={~p"/companies/#{@current_company.id}/houses/new"}
           class="blue button"
-          id="new_holiday"
+          id="new_advance"
         >
-          <%= gettext("New holidays") %>
+          <%= gettext("New House") %>
         </.link>
       </div>
-      <div class="text-center">
-        <div class="bg-amber-200 border-y-2 border-amber-500 font-bold p-1">
-          <%= gettext("Holiday Information") %>
+      <div class="font-medium flex flex-row text-center tracking-tighter bg-amber-200">
+        <div class="w-[10%] border-b border-t border-amber-400 py-1">
+          <%= gettext("House No") %>
+        </div>
+        <div class="w-[10%] border-b border-t border-amber-400 py-1">
+          <%= gettext("Capacity") %>
         </div>
       </div>
       <div
@@ -36,10 +53,10 @@ defmodule FullCircleWeb.HolidayLive.Index do
       >
         <%= for {obj_id, obj} <- @streams.objects do %>
           <.live_component
-            current_company={@current_company}
-            module={IndexComponent}
-            id={"#{obj_id}"}
+            module={Houseonent}
+            id={obj_id}
             obj={obj}
+            company={@current_company}
             ex_class=""
           />
         <% end %>
@@ -54,7 +71,7 @@ defmodule FullCircleWeb.HolidayLive.Index do
     socket =
       socket
 
-      |> assign(page_title: gettext("Holiday Listing"))
+      |> assign(page_title: gettext("House Listing"))
 
     {:ok, socket}
   end
@@ -66,8 +83,8 @@ defmodule FullCircleWeb.HolidayLive.Index do
 
     {:noreply,
      socket
-     |> assign(search: %{terms: terms})
 
+     |> assign(search: %{terms: terms})
      |> filter_objects(terms, true, 1)}
   end
 
@@ -97,7 +114,7 @@ defmodule FullCircleWeb.HolidayLive.Index do
       "search[terms]" => terms
     }
 
-    url = "/companies/#{socket.assigns.current_company.id}/holidays?#{URI.encode_query(qry)}"
+    url = "/companies/#{socket.assigns.current_company.id}/houses?#{URI.encode_query(qry)}"
 
     {:noreply, socket |> push_patch(to: url)}
   end
@@ -105,8 +122,8 @@ defmodule FullCircleWeb.HolidayLive.Index do
   defp filter_objects(socket, terms, reset, page) do
     objects =
       StdInterface.filter(
-        Holiday,
-        [:name, :short_name],
+        Weighing,
+        [:house_no],
         terms,
         socket.assigns.current_company,
         socket.assigns.current_user,
@@ -114,11 +131,9 @@ defmodule FullCircleWeb.HolidayLive.Index do
         per_page: @per_page
       )
 
-    obj_count = Enum.count(objects)
-
     socket
     |> assign(page: page, per_page: @per_page)
     |> stream(:objects, objects, reset: reset)
-    |> assign(end_of_timeline?: obj_count < @per_page)
+    |> assign(end_of_timeline?: Enum.count(objects) < @per_page)
   end
 end
