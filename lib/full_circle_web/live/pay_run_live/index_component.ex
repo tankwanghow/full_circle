@@ -35,33 +35,54 @@ defmodule FullCircleWeb.PayRunLive.IndexComponent do
   def render(assigns) do
     ~H"""
     <div id={@id} class={"#{@ex_class} flex bg-gray-200 hover:bg-gray-300 text-center"}>
-      <.link
-        class="w-[30%] hover:font-bold border-l border-r border-b border-gray-600"
-        navigate={~p"/companies/#{@company.id}/employees/#{@obj.id}/edit"}
-      >
-        <%= @obj.employee_name %>
-      </.link>
+      <div class="w-[30%] border border-gray-300">
+        <.link
+          class="hover:font-bold"
+          navigate={~p"/companies/#{@company.id}/employees/#{@obj.id}/edit"}
+        >
+          <%= @obj.employee_name %>
+        </.link>
+      </div>
       <%= for {ps, ps_id, yr, mth} <- @obj.pay_list do %>
-        <.link
-          class="w-[8.3%] hover:font-bold text-orange-600 border-b border-gray-600"
-          navigate={card_url(yr, mth, @obj.employee_name, @company)}
-        >
-          Card
-        </.link>
-        <.link
-          :if={is_nil(ps)}
-          navigate={new_payslip_url(@obj.id, yr, mth, @company)}
-          class="w-[15%] text-blue-600 border-b border-r border-gray-600 hover:font-bold"
-        >
-          New Pay
-        </.link>
-        <.link
-          :if={!is_nil(ps)}
-          navigate={"/companies/#{@company.id}/PaySlip/#{ps_id}/view"}
-          class="w-[15%] text-green-600 border-b border-r border-gray-600 hover:font-bold"
-        >
-          View Pay <%= ps %>
-        </.link>
+        <div class="flex w-[23.3333%] border border-gray-300">
+          <div class="w-[40%]">
+            <.link
+              class="hover:font-bold text-orange-600"
+              navigate={card_url(yr, mth, @obj.employee_name, @company)}
+            >
+              Card
+            </.link>
+          </div>
+
+          <div class="w-[60%]">
+            <.link
+              :if={is_nil(ps)}
+              navigate={new_payslip_url(@obj.id, yr, mth, @company)}
+              class=" text-blue-600 hover:font-bold"
+            >
+              New Pay
+            </.link>
+
+            <input
+              :if={!is_nil(ps)}
+              class="mb-1 border-green-600 rounded checked:bg-green-600"
+              id={"checkbox_#{ps_id}"}
+              name={"checkbox[#{ps_id}]"}
+              type="checkbox"
+              class="rounded border-gray-400 checked:bg-gray-400"
+              phx-click="check_click"
+              phx-value-object-id={ps_id}
+            />
+
+            <.link
+              :if={!is_nil(ps)}
+              navigate={"/companies/#{@company.id}/PaySlip/#{ps_id}/view"}
+              class="text-green-600 hover:font-bold"
+            >
+              <%= ps %>
+            </.link>
+          </div>
+        </div>
       <% end %>
     </div>
     """

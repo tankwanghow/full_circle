@@ -97,7 +97,7 @@ defmodule FullCircleWeb.ChequeLive.ReturnChequePrint do
     <div class="detail is-size-5">
       <div class="bank"><%= @chq.bank %></div>
       <div class="chq_no"><%= @chq.cheque_no %></div>
-      <div class="due_date"><%= @chq.due_date %></div>
+      <div class="due_date"><%= @chq.due_date |> FullCircleWeb.Helpers.format_date() %></div>
       <div class="city"><%= @chq.city %></div>
       <div class="state"><%= @chq.state %></div>
       <div class="amount"><%= Number.Delimit.number_to_delimited(@chq.amount) %></div>

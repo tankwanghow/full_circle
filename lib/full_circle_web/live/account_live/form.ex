@@ -169,9 +169,14 @@ defmodule FullCircleWeb.AccountLive.Form do
         phx-submit="save"
         class="w-full"
       >
-        <.input field={@form[:name]} label={gettext("Account Name")} />
+        <.input
+          readonly={FullCircle.Accounting.is_default_account?(@form.data)}
+          field={@form[:name]}
+          label={gettext("Account Name")}
+        />
 
         <.input
+          disabled={FullCircle.Accounting.is_default_account?(@form.data)}
           field={@form[:account_type]}
           label={gettext("Account Type")}
           type="select"

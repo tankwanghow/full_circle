@@ -9,7 +9,6 @@ defmodule FullCircleWeb.ChequeLive.DepositIndex do
   def mount(_params, _session, socket) do
     socket =
       socket
-
       |> assign(page_title: "Deposits")
 
     {:ok, socket}
@@ -25,7 +24,6 @@ defmodule FullCircleWeb.ChequeLive.DepositIndex do
     {:noreply,
      socket
      |> assign(search: %{terms: terms, d_date: d_date})
-
      |> filter_objects(terms, true, d_date, 1)}
   end
 
@@ -33,7 +31,6 @@ defmodule FullCircleWeb.ChequeLive.DepositIndex do
   def handle_event("next-page", _, socket) do
     {:noreply,
      socket
-
      |> filter_objects(
        socket.assigns.search.terms,
        false,

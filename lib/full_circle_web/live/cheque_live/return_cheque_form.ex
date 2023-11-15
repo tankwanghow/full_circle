@@ -332,7 +332,7 @@ defmodule FullCircleWeb.ChequeLive.ReturnChequeForm do
         <%= for obj <- @qry_cheques do %>
           <div class="flex flex-row border-b bg-gray-200 border-gray-400 text-center">
             <div class="border w-[12%] px-1 py-1">
-              <span><%= obj.deposit_date %></span>
+              <span><%= obj.deposit_date |> FullCircleWeb.Helpers.format_date() %></span>
             </div>
             <div class="border w-[24%] px-1 py-1">
               <span><%= obj.deposit_bank_name %></span>
@@ -347,7 +347,7 @@ defmodule FullCircleWeb.ChequeLive.ReturnChequeForm do
               <%= obj.cheque_no %>
             </div>
             <div class="border w-[12%] px-1 py-1">
-              <%= obj.due_date %>
+              <%= obj.due_date |> FullCircleWeb.Helpers.format_date() %>
             </div>
             <div class="border w-[18%] px-1 py-1">
               <%= obj.amount |> Number.Delimit.number_to_delimited() %>

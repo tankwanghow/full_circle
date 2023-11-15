@@ -179,7 +179,7 @@ defmodule FullCircleWeb.TransactionLive.Print do
     ~H"""
     <div class="detail">
       <span class="doc_date">
-        <%= @txn.doc_date %>
+        <%= @txn.doc_date |> FullCircleWeb.Helpers.format_date() %>
       </span>
       <span class="doc_type">
         <%= @txn.doc_type %>

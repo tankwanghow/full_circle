@@ -135,7 +135,6 @@ defmodule FullCircleWeb.InvoiceLive.Index do
   def mount(_params, _session, socket) do
     socket =
       socket
-
       |> assign(page_title: gettext("Invoice Listing"))
 
     {:ok, socket}
@@ -156,7 +155,6 @@ defmodule FullCircleWeb.InvoiceLive.Index do
        search: %{terms: terms, balance: bal, invoice_date: invoice_date, due_date: due_date}
      )
      |> assign(selected_invoices: [])
-
      |> assign(ids: "")
      |> filter_objects(terms, true, invoice_date, due_date, bal, 1)}
   end
@@ -211,7 +209,6 @@ defmodule FullCircleWeb.InvoiceLive.Index do
   def handle_event("next-page", _, socket) do
     {:noreply,
      socket
-
      |> filter_objects(
        socket.assigns.search.terms,
        false,

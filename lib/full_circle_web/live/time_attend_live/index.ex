@@ -111,7 +111,6 @@ defmodule FullCircleWeb.TimeAttendLive.Index do
     socket =
       socket
       |> assign(page_title: gettext("Punch RAW Listing"))
-
       |> assign(search: %{terms: "", punch_date: ""})
       |> filter_objects("", true, "", 1)
 
@@ -122,7 +121,6 @@ defmodule FullCircleWeb.TimeAttendLive.Index do
   def handle_event("next-page", _, socket) do
     {:noreply,
      socket
-
      |> filter_objects(
        socket.assigns.search.terms,
        false,
@@ -145,7 +143,6 @@ defmodule FullCircleWeb.TimeAttendLive.Index do
     {:noreply,
      socket
      |> assign(search: %{terms: terms, punch_date: pd})
-
      |> filter_objects(terms, true, pd, 1)}
   end
 

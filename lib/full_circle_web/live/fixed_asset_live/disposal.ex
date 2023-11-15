@@ -197,7 +197,8 @@ defmodule FullCircleWeb.FixedAssetLive.Disposals do
       </div>
       <p>
         <span class="font-bold"><%= gettext("Assets info:") %></span>
-        <%= Number.Currency.number_to_currency(@ass.pur_price) %> &#9679; <%= @ass.depre_start_date %> &#9679; <%= @ass.depre_method %> &#9679; <%= Number.Percentage.number_to_percentage(
+        <%= Number.Currency.number_to_currency(@ass.pur_price) %> &#9679; <%= @ass.depre_start_date
+        |> FullCircleWeb.Helpers.format_date() %> &#9679; <%= @ass.depre_method %> &#9679; <%= Number.Percentage.number_to_percentage(
           Decimal.mult(@ass.depre_rate, 100)
         ) %> &#9679; <%= @ass.depre_interval %>
       </p>
@@ -267,7 +268,7 @@ defmodule FullCircleWeb.FixedAssetLive.Disposals do
           <%= for obj <- @saved_disposals do %>
             <div class="flex flex-row text-center tracking-tighter">
               <div class="w-5/12 border rounded bg-green-200 border-green-400 text-center px-2 py-1">
-                <%= obj.disp_date %>
+                <%= obj.disp_date |> FullCircleWeb.Helpers.format_date() %>
               </div>
               <div class="w-5/12 border rounded bg-green-200 border-green-400 text-center px-2 py-1">
                 <%= obj.amount |> Number.Delimit.number_to_delimited() %>

@@ -93,6 +93,10 @@ defmodule FullCircle.HR.Employee do
       name: :employees_unique_name_in_company,
       message: gettext("has already been taken")
     )
+    |> foreign_key_constraint(:name,
+      name: :time_attendences_employee_id_fkey,
+      message: gettext("referenced by time attendendes")
+    )
     |> validate_number(:work_hours_per_day, less_than_or_equal_to: 12)
     |> validate_number(:work_days_per_week, less_than_or_equal_to: 7)
     |> validate_number(:work_days_per_month, less_than_or_equal_to: 26)

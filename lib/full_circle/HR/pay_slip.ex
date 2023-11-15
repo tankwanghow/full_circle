@@ -18,7 +18,7 @@ defmodule FullCircle.HR.PaySlip do
     has_many(:bonuses, FullCircle.HR.SalaryNote, on_delete: :delete_all)
     has_many(:deductions, FullCircle.HR.SalaryNote, on_delete: :delete_all)
     has_many(:contributions, FullCircle.HR.SalaryNote, on_delete: :delete_all)
-    has_many(:leaves, FullCircle.HR.SalaryNote, on_delete: :delete_all)
+    has_many(:leaves, FullCircle.HR.SalaryNote, on_delete: :nothing)
     has_many(:advances, FullCircle.HR.Advance, on_delete: :nothing)
 
     field(:employee_name, :string, virtual: true)

@@ -19,7 +19,7 @@ defmodule FullCircleWeb.ChequeLive.ReturnChequeIndexComponent do
       class={"#{@ex_class} max-h-8 flex flex-row text-center tracking-tighter bg-gray-200 hover:bg-gray-400"}
     >
       <div class="w-[13%] border-b border-gray-400 py-1">
-        <%= @obj.doc_date %>
+        <%= @obj.doc_date |> FullCircleWeb.Helpers.format_date() %>
       </div>
 
       <div

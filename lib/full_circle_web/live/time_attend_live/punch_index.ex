@@ -121,7 +121,6 @@ defmodule FullCircleWeb.TimeAttendLive.PunchIndex do
     socket =
       socket
       |> assign(page_title: gettext("Punch In/Out Listing"))
-
       |> assign(
         search: %{
           employee: "",
@@ -138,7 +137,6 @@ defmodule FullCircleWeb.TimeAttendLive.PunchIndex do
   def handle_event("next-page", _, socket) do
     {:noreply,
      socket
-
      |> filter_objects(
        socket.assigns.search.employee,
        false,
@@ -163,7 +161,6 @@ defmodule FullCircleWeb.TimeAttendLive.PunchIndex do
     {:noreply,
      socket
      |> assign(search: %{employee: employee, sdate: sd, edate: ed})
-
      |> filter_objects(employee, true, sd, ed, 1)}
   end
 

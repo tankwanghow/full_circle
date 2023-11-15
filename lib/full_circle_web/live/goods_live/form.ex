@@ -385,7 +385,11 @@ defmodule FullCircleWeb.GoodLive.Form do
             <div class="col-span-4">
               <div class="grid grid-cols-12">
                 <div class="col-span-2 pt-2 pl-1">
-                  <.input type="checkbox" field={pack[:default]} />
+                  <.input
+                    type="checkbox"
+                    class="rounded border-gray-400 checked:bg-gray-400"
+                    field={pack[:default]}
+                  />
                 </div>
                 <div class="col-span-10">
                   <.input field={pack[:name]} />

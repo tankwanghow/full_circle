@@ -1,8 +1,8 @@
-defmodule FullCircleWeb.SalaryNoteLive.Print do
+defmodule FullCircleWeb.WeighingLive.Print do
   use FullCircleWeb, :live_view
 
   import FullCircleWeb.Helpers
-  alias FullCircle.HR
+  alias FullCircle.WeightBridge
 
   @impl true
   def mount(%{"id" => id, "pre_print" => pre_print}, _session, socket) do
@@ -30,32 +30,32 @@ defmodule FullCircleWeb.SalaryNoteLive.Print do
 
   defp set_page_defaults(socket) do
     socket
-    |> assign(:detail_body_height, 8)
-    |> assign(:detail_height, 8)
+    |> assign(:detail_body_height, 7)
+    |> assign(:detail_height, 7)
     |> assign(:company, FullCircle.Sys.get_company!(socket.assigns.current_company.id))
   end
 
   defp fill_journals(socket, ids) do
     chunk = (socket.assigns.detail_body_height / socket.assigns.detail_height) |> floor
 
-    advs =
-      HR.get_print_salary_notes!(
+    weis =
+      WeightBridge.get_print_weighings!(
         ids,
         socket.assigns.current_company,
         socket.assigns.current_user
       )
-      |> Enum.map(fn adv ->
-        adv
+      |> Enum.map(fn wei ->
+        wei
         |> Map.merge(%{
-          chunk_number: Enum.chunk_every([adv], chunk) |> Enum.count()
+          chunk_number: Enum.chunk_every([wei], chunk) |> Enum.count()
         })
         |> Map.merge(%{
-          detail_chunks: Enum.chunk_every([adv], chunk)
+          detail_chunks: Enum.chunk_every([wei], chunk)
         })
       end)
 
     socket
-    |> assign(:advs, advs)
+    |> assign(:weis, weis)
   end
 
   @impl true
@@ -64,25 +64,25 @@ defmodule FullCircleWeb.SalaryNoteLive.Print do
     <div id="print-me" class="print-here">
       <%= pre_print_style(assigns) %>
       <%= if(@pre_print == "false", do: full_style(assigns)) %>
-      <%= for adv <- @advs do %>
-        <%= Enum.map 1..adv.chunk_number, fn n -> %>
+      <%= for wei <- @weis do %>
+        <%= Enum.map 1..wei.chunk_number, fn n -> %>
           <div class="page">
             <div class="letter-head">
               <%= if(@pre_print == "true", do: "", else: letter_head_data(assigns)) %>
             </div>
-            <div class="doctype is-size-4 has-text-weight-semibold">SALARY NOTE</div>
-            <%= header(adv, assigns) %>
+            <div class="doctype is-size-4 has-text-weight-semibold">Weighting Note</div>
+            <%= header(wei, assigns) %>
             <%= detail_header(assigns) %>
             <div class="details-body is-size-6">
-              <%= for chq <- Enum.at(adv.detail_chunks, n - 1) do %>
+              <%= for chq <- Enum.at(wei.detail_chunks, n - 1) do %>
                 <%= detail(chq, assigns) %>
               <% end %>
             </div>
-            <%= if(n == adv.chunk_number,
-              do: footer(adv, n, adv.chunk_number, assigns),
-              else: footer("continue", n, adv.chunk_number, assigns)
+            <%= if(n == wei.chunk_number,
+              do: footer(wei, n, wei.chunk_number, assigns),
+              else: footer("continue", n, wei.chunk_number, assigns)
             ) %>
-            <%= if(@pre_print == "true", do: "", else: letter_foot(adv, assigns)) %>
+            <%= if(@pre_print == "true", do: "", else: letter_foot(wei, assigns)) %>
           </div>
         <% end %>
       <% end %>
@@ -90,18 +90,17 @@ defmodule FullCircleWeb.SalaryNoteLive.Print do
     """
   end
 
-  def detail(adv, assigns) do
-    assigns = assign(assigns, :adv, adv)
+  def detail(wei, assigns) do
+    assigns = assign(assigns, :wei, wei)
 
     ~H"""
-    <div class="detail is-size-5">
-      <div class="type"><%= @adv.salary_type.name %></div>
-      <div class="desc"><%= @adv.descriptions %></div>
-      <div class="qty"><%= Number.Delimit.number_to_delimited(@adv.quantity) %></div>
-      <div class="price"><%= Number.Delimit.number_to_delimited(@adv.unit_price) %></div>
-      <div class="amount">
-        <%= Number.Delimit.number_to_delimited(Decimal.mult(@adv.quantity, @adv.unit_price)) %>
-      </div>
+    <div class="is-size-5 font-mono">
+      <span class="weight"><span class="has-text-weight-semibold">Gross: </span>
+        <%= Number.Delimit.number_to_delimited(@wei.gross, precision: 0) %></span>
+      <span class="weight"><span class="has-text-weight-semibold">Tare:</span>
+        <%= Number.Delimit.number_to_delimited(@wei.tare, precision: 0) %></span>
+      <span class="weight"><span class="has-text-weight-semibold">Nett:</span>
+        <%= Number.Delimit.number_to_delimited(@wei.gross - @wei.tare, precision: 0) %></span>
     </div>
     """
   end
@@ -117,8 +116,8 @@ defmodule FullCircleWeb.SalaryNoteLive.Print do
     """
   end
 
-  def footer(adv, page, pages, assigns) do
-    assigns = assign(assigns, :page, page) |> assign(:pages, pages) |> assign(:adv, adv)
+  def footer(wei, page, pages, assigns) do
+    assigns = assign(assigns, :page, page) |> assign(:pages, pages) |> assign(:wei, wei)
 
     ~H"""
     <div class="footer">
@@ -128,46 +127,57 @@ defmodule FullCircleWeb.SalaryNoteLive.Print do
     """
   end
 
-  def letter_foot(adv, assigns) do
-    assigns = assigns |> assign(:adv, adv)
+  def letter_foot(wei, assigns) do
+    assigns = assigns |> assign(:wei, wei)
 
     ~H"""
     <div class="letter-foot">
-      <div class="has-text-weight-light is-italic">Issued By: <%= @adv.issued_by.user.email %></div>
-      <div class="sign">Entry By</div>
-      <div class="sign">Employee Sign</div>
+      <div class="sign">Entry By <%= @wei.issued_by.user.email %></div>
     </div>
     """
   end
 
   def detail_header(assigns) do
     ~H"""
-    <div class="details-header has-text-weight-bold is-size-5">
-      <div class="type">Type</div>
-      <div class="desc">Descriptions</div>
-      <div class="qty">Quantity</div>
-      <div class="price">Unit Price</div>
-      <div class="amount">Amount</div>
-    </div>
+    <div class="details-header"></div>
     """
   end
 
-  def header(adv, assigns) do
-    assigns = assigns |> assign(:adv, adv)
+  def header(wei, assigns) do
+    assigns = assigns |> assign(:wei, wei)
 
     ~H"""
-    <div class="adv-header">
-      <div class="is-size-6">To</div>
+    <div class="wei-header font-mono is-size-6">
       <div class="customer">
-        <div class="is-size-4 has-text-weight-semibold"><%= @adv.employee.name %></div>
-        <div class="is-size-4"><%= @adv.employee.id_no %></div>
-      </div>
-      <div class="adv-info is-size-5">
         <div>
-          Note Date: <span class="has-text-weight-semibold"><%= format_date(@adv.note_date) %></span>
+          Weight Date:
+          <span class="has-text-weight-semibold"><%= format_date(@wei.note_date) %></span>
         </div>
         <div>
-          Note No: <span class="has-text-weight-semibold"><%= @adv.note_no %></span>
+          Vehicle No: <span class="has-text-weight-semibold"><%= @wei.vehicle_no %></span>
+        </div>
+        <div>
+          Goods: <span class="has-text-weight-semibold"><%= @wei.good_name %></span>
+        </div>
+        <div class="is-size-6">
+          Note: <span class="has-text-weight-semibold"><%= @wei.note %></span>
+        </div>
+      </div>
+      <div class="wei-info">
+        <div>
+          Weight Code: <span class="has-text-weight-semibold"><%= @wei.note_no %></span>
+        </div>
+        <div>
+          In Time:
+          <span class="has-text-weight-semibold">
+            <%= @wei.inserted_at |> format_datetime(@company) %>
+          </span>
+        </div>
+        <div>
+          Out Time:
+          <span class="has-text-weight-semibold">
+            <%= @wei.updated_at |> format_datetime(@company) %>
+          </span>
         </div>
       </div>
     </div>
@@ -194,8 +204,8 @@ defmodule FullCircleWeb.SalaryNoteLive.Print do
       .letter-foot { border-top: 0.5mm solid black; }
       .header { border-bottom: 0.5mm solid black; }
       .footer {  }
-      .terms { height: 15mm; }
-      .sign { padding: 3mm; border-top: 2px dotted black; width: 30%; text-align: center; float: right; margin-left: 2mm; margin-top: 15mm;}
+      .terms { height: 10mm; }
+      .sign { padding: 3mm; border-top: 2px dotted black; width: 40%; text-align: center; float: right; margin-left: 2mm; margin-top: 20mm;}
     </style>
     """
   end
@@ -215,17 +225,12 @@ defmodule FullCircleWeb.SalaryNoteLive.Print do
 
       .letter-head { padding-bottom: 2mm; margin-bottom: 2mm; height: 28mm;}
       .doctype { float: right; margin-top: -20mm; margin-right: 0mm; }
-      .adv-info, .amount { float: right; }
-      .adv-header { width: 100%; height: 25mm; border-bottom: 0.5mm solid black; }
-      .customer { padding-left: 2mm; float: left;}
-      .adv-info div { margin-bottom: 2mm; text-align: right; }
-      .details-header { display: flex; text-align: center; padding-bottom: 2mm; padding-top: 2mm; border-bottom: 0.5mm solid black; }
-
-      .type { width: 27%; }
-      .desc { width: 27%; }
-      .qty { width: 15%; }
-      .price { width: 15%; }
-      .amount { width: 16%; }
+      .wei-info, .amount { float: right; }
+      .wei-header { width: 100%; height: 25mm; border-bottom: 0.5mm solid black; }
+      .customer { width: 60%; padding-left: 2mm; float: left;}
+      .wei-info div { margin-bottom: 0.5mm; text-align: right; }
+      .details-header { margin-bottom: 5mm; }
+      .weight { margin-left: 19mm; }
 
       .footer { margin-bottom: 1mm; padding: 1mm 0 1mm 0; }
 

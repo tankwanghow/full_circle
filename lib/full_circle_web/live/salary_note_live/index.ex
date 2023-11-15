@@ -118,7 +118,6 @@ defmodule FullCircleWeb.SalaryNoteLive.Index do
       socket
       |> assign(page_title: gettext("Salary Note Listing"))
 
-
     {:ok, socket}
   end
 
@@ -133,7 +132,6 @@ defmodule FullCircleWeb.SalaryNoteLive.Index do
      |> assign(search: %{terms: terms, note_date: note_date})
      |> assign(selected_notes: [])
      |> assign(ids: "")
-
      |> filter_objects(terms, true, note_date, 1)}
   end
 
@@ -187,7 +185,6 @@ defmodule FullCircleWeb.SalaryNoteLive.Index do
   def handle_event("next-page", _, socket) do
     {:noreply,
      socket
-
      |> filter_objects(
        socket.assigns.search.terms,
        false,

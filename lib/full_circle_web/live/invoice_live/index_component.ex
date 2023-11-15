@@ -24,6 +24,7 @@ defmodule FullCircleWeb.InvoiceLive.IndexComponent do
           id={"checkbox_invoice_#{@obj.id}"}
           name={"checkbox_invoice[#{@obj.id}]"}
           type="checkbox"
+          class="rounded border-gray-400 checked:bg-gray-400"
           phx-click="check_click"
           phx-value-object-id={@obj.id}
           checked
@@ -33,15 +34,16 @@ defmodule FullCircleWeb.InvoiceLive.IndexComponent do
           id={"checkbox_invoice_#{@obj.id}"}
           name={"checkbox_invoice[#{@obj.id}]"}
           type="checkbox"
+          class="rounded border-gray-400 checked:bg-gray-400"
           phx-click="check_click"
           phx-value-object-id={@obj.id}
         />
       </div>
       <div class="w-[9%] border-b border-gray-400 py-1">
-        <%= @obj.invoice_date %>
+        <%= @obj.invoice_date |> FullCircleWeb.Helpers.format_date() %>
       </div>
       <div class="w-[9%] border-b border-gray-400 py-1">
-        <%= @obj.due_date %>
+        <%= @obj.due_date |> FullCircleWeb.Helpers.format_date() %>
       </div>
       <div class="w-[10%] border-b border-gray-400 py-1">
         <%= if @obj.old_data do %>

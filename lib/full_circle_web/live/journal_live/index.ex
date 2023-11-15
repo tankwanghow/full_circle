@@ -113,7 +113,6 @@ defmodule FullCircleWeb.JournalLive.Index do
   def mount(_params, _session, socket) do
     socket =
       socket
-
       |> assign(page_title: gettext("Journal Listing"))
 
     {:ok, socket}
@@ -136,7 +135,6 @@ defmodule FullCircleWeb.JournalLive.Index do
      )
      |> assign(selected_journals: [])
      |> assign(ids: "")
-
      |> filter_objects(terms, true, journal_date, 1)}
   end
 
@@ -190,7 +188,6 @@ defmodule FullCircleWeb.JournalLive.Index do
   def handle_event("next-page", _, socket) do
     {:noreply,
      socket
-
      |> filter_objects(
        socket.assigns.search.terms,
        false,

@@ -113,7 +113,6 @@ defmodule FullCircleWeb.AdvanceLive.Index do
   def mount(_params, _session, socket) do
     socket =
       socket
-
       |> assign(page_title: gettext("Advance Listing"))
 
     {:ok, socket}
@@ -127,7 +126,6 @@ defmodule FullCircleWeb.AdvanceLive.Index do
 
     {:noreply,
      socket
-
      |> assign(search: %{terms: terms, slip_date: slip_date})
      |> assign(selected_advances: [])
      |> assign(ids: "")
@@ -184,7 +182,6 @@ defmodule FullCircleWeb.AdvanceLive.Index do
   def handle_event("next-page", _, socket) do
     {:noreply,
      socket
-
      |> filter_objects(
        socket.assigns.search.terms,
        false,

@@ -63,13 +63,13 @@ defmodule FullCircleWeb.WeighingLive.Index do
         <div class="w-[20%] border-b border-t border-amber-400 py-1">
           <%= gettext("Note") %>
         </div>
-        <div class="w-[10%] border-b border-t border-amber-400 py-1">
+        <div class="w-[10%] border-b border-t border-amber-400 py-1 text-right pr-2">
           <%= gettext("Gross") %>
         </div>
-        <div class="w-[10%] border-b border-t border-amber-400 py-1">
+        <div class="w-[10%] border-b border-t border-amber-400 py-1 text-right pr-2">
           <%= gettext("Tare") %>
         </div>
-        <div class="w-[10%] border-b border-t border-amber-400 py-1">
+        <div class="w-[10%] border-b border-t border-amber-400 py-1 text-right pr-2">
           <%= gettext("Nett") %>
         </div>
       </div>
@@ -99,7 +99,6 @@ defmodule FullCircleWeb.WeighingLive.Index do
   def mount(_params, _session, socket) do
     socket =
       socket
-
       |> assign(page_title: gettext("Weighing Listing"))
 
     {:ok, socket}
@@ -109,11 +108,10 @@ defmodule FullCircleWeb.WeighingLive.Index do
   def handle_params(params, _uri, socket) do
     params = params["search"]
     terms = params["terms"] || ""
-    df = params["date_form"] ||""
+    df = params["date_form"] || ""
 
     {:noreply,
      socket
-
      |> assign(search: %{terms: terms, date_form: df})
      |> filter_objects(terms, df, true, 1)}
   end
@@ -122,7 +120,6 @@ defmodule FullCircleWeb.WeighingLive.Index do
   def handle_event("next-page", _, socket) do
     {:noreply,
      socket
-
      |> filter_objects(
        socket.assigns.search.terms,
        socket.assigns.search.date_form,
@@ -153,7 +150,6 @@ defmodule FullCircleWeb.WeighingLive.Index do
   end
 
   import Ecto.Query, warn: false
-
 
   defp filter_objects(socket, terms, "", reset, page) do
     objects =

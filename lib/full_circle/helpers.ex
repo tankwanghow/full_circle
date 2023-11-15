@@ -45,7 +45,7 @@ defmodule FullCircle.Helpers do
 
     x =
       for col <- fields, term <- texts do
-        m = (c - Enum.find_index(fields, fn x -> x == col end)) |> :math.pow(3)
+        m = (c - Enum.find_index(fields, fn x -> x == col end)) |> :math.pow(2)
 
         dynamic(
           [cont],
@@ -55,6 +55,10 @@ defmodule FullCircle.Helpers do
       |> Enum.reduce(fn a, b -> dynamic(^a + ^b) end)
 
     [desc: x]
+  end
+
+  def to_upcase(cs, field) do
+    force_change(cs, field, (fetch_field!(cs, field) || "") |> String.upcase() |> String.trim())
   end
 
   def get_entity_from_multi_tuple(multi, name) do

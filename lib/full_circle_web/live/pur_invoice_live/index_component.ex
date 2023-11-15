@@ -19,10 +19,10 @@ defmodule FullCircleWeb.PurInvoiceLive.IndexComponent do
       class={"#{@ex_class} max-h-8 flex flex-row text-center tracking-tighter bg-gray-200 hover:bg-gray-400"}
     >
       <div class="w-[10%] border-b border-gray-400 py-1">
-        <%= @obj.pur_invoice_date %>
+        <%= @obj.pur_invoice_date |> FullCircleWeb.Helpers.format_date() %>
       </div>
       <div class="w-[10%] border-b border-gray-400 py-1">
-        <%= @obj.due_date %>
+        <%= @obj.due_date |> FullCircleWeb.Helpers.format_date() %>
       </div>
       <div class="w-[10%] border-b border-gray-400 py-1">
         <%= if @obj.old_data do %>

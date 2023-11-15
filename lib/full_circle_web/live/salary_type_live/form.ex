@@ -214,10 +214,15 @@ defmodule FullCircleWeb.SalaryTypeLive.Form do
       >
         <div class="grid grid-cols-12 gap-1">
           <div class="col-span-5">
-            <.input field={@form[:name]} label={gettext("Name")} />
+            <.input
+              field={@form[:name]}
+              readonly={FullCircle.HR.is_default_salary_type?(@form.data)}
+              label={gettext("Name")}
+            />
           </div>
           <div class="col-span-3">
             <.input
+              disabled={FullCircle.HR.is_default_salary_type?(@form.data)}
               field={@form[:type]}
               label={gettext("Type")}
               type="select"

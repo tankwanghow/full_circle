@@ -204,6 +204,10 @@ defmodule FullCircleWeb.Router do
       live("/Journal/new", JournalLive.Form, :new)
       live("/Journal/:journal_id/edit", JournalLive.Form, :edit)
 
+      live("/Weighing", WeighingLive.Index, :index)
+      live("/Weighing/new", WeighingLive.Form, :new)
+      live("/Weighing/:weighing_id/edit", WeighingLive.Form, :edit)
+
       live("/PayRun", PayRunLive.Index, :index)
 
       live("/PaySlip/new", PaySlipLive.Form, :new)
@@ -250,6 +254,9 @@ defmodule FullCircleWeb.Router do
 
       live("/PaySlip/:id/print", PaySlipLive.Print, :print)
       live("/PaySlip/print_multi", PaySlipLive.Print, :print)
+
+      live("/Weighing/:id/print", WeighingLive.Print, :print)
+      live("/Weighing/print_multi", WeighingLive.Print, :print)
 
       live("/print_transactions", TransactionLive.Print, :print)
     end

@@ -88,7 +88,7 @@ defmodule FullCircleWeb.JournalEntryViewLive.Component do
             <%= for obj <- @entries do %>
               <div class="flex flex-row text-center tracking-tighter">
                 <div class="w-[9%] border rounded bg-blue-100 border-blue-400 text-center px-2 py-1">
-                  <%= obj.doc_date %>
+                  <%= obj.doc_date |> FullCircleWeb.Helpers.format_date() %>
                 </div>
                 <div class="w-[9%] border rounded bg-blue-100 border-blue-400 text-center px-2 py-1">
                   <%= obj.doc_no %>

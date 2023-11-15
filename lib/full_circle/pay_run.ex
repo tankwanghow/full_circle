@@ -43,6 +43,7 @@ defmodule FullCircle.PayRun do
                       el0.pay_year::varchar || '|' || el0.pay_month::varchar order by el0.pay_year desc, el0.pay_month desc) as pay_list
        from (select e0.id as employee_id, e0.name, c1.id as company_id, l0.pay_month, l0.pay_year
                from employees as e0 inner join companies as c1 on c1.id = '#{com.id}'
+                and e0.company_id = c1.id
                 and e0.status = 'Active', (#{pay_month_year_list}) as l0) as el0
        left outer join pay_slips as p5 on p5.employee_id = el0.employee_id
         and p5.company_id = el0.company_id and p5.pay_month = el0.pay_month

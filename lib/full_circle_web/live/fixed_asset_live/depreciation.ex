@@ -228,7 +228,8 @@ defmodule FullCircleWeb.FixedAssetLive.Depreciations do
       </div>
       <p class="text-center">
         <span class="font-bold"><%= gettext("Depreciation info:") %></span>
-        <%= Number.Currency.number_to_currency(@ass.pur_price) %> &#9679; <%= @ass.depre_start_date %> &#9679; <%= @ass.depre_method %> &#9679; <%= Number.Percentage.number_to_percentage(
+        <%= Number.Currency.number_to_currency(@ass.pur_price) %> &#9679; <%= @ass.depre_start_date
+        |> FullCircleWeb.Helpers.format_date() %> &#9679; <%= @ass.depre_method %> &#9679; <%= Number.Percentage.number_to_percentage(
           Decimal.mult(@ass.depre_rate, 100)
         ) %> &#9679; <%= @ass.depre_interval %><br />
 
@@ -319,7 +320,7 @@ defmodule FullCircleWeb.FixedAssetLive.Depreciations do
                 "w-[17%] border rounded bg-green-200 border-green-400 text-center px-2 py-1",
                 !obj.closed && "hover:bg-green-300"
               ]}>
-                <%= obj.depre_date %>
+                <%= obj.depre_date |> FullCircleWeb.Helpers.format_date() %>
               </div>
               <div class={[
                 "w-[20%] border rounded bg-green-200 border-green-400 text-center px-2 py-1",

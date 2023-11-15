@@ -23,6 +23,7 @@ defmodule FullCircleWeb.EmployeeLive.IndexComponent do
           type="checkbox"
           phx-click="check_click"
           phx-value-object-id={@obj.id}
+          class="rounded border-gray-400 checked:bg-gray-400"
           checked
         />
         <input
@@ -30,6 +31,7 @@ defmodule FullCircleWeb.EmployeeLive.IndexComponent do
           id={"checkbox_#{@obj.id}"}
           name={"checkbox[#{@obj.id}]"}
           type="checkbox"
+          class="rounded border-gray-400 checked:bg-gray-400"
           phx-click="check_click"
           phx-value-object-id={@obj.id}
         />

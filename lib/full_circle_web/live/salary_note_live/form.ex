@@ -211,7 +211,7 @@ defmodule FullCircleWeb.SalaryNoteLive.Form do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="w-6/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
+    <div class="w-7/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
       <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
       <div class="text-center">
         <span class="text-xl">PaySlip Info:- </span>

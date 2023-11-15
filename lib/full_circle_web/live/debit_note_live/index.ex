@@ -110,7 +110,6 @@ defmodule FullCircleWeb.DebitNoteLive.Index do
   def mount(_params, _session, socket) do
     socket =
       socket
-
       |> assign(page_title: gettext("Debit Note Listing"))
 
     {:ok, socket}
@@ -125,7 +124,6 @@ defmodule FullCircleWeb.DebitNoteLive.Index do
     {:noreply,
      socket
      |> assign(search: %{terms: terms, note_date: note_date})
-
      |> assign(selected: [])
      |> assign(ids: "")
      |> filter_objects(terms, true, note_date, 1)}
@@ -179,7 +177,6 @@ defmodule FullCircleWeb.DebitNoteLive.Index do
   def handle_event("next-page", _, socket) do
     {:noreply,
      socket
-
      |> filter_objects(
        socket.assigns.search.terms,
        false,

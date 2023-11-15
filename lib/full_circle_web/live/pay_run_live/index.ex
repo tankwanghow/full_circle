@@ -36,6 +36,24 @@ defmodule FullCircleWeb.PayRunLive.Index do
   end
 
   @impl true
+  def handle_event("check_click", %{"object-id" => id, "value" => "on"}, socket) do
+    socket =
+      socket
+      |> assign(selected: [id | socket.assigns.selected])
+
+    {:noreply, socket |> assign(ids: Enum.join(socket.assigns.selected, ","))}
+  end
+
+  @impl true
+  def handle_event("check_click", %{"object-id" => id}, socket) do
+    socket =
+      socket
+      |> assign(selected: Enum.reject(socket.assigns.selected, fn sid -> sid == id end))
+
+    {:noreply, socket |> assign(ids: Enum.join(socket.assigns.selected, ","))}
+  end
+
+  @impl true
   def handle_params(params, _uri, socket) do
     params = params["search"]
 
@@ -47,6 +65,8 @@ defmodule FullCircleWeb.PayRunLive.Index do
     {:noreply,
      socket
      |> assign(search: %{month: month, year: year})
+     |> assign(selected: [])
+     |> assign(ids: "")
      |> filter_objects(month, year)}
   end
 
@@ -93,15 +113,44 @@ defmodule FullCircleWeb.PayRunLive.Index do
               />
             </div>
             <.button class="w-[7%] mt-5 h-10 grow-0 shrink-0">🔍</.button>
+            <div class="text-center mt-7">
+              <.link
+                :if={@ids != ""}
+                navigate={
+                  ~p"/companies/#{@current_company.id}/PaySlip/print_multi?pre_print=false&ids=#{@ids}"
+                }
+                target="_blank"
+                class="blue button"
+              >
+                <%= gettext("Print") %>
+              </.link>
+              <.link
+                :if={@ids != ""}
+                navigate={
+                  ~p"/companies/#{@current_company.id}/PaySlip/print_multi?pre_print=true&ids=#{@ids}"
+                }
+                target="_blank"
+                class="blue button"
+              >
+                <%= gettext("Pre Print") %>
+              </.link>
+            </div>
           </div>
         </.form>
       </div>
 
-      <div class="flex bg-amber-200 text-center font-bold">
-        <div class="w-[30%] border-y-2 border-x border-amber-600">Name</div>
+      <div :if={Enum.count(@objects) > 0} class="flex bg-amber-200 text-center font-bold">
+        <div class="w-[30%] border border-rose-400">Name</div>
         <%= for ym <- Enum.at(@objects, 1).pay_list |> Enum.map(fn {_,_,y,m} -> "#{m}/#{y}" end) do %>
-          <div class="border-y-2 border-r border-amber-600 w-[23.3%]"><%= ym %></div>
+          <div class="border border-rose-400 w-[23.333%]"><%= ym %></div>
         <% end %>
+      </div>
+
+      <div
+        :if={Enum.count(@objects) == 0}
+        class="bg-amber-200 text-3xl p-4 rounded text-center font-bold"
+      >
+        No Data.....
       </div>
 
       <div id="objects_list" class="mb-5">

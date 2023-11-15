@@ -177,7 +177,7 @@ defmodule FullCircleWeb.TransactionLive.Account do
             <div class="flex flex-row text-center tracking-tighter">
               <p class="hidden"><%= obj.inserted_at %></p>
               <div class="w-[10%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
-                <%= obj.doc_date %>
+                <%= obj.doc_date |> FullCircleWeb.Helpers.format_date() %>
               </div>
               <div class="w-[12%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
                 <%= if obj.old_data do %>

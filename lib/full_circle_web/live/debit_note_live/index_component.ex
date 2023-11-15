@@ -24,6 +24,7 @@ defmodule FullCircleWeb.DebitNoteLive.IndexComponent do
           id={"checkbox_#{@obj.id}"}
           name={"checkbox[#{@obj.id}]"}
           type="checkbox"
+          class="rounded border-gray-400 checked:bg-gray-400"
           phx-click="check_click"
           phx-value-object-id={@obj.id}
           checked
@@ -33,12 +34,13 @@ defmodule FullCircleWeb.DebitNoteLive.IndexComponent do
           id={"checkbox_#{@obj.id}"}
           name={"checkbox[#{@obj.id}]"}
           type="checkbox"
+          class="rounded border-gray-400 checked:bg-gray-400"
           phx-click="check_click"
           phx-value-object-id={@obj.id}
         />
       </div>
       <div class="w-[10%] border-b border-gray-400 py-1">
-        <%= @obj.note_date %>
+        <%= @obj.note_date |> FullCircleWeb.Helpers.format_date() %>
       </div>
       <div
         :if={!@obj.old_data}

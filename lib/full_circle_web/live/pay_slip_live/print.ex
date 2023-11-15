@@ -3,7 +3,6 @@ defmodule FullCircleWeb.PaySlipLive.Print do
 
   import FullCircleWeb.Helpers
   alias FullCircle.PaySlipOp
-  # alias FullCircle.HR.PaySlip
 
   @impl true
   def mount(%{"id" => id, "pre_print" => pre_print}, _session, socket) do
@@ -31,8 +30,8 @@ defmodule FullCircleWeb.PaySlipLive.Print do
 
   defp set_page_defaults(socket) do
     socket
-    |> assign(:detail_body_height, 155)
-    |> assign(:detail_height, 6)
+    |> assign(:detail_body_height, 170)
+    |> assign(:detail_height, 5)
     |> assign(:company, FullCircle.Sys.get_company!(socket.assigns.current_company.id))
   end
 
@@ -243,7 +242,7 @@ defmodule FullCircleWeb.PaySlipLive.Print do
       class={"detail #{@psd.type} is-italic"}
     >
       <span class="con-item">
-        <%= @psd.item %> <%= @psd.note %>
+        <%= @psd.item %>
       </span>
       <span class="con-total">
         <%= Number.Delimit.number_to_delimited(@psd.amount) %>
@@ -393,9 +392,9 @@ defmodule FullCircleWeb.PaySlipLive.Print do
       .letter-head { padding-bottom: 2mm; margin-bottom: 2mm; height: 28mm;}
       .doctype { float: right; margin-top: -20mm; margin-right: 0mm; }
       .pay_slip-info { float: right; }
-      .pay_slip-header { width: 100%; height: 34mm; border-bottom: 0.5mm solid black; }
+      .pay_slip-header { width: 100%; height: 30mm; border-bottom: 0.5mm solid black; }
       .customer { padding-left: 2mm; float: left;}
-      .pay_slip-info div { margin-bottom: 2mm; text-align: right; }
+      .pay_slip-info div { margin-bottom: 1mm; text-align: right; }
 
       .details-header { display: flex; text-align: center; padding-bottom: 2mm; padding-top: 2mm; border-bottom: 0.5mm solid black; }
 

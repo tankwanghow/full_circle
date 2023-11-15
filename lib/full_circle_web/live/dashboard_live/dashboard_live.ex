@@ -105,6 +105,13 @@ defmodule FullCircleWeb.DashboardLive do
         </.link>
       </div>
 
+      <div class="font-medium text-xl">Weight Bridge</div>
+      <div class="mb-4 flex flex-wrap justify-center">
+        <.link navigate={~p"/companies/#{@current_company.id}/Weighing"} class="nav-btn">
+          <%= gettext("Weighings") %>
+        </.link>
+      </div>
+
       <div class="font-medium text-xl">Reporting</div>
       <div class="mb-4 flex flex-wrap justify-center">
         <.link navigate={~p"/companies/#{@current_company.id}/account_transactions"} class="nav-btn">

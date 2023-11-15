@@ -21,7 +21,8 @@ defmodule FullCircleWeb.RecurringLive.IndexComponent do
       >
         <%= @obj.recur_no %>
       </.link>
-      &#8226; <%= @obj.recur_date %> &#8226; <%= @obj.employee_name %> &#8226; <%= @obj.salary_type_name %> &#8226; <%= @obj.start_date %> &#8226; <%= @obj.status %>
+      &#8226; <%= @obj.recur_date |> FullCircleWeb.Helpers.format_date() %> &#8226; <%= @obj.employee_name %> &#8226; <%= @obj.salary_type_name %> &#8226; <%= @obj.start_date
+      |> FullCircleWeb.Helpers.format_date() %> &#8226; <%= @obj.status %>
     </div>
     """
   end

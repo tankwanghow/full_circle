@@ -110,7 +110,6 @@ defmodule FullCircleWeb.PaymentLive.Index do
   def mount(_params, _session, socket) do
     socket =
       socket
-
       |> assign(page_title: gettext("Payment Listing"))
 
     {:ok, socket}
@@ -126,7 +125,6 @@ defmodule FullCircleWeb.PaymentLive.Index do
      socket
      |> assign(search: %{terms: terms, payment_date: payment_date})
      |> assign(selected: [])
-
      |> assign(ids: "")
      |> filter_objects(terms, true, payment_date, 1)}
   end
@@ -179,7 +177,6 @@ defmodule FullCircleWeb.PaymentLive.Index do
   def handle_event("next-page", _, socket) do
     {:noreply,
      socket
-
      |> filter_objects(
        socket.assigns.search.terms,
        false,

@@ -52,7 +52,6 @@ defmodule FullCircleWeb.ContactLive.Index do
   def mount(_params, _session, socket) do
     socket =
       socket
-
       |> assign(page_title: gettext("Contacts Listing"))
 
     {:ok, socket}
@@ -66,7 +65,6 @@ defmodule FullCircleWeb.ContactLive.Index do
 
     {:noreply,
      socket
-
      |> assign(search: %{terms: terms})
      |> filter_objects(terms, true, 1)}
   end
@@ -75,7 +73,6 @@ defmodule FullCircleWeb.ContactLive.Index do
   def handle_event("next-page", _, socket) do
     {:noreply,
      socket
-
      |> filter_objects(socket.assigns.search.terms, false, socket.assigns.page + 1)}
   end
 

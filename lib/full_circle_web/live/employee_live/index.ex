@@ -91,7 +91,6 @@ defmodule FullCircleWeb.EmployeeLive.Index do
   def handle_event("next-page", _, socket) do
     {:noreply,
      socket
-
      |> filter_objects(socket.assigns.search.terms, false, socket.assigns.page + 1)}
   end
 
@@ -169,7 +168,7 @@ defmodule FullCircleWeb.EmployeeLive.Index do
         per_page: @per_page
       )
 
-    IO.inspect objects |> Enum.map(fn x -> x.name end)
+    IO.inspect(objects |> Enum.map(fn x -> x.name end))
 
     socket
     |> assign(page: page, per_page: @per_page)

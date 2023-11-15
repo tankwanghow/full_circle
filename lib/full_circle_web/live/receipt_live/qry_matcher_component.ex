@@ -69,7 +69,7 @@ defmodule FullCircleWeb.ReceiptLive.QryMatcherComponent do
       <%= for obj <- @query_match_trans do %>
         <div class="flex flex-row flex-wrap">
           <div class="max-h-8 w-[13%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
-            <%= obj.t_doc_date %>
+            <%= obj.t_doc_date |> FullCircleWeb.Helpers.format_date() %>
           </div>
           <div class="max-h-8 w-[13%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
             <%= obj.t_doc_type %>
