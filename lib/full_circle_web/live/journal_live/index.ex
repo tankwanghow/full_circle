@@ -5,6 +5,7 @@ defmodule FullCircleWeb.JournalLive.Index do
   alias FullCircleWeb.JournalLive.IndexComponent
 
   @per_page 25
+  @selected_max 30
 
   @impl true
   def render(assigns) do
@@ -46,7 +47,7 @@ defmodule FullCircleWeb.JournalLive.Index do
           <%= gettext("New Journal") %>
         </.link>
         <.link
-          :if={@ids != ""}
+          :if={@can_print}
           navigate={
             ~p"/companies/#{@current_company.id}/Journal/print_multi?pre_print=false&ids=#{@ids}"
           }
@@ -56,7 +57,7 @@ defmodule FullCircleWeb.JournalLive.Index do
           <%= gettext("Print") %>
         </.link>
         <.link
-          :if={@ids != ""}
+          :if={@can_print}
           navigate={
             ~p"/companies/#{@current_company.id}/Journal/print_multi?pre_print=true&ids=#{@ids}"
           }
@@ -133,8 +134,9 @@ defmodule FullCircleWeb.JournalLive.Index do
          journal_date: journal_date
        }
      )
-     |> assign(selected_journals: [])
+     |> assign(selected: [])
      |> assign(ids: "")
+     |> assign(can_print: false)
      |> filter_objects(terms, true, journal_date, 1)}
   end
 
@@ -155,9 +157,10 @@ defmodule FullCircleWeb.JournalLive.Index do
 
     socket =
       socket
-      |> assign(selected_journals: [id | socket.assigns.selected_journals])
+      |> assign(selected: [id | socket.assigns.selected])
+      |> FullCircleWeb.Helpers.can_print?(:selected, @selected_max)
 
-    {:noreply, socket |> assign(ids: Enum.join(socket.assigns.selected_journals, ","))}
+    {:noreply, socket |> assign(ids: Enum.join(socket.assigns.selected, ","))}
   end
 
   @impl true
@@ -177,11 +180,10 @@ defmodule FullCircleWeb.JournalLive.Index do
 
     socket =
       socket
-      |> assign(
-        selected_journals: Enum.reject(socket.assigns.selected_journals, fn sid -> sid == id end)
-      )
+      |> assign(selected: Enum.reject(socket.assigns.selected, fn sid -> sid == id end))
+      |> FullCircleWeb.Helpers.can_print?(:selected, @selected_max)
 
-    {:noreply, socket |> assign(ids: Enum.join(socket.assigns.selected_journals, ","))}
+    {:noreply, socket |> assign(ids: Enum.join(socket.assigns.selected, ","))}
   end
 
   @impl true

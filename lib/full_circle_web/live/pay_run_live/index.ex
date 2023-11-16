@@ -4,6 +4,8 @@ defmodule FullCircleWeb.PayRunLive.Index do
   alias FullCircle.PayRun
   alias FullCircleWeb.PayRunLive.IndexComponent
 
+  @selected_max 30
+
   @impl true
   def mount(_params, _session, socket) do
     socket =
@@ -40,6 +42,7 @@ defmodule FullCircleWeb.PayRunLive.Index do
     socket =
       socket
       |> assign(selected: [id | socket.assigns.selected])
+      |> FullCircleWeb.Helpers.can_print?(:selected, @selected_max)
 
     {:noreply, socket |> assign(ids: Enum.join(socket.assigns.selected, ","))}
   end
@@ -49,6 +52,7 @@ defmodule FullCircleWeb.PayRunLive.Index do
     socket =
       socket
       |> assign(selected: Enum.reject(socket.assigns.selected, fn sid -> sid == id end))
+      |> FullCircleWeb.Helpers.can_print?(:selected, @selected_max)
 
     {:noreply, socket |> assign(ids: Enum.join(socket.assigns.selected, ","))}
   end
@@ -67,6 +71,7 @@ defmodule FullCircleWeb.PayRunLive.Index do
      |> assign(search: %{month: month, year: year})
      |> assign(selected: [])
      |> assign(ids: "")
+     |> assign(can_print: false)
      |> filter_objects(month, year)}
   end
 
@@ -115,7 +120,7 @@ defmodule FullCircleWeb.PayRunLive.Index do
             <.button class="w-[7%] mt-5 h-10 grow-0 shrink-0">🔍</.button>
             <div class="text-center mt-7">
               <.link
-                :if={@ids != ""}
+                :if={@can_print}
                 navigate={
                   ~p"/companies/#{@current_company.id}/PaySlip/print_multi?pre_print=false&ids=#{@ids}"
                 }
@@ -125,7 +130,7 @@ defmodule FullCircleWeb.PayRunLive.Index do
                 <%= gettext("Print") %>
               </.link>
               <.link
-                :if={@ids != ""}
+                :if={@can_print}
                 navigate={
                   ~p"/companies/#{@current_company.id}/PaySlip/print_multi?pre_print=true&ids=#{@ids}"
                 }

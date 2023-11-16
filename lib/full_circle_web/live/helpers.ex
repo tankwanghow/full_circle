@@ -1,5 +1,6 @@
 defmodule FullCircleWeb.Helpers do
   use Phoenix.Component
+  import FullCircleWeb.Gettext
 
   def list_n_value(socket, terms, list_fn) do
     list = list_fn.(terms, socket.assigns.current_company, socket.assigns.current_user)
@@ -118,6 +119,21 @@ defmodule FullCircleWeb.Helpers do
       nil
     else
       Timex.format!(Timex.to_datetime(datetime, com.timezone), "%d-%m-%Y %H:%M:%S", :strftime)
+    end
+  end
+
+  def can_print?(socket, selected_name, max_selected) do
+    if socket.assigns[selected_name] |> Enum.count() > max_selected do
+      socket
+      |> assign(can_print: false)
+      |> Phoenix.LiveView.put_flash(
+        :error,
+        gettext("Please don't select more than ") <>
+          (max_selected |> Integer.to_string()) <>
+          gettext(" items.")
+      )
+    else
+      socket |> assign(can_print: true)
     end
   end
 end

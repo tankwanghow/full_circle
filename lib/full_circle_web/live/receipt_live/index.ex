@@ -5,6 +5,7 @@ defmodule FullCircleWeb.ReceiptLive.Index do
   alias FullCircleWeb.ReceiptLive.IndexComponent
 
   @per_page 25
+  @selected_max 30
 
   @impl true
   def render(assigns) do
@@ -46,7 +47,7 @@ defmodule FullCircleWeb.ReceiptLive.Index do
           <%= gettext("New Receipt") %>
         </.link>
         <.link
-          :if={@ids != ""}
+          :if={@can_print}
           navigate={
             ~p"/companies/#{@current_company.id}/Receipt/print_multi?pre_print=false&ids=#{@ids}"
           }
@@ -56,7 +57,7 @@ defmodule FullCircleWeb.ReceiptLive.Index do
           <%= gettext("Print") %>
         </.link>
         <.link
-          :if={@ids != ""}
+          :if={@can_print}
           navigate={
             ~p"/companies/#{@current_company.id}/Receipt/print_multi?pre_print=true&ids=#{@ids}"
           }
@@ -126,6 +127,7 @@ defmodule FullCircleWeb.ReceiptLive.Index do
      |> assign(search: %{terms: terms, receipt_date: receipt_date})
      |> assign(selected: [])
      |> assign(ids: "")
+     |> assign(can_print: false)
      |> filter_objects(terms, true, receipt_date, 1)}
   end
 
@@ -147,6 +149,7 @@ defmodule FullCircleWeb.ReceiptLive.Index do
     socket =
       socket
       |> assign(selected: [id | socket.assigns.selected])
+      |> FullCircleWeb.Helpers.can_print?(:selected, @selected_max)
 
     {:noreply, socket |> assign(ids: Enum.join(socket.assigns.selected, ","))}
   end
@@ -169,6 +172,7 @@ defmodule FullCircleWeb.ReceiptLive.Index do
     socket =
       socket
       |> assign(selected: Enum.reject(socket.assigns.selected, fn sid -> sid == id end))
+      |> FullCircleWeb.Helpers.can_print?(:selected, @selected_max)
 
     {:noreply, socket |> assign(ids: Enum.join(socket.assigns.selected, ","))}
   end

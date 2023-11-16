@@ -5,6 +5,7 @@ defmodule FullCircleWeb.SalaryNoteLive.Index do
   alias FullCircleWeb.SalaryNoteLive.IndexComponent
 
   @per_page 25
+  @selected_max 30
 
   @impl true
   def render(assigns) do
@@ -46,7 +47,7 @@ defmodule FullCircleWeb.SalaryNoteLive.Index do
           <%= gettext("New Salary Note") %>
         </.link>
         <.link
-          :if={@ids != ""}
+          :if={@can_print}
           navigate={
             ~p"/companies/#{@current_company.id}/SalaryNote/print_multi?pre_print=false&ids=#{@ids}"
           }
@@ -56,7 +57,7 @@ defmodule FullCircleWeb.SalaryNoteLive.Index do
           <%= gettext("Print") %>
         </.link>
         <.link
-          :if={@ids != ""}
+          :if={@can_print}
           navigate={
             ~p"/companies/#{@current_company.id}/SalaryNote/print_multi?pre_print=true&ids=#{@ids}"
           }
@@ -130,8 +131,9 @@ defmodule FullCircleWeb.SalaryNoteLive.Index do
     {:noreply,
      socket
      |> assign(search: %{terms: terms, note_date: note_date})
-     |> assign(selected_notes: [])
+     |> assign(selected: [])
      |> assign(ids: "")
+     |> assign(can_print: false)
      |> filter_objects(terms, true, note_date, 1)}
   end
 
@@ -152,9 +154,10 @@ defmodule FullCircleWeb.SalaryNoteLive.Index do
 
     socket =
       socket
-      |> assign(selected_notes: [id | socket.assigns.selected_notes])
+      |> assign(selected: [id | socket.assigns.selected])
+      |> FullCircleWeb.Helpers.can_print?(:selected, @selected_max)
 
-    {:noreply, socket |> assign(ids: Enum.join(socket.assigns.selected_notes, ","))}
+    {:noreply, socket |> assign(ids: Enum.join(socket.assigns.selected, ","))}
   end
 
   @impl true
@@ -174,11 +177,10 @@ defmodule FullCircleWeb.SalaryNoteLive.Index do
 
     socket =
       socket
-      |> assign(
-        selected_notes: Enum.reject(socket.assigns.selected_notes, fn sid -> sid == id end)
-      )
+      |> assign(selected: Enum.reject(socket.assigns.selected, fn sid -> sid == id end))
+      |> FullCircleWeb.Helpers.can_print?(:selected, @selected_max)
 
-    {:noreply, socket |> assign(ids: Enum.join(socket.assigns.selected_notes, ","))}
+    {:noreply, socket |> assign(ids: Enum.join(socket.assigns.selected, ","))}
   end
 
   @impl true

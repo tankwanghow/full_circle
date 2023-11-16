@@ -5,6 +5,7 @@ defmodule FullCircleWeb.AdvanceLive.Index do
   alias FullCircleWeb.AdvanceLive.IndexComponent
 
   @per_page 25
+  @selected_max 30
 
   @impl true
   def render(assigns) do
@@ -46,7 +47,7 @@ defmodule FullCircleWeb.AdvanceLive.Index do
           <%= gettext("New Advance") %>
         </.link>
         <.link
-          :if={@ids != ""}
+          :if={@can_print}
           navigate={
             ~p"/companies/#{@current_company.id}/Advance/print_multi?pre_print=false&ids=#{@ids}"
           }
@@ -56,7 +57,7 @@ defmodule FullCircleWeb.AdvanceLive.Index do
           <%= gettext("Print") %>
         </.link>
         <.link
-          :if={@ids != ""}
+          :if={@can_print}
           navigate={
             ~p"/companies/#{@current_company.id}/Advance/print_multi?pre_print=true&ids=#{@ids}"
           }
@@ -127,8 +128,9 @@ defmodule FullCircleWeb.AdvanceLive.Index do
     {:noreply,
      socket
      |> assign(search: %{terms: terms, slip_date: slip_date})
-     |> assign(selected_advances: [])
+     |> assign(selected: [])
      |> assign(ids: "")
+     |> assign(can_print: false)
      |> filter_objects(terms, true, slip_date, 1)}
   end
 
@@ -149,9 +151,10 @@ defmodule FullCircleWeb.AdvanceLive.Index do
 
     socket =
       socket
-      |> assign(selected_advances: [id | socket.assigns.selected_advances])
+      |> assign(selected: [id | socket.assigns.selected])
+      |> FullCircleWeb.Helpers.can_print?(:selected, @selected_max)
 
-    {:noreply, socket |> assign(ids: Enum.join(socket.assigns.selected_advances, ","))}
+    {:noreply, socket |> assign(ids: Enum.join(socket.assigns.selected, ","))}
   end
 
   @impl true
@@ -171,11 +174,10 @@ defmodule FullCircleWeb.AdvanceLive.Index do
 
     socket =
       socket
-      |> assign(
-        selected_advances: Enum.reject(socket.assigns.selected_advances, fn sid -> sid == id end)
-      )
+      |> assign(selected: Enum.reject(socket.assigns.selected, fn sid -> sid == id end))
+      |> FullCircleWeb.Helpers.can_print?(:selected, @selected_max)
 
-    {:noreply, socket |> assign(ids: Enum.join(socket.assigns.selected_advances, ","))}
+    {:noreply, socket |> assign(ids: Enum.join(socket.assigns.selected, ","))}
   end
 
   @impl true

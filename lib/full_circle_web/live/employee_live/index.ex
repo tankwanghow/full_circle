@@ -6,6 +6,7 @@ defmodule FullCircleWeb.EmployeeLive.Index do
   alias FullCircleWeb.EmployeeLive.IndexComponent
 
   @per_page 30
+  @selected_max 30
 
   @impl true
   def render(assigns) do
@@ -25,7 +26,7 @@ defmodule FullCircleWeb.EmployeeLive.Index do
           <%= gettext("New Employee") %>
         </.link>
         <.link
-          :if={@ids != ""}
+          :if={@can_print}
           navigate={
             ~p"/companies/#{@current_company.id}/employees/print_multi?pre_print=false&ids=#{@ids}"
           }
@@ -80,8 +81,9 @@ defmodule FullCircleWeb.EmployeeLive.Index do
 
     {:noreply,
      socket
-     |> assign(selected_employees: [])
+     |> assign(selected: [])
      |> assign(ids: "")
+     |> assign(can_print: false)
      |> assign(update_action: "stream")
      |> assign(search: %{terms: terms})
      |> filter_objects(terms, true, 1)}
@@ -122,9 +124,10 @@ defmodule FullCircleWeb.EmployeeLive.Index do
 
     socket =
       socket
-      |> assign(selected_employees: [id | socket.assigns.selected_employees])
+      |> assign(selected: [id | socket.assigns.selected])
+      |> FullCircleWeb.Helpers.can_print?(:selected, @selected_max)
 
-    {:noreply, socket |> assign(ids: Enum.join(socket.assigns.selected_employees, ","))}
+    {:noreply, socket |> assign(ids: Enum.join(socket.assigns.selected, ","))}
   end
 
   @impl true
@@ -144,12 +147,10 @@ defmodule FullCircleWeb.EmployeeLive.Index do
 
     socket =
       socket
-      |> assign(
-        selected_employees:
-          Enum.reject(socket.assigns.selected_employees, fn sid -> sid == id end)
-      )
+      |> assign(selected: Enum.reject(socket.assigns.selected, fn sid -> sid == id end))
+      |> FullCircleWeb.Helpers.can_print?(:selected, @selected_max)
 
-    {:noreply, socket |> assign(ids: Enum.join(socket.assigns.selected_employees, ","))}
+    {:noreply, socket |> assign(ids: Enum.join(socket.assigns.selected, ","))}
   end
 
   defp filter_objects(socket, terms, reset, page) when page >= 1 do

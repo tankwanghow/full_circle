@@ -5,6 +5,7 @@ defmodule FullCircleWeb.InvoiceLive.Index do
   alias FullCircleWeb.InvoiceLive.IndexComponent
 
   @per_page 25
+  @selected_max 30
 
   @impl true
   def render(assigns) do
@@ -65,7 +66,7 @@ defmodule FullCircleWeb.InvoiceLive.Index do
           <%= gettext("New Invoice") %>
         </.link>
         <.link
-          :if={@ids != ""}
+          :if={@can_print}
           navigate={
             ~p"/companies/#{@current_company.id}/Invoice/print_multi?pre_print=false&ids=#{@ids}"
           }
@@ -75,7 +76,7 @@ defmodule FullCircleWeb.InvoiceLive.Index do
           <%= gettext("Print") %>
         </.link>
         <.link
-          :if={@ids != ""}
+          :if={@can_print}
           navigate={
             ~p"/companies/#{@current_company.id}/Invoice/print_multi?pre_print=true&ids=#{@ids}"
           }
@@ -154,8 +155,9 @@ defmodule FullCircleWeb.InvoiceLive.Index do
      |> assign(
        search: %{terms: terms, balance: bal, invoice_date: invoice_date, due_date: due_date}
      )
-     |> assign(selected_invoices: [])
+     |> assign(selected: [])
      |> assign(ids: "")
+     |> assign(can_print: false)
      |> filter_objects(terms, true, invoice_date, due_date, bal, 1)}
   end
 
@@ -176,9 +178,10 @@ defmodule FullCircleWeb.InvoiceLive.Index do
 
     socket =
       socket
-      |> assign(selected_invoices: [id | socket.assigns.selected_invoices])
+      |> assign(selected: [id | socket.assigns.selected])
+      |> FullCircleWeb.Helpers.can_print?(:selected, @selected_max)
 
-    {:noreply, socket |> assign(ids: Enum.join(socket.assigns.selected_invoices, ","))}
+    {:noreply, socket |> assign(ids: Enum.join(socket.assigns.selected, ","))}
   end
 
   @impl true
@@ -198,11 +201,10 @@ defmodule FullCircleWeb.InvoiceLive.Index do
 
     socket =
       socket
-      |> assign(
-        selected_invoices: Enum.reject(socket.assigns.selected_invoices, fn sid -> sid == id end)
-      )
+      |> assign(selected: Enum.reject(socket.assigns.selected, fn sid -> sid == id end))
+      |> FullCircleWeb.Helpers.can_print?(:selected, @selected_max)
 
-    {:noreply, socket |> assign(ids: Enum.join(socket.assigns.selected_invoices, ","))}
+    {:noreply, socket |> assign(ids: Enum.join(socket.assigns.selected, ","))}
   end
 
   @impl true

@@ -140,55 +140,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Index do
          due_date: due_date
        }
      )
-     |> assign(selected_invoices: [])
-     |> assign(ids: "")
      |> filter_objects(terms, true, pur_invoice_date, due_date, bal, 1)}
-  end
-
-  @impl true
-  def handle_event("check_click", %{"object-id" => id, "value" => "on"}, socket) do
-    obj =
-      FullCircle.Billing.get_pur_invoice_by_id_index_component_field!(
-        id,
-        socket.assigns.current_company,
-        socket.assigns.current_user
-      )
-
-    Phoenix.LiveView.send_update(
-      self(),
-      IndexComponent,
-      [{:id, "objects-#{id}"}, {:obj, Map.merge(obj, %{checked: true})}]
-    )
-
-    socket =
-      socket
-      |> assign(selected_invoices: [id | socket.assigns.selected_invoices])
-
-    {:noreply, socket |> assign(ids: Enum.join(socket.assigns.selected_invoices, ","))}
-  end
-
-  @impl true
-  def handle_event("check_click", %{"object-id" => id}, socket) do
-    obj =
-      FullCircle.Billing.get_invoice_by_id_index_component_field!(
-        id,
-        socket.assigns.current_company,
-        socket.assigns.current_user
-      )
-
-    Phoenix.LiveView.send_update(
-      self(),
-      IndexComponent,
-      [{:id, "objects-#{id}"}, {:obj, Map.merge(obj, %{checked: false})}]
-    )
-
-    socket =
-      socket
-      |> assign(
-        selected_invoices: Enum.reject(socket.assigns.selected_invoices, fn sid -> sid == id end)
-      )
-
-    {:noreply, socket |> assign(ids: Enum.join(socket.assigns.selected_invoices, ","))}
   end
 
   @impl true
