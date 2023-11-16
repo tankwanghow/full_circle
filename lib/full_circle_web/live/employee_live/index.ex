@@ -169,8 +169,6 @@ defmodule FullCircleWeb.EmployeeLive.Index do
         per_page: @per_page
       )
 
-    IO.inspect(objects |> Enum.map(fn x -> x.name end))
-
     socket
     |> assign(page: page, per_page: @per_page)
     |> stream(:objects, objects, reset: reset)
