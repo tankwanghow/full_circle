@@ -1043,23 +1043,6 @@ defmodule FullCircle.HR do
     |> Repo.all()
   end
 
-  def exec_query(qry) do
-    k = FullCircle.Repo.query!(qry)
-
-    Enum.map(k.rows, fn r ->
-      Enum.zip(k.columns |> Enum.map(fn x -> String.to_atom(x) end), r)
-    end)
-    |> Enum.map(fn x ->
-      Map.new(x, fn {kk, vv} ->
-        {kk,
-         if(Atom.to_string(kk) |> String.ends_with?("id") and !is_nil(vv),
-           do: Ecto.UUID.cast!(vv),
-           else: vv
-         )}
-      end)
-    end)
-  end
-
   defp count_hours_work(tl) when is_nil(tl) do
     0
   end

@@ -9,6 +9,7 @@ defmodule FullCircle.Layer.House do
     field :capacity, :integer
 
     belongs_to :company, FullCircle.Sys.Company
+    has_many(:movements, FullCircle.Layer.Movement, on_delete: :delete_all)
 
     timestamps(type: :utc_datetime)
   end

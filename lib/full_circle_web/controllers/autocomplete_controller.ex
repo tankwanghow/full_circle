@@ -7,6 +7,11 @@ defmodule FullCircleWeb.AutoCompleteController do
 
     names =
       case schema do
+        "house" ->
+          FullCircle.Layer.houses_no(name, %{id: params["company_id"]}, %{
+            id: params["user_id"]
+          })
+
         "contact" ->
           FullCircle.Accounting.contact_names(
             name,

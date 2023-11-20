@@ -130,6 +130,14 @@ defmodule FullCircleWeb.Router do
       live("/employees/:employee_id/copy", EmployeeLive.Form, :copy)
       live("/employees/:employee_id/edit", EmployeeLive.Form, :edit)
 
+      live("/houses", LayerLive.HouseIndex, :index)
+      live("/houses/new", LayerLive.HouseForm, :new)
+      live("/houses/:house_id/edit", LayerLive.HouseForm, :edit)
+
+      live("/flocks", LayerLive.FlockIndex, :index)
+      live("/flocks/new", LayerLive.FlockForm, :new)
+      live("/flocks/:flock_id/edit", LayerLive.FlockForm, :edit)
+
       live("/holidays", HolidayLive.Index, :index)
       live("/holidays/new", HolidayLive.Form, :new)
       live("/holidays/:holiday_id/copy", HolidayLive.Form, :copy)
