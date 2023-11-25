@@ -57,11 +57,8 @@ defmodule FullCircleWeb.WeighingLive.Index do
         <div class="w-[10%] border-b border-t border-amber-400 py-1">
           <%= gettext("Vechile") %>
         </div>
-        <div class="w-[20%] border-b border-t border-amber-400 py-1">
+        <div class="w-[15%] border-b border-t border-amber-400 py-1">
           <%= gettext("Good") %>
-        </div>
-        <div class="w-[20%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Note") %>
         </div>
         <div class="w-[10%] border-b border-t border-amber-400 py-1 text-right pr-2">
           <%= gettext("Gross") %>
@@ -71,6 +68,12 @@ defmodule FullCircleWeb.WeighingLive.Index do
         </div>
         <div class="w-[10%] border-b border-t border-amber-400 py-1 text-right pr-2">
           <%= gettext("Nett") %>
+        </div>
+        <div class="w-[5%] border-b border-t border-amber-400 py-1 pr-2">
+          <%= gettext("Unit") %>
+        </div>
+        <div class="w-[20%] border-b border-t border-amber-400 py-1">
+          <%= gettext("Note") %>
         </div>
       </div>
       <div

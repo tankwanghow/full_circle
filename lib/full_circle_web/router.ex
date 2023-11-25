@@ -168,8 +168,10 @@ defmodule FullCircleWeb.Router do
 
       live("/logs/:entity/:entity_id", LogLive.Index, :index)
       live("/journal_entries/:doc_type/:doc_no", JournalEntryViewLive.Index, :index)
+
       live("/account_transactions", TransactionLive.Account, :index)
       live("/contact_transactions", TransactionLive.Contact, :index)
+      live("/harvest_report", LayerLive.HarvestReport, :index)
 
       live("/Deposit", ChequeLive.DepositIndex, :index)
       live("/Deposit/new", ChequeLive.DepositForm, :new)
@@ -215,6 +217,10 @@ defmodule FullCircleWeb.Router do
       live("/Weighing", WeighingLive.Index, :index)
       live("/Weighing/new", WeighingLive.Form, :new)
       live("/Weighing/:weighing_id/edit", WeighingLive.Form, :edit)
+
+      live("/harvests", LayerLive.HarvestIndex, :index)
+      live("/harvests/new", LayerLive.HarvestForm, :new)
+      live("/harvests/:harvest_id/edit", LayerLive.HarvestForm, :edit)
 
       live("/PayRun", PayRunLive.Index, :index)
 
@@ -267,6 +273,7 @@ defmodule FullCircleWeb.Router do
       live("/Weighing/print_multi", WeighingLive.Print, :print)
 
       live("/print_transactions", TransactionLive.Print, :print)
+      live("/print_harvest_report", LayerLive.HarvestReportPrint, :print)
     end
 
     live_session :require_authenticated_user_n_active_company_punch,

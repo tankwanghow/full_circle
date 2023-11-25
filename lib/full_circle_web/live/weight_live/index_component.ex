@@ -30,11 +30,8 @@ defmodule FullCircleWeb.WeighingLive.IndexComponent do
       <div class="w-[10%] border-b text-center border-gray-400 py-1 overflow-clip">
         <%= @obj.vehicle_no %>
       </div>
-      <div class="w-[20%] border-b text-center border-gray-400 py-1 overflow-clip">
+      <div class="w-[15%] border-b text-center border-gray-400 py-1 overflow-clip">
         <%= @obj.good_name %>
-      </div>
-      <div class="w-[20%] border-b text-center border-gray-400 py-1 overflow-clip">
-        <%= @obj.note %>
       </div>
       <div class="w-[10%] border-b border-gray-400 py-1 text-right pr-2">
         <%= @obj.gross |> Number.Delimit.number_to_delimited(precision: 0) %>
@@ -44,6 +41,12 @@ defmodule FullCircleWeb.WeighingLive.IndexComponent do
       </div>
       <div class="w-[10%] border-b border-gray-400 py-1 text-right pr-2">
         <%= (@obj.gross - @obj.tare) |> Number.Delimit.number_to_delimited(precision: 0) %>
+      </div>
+      <div class="w-[5%] border-b border-gray-400 py-1 pr-2">
+        <%= @obj.unit %>
+      </div>
+      <div class="w-[20%] border-b text-center border-gray-400 py-1 overflow-clip">
+        <%= @obj.note %>
       </div>
     </div>
     """

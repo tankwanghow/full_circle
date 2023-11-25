@@ -96,11 +96,11 @@ defmodule FullCircle.Repo.Migrations.CreateLayer do
       add :harvest_id, references(:harvests, on_delete: :delete_all)
       add :house_id, references(:houses, on_delete: :restrict)
       add :flock_id, references(:flocks, on_delete: :restrict)
-      add :har_qty_1, :integer, default: 0
-      add :har_qty_2, :integer, default: 0
-      add :har_qty_3, :integer, default: 0
-      add :dea_qty_1, :integer, default: 0
-      add :dea_qty_2, :integer, default: 0
+      add :har_1, :integer, default: 0
+      add :har_2, :integer, default: 0
+      add :har_3, :integer, default: 0
+      add :dea_1, :integer, default: 0
+      add :dea_2, :integer, default: 0
 
       timestamps(type: :timestamptz)
     end

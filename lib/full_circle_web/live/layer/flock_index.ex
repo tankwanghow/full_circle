@@ -2,7 +2,7 @@ defmodule FullCircleWeb.LayerLive.FlockIndex do
   use FullCircleWeb, :live_view
 
   alias FullCircleWeb.LayerLive.FlockIndexComponent
-  alias FullCircle.Layer.Flock
+  alias FullCircle.Layer.{Flock, Movement, House}
   alias FullCircle.StdInterface
 
   @per_page 50
@@ -27,12 +27,7 @@ defmodule FullCircleWeb.LayerLive.FlockIndex do
             </div>
             <div class="w-[9.5rem] grow-0 shrink-0">
               <label>DOB From</label>
-              <.input
-                name="search[dob]"
-                type="date"
-                value={@search.dob}
-                id="search_dob"
-              />
+              <.input name="search[dob]" type="date" value={@search.dob} id="search_dob" />
             </div>
             <.button class="mt-5 h-10 w-10 grow-0 shrink-0">🔍</.button>
           </div>
@@ -48,19 +43,19 @@ defmodule FullCircleWeb.LayerLive.FlockIndex do
         </.link>
       </div>
       <div class="font-medium flex flex-row text-center tracking-tighter bg-amber-200">
-        <div class="w-[15%] border-b border-t border-amber-400 py-1">
+        <div class="w-[10%] border-b border-t border-amber-400 py-1">
           <%= gettext("DOB") %>
         </div>
-        <div class="w-[15%] border-b border-t border-amber-400 py-1">
+        <div class="w-[14%] border-b border-t border-amber-400 py-1">
           <%= gettext("Flock No") %>
         </div>
-        <div class="w-[15%] border-b border-t border-amber-400 py-1">
+        <div class="w-[10%] border-b border-t border-amber-400 py-1">
           <%= gettext("Breed") %>
         </div>
-        <div class="w-[15%] border-b border-t border-amber-400 py-1">
+        <div class="w-[10%] border-b border-t border-amber-400 py-1">
           <%= gettext("Quantity") %>
         </div>
-        <div class="w-[15%] border-b border-t border-amber-400 py-1">
+        <div class="w-[31%] border-b border-t border-amber-400 py-1">
           <%= gettext("Houses") %>
         </div>
         <div class="w-[25%] border-b border-t border-amber-400 py-1">
@@ -146,32 +141,51 @@ defmodule FullCircleWeb.LayerLive.FlockIndex do
 
   import Ecto.Query, warn: false
 
-
   defp filter_objects(socket, terms, reset, "", page) do
     from(obj in Flock,
-    join:
-      com in subquery(
-        FullCircle.Sys.user_company(
-          socket.assigns.current_company,
-          socket.assigns.current_user
-        )
-      ),
-    on: com.id == obj.company_id
-  ) |> filter(socket, terms, reset, page)
+      join: mv in Movement,
+      on: mv.flock_id == obj.id,
+      join: h in House,
+      on: h.id == mv.house_id,
+      join:
+        com in subquery(
+          FullCircle.Sys.user_company(
+            socket.assigns.current_company,
+            socket.assigns.current_user
+          )
+        ),
+      on: com.id == obj.company_id,
+      select: obj,
+      select_merge: %{
+        houses: fragment("string_agg(distinct ?, ', ')", h.house_no)
+      },
+      group_by: obj.id
+    )
+    |> filter(socket, terms, reset, page)
   end
 
   defp filter_objects(socket, terms, reset, dob, page) do
     from(obj in Flock,
-    join:
-      com in subquery(
-        FullCircle.Sys.user_company(
-          socket.assigns.current_company,
-          socket.assigns.current_user
-        )
-      ),
-    on: com.id == obj.company_id,
-    where: obj.dob >= ^dob
-  ) |> filter(socket, terms, reset, page)
+      join: mv in Movement,
+      on: mv.flock_id == obj.id,
+      join: h in House,
+      on: h.id == mv.house_id,
+      join:
+        com in subquery(
+          FullCircle.Sys.user_company(
+            socket.assigns.current_company,
+            socket.assigns.current_user
+          )
+        ),
+      on: com.id == obj.company_id,
+      where: obj.dob >= ^dob,
+      select: obj,
+      select_merge: %{
+        houses: fragment("string_agg(distinct ?, ', ')", h.house_no)
+      },
+      group_by: obj.id
+    )
+    |> filter(socket, terms, reset, page)
   end
 
   defp filter(qry, socket, terms, reset, page) do
@@ -180,8 +194,6 @@ defmodule FullCircleWeb.LayerLive.FlockIndex do
         qry,
         [:flock_no, :breed, :note],
         terms,
-        socket.assigns.current_company,
-        socket.assigns.current_user,
         page: page,
         per_page: @per_page
       )

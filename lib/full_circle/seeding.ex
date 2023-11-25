@@ -2,6 +2,7 @@ defmodule FullCircle.Seeding do
   import Ecto.Query, warn: false
   import FullCircle.Authorization
 
+  alias FullCircle.WeightBridge.Weighing
   alias FullCircle.Accounting.FixedAssetDepreciation
   alias FullCircle.Repo
   alias FullCircle.HR.{Employee, SalaryType, EmployeeSalaryType}
@@ -15,6 +16,8 @@ defmodule FullCircle.Seeding do
     SeedTransactionMatcher
   }
 
+  alias FullCircle.Layer.{House, Flock, Movement, Harvest, HarvestDetail}
+  alias FullCircle.WeightBridge.Weighing
   alias FullCircle.Product.{Good}
 
   def seed("Employees", seed_data, com, user) do
@@ -63,6 +66,30 @@ defmodule FullCircle.Seeding do
 
   def seed("TransactionMatchers", seed_data, com, user) do
     save_seed(%SeedTransactionMatcher{}, :seed_transaction_matchers, seed_data, com, user, false)
+  end
+
+  def seed("Houses", seed_data, com, user) do
+    save_seed(%House{}, :seed_houses, seed_data, com, user)
+  end
+
+  def seed("Weighings", seed_data, com, user) do
+    save_seed(%Weighing{}, :seed_weighings, seed_data, com, user)
+  end
+
+  def seed("Flocks", seed_data, com, user) do
+    save_seed(%Flock{}, :seed_flocks, seed_data, com, user)
+  end
+
+  def seed("Movements", seed_data, com, user) do
+    save_seed(%Movement{}, :seed_movements, seed_data, com, user)
+  end
+
+  def seed("Harvests", seed_data, com, user) do
+    save_seed(%Harvest{}, :seed_harvests, seed_data, com, user)
+  end
+
+  def seed("Harvest_Details", seed_data, com, user) do
+    save_seed(%HarvestDetail{}, :seed_harvest_details, seed_data, com, user)
   end
 
   defp save_seed(_klass_struct, action, seed_data, company, user, log? \\ true) do
@@ -204,6 +231,86 @@ defmodule FullCircle.Seeding do
     {FullCircle.StdInterface.changeset(
        FullCircle.Product.Good,
        FullCircle.Product.Good.__struct__(),
+       attr,
+       com
+     ), attr}
+  end
+
+  def fill_changeset("Weighings", attr, com, _user) do
+    {FullCircle.StdInterface.changeset(
+       FullCircle.WeightBridge.Weighing,
+       FullCircle.WeightBridge.Weighing.__struct__(),
+       attr,
+       com,
+       :seed_changeset
+     ), attr}
+  end
+
+  def fill_changeset("Houses", attr, com, _user) do
+    {FullCircle.StdInterface.changeset(
+       FullCircle.Layer.House,
+       FullCircle.Layer.House.__struct__(),
+       attr,
+       com
+     ), attr}
+  end
+
+  def fill_changeset("Flocks", attr, com, _user) do
+    {FullCircle.StdInterface.changeset(
+       FullCircle.Layer.Flock,
+       FullCircle.Layer.Flock.__struct__(),
+       attr,
+       com
+     ), attr}
+  end
+
+  def fill_changeset("Harvests", attr, com, user) do
+    e = FullCircle.HR.get_employee_by_name(Map.fetch!(attr, "employee_name"), com, user)
+
+    attr =
+      attr
+      |> Map.merge(%{"employee_id" => if(e, do: e.id, else: nil)})
+
+    {FullCircle.StdInterface.changeset(
+       FullCircle.Layer.Harvest,
+       FullCircle.Layer.Harvest.__struct__(),
+       attr,
+       com,
+       :seed_changeset
+     ), attr}
+  end
+
+  def fill_changeset("Harvest_Details", attr, com, _user) do
+    hv = FullCircle.Layer.get_harvest_by_no(Map.fetch!(attr, "harvest_no"), com, nil)
+    h = FullCircle.Layer.get_house_by_no(Map.fetch!(attr, "house_no"), com, nil)
+    f = FullCircle.Layer.get_flock_by_no(Map.fetch!(attr, "flock_no"), com, nil)
+
+    attr =
+      attr
+      |> Map.merge(%{"house_id" => if(h, do: h.id, else: nil)})
+      |> Map.merge(%{"flock_id" => if(f, do: f.id, else: nil)})
+      |> Map.merge(%{"harvest_id" => if(hv, do: hv.id, else: nil)})
+
+    {FullCircle.StdInterface.changeset(
+       FullCircle.Layer.HarvestDetail,
+       FullCircle.Layer.HarvestDetail.__struct__(),
+       attr,
+       com
+     ), attr}
+  end
+
+  def fill_changeset("Movements", attr, com, _user) do
+    h = FullCircle.Layer.get_house_by_no(Map.fetch!(attr, "house_no"), com, nil)
+    f = FullCircle.Layer.get_flock_by_no(Map.fetch!(attr, "flock_no"), com, nil)
+
+    attr =
+      attr
+      |> Map.merge(%{"house_id" => if(h, do: h.id, else: nil)})
+      |> Map.merge(%{"flock_id" => if(f, do: f.id, else: nil)})
+
+    {FullCircle.StdInterface.changeset(
+       FullCircle.Layer.Movement,
+       FullCircle.Layer.Movement.__struct__(),
        attr,
        com
      ), attr}

@@ -105,7 +105,7 @@ defmodule FullCircleWeb.DashboardLive do
         </.link>
       </div>
 
-      <div class="font-medium text-xl">Weight Bridge</div>
+      <div class="font-medium text-xl">Operations</div>
       <div class="mb-4 flex flex-wrap justify-center">
         <.link navigate={~p"/companies/#{@current_company.id}/Weighing"} class="nav-btn">
           <%= gettext("Weighings") %>
@@ -115,6 +115,12 @@ defmodule FullCircleWeb.DashboardLive do
         </.link>
         <.link navigate={~p"/companies/#{@current_company.id}/flocks"} class="nav-btn">
           <%= gettext("Flock") %>
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/harvests"} class="nav-btn">
+          <%= gettext("Harvest") %>
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/harvest_report"} class="nav-btn">
+          <%= gettext("Harvest Report") %>
         </.link>
       </div>
 

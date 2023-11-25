@@ -37,6 +37,14 @@ defmodule FullCircleWeb.CsvController do
     )
   end
 
+  def show(conn, %{"company_id" => com_id, "report" => "harvrepo", "tdate" => tdate}) do
+    tdate = tdate |> Timex.parse!("{YYYY}-{0M}-{0D}") |> NaiveDateTime.to_date()
+    data = FullCircle.Layer.harvest_report(tdate, com_id)
+    fields = data |> Enum.at(0) |> Map.keys()
+    filename = "harvest_report_#{tdate}"
+    send_csv(conn, data, fields, filename)
+  end
+
   defp transactions_csv(conn, name, fdate, tdate, com_id, name_func, trans_func) do
     com = FullCircle.Sys.get_company!(com_id)
 

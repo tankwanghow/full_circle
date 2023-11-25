@@ -2,9 +2,6 @@ defmodule FullCircleWeb.LayerLive.HouseIndex do
   alias FullCircleWeb.LayerLive.HouseIndexComponent
   use FullCircleWeb, :live_view
 
-  alias FullCircle.StdInterface
-  alias FullCircle.Layer.House
-
   @per_page 50
 
   @impl true

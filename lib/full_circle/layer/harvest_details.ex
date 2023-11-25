@@ -8,14 +8,15 @@ defmodule FullCircle.Layer.HarvestDetail do
     belongs_to :flock, FullCircle.Layer.Flock
     belongs_to :house, FullCircle.Layer.House
 
-    field :har_qty_1, :integer, default: 0
-    field :har_qty_2, :integer, default: 0
-    field :har_qty_3, :integer, default: 0
-    field :dea_qty_1, :integer, default: 0
-    field :dea_qty_2, :integer, default: 0
+    field :har_1, :integer, default: 0
+    field :har_2, :integer, default: 0
+    field :har_3, :integer, default: 0
+    field :dea_1, :integer, default: 0
+    field :dea_2, :integer, default: 0
 
     field :flock_no, :string, virtual: true
     field :house_no, :string, virtual: true
+    field(:delete, :boolean, virtual: true, default: false)
 
     timestamps(type: :utc_datetime)
   end
@@ -24,33 +25,34 @@ defmodule FullCircle.Layer.HarvestDetail do
   def changeset(note, attrs) do
     note
     |> cast(attrs, [
-      :har_qty_1,
-      :har_qty_2,
-      :har_qty_3,
-      :dea_qty_1,
-      :dea_qty_2,
+      :har_1,
+      :har_2,
+      :har_3,
+      :dea_1,
+      :dea_2,
       :harvest_id,
       :flock_id,
       :house_id,
       :flock_no,
-      :house_no
+      :house_no,
+      :delete
     ])
     |> validate_required([
-      :har_qty_1,
-      :har_qty_2,
-      :har_qty_3,
-      :dea_qty_1,
-      :dea_qty_2,
+      :har_1,
+      :har_2,
+      :har_3,
+      :dea_1,
+      :dea_2,
       :flock_no,
       :house_no
     ])
     |> validate_id(:house_no, :house_id)
     |> validate_id(:flock_no, :flock_id)
-    |> validate_number(:har_qty_1, greater_than: -1)
-    |> validate_number(:har_qty_2, greater_than: -1)
-    |> validate_number(:har_qty_3, greater_than: -1)
-    |> validate_number(:dea_qty_1, greater_than: -1)
-    |> validate_number(:dea_qty_2, greater_than: -1)
+    |> validate_number(:har_1, greater_than: -1)
+    |> validate_number(:har_2, greater_than: -1)
+    |> validate_number(:har_3, greater_than: -1)
+    |> validate_number(:dea_1, greater_than: -1)
+    |> validate_number(:dea_2, greater_than: -1)
     |> maybe_mark_for_deletion()
   end
 

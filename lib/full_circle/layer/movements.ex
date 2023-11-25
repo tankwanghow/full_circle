@@ -15,6 +15,7 @@ defmodule FullCircle.Layer.Movement do
     field :flock_no, :string, virtual: true
     field :house_no, :string, virtual: true
     field :house_info, :string, virtual: true
+    field(:delete, :boolean, virtual: true, default: false)
 
     timestamps(type: :utc_datetime)
   end
@@ -26,11 +27,13 @@ defmodule FullCircle.Layer.Movement do
       :flock_id,
       :house_id,
       :house_no,
+      :flock_no,
       :move_date,
       :quantity,
       :note,
       :company_id,
-      :house_info
+      :house_info,
+      :delete
     ])
     |> validate_required([
       :house_no,

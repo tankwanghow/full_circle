@@ -12,6 +12,7 @@ defmodule FullCircle.WeightBridge.Weighing do
     field :note, :string
     field :gross, :integer, default: 0
     field :tare, :integer, default: 0
+    field :unit, :string, default: "Kg"
 
     belongs_to :company, FullCircle.Sys.Company
 
@@ -31,6 +32,7 @@ defmodule FullCircle.WeightBridge.Weighing do
       :note,
       :gross,
       :tare,
+      :unit,
       :company_id
     ])
     |> fill_today(:note_date)
@@ -40,6 +42,7 @@ defmodule FullCircle.WeightBridge.Weighing do
       :vehicle_no,
       :good_name,
       :gross,
+      :unit,
       :tare
     ])
     |> validate_date(:note_date, days_before: 1)
@@ -50,6 +53,32 @@ defmodule FullCircle.WeightBridge.Weighing do
       message: gettext("note no already in company")
     )
     |> compute_nett()
+  end
+
+  @doc false
+  def seed_changeset(note, attrs) do
+    note
+    |> cast(attrs, [
+      :note_no,
+      :note_date,
+      :vehicle_no,
+      :good_name,
+      :note,
+      :gross,
+      :tare,
+      :unit,
+      :company_id
+    ])
+    |> fill_today(:note_date)
+    |> validate_required([
+      :note_no,
+      :note_date,
+      :vehicle_no,
+      :good_name,
+      :gross,
+      :unit,
+      :tare
+    ])
   end
 
   def compute_nett(cs) do

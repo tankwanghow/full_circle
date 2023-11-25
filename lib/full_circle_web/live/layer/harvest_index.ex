@@ -2,7 +2,7 @@ defmodule FullCircleWeb.LayerLive.HarvestIndex do
   use FullCircleWeb, :live_view
 
   alias FullCircleWeb.LayerLive.HarvestIndexComponent
-  alias FullCircle.Layer.Harvest
+  alias FullCircle.Layer.{Harvest, HarvestDetail, House}
   alias FullCircle.StdInterface
 
   @per_page 50
@@ -54,18 +54,13 @@ defmodule FullCircleWeb.LayerLive.HarvestIndex do
         <div class="w-[15%] border-b border-t border-amber-400 py-1">
           <%= gettext("Harvest No") %>
         </div>
-        <div class="w-[15%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Breed") %>
+        <div class="w-[30%] border-b border-t border-amber-400 py-1">
+          <%= gettext("Employee") %>
         </div>
-        <div class="w-[15%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Quantity") %>
-        </div>
-        <div class="w-[15%] border-b border-t border-amber-400 py-1">
+        <div class="w-[40%] border-b border-t border-amber-400 py-1">
           <%= gettext("Houses") %>
         </div>
-        <div class="w-[25%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Note") %>
-        </div>
+
       </div>
       <div
         :if={Enum.count(@streams.objects) > 0 or @page > 1}
@@ -148,42 +143,65 @@ defmodule FullCircleWeb.LayerLive.HarvestIndex do
 
   import Ecto.Query, warn: false
 
-
   defp filter_objects(socket, terms, reset, "", page) do
-    from(obj in Harvest,
-    join:
-      com in subquery(
-        FullCircle.Sys.user_company(
-          socket.assigns.current_company,
-          socket.assigns.current_user
-        )
-      ),
-    on: com.id == obj.company_id
-  ) |> filter(socket, terms, reset, page)
+    from(hv in Harvest,
+      join: hvd in HarvestDetail,
+      on: hvd.harvest_id == hv.id,
+      join: h in House,
+      on: h.id == hvd.house_id,
+      join: emp in FullCircle.HR.Employee,
+      on: emp.id == hv.employee_id,
+      join:
+        com in subquery(
+          FullCircle.Sys.user_company(
+            socket.assigns.current_company,
+            socket.assigns.current_user
+          )
+        ),
+      on: com.id == hv.company_id,
+      select: hv,
+      select_merge: %{
+        employee_name: emp.name,
+        houses: fragment("string_agg(distinct ?, ', ')", h.house_no)
+      },
+      group_by: [hv.id, emp.id]
+    )
+    |> filter(socket, terms, reset, page)
   end
 
-  defp filter_objects(socket, terms, reset, har_date, page) do
-    from(obj in Harvest,
-    join:
-      com in subquery(
-        FullCircle.Sys.user_company(
-          socket.assigns.current_company,
-          socket.assigns.current_user
-        )
-      ),
-    on: com.id == obj.company_id,
-    where: obj.har_date >= ^har_date
-  ) |> filter(socket, terms, reset, page)
+  defp filter_objects(socket, terms, reset, hard, page) do
+    from(hv in Harvest,
+      join: hvd in HarvestDetail,
+      on: hvd.harvest_id == hv.id,
+      join: h in House,
+      on: h.id == hvd.house_id,
+      join: emp in FullCircle.HR.Employee,
+      on: emp.id == hv.employee_id,
+      join:
+        com in subquery(
+          FullCircle.Sys.user_company(
+            socket.assigns.current_company,
+            socket.assigns.current_user
+          )
+        ),
+      on: com.id == hv.company_id,
+      where: hv.har_date >= ^hard,
+      select: hv,
+      select_merge: %{
+        employee_name: emp.name,
+        houses: fragment("string_agg(distinct ?, ', ')", h.house_no)
+      },
+      group_by: [hv.id, emp.id]
+    )
+    |> filter(socket, terms, reset, page)
   end
 
   defp filter(qry, socket, terms, reset, page) do
     objects =
       StdInterface.filter(
         qry,
-        [:employee, :house],
+        [:employee_name, :houses],
         terms,
-        socket.assigns.current_company,
-        socket.assigns.current_user,
         page: page,
         per_page: @per_page
       )

@@ -20,7 +20,13 @@ defmodule FullCircleWeb.SeedLive.Index do
     "Balances" => ~w(doc_date	account_name amount),
     "Transactions" => ~w(doc_date	account_name	doc_no doc_type particulars	amount),
     "TransactionMatchers" =>
-      ~w(account_name m_doc_date m_doc_id m_doc_type m_amount n_doc_date n_doc_id n_doc_type n_amount)
+      ~w(account_name m_doc_date m_doc_id m_doc_type m_amount n_doc_date n_doc_id n_doc_type n_amount),
+    "Houses" => ~w(house_no capacity),
+    "Flocks" => ~w(flock_no dob quantity breed note),
+    "Movements" => ~w(move_date house_no flock_no quantity note),
+    "Harvests" => ~w(harvest_no har_date employee_name),
+    "Harvest_Details" => ~w(harvest_no house_no flock_no har_1 har_2 har_3 dea_1 dea_2 note),
+    "Weighings" => ~w(note_no note_date good_name vehicle_no gross tare unit)
   }
 
   @impl true

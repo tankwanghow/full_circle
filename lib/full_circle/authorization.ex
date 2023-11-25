@@ -38,6 +38,24 @@ defmodule FullCircle.Authorization do
   def can?(user, :seed_employees, company),
     do: allow_roles(~w(admin), company, user)
 
+  def can?(user, :seed_houses, company),
+    do: allow_roles(~w(admin), company, user)
+
+  def can?(user, :seed_flocks, company),
+    do: allow_roles(~w(admin), company, user)
+
+  def can?(user, :seed_movements, company),
+    do: allow_roles(~w(admin), company, user)
+
+  def can?(user, :seed_harvests, company),
+    do: allow_roles(~w(admin), company, user)
+
+  def can?(user, :seed_weighings, company),
+    do: allow_roles(~w(admin), company, user)
+
+  def can?(user, :seed_harvest_details, company),
+    do: allow_roles(~w(admin), company, user)
+
   def can?(user, :seed_salary_types, company),
     do: allow_roles(~w(admin), company, user)
 
@@ -136,6 +154,15 @@ defmodule FullCircle.Authorization do
 
   def can?(user, :delete_holiday, company),
     do: allow_roles(~w(admin manager supervisor), company, user)
+
+  def can?(user, :create_harvest, company),
+    do: forbid_roles(~w(auditor guest), company, user)
+
+  def can?(user, :update_harvest, company),
+    do: forbid_roles(~w(auditor guest cashier), company, user)
+
+  def can?(user, :delete_harvest, company),
+    do: forbid_roles(~w(auditor guest cashier), company, user)
 
   def can?(user, :create_contact, company),
     do: forbid_roles(~w(auditor guest), company, user)

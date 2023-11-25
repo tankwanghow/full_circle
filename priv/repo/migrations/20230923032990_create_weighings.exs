@@ -11,6 +11,7 @@ defmodule FullCircle.Repo.Migrations.CreateWeighings do
       add :note, :string
       add :gross, :integer, default: 0
       add :tare, :integer, default: 0
+      add :unit, :string, default: "Kg"
 
       timestamps(type: :timestamptz)
     end

@@ -70,7 +70,7 @@ defmodule FullCircleWeb.WeighingLive.Form do
       {:ok, _ac} ->
         {:noreply,
          socket
-         |> push_patch(to: "/companies/#{socket.assigns.current_company.id}/Weighing")
+         |> push_navigate(to: "/companies/#{socket.assigns.current_company.id}/Weighing")
          |> put_flash(:info, "#{gettext("Weighing deleted successfully.")}")}
 
       {:error, failed_operation, changeset, _} ->
@@ -192,14 +192,17 @@ defmodule FullCircleWeb.WeighingLive.Form do
           </div>
         </div>
         <div class="grid grid-cols-12 gap-1">
-          <div class="col-span-4">
+          <div class="col-span-3">
             <.input field={@form[:gross]} label={gettext("Gross")} type="number" />
           </div>
-          <div class="col-span-4">
+          <div class="col-span-3">
             <.input field={@form[:tare]} label={gettext("Tare")} type="number" />
           </div>
-          <div class="col-span-4">
+          <div class="col-span-3">
             <.input readonly field={@form[:nett]} label={gettext("Nett")} type="number" />
+          </div>
+          <div class="col-span-3">
+            <.input field={@form[:unit]} label={gettext("Unit")} />
           </div>
         </div>
         <div>
