@@ -5,10 +5,6 @@ defmodule FullCircleWeb.LayerLive.HarvestReport do
 
   @impl true
   def mount(_params, _session, socket) do
-    socket =
-      socket
-      |> assign(page_title: "Harvest Report")
-
     {:ok, socket}
   end
 
@@ -16,10 +12,11 @@ defmodule FullCircleWeb.LayerLive.HarvestReport do
   def handle_params(params, _uri, socket) do
     params = params["search"]
 
-    t_date = params["t_date"] || Timex.today |> Timex.format!("%Y-%m-%d", :strftime)
+    t_date = params["t_date"] || Timex.today() |> Timex.format!("%Y-%m-%d", :strftime)
 
     {:noreply,
      socket
+     |> assign(page_title: "Harvest Report for #{t_date}")
      |> assign(search: %{t_date: t_date})
      |> filter_transactions(t_date)}
   end
@@ -62,6 +59,13 @@ defmodule FullCircleWeb.LayerLive.HarvestReport do
     socket
     |> assign(objects_count: Enum.count(objects))
     |> assign(objects: objects)
+  end
+
+  defp yield_color(y1, y2) do
+    cond do
+      y1 - y2 > -0.02 -> "bg-green-200 border-green-400"
+      y1 - y2 <= -0.02 -> "bg-rose-200 border-rose-400"
+    end
   end
 
   @impl true
@@ -193,50 +197,43 @@ defmodule FullCircleWeb.LayerLive.HarvestReport do
               </div>
               <div class={[
                 "w-[7%] border rounded px-2 py-1",
-                obj.yield_0 - obj.yield_1 > -0.02 && "bg-green-200 border-green-400",
-                obj.yield_0 - obj.yield_1 <= -0.02 && "bg-rose-200 border-rose-400"
+                yield_color(obj.yield_0, obj.yield_1)
               ]}>
                 <%= (obj.yield_0 * 100) |> Number.Percentage.number_to_percentage(precision: 1) %>
               </div>
               <div class={[
                 "w-[7%] border rounded px-2 py-1",
-                obj.yield_1 - obj.yield_2 > -0.02 && "bg-green-200 border-green-400",
-                obj.yield_1 - obj.yield_2 <= -0.02 && "bg-rose-200 border-rose-400"
+                yield_color(obj.yield_1, obj.yield_2)
               ]}>
                 <%= (obj.yield_1 * 100) |> Number.Percentage.number_to_percentage(precision: 1) %>
               </div>
               <div class={[
                 "w-[7%] border rounded px-2 py-1",
-                obj.yield_2 - obj.yield_3 > -0.02 && "bg-green-200 border-green-400",
-                obj.yield_2 - obj.yield_3 <= -0.02 && "bg-rose-200 border-rose-400"
+                yield_color(obj.yield_2, obj.yield_3)
               ]}>
                 <%= (obj.yield_2 * 100) |> Number.Percentage.number_to_percentage(precision: 1) %>
               </div>
               <div class={[
                 "w-[7%] border rounded px-2 py-1",
-                obj.yield_3 - obj.yield_4 > -0.02 && "bg-green-200 border-green-400",
-                obj.yield_3 - obj.yield_4 <= -0.02 && "bg-rose-200 border-rose-400"
+                yield_color(obj.yield_3, obj.yield_4)
               ]}>
                 <%= (obj.yield_3 * 100) |> Number.Percentage.number_to_percentage(precision: 1) %>
               </div>
               <div class={[
                 "w-[7%] border rounded px-2 py-1",
-                obj.yield_4 - obj.yield_5 > -0.02 && "bg-green-200 border-green-400",
-                obj.yield_4 - obj.yield_5 <= -0.02 && "bg-rose-200 border-rose-400"
+                yield_color(obj.yield_4, obj.yield_5)
               ]}>
                 <%= (obj.yield_4 * 100) |> Number.Percentage.number_to_percentage(precision: 1) %>
               </div>
               <div class={[
                 "w-[7%] border rounded px-2 py-1",
-                obj.yield_5 - obj.yield_6 > -0.02 && "bg-green-200 border-green-400",
-                obj.yield_5 - obj.yield_6 <= -0.02 && "bg-rose-200 border-rose-400"
+                yield_color(obj.yield_5, obj.yield_6)
               ]}>
                 <%= (obj.yield_5 * 100) |> Number.Percentage.number_to_percentage(precision: 1) %>
               </div>
               <div class={[
                 "w-[7%] border rounded px-2 py-1",
-                obj.yield_6 - obj.yield_7 > -0.02 && "bg-green-200 border-green-400",
-                obj.yield_6 - obj.yield_7 <= -0.02 && "bg-rose-200 border-rose-400"
+                yield_color(obj.yield_6, obj.yield_7)
               ]}>
                 <%= (obj.yield_6 * 100) |> Number.Percentage.number_to_percentage(precision: 1) %>
               </div>

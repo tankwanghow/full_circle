@@ -94,11 +94,18 @@ defmodule FullCircleWeb.LayerLive.HarvestReportPrint do
     """
   end
 
+  defp yield_bold(y1, y2) do
+    cond do
+      y1 - y2 > -0.02 -> ""
+      y1 - y2 <= -0.02 -> "has-text-weight-bold"
+    end
+  end
+
   defp har_detail(dtl, assigns) do
     assigns = assign(assigns, :dtl, dtl)
 
     ~H"""
-    <div class="detail">
+    <div class="detail has-text-weight-light">
       <span class="house">
         <%= @dtl.house_no %>
       </span>
@@ -114,25 +121,25 @@ defmodule FullCircleWeb.LayerLive.HarvestReportPrint do
       <span class="death">
         <%= @dtl.dea %>
       </span>
-      <span class="yield">
+      <span class={["yield", yield_bold(@dtl.yield_0, @dtl.yield_1)]}>
         <%= (@dtl.yield_0 * 100) |> Number.Percentage.number_to_percentage(precision: 0) %>
       </span>
-      <span class="yield">
+      <span class={["yield", yield_bold(@dtl.yield_1, @dtl.yield_2)]}>
         <%= (@dtl.yield_1 * 100) |> Number.Percentage.number_to_percentage(precision: 0) %>
       </span>
-      <span class="yield">
+      <span class={["yield", yield_bold(@dtl.yield_2, @dtl.yield_3)]}>
         <%= (@dtl.yield_2 * 100) |> Number.Percentage.number_to_percentage(precision: 0) %>
       </span>
-      <span class="yield">
+      <span class={["yield", yield_bold(@dtl.yield_3, @dtl.yield_4)]}>
         <%= (@dtl.yield_3 * 100) |> Number.Percentage.number_to_percentage(precision: 0) %>
       </span>
-      <span class="yield">
+      <span class={["yield", yield_bold(@dtl.yield_4, @dtl.yield_5)]}>
         <%= (@dtl.yield_4 * 100) |> Number.Percentage.number_to_percentage(precision: 0) %>
       </span>
-      <span class="yield">
+      <span class={["yield", yield_bold(@dtl.yield_5, @dtl.yield_6)]}>
         <%= (@dtl.yield_5 * 100) |> Number.Percentage.number_to_percentage(precision: 0) %>
       </span>
-      <span class="yield">
+      <span class={["yield", yield_bold(@dtl.yield_6, @dtl.yield_7)]}>
         <%= (@dtl.yield_6 * 100) |> Number.Percentage.number_to_percentage(precision: 0) %>
       </span>
       <span class="yield">
