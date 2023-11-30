@@ -19,15 +19,26 @@ chqs = Reporting.post_dated_cheques("", "All", "", "2023-12-31", c)
 # Enum.at(a, 1).pay_list |> Enum.map(fn {_,_,y,m} -> "#{m}/#{y}" end)
 
 # FullCircle.HR.get_employee_salary_types("04833330-5721-48ea-b696-501c5bd38ca0")
-emp = FullCircle.HR.get_employee_by_name("Tan Kwang How", c, u)
+# emp = FullCircle.HR.get_employee_by_name("Tan Kwang How", c, u)
 
-cs =
-  FullCircle.PaySlipOp.generate_new_changeset_for(
-    emp,
-    10,
-    2023,
-    c
-  )
+# cs =
+#   FullCircle.PaySlipOp.generate_new_changeset_for(
+#     emp,
+#     10,
+#     2023,
+#     c
+#   )
+
+a = FullCircle.Layer.harvest_wage_report(~D[2023-11-01], ~D[2023-11-15], c.id)
+
+a
+|> Enum.group_by(
+  & &1.employee,
+  &%{har_date: &1.har_date, house: &1.house_no, prod: &1.prod, wages: &1.wages}
+)
+|> Enum.map(fn {n, l} ->
+  {n, Enum.group_by(l, & &1.har_date, &%{house: &1.house, prod: &1.prod, wages: &1.wages})}
+end)
 
 # FullCircle.PaySlipOp.calculate_pay(cs)
 

@@ -33,7 +33,6 @@ defmodule FullCircleWeb.LayerLive.HouseIndexComponent do
       <div class="w-[25%]">
         <%= @obj.qty %>
       </div>
-
     </div>
     """
   end

@@ -3,7 +3,34 @@ defmodule FullCircle.Layer do
   import FullCircle.Helpers
 
   alias FullCircle.{Repo}
-  alias FullCircle.Layer.{House, Flock, Movement, Harvest, HarvestDetail}
+  alias FullCircle.Layer.{House, Flock, Movement, Harvest, HarvestDetail, HouseHarvestWage}
+
+  def harvest_wage_report(fd, td, com_id) do
+    from(hhw in HouseHarvestWage,
+      join: h in House,
+      on: h.id == hhw.house_id,
+      join: hd in HarvestDetail,
+      on: hd.house_id == h.id,
+      join: hv in Harvest,
+      on: hv.id == hd.harvest_id,
+      left_join: e in FullCircle.HR.Employee,
+      on: e.id == hv.employee_id,
+      where: hv.har_date >= ^fd,
+      where: hv.har_date <= ^td,
+      where: hd.har_1 + hd.har_2 + hd.har_3 >= hhw.ltry,
+      where: hd.har_1 + hd.har_2 + hd.har_3 <= hhw.utry,
+      where: hv.company_id == ^com_id,
+      order_by: [e.name, hv.har_date],
+      select: %{
+        house_no: h.house_no,
+        prod: hd.har_1 + hd.har_2 + hd.har_3,
+        har_date: hv.har_date,
+        employee: e.name,
+        wages: hhw.wages
+      }
+    )
+    |> Repo.all()
+  end
 
   def harvest_report(dt, com_id) do
     "WITH
@@ -46,7 +73,6 @@ defmodule FullCircle.Layer do
       |> Enum.filter(fn e ->
         e.gdate ==
           dt
-          
       end)
       |> Enum.map(fn e -> Map.merge(e, %{id: e.house_no, yield_0: e.prod / e.cur_qty}) end)
 
@@ -132,6 +158,15 @@ defmodule FullCircle.Layer do
       preload: [movements: ^flock_movements()],
       where: flk.id == ^id,
       where: flk.company_id == ^com.id
+    )
+    |> Repo.one!()
+  end
+
+  def get_house!(id, com) do
+    from(hou in House,
+      preload: [:house_harvest_wages],
+      where: hou.id == ^id,
+      where: hou.company_id == ^com.id
     )
     |> Repo.one!()
   end

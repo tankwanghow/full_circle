@@ -17,4 +17,8 @@ defmodule FullCircle.WeightBridge do
       Map.merge(x, %{issued_by: last_log_record_for("weighings", x.id, x.company_id)})
     end)
   end
+
+  def feed_usage_report(feed_list, fdate, tdate, com_id) do
+    
+  end
 end

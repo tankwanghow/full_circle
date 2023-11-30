@@ -47,8 +47,6 @@ defmodule FullCircleWeb.LayerLive.FlockForm do
       |> FullCircleWeb.Helpers.add_line(:movements)
       |> Map.put(:action, socket.assigns.live_action)
 
-    # |> Good.validate_has_movement()
-
     {:noreply, socket |> assign(form: to_form(cs))}
   end
 
@@ -58,8 +56,6 @@ defmodule FullCircleWeb.LayerLive.FlockForm do
       socket.assigns.form.source
       |> FullCircleWeb.Helpers.delete_line(index, :movements)
       |> Map.put(:action, socket.assigns.live_action)
-
-    # |> Good.validate_has_movement()
 
     {:noreply, socket |> assign(form: to_form(cs))}
   end

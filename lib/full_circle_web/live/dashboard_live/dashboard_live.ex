@@ -122,6 +122,9 @@ defmodule FullCircleWeb.DashboardLive do
         <.link navigate={~p"/companies/#{@current_company.id}/harvest_report"} class="nav-btn">
           <%= gettext("Harvest Report") %>
         </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/harvest_wage_report"} class="nav-btn">
+          <%= gettext("Harvest Wages Report") %>
+        </.link>
       </div>
 
       <div class="font-medium text-xl">Reporting</div>

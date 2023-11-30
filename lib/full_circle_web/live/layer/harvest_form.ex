@@ -114,8 +114,8 @@ defmodule FullCircleWeb.LayerLive.HarvestForm do
     detail =
       Map.merge(detail, %{
         "house_id" => Util.attempt(info, :id),
-        "flock_id" =>Util.attempt(info, :flock_id),
-        "flock_no" =>Util.attempt(info, :flock_no),
+        "flock_id" => Util.attempt(info, :flock_id),
+        "flock_no" => Util.attempt(info, :flock_no),
         "house_info" => info_str,
         "company_id" => socket.assigns.current_company.id
       })

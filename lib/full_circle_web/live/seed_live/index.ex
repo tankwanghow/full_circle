@@ -25,8 +25,9 @@ defmodule FullCircleWeb.SeedLive.Index do
     "Flocks" => ~w(flock_no dob quantity breed note),
     "Movements" => ~w(move_date house_no flock_no quantity note),
     "Harvests" => ~w(harvest_no har_date employee_name),
-    "Harvest_Details" => ~w(harvest_no house_no flock_no har_1 har_2 har_3 dea_1 dea_2 note),
-    "Weighings" => ~w(note_no note_date good_name vehicle_no gross tare unit)
+    "HarvestDetails" => ~w(harvest_no house_no flock_no har_1 har_2 har_3 dea_1 dea_2 note),
+    "Weighings" => ~w(note_no note_date good_name vehicle_no gross tare unit),
+    "HouseHarvestWages" => ~w(house_no ltry utry wages)
   }
 
   @impl true

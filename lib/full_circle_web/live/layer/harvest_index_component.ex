@@ -33,7 +33,6 @@ defmodule FullCircleWeb.LayerLive.HarvestIndexComponent do
       <div class="w-[40%] border-b border-gray-400 py-1">
         <%= @obj.houses %>
       </div>
-
     </div>
     """
   end

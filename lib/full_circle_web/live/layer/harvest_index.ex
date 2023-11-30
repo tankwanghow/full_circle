@@ -60,7 +60,6 @@ defmodule FullCircleWeb.LayerLive.HarvestIndex do
         <div class="w-[40%] border-b border-t border-amber-400 py-1">
           <%= gettext("Houses") %>
         </div>
-
       </div>
       <div
         :if={Enum.count(@streams.objects) > 0 or @page > 1}

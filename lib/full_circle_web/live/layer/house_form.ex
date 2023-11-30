@@ -28,7 +28,7 @@ defmodule FullCircleWeb.LayerLive.HouseForm do
   end
 
   defp mount_edit(socket, id) do
-    account = StdInterface.get!(House, id)
+    account = FullCircle.Layer.get_house!(id, socket.assigns.current_company)
 
     socket
     |> assign(live_action: :edit)
@@ -38,6 +38,26 @@ defmodule FullCircleWeb.LayerLive.HouseForm do
       :form,
       to_form(StdInterface.changeset(House, account, %{}, socket.assigns.current_company))
     )
+  end
+
+  @impl true
+  def handle_event("add_wage", _, socket) do
+    cs =
+      socket.assigns.form.source
+      |> FullCircleWeb.Helpers.add_line(:house_harvest_wages)
+      |> Map.put(:action, socket.assigns.live_action)
+
+    {:noreply, socket |> assign(form: to_form(cs))}
+  end
+
+  @impl true
+  def handle_event("delete_wage", %{"index" => index}, socket) do
+    cs =
+      socket.assigns.form.source
+      |> FullCircleWeb.Helpers.delete_line(index, :house_harvest_wages)
+      |> Map.put(:action, socket.assigns.live_action)
+
+    {:noreply, socket |> assign(form: to_form(cs))}
   end
 
   @impl true
@@ -177,6 +197,39 @@ defmodule FullCircleWeb.LayerLive.HouseForm do
           <div class="col-span-6">
             <.input field={@form[:capacity]} label={gettext("Capacity")} type="number" />
           </div>
+        </div>
+
+        <div class="font-bold flex flex-row text-center mt-2">
+          <div class="w-[25%]"><%= gettext("Lower Trays") %></div>
+          <div class="w-[25%]"><%= gettext("Upper Tray") %></div>
+          <div class="w-[25%]"><%= gettext("Wages") %></div>
+          <div class="w-[3%]" />
+        </div>
+
+        <.inputs_for :let={wg} field={@form[:house_harvest_wages]}>
+          <div class={"flex flex-row  #{if(wg[:delete].value == true and Enum.count(wg.errors) == 0, do: "hidden", else: "")}"}>
+            <div class="w-[25%]">
+              <.input type="number" field={wg[:ltry]} />
+            </div>
+            <div class="w-[25%]">
+              <.input field={wg[:utry]} type="number" />
+            </div>
+            <div class="w-[25%]">
+              <.input type="number" field={wg[:wages]} step="0.01"/>
+            </div>
+            <div class="w-[3%] mt-1.5 text-rose-500">
+              <.link phx-click={:delete_wage} phx-value-index={wg.index}>
+                <Heroicons.trash solid class="h-5 w-5" />
+              </.link>
+              <%= Phoenix.HTML.Form.hidden_input(wg, :delete) %>
+            </div>
+          </div>
+        </.inputs_for>
+
+        <div class="my-2">
+          <.link phx-click={:add_wage} class="text-orange-500 hover:font-bold focus:font-bold">
+            <.icon name="hero-plus-circle" class="w-5 h-5" /><%= gettext("Add Wage") %>
+          </.link>
         </div>
 
         <div class="flex justify-center gap-x-1 mt-1">

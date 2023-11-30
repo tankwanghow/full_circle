@@ -8,7 +8,7 @@ defmodule FullCircle.Layer.Movement do
     belongs_to :flock, FullCircle.Layer.Flock
     belongs_to :house, FullCircle.Layer.House
 
-    field :move_date, :date, default: Timex.today
+    field :move_date, :date, default: Timex.today()
     field :quantity, :integer, default: 0
     field :note, :string
 

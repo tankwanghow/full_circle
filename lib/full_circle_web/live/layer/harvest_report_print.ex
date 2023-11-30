@@ -7,7 +7,7 @@ defmodule FullCircleWeb.LayerLive.HarvestReportPrint do
     detail_height = 5.5
     chunk = (detail_body_height / detail_height) |> floor
 
-    {tdate, data} =
+    {_, data} =
       fill_data(socket, params["tdate"])
 
     {:ok,
@@ -17,9 +17,7 @@ defmodule FullCircleWeb.LayerLive.HarvestReportPrint do
      |> assign(:chunk_number, Enum.chunk_every(data, chunk) |> Enum.count())
      |> assign(:detail_chunks, Enum.chunk_every(data, chunk))
      |> assign(:data, data)
-     |> assign(:tdate, tdate)
-     |> assign(page_title: gettext("Print"))
-     |> assign(:tdate, Date.from_iso8601!(params["tdate"]))}
+     |> assign(page_title: gettext("Print"))}
   end
 
   defp fill_data(socket, tdate) do

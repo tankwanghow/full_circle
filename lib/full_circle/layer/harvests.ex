@@ -41,23 +41,23 @@ defmodule FullCircle.Layer.Harvest do
     |> cast_assoc(:harvest_details)
   end
 
-    @doc false
-    def seed_changeset(note, attrs) do
-      note
-      |> cast(attrs, [
-        :harvest_no,
-        :employee_id,
-        :har_date,
-        :company_id,
-        :employee_name
-      ])
-      |> validate_required([
-        :harvest_no,
-        :employee_id,
-        :har_date
-      ])
-      |> unsafe_validate_unique([:harvest_no, :company_id], FullCircle.Repo,
-        message: gettext("already in company")
-      )
-    end
+  @doc false
+  def seed_changeset(note, attrs) do
+    note
+    |> cast(attrs, [
+      :harvest_no,
+      :employee_id,
+      :har_date,
+      :company_id,
+      :employee_name
+    ])
+    |> validate_required([
+      :harvest_no,
+      :employee_id,
+      :har_date
+    ])
+    |> unsafe_validate_unique([:harvest_no, :company_id], FullCircle.Repo,
+      message: gettext("already in company")
+    )
+  end
 end

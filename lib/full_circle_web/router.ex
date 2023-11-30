@@ -172,6 +172,7 @@ defmodule FullCircleWeb.Router do
       live("/account_transactions", TransactionLive.Account, :index)
       live("/contact_transactions", TransactionLive.Contact, :index)
       live("/harvest_report", LayerLive.HarvestReport, :index)
+      live("/harvest_wage_report", LayerLive.HarvestWageReport, :index)
 
       live("/Deposit", ChequeLive.DepositIndex, :index)
       live("/Deposit/new", ChequeLive.DepositForm, :new)
@@ -274,6 +275,7 @@ defmodule FullCircleWeb.Router do
 
       live("/print_transactions", TransactionLive.Print, :print)
       live("/print_harvest_report", LayerLive.HarvestReportPrint, :print)
+      live("/print_harvest_wage_report", LayerLive.HarvestWageReportPrint, :print)
     end
 
     live_session :require_authenticated_user_n_active_company_punch,

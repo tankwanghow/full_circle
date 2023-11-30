@@ -10,6 +10,7 @@ defmodule FullCircle.Layer.House do
 
     belongs_to :company, FullCircle.Sys.Company
     has_many(:movements, FullCircle.Layer.Movement, on_delete: :delete_all)
+    has_many(:house_harvest_wages, FullCircle.Layer.HouseHarvestWage, on_delete: :delete_all)
 
     timestamps(type: :utc_datetime)
   end
@@ -31,5 +32,6 @@ defmodule FullCircle.Layer.House do
     |> unsafe_validate_unique([:house_no, :company_id], FullCircle.Repo,
       message: gettext("already in company")
     )
+    |> cast_assoc(:house_harvest_wages)
   end
 end

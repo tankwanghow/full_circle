@@ -72,6 +72,10 @@ defmodule FullCircle.Seeding do
     save_seed(%House{}, :seed_houses, seed_data, com, user)
   end
 
+  def seed("HouseHarvestWages", seed_data, com, user) do
+    save_seed(%House{}, :seed_house_harvest_wages, seed_data, com, user)
+  end
+
   def seed("Weighings", seed_data, com, user) do
     save_seed(%Weighing{}, :seed_weighings, seed_data, com, user)
   end
@@ -88,7 +92,7 @@ defmodule FullCircle.Seeding do
     save_seed(%Harvest{}, :seed_harvests, seed_data, com, user)
   end
 
-  def seed("Harvest_Details", seed_data, com, user) do
+  def seed("HarvestDetails", seed_data, com, user) do
     save_seed(%HarvestDetail{}, :seed_harvest_details, seed_data, com, user)
   end
 
@@ -255,6 +259,21 @@ defmodule FullCircle.Seeding do
      ), attr}
   end
 
+  def fill_changeset("HouseHarvestWages", attr, com, _user) do
+    h = FullCircle.Layer.get_house_by_no(Map.fetch!(attr, "house_no"), com, nil)
+
+    attr =
+      attr
+      |> Map.merge(%{"house_id" => if(h, do: h.id, else: nil)})
+
+    {FullCircle.StdInterface.changeset(
+       FullCircle.Layer.HouseHarvestWage,
+       FullCircle.Layer.HouseHarvestWage.__struct__(),
+       attr,
+       com
+     ), attr}
+  end
+
   def fill_changeset("Flocks", attr, com, _user) do
     {FullCircle.StdInterface.changeset(
        FullCircle.Layer.Flock,
@@ -280,7 +299,7 @@ defmodule FullCircle.Seeding do
      ), attr}
   end
 
-  def fill_changeset("Harvest_Details", attr, com, _user) do
+  def fill_changeset("HarvestDetails", attr, com, _user) do
     hv = FullCircle.Layer.get_harvest_by_no(Map.fetch!(attr, "harvest_no"), com, nil)
     h = FullCircle.Layer.get_house_by_no(Map.fetch!(attr, "house_no"), com, nil)
     f = FullCircle.Layer.get_flock_by_no(Map.fetch!(attr, "flock_no"), com, nil)

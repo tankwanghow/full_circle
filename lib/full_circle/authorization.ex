@@ -41,6 +41,9 @@ defmodule FullCircle.Authorization do
   def can?(user, :seed_houses, company),
     do: allow_roles(~w(admin), company, user)
 
+  def can?(user, :seed_house_harvest_wages, company),
+    do: allow_roles(~w(admin), company, user)
+
   def can?(user, :seed_flocks, company),
     do: allow_roles(~w(admin), company, user)
 
