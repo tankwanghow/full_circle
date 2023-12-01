@@ -45,12 +45,40 @@ defmodule FullCircleWeb.CsvController do
     send_csv(conn, data, fields, filename)
   end
 
-  def show(conn, %{"company_id" => com_id, "report" => "harvwagrepo", "fdate" => fdate, "tdate" => tdate}) do
+  def show(conn, %{
+        "company_id" => com_id,
+        "report" => "harvwagrepo",
+        "fdate" => fdate,
+        "tdate" => tdate
+      }) do
     tdate = tdate |> Timex.parse!("{YYYY}-{0M}-{0D}") |> NaiveDateTime.to_date()
     fdate = fdate |> Timex.parse!("{YYYY}-{0M}-{0D}") |> NaiveDateTime.to_date()
     data = FullCircle.Layer.harvest_wage_report(fdate, tdate, com_id)
     fields = data |> Enum.at(0) |> Map.keys()
     filename = "harvest_wage_report_#{fdate}_#{tdate}"
+    send_csv(conn, data, fields, filename)
+  end
+
+  def show(conn, %{
+        "company_id" => com_id,
+        "report" => "weigoodrepo",
+        "glist" => glist,
+        "fdate" => fdate,
+        "tdate" => tdate
+      }) do
+    glist = glist |> String.split(",") |> Enum.map(fn x -> String.trim(x) end)
+    tdate = tdate |> Timex.parse!("{YYYY}-{0M}-{0D}") |> NaiveDateTime.to_date()
+    fdate = fdate |> Timex.parse!("{YYYY}-{0M}-{0D}") |> NaiveDateTime.to_date()
+
+    data = FullCircle.WeightBridge.goods_report(
+      glist,
+      fdate,
+      tdate,
+      com_id
+    )
+
+    fields = data |> Enum.at(0) |> Map.keys()
+    filename = "weight_good_report_#{fdate}_#{tdate}"
     send_csv(conn, data, fields, filename)
   end
 

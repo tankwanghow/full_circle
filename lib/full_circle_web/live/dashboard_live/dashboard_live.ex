@@ -110,6 +110,9 @@ defmodule FullCircleWeb.DashboardLive do
         <.link navigate={~p"/companies/#{@current_company.id}/Weighing"} class="nav-btn">
           <%= gettext("Weighings") %>
         </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/weighted_goods_report"} class="nav-btn">
+          <%= gettext("Weight Goods Report") %>
+        </.link>
         <.link navigate={~p"/companies/#{@current_company.id}/houses"} class="nav-btn">
           <%= gettext("House") %>
         </.link>
