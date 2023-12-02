@@ -5,7 +5,6 @@ defmodule FullCircle.HR.Employee do
 
   schema "employees" do
     field(:name, :string)
-    field(:department, :string)
     field(:id_no, :string)
     field(:dob, :date)
     field(:gender, :string)
@@ -41,7 +40,6 @@ defmodule FullCircle.HR.Employee do
     |> cast(attrs, [
       :name,
       :id_no,
-      :department,
       :dob,
       :gender,
       :epf_no,
