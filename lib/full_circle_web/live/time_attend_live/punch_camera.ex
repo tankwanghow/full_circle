@@ -194,7 +194,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCamera do
           class="w-[80%] text-center text-2xl mx-auto border-y-4 bg-green-200 border-green-600"
         >
           <audio autoplay>
-            <source src="/assets/beep.mp3" type="audio/mpeg" />
+            <source src="/sounds/beep.mp3" type="audio/mpeg" />
           </audio>
           <%= @employee.name %>
           <%= @employee.id_no %>
@@ -222,7 +222,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCamera do
           class="w-[80%] text-center text-2xl mx-auto border-y-4 bg-rose-200 border-rose-600"
         >
           <audio autoplay>
-            <source src="/assets/beep-error.mp3" type="audio/mpeg" />
+            <source src="/sounds/beep-error.mp3" type="audio/mpeg" />
           </audio>
           QR ERROR!!
           <div><%= @msg %></div>

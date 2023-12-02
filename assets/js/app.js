@@ -22,7 +22,7 @@ import { Socket } from "phoenix"
 import { LiveSocket } from "phoenix_live_view"
 import topbar from "../vendor/topbar"
 import Tribute from "../vendor/tribute"
-import { Html5QrcodeScanner } from "html5-qrcode"
+import { Html5QrcodeScanner } from "../vendor/html5-qrcode/src/html5-qrcode-scanner"
 
 let csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 let Hooks = {}

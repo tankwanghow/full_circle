@@ -228,4 +228,8 @@ defmodule FullCircle.Reporting do
 
     union_all(bal_qry, ^txn_qry) |> order_by([1, 8, 2]) |> Repo.all()
   end
+
+  def contact_aging_reports(edate, com_id) do
+    
+  end
 end
