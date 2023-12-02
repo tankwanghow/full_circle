@@ -65,7 +65,7 @@ config :full_circle, FullCircleWeb.Endpoint,
 config :full_circle, FullCircleWeb.Endpoint,
   live_reload: [
     patterns: [
-      ~r"priv/static/.*(js|css|png|jpeg|jpg|gif|svg)$",
+      ~r"priv/static/.*(js|css|png|jpeg|jpg|gif|svg|mp3)$",
       ~r"priv/gettext/.*(po)$",
       ~r"lib/full_circle_web/(controllers|live|components)/.*(ex|heex)$"
     ]
