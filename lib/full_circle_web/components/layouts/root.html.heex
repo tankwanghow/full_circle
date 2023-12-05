@@ -10,7 +10,7 @@
   </head>
   <body class="bg-green-50">
     <%= if @current_user do %>
-      <div class="flex fixed top-0 z-10 w-full items-center text-white gap-4 bg-gray-800 py-3 px-5 shadow">
+      <div :if={@current_role != "punch_camera"} class="flex fixed top-0 z-10 w-full items-center text-white gap-4 bg-gray-800 py-3 px-5 shadow">
         <span class="text-3xl font-bold cursor-default">
           <%= gettext("FullCircle") %>
           <%= if assigns[:current_company] do %>

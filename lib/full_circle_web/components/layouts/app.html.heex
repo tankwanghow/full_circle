@@ -1,11 +1,17 @@
 <main
-  :if={@page_title != "Attendence Camera"}
+  :if={@current_role != "punch_camera"}
   class={if(assigns[:current_user], do: "mt-20", else: "")}
 >
   <.flash_group flash={@flash} />
   <%= @inner_content %>
 </main>
 
-<main :if={@page_title == "Attendence Camera"} class="mt-5">
+<main :if={@current_role == "punch_camera"} class="mt-5">
+  <p class="w-full text-3xl text-center font-medium"><%= @current_company.name %></p>
   <%= @inner_content %>
+  <div class="mx-auto text-center mt-10">
+    <.link href={~p"/users/log_out"} method="delete" class="button red text-2xl font-bold">
+      <%= gettext("Log out") %>
+    </.link>
+  </div>
 </main>
