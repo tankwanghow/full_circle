@@ -1,17 +1,20 @@
 <main
-  :if={@current_role != "punch_camera"}
+  :if={assigns[:current_role] != "punch_camera"}
   class={if(assigns[:current_user], do: "mt-20", else: "")}
 >
   <.flash_group flash={@flash} />
   <%= @inner_content %>
 </main>
 
-<main :if={@current_role == "punch_camera"} class="mt-5">
-  <p class="w-full text-3xl text-center font-medium"><%= @current_company.name %></p>
+<main :if={assigns[:current_role] == "punch_camera"} class="mt-5">
+  <p :if={assigns[:page_title] != gettext("Attendence Camera")} class="w-full text-3xl text-center font-medium"><%= @current_company.name %></p>
   <%= @inner_content %>
-  <div class="mx-auto text-center mt-10">
-    <.link href={~p"/users/log_out"} method="delete" class="button red text-2xl font-bold">
+  <div :if={assigns[:page_title] != gettext("Attendence Camera")} class="mx-auto text-center mt-10">
+    <.link href={~p"/users/log_out"} method="delete" class="button red text-xl font-bold">
       <%= gettext("Log out") %>
+    </.link>
+    <.link navigate={~p"/users/settings"} class="button blue text-xl font-bold">
+      <%= gettext("User Settings") %>
     </.link>
   </div>
 </main>
