@@ -7,9 +7,17 @@
 </main>
 
 <main :if={assigns[:current_role] == "punch_camera"} class="mt-5">
-  <p :if={assigns[:page_title] != gettext("Attendence Camera")} class="w-full text-3xl text-center font-medium"><%= @current_company.name %></p>
+  <p
+    :if={assigns[:page_title] != gettext("Attendence Camera")}
+    class="w-full text-3xl text-center font-medium"
+  >
+    <%= @current_company.name %>
+  </p>
   <%= @inner_content %>
-  <div :if={assigns[:page_title] != gettext("Attendence Camera")} class="mx-auto text-center mt-10">
+  <div
+    :if={assigns[:page_title] != gettext("Attendence Camera")}
+    class="mx-auto text-center mt-10"
+  >
     <.link href={~p"/users/log_out"} method="delete" class="button red text-xl font-bold">
       <%= gettext("Log out") %>
     </.link>
