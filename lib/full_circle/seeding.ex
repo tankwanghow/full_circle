@@ -526,10 +526,12 @@ defmodule FullCircle.Seeding do
     attr = if(ac, do: Map.merge(attr, %{"account_id" => ac.id}), else: attr)
     attr = if(ct, do: Map.merge(attr, %{"contact_id" => ct.id}), else: attr)
 
+    ac_name = if(name != ac.name, do: "#{ac.name} (#{name})", else: ac.name)
+
     attr =
       attr
       |> Map.merge(%{
-        "particulars" => if(ct, do: "Balance B/F #{ct.name}", else: "Balance B/F #{ac.name}")
+        "particulars" => if(ct, do: "Balance B/F #{ct.name}", else: "Balance B/F #{ac_name}")
       })
 
     {FullCircle.StdInterface.changeset(
@@ -549,6 +551,14 @@ defmodule FullCircle.Seeding do
 
     attr = if(ac, do: Map.merge(attr, %{"account_id" => ac.id}), else: attr)
     attr = if(ct, do: Map.merge(attr, %{"contact_id" => ct.id}), else: attr)
+
+    ac_name = if(name != ac.name, do: "#{ac.name} (#{name})", else: ac.name)
+
+    attr =
+      attr
+      |> Map.merge(%{
+        "contact_particulars" => ac_name
+      })
 
     attr =
       attr

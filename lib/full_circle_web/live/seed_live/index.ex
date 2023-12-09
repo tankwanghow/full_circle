@@ -87,7 +87,7 @@ defmodule FullCircleWeb.SeedLive.Index do
       {:ok, _cs} ->
         {:noreply,
          socket
-         |> assign(status: "Seeding #{val} Database Done!!")
+         |> assign(status: "Seeding #{val} #{socket.assigns.filename} Database Done!!")
          |> assign(status_flag: :success)
          |> reset_form()}
 
@@ -241,7 +241,7 @@ defmodule FullCircleWeb.SeedLive.Index do
       <p class="text-3xl font-medium"><%= @page_title %></p>
       <ol class="shake p-2 border-4 border-cyan-600 bg-cyan-200 rounded-lg mb-2">
         <li class="font-bold text-2xl">Seeding Order</li>
-        <li>Accounts, Contacts, Balance, TaxCodes, FixedAssets, FixedAssetsDepreciations</li>
+        <li>Accounts, Contacts, FixedAssets, FixedAssetsDepreciations, Balance, TaxCodes</li>
         <li>Goods, Employees, SalaryTypes, Houses, Weighings</li>
         <li>Transactions, TransactionMatchers, EmployeeSalaryTypes</li>
         <li>HouseHarvestWages, Flocks, Movements, Harvest, HarvestDetails</li>
