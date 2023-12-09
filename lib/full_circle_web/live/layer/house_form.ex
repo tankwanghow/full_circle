@@ -215,7 +215,7 @@ defmodule FullCircleWeb.LayerLive.HouseForm do
               <.input field={wg[:utry]} type="number" />
             </div>
             <div class="w-[25%]">
-              <.input type="number" field={wg[:wages]} step="0.01"/>
+              <.input type="number" field={wg[:wages]} step="0.01" />
             </div>
             <div class="w-[3%] mt-1.5 text-rose-500">
               <.link phx-click={:delete_wage} phx-value-index={wg.index}>

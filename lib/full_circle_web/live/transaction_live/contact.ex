@@ -130,7 +130,7 @@ defmodule FullCircleWeb.TransactionLive.Contact do
                 :if={@objects_count > 0}
                 class="blue button mr-1"
                 navigate={
-                  ~p"/companies/#{@current_company.id}/print_transactions?report=contacttrans&name=#{@search.name}&fdate=#{@search.f_date}&tdate=#{@search.t_date}"
+                  ~p"/companies/#{@current_company.id}/print/transactions?report=contacttrans&name=#{@search.name}&fdate=#{@search.f_date}&tdate=#{@search.t_date}"
                 }
                 target="_blank"
               >
@@ -138,10 +138,11 @@ defmodule FullCircleWeb.TransactionLive.Contact do
               </.link>
               <.link
                 :if={@objects_count > 0}
-                href={
+                navigate={
                   ~p"/companies/#{@current_company.id}/csv?report=contacttrans&name=#{@search.name}&fdate=#{@search.f_date}&tdate=#{@search.t_date}"
                 }
                 class="blue button"
+                target="_blank"
               >
                 CSV
               </.link>

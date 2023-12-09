@@ -70,15 +70,45 @@ defmodule FullCircleWeb.CsvController do
     tdate = tdate |> Timex.parse!("{YYYY}-{0M}-{0D}") |> NaiveDateTime.to_date()
     fdate = fdate |> Timex.parse!("{YYYY}-{0M}-{0D}") |> NaiveDateTime.to_date()
 
-    data = FullCircle.WeightBridge.goods_report(
-      glist,
-      fdate,
-      tdate,
-      com_id
-    )
+    data =
+      FullCircle.WeightBridge.goods_report(
+        glist,
+        fdate,
+        tdate,
+        com_id
+      )
 
     fields = data |> Enum.at(0) |> Map.keys()
     filename = "weight_good_report_#{fdate}_#{tdate}"
+    send_csv(conn, data, fields, filename)
+  end
+
+  def show(conn, %{
+        "company_id" => com_id,
+        "report" => "tbplbs",
+        "rep" => rep,
+        "tdate" => tdate
+      }) do
+    tdate = tdate |> Timex.parse!("{YYYY}-{0M}-{0D}") |> NaiveDateTime.to_date()
+    com = FullCircle.Sys.get_company!(com_id)
+
+    data =
+      cond do
+        rep == "Trail Balance" ->
+          FullCircle.Reporting.trail_balance(tdate, com)
+
+        rep == "Profit Loss" ->
+          FullCircle.Reporting.profit_loss(tdate, com)
+
+        rep == "Balance Sheet" ->
+          FullCircle.Reporting.balance_sheet(tdate, com)
+
+        true ->
+          []
+      end
+
+    fields = data |> Enum.at(0) |> Map.keys()
+    filename = "#{rep |> String.replace(" ", "") |> Macro.underscore}_#{tdate}"
     send_csv(conn, data, fields, filename)
   end
 

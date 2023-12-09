@@ -110,7 +110,7 @@ defmodule FullCircleWeb.DashboardLive do
         <.link navigate={~p"/companies/#{@current_company.id}/Weighing"} class="nav-btn">
           <%= gettext("Weighings") %>
         </.link>
-        <.link navigate={~p"/companies/#{@current_company.id}/weighted_goods_report"} class="nav-btn">
+        <.link navigate={~p"/companies/#{@current_company.id}/weighed_goods_report"} class="nav-btn">
           <%= gettext("Weight Goods Report") %>
         </.link>
         <.link navigate={~p"/companies/#{@current_company.id}/houses"} class="nav-btn">
@@ -137,6 +137,9 @@ defmodule FullCircleWeb.DashboardLive do
         </.link>
         <.link navigate={~p"/companies/#{@current_company.id}/contact_transactions"} class="nav-btn">
           <%= gettext("Contact Transactions") %>
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/tbplbs"} class="nav-btn">
+          <%= gettext("TB/PL/BS") %>
         </.link>
       </div>
     </div>

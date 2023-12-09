@@ -253,7 +253,9 @@ defmodule FullCircleWeb.LayerLive.HarvestForm do
   def render(assigns) do
     ~H"""
     <div class="w-6/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
-      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
+      <p class="w-full text-3xl text-center font-medium">
+        <%= @page_title %> <%= @form.source.data.harvest_no %>
+      </p>
       <.form
         for={@form}
         id="object-form"
@@ -264,7 +266,7 @@ defmodule FullCircleWeb.LayerLive.HarvestForm do
       >
         <div class="grid grid-cols-12 gap-1">
           <div class="col-span-3">
-            <.input field={@form[:har_date]} label={gettext("DOB")} type="date" />
+            <.input feedback={true} field={@form[:har_date]} label={gettext("DOB")} type="date" />
           </div>
           <div class="col-span-5">
             <%= Phoenix.HTML.Form.hidden_input(@form, :employee_id) %>

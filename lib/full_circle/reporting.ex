@@ -105,19 +105,20 @@ defmodule FullCircle.Reporting do
     Date.new!(at_date.year - 1, com.closing_month, com.closing_day)
   end
 
-  def balance_sheet_query(at_date, com) do
+  defp balance_sheet_query(at_date, com) do
     from(ac in Account,
       join: txn in Transaction,
       on: ac.id == txn.account_id,
       where: ac.company_id == ^com.id,
       where: ac.account_type in ^FullCircle.Accounting.balance_sheet_account_types(),
       where: txn.doc_date <= ^at_date,
-      select: %{type: ac.account_type, name: ac.name, balance: sum(txn.amount)},
-      group_by: [ac.account_type, ac.name]
+      select: %{id: ac.id, type: ac.account_type, name: ac.name, balance: sum(txn.amount)},
+      group_by: [ac.account_type, ac.id],
+      having: sum(txn.amount) != 0
     )
   end
 
-  def profit_loss_query(at_date, com) do
+  defp profit_loss_query(at_date, com) do
     from(ac in Account,
       join: txn in Transaction,
       on: ac.id == txn.account_id,
@@ -125,14 +126,27 @@ defmodule FullCircle.Reporting do
       where: ac.account_type in ^FullCircle.Accounting.profit_loss_account_types(),
       where: txn.doc_date <= ^at_date,
       where: txn.doc_date > ^prev_close_date(at_date, com),
-      select: %{type: ac.account_type, name: ac.name, balance: sum(txn.amount)},
-      group_by: [ac.account_type, ac.name]
+      select: %{id: ac.id, type: ac.account_type, name: ac.name, balance: sum(txn.amount)},
+      group_by: [ac.account_type, ac.id],
+      having: sum(txn.amount) != 0
     )
+  end
+
+  def balance_sheet(at_date, com) do
+    balance_sheet_query(at_date, com)
+    |> order_by([2, 3])
+    |> Repo.all()
+  end
+
+  def profit_loss(at_date, com) do
+    profit_loss_query(at_date, com)
+    |> order_by([2, 3])
+    |> Repo.all()
   end
 
   def trail_balance(at_date, com) do
     union_all(profit_loss_query(at_date, com), ^balance_sheet_query(at_date, com))
-    |> order_by([1, 2])
+    |> order_by([2, 3])
     |> Repo.all()
   end
 
@@ -230,6 +244,5 @@ defmodule FullCircle.Reporting do
   end
 
   def contact_aging_reports(edate, com_id) do
-    
   end
 end

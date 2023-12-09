@@ -89,10 +89,15 @@ defmodule FullCircleWeb.LayerLive.HarvestReport do
   end
 
   defp yield_header(dt, days) do
-    dt
-    |> Timex.parse!("{YYYY}-{0M}-{0D}")
-    |> Timex.shift(days: days)
-    |> Timex.format!("%d/%m", :strftime)
+    try do
+      dt
+      |> Timex.parse!("{YYYY}-{0M}-{0D}")
+      |> Timex.shift(days: days)
+      |> Timex.format!("%d/%m", :strftime)
+    rescue
+      Timex.Parse.ParseError ->
+        "error"
+    end
   end
 
   @impl true
@@ -120,7 +125,7 @@ defmodule FullCircleWeb.LayerLive.HarvestReport do
                 :if={@objects_count > 0}
                 class="blue button mr-1"
                 navigate={
-                  ~p"/companies/#{@current_company.id}/print_harvest_report?report=harvrepo&tdate=#{@search.t_date}"
+                  ~p"/companies/#{@current_company.id}/print/harvrepo?tdate=#{@search.t_date}"
                 }
                 target="_blank"
               >
@@ -129,9 +134,10 @@ defmodule FullCircleWeb.LayerLive.HarvestReport do
 
               <.link
                 :if={@objects_count > 0}
-                href={
+                navigate={
                   ~p"/companies/#{@current_company.id}/csv?report=harvrepo&tdate=#{@search.t_date}"
                 }
+                target="_blank"
                 class="blue button"
               >
                 CSV

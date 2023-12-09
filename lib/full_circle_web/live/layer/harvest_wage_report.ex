@@ -77,7 +77,7 @@ defmodule FullCircleWeb.LayerLive.HarvestWageReport do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="w-8/12 mx-auto">
+    <div class="w-6/12 mx-auto">
       <p class="text-2xl text-center font-medium"><%= "#{@page_title}" %></p>
       <div class="border rounded bg-purple-200 text-center p-2">
         <.form for={%{}} id="search-form" phx-change="changed" phx-submit="query" autocomplete="off">
@@ -100,7 +100,7 @@ defmodule FullCircleWeb.LayerLive.HarvestWageReport do
                 value={@search.t_date}
               />
             </div>
-            <div class="col-span-2 mt-6">
+            <div class="col-span-4 mt-6">
               <.button>
                 <%= gettext("Query") %>
               </.button>
@@ -108,7 +108,7 @@ defmodule FullCircleWeb.LayerLive.HarvestWageReport do
                 :if={@objects_count > 0}
                 class="blue button mr-1"
                 navigate={
-                  ~p"/companies/#{@current_company.id}/print_harvest_wage_report?report=harvwagrepo&fdate=#{@search.f_date}&tdate=#{@search.t_date}"
+                  ~p"/companies/#{@current_company.id}/print/harvwagrepo?fdate=#{@search.f_date}&tdate=#{@search.t_date}"
                 }
                 target="_blank"
               >
@@ -117,9 +117,10 @@ defmodule FullCircleWeb.LayerLive.HarvestWageReport do
 
               <.link
                 :if={@objects_count > 0}
-                href={
+                navigate={
                   ~p"/companies/#{@current_company.id}/csv?report=harvwagrepo&fdate=#{@search.f_date}&tdate=#{@search.t_date}"
                 }
+                target="_blank"
                 class="blue button"
               >
                 CSV
@@ -138,22 +139,32 @@ defmodule FullCircleWeb.LayerLive.HarvestWageReport do
           gettext("Wages")
         ],
         "font-medium flex flex-row text-center tracking-tighter mb-1",
-        ["18.7%", "18.7%", "25%", "18.7%", "18.7%"],
+        ["18%", "18%", "28%", "18%", "18%"],
         "border rounded bg-gray-200 border-gray-400 px-2 py-1",
         assigns
       ) %>
 
       <%= FullCircleWeb.CsvHtml.data(
         [
-          :har_date, :house_no, :employee, :prod, :wages
+          :har_date,
+          :house_no,
+          :employee,
+          :prod,
+          :wages
         ],
         @objects,
+        [
+          nil,
+          nil,
+          nil,
+          fn n -> Number.Delimit.number_to_delimited(n, precision: 0) end,
+          &Number.Delimit.number_to_delimited/1
+        ],
         "flex flex-row text-center tracking-tighter max-h-20",
-        ["18.7%", "18.7%", "25%", "18.7%", "18.7%"],
+        ["18%", "18%", "28%", "18%", "18%"],
         "border rounded bg-blue-200 border-blue-400 px-2 py-1",
         assigns
       ) %>
-
     </div>
     """
   end

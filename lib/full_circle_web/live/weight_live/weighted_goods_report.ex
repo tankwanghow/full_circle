@@ -12,13 +12,13 @@ defmodule FullCircleWeb.WeighingLive.GoodsReport do
   def handle_params(params, _uri, socket) do
     params = params["search"]
 
-    IO.inspect params["glist"]
+    IO.inspect(params["glist"])
 
     glist = (params["glist"] || "") |> String.split(",") |> Enum.map(fn x -> String.trim(x) end)
     f_date = params["f_date"] || Timex.today() |> Timex.format!("%Y-%m-%d", :strftime)
     t_date = params["t_date"] || Timex.today() |> Timex.format!("%Y-%m-%d", :strftime)
 
-    IO.inspect glist
+    IO.inspect(glist)
 
     {:noreply,
      socket
@@ -46,7 +46,7 @@ defmodule FullCircleWeb.WeighingLive.GoodsReport do
     }
 
     url =
-      "/companies/#{socket.assigns.current_company.id}/weighted_goods_report?#{URI.encode_query(qry)}"
+      "/companies/#{socket.assigns.current_company.id}/weighed_goods_report?#{URI.encode_query(qry)}"
 
     {:noreply,
      socket
@@ -124,10 +124,11 @@ defmodule FullCircleWeb.WeighingLive.GoodsReport do
               </.button>
               <.link
                 :if={@objects_count > 0}
-                href={
+                navigate={
                   ~p"/companies/#{@current_company.id}/csv?report=weigoodrepo&glist=#{@search.glist}&fdate=#{@search.f_date}&tdate=#{@search.t_date}"
                 }
                 class="blue button"
+                target="_blank"
               >
                 CSV
               </.link>
@@ -155,9 +156,11 @@ defmodule FullCircleWeb.WeighingLive.GoodsReport do
           :month,
           :year,
           :good_name,
-          :total, :unit
+          :total,
+          :unit
         ],
         @objects,
+        [nil, nil, nil, fn n -> Number.Delimit.number_to_delimited(n, precision: 0) end, nil],
         "flex flex-row text-center tracking-tighter max-h-20",
         ["20%", "20%", "20%", "20%", "20%"],
         "border rounded bg-blue-200 border-blue-400 px-2 py-1",

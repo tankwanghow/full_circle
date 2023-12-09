@@ -52,12 +52,13 @@ defmodule FullCircleWeb.LayerLive.HarvestWageReportPrint do
               </div>
               <%= for v <- l do %>
                 <div class="info">
-                <span>
-                  <span class="is-italic"><%= v.house %></span> &#8226;
-                  <span><%= v.prod %></span> &#8226;
-                  <span class="has-text-weight-medium">
-                    <%= Number.Delimit.number_to_delimited(v.wages, precision: 2) %>
-                  </span>
+                  <span>
+                    <span class="is-italic"><%= v.house %></span>
+                    &#8226; <span><%= v.prod %></span>
+                    &#8226;
+                    <span class="has-text-weight-medium">
+                      <%= Number.Delimit.number_to_delimited(v.wages, precision: 2) %>
+                    </span>
                   </span>
                 </div>
               <% end %>
