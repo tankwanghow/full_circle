@@ -1,4 +1,4 @@
-defmodule FullCircleWeb.TransactionLive.Print do
+defmodule FullCircleWeb.ReportLive.Print do
   use FullCircleWeb, :live_view
 
   @impl true

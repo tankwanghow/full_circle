@@ -1,4 +1,4 @@
-defmodule FullCircleWeb.TransactionLive.Contact do
+defmodule FullCircleWeb.ReportLive.Contact do
   use FullCircleWeb, :live_view
 
   alias FullCircle.{Reporting, Accounting}

@@ -37,6 +37,36 @@ defmodule FullCircleWeb.CsvController do
     )
   end
 
+  def show(conn, %{
+        "company_id" => com_id,
+        "days" => days,
+        "rep" => rep,
+        "report" => "aging",
+        "tdate" => tdate
+      }) do
+    tdate = tdate |> Timex.parse!("{YYYY}-{0M}-{0D}") |> NaiveDateTime.to_date()
+
+    data =
+      cond do
+        rep == "Debtors Aging" ->
+          FullCircle.Reporting.debtor_aging_report(tdate, days |> String.to_integer(), com_id)
+
+        rep == "Creditors Aging" ->
+          FullCircle.Reporting.creditor_aging_report(tdate, days |> String.to_integer(), com_id)
+
+        true ->
+          []
+      end
+
+    fields = data |> Enum.at(0) |> Map.keys()
+    filename = "#{rep |> String.replace(" ", "") |> Macro.underscore()}_#{tdate}"
+    send_csv(conn, data, fields, filename)
+
+    fields = data |> Enum.at(0) |> Map.keys()
+    filename = "harvest_report_#{tdate}"
+    send_csv(conn, data, fields, filename)
+  end
+
   def show(conn, %{"company_id" => com_id, "report" => "harvrepo", "tdate" => tdate}) do
     tdate = tdate |> Timex.parse!("{YYYY}-{0M}-{0D}") |> NaiveDateTime.to_date()
     data = FullCircle.Layer.harvest_report(tdate, com_id)
@@ -90,25 +120,24 @@ defmodule FullCircleWeb.CsvController do
         "tdate" => tdate
       }) do
     tdate = tdate |> Timex.parse!("{YYYY}-{0M}-{0D}") |> NaiveDateTime.to_date()
-    com = FullCircle.Sys.get_company!(com_id)
 
     data =
       cond do
         rep == "Trail Balance" ->
-          FullCircle.Reporting.trail_balance(tdate, com)
+          FullCircle.Reporting.trail_balance(tdate, com_id)
 
         rep == "Profit Loss" ->
-          FullCircle.Reporting.profit_loss(tdate, com)
+          FullCircle.Reporting.profit_loss(tdate, com_id)
 
         rep == "Balance Sheet" ->
-          FullCircle.Reporting.balance_sheet(tdate, com)
+          FullCircle.Reporting.balance_sheet(tdate, com_id)
 
         true ->
           []
       end
 
     fields = data |> Enum.at(0) |> Map.keys()
-    filename = "#{rep |> String.replace(" ", "") |> Macro.underscore}_#{tdate}"
+    filename = "#{rep |> String.replace(" ", "") |> Macro.underscore()}_#{tdate}"
     send_csv(conn, data, fields, filename)
   end
 
