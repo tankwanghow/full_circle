@@ -634,4 +634,38 @@ defmodule FullCircle.Seeding do
       {ac, ct}
     end
   end
+
+  def get_transactions(doc_type, doc_no, com_id) do
+    from(txn in Transaction,
+      join: ac in Account,
+      on: ac.id == txn.account_id,
+      left_join: cont in Contact,
+      on: cont.id == txn.contact_id,
+      where: txn.doc_type == ^doc_type,
+      where: txn.doc_no == ^doc_no,
+      where: txn.company_id == ^com_id,
+      where: txn.old_data == true,
+      select: txn,
+      select_merge: %{
+        account_name: ac.name,
+        contact_name: cont.name
+      }
+    ) |> FullCircle.Repo.all
+  end
+
+  # def update_seeds(txns, com, user) do
+  #   case can?(user, :update_seed_transactions, com) do
+  #     true ->
+  #       Multi.new()
+  #       |> Multi.run(:txn, fn repo, changes ->
+
+  #       end)
+
+  #     false ->
+  #       :not_authorise
+  #   end
+  # rescue
+  #   e in Postgrex.Error ->
+  #     {:sql_error, e.postgres.message}
+  # end
 end

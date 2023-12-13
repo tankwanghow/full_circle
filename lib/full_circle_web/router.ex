@@ -195,6 +195,7 @@ defmodule FullCircleWeb.Router do
       live("/DebitNote/:note_id/edit", DebitNoteLive.Form, :edit)
 
       live("/seeds", SeedLive.Index, :index)
+      live("/seeds/:doc_type/:doc_no/edit", SeedLive.Form, :edit)
 
       live("/Receipt", ReceiptLive.Index, :index)
       live("/Receipt/new", ReceiptLive.Form, :new)

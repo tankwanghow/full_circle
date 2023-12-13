@@ -32,6 +32,22 @@ defmodule FullCircle.Accounting.Transaction do
     timestamps(updated_at: false, type: :utc_datetime)
   end
 
+  def seed_changeset(tran, attrs) do
+    tran
+    |> cast(attrs, [
+      :doc_type,
+      :doc_date,
+      :doc_no,
+      :particulars,
+      :amount,
+      :company_id,
+      :account_id,
+      :contact_id,
+      :account_name,
+      :contact_name
+    ])
+  end
+
   def journal_entry_changeset(tran, attrs) do
     tran
     |> cast(attrs, [
