@@ -177,17 +177,7 @@ defmodule FullCircleWeb.ReportLive.Aging do
         "border rounded bg-blue-200 border-blue-400 px-2 py-1",
         assigns
       ) %>
-
-      <%!-- <div id="footer">
-        <div class="flex flex-row text-center tracking-tighter mb-5 mt-1">
-          <div class="w-[80%] border px-2 py-1 text-right font-bold rounded bg-lime-200 border-lime-400">
-            <%= gettext("Balance") %>
-          </div>
-          <div class="w-[20%] font-bold border rounded bg-lime-200 border-lime-400 text-center px-2 py-1">
-            <%=  %>
-          </div>
-        </div>
-      </div> --%>
+      <div class="mb-10" />
     </div>
     """
   end
