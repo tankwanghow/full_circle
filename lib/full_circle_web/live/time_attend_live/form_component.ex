@@ -70,7 +70,7 @@ defmodule FullCircleWeb.TimeAttendLive.FormComponent do
         {:noreply, socket}
 
       {:error, changeset} ->
-        send(self(), {socket.assigns.errored_info, changeset})
+        send(self(), {socket.assigns.error_info, changeset})
         {:noreply, socket}
 
       :not_authorise ->
@@ -92,7 +92,7 @@ defmodule FullCircleWeb.TimeAttendLive.FormComponent do
         {:noreply, socket}
 
       {:error, changeset} ->
-        send(self(), {socket.assigns.errored_info, changeset})
+        send(self(), {socket.assigns.error_info, changeset})
         {:noreply, socket}
 
       :not_authorise ->
@@ -113,7 +113,7 @@ defmodule FullCircleWeb.TimeAttendLive.FormComponent do
         {:noreply, socket}
 
       {:error, changeset} ->
-        send(self(), {socket.assigns.errored_info, changeset})
+        send(self(), {socket.assigns.error_info, changeset})
         {:noreply, socket}
 
       :not_authorise ->

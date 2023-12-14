@@ -114,7 +114,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchIndex do
         created_info={:created}
         updated_info={:updated}
         deleted_info={:deleted}
-        error_info={:errored}
+        error_info={:error}
       />
     </.modal>
     """

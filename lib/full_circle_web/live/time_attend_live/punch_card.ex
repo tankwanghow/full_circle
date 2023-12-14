@@ -291,6 +291,10 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
         action={@live_action_ta}
         current_company={@current_company}
         current_user={@current_user}
+        created_info={:refresh_page_ta}
+        updated_info={:refresh_page_ta}
+        deleted_info={:refresh_page_ta}
+        error_info={:error_refresh_page_ta}
       />
     </.modal>
     <.modal
@@ -327,11 +331,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
         action={@live_action_adv}
         current_company={@current_company}
         current_user={@current_user}
-        created_info={:refresh_page_ta}
-        updated_info={:refresh_page_ta}
-        deleted_info={:refresh_page_ta}
-        error_info={:error_refresh_page_ta}
-      />
+        />
     </.modal>
     """
   end
