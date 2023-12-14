@@ -12,7 +12,6 @@ defmodule FullCircleWeb.TimeAttendLive.FormComponent do
 
   @impl true
   def update(assigns, socket) do
-    IO.inspect assigns
     {:ok,
      socket
      |> assign(assigns)
