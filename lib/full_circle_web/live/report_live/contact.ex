@@ -181,7 +181,11 @@ defmodule FullCircleWeb.ReportLive.Contact do
               </div>
               <div class="w-[12%] border rounded bg-green-200 border-green-400 px-2 py-1">
                 <%= if obj.old_data do %>
-                  <%= obj.doc_no %>
+                  <.update_seed_link
+                    doc_obj={obj}
+                    current_company={@current_company}
+                    current_user={@current_user}
+                  />
                 <% else %>
                   <.doc_link current_company={@current_company} doc_obj={obj} />
                 <% end %>
