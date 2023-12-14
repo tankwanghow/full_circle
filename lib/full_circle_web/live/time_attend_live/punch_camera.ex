@@ -12,7 +12,15 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCamera do
      |> assign(page_title: gettext("Attendence Camera"))
      |> assign(shift_id: "")
      |> assign(valid?: false)
+     |> assign(gps_long: "none")
+     |> assign(gps_lat: "none")
      |> assign(last_shifts: HR.last_shift(6, socket.assigns.current_company.id))}
+  end
+
+  @impl true
+  def handle_event("update_gps", params, socket) do
+    {:noreply,
+     socket |> assign(gps_long: params["gps_long"]) |> assign(gps_lat: params["gps_lat"])}
   end
 
   @impl true
@@ -46,7 +54,8 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCamera do
 
       {:noreply, socket}
     rescue
-      _e ->
+      e ->
+        IO.inspect e
         {:noreply, socket |> assign(status: :error) |> assign(msg: employee_id)}
     end
   end
@@ -98,6 +107,8 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCamera do
              company_id: socket.assigns.current_company.id,
              user_id: socket.assigns.current_user.id,
              input_medium: "WebCam",
+             gps_long: socket.assigns.gps_long,
+             gps_lat: socket.assigns.gps_lat,
              shift_id: socket.assigns.shift_id
            },
            socket.assigns.current_company,
@@ -107,6 +118,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCamera do
         {:success, "#{ta.shift_id}"}
 
       {:error, changeset} ->
+        IO.inspect changeset
         {:error,
          Enum.map_join(changeset.errors, fn {field, {msg, _}} ->
            "#{Atom.to_string(field)}: #{msg}"
@@ -240,6 +252,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCamera do
           <div class="text-lg"><%= @msg %></div>
         </div>
       </div>
+      <div id="gps" class="mt-5 text-center" phx-hook="GPS_Loc">Lat:- <%= @gps_lat %>, Long:- <%= @gps_long %></div>
       <div class="text-center mt-5">
         <.link navigate={~p"/companies/#{@current_company.id}/dashboard"} class="red button">
           <%= gettext("Back") %>

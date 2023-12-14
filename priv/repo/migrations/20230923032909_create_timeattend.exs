@@ -8,6 +8,8 @@ defmodule FullCircle.Repo.Migrations.CreateTimeAttends do
       add :company_id, references(:companies, on_delete: :delete_all)
       add :flag, :string
       add :input_medium, :string
+      add :gps_long, :float
+      add :gps_lat, :float
       add :punch_time, :timestamptz
       add :shift_id, :string
       add :status, :string

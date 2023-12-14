@@ -9,6 +9,8 @@ defmodule FullCircle.HR.TimeAttend do
     field(:input_medium, :string)
     field(:punch_time, :utc_datetime)
     field(:shift_id, :string)
+    field(:gps_long, :float)
+    field(:gps_lat, :float)
     field(:status, :string, default: "Draft")
 
     field(:employee_name, :string, virtual: true)
@@ -61,6 +63,8 @@ defmodule FullCircle.HR.TimeAttend do
       :punch_time,
       :company_id,
       :employee_id,
+      :gps_long,
+      :gps_lat,
       :user_id,
       :shift_id
     ])

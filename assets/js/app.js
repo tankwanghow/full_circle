@@ -29,6 +29,24 @@ let Hooks = {}
 
 let html5QrcodeScanner;
 
+Hooks.GPS_Loc = {
+  mounted() {
+    if (navigator.geolocation) {
+      navigator.geolocation.watchPosition(
+        (pos) => {
+          rtnpos = { gps_long: pos.coords.longitude, gps_lat: pos.coords.latitude };
+          this.pushEvent("update_gps", rtnpos);
+        },
+        () => {
+          rtnpos = { gps_long: "none", gps_lat: "none" };
+          this.pushEvent("update_gps", rtnpos);
+        });
+    } else {
+      this.el.innerHTML = "Geolocation is not supported by this browser.";
+    }
+  }
+}
+
 Hooks.QR_Reply = {
   mounted() {
     this.el.innerHTML = "Scan Employee QR";
