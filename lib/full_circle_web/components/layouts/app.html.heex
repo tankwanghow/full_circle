@@ -1,12 +1,12 @@
 <main
-  :if={assigns[:current_role] != "punch_camera"}
+  :if={assigns[:page_title] != gettext("Attendence Camera")}
   class={if(assigns[:current_user], do: "mt-20", else: "")}
 >
   <.flash_group flash={@flash} />
   <%= @inner_content %>
 </main>
 
-<main :if={assigns[:current_role] == "punch_camera"} class="mt-5">
+<main :if={assigns[:page_title] == gettext("Attendence Camera")} class="mt-5">
   <p
     :if={assigns[:page_title] != gettext("Attendence Camera")}
     class="w-full text-3xl text-center font-medium"

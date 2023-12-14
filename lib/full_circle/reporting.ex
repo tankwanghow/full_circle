@@ -267,7 +267,8 @@ defmodule FullCircle.Reporting do
             p2 |> Decimal.to_float(),
             p1 |> Decimal.to_float()
           ],
-          {0, []}, debcre
+          {0, []},
+          debcre
         )
 
       %{

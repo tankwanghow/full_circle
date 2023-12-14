@@ -55,7 +55,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCamera do
       {:noreply, socket}
     rescue
       e ->
-        IO.inspect e
+        IO.inspect(e)
         {:noreply, socket |> assign(status: :error) |> assign(msg: employee_id)}
     end
   end
@@ -118,7 +118,8 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCamera do
         {:success, "#{ta.shift_id}"}
 
       {:error, changeset} ->
-        IO.inspect changeset
+        IO.inspect(changeset)
+
         {:error,
          Enum.map_join(changeset.errors, fn {field, {msg, _}} ->
            "#{Atom.to_string(field)}: #{msg}"
@@ -136,7 +137,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCamera do
       <div class="text-xl text-center font-bold">
         <%= @current_company.name %>
       </div>
-      <div class="mx-auto p-2 w-[80%] text-2xl text-center mb-2 border-y-4 border-green-800 bg-green-200">
+      <div class="mx-auto w-[80%] text-2xl text-center mb-2 border-y-4 border-green-800 bg-green-200">
         <span class="text-blue-600" id="date" /> <span class="text-amber-800" id="clock" />
       </div>
       <div :if={@shift_id == ""}>
@@ -160,11 +161,11 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCamera do
             </div>
           </div>
         </.form>
-        <div class="text-center mt-5 text-red-500 font-bold text-2xl">
+        <div class="text-center mt-3 text-red-500 font-bold text-2xl">
           Last 6 Shifts
         </div>
         <%= for obj <- @last_shifts do %>
-          <div class="mt-5 text-center text-2xl">
+          <div class="mt-3 text-center text-2xl">
             <.link
               phx-value-shift={obj.shift}
               phx-click={:continue_shift}
@@ -181,19 +182,19 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCamera do
         <div
           :if={@flag == "OUT"}
           phx-click="in_out"
-          class="mb-2 font-bold text-xl mx-auto w-[50%] button blue"
+          class="mb-1 font-bold text-xl mx-auto w-[50%] button blue"
         >
-          IN <span aria-hidden="true">→</span> OUT
+          OUT <span aria-hidden="true">→</span> IN
         </div>
         <div
           :if={@flag == "IN"}
           phx-click="in_out"
           class="mb-2 font-bold text-xl mx-auto text-center w-[50%] button red"
         >
-          OUT <span aria-hidden="true">→</span> IN
+          IN <span aria-hidden="true">→</span> OUT
         </div>
-        <div class={"mx-auto w-[80%] text-2xl text-center border-y-4 #{if(@flag == "IN", do: "bg-blue-200 border-blue-400", else: "bg-red-200 border-red-600")} mb-2"}>
-          <div class="text-3xl font-bold"><%= @flag %></div>
+        <div class={"mx-auto w-[80%] text-center border-y-2 #{if(@flag == "IN", do: "bg-blue-200 border-blue-400", else: "bg-red-200 border-red-600")} mb-2"}>
+          <div class="text-2xl font-bold"><%= @flag %></div>
           <div :if={@flag == "IN"} class="font-bold font-mono text-cyan-600"><%= @shift_id %></div>
         </div>
 
@@ -252,8 +253,8 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCamera do
           <div class="text-lg"><%= @msg %></div>
         </div>
       </div>
-      <div id="gps" class="mt-5 text-center" phx-hook="GPS_Loc">Lat:- <%= @gps_lat %>, Long:- <%= @gps_long %></div>
-      <div class="text-center mt-5">
+      <div id="gps" class="mt-2 text-center" phx-hook="GPS_Loc"></div>
+      <div class="text-center mt-2">
         <.link navigate={~p"/companies/#{@current_company.id}/dashboard"} class="red button">
           <%= gettext("Back") %>
         </.link>

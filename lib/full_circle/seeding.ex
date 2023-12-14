@@ -650,7 +650,8 @@ defmodule FullCircle.Seeding do
         account_name: ac.name,
         contact_name: cont.name
       }
-    ) |> FullCircle.Repo.all
+    )
+    |> FullCircle.Repo.all()
   end
 
   # def update_seeds(txns, com, user) do
