@@ -152,7 +152,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCamera do
             <div class="col-span-4 text-xl mt-1 font-mono tracking-tighter">
               <%= Timex.today() |> Timex.format!("%Y%m%d", :strftime) %>
             </div>
-            <div class="col-span-3">
+            <div class="col-span-4">
               <.input name="shift_form[shift_id]" type="text" id="shift_form_shift_id" value="" />
             </div>
             <div class="col-span-4 -mt-1">
