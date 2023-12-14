@@ -12,6 +12,7 @@ defmodule FullCircleWeb.TimeAttendLive.FormComponent do
 
   @impl true
   def update(assigns, socket) do
+    IO.inspect assigns
     {:ok,
      socket
      |> assign(assigns)
@@ -66,11 +67,11 @@ defmodule FullCircleWeb.TimeAttendLive.FormComponent do
            socket.assigns.current_user
          ) do
       {:ok, obj} ->
-        send(self(), {:refresh_page_ta, obj})
+        send(self(), {socket.assigns.deleted_info, obj})
         {:noreply, socket}
 
       {:error, changeset} ->
-        send(self(), {:error_refresh_page_ta, changeset})
+        send(self(), {socket.assigns.errored_info, changeset})
         {:noreply, socket}
 
       :not_authorise ->
@@ -88,11 +89,11 @@ defmodule FullCircleWeb.TimeAttendLive.FormComponent do
       )
     ) do
       {:ok, obj} ->
-        send(self(), {:refresh_page_ta, obj})
+        send(self(), {socket.assigns.created_info, obj})
         {:noreply, socket}
 
       {:error, changeset} ->
-        send(self(), {:error_refresh_page_ta, changeset})
+        send(self(), {socket.assigns.errored_info, changeset})
         {:noreply, socket}
 
       :not_authorise ->
@@ -109,11 +110,11 @@ defmodule FullCircleWeb.TimeAttendLive.FormComponent do
            socket.assigns.current_user
          ) do
       {:ok, obj} ->
-        send(self(), {:refresh_page_ta, obj})
+        send(self(), {socket.assigns.updated_info, obj})
         {:noreply, socket}
 
       {:error, changeset} ->
-        send(self(), {:error_refresh_page_ta, changeset})
+        send(self(), {socket.assigns.errored_info, changeset})
         {:noreply, socket}
 
       :not_authorise ->

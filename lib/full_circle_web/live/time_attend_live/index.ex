@@ -101,6 +101,10 @@ defmodule FullCircleWeb.TimeAttendLive.Index do
         action={@live_action}
         current_company={@current_company}
         current_user={@current_user}
+        created_info={:created}
+        updated_info={:updated}
+        deleted_info={:deleted}
+        error_info={:errored}
       />
     </.modal>
     """
