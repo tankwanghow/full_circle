@@ -26,7 +26,8 @@ defmodule FullCircleWeb.TimeAttendLive.FormComponent do
              input_medium: "UserEntry",
              user_id: assigns.current_user.id
            },
-           assigns.current_company
+           assigns.current_company,
+           :data_entry_changeset
          )
        )
      )}
