@@ -13,7 +13,7 @@ defmodule FullCircleWeb.UserLoginLive do
           <%= gettext("Register for an account") %>
         </.link>
       </div>
-      <.simple_form for={@form} id="login_form" action={~p"/users/log_in"} phx-update="ignore">
+      <.simple_form for={@form} id="login_form" action={~p"/users/log_in"} phx-update="ignore" class="w-[90%] mx-auto">
         <.input field={@form[:email]} type="email" label={gettext("Email")} required />
         <.input field={@form[:password]} type="password" label={gettext("Password")} required />
 
