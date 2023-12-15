@@ -146,7 +146,10 @@ defmodule FullCircleWeb.DashboardLive do
         </.link>
       </div>
     </div>
-    <div class="mx-auto text-center">
+    <div
+      :if={FullCircle.Authorization.can?(@current_user, :create_time_attendence, @current_company)}
+      class="mx-auto text-center"
+    >
       <div class="mt-20 text-2xl font-bold">
         <.link navigate={~p"/companies/#{@current_company.id}/PunchCamera"} class="orange button">
           <%= gettext("Start Punch Camera") %>

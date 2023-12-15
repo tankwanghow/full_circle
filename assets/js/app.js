@@ -29,24 +29,6 @@ let Hooks = {}
 
 let html5QrcodeScanner;
 
-Hooks.GPS_Loc = {
-  mounted() {
-    if (navigator.geolocation) {
-      navigator.geolocation.watchPosition(
-        (pos) => {
-          rtnpos = { gps_long: pos.coords.longitude, gps_lat: pos.coords.latitude };
-          this.pushEvent("update_gps", rtnpos);
-        },
-        () => {
-          rtnpos = { gps_long: "none", gps_lat: "none" };
-          this.pushEvent("update_gps", rtnpos);
-        });
-    } else {
-      this.el.innerHTML = "Geolocation is not supported by this browser.";
-    }
-  }
-}
-
 Hooks.QR_Reply = {
   mounted() {
     this.el.innerHTML = "Scan Employee QR";
@@ -79,8 +61,23 @@ Hooks.QR_Scanner = {
     )
 
     onScanSuccess = (decodedText, decodedResult) => {
-      this.pushEvent("qr-code-scanned", decodedResult);
-      html5QrcodeScanner.pause();
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            decodedResult.gps_long = pos.coords.longitude;
+            decodedResult.gps_lat = pos.coords.latitude;
+            this.pushEvent("qr-code-scanned", decodedResult);
+            html5QrcodeScanner.pause();
+          },
+          () => {
+            this.pushEvent("qr-code-scanned", decodedResult);
+            html5QrcodeScanner.pause();
+          },
+          { maximumAge: 60000, enableHighAccuracy: true });
+      } else {
+        this.pushEvent("qr-code-scanned", decodedResult);
+        html5QrcodeScanner.pause();
+      }
     }
 
     html5QrcodeScanner.render(onScanSuccess, this.onScanFailure);

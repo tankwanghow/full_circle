@@ -12,20 +12,17 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCamera do
      |> assign(page_title: gettext("Attendence Camera"))
      |> assign(shift_id: "")
      |> assign(valid?: false)
-     |> assign(gps_long: "none")
-     |> assign(gps_lat: "none")
      |> assign(last_shifts: HR.last_shift(6, socket.assigns.current_company.id))}
-  end
-
-  @impl true
-  def handle_event("update_gps", params, socket) do
-    {:noreply,
-     socket |> assign(gps_long: params["gps_long"]) |> assign(gps_lat: params["gps_lat"])}
   end
 
   @impl true
   def handle_event("qr-code-scanned", params, socket) do
     employee_id = params["decodedText"] || "Not Found!!"
+
+    socket =
+      socket
+      |> assign(gps_long: params["gps_long"] || 182)
+      |> assign(gps_lat: params["gps_lat"] || 182)
 
     try do
       emp =
@@ -49,13 +46,16 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCamera do
 
           true ->
             {status, msg} = punch_in(emp, socket)
-            socket |> assign(employee: emp) |> assign(status: status) |> assign(msg: msg)
+
+            socket
+            |> assign(employee: emp)
+            |> assign(status: status)
+            |> assign(msg: msg)
         end
 
       {:noreply, socket}
     rescue
-      e ->
-        IO.inspect(e)
+      _e ->
         {:noreply, socket |> assign(status: :error) |> assign(msg: employee_id)}
     end
   end
@@ -253,8 +253,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCamera do
           <div class="text-lg"><%= @msg %></div>
         </div>
       </div>
-      <div id="gps" class="mt-2 text-center" phx-hook="GPS_Loc"></div>
-      <div class="text-center mt-2">
+      <div class="text-center mt-4">
         <.link navigate={~p"/companies/#{@current_company.id}/dashboard"} class="red button">
           <%= gettext("Back") %>
         </.link>
