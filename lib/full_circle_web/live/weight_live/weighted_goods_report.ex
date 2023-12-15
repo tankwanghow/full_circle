@@ -11,14 +11,9 @@ defmodule FullCircleWeb.WeighingLive.GoodsReport do
   @impl true
   def handle_params(params, _uri, socket) do
     params = params["search"]
-
-    IO.inspect(params["glist"])
-
     glist = (params["glist"] || "") |> String.split(",") |> Enum.map(fn x -> String.trim(x) end)
     f_date = params["f_date"] || Timex.today() |> Timex.format!("%Y-%m-%d", :strftime)
     t_date = params["t_date"] || Timex.today() |> Timex.format!("%Y-%m-%d", :strftime)
-
-    IO.inspect(glist)
 
     {:noreply,
      socket
