@@ -118,8 +118,6 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCamera do
         {:success, "#{ta.shift_id}"}
 
       {:error, changeset} ->
-        IO.inspect(changeset)
-
         {:error,
          Enum.map_join(changeset.errors, fn {field, {msg, _}} ->
            "#{Atom.to_string(field)}: #{msg}"

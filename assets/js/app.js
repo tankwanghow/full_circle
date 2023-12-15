@@ -60,24 +60,30 @@ Hooks.QR_Scanner = {
       false
     )
 
+    long = 182;
+    lat = 182;
+
+    if (navigator.geolocation) {
+      navigator.geolocation.watchPosition(
+        (pos) => {
+          long = pos.coords.longitude;
+          lat = pos.coords.latitude;
+        },
+        () => {
+          long = 182;
+          lat = 182;
+        },
+        { maximumAge: 60000, enableHighAccuracy: true });
+    } else {
+      long = 182;
+      lat = 182;
+    }
+
     onScanSuccess = (decodedText, decodedResult) => {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            decodedResult.gps_long = pos.coords.longitude;
-            decodedResult.gps_lat = pos.coords.latitude;
-            this.pushEvent("qr-code-scanned", decodedResult);
-            html5QrcodeScanner.pause();
-          },
-          () => {
-            this.pushEvent("qr-code-scanned", decodedResult);
-            html5QrcodeScanner.pause();
-          },
-          { maximumAge: 60000, enableHighAccuracy: true });
-      } else {
-        this.pushEvent("qr-code-scanned", decodedResult);
-        html5QrcodeScanner.pause();
-      }
+      decodedResult.gps_long = long;
+      decodedResult.gps_lat = lat;
+      this.pushEvent("qr-code-scanned", decodedResult);
+      html5QrcodeScanner.pause();
     }
 
     html5QrcodeScanner.render(onScanSuccess, this.onScanFailure);

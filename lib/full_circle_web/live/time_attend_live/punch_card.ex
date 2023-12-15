@@ -331,7 +331,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
         action={@live_action_adv}
         current_company={@current_company}
         current_user={@current_user}
-        />
+      />
     </.modal>
     """
   end
