@@ -5,7 +5,7 @@ defmodule FullCircleWeb.InvoiceLive.Index do
   alias FullCircleWeb.InvoiceLive.IndexComponent
 
   @per_page 25
-  @selected_max 30
+  @selected_max 15
 
   @impl true
   def render(assigns) do
@@ -73,7 +73,7 @@ defmodule FullCircleWeb.InvoiceLive.Index do
           target="_blank"
           class="blue button"
         >
-          <%= gettext("Print") %>
+          <%= gettext("Print") %><%= "(#{Enum.count(@selected)})" %>
         </.link>
         <.link
           :if={@can_print}
@@ -83,7 +83,7 @@ defmodule FullCircleWeb.InvoiceLive.Index do
           target="_blank"
           class="blue button"
         >
-          <%= gettext("Pre Print") %>
+          <%= gettext("Pre Print") %><%= "(#{Enum.count(@selected)})" %>
         </.link>
       </div>
       <div class="font-medium flex flex-row text-center tracking-tighter bg-amber-200">

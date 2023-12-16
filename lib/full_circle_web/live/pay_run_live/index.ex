@@ -4,7 +4,7 @@ defmodule FullCircleWeb.PayRunLive.Index do
   alias FullCircle.PayRun
   alias FullCircleWeb.PayRunLive.IndexComponent
 
-  @selected_max 30
+  @selected_max 15
 
   @impl true
   def mount(_params, _session, socket) do
@@ -127,7 +127,7 @@ defmodule FullCircleWeb.PayRunLive.Index do
                 target="_blank"
                 class="blue button"
               >
-                <%= gettext("Print") %>
+                <%= gettext("Print") %><%= "(#{Enum.count(@selected)})" %>
               </.link>
               <.link
                 :if={@can_print}
@@ -137,7 +137,7 @@ defmodule FullCircleWeb.PayRunLive.Index do
                 target="_blank"
                 class="blue button"
               >
-                <%= gettext("Pre Print") %>
+                <%= gettext("Pre Print") %><%= "(#{Enum.count(@selected)})" %>
               </.link>
             </div>
           </div>

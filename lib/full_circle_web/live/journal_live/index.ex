@@ -5,7 +5,7 @@ defmodule FullCircleWeb.JournalLive.Index do
   alias FullCircleWeb.JournalLive.IndexComponent
 
   @per_page 25
-  @selected_max 30
+  @selected_max 15
 
   @impl true
   def render(assigns) do
@@ -54,7 +54,7 @@ defmodule FullCircleWeb.JournalLive.Index do
           target="_blank"
           class="blue button"
         >
-          <%= gettext("Print") %>
+          <%= gettext("Print") %><%= "(#{Enum.count(@selected)})" %>
         </.link>
         <.link
           :if={@can_print}
@@ -64,7 +64,7 @@ defmodule FullCircleWeb.JournalLive.Index do
           target="_blank"
           class="blue button"
         >
-          <%= gettext("Pre Print") %>
+          <%= gettext("Pre Print") %><%= "(#{Enum.count(@selected)})" %>
         </.link>
       </div>
 

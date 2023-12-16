@@ -1,12 +1,11 @@
 defmodule FullCircleWeb.EmployeeLive.Index do
   use FullCircleWeb, :live_view
 
-  # alias FullCircle.HR.Employee
   alias FullCircle.StdInterface
   alias FullCircleWeb.EmployeeLive.IndexComponent
 
   @per_page 30
-  @selected_max 30
+  @selected_max 15
 
   @impl true
   def render(assigns) do
@@ -33,7 +32,7 @@ defmodule FullCircleWeb.EmployeeLive.Index do
           target="_blank"
           class="blue button"
         >
-          <%= gettext("Print QRCode") %>
+          <%= gettext("Print QRCode") %><%= "(#{Enum.count(@selected)})" %>
         </.link>
       </div>
       <div class="text-center">
