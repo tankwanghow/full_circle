@@ -105,6 +105,20 @@ defmodule FullCircle.Reporting do
     Date.new!(at_date.year - 1, com.closing_month, com.closing_day)
   end
 
+  def debtors_balance(gt, at_date, com) do
+    from(cont in Contact,
+      join: txn in Transaction,
+      on: cont.id == txn.contact_id,
+      where: cont.company_id == ^com.id,
+      where: txn.doc_date <= ^at_date,
+      select: %{checked: false, id: cont.id, name: cont.name, balance: sum(txn.amount)},
+      group_by: [cont.id],
+      having: sum(txn.amount) > ^gt,
+      order_by: cont.name
+    )
+    |> Repo.all()
+  end
+
   defp balance_sheet_query(at_date, com) do
     from(ac in Account,
       join: txn in Transaction,
@@ -148,6 +162,35 @@ defmodule FullCircle.Reporting do
     union_all(profit_loss_query(at_date, com), ^balance_sheet_query(at_date, com))
     |> order_by([2, 3])
     |> Repo.all()
+  end
+
+  def statements(ids, sdate, edate, com) do
+    conts =
+      from(cont in Contact,
+        where: cont.id in ^ids,
+        where: cont.company_id == ^com.id,
+        select: cont
+      )
+      |> Repo.all()
+
+    agings =
+      (contact_aging_query(ids, edate, 30, com.id) <> " and p1 + p2 + p3 + p4 + p5 >= 0")
+      |> exec_query()
+      |> fix_unmatch_balance("debtor")
+
+    conts
+    |> Enum.map(fn c ->
+      c
+      |> Map.merge(%{aging: Enum.find(agings, fn a -> a.contact_id == c.id end)})
+      |> Map.merge(%{
+        transactions:
+          contact_transactions(c, sdate, edate, com)
+          |> Enum.map(fn a -> Map.merge(a, %{running: Decimal.to_float(a.amount)}) end)
+          |> Enum.scan(fn h1, h2 ->
+            Map.merge(h1, %{running: h1.running + h2.running})
+          end)
+      })
+    end)
   end
 
   def contact_transactions(ct, sdate, edate, com) do
@@ -257,7 +300,16 @@ defmodule FullCircle.Reporting do
 
   defp fix_unmatch_balance(list, debcre) do
     list
-    |> Enum.map(fn %{contact_name: cn, p1: p1, p2: p2, p3: p3, p4: p4, p5: p5, total: tot} ->
+    |> Enum.map(fn %{
+                     contact_id: id,
+                     contact_name: cn,
+                     p1: p1,
+                     p2: p2,
+                     p3: p3,
+                     p4: p4,
+                     p5: p5,
+                     total: tot
+                   } ->
       {_, k} =
         fix_total(
           [
@@ -272,6 +324,7 @@ defmodule FullCircle.Reporting do
         )
 
       %{
+        contact_id: id,
         contact_name: cn,
         p1: Enum.at(k, 0),
         p2: Enum.at(k, 1),
@@ -299,6 +352,59 @@ defmodule FullCircle.Reporting do
 
   def fix_total([], {acc, a}, _debcre) do
     {acc, a}
+  end
+
+  defp contact_aging_query(ids, edate, days, com_id) do
+    "with
+        has_balance_contacts as (
+          select c.id, c.name
+            from contacts c inner join transactions t on c.id = t.contact_id
+          where t.doc_date <= '#{edate}'
+            and c.company_id = '#{com_id}'
+            and c.id = ANY('{#{Enum.join(ids, ",")}}')
+          group by c.id),
+        has_balance_txn as (
+          select t.doc_date, t.doc_type, t.doc_no, t.contact_id, c.name as contact_name,
+                t.amount + coalesce(sum(stm.match_amount), 0) + coalesce(sum(tm.match_amount), 0) as balance
+              from transactions t inner join has_balance_contacts c
+                on c.id = t.contact_id left outer join seed_transaction_matchers stm
+                on stm.transaction_id = t.id left outer join transaction_matchers tm
+                on tm.transaction_id = t.id
+            where t.contact_id is not null
+              and t.doc_date <= '#{edate}'
+            group by t.id, c.name
+            having t.amount + coalesce(sum(stm.match_amount), 0) + coalesce(sum(tm.match_amount), 0) <> 0
+        ),
+        has_balance_txn_1 as (
+          select hbt.doc_date, hbt.doc_type, hbt.doc_no, hbt.contact_id, hbt.contact_name,
+                hbt.balance - coalesce(sum(stm.match_amount), 0) - coalesce(sum(tm.match_amount), 0) as balance
+            from has_balance_txn hbt left outer join seed_transaction_matchers stm
+              on stm.m_doc_type = hbt.doc_type and stm.m_doc_id::varchar = hbt.doc_no left outer join transaction_matchers tm
+                on tm.doc_type = hbt.doc_type and tm.doc_id::varchar = hbt.doc_no
+          group by hbt.doc_date, hbt.doc_type, hbt.doc_no, hbt.contact_id, hbt.contact_name, hbt.balance
+          having hbt.balance - coalesce(sum(stm.match_amount), 0) - coalesce(sum(tm.match_amount), 0)  <> 0),
+        aging_list as (
+          select contact_name, contact_id,
+                 sum(case when
+                       extract(day from '#{edate}'::timestamp - doc_date::timestamp) <= #{days} then balance else 0 end) as p1,
+                 sum(case when
+                       extract(day from '#{edate}'::timestamp - doc_date::timestamp) <= #{days * 2} and
+                       extract(day from '#{edate}'::timestamp - doc_date::timestamp) > #{days} then balance else 0 end) as p2,
+                 sum(case when
+                       extract(day from '#{edate}'::timestamp - doc_date::timestamp) <= #{days * 3} and
+                       extract(day from '#{edate}'::timestamp - doc_date::timestamp) > #{days * 2} then balance else 0 end) as p3,
+                 sum(case when
+                       extract(day from '#{edate}'::timestamp - doc_date::timestamp) <= #{days * 4} and
+                       extract(day from '#{edate}'::timestamp - doc_date::timestamp) > #{days * 3} then balance else 0 end) as p4,
+                 sum(case when
+                       extract(day from '#{edate}'::timestamp - doc_date::timestamp) > #{days * 4} then balance else 0 end) as p5
+            from has_balance_txn_1
+            group by contact_name, contact_id)
+
+        select contact_id, contact_name, p1, p2, p3, p4, p5,
+               p1 + p2 + p3 + p4 + p5 as total
+          from aging_list where true
+    "
   end
 
   defp contact_aging_query(edate, days, com_id) do
@@ -331,7 +437,7 @@ defmodule FullCircle.Reporting do
           group by hbt.doc_date, hbt.doc_type, hbt.doc_no, hbt.contact_id, hbt.contact_name, hbt.balance
           having hbt.balance - coalesce(sum(stm.match_amount), 0) - coalesce(sum(tm.match_amount), 0)  <> 0),
         aging_list as (
-          select contact_name,
+          select contact_name, contact_id,
                  sum(case when
                        extract(day from '#{edate}'::timestamp - doc_date::timestamp) <= #{days} then balance else 0 end) as p1,
                  sum(case when
@@ -346,9 +452,9 @@ defmodule FullCircle.Reporting do
                  sum(case when
                        extract(day from '#{edate}'::timestamp - doc_date::timestamp) > #{days * 4} then balance else 0 end) as p5
             from has_balance_txn_1
-            group by contact_name)
+            group by contact_name, contact_id)
 
-        select contact_name, p1, p2, p3, p4, p5,
+        select contact_id, contact_name, p1, p2, p3, p4, p5,
                p1 + p2 + p3 + p4 + p5 as total
           from aging_list where true
     "

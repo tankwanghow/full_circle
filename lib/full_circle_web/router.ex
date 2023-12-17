@@ -171,6 +171,7 @@ defmodule FullCircleWeb.Router do
 
       live("/account_transactions", ReportLive.Account, :index)
       live("/contact_transactions", ReportLive.Contact, :index)
+      live("/debtor_statement", ReportLive.Statement, :index)
       live("/harvest_report", LayerLive.HarvestReport, :index)
       live("/harvest_wage_report", LayerLive.HarvestWageReport, :index)
       live("/weighed_goods_report", WeighingLive.GoodsReport, :index)
@@ -277,6 +278,8 @@ defmodule FullCircleWeb.Router do
 
       live("/Weighing/:id/print", WeighingLive.Print, :print)
       live("/Weighing/print_multi", WeighingLive.Print, :print)
+
+      live("/Statement/print_multi", ReportLive.Statement.Print, :print)
 
       live("/print/transactions", ReportLive.Print, :print)
       live("/print/harvrepo", LayerLive.HarvestReportPrint, :print)
