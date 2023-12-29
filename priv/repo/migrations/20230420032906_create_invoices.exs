@@ -7,7 +7,10 @@ defmodule FullCircle.Repo.Migrations.CreateInvoices do
       add :invoice_date, :date
       add :due_date, :date
       add :descriptions, :text
-      add :tags, :text
+      add :delivery_man_tags, :text
+      add :delivery_wages_tags, :text
+      add :loader_tags, :text
+      add :loader_wages_tags, :text
       add :company_id, references(:companies, on_delete: :delete_all)
       add :contact_id, references(:contacts, on_delete: :restrict)
 

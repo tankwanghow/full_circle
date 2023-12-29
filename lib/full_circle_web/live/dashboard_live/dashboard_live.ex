@@ -62,6 +62,15 @@ defmodule FullCircleWeb.DashboardLive do
         <.link navigate={~p"/companies/#{@current_company.id}/tax_codes"} class="nav-btn">
           <%= gettext("TaxCodes") %>
         </.link>
+        <%!-- <.link navigate={~p"/companies/#{@current_company.id}/Order"} class="nav-btn">
+          <%= gettext("Order") %>
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/Load"} class="nav-btn">
+          <%= gettext("Load") %>
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/Delivery"} class="nav-btn">
+          <%= gettext("Delivery") %>
+        </.link> --%>
         <.link navigate={~p"/companies/#{@current_company.id}/Invoice"} class="nav-btn">
           <%= gettext("Invoices") %>
         </.link>
@@ -90,7 +99,6 @@ defmodule FullCircleWeb.DashboardLive do
         <.link navigate={~p"/companies/#{@current_company.id}/recurrings"} class="nav-btn">
           <%= gettext("Recurrings") %>
         </.link>
-
         <.link navigate={~p"/companies/#{@current_company.id}/TimeAttend"} class="nav-btn">
           <%= gettext("Punching RAW Listing") %>
         </.link>
@@ -140,6 +148,9 @@ defmodule FullCircleWeb.DashboardLive do
         </.link>
         <.link navigate={~p"/companies/#{@current_company.id}/debtor_statement"} class="nav-btn">
           <%= gettext("Contact Statement") %>
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/tagged_bills"} class="nav-btn">
+          <%= gettext("Tagged Bill") %>
         </.link>
         <.link navigate={~p"/companies/#{@current_company.id}/tbplbs"} class="nav-btn">
           <%= gettext("TB/PL/BS") %>

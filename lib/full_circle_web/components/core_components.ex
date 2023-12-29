@@ -958,14 +958,14 @@ defmodule FullCircleWeb.CoreComponents do
   end
 
   attr(:doc_obj, :any)
-  attr(:current_user, :any)
+  attr(:current_role, :any)
   attr(:current_company, :any)
   attr(:klass, :string, default: "")
   attr(:rest, :global)
 
   def update_seed_link(assigns) do
     ~H"""
-    <%= if FullCircle.Authorization.can?(@current_user, :update_seed, @current_company) do %>
+    <%= if @current_role == "admin" do %>
       <.link
         class={["text-blue-600 hover:font-bold", @klass]}
         navigate={"/companies/#{@current_company.id}/seeds/#{@doc_obj.doc_type}/#{@doc_obj.doc_no}/edit"}

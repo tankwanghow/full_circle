@@ -93,6 +93,8 @@ defmodule FullCircle.Billing do
       }
   end
 
+  # Regex.scan(~r/\B#[a-zA-Z0-9_]+/, a) |> Enum.concat - Counting Hashtags
+
   def get_invoice!(id, company, user) do
     Repo.one(
       from inv in Invoice,
@@ -104,7 +106,7 @@ defmodule FullCircle.Billing do
         on: cont.id == inv.contact_id,
         where: inv.id == ^id,
         preload: [invoice_details: ^invoice_details()],
-        group_by: [inv.id, inv.invoice_no, inv.descriptions, cont.name, inv.tags, cont.id],
+        group_by: [inv.id, cont.id],
         select: inv,
         select_merge: %{
           contact_name: cont.name,
@@ -181,10 +183,9 @@ defmodule FullCircle.Billing do
     qry =
       if terms != "" do
         from inv in subquery(qry),
-          order_by: ^similarity_order([:invoice_no, :contact_name, :particulars], terms),
-          order_by: [desc: 6]
+          order_by: ^similarity_order([:invoice_no, :contact_name, :particulars], terms)
       else
-        qry |> order_by(desc: 6)
+        qry
       end
 
     qry =
@@ -550,9 +551,9 @@ defmodule FullCircle.Billing do
       if terms != "" do
         from inv in subquery(qry),
           order_by: ^similarity_order([:pur_invoice_no, :contact_name, :particulars], terms),
-          order_by: [desc: 6]
+          order_by: [desc: :updated_at]
       else
-        qry |> order_by(desc: 6)
+        qry |> order_by(desc: :updated_at)
       end
 
     qry =

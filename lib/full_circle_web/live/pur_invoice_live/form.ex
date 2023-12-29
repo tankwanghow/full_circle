@@ -392,7 +392,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
               field={@form[:tags]}
               label={gettext("Tags")}
               phx-hook="tributeTagText"
-              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/tags?klass=FullCircle.Billing.PurInvoice&tag="}
+              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/billingtags?tag="}
             />
           </div>
         </div>

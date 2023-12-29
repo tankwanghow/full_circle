@@ -19,6 +19,16 @@ defmodule FullCircle.Sys do
         company_id: company_id
       },
       %{
+        doc_type: "Order",
+        current: 0,
+        company_id: company_id
+      },
+      %{
+        doc_type: "Load",
+        current: 0,
+        company_id: company_id
+      },
+      %{
         doc_type: "PurInvoice",
         current: 0,
         company_id: company_id
@@ -157,7 +167,7 @@ defmodule FullCircle.Sys do
           "Is an asset account in accounting that represents the amount of tax credit a business can claim for taxes paid on its purchases. It helps businesses reduce their tax liability in the future."
       },
       %{
-        name: "Post Dated Cheques Received",
+        name: "Post Dated Cheques In Hand",
         account_type: "Post Dated Cheques",
         descriptions:
           "An Account in accounting that records the value of post-dated cheques received by a business but not yet deposited or cashed."

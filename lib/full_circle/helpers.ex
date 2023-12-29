@@ -16,17 +16,44 @@ defmodule FullCircle.Helpers do
     |> FullCircle.Repo.one()
   end
 
-  def list_hashtag(tag \\ "", class, key, com) do
+  def list_billing_tags(tag \\ "", key, com) do
     regexp = "#(\\w+#{tag}$|\\w+)"
     tag = "#%#{tag}%"
 
-    FullCircle.Repo.all(
-      from c in class,
+    invtags =
+      from(c in FullCircle.Billing.Invoice,
         where: c.company_id == ^com.id,
         where: ilike(field(c, ^key), ^tag),
-        select: fragment("distinct regexp_matches(?, ?, 'g')", field(c, ^key), ^regexp),
-        order_by: 1
-    )
+        select: fragment("distinct regexp_matches(?, ?, 'g')", field(c, ^key), ^regexp)
+      )
+
+    purinvtags =
+      from(c in FullCircle.Billing.PurInvoice,
+        where: c.company_id == ^com.id,
+        where: ilike(field(c, ^key), ^tag),
+        select: fragment("distinct regexp_matches(?, ?, 'g')", field(c, ^key), ^regexp)
+      )
+
+    union(invtags, ^purinvtags)
+    |> order_by([1])
+    |> FullCircle.Repo.all()
+    |> List.flatten()
+  end
+
+  def list_klass_tags(tag \\ "", class, key, com) do
+    regexp = "#(\\w+#{tag}$|\\w+)"
+    tag = "#%#{tag}%"
+
+    tags =
+      from(c in class,
+        where: c.company_id == ^com.id,
+        where: ilike(field(c, ^key), ^tag),
+        select: fragment("distinct regexp_matches(?, ?, 'g')", field(c, ^key), ^regexp)
+      )
+
+    tags
+    |> order_by([1])
+    |> FullCircle.Repo.all()
     |> List.flatten()
   end
 

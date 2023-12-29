@@ -183,8 +183,8 @@ defmodule FullCircleWeb.ReportLive.Contact do
                 <%= if obj.old_data do %>
                   <.update_seed_link
                     doc_obj={obj}
+                    current_role={@current_role}
                     current_company={@current_company}
-                    current_user={@current_user}
                   />
                 <% else %>
                   <.doc_link current_company={@current_company} doc_obj={obj} />

@@ -9,7 +9,10 @@ defmodule FullCircle.Billing.Invoice do
     field :descriptions, :string
     field :due_date, :date
     field :invoice_date, :date
-    field :tags, :string
+    field :loader_tags, :string
+    field :delivery_man_tags, :string
+    field :loader_wages_tags, :string
+    field :delivery_wages_tags, :string
 
     belongs_to :company, FullCircle.Sys.Company
     belongs_to :contact, FullCircle.Accounting.Contact
@@ -32,7 +35,10 @@ defmodule FullCircle.Billing.Invoice do
       :invoice_date,
       :due_date,
       :descriptions,
-      :tags,
+      :loader_tags,
+      :delivery_man_tags,
+      :loader_wages_tags,
+      :delivery_wages_tags,
       :company_id,
       :contact_id,
       :contact_name,

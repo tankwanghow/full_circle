@@ -29,6 +29,7 @@ defmodule FullCircleWeb.Router do
 
   scope "/api", FullCircleWeb do
     pipe_through(:api)
+    get "/companies/:company_id/:user_id/billingtags", BillingTagController, :index
     get "/companies/:company_id/:user_id/tags", TagController, :index
     get "/companies/:company_id/:user_id/autocomplete", AutoCompleteController, :index
   end
@@ -154,6 +155,18 @@ defmodule FullCircleWeb.Router do
       live("/Invoice/new", InvoiceLive.Form, :new)
       live("/Invoice/:invoice_id/edit", InvoiceLive.Form, :edit)
 
+      live("/Delivery", DeliveryLive.Index, :index)
+      live("/Delivery/new", DeliveryLive.Form, :new)
+      live("/Delivery/:delivery_id/edit", DeliveryLive.Form, :edit)
+
+      live("/Order", OrderLive.Index, :index)
+      live("/Order/new", OrderLive.Form, :new)
+      live("/Order/:order_id/edit", OrderLive.Form, :edit)
+
+      live("/Load", LoadLive.Index, :index)
+      live("/Load/new", LoadLive.Form, :new)
+      live("/Load/:load_id/edit", LoadLive.Form, :edit)
+
       live("/Advance", AdvanceLive.Index, :index)
       live("/Advance/new", AdvanceLive.Form, :new)
       live("/Advance/:slip_id/edit", AdvanceLive.Form, :edit)
@@ -175,6 +188,7 @@ defmodule FullCircleWeb.Router do
       live("/harvest_report", LayerLive.HarvestReport, :index)
       live("/harvest_wage_report", LayerLive.HarvestWageReport, :index)
       live("/weighed_goods_report", WeighingLive.GoodsReport, :index)
+      live("/tagged_bills", ReportLive.TaggedBill, :index)
 
       live("/tbplbs", ReportLive.TbPlBs, :index)
       live("/aging", ReportLive.Aging, :index)
@@ -275,6 +289,15 @@ defmodule FullCircleWeb.Router do
 
       live("/PaySlip/:id/print", PaySlipLive.Print, :print)
       live("/PaySlip/print_multi", PaySlipLive.Print, :print)
+
+      live("/Load/:id/print", LoadLive.Print, :print)
+      live("/Load/print_multi", LoadLive.Print, :print)
+
+      live("/Order/:id/print", OrderLive.Print, :print)
+      live("/Order/print_multi", OrderLive.Print, :print)
+
+      live("/Delivery/:id/print", DeliveryLive.Print, :print)
+      live("/Delivery/print_multi", DeliveryLive.Print, :print)
 
       live("/Weighing/:id/print", WeighingLive.Print, :print)
       live("/Weighing/print_multi", WeighingLive.Print, :print)

@@ -136,4 +136,15 @@ defmodule FullCircleWeb.Helpers do
       socket |> assign(can_print: true)
     end
   end
+
+  def int_or_float_format(n) do
+    if(Decimal.eq?(n, Decimal.new("0")),
+      do: "",
+      else:
+        if(Decimal.integer?(n),
+          do: Decimal.to_integer(n) |> Number.Delimit.number_to_delimited(precision: 0),
+          else: Number.Delimit.number_to_delimited(precision: 4)
+        )
+    )
+  end
 end

@@ -104,6 +104,10 @@ button[disabled] {
   @apply cursor-not-allowed bg-gray-400;
 }
 
+input[disabled] {
+  @apply cursor-not-allowed bg-gray-200;
+}
+
 .button {
   @apply text-center tracking-tighter rounded-md transition px-3 py-2 border duration-500;
   @apply select-none hover:cursor-pointer;

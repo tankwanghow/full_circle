@@ -553,11 +553,13 @@ defmodule FullCircle.Seeding do
     attr = if(ct, do: Map.merge(attr, %{"contact_id" => ct.id}), else: attr)
 
     ac_name = if(name != ac.name, do: "#{ac.name} (#{name})", else: ac.name)
+    part = attr["particulars"]
 
     attr =
       attr
       |> Map.merge(%{
-        "contact_particulars" => ac_name
+        "particulars" => ac_name,
+        "contact_particulars" => part
       })
 
     attr =
@@ -653,20 +655,4 @@ defmodule FullCircle.Seeding do
     )
     |> FullCircle.Repo.all()
   end
-
-  # def update_seeds(txns, com, user) do
-  #   case can?(user, :update_seed_transactions, com) do
-  #     true ->
-  #       Multi.new()
-  #       |> Multi.run(:txn, fn repo, changes ->
-
-  #       end)
-
-  #     false ->
-  #       :not_authorise
-  #   end
-  # rescue
-  #   e in Postgrex.Error ->
-  #     {:sql_error, e.postgres.message}
-  # end
 end

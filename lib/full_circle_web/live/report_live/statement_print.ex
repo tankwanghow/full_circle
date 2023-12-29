@@ -75,8 +75,7 @@ defmodule FullCircleWeb.ReportLive.Statement.Print do
     ~H"""
     <div class="txn header">
       <div class="doc_date">Date</div>
-      <div class="doc_type">Doc Type</div>
-      <div class="doc_no">Doc No.</div>
+      <div class="doc_info">Transaction</div>
       <div class="parti">Particulars</div>
       <div class="amount">Amount</div>
       <div class="running_sum">Balance</div>
@@ -90,8 +89,7 @@ defmodule FullCircleWeb.ReportLive.Statement.Print do
     ~H"""
     <div class="txn">
       <div class="doc_date"><%= @txn.doc_date %></div>
-      <div class="doc_type"><%= @txn.doc_type %></div>
-      <div class="doc_no"><%= @txn.doc_no %></div>
+      <div class="doc_info"><%= @txn.doc_type %> <%= @txn.doc_no %></div>
       <div class="parti"><%= @txn.particulars |> String.slice(0..40) %></div>
       <div class="amount"><%= @txn.amount |> Number.Delimit.number_to_delimited() %></div>
       <div class="running_sum"><%= @txn.running |> Number.Delimit.number_to_delimited() %></div>
@@ -209,13 +207,12 @@ defmodule FullCircleWeb.ReportLive.Statement.Print do
 
       .txn.header { font-weight: bold; border-top: 2px solid black; border-bottom: 2px solid black; height: 8mm; padding-top: 1mm; margin-bottom: 2mm; }
 
-      .txn { display: flex; height: <%= @detail_height %>mm; font-family: 'Sans-serif'; }
-      .txn .doc_date { width: 10%; text-align: left; }
-      .txn .doc_type { width: 10%; text-align: center; }
-      .txn .doc_no { width: 10%; text-align: center; }
+      .txn { display: flex; height: <%= @detail_height %>mm;  }
+      .txn .doc_date { width: 12%; text-align: left; }
+      .txn .doc_info { width: 21%; text-align: center; }
       .txn .parti { width: 40%; text-align: center; overflow: clip;}
-      .txn .amount { width: 13%; text-align: right; }
-      .txn .running_sum { width: 17%; text-align: right; }
+      .txn .amount { width: 12%; text-align: right; }
+      .txn .running_sum { width: 15%; text-align: right; }
 
       .aging_group { bottom: 10px;}
       .aging { display: flex; gap: 2px; margin-bottom: 1px;}
