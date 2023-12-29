@@ -336,29 +336,6 @@ defmodule FullCircle.Product do
     |> Repo.one!()
   end
 
-  def load_lines_to_delivery_lines(ids) do
-    from(odd in LoadDetail,
-      join: gd in Good,
-      on: gd.id == odd.good_id,
-      join: pkg in Packaging,
-      on: pkg.id == odd.package_id,
-      where: odd.id in ^ids,
-      order_by: odd._persistent_id,
-      select: %{
-        good_name: gd.name,
-        good_id: gd.id,
-        package_id: pkg.id,
-        order_detail_id: odd.id,
-        package_name: pkg.name,
-        load_pack_qty: odd.load_pack_qty,
-        load_qty: odd.load_qty,
-        unit: gd.unit,
-        descriptions: odd.descriptions
-      }
-    )
-    |> Repo.all()
-  end
-
   def load_index_query(terms, load_date_form, com, user,
         page: page,
         per_page: per_page

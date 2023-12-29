@@ -232,7 +232,7 @@ defmodule FullCircleWeb.LoadLive.Index do
     |> assign(end_of_timeline?: obj_count < @per_page)
   end
 
-  defp can_deliver?(socket) do
-    socket.assigns.selected
-  end
+  # defp can_deliver?(socket) do
+  #   socket.assigns.selected
+  # end
 end
