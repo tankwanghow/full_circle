@@ -363,7 +363,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
       <.form for={@form} id="object-form" autocomplete="off" phx-change="validate" phx-submit="save">
         <%= Phoenix.HTML.Form.hidden_input(@form, :pur_invoice_no) %>
         <div class="flex flex-row flex-nowarp">
-          <div class="w-1/2 grow shrink">
+          <div class="w-1/4 grow shrink">
             <%= Phoenix.HTML.Form.hidden_input(@form, :contact_id) %>
             <.input
               field={@form[:contact_name]}
@@ -373,26 +373,51 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
               url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
             />
           </div>
-          <div class="grow shrink w-3/12">
+          <div class="grow shrink">
             <.input field={@form[:supplier_invoice_no]} label={gettext("Invoice No")} />
           </div>
-          <div class="grow shrink w-1/4">
+          <div class="grow shrink">
             <.input field={@form[:pur_invoice_date]} label={gettext("Invoice Date")} type="date" />
           </div>
-          <div class="grow shrink w-1/4">
+          <div class="grow shrink">
             <.input field={@form[:due_date]} label={gettext("Due Date")} type="date" />
           </div>
-        </div>
-        <div class="flex flex-row flex-nowrap gap-2">
-          <div class="grow shrink">
+          <div class="w-1/4 grow shrink">
             <.input field={@form[:descriptions]} label={gettext("Descriptions")} />
+          </div>
+        </div>
+
+        <div class="flex flex-row flex-nowrap mt-2">
+          <div class="grow shrink">
+            <.input
+              field={@form[:loader_tags]}
+              label={gettext("Loader Tags")}
+              phx-hook="tributeTagText"
+              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/tags?klass=FullCircle.Billing.PurInvoice&tag_field=loader_tags&tag="}
+            />
           </div>
           <div class="grow shrink">
             <.input
-              field={@form[:tags]}
-              label={gettext("Tags")}
+              field={@form[:loader_wages_tags]}
+              label={gettext("Loader Wages Tags")}
               phx-hook="tributeTagText"
-              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/billingtags?tag="}
+              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/tags?klass=FullCircle.Billing.PurInvoice&tag_field=loader_wages_tags&tag="}
+            />
+          </div>
+          <div class="grow shrink">
+            <.input
+              field={@form[:delivery_man_tags]}
+              label={gettext("Delivery Man Tags")}
+              phx-hook="tributeTagText"
+              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/tags?klass=FullCircle.Billing.PurInvoice&tag_field=delivery_man_tags&tag="}
+            />
+          </div>
+          <div class="grow shrink">
+            <.input
+              field={@form[:delivery_wages_tags]}
+              label={gettext("Delivery Wages Tags")}
+              phx-hook="tributeTagText"
+              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/tags?klass=FullCircle.Billing.PurInvoice&tag_field=delivery_wages_tags&tag="}
             />
           </div>
         </div>
@@ -418,7 +443,8 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
           <.form_action_button
             form={@form}
             live_action={@live_action}
-            new_url={~p"/companies/#{@current_company.id}/PurInvoice/new"}
+            current_company={@current_company}
+            type="PurInvoice"
           />
           <.live_component
             :if={@live_action == :edit}

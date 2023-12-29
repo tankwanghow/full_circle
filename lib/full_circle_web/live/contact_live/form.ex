@@ -208,8 +208,10 @@ defmodule FullCircleWeb.ContactLive.Form do
           <.form_action_button
             form={@form}
             live_action={@live_action}
-            new_url={~p"/companies/#{@current_company.id}/contacts/new"}
+            current_company={@current_company}
+            type="contacts"
           />
+          ReturnCheque
           <%= if @live_action == :edit and FullCircle.Authorization.can?(@current_user, :delete_contact, @current_company) do %>
             <.delete_confirm_modal
               id="delete-object"

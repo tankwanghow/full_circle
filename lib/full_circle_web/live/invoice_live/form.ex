@@ -370,6 +370,12 @@ defmodule FullCircleWeb.InvoiceLive.Form do
             <.input field={@form[:due_date]} label={gettext("Due Date")} type="date" />
           </div>
           <div class="w-1/4 grow shrink">
+            <.input field={@form[:descriptions]} label={gettext("Descriptions")} />
+          </div>
+        </div>
+
+        <div class="flex flex-row flex-nowrap mt-2">
+          <div class="grow shrink">
             <.input
               field={@form[:loader_tags]}
               label={gettext("Loader Tags")}
@@ -377,35 +383,13 @@ defmodule FullCircleWeb.InvoiceLive.Form do
               url={"/api/companies/#{@current_company.id}/#{@current_user.id}/tags?klass=FullCircle.Billing.Invoice&tag_field=loader_tags&tag="}
             />
           </div>
-          <div class="w-1/4 grow shrink">
+          <div class="grow shrink">
             <.input
               field={@form[:loader_wages_tags]}
               label={gettext("Loader Wages Tags")}
               phx-hook="tributeTagText"
               url={"/api/companies/#{@current_company.id}/#{@current_user.id}/tags?klass=FullCircle.Billing.Invoice&tag_field=loader_wages_tags&tag="}
             />
-          </div>
-        </div>
-        <.live_component
-          module={FullCircleWeb.InvoiceLive.DetailComponent}
-          id="invoice_details"
-          klass=""
-          settings={@settings}
-          doc_name="Invoice"
-          detail_name={:invoice_details}
-          form={@form}
-          taxcodetype="saltaxcode"
-          doc_good_amount={:invoice_good_amount}
-          doc_tax_amount={:invoice_tax_amount}
-          doc_detail_amount={:invoice_amount}
-          matched_trans={@matched_trans}
-          current_company={@current_company}
-          current_user={@current_user}
-        />
-
-        <div class="flex flex-row flex-nowrap mt-4">
-          <div class="w-1/2 grow shrink">
-            <.input field={@form[:descriptions]} label={gettext("Descriptions")} />
           </div>
           <div class="grow shrink">
             <.input
@@ -425,11 +409,29 @@ defmodule FullCircleWeb.InvoiceLive.Form do
           </div>
         </div>
 
+        <.live_component
+          module={FullCircleWeb.InvoiceLive.DetailComponent}
+          id="invoice_details"
+          klass=""
+          settings={@settings}
+          doc_name="Invoice"
+          detail_name={:invoice_details}
+          form={@form}
+          taxcodetype="saltaxcode"
+          doc_good_amount={:invoice_good_amount}
+          doc_tax_amount={:invoice_tax_amount}
+          doc_detail_amount={:invoice_amount}
+          matched_trans={@matched_trans}
+          current_company={@current_company}
+          current_user={@current_user}
+        />
+
         <div class="flex flex-row justify-center gap-x-1 mt-1">
           <.form_action_button
             form={@form}
             live_action={@live_action}
-            new_url={~p"/companies/#{@current_company.id}/Invoice/new"}
+            current_company={@current_company}
+            type="Invoice"
           />
           <.print_button
             :if={@live_action == :edit}

@@ -368,7 +368,8 @@ defmodule FullCircleWeb.LoadLive.Form do
           <.form_action_button
             form={@form}
             live_action={@live_action}
-            new_url={~p"/companies/#{@current_company.id}/Load/new"}
+            current_company={@current_company}
+            type="Load"
           />
           <.print_button
             :if={@live_action == :edit}

@@ -236,7 +236,8 @@ defmodule FullCircleWeb.LayerLive.HouseForm do
           <.form_action_button
             form={@form}
             live_action={@live_action}
-            new_url={~p"/companies/#{@current_company.id}/houses/new"}
+            current_company={@current_company}
+            type="houses"
           />
           <%= if @live_action == :edit and FullCircle.Authorization.can?(@current_user, :delete_house, @current_company) do %>
             <.delete_confirm_modal

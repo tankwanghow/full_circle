@@ -386,7 +386,8 @@ defmodule FullCircleWeb.FixedAssetLive.Form do
           <.form_action_button
             form={@form}
             live_action={@live_action}
-            new_url={~p"/companies/#{@current_company.id}/fixed_assets/new"}
+            current_company={@current_company}
+            type="fixed_assets"
           />
           <%= if @live_action == :edit and FullCircle.Authorization.can?(@current_user, :delete_fixed_asset, @current_company) do %>
             <.delete_confirm_modal

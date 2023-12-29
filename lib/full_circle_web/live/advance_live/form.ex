@@ -226,7 +226,8 @@ defmodule FullCircleWeb.AdvanceLive.Form do
           <.form_action_button
             form={@form}
             live_action={@live_action}
-            new_url={~p"/companies/#{@current_company.id}/Advance/new"}
+            type="Advance"
+            current_company={@current_company}
           />
           <.print_button
             :if={@live_action == :edit}

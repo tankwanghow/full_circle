@@ -340,7 +340,8 @@ defmodule FullCircleWeb.DeliveryLive.Form do
           <.form_action_button
             form={@form}
             live_action={@live_action}
-            new_url={~p"/companies/#{@current_company.id}/Delivery/new"}
+            current_company={@current_company}
+            type="Delivery"
           />
           <.print_button
             :if={@live_action == :edit}

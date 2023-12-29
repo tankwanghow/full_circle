@@ -573,7 +573,8 @@ defmodule FullCircleWeb.PaymentLive.Form do
           <.form_action_button
             form={@form}
             live_action={@live_action}
-            new_url={~p"/companies/#{@current_company.id}/Payment/new"}
+            current_company={@current_company}
+            type="Payment"
           />
           <.print_button
             :if={@live_action != :new}

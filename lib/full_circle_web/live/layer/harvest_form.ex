@@ -344,7 +344,8 @@ defmodule FullCircleWeb.LayerLive.HarvestForm do
           <.form_action_button
             form={@form}
             live_action={@live_action}
-            new_url={~p"/companies/#{@current_company.id}/harvests/new"}
+            current_company={@current_company}
+            type="harvests"
           />
           <%= if @live_action == :edit and FullCircle.Authorization.can?(@current_user, :delete_harvest, @current_company) do %>
             <.delete_confirm_modal

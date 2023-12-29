@@ -211,7 +211,8 @@ defmodule FullCircleWeb.HolidayLive.Form do
           <.form_action_button
             form={@form}
             live_action={@live_action}
-            new_url={~p"/companies/#{@current_company.id}/holidays/new"}
+            current_company={@current_company}
+            type="holidays"
           />
           <%= if @live_action == :edit and
                  FullCircle.Authorization.can?(@current_user, :delete_holiday, @current_company) do %>

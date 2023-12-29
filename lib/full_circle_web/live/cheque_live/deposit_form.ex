@@ -321,7 +321,8 @@ defmodule FullCircleWeb.ChequeLive.DepositForm do
           <.form_action_button
             form={@form}
             live_action={@live_action}
-            new_url={~p"/companies/#{@current_company.id}/Deposit/new"}
+            type="Deposit"
+            current_company={@current_company}
           />
           <.live_component
             :if={@live_action == :edit}

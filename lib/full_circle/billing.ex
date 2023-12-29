@@ -467,11 +467,6 @@ defmodule FullCircle.Billing do
         preload: [pur_invoice_details: ^pur_invoice_details()],
         group_by: [
           inv.id,
-          inv.pur_invoice_no,
-          inv.supplier_invoice_no,
-          inv.descriptions,
-          cont.name,
-          inv.tags,
           cont.id
         ],
         select: inv,

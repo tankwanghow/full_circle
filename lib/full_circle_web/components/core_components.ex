@@ -851,7 +851,8 @@ defmodule FullCircleWeb.CoreComponents do
 
   attr :form, :any
   attr :live_action, :atom
-  attr :new_url, :any
+  attr :current_company, :any
+  attr :type, :string
 
   def form_action_button(assigns) do
     ~H"""
@@ -859,10 +860,17 @@ defmodule FullCircleWeb.CoreComponents do
     <.link :if={@live_action != :new} navigate="" class="orange button">
       <%= gettext("Cancel") %>
     </.link>
-    <.link :if={@live_action == :edit} navigate={@new_url} class="blue button">
+    <.link
+      :if={@live_action == :edit}
+      navigate={"/companies/#{@current_company.id}/#{@type}/new"}
+      class="blue button"
+    >
       <%= gettext("New") %>
     </.link>
-    <a onclick="history.back();" class="blue button"><%= gettext("Back") %></a>
+    <.link class="orange button" navigate={"/companies/#{@current_company.id}/#{@type}"}>
+      <%= gettext("Index") %>
+    </.link>
+    <%!-- <a onclick="history.back();" class="blue button"><%= gettext("Back") %></a> --%>
     """
   end
 
@@ -954,6 +962,16 @@ defmodule FullCircleWeb.CoreComponents do
     >
       <%= @doc_obj.doc_no %>
     </.link>
+    """
+  end
+
+  attr(:type, :any)
+  attr(:current_company, :any)
+  attr(:rest, :global)
+
+  def doc_index(assigns) do
+    ~H"""
+
     """
   end
 

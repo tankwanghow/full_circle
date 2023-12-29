@@ -413,7 +413,8 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
           <.form_action_button
             form={@form}
             live_action={@live_action}
-            new_url={~p"/companies/#{@current_company.id}/CreditNote/new"}
+            current_company={@current_company}
+            type="CreditNote"
           />
           <.print_button
             :if={@live_action != :new}

@@ -286,7 +286,8 @@ defmodule FullCircleWeb.SalaryNoteLive.Form do
           <.form_action_button
             form={@form}
             live_action={@live_action}
-            new_url={~p"/companies/#{@current_company.id}/SalaryNote/new"}
+            current_company={@current_company}
+            type="SalaryNote"
           />
           <%= if @live_action == :edit and FullCircle.Authorization.can?(@current_user, :delete_salary_note, @current_company) do %>
             <.delete_confirm_modal

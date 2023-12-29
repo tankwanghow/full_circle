@@ -309,15 +309,9 @@ defmodule FullCircleWeb.JournalLive.Form do
           <.form_action_button
             form={@form}
             live_action={@live_action}
-            new_url={~p"/companies/#{@current_company.id}/Journal/new"}
+            current_company={@current_company}
+            type="Journal"
           />
-          <.link
-            :if={@live_action == :edit}
-            navigate={~p"/companies/#{@current_company.id}/Journal/new"}
-            class="blue button"
-          >
-            <%= gettext("New") %>
-          </.link>
           <.print_button
             :if={@live_action == :edit}
             company={@current_company}

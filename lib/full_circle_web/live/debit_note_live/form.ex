@@ -413,7 +413,8 @@ defmodule FullCircleWeb.DebitNoteLive.Form do
           <.form_action_button
             form={@form}
             live_action={@live_action}
-            new_url={~p"/companies/#{@current_company.id}/DebitNote/new"}
+            current_company={@current_company}
+            type="DebitNote"
           />
           <.print_button
             :if={@live_action != :new}

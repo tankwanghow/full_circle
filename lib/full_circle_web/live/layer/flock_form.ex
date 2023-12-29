@@ -307,7 +307,8 @@ defmodule FullCircleWeb.LayerLive.FlockForm do
           <.form_action_button
             form={@form}
             live_action={@live_action}
-            new_url={~p"/companies/#{@current_company.id}/flocks/new"}
+            current_company={@current_company}
+            type="flocks"
           />
           <%= if @live_action == :edit and FullCircle.Authorization.can?(@current_user, :delete_flock, @current_company) do %>
             <.delete_confirm_modal
