@@ -14,6 +14,9 @@ defmodule FullCircle.Authorization do
   def can?(user, :seed_goods, company),
     do: allow_roles(~w(admin), company, user)
 
+  def can?(user, :seed_good_packagings, company),
+    do: allow_roles(~w(admin), company, user)
+
   def can?(user, :seed_contacts, company),
     do: allow_roles(~w(admin), company, user)
 

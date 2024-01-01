@@ -16,7 +16,8 @@ defmodule FullCircleWeb.SeedLive.Index do
     "Contacts" =>
       ~w(name address1 address2 city zipcode state country reg_no email contact_info descriptions),
     "Goods" =>
-      ~w(name descriptions unit purchase_account_name sales_account_name purchase_tax_code_name sales_tax_code_name package_name unit_multiplier cost_per_package),
+      ~w(name descriptions unit purchase_account_name sales_account_name purchase_tax_code_name sales_tax_code_name),
+    "GoodPackagings" => ~w(good_name name unit_multiplier cost_per_package),
     "Balances" => ~w(doc_date	account_name amount),
     "Transactions" => ~w(doc_date	account_name	doc_no doc_type particulars	amount),
     "TransactionMatchers" =>
@@ -242,7 +243,7 @@ defmodule FullCircleWeb.SeedLive.Index do
       <ol class="shake p-2 border-4 border-cyan-600 bg-cyan-200 rounded-lg mb-2">
         <li class="font-bold text-2xl">Seeding Order</li>
         <li>Accounts, Contacts, FixedAssets, FixedAssetsDepreciations, Balance, TaxCodes</li>
-        <li>Goods, Employees, SalaryTypes, Houses, Weighings</li>
+        <li>Goods, GoodPackagings, Employees, SalaryTypes, Houses, Weighings</li>
         <li>Transactions, TransactionMatchers, EmployeeSalaryTypes</li>
         <li>HouseHarvestWages, Flocks, Movements, Harvest, HarvestDetails</li>
       </ol>

@@ -24,6 +24,7 @@ defmodule FullCircle.Product.Packaging do
     |> cast(attrs, [
       :_persistent_id,
       :name,
+      :good_id,
       :unit_multiplier,
       :cost_per_package,
       :default,

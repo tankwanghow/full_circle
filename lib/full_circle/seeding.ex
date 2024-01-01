@@ -18,7 +18,7 @@ defmodule FullCircle.Seeding do
 
   alias FullCircle.Layer.{House, Flock, Movement, Harvest, HarvestDetail}
   alias FullCircle.WeightBridge.Weighing
-  alias FullCircle.Product.{Good}
+  alias FullCircle.Product.{Good, Packaging}
 
   def seed("Employees", seed_data, com, user) do
     save_seed(%Employee{}, :seed_employees, seed_data, com, user)
@@ -38,6 +38,10 @@ defmodule FullCircle.Seeding do
 
   def seed("Goods", seed_data, com, user) do
     save_seed(%Good{}, :seed_goods, seed_data, com, user)
+  end
+
+  def seed("GoodPackagings", seed_data, com, user) do
+    save_seed(%Packaging{}, :seed_good_packagings, seed_data, com, user)
   end
 
   def seed("Accounts", seed_data, com, user) do
@@ -210,31 +214,29 @@ defmodule FullCircle.Seeding do
         user
       )
 
-    packagings = %{
-      "0" => %{
-        name: Map.fetch!(attr, "package_name"),
-        unit_multiplier: Map.fetch!(attr, "unit_multiplier"),
-        cost_per_package: Map.fetch!(attr, "cost_per_package")
-      }
-    }
-
-    attr =
-      attr
-      |> Map.delete("package_name")
-      |> Map.delete("unit_multiplier")
-      |> Map.delete("cost_per_package")
-
     attr =
       attr
       |> Map.merge(%{"purchase_account_id" => if(pur_ac, do: pur_ac.id, else: nil)})
       |> Map.merge(%{"sales_account_id" => if(sal_ac, do: sal_ac.id, else: nil)})
       |> Map.merge(%{"purchase_tax_code_id" => if(pur_tax, do: pur_tax.id, else: nil)})
       |> Map.merge(%{"sales_tax_code_id" => if(sal_tax, do: sal_tax.id, else: nil)})
-      |> Map.merge(%{packagings: packagings})
 
     {FullCircle.StdInterface.changeset(
        FullCircle.Product.Good,
        FullCircle.Product.Good.__struct__(),
+       attr,
+       com, :seed_changeset
+     ), attr}
+  end
+
+  def fill_changeset("GoodPackagings", attr, com, user) do
+    good = FullCircle.Product.get_good_by_name(Map.fetch!(attr, "good_name"), com, user)
+
+    attr = attr |> Map.merge(%{"good_id" => good.id})
+
+    {FullCircle.StdInterface.changeset(
+       FullCircle.Product.Packaging,
+       FullCircle.Product.Packaging.__struct__(),
        attr,
        com
      ), attr}

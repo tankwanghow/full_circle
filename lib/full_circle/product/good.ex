@@ -37,6 +37,56 @@ defmodule FullCircle.Product.Good do
   end
 
   @doc false
+  def seed_changeset(good, attrs) do
+    good
+    |> cast(attrs, [
+      :name,
+      :unit,
+      :descriptions,
+      :company_id,
+      :purchase_account_name,
+      :sales_account_name,
+      :purchase_tax_code_name,
+      :sales_tax_code_name,
+      :purchase_account_id,
+      :purchase_tax_code_id,
+      :sales_account_id,
+      :sales_tax_code_id,
+      :purchase_tax_rate,
+      :sales_tax_rate
+    ])
+    |> validate_required([
+      :name,
+      :unit,
+      :company_id,
+      :purchase_account_name,
+      :sales_account_name,
+      :purchase_tax_code_name,
+      :sales_tax_code_name
+    ])
+    |> unsafe_validate_unique([:name, :company_id], FullCircle.Repo,
+      message: gettext("has already been taken")
+    )
+    |> unique_constraint(:name,
+      name: :goods_unique_name_in_company,
+      message: gettext("has already been taken")
+    )
+    |> validate_id(:sales_account_name, :sales_account_id)
+    |> validate_id(:purchase_account_name, :purchase_account_id)
+    |> validate_id(:sales_tax_code_name, :sales_tax_code_id)
+    |> validate_id(:purchase_tax_code_name, :purchase_tax_code_id)
+    |> cast_assoc(:packagings)
+    |> foreign_key_constraint(:name,
+      name: :invoice_details_good_id_fkey,
+      message: gettext("referenced by invoice details")
+    )
+    |> foreign_key_constraint(:name,
+      name: :pur_invoice_details_good_id_fkey,
+      message: gettext("referenced by pur_invoice details")
+    )
+  end
+
+  @doc false
   def changeset(good, attrs) do
     good
     |> cast(attrs, [
