@@ -18,42 +18,46 @@ defmodule FullCircleWeb.UserRegistrationLive do
         </:subtitle>
       </.header>
 
-      <.simple_form
-        for={@form}
-        id="registration_form"
-        phx-submit="save"
-        phx-change="validate"
-        phx-trigger-action={@trigger_submit}
-        action={~p"/users/log_in?_action=registered"}
-        method="post"
-      >
-        <.error :if={@check_errors}>
-          <%= gettext("Oops, something went wrong! Please check the errors below.") %>
-        </.error>
+      <div class="mx-auto max-w-xs text-center mt-3">
+        <a class="red button" :if={!@is_a_human} phx-click="human">I am a human</a>
+        <a class="blue button" :if={!@is_a_human}>I am a bot</a>
+      </div>
 
-        <.input field={@form[:email]} type="email" label={gettext("Email")} required />
-        <.input field={@form[:password]} type="password" label={gettext("Password")} required />
+      <div :if={@is_a_human}>
+        <.simple_form
+          for={@form}
+          id="registration_form"
+          phx-submit="save"
+          phx-change="validate"
+          phx-trigger-action={@trigger_submit}
+          action={~p"/users/log_in?_action=registered"}
+          method="post"
+        >
+          <.error :if={@check_errors}>
+            <%= gettext("Oops, something went wrong! Please check the errors below.") %>
+          </.error>
 
-        <:actions>
-          <.button phx-disable-with={gettext("Creating account...")} class="w-full">
-            <%= gettext("Create an account") %>
-          </.button>
-        </:actions>
-      </.simple_form>
+          <.input field={@form[:email]} type="email" label={gettext("Email")} required />
+          <.input field={@form[:password]} type="password" label={gettext("Password")} required />
+
+          <:actions>
+            <.button phx-disable-with={gettext("Creating account...")} class="w-full">
+              <%= gettext("Create an account") %>
+            </.button>
+          </:actions>
+        </.simple_form>
+      </div>
     </div>
     """
   end
 
   def mount(_params, _session, socket) do
-    changeset = UserAccounts.change_user_registration(%User{})
-
     socket =
       socket
-      |> assign(trigger_submit: false, check_errors: false)
       |> assign(page_title: gettext("Register"))
-      |> assign_form(changeset)
+      |> assign(is_a_human: false)
 
-    {:ok, socket, temporary_assigns: [form: nil]}
+    {:ok, socket}
   end
 
   def handle_event("save", %{"user" => user_params}, socket) do
@@ -76,6 +80,19 @@ defmodule FullCircleWeb.UserRegistrationLive do
   def handle_event("validate", %{"user" => user_params}, socket) do
     changeset = UserAccounts.change_user_registration(%User{}, user_params)
     {:noreply, assign_form(socket, Map.put(changeset, :action, :validate))}
+  end
+
+  def handle_event("human", _, socket) do
+    changeset = UserAccounts.change_user_registration(%User{})
+
+    socket =
+      socket
+      |> assign(trigger_submit: false, check_errors: false)
+      |> assign(page_title: gettext("Register"))
+      |> assign(is_a_human: true)
+      |> assign_form(changeset)
+
+    {:noreply, socket}
   end
 
   defp assign_form(socket, %Ecto.Changeset{} = changeset) do
