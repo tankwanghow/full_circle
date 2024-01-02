@@ -58,7 +58,7 @@ defmodule FullCircleWeb.WeighingLive.GoodsReport do
 
   defp filter_objects(socket, glist, f_date, t_date) do
     objects =
-      if glist == "" or t_date == "" or f_date == "" do
+      if t_date == "" or f_date == "" do
         []
       else
         t_date = t_date |> Timex.parse!("{YYYY}-{0M}-{0D}") |> NaiveDateTime.to_date()

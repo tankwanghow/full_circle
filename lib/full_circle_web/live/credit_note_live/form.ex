@@ -292,6 +292,8 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
   end
 
   defp validate(params, socket) do
+    params = params |>  FullCircleWeb.Helpers.put_into_matchers("doc_date", params["note_date"])
+
     changeset =
       StdInterface.changeset(
         CreditNote,

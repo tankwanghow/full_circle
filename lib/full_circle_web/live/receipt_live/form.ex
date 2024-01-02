@@ -446,6 +446,8 @@ defmodule FullCircleWeb.ReceiptLive.Form do
   end
 
   defp validate(params, socket) do
+    params = params |>  FullCircleWeb.Helpers.put_into_matchers("doc_date", params["receipt_date"])
+
     changeset =
       StdInterface.changeset(
         Receipt,

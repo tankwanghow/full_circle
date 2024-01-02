@@ -229,16 +229,34 @@ defmodule FullCircle.Reporting do
   end
 
   defp balance_sheet_query(at_date, com) do
-    from(ac in Account,
+    bs_acc =
+      FullCircle.Accounting.balance_sheet_account_types()
+      |> Enum.reject(fn x -> x == "Inventory" end)
+
+    a = from(ac in Account,
       join: txn in Transaction,
       on: ac.id == txn.account_id,
       where: ac.company_id == ^com.id,
-      where: ac.account_type in ^FullCircle.Accounting.balance_sheet_account_types(),
+      where: ac.account_type in ^bs_acc,
       where: txn.doc_date <= ^at_date,
       select: %{id: ac.id, type: ac.account_type, name: ac.name, balance: sum(txn.amount)},
       group_by: [ac.account_type, ac.id],
       having: sum(txn.amount) != 0
     )
+
+    b = from(ac in Account,
+      join: txn in Transaction,
+      on: ac.id == txn.account_id,
+      where: ac.company_id == ^com.id,
+      where: ac.account_type == "Inventory",
+      where: txn.doc_date <= ^at_date,
+      where: txn.doc_date > ^prev_close_date(at_date, com),
+      select: %{id: ac.id, type: ac.account_type, name: ac.name, balance: sum(txn.amount)},
+      group_by: [ac.account_type, ac.id],
+      having: sum(txn.amount) != 0
+    )
+
+    union_all(a, ^b)
   end
 
   defp profit_loss_query(at_date, com) do
@@ -467,30 +485,29 @@ defmodule FullCircle.Reporting do
     "with
         has_balance_contacts as (
           select c.id, c.name
-            from contacts c inner join transactions t on c.id = t.contact_id
-          where t.doc_date <= '#{edate}'
-            and c.company_id = '#{com_id}'
-            and c.id = ANY('{#{Enum.join(ids, ",")}}')
-          group by c.id),
+            from contacts c
+           where c.company_id = '#{com_id}'
+             and c.id = ANY('{#{Enum.join(ids, ",")}}')
+           group by c.id),
         has_balance_txn as (
-          select t.doc_date, t.doc_type, t.doc_no, t.contact_id, c.name as contact_name,
-                t.amount + coalesce(sum(stm.match_amount), 0) + coalesce(sum(tm.match_amount), 0) as balance
-              from transactions t inner join has_balance_contacts c
-                on c.id = t.contact_id left outer join seed_transaction_matchers stm
-                on stm.transaction_id = t.id left outer join transaction_matchers tm
-                on tm.transaction_id = t.id
-            where t.contact_id is not null
-              and t.doc_date <= '#{edate}'
-            group by t.id, c.name
-            having t.amount + coalesce(sum(stm.match_amount), 0) + coalesce(sum(tm.match_amount), 0) <> 0
-        ),
+          select t.doc_date, t.doc_type, t.doc_no, t.doc_id, t.contact_id, c.name as contact_name,
+                 t.amount + coalesce(sum(stm.match_amount), 0) + coalesce(sum(tm.match_amount), 0) as balance
+            from transactions t inner join has_balance_contacts c
+              on c.id = t.contact_id left outer join seed_transaction_matchers stm
+              on stm.transaction_id = t.id and stm.m_doc_date <= '#{edate}' left outer join transaction_matchers tm
+              on tm.transaction_id = t.id and tm.doc_date <= '#{edate}'
+           where t.contact_id is not null
+             and t.doc_date <= '#{edate}'
+           group by t.id, c.name
+          having t.amount + coalesce(sum(stm.match_amount), 0) + coalesce(sum(tm.match_amount), 0) <> 0),
         has_balance_txn_1 as (
           select hbt.doc_date, hbt.doc_type, hbt.doc_no, hbt.contact_id, hbt.contact_name,
-                hbt.balance - coalesce(sum(stm.match_amount), 0) - coalesce(sum(tm.match_amount), 0) as balance
+                 hbt.balance - coalesce(sum(stm.match_amount), 0) - coalesce(sum(tm.match_amount), 0) as balance
             from has_balance_txn hbt left outer join seed_transaction_matchers stm
-              on stm.m_doc_type = hbt.doc_type and stm.m_doc_id::varchar = hbt.doc_no left outer join transaction_matchers tm
-                on tm.doc_type = hbt.doc_type and tm.doc_id::varchar = hbt.doc_no
-          group by hbt.doc_date, hbt.doc_type, hbt.doc_no, hbt.contact_id, hbt.contact_name, hbt.balance
+              on stm.m_doc_type = hbt.doc_type and stm.m_doc_id::varchar = hbt.doc_no
+            left outer join transaction_matchers tm
+              on tm.doc_type = hbt.doc_type and tm.doc_id = hbt.doc_id
+           group by hbt.doc_date, hbt.doc_type, hbt.doc_no, hbt.contact_id, hbt.contact_name, hbt.balance
           having hbt.balance - coalesce(sum(stm.match_amount), 0) - coalesce(sum(tm.match_amount), 0)  <> 0),
         aging_list as (
           select contact_name, contact_id,
@@ -508,7 +525,7 @@ defmodule FullCircle.Reporting do
                  sum(case when
                        extract(day from '#{edate}'::timestamp - doc_date::timestamp) > #{days * 4} then balance else 0 end) as p5
             from has_balance_txn_1
-            group by contact_name, contact_id)
+           group by contact_name, contact_id)
 
         select contact_id, contact_name, p1, p2, p3, p4, p5,
                p1 + p2 + p3 + p4 + p5 as total
@@ -520,30 +537,32 @@ defmodule FullCircle.Reporting do
     "with
         has_balance_contacts as (
           select c.id, c.name
-            from contacts c inner join transactions t on c.id = t.contact_id
-          where t.doc_date <= '#{edate}'
-            and c.company_id = '#{com_id}'
-          group by c.id
+            from contacts c inner join transactions t
+              on t.contact_id = c.id
+           where t.doc_date <= '#{edate}'
+             and c.company_id = '#{com_id}'
+           group by c.id
           having sum(t.amount) <> 0),
         has_balance_txn as (
-          select t.doc_date, t.doc_type, t.doc_no, t.contact_id, c.name as contact_name,
-                t.amount + coalesce(sum(stm.match_amount), 0) + coalesce(sum(tm.match_amount), 0) as balance
-              from transactions t inner join has_balance_contacts c
-                on c.id = t.contact_id left outer join seed_transaction_matchers stm
-                on stm.transaction_id = t.id left outer join transaction_matchers tm
-                on tm.transaction_id = t.id
-            where t.contact_id is not null
-              and t.doc_date <= '#{edate}'
-            group by t.id, c.name
-            having t.amount + coalesce(sum(stm.match_amount), 0) + coalesce(sum(tm.match_amount), 0) <> 0
+          select t.doc_date, t.doc_type, t.doc_no, t.doc_id, t.contact_id, c.name as contact_name,
+                 t.amount + coalesce(sum(stm.match_amount), 0) + coalesce(sum(tm.match_amount), 0) as balance
+            from transactions t inner join has_balance_contacts c
+              on c.id = t.contact_id left outer join seed_transaction_matchers stm
+              on stm.transaction_id = t.id and stm.m_doc_date <= '#{edate}' left outer join transaction_matchers tm
+              on tm.transaction_id = t.id and tm.doc_date <= '#{edate}'
+           where t.contact_id is not null
+             and t.doc_date <= '#{edate}'
+           group by t.id, c.name
+          having t.amount + coalesce(sum(stm.match_amount), 0) + coalesce(sum(tm.match_amount), 0) <> 0
         ),
         has_balance_txn_1 as (
           select hbt.doc_date, hbt.doc_type, hbt.doc_no, hbt.contact_id, hbt.contact_name,
-                hbt.balance - coalesce(sum(stm.match_amount), 0) - coalesce(sum(tm.match_amount), 0) as balance
+                 hbt.balance - coalesce(sum(stm.match_amount), 0) - coalesce(sum(tm.match_amount), 0) as balance
             from has_balance_txn hbt left outer join seed_transaction_matchers stm
-              on stm.m_doc_type = hbt.doc_type and stm.m_doc_id::varchar = hbt.doc_no left outer join transaction_matchers tm
-                on tm.doc_type = hbt.doc_type and tm.doc_id::varchar = hbt.doc_no
-          group by hbt.doc_date, hbt.doc_type, hbt.doc_no, hbt.contact_id, hbt.contact_name, hbt.balance
+              on stm.m_doc_type = hbt.doc_type and stm.m_doc_id::varchar = hbt.doc_no
+            left outer join transaction_matchers tm
+              on tm.doc_type = hbt.doc_type and tm.doc_id = hbt.doc_id
+           group by hbt.doc_date, hbt.doc_type, hbt.doc_no, hbt.contact_id, hbt.contact_name, hbt.balance
           having hbt.balance - coalesce(sum(stm.match_amount), 0) - coalesce(sum(tm.match_amount), 0)  <> 0),
         aging_list as (
           select contact_name, contact_id,
@@ -561,7 +580,7 @@ defmodule FullCircle.Reporting do
                  sum(case when
                        extract(day from '#{edate}'::timestamp - doc_date::timestamp) > #{days * 4} then balance else 0 end) as p5
             from has_balance_txn_1
-            group by contact_name, contact_id)
+           group by contact_name, contact_id)
 
         select contact_id, contact_name, p1, p2, p3, p4, p5,
                p1 + p2 + p3 + p4 + p5 as total

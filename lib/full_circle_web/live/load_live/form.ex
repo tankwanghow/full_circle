@@ -290,8 +290,6 @@ defmodule FullCircleWeb.LoadLive.Form do
 
     socket = assign(socket, form: to_form(changeset))
 
-    IO.inspect(changeset)
-
     {:noreply, socket}
   end
 

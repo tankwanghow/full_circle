@@ -168,6 +168,7 @@ defmodule FullCircle.Seeding do
       end
 
     new_attr = %{
+      m_doc_date: Map.fetch!(attr, "m_doc_date"),
       m_doc_type: Map.fetch!(attr, "m_doc_type"),
       m_doc_id: Map.fetch!(attr, "m_doc_id"),
       n_doc_type: Map.fetch!(attr, "n_doc_type"),

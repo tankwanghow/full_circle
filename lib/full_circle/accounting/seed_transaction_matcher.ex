@@ -3,6 +3,7 @@ defmodule FullCircle.Accounting.SeedTransactionMatcher do
   import Ecto.Changeset
 
   schema "seed_transaction_matchers" do
+    field :m_doc_date, :date
     field :m_doc_type, :string
     field :m_doc_id, :integer
     field :n_doc_type, :string
@@ -16,6 +17,7 @@ defmodule FullCircle.Accounting.SeedTransactionMatcher do
   def changeset(seed, attrs) do
     seed
     |> cast(attrs, [
+      :m_doc_date,
       :m_doc_type,
       :m_doc_id,
       :n_doc_type,
@@ -24,6 +26,7 @@ defmodule FullCircle.Accounting.SeedTransactionMatcher do
       :transaction_id
     ])
     |> validate_required([
+      :m_doc_date,
       :m_doc_type,
       :m_doc_id,
       :n_doc_type,

@@ -120,17 +120,18 @@ defmodule FullCircleWeb.CsvController do
         "tdate" => tdate
       }) do
     tdate = tdate |> Timex.parse!("{YYYY}-{0M}-{0D}") |> NaiveDateTime.to_date()
+    com = FullCircle.Sys.get_company!(com_id)
 
     data =
       cond do
         rep == "Trail Balance" ->
-          FullCircle.Reporting.trail_balance(tdate, com_id)
+          FullCircle.Reporting.trail_balance(tdate, com)
 
         rep == "Profit Loss" ->
-          FullCircle.Reporting.profit_loss(tdate, com_id)
+          FullCircle.Reporting.profit_loss(tdate, com)
 
         rep == "Balance Sheet" ->
-          FullCircle.Reporting.balance_sheet(tdate, com_id)
+          FullCircle.Reporting.balance_sheet(tdate, com)
 
         true ->
           []

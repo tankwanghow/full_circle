@@ -147,4 +147,18 @@ defmodule FullCircleWeb.Helpers do
         )
     )
   end
+
+  def put_into_matchers(params, field, doc_date) do
+    if params["transaction_matchers"] do
+      mt =
+        params["transaction_matchers"]
+        |> Enum.reduce(%{}, fn {k, v}, acc ->
+          Map.put(acc, k, Map.merge(v, %{field => doc_date}))
+        end)
+
+      Map.merge(params, %{"transaction_matchers" => mt})
+    else
+      params
+    end
+  end
 end
