@@ -427,6 +427,11 @@ defmodule FullCircle.Sys do
         end)
       end
     )
+    |> Multi.run(:create_upload_directory, fn _, %{create_company: c} ->
+      with :ok <- File.mkdir("priv/static/uploads/#{c.id}") do
+        {:ok, nil}
+      end
+    end)
     |> FullCircle.Repo.transaction()
     |> case do
       {:ok, %{create_company: company}} ->
@@ -461,6 +466,11 @@ defmodule FullCircle.Sys do
       true ->
         Multi.new()
         |> Multi.delete(:delete_company, company)
+        |> Multi.run(:delete_upload_directory, fn _, %{delete_company: c} ->
+          with {:ok, _} <- File.rm_rf("priv/static/uploads/#{c.id}") do
+            {:ok, nil}
+          end
+        end)
         |> FullCircle.Repo.transaction()
         |> case do
           {:ok, %{delete_company: company}} ->

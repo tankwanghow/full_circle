@@ -166,10 +166,12 @@ from products p inner join product_packagings pp
 	
   Postgres cluster fullcircle-db created
   Username:    postgres
-  Password:    ahmaGl3gsWRjavP
+  Password:    01RIToySVVKXxc3
   Hostname:    fullcircle-db.internal
-  Flycast:     fdaa:0:3eac:0:1::b
+  Flycast:     fdaa:0:3eac:0:1::c
   Proxy port:  5432
   Postgres port:  5433
-  Connection string: postgres://postgres:ahmaGl3gsWRjavP@fullcircle-db.flycast:5432
+  Connection string: postgres://postgres:01RIToySVVKXxc3@fullcircle-db.flycast:5432
+
+Save your credentials in a secure place -- you won't be able to see them again!
 
