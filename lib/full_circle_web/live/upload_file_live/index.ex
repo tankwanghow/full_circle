@@ -53,7 +53,8 @@ defmodule FullCircleWeb.UploadFileLive.Index do
 
     filenames = File.ls!(path)
 
-    filenames |> Enum.map(fn f -> Map.merge(File.stat!(Path.join(path, f)), %{name: f}) end)
+    filenames
+    |> Enum.map(fn f -> Map.merge(File.stat!(Path.join(path, f)), %{name: f, path: path}) end)
   end
 
   defp error_to_string(:too_large), do: "Too large!"
@@ -63,8 +64,8 @@ defmodule FullCircleWeb.UploadFileLive.Index do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="w-10/12 h-screen mx-auto text-center flex gap-2">
-      <div class="w-[40%] h-[50%] border-4 rounded bg-yellow-200 border-yellow-800">
+    <div class="mx-auto w-10/12 h-screen text-center">
+      <div class="w-[40%] h-[35%] mx-auto border-4 rounded bg-yellow-200 border-yellow-800 mb-2">
         <div class="text-3xl font-medium"><%= @page_title %></div>
         <span class="text font-medium">
           <%= "Maximum file size is #{@uploads.any_file.max_file_size / 1_000_000}MB," %>
@@ -118,12 +119,17 @@ defmodule FullCircleWeb.UploadFileLive.Index do
           </.button>
         </form>
       </div>
-      <div class="w-[60%] h-[90%] border-4 font-mono rounded bg-green-200 border-green-800 overflow-y-auto">
+      <div class="mx-auto h-[55%] border-4 rounded bg-green-200 border-green-800 overflow-y-auto">
         <%= for f <- @uploaded_files do %>
           <div class="flex gap-1 m-2 hover:bg-green-400 hover:cursor-pointer">
-            <div class="w-[64%] text-left"><%= f.name %></div>
-            <div class="w-[10%] text-right"><%= (f.size / 1_000) |> Float.round(2) %>KB</div>
-            <div class="w-[24%] text-right">
+            <div class="w-[79%] text-left">
+              <%= f.name %>
+              <div class="text-left text-xs">
+                <%= f.path %>
+              </div>
+            </div>
+            <div class="w-[5%] text-right"><%= (f.size / 1_000) |> Float.round(2) %>KB</div>
+            <div class="w-[14%] text-right">
               <%= f.mtime
               |> :calendar.datetime_to_gregorian_seconds()
               |> DateTime.from_gregorian_seconds()
