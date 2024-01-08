@@ -45,3 +45,5 @@ Dockerfile
 
 txnpart*
 stuff*.*
+
+secret.txt
