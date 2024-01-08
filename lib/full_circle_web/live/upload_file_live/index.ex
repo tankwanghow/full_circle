@@ -25,9 +25,7 @@ defmodule FullCircleWeb.UploadFileLive.Index do
     consume_uploaded_entries(socket, :any_file, fn %{path: path}, entry ->
       dest =
         Path.join([
-          :code.priv_dir(:full_circle),
-          "static",
-          "uploads",
+          Application.get_env(:full_circle, :uploads_dir),
           "#{socket.assigns.current_company.id}",
           Path.basename(entry.client_name)
         ])
@@ -45,9 +43,7 @@ defmodule FullCircleWeb.UploadFileLive.Index do
   defp uploaded_files(socket) do
     path =
       Path.join([
-        :code.priv_dir(:full_circle),
-        "static",
-        "uploads",
+        Application.get_env(:full_circle, :uploads_dir),
         "#{socket.assigns.current_company.id}"
       ])
 

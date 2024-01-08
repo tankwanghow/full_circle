@@ -428,7 +428,7 @@ defmodule FullCircle.Sys do
       end
     )
     |> Multi.run(:create_upload_directory, fn _, %{create_company: c} ->
-      path = Path.join([:code.priv_dir(:full_circle), "static", "uploads", "#{c.id}"])
+      path = Path.join([Application.get_env(:full_circle, :uploads_dir), "#{c.id}"])
 
       with :ok <- File.mkdir(path) do
         {:ok, nil}
@@ -469,7 +469,7 @@ defmodule FullCircle.Sys do
         Multi.new()
         |> Multi.delete(:delete_company, company)
         |> Multi.run(:delete_upload_directory, fn _, %{delete_company: c} ->
-          path = Path.join([:code.priv_dir(:full_circle), "static", "uploads", "#{c.id}"])
+          path = Path.join([Application.get_env(:full_circle, :uploads_dir), "#{c.id}"])
 
           with {:ok, _} <- File.rm_rf(path) do
             {:ok, nil}
