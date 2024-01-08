@@ -158,20 +158,3 @@ from products p inner join product_packagings pp
                  extract(day from '2023-10-31'::timestamp - doc_date::timestamp) > 120 then balance else 0 end) as day120
 	    from has_balance_txn_1 
 	   group by contact_name;
-	    
-	    
-	    
-	    
-	    
-	
-  Postgres cluster fullcircle-db created
-  Username:    postgres
-  Password:    01RIToySVVKXxc3
-  Hostname:    fullcircle-db.internal
-  Flycast:     fdaa:0:3eac:0:1::c
-  Proxy port:  5432
-  Postgres port:  5433
-  Connection string: postgres://postgres:01RIToySVVKXxc3@fullcircle-db.flycast:5432
-
-Save your credentials in a secure place -- you won't be able to see them again!
-
