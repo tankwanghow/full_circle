@@ -187,7 +187,6 @@ defmodule FullCircleWeb.TimeAttendLive.SalaryNoteFormComponent do
               field={@form[:employee_name]}
               label={gettext("Employee")}
               phx-hook="tributeAutoComplete"
-              phx-debounce="blur"
               url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=employee&name="}
             />
           </div>
@@ -197,7 +196,6 @@ defmodule FullCircleWeb.TimeAttendLive.SalaryNoteFormComponent do
               field={@form[:salary_type_name]}
               label={gettext("Salary Type")}
               phx-hook="tributeAutoComplete"
-              phx-debounce="blur"
               url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=salarytype&name="}
             />
           </div>

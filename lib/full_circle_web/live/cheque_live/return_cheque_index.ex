@@ -101,7 +101,6 @@ defmodule FullCircleWeb.ChequeLive.ReturnChequeIndex do
                 id="search_terms"
                 name="search[terms]"
                 value={@search.terms}
-                phx-debounce="500"
                 placeholder={gettext("bank, deposit no or particulars...")}
               />
             </div>

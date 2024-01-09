@@ -359,7 +359,6 @@ defmodule FullCircleWeb.InvoiceLive.Form do
               field={@form[:contact_name]}
               label={gettext("Customer")}
               phx-hook="tributeAutoComplete"
-              phx-debounce="500"
               url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
             />
           </div>

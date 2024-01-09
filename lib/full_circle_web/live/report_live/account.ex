@@ -100,7 +100,6 @@ defmodule FullCircleWeb.ReportLive.Account do
                 name="search[name]"
                 value={@search.name}
                 phx-hook="tributeAutoComplete"
-                phx-debounce="500"
                 url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=account&name="}
               />
             </div>

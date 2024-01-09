@@ -260,7 +260,6 @@ defmodule FullCircleWeb.JournalLive.Form do
                 <.input
                   field={dtl[:account_name]}
                   phx-hook="tributeAutoComplete"
-                  phx-debounce="500"
                   url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=account&name="}
                 />
               </div>
@@ -269,13 +268,12 @@ defmodule FullCircleWeb.JournalLive.Form do
                 <.input
                   field={dtl[:contact_name]}
                   phx-hook="tributeAutoComplete"
-                  phx-debounce="500"
                   url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
                 />
               </div>
               <div class="w-[30%]"><.input feedback field={dtl[:particulars]} /></div>
               <div class="w-[17%]">
-                <.input phx-debounce="500" type="number" step="0.01" field={dtl[:amount]} />
+                <.input type="number" step="0.01" field={dtl[:amount]} />
               </div>
               <div class="w-[3%] mt-1 text-rose-500">
                 <.link phx-click={:delete_trans} phx-value-index={dtl.index} tabindex="-1">

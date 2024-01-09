@@ -42,10 +42,10 @@ defmodule FullCircleWeb.CreditNoteLive.DetailComponent do
         <div class={"flex flex-row #{if(dtl[:delete].value == true, do: "hidden", else: "")}"}>
           <div class="w-[30%]"><.input field={dtl[:descriptions]} /></div>
           <div class="w-[10%]">
-            <.input type="number" field={dtl[:quantity]} step="0.0001" phx-debounce="500" />
+            <.input type="number" field={dtl[:quantity]} step="0.0001" />
           </div>
           <div class="w-[8%]">
-            <.input type="number" phx-debounce="500" field={dtl[:unit_price]} step="0.0001" />
+            <.input type="number" field={dtl[:unit_price]} step="0.0001" />
           </div>
           <div class="w-[10%]">
             <.input type="number" field={dtl[:desc_amount]} readonly tabindex="-1" />
@@ -54,7 +54,6 @@ defmodule FullCircleWeb.CreditNoteLive.DetailComponent do
             <.input
               field={dtl[:account_name]}
               phx-hook="tributeAutoComplete"
-              phx-debounce="500"
               url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=account&name="}
             />
           </div>
@@ -63,13 +62,12 @@ defmodule FullCircleWeb.CreditNoteLive.DetailComponent do
             <.input
               field={dtl[:tax_code_name]}
               phx-hook="tributeAutoComplete"
-              phx-debounce="500"
               url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=#{@taxcodetype}&name="}
             />
           </div>
           <%= Phoenix.HTML.Form.hidden_input(dtl, :tax_code_id) %>
           <div class="w-[8%]">
-            <.input type="number" field={dtl[:tax_rate]} phx-debounce="500" step="0.0001" />
+            <.input type="number" field={dtl[:tax_rate]} step="0.0001" />
           </div>
           <div class="w-[8%]">
             <.input type="number" field={dtl[:tax_amount]} readonly tabindex="-1" />

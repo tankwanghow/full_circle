@@ -292,7 +292,7 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
   end
 
   defp validate(params, socket) do
-    params = params |>  FullCircleWeb.Helpers.put_into_matchers("doc_date", params["note_date"])
+    params = params |> FullCircleWeb.Helpers.put_into_matchers("doc_date", params["note_date"])
 
     changeset =
       StdInterface.changeset(
@@ -322,7 +322,6 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
               field={@form[:contact_name]}
               label={gettext("Credit Note To")}
               phx-hook="tributeAutoComplete"
-              phx-debounce="500"
               url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
             />
           </div>

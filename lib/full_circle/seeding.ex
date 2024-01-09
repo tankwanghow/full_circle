@@ -226,7 +226,8 @@ defmodule FullCircle.Seeding do
        FullCircle.Product.Good,
        FullCircle.Product.Good.__struct__(),
        attr,
-       com, :seed_changeset
+       com,
+       :seed_changeset
      ), attr}
   end
 

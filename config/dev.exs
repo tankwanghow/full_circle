@@ -11,7 +11,7 @@ config :full_circle, FullCircle.Repo,
   pool_size: 10,
   timeout: 60_000
 
-  config :full_circle, uploads_dir: "uploads"
+config :full_circle, uploads_dir: "uploads"
 
 # For development, we disable any cache and enable
 # debugging and code reloading.

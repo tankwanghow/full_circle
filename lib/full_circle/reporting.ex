@@ -233,28 +233,30 @@ defmodule FullCircle.Reporting do
       FullCircle.Accounting.balance_sheet_account_types()
       |> Enum.reject(fn x -> x == "Inventory" end)
 
-    a = from(ac in Account,
-      join: txn in Transaction,
-      on: ac.id == txn.account_id,
-      where: ac.company_id == ^com.id,
-      where: ac.account_type in ^bs_acc,
-      where: txn.doc_date <= ^at_date,
-      select: %{id: ac.id, type: ac.account_type, name: ac.name, balance: sum(txn.amount)},
-      group_by: [ac.account_type, ac.id],
-      having: sum(txn.amount) != 0
-    )
+    a =
+      from(ac in Account,
+        join: txn in Transaction,
+        on: ac.id == txn.account_id,
+        where: ac.company_id == ^com.id,
+        where: ac.account_type in ^bs_acc,
+        where: txn.doc_date <= ^at_date,
+        select: %{id: ac.id, type: ac.account_type, name: ac.name, balance: sum(txn.amount)},
+        group_by: [ac.account_type, ac.id],
+        having: sum(txn.amount) != 0
+      )
 
-    b = from(ac in Account,
-      join: txn in Transaction,
-      on: ac.id == txn.account_id,
-      where: ac.company_id == ^com.id,
-      where: ac.account_type == "Inventory",
-      where: txn.doc_date <= ^at_date,
-      where: txn.doc_date > ^prev_close_date(at_date, com),
-      select: %{id: ac.id, type: ac.account_type, name: ac.name, balance: sum(txn.amount)},
-      group_by: [ac.account_type, ac.id],
-      having: sum(txn.amount) != 0
-    )
+    b =
+      from(ac in Account,
+        join: txn in Transaction,
+        on: ac.id == txn.account_id,
+        where: ac.company_id == ^com.id,
+        where: ac.account_type == "Inventory",
+        where: txn.doc_date <= ^at_date,
+        where: txn.doc_date > ^prev_close_date(at_date, com),
+        select: %{id: ac.id, type: ac.account_type, name: ac.name, balance: sum(txn.amount)},
+        group_by: [ac.account_type, ac.id],
+        having: sum(txn.amount) != 0
+      )
 
     union_all(a, ^b)
   end

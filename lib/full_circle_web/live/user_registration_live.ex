@@ -19,8 +19,8 @@ defmodule FullCircleWeb.UserRegistrationLive do
       </.header>
 
       <div class="mx-auto max-w-xs text-center mt-3">
-        <a class="red button" :if={!@is_a_human} phx-click="human">I am a human</a>
-        <a class="blue button" :if={!@is_a_human}>I am a bot</a>
+        <a :if={!@is_a_human} class="red button" phx-click="human">I am a human</a>
+        <a :if={!@is_a_human} class="blue button">I am a bot</a>
       </div>
 
       <div :if={@is_a_human}>

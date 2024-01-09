@@ -446,7 +446,7 @@ defmodule FullCircleWeb.ReceiptLive.Form do
   end
 
   defp validate(params, socket) do
-    params = params |>  FullCircleWeb.Helpers.put_into_matchers("doc_date", params["receipt_date"])
+    params = params |> FullCircleWeb.Helpers.put_into_matchers("doc_date", params["receipt_date"])
 
     changeset =
       StdInterface.changeset(
@@ -476,7 +476,6 @@ defmodule FullCircleWeb.ReceiptLive.Form do
               field={@form[:contact_name]}
               label={gettext("Receive From")}
               phx-hook="tributeAutoComplete"
-              phx-debounce="500"
               url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
             />
           </div>
@@ -487,7 +486,6 @@ defmodule FullCircleWeb.ReceiptLive.Form do
               field={@form[:funds_account_name]}
               label={gettext("Funds Account")}
               phx-hook="tributeAutoComplete"
-              phx-debounce="500"
               url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=fundsaccount&name="}
             />
           </div>
@@ -495,7 +493,6 @@ defmodule FullCircleWeb.ReceiptLive.Form do
             <.input
               field={@form[:funds_amount]}
               label={gettext("Funds Amount")}
-              phx-debounce="500"
               type="number"
               step="0.01"
             />
@@ -627,7 +624,7 @@ defmodule FullCircleWeb.ReceiptLive.Form do
               <div class="w-[17%]"><.input field={dtl[:state]} /></div>
               <div class="w-[16%]"><.input type="date" field={dtl[:due_date]} /></div>
               <div class="w-[16%]">
-                <.input phx-debounce="500" type="number" step="0.01" field={dtl[:amount]} />
+                <.input type="number" step="0.01" field={dtl[:amount]} />
               </div>
               <div class="w-[3%] mt-2.5 text-rose-500">
                 <.link phx-click={:delete_cheque} phx-value-index={dtl.index} tabindex="-1">

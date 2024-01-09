@@ -274,7 +274,6 @@ defmodule FullCircleWeb.LayerLive.FlockForm do
               <.input
                 field={move[:house_no]}
                 phx-hook="tributeAutoComplete"
-                phx-debounce="blur"
                 url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=house&name="}
               />
             </div>

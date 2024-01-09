@@ -22,11 +22,11 @@ from employees e inner join employee_salary_types est  on e.id = est.employee_id
 inner join salary_types st on st.id = est.sal
 
  -- Contacts
- select act.name, ac.name1, ac.id, address1 || ' ' || address2 as address1, address3  || ' ' ||  area as address2,  city, state, zipcode, country, 
+ select ac.name1 as name, address1 || ' ' || address2 as address1, address3  || ' ' ||  area as address2,  city, state, zipcode, "Malaysia" as country, 
        'Tel. ' || tel_no || ' Fax. ' as contact_info, email, reg_no, 'GST No. ' || gst_no || ' ' || note as descriptions
   from accounts ac left outer join addresses ad 
     on ac.id = ad.addressable_id
-   and addressable_type = 'Account' inner join account_types act
+   and addressable_type = 'Account' inner join account_types act 
     on act.id = ac.account_type_id
    where act.name ilike '%creditor%'
       or act.name ilike '%debtor%'

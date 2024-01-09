@@ -426,7 +426,7 @@ defmodule FullCircleWeb.PaymentLive.Form do
   end
 
   defp validate(params, socket) do
-    params = params |>  FullCircleWeb.Helpers.put_into_matchers("doc_date", params["payment_date"])
+    params = params |> FullCircleWeb.Helpers.put_into_matchers("doc_date", params["payment_date"])
 
     changeset =
       StdInterface.changeset(
@@ -456,7 +456,6 @@ defmodule FullCircleWeb.PaymentLive.Form do
               field={@form[:contact_name]}
               label={gettext("Pay To")}
               phx-hook="tributeAutoComplete"
-              phx-debounce="500"
               url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
             />
           </div>
@@ -466,7 +465,6 @@ defmodule FullCircleWeb.PaymentLive.Form do
               field={@form[:funds_account_name]}
               label={gettext("Funds Account")}
               phx-hook="tributeAutoComplete"
-              phx-debounce="500"
               url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=fundsaccount&name="}
             />
           </div>
@@ -474,7 +472,6 @@ defmodule FullCircleWeb.PaymentLive.Form do
             <.input
               field={@form[:funds_amount]}
               label={gettext("Funds Amount")}
-              phx-debounce="500"
               type="number"
               step="0.01"
             />

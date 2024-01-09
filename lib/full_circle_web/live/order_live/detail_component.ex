@@ -35,7 +35,6 @@ defmodule FullCircleWeb.OrderLive.DetailComponent do
             <.input
               field={dtl[:good_name]}
               phx-hook="tributeAutoComplete"
-              phx-debounce="500"
               url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=good&name="}
             />
           </div>
@@ -45,7 +44,6 @@ defmodule FullCircleWeb.OrderLive.DetailComponent do
             <.input
               field={dtl[:package_name]}
               phx-hook="tributeAutoComplete"
-              phx-debounce="500"
               url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=packaging&good_id=#{dtl[:good_id].value}&name="}
             />
           </div>
@@ -59,7 +57,6 @@ defmodule FullCircleWeb.OrderLive.DetailComponent do
               type="number"
               field={dtl[:order_qty]}
               step="0.0001"
-              phx-debounce="500"
               readonly={Phoenix.HTML.Form.input_value(dtl, :unit_multiplier) |> Decimal.gt?(0)}
             />
           </div>

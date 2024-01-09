@@ -307,7 +307,6 @@ defmodule FullCircleWeb.LoadLive.Form do
               field={@form[:supplier_name]}
               label={gettext("Supplier")}
               phx-hook="tributeAutoComplete"
-              phx-debounce="500"
               url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
             />
           </div>
@@ -317,7 +316,6 @@ defmodule FullCircleWeb.LoadLive.Form do
               field={@form[:shipper_name]}
               label={gettext("Shipper")}
               phx-hook="tributeAutoComplete"
-              phx-debounce="500"
               url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
             />
           </div>

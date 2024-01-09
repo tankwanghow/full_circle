@@ -251,7 +251,6 @@ defmodule FullCircleWeb.ChequeLive.DepositForm do
               field={@form[:bank_name]}
               label={gettext("Deposit To")}
               phx-hook="tributeAutoComplete"
-              phx-debounce="500"
               url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=fundsaccount&name="}
             />
           </div>
@@ -260,7 +259,6 @@ defmodule FullCircleWeb.ChequeLive.DepositForm do
               field={@form[:funds_from_name]}
               label={gettext("Funds From")}
               phx-hook="tributeAutoComplete"
-              phx-debounce="500"
               url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=fundsaccount&name="}
             />
           </div>
@@ -268,7 +266,6 @@ defmodule FullCircleWeb.ChequeLive.DepositForm do
             <.input
               field={@form[:funds_amount]}
               label={gettext("Funds Amount")}
-              phx-debounce="500"
               type="number"
               step="0.01"
               feedback={true}

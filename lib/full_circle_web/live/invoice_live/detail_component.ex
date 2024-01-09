@@ -54,7 +54,6 @@ defmodule FullCircleWeb.InvoiceLive.DetailComponent do
             <.input
               field={dtl[:good_name]}
               phx-hook="tributeAutoComplete"
-              phx-debounce="500"
               url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=good&name="}
             />
           </div>
@@ -64,7 +63,6 @@ defmodule FullCircleWeb.InvoiceLive.DetailComponent do
             <.input
               field={dtl[:package_name]}
               phx-hook="tributeAutoComplete"
-              phx-debounce="500"
               url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=packaging&good_id=#{dtl[:good_id].value}&name="}
             />
           </div>
@@ -78,18 +76,17 @@ defmodule FullCircleWeb.InvoiceLive.DetailComponent do
               type="number"
               field={dtl[:quantity]}
               step="0.0001"
-              phx-debounce="500"
-              readonly={Phoenix.HTML.Form.input_value(dtl, :unit_multiplier) |> Decimal.gt?(0)}
+              disabled={Phoenix.HTML.Form.input_value(dtl, :unit_multiplier) |> Decimal.gt?(0)}
             />
           </div>
           <div class="detail-unit-col">
             <.input field={dtl[:unit]} readonly tabindex="-1" />
           </div>
           <div class="detail-price-col">
-            <.input type="number" phx-debounce="500" field={dtl[:unit_price]} step="0.0001" />
+            <.input type="number" field={dtl[:unit_price]} step="0.0001" />
           </div>
           <div class={"detail-discount-col #{Sys.get_setting(@settings, @doc_name, "discount-col")}"}>
-            <.input type="number" phx-debounce="500" field={dtl[:discount]} step="0.01" />
+            <.input type="number" field={dtl[:discount]} step="0.01" />
           </div>
           <div class={"detail-goodamt-col #{Sys.get_setting(@settings, @doc_name, "goodamt-col")}"}>
             <.input type="number" field={dtl[:good_amount]} readonly tabindex="-1" />
@@ -98,7 +95,6 @@ defmodule FullCircleWeb.InvoiceLive.DetailComponent do
             <.input
               field={dtl[:account_name]}
               phx-hook="tributeAutoComplete"
-              phx-debounce="500"
               url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=account&name="}
             />
           </div>
@@ -107,7 +103,6 @@ defmodule FullCircleWeb.InvoiceLive.DetailComponent do
             <.input
               field={dtl[:tax_code_name]}
               phx-hook="tributeAutoComplete"
-              phx-debounce="500"
               url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=#{@taxcodetype}&name="}
             />
           </div>

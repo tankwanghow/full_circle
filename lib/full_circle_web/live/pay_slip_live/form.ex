@@ -270,7 +270,6 @@ defmodule FullCircleWeb.PaySlipLive.Form do
               field={@form[:funds_account_name]}
               label={gettext("Funds From")}
               phx-hook="tributeAutoComplete"
-              phx-debounce="500"
               url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=fundsaccount&name="}
             />
           </div>

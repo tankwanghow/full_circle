@@ -284,6 +284,7 @@ defmodule FullCircleWeb.CoreComponents do
   attr(:value, :any)
   attr(:url, :string, default: nil)
   attr(:feedback, :boolean, default: false)
+  attr(:"phx-debounce", :string, default: "blur")
 
   attr(:type, :string,
     default: "text",
@@ -302,7 +303,7 @@ defmodule FullCircleWeb.CoreComponents do
   attr(:multiple, :boolean, default: false, doc: "the multiple flag for select inputs")
 
   attr(:rest, :global,
-    include: ~w(autocomplete cols disabled list form max maxlength min minlength phx-debounce
+    include: ~w(autocomplete cols disabled list form max maxlength min minlength
                 required pattern placeholder readonly rows size step tag-url)
   )
 
@@ -327,6 +328,7 @@ defmodule FullCircleWeb.CoreComponents do
         <input type="hidden" name={@name} value="false" />
         <input
           type="checkbox"
+          phx-debounce={Map.get(assigns, :"phx-debounce")}
           id={@id}
           name={@name}
           value="true"
@@ -367,6 +369,7 @@ defmodule FullCircleWeb.CoreComponents do
       <textarea
         id={@id}
         name={@name}
+        phx-debounce={Map.get(assigns, :"phx-debounce")}
         class={[
           "block w-full rounded text-zinc-900 focus:ring-0",
           "phx-no-feedback:border-zinc-300 phx-no-feedback:focus:border-zinc-400",
@@ -391,6 +394,7 @@ defmodule FullCircleWeb.CoreComponents do
         type={@type}
         name={@name}
         id={@id}
+        phx-debounce={Map.get(assigns, :"phx-debounce")}
         value={Phoenix.HTML.Form.normalize_value(@type, @value)}
         url={@url}
         class={[
@@ -415,6 +419,7 @@ defmodule FullCircleWeb.CoreComponents do
         type={@type}
         name={@name}
         id={@id}
+        phx-debounce={Map.get(assigns, :"phx-debounce")}
         value={Phoenix.HTML.Form.normalize_value(@type, @value)}
         url={@url}
         class={[

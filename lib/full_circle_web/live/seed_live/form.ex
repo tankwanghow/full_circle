@@ -85,12 +85,12 @@ defmodule FullCircleWeb.SeedLive.Form do
             <%= Phoenix.HTML.Form.hidden_input(dtl, :contact_id) %>
             <%= Phoenix.HTML.Form.hidden_input(dtl, :doc_type) %>
             <%= Phoenix.HTML.Form.hidden_input(dtl, :doc_no) %>
-            <div class="w-[10%]"><.input phx-debounce="blur" type="date" field={dtl[:doc_date]} /></div>
+            <div class="w-[10%]"><.input type="date" field={dtl[:doc_date]} /></div>
             <div class="w-[20%]"><.input readonly={true} field={dtl[:account_name]} /></div>
             <div class="w-[20%]"><.input field={dtl[:contact_name]} readonly={true} /></div>
-            <div class="w-[30%]"><.input phx-debounce="blur" field={dtl[:particulars]} /></div>
+            <div class="w-[30%]"><.input field={dtl[:particulars]} /></div>
             <div class="w-[20%]">
-              <.input phx-debounce="blur" type="number" step="0.01" field={dtl[:amount]} />
+              <.input type="number" step="0.01" field={dtl[:amount]} />
             </div>
           </div>
         </.form>

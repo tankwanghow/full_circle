@@ -289,7 +289,6 @@ defmodule FullCircleWeb.DeliveryLive.Form do
               field={@form[:customer_name]}
               label={gettext("Customer")}
               phx-hook="tributeAutoComplete"
-              phx-debounce="500"
               url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
             />
           </div>

@@ -40,7 +40,7 @@ defmodule FullCircleWeb.ReceiptLive.MatcherComponent do
             <.input readonly type="number" field={dtl[:balance]} tabindex="-1" />
           </div>
           <div class="w-[16%]">
-            <.input type="number" phx-debounce="500" step="0.01" field={dtl[:match_amount]} />
+            <.input type="number" step="0.01" field={dtl[:match_amount]} />
           </div>
           <div class="w-[3%] mt-2.5 text-rose-500">
             <.link phx-click={:delete_match_tran} phx-value-index={dtl.index} tabindex="-1">
