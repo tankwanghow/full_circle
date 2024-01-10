@@ -131,11 +131,11 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCamera do
   @impl true
   def render(assigns) do
     ~H"""
-    <div id="punch-camera" class="max-w-xs mx-auto">
+    <div id="punch-camera" class="mx-auto">
       <div class="text-xl text-center font-bold">
         <%= @current_company.name %>
       </div>
-      <div class="mx-auto w-[80%] text-2xl text-center mb-2 border-y-4 border-green-800 bg-green-200">
+      <div class="mx-auto w-[90%] text-2xl text-center mb-2 border-y-4 border-green-800 bg-green-200">
         <span class="text-blue-600" id="date" /> <span class="text-amber-800" id="clock" />
       </div>
       <div :if={@shift_id == ""}>
@@ -196,7 +196,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCamera do
           <div :if={@flag == "IN"} class="font-bold font-mono text-cyan-600"><%= @shift_id %></div>
         </div>
 
-        <div id="qr-reader" phx-update="ignore" class="w-[80%] mx-auto mb-2" phx-hook="QR_Scanner">
+        <div id="qr-reader" phx-update="ignore" class="w-[90%] mx-auto mb-2" phx-hook="QR_Scanner">
         </div>
         <div
           :if={@status == :success}

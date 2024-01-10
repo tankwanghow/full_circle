@@ -23,16 +23,16 @@ defmodule FullCircleWeb.UserLoginLive do
         <.input field={@form[:email]} type="email" label={gettext("Email")} required />
         <.input field={@form[:password]} type="password" label={gettext("Password")} required />
 
-        <div class="flex flex-row flex-warp gap-2">
-          <div class="w-[50%]">
+        <%!-- <div class="flex flex-row flex-warp gap-2"> --%>
+          <div class="text-center">
             <.input field={@form[:remember_me]} type="checkbox" label={gettext("Keep me logged in")} />
           </div>
-          <div class="w-[50%]">
+          <div class="text-center">
             <.link href={~p"/users/reset_password"} class="text-sm font-semibold">
               <%= gettext("Forgot your password?") %>
             </.link>
           </div>
-        </div>
+        <%!-- </div> --%>
         <:actions>
           <.button phx-disable-with={gettext("Signing in...")} class="w-full">
             <%= gettext("Sign in") %>
