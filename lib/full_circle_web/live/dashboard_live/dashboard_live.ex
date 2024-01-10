@@ -62,7 +62,7 @@ defmodule FullCircleWeb.DashboardLive do
         <.link navigate={~p"/companies/#{@current_company.id}/tax_codes"} class="nav-btn">
           <%= gettext("TaxCodes") %>
         </.link>
-        <%!-- <.link navigate={~p"/companies/#{@current_company.id}/Order"} class="nav-btn">
+<!--        <.link navigate={~p"/companies/#{@current_company.id}/Order"} class="nav-btn">
           <%= gettext("Order") %>
         </.link>
         <.link navigate={~p"/companies/#{@current_company.id}/Load"} class="nav-btn">
@@ -70,7 +70,7 @@ defmodule FullCircleWeb.DashboardLive do
         </.link>
         <.link navigate={~p"/companies/#{@current_company.id}/Delivery"} class="nav-btn">
           <%= gettext("Delivery") %>
-        </.link> --%>
+        </.link> -->
         <.link navigate={~p"/companies/#{@current_company.id}/Invoice"} class="nav-btn">
           <%= gettext("Invoices") %>
         </.link>
