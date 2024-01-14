@@ -285,6 +285,7 @@ defmodule FullCircleWeb.CoreComponents do
   attr(:url, :string, default: nil)
   attr(:feedback, :boolean, default: false)
   attr(:"phx-debounce", :string, default: "blur")
+  attr(:klass, :string, default: "")
 
   attr(:type, :string,
     default: "text",
@@ -397,7 +398,7 @@ defmodule FullCircleWeb.CoreComponents do
         phx-debounce={Map.get(assigns, :"phx-debounce")}
         value={Phoenix.HTML.Form.normalize_value(@type, @value)}
         url={@url}
-        class={[
+        class={[@klass,
           "block w-full rounded text-zinc-900 focus:ring-0",
           "phx-no-feedback:border-zinc-300 phx-no-feedback:focus:border-zinc-400",
           "border-zinc-300 focus:border-zinc-400 p-1",
@@ -422,7 +423,7 @@ defmodule FullCircleWeb.CoreComponents do
         phx-debounce={Map.get(assigns, :"phx-debounce")}
         value={Phoenix.HTML.Form.normalize_value(@type, @value)}
         url={@url}
-        class={[
+        class={[@klass,
           "block w-full rounded text-zinc-900 focus:ring-0",
           "phx-no-feedback:border-zinc-300 phx-no-feedback:focus:border-zinc-400",
           "border-zinc-300 focus:border-zinc-400 p-1",

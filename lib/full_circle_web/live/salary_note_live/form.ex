@@ -264,10 +264,10 @@ defmodule FullCircleWeb.SalaryNoteLive.Form do
         </div>
         <div class="grid grid-cols-12 gap-1">
           <div class="col-span-4">
-            <.input field={@form[:quantity]} label={gettext("Quantity")} type="number" step="0.0001" />
+            <.input field={@form[:quantity]} label={gettext("Quantity")} phx-hook="calculatorInput" klass="text-right" step="0.0001" />
           </div>
           <div class="col-span-4">
-            <.input field={@form[:unit_price]} label={gettext("Price")} type="number" step="0.0001" />
+            <.input field={@form[:unit_price]} label={gettext("Price")} tphx-hook="calculatorInput" klass="text-right" step="0.0001" />
           </div>
           <div class="col-span-4">
             <.input

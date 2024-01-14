@@ -27,6 +27,22 @@ import { Html5QrcodeScanner } from "../vendor/html5-qrcode/src/html5-qrcode-scan
 let csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 let Hooks = {}
 
+Hooks.calculatorInput = {
+  mounted() {
+    this.el.addEventListener("blur", e => {
+      if (!/[a-zA-Z]+/.test(this.el.value)) {
+        try {
+          var eval2 = eval;
+          val = eval2(this.el.value);
+          this.el.value = val;
+        } catch (error) {
+          
+        }
+      }
+    })
+  }
+}
+
 let html5QrcodeScanner;
 
 Hooks.QR_Reply = {

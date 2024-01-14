@@ -69,11 +69,12 @@ defmodule FullCircleWeb.InvoiceLive.DetailComponent do
           <%= Phoenix.HTML.Form.hidden_input(dtl, :unit_multiplier) %>
           <%= Phoenix.HTML.Form.hidden_input(dtl, :package_id) %>
           <div class="detail-packqty-col">
-            <.input type="number" field={dtl[:package_qty]} />
+            <.input phx-hook="calculatorInput" klass="text-right" field={dtl[:package_qty]} />
           </div>
           <div class="detail-qty-col">
             <.input
-              type="number"
+              phx-hook="calculatorInput"
+              klass="text-right"
               field={dtl[:quantity]}
               step="0.0001"
               disabled={Phoenix.HTML.Form.input_value(dtl, :unit_multiplier) |> Decimal.gt?(0)}
@@ -83,10 +84,15 @@ defmodule FullCircleWeb.InvoiceLive.DetailComponent do
             <.input field={dtl[:unit]} readonly tabindex="-1" />
           </div>
           <div class="detail-price-col">
-            <.input type="number" field={dtl[:unit_price]} step="0.0001" />
+            <.input
+              field={dtl[:unit_price]}
+              step="0.0001"
+              phx-hook="calculatorInput"
+              klass="text-right"
+            />
           </div>
           <div class={"detail-discount-col #{Sys.get_setting(@settings, @doc_name, "discount-col")}"}>
-            <.input type="number" field={dtl[:discount]} step="0.01" />
+            <.input field={dtl[:discount]} phx-hook="calculatorInput" klass="text-right" />
           </div>
           <div class={"detail-goodamt-col #{Sys.get_setting(@settings, @doc_name, "goodamt-col")}"}>
             <.input type="number" field={dtl[:good_amount]} readonly tabindex="-1" />

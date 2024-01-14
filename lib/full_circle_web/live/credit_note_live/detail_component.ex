@@ -42,10 +42,10 @@ defmodule FullCircleWeb.CreditNoteLive.DetailComponent do
         <div class={"flex flex-row #{if(dtl[:delete].value == true, do: "hidden", else: "")}"}>
           <div class="w-[30%]"><.input field={dtl[:descriptions]} /></div>
           <div class="w-[10%]">
-            <.input type="number" field={dtl[:quantity]} step="0.0001" />
+            <.input phx-hook="calculatorInput" klass="text-right" field={dtl[:quantity]} step="0.0001" />
           </div>
           <div class="w-[8%]">
-            <.input type="number" field={dtl[:unit_price]} step="0.0001" />
+            <.input phx-hook="calculatorInput" klass="text-right" field={dtl[:unit_price]} step="0.0001" />
           </div>
           <div class="w-[10%]">
             <.input type="number" field={dtl[:desc_amount]} readonly tabindex="-1" />
