@@ -71,7 +71,7 @@ defmodule FullCircleWeb.InvoiceLive.Print do
               <%= if(@pre_print == "true", do: "", else: letter_head_data(assigns)) %>
             </div>
             <div class="doctype is-size-4 has-text-weight-semibold">INVOICE</div>
-            <%= invoice_header(invoice, assigns) %>
+            <%= invoice_header(invoice, n, invoice.chunk_number, assigns) %>
             <%= detail_header(assigns) %>
             <div class="details-body is-size-6">
               <%= for invd <- Enum.at(invoice.detail_chunks, n - 1) do %>
@@ -79,8 +79,8 @@ defmodule FullCircleWeb.InvoiceLive.Print do
               <% end %>
             </div>
             <%= if(n == invoice.chunk_number,
-              do: invoice_footer(invoice, n, invoice.chunk_number, assigns),
-              else: invoice_footer("continue", n, invoice.chunk_number, assigns)
+              do: invoice_footer(invoice, assigns),
+              else: invoice_footer("continue", assigns)
             ) %>
             <%= if(@pre_print == "true", do: "", else: letter_foot(invoice, assigns)) %>
           </div>
@@ -95,7 +95,7 @@ defmodule FullCircleWeb.InvoiceLive.Print do
 
     ~H"""
     <div class="detail">
-      <span class="particular">
+      <div class="particular">
         <div>
           <%= @invd.good_name %>
           <%= if(Decimal.gt?(@invd.package_qty, 0), do: " - #{@invd.package_qty}", else: "") %>
@@ -110,46 +110,43 @@ defmodule FullCircleWeb.InvoiceLive.Print do
             else: ""
           ) %>
         </div>
-      </span>
-      <span class="qty">
+      </div>
+      <div class="qty">
         <%= if Decimal.integer?(@invd.quantity),
           do: Decimal.to_integer(@invd.quantity),
           else: @invd.quantity %> <%= if @invd.unit == "-", do: "", else: @invd.unit %>
-      </span>
-      <span class="price"><%= format_unit_price(@invd.unit_price) %></span>
-      <span class="disc">
+      </div>
+      <div class="price"><%= format_unit_price(@invd.unit_price) %></div>
+      <div class="disc">
         <%= if(Decimal.eq?(@invd.discount, 0),
           do: "-",
           else: Number.Delimit.number_to_delimited(@invd.discount)
         ) %>
-      </span>
-      <span class="total">
+      </div>
+      <div class="total">
         <div><%= Number.Delimit.number_to_delimited(@invd.good_amount) %></div>
 
         <%= if Decimal.gt?(@invd.tax_amount, 0) do %>
-          <span class="is-size-7 is-italic">
+          <div class="is-size-7 is-italic">
             <%= @invd.tax_code %>
             <%= Number.Percentage.number_to_percentage(@invd.tax_rate) %>
             <%= Number.Delimit.number_to_delimited(@invd.tax_amount) %>
-          </span>
+          </div>
         <% end %>
-      </span>
+      </div>
     </div>
     """
   end
 
-  def invoice_footer("continue", page, pages, assigns) do
-    assigns = assign(assigns, :page, page) |> assign(:pages, pages)
-
+  def invoice_footer("continue", assigns) do
     ~H"""
     <div class="descriptions">....continue....</div>
     <div class="invoice-footer"></div>
-    <span class="page-count"><%= "page #{@page} of #{@pages}" %></span>
     """
   end
 
-  def invoice_footer(invoice, page, pages, assigns) do
-    assigns = assign(assigns, :page, page) |> assign(:pages, pages) |> assign(:invoice, invoice)
+  def invoice_footer(invoice, assigns) do
+    assigns = assign(assigns, :invoice, invoice)
 
     ~H"""
     <div class="descriptions">
@@ -168,7 +165,6 @@ defmodule FullCircleWeb.InvoiceLive.Print do
         </div>
       </div>
     </div>
-    <span class="page-count"><%= "page #{@page} of #{@pages}" %></span>
     """
   end
 
@@ -204,8 +200,12 @@ defmodule FullCircleWeb.InvoiceLive.Print do
     """
   end
 
-  def invoice_header(invoice, assigns) do
-    assigns = assigns |> assign(:invoice, invoice)
+  def invoice_header(invoice, page, pages, assigns) do
+    assigns =
+      assigns
+      |> assign(:invoice, invoice)
+      |> assign(:page, page)
+      |> assign(:pages, pages)
 
     ~H"""
     <div class="invoice-header">
@@ -236,6 +236,7 @@ defmodule FullCircleWeb.InvoiceLive.Print do
           Pay By: <span class="has-text-weight-bold"><%= format_date(@invoice.due_date) %></span>
         </div>
         <div>Invoice No: <span class="has-text-weight-bold"><%= @invoice.invoice_no %></span></div>
+        <span class="page-count"><%= "page #{@page} of #{@pages}" %></span>
       </div>
     </div>
     """
@@ -258,7 +259,7 @@ defmodule FullCircleWeb.InvoiceLive.Print do
     ~H"""
     <style>
       .letter-head { border-bottom: 0.5mm solid black; }
-      .letter-foot { border-top: 0.5mm solid black; }
+      .letter-foot { top: 255mm; border-top: 0.5mm solid black; }
       .invoice-header { border-bottom: 0.5mm solid black; }
       .invoice-footer {  }
       .terms { height: 15mm; }
@@ -271,14 +272,15 @@ defmodule FullCircleWeb.InvoiceLive.Print do
     ~H"""
     <style>
       .details-body { height: <%= @detail_body_height %>mm; }
-      .detail { display: flex; height: <%= @detail_height %>mm; vertical-align: middle; align-items : center;  line-height: 4mm;}
+      .details-body div { vertical-align: top; }
+      .detail { display: flex; height: <%= @detail_height %>mm; align-items : center;  line-height: 4mm;}
       .page { width: 210mm; min-height: 290mm; padding: 5mm; }
 
       @media print {
         @page { size: A4; margin: 0mm; }
         body { width: 210mm; height: 290mm; margin: 0mm; }
         html { margin: 0mm; }
-        .page { padding: 5mm; page-break-after: always;} }
+        .page { padding-left: 10mm; padding-right: 10mm; page-break-after: always;} }
 
       .letter-head { padding-bottom: 2mm; margin-bottom: 2mm; height: 28mm;}
       .doctype { float: right; margin-top: -20mm; margin-right: 0mm; }
