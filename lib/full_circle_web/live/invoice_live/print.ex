@@ -30,8 +30,8 @@ defmodule FullCircleWeb.InvoiceLive.Print do
 
   defp set_page_defaults(socket) do
     socket
-    |> assign(:detail_body_height, 145)
-    |> assign(:detail_height, 9)
+    |> assign(:detail_body_height, 150)
+    |> assign(:detail_height, 10)
     |> assign(:company, FullCircle.Sys.get_company!(socket.assigns.current_company.id))
   end
 
@@ -104,7 +104,7 @@ defmodule FullCircleWeb.InvoiceLive.Print do
             else: ""
           ) %>
         </div>
-        <div class="is-size-7">
+        <div>
           <%= if(@invd.descriptions != "" and !is_nil(@invd.descriptions),
             do: "#{@invd.descriptions}",
             else: ""
@@ -263,7 +263,7 @@ defmodule FullCircleWeb.InvoiceLive.Print do
       .invoice-header { border-bottom: 0.5mm solid black; }
       .invoice-footer {  }
       .terms { height: 15mm; }
-      .sign { padding: 3mm; border-top: 2px dotted black; width: 30%; text-align: center; float: right; margin-left: 2mm; margin-top: 15mm;}
+      .sign { padding: 3mm; border-top: 2px dotted black; width: 30%; text-align: center; float: right; margin-left: 2mm; margin-top: 5mm;}
     </style>
     """
   end
@@ -273,7 +273,7 @@ defmodule FullCircleWeb.InvoiceLive.Print do
     <style>
       .details-body { height: <%= @detail_body_height %>mm; }
       .details-body div { vertical-align: top; }
-      .detail { display: flex; height: <%= @detail_height %>mm; align-items : center;  line-height: 4mm;}
+      .detail { display: flex; height: <%= @detail_height %>mm; align-items : center;  line-height: 4mm; }
       .page { width: 210mm; min-height: 290mm; padding: 5mm; }
 
       @media print {
@@ -282,18 +282,18 @@ defmodule FullCircleWeb.InvoiceLive.Print do
         html { margin: 0mm; }
         .page { padding-left: 10mm; padding-right: 10mm; page-break-after: always;} }
 
-      .letter-head { padding-bottom: 2mm; margin-bottom: 2mm; height: 28mm;}
+      .letter-head { padding-bottom: 2mm; margin-bottom: 5mm; height: 28mm;}
       .doctype { float: right; margin-top: -20mm; margin-right: 0mm; }
       .invoice-info { float: right; }
       .invoice-header { width: 100%; height: 40mm; border-bottom: 0.5mm solid black; }
       .customer { padding-left: 2mm; float: left;}
       .invoice-info div { margin-bottom: 2mm; text-align: right; }
-      .details-header { display: flex; text-align: center; padding-bottom: 2mm; padding-top: 2mm; border-bottom: 0.5mm solid black; }
-      .particular { width: 80mm; text-align: left; }
-      .qty { width: 32mm; text-align: center; }
-      .price { width: 25mm; text-align: center; }
-      .disc { width: 24mm; text-align: center; }
-      .total { width: 45mm; text-align: right; }
+      .details-header { display: flex; text-align: center; padding-bottom: 2mm; padding-top: 2mm; border-bottom: 0.5mm solid black; margin-bottom: 2mm;}
+      .particular { width: 80mm; text-align: left;  height: 100%; }
+      .qty { width: 32mm; text-align: center; height: 100%; }
+      .price { width: 25mm; text-align: center;  height: 100%; }
+      .disc { width: 24mm; text-align: center;  height: 100%; }
+      .total { width: 45mm; text-align: right;  height: 100%; }
 
       .invoice-footer { min-height: 10mm; }
       .descriptions { min-height: 6mm; }

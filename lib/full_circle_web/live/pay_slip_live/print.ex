@@ -31,7 +31,7 @@ defmodule FullCircleWeb.PaySlipLive.Print do
   defp set_page_defaults(socket) do
     socket
     |> assign(:detail_body_height, 170)
-    |> assign(:detail_height, 5)
+    |> assign(:detail_height, 6)
     |> assign(:company, FullCircle.Sys.get_company!(socket.assigns.current_company.id))
   end
 
@@ -221,7 +221,6 @@ defmodule FullCircleWeb.PaySlipLive.Print do
     ~H"""
     <div
       :if={@psd.no != "session_total" and @psd.no != "pay_total" and @psd.type != "contribution"}
-      }
       class={"detail #{@psd.type}"}
     >
       <span class="date">
@@ -312,11 +311,11 @@ defmodule FullCircleWeb.PaySlipLive.Print do
   def detail_header(assigns) do
     ~H"""
     <div class="details-header has-text-weight-bold">
-      <div class="date">Date</div>
-      <div class="item">Pay Items</div>
-      <div class="qty">Quantity</div>
-      <div class="price">Price</div>
-      <div class="total">Amount</div>
+      <span class="date">Date</span>
+      <span class="item">Pay Items</span>
+      <span class="qty">Quantity</span>
+      <span class="price">Price</span>
+      <span class="total">Amount</span>
     </div>
     """
   end
@@ -387,14 +386,14 @@ defmodule FullCircleWeb.PaySlipLive.Print do
         @page { size: A4; margin: 0mm; }
         body { width: 210mm; height: 290mm; margin: 0mm; }
         html { margin: 0mm; }
-        .page { padding: 5mm; page-break-after: always;} }
+        .page { padding-left: 10mm; padding-right: 10mm; page-break-after: always;} }
 
-      .letter-head { padding-bottom: 2mm; margin-bottom: 2mm; height: 28mm;}
+      .letter-head { padding-bottom: 2mm; margin-bottom: 5mm; height: 28mm;}
       .doctype { float: right; margin-top: -20mm; margin-right: 0mm; }
       .pay_slip-info { float: right; }
       .pay_slip-header { width: 100%; height: 30mm; border-bottom: 0.5mm solid black; }
       .customer { padding-left: 2mm; float: left;}
-      .pay_slip-info div { margin-bottom: 1mm; text-align: right; }
+      .pay_slip-info div { text-align: right; }
 
       .details-header { display: flex; text-align: center; padding-bottom: 2mm; padding-top: 2mm; border-bottom: 0.5mm solid black; }
 

@@ -95,7 +95,7 @@ defmodule FullCircleWeb.PaymentLive.Print do
   def render(assigns) do
     ~H"""
     <div id="print-me" class="print-here">
-      <%= pre_print_style(assigns) %>
+    <%= pre_print_style(assigns) %>
       <%= if(@pre_print == "false", do: full_style(assigns)) %>
       <%= for payment  <- @payments do %>
         <%= Enum.map 1..payment.chunk_number, fn n -> %>
@@ -395,7 +395,7 @@ defmodule FullCircleWeb.PaymentLive.Print do
         @page { size: A4; margin: 0mm; }
         body { width: 210mm; height: 290mm; margin: 0mm; }
         html { margin: 0mm; }
-        .page { padding: 5mm; page-break-after: always;} }
+        .page { padding-left: 10mm; padding-right: 10mm; page-break-after: always;} }
 
       .letter-head { padding-bottom: 2mm; margin-bottom: 2mm; height: 28mm;}
       .letter-foot { padding-top: 2mm; margin-top: 2mm; height: 28mm;}
@@ -408,11 +408,11 @@ defmodule FullCircleWeb.PaymentLive.Print do
       .payment-info div { display: block; margin-bottom: 1px; text-align: right; }
 
       .details-header { display: flex; padding-bottom: 1mm; padding-top: 1mm; border-bottom: 0.5mm dotted black; margin-bottom: 3px;}
-      .particular { width: 80mm; text-align: left;}
-      .qty { width: 32mm; text-align: center; }
-      .price { width: 25mm; text-align: center; }
-      .disc { width: 24mm; text-align: center; }
-      .total { width: 45mm; text-align: right; }
+      .particular { width: 52%; text-align: left; height: 100%; }
+      .qty { width: 9%; text-align: center; height: 100%; }
+      .price { width: 15%; text-align: center; height: 100%; }
+      .disc { width: 9%; text-align: center; height: 100%; }
+      .total { width: 15%; text-align: right; height: 100%; }
 
       .matched .date {width: 14%;}
       .matched .matchdoctype {width: 16%;}
