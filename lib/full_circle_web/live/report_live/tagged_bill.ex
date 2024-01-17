@@ -51,13 +51,13 @@ defmodule FullCircleWeb.ReportLive.TaggedBill do
         socket
       ) do
     qry = %{
-      "search[tags]" => tags,
+      "search[tags]" => tags |> String.trim(),
       "search[f_date]" => f_date,
       "search[t_date]" => t_date
     }
 
     url =
-      "/companies/#{socket.assigns.current_company.id}/tagged_bill?#{URI.encode_query(qry)}"
+      "/companies/#{socket.assigns.current_company.id}/tagged_bills?#{URI.encode_query(qry)}"
 
     {:noreply,
      socket
@@ -69,7 +69,7 @@ defmodule FullCircleWeb.ReportLive.TaggedBill do
       if tags == "" or f_date == "" or t_date == "" do
         []
       else
-        Reporting.tagged_bill(tags, f_date, t_date, socket.assigns.current_company)
+        Reporting.tagged_bill(tags, f_date, t_date, socket.assigns.current_company.id)
       end
 
     socket
@@ -80,12 +80,12 @@ defmodule FullCircleWeb.ReportLive.TaggedBill do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="w-8/12 mx-auto mb-8">
+    <div class="w-11/12 mx-auto mb-8">
       <p class="text-2xl text-center font-medium"><%= "#{@page_title}" %></p>
       <div class="border rounded bg-amber-200 text-center p-2">
-        <.form for={%{}} id="search-form" phx-submit="query" phx-change="changed" autocomplete="off">
+        <.form for={%{}} id="search-form" phx-submit="query" phx-change="changed" autocomplete="off" class="w-9/12 mx-auto">
           <div class="grid grid-cols-12 tracking-tighter">
-            <div class="col-span-7">
+            <div class="col-span-6">
               <.input
                 label={gettext("Tags")}
                 name="search[tags]"
@@ -113,13 +113,80 @@ defmodule FullCircleWeb.ReportLive.TaggedBill do
                 value={@search.t_date}
               />
             </div>
-            <div class="col-span-1 mt-5">
+            <div class="col-span-2 mt-6">
               <.button>
                 <%= gettext("Query") %>
               </.button>
+              <.link
+                :if={@objects_count > 0}
+                navigate={
+                  ~p"/companies/#{@current_company.id}/csv?report=tagged_bills&tags=#{@search.tags}&fdate=#{@search.f_date}&tdate=#{@search.t_date}"
+                }
+                target="_blank"
+                class="blue button"
+              >
+                CSV
+              </.link>
             </div>
           </div>
         </.form>
+
+        <%= FullCircleWeb.CsvHtml.headers(
+          [
+            gettext("Date"),
+            gettext("Count"),
+            gettext("Contacts"),
+            gettext("Goods"),
+            gettext("Quantity"),
+            gettext("Unit"),
+            gettext("Load"),
+            gettext("LCnt"),
+            gettext("Wages"),
+            gettext("Deliver"),
+            gettext("DCnt"),
+            gettext("wages")
+          ],
+          "font-medium flex flex-row text-center tracking-tighter mb-1",
+          ["5%", "5%", "15%", "24%", "10%", "5%", "8%", "3%", "7%", "8%", "3%", "7%"],
+          "border rounded bg-gray-200 border-gray-400 px-2 py-1",
+          assigns
+        ) %>
+
+        <%= FullCircleWeb.CsvHtml.data(
+          [
+            :invoice_date,
+            :contact_count,
+            :contact_shorts,
+            :good_names,
+            :quantity,
+            :unit,
+            :loader_tags,
+            :loader_tags_count,
+            :loader_wages_tags,
+            :delivery_man_tags,
+            :delivery_man_tags_count,
+            :delivery_wages_tags
+          ],
+          @objects,
+          [
+            nil,
+            nil,
+            nil,
+            nil,
+            fn n -> Number.Delimit.number_to_delimited(n, precision: 2) end,
+            nil,
+            nil,
+            nil,
+            nil,
+            nil,
+            nil,
+            nil
+          ],
+          "flex flex-row text-center tracking-tighter overflow-clip max-h-8",
+          ["5%", "5%", "15%", "24%", "10%", "5%", "8%", "3%", "7%", "8%", "3%", "7%"],
+          "border rounded bg-blue-200 border-blue-400 px-2 py-1",
+          assigns
+        ) %>
       </div>
     </div>
     """

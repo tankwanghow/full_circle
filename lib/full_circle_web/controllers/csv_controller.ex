@@ -3,6 +3,21 @@ defmodule FullCircleWeb.CsvController do
 
   def show(conn, %{
         "company_id" => com_id,
+        "report" => "tagged_bills",
+        "tags" => tags,
+        "fdate" => fdate,
+        "tdate" => tdate
+      }) do
+    tdate = tdate |> Timex.parse!("{YYYY}-{0M}-{0D}") |> NaiveDateTime.to_date()
+    fdate = fdate |> Timex.parse!("{YYYY}-{0M}-{0D}") |> NaiveDateTime.to_date()
+    data = FullCircle.Reporting.tagged_bill(tags, fdate, tdate, com_id)
+    fields = data |> Enum.at(0) |> Map.keys()
+    filename = "tagged_bills_#{fdate}_#{tdate}"
+    send_csv(conn, data, fields, filename)
+  end
+
+  def show(conn, %{
+        "company_id" => com_id,
         "report" => "actrans",
         "fdate" => fdate,
         "tdate" => tdate,

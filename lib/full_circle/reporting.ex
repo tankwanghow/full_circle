@@ -7,113 +7,121 @@ defmodule FullCircle.Reporting do
   alias FullCircle.ReceiveFund.{ReceivedCheque, Receipt}
   import FullCircle.Helpers
 
-  # def tagged_bill(tags, fdate, tdate, com) do
-  #   tags = tags |> String.split(" ", trim: true)
-
-  #   q1 =
-  #     Enum.map(tags, fn t ->
-  #       from(i in FullCircle.Billing.Invoice,
-  #         where: ilike(i.tags, ^"%#{t}%"),
-  #         where: i.company_id == ^com.id,
-  #         where: i.invoice_date >= ^fdate,
-  #         where: i.invoice_date <= ^tdate,
-  #         select: %{
-  #           id: i.id,
-  #           invoice_no: i.invoice_no,
-  #           invoice_date: i.invoice_date,
-  #           contact_id: i.contact_id
-  #         },
-  #         select_merge: %{matched_tag: ^t}
-  #       )
-  #     end)
-  #     |> Enum.reduce(fn a, b -> union(a, ^b) end)
-
-  #     q2 = from(i in subquery(q1),
-  #       select: %{
-  #         id: i.id,
-  #         invoice_no: i.invoice_no,
-  #         invoice_date: i.invoice_date,
-  #         contact_id: i.contact_id
-  #       },
-  #       select_merge: %{matched_tags: fragment("string_agg(distinct ?, ' ')", i.matched_tag)},
-  #       group_by: [i.id, i.invoice_no, i.invoice_date, i.contact_id]
-  #     )
-
-  #   from(inv in subquery(q2),
-  #     join: invd in FullCircle.Billing.InvoiceDetail,
-  #     on: invd.invoice_id == inv.id,
-  #     join: gd in FullCircle.Product.Good,
-  #     on: gd.id == invd.good_id,
-  #     join: cont in Contact,
-  #     on: cont.id == inv.contact_id,
-  #     select: %{
-  #       invoices_count: count(fragment("distinct ?", cont.id)),
-  #       invoices: fragment("string_agg(distinct ?, ', ')", inv.invoice_no),
-  #       invoice_date: inv.invoice_date,
-  #       customers: fragment("string_agg(distinct ?, ', ')", cont.name),
-  #       customer_shorts:
-  #         fragment(
-  #           "string_agg(distinct regexp_replace(?, '[a-z]|\\s|\\.|\\+|\\,|\\(|\\)', '', 'g'), ', ')",
-  #           cont.name
-  #         ),
-  #       good_names: fragment("string_agg(distinct ?, ', ')", gd.name),
-  #       quantity: sum(invd.quantity),
-  #       matched_tags: inv.matched_tags,
-  #       unit: gd.unit
-  #     },
-  #     group_by: [inv.invoice_date, inv.matched_tags, gd.unit],
-  #     order_by: [inv.invoice_date]
-  #   ) |> Repo.all
-  # end
-
-  def tagged_bill(tags, fdate, tdate, com) do
+  def tagged_bill(tags, fdate, tdate, com_id) do
     tags = tags |> String.split(" ", trim: true)
 
     ors =
       for t <- tags do
         dynamic(
           [cont],
-          fragment("? ilike ?", cont.tags, ^"%#{t}%")
+          fragment(
+            "? ilike ? or ? ilike ?",
+            cont.loader_tags,
+            ^"%#{t}%",
+            cont.delivery_man_tags,
+            ^"%#{t}%"
+          )
         )
       end
       |> Enum.reduce(fn a, b -> dynamic(^a or ^b) end)
 
-    ids_qry =
+    inv_ids_qry =
       from(i in FullCircle.Billing.Invoice,
         where: ^ors,
-        where: i.company_id == ^com.id,
+        where: i.company_id == ^com_id,
         where: i.invoice_date >= ^fdate,
         where: i.invoice_date <= ^tdate,
         select: i.id
       )
 
-    from(inv in FullCircle.Billing.Invoice,
-      join: invd in FullCircle.Billing.InvoiceDetail,
-      on: invd.invoice_id == inv.id,
-      join: gd in FullCircle.Product.Good,
-      on: gd.id == invd.good_id,
-      join: cont in Contact,
-      on: cont.id == inv.contact_id,
-      where: inv.id in subquery(ids_qry),
-      select: %{
-        invoices_count: count(fragment("distinct ?", cont.id)),
-        invoices: fragment("string_agg(distinct ?, ', ')", inv.invoice_no),
-        invoice_date: inv.invoice_date,
-        customers: fragment("string_agg(distinct ?, ', ')", cont.name),
-        customer_shorts:
-          fragment(
-            "string_agg(distinct regexp_replace(?, '[a-z]|\\s|\\.|\\+|\\,|\\(|\\)', '', 'g'), ', ')",
-            cont.name
-          ),
-        good_names: fragment("string_agg(distinct ?, ', ')", gd.name),
-        quantity: sum(invd.quantity),
-        tags: inv.tags,
-        unit: gd.unit
-      },
-      group_by: [inv.invoice_date, inv.tags, gd.unit],
-      order_by: [inv.invoice_date]
-    )
+    pur_inv_ids_qry =
+      from(i in FullCircle.Billing.PurInvoice,
+        where: ^ors,
+        where: i.company_id == ^com_id,
+        where: i.pur_invoice_date >= ^fdate,
+        where: i.pur_invoice_date <= ^tdate,
+        select: i.id
+      )
+
+    ids_qry = union_all(inv_ids_qry, ^pur_inv_ids_qry)
+
+    inv =
+      from(inv in FullCircle.Billing.Invoice,
+        join: invd in FullCircle.Billing.InvoiceDetail,
+        on: invd.invoice_id == inv.id,
+        join: gd in FullCircle.Product.Good,
+        on: gd.id == invd.good_id,
+        join: cont in Contact,
+        on: cont.id == inv.contact_id,
+        where: inv.id in subquery(ids_qry),
+        select: %{
+          contact_count: count(fragment("distinct ?", cont.name)),
+          invoices: fragment("string_agg(distinct ?, '')", inv.invoice_no),
+          invoice_date: inv.invoice_date,
+          contacts: fragment("string_agg(distinct ?, ', ')", cont.name),
+          contact_shorts:
+            fragment(
+              "string_agg(distinct regexp_replace(?, '[a-z]|\\s|\\.|\\+|\\,|\\(|\\)', '', 'g'), ', ')",
+              cont.name
+            ),
+          good_names: fragment("string_agg(distinct ?, ', ')", gd.name),
+          quantity: sum(invd.quantity),
+          loader_tags: fragment("string_agg(distinct ?, '')", inv.loader_tags),
+          delivery_man_tags: fragment("string_agg(distinct ?, '')", inv.delivery_man_tags),
+          loader_wages_tags: fragment("string_agg(distinct ?, '')", inv.loader_wages_tags),
+          delivery_wages_tags: fragment("string_agg(distinct ?, '')", inv.delivery_wages_tags),
+          unit: gd.unit
+        },
+        group_by: [
+          inv.invoice_date,
+          gd.unit
+        ]
+      )
+
+    pur_inv =
+      from(inv in FullCircle.Billing.PurInvoice,
+        join: invd in FullCircle.Billing.PurInvoiceDetail,
+        on: invd.pur_invoice_id == inv.id,
+        join: gd in FullCircle.Product.Good,
+        on: gd.id == invd.good_id,
+        join: cont in Contact,
+        on: cont.id == inv.contact_id,
+        where: inv.id in subquery(ids_qry),
+        select: %{
+          invoices_count: count(fragment("distinct ?", cont.id)),
+          invoices: fragment("string_agg(distinct ?, ', ')", inv.pur_invoice_no),
+          invoice_date: inv.pur_invoice_date,
+          contacts: fragment("string_agg(distinct ?, ', ')", cont.name),
+          contact_shorts:
+            fragment(
+              "string_agg(distinct regexp_replace(?, '[a-z]|\\s|\\.|\\+|\\,|\\(|\\)', '', 'g'), ', ')",
+              cont.name
+            ),
+          good_names: fragment("string_agg(distinct ?, ', ')", gd.name),
+          quantity: sum(invd.quantity),
+          loader_tags: fragment("string_agg(distinct ?, '')", inv.loader_tags),
+          delivery_man_tags: fragment("string_agg(distinct ?, '')", inv.delivery_man_tags),
+          loader_wages_tags: fragment("string_agg(distinct ?, '')", inv.loader_wages_tags),
+          delivery_wages_tags: fragment("string_agg(distinct ?, '')", inv.delivery_wages_tags),
+          unit: gd.unit
+        },
+        group_by: [
+          inv.pur_invoice_date,
+          gd.unit
+        ]
+      )
+
+    union_all(inv, ^pur_inv)
+    |> order_by([3])
     |> Repo.all()
+    |> Enum.map(fn x ->
+      Map.merge(x, %{
+        loader_tags: String.split(x.loader_tags) |> Enum.uniq() |> Enum.join(", "),
+        loader_tags_count: String.split(x.loader_tags) |> Enum.uniq() |> Enum.count(),
+        delivery_man_tags: String.split(x.delivery_man_tags) |> Enum.uniq() |> Enum.join(", "),
+        delivery_man_tags_count: String.split(x.delivery_man_tags) |> Enum.uniq() |> Enum.count()
+      })
+    end)
   end
 
   def post_dated_cheques(terms, flag, rdate, ddate, com) do
