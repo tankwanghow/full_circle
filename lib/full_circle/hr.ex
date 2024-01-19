@@ -952,7 +952,8 @@ defmodule FullCircle.HR do
       join: com in subquery(Sys.user_company(company, user)),
       on: com.id == emp.company_id,
       select: emp,
-      select_merge: %{checked: false}
+      select_merge: %{checked: false},
+      order_by: [emp.status, emp.name]
     )
   end
 

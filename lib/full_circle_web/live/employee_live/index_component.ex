@@ -17,7 +17,7 @@ defmodule FullCircleWeb.EmployeeLive.IndexComponent do
     <div id={@id} class={"#{@ex_class} flex text-center bg-gray-200 border-gray-500 border-b p-1"}>
       <div class="w-[3%]">
         <input
-          :if={@obj.checked}
+          :if={@obj.checked and @obj.status == "Active"}
           id={"checkbox_#{@obj.id}"}
           name={"checkbox[#{@obj.id}]"}
           type="checkbox"
@@ -27,7 +27,7 @@ defmodule FullCircleWeb.EmployeeLive.IndexComponent do
           checked
         />
         <input
-          :if={!@obj.checked}
+          :if={!@obj.checked and @obj.status == "Active"}
           id={"checkbox_#{@obj.id}"}
           name={"checkbox[#{@obj.id}]"}
           type="checkbox"
