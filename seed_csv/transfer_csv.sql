@@ -90,7 +90,7 @@ select 'HS-old-' || hs.id::varchar as harvest_no, hs.harvest_date as har_date, c
 SELECT 'WS-old-' || id::varchar as note_no, usage_date as note_date,
        feed_type as good_name,lorry as vehicle_no, gross, tare, unit
   FROM feed_usages
- where usage_date <= '2023-10-31'
+ where usage_date <= '2023-12-31'
 
 --goods
 select p.name1 as name,	p.unit,	p.description as descriptions,	sa.name1 as sales_account_name,
