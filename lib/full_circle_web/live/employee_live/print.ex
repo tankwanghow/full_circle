@@ -16,8 +16,8 @@ defmodule FullCircleWeb.EmployeeLive.Print do
   end
 
   defp fill_employee(socket, ids) do
-    detail_body_height = 290
-    detail_height = 55
+    detail_body_height = 285
+    detail_height = 52
     chunk = (detail_body_height / detail_height) |> floor
 
     svg_settings = %QRCode.Render.SvgSettings{scale: 4}
@@ -34,7 +34,7 @@ defmodule FullCircleWeb.EmployeeLive.Print do
           svg: QRCode.create(emp.id, :high) |> QRCode.render(:svg, svg_settings) |> elem(1)
         })
       end)
-      |> Enum.chunk_every(2)
+      |> Enum.chunk_every(3)
 
     socket
     |> assign(page_title: gettext("Print"))
@@ -84,9 +84,9 @@ defmodule FullCircleWeb.EmployeeLive.Print do
         html { margin: 0mm; }
         .page { padding: 5mm; page-break-after: always;} }
 
-      .emp-card { width: 85mm; border: 1px solid black; margin-left: 12mm;}
-      .emp-svg { margin-top: 2mm; margin-left: 20mm; }
-      .emp-info { text-align: center; }
+      .emp-card { width: 55mm; border: 1px solid black; margin-left: 10mm; }
+      .emp-card .emp-svg { margin-left: 7.5mm; }
+      .emp-card .emp-info { text-align: center; width: 55mm; max-height: 5mm; overflow: hidden; }
     </style>
     """
   end
