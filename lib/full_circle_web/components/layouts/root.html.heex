@@ -25,14 +25,14 @@
           :if={assigns[:current_company]}
           id="full_circle_dashboard"
           navigate={~p"/companies/#{@current_company.id}/dashboard"}
-          class="rounded hover:bg-gray-400 p-2 w-[20%]"
+          class="rounded hover:bg-gray-400 p-2"
         >
           <%= gettext("Dashboard") %>
         </.link>
 
         <ul>
           <li class="group relative" tabindex="-1">
-            <button class="rounded-md hover:bg-gray-400 p-2 w-[10%]">
+            <button class="rounded-md hover:bg-gray-400 p-2">
               <Heroicons.bars_4 class="w-5 h-5" />
             </button>
 
