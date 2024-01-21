@@ -47,7 +47,6 @@ select t.transaction_date as doc_date, a.name1 as account_name, t.doc_id as doc_
     on t.account_id = a.id
  where t.transaction_date >= '2023-01-01'
 
-
 -- TransactionMatchers
 select a.name1 as account_name, tm.doc_date as m_doc_date, tm.doc_id as m_doc_id, tm.doc_type as m_doc_type, tm.amount as m_amount,
        t.transaction_date as n_doc_date, t.doc_id as n_doc_id, t.doc_type as n_doc_type, t.amount as n_amount
@@ -111,6 +110,12 @@ from products p inner join product_packagings pp
   on pp.product_id = p.id inner join packagings p2 
   on p2.id = pp.packaging_id
 	order by 1
+
+-- balance
+select t.transaction_date as doc_date, a.name1 as account_name, sum(amount) as amount
+  from accounts a inner join transactions t 
+    on t.account_id = a.id
+ where t.transaction_date <= '2015-12-31'
 
  -- aging query
  with has_balance_contacts as (
