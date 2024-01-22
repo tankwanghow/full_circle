@@ -43,7 +43,7 @@ defmodule FullCircle.Helpers do
     union(invtags, ^purinvtags)
     |> order_by([1])
     |> FullCircle.Repo.all()
-    |> List.flatten()
+    |> List.flatten() |> Enum.map(fn x -> String.trim(x) end) |> Enum.uniq
   end
 
   def list_klass_tags(tag \\ "", class, key, com) do
@@ -54,13 +54,13 @@ defmodule FullCircle.Helpers do
       from(c in class,
         where: c.company_id == ^com.id,
         where: ilike(field(c, ^key), ^tag),
-        select: fragment("distinct regexp_matches(?, ?, 'g')", field(c, ^key), ^regexp)
+        select: fragment("distinct btrim(regexp_matches(?, ?, 'g'))", field(c, ^key), ^regexp)
       )
 
     tags
     |> order_by([1])
     |> FullCircle.Repo.all()
-    |> List.flatten()
+    |> List.flatten() |> Enum.map(fn x -> String.trim(x) end) |> Enum.uniq
   end
 
   def gen_temp_id(val \\ 6),
