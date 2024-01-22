@@ -92,7 +92,7 @@ defmodule FullCircleWeb.ReportLive.TaggedBill do
                 id="search_tags"
                 value={@search.tags}
                 phx-hook="tributeTagText"
-                url={"/api/companies/#{@current_company.id}/#{@current_user.id}/billingtags?tag="}
+                url={"/api/companies/#{@current_company.id}/#{@current_user.id}/billingtags?klass=FullCircle.Billing.Invoice&tag_field=loader_tags&tag="}
               />
             </div>
             <div class="col-span-2">

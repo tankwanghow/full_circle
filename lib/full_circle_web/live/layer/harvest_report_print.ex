@@ -30,6 +30,13 @@ defmodule FullCircleWeb.LayerLive.HarvestReportPrint do
         socket.assigns.current_company.id
       )
 
+    # data =
+    #   data
+    #   |> Enum.filter(fn x ->
+    #     x.yield_0 + x.yield_1 + x.yield_2 + x.yield_3 + x.yield_4 + x.yield_5 + x.yield_6 +
+    #       x.yield_7 > 0
+    #   end)
+
     {tdate, data}
   end
 
