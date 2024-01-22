@@ -122,6 +122,26 @@ defmodule FullCircle.Reporting do
         delivery_man_tags_count: String.split(x.delivery_man_tags) |> Enum.uniq() |> Enum.count()
       })
     end)
+    |> Enum.map(fn x ->
+      Map.merge(x, %{
+        load_wages:
+          (wages_parse(x.loader_wages_tags) * Decimal.to_float(x.quantity) / x.loader_tags_count)
+          |> Float.round(2),
+        delivery_wages:
+          (wages_parse(x.delivery_wages_tags) * Decimal.to_float(x.quantity) /
+             x.delivery_man_tags_count)
+          |> Float.round(2)
+      })
+    end)
+  end
+
+  defp wages_parse(tag) do
+    {wage, _} =
+      (Regex.scan(~r/(?<=\[).+?(?=\])/, tag) |> List.flatten() |> List.first() ||
+         "0")
+      |> Float.parse()
+
+    wage
   end
 
   def post_dated_cheques(terms, flag, rdate, ddate, com) do

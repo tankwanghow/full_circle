@@ -279,7 +279,7 @@ defmodule FullCircleWeb.LayerLive.FlockForm do
             </div>
 
             <div class="w-[20%]">
-              <.input type="number" field={move[:quantity]} />
+              <.input phx-hook="calculatorInput" klass="text-right" field={move[:quantity]} />
             </div>
             <div class="w-[37%]">
               <.input field={move[:note]} />

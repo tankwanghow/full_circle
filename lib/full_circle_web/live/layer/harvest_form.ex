@@ -305,19 +305,19 @@ defmodule FullCircleWeb.LayerLive.HarvestForm do
               <.input field={dtl[:flock_no]} readonly tabindex="-1" />
             </div>
             <div class="w-[13%]">
-              <.input type="number" field={dtl[:har_1]} />
+              <.input phx-hook="calculatorInput" klass="text-right" field={dtl[:har_1]} />
             </div>
             <div class="w-[13%]">
-              <.input type="number" field={dtl[:har_2]} />
+              <.input phx-hook="calculatorInput" klass="text-right" field={dtl[:har_2]} />
             </div>
             <div class="w-[13%]">
-              <.input type="number" field={dtl[:har_3]} />
+              <.input phx-hook="calculatorInput" klass="text-right" field={dtl[:har_3]} />
             </div>
             <div class="w-[13%]">
-              <.input type="number" field={dtl[:dea_1]} />
+              <.input phx-hook="calculatorInput" klass="text-right" field={dtl[:dea_1]} />
             </div>
             <div class="w-[13%]">
-              <.input type="number" field={dtl[:dea_2]} />
+              <.input phx-hook="calculatorInput" klass="text-right" field={dtl[:dea_2]} />
             </div>
 
             <div class="w-[3%] mt-1.5 text-rose-500">

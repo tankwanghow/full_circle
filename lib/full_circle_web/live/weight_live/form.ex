@@ -193,13 +193,13 @@ defmodule FullCircleWeb.WeighingLive.Form do
         </div>
         <div class="grid grid-cols-12 gap-1">
           <div class="col-span-3">
-            <.input field={@form[:gross]} label={gettext("Gross")} type="number" />
+            <.input field={@form[:gross]} label={gettext("Gross")} phx-hook="calculatorInput" klass="text-right" />
           </div>
           <div class="col-span-3">
-            <.input field={@form[:tare]} label={gettext("Tare")} type="number" />
+            <.input field={@form[:tare]} label={gettext("Tare")} phx-hook="calculatorInput" klass="text-right" />
           </div>
           <div class="col-span-3">
-            <.input readonly field={@form[:nett]} label={gettext("Nett")} type="number" />
+            <.input tabindex="-1" readonly field={@form[:nett]} label={gettext("Nett")} type="number" />
           </div>
           <div class="col-span-3">
             <.input field={@form[:unit]} label={gettext("Unit")} />

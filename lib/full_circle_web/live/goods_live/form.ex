@@ -393,10 +393,10 @@ defmodule FullCircleWeb.GoodLive.Form do
               </div>
             </div>
             <div class="col-span-3">
-              <.input type="number" field={pack[:unit_multiplier]} step="0.0001" />
+              <.input field={pack[:unit_multiplier]} phx-hook="calculatorInput" klass="text-right" />
             </div>
             <div class="col-span-3">
-              <.input type="number" field={pack[:cost_per_package]} step="0.0001" />
+              <.input field={pack[:cost_per_package]} phx-hook="calculatorInput" klass="text-right" />
             </div>
             <div class="col-span-1 mt-1.5 text-rose-500">
               <.link phx-click={:delete_packaging} phx-value-index={pack.index}>

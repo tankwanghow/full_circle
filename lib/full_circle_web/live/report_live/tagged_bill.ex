@@ -134,20 +134,19 @@ defmodule FullCircleWeb.ReportLive.TaggedBill do
         <%= FullCircleWeb.CsvHtml.headers(
           [
             gettext("Date"),
-            gettext("Count"),
             gettext("Contacts"),
             gettext("Goods"),
             gettext("Quantity"),
             gettext("Unit"),
-            gettext("Load"),
-            gettext("LCnt"),
+            gettext("LTags"),
+            gettext("LWTag"),
             gettext("Wages"),
-            gettext("Deliver"),
-            gettext("DCnt"),
-            gettext("wages")
+            gettext("DTags"),
+            gettext("DWTag"),
+            gettext("Wages")
           ],
           "font-medium flex flex-row text-center tracking-tighter mb-1",
-          ["5%", "5%", "15%", "24%", "10%", "5%", "8%", "3%", "7%", "8%", "3%", "7%"],
+          ["5%", "15%", "21%", "8%", "5%", "8%", "9%", "6%", "8%", "9%", "6%"],
           "border rounded bg-gray-200 border-gray-400 px-2 py-1",
           assigns
         ) %>
@@ -155,21 +154,19 @@ defmodule FullCircleWeb.ReportLive.TaggedBill do
         <%= FullCircleWeb.CsvHtml.data(
           [
             :invoice_date,
-            :contact_count,
             :contact_shorts,
             :good_names,
             :quantity,
             :unit,
             :loader_tags,
-            :loader_tags_count,
             :loader_wages_tags,
+            :load_wages,
             :delivery_man_tags,
-            :delivery_man_tags_count,
-            :delivery_wages_tags
+            :delivery_wages_tags,
+            :delivery_wages
           ],
           @objects,
           [
-            nil,
             nil,
             nil,
             nil,
@@ -183,7 +180,7 @@ defmodule FullCircleWeb.ReportLive.TaggedBill do
             nil
           ],
           "flex flex-row text-center tracking-tighter overflow-clip max-h-8",
-          ["5%", "5%", "15%", "24%", "10%", "5%", "8%", "3%", "7%", "8%", "3%", "7%"],
+          ["5%", "15%", "21%", "8%", "5%", "8%", "9%", "6%", "8%", "9%", "6%"],
           "border rounded bg-blue-200 border-blue-400 px-2 py-1",
           assigns
         ) %>
