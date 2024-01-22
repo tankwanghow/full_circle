@@ -50,7 +50,7 @@ defmodule FullCircle.Layer do
                   and hd1.flock_id = f.id), 0) as cur_qty
           from movements m inner join houses hou on hou.id = m.house_id
         inner join flocks f on m.flock_id = f.id, datelist dl
-        where (date_part('day', dl.gdate::timestamp - f.dob::timestamp)/7)::integer < 95
+        where (date_part('day', dl.gdate::timestamp - f.dob::timestamp)/7)::integer < 110
           and m.company_id = '#{com_id}'
         group by dl.gdate, hou.id, f.id)
 
