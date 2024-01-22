@@ -392,7 +392,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
               field={@form[:loader_tags]}
               label={gettext("Loader Tags")}
               phx-hook="tributeTagText"
-              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/tags?klass=FullCircle.Billing.PurInvoice&tag_field=loader_tags&tag="}
+              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/billingtags?klass=FullCircle.Billing.PurInvoice&tag_field=loader_tags&tag="}
             />
           </div>
           <div class="grow shrink">
@@ -400,7 +400,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
               field={@form[:loader_wages_tags]}
               label={gettext("Loader Wages Tags")}
               phx-hook="tributeTagText"
-              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/tags?klass=FullCircle.Billing.PurInvoice&tag_field=loader_wages_tags&tag="}
+              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/billingtags?klass=FullCircle.Billing.PurInvoice&tag_field=loader_wages_tags&tag="}
             />
           </div>
           <div class="grow shrink">
@@ -408,7 +408,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
               field={@form[:delivery_man_tags]}
               label={gettext("Delivery Man Tags")}
               phx-hook="tributeTagText"
-              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/tags?klass=FullCircle.Billing.PurInvoice&tag_field=delivery_man_tags&tag="}
+              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/billingtags?klass=FullCircle.Billing.PurInvoice&tag_field=delivery_man_tags&tag="}
             />
           </div>
           <div class="grow shrink">
@@ -416,7 +416,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
               field={@form[:delivery_wages_tags]}
               label={gettext("Delivery Wages Tags")}
               phx-hook="tributeTagText"
-              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/tags?klass=FullCircle.Billing.PurInvoice&tag_field=delivery_wages_tags&tag="}
+              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/billingtags?klass=FullCircle.Billing.PurInvoice&tag_field=delivery_wages_tags&tag="}
             />
           </div>
         </div>

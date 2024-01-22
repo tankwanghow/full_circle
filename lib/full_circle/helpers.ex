@@ -17,7 +17,13 @@ defmodule FullCircle.Helpers do
   end
 
   def list_billing_tags(tag \\ "", key, com) do
-    regexp = "#(\\w+#{tag}$|\\w+)"
+    regexp =
+      if Atom.to_string(key) |> String.contains?("wages") do
+        "#(\.+#{tag}$|\.+)"
+      else
+        "#(\\w+#{tag}$|\\w+)"
+      end
+
     tag = "#%#{tag}%"
 
     invtags =

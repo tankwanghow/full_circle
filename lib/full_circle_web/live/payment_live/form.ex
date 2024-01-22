@@ -196,11 +196,11 @@ defmodule FullCircleWeb.PaymentLive.Form do
 
     detail =
       Map.merge(detail, %{
-        "account_name" => Util.attempt(good, :sales_account_name),
-        "account_id" => Util.attempt(good, :sales_account_id),
-        "tax_code_name" => Util.attempt(good, :sales_tax_code_name),
-        "tax_code_id" => Util.attempt(good, :sales_tax_code_id),
-        "tax_rate" => Util.attempt(good, :sales_tax_rate),
+        "account_name" => Util.attempt(good, :purchase_account_name),
+        "account_id" => Util.attempt(good, :purchase_account_id),
+        "tax_code_name" => Util.attempt(good, :purchase_tax_code_name),
+        "tax_code_id" => Util.attempt(good, :purchase_tax_code_id),
+        "tax_rate" => Util.attempt(good, :purchase_tax_rate),
         "package_name" => Util.attempt(good, :package_name),
         "package_id" => Util.attempt(good, :package_id),
         "unit" => Util.attempt(good, :unit),
