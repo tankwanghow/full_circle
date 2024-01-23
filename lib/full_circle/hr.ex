@@ -852,6 +852,19 @@ defmodule FullCircle.HR do
     |> create_advance_transactions(advance_name, com, user)
   end
 
+  def get_salary_type!(id, com_id) do
+    from(st in SalaryType,
+      left_join: dbac in Account,
+      on: dbac.id == st.db_ac_id,
+      left_join: crac in Account,
+      on: crac.id == st.cr_ac_id,
+      where: st.company_id == ^com_id,
+      where: st.id == ^id,
+      select: st,
+      select_merge: %{db_ac_name: dbac.name, cr_ac_name: crac.name}
+    ) |> Repo.one!
+  end
+
   def get_salary_type!(id, com, user) do
     from(st in salary_type_query(com, user),
       where: st.id == ^id
