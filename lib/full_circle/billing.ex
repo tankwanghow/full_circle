@@ -223,7 +223,7 @@ defmodule FullCircle.Billing do
     union_all(invoice_transactions(company, user), ^invoice_old_transactions(company, user))
   end
 
-  defp invoice_transactions(company, user) do
+  defp invoice_transactions(company, _user) do
     from inv in Invoice,
       join: cont in Contact,
       on: cont.id == inv.contact_id,
@@ -231,10 +231,9 @@ defmodule FullCircle.Billing do
       on: inv.id == invd.invoice_id,
       join: good in Good,
       on: invd.good_id == good.id,
-      join: com in subquery(Sys.user_company(company, user)),
-      on: com.id == inv.company_id,
+      on: inv.company_id == ^company.id,
       left_join: txn in Transaction,
-      on: com.id == txn.company_id,
+      on: txn.company_id == ^company.id,
       on: txn.doc_type == "Invoice",
       on: txn.doc_no == inv.invoice_no,
       on: txn.contact_id == cont.id,
@@ -245,7 +244,6 @@ defmodule FullCircle.Billing do
         invoice_date: inv.invoice_date,
         due_date: inv.due_date,
         updated_at: inv.updated_at,
-        company_id: com.id,
         contact_name: cont.name,
         invoice_amount:
           sum(
@@ -268,13 +266,11 @@ defmodule FullCircle.Billing do
         checked: false,
         old_data: false
       },
-      group_by: [inv.id, txn.id, cont.name, com.id]
+      group_by: [inv.id, txn.id, cont.name]
   end
 
-  defp invoice_old_transactions(company, user) do
+  defp invoice_old_transactions(company, _user) do
     from txn in Transaction,
-      join: com in subquery(Sys.user_company(company, user)),
-      on: com.id == txn.company_id and txn.doc_type == "Invoice",
       join: cont in Contact,
       on: cont.id == txn.contact_id,
       left_join: stxm in SeedTransactionMatcher,
@@ -282,6 +278,8 @@ defmodule FullCircle.Billing do
       left_join: atxm in TransactionMatcher,
       on: atxm.transaction_id == txn.id,
       where: txn.old_data == true,
+      where: txn.company_id == ^company.id,
+      where: txn.doc_type == "Invoice",
       select: %{
         id: txn.id,
         invoice_no: txn.doc_no,
@@ -289,7 +287,6 @@ defmodule FullCircle.Billing do
         invoice_date: txn.doc_date,
         due_date: txn.doc_date,
         updated_at: txn.inserted_at,
-        company_id: com.id,
         contact_name: cont.name,
         invoice_amount: txn.amount,
         balance:
@@ -297,7 +294,7 @@ defmodule FullCircle.Billing do
         checked: false,
         old_data: txn.old_data
       },
-      group_by: [txn.id, cont.name, com.id]
+      group_by: [txn.id, cont.name]
   end
 
   def create_invoice(attrs, com, user) do
@@ -352,11 +349,6 @@ defmodule FullCircle.Billing do
                doc_no: invoice.invoice_no,
                doc_id: invoice.id,
                doc_date: invoice.invoice_date,
-               contact_id:
-                 if(Accounting.is_balance_sheet_account?(x.account),
-                   do: invoice.contact_id,
-                   else: nil
-                 ),
                account_id: x.account_id,
                company_id: com.id,
                amount: Decimal.negate(x.good_amount),
@@ -589,18 +581,17 @@ defmodule FullCircle.Billing do
     )
   end
 
-  defp pur_invoice_transactions(company, user) do
+  defp pur_invoice_transactions(company, _user) do
     from inv in PurInvoice,
       join: cont in Contact,
       on: cont.id == inv.contact_id,
+      on: inv.company_id == ^company.id,
       join: invd in PurInvoiceDetail,
       on: inv.id == invd.pur_invoice_id,
       join: good in Good,
       on: invd.good_id == good.id,
-      join: com in subquery(Sys.user_company(company, user)),
-      on: com.id == inv.company_id,
       left_join: txn in Transaction,
-      on: com.id == txn.company_id,
+      on: txn.company_id == ^company.id,
       on: txn.doc_type == "PurInvoice",
       on: txn.doc_no == inv.pur_invoice_no,
       on: txn.contact_id == cont.id,
@@ -611,7 +602,6 @@ defmodule FullCircle.Billing do
         pur_invoice_date: inv.pur_invoice_date,
         due_date: inv.due_date,
         updated_at: inv.updated_at,
-        company_id: com.id,
         contact_name: cont.name,
         pur_invoice_amount:
           -sum(
@@ -634,13 +624,11 @@ defmodule FullCircle.Billing do
         checked: false,
         old_data: false
       },
-      group_by: [inv.id, txn.id, cont.name, com.id]
+      group_by: [inv.id, txn.id, cont.name]
   end
 
-  defp pur_invoice_old_transactions(company, user) do
+  defp pur_invoice_old_transactions(company, _user) do
     from txn in Transaction,
-      join: com in subquery(Sys.user_company(company, user)),
-      on: com.id == txn.company_id and txn.doc_type == "PurInvoice",
       join: cont in Contact,
       on: cont.id == txn.contact_id,
       left_join: stxm in SeedTransactionMatcher,
@@ -648,6 +636,8 @@ defmodule FullCircle.Billing do
       left_join: atxm in TransactionMatcher,
       on: atxm.transaction_id == txn.id,
       where: txn.old_data == true,
+      where: txn.company_id == ^company.id,
+      where: txn.doc_type == "PurInvoice",
       select: %{
         id: txn.id,
         pur_invoice_no: txn.doc_no,
@@ -655,7 +645,6 @@ defmodule FullCircle.Billing do
         pur_invoice_date: txn.doc_date,
         due_date: txn.doc_date,
         updated_at: txn.inserted_at,
-        company_id: com.id,
         contact_name: cont.name,
         pur_invoice_amount: txn.amount,
         balance:
@@ -663,7 +652,7 @@ defmodule FullCircle.Billing do
         checked: false,
         old_data: txn.old_data
       },
-      group_by: [txn.id, cont.name, com.id]
+      group_by: [txn.id, cont.name]
   end
 
   def create_pur_invoice(attrs, com, user) do
@@ -724,11 +713,6 @@ defmodule FullCircle.Billing do
                doc_no: pur_invoice.pur_invoice_no,
                doc_id: pur_invoice.id,
                doc_date: pur_invoice.pur_invoice_date,
-               contact_id:
-                 if(Accounting.is_balance_sheet_account?(x.account),
-                   do: pur_invoice.contact_id,
-                   else: nil
-                 ),
                account_id: x.account_id,
                company_id: com.id,
                amount: x.good_amount,
