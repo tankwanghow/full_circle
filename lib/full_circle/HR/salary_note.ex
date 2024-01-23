@@ -102,10 +102,12 @@ defmodule FullCircle.HR.SalaryNote do
   end
 
   defp validate_date_by_type(cs) do
-    note = cs.data |> FullCircle.Repo.preload([:salary_type])
+    stid = fetch_field!(cs, :salary_type_id)
+    com_id = fetch_field!(cs, :company_id)
+    salary_type = if(stid, do: FullCircle.HR.get_salary_type!(stid, com_id), else: nil)
 
-    if note.salary_type do
-      if note.salary_type.type != "Recording" and note.salary_type.type != "LeaveTaken" do
+    if salary_type do
+      if salary_type.type != "Recording" and salary_type.type != "LeaveTaken" do
         cs
         |> validate_date(:note_date, days_before: 31)
         |> validate_date(:note_date, days_after: 14)
