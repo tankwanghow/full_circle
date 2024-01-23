@@ -136,6 +136,8 @@ defmodule FullCircle.Reporting do
   end
 
   defp wages_parse(tag) do
+    tag = tag || ""
+
     {wage, _} =
       (Regex.scan(~r/(?<=\[).+?(?=\])/, tag) |> List.flatten() |> List.first() ||
          "0")
