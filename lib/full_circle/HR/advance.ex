@@ -74,7 +74,7 @@ defmodule FullCircle.HR.Advance do
     |> fill_today(:slip_date)
     |> validate_id(:employee_name, :employee_id)
     |> validate_id(:funds_account_name, :funds_account_id)
-    |> validate_date(:slip_date, days_before: 2)
+    |> validate_date(:slip_date, days_before: 38)
     |> validate_date(:slip_date, days_after: 2)
     |> validate_number(:amount, greater_than: 0)
     |> unsafe_validate_unique([:slip_no, :company_id], FullCircle.Repo,
