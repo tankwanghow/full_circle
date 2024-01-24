@@ -218,7 +218,7 @@ defmodule FullCircle.BillPay do
         particulars:
           fragment(
             "string_agg(distinct coalesce(?, ?), ', ')",
-            txn.contact_particulars,
+            pay.descriptions,
             txn.particulars
           ),
         payment_date: txn.doc_date,
@@ -295,11 +295,6 @@ defmodule FullCircle.BillPay do
               doc_no: payment.payment_no,
               doc_id: payment.id,
               doc_date: payment.payment_date,
-              contact_id:
-                if(Accounting.is_balance_sheet_account?(x.account),
-                  do: payment.contact_id,
-                  else: nil
-                ),
               account_id: x.account_id,
               company_id: com.id,
               amount: x.good_amount,
