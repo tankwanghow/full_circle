@@ -277,11 +277,6 @@ defmodule FullCircle.DebCre do
             doc_no: cn.note_no,
             doc_id: cn.id,
             doc_date: cn.note_date,
-            contact_id:
-              if(Accounting.is_balance_sheet_account?(x.account),
-                do: cn.contact_id,
-                else: nil
-              ),
             account_id: x.account_id,
             company_id: com.id,
             amount: x.desc_amount,
@@ -649,11 +644,6 @@ defmodule FullCircle.DebCre do
             doc_no: cn.note_no,
             doc_id: cn.id,
             doc_date: cn.note_date,
-            contact_id:
-              if(Accounting.is_balance_sheet_account?(x.account),
-                do: cn.contact_id,
-                else: nil
-              ),
             account_id: x.account_id,
             company_id: com.id,
             amount: Decimal.negate(x.desc_amount),
