@@ -188,7 +188,7 @@ defmodule FullCircleWeb.Router do
       live("/harvest_report", LayerLive.HarvestReport, :index)
       live("/harvest_wage_report", LayerLive.HarvestWageReport, :index)
       live("/weighed_goods_report", WeighingLive.GoodsReport, :index)
-      live("/tagged_bills", ReportLive.TaggedBill, :index)
+      live("/transport_commission", ReportLive.TransportCommission, :index)
 
       live("/tbplbs", ReportLive.TbPlBs, :index)
       live("/aging", ReportLive.Aging, :index)
