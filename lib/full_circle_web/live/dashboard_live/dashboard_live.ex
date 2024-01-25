@@ -152,8 +152,8 @@ defmodule FullCircleWeb.DashboardLive do
         <.link navigate={~p"/companies/#{@current_company.id}/debtor_statement"} class="nav-btn">
           <%= gettext("Contact Statement") %>
         </.link>
-        <.link navigate={~p"/companies/#{@current_company.id}/tagged_bills"} class="nav-btn">
-          <%= gettext("Tagged Bill") %>
+        <.link navigate={~p"/companies/#{@current_company.id}/transport_commission"} class="nav-btn">
+          <%= gettext("Driver Commission") %>
         </.link>
         <.link navigate={~p"/companies/#{@current_company.id}/tbplbs"} class="nav-btn">
           <%= gettext("TB/PL/BS") %>

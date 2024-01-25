@@ -1,14 +1,13 @@
-defmodule FullCircleWeb.ReportLive.TaggedBill do
+defmodule FullCircleWeb.ReportLive.TransportCommission do
   use FullCircleWeb, :live_view
 
-  alias FullCircle.{Reporting}
-  # alias FullCircleWeb.ReportLive.StatementComponent
+  alias FullCircle.TaggedBill
 
   @impl true
   def mount(_params, _session, socket) do
     socket =
       socket
-      |> assign(page_title: "Tagged Bill")
+      |> assign(page_title: "Driver Commission")
 
     {:ok, socket}
   end
@@ -57,7 +56,7 @@ defmodule FullCircleWeb.ReportLive.TaggedBill do
     }
 
     url =
-      "/companies/#{socket.assigns.current_company.id}/tagged_bills?#{URI.encode_query(qry)}"
+      "/companies/#{socket.assigns.current_company.id}/transport_commission?#{URI.encode_query(qry)}"
 
     {:noreply,
      socket
@@ -69,7 +68,7 @@ defmodule FullCircleWeb.ReportLive.TaggedBill do
       if tags == "" or f_date == "" or t_date == "" do
         []
       else
-        Reporting.tagged_bill(tags, f_date, t_date, socket.assigns.current_company.id)
+        TaggedBill.transport_commission(tags, f_date, t_date, socket.assigns.current_company.id)
       end
 
     socket
@@ -83,7 +82,14 @@ defmodule FullCircleWeb.ReportLive.TaggedBill do
     <div class="w-11/12 mx-auto mb-8">
       <p class="text-2xl text-center font-medium"><%= "#{@page_title}" %></p>
       <div class="border rounded bg-amber-200 text-center p-2">
-        <.form for={%{}} id="search-form" phx-submit="query" phx-change="changed" autocomplete="off" class="w-9/12 mx-auto">
+        <.form
+          for={%{}}
+          id="search-form"
+          phx-submit="query"
+          phx-change="changed"
+          autocomplete="off"
+          class="w-9/12 mx-auto"
+        >
           <div class="grid grid-cols-12 tracking-tighter">
             <div class="col-span-6">
               <.input
@@ -134,7 +140,8 @@ defmodule FullCircleWeb.ReportLive.TaggedBill do
         <%= FullCircleWeb.CsvHtml.headers(
           [
             gettext("Date"),
-            gettext("Contacts"),
+            gettext("DocNo"),
+            gettext("Contact"),
             gettext("Goods"),
             gettext("Quantity"),
             gettext("Unit"),
@@ -146,7 +153,7 @@ defmodule FullCircleWeb.ReportLive.TaggedBill do
             gettext("Wages")
           ],
           "font-medium flex flex-row text-center tracking-tighter mb-1",
-          ["5%", "15%", "21%", "8%", "5%", "8%", "9%", "6%", "8%", "9%", "6%"],
+          ["5%", "6%", "13%", "18%", "7%", "5%", "8%", "9%", "6%", "8%", "9%", "6%"],
           "border rounded bg-gray-200 border-gray-400 px-2 py-1",
           assigns
         ) %>
@@ -154,7 +161,8 @@ defmodule FullCircleWeb.ReportLive.TaggedBill do
         <%= FullCircleWeb.CsvHtml.data(
           [
             :invoice_date,
-            :contact_shorts,
+            :doc_no,
+            :contact,
             :good_names,
             :quantity,
             :unit,
@@ -170,6 +178,7 @@ defmodule FullCircleWeb.ReportLive.TaggedBill do
             nil,
             nil,
             nil,
+            nil,
             fn n -> Number.Delimit.number_to_delimited(n, precision: 2) end,
             nil,
             nil,
@@ -180,10 +189,20 @@ defmodule FullCircleWeb.ReportLive.TaggedBill do
             nil
           ],
           "flex flex-row text-center tracking-tighter overflow-clip max-h-8",
-          ["5%", "15%", "21%", "8%", "5%", "8%", "9%", "6%", "8%", "9%", "6%"],
+          ["5%", "6%", "13%", "18%", "7%", "5%", "8%", "9%", "6%", "8%", "9%", "6%"],
           "border rounded bg-blue-200 border-blue-400 px-2 py-1",
           assigns
         ) %>
+        <div class="flex h-8 font-bold">
+          <div class="w-[71%] border rounded bg-green-200 border-green-400 px-2 py-1"></div>
+          <div class="w-[6%] border rounded bg-green-200 border-green-400 px-2 py-1">
+            <%= [0.0 | Enum.map(@objects, fn x -> x.load_wages end)] |> Enum.sum() |> Float.round(2) %>
+          </div>
+          <div class="w-[17%] border rounded bg-green-200 border-green-400 px-2 py-1"></div>
+          <div class="w-[6%] border rounded bg-green-200 border-green-400 px-2 py-1">
+            <%= [0.0 | Enum.map(@objects, fn x -> x.delivery_wages end)] |> Enum.sum() |> Float.round(2) %>
+          </div>
+        </div>
       </div>
     </div>
     """
