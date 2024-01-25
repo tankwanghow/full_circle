@@ -31,7 +31,7 @@ defmodule FullCircleWeb.ReceiptLive.Print do
   defp set_page_defaults(socket) do
     socket
     |> assign(:detail_body_height, 160)
-    |> assign(:detail_height, 6)
+    |> assign(:detail_height, 11)
     |> assign(:company, FullCircle.Sys.get_company!(socket.assigns.current_company.id))
   end
 
@@ -195,7 +195,7 @@ defmodule FullCircleWeb.ReceiptLive.Print do
 
     ~H"""
     <div :if={@recd.__struct__ == ReceiveFund.ReceiptDetail} class="detail">
-      <span class="particular">
+      <div class="particular">
         <div>
           <%= if(@recd.good_name != "Note", do: @recd.good_name, else: "") %>
           <%= if(Decimal.gt?(@recd.package_qty, 0), do: " - #{@recd.package_qty}", else: "") %>
@@ -210,30 +210,30 @@ defmodule FullCircleWeb.ReceiptLive.Print do
             else: ""
           ) %>
         </div>
-      </span>
-      <span class="qty">
+      </div>
+      <div class="qty">
         <%= if Decimal.integer?(@recd.quantity),
           do: Decimal.to_integer(@recd.quantity),
           else: @recd.quantity %> <%= if @recd.unit == "-", do: "", else: @recd.unit %>
-      </span>
-      <span class="price"><%= format_unit_price(@recd.unit_price) %></span>
-      <span class="disc">
+      </div>
+      <div class="price"><%= format_unit_price(@recd.unit_price) %></div>
+      <div class="disc">
         <%= if(Decimal.eq?(@recd.discount, 0),
           do: "-",
           else: Number.Delimit.number_to_delimited(@recd.discount)
         ) %>
-      </span>
-      <span class="total">
+      </div>
+      <div class="total">
         <div><%= Number.Delimit.number_to_delimited(@recd.good_amount) %></div>
 
         <%= if Decimal.gt?(@recd.tax_amount, 0) do %>
-          <span class="is-size-7">
+          <div class="is-size-7">
             <%= @recd.tax_code_name %>
             <%= Number.Percentage.number_to_percentage(Decimal.mult(@recd.tax_rate, 100)) %>
             <%= Number.Delimit.number_to_delimited(@recd.tax_amount) %>
-          </span>
+          </div>
         <% end %>
-      </span>
+      </div>
     </div>
     """
   end
@@ -465,7 +465,8 @@ defmodule FullCircleWeb.ReceiptLive.Print do
     ~H"""
     <style>
       .details-body { min-height: <%= @detail_body_height %>mm; max-height: <%= @detail_body_height %>mm; }
-      .detail { display: flex; height: <%= @detail_height %>mm; vertical-align: middle; align-items: center; line-height: 3.5mm; margin-top: 3mm; margin-bottom: 2mm; }
+      .details-body div { vertical-align: top; }
+      .detail { display: flex; height: <%= @detail_height %>mm; vertical-align: middle; align-items: center; }
       .cheque { display: flex; height: <%= @detail_height %>mm; vertical-align: middle;  align-items: center; }
       .funds { display: flex; height: <%= @detail_height %>mm; vertical-align: middle;  align-items: center; }
       .matched { display: flex; height: <%= @detail_height %>mm; vertical-align: middle;  align-items: center; }
@@ -486,7 +487,8 @@ defmodule FullCircleWeb.ReceiptLive.Print do
       .customer { padding-left: 2mm; float: left;}
       .receipt-info div { margin-bottom: 2mm; text-align: right; }
       .details-header { display: flex; padding-bottom: 1mm; padding-top: 1mm; border-bottom: 0.5mm dotted black; margin-bottom: 3px;}
-      .particular { width: 80mm; text-align: left;}
+      .particular { width: 80mm; text-align: left; }
+      .particular div { margin-bottom: 0.5mm; }
       .qty { width: 32mm; text-align: center; }
       .price { width: 25mm; text-align: center; }
       .disc { width: 24mm; text-align: center; }

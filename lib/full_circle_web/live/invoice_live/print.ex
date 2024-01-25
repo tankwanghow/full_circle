@@ -31,7 +31,7 @@ defmodule FullCircleWeb.InvoiceLive.Print do
   defp set_page_defaults(socket) do
     socket
     |> assign(:detail_body_height, 150)
-    |> assign(:detail_height, 10)
+    |> assign(:detail_height, 11)
     |> assign(:company, FullCircle.Sys.get_company!(socket.assigns.current_company.id))
   end
 
@@ -273,7 +273,7 @@ defmodule FullCircleWeb.InvoiceLive.Print do
     <style>
       .details-body { height: <%= @detail_body_height %>mm; }
       .details-body div { vertical-align: top; }
-      .detail { display: flex; height: <%= @detail_height %>mm; align-items : center;  line-height: 4mm; }
+      .detail { display: flex; height: <%= @detail_height %>mm; align-items : center; }
       .page { width: 210mm; min-height: 290mm; padding: 5mm; }
 
       @media print {
