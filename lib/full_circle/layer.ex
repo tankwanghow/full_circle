@@ -63,7 +63,7 @@ defmodule FullCircle.Layer do
     right outer join hou_flo_dt_qty hq on hd.house_id = hq.house_id and hd.flock_id = hq.flock_id and h.har_date = hq.gdate
     where hq.cur_qty > 0 and hq.age >= 14
       group by hq.gdate, hq.house_no, hq.flock_no, hq.age, hq.cur_qty"
-    |> exec_query()
+    |> exec_query_map()
     |> format_harvest_report(dt)
   end
 
@@ -99,7 +99,7 @@ defmodule FullCircle.Layer do
   end
 
   def get_house_info_at(dt, h_no, com_id) do
-    (house_info_query(dt, com_id) <> " and h.house_no = '#{h_no}'") |> exec_query() |> Enum.at(0)
+    (house_info_query(dt, com_id) <> " and h.house_no = '#{h_no}'") |> exec_query_map() |> Enum.at(0)
   end
 
   def house_index(terms, com_id, page: page, per_page: per_page) do
@@ -107,7 +107,7 @@ defmodule FullCircle.Layer do
        " order by COALESCE(WORD_SIMILARITY('#{terms}', h.house_no), 0) +" <>
        " COALESCE(WORD_SIMILARITY('#{terms}', info.flock_no), 0) desc, h.house_no" <>
        " limit #{per_page} offset #{(page - 1) * per_page}")
-    |> exec_query()
+    |> exec_query_map()
   end
 
   defp house_info_query(dt, com_id) do

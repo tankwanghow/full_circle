@@ -195,7 +195,7 @@ defmodule FullCircle.Reporting do
 
     agings =
       (contact_aging_query(ids, edate, 30, com.id) <> " and p1 + p2 + p3 + p4 + p5 >= 0")
-      |> exec_query()
+      |> exec_query_map()
       |> fix_unmatch_balance("debtor")
 
     conts
@@ -308,13 +308,13 @@ defmodule FullCircle.Reporting do
 
   def debtor_aging_report(edate, days, com_id) do
     (contact_aging_query(edate, days, com_id) <> " and p1 + p2 + p3 + p4 + p5 > 0")
-    |> exec_query()
+    |> exec_query_map()
     |> fix_unmatch_balance("debtor")
   end
 
   def creditor_aging_report(edate, days, com_id) do
     (contact_aging_query(edate, days, com_id) <> " and p1 + p2 + p3 + p4 + p5 < 0")
-    |> exec_query()
+    |> exec_query_map()
     |> fix_unmatch_balance("creditor")
   end
 

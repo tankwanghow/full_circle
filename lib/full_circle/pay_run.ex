@@ -48,7 +48,7 @@ defmodule FullCircle.PayRun do
        left outer join pay_slips as p5 on p5.employee_id = el0.employee_id
         and p5.company_id = el0.company_id and p5.pay_month = el0.pay_month
         and p5.pay_year = el0.pay_year group by el0.employee_id, el0.name
-      order by el0.name" |> Helpers.exec_query() |> unzip_pay_lists()
+      order by el0.name" |> Helpers.exec_query_map() |> unzip_pay_lists()
   end
 
   defp unzip_pay_lists(lists) do

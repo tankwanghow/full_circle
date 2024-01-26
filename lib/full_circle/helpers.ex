@@ -249,7 +249,7 @@ defmodule FullCircle.Helpers do
     if(Enum.count(cs.errors) == 0, do: Map.replace(cs, :valid?, true), else: cs)
   end
 
-  def exec_query(qry) do
+  def exec_query_map(qry) do
     k = FullCircle.Repo.query!(qry)
 
     Enum.map(k.rows, fn r ->
@@ -264,5 +264,10 @@ defmodule FullCircle.Helpers do
          )}
       end)
     end)
+  end
+
+  def exec_query_row_col(qry) do
+    k = FullCircle.Repo.query!(qry)
+    {k.columns, k.rows}
   end
 end
