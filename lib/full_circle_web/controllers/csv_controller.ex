@@ -3,6 +3,49 @@ defmodule FullCircleWeb.CsvController do
 
   def show(conn, %{
         "company_id" => com_id,
+        "report" => "epfsocsoeis",
+        "rep" => rep,
+        "code" => code,
+        "month" => month,
+        "year" => year
+      }) do
+    {col, row} =
+      cond do
+        rep == "EPF" ->
+          FullCircle.HR.epf_submit_file_format_query(
+            month,
+            year,
+            code,
+            com_id
+          )
+
+        rep == "SOCSO" ->
+          FullCircle.HR.socso_submit_file_format_query(
+            month,
+            year,
+            code,
+            com_id
+          )
+
+        rep == "EIS" ->
+          FullCircle.HR.eis_submit_file_format_query(
+            month,
+            year,
+            code,
+            com_id
+          )
+
+        true ->
+          []
+      end
+
+    filename = "#{rep}_#{month}_#{year}"
+
+    send_csv_row_col(conn, row, col, filename)
+  end
+
+  def show(conn, %{
+        "company_id" => com_id,
         "report" => "tagged_bills",
         "tags" => tags,
         "fdate" => fdate,
@@ -13,7 +56,7 @@ defmodule FullCircleWeb.CsvController do
     data = FullCircle.TaggedBill.transport_commission(tags, fdate, tdate, com_id)
     fields = data |> Enum.at(0) |> Map.keys()
     filename = "driver_commission_#{fdate}_#{tdate}"
-    send_csv(conn, data, fields, filename)
+    send_csv_map(conn, data, fields, filename)
   end
 
   def show(conn, %{
@@ -75,11 +118,11 @@ defmodule FullCircleWeb.CsvController do
 
     fields = data |> Enum.at(0) |> Map.keys()
     filename = "#{rep |> String.replace(" ", "") |> Macro.underscore()}_#{tdate}"
-    send_csv(conn, data, fields, filename)
+    send_csv_map(conn, data, fields, filename)
 
     fields = data |> Enum.at(0) |> Map.keys()
     filename = "harvest_report_#{tdate}"
-    send_csv(conn, data, fields, filename)
+    send_csv_map(conn, data, fields, filename)
   end
 
   def show(conn, %{"company_id" => com_id, "report" => "harvrepo", "tdate" => tdate}) do
@@ -87,7 +130,7 @@ defmodule FullCircleWeb.CsvController do
     data = FullCircle.Layer.harvest_report(tdate, com_id)
     fields = data |> Enum.at(0) |> Map.keys()
     filename = "harvest_report_#{tdate}"
-    send_csv(conn, data, fields, filename)
+    send_csv_map(conn, data, fields, filename)
   end
 
   def show(conn, %{
@@ -101,7 +144,7 @@ defmodule FullCircleWeb.CsvController do
     data = FullCircle.Layer.harvest_wage_report(fdate, tdate, com_id)
     fields = data |> Enum.at(0) |> Map.keys()
     filename = "harvest_wage_report_#{fdate}_#{tdate}"
-    send_csv(conn, data, fields, filename)
+    send_csv_map(conn, data, fields, filename)
   end
 
   def show(conn, %{
@@ -125,7 +168,7 @@ defmodule FullCircleWeb.CsvController do
 
     fields = data |> Enum.at(0) |> Map.keys()
     filename = "weight_good_report_#{fdate}_#{tdate}"
-    send_csv(conn, data, fields, filename)
+    send_csv_map(conn, data, fields, filename)
   end
 
   def show(conn, %{
@@ -154,7 +197,7 @@ defmodule FullCircleWeb.CsvController do
 
     fields = data |> Enum.at(0) |> Map.keys()
     filename = "#{rep |> String.replace(" ", "") |> Macro.underscore()}_#{tdate}"
-    send_csv(conn, data, fields, filename)
+    send_csv_map(conn, data, fields, filename)
   end
 
   defp transactions_csv(conn, name, fdate, tdate, com_id, name_func, trans_func) do
@@ -178,21 +221,36 @@ defmodule FullCircleWeb.CsvController do
       ]
       |> Enum.join("_")
 
-    send_csv(conn, data, [:doc_date, :doc_type, :doc_no, :particulars, :amount], filename)
+    send_csv_map(conn, data, [:doc_date, :doc_type, :doc_no, :particulars, :amount], filename)
   end
 
-  defp send_csv(conn, data, fields, filename) do
+  defp send_csv_map(conn, data, fields, filename) do
     conn
     |> put_resp_content_type("text/csv")
     |> put_resp_header("content-disposition", "attachment; filename=\"#{filename}.csv\"")
     |> put_root_layout(false)
     |> send_resp(
       200,
-      to_csv(data, fields)
+      to_csv_map(data, fields)
     )
   end
 
-  defp to_csv(data, fields) do
+  defp send_csv_row_col(conn, data, fields, filename) do
+    conn
+    |> put_resp_content_type("text/csv")
+    |> put_resp_header("content-disposition", "attachment; filename=\"#{filename}.csv\"")
+    |> put_root_layout(false)
+    |> send_resp(
+      200,
+      to_csv_row_col(data, fields)
+    )
+  end
+
+  defp to_csv_row_col(data, fields) do
+    [fields | data] |> NimbleCSV.RFC4180.dump_to_iodata()
+  end
+
+  defp to_csv_map(data, fields) do
     body = data |> Enum.map(fn d -> Enum.map(fields, fn f -> Map.fetch!(d, f) end) end)
 
     [fields | body] |> NimbleCSV.RFC4180.dump_to_iodata()
