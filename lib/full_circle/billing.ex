@@ -183,9 +183,10 @@ defmodule FullCircle.Billing do
     qry =
       if terms != "" do
         from inv in subquery(qry),
+          order_by: [inv.old_data],
           order_by: ^similarity_order([:invoice_no, :contact_name, :particulars], terms)
       else
-        qry
+        from inv in qry, order_by: [inv.old_data]
       end
 
     qry =
@@ -243,7 +244,6 @@ defmodule FullCircle.Billing do
         particulars: fragment("string_agg(distinct ?, ', ')", good.name),
         invoice_date: inv.invoice_date,
         due_date: inv.due_date,
-        updated_at: inv.updated_at,
         contact_name: cont.name,
         invoice_amount:
           sum(
@@ -277,7 +277,6 @@ defmodule FullCircle.Billing do
       on: stxm.transaction_id == txn.id,
       left_join: atxm in TransactionMatcher,
       on: atxm.transaction_id == txn.id,
-      where: txn.old_data == true,
       where: txn.company_id == ^company.id,
       where: txn.doc_type == "Invoice",
       select: %{
@@ -286,7 +285,6 @@ defmodule FullCircle.Billing do
         particulars: coalesce(txn.contact_particulars, txn.particulars),
         invoice_date: txn.doc_date,
         due_date: txn.doc_date,
-        updated_at: txn.inserted_at,
         contact_name: cont.name,
         invoice_amount: txn.amount,
         balance:
@@ -537,10 +535,10 @@ defmodule FullCircle.Billing do
     qry =
       if terms != "" do
         from inv in subquery(qry),
-          order_by: ^similarity_order([:pur_invoice_no, :contact_name, :particulars], terms),
-          order_by: [desc: :updated_at]
+          order_by: [inv.old_data],
+          order_by: ^similarity_order([:pur_invoice_no, :contact_name, :particulars], terms)
       else
-        qry |> order_by(desc: :updated_at)
+        from inv in qry, order_by: [inv.old_data]
       end
 
     qry =
@@ -601,7 +599,6 @@ defmodule FullCircle.Billing do
         particulars: fragment("string_agg(distinct ?, ', ')", good.name),
         pur_invoice_date: inv.pur_invoice_date,
         due_date: inv.due_date,
-        updated_at: inv.updated_at,
         contact_name: cont.name,
         pur_invoice_amount:
           -sum(
@@ -635,7 +632,6 @@ defmodule FullCircle.Billing do
       on: stxm.transaction_id == txn.id,
       left_join: atxm in TransactionMatcher,
       on: atxm.transaction_id == txn.id,
-      where: txn.old_data == true,
       where: txn.company_id == ^company.id,
       where: txn.doc_type == "PurInvoice",
       select: %{
@@ -644,7 +640,6 @@ defmodule FullCircle.Billing do
         particulars: coalesce(txn.contact_particulars, txn.particulars),
         pur_invoice_date: txn.doc_date,
         due_date: txn.doc_date,
-        updated_at: txn.inserted_at,
         contact_name: cont.name,
         pur_invoice_amount: txn.amount,
         balance:

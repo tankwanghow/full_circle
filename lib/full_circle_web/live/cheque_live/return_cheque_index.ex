@@ -84,7 +84,7 @@ defmodule FullCircleWeb.ChequeLive.ReturnChequeIndex do
       "search[r_date]" => socket.assigns.search.r_date
     }
 
-    "/companies/#{socket.assigns.current_company.id}/Deposit?#{URI.encode_query(qry)}"
+    "/companies/#{socket.assigns.current_company.id}/ReturnCheque?#{URI.encode_query(qry)}"
   end
 
   @impl true

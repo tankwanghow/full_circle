@@ -69,9 +69,10 @@ defmodule FullCircle.Cheque do
     qry =
       if terms != "" do
         from rec in qry,
+          order_by: [rec.old_data],
           order_by: ^similarity_order([:particulars, :doc_no], terms)
       else
-        qry
+        from rec in qry, order_by: [rec.old_data]
       end
 
     qry =
@@ -94,10 +95,11 @@ defmodule FullCircle.Cheque do
       on: txn.doc_id == rtnq.id,
       left_join: rtn_bank in FullCircle.Accounting.Account,
       on: rtn_bank.id == rtnq.return_from_bank_id,
-      order_by: [desc: txn.inserted_at],
+      order_by: [desc: txn.doc_date],
       where: txn.amount > 0,
       select: txn,
       select_merge: %{
+        doc_date: txn.doc_date,
         return_from_bank_name: rtn_bank.name,
         cheque_owner_name: owner.name,
         return_reason: rtnq.return_reason,
@@ -111,9 +113,10 @@ defmodule FullCircle.Cheque do
     qry =
       if terms != "" do
         from rec in qry,
+          order_by: [rec.old_data],
           order_by: ^similarity_order([:particulars, :deposit_no, :deposit_bank_name], terms)
       else
-        qry
+        from rec in qry, order_by: [rec.old_data]
       end
 
     qry =
@@ -136,7 +139,7 @@ defmodule FullCircle.Cheque do
       on: txn.doc_no == dep.deposit_no,
       left_join: funds_from in Account,
       on: funds_from.id == dep.funds_from_id,
-      order_by: [desc: txn.inserted_at],
+      order_by: [desc: txn.doc_date],
       where: txn.amount > 0,
       select: %{
         id: txn.id,

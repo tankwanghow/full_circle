@@ -154,9 +154,10 @@ defmodule FullCircle.DebCre do
     qry =
       if terms != "" do
         from inv in subquery(qry),
+          order_by: [inv.old_data],
           order_by: ^similarity_order([:note_no, :contact_name, :particulars], terms)
       else
-        qry
+        from inv in qry, order_by: [inv.old_data]
       end
 
     qry =
@@ -186,7 +187,7 @@ defmodule FullCircle.DebCre do
       on: ac.id == txn.account_id,
       left_join: obj in CreditNote,
       on: txn.doc_no == obj.note_no,
-      order_by: [desc: txn.inserted_at],
+      order_by: [desc: txn.doc_date],
       where: txn.amount < 0,
       select: %{
         id: coalesce(obj.id, txn.id),
@@ -198,7 +199,6 @@ defmodule FullCircle.DebCre do
             txn.particulars
           ),
         note_date: txn.doc_date,
-        updated_at: txn.inserted_at,
         company_id: com.id,
         contact_name: coalesce(cont.name, ac.name),
         amount: sum(txn.amount),
@@ -211,8 +211,7 @@ defmodule FullCircle.DebCre do
         coalesce(cont.name, ac.name),
         txn.doc_date,
         com.id,
-        txn.old_data,
-        txn.inserted_at
+        txn.old_data
       ]
   end
 
@@ -521,9 +520,10 @@ defmodule FullCircle.DebCre do
     qry =
       if terms != "" do
         from inv in subquery(qry),
+          order_by: [inv.old_data],
           order_by: ^similarity_order([:note_no, :contact_name, :particulars], terms)
       else
-        qry
+        from inv in qry, order_by: [inv.old_data]
       end
 
     qry =
@@ -553,7 +553,7 @@ defmodule FullCircle.DebCre do
       on: ac.id == txn.account_id,
       left_join: obj in DebitNote,
       on: txn.doc_no == obj.note_no,
-      order_by: [desc: txn.inserted_at],
+      order_by: [desc: txn.doc_date],
       where: txn.amount > 0,
       select: %{
         id: coalesce(obj.id, txn.id),
@@ -565,7 +565,6 @@ defmodule FullCircle.DebCre do
             txn.particulars
           ),
         note_date: txn.doc_date,
-        updated_at: txn.inserted_at,
         company_id: com.id,
         contact_name: coalesce(cont.name, ac.name),
         amount: sum(txn.amount),
@@ -578,8 +577,7 @@ defmodule FullCircle.DebCre do
         coalesce(cont.name, ac.name),
         txn.doc_date,
         com.id,
-        txn.old_data,
-        txn.inserted_at
+        txn.old_data
       ]
   end
 

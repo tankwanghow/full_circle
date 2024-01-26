@@ -180,14 +180,15 @@ defmodule FullCircle.BillPay do
     qry =
       if terms != "" do
         from inv in subquery(qry),
+          order_by: [inv.old_data],
           order_by: ^similarity_order([:payment_no, :contact_name, :particulars], terms)
       else
-        qry
+        from inv in qry, order_by: [inv.old_data]
       end
 
     qry =
       if date_from != "" do
-        from inv in qry, where: inv.payment_date >= ^date_from, order_by: inv.payment_date
+        from inv in qry, where: inv.payment_date >= ^date_from, order_by: [desc: inv.payment_date]
       else
         qry
       end
@@ -210,7 +211,7 @@ defmodule FullCircle.BillPay do
       on: txn.doc_no == pay.payment_no,
       join: cont in Contact,
       on: cont.id == pay.contact_id or cont.id == txn.contact_id,
-      order_by: [desc: txn.inserted_at],
+      order_by: [desc: txn.doc_date],
       where: txn.amount > 0,
       select: %{
         id: coalesce(pay.id, txn.id),
@@ -222,7 +223,6 @@ defmodule FullCircle.BillPay do
             txn.particulars
           ),
         payment_date: txn.doc_date,
-        updated_at: txn.inserted_at,
         company_id: com.id,
         contact_name: cont.name,
         amount: sum(txn.amount),
@@ -235,8 +235,7 @@ defmodule FullCircle.BillPay do
         cont.name,
         txn.doc_date,
         com.id,
-        txn.old_data,
-        txn.inserted_at
+        txn.old_data
       ]
   end
 
