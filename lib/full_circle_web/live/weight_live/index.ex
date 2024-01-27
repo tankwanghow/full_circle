@@ -183,7 +183,8 @@ defmodule FullCircleWeb.WeighingLive.Index do
             )
           ),
         on: com.id == obj.company_id,
-        where: obj.note_date >= ^df
+        where: obj.note_date >= ^df,
+        order_by: [desc: obj.inserted_at]
       )
 
     objects =

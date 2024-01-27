@@ -163,7 +163,8 @@ defmodule FullCircleWeb.LayerLive.HarvestIndex do
         employee_name: emp.name,
         houses: fragment("string_agg(distinct ?, ', ')", h.house_no)
       },
-      group_by: [hv.id, emp.id]
+      group_by: [hv.id, emp.id],
+      order_by: [desc: hv.har_date]
     )
     |> filter(socket, terms, reset, page)
   end
@@ -190,7 +191,8 @@ defmodule FullCircleWeb.LayerLive.HarvestIndex do
         employee_name: emp.name,
         houses: fragment("string_agg(distinct ?, ', ')", h.house_no)
       },
-      group_by: [hv.id, emp.id]
+      group_by: [hv.id, emp.id],
+      order_by: [desc: hv.har_date]
     )
     |> filter(socket, terms, reset, page)
   end

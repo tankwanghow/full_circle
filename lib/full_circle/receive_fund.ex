@@ -196,6 +196,7 @@ defmodule FullCircle.ReceiveFund do
     qry =
       if terms != "" do
         from inv in subquery(qry),
+          order_by: [inv.old_data],
           order_by: ^similarity_order([:receipt_no, :contact_name, :particulars], terms)
       else
         qry
@@ -205,7 +206,7 @@ defmodule FullCircle.ReceiveFund do
       if date_from != "" do
         from inv in qry, where: inv.receipt_date >= ^date_from, order_by: inv.receipt_date
       else
-        qry
+        from inv in qry, order_by: [inv.old_data]
       end
 
     qry |> offset((^page - 1) * ^per_page) |> limit(^per_page) |> Repo.all()
@@ -226,7 +227,7 @@ defmodule FullCircle.ReceiveFund do
       on: txn.doc_no == rec.receipt_no,
       join: cont in Contact,
       on: cont.id == rec.contact_id or cont.id == txn.contact_id,
-      order_by: [desc: txn.inserted_at],
+      order_by: [desc: txn.doc_date],
       where: txn.amount < 0,
       select: %{
         id: coalesce(rec.id, txn.id),
@@ -238,7 +239,6 @@ defmodule FullCircle.ReceiveFund do
             txn.particulars
           ),
         receipt_date: txn.doc_date,
-        updated_at: txn.inserted_at,
         company_id: com.id,
         contact_name: cont.name,
         amount: sum(txn.amount),
@@ -251,8 +251,7 @@ defmodule FullCircle.ReceiveFund do
         cont.name,
         txn.doc_date,
         com.id,
-        txn.old_data,
-        txn.inserted_at
+        txn.old_data
       ]
   end
 
