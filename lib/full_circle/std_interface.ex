@@ -43,8 +43,7 @@ defmodule FullCircle.StdInterface do
       if(terms != "",
         do:
           from(i in q,
-            order_by: ^similarity_order(fields, terms),
-            order_by: ^fields
+            order_by: ^similarity_order(fields, terms)
           ),
         else: from(i in q)
       )
@@ -63,8 +62,8 @@ defmodule FullCircle.StdInterface do
       if(terms != "",
         do:
           from(i in q,
-            order_by: ^similarity_order(fields, terms),
-            order_by: ^fields
+
+            order_by: ^similarity_order(fields, terms)
           ),
         else: from(i in q)
       )
