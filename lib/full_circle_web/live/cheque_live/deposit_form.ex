@@ -290,7 +290,7 @@ defmodule FullCircleWeb.ChequeLive.DepositForm do
         <.inputs_for :let={dtl} field={@form[:cheques]}>
           <div class={"flex flex-row flex-wrap #{if(dtl[:delete].value == true, do: "hidden", else: "")}"}>
             <%= Phoenix.HTML.Form.hidden_input(dtl, :id) %>
-            <div feedback={true} class="w-[16%]"><.input field={dtl[:bank]} readonly /></div>
+            <div class="w-[16%]"><.input feedback={true} field={dtl[:bank]} readonly /></div>
             <div class="w-[16%]"><.input field={dtl[:cheque_no]} readonly /></div>
             <div class="w-[16%]"><.input field={dtl[:city]} readonly /></div>
             <div class="w-[17%]"><.input field={dtl[:state]} readonly /></div>

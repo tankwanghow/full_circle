@@ -21,6 +21,9 @@ defmodule FullCircleWeb.ReceiptLive.Form do
      socket
      |> assign(query: %{from: from, to: to})
      |> assign(query_match_trans: [])
+     |> assign(cheques_got_error: false)
+     |> assign(details_got_error: false)
+     |> assign(matchers_got_error: false)
      |> assign(
        settings:
          FullCircle.Sys.load_settings(
@@ -457,7 +460,11 @@ defmodule FullCircleWeb.ReceiptLive.Form do
       )
       |> Map.put(:action, socket.assigns.live_action)
 
-    socket = assign(socket, form: to_form(changeset))
+    socket =
+      assign(socket, form: to_form(changeset))
+      |> FullCircleWeb.Helpers.assign_got_error(:cheques_got_error, changeset, :received_cheques)
+      |> FullCircleWeb.Helpers.assign_got_error(:details_got_error, changeset, :receipt_details)
+      |> FullCircleWeb.Helpers.assign_got_error(:matchers_got_error, changeset, :transaction_matchers)
 
     {:noreply, socket}
   end
@@ -551,6 +558,9 @@ defmodule FullCircleWeb.ReceiptLive.Form do
               <%= Ecto.Changeset.fetch_field!(@form.source, :cheques_amount)
               |> Number.Delimit.number_to_delimited() %>
             </span>
+            <span class="text-rose-500">
+              <.icon :if={@cheques_got_error} name="hero-exclamation-triangle-mini" class="h-5 w-5" />
+            </span>
           </div>
 
           <div
@@ -576,6 +586,9 @@ defmodule FullCircleWeb.ReceiptLive.Form do
               |> Decimal.abs()
               |> Number.Delimit.number_to_delimited() %>
             </span>
+            <span class="text-rose-500">
+              <.icon :if={@matchers_got_error} name="hero-exclamation-triangle-mini" class="h-5 w-5" />
+            </span>
           </div>
 
           <div
@@ -599,6 +612,9 @@ defmodule FullCircleWeb.ReceiptLive.Form do
               <%= Ecto.Changeset.fetch_field!(@form.source, :receipt_detail_amount)
               |> Number.Delimit.number_to_delimited() %>
             </span>
+            <span class="text-rose-500">
+              <.icon :if={@details_got_error} name="hero-exclamation-triangle-mini" class="h-5 w-5" />
+            </span>
           </div>
         </div>
 
@@ -618,7 +634,7 @@ defmodule FullCircleWeb.ReceiptLive.Form do
 
           <.inputs_for :let={dtl} field={@form[:received_cheques]}>
             <div class={"flex flex-row flex-wrap #{if(dtl[:delete].value == true, do: "hidden", else: "")}"}>
-              <div feedback={true} class="w-[16%]"><.input field={dtl[:bank]} /></div>
+              <div class="w-[16%]"><.input feedback={true} field={dtl[:bank]} /></div>
               <div class="w-[16%]"><.input field={dtl[:cheque_no]} /></div>
               <div class="w-[16%]"><.input field={dtl[:city]} /></div>
               <div class="w-[17%]"><.input field={dtl[:state]} /></div>

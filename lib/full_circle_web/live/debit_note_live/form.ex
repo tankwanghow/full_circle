@@ -19,6 +19,8 @@ defmodule FullCircleWeb.DebitNoteLive.Form do
 
     {:ok,
      socket
+     |> assign(details_got_error: false)
+     |> assign(matchers_got_error: false)
      |> assign(query: %{from: from, to: to})
      |> assign(query_match_trans: [])}
   end
@@ -303,7 +305,18 @@ defmodule FullCircleWeb.DebitNoteLive.Form do
       )
       |> Map.put(:action, socket.assigns.live_action)
 
-    socket = assign(socket, form: to_form(changeset))
+    socket =
+      assign(socket, form: to_form(changeset))
+      |> FullCircleWeb.Helpers.assign_got_error(
+        :details_got_error,
+        changeset,
+        :debit_note_details
+      )
+      |> FullCircleWeb.Helpers.assign_got_error(
+        :matchers_got_error,
+        changeset,
+        :transaction_matchers
+      )
 
     {:noreply, socket}
   end
@@ -359,6 +372,9 @@ defmodule FullCircleWeb.DebitNoteLive.Form do
               <%= Ecto.Changeset.fetch_field!(@form.source, :note_amount)
               |> Number.Delimit.number_to_delimited() %>
             </span>
+            <span class="text-rose-500">
+              <.icon :if={@details_got_error} name="hero-exclamation-triangle-mini" class="h-5 w-5" />
+            </span>
           </div>
 
           <div
@@ -381,6 +397,9 @@ defmodule FullCircleWeb.DebitNoteLive.Form do
               |> Decimal.new()
               |> Decimal.abs()
               |> Number.Delimit.number_to_delimited() %>
+            </span>
+            <span class="text-rose-500">
+              <.icon :if={@matchers_got_error} name="hero-exclamation-triangle-mini" class="h-5 w-5" />
             </span>
           </div>
         </div>
