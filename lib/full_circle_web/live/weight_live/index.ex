@@ -154,24 +154,6 @@ defmodule FullCircleWeb.WeighingLive.Index do
 
   import Ecto.Query, warn: false
 
-  defp filter_objects(socket, terms, "", reset, page) do
-    objects =
-      StdInterface.filter(
-        Weighing,
-        [:note_no, :vehicle_no, :good_name, :note],
-        terms,
-        socket.assigns.current_company,
-        socket.assigns.current_user,
-        page: page,
-        per_page: @per_page
-      )
-
-    socket
-    |> assign(page: page, per_page: @per_page)
-    |> stream(:objects, objects, reset: reset)
-    |> assign(end_of_timeline?: Enum.count(objects) < @per_page)
-  end
-
   defp filter_objects(socket, terms, df, reset, page) do
     qry =
       from(obj in Weighing,
@@ -183,17 +165,25 @@ defmodule FullCircleWeb.WeighingLive.Index do
             )
           ),
         on: com.id == obj.company_id,
-        where: obj.note_date >= ^df,
-        order_by: [desc: obj.inserted_at]
+        order_by: [desc: obj.note_date]
       )
 
+    qry =
+      if df != "" do
+        from obj in qry, where: obj.note_date >= ^df
+      else
+        qry
+      end
+
+    do_query(socket, qry, terms, reset, page)
+  end
+
+  defp do_query(socket, qry, terms, reset, page) do
     objects =
       StdInterface.filter(
         qry,
         [:note_no, :vehicle_no, :good_name, :note],
         terms,
-        socket.assigns.current_company,
-        socket.assigns.current_user,
         page: page,
         per_page: @per_page
       )

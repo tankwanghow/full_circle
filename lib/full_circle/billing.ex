@@ -93,8 +93,6 @@ defmodule FullCircle.Billing do
       }
   end
 
-  # Regex.scan(~r/\B#[a-zA-Z0-9_]+/, a) |> Enum.concat - Counting Hashtags
-
   def get_invoice!(id, company, user) do
     Repo.one(
       from inv in Invoice,
@@ -221,56 +219,10 @@ defmodule FullCircle.Billing do
   end
 
   defp invoice_raw_query(company, user) do
-    # union_all(invoice_transactions(company, user), ^invoice_old_transactions(company, user))
-    invoice_old_transactions(company, user)
+    invoice_transactions(company, user)
   end
 
-  # defp invoice_transactions(company, _user) do
-  #   from inv in Invoice,
-  #     join: cont in Contact,
-  #     on: cont.id == inv.contact_id,
-  #     join: invd in InvoiceDetail,
-  #     on: inv.id == invd.invoice_id,
-  #     join: good in Good,
-  #     on: invd.good_id == good.id,
-  #     on: inv.company_id == ^company.id,
-  #     left_join: txn in Transaction,
-  #     on: txn.company_id == ^company.id,
-  #     on: txn.doc_type == "Invoice",
-  #     on: txn.doc_no == inv.invoice_no,
-  #     on: txn.contact_id == cont.id,
-  #     select: %{
-  #       id: inv.id,
-  #       invoice_no: inv.invoice_no,
-  #       particulars: fragment("string_agg(distinct ?, ', ')", good.name),
-  #       invoice_date: inv.invoice_date,
-  #       due_date: inv.due_date,
-  #       contact_name: cont.name,
-  #       invoice_amount:
-  #         sum(
-  #           invd.quantity * invd.unit_price + invd.discount +
-  #             invd.tax_rate * (invd.quantity * invd.unit_price + invd.discount)
-  #         ),
-  #       balance:
-  #         sum(
-  #           invd.quantity * invd.unit_price + invd.discount +
-  #             invd.tax_rate * (invd.quantity * invd.unit_price + invd.discount)
-  #         ) +
-  #           fragment(
-  #             "select coalesce(sum(match_amount),0) from transaction_matchers where transaction_id = ?",
-  #             txn.id
-  #           ) +
-  #           fragment(
-  #             "select coalesce(sum(match_amount), 0) from seed_transaction_matchers where transaction_id = ?",
-  #             txn.id
-  #           ),
-  #       checked: false,
-  #       old_data: false
-  #     },
-  #     group_by: [inv.id, txn.id, cont.name]
-  # end
-
-  defp invoice_old_transactions(company, _user) do
+  defp invoice_transactions(company, _user) do
     from txn in Transaction,
       join: cont in Contact,
       on: cont.id == txn.contact_id,
@@ -295,7 +247,8 @@ defmodule FullCircle.Billing do
         checked: false,
         old_data: txn.old_data
       },
-      group_by: [txn.id, cont.name]
+      group_by: [txn.id, cont.name],
+      order_by: [desc: txn.doc_date]
   end
 
   def create_invoice(attrs, com, user) do
@@ -576,59 +529,10 @@ defmodule FullCircle.Billing do
   end
 
   defp pur_invoice_raw_query(company, user) do
-    # union_all(
-    #   pur_invoice_transactions(company, user),
-    #   ^pur_invoice_old_transactions(company, user)
-    # )
-    pur_invoice_old_transactions(company, user)
+    pur_invoice_transactions(company, user)
   end
 
-  # defp pur_invoice_transactions(company, _user) do
-  #   from inv in PurInvoice,
-  #     join: cont in Contact,
-  #     on: cont.id == inv.contact_id,
-  #     on: inv.company_id == ^company.id,
-  #     join: invd in PurInvoiceDetail,
-  #     on: inv.id == invd.pur_invoice_id,
-  #     join: good in Good,
-  #     on: invd.good_id == good.id,
-  #     left_join: txn in Transaction,
-  #     on: txn.company_id == ^company.id,
-  #     on: txn.doc_type == "PurInvoice",
-  #     on: txn.doc_no == inv.pur_invoice_no,
-  #     on: txn.contact_id == cont.id,
-  #     select: %{
-  #       id: inv.id,
-  #       pur_invoice_no: inv.pur_invoice_no,
-  #       particulars: fragment("string_agg(distinct ?, ', ')", good.name),
-  #       pur_invoice_date: inv.pur_invoice_date,
-  #       due_date: inv.due_date,
-  #       contact_name: cont.name,
-  #       pur_invoice_amount:
-  #         -sum(
-  #           invd.quantity * invd.unit_price + invd.discount +
-  #             invd.tax_rate * (invd.quantity * invd.unit_price + invd.discount)
-  #         ),
-  #       balance:
-  #         -sum(
-  #           invd.quantity * invd.unit_price + invd.discount +
-  #             invd.tax_rate * (invd.quantity * invd.unit_price + invd.discount)
-  #         ) +
-  #           fragment(
-  #             "select coalesce(sum(match_amount),0) from transaction_matchers where transaction_id = ?",
-  #             txn.id
-  #           ) +
-  #           fragment(
-  #             "select coalesce(sum(match_amount), 0) from seed_transaction_matchers where transaction_id = ?",
-  #             txn.id
-  #           ),
-  #       checked: false,
-  #       old_data: false
-  #     },
-  #     group_by: [inv.id, txn.id, cont.name]
-  # end
-
-  defp pur_invoice_old_transactions(company, _user) do
+  defp pur_invoice_transactions(company, _user) do
     from txn in Transaction,
       join: cont in Contact,
       on: cont.id == txn.contact_id,
@@ -653,7 +557,8 @@ defmodule FullCircle.Billing do
         checked: false,
         old_data: txn.old_data
       },
-      group_by: [txn.id, cont.name]
+      group_by: [txn.id, cont.name],
+      order_by: [desc: txn.doc_date]
   end
 
   def create_pur_invoice(attrs, com, user) do

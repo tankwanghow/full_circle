@@ -819,7 +819,7 @@ defmodule FullCircle.HR do
       on: emp.id == adv.employee_id,
       left_join: funds in Account,
       on: funds.id == adv.funds_account_id,
-      order_by: [desc: txn.inserted_at],
+      order_by: [desc: txn.doc_date],
       where: txn.amount > 0,
       select: %{
         id: coalesce(adv.id, txn.id),
