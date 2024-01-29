@@ -338,8 +338,10 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
   @impl true
   def mount(params, _session, socket) do
     emp_name = params["search"]["employee_name"] || ""
-    month = params["search"]["month"] || Timex.today().month
-    year = params["search"]["year"] || Timex.today().year
+    d = Timex.today() |> Timex.shift(months: -1)
+
+    month = params["search"]["month"] || d.month
+    year = params["search"]["year"] || d.year
 
     socket =
       socket

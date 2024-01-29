@@ -61,10 +61,11 @@ defmodule FullCircleWeb.PayRunLive.Index do
   def handle_params(params, _uri, socket) do
     params = params["search"]
 
-    month =
-      String.to_integer(params["month"] || "#{(Timex.today() |> Timex.shift(months: -1)).month}")
+    d = Timex.today() |> Timex.shift(months: -1)
 
-    year = String.to_integer(params["year"] || "#{Timex.today().year}")
+    month = String.to_integer(params["month"] || "#{d.month}")
+
+    year = String.to_integer(params["year"] || "#{d.year}")
 
     {:noreply,
      socket
