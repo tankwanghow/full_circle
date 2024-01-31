@@ -4,27 +4,146 @@ defmodule FullCircle.TaggedBill do
   alias FullCircle.Repo
   alias FullCircle.Accounting.Contact
 
+  def goods_sales_report(goods, fdate, tdate, com_id) do
+    good_lst = goods |> String.split(",") |> Enum.map(fn x -> String.trim(x) end)
+
+    goods_qry =
+      from(gd in FullCircle.Product.Good,
+        where: gd.name in ^good_lst
+      )
+
+    inv =
+      from(inv in FullCircle.Billing.Invoice,
+        join: invd in FullCircle.Billing.InvoiceDetail,
+        on: invd.invoice_id == inv.id,
+        join: gd in ^goods_qry,
+        on: gd.id == invd.good_id,
+        join: cont in Contact,
+        on: cont.id == inv.contact_id,
+        join: pkg in FullCircle.Product.Packaging,
+        on: pkg.id == invd.package_id,
+        where: inv.invoice_date >= ^fdate,
+        where: inv.invoice_date <= ^tdate,
+        where: inv.company_id == ^com_id,
+        select: %{
+          doc_no: inv.invoice_no,
+          invoice_date: inv.invoice_date,
+          contact: cont.name,
+          good: gd.name,
+          pack_name: pkg.name,
+          pack_qty: invd.package_qty,
+          qty: invd.quantity,
+          avg_qty: fragment("? / case when ? = 0 then 1 else ? end", invd.quantity, invd.package_qty, invd.package_qty),
+          unit: gd.unit,
+          price: (invd.unit_price * invd.quantity - invd.discount) / invd.quantity
+        }
+      )
+
+    rec =
+      from(inv in FullCircle.ReceiveFund.Receipt,
+        join: invd in FullCircle.ReceiveFund.ReceiptDetail,
+        on: invd.receipt_id == inv.id,
+        join: gd in ^goods_qry,
+        on: gd.id == invd.good_id,
+        join: cont in Contact,
+        on: cont.id == inv.contact_id,
+        join: pkg in FullCircle.Product.Packaging,
+        on: pkg.id == invd.package_id,
+        where: inv.receipt_date >= ^fdate,
+        where: inv.receipt_date <= ^tdate,
+        where: inv.company_id == ^com_id,
+        select: %{
+          doc_no: inv.receipt_no,
+          doc_date: inv.receipt_date,
+          contact: cont.name,
+          good: gd.name,
+          pack_name: pkg.name,
+          pack_qty: invd.package_qty,
+          qty: invd.quantity,
+          avg_qty: fragment("? / case when ? = 0 then 1 else ? end", invd.quantity, invd.package_qty, invd.package_qty),
+          unit: gd.unit,
+          price: (invd.unit_price * invd.quantity - invd.discount) / invd.quantity
+        }
+      )
+
+    union_all(rec, ^inv) |> order_by([2, 1, 4]) |> Repo.all()
+  end
+
+  def goods_sales_summary_report(goods, fdate, tdate, com_id) do
+    good_lst = goods |> String.split(",") |> Enum.map(fn x -> String.trim(x) end)
+
+    goods_qry =
+      from(gd in FullCircle.Product.Good,
+        where: gd.name in ^good_lst
+      )
+
+    inv =
+      from(inv in FullCircle.Billing.Invoice,
+        join: invd in FullCircle.Billing.InvoiceDetail,
+        on: invd.invoice_id == inv.id,
+        join: gd in ^goods_qry,
+        on: gd.id == invd.good_id,
+        join: pkg in FullCircle.Product.Packaging,
+        on: pkg.id == invd.package_id,
+        where: inv.invoice_date >= ^fdate,
+        where: inv.invoice_date <= ^tdate,
+        where: inv.company_id == ^com_id,
+        select: %{
+          good: gd.name,
+          pack_name: pkg.name,
+          pack_qty: sum(invd.package_qty),
+          qty: sum(invd.quantity),
+          unit: gd.unit,
+          price: avg((invd.unit_price * invd.quantity - invd.discount) / invd.quantity)
+        },
+        group_by: [gd.name, pkg.name, gd.unit]
+      )
+
+    rec =
+      from(inv in FullCircle.ReceiveFund.Receipt,
+        join: invd in FullCircle.ReceiveFund.ReceiptDetail,
+        on: invd.receipt_id == inv.id,
+        join: gd in ^goods_qry,
+        on: gd.id == invd.good_id,
+        join: pkg in FullCircle.Product.Packaging,
+        on: pkg.id == invd.package_id,
+        where: inv.receipt_date >= ^fdate,
+        where: inv.receipt_date <= ^tdate,
+        where: inv.company_id == ^com_id,
+        select: %{
+          good: gd.name,
+          pack_name: pkg.name,
+          pack_qty: sum(invd.package_qty),
+          qty: sum(invd.quantity),
+          unit: gd.unit,
+          price: avg((invd.unit_price * invd.quantity - invd.discount) / invd.quantity)
+        },
+        group_by: [gd.name, pkg.name, gd.unit]
+      )
+
+    uni = union_all(rec, ^inv)
+
+    from(u in subquery(uni),
+      select: %{
+        good: u.good,
+        pack_name: u.pack_name,
+        pack_qty: sum(u.pack_qty),
+        qty: sum(u.qty),
+        avg_qty: fragment("sum(?) / sum(case when ? = 0 then 1 else ? end)", u.qty, u.pack_qty, u.pack_qty),
+        unit: u.unit,
+        price: avg((u.price * u.qty) / u.qty)
+      },
+      group_by: [u.good, u.pack_name, u.unit],
+      order_by: u.good
+    )
+    |> Repo.all()
+  end
+
   def transport_commission(tags, fdate, tdate, com_id) do
     tag = tags |> String.split(" ", trim: true) |> Enum.at(0)
 
-    # ors =
-    #   for t <- tags do
-    #     dynamic(
-    #       [cont],
-    #       fragment(
-    #         "? ilike ? or ? ilike ?",
-    #         cont.loader_tags,
-    #         ^"%#{t}%",
-    #         cont.delivery_man_tags,
-    #         ^"%#{t}%"
-    #       )
-    #     )
-    #   end
-    #   |> Enum.reduce(fn a, b -> dynamic(^a or ^b) end)
-
     inv_ids_qry =
       from(i in FullCircle.Billing.Invoice,
-        # where: ^ors,
         where:
           fragment(
             "? ilike ? or ? ilike ?",
@@ -41,7 +160,6 @@ defmodule FullCircle.TaggedBill do
 
     pur_inv_ids_qry =
       from(i in FullCircle.Billing.PurInvoice,
-        # where: ^ors,
         where:
           fragment(
             "? ilike ? or ? ilike ?",
