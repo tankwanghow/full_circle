@@ -12,13 +12,13 @@ defmodule FullCircleWeb.WeighingLive.GoodsReport do
   def handle_params(params, _uri, socket) do
     params = params["search"]
     glist = (params["glist"] || "") |> String.split(",") |> Enum.map(fn x -> String.trim(x) end)
-    f_date = params["f_date"] || Timex.today() |> Timex.format!("%Y-%m-%d", :strftime)
+    f_date = params["f_date"] || Timex.today() |> Timex.format!("%Y-%m-01", :strftime)
     t_date = params["t_date"] || Timex.today() |> Timex.format!("%Y-%m-%d", :strftime)
 
     {:noreply,
      socket
      |> assign(page_title: "Weight Goods Report :- #{f_date} to #{t_date}")
-     |> assign(search: %{glist: params["glist"], f_date: f_date, t_date: t_date})
+     |> assign(search: %{glist: glist, f_date: f_date, t_date: t_date})
      |> filter_objects(glist, f_date, t_date)}
   end
 
