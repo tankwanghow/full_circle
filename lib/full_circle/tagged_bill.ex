@@ -89,6 +89,7 @@ defmodule FullCircle.TaggedBill do
   def goods_sales_summary_report(contact, goods, fdate, tdate, com_id) do
     good_lst = goods |> String.split(",") |> Enum.map(fn x -> String.trim(x) end)
     cont = FullCircle.Accounting.get_contact_by_name(contact, %{id: com_id}, nil)
+
     goods_qry =
       from(gd in FullCircle.Product.Good,
         where: gd.name in ^good_lst
@@ -116,7 +117,7 @@ defmodule FullCircle.TaggedBill do
         group_by: [gd.name, pkg.name, gd.unit]
       )
 
-      inv = if(cont, do: from(i in inv, where: i.contact_id == ^cont.id), else: inv)
+    inv = if(cont, do: from(i in inv, where: i.contact_id == ^cont.id), else: inv)
 
     rec =
       from(inv in FullCircle.ReceiveFund.Receipt,
@@ -140,7 +141,7 @@ defmodule FullCircle.TaggedBill do
         group_by: [gd.name, pkg.name, gd.unit]
       )
 
-      rec = if(cont, do: from(i in inv, where: i.contact_id == ^cont.id), else: inv)
+    rec = if(cont, do: from(i in rec, where: i.contact_id == ^cont.id), else: inv)
 
     uni = union_all(rec, ^inv)
 
