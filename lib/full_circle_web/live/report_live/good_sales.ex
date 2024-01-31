@@ -148,7 +148,7 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
         <div class="w-[15%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
           <%= gettext("Goods") %>
         </div>
-        <div class="w-[8%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
+        <div class="w-[6%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
           <%= gettext("Pack") %>
         </div>
         <div class="w-[8%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
@@ -157,11 +157,14 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
         <div class="w-[10%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
           <%= gettext("Qty (Avg Qty)") %>
         </div>
-        <div class="w-[8%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
+        <div class="w-[6%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
           <%= gettext("Unit") %>
         </div>
-        <div class="w-[10%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
+        <div class="w-[6%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
           <%= gettext("Avg Price") %>
+        </div>
+        <div class="w-[8%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
+          <%= gettext("Amount") %>
         </div>
       </div>
 
@@ -180,7 +183,7 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
             <div class="w-[15%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
               <%= obj.good %>
             </div>
-            <div class="w-[8%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
+            <div class="w-[6%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
               <%= obj.pack_name %>
             </div>
             <div class="w-[8%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
@@ -190,11 +193,14 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
               <%= obj.qty |> Number.Delimit.number_to_delimited() %> (<%= obj.avg_qty
               |> Number.Delimit.number_to_delimited() %>)
             </div>
-            <div class="w-[8%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
+            <div class="w-[6%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
               <%= obj.unit %>
             </div>
-            <div class="w-[10%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
+            <div class="w-[6%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
               <%= obj.price |> Number.Delimit.number_to_delimited() %>
+            </div>
+            <div class="w-[8%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
+              <%= obj.amount |> Number.Delimit.number_to_delimited() %>
             </div>
           </div>
         <% end %>
@@ -209,7 +215,7 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
             <div class="w-[15%] border rounded bg-green-200 border-green-400 px-2 py-1">
               <%= obj.good %>
             </div>
-            <div class="w-[8%] border rounded bg-green-200 border-green-400 px-2 py-1">
+            <div class="w-[6%] border rounded bg-green-200 border-green-400 px-2 py-1">
               <%= obj.pack_name %>
             </div>
             <div class="w-[8%] border rounded bg-green-200 border-green-400 px-2 py-1">
@@ -219,11 +225,14 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
               <%= obj.qty |> Number.Delimit.number_to_delimited() %> (<%= obj.avg_qty
               |> Number.Delimit.number_to_delimited() %>)
             </div>
-            <div class="w-[8%] border rounded bg-green-200 border-green-400 px-2 py-1">
+            <div class="w-[6%] border rounded bg-green-200 border-green-400 px-2 py-1">
               <%= obj.unit %>
             </div>
-            <div class="w-[10%] border rounded bg-green-200 border-green-400 px-2 py-1">
+            <div class="w-[6%] border rounded bg-green-200 border-green-400 px-2 py-1">
               <%= obj.price |> Number.Delimit.number_to_delimited() %>
+            </div>
+            <div class="w-[8%] border rounded bg-green-200 border-green-400 px-2 py-1">
+              <%= obj.amount |> Number.Delimit.number_to_delimited() %>
             </div>
           </div>
         <% end %>
