@@ -95,7 +95,7 @@ defmodule FullCircleWeb.ReportLive.Contact do
           <div class="grid grid-cols-12 tracking-tighter">
             <div class="col-span-6">
               <.input
-                label={gettext("Account")}
+                label={gettext("Contact")}
                 id="search_name"
                 name="search[name]"
                 value={@search.name}

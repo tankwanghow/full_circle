@@ -535,13 +535,12 @@ defmodule FullCircle.Accounting do
     |> Repo.all()
   end
 
-  def get_contact_by_name(name, com, user) do
+  def get_contact_by_name(name, com, _user) do
     name = name |> String.trim()
 
     Repo.one(
       from ct in Contact,
-        join: com in subquery(Sys.user_company(com, user)),
-        on: com.id == ct.company_id,
+        where: ct.company_id == ^com.id,
         where: ct.name == ^name
     )
   end

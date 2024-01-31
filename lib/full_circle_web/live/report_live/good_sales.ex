@@ -1,8 +1,6 @@
 defmodule FullCircleWeb.ReportLive.GoodSales do
   use FullCircleWeb, :live_view
 
-  alias FullCircle.Product
-
   @impl true
   def mount(_params, _session, socket) do
     socket =
@@ -16,14 +14,15 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
   def handle_params(params, _uri, socket) do
     params = params["search"]
 
+    contact = params["contact"] || ""
     goods = params["goods"] || ""
     f_date = params["f_date"] || Timex.shift(Timex.today(), months: -1)
     t_date = params["t_date"] || Timex.today()
 
     {:noreply,
      socket
-     |> assign(search: %{goods: goods, f_date: f_date, t_date: t_date})
-     |> filter_transactions(goods, f_date, t_date)}
+     |> assign(search: %{contact: contact, goods: goods, f_date: f_date, t_date: t_date})
+     |> filter_transactions(contact, goods, f_date, t_date)}
   end
 
   @impl true
@@ -31,6 +30,7 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
         "query",
         %{
           "search" => %{
+            "contact" => contact,
             "goods" => goods,
             "f_date" => f_date,
             "t_date" => t_date
@@ -39,6 +39,7 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
         socket
       ) do
     qry = %{
+      "search[contact]" => contact,
       "search[goods]" => goods,
       "search[f_date]" => f_date,
       "search[t_date]" => t_date
@@ -52,18 +53,20 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
      |> push_patch(to: url)}
   end
 
-  defp filter_transactions(socket, goods, f_date, t_date) do
+  defp filter_transactions(socket, contact, goods, f_date, t_date) do
     {objects, summaries} =
-      if String.trim(goods) == "" or f_date == "" or t_date == "" do
-        []
+      if f_date == "" or t_date == "" do
+        {[], []}
       else
         {FullCircle.TaggedBill.goods_sales_report(
+          contact,
            goods,
            f_date,
            t_date,
            socket.assigns.current_company.id
          ),
          FullCircle.TaggedBill.goods_sales_summary_report(
+          contact,
            goods,
            f_date,
            t_date,
@@ -84,8 +87,18 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
       <p class="text-2xl text-center font-medium"><%= "#{@page_title}" %></p>
       <div class="border rounded bg-purple-200 text-center p-2">
         <.form for={%{}} id="search-form" phx-submit="query" autocomplete="off">
-          <div class="grid grid-cols-12 tracking-tighter">
-            <div class="col-span-8">
+          <div class="flex tracking-tighter">
+            <div class="w-[20%]">
+              <.input
+                label={gettext("Contact")}
+                id="search_contact"
+                name="search[contact]"
+                value={@search.contact}
+                phx-hook="tributeAutoComplete"
+                url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
+              />
+            </div>
+            <div class="w-[59%]">
               <.input
                 label={gettext("Good List")}
                 id="search_goods"
@@ -95,7 +108,7 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
                 url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=good&name="}
               />
             </div>
-            <div class="col-span-1">
+            <div class="w-[8%]">
               <.input
                 label={gettext("From")}
                 name="search[f_date]"
@@ -104,7 +117,7 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
                 value={@search.f_date}
               />
             </div>
-            <div class="col-span-1">
+            <div class="w-[8%]">
               <.input
                 label={gettext("To")}
                 name="search[t_date]"
@@ -113,7 +126,7 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
                 value={@search.t_date}
               />
             </div>
-            <div class="col-span-1 mt-6">
+            <div class="w-[5%] mt-5">
               <.button>
                 <%= gettext("Query") %>
               </.button>

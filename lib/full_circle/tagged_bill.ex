@@ -4,8 +4,9 @@ defmodule FullCircle.TaggedBill do
   alias FullCircle.Repo
   alias FullCircle.Accounting.Contact
 
-  def goods_sales_report(goods, fdate, tdate, com_id) do
+  def goods_sales_report(contact, goods, fdate, tdate, com_id) do
     good_lst = goods |> String.split(",") |> Enum.map(fn x -> String.trim(x) end)
+    cont = FullCircle.Accounting.get_contact_by_name(contact, %{id: com_id}, nil)
 
     goods_qry =
       from(gd in FullCircle.Product.Good,
@@ -33,11 +34,19 @@ defmodule FullCircle.TaggedBill do
           pack_name: pkg.name,
           pack_qty: invd.package_qty,
           qty: invd.quantity,
-          avg_qty: fragment("? / case when ? = 0 then 1 else ? end", invd.quantity, invd.package_qty, invd.package_qty),
+          avg_qty:
+            fragment(
+              "? / case when ? = 0 then 1 else ? end",
+              invd.quantity,
+              invd.package_qty,
+              invd.package_qty
+            ),
           unit: gd.unit,
           price: (invd.unit_price * invd.quantity - invd.discount) / invd.quantity
         }
       )
+
+    inv = if(cont, do: from(i in inv, where: i.contact_id == ^cont.id), else: inv)
 
     rec =
       from(inv in FullCircle.ReceiveFund.Receipt,
@@ -60,18 +69,26 @@ defmodule FullCircle.TaggedBill do
           pack_name: pkg.name,
           pack_qty: invd.package_qty,
           qty: invd.quantity,
-          avg_qty: fragment("? / case when ? = 0 then 1 else ? end", invd.quantity, invd.package_qty, invd.package_qty),
+          avg_qty:
+            fragment(
+              "? / case when ? = 0 then 1 else ? end",
+              invd.quantity,
+              invd.package_qty,
+              invd.package_qty
+            ),
           unit: gd.unit,
           price: (invd.unit_price * invd.quantity - invd.discount) / invd.quantity
         }
       )
 
+    rec = if(cont, do: from(i in rec, where: i.contact_id == ^cont.id), else: rec)
+
     union_all(rec, ^inv) |> order_by([2, 1, 4]) |> Repo.all()
   end
 
-  def goods_sales_summary_report(goods, fdate, tdate, com_id) do
+  def goods_sales_summary_report(contact, goods, fdate, tdate, com_id) do
     good_lst = goods |> String.split(",") |> Enum.map(fn x -> String.trim(x) end)
-
+    cont = FullCircle.Accounting.get_contact_by_name(contact, %{id: com_id}, nil)
     goods_qry =
       from(gd in FullCircle.Product.Good,
         where: gd.name in ^good_lst
@@ -99,6 +116,8 @@ defmodule FullCircle.TaggedBill do
         group_by: [gd.name, pkg.name, gd.unit]
       )
 
+      inv = if(cont, do: from(i in inv, where: i.contact_id == ^cont.id), else: inv)
+
     rec =
       from(inv in FullCircle.ReceiveFund.Receipt,
         join: invd in FullCircle.ReceiveFund.ReceiptDetail,
@@ -121,6 +140,8 @@ defmodule FullCircle.TaggedBill do
         group_by: [gd.name, pkg.name, gd.unit]
       )
 
+      rec = if(cont, do: from(i in inv, where: i.contact_id == ^cont.id), else: inv)
+
     uni = union_all(rec, ^inv)
 
     from(u in subquery(uni),
@@ -129,9 +150,15 @@ defmodule FullCircle.TaggedBill do
         pack_name: u.pack_name,
         pack_qty: sum(u.pack_qty),
         qty: sum(u.qty),
-        avg_qty: fragment("sum(?) / sum(case when ? = 0 then 1 else ? end)", u.qty, u.pack_qty, u.pack_qty),
+        avg_qty:
+          fragment(
+            "sum(?) / sum(case when ? = 0 then 1 else ? end)",
+            u.qty,
+            u.pack_qty,
+            u.pack_qty
+          ),
         unit: u.unit,
-        price: avg((u.price * u.qty) / u.qty)
+        price: avg(u.price * u.qty / u.qty)
       },
       group_by: [u.good, u.pack_name, u.unit],
       order_by: u.good
