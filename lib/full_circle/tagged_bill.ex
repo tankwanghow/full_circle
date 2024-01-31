@@ -145,7 +145,7 @@ defmodule FullCircle.TaggedBill do
         group_by: [gd.name, pkg.name, gd.unit]
       )
 
-    rec = if(cont, do: from(i in rec, where: i.contact_id == ^cont.id), else: inv)
+    rec = if(cont, do: from(i in rec, where: i.contact_id == ^cont.id), else: rec)
 
     uni = union_all(rec, ^inv)
 
