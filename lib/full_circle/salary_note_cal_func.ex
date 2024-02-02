@@ -393,14 +393,17 @@ defmodule FullCircle.SalaryNoteCalFunc do
       Timex.end_of_month(fetch_field!(cs, :pay_year), fetch_field!(cs, :pay_month))
       |> Timex.diff(emp.dob, :years)
 
+    is_malaysian =
+      emp.nationality |> String.trim() |> String.downcase() |> String.starts_with?("malays")
+
     rate =
       cond do
         income <= 10 -> 0.0
-        age >= 60 -> 0.04
-        income <= 5000 and age < 60 -> 0.13
-        income <= 5000 and age >= 60 -> 0.065
-        income > 5000 and age < 60 -> 0.12
-        income > 5000 and age >= 60 -> 0.06
+        age >= 60 and is_malaysian -> 0.04
+        income <= 5000 and is_malaysian and age < 60 -> 0.13
+        income <= 5000 and not is_malaysian and age >= 60 -> 0.065
+        income > 5000 and is_malaysian and age < 60 -> 0.12
+        income > 5000 and not is_malaysian and age >= 60 -> 0.06
       end
 
     (income * rate) |> Float.ceil() |> Decimal.from_float()
@@ -415,14 +418,17 @@ defmodule FullCircle.SalaryNoteCalFunc do
       Timex.end_of_month(fetch_field!(cs, :pay_year), fetch_field!(cs, :pay_month))
       |> Timex.diff(emp.dob, :years)
 
+    is_malaysian =
+      emp.nationality |> String.trim() |> String.downcase() |> String.starts_with?("malays")
+
     rate =
       cond do
         income <= 10 -> 0
-        age >= 60 -> 0.04
-        income <= 5000 and age < 60 -> 0.11
-        income <= 5000 and age >= 60 -> 0.055
-        income > 5000 and age < 60 -> 0.11
-        income > 5000 and age >= 60 -> 0.055
+        age >= 60 and is_malaysian -> 0.0
+        income <= 5000 and is_malaysian and age < 60 -> 0.11
+        income <= 5000 and not is_malaysian and age >= 60 -> 0.055
+        income > 5000 and is_malaysian and age < 60 -> 0.11
+        income > 5000 and not is_malaysian and age >= 60 -> 0.055
       end
 
     (income * rate) |> Float.ceil() |> Decimal.from_float()

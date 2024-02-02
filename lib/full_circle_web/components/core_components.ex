@@ -960,10 +960,14 @@ defmodule FullCircleWeb.CoreComponents do
   attr(:rest, :global)
 
   def doc_link(assigns) do
+    doc_type = Map.get(assigns, :doc_type)
+    action = if doc_type == "PaySlip", do: "view", else: "edit"
+    assigns = assign(assigns, :action, action)
+
     ~H"""
     <.link
       class={["text-blue-600 hover:font-bold", @klass]}
-      navigate={"/companies/#{@current_company.id}/#{@doc_obj.doc_type}/#{@doc_obj.doc_id}/edit"}
+      navigate={"/companies/#{@current_company.id}/#{@doc_obj.doc_type}/#{@doc_obj.doc_id}/#{@action}"}
       {@rest}
     >
       <%= @doc_obj.doc_no %>

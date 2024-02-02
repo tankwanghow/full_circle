@@ -219,7 +219,6 @@ defmodule FullCircleWeb.PaySlipLive.Form do
       |> Map.put(:action, socket.assigns.live_action)
 
     socket = assign(socket, form: to_form(changeset))
-    IO.inspect changeset
 
     {:noreply, socket}
   end
