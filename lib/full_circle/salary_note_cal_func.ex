@@ -389,7 +389,7 @@ defmodule FullCircle.SalaryNoteCalFunc do
 
     pcb = ((p - m) * r + b - (z + x)) / (n + 1)
 
-    if pcb > 0, do: Float.round(pcb, 2), else: 0
+    if pcb > 0, do: Float.round(pcb, 1), else: 0
   end
 
   def calculate_value(:epf_employer, emp, cs) do
