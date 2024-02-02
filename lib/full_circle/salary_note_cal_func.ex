@@ -270,14 +270,14 @@ defmodule FullCircle.SalaryNoteCalFunc do
   # respect of Y1, subject to the total qualifying amount per year
   defp k1(k, emp, cs) do
     if k >= @epf_or_insurance_limit do
-      0
+      0.0
     else
       cur_epf = calculate_value(:epf_employee, emp, cs) |> Decimal.to_float()
 
-      if k + cur_epf >= @epf_or_insurance_limit do
-        @epf_or_insurance_limit - k
-      else
-        cur_epf
+      cond do
+        cur_epf == 0.0 -> cur_epf
+        k + cur_epf >= @epf_or_insurance_limit -> @epf_or_insurance_limit - k
+        true -> cur_epf
       end
     end
   end
@@ -293,10 +293,14 @@ defmodule FullCircle.SalaryNoteCalFunc do
   defp k2(k, k1, mth) do
     t = k + k1 * n(mth)
 
-    if t >= @epf_or_insurance_limit do
-      0
+    if k + k1 == 0 do
+      0.0
     else
-      @epf_or_insurance_limit - t
+      if t >= @epf_or_insurance_limit do
+        0.0
+      else
+        @epf_or_insurance_limit - t
+      end
     end
   end
 
@@ -308,17 +312,21 @@ defmodule FullCircle.SalaryNoteCalFunc do
   # Contribution to Employees Provident Fund or other approved scheme paid in
   # respect of Yt , subject to the total qualifying amount per year
   defp kt(k, k1, k2, emp, cs) do
-    if k + k1 + k2 >= @epf_or_insurance_limit do
-      0
+    if k + k1 + k2 == 0 do
+      0.0
     else
-      kt = calculate_value(:epf_employee, emp, cs) |> Decimal.to_float()
+      if k + k1 + k2 >= @epf_or_insurance_limit do
+        0.0
+      else
+        kt = calculate_value(:epf_employee, emp, cs) |> Decimal.to_float()
 
-      cond do
-        k + k1 + k2 + kt <= @epf_or_insurance_limit ->
-          kt
+        cond do
+          k + k1 + k2 + kt <= @epf_or_insurance_limit ->
+            kt
 
-        k + k1 + k2 + kt > @epf_or_insurance_limit ->
-          @epf_or_insurance_limit - (k + k1 + k2)
+          k + k1 + k2 + kt > @epf_or_insurance_limit ->
+            @epf_or_insurance_limit - (k + k1 + k2)
+        end
       end
     end
   end
@@ -404,6 +412,7 @@ defmodule FullCircle.SalaryNoteCalFunc do
         income <= 5000 and not is_malaysian and age >= 60 -> 0.065
         income > 5000 and is_malaysian and age < 60 -> 0.12
         income > 5000 and not is_malaysian and age >= 60 -> 0.06
+        true -> 0.0
       end
 
     (income * rate) |> Float.ceil() |> Decimal.from_float()
@@ -429,6 +438,7 @@ defmodule FullCircle.SalaryNoteCalFunc do
         income <= 5000 and not is_malaysian and age >= 60 -> 0.055
         income > 5000 and is_malaysian and age < 60 -> 0.11
         income > 5000 and not is_malaysian and age >= 60 -> 0.055
+        true -> 0.0
       end
 
     (income * rate) |> Float.ceil() |> Decimal.from_float()
