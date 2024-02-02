@@ -5,6 +5,80 @@ defmodule FullCircle.Layer do
   alias FullCircle.{Repo}
   alias FullCircle.Layer.{House, Flock, Movement, Harvest, HarvestDetail, HouseHarvestWage}
 
+  def house_feed_type(fd, td, com_id) do
+    """
+    WITH
+      datelist as (
+        select generate_series('#{fd}'::date, '#{td}', interval '1 day') :: date gdate),
+      hou_flo_dt_qty as (
+        select dl.gdate, hou.id as house_id, hou.house_no, f.id as flock_id, f.flock_no, f.dob,
+              (date_part('day', dl.gdate::timestamp - f.dob::timestamp)/7)::integer as age,
+              (select sum(m.quantity) from movements m
+                where m.move_date <= dl.gdate
+                  and hou.id = m.house_id and f.id = m.flock_id) -
+              coalesce((select sum(hd1.dea_1+hd1.dea_2)
+                  from harvests hv1
+                inner join harvest_details hd1 on hv1.id = hd1.harvest_id
+                where hd1.house_id = hou.id
+                  and hv1.har_date < dl.gdate
+                  and hd1.flock_id = f.id), 0) as cur_qty
+          from movements m inner join houses hou on hou.id = m.house_id
+        inner join flocks f on m.flock_id = f.id, datelist dl
+        where (date_part('day', dl.gdate::timestamp - f.dob::timestamp)/7)::integer < 110
+          and m.company_id = '#{com_id}'
+        group by dl.gdate, hou.id, f.id),
+        house_date_feed as (
+          select gdate, house_no, age, cur_qty,
+                 case when age >= 0 and age <=  5 and cur_qty > 0 then 'A1'
+                      when age >  5 and age <= 10 and cur_qty > 0 then 'A1'
+                      when age > 10 and age <= 16 and cur_qty > 0 then 'A3'
+                      when age > 16 and age <= 20 and cur_qty > 0 then 'A3'
+                      when age > 20 and age <= 48 and cur_qty > 0 then 'A5'
+                      when age > 48 and age <= 70 and cur_qty > 0 then 'A6'
+                      when age > 70 and age <= 80 and cur_qty > 0 then 'A7'
+                      when age > 80 and cur_qty > 0 then 'A8'
+                      else 'NO' end as feed_type
+            from hou_flo_dt_qty
+            where cur_qty > 0)
+
+    select cur.house_no,
+           (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.gdate) = 1 and hdf.house_no = cur.house_no) as D1,
+           (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.gdate) = 2 and hdf.house_no = cur.house_no) as D2,
+           (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.gdate) = 3 and hdf.house_no = cur.house_no) as D3,
+           (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.gdate) = 4 and hdf.house_no = cur.house_no) as D4,
+           (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.gdate) = 5 and hdf.house_no = cur.house_no) as D5,
+           (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.gdate) = 6 and hdf.house_no = cur.house_no) as D6,
+           (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.gdate) = 7 and hdf.house_no = cur.house_no) as D7,
+           (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.gdate) = 8 and hdf.house_no = cur.house_no) as D8,
+           (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.gdate) = 9 and hdf.house_no = cur.house_no) as D9,
+           (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.gdate) = 10 and hdf.house_no = cur.house_no) as D10,
+           (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.gdate) = 11 and hdf.house_no = cur.house_no) as D11,
+           (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.gdate) = 12 and hdf.house_no = cur.house_no) as D12,
+           (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.gdate) = 13 and hdf.house_no = cur.house_no) as D13,
+           (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.gdate) = 14 and hdf.house_no = cur.house_no) as D14,
+           (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.gdate) = 15 and hdf.house_no = cur.house_no) as D15,
+           (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.gdate) = 16 and hdf.house_no = cur.house_no) as D16,
+           (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.gdate) = 17 and hdf.house_no = cur.house_no) as D17,
+           (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.gdate) = 18 and hdf.house_no = cur.house_no) as D18,
+           (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.gdate) = 19 and hdf.house_no = cur.house_no) as D19,
+           (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.gdate) = 20 and hdf.house_no = cur.house_no) as D20,
+           (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.gdate) = 21 and hdf.house_no = cur.house_no) as D21,
+           (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.gdate) = 22 and hdf.house_no = cur.house_no) as D22,
+           (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.gdate) = 23 and hdf.house_no = cur.house_no) as D23,
+           (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.gdate) = 24 and hdf.house_no = cur.house_no) as D24,
+           (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.gdate) = 25 and hdf.house_no = cur.house_no) as D25,
+           (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.gdate) = 26 and hdf.house_no = cur.house_no) as D26,
+           (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.gdate) = 27 and hdf.house_no = cur.house_no) as D27,
+           (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.gdate) = 28 and hdf.house_no = cur.house_no) as D28,
+           (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.gdate) = 29 and hdf.house_no = cur.house_no) as D29,
+           (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.gdate) = 30 and hdf.house_no = cur.house_no) as D30,
+           (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.gdate) = 31 and hdf.house_no = cur.house_no) as D31
+    from house_date_feed cur
+    group by cur.house_no
+    order by 1
+    """
+  end
+
   def harvest_wage_report(fd, td, com_id) do
     from(hhw in HouseHarvestWage,
       join: h in House,
@@ -99,7 +173,9 @@ defmodule FullCircle.Layer do
   end
 
   def get_house_info_at(dt, h_no, com_id) do
-    (house_info_query(dt, com_id) <> " and h.house_no = '#{h_no}'") |> exec_query_map() |> Enum.at(0)
+    (house_info_query(dt, com_id) <> " and h.house_no = '#{h_no}'")
+    |> exec_query_map()
+    |> Enum.at(0)
   end
 
   def house_index(terms, com_id, page: page, per_page: per_page) do
