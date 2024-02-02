@@ -139,7 +139,8 @@ defmodule FullCircle.HR do
                where st.name = 'EPF By Employer' and sn.company_id = '#{com_id}' and sn.pay_slip_id = ps.id) as EMPLOYER,
              (select quantity * unit_price from salary_notes sn
                inner join salary_types st on sn.salary_type_id = st.id
-               where st.name = 'EPF By Employee' and sn.company_id = '#{com_id}' and sn.pay_slip_id = ps.id) as EMPLOYEE
+               where (st.name = 'EPF By Employee' or st.name = 'EPF Employee Self')
+                 and sn.company_id = '#{com_id}' and sn.pay_slip_id = ps.id) as EMPLOYEE
         from pay_slips ps inner join employees emp on emp.id = ps.employee_id
        where ps.pay_month = #{month} and ps.pay_year = #{year} and ps.company_id = '#{com_id}'
        order by name)
