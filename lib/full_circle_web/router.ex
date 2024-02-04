@@ -191,7 +191,7 @@ defmodule FullCircleWeb.Router do
       live("/transport_commission", ReportLive.TransportCommission, :index)
       live("/epfsocsoeis", ReportLive.EpfSocsoEis, :index)
       live("/good_sales", ReportLive.GoodSales, :index)
-      live("/feed_listing", ReportLive.HouseFeedTypes, :index)
+      live("/house_feed", ReportLive.HouseFeed, :index)
 
       live("/tbplbs", ReportLive.TbPlBs, :index)
       live("/aging", ReportLive.Aging, :index)
@@ -313,6 +313,7 @@ defmodule FullCircleWeb.Router do
       live("/print/harvrepo", LayerLive.HarvestReportPrint, :print)
       live("/print/harvwagrepo", LayerLive.HarvestWageReportPrint, :print)
       live("/print/tbplbs", ReportLive.TbPlBs, :print)
+      live("/print/house_feed", ReportLive.HouseFeedPrint, :print)
     end
 
     live_session :require_authenticated_user_n_active_company_punch,

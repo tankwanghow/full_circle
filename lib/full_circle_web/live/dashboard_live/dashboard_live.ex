@@ -142,8 +142,8 @@ defmodule FullCircleWeb.DashboardLive do
         <.link navigate={~p"/companies/#{@current_company.id}/harvest_wage_report"} class="nav-btn">
           <%= gettext("Harvest Wages Report") %>
         </.link>
-        <.link navigate={~p"/companies/#{@current_company.id}/feed_listing"} class="nav-btn">
-          <%= gettext("Feed Listing") %>
+        <.link navigate={~p"/companies/#{@current_company.id}/house_feed"} class="nav-btn">
+          <%= gettext("House Feed") %>
         </.link>
         <%!-- <.link navigate={~p"/companies/#{@current_company.id}/upload_files"} class="nav-btn">
           <%= gettext("Upload") %>

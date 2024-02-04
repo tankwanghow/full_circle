@@ -1,4 +1,4 @@
-defmodule FullCircleWeb.ReportLive.HouseFeedTypes do
+defmodule FullCircleWeb.ReportLive.HouseFeed do
   use FullCircleWeb, :live_view
 
   @impl true
@@ -43,7 +43,7 @@ defmodule FullCircleWeb.ReportLive.HouseFeedTypes do
     }
 
     url =
-      "/companies/#{socket.assigns.current_company.id}/feed_listing?#{URI.encode_query(qry)}"
+      "/companies/#{socket.assigns.current_company.id}/house_feed?#{URI.encode_query(qry)}"
 
     {:noreply,
      socket
@@ -73,7 +73,7 @@ defmodule FullCircleWeb.ReportLive.HouseFeedTypes do
       <div class="border rounded bg-purple-200 text-center p-2">
         <.form for={%{}} id="search-form" phx-submit="query" autocomplete="off">
           <div class="flex tracking-tighter">
-            <div class="w-[59%]">
+            <div class="w-[59%] hidden">
               <.input
                 label={gettext("Good List")}
                 id="search_report"
@@ -101,10 +101,20 @@ defmodule FullCircleWeb.ReportLive.HouseFeedTypes do
                 value={@search.t_date}
               />
             </div>
-            <div class="w-[5%] mt-5">
+            <div class="w-[10%] mt-5">
               <.button>
                 <%= gettext("Query") %>
               </.button>
+              <.link
+                :if={Enum.count(@row) > 0}
+                class="blue button mr-1"
+                navigate={
+                  ~p"/companies/#{@current_company.id}/print/house_feed?report=actrans&name=#{@search.report}&fdate=#{@search.f_date}&tdate=#{@search.t_date}"
+                }
+                target="_blank"
+              >
+                Print
+              </.link>
             </div>
           </div>
         </.form>
