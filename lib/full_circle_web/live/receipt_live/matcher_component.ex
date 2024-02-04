@@ -46,7 +46,7 @@ defmodule FullCircleWeb.ReceiptLive.MatcherComponent do
             <.link phx-click={:delete_match_tran} phx-value-index={dtl.index} tabindex="-1">
               <.icon name="hero-trash-solid" class="h-5 w-5" />
             </.link>
-            <%= Phoenix.HTML.Form.hidden_input(dtl, :delete) %>
+            <.input type="hidden" field={dtl[:delete]} value={"#{dtl[:delete].value}"} />
           </div>
         </div>
       </.inputs_for>

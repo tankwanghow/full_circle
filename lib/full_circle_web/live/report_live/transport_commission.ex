@@ -60,7 +60,7 @@ defmodule FullCircleWeb.ReportLive.TransportCommission do
 
     {:noreply,
      socket
-     |> push_patch(to: url)}
+     |> push_navigate(to: url)}
   end
 
   defp query(socket, tags, f_date, t_date) do

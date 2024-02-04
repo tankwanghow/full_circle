@@ -324,7 +324,7 @@ defmodule FullCircleWeb.GoodLive.Form do
         </div>
         <div class="grid grid-cols-12 gap-2">
           <div class="col-span-9">
-            <%= Phoenix.HTML.Form.hidden_input(@form, :sales_account_id) %>
+            <.input type="hidden" field={@form[:sales_account_id]} />
             <.input
               field={@form[:sales_account_name]}
               label={gettext("Sales Account")}
@@ -333,7 +333,7 @@ defmodule FullCircleWeb.GoodLive.Form do
             />
           </div>
           <div class="col-span-3">
-            <%= Phoenix.HTML.Form.hidden_input(@form, :sales_tax_code_id) %>
+            <.input type="hidden" field={@form[:sales_tax_code_id]} />
             <.input
               field={@form[:sales_tax_code_name]}
               label={gettext("Sales TaxCode")}
@@ -345,7 +345,7 @@ defmodule FullCircleWeb.GoodLive.Form do
 
         <div class="grid grid-cols-12 gap-2">
           <div class="col-span-9">
-            <%= Phoenix.HTML.Form.hidden_input(@form, :purchase_account_id) %>
+            <.input type="hidden" field={@form[:purchase_account_id]} />
             <.input
               field={@form[:purchase_account_name]}
               label={gettext("Purchase Account")}
@@ -354,7 +354,7 @@ defmodule FullCircleWeb.GoodLive.Form do
             />
           </div>
           <div class="col-span-3">
-            <%= Phoenix.HTML.Form.hidden_input(@form, :purchase_tax_code_id) %>
+            <.input type="hidden" field={@form[:purchase_tax_code_id]} />
             <.input
               field={@form[:purchase_tax_code_name]}
               label={gettext("Purchase TaxCode")}
@@ -400,9 +400,9 @@ defmodule FullCircleWeb.GoodLive.Form do
             </div>
             <div class="col-span-1 mt-1.5 text-rose-500">
               <.link phx-click={:delete_packaging} phx-value-index={pack.index}>
-                <Heroicons.trash solid class="h-5 w-5" />
+                <.icon name="hero-trash-solid" class="h-5 w-5" />
               </.link>
-              <%= Phoenix.HTML.Form.hidden_input(pack, :delete) %>
+              <.input type="hidden" field={pack[:delete]} value={"#{pack[:delete].value}"} />
             </div>
           </div>
         </.inputs_for>

@@ -202,7 +202,7 @@ defmodule FullCircleWeb.ContactLive.Form do
             <.input field={@form[:descriptions]} label={gettext("Descriptions")} type="textarea" />
           </div>
         </div>
-        <%= datalist(FullCircle.Sys.countries(), "countries") %>
+        <%= datalist(assigns, FullCircle.Sys.countries(), "countries") %>
 
         <div class="flex justify-center gap-x-1 mt-1">
           <.form_action_button

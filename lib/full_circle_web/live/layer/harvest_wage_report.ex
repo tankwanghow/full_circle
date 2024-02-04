@@ -43,7 +43,7 @@ defmodule FullCircleWeb.LayerLive.HarvestWageReport do
 
     {:noreply,
      socket
-     |> push_patch(to: url)}
+     |> push_navigate(to: url)}
   end
 
   @impl true

@@ -59,15 +59,6 @@ defmodule FullCircle.DebCre.CreditNote do
   end
 
   def compute_balance(cs) do
-    # cs =
-    #   Map.replace(
-    #     cs,
-    #     :errors,
-    #     Enum.filter(cs.errors, fn {k, _} -> k != :note_balance and k != :note_amount end)
-    #   )
-
-    # cs = if(Enum.count(cs.errors) == 0, do: Map.replace(cs, :valid?, true), else: cs)
-
     cs =
       cs
       |> compute_fields()

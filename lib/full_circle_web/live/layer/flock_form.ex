@@ -269,8 +269,8 @@ defmodule FullCircleWeb.LayerLive.FlockForm do
               <.input type="date" field={move[:move_date]} />
             </div>
             <div class="w-[20%]">
-              <%= Phoenix.HTML.Form.hidden_input(move, :house_id) %>
-              <%= Phoenix.HTML.Form.hidden_input(move, :company_id) %>
+              <.input type="hidden" field={move[:house_id]} />
+              <.input type="hidden" field={move[:company_id]} />
               <.input
                 field={move[:house_no]}
                 phx-hook="tributeAutoComplete"
@@ -286,9 +286,9 @@ defmodule FullCircleWeb.LayerLive.FlockForm do
             </div>
             <div class="w-[3%] mt-1.5 text-rose-500">
               <.link phx-click={:delete_movement} phx-value-index={move.index}>
-                <Heroicons.trash solid class="h-5 w-5" />
+                <.icon name="hero-trash-solid" class="h-5 w-5" />
               </.link>
-              <%= Phoenix.HTML.Form.hidden_input(move, :delete) %>
+              <.input type="hidden" field={move[:delete]} value={"#{move[:delete].value}"} />
             </div>
           </div>
           <span class="text-sm text-gray-500">

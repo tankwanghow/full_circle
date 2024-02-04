@@ -299,10 +299,10 @@ defmodule FullCircleWeb.LoadLive.Form do
     <div class="w-8/12 mx-auto bload rounded-lg bload-yellow-500 bg-yellow-100 p-4">
       <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
       <.form for={@form} id="object-form" autocomplete="off" phx-change="validate" phx-submit="save">
-        <%= Phoenix.HTML.Form.hidden_input(@form, :load_no) %>
+        <.input type="hidden" field={@form[:load_no]} />
         <div class="flex flex-row flex-nowarp gap-2">
           <div class="w-1/2 grow shrink">
-            <%= Phoenix.HTML.Form.hidden_input(@form, :supplier_id) %>
+            <.input field={@form[:supplier_id]} type="hidden" />
             <.input
               field={@form[:supplier_name]}
               label={gettext("Supplier")}
@@ -311,7 +311,7 @@ defmodule FullCircleWeb.LoadLive.Form do
             />
           </div>
           <div class="w-1/2 grow shrink">
-            <%= Phoenix.HTML.Form.hidden_input(@form, :shipper_id) %>
+            <.input field={@form[:shipper_id]} type="hidden" />
             <.input
               field={@form[:shipper_name]}
               label={gettext("Shipper")}

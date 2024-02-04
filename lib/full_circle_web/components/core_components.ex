@@ -84,7 +84,7 @@ defmodule FullCircleWeb.CoreComponents do
                   class="-m-3 flex-none p-3 opacity-20 hover:opacity-40"
                   aria-label={gettext("close")}
                 >
-                  esc <Heroicons.x_mark solid class="h-5 w-5 stroke-current" />
+                  esc <.icon name="hero-x-mark" class="h-5 w-5" />
                 </button>
               </div>
               <div id={"#{@id}-content"}>
@@ -398,7 +398,8 @@ defmodule FullCircleWeb.CoreComponents do
         phx-debounce={Map.get(assigns, :"phx-debounce")}
         value={Phoenix.HTML.Form.normalize_value(@type, @value)}
         url={@url}
-        class={[@klass,
+        class={[
+          @klass,
           "block w-full rounded text-zinc-900 focus:ring-0",
           "phx-no-feedback:border-zinc-300 phx-no-feedback:focus:border-zinc-400",
           "border-zinc-300 focus:border-zinc-400 p-1",
@@ -423,7 +424,8 @@ defmodule FullCircleWeb.CoreComponents do
         phx-debounce={Map.get(assigns, :"phx-debounce")}
         value={Phoenix.HTML.Form.normalize_value(@type, @value)}
         url={@url}
-        class={[@klass,
+        class={[
+          @klass,
           "block w-full rounded text-zinc-900 focus:ring-0",
           "phx-no-feedback:border-zinc-300 phx-no-feedback:focus:border-zinc-400",
           "border-zinc-300 focus:border-zinc-400 p-1",
@@ -727,28 +729,22 @@ defmodule FullCircleWeb.CoreComponents do
     end
   end
 
-  def datalist(list, id) do
-    Phoenix.HTML.Tag.content_tag(:datalist, options(list), id: id)
+  def datalist(assigns, list, id) do
+    assigns = assign(assigns, list: list) |> assign(id: id)
+    ~H"""
+    <datalist id={@id}>
+      <%= for el <- @list do %>
+        <option value={el} />
+      <% end %>
+    </datalist>
+    """
   end
 
-  def datalist_with_ids(list, id, value_key \\ :value, id_key \\ :id) do
-    Phoenix.HTML.Tag.content_tag(:datalist, option_with_ids(list, value_key, id_key), id: id)
-  end
-
-  def options(list) do
-    Enum.map(list, fn el ->
-      Phoenix.HTML.Tag.content_tag(:option, "", value: el)
-    end)
-  end
-
-  def option_with_ids(list, value_key, id_key) do
-    Enum.map(list, fn el ->
-      Phoenix.HTML.Tag.content_tag(:option, "",
-        value: Map.get(el, value_key),
-        data_id: Map.get(el, id_key)
-      )
-    end)
-  end
+  # def options(list) do
+  #   Enum.map(list, fn el ->
+  #     Phoenix.HTML.Tag.content_tag(:option, "", value: el)
+  #   end)
+  # end
 
   attr(:id, :any)
   attr(:msg1, :string)

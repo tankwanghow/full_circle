@@ -80,11 +80,11 @@ defmodule FullCircleWeb.SeedLive.Form do
       <%= for dtl <- @seeds do %>
         <.form for={dtl} id={"object-form-#{dtl.source.data.id}"} autocomplete="off" phx-change="save">
           <div class="flex flex-row flex-wrap">
-            <%= Phoenix.HTML.Form.hidden_input(dtl, :id) %>
-            <%= Phoenix.HTML.Form.hidden_input(dtl, :account_id) %>
-            <%= Phoenix.HTML.Form.hidden_input(dtl, :contact_id) %>
-            <%= Phoenix.HTML.Form.hidden_input(dtl, :doc_type) %>
-            <%= Phoenix.HTML.Form.hidden_input(dtl, :doc_no) %>
+            <.input type="hidden" field={dtl[:id]} />
+            <.input type="hidden" field={dtl[:account_id]} />
+            <.input type="hidden" field={dtl[:contact_id]} />
+            <.input type="hidden" field={dtl[:doc_type]} />
+            <.input type="hidden" field={dtl[:doc_no]} />
             <div class="w-[10%]"><.input type="date" field={dtl[:doc_date]} /></div>
             <div class="w-[20%]"><.input readonly={true} field={dtl[:account_name]} /></div>
             <div class="w-[20%]"><.input field={dtl[:contact_name]} readonly={true} /></div>

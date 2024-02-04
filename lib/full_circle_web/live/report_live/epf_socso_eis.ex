@@ -50,7 +50,7 @@ defmodule FullCircleWeb.ReportLive.EpfSocsoEis do
 
     {:noreply,
      socket
-     |> push_patch(to: url)}
+     |> push_navigate(to: url)}
   end
 
   defp filter_transactions(socket, report, month, year, code) do
@@ -93,7 +93,7 @@ defmodule FullCircleWeb.ReportLive.EpfSocsoEis do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="w-6/12 mx-auto">
+    <div class="w-8/12 mx-auto">
       <p class="text-2xl text-center font-medium"><%= "#{@page_title}" %></p>
       <div class="border rounded bg-amber-200 text-center p-2">
         <.form for={%{}} id="search-form" phx-change="changed" phx-submit="query" autocomplete="off">
@@ -159,7 +159,7 @@ defmodule FullCircleWeb.ReportLive.EpfSocsoEis do
 
       <div :if={Enum.count(@col) > 0} class="flex flex-row">
         <%= for h <- @col do %>
-          <div class={"w-[#{trunc(100/Enum.count(@col))}%] text-center font-bold border rounded bg-gray-200 border-gray-500"}>
+          <div class={"w-[#{trunc(Float.ceil(100/Enum.count(@col)))}%] text-center font-bold border rounded bg-gray-200 border-gray-500"}>
             <%= h %>
           </div>
         <% end %>
@@ -168,7 +168,7 @@ defmodule FullCircleWeb.ReportLive.EpfSocsoEis do
       <%= for r <- @row do %>
         <div class="flex flex-row">
           <%= for c <- r do %>
-            <div class={"w-[#{trunc(100/Enum.count(@col))}%] text-center border rounded bg-blue-200 border-blue-500"}>
+            <div class={"w-[#{trunc(Float.ceil(100/Enum.count(@col)))}%] text-center border rounded bg-blue-200 border-blue-500"}>
               <%= c %>
             </div>
           <% end %>

@@ -49,7 +49,7 @@ defmodule FullCircleWeb.ReportLive.Contact do
 
     {:noreply,
      socket
-     |> push_patch(to: url)}
+     |> push_navigate(to: url)}
   end
 
   defp filter_transactions(socket, name, f_date, t_date) do

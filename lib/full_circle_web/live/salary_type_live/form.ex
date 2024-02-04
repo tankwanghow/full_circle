@@ -235,7 +235,7 @@ defmodule FullCircleWeb.SalaryTypeLive.Form do
         </div>
         <div class="grid grid-cols-12 gap-1">
           <div class="col-span-6">
-            <%= Phoenix.HTML.Form.hidden_input(@form, :db_ac_id) %>
+            <.input type="hidden" field={@form[:db_ac_id]} />
             <.input
               field={@form[:db_ac_name]}
               label={gettext("Debit Account")}
@@ -244,7 +244,7 @@ defmodule FullCircleWeb.SalaryTypeLive.Form do
             />
           </div>
           <div class="col-span-6">
-            <%= Phoenix.HTML.Form.hidden_input(@form, :cr_ac_id) %>
+            <.input type="hidden" field={@form[:cr_ac_id]} />
             <.input
               field={@form[:cr_ac_name]}
               label={gettext("Credit Account")}

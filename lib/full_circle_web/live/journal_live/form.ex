@@ -234,7 +234,7 @@ defmodule FullCircleWeb.JournalLive.Form do
     <div class="w-6/12 mx-auto border rounded-lg border-pink-500 bg-pink-100 p-4">
       <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
       <.form for={@form} id="object-form" autocomplete="off" phx-change="validate" phx-submit="save">
-        <%= Phoenix.HTML.Form.hidden_input(@form, :journal_no) %>
+        <.input type="hidden" field={@form[:journal_no]} />
         <div class="flex flex-row flex-nowarp">
           <div class="w-1/4">
             <.input field={@form[:journal_date]} label={gettext("Invoice Date")} type="date" />
@@ -255,7 +255,7 @@ defmodule FullCircleWeb.JournalLive.Form do
 
           <.inputs_for :let={dtl} field={@form[:transactions]}>
             <div class={"flex flex-row flex-wrap #{if(dtl[:delete].value == true, do: "hidden", else: "")}"}>
-              <%= Phoenix.HTML.Form.hidden_input(dtl, :account_id) %>
+              <.input type="hidden" field={dtl[:account_id]} />
               <div class="w-[25%]">
                 <.input
                   field={dtl[:account_name]}
@@ -263,7 +263,7 @@ defmodule FullCircleWeb.JournalLive.Form do
                   url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=account&name="}
                 />
               </div>
-              <%= Phoenix.HTML.Form.hidden_input(dtl, :contact_id) %>
+              <.input type="hidden" field={dtl[:contact_id]} />
               <div class="w-[25%]">
                 <.input
                   field={dtl[:contact_name]}
@@ -279,7 +279,7 @@ defmodule FullCircleWeb.JournalLive.Form do
                 <.link phx-click={:delete_trans} phx-value-index={dtl.index} tabindex="-1">
                   <.icon name="hero-trash-solid" class="h-5 w-5" />
                 </.link>
-                <%= Phoenix.HTML.Form.hidden_input(dtl, :delete) %>
+                <.input type="hidden" field={dtl[:delete]} value={"#{dtl[:delete].value}"} />
               </div>
             </div>
           </.inputs_for>

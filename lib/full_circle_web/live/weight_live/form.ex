@@ -179,7 +179,7 @@ defmodule FullCircleWeb.WeighingLive.Form do
         phx-submit="save"
         class="mx-auto"
       >
-        <%= Phoenix.HTML.Form.hidden_input(@form, :note_no) %>
+        <.input type="hidden" field={@form[:note_no]} />
         <div class="grid grid-cols-12 gap-1">
           <div class="col-span-3">
             <.input field={@form[:note_date]} label={gettext("Date")} type="date" />

@@ -57,7 +57,7 @@ defmodule FullCircleWeb.CreditNoteLive.DetailComponent do
               url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=account&name="}
             />
           </div>
-          <%= Phoenix.HTML.Form.hidden_input(dtl, :account_id) %>
+          <.input type="hidden" field={dtl[:account_id]} />
           <div class="w-[8%]">
             <.input
               field={dtl[:tax_code_name]}
@@ -65,7 +65,7 @@ defmodule FullCircleWeb.CreditNoteLive.DetailComponent do
               url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=#{@taxcodetype}&name="}
             />
           </div>
-          <%= Phoenix.HTML.Form.hidden_input(dtl, :tax_code_id) %>
+          <.input type="hidden" field={dtl[:tax_code_id]} />
           <div class="w-[8%]">
             <.input type="number" field={dtl[:tax_rate]} step="0.0001" />
           </div>
@@ -79,7 +79,7 @@ defmodule FullCircleWeb.CreditNoteLive.DetailComponent do
             <.link phx-click={:delete_detail} phx-value-index={dtl.index} tabindex="-1">
               <.icon name="hero-trash-solid" class="h-5 w-5" />
             </.link>
-            <%= Phoenix.HTML.Form.hidden_input(dtl, :delete) %>
+            <.input type="hidden" field={dtl[:delete]} value={"#{dtl[:delete].value}"} />
           </div>
         </div>
       </.inputs_for>

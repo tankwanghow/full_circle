@@ -39,7 +39,7 @@ defmodule FullCircleWeb.ReportLive.TbPlBs do
 
     {:noreply,
      socket
-     |> push_patch(to: url)}
+     |> push_navigate(to: url)}
   end
 
   defp filter_transactions(socket, report, t_date) do

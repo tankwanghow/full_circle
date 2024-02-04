@@ -57,7 +57,7 @@ defmodule FullCircleWeb.InvoiceLive.DetailComponent do
               url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=good&name="}
             />
           </div>
-          <%= Phoenix.HTML.Form.hidden_input(dtl, :good_id) %>
+          <.input type="hidden" field={dtl[:good_id]} />
           <div class="detail-desc-col"><.input field={dtl[:descriptions]} /></div>
           <div class="detail-pack-col">
             <.input
@@ -66,8 +66,8 @@ defmodule FullCircleWeb.InvoiceLive.DetailComponent do
               url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=packaging&good_id=#{dtl[:good_id].value}&name="}
             />
           </div>
-          <%= Phoenix.HTML.Form.hidden_input(dtl, :unit_multiplier) %>
-          <%= Phoenix.HTML.Form.hidden_input(dtl, :package_id) %>
+          <.input type="hidden" field={dtl[:unit_multiplier]} />
+          <.input type="hidden" field={dtl[:package_id]} />
           <div class="detail-packqty-col">
             <.input phx-hook="calculatorInput" klass="text-right" field={dtl[:package_qty]} />
           </div>
@@ -104,7 +104,7 @@ defmodule FullCircleWeb.InvoiceLive.DetailComponent do
               url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=account&name="}
             />
           </div>
-          <%= Phoenix.HTML.Form.hidden_input(dtl, :account_id) %>
+          <.input type="hidden" field={dtl[:account_id]} />
           <div class="detail-taxcode-col">
             <.input
               field={dtl[:tax_code_name]}
@@ -112,7 +112,7 @@ defmodule FullCircleWeb.InvoiceLive.DetailComponent do
               url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=#{@taxcodetype}&name="}
             />
           </div>
-          <%= Phoenix.HTML.Form.hidden_input(dtl, :tax_code_id) %>
+          <.input type="hidden" field={dtl[:tax_code_id]} />
           <div class={"detail-taxrate-col #{Sys.get_setting(@settings, @doc_name, "taxrate-col")}"}>
             <.input type="number" field={dtl[:tax_rate]} readonly step="0.0001" tabindex="-1" />
           </div>
@@ -126,7 +126,7 @@ defmodule FullCircleWeb.InvoiceLive.DetailComponent do
             <.link phx-click={:delete_detail} phx-value-index={dtl.index} tabindex="-1">
               <.icon name="hero-trash-solid" class="h-5 w-5" />
             </.link>
-            <%= Phoenix.HTML.Form.hidden_input(dtl, :delete) %>
+            <.input type="hidden" field={dtl[:delete]} value={"#{dtl[:delete].value}"} />
           </div>
         </div>
       </.inputs_for>

@@ -216,7 +216,7 @@ defmodule FullCircleWeb.JournalLive.Index do
 
     url = "/companies/#{socket.assigns.current_company.id}/Journal?#{URI.encode_query(qry)}"
 
-    {:noreply, socket |> push_patch(to: url)}
+    {:noreply, socket |> push_navigate(to: url)}
   end
 
   defp filter_objects(socket, terms, reset, journal_date, page) do

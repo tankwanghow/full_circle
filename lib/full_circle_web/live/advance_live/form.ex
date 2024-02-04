@@ -187,13 +187,13 @@ defmodule FullCircleWeb.AdvanceLive.Form do
         phx-submit="save"
         class="mx-auto"
       >
-        <%= Phoenix.HTML.Form.hidden_input(@form, :slip_no) %>
+        <.input field={@form[:slip_no]} type="hidden" />
         <div class="grid grid-cols-12 gap-1">
           <div class="col-span-3">
             <.input field={@form[:slip_date]} label={gettext("Date")} type="date" />
           </div>
           <div class="col-span-5">
-            <%= Phoenix.HTML.Form.hidden_input(@form, :employee_id) %>
+            <.input field={@form[:employee_id]} type="hidden" />
             <.input
               field={@form[:employee_name]}
               label={gettext("Employee")}
@@ -202,7 +202,7 @@ defmodule FullCircleWeb.AdvanceLive.Form do
             />
           </div>
           <div class="col-span-4">
-            <%= Phoenix.HTML.Form.hidden_input(@form, :funds_account_id) %>
+            <.input field={@form[:funds_account_id]} type="hidden" />
             <.input
               field={@form[:funds_account_name]}
               label={gettext("Funds From")}

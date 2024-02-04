@@ -229,7 +229,7 @@ defmodule FullCircleWeb.FixedAssetLive.Disposals do
           phx-submit="save"
           class="w-full"
         >
-          <%= Phoenix.HTML.Form.hidden_input(@form, :fixed_asset_id) %>
+          <.input type="hidden" field={@form[:fixed_asset_id]} />
           <div class="flex flex-row flex-nowarp">
             <div class="w-4/12 grow shrink">
               <.input type="date" field={@form[:disp_date]} label={gettext("Disposal Date")} />

@@ -269,7 +269,7 @@ defmodule FullCircleWeb.LayerLive.HarvestForm do
             <.input feedback={true} field={@form[:har_date]} label={gettext("DOB")} type="date" />
           </div>
           <div class="col-span-5">
-            <%= Phoenix.HTML.Form.hidden_input(@form, :employee_id) %>
+            <.input type="hidden" field={@form[:employee_id]} />
             <.input
               field={@form[:employee_name]}
               label={gettext("Employee")}
@@ -292,8 +292,8 @@ defmodule FullCircleWeb.LayerLive.HarvestForm do
         <.inputs_for :let={dtl} field={@form[:harvest_details]}>
           <div class={"flex flex-row  #{if(dtl[:delete].value == true and Enum.count(dtl.errors) == 0, do: "hidden", else: "")}"}>
             <div class="w-[16%]">
-              <%= Phoenix.HTML.Form.hidden_input(dtl, :house_id) %>
-              <%= Phoenix.HTML.Form.hidden_input(dtl, :company_id) %>
+              <.input type="hidden" field={dtl[:house_id]} />
+              <.input type="hidden" field={dtl[:company_id]} />
               <.input
                 field={dtl[:house_no]}
                 phx-hook="tributeAutoComplete"
@@ -301,7 +301,7 @@ defmodule FullCircleWeb.LayerLive.HarvestForm do
               />
             </div>
             <div class="w-[16%]">
-              <%= Phoenix.HTML.Form.hidden_input(dtl, :flock_id) %>
+              <.input type="hidden" field={dtl[:flock_id]} />
               <.input field={dtl[:flock_no]} readonly tabindex="-1" />
             </div>
             <div class="w-[13%]">
@@ -322,9 +322,9 @@ defmodule FullCircleWeb.LayerLive.HarvestForm do
 
             <div class="w-[3%] mt-1.5 text-rose-500">
               <.link phx-click={:delete_detail} phx-value-index={dtl.index}>
-                <Heroicons.trash solid class="h-5 w-5" />
+                <.icon name="hero-trash-solid" class="h-5 w-5" />
               </.link>
-              <%= Phoenix.HTML.Form.hidden_input(dtl, :delete) %>
+              <.input type="hidden" field={dtl[:delete]} value={"#{dtl[:delete].value}"} />
             </div>
           </div>
           <span class="text-sm text-gray-500">

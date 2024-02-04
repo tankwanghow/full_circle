@@ -56,7 +56,7 @@ defmodule FullCircle.Cheque.Deposit do
     if Decimal.add(fa, ca) |> Decimal.eq?(0) do
       add_unique_error(cs, :cheques_amount, gettext("deposit amount zero"))
     else
-      cs
+      clear_error(cs, :cheques_amount)
     end
   end
 
@@ -74,7 +74,7 @@ defmodule FullCircle.Cheque.Deposit do
     chqs_param =
       chqs_attrs
       |> Enum.map(fn {_, v} ->
-        if !is_nil(v) and v["delete"] == "false" do
+        if !is_nil(v) and (v["delete"] == "false" or v["delete"] == "") do
           FullCircle.Repo.get!(FullCircle.ReceiveFund.ReceivedCheque, v["id"])
         else
           nil

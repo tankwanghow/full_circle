@@ -41,7 +41,7 @@ defmodule FullCircle.Layer do
             from hou_flo_dt_qty
             where cur_qty > 0)
 
-    select cur.house_no,
+    select cur.house_no as hou,
            (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.gdate) = 1 and hdf.house_no = cur.house_no) as D1,
            (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.gdate) = 2 and hdf.house_no = cur.house_no) as D2,
            (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.gdate) = 3 and hdf.house_no = cur.house_no) as D3,
@@ -77,6 +77,7 @@ defmodule FullCircle.Layer do
     group by cur.house_no
     order by 1
     """
+    |> exec_query_row_col()
   end
 
   def harvest_wage_report(fd, td, com_id) do

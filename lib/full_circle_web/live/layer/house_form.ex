@@ -219,9 +219,9 @@ defmodule FullCircleWeb.LayerLive.HouseForm do
             </div>
             <div class="w-[3%] mt-1.5 text-rose-500">
               <.link phx-click={:delete_wage} phx-value-index={wg.index}>
-                <Heroicons.trash solid class="h-5 w-5" />
+                <.icon name="hero-trash-solid" class="h-5 w-5" />
               </.link>
-              <%= Phoenix.HTML.Form.hidden_input(wg, :delete) %>
+              <.input type="hidden" field={wg[:delete]} value={"#{wg[:delete].value}"}  />
             </div>
           </div>
         </.inputs_for>

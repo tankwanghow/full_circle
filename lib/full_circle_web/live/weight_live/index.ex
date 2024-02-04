@@ -149,7 +149,7 @@ defmodule FullCircleWeb.WeighingLive.Index do
 
     url = "/companies/#{socket.assigns.current_company.id}/Weighing?#{URI.encode_query(qry)}"
 
-    {:noreply, socket |> push_patch(to: url)}
+    {:noreply, socket |> push_navigate(to: url)}
   end
 
   import Ecto.Query, warn: false

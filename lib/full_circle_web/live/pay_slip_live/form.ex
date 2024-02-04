@@ -236,10 +236,10 @@ defmodule FullCircleWeb.PaySlipLive.Form do
         phx-submit="save"
         class="mx-auto"
       >
-        <%= Phoenix.HTML.Form.hidden_input(@form, :slip_no) %>
+        <.input type="hidden" field={@form[:slip_no]} />
         <div class="flex flex-nowrap gap-1 mb-2">
           <div class="w-[25%]">
-            <%= Phoenix.HTML.Form.hidden_input(@form, :employee_id) %>
+            <.input type="hidden" field={@form[:employee_id]} />
             <.input field={@form[:employee_name]} label={gettext("Employee")} readonly tabindex="-1" />
           </div>
           <div class="w-[15%]">
@@ -265,7 +265,7 @@ defmodule FullCircleWeb.PaySlipLive.Form do
             />
           </div>
           <div class="w-[20%]">
-            <%= Phoenix.HTML.Form.hidden_input(@form, :funds_account_id) %>
+            <.input type="hidden" field={@form[:funds_account_id]} />
             <.input
               field={@form[:funds_account_name]}
               label={gettext("Funds From")}

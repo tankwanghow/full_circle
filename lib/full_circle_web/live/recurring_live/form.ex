@@ -186,13 +186,13 @@ defmodule FullCircleWeb.RecurringLive.Form do
         phx-submit="save"
         class="mx-auto"
       >
-        <%= Phoenix.HTML.Form.hidden_input(@form, :recur_no) %>
+        <.input type="hidden" field={@form[:recur_no]} />
         <div class="grid grid-cols-12 gap-1">
           <div class="col-span-3">
             <.input field={@form[:recur_date]} label={gettext("Date")} type="date" />
           </div>
           <div class="col-span-5">
-            <%= Phoenix.HTML.Form.hidden_input(@form, :employee_id) %>
+            <.input type="hidden" field={@form[:employee_id]} />
             <.input
               field={@form[:employee_name]}
               label={gettext("Employee")}
@@ -201,7 +201,7 @@ defmodule FullCircleWeb.RecurringLive.Form do
             />
           </div>
           <div class="col-span-4">
-            <%= Phoenix.HTML.Form.hidden_input(@form, :salary_type_id) %>
+            <.input type="hidden" field={@form[:salary_type_id]} />
             <.input
               field={@form[:salary_type_name]}
               label={gettext("Salary Type")}

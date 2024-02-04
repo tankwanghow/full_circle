@@ -252,7 +252,7 @@ defmodule FullCircleWeb.FixedAssetLive.Depreciations do
           phx-submit="save"
           class="w-full"
         >
-          <%= Phoenix.HTML.Form.hidden_input(@form, :fixed_asset_id) %>
+          <.input type="hidden" field={@form[:fixed_asset_id]} />
           <div class="flex flex-row flex-nowarp">
             <div class="w-3/12 grow shrink">
               <.input type="date" field={@form[:depre_date]} label={gettext("Depreciation Date")} />
@@ -372,9 +372,7 @@ defmodule FullCircleWeb.FixedAssetLive.Depreciations do
 
       <div class="my-4 border rounded bg-purple-200 p-5 text-center">
         <.form :let={f} for={%{}} phx-submit="generate_depreciation" autocomplete="off">
-          <%= Phoenix.HTML.Form.select(f, :ddate, @depre_dates,
-            class: "rounded py-2 pl-3 pr-10 border bg-indigo-50 text-xl"
-          ) %>
+          <.input type="select" field={f[:ddate]} options={@depre_dates} />
           <.button><%= gettext("Generate Depreciations") %></.button>
         </.form>
 

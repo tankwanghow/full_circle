@@ -24,20 +24,24 @@ defmodule FullCircleWeb.UserLive.Index do
           phx-change="update_role"
           autocomplete="off"
         >
-          <div class="border-b-2 border-indigo-400 py-3 bg-indigo-100 text-center">
-            <.delete_confirm_modal
-              id={"delete-object_#{u.id}"}
-              msg1={gettext("Remove User from Company.") <> " #{u.email}"}
-              msg2={gettext("Cannot be recover.")}
-              confirm={
-                JS.push("delete_user", value: %{user_id: u.id})
-                |> JS.hide(to: "#delete-object-modal")
-              }
-            />
-            <span id={"new_user_password_#{u.id}"} class="text-gray-500 m-3">
+          <div class="flex border-b-2 border-indigo-400 py-3 bg-indigo-100 text-center">
+            <div class="w-[10%]">
+              <.delete_confirm_modal
+                id={"delete-object_#{u.id}"}
+                msg1={gettext("Remove User from Company.") <> " #{u.email}"}
+                msg2={gettext("Cannot be recover.")}
+                confirm={
+                  JS.push("delete_user", value: %{user_id: u.id})
+                  |> JS.hide(to: "#delete-object-modal")
+                }
+              />
+            </div>
+
+            <div id={"new_user_password_#{u.id}"} class="w-[20%]">
               <%= if u.email != @current_user.email  do %>
                 <%= if @new_password_id == u.id do %>
-                  <span>Password reset to </span><span class="font-bold text-emerald-600"><%= @new_password %></span>
+                  <div>Password reset to</div>
+                  <div class="font-bold text-emerald-600"><%= @new_password %></div>
                 <% else %>
                   <.link
                     id={"reset_user_password_#{u.id}"}
@@ -45,25 +49,29 @@ defmodule FullCircleWeb.UserLive.Index do
                     phx-value-id={u.id}
                     class="blue button"
                   >
-                    <span class="font-bold"><%= gettext("Reset Password") %></span>
+                    <%= gettext("Reset Password") %>
                   </.link>
                 <% end %>
               <% end %>
-            </span>
-            <span class="email font-mono font-bold"><%= u.email %></span>
-            <span>
+            </div>
+
+            <div class="flex gap-1 w-[70%]">
+              <div class="email font-mono font-bold"><%= u.email %> <%= gettext("is") %></div>
               <%= if u.email == @current_user.email do %>
-                <%= gettext("is") %> <span class="text-amber-700"><%= u.role %></span>
+                <div class="text-amber-700"><%= u.role %></div>
               <% else %>
-                <%= gettext("is") %>
-                <%= Phoenix.HTML.Form.hidden_input(f, :id, value: u.id) %>
-                <%= Phoenix.HTML.Form.select(f, :role, FullCircle.Authorization.roles(),
-                  class: "rounded py-[1px] pl-[2px] pr-[40px] border-0 bg-indigo-50",
-                  value: u.role,
-                  phx_page_loading: true
-                ) %>
+                <div class="-mt-2 w-[30%]">
+                  <.input type="hidden" field={f[:id]} value={u.id} />
+                  <.input
+                    type="select"
+                    field={f[:role]}
+                    options={FullCircle.Authorization.roles()}
+                    value={u.role}
+                    phx-page-loading={true}
+                  />
+                </div>
               <% end %>
-            </span>
+            </div>
           </div>
         </.form>
       <% end %>

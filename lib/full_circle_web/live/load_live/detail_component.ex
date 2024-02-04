@@ -40,8 +40,8 @@ defmodule FullCircleWeb.LoadLive.DetailComponent do
               url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=good&name="}
             />
           </div>
-          <%= Phoenix.HTML.Form.hidden_input(dtl, :order_detail_id) %>
-          <%= Phoenix.HTML.Form.hidden_input(dtl, :good_id) %>
+          <.input type="hidden" field={dtl[:order_detail_id]} />
+          <.input type="hidden" field={dtl[:good_id]} />
           <div class="w-[25%]"><.input field={dtl[:descriptions]} /></div>
           <div class="w-[12%]">
             <.input
@@ -50,8 +50,8 @@ defmodule FullCircleWeb.LoadLive.DetailComponent do
               url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=packaging&good_id=#{dtl[:good_id].value}&name="}
             />
           </div>
-          <%= Phoenix.HTML.Form.hidden_input(dtl, :unit_multiplier) %>
-          <%= Phoenix.HTML.Form.hidden_input(dtl, :package_id) %>
+          <.input type="hidden" field={dtl[:unit_multiplier]} />
+          <.input type="hidden" field={dtl[:package_id]} />
           <div class="w-[10%]">
             <.input type="number" field={dtl[:load_pack_qty]} />
           </div>
@@ -73,7 +73,7 @@ defmodule FullCircleWeb.LoadLive.DetailComponent do
             <.link phx-click={:delete_detail} phx-value-index={dtl.index} tabindex="-1">
               <.icon name="hero-trash-solid" class="h-5 w-5" />
             </.link>
-            <%= Phoenix.HTML.Form.hidden_input(dtl, :delete) %>
+            <.input type="hidden" field={dtl[:delete]} value={"#{dtl[:delete].value}"} />
           </div>
         </div>
       </.inputs_for>

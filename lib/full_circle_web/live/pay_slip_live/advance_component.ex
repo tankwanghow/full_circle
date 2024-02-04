@@ -19,7 +19,7 @@ defmodule FullCircleWeb.PaySlipLive.AdvanceComponent do
         <div class={[
           "flex flex-row"
         ]}>
-          <%= Phoenix.HTML.Form.hidden_input(sn, :_id) %>
+          <.input type="hidden" field={sn[:_id]} />
           <div class="w-[14%]">
             <.input readonly tabindex="-1" field={sn[:slip_date]} type="date" />
           </div>

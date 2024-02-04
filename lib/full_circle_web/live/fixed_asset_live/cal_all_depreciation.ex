@@ -81,7 +81,7 @@ defmodule FullCircleWeb.FixedAssetLive.CalAllDepre do
           phx-change="validate"
         >
           <span class="font-bold"><%= gettext("Until") %></span>
-          <%= Phoenix.HTML.Form.date_input(f, :ddate, class: "rounded py-2 pl-3 border") %>
+          <input type="date" field={f[:ddate]} />
           <.button disabled={!@valid?}><%= gettext("Generate Depreciations") %></.button>
         </.form>
 

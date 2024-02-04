@@ -386,7 +386,7 @@ defmodule FullCircleWeb.EmployeeLive.Form do
           </div>
         </div>
         <.input field={@form[:note]} label={gettext("Note")} />
-        <%= datalist(FullCircle.Sys.countries(), "countries") %>
+        <%= datalist(assigns, FullCircle.Sys.countries(), "countries") %>
 
         <div class="font-bold grid grid-cols-12 gap-2 mt-2 text-center">
           <div class="col-span-6">
@@ -399,8 +399,8 @@ defmodule FullCircleWeb.EmployeeLive.Form do
         <.inputs_for :let={st} field={@form[:employee_salary_types]}>
           <div class={"grid grid-cols-12 gap-1 #{if(st[:delete].value == true and Enum.count(st.errors) == 0, do: "hidden", else: "")}"}>
             <div class="col-span-6">
-              <%= Phoenix.HTML.Form.hidden_input(st, :employee_id) %>
-              <%= Phoenix.HTML.Form.hidden_input(st, :salary_type_id) %>
+              <.input field={st[:employee_id]} type="hidden" />
+              <.input field={st[:salary_type_id]} type="hidden" />
               <.input
                 field={st[:salary_type_name]}
                 phx-hook="tributeAutoComplete"
@@ -412,9 +412,9 @@ defmodule FullCircleWeb.EmployeeLive.Form do
             </div>
             <div class="col-span-1 mt-1.5 text-rose-500">
               <.link phx-click={:delete_salary_type} phx-value-index={st.index}>
-                <Heroicons.trash solid class="h-5 w-5" />
+                <.icon name="hero-trash-solid" class="h-5 w-5" />
               </.link>
-              <%= Phoenix.HTML.Form.hidden_input(st, :delete) %>
+              <.input field={st[:delete]} type="hidden" value={"#{st[:delete].value}"} />
             </div>
           </div>
         </.inputs_for>

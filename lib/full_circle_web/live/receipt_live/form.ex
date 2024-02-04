@@ -475,10 +475,10 @@ defmodule FullCircleWeb.ReceiptLive.Form do
     <div class="w-11/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
       <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
       <.form for={@form} id="object-form" autocomplete="off" phx-change="validate" phx-submit="save">
-        <%= Phoenix.HTML.Form.hidden_input(@form, :receipt_no) %>
+        <.input type="hidden" field={@form[:receipt_no]} />
         <div class="flex flex-row flex-nowarp">
           <div class="w-5/12 grow shrink">
-            <%= Phoenix.HTML.Form.hidden_input(@form, :contact_id) %>
+            <.input type="hidden" field={@form[:contact_id]} />
             <.input
               field={@form[:contact_name]}
               label={gettext("Receive From")}
@@ -487,7 +487,7 @@ defmodule FullCircleWeb.ReceiptLive.Form do
             />
           </div>
           <div class="w-5/12 grow shrink">
-            <%= Phoenix.HTML.Form.hidden_input(@form, :funds_account_id) %>
+            <.input type="hidden" field={@form[:funds_account_id]} />
             <.input
               feedback={true}
               field={@form[:funds_account_name]}
@@ -646,7 +646,7 @@ defmodule FullCircleWeb.ReceiptLive.Form do
                 <.link phx-click={:delete_cheque} phx-value-index={dtl.index} tabindex="-1">
                   <.icon name="hero-trash-solid" class="h-5 w-5" />
                 </.link>
-                <%= Phoenix.HTML.Form.hidden_input(dtl, :delete) %>
+                <.input type="hidden" field={dtl[:delete]} value={"#{dtl[:delete].value}"} />
               </div>
             </div>
           </.inputs_for>

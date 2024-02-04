@@ -56,7 +56,7 @@ defmodule FullCircleWeb.ChequeLive.DepositIndex do
 
     {:noreply,
      socket
-     |> push_patch(to: url_from_search(socket))}
+     |> push_navigate(to: url_from_search(socket))}
   end
 
   defp filter_objects(socket, terms, reset, d_date, page) do

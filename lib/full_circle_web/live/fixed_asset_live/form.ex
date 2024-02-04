@@ -337,7 +337,7 @@ defmodule FullCircleWeb.FixedAssetLive.Form do
             />
           </div>
           <div class="w-6/12">
-            <%= Phoenix.HTML.Form.hidden_input(@form, :asset_ac_id) %>
+            <.input type="hidden" field={@form[:asset_ac_id]} />
             <.input
               field={@form[:asset_ac_name]}
               label={gettext("Asset Account")}
@@ -348,7 +348,7 @@ defmodule FullCircleWeb.FixedAssetLive.Form do
         </div>
         <div class="flex flex-row gap-1">
           <div class="w-4/12">
-            <%= Phoenix.HTML.Form.hidden_input(@form, :depre_ac_id) %>
+            <.input type="hidden" field={@form[:depre_ac_id]} />
             <.input
               field={@form[:depre_ac_name]}
               label={gettext("Depreciation Account")}
@@ -357,7 +357,7 @@ defmodule FullCircleWeb.FixedAssetLive.Form do
             />
           </div>
           <div class="w-4/12">
-            <%= Phoenix.HTML.Form.hidden_input(@form, :cume_depre_ac_id) %>
+            <.input type="hidden" field={@form[:cume_depre_ac_id]} />
             <.input
               field={@form[:cume_depre_ac_name]}
               label={gettext("Cume Depreciation Account")}
@@ -366,7 +366,7 @@ defmodule FullCircleWeb.FixedAssetLive.Form do
             />
           </div>
           <div class="w-4/12">
-            <%= Phoenix.HTML.Form.hidden_input(@form, :disp_fund_ac_id) %>
+            <.input type="hidden" field={@form[:disp_fund_ac_id]} />
             <.input
               field={@form[:disp_fund_ac_name]}
               label={gettext("Disposal Fund Account")}

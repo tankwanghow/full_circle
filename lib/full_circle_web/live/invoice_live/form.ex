@@ -351,10 +351,10 @@ defmodule FullCircleWeb.InvoiceLive.Form do
     <div class="w-11/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
       <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
       <.form for={@form} id="object-form" autocomplete="off" phx-change="validate" phx-submit="save">
-        <%= Phoenix.HTML.Form.hidden_input(@form, :invoice_no) %>
+        <.input type="hidden" field={@form[:invoice_no]} />
         <div class="flex flex-row flex-nowarp">
           <div class="w-1/4 grow shrink">
-            <%= Phoenix.HTML.Form.hidden_input(@form, :contact_id) %>
+            <.input type="hidden" field={@form[:contact_id]} />
             <.input
               field={@form[:contact_name]}
               label={gettext("Customer")}

@@ -452,10 +452,10 @@ defmodule FullCircleWeb.PaymentLive.Form do
     <div class="w-11/12 mx-auto border rounded-lg border-pink-500 bg-pink-100 p-4">
       <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
       <.form for={@form} id="object-form" autocomplete="off" phx-change="validate" phx-submit="save">
-        <%= Phoenix.HTML.Form.hidden_input(@form, :payment_no) %>
+        <.input type="hidden" field={@form[:payment_no]} />
         <div class="flex flex-row flex-nowarp">
           <div class="w-5/12 grow shrink">
-            <%= Phoenix.HTML.Form.hidden_input(@form, :contact_id) %>
+            <.input type="hidden" field={@form[:contact_id]} />
             <.input
               field={@form[:contact_name]}
               label={gettext("Pay To")}
@@ -464,7 +464,7 @@ defmodule FullCircleWeb.PaymentLive.Form do
             />
           </div>
           <div class="w-5/12 grow shrink">
-            <%= Phoenix.HTML.Form.hidden_input(@form, :funds_account_id) %>
+            <.input type="hidden" field={@form[:funds_account_id]} />
             <.input
               field={@form[:funds_account_name]}
               label={gettext("Funds Account")}

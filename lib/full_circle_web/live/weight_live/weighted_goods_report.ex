@@ -45,7 +45,7 @@ defmodule FullCircleWeb.WeighingLive.GoodsReport do
 
     {:noreply,
      socket
-     |> push_patch(to: url)}
+     |> push_navigate(to: url)}
   end
 
   @impl true

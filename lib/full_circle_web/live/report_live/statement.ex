@@ -102,7 +102,7 @@ defmodule FullCircleWeb.ReportLive.Statement do
 
     {:noreply,
      socket
-     |> push_patch(to: url)}
+     |> push_navigate(to: url)}
   end
 
   defp query(socket, gt, f_date, t_date) do

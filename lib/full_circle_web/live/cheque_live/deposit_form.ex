@@ -241,7 +241,7 @@ defmodule FullCircleWeb.ChequeLive.DepositForm do
     <div class="w-8/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
       <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
       <.form for={@form} id="object-form" autocomplete="off" phx-change="validate" phx-submit="save">
-        <%= Phoenix.HTML.Form.hidden_input(@form, :deposit_no) %>
+        <.input field={@form[:deposit_no]} type="hidden" />
         <div class="flex flex-row flex-nowarp gap-1">
           <div class="w-2/12">
             <.input field={@form[:deposit_date]} label={gettext("Deposit Date")} type="date" />
@@ -272,9 +272,9 @@ defmodule FullCircleWeb.ChequeLive.DepositForm do
             />
           </div>
 
-          <%= Phoenix.HTML.Form.hidden_input(@form, :bank_id) %>
-          <%= Phoenix.HTML.Form.hidden_input(@form, :funds_from_id) %>
-          <%= Phoenix.HTML.Form.hidden_input(@form, :company_id) %>
+          <.input field={@form[:bank_id]} type="hidden" />
+          <.input field={@form[:funds_from_id]} type="hidden" />
+          <.input field={@form[:company_id]} type="hidden" />
         </div>
 
         <div class="flex flex-row flex-wrap font-medium text-center mt-2 tracking-tighter">
@@ -289,7 +289,7 @@ defmodule FullCircleWeb.ChequeLive.DepositForm do
 
         <.inputs_for :let={dtl} field={@form[:cheques]}>
           <div class={"flex flex-row flex-wrap #{if(dtl[:delete].value == true, do: "hidden", else: "")}"}>
-            <%= Phoenix.HTML.Form.hidden_input(dtl, :id) %>
+            <.input field={dtl[:id]} type="hidden" />
             <div class="w-[16%]"><.input feedback={true} field={dtl[:bank]} readonly /></div>
             <div class="w-[16%]"><.input field={dtl[:cheque_no]} readonly /></div>
             <div class="w-[16%]"><.input field={dtl[:city]} readonly /></div>
@@ -302,7 +302,7 @@ defmodule FullCircleWeb.ChequeLive.DepositForm do
               <.link phx-click={:delete_chq} phx-value-index={dtl.index} tabindex="-1">
                 <.icon name="hero-trash-solid" class="h-5 w-5" />
               </.link>
-              <%= Phoenix.HTML.Form.hidden_input(dtl, :delete) %>
+              <.input field={dtl[:delete]} type="hidden" value={"#{dtl[:delete].value}"} />
             </div>
           </div>
         </.inputs_for>

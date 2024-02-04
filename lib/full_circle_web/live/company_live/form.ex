@@ -92,8 +92,8 @@ defmodule FullCircleWeb.CompanyLive.Form do
           <.input field={@form[:descriptions]} label={gettext("Descriptions")} />
         </div>
       </div>
-      <%= datalist(FullCircle.Sys.countries(), "countries") %>
-      <%= datalist(Tzdata.zone_list(), "timezones") %>
+      <%= datalist(assigns, FullCircle.Sys.countries(), "countries") %>
+      <%= datalist(assigns, Tzdata.zone_list(), "timezones") %>
       <div class="flex justify-center gap-x-1 mt-2">
         <.save_button form={@form} />
         <%= if @live_action == :edit and FullCircle.Authorization.can?(@current_user, :delete_company, @company) do %>

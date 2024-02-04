@@ -282,10 +282,10 @@ defmodule FullCircleWeb.OrderLive.Form do
     <div class="w-8/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4 mb-4">
       <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
       <.form for={@form} id="object-form" autocomplete="off" phx-change="validate" phx-submit="save">
-        <%= Phoenix.HTML.Form.hidden_input(@form, :order_no) %>
+        <.input type="hidden" field={@form[:order_no]} />
         <div class="flex flex-row flex-nowarp gap-2">
           <div class="w-1/2 grow shrink">
-            <%= Phoenix.HTML.Form.hidden_input(@form, :customer_id) %>
+            <.input type="hidden" field={@form[:customer_id]} />
             <.input
               field={@form[:customer_name]}
               label={gettext("Contact")}

@@ -196,7 +196,7 @@ defmodule FullCircleWeb.ChequeLive.ReturnChequeForm do
     <div class="w-8/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
       <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
       <.form for={@form} id="object-form" autocomplete="off" phx-change="validate" phx-submit="save">
-        <%= Phoenix.HTML.Form.hidden_input(@form, :return_no) %>
+        <.input type="hidden" field={@form[:return_no]} />
         <div class="flex flex-row flex-nowarp gap-1">
           <div class="w-2/12">
             <.input
@@ -241,11 +241,11 @@ defmodule FullCircleWeb.ChequeLive.ReturnChequeForm do
             />
           </div>
 
-          <%= Phoenix.HTML.Form.hidden_input(@form, :cheque_owner_id) %>
-          <%= Phoenix.HTML.Form.hidden_input(@form, :return_from_bank_id) %>
-          <%= Phoenix.HTML.Form.hidden_input(@form, :company_id) %>
+          <.input type="hidden" field={@form[:cheque_owner_id]} />
+          <.input type="hidden" field={@form[:return_from_bank_id]} />
+          <.input type="hidden" field={@form[:company_id]} />
           <.inputs_for :let={dtl} field={@form[:cheque]}>
-            <%= Phoenix.HTML.Form.hidden_input(dtl, :id) %>
+            <.input type="hidden" field={dtl[:id]} />
           </.inputs_for>
         </div>
 

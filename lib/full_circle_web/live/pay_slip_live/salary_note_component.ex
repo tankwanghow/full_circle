@@ -19,11 +19,11 @@ defmodule FullCircleWeb.PaySlipLive.SalaryNoteComponent do
         <div class={[
           "flex flex-row"
         ]}>
-          <%= Phoenix.HTML.Form.hidden_input(sn, :_id) %>
-          <%= Phoenix.HTML.Form.hidden_input(sn, :cal_func) %>
-          <%= Phoenix.HTML.Form.hidden_input(sn, :salary_type_type) %>
-          <%= Phoenix.HTML.Form.hidden_input(sn, :recurring_id) %>
-          <%= Phoenix.HTML.Form.hidden_input(sn, :employee_id) %>
+          <.input type="hidden" field={sn[:_id]} />
+          <.input type="hidden" field={sn[:cal_func]} />
+          <.input type="hidden" field={sn[:salary_type_type]} />
+          <.input type="hidden" field={sn[:recurring_id]} />
+          <.input type="hidden" field={sn[:employee_id]} />
           <div class="w-[14%]">
             <.input field={sn[:note_date]} type="date" readonly tabindex="-1" />
           </div>
@@ -31,7 +31,7 @@ defmodule FullCircleWeb.PaySlipLive.SalaryNoteComponent do
             <.input field={sn[:note_no]} readonly tabindex="-1" />
           </div>
           <div class="w-[21%]">
-            <%= Phoenix.HTML.Form.hidden_input(sn, :salary_type_id) %>
+            <.input field={sn[:salary_type_id]} type="hidden" />
             <.input readonly tabindex="-1" field={sn[:salary_type_name]} />
           </div>
           <div class="w-[24%]">
