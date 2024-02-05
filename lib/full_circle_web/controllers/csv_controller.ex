@@ -154,7 +154,6 @@ defmodule FullCircleWeb.CsvController do
         "fdate" => fdate,
         "tdate" => tdate
       }) do
-    glist = glist |> String.split(",") |> Enum.map(fn x -> String.trim(x) end)
     tdate = tdate |> Timex.parse!("{YYYY}-{0M}-{0D}") |> NaiveDateTime.to_date()
     fdate = fdate |> Timex.parse!("{YYYY}-{0M}-{0D}") |> NaiveDateTime.to_date()
 
