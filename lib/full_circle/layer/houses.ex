@@ -7,6 +7,9 @@ defmodule FullCircle.Layer.House do
   schema "houses" do
     field :house_no, :string
     field :capacity, :integer
+    field :status, :string, default: "Active"
+    field :filling_wages, :decimal, default: 0
+    field :feeding_wages, :decimal, default: 0
 
     belongs_to :company, FullCircle.Sys.Company
     has_many(:movements, FullCircle.Layer.Movement, on_delete: :delete_all)
@@ -21,11 +24,18 @@ defmodule FullCircle.Layer.House do
     |> cast(attrs, [
       :house_no,
       :capacity,
+      :status,
+      :filling_wages,
+      :feeding_wages,
       :company_id
+
     ])
     |> validate_required([
       :house_no,
-      :capacity
+      :capacity,
+      :status,
+      :filling_wages,
+      :feeding_wages,
     ])
     |> to_upcase(:house_no)
     |> validate_number(:capacity, greater_than: 0)

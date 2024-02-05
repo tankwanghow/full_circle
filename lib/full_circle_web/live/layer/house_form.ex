@@ -180,7 +180,7 @@ defmodule FullCircleWeb.LayerLive.HouseForm do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="w-3/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
+    <div class="w-4/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
       <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
       <.form
         for={@form}
@@ -190,38 +190,62 @@ defmodule FullCircleWeb.LayerLive.HouseForm do
         phx-submit="save"
         class="mx-auto"
       >
-        <div class="grid grid-cols-12 gap-1">
-          <div class="col-span-6">
+        <div class="flex">
+          <div class="w-[20%]">
             <.input field={@form[:house_no]} label={gettext("House")} />
           </div>
-          <div class="col-span-6">
-            <.input field={@form[:capacity]} label={gettext("Capacity")} type="number" />
+          <div class="w-[20%]">
+            <.input field={@form[:capacity]} label={gettext("Capacity")} type="number" step="0.0001" />
+          </div>
+          <div class="w-[20%]">
+            <.input
+              field={@form[:filling_wages]}
+              label={gettext("Filling Wages")}
+              type="number"
+              step="0.0001"
+            />
+          </div>
+          <div class="w-[20%]">
+            <.input
+              field={@form[:feeding_wages]}
+              label={gettext("Feeding Wages")}
+              type="number"
+              step="0.0001"
+            />
+          </div>
+          <div class="w-[20%]">
+            <.input
+              field={@form[:status]}
+              label={gettext("Status")}
+              type="select"
+              options={["Active", "Dormant"]}
+            />
           </div>
         </div>
 
         <div class="font-bold flex flex-row text-center mt-2">
-          <div class="w-[25%]"><%= gettext("Lower Trays") %></div>
-          <div class="w-[25%]"><%= gettext("Upper Tray") %></div>
-          <div class="w-[25%]"><%= gettext("Wages") %></div>
+          <div class="w-[30%]"><%= gettext("Lower Trays") %></div>
+          <div class="w-[30%]"><%= gettext("Upper Tray") %></div>
+          <div class="w-[30%]"><%= gettext("Wages") %></div>
           <div class="w-[3%]" />
         </div>
 
         <.inputs_for :let={wg} field={@form[:house_harvest_wages]}>
           <div class={"flex flex-row  #{if(wg[:delete].value == true and Enum.count(wg.errors) == 0, do: "hidden", else: "")}"}>
-            <div class="w-[25%]">
+            <div class="w-[30%]">
               <.input type="number" field={wg[:ltry]} />
             </div>
-            <div class="w-[25%]">
+            <div class="w-[30%]">
               <.input field={wg[:utry]} type="number" />
             </div>
-            <div class="w-[25%]">
+            <div class="w-[30%]">
               <.input type="number" field={wg[:wages]} step="0.01" />
             </div>
             <div class="w-[3%] mt-1.5 text-rose-500">
               <.link phx-click={:delete_wage} phx-value-index={wg.index}>
                 <.icon name="hero-trash-solid" class="h-5 w-5" />
               </.link>
-              <.input type="hidden" field={wg[:delete]} value={"#{wg[:delete].value}"}  />
+              <.input type="hidden" field={wg[:delete]} value={"#{wg[:delete].value}"} />
             </div>
           </div>
         </.inputs_for>

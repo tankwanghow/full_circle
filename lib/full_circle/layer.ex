@@ -7,27 +7,50 @@ defmodule FullCircle.Layer do
 
   def house_feed_type(fd, td, com_id) do
     """
-    WITH
-      datelist as (
-        select generate_series('#{fd}'::date, '#{td}', interval '1 day') :: date gdate),
-      hou_flo_dt_qty as (
-        select dl.gdate, hou.id as house_id, hou.house_no, f.id as flock_id, f.flock_no, f.dob,
-              (date_part('day', dl.gdate::timestamp - f.dob::timestamp)/7)::integer as age,
-              (select sum(m.quantity) from movements m
-                where m.move_date <= dl.gdate
-                  and hou.id = m.house_id and f.id = m.flock_id) -
-              coalesce((select sum(hd1.dea_1+hd1.dea_2)
-                  from harvests hv1
-                inner join harvest_details hd1 on hv1.id = hd1.harvest_id
-                where hd1.house_id = hou.id
-                  and hv1.har_date < dl.gdate
-                  and hd1.flock_id = f.id), 0) as cur_qty
-          from movements m inner join houses hou on hou.id = m.house_id
-        inner join flocks f on m.flock_id = f.id, datelist dl
-        where (date_part('day', dl.gdate::timestamp - f.dob::timestamp)/7)::integer < 110
-          and m.company_id = '#{com_id}'
-        group by dl.gdate, hou.id, f.id),
-        house_date_feed as (
+    with
+    datelist as (
+         select generate_series('#{fd}'::date, '#{td}', interval '1 day')::date gdate),
+    mv_qty as (
+         select h.id as house_id, f.id as flock_id, h.house_no, f.flock_no, f.dob,
+                h.capacity,
+                max(m.move_date) as info_date, sum(m.quantity) as qty
+           from movements m inner join houses h
+             on h.id = m.house_id inner join flocks f
+             on f.id = m.flock_id
+          where m.company_id = '#{com_id}'
+            and m.move_date <= '#{td}'
+            and h.status = 'Active'
+          group by h.id, f.id),
+    dea_qty as (
+         select h2.id as house_id, f2.id as flock_id, h2.house_no, f2.flock_no, f2.dob,
+                max(h.har_date) as info_date, sum(hd.dea_1) + sum(hd.dea_2) as qty,
+                h2.capacity
+           from harvests h inner join harvest_details hd
+             on hd.harvest_id = h.id inner join houses h2
+             on hd.house_id = h2.id inner join flocks f2
+             on hd.flock_id = f2.id
+          where h2.company_id = '#{com_id}'
+            and h.har_date <= '#{td}'
+            and h2.status = 'Active'
+          group by h2.id, f2.id),
+       sum_qty as (
+         select m.house_id, m.flock_id, m.house_no, m.flock_no, m.dob,
+                (select max(x) from unnest(array[m.info_date, coalesce(d.info_date, m.info_date)]) as x) as info_date,
+                (m.qty - coalesce(d.qty, 0)) as qty
+           from mv_qty m left outer join dea_qty d
+             on d.house_id = m.house_id
+            and d.flock_id = m.flock_id
+          where (m.qty - coalesce(d.qty, 0)) > 0
+            and date_part('day', '#{td}'::timestamp -
+                          (select max(x) from unnest(array[m.info_date, coalesce(d.info_date, m.info_date)]) as x)::timestamp) < 60
+         ),
+    house_date_feed_0 as (
+     select dl.gdate, h.house_no, (date_part('day', dl.gdate::timestamp - info.dob::timestamp)/7)::integer as age, coalesce(info.qty, 0) as cur_qty
+       from houses h
+       left join sum_qty info
+         on info.house_id = h.id, datelist dl
+      where h.status = 'Active'),
+    house_date_feed as (
           select gdate, house_no, age, cur_qty,
                  case when age >= 0 and age <=  5 and cur_qty > 0 then 'A1'
                       when age >  5 and age <= 10 and cur_qty > 0 then 'A1'
@@ -38,8 +61,7 @@ defmodule FullCircle.Layer do
                       when age > 70 and age <= 80 and cur_qty > 0 then 'A7'
                       when age > 80 and cur_qty > 0 then 'A8'
                       else 'NO' end as feed_type
-            from hou_flo_dt_qty
-            where cur_qty > 0)
+            from house_date_feed_0)
 
     select cur.house_no as hou,
            (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.gdate) = 1 and hdf.house_no = cur.house_no) as D1,
@@ -182,7 +204,8 @@ defmodule FullCircle.Layer do
   def house_index(terms, com_id, page: page, per_page: per_page) do
     (house_info_query(Timex.today(), com_id) <>
        " order by COALESCE(WORD_SIMILARITY('#{terms}', h.house_no), 0) +" <>
-       " COALESCE(WORD_SIMILARITY('#{terms}', info.flock_no), 0) desc, h.house_no" <>
+       " COALESCE(WORD_SIMILARITY('#{terms}', info.flock_no), 0) +" <>
+       " COALESCE(WORD_SIMILARITY('#{terms}', h.status), 0) desc, h.house_no" <>
        " limit #{per_page} offset #{(page - 1) * per_page}")
     |> exec_query_map()
   end
@@ -222,7 +245,7 @@ defmodule FullCircle.Layer do
                           (select max(x) from unnest(array[m.info_date, coalesce(d.info_date, m.info_date)]) as x)::timestamp) < 60
          )
 
-     select h.id, h.house_no, info.flock_id, h.capacity, info.flock_no,
+     select h.id, h.house_no, info.flock_id, h.capacity, info.flock_no, h.filling_wages, h.feeding_wages, h.status,
             coalesce(info.qty, 0) as qty, info.info_date
        from houses h
        left join sum_qty info

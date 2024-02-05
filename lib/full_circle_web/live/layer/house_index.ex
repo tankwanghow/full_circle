@@ -36,17 +36,26 @@ defmodule FullCircleWeb.LayerLive.HouseIndex do
         </.link>
       </div>
       <div class="font-medium flex flex-row text-center tracking-tighter bg-amber-200">
-        <div class="w-[25%] border-b border-t border-amber-400 py-1">
+        <div class="w-[14%] border-b border-t border-amber-400 py-1">
           <%= gettext("House No") %>
         </div>
-        <div class="w-[25%] border-b border-t border-amber-400 py-1">
+        <div class="w-[14%] border-b border-t border-amber-400 py-1">
           <%= gettext("Capacity") %>
         </div>
-        <div class="w-[25%] border-b border-t border-amber-400 py-1">
+        <div class="w-[15%] border-b border-t border-amber-400 py-1">
           <%= gettext("Flock") %>
         </div>
-        <div class="w-[25%] border-b border-t border-amber-400 py-1">
+        <div class="w-[15%] border-b border-t border-amber-400 py-1">
           <%= gettext("Quantity") %>
+        </div>
+        <div class="w-[14%] border-b border-t border-amber-400 py-1">
+          <%= gettext("Filling") %>
+        </div>
+        <div class="w-[14%] border-b border-t border-amber-400 py-1">
+          <%= gettext("Feeding") %>
+        </div>
+        <div class="w-[14%] border-b border-t border-amber-400 py-1">
+          <%= gettext("Status") %>
         </div>
       </div>
       <div
