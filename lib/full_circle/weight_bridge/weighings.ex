@@ -45,7 +45,7 @@ defmodule FullCircle.WeightBridge.Weighing do
       :unit,
       :tare
     ])
-    |> validate_date(:note_date, days_before: 1)
+    |> validate_date(:note_date, days_before: 14)
     |> validate_date(:note_date, days_after: 1)
     |> to_upcase(:vehicle_no)
     |> to_upcase(:good_name)
