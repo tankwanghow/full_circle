@@ -14,11 +14,11 @@ defmodule FullCircleWeb.LayerLive.HarvestIndexComponent do
   @impl true
   def render(assigns) do
     ~H"""
-    <div id={@id} class={"#{@ex_class}flex text-center"}>
-      <div class="w-[15%] border-b border-gray-400 py-1">
+    <div id={@id} class={"#{@ex_class}flex text-center border-b border-gray-500 hover:bg-gray-300 bg-gray-200"}>
+      <div class="w-[15%] py-1">
         <%= @obj.har_date |> FullCircleWeb.Helpers.format_date() %>
       </div>
-      <div class="w-[15%] border-b border-gray-400 py-1">
+      <div class="w-[15%] py-1">
         <.link
           class="text-blue-600 hover:font-bold"
           tabindex="-1"
@@ -27,10 +27,10 @@ defmodule FullCircleWeb.LayerLive.HarvestIndexComponent do
           <%= @obj.harvest_no %>
         </.link>
       </div>
-      <div class="w-[30%] border-b text-center border-gray-400 py-1 overflow-clip">
+      <div class="w-[30%] py-1 overflow-clip">
         <span class="font-light"><%= @obj.employee_name %></span>
       </div>
-      <div class="w-[40%] border-b border-gray-400 py-1">
+      <div class="w-[40%] py-1">
         <%= @obj.houses %>
       </div>
     </div>

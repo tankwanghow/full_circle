@@ -14,7 +14,7 @@ defmodule FullCircleWeb.FixedAssetLive.IndexComponent do
   @impl true
   def render(assigns) do
     ~H"""
-    <div id={@id} class={"#{@ex_class} text-center bg-gray-200 border-gray-500 border-b"}>
+    <div id={@id} class={"#{@ex_class} text-center bg-gray-200 border-gray-500 hover:bg-gray-300 border-b"}>
       <div class="grid grid-cols-12">
         <div class="col-span-7 bg-gray-100 p-2">
           <.link

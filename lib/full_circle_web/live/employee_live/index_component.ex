@@ -14,7 +14,7 @@ defmodule FullCircleWeb.EmployeeLive.IndexComponent do
   @impl true
   def render(assigns) do
     ~H"""
-    <div id={@id} class={"#{@ex_class} flex text-center bg-gray-200 border-gray-500 border-b p-1"}>
+    <div id={@id} class={"#{@ex_class} flex text-center bg-gray-200 border-gray-500 hover:bg-gray-300 border-b p-1"}>
       <div class="w-[3%]">
         <input
           :if={@obj.checked and @obj.status == "Active"}

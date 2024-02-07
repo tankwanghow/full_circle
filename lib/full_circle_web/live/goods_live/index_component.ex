@@ -14,7 +14,7 @@ defmodule FullCircleWeb.GoodLive.IndexComponent do
   @impl true
   def render(assigns) do
     ~H"""
-    <div id={@id} class={"#{@ex_class} text-center bg-gray-200 border-gray-500 border-b p-2"}>
+    <div id={@id} class={"#{@ex_class} text-center bg-gray-200 border-gray-500 border-b p-2 hover:bg-gray-300"}>
       <.link
         class="text-blue-600 hover:font-bold"
         navigate={~p"/companies/#{@current_company}/goods/#{@obj.id}/edit"}

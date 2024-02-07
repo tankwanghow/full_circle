@@ -14,7 +14,7 @@ defmodule FullCircleWeb.SalaryTypeLive.IndexComponent do
   @impl true
   def render(assigns) do
     ~H"""
-    <div id={@id} class={"#{@ex_class} text-center bg-gray-200 border-gray-500 border-b py-1"}>
+    <div id={@id} class={"#{@ex_class} text-center bg-gray-200 border-gray-500 hover:bg-gray-300 border-b py-1"}>
       <%= if !FullCircle.HR.is_default_salary_type?(@obj) do %>
         <.link
           class="hover:font-bold text-blue-600"

@@ -14,11 +14,11 @@ defmodule FullCircleWeb.LayerLive.FlockIndexComponent do
   @impl true
   def render(assigns) do
     ~H"""
-    <div id={@id} class={"#{@ex_class}flex text-center"}>
-      <div class="w-[10%] border-b border-gray-400 py-1">
+    <div id={@id} class={"#{@ex_class}flex text-center border-b border-gray-400 hover:bg-gray-300 bg-gray-200 "}>
+      <div class="w-[10%] py-1">
         <%= @obj.dob |> FullCircleWeb.Helpers.format_date() %>
       </div>
-      <div class="w-[14%] border-b border-gray-400 py-1">
+      <div class="w-[14%] py-1">
         <.link
           class="text-blue-600 hover:font-bold"
           tabindex="-1"
@@ -27,16 +27,16 @@ defmodule FullCircleWeb.LayerLive.FlockIndexComponent do
           <%= @obj.flock_no %>
         </.link>
       </div>
-      <div class="w-[10%] border-b text-center border-gray-400 py-1 overflow-clip">
+      <div class="w-[10%] py-1 overflow-clip">
         <span class="font-light"><%= @obj.breed %></span>
       </div>
-      <div class="w-[10%] border-b border-gray-400 py-1">
+      <div class="w-[10%] border-b py-1">
         <%= Number.Delimit.number_to_delimited(@obj.quantity, precision: 0) %>
       </div>
-      <div class="w-[31%] border-b border-gray-400 py-1">
+      <div class="w-[31%] py-1">
         <%= @obj.houses %>
       </div>
-      <div class="w-[25%] border-b text-center border-gray-400 py-1 overflow-clip">
+      <div class="w-[25%] py-1 overflow-clip">
         <span class="font-light"><%= @obj.note %></span>
       </div>
     </div>
