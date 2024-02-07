@@ -14,7 +14,10 @@ defmodule FullCircleWeb.LayerLive.HouseIndexComponent do
   @impl true
   def render(assigns) do
     ~H"""
-    <div id={@id} class={"#{@ex_class}flex p-1 text-center bg-gray-200 border-gray-500 hover:bg-gray-300 border-b"}>
+    <div
+      id={@id}
+      class={"#{@ex_class}flex p-1 text-center bg-gray-200 border-gray-500 hover:bg-gray-300 border-b"}
+    >
       <div class="w-[14%]">
         <.link
           class="text-blue-600 hover:font-bold"
@@ -42,7 +45,6 @@ defmodule FullCircleWeb.LayerLive.HouseIndexComponent do
       <div class="w-[14%]">
         <%= @obj.status %>
       </div>
-
     </div>
     """
   end

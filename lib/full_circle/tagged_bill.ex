@@ -115,7 +115,7 @@ defmodule FullCircle.TaggedBill do
           qty: sum(invd.quantity),
           unit: gd.unit,
           price: avg((invd.unit_price * invd.quantity - invd.discount) / invd.quantity),
-          amount: sum((invd.unit_price * invd.quantity - invd.discount))
+          amount: sum(invd.unit_price * invd.quantity - invd.discount)
         },
         group_by: [gd.name, pkg.name, gd.unit]
       )
@@ -140,7 +140,7 @@ defmodule FullCircle.TaggedBill do
           qty: sum(invd.quantity),
           unit: gd.unit,
           price: avg((invd.unit_price * invd.quantity - invd.discount) / invd.quantity),
-          amount: sum((invd.unit_price * invd.quantity - invd.discount))
+          amount: sum(invd.unit_price * invd.quantity - invd.discount)
         },
         group_by: [gd.name, pkg.name, gd.unit]
       )

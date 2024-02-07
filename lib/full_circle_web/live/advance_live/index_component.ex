@@ -22,7 +22,6 @@ defmodule FullCircleWeb.AdvanceLive.IndexComponent do
         <input
           :if={@obj.checked and !@obj.old_data}
           id={"checkbox_advance_#{@obj.id}"}
-          name={"checkbox_advance[#{@obj.id}]"}
           type="checkbox"
           class="rounded border-gray-400 checked:bg-gray-400"
           phx-click="check_click"
@@ -32,7 +31,6 @@ defmodule FullCircleWeb.AdvanceLive.IndexComponent do
         <input
           :if={!@obj.checked and !@obj.old_data}
           id={"checkbox_advance_#{@obj.id}"}
-          name={"checkbox_advance[#{@obj.id}]"}
           type="checkbox"
           class="rounded border-gray-400 checked:bg-gray-400"
           phx-click="check_click"

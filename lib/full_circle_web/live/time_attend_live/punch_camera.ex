@@ -152,7 +152,13 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCamera do
               <%= Timex.today() |> Timex.format!("%Y%m%d", :strftime) %>
             </div>
             <div class="col-span-4">
-              <.input phx-debounce="300" name="shift_form[shift_id]" type="text" id="shift_form_shift_id" value="" />
+              <.input
+                phx-debounce="300"
+                name="shift_form[shift_id]"
+                type="text"
+                id="shift_form_shift_id"
+                value=""
+              />
             </div>
             <div class="col-span-4 -mt-1">
               <.button disabled={!@valid?}>Start Shift</.button>

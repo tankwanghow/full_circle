@@ -3,14 +3,18 @@ defmodule FullCircleWeb.Helpers do
   import FullCircleWeb.Gettext
 
   def assign_got_error(socket, assign_field, cs, list_name) do
-    assign(socket, assign_field, if cs.changes[list_name] do
-      if(cs.changes[list_name] |> Enum.find(fn x -> !x.valid? end),
-        do: true,
-        else: false
-      )
-    else
-      false
-    end)
+    assign(
+      socket,
+      assign_field,
+      if cs.changes[list_name] do
+        if(cs.changes[list_name] |> Enum.find(fn x -> !x.valid? end),
+          do: true,
+          else: false
+        )
+      else
+        false
+      end
+    )
   end
 
   def list_n_value(socket, terms, list_fn) do

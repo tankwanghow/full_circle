@@ -19,7 +19,6 @@ defmodule FullCircleWeb.ReportLive.StatementComponent do
         <input
           :if={@obj.checked}
           id={"checkbox_#{@obj.id}"}
-          name={"checkbox[#{@obj.id}]"}
           type="checkbox"
           phx-click="check_click"
           phx-value-object-id={@obj.id}
@@ -29,7 +28,6 @@ defmodule FullCircleWeb.ReportLive.StatementComponent do
         <input
           :if={!@obj.checked}
           id={"checkbox_#{@obj.id}"}
-          name={"checkbox[#{@obj.id}]"}
           type="checkbox"
           class="rounded border-gray-400 checked:bg-gray-400"
           phx-click="check_click"

@@ -28,14 +28,13 @@ defmodule FullCircle.Layer.House do
       :filling_wages,
       :feeding_wages,
       :company_id
-
     ])
     |> validate_required([
       :house_no,
       :capacity,
       :status,
       :filling_wages,
-      :feeding_wages,
+      :feeding_wages
     ])
     |> to_upcase(:house_no)
     |> validate_number(:capacity, greater_than: 0)

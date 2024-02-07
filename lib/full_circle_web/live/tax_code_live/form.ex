@@ -216,7 +216,7 @@ defmodule FullCircleWeb.TaxCodeLive.Form do
             />
           </div>
           <div class="w-[60%]">
-            <.input type="hidden" field={@form[:account_id]}/>
+            <.input type="hidden" field={@form[:account_id]} />
             <.input
               field={@form[:account_name]}
               label={gettext("Account")}

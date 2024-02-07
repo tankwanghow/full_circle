@@ -14,7 +14,10 @@ defmodule FullCircleWeb.AccountLive.IndexComponent do
   @impl true
   def render(assigns) do
     ~H"""
-    <div id={@id} class={~s(#{@ex_class} hover:bg-gray-300 text-center bg-gray-200 border-gray-500 border-b p-1)}>
+    <div
+      id={@id}
+      class={~s(#{@ex_class} hover:bg-gray-300 text-center bg-gray-200 border-gray-500 border-b p-1)}
+    >
       <%= if !FullCircle.Accounting.is_default_account?(@obj) do %>
         <.link
           class="hover:font-bold text-blue-600"

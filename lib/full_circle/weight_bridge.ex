@@ -20,6 +20,7 @@ defmodule FullCircle.WeightBridge do
 
   def goods_report(glist, fdate, tdate, com_id) when glist != "" do
     glist = glist |> String.split(",") |> Enum.map(fn x -> String.trim(x) end)
+
     from(wei in Weighing,
       where: wei.company_id == ^com_id,
       where: wei.note_date >= ^fdate,

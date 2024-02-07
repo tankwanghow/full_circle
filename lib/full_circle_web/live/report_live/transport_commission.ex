@@ -200,7 +200,9 @@ defmodule FullCircleWeb.ReportLive.TransportCommission do
           </div>
           <div class="w-[17%] border rounded bg-green-200 border-green-400 px-2 py-1"></div>
           <div class="w-[6%] border rounded bg-green-200 border-green-400 px-2 py-1">
-            <%= [0.0 | Enum.map(@objects, fn x -> x.delivery_wages end)] |> Enum.sum() |> Float.round(2) %>
+            <%= [0.0 | Enum.map(@objects, fn x -> x.delivery_wages end)]
+            |> Enum.sum()
+            |> Float.round(2) %>
           </div>
         </div>
       </div>

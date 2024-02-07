@@ -122,7 +122,7 @@ defmodule FullCircleWeb.ReportLive.HouseFeed do
 
       <div :if={Enum.count(@col) > 0} class="flex flex-row">
         <%= for h <- @col do %>
-          <div class={"w-[4%] text-center font-bold border rounded bg-gray-200 border-gray-500"}>
+          <div class="w-[4%] text-center font-bold border rounded bg-gray-200 border-gray-500">
             <%= h %>
           </div>
         <% end %>
@@ -131,7 +131,7 @@ defmodule FullCircleWeb.ReportLive.HouseFeed do
       <%= for r <- @row do %>
         <div class="flex flex-row">
           <%= for c <- r do %>
-            <div class={"w-[4%] text-center border rounded bg-blue-200 border-blue-500"}>
+            <div class="w-[4%] text-center border rounded bg-blue-200 border-blue-500">
               <%= c %>
             </div>
           <% end %>

@@ -14,7 +14,10 @@ defmodule FullCircleWeb.LayerLive.HarvestIndexComponent do
   @impl true
   def render(assigns) do
     ~H"""
-    <div id={@id} class={"#{@ex_class}flex text-center border-b border-gray-500 hover:bg-gray-300 bg-gray-200"}>
+    <div
+      id={@id}
+      class={"#{@ex_class}flex text-center border-b border-gray-500 hover:bg-gray-300 bg-gray-200"}
+    >
       <div class="w-[15%] py-1">
         <%= @obj.har_date |> FullCircleWeb.Helpers.format_date() %>
       </div>

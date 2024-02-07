@@ -14,7 +14,10 @@ defmodule FullCircleWeb.RecurringLive.IndexComponent do
   @impl true
   def render(assigns) do
     ~H"""
-    <div id={@id} class={"#{@ex_class} text-center bg-gray-200 border-gray-500 hover:bg-gray-300 border-b p-1"}>
+    <div
+      id={@id}
+      class={"#{@ex_class} text-center bg-gray-200 border-gray-500 hover:bg-gray-300 border-b p-1"}
+    >
       <.link
         class="text-blue-600 hover:font-bold"
         navigate={~p"/companies/#{@current_company}/recurrings/#{@obj.id}/edit"}

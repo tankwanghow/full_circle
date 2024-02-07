@@ -59,14 +59,14 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
         {[], []}
       else
         {FullCircle.TaggedBill.goods_sales_report(
-          contact,
+           contact,
            goods,
            f_date,
            t_date,
            socket.assigns.current_company.id
          ),
          FullCircle.TaggedBill.goods_sales_summary_report(
-          contact,
+           contact,
            goods,
            f_date,
            t_date,

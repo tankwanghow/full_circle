@@ -439,9 +439,14 @@ defmodule FullCircleWeb.PaymentLive.Form do
       )
       |> Map.put(:action, socket.assigns.live_action)
 
-    socket = assign(socket, form: to_form(changeset))
-    |> FullCircleWeb.Helpers.assign_got_error(:details_got_error, changeset, :payment_details)
-    |> FullCircleWeb.Helpers.assign_got_error(:matchers_got_error, changeset, :transaction_matchers)
+    socket =
+      assign(socket, form: to_form(changeset))
+      |> FullCircleWeb.Helpers.assign_got_error(:details_got_error, changeset, :payment_details)
+      |> FullCircleWeb.Helpers.assign_got_error(
+        :matchers_got_error,
+        changeset,
+        :transaction_matchers
+      )
 
     {:noreply, socket}
   end

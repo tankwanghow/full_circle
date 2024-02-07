@@ -20,7 +20,7 @@ defmodule FullCircleWeb.EmployeeLive.Index do
         <.link
           navigate={~p"/companies/#{@current_company.id}/employees/new"}
           class="blue button"
-          id="new_object"
+          id="new_employee"
         >
           <%= gettext("New Employee") %>
         </.link>
@@ -51,7 +51,7 @@ defmodule FullCircleWeb.EmployeeLive.Index do
           <.live_component
             current_company={@current_company}
             module={IndexComponent}
-            id={"#{obj_id}"}
+            id={obj_id}
             obj={obj}
             ex_class=""
           />

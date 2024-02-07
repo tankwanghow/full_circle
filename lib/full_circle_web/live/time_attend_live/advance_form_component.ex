@@ -145,13 +145,13 @@ defmodule FullCircleWeb.TimeAttendLive.AdvanceFormComponent do
         <p :if={!is_nil(@form.source.data.pay_slip_no)} class="w-full text-xl text-center font-bold">
           <%= @form.source.data.pay_slip_no %>
         </p>
-        <.input type="hidden" field={@form[:slip_no]}/>
+        <.input type="hidden" field={@form[:slip_no]} />
         <div class="grid grid-cols-12 gap-1">
           <div class="col-span-3">
             <.input feedback={true} field={@form[:slip_date]} label={gettext("Date")} type="date" />
           </div>
           <div class="col-span-5">
-            <.input type="hidden" field={@form[:employee_id]}/>
+            <.input type="hidden" field={@form[:employee_id]} />
             <.input
               field={@form[:employee_name]}
               label={gettext("Employee")}
@@ -160,7 +160,7 @@ defmodule FullCircleWeb.TimeAttendLive.AdvanceFormComponent do
             />
           </div>
           <div class="col-span-4">
-            <.input type="hidden" field={@form[:funds_account_id]}/>
+            <.input type="hidden" field={@form[:funds_account_id]} />
             <.input
               field={@form[:funds_account_name]}
               label={gettext("Funds From")}

@@ -731,6 +731,7 @@ defmodule FullCircleWeb.CoreComponents do
 
   def datalist(assigns, list, id) do
     assigns = assign(assigns, list: list) |> assign(id: id)
+
     ~H"""
     <datalist id={@id}>
       <%= for el <- @list do %>

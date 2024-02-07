@@ -76,12 +76,12 @@ defmodule FullCircleWeb.LayerLive.HarvestReport do
         )
       end
 
-      # objects =
-      #   objects
-      #   |> Enum.filter(fn x ->
-      #     x.yield_0 + x.yield_1 + x.yield_2 + x.yield_3 + x.yield_4 + x.yield_5 + x.yield_6 +
-      #       x.yield_7 > 0
-      #   end)
+    # objects =
+    #   objects
+    #   |> Enum.filter(fn x ->
+    #     x.yield_0 + x.yield_1 + x.yield_2 + x.yield_3 + x.yield_4 + x.yield_5 + x.yield_6 +
+    #       x.yield_7 > 0
+    #   end)
 
     socket
     |> assign(objects_count: Enum.count(objects))

@@ -14,7 +14,10 @@ defmodule FullCircleWeb.HolidayLive.IndexComponent do
   @impl true
   def render(assigns) do
     ~H"""
-    <div id={@id} class={"#{@ex_class} text-center bg-gray-200 border-gray-500 hover:bg-gray-300 border-b p-1"}>
+    <div
+      id={@id}
+      class={"#{@ex_class} text-center bg-gray-200 border-gray-500 hover:bg-gray-300 border-b p-1"}
+    >
       <.link
         class="hover:font-bold text-blue-600"
         navigate={~p"/companies/#{@current_company.id}/holidays/#{@obj.id}/edit"}

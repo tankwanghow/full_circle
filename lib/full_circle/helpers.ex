@@ -43,7 +43,9 @@ defmodule FullCircle.Helpers do
     union(invtags, ^purinvtags)
     |> order_by([1])
     |> FullCircle.Repo.all()
-    |> List.flatten() |> Enum.map(fn x -> String.trim(x) end) |> Enum.uniq
+    |> List.flatten()
+    |> Enum.map(fn x -> String.trim(x) end)
+    |> Enum.uniq()
   end
 
   def list_klass_tags(tag \\ "", class, key, com) do
@@ -60,7 +62,9 @@ defmodule FullCircle.Helpers do
     tags
     |> order_by([1])
     |> FullCircle.Repo.all()
-    |> List.flatten() |> Enum.map(fn x -> String.trim(x) end) |> Enum.uniq
+    |> List.flatten()
+    |> Enum.map(fn x -> String.trim(x) end)
+    |> Enum.uniq()
   end
 
   def gen_temp_id(val \\ 6),

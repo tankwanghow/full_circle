@@ -156,11 +156,11 @@ defmodule FullCircleWeb.TimeAttendLive.FormComponent do
           <%= gettext("Warning! Minimum Data Integrity is Impose! Make sure your data is correct.") %>
         </p>
         <div class="grid grid-cols-12 gap-1 mb-2">
-          <.input type="hidden" field={@form[:input_medium]}/>
-          <.input type="hidden" field={@form[:user_id]}/>
-          <.input type="hidden" field={@form[:company_id]}/>
+          <.input type="hidden" field={@form[:input_medium]} />
+          <.input type="hidden" field={@form[:user_id]} />
+          <.input type="hidden" field={@form[:company_id]} />
           <div class="col-span-4">
-            <.input type="hidden" field={@form[:employee_id]}/>
+            <.input type="hidden" field={@form[:employee_id]} />
             <.input
               :if={@live_action == :new}
               feedback={true}

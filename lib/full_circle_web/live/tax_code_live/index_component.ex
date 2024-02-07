@@ -14,7 +14,10 @@ defmodule FullCircleWeb.TaxCodeLive.IndexComponent do
   @impl true
   def render(assigns) do
     ~H"""
-    <div id={@id} class={"#{@ex_class} text-center bg-gray-200 border-gray-500 hover:bg-gray-300border-b p-1"}>
+    <div
+      id={@id}
+      class={"#{@ex_class} text-center bg-gray-200 border-gray-500 hover:bg-gray-300border-b p-1"}
+    >
       <.link
         :if={!FullCircle.Accounting.is_default_tax_code?(@obj)}
         class="hover:font-bold text-blue-600"

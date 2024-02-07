@@ -464,7 +464,11 @@ defmodule FullCircleWeb.ReceiptLive.Form do
       assign(socket, form: to_form(changeset))
       |> FullCircleWeb.Helpers.assign_got_error(:cheques_got_error, changeset, :received_cheques)
       |> FullCircleWeb.Helpers.assign_got_error(:details_got_error, changeset, :receipt_details)
-      |> FullCircleWeb.Helpers.assign_got_error(:matchers_got_error, changeset, :transaction_matchers)
+      |> FullCircleWeb.Helpers.assign_got_error(
+        :matchers_got_error,
+        changeset,
+        :transaction_matchers
+      )
 
     {:noreply, socket}
   end

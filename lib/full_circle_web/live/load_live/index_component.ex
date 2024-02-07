@@ -22,7 +22,6 @@ defmodule FullCircleWeb.LoadLive.IndexComponent do
         <input
           :if={@obj.checked}
           id={"checkbox_#{@id}"}
-          name={"checkbox[#{@id}]"}
           type="checkbox"
           class="rounded border-gray-400 checked:bg-gray-400"
           phx-click="check_click"
@@ -32,7 +31,6 @@ defmodule FullCircleWeb.LoadLive.IndexComponent do
         <input
           :if={!@obj.checked}
           id={"checkbox_#{@id}"}
-          name={"checkbox[#{@id}]"}
           type="checkbox"
           class="rounded border-gray-400 checked:bg-gray-400"
           phx-click="check_click"

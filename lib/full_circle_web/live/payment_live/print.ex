@@ -95,7 +95,7 @@ defmodule FullCircleWeb.PaymentLive.Print do
   def render(assigns) do
     ~H"""
     <div id="print-me" class="print-here">
-    <%= pre_print_style(assigns) %>
+      <%= pre_print_style(assigns) %>
       <%= if(@pre_print == "false", do: full_style(assigns)) %>
       <%= for payment  <- @payments do %>
         <%= Enum.map 1..payment.chunk_number, fn n -> %>
@@ -171,7 +171,10 @@ defmodule FullCircleWeb.PaymentLive.Print do
     <div :if={@recd.__struct__ == BillPay.PaymentDetail} class="detail">
       <span class="particular">
         <div>
-          <%= if(@recd.good_name != "Note", do: "#{@recd.account_name} - #{@recd.good_name}", else: "#{@recd.account_name}") %>
+          <%= if(@recd.good_name != "Note",
+            do: "#{@recd.account_name} - #{@recd.good_name}",
+            else: "#{@recd.account_name}"
+          ) %>
           <%= if(Decimal.gt?(@recd.package_qty, 0), do: " - #{@recd.package_qty}", else: "") %>
           <%= if(!is_nil(@recd.package_name) and @recd.package_name != "-",
             do: "(#{@recd.package_name})",
