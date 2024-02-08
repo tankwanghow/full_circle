@@ -8,7 +8,7 @@ defmodule FullCircleWeb.ReportLive.HouseFeedPrint do
     chunk = (detail_body_height / detail_height) |> floor
 
     {cols, rows} =
-      fill_data(socket, params["report"], params["fdate"], params["tdate"])
+      fill_data(socket, params["report"], params["month"], params["year"])
 
     {:ok,
      socket
@@ -18,14 +18,14 @@ defmodule FullCircleWeb.ReportLive.HouseFeedPrint do
      |> assign(:cols, cols)
      |> assign(:rows, rows)
      |> assign(page_title: gettext("Print"))
-     |> assign(:fdate, Date.from_iso8601!(params["fdate"]))
-     |> assign(:tdate, Date.from_iso8601!(params["tdate"]))}
+     |> assign(:month, Date.from_iso8601!(params["month"]))
+     |> assign(:year, Date.from_iso8601!(params["year"]))}
   end
 
-  defp fill_data(socket, _name, fdate, tdate) do
+  defp fill_data(socket, _name, month, year) do
     FullCircle.Layer.house_feed_type(
-      fdate,
-      tdate,
+      month,
+      year,
       socket.assigns.current_company.id
     )
   end
@@ -49,9 +49,11 @@ defmodule FullCircleWeb.ReportLive.HouseFeedPrint do
   end
 
   defp details(assigns, row) do
+    assigns =
+      assigns |> assign(:row, row)
     ~H"""
     <div class="details">
-      <%= for c <- row do %>
+      <%= for c <- @row do %>
         <div class="detail">
           <%= c || "NO" %>
         </div>

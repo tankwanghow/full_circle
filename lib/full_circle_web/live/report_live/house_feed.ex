@@ -15,13 +15,13 @@ defmodule FullCircleWeb.ReportLive.HouseFeed do
     params = params["search"]
 
     report = params["report"] || ""
-    f_date = params["f_date"] || ""
-    t_date = params["t_date"] || ""
+    month = params["month"] || ""
+    year = params["year"] || ""
 
     {:noreply,
      socket
-     |> assign(search: %{report: report, f_date: f_date, t_date: t_date})
-     |> filter_transactions(report, f_date, t_date)}
+     |> assign(search: %{report: report, month: month, year: year})
+     |> filter_transactions(report, month, year)}
   end
 
   @impl true
@@ -30,16 +30,16 @@ defmodule FullCircleWeb.ReportLive.HouseFeed do
         %{
           "search" => %{
             "report" => report,
-            "f_date" => f_date,
-            "t_date" => t_date
+            "month" => month,
+            "year" => year
           }
         },
         socket
       ) do
     qry = %{
       "search[report]" => report,
-      "search[f_date]" => f_date,
-      "search[t_date]" => t_date
+      "search[month]" => month,
+      "search[year]" => year
     }
 
     url =
@@ -50,19 +50,26 @@ defmodule FullCircleWeb.ReportLive.HouseFeed do
      |> push_navigate(to: url)}
   end
 
-  defp filter_transactions(socket, _report, f_date, t_date) do
-    {col, row} =
-      if f_date == "" or t_date == "" do
-        {[], []}
-      else
-        FullCircle.Layer.house_feed_type(
-          f_date,
-          t_date,
-          socket.assigns.current_company.id
-        )
+  defp filter_transactions(socket, _report, month, year) do
+    socket
+    |> assign_async(
+      :result,
+      fn ->
+        {:ok,
+         %{
+           result:
+             if month == "" or year == "" do
+               {[], []}
+             else
+               FullCircle.Layer.house_feed_type(
+                 month,
+                 year,
+                 socket.assigns.current_company.id
+               )
+             end
+         }}
       end
-
-    socket |> assign(row: row) |> assign(col: col)
+    )
   end
 
   @impl true
@@ -86,19 +93,19 @@ defmodule FullCircleWeb.ReportLive.HouseFeed do
             <div class="w-[8%]">
               <.input
                 label={gettext("From")}
-                name="search[f_date]"
-                type="date"
-                id="search_f_date"
-                value={@search.f_date}
+                name="search[month]"
+                type="number"
+                id="search_month"
+                value={@search.month}
               />
             </div>
             <div class="w-[8%]">
               <.input
                 label={gettext("To")}
-                name="search[t_date]"
-                type="date"
-                id="search_t_date"
-                value={@search.t_date}
+                name="search[year]"
+                type="number"
+                id="search_year"
+                value={@search.year}
               />
             </div>
             <div class="w-[10%] mt-5">
@@ -106,10 +113,10 @@ defmodule FullCircleWeb.ReportLive.HouseFeed do
                 <%= gettext("Query") %>
               </.button>
               <.link
-                :if={Enum.count(@row) > 0}
+                :if={@result.result != {[], []} and @result.result}
                 class="blue button mr-1"
                 navigate={
-                  ~p"/companies/#{@current_company.id}/print/house_feed?report=actrans&name=#{@search.report}&fdate=#{@search.f_date}&tdate=#{@search.t_date}"
+                  ~p"/companies/#{@current_company.id}/print/house_feed?report=actrans&name=#{@search.report}&month=#{@search.month}&year=#{@search.year}"
                 }
                 target="_blank"
               >
@@ -119,23 +126,31 @@ defmodule FullCircleWeb.ReportLive.HouseFeed do
           </div>
         </.form>
       </div>
-
-      <div :if={Enum.count(@col) > 0} class="flex flex-row">
-        <%= for h <- @col do %>
-          <div class="w-[4%] text-center font-bold border rounded bg-gray-200 border-gray-500">
-            <%= h %>
-          </div>
-        <% end %>
-      </div>
-
-      <%= for r <- @row do %>
-        <div class="flex flex-row">
-          <%= for c <- r do %>
-            <div class="w-[4%] text-center border rounded bg-blue-200 border-blue-500">
-              <%= c %>
+      <%= if @result.loading do %>
+        <div class="bg-green-200 border-green-500 text-2xl text-center">Loading...</div>
+      <% end %>
+      <%= if @result.failed do %>
+        <div class="bg-rose-200 border-rose-500 text-2xl text-center"><%= "ERROR!!" %></div>
+      <% end %>
+      <%= if @result.ok? do %>
+        <% {col, row} = @result.result %>
+        <div :if={Enum.count(col) > 0} class="flex flex-row">
+          <%= for h <- col do %>
+            <div class="w-[4%] text-center font-bold border rounded bg-gray-200 border-gray-500">
+              <%= h %>
             </div>
           <% end %>
         </div>
+
+        <%= for r <- row do %>
+          <div class="flex flex-row">
+            <%= for c <- r do %>
+              <div class="w-[4%] text-center border rounded bg-blue-200 border-blue-500">
+                <%= c %>
+              </div>
+            <% end %>
+          </div>
+        <% end %>
       <% end %>
     </div>
     """
