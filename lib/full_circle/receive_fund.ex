@@ -273,13 +273,9 @@ defmodule FullCircle.ReceiveFund do
 
     multi
     |> get_gapless_doc_id(gapless_name, "Receipt", "RC", com)
-    |> Multi.insert(
-      receipt_name,
-      fn mty ->
-        doc = Map.get(mty, gapless_name)
-        StdInterface.changeset(Receipt, %Receipt{}, Map.merge(attrs, %{"receipt_no" => doc}), com)
-      end
-    )
+    |> Multi.insert(receipt_name, fn %{^gapless_name => doc} ->
+      StdInterface.changeset(Receipt, %Receipt{}, Map.merge(attrs, %{"receipt_no" => doc}), com)
+    end)
     |> Multi.insert("#{receipt_name}_log", fn %{^receipt_name => entity} ->
       FullCircle.Sys.log_changeset(
         receipt_name,

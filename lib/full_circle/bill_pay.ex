@@ -257,13 +257,9 @@ defmodule FullCircle.BillPay do
 
     multi
     |> get_gapless_doc_id(gapless_name, "Payment", "PV", com)
-    |> Multi.insert(
-      payment_name,
-      fn mty ->
-        doc = Map.get(mty, gapless_name)
-        StdInterface.changeset(Payment, %Payment{}, Map.merge(attrs, %{"payment_no" => doc}), com)
-      end
-    )
+    |> Multi.insert(payment_name, fn %{^gapless_name => doc} ->
+      StdInterface.changeset(Payment, %Payment{}, Map.merge(attrs, %{"payment_no" => doc}), com)
+    end)
     |> Multi.insert("#{payment_name}_log", fn %{^payment_name => entity} ->
       FullCircle.Sys.log_changeset(
         payment_name,

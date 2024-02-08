@@ -269,13 +269,14 @@ defmodule FullCircle.Billing do
 
     multi
     |> get_gapless_doc_id(gapless_name, "Invoice", "INV", com)
-    |> Multi.insert(
-      invoice_name,
-      fn mty ->
-        doc = Map.get(mty, gapless_name)
-        StdInterface.changeset(Invoice, %Invoice{}, Map.merge(attrs, %{"invoice_no" => doc}), com)
-      end
-    )
+    |> Multi.insert(invoice_name, fn %{^gapless_name => doc} ->
+      StdInterface.changeset(
+        Invoice,
+        %Invoice{},
+        Map.merge(attrs, %{"invoice_no" => doc}),
+        com
+      )
+    end)
     |> Multi.insert("#{invoice_name}_log", fn %{^invoice_name => entity} ->
       FullCircle.Sys.log_changeset(
         invoice_name,
@@ -579,19 +580,14 @@ defmodule FullCircle.Billing do
 
     multi
     |> get_gapless_doc_id(gapless_name, "PurInvoice", "PINV", com)
-    |> Multi.insert(
-      pur_invoice_name,
-      fn mty ->
-        doc = Map.get(mty, gapless_name)
-
-        StdInterface.changeset(
-          PurInvoice,
-          %PurInvoice{},
-          Map.merge(attrs, %{"pur_invoice_no" => doc}),
-          com
-        )
-      end
-    )
+    |> Multi.insert(pur_invoice_name, fn %{^gapless_name => doc} ->
+      StdInterface.changeset(
+        PurInvoice,
+        %PurInvoice{},
+        Map.merge(attrs, %{"pur_invoice_no" => doc}),
+        com
+      )
+    end)
     |> Multi.insert("#{pur_invoice_name}_log", fn %{^pur_invoice_name => entity} ->
       FullCircle.Sys.log_changeset(
         pur_invoice_name,

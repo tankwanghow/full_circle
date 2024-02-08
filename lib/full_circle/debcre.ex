@@ -233,19 +233,14 @@ defmodule FullCircle.DebCre do
 
     multi
     |> get_gapless_doc_id(gapless_name, "CreditNote", "CN", com)
-    |> Multi.insert(
-      note_name,
-      fn mty ->
-        doc = Map.get(mty, gapless_name)
-
-        StdInterface.changeset(
-          CreditNote,
-          %CreditNote{},
-          Map.merge(attrs, %{"note_no" => doc}),
-          com
-        )
-      end
-    )
+    |> Multi.insert(note_name, fn %{^gapless_name => doc} ->
+      StdInterface.changeset(
+        CreditNote,
+        %CreditNote{},
+        Map.merge(attrs, %{"note_no" => doc}),
+        com
+      )
+    end)
     |> Multi.insert("#{note_name}_log", fn %{^note_name => entity} ->
       FullCircle.Sys.log_changeset(
         note_name,
@@ -599,19 +594,14 @@ defmodule FullCircle.DebCre do
 
     multi
     |> get_gapless_doc_id(gapless_name, "DebitNote", "DN", com)
-    |> Multi.insert(
-      note_name,
-      fn mty ->
-        doc = Map.get(mty, gapless_name)
-
-        StdInterface.changeset(
-          DebitNote,
-          %DebitNote{},
-          Map.merge(attrs, %{"note_no" => doc}),
-          com
-        )
-      end
-    )
+    |> Multi.insert(note_name, fn %{^gapless_name => doc} ->
+      StdInterface.changeset(
+        DebitNote,
+        %DebitNote{},
+        Map.merge(attrs, %{"note_no" => doc}),
+        com
+      )
+    end)
     |> Multi.insert("#{note_name}_log", fn %{^note_name => entity} ->
       FullCircle.Sys.log_changeset(
         note_name,

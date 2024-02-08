@@ -142,29 +142,24 @@ defmodule FullCircle.JournalEntry do
 
     multi
     |> get_gapless_doc_id(gapless_name, "Journal", "JS", com)
-    |> Multi.insert(
-      journal_name,
-      fn mty ->
-        doc = Map.get(mty, gapless_name)
+    |> Multi.insert(journal_name, fn %{^gapless_name => doc} ->
+      attrs =
+        Map.merge(attrs, %{
+          "transactions" =>
+            Enum.into(attrs["transactions"], %{}, fn {k, v} ->
+              {k,
+               Map.merge(v, %{
+                 "doc_no" => doc,
+                 "doc_type" => "Journal",
+                 "doc_date" => attrs["journal_date"],
+                 "contact_particulars" => v["particulars"],
+                 "company_id" => com.id
+               })}
+            end)
+        })
 
-        attrs =
-          Map.merge(attrs, %{
-            "transactions" =>
-              Enum.into(attrs["transactions"], %{}, fn {k, v} ->
-                {k,
-                 Map.merge(v, %{
-                   "doc_no" => doc,
-                   "doc_type" => "Journal",
-                   "doc_date" => attrs["journal_date"],
-                   "contact_particulars" => v["particulars"],
-                   "company_id" => com.id
-                 })}
-              end)
-          })
-
-        StdInterface.changeset(Journal, %Journal{}, Map.merge(attrs, %{"journal_no" => doc}), com)
-      end
-    )
+      StdInterface.changeset(Journal, %Journal{}, Map.merge(attrs, %{"journal_no" => doc}), com)
+    end)
     |> Multi.insert("#{journal_name}_log", fn %{^journal_name => entity} ->
       FullCircle.Sys.log_changeset(
         journal_name,

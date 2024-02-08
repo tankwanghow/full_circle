@@ -187,13 +187,9 @@ defmodule FullCircle.Cheque do
 
     multi
     |> get_gapless_doc_id(gapless_name, "Deposit", "DS", com)
-    |> Multi.insert(
-      deposit_name,
-      fn mty ->
-        doc = Map.get(mty, gapless_name)
-        StdInterface.changeset(Deposit, %Deposit{}, Map.merge(attrs, %{"deposit_no" => doc}), com)
-      end
-    )
+    |> Multi.insert(deposit_name, fn %{^gapless_name => doc} ->
+      StdInterface.changeset(Deposit, %Deposit{}, Map.merge(attrs, %{"deposit_no" => doc}), com)
+    end)
     |> Multi.insert("#{deposit_name}_log", fn %{^deposit_name => entity} ->
       FullCircle.Sys.log_changeset(
         deposit_name,
@@ -325,19 +321,14 @@ defmodule FullCircle.Cheque do
 
     multi
     |> get_gapless_doc_id(gapless_name, "ReturnCheque", "RQ", com)
-    |> Multi.insert(
-      return_name,
-      fn mty ->
-        doc = Map.get(mty, gapless_name)
-
-        StdInterface.changeset(
-          ReturnCheque,
-          %ReturnCheque{},
-          Map.merge(attrs, %{"return_no" => doc}),
-          com
-        )
-      end
-    )
+    |> Multi.insert(return_name, fn %{^gapless_name => doc} ->
+      StdInterface.changeset(
+        ReturnCheque,
+        %ReturnCheque{},
+        Map.merge(attrs, %{"return_no" => doc}),
+        com
+      )
+    end)
     |> Multi.insert("#{return_name}_log", fn %{^return_name => entity} ->
       FullCircle.Sys.log_changeset(
         return_name,

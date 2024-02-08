@@ -259,19 +259,14 @@ defmodule FullCircle.Product do
 
     multi
     |> get_gapless_doc_id(gapless_name, "Delivery", "DO", com)
-    |> Multi.insert(
-      note_name,
-      fn mty ->
-        doc = Map.get(mty, gapless_name)
-
-        StdInterface.changeset(
-          Delivery,
-          %Delivery{},
-          Map.merge(attrs, %{"delivery_no" => doc}),
-          com
-        )
-      end
-    )
+    |> Multi.insert(note_name, fn %{^gapless_name => doc} ->
+      StdInterface.changeset(
+        Delivery,
+        %Delivery{},
+        Map.merge(attrs, %{"delivery_no" => doc}),
+        com
+      )
+    end)
     |> Multi.insert("#{note_name}_log", fn %{^note_name => entity} ->
       FullCircle.Sys.log_changeset(
         note_name,
@@ -470,19 +465,14 @@ defmodule FullCircle.Product do
 
     multi
     |> get_gapless_doc_id(gapless_name, "Load", "LD", com)
-    |> Multi.insert(
-      note_name,
-      fn mty ->
-        doc = Map.get(mty, gapless_name)
-
-        StdInterface.changeset(
-          Load,
-          %Load{},
-          Map.merge(attrs, %{"load_no" => doc}),
-          com
-        )
-      end
-    )
+    |> Multi.insert(note_name, fn %{^gapless_name => doc} ->
+      StdInterface.changeset(
+        Load,
+        %Load{},
+        Map.merge(attrs, %{"load_no" => doc}),
+        com
+      )
+    end)
     |> Multi.insert("#{note_name}_log", fn %{^note_name => entity} ->
       FullCircle.Sys.log_changeset(
         note_name,
@@ -749,19 +739,14 @@ defmodule FullCircle.Product do
 
     multi
     |> get_gapless_doc_id(gapless_name, "Order", "OR", com)
-    |> Multi.insert(
-      note_name,
-      fn mty ->
-        doc = Map.get(mty, gapless_name)
-
-        StdInterface.changeset(
-          Order,
-          %Order{},
-          Map.merge(attrs, %{"order_no" => doc}),
-          com
-        )
-      end
-    )
+    |> Multi.insert(note_name, fn %{^gapless_name => doc} ->
+      StdInterface.changeset(
+        Order,
+        %Order{},
+        Map.merge(attrs, %{"order_no" => doc}),
+        com
+      )
+    end)
     |> Multi.insert("#{note_name}_log", fn %{^note_name => entity} ->
       FullCircle.Sys.log_changeset(
         note_name,

@@ -5,7 +5,10 @@ defmodule FullCircle.Layer do
   alias FullCircle.{Repo}
   alias FullCircle.Layer.{House, Flock, Movement, Harvest, HarvestDetail, HouseHarvestWage}
 
-  def house_feed_type(fd, td, com_id) do
+  def house_feed_type(month, year, com_id) do
+    fd = Date.new!(String.to_integer(year), String.to_integer(month), 1)
+    td = Date.end_of_month(fd)
+
     """
     with
     datelist as (
