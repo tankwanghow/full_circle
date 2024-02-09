@@ -15,8 +15,8 @@ defmodule FullCircleWeb.ReportLive.HouseFeed do
     params = params["search"]
 
     report = params["report"] || ""
-    month = params["month"] || ""
-    year = params["year"] || ""
+    month = (params["month"] || "#{Timex.today().month}") |> String.to_integer()
+    year = (params["year"] || "#{Timex.today().year}") |> String.to_integer()
 
     {:noreply,
      socket
@@ -92,7 +92,7 @@ defmodule FullCircleWeb.ReportLive.HouseFeed do
             </div>
             <div class="w-[8%]">
               <.input
-                label={gettext("From")}
+                label={gettext("Month")}
                 name="search[month]"
                 type="number"
                 id="search_month"
@@ -101,7 +101,7 @@ defmodule FullCircleWeb.ReportLive.HouseFeed do
             </div>
             <div class="w-[8%]">
               <.input
-                label={gettext("To")}
+                label={gettext("Year")}
                 name="search[year]"
                 type="number"
                 id="search_year"
