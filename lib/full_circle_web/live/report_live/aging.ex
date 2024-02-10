@@ -24,14 +24,6 @@ defmodule FullCircleWeb.ReportLive.Aging do
   end
 
   @impl true
-  def handle_event("changed", _, socket) do
-    {:noreply,
-     socket
-     |> assign(objects_count: 0)
-     |> assign(objects: [])}
-  end
-
-  @impl true
   def handle_event(
         "query",
         %{"search" => %{"report" => report, "t_date" => t_date, "days" => days}},
@@ -51,30 +43,35 @@ defmodule FullCircleWeb.ReportLive.Aging do
     t_date = t_date |> Timex.parse!("{YYYY}-{0M}-{0D}") |> NaiveDateTime.to_date()
     days = String.to_integer(days)
 
-    objects =
-      cond do
-        report == "Debtors Aging" ->
-          FullCircle.Reporting.debtor_aging_report(
-            t_date,
-            days,
-            socket.assigns.current_company.id
-          )
-
-        report == "Creditors Aging" ->
-          FullCircle.Reporting.creditor_aging_report(
-            t_date,
-            days,
-            socket.assigns.current_company.id
-          )
-
-        true ->
-          []
-      end
-
     socket
-    |> assign(objects: objects)
-    |> assign(objects_count: Enum.count(objects))
     |> assign(days: days)
+    |> assign_async(
+      :result,
+      fn ->
+        {:ok,
+         %{
+           result:
+             cond do
+               report == "Debtors Aging" ->
+                 FullCircle.Reporting.debtor_aging_report(
+                   t_date,
+                   days,
+                   socket.assigns.current_company.id
+                 )
+
+               report == "Creditors Aging" ->
+                 FullCircle.Reporting.creditor_aging_report(
+                   t_date,
+                   days,
+                   socket.assigns.current_company.id
+                 )
+
+               true ->
+                 []
+             end
+         }}
+      end
+    )
   end
 
   @impl true
@@ -83,7 +80,7 @@ defmodule FullCircleWeb.ReportLive.Aging do
     <div class="w-8/12 mx-auto">
       <p class="text-2xl text-center font-medium"><%= "#{@page_title}" %></p>
       <div class="border rounded bg-amber-200 text-center p-2">
-        <.form for={%{}} id="search-form" phx-change="changed" phx-submit="query" autocomplete="off">
+        <.form for={%{}} id="search-form" phx-submit="query" autocomplete="off">
           <div class="grid grid-cols-12 tracking-tighter">
             <div class="col-span-3  ">
               <.input
@@ -122,7 +119,7 @@ defmodule FullCircleWeb.ReportLive.Aging do
                 <%= gettext("Query") %>
               </.button>
               <.link
-                :if={@objects_count > 0}
+                :if={@result.ok? and Enum.count(@result.result) > 0}
                 navigate={
                   ~p"/companies/#{@current_company.id}/csv?report=aging&rep=#{@search.report}&tdate=#{@search.t_date}&days=#{@search.days}"
                 }
@@ -135,49 +132,52 @@ defmodule FullCircleWeb.ReportLive.Aging do
           </div>
         </.form>
       </div>
+      <.async_html result={@result}>
+        <:result_html>
+          <%= FullCircleWeb.CsvHtml.headers(
+            [
+              gettext("Account"),
+              "#{@days} days",
+              "#{@days * 2} days",
+              "#{@days * 3} days",
+              "#{@days * 4} days",
+              "#{@days * 5} days",
+              gettext("Total")
+            ],
+            "font-medium flex flex-row text-center tracking-tighter mb-1",
+            ["28%", "12%", "12%", "12%", "12%", "12%", "12%"],
+            "border rounded bg-gray-200 border-gray-400 px-2 py-1",
+            assigns
+          ) %>
 
-      <%= FullCircleWeb.CsvHtml.headers(
-        [
-          gettext("Account"),
-          "#{@days} days",
-          "#{@days * 2} days",
-          "#{@days * 3} days",
-          "#{@days * 4} days",
-          "#{@days * 5} days",
-          gettext("Total")
-        ],
-        "font-medium flex flex-row text-center tracking-tighter mb-1",
-        ["28%", "12%", "12%", "12%", "12%", "12%", "12%"],
-        "border rounded bg-gray-200 border-gray-400 px-2 py-1",
-        assigns
-      ) %>
-
-      <%= FullCircleWeb.CsvHtml.data(
-        [
-          :contact_name,
-          :p1,
-          :p2,
-          :p3,
-          :p4,
-          :p5,
-          :total
-        ],
-        @objects,
-        [
-          nil,
-          &Number.Delimit.number_to_delimited/1,
-          &Number.Delimit.number_to_delimited/1,
-          &Number.Delimit.number_to_delimited/1,
-          &Number.Delimit.number_to_delimited/1,
-          &Number.Delimit.number_to_delimited/1,
-          &Number.Delimit.number_to_delimited/1
-        ],
-        "flex flex-row text-center tracking-tighter max-h-20",
-        ["28%", "12%", "12%", "12%", "12%", "12%", "12%"],
-        "border rounded bg-blue-200 border-blue-400 px-2 py-1",
-        assigns
-      ) %>
-      <div class="mb-10" />
+          <%= FullCircleWeb.CsvHtml.data(
+            [
+              :contact_name,
+              :p1,
+              :p2,
+              :p3,
+              :p4,
+              :p5,
+              :total
+            ],
+            @result.result,
+            [
+              nil,
+              &Number.Delimit.number_to_delimited/1,
+              &Number.Delimit.number_to_delimited/1,
+              &Number.Delimit.number_to_delimited/1,
+              &Number.Delimit.number_to_delimited/1,
+              &Number.Delimit.number_to_delimited/1,
+              &Number.Delimit.number_to_delimited/1
+            ],
+            "flex flex-row text-center tracking-tighter max-h-20",
+            ["28%", "12%", "12%", "12%", "12%", "12%", "12%"],
+            "border rounded bg-blue-200 border-blue-400 px-2 py-1",
+            assigns
+          ) %>
+          <div class="mb-10" />
+        </:result_html>
+      </.async_html>
     </div>
     """
   end

@@ -15,8 +15,8 @@ defmodule FullCircleWeb.ReportLive.HouseFeed do
     params = params["search"]
 
     report = params["report"] || ""
-    month = (params["month"] || "#{Timex.today().month}") |> String.to_integer()
-    year = (params["year"] || "#{Timex.today().year}") |> String.to_integer()
+    month = params["month"] || "#{Timex.today().month}"
+    year = params["year"] || "#{Timex.today().year}"
 
     {:noreply,
      socket
@@ -126,32 +126,29 @@ defmodule FullCircleWeb.ReportLive.HouseFeed do
           </div>
         </.form>
       </div>
-      <%= if @result.loading do %>
-        <div class="bg-green-200 border-green-500 text-2xl text-center">Loading...</div>
-      <% end %>
-      <%= if @result.failed do %>
-        <div class="bg-rose-200 border-rose-500 text-2xl text-center"><%= "ERROR!!" %></div>
-      <% end %>
-      <%= if @result.ok? do %>
-        <% {col, row} = @result.result %>
-        <div :if={Enum.count(col) > 0} class="flex flex-row">
-          <%= for h <- col do %>
-            <div class="w-[4%] text-center font-bold border rounded bg-gray-200 border-gray-500">
-              <%= h %>
-            </div>
-          <% end %>
-        </div>
 
-        <%= for r <- row do %>
-          <div class="flex flex-row">
-            <%= for c <- r do %>
-              <div class="w-[4%] text-center border rounded bg-blue-200 border-blue-500">
-                <%= c %>
+      <.async_html result={@result}>
+        <:result_html>
+          <% {col, row} = @result.result %>
+          <div :if={Enum.count(col) > 0} class="flex flex-row">
+            <%= for h <- col do %>
+              <div class="w-[4%] text-center font-bold border rounded bg-gray-200 border-gray-500">
+                <%= h %>
               </div>
             <% end %>
           </div>
-        <% end %>
-      <% end %>
+
+          <%= for r <- row do %>
+            <div class="flex flex-row">
+              <%= for c <- r do %>
+                <div class="w-[4%] text-center border rounded bg-blue-200 border-blue-500">
+                  <%= c %>
+                </div>
+              <% end %>
+            </div>
+          <% end %>
+        </:result_html>
+      </.async_html>
     </div>
     """
   end

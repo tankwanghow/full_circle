@@ -51,6 +51,7 @@ defmodule FullCircleWeb.ReportLive.HouseFeedPrint do
   defp details(assigns, row) do
     assigns =
       assigns |> assign(:row, row)
+
     ~H"""
     <div class="details">
       <%= for c <- @row do %>

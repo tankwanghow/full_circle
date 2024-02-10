@@ -971,16 +971,6 @@ defmodule FullCircleWeb.CoreComponents do
     """
   end
 
-  attr(:type, :any)
-  attr(:current_company, :any)
-  attr(:rest, :global)
-
-  def doc_index(assigns) do
-    ~H"""
-
-    """
-  end
-
   attr(:doc_obj, :any)
   attr(:current_role, :any)
   attr(:current_company, :any)
@@ -999,6 +989,25 @@ defmodule FullCircleWeb.CoreComponents do
       </.link>
     <% else %>
       <%= @doc_obj.doc_no %>
+    <% end %>
+    """
+  end
+
+  attr(:result, :any)
+  slot(:result_html, required: true)
+
+  def async_html(assigns) do
+    ~H"""
+    <%= if @result.loading do %>
+      <div class="bg-green-200 border-green-500 text-2xl text-center">
+        <%= gettext("Loading...") %><.icon name="hero-arrow-path" class="ml-1 h-3 w-3 animate-spin" />
+      </div>
+    <% end %>
+    <%= if @result.failed do %>
+      <div class="bg-rose-200 border-rose-500 text-2xl text-center"><%= "ERROR!!" %></div>
+    <% end %>
+    <%= if @result.ok? do %>
+      <%= render_slot(@result_html) %>
     <% end %>
     """
   end
