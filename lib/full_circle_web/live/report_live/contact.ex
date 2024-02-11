@@ -53,37 +53,6 @@ defmodule FullCircleWeb.ReportLive.Contact do
   end
 
   defp filter_transactions(socket, name, f_date, t_date) do
-    # objects =
-    #   if String.trim(name) == "" or f_date == "" or t_date == "" do
-    #     []
-    #   else
-    #     contact =
-    #       Accounting.get_contact_by_name(
-    #         name,
-    #         socket.assigns.current_company,
-    #         socket.assigns.current_user
-    #       )
-
-    #     if !is_nil(contact) do
-    #       Reporting.contact_transactions(
-    #         contact,
-    #         Date.from_iso8601!(f_date),
-    #         Date.from_iso8601!(t_date),
-    #         socket.assigns.current_company
-    #       )
-    #     else
-    #       []
-    #     end
-    #   end
-
-    # socket
-    # |> assign(objects: objects)
-    # |> assign(objects_count: Enum.count(objects))
-    # |> assign(
-    #   objects_balance:
-    #     Enum.reduce(objects, Decimal.new("0"), fn obj, acc -> Decimal.add(obj.amount, acc) end)
-    # )
-
     socket
     |> assign_async(
       :result,

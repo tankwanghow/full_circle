@@ -20,9 +20,9 @@ defmodule FullCircleWeb.ReportLive.TransportCommission do
 
     f_date =
       params["f_date"] ||
-        Timex.shift(Timex.today(), months: -1) |> Timex.format!("%Y-%m-%d", :strftime)
+        Timex.shift(Timex.today(), months: -1)
 
-    t_date = params["t_date"] || Timex.today() |> Timex.format!("%Y-%m-%d", :strftime)
+    t_date = params["t_date"] || Timex.today()
 
     {:noreply,
      socket
@@ -30,11 +30,6 @@ defmodule FullCircleWeb.ReportLive.TransportCommission do
      |> query(tags, f_date, t_date)
      |> assign(can_print: false)
      |> assign(selected: [])}
-  end
-
-  @impl true
-  def handle_event("changed", _, socket) do
-    {:noreply, socket |> assign(objects: [])}
   end
 
   @impl true
@@ -64,16 +59,26 @@ defmodule FullCircleWeb.ReportLive.TransportCommission do
   end
 
   defp query(socket, tags, f_date, t_date) do
-    objects =
-      if tags == "" or f_date == "" or t_date == "" do
-        []
-      else
-        TaggedBill.transport_commission(tags, f_date, t_date, socket.assigns.current_company.id)
-      end
-
     socket
-    |> assign(objects: objects)
-    |> assign(objects_count: Enum.count(objects))
+    |> assign_async(
+      :result,
+      fn ->
+        {:ok,
+         %{
+           result:
+             if tags == "" or f_date == "" or t_date == "" do
+               []
+             else
+               TaggedBill.transport_commission(
+                 tags,
+                 f_date,
+                 t_date,
+                 socket.assigns.current_company.id
+               )
+             end
+         }}
+      end
+    )
   end
 
   @impl true
@@ -82,14 +87,7 @@ defmodule FullCircleWeb.ReportLive.TransportCommission do
     <div class="w-11/12 mx-auto mb-8">
       <p class="text-2xl text-center font-medium"><%= "#{@page_title}" %></p>
       <div class="border rounded bg-amber-200 text-center p-2">
-        <.form
-          for={%{}}
-          id="search-form"
-          phx-submit="query"
-          phx-change="changed"
-          autocomplete="off"
-          class="w-9/12 mx-auto"
-        >
+        <.form for={%{}} id="search-form" phx-submit="query" autocomplete="off" class="w-9/12 mx-auto">
           <div class="grid grid-cols-12 tracking-tighter">
             <div class="col-span-6">
               <.input
@@ -124,7 +122,7 @@ defmodule FullCircleWeb.ReportLive.TransportCommission do
                 <%= gettext("Query") %>
               </.button>
               <.link
-                :if={@objects_count > 0}
+                :if={@result.ok? and Enum.count(@result.result) > 0}
                 navigate={
                   ~p"/companies/#{@current_company.id}/csv?report=tagged_bills&tags=#{@search.tags}&fdate=#{@search.f_date}&tdate=#{@search.t_date}"
                 }
@@ -137,74 +135,80 @@ defmodule FullCircleWeb.ReportLive.TransportCommission do
           </div>
         </.form>
 
-        <%= FullCircleWeb.CsvHtml.headers(
-          [
-            gettext("Date"),
-            gettext("DocNo"),
-            gettext("Contact"),
-            gettext("Goods"),
-            gettext("Quantity"),
-            gettext("Unit"),
-            gettext("LTags"),
-            gettext("LWTag"),
-            gettext("Wages"),
-            gettext("DTags"),
-            gettext("DWTag"),
-            gettext("Wages")
-          ],
-          "font-medium flex flex-row text-center tracking-tighter mb-1",
-          ["5%", "6%", "13%", "18%", "7%", "5%", "8%", "9%", "6%", "8%", "9%", "6%"],
-          "border rounded bg-gray-200 border-gray-400 px-2 py-1",
-          assigns
-        ) %>
+        <.async_html result={@result}>
+          <:result_html>
+            <%= FullCircleWeb.CsvHtml.headers(
+              [
+                gettext("Date"),
+                gettext("DocNo"),
+                gettext("Contact"),
+                gettext("Goods"),
+                gettext("Quantity"),
+                gettext("Unit"),
+                gettext("LTags"),
+                gettext("LWTag"),
+                gettext("Wages"),
+                gettext("DTags"),
+                gettext("DWTag"),
+                gettext("Wages")
+              ],
+              "font-medium flex flex-row text-center tracking-tighter mb-1",
+              ["5%", "6%", "13%", "18%", "7%", "5%", "8%", "9%", "6%", "8%", "9%", "6%"],
+              "border rounded bg-gray-200 border-gray-400 px-2 py-1",
+              assigns
+            ) %>
 
-        <%= FullCircleWeb.CsvHtml.data(
-          [
-            :invoice_date,
-            :doc_no,
-            :contact,
-            :good_names,
-            :quantity,
-            :unit,
-            :loader_tags,
-            :loader_wages_tags,
-            :load_wages,
-            :delivery_man_tags,
-            :delivery_wages_tags,
-            :delivery_wages
-          ],
-          @objects,
-          [
-            nil,
-            nil,
-            nil,
-            nil,
-            fn n -> Number.Delimit.number_to_delimited(n, precision: 2) end,
-            nil,
-            nil,
-            nil,
-            nil,
-            nil,
-            nil,
-            nil
-          ],
-          "flex flex-row text-center tracking-tighter overflow-clip max-h-8",
-          ["5%", "6%", "13%", "18%", "7%", "5%", "8%", "9%", "6%", "8%", "9%", "6%"],
-          "border rounded bg-blue-200 border-blue-400 px-2 py-1",
-          assigns
-        ) %>
-        <div class="flex h-8 font-bold">
-          <div class="w-[71%] border rounded bg-green-200 border-green-400 px-2 py-1"></div>
-          <div class="w-[6%] border rounded bg-green-200 border-green-400 px-2 py-1">
-            <%= [0.0 | Enum.map(@objects, fn x -> x.load_wages end)] |> Enum.sum() |> Float.round(2) %>
-          </div>
-          <div class="w-[17%] border rounded bg-green-200 border-green-400 px-2 py-1"></div>
-          <div class="w-[6%] border rounded bg-green-200 border-green-400 px-2 py-1">
-            <%= [0.0 | Enum.map(@objects, fn x -> x.delivery_wages end)]
-            |> Enum.sum()
-            |> Float.round(2) %>
-          </div>
-        </div>
+            <%= FullCircleWeb.CsvHtml.data(
+              [
+                :invoice_date,
+                :doc_no,
+                :contact,
+                :good_names,
+                :quantity,
+                :unit,
+                :loader_tags,
+                :loader_wages_tags,
+                :load_wages,
+                :delivery_man_tags,
+                :delivery_wages_tags,
+                :delivery_wages
+              ],
+              @result.result,
+              [
+                nil,
+                nil,
+                nil,
+                nil,
+                fn n -> Number.Delimit.number_to_delimited(n, precision: 2) end,
+                nil,
+                nil,
+                nil,
+                nil,
+                nil,
+                nil,
+                nil
+              ],
+              "flex flex-row text-center tracking-tighter overflow-clip max-h-8",
+              ["5%", "6%", "13%", "18%", "7%", "5%", "8%", "9%", "6%", "8%", "9%", "6%"],
+              "border rounded bg-blue-200 border-blue-400 px-2 py-1",
+              assigns
+            ) %>
+            <div class="flex h-8 font-bold">
+              <div class="w-[71%] border rounded bg-green-200 border-green-400 px-2 py-1"></div>
+              <div class="w-[6%] border rounded bg-green-200 border-green-400 px-2 py-1">
+                <%= [0.0 | Enum.map(@result.result, fn x -> x.load_wages end)]
+                |> Enum.sum()
+                |> Float.round(2) %>
+              </div>
+              <div class="w-[17%] border rounded bg-green-200 border-green-400 px-2 py-1"></div>
+              <div class="w-[6%] border rounded bg-green-200 border-green-400 px-2 py-1">
+                <%= [0.0 | Enum.map(@result.result, fn x -> x.delivery_wages end)]
+                |> Enum.sum()
+                |> Float.round(2) %>
+              </div>
+            </div>
+          </:result_html>
+        </.async_html>
       </div>
     </div>
     """

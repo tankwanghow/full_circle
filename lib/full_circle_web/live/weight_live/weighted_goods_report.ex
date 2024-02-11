@@ -12,8 +12,8 @@ defmodule FullCircleWeb.WeighingLive.GoodsReport do
   def handle_params(params, _uri, socket) do
     params = params["search"]
     glist = params["glist"] || ""
-    f_date = params["f_date"] || Timex.today() |> Timex.format!("%Y-%m-01", :strftime)
-    t_date = params["t_date"] || Timex.today() |> Timex.format!("%Y-%m-%d", :strftime)
+    f_date = params["f_date"] || Timex.today()
+    t_date = params["t_date"] || Timex.today()
 
     {:noreply,
      socket
@@ -48,33 +48,27 @@ defmodule FullCircleWeb.WeighingLive.GoodsReport do
      |> push_navigate(to: url)}
   end
 
-  @impl true
-  def handle_event("changed", _, socket) do
-    {:noreply,
-     socket
-     |> assign(objects_count: 0)
-     |> assign(objects: [])}
-  end
-
   defp filter_objects(socket, glist, f_date, t_date) do
-    objects =
-      if t_date == "" or f_date == "" do
-        []
-      else
-        t_date = t_date |> Timex.parse!("{YYYY}-{0M}-{0D}") |> NaiveDateTime.to_date()
-        f_date = f_date |> Timex.parse!("{YYYY}-{0M}-{0D}") |> NaiveDateTime.to_date()
-
-        WeightBridge.goods_report(
-          glist,
-          f_date,
-          t_date,
-          socket.assigns.current_company.id
-        )
-      end
-
     socket
-    |> assign(objects_count: Enum.count(objects))
-    |> assign(objects: objects)
+    |> assign_async(
+      :result,
+      fn ->
+        {:ok,
+         %{
+           result:
+             if t_date == "" or f_date == "" do
+               []
+             else
+               WeightBridge.goods_report(
+                 glist,
+                 f_date,
+                 t_date,
+                 socket.assigns.current_company.id
+               )
+             end
+         }}
+      end
+    )
   end
 
   @impl true
@@ -83,7 +77,7 @@ defmodule FullCircleWeb.WeighingLive.GoodsReport do
     <div class="w-8/12 mx-auto">
       <p class="text-2xl text-center font-medium"><%= "#{@page_title}" %></p>
       <div class="border rounded bg-purple-200 text-center p-2">
-        <.form for={%{}} id="search-form" phx-change="changed" phx-submit="query" autocomplete="off">
+        <.form for={%{}} id="search-form" phx-submit="query" autocomplete="off">
           <div class="grid grid-cols-12 tracking-tighter">
             <div class="col-span-5 grow shrink">
               <label class="">Search Terms</label>
@@ -118,7 +112,7 @@ defmodule FullCircleWeb.WeighingLive.GoodsReport do
                 <%= gettext("Query") %>
               </.button>
               <.link
-                :if={@objects_count > 0}
+                :if={@result.ok? and Enum.count(@result.result) > 0}
                 navigate={
                   ~p"/companies/#{@current_company.id}/csv?report=weigoodrepo&glist=#{@search.glist}&fdate=#{@search.f_date}&tdate=#{@search.t_date}"
                 }
@@ -132,35 +126,39 @@ defmodule FullCircleWeb.WeighingLive.GoodsReport do
         </.form>
       </div>
 
-      <%= FullCircleWeb.CsvHtml.headers(
-        [
-          gettext("Month"),
-          gettext("Year"),
-          gettext("Goods"),
-          gettext("Amount"),
-          gettext("Unit")
-        ],
-        "font-medium flex flex-row text-center tracking-tighter mb-1",
-        ["20%", "20%", "20%", "20%", "20%"],
-        "border rounded bg-gray-200 border-gray-400 px-2 py-1",
-        assigns
-      ) %>
+      <.async_html result={@result}>
+        <:result_html>
+          <%= FullCircleWeb.CsvHtml.headers(
+            [
+              gettext("Month"),
+              gettext("Year"),
+              gettext("Goods"),
+              gettext("Amount"),
+              gettext("Unit")
+            ],
+            "font-medium flex flex-row text-center tracking-tighter mb-1",
+            ["20%", "20%", "20%", "20%", "20%"],
+            "border rounded bg-gray-200 border-gray-400 px-2 py-1",
+            assigns
+          ) %>
 
-      <%= FullCircleWeb.CsvHtml.data(
-        [
-          :month,
-          :year,
-          :good_name,
-          :total,
-          :unit
-        ],
-        @objects,
-        [nil, nil, nil, fn n -> Number.Delimit.number_to_delimited(n, precision: 0) end, nil],
-        "flex flex-row text-center tracking-tighter max-h-20",
-        ["20%", "20%", "20%", "20%", "20%"],
-        "border rounded bg-blue-200 border-blue-400 px-2 py-1",
-        assigns
-      ) %>
+          <%= FullCircleWeb.CsvHtml.data(
+            [
+              :month,
+              :year,
+              :good_name,
+              :total,
+              :unit
+            ],
+            @result.result,
+            [nil, nil, nil, fn n -> Number.Delimit.number_to_delimited(n, precision: 0) end, nil],
+            "flex flex-row text-center tracking-tighter max-h-20",
+            ["20%", "20%", "20%", "20%", "20%"],
+            "border rounded bg-blue-200 border-blue-400 px-2 py-1",
+            assigns
+          ) %>
+        </:result_html>
+      </.async_html>
     </div>
     """
   end

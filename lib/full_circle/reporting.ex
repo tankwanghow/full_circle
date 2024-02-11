@@ -47,10 +47,10 @@ defmodule FullCircle.Reporting do
             where: is_nil(rec.return_id)
 
         flag == "Can-Be-Return" ->
+          [y, m, d] = ddate |> String.split("-") |> Enum.map(fn x -> String.to_integer(x) end)
+
           ddate =
-            ddate
-            |> Timex.parse!("{YYYY}-{0M}-{0D}")
-            |> NaiveDateTime.to_date()
+            Date.new!(y, m, d)
             |> Timex.shift(days: -14)
 
           from rec in qry,

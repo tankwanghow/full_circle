@@ -15,7 +15,7 @@ defmodule FullCircleWeb.ReportLive.Aging do
     params = params["search"]
     report = params["report"]
     days = params["days"] || "15"
-    t_date = params["t_date"] || Timex.today() |> Timex.format!("%Y-%m-%d", :strftime)
+    t_date = params["t_date"] || Timex.today()
 
     {:noreply,
      socket
@@ -40,7 +40,6 @@ defmodule FullCircleWeb.ReportLive.Aging do
   end
 
   defp filter_transactions(socket, report, t_date, days) do
-    t_date = t_date |> Timex.parse!("{YYYY}-{0M}-{0D}") |> NaiveDateTime.to_date()
     days = String.to_integer(days)
 
     socket

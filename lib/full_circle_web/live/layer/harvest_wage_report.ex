@@ -46,32 +46,29 @@ defmodule FullCircleWeb.LayerLive.HarvestWageReport do
      |> push_navigate(to: url)}
   end
 
-  @impl true
-  def handle_event("changed", _, socket) do
-    {:noreply,
-     socket
-     |> assign(objects_count: 0)
-     |> assign(objects: [])}
-  end
-
   defp filter_transactions(socket, f_date, t_date) do
-    objects =
-      if t_date == "" or f_date == "" do
-        []
-      else
-        t_date = t_date |> Timex.parse!("{YYYY}-{0M}-{0D}") |> NaiveDateTime.to_date()
-        f_date = f_date |> Timex.parse!("{YYYY}-{0M}-{0D}") |> NaiveDateTime.to_date()
-
-        Layer.harvest_wage_report(
-          f_date,
-          t_date,
-          socket.assigns.current_company.id
-        )
-      end
-
     socket
-    |> assign(objects_count: Enum.count(objects))
-    |> assign(objects: objects)
+    |> assign_async(
+      :result,
+      fn ->
+        {:ok,
+         %{
+           result:
+             if t_date == "" or f_date == "" do
+               []
+             else
+               t_date = t_date |> Timex.parse!("{YYYY}-{0M}-{0D}") |> NaiveDateTime.to_date()
+               f_date = f_date |> Timex.parse!("{YYYY}-{0M}-{0D}") |> NaiveDateTime.to_date()
+
+               Layer.harvest_wage_report(
+                 f_date,
+                 t_date,
+                 socket.assigns.current_company.id
+               )
+             end
+         }}
+      end
+    )
   end
 
   @impl true
@@ -80,7 +77,7 @@ defmodule FullCircleWeb.LayerLive.HarvestWageReport do
     <div class="w-6/12 mx-auto">
       <p class="text-2xl text-center font-medium"><%= "#{@page_title}" %></p>
       <div class="border rounded bg-purple-200 text-center p-2">
-        <.form for={%{}} id="search-form" phx-change="changed" phx-submit="query" autocomplete="off">
+        <.form for={%{}} id="search-form" phx-submit="query" autocomplete="off">
           <div class="grid grid-cols-12 tracking-tighter">
             <div class="col-span-2">
               <.input
@@ -105,7 +102,7 @@ defmodule FullCircleWeb.LayerLive.HarvestWageReport do
                 <%= gettext("Query") %>
               </.button>
               <.link
-                :if={@objects_count > 0}
+                :if={@result.ok? and Enum.count(@result.result) > 0}
                 class="blue button mr-1"
                 navigate={
                   ~p"/companies/#{@current_company.id}/print/harvwagrepo?fdate=#{@search.f_date}&tdate=#{@search.t_date}"
@@ -116,7 +113,7 @@ defmodule FullCircleWeb.LayerLive.HarvestWageReport do
               </.link>
 
               <.link
-                :if={@objects_count > 0}
+                :if={@result.ok? and Enum.count(@result.result) > 0}
                 navigate={
                   ~p"/companies/#{@current_company.id}/csv?report=harvwagrepo&fdate=#{@search.f_date}&tdate=#{@search.t_date}"
                 }
@@ -129,42 +126,45 @@ defmodule FullCircleWeb.LayerLive.HarvestWageReport do
           </div>
         </.form>
       </div>
+      <.async_html result={@result}>
+        <:result_html>
+          <%= FullCircleWeb.CsvHtml.headers(
+            [
+              gettext("Date"),
+              gettext("House"),
+              gettext("Collector"),
+              gettext("Production"),
+              gettext("Wages")
+            ],
+            "font-medium flex flex-row text-center tracking-tighter mb-1",
+            ["18%", "18%", "28%", "18%", "18%"],
+            "border rounded bg-gray-200 border-gray-400 px-2 py-1",
+            assigns
+          ) %>
 
-      <%= FullCircleWeb.CsvHtml.headers(
-        [
-          gettext("Date"),
-          gettext("House"),
-          gettext("Collector"),
-          gettext("Production"),
-          gettext("Wages")
-        ],
-        "font-medium flex flex-row text-center tracking-tighter mb-1",
-        ["18%", "18%", "28%", "18%", "18%"],
-        "border rounded bg-gray-200 border-gray-400 px-2 py-1",
-        assigns
-      ) %>
-
-      <%= FullCircleWeb.CsvHtml.data(
-        [
-          :har_date,
-          :house_no,
-          :employee,
-          :prod,
-          :wages
-        ],
-        @objects,
-        [
-          nil,
-          nil,
-          nil,
-          fn n -> Number.Delimit.number_to_delimited(n, precision: 0) end,
-          &Number.Delimit.number_to_delimited/1
-        ],
-        "flex flex-row text-center tracking-tighter max-h-20",
-        ["18%", "18%", "28%", "18%", "18%"],
-        "border rounded bg-blue-200 border-blue-400 px-2 py-1",
-        assigns
-      ) %>
+          <%= FullCircleWeb.CsvHtml.data(
+            [
+              :har_date,
+              :house_no,
+              :employee,
+              :prod,
+              :wages
+            ],
+            @result.result,
+            [
+              nil,
+              nil,
+              nil,
+              fn n -> Number.Delimit.number_to_delimited(n, precision: 0) end,
+              &Number.Delimit.number_to_delimited/1
+            ],
+            "flex flex-row text-center tracking-tighter max-h-20",
+            ["18%", "18%", "28%", "18%", "18%"],
+            "border rounded bg-blue-200 border-blue-400 px-2 py-1",
+            assigns
+          ) %>
+        </:result_html>
+      </.async_html>
     </div>
     """
   end
