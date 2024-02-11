@@ -24,9 +24,10 @@ defmodule FullCircleWeb.UserLive.Index do
           phx-change="update_role"
           autocomplete="off"
         >
-          <div class="flex border-b-2 border-indigo-400 py-3 bg-indigo-100 text-center">
-            <div class="w-[10%]">
+          <div class="flex gap-1 border-b-2 border-indigo-400 py-3 bg-indigo-100 text-center">
+            <div class="w-[15%]">
               <.delete_confirm_modal
+                :if={@current_user.id != u.id}
                 id={"delete-object_#{u.id}"}
                 msg1={gettext("Remove User from Company.") <> " #{u.email}"}
                 msg2={gettext("Cannot be recover.")}
@@ -37,7 +38,7 @@ defmodule FullCircleWeb.UserLive.Index do
               />
             </div>
 
-            <div id={"new_user_password_#{u.id}"} class="w-[20%]">
+            <div id={"new_user_password_#{u.id}"} class="w-[40%]">
               <%= if u.email != @current_user.email  do %>
                 <%= if @new_password_id == u.id do %>
                   <div>Password reset to</div>
@@ -55,12 +56,14 @@ defmodule FullCircleWeb.UserLive.Index do
               <% end %>
             </div>
 
-            <div class="flex gap-1 w-[70%]">
-              <div class="email font-mono font-bold"><%= u.email %> <%= gettext("is") %></div>
+            <div class="flex gap-1 w-[45%]">
+              <div class="email font-mono font-bold w-[55%]">
+                <%= u.email %> <%= gettext("is") %>
+              </div>
               <%= if u.email == @current_user.email do %>
                 <div class="text-amber-700"><%= u.role %></div>
               <% else %>
-                <div class="-mt-2 w-[30%]">
+                <div class="-mt-2 w-[45%]">
                   <.input type="hidden" field={f[:id]} value={u.id} />
                   <.input
                     type="select"

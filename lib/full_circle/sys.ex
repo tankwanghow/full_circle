@@ -535,7 +535,7 @@ defmodule FullCircle.Sys do
   end
 
   def delete_user_from_company(com, user, admin) do
-    case can?(admin, :delete_user_from_company, com) do
+    case can?(admin, :delete_user_from_company, com) and admin != user do
       true ->
         uc = get_company_user(com.id, user.id)
 
