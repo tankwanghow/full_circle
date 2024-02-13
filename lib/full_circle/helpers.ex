@@ -175,19 +175,22 @@ defmodule FullCircle.Helpers do
   end
 
   def get_gapless_doc_id(multi, name, doc, doc_code, com, extra_code \\ nil) do
-    Ecto.Multi.run(multi, name, fn repo, _ ->
-      gap =
-        repo.one(
-          from gap in FullCircle.Sys.GaplessDocId,
-            where: gap.company_id == ^com.id,
-            where: gap.doc_type == ^doc,
-            select: gap
-        )
-
-      {:ok, gap} =
-        repo.update(Ecto.Changeset.change(gap, current: gap.current + 1), returning: [:current])
-
-      {:ok, gen_doc_id(gap.current, doc_code, extra_code)}
+    multi
+    |> Ecto.Multi.one(
+      :gap,
+      from(gap in FullCircle.Sys.GaplessDocId,
+        where: gap.company_id == ^com.id,
+        where: gap.doc_type == ^doc,
+        select: gap
+      )
+    )
+    |> Ecto.Multi.update(
+      :gap_current,
+      fn %{gap: gap} -> Ecto.Changeset.change(gap, current: gap.current + 1) end,
+      returning: true
+    )
+    |> Ecto.Multi.run(name, fn _, %{gap_current: gap_current} ->
+      {:ok, gen_doc_id(gap_current.current, doc_code, extra_code)}
     end)
   end
 
