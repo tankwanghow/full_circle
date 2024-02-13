@@ -12,8 +12,12 @@ defmodule FullCircleWeb.WeighingLive.GoodsReport do
   def handle_params(params, _uri, socket) do
     params = params["search"]
     glist = params["glist"] || ""
-    f_date = params["f_date"] || Timex.today()
-    t_date = params["t_date"] || Timex.today()
+
+    f_date =
+      params["f_date"] ||
+        Timex.today() |> Timex.shift(months: -1) |> Timex.format!("%Y-%m-%d", :strftime)
+
+    t_date = params["t_date"] || Timex.today() |> Timex.format!("%Y-%m-%d", :strftime)
 
     {:noreply,
      socket
