@@ -5,7 +5,7 @@ defmodule FullCircleWeb.ReportLive.Statement.Print do
 
   @impl true
   def mount(params, _session, socket) do
-    detail_body_height = 190
+    detail_body_height = 185
     detail_height = 6
     chunk = (detail_body_height / detail_height) |> floor
 
@@ -204,7 +204,7 @@ defmodule FullCircleWeb.ReportLive.Statement.Print do
         @page { size: A4; margin: 0mm; }
         body { width: 210mm; height: 290mm; margin: 0mm; }
         html { margin: 0mm; }
-        .page { padding: 5mm; page-break-after: always;} }
+        .page { padding-left: 5mm; padding-right: 5mm; page-break-after: always;} }
 
       .doctype { float: right; font-weight: bold; font-size: 1.5rem; }
 
