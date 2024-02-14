@@ -17,12 +17,8 @@ defmodule FullCircleWeb.ReportLive.TransportCommission do
     params = params["search"]
 
     tags = params["tags"] || ""
-
-    f_date =
-      params["f_date"] ||
-        Timex.shift(Timex.today(), months: -1)
-
-    t_date = params["t_date"] || Timex.today()
+    f_date = params["f_date"]
+    t_date = params["t_date"]
 
     {:noreply,
      socket
@@ -153,7 +149,7 @@ defmodule FullCircleWeb.ReportLive.TransportCommission do
                 gettext("Wages")
               ],
               "font-medium flex flex-row text-center tracking-tighter mb-1",
-              ["5%", "6%", "13%", "18%", "7%", "5%", "8%", "9%", "6%", "8%", "9%", "6%"],
+              ["6%", "7%", "13%", "18%", "7%", "5%", "8%", "9%", "5%", "8%", "9%", "5%"],
               "border rounded bg-gray-200 border-gray-400 px-2 py-1",
               assigns
             ) %>
@@ -189,19 +185,19 @@ defmodule FullCircleWeb.ReportLive.TransportCommission do
                 nil
               ],
               "flex flex-row text-center tracking-tighter overflow-clip max-h-8",
-              ["5%", "6%", "13%", "18%", "7%", "5%", "8%", "9%", "6%", "8%", "9%", "6%"],
+              ["6%", "7%", "13%", "18%", "7%", "5%", "8%", "9%", "5%", "8%", "9%", "5%"],
               "border rounded bg-blue-200 border-blue-400 px-2 py-1",
               assigns
             ) %>
             <div class="flex h-8 font-bold">
-              <div class="w-[71%] border rounded bg-green-200 border-green-400 px-2 py-1"></div>
-              <div class="w-[6%] border rounded bg-green-200 border-green-400 px-2 py-1">
+              <div class="w-[73%] border rounded bg-green-200 border-green-400 px-2 py-1"></div>
+              <div class="w-[5%] border rounded bg-green-200 border-green-400 px-2 py-1">
                 <%= [0.0 | Enum.map(@result.result, fn x -> x.load_wages end)]
                 |> Enum.sum()
                 |> Float.round(2) %>
               </div>
               <div class="w-[17%] border rounded bg-green-200 border-green-400 px-2 py-1"></div>
-              <div class="w-[6%] border rounded bg-green-200 border-green-400 px-2 py-1">
+              <div class="w-[5%] border rounded bg-green-200 border-green-400 px-2 py-1">
                 <%= [0.0 | Enum.map(@result.result, fn x -> x.delivery_wages end)]
                 |> Enum.sum()
                 |> Float.round(2) %>

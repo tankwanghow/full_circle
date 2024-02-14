@@ -15,8 +15,8 @@ defmodule FullCircleWeb.ReportLive.EpfSocsoEis do
     params = params["search"]
     report = params["report"]
     code = params["code"]
-    month = (params["month"] || "#{Timex.today().month}") |> String.to_integer()
-    year = (params["year"] || "#{Timex.today().year}") |> String.to_integer()
+    month = params["month"] || Timex.today.month
+    year = params["year"] || Timex.today.year
 
     {:noreply,
      socket
@@ -28,8 +28,9 @@ defmodule FullCircleWeb.ReportLive.EpfSocsoEis do
   def handle_event("changed", _, socket) do
     {:noreply,
      socket
-     |> assign(objects_count: 0)
-     |> assign(objects: [])}
+     |> assign(row: [])
+     |> assign(col: [])
+    }
   end
 
   @impl true
@@ -118,6 +119,10 @@ defmodule FullCircleWeb.ReportLive.EpfSocsoEis do
                 name="search[month]"
                 type="number"
                 id="search_month"
+                min="1"
+                max="12"
+                step="1"
+                required
                 value={@search.month}
               />
             </div>
@@ -127,6 +132,10 @@ defmodule FullCircleWeb.ReportLive.EpfSocsoEis do
                 name="search[year]"
                 type="number"
                 id="search_year"
+                min="2000"
+                max="3000"
+                step="1"
+                required
                 value={@search.year}
               />
             </div>

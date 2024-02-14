@@ -998,17 +998,32 @@ defmodule FullCircleWeb.CoreComponents do
 
   def async_html(assigns) do
     ~H"""
-    <%= if @result.loading do %>
-      <div class="bg-green-200 border-green-500 text-2xl text-center">
-        <%= gettext("Loading...") %><.icon name="hero-arrow-path" class="ml-1 h-3 w-3 animate-spin" />
-      </div>
-    <% end %>
-    <%= if @result.failed do %>
-      <div class="bg-rose-200 border-rose-500 text-2xl text-center"><%= "ERROR!!" %></div>
-    <% end %>
-    <%= if @result.ok? do %>
-      <%= render_slot(@result_html) %>
+    <%= cond do %>
+      <% @result.loading -> %>
+        <div class="bg-green-200 border-green-500 text-2xl text-center p-10 rounded">
+          <%= gettext("Loading...") %><.icon name="hero-arrow-path" class="ml-1 h-3 w-3 animate-spin" />
+        </div>
+      <% @result.failed -> %>
+        <div class="bg-rose-200 border-rose-500 text-2xl text-center p-10 rounded">
+          <%= "ERROR!!" %>
+        </div>
+      <% @result.ok? and @result.result != [] -> %>
+        <%= render_slot(@result_html) %>
+      <% @result.ok? and @result.result == [] and !@result.failed and !@result.loading -> %>
+        <div class="bg-yellow-200 border-yellow-500 text-2xl text-center p-10 rounded">
+          <%= gettext("No Result returned...") %>
+        </div>
+      <% @result.result == "...waiting for action..." -> %>
+        <div class="bg-gray-200 border-gray-500 text-2xl text-center p-10 rounded">
+          <%= gettext("Waiting for action...") %>
+        </div>
+      <% true -> %>
+        <%= inspect(@result) %>
     <% end %>
     """
+  end
+
+  def waiting_for_async_action_map() do
+    %{loading: nil, failed: nil, ok?: false, result: "...waiting for action..."}
   end
 end

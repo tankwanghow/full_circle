@@ -16,8 +16,8 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
 
     contact = params["contact"] || ""
     goods = params["goods"] || ""
-    f_date = params["f_date"] || Timex.shift(Timex.today(), months: -1)
-    t_date = params["t_date"] || Timex.today()
+    f_date = params["f_date"]
+    t_date = params["t_date"]
 
     {:noreply,
      socket

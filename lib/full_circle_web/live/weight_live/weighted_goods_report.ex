@@ -5,25 +5,36 @@ defmodule FullCircleWeb.WeighingLive.GoodsReport do
 
   @impl true
   def mount(_params, _session, socket) do
-    {:ok, socket}
+    {:ok,
+     socket
+     |> assign(result: waiting_for_async_action_map())}
   end
 
   @impl true
   def handle_params(params, _uri, socket) do
     params = params["search"]
     glist = params["glist"] || ""
+    f_date = params["f_date"] || ""
+    t_date = params["t_date"] || ""
 
-    f_date =
-      params["f_date"] ||
-        Timex.today() |> Timex.shift(months: -1) |> Timex.format!("%Y-%m-%d", :strftime)
-
-    t_date = params["t_date"] || Timex.today() |> Timex.format!("%Y-%m-%d", :strftime)
+    socket =
+      socket
+      |> assign(page_title: "Weight Goods Report :- #{f_date} to #{t_date}")
+      |> assign(search: %{glist: glist, f_date: f_date, t_date: t_date})
 
     {:noreply,
+     if t_date == "" or f_date == "" do
+       socket
+     else
+       socket |> filter_objects(glist, f_date, t_date)
+     end}
+  end
+
+  @impl true
+  def handle_event("changed", _, socket) do
+    {:noreply,
      socket
-     |> assign(page_title: "Weight Goods Report :- #{f_date} to #{t_date}")
-     |> assign(search: %{glist: glist, f_date: f_date, t_date: t_date})
-     |> filter_objects(glist, f_date, t_date)}
+     |> assign(result: waiting_for_async_action_map())}
   end
 
   @impl true
@@ -60,16 +71,12 @@ defmodule FullCircleWeb.WeighingLive.GoodsReport do
         {:ok,
          %{
            result:
-             if t_date == "" or f_date == "" do
-               []
-             else
-               WeightBridge.goods_report(
-                 glist,
-                 f_date,
-                 t_date,
-                 socket.assigns.current_company.id
-               )
-             end
+             WeightBridge.goods_report(
+               glist,
+               f_date,
+               t_date,
+               socket.assigns.current_company.id
+             )
          }}
       end
     )
@@ -81,7 +88,7 @@ defmodule FullCircleWeb.WeighingLive.GoodsReport do
     <div class="w-8/12 mx-auto">
       <p class="text-2xl text-center font-medium"><%= "#{@page_title}" %></p>
       <div class="border rounded bg-purple-200 text-center p-2">
-        <.form for={%{}} id="search-form" phx-submit="query" autocomplete="off">
+        <.form for={%{}} id="search-form" phx-change="changed" phx-submit="query" autocomplete="off">
           <div class="grid grid-cols-12 tracking-tighter">
             <div class="col-span-5 grow shrink">
               <label class="">Search Terms</label>

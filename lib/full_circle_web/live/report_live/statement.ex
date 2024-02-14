@@ -21,11 +21,8 @@ defmodule FullCircleWeb.ReportLive.Statement do
 
     gt = params["gt"] || "0.00"
 
-    f_date =
-      params["f_date"] ||
-        Timex.shift(Timex.today(), months: -1) |> Timex.format!("%Y-%m-%d", :strftime)
-
-    t_date = params["t_date"] || Timex.today() |> Timex.format!("%Y-%m-%d", :strftime)
+    f_date = params["f_date"] || ""
+    t_date = params["t_date"] || ""
 
     {:noreply,
      socket
@@ -106,6 +103,7 @@ defmodule FullCircleWeb.ReportLive.Statement do
   end
 
   defp query(socket, gt, f_date, t_date) do
+    IO.inspect({gt , f_date , t_date})
     objects =
       if gt == "" or f_date == "" or t_date == "" do
         []

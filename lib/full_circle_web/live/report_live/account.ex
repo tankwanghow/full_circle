@@ -8,6 +8,7 @@ defmodule FullCircleWeb.ReportLive.Account do
     socket =
       socket
       |> assign(page_title: "Account Transactions")
+      |> assign(result: waiting_for_async_action_map())
 
     {:ok, socket}
   end
@@ -17,13 +18,24 @@ defmodule FullCircleWeb.ReportLive.Account do
     params = params["search"]
 
     name = params["name"] || ""
-    f_date = params["f_date"] || Timex.shift(Timex.today(), months: -1)
-    t_date = params["t_date"] || Timex.today()
+    f_date = params["f_date"] || ""
+    t_date = params["t_date"] || ""
+
+    socket = socket |> assign(search: %{name: name, f_date: f_date, t_date: t_date})
 
     {:noreply,
+     if String.trim(name) == "" or f_date == "" or t_date == "" do
+       socket
+     else
+       socket |> filter_transactions(name, f_date, t_date)
+     end}
+  end
+
+  @impl true
+  def handle_event("changed", _, socket) do
+    {:noreply,
      socket
-     |> assign(search: %{name: name, f_date: f_date, t_date: t_date})
-     |> filter_transactions(name, f_date, t_date)}
+     |> assign(result: waiting_for_async_action_map())}
   end
 
   @impl true
@@ -53,6 +65,13 @@ defmodule FullCircleWeb.ReportLive.Account do
   end
 
   defp filter_transactions(socket, name, f_date, t_date) do
+    account =
+      Accounting.get_account_by_name(
+        name,
+        socket.assigns.current_company,
+        socket.assigns.current_user
+      )
+
     socket
     |> assign_async(
       :result,
@@ -60,26 +79,15 @@ defmodule FullCircleWeb.ReportLive.Account do
         {:ok,
          %{
            result:
-             if String.trim(name) == "" or f_date == "" or t_date == "" do
-               []
+             if !is_nil(account) do
+               Reporting.account_transactions(
+                 account,
+                 Date.from_iso8601!(f_date),
+                 Date.from_iso8601!(t_date),
+                 socket.assigns.current_company
+               )
              else
-               account =
-                 Accounting.get_account_by_name(
-                   name,
-                   socket.assigns.current_company,
-                   socket.assigns.current_user
-                 )
-
-               if !is_nil(account) do
-                 Reporting.account_transactions(
-                   account,
-                   Date.from_iso8601!(f_date),
-                   Date.from_iso8601!(t_date),
-                   socket.assigns.current_company
-                 )
-               else
-                 []
-               end
+               []
              end
          }}
       end
@@ -92,7 +100,7 @@ defmodule FullCircleWeb.ReportLive.Account do
     <div class="w-11/12 mx-auto">
       <p class="text-2xl text-center font-medium"><%= "#{@page_title}" %></p>
       <div class="border rounded bg-purple-200 text-center p-2">
-        <.form for={%{}} id="search-form" phx-submit="query" autocomplete="off">
+        <.form for={%{}} id="search-form" phx-change="changed" phx-submit="query" autocomplete="off">
           <div class="grid grid-cols-12 tracking-tighter">
             <div class="col-span-6">
               <.input

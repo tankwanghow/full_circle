@@ -112,7 +112,7 @@ defmodule FullCircleWeb.ReportLive.Statement.Print do
       </div>
     </div>
     <div class="aging_group">
-      <div class="aging">
+      <div :if={@aging} class="aging">
         <div class="aging_p"><%= @aging.p1 |> Number.Delimit.number_to_delimited() %></div>
         <div class="aging_p"><%= @aging.p2 |> Number.Delimit.number_to_delimited() %></div>
         <div class="aging_p"><%= @aging.p3 |> Number.Delimit.number_to_delimited() %></div>
@@ -122,6 +122,14 @@ defmodule FullCircleWeb.ReportLive.Statement.Print do
           <%= (@aging.p1 + @aging.p2 + @aging.p3 + @aging.p4 + @aging.p5)
           |> Number.Delimit.number_to_delimited() %>
         </div>
+      </div>
+      <div :if={is_nil(@aging)} class="aging">
+        <div class="aging_p">0.00</div>
+        <div class="aging_p">0.00</div>
+        <div class="aging_p">0.00</div>
+        <div class="aging_p">0.00</div>
+        <div class="aging_p">0.00</div>
+        <div class="aging_p total">0.00</div>
       </div>
     </div>
     """

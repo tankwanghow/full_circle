@@ -15,7 +15,7 @@ defmodule FullCircleWeb.ReportLive.Aging do
     params = params["search"]
     report = params["report"]
     days = params["days"] || "15"
-    t_date = params["t_date"] || Timex.today()
+    t_date = params["t_date"] || ""
 
     {:noreply,
      socket

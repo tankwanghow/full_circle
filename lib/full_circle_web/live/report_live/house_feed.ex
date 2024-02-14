@@ -15,8 +15,8 @@ defmodule FullCircleWeb.ReportLive.HouseFeed do
     params = params["search"]
 
     report = params["report"] || ""
-    month = params["month"] || "#{Timex.today().month}"
-    year = params["year"] || "#{Timex.today().year}"
+    month = params["month"]
+    year = params["year"]
 
     {:noreply,
      socket
@@ -95,6 +95,10 @@ defmodule FullCircleWeb.ReportLive.HouseFeed do
                 label={gettext("Month")}
                 name="search[month]"
                 type="number"
+                min="1"
+                max="12"
+                step="1"
+                required
                 id="search_month"
                 value={@search.month}
               />
@@ -104,6 +108,10 @@ defmodule FullCircleWeb.ReportLive.HouseFeed do
                 label={gettext("Year")}
                 name="search[year]"
                 type="number"
+                min="2000"
+                max="3000"
+                step="1"
+                required
                 id="search_year"
                 value={@search.year}
               />
