@@ -277,4 +277,12 @@ defmodule FullCircle.Helpers do
     k = FullCircle.Repo.query!(qry)
     {k.columns, k.rows}
   end
+
+  def remove_field_if_new_flag(attrs, field_name) do
+    if Map.fetch!(attrs, field_name) == "...new..." do
+      Map.delete(attrs, field_name)
+    else
+      attrs
+    end
+  end
 end

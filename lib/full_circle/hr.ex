@@ -660,6 +660,7 @@ defmodule FullCircle.HR do
   end
 
   def update_salary_note(%SalaryNote{} = salary_note, attrs, com, user) do
+    attrs = remove_field_if_new_flag(attrs, "note_no")
     case can?(user, :update_salary_note, com) do
       true ->
         Multi.new()
@@ -897,6 +898,7 @@ defmodule FullCircle.HR do
   end
 
   def update_advance(%Advance{} = advance, attrs, com, user) do
+    attrs = remove_field_if_new_flag(attrs, "slip_no")
     case can?(user, :update_advance, com) do
       true ->
         Multi.new()

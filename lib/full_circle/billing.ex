@@ -353,6 +353,7 @@ defmodule FullCircle.Billing do
   end
 
   def update_invoice(%Invoice{} = invoice, attrs, com, user) do
+    attrs = remove_field_if_new_flag(attrs, "invoice_no")
     case can?(user, :update_invoice, com) do
       true ->
         Multi.new()
@@ -666,6 +667,7 @@ defmodule FullCircle.Billing do
   end
 
   def update_pur_invoice(%PurInvoice{} = pur_invoice, attrs, com, user) do
+    attrs = remove_field_if_new_flag(attrs, "pur_invoice_no")
     case can?(user, :update_pur_invoice, com) do
       true ->
         Multi.new()

@@ -398,6 +398,7 @@ defmodule FullCircle.ReceiveFund do
   end
 
   def update_receipt(%Receipt{} = receipt, attrs, com, user) do
+    attrs = remove_field_if_new_flag(attrs, "receipt_no")
     case can?(user, :update_receipt, com) do
       true ->
         Multi.new()

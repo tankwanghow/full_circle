@@ -359,6 +359,8 @@ defmodule FullCircle.BillPay do
   end
 
   def update_payment(%Payment{} = payment, attrs, com, user) do
+    attrs = remove_field_if_new_flag(attrs, "payment_no")
+
     case can?(user, :update_payment, com) do
       true ->
         Multi.new()

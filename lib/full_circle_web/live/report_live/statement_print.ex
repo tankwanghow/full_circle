@@ -5,7 +5,7 @@ defmodule FullCircleWeb.ReportLive.Statement.Print do
 
   @impl true
   def mount(params, _session, socket) do
-    detail_body_height = 185
+    detail_body_height = 180
     detail_height = 6
     chunk = (detail_body_height / detail_height) |> floor
 

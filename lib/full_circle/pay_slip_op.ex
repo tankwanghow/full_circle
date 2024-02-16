@@ -429,6 +429,7 @@ defmodule FullCircle.PaySlipOp do
   end
 
   def update_pay_slip(%PaySlip{} = ps, attrs, com, user) do
+    attrs = remove_field_if_new_flag(attrs, "slip_no")
     case can?(user, :update_pay_slip, com) do
       true ->
         Multi.new()
