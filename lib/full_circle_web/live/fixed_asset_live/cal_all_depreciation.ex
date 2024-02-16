@@ -4,10 +4,10 @@ defmodule FullCircleWeb.FixedAssetLive.CalAllDepre do
   alias FullCircle.Accounting
 
   @impl true
-  def mount(params, _session, socket) do
+  def mount(_params, _session, socket) do
     socket =
       socket
-      |> assign(terms: params["terms"] || "")
+      |> assign(ddate: Timex.today())
       |> assign(page_title: gettext("Calculate All Fixed Assets Depreciations"))
       |> assign(generated_depreciations: [])
       |> assign(live_action: :new)
@@ -73,16 +73,16 @@ defmodule FullCircleWeb.FixedAssetLive.CalAllDepre do
       </div>
 
       <div class="my-4 border rounded bg-purple-200 p-5 text-center">
-        <.form
-          :let={f}
-          for={%{}}
-          phx-submit="generate_depreciation"
-          autocomplete="off"
-          phx-change="validate"
-        >
-          <span class="font-bold"><%= gettext("Until") %></span>
-          <input type="date" field={f[:ddate]} />
-          <.button disabled={!@valid?}><%= gettext("Generate Depreciations") %></.button>
+        <.form for={%{}} phx-submit="generate_depreciation" autocomplete="off" phx-change="validate">
+          <div class="flex gap-2">
+            <div class="font-bold mt-2"><%= gettext("Until") %></div>
+            <div class="mt-1">
+              <.input name="ddate" type="date" value={@ddate} id="ddate" />
+            </div>
+            <div>
+              <.button disabled={!@valid?}><%= gettext("Generate Depreciations") %></.button>
+            </div>
+          </div>
         </.form>
 
         <div class="font-medium flex flex-row flex-wrap text-center mt-2 tracking-tighter">
