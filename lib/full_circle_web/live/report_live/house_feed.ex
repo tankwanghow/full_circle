@@ -15,8 +15,8 @@ defmodule FullCircleWeb.ReportLive.HouseFeed do
     params = params["search"]
 
     report = params["report"] || ""
-    month = params["month"]
-    year = params["year"]
+    month = params["month"] || ""
+    year = params["year"] || ""
 
     {:noreply,
      socket
