@@ -18,8 +18,8 @@ defmodule FullCircleWeb.ReportLive.HouseFeedPrint do
      |> assign(:cols, cols)
      |> assign(:rows, rows)
      |> assign(page_title: gettext("Print"))
-     |> assign(:month, Date.from_iso8601!(params["month"]))
-     |> assign(:year, Date.from_iso8601!(params["year"]))}
+     |> assign(:month, params["month"])
+     |> assign(:year, params["year"])}
   end
 
   defp fill_data(socket, _name, month, year) do

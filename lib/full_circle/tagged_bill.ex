@@ -9,9 +9,13 @@ defmodule FullCircle.TaggedBill do
     cont = FullCircle.Accounting.get_contact_by_name(contact, %{id: com_id}, nil)
 
     goods_qry =
-      from(gd in FullCircle.Product.Good,
-        where: gd.name in ^good_lst
-      )
+      if good_lst != [""] do
+        from(gd in FullCircle.Product.Good,
+          where: gd.name in ^good_lst
+        )
+      else
+        from(gd in FullCircle.Product.Good)
+      end
 
     inv =
       from(inv in FullCircle.Billing.Invoice,
@@ -93,9 +97,13 @@ defmodule FullCircle.TaggedBill do
     cont = FullCircle.Accounting.get_contact_by_name(contact, %{id: com_id}, nil)
 
     goods_qry =
-      from(gd in FullCircle.Product.Good,
-        where: gd.name in ^good_lst
-      )
+      if good_lst != [""] do
+        from(gd in FullCircle.Product.Good,
+          where: gd.name in ^good_lst
+        )
+      else
+        from(gd in FullCircle.Product.Good)
+      end
 
     inv =
       from(inv in FullCircle.Billing.Invoice,
