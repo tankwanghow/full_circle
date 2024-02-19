@@ -14,6 +14,7 @@ defmodule FullCircle.Accounting.FixedAsset do
     field(:pur_date, :date)
     field(:pur_price, :decimal)
     field(:residual_value, :decimal)
+    field(:status, :string, default: "Active")
 
     belongs_to(:company, FullCircle.Sys.Company)
     belongs_to(:asset_ac, FullCircle.Accounting.Account, foreign_key: :asset_ac_id)
@@ -52,7 +53,8 @@ defmodule FullCircle.Accounting.FixedAsset do
       :depre_ac_name,
       :cume_depre_ac_name,
       :disp_fund_ac_name,
-      :depre_interval
+      :depre_interval,
+      :status
     ])
     |> validate_required([
       :name,
@@ -66,7 +68,8 @@ defmodule FullCircle.Accounting.FixedAsset do
       :asset_ac_name,
       :cume_depre_ac_name,
       :depre_ac_name,
-      :disp_fund_ac_name
+      :disp_fund_ac_name,
+      :status
     ])
     |> validate_id(:asset_ac_name, :asset_ac_id)
     |> validate_id(:depre_ac_name, :depre_ac_id)

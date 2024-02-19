@@ -241,7 +241,7 @@ defmodule FullCircleWeb.FixedAssetLive.Form do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="w-8/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
+    <div class="w-7/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
       <p class="w-full text-2xl text-center font-medium"><%= @page_title %></p>
       <.form
         for={@form}
@@ -287,7 +287,7 @@ defmodule FullCircleWeb.FixedAssetLive.Form do
           </div>
         </div>
         <div class="flex flex-row gap-1">
-          <div class="w-3/12">
+          <div class="w-2/12">
             <.input
               type="number"
               step="0.01"
@@ -295,14 +295,14 @@ defmodule FullCircleWeb.FixedAssetLive.Form do
               label={gettext("Purchase Price")}
             />
           </div>
-          <div class="w-3/12">
+          <div class="w-2/12">
             <.input
               type="date"
               field={@form[:depre_start_date]}
               label={gettext("Depreciation Start")}
             />
           </div>
-          <div class="w-3/12">
+          <div class="w-2/12">
             <.input
               type="number"
               step="0.01"
@@ -310,7 +310,7 @@ defmodule FullCircleWeb.FixedAssetLive.Form do
               label={gettext("Dep Rate(0.1 = 10%)")}
             />
           </div>
-          <div class="w-3/12">
+          <div class="w-2/12">
             <.input
               type="number"
               step="0.01"
@@ -318,9 +318,7 @@ defmodule FullCircleWeb.FixedAssetLive.Form do
               label={gettext("Residual Value")}
             />
           </div>
-        </div>
-        <div class="flex flex-row gap-1">
-          <div class="w-3/12">
+          <div class="w-2/12">
             <.input
               field={@form[:depre_method]}
               label={gettext("Depreciation Method")}
@@ -328,7 +326,7 @@ defmodule FullCircleWeb.FixedAssetLive.Form do
               options={FullCircle.Accounting.depreciation_methods()}
             />
           </div>
-          <div class="w-3/12">
+          <div class="w-2/12">
             <.input
               field={@form[:depre_interval]}
               label={gettext("Depreciation Interval")}
@@ -336,7 +334,9 @@ defmodule FullCircleWeb.FixedAssetLive.Form do
               options={FullCircle.Accounting.depreciation_intervals()}
             />
           </div>
-          <div class="w-6/12">
+        </div>
+        <div class="flex flex-row gap-1">
+          <div class="w-3/12">
             <.input type="hidden" field={@form[:asset_ac_id]} />
             <.input
               field={@form[:asset_ac_name]}
@@ -345,9 +345,7 @@ defmodule FullCircleWeb.FixedAssetLive.Form do
               url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=account&name="}
             />
           </div>
-        </div>
-        <div class="flex flex-row gap-1">
-          <div class="w-4/12">
+          <div class="w-3/12">
             <.input type="hidden" field={@form[:depre_ac_id]} />
             <.input
               field={@form[:depre_ac_name]}
@@ -356,7 +354,7 @@ defmodule FullCircleWeb.FixedAssetLive.Form do
               url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=account&name="}
             />
           </div>
-          <div class="w-4/12">
+          <div class="w-3/12">
             <.input type="hidden" field={@form[:cume_depre_ac_id]} />
             <.input
               field={@form[:cume_depre_ac_name]}
@@ -365,7 +363,7 @@ defmodule FullCircleWeb.FixedAssetLive.Form do
               url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=account&name="}
             />
           </div>
-          <div class="w-4/12">
+          <div class="w-3/12">
             <.input type="hidden" field={@form[:disp_fund_ac_id]} />
             <.input
               field={@form[:disp_fund_ac_name]}
@@ -375,8 +373,19 @@ defmodule FullCircleWeb.FixedAssetLive.Form do
             />
           </div>
         </div>
-
-        <.input field={@form[:descriptions]} type="textarea" label={gettext("Descriptions")} />
+        <div class="flex flex-row gap-1">
+          <div class="w-9/12">
+            <.input field={@form[:descriptions]} label={gettext("Descriptions")} />
+          </div>
+          <div class="w-3/12">
+            <.input
+              field={@form[:status]}
+              type="select"
+              label={gettext("Status")}
+              options={["Active", "Discarded", "Disposed"]}
+            />
+          </div>
+        </div>
 
         <div class="flex justify-center gap-x-1 mt-1">
           <.form_action_button

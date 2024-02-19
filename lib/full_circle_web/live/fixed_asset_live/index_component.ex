@@ -14,17 +14,20 @@ defmodule FullCircleWeb.FixedAssetLive.IndexComponent do
   @impl true
   def render(assigns) do
     ~H"""
-    <div
-      id={@id}
-      class={"#{@ex_class} text-center bg-gray-200 border-gray-500 hover:bg-gray-300 border-b"}
-    >
+    <div id={@id} class="text-center border-b border-gray-500">
       <div class="grid grid-cols-12">
-        <div class="col-span-7 bg-gray-100 p-2">
+        <div class={[
+          "col-span-7 p-2",
+          if(@obj.status == "Active",
+            do: "bg-gray-200",
+            else: "bg-rose-200"
+          )
+        ]}>
           <.link
             navigate={~p"/companies/#{@current_company.id}/fixed_assets/#{@obj.id}/edit"}
             class="text-xl hover:font-bold text-blue-600"
           >
-            <%= @obj.name %>
+            <%= @obj.name %> (<%= @obj.status %>)
           </.link>
           <p>
             <span class="font-bold"><%= gettext("Fixed Asset Account:") %></span> <%= @obj.asset_ac_name %>
@@ -39,7 +42,13 @@ defmodule FullCircleWeb.FixedAssetLive.IndexComponent do
           <%= @obj.cume_depre_ac_name %>
           <p><%= @obj.descriptions %></p>
         </div>
-        <div class="col-span-5 p-2 bg-gray-200">
+        <div class={[
+          "col-span-5 p-2",
+          if(@obj.status == "Active",
+            do: "bg-gray-200",
+            else: "bg-rose-200"
+          )
+        ]}>
           <p>
             <%= gettext("Purchase Price:") %> - <%= Number.Currency.number_to_currency(@obj.pur_price) %>
           </p>

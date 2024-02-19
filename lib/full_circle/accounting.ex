@@ -268,7 +268,7 @@ defmodule FullCircle.Accounting do
 
   def generate_depreciations_for_all_fixed_assets(edate, com, user) do
     fixed_assets = fixed_asset_query(com, user) |> Repo.all()
-    fixed_assets = Enum.reject(fixed_assets, fn fa -> Decimal.to_float(fa.depre_rate) <= 0 end)
+    fixed_assets = Enum.reject(fixed_assets, fn fa -> Decimal.to_float(fa.depre_rate) <= 0 or fa.status != "Active" end)
 
     Enum.flat_map(fixed_assets, fn fa ->
       generate_depreciations(fa, edate, com)
@@ -476,6 +476,7 @@ defmodule FullCircle.Accounting do
         inserted_at: fa.inserted_at,
         updated_at: fa.updated_at,
         company_id: com.id,
+        status: fa.status,
         cume_disp:
           fragment(
             "select COALESCE(sum(amount), 0) from fixed_asset_disposals where fixed_asset_id = ?",
