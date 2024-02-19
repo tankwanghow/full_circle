@@ -207,7 +207,7 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
                   <%= obj.doc_date |> FullCircleWeb.Helpers.format_date() %>
                 </div>
                 <div class="w-[8%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
-                  <%= obj.doc_no %>
+                <.doc_link current_company={@current_company} doc_obj={obj} />
                 </div>
                 <div class="w-[25%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
                   <%= obj.contact %>

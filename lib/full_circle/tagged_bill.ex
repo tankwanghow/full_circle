@@ -31,6 +31,8 @@ defmodule FullCircle.TaggedBill do
         where: inv.invoice_date <= ^tdate,
         where: inv.company_id == ^com_id,
         select: %{
+          doc_id: inv.id,
+          doc_type: "Invoice",
           doc_no: inv.invoice_no,
           invoice_date: inv.invoice_date,
           contact: cont.name,
@@ -67,6 +69,8 @@ defmodule FullCircle.TaggedBill do
         where: inv.receipt_date <= ^tdate,
         where: inv.company_id == ^com_id,
         select: %{
+          doc_id: inv.id,
+          doc_type: "Receipt",
           doc_no: inv.receipt_no,
           doc_date: inv.receipt_date,
           contact: cont.name,
