@@ -284,23 +284,33 @@ defmodule FullCircle.TaggedBill do
     |> Repo.all()
     |> Enum.map(fn x ->
       Map.merge(x, %{
-        loader_tags: String.split(x.loader_tags) |> Enum.uniq() |> Enum.join(", "),
-        loader_tags_count: String.split(x.loader_tags) |> Enum.uniq() |> Enum.count(),
-        delivery_man_tags: String.split(x.delivery_man_tags) |> Enum.uniq() |> Enum.join(", "),
-        delivery_man_tags_count: String.split(x.delivery_man_tags) |> Enum.uniq() |> Enum.count()
+        loader_tags: String.split(x.loader_tags || "") |> Enum.uniq() |> Enum.join(", "),
+        loader_tags_count: String.split(x.loader_tags || "") |> Enum.uniq() |> Enum.count(),
+        delivery_man_tags:
+          String.split(x.delivery_man_tags || "") |> Enum.uniq() |> Enum.join(", "),
+        delivery_man_tags_count:
+          String.split(x.delivery_man_tags || "") |> Enum.uniq() |> Enum.count()
       })
     end)
     |> Enum.map(fn x ->
       Map.merge(x, %{
         load_wages:
-          (wages_parse(x.loader_wages_tags, tag, x.loader_tags) * Decimal.to_float(x.quantity) /
-             x.loader_tags_count)
-          |> Float.round(2),
+          if(x.loader_tags_count > 0,
+            do:
+              (wages_parse(x.loader_wages_tags, tag, x.loader_tags) * Decimal.to_float(x.quantity) /
+                 x.loader_tags_count)
+              |> Float.round(2),
+            else: 0
+          ),
         delivery_wages:
-          (wages_parse(x.delivery_wages_tags, tag, x.delivery_man_tags) *
-             Decimal.to_float(x.quantity) /
-             x.delivery_man_tags_count)
-          |> Float.round(2)
+          if(x.delivery_man_tags_count > 0,
+            do:
+              (wages_parse(x.delivery_wages_tags, tag, x.delivery_man_tags) *
+                 Decimal.to_float(x.quantity) /
+                 x.delivery_man_tags_count)
+              |> Float.round(2),
+            else: 0
+          )
       })
     end)
   end

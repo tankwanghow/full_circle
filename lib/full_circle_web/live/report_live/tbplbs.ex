@@ -14,7 +14,7 @@ defmodule FullCircleWeb.ReportLive.TbPlBs do
   def handle_params(params, _uri, socket) do
     params = params["search"]
     report = params["report"]
-    t_date = params["t_date"]
+    t_date = params["t_date"] || ""
 
     {:noreply,
      socket
@@ -35,7 +35,12 @@ defmodule FullCircleWeb.ReportLive.TbPlBs do
   end
 
   defp filter_transactions(socket, report, t_date) do
-    [y, m, d] = t_date |> String.split("-") |> Enum.map(fn x -> String.to_integer(x) end)
+    [y, m, d] = try do
+      t_date |> String.split("-") |> Enum.map(fn x -> String.to_integer(x) end)
+    rescue
+      _e ->
+        [0,0,0]
+    end
 
     socket
     |> assign_async(
