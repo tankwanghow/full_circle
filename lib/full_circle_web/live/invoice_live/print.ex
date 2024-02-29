@@ -96,7 +96,7 @@ defmodule FullCircleWeb.InvoiceLive.Print do
     ~H"""
     <div class="detail">
       <div class="particular">
-        <div>
+        <div :if={@invd.good_name != "Note"}>
           <%= @invd.good_name %>
           <%= if(Decimal.gt?(@invd.package_qty, 0), do: " - #{@invd.package_qty}", else: "") %>
           <%= if(!is_nil(@invd.package_name) and @invd.package_name != "-",
