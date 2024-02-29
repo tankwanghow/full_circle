@@ -268,7 +268,11 @@ defmodule FullCircle.Accounting do
 
   def generate_depreciations_for_all_fixed_assets(edate, com, user) do
     fixed_assets = fixed_asset_query(com, user) |> Repo.all()
-    fixed_assets = Enum.reject(fixed_assets, fn fa -> Decimal.to_float(fa.depre_rate) <= 0 or fa.status != "Active" end)
+
+    fixed_assets =
+      Enum.reject(fixed_assets, fn fa ->
+        Decimal.to_float(fa.depre_rate) <= 0 or fa.status != "Active"
+      end)
 
     Enum.flat_map(fixed_assets, fn fa ->
       generate_depreciations(fa, edate, com)

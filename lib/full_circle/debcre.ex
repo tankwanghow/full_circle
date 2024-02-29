@@ -346,6 +346,7 @@ defmodule FullCircle.DebCre do
 
   def update_credit_note(%CreditNote{} = credit_note, attrs, com, user) do
     attrs = remove_field_if_new_flag(attrs, "note_no")
+
     case can?(user, :update_credit_note, com) do
       true ->
         Multi.new()
@@ -708,6 +709,7 @@ defmodule FullCircle.DebCre do
 
   def update_debit_note(%DebitNote{} = debit_note, attrs, com, user) do
     attrs = remove_field_if_new_flag(attrs, "note_no")
+
     case can?(user, :update_debit_note, com) do
       true ->
         Multi.new()

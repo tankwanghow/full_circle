@@ -1,14 +1,7 @@
 # Deposit Cheques
 
 ```elixir
-alias FullCircle.{Sys, Reporting}
-alias FullCircle.Cheque.Deposit
-alias FullCircle.Cheque
-alias FullCircle.ReceiveFund.ReceivedCheque
-
-{u, c} = Sys.get_user_default_company_by_email("tankwanghow@gmail.com")
-emp = FullCircle.HR.get_employee_by_name("Tan Kwang How", c, u)
-chqs = Reporting.post_dated_cheques("", "All", "", "2023-12-31", c)
+{u, c} = FullCircle.Sys.get_user_default_company_by_email("kpsittat@gmail.com")
 ```
 
 ## Depositing Cheques
@@ -23,88 +16,5 @@ alias FullCircle.Accounting.{Account, TaxCode, Contact}
 alias FullCircle.Product.{Good, Packaging, Order, OrderDetail, Load, LoadDetail}
 alias FullCircle.{Repo, Sys, StdInterface}
 
-# a = FullCircle.PayRun.pay_run_index(10, 2023, c)
-
-# Enum.at(a, 1).pay_list |> Enum.map(fn {_,_,y,m} -> "#{m}/#{y}" end)
-
-# FullCircle.HR.get_employee_salary_types("04833330-5721-48ea-b696-501c5bd38ca0")
-# emp = FullCircle.HR.get_employee_by_name("Tan Kwang How", c, u)
-
-# cs =
-#   FullCircle.PaySlipOp.generate_new_changeset_for(
-#     emp,
-#     10,
-#     2023,
-#     c
-#   )
-
-# a = FullCircle.Layer.harvest_wage_report(~D[2023-11-01], ~D[2023-11-15], c.id)
-
-# a
-# |> Enum.group_by(
-#   & &1.employee,
-#   &%{har_date: &1.har_date, house: &1.house_no, prod: &1.prod, wages: &1.wages}
-# )
-# |> Enum.map(fn {n, l} ->
-#   {n, Enum.group_by(l, & &1.har_date, &%{house: &1.house, prod: &1.prod, wages: &1.wages})}
-# end)
-
-# FullCircle.PaySlipOp.calculate_pay(cs)
-
-# FullCircle.PaySlipOp.get_uncount_recurrings(emp.id, 10, 2023, c)
-
-# FullCircle.DebCre.get_debit_note!("2113ecd3-814e-4e37-9b20-fb19611a8447", c, u)
-
-# FullCircle.PayRun.employee_leave_summary("e55f919a-df17-4833-a9ad-1621a3f36171", 2023, c)
-
-# Repo.preload posts, [comments: {query, [:replies, :likes]}]
-
-from(odd in OrderDetail,
-  join: od in Order,
-  on: od.id == odd.order_id,
-  join: cont in Contact,
-  on: cont.id == od.contact_id,
-  join: good in Good,
-  on: good.id == odd.good_id,
-  left_join: pkg in Packaging,
-  on: pkg.id == odd.package_id,
-  left_join: ldd in LoadDetail,
-  on: odd.id == ldd.order_detail_id,
-  left_join: ld in Load,
-  on: ld.id == ldd.load_id,
-  left_join: ship in Contact,
-  on: ship.id == ld.shipper_id,
-  left_join: supp in Contact,
-  on: supp.id == ld.supplier_id,
-  preload: [good: good, package: pkg],
-  preload: [order: {od, contact: cont}],
-  preload: [load_details: {ldd, [load: {ld, supplier: supp, shipper: ship}]}]
-)
-|> Repo.all()
-```
-
-```elixir
-# sns = FullCircle.PaySlipOp.get_uncount_salary_notes("e55f919a-df17-4833-a9ad-1621a3f36171", c)
-# adv = FullCircle.PaySlipOp.get_uncount_advances("e55f919a-df17-4833-a9ad-1621a3f36171", c)
-
-# sns |> Enum.filter(fn x -> x.salary_type_type == "" end)
-
-# adv = FullCircle.HR.get_advance!("1142af82-f6e7-4f11-9fb0-10c811a3f601", c, u)
-
-# IO.inspect(adv)
-
-# keep = [:employee_name, :funds_account_name, :amount, :slip_no, :slip_date, :note, :pay_slip_no]
-
-# adv =
-#   Map.reject(adv, fn {k, _} ->
-#     is_nil(
-#       Enum.find_index(keep, fn x ->
-#         k == x
-#       end)
-#     )
-#   end)
-
-# FullCircle.Helpers.last_log_record_for("pay_slips", "5375d7af-6a9c-45ab-918e-6a19f037c666", c)
-
-# FullCircle.PaySlipOp.get_print_pay_slips(["5375d7af-6a9c-45ab-918e-6a19f037c666"], c)
+FullCircle.CopyCompany.copy_company(c, u)
 ```

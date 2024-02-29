@@ -173,6 +173,7 @@ defmodule FullCircle.JournalEntry do
 
   def update_journal(%Journal{} = journal, attrs, com, user) do
     attrs = remove_field_if_new_flag(attrs, "journal_no")
+
     case can?(user, :update_journal, com) do
       true ->
         Multi.new()

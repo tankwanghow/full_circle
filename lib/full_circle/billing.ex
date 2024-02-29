@@ -175,40 +175,40 @@ defmodule FullCircle.Billing do
         page: page,
         per_page: per_page
       ) do
-      qry =
-        from(inv in subquery(invoice_raw_query(com, user)))
+    qry =
+      from(inv in subquery(invoice_raw_query(com, user)))
 
-      qry =
-        if terms != "" do
-          from inv in subquery(qry),
-            order_by: [inv.old_data],
-            order_by: ^similarity_order([:invoice_no, :contact_name, :particulars], terms)
-        else
-          from inv in qry, order_by: [inv.old_data]
-        end
+    qry =
+      if terms != "" do
+        from inv in subquery(qry),
+          order_by: [inv.old_data],
+          order_by: ^similarity_order([:invoice_no, :contact_name, :particulars], terms)
+      else
+        from inv in qry, order_by: [inv.old_data]
+      end
 
-      qry =
-        case bal do
-          "Paid" -> from inv in qry, where: inv.balance == 0
-          "Unpaid" -> from inv in qry, where: inv.balance > 0
-          _ -> qry
-        end
+    qry =
+      case bal do
+        "Paid" -> from inv in qry, where: inv.balance == 0
+        "Unpaid" -> from inv in qry, where: inv.balance > 0
+        _ -> qry
+      end
 
-      qry =
-        if date_from != "" do
-          from inv in qry, where: inv.invoice_date >= ^date_from, order_by: inv.invoice_date
-        else
-          qry
-        end
+    qry =
+      if date_from != "" do
+        from inv in qry, where: inv.invoice_date >= ^date_from, order_by: inv.invoice_date
+      else
+        qry
+      end
 
-      qry =
-        if due_date_from != "" do
-          from inv in qry, where: inv.due_date >= ^due_date_from, order_by: inv.due_date
-        else
-          qry
-        end
+    qry =
+      if due_date_from != "" do
+        from inv in qry, where: inv.due_date >= ^due_date_from, order_by: inv.due_date
+      else
+        qry
+      end
 
-      qry |> offset((^page - 1) * ^per_page) |> limit(^per_page) |> Repo.all()
+    qry |> offset((^page - 1) * ^per_page) |> limit(^per_page) |> Repo.all()
   end
 
   def get_invoice_by_id_index_component_field!(id, com, user) do
@@ -354,6 +354,7 @@ defmodule FullCircle.Billing do
 
   def update_invoice(%Invoice{} = invoice, attrs, com, user) do
     attrs = remove_field_if_new_flag(attrs, "invoice_no")
+
     case can?(user, :update_invoice, com) do
       true ->
         Multi.new()
@@ -668,6 +669,7 @@ defmodule FullCircle.Billing do
 
   def update_pur_invoice(%PurInvoice{} = pur_invoice, attrs, com, user) do
     attrs = remove_field_if_new_flag(attrs, "pur_invoice_no")
+
     case can?(user, :update_pur_invoice, com) do
       true ->
         Multi.new()

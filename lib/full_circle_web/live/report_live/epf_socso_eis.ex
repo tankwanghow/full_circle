@@ -15,8 +15,8 @@ defmodule FullCircleWeb.ReportLive.EpfSocsoEis do
     params = params["search"]
     report = params["report"]
     code = params["code"]
-    month = params["month"] || Timex.today.month
-    year = params["year"] || Timex.today.year
+    month = params["month"] || Timex.today().month
+    year = params["year"] || Timex.today().year
 
     {:noreply,
      socket
@@ -29,8 +29,7 @@ defmodule FullCircleWeb.ReportLive.EpfSocsoEis do
     {:noreply,
      socket
      |> assign(row: [])
-     |> assign(col: [])
-    }
+     |> assign(col: [])}
   end
 
   @impl true

@@ -280,6 +280,7 @@ defmodule FullCircle.Product do
 
   def update_delivery(%Delivery{} = delivery, attrs, com, user) do
     attrs = remove_field_if_new_flag(attrs, "delivery_no")
+
     case can?(user, :update_delivery, com) do
       true ->
         Multi.new()
@@ -487,6 +488,7 @@ defmodule FullCircle.Product do
 
   def update_load(%Load{} = load, attrs, com, user) do
     attrs = remove_field_if_new_flag(attrs, "load_no")
+
     case can?(user, :update_load, com) do
       true ->
         Multi.new()
@@ -762,6 +764,7 @@ defmodule FullCircle.Product do
 
   def update_order(%Order{} = load, attrs, com, user) do
     attrs = remove_field_if_new_flag(attrs, "order_no")
+
     case can?(user, :update_order, com) do
       true ->
         Multi.new()

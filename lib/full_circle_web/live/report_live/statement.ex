@@ -103,7 +103,6 @@ defmodule FullCircleWeb.ReportLive.Statement do
   end
 
   defp query(socket, gt, f_date, t_date) do
-    IO.inspect({gt , f_date , t_date})
     objects =
       if gt == "" or f_date == "" or t_date == "" do
         []

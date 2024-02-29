@@ -266,6 +266,7 @@ defmodule FullCircle.Cheque do
 
   def update_deposit(%Deposit{} = deposit, attrs, com, user) do
     attrs = remove_field_if_new_flag(attrs, "deposit_no")
+
     case can?(user, :update_deposit, com) do
       true ->
         Multi.new()
@@ -399,6 +400,7 @@ defmodule FullCircle.Cheque do
 
   def update_return_cheque(%ReturnCheque{} = return_cheque, attrs, com, user) do
     attrs = remove_field_if_new_flag(attrs, "return_no")
+
     case can?(user, :update_return_cheque, com) do
       true ->
         Multi.new()
