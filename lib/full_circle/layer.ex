@@ -12,50 +12,55 @@ defmodule FullCircle.Layer do
     """
     with
     datelist as (
-         select generate_series('#{fd}'::date, '#{td}', interval '1 day')::date gdate),
-      mv_qty as (
-          select dl.gdate as info_date, h.id as house_id, f.id as flock_id, h.house_no, f.flock_no, f.dob, h.capacity,
-                 sum(m.quantity) as qty
-            from datelist dl, movements m inner join houses h
-              on h.id = m.house_id inner join flocks f
-              on f.id = m.flock_id
-           where m.company_id = '#{com_id}'
-             and h.status = 'Active'
-             and m.move_date <= dl.gdate
-           group by dl.gdate, h.id, f.id),
-      dea_qty as (
-          select dl.gdate as info_date, h2.id as house_id, f2.id as flock_id, h2.house_no, f2.flock_no, f2.dob,
-                 sum(hd.dea_1) + sum(hd.dea_2) as qty, h2.capacity
-            from datelist dl, harvests h inner join harvest_details hd
-              on hd.harvest_id = h.id inner join houses h2
-              on hd.house_id = h2.id inner join flocks f2
-              on hd.flock_id = f2.id
-           where h2.company_id = '#{com_id}'
-             and h2.status = 'Active'
-             and dl.gdate >= h.har_date
-           group by dl.gdate, h2.id, f2.id),
-         sum_qty as (
-          select m.info_date, m.house_id, m.flock_id, m.house_no, m.flock_no, m.dob, m.qty - coalesce(d.qty, 0) as qty
-            from mv_qty m left outer join dea_qty d
-              on d.house_id = m.house_id
-             and d.flock_id = m.flock_id
-             and d.info_date = m.info_date
-           where m.qty - coalesce(d.qty, 0) > 0),
+     select generate_series('#{fd}'::date, '#{td}', interval '1 day')::date gdate),
+    mv_qty as (
+      select dl.gdate as info_date, h.id as house_id, f.id as flock_id, h.house_no, f.flock_no, f.dob, h.capacity,
+             sum(m.quantity) as qty
+        from datelist dl, movements m inner join houses h
+          on h.id = m.house_id inner join flocks f
+          on f.id = m.flock_id
+       where m.company_id = '#{com_id}'
+         and h.status = 'Active'
+         and m.move_date <= dl.gdate
+       group by dl.gdate, h.id, f.id),
+    dea_qty as (
+      select dl.gdate as info_date, h2.id as house_id, f2.id as flock_id, h2.house_no, f2.flock_no, f2.dob,
+             sum(hd.dea_1) + sum(hd.dea_2) as qty, h2.capacity
+        from datelist dl, harvests h inner join harvest_details hd
+          on hd.harvest_id = h.id inner join houses h2
+          on hd.house_id = h2.id inner join flocks f2
+          on hd.flock_id = f2.id
+       where h2.company_id = '#{com_id}'
+         and h2.status = 'Active'
+         and dl.gdate >= h.har_date
+       group by dl.gdate, h2.id, f2.id),
+     sum_qty as (
+      select m.info_date, m.house_id, m.flock_id, m.house_no, m.flock_no, m.dob, m.qty - coalesce(d.qty, 0) as qty
+        from mv_qty m left outer join dea_qty d
+          on d.house_id = m.house_id
+         and d.flock_id = m.flock_id
+         and d.info_date = m.info_date
+       where m.qty - coalesce(d.qty, 0) > 0),
     house_date_feed_0 as (
-            select info.info_date, house_no, (date_part('day', info.info_date::timestamp - info.dob::timestamp)/7)::integer as age, info.qty as cur_qty
-              from sum_qty info),
+      select info.info_date, info.house_no, info.house_id, (date_part('day', info.info_date::timestamp - info.dob::timestamp)/7)::integer as age, info.qty as cur_qty
+        from sum_qty info),
+    house_date as (
+      select dl.gdate as info_date, h.house_no, h.id as house_id, 0 as age, 0 as cur_qty from houses h, datelist dl
+       where h.id not in (select distinct house_id from sum_qty)
+         and h.status = 'Active'),
+    house_date_feed_1 as (select * from house_date_feed_0 where age <= 120 union all select * from house_date),
     house_date_feed as (
-            select info_date, house_no, age, cur_qty,
-                   case when age >= 0 and age <=  5 and cur_qty > 0 then 'A1'
-                        when age >  5 and age <= 10 and cur_qty > 0 then 'A1'
-                        when age > 10 and age <= 16 and cur_qty > 0 then 'A3'
-                        when age > 16 and age <= 20 and cur_qty > 0 then 'A3'
-                        when age > 20 and age <= 48 and cur_qty > 0 then 'A5'
-                        when age > 48 and age <= 70 and cur_qty > 0 then 'A6'
-                        when age > 70 and age <= 80 and cur_qty > 0 then 'A7'
-                        when age > 80 and cur_qty > 0 then 'A8'
-                        else 'NO' end as feed_type
-              from house_date_feed_0 where age <= 120)
+        select info_date, house_no, age, cur_qty,
+               case when age >= 0 and age <=  5 and cur_qty > 0 then 'A1'
+                    when age >  5 and age <= 10 and cur_qty > 0 then 'A1'
+                    when age > 10 and age <= 16 and cur_qty > 0 then 'A3'
+                    when age > 16 and age <= 20 and cur_qty > 0 then 'A3'
+                    when age > 20 and age <= 48 and cur_qty > 0 then 'A5'
+                    when age > 48 and age <= 70 and cur_qty > 0 then 'A6'
+                    when age > 70 and age <= 80 and cur_qty > 0 then 'A7'
+                    when age > 80 and cur_qty > 0 then 'A8'
+                    else '' end as feed_type
+          from house_date_feed_1)
 
       select cur.house_no as hou,
             (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.info_date) = 1 and hdf.house_no = cur.house_no) as D1,
