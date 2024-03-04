@@ -163,3 +163,20 @@ select t.transaction_date as doc_date, a.name1 as account_name, sum(amount) as a
                  extract(day from '2023-10-31'::timestamp - doc_date::timestamp) > 120 then balance else 0 end) as day120
 	    from has_balance_txn_1 
 	   group by contact_name;
+
+--Fixed Assets Report
+select acname, name, pur_date, pur_price, max_depre_date, cur_depre, cume_depre, cur_disp, cume_disp, 
+       pur_price - cur_depre - cume_depre - cur_disp - cume_disp as nbv
+  from (select ac.name as acname, fa.name, fa.pur_date, fa.pur_price, max(fad.depre_date) as max_depre_date, 
+               sum(case when fad.depre_date >= '2023-01-01' then fad.amount else 0 end) as cur_depre, 
+               sum(case when fad.depre_date < '2023-01-01' then fad.amount else 0 end) as cume_depre, 
+               sum(case when fad2.disp_date >= '2023-01-01' then fad2.amount else 0 end) as cur_disp, 
+               sum(case when fad2.disp_date < '2023-01-01' then fad2.amount else 0 end) as cume_disp
+	        from fixed_assets fa inner join accounts ac 
+            on ac.id = fa.asset_ac_id	left outer join fixed_asset_depreciations fad 
+            on fa.id = fad.fixed_asset_id	left outer join fixed_asset_disposals fad2 
+            on fad2.fixed_asset_id = fa.id
+         where fa.status = 'Active'
+		       and (fad.depre_date <= '2023-12-31' or fad2.disp_date <= '2023-12-31')
+	       group by ac.name, fa.name, fa.pur_price, fa.pur_date
+         order by 1, 2) as fa0

@@ -61,11 +61,11 @@ defmodule FullCircleWeb.ReportLive.HouseFeed do
              if month == "" or year == "" do
                {[], []}
              else
-               FullCircle.Layer.house_feed_type(
+               FullCircle.Layer.house_feed_type_query(
                  month,
                  year,
                  socket.assigns.current_company.id
-               )
+               ) |> FullCircle.Helpers.exec_query_row_col()
              end
          }}
       end
@@ -80,7 +80,7 @@ defmodule FullCircleWeb.ReportLive.HouseFeed do
       <div class="border rounded bg-purple-200 text-center p-2">
         <.form for={%{}} id="search-form" phx-submit="query" autocomplete="off">
           <div class="flex tracking-tighter">
-            <div class="w-[59%] hidden">
+            <div class="w-[50%] hidden">
               <.input
                 label={gettext("Good List")}
                 id="search_report"
@@ -116,7 +116,7 @@ defmodule FullCircleWeb.ReportLive.HouseFeed do
                 value={@search.year}
               />
             </div>
-            <div class="w-[10%] mt-5">
+            <div class="w-[19%] mt-5">
               <.button>
                 <%= gettext("Query") %>
               </.button>
@@ -124,11 +124,22 @@ defmodule FullCircleWeb.ReportLive.HouseFeed do
                 :if={@result.result != {[], []} and @result.result}
                 class="blue button mr-1"
                 navigate={
-                  ~p"/companies/#{@current_company.id}/print/house_feed?report=actrans&name=#{@search.report}&month=#{@search.month}&year=#{@search.year}"
+                  ~p"/companies/#{@current_company.id}/print/house_feed?month=#{@search.month}&year=#{@search.year}"
                 }
                 target="_blank"
               >
                 Print
+              </.link>
+
+              <.link
+                :if={@result.result != {[], []} and @result.result}
+                navigate={
+                  ~p"/companies/#{@current_company.id}/csv?report=housefeed&month=#{@search.month}&year=#{@search.year}"
+                }
+                target="_blank"
+                class="blue button"
+              >
+                CSV
               </.link>
             </div>
           </div>

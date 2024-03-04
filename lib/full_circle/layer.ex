@@ -5,7 +5,7 @@ defmodule FullCircle.Layer do
   alias FullCircle.{Repo}
   alias FullCircle.Layer.{House, Flock, Movement, Harvest, HarvestDetail, HouseHarvestWage}
 
-  def house_feed_type(month, year, com_id) do
+  def house_feed_type_query(month, year, com_id) do
     fd = Date.new!(String.to_integer(year), String.to_integer(month), 1)
     td = Date.end_of_month(fd)
 
@@ -46,7 +46,7 @@ defmodule FullCircle.Layer do
         from sum_qty info),
     house_date as (
       select dl.gdate as info_date, h.house_no, h.id as house_id, 0 as age, 0 as cur_qty from houses h, datelist dl
-       where h.id not in (select distinct house_id from sum_qty)
+       where h.id not in (select distinct house_id from house_date_feed_0 where age <= 120)
          and h.status = 'Active'),
     house_date_feed_1 as (select * from house_date_feed_0 where age <= 120 union all select * from house_date),
     house_date_feed as (
@@ -98,7 +98,6 @@ defmodule FullCircle.Layer do
       group by cur.house_no
       order by 1
     """
-    |> exec_query_row_col()
   end
 
   def harvest_wage_report(fd, td, com_id) do
