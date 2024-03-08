@@ -35,12 +35,13 @@ defmodule FullCircleWeb.ReportLive.TbPlBs do
   end
 
   defp filter_transactions(socket, report, t_date) do
-    [y, m, d] = try do
-      t_date |> String.split("-") |> Enum.map(fn x -> String.to_integer(x) end)
-    rescue
-      _e ->
-        [0,0,0]
-    end
+    [y, m, d] =
+      try do
+        t_date |> String.split("-") |> Enum.map(fn x -> String.to_integer(x) end)
+      rescue
+        _e ->
+          [0, 0, 0]
+      end
 
     socket
     |> assign_async(

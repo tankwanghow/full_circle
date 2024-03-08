@@ -65,7 +65,8 @@ defmodule FullCircleWeb.ReportLive.HouseFeed do
                  month,
                  year,
                  socket.assigns.current_company.id
-               ) |> FullCircle.Helpers.exec_query_row_col()
+               )
+               |> FullCircle.Helpers.exec_query_row_col()
              end
          }}
       end
