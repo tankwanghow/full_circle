@@ -54,31 +54,6 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
   end
 
   defp filter_transactions(socket, contact, goods, f_date, t_date) do
-    # {objects, summaries} =
-    #   if f_date == "" or t_date == "" do
-    #     {[], []}
-    #   else
-    #     {FullCircle.TaggedBill.goods_sales_report(
-    #        contact,
-    #        goods,
-    #        f_date,
-    #        t_date,
-    #        socket.assigns.current_company.id
-    #      ),
-    #      FullCircle.TaggedBill.goods_sales_summary_report(
-    #        contact,
-    #        goods,
-    #        f_date,
-    #        t_date,
-    #        socket.assigns.current_company.id
-    #      )}
-    #   end
-
-    # socket
-    # |> assign(objects: objects)
-    # |> assign(summaries: summaries)
-    # |> assign(objects_count: Enum.count(objects))
-
     socket
     |> assign_async(
       :result,
@@ -127,7 +102,7 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
                 url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
               />
             </div>
-            <div class="w-[59%]">
+            <div class="w-[54%]">
               <.input
                 label={gettext("Good List")}
                 id="search_goods"
@@ -155,10 +130,20 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
                 value={@search.t_date}
               />
             </div>
-            <div class="w-[5%] mt-5">
+            <div class="w-[10%] mt-5">
               <.button>
                 <%= gettext("Query") %>
               </.button>
+              <.link
+                :if={@result.result != {[], []}}
+                navigate={
+                  ~p"/companies/#{@current_company.id}/csv?report=goodsales&&contact=#{@search.goods}&goods=#{@search.goods}&fdate=#{@search.f_date}&tdate=#{@search.t_date}"
+                }
+                class="blue button"
+                target="_blank"
+              >
+                CSV
+              </.link>
             </div>
           </div>
         </.form>

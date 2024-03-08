@@ -101,7 +101,9 @@ defmodule FullCircleWeb.CsvController do
         "month" => mth,
         "year" => yr
       }) do
-    data = FullCircle.Layer.house_feed_type_query(mth, yr, com_id) |> FullCircle.Helpers.exec_query_map()
+    data =
+      FullCircle.Layer.house_feed_type_query(mth, yr, com_id)
+      |> FullCircle.Helpers.exec_query_map()
 
     fields = data |> Enum.at(0) |> Map.keys()
 
@@ -158,6 +160,44 @@ defmodule FullCircleWeb.CsvController do
     data = FullCircle.Layer.harvest_wage_report(fdate, tdate, com_id)
     fields = data |> Enum.at(0) |> Map.keys()
     filename = "harvest_wage_report_#{fdate}_#{tdate}"
+    send_csv_map(conn, data, fields, filename)
+  end
+
+  def show(conn, %{
+        "company_id" => com_id,
+        "report" => "goodsales",
+        "contact" => contact,
+        "goods" => goods,
+        "fdate" => fdate,
+        "tdate" => tdate
+      }) do
+    tdate = tdate |> Timex.parse!("{YYYY}-{0M}-{0D}") |> NaiveDateTime.to_date()
+    fdate = fdate |> Timex.parse!("{YYYY}-{0M}-{0D}") |> NaiveDateTime.to_date()
+
+    data =
+      FullCircle.TaggedBill.goods_sales_report(
+        contact,
+        goods,
+        fdate,
+        tdate,
+        com_id
+      )
+
+    fields = [
+      :doc_date,
+      :doc_type,
+      :doc_no,
+      :contact,
+      :good,
+      :pack_name,
+      :pack_qty,
+      :qty,
+      :unit,
+      :price,
+      :amount
+    ]
+
+    filename = "good_sales_#{fdate}_#{tdate}"
     send_csv_map(conn, data, fields, filename)
   end
 
