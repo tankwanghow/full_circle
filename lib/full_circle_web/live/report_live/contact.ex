@@ -65,10 +65,12 @@ defmodule FullCircleWeb.ReportLive.Contact do
   end
 
   defp filter_transactions(socket, name, f_date, t_date) do
+    current_company = socket.assigns.current_company
+
     account =
       Accounting.get_contact_by_name(
         name,
-        socket.assigns.current_company,
+        current_company,
         socket.assigns.current_user
       )
 
@@ -84,7 +86,7 @@ defmodule FullCircleWeb.ReportLive.Contact do
                  account,
                  Date.from_iso8601!(f_date),
                  Date.from_iso8601!(t_date),
-                 socket.assigns.current_company
+                 current_company
                )
              else
                []

@@ -54,6 +54,8 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
   end
 
   defp filter_transactions(socket, contact, goods, f_date, t_date) do
+    current_company = socket.assigns.current_company
+
     socket
     |> assign_async(
       :result,
@@ -69,14 +71,14 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
                   goods,
                   f_date,
                   t_date,
-                  socket.assigns.current_company.id
+                  current_company.id
                 ),
                 FullCircle.TaggedBill.goods_sales_summary_report(
                   contact,
                   goods,
                   f_date,
                   t_date,
-                  socket.assigns.current_company.id
+                  current_company.id
                 )}
              end
          }}

@@ -42,6 +42,8 @@ defmodule FullCircleWeb.ReportLive.Aging do
   defp filter_transactions(socket, report, t_date, days) do
     days = String.to_integer(days)
 
+    current_company = socket.assigns.current_company
+
     socket
     |> assign(days: days)
     |> assign_async(
@@ -55,14 +57,14 @@ defmodule FullCircleWeb.ReportLive.Aging do
                  FullCircle.Reporting.debtor_aging_report(
                    t_date,
                    days,
-                   socket.assigns.current_company.id
+                   current_company.id
                  )
 
                report == "Creditors Aging" ->
                  FullCircle.Reporting.creditor_aging_report(
                    t_date,
                    days,
-                   socket.assigns.current_company.id
+                   current_company.id
                  )
 
                true ->

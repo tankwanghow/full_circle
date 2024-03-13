@@ -35,6 +35,8 @@ defmodule FullCircleWeb.ReportLive.TbPlBs do
   end
 
   defp filter_transactions(socket, report, t_date) do
+    current_company = socket.assigns.current_company
+
     [y, m, d] =
       try do
         t_date |> String.split("-") |> Enum.map(fn x -> String.to_integer(x) end)
@@ -54,19 +56,19 @@ defmodule FullCircleWeb.ReportLive.TbPlBs do
                report == "Trail Balance" ->
                  FullCircle.Reporting.trail_balance(
                    Date.new!(y, m, d),
-                   socket.assigns.current_company
+                   current_company
                  )
 
                report == "Profit Loss" ->
                  FullCircle.Reporting.profit_loss(
                    Date.new!(y, m, d),
-                   socket.assigns.current_company
+                   current_company
                  )
 
                report == "Balance Sheet" ->
                  FullCircle.Reporting.balance_sheet(
                    Date.new!(y, m, d),
-                   socket.assigns.current_company
+                   current_company
                  )
 
                true ->
