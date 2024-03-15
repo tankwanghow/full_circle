@@ -26,7 +26,7 @@ defmodule FullCircleWeb.GoodLive.IndexComponent do
       </.link>
       &#11049;
       <span>
-        <%= @obj.sales_account_name %> &#11049; <%= @obj.sales_tax_code_name %> &#8226; <%= @obj.purchase_account_name %> &#11049; <%= @obj.purchase_tax_code_name %>
+        <%= @obj.category %> &#11049; <%= @obj.sales_account_name %> &#11049; <%= @obj.sales_tax_code_name %> &#8226; <%= @obj.purchase_account_name %> &#11049; <%= @obj.purchase_tax_code_name %>
       </span>
       <.link
         navigate={~p"/companies/#{@current_company}/goods/#{@obj.id}/copy"}

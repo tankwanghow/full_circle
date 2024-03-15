@@ -7,6 +7,7 @@ defmodule FullCircle.Product.Good do
   schema "goods" do
     field(:name, :string)
     field(:unit, :string)
+    field(:category, :string)
     field(:descriptions, :string)
 
     belongs_to(:company, FullCircle.Sys.Company)
@@ -92,6 +93,7 @@ defmodule FullCircle.Product.Good do
     |> cast(attrs, [
       :name,
       :unit,
+      :category,
       :descriptions,
       :company_id,
       :purchase_account_name,
@@ -108,6 +110,7 @@ defmodule FullCircle.Product.Good do
     |> validate_required([
       :name,
       :unit,
+      :category,
       :company_id,
       :purchase_account_name,
       :sales_account_name,

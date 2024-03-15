@@ -19,6 +19,10 @@ defmodule FullCircle.Product do
 
   alias FullCircle.{Repo, Sys, StdInterface}
 
+  def categories() do
+    ~w{Egg Chicken Pig Dung Feed FFB Vaccine Additive Others}
+  end
+
   # Deliveries
 
   def get_print_deliveries!(ids, com, user) do
@@ -890,6 +894,7 @@ defmodule FullCircle.Product do
       select: %Good{
         id: good.id,
         name: good.name,
+        category: good.category,
         unit: good.unit,
         sales_account_name: sac.name,
         purchase_account_name: pac.name,
@@ -925,7 +930,7 @@ defmodule FullCircle.Product do
       preload: :packagings,
       order_by:
         ^similarity_order(
-          ~w(name unit purchase_account_name sales_account_name sales_tax_code_name purchase_tax_code_name)a,
+          ~w(name category unit purchase_account_name sales_account_name sales_tax_code_name purchase_tax_code_name)a,
           terms
         )
     )

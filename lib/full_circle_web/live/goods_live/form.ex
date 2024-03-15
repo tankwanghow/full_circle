@@ -315,11 +315,19 @@ defmodule FullCircleWeb.GoodLive.Form do
         class="mx-auto"
       >
         <div class="grid grid-cols-12 gap-2">
-          <div class="col-span-9">
+          <div class="col-span-6">
             <.input feedback field={@form[:name]} label={gettext("Name")} />
           </div>
           <div class="col-span-3">
             <.input field={@form[:unit]} label={gettext("Unit")} />
+          </div>
+          <div class="col-span-3">
+          <.input
+          field={@form[:category]}
+          label={gettext("Category")}
+          type="select"
+          options={FullCircle.Product.categories()}
+        />
           </div>
         </div>
         <div class="grid grid-cols-12 gap-2">
