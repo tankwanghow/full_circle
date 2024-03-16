@@ -322,12 +322,12 @@ defmodule FullCircleWeb.GoodLive.Form do
             <.input field={@form[:unit]} label={gettext("Unit")} />
           </div>
           <div class="col-span-3">
-          <.input
-          field={@form[:category]}
-          label={gettext("Category")}
-          type="select"
-          options={FullCircle.Product.categories()}
-        />
+            <.input
+              field={@form[:category]}
+              label={gettext("Category")}
+              type="select"
+              options={FullCircle.Product.categories()}
+            />
           </div>
         </div>
         <div class="grid grid-cols-12 gap-2">

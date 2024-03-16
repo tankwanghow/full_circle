@@ -16,12 +16,21 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
 
     contact = params["contact"] || ""
     goods = params["goods"] || ""
+    category = params["category"] || ""
     f_date = params["f_date"] || ""
     t_date = params["t_date"] || ""
 
     {:noreply,
      socket
-     |> assign(search: %{contact: contact, goods: goods, f_date: f_date, t_date: t_date})
+     |> assign(
+       search: %{
+         contact: contact,
+         goods: goods,
+         f_date: f_date,
+         t_date: t_date,
+         category: category
+       }
+     )
      |> filter_transactions(contact, goods, f_date, t_date)}
   end
 
@@ -32,6 +41,7 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
           "search" => %{
             "contact" => contact,
             "goods" => goods,
+            "category" => category,
             "f_date" => f_date,
             "t_date" => t_date
           }
@@ -41,6 +51,7 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
     qry = %{
       "search[contact]" => contact,
       "search[goods]" => goods,
+      "search[category]" => category,
       "search[f_date]" => f_date,
       "search[t_date]" => t_date
     }
@@ -51,6 +62,55 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
     {:noreply,
      socket
      |> push_navigate(to: url)}
+  end
+
+  @impl true
+  def handle_event(
+        "change",
+        %{
+          "_target" => ["search", "category"],
+          "search" => %{
+            "category" => cat,
+            "contact" => cont,
+            "f_date" => f_date,
+            "goods" => _goods,
+            "t_date" => t_date
+          }
+        },
+        socket
+      ) do
+    goods =
+      FullCircle.Product.get_goods_by_category(
+        cat,
+        socket.assigns.current_company,
+        socket.assigns.current_user
+      )
+
+    goods =
+      if Enum.count(goods) > 0 do
+        goods
+        |> Enum.map(fn x -> x.name end)
+        |> Enum.join(", ")
+      else
+        ["Not Goods in this category"]
+      end
+
+    {:noreply,
+     socket
+     |> assign(
+       search: %{
+         contact: cont,
+         goods: goods,
+         f_date: f_date,
+         t_date: t_date,
+         category: cat
+       }
+     )}
+  end
+
+  @impl true
+  def handle_event("change", _, socket) do
+    {:noreply, socket}
   end
 
   defp filter_transactions(socket, contact, goods, f_date, t_date) do
@@ -92,9 +152,19 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
     <div class="w-11/12 mx-auto mb-5">
       <p class="text-2xl text-center font-medium"><%= "#{@page_title}" %></p>
       <div class="border rounded bg-purple-200 text-center p-2">
-        <.form for={%{}} id="search-form" phx-submit="query" autocomplete="off">
+        <.form for={%{}} id="search-form" phx-change="change" phx-submit="query" autocomplete="off">
           <div class="flex tracking-tighter">
-            <div class="w-[20%]">
+            <div class="w-[10%]">
+              <.input
+                id="search_category"
+                name="search[category]"
+                value={@search.category}
+                label={gettext("Category")}
+                type="select"
+                options={FullCircle.Product.categories()}
+              />
+            </div>
+            <div class="w-[40%]">
               <.input
                 label={gettext("Contact")}
                 id="search_contact"
@@ -104,17 +174,7 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
                 url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
               />
             </div>
-            <div class="w-[54%]">
-              <.input
-                label={gettext("Good List")}
-                id="search_goods"
-                name="search[goods]"
-                value={@search.goods}
-                phx-hook="tributeAutoComplete"
-                url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=good&name="}
-              />
-            </div>
-            <div class="w-[8%]">
+            <div class="w-[10%]">
               <.input
                 label={gettext("From")}
                 name="search[f_date]"
@@ -123,7 +183,7 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
                 value={@search.f_date}
               />
             </div>
-            <div class="w-[8%]">
+            <div class="w-[10%]">
               <.input
                 label={gettext("To")}
                 name="search[t_date]"
@@ -147,6 +207,17 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
                 CSV
               </.link>
             </div>
+          </div>
+          <div class="w-[100%]">
+            <.input
+              label={gettext("Good List")}
+              type="textarea"
+              id="search_goods"
+              name="search[goods]"
+              value={@search.goods}
+              phx-hook="tributeAutoComplete"
+              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=good&name="}
+            />
           </div>
         </.form>
       </div>

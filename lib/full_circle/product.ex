@@ -804,6 +804,18 @@ defmodule FullCircle.Product do
     |> Repo.one!()
   end
 
+  def get_goods_by_category(cat, com, user) do
+    from(good in subquery(good_query(com, user)),
+      where: good.category == ^cat,
+      select: %{
+        id: good.id,
+        name: good.name
+      },
+      order_by: good.name
+    )
+    |> Repo.all()
+  end
+
   def get_good_by_name(name, company, user) do
     name = name |> String.trim()
 
