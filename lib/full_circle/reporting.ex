@@ -294,7 +294,7 @@ defmodule FullCircle.Reporting do
           doc_date: q.doc_date,
           doc_type: q.doc_type,
           doc_no: q.doc_no,
-          doc_id: type(coalesce(q.doc_id, ^Ecto.UUID.bingenerate()), :string),
+          doc_id: type(coalesce(q.doc_id, coalesce(q.fixed_asset_id, ^Ecto.UUID.bingenerate())), :string),
           particulars: q.particulars,
           amount: q.amount,
           reconciled: q.reconciled,

@@ -957,13 +957,25 @@ defmodule FullCircleWeb.CoreComponents do
   attr(:rest, :global)
 
   def doc_link(assigns) do
-    action = if assigns.doc_obj.doc_type == "PaySlip", do: "view", else: "edit"
-    assigns = assign(assigns, :action, action)
+    {action, doc_type, doc_id} =
+      cond do
+        assigns.doc_obj.doc_type == "PaySlip" ->
+          {"view", assigns.doc_obj.doc_type, assigns.doc_obj.doc_id}
+
+        assigns.doc_obj.doc_type == "fixed_asset_depreciations" ->
+          {"depreciations", "fixed_assets", assigns.doc_obj.doc_id}
+
+        true ->
+          {"edit", assigns.doc_obj.doc_type, assigns.doc_obj.doc_id}
+      end
+
+    assigns =
+      assign(assigns, :action, action) |> assign(:doc_type, doc_type) |> assign(:doc_id, doc_id)
 
     ~H"""
     <.link
       class={["text-blue-600 hover:font-bold", @klass]}
-      navigate={"/companies/#{@current_company.id}/#{@doc_obj.doc_type}/#{@doc_obj.doc_id}/#{@action}"}
+      navigate={"/companies/#{@current_company.id}/#{@doc_type}/#{@doc_id}/#{@action}"}
       {@rest}
     >
       <%= @doc_obj.doc_no %>
