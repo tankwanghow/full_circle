@@ -39,6 +39,9 @@ defmodule FullCircleWeb.CsvController do
           []
       end
 
+    IO.inspect row
+    IO.inspect col
+
     filename = "#{rep}_#{month}_#{year}"
 
     send_csv_row_col(conn, row, col, filename)
@@ -109,6 +112,20 @@ defmodule FullCircleWeb.CsvController do
 
     filename = "house_feed_type_#{mth}_#{yr}"
     send_csv_map(conn, data, fields, filename)
+  end
+
+  def show(conn, %{
+        "report" => "fixed_assets_report",
+        "tdate" => tdate
+      }) do
+    com = get_session(conn, "current_company")
+    tdate = tdate |> Timex.parse!("{YYYY}-{0M}-{0D}") |> NaiveDateTime.to_date()
+
+    {col, row} = FullCircle.Reporting.fixed_assets(tdate, com)
+
+    filename = "fixed_assets_report_#{tdate}"
+
+    send_csv_row_col(conn, row, col, filename)
   end
 
   def show(conn, %{
