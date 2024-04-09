@@ -481,7 +481,8 @@ defmodule FullCircleWeb.PaymentLive.Form do
             <.input
               field={@form[:funds_amount]}
               label={gettext("Funds Amount")}
-              type="number"
+              phx-hook="calculatorInput"
+              klass="text-right"
               step="0.01"
             />
           </div>

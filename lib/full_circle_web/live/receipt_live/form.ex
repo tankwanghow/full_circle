@@ -504,8 +504,9 @@ defmodule FullCircleWeb.ReceiptLive.Form do
             <.input
               field={@form[:funds_amount]}
               label={gettext("Funds Amount")}
-              type="number"
               step="0.01"
+              phx-hook="calculatorInput"
+              klass="text-right"
             />
           </div>
           <div class="grow shrink w-2/12">
