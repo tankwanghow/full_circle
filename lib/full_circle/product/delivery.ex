@@ -48,6 +48,7 @@ defmodule FullCircle.Product.Delivery do
     ])
     |> validate_date(:delivery_date, days_before: 2)
     |> validate_date(:delivery_date, days_after: 2)
+    |> validate_length(:descriptions, max: 230)
     |> unsafe_validate_unique([:delivery_no, :company_id], FullCircle.Repo,
       message: gettext("Delivery No already in company")
     )

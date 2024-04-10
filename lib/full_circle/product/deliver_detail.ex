@@ -51,6 +51,7 @@ defmodule FullCircle.Product.DeliveryDetail do
     |> validate_id(:good_name, :good_id)
     |> validate_id(:package_name, :package_id)
     |> validate_number(:delivery_qty, greater_than: 0)
+    |> validate_length(:descriptions, max: 230)
     |> compute_fields()
     |> maybe_mark_for_deletion()
   end

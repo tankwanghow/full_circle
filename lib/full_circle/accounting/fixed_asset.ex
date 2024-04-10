@@ -73,6 +73,8 @@ defmodule FullCircle.Accounting.FixedAsset do
     ])
     |> validate_id(:asset_ac_name, :asset_ac_id)
     |> validate_id(:depre_ac_name, :depre_ac_id)
+    |> validate_length(:descriptions, max: 230)
+    |> validate_length(:name, max: 230)
     |> validate_id(:disp_fund_ac_name, :disp_fund_ac_id)
     |> validate_id(:cume_depre_ac_name, :cume_depre_ac_id)
     |> validate_number(:depre_rate, greater_than_or_equal_to: 0, less_than_or_equal_to: 1)

@@ -66,6 +66,7 @@ defmodule FullCircle.Billing.PurInvoice do
     |> validate_date(:pur_invoice_date, days_before: 60)
     |> validate_date(:pur_invoice_date, days_after: 0)
     |> validate_id(:contact_name, :contact_id)
+    |> validate_length(:descriptions, max: 230)
     |> unsafe_validate_unique([:pur_invoice_no, :company_id], FullCircle.Repo,
       message: gettext("pur_invoice no already in company")
     )

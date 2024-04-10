@@ -57,6 +57,7 @@ defmodule FullCircle.BillPay.Payment do
       :funds_amount
     ])
     |> validate_id(:contact_name, :contact_id)
+    |> validate_length(:descriptions, max: 230)
     |> validate_id(:funds_account_name, :funds_account_id)
     |> validate_date(:payment_date, days_before: 60)
     |> validate_date(:payment_date, days_after: 0)

@@ -59,6 +59,7 @@ defmodule FullCircle.ReceiveFund.Receipt do
       :funds_amount
     ])
     |> validate_funds_account_name()
+    |> validate_length(:descriptions, max: 230)
     |> validate_date(:receipt_date, days_after: 0)
     |> validate_date(:receipt_date, days_before: 60)
     |> validate_id(:contact_name, :contact_id)

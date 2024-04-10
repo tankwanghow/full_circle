@@ -56,6 +56,7 @@ defmodule FullCircle.HR.Recurring do
     |> validate_id(:salary_type_name, :salary_type_id)
     |> fill_today(:recur_date)
     |> validate_date(:recur_date, days_before: 5)
+    |> validate_length(:descriptions, max: 230)
     |> validate_date(:recur_date, days_after: 5)
     |> validate_date(:start_date, days_before: 0)
     |> unsafe_validate_unique([:recur_no, :company_id], FullCircle.Repo,

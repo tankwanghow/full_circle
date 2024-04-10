@@ -59,6 +59,8 @@ defmodule FullCircle.Sys.Company do
       less_than: 32,
       message: gettext("must between 1 to 31")
     )
+    |> validate_length(:descriptions, max: 230)
+    |> validate_length(:name, max: 230)
     |> validate_inclusion(:country, FullCircle.Sys.countries(), message: gettext("not in list"))
     |> validate_inclusion(:timezone, Tzdata.zone_list(), message: gettext("not in list"))
     |> validate_unique_by_user(:name, user)

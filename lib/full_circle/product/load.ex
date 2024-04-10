@@ -48,6 +48,7 @@ defmodule FullCircle.Product.Load do
     ])
     |> validate_date(:load_date, days_before: 2)
     |> validate_date(:load_date, days_after: 2)
+    |> validate_length(:descriptions, max: 230)
     |> unsafe_validate_unique([:load_no, :company_id], FullCircle.Repo,
       message: gettext("Load No already in company")
     )

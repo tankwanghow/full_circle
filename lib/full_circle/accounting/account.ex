@@ -21,6 +21,8 @@ defmodule FullCircle.Accounting.Account do
     account
     |> cast(attrs, [:company_id, :account_type, :name, :descriptions])
     |> validate_required([:company_id, :account_type, :name])
+    |> validate_length(:descriptions, max: 230)
+    |> validate_length(:name, max: 230)
     |> validate_inclusion(:account_type, FullCircle.Accounting.account_types(),
       message: gettext("not in list")
     )

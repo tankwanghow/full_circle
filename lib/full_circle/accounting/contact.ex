@@ -40,6 +40,8 @@ defmodule FullCircle.Accounting.Contact do
       :company_id
     ])
     |> validate_required([:name, :company_id])
+    |> validate_length(:descriptions, max: 230)
+    |> validate_length(:name, max: 230)
     |> validate_inclusion(:country, FullCircle.Sys.countries(), message: gettext("not in list"))
     |> unsafe_validate_unique([:name, :company_id], FullCircle.Repo,
       message: gettext("has already been taken")

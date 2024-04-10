@@ -43,6 +43,7 @@ defmodule FullCircle.Product.Order do
     |> validate_date(:order_date, days_before: 2)
     |> validate_date(:order_date, days_after: 2)
     |> validate_id(:customer_name, :customer_id)
+    |> validate_length(:descriptions, max: 230)
     |> unsafe_validate_unique([:order_no, :company_id], FullCircle.Repo,
       message: gettext("Order No already in company")
     )
