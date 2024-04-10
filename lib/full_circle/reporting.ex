@@ -484,23 +484,26 @@ defmodule FullCircle.Reporting do
   def fixed_assets(tdate, com) do
     pcdate = prev_close_date(tdate, com)
     "
-    select acname, name, pur_date, pur_price, max_depre_date, depre_rate, cur_depre, cume_depre, cur_disp, cume_disp,
-           pur_price - cur_depre - cume_depre - cur_disp - cume_disp as nbv
-      from (select ac.name as acname, fa.name, fa.pur_date, fa.pur_price, max(fad.depre_date) as max_depre_date,
-               sum(case when fad.depre_date >= '#{pcdate}' then fad.amount else 0 end) as cur_depre,
-               sum(case when fad.depre_date < '#{pcdate}' then fad.amount else 0 end) as cume_depre,
-               sum(case when fad2.disp_date >= '#{pcdate}' then fad2.amount else 0 end) as cur_disp,
-               sum(case when fad2.disp_date < '#{pcdate}' then fad2.amount else 0 end) as cume_disp,
-               fa.depre_rate
-	        from fixed_assets fa inner join accounts ac
-            on ac.id = fa.asset_ac_id	left outer join fixed_asset_depreciations fad
-            on fa.id = fad.fixed_asset_id	left outer join fixed_asset_disposals fad2
-            on fad2.fixed_asset_id = fa.id
-         where fa.status = 'Active'
-           and fa.company_id = '#{com.id}'
-		       and (fad.depre_date <= '#{tdate}' or fad2.disp_date <= '#{tdate}')
-	       group by ac.name, fa.name, fa.pur_price, fa.pur_date, fa.depre_rate
-         order by 1, 2) as fa0
+    select acname, name, pur_date, pur_price, prev_disp, cur_disp, cume_disp, depre_rate,
+           prev_depre, cur_depre, cume_depre,
+           case when pur_price - cume_depre - cume_disp < 0 then 0 else pur_price - cume_depre - cume_disp end as nbv
+      from (select ac.name as acname, fa.name, fa.pur_date, fa.pur_price,
+                   sum(case when fad2.disp_date <= '#{pcdate}' then fad2.amount else 0 end) as prev_disp,
+                   sum(case when fad2.disp_date > '#{pcdate}'  and fad2.disp_date <= '#{tdate}' then fad2.amount else 0 end) as cur_disp,
+                   sum(case when fad2.disp_date <= '#{tdate}' then fad2.amount else 0 end) as cume_disp,
+                   sum(case when fad.depre_date <= '#{pcdate}' then fad.amount else 0 end) as prev_depre,
+                   sum(case when fad.depre_date > '#{pcdate}' and fad.depre_date <= '#{tdate}' then fad.amount else 0 end) as cur_depre,
+                   sum(case when fad.depre_date <= '#{tdate}' then fad.amount else 0 end) as cume_depre,
+                   fa.depre_rate, fa.status
+	            from fixed_assets fa inner join accounts ac
+                on ac.id = fa.asset_ac_id	left outer join fixed_asset_depreciations fad
+                on fa.id = fad.fixed_asset_id	left outer join fixed_asset_disposals fad2
+                on fad2.fixed_asset_id = fa.id
+             where fa.company_id = '#{com.id}'
+		           and (fad.depre_date <= '#{tdate}' or fad2.disp_date <= '#{tdate}')
+	           group by ac.name, fa.name, fa.pur_price, fa.pur_date, fa.depre_rate, fa.status
+             order by 1, 2) as fa0
+     where (cur_depre > 0 or cur_disp > 0 or status = 'Active')
     " |> exec_query_row_col()
   end
 end
