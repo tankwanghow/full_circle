@@ -321,7 +321,7 @@ defmodule FullCircle.BillPay do
         |> Enum.map(fn {k, v} ->
           %{
             account_id: k,
-            match_doc_nos: Enum.map(v, fn x -> x.t_doc_no end) |> Enum.join(", "),
+            match_doc_nos: Enum.map(v, fn x -> x.t_doc_no end) |> Enum.join(", ") |> String.slice(0..200),
             amount: Enum.reduce(v, 0, fn x, acc -> Decimal.add(acc, x.match_amount) end)
           }
         end)
