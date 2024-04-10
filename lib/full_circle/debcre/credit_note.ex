@@ -99,8 +99,8 @@ defmodule FullCircle.DebCre.CreditNote do
       |> sum_field_to(:credit_note_details, :quantity, :sum_qty)
 
     cond do
-      Decimal.lt?(fetch_field!(changeset, :note_amount), 0) ->
-        add_unique_error(changeset, :note_amount, gettext("must be +ve"))
+      Decimal.to_float(fetch_field!(changeset, :note_amount)) >= 0.0 ->
+        add_unique_error(changeset, :note_amount, gettext("must be > 0"))
 
       Decimal.eq?(fetch_field!(changeset, :sum_qty), 0) ->
         add_unique_error(changeset, :note_amount, gettext("need detail"))

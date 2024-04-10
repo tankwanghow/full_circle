@@ -83,8 +83,8 @@ defmodule FullCircle.Billing.PurInvoice do
       |> sum_field_to(:pur_invoice_details, :quantity, :sum_qty)
 
     cond do
-      Decimal.lt?(fetch_field!(changeset, :pur_invoice_amount), 0) ->
-        add_unique_error(changeset, :pur_invoice_amount, gettext("must be +ve"))
+      Decimal.to_float(fetch_field!(changeset, :pur_invoice_amount)) <= 0.0 ->
+        add_unique_error(changeset, :pur_invoice_amount, gettext("must be > 0"))
 
       Decimal.eq?(fetch_field!(changeset, :sum_qty), 0) ->
         add_unique_error(changeset, :pur_invoice_amount, gettext("need detail"))
