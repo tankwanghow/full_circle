@@ -109,7 +109,6 @@ defmodule FullCircle.DebCre.DebitNote do
 
     cond do
       Decimal.to_float(fetch_field!(changeset, :note_amount)) <= 0.0 ->
-        IO.inspect fetch_field!(changeset, :note_amount)
         add_unique_error(changeset, :note_amount, gettext("must be > 0"))
 
       Decimal.eq?(fetch_field!(changeset, :sum_qty), 0) ->
