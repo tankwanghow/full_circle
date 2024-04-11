@@ -80,6 +80,14 @@ defmodule FullCircleWeb.ReportLive.EpfSocsoEis do
             socket.assigns.current_company.id
           )
 
+        report == "SOCSO+EIS" ->
+          FullCircle.HR.socso_eis_submit_file_format_query(
+            month,
+            year,
+            code,
+            socket.assigns.current_company.id
+          )
+
         true ->
           {[], []}
       end
@@ -106,7 +114,7 @@ defmodule FullCircleWeb.ReportLive.EpfSocsoEis do
                 options={[
                   "EPF",
                   "SOCSO",
-                  "EIS"
+                  "EIS", "SOCSO+EIS"
                 ]}
                 type="select"
                 label={gettext("Report")}

@@ -375,7 +375,8 @@ defmodule FullCircle.Reporting do
   end
 
   defp contact_aging_query(ids, edate, days, com_id) do
-    "with
+    """
+      with
         has_balance_contacts as (
           select c.id, c.name
             from contacts c
@@ -423,11 +424,12 @@ defmodule FullCircle.Reporting do
         select contact_id, contact_name, p1, p2, p3, p4, p5,
                p1 + p2 + p3 + p4 + p5 as total
           from aging_list where true
-    "
+    """
   end
 
   defp contact_aging_query(edate, days, com_id) do
-    "with
+    """
+      with
         has_balance_contacts as (
           select c.id, c.name
             from contacts c inner join transactions t
@@ -478,12 +480,12 @@ defmodule FullCircle.Reporting do
         select contact_id, contact_name, p1, p2, p3, p4, p5,
                p1 + p2 + p3 + p4 + p5 as total
           from aging_list where true
-    "
+    """
   end
 
   def fixed_assets(tdate, com) do
     pcdate = prev_close_date(tdate, com)
-    "
+    """
     select acname, name, pur_date, pur_price, prev_disp, cur_disp, cume_disp, depre_rate,
            prev_depre, cur_depre, cume_depre,
            case when pur_price - cume_depre - cume_disp < 0 then 0 else pur_price - cume_depre - cume_disp end as nbv
@@ -504,6 +506,6 @@ defmodule FullCircle.Reporting do
 	           group by ac.name, fa.name, fa.pur_price, fa.pur_date, fa.depre_rate, fa.status
              order by 1, 2) as fa0
      where (cur_depre > 0 or cur_disp > 0 or status = 'Active')
-    " |> exec_query_row_col()
+    """ |> exec_query_row_col()
   end
 end
