@@ -15,7 +15,7 @@ defmodule FullCircleWeb.ReportLive.StatementComponent do
   def render(assigns) do
     ~H"""
     <div id={"objects-#{@id}"} class="flex flex-row text-center tracking-tighter">
-      <div class="w-[10%] border rounded bg-green-200 border-green-400 px-2 py-1">
+      <div class="w-[6%] border rounded bg-green-200 border-green-400 px-2 py-1">
         <input
           :if={@obj.checked}
           id={"checkbox_#{@obj.id}"}
@@ -34,11 +34,21 @@ defmodule FullCircleWeb.ReportLive.StatementComponent do
           phx-value-object-id={@obj.id}
         />
       </div>
-      <div class="w-[60%] border rounded bg-green-200 border-green-400 px-2 py-1">
+      <div class="w-[47%] border rounded bg-green-200 border-green-400 px-2 py-1">
         <%= @obj.name %>
       </div>
-      <div class="w-[30%] border rounded bg-green-200 border-green-400 text-center px-2 py-1">
+      <div class="w-[13%] border rounded bg-blue-200 border-blue-400 text-center px-2 py-1">
         <%= @obj.balance |> Number.Delimit.number_to_delimited() %>
+      </div>
+
+      <div class="w-[8%] border rounded bg-rose-200 border-rose-400 text-center px-2 py-1">
+        <%= @obj.chqs %>
+      </div>
+      <div class="w-[13%] border rounded bg-rose-200 border-rose-400 text-center px-2 py-1">
+        <%= @obj.chqs_amt |> Number.Delimit.number_to_delimited() %>
+      </div>
+      <div class="w-[13%] border rounded bg-orange-200 border-orange-400 text-center px-2 py-1">
+        <%= Decimal.add(@obj.balance, @obj.chqs_amt) |> Number.Delimit.number_to_delimited() %>
       </div>
     </div>
     """

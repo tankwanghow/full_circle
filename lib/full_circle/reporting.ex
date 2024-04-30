@@ -106,17 +106,33 @@ defmodule FullCircle.Reporting do
   end
 
   def debtors_balance(gt, at_date, com) do
-    from(cont in Contact,
-      join: txn in Transaction,
-      on: cont.id == txn.contact_id,
-      where: cont.company_id == ^com.id,
-      where: txn.doc_date <= ^at_date,
-      select: %{checked: false, id: cont.id, name: cont.name, balance: sum(txn.amount)},
-      group_by: [cont.id],
-      having: sum(txn.amount) > ^gt,
-      order_by: cont.name
-    )
-    |> Repo.all()
+    a =
+      from(cont in Contact,
+        join: txn in Transaction,
+        on: cont.id == txn.contact_id,
+        where: cont.company_id == ^com.id,
+        where: txn.doc_date <= ^at_date,
+        select: %{checked: false, id: cont.id, name: cont.name, balance: sum(txn.amount)},
+        group_by: [cont.id],
+        having: sum(txn.amount) > ^gt,
+        order_by: cont.name
+      )
+      |> Repo.all()
+
+    b = contact_undeposit_cheques_amount(at_date, com)
+
+    a
+    |> Enum.map(fn aa ->
+      q = Enum.find(b, fn qq -> qq.contact_id == aa.id end)
+
+      Map.merge(
+        aa,
+        if(q,
+          do: %{chqs: q.cheques, chqs_amt: q.amount},
+          else: %{chqs: 0, chqs_amt: Decimal.new(0)}
+        )
+      )
+    end)
   end
 
   defp balance_sheet_query(at_date, com) do
@@ -198,10 +214,13 @@ defmodule FullCircle.Reporting do
       |> exec_query_map()
       |> fix_unmatch_balance("debtor")
 
+    pdcs = contact_undeposit_cheques_amount(ids, edate, com)
+
     conts
     |> Enum.map(fn c ->
       c
       |> Map.merge(%{aging: Enum.find(agings, fn a -> a.contact_id == c.id end)})
+      |> Map.merge(%{pd_chqs: Enum.find(pdcs, fn a -> a.contact_id == c.id end)})
       |> Map.merge(%{
         transactions:
           contact_transactions(c, sdate, edate, com)
@@ -211,6 +230,57 @@ defmodule FullCircle.Reporting do
           end)
       })
     end)
+  end
+
+  defp contact_undeposit_cheques(com) do
+    from(chq in ReceivedCheque,
+      join: rec in Receipt,
+      on: rec.id == chq.receipt_id,
+      join: cont in Contact,
+      on: cont.id == rec.contact_id,
+      left_join: dep in Deposit,
+      on: dep.id == chq.deposit_id,
+      left_join: rtn in ReturnCheque,
+      on: rtn.id == chq.return_cheque_id,
+      where: rec.company_id == ^com.id,
+      select: %{
+        contact_name: cont.name,
+        contact_id: cont.id,
+        amount: chq.amount,
+        deposit_date: dep.deposit_date,
+        return_date: rtn.return_date
+      }
+    )
+  end
+
+  def contact_undeposit_cheques_amount(edate, com) do
+    q = from(x in contact_undeposit_cheques(com))
+
+    r1 = from r in subquery(q), where: is_nil(r.deposit_date), where: is_nil(r.return_date)
+    r2 = from r in subquery(q), where: r.deposit_date > ^edate or r.return_date > ^edate
+
+    r3 = union_all(r1, ^r2)
+
+    from(r in subquery(r3),
+      select: %{contact_id: r.contact_id, cheques: count(), amount: sum(r.amount)},
+      group_by: [r.contact_id]
+    )
+    |> Repo.all()
+  end
+
+  def contact_undeposit_cheques_amount(ids, edate, com) do
+    q = from x in subquery(contact_undeposit_cheques(com)), where: x.contact_id in ^ids
+
+    r1 = from r in subquery(q), where: is_nil(r.deposit_date), where: is_nil(r.return_date)
+    r2 = from r in subquery(q), where: r.deposit_date > ^edate or r.return_date > ^edate
+
+    r3 = union_all(r1, ^r2)
+
+    from(r in subquery(r3),
+      select: %{contact_id: r.contact_id, cheques: count(), amount: sum(r.amount)},
+      group_by: [r.contact_id]
+    )
+    |> Repo.all()
   end
 
   def contact_transactions(ct, sdate, edate, com) do
@@ -294,7 +364,11 @@ defmodule FullCircle.Reporting do
           doc_date: q.doc_date,
           doc_type: q.doc_type,
           doc_no: q.doc_no,
-          doc_id: type(coalesce(q.doc_id, coalesce(q.fixed_asset_id, ^Ecto.UUID.bingenerate())), :string),
+          doc_id:
+            type(
+              coalesce(q.doc_id, coalesce(q.fixed_asset_id, ^Ecto.UUID.bingenerate())),
+              :string
+            ),
           particulars: q.particulars,
           amount: q.amount,
           reconciled: q.reconciled,
@@ -485,6 +559,7 @@ defmodule FullCircle.Reporting do
 
   def fixed_assets(tdate, com) do
     pcdate = prev_close_date(tdate, com)
+
     """
     select acname, name, pur_date, pur_price, prev_disp, cur_disp, cume_disp, depre_rate,
            prev_depre, cur_depre, cume_depre,
@@ -497,15 +572,16 @@ defmodule FullCircle.Reporting do
                    sum(case when fad.depre_date > '#{pcdate}' and fad.depre_date <= '#{tdate}' then fad.amount else 0 end) as cur_depre,
                    sum(case when fad.depre_date <= '#{tdate}' then fad.amount else 0 end) as cume_depre,
                    fa.depre_rate, fa.status
-	            from fixed_assets fa inner join accounts ac
+             from fixed_assets fa inner join accounts ac
                 on ac.id = fa.asset_ac_id	left outer join fixed_asset_depreciations fad
                 on fa.id = fad.fixed_asset_id	left outer join fixed_asset_disposals fad2
                 on fad2.fixed_asset_id = fa.id
              where fa.company_id = '#{com.id}'
-		           and (fad.depre_date <= '#{tdate}' or fad2.disp_date <= '#{tdate}')
-	           group by ac.name, fa.name, fa.pur_price, fa.pur_date, fa.depre_rate, fa.status
+             and (fad.depre_date <= '#{tdate}' or fad2.disp_date <= '#{tdate}')
+            group by ac.name, fa.name, fa.pur_price, fa.pur_date, fa.depre_rate, fa.status
              order by 1, 2) as fa0
      where (cur_depre > 0 or cur_disp > 0 or status = 'Active')
-    """ |> exec_query_row_col()
+    """
+    |> exec_query_row_col()
   end
 end

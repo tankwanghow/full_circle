@@ -174,10 +174,13 @@ defmodule FullCircleWeb.ReportLive.Statement do
         [
           gettext("Print"),
           gettext("Account"),
-          gettext("Balance")
+          gettext("Balance"),
+          gettext("PD Chqs"),
+          gettext("PD Chqs Amt"),
+          gettext("Actual")
         ],
         "font-medium flex flex-row text-center tracking-tighter mb-1",
-        ["10%", "60%", "30%"],
+        ["6%", "47%", "13%", "8%", "13%", "13%"],
         "border rounded bg-gray-200 border-gray-400 px-2 py-1",
         assigns
       ) %>

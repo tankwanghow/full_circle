@@ -61,7 +61,7 @@ defmodule FullCircleWeb.ReportLive.Statement.Print do
               <% end %>
             </div>
             <%= if(n == contact.chunk_number,
-              do: print_aging(assigns, contact.aging),
+              do: print_aging(assigns, contact.aging, contact.pd_chqs),
               else: "continue...."
             ) %>
           </div>
@@ -97,8 +97,8 @@ defmodule FullCircleWeb.ReportLive.Statement.Print do
     """
   end
 
-  defp print_aging(assigns, aging) do
-    assigns = assign(assigns, :aging, aging)
+  defp print_aging(assigns, aging, pd_chqs) do
+    assigns = assign(assigns, :aging, aging) |> assign(:pd_chqs, pd_chqs)
 
     ~H"""
     <div class="aging_group">
@@ -109,6 +109,7 @@ defmodule FullCircleWeb.ReportLive.Statement.Print do
         <div class="aging_p header">90-120 days</div>
         <div class="aging_p header">120++ days</div>
         <div class="aging_p header total">Total</div>
+        <div :if={@pd_chqs} class="aging_p header"><%= @pd_chqs.cheques %> PD Chqs</div>
       </div>
     </div>
     <div class="aging_group">
@@ -122,6 +123,9 @@ defmodule FullCircleWeb.ReportLive.Statement.Print do
           <%= (@aging.p1 + @aging.p2 + @aging.p3 + @aging.p4 + @aging.p5)
           |> Number.Delimit.number_to_delimited() %>
         </div>
+        <div :if={@pd_chqs} class="aging_p">
+          <%= @pd_chqs.amount |> Number.Delimit.number_to_delimited() %>
+        </div>
       </div>
       <div :if={is_nil(@aging)} class="aging">
         <div class="aging_p">0.00</div>
@@ -130,6 +134,7 @@ defmodule FullCircleWeb.ReportLive.Statement.Print do
         <div class="aging_p">0.00</div>
         <div class="aging_p">0.00</div>
         <div class="aging_p total">0.00</div>
+        <div :if={@pd_chqs} class="aging_p">0.00</div>
       </div>
     </div>
     """
