@@ -31,7 +31,7 @@ defmodule FullCircleWeb.PaymentLive.Print do
   defp set_page_defaults(socket) do
     socket
     |> assign(:detail_body_height, 160)
-    |> assign(:detail_height, 11)
+    |> assign(:detail_height, 9)
     |> assign(:company, FullCircle.Sys.get_company!(socket.assigns.current_company.id))
   end
 

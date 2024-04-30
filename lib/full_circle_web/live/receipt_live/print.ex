@@ -31,7 +31,7 @@ defmodule FullCircleWeb.ReceiptLive.Print do
   defp set_page_defaults(socket) do
     socket
     |> assign(:detail_body_height, 160)
-    |> assign(:detail_height, 11)
+    |> assign(:detail_height, 9)
     |> assign(:company, FullCircle.Sys.get_company!(socket.assigns.current_company.id))
   end
 
@@ -456,7 +456,7 @@ defmodule FullCircleWeb.ReceiptLive.Print do
       .receipt-header { border-bottom: 0.5mm solid black; }
       .receipt-footer { display: flex; }
       .terms { height: 15mm; }
-      .sign { padding: 3mm; border-top: 2px dotted black; width: 30%; text-align: center; float: right; margin-left: 2mm; margin-top: 10mm;}
+      .sign { padding: 3mm; border-top: 2px dotted black; width: 30%; text-align: center; float: right; margin-left: 2mm; margin-top: 8mm;}
     </style>
     """
   end
@@ -479,11 +479,12 @@ defmodule FullCircleWeb.ReceiptLive.Print do
         .page { padding: 5mm; page-break-after: always;} }
 
       .letter-head { padding-bottom: 2mm; margin-bottom: 2mm; height: 28mm;}
-      .letter-foot { padding-top: 2mm; margin-top: 2mm; height: 28mm;}
+      .letter-foot { padding-top: 2mm; margin-top: 2mm; height: 25mm;}
 
       .doctype { float: right; margin-top: -20mm; margin-right: 0mm; }
       .receipt-info { float: right; }
       .receipt-header { width: 100%; height: 40mm; border-bottom: 0.5mm solid black; }
+      .receipt-footer { display: flex; }
       .customer { padding-left: 2mm; float: left;}
       .receipt-info div { margin-bottom: 2mm; text-align: right; }
       .details-header { display: flex; padding-bottom: 1mm; padding-top: 1mm; border-bottom: 0.5mm dotted black; margin-bottom: 3px;}
