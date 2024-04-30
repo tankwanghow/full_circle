@@ -240,7 +240,7 @@ defmodule FullCircle.Layer do
             and d.flock_id = m.flock_id
           where (m.qty - coalesce(d.qty, 0)) > 0
             and date_part('day', '#{dt}'::timestamp -
-                          (select max(x) from unnest(array[m.info_date, coalesce(d.info_date, m.info_date)]) as x)::timestamp) < 90
+                          (select max(x) from unnest(array[m.info_date, coalesce(d.info_date, m.info_date)]) as x)::timestamp) < 75
          )
 
      select h.id, h.house_no, info.flock_id, h.capacity, info.flock_no, h.filling_wages, h.feeding_wages, h.status,
