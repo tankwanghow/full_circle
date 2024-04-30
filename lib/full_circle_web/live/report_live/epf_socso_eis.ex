@@ -114,7 +114,8 @@ defmodule FullCircleWeb.ReportLive.EpfSocsoEis do
                 options={[
                   "EPF",
                   "SOCSO",
-                  "EIS", "SOCSO+EIS"
+                  "EIS",
+                  "SOCSO+EIS"
                 ]}
                 type="select"
                 label={gettext("Report")}

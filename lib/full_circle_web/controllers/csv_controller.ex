@@ -36,12 +36,12 @@ defmodule FullCircleWeb.CsvController do
           )
 
         rep == "SOCSO+EIS" ->
-            FullCircle.HR.socso_eis_submit_file_format_query(
-              month,
-              year,
-              code,
-              com_id
-            )
+          FullCircle.HR.socso_eis_submit_file_format_query(
+            month,
+            year,
+            code,
+            com_id
+          )
 
         true ->
           []

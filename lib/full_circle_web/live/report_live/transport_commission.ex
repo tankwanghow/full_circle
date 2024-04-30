@@ -56,6 +56,7 @@ defmodule FullCircleWeb.ReportLive.TransportCommission do
 
   defp query(socket, tags, f_date, t_date) do
     current_company = socket.assigns.current_company
+
     socket
     |> assign_async(
       :result,

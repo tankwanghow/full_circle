@@ -65,6 +65,7 @@ defmodule FullCircleWeb.WeighingLive.GoodsReport do
 
   defp filter_objects(socket, glist, f_date, t_date) do
     current_company = socket.assigns.current_company
+
     socket
     |> assign_async(
       :result,

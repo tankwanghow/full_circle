@@ -52,6 +52,7 @@ defmodule FullCircleWeb.ReportLive.HouseFeed do
 
   defp filter_transactions(socket, _report, month, year) do
     current_company = socket.assigns.current_company
+
     socket
     |> assign_async(
       :result,

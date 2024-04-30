@@ -48,6 +48,7 @@ defmodule FullCircleWeb.LayerLive.HarvestWageReport do
 
   defp filter_transactions(socket, f_date, t_date) do
     current_company = socket.assigns.current_company
+
     socket
     |> assign_async(
       :result,
