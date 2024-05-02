@@ -107,10 +107,11 @@ defmodule FullCircleWeb.CsvController do
         "company_id" => com_id,
         "report" => "housefeed",
         "month" => mth,
-        "year" => yr
+        "year" => yr,
+        "field" => fld
       }) do
     data =
-      FullCircle.Layer.house_feed_type_query(mth, yr, com_id)
+      FullCircle.Layer.house_feed_type_query(mth, yr, com_id, fld)
       |> FullCircle.Helpers.exec_query_map()
 
     fields = data |> Enum.at(0) |> Map.keys()

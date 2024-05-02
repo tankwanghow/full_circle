@@ -8,7 +8,7 @@ defmodule FullCircleWeb.ReportLive.HouseFeedPrint do
     chunk = (detail_body_height / detail_height) |> floor
 
     {cols, rows} =
-      fill_data(socket, params["month"], params["year"])
+      fill_data(socket, params["month"], params["year"], params["field"])
 
     {:ok,
      socket
@@ -19,14 +19,16 @@ defmodule FullCircleWeb.ReportLive.HouseFeedPrint do
      |> assign(:rows, rows)
      |> assign(page_title: gettext("Print"))
      |> assign(:month, params["month"])
+     |> assign(:field, params["field"])
      |> assign(:year, params["year"])}
   end
 
-  defp fill_data(socket, month, year) do
+  defp fill_data(socket, month, year, field) do
     FullCircle.Layer.house_feed_type_query(
       month,
       year,
-      socket.assigns.current_company.id
+      socket.assigns.current_company.id,
+      field
     )
     |> FullCircle.Helpers.exec_query_row_col()
   end
@@ -79,7 +81,7 @@ defmodule FullCircleWeb.ReportLive.HouseFeedPrint do
   defp style(assigns) do
     ~H"""
     <style>
-      .detail { height: <%= @detail_height %>mm; vertical-align: middle; }
+      .details { height: <%= @detail_height %>mm; vertical-align: middle; }
       .page { width: 290mm; min-height: 210mm; padding: 5mm; }
 
       @media print {
@@ -88,10 +90,10 @@ defmodule FullCircleWeb.ReportLive.HouseFeedPrint do
         html { margin: 0mm; }
         .page { padding-left: 5mm; padding-top: 0mm; } }
 
-      .headers { display: flex; text-align: center; font-weight: bold;}
-      .details { display: flex; text-align: center; }
-      .headers .header { width: 4%; border: 1px solid gray; }
-      .details .detail { width: 4%; border: 1px solid gray; }
+      .headers { display: flex; text-align: center; font-weight: bold; }
+      .details { display: flex; text-align: center; font-size: 14px; }
+      .headers .header { width: 3.125%; border: 1px solid gray; }
+      .details .detail { width: 3.125%; border: 1px solid gray; }
     </style>
     """
   end
