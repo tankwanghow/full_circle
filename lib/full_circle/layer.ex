@@ -5,7 +5,7 @@ defmodule FullCircle.Layer do
   alias FullCircle.{Repo}
   alias FullCircle.Layer.{House, Flock, Movement, Harvest, HarvestDetail, HouseHarvestWage}
 
-  def house_feed_type_query(month, year, com_id) do
+  def house_feed_type_query(month, year, com_id, field \\ "feed_type") do
     fd = Date.new!(String.to_integer(year), String.to_integer(month), 1)
     td = Date.end_of_month(fd)
 
@@ -50,7 +50,7 @@ defmodule FullCircle.Layer do
          and h.status = 'Active'),
     house_date_feed_1 as (select * from house_date_feed_0 where age <= 120 union all select * from house_date),
     house_date_feed as (
-        select info_date, house_no, age, cur_qty,
+        select info_date, hdf1.house_no, age, cur_qty,
                case when age >= 0 and age <=  5 and cur_qty > 0 then 'A1'
                     when age >  5 and age <= 10 and cur_qty > 0 then 'A1'
                     when age > 10 and age <= 16 and cur_qty > 0 then 'A3'
@@ -59,41 +59,41 @@ defmodule FullCircle.Layer do
                     when age > 48 and age <= 70 and cur_qty > 0 then 'A6'
                     when age > 70 and age <= 80 and cur_qty > 0 then 'A7'
                     when age > 80 and cur_qty > 0 then 'A8'
-                    else '' end as feed_type
-          from house_date_feed_1)
+                    else '' end as feed_type, h.filling_wages, h.feeding_wages
+          from house_date_feed_1 hdf1 inner join houses h on h.id = hdf1.house_id)
 
       select cur.house_no as hou,
-            (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.info_date) = 1 and hdf.house_no = cur.house_no) as D1,
-            (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.info_date) = 2 and hdf.house_no = cur.house_no) as D2,
-            (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.info_date) = 3 and hdf.house_no = cur.house_no) as D3,
-            (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.info_date) = 4 and hdf.house_no = cur.house_no) as D4,
-            (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.info_date) = 5 and hdf.house_no = cur.house_no) as D5,
-            (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.info_date) = 6 and hdf.house_no = cur.house_no) as D6,
-            (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.info_date) = 7 and hdf.house_no = cur.house_no) as D7,
-            (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.info_date) = 8 and hdf.house_no = cur.house_no) as D8,
-            (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.info_date) = 9 and hdf.house_no = cur.house_no) as D9,
-            (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.info_date) = 10 and hdf.house_no = cur.house_no) as D10,
-            (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.info_date) = 11 and hdf.house_no = cur.house_no) as D11,
-            (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.info_date) = 12 and hdf.house_no = cur.house_no) as D12,
-            (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.info_date) = 13 and hdf.house_no = cur.house_no) as D13,
-            (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.info_date) = 14 and hdf.house_no = cur.house_no) as D14,
-            (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.info_date) = 15 and hdf.house_no = cur.house_no) as D15,
-            (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.info_date) = 16 and hdf.house_no = cur.house_no) as D16,
-            (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.info_date) = 17 and hdf.house_no = cur.house_no) as D17,
-            (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.info_date) = 18 and hdf.house_no = cur.house_no) as D18,
-            (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.info_date) = 19 and hdf.house_no = cur.house_no) as D19,
-            (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.info_date) = 20 and hdf.house_no = cur.house_no) as D20,
-            (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.info_date) = 21 and hdf.house_no = cur.house_no) as D21,
-            (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.info_date) = 22 and hdf.house_no = cur.house_no) as D22,
-            (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.info_date) = 23 and hdf.house_no = cur.house_no) as D23,
-            (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.info_date) = 24 and hdf.house_no = cur.house_no) as D24,
-            (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.info_date) = 25 and hdf.house_no = cur.house_no) as D25,
-            (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.info_date) = 26 and hdf.house_no = cur.house_no) as D26,
-            (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.info_date) = 27 and hdf.house_no = cur.house_no) as D27,
-            (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.info_date) = 28 and hdf.house_no = cur.house_no) as D28,
-            (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.info_date) = 29 and hdf.house_no = cur.house_no) as D29,
-            (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.info_date) = 30 and hdf.house_no = cur.house_no) as D30,
-            (select hdf.feed_type from house_date_feed hdf where extract(day from hdf.info_date) = 31 and hdf.house_no = cur.house_no) as D31
+            (select hdf.#{field} from house_date_feed hdf where extract(day from hdf.info_date) = 1 and hdf.house_no = cur.house_no) as D1,
+            (select hdf.#{field} from house_date_feed hdf where extract(day from hdf.info_date) = 2 and hdf.house_no = cur.house_no) as D2,
+            (select hdf.#{field} from house_date_feed hdf where extract(day from hdf.info_date) = 3 and hdf.house_no = cur.house_no) as D3,
+            (select hdf.#{field} from house_date_feed hdf where extract(day from hdf.info_date) = 4 and hdf.house_no = cur.house_no) as D4,
+            (select hdf.#{field} from house_date_feed hdf where extract(day from hdf.info_date) = 5 and hdf.house_no = cur.house_no) as D5,
+            (select hdf.#{field} from house_date_feed hdf where extract(day from hdf.info_date) = 6 and hdf.house_no = cur.house_no) as D6,
+            (select hdf.#{field} from house_date_feed hdf where extract(day from hdf.info_date) = 7 and hdf.house_no = cur.house_no) as D7,
+            (select hdf.#{field} from house_date_feed hdf where extract(day from hdf.info_date) = 8 and hdf.house_no = cur.house_no) as D8,
+            (select hdf.#{field} from house_date_feed hdf where extract(day from hdf.info_date) = 9 and hdf.house_no = cur.house_no) as D9,
+            (select hdf.#{field} from house_date_feed hdf where extract(day from hdf.info_date) = 10 and hdf.house_no = cur.house_no) as D10,
+            (select hdf.#{field} from house_date_feed hdf where extract(day from hdf.info_date) = 11 and hdf.house_no = cur.house_no) as D11,
+            (select hdf.#{field} from house_date_feed hdf where extract(day from hdf.info_date) = 12 and hdf.house_no = cur.house_no) as D12,
+            (select hdf.#{field} from house_date_feed hdf where extract(day from hdf.info_date) = 13 and hdf.house_no = cur.house_no) as D13,
+            (select hdf.#{field} from house_date_feed hdf where extract(day from hdf.info_date) = 14 and hdf.house_no = cur.house_no) as D14,
+            (select hdf.#{field} from house_date_feed hdf where extract(day from hdf.info_date) = 15 and hdf.house_no = cur.house_no) as D15,
+            (select hdf.#{field} from house_date_feed hdf where extract(day from hdf.info_date) = 16 and hdf.house_no = cur.house_no) as D16,
+            (select hdf.#{field} from house_date_feed hdf where extract(day from hdf.info_date) = 17 and hdf.house_no = cur.house_no) as D17,
+            (select hdf.#{field} from house_date_feed hdf where extract(day from hdf.info_date) = 18 and hdf.house_no = cur.house_no) as D18,
+            (select hdf.#{field} from house_date_feed hdf where extract(day from hdf.info_date) = 19 and hdf.house_no = cur.house_no) as D19,
+            (select hdf.#{field} from house_date_feed hdf where extract(day from hdf.info_date) = 20 and hdf.house_no = cur.house_no) as D20,
+            (select hdf.#{field} from house_date_feed hdf where extract(day from hdf.info_date) = 21 and hdf.house_no = cur.house_no) as D21,
+            (select hdf.#{field} from house_date_feed hdf where extract(day from hdf.info_date) = 22 and hdf.house_no = cur.house_no) as D22,
+            (select hdf.#{field} from house_date_feed hdf where extract(day from hdf.info_date) = 23 and hdf.house_no = cur.house_no) as D23,
+            (select hdf.#{field} from house_date_feed hdf where extract(day from hdf.info_date) = 24 and hdf.house_no = cur.house_no) as D24,
+            (select hdf.#{field} from house_date_feed hdf where extract(day from hdf.info_date) = 25 and hdf.house_no = cur.house_no) as D25,
+            (select hdf.#{field} from house_date_feed hdf where extract(day from hdf.info_date) = 26 and hdf.house_no = cur.house_no) as D26,
+            (select hdf.#{field} from house_date_feed hdf where extract(day from hdf.info_date) = 27 and hdf.house_no = cur.house_no) as D27,
+            (select hdf.#{field} from house_date_feed hdf where extract(day from hdf.info_date) = 28 and hdf.house_no = cur.house_no) as D28,
+            (select hdf.#{field} from house_date_feed hdf where extract(day from hdf.info_date) = 29 and hdf.house_no = cur.house_no) as D29,
+            (select hdf.#{field} from house_date_feed hdf where extract(day from hdf.info_date) = 30 and hdf.house_no = cur.house_no) as D30,
+            (select hdf.#{field} from house_date_feed hdf where extract(day from hdf.info_date) = 31 and hdf.house_no = cur.house_no) as D31
       from house_date_feed cur
       group by cur.house_no
       order by 1

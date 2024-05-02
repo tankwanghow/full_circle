@@ -15,13 +15,14 @@ defmodule FullCircleWeb.ReportLive.HouseFeed do
     params = params["search"]
 
     report = params["report"] || ""
+    field = params["field"] || "feed_type"
     month = params["month"] || ""
     year = params["year"] || ""
 
     {:noreply,
      socket
-     |> assign(search: %{report: report, month: month, year: year})
-     |> filter_transactions(report, month, year)}
+     |> assign(search: %{report: report, month: month, year: year, field: field})
+     |> filter_transactions(report, month, year, field)}
   end
 
   @impl true
@@ -31,7 +32,8 @@ defmodule FullCircleWeb.ReportLive.HouseFeed do
           "search" => %{
             "report" => report,
             "month" => month,
-            "year" => year
+            "year" => year,
+            "field" => field
           }
         },
         socket
@@ -39,7 +41,8 @@ defmodule FullCircleWeb.ReportLive.HouseFeed do
     qry = %{
       "search[report]" => report,
       "search[month]" => month,
-      "search[year]" => year
+      "search[year]" => year,
+      "search[field]" => field
     }
 
     url =
@@ -50,7 +53,7 @@ defmodule FullCircleWeb.ReportLive.HouseFeed do
      |> push_navigate(to: url)}
   end
 
-  defp filter_transactions(socket, _report, month, year) do
+  defp filter_transactions(socket, _report, month, year, field) do
     current_company = socket.assigns.current_company
 
     socket
@@ -66,7 +69,8 @@ defmodule FullCircleWeb.ReportLive.HouseFeed do
                FullCircle.Layer.house_feed_type_query(
                  month,
                  year,
-                 current_company.id
+                 current_company.id,
+                 field
                )
                |> FullCircle.Helpers.exec_query_row_col()
              end
@@ -83,16 +87,28 @@ defmodule FullCircleWeb.ReportLive.HouseFeed do
       <div class="border rounded bg-purple-200 text-center p-2">
         <.form for={%{}} id="search-form" phx-submit="query" autocomplete="off">
           <div class="flex tracking-tighter">
-            <div class="w-[50%] hidden">
+            <div class="hidden">
               <.input
-                label={gettext("Good List")}
                 id="search_report"
                 name="search[report]"
                 value={@search.report}
-                phx-hook="tributeAutoComplete"
-                url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=good&name="}
               />
             </div>
+            <div class="w-[15%]">
+              <.input
+                name="search[field]"
+                id="search_field"
+                value={@search.field}
+                options={[
+                  "feed_type",
+                  "filling_wages",
+                  "feeding_wages"
+                ]}
+                type="select"
+                label={gettext("Field")}
+              />
+            </div>
+
             <div class="w-[8%]">
               <.input
                 label={gettext("Month")}
