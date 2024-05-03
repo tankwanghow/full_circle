@@ -116,7 +116,7 @@ defmodule FullCircleWeb.CsvController do
 
     fields = data |> Enum.at(0) |> Map.keys()
 
-    filename = "house_feed_type_#{mth}_#{yr}"
+    filename = "house_#{fld}_#{mth}_#{yr}"
     send_csv_map(conn, data, fields, filename)
   end
 
@@ -155,13 +155,9 @@ defmodule FullCircleWeb.CsvController do
           []
       end
 
-    fields = data |> Enum.at(0) |> Map.keys()
+    # fields = data |> Enum.at(0) |> Map.keys()
     filename = "#{rep |> String.replace(" ", "") |> Macro.underscore()}_#{tdate}"
-    send_csv_map(conn, data, fields, filename)
-
-    fields = data |> Enum.at(0) |> Map.keys()
-    filename = "harvest_report_#{tdate}"
-    send_csv_map(conn, data, fields, filename)
+    send_csv_map(conn, data, [:contact_name, :p1, :p2, :p3, :p4, :p5, :total, :pd_amt, :pd_chqs], filename)
   end
 
   def show(conn, %{"company_id" => com_id, "report" => "harvrepo", "tdate" => tdate}) do
@@ -307,7 +303,7 @@ defmodule FullCircleWeb.CsvController do
     |> put_root_layout(false)
     |> send_resp(
       200,
-      to_csv_map(data, fields)
+      csv_map(data, fields)
     )
   end
 
@@ -318,15 +314,15 @@ defmodule FullCircleWeb.CsvController do
     |> put_root_layout(false)
     |> send_resp(
       200,
-      to_csv_row_col(data, fields)
+      csv_row_col(data, fields)
     )
   end
 
-  defp to_csv_row_col(data, fields) do
+  defp csv_row_col(data, fields) do
     [fields | data] |> NimbleCSV.RFC4180.dump_to_iodata()
   end
 
-  defp to_csv_map(data, fields) do
+  defp csv_map(data, fields) do
     body = data |> Enum.map(fn d -> Enum.map(fields, fn f -> Map.fetch!(d, f) end) end)
 
     [fields | body] |> NimbleCSV.RFC4180.dump_to_iodata()

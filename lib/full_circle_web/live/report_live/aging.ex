@@ -143,10 +143,12 @@ defmodule FullCircleWeb.ReportLive.Aging do
               "#{@days * 3} days",
               "#{@days * 4} days",
               "#{@days * 5} days",
-              gettext("Total")
+              gettext("Total"),
+              gettext("PD Amt"),
+              gettext("Chqs")
             ],
             "font-medium flex flex-row text-center tracking-tighter mb-1",
-            ["28%", "12%", "12%", "12%", "12%", "12%", "12%"],
+            ["25%", "10%", "10%", "10%", "10%", "10%", "10%", "10%", "5%"],
             "border rounded bg-gray-200 border-gray-400 px-2 py-1",
             assigns
           ) %>
@@ -159,7 +161,9 @@ defmodule FullCircleWeb.ReportLive.Aging do
               :p3,
               :p4,
               :p5,
-              :total
+              :total,
+              :pd_amt,
+              :pd_chqs
             ],
             @result.result,
             [
@@ -169,10 +173,12 @@ defmodule FullCircleWeb.ReportLive.Aging do
               &Number.Delimit.number_to_delimited/1,
               &Number.Delimit.number_to_delimited/1,
               &Number.Delimit.number_to_delimited/1,
-              &Number.Delimit.number_to_delimited/1
+              &Number.Delimit.number_to_delimited/1,
+              &Number.Delimit.number_to_delimited/1,
+              nil
             ],
             "flex flex-row text-center tracking-tighter max-h-20",
-            ["28%", "12%", "12%", "12%", "12%", "12%", "12%"],
+            ["25%", "10%", "10%", "10%", "10%", "10%", "12%", "10%", "5%"],
             "border rounded bg-blue-200 border-blue-400 px-2 py-1",
             assigns
           ) %>

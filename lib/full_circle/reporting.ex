@@ -384,12 +384,28 @@ defmodule FullCircle.Reporting do
     (contact_aging_query(edate, days, com_id) <> " and p1 + p2 + p3 + p4 + p5 > 0")
     |> exec_query_map()
     |> fix_unmatch_balance("debtor")
+    |> fill_in_undeposit_cheques_amount(edate, com_id)
   end
 
   def creditor_aging_report(edate, days, com_id) do
     (contact_aging_query(edate, days, com_id) <> " and p1 + p2 + p3 + p4 + p5 < 0")
     |> exec_query_map()
     |> fix_unmatch_balance("creditor")
+    |> fill_in_undeposit_cheques_amount(edate, com_id)
+  end
+
+  defp fill_in_undeposit_cheques_amount(list, edate, com_id) do
+    pdcs = contact_undeposit_cheques_amount(edate, %{id: com_id})
+
+    list
+    |> Enum.map(fn i ->
+      pdc = Enum.find(pdcs, fn a -> i.contact_id == a.contact_id end)
+
+      Map.merge(
+        i,
+        if(pdc, do: %{pd_chqs: pdc.cheques, pd_amt: pdc.amount}, else: %{pd_chqs: 0, pd_amt: 0})
+      )
+    end)
   end
 
   defp fix_unmatch_balance(list, debcre) do
