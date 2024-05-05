@@ -148,7 +148,7 @@ defmodule FullCircleWeb.ReportLive.Aging do
               gettext("Chqs")
             ],
             "font-medium flex flex-row text-center tracking-tighter mb-1",
-            ["25%", "10%", "10%", "10%", "10%", "10%", "10%", "10%", "5%"],
+            ["28%", "9%", "9%", "9%", "9%", "9%", "13%", "9%", "5%"],
             "border rounded bg-gray-200 border-gray-400 px-2 py-1",
             assigns
           ) %>
@@ -178,7 +178,7 @@ defmodule FullCircleWeb.ReportLive.Aging do
               nil
             ],
             "flex flex-row text-center tracking-tighter max-h-20",
-            ["25%", "10%", "10%", "10%", "10%", "10%", "12%", "10%", "5%"],
+            ["28%", "9%", "9%", "9%", "9%", "9%", "13%", "9%", "5%"],
             "border rounded bg-blue-200 border-blue-400 px-2 py-1",
             assigns
           ) %>

@@ -473,7 +473,7 @@ defmodule FullCircle.Reporting do
            where c.company_id = '#{com_id}'
              and c.id = ANY('{#{Enum.join(ids, ",")}}')
            group by c.id),
-        has_balance_txn as (
+        has_balance_txn_0 as (
           select t.doc_date, t.doc_type, t.doc_no, t.doc_id, t.contact_id, c.name as contact_name,
                  t.amount + coalesce(sum(stm.match_amount), 0) + coalesce(sum(tm.match_amount), 0) as balance
             from transactions t inner join has_balance_contacts c
@@ -485,6 +485,12 @@ defmodule FullCircle.Reporting do
            group by t.id, c.name
           having t.amount + coalesce(sum(stm.match_amount), 0) + coalesce(sum(tm.match_amount), 0) <> 0),
         has_balance_txn_1 as (
+          select hbt.doc_date, hbt.doc_type, hbt.doc_no, hbt.doc_id, hbt.contact_id, hbt.contact_name,
+                 sum(hbt.balance) as balance
+            from has_balance_txn_0 hbt
+           group by hbt.doc_date, hbt.doc_type, hbt.doc_no, hbt.doc_id, hbt.contact_id, hbt.contact_name
+          ),
+        has_balance_txn_2 as (
           select hbt.doc_date, hbt.doc_type, hbt.doc_no, hbt.contact_id, hbt.contact_name,
                  hbt.balance - coalesce(sum(stm.match_amount), 0) - coalesce(sum(tm.match_amount), 0) as balance
             from has_balance_txn hbt left outer join seed_transaction_matchers stm
@@ -508,7 +514,7 @@ defmodule FullCircle.Reporting do
                        extract(day from '#{edate}'::timestamp - doc_date::timestamp) > #{days * 3} then balance else 0 end) as p4,
                  sum(case when
                        extract(day from '#{edate}'::timestamp - doc_date::timestamp) > #{days * 4} then balance else 0 end) as p5
-            from has_balance_txn_1
+            from has_balance_txn_2
            group by contact_name, contact_id)
 
         select contact_id, contact_name, p1, p2, p3, p4, p5,
@@ -528,7 +534,7 @@ defmodule FullCircle.Reporting do
              and c.company_id = '#{com_id}'
            group by c.id
           having sum(t.amount) <> 0),
-        has_balance_txn as (
+        has_balance_txn_0 as (
           select t.doc_date, t.doc_type, t.doc_no, t.doc_id, t.contact_id, c.name as contact_name,
                  t.amount + coalesce(sum(stm.match_amount), 0) + coalesce(sum(tm.match_amount), 0) as balance
             from transactions t inner join has_balance_contacts c
@@ -541,9 +547,15 @@ defmodule FullCircle.Reporting do
           having t.amount + coalesce(sum(stm.match_amount), 0) + coalesce(sum(tm.match_amount), 0) <> 0
         ),
         has_balance_txn_1 as (
+          select hbt.doc_date, hbt.doc_type, hbt.doc_no, hbt.doc_id, hbt.contact_id, hbt.contact_name,
+                 sum(hbt.balance) as balance
+            from has_balance_txn_0 hbt
+           group by hbt.doc_date, hbt.doc_type, hbt.doc_no, hbt.doc_id, hbt.contact_id, hbt.contact_name
+        ),
+        has_balance_txn_2 as (
           select hbt.doc_date, hbt.doc_type, hbt.doc_no, hbt.contact_id, hbt.contact_name,
                  hbt.balance - coalesce(sum(stm.match_amount), 0) - coalesce(sum(tm.match_amount), 0) as balance
-            from has_balance_txn hbt left outer join seed_transaction_matchers stm
+            from has_balance_txn_1 hbt left outer join seed_transaction_matchers stm
               on stm.m_doc_type = hbt.doc_type and stm.m_doc_id::varchar = hbt.doc_no
             left outer join transaction_matchers tm
               on tm.doc_type = hbt.doc_type and tm.doc_id = hbt.doc_id
@@ -564,7 +576,7 @@ defmodule FullCircle.Reporting do
                        extract(day from '#{edate}'::timestamp - doc_date::timestamp) > #{days * 3} then balance else 0 end) as p4,
                  sum(case when
                        extract(day from '#{edate}'::timestamp - doc_date::timestamp) > #{days * 4} then balance else 0 end) as p5
-            from has_balance_txn_1
+            from has_balance_txn_2
            group by contact_name, contact_id)
 
         select contact_id, contact_name, p1, p2, p3, p4, p5,
