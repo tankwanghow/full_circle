@@ -245,6 +245,7 @@ defmodule FullCircle.Reporting do
       where: rec.company_id == ^com.id,
       select: %{
         contact_name: cont.name,
+        receipt_date: rec.receipt_date,
         contact_id: cont.id,
         amount: chq.amount,
         deposit_date: dep.deposit_date,
@@ -254,10 +255,10 @@ defmodule FullCircle.Reporting do
   end
 
   def contact_undeposit_cheques_amount(edate, com) do
-    q = from(x in contact_undeposit_cheques(com))
+    q = from(x in subquery(contact_undeposit_cheques(com)), where: x.receipt_date < ^edate)
 
-    r1 = from r in subquery(q), where: is_nil(r.deposit_date), where: is_nil(r.return_date)
-    r2 = from r in subquery(q), where: r.deposit_date > ^edate or r.return_date > ^edate
+    r1 = from r in q, where: is_nil(r.deposit_date), where: is_nil(r.return_date)
+    r2 = from r in q, where: r.deposit_date > ^edate or r.return_date > ^edate
 
     r3 = union_all(r1, ^r2)
 
@@ -269,10 +270,10 @@ defmodule FullCircle.Reporting do
   end
 
   def contact_undeposit_cheques_amount(ids, edate, com) do
-    q = from x in subquery(contact_undeposit_cheques(com)), where: x.contact_id in ^ids
+    q = from x in subquery(contact_undeposit_cheques(com)), where: x.contact_id in ^ids, where: x.receipt_date < ^edate
 
-    r1 = from r in subquery(q), where: is_nil(r.deposit_date), where: is_nil(r.return_date)
-    r2 = from r in subquery(q), where: r.deposit_date > ^edate or r.return_date > ^edate
+    r1 = from r in q, where: is_nil(r.deposit_date), where: is_nil(r.return_date)
+    r2 = from r in q, where: r.deposit_date > ^edate or r.return_date > ^edate
 
     r3 = union_all(r1, ^r2)
 
@@ -493,7 +494,7 @@ defmodule FullCircle.Reporting do
         has_balance_txn_2 as (
           select hbt.doc_date, hbt.doc_type, hbt.doc_no, hbt.contact_id, hbt.contact_name,
                  hbt.balance - coalesce(sum(stm.match_amount), 0) - coalesce(sum(tm.match_amount), 0) as balance
-            from has_balance_txn hbt left outer join seed_transaction_matchers stm
+            from has_balance_txn_1 hbt left outer join seed_transaction_matchers stm
               on stm.m_doc_type = hbt.doc_type and stm.m_doc_id::varchar = hbt.doc_no
             left outer join transaction_matchers tm
               on tm.doc_type = hbt.doc_type and tm.doc_id = hbt.doc_id
