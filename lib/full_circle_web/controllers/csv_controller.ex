@@ -157,7 +157,13 @@ defmodule FullCircleWeb.CsvController do
 
     # fields = data |> Enum.at(0) |> Map.keys()
     filename = "#{rep |> String.replace(" ", "") |> Macro.underscore()}_#{tdate}"
-    send_csv_map(conn, data, [:contact_name, :p1, :p2, :p3, :p4, :p5, :total, :pd_amt, :pd_chqs], filename)
+
+    send_csv_map(
+      conn,
+      data,
+      [:contact_name, :p1, :p2, :p3, :p4, :p5, :total, :pd_amt, :pd_chqs],
+      filename
+    )
   end
 
   def show(conn, %{"company_id" => com_id, "report" => "harvrepo", "tdate" => tdate}) do

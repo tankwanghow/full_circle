@@ -88,11 +88,7 @@ defmodule FullCircleWeb.ReportLive.HouseFeed do
         <.form for={%{}} id="search-form" phx-submit="query" autocomplete="off">
           <div class="flex tracking-tighter">
             <div class="hidden">
-              <.input
-                id="search_report"
-                name="search[report]"
-                value={@search.report}
-              />
+              <.input id="search_report" name="search[report]" value={@search.report} />
             </div>
             <div class="w-[15%]">
               <.input
