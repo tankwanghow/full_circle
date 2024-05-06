@@ -182,9 +182,10 @@ defmodule FullCircle.Billing do
       if terms != "" do
         from inv in subquery(qry),
           order_by: [inv.old_data],
-          order_by: ^similarity_order([:invoice_no, :contact_name, :particulars], terms)
+          order_by: ^similarity_order([:invoice_no, :contact_name, :particulars], terms),
+          order_by: [desc: inv.invoice_no]
       else
-        from inv in qry, order_by: [inv.old_data]
+        from inv in qry, order_by: [inv.old_data, desc: inv.invoice_no]
       end
 
     qry =
@@ -495,9 +496,14 @@ defmodule FullCircle.Billing do
       if terms != "" do
         from inv in subquery(qry),
           order_by: [inv.old_data],
-          order_by: ^similarity_order([:pur_invoice_no, :contact_name, :particulars], terms)
+          order_by:
+            ^similarity_order(
+              [:pur_invoice_no, :supplier_invoice_no, :contact_name, :particulars],
+              terms
+            ),
+          order_by: [desc: inv.pur_invoice_no]
       else
-        from inv in qry, order_by: [inv.old_data]
+        from inv in qry, order_by: [inv.old_data, desc: inv.pur_invoice_no]
       end
 
     qry =
@@ -550,6 +556,7 @@ defmodule FullCircle.Billing do
       select: %{
         id: coalesce(txn.doc_id, txn.id),
         pur_invoice_no: txn.doc_no,
+        supplier_invoice_no: coalesce(inv.supplier_invoice_no, "-"),
         particulars: coalesce(txn.contact_particulars, txn.particulars),
         pur_invoice_date: txn.doc_date,
         due_date: txn.doc_date,
@@ -560,7 +567,7 @@ defmodule FullCircle.Billing do
         checked: false,
         old_data: txn.old_data
       },
-      group_by: [txn.id, cont.name],
+      group_by: [txn.id, cont.name, inv.id],
       order_by: [desc: txn.doc_date]
   end
 

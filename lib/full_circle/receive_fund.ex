@@ -197,9 +197,10 @@ defmodule FullCircle.ReceiveFund do
       if terms != "" do
         from inv in subquery(qry),
           order_by: [inv.old_data],
-          order_by: ^similarity_order([:receipt_no, :contact_name, :particulars], terms)
+          order_by: ^similarity_order([:receipt_no, :contact_name, :particulars], terms),
+          order_by: [desc: inv.receipt_no]
       else
-        qry
+        from inv in qry, order_by: [inv.old_data], order_by: [desc: inv.receipt_no]
       end
 
     qry =

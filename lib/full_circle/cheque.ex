@@ -114,9 +114,10 @@ defmodule FullCircle.Cheque do
       if terms != "" do
         from rec in qry,
           order_by: [rec.old_data],
-          order_by: ^similarity_order([:particulars, :deposit_no, :deposit_bank_name], terms)
+          order_by: ^similarity_order([:particulars, :deposit_no, :deposit_bank_name], terms),
+          order_by: [desc: rec.deposit_no]
       else
-        from rec in qry, order_by: [rec.old_data]
+        from rec in qry, order_by: [rec.old_data], order_by: [desc: rec.deposit_no]
       end
 
     qry =

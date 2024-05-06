@@ -18,13 +18,13 @@ defmodule FullCircleWeb.PurInvoiceLive.IndexComponent do
       id={@id}
       class={"#{@ex_class} max-h-8 flex flex-row text-center tracking-tighter bg-gray-200 hover:bg-gray-400"}
     >
-      <div class="w-[10%] border-b border-gray-400 py-1">
+      <div class="w-[6%] border-b border-gray-400 py-1">
         <%= @obj.pur_invoice_date |> FullCircleWeb.Helpers.format_date() %>
       </div>
-      <div class="w-[10%] border-b border-gray-400 py-1">
+      <div class="w-[6%] border-b border-gray-400 py-1">
         <%= @obj.due_date |> FullCircleWeb.Helpers.format_date() %>
       </div>
-      <div class="w-[10%] border-b border-gray-400 py-1">
+      <div class="w-[8%] border-b border-gray-400 py-1">
         <%= if @obj.old_data do %>
           <%= @obj.pur_invoice_no %>
         <% else %>
@@ -34,7 +34,10 @@ defmodule FullCircleWeb.PurInvoiceLive.IndexComponent do
           />
         <% end %>
       </div>
-      <div class="w-[20%] border-b border-gray-400 py-1 overflow-clip">
+      <div class="w-[8%] border-b border-gray-400 py-1 italic font-light">
+        <%= @obj.supplier_invoice_no %>
+      </div>
+      <div class="w-[22%] border-b border-gray-400 py-1 overflow-clip">
         <%= @obj.contact_name %>
       </div>
       <div class="w-[30%] border-b text-center border-gray-400 py-1 overflow-clip">

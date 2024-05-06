@@ -75,9 +75,10 @@ defmodule FullCircle.JournalEntry do
     qry =
       if terms != "" do
         from inv in subquery(qry),
-          order_by: ^similarity_order([:journal_no, :account_info, :particulars], terms)
+          order_by: ^similarity_order([:journal_no, :account_info, :particulars], terms),
+          order_by: [desc: inv.journal_no]
       else
-        qry
+        from inv in qry, order_by: [inv.old_data], order_by: [desc: inv.journal_no]
       end
 
     qry =

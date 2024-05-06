@@ -181,9 +181,10 @@ defmodule FullCircle.BillPay do
       if terms != "" do
         from inv in subquery(qry),
           order_by: [inv.old_data],
-          order_by: ^similarity_order([:payment_no, :contact_name, :particulars], terms)
+          order_by: ^similarity_order([:payment_no, :contact_name, :particulars], terms),
+          order_by: [desc: inv.payment_no]
       else
-        from inv in qry, order_by: [inv.old_data]
+        from inv in qry, order_by: [inv.old_data], order_by: [desc: inv.payment_no]
       end
 
     qry =

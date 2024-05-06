@@ -501,9 +501,11 @@ defmodule FullCircle.HR do
             ^similarity_order(
               [:note_no, :employee_name, :salary_type_name, :particulars],
               terms
-            )
+            ),
+          order_by: [desc: inv.note_no]
       else
-        qry
+        from inv in subquery(qry),
+          order_by: [desc: inv.note_no]
       end
 
     qry =
@@ -827,9 +829,11 @@ defmodule FullCircle.HR do
             ^similarity_order(
               [:slip_no, :employee_name, :funds_account_name, :particulars],
               terms
-            )
+            ),
+          order_by: [desc: inv.slip_no]
       else
-        qry
+        from inv in subquery(qry),
+          order_by: [desc: inv.slip_no]
       end
 
     qry =

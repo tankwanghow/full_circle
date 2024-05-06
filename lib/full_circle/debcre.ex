@@ -155,9 +155,10 @@ defmodule FullCircle.DebCre do
       if terms != "" do
         from inv in subquery(qry),
           order_by: [inv.old_data],
-          order_by: ^similarity_order([:note_no, :contact_name, :particulars], terms)
+          order_by: ^similarity_order([:note_no, :contact_name, :particulars], terms),
+          order_by: [desc: inv.note_no]
       else
-        from inv in qry, order_by: [inv.old_data]
+        from inv in qry, order_by: [inv.old_data], order_by: [desc: inv.note_no]
       end
 
     qry =
@@ -519,9 +520,10 @@ defmodule FullCircle.DebCre do
       if terms != "" do
         from inv in subquery(qry),
           order_by: [inv.old_data],
-          order_by: ^similarity_order([:note_no, :contact_name, :particulars], terms)
+          order_by: ^similarity_order([:note_no, :contact_name, :particulars], terms),
+          order_by: [desc: inv.note_no]
       else
-        from inv in qry, order_by: [inv.old_data]
+        from inv in qry, order_by: [inv.old_data], order_by: [desc: inv.note_no]
       end
 
     qry =
