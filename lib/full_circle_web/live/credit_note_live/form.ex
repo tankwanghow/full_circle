@@ -477,7 +477,7 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
       query={@query}
       query_match_trans={@query_match_trans}
       form={@form}
-      balance_ve="+ve"
+      cannot_match_doc_type={~w(CreditNote Receipt DebitNote Payment)}
       doc_no_field={:note_no}
       current_company={@current_company}
       current_user={@current_user}

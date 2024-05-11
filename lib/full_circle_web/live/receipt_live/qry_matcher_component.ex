@@ -94,11 +94,11 @@ defmodule FullCircleWeb.ReceiptLive.QryMatcherComponent do
           <div class="max-h-8 w-[15%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
             <%= obj.balance |> Number.Delimit.number_to_delimited() %>
           </div>
-          <div
+          <%!-- <div
             :if={
               @balance_ve == "+ve" and
                 !found_in_matched_trans?(@form.source, obj.transaction_id) and
-                Decimal.positive?(obj.balance) and
+                #Decimal.positive?(obj.balance) and
                 obj.t_doc_no != Map.fetch!(@form.data, @doc_no_field)
             }
             class="w-[3%] text-green-500 cursor-pointer"
@@ -106,12 +106,12 @@ defmodule FullCircleWeb.ReceiptLive.QryMatcherComponent do
             <.link phx-click={:add_match_tran} phx-value-trans-id={obj.transaction_id} tabindex="-1">
               <.icon name="hero-plus-circle-solid" class="h-7 w-7" />
             </.link>
-          </div>
+          </div> --%>
           <div
             :if={
-              @balance_ve == "-ve" and
+              !Enum.any?(@cannot_match_doc_type, fn x -> x == obj.t_doc_type end) and
                 !found_in_matched_trans?(@form.source, obj.transaction_id) and
-                Decimal.negative?(obj.balance) and
+                !Decimal.eq?(obj.balance, 0) and
                 obj.t_doc_no != Map.fetch!(@form.data, @doc_no_field)
             }
             class="w-[3%] text-green-500 cursor-pointer"

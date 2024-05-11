@@ -747,7 +747,7 @@ defmodule FullCircleWeb.ReceiptLive.Form do
       query={@query}
       query_match_trans={@query_match_trans}
       form={@form}
-      balance_ve="+ve"
+      cannot_match_doc_type={~w(Receipt)}
       doc_no_field={:receipt_no}
       current_company={@current_company}
       current_user={@current_user}
