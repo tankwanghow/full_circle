@@ -271,7 +271,7 @@ defmodule FullCircleWeb.JournalLive.Form do
                   url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
                 />
               </div>
-              <div class="w-[30%]"><.input feedback field={dtl[:particulars]} /></div>
+              <div class="w-[30%]"><.input field={dtl[:particulars]} /></div>
               <div class="w-[17%]">
                 <.input type="number" step="0.01" field={dtl[:amount]} />
               </div>

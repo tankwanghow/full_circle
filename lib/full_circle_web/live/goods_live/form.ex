@@ -316,7 +316,7 @@ defmodule FullCircleWeb.GoodLive.Form do
       >
         <div class="grid grid-cols-12 gap-2">
           <div class="col-span-6">
-            <.input feedback field={@form[:name]} label={gettext("Name")} />
+            <.input field={@form[:name]} label={gettext("Name")} />
           </div>
           <div class="col-span-3">
             <.input field={@form[:unit]} label={gettext("Unit")} />

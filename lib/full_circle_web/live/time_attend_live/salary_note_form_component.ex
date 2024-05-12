@@ -179,7 +179,7 @@ defmodule FullCircleWeb.TimeAttendLive.SalaryNoteFormComponent do
         <.input type="hidden" field={@form[:note_no]} />
         <div class="grid grid-cols-12 gap-1">
           <div class="col-span-3">
-            <.input feedback field={@form[:note_date]} label={gettext("Date")} type="date" />
+            <.input field={@form[:note_date]} label={gettext("Date")} type="date" />
           </div>
           <div class="col-span-5">
             <.input type="hidden" field={@form[:employee_id]} />
