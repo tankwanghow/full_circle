@@ -205,7 +205,7 @@ defmodule FullCircle.Cheque do
 
   defp create_deposit_transactions(multi, name, com, user) do
     pdc_id =
-      FullCircle.Accounting.get_account_by_name("Post Dated Cheques Received", com, user).id
+      FullCircle.Accounting.get_account_by_name("Post Dated Cheques", com, user).id
 
     multi
     |> Ecto.Multi.run("create_transactions", fn repo, %{^name => deposit} ->
@@ -349,7 +349,7 @@ defmodule FullCircle.Cheque do
       FullCircle.Accounting.get_account_by_name("Account Receivables", com, user).id
 
     pdc_id =
-      FullCircle.Accounting.get_account_by_name("Post Dated Cheques Received", com, user).id
+      FullCircle.Accounting.get_account_by_name("Post Dated Cheques", com, user).id
 
     multi
     |> Ecto.Multi.run("create_transactions", fn repo, %{^name => rtnq} ->

@@ -45,7 +45,7 @@ defmodule FullCircle.Accounting do
       "Non-current Liability",
       "Intangible Asset",
       "Accrual",
-      "Post Dated Cheques Received"
+      "Post Dated Cheques"
     ]
   end
 

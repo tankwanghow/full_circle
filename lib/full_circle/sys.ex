@@ -167,8 +167,8 @@ defmodule FullCircle.Sys do
           "Is an asset account in accounting that represents the amount of tax credit a business can claim for taxes paid on its purchases. It helps businesses reduce their tax liability in the future."
       },
       %{
-        name: "Post Dated Cheques Received",
-        account_type: "Post Dated Cheques",
+        name: "Post Dated Cheques",
+        account_type: "Current Asset",
         descriptions:
           "An Account in accounting that records the value of post-dated cheques received by a business but not yet deposited or cashed."
       },

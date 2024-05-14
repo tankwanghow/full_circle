@@ -291,7 +291,7 @@ defmodule FullCircle.ReceiveFund do
 
   defp create_receipt_transactions(multi, name, com, user) do
     pdc_id =
-      FullCircle.Accounting.get_account_by_name("Post Dated Cheques Received", com, user).id
+      FullCircle.Accounting.get_account_by_name("Post Dated Cheques", com, user).id
 
     multi
     |> Ecto.Multi.run("create_transactions", fn repo, %{^name => receipt} ->
