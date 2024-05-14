@@ -205,7 +205,7 @@ defmodule FullCircleWeb.DebitNoteLive.Index do
       "search[note_date]" => id
     }
 
-    url = "/companies/#{socket.assigns.current_company.id}/CreditNote?#{URI.encode_query(qry)}"
+    url = "/companies/#{socket.assigns.current_company.id}/DebitNote?#{URI.encode_query(qry)}"
 
     {:noreply, socket |> push_navigate(to: url)}
   end
