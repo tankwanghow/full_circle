@@ -177,6 +177,15 @@ defmodule FullCircle.Accounting do
     |> Repo.all()
   end
 
+  def contact_catgories(com) do
+    from(cont in Contact,
+      where: cont.company_id == ^com.id,
+      distinct: [desc: cont.category],
+      select: cont.category
+    )
+    |> Repo.all()
+  end
+
   def sale_tax_codes(terms, company, user) do
     from(taxcode in TaxCode,
       join: com in subquery(Sys.user_company(company, user)),

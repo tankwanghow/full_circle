@@ -5,6 +5,7 @@ defmodule FullCircle.Accounting.Contact do
 
   schema "contacts" do
     belongs_to :company, FullCircle.Sys.Company
+    field :category, :string
     field :address1, :string
     field :address2, :string
     field :city, :string
@@ -37,6 +38,7 @@ defmodule FullCircle.Accounting.Contact do
       :email,
       :contact_info,
       :descriptions,
+      :category,
       :company_id
     ])
     |> validate_required([:name, :company_id])

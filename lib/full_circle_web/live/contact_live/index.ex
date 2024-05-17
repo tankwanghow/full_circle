@@ -91,7 +91,7 @@ defmodule FullCircleWeb.ContactLive.Index do
     objects =
       StdInterface.filter(
         Contact,
-        [:name, :city, :state, :descriptions],
+        [:name, :category, :city, :state, :descriptions],
         terms,
         socket.assigns.current_company,
         socket.assigns.current_user,

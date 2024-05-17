@@ -171,10 +171,13 @@ defmodule FullCircleWeb.ContactLive.Form do
         class="mx-auto"
       >
         <div class="grid grid-cols-12 gap-1">
-          <div class="col-span-7">
+          <div class="col-span-5">
             <.input field={@form[:name]} label={gettext("Name")} />
           </div>
-          <div class="col-span-5">
+          <div class="col-span-4">
+            <.input field={@form[:category]} label={gettext("Category")} list="categories"/>
+          </div>
+          <div class="col-span-3">
             <.input field={@form[:reg_no]} label={gettext("Reg No")} />
           </div>
           <div class="col-span-6">
@@ -203,6 +206,7 @@ defmodule FullCircleWeb.ContactLive.Form do
           </div>
         </div>
         <%= datalist(assigns, FullCircle.Sys.countries(), "countries") %>
+        <%= datalist(assigns, FullCircle.Accounting.contact_catgories(@current_company), "categories") %>
 
         <div class="flex justify-center gap-x-1 mt-1">
           <.form_action_button
