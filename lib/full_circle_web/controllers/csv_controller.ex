@@ -300,7 +300,7 @@ defmodule FullCircleWeb.CsvController do
           []
       end
 
-    fields = data |> Enum.at(0) |> Map.keys()
+    fields = [:type, :name, :balance]
     filename = "#{rep |> String.replace(" ", "") |> Macro.underscore()}_#{tdate}"
     send_csv_map(conn, data, fields, filename)
   end

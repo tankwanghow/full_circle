@@ -145,20 +145,17 @@ defmodule FullCircle.Reporting do
       from(ac in Account,
         join: txn in Transaction,
         on: ac.id == txn.account_id,
-        left_join: cont in Contact,
-        on: cont.id == txn.contact_id,
         where: ac.company_id == ^com.id,
         where: ac.account_type in ^bs_acc,
         where: txn.doc_date <= ^at_date,
+        where: is_nil(txn.contact_id),
         select: %{
           id: ac.id,
           type: ac.account_type,
           name: ac.name,
-          contact: cont.name,
-          category: cont.category,
           balance: sum(txn.amount)
         },
-        group_by: [ac.account_type, ac.id, cont.id],
+        group_by: [ac.account_type, ac.id],
         having: sum(txn.amount) != 0
       )
 
@@ -166,33 +163,47 @@ defmodule FullCircle.Reporting do
       from(ac in Account,
         join: txn in Transaction,
         on: ac.id == txn.account_id,
-        left_join: cont in Contact,
-        on: cont.id == txn.contact_id,
         where: ac.company_id == ^com.id,
         where: ac.account_type == "Inventory",
         where: txn.doc_date <= ^at_date,
         where: txn.doc_date > ^prev_close_date(at_date, com),
+        where: is_nil(txn.contact_id),
         select: %{
           id: ac.id,
           type: ac.account_type,
           name: ac.name,
-          contact: cont.name,
-          category: cont.category,
           balance: sum(txn.amount)
         },
-        group_by: [ac.account_type, ac.id, cont.id],
+        group_by: [ac.account_type, ac.id],
         having: sum(txn.amount) != 0
       )
 
-    union_all(a, ^b)
+      c =
+        from(ac in Account,
+          join: txn in Transaction,
+          on: ac.id == txn.account_id,
+          join: cont in Contact,
+          on: cont.id == txn.contact_id,
+          where: ac.company_id == ^com.id,
+          where: ac.account_type in ^bs_acc,
+          where: txn.doc_date <= ^at_date,
+          select: %{
+            id: cont.id,
+            type: cont.category,
+            name: cont.name,
+            balance: sum(txn.amount)
+          },
+          group_by: [cont.id],
+          having: sum(txn.amount) != 0
+        )
+
+    union_all(a, ^b) |> union_all(^c)
   end
 
   defp profit_loss_query(at_date, com) do
     from(ac in Account,
       join: txn in Transaction,
       on: ac.id == txn.account_id,
-      left_join: cont in Contact,
-      on: cont.id == txn.contact_id,
       where: ac.company_id == ^com.id,
       where: ac.account_type in ^FullCircle.Accounting.profit_loss_account_types(),
       where: txn.doc_date <= ^at_date,
@@ -201,11 +212,9 @@ defmodule FullCircle.Reporting do
         id: ac.id,
         type: ac.account_type,
         name: ac.name,
-        contact: cont.name,
-        category: cont.category,
         balance: sum(txn.amount)
       },
-      group_by: [ac.account_type, ac.id, cont.id],
+      group_by: [ac.account_type, ac.id],
       having: sum(txn.amount) != 0
     )
   end
