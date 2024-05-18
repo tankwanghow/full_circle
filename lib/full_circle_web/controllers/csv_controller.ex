@@ -135,6 +135,33 @@ defmodule FullCircleWeb.CsvController do
   end
 
   def show(conn, %{
+        "report" => "post_dated_cheque_listing",
+        "tdate" => tdate
+      }) do
+    com = get_session(conn, "current_company")
+    tdate = tdate |> Timex.parse!("{YYYY}-{0M}-{0D}") |> NaiveDateTime.to_date()
+
+    data = FullCircle.Reporting.contact_undeposit_cheques(tdate, com)
+
+    fields = [
+      :receipt_date,
+      :receipt_no,
+      :contact_name,
+      :bank,
+      :chq_no,
+      :amount,
+      :deposit_date,
+      :deposit_no,
+      :return_no,
+      :return_date
+    ]
+
+    filename = "post_dated_cheque_listing#{tdate}"
+
+    send_csv_map(conn, data, fields, filename)
+  end
+
+  def show(conn, %{
         "company_id" => com_id,
         "days" => days,
         "rep" => rep,

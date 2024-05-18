@@ -137,6 +137,7 @@ defmodule FullCircleWeb.ReportLive.Aging do
         <:result_html>
           <%= FullCircleWeb.CsvHtml.headers(
             [
+              gettext("Category"),
               gettext("Account"),
               "#{@days} days",
               "#{@days * 2} days",
@@ -148,13 +149,14 @@ defmodule FullCircleWeb.ReportLive.Aging do
               gettext("Chqs")
             ],
             "font-medium flex flex-row text-center tracking-tighter mb-1",
-            ["28%", "9%", "9%", "9%", "9%", "9%", "13%", "9%", "5%"],
+            ["11%", "25%", "8%", "8%", "8%", "8%", "8%", "10%", "10%", "4%"],
             "border rounded bg-gray-200 border-gray-400 px-2 py-1",
             assigns
           ) %>
 
           <%= FullCircleWeb.CsvHtml.data(
             [
+              :category,
               :contact_name,
               :p1,
               :p2,
@@ -168,6 +170,7 @@ defmodule FullCircleWeb.ReportLive.Aging do
             @result.result,
             [
               nil,
+              nil,
               &Number.Delimit.number_to_delimited/1,
               &Number.Delimit.number_to_delimited/1,
               &Number.Delimit.number_to_delimited/1,
@@ -178,7 +181,7 @@ defmodule FullCircleWeb.ReportLive.Aging do
               nil
             ],
             "flex flex-row text-center tracking-tighter max-h-20",
-            ["28%", "9%", "9%", "9%", "9%", "9%", "13%", "9%", "5%"],
+            ["11%", "25%", "8%", "8%", "8%", "8%", "8%", "10%", "10%", "4%"],
             "border rounded bg-blue-200 border-blue-400 px-2 py-1",
             assigns
           ) %>

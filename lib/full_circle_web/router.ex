@@ -196,6 +196,7 @@ defmodule FullCircleWeb.Router do
       live("/tbplbs", ReportLive.TbPlBs, :index)
       live("/aging", ReportLive.Aging, :index)
       live("/fixed_assets_report", ReportLive.FixedAssets, :index)
+      live("/post_dated_cheque_listing", ReportLive.PostDatedCheques, :index)
 
       live("/Deposit", ChequeLive.DepositIndex, :index)
       live("/Deposit/new", ChequeLive.DepositForm, :new)
