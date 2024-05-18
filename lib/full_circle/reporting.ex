@@ -240,7 +240,7 @@ defmodule FullCircle.Reporting do
     agings =
       (contact_aging_query(ids, edate, 30, com.id) <> " and p1 + p2 + p3 + p4 + p5 >= 0")
       |> exec_query_map()
-      |> fix_unmatch_balance("debtor")
+      |> fix_unmatch_balance()
 
     pdcs = contact_undeposit_cheques_amount(ids, edate, com)
 
@@ -430,14 +430,14 @@ defmodule FullCircle.Reporting do
   def debtor_aging_report(edate, days, com_id) do
     (contact_aging_query(edate, days, com_id) <> " and p1 + p2 + p3 + p4 + p5 > 0")
     |> exec_query_map()
-    |> fix_unmatch_balance("debtor")
+    |> fix_unmatch_balance()
     |> fill_in_undeposit_cheques_amount(edate, com_id)
   end
 
   def creditor_aging_report(edate, days, com_id) do
     (contact_aging_query(edate, days, com_id) <> " and p1 + p2 + p3 + p4 + p5 < 0")
     |> exec_query_map()
-    |> fix_unmatch_balance("creditor")
+    |> fix_unmatch_balance()
     |> fill_in_undeposit_cheques_amount(edate, com_id)
   end
 
@@ -455,7 +455,7 @@ defmodule FullCircle.Reporting do
     end)
   end
 
-  defp fix_unmatch_balance(list, debcre) do
+  defp fix_unmatch_balance(list) do
     list
     |> Enum.map(fn %{
                      contact_id: id,
@@ -478,7 +478,7 @@ defmodule FullCircle.Reporting do
             p1 |> Decimal.to_float()
           ],
           {0, []},
-          debcre
+          tot |> Decimal.to_float()
         )
 
       %{
@@ -495,21 +495,21 @@ defmodule FullCircle.Reporting do
     end)
   end
 
-  def fix_total([h | t], {acc, a}, "debtor") do
+  def fix_total([h | t], {acc, a}, tot) when tot > 0 do
     cond do
-      h + acc < 0 -> fix_total(t, {h + acc, [0 | a]}, "debtor")
+      h + acc < 0 or Enum.any?(t, fn v -> v < 0 end) -> fix_total(t, {h + acc, [0 | a]}, tot)
       true -> {h + acc, [t |> Enum.reverse(), h + acc | a] |> List.flatten()}
     end
   end
 
-  def fix_total([h | t], {acc, a}, "creditor") do
+  def fix_total([h | t], {acc, a}, tot) when tot < 0 do
     cond do
-      h + acc > 0 -> fix_total(t, {h + acc, [0 | a]}, "creditor")
+      h + acc > 0 or Enum.any?(t, fn v -> v > 0 end) -> fix_total(t, {h + acc, [0 | a]}, tot)
       true -> {h + acc, [t |> Enum.reverse(), h + acc | a] |> List.flatten()}
     end
   end
 
-  def fix_total([], {acc, a}, _debcre) do
+  def fix_total([], {acc, a}, _tot) do
     {acc, a}
   end
 
