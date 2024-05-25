@@ -178,24 +178,24 @@ defmodule FullCircle.Reporting do
         having: sum(txn.amount) != 0
       )
 
-      c =
-        from(ac in Account,
-          join: txn in Transaction,
-          on: ac.id == txn.account_id,
-          join: cont in Contact,
-          on: cont.id == txn.contact_id,
-          where: ac.company_id == ^com.id,
-          where: ac.account_type in ^bs_acc,
-          where: txn.doc_date <= ^at_date,
-          select: %{
-            id: cont.id,
-            type: cont.category,
-            name: cont.name,
-            balance: sum(txn.amount)
-          },
-          group_by: [cont.id],
-          having: sum(txn.amount) != 0
-        )
+    c =
+      from(ac in Account,
+        join: txn in Transaction,
+        on: ac.id == txn.account_id,
+        join: cont in Contact,
+        on: cont.id == txn.contact_id,
+        where: ac.company_id == ^com.id,
+        where: ac.account_type in ^bs_acc,
+        where: txn.doc_date <= ^at_date,
+        select: %{
+          id: cont.id,
+          type: cont.category,
+          name: cont.name,
+          balance: sum(txn.amount)
+        },
+        group_by: [cont.id],
+        having: sum(txn.amount) != 0
+      )
 
     union_all(a, ^b) |> union_all(^c)
   end
@@ -303,7 +303,7 @@ defmodule FullCircle.Reporting do
     r1 = from r in q, where: is_nil(r.deposit_date), where: is_nil(r.return_date)
     r2 = from r in q, where: r.deposit_date > ^edate or r.return_date > ^edate
 
-    union_all(r1, ^r2) |> order_by([2]) |> Repo.all
+    union_all(r1, ^r2) |> order_by([2]) |> Repo.all()
   end
 
   def contact_undeposit_cheques_amount(edate, com) do
