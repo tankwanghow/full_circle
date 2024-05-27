@@ -93,7 +93,7 @@ defmodule FullCircle.TaggedBill do
 
     rec = if(cont, do: from(i in rec, where: i.contact_id == ^cont.id), else: rec)
 
-    union_all(rec, ^inv) |> order_by([2, 1, 4]) |> Repo.all()
+    union_all(rec, ^inv) |> order_by([4, 2, 3]) |> Repo.all()
   end
 
   def goods_sales_summary_report(contact, goods, fdate, tdate, com_id) do
