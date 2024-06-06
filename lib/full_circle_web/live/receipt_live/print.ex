@@ -377,7 +377,6 @@ defmodule FullCircleWeb.ReceiptLive.Print do
     assigns = assigns |> assign(:recd, recd) |> assign(:receipt, receipt)
 
     ~H"""
-
     """
   end
 

@@ -114,7 +114,6 @@ defmodule FullCircleWeb.ReportLive.PostDatedCheques do
               gettext("Dep No"),
               gettext("Rtn Date"),
               gettext("Rtn No")
-
             ],
             "font-medium flex flex-row text-center tracking-tighter mb-1",
             ["8%", "8%", "28%", "8%", "8%", "8%", "8%", "8%", "8%", "8%"],

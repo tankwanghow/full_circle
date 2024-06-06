@@ -10,7 +10,7 @@ defmodule FullCircleWeb.TaxCodeLive.Index do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="mx-auto w-8/12">
+    <div class="mx-auto w-6/12">
       <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
       <.search_form
         search_val={@search.terms}

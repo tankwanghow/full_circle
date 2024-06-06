@@ -24,7 +24,8 @@ defmodule FullCircleWeb.ContactLive.IndexComponent do
         navigate={~p"/companies/#{@current_company.id}/contacts/#{@obj.id}/edit"}
       >
         <%= @obj.name %>
-      </.link> (<%= @obj.category %>)
+      </.link>
+      (<%= @obj.category %>)
       <div>
         <p><%= @obj.address1 %>, <%= @obj.address2 %>
           <%= @obj.city %> <%= @obj.zipcode %>, <%= @obj.state %> <%= @obj.country %></p>
