@@ -256,8 +256,8 @@ defmodule FullCircle.Helpers do
     if(Enum.count(cs.errors) == 0, do: Map.replace(cs, :valid?, true), else: cs)
   end
 
-  def exec_query_map(qry) do
-    k = FullCircle.Repo.query!(qry)
+  def exec_query_map(qry, repo \\ FullCircle.Repo) do
+    k = repo.query!(qry)
 
     Enum.map(k.rows, fn r ->
       Enum.zip(k.columns |> Enum.map(fn x -> String.to_atom(x) end), r)
@@ -265,7 +265,9 @@ defmodule FullCircle.Helpers do
     |> Enum.map(fn x ->
       Map.new(x, fn {kk, vv} ->
         {kk,
-         if(Atom.to_string(kk) |> String.ends_with?("id") and !is_nil(vv),
+         if(
+           (String.ends_with?(Atom.to_string(kk), "_id") or Atom.to_string(kk) == "id") and
+             !is_nil(vv),
            do: Ecto.UUID.cast!(vv),
            else: vv
          )}
@@ -273,9 +275,24 @@ defmodule FullCircle.Helpers do
     end)
   end
 
-  def exec_query_row_col(qry) do
-    k = FullCircle.Repo.query!(qry)
-    {k.columns, k.rows}
+  def exec_query_row_col(qry, repo \\ FullCircle.Repo) do
+    k = repo.query!(qry)
+
+    rows =
+      Enum.map(k.rows, fn r ->
+        Enum.zip(k.columns |> Enum.map(fn x -> x end), r)
+      end)
+
+    {k.columns,
+     rows
+     |> Enum.map(fn r ->
+       Enum.map(r, fn {k, v} ->
+         if(!is_nil(v) and (String.ends_with?(k, "_id") or k == "id"),
+           do: Ecto.UUID.cast!(v),
+           else: v
+         )
+       end)
+     end)}
   end
 
   def remove_field_if_new_flag(attrs, field_name) do

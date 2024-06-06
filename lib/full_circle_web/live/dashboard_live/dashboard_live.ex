@@ -167,7 +167,10 @@ defmodule FullCircleWeb.DashboardLive do
         <.link navigate={~p"/companies/#{@current_company.id}/fixed_assets_report"} class="nav-btn">
           <%= gettext("Fixed Assets") %>
         </.link>
-        <.link navigate={~p"/companies/#{@current_company.id}/post_dated_cheque_listing"} class="nav-btn">
+        <.link
+          navigate={~p"/companies/#{@current_company.id}/post_dated_cheque_listing"}
+          class="nav-btn"
+        >
           <%= gettext("Post Dated Cheques") %>
         </.link>
         <.link navigate={~p"/companies/#{@current_company.id}/tbplbs"} class="nav-btn">
@@ -175,6 +178,9 @@ defmodule FullCircleWeb.DashboardLive do
         </.link>
         <.link navigate={~p"/companies/#{@current_company.id}/aging"} class="nav-btn">
           <%= gettext("Agings") %>
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/queries"} class="nav-btn">
+          <%= gettext("Queries") %>
         </.link>
       </div>
     </div>

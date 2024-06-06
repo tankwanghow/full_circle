@@ -378,8 +378,9 @@ defmodule FullCircleWeb.CoreComponents do
         name={@name}
         phx-debounce={Map.get(assigns, :"phx-debounce")}
         class={[
-          "block w-full rounded text-zinc-900 focus:ring-0 p-1",
-          @errors == [] && "min-h-[6rem] border-zinc-300 focus:border-zinc-400",
+          "block w-full rounded text-zinc-900 focus:ring-0 p-1 min-h-[6rem]",
+          @klass,
+          @errors == [] && "border-zinc-300 focus:border-zinc-400",
           @errors != [] && "border-rose-400 focus:border-rose-400"
         ]}
         url={@url}
@@ -994,7 +995,8 @@ defmodule FullCircleWeb.CoreComponents do
         </div>
       <% @result.failed -> %>
         <div class="bg-rose-200 border-rose-500 text-2xl text-center p-10 rounded">
-          <%= "ERROR!!" %>
+          <%= "ERROR!!" %><br />
+          <%= inspect(@result) %>
         </div>
       <% @result.ok? and @result.result != [] -> %>
         <%= render_slot(@result_html) %>

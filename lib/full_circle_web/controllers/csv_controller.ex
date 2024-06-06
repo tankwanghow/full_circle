@@ -134,6 +134,19 @@ defmodule FullCircleWeb.CsvController do
     send_csv_row_col(conn, row, col, filename)
   end
 
+  def show(conn, %{"report" => "queries", "id" => id}) do
+    com = get_session(conn, "current_company")
+    user = conn.assigns.current_user
+
+    q = FullCircle.StdInterface.get!(FullCircle.UserQueries.Query, id)
+
+    {col, row} = FullCircle.UserQueries.execute(q.sql_string, com, user)
+
+    filename = "#{q.qry_name}_#{Timex.now |> Timex.format!("%Y%m%d%H%M%S", :strftime)}"
+
+    send_csv_row_col(conn, row, col, filename)
+  end
+
   def show(conn, %{
         "report" => "post_dated_cheque_listing",
         "tdate" => tdate
