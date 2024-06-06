@@ -183,25 +183,25 @@ select acname, name, pur_date, pur_price, max_depre_date, cur_depre, cume_depre,
 
 
 with 
-periods as (
-  select distinct to_char(extract(month from t1."doc_date"), '00') || '/' || to_char(extract(year from t1."doc_date"), '0000') as prid
-    from "accounts" as a0 inner join "transactions" as t1 
-      on a0."id" = t1."account_id"
-   where (a0."company_id" = 'a2edcb0f-e9fb-4a8d-888b-61cd334210ba')
-     and (t1."doc_date" <= '2023-12-31')
-     and (t1."doc_date" > '2022-12-31')
-   group by to_char(extract(month from t1."doc_date"), '00') || '/' || to_char(extract(year from t1."doc_date"), '0000')
-),
-profit_mth_list as (
-  select a0."account_type", a0."name", pd.prid, sum(t1."amount") as amount
-    from "accounts" as a0 inner join "transactions" as t1 
-      on a0."id" = t1."account_id" inner join periods pd
-      on pd.prid = to_char(extract(month from t1."doc_date"), '00') || '/' || to_char(extract(year from t1."doc_date"), '0000')
-   where (a0."company_id" = 'a2edcb0f-e9fb-4a8d-888b-61cd334210ba')
-     and (a0."account_type" = any('{Depreciation,Direct Costs,Expenses,Overhead,Other Income,Revenue,Cost Of Goods Sold}'))
-   group by a0."account_type", a0."id", pd.prid
-  having (sum(t1."amount") != 0)
-   order by 1, 2, 3, 4
-)
+  periods as (
+    select distinct to_char(extract(month from t1."doc_date"), '00') || '/' || to_char(extract(year from t1."doc_date"), '0000') as prid
+      from "accounts" as a0 inner join "transactions" as t1 
+        on a0."id" = t1."account_id"
+     where (a0."company_id" = 'a2edcb0f-e9fb-4a8d-888b-61cd334210ba')
+       and (t1."doc_date" <= '2023-12-31')
+       and (t1."doc_date" > '2022-12-31')
+     group by to_char(extract(month from t1."doc_date"), '00') || '/' || to_char(extract(year from t1."doc_date"), '0000')
+  ),
+  profit_mth_list as (
+    select a0."account_type", a0."name", pd.prid, sum(t1."amount") as amount
+      from "accounts" as a0 inner join "transactions" as t1 
+        on a0."id" = t1."account_id" inner join periods pd
+        on pd.prid = to_char(extract(month from t1."doc_date"), '00') || '/' || to_char(extract(year from t1."doc_date"), '0000')
+     where (a0."company_id" = 'a2edcb0f-e9fb-4a8d-888b-61cd334210ba')
+       and (a0."account_type" = any('{Depreciation,Direct Costs,Expenses,Overhead,Other Income,Revenue,Cost Of Goods Sold}'))
+     group by a0."account_type", a0."id", pd.prid
+    having (sum(t1."amount") != 0)
+     order by 1, 2, 3, 4
+  )
 
 select * from profit_mth_list
