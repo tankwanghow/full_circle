@@ -28,6 +28,13 @@ if config_env() == :prod do
       For example: ecto://USER:PASS@HOST/DATABASE
       """
 
+  database_query_url =
+    System.get_env("DATABASE_QUERY_URL") ||
+      raise """
+      environment variable DATABASE_QUERY_URL is missing.
+      For example: ecto://USER:PASS@HOST/DATABASE
+      """
+
   maybe_ipv6 = if System.get_env("ECTO_IPV6") in ~w(true 1), do: [:inet6], else: []
 
   config :full_circle, uploads_dir: "/app/uploads"
@@ -35,6 +42,13 @@ if config_env() == :prod do
   config :full_circle, FullCircle.Repo,
     # ssl: true,
     url: database_url,
+    pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10"),
+    socket_options: maybe_ipv6,
+    timeout: 60_000
+
+  config :full_circle, FullCircle.QueryRepo,
+    # ssl: true,
+    url: database_query_url,
     pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10"),
     socket_options: maybe_ipv6,
     timeout: 60_000

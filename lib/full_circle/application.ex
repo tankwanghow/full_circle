@@ -12,6 +12,7 @@ defmodule FullCircle.Application do
       FullCircleWeb.Telemetry,
       # Start the Ecto repository
       FullCircle.Repo,
+      FullCircle.QueryRepo,
       # Start the PubSub system
       {Phoenix.PubSub, name: FullCircle.PubSub},
       # Start Finch

@@ -11,6 +11,16 @@ config :full_circle, FullCircle.Repo,
   pool_size: 10,
   timeout: 60_000
 
+config :full_circle, FullCircle.QueryRepo,
+  username: "full_circle_query",
+  password: "nyhlisted",
+  hostname: "localhost",
+  database: "full_circle_dev",
+  stacktrace: true,
+  show_sensitive_data_on_connection_error: true,
+  pool_size: 10,
+  timeout: 60_000
+
 config :full_circle, uploads_dir: "uploads"
 
 # For development, we disable any cache and enable
