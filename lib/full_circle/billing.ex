@@ -652,7 +652,7 @@ defmodule FullCircle.Billing do
            if !Decimal.eq?(pur_invoice.pur_invoice_amount, 0) do
              cont_part =
                Enum.map(pur_invoice.pur_invoice_details, fn x ->
-                 String.slice(x.good_name, 0..14)
+                 x.good_name
                end)
                |> Enum.uniq()
                |> Enum.join(", ")

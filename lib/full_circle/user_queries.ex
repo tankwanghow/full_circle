@@ -14,6 +14,8 @@ defmodule FullCircle.UserQueries do
   end
 
   def fill_company_name(qry, com_id) do
-    Regex.replace(~r/[\s+|\n+\^](fct_)(\w+)[\s+|\n+]/, qry <> " ", fn _full, st, nd -> " #{st}#{nd}('#{com_id}') " end)
+    Regex.replace(~r/[\s+|\n+\^](fct_)(\w+)[\s+|\n+]/, qry <> " ", fn _full, st, nd ->
+      " #{st}#{nd}('#{com_id}') "
+    end)
   end
 end

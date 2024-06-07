@@ -142,7 +142,7 @@ defmodule FullCircleWeb.CsvController do
 
     {col, row} = FullCircle.UserQueries.execute(q.sql_string, com, user)
 
-    filename = "#{q.qry_name}_#{Timex.now |> Timex.format!("%Y%m%d%H%M%S", :strftime)}"
+    filename = "#{q.qry_name}_#{Timex.now() |> Timex.format!("%Y%m%d%H%M%S", :strftime)}"
 
     send_csv_row_col(conn, row, col, filename)
   end
