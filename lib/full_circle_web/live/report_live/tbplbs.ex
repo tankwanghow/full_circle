@@ -14,7 +14,7 @@ defmodule FullCircleWeb.ReportLive.TbPlBs do
   def handle_params(params, _uri, socket) do
     params = params["search"]
     report = params["report"]
-    t_date = params["t_date"] || ""
+    t_date = params["t_date"] || Timex.today()
 
     {:noreply,
      socket

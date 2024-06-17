@@ -33,6 +33,7 @@ defmodule FullCircle.Product.Order do
       :order_no
     ])
     |> fill_today(:order_date)
+    |> fill_today(:etd_date)
     |> validate_required([
       :order_date,
       :etd_date,

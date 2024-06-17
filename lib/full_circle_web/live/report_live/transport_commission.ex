@@ -17,8 +17,8 @@ defmodule FullCircleWeb.ReportLive.TransportCommission do
     params = params["search"]
 
     tags = params["tags"] || ""
-    f_date = params["f_date"]
-    t_date = params["t_date"]
+    f_date = params["f_date"] || Timex.today()
+    t_date = params["t_date"] || Timex.today()
 
     {:noreply,
      socket

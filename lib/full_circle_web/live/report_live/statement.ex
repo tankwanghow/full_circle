@@ -21,8 +21,8 @@ defmodule FullCircleWeb.ReportLive.Statement do
 
     gt = params["gt"] || "0.00"
 
-    f_date = params["f_date"] || ""
-    t_date = params["t_date"] || ""
+    f_date = params["f_date"] || Timex.today()
+    t_date = params["t_date"] || Timex.today()
 
     {:noreply,
      socket

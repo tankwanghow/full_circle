@@ -18,8 +18,8 @@ defmodule FullCircleWeb.ReportLive.Account do
     params = params["search"]
 
     name = params["name"] || ""
-    f_date = params["f_date"] || ""
-    t_date = params["t_date"] || ""
+    f_date = params["f_date"] || Timex.today()
+    t_date = params["t_date"] || Timex.today()
 
     socket = socket |> assign(search: %{name: name, f_date: f_date, t_date: t_date})
 
@@ -191,7 +191,7 @@ defmodule FullCircleWeb.ReportLive.Account do
           <div class=" bg-gray-50">
             <div id="transactions">
               <%= for obj <- @result.result do %>
-                <div class="flex flex-row text-center tracking-tighter">
+                <div class="flex flex-row text-center tracking-tighter hover:font-semibold">
                   <p class="hidden"><%= obj.inserted_at %></p>
                   <div class="w-[10%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
                     <%= obj.doc_date |> FullCircleWeb.Helpers.format_date() %>

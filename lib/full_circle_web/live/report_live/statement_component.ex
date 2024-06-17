@@ -14,7 +14,7 @@ defmodule FullCircleWeb.ReportLive.StatementComponent do
   @impl true
   def render(assigns) do
     ~H"""
-    <div id={"objects-#{@id}"} class="flex flex-row text-center tracking-tighter">
+    <div id={"objects-#{@id}"} class="flex flex-row text-center tracking-tighter hover:font-semibold">
       <div class="w-[6%] border rounded bg-green-200 border-green-400 px-2 py-1">
         <input
           :if={@obj.checked}
