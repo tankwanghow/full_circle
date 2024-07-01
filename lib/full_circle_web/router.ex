@@ -93,6 +93,7 @@ defmodule FullCircleWeb.Router do
     pipe_through([:browser, :require_authenticated_user])
 
     get "/csv", CsvController, :show
+    get "/download/:filename", FileDownloadController, :show
 
     live_session :require_authenticated_user_n_active_company,
       on_mount: [

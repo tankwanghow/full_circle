@@ -145,9 +145,9 @@ defmodule FullCircleWeb.DashboardLive do
         <.link navigate={~p"/companies/#{@current_company.id}/house_feed"} class="nav-btn">
           <%= gettext("House Feed") %>
         </.link>
-        <%!-- <.link navigate={~p"/companies/#{@current_company.id}/upload_files"} class="nav-btn">
-          <%= gettext("Upload") %>
-        </.link> --%>
+        <.link navigate={~p"/companies/#{@current_company.id}/upload_files"} class="nav-btn">
+          <%= gettext("Files") %>
+        </.link>
       </div>
 
       <div class="font-medium text-xl">Accounting Reports</div>
