@@ -302,7 +302,7 @@ defmodule FullCircleWeb.UploadFileLive.Index do
 
         <div :if={@current_path != @root} class="flex place-items-center">
           <.link class="w-[65%] text-left hover:cursor-pointer hover:bg-green-400" phx-click="cd-up">
-            <.icon name="hero-folder-solid" class="h-5 w-5 text-cyan-600" /> up dir...
+            <.icon name="hero-folder-minus-solid" class="h-5 w-5 text-orange-600" />..
           </.link>
         </div>
         <%= for f <- @uploaded_files do %>
