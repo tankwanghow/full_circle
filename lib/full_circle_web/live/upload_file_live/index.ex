@@ -14,6 +14,7 @@ defmodule FullCircleWeb.UploadFileLive.Index do
       |> assign(:mark_delete, nil)
       |> assign(:mark_rename, nil)
       |> assign(:mark_create, nil)
+      |> assign(:selected, [])
       |> assign(:root, root)
       |> assign(:current_path, root)
       |> assign(:name_paths, name_paths(root, root))
@@ -47,8 +48,7 @@ defmodule FullCircleWeb.UploadFileLive.Index do
 
   @impl true
   def handle_event("clear-mark", _, socket) do
-    {:noreply,
-     socket |> clear_all_marked() }
+    {:noreply, socket |> clear_all_marked()}
   end
 
   @impl true
@@ -86,7 +86,10 @@ defmodule FullCircleWeb.UploadFileLive.Index do
 
     File.rm!(path)
 
-    {:noreply, socket |> clear_all_marked |> assign(:uploaded_files, list_files(socket.assigns.current_path))}
+    {:noreply,
+     socket
+     |> clear_all_marked
+     |> assign(:uploaded_files, list_files(socket.assigns.current_path))}
   end
 
   @impl true
@@ -99,7 +102,25 @@ defmodule FullCircleWeb.UploadFileLive.Index do
 
     File.rm_rf!(path)
 
-    {:noreply, socket |> clear_all_marked |> assign(:uploaded_files, list_files(socket.assigns.current_path))}
+    {:noreply,
+     socket
+     |> clear_all_marked
+     |> assign(:uploaded_files, list_files(socket.assigns.current_path))}
+  end
+
+  @impl true
+  def handle_event("move", _, socket) do
+    Enum.each(socket.assigns.selected, fn src ->
+      name = Path.split(src) |> Enum.reverse() |> Enum.at(0)
+      dest = Path.join(socket.assigns.current_path, name)
+
+      File.rename!(src, dest)
+    end)
+
+    {:noreply,
+     socket
+     |> clear_all_marked
+     |> assign(:uploaded_files, list_files(socket.assigns.current_path))}
   end
 
   @impl true
@@ -116,18 +137,26 @@ defmodule FullCircleWeb.UploadFileLive.Index do
       {:ok, dest}
     end)
 
-    {:noreply, socket |> clear_all_marked |> assign(:uploaded_files, list_files(socket.assigns.current_path))}
+    {:noreply,
+     socket
+     |> clear_all_marked
+     |> assign(:uploaded_files, list_files(socket.assigns.current_path))}
   end
 
   @impl true
   def handle_event("cd-down", %{"dirname" => dirname}, socket) do
     path = Path.join([socket.assigns.current_path, dirname])
-    socket = socket |> assign(:current_path, path)
 
-    {:noreply,
-     socket
-     |> assign(:name_paths, name_paths(path, socket.assigns.root))
-     |> assign(:uploaded_files, list_files(path))}
+    if is_nil(Enum.find(socket.assigns.selected, fn x -> x == path end)) do
+      socket = socket |> assign(:current_path, path)
+
+      {:noreply,
+       socket
+       |> assign(:name_paths, name_paths(path, socket.assigns.root))
+       |> assign(:uploaded_files, list_files(path))}
+    else
+      {:noreply, socket}
+    end
   end
 
   @impl true
@@ -151,6 +180,18 @@ defmodule FullCircleWeb.UploadFileLive.Index do
      |> assign(:uploaded_files, list_files(path))}
   end
 
+  @impl true
+  def handle_event("select-clicked", %{"name" => name}, socket) do
+    selected =
+      if is_nil(Enum.find(socket.assigns.selected, fn x -> x == name end)) do
+        [name | socket.assigns.selected]
+      else
+        Enum.reject(socket.assigns.selected, fn x -> x == name end)
+      end
+
+    {:noreply, socket |> assign(:selected, selected)}
+  end
+
   defp rename(old, new, current_path) do
     if String.trim(new) != "" do
       old_path =
@@ -170,7 +211,11 @@ defmodule FullCircleWeb.UploadFileLive.Index do
   end
 
   defp clear_all_marked(socket) do
-    socket |> assign(:mark_rename, nil) |> assign(:mark_delete, nil) |> assign(:mark_create, nil)
+    socket
+    |> assign(:mark_rename, nil)
+    |> assign(:mark_delete, nil)
+    |> assign(:mark_create, nil)
+    |> assign(:selected, [])
   end
 
   defp create_folder(new, current_path) do
@@ -300,17 +345,52 @@ defmodule FullCircleWeb.UploadFileLive.Index do
           </.link>
         </div>
 
+        <div class="flex place-content-center">
+          <%= if Enum.count(@selected) > 0 do %>
+            <%= "Move the selected #{Enum.count(@selected)} file(s) or folder(s) to" %>
+            <div class="pl-1 hover:cursor-pointer text-rose-600 hover:font-extrabold" phx-click="move">
+              Here
+            </div>
+            <% else %>
+            <br/>
+          <% end %>
+        </div>
+
         <div :if={@current_path != @root} class="flex place-items-center">
-          <.link class="w-[65%] text-left hover:cursor-pointer hover:bg-green-400" phx-click="cd-up">
+          <div class="w-[3%]"></div>
+          <.link class="w-[95%] text-left hover:cursor-pointer hover:bg-green-400" phx-click="cd-up">
             <.icon name="hero-folder-minus-solid" class="h-5 w-5 text-orange-600" />..
           </.link>
         </div>
+
         <%= for f <- @uploaded_files do %>
           <div class="flex mb-1 place-items-center hover:bg-green-400">
+            <div
+              class="w-[3%]"
+              phx-value-name={Path.join([@current_path, f.name])}
+              phx-click="select-clicked"
+            >
+              <%= if is_nil(@mark_delete) and is_nil(@mark_rename) and is_nil(@mark_create) do %>
+                <.icon
+                  :if={
+                    !is_nil(Enum.find(@selected, fn x -> x == Path.join([@current_path, f.name]) end))
+                  }
+                  name="hero-check-circle-solid"
+                />
+                <.icon
+                  :if={
+                    is_nil(Enum.find(@selected, fn x -> x == Path.join([@current_path, f.name]) end))
+                  }
+                  name="hero-minus-circle"
+                />
+              <% end %>
+            </div>
             <.link
               :if={f.type == :regular and @mark_rename != f.name}
-              class="w-[65%] text-left hover:cursor-pointer"
-              navigate={~p"/companies/#{@current_company.id}/download/#{f.name}"}
+              class="w-[62%] text-left hover:cursor-pointer"
+              navigate={
+                ~p"/companies/#{@current_company.id}/download/#{Path.join([@current_path, f.name])}"
+              }
               target="_blank"
             >
               <.icon name="hero-document-solid" class="h-5 w-5 text-cyan-600" />
@@ -319,15 +399,15 @@ defmodule FullCircleWeb.UploadFileLive.Index do
 
             <.link
               :if={f.type == :directory and @mark_rename != f.name}
-              class="w-[65%] text-left hover:cursor-pointer text-blue-600"
+              class="w-[62%] text-left hover:cursor-pointer text-blue-600"
               phx-click="cd-down"
               phx-value-dirname={f.name}
             >
               <.icon name="hero-folder-solid" class="h-5 w-5 text-orange-600" />
-              <%= f.name %>...
+              <%= f.name %>
             </.link>
 
-            <div :if={@mark_rename == f.name} class="w-[65%] p-1">
+            <div :if={@mark_rename == f.name} class="w-[62%] p-1">
               <div class="flex">
                 <input
                   id="rename"
@@ -343,7 +423,7 @@ defmodule FullCircleWeb.UploadFileLive.Index do
               </div>
             </div>
 
-            <div :if={@mark_delete == f.name and f.type == :regular} class="w-[30%] text-right italic">
+            <div :if={@mark_delete == f.name and f.type == :regular} class="w-[32%] text-right italic">
               <.link
                 phx-click="delete-file"
                 phx-value-filename={f.name}
@@ -359,7 +439,7 @@ defmodule FullCircleWeb.UploadFileLive.Index do
 
             <div
               :if={@mark_delete == f.name and f.type == :directory}
-              class="w-[30%] text-right italic"
+              class="w-[32%] text-right italic"
             >
               <.link
                 phx-click="delete-dir"
@@ -374,11 +454,9 @@ defmodule FullCircleWeb.UploadFileLive.Index do
               </.link>
             </div>
 
-            <div
-              :if={is_nil(@mark_delete) and is_nil(@mark_rename) and is_nil(@mark_create)}
-              class="w-[5%]"
-            >
+            <div class="w-[3%]">
               <.link
+                :if={is_nil(@mark_delete) and is_nil(@mark_rename) and is_nil(@mark_create)}
                 phx-click={JS.push("mark-rename")}
                 phx-value-name={f.name}
                 class="font-bold text-blue-600"
@@ -387,7 +465,7 @@ defmodule FullCircleWeb.UploadFileLive.Index do
               </.link>
             </div>
 
-            <div :if={@mark_delete != f.name} class="w-[20%] text-right">
+            <div :if={@mark_delete != f.name} class="w-[19%] text-right">
               <%= f.ctime
               |> :calendar.datetime_to_gregorian_seconds()
               |> DateTime.from_gregorian_seconds()
@@ -398,11 +476,13 @@ defmodule FullCircleWeb.UploadFileLive.Index do
               <%= (f.size / 1_000) |> Float.round(2) %>KB
             </div>
 
-            <div
-              :if={is_nil(@mark_delete) and is_nil(@mark_rename) and is_nil(@mark_create)}
-              class="w-[5%]"
-            >
-              <.link phx-click="mark-delete" phx-value-name={f.name} class="font-bold text-green-600">
+            <div class="w-[3%]">
+              <.link
+                :if={is_nil(@mark_delete) and is_nil(@mark_rename) and is_nil(@mark_create)}
+                phx-click="mark-delete"
+                phx-value-name={f.name}
+                class="font-bold text-green-600"
+              >
                 X
               </.link>
             </div>
