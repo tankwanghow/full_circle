@@ -179,7 +179,7 @@ defmodule FullCircleWeb.DashboardLive do
         <.link navigate={~p"/companies/#{@current_company.id}/aging"} class="nav-btn">
           <%= gettext("Agings") %>
         </.link>
-        <.link navigate={~p"/companies/#{@current_company.id}/queries"} class="nav-btn">
+        <.link :if={@current_role == "admin"} navigate={~p"/companies/#{@current_company.id}/queries"} class="nav-btn">
           <%= gettext("Queries") %>
         </.link>
       </div>
