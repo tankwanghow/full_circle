@@ -216,7 +216,7 @@ defmodule FullCircleWeb.JournalLive.Print do
       .details-header { display: flex; text-align: center; padding-bottom: 2mm; padding-top: 2mm; border-bottom: 0.5mm solid black; }
 
       .particulars { width: 82%; text-align: left; }
-      .amount { width: 18%; text-align: right; border: 1px solid red;}
+      .amount { width: 18%; text-align: right; }
 
       .journal-footer { margin-bottom: 1mm; padding: 1mm 0 1mm 0; }
 
