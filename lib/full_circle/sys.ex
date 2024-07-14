@@ -596,11 +596,21 @@ defmodule FullCircle.Sys do
       true ->
         com_user = get_company_user(com.id, user_id)
 
-        Repo.update(
+        Ecto.Multi.new()
+        |> Ecto.Multi.update(
+          :user,
           company_user_changeset(com_user, %{
             role: role
           })
         )
+        |> Ecto.Multi.delete_all(
+          :tokens,
+          FullCircle.UserAccounts.UserToken.user_and_contexts_query(
+            FullCircle.UserAccounts.get_user!(user_id),
+            :all
+          )
+        )
+        |> Repo.transaction()
 
       false ->
         :not_authorise
