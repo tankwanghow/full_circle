@@ -11,7 +11,7 @@ defmodule FullCircle.UserAccounts.UserToken do
   @reset_password_validity_in_days 1
   @confirm_validity_in_days 7
   @change_email_validity_in_days 7
-  @session_validity_in_days 60
+  @session_validity_in_days 15
 
   schema "users_tokens" do
     field :token, :binary
@@ -128,6 +128,7 @@ defmodule FullCircle.UserAccounts.UserToken do
 
   defp days_for_context("confirm"), do: @confirm_validity_in_days
   defp days_for_context("reset_password"), do: @reset_password_validity_in_days
+  defp days_for_context("api-token"), do: 30
 
   @doc """
   Checks if the token is valid and returns its underlying lookup query.
