@@ -327,6 +327,7 @@ defmodule FullCircleWeb.JournalLive.Form do
           <.live_component
             :if={@live_action == :edit}
             module={FullCircleWeb.LogLive.Component}
+            current_company={@current_company}
             id={"log_#{@id}"}
             show_log={false}
             entity="journals"

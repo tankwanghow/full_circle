@@ -20,8 +20,6 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
     f_date = params["f_date"] || "#{Timex.today()}"
     t_date = params["t_date"] || "#{Timex.today()}"
 
-
-
     {:noreply,
      socket
      |> assign(

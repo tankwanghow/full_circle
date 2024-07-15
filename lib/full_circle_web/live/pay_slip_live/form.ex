@@ -389,6 +389,7 @@ defmodule FullCircleWeb.PaySlipLive.Form do
           <.live_component
             :if={@live_action == :view}
             module={FullCircleWeb.LogLive.Component}
+            current_company={@current_company}
             id={"log_#{@id}"}
             show_log={false}
             entity="pay_slips"

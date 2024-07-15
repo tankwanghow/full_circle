@@ -790,8 +790,14 @@ defmodule FullCircleWeb.CoreComponents do
     |> Enum.join(" ")
   end
 
-  def to_fc_time_format(dt) do
-    Timex.format!(Timex.local(dt), "%F %r %Z", :strftime)
+  def to_fc_time_format(dt, com, flag \\ :full) do
+    format = case flag do
+      :date -> "%F"
+      :time -> "%r"
+      :datetime -> "%F %r"
+    _ -> "%F %r %Z"
+    end
+    Timex.format!(Timex.Timezone.convert(dt, com.timezone), format, :strftime)
   end
 
   def css_trans(module, obj, obj_name, id, ex_class_1, ex_class_2 \\ "") do

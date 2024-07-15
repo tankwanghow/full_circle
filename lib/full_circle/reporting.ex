@@ -506,9 +506,9 @@ defmodule FullCircle.Reporting do
 
   def fix_total([h | t], {acc, a}, tot) when tot == 0 do
     # cond do
-      # h + acc < 0 or Enum.any?(t, fn v -> v < 0 end) -> fix_total(t, {h + acc, [0 | a]}, tot)
-      # true ->
-        {h + acc, [t |> Enum.reverse(), h + acc | a] |> List.flatten()}
+    # h + acc < 0 or Enum.any?(t, fn v -> v < 0 end) -> fix_total(t, {h + acc, [0 | a]}, tot)
+    # true ->
+    {h + acc, [t |> Enum.reverse(), h + acc | a] |> List.flatten()}
     # end
   end
 

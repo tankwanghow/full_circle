@@ -19,6 +19,7 @@ defmodule FullCircleWeb.LogLive.Component do
 
   @impl true
   def handle_event("show_log", _, socket) do
+    IO.inspect socket.assigns
     {:noreply,
      socket
      |> assign(:show_log, true)
@@ -86,7 +87,7 @@ defmodule FullCircleWeb.LogLive.Component do
                   </div>
                   <div><%= obj.email %></div>
                   <div class="text-sm">
-                    <%= FullCircleWeb.CoreComponents.to_fc_time_format(obj.inserted_at) %>
+                    <%= FullCircleWeb.CoreComponents.to_fc_time_format(obj.inserted_at, @current_company) %>
                   </div>
                 </div>
                 <div class="text-left col-span-8 border rounded p-2 bg-rose-100 text-xs font-mono">

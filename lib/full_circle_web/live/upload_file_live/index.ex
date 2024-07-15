@@ -351,8 +351,8 @@ defmodule FullCircleWeb.UploadFileLive.Index do
             <div class="pl-1 hover:cursor-pointer text-rose-600 hover:font-extrabold" phx-click="move">
               Here
             </div>
-            <% else %>
-            <br/>
+          <% else %>
+            <br />
           <% end %>
         </div>
 
@@ -469,7 +469,7 @@ defmodule FullCircleWeb.UploadFileLive.Index do
               <%= f.ctime
               |> :calendar.datetime_to_gregorian_seconds()
               |> DateTime.from_gregorian_seconds()
-              |> to_fc_time_format %>
+              |> to_fc_time_format(@current_company, :datetime) %>
             </div>
 
             <div :if={@mark_delete != f.name} class="w-[10%] text-right">
