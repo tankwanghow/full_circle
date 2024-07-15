@@ -307,7 +307,7 @@ defmodule FullCircleWeb.LoadLive.Form do
               field={@form[:supplier_name]}
               label={gettext("Supplier")}
               phx-hook="tributeAutoComplete"
-              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
+              url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
             />
           </div>
           <div class="w-1/2 grow shrink">
@@ -316,7 +316,7 @@ defmodule FullCircleWeb.LoadLive.Form do
               field={@form[:shipper_name]}
               label={gettext("Shipper")}
               phx-hook="tributeAutoComplete"
-              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
+              url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
             />
           </div>
           <div class="grow shrink w-1/4">
@@ -347,7 +347,7 @@ defmodule FullCircleWeb.LoadLive.Form do
               field={@form[:loader_tags]}
               label={gettext("Loader Tags")}
               phx-hook="tributeTagText"
-              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/tags?klass=FullCircle.Product.Load&tag_field=loader_tags&tag="}
+              url={"/list/companies/#{@current_company.id}/#{@current_user.id}/tags?klass=FullCircle.Product.Load&tag_field=loader_tags&tag="}
             />
           </div>
           <div class="w-[20%]">
@@ -355,7 +355,7 @@ defmodule FullCircleWeb.LoadLive.Form do
               field={@form[:loader_wages_tags]}
               label={gettext("Loader Wages Tags")}
               phx-hook="tributeTagText"
-              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/tags?klass=FullCircle.Product.Loader&tag_field=loader_wages_tags&tag="}
+              url={"/list/companies/#{@current_company.id}/#{@current_user.id}/tags?klass=FullCircle.Product.Loader&tag_field=loader_wages_tags&tag="}
             />
           </div>
         </div>

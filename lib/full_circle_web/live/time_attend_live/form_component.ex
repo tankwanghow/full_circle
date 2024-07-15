@@ -167,7 +167,7 @@ defmodule FullCircleWeb.TimeAttendLive.FormComponent do
               field={@form[:employee_name]}
               label={gettext("Employee")}
               phx-hook="tributeAutoComplete"
-              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=employee&name="}
+              url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=employee&name="}
             />
             <.input
               :if={@live_action == :edit}

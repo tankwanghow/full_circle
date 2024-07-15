@@ -173,7 +173,7 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
                 name="search[contact]"
                 value={@search.contact}
                 phx-hook="tributeAutoComplete"
-                url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
+                url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
               />
             </div>
             <div class="w-[10%]">
@@ -218,7 +218,7 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
               name="search[goods]"
               value={@search.goods}
               phx-hook="tributeAutoComplete"
-              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=good&name="}
+              url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=good&name="}
             />
           </div>
         </.form>

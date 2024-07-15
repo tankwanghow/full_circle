@@ -465,7 +465,7 @@ defmodule FullCircleWeb.PaymentLive.Form do
               field={@form[:contact_name]}
               label={gettext("Pay To")}
               phx-hook="tributeAutoComplete"
-              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
+              url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
             />
           </div>
           <div class="w-5/12 grow shrink">
@@ -474,7 +474,7 @@ defmodule FullCircleWeb.PaymentLive.Form do
               field={@form[:funds_account_name]}
               label={gettext("Funds Account")}
               phx-hook="tributeAutoComplete"
-              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=fundsaccount&name="}
+              url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=fundsaccount&name="}
             />
           </div>
           <div class="w-2/12 grow shrink">

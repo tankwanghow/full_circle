@@ -156,7 +156,7 @@ defmodule FullCircleWeb.TimeAttendLive.AdvanceFormComponent do
               field={@form[:employee_name]}
               label={gettext("Employee")}
               phx-hook="tributeAutoComplete"
-              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=employee&name="}
+              url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=employee&name="}
             />
           </div>
           <div class="col-span-4">
@@ -165,7 +165,7 @@ defmodule FullCircleWeb.TimeAttendLive.AdvanceFormComponent do
               field={@form[:funds_account_name]}
               label={gettext("Funds From")}
               phx-hook="tributeAutoComplete"
-              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=fundsaccount&name="}
+              url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=fundsaccount&name="}
             />
           </div>
         </div>

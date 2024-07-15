@@ -289,7 +289,7 @@ defmodule FullCircleWeb.DeliveryLive.Form do
               field={@form[:customer_name]}
               label={gettext("Customer")}
               phx-hook="tributeAutoComplete"
-              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
+              url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
             />
           </div>
           <div class="grow shrink w-1/4">
@@ -320,7 +320,7 @@ defmodule FullCircleWeb.DeliveryLive.Form do
               field={@form[:loader_tags]}
               label={gettext("Delivery Man Tags")}
               phx-hook="tributeTagText"
-              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/tags?klass=FullCircle.Product.Delivery&tag_field=delivery_man_tags&tag="}
+              url={"/list/companies/#{@current_company.id}/#{@current_user.id}/tags?klass=FullCircle.Product.Delivery&tag_field=delivery_man_tags&tag="}
             />
           </div>
           <div class="w-[20%]">
@@ -328,7 +328,7 @@ defmodule FullCircleWeb.DeliveryLive.Form do
               field={@form[:loader_wages_tags]}
               label={gettext("Delivery Wages Tags")}
               phx-hook="tributeTagText"
-              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/tags?klass=FullCircle.Product.Deliveryer&tag_field=delivery_wages_tags&tag="}
+              url={"/list/companies/#{@current_company.id}/#{@current_user.id}/tags?klass=FullCircle.Product.Deliveryer&tag_field=delivery_wages_tags&tag="}
             />
           </div>
         </div>

@@ -54,7 +54,7 @@ defmodule FullCircleWeb.InvoiceLive.DetailComponent do
             <.input
               field={dtl[:good_name]}
               phx-hook="tributeAutoComplete"
-              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=good&name="}
+              url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=good&name="}
             />
           </div>
           <.input type="hidden" field={dtl[:good_id]} />
@@ -63,7 +63,7 @@ defmodule FullCircleWeb.InvoiceLive.DetailComponent do
             <.input
               field={dtl[:package_name]}
               phx-hook="tributeAutoComplete"
-              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=packaging&good_id=#{dtl[:good_id].value}&name="}
+              url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=packaging&good_id=#{dtl[:good_id].value}&name="}
             />
           </div>
           <.input type="hidden" field={dtl[:unit_multiplier]} />
@@ -101,7 +101,7 @@ defmodule FullCircleWeb.InvoiceLive.DetailComponent do
             <.input
               field={dtl[:account_name]}
               phx-hook="tributeAutoComplete"
-              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=account&name="}
+              url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=account&name="}
             />
           </div>
           <.input type="hidden" field={dtl[:account_id]} />
@@ -109,7 +109,7 @@ defmodule FullCircleWeb.InvoiceLive.DetailComponent do
             <.input
               field={dtl[:tax_code_name]}
               phx-hook="tributeAutoComplete"
-              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=#{@taxcodetype}&name="}
+              url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=#{@taxcodetype}&name="}
             />
           </div>
           <.input type="hidden" field={dtl[:tax_code_id]} />

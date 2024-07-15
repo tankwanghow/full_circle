@@ -274,7 +274,7 @@ defmodule FullCircleWeb.LayerLive.HarvestForm do
               field={@form[:employee_name]}
               label={gettext("Employee")}
               phx-hook="tributeAutoComplete"
-              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=employee&name="}
+              url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=employee&name="}
             />
           </div>
         </div>
@@ -297,7 +297,7 @@ defmodule FullCircleWeb.LayerLive.HarvestForm do
               <.input
                 field={dtl[:house_no]}
                 phx-hook="tributeAutoComplete"
-                url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=house&name="}
+                url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=house&name="}
               />
             </div>
             <div class="w-[16%]">

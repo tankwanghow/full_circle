@@ -22,17 +22,27 @@ defmodule FullCircleWeb.Router do
     plug(:fetch_api_user)
   end
 
+  pipeline :list do
+    plug(:accepts, ["json"])
+    plug(:fetch_session)
+    plug(:protect_from_forgery)
+  end
+
+  scope "/list", FullCircleWeb do
+    pipe_through(:list)
+    get "/companies/:company_id/:user_id/billingtags", BillingTagController, :index
+    get "/companies/:company_id/:user_id/tags", TagController, :index
+    get "/companies/:company_id/:user_id/autocomplete", AutoCompleteController, :index
+  end
+
   scope "/", FullCircleWeb do
     pipe_through(:browser)
-
     get("/", PageController, :home)
   end
 
   scope "/api", FullCircleWeb do
     pipe_through(:api)
-    get "/companies/:company_id/:user_id/billingtags", BillingTagController, :index
-    get "/companies/:company_id/:user_id/tags", TagController, :index
-    get "/companies/:company_id/:user_id/autocomplete", AutoCompleteController, :index
+    # all api routes place here
   end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development

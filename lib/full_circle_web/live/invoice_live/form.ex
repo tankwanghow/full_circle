@@ -359,7 +359,7 @@ defmodule FullCircleWeb.InvoiceLive.Form do
               field={@form[:contact_name]}
               label={gettext("Customer")}
               phx-hook="tributeAutoComplete"
-              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
+              url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
             />
           </div>
           <div class="grow shrink">
@@ -379,7 +379,7 @@ defmodule FullCircleWeb.InvoiceLive.Form do
               field={@form[:loader_tags]}
               label={gettext("Loader Tags")}
               phx-hook="tributeTagText"
-              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/billingtags?klass=FullCircle.Billing.Invoice&tag_field=loader_tags&tag="}
+              url={"/list/companies/#{@current_company.id}/#{@current_user.id}/billingtags?klass=FullCircle.Billing.Invoice&tag_field=loader_tags&tag="}
             />
           </div>
           <div class="grow shrink">
@@ -387,7 +387,7 @@ defmodule FullCircleWeb.InvoiceLive.Form do
               field={@form[:loader_wages_tags]}
               label={gettext("Loader Wages Tags")}
               phx-hook="tributeTagText"
-              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/billingtags?klass=FullCircle.Billing.Invoice&tag_field=loader_wages_tags&tag="}
+              url={"/list/companies/#{@current_company.id}/#{@current_user.id}/billingtags?klass=FullCircle.Billing.Invoice&tag_field=loader_wages_tags&tag="}
             />
           </div>
           <div class="grow shrink">
@@ -395,7 +395,7 @@ defmodule FullCircleWeb.InvoiceLive.Form do
               field={@form[:delivery_man_tags]}
               label={gettext("Delivery Man Tags")}
               phx-hook="tributeTagText"
-              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/billingtags?klass=FullCircle.Billing.Invoice&tag_field=delivery_man_tags&tag="}
+              url={"/list/companies/#{@current_company.id}/#{@current_user.id}/billingtags?klass=FullCircle.Billing.Invoice&tag_field=delivery_man_tags&tag="}
             />
           </div>
           <div class="grow shrink">
@@ -403,7 +403,7 @@ defmodule FullCircleWeb.InvoiceLive.Form do
               field={@form[:delivery_wages_tags]}
               label={gettext("Delivery Wages Tags")}
               phx-hook="tributeTagText"
-              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/billingtags?klass=FullCircle.Billing.Invoice&tag_field=delivery_wages_tags&tag="}
+              url={"/list/companies/#{@current_company.id}/#{@current_user.id}/billingtags?klass=FullCircle.Billing.Invoice&tag_field=delivery_wages_tags&tag="}
             />
           </div>
         </div>

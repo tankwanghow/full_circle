@@ -251,7 +251,7 @@ defmodule FullCircleWeb.ChequeLive.DepositForm do
               field={@form[:bank_name]}
               label={gettext("Deposit To")}
               phx-hook="tributeAutoComplete"
-              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=fundsaccount&name="}
+              url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=fundsaccount&name="}
             />
           </div>
           <div class="w-4/12">
@@ -259,7 +259,7 @@ defmodule FullCircleWeb.ChequeLive.DepositForm do
               field={@form[:funds_from_name]}
               label={gettext("Funds From")}
               phx-hook="tributeAutoComplete"
-              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=fundsaccount&name="}
+              url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=fundsaccount&name="}
             />
           </div>
           <div class="w-2/12 grow shrink">

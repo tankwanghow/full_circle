@@ -36,7 +36,7 @@ defmodule FullCircleWeb.DeliveryLive.DetailComponent do
                 !is_nil(Phoenix.HTML.Form.input_value(dtl, :load_detail_id)) and
                   Phoenix.HTML.Form.input_value(dtl, :load_detail_id) != ""
               }
-              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=good&name="}
+              url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=good&name="}
             />
           </div>
           <.input type="hidden" field={dtl[:load_detail_id]} />
@@ -46,7 +46,7 @@ defmodule FullCircleWeb.DeliveryLive.DetailComponent do
             <.input
               field={dtl[:package_name]}
               phx-hook="tributeAutoComplete"
-              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=packaging&good_id=#{dtl[:good_id].value}&name="}
+              url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=packaging&good_id=#{dtl[:good_id].value}&name="}
             />
           </div>
           <.input type="hidden" field={dtl[:unit_multiplier]} />

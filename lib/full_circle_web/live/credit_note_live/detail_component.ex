@@ -64,7 +64,7 @@ defmodule FullCircleWeb.CreditNoteLive.DetailComponent do
             <.input
               field={dtl[:account_name]}
               phx-hook="tributeAutoComplete"
-              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=account&name="}
+              url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=account&name="}
             />
           </div>
           <.input type="hidden" field={dtl[:account_id]} />
@@ -72,7 +72,7 @@ defmodule FullCircleWeb.CreditNoteLive.DetailComponent do
             <.input
               field={dtl[:tax_code_name]}
               phx-hook="tributeAutoComplete"
-              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=#{@taxcodetype}&name="}
+              url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=#{@taxcodetype}&name="}
             />
           </div>
           <.input type="hidden" field={dtl[:tax_code_id]} />

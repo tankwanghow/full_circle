@@ -342,7 +342,7 @@ defmodule FullCircleWeb.FixedAssetLive.Form do
               field={@form[:asset_ac_name]}
               label={gettext("Asset Account")}
               phx-hook="tributeAutoComplete"
-              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=account&name="}
+              url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=account&name="}
             />
           </div>
           <div class="w-3/12">
@@ -351,7 +351,7 @@ defmodule FullCircleWeb.FixedAssetLive.Form do
               field={@form[:depre_ac_name]}
               label={gettext("Depreciation Account")}
               phx-hook="tributeAutoComplete"
-              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=account&name="}
+              url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=account&name="}
             />
           </div>
           <div class="w-3/12">
@@ -360,7 +360,7 @@ defmodule FullCircleWeb.FixedAssetLive.Form do
               field={@form[:cume_depre_ac_name]}
               label={gettext("Cume Depreciation Account")}
               phx-hook="tributeAutoComplete"
-              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=account&name="}
+              url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=account&name="}
             />
           </div>
           <div class="w-3/12">
@@ -369,7 +369,7 @@ defmodule FullCircleWeb.FixedAssetLive.Form do
               field={@form[:disp_fund_ac_name]}
               label={gettext("Disposal Fund Account")}
               phx-hook="tributeAutoComplete"
-              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=account&name="}
+              url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=account&name="}
             />
           </div>
         </div>

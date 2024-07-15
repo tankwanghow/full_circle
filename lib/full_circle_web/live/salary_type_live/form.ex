@@ -240,7 +240,7 @@ defmodule FullCircleWeb.SalaryTypeLive.Form do
               field={@form[:db_ac_name]}
               label={gettext("Debit Account")}
               phx-hook="tributeAutoComplete"
-              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=account&name="}
+              url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=account&name="}
             />
           </div>
           <div class="col-span-6">
@@ -249,7 +249,7 @@ defmodule FullCircleWeb.SalaryTypeLive.Form do
               field={@form[:cr_ac_name]}
               label={gettext("Credit Account")}
               phx-hook="tributeAutoComplete"
-              url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=account&name="}
+              url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=account&name="}
             />
           </div>
         </div>

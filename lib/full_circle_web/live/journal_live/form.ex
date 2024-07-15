@@ -260,7 +260,7 @@ defmodule FullCircleWeb.JournalLive.Form do
                 <.input
                   field={dtl[:account_name]}
                   phx-hook="tributeAutoComplete"
-                  url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=account&name="}
+                  url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=account&name="}
                 />
               </div>
               <.input type="hidden" field={dtl[:contact_id]} />
@@ -268,7 +268,7 @@ defmodule FullCircleWeb.JournalLive.Form do
                 <.input
                   field={dtl[:contact_name]}
                   phx-hook="tributeAutoComplete"
-                  url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
+                  url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
                 />
               </div>
               <div class="w-[30%]"><.input field={dtl[:particulars]} /></div>

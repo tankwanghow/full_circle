@@ -404,7 +404,7 @@ defmodule FullCircleWeb.EmployeeLive.Form do
               <.input
                 field={st[:salary_type_name]}
                 phx-hook="tributeAutoComplete"
-                url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=salarytype&name="}
+                url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=salarytype&name="}
               />
             </div>
             <div class="col-span-5">

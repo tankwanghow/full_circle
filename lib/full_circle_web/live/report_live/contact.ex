@@ -111,7 +111,7 @@ defmodule FullCircleWeb.ReportLive.Contact do
                 name="search[name]"
                 value={@search.name}
                 phx-hook="tributeAutoComplete"
-                url={"/api/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
+                url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
               />
             </div>
             <div class="col-span-2">
