@@ -120,11 +120,14 @@ defmodule FullCircleWeb.DashboardLive do
       </div>
 
       <div class="font-medium text-xl">Operations</div>
-      <div class="mb-4 gap-1 flex flex-wrap justify-center gap-1">
+      <div class="mb-4 gap-1 flex flex-wrap justify-center">
         <.link navigate={~p"/companies/#{@current_company.id}/Weighing"} class="button gray">
           <%= gettext("Weighings") %>
         </.link>
-        <.link navigate={~p"/companies/#{@current_company.id}/weighed_goods_report"} class="button gray">
+        <.link
+          navigate={~p"/companies/#{@current_company.id}/weighed_goods_report"}
+          class="button gray"
+        >
           <%= gettext("Weight Goods Report") %>
         </.link>
         <.link navigate={~p"/companies/#{@current_company.id}/houses"} class="button gray">
@@ -139,7 +142,10 @@ defmodule FullCircleWeb.DashboardLive do
         <.link navigate={~p"/companies/#{@current_company.id}/harvest_report"} class="button gray">
           <%= gettext("Harvest Report") %>
         </.link>
-        <.link navigate={~p"/companies/#{@current_company.id}/harvest_wage_report"} class="button gray">
+        <.link
+          navigate={~p"/companies/#{@current_company.id}/harvest_wage_report"}
+          class="button gray"
+        >
           <%= gettext("Harvest Wages Report") %>
         </.link>
         <.link navigate={~p"/companies/#{@current_company.id}/house_feed"} class="button gray">
@@ -152,16 +158,25 @@ defmodule FullCircleWeb.DashboardLive do
 
       <div class="font-medium text-xl">Accounting Reports</div>
       <div class="mb-4 gap-1 flex flex-wrap justify-center">
-        <.link navigate={~p"/companies/#{@current_company.id}/account_transactions"} class="button red">
+        <.link
+          navigate={~p"/companies/#{@current_company.id}/account_transactions"}
+          class="button red"
+        >
           <%= gettext("Account Transactions") %>
         </.link>
-        <.link navigate={~p"/companies/#{@current_company.id}/contact_transactions"} class="button red">
+        <.link
+          navigate={~p"/companies/#{@current_company.id}/contact_transactions"}
+          class="button red"
+        >
           <%= gettext("Contact Transactions") %>
         </.link>
         <.link navigate={~p"/companies/#{@current_company.id}/debtor_statement"} class="button red">
           <%= gettext("Contact Statement") %>
         </.link>
-        <.link navigate={~p"/companies/#{@current_company.id}/transport_commission"} class="button red">
+        <.link
+          navigate={~p"/companies/#{@current_company.id}/transport_commission"}
+          class="button red"
+        >
           <%= gettext("Driver Commission") %>
         </.link>
         <.link navigate={~p"/companies/#{@current_company.id}/fixed_assets_report"} class="button red">
@@ -179,7 +194,11 @@ defmodule FullCircleWeb.DashboardLive do
         <.link navigate={~p"/companies/#{@current_company.id}/aging"} class="button red">
           <%= gettext("Agings") %>
         </.link>
-        <.link :if={@current_role == "admin"} navigate={~p"/companies/#{@current_company.id}/queries"} class="button red">
+        <.link
+          :if={@current_role == "admin"}
+          navigate={~p"/companies/#{@current_company.id}/queries"}
+          class="button red"
+        >
           <%= gettext("Queries") %>
         </.link>
       </div>
