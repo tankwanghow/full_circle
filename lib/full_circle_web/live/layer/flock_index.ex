@@ -159,7 +159,8 @@ defmodule FullCircleWeb.LayerLive.FlockIndex do
       select_merge: %{
         houses: fragment("string_agg(distinct ?, ', ')", h.house_no)
       },
-      group_by: obj.id
+      group_by: obj.id,
+      order_by: [desc: obj.dob]
     )
     |> filter(socket, terms, reset, page)
   end
@@ -183,7 +184,8 @@ defmodule FullCircleWeb.LayerLive.FlockIndex do
       select_merge: %{
         houses: fragment("string_agg(distinct ?, ', ')", h.house_no)
       },
-      group_by: obj.id
+      group_by: obj.id,
+      order_by: [desc: obj.dob]
     )
     |> filter(socket, terms, reset, page)
   end
