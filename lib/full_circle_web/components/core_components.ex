@@ -791,7 +791,7 @@ defmodule FullCircleWeb.CoreComponents do
   end
 
   def to_fc_time_format(dt) do
-    Timex.format!(Timex.local(dt), "%Y-%m-%d %I:%M:%S%p", :strftime)
+    Timex.format!(Timex.local(dt), "%F %r %Z", :strftime)
   end
 
   def css_trans(module, obj, obj_name, id, ex_class_1, ex_class_2 \\ "") do

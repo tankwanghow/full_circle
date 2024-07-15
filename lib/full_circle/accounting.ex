@@ -399,7 +399,7 @@ defmodule FullCircle.Accounting do
       %{
         fixed_asset_id: fa.id,
         fixed_asset: fa,
-        depre_date: dt |> Timex.format!("%Y-%m-%d", :strftime),
+        depre_date: dt |> Timex.format!("%F", :strftime),
         cost_basis: cost,
         amount: dep,
         cume_depre: cume
