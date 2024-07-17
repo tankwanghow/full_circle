@@ -33,8 +33,8 @@ defmodule FullCircle.Layer.Harvest do
     ])
     |> fill_today(:har_date)
     |> validate_id(:employee_name, :employee_id)
-    |> validate_date(:har_date, days_before: 2)
-    |> validate_date(:har_date, days_after: 2)
+    |> validate_date(:har_date, days_before: 30)
+    |> validate_date(:har_date, days_after: 30)
     |> unsafe_validate_unique([:harvest_no, :company_id], FullCircle.Repo,
       message: gettext("already in company")
     )
