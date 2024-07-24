@@ -14,6 +14,7 @@ defmodule FullCircle.Accounting.Contact do
     field :state, :string
     field :zipcode, :string
     field :reg_no, :string
+    field :tax_id, :string
     field :email, :string
     field :contact_info, :string
     field :descriptions, :string
@@ -35,6 +36,7 @@ defmodule FullCircle.Accounting.Contact do
       :state,
       :country,
       :reg_no,
+      :tax_id,
       :email,
       :contact_info,
       :descriptions,

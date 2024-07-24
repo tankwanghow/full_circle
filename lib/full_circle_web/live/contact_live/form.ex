@@ -171,14 +171,17 @@ defmodule FullCircleWeb.ContactLive.Form do
         class="mx-auto"
       >
         <div class="grid grid-cols-12 gap-1">
-          <div class="col-span-5">
+          <div class="col-span-6">
             <.input field={@form[:name]} label={gettext("Name")} />
           </div>
-          <div class="col-span-4">
+          <div class="col-span-2">
             <.input field={@form[:category]} label={gettext("Category")} list="categories" />
           </div>
-          <div class="col-span-3">
+          <div class="col-span-2">
             <.input field={@form[:reg_no]} label={gettext("Reg No")} />
+          </div>
+          <div class="col-span-2">
+            <.input field={@form[:tax_id]} label={gettext("Tax Id")} />
           </div>
           <div class="col-span-6">
             <.input field={@form[:address1]} label={gettext("Address Line 1")} />

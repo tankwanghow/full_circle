@@ -23,6 +23,7 @@ defmodule FullCircle.Repo.Migrations.CreateAccountsAndContacts do
       add :state, :string
       add :country, :string
       add :reg_no, :string
+      add :tax_id, :string
       add :email, :string
       add :contact_info, :text
       add :descriptions, :text
