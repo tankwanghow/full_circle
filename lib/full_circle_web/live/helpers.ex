@@ -100,8 +100,8 @@ defmodule FullCircleWeb.Helpers do
 
   def make_log_delta_to_html(delta) do
     delta
-    |> String.replace("&^", "<span>")
-    |> String.replace("^&", "</span>")
+    # |> String.replace("&^", "<span>")
+    # |> String.replace("^&", "</span>")
     |> String.replace("[", "<div class='pl-4'>")
     |> String.replace("]", "</div>")
     |> String.replace("<!", "<span class='text-red-500 line-through'>")
@@ -111,6 +111,9 @@ defmodule FullCircleWeb.Helpers do
   end
 
   def put_marker_in_diff_log_delta(a1, a2) do
+    a1 = a1 |> String.replace("&^", "") |> String.replace("^&", "")
+    a2 = a2 |> String.replace("&^", "") |> String.replace("^&", "")
+
     String.myers_difference(a1, a2)
     |> Enum.map_join(fn {k, v} ->
       case k do
