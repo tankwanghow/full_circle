@@ -739,7 +739,7 @@ defmodule FullCircle.HR do
         where: txn.company_id == ^com.id
       )
     )
-    |> Sys.insert_log_for(name, attrs, com, user)
+    |> Sys.insert_log_for(name, attrs |> Map.merge(%{"employee_name" => salary_note.employee_name}), com, user)
     |> create_salary_note_transactions(name, com, user)
   end
 
