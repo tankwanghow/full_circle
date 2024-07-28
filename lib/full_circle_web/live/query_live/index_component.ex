@@ -24,7 +24,7 @@ defmodule FullCircleWeb.QueryLive.IndexComponent do
       >
         <%= @obj.qry_name %>
       </.link>
-      <p class="text-sm text-green-600"><%= @obj.sql_string %></p>
+      <p class="text-xs text-green-600"><%= @obj.sql_string %></p>
     </div>
     """
   end
