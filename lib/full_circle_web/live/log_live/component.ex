@@ -19,7 +19,6 @@ defmodule FullCircleWeb.LogLive.Component do
 
   @impl true
   def handle_event("show_log", _, socket) do
-    IO.inspect socket.assigns
     {:noreply,
      socket
      |> assign(:show_log, true)
