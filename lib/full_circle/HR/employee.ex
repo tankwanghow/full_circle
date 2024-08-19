@@ -30,6 +30,7 @@ defmodule FullCircle.HR.Employee do
     belongs_to(:company, FullCircle.Sys.Company)
 
     has_many(:employee_salary_types, FullCircle.HR.EmployeeSalaryType, on_delete: :delete_all)
+    has_many(:employee_photos, FullCircle.HR.EmployeePhoto, on_delete: :delete_all)
 
     timestamps(type: :utc_datetime)
   end

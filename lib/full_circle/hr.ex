@@ -12,7 +12,8 @@ defmodule FullCircle.HR do
     PaySlip,
     SalaryNote,
     Recurring,
-    TimeAttend
+    TimeAttend,
+    EmployeePhoto
   }
 
   alias FullCircle.Accounting.{Account, Transaction}
@@ -464,6 +465,28 @@ defmodule FullCircle.HR do
     end
   end
 
+  def get_employee_photos(emp_id, com_id) do
+    from(pht in EmployeePhoto,
+      where: pht.employee_id == ^emp_id,
+      where: pht.company_id == ^com_id,
+      limit: 5,
+      order_by: [desc: pht.inserted_at],
+      select: %{
+        id: pht.id,
+        photo_data: pht.photo_data,
+        inserted_at: pht.inserted_at
+      }
+    )
+    |> Repo.all()
+  end
+
+  def delete_employee_photo(photo_id) do
+    from(pht in EmployeePhoto,
+      where: pht.id == ^photo_id
+    )
+    |> Repo.delete_all()
+  end
+
   def salary_note_query(company, user) do
     from(note in SalaryNote,
       join: com in subquery(Sys.user_company(company, user)),
@@ -739,7 +762,12 @@ defmodule FullCircle.HR do
         where: txn.company_id == ^com.id
       )
     )
-    |> Sys.insert_log_for(name, attrs |> Map.merge(%{"employee_name" => salary_note.employee_name}), com, user)
+    |> Sys.insert_log_for(
+      name,
+      attrs |> Map.merge(%{"employee_name" => salary_note.employee_name}),
+      com,
+      user
+    )
     |> create_salary_note_transactions(name, com, user)
   end
 

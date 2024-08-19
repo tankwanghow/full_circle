@@ -344,6 +344,18 @@ defmodule FullCircleWeb.Router do
       root_layout: {FullCircleWeb.Layouts, :punch} do
       live("/PunchCamera", TimeAttendLive.PunchCamera)
     end
+
+    live_session :require_authenticated_user_n_active_company_recon,
+    on_mount: [
+      {FullCircleWeb.UserAuth, :ensure_authenticated},
+      {FullCircleWeb.Locale, :set_locale},
+      {FullCircleWeb.ActiveCompany, :assign_active_company}
+    ],
+    root_layout: {FullCircleWeb.Layouts, :recon} do
+    live("/recon", ReconLive)
+    live("/take_photo", TakePhotoLive)
+
+  end
   end
 
   scope "/", FullCircleWeb do

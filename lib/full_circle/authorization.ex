@@ -314,6 +314,9 @@ defmodule FullCircle.Authorization do
   def can?(user, :update_return_cheque, company),
     do: forbid_roles(~w(auditor guest cashier), company, user)
 
+  def can?(user, :create_employee_photo, company),
+    do: forbid_roles(~w(auditor guest cashier), company, user)
+
   def can?(user, :see_user_list, company), do: allow_role("admin", company, user)
   def can?(user, :invite_company, company), do: allow_role("admin", company, user)
   def can?(user, :add_user_to_company, company), do: allow_role("admin", company, user)

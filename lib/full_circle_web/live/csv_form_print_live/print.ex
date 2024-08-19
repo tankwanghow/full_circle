@@ -9,9 +9,10 @@ defmodule FullCircleWeb.CsvFormPrintLive.Print do
 
     data =
       fill_data()
-      |> Enum.filter(fn x -> x.debit == "0.00" end)
+      |> Enum.filter(fn x -> Decimal.new(x.debit) |> Decimal.to_float == 0.0 end)
       |> Enum.filter(fn x -> x.source != "Bank Transfer" end)
       |> Enum.filter(fn x -> x.relatedaccount != "404 - Bank Charges" end)
+      # |> Enum.filter(fn x -> String.contains?(x.contact, ["ajk", "AJK"]) end)
       |> Enum.sort_by(&{&1.relatedaccount, &1.contact})
 
     {:ok,

@@ -8,7 +8,8 @@ defmodule FullCircleWeb.ActiveCompany do
     {:cont,
      socket
      |> Phoenix.Component.assign(:current_company, session["current_company"])
-     |> Phoenix.Component.assign(:current_role, session["current_role"])}
+     |> Phoenix.Component.assign(:current_role, session["current_role"])
+     |> Phoenix.Component.assign(:full_screen_app?, session["full_screen_app?"])}
   end
 
   def set_active_company(%{params: %{"company_id" => url_company_id}} = conn, _opts) do
@@ -24,8 +25,10 @@ defmodule FullCircleWeb.ActiveCompany do
           conn
           |> put_session(:current_role, cu.role)
           |> put_session(:current_company, c)
+          |> put_session(:full_screen_app?, false)
           |> assign(:current_role, cu.role)
           |> assign(:current_company, c)
+          |> assign(:full_screen_app?, false)
         else
           conn
           |> put_flash(:error, FullCircleWeb.Gettext.gettext("Not Authorise."))
@@ -44,5 +47,6 @@ defmodule FullCircleWeb.ActiveCompany do
     conn
     |> assign(:current_role, get_session(conn, "current_role"))
     |> assign(:current_company, get_session(conn, "current_company"))
+    |> assign(:full_screen_app?, get_session(conn, "full_screen_app?"))
   end
 end

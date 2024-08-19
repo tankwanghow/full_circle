@@ -8,6 +8,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCamera do
     {:ok,
      socket
      |> assign(status: :waiting)
+     |> assign(full_screen_app?: true)
      |> assign(flag: "IN")
      |> assign(page_title: gettext("Attendence Camera"))
      |> assign(shift_id: "")

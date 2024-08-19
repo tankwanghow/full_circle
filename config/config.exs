@@ -48,8 +48,11 @@ config :full_circle, FullCircleWeb.Endpoint,
 config :esbuild,
   version: "0.19.11",
   default: [
-    args:
-      ~w(js/app.js --bundle --target=es2017 --outdir=../priv/static/assets --external:/fonts/* --external:/images/* --external:/sounds/*),
+    args: ~w(js/app.js js/tri_autocomplete.js js/take_photo_faceapi.js js/take_photo_human.js
+        --chunk-names=chunks/[name]-[hash] --splitting
+        --bundle --target=es2017 --format=esm
+        --outdir=../priv/static/assets --external:/fonts/* --external:/images/*
+        --external:/sounds/* --external:/models/*),
     cd: Path.expand("../assets", __DIR__),
     env: %{"NODE_PATH" => Path.expand("../deps", __DIR__)}
   ]

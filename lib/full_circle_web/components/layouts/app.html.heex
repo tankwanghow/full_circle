@@ -1,28 +1,17 @@
-<main
-  :if={assigns[:page_title] != gettext("Attendence Camera")}
-  class={if(assigns[:current_user], do: "mt-20", else: "")}
->
-  <.flash_group flash={@flash} />
-  <%= @inner_content %>
-</main>
-
-<main :if={assigns[:page_title] == gettext("Attendence Camera")} class="mt-5">
-  <p
-    :if={assigns[:page_title] != gettext("Attendence Camera")}
-    class="w-full text-3xl text-center font-medium"
-  >
-    <%= @current_company.name %>
-  </p>
-  <%= @inner_content %>
-  <div
-    :if={assigns[:page_title] != gettext("Attendence Camera")}
-    class="mx-auto text-center mt-10"
-  >
-    <.link href={~p"/users/log_out"} method="delete" class="button red text-xl font-bold">
-      <%= gettext("Log out") %>
-    </.link>
-    <.link navigate={~p"/users/settings"} class="button blue text-xl font-bold">
-      <%= gettext("User Settings") %>
-    </.link>
-  </div>
-</main>
+<%= if @current_user do %>
+  <%= if @full_screen_app? do %>
+    <main class="mt-5">
+      <%= @inner_content %>
+    </main>
+  <% else %>
+    <main class="mt-20">
+      <.flash_group flash={@flash} />
+      <%= @inner_content %>
+    </main>
+  <% end %>
+<% else %>
+  <main>
+    <.flash_group flash={@flash} />
+    <%= @inner_content %>
+  </main> 
+<% end %>

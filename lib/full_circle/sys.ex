@@ -679,7 +679,7 @@ defmodule FullCircle.Sys do
   end
 
   def attr_to_string(attrs) do
-    bl = ["_id", "delete", "__meta__"]
+    bl = ["_id", "delete", "__meta__", "photo_data", "photo_descriptor"]
 
     if Enum.any?(attrs, fn {k, v} ->
          (k == "delete" or k == :delete) and v == "true"

@@ -21,11 +21,50 @@ import "phoenix_html"
 import { Socket } from "phoenix"
 import { LiveSocket } from "phoenix_live_view"
 import topbar from "../vendor/topbar"
-import Tribute from "../vendor/tribute"
-import { Html5QrcodeScanner } from "../vendor/html5-qrcode/src/html5-qrcode-scanner"
 
 let csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 let Hooks = {}
+
+// Hooks.takePhotoFaceApi = {
+//   mounted() {
+//     import("./take_photo_faceapi").then(
+//       ({ initTakePicture }) => {
+//         initTakePicture();
+//       }
+//     );
+//   }
+// }
+
+Hooks.takePhotoHuman = {
+  mounted() {
+    import("./take_photo_human").then(
+      ({ initTakePicture }) => {
+        initTakePicture(this);
+      }
+    );
+  }
+}
+
+Hooks.tributeAutoComplete = {
+  mounted() {
+    import("./tri_autocomplete").then(
+      ({ initTributeAutoComplete }) => {
+        initTributeAutoComplete(this.el);
+      }
+    );
+
+  }
+}
+
+Hooks.tributeTagText = {
+  mounted() {
+    import("./tri_autocomplete").then(
+      ({ initTributeTagText }) => {
+        initTributeTagText(this.el);
+      }
+    );
+  }
+}
 
 Hooks.calculatorInput = {
   mounted() {
@@ -36,117 +75,11 @@ Hooks.calculatorInput = {
           val = eval2(this.el.value);
           this.el.value = val;
         } catch (error) {
-          
+
         }
       }
     })
   }
-}
-
-let html5QrcodeScanner;
-
-Hooks.QR_Reply = {
-  mounted() {
-    this.el.innerHTML = "Scan Employee QR";
-    this.el.className += " bg-amber-200 border-amber-600";
-  },
-  updated() {
-    if (this.el.innerText != "Scan Employee QR") {
-      reader = document.getElementById("qr-reader");
-      reader_class = reader.className;
-      reader.className = "hidden";
-
-      setTimeout(() => {
-        this.pushEvent("qr-code-scan-resume");
-        reader.className = reader_class;
-        html5QrcodeScanner.resume();
-      }, 3000);
-    }
-  }
-}
-
-Hooks.QR_Scanner = {
-  onScanFailure(error) {
-  },
-
-  mounted() {
-    html5QrcodeScanner = new Html5QrcodeScanner(
-      "qr-reader",
-      { fps: 2, aspectRatio: 1, qrbox: { width: 280, height: 280 } },
-      false
-    )
-
-    long = 182;
-    lat = 182;
-
-    if (navigator.geolocation) {
-      navigator.geolocation.watchPosition(
-        (pos) => {
-          long = pos.coords.longitude;
-          lat = pos.coords.latitude;
-        },
-        () => {
-          long = 182;
-          lat = 182;
-        },
-        { maximumAge: 60000, enableHighAccuracy: true });
-    } else {
-      long = 182;
-      lat = 182;
-    }
-
-    onScanSuccess = (decodedText, decodedResult) => {
-      decodedResult.gps_long = long;
-      decodedResult.gps_lat = lat;
-      this.pushEvent("qr-code-scanned", decodedResult);
-      html5QrcodeScanner.pause();
-    }
-
-    html5QrcodeScanner.render(onScanSuccess, this.onScanFailure);
-  }
-}
-
-Hooks.tributeTagText = {
-  mounted() {
-    var tribute = new Tribute({
-      trigger: "#",
-      values: (t, c) => { remoteSearch(this.el, t, c) },
-      lookup: "value",
-      fillAttr: "value",
-      menuItemLimit: 8
-    });
-    tribute.attach(this.el)
-  }
-};
-
-Hooks.tributeAutoComplete = {
-  mounted() {
-    var tribute = new Tribute({
-      values: (t, c) => { remoteSearch(this.el, t, c) },
-      autocompleteMode: true,
-      lookup: "value",
-      fillAttr: "value",
-      menuItemLimit: 8
-    });
-    tribute.attach(this.el)
-  }
-}
-
-function remoteSearch(el, text, cb) {
-  var URL = el.getAttribute('url');
-  xhr = new XMLHttpRequest();
-  xhr.onreadystatechange = function () {
-    if (xhr.readyState === 4) {
-      if (xhr.status === 200) {
-        var data = JSON.parse(xhr.responseText);
-        cb(data);
-      } else if (xhr.status === 403) {
-        cb([]);
-      }
-    }
-  };
-  xhr.open("GET", URL + text, true);
-  xhr.send();
 }
 
 let liveSocket = new LiveSocket("/live", Socket, {
