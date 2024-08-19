@@ -172,6 +172,11 @@ defmodule FullCircleWeb.TakePhotoLive do
         </div>
         <div id="log" class="mt-1 text-center"></div>
       </div>
+      <div class="text-center mt-4">
+        <.link navigate={~p"/companies/#{@current_company.id}/dashboard"} class="red button">
+          <%= gettext("Back") %>
+        </.link>
+      </div>
     </div>
     """
   end
