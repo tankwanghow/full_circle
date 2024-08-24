@@ -6,7 +6,7 @@ const humanConfig = {
   cacheSensitivity: 0,
   modelBasePath: "/human-models",
   filter: { enabled: true, equalization: true }, // lets run with histogram equilizer
-  debug: true,
+  // debug: true,
   face: {
     enabled: true,
     detector: { rotation: true, return: true, mask: false }, // return tensor is used to get detected face image
@@ -96,7 +96,7 @@ const log = (...msg) => {
   console.log(...msg) // eslint-disable-line no-console
 }
 
-let phx_view;
+let phx_liveview;
 
 async function webCam() {
   // initialize webcam
@@ -105,8 +105,7 @@ async function webCam() {
   const cameraOptions = {
     audio: false,
     video: {
-      deviceId: videoSource ? { exact: videoSource } : undefined
-      ,
+      deviceId: videoSource ? { exact: videoSource } : undefined,
       width: { min: 240, ideal: 300 },
       height: { min: 240, ideal: 300 }
     }
@@ -180,7 +179,7 @@ async function validationLoop() {
       gestures.includes("blink left eye") ||
       gestures.includes("blink right eye")
     )
-    ok.facingCenter.status = gestures.includes("facing center")
+      ok.facingCenter.status = gestures.includes("facing center")
     ok.faceConfidence.val =
       human.result.face[0].faceScore || human.result.face[0].boxScore || 0
     ok.faceConfidence.status = ok.faceConfidence.val >= options.minConfidence
@@ -201,7 +200,6 @@ async function validationLoop() {
     ok.gender.status = ok.gender.val >= options.minConfidence
   }
   // run again
-
   drawValidationTests()
   if (allOk()) {
     // all criteria met
@@ -213,7 +211,7 @@ async function validationLoop() {
     setTimeout(async () => {
       await validationLoop() // run validation loop until conditions are met
       resolve(human.result.face[0]) // recursive promise resolve
-    }, 100) // use to slow down refresh from max refresh rate to target of 30 fps
+    }, 40) // use to slow down refresh from max refresh rate to target of 30 fps
   })
 }
 
@@ -222,7 +220,6 @@ async function detectFace() {
   dom.canvas.getContext("2d")?.clearRect(0, 0, options.minSize, options.minSize)
   if (!current?.face?.tensor || !current?.face?.embedding) return false
   await human.tf.browser.draw(current.face.tensor, dom.canvas)
-  phx_view.pushEvent("got_photo", { discriptor: current.face?.embedding, photo: dom.canvas.toDataURL('image/png') });
 }
 
 async function main() {
@@ -264,8 +261,8 @@ async function main() {
 }
 
 export async function initTakePicture(phx_this) {
-  phx_view = phx_this
-  phx_view.handleEvent('retry_from_lv', () => main())
+  phx_liveview = phx_this
+  phx_liveview.handleEvent('retry_from_lv', () => main())
 
   log(
     "human version:",
@@ -308,7 +305,7 @@ function snap() {
 }
 
 function save() {
-  phx_view.pushEvent('save_photo', null)
+  phx_liveview.pushEvent('save_photo', { discriptor: current.face?.embedding, photo: dom.canvas.toDataURL('image/png') })
   main()
 }
 

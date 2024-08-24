@@ -3,6 +3,7 @@ defmodule FullCircleWeb.TakePhotoLive do
 
   alias FullCircle.HR.EmployeePhoto
   alias FullCircle.StdInterface
+  alias Phoenix.PubSub
 
   @impl true
   def mount(_params, _session, socket) do
@@ -12,34 +13,6 @@ defmodule FullCircleWeb.TakePhotoLive do
      |> assign(emp_id: nil)
      |> assign(emp_name: nil)
      |> assign(photos: [])}
-  end
-
-  @impl true
-  def handle_event(
-        "save-photo",
-        %{"descriptor" => descriptor, "photo-data" => photo_data},
-        socket
-      ) do
-    attrs = %{
-      live_action: :new,
-      employee_id: "2f123943-f345-41af-ba77-ae4366c0e3d4",
-      flag: "source",
-      photo_data: photo_data,
-      photo_descriptor:
-        descriptor |> String.split(",") |> Enum.map(fn x -> String.to_float(x) end),
-      photo_type: "png",
-      company_id: socket.assigns.current_company.id
-    }
-
-    StdInterface.create(
-      EmployeePhoto,
-      "employee_photo",
-      attrs,
-      socket.assigns.current_company,
-      socket.assigns.current_user
-    )
-
-    {:noreply, socket}
   end
 
   @impl true
@@ -70,13 +43,14 @@ defmodule FullCircleWeb.TakePhotoLive do
   end
 
   @impl true
-  def handle_event("got_photo", %{"discriptor" => discriptor, "photo" => photo}, socket) do
-    {:noreply, socket |> assign(discriptor: discriptor) |> assign(photo: photo)}
-  end
-
-  @impl true
   def handle_event("delete_photo", %{"id" => id}, socket) do
     FullCircle.HR.delete_employee_photo(id)
+
+    PubSub.broadcast(
+      FullCircle.PubSub,
+      "#{socket.assigns.current_company.id}_refresh_face_id_data",
+      {:delete_photo, id}
+    )
 
     {:noreply,
      socket
@@ -90,19 +64,25 @@ defmodule FullCircleWeb.TakePhotoLive do
   end
 
   @impl true
-  def handle_event("save_photo", _, socket) do
-    StdInterface.create(
+  def handle_event("save_photo", %{"discriptor" => discriptor, "photo" => photo}, socket) do
+    {:ok, photo} = StdInterface.create(
       EmployeePhoto,
       "employee_photo",
       %{
-        "photo_descriptor" => socket.assigns.discriptor,
-        "photo_data" => socket.assigns.photo,
+        "photo_descriptor" => discriptor,
+        "photo_data" => photo,
         "photo_type" => "png",
         "flag" => "source",
         "employee_id" => socket.assigns.emp_id
       },
       socket.assigns.current_company,
       socket.assigns.current_user
+    )
+
+    PubSub.broadcast(
+      FullCircle.PubSub,
+      "#{socket.assigns.current_company.id}_refresh_face_id_data",
+      {:new_photo, photo}
     )
 
     {:noreply,
@@ -125,7 +105,7 @@ defmodule FullCircleWeb.TakePhotoLive do
         id="employee_name"
         phx-hook="tributeAutoComplete"
         phx-blur="find_employee_id"
-        class="rounded h-8 p-1 border w-80 text-center mb-1"
+        class="rounded h-8 p-1 border w-[80%] text-center mb-1"
         placeholder="Employee Name..."
         autocomplete="off"
         url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=employee&name="}
@@ -134,7 +114,7 @@ defmodule FullCircleWeb.TakePhotoLive do
       <input
         readonly
         id="employee_id"
-        class="rounded h-8 p-1 border w-80 text-center mb-1"
+        class="rounded h-8 p-1 border w-[80%] text-center mb-1"
         placeholder="Employee Id Not Found..."
         value={@emp_id}
         tabindex="-1"

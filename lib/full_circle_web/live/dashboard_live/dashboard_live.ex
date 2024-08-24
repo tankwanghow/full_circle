@@ -207,14 +207,19 @@ defmodule FullCircleWeb.DashboardLive do
       :if={FullCircle.Authorization.can?(@current_user, :create_time_attendence, @current_company)}
       class="mx-auto text-center"
     >
-      <div class="mt-20 text-2xl font-bold">
+      <div class="mt-10 text-2xl font-bold">
         <.link navigate={~p"/companies/#{@current_company.id}/PunchCamera"} class="blue button">
           <%= gettext("Start Punch Camera") %>
         </.link>
       </div>
-      <div class="mt-20 text-2xl font-bold">
+      <div class="mt-2 text-2xl font-bold">
         <.link navigate={~p"/companies/#{@current_company.id}/take_photo"} class="blue button">
           <%= gettext("Take A Photo") %>
+        </.link>
+      </div>
+      <div class="mt-2 text-2xl font-bold">
+        <.link navigate={~p"/companies/#{@current_company.id}/face_id"} class="blue button">
+          <%= gettext("Face ID") %>
         </.link>
       </div>
     </div>

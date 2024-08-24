@@ -352,7 +352,7 @@ defmodule FullCircleWeb.Router do
       {FullCircleWeb.ActiveCompany, :assign_active_company}
     ],
     root_layout: {FullCircleWeb.Layouts, :recon} do
-    live("/recon", ReconLive)
+    live("/face_id", FaceIdLive)
     live("/take_photo", TakePhotoLive)
 
   end

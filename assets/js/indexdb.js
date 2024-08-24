@@ -1,7 +1,7 @@
 let db // instance of indexdb
 
 const database = "full_circle"
-const table = "employee_photo"
+const table = "employee_photos"
 
 const log = (...msg) => console.log("indexdb", ...msg) // eslint-disable-line no-console
 
@@ -60,17 +60,16 @@ export async function count() {
 export async function save(faceRecord) {
   if (!db) await open() // open or create if not already done
   const newRecord = {
-    name: faceRecord.name,
-    descriptor: faceRecord.descriptor,
-    image: faceRecord.image,
-    employee_id: faceRecord.employee_id,
-    flag: faceRecord.flag,
-    company_id: faceRecord.company_id
+    id: faceRecord.id,
+    name: faceRecord.employee_name,
+    descriptor: faceRecord.photo_descriptor,
+    image: faceRecord.photo_data,
+    employee_id: faceRecord.employee_id
   } // omit id as its autoincrement
   db.transaction([table], "readwrite")
     .objectStore(table)
     .put(newRecord)
-  log("save:", newRecord)
+  // log("save:", newRecord)
 }
 
 export async function remove(faceRecord) {
@@ -78,5 +77,12 @@ export async function remove(faceRecord) {
   db.transaction([table], "readwrite")
     .objectStore(table)
     .delete(faceRecord.id) // delete based on id
-  log("delete:", faceRecord)
+  // log("delete:", faceRecord)
+}
+
+export async function clear() {
+  if (!db) await open() // open or create if not already done
+  db.transaction([table], "readwrite")
+    .objectStore(table)
+    .clear()
 }

@@ -465,6 +465,22 @@ defmodule FullCircle.HR do
     end
   end
 
+  def get_face_id_photos(com_id) do
+    from(pht in EmployeePhoto,
+    join: emp in Employee,
+    on: emp.id == pht.employee_id,
+      where: pht.company_id == ^com_id,
+      select: %{
+        id: pht.id,
+        employee_id: pht.employee_id,
+        employee_name: emp.name,
+        photo_data: pht.photo_data,
+        photo_descriptor: pht.photo_descriptor
+      }
+    )
+    |> Repo.all()
+  end
+
   def get_employee_photos(emp_id, com_id) do
     from(pht in EmployeePhoto,
       where: pht.employee_id == ^emp_id,

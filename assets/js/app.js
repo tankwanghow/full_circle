@@ -35,6 +35,16 @@ let Hooks = {}
 //   }
 // }
 
+Hooks.FaceID = {
+  mounted() {
+    import("./face_id").then(
+      ({ initFaceID }) => {
+        initFaceID(this);
+      }
+    );
+  }
+}
+
 Hooks.takePhotoHuman = {
   mounted() {
     import("./take_photo_human").then(
