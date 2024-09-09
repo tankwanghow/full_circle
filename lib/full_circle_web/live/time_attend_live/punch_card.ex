@@ -184,7 +184,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
           </.link>
         </span>
       </div>
-      <%!-- phx-hook="punchCardHourCount" --%>
+
       <div
         id="timeAttendList"
         class="font-medium flex flex-row text-center tracking-tighter bg-blue-200"
@@ -503,7 +503,6 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
      )}
   end
 
-  # %{id: id, in1: in1, out1: out1, in2: in2, out2: out2, in3: in3, out3: out3}}
   @impl true
   def handle_info(
         {:updated_punch, idg, tis, wh, nh, ot},

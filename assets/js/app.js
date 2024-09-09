@@ -56,16 +56,6 @@ Hooks.punchCamera = {
   }
 }
 
-Hooks.punchCardHourCount = {
-  mounted() {
-    import("./punch_card_count").then(
-      (t) => {
-        t.initPunchCardCount(this)
-      }
-    )
-  }
-}
-
 Hooks.tributeAutoComplete = {
   mounted() {
     import("./tri_autocomplete").then(

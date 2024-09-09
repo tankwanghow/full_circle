@@ -49,7 +49,7 @@ config :esbuild,
   version: "0.19.11",
   default: [
     args: ~w(js/app.js js/tri_autocomplete.js js/take_photo_human.js
-             js/face_id.js js/qr_attend.js js/punch_card_count.js
+             js/face_id.js js/qr_attend.js
         --chunk-names=chunks/[name]-[hash] --splitting
         --bundle --target=es2017 --format=esm
         --outdir=../priv/static/assets --external:/fonts/* --external:/images/*
