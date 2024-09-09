@@ -21,25 +21,20 @@ defmodule FullCircleWeb.TimeAttendLive.IndexComponent do
       <div class="w-[30%] border-b border-gray-400">
         <%= @obj.employee_name %>
       </div>
-      <div class="w-[10%] border-b border-gray-400">
-        <%= @obj.shift_id %>
-      </div>
       <div class="w-[15%] border-b border-gray-400">
         <.link
           class="text-blue-600 hover:font-bold"
           phx-value-id={@obj.id}
           phx-click={:edit_timeattend}
         >
-          <%= @obj.punch_time |> Timex.weekday() |> Timex.day_shortname() %>, <%= FullCircleWeb.Helpers.format_datetime(
-            @obj.punch_time,
-            @company
-          ) %>
+          <%= Timex.to_datetime(@obj.punch_time, @company.timezone)
+          |> Timex.format!("%a, %Y-%m-%d %H:%M", :strftime) %>
         </.link>
       </div>
-      <div class="w-[5%] border-b text-center border-gray-400">
+      <div class="w-[10%] border-b text-center border-gray-400">
         <%= @obj.flag %>
       </div>
-      <div class="w-[10%] border-b text-center border-gray-400">
+      <div class="w-[15%] border-b text-center border-gray-400">
         <%= @obj.input_medium %>
       </div>
       <div class="w-[15%] border-b text-center border-gray-400">

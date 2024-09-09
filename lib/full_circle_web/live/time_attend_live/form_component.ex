@@ -155,12 +155,12 @@ defmodule FullCircleWeb.TimeAttendLive.FormComponent do
         <p class="w-full text-center text-xl border-2 border-orange-400 bg-orange-200 rounded-lg p-3 mb-3">
           <%= gettext("Warning! Minimum Data Integrity is Impose! Make sure your data is correct.") %>
         </p>
+        <.input type="hidden" field={@form[:input_medium]} />
+        <.input type="hidden" field={@form[:user_id]} />
+        <.input type="hidden" field={@form[:company_id]} />
+        <.input type="hidden" field={@form[:employee_id]} />
         <div class="grid grid-cols-12 gap-1 mb-2">
-          <.input type="hidden" field={@form[:input_medium]} />
-          <.input type="hidden" field={@form[:user_id]} />
-          <.input type="hidden" field={@form[:company_id]} />
           <div class="col-span-4">
-            <.input type="hidden" field={@form[:employee_id]} />
             <.input
               :if={@live_action == :new}
               feedback={true}
@@ -178,9 +178,6 @@ defmodule FullCircleWeb.TimeAttendLive.FormComponent do
               tabindex="-1"
             />
           </div>
-          <div class="col-span-2">
-            <.input feedback={true} field={@form[:shift_id]} label={gettext("shift_id")} />
-          </div>
           <div class="col-span-3">
             <.input
               feedback={true}
@@ -189,13 +186,13 @@ defmodule FullCircleWeb.TimeAttendLive.FormComponent do
               type="datetime-local"
             />
           </div>
-          <div class="col-span-1">
+          <div class="col-span-2">
             <.input
               feedback={true}
               field={@form[:flag]}
               label={gettext("Flag")}
               type="select"
-              options={["IN", "OUT"]}
+              options={["1_IN_1", "1_OUT_1", "2_IN_2", "2_OUT_2", "3_IN_3", "3_OUT_3"]}
             />
           </div>
           <div class="col-span-2">

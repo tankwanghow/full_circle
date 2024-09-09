@@ -212,7 +212,7 @@ defmodule FullCircleWeb.DashboardLive do
           <%= gettext("Start Punch Camera") %>
         </.link>
       </div>
-      <div class="mt-2 text-2xl font-bold">
+      <%!-- <div class="mt-2 text-2xl font-bold">
         <.link navigate={~p"/companies/#{@current_company.id}/take_photo"} class="blue button">
           <%= gettext("Take A Photo") %>
         </.link>
@@ -221,7 +221,7 @@ defmodule FullCircleWeb.DashboardLive do
         <.link navigate={~p"/companies/#{@current_company.id}/face_id"} class="blue button">
           <%= gettext("Face ID") %>
         </.link>
-      </div>
+      </div> --%>
     </div>
     """
   end

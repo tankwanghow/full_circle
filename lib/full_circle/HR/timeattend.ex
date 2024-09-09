@@ -8,14 +8,13 @@ defmodule FullCircle.HR.TimeAttend do
     field(:flag, :string)
     field(:input_medium, :string)
     field(:punch_time, :utc_datetime)
-    field(:shift_id, :string)
     field(:gps_long, :float)
     field(:gps_lat, :float)
     field(:status, :string, default: "Draft")
 
     field(:employee_name, :string, virtual: true)
     field(:email, :string, virtual: true)
-    field(:punch_time_local, :utc_datetime, virtual: true)
+    field(:punch_time_local, :naive_datetime, virtual: true)
 
     belongs_to(:company, FullCircle.Sys.Company)
     belongs_to(:employee, FullCircle.HR.Employee)
@@ -33,7 +32,6 @@ defmodule FullCircle.HR.TimeAttend do
       :employee_id,
       :employee_name,
       :punch_time_local,
-      :shift_id,
       :status,
       :user_id
     ])
@@ -44,12 +42,11 @@ defmodule FullCircle.HR.TimeAttend do
       :company_id,
       :employee_id,
       :employee_name,
-      :shift_id,
       :status,
       :user_id
     ])
-    |> fill_punch_time()
-    |> validate_date(:punch_time_local, days_before: 31)
+    |> punch_time_to_utc()
+    |> validate_date(:punch_time_local, days_before: 40)
     |> validate_date(:punch_time_local, days_after: 0)
     |> validate_id(:employee_name, :employee_id)
   end
@@ -65,8 +62,7 @@ defmodule FullCircle.HR.TimeAttend do
       :employee_id,
       :gps_long,
       :gps_lat,
-      :user_id,
-      :shift_id
+      :user_id
     ])
     |> validate_required([
       :flag,
@@ -74,17 +70,16 @@ defmodule FullCircle.HR.TimeAttend do
       :punch_time,
       :company_id,
       :employee_id,
-      :shift_id,
       :user_id
     ])
     |> validate_punch_time()
   end
 
-  def set_punch_time_local(ta, com) do
+  def punch_time_to_local_tz(ta, com) do
     ta |> Map.merge(%{punch_time_local: ta.punch_time |> Timex.to_datetime(com.timezone)})
   end
 
-  defp fill_punch_time(cs) do
+  defp punch_time_to_utc(cs) do
     pt = fetch_field!(cs, :punch_time_local)
 
     if !is_nil(pt) do
@@ -105,25 +100,18 @@ defmodule FullCircle.HR.TimeAttend do
 
     lpr = last_punch_record(id, emp_id, com_id)
 
-    cs =
-      if flag == "OUT" and lpr.flag == "IN" do
-        put_change(cs, :shift_id, lpr.shift_id)
-      else
-        cs
-      end
-
     cond do
-      is_nil(lpr) and flag == "OUT" ->
+      is_nil(lpr) and String.contains?(flag, "OUT") ->
         add_error(cs, :flag, "NO IN RECORD!!")
 
       is_nil(lpr) ->
-        cs
+        put_change(cs, :flag, mold_punch_time_flag(lpr.flag, flag))
 
-      lpr.flag == flag ->
+      extract_flag_inout(lpr.flag) == flag ->
         add_error(cs, :flag, "DOUBLE #{flag}")
 
       Timex.compare(punch_time, lpr.punch_time, :minute) == 1 ->
-        cs
+        put_change(cs, :flag, mold_punch_time_flag(lpr.flag, flag))
 
       Timex.compare(punch_time, lpr.punch_time, :minute) != 1 ->
         add_error(
@@ -132,6 +120,25 @@ defmodule FullCircle.HR.TimeAttend do
           "#{FullCircleWeb.Helpers.format_datetime(lpr.punch_time, FullCircle.Sys.get_company!(com_id))} Punched #{lpr.flag}"
         )
     end
+  end
+
+  defp mold_punch_time_flag(lpr, flag) do
+    if is_nil(lpr) do
+      "1_IN_1"
+    else
+      cond do
+        lpr == "1_IN_1" and flag == "OUT" -> "1_OUT_1"
+        lpr == "2_IN_2" and flag == "OUT" -> "2_OUT_2"
+        lpr == "3_IN_3" and flag == "OUT" -> "3_OUT_3"
+        lpr == "1_OUT_1" and flag == "IN" -> "2_IN_2"
+        lpr == "2_OUT_2" and flag == "IN" -> "3_IN_3"
+        lpr == "3_OUT_3" and flag == "IN" -> "1_IN_1"
+      end
+    end
+  end
+
+  defp extract_flag_inout(flag) do
+    Regex.scan(~r/IN|OUT/, flag) |> List.flatten() |> Enum.at(0)
   end
 
   def last_punch_record(id, emp_id, com_id) do

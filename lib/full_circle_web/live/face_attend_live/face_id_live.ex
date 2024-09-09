@@ -54,25 +54,26 @@ defmodule FullCircleWeb.FaceIdLive do
       </div>
 
       <div id="faceID" phx-hook="FaceID" phx-update="ignore">
-        <canvas id="canvas" class="mx-auto mb-1"></canvas>
+        <canvas id="canvas" class="mx-auto mb-1 w-11/12"></canvas>
         <video id="video" playsinline style="display: none" class="mb-1"></video>
         <div class="text-center">
           <label for="videoSelect">Camera</label>
           <select id="videoSelect" class="rounded h-8 py-1 pr-8" />
         </div>
-        <div class="flex mt-3 gap-1 p-1 text-3xl">
-          <button id="outBtn" class="w-1/2 h-20 red button font-bold invisible">
+        <div id="in_out" class="flex mt-3 gap-1 p-2 text-3xl" style="display: none;">
+          <button id="outBtn" class="w-1/2 h-20 red button font-bold">
             <%= gettext("OUT") %>
           </button>
-          <button id="inBtn" class="w-1/2 h-20 green button font-bold invisible">
+          <button id="inBtn" class="w-1/2 h-20 green button font-bold">
             <%= gettext("IN") %>
           </button>
         </div>
         <div id="scanResultName" class="mt-1 font-bold text-xl text-blue-700"></div>
-        <div id="scanResultPhotos" class="flex p-1 gap-1 mx-auto"></div>
+        <div id="scanResultPhotos" class="flex p-1 gap-1 mx-auto w-11/12"></div>
+        <div id="compareList" style="display: none;" class="flex flex-wrap p-1 gap-1 mx-auto border border-red-400 text-xs w-11/12"></div>
         <div id="log" class="mt-1 text-center"></div>
       </div>
-      <div class="text-center mt-4">
+      <div class="text-center my-4">
         <.link navigate={~p"/companies/#{@current_company.id}/dashboard"} class="orange button">
           <%= gettext("Back") %>
         </.link>

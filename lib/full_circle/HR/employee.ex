@@ -1,7 +1,7 @@
 defmodule FullCircle.HR.Employee do
   use FullCircle.Schema
   import Ecto.Changeset
-  import FullCircleWeb.Gettext
+  use Gettext, backend: FullCircleWeb.Gettext
 
   schema "employees" do
     field(:name, :string)

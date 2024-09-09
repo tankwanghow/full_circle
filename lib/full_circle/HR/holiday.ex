@@ -1,7 +1,7 @@
 defmodule FullCircle.HR.Holiday do
   use FullCircle.Schema
   import Ecto.Changeset
-  import FullCircleWeb.Gettext
+  use Gettext, backend: FullCircleWeb.Gettext
 
   schema "holidays" do
     field(:name, :string)

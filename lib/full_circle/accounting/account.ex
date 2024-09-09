@@ -1,7 +1,7 @@
 defmodule FullCircle.Accounting.Account do
   use FullCircle.Schema
   import Ecto.Changeset
-  import FullCircleWeb.Gettext
+  use Gettext, backend: FullCircleWeb.Gettext
 
   schema "accounts" do
     belongs_to :company, FullCircle.Sys.Company

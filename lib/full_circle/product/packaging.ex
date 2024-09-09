@@ -1,7 +1,7 @@
 defmodule FullCircle.Product.Packaging do
   use FullCircle.Schema
   import Ecto.Changeset
-  import FullCircleWeb.Gettext
+  use Gettext, backend: FullCircleWeb.Gettext
 
   schema "packagings" do
     field(:name, :string)

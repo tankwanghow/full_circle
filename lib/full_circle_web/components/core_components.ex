@@ -17,7 +17,7 @@ defmodule FullCircleWeb.CoreComponents do
   use Phoenix.Component
 
   alias Phoenix.LiveView.JS
-  import FullCircleWeb.Gettext
+  use Gettext, backend: FullCircleWeb.Gettext
 
   @doc """
   Renders a modal.

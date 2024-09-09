@@ -2,7 +2,7 @@ defmodule FullCircle.DebCre.DebitNote do
   use FullCircle.Schema
   import Ecto.Changeset
   import FullCircle.Helpers
-  import FullCircleWeb.Gettext
+  use Gettext, backend: FullCircleWeb.Gettext
 
   schema "debit_notes" do
     field :note_no, :string

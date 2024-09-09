@@ -2,7 +2,7 @@ defmodule FullCircleWeb.ActiveCompany do
   use FullCircleWeb, :verified_routes
   import Plug.Conn
   import Phoenix.Controller
-  require FullCircleWeb.Gettext
+  use Gettext, backend: MyApp.Gettext
 
   def on_mount(:assign_active_company, _params, session, socket) do
     {:cont,
@@ -31,7 +31,7 @@ defmodule FullCircleWeb.ActiveCompany do
           |> assign(:full_screen_app?, false)
         else
           conn
-          |> put_flash(:error, FullCircleWeb.Gettext.gettext("Not Authorise."))
+          |> put_flash(:error, gettext("Not Authorise."))
           |> redirect(to: "/")
           |> halt()
         end

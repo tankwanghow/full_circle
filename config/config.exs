@@ -48,7 +48,8 @@ config :full_circle, FullCircleWeb.Endpoint,
 config :esbuild,
   version: "0.19.11",
   default: [
-    args: ~w(js/app.js js/tri_autocomplete.js js/take_photo_human.js js/face_id.js
+    args: ~w(js/app.js js/tri_autocomplete.js js/take_photo_human.js
+             js/face_id.js js/qr_attend.js js/punch_card_count.js
         --chunk-names=chunks/[name]-[hash] --splitting
         --bundle --target=es2017 --format=esm
         --outdir=../priv/static/assets --external:/fonts/* --external:/images/*
@@ -73,6 +74,8 @@ config :tailwind,
 config :logger, :console,
   format: "$time $metadata[$level] $message\n",
   metadata: [:request_id]
+
+config :tzdata, :autoupdate, :disabled
 
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason

@@ -2,7 +2,7 @@ defmodule FullCircle.WeightBridge.Weighing do
   use FullCircle.Schema
   import Ecto.Changeset
   import FullCircle.Helpers
-  import FullCircleWeb.Gettext
+  use Gettext, backend: FullCircleWeb.Gettext
 
   schema "weighings" do
     field :note_no, :string

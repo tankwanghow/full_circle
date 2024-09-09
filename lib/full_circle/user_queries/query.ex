@@ -1,7 +1,7 @@
 defmodule FullCircle.UserQueries.Query do
   use FullCircle.Schema
   import Ecto.Changeset
-  import FullCircleWeb.Gettext
+  use Gettext, backend: FullCircleWeb.Gettext
 
   schema "queries" do
     field :qry_name, :string

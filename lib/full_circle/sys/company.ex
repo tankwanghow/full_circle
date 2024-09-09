@@ -3,7 +3,7 @@ defmodule FullCircle.Sys.Company do
   import Ecto.Changeset
   import Ecto.Query
   alias FullCircle.Repo
-  import FullCircleWeb.Gettext
+  use Gettext, backend: FullCircleWeb.Gettext
 
   schema "companies" do
     field :address1, :string

@@ -2,7 +2,7 @@ defmodule FullCircle.Billing.PurInvoice do
   use FullCircle.Schema
   import Ecto.Changeset
   import FullCircle.Helpers
-  import FullCircleWeb.Gettext
+  use Gettext, backend: FullCircleWeb.Gettext
 
   schema "pur_invoices" do
     field :pur_invoice_no, :string

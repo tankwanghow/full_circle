@@ -257,7 +257,7 @@ defmodule FullCircle.HR do
         from inv in subquery(qry),
           order_by:
             ^similarity_order(
-              [:employee_name, :shift_id, :flag, :input_medium],
+              [:employee_name, :flag, :input_medium],
               terms
             ),
           order_by: [inv.punch_time]
@@ -267,7 +267,7 @@ defmodule FullCircle.HR do
 
     qry =
       if date_from != "" do
-        date_from = "#{date_from} 00:00:00"
+        date_from = "#{date_from}"
 
         from inv in qry,
           where: inv.punch_time >= ^date_from,
@@ -284,7 +284,17 @@ defmodule FullCircle.HR do
       where: ta.id == ^id
     )
     |> Repo.one!()
-    |> FullCircle.HR.TimeAttend.set_punch_time_local(company)
+    |> FullCircle.HR.TimeAttend.punch_time_to_local_tz(company)
+  end
+
+  def find_employee_last_punch_data(emp_id, com_id) do
+    from(ta in TimeAttend,
+      where: ta.employee_id == ^emp_id,
+      where: ta.company_id == ^com_id,
+      order_by: [desc: ta.punch_time],
+      limit: 1
+    )
+    |> Repo.one!()
   end
 
   defp timeattend_raw_query(company, _user) do
@@ -333,6 +343,27 @@ defmodule FullCircle.HR do
     case can?(user, :delete_time_attendence, com) do
       true ->
         Repo.delete(ta)
+
+      false ->
+        :not_authorise
+    end
+  end
+
+  def delete_time_attendence_by_id(id, com, user) do
+    case can?(user, :delete_time_attendence, com) do
+      true ->
+        from(ta in TimeAttend, where: ta.id == ^id, where: ta.company_id == ^com.id)
+        |> Repo.delete_all()
+
+      false ->
+        :not_authorise
+    end
+  end
+
+  def insert_time_attendence_by_data(struct, com, user) do
+    case can?(user, :create_time_attendence, com) do
+      true ->
+        Repo.insert(struct)
 
       false ->
         :not_authorise
@@ -467,8 +498,8 @@ defmodule FullCircle.HR do
 
   def get_face_id_photos(com_id) do
     from(pht in EmployeePhoto,
-    join: emp in Employee,
-    on: emp.id == pht.employee_id,
+      join: emp in Employee,
+      on: emp.id == pht.employee_id,
       where: pht.company_id == ^com_id,
       select: %{
         id: pht.id,
@@ -1138,8 +1169,7 @@ defmodule FullCircle.HR do
 
   defp punch_query_by_company_id(sdate, edate, com_id) do
     "select d2.id::varchar || d2.dd::varchar as idg, d2.dd, d2.name, d2.work_hours_per_day,
-            d2.work_days_per_week, d2.work_days_per_month, d2.id as employee_id,
-            p2.shift, p2.time_list, holi_list, sholi_list
+            d2.work_days_per_week, d2.work_days_per_month, d2.id as employee_id, p2.time_list, holi_list, sholi_list
        from (select d1.dd, d1.name, d1.id, d1.status, d1.id_no, d1.work_hours_per_day,
                     d1.work_days_per_week, d1.work_days_per_month,
                     string_agg(hl.name, ', ' order by hl.name) as holi_list,
@@ -1153,13 +1183,13 @@ defmodule FullCircle.HR do
                       group by d1.dd, d1.name, d1.id, d1.status, d1.id_no,
                                d1.work_hours_per_day, d1.work_days_per_week,
                                d1.work_days_per_month) d2 left outer join
-              (select ta.employee_id, ta.shift_id as shift, min(ta.punch_time)::date as pt, min(ta.punch_time) as punch_time,
-                      array_agg(ta.punch_time::varchar || '|' || ta.id::varchar || '|' || ta.status || '|' || ta.flag order by ta.punch_time) time_list
-                 from time_attendences ta inner join companies c on c.id = ta.company_id
+              (select ta.employee_id, min(ta.punch_time)::date as pt, min(ta.punch_time) as punch_time,
+                      array_agg(ta.punch_time::varchar || '|' || ta.id::varchar || '|' || ta.status || '|' || ta.flag order by ta.flag) time_list
+                 from time_attendences ta inner join companies c on c.id = ta.company_id,
+                      generate_series('#{sdate}'::date, '#{edate}'::date, '1 day') as dd
                 where ta.company_id = '#{com_id}'
-                  and ta.punch_time::date >= '#{sdate}'
-                  and ta.punch_time::date <= '#{edate}'
-                group by ta.employee_id, ta.shift_id) p2
+                  and ta.punch_time::date = dd::date
+                group by ta.employee_id, dd) p2
          on p2.pt = d2.dd
         and d2.id = p2.employee_id
       where true"
@@ -1168,7 +1198,7 @@ defmodule FullCircle.HR do
   def punch_by_date(emp_id, pdate, com_id) do
     (punch_query_by_company_id(pdate, pdate, com_id) <>
        " and d2.id = '#{emp_id}'" <>
-       " order by d2.dd, p2.shift")
+       " order by d2.dd")
     |> exec_query_map()
     |> unzip_all_time_list()
     |> Enum.at(0)
@@ -1180,7 +1210,7 @@ defmodule FullCircle.HR do
 
     (punch_query_by_company_id(sdate, edate, com_id) <>
        " and d2.id = '#{emp_id}'" <>
-       " order by d2.dd, p2.shift")
+       " order by d2.dd")
     |> exec_query_map()
     |> unzip_all_time_list()
   end
@@ -1204,36 +1234,28 @@ defmodule FullCircle.HR do
          do: " and (d2.name ilike '%#{terms}%' or d2.id_no ilike '%#{terms}%')",
          else: ""
        ) <>
-       " order by d2.name, d2.dd, p2.shift" <>
+       " order by d2.name, d2.dd" <>
        " limit #{per_page} offset (#{page} - 1) * #{per_page} ")
     |> exec_query_map()
     |> unzip_all_time_list()
   end
 
-  def last_shift(number, com_id) do
-    from(ta in TimeAttend,
-      join: com in FullCircle.Sys.Company,
-      on: ta.company_id == com.id,
-      where: com.id == ^com_id,
-      limit: ^number,
-      distinct: [desc: ta.shift_id],
-      order_by: [desc: ta.shift_id],
-      select: %{shift: ta.shift_id}
-    )
-    |> Repo.all()
-  end
-
-  defp count_hours_work(tl) when is_nil(tl) do
+  def count_hours_work(tl) when is_nil(tl) do
     0
   end
 
-  defp count_hours_work(tl) do
+  def count_hours_work(tl) do
     tl
     |> Enum.chunk_every(2)
     |> Enum.map(fn t ->
       try do
-        [[ti, _, _, "IN"], [to, _, _, "OUT"]] = t
-        Timex.diff(to, ti, :minute) / 60
+        [[ti, _, _, _], [to, _, _, _]] = t
+
+        if(is_nil(ti) || is_nil(to)) do
+          0
+        else
+          Timex.diff(to, ti, :minute) / 60
+        end
       rescue
         MatchError ->
           0
@@ -1244,11 +1266,29 @@ defmodule FullCircle.HR do
     end)
   end
 
-  defp unzip_all_time_list(ps) when is_nil(ps) do
+  def wh(ut) do
+    Enum.sum(count_hours_work(ut))
+  end
+
+  def nh(wh, nwh) do
+    cond do
+      wh >= nwh -> nwh
+      true -> wh
+    end
+  end
+
+  def ot(wh, nwh) do
+    cond do
+      wh > nwh -> wh - nwh
+      true -> 0
+    end
+  end
+
+  def unzip_all_time_list(ps) when is_nil(ps) do
     nil
   end
 
-  defp unzip_all_time_list(ps) do
+  def unzip_all_time_list(ps) do
     ps
     |> Enum.map(fn t ->
       ut = Map.get(t, :time_list) |> unzip_time_list()
@@ -1257,23 +1297,15 @@ defmodule FullCircle.HR do
       nwh = Decimal.to_float(Map.get(t, :work_hours_per_day) || Decimal.new("0.00001"))
       wh = Enum.sum(count_hours_work(ut))
 
-      nh =
-        cond do
-          wh >= nwh -> nwh
-          true -> wh
-        end
+      nh = nh(wh, nwh)
 
-      ot =
-        cond do
-          wh > nwh -> wh - nwh
-          true -> 0
-        end
+      ot = ot(wh, nwh)
 
       Map.merge(t, %{time_list: ut, wh: wh, nh: nh, ot: ot, id: idg, work_hours_per_day: nwh})
     end)
   end
 
-  defp unzip_time_list(tl) do
+  def unzip_time_list(tl) do
     if is_nil(tl) do
       []
     else

@@ -1,4 +1,4 @@
-defmodule FullCircle.Repo.Migrations.AddColToHouse do
+defmodule FullCircle.Repo.Migrations.AddColToFixedAssets do
   use Ecto.Migration
 
   def change do

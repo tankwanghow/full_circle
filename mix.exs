@@ -7,7 +7,7 @@ defmodule FullCircle.MixProject do
       version: "1.0.0",
       elixir: "~> 1.16.3",
       elixirc_paths: elixirc_paths(Mix.env()),
-      elixirc_options: [debug_info: Mix.env() == :dev],
+      # elixirc_options: [debug_info: Mix.env() == :dev],
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
       deps: deps()
@@ -34,26 +34,26 @@ defmodule FullCircle.MixProject do
   defp deps do
     [
       {:bcrypt_elixir, "~> 3.0"},
-      {:phoenix, "~> 1.7.11"},
+      {:phoenix, "~> 1.7.14"},
       {:phoenix_ecto, "~> 4.5"},
       {:ecto_sql, "~> 3.10"},
       {:postgrex, ">= 0.0.0"},
       {:phoenix_html, "~> 4.1"},
       {:phoenix_live_reload, "~> 1.2", only: :dev},
-      {:phoenix_live_view, "~> 1.0.0-rc.0"},
+      {:phoenix_live_view, "~> 1.0.0-rc.1"},
       {:floki, ">= 0.30.0", only: :test},
       {:esbuild, "~> 0.8", runtime: Mix.env() == :dev},
       {:tailwind, "~> 0.2", runtime: Mix.env() == :dev},
       {:heroicons,
        github: "tailwindlabs/heroicons",
-       tag: "v2.1.1",
+       tag: "v2.1.5",
        sparse: "optimized",
        app: false,
        compile: false,
        depth: 1},
       {:swoosh, "~> 1.5"},
       {:finch, "~> 0.13"},
-      {:telemetry_metrics, "~> 0.6"},
+      {:telemetry_metrics, "~> 1.0"},
       {:telemetry_poller, "~> 1.0"},
       {:gettext, "~> 0.20"},
       {:jason, "~> 1.2"},
@@ -81,8 +81,8 @@ defmodule FullCircle.MixProject do
       "ecto.reset": ["ecto.drop", "ecto.setup"],
       test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
-      "assets.build": ["tailwind default", "esbuild default"],
-      "assets.deploy": ["tailwind default --minify", "esbuild default --minify", "phx.digest"]
+      "assets.build": ["tailwind full_circle", "esbuild full_circle"],
+      "assets.deploy": ["tailwind full_circle --minify", "esbuild full_circle --minify", "phx.digest"]
     ]
   end
 end

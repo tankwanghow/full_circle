@@ -2,7 +2,7 @@ defmodule FullCircle.BillPay.Payment do
   use FullCircle.Schema
   import Ecto.Changeset
   import FullCircle.Helpers
-  import FullCircleWeb.Gettext
+  use Gettext, backend: FullCircleWeb.Gettext
 
   schema "payments" do
     field :payment_no, :string

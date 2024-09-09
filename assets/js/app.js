@@ -21,58 +21,68 @@ import "phoenix_html"
 import { Socket } from "phoenix"
 import { LiveSocket } from "phoenix_live_view"
 import topbar from "../vendor/topbar"
+import { countPunchCard } from "./punch_card_count"
 
 let csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 let Hooks = {}
 
-// Hooks.takePhotoFaceApi = {
-//   mounted() {
-//     import("./take_photo_faceapi").then(
-//       ({ initTakePicture }) => {
-//         initTakePicture();
-//       }
-//     );
-//   }
-// }
-
 Hooks.FaceID = {
   mounted() {
     import("./face_id").then(
-      ({ initFaceID }) => {
-        initFaceID(this);
+      (h) => {
+        h.initFaceID(this)
       }
     );
   }
 }
 
-Hooks.takePhotoHuman = {
+Hooks.takePhoto = {
   mounted() {
     import("./take_photo_human").then(
-      ({ initTakePicture }) => {
-        initTakePicture(this);
+      (h) => {
+        h.initTakePhoto(this)
       }
     );
+  }
+}
+
+Hooks.punchCamera = {
+  mounted() {
+    import("./qr_attend").then(
+      (q) => {
+        q.initPunchCamera(this)
+      }
+    );
+  }
+}
+
+Hooks.punchCardHourCount = {
+  mounted() {
+    import("./punch_card_count").then(
+      (t) => {
+        t.initPunchCardCount(this)
+      }
+    )
   }
 }
 
 Hooks.tributeAutoComplete = {
   mounted() {
     import("./tri_autocomplete").then(
-      ({ initTributeAutoComplete }) => {
-        initTributeAutoComplete(this.el);
+      (t) => {
+        t.initTributeAutoComplete(this.el)
       }
-    );
-
+    )
   }
 }
 
 Hooks.tributeTagText = {
   mounted() {
     import("./tri_autocomplete").then(
-      ({ initTributeTagText }) => {
-        initTributeTagText(this.el);
+      (t) => {
+        t.initTributeTagText(this.el)
       }
-    );
+    )
   }
 }
 
@@ -81,9 +91,9 @@ Hooks.calculatorInput = {
     this.el.addEventListener("blur", e => {
       if (!/[a-zA-Z]+/.test(this.el.value)) {
         try {
-          var eval2 = eval;
-          val = eval2(this.el.value);
-          this.el.value = val;
+          var eval2 = eval
+          val = eval2(this.el.value)
+          this.el.value = val
         } catch (error) {
 
         }

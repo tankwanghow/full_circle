@@ -1,7 +1,7 @@
 defmodule FullCircle.Helpers do
   import Ecto.Query, warn: false
   import Ecto.Changeset
-  import FullCircleWeb.Gettext
+  use Gettext, backend: FullCircleWeb.Gettext
 
   def last_log_record_for(entity, id, com_id) do
     from(log in FullCircle.Sys.Log,

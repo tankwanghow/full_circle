@@ -1,6 +1,6 @@
 defmodule FullCircle.Accounting do
   import Ecto.Query, warn: false
-  import FullCircleWeb.Gettext
+  use Gettext, backend: FullCircleWeb.Gettext
   import FullCircle.Authorization
 
   alias Ecto.Multi

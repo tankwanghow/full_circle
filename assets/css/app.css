@@ -82,6 +82,11 @@ input[type=number] {
   text-align: right;
 }
 
+input[type="time"]::-webkit-calendar-picker-indicator {
+  background: none;
+  display: none;
+}
+
 .detail-header {
   @apply border border-gray-500 bg-gray-200 py-1;
 }

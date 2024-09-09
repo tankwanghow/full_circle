@@ -1,7 +1,7 @@
 defmodule FullCircle.UserAccounts.User do
   use FullCircle.Schema
+  use Gettext, backend: FullCircleWeb.Gettext
   import Ecto.Changeset
-  import FullCircleWeb.Gettext
   import Ecto.Query, warn: false
 
   schema "users" do

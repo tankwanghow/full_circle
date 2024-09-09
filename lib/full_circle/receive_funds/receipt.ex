@@ -2,7 +2,7 @@ defmodule FullCircle.ReceiveFund.Receipt do
   use FullCircle.Schema
   import Ecto.Changeset
   import FullCircle.Helpers
-  import FullCircleWeb.Gettext
+  use Gettext, backend: FullCircleWeb.Gettext
 
   schema "receipts" do
     field :receipt_no, :string

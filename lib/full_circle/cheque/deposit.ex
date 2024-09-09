@@ -2,7 +2,7 @@ defmodule FullCircle.Cheque.Deposit do
   use FullCircle.Schema
   import Ecto.Changeset
   import FullCircle.Helpers
-  import FullCircleWeb.Gettext
+  use Gettext, backend: FullCircleWeb.Gettext
 
   schema "deposits" do
     field :deposit_no, :string

@@ -1,7 +1,7 @@
 defmodule FullCircle.HR.Recurring do
   use FullCircle.Schema
   import Ecto.Changeset
-  import FullCircleWeb.Gettext
+  use Gettext, backend: FullCircleWeb.Gettext
   import FullCircle.Helpers
 
   schema "recurrings" do

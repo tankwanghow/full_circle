@@ -2,7 +2,7 @@ defmodule FullCircle.Product.Load do
   use FullCircle.Schema
   import Ecto.Changeset
   import FullCircle.Helpers
-  import FullCircleWeb.Gettext
+  use Gettext, backend: FullCircleWeb.Gettext
 
   schema "loads" do
     field :load_no, :string

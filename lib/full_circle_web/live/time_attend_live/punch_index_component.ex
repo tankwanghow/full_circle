@@ -1,6 +1,8 @@
 defmodule FullCircleWeb.TimeAttendLive.PunchIndexComponent do
   use FullCircleWeb, :live_component
 
+  require Integer
+
   @impl true
   def mount(socket) do
     {:ok, socket}
@@ -13,16 +15,23 @@ defmodule FullCircleWeb.TimeAttendLive.PunchIndexComponent do
     tis =
       if(assigns.obj.time_list != []) do
         assigns.obj.time_list
-        |> Enum.map(fn [t, i, s, f] ->
+        |> Enum.map(fn [time, id, status, inout] ->
           {Timex.format!(
-             Timex.to_datetime(t, assigns.company.timezone),
+             Timex.to_datetime(time, assigns.company.timezone),
              "%H:%M",
              :strftime
-           ), i, s, f}
+           ), id, status, inout, Timex.to_datetime(time, assigns.company.timezone)}
         end)
       else
-        nil
+        []
       end
+
+    tis =
+      Enum.map(1..6, fn i ->
+        Enum.at(tis, i - 1) ||
+        {nil, "_new_#{FullCircle.Helpers.gen_temp_id(31)}", "normal",
+        if(Integer.is_odd(i), do: "#{ceil(i/2)}_IN_#{ceil(i/2)}", else: "#{ceil(i/2)}_OUT_#{ceil(i/2)}"), nil}
+      end)
 
     {:ok, socket |> assign(assigns) |> assign(yw: yw) |> assign(tis: tis)}
   end
@@ -46,26 +55,16 @@ defmodule FullCircleWeb.TimeAttendLive.PunchIndexComponent do
       <div class="w-[10%] border-b border-gray-400">
         <%= @yw %>, <%= @obj.dd |> Timex.weekday() |> Timex.day_shortname() %>
       </div>
-      <div class="w-[10%] border-b border-gray-400">
-        <%= @obj.shift %>
-      </div>
-      <div class="w-[25%] border-b border-gray-400">
+      <div class="w-[50%] border-b border-gray-400">
         <.live_component
           module={FullCircleWeb.TimeAttendLive.PunchTimeComponent}
           id={@id}
           comp_id={@id}
-          obj={@tis}
+          obj={@obj}
+          tis={@tis}
           company={@company}
+          user={@user}
         />
-      </div>
-      <div class="w-[5%] border-b text-center border-gray-400">
-        <%= Number.Delimit.number_to_delimited(@obj.wh) %>
-      </div>
-      <div class="w-[5%] border-b text-center border-gray-400">
-        <%= Number.Delimit.number_to_delimited(@obj.nh) %>
-      </div>
-      <div class="w-[5%] border-b text-center border-gray-400">
-        <%= Number.Delimit.number_to_delimited(@obj.ot) %>
       </div>
     </div>
     """

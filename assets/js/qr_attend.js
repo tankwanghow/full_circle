@@ -1,59 +1,153 @@
 import { Html5QrcodeScanner } from "../vendor/html5-qrcode/src/html5-qrcode-scanner"
 
-export function initReply(el, lv) {
-  this.el.innerHTML = "Scan Employee QR";
-  this.el.className += " bg-amber-200 border-amber-600";
+let phx_liveview
+let camera
+let long
+let lat
+
+const dom = {
+  clock: document.getElementById("clock"),
+  camera: document.getElementById("camera"),
+  decodedText: document.getElementById("decodedText"),
+  msg: document.getElementById("msg"),
+  scannedResult: document.getElementById("scanned-result"),
+  goodSound: document.getElementById('good-sound'),
+  badSound: document.getElementById('bad-sound'),
+  inOut: document.getElementById("in_out"),
+  inBtn: document.getElementById("inBtn"),
+  outBtn: document.getElementById("outBtn")
 }
 
-export function updateReply(reader, scanner) {
-  if (this.el.innerText != "Scan Employee QR") {
-    reader = document.getElementById("qr-reader");
-    reader_class = reader.className;
-    reader.className = "hidden";
+export async function initPunchCamera(lv) {
+  phx_liveview = lv
 
-    setTimeout(() => {
-      lv.pushEvent("qr-code-scan-resume");
-      reader.className = reader_class;
-      scanner.resume();
-    }, 3000);
-  }
+  setInterval(async () => { showClock() }, 1000)
+
+  setStatusBgColor('bg-orange-200', 'bg-green-400')
+
+  phx_liveview.handleEvent('returnScanResult', (data) => scanResult(data))
+  phx_liveview.handleEvent('punchResult', (data) => punchResult(data))
+
+  dom.inBtn.addEventListener('click', async () => {
+    phx_liveview.pushEvent('punch_in', {employee_id: dom.decodedText.innerHTML, gps_long: long, gps_lat: lat})
+  })
+
+  dom.outBtn.addEventListener('click', async () => {
+    phx_liveview.pushEvent('punch_out', {employee_id: dom.decodedText.innerHTML, gps_long: long, gps_lat: lat})
+  })
+
+  dom.badSound.play()
+  dom.goodSound.play()
+
+  await initCamera()
+}
+
+async function rescan() {
+  dom.camera.style.display = ''
+  dom.scannedResult.style.display = 'none'
+  dom.inOut.style.display = 'none'
+  setStatusBgColor('bg-orange-200', 'bg-green-400')
+  camera.resume()
+}
+
+async function showClock() {
+  var x = new Date()
+  var hours = addZero(x.getHours())
+  var date = x.getFullYear() + "-" + addZero((x.getMonth() + 1)) + "-" + addZero(x.getDate())
+  var time = hours + ":" + addZero(x.getMinutes()) + ":" + addZero(x.getSeconds())
+
+  clock.innerHTML = `${date} ${time}`
+}
+
+function addZero(i) {
+  if (i < 10) { i = "0" + i }  // add zero in front of numbers < 10
+  return i
 }
 
 
-export function initScanner(id, lv) {
-  scanner = new Html5QrcodeScanner(
-    id,
-    { fps: 2, aspectRatio: 1, qrbox: { width: 280, height: 280 } },
+async function initCamera() {
+  camera = new Html5QrcodeScanner(
+    'camera',
+    { fps: 30, aspectRatio: 1 },
     false
   )
-
-  let long = 182;
-  let lat = 182;
 
   if (navigator.geolocation) {
     navigator.geolocation.watchPosition(
       (pos) => {
-        long = pos.coords.longitude;
-        lat = pos.coords.latitude;
+        long = pos.coords.longitude
+        lat = pos.coords.latitude
       },
       () => {
-        long = 182;
-        lat = 182;
+        long = 182
+        lat = 182
       },
-      { maximumAge: 60000, enableHighAccuracy: true });
+      { maximumAge: 60000, enableHighAccuracy: true })
   } else {
-    long = 182;
-    lat = 182;
+    long = 182
+    lat = 182
   }
 
-  onScanSuccess = (decodedText, decodedResult) => {
-    decodedResult.gps_long = long;
-    decodedResult.gps_lat = lat;
-    scanner.pause();
-    lv.pushEvent("qr-code-scanned", decodedResult);
+  function onScanSuccess(decodedText, decodedResult) {
+    decodedResult.gps_long = long
+    decodedResult.gps_lat = lat
+    camera.pause()
+    phx_liveview.pushEvent("qr-code-scanned", decodedResult)
   }
 
-  scanner.render(onScanSuccess);
+  camera.render(onScanSuccess)
 }
 
-export function destroyScanner(scanner) { scanner.clear(); }
+function scanResult(data) {
+  switch (data.status) {
+    case 'error':
+      showResult(data)
+      dom.inOut.style.display = 'none'
+      setStatusBgColor('bg-rose-200', 'bg-rose-400')
+      dom.badSound.play()
+      setTimeout(async () => { await rescan() }, 3000)
+      break;
+    case 'success':
+      setStatusBgColor('bg-green-200', 'bg-green-400')
+      showResult(data)
+      dom.goodSound.play()
+      dom.inOut.style.display = ''
+      break;
+  }
+}
+
+function punchResult(data) {
+  switch (data.status) {
+    case 'error':
+      showResult(data)
+      dom.inOut.style.display = 'none'  
+      setStatusBgColor('bg-rose-200', 'bg-rose-400')
+      dom.badSound.play()
+      setTimeout(async () => { await rescan() }, 3000)
+      break;
+    case 'success':
+      setStatusBgColor('bg-green-200', 'bg-green-400')
+      showResult(data)
+      dom.goodSound.play()
+      dom.inOut.style.display = ''
+      setTimeout(async () => { await rescan() }, 2000)
+      break;
+  }
+}
+
+function showResult(data) {
+  dom.camera.style.display = 'none'
+  dom.scannedResult.style.display = ''
+  dom.msg.innerHTML = data.msg
+  dom.decodedText.innerHTML = data.decodedText
+}
+
+export function destroyScanner(camera) { camera.clear() }
+
+function setStatusBgColor(BgColor, ResColor) {
+  var r = /bg\-[a-z]+\-[0-9]+/
+  document.body.classList.forEach(function (c) { if (r.test(c)) { document.body.classList.remove(c) } })
+  document.body.classList.add(BgColor)
+  dom.scannedResult.classList.forEach(function (c) { if (r.test(c)) { dom.scannedResult.classList.remove(c) } })
+  dom.scannedResult.classList.add(ResColor)
+}

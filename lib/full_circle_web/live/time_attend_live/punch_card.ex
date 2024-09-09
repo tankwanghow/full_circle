@@ -66,14 +66,6 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
         </.link>
         <.link
           :if={@search.employee_name != ""}
-          phx-click={:new_timeattend}
-          class="w-[14%] h-10 mt-5 blue button ml-2"
-          id="new_timeattend"
-        >
-          <%= gettext("+ Attendence") %>
-        </.link>
-        <.link
-          :if={@search.employee_name != ""}
           phx-click={:new_salarynote}
           class="w-[9%] h-10 mt-5 blue button ml-2"
           id="new_salarynote"
@@ -136,7 +128,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
       <div class="flex flex-row justify-around gap-2 h-8 w-full mb-2 border-y border-purple-600 bg-purple-200">
         <span class="mt-1">
           Total:
-          <span :if={@employee} class="font-bold text-orange-600">
+          <span :if={@employee} id="total_worked_hours" class="font-bold text-orange-600">
             <%= @total_day_worked |> Number.Delimit.number_to_delimited() %>
           </span>
         </span>
@@ -144,6 +136,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
           Overtime:
           <.link
             :if={@employee}
+            id="total_ot_hours"
             class="text-blue-600 hover:font-bold"
             phx-value-qty={@ot_day_worked |> Number.Delimit.number_to_delimited()}
             phx-click={:new_salarynote_with_qty}
@@ -155,6 +148,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
           Normal:
           <.link
             :if={@employee}
+            id="total_normal_hours"
             class="text-blue-600 hover:font-bold"
             phx-value-qty={@normal_pay_days |> Number.Delimit.number_to_delimited()}
             phx-click={:new_salarynote_with_qty}
@@ -190,8 +184,11 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
           </.link>
         </span>
       </div>
-
-      <div class="font-medium flex flex-row text-center tracking-tighter bg-blue-200">
+      <%!-- phx-hook="punchCardHourCount" --%>
+      <div
+        id="timeAttendList"
+        class="font-medium flex flex-row text-center tracking-tighter bg-blue-200"
+      >
         <div class="w-[10%] border-b border-t border-blue-400 py-1">
           <%= gettext("Date") %>
         </div>
@@ -240,26 +237,28 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
       </div>
 
       <div class="font-medium flex flex-row text-center tracking-tighter bg-amber-200">
-        <div class="w-[20%] border-b border-t border-amber-400 py-1">
+        <div class="w-[12%] border-b border-t border-amber-400 py-1">
           <%= gettext("Date") %>
         </div>
-        <div class="w-[15%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Year/Week") %>
-        </div>
         <div class="w-[12%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Shift") %>
+          <%= gettext("Holiday") %>
         </div>
-        <div class="w-[32%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Punches") %>
+        <div class="w-[11%] border-b border-t border-amber-400 py-1">
+          <%= gettext("Day") %>
         </div>
-        <div class="w-[7%] border-b border-t border-amber-400 py-1">
-          <%= gettext("HW") %>
-        </div>
-        <div class="w-[7%] border-b border-t border-amber-400 py-1">
-          <%= gettext("NH") %>
-        </div>
-        <div class="w-[7%] border-b border-t border-amber-400 py-1">
-          <%= gettext("OT") %>
+        <div class="w-[65%] flex flex-row border-b border-t border-amber-400 py-1">
+          <div class="w-[70%]">
+            <%= gettext("Punches") %>
+          </div>
+          <div class="w-[10%]">
+            <%= gettext("HW") %>
+          </div>
+          <div class="w-[10%]">
+            <%= gettext("NH") %>
+          </div>
+          <div class="w-[10%]">
+            <%= gettext("OT") %>
+          </div>
         </div>
       </div>
       <div id="punches_list" class="mb-5">
@@ -268,34 +267,12 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
             module={PunchCardComponent}
             id={obj.id}
             obj={obj}
+            user={@current_user}
             company={@current_company}
-            shake_obj={@shake_obj}
           />
         <% end %>
       </div>
     </div>
-    <.modal
-      :if={@live_action_ta in [:new, :edit]}
-      id="timeattend-modal"
-      show
-      on_cancel={JS.push("modal_cancel")}
-      max_w="max-w-4xl"
-    >
-      <.live_component
-        module={FullCircleWeb.TimeAttendLive.FormComponent}
-        live_action={@live_action_ta}
-        id={@obj.id || :new}
-        obj={@obj}
-        title={@title}
-        action={@live_action_ta}
-        current_company={@current_company}
-        current_user={@current_user}
-        created_info={:refresh_page_ta}
-        updated_info={:refresh_page_ta}
-        deleted_info={:refresh_page_ta}
-        error_info={:error_refresh_page_ta}
-      />
-    </.modal>
     <.modal
       :if={@live_action_sn in [:new, :edit]}
       id="salarynote-modal"
@@ -487,69 +464,12 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
      |> assign(obj: obj)}
   end
 
-  def handle_event("new_timeattend", _, socket) do
-    {:noreply,
-     socket
-     |> assign(live_action_ta: :new)
-     |> assign(shake_obj: %{id: ""})
-     |> assign(obj: %FullCircle.HR.TimeAttend{employee_name: socket.assigns.employee.name})
-     |> assign(title: gettext("New Attendence"))}
-  end
-
-  @impl true
-  def handle_event("edit_timeattend", params, socket) do
-    ta =
-      HR.get_time_attendence!(
-        params["id"],
-        socket.assigns.current_company,
-        socket.assigns.current_user
-      )
-
-    {:noreply,
-     socket
-     |> assign(live_action_ta: :edit)
-     |> assign(comp_id: params["comp-id"])
-     |> assign(shake_obj: %{id: ""})
-     |> assign(obj: ta)
-     |> assign(title: gettext("Edit Attendence"))}
-  end
-
   @impl true
   def handle_event("modal_cancel", _, socket) do
     {:noreply,
      socket
-     |> assign(live_action_ta: nil)
      |> assign(live_action_sn: nil)
      |> assign(live_action_adv: nil)}
-  end
-
-  @impl true
-  def handle_info({:refresh_page_ta, _obj}, socket) do
-    {:noreply,
-     socket
-     |> assign(live_action_ta: nil)
-     |> assign(shake_obj: %{id: socket.assigns.comp_id})
-     |> filter_punches(
-       socket.assigns.search.month,
-       socket.assigns.search.year,
-       socket.assigns.employee.name
-     )}
-  end
-
-  @impl true
-  def handle_info({:error_refresh_page_ta, cs}, socket) do
-    {:noreply,
-     socket
-     |> assign(live_action_ta: nil)
-     |> put_flash(
-       :error,
-       Enum.map(cs.errors, fn {f, {msg, _}} -> "#{Atom.to_string(f)} #{msg}" end)
-     )
-     |> filter_punches(
-       socket.assigns.search.month,
-       socket.assigns.search.year,
-       socket.assigns.employee.name
-     )}
   end
 
   @impl true
@@ -581,6 +501,38 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
        socket.assigns.search.year,
        socket.assigns.employee.name
      )}
+  end
+
+  # %{id: id, in1: in1, out1: out1, in2: in2, out2: out2, in3: in3, out3: out3}}
+  @impl true
+  def handle_info(
+        {:updated_punch, idg, tis, wh, nh, ot},
+        socket
+      ) do
+    [
+      {_ti1, id1, st1, fl1, dt1},
+      {_ti2, id2, st2, fl2, dt2},
+      {_ti3, id3, st3, fl3, dt3},
+      {_ti4, id4, st4, fl4, dt4},
+      {_ti5, id5, st5, fl5, dt5},
+      {_ti6, id6, st6, fl6, dt6}
+    ] = tis
+
+    tl = [
+      [dt1, id1, st1, fl1],
+      [dt2, id2, st2, fl2],
+      [dt3, id3, st3, fl3],
+      [dt4, id4, st4, fl4],
+      [dt5, id5, st5, fl5],
+      [dt6, id6, st6, fl6]
+    ]
+
+    i = socket.assigns.punches |> Enum.find_index(fn x -> x.idg == idg end)
+    old = socket.assigns.punches |> Enum.at(i)
+    new = old |> Map.merge(%{time_list: tl, wh: wh, nh: nh, ot: ot})
+    punches = socket.assigns.punches |> List.replace_at(i, new)
+
+    {:noreply, socket |> assign(punches: punches) |> update_punch_card(punches)}
   end
 
   defp filter_punches(socket, month, year, emp_name) do
@@ -651,31 +603,8 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
           new_pay_slip_url:
             "/companies/#{socket.assigns.current_company.id}/PaySlip/new?#{URI.encode_query(qry)}"
         )
-        |> assign(total_day_worked: total_day_worked(punches))
-        |> assign(ot_day_worked: ot_day_worked(punches))
-        |> assign(days_in_month: days_in_month(punches))
-        |> assign(sunday_count: sunday_count(punches))
-        |> assign(holiday_pay_days: holiday_pay_days(punches, socket.assigns.current_company.id))
 
-      socket
-      |> assign(
-        normal_pay_days:
-          normal_pay_days(
-            emp.work_days_per_week |> Decimal.to_float(),
-            socket.assigns.days_in_month,
-            socket.assigns.sunday_count,
-            socket.assigns.total_day_worked
-          )
-      )
-      |> assign(
-        sunday_pay_days:
-          sunday_pay_days(
-            emp.work_days_per_week |> Decimal.to_float(),
-            socket.assigns.days_in_month,
-            socket.assigns.sunday_count,
-            socket.assigns.total_day_worked
-          )
-      )
+      socket |> update_punch_card(punches)
     else
       socket
       |> assign(punches: [])
@@ -695,9 +624,35 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
     end
   end
 
+  defp update_punch_card(socket, punches) do
+    days_in_month = days_in_month(punches)
+    total_day_worked = total_day_worked(punches)
+    sunday_count = sunday_count(punches)
+    ot_day_worked = ot_day_worked(punches)
+    normal_pay_days = normal_pay_days(punches)
+
+    socket
+    |> assign(total_day_worked: total_day_worked)
+    |> assign(ot_day_worked: ot_day_worked)
+    |> assign(days_in_month: days_in_month)
+    |> assign(sunday_count: sunday_count)
+    |> assign(holiday_pay_days: holiday_pay_days(punches, socket.assigns.current_company.id))
+    |> assign(normal_pay_days: normal_pay_days)
+    |> assign(
+      sunday_pay_days:
+        sunday_pay_days(
+          total_day_worked,
+          ot_day_worked,
+          sunday_count,
+          days_in_month,
+          socket.assigns.employee.work_days_per_week |> Decimal.to_float()
+        )
+    )
+  end
+
   defp holiday_pay_days(objs, com_id) do
     Enum.map(objs, fn x ->
-      if !is_nil(x.sholi_list) and x.nh / x.work_hours_per_day > 0 do
+      if !is_nil(x.sholi_list) and x.nh > x.work_hours_per_day / 2 do
         px = HR.punch_by_date(x.employee_id, Timex.shift(x.dd, days: -1), com_id)
         nx = HR.punch_by_date(x.employee_id, Timex.shift(x.dd, days: 1), com_id)
 
@@ -713,24 +668,19 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
     |> Enum.sum()
   end
 
-  defp sunday_pay_days(ewdpw, dim, sc, tdw) do
+  defp sunday_pay_days(tdw, ot, sc, dim, ewdpw) do
     rest_day_per_week = 7 - ewdpw
     expected_work_days = dim - sc * rest_day_per_week
 
-    cond do
-      tdw > expected_work_days -> tdw - expected_work_days
-      tdw <= expected_work_days -> 0
-    end
+    dw = tdw - ot
+    sw = dw - expected_work_days
+
+    if(sw > 0, do: sw, else: 0)
   end
 
-  defp normal_pay_days(ewdpw, dim, sc, tdw) do
-    rest_day_per_week = 7 - ewdpw
-    expected_work_days = dim - sc * rest_day_per_week
-
-    cond do
-      tdw > expected_work_days -> expected_work_days
-      tdw <= expected_work_days -> tdw
-    end
+  defp normal_pay_days(objs) do
+    Enum.map(objs, fn x -> x.nh / x.work_hours_per_day end)
+    |> Enum.sum()
   end
 
   defp sunday_count(objs) do
@@ -742,7 +692,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
   end
 
   defp total_day_worked(objs) do
-    Enum.map(objs, fn x -> x.nh / x.work_hours_per_day end)
+    Enum.map(objs, fn x -> x.wh / x.work_hours_per_day end)
     |> Enum.sum()
   end
 

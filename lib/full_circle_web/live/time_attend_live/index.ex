@@ -14,7 +14,7 @@ defmodule FullCircleWeb.TimeAttendLive.Index do
       <div class="flex justify-center mb-2">
         <.form for={%{}} id="search-form" phx-submit="search" autocomplete="off" class="w-full">
           <div class=" flex flex-row flex-wrap tracking-tighter text-sm">
-            <div class="w-[15.5rem] grow shrink">
+            <div class="w-[13rem] grow shrink">
               <label class="">Search Terms</label>
               <.input
                 id="search_terms"
@@ -24,7 +24,7 @@ defmodule FullCircleWeb.TimeAttendLive.Index do
                 placeholder="employee, flag or input medium..."
               />
             </div>
-            <div class="w-[9.5rem] grow-0 shrink-0">
+            <div class="w-[12rem] grow-0 shrink-0">
               <label>Punch Date From</label>
               <.input
                 name="search[punch_date]"
@@ -46,16 +46,13 @@ defmodule FullCircleWeb.TimeAttendLive.Index do
         <div class="w-[30%] border-b border-t border-amber-400 py-1">
           <%= gettext("Employee") %>
         </div>
-        <div class="w-[10%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Shift") %>
-        </div>
         <div class="w-[15%] border-b border-t border-amber-400 py-1">
           <%= gettext("Punch Date Time") %>
         </div>
-        <div class="w-[5%] border-b border-t border-amber-400 py-1">
+        <div class="w-[10%] border-b border-t border-amber-400 py-1">
           <%= gettext("IN/OUT") %>
         </div>
-        <div class="w-[10%] border-b border-t border-amber-400 py-1">
+        <div class="w-[15%] border-b border-t border-amber-400 py-1">
           <%= gettext("Medium") %>
         </div>
         <div class="w-[15%] border-b border-t border-amber-400 py-1">
@@ -248,6 +245,16 @@ defmodule FullCircleWeb.TimeAttendLive.Index do
   end
 
   defp filter_objects(socket, terms, reset, punch_date, page) do
+    punch_date =
+      if punch_date == "" do
+        ""
+      else
+        "#{punch_date} 00:00"
+        |> Timex.parse!("{RFC3339}")
+        |> Timex.to_datetime(socket.assigns.current_company.timezone)
+        |> Timex.to_datetime(:utc)
+      end
+
     objects =
       HR.timeattend_index_query(
         terms,

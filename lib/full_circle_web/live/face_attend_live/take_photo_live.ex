@@ -65,19 +65,20 @@ defmodule FullCircleWeb.TakePhotoLive do
 
   @impl true
   def handle_event("save_photo", %{"discriptor" => discriptor, "photo" => photo}, socket) do
-    {:ok, photo} = StdInterface.create(
-      EmployeePhoto,
-      "employee_photo",
-      %{
-        "photo_descriptor" => discriptor,
-        "photo_data" => photo,
-        "photo_type" => "png",
-        "flag" => "source",
-        "employee_id" => socket.assigns.emp_id
-      },
-      socket.assigns.current_company,
-      socket.assigns.current_user
-    )
+    {:ok, photo} =
+      StdInterface.create(
+        EmployeePhoto,
+        "employee_photo",
+        %{
+          "photo_descriptor" => discriptor,
+          "photo_data" => photo,
+          "photo_type" => "png",
+          "flag" => "source",
+          "employee_id" => socket.assigns.emp_id
+        },
+        socket.assigns.current_company,
+        socket.assigns.current_user
+      )
 
     PubSub.broadcast(
       FullCircle.PubSub,
@@ -130,8 +131,8 @@ defmodule FullCircleWeb.TakePhotoLive do
         <% end %>
       </div>
 
-      <div id="take-photo" phx-hook="takePhotoHuman" phx-update="ignore">
-        <canvas id="canvas" class="mx-auto mb-1"></canvas>
+      <div id="take-photo" phx-hook="takePhoto" phx-update="ignore">
+        <canvas id="canvas" class="mx-auto mb-1 w-11/12"></canvas>
         <video id="video" playsinline style="display: none" class="mb-1"></video>
         <div class="text-center mb-1">
           <label for="videoSelect">Camera</label>
@@ -142,7 +143,7 @@ defmodule FullCircleWeb.TakePhotoLive do
           <select id="zoomSelect" class="rounded h-8 py-1 pr-8 mb-1" />
         </div>
         <div id="retry" class="button blue w-1/2 mx-auto" style="display: none">
-          Scan Face
+          Take Again
         </div>
         <div id="snapBtn" class="button green w-1/2 mx-auto">
           Take Photo
@@ -152,7 +153,7 @@ defmodule FullCircleWeb.TakePhotoLive do
         </div>
         <div id="log" class="mt-1 text-center"></div>
       </div>
-      <div class="text-center mt-4">
+      <div class="text-center my-4">
         <.link navigate={~p"/companies/#{@current_company.id}/dashboard"} class="red button">
           <%= gettext("Back") %>
         </.link>

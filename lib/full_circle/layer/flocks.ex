@@ -2,7 +2,7 @@ defmodule FullCircle.Layer.Flock do
   use FullCircle.Schema
   import Ecto.Changeset
   import FullCircle.Helpers
-  import FullCircleWeb.Gettext
+  use Gettext, backend: FullCircleWeb.Gettext
 
   schema "flocks" do
     belongs_to :company, FullCircle.Sys.Company

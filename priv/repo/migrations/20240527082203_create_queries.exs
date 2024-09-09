@@ -30,9 +30,9 @@ defmodule FullCircle.Repo.Migrations.CreateQueries do
              name: :queries_unique_qry_name_in_company
            )
 
-    # execute "CREATE ROLE full_circle_query NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT LOGIN NOREPLICATION NOBYPASSRLS PASSWORD 'nyhlisted';"
+    execute "CREATE ROLE full_circle_query NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT LOGIN NOREPLICATION NOBYPASSRLS PASSWORD 'nyhlisted';"
 
-    # execute "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO full_circle_query;"
+    execute "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO full_circle_query;"
 
     create_function_tables()
   end
@@ -48,7 +48,7 @@ defmodule FullCircle.Repo.Migrations.CreateQueries do
 
     # execute "ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON FUNCTIONS FROM full_circle_query;"
 
-    # execute "DROP ROLE full_circle_query;"
+    execute "DROP ROLE full_circle_query;"
   end
 
   defp create_function_tables() do

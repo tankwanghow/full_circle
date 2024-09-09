@@ -17,24 +17,22 @@ const humanConfig = {
     // insightface: { enabled: true, modelPath: 'https://vladmandic.github.io/insightface/models/insightface-mobilenet-swish.json' }, // alternative model
     iris: { enabled: false }, // needed to determine gaze direction
     emotion: { enabled: false }, // not needed
-    antispoof: { enabled: false }, // enable optional antispoof module
-    liveness: { enabled: false } // enable optional liveness module
+    antispoof: { enabled: true }, // enable optional antispoof module
+    liveness: { enabled: true } // enable optional liveness module
   },
   body: { enabled: false },
   hand: { enabled: false },
   object: { enabled: false },
-  gesture: { enabled: false } // parses face and iris gestures
+  gesture: { enabled: true } // parses face and iris gestures
 }
 
 // const matchOptions = { order: 2, multiplier: 1000, min: 0.0, max: 1.0 }; // for embedding model
-const matchOptions = { order: 2, multiplier: 25, min: 0.2, max: 0.8 }; // for faceres model
+const matchOptions = { order: 2, multiplier: 20, min: 0.2, max: 0.8 }; // for faceres model
 
 const options = {
-  minConfidence: 0.5, // overal face confidence for box, face, gender, real, live
-  minSize: 150, // min input to face descriptor model before degradation
-  blinkMin: 10, // minimum duration of a valid blink
-  blinkMax: 800, // maximum duration of a valid blink
-  threshold: 0.7, // minimum similarity
+  minConfidence: 0.6, // overal face confidence for box, face, gender, real, live
+  minSize: 224, // min input to face descriptor model before degradation
+  threshold: 0.65, // minimum similarity
   mask: humanConfig.face.detector.mask,
   rotation: humanConfig.face.detector.rotation,
   ...matchOptions
@@ -56,7 +54,6 @@ human.draw.options.drawBoxes = true
 let db
 let descriptors
 let detectFPS = 0
-let drawFPS = 0
 const matches = { list: [], times: 5 }
 const timestamp = { detect: 0, draw: 0 } // holds information used to calculate performance and possible memory leaks
 
@@ -69,8 +66,10 @@ const dom = {
   zoom: document.getElementById("zoom"),
   inBtn: document.getElementById("inBtn"),
   outBtn: document.getElementById("outBtn"),
+  in_out: document.getElementById("in_out"),
   scanResultName: document.getElementById("scanResultName"),
   scanResultPhotos: document.getElementById("scanResultPhotos"),
+  compareList: document.getElementById("compareList")
 }
 
 const log = (...msg) => {
@@ -87,8 +86,8 @@ async function webCam() {
     audio: false,
     video: {
       deviceId: videoSource ? { exact: videoSource } : undefined,
-      width: { min: 240, ideal: 300 },
-      height: { min: 240, ideal: 300 }
+      width: { ideal: 640 },
+      height: { ideal: 640 }
     }
   }
   const stream = await navigator.mediaDevices.getUserMedia(cameraOptions)
@@ -130,18 +129,14 @@ async function detectionLoop() {
 }
 
 async function drawPerformance() {
-  const now = human.now()
-  drawFPS = Math.round(10000 / (now - timestamp.draw)) / 10
-  timestamp.draw = now
-
-  const ctx = canvas.getContext('2d', { willReadFrequently: true })
-  if (!ctx) return
-  ctx.font = "bold 15px sans"
-  ctx.fillStyle = "#AAFF00"
-  ctx.fillText(`detectFPS: ${detectFPS}`, 5, 20)
-  ctx.fillText(`drawFPS: ${drawFPS}`, 5, 40)
-
-  requestAnimationFrame(drawPerformance)
+  if (!dom.video.paused) {
+    const ctx = canvas.getContext('2d', { willReadFrequently: true })
+    if (!ctx) return
+    ctx.font = "bold 30px sans"
+    ctx.fillStyle = "#AAFF00"
+    ctx.fillText(`detectFPS: ${detectFPS}`, 10, 20)
+    requestAnimationFrame(drawPerformance)
+  }
 }
 
 async function detectFace() {
@@ -158,28 +153,33 @@ async function detectFace() {
 
   current.record = db[res.index] || null
 
+  // Uncomment to Log Match Faces
+  // dom.compareList.style.display = ""
+  // if (current.record) { 
+  //   insertMatchedImg(dom.compareList, current.record.image, Math.round(1000 * res.similarity) / 10, "w-1/12") 
+  // }
+
   if (current.record && (res.similarity > options.threshold)) {
     dom.scanResultPhotos.style.display = ""
-    if (matched(current.record.employee_id, current.record.image, Math.round(1000 * res.similarity) / 10)) {
+    if (matched(dom.scanResultPhotos, current.record.employee_id, current.record.image, Math.round(1000 * res.similarity) / 10)) {
       await dom.video.pause()
       dom.scanResultName.innerHTML = current.record.name
       setBodyBgColor("bg-green-300")
-      dom.inBtn.classList.remove("invisible")
-      dom.outBtn.classList.remove("invisible")
+      dom.in_out.style.display = ''
     }
   }
   return res.similarity > options.threshold
 }
 
-function insertMatchedImg(photo, similarity) {
+function insertMatchedImg(el, photo, similarity, klass) {
   const div = document.createElement('div')
   const img = document.createElement('img')
   const span = document.createElement('span')
   span.innerHTML = `${Math.round(similarity)}%`
   img.setAttribute('src', photo)
   img.setAttribute('class', 'rounded-xl')
-  div.setAttribute('class', 'w-1/5')
-  dom.scanResultPhotos.appendChild(div)
+  div.setAttribute('class', klass)
+  el.appendChild(div)
   div.appendChild(img)
   div.appendChild(span)
 }
@@ -205,16 +205,16 @@ function setNoMatch() {
   dom.scanResultName.innerHTML = "No Match !!!"
   dom.scanResultPhotos.style.display = "none"
   setBodyBgColor("bg-red-300")
-  dom.inBtn.classList.add("invisible")
-  dom.outBtn.classList.add("invisible")
+  dom.in_out.style.display = 'none'
   matches.list = []
   dom.scanResultPhotos.textContent = ''
+  dom.compareList.textContent = ''
 }
 
-function matched(id, image, similarity) {
+function matched(el, id, image, similarity) {
   if (matches.list.length < matches.times) {
     matches.list.push(id)
-    insertMatchedImg(image, similarity)
+    insertMatchedImg(el, image, similarity, "w-1/5")
     return false
   }
   if (matches.list.filter((v, i, ar) => ar.indexOf(v) === i).length == 1) {
@@ -222,6 +222,7 @@ function matched(id, image, similarity) {
   }
   else {
     matches.list = []
+    setNoMatch()
     return false
   }
 }

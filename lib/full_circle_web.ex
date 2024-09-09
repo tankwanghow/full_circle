@@ -17,7 +17,8 @@ defmodule FullCircleWeb do
   those modules here.
   """
 
-  def static_paths, do: ~w(assets fonts sounds images face-api-models human-models favicon.ico robots.txt)
+  def static_paths,
+    do: ~w(assets fonts sounds images face-api-models human-models favicon.ico robots.txt)
 
   def router do
     quote do
@@ -43,7 +44,7 @@ defmodule FullCircleWeb do
         layouts: [html: FullCircleWeb.Layouts]
 
       import Plug.Conn
-      import FullCircleWeb.Gettext
+      use Gettext, backend: FullCircleWeb.Gettext
 
       unquote(verified_routes())
     end
@@ -85,10 +86,11 @@ defmodule FullCircleWeb do
       import Phoenix.HTML
       # Core UI components and translation
       import FullCircleWeb.CoreComponents
-      import FullCircleWeb.Gettext
 
       # Shortcut for generating JS commands
       alias Phoenix.LiveView.JS
+
+      use Gettext, backend: FullCircleWeb.Gettext
 
       # Routes generation with the ~p sigil
       unquote(verified_routes())

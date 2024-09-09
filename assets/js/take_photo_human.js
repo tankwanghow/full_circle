@@ -6,25 +6,28 @@ const humanConfig = {
   cacheSensitivity: 0,
   modelBasePath: "/human-models",
   filter: { enabled: true, equalization: true }, // lets run with histogram equilizer
-  // debug: true,
+  debug: false,
   face: {
     enabled: true,
-    detector: { rotation: true, return: true, mask: false }, // return tensor is used to get detected face image
+    mesh: { enabled: true },
+    detector: { maxDetected: 1, rotation: true, return: true, mask: false }, // return tensor is used to get detected face image
     description: { enabled: true }, // default model for face descriptor extraction is faceres
-    iris: { enabled: true }, // needed to determine gaze direction
+    // mobilefacenet: { enabled: true, modelPath: 'https://vladmandic.github.io/human-models/models/mobilefacenet.json' }, // alternative model
+    // insightface: { enabled: true, modelPath: 'https://vladmandic.github.io/insightface/models/insightface-mobilenet-swish.json' }, // alternative model
+    iris: { enabled: false }, // needed to determine gaze direction
     emotion: { enabled: false }, // not needed
-    antispoof: { enabled: true }, // enable optional antispoof module
-    liveness: { enabled: true } // enable optional liveness module
+    antispoof: { enabled: false }, // enable optional antispoof module
+    liveness: { enabled: false } // enable optional liveness module
   },
   body: { enabled: false },
   hand: { enabled: false },
   object: { enabled: false },
-  gesture: { enabled: true } // parses face and iris gestures
+  gesture: { enabled: false } // parses face and iris gestures
 }
 
 const options = {
   minConfidence: 0.5, // overal face confidence for box, face, gender, real, live
-  minSize: 150, // min input to face descriptor model before degradation
+  minSize: 224, // min input to face descriptor model before degradation
   mask: humanConfig.face.detector.mask,
   rotation: humanConfig.face.detector.rotation
 }
@@ -32,13 +35,7 @@ const options = {
 const ok = {
   // must meet all rules
   faceCount: { status: false, val: 0 },
-  faceConfidence: { status: false, val: 0 },
-  facingCenter: { status: false, val: 0 },
   faceSize: { status: false, val: 0 },
-  antispoofCheck: { status: false, val: 0 },
-  livenessCheck: { status: false, val: 0 },
-  age: { status: false, val: 0 },
-  gender: { status: false, val: 0 },
   descriptor: { status: false, val: 0 },
   detectFPS: { status: undefined, val: 0 }, // mark detection fps performance
   drawFPS: { status: undefined, val: 0 }, // mark redraw fps performance
@@ -48,13 +45,7 @@ const ok = {
 const allOk = () =>
   ok.faceCount.status &&
   ok.faceSize.status &&
-  ok.facingCenter.status &&
-  ok.faceConfidence.status &&
-  ok.antispoofCheck.status &&
-  ok.livenessCheck.status &&
   ok.descriptor.status &&
-  ok.age.status &&
-  ok.gender.status &&
   ok.snapClicked.status
 
 const current = { face: null }
@@ -106,8 +97,8 @@ async function webCam() {
     audio: false,
     video: {
       deviceId: videoSource ? { exact: videoSource } : undefined,
-      width: { min: 240, ideal: 300 },
-      height: { min: 240, ideal: 300 }
+      width: { ideal: 640 },
+      height: { ideal: 640 }
     }
   }
   const stream = await navigator.mediaDevices.getUserMedia(cameraOptions)
@@ -146,18 +137,15 @@ function drawValidationTests() {
   let y = 10
   const ctx = canvas.getContext('2d', { willReadFrequently: true })
   if (!ctx) return
-  ctx.font = "bold 8px sans"
+  ctx.font = "bold 24px sans"
   for (const [key, val] of Object.entries(ok)) {
     if (typeof val.status === "boolean")
       ctx.fillStyle = val.status ? "#AAFF00" : "#FF5733"
     const status = val.status ? "ok" : "fail"
     var txt = `${key}: ${val.val === 0 ? status : val.val}`
-    y += 10
+    y += 30
     ctx.fillText(`${txt}`, 5, y)
   }
-  ctx.fillStyle = "#AAFF00"
-  ctx.fillText(`Backends: ${human.env.backends}`, 5, y + 10)
-  ctx.fillText(`Backend: ${human.config.backend}`, 5, y + 20)
 }
 
 async function validationLoop() {
@@ -179,14 +167,8 @@ async function validationLoop() {
       gestures.includes("blink left eye") ||
       gestures.includes("blink right eye")
     )
-      ok.facingCenter.status = gestures.includes("facing center")
     ok.faceConfidence.val =
       human.result.face[0].faceScore || human.result.face[0].boxScore || 0
-    ok.faceConfidence.status = ok.faceConfidence.val >= options.minConfidence
-    ok.antispoofCheck.val = human.result.face[0].real || 0
-    ok.antispoofCheck.status = ok.antispoofCheck.val >= options.minConfidence
-    ok.livenessCheck.val = human.result.face[0].live || 0
-    ok.livenessCheck.status = ok.livenessCheck.val >= options.minConfidence
     ok.faceSize.val = Math.min(
       human.result.face[0].box[2],
       human.result.face[0].box[3]
@@ -194,10 +176,6 @@ async function validationLoop() {
     ok.faceSize.status = ok.faceSize.val >= options.minSize
     ok.descriptor.val = human.result.face[0].embedding?.length || 0
     ok.descriptor.status = ok.descriptor.val > 0
-    ok.age.val = human.result.face[0].age || 0
-    ok.age.status = ok.age.val > 0
-    ok.gender.val = human.result.face[0].genderScore || 0
-    ok.gender.status = ok.gender.val >= options.minConfidence
   }
   // run again
   drawValidationTests()
@@ -211,7 +189,7 @@ async function validationLoop() {
     setTimeout(async () => {
       await validationLoop() // run validation loop until conditions are met
       resolve(human.result.face[0]) // recursive promise resolve
-    }, 40) // use to slow down refresh from max refresh rate to target of 30 fps
+    }, 250) // use to slow down refresh from max refresh rate to target of 30 fps
   })
 }
 
@@ -225,13 +203,6 @@ async function detectFace() {
 async function main() {
   // main entry point
   ok.faceCount.status = false
-  ok.faceConfidence.status = false
-  ok.facingCenter.status = false
-  ok.faceSize.status = false
-  ok.antispoofCheck.status = false
-  ok.livenessCheck.status = false
-  ok.age.status = false
-  ok.gender.status = false
   ok.snapClicked.status = false
 
   dom.retry.style = "display: none;"
@@ -260,7 +231,7 @@ async function main() {
   return detectFace()
 }
 
-export async function initTakePicture(phx_this) {
+export async function initTakePhoto(phx_this) {
   phx_liveview = phx_this
   phx_liveview.handleEvent('retry_from_lv', () => main())
 

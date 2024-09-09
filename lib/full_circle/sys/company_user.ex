@@ -1,7 +1,7 @@
 defmodule FullCircle.Sys.CompanyUser do
   use FullCircle.Schema
   import Ecto.Changeset
-  import FullCircleWeb.Gettext
+  use Gettext, backend: FullCircleWeb.Gettext
 
   schema "company_user" do
     field :role, :string
