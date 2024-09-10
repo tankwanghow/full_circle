@@ -45,11 +45,6 @@ defmodule FullCircleWeb.TimeAttendLive.PunchIndex do
           </div>
         </.form>
       </div>
-      <%!-- <div class="text-center mb-2">
-        <.link phx-click={:new_timeattend} class="blue button" id="new_timeattend">
-          <%= gettext("New Time Attendence") %>
-        </.link>
-      </div> --%>
       <div class="font-medium flex flex-row text-center tracking-tighter bg-amber-200">
         <div class="w-[25%] border-b border-t border-amber-400 py-1">
           <%= gettext("Employee") %>
@@ -95,28 +90,6 @@ defmodule FullCircleWeb.TimeAttendLive.PunchIndex do
       </div>
       <.infinite_scroll_footer ended={@end_of_timeline?} />
     </div>
-    <%!-- <.modal
-      :if={@live_action in [:new, :edit]}
-      id="timeattend-modal"
-      show
-      on_cancel={JS.push("modal_cancel")}
-      max_w="max-w-5xl"
-    >
-      <.live_component
-        module={FullCircleWeb.TimeAttendLive.FormComponent}
-        live_action={@live_action}
-        id={@obj.id || :new}
-        obj={@obj}
-        title={@title}
-        action={@live_action}
-        current_company={@current_company}
-        current_user={@current_user}
-        created_info={:created}
-        updated_info={:updated}
-        deleted_info={:deleted}
-        error_info={:error}
-      />
-    </.modal> --%>
     """
   end
 
@@ -135,6 +108,32 @@ defmodule FullCircleWeb.TimeAttendLive.PunchIndex do
       |> filter_objects("", true, Timex.today(), Timex.today() |> Timex.shift(days: 1), 1)
 
     {:ok, socket}
+  end
+
+  @impl true
+  def handle_event("edit_click", _, socket) do
+    {:noreply,
+     socket
+     |> filter_objects(
+       socket.assigns.search.employee,
+       false,
+       socket.assigns.search.sdate,
+       socket.assigns.search.edate,
+       socket.assigns.page + 1
+     )}
+  end
+
+  @impl true
+  def handle_event("lock_click", _, socket) do
+    {:noreply,
+     socket
+     |> filter_objects(
+       socket.assigns.search.employee,
+       false,
+       socket.assigns.search.sdate,
+       socket.assigns.search.edate,
+       socket.assigns.page + 1
+     )}
   end
 
   @impl true
@@ -175,111 +174,6 @@ defmodule FullCircleWeb.TimeAttendLive.PunchIndex do
      |> assign(obj: %FullCircle.HR.TimeAttend{})
      |> assign(title: gettext("New Attendence"))}
   end
-
-  # @impl true
-  # def handle_event("edit_timeattend", params, socket) do
-  #   ta =
-  #     HR.get_time_attendence!(
-  #       params["id"],
-  #       socket.assigns.current_company,
-  #       socket.assigns.current_user
-  #     )
-
-  #   {:noreply,
-  #    socket
-  #    |> assign(live_action: :edit)
-  #    |> assign(comp_id: params["comp-id"])
-  #    |> assign(obj: ta)
-  #    |> assign(title: gettext("Edit Attendence"))}
-  # end
-
-  # @impl true
-  # def handle_event("modal_cancel", _, socket) do
-  #   {:noreply, socket |> assign(live_action: nil)}
-  # end
-
-  # @impl true
-  # def handle_info({:deleted, obj}, socket) do
-  #   obj = HR.punch_query_by_id(obj.employee_id, obj.punch_time, socket.assigns.current_company.id)
-
-  #   send_update(self(), FullCircleWeb.TimeAttendLive.PunchIndexComponent,
-  #     id: socket.assigns.comp_id,
-  #     company: socket.assigns.current_company,
-  #     obj: obj,
-  #     ex_class: "shake"
-  #   )
-
-  #   send_update_after(
-  #     self(),
-  #     FullCircleWeb.TimeAttendLive.PunchIndexComponent,
-  #     [
-  #       id: socket.assigns.comp_id,
-  #       company: socket.assigns.current_company,
-  #       obj: obj,
-  #       ex_class: ""
-  #     ],
-  #     1000
-  #   )
-
-  #   {:noreply,
-  #    socket
-  #    |> assign(live_action: nil)
-  #    |> put_flash(:success, "#{gettext("Deleted!!")}")}
-  # end
-
-  # @impl true
-  # def handle_info({:created, obj}, socket) do
-  #   obj = HR.punch_query_by_id(obj.employee_id, obj.punch_time, socket.assigns.current_company.id)
-
-  #   send_update(
-  #     self(),
-  #     FullCircleWeb.TimeAttendLive.PunchIndexComponent,
-  #     id: "#{obj.id}",
-  #     company: socket.assigns.current_company,
-  #     obj: obj,
-  #     ex_class: "shake"
-  #   )
-
-  #   send_update_after(
-  #     self(),
-  #     FullCircleWeb.TimeAttendLive.PunchIndexComponent,
-  #     [
-  #       id: "#{obj.id}",
-  #       company: socket.assigns.current_company,
-  #       obj: obj,
-  #       ex_class: ""
-  #     ],
-  #     1000
-  #   )
-
-  #   {:noreply, socket |> assign(live_action: nil)}
-  # end
-
-  # @impl true
-  # def handle_info({:updated, obj}, socket) do
-  #   obj = HR.punch_query_by_id(obj.employee_id, obj.punch_time, socket.assigns.current_company.id)
-
-  #   send_update(self(), FullCircleWeb.TimeAttendLive.PunchIndexComponent,
-  #     id: socket.assigns.comp_id,
-  #     obj: obj,
-  #     company: socket.assigns.current_company,
-  #     ex_class: "shake"
-  #   )
-
-  #   send_update_after(
-  #     self(),
-  #     FullCircleWeb.TimeAttendLive.PunchIndexComponent,
-  #     [
-  #       id: socket.assigns.comp_id,
-  #       company: socket.assigns.current_company,
-  #       obj: obj,
-  #       ex_class: ""
-  #     ],
-  #     1000
-  #   )
-
-  #   {:noreply, socket |> assign(live_action: nil)}
-  # end
 
   defp filter_objects(socket, employee, reset, sdate, edate, page) do
     objects =

@@ -29,8 +29,11 @@ defmodule FullCircleWeb.TimeAttendLive.PunchIndexComponent do
     tis =
       Enum.map(1..6, fn i ->
         Enum.at(tis, i - 1) ||
-        {nil, "_new_#{FullCircle.Helpers.gen_temp_id(31)}", "normal",
-        if(Integer.is_odd(i), do: "#{ceil(i/2)}_IN_#{ceil(i/2)}", else: "#{ceil(i/2)}_OUT_#{ceil(i/2)}"), nil}
+          {nil, "_new_#{FullCircle.Helpers.gen_temp_id(31)}", "normal",
+           if(Integer.is_odd(i),
+             do: "#{ceil(i / 2)}_IN_#{ceil(i / 2)}",
+             else: "#{ceil(i / 2)}_OUT_#{ceil(i / 2)}"
+           ), nil}
       end)
 
     {:ok, socket |> assign(assigns) |> assign(yw: yw) |> assign(tis: tis)}

@@ -99,10 +99,11 @@ defmodule FullCircle.HR.TimeAttend do
     id = fetch_field!(cs, :id)
 
     lpr = last_punch_record(id, emp_id, com_id)
+    diff = Timex.diff(punch_time, lpr.punch_time, :minute)
 
     cond do
       is_nil(lpr) and String.contains?(flag, "OUT") ->
-        add_error(cs, :flag, "NO IN RECORD!!")
+        add_error(cs, :flag, "NO 'IN' RECORD!!")
 
       is_nil(lpr) ->
         put_change(cs, :flag, mold_punch_time_flag(lpr.flag, flag))
@@ -110,15 +111,17 @@ defmodule FullCircle.HR.TimeAttend do
       extract_flag_inout(lpr.flag) == flag ->
         add_error(cs, :flag, "DOUBLE #{flag}")
 
-      Timex.compare(punch_time, lpr.punch_time, :minute) == 1 ->
+      diff < 3 ->
+        add_error(cs, :punch_time, "need 3 minute in between punches")
+
+      diff / 60 > 12 and !String.contains?(flag, "IN") ->
+        add_error(cs, :punch_time, "more than 12 hours")
+
+      diff / 60 > 12 and String.contains?(flag, "IN") ->
         put_change(cs, :flag, mold_punch_time_flag(lpr.flag, flag))
 
-      Timex.compare(punch_time, lpr.punch_time, :minute) != 1 ->
-        add_error(
-          cs,
-          :punch_time,
-          "#{FullCircleWeb.Helpers.format_datetime(lpr.punch_time, FullCircle.Sys.get_company!(com_id))} Punched #{lpr.flag}"
-        )
+      diff >= 3 and diff / 60 <= 12 ->
+        put_change(cs, :flag, mold_punch_time_flag(lpr.flag, flag))
     end
   end
 

@@ -82,7 +82,11 @@ defmodule FullCircle.MixProject do
       test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
       "assets.build": ["tailwind full_circle", "esbuild full_circle"],
-      "assets.deploy": ["tailwind full_circle --minify", "esbuild full_circle --minify", "phx.digest"]
+      "assets.deploy": [
+        "tailwind full_circle --minify",
+        "esbuild full_circle --minify",
+        "phx.digest"
+      ]
     ]
   end
 end

@@ -7,7 +7,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchTimeComponent do
   def mount(socket) do
     {:ok,
      socket
-     |> assign(border_color: "bg-blue-200")
+     |> assign(bg_color: "bg-transparent")
      |> assign(wh: 0)
      |> assign(nh: 0)
      |> assign(ot: 0)}
@@ -44,7 +44,11 @@ defmodule FullCircleWeb.TimeAttendLive.PunchTimeComponent do
           socket
       end
 
-    send(self(), {:updated_punch, socket.assigns.obj.id, socket.assigns.tis, socket.assigns.wh, socket.assigns.nh, socket.assigns.ot})
+    send(
+      self(),
+      {:updated_punch, socket.assigns.obj.id, socket.assigns.tis, socket.assigns.wh,
+       socket.assigns.nh, socket.assigns.ot}
+    )
 
     {:noreply, socket}
   end
@@ -60,7 +64,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchTimeComponent do
     HR.delete_time_attendence_by_id(taid, socket.assigns.company, socket.assigns.user)
 
     socket
-    |> assign(border_color: "bg-green-200")
+    |> assign(bg_color: "bg-transparent")
     |> assign(
       tis:
         List.replace_at(
@@ -102,7 +106,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchTimeComponent do
     ) do
       {:ok, obj} ->
         socket
-        |> assign(border_color: "bg-green-200")
+        |> assign(bg_color: "bg-transparent")
         |> assign(
           tis:
             List.replace_at(
@@ -114,10 +118,10 @@ defmodule FullCircleWeb.TimeAttendLive.PunchTimeComponent do
         |> update_working_hours
 
       {:error, _cs} ->
-        socket |> assign(border_color: "bg-rose-200")
+        socket |> assign(bg_color: "bg-red-300")
 
       :not_authorise ->
-        socket |> assign(border_color: "bg-rose-200")
+        socket |> assign(bg_color: "bg-red-300")
     end
   end
 
@@ -155,7 +159,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchTimeComponent do
     ) do
       {:ok, obj} ->
         socket
-        |> assign(border_color: "bg-green-200")
+        |> assign(bg_color: "bg-transparent")
         |> assign(
           tis:
             List.replace_at(
@@ -167,10 +171,10 @@ defmodule FullCircleWeb.TimeAttendLive.PunchTimeComponent do
         |> update_working_hours
 
       {:error, _cs} ->
-        socket |> assign(border_color: "bg-rose-200")
+        socket |> assign(bg_color: "bg-red-300")
 
       :not_authorise ->
-        socket |> assign(border_color: "bg-rose-200")
+        socket |> assign(bg_color: "bg-red-300")
     end
   end
 
@@ -184,15 +188,28 @@ defmodule FullCircleWeb.TimeAttendLive.PunchTimeComponent do
       {_ti6, id6, st6, fl6, dt6}
     ] = socket.assigns.tis
 
-    wh =
-      HR.wh([
-        [dt1, id1, st1, fl1],
-        [dt2, id2, st2, fl2],
-        [dt3, id3, st3, fl3],
-        [dt4, id4, st4, fl4],
-        [dt5, id5, st5, fl5],
-        [dt6, id6, st6, fl6]
-      ])
+    tl = [
+      [dt1, id1, st1, fl1],
+      [dt2, id2, st2, fl2],
+      [dt3, id3, st3, fl3],
+      [dt4, id4, st4, fl4],
+      [dt5, id5, st5, fl5],
+      [dt6, id6, st6, fl6]
+    ]
+
+    wh = HR.wh(tl)
+
+    socket =
+      if tl
+         |> Enum.filter(fn x -> !is_nil(Enum.at(x, 0)) end)
+         |> Enum.sort_by(fn x -> Enum.at(x, 3) end) !=
+           tl
+           |> Enum.filter(fn x -> !is_nil(Enum.at(x, 0)) end)
+           |> Enum.sort_by(fn x -> Enum.at(x, 0) end) do
+        socket |> assign(bg_color: "bg-red-300")
+      else
+        socket |> assign(bg_color: "bg-transparent")
+      end
 
     socket
     |> assign(wh: wh)
@@ -209,7 +226,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchTimeComponent do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="flex flex-nowrap">
+    <div class="flex flex-nowrap gap-1">
       <%= if !is_nil(@tis) do %>
         <%= for o <- @tis do %>
           <% {time, id, status, flag, datetime} = o %>
@@ -229,20 +246,20 @@ defmodule FullCircleWeb.TimeAttendLive.PunchTimeComponent do
               name="punch_time"
               type="time"
               value={time}
-              class={"rounded h-6 #{@border_color} w-full text-center"}
+              class={"rounded h-6 #{@bg_color} w-full text-center text-black"}
               phx-debounce="blur"
               id={id}
             />
           </.form>
         <% end %>
       <% end %>
-      <div class="worked-hours w-[10%] border-b text-center border-gray-400">
+      <div class="worked-hours w-[10%] text-center">
         <%= Number.Delimit.number_to_delimited(@wh) %>
       </div>
-      <div class="normal-hours w-[10%] border-b text-center border-gray-400">
+      <div class="normal-hours w-[10%] text-center">
         <%= Number.Delimit.number_to_delimited(@nh) %>
       </div>
-      <div class="ot-hours w-[10%] border-b text-center border-gray-400">
+      <div class="ot-hours w-[10%] text-center">
         <%= Number.Delimit.number_to_delimited(@ot) %>
       </div>
     </div>

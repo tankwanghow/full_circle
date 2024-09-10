@@ -346,16 +346,15 @@ defmodule FullCircleWeb.Router do
     end
 
     live_session :require_authenticated_user_n_active_company_recon,
-    on_mount: [
-      {FullCircleWeb.UserAuth, :ensure_authenticated},
-      {FullCircleWeb.Locale, :set_locale},
-      {FullCircleWeb.ActiveCompany, :assign_active_company}
-    ],
-    root_layout: {FullCircleWeb.Layouts, :recon} do
-    live("/face_id", FaceIdLive)
-    live("/take_photo", TakePhotoLive)
-
-  end
+      on_mount: [
+        {FullCircleWeb.UserAuth, :ensure_authenticated},
+        {FullCircleWeb.Locale, :set_locale},
+        {FullCircleWeb.ActiveCompany, :assign_active_company}
+      ],
+      root_layout: {FullCircleWeb.Layouts, :recon} do
+      live("/face_id", FaceIdLive)
+      live("/take_photo", TakePhotoLive)
+    end
   end
 
   scope "/", FullCircleWeb do

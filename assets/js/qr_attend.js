@@ -15,7 +15,9 @@ const dom = {
   badSound: document.getElementById('bad-sound'),
   inOut: document.getElementById("in_out"),
   inBtn: document.getElementById("inBtn"),
-  outBtn: document.getElementById("outBtn")
+  outBtn: document.getElementById("outBtn"),
+  spinner: document.getElementById("spinner"),
+  backBtn: document.getElementById("backBtn")
 }
 
 export async function initPunchCamera(lv) {
@@ -46,6 +48,8 @@ async function rescan() {
   dom.camera.style.display = ''
   dom.scannedResult.style.display = 'none'
   dom.inOut.style.display = 'none'
+  dom.backBtn.style.display = ''
+  dom.spinner.style.display = 'none'
   setStatusBgColor('bg-orange-200', 'bg-green-400')
   camera.resume()
 }
@@ -105,11 +109,15 @@ function scanResult(data) {
       dom.inOut.style.display = 'none'
       setStatusBgColor('bg-rose-200', 'bg-rose-400')
       dom.badSound.play()
+      dom.backBtn.style.display = "none"
+      dom.spinner.style.display = ''
       setTimeout(async () => { await rescan() }, 3000)
       break;
     case 'success':
       setStatusBgColor('bg-green-200', 'bg-green-400')
       showResult(data)
+      dom.backBtn.style.display = "none"
+      dom.spinner.style.display = 'none'
       dom.goodSound.play()
       dom.inOut.style.display = ''
       break;
@@ -122,12 +130,16 @@ function punchResult(data) {
       showResult(data)
       dom.inOut.style.display = 'none'  
       setStatusBgColor('bg-rose-200', 'bg-rose-400')
+      dom.backBtn.style.display = "none"
+      dom.spinner.style.display = ''
       dom.badSound.play()
       setTimeout(async () => { await rescan() }, 3000)
       break;
     case 'success':
       setStatusBgColor('bg-green-200', 'bg-green-400')
       showResult(data)
+      dom.backBtn.style.display = "none"
+      dom.spinner.style.display = ''
       dom.goodSound.play()
       dom.inOut.style.display = ''
       setTimeout(async () => { await rescan() }, 2000)

@@ -1168,7 +1168,7 @@ defmodule FullCircle.HR do
   end
 
   defp punch_query_by_company_id(sdate, edate, com_id) do
-    "select d2.id::varchar || d2.dd::varchar as idg, d2.dd, d2.name, d2.work_hours_per_day,
+    "select d2.id::varchar || d2.dd::varchar as idg, d2.dd, d2.name, d2.work_hours_per_day, p2.timezone,
             d2.work_days_per_week, d2.work_days_per_month, d2.id as employee_id, p2.time_list, holi_list, sholi_list
        from (select d1.dd, d1.name, d1.id, d1.status, d1.id_no, d1.work_hours_per_day,
                     d1.work_days_per_week, d1.work_days_per_month,
@@ -1183,13 +1183,13 @@ defmodule FullCircle.HR do
                       group by d1.dd, d1.name, d1.id, d1.status, d1.id_no,
                                d1.work_hours_per_day, d1.work_days_per_week,
                                d1.work_days_per_month) d2 left outer join
-              (select ta.employee_id, min(ta.punch_time)::date as pt, min(ta.punch_time) as punch_time,
+              (select ta.employee_id, min(ta.punch_time)::date as pt, min(ta.punch_time) as punch_time, c.timezone,
                       array_agg(ta.punch_time::varchar || '|' || ta.id::varchar || '|' || ta.status || '|' || ta.flag order by ta.flag) time_list
                  from time_attendences ta inner join companies c on c.id = ta.company_id,
                       generate_series('#{sdate}'::date, '#{edate}'::date, '1 day') as dd
                 where ta.company_id = '#{com_id}'
                   and ta.punch_time::date = dd::date
-                group by ta.employee_id, dd) p2
+                group by c.timezone, ta.employee_id, dd) p2
          on p2.pt = d2.dd
         and d2.id = p2.employee_id
       where true"

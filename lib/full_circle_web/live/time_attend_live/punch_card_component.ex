@@ -20,10 +20,10 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCardComponent do
             {nil, id, status, inout, nil}
           else
             {Timex.format!(
-              Timex.to_datetime(time, assigns.company.timezone),
-              "%H:%M",
-              :strftime
-            ), id, status, inout, Timex.to_datetime(time, assigns.company.timezone)}
+               Timex.to_datetime(time, assigns.company.timezone),
+               "%H:%M",
+               :strftime
+             ), id, status, inout, Timex.to_datetime(time, assigns.company.timezone)}
           end
         end)
       else
@@ -53,10 +53,10 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCardComponent do
     <div
       id={@id}
       class={[
-        "flex flex-row text-center",
+        "flex flex-row text-center bg-gray-200 hover:bg-gray-30",
         if(@obj.dd |> is_sunday(),
-          do: "bg-rose-200 hover:bg-rose-300",
-          else: "bg-gray-200 hover:bg-gray-300"
+          do: "text-red-500",
+          else: "text-black"
         ),
         "punch-rows"
       ]}

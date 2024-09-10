@@ -2,7 +2,6 @@ defmodule FullCircleWeb.Helpers do
   use Phoenix.Component
   use Gettext, backend: MyApp.Gettext
 
-
   def assign_got_error(socket, assign_field, cs, list_name) do
     assign(
       socket,

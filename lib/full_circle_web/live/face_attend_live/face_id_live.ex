@@ -70,7 +70,12 @@ defmodule FullCircleWeb.FaceIdLive do
         </div>
         <div id="scanResultName" class="mt-1 font-bold text-xl text-blue-700"></div>
         <div id="scanResultPhotos" class="flex p-1 gap-1 mx-auto w-11/12"></div>
-        <div id="compareList" style="display: none;" class="flex flex-wrap p-1 gap-1 mx-auto border border-red-400 text-xs w-11/12"></div>
+        <div
+          id="compareList"
+          style="display: none;"
+          class="flex flex-wrap p-1 gap-1 mx-auto border border-red-400 text-xs w-11/12"
+        >
+        </div>
         <div id="log" class="mt-1 text-center"></div>
       </div>
       <div class="text-center my-4">
