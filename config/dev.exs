@@ -27,9 +27,8 @@ config :full_circle, uploads_dir: "uploads"
 # debugging and code reloading.
 #
 # The watchers configuration can be used to run external
-# watchers to your application. For example, we use it
-# with esbuild to bundle .js and .css sources.
-
+# watchers to your application. For example, we can use it
+# to bundle .js and .css sources.
 config :full_circle, FullCircleWeb.Endpoint,
   # Binding to loopback ipv4 address prevents access from other machines.
   # Change to `ip: {0, 0, 0, 0}` to allow access from other machines.
@@ -46,8 +45,8 @@ config :full_circle, FullCircleWeb.Endpoint,
   debug_errors: true,
   secret_key_base: "dRTUHbS3aq8lgejsXxsgdi6zpwPwdDvoc++s3Bjr++QMBnGcEsl9KkDgJiVz2W6S",
   watchers: [
-    esbuild: {Esbuild, :install_and_run, [:default, ~w(--sourcemap=inline --watch)]},
-    tailwind: {Tailwind, :install_and_run, [:default, ~w(--watch)]}
+    esbuild: {Esbuild, :install_and_run, [:full_circle, ~w(--sourcemap=inline --watch)]},
+    tailwind: {Tailwind, :install_and_run, [:full_circle, ~w(--watch)]}
   ]
 
 # ## SSL Support
@@ -77,7 +76,7 @@ config :full_circle, FullCircleWeb.Endpoint,
 config :full_circle, FullCircleWeb.Endpoint,
   live_reload: [
     patterns: [
-      ~r"priv/static/.*(js|css|png|jpeg|jpg|gif|svg|mp3)$",
+      ~r"priv/static/(?!uploads/).*(js|css|png|jpeg|jpg|gif|svg|mp3)$",
       ~r"priv/gettext/.*(po)$",
       ~r"lib/full_circle_web/(controllers|live|components)/.*(ex|heex)$"
     ]
@@ -95,6 +94,12 @@ config :phoenix, :stacktrace_depth, 20
 
 # Initialize plugs at runtime for faster development compilation
 config :phoenix, :plug_init_mode, :runtime
+
+config :phoenix_live_view,
+  # Include HEEx debug annotations as HTML comments in rendered markup
+  debug_heex_annotations: true,
+  # Enable helpful, but potentially expensive runtime checks
+  enable_expensive_runtime_checks: true
 
 # Configures the mailer
 #
