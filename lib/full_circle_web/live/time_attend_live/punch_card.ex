@@ -278,7 +278,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
       id="salarynote-modal"
       show
       on_cancel={JS.push("modal_cancel")}
-      max_w="max-w-3xl"
+      max_w="max-w-4xl"
     >
       <.live_component
         module={FullCircleWeb.TimeAttendLive.SalaryNoteFormComponent}

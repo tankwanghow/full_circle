@@ -283,9 +283,9 @@ defmodule FullCircleWeb.CoreComponents do
   attr(:label, :string, default: nil)
   attr(:value, :any)
   attr(:url, :string, default: nil)
-  attr(:feedback, :boolean, default: false)
   attr(:"phx-debounce", :string, default: "blur")
   attr(:klass, :string, default: "")
+  attr(:feedback, :boolean, default: false)
 
   attr(:type, :string,
     default: "text",
@@ -311,7 +311,11 @@ defmodule FullCircleWeb.CoreComponents do
   slot(:inner_block)
 
   def input(%{field: %Phoenix.HTML.FormField{} = field} = assigns) do
-    errors = if Phoenix.Component.used_input?(field), do: field.errors, else: []
+    errors =
+      if(Phoenix.Component.used_input?(field) || assigns.feedback,
+        do: Enum.uniq(field.errors),
+        else: []
+      )
 
     assigns
     |> assign(field: nil, id: assigns.id || field.id)
@@ -437,10 +441,10 @@ defmodule FullCircleWeb.CoreComponents do
 
   def error(assigns) do
     ~H"""
-    <span class="text-sm text-rose-600 phx-no-feedback:hidden tracking-tighter">
-      <.icon name="hero-x-circle-mini" class="h-3 w-3" />
+    <p class="flex text-xs leading-5 text-rose-600">
+      <.icon name="hero-exclamation-circle-mini" class="mt-0.5 h-4 w-4 flex-none" />
       <%= render_slot(@inner_block) %>
-    </span>
+    </p>
     """
   end
 
@@ -791,12 +795,14 @@ defmodule FullCircleWeb.CoreComponents do
   end
 
   def to_fc_time_format(dt, com, flag \\ :full) do
-    format = case flag do
-      :date -> "%F"
-      :time -> "%r"
-      :datetime -> "%F %r"
-    _ -> "%F %r %Z"
-    end
+    format =
+      case flag do
+        :date -> "%F"
+        :time -> "%r"
+        :datetime -> "%F %r"
+        _ -> "%F %r %Z"
+      end
+
     Timex.format!(Timex.Timezone.convert(dt, com.timezone), format, :strftime)
   end
 
