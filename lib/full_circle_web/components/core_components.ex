@@ -151,7 +151,8 @@ defmodule FullCircleWeb.CoreComponents do
       phx-click={JS.push("lv:clear-flash", value: %{key: @kind}) |> hide("##{@id}")}
       role="alert"
       class={[
-        "shake fixed top-10 right-72 w-80 sm:w-96 z-50 rounded-lg p-3 ring-1",
+        "fixed top-10 left-1/2 transform -translate-x-1/2 shake",
+        "w-80 z-50 rounded-lg p-3 ring-1",
         @kind == :info && "bg-emerald-50 text-emerald-800 ring-emerald-500 fill-cyan-900",
         @kind == :warn && "bg-amber-50 text-amber-800 ring-amber-500 fill-amber-900",
         @kind == :error && "bg-rose-50 text-rose-900 shadow-md ring-rose-500 fill-rose-900"

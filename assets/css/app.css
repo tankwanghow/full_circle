@@ -92,8 +92,8 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 }
 
 .shake {
-  animation: shake 0.5s;
-  animation-iteration-count: 3;
+  animation: shake 0.2s;
+  animation-iteration-count: 10;
 }
 
 .slow-hide {
@@ -218,47 +218,16 @@ input[disabled] {
 }
 
 @keyframes shake {
-  0% {
-    transform: translate(1px, 1px);
+  0%, 100% {
+    transform: translateX(-50%);
   }
-
-  10% {
-    transform: translate(-1px, -2px);
+  25% {
+    transform: translateX(calc(-50% - 5px));
   }
-
-  20% {
-    transform: translate(-3px, 0px);
-  }
-
-  30% {
-    transform: translate(3px, 2px);
-  }
-
-  40% {
-    transform: translate(1px, -1px);
-  }
-
   50% {
-    transform: translate(-1px, 2px);
+    transform: translateX(calc(-50% + 5px));
   }
-
-  60% {
-    transform: translate(-3px, 1px);
-  }
-
-  70% {
-    transform: translate(3px, 1px);
-  }
-
-  80% {
-    transform: translate(-1px, -1px);
-  }
-
-  90% {
-    transform: translate(1px, 2px);
-  }
-
-  100% {
-    transform: translate(1px, -2px);
+  75% {
+    transform: translateX(calc(-50% - 5px));
   }
 }
