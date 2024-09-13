@@ -80,11 +80,9 @@ Hooks.calculatorInput = {
     this.el.addEventListener("blur", e => {
       if (!/[a-zA-Z]+/.test(this.el.value)) {
         try {
-          var eval2 = eval
-          val = eval2(this.el.value)
-          this.el.value = val
+          this.el.value = eval(this.el.value)
         } catch (error) {
-
+          console.log(error)
         }
       }
     })
