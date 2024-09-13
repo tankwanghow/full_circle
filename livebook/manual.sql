@@ -1,41 +1,40 @@
 INSERT INTO public.time_attendences
-  (id, employee_id, user_id, company_id, flag, input_medium, punch_time, shift_id, status, inserted_at, updated_at)
+  (id, employee_id, user_id, company_id, flag, input_medium, punch_time, status, inserted_at, updated_at)
   select
     gen_random_uuid(),
     e.id,
-    'ebc7770b-940f-47a1-82d5-d38ea5c80eb3',
-    '66abd687-cfb8-47a7-827d-f8c39b2f8df5',
+    '1c0e02d7-ce53-48bf-baa1-9ce601e0f5bc',
+    'a2edcb0f-e9fb-4a8d-888b-61cd334210ba',
     it1.flag,
     'WebCamT',
     it1.punch_time,
-    substring(it1.punch_time::varchar, 1, 10) || '-A',
     'normal', now(), now()
   from
     employees e,
     (
     select
-      'IN' as flag,
+      '1_IN_1' as flag,
       (generate_series::date || ' ' || '8:' || (random() * 30)::integer::varchar || ' +08')::timestamptz as punch_time
     from
       generate_series('2020-01-01',
       '2023-10-31',
       interval '1 day') union all
       select
-      'OUT' as flag,
+      '1_OUT_1' as flag,
       (generate_series::date || ' ' || '12:' || (random() * 30)::integer::varchar || ' +08')::timestamptz as punch_time
     from
       generate_series('2020-01-01',
       '2023-10-31',
       interval '1 day') union all
       select
-      'IN' as flag,
+      '2_IN_2' as flag,
       (generate_series::date || ' ' || '13:' || (random() * 30)::integer::varchar || ' +08')::timestamptz as punch_time
     from
       generate_series('2020-01-01',
       '2023-10-31',
       interval '1 day') union all
       select
-      'OUT' as flag,
+      '2_OUT_2' as flag,
       (generate_series::date || ' ' || '17:' || (random() * 30)::integer::varchar || ' +08')::timestamptz as punch_time
     from
       generate_series('2020-01-01',
