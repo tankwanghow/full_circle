@@ -9,12 +9,10 @@
   "types": "types/human.d.ts",
   "exports": {
     "node": {
+      "module": "./dist/human.node.js",
       "require": "./dist/human.node.js",
-      "import": "./dist/human.node.js",
-      "module": "./dist/human.node.js"
+      "import": "./dist/human.node.js"
     },
-    "require": "./dist/human.node.js",
-    "import": "./dist/human.esm.js",
     "script": "./dist/human.js",
     "module": "./dist/human.esm.js",
     "types": "./types/human.d.ts",
@@ -29,7 +27,9 @@
     "dist/human.node-wasm": "./dist/human.node-wasm.js",
     "dist/human.node-wasm.js": "./dist/human.node-wasm.js",
     "dist/human.node-gpu": "./dist/human.node-gpu.js",
-    "dist/human.node-gpu.js": "./dist/human.node-gpu.js"
+    "dist/human.node-gpu.js": "./dist/human.node-gpu.js",
+    "require": "./dist/human.node.js",
+    "import": "./dist/human.esm.js"
   },
   "author": "Vladimir Mandic <mandic00@live.com>",
   "bugs": {

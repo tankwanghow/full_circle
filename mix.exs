@@ -5,7 +5,7 @@ defmodule FullCircle.MixProject do
     [
       app: :full_circle,
       version: "1.0.0",
-      elixir: "~> 1.16.3",
+      elixir: "~> 1.17.2",
       elixirc_paths: elixirc_paths(Mix.env()),
       # elixirc_options: [debug_info: Mix.env() == :dev],
       start_permanent: Mix.env() == :prod,

@@ -116,6 +116,7 @@ defmodule FullCircleWeb.CompanyLive.Form do
   def mount(params, session, socket) do
     socket =
       socket
+      |> assign(:full_screen_app?, false)
       |> assign(:current_company, session["current_company"])
       |> assign(:current_role, session["current_role"])
 

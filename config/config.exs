@@ -46,7 +46,7 @@ config :full_circle, FullCircleWeb.Endpoint,
 
 # Configure esbuild (the version is required)
 config :esbuild,
-  version: "0.19.11",
+  version: "0.23.1",
   full_circle: [
     args: ~w(js/app.js js/tri_autocomplete.js js/take_photo_human.js
              js/face_id.js js/qr_attend.js
