@@ -6,6 +6,14 @@ defmodule FullCircleWeb.ReportLive.HouseFeed do
     socket =
       socket
       |> assign(page_title: "Feed Listing")
+      |> assign(
+        settings:
+          FullCircle.Sys.load_settings(
+            "HouseFeed",
+            socket.assigns.current_company,
+            socket.assigns.current_user
+          )
+      )
 
     {:ok, socket}
   end
@@ -16,13 +24,19 @@ defmodule FullCircleWeb.ReportLive.HouseFeed do
 
     report = params["report"] || ""
     field = params["field"] || "feed_type"
+
+    feed_str =
+      params["feed_str"] || Enum.at(socket.assigns.settings, 0).value
+
     month = params["month"] || ""
     year = params["year"] || ""
 
     {:noreply,
      socket
-     |> assign(search: %{report: report, month: month, year: year, field: field})
-     |> filter_transactions(report, month, year, field)}
+     |> assign(
+       search: %{report: report, month: month, year: year, feed_str: feed_str, field: field}
+     )
+     |> filter_transactions(report, month, year, feed_str, field)}
   end
 
   @impl true
@@ -33,7 +47,8 @@ defmodule FullCircleWeb.ReportLive.HouseFeed do
             "report" => report,
             "month" => month,
             "year" => year,
-            "field" => field
+            "field" => field,
+            "feed_str" => feed_str
           }
         },
         socket
@@ -42,7 +57,8 @@ defmodule FullCircleWeb.ReportLive.HouseFeed do
       "search[report]" => report,
       "search[month]" => month,
       "search[year]" => year,
-      "search[field]" => field
+      "search[field]" => field,
+      "search[feed_str]" => feed_str
     }
 
     url =
@@ -53,10 +69,13 @@ defmodule FullCircleWeb.ReportLive.HouseFeed do
      |> push_navigate(to: url)}
   end
 
-  defp filter_transactions(socket, _report, month, year, field) do
+  defp filter_transactions(socket, _report, month, year, feed_str, field) do
     current_company = socket.assigns.current_company
 
+    setting = Enum.at(socket.assigns.settings, 0)
+
     socket
+    |> assign(settings: [FullCircle.Sys.update_setting(setting, feed_str)])
     |> assign_async(
       :result,
       fn ->
@@ -70,6 +89,7 @@ defmodule FullCircleWeb.ReportLive.HouseFeed do
                  month,
                  year,
                  current_company.id,
+                 feed_str,
                  field
                )
                |> FullCircle.Helpers.exec_query_row_col()
@@ -90,7 +110,7 @@ defmodule FullCircleWeb.ReportLive.HouseFeed do
             <div class="hidden">
               <.input id="search_report" name="search[report]" value={@search.report} />
             </div>
-            <div class="w-[15%]">
+            <div class="w-[8%]">
               <.input
                 name="search[field]"
                 id="search_field"
@@ -102,6 +122,14 @@ defmodule FullCircleWeb.ReportLive.HouseFeed do
                 ]}
                 type="select"
                 label={gettext("Field")}
+              />
+            </div>
+            <div class="w-[40%]">
+              <.input
+                name="search[feed_str]"
+                id="search_feed_str"
+                value={@search.feed_str}
+                label={gettext("Feed String")}
               />
             </div>
 

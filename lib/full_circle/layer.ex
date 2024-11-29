@@ -5,7 +5,13 @@ defmodule FullCircle.Layer do
   alias FullCircle.{Repo}
   alias FullCircle.Layer.{House, Flock, Movement, Harvest, HarvestDetail, HouseHarvestWage}
 
-  def house_feed_type_query(month, year, com_id, field \\ "feed_type") do
+  def house_feed_type_query(
+        month,
+        year,
+        com_id,
+        feed_str \\ "0-5=A1, 5-10=A2, 10-16=A3, 16-20=A4, 20-48=A5, 48-70=A6, 70-80=A7, 80-200=A8",
+        field \\ "feed_type"
+      ) do
     fd = Date.new!(String.to_integer(year), String.to_integer(month), 1)
     td = Date.end_of_month(fd)
 
@@ -42,7 +48,8 @@ defmodule FullCircle.Layer do
          and d.info_date = m.info_date
        where m.qty - coalesce(d.qty, 0) > 0),
     house_date_feed_0 as (
-      select info.info_date, info.house_no, info.house_id, (date_part('day', info.info_date::timestamp - info.dob::timestamp)/7)::integer as age, info.qty as cur_qty
+      select info.info_date, info.house_no, info.house_id, (date_part('day', info.info_date::timestamp - info.dob::timestamp)/7)::integer as age,
+             info.qty as cur_qty
         from sum_qty info),
     house_date as (
       select dl.gdate as info_date, h.house_no, h.id as house_id, 0 as age, 0 as cur_qty from houses h, datelist dl
@@ -51,15 +58,8 @@ defmodule FullCircle.Layer do
     house_date_feed_1 as (select * from house_date_feed_0 where age <= 120 union all select * from house_date),
     house_date_feed as (
         select info_date, hdf1.house_no, age, cur_qty,
-               case when age >= 0 and age <=  5 and cur_qty > 0 then 'A1'
-                    when age >  5 and age <= 10 and cur_qty > 0 then 'A1'
-                    when age > 10 and age <= 16 and cur_qty > 0 then 'A3'
-                    when age > 16 and age <= 20 and cur_qty > 0 then 'A3'
-                    when age > 20 and age <= 48 and cur_qty > 0 then 'A5'
-                    when age > 48 and age <= 70 and cur_qty > 0 then 'A6'
-                    when age > 70 and age <= 80 and cur_qty > 0 then 'A7'
-                    when age > 80 and cur_qty > 0 then 'A8'
-                    else '' end as feed_type, h.filling_wages, h.feeding_wages
+               case #{feed_type_age(feed_str)},
+               h.filling_wages, h.feeding_wages
           from house_date_feed_1 hdf1 inner join houses h on h.id = hdf1.house_id)
 
       select cur.house_no as hou,
@@ -98,6 +98,16 @@ defmodule FullCircle.Layer do
       group by cur.house_no
       order by 1
     """
+  end
+
+  defp feed_type_age(age_feeds) do
+    r =
+      Regex.scan(~r/(\d|\d+)-(\d|\d+)=(\w+)/, age_feeds)
+      |> Enum.map_join(" ", fn [_, l, h, f] ->
+        "when age > #{l} and age <= #{h} and cur_qty > 0 then '#{f}'"
+      end)
+
+    "#{r} else '' end as feed_type"
   end
 
   def harvest_wage_report(fd, td, com_id) do
