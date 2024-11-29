@@ -64,7 +64,9 @@ defmodule FullCircle.MixProject do
       {:number, "~> 1.0"},
       {:countries, "~> 1.6"},
       {:nimble_csv, "~> 1.2"},
-      {:qr_code, "~> 3.0.0"}
+      {:qr_code, "~> 3.0.0"},
+      {:req, "~> 0.5.0"},
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
     ]
   end
 

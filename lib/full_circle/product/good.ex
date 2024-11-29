@@ -149,12 +149,10 @@ defmodule FullCircle.Product.Good do
       cs
       |> sum_field_to(:packagings, :count, :packaging_count)
 
-    cond do
-      Decimal.eq?(fetch_field!(cs, :packaging_count), 0) ->
-        add_unique_error(cs, :name, gettext("need packaging"))
-
-      true ->
-        cs
+    if Decimal.eq?(fetch_field!(cs, :packaging_count), 0) do
+      add_unique_error(cs, :name, gettext("need packaging"))
+    else
+      cs
     end
   end
 end

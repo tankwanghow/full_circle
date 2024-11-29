@@ -91,7 +91,7 @@ defmodule FullCircle.HR.SalaryNote do
     |> validate_id(:employee_name, :employee_id)
     |> validate_id(:salary_type_name, :salary_type_id)
     |> validate_date_by_type()
-    |> validate_number(:unit_price, greater_than: 0)
+    |> validate_number(:unit_price, greater_than_or_equal_to: 0)
     |> validate_number(:quantity, greater_than: 0)
     |> unsafe_validate_unique([:note_no, :company_id], FullCircle.Repo,
       message: gettext("has already been taken")

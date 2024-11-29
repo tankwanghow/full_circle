@@ -31,13 +31,11 @@ defmodule FullCircleWeb.FaceIdLive do
 
   @impl true
   def handle_info({:new_photo, data}, socket) do
-    IO.inspect(data)
     {:noreply, socket}
   end
 
   @impl true
   def handle_info({:delete_photo, data}, socket) do
-    IO.inspect(data)
     {:noreply, socket}
   end
 

@@ -23,12 +23,10 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCamera do
             socket.assigns.current_user
           )
 
-        cond do
-          emp.status != "Active" ->
-            %{decodedText: emp_id, status: :error, msg: "Employee Not Acvtive"}
-
-          true ->
-            %{decodedText: emp_id, status: :success, msg: emp.name}
+        if emp.status != "Active" do
+          %{decodedText: emp_id, status: :error, msg: "Employee Not Acvtive"}
+        else
+          %{decodedText: emp_id, status: :success, msg: emp.name}
         end
       rescue
         _e ->

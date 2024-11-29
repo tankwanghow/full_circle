@@ -1,6 +1,6 @@
 defmodule FullCircleWeb.Helpers do
   use Phoenix.Component
-  use Gettext, backend: MyApp.Gettext
+  use Gettext, backend: FullCircleWeb.Gettext
 
   def assign_got_error(socket, assign_field, cs, list_name) do
     assign(
@@ -40,8 +40,19 @@ defmodule FullCircleWeb.Helpers do
   def assign_autocomplete_id(socket, params, terms_name, assign_id, get_id_func) do
     terms = params[terms_name] |> String.trim()
     rec = get_id_func.(terms, socket.assigns.current_company, socket.assigns.current_user)
-    params = Map.merge(params, %{assign_id => Util.attempt(rec, :id) || nil})
+    params = Map.merge(params, %{assign_id => Util.attempt(rec, :id)})
     {params, socket, rec}
+  end
+
+  def assign_autocomplete_ids(socket, params, terms_name, assign_ids, get_id_func) do
+    terms = params[terms_name] |> String.trim()
+    rec = get_id_func.(terms, socket.assigns.current_company, socket.assigns.current_user)
+
+    rtn =
+      Enum.map(assign_ids, fn {k, v} -> %{k => Util.attempt(rec, v)} end)
+      |> Enum.reduce(fn acc, x -> Map.merge(acc, x) end)
+
+    {Map.merge(params, rtn), socket, rec}
   end
 
   def merge_detail(attrs, details_key, id, new_detail) do

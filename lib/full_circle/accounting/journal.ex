@@ -53,12 +53,10 @@ defmodule FullCircle.Accounting.Journal do
       |> sum_field_to(:transactions, :amount, :journal_balance)
       |> sum_field_to(:transactions, :count, :transaction_count)
 
-    cond do
-      Decimal.eq?(fetch_field!(changeset, :transaction_count), 0) ->
-        add_unique_error(changeset, :journal_balance, gettext("need entries"))
-
-      true ->
-        changeset
+    if Decimal.eq?(fetch_field!(changeset, :transaction_count), 0) do
+      add_unique_error(changeset, :journal_balance, gettext("need entries"))
+    else
+      changeset
     end
   end
 end

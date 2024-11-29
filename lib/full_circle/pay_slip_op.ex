@@ -79,12 +79,18 @@ defmodule FullCircle.PaySlipOp do
            }
          ])
       |> Enum.uniq_by(fn %{id: id} -> id end)
-      |> Enum.reject(fn x -> x.type == "Addition" end)
       |> Enum.reject(fn x ->
-        Enum.any?(sns, fn y ->
-          y.salary_type_id == x.id
-        end)
+        x.type == "Addition" and
+          Enum.any?(sns, fn y ->
+            y.salary_type_id == x.id
+          end)
       end)
+
+    # |> Enum.reject(fn x ->
+    #   Enum.any?(sns, fn y ->
+    #     y.salary_type_id == x.id
+    #   end)
+    # end)
 
     sns =
       sns ++

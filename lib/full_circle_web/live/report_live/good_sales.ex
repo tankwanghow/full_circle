@@ -89,8 +89,7 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
     goods =
       if Enum.count(goods) > 0 do
         goods
-        |> Enum.map(fn x -> x.name end)
-        |> Enum.join(", ")
+        |> Enum.map_join(", ", fn x -> x.name end)
       else
         ["Not Goods in this category"]
       end

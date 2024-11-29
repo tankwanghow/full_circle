@@ -236,7 +236,7 @@ defmodule FullCircleWeb.SalaryNoteLive.Form do
         <.input type="hidden" field={@form[:note_no]} />
         <div class="grid grid-cols-12 gap-1">
           <div class="col-span-3">
-            <.input field={@form[:note_date]} label={gettext("Date")} type="date" feedback={true}/>
+            <.input field={@form[:note_date]} label={gettext("Date")} type="date" feedback={true} />
           </div>
           <div class="col-span-5">
             <.input type="hidden" field={@form[:employee_id]} />

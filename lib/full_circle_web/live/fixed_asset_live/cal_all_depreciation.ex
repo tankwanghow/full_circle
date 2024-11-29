@@ -26,7 +26,7 @@ defmodule FullCircleWeb.FixedAssetLive.CalAllDepre do
       )
 
     socket =
-      if Enum.count(deps) == 0 do
+      if Enum.empty?(deps) do
         put_flash(socket, :warn, gettext("No depreciation calculated!!"))
       else
         put_flash(socket, :info, gettext("Finish calculating depreciations!!"))

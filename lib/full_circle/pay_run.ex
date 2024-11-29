@@ -33,10 +33,9 @@ defmodule FullCircle.PayRun do
         Timex.end_of_month(year, month)
         |> Timex.shift(months: x)
       end)
-      |> Enum.map(fn x ->
+      |> Enum.map_join(" union ", fn x ->
         "select #{x.month} as pay_month, #{x.year} as pay_year"
       end)
-      |> Enum.join(" union ")
 
     "select el0.employee_id as id, el0.name as employee_name,
             array_agg(coalesce(p5.slip_no, '') || '|' || coalesce(p5.id::varchar, '') || '|' ||

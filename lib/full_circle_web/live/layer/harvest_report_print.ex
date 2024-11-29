@@ -30,13 +30,6 @@ defmodule FullCircleWeb.LayerLive.HarvestReportPrint do
         socket.assigns.current_company.id
       )
 
-    # data =
-    #   data
-    #   |> Enum.filter(fn x ->
-    #     x.yield_0 + x.yield_1 + x.yield_2 + x.yield_3 + x.yield_4 + x.yield_5 + x.yield_6 +
-    #       x.yield_7 > 0
-    #   end)
-
     {tdate, data}
   end
 
@@ -78,23 +71,43 @@ defmodule FullCircleWeb.LayerLive.HarvestReportPrint do
     """
   end
 
+  defp average_yield(results, yield_n) do
+    sum = results |> Enum.reduce(0, fn e, acc -> acc + e[yield_n] * 100 end)
+    count = results |> Enum.count(fn x -> x[yield_n] * 100 > 0 end)
+
+    count = if(count == 0, do: 1, else: count)
+
+    (sum / count) |> Number.Percentage.number_to_percentage(precision: 0)
+  end
+
   defp footer(n, assigns) do
     assigns = assign(assigns, :n, n)
 
     ~H"""
     <%= if @n == @chunk_number do %>
       <div class="footer has-text-weight-bold">
-        <span>
-          Avg Age: <%= ((@data |> Enum.reduce(0, fn e, acc -> acc + e.age end)) / Enum.count(@data))
+        <span class="house"></span>
+        <span class="collector">Summary</span>
+        <span class="age">
+          <%= ((@data |> Enum.reduce(0, fn e, acc -> acc + e.age end)) / Enum.count(@data))
+          |> Float.round(2) %>
+        </span>
+        <span class="prod">
+          <%= ((@data |> Enum.reduce(0, fn e, acc -> acc + e.prod end)) / 30)
           |> trunc %>
         </span>
-        <span>
-          Total Production: <%= ((@data |> Enum.reduce(0, fn e, acc -> acc + e.prod end)) / 30)
-          |> trunc %>
+        <span class="death">
+          <%= @data |> Enum.reduce(0, fn e, acc -> acc + e.dea end) |> trunc %>
         </span>
-        <span>
-          Total Death: <%= @data |> Enum.reduce(0, fn e, acc -> acc + e.dea end) |> trunc %>
-        </span>
+
+        <span class="yield"><%= average_yield(@data, :yield_0) %></span>
+        <span class="yield"><%= average_yield(@data, :yield_1) %></span>
+        <span class="yield"><%= average_yield(@data, :yield_2) %></span>
+        <span class="yield"><%= average_yield(@data, :yield_3) %></span>
+        <span class="yield"><%= average_yield(@data, :yield_4) %></span>
+        <span class="yield"><%= average_yield(@data, :yield_5) %></span>
+        <span class="yield"><%= average_yield(@data, :yield_6) %></span>
+        <span class="yield"><%= average_yield(@data, :yield_7) %></span>
       </div>
     <% end %>
     """
@@ -179,7 +192,7 @@ defmodule FullCircleWeb.LayerLive.HarvestReportPrint do
       .death { width: 6%; text-align: center; border-right: 1px solid black;}
       .yield { width: 6.5%; text-align: center; border-right: 1px solid black;}
 
-      .footer { display: flex; gap: 5mm; padding: 2mm; border-bottom: 1px solid black; border-top: 1px solid black; }
+      .footer { display: flex; border-bottom: 1px solid black; border-top: 1px solid black; }
       .nofooter { border-top: 1px solid black; }
       .page-count { float: right; }
     </style>

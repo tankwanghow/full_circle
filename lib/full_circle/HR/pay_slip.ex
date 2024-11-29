@@ -126,12 +126,10 @@ defmodule FullCircle.HR.PaySlip do
         |> Decimal.sub(fetch_field!(changeset, :advance_amount))
       )
 
-    cond do
-      Decimal.lt?(fetch_field!(changeset, :pay_slip_amount), 0) ->
-        add_unique_error(changeset, :pay_slip_amount, gettext("must be +ve"))
-
-      true ->
-        changeset |> clear_error(:pay_slip_amount)
+    if Decimal.lt?(fetch_field!(changeset, :pay_slip_amount), 0) do
+      add_unique_error(changeset, :pay_slip_amount, gettext("must be +ve"))
+    else
+      changeset |> clear_error(:pay_slip_amount)
     end
   end
 

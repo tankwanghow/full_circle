@@ -789,10 +789,9 @@ defmodule FullCircleWeb.CoreComponents do
 
   def list_errors_to_string(errors) do
     errors
-    |> Enum.map(fn {x, _} ->
+    |> Enum.map_join(" ", fn {x, _} ->
       "#{x} #{FullCircleWeb.CoreComponents.translate_errors(errors, x)}"
     end)
-    |> Enum.join(" ")
   end
 
   def to_fc_time_format(dt, com, flag \\ :full) do
@@ -823,12 +822,12 @@ defmodule FullCircleWeb.CoreComponents do
   end
 
   attr :form, :any
+  attr :label, :string
 
   def save_button(assigns) do
     ~H"""
     <button
       type="submit"
-      disabled={!@form.source.valid?}
       class={[
         "phx-submit-loading:opacity-75 rounded-lg py-2 px-3 leading-6 border",
         @form.source.valid? && "bg-green-200 hover:bg-green-600 border-green-600",
@@ -837,8 +836,8 @@ defmodule FullCircleWeb.CoreComponents do
       ]}
     >
       <%= if @form.source.valid?,
-        do: gettext("Save"),
-        else: gettext("Cannot Save!! Form Invalid!") %>
+        do: @label,
+        else: gettext("Show Error!") %>
     </button>
     """
   end
@@ -850,7 +849,13 @@ defmodule FullCircleWeb.CoreComponents do
 
   def form_action_button(assigns) do
     ~H"""
-    <.save_button form={@form} />
+    <.save_button
+      :if={@live_action == :new or @live_action == :edit}
+      form={@form}
+      label={gettext("Save")}
+    />
+    <.save_button :if={@live_action == :match} form={@form} label={gettext("Match E-Invoice")} />
+    <.save_button :if={@live_action == :unmatch} form={@form} label={gettext("Unmatch E-Invoice")} />
     <.link :if={@live_action != :new} navigate="" class="orange button">
       <%= gettext("Cancel") %>
     </.link>
@@ -1029,5 +1034,27 @@ defmodule FullCircleWeb.CoreComponents do
 
   def waiting_for_async_action_map() do
     %{loading: nil, failed: nil, ok?: false, result: "...waiting for action..."}
+  end
+
+  def e_invoice_link(assigns) do
+    ~H"""
+    <%= if @obj.e_inv_uuid do %>
+      <.link
+        class="font-extrabold text-blue-500"
+        href={"https://myinvois.hasil.gov.my/documents/#{@obj.e_inv_uuid}"}
+        target="_blank"
+      >
+        <.icon name="hero-document-solid" class="h-5 w-5" />
+      </.link>
+    <% else %>
+      <.link
+        class="font-extrabold text-green-500"
+        href="https://myinvois.hasil.gov.my/newdocument"
+        target="_blank"
+      >
+        <.icon name="hero-document-plus-solid" class="h-5 w-5" />
+      </.link>
+    <% end %>
+    """
   end
 end

@@ -215,7 +215,7 @@ defmodule FullCircle.Sys do
   def load_settings(page, company, user) do
     settings = Repo.all(load_settings_query(page, company, user))
 
-    if Enum.count(settings) == 0 do
+    if Enum.empty?(settings) do
       insert_default_settings(page, company, user)
       Repo.all(load_settings_query(page, company, user))
     else

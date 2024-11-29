@@ -542,7 +542,23 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
         socket.assigns.current_user
       )
 
-    if !is_nil(emp) do
+    if is_nil(emp) do
+      socket
+      |> assign(punches: [])
+      |> assign(salary_notes: [])
+      |> assign(advances: [])
+      |> assign(employee: nil)
+      |> assign(pay_slip: nil)
+      |> assign(days_in_month: 0)
+      |> assign(sunday_count: 0)
+      |> assign(total_day_worked: 0)
+      |> assign(ot_day_worked: 0)
+      |> assign(normal_pay_days: 0)
+      |> assign(sunday_pay_days: 0)
+      |> assign(holiday_pay_days: 0)
+      |> assign(new_pay_slip_url: nil)
+      |> assign(search: %{employee_name: emp_name, month: month, year: year})
+    else
       punches =
         HR.punch_card_query(
           month |> String.to_integer(),
@@ -604,22 +620,6 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
         )
 
       socket |> update_punch_card(punches)
-    else
-      socket
-      |> assign(punches: [])
-      |> assign(salary_notes: [])
-      |> assign(advances: [])
-      |> assign(employee: nil)
-      |> assign(pay_slip: nil)
-      |> assign(days_in_month: 0)
-      |> assign(sunday_count: 0)
-      |> assign(total_day_worked: 0)
-      |> assign(ot_day_worked: 0)
-      |> assign(normal_pay_days: 0)
-      |> assign(sunday_pay_days: 0)
-      |> assign(holiday_pay_days: 0)
-      |> assign(new_pay_slip_url: nil)
-      |> assign(search: %{employee_name: emp_name, month: month, year: year})
     end
   end
 

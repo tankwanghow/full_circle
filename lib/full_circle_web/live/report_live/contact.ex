@@ -81,15 +81,15 @@ defmodule FullCircleWeb.ReportLive.Contact do
         {:ok,
          %{
            result:
-             if !is_nil(account) do
+             if is_nil(account) do
+               []
+             else
                Reporting.contact_transactions(
                  account,
                  Date.from_iso8601!(f_date),
                  Date.from_iso8601!(t_date),
                  current_company
                )
-             else
-               []
              end
          }}
       end

@@ -231,7 +231,7 @@ defmodule FullCircleWeb.UserAuth do
     if default_company do
       "/companies/#{default_company.company_id}/dashboard"
     else
-      if(Enum.count(FullCircle.Sys.list_companies(user)) > 0) do
+      if Enum.count(FullCircle.Sys.list_companies(user)) > 0 do
         "/companies"
       else
         "/companies/new"

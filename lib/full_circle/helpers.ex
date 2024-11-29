@@ -126,14 +126,12 @@ defmodule FullCircle.Helpers do
     dtls = Map.fetch!(inval, detail_name)
 
     sum =
-      cond do
-        is_struct(dtls, Ecto.Association.NotLoaded) ->
-          Decimal.new("0")
-
-        true ->
-          Enum.reduce(dtls, Decimal.new("0"), fn x, acc ->
-            Decimal.add(acc, Map.fetch!(x, field_name))
-          end)
+      if is_struct(dtls, Ecto.Association.NotLoaded) do
+        Decimal.new("0")
+      else
+        Enum.reduce(dtls, Decimal.new("0"), fn x, acc ->
+          Decimal.add(acc, Map.fetch!(x, field_name))
+        end)
       end
 
     inval |> Map.replace!(result_field, sum)
@@ -153,9 +151,9 @@ defmodule FullCircle.Helpers do
 
         Decimal.add(
           acc,
-          if(!func.(x, :delete),
-            do: func.(x, field_name),
-            else: Decimal.new("0")
+          if(func.(x, :delete),
+            do: Decimal.new("0"),
+            else: func.(x, field_name)
           )
         )
       end)
@@ -238,10 +236,10 @@ defmodule FullCircle.Helpers do
   end
 
   def add_unique_error(cs, field, msg) do
-    if !Enum.any?(cs.errors, fn {k, {m, _}} -> k == field and msg == m end) do
-      Ecto.Changeset.add_error(cs, field, msg)
-    else
+    if Enum.any?(cs.errors, fn {k, {m, _}} -> k == field and msg == m end) do
       cs
+    else
+      Ecto.Changeset.add_error(cs, field, msg)
     end
   end
 
@@ -253,7 +251,7 @@ defmodule FullCircle.Helpers do
         Enum.filter(cs.errors, fn {k, _} -> k != field end)
       )
 
-    if(Enum.count(cs.errors) == 0, do: Map.replace(cs, :valid?, true), else: cs)
+    if(Enum.empty?(cs.errors), do: Map.replace(cs, :valid?, true), else: cs)
   end
 
   def exec_query_map(qry, repo \\ FullCircle.Repo) do
@@ -296,10 +294,14 @@ defmodule FullCircle.Helpers do
   end
 
   def remove_field_if_new_flag(attrs, field_name) do
-    if Map.fetch!(attrs, field_name) == "...new..." do
-      Map.delete(attrs, field_name)
-    else
-      attrs
-    end
+    # if Map.fetch!(attrs, field_name) == "...new..." do
+    #   Map.delete(attrs, field_name)
+    # else
+    attrs
+    # end
+  end
+
+  def e_inv_validate_url(obj) do
+    "https://myinvois.hasil.gov.my/#{obj.e_inv_uuid}/share/#{obj.e_inv_long_id}"
   end
 end

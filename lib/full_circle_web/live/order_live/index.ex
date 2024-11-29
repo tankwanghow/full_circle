@@ -241,7 +241,7 @@ defmodule FullCircleWeb.OrderLive.Index do
   end
 
   defp selected_ids(selected) do
-    selected |> Enum.map(fn x -> x.line_id end) |> Enum.join(",")
+    selected |> Enum.map_join(", ", fn x -> x.line_id end)
   end
 
   defp can_load?(socket) do

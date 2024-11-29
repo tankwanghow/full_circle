@@ -24,7 +24,7 @@
         <.link
           :if={assigns[:current_company]}
           id="full_circle_dashboard"
-          navigate={~p"/companies/#{@current_company.id}/dashboard"}
+          patch={~p"/companies/#{@current_company.id}/dashboard"}
           class="rounded hover:bg-gray-400 p-2"
         >
           <%= gettext("Dashboard") %>

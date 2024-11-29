@@ -1251,7 +1251,7 @@ defmodule FullCircle.HR do
       try do
         [[ti, _, _, _], [to, _, _, _]] = t
 
-        if(is_nil(ti) || is_nil(to)) do
+        if is_nil(ti) || is_nil(to) do
           0
         else
           Timex.diff(to, ti, :minute) / 60
@@ -1271,16 +1271,18 @@ defmodule FullCircle.HR do
   end
 
   def nh(wh, nwh) do
-    cond do
-      wh >= nwh -> nwh
-      true -> wh
+    if wh >= nwh do
+      nwh
+    else
+      wh
     end
   end
 
   def ot(wh, nwh) do
-    cond do
-      wh > nwh -> wh - nwh
-      true -> 0
+    if wh > nwh do
+      wh - nwh
+    else
+      0
     end
   end
 

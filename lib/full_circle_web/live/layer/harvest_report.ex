@@ -87,6 +87,15 @@ defmodule FullCircleWeb.LayerLive.HarvestReport do
     end
   end
 
+  defp average_yield(results, yield_n) do
+    sum = results.result |> Enum.reduce(0, fn e, acc -> acc + e[yield_n] * 100 end)
+    count = results.result |> Enum.count(fn x -> x[yield_n] * 100 > 0 end)
+
+    count = if(count == 0, do: 1, else: count)
+
+    (sum / count) |> Number.Percentage.number_to_percentage(precision: 1)
+  end
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -239,7 +248,30 @@ defmodule FullCircleWeb.LayerLive.HarvestReport do
               <div class="w-[5%] border rounded bg-amber-200 border-amber-400 px-2 py-1">
                 <%= @result.result |> Enum.reduce(0, fn e, acc -> acc + e.dea end) %>
               </div>
-              <div class="w-[56%] border rounded bg-amber-200 border-amber-400 px-2 py-1"></div>
+              <div class="w-[7%] border rounded bg-amber-200 border-amber-400 px-2 py-1">
+                <%= average_yield(@result, :yield_0) %>
+              </div>
+              <div class="w-[7%] border rounded bg-amber-200 border-amber-400 px-2 py-1">
+                <%= average_yield(@result, :yield_1) %>
+              </div>
+              <div class="w-[7%] border rounded bg-amber-200 border-amber-400 px-2 py-1">
+                <%= average_yield(@result, :yield_2) %>
+              </div>
+              <div class="w-[7%] border rounded bg-amber-200 border-amber-400 px-2 py-1">
+                <%= average_yield(@result, :yield_3) %>
+              </div>
+              <div class="w-[7%] border rounded bg-amber-200 border-amber-400 px-2 py-1">
+                <%= average_yield(@result, :yield_4) %>
+              </div>
+              <div class="w-[7%] border rounded bg-amber-200 border-amber-400 px-2 py-1">
+                <%= average_yield(@result, :yield_5) %>
+              </div>
+              <div class="w-[7%] border rounded bg-amber-200 border-amber-400 px-2 py-1">
+                <%= average_yield(@result, :yield_6) %>
+              </div>
+              <div class="w-[7%] border rounded bg-amber-200 border-amber-400 px-2 py-1">
+                <%= average_yield(@result, :yield_7) %>
+              </div>
             </div>
           </div>
         </:result_html>

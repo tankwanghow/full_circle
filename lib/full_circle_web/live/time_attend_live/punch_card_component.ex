@@ -13,7 +13,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCardComponent do
     yw = FullCircleWeb.Helpers.work_week(assigns.obj.dd)
 
     tis =
-      if(assigns.obj.time_list != []) do
+      if assigns.obj.time_list != [] do
         assigns.obj.time_list
         |> Enum.map(fn [time, id, status, inout] ->
           if(is_nil(time)) do

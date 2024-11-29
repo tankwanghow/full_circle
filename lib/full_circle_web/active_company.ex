@@ -2,7 +2,7 @@ defmodule FullCircleWeb.ActiveCompany do
   use FullCircleWeb, :verified_routes
   import Plug.Conn
   import Phoenix.Controller
-  use Gettext, backend: MyApp.Gettext
+  use Gettext, backend: FullCircleWeb.Gettext
 
   def on_mount(:assign_active_company, _params, session, socket) do
     {:cont,
