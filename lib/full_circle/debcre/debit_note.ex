@@ -19,6 +19,11 @@ defmodule FullCircle.DebCre.DebitNote do
       foreign_key: :doc_id,
       references: :id
 
+    field :e_inv_uuid, :string
+    field :e_inv_long_id, :string
+    field :e_inv_internal_id, :string
+    field :e_inv_info, :string
+
     field :contact_name, :string, virtual: true
     field :note_desc_amount, :decimal, virtual: true, default: 0
     field :note_amount, :decimal, virtual: true, default: 0
@@ -38,9 +43,14 @@ defmodule FullCircle.DebCre.DebitNote do
       :company_id,
       :contact_id,
       :contact_name,
-      :note_no
+      :note_no,
+      :e_inv_uuid,
+      :e_inv_long_id,
+      :e_inv_internal_id,
+      :e_inv_info
     ])
     |> fill_today(:note_date)
+    |> unique_constraint(:e_inv_uuid)
     |> validate_required([
       :note_date,
       :company_id,

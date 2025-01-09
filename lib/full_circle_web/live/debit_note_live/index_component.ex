@@ -16,7 +16,7 @@ defmodule FullCircleWeb.DebitNoteLive.IndexComponent do
     ~H"""
     <div
       id={@id}
-      class={"#{@ex_class} max-h-8 flex flex-row text-center tracking-tighter bg-gray-200 hover:bg-gray-400"}
+      class={"#{@ex_class}  flex flex-row text-center tracking-tighter bg-gray-200 hover:bg-gray-400"}
     >
       <div class="w-[2%] border-b border-gray-400 py-1">
         <input

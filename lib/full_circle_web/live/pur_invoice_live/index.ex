@@ -21,7 +21,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Index do
                 name="search[terms]"
                 type="search"
                 value={@search.terms}
-                placeholder="pur_invoice, supplier_invoice_no, contact, goods or descriptions..."
+                placeholder="pur_invoice, e_inv_internal_id, contact, goods or descriptions..."
               />
             </div>
             <div class="w-[7rem] grow-0 shrink-0">
@@ -77,12 +77,15 @@ defmodule FullCircleWeb.PurInvoiceLive.Index do
           <%= gettext("Invoice No") %>
         </div>
         <div class="w-[10%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Invoice No") %>
+          <%= gettext("Supp Inv No") %>
         </div>
-        <div class="w-[22%] border-b border-t border-amber-400 py-1">
+        <div class="w-[4%] border-b border-t border-amber-400 py-1">
+          <%= gettext("E-Inv") %>
+        </div>
+        <div class="w-[20%] border-b border-t border-amber-400 py-1">
           <%= gettext("Contact") %>
         </div>
-        <div class="w-[30%] border-b border-t border-amber-400 py-1">
+        <div class="w-[28%] border-b border-t border-amber-400 py-1">
           <%= gettext("Particulars") %>
         </div>
         <div class="w-[10%] border-b border-t border-amber-400 py-1">

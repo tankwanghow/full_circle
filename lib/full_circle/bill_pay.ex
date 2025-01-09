@@ -217,6 +217,7 @@ defmodule FullCircle.BillPay do
       select: %{
         id: coalesce(pay.id, txn.id),
         payment_no: txn.doc_no,
+        e_inv_uuid: pay.e_inv_uuid,
         particulars:
           fragment(
             "string_agg(distinct coalesce(?, ?), ', ')",
@@ -233,7 +234,8 @@ defmodule FullCircle.BillPay do
       group_by: [
         coalesce(pay.id, txn.id),
         txn.doc_no,
-        cont.name,
+        cont.id,
+        pay.e_inv_uuid,
         txn.doc_date,
         com.id,
         txn.old_data
@@ -322,8 +324,7 @@ defmodule FullCircle.BillPay do
         |> Enum.map(fn {k, v} ->
           %{
             account_id: k,
-            match_doc_nos:
-              Enum.map(v, fn x -> x.t_doc_no end) |> Enum.join(", ") |> String.slice(0..200),
+            match_doc_nos: Enum.map_join(v, ", ", fn x -> x.t_doc_no end) |> String.slice(0..200),
             amount: Enum.reduce(v, 0, fn x, acc -> Decimal.add(acc, x.match_amount) end)
           }
         end)

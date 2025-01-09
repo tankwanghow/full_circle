@@ -67,6 +67,8 @@ defmodule FullCircle.ReceiveFund.ReceiptDetail do
     |> validate_id(:package_name, :package_id)
     |> validate_id(:account_name, :account_id)
     |> validate_number(:quantity, greater_than: 0)
+    |> validate_number(:unit_price, greater_than_or_equal_to: 0)
+    |> validate_number(:discount, less_than_or_equal_to: 0)
     |> validate_length(:descriptions, max: 230)
     |> compute_fields()
     |> maybe_mark_for_deletion()

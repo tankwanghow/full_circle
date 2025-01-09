@@ -62,6 +62,12 @@ defmodule FullCircleWeb.DashboardLive do
         <.link navigate={~p"/companies/#{@current_company.id}/tax_codes"} class="button teal">
           <%= gettext("TaxCodes") %>
         </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/e_inv_meta"} class="button teal">
+          <%= gettext("E-Invoice Meta Data") %>
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/e_invoices"} class="button teal">
+          <%= gettext("E-Invoices") %>
+        </.link>
         <!--  <.link navigate={~p"/companies/#{@current_company.id}/Order"} class="button teal">
           <%= gettext("Order") %>
         </.link>
@@ -235,5 +241,10 @@ defmodule FullCircleWeb.DashboardLive do
   @impl true
   def mount(_params, _session, socket) do
     {:ok, socket |> assign(:back_to_route, "#") |> assign(page_title: gettext("Dashboard"))}
+  end
+
+  @impl true
+  def handle_params(_, _uri, socket) do
+    {:noreply, socket}
   end
 end

@@ -55,10 +55,7 @@ defmodule FullCircleWeb.CompanyLive.Form do
         <div class="col-span-4">
           <.input field={@form[:email]} type="email" label={gettext("Email")} />
         </div>
-        <div class="col-span-3">
-          <.input field={@form[:tax_id]} label={gettext("Tax No")} />
-        </div>
-        <div class="col-span-3">
+        <div class="col-span-4">
           <.input
             field={@form[:closing_month]}
             options={[
@@ -80,13 +77,25 @@ defmodule FullCircleWeb.CompanyLive.Form do
             label={gettext("Closing Month")}
           />
         </div>
-        <div class="col-span-2">
+        <div class="col-span-4">
           <.input
             field={@form[:closing_day]}
             options={@closing_days}
             type="select"
             label={gettext("Closing Day")}
           />
+        </div>
+        <div class="col-span-3">
+          <.input field={@form[:tax_id]} label={gettext("Tax Id")} />
+        </div>
+        <div class="col-span-3">
+          <.input field={@form[:gst_id]} label={gettext("GST Id")} />
+        </div>
+        <div class="col-span-3">
+          <.input field={@form[:sst_id]} label={gettext("SST Id")} />
+        </div>
+        <div class="col-span-3">
+          <.input field={@form[:tou_id]} label={gettext("Tourism Tax Id")} />
         </div>
         <div class="col-span-12">
           <.input field={@form[:descriptions]} label={gettext("Descriptions")} />

@@ -193,6 +193,7 @@ defmodule FullCircle.DebCre do
       select: %{
         id: coalesce(obj.id, txn.id),
         note_no: txn.doc_no,
+        e_inv_uuid: obj.e_inv_uuid,
         particulars:
           fragment(
             "string_agg(distinct coalesce(?, ?), ', ')",
@@ -206,14 +207,16 @@ defmodule FullCircle.DebCre do
         checked: false,
         old_data: txn.old_data
       },
-      group_by: [
-        coalesce(obj.id, txn.id),
-        txn.doc_no,
-        coalesce(cont.name, ac.name),
-        txn.doc_date,
-        com.id,
-        txn.old_data
-      ]
+      group_by: [txn.id, cont.id, obj.id, com.id, ac.id]
+
+    # group_by: [
+    #   coalesce(obj.id, txn.id),
+    #   txn.doc_no,
+    #   coalesce(cont.name, ac.name),
+    #   txn.doc_date,
+    #   com.id,
+    #   txn.old_data
+    # ]
   end
 
   def create_credit_note(attrs, com, user) do
@@ -302,8 +305,7 @@ defmodule FullCircle.DebCre do
         |> Enum.map(fn {k, v} ->
           %{
             account_id: k,
-            match_doc_nos:
-              Enum.map(v, fn x -> x.t_doc_no end) |> Enum.join(", ") |> String.slice(0..200),
+            match_doc_nos: Enum.map_join(v, ", ", fn x -> x.t_doc_no end) |> String.slice(0..200),
             amount: Enum.reduce(v, 0, fn x, acc -> Decimal.add(acc, x.match_amount) end)
           }
         end)
@@ -325,8 +327,7 @@ defmodule FullCircle.DebCre do
 
       if !Decimal.eq?(cn.note_balance, 0) do
         cont_part =
-          Enum.map(cn.credit_note_details, fn x -> x.descriptions end)
-          |> Enum.join(", ")
+          Enum.map_join(cn.credit_note_details, ", ", fn x -> x.descriptions end)
 
         repo.insert!(%Transaction{
           doc_type: "CreditNote",
@@ -558,6 +559,7 @@ defmodule FullCircle.DebCre do
       select: %{
         id: coalesce(obj.id, txn.id),
         note_no: txn.doc_no,
+        e_inv_uuid: obj.e_inv_uuid,
         particulars:
           fragment(
             "string_agg(distinct coalesce(?, ?), ', ')",
@@ -577,7 +579,8 @@ defmodule FullCircle.DebCre do
         coalesce(cont.name, ac.name),
         txn.doc_date,
         com.id,
-        txn.old_data
+        txn.old_data,
+        obj.e_inv_uuid
       ]
   end
 
@@ -667,7 +670,7 @@ defmodule FullCircle.DebCre do
         |> Enum.map(fn {k, v} ->
           %{
             account_id: k,
-            match_doc_nos: Enum.map(v, fn x -> x.t_doc_no end) |> Enum.join(", "),
+            match_doc_nos: Enum.map_join(v, ", ", fn x -> x.t_doc_no end),
             amount: Enum.reduce(v, 0, fn x, acc -> Decimal.add(acc, x.match_amount) end)
           }
         end)
@@ -689,8 +692,7 @@ defmodule FullCircle.DebCre do
 
       if !Decimal.eq?(cn.note_balance, 0) do
         cont_part =
-          Enum.map(cn.debit_note_details, fn x -> x.descriptions end)
-          |> Enum.join(", ")
+          Enum.map_join(cn.debit_note_details, ", ", fn x -> x.descriptions end)
 
         repo.insert!(%Transaction{
           doc_type: "DebitNote",

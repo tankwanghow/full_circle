@@ -48,3 +48,9 @@ erl_crash.dump
 /seed_csv/
 /seed_csv_old/
 /livebook/
+/deploy_to_linode/
+*.tar
+
+secret.txt
+deploy.conf
+

@@ -20,6 +20,9 @@ defmodule FullCircle.Sys.Company do
     field :fax, :string
     field :descriptions, :string
     field :tax_id, :string
+    field :gst_id, :string
+    field :sst_id, :string
+    field :tou_id, :string
     field :closing_month, :integer
     field :closing_day, :integer
 

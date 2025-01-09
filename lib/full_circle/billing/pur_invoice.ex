@@ -6,7 +6,7 @@ defmodule FullCircle.Billing.PurInvoice do
 
   schema "pur_invoices" do
     field :pur_invoice_no, :string
-    field :supplier_invoice_no, :string
+    field :e_inv_internal_id, :string
     field :descriptions, :string
     field :due_date, :date
     field :pur_invoice_date, :date
@@ -14,6 +14,9 @@ defmodule FullCircle.Billing.PurInvoice do
     field :delivery_man_tags, :string
     field :loader_wages_tags, :string
     field :delivery_wages_tags, :string
+    field :e_inv_uuid, :string
+    field :e_inv_long_id, :string
+    field :e_inv_info, :string
 
     belongs_to :company, FullCircle.Sys.Company
     belongs_to :contact, FullCircle.Accounting.Contact
@@ -41,7 +44,7 @@ defmodule FullCircle.Billing.PurInvoice do
     pur_invoice
     |> cast(attrs, [
       :pur_invoice_date,
-      :supplier_invoice_no,
+      :e_inv_internal_id,
       :due_date,
       :descriptions,
       :loader_tags,
@@ -51,13 +54,16 @@ defmodule FullCircle.Billing.PurInvoice do
       :company_id,
       :contact_id,
       :contact_name,
-      :pur_invoice_no
+      :pur_invoice_no,
+      :e_inv_uuid,
+      :e_inv_long_id,
+      :e_inv_info
     ])
     |> fill_today(:pur_invoice_date)
     |> fill_today(:due_date)
     |> validate_required([
       :pur_invoice_date,
-      :supplier_invoice_no,
+      :e_inv_internal_id,
       :due_date,
       :company_id,
       :contact_name,
@@ -67,6 +73,7 @@ defmodule FullCircle.Billing.PurInvoice do
     |> validate_date(:pur_invoice_date, days_after: 0)
     |> validate_id(:contact_name, :contact_id)
     |> validate_length(:descriptions, max: 230)
+    |> unique_constraint(:e_inv_uuid)
     |> unsafe_validate_unique([:pur_invoice_no, :company_id], FullCircle.Repo,
       message: gettext("pur_invoice no already in company")
     )

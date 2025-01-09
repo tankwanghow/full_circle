@@ -155,6 +155,9 @@ defmodule FullCircleWeb.Router do
       live("/flocks/new", LayerLive.FlockForm, :new)
       live("/flocks/:flock_id/edit", LayerLive.FlockForm, :edit)
 
+      live("/e_inv_meta", EInvMetaLive.Form)
+      live("/e_invoices", EInvListLive.Index)
+
       live("/holidays", HolidayLive.Index, :index)
       live("/holidays/new", HolidayLive.Form, :new)
       live("/holidays/:holiday_id/copy", HolidayLive.Form, :copy)
@@ -170,6 +173,7 @@ defmodule FullCircleWeb.Router do
       live("/Invoice", InvoiceLive.Index, :index)
       live("/Invoice/new", InvoiceLive.Form, :new)
       live("/Invoice/:invoice_id/edit", InvoiceLive.Form, :edit)
+      live("/Invoice/:invoice_id/match_e_inv", InvoiceLive.Form, :match)
 
       live("/Delivery", DeliveryLive.Index, :index)
       live("/Delivery/new", DeliveryLive.Form, :new)
@@ -194,6 +198,8 @@ defmodule FullCircleWeb.Router do
       live("/PurInvoice", PurInvoiceLive.Index, :index)
       live("/PurInvoice/new", PurInvoiceLive.Form, :new)
       live("/PurInvoice/:invoice_id/edit", PurInvoiceLive.Form, :edit)
+      live("/PurInvoice/:invoice_id/match_e_inv", PurInvoiceLive.Form, :match)
+      live("/PurInvoice/:invoice_id/unmatch_e_inv", PurInvoiceLive.Form, :unmatch)
 
       live("/logs/:entity/:entity_id", LogLive.Index, :index)
       live("/journal_entries/:doc_type/:doc_no", JournalEntryViewLive.Index, :index)
@@ -225,10 +231,12 @@ defmodule FullCircleWeb.Router do
       live("/CreditNote", CreditNoteLive.Index, :index)
       live("/CreditNote/new", CreditNoteLive.Form, :new)
       live("/CreditNote/:note_id/edit", CreditNoteLive.Form, :edit)
+      live("/CreditNote/:note_id/match_e_inv", CreditNoteLive.Form, :match)
 
       live("/DebitNote", DebitNoteLive.Index, :index)
       live("/DebitNote/new", DebitNoteLive.Form, :new)
       live("/DebitNote/:note_id/edit", DebitNoteLive.Form, :edit)
+      live("/DebitNote/:note_id/match_e_inv", DebitNoteLive.Form, :match)
 
       live("/seeds", SeedLive.Index, :index)
       live("/seeds/:doc_type/:doc_no/edit", SeedLive.Form, :edit)
@@ -236,6 +244,7 @@ defmodule FullCircleWeb.Router do
       live("/Receipt", ReceiptLive.Index, :index)
       live("/Receipt/new", ReceiptLive.Form, :new)
       live("/Receipt/:receipt_id/edit", ReceiptLive.Form, :edit)
+      live("/Receipt/:receipt_id/match_e_inv", ReceiptLive.Form, :match)
 
       live("/recurrings", RecurringLive.Index, :index)
       live("/recurrings/new", RecurringLive.Form, :new)
@@ -244,6 +253,7 @@ defmodule FullCircleWeb.Router do
       live("/Payment", PaymentLive.Index, :index)
       live("/Payment/new", PaymentLive.Form, :new)
       live("/Payment/:payment_id/edit", PaymentLive.Form, :edit)
+      live("/Payment/:payment_id/match_e_inv", PaymentLive.Form, :match)
 
       live("/TimeAttend", TimeAttendLive.Index, :index)
       live("/TimeAttend/new", TimeAttendLive.Form, :new)

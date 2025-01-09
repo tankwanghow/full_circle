@@ -361,10 +361,11 @@ defmodule FullCircle.Cheque do
           doc_no: rtnq.return_no,
           doc_id: rtnq.id,
           doc_date: rtnq.return_date,
-          account_id: rtnq.return_from_bank_id,
+          account_id: pdc_id,
           company_id: com.id,
           amount: Decimal.negate(rtnq.cheque_amount),
-          particulars: "Return #{rtnq.cheque.bank} #{rtnq.cheque.cheque_no} #{rtnq.return_reason}"
+          particulars:
+            "Return #{rtnq.cheque.bank} #{rtnq.cheque.cheque_no} #{rtnq.return_reason} to #{rtnq.cheque_owner_name}"
         })
       else
         repo.insert!(%Transaction{
@@ -372,11 +373,10 @@ defmodule FullCircle.Cheque do
           doc_no: rtnq.return_no,
           doc_id: rtnq.id,
           doc_date: rtnq.return_date,
-          account_id: pdc_id,
+          account_id: rtnq.return_from_bank_id,
           company_id: com.id,
           amount: Decimal.negate(rtnq.cheque_amount),
-          particulars:
-            "Return #{rtnq.cheque.bank} #{rtnq.cheque.cheque_no} #{rtnq.return_reason} to #{rtnq.cheque_owner_name}"
+          particulars: "Return #{rtnq.cheque.bank} #{rtnq.cheque.cheque_no} #{rtnq.return_reason}"
         })
       end
 

@@ -25,6 +25,13 @@ import topbar from "../vendor/topbar"
 let csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 let Hooks = {}
 
+Hooks.matchEInvoice = {
+  mounted() {
+    if (['match', 'unmatch'].includes(document.getElementById('live_action').value))
+      document.querySelectorAll('input').forEach((e) => e.readOnly = true)
+  }
+}
+
 Hooks.FaceID = {
   mounted() {
     import("./face_id").then(

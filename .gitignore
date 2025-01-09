@@ -49,3 +49,10 @@ stuff*.*
 secret.txt
 
 /uploads
+
+/livebook
+
+/seed_csv
+
+deploy.conf
+/.elixir_ls

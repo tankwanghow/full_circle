@@ -19,7 +19,6 @@ defmodule FullCircle.Repo.Migrations.CreateCompanies do
       add :tax_id, :string
       add :closing_day, :integer
       add :closing_month, :integer
-      add :normal_work_hours, :decimal
       timestamps(type: :timestamptz)
     end
 

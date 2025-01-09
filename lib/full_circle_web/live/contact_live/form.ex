@@ -174,14 +174,23 @@ defmodule FullCircleWeb.ContactLive.Form do
           <div class="col-span-6">
             <.input field={@form[:name]} label={gettext("Name")} />
           </div>
-          <div class="col-span-2">
+          <div class="col-span-3">
             <.input field={@form[:category]} label={gettext("Category")} list="categories" />
           </div>
-          <div class="col-span-2">
+          <div class="col-span-3">
             <.input field={@form[:reg_no]} label={gettext("Reg No")} />
           </div>
-          <div class="col-span-2">
+          <div class="col-span-3">
             <.input field={@form[:tax_id]} label={gettext("Tax Id")} />
+          </div>
+          <div class="col-span-3">
+            <.input field={@form[:gst_id]} label={gettext("GST Id")} />
+          </div>
+          <div class="col-span-3">
+            <.input field={@form[:sst_id]} label={gettext("SST Id")} />
+          </div>
+          <div class="col-span-3">
+            <.input field={@form[:tou_id]} label={gettext("Tourism Tax Id")} />
           </div>
           <div class="col-span-6">
             <.input field={@form[:address1]} label={gettext("Address Line 1")} />

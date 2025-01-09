@@ -88,16 +88,19 @@ defmodule FullCircleWeb.InvoiceLive.Index do
       </div>
       <div class="font-medium flex flex-row text-center tracking-tighter bg-amber-200">
         <div class="w-[2%] border-b border-t border-amber-400 py-1"></div>
-        <div class="w-[9%] border-b border-t border-amber-400 py-1">
+        <div class="w-[8%] border-b border-t border-amber-400 py-1">
           <%= gettext("Date") %>
         </div>
-        <div class="w-[9%] border-b border-t border-amber-400 py-1">
+        <div class="w-[8%] border-b border-t border-amber-400 py-1">
           <%= gettext("Due Date") %>
         </div>
-        <div class="w-[10%] border-b border-t border-amber-400 py-1">
+        <div class="w-[9%] border-b border-t border-amber-400 py-1">
           <%= gettext("Invoice No") %>
         </div>
-        <div class="w-[20%] border-b border-t border-amber-400 py-1">
+        <div class="w-[4%] border-b border-t border-amber-400 py-1">
+          <%= gettext("E-Inv") %>
+        </div>
+        <div class="w-[19%] border-b border-t border-amber-400 py-1">
           <%= gettext("Contact") %>
         </div>
         <div class="w-[30%] border-b border-t border-amber-400 py-1">

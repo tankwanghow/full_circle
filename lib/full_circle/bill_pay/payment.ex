@@ -13,6 +13,11 @@ defmodule FullCircle.BillPay.Payment do
     field :funds_amount, :decimal, default: Decimal.new("0")
     belongs_to :company, FullCircle.Sys.Company
 
+    field :e_inv_uuid, :string
+    field :e_inv_long_id, :string
+    field :e_inv_internal_id, :string
+    field :e_inv_info, :string
+
     has_many :payment_details, FullCircle.BillPay.PaymentDetail, on_replace: :delete
 
     has_many :transaction_matchers, FullCircle.Accounting.TransactionMatcher,
@@ -45,7 +50,11 @@ defmodule FullCircle.BillPay.Payment do
       :payment_no,
       :funds_account_name,
       :funds_account_id,
-      :funds_amount
+      :funds_amount,
+      :e_inv_uuid,
+      :e_inv_long_id,
+      :e_inv_internal_id,
+      :e_inv_info
     ])
     |> fill_today(:payment_date)
     |> validate_required([
@@ -57,6 +66,7 @@ defmodule FullCircle.BillPay.Payment do
       :funds_amount
     ])
     |> validate_id(:contact_name, :contact_id)
+    |> unique_constraint(:e_inv_uuid)
     |> validate_length(:descriptions, max: 230)
     |> validate_id(:funds_account_name, :funds_account_id)
     |> validate_date(:payment_date, days_before: 60)

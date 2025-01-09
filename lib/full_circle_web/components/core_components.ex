@@ -822,7 +822,7 @@ defmodule FullCircleWeb.CoreComponents do
   end
 
   attr :form, :any
-  attr :label, :string
+  attr :label, :string, default: gettext("Save")
 
   def save_button(assigns) do
     ~H"""
@@ -852,7 +852,6 @@ defmodule FullCircleWeb.CoreComponents do
     <.save_button
       :if={@live_action == :new or @live_action == :edit}
       form={@form}
-      label={gettext("Save")}
     />
     <.save_button :if={@live_action == :match} form={@form} label={gettext("Match E-Invoice")} />
     <.save_button :if={@live_action == :unmatch} form={@form} label={gettext("Unmatch E-Invoice")} />

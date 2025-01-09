@@ -16,7 +16,7 @@ defmodule FullCircleWeb.InvoiceLive.IndexComponent do
     ~H"""
     <div
       id={@id}
-      class={"#{@ex_class} max-h-8 flex flex-row text-center tracking-tighter bg-gray-200 hover:bg-gray-400"}
+      class={"#{@ex_class} flex flex-row text-center tracking-tighter bg-gray-200 hover:bg-gray-400"}
     >
       <div class="w-[2%] border-b border-gray-400 py-1">
         <input
@@ -37,13 +37,13 @@ defmodule FullCircleWeb.InvoiceLive.IndexComponent do
           phx-value-object-id={@obj.id}
         />
       </div>
-      <div class="w-[9%] border-b border-gray-400 py-1">
+      <div class="w-[8%] border-b border-gray-400 py-1">
         <%= @obj.invoice_date |> FullCircleWeb.Helpers.format_date() %>
       </div>
-      <div class="w-[9%] border-b border-gray-400 py-1">
+      <div class="w-[8%] border-b border-gray-400 py-1">
         <%= @obj.due_date |> FullCircleWeb.Helpers.format_date() %>
       </div>
-      <div class="w-[10%] border-b border-gray-400 py-1">
+      <div class="w-[9%] border-b border-gray-400 py-1">
         <%= if @obj.old_data do %>
           <%= @obj.invoice_no %>
         <% else %>
@@ -53,7 +53,10 @@ defmodule FullCircleWeb.InvoiceLive.IndexComponent do
           />
         <% end %>
       </div>
-      <div class="w-[20%] border-b border-gray-400 py-1 overflow-clip">
+      <div class="w-[4%] border-b border-gray-400 py-1">
+        <.e_invoice_link obj={@obj} />
+      </div>
+      <div class="w-[19%] border-b border-gray-400 py-1 overflow-clip">
         <%= @obj.contact_name %>
       </div>
       <div class="w-[30%] border-b text-center border-gray-400 py-1 overflow-clip">

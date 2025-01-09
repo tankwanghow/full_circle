@@ -13,6 +13,10 @@ defmodule FullCircle.Billing.Invoice do
     field :delivery_man_tags, :string
     field :loader_wages_tags, :string
     field :delivery_wages_tags, :string
+    field :e_inv_uuid, :string
+    field :e_inv_long_id, :string
+    field :e_inv_info, :string
+    field :e_inv_internal_id, :string
 
     belongs_to :company, FullCircle.Sys.Company
     belongs_to :contact, FullCircle.Accounting.Contact
@@ -20,6 +24,8 @@ defmodule FullCircle.Billing.Invoice do
     has_many :invoice_details, FullCircle.Billing.InvoiceDetail, on_replace: :delete
 
     field :contact_name, :string, virtual: true
+    field :tax_id, :string, virtual: true
+    field :reg_no, :string, virtual: true
     field :invoice_amount, :decimal, virtual: true, default: 0
     field :invoice_good_amount, :decimal, virtual: true, default: 0
     field :invoice_tax_amount, :decimal, virtual: true, default: 0
@@ -42,7 +48,13 @@ defmodule FullCircle.Billing.Invoice do
       :company_id,
       :contact_id,
       :contact_name,
-      :invoice_no
+      :invoice_no,
+      :e_inv_uuid,
+      :e_inv_long_id,
+      :e_inv_internal_id,
+      :e_inv_info,
+      :tax_id,
+      :reg_no
     ])
     |> fill_today(:invoice_date)
     |> fill_today(:due_date)
@@ -57,6 +69,7 @@ defmodule FullCircle.Billing.Invoice do
     |> validate_date(:invoice_date, days_after: 3)
     |> validate_length(:descriptions, max: 230)
     |> validate_id(:contact_name, :contact_id)
+    |> unique_constraint(:e_inv_uuid)
     |> unsafe_validate_unique([:invoice_no, :company_id], FullCircle.Repo,
       message: gettext("invoice no already in company")
     )

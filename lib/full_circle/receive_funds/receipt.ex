@@ -22,6 +22,11 @@ defmodule FullCircle.ReceiveFund.Receipt do
       foreign_key: :doc_id,
       references: :id
 
+    field :e_inv_uuid, :string
+    field :e_inv_long_id, :string
+    field :e_inv_internal_id, :string
+    field :e_inv_info, :string
+
     field :contact_name, :string, virtual: true
     field :funds_account_name, :string, virtual: true
     field :cheques_amount, :decimal, virtual: true, default: 0
@@ -48,7 +53,11 @@ defmodule FullCircle.ReceiveFund.Receipt do
       :receipt_no,
       :funds_account_name,
       :funds_account_id,
-      :funds_amount
+      :funds_amount,
+      :e_inv_uuid,
+      :e_inv_long_id,
+      :e_inv_internal_id,
+      :e_inv_info
     ])
     |> fill_today(:receipt_date)
     |> validate_required([
@@ -62,6 +71,7 @@ defmodule FullCircle.ReceiveFund.Receipt do
     |> validate_length(:descriptions, max: 230)
     |> validate_date(:receipt_date, days_after: 0)
     |> validate_date(:receipt_date, days_before: 60)
+    |> unique_constraint(:e_inv_uuid)
     |> validate_id(:contact_name, :contact_id)
     |> validate_id(:funds_account_name, :funds_account_id)
     |> unsafe_validate_unique([:receipt_no, :company_id], FullCircle.Repo,

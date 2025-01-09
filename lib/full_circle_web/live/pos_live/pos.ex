@@ -24,8 +24,7 @@ defmodule FullCircleWeb.PosLive do
           value=""
         />
       </div>
-      <div class="w-1/3 h-[90%] bg-gray-500 rounded-xl">
-      </div>
+      <div class="w-1/3 h-[90%] bg-gray-500 rounded-xl"></div>
     </div>
     """
   end

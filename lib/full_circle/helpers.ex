@@ -266,7 +266,7 @@ defmodule FullCircle.Helpers do
          if(
            (String.ends_with?(Atom.to_string(kk), "_id") or Atom.to_string(kk) == "id") and
              !is_nil(vv),
-           do: Ecto.UUID.cast!(vv),
+           do: try_cast(vv),
            else: vv
          )}
       end)
@@ -286,11 +286,19 @@ defmodule FullCircle.Helpers do
      |> Enum.map(fn r ->
        Enum.map(r, fn {k, v} ->
          if(!is_nil(v) and (String.ends_with?(k, "_id") or k == "id"),
-           do: Ecto.UUID.cast!(v),
+           do: try_cast(v),
            else: v
          )
        end)
      end)}
+  end
+
+  defp try_cast(val) do
+    try do
+      Ecto.UUID.cast!(val)
+    rescue
+      Ecto.CastError -> val
+    end
   end
 
   def remove_field_if_new_flag(attrs, field_name) do

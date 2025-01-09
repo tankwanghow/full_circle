@@ -506,6 +506,21 @@ defmodule FullCircleWeb.PaymentLive.Form do
           </div>
         </div>
 
+        <div class="flex flex-row flex-nowrap mt-2">
+          <div class="w-[50%]">
+            <.input field={@form[:e_inv_info]} readonly={true} label={gettext("E Invoice Info")} />
+          </div>
+          <div class="w-[10%]">
+            <.input field={@form[:e_inv_internal_id]} label={gettext("E Invoice Internal Id")} />
+          </div>
+          <div class="w-[15%]">
+            <.input field={@form[:e_inv_uuid]} label={gettext("E Invoice UUID")} />
+          </div>
+          <div class="w-[25%]">
+            <.input field={@form[:e_inv_long_id]} label={gettext("E Invoice Long Id")} />
+          </div>
+        </div>
+
         <div class="flex flex-row gap-2 flex-nowrap w-2/3 mx-auto text-center mt-5">
           <div
             id="match-trans-tab"

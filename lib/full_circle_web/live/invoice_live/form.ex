@@ -8,11 +8,13 @@ defmodule FullCircleWeb.InvoiceLive.Form do
   @impl true
   def mount(params, _session, socket) do
     id = params["invoice_id"]
+    obj = Jason.decode!(params["obj"] || "{}")
 
     socket =
       case socket.assigns.live_action do
-        :new -> mount_new(socket)
+        :new -> mount_new(socket, obj)
         :edit -> mount_edit(socket, id)
+        :match -> mount_match(socket, id, obj)
       end
 
     {:ok,
@@ -24,10 +26,27 @@ defmodule FullCircleWeb.InvoiceLive.Form do
            socket.assigns.current_company,
            socket.assigns.current_user
          )
-     )}
+     )
+     |> assign(e_inv_obj: obj)}
   end
 
-  defp mount_new(socket) do
+  defp mount_new(socket, obj) do
+    attrs =
+      if obj != %{} do
+        %{
+          invoice_no: "...new...",
+          e_inv_internal_id: obj["internalId"],
+          invoice_date: obj["dateTimeIssued"] |> String.slice(0..9),
+          due_date: obj["dateTimeIssued"] |> String.slice(0..9),
+          e_inv_uuid: obj["uuid"],
+          e_inv_long_id: obj["longId"],
+          e_inv_info:
+            ~s(#{obj["fc_mainName"]} - #{obj["fc_direction"]} - #{obj["typeName"]} - #{obj["documentCurrency"]}#{obj["totalNetAmount"]})
+        }
+      else
+        %{invoice_no: "...new..."}
+      end
+
     socket
     |> assign(live_action: :new)
     |> assign(id: "new")
@@ -39,7 +58,7 @@ defmodule FullCircleWeb.InvoiceLive.Form do
         StdInterface.changeset(
           Invoice,
           %Invoice{},
-          %{invoice_no: "...new..."},
+          attrs,
           socket.assigns.current_company
         )
       )
@@ -62,6 +81,36 @@ defmodule FullCircleWeb.InvoiceLive.Form do
     |> assign(
       :form,
       to_form(StdInterface.changeset(Invoice, object, %{}, socket.assigns.current_company))
+    )
+  end
+
+  defp mount_match(socket, id, obj) do
+    object =
+      Billing.get_invoice!(
+        id,
+        socket.assigns.current_company,
+        socket.assigns.current_user
+      )
+
+    attrs =
+      %{
+        e_inv_internal_id: obj["internalId"],
+        invoice_date: obj["dateTimeIssued"] |> String.slice(0..9),
+        due_date: obj["dateTimeIssued"] |> String.slice(0..9),
+        e_inv_uuid: obj["uuid"],
+        e_inv_long_id: obj["longId"],
+        e_inv_info:
+          ~s(#{obj["fc_mainName"]} - #{obj["fc_direction"]} - #{obj["typeName"]} - #{obj["documentCurrency"]}#{obj["totalNetAmount"]})
+      }
+
+    socket
+    |> assign(live_action: :edit)
+    |> assign(id: id)
+    |> assign(page_title: gettext("Edit Invoice") <> " " <> object.invoice_no)
+    |> assign(matched_trans: Billing.get_matcher_by("Invoice", id))
+    |> assign(
+      :form,
+      to_form(StdInterface.changeset(Invoice, object, attrs, socket.assigns.current_company))
     )
   end
 
@@ -115,11 +164,11 @@ defmodule FullCircleWeb.InvoiceLive.Form do
         socket
       ) do
     {params, socket, _} =
-      FullCircleWeb.Helpers.assign_autocomplete_id(
+      FullCircleWeb.Helpers.assign_autocomplete_ids(
         socket,
         params,
         "contact_name",
-        "contact_id",
+        %{"contact_id" => :id, "tax_id" => :tax_id, "reg_no" => :reg_no},
         &FullCircle.Accounting.get_contact_by_name/3
       )
 
@@ -363,6 +412,12 @@ defmodule FullCircleWeb.InvoiceLive.Form do
             />
           </div>
           <div class="grow shrink">
+            <.input field={@form[:reg_no]} label={gettext("Reg No")} readonly tabindex="-1" />
+          </div>
+          <div class="grow shrink">
+            <.input field={@form[:tax_id]} label={gettext("Tax Id")} readonly tabindex="-1" />
+          </div>
+          <div class="grow shrink">
             <.input field={@form[:invoice_date]} label={gettext("Invoice Date")} type="date" />
           </div>
           <div class="grow shrink">
@@ -370,6 +425,21 @@ defmodule FullCircleWeb.InvoiceLive.Form do
           </div>
           <div class="w-1/4 grow shrink">
             <.input field={@form[:descriptions]} label={gettext("Descriptions")} />
+          </div>
+        </div>
+
+        <div class="flex flex-row flex-nowrap mt-2">
+          <div class="w-[50%]">
+            <.input field={@form[:e_inv_info]} readonly label={gettext("E Invoice Info")} />
+          </div>
+          <div class="w-[10%]">
+            <.input field={@form[:e_inv_internal_id]} label={gettext("E Invoice Internal Id")} />
+          </div>
+          <div class="w-[15%]">
+            <.input field={@form[:e_inv_uuid]} label={gettext("E Invoice UUID")} />
+          </div>
+          <div class="w-[25%]">
+            <.input field={@form[:e_inv_long_id]} label={gettext("E Invoice Long Id")} />
           </div>
         </div>
 
@@ -405,6 +475,21 @@ defmodule FullCircleWeb.InvoiceLive.Form do
               phx-hook="tributeTagText"
               url={"/list/companies/#{@current_company.id}/#{@current_user.id}/billingtags?klass=FullCircle.Billing.Invoice&tag_field=delivery_wages_tags&tag="}
             />
+          </div>
+        </div>
+
+        <div class="flex flex-row flex-nowrap mt-2">
+          <div class="w-[50%]">
+            <.input field={@form[:e_inv_info]} readonly={true} label={gettext("E Invoice Info")} />
+          </div>
+          <div class="w-[10%]">
+            <.input field={@form[:e_inv_internal_id]} label={gettext("E Invoice Internal Id")} />
+          </div>
+          <div class="w-[15%]">
+            <.input field={@form[:e_inv_uuid]} label={gettext("E Invoice UUID")} />
+          </div>
+          <div class="w-[25%]">
+            <.input field={@form[:e_inv_long_id]} label={gettext("E Invoice Long Id")} />
           </div>
         </div>
 

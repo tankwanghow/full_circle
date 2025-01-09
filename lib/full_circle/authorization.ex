@@ -101,6 +101,12 @@ defmodule FullCircle.Authorization do
   def can?(user, :update_payment, company),
     do: allow_roles(~w(admin manager supervisor clerk cashier), company, user)
 
+  def can?(user, :create_e_inv_meta, company),
+    do: allow_roles(~w(admin manager), company, user)
+
+  def can?(user, :update_e_inv_meta, company),
+    do: allow_roles(~w(admin manager), company, user)
+
   def can?(user, :create_journal, company),
     do: allow_roles(~w(admin manager supervisor), company, user)
 

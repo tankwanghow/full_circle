@@ -233,6 +233,7 @@ defmodule FullCircle.ReceiveFund do
       select: %{
         id: coalesce(rec.id, txn.id),
         receipt_no: txn.doc_no,
+        e_inv_uuid: rec.e_inv_uuid,
         particulars:
           fragment(
             "string_agg(distinct coalesce(?, ?), ', ')",
@@ -346,8 +347,7 @@ defmodule FullCircle.ReceiveFund do
         |> Enum.map(fn {k, v} ->
           %{
             account_id: k,
-            match_doc_nos:
-              Enum.map(v, fn x -> x.t_doc_no end) |> Enum.join(", ") |> String.slice(0..200),
+            match_doc_nos: Enum.map_join(v, ", ", fn x -> x.t_doc_no end) |> String.slice(0..200),
             amount: Enum.reduce(v, 0, fn x, acc -> Decimal.add(acc, x.match_amount) end)
           }
         end)

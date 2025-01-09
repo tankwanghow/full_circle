@@ -70,7 +70,13 @@ defmodule FullCircleWeb.InvoiceLive.Print do
             <div class="letter-head">
               <%= if(@pre_print == "true", do: "", else: letter_head_data(assigns)) %>
             </div>
-            <div class="doctype is-size-4 has-text-weight-semibold">INVOICE</div>
+
+            <div class="doctype">
+              <%= QRCode.create(FullCircle.Helpers.e_inv_validate_url(invoice), :high)
+              |> QRCode.render(:svg, %QRCode.Render.SvgSettings{scale: 1.5})
+              |> elem(1)
+              |> raw %>
+            </div>
             <%= invoice_header(invoice, n, invoice.chunk_number, assigns) %>
             <%= detail_header(assigns) %>
             <div class="details-body is-size-6">
@@ -228,6 +234,7 @@ defmodule FullCircleWeb.InvoiceLive.Print do
         <%= @invoice.contact.reg_no %>
       </div>
       <div class="invoice-info">
+        <div class="is-size-4 has-text-weight-semibold">INVOICE</div>
         <div>
           Invoice Date:
           <span class="has-text-weight-bold"><%= format_date(@invoice.invoice_date) %></span>
@@ -283,8 +290,8 @@ defmodule FullCircleWeb.InvoiceLive.Print do
         .page { padding-left: 10mm; padding-right: 10mm; page-break-after: always;} }
 
       .letter-head { padding-bottom: 2mm; margin-bottom: 5mm; height: 28mm;}
-      .doctype { float: right; margin-top: -20mm; margin-right: 0mm; }
-      .invoice-info { float: right; }
+      .doctype { float: right; margin-top: -30mm; margin-right: 0mm; vertical-align: top;}
+      .invoice-info { margin-top: -5mm; float: right; }
       .invoice-header { width: 100%; height: 40mm; border-bottom: 0.5mm solid black; }
       .customer { padding-left: 2mm; float: left;}
       .invoice-info div { margin-bottom: 2mm; text-align: right; }

@@ -18,6 +18,9 @@ defmodule FullCircle.Accounting.Contact do
     field :email, :string
     field :contact_info, :string
     field :descriptions, :string
+    field :sst_id, :string
+    field :gst_id, :string
+    field :tou_id, :string
 
     has_many :invoices, FullCircle.Billing.Invoice
 
@@ -41,7 +44,10 @@ defmodule FullCircle.Accounting.Contact do
       :contact_info,
       :descriptions,
       :category,
-      :company_id
+      :company_id,
+      :gst_id,
+      :sst_id,
+      :tou_id
     ])
     |> validate_required([:name, :company_id])
     |> validate_length(:descriptions, max: 230)

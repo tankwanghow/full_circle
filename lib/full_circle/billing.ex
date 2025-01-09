@@ -109,6 +109,8 @@ defmodule FullCircle.Billing do
         select_merge: %{
           contact_name: cont.name,
           contact_id: cont.id,
+          reg_no: cont.reg_no,
+          tax_id: cont.tax_id,
           invoice_tax_amount:
             fragment(
               "round(?, 2)",
@@ -238,17 +240,20 @@ defmodule FullCircle.Billing do
       select: %{
         id: coalesce(txn.doc_id, txn.id),
         invoice_no: txn.doc_no,
+        e_inv_uuid: inv.e_inv_uuid,
         particulars: coalesce(txn.contact_particulars, txn.particulars),
         invoice_date: txn.doc_date,
         due_date: txn.doc_date,
         contact_name: cont.name,
+        reg_no: cont.reg_no,
+        tax_id: cont.tax_id,
         invoice_amount: txn.amount,
         balance:
           txn.amount + coalesce(sum(stxm.match_amount), 0) + coalesce(sum(atxm.match_amount), 0),
         checked: false,
         old_data: txn.old_data
       },
-      group_by: [txn.id, cont.name],
+      group_by: [txn.id, cont.id, inv.id],
       order_by: [desc: txn.doc_date]
   end
 
@@ -500,7 +505,7 @@ defmodule FullCircle.Billing do
           order_by: [inv.old_data],
           order_by:
             ^similarity_order(
-              [:pur_invoice_no, :supplier_invoice_no, :contact_name, :particulars],
+              [:pur_invoice_no, :e_inv_internal_id, :contact_name, :particulars],
               terms
             ),
           order_by: [desc: inv.pur_invoice_no]
@@ -558,18 +563,21 @@ defmodule FullCircle.Billing do
       select: %{
         id: coalesce(txn.doc_id, txn.id),
         pur_invoice_no: txn.doc_no,
-        supplier_invoice_no: coalesce(inv.supplier_invoice_no, "-"),
+        e_inv_internal_id: coalesce(inv.e_inv_internal_id, "-"),
+        e_inv_uuid: inv.e_inv_uuid,
         particulars: coalesce(txn.contact_particulars, txn.particulars),
         pur_invoice_date: txn.doc_date,
         due_date: txn.doc_date,
         contact_name: cont.name,
+        reg_no: cont.reg_no,
+        tax_id: cont.tax_id,
         pur_invoice_amount: txn.amount,
         balance:
           txn.amount + coalesce(sum(stxm.match_amount), 0) + coalesce(sum(atxm.match_amount), 0),
         checked: false,
         old_data: txn.old_data
       },
-      group_by: [txn.id, cont.name, inv.id],
+      group_by: [txn.id, cont.id, inv.id],
       order_by: [desc: txn.doc_date]
   end
 
@@ -676,6 +684,28 @@ defmodule FullCircle.Billing do
       |> List.flatten()
       |> Enum.reject(fn x -> is_nil(x) end)
     end)
+  end
+
+  def match_pur_invoice(%PurInvoice{} = pur_invoice, attrs, com, user) do
+    pur_invoice_name = :update_pur_invoice
+    attrs = remove_field_if_new_flag(attrs, "pur_invoice_no")
+
+    case can?(user, :update_pur_invoice, com) do
+      true ->
+        Multi.new()
+        |> Multi.update(
+          pur_invoice_name,
+          StdInterface.changeset(PurInvoice, pur_invoice, attrs, com)
+        )
+        |> Sys.insert_log_for(pur_invoice_name, attrs, com, user)
+        |> Repo.transaction()
+
+      false ->
+        :not_authorise
+    end
+  rescue
+    e in Postgrex.Error ->
+      {:sql_error, e.postgres.message}
   end
 
   def update_pur_invoice(%PurInvoice{} = pur_invoice, attrs, com, user) do

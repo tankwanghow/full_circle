@@ -10,11 +10,13 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
     id = params["note_id"]
     to = Timex.today()
     from = Timex.shift(to, months: -1)
+    obj = Jason.decode!(params["obj"] || "{}")
 
     socket =
       case socket.assigns.live_action do
-        :new -> mount_new(socket)
+        :new -> mount_new(socket, obj)
         :edit -> mount_edit(socket, id)
+        :match -> mount_match(socket, id, obj)
       end
 
     {:ok,
@@ -22,10 +24,26 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
      |> assign(details_got_error: false)
      |> assign(matchers_got_error: false)
      |> assign(query: %{from: from, to: to})
-     |> assign(query_match_trans: [])}
+     |> assign(query_match_trans: [])
+     |> assign(e_inv_obj: obj)}
   end
 
-  defp mount_new(socket) do
+  defp mount_new(socket, obj) do
+    attrs =
+      if obj != %{} do
+        %{
+          note_no: "...new...",
+          e_inv_internal_id: obj["internalId"],
+          note_date: obj["dateTimeIssued"] |> String.slice(0..9),
+          e_inv_uuid: obj["uuid"],
+          e_inv_long_id: obj["longId"],
+          e_inv_info:
+            ~s(#{obj["fc_mainName"]} - #{obj["fc_direction"]} - #{obj["typeName"]} - #{obj["documentCurrency"]}#{obj["totalNetAmount"]})
+        }
+      else
+        %{note_no: "...new..."}
+      end
+
     socket
     |> assign(live_action: :new)
     |> assign(id: "new")
@@ -36,7 +54,7 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
         StdInterface.changeset(
           CreditNote,
           %CreditNote{},
-          %{note_no: "...new..."},
+          attrs,
           socket.assigns.current_company
         )
       )
@@ -53,6 +71,34 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
 
     cs =
       StdInterface.changeset(CreditNote, object, %{}, socket.assigns.current_company)
+
+    socket
+    |> assign(live_action: :edit)
+    |> assign(id: id)
+    |> assign(page_title: gettext("Edit Credit Note") <> " " <> object.note_no)
+    |> assign(:form, to_form(cs))
+  end
+
+  defp mount_match(socket, id, obj) do
+    object =
+      DebCre.get_debit_note!(
+        id,
+        socket.assigns.current_company,
+        socket.assigns.current_user
+      )
+
+    attrs =
+      %{
+        e_inv_internal_id: obj["internalId"],
+        note_date: obj["dateTimeIssued"] |> String.slice(0..9),
+        e_inv_uuid: obj["uuid"],
+        e_inv_long_id: obj["longId"],
+        e_inv_info:
+          ~s(#{obj["fc_mainName"]} - #{obj["fc_direction"]} - #{obj["typeName"]} - #{obj["documentCurrency"]}#{obj["totalNetAmount"]})
+      }
+
+    cs =
+      StdInterface.changeset(CreditNote, object, attrs, socket.assigns.current_company)
 
     socket
     |> assign(live_action: :edit)
@@ -329,7 +375,7 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
       <.form for={@form} id="object-form" autocomplete="off" phx-change="validate" phx-submit="save">
         <.input type="hidden" field={@form[:note_no]} />
         <div class="flex flex-row flex-nowarp">
-          <div class="w-6/12 grow shrink">
+          <div class="w-[41%]">
             <.input type="hidden" field={@form[:contact_id]} />
             <.input
               field={@form[:contact_name]}
@@ -338,10 +384,10 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
               url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
             />
           </div>
-          <div class="grow shrink w-3/12">
+          <div class="w-[12%]">
             <.input field={@form[:note_date]} label={gettext("Credit Note Date")} type="date" />
           </div>
-          <div class="grow shrink w-3/12">
+          <div class="w-[12%]">
             <.input
               feedback={true}
               type="number"
@@ -351,7 +397,25 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
               value={Ecto.Changeset.fetch_field!(@form.source, :note_balance)}
             />
           </div>
+
+          <div class="w-[15%]">
+            <.input field={@form[:e_inv_internal_id]} label={gettext("E Invoice Internal Id")} />
+          </div>
+
+          <div class="w-[20%]">
+            <.input field={@form[:e_inv_uuid]} label={gettext("E Invoice UUID")} />
+          </div>
         </div>
+
+        <div class="flex flex-row flex-nowrap mt-2">
+          <div class="w-[70%]">
+            <.input field={@form[:e_inv_info]} readonly={true} label={gettext("E Invoice Info")} />
+          </div>
+          <div class="w-[30%]">
+            <.input field={@form[:e_inv_long_id]} label={gettext("E Invoice Long Id")} />
+          </div>
+        </div>
+
         <div class="flex flex-row gap-2 flex-nowrap w-2/3 mx-auto text-center mt-5">
           <div
             id="credit-note-details-tab"
