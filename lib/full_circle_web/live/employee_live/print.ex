@@ -49,7 +49,7 @@ defmodule FullCircleWeb.EmployeeLive.Print do
   def render(assigns) do
     ~H"""
     <div id="print-me" class="print-here">
-      <%= style(assigns) %>
+      {style(assigns)}
       <%= Enum.map 1..@chunk_number, fn n -> %>
         <div class="page">
           <div class="details-body is-size-6">
@@ -57,9 +57,9 @@ defmodule FullCircleWeb.EmployeeLive.Print do
               <div class="detail">
                 <%= for e <- emp do %>
                   <div class="emp-card">
-                    <div class="emp-svg"><%= e.svg |> raw %></div>
-                    <div class="emp-info"><%= e.name %></div>
-                    <div class="emp-info"><%= e.id_no %></div>
+                    <div class="emp-svg">{e.svg |> raw}</div>
+                    <div class="emp-info">{e.name}</div>
+                    <div class="emp-info">{e.id_no}</div>
                   </div>
                 <% end %>
               </div>

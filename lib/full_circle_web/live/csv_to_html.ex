@@ -12,7 +12,7 @@ defmodule FullCircleWeb.CsvHtml do
     <div class={@row_class}>
       <%= for h <- @headers do %>
         <div class={"w-[#{Enum.at(@cols_width, Enum.find_index(@headers, fn x -> x == h end))}] #{@col_class}"}>
-          <%= h %>
+          {h}
         </div>
       <% end %>
     </div>
@@ -36,9 +36,9 @@ defmodule FullCircleWeb.CsvHtml do
           <div class={"w-[#{Enum.at(@cols_width, i)}] #{@col_class}"}>
             <% func = Enum.at(@dis_func, i) %>
             <%= if !is_nil(func) do %>
-              <%= func.(d[f]) %>
+              {func.(d[f])}
             <% else %>
-              <%= d[f] %>
+              {d[f]}
             <% end %>
           </div>
         <% end %>

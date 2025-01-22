@@ -37,13 +37,11 @@ defmodule FullCircleWeb.InvoiceLive.IndexComponent do
           phx-value-object-id={@obj.id}
         />
       </div>
-      <div class="w-[8%] border-b border-gray-400 py-1">
-        <%= @obj.invoice_date |> FullCircleWeb.Helpers.format_date() %>
+      <div class="w-[11%] border-b border-gray-400 py-1">
+        {@obj.invoice_date |> FullCircleWeb.Helpers.format_date()} / {@obj.due_date
+        |> FullCircleWeb.Helpers.format_date()}
       </div>
       <div class="w-[8%] border-b border-gray-400 py-1">
-        <%= @obj.due_date |> FullCircleWeb.Helpers.format_date() %>
-      </div>
-      <div class="w-[9%] border-b border-gray-400 py-1">
         <%= if @obj.old_data do %>
           <%= @obj.invoice_no %>
         <% else %>
@@ -51,22 +49,20 @@ defmodule FullCircleWeb.InvoiceLive.IndexComponent do
             current_company={@company}
             doc_obj={%{doc_type: "Invoice", doc_id: @obj.id, doc_no: @obj.invoice_no}}
           />
+          <.e_invoice_link obj={@obj} />
         <% end %>
       </div>
-      <div class="w-[4%] border-b border-gray-400 py-1">
-        <.e_invoice_link obj={@obj} />
+      <div class="w-[20%] border-b border-gray-400 py-1 overflow-clip">
+        {@obj.contact_name}
       </div>
-      <div class="w-[19%] border-b border-gray-400 py-1 overflow-clip">
-        <%= @obj.contact_name %>
-      </div>
-      <div class="w-[30%] border-b text-center border-gray-400 py-1 overflow-clip">
-        <span class="font-light"><%= @obj.particulars %></span>
+      <div class="w-[39%] border-b text-center border-gray-400 py-1 overflow-clip">
+        <span class="font-light">{@obj.particulars}</span>
       </div>
       <div class="w-[10%] border-b border-gray-400 py-1">
-        <%= Number.Currency.number_to_currency(@obj.invoice_amount) %>
+        {Number.Currency.number_to_currency(@obj.invoice_amount)}
       </div>
       <div class="w-[10%] border-b border-gray-400 py-1">
-        <%= Number.Currency.number_to_currency(@obj.balance) %>
+        {Number.Currency.number_to_currency(@obj.balance)}
       </div>
     </div>
     """

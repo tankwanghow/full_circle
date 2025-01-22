@@ -11,7 +11,7 @@ defmodule FullCircleWeb.AdvanceLive.Index do
   def render(assigns) do
     ~H"""
     <div class="mx-auto w-10/12">
-      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
+      <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <div class="flex justify-center mb-2">
         <.form for={%{}} id="search-form" phx-submit="search" autocomplete="off" class="w-full">
           <div class=" flex flex-row flex-wrap tracking-tighter text-sm">
@@ -44,7 +44,7 @@ defmodule FullCircleWeb.AdvanceLive.Index do
           class="blue button"
           id="new_advance"
         >
-          <%= gettext("New Advance") %>
+          {gettext("New Advance")}
         </.link>
         <.link
           :if={@can_print}
@@ -54,7 +54,7 @@ defmodule FullCircleWeb.AdvanceLive.Index do
           target="_blank"
           class="blue button"
         >
-          <%= gettext("Print") %><%= "(#{Enum.count(@selected)})" %>
+          {gettext("Print")}{"(#{Enum.count(@selected)})"}
         </.link>
         <.link
           :if={@can_print}
@@ -64,28 +64,28 @@ defmodule FullCircleWeb.AdvanceLive.Index do
           target="_blank"
           class="blue button"
         >
-          <%= gettext("Pre Print") %><%= "(#{Enum.count(@selected)})" %>
+          {gettext("Pre Print")}{"(#{Enum.count(@selected)})"}
         </.link>
       </div>
       <div class="font-medium flex flex-row text-center tracking-tighter bg-amber-200">
         <div class="w-[2%] border-b border-t border-amber-400 py-1"></div>
         <div class="w-[10%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Date") %>
+          {gettext("Date")}
         </div>
         <div class="w-[10%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Advance No") %>
+          {gettext("Advance No")}
         </div>
         <div class="w-[19%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Employee") %>
+          {gettext("Employee")}
         </div>
         <div class="w-[19%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Funds Account") %>
+          {gettext("Funds Account")}
         </div>
         <div class="w-[30%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Note") %>
+          {gettext("Note")}
         </div>
         <div class="w-[10%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Amount") %>
+          {gettext("Amount")}
         </div>
       </div>
       <div

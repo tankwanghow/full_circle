@@ -8,7 +8,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
   def render(assigns) do
     ~H"""
     <div class="mx-auto w-8/12">
-      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
+      <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
 
       <.form
         for={%{}}
@@ -52,7 +52,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
             />
           </div>
           <.button class="w-[5%] mt-5 h-10 grow-0 shrink-0">🔍</.button>
-          <a onclick="history.back();" class="w-[7%] h-10 mt-5 blue button"><%= gettext("Back") %></a>
+          <a onclick="history.back();" class="w-[7%] h-10 mt-5 blue button">{gettext("Back")}</a>
         </div>
       </.form>
       <div class="text-center my-4">
@@ -62,7 +62,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
           class="w-[14%] h-10 mt-5 blue button ml-2"
           id="new_timeattend"
         >
-          <%= gettext("Edit Employee") %>
+          {gettext("Edit Employee")}
         </.link>
         <.link
           :if={@search.employee_name != ""}
@@ -70,7 +70,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
           class="w-[9%] h-10 mt-5 blue button ml-2"
           id="new_salarynote"
         >
-          <%= gettext("+ Note") %>
+          {gettext("+ Note")}
         </.link>
         <.link
           :if={@search.employee_name != ""}
@@ -78,7 +78,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
           class="w-[9%] h-10 mt-5 blue button ml-2"
           id="new_advance"
         >
-          <%= gettext("+ Advance") %>
+          {gettext("+ Advance")}
         </.link>
         <.link
           :if={is_nil(@pay_slip)}
@@ -86,7 +86,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
           class="w-[10%] h-10 mt-5 blue button ml-2"
           id="new_payslip"
         >
-          <%= gettext("+ Pay") %>
+          {gettext("+ Pay")}
         </.link>
         <.link
           :if={!is_nil(@pay_slip)}
@@ -94,34 +94,34 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
           class="w-[11%] h-10 mt-5 blue button ml-2"
           id="recal_payslip"
         >
-          <%= gettext("Recal Pay") %>
+          {gettext("Recal Pay")}
         </.link>
       </div>
 
       <div :if={@employee} class="text-center">
-        <span class="font-medium"><%= @employee.name %></span>
-        from <span class="font-medium"><%= @employee.nationality %></span>
-        with id <span class="font-medium"><%= @employee.id_no %></span>
+        <span class="font-medium">{@employee.name}</span>
+        from <span class="font-medium">{@employee.nationality}</span>
+        with id <span class="font-medium">{@employee.id_no}</span>
         work in the company for
         <span class="font-medium">
-          <%= (Timex.diff(Timex.today(), @employee.service_since, :days) / 365)
-          |> Number.Delimit.number_to_delimited() %>
+          {(Timex.diff(Timex.today(), @employee.service_since, :days) / 365)
+          |> Number.Delimit.number_to_delimited()}
         </span>
         years
         currently age
         <span class="font-medium">
-          <%= (Timex.diff(Timex.today(), @employee.dob, :days) / 365)
-          |> Number.Delimit.number_to_delimited() %>
+          {(Timex.diff(Timex.today(), @employee.dob, :days) / 365)
+          |> Number.Delimit.number_to_delimited()}
         </span>
         year old.
         <span :if={Enum.count(@leaves) == 0}>
-          For the year, <span class="font-medium"><%= @employee.name %></span>
+          For the year, <span class="font-medium">{@employee.name}</span>
           has not taken any leaves yet.
         </span>
         <span :if={Enum.count(@leaves) > 0}>
-          For the year, <span class="font-medium"><%= @employee.name %></span>
-          has <%= Enum.map(@leaves, fn x -> "#{Decimal.to_string(x.amount)} #{x.name}" end)
-          |> Enum.join(", ") %>.
+          For the year, <span class="font-medium">{@employee.name}</span>
+          has {Enum.map(@leaves, fn x -> "#{Decimal.to_string(x.amount)} #{x.name}" end)
+          |> Enum.join(", ")}.
         </span>
       </div>
 
@@ -129,7 +129,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
         <span class="mt-1">
           Total:
           <span :if={@employee} id="total_worked_hours" class="font-bold text-orange-600">
-            <%= @total_day_worked |> Number.Delimit.number_to_delimited() %>
+            {@total_day_worked |> Number.Delimit.number_to_delimited()}
           </span>
         </span>
         <span class="mt-1">
@@ -141,7 +141,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
             phx-value-qty={@ot_day_worked |> Number.Delimit.number_to_delimited()}
             phx-click={:new_salarynote_with_qty}
           >
-            <%= @ot_day_worked |> Number.Delimit.number_to_delimited() %>
+            {@ot_day_worked |> Number.Delimit.number_to_delimited()}
           </.link>
         </span>
         <span class="mt-1">
@@ -153,7 +153,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
             phx-value-qty={@normal_pay_days |> Number.Delimit.number_to_delimited()}
             phx-click={:new_salarynote_with_qty}
           >
-            <%= @normal_pay_days |> Number.Delimit.number_to_delimited() %>
+            {@normal_pay_days |> Number.Delimit.number_to_delimited()}
           </.link>
         </span>
         <span class="mt-1">
@@ -164,7 +164,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
             phx-value-qty={@sunday_pay_days |> Number.Delimit.number_to_delimited()}
             phx-click={:new_salarynote_with_qty}
           >
-            <%= @sunday_pay_days |> Number.Delimit.number_to_delimited() %>
+            {@sunday_pay_days |> Number.Delimit.number_to_delimited()}
           </.link>
         </span>
         <span class="mt-1">
@@ -180,7 +180,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
             phx-value-qty={@holiday_pay_days |> Number.Delimit.number_to_delimited()}
             phx-click={:new_salarynote_with_qty}
           >
-            <%= @holiday_pay_days |> Number.Delimit.number_to_delimited() %>
+            {@holiday_pay_days |> Number.Delimit.number_to_delimited()}
           </.link>
         </span>
       </div>
@@ -190,28 +190,28 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
         class="font-medium flex flex-row text-center tracking-tighter bg-blue-200"
       >
         <div class="w-[10%] border-b border-t border-blue-400 py-1">
-          <%= gettext("Date") %>
+          {gettext("Date")}
         </div>
         <div class="w-[10%] border-b border-t border-blue-400 py-1">
-          <%= gettext("Note No") %>
+          {gettext("Note No")}
         </div>
         <div class="w-[10%] border-b border-t border-blue-400 py-1">
-          <%= gettext("Pay Slip No") %>
+          {gettext("Pay Slip No")}
         </div>
         <div class="w-[20%] border-b border-t border-blue-400 py-1">
-          <%= gettext("Salary Type") %>
+          {gettext("Salary Type")}
         </div>
         <div class="w-[26%] border-b border-t border-blue-400 py-1">
-          <%= gettext("Descriptions") %>
+          {gettext("Descriptions")}
         </div>
         <div class="w-[8%] border-b border-t border-blue-400 py-1">
-          <%= gettext("Quantity") %>
+          {gettext("Quantity")}
         </div>
         <div class="w-[8%] border-b border-t border-blue-400 py-1">
-          <%= gettext("Price") %>
+          {gettext("Price")}
         </div>
         <div class="w-[8%] border-b border-t border-blue-400 py-1">
-          <%= gettext("Amount") %>
+          {gettext("Amount")}
         </div>
       </div>
       <div id="notes_list" class="mb-5">
@@ -238,26 +238,26 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
 
       <div class="font-medium flex flex-row text-center tracking-tighter bg-amber-200">
         <div class="w-[12%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Date") %>
+          {gettext("Date")}
         </div>
         <div class="w-[12%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Holiday") %>
+          {gettext("Holiday")}
         </div>
         <div class="w-[11%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Day") %>
+          {gettext("Day")}
         </div>
         <div class="w-[65%] flex flex-row border-b border-t border-amber-400 py-1">
           <div class="w-[70%]">
-            <%= gettext("Punches") %>
+            {gettext("Punches")}
           </div>
           <div class="w-[10%]">
-            <%= gettext("HW") %>
+            {gettext("HW")}
           </div>
           <div class="w-[10%]">
-            <%= gettext("NH") %>
+            {gettext("NH")}
           </div>
           <div class="w-[10%]">
-            <%= gettext("OT") %>
+            {gettext("OT")}
           </div>
         </div>
       </div>

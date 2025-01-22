@@ -11,7 +11,7 @@ defmodule FullCircleWeb.TaxCodeLive.Index do
   def render(assigns) do
     ~H"""
     <div class="mx-auto w-6/12">
-      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
+      <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <.search_form
         search_val={@search.terms}
         placeholder={gettext("Code, Tax Type, Account Name and Descriptions...")}
@@ -22,12 +22,12 @@ defmodule FullCircleWeb.TaxCodeLive.Index do
           class="blue button"
           id="new_object"
         >
-          <%= gettext("New TaxCode") %>
+          {gettext("New TaxCode")}
         </.link>
       </div>
       <div class="text-center">
         <div class="bg-amber-200 border-y-2 border-amber-500 font-bold p-2">
-          <%= gettext("TaxCode Information") %>
+          {gettext("TaxCode Information")}
         </div>
       </div>
       <div

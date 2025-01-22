@@ -261,12 +261,12 @@ defmodule FullCircleWeb.UploadFileLive.Index do
     ~H"""
     <div class="flex mx-auto w-10/12 h-screen text-center">
       <div class="w-[40%] h-[90%] mr-4 border-4 rounded bg-yellow-200 border-yellow-800 mb-2 overflow-y-auto">
-        <div class="text-3xl font-medium"><%= @page_title %></div>
+        <div class="text-3xl font-medium">{@page_title}</div>
         <span class="text font-medium">
-          <%= "Maximum file size is #{@uploads.any_file.max_file_size / 1000_000}MB," %>
+          {"Maximum file size is #{@uploads.any_file.max_file_size / 1000_000}MB,"}
         </span>
         <span class="text-xl font-medium">
-          <%= "and select only #{@uploads.any_file.max_entries} files." %>
+          {"and select only #{@uploads.any_file.max_entries} files."}
         </span>
         <form id="upload-form" phx-submit="upload" phx-change="validate">
           <div>
@@ -275,10 +275,10 @@ defmodule FullCircleWeb.UploadFileLive.Index do
           <div phx-drop-target={@uploads.any_file.ref} class="p-2">
             <%= for entry <- @uploads.any_file.entries do %>
               <div class="mt-2 gap-2 flex flex-row tracking-tighter border-2 border-green-600 place-items-center p-2 rounded-lg">
-                <div class="w-[50%]"><%= entry.client_name %></div>
+                <div class="w-[50%]">{entry.client_name}</div>
                 <div class="w-[50%] text-right">
                   <progress class="mt-1" value={entry.progress} max="100">
-                    <%= entry.progress %>%
+                    {entry.progress}%
                   </progress>
                   <.link
                     phx-click="cancel-upload"
@@ -289,7 +289,7 @@ defmodule FullCircleWeb.UploadFileLive.Index do
                   </.link>
                   <%= for err <- upload_errors(@uploads.any_file, entry) do %>
                     <div class="text-center text-rose-600">
-                      <%= error_to_string(err) %>
+                      {error_to_string(err)}
                     </div>
                   <% end %>
                 </div>
@@ -298,7 +298,7 @@ defmodule FullCircleWeb.UploadFileLive.Index do
 
             <%= for err <- upload_errors(@uploads.any_file) do %>
               <p class="w-[40%] text-xl mx-auto text-rose-600 border-4 font-bold rounded p-4 border-rose-700 bg-rose-200">
-                <%= error_to_string(err) %>
+                {error_to_string(err)}
               </p>
             <% end %>
           </div>
@@ -318,10 +318,10 @@ defmodule FullCircleWeb.UploadFileLive.Index do
         <%= for path <- Path.split(String.replace(@current_path, @root, "root")) do %>
           <%= if @current_path != @name_paths[path] do %>
             <.link class="text-blue-600" phx-click="cd-to" phx-value-path={@name_paths[path]}>
-              <%= path %>
+              {path}
             </.link>
           <% else %>
-            <%= path %>
+            {path}
           <% end %>/
         <% end %>
 
@@ -347,7 +347,7 @@ defmodule FullCircleWeb.UploadFileLive.Index do
 
         <div class="flex place-content-center">
           <%= if Enum.count(@selected) > 0 do %>
-            <%= "Move the selected #{Enum.count(@selected)} file(s) or folder(s) to" %>
+            {"Move the selected #{Enum.count(@selected)} file(s) or folder(s) to"}
             <div class="pl-1 hover:cursor-pointer text-rose-600 hover:font-extrabold" phx-click="move">
               Here
             </div>
@@ -394,7 +394,7 @@ defmodule FullCircleWeb.UploadFileLive.Index do
               target="_blank"
             >
               <.icon name="hero-document-solid" class="h-5 w-5 text-cyan-600" />
-              <%= f.name %>
+              {f.name}
             </.link>
 
             <.link
@@ -404,7 +404,7 @@ defmodule FullCircleWeb.UploadFileLive.Index do
               phx-value-dirname={f.name}
             >
               <.icon name="hero-folder-solid" class="h-5 w-5 text-orange-600" />
-              <%= f.name %>
+              {f.name}
             </.link>
 
             <div :if={@mark_rename == f.name} class="w-[62%] p-1">
@@ -431,7 +431,7 @@ defmodule FullCircleWeb.UploadFileLive.Index do
               >
                 <.icon name="hero-trash-solid" class="h-5 w-5" />
               </.link>
-              <%= "<-- click to confirm delete file" %>
+              {"<-- click to confirm delete file"}
               <.link phx-click="clear-mark" class="font-bold text-orange-600">
                 <.icon name="hero-no-symbol-solid" class="h-5 w-5" />
               </.link>
@@ -448,7 +448,7 @@ defmodule FullCircleWeb.UploadFileLive.Index do
               >
                 <.icon name="hero-trash-solid" class="h-5 w-5" />
               </.link>
-              <%= "<-- click to confirm delete folder" %>
+              {"<-- click to confirm delete folder"}
               <.link phx-click="clear-mark" class="font-bold text-orange-600">
                 <.icon name="hero-no-symbol-solid" class="h-5 w-5" />
               </.link>
@@ -466,14 +466,14 @@ defmodule FullCircleWeb.UploadFileLive.Index do
             </div>
 
             <div :if={@mark_delete != f.name} class="w-[19%] text-right">
-              <%= f.ctime
+              {f.ctime
               |> :calendar.datetime_to_gregorian_seconds()
               |> DateTime.from_gregorian_seconds()
-              |> to_fc_time_format(@current_company, :datetime) %>
+              |> to_fc_time_format(@current_company, :datetime)}
             </div>
 
             <div :if={@mark_delete != f.name} class="w-[10%] text-right">
-              <%= (f.size / 1_000) |> Float.round(2) %>KB
+              {(f.size / 1_000) |> Float.round(2)}KB
             </div>
 
             <div class="w-[3%]">

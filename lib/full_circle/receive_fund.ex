@@ -196,18 +196,16 @@ defmodule FullCircle.ReceiveFund do
     qry =
       if terms != "" do
         from inv in subquery(qry),
-          order_by: [inv.old_data],
-          order_by: ^similarity_order([:receipt_no, :contact_name, :particulars], terms),
-          order_by: [desc: inv.receipt_no]
+          order_by: ^similarity_order([:receipt_no, :contact_name, :particulars], terms)
       else
-        from inv in qry, order_by: [inv.old_data], order_by: [desc: inv.receipt_no]
+        qry
       end
 
     qry =
       if date_from != "" do
         from inv in qry, where: inv.receipt_date >= ^date_from, order_by: inv.receipt_date
       else
-        from inv in qry, order_by: [inv.old_data]
+        from inv in qry, order_by: [desc: inv.receipt_date]
       end
 
     qry |> offset((^page - 1) * ^per_page) |> limit(^per_page) |> Repo.all()
@@ -220,18 +218,17 @@ defmodule FullCircle.ReceiveFund do
     |> Repo.one!()
   end
 
-  defp receipt_raw_query(company, user) do
+  defp receipt_raw_query(company, _user) do
     from txn in Transaction,
-      join: com in subquery(Sys.user_company(company, user)),
-      on: com.id == txn.company_id and txn.doc_type == "Receipt",
       left_join: rec in Receipt,
       on: txn.doc_no == rec.receipt_no,
       join: cont in Contact,
       on: cont.id == rec.contact_id or cont.id == txn.contact_id,
-      order_by: [desc: txn.doc_date],
+      where: txn.company_id == ^company.id,
+      where: txn.doc_type == "Receipt",
       where: txn.amount < 0,
       select: %{
-        id: coalesce(rec.id, txn.id),
+        id: coalesce(txn.doc_id, txn.id),
         receipt_no: txn.doc_no,
         e_inv_uuid: rec.e_inv_uuid,
         particulars:
@@ -241,18 +238,19 @@ defmodule FullCircle.ReceiveFund do
             txn.particulars
           ),
         receipt_date: txn.doc_date,
-        company_id: com.id,
+        company_id: txn.company_id,
         contact_name: cont.name,
         amount: sum(txn.amount),
         checked: false,
         old_data: txn.old_data
       },
       group_by: [
-        coalesce(rec.id, txn.id),
+        coalesce(txn.doc_id, txn.id),
+        rec.id,
         txn.doc_no,
-        cont.name,
+        cont.id,
         txn.doc_date,
-        com.id,
+        txn.company_id,
         txn.old_data
       ]
   end

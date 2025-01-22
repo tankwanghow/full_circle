@@ -23,15 +23,15 @@ defmodule FullCircleWeb.ContactLive.IndexComponent do
         class="hover:font-bold text-blue-600"
         navigate={~p"/companies/#{@current_company.id}/contacts/#{@obj.id}/edit"}
       >
-        <%= @obj.name %>
+        {@obj.name}
       </.link>
-      (<%= @obj.category %>)
+      ({@obj.category})
       <div>
-        <p><%= @obj.address1 %>, <%= @obj.address2 %>
-          <%= @obj.city %> <%= @obj.zipcode %>, <%= @obj.state %> <%= @obj.country %></p>
-        <p><%= @obj.contact_info %></p>
+        <p>{@obj.address1}, {@obj.address2}
+          {@obj.city} {@obj.zipcode}, {@obj.state} {@obj.country}</p>
+        <p>{@obj.contact_info}</p>
       </div>
-      <p class="text-green-800"><%= @obj.descriptions %></p>
+      <p class="text-green-800">{@obj.descriptions}</p>
     </div>
     """
   end

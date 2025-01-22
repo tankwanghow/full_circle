@@ -10,7 +10,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Index do
   def render(assigns) do
     ~H"""
     <div class="mx-auto w-10/12">
-      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
+      <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <div class="flex justify-center mb-2">
         <.form for={%{}} id="search-form" phx-submit="search" class="w-full" autocomplete="off">
           <div class=" flex flex-row flex-wrap tracking-tighter text-sm">
@@ -62,37 +62,37 @@ defmodule FullCircleWeb.PurInvoiceLive.Index do
           class="blue button"
           id="new_purinvoice"
         >
-          <%= gettext("New Purchase Invoice") %>
+          {gettext("New Purchase Invoice")}
         </.link>
       </div>
 
       <div class="font-medium flex flex-row text-center tracking-tighter bg-amber-200">
         <div class="w-[6%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Date") %>
+          {gettext("Date")}
         </div>
         <div class="w-[6%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Due Date") %>
+          {gettext("Due Date")}
         </div>
         <div class="w-[8%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Invoice No") %>
+          {gettext("Invoice No")}
         </div>
         <div class="w-[10%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Supp Inv No") %>
+          {gettext("Supp Inv No")}
         </div>
         <div class="w-[4%] border-b border-t border-amber-400 py-1">
-          <%= gettext("E-Inv") %>
+          {gettext("E-Inv")}
         </div>
         <div class="w-[20%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Contact") %>
+          {gettext("Contact")}
         </div>
         <div class="w-[28%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Particulars") %>
+          {gettext("Particulars")}
         </div>
         <div class="w-[10%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Amount") %>
+          {gettext("Amount")}
         </div>
         <div class="w-[10%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Balance") %>
+          {gettext("Balance")}
         </div>
       </div>
       <div

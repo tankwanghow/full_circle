@@ -114,7 +114,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCamera do
     ~H"""
     <div id="punch-camera" phx-hook="punchCamera" class="mx-auto w-11/12">
       <div class="text-green-600 text-center font-bold">
-        <%= @current_company.name %>
+        {@current_company.name}
       </div>
       <div id="clock" class="text-blue-800 text-center font-bold"></div>
 
@@ -153,16 +153,16 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCamera do
         style="display: none;"
       >
         <button id="outBtn" class="w-1/2 h-28 red button">
-          <%= gettext("OUT") %>
+          {gettext("OUT")}
         </button>
         <button id="inBtn" class="w-1/2 h-28 blue button">
-          <%= gettext("IN") %>
+          {gettext("IN")}
         </button>
       </div>
 
       <div id="backBtn" class="text-center mt-4" style="display: block;">
         <.link navigate={~p"/companies/#{@current_company.id}/dashboard"} class="red button">
-          <%= gettext("Back") %>
+          {gettext("Back")}
         </.link>
       </div>
 

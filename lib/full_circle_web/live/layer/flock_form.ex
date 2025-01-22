@@ -229,7 +229,7 @@ defmodule FullCircleWeb.LayerLive.FlockForm do
   def render(assigns) do
     ~H"""
     <div class="w-6/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
-      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
+      <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <.form
         for={@form}
         id="object-form"
@@ -257,10 +257,10 @@ defmodule FullCircleWeb.LayerLive.FlockForm do
         </div>
 
         <div class="font-bold flex flex-row text-center mt-2">
-          <div class="w-[20%]"><%= gettext("Move Date") %></div>
-          <div class="w-[20%]"><%= gettext("House") %></div>
-          <div class="w-[20%]"><%= gettext("Quantity") %></div>
-          <div class="w-[37%]"><%= gettext("Note") %></div>
+          <div class="w-[20%]">{gettext("Move Date")}</div>
+          <div class="w-[20%]">{gettext("House")}</div>
+          <div class="w-[20%]">{gettext("Quantity")}</div>
+          <div class="w-[37%]">{gettext("Note")}</div>
           <div class="w-[3%]" />
         </div>
         <.inputs_for :let={move} field={@form[:movements]}>
@@ -292,13 +292,13 @@ defmodule FullCircleWeb.LayerLive.FlockForm do
             </div>
           </div>
           <span class="text-sm text-gray-500">
-            <%= Phoenix.HTML.Form.input_value(move, :house_info) %>
+            {Phoenix.HTML.Form.input_value(move, :house_info)}
           </span>
         </.inputs_for>
 
         <div class="my-2">
           <.link phx-click={:add_movement} class="text-orange-500 hover:font-bold focus:font-bold">
-            <.icon name="hero-plus-circle" class="w-5 h-5" /><%= gettext("Add Movement") %>
+            <.icon name="hero-plus-circle" class="w-5 h-5" />{gettext("Add Movement")}
           </.link>
         </div>
 

@@ -28,11 +28,11 @@ defmodule FullCircleWeb.TimeAttendLive.SalaryNoteComponent do
       ]}
     >
       <div class="w-[10%] border-b border-gray-400 py-1">
-        <%= @obj.note_date |> FullCircleWeb.Helpers.format_date() %>
+        {@obj.note_date |> FullCircleWeb.Helpers.format_date()}
       </div>
       <div class="w-[10%] border-b border-gray-400 py-1">
         <.link class="hover:font-bold" phx-value-id={@id} phx-click={:edit_salarynote}>
-          <%= @obj.note_no %>
+          {@obj.note_no}
         </.link>
       </div>
       <div class="w-[10%] border-b border-gray-400 py-1">
@@ -40,23 +40,23 @@ defmodule FullCircleWeb.TimeAttendLive.SalaryNoteComponent do
           class="hover:font-bold"
           navigate={"/companies/#{@company.id}/PaySlip/#{@obj.pay_slip_id}/view"}
         >
-          <%= @obj.pay_slip_no %>
+          {@obj.pay_slip_no}
         </.link>
       </div>
       <div class="w-[20%] border-b text-center border-gray-400 py-1">
-        <span class="font-light"><%= @obj.salary_type_name %></span>
+        <span class="font-light">{@obj.salary_type_name}</span>
       </div>
       <div class="w-[26%] border-b text-center border-gray-400 py-1">
-        <span class="font-light"><%= @obj.descriptions %></span>
+        <span class="font-light">{@obj.descriptions}</span>
       </div>
       <div class="w-[8%] border-b border-gray-400 py-1">
-        <%= Number.Delimit.number_to_delimited(@obj.quantity) %>
+        {Number.Delimit.number_to_delimited(@obj.quantity)}
       </div>
       <div class="w-[8%] border-b border-gray-400 py-1">
-        <%= Number.Currency.number_to_currency(@obj.unit_price) %>
+        {Number.Currency.number_to_currency(@obj.unit_price)}
       </div>
       <div class="w-[8%] border-b border-gray-400 py-1">
-        <%= Number.Currency.number_to_currency(Decimal.mult(@obj.quantity, @obj.unit_price)) %>
+        {Number.Currency.number_to_currency(Decimal.mult(@obj.quantity, @obj.unit_price))}
       </div>
     </div>
     """

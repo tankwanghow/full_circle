@@ -134,7 +134,7 @@ defmodule FullCircleWeb.EInvMetaLive.Form do
   def render(assigns) do
     ~H"""
     <div class="w-7/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
-      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
+      <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <.form
         for={@form}
         id="object-form"
@@ -189,7 +189,7 @@ defmodule FullCircleWeb.EInvMetaLive.Form do
         <div class="flex justify-center gap-x-1 mt-1">
           <.save_button form={@form} />
           <.link :if={@live_action != :new} navigate="" class="orange button">
-            <%= gettext("Cancel") %>
+            {gettext("Cancel")}
           </.link>
           <.live_component
             :if={@live_action != :new}

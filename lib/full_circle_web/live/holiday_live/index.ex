@@ -11,7 +11,7 @@ defmodule FullCircleWeb.HolidayLive.Index do
   def render(assigns) do
     ~H"""
     <div class="mx-auto w-6/12">
-      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
+      <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <.search_form search_val={@search.terms} placeholder={gettext("Name or Short Name...")} />
       <div class="text-center mb-2">
         <.link
@@ -19,12 +19,12 @@ defmodule FullCircleWeb.HolidayLive.Index do
           class="blue button"
           id="new_holiday"
         >
-          <%= gettext("New holidays") %>
+          {gettext("New holidays")}
         </.link>
       </div>
       <div class="text-center">
         <div class="bg-amber-200 border-y-2 border-amber-500 font-bold p-1">
-          <%= gettext("Holiday Information") %>
+          {gettext("Holiday Information")}
         </div>
       </div>
       <div

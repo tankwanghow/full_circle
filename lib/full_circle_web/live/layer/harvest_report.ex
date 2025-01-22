@@ -100,7 +100,7 @@ defmodule FullCircleWeb.LayerLive.HarvestReport do
   def render(assigns) do
     ~H"""
     <div class="w-8/12 mx-auto">
-      <p class="text-2xl text-center font-medium"><%= "#{@page_title}" %></p>
+      <p class="text-2xl text-center font-medium">{"#{@page_title}"}</p>
       <div class="border rounded bg-purple-200 text-center p-2">
         <.form for={%{}} id="search-form" phx-submit="query" autocomplete="off">
           <div class="grid grid-cols-12 tracking-tighter">
@@ -115,7 +115,7 @@ defmodule FullCircleWeb.LayerLive.HarvestReport do
             </div>
             <div class="col-span-2 mt-6">
               <.button>
-                <%= gettext("Query") %>
+                {gettext("Query")}
               </.button>
               <.link
                 :if={@result.ok? and Enum.count(@result.result) > 0}
@@ -145,7 +145,7 @@ defmodule FullCircleWeb.LayerLive.HarvestReport do
 
       <.async_html result={@result}>
         <:result_html>
-          <%= FullCircleWeb.CsvHtml.headers(
+          {FullCircleWeb.CsvHtml.headers(
             [
               gettext("House"),
               gettext("Collector"),
@@ -165,70 +165,70 @@ defmodule FullCircleWeb.LayerLive.HarvestReport do
             ~w(6% 20% 6% 7% 5% 7% 7% 7% 7% 7% 7% 7% 7%),
             "border rounded bg-gray-200 border-gray-400 px-2 py-1",
             assigns
-          ) %>
+          )}
 
           <div id="lists">
             <%= for obj <- @result.result do %>
               <div class="flex flex-row text-center tracking-tighter max-h-20">
                 <div class="w-[6%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
-                  <%= obj.house_no %>
+                  {obj.house_no}
                 </div>
                 <div class="w-[20%] border rounded bg-blue-200 border-blue-400 px-2 py-1 overflow-clip">
-                  <%= obj.employee %>
+                  {obj.employee}
                 </div>
                 <div class="w-[6%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
-                  <%= obj.age %>
+                  {obj.age}
                 </div>
                 <div class="w-[7%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
-                  <%= (obj.prod / 30) |> trunc %>
+                  {(obj.prod / 30) |> trunc}
                 </div>
                 <div class="w-[5%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
-                  <%= obj.dea %>
+                  {obj.dea}
                 </div>
                 <div class={[
                   "w-[7%] border rounded px-2 py-1",
                   yield_color(obj.yield_0, obj.yield_1)
                 ]}>
-                  <%= (obj.yield_0 * 100) |> Number.Percentage.number_to_percentage(precision: 1) %>
+                  {(obj.yield_0 * 100) |> Number.Percentage.number_to_percentage(precision: 1)}
                 </div>
                 <div class={[
                   "w-[7%] border rounded px-2 py-1",
                   yield_color(obj.yield_1, obj.yield_2)
                 ]}>
-                  <%= (obj.yield_1 * 100) |> Number.Percentage.number_to_percentage(precision: 1) %>
+                  {(obj.yield_1 * 100) |> Number.Percentage.number_to_percentage(precision: 1)}
                 </div>
                 <div class={[
                   "w-[7%] border rounded px-2 py-1",
                   yield_color(obj.yield_2, obj.yield_3)
                 ]}>
-                  <%= (obj.yield_2 * 100) |> Number.Percentage.number_to_percentage(precision: 1) %>
+                  {(obj.yield_2 * 100) |> Number.Percentage.number_to_percentage(precision: 1)}
                 </div>
                 <div class={[
                   "w-[7%] border rounded px-2 py-1",
                   yield_color(obj.yield_3, obj.yield_4)
                 ]}>
-                  <%= (obj.yield_3 * 100) |> Number.Percentage.number_to_percentage(precision: 1) %>
+                  {(obj.yield_3 * 100) |> Number.Percentage.number_to_percentage(precision: 1)}
                 </div>
                 <div class={[
                   "w-[7%] border rounded px-2 py-1",
                   yield_color(obj.yield_4, obj.yield_5)
                 ]}>
-                  <%= (obj.yield_4 * 100) |> Number.Percentage.number_to_percentage(precision: 1) %>
+                  {(obj.yield_4 * 100) |> Number.Percentage.number_to_percentage(precision: 1)}
                 </div>
                 <div class={[
                   "w-[7%] border rounded px-2 py-1",
                   yield_color(obj.yield_5, obj.yield_6)
                 ]}>
-                  <%= (obj.yield_5 * 100) |> Number.Percentage.number_to_percentage(precision: 1) %>
+                  {(obj.yield_5 * 100) |> Number.Percentage.number_to_percentage(precision: 1)}
                 </div>
                 <div class={[
                   "w-[7%] border rounded px-2 py-1",
                   yield_color(obj.yield_6, obj.yield_7)
                 ]}>
-                  <%= (obj.yield_6 * 100) |> Number.Percentage.number_to_percentage(precision: 1) %>
+                  {(obj.yield_6 * 100) |> Number.Percentage.number_to_percentage(precision: 1)}
                 </div>
                 <div class="w-[7%] border rounded bg-green-200 border-green-400 px-2 py-1">
-                  <%= (obj.yield_7 * 100) |> Number.Percentage.number_to_percentage(precision: 1) %>
+                  {(obj.yield_7 * 100) |> Number.Percentage.number_to_percentage(precision: 1)}
                 </div>
               </div>
             <% end %>
@@ -238,39 +238,39 @@ defmodule FullCircleWeb.LayerLive.HarvestReport do
               <div class="w-[26%] border rounded bg-amber-200 border-amber-400 px-2 py-1 overflow-clip">
               </div>
               <div class="w-[6%] border rounded bg-amber-200 border-amber-400 px-2 py-1">
-                <%= ((@result.result |> Enum.reduce(0, fn e, acc -> acc + e.age end)) /
-                       Enum.count(@result.result))
-                |> trunc %>
+                {((@result.result |> Enum.reduce(0, fn e, acc -> acc + e.age end)) /
+                    Enum.count(@result.result))
+                |> trunc}
               </div>
               <div class="w-[7%] border rounded bg-amber-200 border-amber-400 px-2 py-1">
-                <%= ((@result.result |> Enum.reduce(0, fn e, acc -> acc + e.prod end)) / 30) |> trunc %>
+                {((@result.result |> Enum.reduce(0, fn e, acc -> acc + e.prod end)) / 30) |> trunc}
               </div>
               <div class="w-[5%] border rounded bg-amber-200 border-amber-400 px-2 py-1">
-                <%= @result.result |> Enum.reduce(0, fn e, acc -> acc + e.dea end) %>
+                {@result.result |> Enum.reduce(0, fn e, acc -> acc + e.dea end)}
               </div>
               <div class="w-[7%] border rounded bg-amber-200 border-amber-400 px-2 py-1">
-                <%= average_yield(@result, :yield_0) %>
+                {average_yield(@result, :yield_0)}
               </div>
               <div class="w-[7%] border rounded bg-amber-200 border-amber-400 px-2 py-1">
-                <%= average_yield(@result, :yield_1) %>
+                {average_yield(@result, :yield_1)}
               </div>
               <div class="w-[7%] border rounded bg-amber-200 border-amber-400 px-2 py-1">
-                <%= average_yield(@result, :yield_2) %>
+                {average_yield(@result, :yield_2)}
               </div>
               <div class="w-[7%] border rounded bg-amber-200 border-amber-400 px-2 py-1">
-                <%= average_yield(@result, :yield_3) %>
+                {average_yield(@result, :yield_3)}
               </div>
               <div class="w-[7%] border rounded bg-amber-200 border-amber-400 px-2 py-1">
-                <%= average_yield(@result, :yield_4) %>
+                {average_yield(@result, :yield_4)}
               </div>
               <div class="w-[7%] border rounded bg-amber-200 border-amber-400 px-2 py-1">
-                <%= average_yield(@result, :yield_5) %>
+                {average_yield(@result, :yield_5)}
               </div>
               <div class="w-[7%] border rounded bg-amber-200 border-amber-400 px-2 py-1">
-                <%= average_yield(@result, :yield_6) %>
+                {average_yield(@result, :yield_6)}
               </div>
               <div class="w-[7%] border rounded bg-amber-200 border-amber-400 px-2 py-1">
-                <%= average_yield(@result, :yield_7) %>
+                {average_yield(@result, :yield_7)}
               </div>
             </div>
           </div>

@@ -11,19 +11,19 @@ defmodule FullCircleWeb.ContactLive.Index do
   def render(assigns) do
     ~H"""
     <div class="w-5/12 mx-auto">
-      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
+      <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <.search_form
         search_val={@search.terms}
         placeholder={gettext("Name, City, State and Descriptions...")}
       />
       <div class="text-center mb-2">
         <.link navigate={~p"/companies/#{@current_company.id}/contacts/new"} class="blue button">
-          <%= gettext("New Contact") %>
+          {gettext("New Contact")}
         </.link>
       </div>
       <div class="text-center">
         <div class=" bg-amber-200 border-y-2 border-amber-500 font-bold p-2">
-          <%= gettext("Contact Information") %>
+          {gettext("Contact Information")}
         </div>
       </div>
       <div

@@ -10,7 +10,7 @@ defmodule FullCircleWeb.DeliveryLive.Index do
   def render(assigns) do
     ~H"""
     <div class="mx-auto w-10/12">
-      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
+      <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <div class="flex justify-center mb-2">
         <.form for={%{}} id="search-form" phx-submit="search" autocomplete="off" class="w-full">
           <div class=" flex flex-row flex-wrap tracking-tighter text-sm">
@@ -43,37 +43,37 @@ defmodule FullCircleWeb.DeliveryLive.Index do
           class="blue button"
           id="new_delivery"
         >
-          <%= gettext("New Delivery") %>
+          {gettext("New Delivery")}
         </.link>
       </div>
       <div class="font-medium flex flex-row text-center tracking-tighter bg-amber-200">
         <div class="w-[2%] border-b border-t border-amber-400 py-1"></div>
         <div class="w-[7%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Date") %>
+          {gettext("Date")}
         </div>
         <div class="w-[7%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Delivery No") %>
+          {gettext("Delivery No")}
         </div>
         <div class="w-[15%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Customer") %>
+          {gettext("Customer")}
         </div>
         <div class="w-[15%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Shipper") %>
+          {gettext("Shipper")}
         </div>
         <div class="w-[8%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Lorry") %>
+          {gettext("Lorry")}
         </div>
         <div class="w-[15%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Goods") %>
+          {gettext("Goods")}
         </div>
         <div class="w-[15%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Package") %>
+          {gettext("Package")}
         </div>
         <div class="w-[8%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Quantity") %>
+          {gettext("Quantity")}
         </div>
         <div class="w-[8%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Status") %>
+          {gettext("Status")}
         </div>
       </div>
       <div

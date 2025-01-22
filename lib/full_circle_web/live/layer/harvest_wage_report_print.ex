@@ -41,23 +41,23 @@ defmodule FullCircleWeb.LayerLive.HarvestWageReportPrint do
   def render(assigns) do
     ~H"""
     <div id="print-me" class="print-here">
-      <%= style(assigns) %>
+      {style(assigns)}
       <%= for {emp, har_list} <- @data do %>
         <div class="page">
-          <span class="has-text-weight-bold is-size-5"><%= emp %></span>
+          <span class="has-text-weight-bold is-size-5">{emp}</span>
           <%= for {d, l} <- har_list do %>
             <div class="wages">
               <div class="info date">
-                <span><%= FullCircleWeb.Helpers.format_date(d) %></span>
+                <span>{FullCircleWeb.Helpers.format_date(d)}</span>
               </div>
               <%= for v <- l do %>
                 <div class="info">
                   <span>
-                    <span class="is-italic"><%= v.house %></span>
-                    &#8226; <span><%= v.prod %></span>
+                    <span class="is-italic">{v.house}</span>
+                    &#8226; <span>{v.prod}</span>
                     &#8226;
                     <span class="has-text-weight-medium">
-                      <%= Number.Delimit.number_to_delimited(v.wages, precision: 2) %>
+                      {Number.Delimit.number_to_delimited(v.wages, precision: 2)}
                     </span>
                   </span>
                 </div>
@@ -65,16 +65,16 @@ defmodule FullCircleWeb.LayerLive.HarvestWageReportPrint do
               <div class="info total">
                 <span class="tot has-text-weight-semibold">Wages</span>
                 <span class="amt">
-                  <%= Enum.reduce(l, 0, fn x, acc -> acc + Decimal.to_float(x.wages) end)
-                  |> Number.Delimit.number_to_delimited(precision: 2) %>
+                  {Enum.reduce(l, 0, fn x, acc -> acc + Decimal.to_float(x.wages) end)
+                  |> Number.Delimit.number_to_delimited(precision: 2)}
                 </span>
               </div>
             </div>
           <% end %>
           <div class="emp_total_wages">
-            Wages for <%= emp %>: <%= Enum.filter(@raw_data, fn e -> e.employee == emp end)
+            Wages for {emp}: {Enum.filter(@raw_data, fn e -> e.employee == emp end)
             |> Enum.reduce(0, fn e, acc -> acc + Decimal.to_float(e.wages) end)
-            |> Number.Delimit.number_to_delimited(precision: 2) %>
+            |> Number.Delimit.number_to_delimited(precision: 2)}
           </div>
         </div>
       <% end %>

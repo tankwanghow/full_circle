@@ -67,46 +67,46 @@ defmodule FullCircleWeb.FixedAssetLive.CalAllDepre do
   def render(assigns) do
     ~H"""
     <div class="w-6/12 mx-auto">
-      <p class="w-full text-2xl text-center font-medium"><%= "#{@page_title}" %></p>
+      <p class="w-full text-2xl text-center font-medium">{"#{@page_title}"}</p>
       <div class="text-center m-4">
-        <a onclick="history.back();" class="blue button"><%= gettext("Back") %></a>
+        <a onclick="history.back();" class="blue button">{gettext("Back")}</a>
       </div>
 
       <div class="my-4 border rounded bg-purple-200 p-5 text-center">
         <.form for={%{}} phx-submit="generate_depreciation" autocomplete="off" phx-change="validate">
           <div class="flex gap-2">
-            <div class="font-bold mt-2"><%= gettext("Until") %></div>
+            <div class="font-bold mt-2">{gettext("Until")}</div>
             <div class="mt-1">
               <.input name="ddate" type="date" value={@ddate} id="ddate" />
             </div>
             <div>
-              <.button disabled={!@valid?}><%= gettext("Generate Depreciations") %></.button>
+              <.button disabled={!@valid?}>{gettext("Generate Depreciations")}</.button>
             </div>
           </div>
         </.form>
 
         <div class="font-medium flex flex-row flex-wrap text-center mt-2 tracking-tighter">
-          <div class="detail-header w-2/12"><%= gettext("Date") %></div>
-          <div class="detail-header w-6/12"><%= gettext("Asset") %></div>
-          <div class="detail-header w-2/12"><%= gettext("Cost Basis") %></div>
+          <div class="detail-header w-2/12">{gettext("Date")}</div>
+          <div class="detail-header w-6/12">{gettext("Asset")}</div>
+          <div class="detail-header w-2/12">{gettext("Cost Basis")}</div>
           <div class="detail-header w-2/12">
-            <%= gettext("Depreciation") %>
+            {gettext("Depreciation")}
           </div>
         </div>
         <div id="generated_depreciation_list">
           <%= for obj <- @generated_depreciations do %>
             <div class="flex flex-row text-center tracking-tighter">
               <div class="w-2/12 border rounded bg-amber-200 border-amber-400 text-center px-2 py-1">
-                <%= obj.depre_date %>
+                {obj.depre_date}
               </div>
               <div class="w-6/12 border rounded bg-amber-200 border-amber-400 text-center px-2 py-1">
-                <%= obj.fixed_asset.name %>
+                {obj.fixed_asset.name}
               </div>
               <div class="w-2/12 border rounded bg-amber-200 border-amber-400 text-center px-2 py-1">
-                <%= obj.cost_basis |> Number.Delimit.number_to_delimited() %>
+                {obj.cost_basis |> Number.Delimit.number_to_delimited()}
               </div>
               <div class="w-2/12 border rounded bg-amber-200 border-amber-400 text-center px-2 py-1">
-                <%= obj.amount |> Number.Delimit.number_to_delimited() %>
+                {obj.amount |> Number.Delimit.number_to_delimited()}
               </div>
             </div>
           <% end %>
@@ -117,7 +117,7 @@ defmodule FullCircleWeb.FixedAssetLive.CalAllDepre do
             phx-click={:save_generated_depreciations}
             class="blue button"
           >
-            <%= gettext("Save Generated Depreciations") %>
+            {gettext("Save Generated Depreciations")}
           </.link>
         </div>
       </div>

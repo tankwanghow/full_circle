@@ -48,7 +48,7 @@ defmodule FullCircleWeb.JournalEntryViewLive.Component do
     ~H"""
     <div id={@id}>
       <.link phx-target={@myself} phx-click={:show_journal} class="blue button block">
-        <%= gettext("Journal") %>
+        {gettext("Journal")}
       </.link>
       <.modal
         :if={@show_journal}
@@ -59,78 +59,78 @@ defmodule FullCircleWeb.JournalEntryViewLive.Component do
       >
         <div class="max-w-full text-black">
           <p class="w-full text-3xl text-center font-medium mb-3">
-            <%= @page_title %>
+            {@page_title}
           </p>
           <div class="font-medium flex flex-row text-center mt-2 tracking-tighter">
             <div class="w-[9%] border rounded bg-gray-100 border-gray-400 px-2 py-1">
-              <%= gettext("Date") %>
+              {gettext("Date")}
             </div>
             <div class="w-[9%] border rounded bg-gray-100 border-gray-400 px-2 py-1">
-              <%= gettext("Doc No") %>
+              {gettext("Doc No")}
             </div>
             <div class="w-[20%] border rounded bg-gray-100 border-gray-400 px-2 py-1">
-              <%= gettext("Account") %>
+              {gettext("Account")}
             </div>
             <div class="w-[21%] border rounded bg-gray-100 border-gray-400 px-2 py-1">
-              <%= gettext("Particulars") %>
+              {gettext("Particulars")}
             </div>
             <div class="w-[21%] border rounded bg-gray-100 border-gray-400 px-2 py-1">
-              <%= gettext("Contact Particulars") %>
+              {gettext("Contact Particulars")}
             </div>
             <div class="w-[10%] border rounded bg-gray-100 border-gray-400 px-2 py-1">
-              <%= gettext("Debit") %>
+              {gettext("Debit")}
             </div>
             <div class="w-[10%] border rounded bg-gray-100 border-gray-400 px-2 py-1">
-              <%= gettext("Credit") %>
+              {gettext("Credit")}
             </div>
           </div>
           <div id="journal_list">
             <%= for obj <- @entries do %>
               <div class="flex flex-row text-center tracking-tighter">
                 <div class="w-[9%] border rounded bg-blue-100 border-blue-400 text-center px-2 py-1">
-                  <%= obj.doc_date |> FullCircleWeb.Helpers.format_date() %>
+                  {obj.doc_date |> FullCircleWeb.Helpers.format_date()}
                 </div>
                 <div class="w-[9%] border rounded bg-blue-100 border-blue-400 text-center px-2 py-1">
-                  <%= obj.doc_no %>
+                  {obj.doc_no}
                 </div>
                 <div class="w-[20%] border rounded bg-blue-100 border-blue-400 text-center px-2 py-1">
-                  <%= obj.account_name %>
+                  {obj.account_name}
                 </div>
                 <div class="w-[21%] border rounded bg-blue-100 border-blue-400 px-2 py-1">
-                  <%= obj.particulars %>
+                  {obj.particulars}
                 </div>
                 <div class="w-[21%] border rounded bg-blue-100 border-blue-400 px-2 py-1">
-                  <%= obj.contact_particulars %>
+                  {obj.contact_particulars}
                 </div>
                 <div class="w-[10%] border rounded bg-blue-100 border-blue-400 text-center px-2 py-1">
-                  <%= if(Decimal.gt?(obj.amount, 0), do: obj.amount, else: 0)
-                  |> Number.Delimit.number_to_delimited() %>
+                  {if(Decimal.gt?(obj.amount, 0), do: obj.amount, else: 0)
+                  |> Number.Delimit.number_to_delimited()}
                 </div>
                 <div class="w-[10%] border rounded bg-blue-100 border-blue-400 text-center px-2 py-1">
-                  <%= if(Decimal.gt?(obj.amount, 0), do: 0, else: Decimal.abs(obj.amount))
-                  |> Number.Delimit.number_to_delimited() %>
+                  {if(Decimal.gt?(obj.amount, 0), do: 0, else: Decimal.abs(obj.amount))
+                  |> Number.Delimit.number_to_delimited()}
                 </div>
               </div>
             <% end %>
             <div class="flex flex-row text-center tracking-tighter font-semibold">
               <div class="w-[80%]"></div>
               <div class="w-[10%] border rounded bg-blue-100 border-blue-400 text-center px-2 py-1">
-                <%= Enum.reduce(@entries, Decimal.new("0"), fn x, acc ->
+                {Enum.reduce(@entries, Decimal.new("0"), fn x, acc ->
                   Decimal.add(
                     acc,
                     if(Decimal.gt?(x.amount, 0), do: Decimal.abs(x.amount), else: Decimal.new("0"))
                   )
                 end)
-                |> Number.Delimit.number_to_delimited() %>
+                |> Number.Delimit.number_to_delimited()}
               </div>
               <div class="w-[10%] border rounded bg-blue-100 border-blue-400 text-center px-2 py-1">
-                <%= Enum.reduce(@entries, Decimal.new("0"), fn x, acc ->
+                {Enum.reduce(@entries, Decimal.new("0"), fn x, acc ->
                   Decimal.add(
                     acc,
                     if(Decimal.gt?(x.amount, 0), do: Decimal.new("0"), else: Decimal.abs(x.amount))
                   )
                 end)
-                |> Number.Delimit.number_to_delimited() %>
+                |> Number.Delimit.number_to_delimited()}
               </div>
             </div>
           </div>

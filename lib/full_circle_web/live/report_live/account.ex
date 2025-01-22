@@ -100,7 +100,7 @@ defmodule FullCircleWeb.ReportLive.Account do
   def render(assigns) do
     ~H"""
     <div class="w-11/12 mx-auto">
-      <p class="text-2xl text-center font-medium"><%= "#{@page_title}" %></p>
+      <p class="text-2xl text-center font-medium">{"#{@page_title}"}</p>
       <div class="border rounded bg-purple-200 text-center p-2">
         <.form for={%{}} id="search-form" phx-change="changed" phx-submit="query" autocomplete="off">
           <div class="grid grid-cols-12 tracking-tighter">
@@ -134,7 +134,7 @@ defmodule FullCircleWeb.ReportLive.Account do
             </div>
             <div class="col-span-2 mt-6">
               <.button>
-                <%= gettext("Query") %>
+                {gettext("Query")}
               </.button>
               <.link
                 :if={@result.ok? and Enum.count(@result.result) > 0}
@@ -170,31 +170,31 @@ defmodule FullCircleWeb.ReportLive.Account do
             end) %>
           <div class="font-medium flex flex-row text-center tracking-tighter mb-1">
             <div class="w-[10%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
-              <%= gettext("Date") %>
+              {gettext("Date")}
             </div>
             <div class="w-[12%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
-              <%= gettext("Doc No") %>
+              {gettext("Doc No")}
             </div>
             <div class="w-[12%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
-              <%= gettext("Doc Type") %>
+              {gettext("Doc Type")}
             </div>
             <div class="w-[40%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
-              <%= gettext("Particulars") %>
+              {gettext("Particulars")}
             </div>
             <div class="w-[13%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
-              <%= gettext("Debit") %>
+              {gettext("Debit")}
             </div>
             <div class="w-[13%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
-              <%= gettext("Credit") %>
+              {gettext("Credit")}
             </div>
           </div>
           <div class=" bg-gray-50">
             <div id="transactions">
               <%= for obj <- @result.result do %>
                 <div class="flex flex-row text-center tracking-tighter hover:font-semibold">
-                  <p class="hidden"><%= obj.inserted_at %></p>
+                  <p class="hidden">{obj.inserted_at}</p>
                   <div class="w-[10%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
-                    <%= obj.doc_date |> FullCircleWeb.Helpers.format_date() %>
+                    {obj.doc_date |> FullCircleWeb.Helpers.format_date()}
                   </div>
                   <div class="w-[12%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
                     <%= if obj.old_data do %>
@@ -208,18 +208,18 @@ defmodule FullCircleWeb.ReportLive.Account do
                     <% end %>
                   </div>
                   <div class="w-[12%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
-                    <%= obj.doc_type %>
+                    {obj.doc_type}
                   </div>
                   <div class="w-[40%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
-                    <%= obj.particulars %>
+                    {obj.particulars}
                   </div>
                   <div class="w-[13%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
-                    <%= if(Decimal.gt?(obj.amount, 0), do: obj.amount, else: nil)
-                    |> Number.Delimit.number_to_delimited() %>
+                    {if(Decimal.gt?(obj.amount, 0), do: obj.amount, else: nil)
+                    |> Number.Delimit.number_to_delimited()}
                   </div>
                   <div class="w-[13%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
-                    <%= if(Decimal.gt?(obj.amount, 0), do: nil, else: Decimal.abs(obj.amount))
-                    |> Number.Delimit.number_to_delimited() %>
+                    {if(Decimal.gt?(obj.amount, 0), do: nil, else: Decimal.abs(obj.amount))
+                    |> Number.Delimit.number_to_delimited()}
                   </div>
                 </div>
               <% end %>
@@ -228,15 +228,15 @@ defmodule FullCircleWeb.ReportLive.Account do
           <div id="footer">
             <div class="flex flex-row text-center tracking-tighter mb-5 mt-1">
               <div class="w-[74%] border px-2 py-1 text-right font-bold rounded bg-cyan-200 border-cyan-400">
-                <%= gettext("Balance") %>
+                {gettext("Balance")}
               </div>
               <div class="w-[13%] font-bold border rounded bg-cyan-200 border-cyan-400 px-2 py-1">
-                <%= if(Decimal.gt?(objects_balance, 0), do: objects_balance, else: nil)
-                |> Number.Delimit.number_to_delimited() %>
+                {if(Decimal.gt?(objects_balance, 0), do: objects_balance, else: nil)
+                |> Number.Delimit.number_to_delimited()}
               </div>
               <div class="w-[13%] font-bold border rounded bg-cyan-200 border-cyan-400 px-2 py-1">
-                <%= if(Decimal.gt?(objects_balance, 0), do: nil, else: Decimal.abs(objects_balance))
-                |> Number.Delimit.number_to_delimited() %>
+                {if(Decimal.gt?(objects_balance, 0), do: nil, else: Decimal.abs(objects_balance))
+                |> Number.Delimit.number_to_delimited()}
               </div>
             </div>
           </div>

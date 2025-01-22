@@ -69,13 +69,13 @@ defmodule FullCircleWeb.SeedLive.Form do
   def render(assigns) do
     ~H"""
     <div class="w-8/12 mx-auto border rounded-lg border-pink-500 bg-pink-100 p-4">
-      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
+      <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <div class="flex flex-row flex-wrap font-medium text-center mt-2 tracking-tighter">
-        <div class="detail-header w-[10%]"><%= gettext("Date") %></div>
-        <div class="detail-header w-[20%]"><%= gettext("Account") %></div>
-        <div class="detail-header w-[20%]"><%= gettext("Contact") %></div>
-        <div class="detail-header w-[30%]"><%= gettext("Particulars") %></div>
-        <div class="detail-header w-[20%]"><%= gettext("Amount") %></div>
+        <div class="detail-header w-[10%]">{gettext("Date")}</div>
+        <div class="detail-header w-[20%]">{gettext("Account")}</div>
+        <div class="detail-header w-[20%]">{gettext("Contact")}</div>
+        <div class="detail-header w-[30%]">{gettext("Particulars")}</div>
+        <div class="detail-header w-[20%]">{gettext("Amount")}</div>
       </div>
       <%= for dtl <- @seeds do %>
         <.form for={dtl} id={"object-form-#{dtl.source.data.id}"} autocomplete="off" phx-change="save">
@@ -96,7 +96,7 @@ defmodule FullCircleWeb.SeedLive.Form do
         </.form>
       <% end %>
       <div class="flex justify-center gap-x-1 mt-1">
-        <a onclick="history.back();" class="blue button"><%= gettext("Done") %></a>
+        <a onclick="history.back();" class="blue button">{gettext("Done")}</a>
       </div>
     </div>
     """

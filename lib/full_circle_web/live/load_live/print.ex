@@ -62,27 +62,27 @@ defmodule FullCircleWeb.LoadLive.Print do
   def render(assigns) do
     ~H"""
     <div id="print-me" class="print-here">
-      <%= pre_print_style(assigns) %>
-      <%= if(@pre_print == "false", do: full_style(assigns)) %>
+      {pre_print_style(assigns)}
+      {if(@pre_print == "false", do: full_style(assigns))}
       <%= for order <- @orders do %>
         <%= Enum.map 1..order.chunk_number, fn n -> %>
           <div class="page">
             <div class="letter-head">
-              <%= if(@pre_print == "true", do: "", else: letter_head_data(assigns)) %>
+              {if(@pre_print == "true", do: "", else: letter_head_data(assigns))}
             </div>
             <div class="doctype is-size-4 has-text-weight-semibold">ORDER</div>
-            <%= order_header(order, assigns) %>
-            <%= detail_header(assigns) %>
+            {order_header(order, assigns)}
+            {detail_header(assigns)}
             <div class="details-body is-size-6">
               <%= for ldd <- Enum.at(order.detail_chunks, n - 1) do %>
-                <%= order_detail(ldd, assigns) %>
+                {order_detail(ldd, assigns)}
               <% end %>
             </div>
-            <%= if(n == order.chunk_number,
+            {if(n == order.chunk_number,
               do: order_footer("", n, order.chunk_number, assigns),
               else: order_footer("continue", n, order.chunk_number, assigns)
-            ) %>
-            <%= if(@pre_print == "true", do: "", else: letter_foot(order, assigns)) %>
+            )}
+            {if(@pre_print == "true", do: "", else: letter_foot(order, assigns))}
           </div>
         <% end %>
       <% end %>
@@ -107,11 +107,11 @@ defmodule FullCircleWeb.LoadLive.Print do
 
     ~H"""
     <div class="details-data">
-      <div class="goods"><%= @ldd.good_name %> - <%= @ldd.descriptions %></div>
-      <div class="pack"><%= @ldd.package_name %></div>
-      <div class="order_pack"><%= @ldd.order_pack_qty |> int_or_float_format %></div>
-      <div class="order_qty"><%= @ldd.order_qty |> int_or_float_format %> <%= @ldd.unit %></div>
-      <div class="order_pack"><%= @ldd.unit_price |> Number.Delimit.number_to_delimited() %></div>
+      <div class="goods">{@ldd.good_name} - {@ldd.descriptions}</div>
+      <div class="pack">{@ldd.package_name}</div>
+      <div class="order_pack">{@ldd.order_pack_qty |> int_or_float_format}</div>
+      <div class="order_qty">{@ldd.order_qty |> int_or_float_format} {@ldd.unit}</div>
+      <div class="order_pack">{@ldd.unit_price |> Number.Delimit.number_to_delimited()}</div>
     </div>
     """
   end
@@ -121,7 +121,7 @@ defmodule FullCircleWeb.LoadLive.Print do
 
     ~H"""
     <div class="order-footer"></div>
-    <span class="page-count"><%= "page #{@page} of #{@pages}" %></span>
+    <span class="page-count">{"page #{@page} of #{@pages}"}</span>
     """
   end
 
@@ -131,7 +131,7 @@ defmodule FullCircleWeb.LoadLive.Print do
     ~H"""
     <div class="descriptions">....continue....</div>
     <div class="order-footer"></div>
-    <span class="page-count"><%= "page #{@page} of #{@pages}" %></span>
+    <span class="page-count">{"page #{@page} of #{@pages}"}</span>
     """
   end
 
@@ -140,7 +140,7 @@ defmodule FullCircleWeb.LoadLive.Print do
 
     ~H"""
     <div class="letter-foot">
-      <div class="terms"><%= @inv.descriptions %></div>
+      <div class="terms">{@inv.descriptions}</div>
       <div class="sign">Seller Sign</div>
       <div class="sign">Manager Sign</div>
       <div class="sign">Buyer Sign</div>
@@ -155,11 +155,11 @@ defmodule FullCircleWeb.LoadLive.Print do
     <div class="order-header">
       <div class="is-size-6">TO</div>
       <div class="customer">
-        <div class="is-size-5 has-text-weight-bold"><%= @order.contact.name %></div>
-        <div><%= @order.contact.address1 %></div>
-        <div><%= @order.contact.address2 %></div>
+        <div class="is-size-5 has-text-weight-bold">{@order.contact.name}</div>
+        <div>{@order.contact.address1}</div>
+        <div>{@order.contact.address2}</div>
         <div>
-          <%= Enum.join(
+          {Enum.join(
             [
               @order.contact.city,
               @order.contact.zipcode,
@@ -167,17 +167,17 @@ defmodule FullCircleWeb.LoadLive.Print do
               @order.contact.country
             ],
             " "
-          ) %>
+          )}
         </div>
-        <%= @order.contact.reg_no %>
+        {@order.contact.reg_no}
       </div>
       <div class="order-info">
-        <div>Order No: <span class="has-text-weight-bold"><%= @order.order_no %></span></div>
+        <div>Order No: <span class="has-text-weight-bold">{@order.order_no}</span></div>
         <div>
-          OrderDate: <span class="has-text-weight-bold"><%= format_date(@order.order_date) %></span>
+          OrderDate: <span class="has-text-weight-bold">{format_date(@order.order_date)}</span>
         </div>
         <div>
-          ETA Date: <span class="has-text-weight-bold"><%= @order.etd_date |> format_date %></span>
+          ETA Date: <span class="has-text-weight-bold">{@order.etd_date |> format_date}</span>
         </div>
       </div>
     </div>
@@ -186,13 +186,13 @@ defmodule FullCircleWeb.LoadLive.Print do
 
   def letter_head_data(assigns) do
     ~H"""
-    <div class="is-size-3 has-text-weight-bold"><%= @company.name %></div>
-    <div><%= @company.address1 %>, <%= @company.address2 %></div>
+    <div class="is-size-3 has-text-weight-bold">{@company.name}</div>
+    <div>{@company.address1}, {@company.address2}</div>
     <div>
-      <%= Enum.join([@company.zipcode, @company.city, @company.state, @company.country], ", ") %>
+      {Enum.join([@company.zipcode, @company.city, @company.state, @company.country], ", ")}
     </div>
     <div>
-      Tel: <%= @company.tel %> RegNo: <%= @company.reg_no %> Email: <%= @company.email %>
+      Tel: {@company.tel} RegNo: {@company.reg_no} Email: {@company.email}
     </div>
     """
   end

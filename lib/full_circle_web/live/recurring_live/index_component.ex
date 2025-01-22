@@ -22,10 +22,10 @@ defmodule FullCircleWeb.RecurringLive.IndexComponent do
         class="text-blue-600 hover:font-bold"
         navigate={~p"/companies/#{@current_company}/recurrings/#{@obj.id}/edit"}
       >
-        <%= @obj.recur_no %>
+        {@obj.recur_no}
       </.link>
-      &#8226; <%= @obj.recur_date |> FullCircleWeb.Helpers.format_date() %> &#8226; <%= @obj.employee_name %> &#8226; <%= @obj.salary_type_name %> &#8226; <%= @obj.start_date
-      |> FullCircleWeb.Helpers.format_date() %> &#8226; <%= @obj.status %>
+      &#8226; {@obj.recur_date |> FullCircleWeb.Helpers.format_date()} &#8226; {@obj.employee_name} &#8226; {@obj.salary_type_name} &#8226; {@obj.start_date
+      |> FullCircleWeb.Helpers.format_date()} &#8226; {@obj.status}
     </div>
     """
   end

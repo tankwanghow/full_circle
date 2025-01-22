@@ -10,7 +10,7 @@ defmodule FullCircleWeb.TimeAttendLive.Index do
   def render(assigns) do
     ~H"""
     <div class="mx-auto w-10/12">
-      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
+      <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <div class="flex justify-center mb-2">
         <.form for={%{}} id="search-form" phx-submit="search" autocomplete="off" class="w-full">
           <div class=" flex flex-row flex-wrap tracking-tighter text-sm">
@@ -39,27 +39,27 @@ defmodule FullCircleWeb.TimeAttendLive.Index do
       </div>
       <div class="text-center mb-2">
         <.link phx-click={:new_timeattend} class="blue button" id="new_timeattend">
-          <%= gettext("New Time Attendence") %>
+          {gettext("New Time Attendence")}
         </.link>
       </div>
       <div class="font-medium flex flex-row text-center tracking-tighter bg-amber-200">
         <div class="w-[30%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Employee") %>
+          {gettext("Employee")}
         </div>
         <div class="w-[15%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Punch Date Time") %>
+          {gettext("Punch Date Time")}
         </div>
         <div class="w-[10%] border-b border-t border-amber-400 py-1">
-          <%= gettext("IN/OUT") %>
+          {gettext("IN/OUT")}
         </div>
         <div class="w-[15%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Medium") %>
+          {gettext("Medium")}
         </div>
         <div class="w-[15%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Touch By") %>
+          {gettext("Touch By")}
         </div>
         <div class="w-[15%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Touch At") %>
+          {gettext("Touch At")}
         </div>
       </div>
       <div

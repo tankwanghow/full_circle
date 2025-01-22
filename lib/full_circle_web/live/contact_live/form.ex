@@ -161,7 +161,7 @@ defmodule FullCircleWeb.ContactLive.Form do
   def render(assigns) do
     ~H"""
     <div class="w-6/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
-      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
+      <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <.form
         for={@form}
         id="object-form"
@@ -217,8 +217,8 @@ defmodule FullCircleWeb.ContactLive.Form do
             <.input field={@form[:descriptions]} label={gettext("Descriptions")} type="textarea" />
           </div>
         </div>
-        <%= datalist(assigns, FullCircle.Sys.countries(), "countries") %>
-        <%= datalist(assigns, FullCircle.Accounting.contact_catgories(@current_company), "categories") %>
+        {datalist(assigns, FullCircle.Sys.countries(), "countries")}
+        {datalist(assigns, FullCircle.Accounting.contact_catgories(@current_company), "categories")}
 
         <div class="flex justify-center gap-x-1 mt-1">
           <.form_action_button

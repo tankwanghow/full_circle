@@ -15,9 +15,9 @@
         class="flex fixed top-0 z-10 w-full items-center justify-center text-white gap-4 bg-gray-800 py-2 px-5 shadow"
       >
         <div class="text-3xl font-bold cursor-default w-[70%]">
-          <%= gettext("FullCircle") %>
+          {gettext("FullCircle")}
           <span :if={assigns[:current_company]} id="active-company" class="font-normal text-2xl">
-            &#8226; <%= @current_company.name %>
+            &#8226; {@current_company.name}
           </span>
         </div>
 
@@ -27,7 +27,7 @@
           patch={~p"/companies/#{@current_company.id}/dashboard"}
           class="rounded hover:bg-gray-400 p-2"
         >
-          <%= gettext("Dashboard") %>
+          {gettext("Dashboard")}
         </.link>
 
         <ul>
@@ -39,22 +39,22 @@
             <div class="p-2 invisible absolute right-0 top-full transform opacity-0 transition-all duration-300 group-focus-within:visible group-focus-within:opacity-100">
               <ul class="mt-1 rounded-md border border-neutral-50 bg-gray-800 p-2 shadow backdrop-blur-sm">
                 <li class="w-60 font-bold mb-2 text-blue-400 overflow-clip text-center">
-                  <%= @current_user.email %>
+                  {@current_user.email}
 
                   <div class="text-base font-normal text-amber-600">
-                    <%= if assigns[:current_company], do: @current_role %>
+                    {if assigns[:current_company], do: @current_role}
                   </div>
                 </li>
 
                 <li class="my-5">
                   <.link navigate={~p"/users/settings"} class="mb-2 p-3 hover:bg-emerald-400 flex">
-                    <%= gettext("User Settings") %>
+                    {gettext("User Settings")}
                   </.link>
                 </li>
 
                 <li :if={@current_role != "punch_camera"} class="my-5">
                   <.link navigate={~p"/companies"} class="mb-2 p-3 hover:bg-emerald-400 flex">
-                    <%= gettext("Companies") %>
+                    {gettext("Companies")}
                   </.link>
                 </li>
 
@@ -78,7 +78,7 @@
                     method="delete"
                     class="p-3 hover:bg-rose-400 flex"
                   >
-                    <%= gettext("Log out") %>
+                    {gettext("Log out")}
                   </.link>
                 </li>
               </ul>
@@ -92,13 +92,13 @@
           <img src="/images/stuff.png" alt="FullCircle Logo" class="mx-auto w-1/6 h-1/6" />
         </div>
         <h1 class="text-center font-bold text-2xl tracking-widest -mt-2">
-          <%= gettext("FullCircle") %>
+          {gettext("FullCircle")}
         </h1>
         <h1 class="text-center text-xl tracking-tighter -mt-1">
-          <%= gettext("Accounting & Payroll Software") %>
+          {gettext("Accounting & Payroll Software")}
         </h1>
         <div class="text-gray-400 text-center tracking-tighter">
-          <%= gettext("Version") %> <%= "0.1.0" %>
+          {gettext("Version")} {"0.1.0"}
         </div>
         <div class="text-green-600 text-center">
           <%= if @locale == "zh" do %>
@@ -113,6 +113,6 @@
         </div>
       <% end %>
     <% end %>
-    <%= @inner_content %>
+    {@inner_content}
   </body>
 </html>

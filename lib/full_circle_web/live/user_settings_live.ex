@@ -6,8 +6,8 @@ defmodule FullCircleWeb.UserSettingsLive do
   def render(assigns) do
     ~H"""
     <.header class="text-center">
-      <%= gettext("User Settings") %>
-      <:subtitle><%= gettext("Manage your account email address and password settings") %></:subtitle>
+      {gettext("User Settings")}
+      <:subtitle>{gettext("Manage your account email address and password settings")}</:subtitle>
     </.header>
 
     <div class="w-3/12 mx-auto space-y-5 divide-y">
@@ -30,7 +30,7 @@ defmodule FullCircleWeb.UserSettingsLive do
           />
           <:actions>
             <.button phx-disable-with={gettext("Changing...")}>
-              <%= gettext("Change Email") %>
+              {gettext("Change Email")}
             </.button>
           </:actions>
         </.simple_form>
@@ -72,7 +72,7 @@ defmodule FullCircleWeb.UserSettingsLive do
             required
           />
           <:actions>
-            <.button phx-disable-with="Changing..."><%= gettext("Change Password") %></.button>
+            <.button phx-disable-with="Changing...">{gettext("Change Password")}</.button>
           </:actions>
         </.simple_form>
       </div>

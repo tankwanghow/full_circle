@@ -40,7 +40,7 @@ defmodule FullCircleWeb.PayRunLive.IndexComponent do
           class="hover:font-bold"
           navigate={~p"/companies/#{@company.id}/employees/#{@obj.id}/edit"}
         >
-          <%= @obj.employee_name %>
+          {@obj.employee_name}
         </.link>
       </div>
       <%= for {ps, ps_id, yr, mth} <- @obj.pay_list do %>
@@ -79,7 +79,7 @@ defmodule FullCircleWeb.PayRunLive.IndexComponent do
               navigate={"/companies/#{@company.id}/PaySlip/#{ps_id}/view"}
               class="text-green-600 hover:font-bold"
             >
-              <%= ps %>
+              {ps}
             </.link>
           </div>
         </div>

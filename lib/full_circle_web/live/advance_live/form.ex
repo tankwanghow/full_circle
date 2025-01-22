@@ -175,9 +175,9 @@ defmodule FullCircleWeb.AdvanceLive.Form do
   def render(assigns) do
     ~H"""
     <div class="w-7/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
-      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
+      <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <p :if={!is_nil(@form.source.data.pay_slip_no)} class="w-full text-xl text-center font-bold">
-        <%= @form.source.data.pay_slip_no %>
+        {@form.source.data.pay_slip_no}
       </p>
       <.form
         for={@form}

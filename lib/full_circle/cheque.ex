@@ -69,17 +69,16 @@ defmodule FullCircle.Cheque do
     qry =
       if terms != "" do
         from rec in qry,
-          order_by: [rec.old_data],
           order_by: ^similarity_order([:particulars, :doc_no], terms)
       else
-        from rec in qry, order_by: [rec.old_data]
+        qry
       end
 
     qry =
       if r_date != "" do
-        from rec in qry, where: rec.doc_date >= ^r_date, order_by: [desc: rec.doc_date]
+        from rec in qry, where: rec.doc_date >= ^r_date, order_by: rec.doc_date
       else
-        qry
+        from rec in qry, order_by: [desc: rec.doc_date]
       end
 
     qry |> offset((^page - 1) * ^per_page) |> limit(^per_page) |> Repo.all()
@@ -95,7 +94,6 @@ defmodule FullCircle.Cheque do
       on: txn.doc_id == rtnq.id,
       left_join: rtn_bank in FullCircle.Accounting.Account,
       on: rtn_bank.id == rtnq.return_from_bank_id,
-      order_by: [desc: txn.doc_date],
       where: txn.amount > 0,
       select: txn,
       select_merge: %{
@@ -113,18 +111,16 @@ defmodule FullCircle.Cheque do
     qry =
       if terms != "" do
         from rec in qry,
-          order_by: [rec.old_data],
-          order_by: ^similarity_order([:particulars, :deposit_no, :deposit_bank_name], terms),
-          order_by: [desc: rec.deposit_no]
+          order_by: ^similarity_order([:particulars, :deposit_no, :deposit_bank_name], terms)
       else
-        from rec in qry, order_by: [rec.old_data], order_by: [desc: rec.deposit_no]
+        qry
       end
 
     qry =
       if d_date != "" do
-        from rec in qry, where: rec.deposit_date >= ^d_date, order_by: [desc: rec.deposit_date]
+        from rec in qry, where: rec.deposit_date >= ^d_date, order_by: rec.deposit_date
       else
-        qry
+        from rec in qry, order_by: [desc: rec.deposit_date]
       end
 
     qry |> offset((^page - 1) * ^per_page) |> limit(^per_page) |> Repo.all()
@@ -140,7 +136,6 @@ defmodule FullCircle.Cheque do
       on: txn.doc_no == dep.deposit_no,
       left_join: funds_from in Account,
       on: funds_from.id == dep.funds_from_id,
-      order_by: [desc: txn.doc_date],
       where: txn.amount > 0,
       select: %{
         id: txn.id,

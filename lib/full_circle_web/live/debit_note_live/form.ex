@@ -371,7 +371,7 @@ defmodule FullCircleWeb.DebitNoteLive.Form do
   def render(assigns) do
     ~H"""
     <div class="w-9/12 mx-auto border rounded-lg border-emerald-500 bg-emerald-100 p-4">
-      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
+      <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <.form for={@form} id="object-form" autocomplete="off" phx-change="validate" phx-submit="save">
         <.input type="hidden" field={@form[:note_no]} />
         <div class="flex flex-row flex-nowarp">
@@ -428,13 +428,13 @@ defmodule FullCircleWeb.DebitNoteLive.Form do
             }
             class="active basis-1/2 tab"
           >
-            <%= gettext("Details") %> =
+            {gettext("Details")} =
             <span
               :if={!Decimal.eq?(Ecto.Changeset.fetch_field!(@form.source, :note_amount), 0)}
               class="font-normal text-rose-700"
             >
-              <%= Ecto.Changeset.fetch_field!(@form.source, :note_amount)
-              |> Number.Delimit.number_to_delimited() %>
+              {Ecto.Changeset.fetch_field!(@form.source, :note_amount)
+              |> Number.Delimit.number_to_delimited()}
             </span>
             <span class="text-rose-500">
               <.icon :if={@details_got_error} name="hero-exclamation-triangle-mini" class="h-5 w-5" />
@@ -452,15 +452,15 @@ defmodule FullCircleWeb.DebitNoteLive.Form do
             }
             class="basis-1/2 tab"
           >
-            <%= gettext("Matchers") %> =
+            {gettext("Matchers")} =
             <span
               :if={!Decimal.eq?(Ecto.Changeset.fetch_field!(@form.source, :matched_amount), 0)}
               class="font-normal text-rose-700"
             >
-              <%= Ecto.Changeset.fetch_field!(@form.source, :matched_amount)
+              {Ecto.Changeset.fetch_field!(@form.source, :matched_amount)
               |> Decimal.new()
               |> Decimal.abs()
-              |> Number.Delimit.number_to_delimited() %>
+              |> Number.Delimit.number_to_delimited()}
             </span>
             <span class="text-rose-500">
               <.icon :if={@matchers_got_error} name="hero-exclamation-triangle-mini" class="h-5 w-5" />

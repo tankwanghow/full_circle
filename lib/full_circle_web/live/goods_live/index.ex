@@ -10,7 +10,7 @@ defmodule FullCircleWeb.GoodLive.Index do
   def render(assigns) do
     ~H"""
     <div class="w-6/12 mx-auto">
-      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
+      <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <.search_form
         search_val={@search.terms}
         placeholder={gettext("Name, Unit, Account Name and TaxCode...")}
@@ -21,12 +21,12 @@ defmodule FullCircleWeb.GoodLive.Index do
           class="blue button"
           id="new_object"
         >
-          <%= gettext("New Good") %>
+          {gettext("New Good")}
         </.link>
       </div>
       <div class="text-center">
         <div class="bg-amber-200 border-y-2 border-amber-500 font-bold p-2">
-          <%= gettext("Good Information") %>
+          {gettext("Good Information")}
         </div>
       </div>
       <div

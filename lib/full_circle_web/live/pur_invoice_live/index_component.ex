@@ -19,14 +19,14 @@ defmodule FullCircleWeb.PurInvoiceLive.IndexComponent do
       class={"#{@ex_class} flex flex-row text-center tracking-tighter bg-gray-200 hover:bg-gray-400"}
     >
       <div class="w-[6%] border-b border-gray-400 py-1">
-        <%= @obj.pur_invoice_date |> FullCircleWeb.Helpers.format_date() %>
+        {@obj.pur_invoice_date |> FullCircleWeb.Helpers.format_date()}
       </div>
       <div class="w-[6%] border-b border-gray-400 py-1">
-        <%= @obj.due_date |> FullCircleWeb.Helpers.format_date() %>
+        {@obj.due_date |> FullCircleWeb.Helpers.format_date()}
       </div>
       <div class="w-[8%] border-b border-gray-400 py-1">
         <%= if @obj.old_data do %>
-          <%= @obj.pur_invoice_no %>
+          {@obj.pur_invoice_no}
         <% else %>
           <.doc_link
             current_company={@company}
@@ -35,22 +35,22 @@ defmodule FullCircleWeb.PurInvoiceLive.IndexComponent do
         <% end %>
       </div>
       <div class="w-[10%] border-b border-gray-400 py-1 italic font-light">
-        <%= @obj.e_inv_internal_id %>
+        {@obj.e_inv_internal_id}
       </div>
       <div class="w-[4%] border-b border-gray-400 py-1">
         <.e_invoice_link obj={@obj} />
       </div>
       <div class="w-[20%] border-b border-gray-400 py-1 overflow-clip">
-        <%= @obj.contact_name %>
+        {@obj.contact_name}
       </div>
       <div class="w-[28%] border-b text-center border-gray-400 py-1 overflow-clip">
-        <span class="font-light"><%= @obj.particulars %></span>
+        <span class="font-light">{@obj.particulars}</span>
       </div>
       <div class="w-[10%] border-b border-gray-400 py-1">
-        <%= Number.Currency.number_to_currency(@obj.pur_invoice_amount) %>
+        {Number.Currency.number_to_currency(@obj.pur_invoice_amount)}
       </div>
       <div class="w-[10%] border-b border-gray-400 py-1">
-        <%= Number.Currency.number_to_currency(@obj.balance) %>
+        {Number.Currency.number_to_currency(@obj.balance)}
       </div>
     </div>
     """

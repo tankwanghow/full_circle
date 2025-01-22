@@ -49,7 +49,7 @@ defmodule FullCircleWeb.PaySlipLive.SalaryNoteComponent do
         </div>
       </.inputs_for>
       <div :if={!is_nil(@total_label)} class="flex flex-row font-bold">
-        <div class="w-[89%] text-right mr-3 mt-1"><%= @total_label %></div>
+        <div class="w-[89%] text-right mr-3 mt-1">{@total_label}</div>
         <div class="w-[11%]">
           <.input readonly tabindex="-1" field={@total_field} type="number" />
         </div>

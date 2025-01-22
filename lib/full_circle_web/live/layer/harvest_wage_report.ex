@@ -77,7 +77,7 @@ defmodule FullCircleWeb.LayerLive.HarvestWageReport do
   def render(assigns) do
     ~H"""
     <div class="w-6/12 mx-auto">
-      <p class="text-2xl text-center font-medium"><%= "#{@page_title}" %></p>
+      <p class="text-2xl text-center font-medium">{"#{@page_title}"}</p>
       <div class="border rounded bg-purple-200 text-center p-2">
         <.form for={%{}} id="search-form" phx-submit="query" autocomplete="off">
           <div class="grid grid-cols-12 tracking-tighter">
@@ -101,7 +101,7 @@ defmodule FullCircleWeb.LayerLive.HarvestWageReport do
             </div>
             <div class="col-span-4 mt-6">
               <.button>
-                <%= gettext("Query") %>
+                {gettext("Query")}
               </.button>
               <.link
                 :if={@result.ok? and Enum.count(@result.result) > 0}
@@ -130,7 +130,7 @@ defmodule FullCircleWeb.LayerLive.HarvestWageReport do
       </div>
       <.async_html result={@result}>
         <:result_html>
-          <%= FullCircleWeb.CsvHtml.headers(
+          {FullCircleWeb.CsvHtml.headers(
             [
               gettext("Date"),
               gettext("House"),
@@ -142,9 +142,9 @@ defmodule FullCircleWeb.LayerLive.HarvestWageReport do
             ["18%", "18%", "28%", "18%", "18%"],
             "border rounded bg-gray-200 border-gray-400 px-2 py-1",
             assigns
-          ) %>
+          )}
 
-          <%= FullCircleWeb.CsvHtml.data(
+          {FullCircleWeb.CsvHtml.data(
             [
               :har_date,
               :house_no,
@@ -164,7 +164,7 @@ defmodule FullCircleWeb.LayerLive.HarvestWageReport do
             ["18%", "18%", "28%", "18%", "18%"],
             "border rounded bg-blue-200 border-blue-400 px-2 py-1",
             assigns
-          ) %>
+          )}
         </:result_html>
       </.async_html>
     </div>

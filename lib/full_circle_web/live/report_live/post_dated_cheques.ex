@@ -68,7 +68,7 @@ defmodule FullCircleWeb.ReportLive.PostDatedCheques do
   def render(assigns) do
     ~H"""
     <div class="w-9/12 mx-auto mb-5">
-      <p class="text-2xl text-center font-medium"><%= "#{@page_title}" %></p>
+      <p class="text-2xl text-center font-medium">{"#{@page_title}"}</p>
       <div class="border rounded bg-amber-200 text-center p-2">
         <.form for={%{}} id="search-form" phx-submit="query" autocomplete="off">
           <div class="grid grid-cols-12 tracking-tighter">
@@ -83,7 +83,7 @@ defmodule FullCircleWeb.ReportLive.PostDatedCheques do
             </div>
             <div class="col-span-4 mt-6">
               <.button>
-                <%= gettext("Query") %>
+                {gettext("Query")}
               </.button>
               <.link
                 :if={@result.result != {[], []} and @result.result}
@@ -102,7 +102,7 @@ defmodule FullCircleWeb.ReportLive.PostDatedCheques do
 
       <.async_html result={@result}>
         <:result_html>
-          <%= FullCircleWeb.CsvHtml.headers(
+          {FullCircleWeb.CsvHtml.headers(
             [
               gettext("Date"),
               gettext("Receipt"),
@@ -119,9 +119,9 @@ defmodule FullCircleWeb.ReportLive.PostDatedCheques do
             ["8%", "8%", "28%", "8%", "8%", "8%", "8%", "8%", "8%", "8%"],
             "border rounded bg-gray-200 border-gray-400 px-2 py-1",
             assigns
-          ) %>
+          )}
 
-          <%= FullCircleWeb.CsvHtml.data(
+          {FullCircleWeb.CsvHtml.data(
             [
               :receipt_date,
               :receipt_no,
@@ -140,7 +140,7 @@ defmodule FullCircleWeb.ReportLive.PostDatedCheques do
             ["8%", "8%", "28%", "8%", "8%", "8%", "8%", "8%", "8%", "8%"],
             "border rounded bg-blue-200 border-blue-400 px-2 py-1",
             assigns
-          ) %>
+          )}
         </:result_html>
       </.async_html>
     </div>

@@ -151,9 +151,9 @@ defmodule FullCircleWeb.TimeAttendLive.FormComponent do
         phx-submit="save"
         phx-target={@myself}
       >
-        <p class="w-full text-3xl text-center font-medium"><%= @title %></p>
+        <p class="w-full text-3xl text-center font-medium">{@title}</p>
         <p class="w-full text-center text-xl border-2 border-orange-400 bg-orange-200 rounded-lg p-3 mb-3">
-          <%= gettext("Warning! Minimum Data Integrity is Impose! Make sure your data is correct.") %>
+          {gettext("Warning! Minimum Data Integrity is Impose! Make sure your data is correct.")}
         </p>
         <.input type="hidden" field={@form[:input_medium]} />
         <.input type="hidden" field={@form[:user_id]} />
@@ -207,16 +207,16 @@ defmodule FullCircleWeb.TimeAttendLive.FormComponent do
         </div>
 
         <p class="text-center mt-2 text-sm text-gray-500">
-          last touch using <%= @form.source.data.input_medium %> by <%= @form.source.data.email %> at <%= FullCircleWeb.Helpers.format_datetime(
+          last touch using {@form.source.data.input_medium} by {@form.source.data.email} at {FullCircleWeb.Helpers.format_datetime(
             @form.source.data.updated_at,
             @current_company
-          ) %>
+          )}
         </p>
 
         <div class="flex justify-center gap-x-1 mt-2">
           <.save_button form={@form} />
           <.link phx-click={:modal_cancel} class="orange button">
-            <%= gettext("Cancel") %>
+            {gettext("Cancel")}
           </.link>
           <%= if @live_action == :edit and FullCircle.Authorization.can?(@current_user, :delete_time_attendence, @current_company) do %>
             <.delete_confirm_modal

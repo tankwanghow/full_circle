@@ -38,7 +38,7 @@ defmodule FullCircleWeb.DeliveryLive.IndexComponent do
         />
       </div>
       <div class="w-[7%] border-b border-gray-400 py-1">
-        <%= @obj.load_date |> FullCircleWeb.Helpers.format_date() %>
+        {@obj.load_date |> FullCircleWeb.Helpers.format_date()}
       </div>
       <div class="w-[7%] border-b border-gray-400 py-1">
         <.doc_link
@@ -47,27 +47,27 @@ defmodule FullCircleWeb.DeliveryLive.IndexComponent do
         />
       </div>
       <div class="w-[15%] border-b border-gray-400 py-1 overflow-clip">
-        <%= @obj.supplier_name %>
+        {@obj.supplier_name}
       </div>
       <div class="w-[15%] border-b border-gray-400 py-1 overflow-clip">
-        <%= @obj.shipper_name %>
+        {@obj.shipper_name}
       </div>
       <div class="w-[8%] border-b border-gray-400 py-1 overflow-clip">
-        <%= @obj.lorry %>
+        {@obj.lorry}
       </div>
       <div class="w-[15%] border-b text-center border-gray-400 py-1 overflow-clip">
         <span class="font-light">
-          <%= @obj.good_name %>
+          {@obj.good_name}
         </span>
       </div>
       <div class="w-[15%] border-b border-gray-400 py-1">
-        <%= @obj.load_pack_qty %> <%= @obj.package %>
+        {@obj.load_pack_qty} {@obj.package}
       </div>
       <div class="w-[8%] border-b border-gray-400 py-1">
-        <%= @obj.load_qty %> <%= @obj.unit %>
+        {@obj.load_qty} {@obj.unit}
       </div>
       <div class="w-[8%] border-b border-gray-400 py-1">
-        <%= @obj.status %>
+        {@obj.status}
       </div>
     </div>
     """

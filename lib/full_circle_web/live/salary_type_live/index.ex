@@ -11,7 +11,7 @@ defmodule FullCircleWeb.SalaryTypeLive.Index do
   def render(assigns) do
     ~H"""
     <div class="w-5/12 mx-auto">
-      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
+      <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <.search_form
         search_val={@search.terms}
         placeholder={gettext("Name, Debit Account or Credit Account...")}
@@ -22,12 +22,12 @@ defmodule FullCircleWeb.SalaryTypeLive.Index do
           class="blue button"
           id="new_object"
         >
-          <%= gettext("New Salary Type") %>
+          {gettext("New Salary Type")}
         </.link>
       </div>
       <div class="text-center">
         <div class="bg-amber-200 border-y-2 border-amber-500 font-bold p-2">
-          <%= gettext("Salary Type Information") %>
+          {gettext("Salary Type Information")}
         </div>
       </div>
       <div

@@ -305,7 +305,7 @@ defmodule FullCircleWeb.GoodLive.Form do
   def render(assigns) do
     ~H"""
     <div class="w-6/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
-      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
+      <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <.form
         for={@form}
         id="object-form"
@@ -375,13 +375,13 @@ defmodule FullCircleWeb.GoodLive.Form do
         <div class="font-bold grid grid-cols-12 gap-2 mt-2">
           <div class="col-span-1 text-center" />
           <div class="col-span-3">
-            <%= gettext("Package Name") %>
+            {gettext("Package Name")}
           </div>
           <div class="col-span-3">
-            <%= gettext("Unit Multiplier") %>
+            {gettext("Unit Multiplier")}
           </div>
           <div class="col-span-3">
-            <%= gettext("Cost Per Pack") %>
+            {gettext("Cost Per Pack")}
           </div>
         </div>
         <.inputs_for :let={pack} field={@form[:packagings]}>
@@ -417,7 +417,7 @@ defmodule FullCircleWeb.GoodLive.Form do
 
         <div class="my-2">
           <.link phx-click={:add_packaging} class="text-orange-500 hover:font-bold focus:font-bold">
-            <.icon name="hero-plus-circle" class="w-5 h-5" /><%= gettext("Add Packaging") %>
+            <.icon name="hero-plus-circle" class="w-5 h-5" />{gettext("Add Packaging")}
           </.link>
         </div>
 

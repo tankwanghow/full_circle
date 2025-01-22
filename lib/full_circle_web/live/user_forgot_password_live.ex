@@ -7,25 +7,25 @@ defmodule FullCircleWeb.UserForgotPasswordLive do
     ~H"""
     <div class="mx-auto max-w-xs">
       <.header class="text-center">
-        <%= gettext("Forgot your password?") %>
-        <:subtitle><%= gettext("We'll send a password reset link to your inbox") %></:subtitle>
+        {gettext("Forgot your password?")}
+        <:subtitle>{gettext("We'll send a password reset link to your inbox")}</:subtitle>
       </.header>
 
       <.simple_form for={@form} id="reset_password_form" phx-submit="send_email">
         <.input field={@form[:email]} type="email" placeholder={gettext("Email")} required />
         <:actions>
           <.button phx-disable-with={gettext("Sending...")} class="w-full">
-            <%= gettext("Send password reset instructions") %>
+            {gettext("Send password reset instructions")}
           </.button>
         </:actions>
       </.simple_form>
       <p class="text-center text-brand mt-4">
         <.link href={~p"/users/register"} class="hover:underline hover:font-bold">
-          <%= gettext("Register") %>
+          {gettext("Register")}
         </.link>
         |
         <.link href={~p"/users/log_in"} class="hover:underline hover:font-bold">
-          <%= gettext("Log in") %>
+          {gettext("Log in")}
         </.link>
       </p>
     </div>

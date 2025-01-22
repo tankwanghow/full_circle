@@ -181,7 +181,7 @@ defmodule FullCircleWeb.LayerLive.HouseForm do
   def render(assigns) do
     ~H"""
     <div class="w-4/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
-      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
+      <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <.form
         for={@form}
         id="object-form"
@@ -224,9 +224,9 @@ defmodule FullCircleWeb.LayerLive.HouseForm do
         </div>
 
         <div class="font-bold flex flex-row text-center mt-2">
-          <div class="w-[30%]"><%= gettext("Lower Trays") %></div>
-          <div class="w-[30%]"><%= gettext("Upper Tray") %></div>
-          <div class="w-[30%]"><%= gettext("Wages") %></div>
+          <div class="w-[30%]">{gettext("Lower Trays")}</div>
+          <div class="w-[30%]">{gettext("Upper Tray")}</div>
+          <div class="w-[30%]">{gettext("Wages")}</div>
           <div class="w-[3%]" />
         </div>
 
@@ -252,7 +252,7 @@ defmodule FullCircleWeb.LayerLive.HouseForm do
 
         <div class="my-2">
           <.link phx-click={:add_wage} class="text-orange-500 hover:font-bold focus:font-bold">
-            <.icon name="hero-plus-circle" class="w-5 h-5" /><%= gettext("Add Wage") %>
+            <.icon name="hero-plus-circle" class="w-5 h-5" />{gettext("Add Wage")}
           </.link>
         </div>
 

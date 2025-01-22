@@ -83,7 +83,7 @@ defmodule FullCircleWeb.ReportLive.TbPlBs do
   def render(assigns) do
     ~H"""
     <div class="w-6/12 mx-auto">
-      <p class="text-2xl text-center font-medium"><%= "#{@page_title}" %></p>
+      <p class="text-2xl text-center font-medium">{"#{@page_title}"}</p>
       <div class="border rounded bg-amber-200 text-center p-2">
         <.form for={%{}} id="search-form" phx-submit="query" autocomplete="off">
           <div class="grid grid-cols-12 tracking-tighter">
@@ -112,7 +112,7 @@ defmodule FullCircleWeb.ReportLive.TbPlBs do
             </div>
             <div class="col-span-4 mt-6">
               <.button>
-                <%= gettext("Query") %>
+                {gettext("Query")}
               </.button>
               <.link
                 :if={@result.ok? and Enum.count(@result.result) > 0}
@@ -131,7 +131,7 @@ defmodule FullCircleWeb.ReportLive.TbPlBs do
 
       <.async_html result={@result}>
         <:result_html>
-          <%= FullCircleWeb.CsvHtml.headers(
+          {FullCircleWeb.CsvHtml.headers(
             [
               gettext("Type"),
               gettext("Account"),
@@ -141,9 +141,9 @@ defmodule FullCircleWeb.ReportLive.TbPlBs do
             ["20%", "60%", "20%"],
             "border rounded bg-gray-200 border-gray-400 px-2 py-1",
             assigns
-          ) %>
+          )}
 
-          <%= FullCircleWeb.CsvHtml.data(
+          {FullCircleWeb.CsvHtml.data(
             [
               :type,
               :name,
@@ -155,18 +155,18 @@ defmodule FullCircleWeb.ReportLive.TbPlBs do
             ["20%", "60%", "20%"],
             "border rounded bg-blue-200 border-blue-400 px-2 py-1",
             assigns
-          ) %>
+          )}
 
           <div id="footer">
             <div class="flex flex-row text-center tracking-tighter mb-5 mt-1">
               <div class="w-[80%] border px-2 py-1 text-right font-bold rounded bg-lime-200 border-lime-400">
-                <%= gettext("Balance") %>
+                {gettext("Balance")}
               </div>
               <div class="w-[20%] font-bold border rounded bg-lime-200 border-lime-400 text-center px-2 py-1">
-                <%= Enum.reduce(@result.result, Decimal.new("0"), fn obj, acc ->
+                {Enum.reduce(@result.result, Decimal.new("0"), fn obj, acc ->
                   Decimal.add(obj.balance, acc)
                 end)
-                |> Number.Delimit.number_to_delimited() %>
+                |> Number.Delimit.number_to_delimited()}
               </div>
             </div>
           </div>

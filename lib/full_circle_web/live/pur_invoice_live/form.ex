@@ -501,7 +501,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
   def render(assigns) do
     ~H"""
     <div class="w-11/12 mx-auto border rounded-lg border-pink-500 bg-pink-100 p-4">
-      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
+      <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <.form
         for={@form}
         id="object-form"

@@ -19,7 +19,7 @@ defmodule FullCircleWeb.LayerLive.FlockIndexComponent do
       class={"#{@ex_class}flex text-center border-b border-gray-400 hover:bg-gray-300 bg-gray-200 "}
     >
       <div class="w-[10%] py-1">
-        <%= @obj.dob |> FullCircleWeb.Helpers.format_date() %>
+        {@obj.dob |> FullCircleWeb.Helpers.format_date()}
       </div>
       <div class="w-[14%] py-1">
         <.link
@@ -27,20 +27,20 @@ defmodule FullCircleWeb.LayerLive.FlockIndexComponent do
           tabindex="-1"
           navigate={~p"/companies/#{@company}/flocks/#{@obj.id}/edit"}
         >
-          <%= @obj.flock_no %>
+          {@obj.flock_no}
         </.link>
       </div>
       <div class="w-[10%] py-1 overflow-clip">
-        <span class="font-light"><%= @obj.breed %></span>
+        <span class="font-light">{@obj.breed}</span>
       </div>
       <div class="w-[10%] border-b py-1">
-        <%= Number.Delimit.number_to_delimited(@obj.quantity, precision: 0) %>
+        {Number.Delimit.number_to_delimited(@obj.quantity, precision: 0)}
       </div>
       <div class="w-[31%] py-1">
-        <%= @obj.houses %>
+        {@obj.houses}
       </div>
       <div class="w-[25%] py-1 overflow-clip">
-        <span class="font-light"><%= @obj.note %></span>
+        <span class="font-light">{@obj.note}</span>
       </div>
     </div>
     """

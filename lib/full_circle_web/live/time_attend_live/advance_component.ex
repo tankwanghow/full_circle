@@ -22,26 +22,26 @@ defmodule FullCircleWeb.TimeAttendLive.AdvanceComponent do
       ]}
     >
       <div class="w-[10%] border-b border-gray-400 py-1">
-        <%= @obj.slip_date |> FullCircleWeb.Helpers.format_date() %>
+        {@obj.slip_date |> FullCircleWeb.Helpers.format_date()}
       </div>
       <div class="w-[10%] border-b border-gray-400 py-1">
         <.link class="hover:font-bold" phx-value-id={@id} phx-click={:edit_advance}>
-          <%= @obj.slip_no %>
+          {@obj.slip_no}
         </.link>
       </div>
       <div class="w-[10%] border-b border-gray-400 py-1">
-        <%= @obj.pay_slip_no %>
+        {@obj.pay_slip_no}
       </div>
       <div class="w-[20%] border-b text-center border-gray-400 py-1">
         <span class="font-light">Advance</span>
       </div>
       <div class="w-[26%] border-b text-center border-gray-400 py-1">
-        <span class="font-light"><%= @obj.note %></span>
+        <span class="font-light">{@obj.note}</span>
       </div>
       <div class="w-[8%] border-b border-gray-400 py-1"></div>
       <div class="w-[8%] border-b border-gray-400 py-1"></div>
       <div class="w-[8%] border-b border-gray-400 py-1">
-        <%= Number.Currency.number_to_currency(@obj.amount) %>
+        {Number.Currency.number_to_currency(@obj.amount)}
       </div>
     </div>
     """

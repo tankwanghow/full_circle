@@ -11,7 +11,7 @@ defmodule FullCircleWeb.RecurringLive.Index do
   def render(assigns) do
     ~H"""
     <div class="w-5/12 mx-auto">
-      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
+      <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <.search_form
         search_val={@search.terms}
         placeholder={gettext("recurring, employee, salary type or status...")}
@@ -22,12 +22,12 @@ defmodule FullCircleWeb.RecurringLive.Index do
           class="blue button"
           id="new_object"
         >
-          <%= gettext("New Recurring") %>
+          {gettext("New Recurring")}
         </.link>
       </div>
       <div class="text-center">
         <div class="bg-amber-200 border-y-2 border-amber-500 font-bold p-2">
-          <%= gettext("Recurring Information") %>
+          {gettext("Recurring Information")}
         </div>
       </div>
       <div

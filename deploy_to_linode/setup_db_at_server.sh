@@ -54,7 +54,7 @@ create_superuser() {
 # Function to create superuser
 create_queryuser() {
     echo "Creating query user $1..."
-    sudo -u postgres psql -c "CREATE USER $1 WITH PASSWORD '$2';"
+    sudo -u postgres psql -c "CREATE USER $1 WITH PASSWORD '$2' LOGIN;"
     if [ $? -eq 0 ]; then
         echo "Query user $1 created successfully."
     else
@@ -69,6 +69,9 @@ echo "Checking and setting up PostgreSQL database and superuser..."
 # Check and create database if not exists
 if ! check_db_exists "${DB_NAME}"; then
     create_db "${DB_NAME}"
+    sudo -u postgres psql -d "${DB_NAME}" -c "CREATE EXTENSION IF NOT EXISTS fuzzystrmatch;"
+    sudo -u postgres psql -d "${DB_NAME}" -c "CREATE EXTENSION IF NOT EXISTS pg_trgm;"
+    sudo -u postgres psql -d "${DB_NAME}" -c "CREATE EXTENSION IF NOT EXISTS citext;"
 fi
 
 # Check and create superuser if not exists
@@ -79,8 +82,8 @@ fi
 # Check and create superuser if not exists
 if ! check_user_exists "${DB_USER}_query"; then
     create_queryuser "${DB_USER}_query" "$DB_PWD"
-    sudo -u postgres psql -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES TO ${DB_USER}_query;"
-    sudo -u postgres psql -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO ${DB_USER}_query;"
+    sudo -u postgres psql -d ${DB_NAME} -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM ${DB_USER}_query;"
+    sudo -u postgres psql -d ${DB_NAME} -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO ${DB_USER}_query;"
 fi
 
 echo "PostgreSQL setup completed."

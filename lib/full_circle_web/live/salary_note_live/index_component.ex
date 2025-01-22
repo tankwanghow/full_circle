@@ -38,11 +38,11 @@ defmodule FullCircleWeb.SalaryNoteLive.IndexComponent do
         />
       </div>
       <div class="w-[10%] border-b border-gray-400 py-1">
-        <%= @obj.note_date |> FullCircleWeb.Helpers.format_date() %>
+        {@obj.note_date |> FullCircleWeb.Helpers.format_date()}
       </div>
       <div class="w-[10%] border-b border-gray-400 py-1">
         <%= if @obj.old_data do %>
-          <%= @obj.note_no %>
+          {@obj.note_no}
         <% else %>
           <.doc_link
             current_company={@company}
@@ -51,19 +51,19 @@ defmodule FullCircleWeb.SalaryNoteLive.IndexComponent do
         <% end %>
       </div>
       <div class="w-[10%] border-b border-gray-400 py-1">
-        <%= @obj.pay_slip_no %>
+        {@obj.pay_slip_no}
       </div>
       <div class="w-[16%] border-b text-center border-gray-400 py-1 overflow-clip">
-        <span class="font-light"><%= @obj.employee_name %></span>
+        <span class="font-light">{@obj.employee_name}</span>
       </div>
       <div class="w-[16%] border-b text-center border-gray-400 py-1 overflow-clip">
-        <span class="font-light"><%= @obj.salary_type_name %></span>
+        <span class="font-light">{@obj.salary_type_name}</span>
       </div>
       <div class="w-[26%] border-b text-center border-gray-400 py-1 overflow-clip">
-        <span class="font-light"><%= @obj.particulars %></span>
+        <span class="font-light">{@obj.particulars}</span>
       </div>
       <div class="w-[10%] border-b border-gray-400 py-1">
-        <%= Number.Currency.number_to_currency(@obj.amount) %>
+        {Number.Currency.number_to_currency(@obj.amount)}
       </div>
     </div>
     """

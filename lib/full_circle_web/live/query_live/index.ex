@@ -11,7 +11,7 @@ defmodule FullCircleWeb.QueryLive.Index do
   def render(assigns) do
     ~H"""
     <div class="w-8/12 mx-auto">
-      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
+      <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <.search_form search_val={@search.terms} placeholder={gettext("Name...")} />
       <div class="text-center mb-2">
         <.link
@@ -19,12 +19,12 @@ defmodule FullCircleWeb.QueryLive.Index do
           class="blue button"
           id="new_query"
         >
-          <%= gettext("New Query") %>
+          {gettext("New Query")}
         </.link>
       </div>
       <div class="text-center">
         <div class="border-y-2 bg-amber-200 border-amber-500 font-bold p-2">
-          <%= gettext("Query Information") %>
+          {gettext("Query Information")}
         </div>
       </div>
       <div

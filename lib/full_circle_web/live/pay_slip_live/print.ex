@@ -187,27 +187,27 @@ defmodule FullCircleWeb.PaySlipLive.Print do
   def render(assigns) do
     ~H"""
     <div id="print-me" class="print-here">
-      <%= pre_print_style(assigns) %>
-      <%= if(@pre_print == "false", do: full_style(assigns)) %>
+      {pre_print_style(assigns)}
+      {if(@pre_print == "false", do: full_style(assigns))}
       <%= for ps <- @pay_slips do %>
         <%= Enum.map 1..ps.chunk_number, fn n -> %>
           <div class="page">
             <div class="letter-head">
-              <%= if(@pre_print == "true", do: "", else: letter_head_data(assigns)) %>
+              {if(@pre_print == "true", do: "", else: letter_head_data(assigns))}
             </div>
             <div class="doctype is-size-4 has-text-weight-semibold">Pay Slip</div>
-            <%= pay_slip_header(ps, assigns) %>
-            <%= detail_header(assigns) %>
+            {pay_slip_header(ps, assigns)}
+            {detail_header(assigns)}
             <div class="details-body is-size-6">
               <%= for psd <- Enum.at(ps.detail_chunks, n - 1) do %>
-                <%= pay_slip_detail(psd, assigns) %>
+                {pay_slip_detail(psd, assigns)}
               <% end %>
             </div>
-            <%= if(n == ps.chunk_number,
+            {if(n == ps.chunk_number,
               do: pay_slip_footer(ps, n, ps.chunk_number, assigns),
               else: pay_slip_footer("continue", n, ps.chunk_number, assigns)
-            ) %>
-            <%= if(@pre_print == "true", do: "", else: letter_foot(ps, assigns)) %>
+            )}
+            {if(@pre_print == "true", do: "", else: letter_foot(ps, assigns))}
           </div>
         <% end %>
       <% end %>
@@ -224,15 +224,15 @@ defmodule FullCircleWeb.PaySlipLive.Print do
       class={"detail #{@psd.type}"}
     >
       <span class="date">
-        <%= format_date(@psd.dt) %>
+        {format_date(@psd.dt)}
       </span>
       <span class="item">
-        <%= @psd.item %> <%= @psd.note %>
+        {@psd.item} {@psd.note}
       </span>
-      <span class="qty"><%= @psd.qty %></span>
-      <span class="price"><%= Number.Delimit.number_to_delimited(@psd.price) %></span>
+      <span class="qty">{@psd.qty}</span>
+      <span class="price">{Number.Delimit.number_to_delimited(@psd.price)}</span>
       <span class="total">
-        <%= Number.Delimit.number_to_delimited(@psd.amount) %>
+        {Number.Delimit.number_to_delimited(@psd.amount)}
       </span>
     </div>
 
@@ -241,10 +241,10 @@ defmodule FullCircleWeb.PaySlipLive.Print do
       class={"detail #{@psd.type} is-italic"}
     >
       <span class="con-item">
-        <%= @psd.item %>
+        {@psd.item}
       </span>
       <span class="con-total">
-        <%= Number.Delimit.number_to_delimited(@psd.amount) %>
+        {Number.Delimit.number_to_delimited(@psd.amount)}
       </span>
     </div>
 
@@ -257,7 +257,7 @@ defmodule FullCircleWeb.PaySlipLive.Print do
       <span class="qty"></span>
       <span class="price"></span>
       <span class="total">
-        <%= Number.Delimit.number_to_delimited(@psd.amount) %>
+        {Number.Delimit.number_to_delimited(@psd.amount)}
       </span>
     </div>
 
@@ -267,7 +267,7 @@ defmodule FullCircleWeb.PaySlipLive.Print do
       <span class="qty"></span>
       <span class="price">Pay Total</span>
       <span class="total">
-        <%= Number.Delimit.number_to_delimited(@psd.amount) %>
+        {Number.Delimit.number_to_delimited(@psd.amount)}
       </span>
     </div>
     """
@@ -279,7 +279,7 @@ defmodule FullCircleWeb.PaySlipLive.Print do
     ~H"""
     <div class="descriptions">....continue....</div>
     <div class="pay_slip-footer"></div>
-    <span class="page-count"><%= "page #{@page} of #{@pages}" %></span>
+    <span class="page-count">{"page #{@page} of #{@pages}"}</span>
     """
   end
 
@@ -288,7 +288,7 @@ defmodule FullCircleWeb.PaySlipLive.Print do
 
     ~H"""
     <div class="pay_slip-footer"></div>
-    <span class="page-count"><%= "page #{@page} of #{@pages}" %></span>
+    <span class="page-count">{"page #{@page} of #{@pages}"}</span>
     """
   end
 
@@ -300,7 +300,7 @@ defmodule FullCircleWeb.PaySlipLive.Print do
       <div class="terms is-size-6">
         <div>Please read the above information carefully.</div>
         <div>Error reported after 7 days, will not be accepted.</div>
-        <div class="has-text-weight-light is-italic">Issued By: <%= @ps.issued_by.user.email %></div>
+        <div class="has-text-weight-light is-italic">Issued By: {@ps.issued_by.user.email}</div>
       </div>
       <div class="sign">Approve By</div>
       <div class="sign">Reciver Signature</div>
@@ -327,22 +327,22 @@ defmodule FullCircleWeb.PaySlipLive.Print do
     <div class="pay_slip-header">
       <div class="is-size-6">TO</div>
       <div class="customer">
-        <div class="is-size-4 has-text-weight-bold"><%= @pay_slip.employee.name %></div>
-        <div class="is-size-4"><%= @pay_slip.employee.id_no %></div>
+        <div class="is-size-4 has-text-weight-bold">{@pay_slip.employee.name}</div>
+        <div class="is-size-4">{@pay_slip.employee.id_no}</div>
       </div>
       <div class="pay_slip-info">
         <div>
-          Pay Date: <span class="has-text-weight-bold"><%= format_date(@pay_slip.slip_date) %></span>
+          Pay Date: <span class="has-text-weight-bold">{format_date(@pay_slip.slip_date)}</span>
         </div>
-        <div>Slip No: <span class="has-text-weight-bold"><%= @pay_slip.slip_no %></span></div>
+        <div>Slip No: <span class="has-text-weight-bold">{@pay_slip.slip_no}</span></div>
         <div>
           Pay Period:
           <span class="has-text-weight-bold">
-            <%= @pay_slip.pay_month %>/<%= @pay_slip.pay_year %>
+            {@pay_slip.pay_month}/{@pay_slip.pay_year}
           </span>
         </div>
         <div>
-          Pay By: <span class="has-text-weight-bold"><%= @pay_slip.funds_account.name %></span>
+          Pay By: <span class="has-text-weight-bold">{@pay_slip.funds_account.name}</span>
         </div>
       </div>
     </div>
@@ -351,13 +351,13 @@ defmodule FullCircleWeb.PaySlipLive.Print do
 
   def letter_head_data(assigns) do
     ~H"""
-    <div class="is-size-3 has-text-weight-bold"><%= @company.name %></div>
-    <div><%= @company.address1 %>, <%= @company.address2 %></div>
+    <div class="is-size-3 has-text-weight-bold">{@company.name}</div>
+    <div>{@company.address1}, {@company.address2}</div>
     <div>
-      <%= Enum.join([@company.zipcode, @company.city, @company.state, @company.country], ", ") %>
+      {Enum.join([@company.zipcode, @company.city, @company.state, @company.country], ", ")}
     </div>
     <div>
-      Tel: <%= @company.tel %> RegNo: <%= @company.reg_no %> Email: <%= @company.email %>
+      Tel: {@company.tel} RegNo: {@company.reg_no} Email: {@company.email}
     </div>
     """
   end

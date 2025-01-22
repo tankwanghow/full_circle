@@ -28,7 +28,7 @@ defmodule FullCircleWeb.CsvFormPrintLive.Print do
   def render(assigns) do
     ~H"""
     <div id="print-me" class="print-here">
-      <%= style(assigns) %>
+      {style(assigns)}
       <%= Enum.map 1..@chunk_number, fn n -> %>
         <div class="page">
           <%= for obj <- Enum.at(@detail_chunks, n - 1) do %>
@@ -37,7 +37,7 @@ defmodule FullCircleWeb.CsvFormPrintLive.Print do
                 Golden Husbandry Sdn. Bhd.
               </div>
               <div class="form-title is-size-5 has-text-weight-bold">Payment Voucher</div>
-              <%= detail(obj, assigns) %>
+              {detail(obj, assigns)}
             </div>
           <% end %>
         </div>
@@ -52,27 +52,27 @@ defmodule FullCircleWeb.CsvFormPrintLive.Print do
     ~H"""
     <div class="detail">
       <div class="date is-size-5">
-        <span class="has-text-weight-semibold">Date : </span><%= @obj.date %>
+        <span class="has-text-weight-semibold">Date : </span>{@obj.date}
       </div>
 
       <div class="is-size-5">
-        <span class="has-text-weight-semibold">Debit : </span><%= @obj.relatedaccount %>
+        <span class="has-text-weight-semibold">Debit : </span>{@obj.relatedaccount}
       </div>
 
       <div class="is-size-5">
-        <span class="has-text-weight-semibold">Pay To : </span><%= @obj.contact %>
+        <span class="has-text-weight-semibold">Pay To : </span>{@obj.contact}
       </div>
 
       <div class="is-size-5">
-        <span class="has-text-weight-semibold">Description : </span><%= "#{@obj.description}, #{@obj.reference} " %>
+        <span class="has-text-weight-semibold">Description : </span>{"#{@obj.description}, #{@obj.reference} "}
       </div>
 
       <div class="amount is-size-4">
-        <span class="has-text-weight-semibold">Amount : </span><%= @obj.credit %>
+        <span class="has-text-weight-semibold">Amount : </span>{@obj.credit}
       </div>
 
       <div class="credit is-size-5">
-        <span class="has-text-weight-semibold">Credit : </span><%= @obj.from %>
+        <span class="has-text-weight-semibold">Credit : </span>{@obj.from}
       </div>
     </div>
     """

@@ -232,7 +232,7 @@ defmodule FullCircleWeb.JournalLive.Form do
   def render(assigns) do
     ~H"""
     <div class="w-6/12 mx-auto border rounded-lg border-pink-500 bg-pink-100 p-4">
-      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
+      <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <.form for={@form} id="object-form" autocomplete="off" phx-change="validate" phx-submit="save">
         <.input type="hidden" field={@form[:journal_no]} />
         <div class="flex flex-row flex-nowarp">
@@ -246,11 +246,11 @@ defmodule FullCircleWeb.JournalLive.Form do
           class="text-center border bg-purple-100 mt-2 p-3 rounded-lg border-purple-400"
         >
           <div class="flex flex-row flex-wrap font-medium text-center mt-2 tracking-tighter">
-            <div class="detail-header w-[25%]"><%= gettext("Account") %></div>
-            <div class="detail-header w-[25%]"><%= gettext("Contact") %></div>
-            <div class="detail-header w-[30%]"><%= gettext("Particulars") %></div>
-            <div class="detail-header w-[17%]"><%= gettext("Amount") %></div>
-            <div class="w-[3%]"><%= gettext("") %></div>
+            <div class="detail-header w-[25%]">{gettext("Account")}</div>
+            <div class="detail-header w-[25%]">{gettext("Contact")}</div>
+            <div class="detail-header w-[30%]">{gettext("Particulars")}</div>
+            <div class="detail-header w-[17%]">{gettext("Amount")}</div>
+            <div class="w-[3%]">{gettext("")}</div>
           </div>
 
           <.inputs_for :let={dtl} field={@form[:transactions]}>
@@ -286,7 +286,7 @@ defmodule FullCircleWeb.JournalLive.Form do
           <div class="flex flex-row flex-wrap">
             <div class="w-[25%] text-orange-500 font-bold pt-2">
               <.link phx-click={:add_trans}>
-                <.icon name="hero-plus-circle" class="w-5 h-5" /><%= gettext("Add Entry") %>
+                <.icon name="hero-plus-circle" class="w-5 h-5" />{gettext("Add Entry")}
               </.link>
             </div>
             <div class="w-[55%] pt-2 pr-2 font-semibold text-right">Balance</div>

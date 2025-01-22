@@ -141,9 +141,9 @@ defmodule FullCircleWeb.TimeAttendLive.AdvanceFormComponent do
         phx-submit="save"
         phx-target={@myself}
       >
-        <p class="w-full text-3xl text-center font-medium"><%= @title %></p>
+        <p class="w-full text-3xl text-center font-medium">{@title}</p>
         <p :if={!is_nil(@form.source.data.pay_slip_no)} class="w-full text-xl text-center font-bold">
-          <%= @form.source.data.pay_slip_no %>
+          {@form.source.data.pay_slip_no}
         </p>
         <.input type="hidden" field={@form[:slip_no]} />
         <div class="grid grid-cols-12 gap-1">
@@ -181,7 +181,7 @@ defmodule FullCircleWeb.TimeAttendLive.AdvanceFormComponent do
         <div class="flex justify-center gap-x-1 mt-1">
           <.save_button form={@form} />
           <.link phx-click={:modal_cancel} class="orange button">
-            <%= gettext("Cancel") %>
+            {gettext("Cancel")}
           </.link>
           <.print_button
             :if={@live_action == :edit}

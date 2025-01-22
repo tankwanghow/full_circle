@@ -62,27 +62,27 @@ defmodule FullCircleWeb.SalaryNoteLive.Print do
   def render(assigns) do
     ~H"""
     <div id="print-me" class="print-here">
-      <%= pre_print_style(assigns) %>
-      <%= if(@pre_print == "false", do: full_style(assigns)) %>
+      {pre_print_style(assigns)}
+      {if(@pre_print == "false", do: full_style(assigns))}
       <%= for adv <- @advs do %>
         <%= Enum.map 1..adv.chunk_number, fn n -> %>
           <div class="page">
             <div class="letter-head">
-              <%= if(@pre_print == "true", do: "", else: letter_head_data(assigns)) %>
+              {if(@pre_print == "true", do: "", else: letter_head_data(assigns))}
             </div>
             <div class="doctype is-size-4 has-text-weight-semibold">SALARY NOTE</div>
-            <%= header(adv, assigns) %>
-            <%= detail_header(assigns) %>
+            {header(adv, assigns)}
+            {detail_header(assigns)}
             <div class="details-body is-size-6">
               <%= for chq <- Enum.at(adv.detail_chunks, n - 1) do %>
-                <%= detail(chq, assigns) %>
+                {detail(chq, assigns)}
               <% end %>
             </div>
-            <%= if(n == adv.chunk_number,
+            {if(n == adv.chunk_number,
               do: footer(adv, n, adv.chunk_number, assigns),
               else: footer("continue", n, adv.chunk_number, assigns)
-            ) %>
-            <%= if(@pre_print == "true", do: "", else: letter_foot(adv, assigns)) %>
+            )}
+            {if(@pre_print == "true", do: "", else: letter_foot(adv, assigns))}
           </div>
         <% end %>
       <% end %>
@@ -95,12 +95,12 @@ defmodule FullCircleWeb.SalaryNoteLive.Print do
 
     ~H"""
     <div class="detail is-size-5">
-      <div class="type"><%= @adv.salary_type.name %></div>
-      <div class="desc"><%= @adv.descriptions %></div>
-      <div class="qty"><%= Number.Delimit.number_to_delimited(@adv.quantity) %></div>
-      <div class="price"><%= Number.Delimit.number_to_delimited(@adv.unit_price) %></div>
+      <div class="type">{@adv.salary_type.name}</div>
+      <div class="desc">{@adv.descriptions}</div>
+      <div class="qty">{Number.Delimit.number_to_delimited(@adv.quantity)}</div>
+      <div class="price">{Number.Delimit.number_to_delimited(@adv.unit_price)}</div>
       <div class="amount">
-        <%= Number.Delimit.number_to_delimited(Decimal.mult(@adv.quantity, @adv.unit_price)) %>
+        {Number.Delimit.number_to_delimited(Decimal.mult(@adv.quantity, @adv.unit_price))}
       </div>
     </div>
     """
@@ -133,7 +133,7 @@ defmodule FullCircleWeb.SalaryNoteLive.Print do
 
     ~H"""
     <div class="letter-foot">
-      <div class="has-text-weight-light is-italic">Issued By: <%= @adv.issued_by.user.email %></div>
+      <div class="has-text-weight-light is-italic">Issued By: {@adv.issued_by.user.email}</div>
       <div class="sign">Entry By</div>
       <div class="sign">Employee Sign</div>
     </div>
@@ -159,15 +159,15 @@ defmodule FullCircleWeb.SalaryNoteLive.Print do
     <div class="adv-header">
       <div class="is-size-6">To</div>
       <div class="customer">
-        <div class="is-size-4 has-text-weight-semibold"><%= @adv.employee.name %></div>
-        <div class="is-size-4"><%= @adv.employee.id_no %></div>
+        <div class="is-size-4 has-text-weight-semibold">{@adv.employee.name}</div>
+        <div class="is-size-4">{@adv.employee.id_no}</div>
       </div>
       <div class="adv-info is-size-5">
         <div>
-          Note Date: <span class="has-text-weight-semibold"><%= format_date(@adv.note_date) %></span>
+          Note Date: <span class="has-text-weight-semibold">{format_date(@adv.note_date)}</span>
         </div>
         <div>
-          Note No: <span class="has-text-weight-semibold"><%= @adv.note_no %></span>
+          Note No: <span class="has-text-weight-semibold">{@adv.note_no}</span>
         </div>
       </div>
     </div>
@@ -176,13 +176,13 @@ defmodule FullCircleWeb.SalaryNoteLive.Print do
 
   def letter_head_data(assigns) do
     ~H"""
-    <div class="is-size-3 has-text-weight-bold"><%= @company.name %></div>
-    <div><%= @company.address1 %>, <%= @company.address2 %></div>
+    <div class="is-size-3 has-text-weight-bold">{@company.name}</div>
+    <div>{@company.address1}, {@company.address2}</div>
     <div>
-      <%= Enum.join([@company.zipcode, @company.city, @company.state, @company.country], ", ") %>
+      {Enum.join([@company.zipcode, @company.city, @company.state, @company.country], ", ")}
     </div>
     <div>
-      Tel: <%= @company.tel %> RegNo: <%= @company.reg_no %> Email: <%= @company.email %>
+      Tel: {@company.tel} RegNo: {@company.reg_no} Email: {@company.email}
     </div>
     """
   end

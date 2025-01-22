@@ -154,18 +154,16 @@ defmodule FullCircle.DebCre do
     qry =
       if terms != "" do
         from inv in subquery(qry),
-          order_by: [inv.old_data],
-          order_by: ^similarity_order([:note_no, :contact_name, :particulars], terms),
-          order_by: [desc: inv.note_no]
+          order_by: ^similarity_order([:note_no, :contact_name, :particulars], terms)
       else
-        from inv in qry, order_by: [inv.old_data], order_by: [desc: inv.note_no]
+        qry
       end
 
     qry =
       if date_from != "" do
         from inv in qry, where: inv.note_date >= ^date_from, order_by: inv.note_date
       else
-        qry
+        from inv in qry, order_by: [desc: inv.note_date]
       end
 
     qry |> offset((^page - 1) * ^per_page) |> limit(^per_page) |> Repo.all()
@@ -207,16 +205,14 @@ defmodule FullCircle.DebCre do
         checked: false,
         old_data: txn.old_data
       },
-      group_by: [txn.id, cont.id, obj.id, com.id, ac.id]
-
-    # group_by: [
-    #   coalesce(obj.id, txn.id),
-    #   txn.doc_no,
-    #   coalesce(cont.name, ac.name),
-    #   txn.doc_date,
-    #   com.id,
-    #   txn.old_data
-    # ]
+    group_by: [
+      coalesce(obj.id, txn.id),
+      txn.doc_no,
+      coalesce(cont.name, ac.name),
+      txn.doc_date,
+      com.id,
+      txn.old_data
+    ]
   end
 
   def create_credit_note(attrs, com, user) do
@@ -520,18 +516,17 @@ defmodule FullCircle.DebCre do
     qry =
       if terms != "" do
         from inv in subquery(qry),
-          order_by: [inv.old_data],
-          order_by: ^similarity_order([:note_no, :contact_name, :particulars], terms),
-          order_by: [desc: inv.note_no]
+
+          order_by: ^similarity_order([:note_no, :contact_name, :particulars], terms)
       else
-        from inv in qry, order_by: [inv.old_data], order_by: [desc: inv.note_no]
+        qry
       end
 
     qry =
       if date_from != "" do
         from inv in qry, where: inv.note_date >= ^date_from, order_by: inv.note_date
       else
-        qry
+        from inv in qry, order_by: [desc: inv.note_date]
       end
 
     qry |> offset((^page - 1) * ^per_page) |> limit(^per_page) |> Repo.all()

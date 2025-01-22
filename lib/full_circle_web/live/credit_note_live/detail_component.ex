@@ -17,24 +17,24 @@ defmodule FullCircleWeb.CreditNoteLive.DetailComponent do
     <div id={@id} class={@klass}>
       <div class="font-medium flex flex-row text-center mt-2 tracking-tighter">
         <div class="detail-header w-[30%]">
-          <%= gettext("Description") %>
+          {gettext("Description")}
         </div>
-        <div class="detail-header w-[10%]"><%= gettext("Quantity") %></div>
-        <div class="detail-header w-[8%]"><%= gettext("Price") %></div>
+        <div class="detail-header w-[10%]">{gettext("Quantity")}</div>
+        <div class="detail-header w-[8%]">{gettext("Price")}</div>
         <div class="detail-header w-[10%]">
-          <%= gettext("Desc Amt") %>
+          {gettext("Desc Amt")}
         </div>
         <div class="detail-header w-[20%]">
-          <%= gettext("Account") %>
+          {gettext("Account")}
         </div>
-        <div class="detail-header w-[8%]"><%= gettext("TxCode") %></div>
+        <div class="detail-header w-[8%]">{gettext("TxCode")}</div>
         <div class="detail-header w-[8%]">
-          <%= gettext("Tax%") %>
+          {gettext("Tax%")}
         </div>
         <div class="detail-header w-[8%]">
-          <%= gettext("TaxAmt") %>
+          {gettext("TaxAmt")}
         </div>
-        <div class="detail-header w-[14%]"><%= gettext("Amount") %></div>
+        <div class="detail-header w-[14%]">{gettext("Amount")}</div>
         <div class="detail-setting-col  mt-1 text-blue-500 grow-0 shrink-0"></div>
       </div>
 
@@ -97,15 +97,15 @@ defmodule FullCircleWeb.CreditNoteLive.DetailComponent do
       <div class="flex flex-row">
         <div class="mt-1 detail-desc-col text-orange-500 text-left">
           <.link phx-click={:add_detail} class="hover:font-bold focus:font-bold">
-            <.icon name="hero-plus-circle" class="w-5 h-5" /><%= gettext("Add Detail") %>
+            <.icon name="hero-plus-circle" class="w-5 h-5" />{gettext("Add Detail")}
           </.link>
         </div>
         <div class="w-[10%] text-right px-1 pt-1">
-          <%= gettext("Desc Total") %>
+          {gettext("Desc Total")}
         </div>
         <div class="detail-amt-col text-right px-1 pt-1">
-          <%= Ecto.Changeset.fetch_field!(@form.source, @doc_desc_amount)
-          |> Number.Delimit.number_to_delimited() %>
+          {Ecto.Changeset.fetch_field!(@form.source, @doc_desc_amount)
+          |> Number.Delimit.number_to_delimited()}
         </div>
         <div class="detail-setting-col" />
       </div>
@@ -113,11 +113,11 @@ defmodule FullCircleWeb.CreditNoteLive.DetailComponent do
       <div class="flex flex-row">
         <div class="w-[82%]"></div>
         <div class="w-[10%] text-right px-1">
-          <%= gettext("Tax Total") %>
+          {gettext("Tax Total")}
         </div>
         <div class="detail-amt-col text-right px-1">
-          <%= Ecto.Changeset.fetch_field!(@form.source, @doc_tax_amount)
-          |> Number.Delimit.number_to_delimited() %>
+          {Ecto.Changeset.fetch_field!(@form.source, @doc_tax_amount)
+          |> Number.Delimit.number_to_delimited()}
         </div>
         <div class="detail-setting-col" />
       </div>
@@ -125,15 +125,15 @@ defmodule FullCircleWeb.CreditNoteLive.DetailComponent do
       <div class="flex flex-row">
         <div class="w-[82%]"></div>
         <div class={"w-[10%] text-right px-1 border-t #{if(@matched_trans == [], do: "font-semibold border-b-4 border-double")} border-black"}>
-          <%= gettext("Note Total") %>
+          {gettext("Note Total")}
         </div>
         <div class={"detail-amt-col text-right border-t #{if(@matched_trans == [], do: "font-semibold border-b-4 border-double")} border-black"}>
           <div>
-            <%= Ecto.Changeset.fetch_field!(@form.source, @doc_detail_amount)
-            |> Number.Delimit.number_to_delimited() %>
+            {Ecto.Changeset.fetch_field!(@form.source, @doc_detail_amount)
+            |> Number.Delimit.number_to_delimited()}
           </div>
           <.error :for={msg <- Enum.map(@form[@doc_detail_amount].errors, &translate_error(&1))}>
-            <%= msg %>
+            {msg}
           </.error>
         </div>
         <div class="detail-setting-col" />
@@ -148,11 +148,11 @@ defmodule FullCircleWeb.CreditNoteLive.DetailComponent do
               target="_blank"
               navigate={"/companies/#{@current_company.id}/#{obj.doc_type}/#{obj.doc_id}/edit"}
             >
-              <%= gettext("Less") %> <%= obj.doc_type %>
+              {gettext("Less")} {obj.doc_type}
             </.link>
           </div>
           <div class="text-red-600 detail-amt-col text-right px-1">
-            <%= Number.Delimit.number_to_delimited(obj.match_amount |> Decimal.abs()) %>
+            {Number.Delimit.number_to_delimited(obj.match_amount |> Decimal.abs())}
           </div>
           <div class="detail-setting-col" />
         </div>
@@ -161,10 +161,10 @@ defmodule FullCircleWeb.CreditNoteLive.DetailComponent do
       <div :if={@matched_trans != []} class="flex flex-row">
         <div class="w-[82%]"></div>
         <div class="w-[10%] font-bold text-right px-1 border-t border-b-4 border-double border-black">
-          <%= gettext("Balance") %>
+          {gettext("Balance")}
         </div>
         <div class="detail-amt-col font-bold text-right px-1 border-t border-b-4 border-double border-black">
-          <%= Decimal.add(
+          {Decimal.add(
             Ecto.Changeset.fetch_field!(@form.source, @doc_detail_amount),
             Enum.reduce(@matched_trans, 0, fn obj, acc ->
               if(obj.doc_type == "Receipt" or obj.doc_type == "CreditNote",
@@ -173,7 +173,7 @@ defmodule FullCircleWeb.CreditNoteLive.DetailComponent do
               )
             end)
           )
-          |> Number.Delimit.number_to_delimited() %>
+          |> Number.Delimit.number_to_delimited()}
         </div>
         <div class="detail-setting-col" />
       </div>

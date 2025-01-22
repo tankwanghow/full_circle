@@ -64,7 +64,7 @@ defmodule FullCircleWeb.UserLive.New do
   @impl true
   def render(assigns) do
     ~H"""
-    <p class="w-full text-xl text-center font-medium"><%= @page_title %></p>
+    <p class="w-full text-xl text-center font-medium">{@page_title}</p>
     <.form
       for={@form}
       id="user"
@@ -92,10 +92,10 @@ defmodule FullCircleWeb.UserLive.New do
       </div>
       <div class="flex justify-center gap-x-1">
         <.button disabled={!@form.source.valid?} phx-disable-with={gettext("...")}>
-          <%= gettext("Add User") %>
+          {gettext("Add User")}
         </.button>
         <.link navigate={~p"/companies/#{@current_company.id}/users"} class="blue button">
-          <%= gettext("Back") %>
+          {gettext("Back")}
         </.link>
       </div>
     </.form>
@@ -105,17 +105,17 @@ defmodule FullCircleWeb.UserLive.New do
         class={"border-2 border-#{@color}-600 bg-#{@color}-200 rounded text-center w-6/12 mx-auto"}
       >
         <span class="text-2xl m-2">
-          <div><%= @message %></div>
+          <div>{@message}</div>
           <%= if @pwd do %>
             <div class="font-bold font-mono text-red-500">
-              <%= gettext("Password") %>
+              {gettext("Password")}
               <div class="font-bold font-mono text-4xl text-blue-500">
-                <%= @pwd %>
+                {@pwd}
               </div>
             </div>
           <% end %>
           <div>
-            <%= gettext("Please contact your user") %>
+            {gettext("Please contact your user")}
           </div>
         </span>
       </div>

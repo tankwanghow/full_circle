@@ -37,13 +37,13 @@ defmodule FullCircleWeb.ReportLive.HouseFeedPrint do
   def render(assigns) do
     ~H"""
     <div id="print-me" class="print-here">
-      <%= style(assigns) %>
+      {style(assigns)}
 
       <%= for chunk <- @detail_chunks do %>
         <div class="page">
-          <%= headers(assigns) %>
+          {headers(assigns)}
           <%= for r <- chunk do %>
-            <%= details(assigns, r) %>
+            {details(assigns, r)}
           <% end %>
         </div>
       <% end %>
@@ -59,7 +59,7 @@ defmodule FullCircleWeb.ReportLive.HouseFeedPrint do
     <div class="details">
       <%= for c <- @row do %>
         <div class="detail">
-          <%= c || "NO" %>
+          {c || "NO"}
         </div>
       <% end %>
     </div>
@@ -71,7 +71,7 @@ defmodule FullCircleWeb.ReportLive.HouseFeedPrint do
     <div :if={Enum.count(@cols) > 0} class="headers">
       <%= for h <- @cols do %>
         <div class="header">
-          <%= h %>
+          {h}
         </div>
       <% end %>
     </div>

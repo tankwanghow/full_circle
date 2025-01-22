@@ -280,7 +280,7 @@ defmodule FullCircleWeb.OrderLive.Form do
   def render(assigns) do
     ~H"""
     <div class="w-8/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4 mb-4">
-      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
+      <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <.form for={@form} id="object-form" autocomplete="off" phx-change="validate" phx-submit="save">
         <.input type="hidden" field={@form[:order_no]} />
         <div class="flex flex-row flex-nowarp gap-2">
@@ -353,27 +353,27 @@ defmodule FullCircleWeb.OrderLive.Form do
     </div>
     <div :if={@order_map} class="text-center tracking-tighter">
       <div class="flex w-6/12 mx-auto border rounded-lg bg-blue-400 font-bold">
-        <div class="w-[16%]"><%= gettext("Load Date") %></div>
-        <div class="w-[18%]"><%= gettext("Load No") %></div>
-        <div class="w-[16%]"><%= gettext("Lorry") %></div>
-        <div class="w-[18%]"><%= gettext("Good") %></div>
-        <div class="w-[16%]"><%= gettext("Load Qty") %></div>
-        <div class="w-[16%]"><%= gettext("Load Status") %></div>
+        <div class="w-[16%]">{gettext("Load Date")}</div>
+        <div class="w-[18%]">{gettext("Load No")}</div>
+        <div class="w-[16%]">{gettext("Lorry")}</div>
+        <div class="w-[18%]">{gettext("Good")}</div>
+        <div class="w-[16%]">{gettext("Load Qty")}</div>
+        <div class="w-[16%]">{gettext("Load Status")}</div>
       </div>
       <%= for odd <- @order_map.order_details do %>
         <%= for ldd <- odd.load_details do %>
           <div class="flex w-6/12 mx-auto border rounded-lg bg-blue-200">
-            <div class="w-[16%]"><%= ldd.load.load_date %></div>
+            <div class="w-[16%]">{ldd.load.load_date}</div>
             <div class="w-[18%]">
               <.doc_link
                 current_company={@current_company}
                 doc_obj={%{doc_type: "Load", doc_id: ldd.load.id, doc_no: ldd.load.load_no}}
               />
             </div>
-            <div class="w-[16%]"><%= ldd.load.lorry %></div>
-            <div class="w-[18%]"><%= odd.good.name %></div>
-            <div class="w-[16%]"><%= ldd.load_qty |> int_or_float_format %> <%= odd.good.unit %></div>
-            <div class="w-[16%]"><%= ldd.status %></div>
+            <div class="w-[16%]">{ldd.load.lorry}</div>
+            <div class="w-[18%]">{odd.good.name}</div>
+            <div class="w-[16%]">{ldd.load_qty |> int_or_float_format} {odd.good.unit}</div>
+            <div class="w-[16%]">{ldd.status}</div>
           </div>
         <% end %>
       <% end %>

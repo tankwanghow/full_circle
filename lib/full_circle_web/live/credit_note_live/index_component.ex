@@ -38,27 +38,27 @@ defmodule FullCircleWeb.CreditNoteLive.IndexComponent do
         />
       </div>
       <div class="w-[10%] border-b border-gray-400 py-1">
-        <%= @obj.note_date |> FullCircleWeb.Helpers.format_date() %>
+        {@obj.note_date |> FullCircleWeb.Helpers.format_date()}
       </div>
       <div
         :if={!@obj.old_data}
         class="text-blue-600 hover:font-bold w-[10%] border-b border-gray-400 py-1 hover:cursor-pointer"
       >
         <.link navigate={~p"/companies/#{@obj.company_id}/CreditNote/#{@obj.id}/edit"}>
-          <%= @obj.note_no %>
+          {@obj.note_no}
         </.link>
       </div>
       <div :if={@obj.old_data} class="w-[10%] border-b border-gray-400 py-1">
-        <%= @obj.note_no %>
+        {@obj.note_no}
       </div>
       <div class="w-[28%] border-b border-gray-400 py-1 overflow-clip">
-        <%= @obj.contact_name %>
+        {@obj.contact_name}
       </div>
       <div class="w-[40%] border-b text-center border-gray-400 py-1 overflow-clip">
-        <span class="font-light"><%= @obj.particulars %></span>
+        <span class="font-light">{@obj.particulars}</span>
       </div>
       <div class="w-[10%] border-b border-gray-400 py-1">
-        <%= Number.Currency.number_to_currency(@obj.amount |> Decimal.abs()) %>
+        {Number.Currency.number_to_currency(@obj.amount |> Decimal.abs())}
       </div>
     </div>
     """

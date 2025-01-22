@@ -11,7 +11,7 @@ defmodule FullCircleWeb.EmployeeLive.Index do
   def render(assigns) do
     ~H"""
     <div class="w-5/12 mx-auto">
-      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
+      <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <.search_form
         search_val={@search.terms}
         placeholder={gettext("Name, Id No, Nationality and Status...")}
@@ -22,7 +22,7 @@ defmodule FullCircleWeb.EmployeeLive.Index do
           class="blue button"
           id="new_employee"
         >
-          <%= gettext("New Employee") %>
+          {gettext("New Employee")}
         </.link>
         <.link
           :if={@can_print}
@@ -32,12 +32,12 @@ defmodule FullCircleWeb.EmployeeLive.Index do
           target="_blank"
           class="blue button"
         >
-          <%= gettext("Print QRCode") %><%= "(#{Enum.count(@selected)})" %>
+          {gettext("Print QRCode")}{"(#{Enum.count(@selected)})"}
         </.link>
       </div>
       <div class="text-center">
         <div class="bg-amber-200 border-y-2 border-amber-500 font-bold p-1">
-          <%= gettext("Employee Information") %>
+          {gettext("Employee Information")}
         </div>
       </div>
       <div

@@ -477,7 +477,7 @@ defmodule FullCircleWeb.ReceiptLive.Form do
   def render(assigns) do
     ~H"""
     <div class="w-11/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
-      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
+      <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <.form for={@form} id="object-form" autocomplete="off" phx-change="validate" phx-submit="save">
         <.input type="hidden" field={@form[:receipt_no]} />
         <div class="flex flex-row flex-nowarp">
@@ -555,13 +555,13 @@ defmodule FullCircleWeb.ReceiptLive.Form do
             }
             class="active basis-1/3 tab"
           >
-            <%= gettext("Cheques") %> =
+            {gettext("Cheques")} =
             <span
               :if={!Decimal.eq?(Ecto.Changeset.fetch_field!(@form.source, :cheques_amount), 0)}
               class="font-normal text-green-700"
             >
-              <%= Ecto.Changeset.fetch_field!(@form.source, :cheques_amount)
-              |> Number.Delimit.number_to_delimited() %>
+              {Ecto.Changeset.fetch_field!(@form.source, :cheques_amount)
+              |> Number.Delimit.number_to_delimited()}
             </span>
             <span class="text-rose-500">
               <.icon :if={@cheques_got_error} name="hero-exclamation-triangle-mini" class="h-5 w-5" />
@@ -581,15 +581,15 @@ defmodule FullCircleWeb.ReceiptLive.Form do
             }
             class="basis-1/3 tab"
           >
-            <%= gettext("Matchers") %> =
+            {gettext("Matchers")} =
             <span
               :if={!Decimal.eq?(Ecto.Changeset.fetch_field!(@form.source, :matched_amount), 0)}
               class="font-normal text-rose-700"
             >
-              <%= Ecto.Changeset.fetch_field!(@form.source, :matched_amount)
+              {Ecto.Changeset.fetch_field!(@form.source, :matched_amount)
               |> Decimal.new()
               |> Decimal.abs()
-              |> Number.Delimit.number_to_delimited() %>
+              |> Number.Delimit.number_to_delimited()}
             </span>
             <span class="text-rose-500">
               <.icon :if={@matchers_got_error} name="hero-exclamation-triangle-mini" class="h-5 w-5" />
@@ -609,13 +609,13 @@ defmodule FullCircleWeb.ReceiptLive.Form do
             }
             class="basis-1/3 tab"
           >
-            <%= gettext("Details") %> =
+            {gettext("Details")} =
             <span
               :if={!Decimal.eq?(Ecto.Changeset.fetch_field!(@form.source, :receipt_detail_amount), 0)}
               class="font-normal text-rose-700"
             >
-              <%= Ecto.Changeset.fetch_field!(@form.source, :receipt_detail_amount)
-              |> Number.Delimit.number_to_delimited() %>
+              {Ecto.Changeset.fetch_field!(@form.source, :receipt_detail_amount)
+              |> Number.Delimit.number_to_delimited()}
             </span>
             <span class="text-rose-500">
               <.icon :if={@details_got_error} name="hero-exclamation-triangle-mini" class="h-5 w-5" />
@@ -628,13 +628,13 @@ defmodule FullCircleWeb.ReceiptLive.Form do
           class="text-center border bg-purple-100 mt-2 p-3 rounded-lg border-purple-400"
         >
           <div class="flex flex-row flex-wrap font-medium text-center mt-2 tracking-tighter">
-            <div class="detail-header w-[16%]"><%= gettext("Bank") %></div>
-            <div class="detail-header w-[16%]"><%= gettext("Cheque No") %></div>
-            <div class="detail-header w-[16%]"><%= gettext("City") %></div>
-            <div class="detail-header w-[17%]"><%= gettext("State") %></div>
-            <div class="detail-header w-[16%]"><%= gettext("Due Date") %></div>
-            <div class="detail-header w-[16%]"><%= gettext("Amount") %></div>
-            <div class="w-[3%]"><%= gettext("") %></div>
+            <div class="detail-header w-[16%]">{gettext("Bank")}</div>
+            <div class="detail-header w-[16%]">{gettext("Cheque No")}</div>
+            <div class="detail-header w-[16%]">{gettext("City")}</div>
+            <div class="detail-header w-[17%]">{gettext("State")}</div>
+            <div class="detail-header w-[16%]">{gettext("Due Date")}</div>
+            <div class="detail-header w-[16%]">{gettext("Amount")}</div>
+            <div class="w-[3%]">{gettext("")}</div>
           </div>
 
           <.inputs_for :let={dtl} field={@form[:received_cheques]}>
@@ -658,7 +658,7 @@ defmodule FullCircleWeb.ReceiptLive.Form do
           <div class="flex flex-row flex-wrap">
             <div class="w-[16%] text-orange-500 font-bold pt-2">
               <.link phx-click={:add_cheque}>
-                <.icon name="hero-plus-circle" class="w-5 h-5" /><%= gettext("Add Cheque") %>
+                <.icon name="hero-plus-circle" class="w-5 h-5" />{gettext("Add Cheque")}
               </.link>
             </div>
             <div class="w-[65%] pt-2 pr-2 font-semibold text-right">Cheques Total</div>

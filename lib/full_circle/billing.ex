@@ -39,7 +39,7 @@ defmodule FullCircle.Billing do
         from inv in Invoice,
           join: com in subquery(Sys.user_company(com, user)),
           on: com.id == inv.company_id,
-          where: inv.invoice_no == ^inv_no,
+          where: inv.e_inv_internal_id == ^inv_no,
           select: inv.id
       )
 
@@ -57,7 +57,7 @@ defmodule FullCircle.Billing do
         on: cont.id == inv.contact_id,
         where: inv.id in ^ids,
         preload: [contact: cont, invoice_details: ^print_invoice_details()],
-        order_by: inv.invoice_no,
+        order_by: inv.e_inv_internal_id,
         select: inv
     )
     |> Enum.map(fn x -> Invoice.compute_struct_fields(x) end)
@@ -177,17 +177,28 @@ defmodule FullCircle.Billing do
         page: page,
         per_page: per_page
       ) do
-    qry =
-      from(inv in subquery(invoice_raw_query(com, user)))
+    qry = from(inv in subquery(invoice_raw_query(com, user)))
 
     qry =
       if terms != "" do
-        from inv in subquery(qry),
-          order_by: [inv.old_data],
-          order_by: ^similarity_order([:invoice_no, :contact_name, :particulars], terms),
-          order_by: [desc: inv.invoice_no]
+        from inv in qry,
+          order_by: ^similarity_order([:invoice_no, :contact_name, :particulars], terms)
       else
-        from inv in qry, order_by: [inv.old_data, desc: inv.invoice_no]
+        qry
+      end
+
+    qry =
+      if date_from != "" do
+        from inv in qry, where: inv.invoice_date >= ^date_from, order_by: inv.invoice_date
+      else
+        from inv in qry, order_by: [desc: inv.invoice_date]
+      end
+
+    qry =
+      if due_date_from != "" do
+        from inv in qry, where: inv.due_date >= ^due_date_from, order_by: inv.due_date
+      else
+        from inv in qry, order_by: [desc: inv.due_date]
       end
 
     qry =
@@ -195,20 +206,6 @@ defmodule FullCircle.Billing do
         "Paid" -> from inv in qry, where: inv.balance == 0
         "Unpaid" -> from inv in qry, where: inv.balance > 0
         _ -> qry
-      end
-
-    qry =
-      if date_from != "" do
-        from inv in qry, where: inv.invoice_date >= ^date_from, order_by: inv.invoice_date
-      else
-        qry
-      end
-
-    qry =
-      if due_date_from != "" do
-        from inv in qry, where: inv.due_date >= ^due_date_from, order_by: inv.due_date
-      else
-        qry
       end
 
     qry |> offset((^page - 1) * ^per_page) |> limit(^per_page) |> Repo.all()
@@ -253,8 +250,7 @@ defmodule FullCircle.Billing do
         checked: false,
         old_data: txn.old_data
       },
-      group_by: [txn.id, cont.id, inv.id],
-      order_by: [desc: txn.doc_date]
+      group_by: [txn.id, cont.id, inv.id]
   end
 
   def create_invoice(attrs, com, user) do
@@ -279,7 +275,7 @@ defmodule FullCircle.Billing do
       StdInterface.changeset(
         Invoice,
         %Invoice{},
-        Map.merge(attrs, %{"invoice_no" => doc}),
+        Map.merge(attrs, %{"e_inv_internal_id" => doc, "e_inv_internal_id" => doc}),
         com
       )
     end)
@@ -287,7 +283,10 @@ defmodule FullCircle.Billing do
       FullCircle.Sys.log_changeset(
         invoice_name,
         entity,
-        Map.merge(attrs, %{"invoice_no" => entity.invoice_no}),
+        Map.merge(attrs, %{
+          "e_inv_internal_id" => entity.e_inv_internal_id,
+          "e_inv_internal_id" => entity.e_inv_internal_id
+        }),
         com,
         user
       )
@@ -307,7 +306,7 @@ defmodule FullCircle.Billing do
            if !Decimal.eq?(x.good_amount, 0) do
              %{
                doc_type: "Invoice",
-               doc_no: invoice.invoice_no,
+               doc_no: invoice.e_inv_internal_id,
                doc_id: invoice.id,
                doc_date: invoice.invoice_date,
                account_id: x.account_id,
@@ -320,7 +319,7 @@ defmodule FullCircle.Billing do
            if !Decimal.eq?(x.tax_amount, 0) do
              %{
                doc_type: "Invoice",
-               doc_no: invoice.invoice_no,
+               doc_no: invoice.e_inv_internal_id,
                doc_id: invoice.id,
                doc_date: invoice.invoice_date,
                account_id: x.tax_code.account_id,
@@ -342,7 +341,7 @@ defmodule FullCircle.Billing do
 
              %{
                doc_type: "Invoice",
-               doc_no: invoice.invoice_no,
+               doc_no: invoice.e_inv_internal_id,
                doc_id: invoice.id,
                doc_date: invoice.invoice_date,
                contact_id: invoice.contact_id,
@@ -361,7 +360,7 @@ defmodule FullCircle.Billing do
   end
 
   def update_invoice(%Invoice{} = invoice, attrs, com, user) do
-    attrs = remove_field_if_new_flag(attrs, "invoice_no")
+    attrs = remove_field_if_new_flag(attrs, "e_inv_internal_id")
 
     case can?(user, :update_invoice, com) do
       true ->
@@ -386,7 +385,7 @@ defmodule FullCircle.Billing do
       :delete_transaction,
       from(txn in Transaction,
         where: txn.doc_type == "Invoice",
-        where: txn.doc_no == ^invoice.invoice_no,
+        where: txn.doc_no == ^invoice.e_inv_internal_id,
         where: txn.company_id == ^com.id
       )
     )
@@ -501,16 +500,28 @@ defmodule FullCircle.Billing do
 
     qry =
       if terms != "" do
-        from inv in subquery(qry),
-          order_by: [inv.old_data],
+        from inv in qry,
           order_by:
             ^similarity_order(
               [:pur_invoice_no, :e_inv_internal_id, :contact_name, :particulars],
               terms
-            ),
-          order_by: [desc: inv.pur_invoice_no]
+            )
       else
-        from inv in qry, order_by: [inv.old_data, desc: inv.pur_invoice_no]
+        qry
+      end
+
+    qry =
+      if date_from != "" do
+        from inv in qry, where: inv.pur_invoice_date >= ^date_from, order_by: inv.pur_invoice_date
+      else
+        from inv in qry, order_by: [desc: inv.pur_invoice_date]
+      end
+
+    qry =
+      if due_date_from != "" do
+        from inv in qry, where: inv.due_date >= ^due_date_from, order_by: inv.due_date
+      else
+        from inv in qry, order_by: [desc: inv.due_date]
       end
 
     qry =
@@ -518,20 +529,6 @@ defmodule FullCircle.Billing do
         "Paid" -> from inv in qry, where: inv.balance == 0
         "Unpaid" -> from inv in qry, where: inv.balance < 0
         _ -> qry
-      end
-
-    qry =
-      if date_from != "" do
-        from inv in qry, where: inv.pur_invoice_date >= ^date_from, order_by: inv.pur_invoice_date
-      else
-        qry
-      end
-
-    qry =
-      if due_date_from != "" do
-        from inv in qry, where: inv.due_date >= ^due_date_from, order_by: inv.due_date
-      else
-        qry
       end
 
     qry |> offset((^page - 1) * ^per_page) |> limit(^per_page) |> Repo.all()
@@ -577,8 +574,7 @@ defmodule FullCircle.Billing do
         checked: false,
         old_data: txn.old_data
       },
-      group_by: [txn.id, cont.id, inv.id],
-      order_by: [desc: txn.doc_date]
+      group_by: [txn.id, cont.id, inv.id]
   end
 
   def create_pur_invoice(attrs, com, user) do

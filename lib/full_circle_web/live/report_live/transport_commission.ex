@@ -83,7 +83,7 @@ defmodule FullCircleWeb.ReportLive.TransportCommission do
   def render(assigns) do
     ~H"""
     <div class="w-11/12 mx-auto mb-8">
-      <p class="text-2xl text-center font-medium"><%= "#{@page_title}" %></p>
+      <p class="text-2xl text-center font-medium">{"#{@page_title}"}</p>
       <div class="border rounded bg-amber-200 text-center p-2">
         <.form for={%{}} id="search-form" phx-submit="query" autocomplete="off" class="w-9/12 mx-auto">
           <div class="grid grid-cols-12 tracking-tighter">
@@ -117,7 +117,7 @@ defmodule FullCircleWeb.ReportLive.TransportCommission do
             </div>
             <div class="col-span-2 mt-6">
               <.button>
-                <%= gettext("Query") %>
+                {gettext("Query")}
               </.button>
               <.link
                 :if={@result.ok? and Enum.count(@result.result) > 0}
@@ -135,7 +135,7 @@ defmodule FullCircleWeb.ReportLive.TransportCommission do
 
         <.async_html result={@result}>
           <:result_html>
-            <%= FullCircleWeb.CsvHtml.headers(
+            {FullCircleWeb.CsvHtml.headers(
               [
                 gettext("Date"),
                 gettext("DocNo"),
@@ -154,9 +154,9 @@ defmodule FullCircleWeb.ReportLive.TransportCommission do
               ["6%", "7%", "13%", "18%", "7%", "5%", "8%", "9%", "5%", "8%", "9%", "5%"],
               "border rounded bg-gray-200 border-gray-400 px-2 py-1",
               assigns
-            ) %>
+            )}
 
-            <%= FullCircleWeb.CsvHtml.data(
+            {FullCircleWeb.CsvHtml.data(
               [
                 :invoice_date,
                 :doc_no,
@@ -190,19 +190,19 @@ defmodule FullCircleWeb.ReportLive.TransportCommission do
               ["6%", "7%", "13%", "18%", "7%", "5%", "8%", "9%", "5%", "8%", "9%", "5%"],
               "border rounded bg-blue-200 border-blue-400 px-2 py-1",
               assigns
-            ) %>
+            )}
             <div class="flex h-8 font-bold">
               <div class="w-[73%] border rounded bg-green-200 border-green-400 px-2 py-1"></div>
               <div class="w-[5%] border rounded bg-green-200 border-green-400 px-2 py-1">
-                <%= [0.0 | Enum.map(@result.result, fn x -> x.load_wages end)]
+                {[0.0 | Enum.map(@result.result, fn x -> x.load_wages end)]
                 |> Enum.sum()
-                |> Float.round(2) %>
+                |> Float.round(2)}
               </div>
               <div class="w-[17%] border rounded bg-green-200 border-green-400 px-2 py-1"></div>
               <div class="w-[5%] border rounded bg-green-200 border-green-400 px-2 py-1">
-                <%= [0.0 | Enum.map(@result.result, fn x -> x.delivery_wages end)]
+                {[0.0 | Enum.map(@result.result, fn x -> x.delivery_wages end)]
                 |> Enum.sum()
-                |> Float.round(2) %>
+                |> Float.round(2)}
               </div>
             </div>
           </:result_html>

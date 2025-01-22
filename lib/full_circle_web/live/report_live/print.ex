@@ -81,16 +81,16 @@ defmodule FullCircleWeb.ReportLive.Print do
   def render(assigns) do
     ~H"""
     <div id="print-me" class="print-here">
-      <%= style(assigns) %>
+      {style(assigns)}
       <%= Enum.map 1..@chunk_number, fn n -> %>
         <div class="page">
           <span class="header">Transactions: </span>
-          <span class="header has-text-weight-bold"><%= @account.name %></span>
+          <span class="header has-text-weight-bold">{@account.name}</span>
           <div class="between">
             <span>
-              From: <span class="has-text-weight-bold"><%= @fdate %></span>
+              From: <span class="has-text-weight-bold">{@fdate}</span>
             </span>
-            <span>To: <span class="has-text-weight-bold"><%= @tdate %></span></span>
+            <span>To: <span class="has-text-weight-bold">{@tdate}</span></span>
           </div>
           <div class="details-body is-size-6">
             <div class="details-header has-text-weight-bold">
@@ -101,12 +101,12 @@ defmodule FullCircleWeb.ReportLive.Print do
               <span class="debit"> Debit </span>
               <span class="credit"> Credit </span>
             </div>
-            <%= previous_page_balance(n, assigns) %>
+            {previous_page_balance(n, assigns)}
             <%= for txn <- Enum.at(@detail_chunks, n - 1) do %>
-              <%= txn_detail(txn, assigns) %>
+              {txn_detail(txn, assigns)}
             <% end %>
           </div>
-          <%= footer(n, assigns) %>
+          {footer(n, assigns)}
         </div>
       <% end %>
     </div>
@@ -123,22 +123,22 @@ defmodule FullCircleWeb.ReportLive.Print do
       <span class="doc_no"></span>
       <span class="particulars"> Balance </span>
       <span class="debit">
-        <%= if(Decimal.gt?((Enum.at(@detail_chunks, @n - 1) |> List.last()).balance, 0),
+        {if(Decimal.gt?((Enum.at(@detail_chunks, @n - 1) |> List.last()).balance, 0),
           do: (Enum.at(@detail_chunks, @n - 1) |> List.last()).balance,
           else: nil
         )
-        |> Number.Delimit.number_to_delimited() %>
+        |> Number.Delimit.number_to_delimited()}
       </span>
 
       <span class="credit">
-        <%= if(Decimal.gt?((Enum.at(@detail_chunks, @n - 1) |> List.last()).balance, 0),
+        {if(Decimal.gt?((Enum.at(@detail_chunks, @n - 1) |> List.last()).balance, 0),
           do: nil,
           else: Decimal.abs((Enum.at(@detail_chunks, @n - 1) |> List.last()).balance)
         )
-        |> Number.Delimit.number_to_delimited() %>
+        |> Number.Delimit.number_to_delimited()}
       </span>
     </div>
-    <div class="page-count"><%= "page #{@n} of #{@chunk_number}" %></div>
+    <div class="page-count">{"page #{@n} of #{@chunk_number}"}</div>
     """
   end
 
@@ -154,19 +154,19 @@ defmodule FullCircleWeb.ReportLive.Print do
         <span class="particulars">Balance Previous Page</span>
 
         <span class="debit">
-          <%= if(Decimal.gt?((Enum.at(@detail_chunks, @n - 2) |> List.last()).balance, 0),
+          {if(Decimal.gt?((Enum.at(@detail_chunks, @n - 2) |> List.last()).balance, 0),
             do: (Enum.at(@detail_chunks, @n - 2) |> List.last()).balance,
             else: nil
           )
-          |> Number.Delimit.number_to_delimited() %>
+          |> Number.Delimit.number_to_delimited()}
         </span>
 
         <span class="credit">
-          <%= if(Decimal.gt?((Enum.at(@detail_chunks, @n - 2) |> List.last()).balance, 0),
+          {if(Decimal.gt?((Enum.at(@detail_chunks, @n - 2) |> List.last()).balance, 0),
             do: nil,
             else: Decimal.abs((Enum.at(@detail_chunks, @n - 2) |> List.last()).balance)
           )
-          |> Number.Delimit.number_to_delimited() %>
+          |> Number.Delimit.number_to_delimited()}
         </span>
       </div>
     <% end %>
@@ -179,24 +179,24 @@ defmodule FullCircleWeb.ReportLive.Print do
     ~H"""
     <div class="detail">
       <span class="doc_date">
-        <%= @txn.doc_date |> FullCircleWeb.Helpers.format_date() %>
+        {@txn.doc_date |> FullCircleWeb.Helpers.format_date()}
       </span>
       <span class="doc_type">
-        <%= @txn.doc_type %>
+        {@txn.doc_type}
       </span>
       <span class="doc_no">
-        <%= @txn.doc_no %>
+        {@txn.doc_no}
       </span>
       <span class="particulars">
-        <%= @txn.particulars %>
+        {@txn.particulars}
       </span>
       <span class="debit">
-        <%= if(Decimal.gt?(@txn.amount, 0), do: @txn.amount, else: nil)
-        |> Number.Delimit.number_to_delimited() %>
+        {if(Decimal.gt?(@txn.amount, 0), do: @txn.amount, else: nil)
+        |> Number.Delimit.number_to_delimited()}
       </span>
       <span class="credit">
-        <%= if(Decimal.gt?(@txn.amount, 0), do: nil, else: Decimal.abs(@txn.amount))
-        |> Number.Delimit.number_to_delimited() %>
+        {if(Decimal.gt?(@txn.amount, 0), do: nil, else: Decimal.abs(@txn.amount))
+        |> Number.Delimit.number_to_delimited()}
       </span>
     </div>
     """

@@ -170,11 +170,11 @@ defmodule FullCircleWeb.TimeAttendLive.SalaryNoteFormComponent do
         phx-submit="save"
         phx-target={@myself}
       >
-        <p class="w-full text-3xl text-center font-medium"><%= @title %></p>
+        <p class="w-full text-3xl text-center font-medium">{@title}</p>
         <p :if={!is_nil(@form.source.data.pay_slip_no)} class="w-full text-xl text-center">
-          <%= @form.source.data.pay_slip_no %> <%= FullCircleWeb.Helpers.format_date(
+          {@form.source.data.pay_slip_no} {FullCircleWeb.Helpers.format_date(
             @form.source.data.pay_slip_date
-          ) %>
+          )}
         </p>
         <.input type="hidden" field={@form[:note_no]} />
         <div class="grid grid-cols-12 gap-1">
@@ -224,7 +224,7 @@ defmodule FullCircleWeb.TimeAttendLive.SalaryNoteFormComponent do
         <div class="flex justify-center gap-x-1 mt-1">
           <.save_button form={@form} />
           <.link phx-click={:modal_cancel} class="orange button">
-            <%= gettext("Cancel") %>
+            {gettext("Cancel")}
           </.link>
           <%= if @live_action == :edit and FullCircle.Authorization.can?(@current_user, :delete_salary_note, @current_company) do %>
             <.delete_confirm_modal

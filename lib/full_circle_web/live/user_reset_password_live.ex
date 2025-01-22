@@ -6,7 +6,7 @@ defmodule FullCircleWeb.UserResetPasswordLive do
   def render(assigns) do
     ~H"""
     <div class="mx-auto max-w-sm">
-      <.header class="text-center"><%= gettext("Reset Password") %></.header>
+      <.header class="text-center">{gettext("Reset Password")}</.header>
 
       <.simple_form
         for={@form}
@@ -15,7 +15,7 @@ defmodule FullCircleWeb.UserResetPasswordLive do
         phx-change="validate"
       >
         <.error :if={@form.errors != []}>
-          <%= gettext("Oops, something went wrong! Please check the errors below.") %>
+          {gettext("Oops, something went wrong! Please check the errors below.")}
         </.error>
 
         <.input field={@form[:password]} type="password" label={gettext("New password")} required />
@@ -27,14 +27,14 @@ defmodule FullCircleWeb.UserResetPasswordLive do
         />
         <:actions>
           <.button phx-disable-with={gettext("Resetting...")} class="w-full">
-            <%= gettext("Reset Password") %>
+            {gettext("Reset Password")}
           </.button>
         </:actions>
       </.simple_form>
 
       <p class="text-center text-sm mt-4">
-        <.link href={~p"/users/register"}><%= gettext("Register") %></.link>
-        | <.link href={~p"/users/log_in"}><%= gettext("Log in") %></.link>
+        <.link href={~p"/users/register"}>{gettext("Register")}</.link>
+        | <.link href={~p"/users/log_in"}>{gettext("Log in")}</.link>
       </p>
     </div>
     """

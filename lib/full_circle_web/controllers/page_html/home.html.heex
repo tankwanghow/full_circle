@@ -3,7 +3,7 @@
     <div class="grid justify-center w-full">
       <span>
         <.link navigate={~p"/companies"} class="font-semibold text-brand hover:underline">
-          <%= gettext("Companies") %>
+          {gettext("Companies")}
         </.link>
         |
         <.link
@@ -11,7 +11,7 @@
           method="delete"
           class="font-semibold text-brand hover:underline"
         >
-          <%= gettext("Log out") %>
+          {gettext("Log out")}
         </.link>
       </span>
     </div>
@@ -19,11 +19,11 @@
     <div class="grid justify-center w-full">
       <span>
         <.link navigate={~p"/users/log_in"} class="font-semibold text-brand hover:underline">
-          <%= gettext("Log in") %>
+          {gettext("Log in")}
         </.link>
         |
         <.link navigate={~p"/users/register"} class="font-semibold text-brand hover:underline">
-          <%= gettext("Register") %>
+          {gettext("Register")}
         </.link>
       </span>
     </div>

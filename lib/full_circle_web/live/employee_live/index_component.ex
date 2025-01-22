@@ -44,17 +44,17 @@ defmodule FullCircleWeb.EmployeeLive.IndexComponent do
           tabindex="-1"
           navigate={~p"/companies/#{@current_company}/employees/#{@obj.id}/edit"}
         >
-          <%= @obj.name %>
+          {@obj.name}
         </.link>
       </div>
       <div class="w-[20%]">
-        <%= @obj.id_no %>
+        {@obj.id_no}
       </div>
       <div class="w-[20%]">
-        <%= @obj.nationality %>
+        {@obj.nationality}
       </div>
       <div class="w-[10%]">
-        <%= @obj.status %>
+        {@obj.status}
       </div>
       <div class="w-[6%]">
         <.link
@@ -62,7 +62,7 @@ defmodule FullCircleWeb.EmployeeLive.IndexComponent do
           navigate={~p"/companies/#{@current_company}/employees/#{@obj.id}/copy"}
           class="text-xs hover:bg-orange-400 bg-orange-200 py-1 px-2 rounded-full border-orange-400 border"
         >
-          <%= gettext("Copy") %>
+          {gettext("Copy")}
         </.link>
       </div>
     </div>

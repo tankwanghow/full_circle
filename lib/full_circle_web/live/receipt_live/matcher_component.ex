@@ -16,12 +16,12 @@ defmodule FullCircleWeb.ReceiptLive.MatcherComponent do
     ~H"""
     <div id={@id} class={@klass}>
       <div class="flex flex-row flex-wrap font-medium text-center mt-2 tracking-tighter">
-        <div class="detail-header w-[16%]"><%= gettext("Doc Date") %></div>
-        <div class="detail-header w-[17%]"><%= gettext("Doc Type") %></div>
-        <div class="detail-header w-[16%]"><%= gettext("Doc No") %></div>
-        <div class="detail-header w-[16%]"><%= gettext("Amount") %></div>
-        <div class="detail-header w-[16%]"><%= gettext("Balance") %></div>
-        <div class="detail-header w-[16%]"><%= gettext("Match") %></div>
+        <div class="detail-header w-[16%]">{gettext("Doc Date")}</div>
+        <div class="detail-header w-[17%]">{gettext("Doc Type")}</div>
+        <div class="detail-header w-[16%]">{gettext("Doc No")}</div>
+        <div class="detail-header w-[16%]">{gettext("Amount")}</div>
+        <div class="detail-header w-[16%]">{gettext("Balance")}</div>
+        <div class="detail-header w-[16%]">{gettext("Match")}</div>
       </div>
       <.inputs_for :let={dtl} field={@form[:transaction_matchers]}>
         <div class={"flex flex-row flex-wrap #{if(dtl[:delete].value == true, do: "hidden", else: "")}"}>

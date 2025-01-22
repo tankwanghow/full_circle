@@ -11,7 +11,7 @@ defmodule FullCircleWeb.AccountLive.Index do
   def render(assigns) do
     ~H"""
     <div class="w-4/12 mx-auto">
-      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
+      <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <.search_form
         search_val={@search.terms}
         placeholder={gettext("Name, AccountType and Descriptions...")}
@@ -22,12 +22,12 @@ defmodule FullCircleWeb.AccountLive.Index do
           class="blue button"
           id="new_account"
         >
-          <%= gettext("New Account") %>
+          {gettext("New Account")}
         </.link>
       </div>
       <div class="text-center">
         <div class="border-y-2 bg-amber-200 border-amber-500 font-bold p-2">
-          <%= gettext("Account Information") %>
+          {gettext("Account Information")}
         </div>
       </div>
       <div

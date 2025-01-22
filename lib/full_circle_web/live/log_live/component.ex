@@ -63,7 +63,7 @@ defmodule FullCircleWeb.LogLive.Component do
     ~H"""
     <div id={@id}>
       <.link phx-target={@myself} phx-click={:show_log} class="blue button block">
-        <%= gettext("Log") %>
+        {gettext("Log")}
       </.link>
 
       <.modal
@@ -75,27 +75,27 @@ defmodule FullCircleWeb.LogLive.Component do
       >
         <div class="max-w-full text-black">
           <p class="w-full text-3xl text-center font-medium mb-3">
-            <%= @page_title %>
+            {@page_title}
           </p>
           <div id="logs_list">
             <%= for obj <- @logs do %>
               <div class="grid grid-cols-12 mb-2">
                 <div class="col-span-4 text-center border rounded p-5 bg-blue-100">
                   <div class="font-medium">
-                    <%= obj.action %>
+                    {obj.action}
                   </div>
-                  <div><%= obj.email %></div>
+                  <div>{obj.email}</div>
                   <div class="text-sm">
-                    <%= FullCircleWeb.CoreComponents.to_fc_time_format(
+                    {FullCircleWeb.CoreComponents.to_fc_time_format(
                       obj.inserted_at,
                       @current_company
-                    ) %>
+                    )}
                   </div>
                 </div>
                 <div class="text-left col-span-8 border rounded p-2 bg-rose-100 text-xs font-mono">
-                  <%= obj.delta
+                  {obj.delta
                   |> FullCircleWeb.Helpers.make_log_delta_to_html()
-                  |> Phoenix.HTML.raw() %>
+                  |> Phoenix.HTML.raw()}
                 </div>
               </div>
             <% end %>

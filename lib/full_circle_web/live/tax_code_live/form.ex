@@ -186,7 +186,7 @@ defmodule FullCircleWeb.TaxCodeLive.Form do
   def render(assigns) do
     ~H"""
     <div class="w-5/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
-      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
+      <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <.form for={@form} id="object-form" autocomplete="off" phx-change="validate" phx-submit="save">
         <div class="flex flex-row gap-1">
           <div class="w-[60%]">

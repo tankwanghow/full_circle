@@ -6,7 +6,7 @@ defmodule FullCircleWeb.UserLive.RougeUserIndex do
   def render(assigns) do
     ~H"""
     <div class="w-6/12 mx-auto">
-      <p class="w-full text-2xl text-center font-bold"><%= @page_title %></p>
+      <p class="w-full text-2xl text-center font-bold">{@page_title}</p>
       <div :if={@users == []} class="border-b border-indigo-400 py-3 m-2 bg-indigo-100 text-center">
         No Rouge User Found!!
       </div>
@@ -21,9 +21,9 @@ defmodule FullCircleWeb.UserLive.RougeUserIndex do
               |> JS.hide(to: "#delete-object-modal")
             }
           />
-          <span class="email font-mono font-bold"><%= u.email %></span>
+          <span class="email font-mono font-bold">{u.email}</span>
           <span>
-            created at <%= FullCircleWeb.Helpers.format_datetime(u.inserted_at, @current_company) %>
+            created at {FullCircleWeb.Helpers.format_datetime(u.inserted_at, @current_company)}
           </span>
         </div>
       <% end %>

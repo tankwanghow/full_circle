@@ -194,7 +194,7 @@ defmodule FullCircleWeb.ChequeLive.ReturnChequeForm do
   def render(assigns) do
     ~H"""
     <div class="w-8/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
-      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
+      <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <.form for={@form} id="object-form" autocomplete="off" phx-change="validate" phx-submit="save">
         <.input type="hidden" field={@form[:return_no]} />
         <div class="flex flex-row flex-nowarp gap-1">
@@ -299,33 +299,33 @@ defmodule FullCircleWeb.ChequeLive.ReturnChequeForm do
           phx-value-d_date={Ecto.Changeset.fetch_field!(@form.source, :return_date)}
           class="text-lg hover:font-bold text-blue-600"
         >
-          <%= gettext("Show Returnable Cheques") %>
-          <%= Ecto.Changeset.fetch_field!(@form.source, :return_date)
-          |> FullCircleWeb.Helpers.format_date() %>
+          {gettext("Show Returnable Cheques")}
+          {Ecto.Changeset.fetch_field!(@form.source, :return_date)
+          |> FullCircleWeb.Helpers.format_date()}
         </.link>
       </div>
 
       <div class="text-center font-medium flex flex-row tracking-tighter bg-amber-200 border-amber-400 border-y-2">
         <div class="w-[12%] px-2 py-1">
-          <%= gettext("Deposit Date") %>
+          {gettext("Deposit Date")}
         </div>
         <div class="w-[24%] px-2 py-1">
-          <%= gettext("To Bank") %>
+          {gettext("To Bank")}
         </div>
         <div class="w-[24%] px-2 py-1">
-          <%= gettext("Customer") %>
+          {gettext("Customer")}
         </div>
         <div class="w-[10%] px-2 py-1">
-          <%= gettext("Bank") %>
+          {gettext("Bank")}
         </div>
         <div class="w-[10%] px-2 py-1 ">
-          <%= gettext("Chq No") %>
+          {gettext("Chq No")}
         </div>
         <div class="w-[12%] px-2 py-1 ">
-          <%= gettext("Due Date") %>
+          {gettext("Due Date")}
         </div>
         <div class="w-[18%] px-2 py-1">
-          <%= gettext("Amount") %>
+          {gettext("Amount")}
         </div>
         <div class="w-[3%]" />
       </div>
@@ -334,25 +334,25 @@ defmodule FullCircleWeb.ChequeLive.ReturnChequeForm do
         <%= for obj <- @qry_cheques do %>
           <div class="flex flex-row border-b bg-gray-200 border-gray-400 text-center">
             <div class="border w-[12%] px-1 py-1">
-              <span><%= obj.deposit_date |> FullCircleWeb.Helpers.format_date() %></span>
+              <span>{obj.deposit_date |> FullCircleWeb.Helpers.format_date()}</span>
             </div>
             <div class="border w-[24%] px-1 py-1">
-              <span><%= obj.deposit_bank_name %></span>
+              <span>{obj.deposit_bank_name}</span>
             </div>
             <div class="border w-[24%] px-1 py-1">
-              <span><%= obj.contact_name %></span>
+              <span>{obj.contact_name}</span>
             </div>
             <div class="border w-[10%] px-1 py-1">
-              <%= obj.bank %>
+              {obj.bank}
             </div>
             <div class="border w-[10%] px-1 py-1">
-              <%= obj.cheque_no %>
+              {obj.cheque_no}
             </div>
             <div class="border w-[12%] px-1 py-1">
-              <%= obj.due_date |> FullCircleWeb.Helpers.format_date() %>
+              {obj.due_date |> FullCircleWeb.Helpers.format_date()}
             </div>
             <div class="border w-[18%] px-1 py-1">
-              <%= obj.amount |> Number.Delimit.number_to_delimited() %>
+              {obj.amount |> Number.Delimit.number_to_delimited()}
             </div>
             <div class="border w-[3%] cursor-pointer">
               <.link

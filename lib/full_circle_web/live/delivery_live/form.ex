@@ -279,7 +279,7 @@ defmodule FullCircleWeb.DeliveryLive.Form do
   def render(assigns) do
     ~H"""
     <div class="w-8/12 mx-auto bload rounded-lg bload-yellow-500 bg-yellow-100 p-4">
-      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
+      <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <.form for={@form} id="object-form" autocomplete="off" phx-change="validate" phx-submit="save">
         <.input type="hidden" field={@form[:delivery_no]} />
         <div class="flex flex-row flex-nowarp gap-2">

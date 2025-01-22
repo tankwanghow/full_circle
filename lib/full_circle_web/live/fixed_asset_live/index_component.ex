@@ -27,20 +27,20 @@ defmodule FullCircleWeb.FixedAssetLive.IndexComponent do
             navigate={~p"/companies/#{@current_company.id}/fixed_assets/#{@obj.id}/edit"}
             class="text-xl hover:font-bold text-blue-600"
           >
-            <%= @obj.name %> (<%= @obj.status %>)
+            {@obj.name} ({@obj.status})
           </.link>
           <p>
-            <span class="font-bold"><%= gettext("Fixed Asset Account:") %></span> <%= @obj.asset_ac_name %>
+            <span class="font-bold">{gettext("Fixed Asset Account:")}</span> {@obj.asset_ac_name}
           </p>
           <p>
-            <span class="font-bold"><%= gettext("Disposal Account:") %></span> <%= @obj.disp_fund_ac_name %>
+            <span class="font-bold">{gettext("Disposal Account:")}</span> {@obj.disp_fund_ac_name}
           </p>
           <p>
-            <span class="font-bold"><%= gettext("Depreciation Account:") %></span> <%= @obj.depre_ac_name %>
+            <span class="font-bold">{gettext("Depreciation Account:")}</span> {@obj.depre_ac_name}
           </p>
-          <span class="font-bold"><%= gettext("Cume Depreciation Account:") %></span>
-          <%= @obj.cume_depre_ac_name %>
-          <p><%= @obj.descriptions %></p>
+          <span class="font-bold">{gettext("Cume Depreciation Account:")}</span>
+          {@obj.cume_depre_ac_name}
+          <p>{@obj.descriptions}</p>
         </div>
         <div class={[
           "col-span-5 p-2",
@@ -50,7 +50,7 @@ defmodule FullCircleWeb.FixedAssetLive.IndexComponent do
           )
         ]}>
           <p>
-            <%= gettext("Purchase Price:") %> - <%= Number.Currency.number_to_currency(@obj.pur_price) %>
+            {gettext("Purchase Price:")} - {Number.Currency.number_to_currency(@obj.pur_price)}
           </p>
           <p>
             <.link
@@ -60,9 +60,7 @@ defmodule FullCircleWeb.FixedAssetLive.IndexComponent do
               }
               class="hover:font-bold text-blue-700"
             >
-              <%= gettext("Depreciations") %> - <%= Number.Currency.number_to_currency(
-                @obj.cume_depre
-              ) %>
+              {gettext("Depreciations")} - {Number.Currency.number_to_currency(@obj.cume_depre)}
             </.link>
           </p>
 
@@ -73,20 +71,20 @@ defmodule FullCircleWeb.FixedAssetLive.IndexComponent do
               }
               class="hover:font-bold text-blue-700"
             >
-              <%= gettext("Disposal") %> - <%= Number.Currency.number_to_currency(@obj.cume_disp) %>
+              {gettext("Disposal")} - {Number.Currency.number_to_currency(@obj.cume_disp)}
             </.link>
           </p>
 
           <p>
-            <%= gettext("Net Book Value") %> - <%= @obj.pur_price
+            {gettext("Net Book Value")} - {@obj.pur_price
             |> Decimal.sub(@obj.cume_disp || Decimal.new("0"))
             |> Decimal.sub(@obj.cume_depre || Decimal.new("0"))
-            |> Number.Currency.number_to_currency() %>
+            |> Number.Currency.number_to_currency()}
           </p>
           <p>
-            <%= gettext("Depreciation info") %> - <%= Number.Percentage.number_to_percentage(
+            {gettext("Depreciation info")} - {Number.Percentage.number_to_percentage(
               Decimal.mult(@obj.depre_rate, 100)
-            ) %> &#9679; <%= @obj.depre_interval %><br />
+            )} &#9679; {@obj.depre_interval}<br />
           </p>
         </div>
       </div>

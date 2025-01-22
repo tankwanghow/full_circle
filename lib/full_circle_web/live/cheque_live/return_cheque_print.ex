@@ -62,27 +62,27 @@ defmodule FullCircleWeb.ChequeLive.ReturnChequePrint do
   def render(assigns) do
     ~H"""
     <div id="print-me" class="print-here">
-      <%= pre_print_style(assigns) %>
-      <%= if(@pre_print == "false", do: full_style(assigns)) %>
+      {pre_print_style(assigns)}
+      {if(@pre_print == "false", do: full_style(assigns))}
       <%= for rtq <- @rtqs do %>
         <%= Enum.map 1..rtq.chunk_number, fn n -> %>
           <div class="page">
             <div class="letter-head">
-              <%= if(@pre_print == "true", do: "", else: letter_head_data(assigns)) %>
+              {if(@pre_print == "true", do: "", else: letter_head_data(assigns))}
             </div>
             <div class="doctype is-size-4 has-text-weight-semibold">RETURN CHEQUE NOTICE</div>
-            <%= header(rtq, assigns) %>
-            <%= detail_header(assigns) %>
+            {header(rtq, assigns)}
+            {detail_header(assigns)}
             <div class="details-body is-size-6">
               <%= for chq <- Enum.at(rtq.detail_chunks, n - 1) do %>
-                <%= detail(chq, assigns) %>
+                {detail(chq, assigns)}
               <% end %>
             </div>
-            <%= if(n == rtq.chunk_number,
+            {if(n == rtq.chunk_number,
               do: footer(rtq, n, rtq.chunk_number, assigns),
               else: footer("continue", n, rtq.chunk_number, assigns)
-            ) %>
-            <%= if(@pre_print == "true", do: "", else: letter_foot(rtq, assigns)) %>
+            )}
+            {if(@pre_print == "true", do: "", else: letter_foot(rtq, assigns))}
           </div>
         <% end %>
       <% end %>
@@ -95,12 +95,12 @@ defmodule FullCircleWeb.ChequeLive.ReturnChequePrint do
 
     ~H"""
     <div class="detail is-size-5">
-      <div class="bank"><%= @chq.bank %></div>
-      <div class="chq_no"><%= @chq.cheque_no %></div>
-      <div class="due_date"><%= @chq.due_date |> FullCircleWeb.Helpers.format_date() %></div>
-      <div class="city"><%= @chq.city %></div>
-      <div class="state"><%= @chq.state %></div>
-      <div class="amount"><%= Number.Delimit.number_to_delimited(@chq.amount) %></div>
+      <div class="bank">{@chq.bank}</div>
+      <div class="chq_no">{@chq.cheque_no}</div>
+      <div class="due_date">{@chq.due_date |> FullCircleWeb.Helpers.format_date()}</div>
+      <div class="city">{@chq.city}</div>
+      <div class="state">{@chq.state}</div>
+      <div class="amount">{Number.Delimit.number_to_delimited(@chq.amount)}</div>
     </div>
     """
   end
@@ -112,7 +112,7 @@ defmodule FullCircleWeb.ChequeLive.ReturnChequePrint do
     <div class="footer">
       <div class="descriptions">....continue....</div>
     </div>
-    <span class="page-count"><%= "page #{@page} of #{@pages}" %></span>
+    <span class="page-count">{"page #{@page} of #{@pages}"}</span>
     """
   end
 
@@ -123,7 +123,7 @@ defmodule FullCircleWeb.ChequeLive.ReturnChequePrint do
     <div class="footer">
       <div class="empty-footer" />
     </div>
-    <span class="page-count"><%= "page #{@page} of #{@pages}" %></span>
+    <span class="page-count">{"page #{@page} of #{@pages}"}</span>
     """
   end
 
@@ -133,7 +133,7 @@ defmodule FullCircleWeb.ChequeLive.ReturnChequePrint do
     ~H"""
     <div class="letter-foot">
       <div class="has-text-weight-light is-italic issued">
-        Issued By: <%= @rtq.issued_by.user.email %>
+        Issued By: {@rtq.issued_by.user.email}
       </div>
       <div class="sign">Approved By</div>
     </div>
@@ -160,11 +160,11 @@ defmodule FullCircleWeb.ChequeLive.ReturnChequePrint do
     <div class="rtq-header">
       <div class="is-size-6">Return Cheque To</div>
       <div class="customer">
-        <div class="is-size-5 has-text-weight-semibold"><%= @rtq.cheque_owner.name %></div>
-        <div><%= @rtq.cheque_owner.address1 %></div>
-        <div><%= @rtq.cheque_owner.address2 %></div>
+        <div class="is-size-5 has-text-weight-semibold">{@rtq.cheque_owner.name}</div>
+        <div>{@rtq.cheque_owner.address1}</div>
+        <div>{@rtq.cheque_owner.address2}</div>
         <div>
-          <%= Enum.join(
+          {Enum.join(
             [
               @rtq.cheque_owner.city,
               @rtq.cheque_owner.zipcode,
@@ -172,20 +172,19 @@ defmodule FullCircleWeb.ChequeLive.ReturnChequePrint do
               @rtq.cheque_owner.country
             ],
             " "
-          ) %>
+          )}
         </div>
-        <%= @rtq.cheque_owner.reg_no %>
+        {@rtq.cheque_owner.reg_no}
       </div>
       <div class="rtq-info is-size-5">
         <div>
-          Return Date:
-          <span class="has-text-weight-semibold"><%= format_date(@rtq.return_date) %></span>
+          Return Date: <span class="has-text-weight-semibold">{format_date(@rtq.return_date)}</span>
         </div>
         <div>
-          Return No: <span class="has-text-weight-semibold"><%= @rtq.return_no %></span>
+          Return No: <span class="has-text-weight-semibold">{@rtq.return_no}</span>
         </div>
         <div>
-          Reason: <span class="has-text-weight-semibold"><%= @rtq.return_reason %></span>
+          Reason: <span class="has-text-weight-semibold">{@rtq.return_reason}</span>
         </div>
       </div>
     </div>
@@ -194,13 +193,13 @@ defmodule FullCircleWeb.ChequeLive.ReturnChequePrint do
 
   def letter_head_data(assigns) do
     ~H"""
-    <div class="is-size-3 has-text-weight-bold"><%= @company.name %></div>
-    <div><%= @company.address1 %>, <%= @company.address2 %></div>
+    <div class="is-size-3 has-text-weight-bold">{@company.name}</div>
+    <div>{@company.address1}, {@company.address2}</div>
     <div>
-      <%= Enum.join([@company.zipcode, @company.city, @company.state, @company.country], ", ") %>
+      {Enum.join([@company.zipcode, @company.city, @company.state, @company.country], ", ")}
     </div>
     <div>
-      Tel: <%= @company.tel %> RegNo: <%= @company.reg_no %> Email: <%= @company.email %>
+      Tel: {@company.tel} RegNo: {@company.reg_no} Email: {@company.email}
     </div>
     """
   end

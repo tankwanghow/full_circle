@@ -10,7 +10,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchIndex do
   def render(assigns) do
     ~H"""
     <div id="punchIOIndex" class="mx-auto w-10/12">
-      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
+      <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <div class="flex justify-center mb-2">
         <.form for={%{}} id="search-form" phx-submit="search" autocomplete="off" class="w-full">
           <div class=" flex flex-row flex-wrap tracking-tighter text-sm">
@@ -47,26 +47,26 @@ defmodule FullCircleWeb.TimeAttendLive.PunchIndex do
       </div>
       <div class="font-medium flex flex-row text-center tracking-tighter bg-amber-200">
         <div class="w-[25%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Employee") %>
+          {gettext("Employee")}
         </div>
         <div class="w-[15%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Date") %>
+          {gettext("Date")}
         </div>
         <div class="w-[10%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Year/Week") %>
+          {gettext("Year/Week")}
         </div>
         <div class="w-[50%] flex flex-row border-b border-t border-amber-400 py-1">
           <div class="w-[66%]">
-            <%= gettext("Punches") %>
+            {gettext("Punches")}
           </div>
           <div class="w-[12%]">
-            <%= gettext("HW") %>
+            {gettext("HW")}
           </div>
           <div class="w-[11%]">
-            <%= gettext("NH") %>
+            {gettext("NH")}
           </div>
           <div class="w-[11%]">
-            <%= gettext("OT") %>
+            {gettext("OT")}
           </div>
         </div>
       </div>

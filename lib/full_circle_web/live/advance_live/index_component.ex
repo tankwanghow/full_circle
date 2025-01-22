@@ -38,11 +38,11 @@ defmodule FullCircleWeb.AdvanceLive.IndexComponent do
         />
       </div>
       <div class="w-[10%] border-b border-gray-400 py-1">
-        <%= @obj.slip_date |> FullCircleWeb.Helpers.format_date() %>
+        {@obj.slip_date |> FullCircleWeb.Helpers.format_date()}
       </div>
       <div class="w-[10%] border-b border-gray-400 py-1">
         <%= if @obj.old_data do %>
-          <%= @obj.slip_no %>
+          {@obj.slip_no}
         <% else %>
           <.doc_link
             current_company={@company}
@@ -51,16 +51,16 @@ defmodule FullCircleWeb.AdvanceLive.IndexComponent do
         <% end %>
       </div>
       <div class="w-[19%] border-b text-center border-gray-400 py-1 overflow-clip">
-        <span class="font-light"><%= @obj.employee_name %></span>
+        <span class="font-light">{@obj.employee_name}</span>
       </div>
       <div class="w-[19%] border-b text-center border-gray-400 py-1 overflow-clip">
-        <span class="font-light"><%= @obj.funds_account_name %></span>
+        <span class="font-light">{@obj.funds_account_name}</span>
       </div>
       <div class="w-[30%] border-b text-center border-gray-400 py-1 overflow-clip">
-        <span class="font-light"><%= @obj.particulars %></span>
+        <span class="font-light">{@obj.particulars}</span>
       </div>
       <div class="w-[10%] border-b border-gray-400 py-1">
-        <%= Number.Currency.number_to_currency(@obj.amount) %>
+        {Number.Currency.number_to_currency(@obj.amount)}
       </div>
     </div>
     """

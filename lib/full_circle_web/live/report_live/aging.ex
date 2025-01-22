@@ -79,7 +79,7 @@ defmodule FullCircleWeb.ReportLive.Aging do
   def render(assigns) do
     ~H"""
     <div class="w-8/12 mx-auto">
-      <p class="text-2xl text-center font-medium"><%= "#{@page_title}" %></p>
+      <p class="text-2xl text-center font-medium">{"#{@page_title}"}</p>
       <div class="border rounded bg-amber-200 text-center p-2">
         <.form for={%{}} id="search-form" phx-submit="query" autocomplete="off">
           <div class="grid grid-cols-12 tracking-tighter">
@@ -117,7 +117,7 @@ defmodule FullCircleWeb.ReportLive.Aging do
             </div>
             <div class="col-span-4 mt-6">
               <.button>
-                <%= gettext("Query") %>
+                {gettext("Query")}
               </.button>
               <.link
                 :if={@result.ok? and Enum.count(@result.result) > 0}
@@ -135,7 +135,7 @@ defmodule FullCircleWeb.ReportLive.Aging do
       </div>
       <.async_html result={@result}>
         <:result_html>
-          <%= FullCircleWeb.CsvHtml.headers(
+          {FullCircleWeb.CsvHtml.headers(
             [
               gettext("Category"),
               gettext("Account"),
@@ -152,9 +152,9 @@ defmodule FullCircleWeb.ReportLive.Aging do
             ["11%", "25%", "8%", "8%", "8%", "8%", "8%", "10%", "10%", "4%"],
             "border rounded bg-gray-200 border-gray-400 px-2 py-1",
             assigns
-          ) %>
+          )}
 
-          <%= FullCircleWeb.CsvHtml.data(
+          {FullCircleWeb.CsvHtml.data(
             [
               :category,
               :contact_name,
@@ -184,7 +184,7 @@ defmodule FullCircleWeb.ReportLive.Aging do
             ["11%", "25%", "8%", "8%", "8%", "8%", "8%", "10%", "10%", "4%"],
             "border rounded bg-blue-200 border-blue-400 px-2 py-1",
             assigns
-          ) %>
+          )}
           <div class="mb-10" />
         </:result_html>
       </.async_html>

@@ -254,13 +254,13 @@ defmodule FullCircleWeb.TimeAttendLive.PunchTimeComponent do
         <% end %>
       <% end %>
       <div class="worked-hours w-[10%] text-center">
-        <%= Number.Delimit.number_to_delimited(@wh) %>
+        {Number.Delimit.number_to_delimited(@wh)}
       </div>
       <div class="normal-hours w-[10%] text-center">
-        <%= Number.Delimit.number_to_delimited(@nh) %>
+        {Number.Delimit.number_to_delimited(@nh)}
       </div>
       <div class="ot-hours w-[10%] text-center">
-        <%= Number.Delimit.number_to_delimited(@ot) %>
+        {Number.Delimit.number_to_delimited(@ot)}
       </div>
     </div>
     """

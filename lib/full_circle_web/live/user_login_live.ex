@@ -5,12 +5,12 @@ defmodule FullCircleWeb.UserLoginLive do
     ~H"""
     <div class="mx-auto max-w-xs">
       <.header class="text-center mb-0">
-        <%= gettext("Log in to account") %>
+        {gettext("Log in to account")}
       </.header>
 
       <div class="text-center -mb-4">
         <.link navigate={~p"/users/register"} class="font-semibold text-brand hover:underline">
-          <%= gettext("Register for an account") %>
+          {gettext("Register for an account")}
         </.link>
       </div>
       <.simple_form
@@ -29,13 +29,13 @@ defmodule FullCircleWeb.UserLoginLive do
         </div>
         <div class="text-center">
           <.link href={~p"/users/reset_password"} class="text-sm font-semibold">
-            <%= gettext("Forgot your password?") %>
+            {gettext("Forgot your password?")}
           </.link>
         </div>
         <%!-- </div> --%>
         <:actions>
           <.button phx-disable-with={gettext("Signing in...")} class="w-full">
-            <%= gettext("Sign in") %>
+            {gettext("Sign in")}
           </.button>
         </:actions>
       </.simple_form>

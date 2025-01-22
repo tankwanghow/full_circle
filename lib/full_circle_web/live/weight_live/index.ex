@@ -11,7 +11,7 @@ defmodule FullCircleWeb.WeighingLive.Index do
   def render(assigns) do
     ~H"""
     <div class="mx-auto w-10/12">
-      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
+      <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <div class="flex justify-center mb-2">
         <.form for={%{}} id="search-form" phx-submit="search" autocomplete="off" class="w-full">
           <div class=" flex flex-row flex-wrap tracking-tighter text-sm">
@@ -44,36 +44,36 @@ defmodule FullCircleWeb.WeighingLive.Index do
           class="blue button"
           id="new_advance"
         >
-          <%= gettext("New Weighing") %>
+          {gettext("New Weighing")}
         </.link>
       </div>
       <div class="font-medium flex flex-row text-center tracking-tighter bg-amber-200">
         <div class="w-[10%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Date") %>
+          {gettext("Date")}
         </div>
         <div class="w-[10%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Note No") %>
+          {gettext("Note No")}
         </div>
         <div class="w-[10%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Vechile") %>
+          {gettext("Vechile")}
         </div>
         <div class="w-[15%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Good") %>
+          {gettext("Good")}
         </div>
         <div class="w-[10%] border-b border-t border-amber-400 py-1 text-right pr-2">
-          <%= gettext("Gross") %>
+          {gettext("Gross")}
         </div>
         <div class="w-[10%] border-b border-t border-amber-400 py-1 text-right pr-2">
-          <%= gettext("Tare") %>
+          {gettext("Tare")}
         </div>
         <div class="w-[10%] border-b border-t border-amber-400 py-1 text-right pr-2">
-          <%= gettext("Nett") %>
+          {gettext("Nett")}
         </div>
         <div class="w-[5%] border-b border-t border-amber-400 py-1 pr-2">
-          <%= gettext("Unit") %>
+          {gettext("Unit")}
         </div>
         <div class="w-[20%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Note") %>
+          {gettext("Note")}
         </div>
       </div>
       <div

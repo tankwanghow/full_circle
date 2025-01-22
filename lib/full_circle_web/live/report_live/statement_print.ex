@@ -48,22 +48,22 @@ defmodule FullCircleWeb.ReportLive.Statement.Print do
   def render(assigns) do
     ~H"""
     <div id="print-me" class="print-here">
-      <%= style(assigns) %>
+      {style(assigns)}
       <%= for contact <- @contacts do %>
         <%= Enum.map 1..contact.chunk_number, fn n -> %>
           <div class="page">
-            <%= letter_head_data(assigns) %>
-            <%= statement_header(assigns, n, contact.chunk_number, contact) %>
-            <%= print_transaction_header(assigns) %>
+            {letter_head_data(assigns)}
+            {statement_header(assigns, n, contact.chunk_number, contact)}
+            {print_transaction_header(assigns)}
             <div class="details">
               <%= for txn <- Enum.at(contact.detail_chunks, n - 1) do %>
-                <%= print_transaction(assigns, txn) %>
+                {print_transaction(assigns, txn)}
               <% end %>
             </div>
-            <%= if(n == contact.chunk_number,
+            {if(n == contact.chunk_number,
               do: print_aging(assigns, contact.aging, contact.pd_chqs),
               else: "continue...."
-            ) %>
+            )}
           </div>
         <% end %>
       <% end %>
@@ -88,11 +88,11 @@ defmodule FullCircleWeb.ReportLive.Statement.Print do
 
     ~H"""
     <div class="txn">
-      <div class="doc_date"><%= @txn.doc_date %></div>
-      <div class="doc_info"><%= @txn.doc_type %> <%= @txn.doc_no %></div>
-      <div class="parti"><%= @txn.particulars |> String.slice(0..40) %></div>
-      <div class="amount"><%= @txn.amount |> Number.Delimit.number_to_delimited() %></div>
-      <div class="running_sum"><%= @txn.running |> Number.Delimit.number_to_delimited() %></div>
+      <div class="doc_date">{@txn.doc_date}</div>
+      <div class="doc_info">{@txn.doc_type} {@txn.doc_no}</div>
+      <div class="parti">{@txn.particulars |> String.slice(0..40)}</div>
+      <div class="amount">{@txn.amount |> Number.Delimit.number_to_delimited()}</div>
+      <div class="running_sum">{@txn.running |> Number.Delimit.number_to_delimited()}</div>
     </div>
     """
   end
@@ -109,22 +109,22 @@ defmodule FullCircleWeb.ReportLive.Statement.Print do
         <div class="aging_p header">90-120 days</div>
         <div class="aging_p header">120++ days</div>
         <div class="aging_p header total">Total</div>
-        <div :if={@pd_chqs} class="aging_p header"><%= @pd_chqs.cheques %> PD Chqs</div>
+        <div :if={@pd_chqs} class="aging_p header">{@pd_chqs.cheques} PD Chqs</div>
       </div>
     </div>
     <div class="aging_group">
       <div :if={@aging} class="aging">
-        <div class="aging_p"><%= @aging.p1 |> Number.Delimit.number_to_delimited() %></div>
-        <div class="aging_p"><%= @aging.p2 |> Number.Delimit.number_to_delimited() %></div>
-        <div class="aging_p"><%= @aging.p3 |> Number.Delimit.number_to_delimited() %></div>
-        <div class="aging_p"><%= @aging.p4 |> Number.Delimit.number_to_delimited() %></div>
-        <div class="aging_p"><%= @aging.p5 |> Number.Delimit.number_to_delimited() %></div>
+        <div class="aging_p">{@aging.p1 |> Number.Delimit.number_to_delimited()}</div>
+        <div class="aging_p">{@aging.p2 |> Number.Delimit.number_to_delimited()}</div>
+        <div class="aging_p">{@aging.p3 |> Number.Delimit.number_to_delimited()}</div>
+        <div class="aging_p">{@aging.p4 |> Number.Delimit.number_to_delimited()}</div>
+        <div class="aging_p">{@aging.p5 |> Number.Delimit.number_to_delimited()}</div>
         <div class="aging_p total">
-          <%= (@aging.p1 + @aging.p2 + @aging.p3 + @aging.p4 + @aging.p5)
-          |> Number.Delimit.number_to_delimited() %>
+          {(@aging.p1 + @aging.p2 + @aging.p3 + @aging.p4 + @aging.p5)
+          |> Number.Delimit.number_to_delimited()}
         </div>
         <div :if={@pd_chqs} class="aging_p">
-          <%= @pd_chqs.amount |> Number.Delimit.number_to_delimited() %>
+          {@pd_chqs.amount |> Number.Delimit.number_to_delimited()}
         </div>
       </div>
       <div :if={is_nil(@aging)} class="aging">
@@ -148,20 +148,20 @@ defmodule FullCircleWeb.ReportLive.Statement.Print do
     <div class="statement-header">
       <div class="is-size-6">TO</div>
       <div class="customer">
-        <div class="is-size-5 has-text-weight-bold"><%= @contact.name %></div>
+        <div class="is-size-5 has-text-weight-bold">{@contact.name}</div>
         <div class="statement-info">
           <div>
-            From Date: <span class="has-text-weight-bold"><%= Helpers.format_date(@fdate) %></span>
+            From Date: <span class="has-text-weight-bold">{Helpers.format_date(@fdate)}</span>
           </div>
           <div>
-            To Date: <span class="has-text-weight-bold"><%= Helpers.format_date(@tdate) %></span>
+            To Date: <span class="has-text-weight-bold">{Helpers.format_date(@tdate)}</span>
           </div>
-          <div class="page-info"><%= "page #{@page} of #{@pages}" %></div>
+          <div class="page-info">{"page #{@page} of #{@pages}"}</div>
         </div>
-        <div><%= @contact.address1 %></div>
-        <div><%= @contact.address2 %></div>
+        <div>{@contact.address1}</div>
+        <div>{@contact.address2}</div>
         <div>
-          <%= Enum.join(
+          {Enum.join(
             [
               @contact.city,
               @contact.zipcode,
@@ -169,9 +169,9 @@ defmodule FullCircleWeb.ReportLive.Statement.Print do
               @contact.country
             ],
             " "
-          ) %>
+          )}
         </div>
-        <%= @contact.reg_no %>
+        {@contact.reg_no}
       </div>
     </div>
     """
@@ -179,11 +179,11 @@ defmodule FullCircleWeb.ReportLive.Statement.Print do
 
   def letter_head_data(assigns) do
     ~H"""
-    <div class="is-size-3 has-text-weight-bold"><%= @current_company.name %></div>
-    <div><%= @current_company.address1 %>, <%= @current_company.address2 %></div>
+    <div class="is-size-3 has-text-weight-bold">{@current_company.name}</div>
+    <div>{@current_company.address1}, {@current_company.address2}</div>
     <div class="doctype">STATEMENT</div>
     <div>
-      <%= Enum.join(
+      {Enum.join(
         [
           @current_company.zipcode,
           @current_company.city,
@@ -191,10 +191,10 @@ defmodule FullCircleWeb.ReportLive.Statement.Print do
           @current_company.country
         ],
         ", "
-      ) %>
+      )}
     </div>
     <div>
-      Tel: <%= @current_company.tel %> RegNo: <%= @current_company.reg_no %> Email: <%= @current_company.email %>
+      Tel: {@current_company.tel} RegNo: {@current_company.reg_no} Email: {@current_company.email}
     </div>
     """
   end

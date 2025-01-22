@@ -11,26 +11,26 @@ defmodule FullCircleWeb.FixedAssetLive.Index do
   def render(assigns) do
     ~H"""
     <div class="w-6/12 mx-auto">
-      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
+      <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <.search_form
         search_val={@search.terms}
         placeholder={gettext("Name, Asset Account, Depreciation Account or Descriptions...")}
       />
       <div class="text-center mb-2">
         <.link navigate={~p"/companies/#{@current_company.id}/fixed_assets/new"} class="blue button">
-          <%= gettext("New Fixed Asset") %>
+          {gettext("New Fixed Asset")}
         </.link>
         <.link
           navigate={~p"/companies/#{@current_company.id}/fixed_assets/calalldepre"}
           class="blue button"
           id="calculate_depre"
         >
-          <%= gettext("Calculate Depreciations") %>
+          {gettext("Calculate Depreciations")}
         </.link>
       </div>
       <div class="text-center">
         <div class="bg-amber-200 border-y-2 border-amber-500 font-bold p-2">
-          <%= gettext("Fixed Asset Information") %>
+          {gettext("Fixed Asset Information")}
         </div>
       </div>
       <div

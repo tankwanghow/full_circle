@@ -23,16 +23,16 @@ defmodule FullCircleWeb.TaxCodeLive.IndexComponent do
         class="hover:font-bold text-blue-600"
         navigate={~p"/companies/#{@current_company.id}/tax_codes/#{@obj.id}/edit"}
       >
-        <%= @obj.code %> (<%= @obj.tax_type %> &#11049; <%= @obj.rate
+        {@obj.code} ({@obj.tax_type} &#11049; {@obj.rate
         |> Decimal.mult(100)
-        |> Number.Percentage.number_to_percentage() %> &#11049; <%= @obj.account_name %>)
+        |> Number.Percentage.number_to_percentage()} &#11049; {@obj.account_name})
       </.link>
       <span :if={FullCircle.Accounting.is_default_tax_code?(@obj)} class="font-bold text-rose-600">
-        <%= @obj.code %> (<%= @obj.tax_type %> &#11049; <%= @obj.rate
+        {@obj.code} ({@obj.tax_type} &#11049; {@obj.rate
         |> Decimal.mult(100)
-        |> Number.Percentage.number_to_percentage() %> &#11049; <%= @obj.account_name %>)
+        |> Number.Percentage.number_to_percentage()} &#11049; {@obj.account_name})
       </span>
-      <p class="tracking-tighter font-light text-amber-800 leading-5"><%= @obj.descriptions %></p>
+      <p class="tracking-tighter font-light text-amber-800 leading-5">{@obj.descriptions}</p>
     </div>
     """
   end

@@ -90,13 +90,13 @@ defmodule FullCircleWeb.CoreComponents do
               <div id={"#{@id}-content"}>
                 <header :if={@title != []}>
                   <h1 id={"#{@id}-title"} class="text-lg font-semibold leading-8 text-zinc-800">
-                    <%= render_slot(@title) %>
+                    {render_slot(@title)}
                   </h1>
                   <p :if={@subtitle != []} class="mt-2 text-sm leading-6 text-zinc-600">
-                    <%= render_slot(@subtitle) %>
+                    {render_slot(@subtitle)}
                   </p>
                 </header>
-                <%= render_slot(@inner_block) %>
+                {render_slot(@inner_block)}
                 <div
                   :if={@confirm != [] or @cancel != []}
                   class="mt-2 grid grid-cols-4 gap-1 justify-items-center"
@@ -108,14 +108,14 @@ defmodule FullCircleWeb.CoreComponents do
                     phx-disable-with
                     class="col-start-2 py-2 px-3"
                   >
-                    <%= render_slot(confirm) %>
+                    {render_slot(confirm)}
                   </.button>
                   <.link
                     :for={cancel <- @cancel}
                     phx-click={JS.exec("phx-remove", to: "##{@id}")}
                     class="py-2 px-3 rounded-lg border font-semibold leading-6 bg-blue-200 hover:bg-blue-400 col-start-3"
                   >
-                    <%= render_slot(cancel) %>
+                    {render_slot(cancel)}
                   </.link>
                 </div>
               </div>
@@ -163,9 +163,9 @@ defmodule FullCircleWeb.CoreComponents do
         <.icon :if={@kind == :info} name="hero-information-circle-mini" class="h-4 w-4" />
         <.icon :if={@kind == :warn} name="hero-information-circle-mini" class="h-4 w-4" />
         <.icon :if={@kind == :error} name="hero-exclamation-circle-mini" class="h-4 w-4" />
-        <%= @title %>
+        {@title}
       </p>
-      <p class="mt-2 text-sm leading-5"><%= msg %></p>
+      <p class="mt-2 text-sm leading-5">{msg}</p>
       <button type="button" class="group absolute top-1 right-1 p-2" aria-label={gettext("close")}>
         <.icon name="hero-x-mark-solid" class="h-5 w-5 opacity-40 group-hover:opacity-70" />
       </button>
@@ -228,9 +228,9 @@ defmodule FullCircleWeb.CoreComponents do
     ~H"""
     <.form :let={f} for={@for} as={@as} {@rest}>
       <div class="mt-5 space-y-4">
-        <%= render_slot(@inner_block, f) %>
+        {render_slot(@inner_block, f)}
         <div :for={action <- @actions} class="flex items-center justify-between gap-6">
-          <%= render_slot(action, f) %>
+          {render_slot(action, f)}
         </div>
       </div>
     </.form>
@@ -262,7 +262,7 @@ defmodule FullCircleWeb.CoreComponents do
       ]}
       {@rest}
     >
-      <%= render_slot(@inner_block) %>
+      {render_slot(@inner_block)}
     </button>
     """
   end
@@ -344,9 +344,9 @@ defmodule FullCircleWeb.CoreComponents do
           class="rounded border-zinc-300 text-zinc-900 focus:ring-0"
           {@rest}
         />
-        <%= @label %>
+        {@label}
       </label>
-      <.error :for={msg <- @errors}><%= msg %></.error>
+      <.error :for={msg <- @errors}>{msg}</.error>
     </div>
     """
   end
@@ -354,7 +354,7 @@ defmodule FullCircleWeb.CoreComponents do
   def input(%{type: "select"} = assigns) do
     ~H"""
     <div>
-      <.label :if={@label} for={@id}><%= @label %></.label>
+      <.label :if={@label} for={@id}>{@label}</.label>
       <select
         id={@id}
         name={@name}
@@ -366,10 +366,10 @@ defmodule FullCircleWeb.CoreComponents do
         multiple={@multiple}
         {@rest}
       >
-        <option :if={@prompt} value=""><%= @prompt %></option>
-        <%= Phoenix.HTML.Form.options_for_select(@options, @value) %>
+        <option :if={@prompt} value="">{@prompt}</option>
+        {Phoenix.HTML.Form.options_for_select(@options, @value)}
       </select>
-      <.error :for={msg <- @errors}><%= msg %></.error>
+      <.error :for={msg <- @errors}>{msg}</.error>
     </div>
     """
   end
@@ -377,7 +377,7 @@ defmodule FullCircleWeb.CoreComponents do
   def input(%{type: "textarea"} = assigns) do
     ~H"""
     <div>
-      <.label :if={@label} for={@id}><%= @label %></.label>
+      <.label :if={@label} for={@id}>{@label}</.label>
       <textarea
         id={@id}
         name={@name}
@@ -391,7 +391,7 @@ defmodule FullCircleWeb.CoreComponents do
         url={@url}
         {@rest}
       ><%= Phoenix.HTML.Form.normalize_value("textarea", @value) %></textarea>
-      <.error :for={msg <- @errors}><%= msg %></.error>
+      <.error :for={msg <- @errors}>{msg}</.error>
     </div>
     """
   end
@@ -400,7 +400,7 @@ defmodule FullCircleWeb.CoreComponents do
   def input(assigns) do
     ~H"""
     <div>
-      <.label :if={@label} for={@id}><%= @label %></.label>
+      <.label :if={@label} for={@id}>{@label}</.label>
       <input
         type={@type}
         name={@name}
@@ -416,7 +416,7 @@ defmodule FullCircleWeb.CoreComponents do
         ]}
         {@rest}
       />
-      <.error :for={msg <- @errors}><%= msg %></.error>
+      <.error :for={msg <- @errors}>{msg}</.error>
     </div>
     """
   end
@@ -430,7 +430,7 @@ defmodule FullCircleWeb.CoreComponents do
   def label(assigns) do
     ~H"""
     <label for={@for} class="block text-sm font-semibold leading-6 text-zinc-800">
-      <%= render_slot(@inner_block) %>
+      {render_slot(@inner_block)}
     </label>
     """
   end
@@ -444,7 +444,7 @@ defmodule FullCircleWeb.CoreComponents do
     ~H"""
     <p class="flex text-xs leading-5 text-rose-600">
       <.icon name="hero-exclamation-circle-mini" class="mt-0.5 h-4 w-4 flex-none" />
-      <%= render_slot(@inner_block) %>
+      {render_slot(@inner_block)}
     </p>
     """
   end
@@ -463,13 +463,13 @@ defmodule FullCircleWeb.CoreComponents do
     <header class={[@actions != [] && "flex items-center justify-between gap-6", @class]}>
       <div>
         <h1 class="text-lg font-semibold leading-8 text-zinc-800">
-          <%= render_slot(@inner_block) %>
+          {render_slot(@inner_block)}
         </h1>
         <p :if={@subtitle != []} class="mt-2 text-sm leading-6 text-zinc-600">
-          <%= render_slot(@subtitle) %>
+          {render_slot(@subtitle)}
         </p>
       </div>
-      <div class="flex-none"><%= render_slot(@actions) %></div>
+      <div class="flex-none">{render_slot(@actions)}</div>
     </header>
     """
   end
@@ -511,8 +511,8 @@ defmodule FullCircleWeb.CoreComponents do
       <table class="w-[40rem] mt-11 sm:w-full">
         <thead class="text-sm text-left leading-6 text-zinc-500">
           <tr>
-            <th :for={col <- @col} class="p-0 pr-6 pb-4 font-normal"><%= col[:label] %></th>
-            <th class="relative p-0 pb-4"><span class="sr-only"><%= gettext("Actions") %></span></th>
+            <th :for={col <- @col} class="p-0 pr-6 pb-4 font-normal">{col[:label]}</th>
+            <th class="relative p-0 pb-4"><span class="sr-only">{gettext("Actions")}</span></th>
           </tr>
         </thead>
         <tbody
@@ -529,7 +529,7 @@ defmodule FullCircleWeb.CoreComponents do
               <div class="block py-4 pr-6">
                 <span class="absolute -inset-y-px right-0 -left-4 group-hover:bg-zinc-50 sm:rounded-l-xl" />
                 <span class={["relative", i == 0 && "font-semibold text-zinc-900"]}>
-                  <%= render_slot(col, @row_item.(row)) %>
+                  {render_slot(col, @row_item.(row))}
                 </span>
               </div>
             </td>
@@ -540,7 +540,7 @@ defmodule FullCircleWeb.CoreComponents do
                   :for={action <- @action}
                   class="relative ml-4 font-semibold leading-6 text-zinc-900 hover:text-zinc-700"
                 >
-                  <%= render_slot(action, @row_item.(row)) %>
+                  {render_slot(action, @row_item.(row))}
                 </span>
               </div>
             </td>
@@ -570,8 +570,8 @@ defmodule FullCircleWeb.CoreComponents do
     <div class="mt-14">
       <dl class="-my-4 divide-y divide-zinc-100">
         <div :for={item <- @item} class="flex gap-4 py-4 text-sm leading-6 sm:gap-8">
-          <dt class="w-1/4 flex-none text-zinc-500"><%= item.title %></dt>
-          <dd class="text-zinc-700"><%= render_slot(item) %></dd>
+          <dt class="w-1/4 flex-none text-zinc-500">{item.title}</dt>
+          <dd class="text-zinc-700">{render_slot(item)}</dd>
         </div>
       </dl>
     </div>
@@ -596,7 +596,7 @@ defmodule FullCircleWeb.CoreComponents do
         class="text-sm font-semibold leading-6 text-zinc-900 hover:text-zinc-700"
       >
         <.icon name="hero-arrow-left-solid" class="h-3 w-3" />
-        <%= render_slot(@inner_block) %>
+        {render_slot(@inner_block)}
       </.link>
     </div>
     """
@@ -739,18 +739,18 @@ defmodule FullCircleWeb.CoreComponents do
   def delete_confirm_modal(assigns) do
     ~H"""
     <.link id={@id} class="red button" phx-click={show_modal("#{@id}-modal")}>
-      <%= gettext("Delete") %>
+      {gettext("Delete")}
     </.link>
     <.modal id={"#{@id}-modal"} on_confirm={@confirm}>
       <div class="text-center">
         <div class="text-rose-600 font-bold text-2xl">
-          <%= @msg1 %>
+          {@msg1}
         </div>
-        <div class="text-red-600 font-bold text-xl"><%= @msg2 %></div>
-        <div class="text-amber-600 font-bold text-xl"><%= gettext("Are you sure?") %></div>
+        <div class="text-red-600 font-bold text-xl">{@msg2}</div>
+        <div class="text-amber-600 font-bold text-xl">{gettext("Are you sure?")}</div>
       </div>
-      <:confirm><%= gettext("OK") %></:confirm>
-      <:cancel><%= gettext("CANCEL") %></:cancel>
+      <:confirm>{gettext("OK")}</:confirm>
+      <:cancel>{gettext("CANCEL")}</:cancel>
     </.modal>
     """
   end
@@ -778,11 +778,11 @@ defmodule FullCircleWeb.CoreComponents do
   def infinite_scroll_footer(assigns) do
     ~H"""
     <div :if={@ended} class="mt-2 mb-2 text-center border-y-2 bg-orange-200 border-orange-400 p-2">
-      <%= gettext("No More.") %>
+      {gettext("No More.")}
     </div>
 
     <div :if={!@ended} class="mt-2 mb-2 text-center border-y-2 bg-blue-200 border-blue-400 p-2">
-      <%= gettext("Loading...") %><.icon name="hero-arrow-path" class="ml-1 h-3 w-3 animate-spin" />
+      {gettext("Loading...")}<.icon name="hero-arrow-path" class="ml-1 h-3 w-3 animate-spin" />
     </div>
     """
   end
@@ -835,9 +835,9 @@ defmodule FullCircleWeb.CoreComponents do
           "bg-rose-400 hover:bg-rose-200 border-rose-400 text-white active:text-white/80"
       ]}
     >
-      <%= if @form.source.valid?,
+      {if @form.source.valid?,
         do: @label,
-        else: gettext("Show Error!") %>
+        else: gettext("Show Error!")}
     </button>
     """
   end
@@ -849,24 +849,21 @@ defmodule FullCircleWeb.CoreComponents do
 
   def form_action_button(assigns) do
     ~H"""
-    <.save_button
-      :if={@live_action == :new or @live_action == :edit}
-      form={@form}
-    />
+    <.save_button :if={@live_action == :new or @live_action == :edit} form={@form} />
     <.save_button :if={@live_action == :match} form={@form} label={gettext("Match E-Invoice")} />
     <.save_button :if={@live_action == :unmatch} form={@form} label={gettext("Unmatch E-Invoice")} />
     <.link :if={@live_action != :new} navigate="" class="orange button">
-      <%= gettext("Cancel") %>
+      {gettext("Cancel")}
     </.link>
     <.link
       :if={@live_action == :edit}
       navigate={"/companies/#{@current_company.id}/#{@type}/new"}
       class="blue button"
     >
-      <%= gettext("New") %>
+      {gettext("New")}
     </.link>
     <.link class="orange button" navigate={"/companies/#{@current_company.id}/#{@type}"}>
-      <%= gettext("Index") %>
+      {gettext("Index")}
     </.link>
     <%!-- <a onclick="history.back();" class="blue button"><%= gettext("Back") %></a> --%>
     """
@@ -886,7 +883,7 @@ defmodule FullCircleWeb.CoreComponents do
       navigate={"/companies/#{@company.id}/#{@doc_type}/#{@doc_id}/print?pre_print=false"}
       class={@class}
     >
-      <%= gettext("Print") %>
+      {gettext("Print")}
     </.link>
     """
   end
@@ -906,7 +903,7 @@ defmodule FullCircleWeb.CoreComponents do
       navigate={"/companies/#{@company.id}/#{@doc_type}/#{@doc_id}/print?pre_print=true"}
       class={@class}
     >
-      <%= gettext("Pre Print") %>
+      {gettext("Pre Print")}
     </.link>
     """
   end
@@ -924,7 +921,7 @@ defmodule FullCircleWeb.CoreComponents do
       <div class="flex flex-row flex-wrap gap-5 mb-2 text-black">
         <%= for st <- @settings do %>
           <div class="">
-            <label><%= st.display_name %></label>
+            <label>{st.display_name}</label>
             <select
               id={"settings_#{st.id}_value"}
               name={"settings[#{st.id}][value]"}
@@ -932,16 +929,16 @@ defmodule FullCircleWeb.CoreComponents do
             >
               <%= for {v, k} <- st.values do %>
                 <%= if st.value == v do %>
-                  <option value={v} selected><%= k %></option>
+                  <option value={v} selected>{k}</option>
                 <% else %>
-                  <option value={v}><%= k %></option>
+                  <option value={v}>{k}</option>
                 <% end %>
               <% end %>
             </select>
           </div>
         <% end %>
       </div>
-      <:cancel><%= gettext("Close") %></:cancel>
+      <:cancel>{gettext("Close")}</:cancel>
     </.modal>
     """
   end
@@ -973,7 +970,7 @@ defmodule FullCircleWeb.CoreComponents do
       navigate={"/companies/#{@current_company.id}/#{@doc_type}/#{@doc_id}/#{@action}"}
       {@rest}
     >
-      <%= @doc_obj.doc_no %>
+      {@doc_obj.doc_no}
     </.link>
     """
   end
@@ -992,10 +989,10 @@ defmodule FullCircleWeb.CoreComponents do
         navigate={"/companies/#{@current_company.id}/seeds/#{@doc_obj.doc_type}/#{@doc_obj.doc_no}/edit"}
         {@rest}
       >
-        <%= @doc_obj.doc_no %>
+        {@doc_obj.doc_no}
       </.link>
     <% else %>
-      <%= @doc_obj.doc_no %>
+      {@doc_obj.doc_no}
     <% end %>
     """
   end
@@ -1008,25 +1005,25 @@ defmodule FullCircleWeb.CoreComponents do
     <%= cond do %>
       <% @result.loading -> %>
         <div class="bg-green-200 border-green-500 text-2xl text-center p-10 rounded">
-          <%= gettext("Loading...") %><.icon name="hero-arrow-path" class="ml-1 h-3 w-3 animate-spin" />
+          {gettext("Loading...")}<.icon name="hero-arrow-path" class="ml-1 h-3 w-3 animate-spin" />
         </div>
       <% @result.failed -> %>
         <div class="bg-rose-200 border-rose-500 text-2xl text-center p-10 rounded">
-          <%= "ERROR!!" %><br />
-          <%= inspect(@result) %>
+          {"ERROR!!"}<br />
+          {inspect(@result)}
         </div>
       <% @result.ok? and @result.result != [] -> %>
-        <%= render_slot(@result_html) %>
+        {render_slot(@result_html)}
       <% @result.ok? and @result.result == [] and !@result.failed and !@result.loading -> %>
         <div class="bg-yellow-200 border-yellow-500 text-2xl text-center p-10 rounded">
-          <%= gettext("No Result returned...") %>
+          {gettext("No Result returned...")}
         </div>
       <% @result.result == "...waiting for action..." -> %>
         <div class="bg-gray-200 border-gray-500 text-2xl text-center p-10 rounded">
-          <%= gettext("Waiting for action...") %>
+          {gettext("Waiting for action...")}
         </div>
       <% true -> %>
-        <%= inspect(@result) %>
+        {inspect(@result)}
     <% end %>
     """
   end

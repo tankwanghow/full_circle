@@ -23,7 +23,7 @@ defmodule FullCircleWeb.AccountLive.IndexComponent do
           class="hover:font-bold text-blue-600"
           navigate={~p"/companies/#{@current_company.id}/accounts/#{@obj.id}/edit"}
         >
-          <%= @obj.name %>
+          {@obj.name}
         </.link>
       <% else %>
         <%= if @current_role == "admin" do %>
@@ -31,16 +31,16 @@ defmodule FullCircleWeb.AccountLive.IndexComponent do
             class="hover:font-bold text-purple-600"
             navigate={~p"/companies/#{@current_company.id}/accounts/#{@obj.id}/edit"}
           >
-            <%= @obj.name %>
+            {@obj.name}
           </.link>
         <% else %>
           <span class="font-bold text-rose-600">
-            <%= @obj.name %>
+            {@obj.name}
           </span>
         <% end %>
       <% end %>
-      <span>(<%= @obj.account_type %>)</span>
-      <p class="text-sm text-green-600"><%= @obj.descriptions %></p>
+      <span>({@obj.account_type})</span>
+      <p class="text-sm text-green-600">{@obj.descriptions}</p>
     </div>
     """
   end

@@ -37,12 +37,12 @@ defmodule FullCircleWeb.LayerLive.HarvestReportPrint do
   def render(assigns) do
     ~H"""
     <div id="print-me" class="print-here">
-      <%= style(assigns) %>
+      {style(assigns)}
       <%= Enum.map 1..@chunk_number, fn n -> %>
         <div class="page">
           <span class="header is-size-5">Harvest Report :- </span>
-          <span class="header is-size-5 has-text-weight-bold"><%= @tdate %></span>
-          <div class="page-count"><%= "page #{n} of #{@chunk_number}" %></div>
+          <span class="header is-size-5 has-text-weight-bold">{@tdate}</span>
+          <div class="page-count">{"page #{n} of #{@chunk_number}"}</div>
           <div class="details-body is-size-6">
             <div class="details-header has-text-weight-bold">
               <span class="house">Hou</span>
@@ -60,11 +60,11 @@ defmodule FullCircleWeb.LayerLive.HarvestReportPrint do
               <span class="yield">Yld 7</span>
             </div>
             <%= for dat <- Enum.at(@detail_chunks, n - 1) do %>
-              <%= har_detail(dat, assigns) %>
+              {har_detail(dat, assigns)}
             <% end %>
             <div class="nofooter" />
           </div>
-          <%= footer(n, assigns) %>
+          {footer(n, assigns)}
         </div>
       <% end %>
     </div>
@@ -89,25 +89,25 @@ defmodule FullCircleWeb.LayerLive.HarvestReportPrint do
         <span class="house"></span>
         <span class="collector">Summary</span>
         <span class="age">
-          <%= ((@data |> Enum.reduce(0, fn e, acc -> acc + e.age end)) / Enum.count(@data))
-          |> Float.round(2) %>
+          {((@data |> Enum.reduce(0, fn e, acc -> acc + e.age end)) / Enum.count(@data))
+          |> Float.round(2)}
         </span>
         <span class="prod">
-          <%= ((@data |> Enum.reduce(0, fn e, acc -> acc + e.prod end)) / 30)
-          |> trunc %>
+          {((@data |> Enum.reduce(0, fn e, acc -> acc + e.prod end)) / 30)
+          |> trunc}
         </span>
         <span class="death">
-          <%= @data |> Enum.reduce(0, fn e, acc -> acc + e.dea end) |> trunc %>
+          {@data |> Enum.reduce(0, fn e, acc -> acc + e.dea end) |> trunc}
         </span>
 
-        <span class="yield"><%= average_yield(@data, :yield_0) %></span>
-        <span class="yield"><%= average_yield(@data, :yield_1) %></span>
-        <span class="yield"><%= average_yield(@data, :yield_2) %></span>
-        <span class="yield"><%= average_yield(@data, :yield_3) %></span>
-        <span class="yield"><%= average_yield(@data, :yield_4) %></span>
-        <span class="yield"><%= average_yield(@data, :yield_5) %></span>
-        <span class="yield"><%= average_yield(@data, :yield_6) %></span>
-        <span class="yield"><%= average_yield(@data, :yield_7) %></span>
+        <span class="yield">{average_yield(@data, :yield_0)}</span>
+        <span class="yield">{average_yield(@data, :yield_1)}</span>
+        <span class="yield">{average_yield(@data, :yield_2)}</span>
+        <span class="yield">{average_yield(@data, :yield_3)}</span>
+        <span class="yield">{average_yield(@data, :yield_4)}</span>
+        <span class="yield">{average_yield(@data, :yield_5)}</span>
+        <span class="yield">{average_yield(@data, :yield_6)}</span>
+        <span class="yield">{average_yield(@data, :yield_7)}</span>
       </div>
     <% end %>
     """
@@ -126,43 +126,43 @@ defmodule FullCircleWeb.LayerLive.HarvestReportPrint do
     ~H"""
     <div class="detail has-text-weight-light">
       <span class="house">
-        <%= @dtl.house_no %>
+        {@dtl.house_no}
       </span>
       <span class="collector">
-        <%= (@dtl.employee || "Company") |> String.slice(0, 15) %>
+        {(@dtl.employee || "Company") |> String.slice(0, 15)}
       </span>
       <span class="age">
-        <%= @dtl.age %>
+        {@dtl.age}
       </span>
       <span class="prod">
-        <%= (@dtl.prod / 30) |> trunc %>
+        {(@dtl.prod / 30) |> trunc}
       </span>
       <span class="death">
-        <%= @dtl.dea %>
+        {@dtl.dea}
       </span>
       <span class={["yield", yield_bold(@dtl.yield_0, @dtl.yield_1)]}>
-        <%= (@dtl.yield_0 * 100) |> Number.Percentage.number_to_percentage(precision: 0) %>
+        {(@dtl.yield_0 * 100) |> Number.Percentage.number_to_percentage(precision: 0)}
       </span>
       <span class={["yield", yield_bold(@dtl.yield_1, @dtl.yield_2)]}>
-        <%= (@dtl.yield_1 * 100) |> Number.Percentage.number_to_percentage(precision: 0) %>
+        {(@dtl.yield_1 * 100) |> Number.Percentage.number_to_percentage(precision: 0)}
       </span>
       <span class={["yield", yield_bold(@dtl.yield_2, @dtl.yield_3)]}>
-        <%= (@dtl.yield_2 * 100) |> Number.Percentage.number_to_percentage(precision: 0) %>
+        {(@dtl.yield_2 * 100) |> Number.Percentage.number_to_percentage(precision: 0)}
       </span>
       <span class={["yield", yield_bold(@dtl.yield_3, @dtl.yield_4)]}>
-        <%= (@dtl.yield_3 * 100) |> Number.Percentage.number_to_percentage(precision: 0) %>
+        {(@dtl.yield_3 * 100) |> Number.Percentage.number_to_percentage(precision: 0)}
       </span>
       <span class={["yield", yield_bold(@dtl.yield_4, @dtl.yield_5)]}>
-        <%= (@dtl.yield_4 * 100) |> Number.Percentage.number_to_percentage(precision: 0) %>
+        {(@dtl.yield_4 * 100) |> Number.Percentage.number_to_percentage(precision: 0)}
       </span>
       <span class={["yield", yield_bold(@dtl.yield_5, @dtl.yield_6)]}>
-        <%= (@dtl.yield_5 * 100) |> Number.Percentage.number_to_percentage(precision: 0) %>
+        {(@dtl.yield_5 * 100) |> Number.Percentage.number_to_percentage(precision: 0)}
       </span>
       <span class={["yield", yield_bold(@dtl.yield_6, @dtl.yield_7)]}>
-        <%= (@dtl.yield_6 * 100) |> Number.Percentage.number_to_percentage(precision: 0) %>
+        {(@dtl.yield_6 * 100) |> Number.Percentage.number_to_percentage(precision: 0)}
       </span>
       <span class="yield">
-        <%= (@dtl.yield_7 * 100) |> Number.Percentage.number_to_percentage(precision: 0) %>
+        {(@dtl.yield_7 * 100) |> Number.Percentage.number_to_percentage(precision: 0)}
       </span>
     </div>
     """

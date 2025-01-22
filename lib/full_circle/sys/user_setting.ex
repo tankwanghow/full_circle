@@ -203,13 +203,18 @@ defmodule FullCircle.Sys.UserSetting do
   end
 
   def default_settings("HouseFeed", cuid) do
-    [%{
-      page: "HouseFeed",
-      code: "feed-string",
-      display_name: "Feed String",
-      values: %{"default" => "0-5=A1, 5-10=A2, 10-16=A3, 16-20=A4, 20-48=A5, 48-70=A6, 70-80=A7, 80-200=A8"},
-      value: "0-5=A1, 5-10=A2, 10-16=A3, 16-20=A4, 20-48=A5, 48-70=A6, 70-80=A7, 80-200=A8",
-      company_user_id: cuid
-    }]
+    [
+      %{
+        page: "HouseFeed",
+        code: "feed-string",
+        display_name: "Feed String",
+        values: %{
+          "default" =>
+            "0-5=A1, 5-10=A2, 10-16=A3, 16-20=A4, 20-48=A5, 48-70=A6, 70-80=A7, 80-200=A8"
+        },
+        value: "0-5=A1, 5-10=A2, 10-16=A3, 16-20=A4, 20-48=A5, 48-70=A6, 70-80=A7, 80-200=A8",
+        company_user_id: cuid
+      }
+    ]
   end
 end

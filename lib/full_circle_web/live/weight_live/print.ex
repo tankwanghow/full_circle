@@ -62,27 +62,27 @@ defmodule FullCircleWeb.WeighingLive.Print do
   def render(assigns) do
     ~H"""
     <div id="print-me" class="print-here">
-      <%= pre_print_style(assigns) %>
-      <%= if(@pre_print == "false", do: full_style(assigns)) %>
+      {pre_print_style(assigns)}
+      {if(@pre_print == "false", do: full_style(assigns))}
       <%= for wei <- @weis do %>
         <%= Enum.map 1..wei.chunk_number, fn n -> %>
           <div class="page">
             <div class="letter-head">
-              <%= if(@pre_print == "true", do: "", else: letter_head_data(assigns)) %>
+              {if(@pre_print == "true", do: "", else: letter_head_data(assigns))}
             </div>
             <div class="doctype is-size-4 has-text-weight-semibold">Weighting Note</div>
-            <%= header(wei, assigns) %>
-            <%= detail_header(assigns) %>
+            {header(wei, assigns)}
+            {detail_header(assigns)}
             <div class="details-body is-size-6">
               <%= for chq <- Enum.at(wei.detail_chunks, n - 1) do %>
-                <%= detail(chq, assigns) %>
+                {detail(chq, assigns)}
               <% end %>
             </div>
-            <%= if(n == wei.chunk_number,
+            {if(n == wei.chunk_number,
               do: footer(wei, n, wei.chunk_number, assigns),
               else: footer("continue", n, wei.chunk_number, assigns)
-            ) %>
-            <%= if(@pre_print == "true", do: "", else: letter_foot(wei, assigns)) %>
+            )}
+            {if(@pre_print == "true", do: "", else: letter_foot(wei, assigns))}
           </div>
         <% end %>
       <% end %>
@@ -96,11 +96,11 @@ defmodule FullCircleWeb.WeighingLive.Print do
     ~H"""
     <div class="is-size-5 font-mono">
       <span class="weight"><span class="has-text-weight-semibold">Gross: </span>
-        <%= Number.Delimit.number_to_delimited(@wei.gross, precision: 0) %></span>
+        {Number.Delimit.number_to_delimited(@wei.gross, precision: 0)}</span>
       <span class="weight"><span class="has-text-weight-semibold">Tare:</span>
-        <%= Number.Delimit.number_to_delimited(@wei.tare, precision: 0) %></span>
+        {Number.Delimit.number_to_delimited(@wei.tare, precision: 0)}</span>
       <span class="weight"><span class="has-text-weight-semibold">Nett:</span>
-        <%= Number.Delimit.number_to_delimited(@wei.gross - @wei.tare, precision: 0) %></span>
+        {Number.Delimit.number_to_delimited(@wei.gross - @wei.tare, precision: 0)}</span>
     </div>
     """
   end
@@ -132,7 +132,7 @@ defmodule FullCircleWeb.WeighingLive.Print do
 
     ~H"""
     <div class="letter-foot">
-      <div class="sign">Entry By <%= @wei.issued_by.user.email %></div>
+      <div class="sign">Entry By {@wei.issued_by.user.email}</div>
     </div>
     """
   end
@@ -150,33 +150,32 @@ defmodule FullCircleWeb.WeighingLive.Print do
     <div class="wei-header font-mono is-size-6">
       <div class="customer">
         <div>
-          Weight Date:
-          <span class="has-text-weight-semibold"><%= format_date(@wei.note_date) %></span>
+          Weight Date: <span class="has-text-weight-semibold">{format_date(@wei.note_date)}</span>
         </div>
         <div>
-          Vehicle No: <span class="has-text-weight-semibold"><%= @wei.vehicle_no %></span>
+          Vehicle No: <span class="has-text-weight-semibold">{@wei.vehicle_no}</span>
         </div>
         <div>
-          Goods: <span class="has-text-weight-semibold"><%= @wei.good_name %></span>
+          Goods: <span class="has-text-weight-semibold">{@wei.good_name}</span>
         </div>
         <div class="is-size-6">
-          Note: <span class="has-text-weight-semibold"><%= @wei.note %></span>
+          Note: <span class="has-text-weight-semibold">{@wei.note}</span>
         </div>
       </div>
       <div class="wei-info">
         <div>
-          Weight Code: <span class="has-text-weight-semibold"><%= @wei.note_no %></span>
+          Weight Code: <span class="has-text-weight-semibold">{@wei.note_no}</span>
         </div>
         <div>
           In Time:
           <span class="has-text-weight-semibold">
-            <%= @wei.inserted_at |> format_datetime(@company) %>
+            {@wei.inserted_at |> format_datetime(@company)}
           </span>
         </div>
         <div>
           Out Time:
           <span class="has-text-weight-semibold">
-            <%= @wei.updated_at |> format_datetime(@company) %>
+            {@wei.updated_at |> format_datetime(@company)}
           </span>
         </div>
       </div>
@@ -186,13 +185,13 @@ defmodule FullCircleWeb.WeighingLive.Print do
 
   def letter_head_data(assigns) do
     ~H"""
-    <div class="is-size-3 has-text-weight-bold"><%= @company.name %></div>
-    <div><%= @company.address1 %>, <%= @company.address2 %></div>
+    <div class="is-size-3 has-text-weight-bold">{@company.name}</div>
+    <div>{@company.address1}, {@company.address2}</div>
     <div>
-      <%= Enum.join([@company.zipcode, @company.city, @company.state, @company.country], ", ") %>
+      {Enum.join([@company.zipcode, @company.city, @company.state, @company.country], ", ")}
     </div>
     <div>
-      Tel: <%= @company.tel %> RegNo: <%= @company.reg_no %> Email: <%= @company.email %>
+      Tel: {@company.tel} RegNo: {@company.reg_no} Email: {@company.email}
     </div>
     """
   end

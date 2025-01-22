@@ -242,7 +242,7 @@ defmodule FullCircleWeb.FixedAssetLive.Form do
   def render(assigns) do
     ~H"""
     <div class="w-7/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
-      <p class="w-full text-2xl text-center font-medium"><%= @page_title %></p>
+      <p class="w-full text-2xl text-center font-medium">{@page_title}</p>
       <.form
         for={@form}
         id="object-form"
@@ -267,9 +267,9 @@ defmodule FullCircleWeb.FixedAssetLive.Form do
                 }
                 class="hover:font-bold text-blue-700"
               >
-                <%= gettext("Depreciations") %> - <%= Number.Currency.number_to_currency(
+                {gettext("Depreciations")} - {Number.Currency.number_to_currency(
                   @form.data.cume_depre
-                ) %>
+                )}
               </.link>
             </p>
             <p>
@@ -279,9 +279,7 @@ defmodule FullCircleWeb.FixedAssetLive.Form do
                 }
                 class="hover:font-bold text-blue-700"
               >
-                <%= gettext("Disposal") %> - <%= Number.Currency.number_to_currency(
-                  @form.data.cume_disp
-                ) %>
+                {gettext("Disposal")} - {Number.Currency.number_to_currency(@form.data.cume_disp)}
               </.link>
             </p>
           </div>

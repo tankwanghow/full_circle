@@ -91,7 +91,7 @@ defmodule FullCircleWeb.ChequeLive.DepositIndex do
   def render(assigns) do
     ~H"""
     <div class="w-8/12 mx-auto">
-      <p class="text-2xl text-center font-medium"><%= "#{@page_title}" %></p>
+      <p class="text-2xl text-center font-medium">{"#{@page_title}"}</p>
       <div class="flex justify-center mb-2">
         <.form for={%{}} id="search-form" phx-submit="query" autocomplete="off">
           <div class=" flex flex-row flex-wrap tracking-tighter text-sm">
@@ -115,7 +115,7 @@ defmodule FullCircleWeb.ChequeLive.DepositIndex do
             </div>
 
             <.button class="mt-5 h-10 w-30 grow-0 shrink-0">
-              <%= gettext("Query") %>
+              {gettext("Query")}
             </.button>
           </div>
         </.form>
@@ -126,25 +126,25 @@ defmodule FullCircleWeb.ChequeLive.DepositIndex do
           class="blue button"
           id="new_invoice"
         >
-          <%= gettext("New Deposit") %>
+          {gettext("New Deposit")}
         </.link>
       </div>
 
       <div class="text-center font-medium flex flex-row tracking-tighter bg-green-200 border-green-400 border-y-2">
         <div class="w-[15%] px-2 py-1">
-          <%= gettext("Date") %>
+          {gettext("Date")}
         </div>
         <div class="w-[15%] px-2 py-1">
-          <%= gettext("Deposit No") %>
+          {gettext("Deposit No")}
         </div>
         <div class="w-[28%] px-2 py-1 ">
-          <%= gettext("Deposit Bank") %>
+          {gettext("Deposit Bank")}
         </div>
         <div class="w-[27%] px-2 py-1 ">
-          <%= gettext("Particulars") %>
+          {gettext("Particulars")}
         </div>
         <div class="w-[15%] px-2 py-1">
-          <%= gettext("Amount") %>
+          {gettext("Amount")}
         </div>
       </div>
 

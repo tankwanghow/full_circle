@@ -11,7 +11,7 @@ defmodule FullCircleWeb.LayerLive.FlockIndex do
   def render(assigns) do
     ~H"""
     <div class="mx-auto w-8/12">
-      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
+      <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <div class="flex justify-center mb-2">
         <.form for={%{}} id="search-form" phx-submit="search" autocomplete="off" class="w-full">
           <div class=" flex flex-row flex-wrap tracking-tighter text-sm">
@@ -39,27 +39,27 @@ defmodule FullCircleWeb.LayerLive.FlockIndex do
           class="blue button"
           id="new_flock"
         >
-          <%= gettext("New Flock") %>
+          {gettext("New Flock")}
         </.link>
       </div>
       <div class="font-medium flex flex-row text-center tracking-tighter bg-amber-200">
         <div class="w-[10%] border-b border-t border-amber-400 py-1">
-          <%= gettext("DOB") %>
+          {gettext("DOB")}
         </div>
         <div class="w-[14%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Flock No") %>
+          {gettext("Flock No")}
         </div>
         <div class="w-[10%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Breed") %>
+          {gettext("Breed")}
         </div>
         <div class="w-[10%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Quantity") %>
+          {gettext("Quantity")}
         </div>
         <div class="w-[31%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Houses") %>
+          {gettext("Houses")}
         </div>
         <div class="w-[25%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Note") %>
+          {gettext("Note")}
         </div>
       </div>
       <div

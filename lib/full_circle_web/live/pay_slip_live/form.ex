@@ -227,7 +227,7 @@ defmodule FullCircleWeb.PaySlipLive.Form do
   def render(assigns) do
     ~H"""
     <div class="w-8/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
-      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
+      <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <.form
         for={@form}
         id="object-form"
@@ -278,18 +278,18 @@ defmodule FullCircleWeb.PaySlipLive.Form do
             phx-click={JS.push("exec_cal_func")}
             class="mt-4 blue button"
           >
-            <%= gettext("Calculate") %>
+            {gettext("Calculate")}
           </.link>
         </div>
 
         <div class="flex flex-row text-center font-semibold">
-          <div class="w-[14%]"><%= gettext("Doc Date") %></div>
-          <div class="w-[13%]"><%= gettext("Doc No") %></div>
-          <div class="w-[21%]"><%= gettext("Salary Type") %></div>
-          <div class="w-[24%]"><%= gettext("Description") %></div>
-          <div class="w-[8%]"><%= gettext("Quantity") %></div>
-          <div class="w-[9%]"><%= gettext("Price") %></div>
-          <div class="w-[11%]"><%= gettext("Amount") %></div>
+          <div class="w-[14%]">{gettext("Doc Date")}</div>
+          <div class="w-[13%]">{gettext("Doc No")}</div>
+          <div class="w-[21%]">{gettext("Salary Type")}</div>
+          <div class="w-[24%]">{gettext("Description")}</div>
+          <div class="w-[8%]">{gettext("Quantity")}</div>
+          <div class="w-[9%]">{gettext("Price")}</div>
+          <div class="w-[11%]">{gettext("Amount")}</div>
           <div class="w-[2%]"></div>
         </div>
 
@@ -338,7 +338,7 @@ defmodule FullCircleWeb.PaySlipLive.Form do
 
         <div class="flex flex-row text-center font-semibold mb-5">
           <div class="w-[89%] text-right px-1 pt-1">
-            <%= gettext("Pay Slip Total") %>
+            {gettext("Pay Slip Total")}
           </div>
           <div class="w-[11%]">
             <.input readonly tabindex="-1" field={@form[:pay_slip_amount]} type="number" />
@@ -371,7 +371,7 @@ defmodule FullCircleWeb.PaySlipLive.Form do
           <%= if @live_action != :view do %>
             <.save_button form={@form} />
           <% end %>
-          <a onclick="history.back();" class="blue button"><%= gettext("Back") %></a>
+          <a onclick="history.back();" class="blue button">{gettext("Back")}</a>
           <.print_button
             :if={@live_action == :view}
             company={@current_company}

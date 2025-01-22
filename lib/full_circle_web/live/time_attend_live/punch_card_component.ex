@@ -62,19 +62,19 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCardComponent do
       ]}
     >
       <div class="date w-[12%] border-b border-gray-400">
-        <%= FullCircleWeb.Helpers.format_date(@obj.dd) %>
+        {FullCircleWeb.Helpers.format_date(@obj.dd)}
       </div>
       <div class="holiday w-[12%] border-b border-gray-400">
         <span :if={!is_nil(@obj.sholi_list)} class="group relative w-max">
-          <span class="text-rose-500"><%= @obj.sholi_list %></span>
+          <span class="text-rose-500">{@obj.sholi_list}</span>
           <span class="pointer-events-none absolute -top-2 left-2 w-max opacity-0 transition-opacity group-hover:opacity-100 bg-white rounded-xl px-2 py-1 text-sm">
-            <%= @obj.holi_list %>
+            {@obj.holi_list}
           </span>
         </span>
       </div>
 
       <div class="day w-[11%] border-b border-gray-400">
-        <%= @obj.dd |> Timex.weekday() |> Timex.day_name() %>
+        {@obj.dd |> Timex.weekday() |> Timex.day_name()}
       </div>
 
       <div class="w-[65%] border-b border-gray-400">

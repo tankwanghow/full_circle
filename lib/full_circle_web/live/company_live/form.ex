@@ -6,7 +6,7 @@ defmodule FullCircleWeb.CompanyLive.Form do
   @impl true
   def render(assigns) do
     ~H"""
-    <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
+    <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
     <.form
       for={@form}
       id="company"
@@ -101,8 +101,8 @@ defmodule FullCircleWeb.CompanyLive.Form do
           <.input field={@form[:descriptions]} label={gettext("Descriptions")} />
         </div>
       </div>
-      <%= datalist(assigns, FullCircle.Sys.countries(), "countries") %>
-      <%= datalist(assigns, Tzdata.zone_list(), "timezones") %>
+      {datalist(assigns, FullCircle.Sys.countries(), "countries")}
+      {datalist(assigns, Tzdata.zone_list(), "timezones")}
       <div class="flex justify-center gap-x-1 mt-2">
         <.save_button form={@form} />
         <%= if @live_action == :edit and FullCircle.Authorization.can?(@current_user, :delete_company, @company) do %>
@@ -114,7 +114,7 @@ defmodule FullCircleWeb.CompanyLive.Form do
           />
         <% end %>
         <.link navigate="/companies" class="blue button">
-          <%= gettext("Back") %>
+          {gettext("Back")}
         </.link>
       </div>
     </.form>

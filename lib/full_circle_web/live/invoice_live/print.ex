@@ -62,33 +62,36 @@ defmodule FullCircleWeb.InvoiceLive.Print do
   def render(assigns) do
     ~H"""
     <div id="print-me" class="print-here">
-      <%= pre_print_style(assigns) %>
-      <%= if(@pre_print == "false", do: full_style(assigns)) %>
+      {pre_print_style(assigns)}
+      {if(@pre_print == "false", do: full_style(assigns))}
       <%= for invoice <- @invoices do %>
         <%= Enum.map 1..invoice.chunk_number, fn n -> %>
           <div class="page">
             <div class="letter-head">
-              <%= if(@pre_print == "true", do: "", else: letter_head_data(assigns)) %>
+              {if(@pre_print == "true", do: "", else: letter_head_data(assigns))}
             </div>
 
-            <div class="doctype">
-              <%= QRCode.create(FullCircle.Helpers.e_inv_validate_url(invoice), :high)
-              |> QRCode.render(:svg, %QRCode.Render.SvgSettings{scale: 1.5})
-              |> elem(1)
-              |> raw %>
+            <div :if={@pre_print == "false"} class="qrcode">
+              <div>
+                {QRCode.create(FullCircle.Helpers.e_inv_validate_url(invoice), :high)
+                |> QRCode.render(:svg, %QRCode.Render.SvgSettings{structure: :readable, scale: 2})
+                |> elem(1)
+                |> raw}
+              </div>
             </div>
-            <%= invoice_header(invoice, n, invoice.chunk_number, assigns) %>
-            <%= detail_header(assigns) %>
+
+            {invoice_header(invoice, n, invoice.chunk_number, assigns)}
+            {detail_header(assigns)}
             <div class="details-body is-size-6">
               <%= for invd <- Enum.at(invoice.detail_chunks, n - 1) do %>
-                <%= invoice_detail(invd, assigns) %>
+                {invoice_detail(invd, assigns)}
               <% end %>
             </div>
-            <%= if(n == invoice.chunk_number,
+            {if(n == invoice.chunk_number,
               do: invoice_footer(invoice, assigns),
               else: invoice_footer("continue", assigns)
-            ) %>
-            <%= if(@pre_print == "true", do: "", else: letter_foot(invoice, assigns)) %>
+            )}
+            {if(@pre_print == "true", do: "", else: letter_foot(invoice, assigns))}
           </div>
         <% end %>
       <% end %>
@@ -103,40 +106,40 @@ defmodule FullCircleWeb.InvoiceLive.Print do
     <div class="detail">
       <div class="particular">
         <div :if={@invd.good_name != "Note"}>
-          <%= @invd.good_name %>
-          <%= if(Decimal.gt?(@invd.package_qty, 0), do: " - #{@invd.package_qty}", else: "") %>
-          <%= if(!is_nil(@invd.package_name) and @invd.package_name != "-",
+          {@invd.good_name}
+          {if(Decimal.gt?(@invd.package_qty, 0), do: " - #{@invd.package_qty}", else: "")}
+          {if(!is_nil(@invd.package_name) and @invd.package_name != "-",
             do: "(#{@invd.package_name})",
             else: ""
-          ) %>
+          )}
         </div>
         <div>
-          <%= if(@invd.descriptions != "" and !is_nil(@invd.descriptions),
+          {if(@invd.descriptions != "" and !is_nil(@invd.descriptions),
             do: "#{@invd.descriptions}",
             else: ""
-          ) %>
+          )}
         </div>
       </div>
       <div class="qty">
-        <%= if Decimal.integer?(@invd.quantity),
+        {if Decimal.integer?(@invd.quantity),
           do: Decimal.to_integer(@invd.quantity),
-          else: @invd.quantity %> <%= if @invd.unit == "-", do: "", else: @invd.unit %>
+          else: @invd.quantity} {if @invd.unit == "-", do: "", else: @invd.unit}
       </div>
-      <div class="price"><%= format_unit_price(@invd.unit_price) %></div>
+      <div class="price">{format_unit_price(@invd.unit_price)}</div>
       <div class="disc">
-        <%= if(Decimal.eq?(@invd.discount, 0),
+        {if(Decimal.eq?(@invd.discount, 0),
           do: "-",
           else: Number.Delimit.number_to_delimited(@invd.discount)
-        ) %>
+        )}
       </div>
       <div class="total">
-        <div><%= Number.Delimit.number_to_delimited(@invd.good_amount) %></div>
+        <div>{Number.Delimit.number_to_delimited(@invd.good_amount)}</div>
 
         <%= if Decimal.gt?(@invd.tax_amount, 0) do %>
           <div class="is-size-7 is-italic">
-            <%= @invd.tax_code %>
-            <%= Number.Percentage.number_to_percentage(@invd.tax_rate) %>
-            <%= Number.Delimit.number_to_delimited(@invd.tax_amount) %>
+            {@invd.tax_code}
+            {Number.Percentage.number_to_percentage(@invd.tax_rate)}
+            {Number.Delimit.number_to_delimited(@invd.tax_amount)}
           </div>
         <% end %>
       </div>
@@ -156,18 +159,18 @@ defmodule FullCircleWeb.InvoiceLive.Print do
 
     ~H"""
     <div class="descriptions">
-      <%= insert_new_html_newline(@invoice.descriptions) %>
+      {insert_new_html_newline(@invoice.descriptions)}
     </div>
     <div class="invoice-footer">
       <div class="invoice-amount">
         <div class="goodamt">
-          Goods Amount: <%= Number.Delimit.number_to_delimited(@invoice.invoice_good_amount) %>
+          Goods Amount: {Number.Delimit.number_to_delimited(@invoice.invoice_good_amount)}
         </div>
         <div class="taxamt">
-          Tax Amount: <%= Number.Delimit.number_to_delimited(@invoice.invoice_tax_amount) %>
+          Tax Amount: {Number.Delimit.number_to_delimited(@invoice.invoice_tax_amount)}
         </div>
         <div class="invamt has-text-weight-semibold">
-          Invoice Amount: <%= Number.Delimit.number_to_delimited(@invoice.invoice_amount) %>
+          Invoice Amount: {Number.Delimit.number_to_delimited(@invoice.invoice_amount)}
         </div>
       </div>
     </div>
@@ -185,7 +188,7 @@ defmodule FullCircleWeb.InvoiceLive.Print do
         </div>
         <div>All cheques should be made payable to the company & crossed "A/C Payee only"</div>
         <div class="is-size-6 has-text-weight-light is-italic">
-          Issued By: <%= @inv.issued_by.user.email %>
+          Issued By: {@inv.issued_by.user.email}
         </div>
       </div>
       <div class="sign">Authorise Signature</div>
@@ -217,11 +220,11 @@ defmodule FullCircleWeb.InvoiceLive.Print do
     <div class="invoice-header">
       <div class="is-size-6">TO</div>
       <div class="customer">
-        <div class="is-size-5 has-text-weight-bold"><%= @invoice.contact.name %></div>
-        <div><%= @invoice.contact.address1 %></div>
-        <div><%= @invoice.contact.address2 %></div>
+        <div class="is-size-5 has-text-weight-bold">{@invoice.contact.name}</div>
+        <div>{@invoice.contact.address1}</div>
+        <div>{@invoice.contact.address2}</div>
         <div>
-          <%= Enum.join(
+          {Enum.join(
             [
               @invoice.contact.city,
               @invoice.contact.zipcode,
@@ -229,21 +232,20 @@ defmodule FullCircleWeb.InvoiceLive.Print do
               @invoice.contact.country
             ],
             " "
-          ) %>
+          )}
         </div>
-        <%= @invoice.contact.reg_no %>
+        {@invoice.contact.reg_no}
       </div>
       <div class="invoice-info">
         <div class="is-size-4 has-text-weight-semibold">INVOICE</div>
         <div>
-          Invoice Date:
-          <span class="has-text-weight-bold"><%= format_date(@invoice.invoice_date) %></span>
+          Invoice Date: <span class="has-text-weight-bold">{format_date(@invoice.invoice_date)}</span>
         </div>
         <div>
-          Pay By: <span class="has-text-weight-bold"><%= format_date(@invoice.due_date) %></span>
+          Pay By: <span class="has-text-weight-bold">{format_date(@invoice.due_date)}</span>
         </div>
-        <div>Invoice No: <span class="has-text-weight-bold"><%= @invoice.invoice_no %></span></div>
-        <span class="page-count"><%= "page #{@page} of #{@pages}" %></span>
+        <div>Invoice No: <span class="has-text-weight-bold">{@invoice.invoice_no}</span></div>
+        <span class="page-count">{"page #{@page} of #{@pages}"}</span>
       </div>
     </div>
     """
@@ -251,13 +253,13 @@ defmodule FullCircleWeb.InvoiceLive.Print do
 
   def letter_head_data(assigns) do
     ~H"""
-    <div class="is-size-3 has-text-weight-bold"><%= @company.name %></div>
-    <div><%= @company.address1 %>, <%= @company.address2 %></div>
+    <div class="is-size-3 has-text-weight-bold">{@company.name}</div>
+    <div>{@company.address1}, {@company.address2}</div>
     <div>
-      <%= Enum.join([@company.zipcode, @company.city, @company.state, @company.country], ", ") %>
+      {Enum.join([@company.zipcode, @company.city, @company.state, @company.country], ", ")}
     </div>
     <div>
-      Tel: <%= @company.tel %> RegNo: <%= @company.reg_no %> Email: <%= @company.email %>
+      Tel: {@company.tel} RegNo: {@company.reg_no} Email: {@company.email}
     </div>
     """
   end
@@ -290,7 +292,7 @@ defmodule FullCircleWeb.InvoiceLive.Print do
         .page { padding-left: 10mm; padding-right: 10mm; page-break-after: always;} }
 
       .letter-head { padding-bottom: 2mm; margin-bottom: 5mm; height: 28mm;}
-      .doctype { float: right; margin-top: -30mm; margin-right: 0mm; vertical-align: top;}
+      .qrcode { float: right; margin-top: -30mm; margin-right: 5mm; vertical-align: top;}
       .invoice-info { margin-top: -5mm; float: right; }
       .invoice-header { width: 100%; height: 40mm; border-bottom: 0.5mm solid black; }
       .customer { padding-left: 2mm; float: left;}

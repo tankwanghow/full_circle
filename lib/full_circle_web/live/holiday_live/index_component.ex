@@ -22,14 +22,14 @@ defmodule FullCircleWeb.HolidayLive.IndexComponent do
         class="hover:font-bold text-blue-600"
         navigate={~p"/companies/#{@current_company.id}/holidays/#{@obj.id}/edit"}
       >
-        <%= @obj.name %>
+        {@obj.name}
       </.link>
-      &#8226; <%= @obj.short_name %> &#8226; <%= @obj.holidate |> FullCircleWeb.Helpers.format_date() %>
+      &#8226; {@obj.short_name} &#8226; {@obj.holidate |> FullCircleWeb.Helpers.format_date()}
       <.link
         navigate={~p"/companies/#{@current_company}/holidays/#{@obj.id}/copy"}
         class="text-xs hover:bg-orange-400 bg-orange-200 py-1 px-2 rounded-full border-orange-400 border"
       >
-        <%= gettext("Copy") %>
+        {gettext("Copy")}
       </.link>
     </div>
     """

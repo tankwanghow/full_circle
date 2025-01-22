@@ -62,27 +62,27 @@ defmodule FullCircleWeb.JournalLive.Print do
   def render(assigns) do
     ~H"""
     <div id="print-me" class="print-here">
-      <%= pre_print_style(assigns) %>
-      <%= if(@pre_print == "false", do: full_style(assigns)) %>
+      {pre_print_style(assigns)}
+      {if(@pre_print == "false", do: full_style(assigns))}
       <%= for journal <- @journals do %>
         <%= Enum.map 1..journal.chunk_number, fn n -> %>
           <div class="page">
             <div class="letter-head">
-              <%= if(@pre_print == "true", do: "", else: letter_head_data(assigns)) %>
+              {if(@pre_print == "true", do: "", else: letter_head_data(assigns))}
             </div>
             <div class="doctype is-size-4 has-text-weight-semibold">JOURNAL</div>
-            <%= journal_header(journal, assigns) %>
-            <%= detail_header(assigns) %>
+            {journal_header(journal, assigns)}
+            {detail_header(assigns)}
             <div class="details-body is-size-6">
               <%= for invd <- Enum.at(journal.detail_chunks, n - 1) do %>
-                <%= journal_detail(invd, assigns) %>
+                {journal_detail(invd, assigns)}
               <% end %>
             </div>
-            <%= if(n == journal.chunk_number,
+            {if(n == journal.chunk_number,
               do: journal_footer(journal, n, journal.chunk_number, assigns),
               else: journal_footer("continue", n, journal.chunk_number, assigns)
-            ) %>
-            <%= if(@pre_print == "true", do: "", else: letter_foot(journal, assigns)) %>
+            )}
+            {if(@pre_print == "true", do: "", else: letter_foot(journal, assigns))}
           </div>
         <% end %>
       <% end %>
@@ -96,11 +96,11 @@ defmodule FullCircleWeb.JournalLive.Print do
     ~H"""
     <div class="detail">
       <span class="particulars">
-        <span><%= @txn.account_name %></span>
-        <span class="is-italic is-underlined"><%= @txn.contact_name %></span>
-        <span class="has-text-weight-light"><%= @txn.particulars %></span>
+        <span>{@txn.account_name}</span>
+        <span class="is-italic is-underlined">{@txn.contact_name}</span>
+        <span class="has-text-weight-light">{@txn.particulars}</span>
       </span>
-      <span class="amount"><%= Number.Delimit.number_to_delimited(@txn.amount) %></span>
+      <span class="amount">{Number.Delimit.number_to_delimited(@txn.amount)}</span>
     </div>
     """
   end
@@ -112,7 +112,7 @@ defmodule FullCircleWeb.JournalLive.Print do
     <div class="journal-footer">
       <div class="descriptions">....continue....</div>
     </div>
-    <span class="page-count"><%= "page #{@page} of #{@pages}" %></span>
+    <span class="page-count">{"page #{@page} of #{@pages}"}</span>
     """
   end
 
@@ -123,7 +123,7 @@ defmodule FullCircleWeb.JournalLive.Print do
     <div class="journal-footer">
       <div class="empty-footer" />
     </div>
-    <span class="page-count"><%= "page #{@page} of #{@pages}" %></span>
+    <span class="page-count">{"page #{@page} of #{@pages}"}</span>
     """
   end
 
@@ -133,7 +133,7 @@ defmodule FullCircleWeb.JournalLive.Print do
     ~H"""
     <div class="letter-foot">
       <div class="has-text-weight-light is-italic is-size-6">
-        Issued By: <%= @journal.issued_by.user.email %>
+        Issued By: {@journal.issued_by.user.email}
       </div>
       <div class="sign">Entry By</div>
       <div class="sign">Approved By</div>
@@ -157,11 +157,10 @@ defmodule FullCircleWeb.JournalLive.Print do
     <div class="journal-header">
       <div class="journal-info is-size-5">
         <div class="journal-date">
-          Journal Date:
-          <span class="has-text-weight-bold"><%= format_date(@journal.journal_date) %></span>
+          Journal Date: <span class="has-text-weight-bold">{format_date(@journal.journal_date)}</span>
         </div>
         <div class="journal-no">
-          Journal No: <span class="has-text-weight-bold"><%= @journal.journal_no %></span>
+          Journal No: <span class="has-text-weight-bold">{@journal.journal_no}</span>
         </div>
       </div>
     </div>
@@ -170,13 +169,13 @@ defmodule FullCircleWeb.JournalLive.Print do
 
   def letter_head_data(assigns) do
     ~H"""
-    <div class="is-size-3 has-text-weight-bold"><%= @company.name %></div>
-    <div><%= @company.address1 %>, <%= @company.address2 %></div>
+    <div class="is-size-3 has-text-weight-bold">{@company.name}</div>
+    <div>{@company.address1}, {@company.address2}</div>
     <div>
-      <%= Enum.join([@company.zipcode, @company.city, @company.state, @company.country], ", ") %>
+      {Enum.join([@company.zipcode, @company.city, @company.state, @company.country], ", ")}
     </div>
     <div>
-      Tel: <%= @company.tel %> RegNo: <%= @company.reg_no %> Email: <%= @company.email %>
+      Tel: {@company.tel} RegNo: {@company.reg_no} Email: {@company.email}
     </div>
     """
   end

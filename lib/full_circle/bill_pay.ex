@@ -180,18 +180,16 @@ defmodule FullCircle.BillPay do
     qry =
       if terms != "" do
         from inv in subquery(qry),
-          order_by: [inv.old_data],
-          order_by: ^similarity_order([:payment_no, :contact_name, :particulars], terms),
-          order_by: [desc: inv.payment_no]
+          order_by: ^similarity_order([:payment_no, :contact_name, :particulars], terms)
       else
-        from inv in qry, order_by: [inv.old_data], order_by: [desc: inv.payment_no]
+        qry
       end
 
     qry =
       if date_from != "" do
-        from inv in qry, where: inv.payment_date >= ^date_from, order_by: [desc: inv.payment_date]
+        from inv in qry, where: inv.payment_date >= ^date_from, order_by: inv.payment_date
       else
-        qry
+        from inv in qry, order_by: [desc: inv.payment_date]
       end
 
     qry |> offset((^page - 1) * ^per_page) |> limit(^per_page) |> Repo.all()
@@ -204,18 +202,17 @@ defmodule FullCircle.BillPay do
     |> Repo.one!()
   end
 
-  defp payment_raw_query(company, user) do
+  defp payment_raw_query(company, _user) do
     from txn in Transaction,
-      join: com in subquery(Sys.user_company(company, user)),
-      on: com.id == txn.company_id and txn.doc_type == "Payment",
       left_join: pay in Payment,
       on: txn.doc_no == pay.payment_no,
       join: cont in Contact,
       on: cont.id == pay.contact_id or cont.id == txn.contact_id,
-      order_by: [desc: txn.doc_date],
       where: txn.amount > 0,
+      where: txn.company_id == ^company.id,
+      where: txn.doc_type == "Payment",
       select: %{
-        id: coalesce(pay.id, txn.id),
+        id: coalesce(txn.doc_id, txn.id),
         payment_no: txn.doc_no,
         e_inv_uuid: pay.e_inv_uuid,
         particulars:
@@ -225,19 +222,19 @@ defmodule FullCircle.BillPay do
             txn.particulars
           ),
         payment_date: txn.doc_date,
-        company_id: com.id,
+        company_id: txn.company_id,
         contact_name: cont.name,
         amount: sum(txn.amount),
         checked: false,
         old_data: txn.old_data
       },
       group_by: [
-        coalesce(pay.id, txn.id),
+        coalesce(txn.doc_id, txn.id),
         txn.doc_no,
         cont.id,
-        pay.e_inv_uuid,
+        pay.id,
         txn.doc_date,
-        com.id,
+        txn.company_id,
         txn.old_data
       ]
   end

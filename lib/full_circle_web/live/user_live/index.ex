@@ -6,13 +6,13 @@ defmodule FullCircleWeb.UserLive.Index do
   def render(assigns) do
     ~H"""
     <div class="w-6/12 mx-auto">
-      <p class="w-full text-2xl text-center font-bold"><%= @page_title %></p>
+      <p class="w-full text-2xl text-center font-bold">{@page_title}</p>
       <div class="flex justify-center gap-x-1">
         <.link
           navigate={~p"/companies/#{@current_company.id}/users/new"}
           class="text-xl mb-2 blue button"
         >
-          🧑<%= gettext("Add User") %>
+          🧑{gettext("Add User")}
         </.link>
       </div>
       <%= for u <- @users do %>
@@ -42,7 +42,7 @@ defmodule FullCircleWeb.UserLive.Index do
               <%= if u.email != @current_user.email  do %>
                 <%= if @new_password_id == u.id do %>
                   <div>Password reset to</div>
-                  <div class="font-bold text-emerald-600"><%= @new_password %></div>
+                  <div class="font-bold text-emerald-600">{@new_password}</div>
                 <% else %>
                   <.link
                     id={"reset_user_password_#{u.id}"}
@@ -50,7 +50,7 @@ defmodule FullCircleWeb.UserLive.Index do
                     phx-value-id={u.id}
                     class="blue button"
                   >
-                    <%= gettext("Reset Password") %>
+                    {gettext("Reset Password")}
                   </.link>
                 <% end %>
               <% end %>
@@ -58,10 +58,10 @@ defmodule FullCircleWeb.UserLive.Index do
 
             <div class="flex gap-1 w-[45%]">
               <div class="email font-mono font-bold w-[55%]">
-                <%= u.email %> <%= gettext("is") %>
+                {u.email} {gettext("is")}
               </div>
               <%= if u.email == @current_user.email do %>
-                <div class="text-amber-700"><%= u.role %></div>
+                <div class="text-amber-700">{u.role}</div>
               <% else %>
                 <div class="-mt-2 w-[45%]">
                   <.input type="hidden" field={f[:id]} value={u.id} />

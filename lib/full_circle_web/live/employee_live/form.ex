@@ -266,7 +266,7 @@ defmodule FullCircleWeb.EmployeeLive.Form do
   def render(assigns) do
     ~H"""
     <div class="w-7/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
-      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
+      <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <.form
         for={@form}
         id="object-form"
@@ -386,14 +386,14 @@ defmodule FullCircleWeb.EmployeeLive.Form do
           </div>
         </div>
         <.input field={@form[:note]} label={gettext("Note")} />
-        <%= datalist(assigns, FullCircle.Sys.countries(), "countries") %>
+        {datalist(assigns, FullCircle.Sys.countries(), "countries")}
 
         <div class="font-bold grid grid-cols-12 gap-2 mt-2 text-center">
           <div class="col-span-6">
-            <%= gettext("Salary Type") %>
+            {gettext("Salary Type")}
           </div>
           <div class="col-span-6">
-            <%= gettext("Amount") %>
+            {gettext("Amount")}
           </div>
         </div>
         <.inputs_for :let={st} field={@form[:employee_salary_types]}>
@@ -421,7 +421,7 @@ defmodule FullCircleWeb.EmployeeLive.Form do
 
         <div class="my-2">
           <.link phx-click={:add_salary_type} class="text-orange-500 hover:font-bold focus:font-bold">
-            <.icon name="hero-plus-circle" class="w-5 h-5" /><%= gettext("Add Salary Type") %>
+            <.icon name="hero-plus-circle" class="w-5 h-5" />{gettext("Add Salary Type")}
           </.link>
         </div>
 

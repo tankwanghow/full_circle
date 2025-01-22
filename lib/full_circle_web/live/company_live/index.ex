@@ -5,7 +5,7 @@ defmodule FullCircleWeb.CompanyLiveIndex do
   @impl true
   def render(assigns) do
     ~H"""
-    <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
+    <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
     <div id="companies_list" class="max-w-2xl mx-auto">
       <%= for c <- @companies do %>
         <div
@@ -17,16 +17,16 @@ defmodule FullCircleWeb.CompanyLiveIndex do
               navigate={~p"/edit_company/#{c.company_id}"}
               class="text-blue-800 text-3xl font-bold"
             >
-              <%= c.name %>
+              {c.name}
             </.link>
           <% else %>
             <div class="text-3xl font-bold">
-              <%= c.name %>
+              {c.name}
             </div>
           <% end %>
-          <div class="text-xl"><%= c.reg_no %></div>
+          <div class="text-xl">{c.reg_no}</div>
           <div class="text-xl">
-            <%= [
+            {[
               c.address1,
               c.address2,
               c.city,
@@ -38,12 +38,12 @@ defmodule FullCircleWeb.CompanyLiveIndex do
               c.email
             ]
             |> Enum.reject(fn x -> is_nil(x) end)
-            |> Enum.join(", ") %>
+            |> Enum.join(", ")}
           </div>
           <div class="text-amber-700 font-semibold mb-2 text-xl">
-            <%= gettext("Your are ") %><span class="text-red-500"><%= c.role %></span><%= gettext(
+            {gettext("Your are ")}<span class="text-red-500"><%= c.role %></span>{gettext(
               " in this farm"
-            ) %>
+            )}
           </div>
 
           <%= if Util.attempt(assigns[:current_company], :id) != c.company_id do %>
@@ -52,11 +52,11 @@ defmodule FullCircleWeb.CompanyLiveIndex do
               phx-value-id={c.company_id}
               navigate={~p"/companies/#{c.company_id}/dashboard"}
             >
-              <%= gettext("Set Active") %>
+              {gettext("Set Active")}
             </.link>
           <% else %>
             <span class="text-xl px-2 py-1 bg-cyan-300 mx-2">
-              <%= gettext("Is Active Company") %>
+              {gettext("Is Active Company")}
             </span>
           <% end %>
 
@@ -66,11 +66,11 @@ defmodule FullCircleWeb.CompanyLiveIndex do
               phx-value-id={c.company_id}
               phx-click="set_default"
             >
-              <%= gettext("Set Default") %>
+              {gettext("Set Default")}
             </.link>
           <% else %>
             <span class="text-xl px-2 py-1 bg-cyan-300 mx-2">
-              <%= gettext("Is Default Company") %>
+              {gettext("Is Default Company")}
             </span>
           <% end %>
         </div>
@@ -81,7 +81,7 @@ defmodule FullCircleWeb.CompanyLiveIndex do
         navigate={~p"/companies/new"}
         class="border-2 border-amber-500 rounded-md text-center text-2xl px-2 py-1 bg-amber-200"
       >
-        <%= gettext("Create a New Company") %>
+        {gettext("Create a New Company")}
       </.link>
     </div>
     """

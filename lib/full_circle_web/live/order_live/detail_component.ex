@@ -16,16 +16,16 @@ defmodule FullCircleWeb.OrderLive.DetailComponent do
     ~H"""
     <div id={@id} class={@klass}>
       <div class="font-medium flex flex-row text-center mt-2 tracking-tighter">
-        <div class="w-[20%] font-bold"><%= gettext("Good") %></div>
+        <div class="w-[20%] font-bold">{gettext("Good")}</div>
         <div class="w-[20%] font-bold">
-          <%= gettext("Description") %>
+          {gettext("Description")}
         </div>
-        <div class="w-[12%] font-bold"><%= gettext("Package") %></div>
-        <div class="w-[10%] font-bold"><%= gettext("Package Qty") %></div>
-        <div class="w-[10%] font-bold"><%= gettext("Quantity") %></div>
-        <div class="w-[6%] font-bold"><%= gettext("Unit") %></div>
-        <div class="w-[10%] font-bold"><%= gettext("Price") %></div>
-        <div class="w-[10%] font-bold"><%= gettext("Status") %></div>
+        <div class="w-[12%] font-bold">{gettext("Package")}</div>
+        <div class="w-[10%] font-bold">{gettext("Package Qty")}</div>
+        <div class="w-[10%] font-bold">{gettext("Quantity")}</div>
+        <div class="w-[6%] font-bold">{gettext("Unit")}</div>
+        <div class="w-[10%] font-bold">{gettext("Price")}</div>
+        <div class="w-[10%] font-bold">{gettext("Status")}</div>
         <div class="w-[2%]"></div>
       </div>
 
@@ -84,7 +84,7 @@ defmodule FullCircleWeb.OrderLive.DetailComponent do
       <div class="flex flex-row">
         <div class="mt-1 detail-good-col text-orange-500 text-left">
           <.link phx-click={:add_detail} class="hover:font-bold focus:font-bold">
-            <.icon name="hero-plus-circle" class="w-5 h-5" /><%= gettext("Add Detail") %>
+            <.icon name="hero-plus-circle" class="w-5 h-5" />{gettext("Add Detail")}
           </.link>
         </div>
       </div>

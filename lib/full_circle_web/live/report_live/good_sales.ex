@@ -149,7 +149,7 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
   def render(assigns) do
     ~H"""
     <div class="w-11/12 mx-auto mb-5">
-      <p class="text-2xl text-center font-medium"><%= "#{@page_title}" %></p>
+      <p class="text-2xl text-center font-medium">{"#{@page_title}"}</p>
       <div class="border rounded bg-purple-200 text-center p-2">
         <.form for={%{}} id="search-form" phx-change="change" phx-submit="query" autocomplete="off">
           <div class="flex tracking-tighter">
@@ -193,7 +193,7 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
             </div>
             <div class="w-[10%] mt-5">
               <.button>
-                <%= gettext("Query") %>
+                {gettext("Query")}
               </.button>
               <.link
                 :if={@result.result != {[], []}}
@@ -226,34 +226,34 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
           <% {objects, summaries} = @result.result %>
           <div class="font-medium flex flex-row text-center tracking-tighter mb-1">
             <div class="w-[8%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
-              <%= gettext("Date") %>
+              {gettext("Date")}
             </div>
             <div class="w-[8%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
-              <%= gettext("Doc No") %>
+              {gettext("Doc No")}
             </div>
             <div class="w-[25%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
-              <%= gettext("Customer") %>
+              {gettext("Customer")}
             </div>
             <div class="w-[15%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
-              <%= gettext("Goods") %>
+              {gettext("Goods")}
             </div>
             <div class="w-[6%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
-              <%= gettext("Pack") %>
+              {gettext("Pack")}
             </div>
             <div class="w-[8%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
-              <%= gettext("PackQty") %>
+              {gettext("PackQty")}
             </div>
             <div class="w-[10%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
-              <%= gettext("Qty (Avg Qty)") %>
+              {gettext("Qty (Avg Qty)")}
             </div>
             <div class="w-[6%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
-              <%= gettext("Unit") %>
+              {gettext("Unit")}
             </div>
             <div class="w-[6%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
-              <%= gettext("Avg Price") %>
+              {gettext("Avg Price")}
             </div>
             <div class="w-[8%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
-              <%= gettext("Amount") %>
+              {gettext("Amount")}
             </div>
           </div>
 
@@ -261,35 +261,35 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
             <%= for obj <- objects do %>
               <div class="flex flex-row text-center tracking-tighter">
                 <div class="w-[8%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
-                  <%= obj.doc_date |> FullCircleWeb.Helpers.format_date() %>
+                  {obj.doc_date |> FullCircleWeb.Helpers.format_date()}
                 </div>
                 <div class="w-[8%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
                   <.doc_link current_company={@current_company} doc_obj={obj} />
                 </div>
                 <div class="w-[25%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
-                  <%= obj.contact %>
+                  {obj.contact}
                 </div>
                 <div class="w-[15%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
-                  <%= obj.good %>
+                  {obj.good}
                 </div>
                 <div class="w-[6%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
-                  <%= obj.pack_name %>
+                  {obj.pack_name}
                 </div>
                 <div class="w-[8%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
-                  <%= obj.pack_qty |> Number.Delimit.number_to_delimited() %>
+                  {obj.pack_qty |> Number.Delimit.number_to_delimited()}
                 </div>
                 <div class="w-[10%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
-                  <%= obj.qty |> Number.Delimit.number_to_delimited() %> (<%= obj.avg_qty
-                  |> Number.Delimit.number_to_delimited() %>)
+                  {obj.qty |> Number.Delimit.number_to_delimited()} ({obj.avg_qty
+                  |> Number.Delimit.number_to_delimited()})
                 </div>
                 <div class="w-[6%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
-                  <%= obj.unit %>
+                  {obj.unit}
                 </div>
                 <div class="w-[6%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
-                  <%= obj.price |> Number.Delimit.number_to_delimited() %>
+                  {obj.price |> Number.Delimit.number_to_delimited()}
                 </div>
                 <div class="w-[8%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
-                  <%= obj.amount |> Number.Delimit.number_to_delimited() %>
+                  {obj.amount |> Number.Delimit.number_to_delimited()}
                 </div>
               </div>
             <% end %>
@@ -302,26 +302,26 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
                   Summary
                 </div>
                 <div class="w-[15%] border rounded bg-green-200 border-green-400 px-2 py-1">
-                  <%= obj.good %>
+                  {obj.good}
                 </div>
                 <div class="w-[6%] border rounded bg-green-200 border-green-400 px-2 py-1">
-                  <%= obj.pack_name %>
+                  {obj.pack_name}
                 </div>
                 <div class="w-[8%] border rounded bg-green-200 border-green-400 px-2 py-1">
-                  <%= obj.pack_qty |> Number.Delimit.number_to_delimited() %>
+                  {obj.pack_qty |> Number.Delimit.number_to_delimited()}
                 </div>
                 <div class="w-[10%] border rounded bg-green-200 border-green-400 px-2 py-1">
-                  <%= obj.qty |> Number.Delimit.number_to_delimited() %> (<%= obj.avg_qty
-                  |> Number.Delimit.number_to_delimited() %>)
+                  {obj.qty |> Number.Delimit.number_to_delimited()} ({obj.avg_qty
+                  |> Number.Delimit.number_to_delimited()})
                 </div>
                 <div class="w-[6%] border rounded bg-green-200 border-green-400 px-2 py-1">
-                  <%= obj.unit %>
+                  {obj.unit}
                 </div>
                 <div class="w-[6%] border rounded bg-green-200 border-green-400 px-2 py-1">
-                  <%= obj.price |> Number.Delimit.number_to_delimited() %>
+                  {obj.price |> Number.Delimit.number_to_delimited()}
                 </div>
                 <div class="w-[8%] border rounded bg-green-200 border-green-400 px-2 py-1">
-                  <%= obj.amount |> Number.Delimit.number_to_delimited() %>
+                  {obj.amount |> Number.Delimit.number_to_delimited()}
                 </div>
               </div>
             <% end %>

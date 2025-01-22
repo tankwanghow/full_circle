@@ -222,26 +222,26 @@ defmodule FullCircleWeb.FixedAssetLive.Depreciations do
   def render(assigns) do
     ~H"""
     <div class="w-6/12 mx-auto">
-      <p class="w-full text-2xl text-center font-medium"><%= "#{@page_title} for #{@ass.name}" %></p>
+      <p class="w-full text-2xl text-center font-medium">{"#{@page_title} for #{@ass.name}"}</p>
       <div class="text-center m-4">
-        <a onclick="history.back();" class="blue button"><%= gettext("Back") %></a>
+        <a onclick="history.back();" class="blue button">{gettext("Back")}</a>
       </div>
       <p class="text-center">
-        <span class="font-bold"><%= gettext("Depreciation info:") %></span>
-        <%= Number.Currency.number_to_currency(@ass.pur_price) %> &#9679; <%= @ass.depre_start_date
-        |> FullCircleWeb.Helpers.format_date() %> &#9679; <%= @ass.depre_method %> &#9679; <%= Number.Percentage.number_to_percentage(
+        <span class="font-bold">{gettext("Depreciation info:")}</span>
+        {Number.Currency.number_to_currency(@ass.pur_price)} &#9679; {@ass.depre_start_date
+        |> FullCircleWeb.Helpers.format_date()} &#9679; {@ass.depre_method} &#9679; {Number.Percentage.number_to_percentage(
           Decimal.mult(@ass.depre_rate, 100)
-        ) %> &#9679; <%= @ass.depre_interval %><br />
+        )} &#9679; {@ass.depre_interval}<br />
 
-        <span class="font-bold"><%= gettext("Depreciation A/C:") %></span>
-        <%= @ass.depre_ac_name %>
-        <span class="font-bold"><%= gettext("Cume Depreciation A/C:") %></span>
-        <%= @ass.cume_depre_ac_name %>
+        <span class="font-bold">{gettext("Depreciation A/C:")}</span>
+        {@ass.depre_ac_name}
+        <span class="font-bold">{gettext("Cume Depreciation A/C:")}</span>
+        {@ass.cume_depre_ac_name}
       </p>
 
       <div class="border rounded bg-blue-200 p-4">
         <p class="w-full text-xl text-center font-medium">
-          <%= gettext("Manual Create Depreciation") %>
+          {gettext("Manual Create Depreciation")}
         </p>
 
         <.form
@@ -284,7 +284,7 @@ defmodule FullCircleWeb.FixedAssetLive.Depreciations do
           </div>
           <div class="flex justify-center gap-x-1 mt-1">
             <.link phx-click={:new_depreciation} class="blue button" id="new_object">
-              <%= gettext("New") %>
+              {gettext("New")}
             </.link>
             <.save_button form={@form} />
           </div>
@@ -292,18 +292,18 @@ defmodule FullCircleWeb.FixedAssetLive.Depreciations do
       </div>
 
       <div class="mt-4 border rounded bg-rose-200 p-5">
-        <p class="w-full text-xl text-center font-medium"><%= gettext("Saved Depreciations") %></p>
+        <p class="w-full text-xl text-center font-medium">{gettext("Saved Depreciations")}</p>
         <div class="font-medium flex flex-row flex-wrap text-center mt-2 tracking-tighter">
-          <div class="detail-header w-[17%]"><%= gettext("Date") %></div>
-          <div class="detail-header w-[20%]"><%= gettext("Cost Basis") %></div>
+          <div class="detail-header w-[17%]">{gettext("Date")}</div>
+          <div class="detail-header w-[20%]">{gettext("Cost Basis")}</div>
           <div class="detail-header w-[20%]">
-            <%= gettext("Depreciation") %>
+            {gettext("Depreciation")}
           </div>
           <div class="detail-header w-[20%]">
-            <%= gettext("Cume Depreciation") %>
+            {gettext("Cume Depreciation")}
           </div>
           <div class="detail-header w-[20%]">
-            <%= gettext("Net Book Value") %>
+            {gettext("Net Book Value")}
           </div>
         </div>
         <div id="saved_depreciation_list">
@@ -320,32 +320,32 @@ defmodule FullCircleWeb.FixedAssetLive.Depreciations do
                 "w-[17%] border rounded bg-green-200 border-green-400 text-center px-2 py-1",
                 !obj.closed && "hover:bg-green-300"
               ]}>
-                <%= obj.depre_date |> FullCircleWeb.Helpers.format_date() %>
+                {obj.depre_date |> FullCircleWeb.Helpers.format_date()}
               </div>
               <div class={[
                 "w-[20%] border rounded bg-green-200 border-green-400 text-center px-2 py-1",
                 !obj.closed && "hover:bg-green-300"
               ]}>
-                <%= obj.cost_basis |> Number.Delimit.number_to_delimited() %>
+                {obj.cost_basis |> Number.Delimit.number_to_delimited()}
               </div>
               <div class={[
                 "w-[20%] border rounded bg-green-200 border-green-400 text-center px-2 py-1",
                 !obj.closed && "hover:bg-green-300"
               ]}>
-                <%= obj.amount |> Number.Delimit.number_to_delimited() %>
+                {obj.amount |> Number.Delimit.number_to_delimited()}
               </div>
               <div class={[
                 "w-[20%] border rounded bg-green-200 border-green-400 text-center px-2 py-1",
                 !obj.closed && "hover:bg-green-300"
               ]}>
-                <%= obj.cume_depre |> Number.Delimit.number_to_delimited() %>
+                {obj.cume_depre |> Number.Delimit.number_to_delimited()}
               </div>
               <div class={[
                 "w-[20%] border rounded bg-green-200 border-green-400 text-center px-2 py-1",
                 !obj.closed && "hover:bg-green-300"
               ]}>
-                <%= Decimal.sub(obj.cost_basis, obj.cume_depre)
-                |> Number.Delimit.number_to_delimited() %>
+                {Decimal.sub(obj.cost_basis, obj.cume_depre)
+                |> Number.Delimit.number_to_delimited()}
               </div>
 
               <div :if={!obj.closed} class="w-[3%] mt-1 text-rose-500  hover:bg-blue-200">
@@ -373,39 +373,39 @@ defmodule FullCircleWeb.FixedAssetLive.Depreciations do
       <div class="my-4 border rounded bg-purple-200 p-5 text-center">
         <.form :let={f} for={%{}} phx-submit="generate_depreciation" autocomplete="off">
           <.input type="select" field={f[:ddate]} options={@depre_dates} />
-          <.button><%= gettext("Generate Depreciations") %></.button>
+          <.button>{gettext("Generate Depreciations")}</.button>
         </.form>
 
         <div class="font-medium flex flex-row flex-wrap text-center mt-2 tracking-tighter">
-          <div class="detail-header w-[20%]"><%= gettext("Date") %></div>
-          <div class="detail-header w-[20%]"><%= gettext("Cost Basis") %></div>
+          <div class="detail-header w-[20%]">{gettext("Date")}</div>
+          <div class="detail-header w-[20%]">{gettext("Cost Basis")}</div>
           <div class="detail-header w-[20%]">
-            <%= gettext("Depreciation") %>
+            {gettext("Depreciation")}
           </div>
           <div class="detail-header w-[20%]">
-            <%= gettext("Cume Depreciation") %>
+            {gettext("Cume Depreciation")}
           </div>
           <div class="detail-header w-[20%]">
-            <%= gettext("Net Book Value") %>
+            {gettext("Net Book Value")}
           </div>
         </div>
         <div id="generated_depreciation_list">
           <%= for obj <- @generated_depreciations do %>
             <div class="flex flex-row text-center tracking-tighter">
               <div class="w-[20%] border rounded bg-amber-200 border-amber-400 text-center px-2 py-1">
-                <%= obj.depre_date %>
+                {obj.depre_date}
               </div>
               <div class="w-[20%] border rounded bg-amber-200 border-amber-400 text-center px-2 py-1">
-                <%= obj.cost_basis |> Number.Delimit.number_to_delimited() %>
+                {obj.cost_basis |> Number.Delimit.number_to_delimited()}
               </div>
               <div class="w-[20%] border rounded bg-amber-200 border-amber-400 text-center px-2 py-1">
-                <%= obj.amount |> Number.Delimit.number_to_delimited() %>
+                {obj.amount |> Number.Delimit.number_to_delimited()}
               </div>
               <div class="w-[20%] border rounded bg-amber-200 border-amber-400 text-center px-2 py-1">
-                <%= obj.cume_depre |> Number.Delimit.number_to_delimited() %>
+                {obj.cume_depre |> Number.Delimit.number_to_delimited()}
               </div>
               <div class="w-[20%] border rounded bg-amber-200 border-amber-400 text-center px-2 py-1">
-                <%= (obj.cost_basis - obj.cume_depre) |> Number.Delimit.number_to_delimited() %>
+                {(obj.cost_basis - obj.cume_depre) |> Number.Delimit.number_to_delimited()}
               </div>
             </div>
           <% end %>
@@ -416,7 +416,7 @@ defmodule FullCircleWeb.FixedAssetLive.Depreciations do
             phx-click={:save_generated_depreciations}
             class={["blue button"]}
           >
-            <%= gettext("Save Generated Depreciations") %>
+            {gettext("Save Generated Depreciations")}
           </.link>
         </div>
       </div>

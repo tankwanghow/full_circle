@@ -44,39 +44,39 @@ defmodule FullCircleWeb.ReceiptLive.QryMatcherComponent do
           class="py-1 rounded-md border border-gray-300 bg-white shadow-sm focus:border-zinc-400 focus:ring-0"
         />
         <.button disabled={is_nil(Ecto.Changeset.fetch_field!(@form.source, :contact_id))}>
-          <%= gettext("Query") %>
+          {gettext("Query")}
         </.button>
       </.form>
       <div
         :if={Enum.count(@query_match_trans) == 0}
         class="mt-2 p-4 border rounded-lg border-orange-600 bg-orange-200 text-center"
       >
-        <%= gettext("No Data!") %>
+        {gettext("No Data!")}
       </div>
 
       <div
         :if={Enum.count(@query_match_trans) > 0}
         class="flex flex-row flex-wrap font-medium text-center mt-2 tracking-tighter"
       >
-        <div class="detail-header w-[13%]"><%= gettext("Doc Date") %></div>
-        <div class="detail-header w-[13%]"><%= gettext("Doc Type") %></div>
-        <div class="detail-header w-[14%]"><%= gettext("Doc No") %></div>
-        <div class="detail-header w-[27%]"><%= gettext("Particulars") %></div>
-        <div class="detail-header w-[15%]"><%= gettext("Amount") %></div>
-        <div class="detail-header w-[15%]"><%= gettext("Balance") %></div>
+        <div class="detail-header w-[13%]">{gettext("Doc Date")}</div>
+        <div class="detail-header w-[13%]">{gettext("Doc Type")}</div>
+        <div class="detail-header w-[14%]">{gettext("Doc No")}</div>
+        <div class="detail-header w-[27%]">{gettext("Particulars")}</div>
+        <div class="detail-header w-[15%]">{gettext("Amount")}</div>
+        <div class="detail-header w-[15%]">{gettext("Balance")}</div>
         <div class="w-[3%]"></div>
       </div>
       <%= for obj <- @query_match_trans do %>
         <div class="flex flex-row flex-wrap">
           <div class="max-h-8 w-[13%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
-            <%= obj.t_doc_date |> FullCircleWeb.Helpers.format_date() %>
+            {obj.t_doc_date |> FullCircleWeb.Helpers.format_date()}
           </div>
           <div class="max-h-8 w-[13%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
-            <%= obj.t_doc_type %>
+            {obj.t_doc_type}
           </div>
           <div class="max-h-8 w-[14%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
             <%= if obj.old_data do %>
-              <%= obj.t_doc_no %>
+              {obj.t_doc_no}
             <% else %>
               <.doc_link
                 target="_blank"
@@ -86,13 +86,13 @@ defmodule FullCircleWeb.ReceiptLive.QryMatcherComponent do
             <% end %>
           </div>
           <div class="max-h-8 w-[27%] border rounded bg-blue-200 border-blue-400 px-2 py-1 overflow-clip">
-            <%= obj.particulars %>
+            {obj.particulars}
           </div>
           <div class="max-h-8 w-[15%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
-            <%= obj.amount |> Number.Delimit.number_to_delimited() %>
+            {obj.amount |> Number.Delimit.number_to_delimited()}
           </div>
           <div class="max-h-8 w-[15%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
-            <%= obj.balance |> Number.Delimit.number_to_delimited() %>
+            {obj.balance |> Number.Delimit.number_to_delimited()}
           </div>
           <%!-- <div
             :if={

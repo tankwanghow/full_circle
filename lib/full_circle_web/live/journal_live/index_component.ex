@@ -38,11 +38,11 @@ defmodule FullCircleWeb.JournalLive.IndexComponent do
         />
       </div>
       <div class="w-[9%] border-b border-gray-400 py-1">
-        <%= @obj.journal_date |> FullCircleWeb.Helpers.format_date() %>
+        {@obj.journal_date |> FullCircleWeb.Helpers.format_date()}
       </div>
       <div class="w-[9%] border-b border-gray-400 py-1">
         <%= if @obj.old_data do %>
-          <%= @obj.journal_no %>
+          {@obj.journal_no}
         <% else %>
           <.doc_link
             current_company={@company}
@@ -51,10 +51,10 @@ defmodule FullCircleWeb.JournalLive.IndexComponent do
         <% end %>
       </div>
       <div class="w-[40%] border-b border-gray-400 py-1 overflow-clip">
-        <%= @obj.account_info %>
+        {@obj.account_info}
       </div>
       <div class="w-[40%] border-b text-center border-gray-400 py-1 overflow-clip">
-        <span class="font-light"><%= @obj.particulars %></span>
+        <span class="font-light">{@obj.particulars}</span>
       </div>
     </div>
     """

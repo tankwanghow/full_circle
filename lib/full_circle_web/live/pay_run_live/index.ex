@@ -86,7 +86,7 @@ defmodule FullCircleWeb.PayRunLive.Index do
   def render(assigns) do
     ~H"""
     <div class="mx-auto w-7/12">
-      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
+      <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <div class="flex justify-center mb-2">
         <.form
           for={%{}}
@@ -128,7 +128,7 @@ defmodule FullCircleWeb.PayRunLive.Index do
                 target="_blank"
                 class="blue button"
               >
-                <%= gettext("Print") %><%= "(#{Enum.count(@selected)})" %>
+                {gettext("Print")}{"(#{Enum.count(@selected)})"}
               </.link>
               <.link
                 :if={@can_print}
@@ -138,7 +138,7 @@ defmodule FullCircleWeb.PayRunLive.Index do
                 target="_blank"
                 class="blue button"
               >
-                <%= gettext("Pre Print") %><%= "(#{Enum.count(@selected)})" %>
+                {gettext("Pre Print")}{"(#{Enum.count(@selected)})"}
               </.link>
             </div>
           </div>
@@ -148,7 +148,7 @@ defmodule FullCircleWeb.PayRunLive.Index do
       <div :if={Enum.count(@objects) > 0} class="flex bg-amber-200 text-center font-bold">
         <div class="w-[30%] border border-rose-400">Name</div>
         <%= for ym <- Enum.at(@objects, 1).pay_list |> Enum.map(fn {_,_,y,m} -> "#{m}/#{y}" end) do %>
-          <div class="border border-rose-400 w-[23.333%]"><%= ym %></div>
+          <div class="border border-rose-400 w-[23.333%]">{ym}</div>
         <% end %>
       </div>
 

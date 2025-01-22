@@ -100,40 +100,40 @@ defmodule FullCircleWeb.ReceiptLive.Print do
   def render(assigns) do
     ~H"""
     <div id="print-me" class="print-here">
-      <%= pre_print_style(assigns) %>
-      <%= if(@pre_print == "false", do: full_style(assigns)) %>
+      {pre_print_style(assigns)}
+      {if(@pre_print == "false", do: full_style(assigns))}
       <%= for receipt  <- @receipts do %>
         <%= Enum.map 1..receipt.chunk_number, fn n -> %>
           <div class="page">
             <div class="letter-head">
-              <%= if(@pre_print == "true", do: "", else: letter_head(assigns)) %>
+              {if(@pre_print == "true", do: "", else: letter_head(assigns))}
             </div>
             <div class="doctype is-size-4 has-text-weight-semibold">RECEIPT</div>
-            <%= receipt_header(receipt, assigns) %>
+            {receipt_header(receipt, assigns)}
 
             <div class="details-body is-size-6">
               <%= for recd <- Enum.at(receipt.all_chunks, n - 1) do %>
-                <%= detail_header(recd, assigns) %>
-                <%= detail_footer(recd, receipt, assigns) %>
-                <%= receipt_detail(recd, assigns) %>
-                <%= match_tran_header(recd, assigns) %>
-                <%= match_tran_footer(recd, receipt, assigns) %>
-                <%= receipt_match_tran(recd, assigns) %>
-                <%= cheque_header(recd, assigns) %>
-                <%= cheque_footer(recd, receipt, assigns) %>
-                <%= receipt_cheque(recd, assigns) %>
-                <%= funds_header(recd, receipt, assigns) %>
-                <%= funds_footer(recd, receipt, assigns) %>
-                <%= receipt_funds(recd, assigns) %>
+                {detail_header(recd, assigns)}
+                {detail_footer(recd, receipt, assigns)}
+                {receipt_detail(recd, assigns)}
+                {match_tran_header(recd, assigns)}
+                {match_tran_footer(recd, receipt, assigns)}
+                {receipt_match_tran(recd, assigns)}
+                {cheque_header(recd, assigns)}
+                {cheque_footer(recd, receipt, assigns)}
+                {receipt_cheque(recd, assigns)}
+                {funds_header(recd, receipt, assigns)}
+                {funds_footer(recd, receipt, assigns)}
+                {receipt_funds(recd, assigns)}
               <% end %>
             </div>
 
-            <%= if(n == receipt.chunk_number,
+            {if(n == receipt.chunk_number,
               do: receipt_footer(receipt, n, receipt.chunk_number, assigns),
               else: receipt_footer("continue", n, receipt.chunk_number, assigns)
-            ) %>
+            )}
             <div class="letter-foot">
-              <%= if(@pre_print == "true", do: "", else: letter_foot(receipt, assigns)) %>
+              {if(@pre_print == "true", do: "", else: letter_foot(receipt, assigns))}
             </div>
           </div>
         <% end %>
@@ -150,9 +150,9 @@ defmodule FullCircleWeb.ReceiptLive.Print do
       :if={@recd.__struct__ == ReceiveFund.Receipt and Decimal.gt?(@recd.funds_amount, 0)}
       class="funds"
     >
-      <div class="account">To <%= @recd.funds_account.name %></div>
+      <div class="account">To {@recd.funds_account.name}</div>
       <div class="amount">
-        <%= Number.Delimit.number_to_delimited(@recd.funds_amount) %>
+        {Number.Delimit.number_to_delimited(@recd.funds_amount)}
       </div>
     </div>
     """
@@ -163,12 +163,12 @@ defmodule FullCircleWeb.ReceiptLive.Print do
 
     ~H"""
     <div :if={@recd.__struct__ == ReceiveFund.ReceivedCheque} class="cheque">
-      <div class="bank"><%= @recd.bank %></div>
-      <div class="city"><%= @recd.city %></div>
-      <div class="state"><%= @recd.state %></div>
-      <div class="chqno"><%= @recd.cheque_no %></div>
-      <div class="duedate"><%= format_date(@recd.due_date) %></div>
-      <div class="chqamt"><%= Number.Delimit.number_to_delimited(@recd.amount) %></div>
+      <div class="bank">{@recd.bank}</div>
+      <div class="city">{@recd.city}</div>
+      <div class="state">{@recd.state}</div>
+      <div class="chqno">{@recd.cheque_no}</div>
+      <div class="duedate">{format_date(@recd.due_date)}</div>
+      <div class="chqamt">{Number.Delimit.number_to_delimited(@recd.amount)}</div>
     </div>
     """
   end
@@ -178,13 +178,13 @@ defmodule FullCircleWeb.ReceiptLive.Print do
 
     ~H"""
     <div :if={@recd.__struct__ == Accounting.TransactionMatcher} class="matched">
-      <div class="date"><%= format_date(@recd.t_doc_date) %></div>
-      <div class="matchdoctype"><%= @recd.t_doc_type %></div>
-      <div class="docno"><%= @recd.t_doc_no %></div>
-      <div class="amount"><%= @recd.amount |> Number.Delimit.number_to_delimited() %></div>
-      <div class="balance"><%= @recd.balance |> Number.Delimit.number_to_delimited() %></div>
+      <div class="date">{format_date(@recd.t_doc_date)}</div>
+      <div class="matchdoctype">{@recd.t_doc_type}</div>
+      <div class="docno">{@recd.t_doc_no}</div>
+      <div class="amount">{@recd.amount |> Number.Delimit.number_to_delimited()}</div>
+      <div class="balance">{@recd.balance |> Number.Delimit.number_to_delimited()}</div>
       <div class="matchamt">
-        <%= Number.Delimit.number_to_delimited(@recd.match_amount |> Decimal.abs()) %>
+        {Number.Delimit.number_to_delimited(@recd.match_amount |> Decimal.abs())}
       </div>
     </div>
     """
@@ -197,40 +197,40 @@ defmodule FullCircleWeb.ReceiptLive.Print do
     <div :if={@recd.__struct__ == ReceiveFund.ReceiptDetail} class="detail">
       <div class="particular">
         <div>
-          <%= if(@recd.good_name != "Note", do: @recd.good_name, else: "") %>
-          <%= if(Decimal.gt?(@recd.package_qty, 0), do: " - #{@recd.package_qty}", else: "") %>
-          <%= if(!is_nil(@recd.package_name) and @recd.package_name != "-",
+          {if(@recd.good_name != "Note", do: @recd.good_name, else: "")}
+          {if(Decimal.gt?(@recd.package_qty, 0), do: " - #{@recd.package_qty}", else: "")}
+          {if(!is_nil(@recd.package_name) and @recd.package_name != "-",
             do: "(#{@recd.package_name})",
             else: ""
-          ) %>
+          )}
         </div>
         <div class={if(@recd.good_name != "Note", do: "is-size-7", else: "")}>
-          <%= if(@recd.descriptions != "" and !is_nil(@recd.descriptions),
+          {if(@recd.descriptions != "" and !is_nil(@recd.descriptions),
             do: "#{@recd.descriptions}",
             else: ""
-          ) %>
+          )}
         </div>
       </div>
       <div class="qty">
-        <%= if Decimal.integer?(@recd.quantity),
+        {if Decimal.integer?(@recd.quantity),
           do: Decimal.to_integer(@recd.quantity),
-          else: @recd.quantity %> <%= if @recd.unit == "-", do: "", else: @recd.unit %>
+          else: @recd.quantity} {if @recd.unit == "-", do: "", else: @recd.unit}
       </div>
-      <div class="price"><%= format_unit_price(@recd.unit_price) %></div>
+      <div class="price">{format_unit_price(@recd.unit_price)}</div>
       <div class="disc">
-        <%= if(Decimal.eq?(@recd.discount, 0),
+        {if(Decimal.eq?(@recd.discount, 0),
           do: "-",
           else: Number.Delimit.number_to_delimited(@recd.discount)
-        ) %>
+        )}
       </div>
       <div class="total">
-        <div><%= Number.Delimit.number_to_delimited(@recd.good_amount) %></div>
+        <div>{Number.Delimit.number_to_delimited(@recd.good_amount)}</div>
 
         <%= if Decimal.gt?(@recd.tax_amount, 0) do %>
           <div class="is-size-7">
-            <%= @recd.tax_code_name %>
-            <%= Number.Percentage.number_to_percentage(Decimal.mult(@recd.tax_rate, 100)) %>
-            <%= Number.Delimit.number_to_delimited(@recd.tax_amount) %>
+            {@recd.tax_code_name}
+            {Number.Percentage.number_to_percentage(Decimal.mult(@recd.tax_rate, 100))}
+            {Number.Delimit.number_to_delimited(@recd.tax_amount)}
           </div>
         <% end %>
       </div>
@@ -244,10 +244,10 @@ defmodule FullCircleWeb.ReceiptLive.Print do
     ~H"""
     <div :if={@recd.__struct__ == "match_foot"} class="details-footer">
       <span class="has-text-weight-semibold">
-        Matched Amount: <%= Number.Delimit.number_to_delimited(
+        Matched Amount: {Number.Delimit.number_to_delimited(
           @receipt.matched_amount
           |> Decimal.abs()
-        ) %>
+        )}
       </span>
     </div>
     """
@@ -259,13 +259,13 @@ defmodule FullCircleWeb.ReceiptLive.Print do
     ~H"""
     <div :if={@recd.__struct__ == "detail_foot"} class="details-footer">
       <span>
-        Particular Amount: <%= Number.Delimit.number_to_delimited(@receipt.receipt_good_amount) %>
+        Particular Amount: {Number.Delimit.number_to_delimited(@receipt.receipt_good_amount)}
       </span>
       <span>
-        Tax Amount: <%= Number.Delimit.number_to_delimited(@receipt.receipt_tax_amount) %>
+        Tax Amount: {Number.Delimit.number_to_delimited(@receipt.receipt_tax_amount)}
       </span>
       <span class="has-text-weight-semibold">
-        Detail Amount: <%= Number.Delimit.number_to_delimited(@receipt.receipt_detail_amount) %>
+        Detail Amount: {Number.Delimit.number_to_delimited(@receipt.receipt_detail_amount)}
       </span>
     </div>
     """
@@ -280,7 +280,7 @@ defmodule FullCircleWeb.ReceiptLive.Print do
       class="details-footer"
     >
       <span class="has-text-weight-semibold">
-        Funds Amount: <%= Number.Delimit.number_to_delimited(@receipt.funds_amount) %>
+        Funds Amount: {Number.Delimit.number_to_delimited(@receipt.funds_amount)}
       </span>
     </div>
     """
@@ -292,7 +292,7 @@ defmodule FullCircleWeb.ReceiptLive.Print do
     ~H"""
     <div :if={@recd.__struct__ == "cheque_foot"} class="details-footer">
       <span class="has-text-weight-semibold">
-        Cheques Amount: <%= Number.Delimit.number_to_delimited(@receipt.cheques_amount) %>
+        Cheques Amount: {Number.Delimit.number_to_delimited(@receipt.cheques_amount)}
       </span>
     </div>
     """
@@ -306,7 +306,7 @@ defmodule FullCircleWeb.ReceiptLive.Print do
       <div class="continue">....continue....</div>
       <div class="empty-footer" />
     </div>
-    <span class="page-count"><%= "page #{@page} of #{@pages}" %></span>
+    <span class="page-count">{"page #{@page} of #{@pages}"}</span>
     """
   end
 
@@ -315,14 +315,14 @@ defmodule FullCircleWeb.ReceiptLive.Print do
 
     ~H"""
     <div class="receipt-footer">
-      <div class="descriptions"><%= @receipt.descriptions %></div>
+      <div class="descriptions">{@receipt.descriptions}</div>
       <div class="receipt-amount has-text-weight-bold">
-        Receipt Amount: <%= Number.Delimit.number_to_delimited(
+        Receipt Amount: {Number.Delimit.number_to_delimited(
           Decimal.add(@receipt.cheques_amount, @receipt.funds_amount)
-        ) %>
+        )}
       </div>
     </div>
-    <span class="page-count"><%= "page #{@page} of #{@pages}" %></span>
+    <span class="page-count">{"page #{@page} of #{@pages}"}</span>
     """
   end
 
@@ -333,7 +333,7 @@ defmodule FullCircleWeb.ReceiptLive.Print do
     <div class="terms is-size-7">
       <div>This receipt is only valid subject to cheque or cheques honoured by the bank.</div>
       <div class="has-text-weight-light is-italic is-size-6">
-        Issued By: <%= @recd.issued_by.user.email %>
+        Issued By: {@recd.issued_by.user.email}
       </div>
     </div>
     <div class="sign">Collector Signature</div>
@@ -405,11 +405,11 @@ defmodule FullCircleWeb.ReceiptLive.Print do
     <div class="receipt-header">
       <div class="is-size-6">Receive From</div>
       <div class="customer">
-        <div class="is-size-5 has-text-weight-semibold"><%= @receipt.contact.name %></div>
-        <div><%= @receipt.contact.address1 %></div>
-        <div><%= @receipt.contact.address2 %></div>
+        <div class="is-size-5 has-text-weight-semibold">{@receipt.contact.name}</div>
+        <div>{@receipt.contact.address1}</div>
+        <div>{@receipt.contact.address2}</div>
         <div>
-          <%= Enum.join(
+          {Enum.join(
             [
               @receipt.contact.city,
               @receipt.contact.zipcode,
@@ -417,17 +417,17 @@ defmodule FullCircleWeb.ReceiptLive.Print do
               @receipt.contact.country
             ],
             " "
-          ) %>
+          )}
         </div>
-        <%= @receipt.contact.reg_no %>
+        {@receipt.contact.reg_no}
       </div>
       <div class="receipt-info">
         <div>
           Receipt Date:
-          <span class="has-text-weight-semibold"><%= format_date(@receipt.receipt_date) %></span>
+          <span class="has-text-weight-semibold">{format_date(@receipt.receipt_date)}</span>
         </div>
         <div>
-          Receipt No: <span class="has-text-weight-semibold"><%= @receipt.receipt_no %></span>
+          Receipt No: <span class="has-text-weight-semibold">{@receipt.receipt_no}</span>
         </div>
       </div>
     </div>
@@ -436,13 +436,13 @@ defmodule FullCircleWeb.ReceiptLive.Print do
 
   def letter_head(assigns) do
     ~H"""
-    <div class="is-size-3 has-text-weight-semibold"><%= @company.name %></div>
-    <div><%= @company.address1 %>, <%= @company.address2 %></div>
+    <div class="is-size-3 has-text-weight-semibold">{@company.name}</div>
+    <div>{@company.address1}, {@company.address2}</div>
     <div>
-      <%= Enum.join([@company.zipcode, @company.city, @company.state, @company.country], ", ") %>
+      {Enum.join([@company.zipcode, @company.city, @company.state, @company.country], ", ")}
     </div>
     <div>
-      Tel: <%= @company.tel %> RegNo: <%= @company.reg_no %> Email: <%= @company.email %>
+      Tel: {@company.tel} RegNo: {@company.reg_no} Email: {@company.email}
     </div>
     """
   end

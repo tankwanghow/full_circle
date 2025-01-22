@@ -22,9 +22,9 @@ defmodule FullCircleWeb.QueryLive.IndexComponent do
         class="hover:font-bold text-purple-600 text-xl"
         navigate={~p"/companies/#{@current_company.id}/queries/#{@obj.id}/edit"}
       >
-        <%= @obj.qry_name %>
+        {@obj.qry_name}
       </.link>
-      <p class="text-xs text-green-600"><%= @obj.sql_string %></p>
+      <p class="text-xs text-green-600">{@obj.sql_string}</p>
     </div>
     """
   end

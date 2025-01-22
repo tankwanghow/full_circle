@@ -254,7 +254,7 @@ defmodule FullCircleWeb.LayerLive.HarvestForm do
     ~H"""
     <div class="w-6/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
       <p class="w-full text-3xl text-center font-medium">
-        <%= @page_title %> <%= @form.source.data.harvest_no %>
+        {@page_title} {@form.source.data.harvest_no}
       </p>
       <.form
         for={@form}
@@ -280,13 +280,13 @@ defmodule FullCircleWeb.LayerLive.HarvestForm do
         </div>
 
         <div class="font-bold flex flex-row text-center mt-2">
-          <div class="w-[16%]"><%= gettext("House") %></div>
-          <div class="w-[16%]"><%= gettext("Flock") %></div>
-          <div class="w-[13%]"><%= gettext("Harvest 1") %></div>
-          <div class="w-[13%]"><%= gettext("Harvest 2") %></div>
-          <div class="w-[13%]"><%= gettext("Harvest 3") %></div>
-          <div class="w-[13%]"><%= gettext("Death 1") %></div>
-          <div class="w-[13%]"><%= gettext("Death 2") %></div>
+          <div class="w-[16%]">{gettext("House")}</div>
+          <div class="w-[16%]">{gettext("Flock")}</div>
+          <div class="w-[13%]">{gettext("Harvest 1")}</div>
+          <div class="w-[13%]">{gettext("Harvest 2")}</div>
+          <div class="w-[13%]">{gettext("Harvest 3")}</div>
+          <div class="w-[13%]">{gettext("Death 1")}</div>
+          <div class="w-[13%]">{gettext("Death 2")}</div>
           <div class="w-[3%]" />
         </div>
         <.inputs_for :let={dtl} field={@form[:harvest_details]}>
@@ -328,13 +328,13 @@ defmodule FullCircleWeb.LayerLive.HarvestForm do
             </div>
           </div>
           <span class="text-sm text-gray-500">
-            <%= Phoenix.HTML.Form.input_value(dtl, :house_info) %>
+            {Phoenix.HTML.Form.input_value(dtl, :house_info)}
           </span>
         </.inputs_for>
 
         <div class="my-2">
           <.link phx-click={:add_detail} class="text-orange-500 hover:font-bold focus:font-bold">
-            <.icon name="hero-plus-circle" class="w-5 h-5" /><%= gettext("Add Detail") %>
+            <.icon name="hero-plus-circle" class="w-5 h-5" />{gettext("Add Detail")}
           </.link>
         </div>
 

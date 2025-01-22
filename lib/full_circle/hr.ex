@@ -560,9 +560,7 @@ defmodule FullCircle.HR do
         per_page: per_page
       ) do
     qry =
-      from(inv in subquery(salary_note_raw_query(com, user)),
-        order_by: [desc: inv.note_date]
-      )
+      from(inv in subquery(salary_note_raw_query(com, user)))
 
     qry =
       if terms != "" do
@@ -571,18 +569,16 @@ defmodule FullCircle.HR do
             ^similarity_order(
               [:note_no, :employee_name, :salary_type_name, :particulars],
               terms
-            ),
-          order_by: [desc: inv.note_no]
+            )
       else
-        from inv in subquery(qry),
-          order_by: [desc: inv.note_no]
+        qry
       end
 
     qry =
       if date_from != "" do
-        from inv in qry, where: inv.note_date >= ^date_from
+        from inv in qry, where: inv.note_date >= ^date_from, order_by: inv.note_date
       else
-        qry
+        from inv in qry, order_by: [desc: inv.note_date]
       end
 
     qry |> offset((^page - 1) * ^per_page) |> limit(^per_page) |> Repo.all()
@@ -904,18 +900,16 @@ defmodule FullCircle.HR do
             ^similarity_order(
               [:slip_no, :employee_name, :funds_account_name, :particulars],
               terms
-            ),
-          order_by: [desc: inv.slip_no]
+            )
       else
-        from inv in subquery(qry),
-          order_by: [desc: inv.slip_no]
+        qry
       end
 
     qry =
       if date_from != "" do
         from inv in qry, where: inv.slip_date >= ^date_from, order_by: inv.slip_date
       else
-        qry
+        from inv in qry, order_by: [desc: inv.slip_date]
       end
 
     qry |> offset((^page - 1) * ^per_page) |> limit(^per_page) |> Repo.all()
@@ -938,7 +932,6 @@ defmodule FullCircle.HR do
       on: emp.id == adv.employee_id,
       left_join: funds in Account,
       on: funds.id == adv.funds_account_id,
-      order_by: [desc: txn.doc_date],
       where: txn.amount > 0,
       select: %{
         id: coalesce(adv.id, txn.id),

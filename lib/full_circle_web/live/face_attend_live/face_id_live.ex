@@ -30,12 +30,12 @@ defmodule FullCircleWeb.FaceIdLive do
   end
 
   @impl true
-  def handle_info({:new_photo, data}, socket) do
+  def handle_info({:new_photo, _data}, socket) do
     {:noreply, socket}
   end
 
   @impl true
-  def handle_info({:delete_photo, data}, socket) do
+  def handle_info({:delete_photo, _data}, socket) do
     {:noreply, socket}
   end
 
@@ -60,10 +60,10 @@ defmodule FullCircleWeb.FaceIdLive do
         </div>
         <div id="in_out" class="flex mt-3 gap-1 p-2 text-3xl" style="display: none;">
           <button id="outBtn" class="w-1/2 h-20 red button font-bold">
-            <%= gettext("OUT") %>
+            {gettext("OUT")}
           </button>
           <button id="inBtn" class="w-1/2 h-20 green button font-bold">
-            <%= gettext("IN") %>
+            {gettext("IN")}
           </button>
         </div>
         <div id="scanResultName" class="mt-1 font-bold text-xl text-blue-700"></div>
@@ -78,7 +78,7 @@ defmodule FullCircleWeb.FaceIdLive do
       </div>
       <div class="text-center my-4">
         <.link navigate={~p"/companies/#{@current_company.id}/dashboard"} class="orange button">
-          <%= gettext("Back") %>
+          {gettext("Back")}
         </.link>
       </div>
     </div>

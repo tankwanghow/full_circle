@@ -231,7 +231,7 @@ defmodule FullCircle.TaggedBill do
         on: cont.id == inv.contact_id,
         where: inv.id in subquery(ids_qry),
         select: %{
-          doc_no: inv.invoice_no,
+          doc_no: inv.e_inv_internal_id,
           invoice_date: inv.invoice_date,
           contact: cont.name,
           good_names: fragment("string_agg(distinct ?, ', ')", gd.name),
@@ -244,7 +244,7 @@ defmodule FullCircle.TaggedBill do
         },
         group_by: [
           cont.name,
-          inv.invoice_no,
+          inv.e_inv_internal_id,
           inv.invoice_date,
           gd.unit
         ]

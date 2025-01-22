@@ -239,7 +239,7 @@ defmodule FullCircleWeb.SeedLive.Index do
   def render(assigns) do
     ~H"""
     <div class="w-10/12 mx-auto text-center">
-      <p class="text-3xl font-medium"><%= @page_title %></p>
+      <p class="text-3xl font-medium">{@page_title}</p>
       <ol class="shake p-2 border-4 border-cyan-600 bg-cyan-200 rounded-lg mb-2">
         <li class="font-bold text-2xl">Seeding Order</li>
         <li>Accounts, Contacts, FixedAssets, FixedAssetsDepreciations, Balance, TaxCodes</li>
@@ -266,13 +266,13 @@ defmodule FullCircleWeb.SeedLive.Index do
         </div>
         <div class="mb-1 rounded-lg p-2 bg-yellow-200 border border-yellow-500 font-semibold text-center">
           <p>
-            <%= "Maximum file size is #{@uploads.csv_file.max_file_size / 1_000_000} MB" %>
+            {"Maximum file size is #{@uploads.csv_file.max_file_size / 1_000_000} MB"}
           </p>
           <span
             :for={{_, msg} <- @uploads.csv_file.errors}
             class="text-center font-bold text-rose-500"
           >
-            <%= msg %>
+            {msg}
           </span>
 
           <div class={[
@@ -282,31 +282,31 @@ defmodule FullCircleWeb.SeedLive.Index do
             @status_flag == :info && "text-purple-500",
             @status_flag == :success && "text-green-500"
           ]}>
-            <%= @status %>
+            {@status}
           </div>
           <%= for entry <- @uploads.csv_file.entries do %>
-            <%= entry.progress %>%
+            {entry.progress}%
           <% end %>
         </div>
 
         <div class="border rounded-lg bg-gray-200 border-gray-500 p-2 mb-1">
           <div class="p-2">
-            <div class="text-3xl text-purple-500 font-bold"><%= @filename %></div>
+            <div class="text-3xl text-purple-500 font-bold">{@filename}</div>
             CSV file require headers like below.
           </div>
           <div class="font-bold font-mono text-amber-600">
-            <%= Enum.join(@seed_table_headers, ", ") %>
+            {Enum.join(@seed_table_headers, ", ")}
           </div>
         </div>
         <.button :if={@uploads.csv_file.errors == [] && !@cs_has_error?}>
-          <%= gettext("Start Seed") %>
+          {gettext("Start Seed")}
         </.button>
       </.form>
       <table :if={Enum.count(@attrs) > 0} class="table-auto">
         <tr>
           <%= for header <- @csv_headers ++ ["seed status"] do %>
             <th class="border border-gray-600 bg-gray-200 px-2">
-              <%= header %>
+              {header}
             </th>
           <% end %>
         </tr>
@@ -320,7 +320,7 @@ defmodule FullCircleWeb.SeedLive.Index do
                 a.errors != [] && "bg-rose-200"
               ]}>
                 <%= if Ecto.Changeset.fetch_field(a, String.to_atom(h)) != :error do %>
-                  <%= Ecto.Changeset.fetch_field!(a, String.to_atom(h)) %>
+                  {Ecto.Changeset.fetch_field!(a, String.to_atom(h))}
                 <% end %>
               </td>
             <% end %>
@@ -329,7 +329,7 @@ defmodule FullCircleWeb.SeedLive.Index do
               a.errors == [] && "bg-green-200",
               a.errors != [] && "bg-rose-200"
             ]}>
-              <%= if(a.errors != [], do: inspect(a.errors), else: "ok") %>
+              {if(a.errors != [], do: inspect(a.errors), else: "ok")}
             </td>
           </tr>
         <% end %>

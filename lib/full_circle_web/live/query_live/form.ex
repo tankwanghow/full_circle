@@ -182,7 +182,7 @@ defmodule FullCircleWeb.QueryLive.Form do
   def render(assigns) do
     ~H"""
     <div class="w-8/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
-      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
+      <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <.form
         for={@form}
         id="query-form"
@@ -203,7 +203,7 @@ defmodule FullCircleWeb.QueryLive.Form do
             class="w-[15%] mt-7 ml-1"
           >
             <.link class="blue button" id="exec_query" phx-click="execute_query">
-              <%= gettext("Execute Query") %>
+              {gettext("Execute Query")}
             </.link>
           </div>
           <div :if={@form.source.changes == %{}} class="w-[15%] mt-7 ml-1">
@@ -214,7 +214,7 @@ defmodule FullCircleWeb.QueryLive.Form do
               navigate={~p"/companies/#{@current_company.id}/csv?report=queries&id=#{@form.data.id}"}
               target="_blank"
             >
-              <%= gettext("Download CSV") %>
+              {gettext("Download CSV")}
             </.link>
           </div>
         </div>
@@ -265,7 +265,7 @@ defmodule FullCircleWeb.QueryLive.Form do
               <tr>
                 <%= for h <- col do %>
                   <th class="text-center font-bold border rounded bg-gray-200 border-gray-500">
-                    <%= h %>
+                    {h}
                   </th>
                 <% end %>
               </tr>
@@ -275,7 +275,7 @@ defmodule FullCircleWeb.QueryLive.Form do
                 <tr>
                   <%= for c <- r do %>
                     <td class="text-center border rounded bg-blue-200 border-blue-500">
-                      <%= c %>
+                      {c}
                     </td>
                   <% end %>
                 </tr>

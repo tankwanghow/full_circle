@@ -24,26 +24,26 @@ defmodule FullCircleWeb.LayerLive.HouseIndexComponent do
           tabindex="-1"
           navigate={~p"/companies/#{@company}/houses/#{@obj.id}/edit"}
         >
-          <%= @obj.house_no %>
+          {@obj.house_no}
         </.link>
       </div>
       <div class="w-[14%]">
-        <%= @obj.capacity %>
+        {@obj.capacity}
       </div>
       <div class="w-[15%]">
-        <%= @obj.flock_no %>
+        {@obj.flock_no}
       </div>
       <div class="w-[15%]">
-        <%= @obj.qty %>
+        {@obj.qty}
       </div>
       <div class="w-[14%]">
-        <%= @obj.filling_wages %>
+        {@obj.filling_wages}
       </div>
       <div class="w-[14%]">
-        <%= @obj.feeding_wages %>
+        {@obj.feeding_wages}
       </div>
       <div class="w-[14%]">
-        <%= @obj.status %>
+        {@obj.status}
       </div>
     </div>
     """

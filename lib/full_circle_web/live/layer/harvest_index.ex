@@ -11,7 +11,7 @@ defmodule FullCircleWeb.LayerLive.HarvestIndex do
   def render(assigns) do
     ~H"""
     <div class="mx-auto w-8/12">
-      <p class="w-full text-3xl text-center font-medium"><%= @page_title %></p>
+      <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <div class="flex justify-center mb-2">
         <.form for={%{}} id="search-form" phx-submit="search" autocomplete="off" class="w-full">
           <div class=" flex flex-row flex-wrap tracking-tighter text-sm">
@@ -44,21 +44,21 @@ defmodule FullCircleWeb.LayerLive.HarvestIndex do
           class="blue button"
           id="new_flock"
         >
-          <%= gettext("New Harvest") %>
+          {gettext("New Harvest")}
         </.link>
       </div>
       <div class="font-medium flex flex-row text-center tracking-tighter bg-amber-200">
         <div class="w-[15%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Date") %>
+          {gettext("Date")}
         </div>
         <div class="w-[15%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Harvest No") %>
+          {gettext("Harvest No")}
         </div>
         <div class="w-[30%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Employee") %>
+          {gettext("Employee")}
         </div>
         <div class="w-[40%] border-b border-t border-amber-400 py-1">
-          <%= gettext("Houses") %>
+          {gettext("Houses")}
         </div>
       </div>
       <div

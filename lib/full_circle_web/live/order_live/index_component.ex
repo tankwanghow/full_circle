@@ -39,7 +39,7 @@ defmodule FullCircleWeb.OrderLive.IndexComponent do
         />
       </div>
       <div class="w-[9%] border-b border-gray-400 py-1">
-        <%= @obj.order_date |> FullCircleWeb.Helpers.format_date() %>
+        {@obj.order_date |> FullCircleWeb.Helpers.format_date()}
       </div>
       <div class="w-[10%] border-b border-gray-400 py-1">
         <.doc_link
@@ -48,24 +48,24 @@ defmodule FullCircleWeb.OrderLive.IndexComponent do
         />
       </div>
       <div class="w-[20%] border-b border-gray-400 py-1 overflow-clip">
-        <%= @obj.customer_name %>
+        {@obj.customer_name}
       </div>
       <div class="w-[19%] border-b text-center border-gray-400 py-1 overflow-clip">
         <span class="font-light">
-          <%= @obj.good_name %>
+          {@obj.good_name}
         </span>
       </div>
       <div class="w-[10%] border-b border-gray-400 py-1">
-        <%= int_or_float_format(@obj.order_qty) %> <%= @obj.unit %>
+        {int_or_float_format(@obj.order_qty)} {@obj.unit}
       </div>
       <div class="w-[10%] text-green-600 border-b border-gray-400 py-1">
-        <%= @obj.loaded_qty |> int_or_float_format %> <%= @obj.unit %>
+        {@obj.loaded_qty |> int_or_float_format} {@obj.unit}
       </div>
       <div class="w-[10%] text-amber-600 border-b border-gray-400 py-1">
-        <%= @obj.delivered_qty |> int_or_float_format %> <%= @obj.unit %>
+        {@obj.delivered_qty |> int_or_float_format} {@obj.unit}
       </div>
       <div class="w-[10%] border-b border-gray-400 py-1">
-        <%= @obj.status %>
+        {@obj.status}
       </div>
     </div>
     """

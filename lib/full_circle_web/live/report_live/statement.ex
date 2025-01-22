@@ -119,7 +119,7 @@ defmodule FullCircleWeb.ReportLive.Statement do
   def render(assigns) do
     ~H"""
     <div class="w-6/12 mx-auto mb-8">
-      <p class="text-2xl text-center font-medium"><%= "#{@page_title}" %></p>
+      <p class="text-2xl text-center font-medium">{"#{@page_title}"}</p>
       <div class="border rounded bg-amber-200 text-center p-2">
         <.form for={%{}} id="search-form" phx-submit="query" phx-change="changed" autocomplete="off">
           <div class="grid grid-cols-12 tracking-tighter">
@@ -153,7 +153,7 @@ defmodule FullCircleWeb.ReportLive.Statement do
             </div>
             <div class="col-span-5 mt-6">
               <.button>
-                <%= gettext("Query") %>
+                {gettext("Query")}
               </.button>
               <.link
                 :if={@can_print}
@@ -163,14 +163,14 @@ defmodule FullCircleWeb.ReportLive.Statement do
                 }
                 target="_blank"
               >
-                Print <%= "(#{Enum.count(@selected)})" %>
+                Print {"(#{Enum.count(@selected)})"}
               </.link>
             </div>
           </div>
         </.form>
       </div>
 
-      <%= FullCircleWeb.CsvHtml.headers(
+      {FullCircleWeb.CsvHtml.headers(
         [
           gettext("Print"),
           gettext("Account"),
@@ -183,7 +183,7 @@ defmodule FullCircleWeb.ReportLive.Statement do
         ["6%", "47%", "13%", "8%", "13%", "13%"],
         "border rounded bg-gray-200 border-gray-400 px-2 py-1",
         assigns
-      ) %>
+      )}
 
       <%= for obj <- @objects do %>
         <.live_component
