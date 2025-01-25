@@ -1,4 +1,4 @@
-defmodule FullCircle.Repo.Migrations.AddEInvoiceFeature do
+defmodule FullCircle.Repo.Migrations.AddEInvoiceSync do
   use Ecto.Migration
 
   def change do
