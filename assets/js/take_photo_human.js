@@ -1,4 +1,4 @@
-import * as H from "../vendor/human-main/dist/human.esm" // equivalent of @vladmandic/Human
+import * as H from "../vendor/human-main/dist/human.esm.js" // equivalent of @vladmandic/Human
 
 const humanConfig = {
   // user configuration for human, used to fine-tune behavior

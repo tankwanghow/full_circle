@@ -97,7 +97,7 @@ defmodule FullCircleWeb.InvoiceLive.Index do
         <div class="w-[20%] border-b border-t border-amber-400 py-1">
           {gettext("Contact")}
         </div>
-        <div class="w-[39%] border-b border-t border-amber-400 py-1">
+        <div class="w-[20%] border-b border-t border-amber-400 py-1">
           {gettext("Particulars")}
         </div>
         <div class="w-[10%] border-b border-t border-amber-400 py-1">

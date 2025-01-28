@@ -275,7 +275,7 @@ defmodule FullCircle.Billing do
       StdInterface.changeset(
         Invoice,
         %Invoice{},
-        Map.merge(attrs, %{"e_inv_internal_id" => doc, "e_inv_internal_id" => doc}),
+        Map.merge(attrs, %{"invoice_no" => doc, "e_inv_internal_id" => doc}),
         com
       )
     end)
@@ -284,7 +284,7 @@ defmodule FullCircle.Billing do
         invoice_name,
         entity,
         Map.merge(attrs, %{
-          "e_inv_internal_id" => entity.e_inv_internal_id,
+          "invoice_no" => entity.invoice_no,
           "e_inv_internal_id" => entity.e_inv_internal_id
         }),
         com,
@@ -306,7 +306,7 @@ defmodule FullCircle.Billing do
            if !Decimal.eq?(x.good_amount, 0) do
              %{
                doc_type: "Invoice",
-               doc_no: invoice.e_inv_internal_id,
+               doc_no: invoice.invoice_no,
                doc_id: invoice.id,
                doc_date: invoice.invoice_date,
                account_id: x.account_id,
@@ -319,7 +319,7 @@ defmodule FullCircle.Billing do
            if !Decimal.eq?(x.tax_amount, 0) do
              %{
                doc_type: "Invoice",
-               doc_no: invoice.e_inv_internal_id,
+               doc_no: invoice.invoice_no,
                doc_id: invoice.id,
                doc_date: invoice.invoice_date,
                account_id: x.tax_code.account_id,
@@ -341,7 +341,7 @@ defmodule FullCircle.Billing do
 
              %{
                doc_type: "Invoice",
-               doc_no: invoice.e_inv_internal_id,
+               doc_no: invoice.invoice_no,
                doc_id: invoice.id,
                doc_date: invoice.invoice_date,
                contact_id: invoice.contact_id,
@@ -385,7 +385,7 @@ defmodule FullCircle.Billing do
       :delete_transaction,
       from(txn in Transaction,
         where: txn.doc_type == "Invoice",
-        where: txn.doc_no == ^invoice.e_inv_internal_id,
+        where: txn.doc_no == ^invoice.invoice_no,
         where: txn.company_id == ^com.id
       )
     )

@@ -15,8 +15,6 @@ defmodule FullCircle.Billing.PurInvoice do
     field :loader_wages_tags, :string
     field :delivery_wages_tags, :string
     field :e_inv_uuid, :string
-    field :e_inv_long_id, :string
-    field :e_inv_info, :string
 
     belongs_to :company, FullCircle.Sys.Company
     belongs_to :contact, FullCircle.Accounting.Contact
@@ -29,6 +27,7 @@ defmodule FullCircle.Billing.PurInvoice do
       foreign_key: :doc_id,
       references: :id
 
+    field :e_inv_long_id, :string, virtual: true
     field :contact_name, :string, virtual: true
     field :pur_invoice_amount, :decimal, virtual: true, default: 0
     field :pur_invoice_good_amount, :decimal, virtual: true, default: 0
@@ -55,9 +54,7 @@ defmodule FullCircle.Billing.PurInvoice do
       :contact_id,
       :contact_name,
       :pur_invoice_no,
-      :e_inv_uuid,
-      :e_inv_long_id,
-      :e_inv_info
+      :e_inv_uuid
     ])
     |> fill_today(:pur_invoice_date)
     |> fill_today(:due_date)

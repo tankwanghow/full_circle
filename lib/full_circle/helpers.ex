@@ -302,11 +302,11 @@ defmodule FullCircle.Helpers do
   end
 
   def remove_field_if_new_flag(attrs, field_name) do
-    # if Map.fetch!(attrs, field_name) == "...new..." do
-    #   Map.delete(attrs, field_name)
-    # else
-    attrs
-    # end
+    if Map.fetch!(attrs, field_name) == "...new..." do
+      Map.delete(attrs, field_name)
+    else
+      attrs
+    end
   end
 
   def e_inv_validate_url(obj) do

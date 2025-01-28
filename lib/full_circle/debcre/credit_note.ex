@@ -20,10 +20,9 @@ defmodule FullCircle.DebCre.CreditNote do
       references: :id
 
     field :e_inv_uuid, :string
-    field :e_inv_long_id, :string
     field :e_inv_internal_id, :string
-    field :e_inv_info, :string
 
+    field :e_inv_long_id, :string, virtual: true
     field :contact_name, :string, virtual: true
     field :note_desc_amount, :decimal, virtual: true, default: 0
     field :note_amount, :decimal, virtual: true, default: 0
@@ -45,9 +44,7 @@ defmodule FullCircle.DebCre.CreditNote do
       :contact_name,
       :note_no,
       :e_inv_uuid,
-      :e_inv_long_id,
-      :e_inv_internal_id,
-      :e_inv_info
+      :e_inv_internal_id
     ])
     |> fill_today(:note_date)
     |> validate_required([

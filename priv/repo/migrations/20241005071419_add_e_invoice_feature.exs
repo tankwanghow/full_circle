@@ -34,44 +34,44 @@ defmodule FullCircle.Repo.Migrations.AddEInvoiceFeature do
 
     alter table(:invoices) do
       add :e_inv_uuid, :string
-      add :e_inv_long_id, :string
-      add :e_inv_info, :text
+      # add :e_inv_long_id, :string
+      # add :e_inv_info, :text
       add :e_inv_internal_id, :string
     end
 
     alter table(:pur_invoices) do
       add :e_inv_uuid, :string
-      add :e_inv_long_id, :string
-      add :e_inv_info, :text
+      # add :e_inv_long_id, :string
+      # add :e_inv_info, :text
     end
 
     rename table(:pur_invoices), :supplier_invoice_no, to: :e_inv_internal_id
 
     alter table(:payments) do
       add :e_inv_uuid, :string
-      add :e_inv_long_id, :string
-      add :e_inv_info, :text
+      # add :e_inv_long_id, :string
+      # add :e_inv_info, :text
       add :e_inv_internal_id, :string
     end
 
     alter table(:receipts) do
       add :e_inv_uuid, :string
-      add :e_inv_long_id, :string
-      add :e_inv_info, :text
+      # add :e_inv_long_id, :string
+      # add :e_inv_info, :text
       add :e_inv_internal_id, :string
     end
 
     alter table(:credit_notes) do
       add :e_inv_uuid, :string
-      add :e_inv_long_id, :string
-      add :e_inv_info, :text
+      # add :e_inv_long_id, :string
+      # add :e_inv_info, :text
       add :e_inv_internal_id, :string
     end
 
     alter table(:debit_notes) do
       add :e_inv_uuid, :string
-      add :e_inv_long_id, :string
-      add :e_inv_info, :text
+      # add :e_inv_long_id, :string
+      # add :e_inv_info, :text
       add :e_inv_internal_id, :string
     end
 

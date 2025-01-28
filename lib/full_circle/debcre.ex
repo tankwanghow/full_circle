@@ -205,14 +205,15 @@ defmodule FullCircle.DebCre do
         checked: false,
         old_data: txn.old_data
       },
-    group_by: [
-      coalesce(obj.id, txn.id),
-      txn.doc_no,
-      coalesce(cont.name, ac.name),
-      txn.doc_date,
-      com.id,
-      txn.old_data
-    ]
+      group_by: [
+        coalesce(obj.id, txn.id),
+        txn.doc_no,
+        coalesce(cont.name, ac.name),
+        txn.doc_date,
+        com.id,
+        txn.old_data,
+        obj.e_inv_uuid
+      ]
   end
 
   def create_credit_note(attrs, com, user) do
@@ -516,7 +517,6 @@ defmodule FullCircle.DebCre do
     qry =
       if terms != "" do
         from inv in subquery(qry),
-
           order_by: ^similarity_order([:note_no, :contact_name, :particulars], terms)
       else
         qry

@@ -23,10 +23,9 @@ defmodule FullCircle.ReceiveFund.Receipt do
       references: :id
 
     field :e_inv_uuid, :string
-    field :e_inv_long_id, :string
     field :e_inv_internal_id, :string
-    field :e_inv_info, :string
 
+    field :e_inv_long_id, :string, virtual: true
     field :contact_name, :string, virtual: true
     field :funds_account_name, :string, virtual: true
     field :cheques_amount, :decimal, virtual: true, default: 0
@@ -55,9 +54,7 @@ defmodule FullCircle.ReceiveFund.Receipt do
       :funds_account_id,
       :funds_amount,
       :e_inv_uuid,
-      :e_inv_long_id,
-      :e_inv_internal_id,
-      :e_inv_info
+      :e_inv_internal_id
     ])
     |> fill_today(:receipt_date)
     |> validate_required([

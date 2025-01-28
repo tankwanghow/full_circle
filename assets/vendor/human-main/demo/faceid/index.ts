@@ -11,7 +11,7 @@ import * as H from '../../dist/human.esm.js'; // equivalent of @vladmandic/Human
 import * as indexDb from './indexdb'; // methods to deal with indexdb
 
 const humanConfig = { // user configuration for human, used to fine-tune behavior
-  cacheSensitivity: 0,
+  cacheSensitivity: 0.01,
   modelBasePath: '../../models',
   filter: { enabled: true, equalization: true }, // lets run with histogram equilizer
   debug: true,
@@ -240,7 +240,7 @@ async function detectFace() {
   if (!current?.face?.tensor || !current?.face?.embedding) return false;
   console.log('face record:', current.face); // eslint-disable-line no-console
   log(`detected face: ${current.face.gender} ${current.face.age || 0}y distance ${100 * (current.face.distance || 0)}cm/${Math.round(100 * (current.face.distance || 0) / 2.54)}in`);
-  await human.tf.browser.draw(current.face.tensor, dom.canvas);
+  await human.draw.tensor(current.face.tensor, dom.canvas);
   if (await indexDb.count() === 0) {
     log('face database is empty: nothing to compare face with');
     document.body.style.background = 'black';

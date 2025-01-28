@@ -14,9 +14,7 @@ defmodule FullCircle.BillPay.Payment do
     belongs_to :company, FullCircle.Sys.Company
 
     field :e_inv_uuid, :string
-    field :e_inv_long_id, :string
     field :e_inv_internal_id, :string
-    field :e_inv_info, :string
 
     has_many :payment_details, FullCircle.BillPay.PaymentDetail, on_replace: :delete
 
@@ -26,6 +24,7 @@ defmodule FullCircle.BillPay.Payment do
       foreign_key: :doc_id,
       references: :id
 
+    field :e_inv_long_id, :string, virtual: true
     field :contact_name, :string, virtual: true
     field :funds_account_name, :string, virtual: true
     field :matched_amount, :decimal, virtual: true, default: Decimal.new("0")
@@ -52,9 +51,7 @@ defmodule FullCircle.BillPay.Payment do
       :funds_account_id,
       :funds_amount,
       :e_inv_uuid,
-      :e_inv_long_id,
-      :e_inv_internal_id,
-      :e_inv_info
+      :e_inv_internal_id
     ])
     |> fill_today(:payment_date)
     |> validate_required([

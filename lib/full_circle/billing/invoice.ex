@@ -14,8 +14,6 @@ defmodule FullCircle.Billing.Invoice do
     field :loader_wages_tags, :string
     field :delivery_wages_tags, :string
     field :e_inv_uuid, :string
-    field :e_inv_long_id, :string
-    field :e_inv_info, :string
     field :e_inv_internal_id, :string
 
     belongs_to :company, FullCircle.Sys.Company
@@ -23,6 +21,7 @@ defmodule FullCircle.Billing.Invoice do
 
     has_many :invoice_details, FullCircle.Billing.InvoiceDetail, on_replace: :delete
 
+    field :e_inv_long_id, :string, virtual: true
     field :contact_name, :string, virtual: true
     field :tax_id, :string, virtual: true
     field :reg_no, :string, virtual: true
@@ -50,9 +49,7 @@ defmodule FullCircle.Billing.Invoice do
       :contact_name,
       :invoice_no,
       :e_inv_uuid,
-      :e_inv_long_id,
       :e_inv_internal_id,
-      :e_inv_info,
       :tax_id,
       :reg_no
     ])

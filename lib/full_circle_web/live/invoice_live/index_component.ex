@@ -43,19 +43,20 @@ defmodule FullCircleWeb.InvoiceLive.IndexComponent do
       </div>
       <div class="w-[8%] border-b border-gray-400 py-1">
         <%= if @obj.old_data do %>
-          <%= @obj.invoice_no %>
+          {@obj.invoice_no}
         <% else %>
           <.doc_link
             current_company={@company}
             doc_obj={%{doc_type: "Invoice", doc_id: @obj.id, doc_no: @obj.invoice_no}}
           />
-          <.e_invoice_link obj={@obj} />
+          <div>
+          <.e_invoice_link obj={@obj} /></div>
         <% end %>
       </div>
       <div class="w-[20%] border-b border-gray-400 py-1 overflow-clip">
         {@obj.contact_name}
       </div>
-      <div class="w-[39%] border-b text-center border-gray-400 py-1 overflow-clip">
+      <div class="w-[20%] border-b text-center border-gray-400 py-1 overflow-clip">
         <span class="font-light">{@obj.particulars}</span>
       </div>
       <div class="w-[10%] border-b border-gray-400 py-1">

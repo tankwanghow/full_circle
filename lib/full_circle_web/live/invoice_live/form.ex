@@ -400,7 +400,7 @@ defmodule FullCircleWeb.InvoiceLive.Form do
     <div class="w-11/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
       <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <.form for={@form} id="object-form" autocomplete="off" phx-change="validate" phx-submit="save">
-        <.input type="hidden" field={@form[:e_inv_internal_id]} />
+        <.input type="hidden" field={@form[:invoice_no]} />
         <div class="flex flex-row flex-nowarp">
           <div class="w-1/4 grow shrink">
             <.input type="hidden" field={@form[:contact_id]} />
@@ -464,18 +464,13 @@ defmodule FullCircleWeb.InvoiceLive.Form do
         </div>
 
         <div class="flex flex-row flex-nowrap mt-2">
-          <div class="w-[50%]">
-            <.input field={@form[:e_inv_info]} readonly={true} label={gettext("E Invoice Info")} />
-          </div>
           <div class="w-[10%]">
             <.input field={@form[:e_inv_internal_id]} label={gettext("E Invoice Internal Id")} />
           </div>
           <div class="w-[15%]">
             <.input field={@form[:e_inv_uuid]} label={gettext("E Invoice UUID")} />
           </div>
-          <div class="w-[25%]">
-            <.input field={@form[:e_inv_long_id]} label={gettext("E Invoice Long Id")} />
-          </div>
+
         </div>
 
         <.live_component

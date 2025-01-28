@@ -407,15 +407,6 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
           </div>
         </div>
 
-        <div class="flex flex-row flex-nowrap mt-2">
-          <div class="w-[70%]">
-            <.input field={@form[:e_inv_info]} readonly={true} label={gettext("E Invoice Info")} />
-          </div>
-          <div class="w-[30%]">
-            <.input field={@form[:e_inv_long_id]} label={gettext("E Invoice Long Id")} />
-          </div>
-        </div>
-
         <div class="flex flex-row gap-2 flex-nowrap w-2/3 mx-auto text-center mt-5">
           <div
             id="credit-note-details-tab"

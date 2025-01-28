@@ -966,6 +966,7 @@ defmodule FullCircleWeb.CoreComponents do
 
     ~H"""
     <.link
+      target="_blank"
       class={["text-blue-600 hover:font-bold", @klass]}
       navigate={"/companies/#{@current_company.id}/#{@doc_type}/#{@doc_id}/#{@action}"}
       {@rest}
@@ -1036,19 +1037,19 @@ defmodule FullCircleWeb.CoreComponents do
     ~H"""
     <%= if @obj.e_inv_uuid do %>
       <.link
-        class="font-extrabold text-blue-500"
+        class="text-xs bg-green-400 p-1 rounded-xl"
         href={"https://myinvois.hasil.gov.my/documents/#{@obj.e_inv_uuid}"}
         target="_blank"
       >
-        <.icon name="hero-document-solid" class="h-5 w-5" />
+        Open e-Invoice
       </.link>
     <% else %>
       <.link
-        class="font-extrabold text-green-500"
+        class="text-xs bg-orange-400 p-1 rounded-xl"
         href="https://myinvois.hasil.gov.my/newdocument"
         target="_blank"
       >
-        <.icon name="hero-document-plus-solid" class="h-5 w-5" />
+        New e-Invoice
       </.link>
     <% end %>
     """

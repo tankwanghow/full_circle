@@ -1,6 +1,6 @@
 # @vladmandic/human  
 
-  Version: **3.2.2**  
+  Version: **3.3.4**  
   Description: **Human: AI-powered 3D Face Detection & Rotation Tracking, Face Description & Recognition, Body Pose Tracking, 3D Hand & Finger Tracking, Iris Analysis, Age & Gender & Emotion Prediction, Gesture Recognition**  
   
   Author: **Vladimir Mandic <mandic00@live.com>**  
@@ -9,8 +9,30 @@
   
 ## Changelog
   
-### **HEAD -> main** 2024/04/17 mandic00@live.com
+### **HEAD -> main** 2024/10/24 mandic00@live.com
 
+
+### **3.3.4** 2024/10/24 mandic00@live.com
+
+
+### **origin/main** 2024/10/14 mandic00@live.com
+
+
+### **3.3.3** 2024/10/14 mandic00@live.com
+
+- add loaded property to model stats and mark models not loaded correctly.
+- release build
+
+### **3.3.2** 2024/09/11 mandic00@live.com
+
+- full rebuild
+
+### **3.3.1** 2024/09/11 mandic00@live.com
+
+- add config.face.detector.square option
+- human 3.3 alpha test run
+- human 3.3 alpha with new build environment
+- release rebuild
 - fix flazeface tensor scale and update build platform
 
 ### **3.2.2** 2024/04/17 mandic00@live.com
