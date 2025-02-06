@@ -228,6 +228,8 @@ defmodule FullCircle.EInvMetas do
       join: cu in CompanyUser,
       on: cu.company_id == c.id,
       where: ei.uuid == ^uuid,
+      where: c.id == ^com.id,
+      where: cu.user_id == ^user.id,
       distinct: true,
       where: ei.totalPayableAmount == ^amount or ei.totalNetAmount == ^amount,
       select: %{
@@ -277,6 +279,8 @@ defmodule FullCircle.EInvMetas do
       join: cu in CompanyUser,
       on: cu.company_id == c.id,
       where: ei.internalId == ^internal_id,
+      where: c.id == ^com.id,
+      where: cu.user_id == ^user.id,
       distinct: true,
       where: ei.totalPayableAmount == ^amount or ei.totalNetAmount == ^amount,
       select: %{
@@ -333,6 +337,10 @@ defmodule FullCircle.EInvMetas do
       on: c.id == ei.company_id and c.tax_id == ei.issuerTIN,
       join: cu in CompanyUser,
       on: cu.company_id == c.id,
+      where: c.id == ^com.id,
+      where: cu.user_id == ^user.id,
+      where: ei.dateTimeReceived >= ^sd,
+      where: ei.dateTimeReceived <= ^ed,
       distinct: true,
       where: ei.totalPayableAmount == ^amount or ei.totalNetAmount == ^amount,
       where:

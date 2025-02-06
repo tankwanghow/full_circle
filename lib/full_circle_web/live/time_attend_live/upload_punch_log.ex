@@ -2,7 +2,6 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
   use FullCircleWeb, :live_view
 
   alias FullCircle.HR
-  alias NimbleCSV.RFC4180, as: CSV
 
   @impl true
   def mount(_params, _session, socket) do
@@ -34,7 +33,7 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
   end
 
   @impl true
-  def handle_event("import", params, socket) do
+  def handle_event("import", _params, socket) do
     insert_time_attendence_from_logs(
       socket.assigns.attendences,
       socket.assigns.current_company,
@@ -42,6 +41,11 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
     )
 
     {:noreply, socket |> assign(imported: true)}
+  end
+
+  @impl true
+  def handle_event("validate", _params, socket) do
+    {:noreply, socket}
   end
 
   defp insert_time_attendence_from_logs(entries, com, user) do
@@ -89,11 +93,6 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
     end
   end
 
-  @impl true
-  def handle_event("validate", params, socket) do
-    {:noreply, socket}
-  end
-
   defp error_to_string(:too_large), do: "Too large!"
   defp error_to_string(:too_many_files), do: "You have selected too many files!"
   defp error_to_string(:not_accepted), do: "You have selected an unacceptable file type"
@@ -118,20 +117,6 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
     |> Enum.drop(4)
     |> Enum.map(fn x ->
       Enum.zip(headers, x) |> Map.new(fn {k, v} -> {k, v} end)
-    end)
-    |> make_like_timeattend(com, user)
-    |> fill_in_employee_info(com, user)
-  end
-
-  defp parse_csv_to_attrs(filename, com, user) do
-    File.stream!(filename)
-    |> CSV.parse_stream(skip_headers: false)
-    |> Stream.transform(nil, fn
-      headers, nil ->
-        {[], headers}
-
-      row, headers ->
-        {[Enum.zip(headers, row) |> Map.new(fn {k, v} -> {k, String.trim(v)} end)], headers}
     end)
     |> make_like_timeattend(com, user)
     |> fill_in_employee_info(com, user)

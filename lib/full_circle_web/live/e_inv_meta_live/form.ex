@@ -10,8 +10,8 @@ defmodule FullCircleWeb.EInvMetaLive.Form do
   def mount(_params, _session, socket) do
     obj =
       EInvMetas.get_by_company_id!(
-        socket.assigns.current_company.id,
-        socket.assigns.current_user.id
+        socket.assigns.current_company,
+        socket.assigns.current_user
       )
 
     socket =
