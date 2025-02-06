@@ -62,7 +62,12 @@ defmodule FullCircle.BillPay do
         preload: [transaction_matchers: ^payment_match_trans(company, user)],
         preload: [payment_details: ^payment_details()],
         select: pay,
-        select_merge: %{contact_name: cont.name, funds_account_name: funds.name},
+        select_merge: %{
+          contact_name: cont.name,
+          reg_no: cont.reg_no,
+          tax_id: cont.tax_id,
+          funds_account_name: funds.name
+        },
         select_merge: %{matched_amount: coalesce(subquery(matched_amount(id)), 0)},
         select_merge: %{payment_tax_amount: coalesce(subquery(payment_tax_amount(id)), 0)},
         select_merge: %{payment_good_amount: coalesce(subquery(payment_good_amount(id)), 0)},

@@ -24,6 +24,8 @@ defmodule FullCircle.DebCre.CreditNote do
 
     field :e_inv_long_id, :string, virtual: true
     field :contact_name, :string, virtual: true
+    field :tax_id, :string, virtual: true
+    field :reg_no, :string, virtual: true
     field :note_desc_amount, :decimal, virtual: true, default: 0
     field :note_amount, :decimal, virtual: true, default: 0
     field :note_tax_amount, :decimal, virtual: true, default: 0

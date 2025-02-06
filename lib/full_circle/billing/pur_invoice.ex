@@ -29,6 +29,8 @@ defmodule FullCircle.Billing.PurInvoice do
 
     field :e_inv_long_id, :string, virtual: true
     field :contact_name, :string, virtual: true
+    field :tax_id, :string, virtual: true
+    field :reg_no, :string, virtual: true
     field :pur_invoice_amount, :decimal, virtual: true, default: 0
     field :pur_invoice_good_amount, :decimal, virtual: true, default: 0
     field :pur_invoice_tax_amount, :decimal, virtual: true, default: 0

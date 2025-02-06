@@ -199,13 +199,47 @@ defmodule FullCircleWeb.TimeAttendLive.PunchTimeComponent do
 
     wh = HR.wh(tl)
 
+    tl_ok? =
+      case [!is_nil(dt1), !is_nil(dt2), !is_nil(dt3), !is_nil(dt4), !is_nil(dt5), !is_nil(dt6)] do
+        [true, true, true, true, true, true] ->
+          [
+            DateTime.compare(dt1, dt2),
+            DateTime.compare(dt2, dt3),
+            DateTime.compare(dt3, dt4),
+            DateTime.compare(dt4, dt5),
+            DateTime.compare(dt5, dt6)
+          ] == [:lt, :lt, :lt, :lt, :lt]
+
+        [true, true, false, false, false, false] ->
+          DateTime.compare(dt1, dt2) == :lt
+
+        [true, true, true, true, false, false] ->
+          [
+            DateTime.compare(dt1, dt2),
+            DateTime.compare(dt2, dt3),
+            DateTime.compare(dt3, dt4)
+          ] ==
+            [:lt, :lt, :lt]
+
+        [false, false, true, true, false, false] ->
+          DateTime.compare(dt3, dt4) == :lt
+
+        [false, false, true, true, true, true] ->
+          [
+            DateTime.compare(dt3, dt4),
+            DateTime.compare(dt4, dt5),
+            DateTime.compare(dt5, dt6)
+          ] == [:lt, :lt, :lt]
+
+        [false, false, false, false, false, false] ->
+          true
+
+        _ ->
+          false
+      end
+
     socket =
-      if tl
-         |> Enum.filter(fn x -> !is_nil(Enum.at(x, 0)) end)
-         |> Enum.sort_by(fn x -> Enum.at(x, 3) end) !=
-           tl
-           |> Enum.filter(fn x -> !is_nil(Enum.at(x, 0)) end)
-           |> Enum.sort_by(fn x -> Enum.at(x, 0) end) do
+      if !tl_ok? do
         socket |> assign(bg_color: "bg-red-300")
       else
         socket |> assign(bg_color: "bg-transparent")

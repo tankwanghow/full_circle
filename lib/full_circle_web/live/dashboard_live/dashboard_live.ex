@@ -93,6 +93,9 @@ defmodule FullCircleWeb.DashboardLive do
         <.link navigate={~p"/companies/#{@current_company.id}/employees"} class="button orange">
           {gettext("Employees")}
         </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/import_attend"} class="blue button">
+          {gettext("Import Attendence File")}
+        </.link>
         <.link navigate={~p"/companies/#{@current_company.id}/holidays"} class="button orange">
           {gettext("Holiday")}
         </.link>
@@ -209,7 +212,7 @@ defmodule FullCircleWeb.DashboardLive do
         </.link>
       </div>
     </div>
-    <div
+    <%!-- <div
       :if={FullCircle.Authorization.can?(@current_user, :create_time_attendence, @current_company)}
       class="mx-auto text-center mb-4"
     >
@@ -225,15 +228,15 @@ defmodule FullCircleWeb.DashboardLive do
       </div>
       <div class="mt-2 text-2xl font-bold">
         <.link navigate={~p"/companies/#{@current_company.id}/take_photo"} class="blue button">
-          <%= gettext("Take A Photo") %>
+          {gettext("Take A Photo")}
         </.link>
       </div>
       <div class="mt-2 text-2xl font-bold">
         <.link navigate={~p"/companies/#{@current_company.id}/face_id"} class="blue button">
-          <%= gettext("Face ID") %>
+          {gettext("Face ID")}
         </.link>
       </div>
-    </div>
+    </div> --%>
     """
   end
 

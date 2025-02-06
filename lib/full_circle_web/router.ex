@@ -283,6 +283,8 @@ defmodule FullCircleWeb.Router do
       live("/POS", PosLive)
 
       live("/upload_files", UploadFileLive.Index, :index)
+
+      live("/import_attend", UploadPunchLog.Index, :index)
     end
 
     live_session :require_authenticated_user_n_active_company_print,

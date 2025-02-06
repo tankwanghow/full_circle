@@ -4,7 +4,7 @@ defmodule FullCircleWeb.InvoiceLive.Index do
   alias FullCircle.Billing
   alias FullCircleWeb.InvoiceLive.IndexComponent
 
-  @per_page 25
+  @per_page 15
   @selected_max 15
 
   @impl true
@@ -88,23 +88,30 @@ defmodule FullCircleWeb.InvoiceLive.Index do
       </div>
       <div class="font-medium flex flex-row text-center tracking-tighter bg-amber-200">
         <div class="w-[2%] border-b border-t border-amber-400 py-1"></div>
-        <div class="w-[11%] border-b border-t border-amber-400 py-1">
-          {gettext("Invoice Date / Due Date")}
+        <div class="w-[6%] border-b border-t border-amber-400 py-1">
+          <div>{gettext("Invoice Date")}</div>
+          <div>{gettext("Due Date")}</div>
         </div>
-        <div class="w-[8%] border-b border-t border-amber-400 py-1">
-          {gettext("Invoice No")}
+        <div class="w-[18%] border-b border-t border-amber-400 py-1">
+          {gettext("Contact / Invoice No / TIN / RegNo")}
         </div>
-        <div class="w-[20%] border-b border-t border-amber-400 py-1">
-          {gettext("Contact")}
-        </div>
-        <div class="w-[20%] border-b border-t border-amber-400 py-1">
+        <div class="w-[18%] border-b border-t border-amber-400 py-1">
           {gettext("Particulars")}
         </div>
-        <div class="w-[10%] border-b border-t border-amber-400 py-1">
-          {gettext("Amount")}
+        <div class="w-[7%] border-b border-t border-amber-400 py-1">
+          {gettext("Amount / Balance")}
         </div>
-        <div class="w-[10%] border-b border-t border-amber-400 py-1">
-          {gettext("Balance")}
+        <div class="w-[0.4%] bg-white"></div>
+        <div class="font-medium flex flex-row bg-blue-200 w-[48.6%]">
+          <div class="w-[22%] border-b border-t border-blue-400 p-1">
+            <div>{gettext("Received/ Issued/ Reject")}</div>
+          </div>
+          <div class="w-[36%] border-b border-t border-blue-400 p-1">
+            <div>{gettext("UUD/ InternalId/ Direction/ Type/ Version")}</div>
+          </div>
+          <div class="w-[42%] border-b border-t border-blue-400 p-1">
+            <div>{gettext("ContactName/ TIN/ Amount")}</div>
+          </div>
         </div>
       </div>
       <div

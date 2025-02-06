@@ -49,9 +49,7 @@ defmodule FullCircle.Billing.Invoice do
       :contact_name,
       :invoice_no,
       :e_inv_uuid,
-      :e_inv_internal_id,
-      :tax_id,
-      :reg_no
+      :e_inv_internal_id
     ])
     |> fill_today(:invoice_date)
     |> fill_today(:due_date)

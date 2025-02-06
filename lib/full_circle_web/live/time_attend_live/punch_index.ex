@@ -4,7 +4,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchIndex do
   alias FullCircle.HR
   alias FullCircleWeb.TimeAttendLive.PunchIndexComponent
 
-  @per_page 60
+  @per_page 100
 
   @impl true
   def render(assigns) do
@@ -16,10 +16,10 @@ defmodule FullCircleWeb.TimeAttendLive.PunchIndex do
           <div class=" flex flex-row flex-wrap tracking-tighter text-sm">
             <div class="w-[50%]">
               <.input
-                id="search_employee"
-                name="search[employee]"
+                id="search_emp_name"
+                name="search[emp_name]"
                 type="search"
-                value={@search.employee}
+                value={@search.emp_name}
                 label={gettext("Employee Name")}
               />
             </div>
@@ -94,18 +94,22 @@ defmodule FullCircleWeb.TimeAttendLive.PunchIndex do
   end
 
   @impl true
-  def mount(_params, _session, socket) do
+  def mount(params, _session, socket) do
+    emp_name = params["search"]["emp_name"] || ""
+    sdate = params["search"]["sdate"] || Timex.today()
+    edate = params["search"]["edate"] || Timex.today() |> Timex.shift(days: 1)
+
     socket =
       socket
       |> assign(page_title: gettext("Punch In/Out Listing"))
       |> assign(
         search: %{
-          employee: "",
-          sdate: Timex.today(),
-          edate: Timex.today() |> Timex.shift(days: 1)
+          emp_name: emp_name,
+          sdate: sdate,
+          edate: edate
         }
       )
-      |> filter_objects("", true, Timex.today(), Timex.today() |> Timex.shift(days: 1), 1)
+      |> filter_objects(emp_name, true, sdate, edate, 1)
 
     {:ok, socket}
   end
@@ -115,7 +119,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchIndex do
     {:noreply,
      socket
      |> filter_objects(
-       socket.assigns.search.employee,
+       socket.assigns.search.emp_name,
        false,
        socket.assigns.search.sdate,
        socket.assigns.search.edate,
@@ -128,7 +132,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchIndex do
     {:noreply,
      socket
      |> filter_objects(
-       socket.assigns.search.employee,
+       socket.assigns.search.emp_name,
        false,
        socket.assigns.search.sdate,
        socket.assigns.search.edate,
@@ -141,7 +145,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchIndex do
     {:noreply,
      socket
      |> filter_objects(
-       socket.assigns.search.employee,
+       socket.assigns.search.emp_name,
        false,
        socket.assigns.search.sdate,
        socket.assigns.search.edate,
@@ -154,17 +158,26 @@ defmodule FullCircleWeb.TimeAttendLive.PunchIndex do
         "search",
         %{
           "search" => %{
-            "employee" => employee,
+            "emp_name" => emp_name,
             "sdate" => sd,
             "edate" => ed
           }
         },
         socket
       ) do
+
+        qry = %{
+          "search[emp_name]" => emp_name,
+          "search[sdate]" => sd,
+          "search[edate]" => ed
+        }
+
     {:noreply,
      socket
-     |> assign(search: %{employee: employee, sdate: sd, edate: ed})
-     |> filter_objects(employee, true, sd, ed, 1)}
+     |> assign(search: %{emp_name: emp_name, sdate: sd, edate: ed})
+     |> push_navigate(
+       to: "/companies/#{socket.assigns.current_company.id}/PunchIndex?#{URI.encode_query(qry)}"
+     )}
   end
 
   def handle_event("new_timeattend", _, socket) do
@@ -175,7 +188,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchIndex do
      |> assign(title: gettext("New Attendence"))}
   end
 
-  defp filter_objects(socket, employee, reset, sdate, edate, page) do
+  defp filter_objects(socket, emp_name, reset, sdate, edate, page) do
     objects =
       if sdate == "" or edate == "" do
         []
@@ -183,7 +196,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchIndex do
         HR.punch_query(
           sdate,
           edate,
-          employee,
+          emp_name,
           socket.assigns.current_company.id,
           page: page,
           per_page: @per_page

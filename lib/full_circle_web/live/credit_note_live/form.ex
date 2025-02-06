@@ -188,11 +188,11 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
         socket
       ) do
     {params, socket, _} =
-      FullCircleWeb.Helpers.assign_autocomplete_id(
+      FullCircleWeb.Helpers.assign_autocomplete_ids(
         socket,
         params,
         "contact_name",
-        "contact_id",
+        %{"contact_id" => :id, "tax_id" => :tax_id, "reg_no" => :reg_no},
         &FullCircle.Accounting.get_contact_by_name/3
       )
 
@@ -384,6 +384,12 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
               url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
             />
           </div>
+          <div class="grow shrink">
+            <.input field={@form[:reg_no]} label={gettext("Reg No")} readonly tabindex="-1" />
+          </div>
+          <div class="grow shrink">
+            <.input field={@form[:tax_id]} label={gettext("Tax Id")} readonly tabindex="-1" />
+          </div>
           <div class="w-[12%]">
             <.input field={@form[:note_date]} label={gettext("Credit Note Date")} type="date" />
           </div>
@@ -397,12 +403,13 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
               value={Ecto.Changeset.fetch_field!(@form.source, :note_balance)}
             />
           </div>
+        </div>
 
-          <div class="w-[15%]">
+        <div class="flex flex-row flex-nowrap mt-2">
+          <div class="w-[10%]">
             <.input field={@form[:e_inv_internal_id]} label={gettext("E Invoice Internal Id")} />
           </div>
-
-          <div class="w-[20%]">
+          <div class="w-[15%]">
             <.input field={@form[:e_inv_uuid]} label={gettext("E Invoice UUID")} />
           </div>
         </div>

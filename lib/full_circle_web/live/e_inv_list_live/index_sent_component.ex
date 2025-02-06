@@ -88,10 +88,21 @@ defmodule FullCircleWeb.EInvListLive.IndexSentComponent do
 
   defp matched_or_try_match(doc, assigns) do
     cond do
-      assigns.obj.status != "Valid" -> "Cannot match"
-      is_nil(doc.e_inv_uuid) or doc.e_inv_uuid == "" -> match(doc, assigns)
-      assigns.obj.uuid != doc.e_inv_uuid -> "wrong match"
-      assigns.obj.uuid == doc.e_inv_uuid -> unmatch(doc, assigns)
+      assigns.obj.status != "Valid" ->
+        ~H"""
+        <span class="font-semibold text-rose-400">Cannot match</span>
+        """
+
+      is_nil(doc.e_inv_uuid) or doc.e_inv_uuid == "" ->
+        match(doc, assigns)
+
+      assigns.obj.uuid != doc.e_inv_uuid ->
+        ~H"""
+        <span class="font-semibold text-orange-400">Wrongly matched</span>
+        """
+
+      assigns.obj.uuid == doc.e_inv_uuid ->
+        unmatch(doc, assigns)
     end
   end
 
@@ -200,7 +211,7 @@ defmodule FullCircleWeb.EInvListLive.IndexSentComponent do
       </div>
       <div class="w-[0.4%] bg-white p-1"></div>
       <div class="w-[49.8%] p-1 border-b border-amber-400">
-      {if Enum.count(@fc_docs) == 0 and @obj.status == "Valid", do: new_fc(assigns)}
+        {if Enum.count(@fc_docs) == 0 and @obj.status == "Valid", do: new_fc(assigns)}
         <%= for doc <- @fc_docs do %>
           <div class="flex border-b border-amber-400 last:border-0">
             <div class="w-[22%]">

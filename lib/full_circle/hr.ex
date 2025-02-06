@@ -319,6 +319,25 @@ defmodule FullCircle.HR do
     end
   end
 
+  def insert_time_attendence_from_log(entry, com) do
+    ptu = entry.punch_time |> Timex.shift(minutes: -5)
+    ptd = entry.punch_time |> Timex.shift(minutes: 5)
+
+    got? =
+      from(ta in TimeAttend,
+        where: ta.employee_id == ^entry.employee_id,
+        where: ta.company_id == ^com.id,
+        where: ta.flag == ^entry.flag,
+        where: ta.punch_time >= ^ptu,
+        where: ta.punch_time <= ^ptd
+      )
+      |> Repo.exists?()
+
+    if !got? do
+      Repo.insert(TimeAttend.finger_print_log_changeset(%TimeAttend{}, entry))
+    end
+  end
+
   def create_time_attendence_by_entry(attrs, com, user) do
     case can?(user, :create_time_attendence, com) do
       true ->
@@ -1113,6 +1132,13 @@ defmodule FullCircle.HR do
     |> Repo.one()
   end
 
+  def get_employees_by_punch_card_ids(card_ids, company, user) do
+    from(emp in employee_query(company, user),
+      where: emp.punch_card_id in ^card_ids
+    )
+    |> Repo.all()
+  end
+
   def get_employee!(id, company, user) do
     from(emp in Employee,
       join: com in subquery(Sys.user_company(company, user)),
@@ -1177,7 +1203,7 @@ defmodule FullCircle.HR do
                                d1.work_hours_per_day, d1.work_days_per_week,
                                d1.work_days_per_month) d2 left outer join
               (select ta.employee_id, min(ta.punch_time)::date as pt, min(ta.punch_time) as punch_time, c.timezone,
-                      array_agg(ta.punch_time::varchar || '|' || ta.id::varchar || '|' || ta.status || '|' || ta.flag order by ta.flag) time_list
+                      array_agg(ta.punch_time::varchar || '|' || ta.id::varchar || '|' || ta.status || '|' || ta.flag order by  ta.punch_time, ta.flag) time_list
                  from time_attendences ta inner join companies c on c.id = ta.company_id,
                       generate_series('#{sdate}'::date, '#{edate}'::date, '1 day') as dd
                 where ta.company_id = '#{com_id}'

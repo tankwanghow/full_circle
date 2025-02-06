@@ -128,7 +128,11 @@ defmodule FullCircleWeb.EInvListLive.IndexReceivedComponent do
       <.link target="_blank" navigate={~p"/companies/#{@company.id}/Invoice/new"} class="blue button">
         {gettext("New Invoice")}
       </.link>
-      <.link target="_blank" navigate={~p"/companies/#{@company.id}/PurInvoice/new"} class="blue button">
+      <.link
+        target="_blank"
+        navigate={~p"/companies/#{@company.id}/PurInvoice/new"}
+        class="blue button"
+      >
         {gettext("New Pur Invoice")}
       </.link>
       <.link target="_blank" navigate={~p"/companies/#{@company.id}/Receipt/new"} class="green button">
@@ -160,7 +164,7 @@ defmodule FullCircleWeb.EInvListLive.IndexReceivedComponent do
     ~H"""
     <div class="flex flex-row bg-gray-200 hover:bg-gray-300">
       <div class="w-[49.8%] text-nowrap flex flex-row border-b border-amber-400 p-1">
-        <div class="w-[22%] text-wrap  p-1">
+        <div class="w-[22%] text-wrap p-1">
           <div>
             <div class="">
               {@obj.dateTimeReceived
@@ -208,7 +212,7 @@ defmodule FullCircleWeb.EInvListLive.IndexReceivedComponent do
       </div>
       <div class="w-[0.4%] bg-white"></div>
       <div class="w-[49.8%] p-1 border-b border-amber-400">
-      {if Enum.count(@fc_docs) == 0 and @obj.status == "Valid", do: new_fc(assigns)}
+        {if Enum.count(@fc_docs) == 0 and @obj.status == "Valid", do: new_fc(assigns)}
         <%= for doc <- @fc_docs do %>
           <div class="flex border-b border-amber-400 last:border-0">
             <div class="w-[22%]">

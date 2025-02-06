@@ -11,31 +11,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchIndexComponent do
   @impl true
   def update(assigns, socket) do
     yw = FullCircleWeb.Helpers.work_week(assigns.obj.dd)
-
-    tis =
-      if assigns.obj.time_list != [] do
-        assigns.obj.time_list
-        |> Enum.map(fn [time, id, status, inout] ->
-          {Timex.format!(
-             Timex.to_datetime(time, assigns.company.timezone),
-             "%H:%M",
-             :strftime
-           ), id, status, inout, Timex.to_datetime(time, assigns.company.timezone)}
-        end)
-      else
-        []
-      end
-
-    tis =
-      Enum.map(1..6, fn i ->
-        Enum.at(tis, i - 1) ||
-          {nil, "_new_#{FullCircle.Helpers.gen_temp_id(31)}", "normal",
-           if(Integer.is_odd(i),
-             do: "#{ceil(i / 2)}_IN_#{ceil(i / 2)}",
-             else: "#{ceil(i / 2)}_OUT_#{ceil(i / 2)}"
-           ), nil}
-      end)
-
+    tis = FullCircleWeb.Helpers.make_timeattend_list(assigns.obj.time_list, assigns.company)
     {:ok, socket |> assign(assigns) |> assign(yw: yw) |> assign(tis: tis)}
   end
 

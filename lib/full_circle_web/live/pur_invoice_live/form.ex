@@ -188,11 +188,11 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
         socket
       ) do
     {params, socket, _} =
-      FullCircleWeb.Helpers.assign_autocomplete_id(
+      FullCircleWeb.Helpers.assign_autocomplete_ids(
         socket,
         params,
         "contact_name",
-        "contact_id",
+        %{"contact_id" => :id, "tax_id" => :tax_id, "reg_no" => :reg_no},
         &FullCircle.Accounting.get_contact_by_name/3
       )
 
@@ -502,13 +502,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
     ~H"""
     <div class="w-11/12 mx-auto border rounded-lg border-pink-500 bg-pink-100 p-4">
       <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
-      <.form
-        for={@form}
-        id="object-form"
-        autocomplete="off"
-        phx-change="validate"
-        phx-submit="save"
-      >
+      <.form for={@form} id="object-form" autocomplete="off" phx-change="validate" phx-submit="save">
         <.input type="hidden" field={@form[:pur_invoice_no]} />
         <input type="hidden" id="live_action" value={@live_action} />
         <div class="flex flex-row flex-nowarp">
@@ -520,6 +514,12 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
               phx-hook="tributeAutoComplete"
               url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
             />
+          </div>
+          <div class="grow shrink">
+            <.input field={@form[:reg_no]} label={gettext("Reg No")} readonly tabindex="-1" />
+          </div>
+          <div class="grow shrink">
+            <.input field={@form[:tax_id]} label={gettext("Tax Id")} readonly tabindex="-1" />
           </div>
           <div class="grow shrink">
             <.input field={@form[:pur_invoice_date]} label={gettext("Invoice Date")} type="date" />

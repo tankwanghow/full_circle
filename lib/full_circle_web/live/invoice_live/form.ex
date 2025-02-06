@@ -470,7 +470,6 @@ defmodule FullCircleWeb.InvoiceLive.Form do
           <div class="w-[15%]">
             <.input field={@form[:e_inv_uuid]} label={gettext("E Invoice UUID")} />
           </div>
-
         </div>
 
         <.live_component

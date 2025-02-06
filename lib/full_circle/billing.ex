@@ -429,6 +429,8 @@ defmodule FullCircle.Billing do
         select_merge: %{
           contact_name: cont.name,
           contact_id: cont.id,
+          reg_no: cont.reg_no,
+          tax_id: cont.tax_id,
           pur_invoice_tax_amount:
             fragment(
               "round(?, 2)",

@@ -190,4 +190,35 @@ defmodule FullCircleWeb.Helpers do
       params
     end
   end
+
+  def make_timeattend_list(time_list, com) do
+    in1 = make_timeattend(time_list, "1_IN_1", com)
+    out1 = make_timeattend(time_list, "1_OUT_1", com)
+    in2 = make_timeattend(time_list, "2_IN_2", com)
+    out2 = make_timeattend(time_list, "2_OUT_2", com)
+    in3 = make_timeattend(time_list, "3_IN_3", com)
+    out3 = make_timeattend(time_list, "3_OUT_3", com)
+
+    [in1, out1, in2, out2, in3, out3]
+  end
+
+  defp make_timeattend(time_list, flag, com) do
+    ti = Enum.find(time_list, fn [_, _, _, inout] -> inout == flag end)
+
+    if !is_nil(ti) do
+      [time, id, status, inout] = ti
+
+      if !is_nil(time) do
+        {Timex.format!(
+           Timex.to_datetime(time, com.timezone),
+           "%H:%M",
+           :strftime
+         ), id, status, inout, Timex.to_datetime(time, com.timezone)}
+      else
+        {nil, "_new_#{FullCircle.Helpers.gen_temp_id(31)}", "normal", flag, nil}
+      end
+    else
+      {nil, "_new_#{FullCircle.Helpers.gen_temp_id(31)}", "normal", flag, nil}
+    end
+  end
 end

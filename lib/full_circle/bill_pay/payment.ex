@@ -26,6 +26,8 @@ defmodule FullCircle.BillPay.Payment do
 
     field :e_inv_long_id, :string, virtual: true
     field :contact_name, :string, virtual: true
+    field :tax_id, :string, virtual: true
+    field :reg_no, :string, virtual: true
     field :funds_account_name, :string, virtual: true
     field :matched_amount, :decimal, virtual: true, default: Decimal.new("0")
     field :payment_detail_amount, :decimal, virtual: true, default: Decimal.new("0")

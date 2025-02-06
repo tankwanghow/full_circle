@@ -22,6 +22,34 @@ defmodule FullCircle.HR.TimeAttend do
     timestamps(type: :utc_datetime)
   end
 
+  def finger_print_log_changeset(st, attrs) do
+    st
+    |> cast(attrs, [
+      :flag,
+      :input_medium,
+      :company_id,
+      :employee_id,
+      :employee_name,
+      :punch_time_local,
+      :punch_time,
+      :status,
+      :user_id
+    ])
+    |> validate_required([
+      :flag,
+      :input_medium,
+      :punch_time_local,
+      :punch_time,
+      :company_id,
+      :employee_id,
+      :employee_name,
+      :status,
+      :user_id
+    ])
+    |> validate_date(:punch_time_local, days_before: 40)
+    |> validate_date(:punch_time_local, days_after: 0)
+  end
+
   @doc false
   def data_entry_changeset(st, attrs) do
     st

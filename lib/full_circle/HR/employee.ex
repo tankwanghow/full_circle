@@ -27,6 +27,7 @@ defmodule FullCircle.HR.Employee do
     field(:paternity_leave, :integer, default: 7)
     field(:status, :string)
     field(:note, :string)
+    field(:punch_card_id, :string, default: nil)
     belongs_to(:company, FullCircle.Sys.Company)
 
     has_many(:employee_salary_types, FullCircle.HR.EmployeeSalaryType, on_delete: :delete_all)
@@ -62,7 +63,8 @@ defmodule FullCircle.HR.Employee do
       :sick_leave,
       :hospital_leave,
       :maternity_leave,
-      :paternity_leave
+      :paternity_leave,
+      :punch_card_id
     ])
     |> validate_required([
       :name,
@@ -90,6 +92,10 @@ defmodule FullCircle.HR.Employee do
     )
     |> unique_constraint(:name,
       name: :employees_unique_name_in_company,
+      message: gettext("has already been taken")
+    )
+    |> unique_constraint(:punch_machine_id,
+      name: :employees_unique_punch_machine_id_in_company,
       message: gettext("has already been taken")
     )
     |> foreign_key_constraint(:name,

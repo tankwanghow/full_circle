@@ -850,8 +850,6 @@ defmodule FullCircleWeb.CoreComponents do
   def form_action_button(assigns) do
     ~H"""
     <.save_button :if={@live_action == :new or @live_action == :edit} form={@form} />
-    <.save_button :if={@live_action == :match} form={@form} label={gettext("Match E-Invoice")} />
-    <.save_button :if={@live_action == :unmatch} form={@form} label={gettext("Unmatch E-Invoice")} />
     <.link :if={@live_action != :new} navigate="" class="orange button">
       {gettext("Cancel")}
     </.link>

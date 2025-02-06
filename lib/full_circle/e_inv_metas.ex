@@ -89,7 +89,7 @@ defmodule FullCircle.EInvMetas do
     )
   end
 
-  defp get_internal_doc_by_contact_and_amount(
+  defp get_internal_doc_by_contact(
          klass,
          einv,
          contact_field,
@@ -148,16 +148,17 @@ defmodule FullCircle.EInvMetas do
 
     q1 = get_internal_doc_by_uuid(klass, einv, amount, com)
     q2 = get_internal_doc_by_doc_no(klass, doc_no_field, einv, amount, com)
-    q3 = get_internal_doc_by_contact_and_amount(klass, einv, contact_field, amount, com)
+    q3 = get_internal_doc_by_contact(klass, einv, contact_field, amount, com)
 
     fq = q1 |> union(^q2) |> union(^q3)
 
     r = Repo.all(fq)
 
-    min = cond do
-      r == [] -> 0
-      true -> Enum.min_by(r, fn x -> x.priority end).priority
-    end
+    min =
+      cond do
+        r == [] -> 0
+        true -> Enum.min_by(r, fn x -> x.priority end).priority
+      end
 
     r = r |> Enum.filter(fn x -> x.priority == min end)
 
@@ -198,6 +199,188 @@ defmodule FullCircle.EInvMetas do
 
   def get_internal_document("Debit Note", "Received", einv, com) do
     get_fc_doc(CreditNote, einv, :note_no, :supplierName, com) || []
+  end
+
+  def get_e_invs(uuid, internal_id, contact_field, contact, amount, doc_date, com, user) do
+    q1 = get_e_invoices_by_uuid(uuid, amount, com, user)
+    q2 = get_e_invoices_by_internal_id(internal_id, amount, com, user)
+    q3 = get_e_invoices_by_contact(contact_field, contact, amount, doc_date, com, user)
+
+    fq = q1 |> union(^q2) |> union(^q3)
+
+    r = Repo.all(fq)
+
+    min =
+      cond do
+        r == [] -> 0
+        true -> Enum.min_by(r, fn x -> x.priority end).priority
+      end
+
+    r = r |> Enum.filter(fn x -> x.priority == min end)
+
+    if r == [], do: nil, else: r
+  end
+
+  defp get_e_invoices_by_uuid(uuid, amount, com, user) do
+    from(ei in EInvoice,
+      join: c in Company,
+      on: c.id == ei.company_id and c.tax_id == ei.issuerTIN,
+      join: cu in CompanyUser,
+      on: cu.company_id == c.id,
+      where: ei.uuid == ^uuid,
+      distinct: true,
+      where: ei.totalPayableAmount == ^amount or ei.totalNetAmount == ^amount,
+      select: %{
+        rejectRequestDateTime: ei.rejectRequestDateTime,
+        intermediaryROB: ei.intermediaryROB,
+        totalExcludingTax: ei.totalExcludingTax,
+        uuid: ei.uuid,
+        totalNetAmount: ei.totalNetAmount,
+        supplierTIN: ei.supplierTIN,
+        issuerTIN: ei.issuerTIN,
+        receiverIDType: ei.receiverIDType,
+        internalId: ei.internalId,
+        status: ei.status,
+        documentStatusReason: ei.documentStatusReason,
+        longId: ei.longId,
+        submissionChannel: ei.submissionChannel,
+        buyerTIN: ei.buyerTIN,
+        issuerID: ei.issuerID,
+        supplierName: ei.supplierName,
+        issuerIDType: ei.issuerIDType,
+        totalPayableAmount: ei.totalPayableAmount,
+        dateTimeValidated: ei.dateTimeValidated,
+        typeName: ei.typeName,
+        buyerName: ei.buyerName,
+        intermediaryTIN: ei.intermediaryTIN,
+        dateTimeReceived: ei.dateTimeReceived,
+        receiverTIN: ei.receiverTIN,
+        dateTimeIssued: ei.dateTimeIssued,
+        submissionUid: ei.submissionUid,
+        cancelDateTime: ei.cancelDateTime,
+        documentCurrency: ei.documentCurrency,
+        receiverID: ei.receiverID,
+        receiverName: ei.receiverName,
+        typeVersionName: ei.typeVersionName,
+        createdByUserId: ei.createdByUserId,
+        intermediaryName: ei.intermediaryName,
+        totalDiscount: ei.totalDiscount,
+        priority: 1
+      }
+    )
+  end
+
+  defp get_e_invoices_by_internal_id(internal_id, amount, com, user) do
+    from(ei in EInvoice,
+      join: c in Company,
+      on: c.id == ei.company_id and c.tax_id == ei.issuerTIN,
+      join: cu in CompanyUser,
+      on: cu.company_id == c.id,
+      where: ei.internalId == ^internal_id,
+      distinct: true,
+      where: ei.totalPayableAmount == ^amount or ei.totalNetAmount == ^amount,
+      select: %{
+        rejectRequestDateTime: ei.rejectRequestDateTime,
+        intermediaryROB: ei.intermediaryROB,
+        totalExcludingTax: ei.totalExcludingTax,
+        uuid: ei.uuid,
+        totalNetAmount: ei.totalNetAmount,
+        supplierTIN: ei.supplierTIN,
+        issuerTIN: ei.issuerTIN,
+        receiverIDType: ei.receiverIDType,
+        internalId: ei.internalId,
+        status: ei.status,
+        documentStatusReason: ei.documentStatusReason,
+        longId: ei.longId,
+        submissionChannel: ei.submissionChannel,
+        buyerTIN: ei.buyerTIN,
+        issuerID: ei.issuerID,
+        supplierName: ei.supplierName,
+        issuerIDType: ei.issuerIDType,
+        totalPayableAmount: ei.totalPayableAmount,
+        dateTimeValidated: ei.dateTimeValidated,
+        typeName: ei.typeName,
+        buyerName: ei.buyerName,
+        intermediaryTIN: ei.intermediaryTIN,
+        dateTimeReceived: ei.dateTimeReceived,
+        receiverTIN: ei.receiverTIN,
+        dateTimeIssued: ei.dateTimeIssued,
+        submissionUid: ei.submissionUid,
+        cancelDateTime: ei.cancelDateTime,
+        documentCurrency: ei.documentCurrency,
+        receiverID: ei.receiverID,
+        receiverName: ei.receiverName,
+        typeVersionName: ei.typeVersionName,
+        createdByUserId: ei.createdByUserId,
+        intermediaryName: ei.intermediaryName,
+        totalDiscount: ei.totalDiscount,
+        priority: 2
+      }
+    )
+  end
+
+  defp get_e_invoices_by_contact(einv_contact_field, contact, amount, doc_date, com, user) do
+    clean_contact =
+      String.replace(contact, ~r/[^a-zA-Z0-9]/, "")
+      |> String.slice(0..15)
+      |> String.downcase()
+
+    sd = doc_date |> Timex.to_datetime() |> DateTime.shift(day: -10)
+    ed = doc_date |> Timex.to_datetime() |> DateTime.shift(day: 10)
+
+    from(ei in EInvoice,
+      join: c in Company,
+      on: c.id == ei.company_id and c.tax_id == ei.issuerTIN,
+      join: cu in CompanyUser,
+      on: cu.company_id == c.id,
+      distinct: true,
+      where: ei.totalPayableAmount == ^amount or ei.totalNetAmount == ^amount,
+      where:
+        ilike(
+          fragment(
+            "lower(left(regexp_replace(?, '[^a-zA-Z0-9]', '', 'g'), 16))",
+            field(ei, ^einv_contact_field)
+          ),
+          ^"%#{clean_contact}%"
+        ),
+      select: %{
+        rejectRequestDateTime: ei.rejectRequestDateTime,
+        intermediaryROB: ei.intermediaryROB,
+        totalExcludingTax: ei.totalExcludingTax,
+        uuid: ei.uuid,
+        totalNetAmount: ei.totalNetAmount,
+        supplierTIN: ei.supplierTIN,
+        issuerTIN: ei.issuerTIN,
+        receiverIDType: ei.receiverIDType,
+        internalId: ei.internalId,
+        status: ei.status,
+        documentStatusReason: ei.documentStatusReason,
+        longId: ei.longId,
+        submissionChannel: ei.submissionChannel,
+        buyerTIN: ei.buyerTIN,
+        issuerID: ei.issuerID,
+        supplierName: ei.supplierName,
+        issuerIDType: ei.issuerIDType,
+        totalPayableAmount: ei.totalPayableAmount,
+        dateTimeValidated: ei.dateTimeValidated,
+        typeName: ei.typeName,
+        buyerName: ei.buyerName,
+        intermediaryTIN: ei.intermediaryTIN,
+        dateTimeReceived: ei.dateTimeReceived,
+        receiverTIN: ei.receiverTIN,
+        dateTimeIssued: ei.dateTimeIssued,
+        submissionUid: ei.submissionUid,
+        cancelDateTime: ei.cancelDateTime,
+        documentCurrency: ei.documentCurrency,
+        receiverID: ei.receiverID,
+        receiverName: ei.receiverName,
+        typeVersionName: ei.typeVersionName,
+        createdByUserId: ei.createdByUserId,
+        intermediaryName: ei.intermediaryName,
+        totalDiscount: ei.totalDiscount,
+        priority: 3
+      }
+    )
   end
 
   def get_e_invoices(sd, ed, per_page, page, com, user, "Sent", terms) do

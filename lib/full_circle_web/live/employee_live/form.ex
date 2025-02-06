@@ -385,7 +385,14 @@ defmodule FullCircleWeb.EmployeeLive.Form do
             />
           </div>
         </div>
-        <.input field={@form[:note]} label={gettext("Note")} />
+        <div class="flex flex-nowrap gap-1">
+          <div class="w-[50%]">
+            <.input field={@form[:note]} label={gettext("Note")} />
+          </div>
+          <div class="w-[50%]">
+            <.input field={@form[:punch_card_id]} label={gettext("Punch Card Id")} />
+          </div>
+        </div>
         {datalist(assigns, FullCircle.Sys.countries(), "countries")}
 
         <div class="font-bold grid grid-cols-12 gap-2 mt-2 text-center">
