@@ -61,8 +61,8 @@ defmodule FullCircle.PaySlipOp do
   end
 
   defp generate_pay_slip_children(emp, mth, yr, com, user) do
-    sns = get_uncount_salary_notes(emp.id, com)
-    adv = get_uncount_advances(emp.id, com)
+    sns = get_uncount_salary_notes(emp.id, mth, yr, com)
+    adv = get_uncount_advances(emp.id, mth, yr, com)
     rec = get_uncount_recurrings(emp.id, mth, yr, com)
 
     pcb_type = HR.get_salary_type_by_name("Employee PCB", com, user)
@@ -86,12 +86,6 @@ defmodule FullCircle.PaySlipOp do
           end)
       end)
 
-    # |> Enum.reject(fn x ->
-    #   Enum.any?(sns, fn y ->
-    #     y.salary_type_id == x.id
-    #   end)
-    # end)
-
     sns =
       sns ++
         rec ++
@@ -101,7 +95,7 @@ defmodule FullCircle.PaySlipOp do
             note_no: "...new...",
             note_date: Timex.end_of_month(yr, mth),
             unit_price: t.amount,
-            quantity: 1,
+            quantity: 0,
             amount: 0,
             salary_type_id: t.id,
             salary_type_name: t.name,
@@ -204,11 +198,14 @@ defmodule FullCircle.PaySlipOp do
     end)
   end
 
-  def get_uncount_advances(emp_id, comp) do
+  def get_uncount_advances(emp_id, mth, yr, comp) do
+    edate = Timex.end_of_month(yr, mth)
+
     from(adv in subquery(advance_query()),
       where: is_nil(adv.pay_slip_id),
       where: adv.company_id == ^comp.id,
       where: adv.employee_id == ^emp_id,
+      where: adv.slip_date <= ^edate,
       select: %{
         slip_no: adv.slip_no,
         slip_date: adv.slip_date,
@@ -260,11 +257,14 @@ defmodule FullCircle.PaySlipOp do
     )
   end
 
-  def get_uncount_salary_notes(emp_id, comp) do
+  def get_uncount_salary_notes(emp_id, mth, yr, comp) do
+    edate = Timex.end_of_month(yr, mth)
+
     from(note in subquery(salary_note_query()),
       where: is_nil(note.pay_slip_id),
       where: note.employee_id == ^emp_id,
       where: note.company_id == ^comp.id,
+      where: note.note_date <= ^edate,
       select: %{
         _id: note.id,
         note_no: note.note_no,

@@ -456,6 +456,7 @@ defmodule FullCircle.EInvMetas do
       Req.get!(meta_url, headers: [Authorization: meta.token]).body
 
     pages = (total_count / 100) |> Float.ceil() |> trunc()
+    pages = if pages == 0, do: 1, else: pages
 
     Enum.map(1..pages, fn p ->
       url =
@@ -488,7 +489,7 @@ defmodule FullCircle.EInvMetas do
   end
 
   def sync_e_invoices(com, user) do
-    last_sync = e_invoice_last_sync_datetime(com.id, user.id) |> DateTime.add(-3, :day)
+    last_sync = e_invoice_last_sync_datetime(com, user) |> DateTime.add(-3, :day)
 
     now = DateTime.utc_now()
     range = get_date_range(last_sync, now) |> Enum.chunk_every(2, 1, :discard)
@@ -498,8 +499,8 @@ defmodule FullCircle.EInvMetas do
         get_e_invoices_from_cloud(
           Timex.format!(a, "%Y-%m-%dT%H:%M:%S", :strftime),
           Timex.format!(b, "%Y-%m-%dT%H:%M:%S", :strftime),
-          com.id,
-          user.id
+          com,
+          user
         )
         |> Enum.map(fn x -> Map.merge(x, %{"company_id" => com.id}) end)
         |> Enum.map(fn x -> EInvoice.changeset(%EInvoice{}, x) end)
@@ -515,9 +516,9 @@ defmodule FullCircle.EInvMetas do
 
   defp get_date_range(a, b) do
     if DateTime.add(a, 60 * 60 * 24 * 2, :second) |> DateTime.compare(b) == :gt do
-      [a, DateTime.add(a, Integer.mod(DateTime.diff(b, a), 60 * 60 * 24 * 2), :second)]
+      [a, DateTime.add(a, Integer.mod(DateTime.diff(b, a), 60 * 60 * 24 * 3), :second)]
     else
-      [a, get_date_range(DateTime.add(a, 60 * 60 * 24 * 2, :second), b)] |> List.flatten()
+      [a, get_date_range(DateTime.add(a, 60 * 60 * 24 * 3, :second), b)] |> List.flatten()
     end
   end
 

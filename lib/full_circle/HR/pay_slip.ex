@@ -57,7 +57,7 @@ defmodule FullCircle.HR.PaySlip do
     ])
     |> validate_id(:employee_name, :employee_id)
     |> validate_id(:funds_account_name, :funds_account_id)
-    |> validate_date(:slip_date, days_before: 2)
+    |> validate_date(:slip_date, days_before: 15)
     |> validate_date(:slip_date, days_after: 15)
     |> validate_pay_month_year()
     |> unsafe_validate_unique([:slip_no, :company_id], FullCircle.Repo,
