@@ -7,6 +7,7 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
   def mount(_params, _session, socket) do
     socket =
       socket
+      |> assign(page_title: gettext("Time Attendence Import"))
       |> allow_upload(:csv_file,
         accept: ~w(.xlsx),
         max_file_size: 6_000_000,
@@ -21,7 +22,8 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
         from_date: "NA",
         to_date: "NA",
         filename: "NA",
-        imported: false
+        imported: false,
+        raw_attendences: []
       )
 
     {:ok, socket}
@@ -44,6 +46,31 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
   end
 
   @impl true
+  def handle_event("refresh", _params, socket) do
+    attendences =
+      make_like_timeattend(
+        socket.assigns.raw_attendences,
+        socket.assigns.current_company,
+        socket.assigns.current_user
+      )
+      |> fill_in_employee_info(
+        socket.assigns.current_company,
+        socket.assigns.current_user
+      )
+
+    employees = attendences |> Enum.uniq_by(fn x -> x.employee_name end)
+
+    {:noreply,
+     socket
+     |> assign(
+       employees: employees |> Enum.sort_by(fn x -> x.employee_name end),
+       total_attendence_entries: Enum.count(attendences),
+       total_employees: employees |> Enum.count(),
+       attendences: attendences
+     )}
+  end
+
+  @impl true
   def handle_event("validate", _params, socket) do
     {:noreply, socket}
   end
@@ -52,7 +79,9 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
     case FullCircle.Authorization.can?(user, :create_time_attendence, com) do
       true ->
         Enum.each(entries, fn x ->
-          HR.insert_time_attendence_from_log(x, com)
+          if x.employee_id != "!! Not Found !!" do
+            HR.insert_time_attendence_from_log(x, com)
+          end
         end)
 
       false ->
@@ -62,15 +91,21 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
 
   def handle_progress(:csv_file, entry, socket) do
     if entry.done? do
-      attendences =
+      raw_attendences =
         consume_uploaded_entry(socket, entry, fn %{path: path} ->
-          {:ok,
-           parse_xlsx_to_attrs(
-             path,
-             socket.assigns.current_company,
-             socket.assigns.current_user
-           )}
+          {:ok, parse_xlsx_to_attrs(path)}
         end)
+
+      attendences =
+        make_like_timeattend(
+          raw_attendences,
+          socket.assigns.current_company,
+          socket.assigns.current_user
+        )
+        |> fill_in_employee_info(
+          socket.assigns.current_company,
+          socket.assigns.current_user
+        )
 
       todate = attendences |> Enum.max_by(fn x -> x.punch_time_local end)
       fromdate = attendences |> Enum.min_by(fn x -> x.punch_time_local end)
@@ -85,6 +120,7 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
          from_date: fromdate.punch_time_local |> Timex.to_date(),
          to_date: todate.punch_time_local |> Timex.to_date(),
          attendences: attendences,
+         raw_attendences: raw_attendences,
          filename: entry.client_name,
          imported: false
        )}
@@ -97,7 +133,7 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
   defp error_to_string(:too_many_files), do: "You have selected too many files!"
   defp error_to_string(:not_accepted), do: "You have selected an unacceptable file type"
 
-  def parse_xlsx_to_attrs(filename, com, user) do
+  def parse_xlsx_to_attrs(filename) do
     blob = File.read!(filename)
     {:ok, package} = XlsxReader.open(blob, source: :binary)
     {:ok, rows} = XlsxReader.sheet(package, "Exception Stat.", empty_rows: false)
@@ -118,8 +154,6 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
     |> Enum.map(fn x ->
       Enum.zip(headers, x) |> Map.new(fn {k, v} -> {k, v} end)
     end)
-    |> make_like_timeattend(com, user)
-    |> fill_in_employee_info(com, user)
   end
 
   defp make_like_timeattend(raw, com, user) do
@@ -214,7 +248,8 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
 
     Enum.map(res, fn x ->
       emp =
-        Enum.find(emps, fn q -> q.punch_card_id == x.punch_card_id end) || %{id: nil, name: nil}
+        Enum.find(emps, fn q -> q.punch_card_id == x.punch_card_id end) ||
+          %{id: "!! Not Found !!", name: x.punch_card_id}
 
       Map.merge(x, %{
         employee_id: emp.id,
@@ -229,6 +264,7 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
   def render(assigns) do
     ~H"""
     <div class="w-10/12 mx-auto">
+    <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <.form
         for={%{}}
         id="object-form"
@@ -294,6 +330,9 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
       </div>
     </div>
     <div class="w-10/12 mx-auto p-4 mb-1 border rounded-lg border-green-500 bg-green-200">
+    <div class="my-2 text-center mx-auto font-bold text-2xl">
+      <.link phx-click="refresh" class="button blue">Refresh</.link>
+      </div>
       <%= for emps <- @employees |> Enum.chunk_every(5) do %>
         <div class="flex">
           <%= for emp <- emps do %>
@@ -302,20 +341,45 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
               "search[sdate]" => @from_date,
               "search[edate]" => @to_date
             } %>
-            <.link
-              :if={@imported}
-              navigate={"/companies/#{@current_company.id}/PunchIndex?#{URI.encode_query(qry)}"}
-              target="_blank"
-              class="w-[20%] m-1 button orange"
-            >
-              {emp.employee_name}
-            </.link>
-            <div
-              :if={!@imported}
-              class="w-[20%] m-1 border rounded bg-cyan-200 border-cyan-400 p-2 text-center"
-            >
-              {emp.employee_name}
-            </div>
+            <%= if emp.employee_id == "!! Not Found !!" do %>
+              <div
+                :if={!@imported}
+                class="w-[20%] m-1 border rounded bg-rose-200 border-rose-400 p-2 text-center"
+              >
+                <div class="mb-1">
+                  {emp.employee_name}<.copy_to_clipboard id={emp.employee_name} />
+                </div>
+                <% clean_name =
+                  Regex.run(~r/^\d+\.(.+)\..+$/, emp.employee_name)
+                  |> Enum.at(1)
+                  |> String.replace(~r/[^a-zA-Z0-9]/, "")
+                  |> String.downcase() %>
+                <.link
+                  target="_blank"
+                  navigate={
+                    ~p"/companies/#{@current_company.id}/employees?search%5Bterms%5D=#{clean_name}"
+                  }
+                  class="bg-red-300 border rounded-xl border-red-600 py-1 px-2 font-bold"
+                >
+                  {gettext("Match Employee")}
+                </.link>
+              </div>
+            <% else %>
+              <.link
+                :if={@imported}
+                navigate={"/companies/#{@current_company.id}/PunchIndex?#{URI.encode_query(qry)}"}
+                target="_blank"
+                class="w-[20%] m-1 button orange"
+              >
+                {emp.employee_name}
+              </.link>
+              <div
+                :if={!@imported}
+                class="w-[20%] m-1 border rounded bg-cyan-200 border-cyan-400 p-2 text-center"
+              >
+                {emp.employee_name}
+              </div>
+            <% end %>
           <% end %>
         </div>
       <% end %>

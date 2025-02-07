@@ -25,6 +25,26 @@ import topbar from "../vendor/topbar"
 let csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 let Hooks = {}
 
+Hooks.clipCopy = {
+  mounted() {
+    this.el.addEventListener("click", () => {
+      const text = this.el.getAttribute("id");
+      navigator.clipboard.writeText(text).then(() => {
+        var elements = document.getElementsByClassName('hero-clipboard-solid');
+        for (var i = 0; i < elements.length; i++) {
+          elements[i].classList.add('hero-clipboard');
+          elements[i].classList.remove('hero-clipboard-solid');
+        }
+        this.el.classList.remove('hero-clipboard');
+        this.el.classList.add('hero-clipboard-solid');
+
+      }).catch(err => {
+        console.error('Could not copy text: ', err);
+      });
+    });
+  }
+}
+
 Hooks.FaceID = {
   mounted() {
     import("./face_id").then(

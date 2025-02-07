@@ -622,10 +622,11 @@ defmodule FullCircleWeb.CoreComponents do
   """
   attr(:name, :string, required: true)
   attr(:class, :string, default: nil)
+  attr(:rest, :global, doc: "the arbitrary HTML attributes to add to the flash container")
 
   def icon(%{name: "hero-" <> _} = assigns) do
     ~H"""
-    <span class={[@name, @class]} />
+    <span class={[@name, @class]} {@rest}/>
     """
   end
 
@@ -993,6 +994,17 @@ defmodule FullCircleWeb.CoreComponents do
     <% else %>
       {@doc_obj.doc_no}
     <% end %>
+    """
+  end
+
+  def copy_to_clipboard(assigns) do
+    ~H"""
+    <.icon
+      id={@id}
+      name="hero-clipboard"
+      phx-hook="clipCopy"
+      class="-mt-1 cursor-pointer h-5 w-5 opacity-40 group-hover:opacity-70"
+    />
     """
   end
 
