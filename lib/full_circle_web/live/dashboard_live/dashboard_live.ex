@@ -212,7 +212,7 @@ defmodule FullCircleWeb.DashboardLive do
         </.link>
       </div>
     </div>
-    <%!-- <div
+    <div
       :if={FullCircle.Authorization.can?(@current_user, :create_time_attendence, @current_company)}
       class="mx-auto text-center mb-4"
     >
@@ -236,7 +236,7 @@ defmodule FullCircleWeb.DashboardLive do
           {gettext("Face ID")}
         </.link>
       </div>
-    </div> --%>
+    </div>
     """
   end
 

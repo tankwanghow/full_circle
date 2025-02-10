@@ -4,7 +4,6 @@
 ![Last Commit](https://img.shields.io/github/last-commit/vladmandic/human?style=flat-square&svg=true)
 ![License](https://img.shields.io/github/license/vladmandic/human?style=flat-square&svg=true)
 ![GitHub Status Checks](https://img.shields.io/github/checks-status/vladmandic/human/main?style=flat-square&svg=true)
-![Vulnerabilities](https://img.shields.io/snyk/vulnerabilities/github/vladmandic/human?style=flat-square&svg=true)
 
 # Human Library
 
@@ -31,15 +30,20 @@
 
 ## Compatibility
 
-- **Browser**:  
-  Compatible with both desktop and mobile platforms  
-  Compatible with *CPU*, *WebGL*, *WASM* backends  
-  Compatible with *WebWorker* execution  
-  Compatible with *WebView*  
-- **NodeJS**:  
-  Compatibile with *WASM* backend for executions on architectures where *tensorflow* binaries are not available  
-  Compatible with *tfjs-node* using software execution via *tensorflow* shared libraries  
-  Compatible with *tfjs-node* using GPU-accelerated execution via *tensorflow* shared libraries and nVidia CUDA  
+**Browser**:  
+  - Compatible with both desktop and mobile platforms  
+  - Compatible with *WebGPU*, *WebGL*, *WASM*, *CPU* backends  
+  - Compatible with *WebWorker* execution  
+  - Compatible with *WebView*  
+  - Primary platform: *Chromium*-based browsers  
+  - Secondary platform: *Firefox*, *Safari*
+
+**NodeJS**:  
+  - Compatibile with *WASM* backend for executions on architectures where *tensorflow* binaries are not available  
+  - Compatible with *tfjs-node* using software execution via *tensorflow* shared libraries  
+  - Compatible with *tfjs-node* using GPU-accelerated execution via *tensorflow* shared libraries and nVidia CUDA  
+  - Supported versions are from **14.x** to **22.x**  
+  - NodeJS version **23.x** is not supported due to breaking changes and issues with `@tensorflow/tfjs`  
 
 <br>
 

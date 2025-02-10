@@ -48,12 +48,8 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
   @impl true
   def handle_event("refresh", _params, socket) do
     attendences =
-      make_like_timeattend(
+      fill_in_employee_info(
         socket.assigns.raw_attendences,
-        socket.assigns.current_company,
-        socket.assigns.current_user
-      )
-      |> fill_in_employee_info(
         socket.assigns.current_company,
         socket.assigns.current_user
       )
@@ -97,12 +93,8 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
         end)
 
       attendences =
-        make_like_timeattend(
+        fill_in_employee_info(
           raw_attendences,
-          socket.assigns.current_company,
-          socket.assigns.current_user
-        )
-        |> fill_in_employee_info(
           socket.assigns.current_company,
           socket.assigns.current_user
         )
@@ -136,111 +128,77 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
   def parse_xlsx_to_attrs(filename) do
     blob = File.read!(filename)
     {:ok, package} = XlsxReader.open(blob, source: :binary)
-    {:ok, rows} = XlsxReader.sheet(package, "Exception Stat.", empty_rows: false)
+    {:ok, rows} = XlsxReader.sheet(package, "Att.log report")
 
-    headers = [
-      "ID",
-      "Name",
-      "Department",
-      "Date",
-      "On-duty-1",
-      "Off-duty-1",
-      "On-duty-2",
-      "Off-duty-2"
-    ]
+    date_range = Enum.at(rows, 2) |> Enum.at(2) |> extract_date_range()
 
     rows
     |> Enum.drop(4)
-    |> Enum.map(fn x ->
-      Enum.zip(headers, x) |> Map.new(fn {k, v} -> {k, v} end)
-    end)
-  end
-
-  defp make_like_timeattend(raw, com, user) do
-    raw
-    |> Enum.map(fn attrs ->
-      dt = attrs["Date"]
-      id = attrs["ID"]
-      dep = attrs["Department"]
-      name = attrs["Name"]
-      out1 = attrs["Off-duty-1"] || ""
-      in1 = attrs["On-duty-1"] || ""
-      out2 = attrs["Off-duty-2"] || ""
-      in2 = attrs["On-duty-2"] || ""
-      out3 = attrs["Off-duty-3"] || ""
-      in3 = attrs["On-duty-3"] || ""
-
-      id = "#{id}.#{name}.#{dep}"
-
-      in1 =
-        if(in1 != "",
-          do: %{
-            flag: "1_IN_1",
-            punch_time_local: NaiveDateTime.from_iso8601!("#{dt} #{in1}:00")
-          },
-          else: nil
-        )
-
-      in2 =
-        if(in2 != "",
-          do: %{
-            flag: "2_IN_2",
-            punch_time_local: NaiveDateTime.from_iso8601!("#{dt} #{in2}:00")
-          },
-          else: nil
-        )
-
-      in3 =
-        if(in3 != "",
-          do: %{
-            flag: "3_IN_3",
-            punch_time_local: NaiveDateTime.from_iso8601!("#{dt} #{in3}:00")
-          },
-          else: nil
-        )
-
-      out1 =
-        if(out1 != "",
-          do: %{
-            flag: "1_OUT_1",
-            punch_time_local: NaiveDateTime.from_iso8601!("#{dt} #{out1}:00")
-          },
-          else: nil
-        )
-
-      out2 =
-        if(out2 != "",
-          do: %{
-            flag: "2_OUT_2",
-            punch_time_local: NaiveDateTime.from_iso8601!("#{dt} #{out2}:00")
-          },
-          else: nil
-        )
-
-      out3 =
-        if(out3 != "",
-          do: %{
-            flag: "3_OUT_3",
-            punch_time_local: NaiveDateTime.from_iso8601!("#{dt} #{out3}:00")
-          },
-          else: nil
-        )
-
-      [in1, in2, out1, out2, in3, out3]
-      |> Enum.filter(fn x -> !is_nil(x) end)
-      |> Enum.map(fn x ->
-        Map.merge(x, %{
-          punch_card_id: id,
-          input_medium: "finger_print_log",
-          user_id: user.id,
-          company_id: com.id
-        })
+    |> Enum.chunk_every(2)
+    |> Enum.map(fn [info, att] ->
+      Enum.map(att, fn x ->
+        Regex.scan(~r/\d{2}:\d{2}/, x)
+        |> List.flatten()
+        |> Enum.map(fn time_str ->
+          [hour, minute] = String.split(time_str, ":") |> Enum.map(&String.to_integer/1)
+          Time.new!(hour, minute, 0)
+        end)
       end)
+      |> Enum.zip(date_range)
+      |> Enum.map(fn x -> filter_times_n_split_to_map(x, info) end)
     end)
     |> List.flatten()
   end
 
-  defp fill_in_employee_info(res, com, user) do
+  defp extract_date_range(date_line) do
+    [start_date, end_date] =
+      Regex.scan(~r/\d{4}-\d{2}-\d{2}/, date_line)
+      |> List.flatten()
+      |> Enum.map(&Date.from_iso8601!/1)
+
+    Date.range(start_date, end_date) |> Enum.to_list()
+  end
+
+  defp filter_times_n_split_to_map({times, dt}, info) do
+    info = Enum.reject(info, fn x -> x == "" end)
+
+    times
+    |> Enum.reduce({[], nil}, fn time, {acc, last_time} ->
+      if last_time && Time.diff(time, last_time, :second) < 120 do
+        {acc, last_time}
+      else
+        {[time | acc], time}
+      end
+    end)
+    |> elem(0)
+    |> Enum.reverse()
+    |> fill_flags_to_map
+    |> Enum.map(fn x ->
+      Map.merge(x, %{
+        ID: Enum.at(info, 1),
+        Name: Enum.at(info, 3),
+        Department: Enum.at(info, 5),
+        punch_card_id: "#{Enum.at(info, 1)}.#{Enum.at(info, 3)}.#{Enum.at(info, 5)}",
+        punch_time_local: NaiveDateTime.new!(dt, x.stamp)
+      })
+    end)
+  end
+
+  def fill_flags_to_map(tl) do
+    Enum.map(Enum.with_index(tl, 1), fn {t, index} ->
+      cond do
+        index == 1 -> %{stamp: t, flag: "1_IN_1"}
+        index == 2 -> %{stamp: t, flag: "1_OUT_1"}
+        index == 3 -> %{stamp: t, flag: "2_IN_2"}
+        index == 4 -> %{stamp: t, flag: "2_OUT_2"}
+        index == 5 -> %{stamp: t, flag: "3_IN_3"}
+        index == 6 -> %{stamp: t, flag: "3_OUT_3"}
+        true -> %{stamp: t, flag: nil}
+      end
+    end)
+  end
+
+  def fill_in_employee_info(res, com, user) do
     emps =
       Enum.uniq_by(res, fn x -> x.punch_card_id end)
       |> Enum.map(fn x -> x.punch_card_id end)
@@ -254,6 +212,9 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
       Map.merge(x, %{
         employee_id: emp.id,
         employee_name: emp.name,
+        company_id: com.id,
+        user_id: user.id,
+        input_medium: "finger_log",
         punch_time:
           x.punch_time_local |> Timex.to_datetime(com.timezone) |> Timex.to_datetime(:utc)
       })
@@ -264,7 +225,7 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
   def render(assigns) do
     ~H"""
     <div class="w-10/12 mx-auto">
-    <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
+      <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <.form
         for={%{}}
         id="object-form"
@@ -330,8 +291,8 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
       </div>
     </div>
     <div class="w-10/12 mx-auto p-4 mb-1 border rounded-lg border-green-500 bg-green-200">
-    <div class="my-2 text-center mx-auto font-bold text-2xl">
-      <.link phx-click="refresh" class="button blue">Refresh</.link>
+      <div class="my-2 text-center mx-auto font-bold text-2xl">
+        <.link phx-click="refresh" class="button blue">Refresh</.link>
       </div>
       <%= for emps <- @employees |> Enum.chunk_every(5) do %>
         <div class="flex">

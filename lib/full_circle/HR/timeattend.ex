@@ -46,8 +46,6 @@ defmodule FullCircle.HR.TimeAttend do
       :status,
       :user_id
     ])
-    |> validate_date(:punch_time_local, days_before: 40)
-    |> validate_date(:punch_time_local, days_after: 0)
   end
 
   @doc false

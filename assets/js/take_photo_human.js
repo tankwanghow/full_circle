@@ -2,11 +2,11 @@ import * as H from "../vendor/human-main/dist/human.esm.js" // equivalent of @vl
 
 const humanConfig = {
   // user configuration for human, used to fine-tune behavior
-  backend: 'webgpu',
+  // backend: 'webgl',
   cacheSensitivity: 0,
   modelBasePath: "/human-models",
   filter: { enabled: true, equalization: true }, // lets run with histogram equilizer
-  debug: false,
+  debug: true,
   face: {
     enabled: true,
     mesh: { enabled: true },
@@ -26,7 +26,7 @@ const humanConfig = {
 }
 
 const options = {
-  minConfidence: 0.5, // overal face confidence for box, face, gender, real, live
+  minConfidence: 0.6, // overal face confidence for box, face, gender, real, live
   minSize: 224, // min input to face descriptor model before degradation
   mask: humanConfig.face.detector.mask,
   rotation: humanConfig.face.detector.rotation
@@ -189,7 +189,7 @@ async function validationLoop() {
     setTimeout(async () => {
       await validationLoop() // run validation loop until conditions are met
       resolve(human.result.face[0]) // recursive promise resolve
-    }, 250) // use to slow down refresh from max refresh rate to target of 30 fps
+    }, 25) // use to slow down refresh from max refresh rate to target of 30 fps
   })
 }
 
@@ -197,7 +197,8 @@ async function detectFace() {
   dom.canvas.style.height = ""
   dom.canvas.getContext("2d")?.clearRect(0, 0, options.minSize, options.minSize)
   if (!current?.face?.tensor || !current?.face?.embedding) return false
-  await human.tf.browser.draw(current.face.tensor, dom.canvas)
+  // await human.tf.browser.draw(current.face.tensor, dom.canvas)
+  await human.draw.tensor(current.face.tensor, dom.canvas);
 }
 
 async function main() {

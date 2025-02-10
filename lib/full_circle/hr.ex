@@ -334,7 +334,8 @@ defmodule FullCircle.HR do
       |> Repo.exists?()
 
     if !got? do
-      Repo.insert(TimeAttend.finger_print_log_changeset(%TimeAttend{}, entry))
+      cs = TimeAttend.finger_print_log_changeset(%TimeAttend{}, entry)
+      Repo.insert(cs)
     end
   end
 
