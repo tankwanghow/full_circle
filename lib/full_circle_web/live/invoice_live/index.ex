@@ -127,6 +127,7 @@ defmodule FullCircleWeb.InvoiceLive.Index do
             id={obj_id}
             obj={obj}
             company={@current_company}
+            user={@current_user}
             ex_class=""
           />
         <% end %>

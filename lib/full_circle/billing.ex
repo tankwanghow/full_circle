@@ -14,6 +14,7 @@ defmodule FullCircle.Billing do
     SeedTransactionMatcher
   }
 
+  alias FullCircle.EInvMetas.EInvoice
   alias FullCircle.Product.{Good, Packaging}
   alias FullCircle.{Repo, Sys, Accounting, StdInterface}
   alias Ecto.Multi
@@ -55,10 +56,13 @@ defmodule FullCircle.Billing do
         on: invd.invoice_id == inv.id,
         join: cont in Contact,
         on: cont.id == inv.contact_id,
+        left_join: einv in EInvoice,
+        on: einv.uuid == inv.e_inv_uuid,
         where: inv.id in ^ids,
         preload: [contact: cont, invoice_details: ^print_invoice_details()],
         order_by: inv.e_inv_internal_id,
-        select: inv
+        select: inv,
+        select_merge: %{e_inv_long_id: einv.longId}
     )
     |> Enum.map(fn x -> Invoice.compute_struct_fields(x) end)
     |> Enum.map(fn x ->
@@ -102,15 +106,18 @@ defmodule FullCircle.Billing do
         on: invd.invoice_id == inv.id,
         join: cont in Contact,
         on: cont.id == inv.contact_id,
+        left_join: einv in EInvoice,
+        on: einv.uuid == inv.e_inv_uuid,
         where: inv.id == ^id,
         preload: [invoice_details: ^invoice_details()],
-        group_by: [inv.id, cont.id],
+        group_by: [inv.id, cont.id, einv.longId],
         select: inv,
         select_merge: %{
           contact_name: cont.name,
           contact_id: cont.id,
           reg_no: cont.reg_no,
           tax_id: cont.tax_id,
+          e_inv_long_id: einv.longId,
           invoice_tax_amount:
             fragment(
               "round(?, 2)",
@@ -211,6 +218,11 @@ defmodule FullCircle.Billing do
     qry |> offset((^page - 1) * ^per_page) |> limit(^per_page) |> Repo.all()
   end
 
+  def get_invoice_by_id(id, com, user) do
+    from(inv in subquery(invoice_raw_query(com, user)), where: inv.id == ^id)
+    |> Repo.one()
+  end
+
   def get_invoice_by_id_index_component_field!(id, com, user) do
     from(i in subquery(invoice_raw_query(com, user)),
       where: i.id == ^id
@@ -235,6 +247,8 @@ defmodule FullCircle.Billing do
       where: txn.company_id == ^company.id,
       where: txn.doc_type == "Invoice",
       select: %{
+        doc_type: "Invoice",
+        doc_id: coalesce(txn.doc_id, txn.id),
         id: coalesce(txn.doc_id, txn.id),
         invoice_no: txn.doc_no,
         e_inv_uuid: inv.e_inv_uuid,
@@ -419,10 +433,13 @@ defmodule FullCircle.Billing do
         on: invd.pur_invoice_id == inv.id,
         join: cont in Contact,
         on: cont.id == inv.contact_id,
+        left_join: einv in EInvoice,
+        on: einv.uuid == inv.e_inv_uuid,
         where: inv.id == ^id,
         preload: [pur_invoice_details: ^pur_invoice_details()],
         group_by: [
           inv.id,
+          einv.longId,
           cont.id
         ],
         select: inv,
@@ -431,6 +448,7 @@ defmodule FullCircle.Billing do
           contact_id: cont.id,
           reg_no: cont.reg_no,
           tax_id: cont.tax_id,
+          e_inv_long_id: einv.longId,
           pur_invoice_tax_amount:
             fragment(
               "round(?, 2)",
@@ -536,6 +554,11 @@ defmodule FullCircle.Billing do
     qry |> offset((^page - 1) * ^per_page) |> limit(^per_page) |> Repo.all()
   end
 
+  def get_pur_invoice_by_id(id, com, user) do
+    from(inv in subquery(pur_invoice_raw_query(com, user)), where: inv.id == ^id)
+    |> Repo.one()
+  end
+
   def get_pur_invoice_by_id_index_component_field!(id, com, user) do
     from(i in subquery(pur_invoice_raw_query(com, user)),
       where: i.id == ^id
@@ -561,6 +584,8 @@ defmodule FullCircle.Billing do
       where: txn.doc_type == "PurInvoice",
       select: %{
         id: coalesce(txn.doc_id, txn.id),
+        doc_type: "PurInvoice",
+        doc_id: coalesce(txn.doc_id, txn.id),
         pur_invoice_no: txn.doc_no,
         e_inv_internal_id: coalesce(inv.e_inv_internal_id, "-"),
         e_inv_uuid: inv.e_inv_uuid,

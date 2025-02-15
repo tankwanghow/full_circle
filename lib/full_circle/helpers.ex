@@ -309,7 +309,30 @@ defmodule FullCircle.Helpers do
     end
   end
 
-  def e_inv_validate_url(obj) do
-    "https://myinvois.hasil.gov.my/#{obj.e_inv_uuid}/share/#{obj.e_inv_long_id}"
+  def e_invoice_validation_url_qrcode(obj) do
+    {data, settings} =
+      if(!is_nil(obj.e_inv_uuid) and !is_nil(obj.e_inv_long_id)) do
+        {e_invoice_validation_url(obj.e_inv_uuid, obj.e_inv_long_id),
+         %QRCode.Render.SvgSettings{
+           qrcode_color: {0, 0, 0},
+           scale: 2,
+           structure: :readable
+         }}
+      else
+        {"blank",
+         %QRCode.Render.SvgSettings{
+           qrcode_color: {255, 255, 255},
+           scale: 0
+         }}
+      end
+
+    {data,
+     QRCode.create(data, :medium)
+     |> QRCode.render(:svg, settings)
+     |> elem(1)}
+  end
+
+  def e_invoice_validation_url(uuid, long_id) do
+    "https://myinvois.hasil.gov.my/#{uuid}/share/#{long_id}"
   end
 end

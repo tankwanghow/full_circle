@@ -8,14 +8,11 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
   @impl true
   def mount(params, _session, socket) do
     id = params["invoice_id"]
-    obj = Jason.decode!(params["obj"] || "{}")
 
     socket =
       case socket.assigns.live_action do
-        :new -> mount_new(socket, obj)
+        :new -> mount_new(socket)
         :edit -> mount_edit(socket, id)
-        :match -> mount_match(socket, id, obj)
-        :unmatch -> mount_unmatch(socket, id)
       end
 
     {:ok,
@@ -27,26 +24,12 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
            socket.assigns.current_company,
            socket.assigns.current_user
          )
-     )
-     |> assign(e_inv_obj: obj)}
+     )}
   end
 
-  defp mount_new(socket, obj) do
+  defp mount_new(socket) do
     attrs =
-      if obj != %{} do
-        %{
-          pur_invoice_no: "...new...",
-          e_inv_internal_id: obj["internalId"],
-          pur_invoice_date: obj["dateTimeIssued"] |> String.slice(0..9),
-          due_date: obj["dateTimeIssued"] |> String.slice(0..9),
-          e_inv_uuid: obj["uuid"],
-          e_inv_long_id: obj["longId"],
-          e_inv_info:
-            ~s(#{obj["fc_mainName"]} - #{obj["fc_direction"]} - #{obj["typeName"]} - #{obj["documentCurrency"]} #{obj["totalNetAmount"]})
-        }
-      else
-        %{pur_invoice_no: "...new..."}
-      end
+      %{pur_invoice_no: "...new..."}
 
     socket
     |> assign(live_action: :new)
@@ -79,56 +62,6 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
     |> assign(id: id)
     |> assign(matched_trans: Billing.get_matcher_by("PurInvoice", id))
     |> assign(page_title: gettext("Edit Purchase Invoice") <> " " <> object.pur_invoice_no)
-    |> assign(
-      :form,
-      to_form(StdInterface.changeset(PurInvoice, object, %{}, socket.assigns.current_company))
-    )
-  end
-
-  defp mount_match(socket, id, obj) do
-    object =
-      Billing.get_pur_invoice!(
-        id,
-        socket.assigns.current_company,
-        socket.assigns.current_user
-      )
-
-    attrs =
-      %{
-        pur_invoice_date: obj["dateTimeIssued"] |> String.slice(0..9),
-        due_date: obj["dateTimeIssued"] |> String.slice(0..9),
-        e_inv_uuid: obj["uuid"],
-        e_inv_long_id: obj["longId"],
-        e_inv_info:
-          ~s(#{obj["fc_mainName"]} - #{obj["fc_direction"]} - #{obj["typeName"]} - #{obj["documentCurrency"]} #{obj["totalNetAmount"]})
-      }
-
-    socket
-    |> assign(live_action: :match)
-    |> assign(id: id)
-    |> assign(matched_trans: Billing.get_matcher_by("PurInvoice", id))
-    |> assign(page_title: gettext("Match E-Inv Purchase Invoice") <> " " <> object.pur_invoice_no)
-    |> assign(
-      :form,
-      to_form(StdInterface.changeset(PurInvoice, object, attrs, socket.assigns.current_company))
-    )
-  end
-
-  defp mount_unmatch(socket, id) do
-    object =
-      Billing.get_pur_invoice!(
-        id,
-        socket.assigns.current_company,
-        socket.assigns.current_user
-      )
-
-    socket
-    |> assign(live_action: :unmatch)
-    |> assign(id: id)
-    |> assign(matched_trans: Billing.get_matcher_by("PurInvoice", id))
-    |> assign(
-      page_title: gettext("Unmatch E-Inv Purchase Invoice") <> " " <> object.pur_invoice_no
-    )
     |> assign(
       :form,
       to_form(StdInterface.changeset(PurInvoice, object, %{}, socket.assigns.current_company))
@@ -505,7 +438,13 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
       <.form for={@form} id="object-form" autocomplete="off" phx-change="validate" phx-submit="save">
         <.input type="hidden" field={@form[:pur_invoice_no]} />
         <input type="hidden" id="live_action" value={@live_action} />
-        <div class="flex flex-row flex-nowarp">
+        <div class="float-right mt-8 mr-4">
+          <% {url, qrcode} = FullCircle.Helpers.e_invoice_validation_url_qrcode(@form.source.data) %>
+          <.link target="_blank" href={url}>
+          {qrcode |> raw}
+          </.link>
+        </div>
+        <div class="flex flex-row flex-nowarp w-[92%]">
           <div class="w-1/4 grow shrink">
             <.input type="hidden" field={@form[:contact_id]} />
             <.input
@@ -532,7 +471,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
           </div>
         </div>
 
-        <div class="flex flex-row flex-nowrap mt-2">
+        <div class="flex flex-row flex-nowrap mt-2 w-[92%]">
           <div class="grow shrink">
             <.input
               field={@form[:loader_tags]}
@@ -567,11 +506,11 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
           </div>
         </div>
 
-        <div class="flex flex-row flex-nowrap mt-2">
-          <div class="w-[10%]">
+        <div class="flex flex-row flex-nowrap mt-2 w-[92%]">
+          <div class="w-[15%]">
             <.input field={@form[:e_inv_internal_id]} label={gettext("E Invoice Internal Id")} />
           </div>
-          <div class="w-[15%]">
+          <div class="w-[20%]">
             <.input field={@form[:e_inv_uuid]} label={gettext("E Invoice UUID")} />
           </div>
         </div>

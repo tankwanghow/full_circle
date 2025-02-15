@@ -9,6 +9,7 @@ defmodule FullCircle.EInvMetas do
   alias FullCircle.ReceiveFund.Receipt
   alias FullCircle.EInvMetas.{EInvMeta, EInvoice}
   alias FullCircle.Repo
+  alias Phoenix.PubSub
   alias Ecto.Multi
 
   def get_by_company_id!(com, user) do
@@ -224,7 +225,8 @@ defmodule FullCircle.EInvMetas do
   defp get_e_invoices_by_uuid(uuid, amount, com, user) do
     from(ei in EInvoice,
       join: c in Company,
-      on: c.id == ei.company_id and c.tax_id == ei.issuerTIN,
+      # and c.tax_id == ei.issuerTIN,
+      on: c.id == ei.company_id,
       join: cu in CompanyUser,
       on: cu.company_id == c.id,
       where: ei.uuid == ^uuid,
@@ -275,10 +277,11 @@ defmodule FullCircle.EInvMetas do
   defp get_e_invoices_by_internal_id(internal_id, amount, com, user) do
     from(ei in EInvoice,
       join: c in Company,
-      on: c.id == ei.company_id and c.tax_id == ei.issuerTIN,
+      # and c.tax_id == ei.issuerTIN,
+      on: c.id == ei.company_id,
       join: cu in CompanyUser,
       on: cu.company_id == c.id,
-      where: ei.internalId == ^internal_id,
+      where: ilike(ei.internalId, ^"%#{internal_id}%"),
       where: c.id == ^com.id,
       where: cu.user_id == ^user.id,
       distinct: true,
@@ -329,12 +332,13 @@ defmodule FullCircle.EInvMetas do
       |> String.slice(0..15)
       |> String.downcase()
 
-    sd = doc_date |> Timex.to_datetime() |> DateTime.shift(day: -10)
-    ed = doc_date |> Timex.to_datetime() |> DateTime.shift(day: 10)
+    sd = doc_date |> Timex.to_datetime() |> DateTime.shift(day: -5)
+    ed = doc_date |> Timex.to_datetime() |> DateTime.shift(day: 5)
 
     from(ei in EInvoice,
       join: c in Company,
-      on: c.id == ei.company_id and c.tax_id == ei.issuerTIN,
+      # and c.tax_id == ei.issuerTIN,
+      on: c.id == ei.company_id,
       join: cu in CompanyUser,
       on: cu.company_id == c.id,
       where: c.id == ^com.id,
@@ -467,6 +471,12 @@ defmodule FullCircle.EInvMetas do
           pageNo: p
         )
 
+        PubSub.broadcast(
+          FullCircle.PubSub,
+          "#{com.id}_e_invoice_sync_status",
+          {:update_sync_status, sd, ed, p}
+        )
+
       %{"metadata" => _, "result" => res} =
         Req.get!(url, headers: [Authorization: meta.token]).body
 
@@ -515,10 +525,10 @@ defmodule FullCircle.EInvMetas do
   end
 
   defp get_date_range(a, b) do
-    if DateTime.add(a, 60 * 60 * 24 * 2, :second) |> DateTime.compare(b) == :gt do
-      [a, DateTime.add(a, Integer.mod(DateTime.diff(b, a), 60 * 60 * 24 * 3), :second)]
+    if DateTime.add(a, 60 * 60 * 24 * 5, :second) |> DateTime.compare(b) == :gt do
+      [a, DateTime.add(a, Integer.mod(DateTime.diff(b, a), 60 * 60 * 24 * 5), :second)]
     else
-      [a, get_date_range(DateTime.add(a, 60 * 60 * 24 * 3, :second), b)] |> List.flatten()
+      [a, get_date_range(DateTime.add(a, 60 * 60 * 24 * 5, :second), b)] |> List.flatten()
     end
   end
 

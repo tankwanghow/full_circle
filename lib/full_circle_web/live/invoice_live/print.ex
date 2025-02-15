@@ -72,12 +72,8 @@ defmodule FullCircleWeb.InvoiceLive.Print do
             </div>
 
             <div :if={@pre_print == "false"} class="qrcode">
-              <div>
-                {QRCode.create(FullCircle.Helpers.e_inv_validate_url(invoice), :high)
-                |> QRCode.render(:svg, %QRCode.Render.SvgSettings{structure: :readable, scale: 2})
-                |> elem(1)
-                |> raw}
-              </div>
+              <% {_, qrcode} = FullCircle.Helpers.e_invoice_validation_url_qrcode(invoice) %>
+              {qrcode |> raw}
             </div>
 
             {invoice_header(invoice, n, invoice.chunk_number, assigns)}
@@ -292,7 +288,7 @@ defmodule FullCircleWeb.InvoiceLive.Print do
         .page { padding-left: 10mm; padding-right: 10mm; page-break-after: always;} }
 
       .letter-head { padding-bottom: 2mm; margin-bottom: 5mm; height: 28mm;}
-      .qrcode { float: right; margin-top: -30mm; margin-right: 5mm; vertical-align: top;}
+      .qrcode { float: right; margin-top: -30mm; margin-right: 5mm; vertical-align: top; }
       .invoice-info { margin-top: -5mm; float: right; }
       .invoice-header { width: 100%; height: 40mm; border-bottom: 0.5mm solid black; }
       .customer { padding-left: 2mm; float: left;}

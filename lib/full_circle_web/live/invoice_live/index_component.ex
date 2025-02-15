@@ -25,10 +25,129 @@ defmodule FullCircleWeb.InvoiceLive.IndexComponent do
           socket.assigns.obj.contact_name,
           socket.assigns.obj.invoice_amount,
           socket.assigns.obj.invoice_date,
-          socket.assigns.obj,
-          socket.assigns.company
+          socket.assigns.company,
+          socket.assigns.user
         ) || []
     )
+  end
+
+  defp refresh_self(doc_id, socket) do
+    socket
+    |> assign(
+      obj:
+        FullCircle.Billing.get_invoice_by_id(doc_id, socket.assigns.company, socket.assigns.user)
+    ) |> get_e_invoices()
+  end
+
+  @impl true
+  def handle_event("match", %{"einv" => einv, "fcdoc" => fc_doc}, socket) do
+    einv = Jason.decode!(einv)
+    fc_doc = Jason.decode!(fc_doc)
+
+    case EInvMetas.match(
+           einv,
+           fc_doc,
+           socket.assigns.company,
+           socket.assigns.user
+         ) do
+      {:ok, _} ->
+        {:noreply, refresh_self(fc_doc["doc_id"], socket)}
+
+      {:error, failed_operation, changeset, _} ->
+        {:noreply,
+         socket
+         |> assign(form: to_form(changeset))
+         |> put_flash(
+           :error,
+           "#{gettext("Failed")} #{failed_operation}. #{list_errors_to_string(changeset.errors)}"
+         )}
+
+      {:sql_error, msg} ->
+        {:noreply,
+         socket
+         |> put_flash(:error, "#{gettext("Failed")} #{msg}")}
+
+      :not_authorise ->
+        {:noreply,
+         socket
+         |> put_flash(:error, gettext("You are not authorised to perform this action"))}
+    end
+  end
+
+  @impl true
+  def handle_event("unmatch", %{"fcdoc" => fc_doc}, socket) do
+    fc_doc = Jason.decode!(fc_doc)
+
+    case EInvMetas.unmatch(fc_doc, socket.assigns.company, socket.assigns.user) do
+      {:ok, _} ->
+        {:noreply, refresh_self(fc_doc["doc_id"], socket)}
+
+      {:error, failed_operation, changeset, _} ->
+        {:noreply,
+         socket
+         |> assign(form: to_form(changeset))
+         |> put_flash(
+           :error,
+           "#{gettext("Failed")} #{failed_operation}. #{list_errors_to_string(changeset.errors)}"
+         )}
+
+      {:sql_error, msg} ->
+        {:noreply,
+         socket
+         |> put_flash(:error, "#{gettext("Failed")} #{msg}")}
+
+      :not_authorise ->
+        {:noreply,
+         socket
+         |> put_flash(:error, gettext("You are not authorised to perform this action"))}
+    end
+  end
+
+  defp matched_or_try_match(fc, einv, assigns) do
+    cond do
+      einv.status != "Valid" ->
+        ~H"""
+        <span class="font-semibold text-rose-400">Cannot match</span>
+        """
+
+      is_nil(fc.e_inv_uuid) or fc.e_inv_uuid == "" ->
+        match(fc, einv, assigns)
+
+      einv.uuid != fc.e_inv_uuid ->
+        ~H"""
+        <span class="font-semibold text-orange-400">Wrongly matched</span>
+        """
+
+      einv.uuid == fc.e_inv_uuid ->
+        unmatch(fc, assigns)
+    end
+  end
+
+  defp match(fc, einv, assigns) do
+    ~H"""
+    <.link
+      phx-target={@myself}
+      phx-value-einv={Jason.encode!(einv)}
+      phx-value-fcdoc={Jason.encode!(fc)}
+      phx-click="match"
+      class="text-xs bg-green-400 p-1 rounded-xl"
+    >
+      Match
+    </.link>
+    """
+  end
+
+  defp unmatch(fc, assigns) do
+    ~H"""
+    <.link
+      phx-target={@myself}
+      phx-value-fcdoc={Jason.encode!(fc)}
+      phx-click="unmatch"
+      class="text-xs bg-orange-400 p-1 rounded-xl"
+    >
+      Remove Match
+    </.link>
+    """
   end
 
   @impl true
@@ -86,51 +205,61 @@ defmodule FullCircleWeb.InvoiceLive.IndexComponent do
       <div class="w-[0.4%] bg-white"></div>
 
       <div class="w-[48.6%] p-1 border-b border-gray-400">
+        <div :if={@e_invs == []} class="flex border-b border-amber-400 last:border-0">
+          <.link
+            target="_blank"
+            href="https://myinvois.hasil.gov.my/newdocument"
+            class="blue button"
+          >
+            {gettext("New E-Invoice")}
+          </.link>
+        </div>
         <%= for einv <- @e_invs do %>
           <div class="flex border-b border-amber-400 last:border-0">
-          <div class="w-[22%]">
-          <div>
-            <div>
-              {einv.dateTimeReceived |> Helpers.format_datetime(@company)}
+            <div class="w-[22%]">
+              <div>
+                <div>
+                  {einv.dateTimeReceived |> Helpers.format_datetime(@company)}
+                </div>
+                <div>
+                  {einv.dateTimeIssued |> Helpers.format_datetime(@company)}
+                </div>
+                <div>
+                  {if !is_nil(einv.rejectRequestDateTime) do
+                    einv.rejectRequestDateTime |> Helpers.format_datetime(@company)
+                  end}
+                </div>
+              </div>
             </div>
-            <div>
-              {einv.dateTimeIssued |> Helpers.format_datetime(@company)}
+            <div class="w-[36%]">
+              <a
+                class="text-blue-600 hover:font-medium"
+                target="_blank"
+                href={~w(https://myinvois.hasil.gov.my/documents/#{einv.uuid})}
+              >
+                {einv.uuid}
+              </a>
+              <div class="text-sm">
+                {"#{einv.internalId}"}
+                <span class="font-bold text-green-600">Sent</span>
+                <span class="text-purple-600">{einv.typeName} {einv.typeVersionName}</span>
+              </div>
             </div>
-            <div>
-              {if !is_nil(einv.rejectRequestDateTime) do
-                einv.rejectRequestDateTime |> Helpers.format_datetime(@company)
-              end}
-            </div>
-          </div>
-        </div>
-        <div class="w-[36%]">
-          <a
-            class="text-blue-600 hover:font-medium"
-            target="_blank"
-            href={~w(https://myinvois.hasil.gov.my/documents/#{einv.uuid})}
-          >
-            {einv.uuid}
-          </a>
-          <div class="text-sm">
-            {"#{einv.internalId}"}
-            <span class="font-bold text-green-600">Sent</span>
-            <span class="text-purple-600">{einv.typeName} {einv.typeVersionName}</span>
-          </div>
-        </div>
 
-        <div class="w-[42%]">
-          <div class="overflow-hidden">{einv.buyerName}</div>
-          <div class="text-sm">
-            {einv.buyerTIN}
-            <span class="font-bold">
-              {einv.documentCurrency} {einv.totalPayableAmount
-              |> Number.Delimit.number_to_delimited()}
-            </span>
-            <span :if={einv.status == "Valid"} class="text-green-600">{einv.status}</span>
-            <span :if={einv.status == "Invalid"} class="text-rose-600">{einv.status}</span>
-            <span :if={einv.status == "Canceled"} class="text-orange-600">{einv.status}</span>
-          </div>
-        </div>
+            <div class="w-[42%]">
+              <div class="overflow-hidden">{einv.buyerName}</div>
+              <div class="text-sm">
+                {einv.buyerTIN}
+                <span class="font-bold">
+                  {einv.documentCurrency} {einv.totalPayableAmount
+                  |> Number.Delimit.number_to_delimited()}
+                </span>
+                <span :if={einv.status == "Valid"} class="text-green-600">{einv.status}</span>
+                <span :if={einv.status == "Invalid"} class="text-rose-600">{einv.status}</span>
+                <span :if={einv.status == "Canceled"} class="text-orange-600">{einv.status}</span>
+                {matched_or_try_match(@obj, einv, assigns)}
+              </div>
+            </div>
           </div>
         <% end %>
       </div>

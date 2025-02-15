@@ -4,11 +4,19 @@ defmodule FullCircleWeb.EInvListLive.Index do
 
   alias FullCircleWeb.EInvListLive.{IndexReceivedComponent, IndexSentComponent}
   alias FullCircle.EInvMetas
+  alias Phoenix.PubSub
 
   @per_page 15
 
   @impl true
   def mount(_params, _session, socket) do
+    if connected?(socket) do
+      PubSub.subscribe(
+        FullCircle.PubSub,
+        "#{socket.assigns.current_company.id}_e_invoice_sync_status"
+      )
+    end
+
     socket =
       socket
       |> assign(update_action: "stream")
@@ -96,7 +104,8 @@ defmodule FullCircleWeb.EInvListLive.Index do
       send(pid, :finished_sync)
     end)
 
-    {:noreply, socket |> assign(syncing: true)}
+    {:noreply,
+     socket |> assign(syncing: true) |> assign(sd: "") |> assign(ed: "") |> assign(page: "")}
   end
 
   @impl true
@@ -115,9 +124,17 @@ defmodule FullCircleWeb.EInvListLive.Index do
      |> filter_objects(true, 1)}
   end
 
-  # Catch-all clause
   @impl true
-  def handle_info(_message, socket) do
+  def handle_info({:update_sync_status, sd, ed, page}, socket) do
+    {:noreply,
+     socket
+     |> assign(sd: String.slice(sd, 0..9))
+     |> assign(ed: String.slice(ed, 0..9))
+     |> assign(page: page)}
+  end
+
+  @impl true
+  def handle_info(_, socket) do
     {:noreply, socket}
   end
 
@@ -153,7 +170,7 @@ defmodule FullCircleWeb.EInvListLive.Index do
         <div class="">
           <%= if @syncing do %>
             <div class="text-lg red button" id="syncing">
-              {gettext("Syncing E-Invoice...")}
+              {gettext("Syncing E-Invoice ")}{"#{@sd} - #{@ed} page #{@page}"}...
               <.icon name="hero-arrow-path" class="ml-1 h-3 w-3 animate-spin" />
             </div>
           <% else %>

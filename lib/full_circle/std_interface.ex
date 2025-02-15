@@ -84,7 +84,7 @@ defmodule FullCircle.StdInterface do
     case can?(user, action, company) do
       true ->
         multi
-        |> Multi.insert(action, changeset(klass, klass.__struct__, attrs, company))
+        |> Multi.insert(action, changeset(klass, klass.__struct__(), attrs, company))
         |> Sys.insert_log_for(action, attrs, company, user)
         |> Repo.transaction()
         |> case do

@@ -8,13 +8,11 @@ defmodule FullCircleWeb.InvoiceLive.Form do
   @impl true
   def mount(params, _session, socket) do
     id = params["invoice_id"]
-    obj = Jason.decode!(params["obj"] || "{}")
 
     socket =
       case socket.assigns.live_action do
-        :new -> mount_new(socket, obj)
+        :new -> mount_new(socket)
         :edit -> mount_edit(socket, id)
-        :match -> mount_match(socket, id, obj)
       end
 
     {:ok,
@@ -26,26 +24,11 @@ defmodule FullCircleWeb.InvoiceLive.Form do
            socket.assigns.current_company,
            socket.assigns.current_user
          )
-     )
-     |> assign(e_inv_obj: obj)}
+     )}
   end
 
-  defp mount_new(socket, obj) do
-    attrs =
-      if obj != %{} do
-        %{
-          invoice_no: "...new...",
-          e_inv_internal_id: obj["internalId"],
-          invoice_date: obj["dateTimeIssued"] |> String.slice(0..9),
-          due_date: obj["dateTimeIssued"] |> String.slice(0..9),
-          e_inv_uuid: obj["uuid"],
-          e_inv_long_id: obj["longId"],
-          e_inv_info:
-            ~s(#{obj["fc_mainName"]} - #{obj["fc_direction"]} - #{obj["typeName"]} - #{obj["documentCurrency"]}#{obj["totalNetAmount"]})
-        }
-      else
-        %{invoice_no: "...new..."}
-      end
+  defp mount_new(socket) do
+    attrs = %{invoice_no: "...new..."}
 
     socket
     |> assign(live_action: :new)
@@ -81,36 +64,6 @@ defmodule FullCircleWeb.InvoiceLive.Form do
     |> assign(
       :form,
       to_form(StdInterface.changeset(Invoice, object, %{}, socket.assigns.current_company))
-    )
-  end
-
-  defp mount_match(socket, id, obj) do
-    object =
-      Billing.get_invoice!(
-        id,
-        socket.assigns.current_company,
-        socket.assigns.current_user
-      )
-
-    attrs =
-      %{
-        e_inv_internal_id: obj["internalId"],
-        invoice_date: obj["dateTimeIssued"] |> String.slice(0..9),
-        due_date: obj["dateTimeIssued"] |> String.slice(0..9),
-        e_inv_uuid: obj["uuid"],
-        e_inv_long_id: obj["longId"],
-        e_inv_info:
-          ~s(#{obj["fc_mainName"]} - #{obj["fc_direction"]} - #{obj["typeName"]} - #{obj["documentCurrency"]}#{obj["totalNetAmount"]})
-      }
-
-    socket
-    |> assign(live_action: :edit)
-    |> assign(id: id)
-    |> assign(page_title: gettext("Edit Invoice") <> " " <> object.invoice_no)
-    |> assign(matched_trans: Billing.get_matcher_by("Invoice", id))
-    |> assign(
-      :form,
-      to_form(StdInterface.changeset(Invoice, object, attrs, socket.assigns.current_company))
     )
   end
 
@@ -401,7 +354,13 @@ defmodule FullCircleWeb.InvoiceLive.Form do
       <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <.form for={@form} id="object-form" autocomplete="off" phx-change="validate" phx-submit="save">
         <.input type="hidden" field={@form[:invoice_no]} />
-        <div class="flex flex-row flex-nowarp">
+        <div class="float-right mt-8 mr-4">
+          <% {url, qrcode} = FullCircle.Helpers.e_invoice_validation_url_qrcode(@form.source.data) %>
+          <.link target="_blank" href={url}>
+          {qrcode |> raw}
+          </.link>
+        </div>
+        <div class="flex flex-row flex-nowarp w-[92%]">
           <div class="w-1/4 grow shrink">
             <.input type="hidden" field={@form[:contact_id]} />
             <.input
@@ -428,7 +387,7 @@ defmodule FullCircleWeb.InvoiceLive.Form do
           </div>
         </div>
 
-        <div class="flex flex-row flex-nowrap mt-2">
+        <div class="flex flex-row flex-nowrap mt-2 w-[92%]">
           <div class="grow shrink">
             <.input
               field={@form[:loader_tags]}
@@ -463,11 +422,11 @@ defmodule FullCircleWeb.InvoiceLive.Form do
           </div>
         </div>
 
-        <div class="flex flex-row flex-nowrap mt-2">
-          <div class="w-[10%]">
+        <div class="flex flex-row flex-nowrap mt-2 w-[92%]">
+          <div class="w-[14%]">
             <.input field={@form[:e_inv_internal_id]} label={gettext("E Invoice Internal Id")} />
           </div>
-          <div class="w-[15%]">
+          <div class="w-[20%]">
             <.input field={@form[:e_inv_uuid]} label={gettext("E Invoice UUID")} />
           </div>
         </div>
