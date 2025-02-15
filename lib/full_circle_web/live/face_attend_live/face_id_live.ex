@@ -32,7 +32,7 @@ defmodule FullCircleWeb.FaceIdLive do
   @impl true
   def handle_event(
         "save_attendence",
-        %{"employee_id" => emp_id, "flag" => flag, "stamp" => stamp},
+        %{"employee_id" => emp_id, "flag" => flag},
         socket
       ) do
     result = case HR.create_time_attendence_by_punch(
@@ -64,6 +64,18 @@ defmodule FullCircleWeb.FaceIdLive do
     end
 
     {:noreply, socket |> push_event("saveAttendenceResult", result)}
+  end
+
+  @impl true
+  def handle_info({:new_photo, data}, socket) do
+    IO.inspect data
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info({:delete_photo, id}, socket) do
+    IO.inspect id
+    {:noreply, socket}
   end
 
   @impl true
@@ -103,7 +115,7 @@ defmodule FullCircleWeb.FaceIdLive do
             {gettext("Scan Face")}
           </button>
         </div>
-        <div id="scanResultPhotos" class="mt-1 flex gap-1 mx-auto w-11/12"></div>
+        <div id="scanResultPhotos" class="mt-1 flex gap-1 mx-auto w-6/12"></div>
         <div id="log" class="text-center"></div>
       </div>
       <div class="text-center mt-10">

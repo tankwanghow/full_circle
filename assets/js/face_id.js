@@ -13,8 +13,8 @@ const humanConfig = {
     mesh: { enabled: true },
     detector: { maxDetected: 1, rotation: true, return: true, mask: false }, // return tensor is used to get detected face image
     description: { enabled: true }, // default model for face descriptor extraction is faceres
-    // mobilefacenet: { enabled: true, modelPath: 'https://vladmandic.github.io/human-models/models/mobilefacenet.json' }, // alternative model
-    // insightface: { enabled: true, modelPath: 'https://vladmandic.github.io/insightface/models/insightface-mobilenet-swish.json' }, // alternative model
+    mobilefacenet: { enabled: true,modelPath: 'mobilefacenet.json' }, // alternative model
+    insightface: { enabled: true, modelPath: 'insightface-mobilenet-swish.json' }, // alternative model
     iris: { enabled: false }, // needed to determine gaze direction
     emotion: { enabled: false }, // not needed
     antispoof: { enabled: false }, // enable optional antispoof module
@@ -55,7 +55,7 @@ let db
 let descriptors
 let detectFPS = 0
 let inOutFlag = ''
-const matches = { list: [], times: 5 }
+const matches = { list: [], times: 3 }
 const timestamp = { detect: 0, draw: 0 } // holds information used to calculate performance and possible memory leaks
 
 const dom = {
@@ -159,7 +159,6 @@ async function detectFace() {
     dom.scanResultPhotos.style.display = ""
     if (matched(dom.scanResultPhotos, current.record.employee_id, current.record.image, Math.round(1000 * res.similarity) / 10)) {
       await dom.video.pause()
-      console.log(current.record)
       dom.statusBar.classList.remove('text-[color:#FFFF00]')
       dom.statusBar.classList.remove('text-[color:#FF0000]')
       dom.statusBar.classList.add('text-[color:#00FF00]')
@@ -212,7 +211,7 @@ function setNoMatch() {
 function matched(el, id, image, similarity) {
   if (matches.list.length < matches.times) {
     matches.list.push(id)
-    insertMatchedImg(el, image, similarity, "w-1/5 text-xs")
+    insertMatchedImg(el, image, similarity, "w-1/3 text-xs")
     return false
   }
   if (matches.list.filter((v, i, ar) => ar.indexOf(v) === i).length == 1) {

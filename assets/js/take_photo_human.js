@@ -4,7 +4,7 @@ const humanConfig = {
   // user configuration for human, used to fine-tune behavior
   // backend: 'webgl',
   cacheSensitivity: 0,
-  modelBasePath: "/human-models",
+  modelBasePath: "/human-models/",
   filter: { enabled: true, equalization: true }, // lets run with histogram equilizer
   debug: true,
   face: {
@@ -12,8 +12,8 @@ const humanConfig = {
     mesh: { enabled: true },
     detector: { maxDetected: 1, rotation: true, return: true, mask: false }, // return tensor is used to get detected face image
     description: { enabled: true }, // default model for face descriptor extraction is faceres
-    // mobilefacenet: { enabled: true, modelPath: 'https://vladmandic.github.io/human-models/models/mobilefacenet.json' }, // alternative model
-    // insightface: { enabled: true, modelPath: 'https://vladmandic.github.io/insightface/models/insightface-mobilenet-swish.json' }, // alternative model
+    mobilefacenet: { enabled: true, modelPath: 'mobilefacenet.json' }, // alternative model
+    insightface: { enabled: true, modelPath: 'insightface-mobilenet-swish.json' }, // alternative model
     iris: { enabled: false }, // needed to determine gaze direction
     emotion: { enabled: false }, // not needed
     antispoof: { enabled: false }, // enable optional antispoof module
