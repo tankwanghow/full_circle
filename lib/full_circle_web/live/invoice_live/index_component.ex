@@ -124,11 +124,12 @@ defmodule FullCircleWeb.InvoiceLive.IndexComponent do
   end
 
   defp match(fc, einv, assigns) do
+    assigns = assigns |> assign(fc: fc) |> assign(einv: einv)
     ~H"""
     <.link
       phx-target={@myself}
-      phx-value-einv={Jason.encode!(einv)}
-      phx-value-fcdoc={Jason.encode!(fc)}
+      phx-value-einv={Jason.encode!(@einv)}
+      phx-value-fcdoc={Jason.encode!(@fc)}
       phx-click="match"
       class="text-xs bg-green-400 p-1 rounded-xl"
     >
@@ -138,10 +139,11 @@ defmodule FullCircleWeb.InvoiceLive.IndexComponent do
   end
 
   defp unmatch(fc, assigns) do
+    assigns = assigns |> assign(fc: fc)
     ~H"""
     <.link
       phx-target={@myself}
-      phx-value-fcdoc={Jason.encode!(fc)}
+      phx-value-fcdoc={Jason.encode!(@fc)}
       phx-click="unmatch"
       class="text-xs bg-orange-400 p-1 rounded-xl"
     >

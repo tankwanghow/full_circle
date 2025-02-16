@@ -107,11 +107,12 @@ defmodule FullCircleWeb.EInvListLive.IndexSentComponent do
   end
 
   defp match(doc, assigns) do
+    assigns = assigns |> assign(doc: doc)
     ~H"""
     <.link
       phx-target={@myself}
       phx-value-einv={Jason.encode!(@obj)}
-      phx-value-fcdoc={Jason.encode!(doc)}
+      phx-value-fcdoc={Jason.encode!(@doc)}
       phx-click="match"
       class="text-xs bg-green-400 p-1 rounded-xl"
     >
@@ -121,10 +122,11 @@ defmodule FullCircleWeb.EInvListLive.IndexSentComponent do
   end
 
   defp unmatch(doc, assigns) do
+    assigns = assigns |> assign(doc: doc)
     ~H"""
     <.link
       phx-target={@myself}
-      phx-value-fcdoc={Jason.encode!(doc)}
+      phx-value-fcdoc={Jason.encode!(@doc)}
       phx-click="unmatch"
       class="text-xs bg-orange-400 p-1 rounded-xl"
     >
