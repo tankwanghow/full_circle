@@ -188,7 +188,7 @@ defmodule FullCircleWeb.PurInvoiceLive.IndexComponent do
         <div class="text-orange-600">{Number.Currency.number_to_currency(@obj.balance)}</div>
       </div>
       <div class="w-[0.4%] bg-white"></div>
-      <div class="w-[48.6%] p-1 border-b border-gray-400">
+      <div class="w-[50.6%] p-1 border-b border-gray-400">
         <div :if={@e_invs == []} class="flex border-b border-amber-400 last:border-0">
           <.link target="_blank" href="https://myinvois.hasil.gov.my/newdocument" class="blue button">
             {gettext("New E-Invoice")}

@@ -81,7 +81,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Index do
           {gettext("Amount / Balance")}
         </div>
         <div class="w-[0.4%] bg-white"></div>
-        <div class="font-medium flex flex-row bg-blue-200 w-[48.6%]">
+        <div class="font-medium flex flex-row bg-blue-200 w-[50.6%]">
           <div class="w-[22%] border-b border-t border-blue-400 p-1">
             <div>{gettext("Received/ Issued/ Reject")}</div>
           </div>
