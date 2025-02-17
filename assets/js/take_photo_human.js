@@ -11,9 +11,9 @@ const humanConfig = {
     enabled: true,
     mesh: { enabled: true },
     detector: { maxDetected: 1, rotation: true, return: true, mask: false }, // return tensor is used to get detected face image
-    description: { enabled: true }, // default model for face descriptor extraction is faceres
-    mobilefacenet: { enabled: true, modelPath: 'mobilefacenet.json' }, // alternative model
-    insightface: { enabled: true, modelPath: 'insightface-mobilenet-swish.json' }, // alternative model
+    description: { enabled: true, modelPath: 'faceres-deep.json', },
+    mobilefacenet: { enabled: true, modelPath: 'mobilefacenet.json' }, 
+    insightface: { enabled: true, modelPath: 'insightface-mobilenet-swish.json' },  
     iris: { enabled: false }, // needed to determine gaze direction
     emotion: { enabled: false }, // not needed
     antispoof: { enabled: false }, // enable optional antispoof module
@@ -97,8 +97,8 @@ async function webCam() {
     audio: false,
     video: {
       deviceId: videoSource ? { exact: videoSource } : undefined,
-      width: { ideal: 640 },
-      height: { ideal: 640 }
+      width: { ideal: 720 },
+      height: { ideal: 720 }
     }
   }
   const stream = await navigator.mediaDevices.getUserMedia(cameraOptions)

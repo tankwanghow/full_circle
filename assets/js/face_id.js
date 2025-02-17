@@ -12,13 +12,13 @@ const humanConfig = {
     enabled: true,
     mesh: { enabled: true },
     detector: { maxDetected: 1, rotation: true, return: true, mask: false }, // return tensor is used to get detected face image
-    description: { enabled: true }, // default model for face descriptor extraction is faceres
+    description: { enabled: true, modelPath: 'faceres-deep.json', },
     mobilefacenet: { enabled: true,modelPath: 'mobilefacenet.json' }, // alternative model
     insightface: { enabled: true, modelPath: 'insightface-mobilenet-swish.json' }, // alternative model
     iris: { enabled: false }, // needed to determine gaze direction
     emotion: { enabled: false }, // not needed
-    antispoof: { enabled: false }, // enable optional antispoof module
-    liveness: { enabled: false } // enable optional liveness module
+    antispoof: { enabled: true }, // enable optional antispoof module
+    liveness: { enabled: true } // enable optional liveness module
   },
   body: { enabled: false },
   hand: { enabled: false },
