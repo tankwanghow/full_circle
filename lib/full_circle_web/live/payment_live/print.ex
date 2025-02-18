@@ -103,7 +103,12 @@ defmodule FullCircleWeb.PaymentLive.Print do
             <div class="letter-head">
               {if(@pre_print == "true", do: "", else: letter_head(assigns))}
             </div>
-            <div class="doctype is-size-4 has-text-weight-semibold">PAYMENT VOUCHER</div>
+
+            <div :if={@pre_print == "false"} class="qrcode">
+              <% {_, qrcode} = FullCircle.Helpers.e_invoice_validation_url_qrcode(payment) %>
+              {qrcode |> raw}
+            </div>
+
             {payment_header(payment, assigns)}
 
             <div class="details-body is-size-6">
@@ -343,6 +348,7 @@ defmodule FullCircleWeb.PaymentLive.Print do
         {@payment.contact.reg_no}
       </div>
       <div class="payment-info">
+      <div class="is-size-4 has-text-weight-semibold">PAYMENT VOUCHER</div>
         <div>
           Payment Date:
           <span class="has-text-weight-semibold">{format_date(@payment.payment_date)}</span>
@@ -403,13 +409,12 @@ defmodule FullCircleWeb.PaymentLive.Print do
       .letter-head { padding-bottom: 2mm; margin-bottom: 2mm; height: 28mm;}
       .letter-foot { padding-top: 2mm; margin-top: 2mm; height: 28mm;}
 
-      .doctype { float: right; margin-top: -20mm; margin-right: 0mm; }
-
       .payment-header { width: 100%; height: 40mm; border-bottom: 0.5mm solid black; }
       .customer { padding-left: 2mm; float: left;}
 
       .payment-info div { display: block; margin-bottom: 1px; text-align: right; }
 
+      .qrcode { float: right; margin-top: -30mm; margin-right: 5mm; vertical-align: top; }
       .details-header { display: flex; padding-bottom: 1mm; padding-top: 1mm; border-bottom: 0.5mm dotted black; margin-bottom: 3px;}
       .particular { width: 52%; text-align: left; height: 100%; }
       .qty { width: 9%; text-align: center; height: 100%; }

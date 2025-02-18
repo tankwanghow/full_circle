@@ -108,7 +108,12 @@ defmodule FullCircleWeb.ReceiptLive.Print do
             <div class="letter-head">
               {if(@pre_print == "true", do: "", else: letter_head(assigns))}
             </div>
-            <div class="doctype is-size-4 has-text-weight-semibold">RECEIPT</div>
+
+            <div :if={@pre_print == "false"} class="qrcode">
+              <% {_, qrcode} = FullCircle.Helpers.e_invoice_validation_url_qrcode(receipt) %>
+              {qrcode |> raw}
+            </div>
+
             {receipt_header(receipt, assigns)}
 
             <div class="details-body is-size-6">
@@ -422,6 +427,7 @@ defmodule FullCircleWeb.ReceiptLive.Print do
         {@receipt.contact.reg_no}
       </div>
       <div class="receipt-info">
+      <div class="is-size-4 has-text-weight-semibold">RECEIPT</div>
         <div>
           Receipt Date:
           <span class="has-text-weight-semibold">{format_date(@receipt.receipt_date)}</span>
@@ -480,7 +486,7 @@ defmodule FullCircleWeb.ReceiptLive.Print do
       .letter-head { padding-bottom: 2mm; margin-bottom: 2mm; height: 28mm;}
       .letter-foot { padding-top: 2mm; margin-top: 2mm; height: 25mm;}
 
-      .doctype { float: right; margin-top: -20mm; margin-right: 0mm; }
+      .qrcode { float: right; margin-top: -30mm; margin-right: 5mm; vertical-align: top; }
       .receipt-info { float: right; }
       .receipt-header { width: 100%; height: 40mm; border-bottom: 0.5mm solid black; }
       .receipt-footer { display: flex; }

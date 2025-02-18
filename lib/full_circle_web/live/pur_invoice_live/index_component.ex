@@ -31,12 +31,11 @@ defmodule FullCircleWeb.PurInvoiceLive.IndexComponent do
     )
   end
 
-
   defp refresh_self(doc_id, socket) do
     socket
     |> assign(
       obj:
-        FullCircle.Billing.get_pur_invoice_by_id(doc_id, socket.assigns.company, socket.assigns.user)
+        FullCircle.Billing.get_pur_invoice_by_id_index_component_field!(doc_id, socket.assigns.company, socket.assigns.user)
     ) |> get_e_invoices()
   end
 

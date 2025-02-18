@@ -4,8 +4,8 @@ defmodule FullCircleWeb.PaymentLive.Index do
   alias FullCircle.BillPay
   alias FullCircleWeb.PaymentLive.IndexComponent
 
-  @per_page 25
-  @selected_max 15
+  @per_page 15
+  @selected_max 10
 
   @impl true
   def render(assigns) do
@@ -69,20 +69,26 @@ defmodule FullCircleWeb.PaymentLive.Index do
       </div>
       <div class="font-medium flex flex-row text-center tracking-tighter bg-amber-200">
         <div class="w-[2%] border-b border-t border-amber-400 py-1"></div>
-        <div class="w-[10%] border-b border-t border-amber-400 py-1">
-          {gettext("Date")}
+        <div class="w-[15%] border-b border-t border-amber-400 py-1">
+          {gettext("Date / Payment No / TIN / RegNo")}
         </div>
-        <div class="w-[10%] border-b border-t border-amber-400 py-1">
-          {gettext("Payment No")}
+        <div class="w-[25%] border-b border-t border-amber-400 py-1">
+          {gettext("Contact / Particulars")}
         </div>
-        <div class="w-[28%] border-b border-t border-amber-400 py-1">
-          {gettext("Contact")}
-        </div>
-        <div class="w-[40%] border-b border-t border-amber-400 py-1">
-          {gettext("Particulars")}
-        </div>
-        <div class="w-[10%] border-b border-t border-amber-400 py-1">
+        <div class="w-[8%] border-b border-t border-amber-400 py-1">
           {gettext("Amount")}
+        </div>
+        <div class="w-[0.4%] bg-white"></div>
+        <div class="font-medium flex flex-row bg-blue-200 w-[49.6%]">
+          <div class="w-[22%] border-b border-t border-blue-400 p-1">
+            <div>{gettext("Received/ Issued/ Reject")}</div>
+          </div>
+          <div class="w-[36%] border-b border-t border-blue-400 p-1">
+            <div>{gettext("UUD/ InternalId/ Direction/ Type/ Version")}</div>
+          </div>
+          <div class="w-[42%] border-b border-t border-blue-400 p-1">
+            <div>{gettext("ContactName/ TIN/ Amount")}</div>
+          </div>
         </div>
       </div>
       <div
@@ -98,6 +104,7 @@ defmodule FullCircleWeb.PaymentLive.Index do
             id={obj_id}
             obj={obj}
             company={@current_company}
+            user={@current_user}
             ex_class=""
           />
         <% end %>

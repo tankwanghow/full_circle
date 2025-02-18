@@ -35,7 +35,7 @@ defmodule FullCircleWeb.InvoiceLive.IndexComponent do
     socket
     |> assign(
       obj:
-        FullCircle.Billing.get_invoice_by_id(doc_id, socket.assigns.company, socket.assigns.user)
+        FullCircle.Billing.get_invoice_by_id_index_component_field!(doc_id, socket.assigns.company, socket.assigns.user)
     ) |> get_e_invoices()
   end
 
@@ -191,7 +191,7 @@ defmodule FullCircleWeb.InvoiceLive.IndexComponent do
           <% else %>
             <.doc_link
               current_company={@company}
-              doc_obj={%{doc_type: "Invoice", doc_id: @obj.id, doc_no: @obj.invoice_no}}
+              doc_obj={%{doc_type: "Invoice", doc_id: @obj.id, doc_no: @obj.e_inv_internal_id}}
             />
           <% end %>
           {@obj.tax_id} <span class="text-green-600">{@obj.reg_no}</span>

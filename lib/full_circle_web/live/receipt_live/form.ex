@@ -479,8 +479,14 @@ defmodule FullCircleWeb.ReceiptLive.Form do
     <div class="w-11/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
       <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <.form for={@form} id="object-form" autocomplete="off" phx-change="validate" phx-submit="save">
+      <div class="float-right mt-8 mr-4">
+          <% {url, qrcode} = FullCircle.Helpers.e_invoice_validation_url_qrcode(@form.source.data) %>
+          <.link target="_blank" href={url}>
+            {qrcode |> raw}
+          </.link>
+        </div>
         <.input type="hidden" field={@form[:receipt_no]} />
-        <div class="flex flex-row flex-nowarp">
+        <div class="flex flex-row flex-nowarp w-[92%]">
           <div class="w-5/12 grow shrink">
             <.input type="hidden" field={@form[:contact_id]} />
             <.input
@@ -519,7 +525,7 @@ defmodule FullCircleWeb.ReceiptLive.Form do
             <.input field={@form[:receipt_date]} label={gettext("Receipt Date")} type="date" />
           </div>
         </div>
-        <div class="flex flex-row flex-nowrap">
+        <div class="flex flex-row flex-nowrap w-[92%]">
           <div class="grow shrink w-8/12">
             <.input field={@form[:descriptions]} label={gettext("Descriptions")} />
           </div>
@@ -547,11 +553,11 @@ defmodule FullCircleWeb.ReceiptLive.Form do
           </div>
         </div>
 
-        <div class="flex flex-row flex-nowrap mt-2">
-          <div class="w-[10%]">
+        <div class="flex flex-row flex-nowrap mt-2 w-[92%]">
+          <div class="w-[15%]">
             <.input field={@form[:e_inv_internal_id]} label={gettext("E Invoice Internal Id")} />
           </div>
-          <div class="w-[15%]">
+          <div class="w-[20%]">
             <.input field={@form[:e_inv_uuid]} label={gettext("E Invoice UUID")} />
           </div>
         </div>

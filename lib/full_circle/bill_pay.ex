@@ -13,6 +13,7 @@ defmodule FullCircle.BillPay do
     TransactionMatcher
   }
 
+  alias FullCircle.EInvMetas.EInvoice
   alias FullCircle.{Sys, Accounting}
   alias FullCircle.Product.{Good, Packaging}
   alias FullCircle.Accounting.Account
@@ -37,11 +38,13 @@ defmodule FullCircle.BillPay do
       from pay in Payment,
         join: com in subquery(Sys.user_company(company, user)),
         on: com.id == pay.company_id,
+        left_join: einv in EInvoice,
+        on: einv.uuid == pay.e_inv_uuid,
         where: pay.id in ^ids,
         preload: [:contact, :funds_account],
         preload: [transaction_matchers: ^payment_match_trans(company, user)],
         preload: [payment_details: ^payment_details()],
-        select: pay
+        select: pay, select_merge: %{e_inv_long_id: einv.longId}
     )
     |> Enum.map(fn x -> Payment.compute_struct_balance(x) end)
     |> Enum.map(fn x ->
@@ -58,6 +61,8 @@ defmodule FullCircle.BillPay do
         on: cont.id == pay.contact_id,
         left_join: funds in Account,
         on: funds.id == pay.funds_account_id,
+        left_join: einv in EInvoice,
+        on: einv.uuid == pay.e_inv_uuid,
         where: pay.id == ^id,
         preload: [transaction_matchers: ^payment_match_trans(company, user)],
         preload: [payment_details: ^payment_details()],
@@ -66,7 +71,8 @@ defmodule FullCircle.BillPay do
           contact_name: cont.name,
           reg_no: cont.reg_no,
           tax_id: cont.tax_id,
-          funds_account_name: funds.name
+          funds_account_name: funds.name,
+          e_inv_long_id: einv.longId,
         },
         select_merge: %{matched_amount: coalesce(subquery(matched_amount(id)), 0)},
         select_merge: %{payment_tax_amount: coalesce(subquery(payment_tax_amount(id)), 0)},
@@ -216,10 +222,16 @@ defmodule FullCircle.BillPay do
       where: txn.amount > 0,
       where: txn.company_id == ^company.id,
       where: txn.doc_type == "Payment",
+      left_join: payd in PaymentDetail,
+      on: payd.payment_id == pay.id,
       select: %{
         id: coalesce(txn.doc_id, txn.id),
+        doc_type: "Payment",
+        doc_id: coalesce(txn.doc_id, txn.id),
         payment_no: txn.doc_no,
         e_inv_uuid: pay.e_inv_uuid,
+        e_inv_internal_id: coalesce(pay.e_inv_internal_id, pay.payment_no),
+        got_details: fragment("count(?)", payd.id),
         particulars:
           fragment(
             "string_agg(distinct coalesce(?, ?), ', ')",
@@ -229,6 +241,8 @@ defmodule FullCircle.BillPay do
         payment_date: txn.doc_date,
         company_id: txn.company_id,
         contact_name: cont.name,
+        reg_no: cont.reg_no,
+        tax_id: cont.tax_id,
         amount: sum(txn.amount),
         checked: false,
         old_data: txn.old_data

@@ -13,6 +13,7 @@ defmodule FullCircle.ReceiveFund do
     TransactionMatcher
   }
 
+  alias FullCircle.EInvMetas.EInvoice
   alias FullCircle.{Sys, Accounting}
   alias FullCircle.Product.{Good, Packaging}
   alias FullCircle.Accounting.{Account, Contact}
@@ -44,12 +45,14 @@ defmodule FullCircle.ReceiveFund do
       from rec in Receipt,
         join: com in subquery(Sys.user_company(company, user)),
         on: com.id == rec.company_id,
+        left_join: einv in EInvoice,
+        on: einv.uuid == rec.e_inv_uuid,
         where: rec.id in ^ids,
         preload: [:contact, :funds_account],
         preload: [:received_cheques],
         preload: [transaction_matchers: ^receipt_match_trans(company, user)],
         preload: [receipt_details: ^receipt_details()],
-        select: rec
+        select: rec, select_merge: %{e_inv_long_id: einv.longId}
     )
     |> Enum.map(fn x -> Receipt.compute_struct_balance(x) end)
     |> Enum.map(fn x ->
@@ -66,6 +69,8 @@ defmodule FullCircle.ReceiveFund do
         on: cont.id == rec.contact_id,
         left_join: funds in Account,
         on: funds.id == rec.funds_account_id,
+        left_join: einv in EInvoice,
+        on: einv.uuid == rec.e_inv_uuid,
         where: rec.id == ^id,
         preload: [:received_cheques],
         preload: [transaction_matchers: ^receipt_match_trans(company, user)],
@@ -75,7 +80,8 @@ defmodule FullCircle.ReceiveFund do
           contact_name: cont.name,
           reg_no: cont.reg_no,
           tax_id: cont.tax_id,
-          funds_account_name: funds.name
+          funds_account_name: funds.name,
+          e_inv_long_id: einv.longId
         },
         select_merge: %{cheques_amount: coalesce(subquery(cheques_amount(id)), 0)},
         select_merge: %{matched_amount: coalesce(subquery(matched_amount(id)), 0)},
@@ -232,10 +238,16 @@ defmodule FullCircle.ReceiveFund do
       where: txn.company_id == ^company.id,
       where: txn.doc_type == "Receipt",
       where: txn.amount < 0,
+      left_join: recd in ReceiptDetail,
+      on: recd.receipt_id == rec.id,
       select: %{
         id: coalesce(txn.doc_id, txn.id),
+        doc_type: "Receipt",
+        doc_id: coalesce(txn.doc_id, txn.id),
         receipt_no: txn.doc_no,
         e_inv_uuid: rec.e_inv_uuid,
+        e_inv_internal_id: coalesce(rec.e_inv_internal_id, rec.receipt_no),
+        got_details: fragment("count(?)", recd.id),
         particulars:
           fragment(
             "string_agg(distinct coalesce(?, ?), ', ')",
@@ -245,6 +257,8 @@ defmodule FullCircle.ReceiveFund do
         receipt_date: txn.doc_date,
         company_id: txn.company_id,
         contact_name: cont.name,
+        reg_no: cont.reg_no,
+        tax_id: cont.tax_id,
         amount: sum(txn.amount),
         checked: false,
         old_data: txn.old_data

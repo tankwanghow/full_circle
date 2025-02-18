@@ -218,11 +218,6 @@ defmodule FullCircle.Billing do
     qry |> offset((^page - 1) * ^per_page) |> limit(^per_page) |> Repo.all()
   end
 
-  def get_invoice_by_id(id, com, user) do
-    from(inv in subquery(invoice_raw_query(com, user)), where: inv.id == ^id)
-    |> Repo.one()
-  end
-
   def get_invoice_by_id_index_component_field!(id, com, user) do
     from(i in subquery(invoice_raw_query(com, user)),
       where: i.id == ^id
@@ -252,6 +247,7 @@ defmodule FullCircle.Billing do
         id: coalesce(txn.doc_id, txn.id),
         invoice_no: txn.doc_no,
         e_inv_uuid: inv.e_inv_uuid,
+        e_inv_internal_id: coalesce(inv.e_inv_internal_id, inv.invoice_no),
         particulars: coalesce(txn.contact_particulars, txn.particulars),
         invoice_date: txn.doc_date,
         due_date: txn.doc_date,
@@ -552,11 +548,6 @@ defmodule FullCircle.Billing do
       end
 
     qry |> offset((^page - 1) * ^per_page) |> limit(^per_page) |> Repo.all()
-  end
-
-  def get_pur_invoice_by_id(id, com, user) do
-    from(inv in subquery(pur_invoice_raw_query(com, user)), where: inv.id == ^id)
-    |> Repo.one()
   end
 
   def get_pur_invoice_by_id_index_component_field!(id, com, user) do
