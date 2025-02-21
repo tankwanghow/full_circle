@@ -3,17 +3,17 @@ import * as indexDb from "./indexdb" // methods to deal with indexdb
 
 const humanConfig = {
   // user configuration for human, used to fine-tune behavior
-  // backend: 'webgl',
-  cacheSensitivity: 0,
+  backend: navigator.gpu ? 'webgpu' : 'webgl',
+  cacheSensitivity: 0.1,
   modelBasePath: "/human-models",
-  filter: { enabled: true, equalization: true }, // lets run with histogram equilizer
+  filter: { enabled: false, equalization: true }, // lets run with histogram equilizer
   debug: false,
   face: {
     enabled: true,
-    mesh: { enabled: true },
-    detector: { maxDetected: 1, rotation: true, return: true, mask: false }, // return tensor is used to get detected face image
+    mesh: { enabled: false },
+    detector: { maxDetected: 1, rotation: false, return: true, mask: false }, // return tensor is used to get detected face image
     description: { enabled: true, modelPath: 'faceres-deep.json', },
-    mobilefacenet: { enabled: true,modelPath: 'mobilefacenet.json' }, // alternative model
+    mobilefacenet: { enabled: true, modelPath: 'mobilefacenet.json' }, // alternative model
     insightface: { enabled: true, modelPath: 'insightface-mobilenet-swish.json' }, // alternative model
     iris: { enabled: false }, // needed to determine gaze direction
     emotion: { enabled: false }, // not needed
@@ -27,12 +27,12 @@ const humanConfig = {
 }
 
 // const matchOptions = { order: 2, multiplier: 1000, min: 0.0, max: 1.0 }; // for embedding model
-const matchOptions = { order: 2, multiplier: 20, min: 0.2, max: 0.8 }; // for faceres model
+const matchOptions = { order: 2, multiplier: 20, min: 0.3, max: 0.7 }; // for faceres model
 
 const options = {
   minConfidence: 0.6, // overal face confidence for box, face, gender, real, live
   minSize: 224, // min input to face descriptor model before degradation
-  threshold: 0.65, // minimum similarity
+  threshold: 0.7, // minimum similarity
   mask: humanConfig.face.detector.mask,
   rotation: humanConfig.face.detector.rotation,
   ...matchOptions
@@ -54,6 +54,8 @@ human.draw.options.drawBoxes = true
 let db
 let descriptors
 let detectFPS = 0
+let frameSkip = 0; // Add frame skipping
+const MATCH_INTERVAL = 3; // Process matching every 3 frames
 let inOutFlag = ''
 const matches = { list: [], times: 3 }
 const timestamp = { detect: 0, draw: 0 } // holds information used to calculate performance and possible memory leaks
@@ -112,22 +114,35 @@ async function webCam() {
 }
 
 async function detectionLoop() {
-  // main detection loop
-  if (!dom.video.paused) {
-    if (current.face?.tensor) human.tf.dispose(current.face.tensor) // dispose previous tensor
-    await human.detect(dom.video) // actual detection; were not capturing output in a local variable as it can also be reached via human.result
-    const now = human.now()
-    detectFPS = Math.round(10000 / (now - timestamp.detect)) / 10
-    timestamp.detect = now
-    requestAnimationFrame(detectionLoop) // start new frame immediately
+  if (dom.video.paused) return;
+  
+  const now = performance.now();
+  detectFPS = Math.round(10000 / (now - timestamp.detect)) / 10;
+  timestamp.detect = now;
+
+  // Skip frames to improve performance
+  frameSkip = (frameSkip + 1) % MATCH_INTERVAL;
+  
+  if (current.face?.tensor) human.tf.dispose(current.face.tensor);
+  const result = await human.detect(dom.video, { skipFrames: MATCH_INTERVAL - 1 });
+  current.face = result.face[0];
+
+  // Only process matching on every MATCH_INTERVAL frames
+  if (frameSkip === 0 && current.face?.embedding) {
+    await detectFace();
   }
 
-  const interpolated = human.next(human.result) // smoothen result using last-known results
-  human.draw.canvas(dom.video, dom.canvas) // draw canvas to screen
-  await human.draw.all(dom.canvas, interpolated) // draw labels, boxes, lines, etc.
+  const interpolated = human.next(result);
+  const ctx = dom.canvas.getContext('2d', { willReadFrequently: true });
+  human.draw.canvas(dom.video, dom.canvas);
+  await human.draw.all(dom.canvas, interpolated);
+  
+  // Draw FPS
+  ctx.font = "bold 20px sans";
+  ctx.fillStyle = "#AAFF00";
+  ctx.fillText(`FPS: ${detectFPS}`, 10, 20);
 
-  current.face = human.result.face[0]
-  await detectFace()
+  requestAnimationFrame(detectionLoop);
 }
 
 async function drawPerformance() {
@@ -186,10 +201,6 @@ function insertMatchedImg(el, photo, similarity, klass) {
 async function main() {
   // main entry point
   setNoMatch()
-  db = await indexDb.load()
-  descriptors = db
-    .map(rec => rec.descriptor)
-    .filter(desc => desc.length > 0)
   await webCam()
   await detectionLoop() // start detection loop
   await drawPerformance()
@@ -226,6 +237,10 @@ function matched(el, id, image, similarity) {
 
 export async function initFaceID(lv) {
   phx_liveview = lv
+  db = await indexDb.load()
+  descriptors = db
+    .map(rec => rec.descriptor)
+    .filter(desc => desc.length > 0)
   setInterval(async () => { showClock() }, 1000)
   log(
     "human version:",
@@ -245,10 +260,6 @@ export async function initFaceID(lv) {
   log("initializing webcam...")
   log(human.env)
 
-  await webCam()// start webcam
-
-  await human.load() // preload all models
-
   log("initializing human...")
   log(
     "face embedding model:",
@@ -257,8 +268,11 @@ export async function initFaceID(lv) {
     humanConfig.face["insightface"]?.enabled ? "insightface" : ""
   )
 
+  await human.load()
+  await human.warmup()
+  await webCam()
+
   await getDevices().then(gotDevices)
-  await human.warmup(); // warmup function to initialize backend for future faster detection
 
   dom.inBtn.addEventListener('click', async () => { await inBtnClicked() })
   dom.outBtn.addEventListener('click', async () => { await outBtnClicked() })
@@ -362,23 +376,23 @@ function addZero(i) {
 const beepContext = new (window.AudioContext || window.webkitAudioContext)();
 
 function playSingleBeep() {
-    const oscillator = beepContext.createOscillator();
-    oscillator.type = 'sine';
-    oscillator.frequency.setValueAtTime(440, beepContext.currentTime); // A4 note
+  const oscillator = beepContext.createOscillator();
+  oscillator.type = 'sine';
+  oscillator.frequency.setValueAtTime(440, beepContext.currentTime); // A4 note
 
-    const gainNode = beepContext.createGain();
-    gainNode.gain.setValueAtTime(10, beepContext.currentTime);
-    gainNode.gain.linearRampToValueAtTime(10, beepContext.currentTime + 0.01);
-    gainNode.gain.linearRampToValueAtTime(0, beepContext.currentTime + 0.1); // Short beep
+  const gainNode = beepContext.createGain();
+  gainNode.gain.setValueAtTime(10, beepContext.currentTime);
+  gainNode.gain.linearRampToValueAtTime(10, beepContext.currentTime + 0.01);
+  gainNode.gain.linearRampToValueAtTime(0, beepContext.currentTime + 0.1); // Short beep
 
-    oscillator.connect(gainNode);
-    gainNode.connect(beepContext.destination);
+  oscillator.connect(gainNode);
+  gainNode.connect(beepContext.destination);
 
-    oscillator.start(beepContext.currentTime);
-    oscillator.stop(beepContext.currentTime + 0.1); // Stop after 0.1 seconds
+  oscillator.start(beepContext.currentTime);
+  oscillator.stop(beepContext.currentTime + 0.1); // Stop after 0.1 seconds
 }
 
 function playDoubleBeep() {
-    playSingleBeep();
-    setTimeout(playSingleBeep, 200); // 200 milliseconds delay for the second beep
+  playSingleBeep();
+  setTimeout(playSingleBeep, 200); // 200 milliseconds delay for the second beep
 }

@@ -2,8 +2,8 @@ import * as H from "../vendor/human-main/dist/human.esm.js" // equivalent of @vl
 
 const humanConfig = {
   // user configuration for human, used to fine-tune behavior
-  // backend: 'webgl',
-  cacheSensitivity: 0,
+  backend: navigator.gpu ? 'webgpu' : 'webgl',
+  cacheSensitivity: 0.1,
   modelBasePath: "/human-models/",
   filter: { enabled: true, equalization: true }, // lets run with histogram equilizer
   debug: true,
