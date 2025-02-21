@@ -21,7 +21,6 @@ defmodule FullCircleWeb.PurInvoiceLive.IndexComponent do
         EInvMetas.get_e_invs(
           socket.assigns.obj.e_inv_uuid || "",
           socket.assigns.obj.e_inv_internal_id,
-          :supplierName,
           socket.assigns.obj.contact_name,
           socket.assigns.obj.pur_invoice_amount |> Decimal.abs,
           socket.assigns.obj.pur_invoice_date,
@@ -175,7 +174,7 @@ defmodule FullCircleWeb.PurInvoiceLive.IndexComponent do
               doc_obj={%{doc_type: "PurInvoice", doc_id: @obj.id, doc_no: @obj.pur_invoice_no}}
             />
           <% end %>
-          {@obj.e_inv_internal_id}
+          {if @obj.pur_invoice_no != @obj.e_inv_internal_id, do: @obj.e_inv_internal_id}
           {@obj.tax_id} <span class="text-green-600">{@obj.reg_no}</span>
         </div>
       </div>

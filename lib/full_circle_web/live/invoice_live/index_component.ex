@@ -21,7 +21,6 @@ defmodule FullCircleWeb.InvoiceLive.IndexComponent do
         EInvMetas.get_e_invs(
           socket.assigns.obj.e_inv_uuid || "",
           socket.assigns.obj.invoice_no,
-          :buyerName,
           socket.assigns.obj.contact_name,
           socket.assigns.obj.invoice_amount,
           socket.assigns.obj.invoice_date,
@@ -191,8 +190,9 @@ defmodule FullCircleWeb.InvoiceLive.IndexComponent do
           <% else %>
             <.doc_link
               current_company={@company}
-              doc_obj={%{doc_type: "Invoice", doc_id: @obj.id, doc_no: @obj.e_inv_internal_id}}
+              doc_obj={%{doc_type: "Invoice", doc_id: @obj.id, doc_no: @obj.invoice_no}}
             />
+            {if @obj.invoice_no != @obj.e_inv_internal_id, do: @obj.e_inv_internal_id}
           <% end %>
           {@obj.tax_id} <span class="text-green-600">{@obj.reg_no}</span>
         </div>

@@ -101,7 +101,12 @@ defmodule FullCircleWeb.DebitNoteLive.Print do
             <div class="letter-head">
               {if(@pre_print == "true", do: "", else: letter_head(assigns))}
             </div>
-            <div class="doctype is-size-4 has-text-weight-semibold">DEBIT NOTE</div>
+
+            <div :if={@pre_print == "false"} class="qrcode">
+              <% {_, qrcode} = FullCircle.Helpers.e_invoice_validation_url_qrcode(note) %>
+              {qrcode |> raw}
+            </div>
+
             {note_header(note, assigns)}
 
             <div class="details-body is-size-6">
@@ -301,6 +306,7 @@ defmodule FullCircleWeb.DebitNoteLive.Print do
         {@note.contact.reg_no}
       </div>
       <div class="payment-info">
+        <div class="doctype is-size-4 has-text-weight-semibold">DEBIT NOTE</div>
         <div>
           Note Date: <span class="has-text-weight-semibold">{format_date(@note.note_date)}</span>
         </div>
@@ -355,7 +361,7 @@ defmodule FullCircleWeb.DebitNoteLive.Print do
       .letter-head { padding-bottom: 2mm; margin-bottom: 2mm; height: 28mm;}
       .letter-foot { padding-top: 2mm; margin-top: 2mm; height: 28mm;}
 
-      .doctype { float: right; margin-top: -20mm; margin-right: 0mm; }
+      .qrcode { float: right; margin-top: -26mm; margin-right: 5mm; vertical-align: top; }
 
       .header { width: 100%; height: 40mm; border-bottom: 0.5mm solid black; }
       .customer { padding-left: 2mm; float: left;}

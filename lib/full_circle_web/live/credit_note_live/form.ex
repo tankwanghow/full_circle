@@ -10,13 +10,11 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
     id = params["note_id"]
     to = Timex.today()
     from = Timex.shift(to, months: -1)
-    obj = Jason.decode!(params["obj"] || "{}")
 
     socket =
       case socket.assigns.live_action do
-        :new -> mount_new(socket, obj)
+        :new -> mount_new(socket)
         :edit -> mount_edit(socket, id)
-        :match -> mount_match(socket, id, obj)
       end
 
     {:ok,
@@ -24,25 +22,11 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
      |> assign(details_got_error: false)
      |> assign(matchers_got_error: false)
      |> assign(query: %{from: from, to: to})
-     |> assign(query_match_trans: [])
-     |> assign(e_inv_obj: obj)}
+     |> assign(query_match_trans: [])}
   end
 
-  defp mount_new(socket, obj) do
-    attrs =
-      if obj != %{} do
-        %{
-          note_no: "...new...",
-          e_inv_internal_id: obj["internalId"],
-          note_date: obj["dateTimeIssued"] |> String.slice(0..9),
-          e_inv_uuid: obj["uuid"],
-          e_inv_long_id: obj["longId"],
-          e_inv_info:
-            ~s(#{obj["fc_mainName"]} - #{obj["fc_direction"]} - #{obj["typeName"]} - #{obj["documentCurrency"]}#{obj["totalNetAmount"]})
-        }
-      else
-        %{note_no: "...new..."}
-      end
+  defp mount_new(socket) do
+    attrs = %{note_no: "...new..."}
 
     socket
     |> assign(live_action: :new)
@@ -71,34 +55,6 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
 
     cs =
       StdInterface.changeset(CreditNote, object, %{}, socket.assigns.current_company)
-
-    socket
-    |> assign(live_action: :edit)
-    |> assign(id: id)
-    |> assign(page_title: gettext("Edit Credit Note") <> " " <> object.note_no)
-    |> assign(:form, to_form(cs))
-  end
-
-  defp mount_match(socket, id, obj) do
-    object =
-      DebCre.get_debit_note!(
-        id,
-        socket.assigns.current_company,
-        socket.assigns.current_user
-      )
-
-    attrs =
-      %{
-        e_inv_internal_id: obj["internalId"],
-        note_date: obj["dateTimeIssued"] |> String.slice(0..9),
-        e_inv_uuid: obj["uuid"],
-        e_inv_long_id: obj["longId"],
-        e_inv_info:
-          ~s(#{obj["fc_mainName"]} - #{obj["fc_direction"]} - #{obj["typeName"]} - #{obj["documentCurrency"]}#{obj["totalNetAmount"]})
-      }
-
-    cs =
-      StdInterface.changeset(CreditNote, object, attrs, socket.assigns.current_company)
 
     socket
     |> assign(live_action: :edit)
@@ -374,7 +330,13 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
       <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <.form for={@form} id="object-form" autocomplete="off" phx-change="validate" phx-submit="save">
         <.input type="hidden" field={@form[:note_no]} />
-        <div class="flex flex-row flex-nowarp">
+        <div class="float-right mt-8 mr-4">
+          <% {url, qrcode} = FullCircle.Helpers.e_invoice_validation_url_qrcode(@form.source.data) %>
+          <.link target="_blank" href={url}>
+          {qrcode |> raw}
+          </.link>
+        </div>
+        <div class="flex flex-row flex-nowarp w-[92%]">
           <div class="w-[41%]">
             <.input type="hidden" field={@form[:contact_id]} />
             <.input
@@ -405,11 +367,11 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
           </div>
         </div>
 
-        <div class="flex flex-row flex-nowrap mt-2">
-          <div class="w-[10%]">
+        <div class="flex flex-row flex-nowrap mt-2 w-[92%]">
+          <div class="w-[15%]">
             <.input field={@form[:e_inv_internal_id]} label={gettext("E Invoice Internal Id")} />
           </div>
-          <div class="w-[15%]">
+          <div class="w-[20%]">
             <.input field={@form[:e_inv_uuid]} label={gettext("E Invoice UUID")} />
           </div>
         </div>

@@ -5,12 +5,12 @@ defmodule FullCircleWeb.CreditNoteLive.Index do
   alias FullCircleWeb.CreditNoteLive.IndexComponent
 
   @per_page 25
-  @selected_max 15
+  @selected_max 5
 
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="mx-auto w-8/12">
+    <div class="mx-auto w-11/12">
       <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <div class="flex justify-center mb-2">
         <.form for={%{}} id="search-form" phx-submit="search" autocomplete="off" class="w-full">
@@ -69,20 +69,26 @@ defmodule FullCircleWeb.CreditNoteLive.Index do
       </div>
       <div class="font-medium flex flex-row text-center tracking-tighter bg-amber-200">
         <div class="w-[2%] border-b border-t border-amber-400 py-1"></div>
-        <div class="w-[10%] border-b border-t border-amber-400 py-1">
-          {gettext("Date")}
+        <div class="w-[15%] border-b border-t border-amber-400 py-1">
+          {gettext("Date / Credit No / TIN / RegNo")}
         </div>
-        <div class="w-[10%] border-b border-t border-amber-400 py-1">
-          {gettext("Credit Note No")}
+        <div class="w-[25%] border-b border-t border-amber-400 py-1">
+          {gettext("Contact / Particulars")}
         </div>
-        <div class="w-[28%] border-b border-t border-amber-400 py-1">
-          {gettext("Contact")}
-        </div>
-        <div class="w-[40%] border-b border-t border-amber-400 py-1">
-          {gettext("Particulars")}
-        </div>
-        <div class="w-[10%] border-b border-t border-amber-400 py-1">
+        <div class="w-[8%] border-b border-t border-amber-400 py-1">
           {gettext("Amount")}
+        </div>
+        <div class="w-[0.4%] bg-white"></div>
+        <div class="font-medium flex flex-row bg-blue-200 w-[49.6%]">
+          <div class="w-[22%] border-b border-t border-blue-400 p-1">
+            <div>{gettext("Received/ Issued/ Reject")}</div>
+          </div>
+          <div class="w-[36%] border-b border-t border-blue-400 p-1">
+            <div>{gettext("UUD/ InternalId/ Direction/ Type/ Version")}</div>
+          </div>
+          <div class="w-[42%] border-b border-t border-blue-400 p-1">
+            <div>{gettext("ContactName/ TIN/ Amount")}</div>
+          </div>
         </div>
       </div>
       <div
@@ -98,6 +104,7 @@ defmodule FullCircleWeb.CreditNoteLive.Index do
             id={obj_id}
             obj={obj}
             company={@current_company}
+            user={@current_user}
             ex_class=""
           />
         <% end %>

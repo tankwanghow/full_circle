@@ -5,6 +5,7 @@ defmodule FullCircle.DebCre do
   alias Ecto.Multi
   import FullCircle.Helpers
 
+  alias FullCircle.EInvMetas.EInvoice
   alias FullCircle.DebCre.{CreditNote, CreditNoteDetail, DebitNote, DebitNoteDetail}
 
   alias FullCircle.Accounting.{
@@ -22,11 +23,14 @@ defmodule FullCircle.DebCre do
       from rec in CreditNote,
         join: com in subquery(Sys.user_company(company, user)),
         on: com.id == rec.company_id,
+        left_join: einv in EInvoice,
+        on: einv.uuid == rec.e_inv_uuid,
         where: rec.id in ^ids,
         preload: [:contact],
         preload: [transaction_matchers: ^credit_note_match_trans(company, user)],
         preload: [credit_note_details: ^credit_note_details()],
-        select: rec
+        select: rec,
+        select_merge: %{e_inv_long_id: einv.longId}
     )
     |> Enum.map(fn x -> CreditNote.compute_struct_fields(x) end)
     |> Enum.map(fn x ->
@@ -41,11 +45,18 @@ defmodule FullCircle.DebCre do
         on: com.id == obj.company_id,
         join: cont in Contact,
         on: cont.id == obj.contact_id,
+        left_join: einv in EInvoice,
+        on: einv.uuid == obj.e_inv_uuid,
         where: obj.id == ^id,
         preload: [transaction_matchers: ^credit_note_match_trans(company, user)],
         preload: [credit_note_details: ^credit_note_details()],
         select: obj,
-        select_merge: %{contact_name: cont.name, reg_no: cont.reg_no, tax_id: cont.tax_id},
+        select_merge: %{
+          e_inv_long_id: einv.longId,
+          contact_name: cont.name,
+          reg_no: cont.reg_no,
+          tax_id: cont.tax_id
+        },
         select_merge: %{matched_amount: coalesce(subquery(dn_matched_amount(id)), 0)},
         select_merge: %{note_tax_amount: coalesce(subquery(credit_note_tax_amount(id)), 0)},
         select_merge: %{note_desc_amount: coalesce(subquery(credit_note_desc_amount(id)), 0)},
@@ -189,9 +200,12 @@ defmodule FullCircle.DebCre do
       order_by: [desc: txn.doc_date],
       where: txn.amount < 0,
       select: %{
-        id: coalesce(obj.id, txn.id),
+        id: coalesce(txn.doc_id, txn.id),
+        doc_type: "CreditNote",
+        doc_id: coalesce(txn.doc_id, txn.id),
         note_no: txn.doc_no,
         e_inv_uuid: obj.e_inv_uuid,
+        e_inv_internal_id: obj.e_inv_internal_id,
         particulars:
           fragment(
             "string_agg(distinct coalesce(?, ?), ', ')",
@@ -202,17 +216,21 @@ defmodule FullCircle.DebCre do
         company_id: com.id,
         contact_name: coalesce(cont.name, ac.name),
         amount: sum(txn.amount),
+        reg_no: cont.reg_no,
+        tax_id: cont.tax_id,
         checked: false,
         old_data: txn.old_data
       },
       group_by: [
-        coalesce(obj.id, txn.id),
+        coalesce(txn.doc_id, txn.id),
+        obj.id,
         txn.doc_no,
-        coalesce(cont.name, ac.name),
+        cont.id,
         txn.doc_date,
-        com.id,
+        txn.company_id,
         txn.old_data,
-        obj.e_inv_uuid
+        com.id,
+        coalesce(cont.name, ac.name)
       ]
   end
 
@@ -385,11 +403,14 @@ defmodule FullCircle.DebCre do
       from rec in DebitNote,
         join: com in subquery(Sys.user_company(company, user)),
         on: com.id == rec.company_id,
+        left_join: einv in EInvoice,
+        on: einv.uuid == rec.e_inv_uuid,
         where: rec.id in ^ids,
         preload: [:contact],
         preload: [transaction_matchers: ^debit_note_match_trans(company, user)],
         preload: [debit_note_details: ^debit_note_details()],
-        select: rec
+        select: rec,
+        select_merge: %{e_inv_long_id: einv.longId}
     )
     |> Enum.map(fn x -> DebitNote.compute_struct_fields(x) end)
     |> Enum.map(fn x ->
@@ -404,11 +425,18 @@ defmodule FullCircle.DebCre do
         on: com.id == obj.company_id,
         join: cont in Contact,
         on: cont.id == obj.contact_id,
+        left_join: einv in EInvoice,
+        on: einv.uuid == obj.e_inv_uuid,
         where: obj.id == ^id,
         preload: [transaction_matchers: ^debit_note_match_trans(company, user)],
         preload: [debit_note_details: ^debit_note_details()],
         select: obj,
-        select_merge: %{contact_name: cont.name, reg_no: cont.reg_no, tax_id: cont.tax_id},
+        select_merge: %{
+          e_inv_long_id: einv.longId,
+          contact_name: cont.name,
+          reg_no: cont.reg_no,
+          tax_id: cont.tax_id
+        },
         select_merge: %{matched_amount: coalesce(subquery(matched_amount(id)), 0)},
         select_merge: %{note_tax_amount: coalesce(subquery(debit_note_tax_amount(id)), 0)},
         select_merge: %{note_desc_amount: coalesce(subquery(debit_note_desc_amount(id)), 0)},
@@ -552,9 +580,12 @@ defmodule FullCircle.DebCre do
       order_by: [desc: txn.doc_date],
       where: txn.amount > 0,
       select: %{
-        id: coalesce(obj.id, txn.id),
+        id: coalesce(txn.doc_id, txn.id),
+        doc_type: "DebitNote",
+        doc_id: coalesce(txn.doc_id, txn.id),
         note_no: txn.doc_no,
         e_inv_uuid: obj.e_inv_uuid,
+        e_inv_internal_id: obj.e_inv_internal_id,
         particulars:
           fragment(
             "string_agg(distinct coalesce(?, ?), ', ')",
@@ -565,17 +596,21 @@ defmodule FullCircle.DebCre do
         company_id: com.id,
         contact_name: coalesce(cont.name, ac.name),
         amount: sum(txn.amount),
+        reg_no: cont.reg_no,
+        tax_id: cont.tax_id,
         checked: false,
         old_data: txn.old_data
       },
       group_by: [
-        coalesce(obj.id, txn.id),
+        coalesce(txn.doc_id, txn.id),
+        obj.id,
         txn.doc_no,
-        coalesce(cont.name, ac.name),
+        cont.id,
         txn.doc_date,
-        com.id,
+        txn.company_id,
         txn.old_data,
-        obj.e_inv_uuid
+        com.id,
+        coalesce(cont.name, ac.name)
       ]
   end
 

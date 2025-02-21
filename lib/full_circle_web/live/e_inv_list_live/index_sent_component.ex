@@ -108,6 +108,7 @@ defmodule FullCircleWeb.EInvListLive.IndexSentComponent do
 
   defp match(doc, assigns) do
     assigns = assigns |> assign(doc: doc)
+
     ~H"""
     <.link
       phx-target={@myself}
@@ -123,6 +124,7 @@ defmodule FullCircleWeb.EInvListLive.IndexSentComponent do
 
   defp unmatch(doc, assigns) do
     assigns = assigns |> assign(doc: doc)
+
     ~H"""
     <.link
       phx-target={@myself}
@@ -202,8 +204,13 @@ defmodule FullCircleWeb.EInvListLive.IndexSentComponent do
           <div class="text-sm">
             {@obj.buyerTIN}
             <span class="font-bold">
-              {@obj.documentCurrency} {@obj.totalPayableAmount
-              |> Number.Delimit.number_to_delimited()}
+              <%= if Decimal.gt?(@obj.totalNetAmount, 0) do %>
+                {@obj.documentCurrency}{@obj.totalNetAmount
+                |> Number.Delimit.number_to_delimited()}
+              <% else %>
+                {@obj.documentCurrency}{@obj.totalPayableAmount
+                |> Number.Delimit.number_to_delimited()}
+              <% end %>
             </span>
             <span :if={@obj.status == "Valid"} class="text-green-600">{@obj.status}</span>
             <span :if={@obj.status == "Invalid"} class="text-rose-600">{@obj.status}</span>

@@ -230,7 +230,7 @@ defmodule FullCircle.BillPay do
         doc_id: coalesce(txn.doc_id, txn.id),
         payment_no: txn.doc_no,
         e_inv_uuid: pay.e_inv_uuid,
-        e_inv_internal_id: coalesce(pay.e_inv_internal_id, pay.payment_no),
+        e_inv_internal_id: pay.e_inv_internal_id,
         got_details: fragment("count(?)", payd.id),
         particulars:
           fragment(

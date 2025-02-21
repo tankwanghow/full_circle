@@ -93,16 +93,21 @@ defmodule FullCircle.EInvMetas do
   defp get_internal_doc_by_contact(
          klass,
          einv,
-         contact_field,
          amount,
          com
        ) do
-    clean_contact =
-      String.replace(Map.get(einv, contact_field), ~r/[^a-zA-Z0-9]/, "")
+    buy_name =
+      String.replace(Map.get(einv, :buyerName), ~r/[^a-zA-Z]/, "")
       |> String.slice(0..15)
       |> String.downcase()
 
-    clean_contact = "%#{clean_contact}%"
+    supp_name =
+      String.replace(Map.get(einv, :supplierName), ~r/[^a-zA-Z]/, "")
+      |> String.slice(0..15)
+      |> String.downcase()
+
+    buy_name = "%#{buy_name}%"
+    supp_name = "%#{supp_name}%"
 
     sd = einv.dateTimeReceived |> DateTime.to_date() |> Date.shift(day: -10)
     ed = einv.dateTimeReceived |> DateTime.to_date() |> Date.shift(day: 10)
@@ -112,14 +117,21 @@ defmodule FullCircle.EInvMetas do
       on: txn.doc_id == inv.id,
       join: cont in Contact,
       on: inv.contact_id == cont.id and txn.company_id == ^com.id,
+      where: fragment("abs(?) = round(?, 2)", txn.amount, ^amount),
       where:
-        fragment("abs(?) = round(?, 2)", txn.amount, ^amount) and
+        ilike(
+          fragment(
+            "lower(left(regexp_replace(?, '[^a-zA-Z]', '', 'g'), 16))",
+            cont.name
+          ),
+          ^supp_name
+        ) or
           ilike(
             fragment(
-              "lower(left(regexp_replace(?, '[^a-zA-Z0-9]', '', 'g'), 16))",
+              "lower(left(regexp_replace(?, '[^a-zA-Z]', '', 'g'), 16))",
               cont.name
             ),
-            ^clean_contact
+            ^buy_name
           ),
       where: txn.doc_date >= ^sd,
       where: txn.doc_date <= ^ed,
@@ -140,7 +152,7 @@ defmodule FullCircle.EInvMetas do
     )
   end
 
-  defp get_fc_doc(klass, einv, doc_no_field, contact_field, com) do
+  defp get_fc_doc(klass, einv, doc_no_field, com) do
     amount =
       if(Decimal.gt?(einv.totalPayableAmount, einv.totalNetAmount),
         do: einv.totalPayableAmount,
@@ -149,7 +161,7 @@ defmodule FullCircle.EInvMetas do
 
     q1 = get_internal_doc_by_uuid(klass, einv, amount, com)
     q2 = get_internal_doc_by_doc_no(klass, doc_no_field, einv, amount, com)
-    q3 = get_internal_doc_by_contact(klass, einv, contact_field, amount, com)
+    q3 = get_internal_doc_by_contact(klass, einv, amount, com)
 
     fq = q1 |> union(^q2) |> union(^q3)
 
@@ -167,45 +179,45 @@ defmodule FullCircle.EInvMetas do
   end
 
   def get_internal_document("Invoice", "Sent", einv, com) do
-    get_fc_doc(Invoice, einv, :invoice_no, :buyerName, com) ||
-      get_fc_doc(Receipt, einv, :receipt_no, :buyerName, com) || []
+    get_fc_doc(Invoice, einv, :invoice_no, com) ||
+      get_fc_doc(Receipt, einv, :receipt_no, com) || []
   end
 
   def get_internal_document("Self-billed Invoice", "Sent", einv, com) do
-    get_fc_doc(PurInvoice, einv, :e_inv_internal_id, :supplierName, com) ||
-      get_fc_doc(Payment, einv, :payment_no, :supplierName, com) || []
+    get_fc_doc(PurInvoice, einv, :e_inv_internal_id, com) ||
+      get_fc_doc(Payment, einv, :payment_no, com) || []
   end
 
   def get_internal_document("Invoice", "Received", einv, com) do
-    get_fc_doc(PurInvoice, einv, :e_inv_internal_id, :supplierName, com) ||
-      get_fc_doc(Payment, einv, :payment_no, :supplierName, com) || []
+    get_fc_doc(PurInvoice, einv, :e_inv_internal_id, com) ||
+      get_fc_doc(Payment, einv, :payment_no, com) || []
   end
 
   def get_internal_document("Self-billed Invoice", "Received", einv, com) do
-    get_fc_doc(Invoice, einv, :invoice_no, :buyerName, com) ||
-      get_fc_doc(Receipt, einv, :receipt_no, :buyerName, com) || []
+    get_fc_doc(Invoice, einv, :invoice_no, com) ||
+      get_fc_doc(Receipt, einv, :receipt_no, com) || []
   end
 
   def get_internal_document("Credit Note", "Sent", einv, com) do
-    get_fc_doc(CreditNote, einv, :note_no, :buyerName, com) || []
+    get_fc_doc(CreditNote, einv, :note_no, com) || []
   end
 
   def get_internal_document("Debit Note", "Sent", einv, com) do
-    get_fc_doc(DebitNote, einv, :note_no, :buyerName, com) || []
+    get_fc_doc(DebitNote, einv, :note_no, com) || []
   end
 
   def get_internal_document("Credit Note", "Received", einv, com) do
-    get_fc_doc(DebitNote, einv, :note_no, :supplierName, com) || []
+    get_fc_doc(DebitNote, einv, :note_no, com) || []
   end
 
   def get_internal_document("Debit Note", "Received", einv, com) do
-    get_fc_doc(CreditNote, einv, :note_no, :supplierName, com) || []
+    get_fc_doc(CreditNote, einv, :note_no, com) || []
   end
 
-  def get_e_invs(uuid, internal_id, contact_field, contact, amount, doc_date, com, user) do
+  def get_e_invs(uuid, internal_id, contact, amount, doc_date, com, user) do
     q1 = get_e_invoices_by_uuid(uuid, amount, com, user)
     q2 = get_e_invoices_by_internal_id(internal_id, amount, com, user)
-    q3 = get_e_invoices_by_contact(contact_field, contact, amount, doc_date, com, user)
+    q3 = get_e_invoices_by_contact(contact, amount, doc_date, com, user)
 
     fq = q1 |> union(^q2) |> union(^q3)
 
@@ -326,14 +338,14 @@ defmodule FullCircle.EInvMetas do
     )
   end
 
-  defp get_e_invoices_by_contact(einv_contact_field, contact, amount, doc_date, com, user) do
+  defp get_e_invoices_by_contact(contact, amount, doc_date, com, user) do
     clean_contact =
-      String.replace(contact, ~r/[^a-zA-Z0-9]/, "")
+      String.replace(contact, ~r/[^a-zA-Z]/, "")
       |> String.slice(0..15)
       |> String.downcase()
 
-    sd = doc_date |> Timex.to_datetime() |> DateTime.shift(day: -5)
-    ed = doc_date |> Timex.to_datetime() |> DateTime.shift(day: 5)
+    sd = doc_date |> Timex.to_datetime() |> DateTime.shift(day: -10)
+    ed = doc_date |> Timex.to_datetime() |> DateTime.shift(day: 10)
 
     from(ei in EInvoice,
       join: c in Company,
@@ -350,11 +362,18 @@ defmodule FullCircle.EInvMetas do
       where:
         ilike(
           fragment(
-            "lower(left(regexp_replace(?, '[^a-zA-Z0-9]', '', 'g'), 16))",
-            field(ei, ^einv_contact_field)
+            "lower(left(regexp_replace(?, '[^a-zA-Z]', '', 'g'), 16))",
+            ei.buyerName
           ),
           ^"%#{clean_contact}%"
-        ),
+        ) or
+          ilike(
+            fragment(
+              "lower(left(regexp_replace(?, '[^a-zA-Z]', '', 'g'), 16))",
+              ei.supplierName
+            ),
+            ^"%#{clean_contact}%"
+          ),
       select: %{
         rejectRequestDateTime: ei.rejectRequestDateTime,
         intermediaryROB: ei.intermediaryROB,
@@ -471,11 +490,11 @@ defmodule FullCircle.EInvMetas do
           pageNo: p
         )
 
-        PubSub.broadcast(
-          FullCircle.PubSub,
-          "#{com.id}_e_invoice_sync_status",
-          {:update_sync_status, sd, ed, p}
-        )
+      PubSub.broadcast(
+        FullCircle.PubSub,
+        "#{com.id}_e_invoice_sync_status",
+        {:update_sync_status, sd, ed, p}
+      )
 
       %{"metadata" => _, "result" => res} =
         Req.get!(url, headers: [Authorization: meta.token]).body

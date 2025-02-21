@@ -21,7 +21,6 @@ defmodule FullCircleWeb.PaymentLive.IndexComponent do
         EInvMetas.get_e_invs(
           socket.assigns.obj.e_inv_uuid || "",
           socket.assigns.obj.payment_no,
-          :supplierName,
           socket.assigns.obj.contact_name,
           socket.assigns.obj.amount,
           socket.assigns.obj.payment_date,
@@ -190,6 +189,7 @@ defmodule FullCircleWeb.PaymentLive.IndexComponent do
             >
               {@obj.payment_no}
             </.link>
+            {if @obj.payment_no != @obj.e_inv_internal_id, do: @obj.e_inv_internal_id}
           </span>
           <span :if={@obj.old_data} class="text-sm">{@obj.payment_no}</span>
         </div>

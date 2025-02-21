@@ -21,7 +21,6 @@ defmodule FullCircleWeb.ReceiptLive.IndexComponent do
         EInvMetas.get_e_invs(
           socket.assigns.obj.e_inv_uuid || "",
           socket.assigns.obj.receipt_no,
-          :buyerName,
           socket.assigns.obj.contact_name,
           socket.assigns.obj.amount |> Decimal.abs,
           socket.assigns.obj.receipt_date,
@@ -190,6 +189,7 @@ defmodule FullCircleWeb.ReceiptLive.IndexComponent do
             >
               {@obj.receipt_no}
             </.link>
+            {if @obj.receipt_no != @obj.e_inv_internal_id, do: @obj.e_inv_internal_id}
           </span>
           <span :if={@obj.old_data} class="text-sm">{@obj.receipt_no}</span>
         </div>

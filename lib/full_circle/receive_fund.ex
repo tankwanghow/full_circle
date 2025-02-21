@@ -246,7 +246,7 @@ defmodule FullCircle.ReceiveFund do
         doc_id: coalesce(txn.doc_id, txn.id),
         receipt_no: txn.doc_no,
         e_inv_uuid: rec.e_inv_uuid,
-        e_inv_internal_id: coalesce(rec.e_inv_internal_id, rec.receipt_no),
+        e_inv_internal_id: rec.e_inv_internal_id,
         got_details: fragment("count(?)", recd.id),
         particulars:
           fragment(
