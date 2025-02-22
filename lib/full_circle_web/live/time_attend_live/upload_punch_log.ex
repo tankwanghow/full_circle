@@ -8,7 +8,7 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
     socket =
       socket
       |> assign(page_title: gettext("Time Attendence Import"))
-      |> allow_upload(:csv_file,
+      |> allow_upload(:xlsx_file,
         accept: ~w(.xlsx),
         max_file_size: 6_000_000,
         auto_upload: true,
@@ -31,7 +31,7 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
 
   @impl true
   def handle_event("cancel-upload", %{"ref" => ref}, socket) do
-    {:noreply, cancel_upload(socket, :csv_file, ref)}
+    {:noreply, cancel_upload(socket, :xlsx_file, ref)}
   end
 
   @impl true
@@ -49,7 +49,7 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
   def handle_event("refresh", _params, socket) do
     attendences =
       fill_in_employee_info(
-        socket.assigns.raw_attendences,
+        parse_xlsx_to_attrs(socket.assigns.raw_attendences),
         socket.assigns.current_company,
         socket.assigns.current_user
       )
@@ -85,16 +85,16 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
     end
   end
 
-  def handle_progress(:csv_file, entry, socket) do
+  def handle_progress(:xlsx_file, entry, socket) do
     if entry.done? do
       raw_attendences =
         consume_uploaded_entry(socket, entry, fn %{path: path} ->
-          {:ok, parse_xlsx_to_attrs(path)}
+          {:ok, read_excel_files(path)}
         end)
 
       attendences =
         fill_in_employee_info(
-          raw_attendences,
+          parse_xlsx_to_attrs(raw_attendences),
           socket.assigns.current_company,
           socket.assigns.current_user
         )
@@ -125,11 +125,14 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
   defp error_to_string(:too_many_files), do: "You have selected too many files!"
   defp error_to_string(:not_accepted), do: "You have selected an unacceptable file type"
 
-  def parse_xlsx_to_attrs(filename) do
-    blob = File.read!(filename)
+  def read_excel_files(file) do
+    blob = File.read!(file)
     {:ok, package} = XlsxReader.open(blob, source: :binary)
     {:ok, rows} = XlsxReader.sheet(package, "Att.log report")
+    rows
+  end
 
+  def parse_xlsx_to_attrs(rows) do
     date_range = Enum.at(rows, 2) |> Enum.at(2) |> extract_date_range()
 
     rows
@@ -178,7 +181,7 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
         ID: Enum.at(info, 1),
         Name: Enum.at(info, 3),
         Department: Enum.at(info, 5),
-        punch_card_id: "#{Enum.at(info, 1)}.#{Enum.at(info, 3)}.#{Enum.at(info, 5)}",
+        punch_card_id: "#{Enum.at(info, 3)}.#{Enum.at(info, 1)}.#{Enum.at(info, 5)}" |> String.replace(" ", ""),
         punch_time_local: NaiveDateTime.new!(dt, x.stamp)
       })
     end)
@@ -234,11 +237,11 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
         phx-change="validate"
         class="p-4 mb-1 border rounded-lg border-blue-500 bg-blue-200"
       >
-        {"Maximum file size is #{@uploads.csv_file.max_file_size / 1_000_000} MB"}
+        {"Maximum file size is #{@uploads.xlsx_file.max_file_size / 1_000_000} MB"}
 
-        <.live_file_input upload={@uploads.csv_file} />
-        <div phx-drop-target={@uploads.csv_file.ref} class="p-2">
-          <%= for entry <- @uploads.csv_file.entries do %>
+        <.live_file_input upload={@uploads.xlsx_file} />
+        <div phx-drop-target={@uploads.xlsx_file.ref} class="p-2">
+          <%= for entry <- @uploads.xlsx_file.entries do %>
             <div class="mt-2 gap-2 flex flex-row tracking-tighter border-2 border-green-600 place-items-center p-2 rounded-lg">
               <div class="w-[40%]">{entry.client_name}</div>
               <div class="w-[10%] border">
@@ -256,7 +259,7 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
                 >
                   X
                 </.link>
-                <%= for err <- upload_errors(@uploads.csv_file, entry) do %>
+                <%= for err <- upload_errors(@uploads.xlsx_file, entry) do %>
                   <div class="text-center text-rose-600">
                     {error_to_string(err)}
                   </div>
@@ -265,7 +268,7 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
             </div>
           <% end %>
 
-          <%= for err <- upload_errors(@uploads.csv_file) do %>
+          <%= for err <- upload_errors(@uploads.xlsx_file) do %>
             <p class="w-[50%] mx-auto text-rose-600 border-4 font-bold rounded p-4 border-rose-700 bg-rose-200">
               {error_to_string(err)}
             </p>
@@ -311,7 +314,7 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
                   {emp.employee_name}<.copy_to_clipboard id={emp.employee_name} />
                 </div>
                 <% clean_name =
-                  Regex.run(~r/^\d+\.(.+)\..+$/, emp.employee_name)
+                  Regex.run(~r/^(.+)\.\d+\..+$/, emp.employee_name)
                   |> Enum.at(1)
                   |> String.replace(~r/[^a-zA-Z0-9]/, "")
                   |> String.downcase() %>
@@ -334,12 +337,14 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
               >
                 {emp.employee_name}
               </.link>
-              <div
+              <.live_component
                 :if={!@imported}
-                class="w-[20%] m-1 border rounded bg-cyan-200 border-cyan-400 p-2 text-center"
-              >
-                {emp.employee_name}
-              </div>
+                module={FullCircleWeb.PreviewAttendenceLive.Component}
+                id={"id_" <> (emp.punch_card_id |> Base.encode16)}
+                show_preview={false}
+                raw_attendences={@raw_attendences}
+                label={"Preview #{emp.employee_name}"}
+              />
             <% end %>
           <% end %>
         </div>
