@@ -5,15 +5,15 @@ const humanConfig = {
   backend: navigator.gpu ? 'webgpu' : 'webgl',
   cacheSensitivity: 0.1,
   modelBasePath: "/human-models/",
-  filter: { enabled: true, equalization: true }, // lets run with histogram equilizer
+  filter: { enabled: false, equalization: true }, // lets run with histogram equilizer
   debug: true,
   face: {
     enabled: true,
     mesh: { enabled: true },
     detector: { maxDetected: 1, rotation: true, return: true, mask: false }, // return tensor is used to get detected face image
-    description: { enabled: true, modelPath: 'faceres-deep.json', },
-    mobilefacenet: { enabled: true, modelPath: 'mobilefacenet.json' }, 
+    description: { enabled: true, modelPath: 'faceres-deep.json' },
     insightface: { enabled: true, modelPath: 'insightface-mobilenet-swish.json' },  
+    mobilefacenet: { enabled: true, modelPath: 'mobilefacenet.json' }, 
     iris: { enabled: false }, // needed to determine gaze direction
     emotion: { enabled: false }, // not needed
     antispoof: { enabled: false }, // enable optional antispoof module
@@ -97,8 +97,8 @@ async function webCam() {
     audio: false,
     video: {
       deviceId: videoSource ? { exact: videoSource } : undefined,
-      width: { ideal: 720 },
-      height: { ideal: 720 }
+      width: { ideal: 640 },
+      height: { ideal: 640 }
     }
   }
   const stream = await navigator.mediaDevices.getUserMedia(cameraOptions)

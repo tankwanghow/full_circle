@@ -11,10 +11,10 @@ const humanConfig = {
   face: {
     enabled: true,
     mesh: { enabled: false },
-    detector: { maxDetected: 1, rotation: false, return: true, mask: false }, // return tensor is used to get detected face image
-    description: { enabled: true, modelPath: 'faceres-deep.json', },
-    mobilefacenet: { enabled: true, modelPath: 'mobilefacenet.json' }, // alternative model
-    insightface: { enabled: true, modelPath: 'insightface-mobilenet-swish.json' }, // alternative model
+    detector: { maxDetected: 1, rotation: true, return: true, mask: false }, // return tensor is used to get detected face image
+    description: { enabled: true, modelPath: 'faceres-deep.json' },
+    insightface: { enabled: true, modelPath: 'insightface-mobilenet-swish.json' },  
+    mobilefacenet: { enabled: true, modelPath: 'mobilefacenet.json' }, 
     iris: { enabled: false }, // needed to determine gaze direction
     emotion: { enabled: false }, // not needed
     antispoof: { enabled: true }, // enable optional antispoof module
@@ -32,7 +32,7 @@ const matchOptions = { order: 2, multiplier: 20, min: 0.3, max: 0.7 }; // for fa
 const options = {
   minConfidence: 0.6, // overal face confidence for box, face, gender, real, live
   minSize: 224, // min input to face descriptor model before degradation
-  threshold: 0.7, // minimum similarity
+  threshold: 0.65, // minimum similarity
   mask: humanConfig.face.detector.mask,
   rotation: humanConfig.face.detector.rotation,
   ...matchOptions
@@ -115,14 +115,14 @@ async function webCam() {
 
 async function detectionLoop() {
   if (dom.video.paused) return;
-  
+
   const now = performance.now();
   detectFPS = Math.round(10000 / (now - timestamp.detect)) / 10;
   timestamp.detect = now;
 
   // Skip frames to improve performance
   frameSkip = (frameSkip + 1) % MATCH_INTERVAL;
-  
+
   if (current.face?.tensor) human.tf.dispose(current.face.tensor);
   const result = await human.detect(dom.video, { skipFrames: MATCH_INTERVAL - 1 });
   current.face = result.face[0];
@@ -136,24 +136,13 @@ async function detectionLoop() {
   const ctx = dom.canvas.getContext('2d', { willReadFrequently: true });
   human.draw.canvas(dom.video, dom.canvas);
   await human.draw.all(dom.canvas, interpolated);
-  
+
   // Draw FPS
   ctx.font = "bold 20px sans";
   ctx.fillStyle = "#AAFF00";
   ctx.fillText(`FPS: ${detectFPS}`, 10, 20);
 
   requestAnimationFrame(detectionLoop);
-}
-
-async function drawPerformance() {
-  if (!dom.video.paused) {
-    const ctx = canvas.getContext('2d', { willReadFrequently: true })
-    if (!ctx) return
-    ctx.font = "bold 20px sans"
-    ctx.fillStyle = "#AAFF00"
-    ctx.fillText(`detectFPS: ${detectFPS}`, 10, 20)
-    requestAnimationFrame(drawPerformance)
-  }
 }
 
 async function detectFace() {
@@ -170,14 +159,17 @@ async function detectFace() {
 
   current.record = db[res.index] || null
 
+  if (current.record) {
+    dom.statusBar.classList.remove('text-[color:#FFFF00]')
+    dom.statusBar.classList.remove('text-[color:#FF0000]')
+    dom.statusBar.classList.add('text-[color:#00FF00]')
+    dom.statusBar.innerHTML = `${current.record.name} - ${Math.round(1000 * res.similarity) / 10}%`
+  }
+
   if (current.record && (res.similarity > options.threshold)) {
     dom.scanResultPhotos.style.display = ""
     if (matched(dom.scanResultPhotos, current.record.employee_id, current.record.image, Math.round(1000 * res.similarity) / 10)) {
       await dom.video.pause()
-      dom.statusBar.classList.remove('text-[color:#FFFF00]')
-      dom.statusBar.classList.remove('text-[color:#FF0000]')
-      dom.statusBar.classList.add('text-[color:#00FF00]')
-      dom.statusBar.innerHTML = current.record.name
       dom.in_out.style.display = ''
       setBodyBgColor("bg-green-300")
     }
@@ -203,7 +195,6 @@ async function main() {
   setNoMatch()
   await webCam()
   await detectionLoop() // start detection loop
-  await drawPerformance()
 }
 
 function setBodyBgColor(color) {
