@@ -9,7 +9,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Index do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="mx-auto w-10/12">
+    <div class="mx-auto w-11/12">
       <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <div class="flex justify-center mb-2">
         <.form for={%{}} id="search-form" phx-submit="search" class="w-full" autocomplete="off">
