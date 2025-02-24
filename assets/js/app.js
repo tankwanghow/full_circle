@@ -110,6 +110,27 @@ Hooks.calculatorInput = {
   }
 }
 
+Hooks.copyAndOpen = {
+  mounted() {
+    this.handleClick = (event) => {
+      event.preventDefault() // Prevent default link behavior
+      var text = this.el.getAttribute('copy-text')
+      var url = this.el.getAttribute('goto-url')
+      console.log(text)
+      navigator.clipboard.writeText(text).then(() => {
+        window.open(url, "_blank") // Open URL in new tab after copying
+      }).catch(err => {
+        console.error("Failed to copy text: ", err) // Log error if copying fails
+        window.open(url, "_blank") // Open URL even if copying fails
+      });
+    };
+    this.el.addEventListener("click", this.handleClick) // Attach click listener
+  },
+  destroyed() {
+    this.el.removeEventListener("click", this.handleClick) // Cleanup listener
+  }
+};
+
 let liveSocket = new LiveSocket("/live", Socket, {
   hooks: Hooks,
   params: { _csrf_token: csrfToken }
