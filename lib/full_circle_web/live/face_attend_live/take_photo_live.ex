@@ -9,6 +9,7 @@ defmodule FullCircleWeb.TakePhotoLive do
   def mount(_params, _session, socket) do
     {:ok,
      socket
+     |> assign(page_title: "Take Photo")
      |> assign(full_screen_app?: true)
      |> assign(emp_id: nil)
      |> assign(emp_name: nil)

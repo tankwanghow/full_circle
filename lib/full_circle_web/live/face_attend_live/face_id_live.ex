@@ -16,6 +16,7 @@ defmodule FullCircleWeb.FaceIdLive do
 
     {:ok,
      socket
+     |> assign(page_title: "Face Id")
      |> assign(full_screen_app?: true)
      |> assign(photos: [])}
   end
