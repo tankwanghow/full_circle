@@ -181,7 +181,8 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
         ID: Enum.at(info, 1),
         Name: Enum.at(info, 3),
         Department: Enum.at(info, 5),
-        punch_card_id: "#{Enum.at(info, 3)}.#{Enum.at(info, 1)}.#{Enum.at(info, 5)}" |> String.replace(" ", ""),
+        punch_card_id:
+          "#{Enum.at(info, 3)}.#{Enum.at(info, 1)}.#{Enum.at(info, 5)}" |> String.replace(" ", ""),
         punch_time_local: NaiveDateTime.new!(dt, x.stamp)
       })
     end)
@@ -311,22 +312,26 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
                 class="w-[20%] m-1 border rounded bg-rose-200 border-rose-400 p-2 text-center"
               >
                 <div class="mb-1">
-                  {emp.employee_name}<.copy_to_clipboard id={emp.employee_name} />
+                  {emp.employee_name}
                 </div>
                 <% clean_name =
                   Regex.run(~r/^(.+)\.\d+\..+$/, emp.employee_name)
                   |> Enum.at(1)
                   |> String.replace(~r/[^a-zA-Z0-9]/, "")
                   |> String.downcase() %>
-                <.link
-                  target="_blank"
-                  navigate={
+
+                <a
+                  id={emp.employee_name}
+                  href="#"
+                  phx-hook="copyAndOpen"
+                  copy-text={emp.employee_name}
+                  goto-url={
                     ~p"/companies/#{@current_company.id}/employees?search%5Bterms%5D=#{clean_name}"
                   }
                   class="bg-red-300 border rounded-xl border-red-600 py-1 px-2 font-bold"
                 >
                   {gettext("Match Employee")}
-                </.link>
+                </a>
               </div>
             <% else %>
               <.link

@@ -560,6 +560,31 @@ defmodule FullCircleWeb.ReceiptLive.Form do
           <div class="w-[20%]">
             <.input field={@form[:e_inv_uuid]} label={gettext("E Invoice UUID")} />
           </div>
+          <div
+            :if={is_nil(@form[:e_inv_uuid].value) and @live_action != :new}
+            class="text-blue-600 hover:font-medium w-[20%] ml-5 mt-6"
+          >
+            <a
+              id={@form[:receipt_no].value}
+              href="#"
+              phx-hook="copyAndOpen"
+              copy-text={@form[:receipt_no].value}
+              goto-url="https://myinvois.hasil.gov.my/newdocument"
+            >
+              {gettext("New E-Invoice")}
+            </a>
+          </div>
+          <div
+            :if={!is_nil(@form[:e_inv_uuid].value)}
+            class="text-blue-600 hover:font-medium w-[20%] ml-5 mt-6"
+          >
+            <.link
+              target="_blank"
+              href={~w(https://myinvois.hasil.gov.my/documents/#{@form[:e_inv_uuid].value})}
+            >
+              Open E-Invoice
+            </.link>
+          </div>
         </div>
 
         <div class="flex flex-row gap-2 flex-nowrap w-2/3 mx-auto text-center mt-5">

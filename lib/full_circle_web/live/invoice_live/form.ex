@@ -357,7 +357,7 @@ defmodule FullCircleWeb.InvoiceLive.Form do
         <div class="float-right mt-8 mr-4">
           <% {url, qrcode} = FullCircle.Helpers.e_invoice_validation_url_qrcode(@form.source.data) %>
           <.link target="_blank" href={url}>
-          {qrcode |> raw}
+            {qrcode |> raw}
           </.link>
         </div>
         <div class="flex flex-row flex-nowarp w-[92%]">
@@ -428,6 +428,31 @@ defmodule FullCircleWeb.InvoiceLive.Form do
           </div>
           <div class="w-[20%]">
             <.input field={@form[:e_inv_uuid]} label={gettext("E Invoice UUID")} />
+          </div>
+          <div
+            :if={is_nil(@form[:e_inv_uuid].value) and @live_action != :new}
+            class="text-blue-600 hover:font-medium w-[20%] ml-5 mt-6"
+          >
+            <a
+              id={@form[:invoice_no].value}
+              href="#"
+              phx-hook="copyAndOpen"
+              copy-text={@form[:invoice_no].value}
+              goto-url="https://myinvois.hasil.gov.my/newdocument"
+            >
+              {gettext("New E-Invoice")}
+            </a>
+          </div>
+          <div
+            :if={!is_nil(@form[:e_inv_uuid].value)}
+            class="text-blue-600 hover:font-medium w-[20%] ml-5 mt-6"
+          >
+            <.link
+              target="_blank"
+              href={~w(https://myinvois.hasil.gov.my/documents/#{@form[:e_inv_uuid].value})}
+            >
+              Open E-Invoice
+            </.link>
           </div>
         </div>
 

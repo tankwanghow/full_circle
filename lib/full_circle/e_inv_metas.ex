@@ -109,8 +109,8 @@ defmodule FullCircle.EInvMetas do
     buy_name = "%#{buy_name}%"
     supp_name = "%#{supp_name}%"
 
-    sd = einv.dateTimeReceived |> DateTime.to_date() |> Date.shift(day: -10)
-    ed = einv.dateTimeReceived |> DateTime.to_date() |> Date.shift(day: 10)
+    sd = einv.dateTimeReceived |> DateTime.to_date() |> Date.shift(day: -5)
+    ed = einv.dateTimeReceived |> DateTime.to_date() |> Date.shift(day: 5)
 
     from(inv in klass,
       join: txn in Transaction,
@@ -237,7 +237,6 @@ defmodule FullCircle.EInvMetas do
   defp get_e_invoices_by_uuid(uuid, amount, com, user) do
     from(ei in EInvoice,
       join: c in Company,
-      # and c.tax_id == ei.issuerTIN,
       on: c.id == ei.company_id,
       join: cu in CompanyUser,
       on: cu.company_id == c.id,
@@ -289,7 +288,6 @@ defmodule FullCircle.EInvMetas do
   defp get_e_invoices_by_internal_id(internal_id, amount, com, user) do
     from(ei in EInvoice,
       join: c in Company,
-      # and c.tax_id == ei.issuerTIN,
       on: c.id == ei.company_id,
       join: cu in CompanyUser,
       on: cu.company_id == c.id,
@@ -344,12 +342,11 @@ defmodule FullCircle.EInvMetas do
       |> String.slice(0..15)
       |> String.downcase()
 
-    sd = doc_date |> Timex.to_datetime() |> DateTime.shift(day: -10)
-    ed = doc_date |> Timex.to_datetime() |> DateTime.shift(day: 10)
+    sd = doc_date |> Timex.to_datetime() |> DateTime.shift(day: -5)
+    ed = doc_date |> Timex.to_datetime() |> DateTime.shift(day: 5)
 
     from(ei in EInvoice,
       join: c in Company,
-      # and c.tax_id == ei.issuerTIN,
       on: c.id == ei.company_id,
       join: cu in CompanyUser,
       on: cu.company_id == c.id,
@@ -541,6 +538,8 @@ defmodule FullCircle.EInvMetas do
         returning: true
       )
     end)
+
+    remove_uuid_from_invalid_e_invoices(last_sync, now, com, user)
   end
 
   defp get_date_range(a, b) do
@@ -694,5 +693,79 @@ defmodule FullCircle.EInvMetas do
       company_id: com.id
     })
     |> Repo.transaction()
+  end
+
+  def remove_uuid_from_invalid_e_invoices(sd, ed, com, user) do
+    from(ei in EInvoice,
+      join: c in Company,
+      on: c.id == ei.company_id,
+      join: cu in CompanyUser,
+      on: cu.company_id == c.id,
+      where: c.id == ^com.id,
+      where: cu.user_id == ^user.id,
+      where: ei.dateTimeReceived >= ^sd,
+      where: ei.dateTimeReceived <= ^ed,
+      where: ei.status != "Valid"
+    )
+    |> Repo.all()
+    |> Enum.each(fn x ->
+      fc_doc = get_fc_doc_by_uuid(x.uuid, com)
+      IO.inspect fc_doc
+      if fc_doc do
+        unmatch(fc_doc, com, user)
+      end
+    end)
+  end
+
+  def get_fc_doc_by_uuid(uuid, com) do
+    inv_qry =
+      from(obj in Invoice,
+        where: obj.company_id == ^com.id,
+        where: obj.e_inv_uuid == ^uuid,
+        select: %{doc_id: obj.id, doc_type: "Invoice"}
+      )
+
+    pur_inv_qry =
+      from(obj in PurInvoice,
+        where: obj.company_id == ^com.id,
+        where: obj.e_inv_uuid == ^uuid,
+        select: %{doc_id: obj.id, doc_type: "PurInvoice"}
+      )
+
+    pay_qry =
+      from(obj in Payment,
+        where: obj.company_id == ^com.id,
+        where: obj.e_inv_uuid == ^uuid,
+        select: %{doc_id: obj.id, doc_type: "Payment"}
+      )
+
+    rec_qry =
+      from(obj in Receipt,
+        where: obj.company_id == ^com.id,
+        where: obj.e_inv_uuid == ^uuid,
+        select: %{doc_id: obj.id, doc_type: "Receipt"}
+      )
+
+    db_note_qry =
+      from(obj in DebitNote,
+        where: obj.company_id == ^com.id,
+        where: obj.e_inv_uuid == ^uuid,
+        select: %{doc_id: obj.id, doc_type: "DebitNote"}
+      )
+
+    cr_note_qry =
+      from(obj in CreditNote,
+        where: obj.company_id == ^com.id,
+        where: obj.e_inv_uuid == ^uuid,
+        select: %{doc_id: obj.id, doc_type: "CreditNote"}
+      )
+
+    inv_qry
+    |> union(^pur_inv_qry)
+    |> union(^pay_qry)
+    |> union(^rec_qry)
+    |> union(^db_note_qry)
+    |> union(^cr_note_qry)
+    |> Repo.one()
   end
 end

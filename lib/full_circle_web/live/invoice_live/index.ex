@@ -106,10 +106,10 @@ defmodule FullCircleWeb.InvoiceLive.Index do
           <div class="w-[22%] border-b border-t border-blue-400 p-1">
             <div>{gettext("Received/ Issued/ Reject")}</div>
           </div>
-          <div class="w-[36%] border-b border-t border-blue-400 p-1">
+          <div class="w-[30%] border-b border-t border-blue-400 p-1">
             <div>{gettext("UUD/ InternalId/ Direction/ Type/ Version")}</div>
           </div>
-          <div class="w-[42%] border-b border-t border-blue-400 p-1">
+          <div class="w-[48%] border-b border-t border-blue-400 p-1">
             <div>{gettext("ContactName/ TIN/ Amount")}</div>
           </div>
         </div>

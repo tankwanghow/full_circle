@@ -513,6 +513,25 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
           <div class="w-[20%]">
             <.input field={@form[:e_inv_uuid]} label={gettext("E Invoice UUID")} />
           </div>
+          <div
+            :if={is_nil(@form[:e_inv_uuid].value)}
+            class="text-blue-600 hover:font-medium w-[20%] ml-5 mt-6"
+          >
+            <.link target="_blank" href="https://myinvois.hasil.gov.my/newdocument">
+              {gettext("New E-Invoice")}
+            </.link>
+          </div>
+          <div
+            :if={!is_nil(@form[:e_inv_uuid].value)}
+            class="text-blue-600 hover:font-medium w-[20%] ml-5 mt-6"
+          >
+            <.link
+              target="_blank"
+              href={~w(https://myinvois.hasil.gov.my/documents/#{@form[:e_inv_uuid].value})}
+            >
+              Open E-Invoice
+            </.link>
+          </div>
         </div>
 
         <.live_component

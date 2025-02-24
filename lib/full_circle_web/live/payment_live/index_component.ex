@@ -30,14 +30,17 @@ defmodule FullCircleWeb.PaymentLive.IndexComponent do
     )
   end
 
-
-
   defp refresh_self(doc_id, socket) do
     socket
     |> assign(
       obj:
-        FullCircle.BillPay.get_payment_by_id_index_component_field!(doc_id, socket.assigns.company, socket.assigns.user)
-    ) |> get_e_invoices()
+        FullCircle.BillPay.get_payment_by_id_index_component_field!(
+          doc_id,
+          socket.assigns.company,
+          socket.assigns.user
+        )
+    )
+    |> get_e_invoices()
   end
 
   @impl true
@@ -105,10 +108,20 @@ defmodule FullCircleWeb.PaymentLive.IndexComponent do
   end
 
   defp matched_or_try_match(fc, einv, assigns) do
+    assigns = assigns |> assign(fc: fc) |> assign(einv: einv)
     cond do
       einv.status != "Valid" ->
         ~H"""
-        <span class="font-semibold text-rose-400">Cannot match</span>
+        <a
+          id={@fc.payment_no}
+          href="#"
+          phx-hook="copyAndOpen"
+          copy-text={@fc.payment_no}
+          goto-url="https://myinvois.hasil.gov.my/newdocument"
+          class="border-blue-600 border hover:font-medium bg-blue-200 p-1 rounded-xl"
+        >
+          {gettext("New E-Invoice")}
+        </a>
         """
 
       is_nil(fc.e_inv_uuid) or fc.e_inv_uuid == "" ->
@@ -126,13 +139,14 @@ defmodule FullCircleWeb.PaymentLive.IndexComponent do
 
   defp match(fc, einv, assigns) do
     assigns = assigns |> assign(fc: fc) |> assign(einv: einv)
+
     ~H"""
     <.link
       phx-target={@myself}
       phx-value-einv={Jason.encode!(@einv)}
       phx-value-fcdoc={Jason.encode!(@fc)}
       phx-click="match"
-      class="text-xs bg-green-400 p-1 rounded-xl"
+      class="bg-green-200 p-1 hover:font-medium rounded-xl border border-green-600"
     >
       Match
     </.link>
@@ -141,12 +155,13 @@ defmodule FullCircleWeb.PaymentLive.IndexComponent do
 
   defp unmatch(fc, assigns) do
     assigns = assigns |> assign(fc: fc)
+
     ~H"""
     <.link
       phx-target={@myself}
       phx-value-fcdoc={Jason.encode!(@fc)}
       phx-click="unmatch"
-      class="text-xs bg-orange-400 p-1 rounded-xl"
+      class="bg-orange-200 p-1 hover:font-medium rounded-xl border border-orange-600"
     >
       Remove Match
     </.link>
@@ -214,13 +229,16 @@ defmodule FullCircleWeb.PaymentLive.IndexComponent do
 
       <div :if={@obj.got_details > 0} class="w-[48.6%] p-1 border-b border-gray-400">
         <div :if={@e_invs == []} class="flex border-b border-amber-400 last:border-0">
-          <.link
-            target="_blank"
-            href="https://myinvois.hasil.gov.my/newdocument"
-            class="blue button"
+          <a
+            id={@obj.payment_no}
+            href="#"
+            phx-hook="copyAndOpen"
+            copy-text={@obj.payment_no}
+            goto-url="https://myinvois.hasil.gov.my/newdocument"
+            class="text-blue-600 hover:font-medium w-[20%] ml-5 mt-3"
           >
             {gettext("New E-Invoice")}
-          </.link>
+          </a>
         </div>
         <%= for einv <- @e_invs do %>
           <div class="flex border-b border-amber-400 last:border-0">
@@ -259,12 +277,17 @@ defmodule FullCircleWeb.PaymentLive.IndexComponent do
               <div class="text-sm">
                 {einv.buyerTIN}
                 <span class="font-bold">
-                  {einv.documentCurrency} {einv.totalPayableAmount
-                  |> Number.Delimit.number_to_delimited()}
+                {einv.documentCurrency}
+                  <%= if Decimal.gt?(einv.totalNetAmount, einv.totalPayableAmount) do %>
+                    {einv.totalNetAmount
+                    |> Number.Delimit.number_to_delimited()}
+                  <% else %>
+                    {einv.totalPayableAmount
+                    |> Number.Delimit.number_to_delimited()}
+                  <% end %>
                 </span>
                 <span :if={einv.status == "Valid"} class="text-green-600">{einv.status}</span>
-                <span :if={einv.status == "Invalid"} class="text-rose-600">{einv.status}</span>
-                <span :if={einv.status == "Canceled"} class="text-orange-600">{einv.status}</span>
+                <span :if={einv.status != "Valid"} class="text-rose-600">{einv.status}</span>
                 {matched_or_try_match(@obj, einv, assigns)}
               </div>
             </div>

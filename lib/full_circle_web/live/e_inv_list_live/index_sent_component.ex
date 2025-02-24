@@ -204,17 +204,16 @@ defmodule FullCircleWeb.EInvListLive.IndexSentComponent do
           <div class="text-sm">
             {@obj.buyerTIN}
             <span class="font-bold">
-              <%= if Decimal.gt?(@obj.totalNetAmount, 0) do %>
-                {@obj.documentCurrency}{@obj.totalNetAmount
+            {@obj.documentCurrency}<%= if Decimal.gt?(@obj.totalNetAmount, @obj.totalPayableAmount) do %>
+                {@obj.totalNetAmount
                 |> Number.Delimit.number_to_delimited()}
               <% else %>
-                {@obj.documentCurrency}{@obj.totalPayableAmount
+                {@obj.totalPayableAmount
                 |> Number.Delimit.number_to_delimited()}
               <% end %>
             </span>
             <span :if={@obj.status == "Valid"} class="text-green-600">{@obj.status}</span>
-            <span :if={@obj.status == "Invalid"} class="text-rose-600">{@obj.status}</span>
-            <span :if={@obj.status == "Canceled"} class="text-orange-600">{@obj.status}</span>
+            <span :if={@obj.status != "Valid"} class="text-rose-600">{@obj.status}</span>
           </div>
         </div>
       </div>
