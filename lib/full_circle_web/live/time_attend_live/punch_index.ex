@@ -165,12 +165,11 @@ defmodule FullCircleWeb.TimeAttendLive.PunchIndex do
         },
         socket
       ) do
-
-        qry = %{
-          "search[emp_name]" => emp_name,
-          "search[sdate]" => sd,
-          "search[edate]" => ed
-        }
+    qry = %{
+      "search[emp_name]" => emp_name,
+      "search[sdate]" => sd,
+      "search[edate]" => ed
+    }
 
     {:noreply,
      socket

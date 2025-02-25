@@ -109,6 +109,7 @@ defmodule FullCircleWeb.CreditNoteLive.IndexComponent do
 
   defp matched_or_try_match(fc, einv, assigns) do
     assigns = assigns |> assign(fc: fc) |> assign(einv: einv)
+
     cond do
       einv.status != "Valid" ->
         ~H"""
@@ -271,7 +272,7 @@ defmodule FullCircleWeb.CreditNoteLive.IndexComponent do
               <div class="text-sm">
                 {einv.buyerTIN}
                 <span class="font-bold">
-                {einv.documentCurrency}
+                  {einv.documentCurrency}
                   <%= if Decimal.gt?(einv.totalNetAmount, einv.totalPayableAmount) do %>
                     {einv.totalNetAmount
                     |> Number.Delimit.number_to_delimited()}

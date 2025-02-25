@@ -710,7 +710,7 @@ defmodule FullCircle.EInvMetas do
     |> Repo.all()
     |> Enum.each(fn x ->
       fc_doc = get_fc_doc_by_uuid(x.uuid, com)
-      IO.inspect fc_doc
+
       if fc_doc do
         unmatch(fc_doc, com, user)
       end

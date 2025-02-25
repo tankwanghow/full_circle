@@ -44,7 +44,8 @@ defmodule FullCircle.BillPay do
         preload: [:contact, :funds_account],
         preload: [transaction_matchers: ^payment_match_trans(company, user)],
         preload: [payment_details: ^payment_details()],
-        select: pay, select_merge: %{e_inv_long_id: einv.longId}
+        select: pay,
+        select_merge: %{e_inv_long_id: einv.longId}
     )
     |> Enum.map(fn x -> Payment.compute_struct_balance(x) end)
     |> Enum.map(fn x ->
@@ -72,7 +73,7 @@ defmodule FullCircle.BillPay do
           reg_no: cont.reg_no,
           tax_id: cont.tax_id,
           funds_account_name: funds.name,
-          e_inv_long_id: einv.longId,
+          e_inv_long_id: einv.longId
         },
         select_merge: %{matched_amount: coalesce(subquery(matched_amount(id)), 0)},
         select_merge: %{payment_tax_amount: coalesce(subquery(payment_tax_amount(id)), 0)},

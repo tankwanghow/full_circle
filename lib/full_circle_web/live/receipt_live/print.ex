@@ -427,7 +427,7 @@ defmodule FullCircleWeb.ReceiptLive.Print do
         {@receipt.contact.reg_no}
       </div>
       <div class="receipt-info">
-      <div class="is-size-4 has-text-weight-semibold">RECEIPT</div>
+        <div class="is-size-4 has-text-weight-semibold">RECEIPT</div>
         <div>
           Receipt Date:
           <span class="has-text-weight-semibold">{format_date(@receipt.receipt_date)}</span>

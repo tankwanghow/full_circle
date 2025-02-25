@@ -204,7 +204,8 @@ defmodule FullCircleWeb.EInvListLive.IndexSentComponent do
           <div class="text-sm">
             {@obj.buyerTIN}
             <span class="font-bold">
-            {@obj.documentCurrency}<%= if Decimal.gt?(@obj.totalNetAmount, @obj.totalPayableAmount) do %>
+              {@obj.documentCurrency}
+              <%= if Decimal.gt?(@obj.totalNetAmount, @obj.totalPayableAmount) do %>
                 {@obj.totalNetAmount
                 |> Number.Delimit.number_to_delimited()}
               <% else %>

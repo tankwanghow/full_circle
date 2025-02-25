@@ -109,6 +109,7 @@ defmodule FullCircleWeb.InvoiceLive.IndexComponent do
 
   defp matched_or_try_match(fc, einv, assigns) do
     assigns = assigns |> assign(fc: fc) |> assign(einv: einv)
+
     cond do
       einv.status != "Valid" ->
         ~H"""

@@ -52,7 +52,8 @@ defmodule FullCircle.ReceiveFund do
         preload: [:received_cheques],
         preload: [transaction_matchers: ^receipt_match_trans(company, user)],
         preload: [receipt_details: ^receipt_details()],
-        select: rec, select_merge: %{e_inv_long_id: einv.longId}
+        select: rec,
+        select_merge: %{e_inv_long_id: einv.longId}
     )
     |> Enum.map(fn x -> Receipt.compute_struct_balance(x) end)
     |> Enum.map(fn x ->

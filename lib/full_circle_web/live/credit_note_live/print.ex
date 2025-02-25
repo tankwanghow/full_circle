@@ -306,7 +306,7 @@ defmodule FullCircleWeb.CreditNoteLive.Print do
         {@crnote.contact.reg_no}
       </div>
       <div class="payment-info">
-      <div class="is-size-4 has-text-weight-semibold">CREDIT NOTE</div>
+        <div class="is-size-4 has-text-weight-semibold">CREDIT NOTE</div>
         <div>
           Note Date: <span class="has-text-weight-semibold">{format_date(@crnote.note_date)}</span>
         </div>

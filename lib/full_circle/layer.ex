@@ -101,7 +101,6 @@ defmodule FullCircle.Layer do
   end
 
   defp feed_type_age(age_feeds) do
-    IO.inspect age_feeds
     r =
       Regex.scan(~r/(\d|\d+)-(\d|\d+)=(\w+)/, age_feeds)
       |> Enum.map_join(" ", fn [_, l, h, f] ->

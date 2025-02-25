@@ -441,7 +441,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
         <div class="float-right mt-8 mr-4">
           <% {url, qrcode} = FullCircle.Helpers.e_invoice_validation_url_qrcode(@form.source.data) %>
           <.link target="_blank" href={url}>
-          {qrcode |> raw}
+            {qrcode |> raw}
           </.link>
         </div>
         <div class="flex flex-row flex-nowarp w-[92%]">

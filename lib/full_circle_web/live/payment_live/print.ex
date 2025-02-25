@@ -348,7 +348,7 @@ defmodule FullCircleWeb.PaymentLive.Print do
         {@payment.contact.reg_no}
       </div>
       <div class="payment-info">
-      <div class="is-size-4 has-text-weight-semibold">PAYMENT VOUCHER</div>
+        <div class="is-size-4 has-text-weight-semibold">PAYMENT VOUCHER</div>
         <div>
           Payment Date:
           <span class="has-text-weight-semibold">{format_date(@payment.payment_date)}</span>

@@ -626,7 +626,7 @@ defmodule FullCircleWeb.CoreComponents do
 
   def icon(%{name: "hero-" <> _} = assigns) do
     ~H"""
-    <span class={[@name, @class]} {@rest}/>
+    <span class={[@name, @class]} {@rest} />
     """
   end
 

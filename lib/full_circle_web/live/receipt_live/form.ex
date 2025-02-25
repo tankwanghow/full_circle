@@ -479,7 +479,7 @@ defmodule FullCircleWeb.ReceiptLive.Form do
     <div class="w-11/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
       <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <.form for={@form} id="object-form" autocomplete="off" phx-change="validate" phx-submit="save">
-      <div class="float-right mt-8 mr-4">
+        <div class="float-right mt-8 mr-4">
           <% {url, qrcode} = FullCircle.Helpers.e_invoice_validation_url_qrcode(@form.source.data) %>
           <.link target="_blank" href={url}>
             {qrcode |> raw}
