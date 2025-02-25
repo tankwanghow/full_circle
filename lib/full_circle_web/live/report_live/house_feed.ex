@@ -167,7 +167,7 @@ defmodule FullCircleWeb.ReportLive.HouseFeed do
                 :if={@result.result != {[], []} and @result.result}
                 class="blue button mr-1"
                 navigate={
-                  ~p"/companies/#{@current_company.id}/print/house_feed?month=#{@search.month}&year=#{@search.year}&field=#{@search.field}"
+                  ~p"/companies/#{@current_company.id}/print/house_feed?month=#{@search.month}&year=#{@search.year}&field=#{@search.field}&feed_str=#{@search.feed_str}"
                 }
                 target="_blank"
               >
@@ -177,7 +177,7 @@ defmodule FullCircleWeb.ReportLive.HouseFeed do
               <.link
                 :if={@result.result != {[], []} and @result.result}
                 navigate={
-                  ~p"/companies/#{@current_company.id}/csv?report=housefeed&month=#{@search.month}&year=#{@search.year}&field=#{@search.field}"
+                  ~p"/companies/#{@current_company.id}/csv?report=housefeed&month=#{@search.month}&year=#{@search.year}&field=#{@search.field}&feed_str=#{@search.feed_str}"
                 }
                 target="_blank"
                 class="blue button"

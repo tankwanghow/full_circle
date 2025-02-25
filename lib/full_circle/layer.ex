@@ -46,7 +46,7 @@ defmodule FullCircle.Layer do
           on d.house_id = m.house_id
          and d.flock_id = m.flock_id
          and d.info_date = m.info_date
-       where m.qty - coalesce(d.qty, 0) > 0), 
+       where m.qty - coalesce(d.qty, 0) > 0),
     house_date_feed_0 as (
       select info.info_date, info.house_no, info.house_id, (date_part('day', info.info_date::timestamp - info.dob::timestamp)/7)::integer as age,
              info.qty as cur_qty
@@ -101,6 +101,7 @@ defmodule FullCircle.Layer do
   end
 
   defp feed_type_age(age_feeds) do
+    IO.inspect age_feeds
     r =
       Regex.scan(~r/(\d|\d+)-(\d|\d+)=(\w+)/, age_feeds)
       |> Enum.map_join(" ", fn [_, l, h, f] ->

@@ -8,7 +8,7 @@ defmodule FullCircleWeb.ReportLive.HouseFeedPrint do
     chunk = (detail_body_height / detail_height) |> floor
 
     {cols, rows} =
-      fill_data(socket, params["month"], params["year"], params["field"])
+      fill_data(socket, params["month"], params["year"], params["field"], params["feed_str"])
 
     {:ok,
      socket
@@ -23,11 +23,12 @@ defmodule FullCircleWeb.ReportLive.HouseFeedPrint do
      |> assign(:year, params["year"])}
   end
 
-  defp fill_data(socket, month, year, field) do
+  defp fill_data(socket, month, year, field, feed_str) do
     FullCircle.Layer.house_feed_type_query(
       month,
       year,
       socket.assigns.current_company.id,
+      feed_str,
       field
     )
     |> FullCircle.Helpers.exec_query_row_col()
