@@ -13,8 +13,8 @@ const humanConfig = {
     mesh: { enabled: false },
     detector: { maxDetected: 1, rotation: true, return: true, mask: false }, // return tensor is used to get detected face image
     description: { enabled: true, modelPath: 'faceres-deep.json' },
-    insightface: { enabled: true, modelPath: 'insightface-mobilenet-swish.json' },  
-    mobilefacenet: { enabled: true, modelPath: 'mobilefacenet.json' }, 
+    insightface: { enabled: true, modelPath: 'insightface-mobilenet-swish.json' },
+    mobilefacenet: { enabled: true, modelPath: 'mobilefacenet.json' },
     iris: { enabled: false }, // needed to determine gaze direction
     emotion: { enabled: false }, // not needed
     antispoof: { enabled: true }, // enable optional antispoof module
@@ -114,33 +114,34 @@ async function webCam() {
 }
 
 async function detectionLoop() {
-  if (dom.video.paused) return;
+  if (dom.video.paused) return
 
-  const now = performance.now();
-  detectFPS = Math.round(10000 / (now - timestamp.detect)) / 10;
-  timestamp.detect = now;
+  const now = performance.now()
+  detectFPS = Math.round(10000 / (now - timestamp.detect)) / 10
+  timestamp.detect = now
 
   // Skip frames to improve performance
-  frameSkip = (frameSkip + 1) % MATCH_INTERVAL;
+  frameSkip = (frameSkip + 1) % MATCH_INTERVAL
 
-  if (current.face?.tensor) human.tf.dispose(current.face.tensor);
-  const result = await human.detect(dom.video, { skipFrames: MATCH_INTERVAL - 1 });
-  current.face = result.face[0];
+  if (current.face?.tensor) human.tf.dispose(current.face.tensor)
+  const result = await human.detect(dom.video, { skipFrames: MATCH_INTERVAL - 1 })
+  current.face = result.face[0]
 
   // Only process matching on every MATCH_INTERVAL frames
   if (frameSkip === 0 && current.face?.embedding) {
-    await detectFace();
+    await detectFace()
   }
 
-  const interpolated = human.next(result);
-  const ctx = dom.canvas.getContext('2d', { willReadFrequently: true });
-  human.draw.canvas(dom.video, dom.canvas);
-  await human.draw.all(dom.canvas, interpolated);
+  const interpolated = human.next(result)
+  const ctx = dom.canvas.getContext('2d', { willReadFrequently: true })
+  human.draw.canvas(dom.video, dom.canvas)
+  await human.draw.all(dom.canvas, interpolated)
 
   // Draw FPS
-  ctx.font = "bold 20px sans";
-  ctx.fillStyle = "#AAFF00";
-  ctx.fillText(`FPS: ${detectFPS}`, 10, 20);
+  ctx.font = "bold 20px sans"
+  ctx.fillStyle = "#AAFF00"
+  ctx.fillText(`FPS: ${detectFPS}`, 10, 20)
+  ctx.fillText(`face records: ${await indexDb.count()}`, 10, 40)
 
   requestAnimationFrame(detectionLoop);
 }
@@ -247,7 +248,6 @@ export async function initFaceID(lv) {
   )
   log("loading face database...")
   refreshFaceIdDB()
-  log("known face records:", await indexDb.count())
   log("initializing webcam...")
   log(human.env)
 
@@ -319,8 +319,6 @@ async function outBtnClicked() {
   phx_liveview.pushEvent("save_attendence", { employee_id: current.record.employee_id, flag: inOutFlag, stamp: new Date })
 }
 
-
-
 function getDevices() {
   // AFAICT in Safari this only gets default devices until gUM is called :/
   return navigator.mediaDevices.enumerateDevices()
@@ -347,6 +345,7 @@ async function refreshFaceIdDB() {
     for (const photo of results['photos']) {
       await indexDb.save(photo)
     }
+    log("known face records:", await indexDb.count())
   })
 }
 

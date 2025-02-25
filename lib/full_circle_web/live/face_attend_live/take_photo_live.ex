@@ -53,6 +53,8 @@ defmodule FullCircleWeb.TakePhotoLive do
       {:delete_photo, id}
     )
 
+    IO.inspect "broadcast #{socket.assigns.current_company.id}_refresh_face_id_data delete"
+
     {:noreply,
      socket
      |> assign(
@@ -86,6 +88,8 @@ defmodule FullCircleWeb.TakePhotoLive do
       "#{socket.assigns.current_company.id}_refresh_face_id_data",
       {:new_photo, photo}
     )
+
+    IO.inspect "broadcast #{socket.assigns.current_company.id}_refresh_face_id_data save"
 
     {:noreply,
      socket

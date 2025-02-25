@@ -2,7 +2,6 @@ defmodule FullCircleWeb.FaceIdLive do
   use FullCircleWeb, :live_view
 
   alias FullCircle.HR
-  # alias FullCircle.StdInterface
   alias Phoenix.PubSub
 
   @impl true
@@ -36,46 +35,61 @@ defmodule FullCircleWeb.FaceIdLive do
         %{"employee_id" => emp_id, "flag" => flag},
         socket
       ) do
-    result = case HR.create_time_attendence_by_punch(
-           %{
-             employee_id: emp_id,
-             punch_time: Timex.now(),
-             flag: flag,
-             company_id: socket.assigns.current_company.id,
-             user_id: socket.assigns.current_user.id,
-             input_medium: "faceId"
-           },
-           socket.assigns.current_company,
-           socket.assigns.current_user
-         ) do
-      {:ok, _ta} ->
-        %{status: :success, msg: flag}
+    result =
+      case HR.create_time_attendence_by_punch(
+             %{
+               employee_id: emp_id,
+               punch_time: Timex.now(),
+               flag: flag,
+               company_id: socket.assigns.current_company.id,
+               user_id: socket.assigns.current_user.id,
+               input_medium: "faceId"
+             },
+             socket.assigns.current_company,
+             socket.assigns.current_user
+           ) do
+        {:ok, _ta} ->
+          %{status: :success, msg: flag}
 
-      {:error, changeset} ->
-        %{
-          status: :error,
-          msg:
-            Enum.map_join(changeset.errors, fn {field, {msg, _}} ->
-              "#{Atom.to_string(field)}: #{msg}"
-            end),
-        }
+        {:error, changeset} ->
+          %{
+            status: :error,
+            msg:
+              Enum.map_join(changeset.errors, fn {field, {msg, _}} ->
+                "#{Atom.to_string(field)}: #{msg}"
+              end)
+          }
 
-      :not_authorise ->
-        %{status: :error, msg: "Not Allowed!!"}
-    end
+        :not_authorise ->
+          %{status: :error, msg: "Not Allowed!!"}
+      end
 
     {:noreply, socket |> push_event("saveAttendenceResult", result)}
   end
 
   @impl true
-  def handle_info({:new_photo, data}, socket) do
-    IO.inspect data
+  def handle_info({:new_photo, _data}, socket) do
+    IO.inspect("subscribe #{socket.assigns.current_company.id}_refresh_face_id_data new")
+
+    {:noreply,
+     socket
+     |> push_event("faceIDPhotos", %{
+       photos: FullCircle.HR.get_face_id_photos(socket.assigns.current_company.id)
+     })}
+
     {:noreply, socket}
   end
 
   @impl true
-  def handle_info({:delete_photo, id}, socket) do
-    IO.inspect id
+  def handle_info({:delete_photo, _id}, socket) do
+    IO.inspect("subscribe #{socket.assigns.current_company.id}_refresh_face_id_data delete")
+
+    {:noreply,
+     socket
+     |> push_event("faceIDPhotos", %{
+       photos: FullCircle.HR.get_face_id_photos(socket.assigns.current_company.id)
+     })}
+
     {:noreply, socket}
   end
 
@@ -86,7 +100,8 @@ defmodule FullCircleWeb.FaceIdLive do
       <div id="clock" class="text-blue-800 text-center text-3xl"></div>
       <div id="faceID" phx-hook="FaceID" phx-update="ignore">
         <div
-          id="statusBar" style="display: none"
+          id="statusBar"
+          style="display: none"
           class="absolute inset-x-0 top-[350px] h-16 text-2xl font-bold"
         >
           Press Scan Face to Start...
