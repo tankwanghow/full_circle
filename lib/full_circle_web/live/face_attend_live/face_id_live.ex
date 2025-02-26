@@ -69,28 +69,20 @@ defmodule FullCircleWeb.FaceIdLive do
 
   @impl true
   def handle_info({:new_photo, _data}, socket) do
-    IO.inspect("subscribe #{socket.assigns.current_company.id}_refresh_face_id_data new")
-
     {:noreply,
      socket
      |> push_event("faceIDPhotos", %{
        photos: FullCircle.HR.get_face_id_photos(socket.assigns.current_company.id)
      })}
-
-    {:noreply, socket}
   end
 
   @impl true
   def handle_info({:delete_photo, _id}, socket) do
-    IO.inspect("subscribe #{socket.assigns.current_company.id}_refresh_face_id_data delete")
-
     {:noreply,
      socket
      |> push_event("faceIDPhotos", %{
        photos: FullCircle.HR.get_face_id_photos(socket.assigns.current_company.id)
      })}
-
-    {:noreply, socket}
   end
 
   @impl true

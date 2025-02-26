@@ -32,7 +32,7 @@ const matchOptions = { order: 2, multiplier: 20, min: 0.3, max: 0.7 }; // for fa
 const options = {
   minConfidence: 0.6, // overal face confidence for box, face, gender, real, live
   minSize: 224, // min input to face descriptor model before degradation
-  threshold: 0.65, // minimum similarity
+  threshold: 0.6, // minimum similarity
   mask: humanConfig.face.detector.mask,
   rotation: humanConfig.face.detector.rotation,
   ...matchOptions
@@ -52,10 +52,11 @@ human.draw.options.drawGestures = false
 human.draw.options.drawBoxes = true
 
 let db
+let phx_liveview
 let descriptors
 let detectFPS = 0
 let frameSkip = 0; // Add frame skipping
-const MATCH_INTERVAL = 3; // Process matching every 3 frames
+const MATCH_INTERVAL = 1; // Process matching every 3 frames
 let inOutFlag = ''
 const matches = { list: [], times: 3 }
 const timestamp = { detect: 0, draw: 0 } // holds information used to calculate performance and possible memory leaks
@@ -73,7 +74,8 @@ const dom = {
   scanFace: document.getElementById("scanFace"),
   statusBar: document.getElementById("statusBar"),
   in_out: document.getElementById("in_out"),
-  scanResultPhotos: document.getElementById("scanResultPhotos")
+  scanResultPhotos: document.getElementById("scanResultPhotos"),
+  allPhotos: document.getElementById("allPhotos")
 }
 
 const log = (...msg) => {
@@ -334,8 +336,6 @@ function gotDevices(deviceInfos) {
     }
   }
 }
-
-let phx_liveview
 
 async function refreshFaceIdDB() {
   log("refreshing FaceID Database....")
