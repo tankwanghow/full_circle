@@ -45,10 +45,10 @@ defmodule FullCircle.Accounting.TransactionMatcher do
       :all_matched_amount,
       :delete
     ])
+    |> compute_balance()
     |> validate_required([:transaction_id, :doc_type, :doc_date])
     |> validate_number(:match_amount, not_equal_to: 0)
     |> maybe_mark_for_deletion()
-    |> compute_balance()
   end
 
   defp compute_balance(changeset) do

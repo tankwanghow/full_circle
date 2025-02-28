@@ -34,6 +34,7 @@ defmodule FullCircle.Cheque.Deposit do
       :funds_from_id,
       :funds_amount
     ])
+    |> compute_fields()
     |> validate_required([:company_id, :deposit_no, :deposit_date, :bank_name])
     |> validate_funds_from_name()
     |> validate_id(:bank_name, :bank_id)
@@ -42,7 +43,6 @@ defmodule FullCircle.Cheque.Deposit do
     |> validate_date(:deposit_date, days_before: 60)
     |> validate_date(:deposit_date, days_after: 4)
     |> validate_deposit_date()
-    |> compute_fields()
   end
 
   def compute_fields(cs) do

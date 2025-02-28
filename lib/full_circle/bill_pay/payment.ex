@@ -64,6 +64,7 @@ defmodule FullCircle.BillPay.Payment do
       :funds_account_name,
       :funds_amount
     ])
+    |> compute_balance()
     |> validate_id(:contact_name, :contact_id)
     |> unique_constraint(:e_inv_uuid)
     |> validate_length(:descriptions, max: 230)
@@ -75,7 +76,6 @@ defmodule FullCircle.BillPay.Payment do
     )
     |> cast_assoc(:transaction_matchers)
     |> cast_assoc(:payment_details)
-    |> compute_balance()
     |> validate_number(:funds_amount, greater_than: Decimal.new("0.00"))
     |> validate_number(:payment_balance, equal_to: Decimal.new("0.00"))
   end
@@ -89,15 +89,6 @@ defmodule FullCircle.BillPay.Payment do
   end
 
   def compute_balance(cs) do
-    # cs =
-    #   Map.replace(
-    #     cs,
-    #     :errors,
-    #     Enum.filter(cs.errors, fn {k, _} -> k != :payment_balance end)
-    #   )
-
-    # cs = if(Enum.count(cs.errors) == 0, do: Map.replace(cs, :valid?, true), else: cs)
-
     cs =
       cs
       |> compute_match_transactions_amount()
@@ -113,7 +104,7 @@ defmodule FullCircle.BillPay.Payment do
 
     cs
     |> cast(%{"payment_balance" => bal}, [:payment_balance])
-    |> validate_number(:payment_balance, equal_to: Decimal.new("0.00"))
+    |> validate_number(:payment_balance, greater_than_or_equal_to: Decimal.new("0.00"))
   end
 
   def compute_details_amount(changeset) do

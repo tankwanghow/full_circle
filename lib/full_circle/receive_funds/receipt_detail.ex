@@ -62,6 +62,7 @@ defmodule FullCircle.ReceiveFund.ReceiptDetail do
       :tax_code_name,
       :good_name
     ])
+    |> compute_fields()
     |> validate_id(:good_name, :good_id)
     |> validate_id(:tax_code_name, :tax_code_id)
     |> validate_id(:package_name, :package_id)
@@ -69,7 +70,6 @@ defmodule FullCircle.ReceiveFund.ReceiptDetail do
     |> validate_number(:quantity, greater_than: 0)
     |> validate_number(:discount, less_than_or_equal_to: 0)
     |> validate_length(:descriptions, max: 230)
-    |> compute_fields()
     |> maybe_mark_for_deletion()
   end
 

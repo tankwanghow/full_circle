@@ -66,6 +66,7 @@ defmodule FullCircle.ReceiveFund.Receipt do
       :receipt_no,
       :funds_amount
     ])
+    |> compute_balance()
     |> validate_funds_account_name()
     |> validate_length(:descriptions, max: 230)
     |> validate_date(:receipt_date, days_after: 0)
@@ -79,7 +80,6 @@ defmodule FullCircle.ReceiveFund.Receipt do
     |> cast_assoc(:transaction_matchers)
     |> cast_assoc(:received_cheques)
     |> cast_assoc(:receipt_details)
-    |> compute_balance()
     |> validate_number(:receipt_amount, greater_than: Decimal.new("0.00"))
     |> validate_number(:receipt_balance, equal_to: Decimal.new("0.00"))
   end

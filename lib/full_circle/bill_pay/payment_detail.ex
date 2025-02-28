@@ -62,13 +62,13 @@ defmodule FullCircle.BillPay.PaymentDetail do
       :tax_code_name,
       :good_name
     ])
+    |> compute_fields()
     |> validate_id(:good_name, :good_id)
     |> validate_id(:tax_code_name, :tax_code_id)
     |> validate_id(:package_name, :package_id)
     |> validate_id(:account_name, :account_id)
     |> validate_number(:quantity, greater_than: 0)
     |> validate_number(:discount, less_than_or_equal_to: 0)
-    |> compute_fields()
     |> maybe_mark_for_deletion()
   end
 
