@@ -22,7 +22,9 @@ defmodule FullCircleWeb.ReceiptLive.IndexComponent do
           socket.assigns.obj.e_inv_uuid || "",
           socket.assigns.obj.receipt_no,
           socket.assigns.obj.contact_name,
-          socket.assigns.obj.amount |> Decimal.abs(),
+          socket.assigns.obj.funds_amount
+          |> Decimal.add(socket.assigns.obj.cheques_amount)
+          |> Decimal.abs(),
           socket.assigns.obj.receipt_date,
           socket.assigns.company,
           socket.assigns.user
@@ -220,7 +222,21 @@ defmodule FullCircleWeb.ReceiptLive.IndexComponent do
       </div>
 
       <div class="w-[8%] py-1">
-        {Number.Currency.number_to_currency(@obj.amount |> Decimal.abs())}
+        <div>
+          {@obj.funds_amount
+          |> Decimal.add(@obj.cheques_amount)
+          |> Decimal.abs()
+          |> Number.Currency.number_to_currency()}
+        </div>
+        <div class="text-orange-500">
+          {@obj.funds_amount
+          |> Decimal.add(@obj.cheques_amount)
+          |> Decimal.abs()
+          |> Decimal.sub(@obj.details_amount)
+          |> Decimal.sub(@obj.tax_amount)
+          |> Decimal.add(@obj.matched_amount)
+          |> Number.Currency.number_to_currency()}
+        </div>
       </div>
       <div class="w-[0.4%] bg-white"></div>
 

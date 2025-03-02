@@ -76,7 +76,7 @@ defmodule FullCircleWeb.ReceiptLive.Index do
           {gettext("Contact / Particulars")}
         </div>
         <div class="w-[8%] border-b border-t border-amber-400 py-1">
-          {gettext("Amount")}
+          {gettext("Amount / Matched Balance")}
         </div>
         <div class="w-[0.4%] bg-white"></div>
         <div class="font-medium flex flex-row bg-blue-200 w-[49.6%]">

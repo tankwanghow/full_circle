@@ -205,7 +205,7 @@ defmodule FullCircle.BillPay do
         from inv in qry, order_by: [desc: inv.payment_date]
       end
 
-    qry |> offset((^page - 1) * ^per_page) |> limit(^per_page) |> Repo.all() |> Enum.uniq_by(fn x -> x.id end)
+    qry |> offset((^page - 1) * ^per_page) |> limit(^per_page) |> Repo.all()
   end
 
   def get_payment_by_id_index_component_field!(id, com, user) do
@@ -216,53 +216,87 @@ defmodule FullCircle.BillPay do
   end
 
   defp payment_raw_query(company, _user) do
-    from txn in Transaction,
-      left_join: pay in Payment,
-      on: txn.doc_id == pay.id,
-      join: cont in Contact,
-      on: cont.id == pay.contact_id or cont.id == txn.contact_id,
-      left_join: atxm in TransactionMatcher,
-      on: atxm.doc_id == pay.id,
-      left_join: payd in PaymentDetail,
-      on: payd.payment_id == pay.id,
-      where: txn.company_id == ^company.id,
-      where: txn.doc_type == "Payment",
-      where: txn.amount < 0,
-      select: %{
-        id: coalesce(txn.doc_id, txn.id),
-        doc_type: "Payment",
-        doc_id: coalesce(txn.doc_id, txn.id),
-        payment_no: txn.doc_no,
-        e_inv_uuid: pay.e_inv_uuid,
-        e_inv_internal_id: pay.e_inv_internal_id,
-        got_details: fragment("count(?)", payd.id),
-        particulars:
-          fragment(
-            "string_agg(distinct coalesce(?, ?), ', ')",
-            pay.descriptions,
-            txn.particulars
-          ),
-        payment_date: txn.doc_date,
-        company_id: txn.company_id,
-        contact_name: cont.name,
-        reg_no: cont.reg_no,
-        tax_id: cont.tax_id,
-        amount: coalesce(pay.funds_amount, sum(txn.amount)),
-        details_amount: coalesce(sum(payd.quantity * payd.unit_price + payd.discount), 0),
-        tax_amount: coalesce(sum((payd.quantity * payd.unit_price + payd.discount) * payd.tax_rate) , 0),
-        matched_amount: coalesce(sum(atxm.match_amount), 0),
-        checked: false,
-        old_data: txn.old_data
-      },
-      group_by: [
-        coalesce(txn.doc_id, txn.id),
-        txn.doc_no,
-        cont.id,
-        pay.id,
-        txn.doc_date,
-        txn.company_id,
-        txn.old_data
-      ]
+
+    # Define the CTE for receipt_details aggregation
+    details_agg =
+      from rd in PaymentDetail,
+        group_by: rd.payment_id,
+        select: %{
+          payment_id: rd.payment_id,
+          details_amount: sum(rd.quantity * rd.unit_price + rd.discount),
+          tax_amount: sum((rd.quantity * rd.unit_price + rd.discount) * rd.tax_rate)
+        }
+
+    # Define the CTE for transaction_matchers aggregation
+    matchers_agg =
+      from tm in TransactionMatcher,
+        group_by: tm.doc_id,
+        select: %{
+          doc_id: tm.doc_id,
+          matched_amount: sum(tm.match_amount)
+        }
+
+    # Build the main query
+    base_query =
+      from st0 in Transaction,
+        left_join: sr1 in Payment,
+        on: st0.doc_id == sr1.id,
+        join: sc2 in Contact,
+        on: sc2.id == coalesce(sr1.contact_id, st0.contact_id),
+        left_join: sr4 in PaymentDetail,
+        on: sr4.payment_id == sr1.id,
+        left_join: da in "details_agg",
+        on: da.payment_id == sr1.id,
+        left_join: ma in "matchers_agg",
+        on: ma.doc_id == sr1.id,
+        where:
+          st0.company_id == ^company.id and
+            st0.doc_type == "Payment" and
+            st0.amount > 0,
+        group_by: [
+          coalesce(st0.doc_id, st0.id),
+          st0.doc_no,
+          sc2.id,
+          sr1.id,
+          st0.doc_date,
+          st0.company_id,
+          st0.old_data,
+          sr1.funds_amount,
+          da.details_amount,
+          da.tax_amount,
+          ma.matched_amount
+        ],
+        order_by: [desc: st0.doc_no],
+        select: %{
+          id: coalesce(st0.doc_id, st0.id),
+          doc_type: "Payment",
+          doc_id: coalesce(st0.doc_id, st0.id),
+          payment_no: st0.doc_no,
+          e_inv_uuid: sr1.e_inv_uuid,
+          e_inv_internal_id: sr1.e_inv_internal_id,
+          got_details: count(sr4.id),
+          particulars:
+            fragment(
+              "STRING_AGG(DISTINCT COALESCE(?, ?), ', ')",
+              st0.contact_particulars,
+              st0.particulars
+            ),
+          payment_date: st0.doc_date,
+          company_id: st0.company_id,
+          contact_name: sc2.name,
+          reg_no: sc2.reg_no,
+          tax_id: sc2.tax_id,
+          amount: coalesce(sr1.funds_amount, sum(st0.amount)),
+          details_amount: coalesce(da.details_amount, 0),
+          tax_amount: coalesce(da.tax_amount, 0),
+          matched_amount: coalesce(ma.matched_amount, 0),
+          checked: false,
+          old_data: st0.old_data
+        }
+
+    base_query
+    |> with_cte("details_agg", as: ^details_agg)
+    |> with_cte("matchers_agg", as: ^matchers_agg)
   end
 
   def create_payment(attrs, com, user) do

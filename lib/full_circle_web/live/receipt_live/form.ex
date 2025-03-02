@@ -413,8 +413,8 @@ defmodule FullCircleWeb.ReceiptLive.Form do
   end
 
   defp save(socket, :edit, params) do
-    params = params |> FullCircleWeb.Helpers.put_into_matchers("doc_date", params["payment_date"])
-    
+    params = params |> FullCircleWeb.Helpers.put_into_matchers("doc_date", params["receipt_date"])
+
     case ReceiveFund.update_receipt(
            socket.assigns.form.data,
            params,
