@@ -196,7 +196,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchIndex do
           sdate,
           edate,
           emp_name,
-          socket.assigns.current_company.id,
+          socket.assigns.current_company,
           page: page,
           per_page: @per_page
         )

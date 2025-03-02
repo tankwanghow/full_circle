@@ -564,7 +564,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
           month |> String.to_integer(),
           year |> String.to_integer(),
           emp.id,
-          socket.assigns.current_company.id
+          socket.assigns.current_company
         )
 
       salary_notes =
@@ -649,11 +649,11 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
     )
   end
 
-  defp holiday_pay_days(objs, com_id) do
+  defp holiday_pay_days(objs, com) do
     Enum.map(objs, fn x ->
       if !is_nil(x.sholi_list) and x.nh > x.work_hours_per_day / 2 do
-        px = HR.punch_by_date(x.employee_id, Timex.shift(x.dd, days: -1), com_id)
-        nx = HR.punch_by_date(x.employee_id, Timex.shift(x.dd, days: 1), com_id)
+        px = HR.punch_by_date(x.employee_id, Timex.shift(x.dd, days: -1), com)
+        nx = HR.punch_by_date(x.employee_id, Timex.shift(x.dd, days: 1), com)
 
         if px.wh == 0 or nx.wh == 0 do
           0
