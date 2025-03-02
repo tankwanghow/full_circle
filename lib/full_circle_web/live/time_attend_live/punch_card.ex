@@ -655,13 +655,13 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
         px = HR.punch_by_date(x.employee_id, Timex.shift(x.dd, days: -1), com)
         nx = HR.punch_by_date(x.employee_id, Timex.shift(x.dd, days: 1), com)
 
-        if px.wh == 0 or nx.wh == 0 do
-          0
+        if px.wh == 0.0 or nx.wh == 0.0 do
+          0.0
         else
           x.nh / x.work_hours_per_day
         end
       else
-        0
+        0.0
       end
     end)
     |> Enum.sum()
@@ -674,7 +674,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
     dw = tdw - ot
     sw = dw - expected_work_days
 
-    if(sw > 0, do: sw, else: 0)
+    if(sw > 0.0, do: sw, else: 0.0)
   end
 
   defp normal_pay_days(objs) do

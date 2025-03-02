@@ -1263,7 +1263,7 @@ defmodule FullCircle.HR do
   end
 
   def count_hours_work(tl) when is_nil(tl) do
-    0
+    0.0
   end
 
   def count_hours_work(tl) do
@@ -1274,13 +1274,13 @@ defmodule FullCircle.HR do
         [[ti, _, _, _], [to, _, _, _]] = t
 
         if is_nil(ti) || is_nil(to) do
-          0
+          0.0
         else
           Timex.diff(to, ti, :minute) / 60
         end
       rescue
         MatchError ->
-          0
+          0.0
 
         e ->
           reraise e, __STACKTRACE__
@@ -1289,7 +1289,7 @@ defmodule FullCircle.HR do
   end
 
   def wh(ut) do
-    Enum.sum(count_hours_work(ut))
+    if ut == [], do: 0.0, else: Enum.sum(count_hours_work(ut))
   end
 
   def nh(wh, nwh) do
@@ -1297,14 +1297,14 @@ defmodule FullCircle.HR do
       nwh
     else
       wh
-    end
+    end |> Float.floor()
   end
 
   def ot(wh, nwh) do
     if wh > nwh do
-      wh - nwh
+      if(wh - nwh > 0.5, do: wh - nwh, else: 0.0)
     else
-      0
+      0.0
     end
   end
 
@@ -1319,7 +1319,7 @@ defmodule FullCircle.HR do
       # change key to id
       idg = Map.get(t, :idg)
       nwh = Decimal.to_float(Map.get(t, :work_hours_per_day) || Decimal.new("0.00001"))
-      wh = Enum.sum(count_hours_work(ut))
+      wh = wh(ut)
 
       nh = nh(wh, nwh)
 

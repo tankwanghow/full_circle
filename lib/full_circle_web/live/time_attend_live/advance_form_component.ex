@@ -174,7 +174,13 @@ defmodule FullCircleWeb.TimeAttendLive.AdvanceFormComponent do
             <.input field={@form[:note]} label={gettext("Note")} />
           </div>
           <div class="col-span-3">
-            <.input field={@form[:amount]} label={gettext("Amount")} type="number" step="0.0001" />
+            <.input
+              field={@form[:amount]}
+              label={gettext("Amount")}
+              phx-hook="calculatorInput"
+              klass="text-right"
+              step="0.0001"
+            />
           </div>
         </div>
 

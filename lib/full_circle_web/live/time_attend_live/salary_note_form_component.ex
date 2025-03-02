@@ -205,10 +205,22 @@ defmodule FullCircleWeb.TimeAttendLive.SalaryNoteFormComponent do
             <.input field={@form[:descriptions]} label={gettext("Descriptions")} />
           </div>
           <div class="col-span-2">
-            <.input field={@form[:quantity]} label={gettext("Quantity")} type="number" step="0.0001" />
+            <.input
+              field={@form[:quantity]}
+              label={gettext("Quantity")}
+              phx-hook="calculatorInput"
+              klass="text-right"
+              step="0.0001"
+            />
           </div>
           <div class="col-span-2">
-            <.input field={@form[:unit_price]} label={gettext("Price")} type="number" step="0.0001" />
+            <.input
+              field={@form[:unit_price]}
+              label={gettext("Price")}
+              phx-hook="calculatorInput"
+              klass="text-right"
+              step="0.0001"
+            />
           </div>
           <div class="col-span-2">
             <.input
