@@ -1187,36 +1187,38 @@ defmodule FullCircle.HR do
     )
   end
 
-  defp punch_query_by_company_id(sdate, edate, com_id) do
-    "select d2.id::varchar || d2.dd::varchar as idg, d2.dd, d2.name, d2.work_hours_per_day, p2.timezone,
+  defp punch_query_by_company_id(sdate, edate, com) do
+    "select d2.id::varchar || d2.dd::varchar as idg, d2.dd AT TIME ZONE '#{com.timezone}' as dd, d2.name, d2.work_hours_per_day, p2.timezone,
             d2.work_days_per_week, d2.work_days_per_month, d2.id as employee_id, p2.time_list, holi_list, sholi_list
        from (select d1.dd, d1.name, d1.id, d1.status, d1.id_no, d1.work_hours_per_day,
                     d1.work_days_per_week, d1.work_days_per_month,
                     string_agg(hl.name, ', ' order by hl.name) as holi_list,
                     string_agg(hl.short_name, ', ' order by hl.short_name) as sholi_list
-               from (select dd::date, e.name, e.id, e.status, e.id_no, e.work_hours_per_day,
+               from (select dd, e.name, e.id, e.status, e.id_no, e.work_hours_per_day,
                             e.work_days_per_week, e.work_days_per_month
                             from employees e,
-                            generate_series('#{sdate}'::date, '#{edate}'::date, '1 day') as dd
-                      where e.status = 'Active' and e.company_id = '#{com_id}') d1 left outer join holidays hl
-                         on hl.holidate = d1.dd and hl.company_id = '#{com_id}'
+                                 generate_series('#{sdate} 00:00:00.000'::timestamp with time zone,
+                                                 '#{edate} 00:00:00.000'::timestamp with time zone, '1 day') as dd
+                      where e.status = 'Active' and e.company_id = '#{com.id}') d1 left outer join holidays hl
+                         on hl.holidate = d1.dd and hl.company_id = '#{com.id}'
                       group by d1.dd, d1.name, d1.id, d1.status, d1.id_no,
                                d1.work_hours_per_day, d1.work_days_per_week,
                                d1.work_days_per_month) d2 left outer join
               (select ta.employee_id, min(ta.punch_time)::date as pt, min(ta.punch_time) as punch_time, c.timezone,
                       array_agg(ta.punch_time::varchar || '|' || ta.id::varchar || '|' || ta.status || '|' || ta.flag order by  ta.punch_time, ta.flag) time_list
                  from time_attendences ta inner join companies c on c.id = ta.company_id,
-                      generate_series('#{sdate}'::date, '#{edate}'::date, '1 day') as dd
-                where ta.company_id = '#{com_id}'
-                  and ta.punch_time::date = dd::date
+                      generate_series('#{sdate} 00:00:00.000'::timestamp with time zone,
+                                      '#{edate} 00:00:00.000'::timestamp with time zone, '1 day') as dd
+                where ta.company_id = '#{com.id}'
+                  and ta.punch_time between dd and dd + INTERVAL '23 hours 59 minutes 59 seconds'
                 group by c.timezone, ta.employee_id, dd) p2
          on p2.pt = d2.dd
         and d2.id = p2.employee_id
       where true"
   end
 
-  def punch_by_date(emp_id, pdate, com_id) do
-    (punch_query_by_company_id(pdate, pdate, com_id) <>
+  def punch_by_date(emp_id, pdate, com) do
+    (punch_query_by_company_id(pdate, pdate, com) <>
        " and d2.id = '#{emp_id}'" <>
        " order by d2.dd")
     |> exec_query_map()
@@ -1224,32 +1226,32 @@ defmodule FullCircle.HR do
     |> Enum.at(0)
   end
 
-  def punch_card_query(month, year, emp_id, com_id) do
+  def punch_card_query(month, year, emp_id, com) do
     edate = Timex.end_of_month(year, month)
     sdate = Timex.beginning_of_month(year, month)
 
-    (punch_query_by_company_id(sdate, edate, com_id) <>
+    (punch_query_by_company_id(sdate, edate, com) <>
        " and d2.id = '#{emp_id}'" <>
        " order by d2.dd")
     |> exec_query_map()
     |> unzip_all_time_list()
   end
 
-  def punch_query_by_id(empid, dd, com_id) do
+  def punch_query_by_id(empid, dd, com) do
     dd = Timex.to_date(dd)
 
-    (punch_query_by_company_id(dd, dd, com_id) <>
+    (punch_query_by_company_id(dd, dd, com) <>
        " and d2.id::varchar || d2.dd::varchar = '#{empid}#{dd}'")
     |> exec_query_map()
     |> unzip_all_time_list()
     |> Enum.at(0)
   end
 
-  def punch_query(sdate, edate, terms, com_id,
+  def punch_query(sdate, edate, terms, com,
         page: page,
         per_page: per_page
       ) do
-    (punch_query_by_company_id(sdate, edate, com_id) <>
+    (punch_query_by_company_id(sdate, edate, com) <>
        if(terms != "",
          do: " and (d2.name ilike '%#{terms}%' or d2.id_no ilike '%#{terms}%')",
          else: ""
