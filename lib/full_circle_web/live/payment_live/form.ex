@@ -392,6 +392,8 @@ defmodule FullCircleWeb.PaymentLive.Form do
   end
 
   defp save(socket, :edit, params) do
+    params = params |> FullCircleWeb.Helpers.put_into_matchers("doc_date", params["payment_date"])
+    
     case BillPay.update_payment(
            socket.assigns.form.data,
            params,

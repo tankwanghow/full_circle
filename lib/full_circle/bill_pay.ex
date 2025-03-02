@@ -7,10 +7,11 @@ defmodule FullCircle.BillPay do
   alias FullCircle.BillPay.{Payment, PaymentDetail}
 
   alias FullCircle.Accounting.{
+    TransactionMatcher,
     Contact,
+    Account,
     Transaction,
-    TaxCode,
-    TransactionMatcher
+    TaxCode
   }
 
   alias FullCircle.EInvMetas.EInvoice
@@ -204,7 +205,7 @@ defmodule FullCircle.BillPay do
         from inv in qry, order_by: [desc: inv.payment_date]
       end
 
-    qry |> offset((^page - 1) * ^per_page) |> limit(^per_page) |> Repo.all()
+    qry |> offset((^page - 1) * ^per_page) |> limit(^per_page) |> Repo.all() |> Enum.uniq_by(fn x -> x.id end)
   end
 
   def get_payment_by_id_index_component_field!(id, com, user) do
@@ -217,14 +218,16 @@ defmodule FullCircle.BillPay do
   defp payment_raw_query(company, _user) do
     from txn in Transaction,
       left_join: pay in Payment,
-      on: txn.doc_no == pay.payment_no,
+      on: txn.doc_id == pay.id,
       join: cont in Contact,
       on: cont.id == pay.contact_id or cont.id == txn.contact_id,
-      where: txn.amount > 0,
-      where: txn.company_id == ^company.id,
-      where: txn.doc_type == "Payment",
+      left_join: atxm in TransactionMatcher,
+      on: atxm.doc_id == pay.id,
       left_join: payd in PaymentDetail,
       on: payd.payment_id == pay.id,
+      where: txn.company_id == ^company.id,
+      where: txn.doc_type == "Payment",
+      where: txn.amount < 0,
       select: %{
         id: coalesce(txn.doc_id, txn.id),
         doc_type: "Payment",
@@ -244,7 +247,10 @@ defmodule FullCircle.BillPay do
         contact_name: cont.name,
         reg_no: cont.reg_no,
         tax_id: cont.tax_id,
-        amount: sum(txn.amount),
+        amount: coalesce(pay.funds_amount, sum(txn.amount)),
+        details_amount: coalesce(sum(payd.quantity * payd.unit_price + payd.discount), 0),
+        tax_amount: coalesce(sum((payd.quantity * payd.unit_price + payd.discount) * payd.tax_rate) , 0),
+        matched_amount: coalesce(sum(atxm.match_amount), 0),
         checked: false,
         old_data: txn.old_data
       },
@@ -292,7 +298,7 @@ defmodule FullCircle.BillPay do
     |> create_payment_transactions(payment_name, com, user)
   end
 
-  defp create_payment_transactions(multi, name, com, _user) do
+  defp create_payment_transactions(multi, name, com, user) do
     multi
     |> Ecto.Multi.run("create_transactions", fn repo, %{^name => payment} ->
       payment =
@@ -361,6 +367,21 @@ defmodule FullCircle.BillPay do
         end)
       end
 
+      if Decimal.gt?(payment.payment_balance, 0) do
+        repo.insert!(%Transaction{
+          doc_type: "Payment",
+          doc_no: payment.payment_no,
+          doc_id: payment.id,
+          doc_date: payment.payment_date,
+          account_id: Accounting.get_account_by_name("Account Receivables", com, user).id,
+          contact_id: payment.contact_id,
+          company_id: com.id,
+          amount: payment.payment_balance,
+          particulars: "Pre-Payment to #{payment.contact_name}",
+          contact_particulars: "Pre-Payment to #{payment.contact_name}"
+        })
+      end
+
       if Decimal.gt?(payment.funds_amount, 0) do
         repo.insert!(%Transaction{
           doc_type: "Payment",
@@ -370,7 +391,7 @@ defmodule FullCircle.BillPay do
           account_id: payment.funds_account_id,
           company_id: com.id,
           amount: Decimal.negate(payment.funds_amount),
-          particulars: "Payment to #{payment.contact_name}"
+          particulars: "Payment to #{payment.contact_name}",
         })
       end
 

@@ -68,6 +68,7 @@ defmodule FullCircle.Billing.PurInvoice do
       :contact_name,
       :pur_invoice_no
     ])
+    |> cast_assoc(:pur_invoice_details)
     |> validate_date(:pur_invoice_date, days_before: 60)
     |> validate_date(:pur_invoice_date, days_after: 0)
     |> validate_id(:contact_name, :contact_id)
@@ -76,8 +77,6 @@ defmodule FullCircle.Billing.PurInvoice do
     |> unsafe_validate_unique([:pur_invoice_no, :company_id], FullCircle.Repo,
       message: gettext("pur_invoice no already in company")
     )
-    |> cast_assoc(:pur_invoice_details)
-    |> cast_assoc(:transaction_matchers)
     |> compute_fields()
   end
 
@@ -99,9 +98,5 @@ defmodule FullCircle.Billing.PurInvoice do
       true ->
         changeset
     end
-  end
-
-  def compute_match_transactions_amount(changeset) do
-    changeset |> sum_field_to(:transaction_matchers, :match_amount, :matched_amount)
   end
 end

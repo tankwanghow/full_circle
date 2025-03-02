@@ -64,7 +64,8 @@ defmodule FullCircle.BillPay.Payment do
       :funds_account_name,
       :funds_amount
     ])
-    |> compute_balance()
+    |> cast_assoc(:transaction_matchers)
+    |> cast_assoc(:payment_details)
     |> validate_id(:contact_name, :contact_id)
     |> unique_constraint(:e_inv_uuid)
     |> validate_length(:descriptions, max: 230)
@@ -74,10 +75,9 @@ defmodule FullCircle.BillPay.Payment do
     |> unsafe_validate_unique([:payment_no, :company_id], FullCircle.Repo,
       message: gettext("payment no already in company")
     )
-    |> cast_assoc(:transaction_matchers)
-    |> cast_assoc(:payment_details)
+    |> compute_balance()
     |> validate_number(:funds_amount, greater_than: Decimal.new("0.00"))
-    |> validate_number(:payment_balance, equal_to: Decimal.new("0.00"))
+    # |> validate_number(:payment_balance, equal_to: Decimal.new("0.00"))
   end
 
   def compute_struct_balance(inval) do

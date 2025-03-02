@@ -72,13 +72,23 @@ defmodule FullCircleWeb.InvoiceLive.DetailComponent do
             <.input phx-hook="calculatorInput" klass="text-right" field={dtl[:package_qty]} />
           </div>
           <div class="detail-qty-col">
-            <.input
-              phx-hook="calculatorInput"
-              klass="text-right"
-              field={dtl[:quantity]}
-              step="0.0001"
-              disabled={Phoenix.HTML.Form.input_value(dtl, :unit_multiplier) |> Decimal.gt?(0)}
-            />
+            <%= if Phoenix.HTML.Form.input_value(dtl, :unit_multiplier) |> Decimal.gt?(0) do %>
+              <.input
+                phx-hook="calculatorInput"
+                klass="text-right"
+                field={dtl[:quantity]}
+                step="0.0001"
+                readonly
+                tabindex="-1"
+              />
+            <% else %>
+              <.input
+                phx-hook="calculatorInput"
+                klass="text-right"
+                field={dtl[:quantity]}
+                step="0.0001"
+              />
+            <% end %>
           </div>
           <div class="detail-unit-col">
             <.input field={dtl[:unit]} readonly tabindex="-1" />

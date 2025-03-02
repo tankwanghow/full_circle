@@ -76,7 +76,7 @@ defmodule FullCircleWeb.PaymentLive.Index do
           {gettext("Contact / Particulars")}
         </div>
         <div class="w-[8%] border-b border-t border-amber-400 py-1">
-          {gettext("Amount")}
+          {gettext("Pay Amount / Match Balance")}
         </div>
         <div class="w-[0.4%] bg-white"></div>
         <div class="font-medium flex flex-row bg-blue-200 w-[49.6%]">
@@ -99,6 +99,7 @@ defmodule FullCircleWeb.PaymentLive.Index do
         phx-page-loading
       >
         <%= for {obj_id, obj} <- @streams.objects do %>
+        <%!-- <div>{obj_id} {obj.payment_no}</div> --%>
           <.live_component
             module={IndexComponent}
             id={obj_id}

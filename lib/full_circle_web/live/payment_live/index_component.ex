@@ -220,7 +220,15 @@ defmodule FullCircleWeb.PaymentLive.IndexComponent do
       </div>
 
       <div class="w-[8%] py-1">
-        {Number.Currency.number_to_currency(@obj.amount |> Decimal.abs())}
+        <div>{Number.Currency.number_to_currency(@obj.amount |> Decimal.abs())}</div>
+        <div class="text-orange-500">
+          {@obj.amount
+          |> Decimal.sub(@obj.details_amount)
+          |> Decimal.sub(@obj.tax_amount)
+          |> Decimal.sub(@obj.matched_amount)
+          |> Decimal.abs()
+          |> Number.Currency.number_to_currency()}
+        </div>
       </div>
       <div class="w-[0.4%] bg-white"></div>
 
@@ -228,7 +236,7 @@ defmodule FullCircleWeb.PaymentLive.IndexComponent do
         Not Matching Needed. Payment to Supplier.
       </div>
 
-      <div :if={@obj.got_details > 0} class="w-[48.6%] p-1 border-b border-gray-400">
+      <div :if={@obj.got_details > 0} class="w-[48.6%] p-1">
         <div :if={@e_invs == []} class="flex border-b border-amber-400 last:border-0">
           <a
             id={@obj.payment_no}

@@ -238,7 +238,7 @@ defmodule FullCircle.Billing do
       left_join: stxm in SeedTransactionMatcher,
       on: stxm.transaction_id == txn.id,
       left_join: atxm in TransactionMatcher,
-      on: atxm.transaction_id == txn.id,
+      on: atxm.doc_id == txn.doc_id,
       where: txn.company_id == ^company.id,
       where: txn.doc_type == "Invoice",
       select: %{

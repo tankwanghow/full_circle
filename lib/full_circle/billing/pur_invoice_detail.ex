@@ -81,7 +81,7 @@ defmodule FullCircle.Billing.PurInvoiceDetail do
     rate = fetch_field!(changeset, :tax_rate)
 
     qty =
-      if Decimal.gt?(pack_qty, "0") and Decimal.gt?(unit_multi, "0") do
+      if Decimal.gt?(unit_multi, "0") do
         Decimal.mult(pack_qty, unit_multi)
       else
         fetch_field!(changeset, :quantity)

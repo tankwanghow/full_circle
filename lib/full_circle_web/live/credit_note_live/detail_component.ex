@@ -77,7 +77,7 @@ defmodule FullCircleWeb.CreditNoteLive.DetailComponent do
           </div>
           <.input type="hidden" field={dtl[:tax_code_id]} />
           <div class="w-[8%]">
-            <.input type="number" field={dtl[:tax_rate]} step="0.0001" />
+            <.input type="number" field={dtl[:tax_rate]} step="0.0001" readonly tabindex="-1" />
           </div>
           <div class="w-[8%]">
             <.input type="number" field={dtl[:tax_amount]} readonly tabindex="-1" />

@@ -60,6 +60,8 @@ defmodule FullCircle.Billing.Invoice do
       :contact_name,
       :invoice_no
     ])
+    |> cast_assoc(:invoice_details)
+    |> compute_fields()
     |> validate_date(:invoice_date, days_before: 60)
     |> validate_date(:invoice_date, days_after: 3)
     |> validate_length(:descriptions, max: 230)
@@ -68,8 +70,6 @@ defmodule FullCircle.Billing.Invoice do
     |> unsafe_validate_unique([:invoice_no, :company_id], FullCircle.Repo,
       message: gettext("invoice no already in company")
     )
-    |> cast_assoc(:invoice_details)
-    |> compute_fields()
   end
 
   def compute_struct_fields(inval) do
