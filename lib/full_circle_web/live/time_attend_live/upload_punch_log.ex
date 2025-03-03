@@ -167,7 +167,7 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
 
     times
     |> Enum.reduce({[], nil}, fn time, {acc, last_time} ->
-      if last_time && Time.diff(time, last_time, :second) < 120 do
+      if last_time && Time.diff(time, last_time, :second) < 600 do
         {acc, last_time}
       else
         {[time | acc], time}
