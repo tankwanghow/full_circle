@@ -69,7 +69,7 @@ defmodule FullCircle.Billing.PurInvoice do
       :pur_invoice_no
     ])
     |> cast_assoc(:pur_invoice_details)
-    |> validate_date(:pur_invoice_date, days_before: 60)
+    |> validate_date(:pur_invoice_date, days_before: 100)
     |> validate_date(:pur_invoice_date, days_after: 0)
     |> validate_id(:contact_name, :contact_id)
     |> validate_length(:descriptions, max: 230)

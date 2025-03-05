@@ -31,7 +31,7 @@ defmodule FullCircleWeb.PaymentLive.Print do
   defp set_page_defaults(socket) do
     socket
     |> assign(:detail_body_height, 160)
-    |> assign(:detail_height, 9)
+    |> assign(:detail_height, 12)
     |> assign(:company, FullCircle.Sys.get_company!(socket.assigns.current_company.id))
   end
 
@@ -185,12 +185,12 @@ defmodule FullCircleWeb.PaymentLive.Print do
             do: "(#{@recd.package_name})",
             else: ""
           )}
-        </div>
-        <div class={if(@recd.good_name != "Note", do: "is-size-7", else: "")}>
-          {if(@recd.descriptions != "" and !is_nil(@recd.descriptions),
-            do: "#{@recd.descriptions}",
-            else: ""
-          )}
+          <span class={if(@recd.good_name != "Note", do: "is-size-7", else: "")}>
+            {if(@recd.descriptions != "" and !is_nil(@recd.descriptions),
+              do: "#{@recd.descriptions}",
+              else: ""
+            )}
+          </span>
         </div>
       </span>
       <span class="qty">

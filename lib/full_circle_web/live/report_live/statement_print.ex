@@ -89,7 +89,9 @@ defmodule FullCircleWeb.ReportLive.Statement.Print do
     ~H"""
     <div class="txn">
       <div class="doc_date">{@txn.doc_date}</div>
-      <div class="doc_info">{@txn.doc_type} {@txn.doc_no}</div>
+      <div class="doc_info">
+      <span class="txn_doctype">{@txn.doc_type}</span> {@txn.doc_no}
+      </div>
       <div class="parti">{@txn.particulars |> String.slice(0..40)}</div>
       <div class="amount">{@txn.amount |> Number.Delimit.number_to_delimited()}</div>
       <div class="running_sum">{@txn.running |> Number.Delimit.number_to_delimited()}</div>
@@ -212,6 +214,8 @@ defmodule FullCircleWeb.ReportLive.Statement.Print do
         .page { padding-left: 5mm; padding-right: 5mm; page-break-after: always;} }
 
       .doctype { float: right; font-weight: bold; font-size: 1.5rem; }
+
+      .txn_doctype { font-size: 0.7rem; }
 
       .statement-header { height: 40mm; margin-top: 3mm; border-top: 1px solid black; }
       .statement-header .customer { padding-left: 3mm; padding-top: 2mm; }
