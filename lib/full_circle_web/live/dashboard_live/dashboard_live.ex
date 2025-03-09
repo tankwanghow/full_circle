@@ -126,6 +126,9 @@ defmodule FullCircleWeb.DashboardLive do
         <.link navigate={~p"/companies/#{@current_company.id}/epfsocsoeis"} class="button orange">
           {gettext("EPF/SOCSO/EIS")}
         </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/eaform"} class="button orange">
+          {gettext("EA Form")}
+        </.link>
       </div>
 
       <div class="font-medium text-xl">Operations</div>
