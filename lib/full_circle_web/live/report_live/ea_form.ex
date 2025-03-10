@@ -61,7 +61,7 @@ defmodule FullCircleWeb.ReportLive.EAForm do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="w-10/12 mx-auto">
+    <div class="w-11/12 mx-auto">
       <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <.form
         for={%{}}
@@ -69,11 +69,50 @@ defmodule FullCircleWeb.ReportLive.EAForm do
         autocomplete="off"
         phx-submit="upload"
         phx-change="validate"
-        class="p-4 mb-1 border rounded-lg border-blue-500 bg-blue-200"
+        class="p-4 mb-1 border rounded-lg border-blue-500 bg-yellow-200"
       >
-        {"Maximum file size is #{@uploads.csv_file.max_file_size / 1_000_000} MB"}
+        <span class="font-bold text-xl">
+          {"Maximum file size is #{@uploads.csv_file.max_file_size / 1_000_000} MB, file type CSV"}
+          <.live_file_input upload={@uploads.csv_file} />
+        </span>
 
-        <.live_file_input upload={@uploads.csv_file} />
+        <div class="font-medium">
+          Your EA Data file needed the columns below, please refer
+          <a
+            href="/samples/ea_cp8a_pin2023.pdf"
+            download="ea_cp8a_pin2023.pdf"
+            class="text-red-400 hover:text-red-700 hover:font-bold"
+          >
+            C.P.8A - Pin 2023
+          </a>
+        </div>
+        <div class="font-mono">
+          <p>
+            <span class="font-bold text-green-700">HEADER - </span>nosiri, nomajikanE, year, tin, lhdnbrh
+          </p>
+          <p>
+            <span class="font-bold text-green-700">SECTION A - </span>a1, a2, a3, a4, a5, a6, a7, a8, a9a, a9b
+          </p>
+          <p>
+            <span class="font-bold text-green-700">SECTION B - </span>b1a, b1b, b1cname, b1c, b1d, b1e, b1fdari, b1fhingga, b1f, b2a, b2b, b2, b3nyata, b3, b4alamat, b4, b5, b6
+          </p>
+          <p><span class="font-bold text-green-700">SECTION C - </span>c1, c2, jumlah</p>
+          <p>
+            <span class="font-bold text-green-700">SECTION D - </span>d1, d2, d3, d4, d5a, d5b, d6
+          </p>
+          <p><span class="font-bold text-green-700">SECTION E - </span>e1name, e1, e2</p>
+          <p><span class="font-bold text-green-700">SECTION F - </span>f</p>
+          <p>
+            <span class="font-bold text-green-700">FOOTER - </span>tarikh, nama, pos, address, phone
+          </p>
+        </div>
+        <a
+          href="/samples/ea_data_format.csv"
+          download="ea_data_format.csv"
+          class="text-red-400 hover:text-red-700 hover:font-bold"
+        >
+          Download Sample CSV File
+        </a>
         <div phx-drop-target={@uploads.csv_file.ref} class="p-2">
           <%= for entry <- @uploads.csv_file.entries do %>
             <div class="mt-2 gap-2 flex flex-row tracking-tighter border-2 border-green-600 place-items-center p-2 rounded-lg">
@@ -114,9 +153,9 @@ defmodule FullCircleWeb.ReportLive.EAForm do
         <:result_html>
           <% {col, row} = @result.result %>
           <div :if={Enum.count(col) > 0} class="flex flex-row">
-          <div class="w-[1.5%] text-center font-bold border rounded bg-gray-200 border-gray-500"></div>
+            <div class="text-center font-bold border rounded bg-gray-200 border-gray-500"></div>
             <%= for h <- col do %>
-              <div class="w-[4.7%] text-center font-bold border rounded bg-gray-200 border-gray-500">
+              <div class="max-w-60 text-center font-bold border rounded bg-gray-200 border-gray-500">
                 {h}
               </div>
             <% end %>
@@ -131,7 +170,7 @@ defmodule FullCircleWeb.ReportLive.EAForm do
                 <.icon name="hero-printer-solid" class="h-5 w-5" />
               </.link>
               <%= for c <- r do %>
-                <div class="w-[4.7%] text-center border overflow-hidden rounded border-blue-200">
+                <div class="max-w-60 text-center border overflow-hidden rounded border-blue-200">
                   {c}
                 </div>
               <% end %>

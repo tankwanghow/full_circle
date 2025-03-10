@@ -18,7 +18,7 @@ defmodule FullCircleWeb do
   """
 
   def static_paths,
-    do: ~w(assets fonts sounds images face-api-models human-models favicon.ico robots.txt)
+    do: ~w(assets fonts sounds images face-api-models human-models samples favicon.ico robots.txt)
 
   def router do
     quote do
