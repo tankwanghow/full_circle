@@ -129,7 +129,7 @@ defmodule FullCircleWeb.ReportLive.EAFormPrint do
         <div class="field" style="top: 36px; left: 488px; text-align: center; width: 35px;">{@year}</div>
         <div class="field" style="top: -2px; left: 550px; text-align: center; width: 190px;">{@tin}</div>
         <div class="field" style="top: -5px; left: 635px; text-align: center; width: 110px;">{@lhdnbrh}</div>
-        <div class="field" style="top: 34px; left: 340px; text-align: center; width: 400px;">{@a1}</div>
+        <div class="field" style="top: 31px; left: 340px; text-align: center; width: 400px;">{@a1}</div>
         <div class="field" style="top: 32px; left: 190px; text-align: center; width: 200px;">{@a2}</div>
         <div class="field" style="top: 10px; left: 575px; text-align: center; width: 165px;">{@a3}</div>
         <div class="field" style="top: 10px; left: 190px; text-align: center; width: 200px;">{@a4}</div>
@@ -196,7 +196,7 @@ defmodule FullCircleWeb.ReportLive.EAFormPrint do
           {zsd(@jumlah, 2)}
         </div>
 
-        <div class="field" style="top: -69px; left: 645px; text-align: right; width: 95px;">
+        <div class="field" style="top: -70px; left: 645px; text-align: right; width: 95px;">
           {zsd(@d1, 2)}
         </div>
         <div class="field" style="top: -71px; left: 645px; text-align: right; width: 95px;">
@@ -235,11 +235,11 @@ defmodule FullCircleWeb.ReportLive.EAFormPrint do
         <div class="field" style="font-weight: bold; top: -37px; left: 645px; text-align: right; width: 95px;">
           {zsd(@f, 2)}
         </div>
-        <div class="field" style="top: 60px; left: 100px; text-align: center; width: 145px;">{@tarikh}</div>
-        <div class="field" style="top: -35px; left: 440px; text-align: center; width: 295px;">{@nama}</div>
-        <div class="field" style="top: -35px; left: 440px; text-align: center; width: 295px;">{@pos}</div>
-        <div class="field" style="top: -37px; left: 440px; text-align: center; width: 295px;">{@address}</div>
-        <div class="field" style="top: -40px; left: 440px; text-align: center; width: 295px;">{@phone}</div>
+        <div class="field" style="top: -12px; left: 440px; text-align: center; width: 295px;">{@nama}</div>
+        <div class="field" style="top: -13px; left: 440px; text-align: center; width: 295px;">{@pos}</div>
+        <div class="field" style="top: -16px; left: 440px; text-align: center; width: 295px;">{@address}</div>
+        <div class="field" style="top: -19px; left: 440px; text-align: center; width: 295px;">{@phone}</div>
+        <div class="field" style="top: -60px; left: 100px; text-align: center; width: 145px;">{@tarikh}</div>
       </div>
     </div>
     """
@@ -264,10 +264,10 @@ defmodule FullCircleWeb.ReportLive.EAFormPrint do
 
       @media print {
         @page { size: A4; margin: 0mm; }
-        .page { width: 210mm; height: 297mm; position: relative;
+        .page { width: 210mm; height: 296.5mm; position: relative;
               background-image: url('/images/ea2023-1.jpg');
-              background-size: 210mm 297mm;  }
-        .field { position: relative; }
+              background-size: 210mm 296.5mm;  }
+        .field { position: relative;  border: 1px dotted white;}
       }
     </style>
     """
