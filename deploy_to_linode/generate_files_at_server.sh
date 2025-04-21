@@ -18,6 +18,8 @@ services:
   web:
     image: ${DOCKER_HUB_USERNAME}/${IMAGE_NAME}
     container_name: ${DOCKER_CONTAINER_NAME}
+    volumes:
+      - /home/${IMAGE_NAME}/uploads:/uploads
     environment:
       - DATABASE_URL=postgres://${DB_USER}:${DB_PWD}@localhost:5432/${DB_NAME}
       - DATABASE_QUERY_URL=postgres://${DB_USER}_query:${DB_PWD}@localhost:5432/${DB_NAME}

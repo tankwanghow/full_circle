@@ -61,6 +61,13 @@ if [ ! -d "/home/${IMAGE_NAME}" ]; then
 else 
     echo "Directory already exists: /home/${IMAGE_NAME}"
 fi
+if [ ! -d "/home/${IMAGE_NAME}/files" ]; then
+    # If it doesn't exist, create it
+    mkdir -p "/home/${IMAGE_NAME}/files"
+    echo "Directory created: /home/${IMAGE_NAME}/files"
+else 
+    echo "Directory already exists: /home/${IMAGE_NAME}/files"
+fi
 EOF
 
 sshpass -p $LINODE_PWD scp $SRC_SETUP_SRV $SRC_SETUP_DB $SRC_SETUP_CERTBOT $SRC_GEN_FILE $SRC_DEPLOY_FILE root@$LINODE_IP:/home/${IMAGE_NAME}
