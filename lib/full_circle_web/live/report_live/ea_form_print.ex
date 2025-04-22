@@ -260,14 +260,14 @@ defmodule FullCircleWeb.ReportLive.EAFormPrint do
               background-image: url('/images/ea2023-1.jpg');
               background-size: 210mm 297mm;  }
 
-      .field { position: relative; border: 1px dotted white;}
+      .field { position: relative; border: 1px dotted transparent;}
 
       @media print {
         @page { size: A4; margin: 0mm; }
         .page { width: 210mm; height: 296.5mm; position: relative;
               background-image: url('/images/ea2023-1.jpg');
               background-size: 210mm 296.5mm;  }
-        .field { position: relative;  border: 1px dotted white;}
+        .field { position: relative;  border: 1px dotted transparent;}
       }
     </style>
     """
