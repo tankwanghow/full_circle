@@ -111,14 +111,12 @@ defmodule FullCircleWeb.CsvController do
         "field" => fld,
         "feed_str" => feed_str
       }) do
-    data =
+    {col, row} =
       FullCircle.Layer.house_feed_type_query(mth, yr, com_id, feed_str, fld)
-      |> FullCircle.Helpers.exec_query_map()
-
-    fields = data |> Enum.at(0) |> Map.keys()
+      |> FullCircle.Helpers.exec_query_row_col()
 
     filename = "house_#{fld}_#{mth}_#{yr}"
-    send_csv_map(conn, data, fields, filename)
+    send_csv_row_col(conn, row, col, filename)
   end
 
   def show(conn, %{
@@ -196,7 +194,6 @@ defmodule FullCircleWeb.CsvController do
           []
       end
 
-    # fields = data |> Enum.at(0) |> Map.keys()
     filename = "#{rep |> String.replace(" ", "") |> Macro.underscore()}_#{tdate}"
 
     send_csv_map(
