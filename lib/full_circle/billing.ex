@@ -89,11 +89,32 @@ defmodule FullCircle.Billing do
         package_name: pkg.name,
         tax_code: tc.code,
         tax_rate: tc.rate * 100,
-        tax_amount: (invd.quantity * invd.unit_price + invd.discount) * invd.tax_rate,
-        good_amount: invd.quantity * invd.unit_price + invd.discount,
+        tax_amount:
+          fragment(
+            "round((? * ? + ?) * ?, 2)",
+            invd.quantity,
+            invd.unit_price,
+            invd.discount,
+            invd.tax_rate
+          ),
+        good_amount:
+          fragment(
+            "round(? * ? + ?, 2)",
+            invd.quantity,
+            invd.unit_price,
+            invd.discount
+          ),
         amount:
-          invd.quantity * invd.unit_price + invd.discount +
-            (invd.quantity * invd.unit_price + invd.discount) * invd.tax_rate
+          fragment(
+            "round(? * ? + ? + (? * ? + ?) * ?, 2)",
+            invd.quantity,
+            invd.unit_price,
+            invd.discount,
+            invd.quantity,
+            invd.unit_price,
+            invd.discount,
+            invd.tax_rate
+          )
       }
   end
 

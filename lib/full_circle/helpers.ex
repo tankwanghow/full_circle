@@ -133,8 +133,8 @@ defmodule FullCircle.Helpers do
           Decimal.add(acc, Map.fetch!(x, field_name))
         end)
       end
-
-    inval |> Map.replace!(result_field, sum)
+    IO.inspect(inval)
+    inval |> Map.replace!(result_field, Decimal.round(sum, 2))
   end
 
   def sum_field_to(changeset, detail_name, field_name, result_field) do
@@ -158,7 +158,7 @@ defmodule FullCircle.Helpers do
         )
       end)
 
-    changeset |> put_change(result_field, sum)
+    changeset |> put_change(result_field, Decimal.round(sum, 2))
   end
 
   def get_change_or_data(changeset, detail_name) do
