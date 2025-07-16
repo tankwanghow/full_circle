@@ -95,8 +95,11 @@ defmodule FullCircle.BillPay do
       where: dtl.payment_id == ^id,
       select:
         fragment(
-          "round(?, 2)",
-          sum((dtl.quantity * dtl.unit_price + dtl.discount) * dtl.tax_rate)
+          "sum(round((?*?+?)*?, 2))",
+          dtl.quantity,
+          dtl.unit_price,
+          dtl.discount,
+          dtl.tax_rate
         )
   end
 
@@ -105,8 +108,10 @@ defmodule FullCircle.BillPay do
       where: dtl.payment_id == ^id,
       select:
         fragment(
-          "round(?, 2)",
-          sum(dtl.quantity * dtl.unit_price + dtl.discount)
+          "sum(round(?*?+?, 2))",
+          dtl.quantity,
+          dtl.unit_price,
+          dtl.discount
         )
   end
 
@@ -115,11 +120,14 @@ defmodule FullCircle.BillPay do
       where: dtl.payment_id == ^id,
       select:
         fragment(
-          "round(?, 2)",
-          sum(
-            dtl.quantity * dtl.unit_price + dtl.discount +
-              (dtl.quantity * dtl.unit_price + dtl.discount) * dtl.tax_rate
-          )
+          "sum(round(?*?+?+(?*?+?)*?, 2))",
+          dtl.quantity,
+          dtl.unit_price,
+          dtl.discount,
+          dtl.quantity,
+          dtl.unit_price,
+          dtl.discount,
+          dtl.tax_rate
         )
   end
 
@@ -216,7 +224,6 @@ defmodule FullCircle.BillPay do
   end
 
   defp payment_raw_query(company, _user) do
-
     # Define the CTE for receipt_details aggregation
     details_agg =
       from rd in PaymentDetail,
@@ -425,7 +432,7 @@ defmodule FullCircle.BillPay do
           account_id: payment.funds_account_id,
           company_id: com.id,
           amount: Decimal.negate(payment.funds_amount),
-          particulars: "Payment to #{payment.contact_name}",
+          particulars: "Payment to #{payment.contact_name}"
         })
       end
 

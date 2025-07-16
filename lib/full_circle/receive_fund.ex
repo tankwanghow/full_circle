@@ -110,8 +110,11 @@ defmodule FullCircle.ReceiveFund do
       where: dtl.receipt_id == ^id,
       select:
         fragment(
-          "round(?, 2)",
-          sum((dtl.quantity * dtl.unit_price + dtl.discount) * dtl.tax_rate)
+          "sum(round((?*?+?)*?, 2))",
+          dtl.quantity,
+          dtl.unit_price,
+          dtl.discount,
+          dtl.tax_rate
         )
   end
 
@@ -120,8 +123,10 @@ defmodule FullCircle.ReceiveFund do
       where: dtl.receipt_id == ^id,
       select:
         fragment(
-          "round(?, 2)",
-          sum(dtl.quantity * dtl.unit_price + dtl.discount)
+          "sum(round(?*?+?, 2))",
+          dtl.quantity,
+          dtl.unit_price,
+          dtl.discount
         )
   end
 
@@ -130,11 +135,14 @@ defmodule FullCircle.ReceiveFund do
       where: dtl.receipt_id == ^id,
       select:
         fragment(
-          "round(?, 2)",
-          sum(
-            dtl.quantity * dtl.unit_price + dtl.discount +
-              (dtl.quantity * dtl.unit_price + dtl.discount) * dtl.tax_rate
-          )
+          "sum(round(?*?+?(?*?+?)*?, 2))",
+          dtl.quantity,
+          dtl.unit_price,
+          dtl.discount,
+          dtl.quantity,
+          dtl.unit_price,
+          dtl.discount,
+          dtl.tax_rate
         )
   end
 

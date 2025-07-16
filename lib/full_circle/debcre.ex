@@ -76,8 +76,10 @@ defmodule FullCircle.DebCre do
       where: dtl.credit_note_id == ^id,
       select:
         fragment(
-          "round(?, 2)",
-          sum(dtl.quantity * dtl.unit_price * dtl.tax_rate)
+          "sum(round(?*?*?, 2))",
+          dtl.quantity,
+          dtl.unit_price,
+          dtl.tax_rate
         )
   end
 
@@ -86,8 +88,9 @@ defmodule FullCircle.DebCre do
       where: dtl.credit_note_id == ^id,
       select:
         fragment(
-          "round(?, 2)",
-          sum(dtl.quantity * dtl.unit_price)
+          "sum(round(?*?, 2))",
+          dtl.quantity,
+          dtl.unit_price
         )
   end
 
@@ -96,11 +99,12 @@ defmodule FullCircle.DebCre do
       where: dtl.credit_note_id == ^id,
       select:
         fragment(
-          "round(?, 2)",
-          sum(
-            dtl.quantity * dtl.unit_price +
-              dtl.quantity * dtl.unit_price * dtl.tax_rate
-          )
+          "sum(round(?*?+?*?*?, 2))",
+          dtl.quantity,
+          dtl.unit_price,
+          dtl.quantity,
+          dtl.unit_price,
+          dtl.tax_rate
         )
   end
 
@@ -456,8 +460,10 @@ defmodule FullCircle.DebCre do
       where: dtl.debit_note_id == ^id,
       select:
         fragment(
-          "round(?, 2)",
-          sum(dtl.quantity * dtl.unit_price * dtl.tax_rate)
+          "sum(round(?*?*?, 2))",
+          dtl.quantity,
+          dtl.unit_price,
+          dtl.tax_rate
         )
   end
 
@@ -466,8 +472,9 @@ defmodule FullCircle.DebCre do
       where: dtl.debit_note_id == ^id,
       select:
         fragment(
-          "round(?, 2)",
-          sum(dtl.quantity * dtl.unit_price)
+          "sum(round(?*?, 2))",
+          dtl.quantity,
+          dtl.unit_price
         )
   end
 
@@ -476,11 +483,12 @@ defmodule FullCircle.DebCre do
       where: dtl.debit_note_id == ^id,
       select:
         fragment(
-          "round(?, 2)",
-          sum(
-            dtl.quantity * dtl.unit_price +
-              dtl.quantity * dtl.unit_price * dtl.tax_rate
-          )
+          "sum(round(?*?+?*?*?, 2))",
+          dtl.quantity,
+          dtl.unit_price,
+          dtl.quantity,
+          dtl.unit_price,
+          dtl.tax_rate
         )
   end
 

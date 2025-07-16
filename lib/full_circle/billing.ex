@@ -120,21 +120,29 @@ defmodule FullCircle.Billing do
           e_inv_long_id: einv.longId,
           invoice_tax_amount:
             fragment(
-              "round(?, 2)",
-              sum((invd.quantity * invd.unit_price + invd.discount) * invd.tax_rate)
+              "sum(round((? * ? + ?) * ?, 2))",
+              invd.quantity,
+              invd.unit_price,
+              invd.discount,
+              invd.tax_rate
             ),
           invoice_good_amount:
             fragment(
-              "round(?, 2)",
-              sum(invd.quantity * invd.unit_price + invd.discount)
+              "sum(round(? * ? + ?, 2))",
+              invd.quantity,
+              invd.unit_price,
+              invd.discount
             ),
           invoice_amount:
             fragment(
-              "round(?, 2)",
-              sum(
-                invd.quantity * invd.unit_price + invd.discount +
-                  (invd.quantity * invd.unit_price + invd.discount) * invd.tax_rate
-              )
+              "sum(round(? * ? + ? + (? * ? + ?) * ?, 2))",
+              invd.quantity,
+              invd.unit_price,
+              invd.discount,
+              invd.quantity,
+              invd.unit_price,
+              invd.discount,
+              invd.tax_rate
             )
         }
     )
@@ -447,21 +455,29 @@ defmodule FullCircle.Billing do
           e_inv_long_id: einv.longId,
           pur_invoice_tax_amount:
             fragment(
-              "round(?, 2)",
-              sum((invd.quantity * invd.unit_price + invd.discount) * invd.tax_rate)
+              "sum(round((? * ? + ?) * ?, 2))",
+              invd.quantity,
+              invd.unit_price,
+              invd.discount,
+              invd.tax_rate
             ),
           pur_invoice_good_amount:
             fragment(
-              "round(?, 2)",
-              sum(invd.quantity * invd.unit_price + invd.discount)
+              "sum(round(? * ? + ?, 2))",
+              invd.quantity,
+              invd.unit_price,
+              invd.discount
             ),
           pur_invoice_amount:
             fragment(
-              "round(?, 2)",
-              sum(
-                invd.quantity * invd.unit_price + invd.discount +
-                  (invd.quantity * invd.unit_price + invd.discount) * invd.tax_rate
-              )
+              "sum(round(? * ? + ? + (? * ? + ?) * ?, 2))",
+              invd.quantity,
+              invd.unit_price,
+              invd.discount,
+              invd.quantity,
+              invd.unit_price,
+              invd.discount,
+              invd.tax_rate
             )
         }
     )
