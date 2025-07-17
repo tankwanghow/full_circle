@@ -135,7 +135,7 @@ defmodule FullCircle.ReceiveFund do
       where: dtl.receipt_id == ^id,
       select:
         fragment(
-          "sum(round(?*?+?(?*?+?)*?, 2))",
+          "sum(round(?*?+?+(?*?+?)*?, 2))",
           dtl.quantity,
           dtl.unit_price,
           dtl.discount,
