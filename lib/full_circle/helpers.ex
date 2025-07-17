@@ -133,7 +133,6 @@ defmodule FullCircle.Helpers do
           Decimal.add(acc, Map.fetch!(x, field_name))
         end)
       end
-    IO.inspect(inval)
     inval |> Map.replace!(result_field, Decimal.round(sum, 2))
   end
 

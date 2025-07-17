@@ -349,7 +349,6 @@ defmodule FullCircle.Cheque do
     multi
     |> Ecto.Multi.run("create_transactions", fn repo, %{^name => rtnq} ->
       rtnq = rtnq |> FullCircle.Repo.preload([:cheque])
-      IO.inspect({rtnq, ac_rec_id, pdc_id})
       if is_nil(rtnq.return_from_bank_id) do
         repo.insert!(%Transaction{
           doc_type: "ReturnCheque",
