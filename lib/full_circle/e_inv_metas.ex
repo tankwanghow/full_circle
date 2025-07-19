@@ -198,6 +198,22 @@ defmodule FullCircle.EInvMetas do
       get_fc_doc(Receipt, einv, :receipt_no, com) || []
   end
 
+  def get_internal_document("Self-billed Debit Note", "Received", einv, com) do
+    get_fc_doc(CreditNote, einv, :note_no, com) || []
+  end
+
+  def get_internal_document("Self-billed Debit Note", "Sent", einv, com) do
+    get_fc_doc(DebitNote, einv, :note_no, com) || []
+  end
+
+  def get_internal_document("Self-billed Credit Note", "Received", einv, com) do
+    get_fc_doc(DebitNote, einv, :note_no, com) || []
+  end
+
+  def get_internal_document("Self-billed Credit Note", "Sent", einv, com) do
+    get_fc_doc(CreditNote, einv, :note_no, com) || []
+  end
+
   def get_internal_document("Credit Note", "Sent", einv, com) do
     get_fc_doc(CreditNote, einv, :note_no, com) || []
   end
@@ -244,7 +260,14 @@ defmodule FullCircle.EInvMetas do
       where: c.id == ^com.id,
       where: cu.user_id == ^user.id,
       distinct: true,
-      where: ei.totalPayableAmount == ^amount or ei.totalNetAmount == ^amount,
+      where:
+        fragment(
+          "round(?,2)=round(?,2) or round(?,2)=round(?,2)",
+          ei.totalPayableAmount,
+          ^amount,
+          ei.totalNetAmount,
+          ^amount
+        ),
       select: %{
         rejectRequestDateTime: ei.rejectRequestDateTime,
         intermediaryROB: ei.intermediaryROB,
@@ -295,7 +318,14 @@ defmodule FullCircle.EInvMetas do
       where: c.id == ^com.id,
       where: cu.user_id == ^user.id,
       distinct: true,
-      where: ei.totalPayableAmount == ^amount or ei.totalNetAmount == ^amount,
+      where:
+        fragment(
+          "round(?,2)=round(?,2) or round(?,2)=round(?,2)",
+          ei.totalPayableAmount,
+          ^amount,
+          ei.totalNetAmount,
+          ^amount
+        ),
       select: %{
         rejectRequestDateTime: ei.rejectRequestDateTime,
         intermediaryROB: ei.intermediaryROB,
@@ -355,7 +385,14 @@ defmodule FullCircle.EInvMetas do
       where: ei.dateTimeReceived >= ^sd,
       where: ei.dateTimeReceived <= ^ed,
       distinct: true,
-      where: ei.totalPayableAmount == ^amount or ei.totalNetAmount == ^amount,
+      where:
+        fragment(
+          "round(?,2)=round(?,2) or round(?,2)=round(?,2)",
+          ei.totalPayableAmount,
+          ^amount,
+          ei.totalNetAmount,
+          ^amount
+        ),
       where:
         ilike(
           fragment(
