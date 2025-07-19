@@ -289,10 +289,10 @@ defmodule FullCircleWeb.InvoiceLive.Print do
 
       .letter-head { padding-bottom: 2mm; margin-bottom: 5mm; height: 28mm;}
       .qrcode { float: right; margin-top: -30mm; margin-right: 5mm; vertical-align: top; }
-      .invoice-info { margin-top: -5mm; float: right; }
+      .invoice-info { margin-top: -7mm; float: right; }
       .invoice-header { width: 100%; height: 40mm; border-bottom: 0.5mm solid black; }
       .customer { padding-left: 2mm; float: left;}
-      .invoice-info div { margin-bottom: 2mm; text-align: right; }
+      .invoice-info div { margin-bottom: 1mm; text-align: right; }
       .details-header { display: flex; text-align: center; padding-bottom: 2mm; padding-top: 2mm; border-bottom: 0.5mm solid black; margin-bottom: 2mm;}
       .particular { width: 80mm; text-align: left;  height: 100%; }
       .qty { width: 32mm; text-align: center; height: 100%; }
@@ -308,7 +308,7 @@ defmodule FullCircleWeb.InvoiceLive.Print do
       .invoice-amount div  { width: 33%; text-align: right; padding-top: 2mm;}
       .invoice-amount .taxamt { width: 33%; text-align: right; }
       .invoice-amount .invamt { width: 33%; text-align: right; }
-      .page-count { float: right; padding-top: 1mm;}
+      .page-count { float: right; }
     </style>
     """
   end
