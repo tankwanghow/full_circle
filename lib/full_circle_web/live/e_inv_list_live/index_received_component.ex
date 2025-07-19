@@ -166,7 +166,7 @@ defmodule FullCircleWeb.EInvListLive.IndexReceivedComponent do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="flex flex-row bg-gray-200 hover:bg-gray-300">
+    <div id={@id} class="flex flex-row bg-gray-200 hover:bg-gray-300">
       <div class="w-[49.8%] text-nowrap flex flex-row border-b border-amber-400 p-1">
         <div class="w-[22%] text-wrap p-1">
           <div>
