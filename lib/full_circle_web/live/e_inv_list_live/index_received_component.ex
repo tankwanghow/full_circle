@@ -141,7 +141,7 @@ defmodule FullCircleWeb.EInvListLive.IndexReceivedComponent do
       </.link>
       <.link
         target="_blank"
-        navigate={~p"/companies/#{@company.id}/PurInvoice/new"}
+        navigate={~p"/companies/#{@company.id}/PurInvoice/new?obj=#{Jason.encode!(@obj)}"}
         class="blue button"
       >
         {gettext("New Pur Invoice")}

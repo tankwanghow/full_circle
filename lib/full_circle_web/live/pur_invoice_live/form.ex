@@ -8,10 +8,11 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
   @impl true
   def mount(params, _session, socket) do
     id = params["invoice_id"]
+    obj = params["obj"]
 
     socket =
       case socket.assigns.live_action do
-        :new -> mount_new(socket)
+        :new -> if(obj, do: mount_new(obj, socket), else: mount_new(socket))
         :edit -> mount_edit(socket, id)
       end
 
@@ -30,6 +31,38 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
   defp mount_new(socket) do
     attrs =
       %{pur_invoice_no: "...new..."}
+
+    socket
+    |> assign(live_action: :new)
+    |> assign(id: "new")
+    |> assign(page_title: gettext("New Purchase Invoice"))
+    |> assign(matched_trans: [])
+    |> assign(
+      :form,
+      to_form(
+        StdInterface.changeset(
+          PurInvoice,
+          %PurInvoice{},
+          attrs,
+          socket.assigns.current_company
+        )
+      )
+    )
+  end
+
+  defp mount_new(obj, socket) do
+    obj = Jason.decode!(obj)
+
+    attrs =
+      %{
+        pur_invoice_no: "...new...",
+        e_inv_internal_id: obj["internalId"],
+        e_inv_uuid: obj["uuid"],
+        pur_invoice_date: obj["dateTimeIssued"],
+        due_date: obj["dateTimeIssued"],
+        contact_name:
+          obj["supplierName"] |> String.replace(~r/[^a-zA-Z0-9]/, "") |> String.downcase()
+      }
 
     socket
     |> assign(live_action: :new)
