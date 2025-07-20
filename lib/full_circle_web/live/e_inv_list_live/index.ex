@@ -155,10 +155,18 @@ defmodule FullCircleWeb.EInvListLive.Index do
         socket.assigns.search.terms
       )
 
+    preloaded_objects = Task.async_stream(objects, fn obj ->
+      direction = if obj.issuerTIN == socket.assigns.current_company.tax_id, do: "Sent", else: "Received"
+
+      fc_docs = EInvMetas.get_internal_document(obj.typeName, direction, obj, socket.assigns.current_company)
+
+      Map.put(obj, :fc_docs, fc_docs)
+    end) |> Enum.map(fn {:ok, obj} -> obj end)
+
     socket
     |> assign(page: page)
-    |> stream(:objects, objects, reset: reset)
-    |> assign(end_of_timeline?: Enum.count(objects) < @per_page)
+    |> stream(:objects, preloaded_objects, reset: reset)
+    |> assign(end_of_timeline?: Enum.count(preloaded_objects) < @per_page)
   end
 
   @impl true

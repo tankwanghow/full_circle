@@ -11,20 +11,7 @@ defmodule FullCircleWeb.EInvListLive.IndexSentComponent do
 
   @impl true
   def update(assigns, socket) do
-    {:ok, socket |> assign(assigns) |> get_fc_docs()}
-  end
-
-  defp get_fc_docs(socket) do
-    socket
-    |> assign(
-      fc_docs:
-        EInvMetas.get_internal_document(
-          socket.assigns.obj.typeName,
-          "Sent",
-          socket.assigns.obj,
-          socket.assigns.company
-        )
-    )
+    {:ok, assign(socket, assigns)}
   end
 
   @impl true
@@ -36,7 +23,17 @@ defmodule FullCircleWeb.EInvListLive.IndexSentComponent do
            socket.assigns.user
          ) do
       {:ok, _} ->
-        {:noreply, socket |> get_fc_docs()}
+        new_fc_docs =
+          EInvMetas.get_internal_document(
+            socket.assigns.obj.typeName,
+            "Sent",
+            socket.assigns.obj,
+            socket.assigns.company
+          )
+
+        new_obj = Map.put(socket.assigns.obj, :fc_docs, new_fc_docs)
+
+        {:noreply, assign(socket, obj: new_obj)}
 
       {:error, failed_operation, changeset, _} ->
         {:noreply,
@@ -63,7 +60,17 @@ defmodule FullCircleWeb.EInvListLive.IndexSentComponent do
   def handle_event("unmatch", %{"fcdoc" => fc_doc}, socket) do
     case EInvMetas.unmatch(Jason.decode!(fc_doc), socket.assigns.company, socket.assigns.user) do
       {:ok, _} ->
-        {:noreply, socket |> get_fc_docs()}
+        new_fc_docs =
+          EInvMetas.get_internal_document(
+            socket.assigns.obj.typeName,
+            "Sent",
+            socket.assigns.obj,
+            socket.assigns.company
+          )
+
+        new_obj = Map.put(socket.assigns.obj, :fc_docs, new_fc_docs)
+
+        {:noreply, assign(socket, obj: new_obj)}
 
       {:error, failed_operation, changeset, _} ->
         {:noreply,
@@ -220,8 +227,8 @@ defmodule FullCircleWeb.EInvListLive.IndexSentComponent do
       </div>
       <div class="w-[0.4%] bg-white p-1"></div>
       <div class="w-[49.8%] p-1 border-b border-amber-400">
-        {if Enum.count(@fc_docs) == 0 and @obj.status == "Valid", do: new_fc(assigns)}
-        <%= for doc <- @fc_docs do %>
+        {if Enum.count(@obj.fc_docs) == 0 and @obj.status == "Valid", do: new_fc(assigns)}
+        <%= for doc <- @obj.fc_docs do %>
           <div class="flex border-b border-amber-400 last:border-0">
             <div class="w-[22%]">
               <div>
