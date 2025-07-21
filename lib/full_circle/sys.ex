@@ -694,11 +694,18 @@ defmodule FullCircle.Sys do
         k = if(is_atom(k), do: Atom.to_string(k), else: k)
 
         if !String.ends_with?(k, bl) and k != "id" do
-          if !is_map(v) do
-            if v != "" and !is_nil(v),
-              do: "&^#{k}: #{Phoenix.HTML.html_escape(v) |> Phoenix.HTML.safe_to_string()}^&",
-              else: nil
+          # Updated condition: Treat structs like scalars, not maps
+          if !is_map(v) or is_struct(v) do
+            if !is_nil(v) do
+              # Safe stringify for Decimal, Date, etc.
+              str = to_string(v)
+
+              if str != "" do
+                "&^#{k}: #{Phoenix.HTML.html_escape(str) |> Phoenix.HTML.safe_to_string()}^&"
+              end
+            end
           else
+            # Only recurse on plain maps
             "&^#{k}: [" <> attr_to_string(v) <> "]^&"
           end
         end
