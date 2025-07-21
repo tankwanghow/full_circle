@@ -325,7 +325,17 @@ defmodule FullCircle.BillPay do
     multi
     |> get_gapless_doc_id(gapless_name, "Payment", "PV", com)
     |> Multi.insert(payment_name, fn %{^gapless_name => doc} ->
-      StdInterface.changeset(Payment, %Payment{}, Map.merge(attrs, %{"payment_no" => doc}), com)
+      if user_role_in_company(user.id, com.id) == "admin" do
+        StdInterface.changeset(
+          Payment,
+          %Payment{},
+          Map.merge(attrs, %{"payment_no" => doc}),
+          com,
+          :admin_changeset
+        )
+      else
+        StdInterface.changeset(Payment, %Payment{}, Map.merge(attrs, %{"payment_no" => doc}), com)
+      end
     end)
     |> Multi.insert("#{payment_name}_log", fn %{^payment_name => entity} ->
       FullCircle.Sys.log_changeset(
@@ -461,7 +471,13 @@ defmodule FullCircle.BillPay do
     payment_name = :update_payment
 
     multi
-    |> Multi.update(payment_name, StdInterface.changeset(Payment, payment, attrs, com))
+    |> Multi.update(payment_name, fn _ ->
+      if user_role_in_company(user.id, com.id) == "admin" do
+        StdInterface.changeset(Payment, payment, attrs, com, :admin_changeset)
+      else
+        StdInterface.changeset(Payment, payment, attrs, com)
+      end
+    end)
     |> Multi.delete_all(
       :delete_transaction,
       from(txn in Transaction,

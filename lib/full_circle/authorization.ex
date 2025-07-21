@@ -349,7 +349,7 @@ defmodule FullCircle.Authorization do
     end
   end
 
-  defp user_role_in_company(user_id, company_id) do
+  def user_role_in_company(user_id, company_id) do
     role = Util.attempt(FullCircle.Sys.get_company_user(company_id, user_id), :role)
 
     if role == nil do
