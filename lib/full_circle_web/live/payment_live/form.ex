@@ -393,7 +393,7 @@ defmodule FullCircleWeb.PaymentLive.Form do
 
   defp save(socket, :edit, params) do
     params = params |> FullCircleWeb.Helpers.put_into_matchers("doc_date", params["payment_date"])
-    
+
     case BillPay.update_payment(
            socket.assigns.form.data,
            params,
@@ -433,12 +433,22 @@ defmodule FullCircleWeb.PaymentLive.Form do
     params = params |> FullCircleWeb.Helpers.put_into_matchers("doc_date", params["payment_date"])
 
     changeset =
-      StdInterface.changeset(
-        Payment,
-        socket.assigns.form.data,
-        params,
-        socket.assigns.current_company
-      )
+      if socket.assigns.current_role == :admin do
+        StdInterface.changeset(
+          Payment,
+          socket.assigns.form.data,
+          params,
+          socket.assigns.current_company
+        )
+      else
+        StdInterface.changeset(
+          Payment,
+          socket.assigns.form.data,
+          params,
+          socket.assigns.current_company,
+          :admin_changeset
+        )
+      end
       |> Map.put(:action, socket.assigns.live_action)
 
     socket =
