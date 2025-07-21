@@ -39,8 +39,20 @@ defmodule FullCircle.BillPay.Payment do
     timestamps(type: :utc_datetime)
   end
 
-  @doc false
   def changeset(payment, attrs) do
+    payment
+    |> normal_changeset(attrs)
+    |> validate_date(:payment_date, days_before: 60)
+    |> validate_date(:payment_date, days_after: 0)
+  end
+
+  def admin_changeset(payment, attrs) do
+    payment
+    |> normal_changeset(attrs)
+  end
+
+  @doc false
+  defp normal_changeset(payment, attrs) do
     payment
     |> cast(attrs, [
       :payment_date,
@@ -70,14 +82,11 @@ defmodule FullCircle.BillPay.Payment do
     |> unique_constraint(:e_inv_uuid)
     |> validate_length(:descriptions, max: 230)
     |> validate_id(:funds_account_name, :funds_account_id)
-    |> validate_date(:payment_date, days_before: 60)
-    |> validate_date(:payment_date, days_after: 0)
     |> unsafe_validate_unique([:payment_no, :company_id], FullCircle.Repo,
       message: gettext("payment no already in company")
     )
     |> compute_balance()
     |> validate_number(:funds_amount, greater_than: Decimal.new("0.00"))
-    # |> validate_number(:payment_balance, equal_to: Decimal.new("0.00"))
   end
 
   def compute_struct_balance(inval) do
