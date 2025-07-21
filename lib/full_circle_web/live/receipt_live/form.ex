@@ -379,7 +379,7 @@ defmodule FullCircleWeb.ReceiptLive.Form do
 
   defp save(socket, :new, params) do
     case ReceiveFund.create_receipt(
-           params,
+           params |> Map.merge(%{"receipt_no" => "...new..."}),
            socket.assigns.current_company,
            socket.assigns.current_user
          ) do

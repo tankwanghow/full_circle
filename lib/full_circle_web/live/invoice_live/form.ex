@@ -263,7 +263,7 @@ defmodule FullCircleWeb.InvoiceLive.Form do
 
   defp save(socket, :new, params) do
     case Billing.create_invoice(
-           params,
+           params |> Map.merge(%{"invoice_no" => "...new..."}),
            socket.assigns.current_company,
            socket.assigns.current_user
          ) do
