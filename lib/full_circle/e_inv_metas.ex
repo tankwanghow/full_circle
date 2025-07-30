@@ -48,7 +48,13 @@ defmodule FullCircle.EInvMetas do
       join: cont in Contact,
       on: inv.contact_id == cont.id and txn.company_id == ^com.id,
       where: inv.e_inv_uuid == ^einv.uuid,
-      where: fragment("abs(?) = round(?, 2)", txn.amount, ^amount),
+      where:
+        fragment(
+          "round(?, 2) between round(abs(?), 2)-0.02 and round(abs(?), 2)+0.02",
+          ^amount,
+          txn.amount,
+          txn.amount
+        ),
       distinct: true,
       select: %{
         priority: 1,
@@ -73,7 +79,13 @@ defmodule FullCircle.EInvMetas do
       on: inv.contact_id == cont.id and txn.company_id == ^com.id,
       where: field(inv, ^field) == ^einv.internalId,
       where: is_nil(inv.e_inv_uuid),
-      where: fragment("abs(?) = round(?, 2)", txn.amount, ^amount),
+      where:
+        fragment(
+          "round(?, 2) between round(abs(?), 2)-0.02 and round(abs(?), 2)+0.02",
+          ^amount,
+          txn.amount,
+          txn.amount
+        ),
       distinct: true,
       select: %{
         priority: 2,
@@ -109,15 +121,21 @@ defmodule FullCircle.EInvMetas do
     buy_name = "%#{buy_name}%"
     supp_name = "%#{supp_name}%"
 
-    sd = einv.dateTimeReceived |> DateTime.to_date() |> Date.shift(day: -5)
-    ed = einv.dateTimeReceived |> DateTime.to_date() |> Date.shift(day: 5)
+    sd = einv.dateTimeReceived |> DateTime.to_date() |> Date.shift(day: -30)
+    ed = einv.dateTimeReceived |> DateTime.to_date() |> Date.shift(day: 30)
 
     from(inv in klass,
       join: txn in Transaction,
       on: txn.doc_id == inv.id,
       join: cont in Contact,
       on: inv.contact_id == cont.id and txn.company_id == ^com.id,
-      where: fragment("abs(?) = round(?, 2)", txn.amount, ^amount),
+      where:
+        fragment(
+          "round(?, 2) between round(abs(?), 2)-0.02 and round(abs(?), 2)+0.02",
+          ^amount,
+          txn.amount,
+          txn.amount
+        ),
       where:
         ilike(
           fragment(
@@ -262,11 +280,13 @@ defmodule FullCircle.EInvMetas do
       distinct: true,
       where:
         fragment(
-          "round(?,2)=round(?,2) or round(?,2)=round(?,2)",
+          "(round(?,2) between round(?,2)-0.02 and round(?,2)+0.02) or (round(?,2) between round(?,2)-0.02 and round(?,2)+0.02)",
+          ^amount,
+          ei.totalPayableAmount,
           ei.totalPayableAmount,
           ^amount,
           ei.totalNetAmount,
-          ^amount
+          ei.totalNetAmount
         ),
       select: %{
         rejectRequestDateTime: ei.rejectRequestDateTime,
@@ -320,11 +340,13 @@ defmodule FullCircle.EInvMetas do
       distinct: true,
       where:
         fragment(
-          "round(?,2)=round(?,2) or round(?,2)=round(?,2)",
+          "(round(?,2) between round(?,2)-0.02 and round(?,2)+0.02) or (round(?,2) between round(?,2)-0.02 and round(?,2)+0.02)",
+          ^amount,
+          ei.totalPayableAmount,
           ei.totalPayableAmount,
           ^amount,
           ei.totalNetAmount,
-          ^amount
+          ei.totalNetAmount
         ),
       select: %{
         rejectRequestDateTime: ei.rejectRequestDateTime,
@@ -387,11 +409,13 @@ defmodule FullCircle.EInvMetas do
       distinct: true,
       where:
         fragment(
-          "round(?,2)=round(?,2) or round(?,2)=round(?,2)",
+          "(round(?,2) between round(?,2)-0.02 and round(?,2)+0.02) or (round(?,2) between round(?,2)-0.02 and round(?,2)+0.02)",
+          ^amount,
+          ei.totalPayableAmount,
           ei.totalPayableAmount,
           ^amount,
           ei.totalNetAmount,
-          ^amount
+          ei.totalNetAmount
         ),
       where:
         ilike(
