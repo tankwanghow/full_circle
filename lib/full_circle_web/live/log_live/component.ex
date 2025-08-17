@@ -119,7 +119,7 @@ defmodule FullCircleWeb.LogLive.Component do
         id={"log-viewer-#{@id}"}
         show
         on_cancel={JS.push("hide_log", target: @myself)}
-        max_width="max-w-5xl"
+        max_w="max-w-6xl"
       >
         <div class="text-gray-800">
           <h2 class="text-2xl font-bold text-center mb-4">
