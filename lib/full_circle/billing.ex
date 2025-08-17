@@ -399,7 +399,9 @@ defmodule FullCircle.Billing do
   end
 
   def update_invoice(%Invoice{} = invoice, attrs, com, user) do
-    attrs = remove_field_if_new_flag(attrs, "e_inv_internal_id")
+    attrs =
+      remove_field_if_new_flag(attrs, "e_inv_internal_id")
+      |> remove_field_if_new_flag("invoice_no")
 
     case can?(user, :update_invoice, com) do
       true ->
