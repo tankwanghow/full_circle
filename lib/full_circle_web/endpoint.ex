@@ -32,6 +32,10 @@ defmodule FullCircleWeb.Endpoint do
     plug Phoenix.Ecto.CheckRepoStatus, otp_app: :full_circle
   end
 
+  if Code.ensure_loaded?(Tidewave) do
+    plug Tidewave, allowed_origins: ["http://localhost:4000"]
+  end
+
   # plug Phoenix.LiveDashboard.RequestLogger,
   #   param_key: "request_logger",
   #   cookie_key: "request_logger"
