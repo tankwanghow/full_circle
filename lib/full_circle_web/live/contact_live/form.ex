@@ -74,6 +74,7 @@ defmodule FullCircleWeb.ContactLive.Form do
         {:noreply,
          socket
          |> push_navigate(to: "/companies/#{socket.assigns.current_company.id}/contacts")
+         |> push_event("invalidate_autocomplete_cache", %{})
          |> put_flash(:info, "#{gettext("Contact deleted successfully.")}")}
 
       {:error, failed_operation, changeset, _} ->
@@ -106,6 +107,7 @@ defmodule FullCircleWeb.ContactLive.Form do
          |> push_navigate(
            to: ~p"/companies/#{socket.assigns.current_company.id}/contacts/#{ac.id}/edit"
          )
+         |> push_event("invalidate_autocomplete_cache", %{})
          |> put_flash(:info, "#{gettext("Contact created successfully.")}")}
 
       {:error, failed_operation, changeset, _} ->
@@ -139,6 +141,7 @@ defmodule FullCircleWeb.ContactLive.Form do
          |> push_navigate(
            to: ~p"/companies/#{socket.assigns.current_company.id}/contacts/#{ac.id}/edit"
          )
+         |> push_event("invalidate_autocomplete_cache", %{})
          |> put_flash(:info, "#{gettext("Contact updated successfully.")}")}
 
       {:error, failed_operation, changeset, _} ->

@@ -136,6 +136,7 @@ defmodule FullCircleWeb.EmployeeLive.Form do
         {:noreply,
          socket
          |> push_navigate(to: "/companies/#{socket.assigns.current_company.id}/employees")
+         |> push_event("invalidate_autocomplete_cache", %{})
          |> put_flash(:info, "#{gettext("Employee deleted successfully.")}")}
 
       {:error, failed_operation, changeset, _} ->
@@ -168,6 +169,7 @@ defmodule FullCircleWeb.EmployeeLive.Form do
          |> push_navigate(
            to: ~p"/companies/#{socket.assigns.current_company.id}/employees/#{ac.id}/edit"
          )
+         |> push_event("invalidate_autocomplete_cache", %{})
          |> put_flash(:info, "#{gettext("Employee created successfully.")}")}
 
       {:error, failed_operation, changeset, _} ->
@@ -201,6 +203,7 @@ defmodule FullCircleWeb.EmployeeLive.Form do
          |> push_navigate(
            to: ~p"/companies/#{socket.assigns.current_company.id}/employees/#{ac.id}/edit"
          )
+         |> push_event("invalidate_autocomplete_cache", %{})
          |> put_flash(:info, "#{gettext("Employee updated successfully.")}")}
 
       {:error, failed_operation, changeset, _} ->

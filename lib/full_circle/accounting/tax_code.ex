@@ -29,7 +29,7 @@ defmodule FullCircle.Accounting.TaxCode do
       :account_id,
       :account_name
     ])
-    |> validate_required([:code, :tax_type, :rate, :account_name, :company_id, :account_id])
+    |> validate_required([:code, :tax_type, :rate, :account_name, :company_id])
     |> validate_length(:descriptions, max: 230)
     |> validate_length(:code, max: 15)
     |> validate_inclusion(:tax_type, FullCircle.Accounting.tax_types(),

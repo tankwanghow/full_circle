@@ -94,6 +94,7 @@ defmodule FullCircleWeb.LayerLive.HouseForm do
         {:noreply,
          socket
          |> push_navigate(to: "/companies/#{socket.assigns.current_company.id}/houses")
+         |> push_event("invalidate_autocomplete_cache", %{})
          |> put_flash(:info, "#{gettext("House deleted successfully.")}")}
 
       {:error, failed_operation, changeset, _} ->
@@ -126,6 +127,7 @@ defmodule FullCircleWeb.LayerLive.HouseForm do
          |> push_navigate(
            to: ~p"/companies/#{socket.assigns.current_company.id}/houses/#{ac.id}/edit"
          )
+         |> push_event("invalidate_autocomplete_cache", %{})
          |> put_flash(:info, "#{gettext("House created successfully.")}")}
 
       {:error, failed_operation, changeset, _} ->
@@ -159,6 +161,7 @@ defmodule FullCircleWeb.LayerLive.HouseForm do
          |> push_navigate(
            to: ~p"/companies/#{socket.assigns.current_company.id}/houses/#{ac.id}/edit"
          )
+         |> push_event("invalidate_autocomplete_cache", %{})
          |> put_flash(:info, "#{gettext("House updated successfully.")}")}
 
       {:error, failed_operation, changeset, _} ->
