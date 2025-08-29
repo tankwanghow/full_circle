@@ -244,10 +244,10 @@ defmodule FullCircleWeb.EInvListLive.Index do
             <div>{gettext("Received/ Issued/ Reject")}</div>
           </div>
           <div class="w-[36%] border-b border-t border-amber-400 p-1">
-            <div>{gettext("UUD/ InternalId/ Direction/ Type/ Version")}</div>
+            <div>{gettext("UUD/ InternalId/ Direction/ Type")}</div>
           </div>
           <div class="w-[42%] border-b border-t border-amber-400 p-1">
-            <div>{gettext("ContactName/ TIN/ Amount")}</div>
+            <div>{gettext("ContactName/ TIN/ NetAmount/ PayaAmount")}</div>
           </div>
         </div>
         <div class="w-[0.4%] bg-white"></div>

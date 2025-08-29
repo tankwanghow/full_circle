@@ -41,7 +41,7 @@ defmodule FullCircle.EInvMetas do
     end
   end
 
-  defp get_internal_doc_by_uuid(klass, einv, amount, com) do
+  defp get_internal_doc_by_uuid(klass, einv, netamt, payamt, com) do
     from(inv in klass,
       join: txn in Transaction,
       on: txn.doc_id == inv.id,
@@ -50,8 +50,11 @@ defmodule FullCircle.EInvMetas do
       where: inv.e_inv_uuid == ^einv.uuid,
       where:
         fragment(
-          "round(?, 2) between round(abs(?), 2)-0.02 and round(abs(?), 2)+0.02",
-          ^amount,
+          "(round(?, 2) between round(abs(?), 2)-0.02 and round(abs(?), 2)+0.02) or (round(?, 2) between round(abs(?), 2)-0.02 and round(abs(?), 2)+0.02)",
+          ^netamt,
+          txn.amount,
+          txn.amount,
+          ^payamt,
           txn.amount,
           txn.amount
         ),
@@ -71,7 +74,7 @@ defmodule FullCircle.EInvMetas do
     )
   end
 
-  defp get_internal_doc_by_doc_no(klass, field, einv, amount, com) do
+  defp get_internal_doc_by_doc_no(klass, field, einv, netamt, payamt, com) do
     from(inv in klass,
       join: txn in Transaction,
       on: txn.doc_id == inv.id,
@@ -81,8 +84,11 @@ defmodule FullCircle.EInvMetas do
       where: is_nil(inv.e_inv_uuid),
       where:
         fragment(
-          "round(?, 2) between round(abs(?), 2)-0.02 and round(abs(?), 2)+0.02",
-          ^amount,
+          "(round(?, 2) between round(abs(?), 2)-0.02 and round(abs(?), 2)+0.02) or (round(?, 2) between round(abs(?), 2)-0.02 and round(abs(?), 2)+0.02)",
+          ^netamt,
+          txn.amount,
+          txn.amount,
+          ^payamt,
           txn.amount,
           txn.amount
         ),
@@ -105,7 +111,8 @@ defmodule FullCircle.EInvMetas do
   defp get_internal_doc_by_contact(
          klass,
          einv,
-         amount,
+         netamt,
+         payamt,
          com
        ) do
     buy_name =
@@ -131,8 +138,11 @@ defmodule FullCircle.EInvMetas do
       on: inv.contact_id == cont.id and txn.company_id == ^com.id,
       where:
         fragment(
-          "round(?, 2) between round(abs(?), 2)-0.02 and round(abs(?), 2)+0.02",
-          ^amount,
+          "(round(?, 2) between round(abs(?), 2)-0.02 and round(abs(?), 2)+0.02) or (round(?, 2) between round(abs(?), 2)-0.02 and round(abs(?), 2)+0.02)",
+          ^netamt,
+          txn.amount,
+          txn.amount,
+          ^payamt,
           txn.amount,
           txn.amount
         ),
@@ -171,15 +181,20 @@ defmodule FullCircle.EInvMetas do
   end
 
   defp get_fc_doc(klass, einv, doc_no_field, com) do
-    amount =
-      if(Decimal.gt?(einv.totalPayableAmount, einv.totalNetAmount),
-        do: einv.totalPayableAmount,
-        else: einv.totalNetAmount
+    q1 = get_internal_doc_by_uuid(klass, einv, einv.totalNetAmount, einv.totalPayableAmount, com)
+
+    q2 =
+      get_internal_doc_by_doc_no(
+        klass,
+        doc_no_field,
+        einv,
+        einv.totalNetAmount,
+        einv.totalPayableAmount,
+        com
       )
 
-    q1 = get_internal_doc_by_uuid(klass, einv, amount, com)
-    q2 = get_internal_doc_by_doc_no(klass, doc_no_field, einv, amount, com)
-    q3 = get_internal_doc_by_contact(klass, einv, amount, com)
+    q3 =
+      get_internal_doc_by_contact(klass, einv, einv.totalNetAmount, einv.totalPayableAmount, com)
 
     fq = q1 |> union(^q2) |> union(^q3)
 

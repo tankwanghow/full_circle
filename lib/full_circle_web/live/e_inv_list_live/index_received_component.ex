@@ -205,24 +205,24 @@ defmodule FullCircleWeb.EInvListLive.IndexReceivedComponent do
             {"#{@obj.internalId}"}
             <span class="font-bold text-orange-600">Received</span>
             <span class="text-purple-600">{@obj.typeName} {@obj.typeVersionName}</span>
+            <span :if={@obj.status == "Valid"} class="text-green-600">{@obj.status}</span>
+            <span :if={@obj.status != "Valid"} class="text-rose-600">{@obj.status}</span>
           </div>
         </div>
         <div class="w-[42%]">
           <div class="overflow-hidden">{@obj.supplierName}</div>
           <div class="text-sm">
-            {@obj.supplierTIN}
             <span class="font-bold">
               {@obj.documentCurrency}
-              <%= if Decimal.gt?(@obj.totalNetAmount, @obj.totalPayableAmount) do %>
-                {@obj.totalNetAmount
-                |> Number.Delimit.number_to_delimited()}
-              <% else %>
-                {@obj.totalPayableAmount
-                |> Number.Delimit.number_to_delimited()}
-              <% end %>
+              {@obj.totalNetAmount
+              |> Number.Delimit.number_to_delimited()}
             </span>
-            <span :if={@obj.status == "Valid"} class="text-green-600">{@obj.status}</span>
-            <span :if={@obj.status != "Valid"} class="text-rose-600">{@obj.status}</span>
+            {@obj.supplierTIN}
+            <span class="font-bold text-gray-500">
+              {@obj.documentCurrency}
+              {@obj.totalPayableAmount
+              |> Number.Delimit.number_to_delimited()}
+            </span>
           </div>
         </div>
       </div>
