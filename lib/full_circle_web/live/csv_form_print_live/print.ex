@@ -80,7 +80,7 @@ defmodule FullCircleWeb.CsvFormPrintLive.Print do
 
   def fill_data() do
     File.stream!(
-      "/home/tankwanghow/Documents/Golden Husbandry/Draft Account 2023/ghbanktrans2023.csv"
+      "/home/tankwanghow/Documents/Golden Husbandry/Draft Account 2024/ghbanktrans2024.csv"
     )
     |> NimbleCSV.RFC4180.parse_stream(skip_headers: false)
     |> Stream.transform(nil, fn

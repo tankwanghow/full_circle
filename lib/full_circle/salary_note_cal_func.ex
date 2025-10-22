@@ -429,9 +429,8 @@ defmodule FullCircle.SalaryNoteCalFunc do
         income <= 10 -> 0.0
         age >= 60 and is_malaysian -> 0.04
         income <= 5000 and is_malaysian and age < 60 -> 0.13
-        income <= 5000 and not is_malaysian and age >= 60 -> 0.065
         income > 5000 and is_malaysian and age < 60 -> 0.12
-        income > 5000 and not is_malaysian and age >= 60 -> 0.06
+        not is_malaysian -> 0.02
         true -> 0.0
       end
 
@@ -453,11 +452,9 @@ defmodule FullCircle.SalaryNoteCalFunc do
     rate =
       cond do
         income <= 10 -> 0
-        age >= 60 and is_malaysian -> 0.0
-        income <= 5000 and is_malaysian and age < 60 -> 0.11
-        income <= 5000 and not is_malaysian and age >= 60 -> 0.055
-        income > 5000 and is_malaysian and age < 60 -> 0.11
-        income > 5000 and not is_malaysian and age >= 60 -> 0.055
+        is_malaysian and age >= 60 -> 0.0
+        is_malaysian and age < 60 -> 0.11
+        not is_malaysian -> 0.02
         true -> 0.0
       end
 
