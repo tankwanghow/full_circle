@@ -42,8 +42,20 @@ defmodule FullCircle.ReceiveFund.Receipt do
     timestamps(type: :utc_datetime)
   end
 
-  @doc false
   def changeset(receipt, attrs) do
+    receipt
+    |> normal_changeset(attrs)
+    |> validate_date(:receipt_date, days_before: 60)
+    |> validate_date(:receipt_date, days_after: 0)
+  end
+
+  def admin_changeset(receipt, attrs) do
+    receipt
+    |> normal_changeset(attrs)
+  end
+
+  @doc false
+  defp normal_changeset(receipt, attrs) do
     receipt
     |> cast(attrs, [
       :receipt_date,
@@ -68,8 +80,6 @@ defmodule FullCircle.ReceiveFund.Receipt do
     ])
     |> validate_funds_account_name()
     |> validate_length(:descriptions, max: 230)
-    |> validate_date(:receipt_date, days_after: 0)
-    |> validate_date(:receipt_date, days_before: 60)
     |> unique_constraint(:e_inv_uuid)
     |> validate_id(:contact_name, :contact_id)
     |> validate_id(:funds_account_name, :funds_account_id)
@@ -81,6 +91,7 @@ defmodule FullCircle.ReceiveFund.Receipt do
     |> cast_assoc(:receipt_details)
     |> compute_balance()
     |> validate_number(:receipt_amount, greater_than: Decimal.new("0.00"))
+
     # |> validate_number(:receipt_balance, equal_to: Decimal.new("0.00"))
   end
 
@@ -127,6 +138,7 @@ defmodule FullCircle.ReceiveFund.Receipt do
       :receipt_balance,
       :receipt_amount
     ])
+
     # |> validate_number(:receipt_amount, greater_than: Decimal.new("0.00"))
     # |> validate_number(:receipt_balance, equal_to: Decimal.new("0.00"))
   end

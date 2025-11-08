@@ -354,7 +354,17 @@ defmodule FullCircle.ReceiveFund do
     multi
     |> get_gapless_doc_id(gapless_name, "Receipt", "RC", com)
     |> Multi.insert(receipt_name, fn %{^gapless_name => doc} ->
-      StdInterface.changeset(Receipt, %Receipt{}, Map.merge(attrs, %{"receipt_no" => doc}), com)
+      if user_role_in_company(user.id, com.id) == "admin" do
+        StdInterface.changeset(
+          Receipt,
+          %Receipt{},
+          Map.merge(attrs, %{"receipt_no" => doc}),
+          com,
+          :admin_changeset
+        )
+      else
+        StdInterface.changeset(Receipt, %Receipt{}, Map.merge(attrs, %{"receipt_no" => doc}), com)
+      end
     end)
     |> Multi.insert("#{receipt_name}_log", fn %{^receipt_name => entity} ->
       FullCircle.Sys.log_changeset(
@@ -498,7 +508,13 @@ defmodule FullCircle.ReceiveFund do
     receipt_name = :update_receipt
 
     multi
-    |> Multi.update(receipt_name, StdInterface.changeset(Receipt, receipt, attrs, com))
+    |> Multi.update(receipt_name, fn _ ->
+      if user_role_in_company(user.id, com.id) == "admin" do
+        StdInterface.changeset(Receipt, receipt, attrs, com, :admin_changeset)
+      else
+        StdInterface.changeset(Receipt, receipt, attrs, com)
+      end
+    end)
     |> Multi.delete_all(
       :delete_transaction,
       from(txn in Transaction,
