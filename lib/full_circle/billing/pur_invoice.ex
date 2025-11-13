@@ -40,8 +40,20 @@ defmodule FullCircle.Billing.PurInvoice do
     timestamps(type: :utc_datetime)
   end
 
+  def changeset(pinv, attrs) do
+    pinv
+    |> normal_changeset(attrs)
+    |> validate_date(:pur_invoice_date, days_before: 100)
+    |> validate_date(:pur_invoice_date, days_after: 0)
+  end
+
+  def admin_changeset(pinv, attrs) do
+    pinv
+    |> normal_changeset(attrs)
+  end
+
   @doc false
-  def changeset(pur_invoice, attrs) do
+  defp normal_changeset(pur_invoice, attrs) do
     pur_invoice
     |> cast(attrs, [
       :pur_invoice_date,
@@ -69,8 +81,6 @@ defmodule FullCircle.Billing.PurInvoice do
       :pur_invoice_no
     ])
     |> cast_assoc(:pur_invoice_details)
-    |> validate_date(:pur_invoice_date, days_before: 100)
-    |> validate_date(:pur_invoice_date, days_after: 0)
     |> validate_id(:contact_name, :contact_id)
     |> validate_length(:descriptions, max: 230)
     |> unique_constraint(:e_inv_uuid)

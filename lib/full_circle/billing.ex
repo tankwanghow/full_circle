@@ -311,12 +311,22 @@ defmodule FullCircle.Billing do
     multi
     |> get_gapless_doc_id(gapless_name, "Invoice", "INV", com)
     |> Multi.insert(invoice_name, fn %{^gapless_name => doc} ->
-      StdInterface.changeset(
-        Invoice,
-        %Invoice{},
-        Map.merge(attrs, %{"invoice_no" => doc, "e_inv_internal_id" => doc}),
-        com
-      )
+      if user_role_in_company(user.id, com.id) == "admin" do
+        StdInterface.changeset(
+          Invoice,
+          %Invoice{},
+          Map.merge(attrs, %{"invoice_no" => doc, "e_inv_internal_id" => doc}),
+          com,
+          :admin_changeset
+        )
+      else
+        StdInterface.changeset(
+          Invoice,
+          %Invoice{},
+          Map.merge(attrs, %{"invoice_no" => doc, "e_inv_internal_id" => doc}),
+          com
+        )
+      end
     end)
     |> Multi.insert("#{invoice_name}_log", fn %{^invoice_name => entity} ->
       FullCircle.Sys.log_changeset(
@@ -421,7 +431,13 @@ defmodule FullCircle.Billing do
     invoice_name = :update_invoice
 
     multi
-    |> Multi.update(invoice_name, StdInterface.changeset(Invoice, invoice, attrs, com))
+    |> Multi.update(invoice_name, fn _ ->
+      if user_role_in_company(user.id, com.id) == "admin" do
+        StdInterface.changeset(Invoice, invoice, attrs, com, :admin_changeset)
+      else
+        StdInterface.changeset(Invoice, invoice, attrs, com)
+      end
+    end)
     |> Multi.delete_all(
       :delete_transaction,
       from(txn in Transaction,
@@ -653,12 +669,22 @@ defmodule FullCircle.Billing do
     multi
     |> get_gapless_doc_id(gapless_name, "PurInvoice", "PINV", com)
     |> Multi.insert(pur_invoice_name, fn %{^gapless_name => doc} ->
-      StdInterface.changeset(
-        PurInvoice,
-        %PurInvoice{},
-        Map.merge(attrs, %{"pur_invoice_no" => doc}),
-        com
-      )
+      if user_role_in_company(user.id, com.id) == "admin" do
+        StdInterface.changeset(
+          PurInvoice,
+          %PurInvoice{},
+          Map.merge(attrs, %{"pur_invoice_no" => doc}),
+          com,
+          :admin_changeset
+        )
+      else
+        StdInterface.changeset(
+          PurInvoice,
+          %PurInvoice{},
+          Map.merge(attrs, %{"pur_invoice_no" => doc}),
+          com
+        )
+      end
     end)
     |> Multi.insert("#{pur_invoice_name}_log", fn %{^pur_invoice_name => entity} ->
       FullCircle.Sys.log_changeset(
@@ -782,7 +808,13 @@ defmodule FullCircle.Billing do
     pur_invoice_name = :update_pur_invoice
 
     multi
-    |> Multi.update(pur_invoice_name, StdInterface.changeset(PurInvoice, pur_invoice, attrs, com))
+    |> Multi.update(pur_invoice_name, fn _ ->
+      if user_role_in_company(user.id, com.id) == "admin" do
+        StdInterface.changeset(PurInvoice, pur_invoice, attrs, com, :admin_changeset)
+      else
+        StdInterface.changeset(PurInvoice, pur_invoice, attrs, com)
+      end
+    end)
     |> Multi.delete_all(
       :delete_transaction,
       from(txn in Transaction,

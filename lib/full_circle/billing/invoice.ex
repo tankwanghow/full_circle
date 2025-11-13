@@ -33,8 +33,20 @@ defmodule FullCircle.Billing.Invoice do
     timestamps(type: :utc_datetime)
   end
 
+  def changeset(inv, attrs) do
+    inv
+    |> normal_changeset(attrs)
+    |> validate_date(:invoice_date, days_before: 60)
+    |> validate_date(:invoice_date, days_after: 3)
+  end
+
+  def admin_changeset(inv, attrs) do
+    inv
+    |> normal_changeset(attrs)
+  end
+
   @doc false
-  def changeset(invoice, attrs) do
+  defp normal_changeset(invoice, attrs) do
     invoice
     |> cast(attrs, [
       :invoice_date,
@@ -61,8 +73,6 @@ defmodule FullCircle.Billing.Invoice do
       :invoice_no
     ])
     |> cast_assoc(:invoice_details)
-    |> validate_date(:invoice_date, days_before: 60)
-    |> validate_date(:invoice_date, days_after: 3)
     |> validate_length(:descriptions, max: 230)
     |> validate_id(:contact_name, :contact_id)
     |> unique_constraint(:e_inv_uuid)
