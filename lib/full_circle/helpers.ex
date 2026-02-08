@@ -16,6 +16,22 @@ defmodule FullCircle.Helpers do
     |> FullCircle.Repo.one()
   end
 
+  def last_log_records_for(entity, ids, com_id) do
+    latest =
+      from(log in FullCircle.Sys.Log,
+        where: log.entity == ^entity,
+        where: log.entity_id in ^ids,
+        where: log.company_id == ^com_id,
+        distinct: log.entity_id,
+        order_by: [asc: log.entity_id, desc: log.inserted_at],
+        select: log
+      )
+
+    from(log in subquery(latest), preload: [:user])
+    |> FullCircle.Repo.all()
+    |> Map.new(fn log -> {log.entity_id, log} end)
+  end
+
   def list_billing_tags(tag \\ "", key, com) do
     regexp =
       if Atom.to_string(key) |> String.contains?("wages") do

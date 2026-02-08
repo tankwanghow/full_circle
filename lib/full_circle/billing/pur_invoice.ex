@@ -2,6 +2,7 @@ defmodule FullCircle.Billing.PurInvoice do
   use FullCircle.Schema
   import Ecto.Changeset
   import FullCircle.Helpers
+  alias FullCircle.Billing.DetailHelpers
   use Gettext, backend: FullCircleWeb.Gettext
 
   schema "pur_invoices" do
@@ -90,23 +91,15 @@ defmodule FullCircle.Billing.PurInvoice do
     |> compute_fields()
   end
 
+  def compute_struct_fields(pinv) do
+    DetailHelpers.compute_struct_fields(
+      pinv, :pur_invoice_details, :pur_invoice_amount, :pur_invoice_good_amount, :pur_invoice_tax_amount
+    )
+  end
+
   def compute_fields(changeset) do
-    changeset =
-      changeset
-      |> sum_field_to(:pur_invoice_details, :good_amount, :pur_invoice_good_amount)
-      |> sum_field_to(:pur_invoice_details, :tax_amount, :pur_invoice_tax_amount)
-      |> sum_field_to(:pur_invoice_details, :amount, :pur_invoice_amount)
-      |> sum_field_to(:pur_invoice_details, :quantity, :sum_qty)
-
-    cond do
-      Decimal.to_float(fetch_field!(changeset, :pur_invoice_amount)) <= 0.0 ->
-        add_unique_error(changeset, :pur_invoice_amount, gettext("must be > 0"))
-
-      Decimal.eq?(fetch_field!(changeset, :sum_qty), 0) ->
-        add_unique_error(changeset, :pur_invoice_amount, gettext("need detail"))
-
-      true ->
-        changeset
-    end
+    DetailHelpers.compute_fields(
+      changeset, :pur_invoice_details, :pur_invoice_amount, :pur_invoice_good_amount, :pur_invoice_tax_amount
+    )
   end
 end

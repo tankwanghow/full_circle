@@ -29,6 +29,9 @@ config :full_circle, FullCircle.Mailer, adapter: Swoosh.Adapters.Test
 # Disable swoosh api client as it is only required for production adapters.
 config :swoosh, :api_client, false
 
+# Upload directory for company creation
+config :full_circle, uploads_dir: System.tmp_dir!()
+
 # Print only warnings and errors during test
 config :logger, level: :warning
 

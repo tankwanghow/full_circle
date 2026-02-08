@@ -133,8 +133,8 @@ defmodule FullCircleWeb.InvoiceLive.Print do
 
         <%= if Decimal.gt?(@invd.tax_amount, 0) do %>
           <div class="is-size-7 is-italic">
-            {@invd.tax_code}
-            {Number.Percentage.number_to_percentage(@invd.tax_rate)}
+            {@invd.tax_code_name}
+            {Number.Percentage.number_to_percentage(Decimal.mult(@invd.tax_rate, 100))}
             {Number.Delimit.number_to_delimited(@invd.tax_amount)}
           </div>
         <% end %>
@@ -288,7 +288,7 @@ defmodule FullCircleWeb.InvoiceLive.Print do
         .page { padding-left: 10mm; padding-right: 10mm; page-break-after: always;} }
 
       .letter-head { padding-bottom: 2mm; margin-bottom: 5mm; height: 28mm;}
-      .qrcode { float: right; margin-top: -30mm; margin-right: 5mm; vertical-align: top; }
+      .qrcode { float: right; margin-top: -32mm; margin-right: 5mm; vertical-align: top; }
       .invoice-info { margin-top: -7mm; float: right; }
       .invoice-header { width: 100%; height: 40mm; border-bottom: 0.5mm solid black; }
       .customer { padding-left: 2mm; float: left;}

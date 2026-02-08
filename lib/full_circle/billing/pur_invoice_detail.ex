@@ -2,6 +2,7 @@ defmodule FullCircle.Billing.PurInvoiceDetail do
   use FullCircle.Schema
   import Ecto.Changeset
   import FullCircle.Helpers
+  import FullCircle.Billing.DetailHelpers
 
   schema "pur_invoice_details" do
     field :descriptions, :string
@@ -62,7 +63,7 @@ defmodule FullCircle.Billing.PurInvoiceDetail do
       :tax_code_name,
       :good_name
     ])
-    |> compute_fields()
+    |> compute_detail_fields()
     |> validate_id(:good_name, :good_id)
     |> validate_id(:tax_code_name, :tax_code_id)
     |> validate_id(:package_name, :package_id)
@@ -71,40 +72,5 @@ defmodule FullCircle.Billing.PurInvoiceDetail do
     |> validate_number(:discount, less_than_or_equal_to: 0)
     |> validate_length(:descriptions, max: 230)
     |> maybe_mark_for_deletion()
-  end
-
-  defp compute_fields(changeset) do
-    unit_multi = fetch_field!(changeset, :unit_multiplier)
-    pack_qty = fetch_field!(changeset, :package_qty)
-    price = fetch_field!(changeset, :unit_price)
-    disc = fetch_field!(changeset, :discount)
-    rate = fetch_field!(changeset, :tax_rate)
-
-    qty =
-      if Decimal.gt?(unit_multi, "0") do
-        Decimal.mult(pack_qty, unit_multi)
-      else
-        fetch_field!(changeset, :quantity)
-      end
-
-    good_amount = Decimal.mult(qty, price) |> Decimal.add(disc) |> Decimal.round(2)
-    tax_amount = Decimal.mult(good_amount, rate) |> Decimal.round(2)
-    amount = Decimal.add(good_amount, tax_amount)
-
-    changeset
-    |> put_change(:good_amount, good_amount)
-    |> put_change(:tax_amount, tax_amount)
-    |> put_change(:amount, amount)
-    |> put_change(:quantity, qty)
-  end
-
-  defp maybe_mark_for_deletion(%{data: %{id: nil}} = changeset), do: changeset
-
-  defp maybe_mark_for_deletion(changeset) do
-    if get_change(changeset, :delete) do
-      %{changeset | action: :delete}
-    else
-      changeset
-    end
   end
 end

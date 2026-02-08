@@ -6,6 +6,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Full Circle is a multi-tenant web-based ERP system built with Elixir/Phoenix, covering accounting, billing, payroll (Malaysia-standard), inventory, and agricultural operations. It uses Phoenix LiveView exclusively for the UI (no REST/SPA pattern).
 
+**Runtime versions:** Elixir 1.19.5, Erlang/OTP 28.3.1, Phoenix 1.8.3, Phoenix LiveView 1.1.x
+
+## Git
+
+Remote origin uses SSH: `git@github.com:tankwanghow/full_circle.git`
+
 ## Common Commands
 
 ```bash

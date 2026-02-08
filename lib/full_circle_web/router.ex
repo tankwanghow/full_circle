@@ -201,8 +201,8 @@ defmodule FullCircleWeb.Router do
       live("/PurInvoice/:invoice_id/match_e_inv", PurInvoiceLive.Form, :match)
       live("/PurInvoice/:invoice_id/unmatch_e_inv", PurInvoiceLive.Form, :unmatch)
 
-      live("/logs/:entity/:entity_id", LogLive.Index, :index)
-      live("/journal_entries/:doc_type/:doc_no", JournalEntryViewLive.Index, :index)
+      # live("/logs/:entity/:entity_id", LogLive.Index, :index)
+      # live("/journal_entries/:doc_type/:doc_no", JournalEntryViewLive.Index, :index)
 
       live("/account_transactions", ReportLive.Account, :index)
       live("/contact_transactions", ReportLive.Contact, :index)
@@ -257,8 +257,8 @@ defmodule FullCircleWeb.Router do
       live("/Payment/:payment_id/match_e_inv", PaymentLive.Form, :match)
 
       live("/TimeAttend", TimeAttendLive.Index, :index)
-      live("/TimeAttend/new", TimeAttendLive.Form, :new)
-      live("/TimeAttend/:attend_id/edit", TimeAttendLive.Form, :edit)
+      # live("/TimeAttend/new", TimeAttendLive.Form, :new)
+      # live("/TimeAttend/:attend_id/edit", TimeAttendLive.Form, :edit)
 
       live("/PunchIndex", TimeAttendLive.PunchIndex, :index)
       live("/PunchCard", TimeAttendLive.PunchCard, :index)

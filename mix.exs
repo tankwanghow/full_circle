@@ -5,10 +5,11 @@ defmodule FullCircle.MixProject do
     [
       app: :full_circle,
       version: "1.0.0",
-      elixir: "~> 1.18.2",
+      elixir: "~> 1.19",
       elixirc_paths: elixirc_paths(Mix.env()),
       # elixirc_options: [debug_info: Mix.env() == :dev],
       start_permanent: Mix.env() == :prod,
+      listeners: [Phoenix.CodeReloader],
       aliases: aliases(),
       deps: deps()
     ]
@@ -34,13 +35,13 @@ defmodule FullCircle.MixProject do
   defp deps do
     [
       {:bcrypt_elixir, "~> 3.0"},
-      {:phoenix, "~> 1.7.14"},
+      {:phoenix, "~> 1.8.0"},
       {:phoenix_ecto, "~> 4.5"},
       {:ecto_sql, "~> 3.10"},
       {:postgrex, ">= 0.0.0"},
       {:phoenix_html, "~> 4.1"},
       {:phoenix_live_reload, "~> 1.2", only: :dev},
-      {:phoenix_live_view, "~> 1.0.0"},
+      {:phoenix_live_view, "~> 1.1"},
       {:floki, ">= 0.30.0", only: :test},
       {:esbuild, "~> 0.8", runtime: Mix.env() == :dev},
       {:tailwind, "~> 0.2", runtime: Mix.env() == :dev},
@@ -67,8 +68,7 @@ defmodule FullCircle.MixProject do
       {:xlsx_reader, "~> 0.8.0"},
       {:qr_code, "~> 3.2.0"},
       {:req, "~> 0.5.0"},
-      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
-      {:tidewave, "~> 0.4", only: :dev}
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
     ]
   end
 
