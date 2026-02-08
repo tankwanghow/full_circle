@@ -705,6 +705,86 @@ defmodule FullCircleWeb.CoreComponents do
     for {^field, {msg, opts}} <- errors, do: translate_error({msg, opts})
   end
 
+  @doc """
+  Renders a consolidated error summary panel at the top of a form.
+  Only visible when the changeset has errors.
+
+  ## Examples
+
+      <.error_box changeset={@form.source} />
+  """
+  attr :changeset, :any, required: true
+
+  def error_box(assigns) do
+    errors = collect_form_errors(assigns.changeset)
+    assigns = assign(assigns, :errors, errors)
+
+    ~H"""
+    <div
+      :if={@changeset.action && !@changeset.valid? && @errors != []}
+      id="error-summary"
+      class="bg-rose-50 border border-rose-400 rounded-lg p-3 mb-3"
+    >
+      <div class="flex items-center gap-2 text-rose-700 font-semibold text-sm mb-1">
+        <.icon name="hero-exclamation-triangle-mini" class="h-5 w-5" />
+        {gettext("Please fix the following errors:")}
+      </div>
+      <ul class="list-disc list-inside text-sm text-rose-600 space-y-0.5">
+        <li :for={{label, msg} <- @errors}><span class="font-medium">{label}</span> — {msg}</li>
+      </ul>
+    </div>
+    """
+  end
+
+  @doc """
+  Collects all errors from a changeset (including nested associations) into
+  a flat list of `{label, message}` tuples for display.
+  """
+  def collect_form_errors(%Ecto.Changeset{} = cs) do
+    top_level =
+      cs
+      |> Ecto.Changeset.traverse_errors(fn {msg, opts} -> translate_error({msg, opts}) end)
+      |> Enum.flat_map(fn
+        {field, messages} when is_list(messages) ->
+          Enum.flat_map(messages, fn
+            msg when is_binary(msg) ->
+              [{humanize_field(field), msg}]
+
+            _nested ->
+              []
+          end)
+
+        _ ->
+          []
+      end)
+
+    detail_errors =
+      (Map.get(cs.changes, :invoice_details, []) ++
+         Map.get(cs.changes, :pur_invoice_details, []))
+      |> Enum.with_index(1)
+      |> Enum.flat_map(fn {detail_cs, idx} ->
+        detail_cs
+        |> Ecto.Changeset.traverse_errors(fn {msg, opts} -> translate_error({msg, opts}) end)
+        |> Enum.flat_map(fn {field, messages} ->
+          Enum.map(messages, fn msg ->
+            {"#{gettext("Line")} #{idx} #{humanize_field(field)}", msg}
+          end)
+        end)
+      end)
+
+    top_level ++ detail_errors
+  end
+
+  def collect_form_errors(_), do: []
+
+  defp humanize_field(field) do
+    field
+    |> Atom.to_string()
+    |> String.replace("_", " ")
+    |> String.split(" ")
+    |> Enum.map_join(" ", &String.capitalize/1)
+  end
+
   def shake(datetime, seconds) do
     if Timex.diff(Timex.now(), DateTime.from_naive!(datetime, "Etc/UTC"), :seconds) <= seconds do
       "shake"
@@ -826,19 +906,32 @@ defmodule FullCircleWeb.CoreComponents do
   attr :label, :string, default: gettext("Save")
 
   def save_button(assigns) do
+    has_errors = assigns.form.source.action && !assigns.form.source.valid?
+
+    error_count =
+      if has_errors,
+        do: length(collect_form_errors(assigns.form.source)),
+        else: 0
+
+    assigns = assigns |> assign(:error_count, error_count) |> assign(:has_errors, has_errors)
+
     ~H"""
     <button
-      type="submit"
+      type={if @has_errors, do: "button", else: "submit"}
+      phx-click={
+        if @has_errors,
+          do: JS.dispatch("phx:scroll-to", detail: %{id: "error-summary"})
+      }
       class={[
         "phx-submit-loading:opacity-75 rounded-lg py-2 px-3 leading-6 border",
-        @form.source.valid? && "bg-green-200 hover:bg-green-600 border-green-600",
-        !@form.source.valid? &&
+        !@has_errors && "bg-green-200 hover:bg-green-600 border-green-600",
+        @has_errors &&
           "bg-rose-400 hover:bg-rose-200 border-rose-400 text-white active:text-white/80"
       ]}
     >
-      {if @form.source.valid?,
-        do: @label,
-        else: gettext("Show Error!")}
+      {if @has_errors,
+        do: "#{@error_count} #{ngettext("Error", "Errors", @error_count)}",
+        else: @label}
     </button>
     """
   end

@@ -324,13 +324,13 @@ defmodule FullCircle.Helpers do
     end
   end
 
-  def e_invoice_validation_url_qrcode(obj) do
+  def e_invoice_validation_url_qrcode(obj, scale \\ 2) do
     {data, settings} =
       if(!is_nil(obj.e_inv_uuid) and !is_nil(obj.e_inv_long_id)) do
         {e_invoice_validation_url(obj.e_inv_uuid, obj.e_inv_long_id),
          %QRCode.Render.SvgSettings{
            qrcode_color: {0, 0, 0},
-           scale: 2,
+           scale: scale,
            structure: :readable
          }}
       else

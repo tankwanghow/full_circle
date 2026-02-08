@@ -16,7 +16,7 @@ defmodule FullCircleWeb.InvoiceLive.DetailComponent do
   def render(assigns) do
     ~H"""
     <div id={@id} class={@klass}>
-      <div class="font-medium flex flex-row text-center mt-2 tracking-tighter">
+      <div class="font-medium flex flex-row text-center mt-2 tracking-tighter sticky top-0 z-10 bg-white">
         <div class="detail-header detail-good-col">{gettext("Good")}</div>
         <div class="detail-header detail-desc-col">
           {gettext("Description")}
@@ -49,7 +49,11 @@ defmodule FullCircleWeb.InvoiceLive.DetailComponent do
       </div>
 
       <.inputs_for :let={dtl} field={@form[@detail_name]}>
-        <div class={"flex flex-row #{if(dtl[:delete].value == true, do: "hidden", else: "")}"}>
+        <div class={[
+          "flex flex-row",
+          if(dtl[:delete].value == true, do: "hidden"),
+          if(!dtl.source.valid?, do: "bg-rose-50 border-l-4 border-l-rose-500")
+        ]}>
           <div class="detail-good-col">
             <.input
               field={dtl[:good_name]}
@@ -158,7 +162,7 @@ defmodule FullCircleWeb.InvoiceLive.DetailComponent do
       </div>
 
       <div class="flex flex-row">
-        <div class="w-[82%]"></div>
+        <div class="grow"></div>
         <div class="w-[10%] text-right px-1">
           {gettext("Tax Total")}
         </div>
@@ -170,7 +174,7 @@ defmodule FullCircleWeb.InvoiceLive.DetailComponent do
       </div>
 
       <div class="flex flex-row">
-        <div class="w-[82%]"></div>
+        <div class="grow"></div>
         <div class={"w-[10%] text-right px-1 border-t #{if(@matched_trans == [], do: "font-semibold border-b-4 border-double")} border-black"}>
           {gettext("Invoice Total")}
         </div>
@@ -188,7 +192,7 @@ defmodule FullCircleWeb.InvoiceLive.DetailComponent do
 
       <%= for obj <- @matched_trans do %>
         <div class="flex flex-row">
-          <div class="w-[82%]"></div>
+          <div class="grow"></div>
           <div class="w-[10%] text-right px-1">
             <.link
               class="text-red-600 hover:font-bold"
@@ -206,7 +210,7 @@ defmodule FullCircleWeb.InvoiceLive.DetailComponent do
       <% end %>
 
       <div :if={@matched_trans != []} class="flex flex-row">
-        <div class="w-[82%]"></div>
+        <div class="grow"></div>
         <div class="w-[10%] font-bold text-right px-1 border-t border-b-4 border-double border-black">
           {gettext("Balance")}
         </div>

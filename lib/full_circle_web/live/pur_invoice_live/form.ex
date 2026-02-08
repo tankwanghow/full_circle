@@ -468,16 +468,11 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
     ~H"""
     <div class="w-11/12 mx-auto border rounded-lg border-pink-500 bg-pink-100 p-4">
       <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
+      <.error_box changeset={@form.source} />
       <.form for={@form} id="object-form" autocomplete="off" phx-change="validate" phx-submit="save">
         <.input type="hidden" field={@form[:pur_invoice_no]} />
         <input type="hidden" id="live_action" value={@live_action} />
-        <div class="float-right mt-8 mr-4">
-          <% {url, qrcode} = FullCircle.Helpers.e_invoice_validation_url_qrcode(@form.source.data) %>
-          <.link target="_blank" href={url}>
-            {qrcode |> raw}
-          </.link>
-        </div>
-        <div class="flex flex-row flex-nowarp w-[92%]">
+        <div class="flex flex-row flex-nowrap">
           <div class="w-1/4 grow shrink">
             <.input type="hidden" field={@form[:contact_id]} />
             <.input
@@ -504,7 +499,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
           </div>
         </div>
 
-        <div class="flex flex-row flex-nowrap mt-2 w-[92%]">
+        <div class="flex flex-row flex-nowrap mt-2">
           <div class="grow shrink">
             <.input
               field={@form[:loader_tags]}
@@ -556,13 +551,19 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
           </div>
           <div
             :if={!is_nil(@form[:e_inv_uuid].value)}
-            class="text-blue-600 hover:font-medium w-[20%] ml-5 mt-6"
+            class="text-blue-600 hover:font-medium ml-5 mt-6"
           >
             <.link
               target="_blank"
-              href={~w(https://myinvois.hasil.gov.my/documents/#{@form[:e_inv_uuid].value})}
+              href={"https://myinvois.hasil.gov.my/documents/#{@form[:e_inv_uuid].value}"}
             >
               Open E-Invoice
+            </.link>
+          </div>
+          <div class="shrink-0 ml-2 mt-1">
+            <% {url, qrcode} = FullCircle.Helpers.e_invoice_validation_url_qrcode(@form.source.data, 1) %>
+            <.link target="_blank" href={url}>
+              {qrcode |> raw}
             </.link>
           </div>
         </div>
