@@ -91,8 +91,7 @@ defmodule FullCircle.ReceiveFund.Receipt do
     |> cast_assoc(:receipt_details)
     |> compute_balance()
     |> validate_number(:receipt_amount, greater_than: Decimal.new("0.00"))
-
-    # |> validate_number(:receipt_balance, equal_to: Decimal.new("0.00"))
+    |> validate_number(:receipt_balance, greater_than_or_equal_to: Decimal.new("0.00"))
   end
 
   defp validate_funds_account_name(changeset) do

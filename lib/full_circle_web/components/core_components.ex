@@ -759,17 +759,24 @@ defmodule FullCircleWeb.CoreComponents do
       end)
 
     detail_errors =
-      (Map.get(cs.changes, :invoice_details, []) ++
-         Map.get(cs.changes, :pur_invoice_details, []))
-      |> Enum.with_index(1)
-      |> Enum.flat_map(fn {detail_cs, idx} ->
-        detail_cs
-        |> Ecto.Changeset.traverse_errors(fn {msg, opts} -> translate_error({msg, opts}) end)
-        |> Enum.flat_map(fn {field, messages} ->
-          Enum.map(messages, fn msg ->
-            {"#{gettext("Line")} #{idx} #{humanize_field(field)}", msg}
+      cs.changes
+      |> Enum.flat_map(fn
+        {assoc_name, details} when is_list(details) ->
+          details
+          |> Enum.filter(&is_struct(&1, Ecto.Changeset))
+          |> Enum.with_index(1)
+          |> Enum.flat_map(fn {detail_cs, idx} ->
+            detail_cs
+            |> Ecto.Changeset.traverse_errors(fn {msg, opts} -> translate_error({msg, opts}) end)
+            |> Enum.flat_map(fn {field, messages} ->
+              Enum.map(messages, fn msg ->
+                {"#{humanize_field(assoc_name)} #{idx} #{humanize_field(field)}", msg}
+              end)
+            end)
           end)
-        end)
+
+        _ ->
+          []
       end)
 
     top_level ++ detail_errors

@@ -24,7 +24,11 @@ defmodule FullCircleWeb.ReceiptLive.MatcherComponent do
         <div class="detail-header w-[16%]">{gettext("Match")}</div>
       </div>
       <.inputs_for :let={dtl} field={@form[:transaction_matchers]}>
-        <div class={"flex flex-row flex-wrap #{if(dtl[:delete].value == true, do: "hidden", else: "")}"}>
+        <div class={[
+          "flex flex-row flex-wrap",
+          if(dtl[:delete].value == true, do: "hidden"),
+          if(!dtl.source.valid?, do: "bg-rose-50 border-l-4 border-l-rose-500")
+        ]}>
           <.input type="hidden" field={dtl[:transaction_id]} />
           <.input type="hidden" field={dtl[:all_matched_amount]} />
           <.input type="hidden" field={dtl[:account_id]} />

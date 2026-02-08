@@ -1,12 +1,12 @@
 defmodule FullCircle.ReceiveFund do
   import Ecto.Query, warn: false
-  alias FullCircle.Repo
   import FullCircle.Helpers
   import FullCircle.Authorization
 
   alias FullCircle.ReceiveFund.{Receipt, ReceiptDetail, ReceivedCheque}
 
   alias FullCircle.Accounting.{
+    Account,
     Contact,
     Transaction,
     TaxCode,
@@ -14,10 +14,8 @@ defmodule FullCircle.ReceiveFund do
   }
 
   alias FullCircle.EInvMetas.EInvoice
-  alias FullCircle.{Sys, Accounting}
   alias FullCircle.Product.{Good, Packaging}
-  alias FullCircle.Accounting.{Account, Contact}
-  alias FullCircle.StdInterface
+  alias FullCircle.{Repo, Sys, Accounting, StdInterface}
   alias Ecto.Multi
 
   def get_cheque_by_id!(id) do
@@ -50,8 +48,8 @@ defmodule FullCircle.ReceiveFund do
         where: rec.id in ^ids,
         preload: [:contact, :funds_account],
         preload: [:received_cheques],
-        preload: [transaction_matchers: ^receipt_match_trans(company, user)],
-        preload: [receipt_details: ^receipt_details()],
+        preload: [transaction_matchers: ^match_trans_query("Receipt", company, user)],
+        preload: [receipt_details: ^detail_query(ReceiptDetail)],
         select: rec,
         select_merge: %{e_inv_long_id: einv.longId}
     )
@@ -72,10 +70,12 @@ defmodule FullCircle.ReceiveFund do
         on: funds.id == rec.funds_account_id,
         left_join: einv in EInvoice,
         on: einv.uuid == rec.e_inv_uuid,
+        left_join: da in subquery(receipt_detail_amounts(id)),
+        on: true,
         where: rec.id == ^id,
         preload: [:received_cheques],
-        preload: [transaction_matchers: ^receipt_match_trans(company, user)],
-        preload: [receipt_details: ^receipt_details()],
+        preload: [transaction_matchers: ^match_trans_query("Receipt", company, user)],
+        preload: [receipt_details: ^detail_query(ReceiptDetail)],
         select: rec,
         select_merge: %{
           contact_name: cont.name,
@@ -86,9 +86,11 @@ defmodule FullCircle.ReceiveFund do
         },
         select_merge: %{cheques_amount: coalesce(subquery(cheques_amount(id)), 0)},
         select_merge: %{matched_amount: coalesce(subquery(matched_amount(id)), 0)},
-        select_merge: %{receipt_tax_amount: coalesce(subquery(receipt_tax_amount(id)), 0)},
-        select_merge: %{receipt_good_amount: coalesce(subquery(receipt_good_amount(id)), 0)},
-        select_merge: %{receipt_detail_amount: coalesce(subquery(receipt_detail_amount(id)), 0)}
+        select_merge: %{
+          receipt_tax_amount: coalesce(da.tax_amount, 0),
+          receipt_good_amount: coalesce(da.good_amount, 0),
+          receipt_detail_amount: coalesce(da.detail_amount, 0)
+        }
     )
   end
 
@@ -105,49 +107,41 @@ defmodule FullCircle.ReceiveFund do
       select: sum(chq.amount)
   end
 
-  defp receipt_tax_amount(id) do
+  defp receipt_detail_amounts(id) do
     from dtl in ReceiptDetail,
       where: dtl.receipt_id == ^id,
-      select:
-        fragment(
-          "sum(round((?*?+?)*?, 2))",
-          dtl.quantity,
-          dtl.unit_price,
-          dtl.discount,
-          dtl.tax_rate
-        )
+      select: %{
+        good_amount:
+          fragment(
+            "sum(round(?*?+?, 2))",
+            dtl.quantity,
+            dtl.unit_price,
+            dtl.discount
+          ),
+        tax_amount:
+          fragment(
+            "sum(round((?*?+?)*?, 2))",
+            dtl.quantity,
+            dtl.unit_price,
+            dtl.discount,
+            dtl.tax_rate
+          ),
+        detail_amount:
+          fragment(
+            "sum(round(?*?+?+(?*?+?)*?, 2))",
+            dtl.quantity,
+            dtl.unit_price,
+            dtl.discount,
+            dtl.quantity,
+            dtl.unit_price,
+            dtl.discount,
+            dtl.tax_rate
+          )
+      }
   end
 
-  defp receipt_good_amount(id) do
-    from dtl in ReceiptDetail,
-      where: dtl.receipt_id == ^id,
-      select:
-        fragment(
-          "sum(round(?*?+?, 2))",
-          dtl.quantity,
-          dtl.unit_price,
-          dtl.discount
-        )
-  end
-
-  defp receipt_detail_amount(id) do
-    from dtl in ReceiptDetail,
-      where: dtl.receipt_id == ^id,
-      select:
-        fragment(
-          "sum(round(?*?+?+(?*?+?)*?, 2))",
-          dtl.quantity,
-          dtl.unit_price,
-          dtl.discount,
-          dtl.quantity,
-          dtl.unit_price,
-          dtl.discount,
-          dtl.tax_rate
-        )
-  end
-
-  defp receipt_details do
-    from recd in ReceiptDetail,
+  defp detail_query(detail_module) do
+    from recd in detail_module,
       join: good in Good,
       on: good.id == recd.good_id,
       join: ac in Account,
@@ -186,11 +180,11 @@ defmodule FullCircle.ReceiveFund do
       }
   end
 
-  defp receipt_match_trans(com, user) do
+  defp match_trans_query(doc_type, com, user) do
     from recmt in TransactionMatcher,
       join: txn in subquery(Accounting.transaction_with_balance_query(com, user)),
       on: txn.id == recmt.transaction_id,
-      where: recmt.doc_type == "Receipt",
+      where: recmt.doc_type == ^doc_type,
       order_by: recmt._persistent_id,
       select: recmt,
       select_merge: %{
@@ -210,25 +204,14 @@ defmodule FullCircle.ReceiveFund do
         page: page,
         per_page: per_page
       ) do
-    qry =
-      from(inv in subquery(receipt_raw_query(com, user)))
-
-    qry =
-      if terms != "" do
-        from inv in subquery(qry),
-          order_by: ^similarity_order([:receipt_no, :contact_name, :particulars], terms)
-      else
-        qry
-      end
-
-    qry =
-      if date_from != "" do
-        from inv in qry, where: inv.receipt_date >= ^date_from, order_by: inv.receipt_date
-      else
-        from inv in qry, order_by: [desc: inv.receipt_date]
-      end
-
-    qry |> offset((^page - 1) * ^per_page) |> limit(^per_page) |> Repo.all()
+    from(inv in subquery(receipt_raw_query(com, user)))
+    |> apply_simple_filters(terms, date_from,
+      search_fields: [:receipt_no, :contact_name, :particulars],
+      date_field: :receipt_date
+    )
+    |> offset((^page - 1) * ^per_page)
+    |> limit(^per_page)
+    |> Repo.all()
   end
 
   def get_receipt_by_id_index_component_field!(id, com, user) do
@@ -335,6 +318,34 @@ defmodule FullCircle.ReceiveFund do
     |> with_cte("cheques_agg", as: ^cheques_agg)
   end
 
+  defp apply_simple_filters(qry, terms, date_from, opts) do
+    search_fields = Keyword.fetch!(opts, :search_fields)
+    date_field = Keyword.fetch!(opts, :date_field)
+
+    qry =
+      if terms != "" do
+        from inv in qry, order_by: ^similarity_order(search_fields, terms)
+      else
+        qry
+      end
+
+    if date_from != "" do
+      from inv in qry,
+        where: field(inv, ^date_field) >= ^date_from,
+        order_by: field(inv, ^date_field)
+    else
+      from inv in qry, order_by: [{:desc, field(inv, ^date_field)}]
+    end
+  end
+
+  defp make_changeset(module, struct, attrs, com, user) do
+    if user_role_in_company(user.id, com.id) == "admin" do
+      StdInterface.changeset(module, struct, attrs, com, :admin_changeset)
+    else
+      StdInterface.changeset(module, struct, attrs, com)
+    end
+  end
+
   def create_receipt(attrs, com, user) do
     case can?(user, :create_receipt, com) do
       true ->
@@ -354,17 +365,7 @@ defmodule FullCircle.ReceiveFund do
     multi
     |> get_gapless_doc_id(gapless_name, "Receipt", "RC", com)
     |> Multi.insert(receipt_name, fn %{^gapless_name => doc} ->
-      if user_role_in_company(user.id, com.id) == "admin" do
-        StdInterface.changeset(
-          Receipt,
-          %Receipt{},
-          Map.merge(attrs, %{"receipt_no" => doc}),
-          com,
-          :admin_changeset
-        )
-      else
-        StdInterface.changeset(Receipt, %Receipt{}, Map.merge(attrs, %{"receipt_no" => doc}), com)
-      end
+      make_changeset(Receipt, %Receipt{}, Map.merge(attrs, %{"receipt_no" => doc}), com, user)
     end)
     |> Multi.insert("#{receipt_name}_log", fn %{^receipt_name => entity} ->
       FullCircle.Sys.log_changeset(
@@ -379,84 +380,93 @@ defmodule FullCircle.ReceiveFund do
   end
 
   defp create_receipt_transactions(multi, name, com, user) do
-    pdc_id =
-      FullCircle.Accounting.get_account_by_name("Post Dated Cheques", com, user).id
+    pdc_id = Accounting.get_account_by_name("Post Dated Cheques", com, user).id
 
     multi
-    |> Ecto.Multi.run("create_transactions", fn repo, %{^name => receipt} ->
+    |> Multi.insert_all(:create_transactions, Transaction, fn %{^name => receipt} ->
       receipt =
-        receipt
-        |> FullCircle.Repo.preload([:receipt_details, :received_cheques, :transaction_matchers])
+        Repo.preload(receipt, [
+          :received_cheques,
+          receipt_details: [:account, :tax_code],
+          transaction_matchers: :transaction
+        ])
+      now = Timex.now() |> DateTime.truncate(:second)
 
-      # Credit Transactions
-      if receipt.receipt_details != Ecto.Association.NotLoaded do
-        Enum.each(receipt.receipt_details, fn x ->
-          x = FullCircle.Repo.preload(x, [:account, :tax_code])
+      (build_detail_transactions(receipt, com, now) ++
+         build_matcher_transactions(receipt, com, now) ++
+         build_funds_transaction(receipt, com, now) ++
+         build_cheque_transactions(receipt, com, pdc_id, now))
+      |> Enum.reject(&is_nil/1)
+    end)
+  end
 
-          if !Decimal.eq?(x.good_amount, 0) do
-            repo.insert!(%Transaction{
-              doc_type: "Receipt",
-              doc_no: receipt.receipt_no,
-              doc_id: receipt.id,
-              doc_date: receipt.receipt_date,
-              contact_id:
-                if(Accounting.is_balance_sheet_account?(x.account),
-                  do: receipt.contact_id,
-                  else: nil
-                ),
-              account_id: x.account_id,
-              company_id: com.id,
-              amount: Decimal.negate(x.good_amount),
-              particulars: "#{receipt.contact_name}, #{x.good_name}"
-            })
-          end
-
-          if !Decimal.eq?(x.tax_amount, 0) do
-            repo.insert!(%Transaction{
-              doc_type: "Receipt",
-              doc_no: receipt.receipt_no,
-              doc_id: receipt.id,
-              doc_date: receipt.receipt_date,
-              account_id: x.tax_code.account_id,
-              company_id: com.id,
-              amount: Decimal.negate(x.tax_amount),
-              particulars: "#{x.tax_code_name} on #{x.good_name}"
-            })
-          end
-        end)
-      end
-
-      # follow matched amount
-      if receipt.transaction_matchers != Ecto.Association.NotLoaded do
-        Enum.group_by(receipt.transaction_matchers, fn m ->
-          m = FullCircle.Repo.preload(m, :transaction)
-          m.transaction.account_id
-        end)
-        |> Enum.map(fn {k, v} ->
+  defp build_detail_transactions(receipt, com, now) do
+    Enum.flat_map(receipt.receipt_details, fn x ->
+      [
+        if !Decimal.eq?(x.good_amount, 0) do
           %{
-            account_id: k,
-            match_doc_nos: Enum.map_join(v, ", ", fn x -> x.t_doc_no end) |> String.slice(0..200),
-            amount: Enum.reduce(v, 0, fn x, acc -> Decimal.add(acc, x.match_amount) end)
-          }
-        end)
-        |> Enum.each(fn x ->
-          repo.insert!(%Transaction{
             doc_type: "Receipt",
             doc_no: receipt.receipt_no,
             doc_id: receipt.id,
             doc_date: receipt.receipt_date,
-            contact_id: receipt.contact_id,
+            contact_id:
+              if(Accounting.is_balance_sheet_account?(x.account),
+                do: receipt.contact_id,
+                else: nil
+              ),
             account_id: x.account_id,
-            particulars: "Received from #{receipt.contact_name}",
-            contact_particulars: "Funds Received for " <> x.match_doc_nos,
             company_id: com.id,
-            amount: x.amount
-          })
-        end)
-      end
+            amount: Decimal.negate(x.good_amount),
+            particulars: "#{receipt.contact_name}, #{x.good_name}",
+            inserted_at: now
+          }
+        end,
+        if !Decimal.eq?(x.tax_amount, 0) do
+          %{
+            doc_type: "Receipt",
+            doc_no: receipt.receipt_no,
+            doc_id: receipt.id,
+            doc_date: receipt.receipt_date,
+            account_id: x.tax_code.account_id,
+            company_id: com.id,
+            amount: Decimal.negate(x.tax_amount),
+            particulars: "#{x.tax_code_name} on #{x.good_name}",
+            inserted_at: now
+          }
+        end
+      ]
+    end)
+  end
 
-      if Decimal.gt?(receipt.funds_amount, 0) do
-        repo.insert!(%Transaction{
+  defp build_matcher_transactions(receipt, com, now) do
+    receipt.transaction_matchers
+    |> Enum.group_by(fn m -> m.transaction.account_id end)
+    |> Enum.map(fn {account_id, matchers} ->
+      match_doc_nos =
+        Enum.map_join(matchers, ", ", fn x -> x.t_doc_no end) |> String.slice(0..200)
+
+      amount = Enum.reduce(matchers, 0, fn x, acc -> Decimal.add(acc, x.match_amount) end)
+
+      %{
+        doc_type: "Receipt",
+        doc_no: receipt.receipt_no,
+        doc_id: receipt.id,
+        doc_date: receipt.receipt_date,
+        contact_id: receipt.contact_id,
+        account_id: account_id,
+        particulars: "Received from #{receipt.contact_name}",
+        contact_particulars: "Funds Received for " <> match_doc_nos,
+        company_id: com.id,
+        amount: amount,
+        inserted_at: now
+      }
+    end)
+  end
+
+  defp build_funds_transaction(receipt, com, now) do
+    if Decimal.gt?(receipt.funds_amount, 0) do
+      [
+        %{
           doc_type: "Receipt",
           doc_no: receipt.receipt_no,
           doc_id: receipt.id,
@@ -464,26 +474,28 @@ defmodule FullCircle.ReceiveFund do
           account_id: receipt.funds_account_id,
           company_id: com.id,
           amount: receipt.funds_amount,
-          particulars: "Received from #{receipt.contact_name}"
-        })
-      end
+          particulars: "Received from #{receipt.contact_name}",
+          inserted_at: now
+        }
+      ]
+    else
+      []
+    end
+  end
 
-      if receipt.received_cheques != Ecto.Association.NotLoaded do
-        Enum.each(receipt.received_cheques, fn x ->
-          repo.insert!(%Transaction{
-            doc_type: "Receipt",
-            doc_no: receipt.receipt_no,
-            doc_id: receipt.id,
-            doc_date: receipt.receipt_date,
-            account_id: pdc_id,
-            company_id: com.id,
-            amount: x.amount,
-            particulars: "#{x.bank} #{x.cheque_no} from #{receipt.contact_name}"
-          })
-        end)
-      end
-
-      {:ok, nil}
+  defp build_cheque_transactions(receipt, com, pdc_id, now) do
+    Enum.map(receipt.received_cheques, fn x ->
+      %{
+        doc_type: "Receipt",
+        doc_no: receipt.receipt_no,
+        doc_id: receipt.id,
+        doc_date: receipt.receipt_date,
+        account_id: pdc_id,
+        company_id: com.id,
+        amount: x.amount,
+        particulars: "#{x.bank} #{x.cheque_no} from #{receipt.contact_name}",
+        inserted_at: now
+      }
     end)
   end
 
@@ -505,26 +517,25 @@ defmodule FullCircle.ReceiveFund do
   end
 
   def update_receipt_multi(multi, receipt, attrs, com, user) do
-    receipt_name = :update_receipt
+    update_doc_multi(multi, :update_receipt, Receipt, receipt, receipt.receipt_no,
+      attrs, com, user)
+  end
 
+  defp update_doc_multi(multi, step_name, schema, doc, doc_no, attrs, com, user) do
     multi
-    |> Multi.update(receipt_name, fn _ ->
-      if user_role_in_company(user.id, com.id) == "admin" do
-        StdInterface.changeset(Receipt, receipt, attrs, com, :admin_changeset)
-      else
-        StdInterface.changeset(Receipt, receipt, attrs, com)
-      end
+    |> Multi.update(step_name, fn _ ->
+      make_changeset(schema, doc, attrs, com, user)
     end)
     |> Multi.delete_all(
       :delete_transaction,
       from(txn in Transaction,
         where: txn.doc_type == "Receipt",
-        where: txn.doc_no == ^receipt.receipt_no,
-        where: txn.doc_id == ^receipt.id,
+        where: txn.doc_no == ^doc_no,
+        where: txn.doc_id == ^doc.id,
         where: txn.company_id == ^com.id
       )
     )
-    |> Sys.insert_log_for(receipt_name, attrs, com, user)
-    |> create_receipt_transactions(receipt_name, com, user)
+    |> Sys.insert_log_for(step_name, attrs, com, user)
+    |> create_receipt_transactions(step_name, com, user)
   end
 end

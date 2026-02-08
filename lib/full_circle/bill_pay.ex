@@ -1,25 +1,22 @@
 defmodule FullCircle.BillPay do
   import Ecto.Query, warn: false
-  alias FullCircle.Repo
   import FullCircle.Helpers
   import FullCircle.Authorization
 
+  alias Ecto.Multi
+  alias FullCircle.EInvMetas.EInvoice
   alias FullCircle.BillPay.{Payment, PaymentDetail}
 
   alias FullCircle.Accounting.{
-    TransactionMatcher,
-    Contact,
     Account,
+    Contact,
     Transaction,
-    TaxCode
+    TaxCode,
+    TransactionMatcher
   }
 
-  alias FullCircle.EInvMetas.EInvoice
-  alias FullCircle.{Sys, Accounting}
   alias FullCircle.Product.{Good, Packaging}
-  alias FullCircle.Accounting.Account
-  alias FullCircle.StdInterface
-  alias Ecto.Multi
+  alias FullCircle.{Repo, Sys, StdInterface, Accounting}
 
   def get_payment_by_no!(no, com, user) do
     id =
@@ -65,6 +62,8 @@ defmodule FullCircle.BillPay do
         on: funds.id == pay.funds_account_id,
         left_join: einv in EInvoice,
         on: einv.uuid == pay.e_inv_uuid,
+        left_join: da in subquery(payment_detail_amounts(id)),
+        on: true,
         where: pay.id == ^id,
         preload: [transaction_matchers: ^payment_match_trans(company, user)],
         preload: [payment_details: ^payment_details()],
@@ -77,9 +76,11 @@ defmodule FullCircle.BillPay do
           e_inv_long_id: einv.longId
         },
         select_merge: %{matched_amount: coalesce(subquery(matched_amount(id)), 0)},
-        select_merge: %{payment_tax_amount: coalesce(subquery(payment_tax_amount(id)), 0)},
-        select_merge: %{payment_good_amount: coalesce(subquery(payment_good_amount(id)), 0)},
-        select_merge: %{payment_detail_amount: coalesce(subquery(payment_detail_amount(id)), 0)}
+        select_merge: %{
+          payment_tax_amount: coalesce(da.tax_amount, 0),
+          payment_good_amount: coalesce(da.good_amount, 0),
+          payment_detail_amount: coalesce(da.detail_amount, 0)
+        }
     )
   end
 
@@ -90,45 +91,37 @@ defmodule FullCircle.BillPay do
       select: sum(mat.match_amount)
   end
 
-  defp payment_tax_amount(id) do
+  defp payment_detail_amounts(id) do
     from dtl in PaymentDetail,
       where: dtl.payment_id == ^id,
-      select:
-        fragment(
-          "sum(round((?*?+?)*?, 2))",
-          dtl.quantity,
-          dtl.unit_price,
-          dtl.discount,
-          dtl.tax_rate
-        )
-  end
-
-  defp payment_good_amount(id) do
-    from dtl in PaymentDetail,
-      where: dtl.payment_id == ^id,
-      select:
-        fragment(
-          "sum(round(?*?+?, 2))",
-          dtl.quantity,
-          dtl.unit_price,
-          dtl.discount
-        )
-  end
-
-  defp payment_detail_amount(id) do
-    from dtl in PaymentDetail,
-      where: dtl.payment_id == ^id,
-      select:
-        fragment(
-          "sum(round(?*?+?+(?*?+?)*?, 2))",
-          dtl.quantity,
-          dtl.unit_price,
-          dtl.discount,
-          dtl.quantity,
-          dtl.unit_price,
-          dtl.discount,
-          dtl.tax_rate
-        )
+      select: %{
+        good_amount:
+          fragment(
+            "sum(round(?*?+?, 2))",
+            dtl.quantity,
+            dtl.unit_price,
+            dtl.discount
+          ),
+        tax_amount:
+          fragment(
+            "sum(round((?*?+?)*?, 2))",
+            dtl.quantity,
+            dtl.unit_price,
+            dtl.discount,
+            dtl.tax_rate
+          ),
+        detail_amount:
+          fragment(
+            "sum(round(?*?+?+(?*?+?)*?, 2))",
+            dtl.quantity,
+            dtl.unit_price,
+            dtl.discount,
+            dtl.quantity,
+            dtl.unit_price,
+            dtl.discount,
+            dtl.tax_rate
+          )
+      }
   end
 
   defp payment_details do
@@ -195,25 +188,14 @@ defmodule FullCircle.BillPay do
         page: page,
         per_page: per_page
       ) do
-    qry =
-      from(inv in subquery(payment_raw_query(com, user)))
-
-    qry =
-      if terms != "" do
-        from inv in subquery(qry),
-          order_by: ^similarity_order([:payment_no, :contact_name, :particulars], terms)
-      else
-        qry
-      end
-
-    qry =
-      if date_from != "" do
-        from inv in qry, where: inv.payment_date >= ^date_from, order_by: inv.payment_date
-      else
-        from inv in qry, order_by: [desc: inv.payment_date]
-      end
-
-    qry |> offset((^page - 1) * ^per_page) |> limit(^per_page) |> Repo.all()
+    from(inv in subquery(payment_raw_query(com, user)))
+    |> apply_simple_filters(terms, date_from,
+      search_fields: [:payment_no, :contact_name, :particulars],
+      date_field: :payment_date
+    )
+    |> offset((^page - 1) * ^per_page)
+    |> limit(^per_page)
+    |> Repo.all()
   end
 
   def get_payment_by_id_index_component_field!(id, com, user) do
@@ -325,17 +307,7 @@ defmodule FullCircle.BillPay do
     multi
     |> get_gapless_doc_id(gapless_name, "Payment", "PV", com)
     |> Multi.insert(payment_name, fn %{^gapless_name => doc} ->
-      if user_role_in_company(user.id, com.id) == "admin" do
-        StdInterface.changeset(
-          Payment,
-          %Payment{},
-          Map.merge(attrs, %{"payment_no" => doc}),
-          com,
-          :admin_changeset
-        )
-      else
-        StdInterface.changeset(Payment, %Payment{}, Map.merge(attrs, %{"payment_no" => doc}), com)
-      end
+      make_changeset(Payment, %Payment{}, Map.merge(attrs, %{"payment_no" => doc}), com, user)
     end)
     |> Multi.insert("#{payment_name}_log", fn %{^payment_name => entity} ->
       FullCircle.Sys.log_changeset(
@@ -347,107 +319,6 @@ defmodule FullCircle.BillPay do
       )
     end)
     |> create_payment_transactions(payment_name, com, user)
-  end
-
-  defp create_payment_transactions(multi, name, com, user) do
-    multi
-    |> Ecto.Multi.run("create_transactions", fn repo, %{^name => payment} ->
-      payment =
-        payment
-        |> FullCircle.Repo.preload([:payment_details, :transaction_matchers])
-
-      # Debit Transactions
-      if payment.payment_details != Ecto.Association.NotLoaded do
-        Enum.each(payment.payment_details, fn x ->
-          x = FullCircle.Repo.preload(x, [:account, :tax_code])
-
-          if !Decimal.eq?(x.good_amount, 0) do
-            repo.insert!(%Transaction{
-              doc_type: "Payment",
-              doc_no: payment.payment_no,
-              doc_id: payment.id,
-              doc_date: payment.payment_date,
-              account_id: x.account_id,
-              company_id: com.id,
-              amount: x.good_amount,
-              particulars: "#{payment.contact_name}, #{x.good_name}"
-            })
-          end
-
-          if !Decimal.eq?(x.tax_amount, 0) do
-            repo.insert!(%Transaction{
-              doc_type: "Payment",
-              doc_no: payment.payment_no,
-              doc_id: payment.id,
-              doc_date: payment.payment_date,
-              account_id: x.tax_code.account_id,
-              company_id: com.id,
-              amount: x.tax_amount,
-              particulars: "#{x.tax_code_name} on #{x.good_name}"
-            })
-          end
-        end)
-      end
-
-      # follow matched amount
-      if payment.transaction_matchers != Ecto.Association.NotLoaded do
-        Enum.group_by(payment.transaction_matchers, fn m ->
-          m = FullCircle.Repo.preload(m, :transaction)
-          m.transaction.account_id
-        end)
-        |> Enum.map(fn {k, v} ->
-          %{
-            account_id: k,
-            match_doc_nos: Enum.map_join(v, ", ", fn x -> x.t_doc_no end) |> String.slice(0..200),
-            amount: Enum.reduce(v, 0, fn x, acc -> Decimal.add(acc, x.match_amount) end)
-          }
-        end)
-        |> Enum.each(fn x ->
-          repo.insert!(%Transaction{
-            doc_type: "Payment",
-            doc_no: payment.payment_no,
-            doc_id: payment.id,
-            doc_date: payment.payment_date,
-            contact_id: payment.contact_id,
-            account_id: x.account_id,
-            particulars: "Payment to #{payment.contact_name}",
-            contact_particulars: "Payment for " <> x.match_doc_nos,
-            company_id: com.id,
-            amount: x.amount
-          })
-        end)
-      end
-
-      if Decimal.gt?(payment.payment_balance, 0) do
-        repo.insert!(%Transaction{
-          doc_type: "Payment",
-          doc_no: payment.payment_no,
-          doc_id: payment.id,
-          doc_date: payment.payment_date,
-          account_id: Accounting.get_account_by_name("Account Receivables", com, user).id,
-          contact_id: payment.contact_id,
-          company_id: com.id,
-          amount: payment.payment_balance,
-          particulars: "Pre-Payment to #{payment.contact_name}",
-          contact_particulars: "Pre-Payment to #{payment.contact_name}"
-        })
-      end
-
-      if Decimal.gt?(payment.funds_amount, 0) do
-        repo.insert!(%Transaction{
-          doc_type: "Payment",
-          doc_no: payment.payment_no,
-          doc_id: payment.id,
-          doc_date: payment.payment_date,
-          account_id: payment.funds_account_id,
-          company_id: com.id,
-          amount: Decimal.negate(payment.funds_amount),
-          particulars: "Payment to #{payment.contact_name}"
-        })
-      end
-
-      {:ok, nil}
-    end)
   end
 
   def update_payment(%Payment{} = payment, attrs, com, user) do
@@ -472,11 +343,7 @@ defmodule FullCircle.BillPay do
 
     multi
     |> Multi.update(payment_name, fn _ ->
-      if user_role_in_company(user.id, com.id) == "admin" do
-        StdInterface.changeset(Payment, payment, attrs, com, :admin_changeset)
-      else
-        StdInterface.changeset(Payment, payment, attrs, com)
-      end
+      make_changeset(Payment, payment, attrs, com, user)
     end)
     |> Multi.delete_all(
       :delete_transaction,
@@ -488,5 +355,156 @@ defmodule FullCircle.BillPay do
     )
     |> Sys.insert_log_for(payment_name, attrs, com, user)
     |> create_payment_transactions(payment_name, com, user)
+  end
+
+  # ── Private Helpers ─────────────────────────────────
+
+  defp make_changeset(schema, struct, attrs, com, user) do
+    if user_role_in_company(user.id, com.id) == "admin" do
+      StdInterface.changeset(schema, struct, attrs, com, :admin_changeset)
+    else
+      StdInterface.changeset(schema, struct, attrs, com)
+    end
+  end
+
+  defp apply_simple_filters(qry, terms, date_from, opts) do
+    search_fields = Keyword.fetch!(opts, :search_fields)
+    date_field = Keyword.fetch!(opts, :date_field)
+
+    qry =
+      if terms != "" do
+        from inv in subquery(qry),
+          order_by: ^similarity_order(search_fields, terms)
+      else
+        qry
+      end
+
+    if date_from != "" do
+      from inv in qry,
+        where: field(inv, ^date_field) >= ^date_from,
+        order_by: field(inv, ^date_field)
+    else
+      from inv in qry, order_by: [desc: field(inv, ^date_field)]
+    end
+  end
+
+  defp create_payment_transactions(multi, name, com, user) do
+    ar_id = Accounting.get_account_by_name("Account Receivables", com, user).id
+
+    multi
+    |> Multi.insert_all(:insert_transactions, Transaction, fn %{^name => payment} ->
+      payment =
+        Repo.preload(payment, [
+          payment_details: [:account, :tax_code],
+          transaction_matchers: :transaction
+        ])
+      now = Timex.now() |> DateTime.truncate(:second)
+
+      (build_detail_transactions(payment, com, now) ++
+         build_matcher_transactions(payment, com, now) ++
+         build_prepayment_transaction(payment, com, now, ar_id) ++
+         build_funds_transaction(payment, com, now))
+      |> Enum.reject(&is_nil/1)
+    end)
+  end
+
+  defp build_detail_transactions(payment, com, now) do
+    Enum.flat_map(payment.payment_details, fn x ->
+      [
+        if !Decimal.eq?(x.good_amount, 0) do
+          %{
+            doc_type: "Payment",
+            doc_no: payment.payment_no,
+            doc_id: payment.id,
+            doc_date: payment.payment_date,
+            account_id: x.account_id,
+            company_id: com.id,
+            amount: x.good_amount,
+            particulars: "#{payment.contact_name}, #{x.good_name}",
+            inserted_at: now
+          }
+        end,
+        if !Decimal.eq?(x.tax_amount, 0) do
+          %{
+            doc_type: "Payment",
+            doc_no: payment.payment_no,
+            doc_id: payment.id,
+            doc_date: payment.payment_date,
+            account_id: x.tax_code.account_id,
+            company_id: com.id,
+            amount: x.tax_amount,
+            particulars: "#{x.tax_code_name} on #{x.good_name}",
+            inserted_at: now
+          }
+        end
+      ]
+    end)
+  end
+
+  defp build_matcher_transactions(payment, com, now) do
+    payment.transaction_matchers
+    |> Enum.group_by(fn m -> m.transaction.account_id end)
+    |> Enum.map(fn {account_id, matchers} ->
+      match_doc_nos =
+        Enum.map_join(matchers, ", ", fn x -> x.t_doc_no end) |> String.slice(0..200)
+
+      amount = Enum.reduce(matchers, 0, fn x, acc -> Decimal.add(acc, x.match_amount) end)
+
+      %{
+        doc_type: "Payment",
+        doc_no: payment.payment_no,
+        doc_id: payment.id,
+        doc_date: payment.payment_date,
+        contact_id: payment.contact_id,
+        account_id: account_id,
+        particulars: "Payment to #{payment.contact_name}",
+        contact_particulars: "Payment for " <> match_doc_nos,
+        company_id: com.id,
+        amount: amount,
+        inserted_at: now
+      }
+    end)
+  end
+
+  defp build_prepayment_transaction(payment, com, now, ar_id) do
+    if Decimal.gt?(payment.payment_balance, 0) do
+      [
+        %{
+          doc_type: "Payment",
+          doc_no: payment.payment_no,
+          doc_id: payment.id,
+          doc_date: payment.payment_date,
+          account_id: ar_id,
+          contact_id: payment.contact_id,
+          company_id: com.id,
+          amount: payment.payment_balance,
+          particulars: "Pre-Payment to #{payment.contact_name}",
+          contact_particulars: "Pre-Payment to #{payment.contact_name}",
+          inserted_at: now
+        }
+      ]
+    else
+      []
+    end
+  end
+
+  defp build_funds_transaction(payment, com, now) do
+    if Decimal.gt?(payment.funds_amount, 0) do
+      [
+        %{
+          doc_type: "Payment",
+          doc_no: payment.payment_no,
+          doc_id: payment.id,
+          doc_date: payment.payment_date,
+          account_id: payment.funds_account_id,
+          company_id: com.id,
+          amount: Decimal.negate(payment.funds_amount),
+          particulars: "Payment to #{payment.contact_name}",
+          inserted_at: now
+        }
+      ]
+    else
+      []
+    end
   end
 end

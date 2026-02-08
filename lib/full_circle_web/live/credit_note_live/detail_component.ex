@@ -39,7 +39,11 @@ defmodule FullCircleWeb.CreditNoteLive.DetailComponent do
       </div>
 
       <.inputs_for :let={dtl} field={@form[@detail_name]}>
-        <div class={"flex flex-row #{if(dtl[:delete].value == true, do: "hidden", else: "")}"}>
+        <div class={[
+          "flex flex-row",
+          if(dtl[:delete].value == true, do: "hidden"),
+          if(!dtl.source.valid?, do: "bg-rose-50 border-l-4 border-l-rose-500")
+        ]}>
           <div class="w-[30%]"><.input field={dtl[:descriptions]} /></div>
           <div class="w-[10%]">
             <.input

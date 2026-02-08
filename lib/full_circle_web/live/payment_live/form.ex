@@ -357,6 +357,8 @@ defmodule FullCircleWeb.PaymentLive.Form do
   end
 
   defp save(socket, :new, params) do
+    params = params |> FullCircleWeb.Helpers.put_into_matchers("doc_date", params["payment_date"])
+
     case BillPay.create_payment(
            params,
            socket.assigns.current_company,
@@ -468,15 +470,10 @@ defmodule FullCircleWeb.PaymentLive.Form do
     ~H"""
     <div class="w-11/12 mx-auto border rounded-lg border-pink-500 bg-pink-100 p-4">
       <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
+      <.error_box changeset={@form.source} />
       <.form for={@form} id="object-form" autocomplete="off" phx-change="validate" phx-submit="save">
-        <div class="float-right mt-8 mr-4">
-          <% {url, qrcode} = FullCircle.Helpers.e_invoice_validation_url_qrcode(@form.source.data) %>
-          <.link target="_blank" href={url}>
-            {qrcode |> raw}
-          </.link>
-        </div>
         <.input type="hidden" field={@form[:payment_no]} />
-        <div class="flex flex-row flex-nowarp w-[92%]">
+        <div class="flex flex-row flex-nowrap">
           <div class="w-5/12 grow shrink">
             <.input type="hidden" field={@form[:contact_id]} />
             <.input
@@ -514,7 +511,7 @@ defmodule FullCircleWeb.PaymentLive.Form do
             <.input field={@form[:payment_date]} label={gettext("Payment Date")} type="date" />
           </div>
         </div>
-        <div class="flex flex-row flex-nowrap w-[92%]">
+        <div class="flex flex-row flex-nowrap">
           <div class="grow shrink w-10/12">
             <.input field={@form[:descriptions]} label={gettext("Descriptions")} />
           </div>
@@ -530,8 +527,8 @@ defmodule FullCircleWeb.PaymentLive.Form do
           </div>
         </div>
 
-        <div class="flex flex-row flex-nowrap mt-2 w-[92%]">
-          <div class="w-[15%]">
+        <div class="flex flex-row flex-nowrap mt-2">
+          <div class="w-[14%]">
             <.input field={@form[:e_inv_internal_id]} label={gettext("E Invoice Internal Id")} />
           </div>
           <div class="w-[20%]">
@@ -553,13 +550,19 @@ defmodule FullCircleWeb.PaymentLive.Form do
           </div>
           <div
             :if={!is_nil(@form[:e_inv_uuid].value)}
-            class="text-blue-600 hover:font-medium w-[20%] ml-5 mt-6"
+            class="text-blue-600 hover:font-medium ml-5 mt-6"
           >
             <.link
               target="_blank"
-              href={~w(https://myinvois.hasil.gov.my/documents/#{@form[:e_inv_uuid].value})}
+              href={"https://myinvois.hasil.gov.my/documents/#{@form[:e_inv_uuid].value}"}
             >
               Open E-Invoice
+            </.link>
+          </div>
+          <div class="shrink-0 ml-2 mt-1">
+            <% {url, qrcode} = FullCircle.Helpers.e_invoice_validation_url_qrcode(@form.source.data, 1) %>
+            <.link target="_blank" href={url}>
+              {qrcode |> raw}
             </.link>
           </div>
         </div>

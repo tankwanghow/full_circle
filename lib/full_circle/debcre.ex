@@ -1,10 +1,9 @@
 defmodule FullCircle.DebCre do
   import Ecto.Query, warn: false
   import FullCircle.Authorization
-
-  alias Ecto.Multi
   import FullCircle.Helpers
 
+  alias Ecto.Multi
   alias FullCircle.EInvMetas.EInvoice
   alias FullCircle.DebCre.{CreditNote, CreditNoteDetail, DebitNote, DebitNoteDetail}
 
@@ -18,6 +17,26 @@ defmodule FullCircle.DebCre do
 
   alias FullCircle.{Repo, Sys, StdInterface, Accounting}
 
+  @credit_note_txn_opts [
+    detail_assoc: :credit_note_details,
+    detail_sign: :positive,
+    header_account: "Account Receivables",
+    header_sign: :negate,
+    doc_type: "CreditNote",
+    desc_prefix: "Credit Note"
+  ]
+
+  @debit_note_txn_opts [
+    detail_assoc: :debit_note_details,
+    detail_sign: :negate,
+    header_account: "Account Payables",
+    header_sign: :positive,
+    doc_type: "DebitNote",
+    desc_prefix: "Debit Note"
+  ]
+
+  # ── Credit Note ─────────────────────────────────────
+
   def get_print_credit_notes!(ids, company, user) do
     Repo.all(
       from rec in CreditNote,
@@ -27,8 +46,8 @@ defmodule FullCircle.DebCre do
         on: einv.uuid == rec.e_inv_uuid,
         where: rec.id in ^ids,
         preload: [:contact],
-        preload: [transaction_matchers: ^credit_note_match_trans(company, user)],
-        preload: [credit_note_details: ^credit_note_details()],
+        preload: [transaction_matchers: ^match_trans_query(company, user, "CreditNote")],
+        preload: [credit_note_details: ^detail_query(CreditNoteDetail)],
         select: rec,
         select_merge: %{e_inv_long_id: einv.longId}
     )
@@ -47,9 +66,11 @@ defmodule FullCircle.DebCre do
         on: cont.id == obj.contact_id,
         left_join: einv in EInvoice,
         on: einv.uuid == obj.e_inv_uuid,
+        left_join: da in subquery(credit_note_amounts(id)),
+        on: true,
         where: obj.id == ^id,
-        preload: [transaction_matchers: ^credit_note_match_trans(company, user)],
-        preload: [credit_note_details: ^credit_note_details()],
+        preload: [transaction_matchers: ^match_trans_query(company, user, "CreditNote")],
+        preload: [credit_note_details: ^detail_query(CreditNoteDetail)],
         select: obj,
         select_merge: %{
           e_inv_long_id: einv.longId,
@@ -57,105 +78,41 @@ defmodule FullCircle.DebCre do
           reg_no: cont.reg_no,
           tax_id: cont.tax_id
         },
-        select_merge: %{matched_amount: coalesce(subquery(dn_matched_amount(id)), 0)},
-        select_merge: %{note_tax_amount: coalesce(subquery(credit_note_tax_amount(id)), 0)},
-        select_merge: %{note_desc_amount: coalesce(subquery(credit_note_desc_amount(id)), 0)},
-        select_merge: %{note_amount: coalesce(subquery(credit_note_amount(id)), 0)}
+        select_merge: %{matched_amount: coalesce(subquery(matched_amount(id, "CreditNote")), 0)},
+        select_merge: %{
+          note_tax_amount: coalesce(da.tax_amount, 0),
+          note_desc_amount: coalesce(da.desc_amount, 0),
+          note_amount: coalesce(da.note_amount, 0)
+        }
     )
   end
 
-  defp dn_matched_amount(id) do
-    from mat in TransactionMatcher,
-      where: mat.doc_type == "CreditNote",
-      where: mat.doc_id == ^id,
-      select: sum(mat.match_amount)
-  end
-
-  defp credit_note_tax_amount(id) do
+  defp credit_note_amounts(id) do
     from dtl in CreditNoteDetail,
       where: dtl.credit_note_id == ^id,
-      select:
-        fragment(
-          "sum(round(?*?*?, 2))",
-          dtl.quantity,
-          dtl.unit_price,
-          dtl.tax_rate
-        )
-  end
-
-  defp credit_note_desc_amount(id) do
-    from dtl in CreditNoteDetail,
-      where: dtl.credit_note_id == ^id,
-      select:
-        fragment(
-          "sum(round(?*?, 2))",
-          dtl.quantity,
-          dtl.unit_price
-        )
-  end
-
-  defp credit_note_amount(id) do
-    from dtl in CreditNoteDetail,
-      where: dtl.credit_note_id == ^id,
-      select:
-        fragment(
-          "sum(round(?*?+?*?*?, 2))",
-          dtl.quantity,
-          dtl.unit_price,
-          dtl.quantity,
-          dtl.unit_price,
-          dtl.tax_rate
-        )
-  end
-
-  defp credit_note_details do
-    from cnd in CreditNoteDetail,
-      join: ac in Account,
-      on: cnd.account_id == ac.id,
-      join: tc in TaxCode,
-      on: tc.id == cnd.tax_code_id,
-      order_by: cnd._persistent_id,
-      select: cnd,
-      select_merge: %{
-        account_name: ac.name,
-        tax_rate: cnd.tax_rate,
-        tax_code_name: tc.code,
-        tax_amount:
-          fragment(
-            "round(?, 2)",
-            cnd.quantity * cnd.unit_price * cnd.tax_rate
-          ),
+      select: %{
         desc_amount:
           fragment(
-            "round(?, 2)",
-            cnd.quantity * cnd.unit_price
+            "sum(round(?*?, 2))",
+            dtl.quantity,
+            dtl.unit_price
           ),
-        line_amount:
+        tax_amount:
           fragment(
-            "round(?, 2)",
-            cnd.quantity * cnd.unit_price +
-              cnd.quantity * cnd.unit_price * cnd.tax_rate
+            "sum(round(?*?*?, 2))",
+            dtl.quantity,
+            dtl.unit_price,
+            dtl.tax_rate
+          ),
+        note_amount:
+          fragment(
+            "sum(round(?*?+?*?*?, 2))",
+            dtl.quantity,
+            dtl.unit_price,
+            dtl.quantity,
+            dtl.unit_price,
+            dtl.tax_rate
           )
-      }
-  end
-
-  defp credit_note_match_trans(com, user) do
-    from cnmt in TransactionMatcher,
-      join: txn in subquery(Accounting.transaction_with_balance_query(com, user)),
-      on: txn.id == cnmt.transaction_id,
-      where: cnmt.doc_type == "CreditNote",
-      order_by: cnmt._persistent_id,
-      select: cnmt,
-      select_merge: %{
-        transaction_id: txn.id,
-        t_doc_date: txn.doc_date,
-        t_doc_type: txn.doc_type,
-        t_doc_no: txn.doc_no,
-        amount: txn.amount,
-        all_matched_amount: txn.all_matched_amount - cnmt.match_amount,
-        particulars: txn.particulars,
-        balance: txn.amount + txn.all_matched_amount,
-        match_amount: cnmt.match_amount
       }
   end
 
@@ -163,25 +120,14 @@ defmodule FullCircle.DebCre do
         page: page,
         per_page: per_page
       ) do
-    qry =
-      from(inv in subquery(credit_note_raw_query(com, user)))
-
-    qry =
-      if terms != "" do
-        from inv in subquery(qry),
-          order_by: ^similarity_order([:note_no, :contact_name, :particulars], terms)
-      else
-        qry
-      end
-
-    qry =
-      if date_from != "" do
-        from inv in qry, where: inv.note_date >= ^date_from, order_by: inv.note_date
-      else
-        from inv in qry, order_by: [desc: inv.note_date]
-      end
-
-    qry |> offset((^page - 1) * ^per_page) |> limit(^per_page) |> Repo.all()
+    from(inv in subquery(credit_note_raw_query(com, user)))
+    |> apply_simple_filters(terms, date_from,
+      search_fields: [:note_no, :contact_name, :particulars],
+      date_field: :note_date
+    )
+    |> offset((^page - 1) * ^per_page)
+    |> limit(^per_page)
+    |> Repo.all()
   end
 
   def get_credit_note_by_id_index_component_field!(id, com, user) do
@@ -273,97 +219,7 @@ defmodule FullCircle.DebCre do
         user
       )
     end)
-    |> create_credit_note_transactions(note_name, com, user)
-  end
-
-  defp create_credit_note_transactions(multi, name, com, user) do
-    ac_rec_id = Accounting.get_account_by_name("Account Receivables", com, user).id
-
-    multi
-    |> Ecto.Multi.run("create_transactions", fn repo, %{^name => cn} ->
-      cn =
-        cn
-        |> FullCircle.Repo.preload([:credit_note_details, :transaction_matchers])
-
-      Enum.each(cn.credit_note_details, fn x ->
-        x = FullCircle.Repo.preload(x, [:account, :tax_code])
-
-        if !Decimal.eq?(x.desc_amount, 0) do
-          repo.insert!(%Transaction{
-            doc_type: "CreditNote",
-            doc_no: cn.note_no,
-            doc_id: cn.id,
-            doc_date: cn.note_date,
-            account_id: x.account_id,
-            company_id: com.id,
-            amount: x.desc_amount,
-            particulars: "#{cn.contact_name}, #{x.descriptions}"
-          })
-        end
-
-        if !Decimal.eq?(x.tax_amount, 0) do
-          repo.insert!(%Transaction{
-            doc_type: "CreditNote",
-            doc_no: cn.note_no,
-            doc_id: cn.id,
-            doc_date: cn.note_date,
-            account_id: x.tax_code.account_id,
-            company_id: com.id,
-            amount: x.tax_amount,
-            particulars: "#{x.tax_code_name} on #{x.descriptions}"
-          })
-        end
-      end)
-
-      # follow matched amount
-      if cn.transaction_matchers != Ecto.Association.NotLoaded do
-        Enum.group_by(cn.transaction_matchers, fn m ->
-          m = FullCircle.Repo.preload(m, :transaction)
-          m.transaction.account_id
-        end)
-        |> Enum.map(fn {k, v} ->
-          %{
-            account_id: k,
-            match_doc_nos: Enum.map_join(v, ", ", fn x -> x.t_doc_no end) |> String.slice(0..200),
-            amount: Enum.reduce(v, 0, fn x, acc -> Decimal.add(acc, x.match_amount) end)
-          }
-        end)
-        |> Enum.each(fn x ->
-          repo.insert!(%Transaction{
-            doc_type: "CreditNote",
-            doc_no: cn.note_no,
-            doc_id: cn.id,
-            doc_date: cn.note_date,
-            contact_id: cn.contact_id,
-            account_id: x.account_id,
-            particulars: "Credit Note to #{cn.contact_name}",
-            contact_particulars: "Credit Note for " <> x.match_doc_nos,
-            company_id: com.id,
-            amount: x.amount
-          })
-        end)
-      end
-
-      if !Decimal.eq?(cn.note_balance, 0) do
-        cont_part =
-          Enum.map_join(cn.credit_note_details, ", ", fn x -> x.descriptions end)
-
-        repo.insert!(%Transaction{
-          doc_type: "CreditNote",
-          doc_no: cn.note_no,
-          doc_id: cn.id,
-          doc_date: cn.note_date,
-          contact_id: cn.contact_id,
-          account_id: ac_rec_id,
-          company_id: com.id,
-          amount: Decimal.negate(cn.note_balance),
-          particulars: cn.contact_name,
-          contact_particulars: cont_part
-        })
-      end
-
-      {:ok, nil}
-    end)
+    |> create_note_transactions(note_name, com, user, @credit_note_txn_opts)
   end
 
   def update_credit_note(%CreditNote{} = credit_note, attrs, com, user) do
@@ -397,10 +253,10 @@ defmodule FullCircle.DebCre do
       )
     )
     |> Sys.insert_log_for(note_name, attrs, com, user)
-    |> create_credit_note_transactions(note_name, com, user)
+    |> create_note_transactions(note_name, com, user, @credit_note_txn_opts)
   end
 
-  # Debit Note
+  # ── Debit Note ──────────────────────────────────────
 
   def get_print_debit_notes!(ids, company, user) do
     Repo.all(
@@ -411,8 +267,8 @@ defmodule FullCircle.DebCre do
         on: einv.uuid == rec.e_inv_uuid,
         where: rec.id in ^ids,
         preload: [:contact],
-        preload: [transaction_matchers: ^debit_note_match_trans(company, user)],
-        preload: [debit_note_details: ^debit_note_details()],
+        preload: [transaction_matchers: ^match_trans_query(company, user, "DebitNote")],
+        preload: [debit_note_details: ^detail_query(DebitNoteDetail)],
         select: rec,
         select_merge: %{e_inv_long_id: einv.longId}
     )
@@ -431,9 +287,11 @@ defmodule FullCircle.DebCre do
         on: cont.id == obj.contact_id,
         left_join: einv in EInvoice,
         on: einv.uuid == obj.e_inv_uuid,
+        left_join: da in subquery(debit_note_amounts(id)),
+        on: true,
         where: obj.id == ^id,
-        preload: [transaction_matchers: ^debit_note_match_trans(company, user)],
-        preload: [debit_note_details: ^debit_note_details()],
+        preload: [transaction_matchers: ^match_trans_query(company, user, "DebitNote")],
+        preload: [debit_note_details: ^detail_query(DebitNoteDetail)],
         select: obj,
         select_merge: %{
           e_inv_long_id: einv.longId,
@@ -441,105 +299,41 @@ defmodule FullCircle.DebCre do
           reg_no: cont.reg_no,
           tax_id: cont.tax_id
         },
-        select_merge: %{matched_amount: coalesce(subquery(matched_amount(id)), 0)},
-        select_merge: %{note_tax_amount: coalesce(subquery(debit_note_tax_amount(id)), 0)},
-        select_merge: %{note_desc_amount: coalesce(subquery(debit_note_desc_amount(id)), 0)},
-        select_merge: %{note_amount: coalesce(subquery(debit_note_amount(id)), 0)}
+        select_merge: %{matched_amount: coalesce(subquery(matched_amount(id, "DebitNote")), 0)},
+        select_merge: %{
+          note_tax_amount: coalesce(da.tax_amount, 0),
+          note_desc_amount: coalesce(da.desc_amount, 0),
+          note_amount: coalesce(da.note_amount, 0)
+        }
     )
   end
 
-  defp matched_amount(id) do
-    from mat in TransactionMatcher,
-      where: mat.doc_type == "DebitNote",
-      where: mat.doc_id == ^id,
-      select: sum(mat.match_amount)
-  end
-
-  defp debit_note_tax_amount(id) do
+  defp debit_note_amounts(id) do
     from dtl in DebitNoteDetail,
       where: dtl.debit_note_id == ^id,
-      select:
-        fragment(
-          "sum(round(?*?*?, 2))",
-          dtl.quantity,
-          dtl.unit_price,
-          dtl.tax_rate
-        )
-  end
-
-  defp debit_note_desc_amount(id) do
-    from dtl in DebitNoteDetail,
-      where: dtl.debit_note_id == ^id,
-      select:
-        fragment(
-          "sum(round(?*?, 2))",
-          dtl.quantity,
-          dtl.unit_price
-        )
-  end
-
-  defp debit_note_amount(id) do
-    from dtl in DebitNoteDetail,
-      where: dtl.debit_note_id == ^id,
-      select:
-        fragment(
-          "sum(round(?*?+?*?*?, 2))",
-          dtl.quantity,
-          dtl.unit_price,
-          dtl.quantity,
-          dtl.unit_price,
-          dtl.tax_rate
-        )
-  end
-
-  defp debit_note_details do
-    from cnd in DebitNoteDetail,
-      join: ac in Account,
-      on: cnd.account_id == ac.id,
-      join: tc in TaxCode,
-      on: tc.id == cnd.tax_code_id,
-      order_by: cnd._persistent_id,
-      select: cnd,
-      select_merge: %{
-        account_name: ac.name,
-        tax_rate: cnd.tax_rate,
-        tax_code_name: tc.code,
-        tax_amount:
-          fragment(
-            "round(?, 2)",
-            cnd.quantity * cnd.unit_price * cnd.tax_rate
-          ),
+      select: %{
         desc_amount:
           fragment(
-            "round(?, 2)",
-            cnd.quantity * cnd.unit_price
+            "sum(round(?*?, 2))",
+            dtl.quantity,
+            dtl.unit_price
           ),
-        line_amount:
+        tax_amount:
           fragment(
-            "round(?, 2)",
-            cnd.quantity * cnd.unit_price +
-              cnd.quantity * cnd.unit_price * cnd.tax_rate
+            "sum(round(?*?*?, 2))",
+            dtl.quantity,
+            dtl.unit_price,
+            dtl.tax_rate
+          ),
+        note_amount:
+          fragment(
+            "sum(round(?*?+?*?*?, 2))",
+            dtl.quantity,
+            dtl.unit_price,
+            dtl.quantity,
+            dtl.unit_price,
+            dtl.tax_rate
           )
-      }
-  end
-
-  defp debit_note_match_trans(com, user) do
-    from cnmt in TransactionMatcher,
-      join: txn in subquery(Accounting.transaction_with_balance_query(com, user)),
-      on: txn.id == cnmt.transaction_id,
-      where: cnmt.doc_type == "DebitNote",
-      order_by: cnmt._persistent_id,
-      select: cnmt,
-      select_merge: %{
-        transaction_id: txn.id,
-        t_doc_date: txn.doc_date,
-        t_doc_type: txn.doc_type,
-        t_doc_no: txn.doc_no,
-        amount: txn.amount,
-        all_matched_amount: txn.all_matched_amount - cnmt.match_amount,
-        particulars: txn.particulars,
-        balance: txn.amount + txn.all_matched_amount,
-        match_amount: cnmt.match_amount
       }
   end
 
@@ -547,25 +341,14 @@ defmodule FullCircle.DebCre do
         page: page,
         per_page: per_page
       ) do
-    qry =
-      from(inv in subquery(debit_note_raw_query(com, user)))
-
-    qry =
-      if terms != "" do
-        from inv in subquery(qry),
-          order_by: ^similarity_order([:note_no, :contact_name, :particulars], terms)
-      else
-        qry
-      end
-
-    qry =
-      if date_from != "" do
-        from inv in qry, where: inv.note_date >= ^date_from, order_by: inv.note_date
-      else
-        from inv in qry, order_by: [desc: inv.note_date]
-      end
-
-    qry |> offset((^page - 1) * ^per_page) |> limit(^per_page) |> Repo.all()
+    from(inv in subquery(debit_note_raw_query(com, user)))
+    |> apply_simple_filters(terms, date_from,
+      search_fields: [:note_no, :contact_name, :particulars],
+      date_field: :note_date
+    )
+    |> offset((^page - 1) * ^per_page)
+    |> limit(^per_page)
+    |> Repo.all()
   end
 
   def get_debit_note_by_id_index_component_field!(id, com, user) do
@@ -657,97 +440,7 @@ defmodule FullCircle.DebCre do
         user
       )
     end)
-    |> create_debit_note_transactions(note_name, com, user)
-  end
-
-  defp create_debit_note_transactions(multi, name, com, user) do
-    ac_paya_id = Accounting.get_account_by_name("Account Payables", com, user).id
-
-    multi
-    |> Ecto.Multi.run("create_transactions", fn repo, %{^name => cn} ->
-      cn =
-        cn
-        |> FullCircle.Repo.preload([:debit_note_details, :transaction_matchers])
-
-      Enum.each(cn.debit_note_details, fn x ->
-        x = FullCircle.Repo.preload(x, [:account, :tax_code])
-
-        if !Decimal.eq?(x.desc_amount, 0) do
-          repo.insert!(%Transaction{
-            doc_type: "DebitNote",
-            doc_no: cn.note_no,
-            doc_id: cn.id,
-            doc_date: cn.note_date,
-            account_id: x.account_id,
-            company_id: com.id,
-            amount: Decimal.negate(x.desc_amount),
-            particulars: "#{cn.contact_name}, #{x.descriptions}"
-          })
-        end
-
-        if !Decimal.eq?(x.tax_amount, 0) do
-          repo.insert!(%Transaction{
-            doc_type: "DebitNote",
-            doc_no: cn.note_no,
-            doc_id: cn.id,
-            doc_date: cn.note_date,
-            account_id: x.tax_code.account_id,
-            company_id: com.id,
-            amount: Decimal.negate(x.tax_amount),
-            particulars: "#{x.tax_code_name} on #{x.descriptions}"
-          })
-        end
-      end)
-
-      # follow matched amount
-      if cn.transaction_matchers != Ecto.Association.NotLoaded do
-        Enum.group_by(cn.transaction_matchers, fn m ->
-          m = FullCircle.Repo.preload(m, :transaction)
-          m.transaction.account_id
-        end)
-        |> Enum.map(fn {k, v} ->
-          %{
-            account_id: k,
-            match_doc_nos: Enum.map_join(v, ", ", fn x -> x.t_doc_no end),
-            amount: Enum.reduce(v, 0, fn x, acc -> Decimal.add(acc, x.match_amount) end)
-          }
-        end)
-        |> Enum.each(fn x ->
-          repo.insert!(%Transaction{
-            doc_type: "DebitNote",
-            doc_no: cn.note_no,
-            doc_id: cn.id,
-            doc_date: cn.note_date,
-            contact_id: cn.contact_id,
-            account_id: x.account_id,
-            particulars: "Debit Note to #{cn.contact_name}",
-            contact_particulars: "Debit Note for " <> x.match_doc_nos,
-            company_id: com.id,
-            amount: x.amount
-          })
-        end)
-      end
-
-      if !Decimal.eq?(cn.note_balance, 0) do
-        cont_part =
-          Enum.map_join(cn.debit_note_details, ", ", fn x -> x.descriptions end)
-
-        repo.insert!(%Transaction{
-          doc_type: "DebitNote",
-          doc_no: cn.note_no,
-          doc_id: cn.id,
-          doc_date: cn.note_date,
-          contact_id: cn.contact_id,
-          account_id: ac_paya_id,
-          company_id: com.id,
-          amount: cn.note_balance,
-          particulars: cn.contact_name,
-          contact_particulars: cont_part
-        })
-      end
-
-      {:ok, nil}
-    end)
+    |> create_note_transactions(note_name, com, user, @debit_note_txn_opts)
   end
 
   def update_debit_note(%DebitNote{} = debit_note, attrs, com, user) do
@@ -781,6 +474,206 @@ defmodule FullCircle.DebCre do
       )
     )
     |> Sys.insert_log_for(note_name, attrs, com, user)
-    |> create_debit_note_transactions(note_name, com, user)
+    |> create_note_transactions(note_name, com, user, @debit_note_txn_opts)
   end
+
+  # ── Shared Private Helpers ──────────────────────────
+
+  defp detail_query(detail_mod) do
+    from cnd in detail_mod,
+      join: ac in Account,
+      on: cnd.account_id == ac.id,
+      join: tc in TaxCode,
+      on: tc.id == cnd.tax_code_id,
+      order_by: cnd._persistent_id,
+      select: cnd,
+      select_merge: %{
+        account_name: ac.name,
+        tax_rate: cnd.tax_rate,
+        tax_code_name: tc.code,
+        tax_amount:
+          fragment(
+            "round(?, 2)",
+            cnd.quantity * cnd.unit_price * cnd.tax_rate
+          ),
+        desc_amount:
+          fragment(
+            "round(?, 2)",
+            cnd.quantity * cnd.unit_price
+          ),
+        line_amount:
+          fragment(
+            "round(?, 2)",
+            cnd.quantity * cnd.unit_price +
+              cnd.quantity * cnd.unit_price * cnd.tax_rate
+          )
+      }
+  end
+
+  defp match_trans_query(com, user, doc_type) do
+    from cnmt in TransactionMatcher,
+      join: txn in subquery(Accounting.transaction_with_balance_query(com, user)),
+      on: txn.id == cnmt.transaction_id,
+      where: cnmt.doc_type == ^doc_type,
+      order_by: cnmt._persistent_id,
+      select: cnmt,
+      select_merge: %{
+        transaction_id: txn.id,
+        t_doc_date: txn.doc_date,
+        t_doc_type: txn.doc_type,
+        t_doc_no: txn.doc_no,
+        amount: txn.amount,
+        all_matched_amount: txn.all_matched_amount - cnmt.match_amount,
+        particulars: txn.particulars,
+        balance: txn.amount + txn.all_matched_amount,
+        match_amount: cnmt.match_amount
+      }
+  end
+
+  defp matched_amount(id, doc_type) do
+    from mat in TransactionMatcher,
+      where: mat.doc_type == ^doc_type,
+      where: mat.doc_id == ^id,
+      select: sum(mat.match_amount)
+  end
+
+  defp apply_simple_filters(qry, terms, date_from, opts) do
+    search_fields = Keyword.fetch!(opts, :search_fields)
+    date_field = Keyword.fetch!(opts, :date_field)
+
+    qry =
+      if terms != "" do
+        from inv in subquery(qry),
+          order_by: ^similarity_order(search_fields, terms)
+      else
+        qry
+      end
+
+    if date_from != "" do
+      from inv in qry,
+        where: field(inv, ^date_field) >= ^date_from,
+        order_by: field(inv, ^date_field)
+    else
+      from inv in qry, order_by: [desc: field(inv, ^date_field)]
+    end
+  end
+
+  defp create_note_transactions(multi, name, com, user, opts) do
+    header_account_id = Accounting.get_account_by_name(opts[:header_account], com, user).id
+    detail_assoc = opts[:detail_assoc]
+
+    multi
+    |> Multi.insert_all(:insert_transactions, Transaction, fn %{^name => note} ->
+      note =
+        Repo.preload(note, [
+          {detail_assoc, [:account, :tax_code]},
+          transaction_matchers: :transaction
+        ])
+      now = Timex.now() |> DateTime.truncate(:second)
+
+      (build_detail_transactions(note, com, now, opts) ++
+         build_matcher_transactions(note, com, now, opts) ++
+         build_header_transaction(note, com, now, header_account_id, opts))
+      |> Enum.reject(&is_nil/1)
+    end)
+  end
+
+  defp build_detail_transactions(note, com, now, opts) do
+    doc_type = opts[:doc_type]
+    detail_assoc = opts[:detail_assoc]
+    sign = opts[:detail_sign]
+
+    Map.get(note, detail_assoc)
+    |> Enum.flat_map(fn x ->
+      [
+        if !Decimal.eq?(x.desc_amount, 0) do
+          %{
+            doc_type: doc_type,
+            doc_no: note.note_no,
+            doc_id: note.id,
+            doc_date: note.note_date,
+            account_id: x.account_id,
+            company_id: com.id,
+            amount: apply_sign(sign, x.desc_amount),
+            particulars: "#{note.contact_name}, #{x.descriptions}",
+            inserted_at: now
+          }
+        end,
+        if !Decimal.eq?(x.tax_amount, 0) do
+          %{
+            doc_type: doc_type,
+            doc_no: note.note_no,
+            doc_id: note.id,
+            doc_date: note.note_date,
+            account_id: x.tax_code.account_id,
+            company_id: com.id,
+            amount: apply_sign(sign, x.tax_amount),
+            particulars: "#{x.tax_code_name} on #{x.descriptions}",
+            inserted_at: now
+          }
+        end
+      ]
+    end)
+  end
+
+  defp build_matcher_transactions(note, com, now, opts) do
+    doc_type = opts[:doc_type]
+    desc_prefix = opts[:desc_prefix]
+
+    note.transaction_matchers
+    |> Enum.group_by(fn m -> m.transaction.account_id end)
+    |> Enum.map(fn {account_id, matchers} ->
+      match_doc_nos =
+        Enum.map_join(matchers, ", ", fn x -> x.t_doc_no end) |> String.slice(0..200)
+
+      amount = Enum.reduce(matchers, 0, fn x, acc -> Decimal.add(acc, x.match_amount) end)
+
+      %{
+        doc_type: doc_type,
+        doc_no: note.note_no,
+        doc_id: note.id,
+        doc_date: note.note_date,
+        contact_id: note.contact_id,
+        account_id: account_id,
+        particulars: "#{desc_prefix} to #{note.contact_name}",
+        contact_particulars: "#{desc_prefix} for " <> match_doc_nos,
+        company_id: com.id,
+        amount: amount,
+        inserted_at: now
+      }
+    end)
+  end
+
+  defp build_header_transaction(note, com, now, header_account_id, opts) do
+    doc_type = opts[:doc_type]
+    detail_assoc = opts[:detail_assoc]
+    sign = opts[:header_sign]
+
+    if !Decimal.eq?(note.note_balance, 0) do
+      cont_part =
+        Map.get(note, detail_assoc)
+        |> Enum.map_join(", ", fn x -> x.descriptions end)
+
+      [
+        %{
+          doc_type: doc_type,
+          doc_no: note.note_no,
+          doc_id: note.id,
+          doc_date: note.note_date,
+          contact_id: note.contact_id,
+          account_id: header_account_id,
+          company_id: com.id,
+          amount: apply_sign(sign, note.note_balance),
+          particulars: note.contact_name,
+          contact_particulars: cont_part,
+          inserted_at: now
+        }
+      ]
+    else
+      []
+    end
+  end
+
+  defp apply_sign(:positive, amount), do: amount
+  defp apply_sign(:negate, amount), do: Decimal.negate(amount)
 end
