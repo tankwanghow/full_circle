@@ -67,6 +67,7 @@ defmodule FullCircle.MixProject do
       {:nimble_csv, "~> 1.2"},
       {:xlsx_reader, "~> 0.8.0"},
       {:qr_code, "~> 3.2.0"},
+      {:castore, "~> 1.0"},
       {:req, "~> 0.5.0"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
     ]

@@ -2,6 +2,7 @@ defmodule FullCircleWeb.LogLive.Component do
   use FullCircleWeb, :live_component
 
   alias FullCircle.Sys
+  alias FullCircleWeb.LogLive.DeltaDiff
 
   @impl true
   def mount(socket) do
@@ -35,71 +36,113 @@ defmodule FullCircleWeb.LogLive.Component do
     ([nil] ++ logs)
     |> Enum.chunk_every(2, 1, :discard)
     |> Enum.map(fn [prev, curr] ->
+      prev_map = DeltaDiff.parse(if(prev == nil, do: "", else: prev.delta))
+      curr_map = DeltaDiff.parse(curr.delta)
+
       %{
         timestamp: curr.inserted_at,
         user_email: curr.email,
         log_action: curr.action,
-        diff_content: generate_diff_content(if(prev == nil, do: "", else: prev.delta), curr.delta)
+        diff_entries: DeltaDiff.diff(prev_map, curr_map)
       }
     end)
     |> Enum.reverse()
   end
 
-  defp generate_diff_content(prev_delta, curr_delta) do
-    if formatted?(curr_delta) do
-      cleaned_prev =
-        if formatted?(prev_delta), do: clean_delta_string(prev_delta), else: prev_delta
+  defp diff_tree(assigns) do
+    assigns = assign_new(assigns, :depth, fn -> 0 end)
 
-      cleaned_curr = clean_delta_string(curr_delta)
-
-      diff_result =
-        String.myers_difference(cleaned_prev, cleaned_curr)
-        |> Enum.map_join(fn
-          {:del, text} -> "<del>#{text}</del>"
-          {:ins, text} -> "<ins>#{text}</ins>"
-          {_, text} -> text
-        end)
-
-      if prev_delta == "" do
-        diff_result
-      else
-        diff_result
-        |> String.split("\n")
-        |> Enum.filter(&(String.contains?(&1, "<del>") or String.contains?(&1, "<ins>")))
-        |> Enum.join("\n")
-      end
-    else
-      # Just show the raw delta without any diff or formatting applied
-      curr_delta
-    end
+    ~H"""
+    <div class={if @depth > 0, do: "ml-4 pl-2 border-l border-gray-300", else: ""}>
+      <.diff_entry :for={entry <- @entries} entry={entry} depth={@depth} />
+    </div>
+    """
   end
 
-  defp formatted?(delta) do
-    delta = delta || ""
-    String.contains?(delta, "&^") && String.contains?(delta, "^&")
+  defp diff_entry(%{entry: %{status: :unchanged, key: key, value: value}} = assigns) do
+    assigns = assign(assigns, :key, key) |> assign(:value, value)
+
+    ~H"""
+    <div class="py-0.5 text-gray-600">
+      <span class="font-semibold">{@key}:</span> {@value}
+    </div>
+    """
   end
 
-  defp clean_delta_string(delta) do
-    delta
-    # Remove opening markers
-    |> String.replace("&^", "")
-    # Turn closing into newlines for readability
-    |> String.replace("^&", "\n")
+  defp diff_entry(%{entry: %{status: :changed, key: key, old_value: old_value, new_value: new_value}} = assigns) do
+    assigns = assign(assigns, :key, key) |> assign(:old_value, old_value) |> assign(:new_value, new_value)
+
+    ~H"""
+    <div class="py-0.5">
+      <span class="font-semibold">{@key}:</span>
+      <span class="text-red-600 line-through">{@old_value}</span>
+      <span class="mx-1">&rarr;</span>
+      <span class="text-green-600 font-bold">{@new_value}</span>
+    </div>
+    """
   end
 
-  defp format_diff_to_html(diff) do
-    diff
-    # Indent nests
-    |> String.replace("[", "<div style='padding-left: 1rem;'>")
-    |> String.replace("]", "</div>")
-    # Red strikethrough for deletions
-    |> String.replace("<del>", "<span style='color: red; text-decoration: line-through;'>")
-    |> String.replace("</del>", "</span>")
-    # Green for insertions
-    |> String.replace("<ins>", "<span style='color: green;'>")
-    |> String.replace("</ins>", "</span>")
-    # Line breaks
-    |> String.replace("\n", "<br/>")
+  defp diff_entry(%{entry: %{status: :added, key: key, value: value}} = assigns) do
+    assigns = assign(assigns, :key, key) |> assign(:value, value)
+
+    ~H"""
+    <div class="py-0.5 text-green-600">
+      <span class="font-bold">+ {@key}:</span> {@value}
+    </div>
+    """
+  end
+
+  defp diff_entry(%{entry: %{status: :removed, key: key, value: value}} = assigns) do
+    assigns = assign(assigns, :key, key) |> assign(:value, value)
+
+    ~H"""
+    <div class="py-0.5 text-red-600 line-through">
+      <span class="font-semibold">- {@key}:</span> {@value}
+    </div>
+    """
+  end
+
+  defp diff_entry(%{entry: %{status: :nested, key: key, children: children}} = assigns) do
+    assigns = assign(assigns, :key, key) |> assign(:children, children)
+
+    ~H"""
+    <div class="py-0.5">
+      <span class="font-semibold text-gray-700">{@key}:</span>
+      <.diff_tree entries={@children} depth={@depth + 1} />
+    </div>
+    """
+  end
+
+  defp diff_entry(%{entry: %{status: :added_nested, key: key, value: value}} = assigns) do
+    flat = DeltaDiff.flatten_map(value)
+    assigns = assign(assigns, :key, key) |> assign(:flat, flat)
+
+    ~H"""
+    <div class="py-0.5 text-green-600">
+      <span class="font-bold">+ {@key}:</span>
+      <div class="ml-4 pl-2 border-l border-green-300">
+        <div :for={{k, v} <- @flat} class="py-0.5">
+          <span class="font-semibold">{k}:</span> {v}
+        </div>
+      </div>
+    </div>
+    """
+  end
+
+  defp diff_entry(%{entry: %{status: :removed_nested, key: key, value: value}} = assigns) do
+    flat = DeltaDiff.flatten_map(value)
+    assigns = assign(assigns, :key, key) |> assign(:flat, flat)
+
+    ~H"""
+    <div class="py-0.5 text-red-600 line-through">
+      <span class="font-semibold">- {@key}:</span>
+      <div class="ml-4 pl-2 border-l border-red-300">
+        <div :for={{k, v} <- @flat} class="py-0.5">
+          <span class="font-semibold">{k}:</span> {v}
+        </div>
+      </div>
+    </div>
+    """
   end
 
   @impl true
@@ -136,7 +179,7 @@ defmodule FullCircleWeb.LogLive.Component do
                   </p>
                 </div>
                 <div class="md:col-span-2 bg-pink-50 p-3 rounded font-mono text-xs overflow-auto">
-                  {log.diff_content |> format_diff_to_html() |> Phoenix.HTML.raw()}
+                  <.diff_tree entries={log.diff_entries} />
                 </div>
               </div>
             <% end %>

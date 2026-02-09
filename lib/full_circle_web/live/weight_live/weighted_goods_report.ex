@@ -147,10 +147,11 @@ defmodule FullCircleWeb.WeighingLive.GoodsReport do
               gettext("Year"),
               gettext("Goods"),
               gettext("Amount"),
-              gettext("Unit")
+              gettext("Unit"),
+              gettext("Note")
             ],
             "font-medium flex flex-row text-center tracking-tighter mb-1",
-            ["20%", "20%", "20%", "20%", "20%"],
+            ["15%", "20%", "15%", "20%", "15%", "15%"],
             "border rounded bg-gray-200 border-gray-400 px-2 py-1",
             assigns
           )}
@@ -161,12 +162,13 @@ defmodule FullCircleWeb.WeighingLive.GoodsReport do
               :year,
               :good_name,
               :total,
-              :unit
+              :unit,
+              :note
             ],
             @result.result,
-            [nil, nil, nil, fn n -> Number.Delimit.number_to_delimited(n, precision: 0) end, nil],
+            [nil, nil, nil, fn n -> Number.Delimit.number_to_delimited(n, precision: 0) end, nil, nil],
             "flex flex-row text-center tracking-tighter max-h-20",
-            ["20%", "20%", "20%", "20%", "20%"],
+            ["15%", "20%", "15%", "20%", "15%", "15%"],
             "border rounded bg-blue-200 border-blue-400 px-2 py-1",
             assigns
           )}

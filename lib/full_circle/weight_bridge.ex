@@ -31,13 +31,15 @@ defmodule FullCircle.WeightBridge do
         total: sum(wei.gross - wei.tare),
         month: fragment("extract(month from ?)::integer", wei.note_date),
         year: fragment("extract(year from ?)::integer", wei.note_date),
-        unit: wei.unit
+        unit: wei.unit,
+        note: wei.note
       },
       group_by: [
         wei.good_name,
         fragment("extract(month from ?)", wei.note_date),
         fragment("extract(year from ?)", wei.note_date),
-        wei.unit
+        wei.unit,
+        wei.note
       ],
       order_by: [4, 3, 1]
     )
