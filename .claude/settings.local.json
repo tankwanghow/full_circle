@@ -1,0 +1,35 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "WebSearch",
+      "WebFetch(domain:hexdocs.pm)",
+      "WebFetch(domain:www.phoenixframework.org)",
+      "WebFetch(domain:hex.pm)",
+      "WebFetch(domain:dev.to)",
+      "WebFetch(domain:elixirforum.com)",
+      "WebFetch(domain:www.phoenixdiff.org)",
+      "Bash(elixir:*)",
+      "Bash(erl:*)",
+      "Bash(mise ls:*)",
+      "WebFetch(domain:hub.docker.com)",
+      "Bash(curl:*)",
+      "Bash(python3:*)",
+      "Bash(mise current:*)",
+      "Bash(mise exec:*)",
+      "Bash(PGPASSWORD=nyhlisted psql:*)",
+      "Bash(done)",
+      "Bash(wc:*)",
+      "Bash(git -C /home/tankwanghow/Projects/elixir/full_circle add lib/full_circle/bill_pay.ex lib/full_circle/cheque.ex lib/full_circle/debcre.ex lib/full_circle/receive_fund.ex lib/full_circle/receive_funds/receipt.ex lib/full_circle_web/components/core_components.ex lib/full_circle_web/live/credit_note_live/detail_component.ex lib/full_circle_web/live/credit_note_live/form.ex lib/full_circle_web/live/debit_note_live/form.ex lib/full_circle_web/live/payment_live/form.ex lib/full_circle_web/live/receipt_live/form.ex lib/full_circle_web/live/receipt_live/matcher_component.ex test/full_circle/bill_pay_test.exs test/full_circle/cheque_test.exs test/full_circle/debcre_test.exs test/full_circle/receive_fund_test.exs test/support/fixtures/bill_pay_fixtures.ex test/support/fixtures/cheque_fixtures.ex test/support/fixtures/debcre_fixtures.ex test/support/fixtures/receive_fund_fixtures.ex)",
+      "Bash(mix test:*)",
+      "Bash(mix deps:*)",
+      "Bash(mix hex.info:*)",
+      "Bash(mix deps.get:*)",
+      "Bash(ls:*)",
+      "Bash(grep:*)"
+    ]
+  }
+}
