@@ -48,7 +48,7 @@ defmodule FullCircleWeb.ActiveCompanyTest do
                result = live(conn, ~p"/companies/#{comp1.id}/dashboard")
 
       {:ok, conn} = follow_redirect(result, conn)
-      assert conn.resp_body =~ "Not Authorise."
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "Not Authorise."
     end
   end
 end

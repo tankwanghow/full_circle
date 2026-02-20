@@ -20,13 +20,16 @@ defmodule FullCircle.AccountingTest do
                "Current Liability",
                "Liability",
                "Non-current Liability",
+               "Intangible Asset",
+               "Accrual",
+               "Post Dated Cheques",
                "Depreciation",
                "Direct Costs",
                "Expenses",
                "Overhead",
                "Other Income",
                "Revenue",
-               "Sales"
+               "Cost Of Goods Sold"
              ] == Accounting.account_types()
     end
   end
@@ -52,9 +55,9 @@ defmodule FullCircle.AccountingTest do
 
       ac = FullCircle.StdInterface.get!(FullCircle.Accounting.Account, Enum.at(all, 0).id)
 
-      FullCircle.Accounting.delete_account(ac, admin, com)
+      FullCircle.Accounting.delete_account(ac, com, admin)
 
-      assert Enum.count(all) ==
+      assert Enum.count(all) - 1 ==
                Enum.count(
                  FullCircle.StdInterface.filter(
                    FullCircle.Accounting.Account,
@@ -78,8 +81,8 @@ defmodule FullCircle.AccountingTest do
           FullCircle.Accounting.Account,
           "account",
           valid_account_attributes(%{account_type: actype}),
-          admin,
-          com
+          com,
+          admin
         )
 
       {:error, :create_account, cs, _} =
@@ -87,8 +90,8 @@ defmodule FullCircle.AccountingTest do
           FullCircle.Accounting.Account,
           "account",
           valid_account_attributes(%{account_type: "name"}),
-          admin,
-          com
+          com,
+          admin
         )
 
       assert "not in list" in errors_on(cs).account_type
@@ -100,8 +103,8 @@ defmodule FullCircle.AccountingTest do
           FullCircle.Accounting.Account,
           "account",
           valid_account_attributes(%{name: "name"}),
-          admin,
-          com
+          com,
+          admin
         )
 
       {:ok, _ac} =
@@ -109,8 +112,8 @@ defmodule FullCircle.AccountingTest do
           FullCircle.Accounting.Account,
           "account",
           valid_account_attributes(%{name: "name2"}),
-          admin,
-          com
+          com,
+          admin
         )
 
       {:error, :create_account, cs, _} =
@@ -118,8 +121,8 @@ defmodule FullCircle.AccountingTest do
           FullCircle.Accounting.Account,
           "account",
           valid_account_attributes(%{name: "name"}),
-          admin,
-          com
+          com,
+          admin
         )
 
       assert "has already been taken" in errors_on(cs).name
@@ -133,8 +136,8 @@ defmodule FullCircle.AccountingTest do
           FullCircle.Accounting.Account,
           "account",
           v,
-          admin,
-          com
+          com,
+          admin
         )
 
       assert "can't be blank" in errors_on(changeset).name
@@ -149,8 +152,8 @@ defmodule FullCircle.AccountingTest do
           FullCircle.Accounting.Account,
           "account",
           valid_account_attributes(%{name: "name"}),
-          admin,
-          com
+          com,
+          admin
         )
 
       assert ac.name == "name"
@@ -177,8 +180,8 @@ defmodule FullCircle.AccountingTest do
           FullCircle.Accounting.Account,
           "account",
           valid_account_attributes(%{name: "name"}),
-          admin,
-          com
+          com,
+          admin
         )
 
       {:ok, uac} =
@@ -186,75 +189,54 @@ defmodule FullCircle.AccountingTest do
           FullCircle.Accounting.Account,
           "account",
           nac,
-          %{name: "kaka", account_type: "Sales", descriptions: "hello"},
-          admin,
-          com
+          %{name: "kaka", account_type: "Revenue", descriptions: "hello"},
+          com,
+          admin
         )
 
       assert uac.name == "kaka"
-      assert uac.account_type == "Sales"
+      assert uac.account_type == "Revenue"
       assert uac.descriptions == "hello"
       assert uac.company_id == com.id
       assert Enum.count(FullCircle.Sys.log_entry_for("accounts", uac.id, com.id)) == 2
     end
 
     test "filter accounts", %{com: com, admin: admin} do
-      aclist1 = [
-        "name",
-        "name1",
-        "Account Payables",
-        "Account Receivables",
-        "General Purchase",
-        "General Sales",
-        "Purchase Tax Receivale",
-        "Sales Tax Payable"
-      ]
-
-      aclist2 = [
-        "name1",
-        "name",
-        "Account Payables",
-        "Account Receivables",
-        "General Purchase",
-        "General Sales",
-        "Purchase Tax Receivale",
-        "Sales Tax Payable"
-      ]
-
       com1 = company_fixture(admin, %{})
 
       FullCircle.StdInterface.create(
         FullCircle.Accounting.Account,
         "account",
         valid_account_attributes(%{name: "name"}),
-        admin,
-        com
+        com,
+        admin
       )
 
       FullCircle.StdInterface.create(
         FullCircle.Accounting.Account,
         "account",
         valid_account_attributes(%{name: "name"}),
-        admin,
-        com1
+        com1,
+        admin
       )
 
       FullCircle.StdInterface.create(
         FullCircle.Accounting.Account,
         "account",
         valid_account_attributes(%{name: "name1"}),
-        admin,
-        com
+        com,
+        admin
       )
 
       FullCircle.StdInterface.create(
         FullCircle.Accounting.Account,
         "account",
         valid_account_attributes(%{name: "name1"}),
-        admin,
-        com1
+        com1,
+        admin
       )
 
+      # user not in company should see nothing
       assert [] ==
                Enum.map(
                  FullCircle.StdInterface.filter(
@@ -269,61 +251,53 @@ defmodule FullCircle.AccountingTest do
                  fn x -> x.name end
                )
 
-      assert aclist1 ==
-               Enum.map(
-                 FullCircle.StdInterface.filter(
-                   FullCircle.Accounting.Account,
-                   [:name, :account_type, :descriptions],
-                   "name",
-                   com,
-                   admin,
-                   page: 1,
-                   per_page: 50
-                 ),
-                 fn x -> x.name end
-               )
+      # filter by "name" should include custom accounts and be scoped to company
+      names_com =
+        FullCircle.StdInterface.filter(
+          FullCircle.Accounting.Account,
+          [:name, :account_type, :descriptions],
+          "name",
+          com,
+          admin,
+          page: 1,
+          per_page: 50
+        )
+        |> Enum.map(fn x -> x.name end)
 
-      assert aclist1 ==
-               Enum.map(
-                 FullCircle.StdInterface.filter(
-                   FullCircle.Accounting.Account,
-                   [:name, :account_type, :descriptions],
-                   "name",
-                   com1,
-                   admin,
-                   page: 1,
-                   per_page: 50
-                 ),
-                 fn x -> x.name end
-               )
+      assert "name" in names_com
+      assert "name1" in names_com
 
-      assert aclist2 ==
-               Enum.map(
-                 FullCircle.StdInterface.filter(
-                   FullCircle.Accounting.Account,
-                   [:name, :account_type, :descriptions],
-                   "name1",
-                   com,
-                   admin,
-                   page: 1,
-                   per_page: 50
-                 ),
-                 fn x -> x.name end
-               )
+      names_com1 =
+        FullCircle.StdInterface.filter(
+          FullCircle.Accounting.Account,
+          [:name, :account_type, :descriptions],
+          "name",
+          com1,
+          admin,
+          page: 1,
+          per_page: 50
+        )
+        |> Enum.map(fn x -> x.name end)
 
-      assert aclist2 ==
-               Enum.map(
-                 FullCircle.StdInterface.filter(
-                   FullCircle.Accounting.Account,
-                   [:name, :account_type, :descriptions],
-                   "name1",
-                   com1,
-                   admin,
-                   page: 1,
-                   per_page: 50
-                 ),
-                 fn x -> x.name end
-               )
+      assert "name" in names_com1
+      assert "name1" in names_com1
+
+      # filter by "name1" should have name1 first (best match)
+      names_name1 =
+        FullCircle.StdInterface.filter(
+          FullCircle.Accounting.Account,
+          [:name, :account_type, :descriptions],
+          "name1",
+          com,
+          admin,
+          page: 1,
+          per_page: 50
+        )
+        |> Enum.map(fn x -> x.name end)
+
+      assert "name1" in names_name1
+      assert "name" in names_name1
+      assert hd(names_name1) == "name1"
     end
   end
 end

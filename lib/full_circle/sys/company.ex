@@ -62,6 +62,11 @@ defmodule FullCircle.Sys.Company do
       less_than: 32,
       message: gettext("must between 1 to 31")
     )
+    |> validate_number(:closing_month,
+      greater_than: 0,
+      less_than: 13,
+      message: gettext("must between 1 to 12")
+    )
     |> validate_length(:descriptions, max: 230)
     |> validate_length(:name, max: 230)
     |> validate_inclusion(:country, FullCircle.Sys.countries(), message: gettext("not in list"))

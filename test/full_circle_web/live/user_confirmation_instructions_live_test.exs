@@ -8,7 +8,7 @@ defmodule FullCircleWeb.UserConfirmationInstructionsLiveTest do
   alias FullCircle.Repo
 
   setup do
-    %{user: user_fixture()}
+    %{user: user_fixture(confirm: false)}
   end
 
   describe "Resend confirmation" do

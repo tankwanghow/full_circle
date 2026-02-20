@@ -163,7 +163,7 @@ defmodule FullCircleWeb.AccountLive.Form do
       <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <.form
         for={@form}
-        id="account-form"
+        id="account"
         autocomplete="off"
         phx-change="validate"
         phx-submit="save"

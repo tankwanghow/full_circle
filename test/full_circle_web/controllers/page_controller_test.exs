@@ -14,8 +14,7 @@ defmodule FullCircleWeb.PageControllerTest do
       |> log_in_user(user_fixture())
       |> get(~p"/")
 
-    assert html_response(conn, 200) =~ "Dashboard"
-    assert html_response(conn, 200) =~ "Farms"
+    assert html_response(conn, 200) =~ "Companies"
     assert html_response(conn, 200) =~ "Log out"
   end
 end

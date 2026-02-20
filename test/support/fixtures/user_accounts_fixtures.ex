@@ -15,12 +15,20 @@ defmodule FullCircle.UserAccountsFixtures do
   end
 
   def user_fixture(attrs \\ %{}) do
+    {confirm, attrs} = Map.pop(Map.new(attrs), :confirm, true)
+
     {:ok, user} =
       attrs
       |> valid_user_attributes()
       |> FullCircle.UserAccounts.register_user()
 
-    user
+    if confirm do
+      user
+      |> Ecto.Changeset.change(%{confirmed_at: ~N[2020-01-01 00:00:00]})
+      |> FullCircle.Repo.update!()
+    else
+      user
+    end
   end
 
   def extract_user_token(fun) do

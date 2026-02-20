@@ -17,7 +17,7 @@ defmodule FullCircle.Sys.CompanyUser do
     company_user
     |> cast(attrs, [:role, :default_company, :company_id, :user_id])
     |> unique_constraint(:email,
-      name: :company_user_unique_user_in_company,
+      name: :company_user_unique_company_in_user,
       message: gettext("already in company")
     )
     |> validate_required([:role, :company_id, :user_id])

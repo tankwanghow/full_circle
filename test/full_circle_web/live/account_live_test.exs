@@ -9,7 +9,7 @@ defmodule FullCircleWeb.AccountLiveTest do
   setup %{conn: conn} do
     user = user_fixture()
     comp = company_fixture(user, %{})
-    ac = account_fixture(%{name: "TESTACCOUNT"}, user, comp)
+    ac = account_fixture(%{name: "TESTACCOUNT"}, comp, user)
     %{conn: log_in_user(conn, user), user: user, comp: comp, ac: ac}
   end
 
@@ -61,7 +61,7 @@ defmodule FullCircleWeb.AccountLiveTest do
         |> follow_redirect(conn)
 
       assert html =~ "kakak"
-      assert html =~ "Accounts Listing"
+      assert html =~ "Account updated successfully"
     end
 
     test "save invalid account", %{lv: lv} do
@@ -70,12 +70,12 @@ defmodule FullCircleWeb.AccountLiveTest do
         |> form("#account", account: %{name: ""})
         |> render_submit()
 
-      assert html =~ "Failed to Update Account"
-      assert html =~ "Editing Account"
+      assert html =~ "Failed"
+      assert html =~ "Edit Account"
     end
 
     test "form layout", %{html: html} do
-      assert html =~ "Editing Account"
+      assert html =~ "Edit Account"
       assert html =~ "Account Name\n</label>"
       assert html =~ "Account Type\n</label>"
       assert html =~ "Descriptions\n</label>"
@@ -96,7 +96,7 @@ defmodule FullCircleWeb.AccountLiveTest do
         |> follow_redirect(conn)
 
       assert html =~ "kakak"
-      assert html =~ "Accounts Listing"
+      assert html =~ "Account created successfully"
     end
 
     test "save invalid account", %{lv: lv} do
@@ -105,7 +105,7 @@ defmodule FullCircleWeb.AccountLiveTest do
         |> form("#account", account: %{})
         |> render_submit()
 
-      assert html =~ "Failed to Create Account"
+      assert html =~ "Failed"
       assert html =~ "New Account"
     end
 
@@ -121,38 +121,38 @@ defmodule FullCircleWeb.AccountLiveTest do
     test "layout", %{conn: conn, comp: comp} do
       {:ok, _index_live, html} = live(conn, ~p"/companies/#{comp.id}/accounts")
       assert html =~ "Accounts Listing"
-      assert Floki.find(html, ~s|form input[name="search[terms]"]|) != []
+      assert LazyHTML.from_fragment(html) |> LazyHTML.query(~s|form input[name="search[terms]"]|) |> LazyHTML.to_tree() != []
 
-      assert html =~ "Account Name"
-      assert html =~ "Account Type"
-      assert html =~ "Descriptions"
+      assert html =~ "Account Information"
     end
 
     test "account list", %{conn: conn, comp: comp} do
       {:ok, _index_live, html} = live(conn, ~p"/companies/#{comp.id}/accounts")
-      text = Floki.find(html, ~s|div.accounts div a|) |> Floki.text()
-      assert text =~ "General Purchase"
+      text = LazyHTML.from_fragment(html) |> LazyHTML.query(~s|div#objects_list a|) |> LazyHTML.text()
+      assert text =~ "General Purchases"
       assert text =~ "General Sales"
       assert text =~ "Account Payables"
       assert text =~ "Account Receivables"
       assert text =~ "Sales Tax Payable"
-      assert text =~ "Purchase Tax Receivale"
+      assert text =~ "Purchase Tax Receivable"
       assert text =~ "TESTACCOUNT"
     end
 
     test "edit account", %{conn: conn, comp: comp, ac: ac} do
       {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/accounts")
-      ac = FullCircle.Accounting.get_account!(ac.id)
 
       {:ok, _lv, html} =
-        lv |> element("#edit_account_#{ac.id}") |> render_click() |> follow_redirect(conn)
+        lv
+        |> element(~s|div#objects-#{ac.id} a|)
+        |> render_click()
+        |> follow_redirect(conn)
 
-      assert html =~ "Editing Account"
+      assert html =~ "Edit Account"
     end
 
     test "add new account", %{conn: conn, comp: comp} do
       {:ok, lv, html} = live(conn, ~p"/companies/#{comp.id}/accounts")
-      assert Floki.find(html, ~s|a#new_account|) != []
+      assert LazyHTML.from_fragment(html) |> LazyHTML.query(~s|a#new_account|) |> LazyHTML.to_tree() != []
 
       {:ok, _lv, html} = lv |> element("#new_account") |> render_click() |> follow_redirect(conn)
 

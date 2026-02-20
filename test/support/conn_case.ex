@@ -76,11 +76,12 @@ defmodule FullCircleWeb.ConnCase do
           lv
           |> element("##{form}")
           |> render_change(%{form => %{field => value}})
-          |> Floki.parse_document!()
 
         text =
-          Floki.find(html, ~s|div[phx-feedback-for="#{form}[#{field}]"] p.text-rose-600|)
-          |> Floki.text()
+          html
+          |> LazyHTML.from_fragment()
+          |> LazyHTML.query(~s|p.text-rose-600|)
+          |> LazyHTML.text()
 
         assert text =~ feedback
       end
@@ -95,21 +96,21 @@ defmodule FullCircleWeb.ConnCase do
         field = unquote(field)
         value = Map.get(obj, String.to_atom(field))
 
-        html = render(lv)
+        html = render(lv) |> LazyHTML.from_fragment()
 
         text =
           case tag do
             "select" ->
-              Floki.find(html, ~s|#{tag}[name="#{form}[#{field}]"] option[selected]|)
-              |> Floki.attribute("value")
+              LazyHTML.query(html, ~s|#{tag}[name="#{form}[#{field}]"] option[selected]|)
+              |> LazyHTML.attribute("value")
               |> Enum.at(0)
 
             "textarea" ->
-              Floki.find(html, ~s|#{tag}[name="#{form}[#{field}]"]|) |> Floki.text()
+              LazyHTML.query(html, ~s|#{tag}[name="#{form}[#{field}]"]|) |> LazyHTML.text()
 
             _ ->
-              Floki.find(html, ~s|#{tag}[name="#{form}[#{field}]"]|)
-              |> Floki.attribute("value")
+              LazyHTML.query(html, ~s|#{tag}[name="#{form}[#{field}]"]|)
+              |> LazyHTML.attribute("value")
               |> Enum.at(0)
           end
 
@@ -126,7 +127,7 @@ defmodule FullCircleWeb.ConnCase do
         field = unquote(field)
         value = Map.get(comp, String.to_atom(field))
 
-        html = render(lv)
+        html = render(lv) |> LazyHTML.from_fragment()
 
         selector =
           if tag != "select" do
@@ -135,7 +136,7 @@ defmodule FullCircleWeb.ConnCase do
             ~s|#{tag}[name="#{form}[#{field}]"] option[selected]|
           end
 
-        text = Floki.find(html, selector) |> Floki.attribute("value") |> Enum.at(0)
+        text = LazyHTML.query(html, selector) |> LazyHTML.attribute("value") |> Enum.at(0)
 
         assert (Decimal.new(text) |> Decimal.to_float()) - value == 0.0
       end

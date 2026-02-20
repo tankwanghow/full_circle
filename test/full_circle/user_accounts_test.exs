@@ -38,7 +38,7 @@ defmodule FullCircle.UserAccountsTest do
   describe "get_user!/1" do
     test "raises if id is invalid" do
       assert_raise Ecto.NoResultsError, fn ->
-        UserAccounts.get_user!(-1)
+        UserAccounts.get_user!("00000000-0000-0000-0000-000000000000")
       end
     end
 
@@ -371,7 +371,7 @@ defmodule FullCircle.UserAccountsTest do
 
   describe "deliver_user_confirmation_instructions/2" do
     setup do
-      %{user: user_fixture()}
+      %{user: user_fixture(confirm: false)}
     end
 
     test "sends token through notification", %{user: user} do
@@ -390,7 +390,7 @@ defmodule FullCircle.UserAccountsTest do
 
   describe "confirm_user/1" do
     setup do
-      user = user_fixture()
+      user = user_fixture(confirm: false)
 
       token =
         extract_user_token(fn url ->

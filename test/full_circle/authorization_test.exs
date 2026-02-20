@@ -12,19 +12,19 @@ defmodule FullCircle.AuthorizationTest do
   end
 
   test_authorise_to(:see_user_list, ["admin"])
-  test_authorise_to(:invite_user, ["admin"])
+  test_authorise_to(:invite_company, ["admin"])
   test_authorise_to(:add_user_to_company, ["admin"])
   test_authorise_to(:delete_company, ["admin"])
   test_authorise_to(:update_company, ["admin"])
   test_authorise_to(:reset_user_password, ["admin"])
 
-  test_not_authorise_to(:create_account, ["disable", "guest", "auditor", "cashier", "clerk"])
-  test_not_authorise_to(:update_account, ["disable", "guest", "auditor", "cashier", "clerk"])
-  test_not_authorise_to(:delete_account, ["disable", "guest", "auditor", "cashier", "clerk"])
+  test_not_authorise_to(:create_account, ["disable", "guest", "auditor", "cashier", "clerk", "punch_camera"])
+  test_not_authorise_to(:update_account, ["disable", "guest", "auditor", "cashier", "clerk", "punch_camera"])
+  test_not_authorise_to(:delete_account, ["disable", "guest", "auditor", "cashier", "clerk", "punch_camera"])
 
   describe "authorization" do
     test "should have roles" do
-      assert Enum.count(Authorization.roles()) == 8
+      assert Enum.count(Authorization.roles()) == 9
       assert Enum.any?(Authorization.roles(), fn x -> x == "guest" end)
       assert Enum.any?(Authorization.roles(), fn x -> x == "admin" end)
       assert Enum.any?(Authorization.roles(), fn x -> x == "clerk" end)

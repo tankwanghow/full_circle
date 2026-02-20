@@ -26,15 +26,15 @@ defmodule FullCircleWeb.CompanyLiveTest do
     #   {:ok, _lv, html} =
     #     lv |> element("#delete-company-modal-confirm") |> render_click() |> follow_redirect(conn)
 
-    #   assert Floki.find(html, "div#company-#{comp.id}") == []
-    #   assert Floki.find(html, "div#company-#{comp1.id}") != []
-    #   assert Floki.find(html, "div#company-#{comp2.id}") != []
+    #   assert LazyHTML.from_fragment(html) |> LazyHTML.query("div#company-#{comp.id}") |> LazyHTML.to_tree() == []
+    #   assert LazyHTML.from_fragment(html) |> LazyHTML.query("div#company-#{comp1.id}") |> LazyHTML.to_tree() != []
+    #   assert LazyHTML.from_fragment(html) |> LazyHTML.query("div#company-#{comp2.id}") |> LazyHTML.to_tree() != []
     # end
 
     # test "active company", %{conn: conn, comp1: comp1} do
     #   conn = conn |> put_session(:current_company, comp1)
     #   {:ok, lv, html} = live(conn, ~p"/edit_company/#{comp1.id}")
-    #   assert Floki.find(html, "#active-company") |> Floki.text() =~ comp1.name
+    #   assert LazyHTML.from_fragment(html) |> LazyHTML.query("#active-company") |> LazyHTML.text() =~ comp1.name
 
     #   {:ok, conn} =
     #     lv |> element("#delete-company-modal-confirm") |> render_click() |> follow_redirect(conn)
@@ -61,14 +61,16 @@ defmodule FullCircleWeb.CompanyLiveTest do
     test "mark active company", %{conn: conn, comp: comp, comp1: comp1, comp2: comp2} do
       conn = conn |> put_session(:current_company, comp)
       {:ok, _lv, html} = live(conn, ~p"/companies")
-      assert Floki.find(html, ~s|div#company-#{comp.id}} a.set-active|) == []
-      assert Floki.find(html, ~s|div#company-#{comp1.id}} a.set-active|) != []
-      assert Floki.find(html, ~s|div#company-#{comp2.id}} a.set-active|) != []
+      parsed = LazyHTML.from_fragment(html)
+      assert LazyHTML.query(parsed, ~s|div#company-#{comp.id} a.set-active|) |> LazyHTML.to_tree() == []
+      assert LazyHTML.query(parsed, ~s|div#company-#{comp1.id} a.set-active|) |> LazyHTML.to_tree() != []
+      assert LazyHTML.query(parsed, ~s|div#company-#{comp2.id} a.set-active|) |> LazyHTML.to_tree() != []
       conn = conn |> put_session(:current_company, comp1)
       {:ok, _lv, html} = live(conn, ~p"/companies")
-      assert Floki.find(html, ~s|div#company-#{comp.id}} a.set-active|) != []
-      assert Floki.find(html, ~s|div#company-#{comp1.id}} a.set-active|) == []
-      assert Floki.find(html, ~s|div#company-#{comp2.id}} a.set-active|) != []
+      parsed = LazyHTML.from_fragment(html)
+      assert LazyHTML.query(parsed, ~s|div#company-#{comp.id} a.set-active|) |> LazyHTML.to_tree() != []
+      assert LazyHTML.query(parsed, ~s|div#company-#{comp1.id} a.set-active|) |> LazyHTML.to_tree() == []
+      assert LazyHTML.query(parsed, ~s|div#company-#{comp2.id} a.set-active|) |> LazyHTML.to_tree() != []
     end
 
     test "click active company", %{conn: conn, comp1: comp1, comp2: comp2} do
@@ -76,20 +78,20 @@ defmodule FullCircleWeb.CompanyLiveTest do
 
       {:ok, _lv, html} =
         lv
-        |> element(~s|div#company-#{comp2.id}} a.set-active|)
+        |> element(~s|div#company-#{comp2.id} a.set-active|)
         |> render_click()
         |> follow_redirect(conn)
 
-      assert Floki.find(html, "#active-company") |> Floki.text() =~ comp2.name
+      assert LazyHTML.from_fragment(html) |> LazyHTML.query("#active-company") |> LazyHTML.text() =~ comp2.name
       {:ok, lv, _html} = live(conn, ~p"/companies")
 
       {:ok, _lv, html} =
         lv
-        |> element(~s|div#company-#{comp1.id}} a.set-active|)
+        |> element(~s|div#company-#{comp1.id} a.set-active|)
         |> render_click()
         |> follow_redirect(conn)
 
-      assert Floki.find(html, "#active-company") |> Floki.text() =~ comp1.name
+      assert LazyHTML.from_fragment(html) |> LazyHTML.query("#active-company") |> LazyHTML.text() =~ comp1.name
     end
 
     test "mark default company", %{conn: conn, comp1: comp1, comp2: comp2} do
@@ -97,19 +99,21 @@ defmodule FullCircleWeb.CompanyLiveTest do
 
       html =
         lv
-        |> element(~s|div#company-#{comp2.id}} a.set-default|)
+        |> element(~s|div#company-#{comp2.id} a.set-default|)
         |> render_click()
 
-      assert Floki.find(html, ~s|div#company-#{comp2.id}} a.set-default|) == []
-      assert Floki.find(html, ~s|div#company-#{comp1.id}} a.set-default|) != []
+      parsed = LazyHTML.from_fragment(html)
+      assert LazyHTML.query(parsed, ~s|div#company-#{comp2.id} a.set-default|) |> LazyHTML.to_tree() == []
+      assert LazyHTML.query(parsed, ~s|div#company-#{comp1.id} a.set-default|) |> LazyHTML.to_tree() != []
 
       html =
         lv
-        |> element(~s|div#company-#{comp1.id}} a.set-default|)
+        |> element(~s|div#company-#{comp1.id} a.set-default|)
         |> render_click()
 
-      assert Floki.find(html, ~s|div#company-#{comp1.id}} a.set-default|) == []
-      assert Floki.find(html, ~s|div#company-#{comp2.id}} a.set-default|) != []
+      parsed = LazyHTML.from_fragment(html)
+      assert LazyHTML.query(parsed, ~s|div#company-#{comp1.id} a.set-default|) |> LazyHTML.to_tree() == []
+      assert LazyHTML.query(parsed, ~s|div#company-#{comp2.id} a.set-default|) |> LazyHTML.to_tree() != []
     end
   end
 
@@ -184,7 +188,7 @@ defmodule FullCircleWeb.CompanyLiveTest do
     test "save active valid company", %{conn: conn, comp: comp} do
       conn = conn |> put_session(:current_company, comp)
       {:ok, lv, html} = live(conn, ~p"/edit_company/#{comp.id}")
-      assert html |> Floki.find("#active-company") |> Floki.text() =~ comp.name
+      assert LazyHTML.from_fragment(html) |> LazyHTML.query("#active-company") |> LazyHTML.text() =~ comp.name
 
       form =
         lv
@@ -232,9 +236,19 @@ defmodule FullCircleWeb.CompanyLiveTest do
     end
 
     test "save valid company", %{conn: conn, lv: lv} do
+      attrs = valid_company_attributes(%{name: "kakak"})
+
+      # First trigger closing_month change to populate closing_days options
+      lv
+      |> element("#company")
+      |> render_change(%{
+        "_target" => ["company", "closing_month"],
+        "company" => %{"closing_month" => "#{attrs.closing_month}"}
+      })
+
       {:ok, _, html} =
         lv
-        |> form("#company", company: valid_company_attributes(%{name: "kakak"}))
+        |> form("#company", company: attrs)
         |> render_submit()
         |> follow_redirect(conn)
 

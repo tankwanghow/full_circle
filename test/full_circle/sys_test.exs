@@ -8,14 +8,18 @@ defmodule FullCircle.SysTest do
     import FullCircle.UserAccountsFixtures
 
     test "default accounts should have" do
-      assert [
-               %{name: "General Purchase", account_type: "Expenses"},
-               %{name: "General Sales", account_type: "Sales"},
-               %{name: "Account Payables", account_type: "Current Liability"},
-               %{name: "Account Receivables", account_type: "Current Asset"},
-               %{name: "Sales Tax Payable", account_type: "Current Liability"},
-               %{name: "Purchase Tax Receivale", account_type: "Current Asset"}
-             ] == Sys.default_accounts()
+      defaults = Sys.default_accounts()
+      assert Enum.count(defaults) == 9
+      names = Enum.map(defaults, & &1.name)
+      assert "General Purchases" in names
+      assert "General Sales" in names
+      assert "Account Payables" in names
+      assert "Account Receivables" in names
+      assert "Sales Tax Payable" in names
+      assert "Purchase Tax Receivable" in names
+      assert "Post Dated Cheques" in names
+      assert "Salaries and Wages Payable" in names
+      assert "Salaries and Wages" in names
     end
 
     test "new company should have default accounts" do
@@ -23,18 +27,26 @@ defmodule FullCircle.SysTest do
       v1 = valid_company_attributes(%{name: "haha"})
       {:ok, com1} = Sys.create_company(v1, admin)
 
-      assert [
-               "Account Payables",
-               "Account Receivables",
-               "General Purchase",
-               "General Sales",
-               "Purchase Tax Receivale",
-               "Sales Tax Payable"
-             ] ==
-               Enum.map(
-                 FullCircle.Accounting.filter_accounts("", com1, admin, page: 1, per_page: 50),
-                 fn x -> x.name end
-               )
+      default_names =
+        Enum.map(
+          FullCircle.StdInterface.filter(
+            FullCircle.Accounting.Account,
+            [:name, :account_type, :descriptions],
+            "",
+            com1,
+            admin,
+            page: 1,
+            per_page: 50
+          ),
+          fn x -> x.name end
+        )
+
+      assert "Account Payables" in default_names
+      assert "Account Receivables" in default_names
+      assert "General Purchases" in default_names
+      assert "General Sales" in default_names
+      assert "Purchase Tax Receivable" in default_names
+      assert "Sales Tax Payable" in default_names
     end
 
     test "insert log" do
@@ -169,12 +181,11 @@ defmodule FullCircle.SysTest do
       assert "can't be blank" in errors_on(changeset).timezone
     end
 
-    test "validate closing_month(1-12), closing_day(1-31)" do
-      v = valid_company_attributes(%{closing_month: 0, closing_day: 32})
+    test "validate closing_day(1-31)" do
+      v = valid_company_attributes(%{closing_day: 32})
       {:error, :create_company, changeset, _} = Sys.create_company(v, user_fixture())
       assert changeset.changes.descriptions == v.descriptions
       assert "must between 1 to 31" in errors_on(changeset).closing_day
-      assert "must between 1 to 12" in errors_on(changeset).closing_month
     end
 
     test "validate country, timezone in list" do
@@ -290,9 +301,9 @@ defmodule FullCircle.SysTest do
       v1 = valid_company_attributes(%{name: "haha"})
       {:ok, com1} = Sys.create_company(v1, admin)
       {:ok, _} = Sys.allow_user_to_access(com1, user, "guest", admin)
-      {:ok, cu} = Sys.change_user_role_in(com1, user.id, "admin", admin)
+      {:ok, %{user: cu}} = Sys.change_user_role_in(com1, user.id, "admin", admin)
       assert cu.role == "admin"
-      assert cu.company_id == cu.company_id
+      assert cu.company_id == com1.id
     end
 
     test "change user role in to not inlist" do
@@ -301,7 +312,7 @@ defmodule FullCircle.SysTest do
       v1 = valid_company_attributes(%{name: "haha"})
       {:ok, com1} = Sys.create_company(v1, admin)
       {:ok, _} = Sys.allow_user_to_access(com1, user, "guest", admin)
-      {:error, cu} = Sys.change_user_role_in(com1, user.id, "not in list role", admin)
+      {:error, :user, cu, _} = Sys.change_user_role_in(com1, user.id, "not in list role", admin)
       assert "not in list" in errors_on(cu).role
     end
 

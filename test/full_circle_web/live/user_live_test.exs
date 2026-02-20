@@ -18,14 +18,17 @@ defmodule FullCircleWeb.UserLiveTest do
   test "admin list users", %{conn: conn, admin: admin, clerk: clerk, manager: manager, comp: comp} do
     {:ok, _lv, html} = live(conn, ~p"/companies/#{comp.id}/users")
 
-    assert Enum.join([admin.email, manager.email, clerk.email], "") ==
-             Floki.find(html, "span.email") |> Floki.text()
+    text = LazyHTML.from_fragment(html) |> LazyHTML.query("div.email") |> LazyHTML.text()
+    assert text =~ admin.email
+    assert text =~ manager.email
+    assert text =~ clerk.email
   end
 
   test "not admin list user", %{conn: conn, clerk: clerk, comp: comp} do
     conn = log_in_user(conn, clerk)
     {:ok, _lv, html} = live(conn, ~p"/companies/#{comp.id}/users")
-    assert clerk.email == Floki.find(html, "span.email") |> Floki.text()
+    text = LazyHTML.from_fragment(html) |> LazyHTML.query("div.email") |> LazyHTML.text()
+    assert text =~ clerk.email
   end
 
   test "change user role", %{conn: conn, clerk: clerk, comp: comp} do
@@ -48,7 +51,9 @@ defmodule FullCircleWeb.UserLiveTest do
       |> element("#reset_user_password_#{clerk.id}")
       |> render_click()
 
-    assert Floki.find(html, "#new_user_password_#{clerk.id}") |> Floki.text() =~
+    assert LazyHTML.from_fragment(html)
+           |> LazyHTML.query("#new_user_password_#{clerk.id}")
+           |> LazyHTML.text() =~
              "Password reset to"
   end
 
@@ -73,9 +78,9 @@ defmodule FullCircleWeb.UserLiveTest do
       assert lv
              |> form("#user", user: %{"email" => "c@c"})
              |> render_submit()
-             |> Floki.parse_document!()
-             |> Floki.find(~s|#add-user-message|)
-             |> Floki.text() =~ "Successfully added"
+             |> LazyHTML.from_fragment()
+             |> LazyHTML.query(~s|#add-user-message|)
+             |> LazyHTML.text() =~ "Successfully added"
     end
 
     test "add new user", %{lv: lv} do
@@ -83,9 +88,9 @@ defmodule FullCircleWeb.UserLiveTest do
         lv
         |> form("#user", user: %{"email" => "z@z"})
         |> render_submit()
-        |> Floki.parse_document!()
-        |> Floki.find(~s|#add-user-message|)
-        |> Floki.text()
+        |> LazyHTML.from_fragment()
+        |> LazyHTML.query(~s|#add-user-message|)
+        |> LazyHTML.text()
 
       assert html =~ "Successfully added"
       assert html =~ "Password"
@@ -96,9 +101,9 @@ defmodule FullCircleWeb.UserLiveTest do
         lv
         |> form("#user", user: %{"email" => "a@a"})
         |> render_submit()
-        |> Floki.parse_document!()
-        |> Floki.find(~s|#add-user-message|)
-        |> Floki.text()
+        |> LazyHTML.from_fragment()
+        |> LazyHTML.query(~s|#add-user-message|)
+        |> LazyHTML.text()
 
       assert html =~ "Failed to add user"
     end

@@ -43,6 +43,7 @@ defmodule FullCircle.MixProject do
       {:phoenix_live_reload, "~> 1.2", only: :dev},
       {:phoenix_live_view, "~> 1.1"},
       {:floki, ">= 0.30.0", only: :test},
+      {:lazy_html, "~> 0.1", only: :test},
       {:esbuild, "~> 0.8", runtime: Mix.env() == :dev},
       {:tailwind, "~> 0.2", runtime: Mix.env() == :dev},
       {:heroicons,

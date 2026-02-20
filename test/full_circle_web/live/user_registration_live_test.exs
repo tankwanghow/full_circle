@@ -25,6 +25,9 @@ defmodule FullCircleWeb.UserRegistrationLiveTest do
     test "renders errors for invalid data", %{conn: conn} do
       {:ok, lv, _html} = live(conn, ~p"/users/register")
 
+      # Click "I am a human" to show the form
+      lv |> element(~s|a[phx-click="human"]|) |> render_click()
+
       result =
         lv
         |> element("#registration_form")
@@ -40,23 +43,23 @@ defmodule FullCircleWeb.UserRegistrationLiveTest do
     test "creates account and logs the user in", %{conn: conn} do
       {:ok, lv, _html} = live(conn, ~p"/users/register")
 
+      # Click "I am a human" to show the form
+      lv |> element(~s|a[phx-click="human"]|) |> render_click()
+
       email = unique_user_email()
       form = form(lv, "#registration_form", user: valid_user_attributes(email: email))
       render_submit(form)
       conn = follow_trigger_action(form, conn)
 
-      assert redirected_to(conn) == ~p"/companies/new"
-
-      # Now do a logged in request and assert on the menu
-      conn = get(conn, "/")
-      response = html_response(conn, 200)
-      assert response =~ email
-      assert response =~ "Settings"
-      assert response =~ "Log out"
+      assert redirected_to(conn) == ~p"/users/log_in"
+      assert Phoenix.Flash.get(conn.assigns.flash, :warn) =~ "Please Confirm your Account"
     end
 
     test "renders errors for duplicated email", %{conn: conn} do
       {:ok, lv, _html} = live(conn, ~p"/users/register")
+
+      # Click "I am a human" to show the form
+      lv |> element(~s|a[phx-click="human"]|) |> render_click()
 
       user = user_fixture(%{email: "test@email.com"})
 
@@ -77,7 +80,7 @@ defmodule FullCircleWeb.UserRegistrationLiveTest do
 
       {:ok, _login_live, login_html} =
         lv
-        |> element(~s|main a:fl-contains("Log in")|)
+        |> element(~s|main a[href="/users/log_in"]|)
         |> render_click()
         |> follow_redirect(conn, ~p"/users/log_in")
 
