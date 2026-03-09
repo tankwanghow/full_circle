@@ -397,7 +397,8 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
             </.link>
           </div>
           <div class="shrink-0 ml-2 mt-1">
-            <% {url, qrcode} = FullCircle.Helpers.e_invoice_validation_url_qrcode(@form.source.data, 1) %>
+            <% {url, qrcode} =
+              FullCircle.Helpers.e_invoice_validation_url_qrcode(@form.source.data, 1) %>
             <.link target="_blank" href={url}>
               {qrcode |> raw}
             </.link>

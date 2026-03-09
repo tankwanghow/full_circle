@@ -78,7 +78,14 @@ defmodule FullCircle.HRTest do
           admin
         )
 
-      %{admin: admin, com: com, employee: employee, salary_type: salary_type, db_ac: db_ac, cr_ac: cr_ac}
+      %{
+        admin: admin,
+        com: com,
+        employee: employee,
+        salary_type: salary_type,
+        db_ac: db_ac,
+        cr_ac: cr_ac
+      }
     end
 
     test "create_salary_note with valid attrs", %{
@@ -288,7 +295,8 @@ defmodule FullCircle.HRTest do
       com = company_fixture(admin, %{})
       employee = employee_fixture(%{}, com, admin)
 
-      funds_ac = account_fixture(%{name: "Cash on Hand", account_type: "Cash or Equivalent"}, com, admin)
+      funds_ac =
+        account_fixture(%{name: "Cash on Hand", account_type: "Cash or Equivalent"}, com, admin)
 
       %{admin: admin, com: com, employee: employee, funds_ac: funds_ac}
     end

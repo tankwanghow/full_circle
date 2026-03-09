@@ -70,8 +70,19 @@ defmodule FullCircle.ReceiveFundFixtures do
     end
   end
 
-  def receipt_attrs_with_funds(contact, good, sales_account, sales_tax_code, funds_account, opts \\ []) do
-    receipt_attrs(contact, good, sales_account, sales_tax_code,
+  def receipt_attrs_with_funds(
+        contact,
+        good,
+        sales_account,
+        sales_tax_code,
+        funds_account,
+        opts \\ []
+      ) do
+    receipt_attrs(
+      contact,
+      good,
+      sales_account,
+      sales_tax_code,
       Keyword.merge(opts,
         funds_amount: Keyword.get(opts, :funds_amount, "50.00"),
         funds_account_name: funds_account.name,
@@ -116,7 +127,12 @@ defmodule FullCircle.ReceiveFundFixtures do
     funds_acct = funds_account_fixture(company, user)
 
     attrs =
-      receipt_attrs_with_funds(contact, good, sales_acct, sales_tc, funds_acct,
+      receipt_attrs_with_funds(
+        contact,
+        good,
+        sales_acct,
+        sales_tc,
+        funds_acct,
         Keyword.merge(opts, tax_rate: tax_rate)
       )
 

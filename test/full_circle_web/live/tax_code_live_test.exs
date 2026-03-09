@@ -36,7 +36,9 @@ defmodule FullCircleWeb.TaxCodeLiveTest do
         |> element("#object-form")
         |> render_change(%{tax_code: %{code: ""}})
 
-      text = html |> LazyHTML.from_fragment() |> LazyHTML.query(~s|p.text-rose-600|) |> LazyHTML.text()
+      text =
+        html |> LazyHTML.from_fragment() |> LazyHTML.query(~s|p.text-rose-600|) |> LazyHTML.text()
+
       assert text =~ "can't be blank"
     end
 
@@ -46,7 +48,9 @@ defmodule FullCircleWeb.TaxCodeLiveTest do
         |> element("#object-form")
         |> render_change(%{tax_code: %{tax_type: ""}})
 
-      text = html |> LazyHTML.from_fragment() |> LazyHTML.query(~s|p.text-rose-600|) |> LazyHTML.text()
+      text =
+        html |> LazyHTML.from_fragment() |> LazyHTML.query(~s|p.text-rose-600|) |> LazyHTML.text()
+
       assert text =~ "can't be blank"
     end
   end
@@ -167,7 +171,10 @@ defmodule FullCircleWeb.TaxCodeLiveTest do
 
     test "tax_code list", %{conn: conn, comp: comp} do
       {:ok, _lv, html} = live(conn, ~p"/companies/#{comp.id}/tax_codes")
-      text = LazyHTML.from_fragment(html) |> LazyHTML.query(~s|div#objects_list|) |> LazyHTML.text()
+
+      text =
+        LazyHTML.from_fragment(html) |> LazyHTML.query(~s|div#objects_list|) |> LazyHTML.text()
+
       assert text =~ "TESTTAX"
     end
 

@@ -1305,7 +1305,8 @@ defmodule FullCircle.HR do
       nwh
     else
       wh
-    end |> Float.round()
+    end
+    |> Float.round()
   end
 
   def ot(wh, nwh) do

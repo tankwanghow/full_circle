@@ -191,7 +191,9 @@ defmodule FullCircle.BillingFixtures do
       end
 
     tax_rate = if opts[:with_tax], do: Decimal.to_string(sales_tc.rate), else: "0"
-    attrs = invoice_attrs(contact, good, sales_acct, sales_tc, Keyword.put(opts, :tax_rate, tax_rate))
+
+    attrs =
+      invoice_attrs(contact, good, sales_acct, sales_tc, Keyword.put(opts, :tax_rate, tax_rate))
 
     {:ok, %{create_invoice: invoice}} =
       FullCircle.Billing.create_invoice(attrs, company, user)
@@ -215,7 +217,9 @@ defmodule FullCircle.BillingFixtures do
       end
 
     tax_rate = if opts[:with_tax], do: Decimal.to_string(pur_tc.rate), else: "0"
-    attrs = pur_invoice_attrs(contact, good, pur_acct, pur_tc, Keyword.put(opts, :tax_rate, tax_rate))
+
+    attrs =
+      pur_invoice_attrs(contact, good, pur_acct, pur_tc, Keyword.put(opts, :tax_rate, tax_rate))
 
     {:ok, %{create_pur_invoice: pur_invoice}} =
       FullCircle.Billing.create_pur_invoice(attrs, company, user)

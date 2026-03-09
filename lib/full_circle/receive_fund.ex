@@ -390,6 +390,7 @@ defmodule FullCircle.ReceiveFund do
           receipt_details: [:account, :tax_code],
           transaction_matchers: :transaction
         ])
+
       now = Timex.now() |> DateTime.truncate(:second)
 
       (build_detail_transactions(receipt, com, now) ++
@@ -517,8 +518,16 @@ defmodule FullCircle.ReceiveFund do
   end
 
   def update_receipt_multi(multi, receipt, attrs, com, user) do
-    update_doc_multi(multi, :update_receipt, Receipt, receipt, receipt.receipt_no,
-      attrs, com, user)
+    update_doc_multi(
+      multi,
+      :update_receipt,
+      Receipt,
+      receipt,
+      receipt.receipt_no,
+      attrs,
+      com,
+      user
+    )
   end
 
   defp update_doc_multi(multi, step_name, schema, doc, doc_no, attrs, com, user) do

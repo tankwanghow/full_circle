@@ -121,14 +121,20 @@ defmodule FullCircleWeb.AccountLiveTest do
     test "layout", %{conn: conn, comp: comp} do
       {:ok, _index_live, html} = live(conn, ~p"/companies/#{comp.id}/accounts")
       assert html =~ "Accounts Listing"
-      assert LazyHTML.from_fragment(html) |> LazyHTML.query(~s|form input[name="search[terms]"]|) |> LazyHTML.to_tree() != []
+
+      assert LazyHTML.from_fragment(html)
+             |> LazyHTML.query(~s|form input[name="search[terms]"]|)
+             |> LazyHTML.to_tree() != []
 
       assert html =~ "Account Information"
     end
 
     test "account list", %{conn: conn, comp: comp} do
       {:ok, _index_live, html} = live(conn, ~p"/companies/#{comp.id}/accounts")
-      text = LazyHTML.from_fragment(html) |> LazyHTML.query(~s|div#objects_list a|) |> LazyHTML.text()
+
+      text =
+        LazyHTML.from_fragment(html) |> LazyHTML.query(~s|div#objects_list a|) |> LazyHTML.text()
+
       assert text =~ "General Purchases"
       assert text =~ "General Sales"
       assert text =~ "Account Payables"
@@ -152,7 +158,10 @@ defmodule FullCircleWeb.AccountLiveTest do
 
     test "add new account", %{conn: conn, comp: comp} do
       {:ok, lv, html} = live(conn, ~p"/companies/#{comp.id}/accounts")
-      assert LazyHTML.from_fragment(html) |> LazyHTML.query(~s|a#new_account|) |> LazyHTML.to_tree() != []
+
+      assert LazyHTML.from_fragment(html)
+             |> LazyHTML.query(~s|a#new_account|)
+             |> LazyHTML.to_tree() != []
 
       {:ok, _lv, html} = lv |> element("#new_account") |> render_click() |> follow_redirect(conn)
 

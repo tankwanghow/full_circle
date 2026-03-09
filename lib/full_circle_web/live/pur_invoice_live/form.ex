@@ -492,6 +492,9 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
             <.input field={@form[:pur_invoice_date]} label={gettext("Invoice Date")} type="date" />
           </div>
           <div class="grow shrink">
+            <.input field={@form[:load_date]} label={gettext("Load Date")} type="date" />
+          </div>
+          <div class="grow shrink">
             <.input field={@form[:due_date]} label={gettext("Due Date")} type="date" />
           </div>
           <div class="w-1/4 grow shrink">
@@ -561,7 +564,8 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
             </.link>
           </div>
           <div class="shrink-0 ml-2 mt-1">
-            <% {url, qrcode} = FullCircle.Helpers.e_invoice_validation_url_qrcode(@form.source.data, 1) %>
+            <% {url, qrcode} =
+              FullCircle.Helpers.e_invoice_validation_url_qrcode(@form.source.data, 1) %>
             <.link target="_blank" href={url}>
               {qrcode |> raw}
             </.link>

@@ -191,6 +191,24 @@ defmodule FullCircle.Authorization do
   def can?(user, :delete_harvest, company),
     do: forbid_roles(~w(auditor guest cashier), company, user)
 
+  def can?(user, :create_egg_stock_day, company),
+    do: forbid_roles(~w(auditor guest), company, user)
+
+  def can?(user, :update_egg_stock_day, company),
+    do: forbid_roles(~w(auditor guest cashier), company, user)
+
+  def can?(user, :delete_egg_stock_day, company),
+    do: forbid_roles(~w(auditor guest cashier), company, user)
+
+  def can?(user, :create_egg_grade, company),
+    do: forbid_roles(~w(auditor guest), company, user)
+
+  def can?(user, :update_egg_grade, company),
+    do: forbid_roles(~w(auditor guest cashier), company, user)
+
+  def can?(user, :delete_egg_grade, company),
+    do: forbid_roles(~w(auditor guest cashier), company, user)
+
   def can?(user, :create_contact, company),
     do: forbid_roles(~w(auditor guest), company, user)
 

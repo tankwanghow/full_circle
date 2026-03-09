@@ -375,6 +375,9 @@ defmodule FullCircleWeb.InvoiceLive.Form do
             <.input field={@form[:invoice_date]} label={gettext("Invoice Date")} type="date" />
           </div>
           <div class="grow shrink">
+            <.input field={@form[:load_date]} label={gettext("Load Date")} type="date" />
+          </div>
+          <div class="grow shrink">
             <.input field={@form[:due_date]} label={gettext("Due Date")} type="date" />
           </div>
           <div class="w-1/4 grow shrink">
@@ -450,7 +453,8 @@ defmodule FullCircleWeb.InvoiceLive.Form do
             </.link>
           </div>
           <div class="shrink-0 ml-2 mt-1">
-            <% {url, qrcode} = FullCircle.Helpers.e_invoice_validation_url_qrcode(@form.source.data, 1) %>
+            <% {url, qrcode} =
+              FullCircle.Helpers.e_invoice_validation_url_qrcode(@form.source.data, 1) %>
             <.link target="_blank" href={url}>
               {qrcode |> raw}
             </.link>
@@ -475,44 +479,44 @@ defmodule FullCircleWeb.InvoiceLive.Form do
         />
 
         <div class="flex flex-row justify-center gap-x-1 mt-1">
-            <.form_action_button
-              form={@form}
-              live_action={@live_action}
-              current_company={@current_company}
-              type="Invoice"
-            />
-            <.print_button
-              :if={@live_action == :edit}
-              company={@current_company}
-              doc_type="Invoice"
-              doc_id={@id}
-              class="gray button"
-            />
-            <.pre_print_button
-              :if={@live_action == :edit}
-              company={@current_company}
-              doc_type="Invoice"
-              doc_id={@id}
-              class="gray button"
-            />
-            <.live_component
-              :if={@live_action == :edit}
-              module={FullCircleWeb.LogLive.Component}
-              current_company={@current_company}
-              id={"log_#{@id}"}
-              show_log={false}
-              entity="invoices"
-              entity_id={@id}
-            />
-            <.live_component
-              :if={@live_action == :edit}
-              module={FullCircleWeb.JournalEntryViewLive.Component}
-              id={"journal_#{@id}"}
-              show_journal={false}
-              doc_type="Invoice"
-              doc_no={@form.data.invoice_no}
-              company_id={@current_company.id}
-            />
+          <.form_action_button
+            form={@form}
+            live_action={@live_action}
+            current_company={@current_company}
+            type="Invoice"
+          />
+          <.print_button
+            :if={@live_action == :edit}
+            company={@current_company}
+            doc_type="Invoice"
+            doc_id={@id}
+            class="gray button"
+          />
+          <.pre_print_button
+            :if={@live_action == :edit}
+            company={@current_company}
+            doc_type="Invoice"
+            doc_id={@id}
+            class="gray button"
+          />
+          <.live_component
+            :if={@live_action == :edit}
+            module={FullCircleWeb.LogLive.Component}
+            current_company={@current_company}
+            id={"log_#{@id}"}
+            show_log={false}
+            entity="invoices"
+            entity_id={@id}
+          />
+          <.live_component
+            :if={@live_action == :edit}
+            module={FullCircleWeb.JournalEntryViewLive.Component}
+            id={"journal_#{@id}"}
+            show_journal={false}
+            doc_type="Invoice"
+            doc_no={@form.data.invoice_no}
+            company_id={@current_company.id}
+          />
         </div>
       </.form>
     </div>

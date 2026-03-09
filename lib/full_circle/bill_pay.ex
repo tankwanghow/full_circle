@@ -394,10 +394,11 @@ defmodule FullCircle.BillPay do
     multi
     |> Multi.insert_all(:insert_transactions, Transaction, fn %{^name => payment} ->
       payment =
-        Repo.preload(payment, [
+        Repo.preload(payment,
           payment_details: [:account, :tax_code],
           transaction_matchers: :transaction
-        ])
+        )
+
       now = Timex.now() |> DateTime.truncate(:second)
 
       (build_detail_transactions(payment, com, now) ++

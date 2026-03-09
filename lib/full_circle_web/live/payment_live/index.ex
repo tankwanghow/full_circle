@@ -99,7 +99,7 @@ defmodule FullCircleWeb.PaymentLive.Index do
         phx-page-loading
       >
         <%= for {obj_id, obj} <- @streams.objects do %>
-        <%!-- <div>{obj_id} {obj.payment_no}</div> --%>
+          <%!-- <div>{obj_id} {obj.payment_no}</div> --%>
           <.live_component
             module={IndexComponent}
             id={obj_id}

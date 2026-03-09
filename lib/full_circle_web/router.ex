@@ -275,6 +275,9 @@ defmodule FullCircleWeb.Router do
       live("/harvests/new", LayerLive.HarvestForm, :new)
       live("/harvests/:harvest_id/edit", LayerLive.HarvestForm, :edit)
 
+      live("/egg_stock", EggStockLive.Form, :today)
+      live("/egg_stock/:date", EggStockLive.Form, :day)
+
       live("/PayRun", PayRunLive.Index, :index)
 
       live("/PaySlip/new", PaySlipLive.Form, :new)
@@ -349,6 +352,8 @@ defmodule FullCircleWeb.Router do
       live("/print/tbplbs", ReportLive.TbPlBs, :print)
       live("/print/house_feed", ReportLive.HouseFeedPrint, :print)
       live("/eaform/print", ReportLive.EAFormPrint, :print)
+
+      live("/EggStock/:date/print", EggStockLive.Print, :print)
     end
 
     live_session :require_authenticated_user_n_active_company_punch,

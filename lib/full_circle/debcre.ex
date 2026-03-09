@@ -569,6 +569,7 @@ defmodule FullCircle.DebCre do
           {detail_assoc, [:account, :tax_code]},
           transaction_matchers: :transaction
         ])
+
       now = Timex.now() |> DateTime.truncate(:second)
 
       (build_detail_transactions(note, com, now, opts) ++

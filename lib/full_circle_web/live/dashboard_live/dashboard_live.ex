@@ -163,6 +163,9 @@ defmodule FullCircleWeb.DashboardLive do
         <.link navigate={~p"/companies/#{@current_company.id}/house_feed"} class="button gray">
           {gettext("House Feed")}
         </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/egg_stock"} class="button gray">
+          {gettext("Egg Stock")}
+        </.link>
         <.link navigate={~p"/companies/#{@current_company.id}/upload_files"} class="button gray">
           {gettext("Files")}
         </.link>

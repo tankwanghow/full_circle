@@ -11,6 +11,7 @@ defmodule FullCircle.Billing.PurInvoice do
     field :descriptions, :string
     field :due_date, :date
     field :pur_invoice_date, :date
+    field :load_date, :date
     field :loader_tags, :string
     field :delivery_man_tags, :string
     field :loader_wages_tags, :string
@@ -58,6 +59,7 @@ defmodule FullCircle.Billing.PurInvoice do
     pur_invoice
     |> cast(attrs, [
       :pur_invoice_date,
+      :load_date,
       :e_inv_internal_id,
       :due_date,
       :descriptions,
@@ -93,13 +95,21 @@ defmodule FullCircle.Billing.PurInvoice do
 
   def compute_struct_fields(pinv) do
     DetailHelpers.compute_struct_fields(
-      pinv, :pur_invoice_details, :pur_invoice_amount, :pur_invoice_good_amount, :pur_invoice_tax_amount
+      pinv,
+      :pur_invoice_details,
+      :pur_invoice_amount,
+      :pur_invoice_good_amount,
+      :pur_invoice_tax_amount
     )
   end
 
   def compute_fields(changeset) do
     DetailHelpers.compute_fields(
-      changeset, :pur_invoice_details, :pur_invoice_amount, :pur_invoice_good_amount, :pur_invoice_tax_amount
+      changeset,
+      :pur_invoice_details,
+      :pur_invoice_amount,
+      :pur_invoice_good_amount,
+      :pur_invoice_tax_amount
     )
   end
 end

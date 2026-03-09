@@ -452,8 +452,17 @@ defmodule FullCircle.Billing do
   end
 
   def update_invoice_multi(multi, invoice, attrs, com, user) do
-    update_doc_multi(multi, :update_invoice, Invoice, invoice, invoice.invoice_no,
-      attrs, com, user, @invoice_txn_opts)
+    update_doc_multi(
+      multi,
+      :update_invoice,
+      Invoice,
+      invoice,
+      invoice.invoice_no,
+      attrs,
+      com,
+      user,
+      @invoice_txn_opts
+    )
   end
 
   ########
@@ -495,7 +504,6 @@ defmodule FullCircle.Billing do
     )
     |> PurInvoice.compute_struct_fields()
   end
-
 
   def pur_invoice_index_query(terms, date_from, due_date_from, bal, com, user,
         page: page,
@@ -663,7 +671,16 @@ defmodule FullCircle.Billing do
   end
 
   def update_pur_invoice_multi(multi, pur_invoice, attrs, com, user) do
-    update_doc_multi(multi, :update_pur_invoice, PurInvoice, pur_invoice,
-      pur_invoice.pur_invoice_no, attrs, com, user, @pur_invoice_txn_opts)
+    update_doc_multi(
+      multi,
+      :update_pur_invoice,
+      PurInvoice,
+      pur_invoice,
+      pur_invoice.pur_invoice_no,
+      attrs,
+      com,
+      user,
+      @pur_invoice_txn_opts
+    )
   end
 end

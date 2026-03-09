@@ -74,9 +74,7 @@ defmodule FullCircle.DebCreFixtures do
     tax_rate = if opts[:with_tax], do: Decimal.to_string(sales_tc.rate), else: "0"
 
     attrs =
-      credit_note_attrs(contact, sales_acct, sales_tc,
-        Keyword.merge(opts, tax_rate: tax_rate)
-      )
+      credit_note_attrs(contact, sales_acct, sales_tc, Keyword.merge(opts, tax_rate: tax_rate))
 
     {:ok, %{create_credit_note: cn}} =
       FullCircle.DebCre.create_credit_note(attrs, company, user)
@@ -101,9 +99,7 @@ defmodule FullCircle.DebCreFixtures do
     tax_rate = if opts[:with_tax], do: Decimal.to_string(pur_tc.rate), else: "0"
 
     attrs =
-      debit_note_attrs(contact, pur_acct, pur_tc,
-        Keyword.merge(opts, tax_rate: tax_rate)
-      )
+      debit_note_attrs(contact, pur_acct, pur_tc, Keyword.merge(opts, tax_rate: tax_rate))
 
     {:ok, %{create_debit_note: dn}} =
       FullCircle.DebCre.create_debit_note(attrs, company, user)

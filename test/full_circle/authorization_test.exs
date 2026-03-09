@@ -18,9 +18,32 @@ defmodule FullCircle.AuthorizationTest do
   test_authorise_to(:update_company, ["admin"])
   test_authorise_to(:reset_user_password, ["admin"])
 
-  test_not_authorise_to(:create_account, ["disable", "guest", "auditor", "cashier", "clerk", "punch_camera"])
-  test_not_authorise_to(:update_account, ["disable", "guest", "auditor", "cashier", "clerk", "punch_camera"])
-  test_not_authorise_to(:delete_account, ["disable", "guest", "auditor", "cashier", "clerk", "punch_camera"])
+  test_not_authorise_to(:create_account, [
+    "disable",
+    "guest",
+    "auditor",
+    "cashier",
+    "clerk",
+    "punch_camera"
+  ])
+
+  test_not_authorise_to(:update_account, [
+    "disable",
+    "guest",
+    "auditor",
+    "cashier",
+    "clerk",
+    "punch_camera"
+  ])
+
+  test_not_authorise_to(:delete_account, [
+    "disable",
+    "guest",
+    "auditor",
+    "cashier",
+    "clerk",
+    "punch_camera"
+  ])
 
   describe "authorization" do
     test "should have roles" do

@@ -79,7 +79,12 @@ defmodule FullCircle.BillPayFixtures do
     tax_rate = if opts[:with_tax], do: Decimal.to_string(pur_tc.rate), else: "0"
 
     attrs =
-      payment_attrs(contact, good, pur_acct, pur_tc, funds_acct,
+      payment_attrs(
+        contact,
+        good,
+        pur_acct,
+        pur_tc,
+        funds_acct,
         Keyword.merge(opts, tax_rate: tax_rate)
       )
 

@@ -90,7 +90,7 @@ defmodule FullCircleWeb.ReportLive.Statement.Print do
     <div class="txn">
       <div class="doc_date">{@txn.doc_date}</div>
       <div class="doc_info">
-      <span class="txn_doctype">{@txn.doc_type}</span> {@txn.doc_no}
+        <span class="txn_doctype">{@txn.doc_type}</span> {@txn.doc_no}
       </div>
       <div class="parti">{@txn.particulars |> String.slice(0..40)}</div>
       <div class="amount">{@txn.amount |> Number.Delimit.number_to_delimited()}</div>

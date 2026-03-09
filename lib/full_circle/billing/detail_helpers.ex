@@ -19,10 +19,18 @@ defmodule FullCircle.Billing.DetailHelpers do
 
     cond do
       Decimal.to_float(fetch_field!(changeset, amount_key)) <= 0.0 ->
-        add_unique_error(changeset, amount_key, Gettext.gettext(FullCircleWeb.Gettext, "must be > 0"))
+        add_unique_error(
+          changeset,
+          amount_key,
+          Gettext.gettext(FullCircleWeb.Gettext, "must be > 0")
+        )
 
       Decimal.eq?(fetch_field!(changeset, :sum_qty), 0) ->
-        add_unique_error(changeset, amount_key, Gettext.gettext(FullCircleWeb.Gettext, "need detail"))
+        add_unique_error(
+          changeset,
+          amount_key,
+          Gettext.gettext(FullCircleWeb.Gettext, "need detail")
+        )
 
       true ->
         changeset

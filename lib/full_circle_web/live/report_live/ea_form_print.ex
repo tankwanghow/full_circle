@@ -124,28 +124,60 @@ defmodule FullCircleWeb.ReportLive.EAFormPrint do
     <div id="print-me" class="print-here">
       {style(assigns)}
       <div class="page">
-        <div class="field" style="top: 55px; left: 125px; text-align: center; width: 108px;">{@nosiri}</div>
-        <div class="field" style="top: 57px; left: 125px; text-align: center; width: 108px;">{@nomajikanE}</div>
-        <div class="field" style="top: 36px; left: 488px; text-align: center; width: 35px;">{@year}</div>
-        <div class="field" style="top: -2px; left: 550px; text-align: center; width: 190px;">{@tin}</div>
-        <div class="field" style="top: -5px; left: 635px; text-align: center; width: 110px;">{@lhdnbrh}</div>
-        <div class="field" style="top: 31px; left: 340px; text-align: center; width: 400px;">{@a1}</div>
-        <div class="field" style="top: 32px; left: 190px; text-align: center; width: 200px;">{@a2}</div>
-        <div class="field" style="top: 10px; left: 575px; text-align: center; width: 165px;">{@a3}</div>
-        <div class="field" style="top: 10px; left: 190px; text-align: center; width: 200px;">{@a4}</div>
-        <div class="field" style="top: -12px; left: 575px; text-align: center; width: 165px;">{@a5}</div>
-        <div class="field" style="top: -13px; left: 190px; text-align: center; width: 200px;">{@a6}</div>
-        <div class="field" style="top: -35px; left: 575px; text-align: center; width: 165px;">{@a7}</div>
-        <div class="field" style="top: -23px; left: 240px; text-align: center; width: 145px;">{zsd(@a8)}</div>
-        <div class="field" style="top: -40px; left: 575px; text-align: center; width: 165px;">{@a9a}</div>
-        <div class="field" style="top: -41px; left: 575px; text-align: center; width: 165px;">{@a9b}</div>
+        <div class="field" style="top: 55px; left: 125px; text-align: center; width: 108px;">
+          {@nosiri}
+        </div>
+        <div class="field" style="top: 57px; left: 125px; text-align: center; width: 108px;">
+          {@nomajikanE}
+        </div>
+        <div class="field" style="top: 36px; left: 488px; text-align: center; width: 35px;">
+          {@year}
+        </div>
+        <div class="field" style="top: -2px; left: 550px; text-align: center; width: 190px;">
+          {@tin}
+        </div>
+        <div class="field" style="top: -5px; left: 635px; text-align: center; width: 110px;">
+          {@lhdnbrh}
+        </div>
+        <div class="field" style="top: 31px; left: 340px; text-align: center; width: 400px;">
+          {@a1}
+        </div>
+        <div class="field" style="top: 32px; left: 190px; text-align: center; width: 200px;">
+          {@a2}
+        </div>
+        <div class="field" style="top: 10px; left: 575px; text-align: center; width: 165px;">
+          {@a3}
+        </div>
+        <div class="field" style="top: 10px; left: 190px; text-align: center; width: 200px;">
+          {@a4}
+        </div>
+        <div class="field" style="top: -12px; left: 575px; text-align: center; width: 165px;">
+          {@a5}
+        </div>
+        <div class="field" style="top: -13px; left: 190px; text-align: center; width: 200px;">
+          {@a6}
+        </div>
+        <div class="field" style="top: -35px; left: 575px; text-align: center; width: 165px;">
+          {@a7}
+        </div>
+        <div class="field" style="top: -23px; left: 240px; text-align: center; width: 145px;">
+          {zsd(@a8)}
+        </div>
+        <div class="field" style="top: -40px; left: 575px; text-align: center; width: 165px;">
+          {@a9a}
+        </div>
+        <div class="field" style="top: -41px; left: 575px; text-align: center; width: 165px;">
+          {@a9b}
+        </div>
         <div class="field" style="top: 4px; left: 645px; text-align: right; width: 95px;">
           {zsd(@b1a, 2)}
         </div>
         <div class="field" style="top: 2px; left: 645px; text-align: right; width: 95px;">
           {zsd(@b1b, 2)}
         </div>
-        <div class="field" style="top: -1px; left: 535px; text-align: center; width: 100px;">{@b1cname}</div>
+        <div class="field" style="top: -1px; left: 535px; text-align: center; width: 100px;">
+          {@b1cname}
+        </div>
         <div class="field" style="top: -21px; left: 645px; text-align: right; width: 95px;">
           {zsd(@b1c, 2)}
         </div>
@@ -155,23 +187,35 @@ defmodule FullCircleWeb.ReportLive.EAFormPrint do
         <div class="field" style="top: -25px; left: 645px; text-align: right; width: 95px;">
           {zsd(@b1e, 2)}
         </div>
-        <div class="field" style="top: -26px; left: 255px; text-align: center; width: 140px;">{@b1fdari}</div>
-        <div class="field" style="top: -47px; left: 430px; text-align: center; width: 140px;">{@b1fhingga}</div>
+        <div class="field" style="top: -26px; left: 255px; text-align: center; width: 140px;">
+          {@b1fdari}
+        </div>
+        <div class="field" style="top: -47px; left: 430px; text-align: center; width: 140px;">
+          {@b1fhingga}
+        </div>
         <div class="field" style="top: -68px; left: 645px; text-align: right; width: 95px;">
           {zsd(@b1f, 2)}
         </div>
 
-        <div class="field" style="top: -53px; left: 228px; text-align: center; width: 160px;">{@b2a}</div>
-        <div class="field" style="top: -54px; left: 228px; text-align: center; width: 160px;">{@b2b}</div>
+        <div class="field" style="top: -53px; left: 228px; text-align: center; width: 160px;">
+          {@b2a}
+        </div>
+        <div class="field" style="top: -54px; left: 228px; text-align: center; width: 160px;">
+          {@b2b}
+        </div>
         <div class="field" style="top: -76px; left: 645px; text-align: right; width: 95px;">
           {zsd(@b2, 2)}
         </div>
-        <div class="field" style="top: -78px; left: 285px; text-align: center; width: 350px;">{@b3nyata}</div>
+        <div class="field" style="top: -78px; left: 285px; text-align: center; width: 350px;">
+          {@b3nyata}
+        </div>
         <div class="field" style="top: -98px; left: 645px; text-align: right; width: 95px;">
           {zsd(@b3, 2)}
         </div>
 
-        <div class="field" style="top: -100px; left: 258px; text-align: center; width: 378px;">{@b4alamat}</div>
+        <div class="field" style="top: -100px; left: 258px; text-align: center; width: 378px;">
+          {@b4alamat}
+        </div>
         <div class="field" style="top: -121px; left: 645px; text-align: right; width: 95px;">
           {zsd(@b4, 2)}
         </div>
@@ -232,14 +276,27 @@ defmodule FullCircleWeb.ReportLive.EAFormPrint do
           {zsd(@e2, 2)}
         </div>
 
-        <div class="field" style="font-weight: bold; top: -37px; left: 645px; text-align: right; width: 95px;">
+        <div
+          class="field"
+          style="font-weight: bold; top: -37px; left: 645px; text-align: right; width: 95px;"
+        >
           {zsd(@f, 2)}
         </div>
-        <div class="field" style="top: -12px; left: 440px; text-align: center; width: 295px;">{@nama}</div>
-        <div class="field" style="top: -13px; left: 440px; text-align: center; width: 295px;">{@pos}</div>
-        <div class="field" style="top: -16px; left: 440px; text-align: center; width: 295px;">{@address}</div>
-        <div class="field" style="top: -19px; left: 440px; text-align: center; width: 295px;">{@phone}</div>
-        <div class="field" style="top: -60px; left: 100px; text-align: center; width: 145px;">{@tarikh}</div>
+        <div class="field" style="top: -12px; left: 440px; text-align: center; width: 295px;">
+          {@nama}
+        </div>
+        <div class="field" style="top: -13px; left: 440px; text-align: center; width: 295px;">
+          {@pos}
+        </div>
+        <div class="field" style="top: -16px; left: 440px; text-align: center; width: 295px;">
+          {@address}
+        </div>
+        <div class="field" style="top: -19px; left: 440px; text-align: center; width: 295px;">
+          {@phone}
+        </div>
+        <div class="field" style="top: -60px; left: 100px; text-align: center; width: 145px;">
+          {@tarikh}
+        </div>
       </div>
     </div>
     """

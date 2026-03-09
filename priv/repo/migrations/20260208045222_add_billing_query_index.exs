@@ -8,8 +8,8 @@ defmodule FullCircle.Repo.Migrations.AddBillingQueryIndex do
     create index(:transactions, [:company_id, :doc_type, :doc_date], concurrently: true)
 
     create index(:transactions, [:doc_id],
-      where: "doc_id IS NOT NULL",
-      concurrently: true
-    )
+             where: "doc_id IS NOT NULL",
+             concurrently: true
+           )
   end
 end

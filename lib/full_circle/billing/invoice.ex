@@ -10,6 +10,7 @@ defmodule FullCircle.Billing.Invoice do
     field :descriptions, :string
     field :due_date, :date
     field :invoice_date, :date
+    field :load_date, :date
     field :loader_tags, :string
     field :delivery_man_tags, :string
     field :loader_wages_tags, :string
@@ -51,6 +52,7 @@ defmodule FullCircle.Billing.Invoice do
     invoice
     |> cast(attrs, [
       :invoice_date,
+      :load_date,
       :due_date,
       :descriptions,
       :loader_tags,
@@ -85,13 +87,21 @@ defmodule FullCircle.Billing.Invoice do
 
   def compute_struct_fields(inv) do
     DetailHelpers.compute_struct_fields(
-      inv, :invoice_details, :invoice_amount, :invoice_good_amount, :invoice_tax_amount
+      inv,
+      :invoice_details,
+      :invoice_amount,
+      :invoice_good_amount,
+      :invoice_tax_amount
     )
   end
 
   def compute_fields(changeset) do
     DetailHelpers.compute_fields(
-      changeset, :invoice_details, :invoice_amount, :invoice_good_amount, :invoice_tax_amount
+      changeset,
+      :invoice_details,
+      :invoice_amount,
+      :invoice_good_amount,
+      :invoice_tax_amount
     )
   end
 end

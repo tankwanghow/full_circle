@@ -69,8 +69,12 @@ defmodule FullCircleWeb.LogLive.Component do
     """
   end
 
-  defp diff_entry(%{entry: %{status: :changed, key: key, old_value: old_value, new_value: new_value}} = assigns) do
-    assigns = assign(assigns, :key, key) |> assign(:old_value, old_value) |> assign(:new_value, new_value)
+  defp diff_entry(
+         %{entry: %{status: :changed, key: key, old_value: old_value, new_value: new_value}} =
+           assigns
+       ) do
+    assigns =
+      assign(assigns, :key, key) |> assign(:old_value, old_value) |> assign(:new_value, new_value)
 
     ~H"""
     <div class="py-0.5">

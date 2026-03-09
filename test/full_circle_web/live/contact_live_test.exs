@@ -47,7 +47,9 @@ defmodule FullCircleWeb.ContactLiveTest do
         |> element("#object-form")
         |> render_change(%{contact: %{name: ""}})
 
-      text = html |> LazyHTML.from_fragment() |> LazyHTML.query(~s|p.text-rose-600|) |> LazyHTML.text()
+      text =
+        html |> LazyHTML.from_fragment() |> LazyHTML.query(~s|p.text-rose-600|) |> LazyHTML.text()
+
       assert text =~ "can't be blank"
     end
 
@@ -57,7 +59,9 @@ defmodule FullCircleWeb.ContactLiveTest do
         |> element("#object-form")
         |> render_change(%{contact: %{name: "TESTCONTACT"}})
 
-      text = html |> LazyHTML.from_fragment() |> LazyHTML.query(~s|p.text-rose-600|) |> LazyHTML.text()
+      text =
+        html |> LazyHTML.from_fragment() |> LazyHTML.query(~s|p.text-rose-600|) |> LazyHTML.text()
+
       assert text =~ "has already been taken"
     end
 
@@ -67,7 +71,9 @@ defmodule FullCircleWeb.ContactLiveTest do
         |> element("#object-form")
         |> render_change(%{contact: %{country: "not a country"}})
 
-      text = html |> LazyHTML.from_fragment() |> LazyHTML.query(~s|p.text-rose-600|) |> LazyHTML.text()
+      text =
+        html |> LazyHTML.from_fragment() |> LazyHTML.query(~s|p.text-rose-600|) |> LazyHTML.text()
+
       assert text =~ "not in list"
     end
   end
@@ -158,7 +164,10 @@ defmodule FullCircleWeb.ContactLiveTest do
 
     test "contact list", %{conn: conn, comp: comp} do
       {:ok, _lv, html} = live(conn, ~p"/companies/#{comp.id}/contacts")
-      text = LazyHTML.from_fragment(html) |> LazyHTML.query(~s|div#objects_list|) |> LazyHTML.text()
+
+      text =
+        LazyHTML.from_fragment(html) |> LazyHTML.query(~s|div#objects_list|) |> LazyHTML.text()
+
       assert text =~ "TESTCONTACT"
     end
   end
