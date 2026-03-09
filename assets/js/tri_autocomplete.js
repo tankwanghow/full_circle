@@ -71,7 +71,9 @@ async function fetchAndCache(url, key, cb, text) {
 function filter(data, text) {
   text = text.trim().toLowerCase()
   if (!text) return data
-  return data.filter(item => (item.value||"").replace(/\s/g, "").toLowerCase().includes(text))
+  var pattern = text.split("").map(c => c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join(".*")
+  var re = new RegExp(pattern)
+  return data.filter(item => re.test((item.value||"").toLowerCase()))
 }
 
 export function initTributeAutoComplete(el) {
