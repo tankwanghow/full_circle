@@ -29,7 +29,9 @@
       "Bash(mix hex.info:*)",
       "Bash(mix deps.get:*)",
       "Bash(ls:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(mix compile:*)",
+      "Bash(mix run:*)"
     ]
   }
 }
