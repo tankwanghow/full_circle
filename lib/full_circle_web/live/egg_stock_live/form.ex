@@ -27,6 +27,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
      |> assign(lookback_days: days)
      |> assign(autosave_delay: autosave_delay)
      |> assign(save_status: nil)
+     |> assign(show_ignored: true)
      |> assign(page_title: gettext("Egg Stock"))}
   end
 
@@ -82,6 +83,18 @@ defmodule FullCircleWeb.EggStockLive.Form do
       {:error, _cs} ->
         socket |> put_flash(:error, gettext("Failed to load day data"))
     end
+  end
+
+  defp load_tab_data(socket, "estimated") do
+    company = socket.assigns.current_company
+    date = socket.assigns.date
+    lookback_weeks = socket.assigns.lookback_weeks
+    lookback_days = socket.assigns.lookback_days
+
+    forecast =
+      EggStock.compute_7day_forecast(company.id, date, lookback_weeks, lookback_days)
+
+    assign(socket, forecast: forecast)
   end
 
   defp load_tab_data(socket, "settings") do
@@ -221,6 +234,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
         else
           actuals_to_details(actual_sales, "actual_order")
         end
+        |> Enum.sort_by(& &1.contact_name)
 
       purchase_details =
         if purchase_rows != [] do
@@ -228,6 +242,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
         else
           actuals_to_details(actual_purchases, "actual_purchase")
         end
+        |> Enum.sort_by(& &1.contact_name)
 
       %{
         day
@@ -275,14 +290,14 @@ defmodule FullCircleWeb.EggStockLive.Form do
   defp compute_est_closing(opening, est_production, details, grades) do
     sales_total =
       details
-      |> Enum.filter(&(&1.section == "actual_order"))
+      |> Enum.filter(&(&1.section == "actual_order" and !&1.ignore))
       |> Enum.reduce(Map.new(grades, &{&1, 0}), fn d, acc ->
         Map.merge(acc, d.quantities || %{}, fn _k, v1, v2 -> to_int(v1) + to_int(v2) end)
       end)
 
     purchase_total =
       details
-      |> Enum.filter(&(&1.section == "actual_purchase"))
+      |> Enum.filter(&(&1.section == "actual_purchase" and !&1.ignore))
       |> Enum.reduce(Map.new(grades, &{&1, 0}), fn d, acc ->
         Map.merge(acc, d.quantities || %{}, fn _k, v1, v2 -> to_int(v1) + to_int(v2) end)
       end)
@@ -303,7 +318,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
       Enum.reduce(details, {Map.new(grades, &{&1, 0}), Map.new(grades, &{&1, 0})}, fn {_k, detail},
                                                                                       {sales,
                                                                                        purchases} ->
-        if detail["delete"] == "true" do
+        if detail["ignore"] == "true" do
           {sales, purchases}
         else
           quantities = detail["quantities"] || %{}
@@ -342,11 +357,28 @@ defmodule FullCircleWeb.EggStockLive.Form do
      |> load_tab_data(tab)}
   end
 
-  def handle_event("change_date", %{"date" => date_str}, socket) do
+  def handle_event("toggle_show_ignored", _, socket) do
+    {:noreply, assign(socket, show_ignored: !socket.assigns.show_ignored)}
+  end
+
+  def handle_event("nav_date", %{"dir" => dir}, socket) do
     socket = flush_autosave(socket)
+    date = socket.assigns.date
+    new_date = if dir == "prev", do: Date.add(date, -1), else: Date.add(date, 1)
 
     {:noreply,
      push_patch(socket,
+       to: ~p"/companies/#{socket.assigns.current_company.id}/egg_stock/#{Date.to_iso8601(new_date)}"
+     )}
+  end
+
+  def handle_event("goto_date", %{"date" => date_str}, socket) do
+    socket = flush_autosave(socket)
+
+    {:noreply,
+     socket
+     |> assign(active_tab: "now")
+     |> push_patch(
        to: ~p"/companies/#{socket.assigns.current_company.id}/egg_stock/#{date_str}"
      )}
   end
@@ -391,14 +423,53 @@ defmodule FullCircleWeb.EggStockLive.Form do
     {:noreply, assign(socket, form: to_form(cs))}
   end
 
-  def handle_event("delete_detail", %{"index" => index}, socket) do
+  def handle_event("toggle_ignore", %{"index" => index}, socket) do
+    index = String.to_integer(index)
     cs = socket.assigns.form.source
 
+    details =
+      Ecto.Changeset.get_assoc(cs, :egg_stock_day_details)
+      |> Enum.with_index()
+      |> Enum.map(fn {detail_cs, i} ->
+        if i == index do
+          current = Ecto.Changeset.get_field(detail_cs, :ignore) || false
+          Ecto.Changeset.put_change(detail_cs, :ignore, !current)
+        else
+          detail_cs
+        end
+      end)
+
     cs =
-      FullCircleWeb.Helpers.delete_line(cs, index, :egg_stock_day_details)
+      cs
+      |> Ecto.Changeset.put_assoc(:egg_stock_day_details, details)
       |> Map.put(:action, :validate)
 
-    {:noreply, assign(socket, form: to_form(cs))}
+    params = changeset_to_params(cs)
+    socket = assign(socket, form: to_form(cs))
+
+    socket =
+      if socket.assigns[:est_production] do
+        opening =
+          if socket.assigns.is_future,
+            do: socket.assigns.est_opening,
+            else: socket.assigns.day.opening_bal
+
+        est_closing =
+          compute_est_closing_from_params(
+            opening,
+            socket.assigns.est_production,
+            params,
+            socket.assigns.grade_names
+          )
+
+        assign(socket, est_closing: est_closing)
+      else
+        socket
+      end
+
+    socket = schedule_autosave(socket, params)
+
+    {:noreply, socket}
   end
 
   # --- Settings events ---
@@ -513,6 +584,35 @@ defmodule FullCircleWeb.EggStockLive.Form do
       end
 
     {:noreply, assign(socket, grades_params: params)}
+  end
+
+  # --- Helpers ---
+
+  defp changeset_to_params(cs) do
+    details =
+      Ecto.Changeset.get_assoc(cs, :egg_stock_day_details)
+      |> Enum.with_index()
+      |> Enum.map(fn {d, i} ->
+        {to_string(i),
+         %{
+           "id" => Ecto.Changeset.get_field(d, :id),
+           "section" => Ecto.Changeset.get_field(d, :section),
+           "contact_id" => Ecto.Changeset.get_field(d, :contact_id),
+           "contact_name" => Ecto.Changeset.get_field(d, :contact_name),
+           "quantities" => Ecto.Changeset.get_field(d, :quantities) || %{},
+           "ignore" => to_string(Ecto.Changeset.get_field(d, :ignore) || false),
+           "_persistent_id" => i
+         }}
+      end)
+      |> Map.new()
+
+    %{
+      "egg_stock_day_details" => details,
+      "closing_bal" => Ecto.Changeset.get_field(cs, :closing_bal) || %{},
+      "expired" => Ecto.Changeset.get_field(cs, :expired) || %{},
+      "ungraded_bal" => to_string(Ecto.Changeset.get_field(cs, :ungraded_bal) || 0),
+      "note" => Ecto.Changeset.get_field(cs, :note) || ""
+    }
   end
 
   # --- Autosave ---
@@ -724,7 +824,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
 
   defp sum_quantities(details, section, grade) when is_list(details) do
     details
-    |> Enum.filter(&(&1.section == section))
+    |> Enum.filter(&(&1.section == section and !&1.ignore))
     |> Enum.reduce(0, fn d, acc ->
       acc + to_int((d.quantities || %{})[grade])
     end)
@@ -752,27 +852,47 @@ defmodule FullCircleWeb.EggStockLive.Form do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="mx-auto w-11/12">
+    <div class="mx-auto w-8/12 mb-10">
       <div class="text-center mb-2">
         <span class="text-xl font-bold">{gettext("Egg Stock")}</span>
       </div>
 
       <%!-- Date selector --%>
-      <div class="flex items-center justify-center gap-4 mb-4">
-        <.form for={%{}} id="date-picker" phx-change="change_date">
-          <input
-            type="date"
-            value={Date.to_iso8601(@date)}
-            name="date"
-            class="text-lg font-semibold border rounded px-2 py-1"
-          />
-        </.form>
+      <div class="flex items-center justify-center gap-2 mb-4">
+        <button
+          type="button"
+          phx-click="nav_date"
+          phx-value-dir="prev"
+          class="px-2 py-1 text-lg font-bold text-gray-600 hover:text-blue-600"
+        >
+          <.icon name="hero-chevron-left" class="h-5 w-5" />
+        </button>
+        <span class="text-lg font-semibold px-2">
+          {FullCircleWeb.Helpers.format_date(@date)}
+        </span>
+        <button
+          type="button"
+          phx-click="nav_date"
+          phx-value-dir="next"
+          class="px-2 py-1 text-lg font-bold text-gray-600 hover:text-blue-600"
+        >
+          <.icon name="hero-chevron-right" class="h-5 w-5" />
+        </button>
+        <button
+          type="button"
+          phx-click="goto_date"
+          phx-value-date={Date.to_iso8601(Date.utc_today())}
+          class="px-2 py-1 text-sm text-blue-600 hover:text-blue-800 border border-blue-300 rounded"
+        >
+          {gettext("Today")}
+        </button>
         <.save_status status={@save_status} />
       </div>
 
       <%!-- Tabs --%>
       <div class="flex gap-1 mb-4 border-b border-gray-300">
         <.tab_button tab="now" active={@active_tab} label={gettext("Stock")} />
+        <.tab_button tab="estimated" active={@active_tab} label={gettext("Estimated")} />
         <.tab_button tab="settings" active={@active_tab} label={gettext("Settings")} />
       </div>
 
@@ -796,6 +916,16 @@ defmodule FullCircleWeb.EggStockLive.Form do
           est_closing={@est_closing}
           current_company={@current_company}
           current_user={@current_user}
+          show_ignored={@show_ignored}
+        />
+      </div>
+
+      <div :if={@active_tab == "estimated"}>
+        <.estimated_tab
+          forecast={@forecast}
+          grades={@grade_names}
+          grade_labels={@grade_labels}
+          date={@date}
         />
       </div>
 
@@ -805,6 +935,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
           lookback_weeks={@lookback_weeks}
           lookback_days={@lookback_days}
           autosave_delay={@autosave_delay}
+          show_ignored={@show_ignored}
           current_company={@current_company}
           current_user={@current_user}
         />
@@ -1018,35 +1149,6 @@ defmodule FullCircleWeb.EggStockLive.Form do
       />
 
       <.form for={@form} id="day-form" autocomplete="off" phx-change="validate" phx-submit="save">
-        <%!-- Sales Order Section --%>
-        <div class="mb-2">
-          <div class="flex items-center gap-2 mb-1">
-            <h3 class="font-bold text-sm">{gettext("Sales Orders")}</h3>
-            <button
-              type="button"
-              phx-click="add_detail"
-              phx-value-section="actual_order"
-              class="text-blue-600 hover:text-blue-800"
-            >
-              <.icon name="hero-plus-circle" class="h-5 w-5" />
-            </button>
-          </div>
-          <.detail_lines
-            form={@form}
-            section="actual_order"
-            grades={@grades}
-            grade_labels={@grade_labels}
-            editable={@editable}
-            current_company={@current_company}
-            current_user={@current_user}
-          />
-          <.section_totals
-            details={@day.egg_stock_day_details}
-            section="actual_order"
-            grades={@grades}
-          />
-        </div>
-
         <%!-- Purchase Orders Section --%>
         <div class="mb-2">
           <div class="flex items-center gap-2 mb-1">
@@ -1068,6 +1170,8 @@ defmodule FullCircleWeb.EggStockLive.Form do
             editable={@editable}
             current_company={@current_company}
             current_user={@current_user}
+            date={@date}
+            show_ignored={@show_ignored}
           />
           <.section_totals
             details={@day.egg_stock_day_details}
@@ -1076,14 +1180,36 @@ defmodule FullCircleWeb.EggStockLive.Form do
           />
         </div>
 
-        <%!-- Actual Sales --%>
-        <.actual_data_section
-          title={gettext("Sales")}
-          rows={@actual_sales}
-          grades={@grades}
-          bg_class="bg-blue-50"
-          title_class="text-blue-700"
-        />
+        <%!-- Sales Order Section --%>
+        <div class="mb-2">
+          <div class="flex items-center gap-2 mb-1">
+            <h3 class="font-bold text-sm">{gettext("Sales Orders")}</h3>
+            <button
+              type="button"
+              phx-click="add_detail"
+              phx-value-section="actual_order"
+              class="text-blue-600 hover:text-blue-800"
+            >
+              <.icon name="hero-plus-circle" class="h-5 w-5" />
+            </button>
+          </div>
+          <.detail_lines
+            form={@form}
+            section="actual_order"
+            grades={@grades}
+            grade_labels={@grade_labels}
+            editable={@editable}
+            current_company={@current_company}
+            current_user={@current_user}
+            date={@date}
+            show_ignored={@show_ignored}
+          />
+          <.section_totals
+            details={@day.egg_stock_day_details}
+            section="actual_order"
+            grades={@grades}
+          />
+        </div>
 
         <%!-- Actual Purchases --%>
         <.actual_data_section
@@ -1092,6 +1218,17 @@ defmodule FullCircleWeb.EggStockLive.Form do
           grades={@grades}
           bg_class="bg-emerald-50"
           title_class="text-emerald-700"
+          company_id={@current_company.id}
+        />
+
+        <%!-- Actual Sales --%>
+        <.actual_data_section
+          title={gettext("Sales")}
+          rows={@actual_sales}
+          grades={@grades}
+          bg_class="bg-blue-50"
+          title_class="text-blue-700"
+          company_id={@current_company.id}
         />
 
         <%!-- Est Production --%>
@@ -1243,6 +1380,16 @@ defmodule FullCircleWeb.EggStockLive.Form do
           >{@form[:note].value}</textarea>
         </div>
       </.form>
+
+      <div class="flex justify-end mt-2">
+        <a
+          href={~p"/companies/#{@current_company.id}/EggStock/#{Date.to_iso8601(@date)}/print"}
+          target="_blank"
+          class="text-blue-600 hover:text-blue-800 flex items-center gap-1 text-sm"
+        >
+          <.icon name="hero-printer" class="h-4 w-4" /> {gettext("Print Report")}
+        </a>
+      </div>
     </div>
 
     <%!-- Future date --%>
@@ -1262,35 +1409,6 @@ defmodule FullCircleWeb.EggStockLive.Form do
         phx-change="validate"
         phx-submit="save"
       >
-        <%!-- Sales Order Section --%>
-        <div class="mb-2">
-          <div class="flex items-center gap-2 mb-1">
-            <h3 class="font-bold text-sm">{gettext("Sales Orders")}</h3>
-            <button
-              type="button"
-              phx-click="add_detail"
-              phx-value-section="actual_order"
-              class="text-blue-600 hover:text-blue-800"
-            >
-              <.icon name="hero-plus-circle" class="h-5 w-5" />
-            </button>
-          </div>
-          <.detail_lines
-            form={@form}
-            section="actual_order"
-            grades={@grades}
-            grade_labels={@grade_labels}
-            editable={true}
-            current_company={@current_company}
-            current_user={@current_user}
-          />
-          <.section_totals
-            details={@day.egg_stock_day_details}
-            section="actual_order"
-            grades={@grades}
-          />
-        </div>
-
         <%!-- Purchase Orders Section --%>
         <div class="mb-2">
           <div class="flex items-center gap-2 mb-1">
@@ -1312,6 +1430,39 @@ defmodule FullCircleWeb.EggStockLive.Form do
             editable={true}
             current_company={@current_company}
             current_user={@current_user}
+            date={@date}
+            show_ignored={@show_ignored}
+          />
+          <.section_totals
+            details={@day.egg_stock_day_details}
+            section="actual_purchase"
+            grades={@grades}
+          />
+        </div>
+
+        <%!-- Sales Order Section --%>
+        <div class="mb-2">
+          <div class="flex items-center gap-2 mb-1">
+            <h3 class="font-bold text-sm">{gettext("Sales Orders")}</h3>
+            <button
+              type="button"
+              phx-click="add_detail"
+              phx-value-section="actual_order"
+              class="text-blue-600 hover:text-blue-800"
+            >
+              <.icon name="hero-plus-circle" class="h-5 w-5" />
+            </button>
+          </div>
+          <.detail_lines
+            form={@form}
+            section="actual_order"
+            grades={@grades}
+            grade_labels={@grade_labels}
+            editable={true}
+            current_company={@current_company}
+            current_user={@current_user}
+            date={@date}
+            show_ignored={@show_ignored}
           />
           <.section_totals
             details={@day.egg_stock_day_details}
@@ -1388,13 +1539,14 @@ defmodule FullCircleWeb.EggStockLive.Form do
           {Enum.reduce(@grades, 0, fn g, acc -> acc + to_int((row.quantities || %{})[g]) end)}
         </span>
         <span :for={{doc_type, doc_id} <- row.doc_links || []} class="inline-flex">
-            <.link
-              navigate={doc_link_path(@company_id, doc_type, doc_id)}
+            <a
+              href={doc_link_path(@company_id, doc_type, doc_id)}
+              target="_blank"
               class="text-blue-600 hover:text-blue-800"
               title={doc_type}
             >
               <.icon name={doc_icon(doc_type)} class="h-3 w-3" />
-            </.link>
+            </a>
           </span>
       </div>
       <div class="flex gap-2 mt-1 font-semibold text-sm text-gray-700 border-t pt-1">
@@ -1431,14 +1583,15 @@ defmodule FullCircleWeb.EggStockLive.Form do
     ~H"""
     <div class="space-y-1">
       <.inputs_for :let={dtl} field={@form[:egg_stock_day_details]}>
+        <% ignored = dtl[:ignore].value in [true, "true"] %>
         <div
-          :if={dtl[:section].value == @section}
-          class={"flex items-center gap-2 #{if dtl[:delete].value == true, do: "hidden"}"}
+          :if={dtl[:section].value == @section and (@show_ignored or !ignored)}
+          class={"flex items-center gap-2 #{if ignored, do: "opacity-40"}"}
         >
           <input :if={dtl[:id].value} type="hidden" name={dtl[:id].name} value={dtl[:id].value} />
           <input type="hidden" name={dtl[:section].name} value={@section} />
           <input type="hidden" name={dtl[:contact_id].name} value={dtl[:contact_id].value} />
-          <input type="hidden" name={dtl[:delete].name} value={"#{dtl[:delete].value}"} />
+          <input type="hidden" name={dtl[:ignore].name} value={"#{dtl[:ignore].value}"} />
           <input type="hidden" name={dtl[:_persistent_id].name} value={dtl.index} />
 
           <input
@@ -1468,16 +1621,60 @@ defmodule FullCircleWeb.EggStockLive.Form do
           <button
             :if={@editable}
             type="button"
-            phx-click="delete_detail"
+            phx-click="toggle_ignore"
             phx-value-index={dtl.index}
-            class="text-red-500 hover:text-red-700"
+            class={if ignored, do: "text-green-500 hover:text-green-700", else: "text-red-500 hover:text-red-700"}
+            title={if ignored, do: gettext("Enable"), else: gettext("Ignore")}
           >
-            <.icon name="hero-trash-solid" class="h-4 w-4" />
+            <.icon name={if ignored, do: "hero-eye", else: "hero-eye-slash"} class="h-4 w-4" />
           </button>
+
+          <a
+            :if={@editable and @section == "actual_order" and dtl[:contact_id].value not in [nil, ""]}
+            href={egg_order_doc_url(@current_company.id, @date, dtl, @grades, "Invoice")}
+            target="_blank"
+            class="text-green-600 hover:text-green-800"
+            title={gettext("Create Invoice")}
+          >
+            <.icon name="hero-document-plus" class="h-4 w-4" />
+          </a>
+
+          <a
+            :if={@editable and @section == "actual_order" and dtl[:contact_id].value not in [nil, ""]}
+            href={egg_order_doc_url(@current_company.id, @date, dtl, @grades, "Receipt")}
+            target="_blank"
+            class="text-amber-600 hover:text-amber-800"
+            title={gettext("Create Receipt")}
+          >
+            <.icon name="hero-banknotes" class="h-4 w-4" />
+          </a>
         </div>
       </.inputs_for>
     </div>
     """
+  end
+
+  defp egg_order_doc_url(company_id, date, dtl, grades, doc_type) do
+    contact_name = dtl[:contact_name].value || ""
+    contact_id = dtl[:contact_id].value || ""
+    quantities = dtl[:quantities].value || %{}
+
+    egg =
+      grades
+      |> Enum.reject(fn g ->
+        qty = quantities[g]
+        qty in [nil, "", "0", 0]
+      end)
+      |> Enum.map(fn g -> "#{URI.encode(g)}:#{quantities[g]}" end)
+      |> Enum.join(",")
+
+    "/companies/#{company_id}/#{doc_type}/new?" <>
+      URI.encode_query(%{
+        "contact_name" => contact_name,
+        "contact_id" => contact_id,
+        "date" => Date.to_iso8601(date),
+        "egg" => egg
+      })
   end
 
   defp section_totals(assigns) do
@@ -1494,11 +1691,149 @@ defmodule FullCircleWeb.EggStockLive.Form do
     """
   end
 
+  # --- Estimated Tab ---
+
+  defp estimated_tab(assigns) do
+    ~H"""
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b">
+            <th class="text-left py-2 px-2 w-28">{gettext("Date")}</th>
+            <th class="text-left py-2 px-1 w-16">{gettext("Day")}</th>
+            <th :for={grade <- @grades} class="text-center py-2 px-1 w-20">
+              {@grade_labels[grade]}
+            </th>
+            <th class="text-center py-2 px-1 w-20">{gettext("Total")}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            :for={row <- @forecast}
+            class="border-b hover:bg-blue-100 cursor-pointer"
+            phx-click="goto_date"
+            phx-value-date={Date.to_iso8601(row.date)}
+          >
+            <td class="py-1 px-2 font-medium">
+              {FullCircleWeb.Helpers.format_date(row.date)}
+            </td>
+            <td class="py-1 px-1 text-gray-500">
+              {Calendar.strftime(row.date, "%a")}
+            </td>
+            <td
+              :for={grade <- @grades}
+              class={"text-center py-1 px-1 #{if to_int(row.closing[grade]) < 0, do: "text-red-600"}"}
+            >
+              {display_val(row.closing[grade])}
+            </td>
+            <% total = Enum.reduce(@grades, 0, fn g, acc -> acc + to_int(row.closing[g]) end) %>
+            <td class={"text-center py-1 px-1 font-semibold #{if total < 0, do: "text-red-600"}"}>
+              {total}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <%!-- Sales/Purchases breakdown --%>
+      <div class="mt-6">
+        <h3 class="font-bold text-sm mb-2">{gettext("Est. Daily Sales")}</h3>
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b">
+              <th class="text-left py-2 px-2 w-28">{gettext("Date")}</th>
+              <th class="text-left py-2 px-1 w-16">{gettext("Day")}</th>
+              <th :for={grade <- @grades} class="text-center py-2 px-1 w-20">
+                {@grade_labels[grade]}
+              </th>
+              <th class="text-center py-2 px-1 w-20">{gettext("Total")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              :for={row <- @forecast}
+              class="border-b hover:bg-blue-100 cursor-pointer"
+              phx-click="goto_date"
+              phx-value-date={Date.to_iso8601(row.date)}
+            >
+              <td class="py-1 px-2 font-medium">
+                {FullCircleWeb.Helpers.format_date(row.date)}
+              </td>
+              <td class="py-1 px-1 text-gray-500">
+                {Calendar.strftime(row.date, "%a")}
+              </td>
+              <td :for={grade <- @grades} class="text-center py-1 px-1">
+                {display_val(row.sales[grade])}
+              </td>
+              <td class="text-center py-1 px-1 font-semibold">
+                {Enum.reduce(@grades, 0, fn g, acc -> acc + to_int(row.sales[g]) end)}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="mt-4">
+        <h3 class="font-bold text-sm mb-2">{gettext("Est. Daily Purchases")}</h3>
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b">
+              <th class="text-left py-2 px-2 w-28">{gettext("Date")}</th>
+              <th class="text-left py-2 px-1 w-16">{gettext("Day")}</th>
+              <th :for={grade <- @grades} class="text-center py-2 px-1 w-20">
+                {@grade_labels[grade]}
+              </th>
+              <th class="text-center py-2 px-1 w-20">{gettext("Total")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              :for={row <- @forecast}
+              class="border-b hover:bg-emerald-100 cursor-pointer"
+              phx-click="goto_date"
+              phx-value-date={Date.to_iso8601(row.date)}
+            >
+              <td class="py-1 px-2 font-medium">
+                {FullCircleWeb.Helpers.format_date(row.date)}
+              </td>
+              <td class="py-1 px-1 text-gray-500">
+                {Calendar.strftime(row.date, "%a")}
+              </td>
+              <td :for={grade <- @grades} class="text-center py-1 px-1">
+                {display_val(row.purchases[grade])}
+              </td>
+              <td class="text-center py-1 px-1 font-semibold">
+                {Enum.reduce(@grades, 0, fn g, acc -> acc + to_int(row.purchases[g]) end)}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    """
+  end
+
   # --- Settings Tab ---
 
   defp settings_tab(assigns) do
     ~H"""
     <div class="space-y-6">
+      <%!-- Display settings --%>
+      <div class="border rounded p-4">
+        <h3 class="font-bold mb-3">{gettext("Display Settings")}</h3>
+        <div class="flex items-center gap-2">
+          <label class="text-sm font-semibold text-gray-600">{gettext("Show ignored rows")}:</label>
+          <button
+            type="button"
+            phx-click="toggle_show_ignored"
+            class="flex items-center gap-1 px-3 py-1 rounded border text-sm font-semibold"
+          >
+            <.icon :if={@show_ignored} name="hero-eye" class="w-4 h-4 text-blue-600" />
+            <.icon :if={!@show_ignored} name="hero-eye-slash" class="w-4 h-4 text-gray-400" />
+            <span>{if @show_ignored, do: gettext("Showing"), else: gettext("Hidden")}</span>
+          </button>
+        </div>
+      </div>
+
       <%!-- Lookback settings --%>
       <div class="border rounded p-4">
         <h3 class="font-bold mb-3">{gettext("Estimation Settings")}</h3>

@@ -109,7 +109,7 @@ defmodule FullCircle.EggStock do
     from(dd in EggStockDayDetail,
       left_join: c in Contact,
       on: c.id == dd.contact_id,
-      order_by: [asc: dd.section, asc: dd.id],
+      order_by: [asc: dd.section, asc: c.name, asc: dd.id],
       select: dd,
       select_merge: %{contact_name: c.name}
     )
@@ -330,6 +330,7 @@ defmodule FullCircle.EggStock do
 
       %{contact_id: contact_id, contact_name: contact_name, quantities: quantities, doc_links: doc_links}
     end)
+    |> Enum.sort_by(& &1.contact_name)
   end
 
   # --- DOW Averages ---
@@ -642,4 +643,50 @@ defmodule FullCircle.EggStock do
   end
 
   defp to_int(v) when is_float(v), do: round(v)
+
+  def compute_7day_forecast(company_id, start_date, lookback_weeks, lookback_days) do
+    grades = grade_names(company_id)
+    avg_prod = compute_avg_production(company_id, lookback_days)
+    sales_by_dow = sales_averages_by_dow(company_id, lookback_weeks)
+    purchases_by_dow = purchase_averages_by_dow(company_id, lookback_weeks)
+
+    opening =
+      compute_estimated_opening(company_id, start_date, lookback_weeks, lookback_days)
+
+    0..6
+    |> Enum.map_reduce(opening, fn offset, prev_closing ->
+      date = Date.add(start_date, offset)
+      day = get_day(company_id, date)
+      dow = Date.day_of_week(date)
+
+      {day_sales, day_purchases} =
+        if day &&
+             Enum.any?(
+               day.egg_stock_day_details,
+               &(&1.section in ["actual_order", "actual_purchase"])
+             ) do
+          {sum_section(day.egg_stock_day_details, "actual_order", grades),
+           sum_section(day.egg_stock_day_details, "actual_purchase", grades)}
+        else
+          {sum_dow_quantities(sales_by_dow[dow] || [], grades),
+           sum_dow_quantities(purchases_by_dow[dow] || [], grades)}
+        end
+
+      closing =
+        if day && has_actual_closing?(day.closing_bal) do
+          day.closing_bal
+        else
+          Map.new(grades, fn g ->
+            o = to_int(prev_closing[g])
+            p = to_int(avg_prod[g])
+            s = to_int(day_sales[g])
+            b = to_int(day_purchases[g])
+            {g, o + p + b - s}
+          end)
+        end
+
+      {%{date: date, closing: closing, sales: day_sales, purchases: day_purchases}, closing}
+    end)
+    |> elem(0)
+  end
 end
