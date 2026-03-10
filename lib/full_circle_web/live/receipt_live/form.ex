@@ -48,6 +48,7 @@ defmodule FullCircleWeb.ReceiptLive.Form do
           contact_name: params["contact_name"],
           contact_id: params["contact_id"],
           receipt_date: params["date"],
+          load_date: params["date"],
           receipt_details: details
         }
       else
@@ -553,6 +554,9 @@ defmodule FullCircleWeb.ReceiptLive.Form do
           </div>
           <div class="grow shrink w-2/12">
             <.input field={@form[:receipt_date]} label={gettext("Receipt Date")} type="date" />
+          </div>
+          <div class="grow shrink w-2/12">
+            <.input field={@form[:load_date]} label={gettext("Load Date")} type="date" />
           </div>
         </div>
         <div class="flex flex-row flex-nowrap">

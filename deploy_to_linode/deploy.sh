@@ -39,7 +39,7 @@ FULL_IMAGE="$DOCKER_HUB_USERNAME/$IMAGE_NAME:$IMAGE_TAG"
 
 # Build Docker image
 echo "Building Docker image... $script_path"
-docker build -t $FULL_IMAGE -f $script_path/../Dockerfile $script_path/..
+docker build --load -t $FULL_IMAGE -f $script_path/../Dockerfile $script_path/..
 
 # Transfer image directly to server (skip Docker Hub)
 IMAGE_SIZE=$(docker image inspect $FULL_IMAGE --format='{{.Size}}')

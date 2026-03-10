@@ -7,6 +7,7 @@ defmodule FullCircle.ReceiveFund.Receipt do
   schema "receipts" do
     field :receipt_no, :string
     field :receipt_date, :date
+    field :load_date, :date
     belongs_to :contact, FullCircle.Accounting.Contact
     field :descriptions, :string
     belongs_to :funds_account, FullCircle.Accounting.Account
@@ -46,7 +47,7 @@ defmodule FullCircle.ReceiveFund.Receipt do
     receipt
     |> normal_changeset(attrs)
     |> validate_date(:receipt_date, days_before: 60)
-    |> validate_date(:receipt_date, days_after: 0)
+    |> validate_date(:receipt_date, days_after: 10)
   end
 
   def admin_changeset(receipt, attrs) do
@@ -59,6 +60,7 @@ defmodule FullCircle.ReceiveFund.Receipt do
     receipt
     |> cast(attrs, [
       :receipt_date,
+      :load_date,
       :descriptions,
       :company_id,
       :contact_id,

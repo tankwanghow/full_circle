@@ -232,7 +232,7 @@ defmodule FullCircle.EggStock do
         on: rd.package_id == pkg.id,
         where: r.company_id == ^company_id,
         where: g.name in ^trimmed_names,
-        where: r.receipt_date == ^date,
+        where: fragment("COALESCE(?, ?)", r.load_date, r.receipt_date) == ^date,
         select: %{
           contact_id: r.contact_id,
           contact_name: c.name,
@@ -392,12 +392,12 @@ defmodule FullCircle.EggStock do
         on: rd.package_id == pkg.id,
         where: r.company_id == ^company_id,
         where: g.name in ^grade_names,
-        where: r.receipt_date >= ^cutoff,
+        where: fragment("COALESCE(?, ?)", r.load_date, r.receipt_date) >= ^cutoff,
         select: %{
           contact_id: r.contact_id,
           contact_name: c.name,
           good_name: g.name,
-          dow: fragment("EXTRACT(ISODOW FROM ?)::integer", r.receipt_date),
+          dow: fragment("EXTRACT(ISODOW FROM COALESCE(?, ?))::integer", r.load_date, r.receipt_date),
           qty_trays:
             fragment("?::numeric / COALESCE(NULLIF(?, 0), 30)", rd.quantity, pkg.unit_multiplier)
         }
