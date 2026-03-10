@@ -351,6 +351,8 @@ defmodule FullCircleWeb.EggStockLive.Form do
 
   @impl true
   def handle_event("switch_tab", %{"tab" => tab}, socket) do
+    socket = flush_autosave(socket)
+
     {:noreply,
      socket
      |> assign(active_tab: tab)
@@ -858,7 +860,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
       </div>
 
       <%!-- Date selector --%>
-      <div class="flex items-center justify-center gap-2 mb-4">
+      <div class="flex items-center justify-center gap-1 mb-4">
         <button
           type="button"
           phx-click="nav_date"
@@ -964,7 +966,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
   defp now_tab(assigns) do
     ~H"""
     <%!-- Grade column headers --%>
-    <div class="flex gap-2 mb-1">
+    <div class="flex gap-1 mb-1">
       <div class="w-40"></div>
       <div :for={grade <- @grades} class="w-20 text-center text-sm font-semibold text-gray-600">
         {@grade_labels[grade]}
@@ -1007,7 +1009,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
         phx-submit="save"
       >
         <%!-- Expired --%>
-        <div class="flex gap-2 mb-1">
+        <div class="flex gap-1 mb-1">
           <div class="w-40 font-bold text-sm py-1">{gettext("Expired")}</div>
           <input
             :for={grade <- @grades}
@@ -1023,7 +1025,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
         </div>
 
         <%!-- Closing Balance --%>
-        <div class="flex gap-2 mb-1">
+        <div class="flex gap-1 mb-1">
           <div class="w-40 font-bold text-sm py-1">{gettext("Closing")}</div>
           <input
             :for={grade <- @grades}
@@ -1058,7 +1060,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
         />
 
         <%!-- Harvested / Yesterday UG / UG --%>
-        <div class="flex gap-2 mb-1">
+        <div class="flex gap-1 mb-1">
           <div class="w-40 font-bold text-sm py-1">{gettext("Harvest/UG/Loss")}</div>
           <div class="w-20 text-center border rounded px-2 py-1 bg-amber-50">{@harvested}</div>
           <div class="w-20 text-center border rounded px-2 py-1 bg-gray-100">{@yesterday_ug}</div>
@@ -1075,7 +1077,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
               acc + to_int((@form[:closing_bal].value || %{})[g])
             end) %>
           <% has_closing = closing_total > 0 %>
-          <div :if={has_closing} class="flex gap-2 mb-1">
+          <div :if={has_closing} class="flex gap-1 mb-1">
             <% opening_total =
               Enum.reduce(@grades, 0, fn g, acc -> acc + to_int((@day.opening_bal || %{})[g]) end) %>
             <% sold_total =
@@ -1093,7 +1095,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
             </div>
           </div>
         </div>
-        <div class="flex gap-2 mb-2 text-xs text-gray-500">
+        <div class="flex gap-1 mb-2 text-xs text-gray-500">
           <div class="w-40"></div>
           <div class="w-20 text-center">{gettext("Harvested")}</div>
           <div class="w-20 text-center">{gettext("Ytd UG")}</div>
@@ -1151,7 +1153,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
       <.form for={@form} id="day-form" autocomplete="off" phx-change="validate" phx-submit="save">
         <%!-- Purchase Orders Section --%>
         <div class="mb-2">
-          <div class="flex items-center gap-2 mb-1">
+          <div class="flex items-center gap-1 mb-1">
             <h3 class="font-bold text-sm">{gettext("Purchase Orders")}</h3>
             <button
               type="button"
@@ -1182,7 +1184,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
 
         <%!-- Sales Order Section --%>
         <div class="mb-2">
-          <div class="flex items-center gap-2 mb-1">
+          <div class="flex items-center gap-1 mb-1">
             <h3 class="font-bold text-sm">{gettext("Sales Orders")}</h3>
             <button
               type="button"
@@ -1250,7 +1252,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
         />
 
         <%!-- Expired --%>
-        <div class="flex gap-2 mb-1">
+        <div class="flex gap-1 mb-1">
           <div class="w-40 font-bold text-sm py-1">{gettext("Expired")}</div>
           <input
             :for={grade <- @grades}
@@ -1266,7 +1268,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
         </div>
 
         <%!-- Closing Balance --%>
-        <div class="flex gap-2 mb-1">
+        <div class="flex gap-1 mb-1">
           <div class="w-40 font-bold text-sm py-1">{gettext("Closing")}</div>
           <input
             :for={grade <- @grades}
@@ -1302,7 +1304,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
 
         <%!-- Harvested / Yesterday UG / UG --%>
         <% harvest_display = if @harvested == 0 && @est_harvest, do: @est_harvest, else: @harvested %>
-        <div class="flex gap-2 mb-1">
+        <div class="flex gap-1 mb-1">
           <div class="w-40 font-bold text-sm py-1">{gettext("Harvest/UG")}</div>
           <div class={"w-20 text-center border rounded px-2 py-1 #{if @harvested == 0 && @est_harvest, do: "bg-purple-50", else: "bg-amber-50"}"}>
             {harvest_display}
@@ -1321,7 +1323,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
               acc + to_int((@form[:closing_bal].value || %{})[g])
             end) %>
           <% has_closing_ed = closing_total_ed > 0 %>
-          <div :if={has_closing_ed} class="flex gap-2 mb-1">
+          <div :if={has_closing_ed} class="flex gap-1 mb-1">
             <% opening_total_ed =
               Enum.reduce(@grades, 0, fn g, acc -> acc + to_int((@day.opening_bal || %{})[g]) end) %>
             <% sold_total_ed =
@@ -1339,7 +1341,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
             </div>
           </div>
         </div>
-        <div class="flex gap-2 mb-2 text-xs text-gray-500">
+        <div class="flex gap-1 mb-2 text-xs text-gray-500">
           <div class="w-40"></div>
           <div class="w-20 text-center">
             {if @harvested == 0 && @est_harvest,
@@ -1411,7 +1413,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
       >
         <%!-- Purchase Orders Section --%>
         <div class="mb-2">
-          <div class="flex items-center gap-2 mb-1">
+          <div class="flex items-center gap-1 mb-1">
             <h3 class="font-bold text-sm">{gettext("Purchase Orders")}</h3>
             <button
               type="button"
@@ -1442,7 +1444,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
 
         <%!-- Sales Order Section --%>
         <div class="mb-2">
-          <div class="flex items-center gap-2 mb-1">
+          <div class="flex items-center gap-1 mb-1">
             <h3 class="font-bold text-sm">{gettext("Sales Orders")}</h3>
             <button
               type="button"
@@ -1480,7 +1482,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
         />
 
         <%!-- Est Harvest --%>
-        <div class="flex gap-2 mb-1">
+        <div class="flex gap-1 mb-1">
           <div class="w-40 font-bold text-sm py-1">{gettext("Est Harvest")}</div>
           <div class="w-20 text-center border rounded px-2 py-1 bg-amber-50">{@est_harvest}</div>
         </div>
@@ -1511,7 +1513,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
     assigns = assign_new(assigns, :suffix, fn -> "" end)
 
     ~H"""
-    <div class="flex gap-2 mb-1">
+    <div class="flex gap-1 mb-1">
       <div class="w-40 font-bold text-sm py-1">{@label}</div>
       <div :for={grade <- @grades} class={"w-20 text-center border rounded px-2 py-1 #{@bg}"}>
         {display_val(@values[grade])}{@suffix}
@@ -1528,7 +1530,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
     ~H"""
     <div :if={@rows != []} class="mb-2">
       <h3 class={"font-bold text-sm mb-1 #{@title_class}"}>{@title}</h3>
-      <div :for={row <- @rows} class={"flex gap-2 text-sm #{@bg_class}"}>
+      <div :for={row <- @rows} class={"flex gap-1 text-sm #{@bg_class}"}>
         <span class="w-40 truncate flex items-center gap-1" title={row.contact_name}>
           {row.contact_name}
         </span>
@@ -1549,7 +1551,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
             </a>
           </span>
       </div>
-      <div class="flex gap-2 mt-1 font-semibold text-sm text-gray-700 border-t pt-1">
+      <div class="flex gap-1 mt-1 font-semibold text-sm text-gray-700 border-t pt-1">
         <div class="w-40 text-right">{gettext("Total")}</div>
         <div :for={grade <- @grades} class="w-20 text-center">
           {actual_total(@rows, grade)}
@@ -1581,12 +1583,12 @@ defmodule FullCircleWeb.EggStockLive.Form do
 
   defp detail_lines(assigns) do
     ~H"""
-    <div class="space-y-1">
+    <div>
       <.inputs_for :let={dtl} field={@form[:egg_stock_day_details]}>
         <% ignored = dtl[:ignore].value in [true, "true"] %>
         <div
           :if={dtl[:section].value == @section and (@show_ignored or !ignored)}
-          class={"flex items-center gap-2 #{if ignored, do: "opacity-40"}"}
+          class={"flex items-center gap-1 #{if ignored, do: "opacity-40"}"}
         >
           <input :if={dtl[:id].value} type="hidden" name={dtl[:id].name} value={dtl[:id].value} />
           <input type="hidden" name={dtl[:section].name} value={@section} />
@@ -1679,7 +1681,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
 
   defp section_totals(assigns) do
     ~H"""
-    <div class="flex gap-2 mt-1 font-semibold text-sm text-gray-700 border-t pt-1">
+    <div class="flex gap-1 mt-1 font-semibold text-sm text-gray-700 border-t pt-1">
       <div class="w-40 text-right">{gettext("Total")}</div>
       <div :for={grade <- @grades} class="w-20 text-center">
         {sum_quantities(@details, @section, grade)}
@@ -1820,7 +1822,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
       <%!-- Display settings --%>
       <div class="border rounded p-4">
         <h3 class="font-bold mb-3">{gettext("Display Settings")}</h3>
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-1">
           <label class="text-sm font-semibold text-gray-600">{gettext("Show ignored rows")}:</label>
           <button
             type="button"
@@ -1839,7 +1841,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
         <h3 class="font-bold mb-3">{gettext("Estimation Settings")}</h3>
 
         <.form for={%{}} id="lookback-weeks-form" phx-change="change_lookback">
-          <div class="flex items-center gap-2 mb-3">
+          <div class="flex items-center gap-1 mb-3">
             <label class="text-sm font-semibold text-gray-600 w-64">
               {gettext("Sales/Purchase lookback weeks")}:
             </label>
@@ -1853,7 +1855,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
         </.form>
 
         <.form for={%{}} id="autosave-delay-form" phx-change="change_autosave_delay">
-          <div class="flex items-center gap-2 mb-3">
+          <div class="flex items-center gap-1 mb-3">
             <label class="text-sm font-semibold text-gray-600 w-64">
               {gettext("Autosave delay (seconds)")}:
             </label>
@@ -1869,7 +1871,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
         </.form>
 
         <.form for={%{}} id="lookback-days-form" phx-change="change_lookback_days">
-          <div class="flex items-center gap-2">
+          <div class="flex items-center gap-1">
             <label class="text-sm font-semibold text-gray-600 w-64">
               {gettext("Harvest/Production lookback days")}:
             </label>
@@ -1897,7 +1899,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
           phx-submit="save_grades"
         >
           <div class="max-w-md">
-            <div class="flex gap-2 mb-2 text-sm font-semibold text-gray-600">
+            <div class="flex gap-1 mb-2 text-sm font-semibold text-gray-600">
               <div class="w-8">#</div>
               <div class="w-48">{gettext("Good Name")}</div>
               <div class="w-32">{gettext("Nickname")}</div>
@@ -1919,7 +1921,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
                 value={grade["nickname"]}
               />
 
-              <div :if={grade["delete"] != "true"} class="flex items-center gap-2">
+              <div :if={grade["delete"] != "true"} class="flex items-center gap-1">
                 <span class="w-8 text-sm text-gray-500">{idx + 1}</span>
 
                 <input
@@ -1968,7 +1970,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
               </div>
             </div>
 
-            <div class="flex gap-2 mt-3">
+            <div class="flex gap-1 mt-3">
               <button type="button" phx-click="add_grade" class="text-blue-600 hover:text-blue-800">
                 <.icon name="hero-plus-circle" class="h-5 w-5" /> {gettext("Add Grade")}
               </button>

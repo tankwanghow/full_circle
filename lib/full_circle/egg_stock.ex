@@ -615,7 +615,7 @@ defmodule FullCircle.EggStock do
 
   defp sum_section(details, section, grades) do
     details
-    |> Enum.filter(&(&1.section == section))
+    |> Enum.filter(&(&1.section == section and !&1.ignore))
     |> Enum.reduce(Map.new(grades, fn g -> {g, 0} end), fn detail, acc ->
       Map.merge(acc, detail.quantities || %{}, fn _k, v1, v2 ->
         to_int(v1) + to_int(v2)
