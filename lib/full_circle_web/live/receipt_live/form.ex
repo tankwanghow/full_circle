@@ -13,7 +13,7 @@ defmodule FullCircleWeb.ReceiptLive.Form do
 
     socket =
       case socket.assigns.live_action do
-        :new -> mount_new(socket)
+        :new -> mount_new(socket, params)
         :edit -> mount_edit(socket, id)
       end
 
@@ -34,7 +34,26 @@ defmodule FullCircleWeb.ReceiptLive.Form do
      )}
   end
 
-  defp mount_new(socket) do
+  defp mount_new(socket, params) do
+    attrs =
+      if params["egg"] do
+        egg_quantities = parse_egg_quantities(params["egg"])
+        details = FullCircle.Billing.build_invoice_details_from_egg_order(
+          egg_quantities,
+          socket.assigns.current_company,
+          socket.assigns.current_user
+        )
+        %{
+          receipt_no: "...new...",
+          contact_name: params["contact_name"],
+          contact_id: params["contact_id"],
+          receipt_date: params["date"],
+          receipt_details: details
+        }
+      else
+        %{receipt_no: "...new..."}
+      end
+
     socket
     |> assign(live_action: :new)
     |> assign(id: "new")
@@ -45,11 +64,23 @@ defmodule FullCircleWeb.ReceiptLive.Form do
         StdInterface.changeset(
           Receipt,
           %Receipt{},
-          %{receipt_no: "...new..."},
+          attrs,
           socket.assigns.current_company
         )
       )
     )
+  end
+
+  defp parse_egg_quantities(egg_str) do
+    egg_str
+    |> String.split(",")
+    |> Enum.map(fn part ->
+      case String.split(part, ":", parts: 2) do
+        [grade, qty] -> {URI.decode(grade), qty}
+        _ -> nil
+      end
+    end)
+    |> Enum.reject(&is_nil/1)
   end
 
   defp mount_edit(socket, id) do

@@ -274,6 +274,39 @@ defmodule FullCircle.Billing do
     end
   end
 
+  def build_invoice_details_from_egg_order(egg_quantities, com, user) do
+    egg_quantities
+    |> Enum.reject(fn {_grade, qty} -> qty in [nil, "", "0", 0] end)
+    |> Enum.with_index()
+    |> Enum.map(fn {{grade_name, tray_qty}, idx} ->
+      good = FullCircle.Product.get_good_by_name(String.trim(grade_name), com, user)
+
+      if good do
+        %{
+          "good_name" => good.value,
+          "good_id" => good.id,
+          "account_name" => good.sales_account_name,
+          "account_id" => good.sales_account_id,
+          "tax_code_name" => good.sales_tax_code_name,
+          "tax_code_id" => good.sales_tax_code_id,
+          "tax_rate" => good.sales_tax_rate || 0,
+          "package_name" => good.package_name,
+          "package_id" => good.package_id,
+          "unit" => good.unit,
+          "unit_multiplier" => good.unit_multiplier || 1,
+          "package_qty" => tray_qty,
+          "quantity" => Decimal.mult(Decimal.new("#{tray_qty}"), Decimal.new("#{good.unit_multiplier || 1}")),
+          "unit_price" => 0,
+          "discount" => 0,
+          "_persistent_id" => idx
+        }
+      else
+        nil
+      end
+    end)
+    |> Enum.reject(&is_nil/1)
+  end
+
   def create_invoice(attrs, com, user) do
     case can?(user, :create_invoice, com) do
       true ->

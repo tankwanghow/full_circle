@@ -107,10 +107,10 @@ defmodule FullCircleWeb.EggStockLive.Print do
         table { width: 100%; border-collapse: collapse; }
         th, td { border: 1px solid #ccc; padding: 3px 5px; text-align: center; }
         th { background: #f3f4f6; font-weight: 600; }
-        .label-col { text-align: left; font-weight: 600; width: 120px; }
+        .label-col { text-align: left; font-weight: 800; width: 120px; }
         .section-title { font-weight: 700; text-align: left; padding: 4px 5px; background: #e5e7eb; }
         .total-row td { font-weight: 700; border-top: 2px solid #666; }
-        .contact-name { text-align: left; padding-left: 10px; }
+        .contact-name { text-align: left; padding-left: 10px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .num { text-align: center; }
         h1 { text-align: center; font-size: 18px; font-weight: 700; margin-bottom: 2px; }
         h2 { text-align: center; font-size: 14px; font-weight: 600; color: #555; margin-bottom: 10px; }
@@ -119,6 +119,9 @@ defmodule FullCircleWeb.EggStockLive.Print do
         .harvest-row table { width: auto; }
         .harvest-row td { border: 1px solid #ccc; padding: 3px 8px; }
         .harvest-label { text-align: left; font-weight: 600; }
+        .bottom-section { position: absolute; bottom: 10mm; left: 10mm; right: 10mm; }
+        @media print { .bottom-section { bottom: 5mm; left: 5mm; right: 5mm; } }
+        .page { position: relative; }
       </style>
 
       <div class="page">
@@ -178,49 +181,67 @@ defmodule FullCircleWeb.EggStockLive.Print do
               <td :for={g <- @grade_names} class="num">{to_int(@expired[g])}</td>
               <td class="num">{Enum.reduce(@grade_names, 0, fn g, acc -> acc + to_int(@expired[g]) end)}</td>
             </tr>
-
-            <%!-- Closing --%>
-            <tr style="background: #f0f0f0; font-weight: 700;">
-              <td class="label-col">{gettext("Closing")}</td>
-              <td :for={g <- @grade_names} class="num">{to_int(@closing[g])}</td>
-              <td class="num">{@closing_total}</td>
-            </tr>
-
-            <%!-- Production --%>
-            <tr style="background: #f0fdf4;">
-              <td class="label-col">{gettext("Production")}</td>
-              <td :for={g <- @grade_names} class="num">{to_int(@productions[g])}</td>
-              <td class="num">{Enum.reduce(@grade_names, 0, fn g, acc -> acc + to_int(@productions[g]) end)}</td>
-            </tr>
-
-            <%!-- Yield --%>
-            <tr style="background: #fefce8;">
-              <td class="label-col">{gettext("Yield %")}</td>
-              <td :for={g <- @grade_names} class="num">{@yields[g]}%</td>
-              <td class="num"></td>
-            </tr>
           </tbody>
         </table>
-
-        <%!-- Harvest / UG / Loss --%>
-        <div class="harvest-row">
-          <table>
-            <tr>
-              <td class="harvest-label">{gettext("Harvested")}</td>
-              <td class="num">{@harvested}</td>
-              <td class="harvest-label">{gettext("Ytd UG")}</td>
-              <td class="num">{@yesterday_ug}</td>
-              <td class="harvest-label">{gettext("UG")}</td>
-              <td class="num">{@day.ungraded_bal || 0}</td>
-              <td class="harvest-label">{gettext("Loss")}</td>
-              <td class="num">{@loss}</td>
-            </tr>
-          </table>
-        </div>
 
         <%!-- Note --%>
         <div :if={@day.note && @day.note != ""} style="margin-top: 8px;">
           <strong>{gettext("Note")}:</strong> {@day.note}
+        </div>
+
+        <%!-- Bottom section --%>
+        <div class="bottom-section">
+          <table>
+            <thead>
+              <tr>
+                <th class="label-col"></th>
+                <th :for={g <- @grade_names}>{@grade_labels[g]}</th>
+                <th>{gettext("Total")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <%!-- Closing --%>
+              <tr style="background: #f0f0f0; font-weight: 700;">
+                <td class="label-col">{gettext("Closing")}</td>
+                <td :for={g <- @grade_names} class="num">{to_int(@closing[g])}</td>
+                <td class="num">{@closing_total}</td>
+              </tr>
+
+              <%!-- Production --%>
+              <tr style="background: #f0fdf4;">
+                <td class="label-col">{gettext("Production")}</td>
+                <td :for={g <- @grade_names} class="num">{to_int(@productions[g])}</td>
+                <td class="num">{Enum.reduce(@grade_names, 0, fn g, acc -> acc + to_int(@productions[g]) end)}</td>
+              </tr>
+
+              <%!-- Yield --%>
+              <tr style="background: #fefce8;">
+                <td class="label-col">{gettext("Yield %")}</td>
+                <td :for={g <- @grade_names} class="num">{@yields[g]}%</td>
+                <td class="num"></td>
+              </tr>
+            </tbody>
+          </table>
+
+          <%!-- Harvest / UG / Loss --%>
+          <div class="harvest-row">
+            <table>
+              <tr>
+                <td class="harvest-label">{gettext("Harvested")}</td>
+                <td class="num">{@harvested}</td>
+                <td class="harvest-label">{gettext("Ytd UG")}</td>
+                <td class="num">{@yesterday_ug}</td>
+                <td class="harvest-label">{gettext("UG")}</td>
+                <td class="num">{@day.ungraded_bal || 0}</td>
+                <td class="harvest-label">{gettext("Loss")}</td>
+                <td class="num">{@loss}</td>
+              </tr>
+            </table>
+          </div>
+
+          <div style="text-align: right; margin-top: 4px; font-size: 10px; color: #888;">
+            {FullCircleWeb.Helpers.format_date(@date)}
+          </div>
         </div>
       </div>
     </div>

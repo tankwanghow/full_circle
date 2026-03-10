@@ -11,7 +11,7 @@ defmodule FullCircleWeb.InvoiceLive.Form do
 
     socket =
       case socket.assigns.live_action do
-        :new -> mount_new(socket)
+        :new -> mount_new(socket, params)
         :edit -> mount_edit(socket, id)
       end
 
@@ -27,8 +27,26 @@ defmodule FullCircleWeb.InvoiceLive.Form do
      )}
   end
 
-  defp mount_new(socket) do
-    attrs = %{invoice_no: "...new..."}
+  defp mount_new(socket, params) do
+    attrs =
+      if params["egg"] do
+        egg_quantities = parse_egg_quantities(params["egg"])
+        details = Billing.build_invoice_details_from_egg_order(
+          egg_quantities,
+          socket.assigns.current_company,
+          socket.assigns.current_user
+        )
+        %{
+          invoice_no: "...new...",
+          contact_name: params["contact_name"],
+          contact_id: params["contact_id"],
+          invoice_date: params["date"],
+          load_date: params["date"],
+          invoice_details: details
+        }
+      else
+        %{invoice_no: "...new..."}
+      end
 
     socket
     |> assign(live_action: :new)
@@ -46,6 +64,18 @@ defmodule FullCircleWeb.InvoiceLive.Form do
         )
       )
     )
+  end
+
+  defp parse_egg_quantities(egg_str) do
+    egg_str
+    |> String.split(",")
+    |> Enum.map(fn part ->
+      case String.split(part, ":", parts: 2) do
+        [grade, qty] -> {URI.decode(grade), qty}
+        _ -> nil
+      end
+    end)
+    |> Enum.reject(&is_nil/1)
   end
 
   defp mount_edit(socket, id) do

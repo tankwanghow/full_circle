@@ -38,23 +38,11 @@ defmodule FullCircle.Repo.Migrations.CreateEggStockTables do
       add :contact_id, references(:contacts, on_delete: :nilify_all)
       add :section, :string, null: false
       add :quantities, :map, default: %{}
+      add :ignore, :boolean, default: false, null: false
     end
 
     create index(:egg_stock_day_details, [:egg_stock_day_id])
     create index(:egg_stock_day_details, [:contact_id])
-
-    create table(:egg_est_templates) do
-      add :company_id, references(:companies, on_delete: :delete_all), null: false
-      add :type, :string, null: false
-      add :day_of_week, :integer, null: false
-      add :contact_id, references(:contacts, on_delete: :nilify_all)
-      add :quantities, :map, default: %{}
-      add :lookback_weeks, :integer, default: 4, null: false
-
-      timestamps(type: :timestamptz)
-    end
-
-    create index(:egg_est_templates, [:company_id, :type, :day_of_week])
 
     alter table(:invoices) do
       add :load_date, :date
