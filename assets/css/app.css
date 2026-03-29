@@ -1,42 +1,197 @@
-@import "tailwindcss/base";
-@import "tailwindcss/components";
-@import "tailwindcss/utilities";
+@import "tailwindcss";
 
-.tribute-container {
-  position: absolute;
-  top: 0;
-  left: 0;
-  height: auto;
-  overflow: auto;
-  display: block;
-  z-index: 999999;
+@source "../../lib/full_circle_web.ex";
+@source "../../lib/full_circle_web/**/*.*ex";
+@source "../js/**/*.js";
+
+@plugin "@tailwindcss/forms";
+@plugin "./tailwind_heroicons.js";
+
+@custom-variant phx-click-loading (".phx-click-loading&", ".phx-click-loading &");
+@custom-variant phx-submit-loading (".phx-submit-loading&", ".phx-submit-loading &");
+@custom-variant phx-change-loading (".phx-change-loading&", ".phx-change-loading &");
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-brand: #FD4F00;
 }
-.tribute-container ul {
-  margin: 0;
-  margin-top: 2px;
-  padding: 0;
-  list-style: none;
-  background: #efefef;
+
+/* ── Dark mode: global overrides ──────────────────────────────────── */
+/* Remap common light backgrounds/text so templates work without per-element dark: classes */
+
+.dark body,
+body.dark {
+  @apply bg-gray-900 text-gray-100;
 }
-.tribute-container li {
-  padding: 5px 5px;
-  cursor: pointer;
+
+/* Form inputs and selects */
+.dark input:not([type="checkbox"]):not([type="radio"]),
+.dark select,
+.dark textarea {
+  @apply bg-gray-800 text-gray-100 border-gray-600;
 }
-.tribute-container li.highlight {
-  background: #ddd;
+
+.dark input[readonly] {
+  @apply bg-gray-700 text-gray-400;
 }
-.tribute-container li span {
-  font-weight: bold;
+
+.dark input[disabled],
+.dark button[disabled] {
+  @apply bg-gray-700 text-gray-500;
 }
-.tribute-container li.no-match {
-  cursor: default;
+
+/* Common light bg remaps */
+.dark .bg-green-50 { background-color: var(--color-gray-900); }
+.dark .bg-green-100 { background-color: var(--color-green-900); }
+.dark .bg-green-200 { background-color: var(--color-green-900); }
+.dark .bg-gray-200 { background-color: var(--color-gray-700); }
+.dark .bg-gray-300 { background-color: var(--color-gray-600); }
+.dark .bg-blue-200 { background-color: var(--color-blue-900); }
+.dark .bg-amber-200 { background-color: var(--color-amber-900); }
+.dark .bg-amber-50 { background-color: var(--color-amber-900); }
+.dark .bg-purple-200 { background-color: var(--color-purple-900); }
+.dark .bg-rose-200 { background-color: var(--color-rose-900); }
+.dark .bg-rose-50 { background-color: var(--color-rose-900); }
+.dark .bg-cyan-200 { background-color: var(--color-cyan-900); }
+.dark .bg-teal-200 { background-color: var(--color-teal-900); }
+.dark .bg-sky-200 { background-color: var(--color-sky-900); }
+.dark .bg-red-200 { background-color: var(--color-red-900); }
+.dark .bg-red-300 { background-color: var(--color-red-800); }
+.dark .bg-emerald-50 { background-color: var(--color-emerald-900); }
+.dark .bg-yellow-100 { background-color: var(--color-gray-800); }
+.dark .bg-yellow-200 { background-color: var(--color-gray-700); }
+.dark .bg-yellow-50 { background-color: var(--color-gray-800); }
+.dark .bg-white { background-color: var(--color-gray-800); }
+.dark .bg-pink-100 { background-color: var(--color-gray-800); }
+.dark .bg-pink-50 { background-color: var(--color-gray-800); }
+.dark .bg-blue-100 { background-color: var(--color-blue-900); }
+.dark .bg-orange-200 { background-color: var(--color-orange-900); }
+.dark .bg-orange-400 { background-color: var(--color-orange-800); }
+.dark .bg-orange-50 { background-color: var(--color-gray-800); }
+.dark .bg-indigo-100 { background-color: var(--color-indigo-900); }
+.dark .bg-lime-200 { background-color: var(--color-lime-900); }
+.dark .bg-red-100 { background-color: var(--color-red-900); }
+.dark .bg-rose-400 { background-color: var(--color-rose-700); }
+.dark .bg-green-600 { background-color: var(--color-green-800); }
+.dark .bg-black { background-color: var(--color-gray-900); }
+.dark .bg-gray-100 { background-color: var(--color-gray-800); }
+.dark .bg-gray-50 { background-color: var(--color-gray-800); }
+.dark .bg-gray-400 { background-color: var(--color-gray-600); }
+.dark .bg-gray-500 { background-color: var(--color-gray-600); }
+.dark .bg-red-300 { background-color: var(--color-red-800); }
+.dark .bg-purple-100 { background-color: var(--color-purple-900); }
+.dark .bg-purple-50 { background-color: var(--color-gray-800); }
+.dark .bg-green-300 { background-color: var(--color-green-800); }
+.dark .bg-green-400 { background-color: var(--color-green-700); }
+.dark .bg-emerald-400 { background-color: var(--color-emerald-700); }
+.dark .bg-emerald-100 { background-color: var(--color-emerald-900); }
+.dark .bg-zinc-50 { background-color: var(--color-gray-800); }
+.dark .bg-blue-50 { background-color: var(--color-gray-800); }
+
+/* Hover bg remaps */
+.dark .hover\:bg-gray-400:hover { background-color: var(--color-gray-600); }
+.dark .hover\:bg-gray-300:hover { background-color: var(--color-gray-600); }
+.dark .hover\:bg-gray-500:hover { background-color: var(--color-gray-500); }
+.dark .hover\:bg-sky-500:hover { background-color: var(--color-sky-700); }
+.dark .hover\:bg-green-500:hover { background-color: var(--color-green-700); }
+.dark .hover\:bg-amber-500:hover { background-color: var(--color-amber-700); }
+.dark .hover\:bg-red-500:hover { background-color: var(--color-red-700); }
+.dark .hover\:bg-teal-500:hover { background-color: var(--color-teal-700); }
+.dark .hover\:bg-blue-400:hover { background-color: var(--color-blue-700); }
+.dark .hover\:bg-amber-200:hover { background-color: var(--color-amber-800); }
+.dark .hover\:bg-blue-200:hover { background-color: var(--color-blue-800); }
+.dark .hover\:bg-emerald-400:hover { background-color: var(--color-emerald-700); }
+.dark .hover\:bg-rose-400:hover { background-color: var(--color-rose-700); }
+.dark .hover\:bg-rose-200:hover { background-color: var(--color-rose-800); }
+.dark .hover\:bg-rose-400:hover { background-color: var(--color-rose-700); }
+.dark .hover\:bg-orange-400:hover { background-color: var(--color-orange-700); }
+.dark .hover\:bg-blue-100:hover { background-color: var(--color-blue-800); }
+.dark .hover\:bg-green-600:hover { background-color: var(--color-green-700); }
+
+/* Focus bg remaps */
+.dark .focus\:bg-sky-500:focus { background-color: var(--color-sky-700); }
+.dark .focus\:bg-green-500:focus { background-color: var(--color-green-700); }
+.dark .focus\:bg-amber-500:focus { background-color: var(--color-amber-700); }
+.dark .focus\:bg-red-500:focus { background-color: var(--color-red-700); }
+.dark .focus\:bg-teal-500:focus { background-color: var(--color-teal-700); }
+.dark .focus\:bg-gray-500:focus { background-color: var(--color-gray-600); }
+
+/* Border remaps */
+.dark .border-gray-400 { border-color: var(--color-gray-600); }
+.dark .border-gray-500 { border-color: var(--color-gray-600); }
+.dark .border-blue-400 { border-color: var(--color-blue-700); }
+.dark .border-blue-500 { border-color: var(--color-blue-700); }
+.dark .border-blue-600 { border-color: var(--color-blue-700); }
+.dark .border-amber-400 { border-color: var(--color-amber-700); }
+.dark .border-amber-500 { border-color: var(--color-amber-700); }
+.dark .border-rose-400 { border-color: var(--color-rose-700); }
+.dark .border-rose-500 { border-color: var(--color-rose-700); }
+.dark .border-yellow-500 { border-color: var(--color-gray-600); }
+.dark .border-yellow-800 { border-color: var(--color-gray-500); }
+.dark .border-green-400 { border-color: var(--color-green-700); }
+.dark .border-green-500 { border-color: var(--color-green-700); }
+.dark .border-green-600 { border-color: var(--color-green-700); }
+.dark .border-red-600 { border-color: var(--color-red-700); }
+.dark .border-pink-500 { border-color: var(--color-pink-700); }
+.dark .border-orange-400 { border-color: var(--color-orange-700); }
+.dark .border-orange-600 { border-color: var(--color-orange-700); }
+.dark .border-indigo-400 { border-color: var(--color-indigo-700); }
+.dark .border-lime-400 { border-color: var(--color-lime-700); }
+
+/* Text color remaps */
+.dark .text-zinc-800 { color: var(--color-zinc-200); }
+.dark .text-zinc-600 { color: var(--color-zinc-400); }
+.dark .text-zinc-900 { color: var(--color-zinc-100); }
+.dark .text-gray-400 { color: var(--color-gray-500); }
+.dark .text-gray-600 { color: var(--color-gray-400); }
+.dark .text-emerald-800 { color: var(--color-emerald-200); }
+.dark .text-amber-800 { color: var(--color-amber-200); }
+.dark .text-rose-900 { color: var(--color-rose-200); }
+
+/* Modal backdrop and container */
+.dark .bg-zinc-50\/90 { background-color: rgb(24 24 27 / 0.9); }
+.dark .shadow-zinc-700\/10 { --tw-shadow-color: rgb(0 0 0 / 0.3); }
+.dark .ring-zinc-700\/10 { --tw-ring-color: rgb(63 63 70 / 0.3); }
+
+/* Input border remaps */
+.dark .border-zinc-300 { border-color: var(--color-zinc-600); }
+.dark .focus\:border-zinc-400:focus { border-color: var(--color-zinc-500); }
+
+/* Ring remaps */
+.dark .ring-emerald-500 { --tw-ring-color: var(--color-emerald-700); }
+.dark .ring-amber-500 { --tw-ring-color: var(--color-amber-700); }
+.dark .ring-rose-500 { --tw-ring-color: var(--color-rose-700); }
+
+/* Nav bar dropdown */
+.dark .bg-gray-800 { background-color: var(--color-gray-800); }
+
+/* Tribute autocomplete */
+.dark .tribute-container ul { background: #374151; }
+.dark .tribute-container li.highlight { background: #4b5563; }
+
+/* Tables and report sections */
+.dark .bg-blue-200.border-blue-500,
+.dark .bg-blue-200.border-blue-400 {
+  background-color: var(--color-blue-900);
+  border-color: var(--color-blue-700);
 }
-.tribute-container .menu-highlighted {
-  font-weight: bold;
+
+.dark .bg-gray-200.border-gray-500,
+.dark .bg-gray-200.border-gray-400 {
+  background-color: var(--color-gray-700);
+  border-color: var(--color-gray-600);
 }
+
+.dark .bg-amber-200.border-amber-400 {
+  background-color: var(--color-amber-900);
+  border-color: var(--color-amber-700);
+}
+
+/* ── End dark mode ────────────────────────────────────────────────── */
 
 input:not([type="file"]).phx-change-loading{
-  @apply ring-inset ring-4 ring-amber-300 animate-quick-pulse !important;
+  @apply !ring-inset !ring-4 !ring-amber-300;
+  animation: quick-pulse 0.5s cubic-bezier(0.4, 0, 0.6, 1) infinite !important;
 }
 
 input[readonly] { @apply cursor-not-allowed bg-gray-200; }
@@ -54,7 +209,7 @@ div.SalaryType_Contribution input {
 }
 
 .phx-click-loading {
-  @apply animate-quick-pulse !important;
+  animation: quick-pulse 0.5s cubic-bezier(0.4, 0, 0.6, 1) infinite !important;
 }
 
 @keyframes quick-pulse {
@@ -66,8 +221,6 @@ div.SalaryType_Contribution input {
 .animate-quick-pulse {
   animation: quick-pulse 0.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
-
-/* This file is for your main application CSS */
 
 /* Chrome, Safari, Edge, Opera */
 input::-webkit-outer-spin-button,
@@ -90,6 +243,9 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 .detail-header {
   @apply border border-gray-500 bg-gray-200 py-1;
 }
+.dark .detail-header {
+  @apply border-gray-600 bg-gray-700;
+}
 
 .flash-shake {
   animation: flash-shake 0.2s;
@@ -106,16 +262,25 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 }
 
 .nav-btn {
-  @apply ml-1 mb-1 rounded-md px-2 py-2 border border-red-600; 
+  @apply ml-1 mb-1 rounded-md px-2 py-2 border border-red-600;
   @apply transition duration-200 select-none bg-red-300 hover:bg-red-500 focus:bg-red-500;
+}
+.dark .nav-btn {
+  @apply border-red-700 bg-red-800 text-red-100 hover:bg-red-600 focus:bg-red-600;
 }
 
 button[disabled] {
   @apply cursor-not-allowed bg-gray-400;
 }
+.dark button[disabled] {
+  @apply bg-gray-700 text-gray-500;
+}
 
 input[disabled] {
   @apply cursor-not-allowed bg-gray-200;
+}
+.dark input[disabled] {
+  @apply bg-gray-700 text-gray-500;
 }
 
 .button {
@@ -128,34 +293,58 @@ input[disabled] {
 .blue.button {
   @apply border-sky-500 bg-sky-200 hover:bg-sky-500 focus:bg-sky-500;
 }
+.dark .blue.button {
+  @apply border-sky-600 bg-sky-800 text-sky-100 hover:bg-sky-600 focus:bg-sky-600;
+}
 
 .green.button {
   @apply border-green-500 bg-green-200 hover:bg-green-500 focus:bg-green-500;
+}
+.dark .green.button {
+  @apply border-green-600 bg-green-800 text-green-100 hover:bg-green-600 focus:bg-green-600;
 }
 
 .orange.button {
   @apply border-amber-500 bg-amber-200 hover:bg-amber-500 focus:bg-amber-500;
 }
+.dark .orange.button {
+  @apply border-amber-600 bg-amber-800 text-amber-100 hover:bg-amber-600 focus:bg-amber-600;
+}
 
 .gray.button {
   @apply border-gray-500 bg-gray-200 hover:bg-gray-500 focus:bg-gray-500;
+}
+.dark .gray.button {
+  @apply border-gray-600 bg-gray-700 text-gray-200 hover:bg-gray-500 focus:bg-gray-500;
 }
 
 .red.button {
   @apply border-red-500 bg-red-200 hover:bg-red-500 focus:bg-red-500;
 }
+.dark .red.button {
+  @apply border-red-600 bg-red-800 text-red-100 hover:bg-red-600 focus:bg-red-600;
+}
 
 .teal.button {
   @apply border-teal-500 bg-teal-200 hover:bg-teal-500 focus:bg-teal-500;
+}
+.dark .teal.button {
+  @apply border-teal-600 bg-teal-800 text-teal-100 hover:bg-teal-600 focus:bg-teal-600;
 }
 
 .tab {
   @apply rounded-lg border-b-2 border-gray-400 font-medium text-lg py-2;
   @apply hover:border-b-2 hover:border-blue-800 hover:font-extrabold hover:cursor-pointer;
 }
+.dark .tab {
+  @apply border-gray-600 hover:border-blue-400;
+}
 
 .tab.active {
   @apply border-b-2 border-blue-800 font-extrabold bg-gray-300;
+}
+.dark .tab.active {
+  @apply border-blue-400 bg-gray-700;
 }
 
 .detail-good-col {

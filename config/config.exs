@@ -46,7 +46,7 @@ config :full_circle, FullCircleWeb.Endpoint,
 
 # Configure esbuild (the version is required)
 config :esbuild,
-  version: "0.24.2",
+  version: "0.27.4",
   full_circle: [
     args: ~w(js/app.js js/tri_autocomplete.js js/take_photo_human.js
              js/face_id.js js/qr_attend.js
@@ -60,14 +60,13 @@ config :esbuild,
 
 # Configure tailwind (the version is required)
 config :tailwind,
-  version: "3.4.17",
+  version: "4.1.8",
   full_circle: [
     args: ~w(
-      --config=tailwind.config.js
-      --input=css/app.css
-      --output=../priv/static/assets/app.css
+      --input=assets/css/app.css
+      --output=priv/static/assets/app.css
     ),
-    cd: Path.expand("../assets", __DIR__)
+    cd: Path.expand("..", __DIR__)
   ]
 
 # Configures Elixir's Logger
