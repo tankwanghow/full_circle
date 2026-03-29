@@ -16,17 +16,18 @@ defmodule FullCircleWeb.WeighingLive.GoodsReport do
     glist = params["glist"] || ""
     f_date = params["f_date"] || ""
     t_date = params["t_date"] || ""
+    group_note = params["group_note"] || "false"
 
     socket =
       socket
       |> assign(page_title: "Weight Goods Report :- #{f_date} to #{t_date}")
-      |> assign(search: %{glist: glist, f_date: f_date, t_date: t_date})
+      |> assign(search: %{glist: glist, f_date: f_date, t_date: t_date, group_note: group_note})
 
     {:noreply,
      if t_date == "" or f_date == "" do
        socket
      else
-       socket |> filter_objects(glist, f_date, t_date)
+       socket |> filter_objects(glist, f_date, t_date, group_note)
      end}
   end
 
@@ -41,18 +42,20 @@ defmodule FullCircleWeb.WeighingLive.GoodsReport do
   def handle_event(
         "query",
         %{
-          "search" => %{
-            "glist" => glist,
-            "t_date" => t_date,
-            "f_date" => f_date
-          }
+          "search" => search
         },
         socket
       ) do
+    glist = search["glist"]
+    f_date = search["f_date"]
+    t_date = search["t_date"]
+    group_note = if search["group_note"], do: "true", else: "false"
+
     qry = %{
       "search[glist]" => glist,
       "search[t_date]" => t_date,
-      "search[f_date]" => f_date
+      "search[f_date]" => f_date,
+      "search[group_note]" => group_note
     }
 
     url =
@@ -63,7 +66,7 @@ defmodule FullCircleWeb.WeighingLive.GoodsReport do
      |> push_navigate(to: url)}
   end
 
-  defp filter_objects(socket, glist, f_date, t_date) do
+  defp filter_objects(socket, glist, f_date, t_date, group_note) do
     current_company = socket.assigns.current_company
 
     socket
@@ -77,7 +80,8 @@ defmodule FullCircleWeb.WeighingLive.GoodsReport do
                glist,
                f_date,
                t_date,
-               current_company.id
+               current_company.id,
+               group_note
              )
          }}
       end
@@ -92,7 +96,7 @@ defmodule FullCircleWeb.WeighingLive.GoodsReport do
       <div class="border rounded bg-purple-200 text-center p-2">
         <.form for={%{}} id="search-form" phx-change="changed" phx-submit="query" autocomplete="off">
           <div class="grid grid-cols-12 tracking-tighter">
-            <div class="col-span-5 grow shrink">
+            <div class="col-span-4 grow shrink">
               <label class="">Search Terms</label>
               <.input
                 id="search_glist"
@@ -100,6 +104,8 @@ defmodule FullCircleWeb.WeighingLive.GoodsReport do
                 type="search"
                 value={@search.glist}
                 placeholder="good names..."
+                phx-hook="localStorageInput"
+                data-ls-key="weight_goods_report_glist"
               />
             </div>
             <div class="col-span-2">
@@ -120,6 +126,16 @@ defmodule FullCircleWeb.WeighingLive.GoodsReport do
                 value={@search.t_date}
               />
             </div>
+            <div class="col-span-2 mt-6 flex items-center gap-1 pl-2">
+              <input
+                type="checkbox"
+                name="search[group_note]"
+                id="search_group_note"
+                value="true"
+                checked={@search.group_note == "true"}
+              />
+              <label for="search_group_note">{gettext("Group Note")}</label>
+            </div>
             <div class="col-span-2 mt-6">
               <.button>
                 {gettext("Query")}
@@ -127,7 +143,7 @@ defmodule FullCircleWeb.WeighingLive.GoodsReport do
               <.link
                 :if={@result.ok? and Enum.count(@result.result) > 0}
                 navigate={
-                  ~p"/companies/#{@current_company.id}/csv?report=weigoodrepo&glist=#{@search.glist}&fdate=#{@search.f_date}&tdate=#{@search.t_date}"
+                  ~p"/companies/#{@current_company.id}/csv?report=weigoodrepo&glist=#{@search.glist}&fdate=#{@search.f_date}&tdate=#{@search.t_date}&group_note=#{@search.group_note}"
                 }
                 class="blue button"
                 target="_blank"
@@ -141,41 +157,33 @@ defmodule FullCircleWeb.WeighingLive.GoodsReport do
 
       <.async_html result={@result}>
         <:result_html>
+          <% {headers, fields, formatters, widths} =
+            if @search.group_note == "true" do
+              {[gettext("Month"), gettext("Year"), gettext("Goods"), gettext("Amount"), gettext("Unit"), gettext("Note")],
+               [:month, :year, :good_name, :total, :unit, :note],
+               [nil, nil, nil, fn n -> Number.Delimit.number_to_delimited(n, precision: 0) end, nil, nil],
+               ["15%", "20%", "15%", "20%", "15%", "15%"]}
+            else
+              {[gettext("Month"), gettext("Year"), gettext("Goods"), gettext("Amount"), gettext("Unit")],
+               [:month, :year, :good_name, :total, :unit],
+               [nil, nil, nil, fn n -> Number.Delimit.number_to_delimited(n, precision: 0) end, nil],
+               ["15%", "20%", "20%", "25%", "20%"]}
+            end
+          %>
           {FullCircleWeb.CsvHtml.headers(
-            [
-              gettext("Month"),
-              gettext("Year"),
-              gettext("Goods"),
-              gettext("Amount"),
-              gettext("Unit"),
-              gettext("Note")
-            ],
+            headers,
             "font-medium flex flex-row text-center tracking-tighter mb-1",
-            ["15%", "20%", "15%", "20%", "15%", "15%"],
+            widths,
             "border rounded bg-gray-200 border-gray-400 px-2 py-1",
             assigns
           )}
 
           {FullCircleWeb.CsvHtml.data(
-            [
-              :month,
-              :year,
-              :good_name,
-              :total,
-              :unit,
-              :note
-            ],
+            fields,
             @result.result,
-            [
-              nil,
-              nil,
-              nil,
-              fn n -> Number.Delimit.number_to_delimited(n, precision: 0) end,
-              nil,
-              nil
-            ],
+            formatters,
             "flex flex-row text-center tracking-tighter max-h-20",
-            ["15%", "20%", "15%", "20%", "15%", "15%"],
+            widths,
             "border rounded bg-blue-200 border-blue-400 px-2 py-1",
             assigns
           )}

@@ -130,6 +130,8 @@ defmodule FullCircleWeb.ReportLive.HouseFeed do
                 id="search_feed_str"
                 value={@search.feed_str}
                 label={gettext("Feed String")}
+                phx-hook="localStorageInput"
+                data-ls-key="house_feed_str"
               />
             </div>
 

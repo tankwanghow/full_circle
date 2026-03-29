@@ -110,6 +110,20 @@ Hooks.calculatorInput = {
   }
 }
 
+Hooks.localStorageInput = {
+  mounted() {
+    let key = this.el.getAttribute("data-ls-key")
+    let stored = localStorage.getItem(key)
+    if (stored !== null && stored !== this.el.value) {
+      this.el.value = stored
+      this.el.dispatchEvent(new Event("input", { bubbles: true }))
+    }
+    this.el.addEventListener("input", () => {
+      localStorage.setItem(key, this.el.value)
+    })
+  }
+}
+
 Hooks.copyAndOpen = {
   mounted() {
     this.handleClick = (event) => {

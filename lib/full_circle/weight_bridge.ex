@@ -18,35 +18,60 @@ defmodule FullCircle.WeightBridge do
     end)
   end
 
-  def goods_report(glist, fdate, tdate, com_id) when glist != "" do
+  def goods_report(glist, fdate, tdate, com_id, group_note \\ "false")
+
+  def goods_report(glist, fdate, tdate, com_id, group_note) when glist != "" do
     glist = glist |> String.split(",") |> Enum.map(fn x -> String.trim(x) end)
 
-    from(wei in Weighing,
-      where: wei.company_id == ^com_id,
-      where: wei.note_date >= ^fdate,
-      where: wei.note_date <= ^tdate,
-      where: wei.good_name in ^glist,
-      select: %{
-        good_name: wei.good_name,
-        total: sum(wei.gross - wei.tare),
-        month: fragment("extract(month from ?)::integer", wei.note_date),
-        year: fragment("extract(year from ?)::integer", wei.note_date),
-        unit: wei.unit,
-        note: wei.note
-      },
-      group_by: [
-        wei.good_name,
-        fragment("extract(month from ?)", wei.note_date),
-        fragment("extract(year from ?)", wei.note_date),
-        wei.unit,
-        wei.note
-      ],
-      order_by: [4, 3, 1]
-    )
+    base =
+      from(wei in Weighing,
+        where: wei.company_id == ^com_id,
+        where: wei.note_date >= ^fdate,
+        where: wei.note_date <= ^tdate,
+        where: wei.good_name in ^glist
+      )
+
+    if group_note == "true" do
+      from(wei in base,
+        select: %{
+          good_name: wei.good_name,
+          total: sum(wei.gross - wei.tare),
+          month: fragment("extract(month from ?)::integer", wei.note_date),
+          year: fragment("extract(year from ?)::integer", wei.note_date),
+          unit: wei.unit,
+          note: wei.note
+        },
+        group_by: [
+          wei.good_name,
+          fragment("extract(month from ?)", wei.note_date),
+          fragment("extract(year from ?)", wei.note_date),
+          wei.unit,
+          wei.note
+        ],
+        order_by: [4, 3, 1]
+      )
+    else
+      from(wei in base,
+        select: %{
+          good_name: wei.good_name,
+          total: sum(wei.gross - wei.tare),
+          month: fragment("extract(month from ?)::integer", wei.note_date),
+          year: fragment("extract(year from ?)::integer", wei.note_date),
+          unit: wei.unit
+        },
+        group_by: [
+          wei.good_name,
+          fragment("extract(month from ?)", wei.note_date),
+          fragment("extract(year from ?)", wei.note_date),
+          wei.unit
+        ],
+        order_by: [4, 3, 1]
+      )
+    end
     |> Repo.all()
   end
 
-  def goods_report(glist, fdate, tdate, com_id) when glist == "" do
+  def goods_report(glist, fdate, tdate, com_id, _group_note) when glist == "" do
     from(wei in Weighing,
       where: wei.company_id == ^com_id,
       where: wei.note_date >= ^fdate,
