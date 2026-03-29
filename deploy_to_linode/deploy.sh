@@ -41,10 +41,14 @@ FULL_IMAGE="$DOCKER_HUB_USERNAME/$IMAGE_NAME:$IMAGE_TAG"
 echo "Building Docker image... $script_path"
 docker build --builder default -t $FULL_IMAGE -f $script_path/../Dockerfile $script_path/..
 
+# Verify the new image was tagged correctly
+NEW_IMAGE_ID=$(docker image inspect $FULL_IMAGE --format='{{.ID}}')
+echo "Built image ID: $NEW_IMAGE_ID"
+
 # Transfer image directly to server (skip Docker Hub)
 IMAGE_SIZE=$(docker image inspect $FULL_IMAGE --format='{{.Size}}')
 echo "Transferring image to server (~$(( IMAGE_SIZE / 1024 / 1024 )) MB uncompressed)..."
 docker save $FULL_IMAGE | gzip | pv | sshpass -p $LINODE_PWD ssh -o StrictHostKeyChecking=no root@$LINODE_IP "gunzip | docker load"
 
 # Restart containers and run migrations
-sshpass -p $LINODE_PWD ssh root@$LINODE_IP "bash /home/$IMAGE_NAME/deploy_at_server.sh $IMAGE_NAME $DOCKER_HUB_USERNAME $DOCKER_CONTAINER_NAME"
+sshpass -p $LINODE_PWD ssh root@$LINODE_IP "bash /home/$IMAGE_NAME/deploy_at_server.sh $IMAGE_NAME $DOCKER_HUB_USERNAME $DOCKER_CONTAINER_NAME $NEW_IMAGE_ID"

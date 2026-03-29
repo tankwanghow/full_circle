@@ -31,7 +31,9 @@
       "Bash(ls:*)",
       "Bash(grep:*)",
       "Bash(mix compile:*)",
-      "Bash(mix run:*)"
+      "Bash(mix run:*)",
+      "Bash(mix tailwind:*)",
+      "Bash(mix:*)"
     ]
   }
 }
