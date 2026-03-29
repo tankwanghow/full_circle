@@ -127,31 +127,31 @@ defmodule FullCircleWeb.ReportLive.EAFormPrint do
         <div class="field" style="top: 55px; left: 125px; text-align: center; width: 108px;">
           {@nosiri}
         </div>
-        <div class="field" style="top: 57px; left: 125px; text-align: center; width: 108px;">
+        <div class="field" style="top: 55px; left: 125px; text-align: center; width: 108px;">
           {@nomajikanE}
         </div>
-        <div class="field" style="top: 36px; left: 488px; text-align: center; width: 35px;">
+        <div class="field" style="top: 30px; left: 488px; text-align: center; width: 35px;">
           {@year}
         </div>
-        <div class="field" style="top: -2px; left: 550px; text-align: center; width: 190px;">
+        <div class="field" style="top: -12px; left: 550px; text-align: center; width: 190px;">
           {@tin}
         </div>
-        <div class="field" style="top: -5px; left: 635px; text-align: center; width: 110px;">
+        <div class="field" style="top: -18px; left: 635px; text-align: center; width: 110px;">
           {@lhdnbrh}
         </div>
-        <div class="field" style="top: 31px; left: 340px; text-align: center; width: 400px;">
+        <div class="field" style="top: 18px; left: 340px; text-align: center; width: 400px;">
           {@a1}
         </div>
-        <div class="field" style="top: 32px; left: 190px; text-align: center; width: 200px;">
+        <div class="field" style="top: 11px; left: 190px; text-align: center; width: 250px;">
           {@a2}
         </div>
         <div class="field" style="top: 10px; left: 575px; text-align: center; width: 165px;">
           {@a3}
         </div>
-        <div class="field" style="top: 10px; left: 190px; text-align: center; width: 200px;">
+        <div class="field" style="top: -18px; left: 190px; text-align: center; width: 200px;">
           {@a4}
         </div>
-        <div class="field" style="top: -12px; left: 575px; text-align: center; width: 165px;">
+        <div class="field" style="top: -25px; left: 575px; text-align: center; width: 165px;">
           {@a5}
         </div>
         <div class="field" style="top: -13px; left: 190px; text-align: center; width: 200px;">

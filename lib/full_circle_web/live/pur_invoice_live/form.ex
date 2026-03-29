@@ -3,7 +3,6 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
 
   alias FullCircle.Billing
   alias FullCircle.Billing.{PurInvoice}
-  alias FullCircle.StdInterface
 
   @impl true
   def mount(params, _session, socket) do
@@ -40,11 +39,12 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
     |> assign(
       :form,
       to_form(
-        StdInterface.changeset(
+        Billing.make_changeset(
           PurInvoice,
           %PurInvoice{},
           attrs,
-          socket.assigns.current_company
+          socket.assigns.current_company,
+          socket.assigns.current_user
         )
       )
     )
@@ -72,11 +72,12 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
     |> assign(
       :form,
       to_form(
-        StdInterface.changeset(
+        Billing.make_changeset(
           PurInvoice,
           %PurInvoice{},
           attrs,
-          socket.assigns.current_company
+          socket.assigns.current_company,
+          socket.assigns.current_user
         )
       )
     )
@@ -97,7 +98,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
     |> assign(page_title: gettext("Edit Purchase Invoice") <> " " <> object.pur_invoice_no)
     |> assign(
       :form,
-      to_form(StdInterface.changeset(PurInvoice, object, %{}, socket.assigns.current_company))
+      to_form(Billing.make_changeset(PurInvoice, object, %{}, socket.assigns.current_company, socket.assigns.current_user))
     )
   end
 
@@ -450,11 +451,12 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
 
   defp validate(params, socket) do
     changeset =
-      StdInterface.changeset(
+      Billing.make_changeset(
         PurInvoice,
         socket.assigns.form.data,
         params,
-        socket.assigns.current_company
+        socket.assigns.current_company,
+        socket.assigns.current_user
       )
       |> Map.put(:action, socket.assigns.live_action)
 

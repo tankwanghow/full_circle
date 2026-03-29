@@ -3,7 +3,6 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
 
   alias FullCircle.{Accounting, DebCre}
   alias FullCircle.DebCre.{CreditNote}
-  alias FullCircle.StdInterface
 
   @impl true
   def mount(params, _session, socket) do
@@ -35,11 +34,12 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
     |> assign(
       :form,
       to_form(
-        StdInterface.changeset(
+        DebCre.make_changeset(
           CreditNote,
           %CreditNote{},
           attrs,
-          socket.assigns.current_company
+          socket.assigns.current_company,
+          socket.assigns.current_user
         )
       )
     )
@@ -54,7 +54,7 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
       )
 
     cs =
-      StdInterface.changeset(CreditNote, object, %{}, socket.assigns.current_company)
+      DebCre.make_changeset(CreditNote, object, %{}, socket.assigns.current_company, socket.assigns.current_user)
 
     socket
     |> assign(live_action: :edit)
@@ -301,11 +301,12 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
     params = params |> FullCircleWeb.Helpers.put_into_matchers("doc_date", params["note_date"])
 
     changeset =
-      StdInterface.changeset(
+      DebCre.make_changeset(
         CreditNote,
         socket.assigns.form.data,
         params,
-        socket.assigns.current_company
+        socket.assigns.current_company,
+        socket.assigns.current_user
       )
       |> Map.put(:action, socket.assigns.live_action)
 

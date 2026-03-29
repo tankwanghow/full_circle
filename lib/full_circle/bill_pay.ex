@@ -359,7 +359,7 @@ defmodule FullCircle.BillPay do
 
   # ── Private Helpers ─────────────────────────────────
 
-  defp make_changeset(schema, struct, attrs, com, user) do
+  def make_changeset(schema, struct, attrs, com, user) do
     if user_role_in_company(user.id, com.id) == "admin" do
       StdInterface.changeset(schema, struct, attrs, com, :admin_changeset)
     else

@@ -3,7 +3,6 @@ defmodule FullCircleWeb.ChequeLive.DepositForm do
 
   alias FullCircle.{Cheque, Reporting}
   alias FullCircle.Cheque.Deposit
-  alias FullCircle.StdInterface
 
   @impl true
   def mount(params, _session, socket) do
@@ -28,11 +27,12 @@ defmodule FullCircleWeb.ChequeLive.DepositForm do
     |> assign(
       :form,
       to_form(
-        StdInterface.changeset(
+        Cheque.make_changeset(
           Deposit,
           %Deposit{},
           %{"deposit_no" => "...new...", "deposit_date" => Timex.today()},
-          socket.assigns.current_company
+          socket.assigns.current_company,
+          socket.assigns.current_user
         )
       )
     )
@@ -46,7 +46,7 @@ defmodule FullCircleWeb.ChequeLive.DepositForm do
         socket.assigns.current_user
       )
 
-    cs = Deposit.changeset(object, %{})
+    cs = Cheque.make_changeset(Deposit, object, %{}, socket.assigns.current_company, socket.assigns.current_user)
 
     socket
     |> assign(live_action: :edit)
@@ -227,7 +227,7 @@ defmodule FullCircleWeb.ChequeLive.DepositForm do
 
   defp validate(params, socket) do
     dep_cs =
-      Deposit.changeset(socket.assigns.form.data, params)
+      Cheque.make_changeset(Deposit, socket.assigns.form.data, params, socket.assigns.current_company, socket.assigns.current_user)
       |> Map.merge(%{action: socket.assigns.live_action})
 
     socket = assign(socket, form: to_form(dep_cs))

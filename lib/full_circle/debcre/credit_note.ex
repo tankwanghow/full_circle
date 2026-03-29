@@ -39,6 +39,18 @@ defmodule FullCircle.DebCre.CreditNote do
   @doc false
   def changeset(note, attrs) do
     note
+    |> normal_changeset(attrs)
+    |> validate_date(:note_date, days_before: 60)
+    |> validate_date(:note_date, days_after: 3)
+  end
+
+  def admin_changeset(note, attrs) do
+    note
+    |> normal_changeset(attrs)
+  end
+
+  defp normal_changeset(note, attrs) do
+    note
     |> cast(attrs, [
       :note_date,
       :company_id,
@@ -56,8 +68,6 @@ defmodule FullCircle.DebCre.CreditNote do
       :note_no
     ])
     |> unique_constraint(:e_inv_uuid)
-    |> validate_date(:note_date, days_before: 60)
-    |> validate_date(:note_date, days_after: 3)
     |> validate_id(:contact_name, :contact_id)
     |> unsafe_validate_unique([:note_no, :company_id], FullCircle.Repo,
       message: gettext("note no already in company")

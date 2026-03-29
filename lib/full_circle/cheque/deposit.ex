@@ -24,6 +24,18 @@ defmodule FullCircle.Cheque.Deposit do
   @doc false
   def changeset(cs, attrs) do
     cs
+    |> normal_changeset(attrs)
+    |> validate_date(:deposit_date, days_before: 60)
+    |> validate_date(:deposit_date, days_after: 4)
+  end
+
+  def admin_changeset(cs, attrs) do
+    cs
+    |> normal_changeset(attrs)
+  end
+
+  defp normal_changeset(cs, attrs) do
+    cs
     |> cast(attrs, [
       :company_id,
       :deposit_no,
@@ -38,8 +50,6 @@ defmodule FullCircle.Cheque.Deposit do
     |> validate_funds_from_name()
     |> validate_id(:bank_name, :bank_id)
     |> validate_id(:funds_from_name, :funds_from_id)
-    |> validate_date(:deposit_date, days_before: 60)
-    |> validate_date(:deposit_date, days_after: 4)
     |> validate_deposit_date()
     |> put_assoc_cheques(attrs)
     |> compute_fields()

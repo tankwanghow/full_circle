@@ -145,6 +145,14 @@ defmodule FullCircle.Cheque do
     )
   end
 
+  def make_changeset(schema, struct, attrs, com, user) do
+    if user_role_in_company(user.id, com.id) == "admin" do
+      StdInterface.changeset(schema, struct, attrs, com, :admin_changeset)
+    else
+      StdInterface.changeset(schema, struct, attrs, com)
+    end
+  end
+
   def create_deposit(attrs, com, user) do
     case can?(user, :create_deposit, com) do
       true ->
@@ -164,7 +172,7 @@ defmodule FullCircle.Cheque do
     multi
     |> get_gapless_doc_id(gapless_name, "Deposit", "DS", com)
     |> Multi.insert(deposit_name, fn %{^gapless_name => doc} ->
-      StdInterface.changeset(Deposit, %Deposit{}, Map.merge(attrs, %{"deposit_no" => doc}), com)
+      make_changeset(Deposit, %Deposit{}, Map.merge(attrs, %{"deposit_no" => doc}), com, user)
     end)
     |> Multi.insert("#{deposit_name}_log", fn %{^deposit_name => entity} ->
       FullCircle.Sys.log_changeset(
@@ -198,7 +206,7 @@ defmodule FullCircle.Cheque do
   def update_deposit_multi(multi, deposit, attrs, com, user) do
     deposit_name = :update_deposit
 
-    cs = Deposit.changeset(deposit, attrs)
+    cs = make_changeset(Deposit, deposit, attrs, com, user)
 
     multi
     |> Multi.update(deposit_name, cs)
@@ -236,11 +244,12 @@ defmodule FullCircle.Cheque do
     multi
     |> get_gapless_doc_id(gapless_name, "ReturnCheque", "RQ", com)
     |> Multi.insert(return_name, fn %{^gapless_name => doc} ->
-      StdInterface.changeset(
+      make_changeset(
         ReturnCheque,
         %ReturnCheque{},
         Map.merge(attrs, %{"return_no" => doc}),
-        com
+        com,
+        user
       )
     end)
     |> Multi.insert("#{return_name}_log", fn %{^return_name => entity} ->
@@ -275,7 +284,7 @@ defmodule FullCircle.Cheque do
   def update_return_cheque_multi(multi, return_cheque, attrs, com, user) do
     return_cheque_name = :update_return_cheque
 
-    cs = ReturnCheque.changeset(return_cheque, attrs)
+    cs = make_changeset(ReturnCheque, return_cheque, attrs, com, user)
 
     multi
     |> Multi.update(return_cheque_name, cs)

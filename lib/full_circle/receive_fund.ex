@@ -338,7 +338,32 @@ defmodule FullCircle.ReceiveFund do
     end
   end
 
-  defp make_changeset(module, struct, attrs, com, user) do
+  def contact_advance_balance(contact_id, com) do
+    ap_acc =
+      Repo.one(
+        from a in Account,
+          where: a.name == "Account Payables",
+          where: a.company_id == ^com.id,
+          select: a.id
+      )
+
+    if ap_acc && contact_id do
+      Repo.all(
+        from t in Transaction,
+          where: t.account_id == ^ap_acc,
+          where: t.contact_id == ^contact_id,
+          where: t.company_id == ^com.id,
+          where: not is_nil(t.doc_id),
+          group_by: [t.doc_type, t.doc_no, t.doc_id],
+          having: sum(t.amount) < 0,
+          select: %{doc_type: t.doc_type, doc_no: t.doc_no, doc_id: t.doc_id, amount: sum(t.amount)}
+      )
+    else
+      []
+    end
+  end
+
+  def make_changeset(module, struct, attrs, com, user) do
     if user_role_in_company(user.id, com.id) == "admin" do
       StdInterface.changeset(module, struct, attrs, com, :admin_changeset)
     else
@@ -381,6 +406,7 @@ defmodule FullCircle.ReceiveFund do
 
   defp create_receipt_transactions(multi, name, com, user) do
     pdc_id = Accounting.get_account_by_name("Post Dated Cheques", com, user).id
+    ap_id = Accounting.get_account_by_name("Account Payables", com, user).id
 
     multi
     |> Multi.insert_all(:create_transactions, Transaction, fn %{^name => receipt} ->
@@ -390,11 +416,13 @@ defmodule FullCircle.ReceiveFund do
           receipt_details: [:account, :tax_code],
           transaction_matchers: :transaction
         ])
+        |> Receipt.compute_struct_balance()
 
       now = Timex.now() |> DateTime.truncate(:second)
 
       (build_detail_transactions(receipt, com, now) ++
          build_matcher_transactions(receipt, com, now) ++
+         build_advance_receipt_transaction(receipt, com, now, ap_id) ++
          build_funds_transaction(receipt, com, now) ++
          build_cheque_transactions(receipt, com, pdc_id, now))
       |> Enum.reject(&is_nil/1)
@@ -462,6 +490,28 @@ defmodule FullCircle.ReceiveFund do
         inserted_at: now
       }
     end)
+  end
+
+  defp build_advance_receipt_transaction(receipt, com, now, ap_id) do
+    if Decimal.gt?(receipt.receipt_balance, 0) do
+      [
+        %{
+          doc_type: "Receipt",
+          doc_no: receipt.receipt_no,
+          doc_id: receipt.id,
+          doc_date: receipt.receipt_date,
+          account_id: ap_id,
+          contact_id: receipt.contact_id,
+          company_id: com.id,
+          amount: Decimal.negate(receipt.receipt_balance),
+          particulars: "Advance Received from #{receipt.contact_name}",
+          contact_particulars: "Advance Received from #{receipt.contact_name}",
+          inserted_at: now
+        }
+      ]
+    else
+      []
+    end
   end
 
   defp build_funds_transaction(receipt, com, now) do

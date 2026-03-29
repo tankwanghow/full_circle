@@ -105,12 +105,19 @@ defmodule FullCircle.ReceiveFund.Receipt do
   end
 
   def compute_struct_balance(inval) do
-    inval
-    |> sum_struct_field_to(:receipt_details, :good_amount, :receipt_good_amount)
-    |> sum_struct_field_to(:receipt_details, :tax_amount, :receipt_tax_amount)
-    |> sum_struct_field_to(:receipt_details, :amount, :receipt_detail_amount)
-    |> sum_struct_field_to(:transaction_matchers, :match_amount, :matched_amount)
-    |> sum_struct_field_to(:received_cheques, :amount, :cheques_amount)
+    inval =
+      inval
+      |> sum_struct_field_to(:receipt_details, :good_amount, :receipt_good_amount)
+      |> sum_struct_field_to(:receipt_details, :tax_amount, :receipt_tax_amount)
+      |> sum_struct_field_to(:receipt_details, :amount, :receipt_detail_amount)
+      |> sum_struct_field_to(:transaction_matchers, :match_amount, :matched_amount)
+      |> sum_struct_field_to(:received_cheques, :amount, :cheques_amount)
+
+    pos = Decimal.add(inval.cheques_amount, inval.funds_amount)
+    neg = Decimal.sub(inval.matched_amount, inval.receipt_detail_amount)
+    bal = Decimal.add(pos, neg)
+
+    %{inval | receipt_balance: bal, receipt_amount: pos}
   end
 
   def compute_balance(cs) do
@@ -139,9 +146,18 @@ defmodule FullCircle.ReceiveFund.Receipt do
       :receipt_balance,
       :receipt_amount
     ])
+    |> validate_matched_not_exceed_receipt(pos)
+  end
 
-    # |> validate_number(:receipt_amount, greater_than: Decimal.new("0.00"))
-    # |> validate_number(:receipt_balance, equal_to: Decimal.new("0.00"))
+  defp validate_matched_not_exceed_receipt(cs, receipt_amount) do
+    matched = fetch_field!(cs, :matched_amount) |> Decimal.abs()
+
+    if Decimal.gt?(matched, receipt_amount) do
+      add_error(cs, :matched_amount,
+        gettext("cannot exceed Receipt Amount"))
+    else
+      cs
+    end
   end
 
   def compute_details_amount(changeset) do

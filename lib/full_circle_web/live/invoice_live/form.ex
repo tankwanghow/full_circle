@@ -3,7 +3,6 @@ defmodule FullCircleWeb.InvoiceLive.Form do
 
   alias FullCircle.Billing
   alias FullCircle.Billing.{Invoice}
-  alias FullCircle.StdInterface
 
   @impl true
   def mount(params, _session, socket) do
@@ -56,11 +55,12 @@ defmodule FullCircleWeb.InvoiceLive.Form do
     |> assign(
       :form,
       to_form(
-        StdInterface.changeset(
+        Billing.make_changeset(
           Invoice,
           %Invoice{},
           attrs,
-          socket.assigns.current_company
+          socket.assigns.current_company,
+          socket.assigns.current_user
         )
       )
     )
@@ -93,7 +93,7 @@ defmodule FullCircleWeb.InvoiceLive.Form do
     |> assign(matched_trans: Billing.get_matcher_by("Invoice", id))
     |> assign(
       :form,
-      to_form(StdInterface.changeset(Invoice, object, %{}, socket.assigns.current_company))
+      to_form(Billing.make_changeset(Invoice, object, %{}, socket.assigns.current_company, socket.assigns.current_user))
     )
   end
 
@@ -364,11 +364,12 @@ defmodule FullCircleWeb.InvoiceLive.Form do
 
   defp validate(params, socket) do
     changeset =
-      StdInterface.changeset(
+      Billing.make_changeset(
         Invoice,
         socket.assigns.form.data,
         params,
-        socket.assigns.current_company
+        socket.assigns.current_company,
+        socket.assigns.current_user
       )
       |> Map.put(:action, socket.assigns.live_action)
 

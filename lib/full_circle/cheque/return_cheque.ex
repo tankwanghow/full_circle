@@ -27,6 +27,18 @@ defmodule FullCircle.Cheque.ReturnCheque do
   @doc false
   def changeset(rtn, attrs) do
     rtn
+    |> normal_changeset(attrs)
+    |> validate_date(:return_date, days_after: 0)
+    |> validate_date(:return_date, days_before: 60)
+  end
+
+  def admin_changeset(rtn, attrs) do
+    rtn
+    |> normal_changeset(attrs)
+  end
+
+  defp normal_changeset(rtn, attrs) do
+    rtn
     |> cast(attrs, [
       :company_id,
       :return_no,
@@ -52,8 +64,6 @@ defmodule FullCircle.Cheque.ReturnCheque do
     ])
     |> validate_id(:return_from_bank_name, :return_from_bank_id)
     |> validate_id(:cheque_owner_name, :cheque_owner_id)
-    |> validate_date(:return_date, days_after: 0)
-    |> validate_date(:return_date, days_before: 60)
     |> put_cheque_assoc(attrs)
   end
 

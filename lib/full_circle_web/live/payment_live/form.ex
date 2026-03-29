@@ -41,11 +41,12 @@ defmodule FullCircleWeb.PaymentLive.Form do
     |> assign(
       :form,
       to_form(
-        StdInterface.changeset(
+        BillPay.make_changeset(
           Payment,
           %Payment{},
           %{payment_no: "...new..."},
-          socket.assigns.current_company
+          socket.assigns.current_company,
+          socket.assigns.current_user
         )
       )
     )
@@ -60,7 +61,7 @@ defmodule FullCircleWeb.PaymentLive.Form do
       )
 
     cs =
-      StdInterface.changeset(Payment, object, %{}, socket.assigns.current_company)
+      BillPay.make_changeset(Payment, object, %{}, socket.assigns.current_company, socket.assigns.current_user)
 
     socket
     |> assign(live_action: :edit)
@@ -435,22 +436,13 @@ defmodule FullCircleWeb.PaymentLive.Form do
     params = params |> FullCircleWeb.Helpers.put_into_matchers("doc_date", params["payment_date"])
 
     changeset =
-      if socket.assigns.current_role == :admin do
-        StdInterface.changeset(
-          Payment,
-          socket.assigns.form.data,
-          params,
-          socket.assigns.current_company
-        )
-      else
-        StdInterface.changeset(
-          Payment,
-          socket.assigns.form.data,
-          params,
-          socket.assigns.current_company,
-          :admin_changeset
-        )
-      end
+      BillPay.make_changeset(
+        Payment,
+        socket.assigns.form.data,
+        params,
+        socket.assigns.current_company,
+        socket.assigns.current_user
+      )
       |> Map.put(:action, socket.assigns.live_action)
 
     socket =

@@ -3,7 +3,6 @@ defmodule FullCircleWeb.ChequeLive.ReturnChequeForm do
 
   alias FullCircle.{Cheque, Reporting}
   alias FullCircle.Cheque.ReturnCheque
-  alias FullCircle.StdInterface
 
   @impl true
   def mount(params, _session, socket) do
@@ -28,11 +27,12 @@ defmodule FullCircleWeb.ChequeLive.ReturnChequeForm do
     |> assign(
       :form,
       to_form(
-        StdInterface.changeset(
+        Cheque.make_changeset(
           ReturnCheque,
           %ReturnCheque{},
           %{"return_no" => "...new...", "return_date" => Timex.today()},
-          socket.assigns.current_company
+          socket.assigns.current_company,
+          socket.assigns.current_user
         )
       )
     )
@@ -46,7 +46,7 @@ defmodule FullCircleWeb.ChequeLive.ReturnChequeForm do
         socket.assigns.current_user
       )
 
-    cs = ReturnCheque.changeset(object, %{})
+    cs = Cheque.make_changeset(ReturnCheque, object, %{}, socket.assigns.current_company, socket.assigns.current_user)
 
     socket
     |> assign(live_action: :edit)
@@ -182,7 +182,7 @@ defmodule FullCircleWeb.ChequeLive.ReturnChequeForm do
 
   defp validate(params, socket) do
     dep_cs =
-      ReturnCheque.changeset(socket.assigns.form.data, params)
+      Cheque.make_changeset(ReturnCheque, socket.assigns.form.data, params, socket.assigns.current_company, socket.assigns.current_user)
       |> Map.merge(%{action: socket.assigns.live_action})
 
     socket = assign(socket, form: to_form(dep_cs))

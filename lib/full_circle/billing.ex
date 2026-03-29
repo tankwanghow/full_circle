@@ -266,7 +266,7 @@ defmodule FullCircle.Billing do
     |> create_doc_transactions(step_name, com, user, txn_opts)
   end
 
-  defp make_changeset(module, struct, attrs, com, user) do
+  def make_changeset(module, struct, attrs, com, user) do
     if user_role_in_company(user.id, com.id) == "admin" do
       StdInterface.changeset(module, struct, attrs, com, :admin_changeset)
     else

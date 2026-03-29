@@ -24,6 +24,7 @@ defmodule FullCircleWeb.ReceiptLive.Form do
      |> assign(cheques_got_error: false)
      |> assign(details_got_error: false)
      |> assign(matchers_got_error: false)
+     |> assign(contact_advances: [])
      |> assign(
        settings:
          FullCircle.Sys.load_settings(
@@ -62,11 +63,12 @@ defmodule FullCircleWeb.ReceiptLive.Form do
     |> assign(
       :form,
       to_form(
-        StdInterface.changeset(
+        ReceiveFund.make_changeset(
           Receipt,
           %Receipt{},
           attrs,
-          socket.assigns.current_company
+          socket.assigns.current_company,
+          socket.assigns.current_user
         )
       )
     )
@@ -93,7 +95,7 @@ defmodule FullCircleWeb.ReceiptLive.Form do
       )
 
     cs =
-      StdInterface.changeset(Receipt, object, %{}, socket.assigns.current_company)
+      ReceiveFund.make_changeset(Receipt, object, %{}, socket.assigns.current_company, socket.assigns.current_user)
 
     socket
     |> assign(live_action: :edit)
@@ -210,6 +212,8 @@ defmodule FullCircleWeb.ReceiptLive.Form do
         %{"contact_id" => :id, "tax_id" => :tax_id, "reg_no" => :reg_no},
         &FullCircle.Accounting.get_contact_by_name/3
       )
+
+    socket = check_contact_advance_balance(params, socket)
 
     validate(params, socket)
   end
@@ -488,11 +492,12 @@ defmodule FullCircleWeb.ReceiptLive.Form do
     params = params |> FullCircleWeb.Helpers.put_into_matchers("doc_date", params["receipt_date"])
 
     changeset =
-      StdInterface.changeset(
+      ReceiveFund.make_changeset(
         Receipt,
         socket.assigns.form.data,
         params,
-        socket.assigns.current_company
+        socket.assigns.current_company,
+        socket.assigns.current_user
       )
       |> Map.put(:action, socket.assigns.live_action)
 
@@ -507,6 +512,17 @@ defmodule FullCircleWeb.ReceiptLive.Form do
       )
 
     {:noreply, socket}
+  end
+
+  defp check_contact_advance_balance(params, socket) do
+    contact_id = params["contact_id"]
+
+    if contact_id != "" and not is_nil(contact_id) do
+      advances = ReceiveFund.contact_advance_balance(contact_id, socket.assigns.current_company)
+      assign(socket, :contact_advances, advances)
+    else
+      assign(socket, :contact_advances, [])
+    end
   end
 
   @impl true
@@ -558,6 +574,17 @@ defmodule FullCircleWeb.ReceiptLive.Form do
           <div class="grow shrink w-2/12">
             <.input field={@form[:load_date]} label={gettext("Load Date")} type="date" />
           </div>
+        </div>
+        <div :if={@contact_advances != []} class="px-2 py-1 my-1 bg-amber-100 border border-amber-400 rounded text-amber-800 text-sm">
+          <span class="font-semibold">{gettext("Advance Balance")}:</span>
+          <%= for adv <- @contact_advances do %>
+            <.link
+              navigate={"/companies/#{@current_company.id}/#{adv.doc_type}/#{adv.doc_id}/edit"}
+              class="ml-2 underline text-blue-600 hover:text-blue-800"
+            >
+              {adv.doc_no} ({Number.Currency.number_to_currency(Decimal.abs(adv.amount))})
+            </.link>
+          <% end %>
         </div>
         <div class="flex flex-row flex-nowrap">
           <div class="grow shrink w-8/12">

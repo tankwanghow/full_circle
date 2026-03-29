@@ -184,6 +184,14 @@ defmodule FullCircle.DebCre do
       ]
   end
 
+  def make_changeset(schema, struct, attrs, com, user) do
+    if user_role_in_company(user.id, com.id) == "admin" do
+      StdInterface.changeset(schema, struct, attrs, com, :admin_changeset)
+    else
+      StdInterface.changeset(schema, struct, attrs, com)
+    end
+  end
+
   def create_credit_note(attrs, com, user) do
     case can?(user, :create_credit_note, com) do
       true ->
@@ -203,11 +211,12 @@ defmodule FullCircle.DebCre do
     multi
     |> get_gapless_doc_id(gapless_name, "CreditNote", "CN", com)
     |> Multi.insert(note_name, fn %{^gapless_name => doc} ->
-      StdInterface.changeset(
+      make_changeset(
         CreditNote,
         %CreditNote{},
         Map.merge(attrs, %{"note_no" => doc}),
-        com
+        com,
+        user
       )
     end)
     |> Multi.insert("#{note_name}_log", fn %{^note_name => entity} ->
@@ -243,7 +252,7 @@ defmodule FullCircle.DebCre do
     note_name = :update_credit_note
 
     multi
-    |> Multi.update(note_name, StdInterface.changeset(CreditNote, credit_note, attrs, com))
+    |> Multi.update(note_name, make_changeset(CreditNote, credit_note, attrs, com, user))
     |> Multi.delete_all(
       :delete_transaction,
       from(txn in Transaction,
@@ -424,11 +433,12 @@ defmodule FullCircle.DebCre do
     multi
     |> get_gapless_doc_id(gapless_name, "DebitNote", "DN", com)
     |> Multi.insert(note_name, fn %{^gapless_name => doc} ->
-      StdInterface.changeset(
+      make_changeset(
         DebitNote,
         %DebitNote{},
         Map.merge(attrs, %{"note_no" => doc}),
-        com
+        com,
+        user
       )
     end)
     |> Multi.insert("#{note_name}_log", fn %{^note_name => entity} ->
@@ -464,7 +474,7 @@ defmodule FullCircle.DebCre do
     note_name = :update_debit_note
 
     multi
-    |> Multi.update(note_name, StdInterface.changeset(DebitNote, debit_note, attrs, com))
+    |> Multi.update(note_name, make_changeset(DebitNote, debit_note, attrs, com, user))
     |> Multi.delete_all(
       :delete_transaction,
       from(txn in Transaction,
