@@ -124,6 +124,7 @@ Hooks.localStorageInput = {
   }
 }
 
+
 Hooks.copyAndOpen = {
   mounted() {
     this.handleClick = (event) => {

@@ -103,6 +103,35 @@ defmodule FullCircleWeb.CompanyLive.Form do
       </div>
       {datalist(assigns, FullCircle.Sys.countries(), "countries")}
       {datalist(assigns, Tzdata.zone_list(), "timezones")}
+
+      <%!-- LLM Settings --%>
+      <div :if={@live_action == :edit and @current_role == "admin"} class="mt-4 border rounded bg-gray-50 p-3">
+        <p class="font-semibold text-lg mb-2">{gettext("LLM Settings")}</p>
+        <p class="text-xs text-gray-500 mb-2">{gettext("Configure LLM for bank statement CSV parsing. These settings are shared across all users in this company.")}</p>
+        <div class="grid grid-cols-12 gap-1">
+          <div class="col-span-3">
+            <label class="block text-sm font-medium mb-1">{gettext("Provider")}</label>
+            <select name="llm[llm-provider]" class="w-full rounded border-gray-300 text-sm">
+              <option value="none" selected={@llm_settings["llm-provider"] == "none"}>{gettext("None")}</option>
+              <option value="claude" selected={@llm_settings["llm-provider"] == "claude"}>Claude</option>
+              <option value="gemini" selected={@llm_settings["llm-provider"] == "gemini"}>Gemini</option>
+            </select>
+          </div>
+          <div class="col-span-9">
+            <label class="block text-sm font-medium mb-1">{gettext("Endpoint")} <span class="text-xs text-gray-400">({gettext("blank=default")})</span></label>
+            <input type="text" name="llm[llm-endpoint]" value={@llm_settings["llm-endpoint"]} placeholder="" class="w-full rounded border-gray-300 text-sm" />
+          </div>
+          <div class="col-span-3">
+            <label class="block text-sm font-medium mb-1">{gettext("Model")} <span class="text-xs text-gray-400">({gettext("blank=default")})</span></label>
+            <input type="text" name="llm[llm-model]" value={@llm_settings["llm-model"]} placeholder="gemini-2.5-flash" class="w-full rounded border-gray-300 text-sm" />
+          </div>
+          <div class="col-span-9">
+            <label class="block text-sm font-medium mb-1">{gettext("API Key")}</label>
+            <input type="text" name="llm[llm-api-key]" value={@llm_settings["llm-api-key"]} class="w-full rounded border-gray-300 text-sm" />
+          </div>
+        </div>
+      </div>
+
       <div class="flex justify-center gap-x-1 mt-2">
         <.save_button form={@form} />
         <%= if @live_action == :edit and FullCircle.Authorization.can?(@current_user, :delete_company, @company) do %>
@@ -152,6 +181,15 @@ defmodule FullCircleWeb.CompanyLive.Form do
     company = Sys.get_company!(id)
     form = to_form(Sys.company_changeset(company, %{}, socket.assigns.current_user))
 
+    llm_defaults = %{
+      "llm-provider" => "none",
+      "llm-endpoint" => "",
+      "llm-model" => "",
+      "llm-api-key" => ""
+    }
+
+    llm_settings = Map.merge(llm_defaults, Sys.get_company_settings(company, "llm"))
+
     {:ok,
      socket
      |> assign(:page_title, gettext("Editing Company"))
@@ -160,6 +198,7 @@ defmodule FullCircleWeb.CompanyLive.Form do
      |> assign(:trigger_action, ~p"/update_active_company?id=#{company.id}")
      |> assign(:trigger_method, "post")
      |> assign(:company, company)
+     |> assign(:llm_settings, llm_settings)
      |> assign(closing_days: closing_days(company.closing_month))}
   end
 
@@ -185,7 +224,11 @@ defmodule FullCircleWeb.CompanyLive.Form do
   end
 
   @impl true
-  def handle_event("save", %{"company" => company_params}, socket) do
+  def handle_event("save", %{"company" => company_params} = params, socket) do
+    if llm_params = params["llm"] do
+      Sys.update_company_settings(socket.assigns.company, "llm", llm_params)
+    end
+
     save_company(socket, socket.assigns.live_action, company_params)
   end
 

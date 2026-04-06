@@ -15,6 +15,7 @@ defmodule FullCircle.Accounting.Transaction do
     field :old_data, :boolean, default: false
     field :closed, :boolean, default: false
     field :reconciled, :boolean, default: false
+    field :match_group_id, :binary_id
 
     belongs_to :company, FullCircle.Sys.Company
     belongs_to :contact, FullCircle.Accounting.Contact

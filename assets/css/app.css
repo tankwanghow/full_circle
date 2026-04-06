@@ -166,6 +166,10 @@ body.dark {
 .dark .bg-gray-800 { background-color: var(--color-gray-800); }
 
 /* Tribute autocomplete */
+.tribute-container { background: white; border: 1px solid #d1d5db; border-radius: 0.375rem; overflow: hidden; }
+.tribute-container ul { background: white; }
+.tribute-container li.highlight { background: #e5e7eb; }
+.dark .tribute-container { background: #374151; border-color: #4b5563; }
 .dark .tribute-container ul { background: #374151; }
 .dark .tribute-container li.highlight { background: #4b5563; }
 

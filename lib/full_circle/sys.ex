@@ -254,6 +254,19 @@ defmodule FullCircle.Sys do
     )
   end
 
+  def get_company_settings(company, key) do
+    settings = Map.get(company, :settings) || %{}
+    Map.get(settings, key, %{})
+  end
+
+  def update_company_settings(company, key, values) do
+    # Re-fetch to ensure we have the latest settings column
+    company = Repo.get!(Company, company.id)
+    new_settings = Map.put(company.settings || %{}, key, values)
+    cs = Ecto.Changeset.change(company, %{settings: new_settings})
+    Repo.update(cs)
+  end
+
   def get_company!(id) do
     Repo.get!(Company, id)
   end

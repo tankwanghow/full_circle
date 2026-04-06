@@ -221,6 +221,8 @@ defmodule FullCircleWeb.Router do
       live("/fixed_assets_report", ReportLive.FixedAssets, :index)
       live("/post_dated_cheque_listing", ReportLive.PostDatedCheques, :index)
 
+      live("/bank_reconciliation", BankReconciliationLive.Index, :index)
+
       live("/Deposit", ChequeLive.DepositIndex, :index)
       live("/Deposit/new", ChequeLive.DepositForm, :new)
       live("/Deposit/:deposit_id/edit", ChequeLive.DepositForm, :edit)
@@ -354,6 +356,8 @@ defmodule FullCircleWeb.Router do
       live("/eaform/print", ReportLive.EAFormPrint, :print)
 
       live("/EggStock/:date/print", EggStockLive.Print, :print)
+
+      live("/bank_reconciliation/print", BankReconciliationLive.Print, :print)
     end
 
     live_session :require_authenticated_user_n_active_company_punch,

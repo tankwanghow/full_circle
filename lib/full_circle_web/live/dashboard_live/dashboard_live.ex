@@ -52,6 +52,9 @@ defmodule FullCircleWeb.DashboardLive do
         <.link navigate={~p"/companies/#{@current_company.id}/Journal"} class="button blue">
           {gettext("Journal Entries")}
         </.link>
+        <.link :if={FullCircle.Authorization.can?(@current_user, :view_bank_reconciliation, @current_company)} navigate={~p"/companies/#{@current_company.id}/bank_reconciliation"} class="button blue">
+          {gettext("Bank Reconciliation")}
+        </.link>
       </div>
 
       <div class="font-medium text-xl">Sales Purchase</div>

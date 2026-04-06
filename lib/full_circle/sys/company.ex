@@ -25,6 +25,7 @@ defmodule FullCircle.Sys.Company do
     field :tou_id, :string
     field :closing_month, :integer
     field :closing_day, :integer
+    field :settings, :map, default: %{}
 
     timestamps(type: :utc_datetime)
   end
