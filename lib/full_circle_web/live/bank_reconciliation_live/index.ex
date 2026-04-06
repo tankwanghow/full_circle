@@ -31,6 +31,7 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
         |> assign(processing_csv: false, csv_task: nil)
         |> assign(processing_ai_match: false, ai_match_task: nil)
         |> assign(book_entry_mode: false, book_entry_lines: [], book_entry_contra: "")
+        |> assign(manual_stmt_mode: false, manual_stmt: new_manual_stmt())
         |> assign(llm_settings: llm_settings)
         |> allow_upload(:csv_file,
           accept: ~w(.csv .pdf),
@@ -418,6 +419,101 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
   end
 
   @impl true
+  def handle_event("toggle_manual_stmt", _, socket) do
+    {:noreply, assign(socket, manual_stmt_mode: !socket.assigns.manual_stmt_mode)}
+  end
+
+  @impl true
+  def handle_event("update_manual_stmt", %{"manual" => params}, socket) do
+    manual = %{
+      statement_date: params["statement_date"] || "",
+      description: params["description"] || "",
+      cheque_no: params["cheque_no"] || "",
+      amount: params["amount"] || ""
+    }
+
+    {:noreply, assign(socket, manual_stmt: manual)}
+  end
+
+  @impl true
+  def handle_event("add_manual_stmt", %{"manual" => params}, socket) do
+    if socket.assigns.account do
+      amount_str = String.trim(params["amount"] || "")
+      date_str = String.trim(params["statement_date"] || "")
+      description = String.trim(params["description"] || "")
+
+      with {amount, _} <- Float.parse(amount_str),
+           {:ok, date} <- Date.from_iso8601(date_str) do
+        line = %{
+          statement_date: date,
+          description: description,
+          cheque_no: String.trim(params["cheque_no"] || ""),
+          amount: Decimal.from_float(amount),
+          reference: "manual"
+        }
+
+        {count, _} =
+          BankReconciliation.import_statement(
+            socket.assigns.account.id,
+            socket.assigns.current_company.id,
+            [line],
+            "manual"
+          )
+
+        {:noreply,
+         socket
+         |> assign(manual_stmt: new_manual_stmt())
+         |> reload_data()
+         |> put_flash(:info, "#{count} #{gettext("manual line added.")}")}
+      else
+        _ ->
+          {:noreply, put_flash(socket, :error, gettext("Invalid date or amount."))}
+      end
+    else
+      {:noreply, put_flash(socket, :error, gettext("Query an account first."))}
+    end
+  end
+
+  @impl true
+  def handle_event("save_manual_balances", %{"balances" => params}, socket) do
+    if socket.assigns.account do
+      opening_str = String.trim(params["opening"] || "")
+      closing_str = String.trim(params["closing"] || "")
+
+      opening =
+        case Float.parse(opening_str) do
+          {v, _} -> Decimal.from_float(v)
+          _ -> nil
+        end
+
+      closing =
+        case Float.parse(closing_str) do
+          {v, _} -> Decimal.from_float(v)
+          _ -> nil
+        end
+
+      if opening || closing do
+        BankReconciliation.save_statement_balances(
+          socket.assigns.current_company.id,
+          socket.assigns.account.id,
+          socket.assigns.search.f_date,
+          socket.assigns.search.t_date,
+          %{opening_balance: opening, closing_balance: closing}
+        )
+
+        {:noreply,
+         socket
+         |> reload_data()
+         |> put_flash(:info, gettext("Statement balances saved."))}
+      else
+        {:noreply, put_flash(socket, :error, gettext("Enter at least one balance."))}
+      end
+    else
+      {:noreply, put_flash(socket, :error, gettext("Query an account first."))}
+    end
+  end
+
+  @impl true
   def handle_event("validate", _, socket), do: {:noreply, socket}
 
   defp stmt_sum_zero?(stmt_ids, socket) do
@@ -642,6 +738,10 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
     |> Enum.reduce(Decimal.new(0), &Decimal.add(&1.amount, &2))
   end
 
+  defp new_manual_stmt do
+    %{statement_date: "", description: "", cheque_no: "", amount: ""}
+  end
+
   defp load_llm_settings(socket) do
     defaults = %{
       "llm-provider" => "none",
@@ -677,7 +777,7 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
       )
 
     ~H"""
-    <div class="w-[98%] mx-auto mb-5">
+    <div class="w-[98%] mx-auto h-[calc(100vh-80px)] flex flex-col">
       <p class="text-2xl text-center font-medium">{@page_title}</p>
 
       <%!-- Search Form --%>
@@ -715,21 +815,84 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
             <div class="col-span-2 mt-6">
               <.button>{gettext("Query")}</.button>
             </div>
-            <div class="col-span-2 mt-6" :if={@queried? and @account}>
-              <label :if={!@processing_csv} class="inline-block bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium px-3 py-1.5 rounded cursor-pointer">
-                {gettext("Upload CSV/PDF")}, {FullCircle.BankReconciliation.LlmClient.active_model(@llm_settings)}
+            <div class="col-span-2 mt-6 flex gap-1 flex-wrap" :if={@queried? and @account}>
+              <label :if={!@processing_csv} class="inline-block bg-blue-500 hover:bg-blue-600 text-white font-medium px-3 py-1.5 rounded cursor-pointer whitespace-nowrap">
+                {gettext("Upload CSV/PDF")}
                 <.live_file_input upload={@uploads.csv_file} class="hidden" />
               </label>
-              <div :if={@processing_csv} class="inline-flex items-center gap-2 bg-amber-100 text-amber-800 text-sm font-medium px-3 py-1.5 rounded">
+              <div :if={@processing_csv} class="inline-flex items-center gap-2 bg-amber-100 text-amber-800 font-medium px-3 py-1.5 rounded">
                 <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                   <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
                 {FullCircle.BankReconciliation.LlmClient.active_model(@llm_settings)} {gettext("is processing...")}
               </div>
+              <button
+                :if={!@processing_csv}
+                type="button"
+                phx-click="toggle_manual_stmt"
+                class={[
+                  "px-3 py-1.5 rounded font-medium whitespace-nowrap",
+                  if(@manual_stmt_mode, do: "bg-amber-500 hover:bg-amber-600 text-white", else: "bg-gray-500 hover:bg-gray-600 text-white")
+                ]}
+              >
+                {gettext("Manual")}
+              </button>
             </div>
           </div>
         </.form>
+      </div>
+
+      <%!-- Manual Entry Form --%>
+      <div :if={@manual_stmt_mode and @queried? and @account} class="border-2 border-amber-400 rounded bg-amber-50 p-3 mb-2">
+        <div class="grid grid-cols-[1fr_2fr] gap-4">
+          <%!-- Manual Statement Balances --%>
+          <div>
+            <div class="font-semibold text-sm mb-1">{gettext("Statement Balances")}</div>
+            <.form for={%{}} phx-submit="save_manual_balances" autocomplete="off">
+              <div class="flex items-end gap-2">
+                <div class="flex-1">
+                  <label class="block text-xs font-medium mb-0.5">{gettext("Opening Balance")}</label>
+                  <input type="text" name="balances[opening]" value={if @summary && @summary.stmt_opening, do: Decimal.to_string(@summary.stmt_opening), else: ""} class="w-full border border-gray-300 rounded px-2 py-1 text-sm" />
+                </div>
+                <div class="flex-1">
+                  <label class="block text-xs font-medium mb-0.5">{gettext("Closing Balance")}</label>
+                  <input type="text" name="balances[closing]" value={if @summary && @summary.stmt_closing, do: Decimal.to_string(@summary.stmt_closing), else: ""} class="w-full border border-gray-300 rounded px-2 py-1 text-sm" />
+                </div>
+                <button type="submit" phx-disable-with={gettext("Saving...")} class="bg-amber-600 text-white px-3 py-1 rounded text-sm hover:bg-amber-700 whitespace-nowrap">
+                  {gettext("Save Balances")}
+                </button>
+              </div>
+            </.form>
+          </div>
+          <%!-- Manual Statement Line --%>
+          <div>
+            <div class="font-semibold text-sm mb-1">{gettext("Add Statement Line")}</div>
+            <.form for={%{}} phx-change="update_manual_stmt" phx-submit="add_manual_stmt" autocomplete="off">
+              <div class="flex items-end gap-2">
+                <div class="flex-1">
+                  <label class="block text-xs font-medium mb-0.5">{gettext("Date")}</label>
+                  <input type="date" name="manual[statement_date]" value={@manual_stmt.statement_date} class="w-full border border-gray-300 rounded px-2 py-1 text-sm" />
+                </div>
+                <div class="flex-[2]">
+                  <label class="block text-xs font-medium mb-0.5">{gettext("Description")}</label>
+                  <input type="text" name="manual[description]" value={@manual_stmt.description} class="w-full border border-gray-300 rounded px-2 py-1 text-sm" />
+                </div>
+                <div class="flex-1">
+                  <label class="block text-xs font-medium mb-0.5">{gettext("Chq#")}</label>
+                  <input type="text" name="manual[cheque_no]" value={@manual_stmt.cheque_no} class="w-full border border-gray-300 rounded px-2 py-1 text-sm" />
+                </div>
+                <div class="flex-1">
+                  <label class="block text-xs font-medium mb-0.5">{gettext("Amount")}</label>
+                  <input type="text" name="manual[amount]" value={@manual_stmt.amount} class="w-full border border-gray-300 rounded px-2 py-1 text-sm" />
+                </div>
+                <button type="submit" phx-disable-with={gettext("Adding...")} class="bg-amber-600 text-white px-3 py-1 rounded text-sm hover:bg-amber-700 whitespace-nowrap">
+                  {gettext("Add")}
+                </button>
+              </div>
+            </.form>
+          </div>
+        </div>
       </div>
 
       <%!-- Summary Bar --%>
@@ -978,9 +1141,9 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
       </div>
 
       <%!-- Two-Panel Layout --%>
-      <div :if={@queried? and @account} class="grid grid-cols-2 gap-2" id="recon-panels">
+      <div :if={@queried? and @account} class="grid grid-cols-2 gap-2 flex-1 min-h-0" id="recon-panels">
         <%!-- Left: Bank Statement Lines --%>
-        <div>
+        <div class="flex flex-col min-h-0">
           <div class="font-semibold text-center bg-amber-200 rounded p-1 mb-1 text-sm">
             {gettext("Bank Statement")} ({length(@statement_lines)})
           </div>
@@ -992,7 +1155,7 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
             <div class="w-[17%] border rounded bg-gray-200 border-gray-400 px-1 py-0.5">{gettext("Amount")}</div>
             <div class="w-[18%] border rounded bg-gray-200 border-gray-400 px-1 py-0.5">{gettext("Status")}</div>
           </div>
-          <div class="max-h-[65vh] overflow-y-auto">
+          <div id="stmt-scroll" class="overflow-y-auto flex-1 min-h-0 border-b-4 border-amber-400">
             <%= for line <- @statement_lines do %>
               <% matched? = not is_nil(line.match_group_id) %>
               <% suggested? = MapSet.member?(@suggested_stmt, line.id) %>
@@ -1048,7 +1211,7 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
         </div>
 
         <%!-- Right: Book Transactions --%>
-        <div>
+        <div class="flex flex-col min-h-0">
           <div class="font-semibold text-center bg-blue-200 rounded p-1 mb-1 text-sm">
             {gettext("Book Transactions")} ({length(@book_transactions)})
           </div>
@@ -1061,7 +1224,7 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
             <div class="w-[15%] border rounded bg-gray-200 border-gray-400 px-1 py-0.5">{gettext("Amount")}</div>
             <div class="w-[15%] border rounded bg-gray-200 border-gray-400 px-1 py-0.5">{gettext("Status")}</div>
           </div>
-          <div class="max-h-[65vh] overflow-y-auto">
+          <div id="txn-scroll" class="overflow-y-auto flex-1 min-h-0 border-b-4 border-blue-400">
             <%= for txn <- @book_transactions do %>
               <% matched? = txn.reconciled %>
               <% suggested? = MapSet.member?(@suggested_txn, txn.id) %>
