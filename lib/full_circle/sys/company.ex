@@ -23,6 +23,7 @@ defmodule FullCircle.Sys.Company do
     field :gst_id, :string
     field :sst_id, :string
     field :tou_id, :string
+    field :misc_code, :string
     field :closing_month, :integer
     field :closing_day, :integer
     field :settings, :map, default: %{}
@@ -49,7 +50,8 @@ defmodule FullCircle.Sys.Company do
       :tel,
       :fax,
       :descriptions,
-      :tax_id
+      :tax_id,
+      :misc_code
     ])
     |> validate_required([
       :name,

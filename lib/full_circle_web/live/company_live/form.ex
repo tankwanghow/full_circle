@@ -89,6 +89,9 @@ defmodule FullCircleWeb.CompanyLive.Form do
           <.input field={@form[:tax_id]} label={gettext("Tax Id")} />
         </div>
         <div class="col-span-3">
+          <.input field={@form[:misc_code]} label={gettext("MSIC Code")} />
+        </div>
+        <div class="col-span-3">
           <.input field={@form[:gst_id]} label={gettext("GST Id")} />
         </div>
         <div class="col-span-3">

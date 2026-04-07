@@ -17,6 +17,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
 
     {:ok,
      socket
+     |> assign(e_inv_preview: nil)
      |> assign(
        settings:
          FullCircle.Sys.load_settings(
@@ -52,23 +53,68 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
 
   defp mount_new(obj, socket) do
     obj = Jason.decode!(obj)
+    com = socket.assigns.current_company
+    user = socket.assigns.current_user
 
-    attrs =
-      %{
-        pur_invoice_no: "...new...",
-        e_inv_internal_id: obj["internalId"],
-        e_inv_uuid: obj["uuid"],
-        pur_invoice_date: obj["dateTimeIssued"],
-        due_date: obj["dateTimeIssued"],
-        contact_name:
-          obj["supplierName"] |> String.replace(~r/[^a-zA-Z0-9]/, "") |> String.downcase()
-      }
+    {attrs, flash} =
+      case FullCircle.EInvMetas.get_full_e_invoice(obj["uuid"], com, user) do
+        {:ok, body} ->
+          parsed = FullCircle.EInvMetas.parse_e_invoice_document(body)
+
+          details =
+            parsed.invoice_lines
+            |> Enum.with_index()
+            |> Enum.map(fn {line, idx} ->
+              %{
+                "_persistent_id" => idx,
+                "descriptions" => line.descriptions,
+                "quantity" => line.quantity,
+                "unit_price" => line.unit_price,
+                "discount" => line.discount,
+                "tax_rate" => line.tax_rate,
+                "good_name" => "",
+                "account_name" => "",
+                "tax_code_name" => "",
+                "package_name" => "",
+                "package_qty" => 0,
+                "unit_multiplier" => 0,
+                "unit" => ""
+              }
+            end)
+
+          {%{
+             pur_invoice_no: "...new...",
+             e_inv_internal_id: parsed.internal_id,
+             e_inv_uuid: obj["uuid"],
+             pur_invoice_date: parsed.issue_date,
+             due_date: parsed.issue_date,
+             contact_name:
+               (parsed.supplier_name || "")
+               |> String.replace(~r/[^a-zA-Z0-9]/, "")
+               |> String.downcase(),
+             pur_invoice_details: details
+           }, nil}
+
+        {:error, _reason} ->
+          {%{
+             pur_invoice_no: "...new...",
+             e_inv_internal_id: obj["internalId"],
+             e_inv_uuid: obj["uuid"],
+             pur_invoice_date: obj["dateTimeIssued"],
+             due_date: obj["dateTimeIssued"],
+             contact_name:
+               obj["supplierName"]
+               |> String.replace(~r/[^a-zA-Z0-9]/, "")
+               |> String.downcase()
+           }, gettext("Could not fetch e-invoice details. Using summary data only.")}
+      end
 
     socket
     |> assign(live_action: :new)
     |> assign(id: "new")
     |> assign(page_title: gettext("New Purchase Invoice"))
     |> assign(matched_trans: [])
+    |> then(fn s -> if flash, do: put_flash(s, :warning, flash), else: s end)
     |> assign(
       :form,
       to_form(
@@ -76,8 +122,8 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
           PurInvoice,
           %PurInvoice{},
           attrs,
-          socket.assigns.current_company,
-          socket.assigns.current_user
+          com,
+          user
         )
       )
     )
@@ -304,6 +350,32 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
   @impl true
   def handle_event("save", %{"pur_invoice" => params}, socket) do
     save(socket, socket.assigns.live_action, params)
+  end
+
+  @impl true
+  def handle_event("show_e_inv", _, socket) do
+    uuid = socket.assigns.form[:e_inv_uuid].value
+
+    preview =
+      case FullCircle.EInvMetas.get_full_e_invoice(
+             uuid,
+             socket.assigns.current_company,
+             socket.assigns.current_user
+           ) do
+        {:ok, body} ->
+          parsed = FullCircle.EInvMetas.parse_e_invoice_document(body)
+          {:ok, parsed}
+
+        {:error, reason} ->
+          {:error, reason}
+      end
+
+    {:noreply, socket |> assign(e_inv_preview: preview)}
+  end
+
+  @impl true
+  def handle_event("close_e_inv_preview", _, socket) do
+    {:noreply, socket |> assign(e_inv_preview: nil)}
   end
 
   defp save(socket, :new, params) do
@@ -550,7 +622,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
             :if={is_nil(@form[:e_inv_uuid].value)}
             class="text-blue-600 hover:font-medium w-[20%] ml-5 mt-6"
           >
-            <.link target="_blank" href="https://myinvois.hasil.gov.my/newdocument">
+            <.link target="_blank" href={"#{@einv_portal}/newdocument"}>
               {gettext("New E-Invoice")}
             </.link>
           </div>
@@ -560,9 +632,17 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
           >
             <.link
               target="_blank"
-              href={"https://myinvois.hasil.gov.my/documents/#{@form[:e_inv_uuid].value}"}
+              href={"#{@einv_portal}/documents/#{@form[:e_inv_uuid].value}"}
             >
               Open E-Invoice
+            </.link>
+          </div>
+          <div
+            :if={@live_action == :new and !is_nil(@form[:e_inv_uuid].value) and is_nil(@e_inv_preview)}
+            class="ml-3 mt-5"
+          >
+            <.link phx-click="show_e_inv" class="blue button text-sm">
+              {gettext("Show E-Invoice")}
             </.link>
           </div>
           <div class="shrink-0 ml-2 mt-1">
@@ -618,6 +698,74 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
           />
         </div>
       </.form>
+
+      <div :if={@live_action == :new and @e_inv_preview} class="mt-4 border rounded-lg border-blue-500 bg-blue-50 p-4">
+        <div class="flex justify-between items-center mb-3">
+          <p class="text-xl font-medium">{gettext("E-Invoice Document")}</p>
+          <.link phx-click="close_e_inv_preview" class="orange button text-sm">
+            {gettext("Close")}
+          </.link>
+        </div>
+        <%= case @e_inv_preview do %>
+          <% {:ok, parsed} -> %>
+            <div class="grid grid-cols-2 gap-4 text-sm">
+              <div class="border rounded p-3 bg-white">
+                <p class="font-bold mb-2">{gettext("Supplier")}</p>
+                <p class="font-medium">{parsed.supplier_name}</p>
+                <p>TIN: {parsed.supplier_tin}</p>
+                <p>BRN: {parsed.supplier_brn}</p>
+              </div>
+              <div class="border rounded p-3 bg-white">
+                <p class="font-bold mb-2">{gettext("Document Info")}</p>
+                <p><span class="font-bold">{gettext("Internal ID")}:</span> {parsed.internal_id}</p>
+                <p><span class="font-bold">{gettext("Issue Date")}:</span> {parsed.issue_date}</p>
+                <p><span class="font-bold">{gettext("Currency")}:</span> {parsed.currency}</p>
+                <p><span class="font-bold">{gettext("Type")}:</span> {parsed.type_code}</p>
+              </div>
+            </div>
+            <div class="mt-3 border rounded p-3 bg-white text-sm">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="border-b font-bold">
+                    <th class="text-left p-1">#</th>
+                    <th class="text-left p-1">{gettext("Description")}</th>
+                    <th class="text-right p-1">{gettext("Qty")}</th>
+                    <th class="text-left p-1">{gettext("Unit")}</th>
+                    <th class="text-right p-1">{gettext("Unit Price")}</th>
+                    <th class="text-right p-1">{gettext("Discount")}</th>
+                    <th class="text-right p-1">{gettext("Amount")}</th>
+                    <th class="text-right p-1">{gettext("Tax%")}</th>
+                    <th class="text-right p-1">{gettext("Tax")}</th>
+                    <th class="text-left p-1">{gettext("Tax Type")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <%= for {line, idx} <- Enum.with_index(parsed.invoice_lines, 1) do %>
+                    <tr class="border-b">
+                      <td class="p-1">{idx}</td>
+                      <td class="p-1">{line.descriptions}</td>
+                      <td class="text-right p-1">{line.quantity}</td>
+                      <td class="p-1">{line.unit}</td>
+                      <td class="text-right p-1">{line.unit_price}</td>
+                      <td class="text-right p-1">{line.discount}</td>
+                      <td class="text-right p-1">{line.quantity * line.unit_price - line.discount}</td>
+                      <td class="text-right p-1">{line.tax_rate}</td>
+                      <td class="text-right p-1">{Float.round((line.quantity * line.unit_price - line.discount) * line.tax_rate / 100, 2)}</td>
+                      <td class="p-1">{line.tax_code_id_lhdn} ({line.tax_scheme})</td>
+                    </tr>
+                  <% end %>
+                </tbody>
+              </table>
+              <div class="flex justify-end gap-6 mt-2 font-bold">
+                <span>{gettext("Subtotal")}: {parsed.total_excluding_tax}</span>
+                <span>{gettext("Tax")}: {parsed.total_payable_amount - parsed.total_excluding_tax}</span>
+                <span>{gettext("Total")}: {parsed.total_payable_amount}</span>
+              </div>
+            </div>
+          <% {:error, reason} -> %>
+            <div class="text-red-600 font-bold">{reason}</div>
+        <% end %>
+      </div>
     </div>
     """
   end

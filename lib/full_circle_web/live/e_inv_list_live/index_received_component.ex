@@ -136,36 +136,36 @@ defmodule FullCircleWeb.EInvListLive.IndexReceivedComponent do
   defp new_fc(assigns) do
     ~H"""
     <div class="w-[99%] flex">
-      <.link target="_blank" navigate={~p"/companies/#{@company.id}/Invoice/new"} class="blue button">
-        {gettext("New Invoice")}
-      </.link>
-      <.link
-        target="_blank"
-        navigate={~p"/companies/#{@company.id}/PurInvoice/new?obj=#{Jason.encode!(@obj)}"}
-        class="blue button"
-      >
-        {gettext("New Pur Invoice")}
-      </.link>
-      <.link target="_blank" navigate={~p"/companies/#{@company.id}/Receipt/new"} class="green button">
-        {gettext("New Receipt")}
-      </.link>
-      <.link target="_blank" navigate={~p"/companies/#{@company.id}/Payment/new"} class="green button">
-        {gettext("New Payment")}
-      </.link>
-      <.link
-        target="_blank"
-        navigate={~p"/companies/#{@company.id}/DebitNote/new"}
-        class="orange button"
-      >
-        {gettext("New Debit Note")}
-      </.link>
-      <.link
-        target="_blank"
-        navigate={~p"/companies/#{@company.id}/CreditNote/new"}
-        class="orange button"
-      >
-        {gettext("New Credit Note")}
-      </.link>
+      <%= case @obj.typeName do %>
+        <% type when type in ["Invoice", "Self-billed Invoice"] -> %>
+          <.link
+            target="_blank"
+            navigate={~p"/companies/#{@company.id}/PurInvoice/new?obj=#{Jason.encode!(@obj)}"}
+            class="blue button"
+          >
+            {gettext("New Pur Invoice")}
+          </.link>
+          <.link target="_blank" navigate={~p"/companies/#{@company.id}/Payment/new"} class="green button">
+            {gettext("New Payment")}
+          </.link>
+        <% type when type in ["Credit Note", "Self-billed Debit Note"] -> %>
+          <.link
+            target="_blank"
+            navigate={~p"/companies/#{@company.id}/DebitNote/new"}
+            class="orange button"
+          >
+            {gettext("New Debit Note")}
+          </.link>
+        <% type when type in ["Debit Note", "Self-billed Credit Note"] -> %>
+          <.link
+            target="_blank"
+            navigate={~p"/companies/#{@company.id}/CreditNote/new"}
+            class="orange button"
+          >
+            {gettext("New Credit Note")}
+          </.link>
+        <% _ -> %>
+      <% end %>
     </div>
     """
   end
@@ -197,7 +197,7 @@ defmodule FullCircleWeb.EInvListLive.IndexReceivedComponent do
           <a
             class="text-blue-600 hover:font-medium"
             target="_blank"
-            href={~w(https://myinvois.hasil.gov.my/documents/#{@obj.uuid})}
+            href={"#{@einv_portal}/documents/#{@obj.uuid}"}
           >
             {@obj.uuid}
           </a>

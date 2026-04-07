@@ -1148,7 +1148,7 @@ defmodule FullCircleWeb.CoreComponents do
     <%= if @obj.e_inv_uuid do %>
       <.link
         class="text-xs bg-green-400 p-1 rounded-xl"
-        href={"https://myinvois.hasil.gov.my/documents/#{@obj.e_inv_uuid}"}
+        href={"#{@einv_portal}/documents/#{@obj.e_inv_uuid}"}
         target="_blank"
       >
         Open e-Invoice
@@ -1156,7 +1156,7 @@ defmodule FullCircleWeb.CoreComponents do
     <% else %>
       <.link
         class="text-xs bg-orange-400 p-1 rounded-xl"
-        href="https://myinvois.hasil.gov.my/newdocument"
+        href={"#{@einv_portal}/newdocument"}
         target="_blank"
       >
         New e-Invoice

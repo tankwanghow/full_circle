@@ -287,6 +287,7 @@ defmodule FullCircleWeb.EInvListLive.Index do
             obj={obj}
             company={@current_company}
             user={@current_user}
+            einv_portal={@einv_portal}
           />
           <.live_component
             :if={obj.issuerTIN == @current_company.tax_id}
@@ -295,6 +296,7 @@ defmodule FullCircleWeb.EInvListLive.Index do
             obj={obj}
             company={@current_company}
             user={@current_user}
+            einv_portal={@einv_portal}
           />
         <% end %>
       </div>

@@ -5,11 +5,22 @@ defmodule FullCircleWeb.ActiveCompany do
   use Gettext, backend: FullCircleWeb.Gettext
 
   def on_mount(:assign_active_company, _params, session, socket) do
+    einv_portal =
+      if session["current_company"] && socket.assigns[:current_user] do
+        FullCircle.EInvMetas.portal_base_url(
+          session["current_company"],
+          socket.assigns.current_user
+        )
+      else
+        "https://myinvois.hasil.gov.my"
+      end
+
     {:cont,
      socket
      |> Phoenix.Component.assign(:current_company, session["current_company"])
      |> Phoenix.Component.assign(:current_role, session["current_role"])
-     |> Phoenix.Component.assign(:full_screen_app?, session["full_screen_app?"])}
+     |> Phoenix.Component.assign(:full_screen_app?, session["full_screen_app?"])
+     |> Phoenix.Component.assign(:einv_portal, einv_portal)}
   end
 
   def set_active_company(%{params: %{"company_id" => url_company_id}} = conn, _opts) do

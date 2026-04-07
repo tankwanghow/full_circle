@@ -3,17 +3,12 @@ defmodule FullCircle.EInvMetas.EInvMeta do
   import Ecto.Changeset
 
   schema "e_inv_metas" do
-    field :e_inv_apibaseurl, :string
-    field :e_inv_idsrvbaseurl, :string
-    field :e_inv_clientid, :string
-    field :e_inv_clientsecret1, :string
-    field :e_inv_clientsecret2, :string
-    field :e_inv_clientsecretexpiration, :date
+    field :environment, :string, default: "production"
+    field :sandbox, :map, default: %{}
+    field :production, :map, default: %{}
+    field :paths, :map, default: %{}
+    field :unit_code_map, :map, default: %{}
     field :token, :string
-    field :login_url, :string
-    field :search_url, :string
-    field :get_doc_url, :string
-    field :get_doc_details_url, :string
 
     belongs_to(:company, FullCircle.Sys.Company, type: :binary_id)
 
@@ -24,31 +19,27 @@ defmodule FullCircle.EInvMetas.EInvMeta do
   def changeset(e_inv_meta, attrs) do
     e_inv_meta
     |> cast(attrs, [
-      :e_inv_apibaseurl,
-      :e_inv_idsrvbaseurl,
-      :e_inv_clientid,
-      :e_inv_clientsecret1,
-      :e_inv_clientsecret2,
-      :e_inv_clientsecretexpiration,
+      :environment,
+      :sandbox,
+      :production,
+      :paths,
+      :unit_code_map,
       :token,
-      :login_url,
-      :search_url,
-      :get_doc_url,
-      :get_doc_details_url,
       :company_id
     ])
     |> validate_required([
-      :e_inv_apibaseurl,
-      :e_inv_idsrvbaseurl,
-      :e_inv_clientid,
-      :e_inv_clientsecret1,
-      :e_inv_clientsecret2,
-      :e_inv_clientsecretexpiration,
-      :login_url,
-      :search_url,
-      :get_doc_url,
-      :get_doc_details_url,
+      :environment,
       :company_id
     ])
+    |> validate_inclusion(:environment, ["sandbox", "production"])
+    |> clear_token_on_env_change()
+  end
+
+  defp clear_token_on_env_change(changeset) do
+    if get_change(changeset, :environment) do
+      put_change(changeset, :token, nil)
+    else
+      changeset
+    end
   end
 end

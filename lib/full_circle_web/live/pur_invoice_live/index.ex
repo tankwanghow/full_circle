@@ -107,6 +107,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Index do
             obj={obj}
             company={@current_company}
             user={@current_user}
+            einv_portal={@einv_portal}
             ex_class=""
           />
         <% end %>

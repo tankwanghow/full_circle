@@ -16,6 +16,7 @@ defmodule FullCircleWeb.InvoiceLive.Form do
 
     {:ok,
      socket
+     |> assign(e_inv_preview: nil)
      |> assign(
        settings:
          FullCircle.Sys.load_settings(
@@ -287,6 +288,96 @@ defmodule FullCircleWeb.InvoiceLive.Form do
   end
 
   @impl true
+  def handle_event("preview_e_inv", _, socket) do
+    preview =
+      FullCircle.EInvMetas.preview_e_invoice(
+        socket.assigns.id,
+        socket.assigns.current_company,
+        socket.assigns.current_user
+      )
+
+    {:noreply, socket |> assign(e_inv_preview: preview)}
+  end
+
+  @impl true
+  def handle_event("update_preview", %{"preview" => params}, socket) do
+    case socket.assigns.e_inv_preview do
+      {:ok, preview} ->
+        supplier =
+          preview.supplier
+          |> Map.merge(%{
+            tin: params["supplier_tin"],
+            brn: params["supplier_brn"],
+            sst: params["supplier_sst"],
+            msic: params["supplier_msic"],
+            tel: params["supplier_tel"],
+            email: params["supplier_email"],
+            address: params["supplier_address"],
+            city: params["supplier_city"],
+            zipcode: params["supplier_zipcode"],
+            state: params["supplier_state"]
+          })
+
+        customer =
+          preview.customer
+          |> Map.merge(%{
+            tin: params["customer_tin"],
+            brn: params["customer_brn"],
+            sst: params["customer_sst"],
+            tel: params["customer_tel"],
+            email: params["customer_email"],
+            address: params["customer_address"],
+            city: params["customer_city"],
+            zipcode: params["customer_zipcode"],
+            state: params["customer_state"]
+          })
+
+        updated =
+          preview
+          |> Map.put(:supplier, supplier)
+          |> Map.put(:customer, customer)
+          |> Map.put(:warnings, FullCircle.EInvMetas.validate_preview(supplier, customer))
+
+        {:noreply, socket |> assign(e_inv_preview: {:ok, updated})}
+
+      _ ->
+        {:noreply, socket}
+    end
+  end
+
+  @impl true
+  def handle_event("close_preview", _, socket) do
+    {:noreply, socket |> assign(e_inv_preview: nil)}
+  end
+
+  @impl true
+  def handle_event("submit_e_inv", _, socket) do
+    {:ok, preview} = socket.assigns.e_inv_preview
+
+    case FullCircle.EInvMetas.submit_e_invoice(
+           socket.assigns.id,
+           preview,
+           socket.assigns.current_company,
+           socket.assigns.current_user
+         ) do
+      {:ok, uuid} ->
+        {:noreply,
+         socket
+         |> assign(e_inv_preview: nil)
+         |> push_navigate(
+           to: ~p"/companies/#{socket.assigns.current_company.id}/Invoice/#{socket.assigns.id}/edit"
+         )
+         |> put_flash(:info, "#{gettext("E-Invoice submitted successfully.")} UUID: #{uuid}")}
+
+      {:error, reason} ->
+        {:noreply,
+         socket
+         |> assign(e_inv_preview: nil)
+         |> put_flash(:error, "#{gettext("E-Invoice submission failed:")} #{reason}")}
+    end
+  end
+
+  @impl true
   def handle_params(_params, uri, socket) do
     {:noreply, socket |> assign(cancel_url: uri)}
   end
@@ -459,18 +550,12 @@ defmodule FullCircleWeb.InvoiceLive.Form do
             <.input field={@form[:e_inv_uuid]} label={gettext("E Invoice UUID")} />
           </div>
           <div
-            :if={is_nil(@form[:e_inv_uuid].value) and @live_action != :new}
-            class="text-blue-600 hover:font-medium w-[20%] ml-5 mt-6"
+            :if={is_nil(@form[:e_inv_uuid].value) and @live_action == :edit}
+            class="ml-5 mt-5"
           >
-            <a
-              id={@form[:invoice_no].value}
-              href="#"
-              phx-hook="copyAndOpen"
-              copy-text={@form[:invoice_no].value}
-              goto-url="https://myinvois.hasil.gov.my/newdocument"
-            >
-              {gettext("New E-Invoice")}
-            </a>
+            <.link phx-click="preview_e_inv" class="blue button">
+              {gettext("Preview E-Invoice")}
+            </.link>
           </div>
           <div
             :if={!is_nil(@form[:e_inv_uuid].value)}
@@ -478,7 +563,7 @@ defmodule FullCircleWeb.InvoiceLive.Form do
           >
             <.link
               target="_blank"
-              href={"https://myinvois.hasil.gov.my/documents/#{@form[:e_inv_uuid].value}"}
+              href={"#{@einv_portal}/documents/#{@form[:e_inv_uuid].value}"}
             >
               Open E-Invoice
             </.link>
@@ -550,6 +635,137 @@ defmodule FullCircleWeb.InvoiceLive.Form do
           />
         </div>
       </.form>
+
+      <div :if={@e_inv_preview} class="mt-4 border rounded-lg border-blue-500 bg-blue-50 p-4">
+        <div class="flex justify-between items-center mb-3">
+          <p class="text-xl font-medium">{gettext("E-Invoice Preview")}</p>
+          <.link phx-click="close_preview" class="orange button text-sm">
+            {gettext("Close")}
+          </.link>
+        </div>
+        <%= case @e_inv_preview do %>
+          <% {:ok, preview} -> %>
+            <div :if={preview.warnings != []} class="mb-3 p-3 bg-red-100 border border-red-400 rounded text-sm text-red-700">
+              <p class="font-bold mb-1">{gettext("Validation Warnings (fix before submitting):")}</p>
+              <ul class="list-disc ml-4">
+                <li :for={w <- preview.warnings}>{w}</li>
+              </ul>
+            </div>
+            <form phx-change="update_preview" id="preview-form">
+              <div class="grid grid-cols-2 gap-4 text-sm">
+                <div class="border rounded p-3 bg-white">
+                  <p class="font-bold mb-2">{gettext("Supplier")}</p>
+                  <p class="font-medium">{preview.supplier.name}</p>
+                  <div class="grid grid-cols-2 gap-1 mt-1">
+                    <label class="text-xs text-gray-500">TIN</label>
+                    <input type="text" name="preview[supplier_tin]" value={preview.supplier.tin} class="text-sm border rounded px-1" />
+                    <label class="text-xs text-gray-500">BRN</label>
+                    <input type="text" name="preview[supplier_brn]" value={preview.supplier.brn} class="text-sm border rounded px-1" />
+                    <label class="text-xs text-gray-500">SST</label>
+                    <input type="text" name="preview[supplier_sst]" value={preview.supplier.sst} class="text-sm border rounded px-1" />
+                    <label class="text-xs text-gray-500">MSIC</label>
+                    <input type="text" name="preview[supplier_msic]" value={preview.supplier.msic} class="text-sm border rounded px-1" />
+                    <label class="text-xs text-gray-500">Tel</label>
+                    <input type="text" name="preview[supplier_tel]" value={preview.supplier.tel} class="text-sm border rounded px-1" />
+                    <label class="text-xs text-gray-500">Email</label>
+                    <input type="text" name="preview[supplier_email]" value={preview.supplier.email} class="text-sm border rounded px-1" />
+                    <label class="text-xs text-gray-500">{gettext("Address")}</label>
+                    <input type="text" name="preview[supplier_address]" value={preview.supplier.address} class="text-sm border rounded px-1" />
+                    <label class="text-xs text-gray-500">{gettext("City")}</label>
+                    <input type="text" name="preview[supplier_city]" value={preview.supplier.city} class="text-sm border rounded px-1" />
+                    <label class="text-xs text-gray-500">{gettext("Postal Code")}</label>
+                    <input type="text" name="preview[supplier_zipcode]" value={preview.supplier.zipcode} class="text-sm border rounded px-1" />
+                    <label class="text-xs text-gray-500">{gettext("State")}</label>
+                    <input type="text" name="preview[supplier_state]" value={preview.supplier.state} class="text-sm border rounded px-1" />
+                  </div>
+                </div>
+                <div class="border rounded p-3 bg-white">
+                  <p class="font-bold mb-2">{gettext("Customer")}</p>
+                  <p class="font-medium">{preview.customer.name}</p>
+                  <div class="grid grid-cols-2 gap-1 mt-1">
+                    <label class="text-xs text-gray-500">TIN</label>
+                    <input type="text" name="preview[customer_tin]" value={preview.customer.tin} class="text-sm border rounded px-1" />
+                    <label class="text-xs text-gray-500">BRN</label>
+                    <input type="text" name="preview[customer_brn]" value={preview.customer.brn} class="text-sm border rounded px-1" />
+                    <label class="text-xs text-gray-500">SST</label>
+                    <input type="text" name="preview[customer_sst]" value={preview.customer.sst} class="text-sm border rounded px-1" />
+                    <label class="text-xs text-gray-500">Tel</label>
+                    <input type="text" name="preview[customer_tel]" value={preview.customer.tel} class="text-sm border rounded px-1" />
+                    <label class="text-xs text-gray-500">Email</label>
+                    <input type="text" name="preview[customer_email]" value={preview.customer.email} class="text-sm border rounded px-1" />
+                    <label class="text-xs text-gray-500">{gettext("Address")}</label>
+                    <input type="text" name="preview[customer_address]" value={preview.customer.address} class="text-sm border rounded px-1" />
+                    <label class="text-xs text-gray-500">{gettext("City")}</label>
+                    <input type="text" name="preview[customer_city]" value={preview.customer.city} class="text-sm border rounded px-1" />
+                    <label class="text-xs text-gray-500">{gettext("Postal Code")}</label>
+                    <input type="text" name="preview[customer_zipcode]" value={preview.customer.zipcode} class="text-sm border rounded px-1" />
+                    <label class="text-xs text-gray-500">{gettext("State")}</label>
+                    <input type="text" name="preview[customer_state]" value={preview.customer.state} class="text-sm border rounded px-1" />
+                  </div>
+                </div>
+              </div>
+            </form>
+            <div class="mt-3 border rounded p-3 bg-white text-sm">
+              <div class="flex gap-4 mb-2">
+                <span><span class="font-bold">{gettext("Invoice No")}:</span> {preview.invoice_no}</span>
+                <span><span class="font-bold">{gettext("Date")}:</span> {preview.invoice_date}</span>
+                <span><span class="font-bold">{gettext("Currency")}:</span> MYR</span>
+                <span><span class="font-bold">{gettext("Type")}:</span> Invoice (01)</span>
+              </div>
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="border-b font-bold">
+                    <th class="text-left p-1">#</th>
+                    <th class="text-left p-1">{gettext("Description")}</th>
+                    <th class="text-right p-1">{gettext("Qty")}</th>
+                    <th class="text-left p-1">{gettext("Unit")}</th>
+                    <th class="text-right p-1">{gettext("Unit Price")}</th>
+                    <th class="text-right p-1">{gettext("Discount")}</th>
+                    <th class="text-right p-1">{gettext("Amount")}</th>
+                    <th class="text-right p-1">{gettext("Tax%")}</th>
+                    <th class="text-right p-1">{gettext("Tax")}</th>
+                    <th class="text-left p-1">{gettext("Tax Type")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <%= for line <- preview.lines do %>
+                    <tr class="border-b">
+                      <td class="p-1">{line.idx}</td>
+                      <td class="p-1">{line.description}</td>
+                      <td class="text-right p-1">{line.quantity}</td>
+                      <td class="p-1">{line.unit} → {line.lhdn_unit}</td>
+                      <td class="text-right p-1">{line.unit_price}</td>
+                      <td class="text-right p-1">{line.discount}</td>
+                      <td class="text-right p-1">{line.good_amount}</td>
+                      <td class="text-right p-1">{line.tax_rate}</td>
+                      <td class="text-right p-1">{line.tax_amount}</td>
+                      <td class="p-1">{line.tax_type}</td>
+                    </tr>
+                  <% end %>
+                </tbody>
+              </table>
+              <div class="flex justify-end gap-6 mt-2 font-bold">
+                <span>{gettext("Subtotal")}: {preview.total_excl}</span>
+                <span>{gettext("Tax")}: {preview.total_tax}</span>
+                <span>{gettext("Total")}: {preview.total_incl}</span>
+              </div>
+            </div>
+            <div class="mt-3 flex justify-center gap-2">
+              <.link
+                phx-click="submit_e_inv"
+                data-confirm={gettext("Confirm submit to LHDN?")}
+                class="green button"
+              >
+                {gettext("Submit to LHDN")}
+              </.link>
+              <.link phx-click="close_preview" class="orange button">
+                {gettext("Cancel")}
+              </.link>
+            </div>
+          <% {:error, reason} -> %>
+            <div class="text-red-600 font-bold">{reason}</div>
+        <% end %>
+      </div>
     </div>
     """
   end

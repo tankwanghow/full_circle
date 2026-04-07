@@ -32,6 +32,7 @@ defmodule FullCircleWeb.EInvMetaLive.Form do
       :form,
       to_form(StdInterface.changeset(EInvMeta, %EInvMeta{}, %{}, socket.assigns.current_company))
     )
+    |> assign_text_fields(%EInvMeta{})
   end
 
   defp mount_edit(socket, obj) do
@@ -43,14 +44,63 @@ defmodule FullCircleWeb.EInvMetaLive.Form do
       :form,
       to_form(StdInterface.changeset(EInvMeta, obj, %{}, socket.assigns.current_company))
     )
+    |> assign_text_fields(obj)
   end
 
-  def handle_event("validate", %{"e_inv_meta" => params}, socket) do
+  defp assign_text_fields(socket, obj) do
+    prod = obj.production || %{}
+    sb = obj.sandbox || %{}
+    paths = obj.paths || %{}
+    unit_map = obj.unit_code_map || %{}
+    merged_units = Map.merge(EInvMetas.default_unit_codes(), unit_map)
+
+    socket
+    |> assign(prod_text: map_to_text(prod))
+    |> assign(sandbox_text: map_to_text(sb))
+    |> assign(paths_text: map_to_text(paths))
+    |> assign(unit_code_text: map_to_text(merged_units))
+  end
+
+  defp map_to_text(map) do
+    map
+    |> Enum.sort_by(fn {k, _} -> k end)
+    |> Enum.map(fn {k, v} -> "#{k}=#{v}" end)
+    |> Enum.join(", ")
+  end
+
+  defp text_to_map(text) do
+    text
+    |> String.split(",")
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.reduce(%{}, fn entry, acc ->
+      case String.split(entry, "=", parts: 2) do
+        [key, value] -> Map.put(acc, String.trim(key), String.trim(value))
+        _ -> acc
+      end
+    end)
+  end
+
+  def handle_event("validate", %{"e_inv_meta" => params} = full_params, socket) do
+    socket =
+      socket
+      |> assign(prod_text: full_params["prod_text"] || socket.assigns.prod_text)
+      |> assign(sandbox_text: full_params["sandbox_text"] || socket.assigns.sandbox_text)
+      |> assign(paths_text: full_params["paths_text"] || socket.assigns.paths_text)
+      |> assign(unit_code_text: full_params["unit_code_text"] || socket.assigns.unit_code_text)
+
     validate(params, socket)
   end
 
   @impl true
-  def handle_event("save", %{"e_inv_meta" => params}, socket) do
+  def handle_event("save", %{"e_inv_meta" => params} = full_params, socket) do
+    params =
+      params
+      |> Map.put("production", text_to_map(full_params["prod_text"] || ""))
+      |> Map.put("sandbox", text_to_map(full_params["sandbox_text"] || ""))
+      |> Map.put("paths", text_to_map(full_params["paths_text"] || ""))
+      |> Map.put("unit_code_map", text_to_map(full_params["unit_code_text"] || ""))
+
     save(socket, socket.assigns.live_action, params)
   end
 
@@ -133,7 +183,7 @@ defmodule FullCircleWeb.EInvMetaLive.Form do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="w-7/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
+    <div class="w-8/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
       <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <.form
         for={@form}
@@ -143,47 +193,63 @@ defmodule FullCircleWeb.EInvMetaLive.Form do
         phx-submit="save"
         class="mx-auto"
       >
-        <div class="flex flex-nowrap gap-1">
-          <div class="w-[50%]">
-            <.input field={@form[:e_inv_apibaseurl]} label={gettext("ApiBaseUrl")} />
-          </div>
-          <div class="w-[50%]">
-            <.input field={@form[:e_inv_idsrvbaseurl]} label={gettext("IdSrvBaseUrl")} />
-          </div>
-        </div>
-
-        <div class="flex flex-nowrap gap-1">
-          <div class="w-[28%]">
-            <.input field={@form[:e_inv_clientid]} label={gettext("Client Id")} />
-          </div>
-          <div class="w-[28%]">
-            <.input field={@form[:e_inv_clientsecret1]} label={gettext("Client Secret 1")} />
-          </div>
-          <div class="w-[28%]">
-            <.input field={@form[:e_inv_clientsecret2]} label={gettext("Client Secret 2")} />
-          </div>
-          <div class="w-[15%]">
+        <div class="flex flex-nowrap gap-1 items-end">
+          <div class="w-[20%]">
             <.input
-              field={@form[:e_inv_clientsecretexpiration]}
-              label={gettext("Expiration")}
-              type="date"
+              field={@form[:environment]}
+              label={gettext("Environment")}
+              type="select"
+              options={[{"Production", "production"}, {"Sandbox", "sandbox"}]}
             />
           </div>
         </div>
 
-        <div class="flex flex-nowrap gap-1">
-          <div class="w-[25%]">
-            <.input field={@form[:login_url]} label={gettext("Login Path")} />
-          </div>
-          <div class="w-[25%]">
-            <.input field={@form[:search_url]} label={gettext("search_path")} />
-          </div>
-          <div class="w-[25%]">
-            <.input field={@form[:get_doc_url]} label={gettext("Get Doc Path")} />
-          </div>
-          <div class="w-[25%]">
-            <.input field={@form[:get_doc_details_url]} label={gettext("Get Detail Doc Path")} />
-          </div>
+        <div class="mt-2">
+          <label class="font-medium text-sm">
+            {gettext("Production")}
+            <span class="text-xs text-gray-500">(api_base, id_base, client_id, client_secret1, client_secret2, expiration)</span>
+          </label>
+          <textarea
+            name="prod_text"
+            rows="3"
+            class="w-full font-mono text-sm border rounded p-2 mt-1"
+          >{@prod_text}</textarea>
+        </div>
+
+        <div class="mt-2">
+          <label class="font-medium text-sm">
+            {gettext("Sandbox")}
+            <span class="text-xs text-gray-500">(api_base, id_base, client_id, client_secret1, client_secret2, expiration)</span>
+          </label>
+          <textarea
+            name="sandbox_text"
+            rows="3"
+            class="w-full font-mono text-sm border rounded p-2 mt-1"
+          >{@sandbox_text}</textarea>
+        </div>
+
+        <div class="mt-2">
+          <label class="font-medium text-sm">
+            {gettext("API Paths")}
+            <span class="text-xs text-gray-500">(login, search, get_doc, get_doc_details, submit)</span>
+          </label>
+          <textarea
+            name="paths_text"
+            rows="3"
+            class="w-full font-mono text-sm border rounded p-2 mt-1"
+          >{@paths_text}</textarea>
+        </div>
+
+        <div class="mt-2">
+          <label class="font-medium text-sm">
+            {gettext("LHDN Unit Code Mapping")}
+            <span class="text-xs text-gray-500">(FC Unit=LHDN Code, comma separated)</span>
+          </label>
+          <textarea
+            name="unit_code_text"
+            rows="3"
+            class="w-full font-mono text-sm border rounded p-2 mt-1"
+          >{@unit_code_text}</textarea>
         </div>
 
         <div class="flex justify-center gap-x-1 mt-1">

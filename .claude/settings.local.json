@@ -33,7 +33,9 @@
       "Bash(mix compile:*)",
       "Bash(mix run:*)",
       "Bash(mix tailwind:*)",
-      "Bash(mix:*)"
+      "Bash(mix:*)",
+      "Bash(psql:*)",
+      "WebFetch(domain:sdk.myinvois.hasil.gov.my)"
     ]
   }
 }

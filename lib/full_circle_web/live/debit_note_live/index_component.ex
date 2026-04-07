@@ -117,7 +117,7 @@ defmodule FullCircleWeb.DebitNoteLive.IndexComponent do
           href="#"
           phx-hook="copyAndOpen"
           copy-text={@fc.note_no}
-          goto-url="https://myinvois.hasil.gov.my/newdocument"
+          goto-url={"#{@einv_portal}/newdocument"}
           class="border-blue-600 border hover:font-medium bg-blue-200 p-1 rounded-xl"
         >
           {gettext("New E-Invoice")}
@@ -227,7 +227,7 @@ defmodule FullCircleWeb.DebitNoteLive.IndexComponent do
             href="#"
             phx-hook="copyAndOpen"
             copy-text={@obj.note_no}
-            goto-url="https://myinvois.hasil.gov.my/newdocument"
+            goto-url={"#{@einv_portal}/newdocument"}
             class="text-blue-600 hover:font-medium w-[20%] ml-5 mt-3"
           >
             {gettext("New E-Invoice")}
@@ -254,7 +254,7 @@ defmodule FullCircleWeb.DebitNoteLive.IndexComponent do
               <a
                 class="text-blue-600 hover:font-medium"
                 target="_blank"
-                href={~w(https://myinvois.hasil.gov.my/documents/#{einv.uuid})}
+                href={"#{@einv_portal}/documents/#{einv.uuid}"}
               >
                 {einv.uuid}
               </a>

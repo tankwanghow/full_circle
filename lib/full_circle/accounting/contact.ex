@@ -21,6 +21,7 @@ defmodule FullCircle.Accounting.Contact do
     field :sst_id, :string
     field :gst_id, :string
     field :tou_id, :string
+    field :misc_code, :string
 
     has_many :invoices, FullCircle.Billing.Invoice
 

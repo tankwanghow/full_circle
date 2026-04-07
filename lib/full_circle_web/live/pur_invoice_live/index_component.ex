@@ -118,7 +118,7 @@ defmodule FullCircleWeb.PurInvoiceLive.IndexComponent do
           href="#"
           phx-hook="copyAndOpen"
           copy-text={@fc.e_inv_internal_id}
-          goto-url="https://myinvois.hasil.gov.my/newdocument"
+          goto-url={"#{@einv_portal}/newdocument"}
           class="border-blue-600 border hover:font-medium bg-blue-200 p-1 rounded-xl"
         >
           {gettext("New E-Invoice")}
@@ -206,7 +206,7 @@ defmodule FullCircleWeb.PurInvoiceLive.IndexComponent do
       <div class="w-[0.4%] bg-white"></div>
       <div class="w-[50.6%] p-1 border-b border-gray-400">
         <div :if={@e_invs == []} class="flex border-b border-amber-400 last:border-0">
-          <.link target="_blank" href="https://myinvois.hasil.gov.my/newdocument" class="blue button">
+          <.link target="_blank" href={"#{@einv_portal}/newdocument"} class="blue button">
             {gettext("New E-Invoice")}
           </.link>
         </div>
@@ -231,7 +231,7 @@ defmodule FullCircleWeb.PurInvoiceLive.IndexComponent do
               <a
                 class="text-blue-600 hover:font-medium"
                 target="_blank"
-                href={~w(https://myinvois.hasil.gov.my/documents/#{einv.uuid})}
+                href={"#{@einv_portal}/documents/#{einv.uuid}"}
               >
                 {einv.uuid}
               </a>

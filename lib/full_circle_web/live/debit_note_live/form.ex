@@ -425,7 +425,7 @@ defmodule FullCircleWeb.DebitNoteLive.Form do
               href="#"
               phx-hook="copyAndOpen"
               copy-text={@form[:note_no].value}
-              goto-url="https://myinvois.hasil.gov.my/newdocument"
+              goto-url={"#{@einv_portal}/newdocument"}
             >
               {gettext("New E-Invoice")}
             </a>
@@ -436,7 +436,7 @@ defmodule FullCircleWeb.DebitNoteLive.Form do
           >
             <.link
               target="_blank"
-              href={"https://myinvois.hasil.gov.my/documents/#{@form[:e_inv_uuid].value}"}
+              href={"#{@einv_portal}/documents/#{@form[:e_inv_uuid].value}"}
             >
               Open E-Invoice
             </.link>
