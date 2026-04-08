@@ -12,13 +12,13 @@ const humanConfig = {
     enabled: true,
     mesh: { enabled: false },
     detector: { maxDetected: 1, rotation: true, return: true, mask: false }, // return tensor is used to get detected face image
-    description: { enabled: true, modelPath: 'faceres-deep.json' },
+    description: { enabled: false },
     insightface: { enabled: true, modelPath: 'insightface-mobilenet-swish.json' },
-    mobilefacenet: { enabled: true, modelPath: 'mobilefacenet.json' },
-    iris: { enabled: false }, // needed to determine gaze direction
-    emotion: { enabled: false }, // not needed
-    antispoof: { enabled: true }, // enable optional antispoof module
-    liveness: { enabled: true } // enable optional liveness module
+    mobilefacenet: { enabled: false },
+    iris: { enabled: false },
+    emotion: { enabled: false },
+    antispoof: { enabled: false },
+    liveness: { enabled: false }
   },
   body: { enabled: false },
   hand: { enabled: false },
@@ -26,13 +26,12 @@ const humanConfig = {
   gesture: { enabled: false } // parses face and iris gestures
 }
 
-// const matchOptions = { order: 2, multiplier: 1000, min: 0.0, max: 1.0 }; // for embedding model
-const matchOptions = { order: 2, multiplier: 20, min: 0.3, max: 0.7 }; // for faceres model
+const matchOptions = { order: 2, multiplier: 25, min: 0.2, max: 0.8 }; // for insightface model
 
 const options = {
-  minConfidence: 0.6, // overal face confidence for box, face, gender, real, live
-  minSize: 224, // min input to face descriptor model before degradation
-  threshold: 0.6, // minimum similarity
+  minConfidence: 0.7, // overal face confidence for box, face, gender, real, live
+  minSize: 112, // min input to face descriptor model before degradation
+  threshold: 0.5, // minimum similarity
   mask: humanConfig.face.detector.mask,
   rotation: humanConfig.face.detector.rotation,
   ...matchOptions
@@ -58,8 +57,14 @@ let detectFPS = 0
 let frameSkip = 0; // Add frame skipping
 const MATCH_INTERVAL = 1; // Process matching every 3 frames
 let inOutFlag = ''
-const matches = { list: [], times: 3 }
+const matches = { list: [], times: 2 }
 const timestamp = { detect: 0, draw: 0 } // holds information used to calculate performance and possible memory leaks
+
+// Offscreen canvas to normalize camera input to a consistent resolution
+const normalizedCanvas = document.createElement('canvas')
+normalizedCanvas.width = 640
+normalizedCanvas.height = 640
+const normalizedCtx = normalizedCanvas.getContext('2d')
 
 const dom = {
   // grab instances of dom objects so we dont have to look them up later
@@ -126,7 +131,8 @@ async function detectionLoop() {
   frameSkip = (frameSkip + 1) % MATCH_INTERVAL
 
   if (current.face?.tensor) human.tf.dispose(current.face.tensor)
-  const result = await human.detect(dom.video, { skipFrames: MATCH_INTERVAL - 1 })
+  normalizedCtx.drawImage(dom.video, 0, 0, 640, 640)
+  const result = await human.detect(normalizedCanvas, { skipFrames: MATCH_INTERVAL - 1 })
   current.face = result.face[0]
 
   // Only process matching on every MATCH_INTERVAL frames
@@ -171,8 +177,10 @@ async function detectFace() {
 
   if (current.record && (res.similarity > options.threshold)) {
     dom.scanResultPhotos.style.display = ""
-    if (matched(dom.scanResultPhotos, current.record.employee_id, current.record.image, Math.round(1000 * res.similarity) / 10)) {
+    if (matched(dom.scanResultPhotos, current.record.employee_id, current.record.id, Math.round(1000 * res.similarity) / 10)) {
       await dom.video.pause()
+      // fetch matched photo on demand
+      phx_liveview.pushEvent("get_face_photo", { photo_id: current.record.id })
       dom.in_out.style.display = ''
       setBodyBgColor("bg-green-300")
     }
@@ -180,17 +188,11 @@ async function detectFace() {
   return res.similarity > options.threshold
 }
 
-function insertMatchedImg(el, photo, similarity, klass) {
-  const div = document.createElement('div')
+function showMatchedPhoto(el, photo) {
   const img = document.createElement('img')
-  const span = document.createElement('span')
-  span.innerHTML = `${Math.round(similarity)}%`
   img.setAttribute('src', photo)
-  img.setAttribute('class', 'rounded-xl')
-  div.setAttribute('class', klass)
-  el.appendChild(div)
-  div.appendChild(img)
-  div.appendChild(span)
+  img.setAttribute('class', 'rounded-xl w-full')
+  el.appendChild(img)
 }
 
 async function main() {
@@ -213,10 +215,9 @@ function setNoMatch() {
   dom.scanResultPhotos.textContent = ''
 }
 
-function matched(el, id, image, similarity) {
+function matched(el, id, photoId, similarity) {
   if (matches.list.length < matches.times) {
     matches.list.push(id)
-    insertMatchedImg(el, image, similarity, "w-1/3 text-xs")
     return false
   }
   if (matches.list.filter((v, i, ar) => ar.indexOf(v) === i).length == 1) {
@@ -229,8 +230,27 @@ function matched(el, id, image, similarity) {
   }
 }
 
+let wakeLock = null
+
+async function requestWakeLock() {
+  if ('wakeLock' in navigator) {
+    try {
+      wakeLock = await navigator.wakeLock.request('screen')
+      wakeLock.addEventListener('release', () => { wakeLock = null })
+    } catch (e) {
+      console.log('Wake Lock request failed:', e.message)
+    }
+  }
+}
+
+// Re-acquire wake lock when page becomes visible again (e.g. after tab switch)
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') requestWakeLock()
+})
+
 export async function initFaceID(lv) {
   phx_liveview = lv
+  await requestWakeLock()
   db = await indexDb.load()
   descriptors = db
     .map(rec => rec.descriptor)
@@ -270,6 +290,12 @@ export async function initFaceID(lv) {
   dom.inBtn.addEventListener('click', async () => { await inBtnClicked() })
   dom.outBtn.addEventListener('click', async () => { await outBtnClicked() })
   dom.scanFace.addEventListener('click', async () => { await startScanFace() })
+
+  phx_liveview.handleEvent('facePhoto', async function (result) {
+    if (result.photo?.photo_data) {
+      showMatchedPhoto(dom.scanResultPhotos, result.photo.photo_data)
+    }
+  })
 
   phx_liveview.handleEvent('saveAttendenceResult', async function (result) {
     if (result.status == 'success') {
@@ -340,11 +366,15 @@ function gotDevices(deviceInfos) {
 async function refreshFaceIdDB() {
   log("refreshing FaceID Database....")
   phx_liveview.pushEvent("get_face_id_photos")
-  phx_liveview.handleEvent('faceIDPhotos', async function (results) {
+  phx_liveview.handleEvent('faceIDDescriptors', async function (results) {
     indexDb.clear()
-    for (const photo of results['photos']) {
-      await indexDb.save(photo)
+    for (const rec of results['descriptors']) {
+      await indexDb.save(rec)
     }
+    db = await indexDb.load()
+    descriptors = db
+      .map(rec => rec.descriptor)
+      .filter(desc => desc.length > 0)
     log("known face records:", await indexDb.count())
   })
 }

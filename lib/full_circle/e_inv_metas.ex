@@ -351,12 +351,18 @@ defmodule FullCircle.EInvMetas do
         parse_json_invoice(raw)
       end
 
+    internal_id =
+      if invoice[:internal_id] in [nil, ""],
+        do: body["internalId"],
+        else: invoice[:internal_id]
+
     Map.merge(invoice, %{
+      internal_id: internal_id,
       uuid: body["uuid"],
-      total_excluding_tax: body["totalExcludingTax"],
-      total_net_amount: body["totalNetAmount"],
-      total_payable_amount: body["totalPayableAmount"],
-      total_discount: body["totalDiscount"]
+      total_excluding_tax: parse_number(body["totalExcludingTax"]),
+      total_net_amount: parse_number(body["totalNetAmount"]),
+      total_payable_amount: parse_number(body["totalPayableAmount"]),
+      total_discount: parse_number(body["totalDiscount"])
     })
   end
 
@@ -393,23 +399,26 @@ defmodule FullCircle.EInvMetas do
           _persistent_id: idx,
           descriptions:
             get_in(line, ["Item", Access.at(0), "Description", Access.at(0), "_"]) || "",
-          quantity: get_in(line, ["InvoicedQuantity", Access.at(0), "_"]) || 1.0,
+          quantity:
+            (get_in(line, ["InvoicedQuantity", Access.at(0), "_"]) || 1.0) |> parse_number(),
           unit: get_in(line, ["InvoicedQuantity", Access.at(0), "unitCode"]) || "",
           unit_price:
-            get_in(line, ["Price", Access.at(0), "PriceAmount", Access.at(0), "_"]) || 0.0,
+            (get_in(line, ["Price", Access.at(0), "PriceAmount", Access.at(0), "_"]) || 0.0)
+            |> parse_number(),
           discount: 0,
           tax_rate:
-            get_in(line, [
-              "TaxTotal",
-              Access.at(0),
-              "TaxSubtotal",
-              Access.at(0),
-              "TaxCategory",
-              Access.at(0),
-              "Percent",
-              Access.at(0),
-              "_"
-            ]) || 0.0,
+            (get_in(line, [
+               "TaxTotal",
+               Access.at(0),
+               "TaxSubtotal",
+               Access.at(0),
+               "TaxCategory",
+               Access.at(0),
+               "Percent",
+               Access.at(0),
+               "_"
+             ]) || 0.0)
+            |> parse_number(),
           tax_scheme:
             get_in(line, [
               "TaxTotal",

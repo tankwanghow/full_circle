@@ -63,13 +63,11 @@ export async function save(faceRecord) {
     id: faceRecord.id,
     name: faceRecord.employee_name,
     descriptor: faceRecord.photo_descriptor,
-    image: faceRecord.photo_data,
     employee_id: faceRecord.employee_id
-  } // omit id as its autoincrement
+  }
   db.transaction([table], "readwrite")
     .objectStore(table)
     .put(newRecord)
-  // log("save:", newRecord)
 }
 
 export async function remove(faceRecord) {

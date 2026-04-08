@@ -24,9 +24,18 @@ defmodule FullCircleWeb.FaceIdLive do
   def handle_event("get_face_id_photos", _, socket) do
     {:noreply,
      socket
-     |> push_event("faceIDPhotos", %{
-       photos: FullCircle.HR.get_face_id_photos(socket.assigns.current_company.id)
+     |> push_event("faceIDDescriptors", %{
+       descriptors: FullCircle.HR.get_face_id_descriptors(socket.assigns.current_company.id)
      })}
+  end
+
+  @impl true
+  def handle_event("get_face_photo", %{"photo_id" => photo_id}, socket) do
+    photo = FullCircle.HR.get_face_id_photo(photo_id)
+
+    {:noreply,
+     socket
+     |> push_event("facePhoto", %{photo: photo})}
   end
 
   @impl true
@@ -71,8 +80,8 @@ defmodule FullCircleWeb.FaceIdLive do
   def handle_info({:new_photo, _data}, socket) do
     {:noreply,
      socket
-     |> push_event("faceIDPhotos", %{
-       photos: FullCircle.HR.get_face_id_photos(socket.assigns.current_company.id)
+     |> push_event("faceIDDescriptors", %{
+       descriptors: FullCircle.HR.get_face_id_descriptors(socket.assigns.current_company.id)
      })}
   end
 
@@ -80,8 +89,8 @@ defmodule FullCircleWeb.FaceIdLive do
   def handle_info({:delete_photo, _id}, socket) do
     {:noreply,
      socket
-     |> push_event("faceIDPhotos", %{
-       photos: FullCircle.HR.get_face_id_photos(socket.assigns.current_company.id)
+     |> push_event("faceIDDescriptors", %{
+       descriptors: FullCircle.HR.get_face_id_descriptors(socket.assigns.current_company.id)
      })}
   end
 
@@ -106,11 +115,12 @@ defmodule FullCircleWeb.FaceIdLive do
         </div>
 
         <div class="w-11/12 mx-auto">
-          <div id="in_out" class="flex mt-1 gap-2" style="display: none;">
-            <button id="inBtn" class="w-1/2 h-20 text-4xl green button">
+          <div id="in_out" class="flex mt-1 gap-2 items-center" style="display: none;">
+            <button id="inBtn" class="w-2/5 h-20 text-4xl green button">
               {gettext("IN")}
             </button>
-            <button id="outBtn" class="w-1/2 h-20 text-4xl orange button">
+            <div id="scanResultPhotos" class="w-1/5 flex justify-center"></div>
+            <button id="outBtn" class="w-2/5 h-20 text-4xl orange button">
               {gettext("OUT")}
             </button>
           </div>
@@ -123,7 +133,6 @@ defmodule FullCircleWeb.FaceIdLive do
             {gettext("Scan Face")}
           </button>
         </div>
-        <div id="scanResultPhotos" class="mt-1 flex gap-1 mx-auto w-6/12"></div>
         <div id="log" class="text-center"></div>
       </div>
       <div class="text-center mt-10">

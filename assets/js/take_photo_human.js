@@ -11,9 +11,9 @@ const humanConfig = {
     enabled: true,
     mesh: { enabled: true },
     detector: { maxDetected: 1, rotation: true, return: true, mask: false }, // return tensor is used to get detected face image
-    description: { enabled: true, modelPath: 'faceres-deep.json' },
-    insightface: { enabled: true, modelPath: 'insightface-mobilenet-swish.json' },  
-    mobilefacenet: { enabled: true, modelPath: 'mobilefacenet.json' }, 
+    description: { enabled: false },
+    insightface: { enabled: true, modelPath: 'insightface-mobilenet-swish.json' },
+    mobilefacenet: { enabled: false },
     iris: { enabled: false }, // needed to determine gaze direction
     emotion: { enabled: false }, // not needed
     antispoof: { enabled: false }, // enable optional antispoof module
@@ -26,8 +26,8 @@ const humanConfig = {
 }
 
 const options = {
-  minConfidence: 0.6, // overal face confidence for box, face, gender, real, live
-  minSize: 224, // min input to face descriptor model before degradation
+  minConfidence: 0.7, // overal face confidence for box, face, gender, real, live
+  minSize: 200, // min input to face descriptor model before degradation (stricter for enrollment quality)
   mask: humanConfig.face.detector.mask,
   rotation: humanConfig.face.detector.rotation
 }
@@ -81,6 +81,12 @@ const dom = {
 const timestamp = { detect: 0, draw: 0 } // holds information used to calculate performance and possible memory leaks
 let startTime = 0
 
+// Offscreen canvas to normalize camera input to a consistent resolution
+const normalizedCanvas = document.createElement('canvas')
+normalizedCanvas.width = 640
+normalizedCanvas.height = 640
+const normalizedCtx = normalizedCanvas.getContext('2d')
+
 const log = (...msg) => {
   // helper method to output messages
   dom.log.innerText += msg.join(" ") + "\n"
@@ -125,7 +131,8 @@ async function detectionLoop() {
   // main detection loop
   if (!dom.video.paused) {
     if (current.face?.tensor) human.tf.dispose(current.face.tensor) // dispose previous tensor
-    await human.detect(dom.video) // actual detection; were not capturing output in a local variable as it can also be reached via human.result
+    normalizedCtx.drawImage(dom.video, 0, 0, 640, 640)
+    await human.detect(normalizedCanvas) // detect from normalized canvas for consistent resolution
     const now = human.now()
     ok.detectFPS.val = Math.round(10000 / (now - timestamp.detect)) / 10
     timestamp.detect = now

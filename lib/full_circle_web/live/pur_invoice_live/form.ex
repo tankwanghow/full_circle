@@ -744,22 +744,30 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
                     <tr class="border-b">
                       <td class="p-1">{idx}</td>
                       <td class="p-1">{line.descriptions}</td>
-                      <td class="text-right p-1">{line.quantity}</td>
+                      <td class="text-right p-1">{:erlang.float_to_binary(line.quantity / 1, decimals: 2)}</td>
                       <td class="p-1">{line.unit}</td>
-                      <td class="text-right p-1">{line.unit_price}</td>
-                      <td class="text-right p-1">{line.discount}</td>
-                      <td class="text-right p-1">{line.quantity * line.unit_price - line.discount}</td>
-                      <td class="text-right p-1">{line.tax_rate}</td>
-                      <td class="text-right p-1">{Float.round((line.quantity * line.unit_price - line.discount) * line.tax_rate / 100, 2)}</td>
+                      <td class="text-right p-1">{:erlang.float_to_binary(line.unit_price / 1, decimals: 2)}</td>
+                      <td class="text-right p-1">{:erlang.float_to_binary(line.discount / 1, decimals: 2)}</td>
+                      <td class="text-right p-1">{:erlang.float_to_binary((line.quantity * line.unit_price - line.discount) / 1, decimals: 2)}</td>
+                      <td class="text-right p-1">{:erlang.float_to_binary(line.tax_rate / 1, decimals: 2)}</td>
+                      <td class="text-right p-1">{:erlang.float_to_binary(Float.round((line.quantity * line.unit_price - line.discount) * line.tax_rate / 100, 2) / 1, decimals: 2)}</td>
                       <td class="p-1">{line.tax_code_id_lhdn} ({line.tax_scheme})</td>
                     </tr>
                   <% end %>
                 </tbody>
               </table>
+              <%
+                subtotal = Enum.reduce(parsed.invoice_lines, 0.0, fn line, acc ->
+                  acc + (line.quantity * line.unit_price - line.discount)
+                end)
+                tax = Enum.reduce(parsed.invoice_lines, 0.0, fn line, acc ->
+                  acc + Float.round((line.quantity * line.unit_price - line.discount) * line.tax_rate / 100, 2)
+                end)
+              %>
               <div class="flex justify-end gap-6 mt-2 font-bold">
-                <span>{gettext("Subtotal")}: {parsed.total_excluding_tax}</span>
-                <span>{gettext("Tax")}: {parsed.total_payable_amount - parsed.total_excluding_tax}</span>
-                <span>{gettext("Total")}: {parsed.total_payable_amount}</span>
+                <span>{gettext("Subtotal")}: {:erlang.float_to_binary(subtotal / 1, decimals: 2)}</span>
+                <span>{gettext("Tax")}: {:erlang.float_to_binary(tax / 1, decimals: 2)}</span>
+                <span>{gettext("Total")}: {:erlang.float_to_binary((subtotal + tax) / 1, decimals: 2)}</span>
               </div>
             </div>
           <% {:error, reason} -> %>
