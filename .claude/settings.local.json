@@ -35,7 +35,15 @@
       "Bash(mix tailwind:*)",
       "Bash(mix:*)",
       "Bash(psql:*)",
-      "WebFetch(domain:sdk.myinvois.hasil.gov.my)"
+      "WebFetch(domain:sdk.myinvois.hasil.gov.my)",
+      "Bash(~/.asdf/shims/mix compile:*)",
+      "Read(//home/tankwanghow/.local/bin/**)",
+      "Bash(echo PATH=$PATH)",
+      "Read(//home/tankwanghow/.mise/shims/**)",
+      "Read(//home/tankwanghow/**)",
+      "Bash(export PATH=\"/home/tankwanghow/.local/share/mise/installs/elixir/1.19.5-otp-28/bin:/home/tankwanghow/.local/share/mise/installs/erlang/28.3.1/bin:$PATH\")",
+      "Bash(find /home/tankwanghow/Projects/elixir/full_circle -type f -name Dockerfile* -o -name docker-compose* -o -name .dockerignore)",
+      "Bash(find /home/tankwanghow/Projects/elixir/full_circle -maxdepth 3 -type f -name mix.exs -o -name mix.lock -o -path */mix/* -name *.exs)"
     ]
   }
 }
