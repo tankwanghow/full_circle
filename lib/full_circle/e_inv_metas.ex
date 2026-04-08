@@ -619,7 +619,7 @@ defmodule FullCircle.EInvMetas do
         |> validate_field(com.state, "Supplier State")
         |> validate_field(contact.tax_id, "Customer TIN")
         |> validate_field(contact.reg_no, "Customer BRN")
-        |> validate_phone(contact.contact_info, "Customer Phone")
+        |> validate_phone(contact.phone, "Customer Phone")
         |> validate_email(contact.email, "Customer Email")
         |> validate_field(contact.address1, "Customer Address")
         |> validate_field(contact.city, "Customer City")
@@ -650,7 +650,7 @@ defmodule FullCircle.EInvMetas do
            tin: contact.tax_id || "N/A",
            brn: contact.reg_no || "N/A",
            sst: contact.sst_id || "N/A",
-           tel: contact.contact_info || "N/A",
+           tel: contact.phone || "N/A",
            email: contact.email || "N/A",
            address: contact.address1 || "",
            city: contact.city || "",

@@ -214,7 +214,13 @@ defmodule FullCircleWeb.ContactLive.Form do
             <.input field={@form[:country]} label={gettext("Country")} list="countries" />
           </div>
           <div class="col-span-6">
-            <.input field={@form[:contact_info]} label={gettext("Contact")} type="textarea" />
+            <.input field={@form[:email]} label={gettext("Email")} type="email" />
+          </div>
+          <div class="col-span-6">
+            <.input field={@form[:phone]} label={gettext("Phone")} />
+          </div>
+          <div class="col-span-6">
+            <.input field={@form[:contact_info]} label={gettext("Contact Info")} type="textarea" />
           </div>
           <div class="col-span-6">
             <.input field={@form[:descriptions]} label={gettext("Descriptions")} type="textarea" />

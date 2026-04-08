@@ -16,7 +16,7 @@ echo "Creating ${APP_COMPOSE} file..."
 cat << EOF > $APP_COMPOSE
 services:
   web:
-    image: ${DOCKER_HUB_USERNAME}/${IMAGE_NAME}
+    image: ${DOCKER_HUB_USERNAME}/${IMAGE_NAME}:latest
     container_name: ${DOCKER_CONTAINER_NAME}
     volumes:
       - /home/${IMAGE_NAME}/uploads:/uploads

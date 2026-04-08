@@ -29,7 +29,9 @@ defmodule FullCircleWeb.ContactLive.IndexComponent do
       <div>
         <p>{@obj.address1}, {@obj.address2}
           {@obj.city} {@obj.zipcode}, {@obj.state} {@obj.country}</p>
-        <p>{@obj.contact_info}</p>
+        <p :if={@obj.email not in [nil, ""]}>{@obj.email}</p>
+        <p :if={@obj.phone not in [nil, ""]}>{@obj.phone}</p>
+        <p :if={@obj.contact_info not in [nil, ""]}>{@obj.contact_info}</p>
       </div>
       <p class="text-green-800">{@obj.descriptions}</p>
     </div>

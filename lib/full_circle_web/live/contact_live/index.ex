@@ -14,7 +14,7 @@ defmodule FullCircleWeb.ContactLive.Index do
       <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <.search_form
         search_val={@search.terms}
-        placeholder={gettext("Name, City, State and Descriptions...")}
+        placeholder={gettext("Name, City, State, Email, Phone and Descriptions...")}
       />
       <div class="text-center mb-2">
         <.link navigate={~p"/companies/#{@current_company.id}/contacts/new"} class="blue button">
@@ -91,7 +91,7 @@ defmodule FullCircleWeb.ContactLive.Index do
     objects =
       StdInterface.filter(
         Contact,
-        [:name, :category, :city, :state, :descriptions],
+        [:name, :category, :city, :state, :email, :phone, :descriptions],
         terms,
         socket.assigns.current_company,
         socket.assigns.current_user,
