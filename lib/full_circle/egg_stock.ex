@@ -576,6 +576,29 @@ defmodule FullCircle.EggStock do
     end
   end
 
+  def production_report(company_id, from_date, to_date) do
+    grades = grade_names(company_id)
+
+    days =
+      from(d in EggStockDay,
+        where: d.company_id == ^company_id,
+        where: d.stock_date >= ^from_date and d.stock_date <= ^to_date,
+        where:
+          fragment(
+            "EXISTS (SELECT 1 FROM jsonb_each_text(?) AS kv WHERE kv.value != '' AND kv.value != '0')",
+            d.closing_bal
+          ),
+        order_by: [asc: d.stock_date]
+      )
+      |> Repo.all()
+
+    Enum.map(days, fn day ->
+      prod = compute_day_production(grades, day)
+      total = Enum.reduce(prod, 0, fn {_g, v}, acc -> acc + v end)
+      %{date: day.stock_date, quantities: prod, total: total}
+    end)
+  end
+
   defp compute_day_production(grades, day) do
     opening = get_previous_closing_bal(day.company_id, day.stock_date)
     closing = day.closing_bal || %{}

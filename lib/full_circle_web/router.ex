@@ -278,6 +278,7 @@ defmodule FullCircleWeb.Router do
       live("/harvests/:harvest_id/edit", LayerLive.HarvestForm, :edit)
 
       live("/egg_stock", EggStockLive.Form, :today)
+      live("/egg_stock/production_report", EggStockLive.ProductionReport, :index)
       live("/egg_stock/:date", EggStockLive.Form, :day)
 
       live("/PayRun", PayRunLive.Index, :index)

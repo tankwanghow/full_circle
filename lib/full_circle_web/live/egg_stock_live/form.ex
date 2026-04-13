@@ -896,6 +896,12 @@ defmodule FullCircleWeb.EggStockLive.Form do
         <.tab_button tab="now" active={@active_tab} label={gettext("Stock")} />
         <.tab_button tab="estimated" active={@active_tab} label={gettext("Estimated")} />
         <.tab_button tab="settings" active={@active_tab} label={gettext("Settings")} />
+        <.link
+          navigate={~p"/companies/#{@current_company.id}/egg_stock/production_report"}
+          class="ml-auto px-3 py-1 text-sm text-blue-700 hover:underline self-end"
+        >
+          {gettext("Production Report")}
+        </.link>
       </div>
 
       <%!-- Tab content --%>
