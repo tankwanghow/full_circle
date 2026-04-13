@@ -18,6 +18,7 @@ defmodule FullCircleWeb.EggStockLive.ProductionReport do
     from_date = params["from_date"] || default_from
     to_date = params["to_date"] || default_to
     group_by = parse_group_by(params["group_by"])
+    zoom = params["zoom"] == "1"
 
     company = socket.assigns.current_company
     grades = EggStock.list_grades(company.id)
@@ -25,7 +26,7 @@ defmodule FullCircleWeb.EggStockLive.ProductionReport do
     {:noreply,
      socket
      |> assign(grades: grades)
-     |> assign(search: %{from_date: from_date, to_date: to_date, group_by: group_by})
+     |> assign(search: %{from_date: from_date, to_date: to_date, group_by: group_by, zoom: zoom})
      |> load_rows(from_date, to_date, group_by)}
   end
 
@@ -39,7 +40,8 @@ defmodule FullCircleWeb.EggStockLive.ProductionReport do
       URI.encode_query(%{
         "search[from_date]" => from_date,
         "search[to_date]" => to_date,
-        "search[group_by]" => params["group_by"] || "1"
+        "search[group_by]" => params["group_by"] || "1",
+        "search[zoom]" => if(params["zoom"] == "1", do: "1", else: "0")
       })
 
     url =
@@ -126,7 +128,7 @@ defmodule FullCircleWeb.EggStockLive.ProductionReport do
 
   defp label_of(grade), do: grade.nickname || grade.name
 
-  defp short_date(%Date{} = d), do: "#{pad2(d.month)}/#{pad2(d.day)}"
+  defp short_date(%Date{} = d), do: "#{pad2(d.day)}/#{pad2(d.month)}"
   defp pad2(n), do: n |> Integer.to_string() |> String.pad_leading(2, "0")
 
   defp short_label(%{date: date, label: label}) do
@@ -142,28 +144,52 @@ defmodule FullCircleWeb.EggStockLive.ProductionReport do
     end
   end
 
-  @chart_colors ~w(#ef4444 #3b82f6 #10b981 #f59e0b #8b5cf6 #ec4899 #14b8a6 #f97316 #84cc16 #6366f1)
+  @chart_colors ~w(#e6194B #3cb44b #4363d8 #f58231 #911eb4 #000000 #42d4f4 #f032e6 #9A6324 #808000)
 
   defp color_for(idx), do: Enum.at(@chart_colors, rem(idx, length(@chart_colors)))
+
+  @bucket_defs [
+    {"Large", ~w(AA A)},
+    {"Medium", ~w(B C)},
+    {"Small", ~w(D E)},
+    {"Other", ~w(F Cr W Dr)}
+  ]
 
   defp chart_data(rows, grades) do
     n = length(rows)
 
+    grade_lookup =
+      Enum.reduce(grades, %{}, fn g, acc ->
+        acc
+        |> Map.put(String.downcase(String.trim(g.name)), g.name)
+        |> then(fn m ->
+          if g.nickname && g.nickname != "",
+            do: Map.put(m, String.downcase(String.trim(g.nickname)), g.name),
+            else: m
+        end)
+      end)
+
     series =
-      grades
+      @bucket_defs
       |> Enum.with_index()
-      |> Enum.map(fn {g, gi} ->
+      |> Enum.map(fn {{name, bucket_names}, gi} ->
+        actual_keys =
+          bucket_names
+          |> Enum.map(&String.downcase/1)
+          |> Enum.map(&Map.get(grade_lookup, &1))
+          |> Enum.reject(&is_nil/1)
+
         points =
           rows
           |> Enum.with_index()
           |> Enum.map(fn {row, ri} ->
             x = if n <= 1, do: 0.0, else: ri / (n - 1)
-            qty = Map.get(row.quantities, g.name, 0)
+            qty = Enum.reduce(actual_keys, 0, fn k, acc -> acc + Map.get(row.quantities, k, 0) end)
             pct = if row.total > 0, do: qty / row.total * 100, else: 0.0
             {x, pct, row.label, qty}
           end)
 
-        %{name: label_of(g), color: color_for(gi), points: points}
+        %{name: name, color: color_for(gi), points: points}
       end)
 
     step = if n <= 8, do: 1, else: max(div(n - 1, 6), 1)
@@ -184,20 +210,63 @@ defmodule FullCircleWeb.EggStockLive.ProductionReport do
     pad_l + x_frac * inner
   end
 
-  @y_max 40.0
+  @y_max 60.0
 
-  defp sy(pct, height, pad_t, pad_b) do
-    inner = height - pad_t - pad_b
-    clamped = pct |> min(@y_max) |> max(0.0)
-    pad_t + (@y_max - clamped) / @y_max * inner
+  defp y_range(_series, false), do: {0.0, @y_max}
+
+  defp y_range(series, true) do
+    pcts =
+      series
+      |> Enum.flat_map(fn s -> Enum.map(s.points, fn {_x, y, _, _} -> y end) end)
+
+    case pcts do
+      [] ->
+        {0.0, @y_max}
+
+      _ ->
+        lo = Enum.min(pcts)
+        hi = Enum.max(pcts)
+        span = max(hi - lo, 1.0)
+        pad = span * 0.15
+        {max(lo - pad, 0.0), hi + pad}
+    end
   end
 
-  defp path_d(points, width, height, pad_l, pad_r, pad_t, pad_b) do
+  defp sy(pct, height, pad_t, pad_b, {y_lo, y_hi}) do
+    inner = height - pad_t - pad_b
+    range = max(y_hi - y_lo, 0.001)
+    clamped = pct |> min(y_hi) |> max(y_lo)
+    pad_t + (y_hi - clamped) / range * inner
+  end
+
+  defp y_ticks({y_lo, y_hi}) do
+    step = nice_step((y_hi - y_lo) / 5)
+    start = Float.ceil(y_lo / step) * step
+
+    Stream.iterate(start, &(&1 + step))
+    |> Enum.take_while(&(&1 <= y_hi + 0.0001))
+  end
+
+  defp nice_step(raw) when raw <= 0, do: 1.0
+
+  defp nice_step(raw) do
+    exp = :math.pow(10, Float.floor(:math.log10(raw)))
+    frac = raw / exp
+
+    cond do
+      frac < 1.5 -> 1 * exp
+      frac < 3 -> 2 * exp
+      frac < 7 -> 5 * exp
+      true -> 10 * exp
+    end
+  end
+
+  defp path_d(points, width, height, pad_l, pad_r, pad_t, pad_b, yr) do
     points
     |> Enum.with_index()
     |> Enum.map(fn {{x, y, _, _}, i} ->
       cmd = if i == 0, do: "M", else: "L"
-      "#{cmd}#{Float.round(sx(x, width, pad_l, pad_r), 2)},#{Float.round(sy(y, height, pad_t, pad_b), 2)}"
+      "#{cmd}#{Float.round(sx(x, width, pad_l, pad_r), 2)},#{Float.round(sy(y, height, pad_t, pad_b, yr), 2)}"
     end)
     |> Enum.join(" ")
   end
@@ -206,7 +275,16 @@ defmodule FullCircleWeb.EggStockLive.ProductionReport do
   def render(assigns) do
     ~H"""
     <div class="w-10/12 mx-auto">
-      <p class="text-2xl text-center font-medium">{@page_title}</p>
+      <div class="flex items-center mb-2">
+        <.link
+          navigate={~p"/companies/#{@current_company.id}/egg_stock"}
+          class="text-blue-700 hover:underline"
+        >
+          &larr; {gettext("Back")}
+        </.link>
+        <p class="flex-1 text-2xl text-center font-medium">{@page_title}</p>
+        <span class="w-20"></span>
+      </div>
 
       <div class="border rounded bg-purple-200 text-center p-2 mb-3">
         <.form for={%{}} id="search-form" phx-submit="query" autocomplete="off">
@@ -239,6 +317,19 @@ defmodule FullCircleWeb.EggStockLive.ProductionReport do
                 value={@search.group_by}
               />
             </div>
+            <div class="col-span-2 mt-7 text-left">
+              <label class="inline-flex items-center gap-1">
+                <input type="hidden" name="search[zoom]" value="0" />
+                <input
+                  type="checkbox"
+                  name="search[zoom]"
+                  value="1"
+                  checked={@search.zoom}
+                  class="rounded"
+                />
+                <span>{gettext("Zoom Y")}</span>
+              </label>
+            </div>
             <div class="col-span-2 mt-6 text-left">
               <.button>{gettext("Query")}</.button>
             </div>
@@ -254,24 +345,25 @@ defmodule FullCircleWeb.EggStockLive.ProductionReport do
         <% pad_r = 20 %>
         <% pad_t = 20 %>
         <% pad_b = 50 %>
+        <% yr = y_range(chart.series, @search.zoom) %>
         <svg viewBox={"0 0 #{width} #{height}"} class="w-full h-80" preserveAspectRatio="none">
-          <%= for pct <- [0, 10, 20, 30, 40] do %>
+          <%= for pct <- y_ticks(yr) do %>
             <line
               x1={pad_l}
               x2={width - pad_r}
-              y1={sy(pct, height, pad_t, pad_b)}
-              y2={sy(pct, height, pad_t, pad_b)}
+              y1={sy(pct, height, pad_t, pad_b, yr)}
+              y2={sy(pct, height, pad_t, pad_b, yr)}
               stroke="#e5e7eb"
               stroke-width="1"
             />
             <text
               x={pad_l - 5}
-              y={sy(pct, height, pad_t, pad_b) + 4}
+              y={sy(pct, height, pad_t, pad_b, yr) + 4}
               text-anchor="end"
               font-size="11"
               fill="#6b7280"
             >
-              {pct}%
+              {Float.round(pct * 1.0, 1)}%
             </text>
           <% end %>
           <%= for {x_frac, lbl} <- chart.x_labels do %>
@@ -288,7 +380,7 @@ defmodule FullCircleWeb.EggStockLive.ProductionReport do
           <% end %>
           <%= for s <- chart.series do %>
             <path
-              d={path_d(s.points, width, height, pad_l, pad_r, pad_t, pad_b)}
+              d={path_d(s.points, width, height, pad_l, pad_r, pad_t, pad_b, yr)}
               fill="none"
               stroke={s.color}
               stroke-width="2"
@@ -296,7 +388,7 @@ defmodule FullCircleWeb.EggStockLive.ProductionReport do
             <%= for {x, y, lbl, qty} <- s.points do %>
               <circle
                 cx={sx(x, width, pad_l, pad_r)}
-                cy={sy(y, height, pad_t, pad_b)}
+                cy={sy(y, height, pad_t, pad_b, yr)}
                 r="3"
                 fill={s.color}
               >
@@ -325,7 +417,7 @@ defmodule FullCircleWeb.EggStockLive.ProductionReport do
           </div>
         <% end %>
         <div class="flex-1 border rounded bg-gray-300 border-gray-500 px-1 py-1">
-          {gettext("Total")}
+          {gettext("Harvest")}
         </div>
       </div>
 

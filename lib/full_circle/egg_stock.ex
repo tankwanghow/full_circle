@@ -594,7 +594,7 @@ defmodule FullCircle.EggStock do
 
     Enum.map(days, fn day ->
       prod = compute_day_production(grades, day)
-      total = Enum.reduce(prod, 0, fn {_g, v}, acc -> acc + v end)
+      total = harvest_total_for_date(company_id, day.stock_date)
       %{date: day.stock_date, quantities: prod, total: total}
     end)
   end
