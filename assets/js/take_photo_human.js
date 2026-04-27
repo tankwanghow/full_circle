@@ -32,22 +32,6 @@ const options = {
   rotation: humanConfig.face.detector.rotation
 }
 
-const ok = {
-  // must meet all rules
-  faceCount: { status: false, val: 0 },
-  faceSize: { status: false, val: 0 },
-  descriptor: { status: false, val: 0 },
-  detectFPS: { status: undefined, val: 0 }, // mark detection fps performance
-  drawFPS: { status: undefined, val: 0 }, // mark redraw fps performance
-  snapClicked: { status: false, val: 0 }
-}
-
-const allOk = () =>
-  ok.faceCount.status &&
-  ok.faceSize.status &&
-  ok.descriptor.status &&
-  ok.snapClicked.status
-
 const current = { face: null }
 
 const human = new H.Human(humanConfig) // create instance of human with overrides from user configuration
@@ -61,22 +45,35 @@ human.draw.options.drawGestures = false
 human.draw.options.drawBoxes = true
 
 
-const dom = {
-  // grab instances of dom objects so we dont have to look them up later
-  video: document.getElementById("video"),
-  canvas: document.getElementById("canvas"),
-  log: document.getElementById("log"),
-  fps: document.getElementById("fps"),
-  retry: document.getElementById("retry"),
-  videoSelect: document.getElementById("videoSelect"),
-  zoomSelect: document.getElementById("zoomSelect"),
-  zoom: document.getElementById("zoom"),
-  snapBtn: document.getElementById("snapBtn"),
-  employee_info: document.getElementById("employee_info"),
-  employee_name: document.getElementById("employee_name"),
-  employee_id: document.getElementById("employee_id"),
-  saveBtn: document.getElementById("saveBtn"),
-  photos: document.getElementById("photos")
+// Re-resolved on every initTakePhoto() call — LiveView navigation creates new
+// DOM nodes, so module-level references would point to detached elements
+// after the first navigation.
+let dom = {}
+function resolveDom() {
+  dom = {
+    video: document.getElementById("video"),
+    canvas: document.getElementById("canvas"),
+    log: document.getElementById("log"),
+    fps: document.getElementById("fps"),
+    videoSelect: document.getElementById("videoSelect"),
+    zoomSelect: document.getElementById("zoomSelect"),
+    zoom: document.getElementById("zoom"),
+    employee_info: document.getElementById("employee_info"),
+    employee_name: document.getElementById("employee_name"),
+    employee_id: document.getElementById("employee_id"),
+    autoEnrollBtn: document.getElementById("autoEnrollBtn"),
+    enrollPrompt: document.getElementById("enrollPrompt"),
+    enrollStatus: document.getElementById("enrollStatus"),
+    shutterSound: document.getElementById("shutter-sound")
+  }
+}
+
+function playShutter() {
+  try {
+    if (!dom.shutterSound) return
+    dom.shutterSound.currentTime = 0
+    dom.shutterSound.play().catch(() => { })
+  } catch { }
 }
 const timestamp = { detect: 0, draw: 0 } // holds information used to calculate performance and possible memory leaks
 let startTime = 0
@@ -94,6 +91,18 @@ const log = (...msg) => {
 }
 
 let phx_liveview;
+// Bumped on every (re)initialization. Running rAF loops compare against this
+// and exit when it changes — prevents stale loops from the previous mount
+// from competing with the freshly mounted camera.
+let runId = 0
+let currentStream = null
+
+function stopCurrentStream() {
+  try {
+    if (currentStream) currentStream.getTracks().forEach(t => t.stop())
+  } catch { }
+  currentStream = null
+}
 
 async function webCam() {
   // initialize webcam
@@ -107,7 +116,9 @@ async function webCam() {
       height: { ideal: 640 }
     }
   }
+  stopCurrentStream()
   const stream = await navigator.mediaDevices.getUserMedia(cameraOptions)
+  currentStream = stream
   const ready = new Promise(resolve => {
     dom.video.onloadeddata = () => resolve(true)
   })
@@ -127,121 +138,50 @@ async function webCam() {
   checkCameraCapabilities()
 }
 
-async function detectionLoop() {
-  // main detection loop
-  if (!dom.video.paused) {
-    if (current.face?.tensor) human.tf.dispose(current.face.tensor) // dispose previous tensor
+async function detectionLoop(myRunId) {
+  if (myRunId !== runId) return // stale loop from previous mount
+  if (dom.video && !dom.video.paused) {
     normalizedCtx.drawImage(dom.video, 0, 0, 640, 640)
-    await human.detect(normalizedCanvas) // detect from normalized canvas for consistent resolution
-    const now = human.now()
-    ok.detectFPS.val = Math.round(10000 / (now - timestamp.detect)) / 10
-    timestamp.detect = now
-    requestAnimationFrame(detectionLoop) // start new frame immediately
+    await human.detect(normalizedCanvas)
+    timestamp.detect = human.now()
   }
+  requestAnimationFrame(() => detectionLoop(myRunId))
 }
 
-function drawValidationTests() {
-  let y = 10
-  const ctx = canvas.getContext('2d', { willReadFrequently: true })
-  if (!ctx) return
-  ctx.font = "bold 24px sans"
-  for (const [key, val] of Object.entries(ok)) {
-    if (typeof val.status === "boolean")
-      ctx.fillStyle = val.status ? "#AAFF00" : "#FF5733"
-    const status = val.status ? "ok" : "fail"
-    var txt = `${key}: ${val.val === 0 ? status : val.val}`
-    y += 30
-    ctx.fillText(`${txt}`, 5, y)
+async function drawLoop(myRunId) {
+  if (myRunId !== runId) return
+  if (dom.video && !dom.video.paused) {
+    const interpolated = human.next(human.result)
+    human.draw.canvas(dom.video, dom.canvas)
+    await human.draw.all(dom.canvas, interpolated)
+    timestamp.draw = human.now()
   }
-}
-
-async function validationLoop() {
-  // main screen refresh loop
-  const interpolated = human.next(human.result) // smoothen result using last-known results
-  human.draw.canvas(dom.video, dom.canvas) // draw canvas to screen
-  await human.draw.all(dom.canvas, interpolated) // draw labels, boxes, lines, etc.
-  const now = human.now()
-  ok.drawFPS.val = Math.round(10000 / (now - timestamp.draw)) / 10
-  timestamp.draw = now
-  ok.faceCount.val = human.result.face.length
-  ok.faceCount.status = ok.faceCount.val === 1 // must be exactly detected face
-  if (ok.faceCount.status) {
-    // skip the rest if no face
-    const gestures = Object.values(human.result.gesture).map(
-      gesture => gesture.gesture
-    ) // flatten all gestures
-    if (
-      gestures.includes("blink left eye") ||
-      gestures.includes("blink right eye")
-    )
-    ok.faceConfidence.val =
-      human.result.face[0].faceScore || human.result.face[0].boxScore || 0
-    ok.faceSize.val = Math.min(
-      human.result.face[0].box[2],
-      human.result.face[0].box[3]
-    )
-    ok.faceSize.status = ok.faceSize.val >= options.minSize
-    ok.descriptor.val = human.result.face[0].embedding?.length || 0
-    ok.descriptor.status = ok.descriptor.val > 0
-  }
-  // run again
-  drawValidationTests()
-  if (allOk()) {
-    // all criteria met
-    dom.video.pause()
-    return human.result.face[0]
-  }
-
-  return new Promise(resolve => {
-    setTimeout(async () => {
-      await validationLoop() // run validation loop until conditions are met
-      resolve(human.result.face[0]) // recursive promise resolve
-    }, 25) // use to slow down refresh from max refresh rate to target of 30 fps
-  })
-}
-
-async function detectFace() {
-  dom.canvas.style.height = ""
-  dom.canvas.getContext("2d")?.clearRect(0, 0, options.minSize, options.minSize)
-  if (!current?.face?.tensor || !current?.face?.embedding) return false
-  // await human.tf.browser.draw(current.face.tensor, dom.canvas)
-  await human.draw.tensor(current.face.tensor, dom.canvas);
+  requestAnimationFrame(() => drawLoop(myRunId))
 }
 
 async function main() {
-  // main entry point
-  ok.faceCount.status = false
-  ok.snapClicked.status = false
-
-  dom.retry.style = "display: none;"
-  buttonsToggle()
-
   await webCam()
-  await detectionLoop() // start detection loop
   startTime = human.now()
+  const myRunId = runId
+  detectionLoop(myRunId)
+  drawLoop(myRunId)
+}
 
-  current.face = await validationLoop() // start validation loop
-
-  dom.canvas.width = current.face?.tensor?.shape[1] || options.minSize
-  dom.canvas.height = current.face?.tensor?.shape[0] || options.minSize
-  dom.canvas.style.width = ""
-
-  dom.retry.style = "display: block;"
-  buttonsToggle()
-
-  ok.snapClicked.status = true
-
-  if (!allOk()) {
-    // is all criteria met?
-    log("did not find valid face")
-    return false
-  }
-  return detectFace()
+export function teardownTakePhoto() {
+  runId++ // invalidate any rAF loops still in flight
+  stopCurrentStream()
+  try { window.speechSynthesis.cancel() } catch { }
+  autoEnrollRunning = false
 }
 
 export async function initTakePhoto(phx_this) {
+  // Bump runId first so any leftover loops from the previous mount stop on
+  // their next tick before we start new ones.
+  runId++
+  stopCurrentStream()
+  resolveDom()
+
   phx_liveview = phx_this
-  phx_liveview.handleEvent('retry_from_lv', () => main())
 
   log(
     "human version:",
@@ -261,9 +201,7 @@ export async function initTakePhoto(phx_this) {
     humanConfig.face["mobilefacenet"]?.enabled ? "mobilefacenet" : "",
     humanConfig.face["insightface"]?.enabled ? "insightface" : ""
   )
-  dom.retry.addEventListener("click", main)
-  dom.snapBtn.addEventListener("click", snap)
-  dom.saveBtn.addEventListener("click", save)
+  dom.autoEnrollBtn.addEventListener("click", autoEnroll)
 
   await getDevices().then(gotDevices)
   dom.videoSelect.addEventListener('change', function (ev) {
@@ -279,13 +217,202 @@ export async function initTakePhoto(phx_this) {
   await main()
 }
 
-function snap() {
-  ok.snapClicked.status = true
+// --- Auto Enroll: capture diverse poses across ~30s ---
+
+const AE = {
+  TARGET: 20,             // hard cap on photos
+  TIMEOUT_MS: 40000,      // total enrollment duration
+  MAX_SIM_VS_LATEST: 0.97, // skip if essentially identical to previous capture
+  MIN_FACE_SIZE: 140,     // profile views have narrower boxes — be lenient
+  MIN_CONFIDENCE: 0.55,   // profile views score lower than frontal
+  PROMPT_MS: 5000,        // total time per prompt (settle + capture window)
+  SETTLE_MS: 2500,        // pause capture this long after each new prompt
+  // [text shown on screen, text spoken aloud]
+  PROMPTS: [
+    ["Look STRAIGHT at camera",      "Look straight at the camera"],
+    ["Turn head slightly LEFT",      "Turn your head to the left"],
+    ["Turn head slightly RIGHT",     "Turn your head to the right"],
+    ["Tilt head UP",                 "Tilt your head up"],
+    ["Tilt head DOWN",               "Tilt your head down"],
+    ["Remove glasses (if wearing)",  "Remove your glasses"],
+    ["Slight smile",                 "Give a slight smile"],
+    ["Put glasses back on",          "Put your glasses back on"]
+  ]
 }
 
-function save() {
-  phx_liveview.pushEvent('save_photo', { discriptor: current.face?.embedding, photo: dom.canvas.toDataURL('image/png') })
-  main()
+function speak(text) {
+  try {
+    if (!('speechSynthesis' in window)) return
+    window.speechSynthesis.cancel() // drop any queued prompt so we don't lag behind
+    const u = new SpeechSynthesisUtterance(text)
+    u.rate = 1.0
+    u.pitch = 1.0
+    u.volume = 1.0
+    u.lang = 'en-US'
+    window.speechSynthesis.speak(u)
+  } catch { /* speech not supported */ }
+}
+
+let autoEnrollRunning = false
+
+async function autoEnroll() {
+  if (autoEnrollRunning) return
+  if (!dom.employee_id.value) {
+    log("Select an employee first")
+    return
+  }
+
+  autoEnrollRunning = true
+  const captured = [] // { embedding, photo }
+  const startedAt = performance.now()
+
+  dom.autoEnrollBtn.style = "display: none;"
+  dom.enrollPrompt.style = ""
+  dom.enrollStatus.style = ""
+
+  // Make sure camera is running
+  if (dom.video.paused) await dom.video.play()
+
+  // Rotate prompts (text + voice). Voice matters because the user is posing,
+  // not looking at the screen.
+  speak("Auto enrollment starting. Follow the spoken instructions.")
+  let promptIdx = 0
+  // Block capture for SETTLE_MS after each prompt so the user has time to
+  // actually move / put on / remove glasses before we sample frames.
+  let settleUntil = performance.now() + AE.SETTLE_MS
+  // One photo per prompt — reset on every prompt change so each pose is
+  // represented by exactly one capture, guaranteeing variety.
+  let capturedThisPrompt = false
+  // Track why we rejected frames in the current capture window so we can log
+  // a useful reason if the prompt rolls over without a capture.
+  let lastRejectReason = "no face seen"
+  let rejectCounts = {}
+  const showPrompt = () => {
+    const [shown, spoken] = AE.PROMPTS[promptIdx]
+    dom.enrollPrompt.innerText = shown
+    speak(spoken)
+    settleUntil = performance.now() + AE.SETTLE_MS
+    capturedThisPrompt = false
+    lastRejectReason = "no face seen"
+    rejectCounts = {}
+  }
+  showPrompt()
+  const promptTimer = setInterval(() => {
+    if (!capturedThisPrompt) {
+      log(`Auto enroll: missed "${AE.PROMPTS[promptIdx][0]}" — ${lastRejectReason} (rejects: ${JSON.stringify(rejectCounts)})`)
+    }
+    promptIdx = (promptIdx + 1) % AE.PROMPTS.length
+    showPrompt()
+  }, AE.PROMPT_MS)
+
+  const updateStatus = () => {
+    const now = performance.now()
+    const remaining = Math.max(0, Math.ceil((AE.TIMEOUT_MS - (now - startedAt)) / 1000))
+    const settling = now < settleUntil
+    const phase = settling ? "Hold the pose…" : "Capturing"
+    dom.enrollStatus.innerText = `${phase}  ·  Captured ${captured.length}  ·  ${remaining}s left`
+  }
+  updateStatus()
+  const statusTimer = setInterval(updateStatus, 250)
+
+  // Sanity check: skip a candidate if it's essentially identical to the
+  // most recent capture (e.g. same exact frame). Different-pose captures
+  // from different prompts are guaranteed by the one-per-prompt gate.
+  const tooSimilarToLatest = (embedding) => {
+    const last = captured[captured.length - 1]
+    if (!last) return false
+    return human.match.similarity(embedding, last.embedding) >= AE.MAX_SIM_VS_LATEST
+  }
+
+  // Snapshot canvas for cropped face capture (separate from main render canvas)
+  const snapCanvas = document.createElement('canvas')
+
+  // Consume frames produced by the existing detectionLoop / validationLoop —
+  // do not call human.detect() here or the two pipelines will fight.
+  let lastSeenFace = null
+  while (autoEnrollRunning &&
+         captured.length < AE.TARGET &&
+         (performance.now() - startedAt) < AE.TIMEOUT_MS) {
+
+    // During the settle window, drain frames without capturing so the user
+    // has time to move / change glasses before we sample.
+    if (performance.now() < settleUntil) {
+      await new Promise(r => requestAnimationFrame(r))
+      continue
+    }
+    // Already grabbed this prompt's photo — wait for the next prompt.
+    if (capturedThisPrompt) {
+      await new Promise(r => requestAnimationFrame(r))
+      continue
+    }
+
+    const face = human.result?.face?.[0]
+    if (!face || human.result.face.length !== 1) {
+      lastRejectReason = "no face / multiple faces"
+      rejectCounts.noFace = (rejectCounts.noFace || 0) + 1
+    } else if (face !== lastSeenFace && face.embedding) {
+      lastSeenFace = face
+      const conf = face.faceScore || face.boxScore || 0
+      const size = Math.min(face.box[2], face.box[3])
+
+      if (conf < AE.MIN_CONFIDENCE) {
+        lastRejectReason = `low confidence ${conf.toFixed(2)} < ${AE.MIN_CONFIDENCE}`
+        rejectCounts.lowConf = (rejectCounts.lowConf || 0) + 1
+      } else if (size < AE.MIN_FACE_SIZE) {
+        lastRejectReason = `face too small ${Math.round(size)}px < ${AE.MIN_FACE_SIZE}`
+        rejectCounts.tooSmall = (rejectCounts.tooSmall || 0) + 1
+      } else if (tooSimilarToLatest(face.embedding)) {
+        lastRejectReason = "too similar to last capture"
+        rejectCounts.tooSimilar = (rejectCounts.tooSimilar || 0) + 1
+      }
+
+      if (conf >= AE.MIN_CONFIDENCE && size >= AE.MIN_FACE_SIZE && !tooSimilarToLatest(face.embedding)) {
+        // Snapshot the cropped face tensor to its own canvas so we don't trample the live preview
+        let photoData
+        if (face.tensor) {
+          snapCanvas.width = face.tensor.shape[1]
+          snapCanvas.height = face.tensor.shape[0]
+          await human.draw.tensor(face.tensor, snapCanvas)
+          photoData = snapCanvas.toDataURL('image/png')
+        } else {
+          photoData = dom.canvas.toDataURL('image/png')
+        }
+        captured.push({ embedding: face.embedding, photo: photoData })
+        capturedThisPrompt = true
+        playShutter()
+
+        const prev = dom.enrollPrompt.innerText
+        dom.enrollPrompt.innerText = `✓ Captured ${captured.length}/${AE.TARGET}`
+        setTimeout(() => {
+          if (dom.enrollPrompt.innerText.startsWith("✓")) dom.enrollPrompt.innerText = prev
+        }, 400)
+      }
+    }
+
+    await new Promise(r => requestAnimationFrame(r))
+  }
+
+  clearInterval(promptTimer)
+  clearInterval(statusTimer)
+  autoEnrollRunning = false
+
+  try { window.speechSynthesis.cancel() } catch { }
+
+  dom.enrollPrompt.style = "display: none;"
+  dom.enrollStatus.style = "display: none;"
+  dom.autoEnrollBtn.style = ""
+
+  if (captured.length === 0) {
+    speak("No usable frames captured. Please try again.")
+    log("Auto enroll: no usable frames captured")
+    return
+  }
+
+  speak(`Done. Captured ${captured.length} photos.`)
+  log(`Auto enroll: sending ${captured.length} photos`)
+  phx_liveview.pushEvent('save_photos_batch', {
+    photos: captured.map(c => ({ discriptor: c.embedding, photo: c.photo }))
+  })
 }
 
 function zoomChange() {
@@ -341,29 +468,5 @@ function checkCameraCapabilities() {
     else {
       dom.zoom.style = "display: none;"
     }
-  }
-}
-
-function buttonsToggle() {
-  if (dom.employee_id.value == '') {
-    dom.saveBtn.style = "display: none;"
-    dom.snapBtn.style = "display: none;"
-  }
-  else {
-    if (!ok.snapClicked.status) {
-      dom.saveBtn.style = "display: none;"
-      dom.snapBtn.style = "display: block;"
-    }
-    else {
-      if (current?.face?.tensor || current?.face?.embedding) {
-        dom.saveBtn.style = "display: block;"
-        dom.snapBtn.style = "display: none;"
-      }
-      else {
-        dom.saveBtn.style = "display: none;"
-        dom.snapBtn.style = "display: none;"
-      }
-    }
-
   }
 }

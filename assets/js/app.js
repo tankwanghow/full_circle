@@ -59,9 +59,13 @@ Hooks.takePhoto = {
   mounted() {
     import("./take_photo_human").then(
       (h) => {
+        this._takePhoto = h
         h.initTakePhoto(this)
       }
     );
+  },
+  destroyed() {
+    if (this._takePhoto?.teardownTakePhoto) this._takePhoto.teardownTakePhoto()
   }
 }
 

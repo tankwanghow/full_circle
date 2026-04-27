@@ -184,6 +184,7 @@ async function detectFace() {
   )
 
   current.record = db[res.index] || null
+  current.lastSimilarity = res.similarity
 
   if (current.record) {
     dom.statusBar.classList.remove('text-[color:#FFFF00]')
@@ -350,16 +351,49 @@ async function startScanFace() {
   await main()
 }
 
+// Online learning: when the matched face is high-confidence, snapshot it so
+// the server can add it to the employee's photo library (and prune the oldest).
+// Threshold is tighter than the match threshold so a borderline-correct match
+// can't poison the library.
+const LEARN_SIMILARITY = 0.80
+const learnSnapCanvas = document.createElement('canvas')
+
+async function buildLearningPayload() {
+  if (!current.record) return {}
+  if (!current.face?.embedding) return {}
+  if ((current.lastSimilarity ?? 0) < LEARN_SIMILARITY) return {}
+
+  let photo
+  if (current.face.tensor) {
+    learnSnapCanvas.width = current.face.tensor.shape[1]
+    learnSnapCanvas.height = current.face.tensor.shape[0]
+    await human.draw.tensor(current.face.tensor, learnSnapCanvas)
+    photo = learnSnapCanvas.toDataURL('image/png')
+  }
+
+  return {
+    learn_discriptor: Array.from(current.face.embedding),
+    learn_photo: photo,
+    learn_similarity: current.lastSimilarity
+  }
+}
+
 async function inBtnClicked() {
   dom.statusBar.innerHTML = "Saving Attendence (IN)..."
   inOutFlag = "IN"
-  phx_liveview.pushEvent("save_attendence", { employee_id: current.record.employee_id, flag: inOutFlag, stamp: new Date })
+  const learn = await buildLearningPayload()
+  phx_liveview.pushEvent("save_attendence", {
+    employee_id: current.record.employee_id, flag: inOutFlag, stamp: new Date, ...learn
+  })
 }
 
 async function outBtnClicked() {
   dom.statusBar.innerHTML = "Saving Attendence (OUT)..."
   inOutFlag = "OUT"
-  phx_liveview.pushEvent("save_attendence", { employee_id: current.record.employee_id, flag: inOutFlag, stamp: new Date })
+  const learn = await buildLearningPayload()
+  phx_liveview.pushEvent("save_attendence", {
+    employee_id: current.record.employee_id, flag: inOutFlag, stamp: new Date, ...learn
+  })
 }
 
 function getDevices() {

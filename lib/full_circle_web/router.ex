@@ -379,7 +379,9 @@ defmodule FullCircleWeb.Router do
       ],
       root_layout: {FullCircleWeb.Layouts, :recon} do
       live("/face_id", FaceIdLive)
-      live("/take_photo", TakePhotoLive)
+      live("/take_photo", SelectEmployeeLive)
+      live("/take_photo/:emp_id", TakePhotoLive)
+      live("/take_photo/:emp_id/photos", EmployeePhotosLive)
     end
   end
 

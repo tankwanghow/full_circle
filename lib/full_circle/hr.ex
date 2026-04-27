@@ -543,7 +543,6 @@ defmodule FullCircle.HR do
     from(pht in EmployeePhoto,
       where: pht.employee_id == ^emp_id,
       where: pht.company_id == ^com_id,
-      limit: 5,
       order_by: [desc: pht.inserted_at],
       select: %{
         id: pht.id,
@@ -559,6 +558,27 @@ defmodule FullCircle.HR do
       where: pht.id == ^photo_id
     )
     |> Repo.delete_all()
+  end
+
+  @doc """
+  Keep only the `max` most-recent photos for an employee. Returns the IDs of
+  the photos that were removed (so the caller can broadcast deletions).
+  """
+  def prune_employee_photos(emp_id, com_id, max) do
+    stale_ids =
+      from(p in EmployeePhoto,
+        where: p.employee_id == ^emp_id and p.company_id == ^com_id,
+        order_by: [desc: p.inserted_at],
+        offset: ^max,
+        select: p.id
+      )
+      |> Repo.all()
+
+    if stale_ids != [] do
+      from(p in EmployeePhoto, where: p.id in ^stale_ids) |> Repo.delete_all()
+    end
+
+    stale_ids
   end
 
   def salary_note_query(company, user) do
