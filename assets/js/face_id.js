@@ -4,7 +4,7 @@ import * as indexDb from "./indexdb" // methods to deal with indexdb
 const humanConfig = {
   // user configuration for human, used to fine-tune behavior
   backend: navigator.gpu ? 'webgpu' : 'webgl',
-  cacheSensitivity: 0.1,
+  cacheSensitivity: 0.4, // reuse cached result when frames are >60% similar (still person at kiosk)
   modelBasePath: "/human-models",
   filter: { enabled: false, equalization: true }, // lets run with histogram equilizer
   debug: false,
@@ -29,9 +29,9 @@ const humanConfig = {
 const matchOptions = { order: 2, multiplier: 25, min: 0.2, max: 0.8 }; // for insightface model
 
 const options = {
-  minConfidence: 0.7, // overal face confidence for box, face, gender, real, live
+  minConfidence: 0.6, // overal face confidence for box, face, gender, real, live
   minSize: 112, // min input to face descriptor model before degradation
-  threshold: 0.5, // minimum similarity
+  threshold: 0.6, // minimum similarity
   mask: humanConfig.face.detector.mask,
   rotation: humanConfig.face.detector.rotation,
   ...matchOptions
@@ -84,11 +84,9 @@ function buildAveragedDB(rawDb) {
   }))
 }
 let detectFPS = 0
-let frameSkip = 0; // Add frame skipping
-const MATCH_INTERVAL = 1; // Process matching every 3 frames
 let inOutFlag = ''
-const matches = { list: [], times: 2 }
-const timestamp = { detect: 0, draw: 0 } // holds information used to calculate performance and possible memory leaks
+const matches = { list: [], times: 4 } // require 4 consecutive matches for higher confidence
+const timestamp = { detect: 0 }
 
 // Offscreen canvas to normalize camera input to a consistent resolution
 const normalizedCanvas = document.createElement('canvas')
@@ -150,38 +148,41 @@ async function webCam() {
     )
 }
 
+// Detection loop — runs at GPU speed (naturally throttled by neural net inference time).
+// Does NOT render: just detects and matches. Schedules itself via rAF so it yields
+// to the browser between frames and doesn't starve the render loop.
 async function detectionLoop() {
   if (dom.video.paused) return
+
+  if (current.face?.tensor) human.tf.dispose(current.face.tensor)
+  normalizedCtx.drawImage(dom.video, 0, 0, 640, 640)
+  const result = await human.detect(normalizedCanvas)
+  current.face = result.face[0]
 
   const now = performance.now()
   detectFPS = Math.round(10000 / (now - timestamp.detect)) / 10
   timestamp.detect = now
 
-  // Skip frames to improve performance
-  frameSkip = (frameSkip + 1) % MATCH_INTERVAL
+  if (current.face?.embedding) await detectFace()
 
-  if (current.face?.tensor) human.tf.dispose(current.face.tensor)
-  normalizedCtx.drawImage(dom.video, 0, 0, 640, 640)
-  const result = await human.detect(normalizedCanvas, { skipFrames: MATCH_INTERVAL - 1 })
-  current.face = result.face[0]
+  requestAnimationFrame(detectionLoop)
+}
 
-  // Only process matching on every MATCH_INTERVAL frames
-  if (frameSkip === 0 && current.face?.embedding) {
-    await detectFace()
-  }
+// Render loop — runs at full 60fps independently of detection speed.
+// Uses human.next() to interpolate the last detection result for smooth animation.
+function renderLoop() {
+  if (dom.video.paused) return
 
-  const interpolated = human.next(result)
-  const ctx = dom.canvas.getContext('2d', { willReadFrequently: true })
+  const interpolated = human.next(human.result)
   human.draw.canvas(dom.video, dom.canvas)
-  await human.draw.all(dom.canvas, interpolated)
+  human.draw.all(dom.canvas, interpolated).then(() => {
+    const ctx = dom.canvas.getContext('2d', { willReadFrequently: true })
+    ctx.font = "bold 20px sans"
+    ctx.fillStyle = "#AAFF00"
+    ctx.fillText(`FPS: ${detectFPS}`, 10, 20)
+  })
 
-  // Draw FPS
-  ctx.font = "bold 20px sans"
-  ctx.fillStyle = "#AAFF00"
-  ctx.fillText(`FPS: ${detectFPS}`, 10, 20)
-  ctx.fillText(`face records: ${await indexDb.count()}`, 10, 40)
-
-  requestAnimationFrame(detectionLoop);
+  requestAnimationFrame(renderLoop)
 }
 
 async function detectFace() {
@@ -235,10 +236,10 @@ function showMatchedPhoto(el, photo) {
 }
 
 async function main() {
-  // main entry point
   setNoMatch()
   await webCam()
-  await detectionLoop() // start detection loop
+  detectionLoop() // fire — detection runs at GPU speed, doesn't block
+  renderLoop()    // fire — rendering runs at 60fps via rAF independently
 }
 
 function setBodyBgColor(color) {
