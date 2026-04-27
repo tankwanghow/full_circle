@@ -44,7 +44,19 @@
       "Bash(export PATH=\"/home/tankwanghow/.local/share/mise/installs/elixir/1.19.5-otp-28/bin:/home/tankwanghow/.local/share/mise/installs/erlang/28.3.1/bin:$PATH\")",
       "Bash(find /home/tankwanghow/Projects/elixir/full_circle -type f -name Dockerfile* -o -name docker-compose* -o -name .dockerignore)",
       "Bash(find /home/tankwanghow/Projects/elixir/full_circle -maxdepth 3 -type f -name mix.exs -o -name mix.lock -o -path */mix/* -name *.exs)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "WebFetch(domain:www.npmjs.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(wget -q https://github.com/vladmandic/human/archive/refs/tags/v3.3.6.zip -O /tmp/human-3.3.6.zip)",
+      "Read(//tmp/**)",
+      "Bash(tar -xzf qr-scanner.tgz)",
+      "Bash(tar -xzf bd.tgz)",
+      "Bash(mkdir -p zxing-wasm-pkg)",
+      "Bash(tar -xzf zxing-wasm.tgz -C zxing-wasm-pkg)",
+      "Bash(git rm *)",
+      "Bash(awk '{print $5, $9}')",
+      "Bash(echo \"EXIT: $?\")"
     ]
   }
 }
