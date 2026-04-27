@@ -51,7 +51,7 @@ config :esbuild,
     args: ~w(js/app.js js/tri_autocomplete.js js/take_photo_human.js
              js/face_id.js js/qr_attend.js
         --chunk-names=chunks/[name]-[hash] --splitting
-        --bundle --target=es2017 --format=esm
+        --bundle --target=es2020 --format=esm
         --outdir=../priv/static/assets --external:/fonts/* --external:/images/*
         --external:/sounds/* --external:/models/*),
     cd: Path.expand("../assets", __DIR__),

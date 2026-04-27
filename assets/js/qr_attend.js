@@ -152,88 +152,101 @@ async function applyAutofocus(stream) {
 
 // --- Frame processing ---
 
-// Offscreen canvas for de-mirroring and contrast boost on fixed-focus cameras
+// Offscreen canvas for scan-region crop, de-mirroring, and contrast boost
 const decodeCanvas = document.createElement('canvas')
 const decodeCtx = decodeCanvas.getContext('2d')
 
+// Returns the center square crop region in video pixel coordinates.
+// Matches the 66% CSS overlay shown to the user (close enough for a guide).
+function getScanRegion() {
+  const vw = dom.video.videoWidth
+  const vh = dom.video.videoHeight
+  const size = Math.round(Math.min(vw, vh) * 0.7)
+  return { x: Math.round((vw - size) / 2), y: Math.round((vh - size) / 2), size }
+}
+
 function prepareDecodeCanvas() {
+  const { x, y, size } = getScanRegion()
   const needsFlip = facingMode === 'user'
   const needsProcessing = !hasAutofocus
 
-  decodeCanvas.width = dom.video.videoWidth
-  decodeCanvas.height = dom.video.videoHeight
+  // Decode canvas is exactly the scan region — the barcode fills more pixels
+  // which directly improves detection accuracy, especially on low-res cameras.
+  decodeCanvas.width = size
+  decodeCanvas.height = size
   decodeCtx.save()
-  // contrast(4) grayscale(1): converts blurry grey QR edges to hard black/white
+  // contrast(4) grayscale(1): sharpens blurry edges on fixed-focus cameras
   if (needsProcessing) decodeCtx.filter = 'contrast(4) grayscale(1)'
   if (needsFlip) {
+    // Flip horizontally so QR code text orientation is correct for decoder
+    decodeCtx.translate(size, 0)
     decodeCtx.scale(-1, 1)
-    decodeCtx.drawImage(dom.video, -decodeCanvas.width, 0)
-  } else {
-    decodeCtx.drawImage(dom.video, 0, 0)
   }
+  // Crop to scan region only
+  decodeCtx.drawImage(dom.video, x, y, size, size, 0, 0, size, size)
   decodeCtx.restore()
   decodeCtx.filter = 'none'
 }
 
 function getDecodeSource() {
-  // Back camera with autofocus: decode directly from video (fastest path)
-  if (hasAutofocus && facingMode !== 'user') return dom.video
+  // Always decode from the cropped scan region canvas.
+  // Smaller image = faster WASM decode; barcode fills more pixels = better accuracy.
   prepareDecodeCanvas()
   return decodeCanvas
 }
 
 // --- Scanner init (ZXing-WASM always, native BarcodeDetector on supporting browsers) ---
 
+// How often to attempt a decode. Native BarcodeDetector is fast (hardware),
+// so 20fps is fine. ZXing-WASM takes 20-80ms per call, so 10fps avoids
+// queueing calls faster than they complete and keeps the UI smooth.
+const NATIVE_SCAN_INTERVAL_MS = 50  // ~20fps
+const WASM_SCAN_INTERVAL_MS = 100   // ~10fps
+
+function startScanLoop(detector, intervalMs) {
+  let lastScan = 0
+  let detecting = false
+
+  async function tick(now) {
+    if (!scanning && !detecting && now - lastScan >= intervalMs &&
+        dom.video.readyState === dom.video.HAVE_ENOUGH_DATA) {
+      detecting = true
+      lastScan = now
+      try {
+        const barcodes = await detector.detect(getDecodeSource())
+        if (barcodes.length > 0) onScanSuccess(barcodes[0].rawValue)
+      } catch { }
+      detecting = false
+    }
+    requestAnimationFrame(tick)
+  }
+
+  requestAnimationFrame(tick)
+}
+
 function initScanner(stream) {
   // Use native BarcodeDetector if available (Chrome Android, fast hardware path)
   // otherwise fall back to ZXing-WASM which works on all browsers and handles
   // low-resolution / fixed-focus cameras much better than jsQR
-  const DetectorClass = ('BarcodeDetector' in window) ? window.BarcodeDetector : ZXingBarcodeDetector
+  const useNative = 'BarcodeDetector' in window
+  const DetectorClass = useNative ? window.BarcodeDetector : ZXingBarcodeDetector
+  const intervalMs = useNative ? NATIVE_SCAN_INTERVAL_MS : WASM_SCAN_INTERVAL_MS
+
+  camera = {
+    resume: () => { scanning = false },
+    pause: () => { scanning = true },
+    destroy: () => { stream.getTracks().forEach(t => t.stop()); dom.video.srcObject = null }
+  }
 
   // Get supported formats asynchronously then start the loop
   DetectorClass.getSupportedFormats().then(formats => {
-    const detector = new DetectorClass({ formats })
-
-    async function tick() {
-      if (!scanning && dom.video.readyState === dom.video.HAVE_ENOUGH_DATA) {
-        try {
-          const barcodes = await detector.detect(getDecodeSource())
-          if (barcodes.length > 0) onScanSuccess(barcodes[0].rawValue)
-        } catch { }
-      }
-      requestAnimationFrame(tick)
-    }
-
-    camera = {
-      resume: () => { scanning = false },
-      pause: () => { scanning = true },
-      destroy: () => { stream.getTracks().forEach(t => t.stop()); dom.video.srcObject = null }
-    }
-
-    requestAnimationFrame(tick)
+    startScanLoop(new DetectorClass({ formats }), intervalMs)
   }).catch(() => {
-    // Last-resort: ZXing-WASM with all common formats
+    // Last-resort: ZXing-WASM with common formats hardcoded
     const detector = new ZXingBarcodeDetector({
       formats: ['qr_code', 'code_128', 'code_39', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'data_matrix', 'pdf417', 'aztec']
     })
-
-    async function tick() {
-      if (!scanning && dom.video.readyState === dom.video.HAVE_ENOUGH_DATA) {
-        try {
-          const barcodes = await detector.detect(getDecodeSource())
-          if (barcodes.length > 0) onScanSuccess(barcodes[0].rawValue)
-        } catch { }
-      }
-      requestAnimationFrame(tick)
-    }
-
-    camera = {
-      resume: () => { scanning = false },
-      pause: () => { scanning = true },
-      destroy: () => { stream.getTracks().forEach(t => t.stop()); dom.video.srcObject = null }
-    }
-
-    requestAnimationFrame(tick)
+    startScanLoop(detector, WASM_SCAN_INTERVAL_MS)
   })
 }
 

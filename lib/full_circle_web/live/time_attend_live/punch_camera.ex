@@ -118,8 +118,18 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCamera do
       </div>
       <div id="clock" class="text-blue-800 text-center font-bold"></div>
 
-      <div id="camera-view" class="w-11/12 mx-auto mb-2" phx-update="ignore" style="display: block;">
-        <video id="camera-video" class="w-full rounded-xl"></video>
+      <div id="camera-view" class="w-11/12 mx-auto mb-2 relative" phx-update="ignore" style="display: block;">
+        <video id="camera-video" class="w-full rounded-xl block"></video>
+        <%!-- Scan region overlay: darkens outside the guide box, shows corner markers --%>
+        <div class="absolute inset-0 flex items-center justify-center pointer-events-none rounded-xl overflow-hidden">
+          <div class="relative w-[66%] aspect-square"
+               style="box-shadow: 0 0 0 9999px rgba(0,0,0,0.45);">
+            <div class="absolute top-0 left-0 w-7 h-7 border-t-[3px] border-l-[3px] border-white"></div>
+            <div class="absolute top-0 right-0 w-7 h-7 border-t-[3px] border-r-[3px] border-white"></div>
+            <div class="absolute bottom-0 left-0 w-7 h-7 border-b-[3px] border-l-[3px] border-white"></div>
+            <div class="absolute bottom-0 right-0 w-7 h-7 border-b-[3px] border-r-[3px] border-white"></div>
+          </div>
+        </div>
         <div class="text-center mt-1">
           <button id="flipCameraBtn" class="gray button text-sm px-3 py-1">
             🔄 {gettext("Flip Camera")}
