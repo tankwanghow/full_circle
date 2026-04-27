@@ -17,8 +17,8 @@ const humanConfig = {
     mobilefacenet: { enabled: false },
     iris: { enabled: false },
     emotion: { enabled: false },
-    antispoof: { enabled: false },
-    liveness: { enabled: false }
+    antispoof: { enabled: true },
+    liveness: { enabled: true }
   },
   body: { enabled: false },
   hand: { enabled: false },
@@ -53,6 +53,36 @@ human.draw.options.drawBoxes = true
 let db
 let phx_liveview
 let descriptors
+
+// Average all descriptors per employee to reduce noise and improve match accuracy
+function averageDescriptors(descriptors) {
+  if (descriptors.length === 1) return descriptors[0]
+  const len = descriptors[0].length
+  const avg = new Array(len).fill(0)
+  for (const desc of descriptors) {
+    for (let i = 0; i < len; i++) avg[i] += desc[i]
+  }
+  for (let i = 0; i < len; i++) avg[i] /= descriptors.length
+  return avg
+}
+
+function buildAveragedDB(rawDb) {
+  const groups = new Map()
+  for (const rec of rawDb) {
+    if (!rec.descriptor?.length) continue
+    if (!groups.has(rec.employee_id)) {
+      groups.set(rec.employee_id, { ...rec, descriptors: [rec.descriptor] })
+    } else {
+      groups.get(rec.employee_id).descriptors.push(rec.descriptor)
+    }
+  }
+  return Array.from(groups.values()).map(group => ({
+    id: group.id,
+    name: group.name,
+    employee_id: group.employee_id,
+    descriptor: averageDescriptors(group.descriptors)
+  }))
+}
 let detectFPS = 0
 let frameSkip = 0; // Add frame skipping
 const MATCH_INTERVAL = 1; // Process matching every 3 frames
@@ -156,7 +186,16 @@ async function detectionLoop() {
 
 async function detectFace() {
   if (!current?.face?.tensor || !current?.face?.embedding) return false
-  if ((await indexDb.count()) === 0) {
+  if ((await indexDb.count()) === 0) return false
+
+  // Reject spoofed or non-live faces
+  const isReal = (current.face.real ?? 1) > 0.5
+  const isLive = (current.face.live ?? 1) > 0.5
+  if (!isReal || !isLive) {
+    dom.statusBar.classList.remove('text-[color:#00FF00]')
+    dom.statusBar.classList.remove('text-[color:#FFFF00]')
+    dom.statusBar.classList.add('text-[color:#FF0000]')
+    dom.statusBar.innerHTML = 'Liveness check failed'
     return false
   }
 
@@ -251,10 +290,8 @@ document.addEventListener('visibilitychange', () => {
 export async function initFaceID(lv) {
   phx_liveview = lv
   await requestWakeLock()
-  db = await indexDb.load()
-  descriptors = db
-    .map(rec => rec.descriptor)
-    .filter(desc => desc.length > 0)
+  db = buildAveragedDB(await indexDb.load())
+  descriptors = db.map(rec => rec.descriptor)
   setInterval(async () => { showClock() }, 1000)
   log(
     "human version:",
@@ -371,11 +408,9 @@ async function refreshFaceIdDB() {
     for (const rec of results['descriptors']) {
       await indexDb.save(rec)
     }
-    db = await indexDb.load()
-    descriptors = db
-      .map(rec => rec.descriptor)
-      .filter(desc => desc.length > 0)
-    log("known face records:", await indexDb.count())
+    db = buildAveragedDB(await indexDb.load())
+    descriptors = db.map(rec => rec.descriptor)
+    log("known face records:", db.length)
   })
 }
 
