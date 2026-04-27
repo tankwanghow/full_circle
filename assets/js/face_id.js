@@ -31,7 +31,7 @@ const matchOptions = { order: 2, multiplier: 25, min: 0.2, max: 0.8 }; // for in
 const options = {
   minConfidence: 0.6, // overal face confidence for box, face, gender, real, live
   minSize: 112, // min input to face descriptor model before degradation
-  threshold: 0.6, // minimum similarity
+  threshold: 0.5, // minimum similarity — per-photo matching gives cleaner scores than averaged
   mask: humanConfig.face.detector.mask,
   rotation: humanConfig.face.detector.rotation,
   ...matchOptions
@@ -54,38 +54,15 @@ let db
 let phx_liveview
 let descriptors
 
-// Average all descriptors per employee to reduce noise and improve match accuracy
-function averageDescriptors(descriptors) {
-  if (descriptors.length === 1) return descriptors[0]
-  const len = descriptors[0].length
-  const avg = new Array(len).fill(0)
-  for (const desc of descriptors) {
-    for (let i = 0; i < len; i++) avg[i] += desc[i]
-  }
-  for (let i = 0; i < len; i++) avg[i] /= descriptors.length
-  return avg
-}
-
-function buildAveragedDB(rawDb) {
-  const groups = new Map()
-  for (const rec of rawDb) {
-    if (!rec.descriptor?.length) continue
-    if (!groups.has(rec.employee_id)) {
-      groups.set(rec.employee_id, { ...rec, descriptors: [rec.descriptor] })
-    } else {
-      groups.get(rec.employee_id).descriptors.push(rec.descriptor)
-    }
-  }
-  return Array.from(groups.values()).map(group => ({
-    id: group.id,
-    name: group.name,
-    employee_id: group.employee_id,
-    descriptor: averageDescriptors(group.descriptors)
-  }))
+// Build a flat list of all photo embeddings — match against every photo individually
+// rather than averaging, which destroys the unit-vector property of InsightFace
+// embeddings and systematically lowers similarity scores.
+function buildDB(rawDb) {
+  return rawDb.filter(rec => rec.descriptor?.length > 0)
 }
 let detectFPS = 0
 let inOutFlag = ''
-const matches = { list: [], times: 4 } // require 4 consecutive matches for higher confidence
+const matches = { list: [], times: 3 } // require 3 consecutive same-person matches
 const timestamp = { detect: 0 }
 
 // Offscreen canvas to normalize camera input to a consistent resolution
@@ -291,7 +268,7 @@ document.addEventListener('visibilitychange', () => {
 export async function initFaceID(lv) {
   phx_liveview = lv
   await requestWakeLock()
-  db = buildAveragedDB(await indexDb.load())
+  db = buildDB(await indexDb.load())
   descriptors = db.map(rec => rec.descriptor)
   setInterval(async () => { showClock() }, 1000)
   log(
@@ -409,7 +386,7 @@ async function refreshFaceIdDB() {
     for (const rec of results['descriptors']) {
       await indexDb.save(rec)
     }
-    db = buildAveragedDB(await indexDb.load())
+    db = buildDB(await indexDb.load())
     descriptors = db.map(rec => rec.descriptor)
     log("known face records:", db.length)
   })
