@@ -240,17 +240,42 @@ const AE = {
   MIN_LIVE: 0.5,          // liveness score — reject static images
   PROMPT_MS: 5000,        // total time per prompt (settle + capture window)
   SETTLE_MS: 2500,        // pause capture this long after each new prompt
-  // [text shown on screen, text spoken aloud]
+  // Pose thresholds in radians. ~0.20 rad ≈ 11°, ~0.25 rad ≈ 14°.
+  // Frontal allows small drift; turn/tilt require a clear deflection so we
+  // don't accept a frontal frame in place of a side pose.
+  FRONTAL_YAW: 0.20,
+  FRONTAL_PITCH: 0.20,
+  TURN_YAW: 0.25,
+  TILT_PITCH: 0.20,
+  // Each prompt: text shown, text spoken, required pose name.
+  // If "Turn LEFT" and "Turn RIGHT" feel reversed in your camera, swap their
+  // pose values (yawNeg ↔ yawPos) — the sign depends on whether the preview
+  // is mirrored. Same for pitchUp ↔ pitchDown.
   PROMPTS: [
-    ["Look STRAIGHT at camera",      "Look straight at the camera"],
-    ["Turn head slightly LEFT",      "Turn your head to the left"],
-    ["Turn head slightly RIGHT",     "Turn your head to the right"],
-    ["Tilt head UP",                 "Tilt your head up"],
-    ["Tilt head DOWN",               "Tilt your head down"],
-    ["Remove glasses (if wearing)",  "Remove your glasses"],
-    ["Slight smile",                 "Give a slight smile"],
-    ["Put glasses back on",          "Put your glasses back on"]
+    { text: "Look STRAIGHT at camera",     voice: "Look straight at the camera", pose: 'frontal' },
+    { text: "Turn head slightly LEFT",     voice: "Turn your head to the left",  pose: 'yawNeg' },
+    { text: "Turn head slightly RIGHT",    voice: "Turn your head to the right", pose: 'yawPos' },
+    { text: "Tilt head UP",                voice: "Tilt your head up",           pose: 'pitchPos' },
+    { text: "Tilt head DOWN",              voice: "Tilt your head down",         pose: 'pitchNeg' },
+    { text: "Remove glasses (if wearing)", voice: "Remove your glasses",         pose: 'any' },
+    { text: "Slight smile",                voice: "Give a slight smile",         pose: 'any' },
+    { text: "Put glasses back on",         voice: "Put your glasses back on",    pose: 'any' }
   ]
+}
+
+// Pose validators map a face's {yaw, pitch} (radians) to whether it matches
+// the prompt. `any` skips the check (e.g. glasses-on/off prompts care about
+// appearance, not orientation).
+function poseValidator(name) {
+  switch (name) {
+    case 'frontal':  return ({ yaw, pitch }) => Math.abs(yaw) < AE.FRONTAL_YAW && Math.abs(pitch) < AE.FRONTAL_PITCH
+    case 'yawNeg':   return ({ yaw })        => yaw < -AE.TURN_YAW
+    case 'yawPos':   return ({ yaw })        => yaw >  AE.TURN_YAW
+    case 'pitchPos': return ({ pitch })      => pitch >  AE.TILT_PITCH
+    case 'pitchNeg': return ({ pitch })      => pitch < -AE.TILT_PITCH
+    case 'any':      return null
+    default:         return null
+  }
 }
 
 function speak(text) {
@@ -301,9 +326,9 @@ async function autoEnroll() {
   let lastRejectReason = "no face seen"
   let rejectCounts = {}
   const showPrompt = () => {
-    const [shown, spoken] = AE.PROMPTS[promptIdx]
-    dom.enrollPrompt.innerText = shown
-    speak(spoken)
+    const { text, voice } = AE.PROMPTS[promptIdx]
+    dom.enrollPrompt.innerText = text
+    speak(voice)
     settleUntil = performance.now() + AE.SETTLE_MS
     capturedThisPrompt = false
     lastRejectReason = "no face seen"
@@ -312,7 +337,7 @@ async function autoEnroll() {
   showPrompt()
   const promptTimer = setInterval(() => {
     if (!capturedThisPrompt) {
-      log(`Auto enroll: missed "${AE.PROMPTS[promptIdx][0]}" — ${lastRejectReason} (rejects: ${JSON.stringify(rejectCounts)})`)
+      log(`Auto enroll: missed "${AE.PROMPTS[promptIdx].text}" — ${lastRejectReason} (rejects: ${JSON.stringify(rejectCounts)})`)
     }
     promptIdx = (promptIdx + 1) % AE.PROMPTS.length
     showPrompt()
@@ -369,6 +394,9 @@ async function autoEnroll() {
       const size = Math.min(face.box[2], face.box[3])
       const real = face.real ?? 1
       const live = face.live ?? 1
+      const angle = face.rotation?.angle ?? { yaw: 0, pitch: 0, roll: 0 }
+      const wantPose = poseValidator(AE.PROMPTS[promptIdx].pose)
+      const poseOk = !wantPose || wantPose(angle)
 
       if (conf < AE.MIN_CONFIDENCE) {
         lastRejectReason = `low confidence ${conf.toFixed(2)} < ${AE.MIN_CONFIDENCE}`
@@ -382,12 +410,15 @@ async function autoEnroll() {
       } else if (live < AE.MIN_LIVE) {
         lastRejectReason = `liveness failed ${live.toFixed(2)} < ${AE.MIN_LIVE}`
         rejectCounts.notLive = (rejectCounts.notLive || 0) + 1
+      } else if (!poseOk) {
+        lastRejectReason = `wrong pose for "${AE.PROMPTS[promptIdx].pose}" yaw=${angle.yaw.toFixed(2)} pitch=${angle.pitch.toFixed(2)}`
+        rejectCounts.wrongPose = (rejectCounts.wrongPose || 0) + 1
       } else if (tooSimilarToLatest(face.embedding)) {
         lastRejectReason = "too similar to last capture"
         rejectCounts.tooSimilar = (rejectCounts.tooSimilar || 0) + 1
       }
 
-      if (conf >= AE.MIN_CONFIDENCE && size >= AE.MIN_FACE_SIZE && real >= AE.MIN_REAL && live >= AE.MIN_LIVE && !tooSimilarToLatest(face.embedding)) {
+      if (conf >= AE.MIN_CONFIDENCE && size >= AE.MIN_FACE_SIZE && real >= AE.MIN_REAL && live >= AE.MIN_LIVE && poseOk && !tooSimilarToLatest(face.embedding)) {
         // Snapshot the cropped face tensor to its own canvas so we don't trample the live preview
         let photoData
         if (face.tensor) {
