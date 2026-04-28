@@ -149,9 +149,9 @@ defmodule FullCircleWeb.EggStockLive.ProductionReport do
   defp color_for(idx), do: Enum.at(@chart_colors, rem(idx, length(@chart_colors)))
 
   @bucket_defs [
-    {"Large", ~w(AA A)},
-    {"Medium", ~w(B C)},
-    {"Small", ~w(D E)},
+    {"AA, A", ~w(AA A)},
+    {"B, C", ~w(B C)},
+    {"D, E", ~w(D E)},
     {"Other", ~w(F Cr W Dr)}
   ]
 
