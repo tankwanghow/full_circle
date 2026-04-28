@@ -172,7 +172,10 @@ defmodule FullCircleWeb.FaceIdLive do
         </div>
         <div id="log" class="text-center"></div>
       </div>
-      <div class="text-center mt-10">
+      <div class="text-center mt-10 space-x-2">
+        <button type="button" phx-click="get_face_id_photos" class="blue button">
+          {gettext("Refresh Face Data")}
+        </button>
         <.link navigate={~p"/companies/#{@current_company.id}/dashboard"} class="orange button">
           {gettext("Back")}
         </.link>

@@ -5,7 +5,7 @@ const humanConfig = {
   backend: navigator.gpu ? 'webgpu' : 'webgl',
   cacheSensitivity: 0.1,
   modelBasePath: "/human-models/",
-  filter: { enabled: false, equalization: true }, // lets run with histogram equilizer
+  filter: { enabled: true, equalization: true }, // histogram equalization normalizes lighting across cameras
   debug: true,
   face: {
     enabled: true,
@@ -16,8 +16,8 @@ const humanConfig = {
     mobilefacenet: { enabled: false },
     iris: { enabled: false }, // needed to determine gaze direction
     emotion: { enabled: false }, // not needed
-    antispoof: { enabled: false }, // enable optional antispoof module
-    liveness: { enabled: false } // enable optional liveness module
+    antispoof: { enabled: true }, // reject printed-photo / screen enrollments
+    liveness: { enabled: true }   // reject still-image enrollments
   },
   body: { enabled: false },
   hand: { enabled: false },
@@ -78,11 +78,22 @@ function playShutter() {
 const timestamp = { detect: 0, draw: 0 } // holds information used to calculate performance and possible memory leaks
 let startTime = 0
 
-// Offscreen canvas to normalize camera input to a consistent resolution
+// Offscreen canvas to normalize camera input to a consistent resolution.
+// Letterboxes (preserves aspect ratio) instead of stretching — stretching to
+// a square distorts faces and shifts embeddings between 4:3 and 16:9 sources.
 const normalizedCanvas = document.createElement('canvas')
 normalizedCanvas.width = 640
 normalizedCanvas.height = 640
 const normalizedCtx = normalizedCanvas.getContext('2d')
+
+function drawNormalized(video) {
+  normalizedCtx.fillStyle = '#000'
+  normalizedCtx.fillRect(0, 0, 640, 640)
+  const scale = Math.min(640 / video.videoWidth, 640 / video.videoHeight)
+  const w = video.videoWidth * scale
+  const h = video.videoHeight * scale
+  normalizedCtx.drawImage(video, (640 - w) / 2, (640 - h) / 2, w, h)
+}
 
 const log = (...msg) => {
   // helper method to output messages
@@ -141,7 +152,7 @@ async function webCam() {
 async function detectionLoop(myRunId) {
   if (myRunId !== runId) return // stale loop from previous mount
   if (dom.video && !dom.video.paused) {
-    normalizedCtx.drawImage(dom.video, 0, 0, 640, 640)
+    drawNormalized(dom.video)
     await human.detect(normalizedCanvas)
     timestamp.detect = human.now()
   }
@@ -223,8 +234,10 @@ const AE = {
   TARGET: 20,             // hard cap on photos
   TIMEOUT_MS: 40000,      // total enrollment duration
   MAX_SIM_VS_LATEST: 0.97, // skip if essentially identical to previous capture
-  MIN_FACE_SIZE: 140,     // profile views have narrower boxes — be lenient
-  MIN_CONFIDENCE: 0.55,   // profile views score lower than frontal
+  MIN_FACE_SIZE: 180,     // descriptor model crops to 112×112 — anything smaller is upscaled and noisy
+  MIN_CONFIDENCE: 0.65,   // higher floor — bad enrollment poisons the photo library forever
+  MIN_REAL: 0.7,          // antispoof score — reject printed photos / screens
+  MIN_LIVE: 0.5,          // liveness score — reject static images
   PROMPT_MS: 5000,        // total time per prompt (settle + capture window)
   SETTLE_MS: 2500,        // pause capture this long after each new prompt
   // [text shown on screen, text spoken aloud]
@@ -354,6 +367,8 @@ async function autoEnroll() {
       lastSeenFace = face
       const conf = face.faceScore || face.boxScore || 0
       const size = Math.min(face.box[2], face.box[3])
+      const real = face.real ?? 1
+      const live = face.live ?? 1
 
       if (conf < AE.MIN_CONFIDENCE) {
         lastRejectReason = `low confidence ${conf.toFixed(2)} < ${AE.MIN_CONFIDENCE}`
@@ -361,12 +376,18 @@ async function autoEnroll() {
       } else if (size < AE.MIN_FACE_SIZE) {
         lastRejectReason = `face too small ${Math.round(size)}px < ${AE.MIN_FACE_SIZE}`
         rejectCounts.tooSmall = (rejectCounts.tooSmall || 0) + 1
+      } else if (real < AE.MIN_REAL) {
+        lastRejectReason = `antispoof failed ${real.toFixed(2)} < ${AE.MIN_REAL}`
+        rejectCounts.notReal = (rejectCounts.notReal || 0) + 1
+      } else if (live < AE.MIN_LIVE) {
+        lastRejectReason = `liveness failed ${live.toFixed(2)} < ${AE.MIN_LIVE}`
+        rejectCounts.notLive = (rejectCounts.notLive || 0) + 1
       } else if (tooSimilarToLatest(face.embedding)) {
         lastRejectReason = "too similar to last capture"
         rejectCounts.tooSimilar = (rejectCounts.tooSimilar || 0) + 1
       }
 
-      if (conf >= AE.MIN_CONFIDENCE && size >= AE.MIN_FACE_SIZE && !tooSimilarToLatest(face.embedding)) {
+      if (conf >= AE.MIN_CONFIDENCE && size >= AE.MIN_FACE_SIZE && real >= AE.MIN_REAL && live >= AE.MIN_LIVE && !tooSimilarToLatest(face.embedding)) {
         // Snapshot the cropped face tensor to its own canvas so we don't trample the live preview
         let photoData
         if (face.tensor) {

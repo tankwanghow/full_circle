@@ -4,9 +4,9 @@ import * as indexDb from "./indexdb" // methods to deal with indexdb
 const humanConfig = {
   // user configuration for human, used to fine-tune behavior
   backend: navigator.gpu ? 'webgpu' : 'webgl',
-  cacheSensitivity: 0.4, // reuse cached result when frames are >60% similar (still person at kiosk)
+  cacheSensitivity: 0.15, // low — kiosk traffic changes; avoid stale cached embeddings
   modelBasePath: "/human-models",
-  filter: { enabled: false, equalization: true }, // lets run with histogram equilizer
+  filter: { enabled: true, equalization: true }, // histogram equalization normalizes lighting across cameras
   debug: false,
   face: {
     enabled: true,
@@ -65,11 +65,22 @@ let inOutFlag = ''
 const matches = { list: [], times: 3 } // require 3 consecutive same-person matches
 const timestamp = { detect: 0 }
 
-// Offscreen canvas to normalize camera input to a consistent resolution
+// Offscreen canvas to normalize camera input to a consistent resolution.
+// Letterboxes (preserves aspect ratio) instead of stretching — stretching to
+// a square distorts faces and shifts embeddings between 4:3 and 16:9 sources.
 const normalizedCanvas = document.createElement('canvas')
 normalizedCanvas.width = 640
 normalizedCanvas.height = 640
 const normalizedCtx = normalizedCanvas.getContext('2d')
+
+function drawNormalized(video) {
+  normalizedCtx.fillStyle = '#000'
+  normalizedCtx.fillRect(0, 0, 640, 640)
+  const scale = Math.min(640 / video.videoWidth, 640 / video.videoHeight)
+  const w = video.videoWidth * scale
+  const h = video.videoHeight * scale
+  normalizedCtx.drawImage(video, (640 - w) / 2, (640 - h) / 2, w, h)
+}
 
 const dom = {
   // grab instances of dom objects so we dont have to look them up later
@@ -132,7 +143,7 @@ async function detectionLoop() {
   if (dom.video.paused) return
 
   if (current.face?.tensor) human.tf.dispose(current.face.tensor)
-  normalizedCtx.drawImage(dom.video, 0, 0, 640, 640)
+  drawNormalized(dom.video)
   const result = await human.detect(normalizedCanvas)
   current.face = result.face[0]
 
@@ -165,6 +176,11 @@ function renderLoop() {
 async function detectFace() {
   if (!current?.face?.tensor || !current?.face?.embedding) return false
   if ((await indexDb.count()) === 0) return false
+
+  // Reject faces too small to embed reliably — descriptor model crops to 112×112,
+  // so faces under ~140px in source are upscaled and produce noisy embeddings.
+  const faceSize = Math.min(current.face.box[2], current.face.box[3])
+  if (faceSize < 140) return false
 
   // Reject spoofed or non-live faces
   const isReal = (current.face.real ?? 1) > 0.5
