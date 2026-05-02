@@ -853,6 +853,8 @@ defmodule FullCircle.EInvMetas do
     end
   end
 
+  defp num(%Decimal{} = d), do: Jason.Fragment.new(Decimal.to_string(d, :normal))
+
   defp build_invoice_ubl(invoice, com, preview, unit_map) do
     sup = preview.supplier
     cust = preview.customer
@@ -865,21 +867,18 @@ defmodule FullCircle.EInvMetas do
       Enum.reduce(invoice.invoice_details, Decimal.new(0), fn d, acc ->
         Decimal.add(acc, d.tax_amount)
       end)
-      |> Decimal.to_float()
 
     total_excl =
       Enum.reduce(invoice.invoice_details, Decimal.new(0), fn d, acc ->
         Decimal.add(acc, d.good_amount)
       end)
-      |> Decimal.to_float()
 
-    total_incl = Decimal.to_float(invoice.invoice_amount)
+    total_incl = invoice.invoice_amount
 
     total_discount =
       Enum.reduce(invoice.invoice_details, Decimal.new(0), fn d, acc ->
         Decimal.add(acc, Decimal.abs(d.discount))
       end)
-      |> Decimal.to_float()
 
     %{
       "_D" => "urn:oasis:names:specification:ubl:schema:xsd:Invoice-2",
@@ -941,17 +940,17 @@ defmodule FullCircle.EInvMetas do
           ],
           "TaxTotal" => [
             %{
-              "TaxAmount" => [%{"_" => total_tax, "currencyID" => "MYR"}],
+              "TaxAmount" => [%{"_" => num(total_tax), "currencyID" => "MYR"}],
               "TaxSubtotal" => tax_subtotals
             }
           ],
           "LegalMonetaryTotal" => [
             %{
-              "LineExtensionAmount" => [%{"_" => total_excl, "currencyID" => "MYR"}],
-              "TaxExclusiveAmount" => [%{"_" => total_excl, "currencyID" => "MYR"}],
-              "TaxInclusiveAmount" => [%{"_" => total_incl, "currencyID" => "MYR"}],
-              "AllowanceTotalAmount" => [%{"_" => total_discount, "currencyID" => "MYR"}],
-              "PayableAmount" => [%{"_" => total_incl, "currencyID" => "MYR"}]
+              "LineExtensionAmount" => [%{"_" => num(total_excl), "currencyID" => "MYR"}],
+              "TaxExclusiveAmount" => [%{"_" => num(total_excl), "currencyID" => "MYR"}],
+              "TaxInclusiveAmount" => [%{"_" => num(total_incl), "currencyID" => "MYR"}],
+              "AllowanceTotalAmount" => [%{"_" => num(total_discount), "currencyID" => "MYR"}],
+              "PayableAmount" => [%{"_" => num(total_incl), "currencyID" => "MYR"}]
             }
           ],
           "InvoiceLine" =>
@@ -1028,18 +1027,18 @@ defmodule FullCircle.EInvMetas do
   end
 
   defp build_invoice_line(detail, idx, unit_map) do
-    good_amount = Decimal.to_float(detail.good_amount)
-    tax_amount = Decimal.to_float(detail.tax_amount)
-    unit_price = Decimal.to_float(detail.unit_price)
-    quantity = Decimal.to_float(detail.quantity)
-    discount = Decimal.to_float(Decimal.abs(detail.discount))
-    tax_rate = Decimal.to_float(Decimal.mult(detail.tax_rate, 100))
+    good_amount = detail.good_amount
+    tax_amount = detail.tax_amount
+    unit_price = detail.unit_price
+    quantity = detail.quantity
+    discount = Decimal.abs(detail.discount)
+    tax_rate = Decimal.mult(detail.tax_rate, 100)
     {tax_type, tax_scheme} = tax_code_to_lhdn(detail.tax_code_name, detail.tax_rate)
 
     line = %{
       "ID" => [%{"_" => "#{idx}"}],
-      "InvoicedQuantity" => [%{"_" => quantity, "unitCode" => to_lhdn_unit(detail.unit, unit_map)}],
-      "LineExtensionAmount" => [%{"_" => good_amount, "currencyID" => "MYR"}],
+      "InvoicedQuantity" => [%{"_" => num(quantity), "unitCode" => to_lhdn_unit(detail.unit, unit_map)}],
+      "LineExtensionAmount" => [%{"_" => num(good_amount), "currencyID" => "MYR"}],
       "Item" => [
         %{
           "Description" => [%{"_" => Enum.join([detail.good_name, detail.descriptions] |> Enum.reject(&is_nil/1), " - ")}],
@@ -1048,21 +1047,21 @@ defmodule FullCircle.EInvMetas do
           ]
         }
       ],
-      "Price" => [%{"PriceAmount" => [%{"_" => unit_price, "currencyID" => "MYR"}]}],
+      "Price" => [%{"PriceAmount" => [%{"_" => num(unit_price), "currencyID" => "MYR"}]}],
       "ItemPriceExtension" => [
-        %{"Amount" => [%{"_" => quantity * unit_price, "currencyID" => "MYR"}]}
+        %{"Amount" => [%{"_" => num(Decimal.mult(quantity, unit_price)), "currencyID" => "MYR"}]}
       ],
       "TaxTotal" => [
         %{
-          "TaxAmount" => [%{"_" => tax_amount, "currencyID" => "MYR"}],
+          "TaxAmount" => [%{"_" => num(tax_amount), "currencyID" => "MYR"}],
           "TaxSubtotal" => [
             %{
-              "TaxableAmount" => [%{"_" => good_amount, "currencyID" => "MYR"}],
-              "TaxAmount" => [%{"_" => tax_amount, "currencyID" => "MYR"}],
+              "TaxableAmount" => [%{"_" => num(good_amount), "currencyID" => "MYR"}],
+              "TaxAmount" => [%{"_" => num(tax_amount), "currencyID" => "MYR"}],
               "TaxCategory" => [
                 %{
                   "ID" => [%{"_" => tax_type}],
-                  "Percent" => [%{"_" => tax_rate}],
+                  "Percent" => [%{"_" => num(tax_rate)}],
                   "TaxScheme" => [
                     %{
                       "ID" => [
@@ -1082,12 +1081,12 @@ defmodule FullCircle.EInvMetas do
       ]
     }
 
-    if discount > 0 do
+    if Decimal.positive?(discount) do
       Map.put(line, "AllowanceCharge", [
         %{
           "ChargeIndicator" => [%{"_" => false}],
           "AllowanceChargeReason" => [%{"_" => "Discount"}],
-          "Amount" => [%{"_" => discount, "currencyID" => "MYR"}]
+          "Amount" => [%{"_" => num(discount), "currencyID" => "MYR"}]
         }
       ])
     else
@@ -1103,19 +1102,17 @@ defmodule FullCircle.EInvMetas do
     |> Enum.map(fn {{{tax_type, tax_scheme}, tax_rate}, group} ->
       taxable =
         Enum.reduce(group, Decimal.new(0), fn d, acc -> Decimal.add(acc, d.good_amount) end)
-        |> Decimal.to_float()
 
       tax_amt =
         Enum.reduce(group, Decimal.new(0), fn d, acc -> Decimal.add(acc, d.tax_amount) end)
-        |> Decimal.to_float()
 
       %{
-        "TaxableAmount" => [%{"_" => taxable, "currencyID" => "MYR"}],
-        "TaxAmount" => [%{"_" => tax_amt, "currencyID" => "MYR"}],
+        "TaxableAmount" => [%{"_" => num(taxable), "currencyID" => "MYR"}],
+        "TaxAmount" => [%{"_" => num(tax_amt), "currencyID" => "MYR"}],
         "TaxCategory" => [
           %{
             "ID" => [%{"_" => tax_type}],
-            "Percent" => [%{"_" => Decimal.to_float(Decimal.mult(tax_rate, 100))}],
+            "Percent" => [%{"_" => num(Decimal.mult(tax_rate, 100))}],
             "TaxScheme" => [
               %{
                 "ID" => [
