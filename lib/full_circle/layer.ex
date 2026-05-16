@@ -110,6 +110,263 @@ defmodule FullCircle.Layer do
     "#{r} else '' end as feed_type"
   end
 
+  @default_feed_good_names ~w(A1 A2 A3 A4 A5 A6 A7)
+
+  @grade_weights_g %{
+    "AA" => 72.5,
+    "A" => 67.5,
+    "B" => 62.5,
+    "C" => 57.5,
+    "D" => 52.5,
+    "E" => 47.5,
+    "F" => 42.5
+  }
+
+  @avg_fallback_weight_g 55.0
+
+  def default_feed_good_names, do: @default_feed_good_names
+
+  def feed_egg_report(fd, td, com_id, group_days \\ 1, feed_names \\ @default_feed_good_names) do
+    fd = to_date(fd)
+    td = to_date(td)
+    group_days = max(group_days, 1)
+    feed_names = normalize_feed_names(feed_names)
+
+    feeds =
+      from(w in FullCircle.WeightBridge.Weighing,
+        where: w.company_id == ^com_id,
+        where: w.note_date >= ^fd,
+        where: w.note_date <= ^td,
+        where: w.good_name in ^feed_names,
+        group_by: w.note_date,
+        select: %{date: w.note_date, feed_kg: sum(w.gross - w.tare)}
+      )
+      |> Repo.all()
+      |> Map.new(fn r -> {r.date, r.feed_kg || 0} end)
+
+    eggs =
+      from(hv in Harvest,
+        join: hd in HarvestDetail,
+        on: hd.harvest_id == hv.id,
+        where: hv.company_id == ^com_id,
+        where: hv.har_date >= ^fd,
+        where: hv.har_date <= ^td,
+        group_by: hv.har_date,
+        select: %{date: hv.har_date, trays: sum(hd.har_1 + hd.har_2 + hd.har_3)}
+      )
+      |> Repo.all()
+      |> Map.new(fn r -> {r.date, r.trays || 0} end)
+
+    graded_grades_by_date =
+      FullCircle.EggStock.production_report(com_id, fd, td)
+      |> Map.new(fn row ->
+        grade_map = Map.new(row.quantities, fn {g, v} -> {g, parse_int(v)} end)
+        {row.date, grade_map}
+      end)
+
+    expired_grades_by_date =
+      from(d in FullCircle.EggStock.EggStockDay,
+        where: d.company_id == ^com_id,
+        where: d.stock_date >= ^fd and d.stock_date <= ^td,
+        select: {d.stock_date, d.expired}
+      )
+      |> Repo.all()
+      |> Map.new(fn {date, expired_map} ->
+        grade_map =
+          (expired_map || %{})
+          |> Map.new(fn {g, v} -> {g, parse_int(v)} end)
+
+        {date, grade_map}
+      end)
+
+    rows =
+      fd
+      |> bucket_starts(td, group_days)
+      |> Enum.map(fn bstart ->
+        bend = Date.add(bstart, group_days - 1) |> min_date(td)
+        days_in_bucket = Date.diff(bend, bstart) + 1
+        days = Date.range(bstart, bend)
+
+        bucket_feed_kg =
+          Enum.reduce(days, 0, fn d, acc -> acc + Map.get(feeds, d, 0) end)
+
+        bucket_trays =
+          Enum.reduce(days, 0, fn d, acc -> acc + Map.get(eggs, d, 0) end)
+
+        graded_grades =
+          Enum.reduce(days, %{}, fn d, acc ->
+            sum_grade_maps(acc, Map.get(graded_grades_by_date, d, %{}))
+          end)
+
+        expired_grades =
+          Enum.reduce(days, %{}, fn d, acc ->
+            sum_grade_maps(acc, Map.get(expired_grades_by_date, d, %{}))
+          end)
+
+        bucket_graded_trays = sum_map_values(graded_grades)
+        bucket_expired_trays = sum_map_values(expired_grades)
+
+        eggs_count = bucket_trays * 30
+        graded_eggs = bucket_graded_trays * 30
+        expired_eggs = bucket_expired_trays * 30
+        net_eggs = graded_eggs - expired_eggs
+        net_trays = bucket_graded_trays - bucket_expired_trays
+
+        graded_mass_kg = egg_mass_kg(graded_grades)
+        expired_mass_kg = egg_mass_kg(expired_grades)
+        net_mass_kg = graded_mass_kg - expired_mass_kg
+
+        feed_tons = bucket_feed_kg / 1000
+        fcr = if graded_mass_kg > 0, do: bucket_feed_kg / graded_mass_kg, else: 0
+        fcr_net = if net_mass_kg > 0, do: bucket_feed_kg / net_mass_kg, else: 0
+        eggs_per_ton_gross = if feed_tons > 0, do: eggs_count / feed_tons, else: 0
+        eggs_per_ton_net = if feed_tons > 0, do: net_eggs / feed_tons, else: 0
+
+        %{
+          from_date: bstart,
+          to_date: bend,
+          days: days_in_bucket,
+          feed_kg: bucket_feed_kg,
+          feed_tons: feed_tons,
+          trays: bucket_trays,
+          eggs: eggs_count,
+          graded_trays: bucket_graded_trays,
+          graded_eggs: graded_eggs,
+          graded_mass_kg: graded_mass_kg,
+          expired_trays: bucket_expired_trays,
+          expired_eggs: expired_eggs,
+          expired_mass_kg: expired_mass_kg,
+          net_eggs: net_eggs,
+          net_trays: net_trays,
+          net_mass_kg: net_mass_kg,
+          fcr: fcr,
+          fcr_net: fcr_net,
+          eggs_per_ton_gross: eggs_per_ton_gross,
+          eggs_per_ton_net: eggs_per_ton_net
+        }
+      end)
+
+    total_feed_kg = Enum.reduce(rows, 0, &(&1.feed_kg + &2))
+    total_trays = Enum.reduce(rows, 0, &(&1.trays + &2))
+    total_graded_trays = Enum.reduce(rows, 0, &(&1.graded_trays + &2))
+    total_expired_trays = Enum.reduce(rows, 0, &(&1.expired_trays + &2))
+    total_days = Enum.reduce(rows, 0, &(&1.days + &2))
+    total_eggs = total_trays * 30
+    total_graded_eggs = total_graded_trays * 30
+    total_expired_eggs = total_expired_trays * 30
+    total_net_eggs = total_graded_eggs - total_expired_eggs
+    total_net_trays = total_graded_trays - total_expired_trays
+    total_feed_tons = total_feed_kg / 1000
+
+    total_graded_grades =
+      Enum.reduce(graded_grades_by_date, %{}, fn {_d, m}, acc -> sum_grade_maps(acc, m) end)
+
+    total_expired_grades =
+      Enum.reduce(expired_grades_by_date, %{}, fn {_d, m}, acc -> sum_grade_maps(acc, m) end)
+
+    total_graded_mass_kg = egg_mass_kg(total_graded_grades)
+    total_expired_mass_kg = egg_mass_kg(total_expired_grades)
+    total_net_mass_kg = total_graded_mass_kg - total_expired_mass_kg
+
+    total_fcr = if total_graded_mass_kg > 0, do: total_feed_kg / total_graded_mass_kg, else: 0
+    total_fcr_net = if total_net_mass_kg > 0, do: total_feed_kg / total_net_mass_kg, else: 0
+
+    total_eggs_per_ton_gross =
+      if total_feed_tons > 0, do: total_eggs / total_feed_tons, else: 0
+
+    total_eggs_per_ton_net =
+      if total_feed_tons > 0, do: total_net_eggs / total_feed_tons, else: 0
+
+    %{
+      rows: rows,
+      total: %{
+        days: total_days,
+        feed_kg: total_feed_kg,
+        feed_tons: total_feed_tons,
+        trays: total_trays,
+        graded_mass_kg: total_graded_mass_kg,
+        expired_mass_kg: total_expired_mass_kg,
+        net_mass_kg: total_net_mass_kg,
+        fcr: total_fcr,
+        fcr_net: total_fcr_net,
+        eggs_per_ton_gross: total_eggs_per_ton_gross,
+        eggs_per_ton_net: total_eggs_per_ton_net,
+        eggs: total_eggs,
+        graded_trays: total_graded_trays,
+        graded_eggs: total_graded_eggs,
+        expired_trays: total_expired_trays,
+        expired_eggs: total_expired_eggs,
+        net_eggs: total_net_eggs,
+        net_trays: total_net_trays
+      }
+    }
+  end
+
+  defp sum_grade_maps(a, b) do
+    Map.merge(a, b, fn _k, v1, v2 -> v1 + v2 end)
+  end
+
+  defp sum_map_values(m) do
+    Enum.reduce(m, 0, fn {_k, v}, acc -> acc + v end)
+  end
+
+  defp grade_weight_g(grade) do
+    key = grade |> to_string() |> String.trim() |> String.upcase()
+    Map.get(@grade_weights_g, key)
+  end
+
+  defp egg_mass_kg(grade_qty_map_trays) do
+    {weighted_eggs, weighted_mass_g, unweighted_eggs} =
+      Enum.reduce(grade_qty_map_trays, {0, 0.0, 0}, fn {grade, trays}, {we, wmg, ue} ->
+        eggs = parse_int(trays) * 30
+
+        case grade_weight_g(grade) do
+          nil -> {we, wmg, ue + eggs}
+          w_g -> {we + eggs, wmg + eggs * w_g, ue}
+        end
+      end)
+
+    avg_weight_g =
+      if weighted_eggs > 0, do: weighted_mass_g / weighted_eggs, else: @avg_fallback_weight_g
+
+    total_mass_g = weighted_mass_g + unweighted_eggs * avg_weight_g
+    total_mass_g / 1000
+  end
+
+  defp parse_int(nil), do: 0
+  defp parse_int(v) when is_integer(v), do: v
+  defp parse_int(v) when is_float(v), do: round(v)
+
+  defp parse_int(v) when is_binary(v) do
+    case Integer.parse(v) do
+      {n, _} -> n
+      :error -> 0
+    end
+  end
+
+  defp parse_int(_), do: 0
+
+  defp bucket_starts(fd, td, group_days) do
+    Stream.unfold(fd, fn d ->
+      if Date.compare(d, td) == :gt, do: nil, else: {d, Date.add(d, group_days)}
+    end)
+    |> Enum.to_list()
+  end
+
+  defp to_date(%Date{} = d), do: d
+  defp to_date(s) when is_binary(s), do: Date.from_iso8601!(s)
+
+  defp min_date(a, b), do: if(Date.compare(a, b) == :lt, do: a, else: b)
+
+  defp normalize_feed_names(names) when is_list(names), do: names
+
+  defp normalize_feed_names(names) when is_binary(names) do
+    names
+    |> String.split(",")
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
+  end
+
   def harvest_wage_report(fd, td, com_id) do
     from(hhw in HouseHarvestWage,
       join: h in House,
