@@ -2,6 +2,7 @@ defmodule FullCircleWeb.ReportLive.Statement.Print do
   use FullCircleWeb, :live_view
 
   alias FullCircleWeb.Helpers
+  alias FullCircle.Reporting.AgingBuckets
 
   @impl true
   def mount(params, _session, socket) do
@@ -9,7 +10,8 @@ defmodule FullCircleWeb.ReportLive.Statement.Print do
     detail_height = 6
     chunk = (detail_body_height / detail_height) |> floor
 
-    contacts = fill_data(socket, params["ids"], params["fdate"], params["tdate"])
+    cutoffs = AgingBuckets.parse_cutoffs(params)
+    contacts = fill_data(socket, params["ids"], params["tdate"], cutoffs)
 
     contacts =
       contacts
@@ -28,19 +30,20 @@ defmodule FullCircleWeb.ReportLive.Statement.Print do
      |> assign(:detail_body_height, detail_body_height)
      |> assign(:detail_height, detail_height)
      |> assign(:contacts, contacts)
+     |> assign(:cutoffs, cutoffs)
+     |> assign(:bucket_labels, AgingBuckets.bucket_labels(cutoffs))
      |> assign(page_title: gettext("Print"))
-     |> assign(:fdate, Date.from_iso8601!(params["fdate"]))
      |> assign(:tdate, Date.from_iso8601!(params["tdate"]))}
   end
 
-  defp fill_data(socket, ids, fdate, tdate) do
+  defp fill_data(socket, ids, tdate, cutoffs) do
     ids = String.split(ids, ",")
 
     FullCircle.Reporting.statements(
       ids,
-      Date.from_iso8601!(fdate),
       Date.from_iso8601!(tdate),
-      socket.assigns.current_company
+      socket.assigns.current_company,
+      cutoffs
     )
   end
 
@@ -105,11 +108,11 @@ defmodule FullCircleWeb.ReportLive.Statement.Print do
     ~H"""
     <div class="aging_group">
       <div class="aging">
-        <div class="aging_p header">Current</div>
-        <div class="aging_p header">30-60 days</div>
-        <div class="aging_p header">60-90 days</div>
-        <div class="aging_p header">90-120 days</div>
-        <div class="aging_p header">120++ days</div>
+        <div class="aging_p header">{Enum.at(@bucket_labels, 0)} days</div>
+        <div class="aging_p header">{Enum.at(@bucket_labels, 1)} days</div>
+        <div class="aging_p header">{Enum.at(@bucket_labels, 2)} days</div>
+        <div class="aging_p header">{Enum.at(@bucket_labels, 3)} days</div>
+        <div class="aging_p header">{Enum.at(@bucket_labels, 4)} days</div>
         <div class="aging_p header total">Total</div>
         <div :if={@pd_chqs} class="aging_p header">{@pd_chqs.cheques} PD Chqs</div>
       </div>
@@ -153,10 +156,7 @@ defmodule FullCircleWeb.ReportLive.Statement.Print do
         <div class="is-size-5 has-text-weight-bold">{@contact.name}</div>
         <div class="statement-info">
           <div>
-            From Date: <span class="has-text-weight-bold">{Helpers.format_date(@fdate)}</span>
-          </div>
-          <div>
-            To Date: <span class="has-text-weight-bold">{Helpers.format_date(@tdate)}</span>
+            Statement Date: <span class="has-text-weight-bold">{Helpers.format_date(@tdate)}</span>
           </div>
           <div class="page-info">{"page #{@page} of #{@pages}"}</div>
         </div>

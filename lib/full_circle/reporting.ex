@@ -237,7 +237,9 @@ defmodule FullCircle.Reporting do
     |> Repo.all()
   end
 
-  def statements(ids, sdate, edate, com) do
+  def statements(ids, edate, com, cutoffs \\ [30, 60, 90, 120]) do
+    cutoffs = to_cutoffs!(cutoffs)
+
     conts =
       from(cont in Contact,
         where: cont.id in ^ids,
@@ -246,15 +248,20 @@ defmodule FullCircle.Reporting do
       )
       |> Repo.all()
 
+    {sql, params} =
+      contact_aging_query(edate, cutoffs, com.id, ids: ids, balance_filter: :nonneg)
+
     agings =
-      (contact_aging_query(ids, edate, 30, com.id) <> " and p1 + p2 + p3 + p4 + p5 >= 0")
-      |> exec_query_map()
+      exec_query_map(sql, params, FullCircle.Repo)
       |> fix_unmatch_balance()
 
     pdcs = contact_undeposit_cheques_amount(ids, edate, com)
+    last_months = contact_last_txn_month(ids, edate, com)
 
     conts
     |> Enum.map(fn c ->
+      sdate = Map.get(last_months, c.id) || Date.beginning_of_month(edate)
+
       c
       |> Map.merge(%{aging: Enum.find(agings, fn a -> a.contact_id == c.id end)})
       |> Map.merge(%{pd_chqs: Enum.find(pdcs, fn a -> a.contact_id == c.id end)})
@@ -267,6 +274,18 @@ defmodule FullCircle.Reporting do
           end)
       })
     end)
+  end
+
+  defp contact_last_txn_month(ids, edate, com) do
+    from(t in Transaction,
+      where: t.contact_id in ^ids,
+      where: t.company_id == ^com.id,
+      where: t.doc_date <= ^edate,
+      group_by: t.contact_id,
+      select: {t.contact_id, max(t.doc_date)}
+    )
+    |> Repo.all()
+    |> Map.new(fn {id, max_date} -> {id, Date.beginning_of_month(max_date)} end)
   end
 
   defp contact_undeposit_cheques(com) do
@@ -436,18 +455,125 @@ defmodule FullCircle.Reporting do
     union_all(bal_qry, ^txn_qry) |> order_by([1, 8, 2]) |> Repo.all()
   end
 
-  def debtor_aging_report(edate, days, com_id) do
-    (contact_aging_query(edate, days, com_id) <> " and p1 + p2 + p3 + p4 + p5 > 0")
-    |> exec_query_map()
+  def debtor_aging_report(edate, cutoffs_or_days, com_id) do
+    edate = to_date!(edate)
+    cutoffs = to_cutoffs!(cutoffs_or_days)
+
+    {sql, params} =
+      contact_aging_query(edate, cutoffs, com_id, balance_filter: :all, direction: :ar)
+
+    exec_query_map(sql, params, FullCircle.Repo)
     |> fix_unmatch_balance()
     |> fill_in_undeposit_cheques_amount(edate, com_id)
   end
 
-  def creditor_aging_report(edate, days, com_id) do
-    (contact_aging_query(edate, days, com_id) <> " and p1 + p2 + p3 + p4 + p5 < 0")
-    |> exec_query_map()
+  def creditor_aging_report(edate, cutoffs_or_days, com_id) do
+    edate = to_date!(edate)
+    cutoffs = to_cutoffs!(cutoffs_or_days)
+
+    {sql, params} =
+      contact_aging_query(edate, cutoffs, com_id, balance_filter: :all, direction: :ap)
+
+    exec_query_map(sql, params, FullCircle.Repo)
     |> fix_unmatch_balance()
     |> fill_in_undeposit_cheques_amount(edate, com_id)
+  end
+
+  def contact_bucket_transactions(edate, com_id, contact_id, lo, hi) do
+    edate = to_date!(edate)
+    com_id_bin = dump_uuid!(com_id)
+    contact_id_bin = dump_uuid!(contact_id)
+
+    sql = """
+      with
+        has_balance_txn_0 as (
+          select t.doc_date, t.doc_type, t.doc_no, t.doc_id,
+                 t.amount + coalesce(sum(stm.match_amount), 0) + coalesce(sum(tm.match_amount), 0) as balance
+            from transactions t
+            left outer join seed_transaction_matchers stm
+              on stm.transaction_id = t.id and stm.m_doc_date <= $1
+            left outer join transaction_matchers tm
+              on tm.transaction_id = t.id and tm.doc_date <= $1
+           where t.contact_id = $3
+             and t.company_id = $2
+             and t.doc_date <= $1
+           group by t.id
+          having t.amount + coalesce(sum(stm.match_amount), 0) + coalesce(sum(tm.match_amount), 0) <> 0
+        ),
+        has_balance_txn_1 as (
+          select doc_date, doc_type, doc_no, doc_id, sum(balance) as balance
+            from has_balance_txn_0
+           group by doc_date, doc_type, doc_no, doc_id
+        ),
+        cut_off_seed as (
+          select stm.* from seed_transaction_matchers stm
+            inner join transactions txn on txn.id = stm.transaction_id
+           where txn.doc_date <= $1 and txn.company_id = $2 and txn.contact_id = $3
+        ),
+        has_balance_txn_2 as (
+          select hbt.doc_date, hbt.doc_type, hbt.doc_no, hbt.doc_id,
+                 hbt.balance - coalesce(sum(stm.match_amount), 0) - coalesce(sum(tm.match_amount), 0) as balance
+            from has_balance_txn_1 hbt
+            left outer join cut_off_seed stm
+              on stm.m_doc_type = hbt.doc_type and stm.m_doc_id::varchar = hbt.doc_no
+            left outer join transaction_matchers tm
+              on tm.doc_type = hbt.doc_type and tm.doc_id = hbt.doc_id
+           group by hbt.doc_date, hbt.doc_type, hbt.doc_no, hbt.doc_id, hbt.balance
+          having hbt.balance - coalesce(sum(stm.match_amount), 0) - coalesce(sum(tm.match_amount), 0) <> 0
+        )
+
+      select doc_date, doc_type, doc_no, doc_id, balance,
+             ($1::date - doc_date)::int as age_days
+        from has_balance_txn_2
+       where ($4::int is null or ($1::date - doc_date)::int > $4)
+         and ($5::int is null or ($1::date - doc_date)::int <= $5)
+       order by doc_date, doc_type, doc_no
+    """
+
+    exec_query_map(sql, [edate, com_id_bin, contact_id_bin, lo, hi], FullCircle.Repo)
+  end
+
+  defp role_counts_cte do
+    """
+    contact_role_counts as (
+      select t.contact_id,
+             sum(case when t.doc_type = 'Invoice' then 1 else 0 end) as inv,
+             sum(case when t.doc_type = 'PurInvoice' then 1 else 0 end) as pinv,
+             sum(case when t.doc_type = 'Receipt' then 1 else 0 end) as rcpt,
+             sum(case when t.doc_type = 'Payment' then 1 else 0 end) as pmt
+        from transactions t
+       where t.company_id = $2
+         and t.doc_date <= $1
+         and t.contact_id is not null
+       group by t.contact_id
+    )
+    """
+  end
+
+  defp direction_filter_clause(:ar), do: "and (r.inv > r.pinv or r.rcpt > r.pmt)"
+  defp direction_filter_clause(:ap), do: "and (r.pinv > r.inv or r.pmt > r.rcpt)"
+  defp direction_filter_clause(_), do: ""
+
+  defp to_cutoffs!(d) when is_integer(d) and d > 0, do: [d, d * 2, d * 3, d * 4]
+
+  defp to_cutoffs!([c1, c2, c3, c4] = cs)
+       when is_integer(c1) and is_integer(c2) and is_integer(c3) and is_integer(c4) do
+    unless c1 < c2 and c2 < c3 and c3 < c4 and c1 >= 0,
+      do: raise(ArgumentError, "cutoffs must be strictly increasing non-negative integers")
+
+    cs
+  end
+
+  defp to_date!(%Date{} = d), do: d
+  defp to_date!(d) when is_binary(d), do: Date.from_iso8601!(d)
+
+  defp dump_uuid!(<<_::binary-size(16)>> = bin), do: bin
+
+  defp dump_uuid!(uuid) when is_binary(uuid) do
+    case Ecto.UUID.dump(uuid) do
+      {:ok, bin} -> bin
+      :error -> raise ArgumentError, "invalid UUID: #{inspect(uuid)}"
+    end
   end
 
   defp fill_in_undeposit_cheques_amount(list, edate, com_id) do
@@ -464,19 +590,25 @@ defmodule FullCircle.Reporting do
     end)
   end
 
+  # The SQL bucket sums can return small negative amounts in earlier buckets when
+  # payments are matched to invoices from a later bucket. Redistribute those into
+  # the next older bucket so the per-row total still reconciles and no bucket
+  # shows a sign opposite the row total.
   defp fix_unmatch_balance(list) do
     list
-    |> Enum.map(fn %{
-                     contact_id: id,
-                     contact_name: cn,
-                     category: ct,
-                     p1: p1,
-                     p2: p2,
-                     p3: p3,
-                     p4: p4,
-                     p5: p5,
-                     total: tot
-                   } ->
+    |> Enum.map(fn row ->
+      %{
+        contact_id: id,
+        contact_name: cn,
+        category: ct,
+        p1: p1,
+        p2: p2,
+        p3: p3,
+        p4: p4,
+        p5: p5,
+        total: tot
+      } = row
+
       {_, k} =
         fix_total(
           [
@@ -499,29 +631,25 @@ defmodule FullCircle.Reporting do
         p3: Enum.at(k, 2),
         p4: Enum.at(k, 3),
         p5: Enum.at(k, 4),
-        total: tot
+        total: tot,
+        oldest_unpaid: Map.get(row, :oldest_unpaid)
       }
     end)
   end
 
-  def fix_total([h | t], {acc, a}, tot) when tot == 0 do
-    # cond do
-    # h + acc < 0 or Enum.any?(t, fn v -> v < 0 end) -> fix_total(t, {h + acc, [0 | a]}, tot)
-    # true ->
+  defp fix_total([h | t], {acc, a}, tot) when tot == 0 do
     {h + acc, [t |> Enum.reverse(), h + acc | a] |> List.flatten()}
-    # end
   end
 
-  def fix_total([h | t], {acc, a}, tot) when tot > 0 do
-    if h + acc < 0 or
-         Enum.any?(t, fn v -> v < 0 end) do
+  defp fix_total([h | t], {acc, a}, tot) when tot > 0 do
+    if h + acc < 0 or Enum.any?(t, fn v -> v < 0 end) do
       fix_total(t, {h + acc, [0 | a]}, tot)
     else
       {h + acc, [t |> Enum.reverse(), h + acc | a] |> List.flatten()}
     end
   end
 
-  def fix_total([h | t], {acc, a}, tot) when tot < 0 do
+  defp fix_total([h | t], {acc, a}, tot) when tot < 0 do
     if h + acc > 0 or Enum.any?(t, fn v -> v > 0 end) do
       fix_total(t, {h + acc, [0 | a]}, tot)
     else
@@ -529,28 +657,72 @@ defmodule FullCircle.Reporting do
     end
   end
 
-  def fix_total([], {acc, a}, _tot) do
+  defp fix_total([], {acc, a}, _tot) do
     {acc, a}
   end
 
-  defp contact_aging_query(ids, edate, days, com_id) do
-    """
+  defp contact_aging_query(edate, [c1, c2, c3, c4] = cutoffs, com_id, opts)
+       when is_integer(c1) and is_integer(c2) and is_integer(c3) and is_integer(c4) do
+    ids = Keyword.get(opts, :ids)
+    balance_filter = Keyword.get(opts, :balance_filter, :all)
+    direction = Keyword.get(opts, :direction)
+
+    com_id_bin = dump_uuid!(com_id)
+    base_params = [edate, com_id_bin | cutoffs]
+
+    role_cte = role_counts_cte()
+    direction_filter = direction_filter_clause(direction)
+
+    {contacts_cte, params} =
+      if is_nil(ids) do
+        {"""
+         has_balance_contacts as (
+           select c.id, c.name, c.category
+             from contacts c inner join transactions t
+               on t.contact_id = c.id
+            inner join contact_role_counts r on r.contact_id = c.id
+            where t.doc_date <= $1
+              and c.company_id = $2
+              #{direction_filter}
+            group by c.id
+           having sum(t.amount) <> 0
+               or max(t.doc_date) >= ($1::date - interval '365 days'))
+         """, base_params}
+      else
+        {"""
+         has_balance_contacts as (
+           select c.id, c.name, c.category
+             from contacts c
+            inner join contact_role_counts r on r.contact_id = c.id
+            where c.company_id = $2
+              and c.id = ANY($7)
+              #{direction_filter}
+            group by c.id)
+         """, base_params ++ [Enum.map(ids, &dump_uuid!/1)]}
+      end
+
+    balance_clause =
+      case balance_filter do
+        :positive -> "and p1 + p2 + p3 + p4 + p5 > 0"
+        :negative -> "and p1 + p2 + p3 + p4 + p5 < 0"
+        :nonneg -> "and p1 + p2 + p3 + p4 + p5 >= 0"
+        :nonpos -> "and p1 + p2 + p3 + p4 + p5 <= 0"
+        :all -> ""
+      end
+
+    sql = """
       with
-        has_balance_contacts as (
-          select c.id, c.name, c.category
-            from contacts c
-           where c.company_id = '#{com_id}'
-             and c.id = ANY('{#{Enum.join(ids, ",")}}')
-           group by c.id),
+        #{role_cte},
+        #{contacts_cte},
         has_balance_txn_0 as (
           select t.doc_date, t.doc_type, t.doc_no, t.doc_id, t.contact_id, c.name as contact_name, c.category,
                  t.amount + coalesce(sum(stm.match_amount), 0) + coalesce(sum(tm.match_amount), 0) as balance
             from transactions t inner join has_balance_contacts c
               on c.id = t.contact_id left outer join seed_transaction_matchers stm
-              on stm.transaction_id = t.id and stm.m_doc_date <= '#{edate}' left outer join transaction_matchers tm
-              on tm.transaction_id = t.id and tm.doc_date <= '#{edate}'
+              on stm.transaction_id = t.id and stm.m_doc_date <= $1 left outer join transaction_matchers tm
+              on tm.transaction_id = t.id and tm.doc_date <= $1
            where t.contact_id is not null
-             and t.doc_date <= '#{edate}'
+             and t.doc_date <= $1
            group by t.id, c.name, c.category
           having t.amount + coalesce(sum(stm.match_amount), 0) + coalesce(sum(tm.match_amount), 0) <> 0),
         has_balance_txn_1 as (
@@ -558,10 +730,10 @@ defmodule FullCircle.Reporting do
                  sum(hbt.balance) as balance
             from has_balance_txn_0 hbt
            group by hbt.doc_date, hbt.doc_type, hbt.doc_no, hbt.doc_id, hbt.contact_id, hbt.contact_name, hbt.category
-          ),
+        ),
         cut_off_seed_transaction_matchers as (
           select stm.* from seed_transaction_matchers stm inner join transactions txn on txn.id = stm.transaction_id
-           where txn.doc_date <= '#{edate}' and txn.company_id = '#{com_id}'
+           where txn.doc_date <= $1 and txn.company_id = $2
           ),
         has_balance_txn_2 as (
           select hbt.doc_date, hbt.doc_type, hbt.doc_no, hbt.contact_id, hbt.contact_name, hbt.category,
@@ -573,93 +745,32 @@ defmodule FullCircle.Reporting do
            group by hbt.doc_date, hbt.doc_type, hbt.doc_no, hbt.contact_id, hbt.contact_name, hbt.balance, hbt.category
           having hbt.balance - coalesce(sum(stm.match_amount), 0) - coalesce(sum(tm.match_amount), 0)  <> 0),
         aging_list as (
-          select contact_name, contact_id, category,
-                 sum(case when
-                       extract(day from '#{edate}'::timestamp - doc_date::timestamp) <= #{days} then balance else 0 end) as p1,
-                 sum(case when
-                       extract(day from '#{edate}'::timestamp - doc_date::timestamp) <= #{days * 2} and
-                       extract(day from '#{edate}'::timestamp - doc_date::timestamp) > #{days} then balance else 0 end) as p2,
-                 sum(case when
-                       extract(day from '#{edate}'::timestamp - doc_date::timestamp) <= #{days * 3} and
-                       extract(day from '#{edate}'::timestamp - doc_date::timestamp) > #{days * 2} then balance else 0 end) as p3,
-                 sum(case when
-                       extract(day from '#{edate}'::timestamp - doc_date::timestamp) <= #{days * 4} and
-                       extract(day from '#{edate}'::timestamp - doc_date::timestamp) > #{days * 3} then balance else 0 end) as p4,
-                 sum(case when
-                       extract(day from '#{edate}'::timestamp - doc_date::timestamp) > #{days * 4} then balance else 0 end) as p5
-            from has_balance_txn_2
-           group by contact_name, contact_id, category)
+          select c.name as contact_name, c.id as contact_id, c.category,
+                 min(t.doc_date) as oldest_unpaid,
+                 coalesce(sum(case when
+                       extract(day from $1::timestamp - t.doc_date::timestamp) <= $3 then t.balance end), 0) as p1,
+                 coalesce(sum(case when
+                       extract(day from $1::timestamp - t.doc_date::timestamp) <= $4 and
+                       extract(day from $1::timestamp - t.doc_date::timestamp) > $3 then t.balance end), 0) as p2,
+                 coalesce(sum(case when
+                       extract(day from $1::timestamp - t.doc_date::timestamp) <= $5 and
+                       extract(day from $1::timestamp - t.doc_date::timestamp) > $4 then t.balance end), 0) as p3,
+                 coalesce(sum(case when
+                       extract(day from $1::timestamp - t.doc_date::timestamp) <= $6 and
+                       extract(day from $1::timestamp - t.doc_date::timestamp) > $5 then t.balance end), 0) as p4,
+                 coalesce(sum(case when
+                       extract(day from $1::timestamp - t.doc_date::timestamp) > $6 then t.balance end), 0) as p5
+            from has_balance_contacts c
+            left join has_balance_txn_2 t on t.contact_id = c.id
+           group by c.name, c.id, c.category)
 
         select contact_id, contact_name, category, p1, p2, p3, p4, p5,
-               p1 + p2 + p3 + p4 + p5 as total
-          from aging_list where true
+               p1 + p2 + p3 + p4 + p5 as total,
+               oldest_unpaid
+          from aging_list where true #{balance_clause}
     """
-  end
 
-  defp contact_aging_query(edate, days, com_id) do
-    """
-      with
-        has_balance_contacts as (
-          select c.id, c.name, c.category
-            from contacts c inner join transactions t
-              on t.contact_id = c.id
-           where t.doc_date <= '#{edate}'
-             and c.company_id = '#{com_id}'
-           group by c.id
-          having sum(t.amount) <> 0),
-        has_balance_txn_0 as (
-          select t.doc_date, t.doc_type, t.doc_no, t.doc_id, t.contact_id, c.name as contact_name, c.category,
-                 t.amount + coalesce(sum(stm.match_amount), 0) + coalesce(sum(tm.match_amount), 0) as balance
-            from transactions t inner join has_balance_contacts c
-              on c.id = t.contact_id left outer join seed_transaction_matchers stm
-              on stm.transaction_id = t.id and stm.m_doc_date <= '#{edate}' left outer join transaction_matchers tm
-              on tm.transaction_id = t.id and tm.doc_date <= '#{edate}'
-           where t.contact_id is not null
-             and t.doc_date <= '#{edate}'
-           group by t.id, c.name, c.category
-          having t.amount + coalesce(sum(stm.match_amount), 0) + coalesce(sum(tm.match_amount), 0) <> 0
-        ),
-        has_balance_txn_1 as (
-          select hbt.doc_date, hbt.doc_type, hbt.doc_no, hbt.doc_id, hbt.contact_id, hbt.contact_name, hbt.category,
-                 sum(hbt.balance) as balance
-            from has_balance_txn_0 hbt
-           group by hbt.doc_date, hbt.doc_type, hbt.doc_no, hbt.doc_id, hbt.contact_id, hbt.contact_name, hbt.category
-        ),
-        cut_off_seed_transaction_matchers as (
-          select stm.* from seed_transaction_matchers stm inner join transactions txn on txn.id = stm.transaction_id
-           where txn.doc_date <= '#{edate}' and txn.company_id = '#{com_id}'
-          ),
-        has_balance_txn_2 as (
-          select hbt.doc_date, hbt.doc_type, hbt.doc_no, hbt.contact_id, hbt.contact_name, hbt.category,
-                 hbt.balance - coalesce(sum(stm.match_amount), 0) - coalesce(sum(tm.match_amount), 0) as balance
-            from has_balance_txn_1 hbt left outer join cut_off_seed_transaction_matchers stm
-              on stm.m_doc_type = hbt.doc_type and stm.m_doc_id::varchar = hbt.doc_no
-            left outer join transaction_matchers tm
-              on tm.doc_type = hbt.doc_type and tm.doc_id = hbt.doc_id
-           group by hbt.doc_date, hbt.doc_type, hbt.doc_no, hbt.contact_id, hbt.contact_name, hbt.balance, hbt.category
-          having hbt.balance - coalesce(sum(stm.match_amount), 0) - coalesce(sum(tm.match_amount), 0)  <> 0),
-        aging_list as (
-          select contact_name, contact_id, category,
-                 sum(case when
-                       extract(day from '#{edate}'::timestamp - doc_date::timestamp) <= #{days} then balance else 0 end) as p1,
-                 sum(case when
-                       extract(day from '#{edate}'::timestamp - doc_date::timestamp) <= #{days * 2} and
-                       extract(day from '#{edate}'::timestamp - doc_date::timestamp) > #{days} then balance else 0 end) as p2,
-                 sum(case when
-                       extract(day from '#{edate}'::timestamp - doc_date::timestamp) <= #{days * 3} and
-                       extract(day from '#{edate}'::timestamp - doc_date::timestamp) > #{days * 2} then balance else 0 end) as p3,
-                 sum(case when
-                       extract(day from '#{edate}'::timestamp - doc_date::timestamp) <= #{days * 4} and
-                       extract(day from '#{edate}'::timestamp - doc_date::timestamp) > #{days * 3} then balance else 0 end) as p4,
-                 sum(case when
-                       extract(day from '#{edate}'::timestamp - doc_date::timestamp) > #{days * 4} then balance else 0 end) as p5
-            from has_balance_txn_2
-           group by contact_name, contact_id, category)
-
-        select contact_id, contact_name, category, p1, p2, p3, p4, p5,
-               p1 + p2 + p3 + p4 + p5 as total
-          from aging_list where true
-    """
+    {sql, params}
   end
 
   def fixed_assets(tdate, com) do

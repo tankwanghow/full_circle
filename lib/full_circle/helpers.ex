@@ -270,8 +270,12 @@ defmodule FullCircle.Helpers do
     if(Enum.empty?(cs.errors), do: Map.replace(cs, :valid?, true), else: cs)
   end
 
-  def exec_query_map(qry, repo \\ FullCircle.Repo) do
-    k = repo.query!(qry)
+  def exec_query_map(qry, repo \\ FullCircle.Repo) when is_atom(repo) do
+    exec_query_map(qry, [], repo)
+  end
+
+  def exec_query_map(qry, params, repo) when is_list(params) and is_atom(repo) do
+    k = repo.query!(qry, params)
 
     Enum.map(k.rows, fn r ->
       Enum.zip(k.columns |> Enum.map(fn x -> String.to_atom(x) end), r)

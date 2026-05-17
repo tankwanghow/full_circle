@@ -180,19 +180,19 @@ body.dark {
 .dark .tribute-container li.highlight { background: #4b5563; }
 
 /* Tables and report sections */
-.dark .bg-blue-200.border-blue-500,
-.dark .bg-blue-200.border-blue-400 {
+.dark .bg-blue-200.border-blue-500:not(:hover),
+.dark .bg-blue-200.border-blue-400:not(:hover) {
   background-color: var(--color-blue-900);
   border-color: var(--color-blue-700);
 }
 
-.dark .bg-gray-200.border-gray-500,
-.dark .bg-gray-200.border-gray-400 {
+.dark .bg-gray-200.border-gray-500:not(:hover),
+.dark .bg-gray-200.border-gray-400:not(:hover) {
   background-color: var(--color-gray-700);
   border-color: var(--color-gray-600);
 }
 
-.dark .bg-amber-200.border-amber-400 {
+.dark .bg-amber-200.border-amber-400:not(:hover) {
   background-color: var(--color-amber-900);
   border-color: var(--color-amber-700);
 }

@@ -175,20 +175,20 @@ defmodule FullCircleWeb.CsvController do
 
   def show(conn, %{
         "company_id" => com_id,
-        "days" => days,
         "rep" => rep,
         "report" => "aging",
         "tdate" => tdate
-      }) do
+      } = params) do
     tdate = tdate |> Timex.parse!("{YYYY}-{0M}-{0D}") |> NaiveDateTime.to_date()
+    cutoffs = FullCircle.Reporting.AgingBuckets.parse_cutoffs(params)
 
     data =
       cond do
         rep == "Debtors Aging" ->
-          FullCircle.Reporting.debtor_aging_report(tdate, days |> String.to_integer(), com_id)
+          FullCircle.Reporting.debtor_aging_report(tdate, cutoffs, com_id)
 
         rep == "Creditors Aging" ->
-          FullCircle.Reporting.creditor_aging_report(tdate, days |> String.to_integer(), com_id)
+          FullCircle.Reporting.creditor_aging_report(tdate, cutoffs, com_id)
 
         true ->
           []
