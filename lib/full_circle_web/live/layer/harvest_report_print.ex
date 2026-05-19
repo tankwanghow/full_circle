@@ -8,7 +8,7 @@ defmodule FullCircleWeb.LayerLive.HarvestReportPrint do
     chunk = (detail_body_height / detail_height) |> floor
 
     {tdate, data} =
-      fill_data(socket, params["tdate"])
+      fill_data(socket, params["tdate"], params["sort_by"], params["sort_dir"])
 
     {:ok,
      socket
@@ -21,7 +21,7 @@ defmodule FullCircleWeb.LayerLive.HarvestReportPrint do
      |> assign(page_title: gettext("Print"))}
   end
 
-  defp fill_data(socket, tdate) do
+  defp fill_data(socket, tdate, sort_by, sort_dir) do
     tdate = tdate |> Timex.parse!("{YYYY}-{0M}-{0D}") |> NaiveDateTime.to_date()
 
     data =
@@ -29,6 +29,7 @@ defmodule FullCircleWeb.LayerLive.HarvestReportPrint do
         tdate,
         socket.assigns.current_company.id
       )
+      |> FullCircle.Layer.sort_harvest_report(sort_by, sort_dir)
 
     {tdate, data}
   end

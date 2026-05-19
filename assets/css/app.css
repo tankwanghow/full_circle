@@ -121,6 +121,21 @@ body.dark {
 .dark .focus\:bg-teal-500:focus { background-color: var(--color-teal-700); }
 .dark .focus\:bg-gray-500:focus { background-color: var(--color-gray-600); }
 
+/* Yield gradient — explicit light/dark colors so importance reads clearly in both modes.
+   Each step should be visually distinct AND have intuitive severity ordering:
+   strong-up (calm green) → slight-up (subtle green) → flat (neutral) → slight-down (warm) → strong-down (loud red). */
+.yield-strong-up   { background-color: var(--color-green-200);   border-color: var(--color-green-500); }
+.yield-slight-up   { background-color: var(--color-emerald-100); border-color: var(--color-emerald-300); }
+.yield-flat        { background-color: var(--color-yellow-100);  border-color: var(--color-yellow-300); }
+.yield-slight-down { background-color: var(--color-amber-100);   border-color: var(--color-amber-400); }
+.yield-strong-down { background-color: var(--color-rose-200);    border-color: var(--color-rose-400); }
+
+.dark .yield-strong-up   { background-color: var(--color-green-800);  border-color: var(--color-green-500); color: var(--color-green-100); }
+.dark .yield-slight-up   { background-color: var(--color-emerald-950); border-color: var(--color-emerald-700); color: var(--color-emerald-200); }
+.dark .yield-flat        { background-color: var(--color-gray-700);   border-color: var(--color-gray-500);  color: var(--color-gray-200); }
+.dark .yield-slight-down { background-color: var(--color-amber-950);  border-color: var(--color-amber-600); color: var(--color-amber-200); }
+.dark .yield-strong-down { background-color: var(--color-rose-700);   border-color: var(--color-rose-400);  color: var(--color-rose-50); font-weight: 600; }
+
 /* Border remaps */
 .dark .border-gray-400 { border-color: var(--color-gray-600); }
 .dark .border-gray-500 { border-color: var(--color-gray-600); }

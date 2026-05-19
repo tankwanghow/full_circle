@@ -395,69 +395,186 @@ defmodule FullCircle.Layer do
   end
 
   def harvest_report(dt, com_id) do
-    "WITH
-      datelist as (
-        select generate_series(('#{dt}'::date-interval '7 day'), '#{dt}', interval '1 day') :: date gdate),
-      hou_flo_dt_qty as (
-        select dl.gdate, hou.id as house_id, hou.house_no, f.id as flock_id, f.flock_no, f.dob,
-              (date_part('day', dl.gdate::timestamp - f.dob::timestamp)/7)::integer as age,
-              (select sum(m.quantity) from movements m
-                where m.move_date <= dl.gdate
-                  and hou.id = m.house_id and f.id = m.flock_id) -
-              coalesce((select sum(hd1.dea_1+hd1.dea_2)
-                  from harvests hv1
-                inner join harvest_details hd1 on hv1.id = hd1.harvest_id
-                where hd1.house_id = hou.id
-                  and hv1.har_date < dl.gdate
-                  and hd1.flock_id = f.id), 0) as cur_qty
-          from movements m inner join houses hou on hou.id = m.house_id
-        inner join flocks f on m.flock_id = f.id, datelist dl
-        where (date_part('day', dl.gdate::timestamp - f.dob::timestamp)/7)::integer < 110
-          and m.company_id = '#{com_id}'
-        group by dl.gdate, hou.id, f.id)
+    sql = """
+    WITH
+      datelist AS (
+        SELECT generate_series($2::date - interval '7 day', $2::date, interval '1 day')::date AS gdate
+      ),
+      hf AS MATERIALIZED (
+        SELECT DISTINCT m.house_id, m.flock_id, hou.house_no, f.flock_no, f.dob
+          FROM movements m
+         INNER JOIN houses hou ON hou.id = m.house_id
+         INNER JOIN flocks f ON f.id = m.flock_id
+         WHERE m.company_id = $1
+      ),
+      total_dea AS MATERIALIZED (
+        SELECT hd.house_id, hd.flock_id, sum(hd.dea_1 + hd.dea_2) AS total_dea
+          FROM harvest_details hd
+         INNER JOIN harvests h ON h.id = hd.harvest_id
+         WHERE h.company_id = $1 AND h.har_date < $2::date
+         GROUP BY hd.house_id, hd.flock_id
+      ),
+      recent_dea_by_day AS MATERIALIZED (
+        SELECT hd.house_id, hd.flock_id, h.har_date, sum(hd.dea_1 + hd.dea_2) AS dea
+          FROM harvest_details hd
+         INNER JOIN harvests h ON h.id = hd.harvest_id
+         WHERE h.company_id = $1
+           AND h.har_date >= $2::date - interval '7 day'
+           AND h.har_date < $2::date
+         GROUP BY hd.house_id, hd.flock_id, h.har_date
+      ),
+      deaths_cum AS (
+        SELECT hf.house_id, hf.flock_id, dl.gdate,
+               coalesce(td.total_dea, 0)
+                 - coalesce(sum(rd.dea) FILTER (WHERE rd.har_date >= dl.gdate AND rd.har_date < $2::date), 0) AS cum_dea
+          FROM hf
+          CROSS JOIN datelist dl
+          LEFT JOIN total_dea td ON td.house_id = hf.house_id AND td.flock_id = hf.flock_id
+          LEFT JOIN recent_dea_by_day rd ON rd.house_id = hf.house_id AND rd.flock_id = hf.flock_id
+         GROUP BY hf.house_id, hf.flock_id, dl.gdate, td.total_dea
+      ),
+      mv_cum AS MATERIALIZED (
+        SELECT m.house_id, m.flock_id, dl.gdate, sum(m.quantity) AS total_qty
+          FROM movements m, datelist dl
+         WHERE m.company_id = $1 AND m.move_date <= dl.gdate
+         GROUP BY m.house_id, m.flock_id, dl.gdate
+      ),
+      today_harvest AS MATERIALIZED (
+        SELECT hd.house_id, hd.flock_id, h.har_date, h.employee_id,
+               sum(hd.har_1 + hd.har_2 + hd.har_3) AS har,
+               sum(hd.dea_1 + hd.dea_2) AS dea
+          FROM harvest_details hd
+         INNER JOIN harvests h ON h.id = hd.harvest_id
+         WHERE h.company_id = $1
+           AND h.har_date BETWEEN $2::date - interval '7 day' AND $2::date
+         GROUP BY hd.house_id, hd.flock_id, h.har_date, h.employee_id
+      )
+    SELECT dl.gdate, hf.house_id, hf.flock_id, hf.house_no, hf.flock_no,
+           (date_part('day', dl.gdate::timestamp - hf.dob::timestamp)/7)::integer AS age,
+           (mv.total_qty - COALESCE(dc.cum_dea, 0))::bigint AS cur_qty,
+           (COALESCE(sum(th.har), 0) * 30)::bigint AS prod,
+           COALESCE(sum(th.dea), 0)::bigint AS dea,
+           string_agg(DISTINCT e.name, ', ') AS employee
+      FROM hf
+      CROSS JOIN datelist dl
+      INNER JOIN mv_cum mv ON mv.house_id = hf.house_id AND mv.flock_id = hf.flock_id AND mv.gdate = dl.gdate
+      LEFT JOIN deaths_cum dc ON dc.house_id = hf.house_id AND dc.flock_id = hf.flock_id AND dc.gdate = dl.gdate
+      LEFT JOIN today_harvest th ON th.house_id = hf.house_id AND th.flock_id = hf.flock_id AND th.har_date = dl.gdate
+      LEFT JOIN employees e ON e.id = th.employee_id
+     WHERE (mv.total_qty - COALESCE(dc.cum_dea, 0)) > 0
+       AND (date_part('day', dl.gdate::timestamp - hf.dob::timestamp)/7)::integer BETWEEN 14 AND 109
+     GROUP BY dl.gdate, hf.house_id, hf.flock_id, hf.house_no, hf.flock_no, hf.dob, mv.total_qty, dc.cum_dea
+    """
 
-    select hq.gdate, string_agg(distinct e.name, ', ') as employee,
-          hq.house_no, hq.age, hq.flock_no, hq.cur_qty,
-          coalesce(sum(hd.har_1+hd.har_2+hd.har_3),0)*30 as prod, coalesce(sum(hd.dea_1+hd.dea_2),0) as dea
-      from harvests h
-    inner join harvest_details hd on h.id = hd.harvest_id
-    inner join employees e on e.id = h.employee_id
-    right outer join hou_flo_dt_qty hq on hd.house_id = hq.house_id and hd.flock_id = hq.flock_id and h.har_date = hq.gdate
-    where hq.cur_qty > 0 and hq.age >= 14
-      group by hq.gdate, hq.house_no, hq.flock_no, hq.age, hq.cur_qty"
-    |> exec_query_map()
-    |> format_harvest_report(dt)
+    exec_query_map(sql, [dump_uuid!(com_id), to_date!(dt)], FullCircle.Repo)
+    |> format_harvest_report(to_date!(dt))
+  end
+
+  @valid_sort_fields ~w(house_no employee age prod dea yield_0 yield_1 yield_2 yield_3 yield_4 yield_5 yield_6 yield_7)a
+
+  def sort_harvest_report(rows, sort_by, sort_dir) do
+    {field, dir} = normalize_sort(sort_by, sort_dir)
+    Enum.sort_by(rows, &Map.get(&1, field), dir)
+  end
+
+  defp normalize_sort(sort_by, sort_dir) do
+    field =
+      case sort_by do
+        atom when is_atom(atom) -> if atom in @valid_sort_fields, do: atom, else: :house_no
+        bin when is_binary(bin) ->
+          try do
+            atom = String.to_existing_atom(bin)
+            if atom in @valid_sort_fields, do: atom, else: :house_no
+          rescue
+            ArgumentError -> :house_no
+          end
+        _ -> :house_no
+      end
+
+    dir =
+      case sort_dir do
+        :asc -> :asc
+        :desc -> :desc
+        "asc" -> :asc
+        "desc" -> :desc
+        _ -> :asc
+      end
+
+    {field, dir}
+  end
+
+  def harvest_detail_for(house_id, flock_id, end_date, com_id, days \\ 14) do
+    end_date = to_date!(end_date)
+    start_date = Date.add(end_date, -days)
+
+    sql = """
+    SELECT h.har_date, h.harvest_no, e.name AS employee,
+           coalesce(sum(hd.har_1), 0)::bigint AS har_1,
+           coalesce(sum(hd.har_2), 0)::bigint AS har_2,
+           coalesce(sum(hd.har_3), 0)::bigint AS har_3,
+           coalesce(sum(hd.dea_1), 0)::bigint AS dea_1,
+           coalesce(sum(hd.dea_2), 0)::bigint AS dea_2,
+           coalesce(sum(hd.har_1 + hd.har_2 + hd.har_3), 0)::bigint AS total_har,
+           coalesce(sum(hd.dea_1 + hd.dea_2), 0)::bigint AS total_dea
+      FROM harvests h
+     INNER JOIN harvest_details hd ON hd.harvest_id = h.id
+     INNER JOIN employees e ON e.id = h.employee_id
+     WHERE h.company_id = $1
+       AND hd.house_id = $2
+       AND hd.flock_id = $3
+       AND h.har_date >= $4
+       AND h.har_date <= $5
+     GROUP BY h.har_date, h.harvest_no, e.name
+     ORDER BY h.har_date DESC, e.name
+    """
+
+    exec_query_map(
+      sql,
+      [
+        dump_uuid!(com_id),
+        dump_uuid!(house_id),
+        dump_uuid!(flock_id),
+        start_date,
+        end_date
+      ],
+      FullCircle.Repo
+    )
   end
 
   defp format_harvest_report(l, dt) do
-    tl =
-      l
-      |> Enum.filter(fn e ->
-        e.gdate ==
-          dt
-      end)
-      |> Enum.map(fn e -> Map.merge(e, %{id: e.house_no, yield_0: e.prod / e.cur_qty}) end)
+    yields = Map.new(l, fn e -> {{e.house_no, e.flock_no, e.gdate}, e.prod / e.cur_qty} end)
 
-    tl
+    l
+    |> Enum.filter(fn e -> e.gdate == dt end)
     |> Enum.map(fn e ->
       Map.merge(e, %{
-        yield_1: house_flock_yield(l, e.house_no, e.flock_no, dt, -1),
-        yield_2: house_flock_yield(l, e.house_no, e.flock_no, dt, -2),
-        yield_3: house_flock_yield(l, e.house_no, e.flock_no, dt, -3),
-        yield_4: house_flock_yield(l, e.house_no, e.flock_no, dt, -4),
-        yield_5: house_flock_yield(l, e.house_no, e.flock_no, dt, -5),
-        yield_6: house_flock_yield(l, e.house_no, e.flock_no, dt, -6),
-        yield_7: house_flock_yield(l, e.house_no, e.flock_no, dt, -7)
+        id: e.house_no,
+        yield_0: e.prod / e.cur_qty,
+        yield_1: shifted_yield(yields, e.house_no, e.flock_no, dt, -1),
+        yield_2: shifted_yield(yields, e.house_no, e.flock_no, dt, -2),
+        yield_3: shifted_yield(yields, e.house_no, e.flock_no, dt, -3),
+        yield_4: shifted_yield(yields, e.house_no, e.flock_no, dt, -4),
+        yield_5: shifted_yield(yields, e.house_no, e.flock_no, dt, -5),
+        yield_6: shifted_yield(yields, e.house_no, e.flock_no, dt, -6),
+        yield_7: shifted_yield(yields, e.house_no, e.flock_no, dt, -7)
       })
     end)
   end
 
-  defp house_flock_yield(l, hou, flo, dt, day) do
-    dt =
-      dt |> Timex.shift(days: day)
+  defp shifted_yield(yields, hou, flo, dt, day) do
+    Map.get(yields, {hou, flo, Timex.shift(dt, days: day)}, 0)
+  end
 
-    a = l |> Enum.find(fn e -> e.house_no == hou and e.flock_no == flo and e.gdate == dt end)
-    if a, do: a.prod / a.cur_qty, else: 0
+  defp to_date!(%Date{} = d), do: d
+  defp to_date!(d) when is_binary(d), do: Date.from_iso8601!(d)
+
+  defp dump_uuid!(<<_::binary-size(16)>> = bin), do: bin
+
+  defp dump_uuid!(uuid) when is_binary(uuid) do
+    case Ecto.UUID.dump(uuid) do
+      {:ok, bin} -> bin
+      :error -> raise ArgumentError, "invalid UUID: #{inspect(uuid)}"
+    end
   end
 
   def get_house_info_at(dt, h_no, com_id) do

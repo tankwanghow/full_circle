@@ -204,9 +204,13 @@ defmodule FullCircleWeb.CsvController do
     )
   end
 
-  def show(conn, %{"company_id" => com_id, "report" => "harvrepo", "tdate" => tdate}) do
+  def show(conn, %{"company_id" => com_id, "report" => "harvrepo", "tdate" => tdate} = params) do
     tdate = tdate |> Timex.parse!("{YYYY}-{0M}-{0D}") |> NaiveDateTime.to_date()
-    data = FullCircle.Layer.harvest_report(tdate, com_id)
+
+    data =
+      FullCircle.Layer.harvest_report(tdate, com_id)
+      |> FullCircle.Layer.sort_harvest_report(params["sort_by"], params["sort_dir"])
+
     fields = data |> Enum.at(0) |> Map.keys()
     filename = "harvest_report_#{tdate}"
     send_csv_map(conn, data, fields, filename)
