@@ -6,22 +6,49 @@ defmodule FullCircleWeb.ReportLive.EpfSocsoEis do
     socket =
       socket
       |> assign(page_title: "EPF/SOCSO/EIS")
+      |> assign(
+        settings:
+          FullCircle.Sys.load_settings(
+            "EpfSocsoEis",
+            socket.assigns.current_company,
+            socket.assigns.current_user
+          )
+      )
 
     {:ok, socket}
   end
 
   @impl true
   def handle_params(params, _uri, socket) do
-    params = params["search"]
-    report = params["report"]
-    code = params["code"]
+    params = params["search"] || %{}
+
+    report = params["report"] || find_setting(socket.assigns.settings, "report").value
+    code = params["code"] || find_setting(socket.assigns.settings, "code").value
     month = params["month"] || Timex.today().month
     year = params["year"] || Timex.today().year
 
     {:noreply,
      socket
      |> assign(search: %{report: report, month: month, year: year, code: code})
+     |> persist_settings(report, code)
      |> filter_transactions(report, month, year, code)}
+  end
+
+  defp find_setting(settings, code) do
+    Enum.find(settings, fn s -> s.code == code end)
+  end
+
+  defp persist_settings(socket, report, code) do
+    settings =
+      Enum.map(socket.assigns.settings, fn s ->
+        case s.code do
+          "report" -> if s.value == report, do: s, else: FullCircle.Sys.update_setting(s, report)
+          "code" -> if s.value == code, do: s, else: FullCircle.Sys.update_setting(s, code)
+          _ -> s
+        end
+      end)
+
+    assign(socket, settings: settings)
   end
 
   @impl true

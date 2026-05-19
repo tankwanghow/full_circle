@@ -273,21 +273,105 @@ defmodule FullCircle.Billing do
 
   defp update_doc_multi(multi, step_name, schema, doc, doc_no, attrs, com, user, txn_opts) do
     doc_type = Keyword.fetch!(txn_opts, :doc_type)
+    cs = make_changeset(schema, doc, attrs, com, user)
 
-    multi
-    |> Multi.update(step_name, fn _ ->
-      make_changeset(schema, doc, attrs, com, user)
-    end)
-    |> Multi.delete_all(
-      :delete_transaction,
-      from(txn in Transaction,
-        where: txn.doc_type == ^doc_type,
-        where: txn.doc_no == ^doc_no,
-        where: txn.company_id == ^com.id
+    multi =
+      multi
+      |> Multi.update(step_name, cs)
+      |> Sys.insert_log_for(step_name, attrs, com, user)
+
+    if cs.valid? and doc_transactions_unchanged?(cs, doc_no, doc_type, com, user, txn_opts) do
+      # No posted field changed → keep the existing transactions intact.
+      # This lets users edit non-GL fields (descriptions, tags, etc.) on docs
+      # that have been matched by receipts/payments/notes without hitting the
+      # transaction_matchers FK :restrict, and on closed-period docs without
+      # hitting the BEFORE DELETE trigger.
+      multi
+    else
+      multi
+      |> Multi.delete_all(
+        :delete_transaction,
+        from(txn in Transaction,
+          where: txn.doc_type == ^doc_type,
+          where: txn.doc_no == ^doc_no,
+          where: txn.company_id == ^com.id
+        )
       )
+      |> create_doc_transactions(step_name, com, user, txn_opts)
+    end
+  end
+
+  defp doc_transactions_unchanged?(cs, doc_no, doc_type, com, user, txn_opts) do
+    detail_key = Keyword.fetch!(txn_opts, :detail_key)
+
+    target_doc =
+      cs
+      |> Ecto.Changeset.apply_changes()
+      |> Map.update!(detail_key, fn details ->
+        details
+        |> Enum.reject(&(Map.get(&1, :delete) == true))
+        |> FullCircle.Repo.preload([:account, :tax_code])
+      end)
+
+    target_attrs = build_doc_transaction_attrs(target_doc, com, user, txn_opts)
+    existing = fetch_existing_doc_txn_rows(doc_no, doc_type, com.id)
+
+    txn_fingerprint(target_attrs) == txn_fingerprint(existing)
+  end
+
+  defp fetch_existing_doc_txn_rows(doc_no, doc_type, com_id) do
+    Repo.all(
+      from t in Transaction,
+        where: t.doc_no == ^doc_no,
+        where: t.doc_type == ^doc_type,
+        where: t.company_id == ^com_id,
+        select: %{
+          doc_date: t.doc_date,
+          account_id: t.account_id,
+          contact_id: t.contact_id,
+          amount: t.amount,
+          particulars: t.particulars,
+          contact_particulars: t.contact_particulars
+        }
     )
-    |> Sys.insert_log_for(step_name, attrs, com, user)
-    |> create_doc_transactions(step_name, com, user, txn_opts)
+  end
+
+  # Compare only GL-affecting fields. `particulars` and `contact_particulars`
+  # are descriptive labels derived from upstream names (Good, TaxCode, Contact)
+  # and can drift after a rename even when the GL impact is unchanged — we
+  # don't force a txn rewrite for that. Use a sorted list (not a set) so that
+  # duplicate-tuple rows are counted, not collapsed.
+  defp txn_fingerprint(rows) do
+    rows
+    |> Enum.map(fn r ->
+      {
+        Map.get(r, :doc_date),
+        Map.get(r, :account_id),
+        Map.get(r, :contact_id),
+        decimal_to_string(Map.get(r, :amount))
+      }
+    end)
+    |> Enum.sort()
+  end
+
+  defp decimal_to_string(nil), do: nil
+  defp decimal_to_string(%Decimal{} = d), do: Decimal.to_string(Decimal.normalize(d), :normal)
+  defp decimal_to_string(other), do: to_string(other)
+
+  defp classify_postgrex_error(%Postgrex.Error{postgres: pg}) do
+    constraint = Map.get(pg, :constraint, "")
+    message = Map.get(pg, :message, "")
+
+    cond do
+      is_binary(constraint) and constraint =~ "transaction_matchers" ->
+        {:error, :has_matchers}
+
+      String.contains?(message, "CLOSED transaction") ->
+        {:error, :closed}
+
+      true ->
+        {:sql_error, message}
+    end
   end
 
   def make_changeset(module, struct, attrs, com, user) do
@@ -374,6 +458,13 @@ defmodule FullCircle.Billing do
   end
 
   defp create_doc_transactions(multi, name, com, user, opts) do
+    multi
+    |> Multi.insert_all(:create_transactions, Transaction, fn %{^name => doc} ->
+      build_doc_transaction_attrs(doc, com, user, opts)
+    end)
+  end
+
+  defp build_doc_transaction_attrs(doc, com, user, opts) do
     doc_type = Keyword.fetch!(opts, :doc_type)
     control_account = Keyword.fetch!(opts, :control_account)
     detail_key = Keyword.fetch!(opts, :detail_key)
@@ -386,71 +477,69 @@ defmodule FullCircle.Billing do
     ac_id = Accounting.get_account_by_name(control_account, com, user).id
     apply_sign = fn amount, negate? -> if negate?, do: Decimal.negate(amount), else: amount end
 
-    multi
-    |> Multi.insert_all(:create_transactions, Transaction, fn %{^name => doc} ->
-      doc_no = Map.fetch!(doc, doc_no_key)
-      doc_date = Map.fetch!(doc, doc_date_key)
-      doc_amount = Map.fetch!(doc, amount_key)
-      details = Map.fetch!(doc, detail_key)
+    doc_no = Map.fetch!(doc, doc_no_key)
+    doc_date = Map.fetch!(doc, doc_date_key)
+    doc_amount = Map.fetch!(doc, amount_key)
+    details = Map.fetch!(doc, detail_key)
+    now = Timex.now() |> DateTime.truncate(:second)
 
-      (Enum.map(details, fn x ->
-         x = FullCircle.Repo.preload(x, [:account, :tax_code])
+    (Enum.map(details, fn x ->
+       x = FullCircle.Repo.preload(x, [:account, :tax_code])
 
-         [
-           if !Decimal.eq?(x.good_amount, 0) do
-             %{
-               doc_type: doc_type,
-               doc_no: doc_no,
-               doc_id: doc.id,
-               doc_date: doc_date,
-               account_id: x.account_id,
-               company_id: com.id,
-               amount: apply_sign.(x.good_amount, negate_line?),
-               particulars: "#{doc.contact_name}, #{x.good_name}",
-               inserted_at: Timex.now() |> DateTime.truncate(:second)
-             }
-           end,
-           if !Decimal.eq?(x.tax_amount, 0) do
-             %{
-               doc_type: doc_type,
-               doc_no: doc_no,
-               doc_id: doc.id,
-               doc_date: doc_date,
-               account_id: x.tax_code.account_id,
-               company_id: com.id,
-               amount: apply_sign.(x.tax_amount, negate_line?),
-               particulars: "#{x.tax_code_name} on #{x.good_name}",
-               inserted_at: Timex.now() |> DateTime.truncate(:second)
-             }
-           end
-         ]
-       end) ++
-         [
-           if !Decimal.eq?(doc_amount, 0) do
-             cont_part =
-               Enum.map(details, fn x -> x.good_name end)
-               |> Enum.uniq()
-               |> Enum.join(", ")
-               |> String.slice(0..200)
+       [
+         if !Decimal.eq?(x.good_amount, 0) do
+           %{
+             doc_type: doc_type,
+             doc_no: doc_no,
+             doc_id: doc.id,
+             doc_date: doc_date,
+             account_id: x.account_id,
+             company_id: com.id,
+             amount: apply_sign.(x.good_amount, negate_line?),
+             particulars: "#{doc.contact_name}, #{x.good_name}",
+             inserted_at: now
+           }
+         end,
+         if !Decimal.eq?(x.tax_amount, 0) do
+           %{
+             doc_type: doc_type,
+             doc_no: doc_no,
+             doc_id: doc.id,
+             doc_date: doc_date,
+             account_id: x.tax_code.account_id,
+             company_id: com.id,
+             amount: apply_sign.(x.tax_amount, negate_line?),
+             particulars: "#{x.tax_code_name} on #{x.good_name}",
+             inserted_at: now
+           }
+         end
+       ]
+     end) ++
+       [
+         if !Decimal.eq?(doc_amount, 0) do
+           cont_part =
+             Enum.map(details, fn x -> x.good_name end)
+             |> Enum.uniq()
+             |> Enum.join(", ")
+             |> String.slice(0..200)
 
-             %{
-               doc_type: doc_type,
-               doc_no: doc_no,
-               doc_id: doc.id,
-               doc_date: doc_date,
-               contact_id: doc.contact_id,
-               account_id: ac_id,
-               company_id: com.id,
-               amount: apply_sign.(doc_amount, negate_header?),
-               particulars: doc.contact_name,
-               contact_particulars: cont_part,
-               inserted_at: Timex.now() |> DateTime.truncate(:second)
-             }
-           end
-         ])
-      |> List.flatten()
-      |> Enum.reject(&is_nil/1)
-    end)
+           %{
+             doc_type: doc_type,
+             doc_no: doc_no,
+             doc_id: doc.id,
+             doc_date: doc_date,
+             contact_id: doc.contact_id,
+             account_id: ac_id,
+             company_id: com.id,
+             amount: apply_sign.(doc_amount, negate_header?),
+             particulars: doc.contact_name,
+             contact_particulars: cont_part,
+             inserted_at: now
+           }
+         end
+       ])
+    |> List.flatten()
+    |> Enum.reject(&is_nil/1)
   end
 
   defp apply_index_filters(qry, terms, date_from, due_date_from, bal, opts) do
@@ -494,18 +583,16 @@ defmodule FullCircle.Billing do
       remove_field_if_new_flag(attrs, "e_inv_internal_id")
       |> remove_field_if_new_flag("invoice_no")
 
-    case can?(user, :update_invoice, com) do
-      true ->
-        Multi.new()
-        |> update_invoice_multi(invoice, attrs, com, user)
-        |> Repo.transaction()
-
-      false ->
-        :not_authorise
+    if can?(user, :update_invoice, com) do
+      Multi.new()
+      |> update_invoice_multi(invoice, attrs, com, user)
+      |> Repo.transaction()
+    else
+      :not_authorise
     end
   rescue
     e in Postgrex.Error ->
-      {:sql_error, e.postgres.message}
+      classify_postgrex_error(e)
   end
 
   def update_invoice_multi(multi, invoice, attrs, com, user) do
@@ -737,18 +824,16 @@ defmodule FullCircle.Billing do
   def update_pur_invoice(%PurInvoice{} = pur_invoice, attrs, com, user) do
     attrs = remove_field_if_new_flag(attrs, "pur_invoice_no")
 
-    case can?(user, :update_pur_invoice, com) do
-      true ->
-        Multi.new()
-        |> update_pur_invoice_multi(pur_invoice, attrs, com, user)
-        |> Repo.transaction()
-
-      false ->
-        :not_authorise
+    if can?(user, :update_pur_invoice, com) do
+      Multi.new()
+      |> update_pur_invoice_multi(pur_invoice, attrs, com, user)
+      |> Repo.transaction()
+    else
+      :not_authorise
     end
   rescue
     e in Postgrex.Error ->
-      {:sql_error, e.postgres.message}
+      classify_postgrex_error(e)
   end
 
   def update_pur_invoice_multi(multi, pur_invoice, attrs, com, user) do

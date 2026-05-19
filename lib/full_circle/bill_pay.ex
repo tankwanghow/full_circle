@@ -326,14 +326,12 @@ defmodule FullCircle.BillPay do
   def update_payment(%Payment{} = payment, attrs, com, user) do
     attrs = remove_field_if_new_flag(attrs, "payment_no")
 
-    case can?(user, :update_payment, com) do
-      true ->
-        Multi.new()
-        |> update_payment_multi(payment, attrs, com, user)
-        |> Repo.transaction()
-
-      false ->
-        :not_authorise
+    with true <- can?(user, :update_payment, com) || :not_authorise,
+         :ok <-
+           Accounting.assert_doc_editable(payment.id, "Payment", com.id, check_matchers: false) do
+      Multi.new()
+      |> update_payment_multi(payment, attrs, com, user)
+      |> Repo.transaction()
     end
   rescue
     e in Postgrex.Error ->

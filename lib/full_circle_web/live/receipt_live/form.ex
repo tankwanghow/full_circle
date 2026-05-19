@@ -476,6 +476,14 @@ defmodule FullCircleWeb.ReceiptLive.Form do
            "#{gettext("Failed")} #{failed_operation}. #{list_errors_to_string(changeset.errors)}"
          )}
 
+      {:error, :closed} ->
+        {:noreply,
+         socket
+         |> put_flash(
+           :error,
+           gettext("Cannot save: this document is in a closed accounting period.")
+         )}
+
       {:sql_error, msg} ->
         {:noreply,
          socket

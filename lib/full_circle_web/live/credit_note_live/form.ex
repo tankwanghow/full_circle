@@ -285,6 +285,24 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
            "#{gettext("Failed")} #{failed_operation}. #{list_errors_to_string(changeset.errors)}"
          )}
 
+      {:error, :has_matchers} ->
+        {:noreply,
+         socket
+         |> put_flash(
+           :error,
+           gettext(
+             "Cannot save: this document has been matched by another document. Remove the matching Receipt/Payment/Credit/Debit Note first."
+           )
+         )}
+
+      {:error, :closed} ->
+        {:noreply,
+         socket
+         |> put_flash(
+           :error,
+           gettext("Cannot save: this document is in a closed accounting period.")
+         )}
+
       {:sql_error, msg} ->
         {:noreply,
          socket

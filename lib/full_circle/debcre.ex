@@ -239,35 +239,29 @@ defmodule FullCircle.DebCre do
   def update_credit_note(%CreditNote{} = credit_note, attrs, com, user) do
     attrs = remove_field_if_new_flag(attrs, "note_no")
 
-    case can?(user, :update_credit_note, com) do
-      true ->
-        Multi.new()
-        |> update_credit_note_multi(credit_note, attrs, com, user)
-        |> Repo.transaction()
-
-      false ->
-        :not_authorise
+    if can?(user, :update_credit_note, com) do
+      Multi.new()
+      |> update_credit_note_multi(credit_note, attrs, com, user)
+      |> Repo.transaction()
+    else
+      :not_authorise
     end
   rescue
     e in Postgrex.Error ->
-      {:sql_error, e.postgres.message}
+      classify_postgrex_error(e)
   end
 
   def update_credit_note_multi(multi, credit_note, attrs, com, user) do
-    note_name = :update_credit_note
-
-    multi
-    |> Multi.update(note_name, make_changeset(CreditNote, credit_note, attrs, com, user))
-    |> Multi.delete_all(
-      :delete_transaction,
-      from(txn in Transaction,
-        where: txn.doc_type == "CreditNote",
-        where: txn.doc_no == ^credit_note.note_no,
-        where: txn.company_id == ^com.id
-      )
+    update_note_multi(
+      multi,
+      :update_credit_note,
+      CreditNote,
+      credit_note,
+      attrs,
+      com,
+      user,
+      @credit_note_txn_opts
     )
-    |> Sys.insert_log_for(note_name, attrs, com, user)
-    |> create_note_transactions(note_name, com, user, @credit_note_txn_opts)
   end
 
   # ── Debit Note ──────────────────────────────────────
@@ -466,35 +460,29 @@ defmodule FullCircle.DebCre do
   def update_debit_note(%DebitNote{} = debit_note, attrs, com, user) do
     attrs = remove_field_if_new_flag(attrs, "note_no")
 
-    case can?(user, :update_debit_note, com) do
-      true ->
-        Multi.new()
-        |> update_debit_note_multi(debit_note, attrs, com, user)
-        |> Repo.transaction()
-
-      false ->
-        :not_authorise
+    if can?(user, :update_debit_note, com) do
+      Multi.new()
+      |> update_debit_note_multi(debit_note, attrs, com, user)
+      |> Repo.transaction()
+    else
+      :not_authorise
     end
   rescue
     e in Postgrex.Error ->
-      {:sql_error, e.postgres.message}
+      classify_postgrex_error(e)
   end
 
   def update_debit_note_multi(multi, debit_note, attrs, com, user) do
-    note_name = :update_debit_note
-
-    multi
-    |> Multi.update(note_name, make_changeset(DebitNote, debit_note, attrs, com, user))
-    |> Multi.delete_all(
-      :delete_transaction,
-      from(txn in Transaction,
-        where: txn.doc_type == "DebitNote",
-        where: txn.doc_no == ^debit_note.note_no,
-        where: txn.company_id == ^com.id
-      )
+    update_note_multi(
+      multi,
+      :update_debit_note,
+      DebitNote,
+      debit_note,
+      attrs,
+      com,
+      user,
+      @debit_note_txn_opts
     )
-    |> Sys.insert_log_for(note_name, attrs, com, user)
-    |> create_note_transactions(note_name, com, user, @debit_note_txn_opts)
   end
 
   # ── Shared Private Helpers ──────────────────────────
@@ -579,24 +567,120 @@ defmodule FullCircle.DebCre do
   end
 
   defp create_note_transactions(multi, name, com, user, opts) do
+    multi
+    |> Multi.insert_all(:insert_transactions, Transaction, fn %{^name => note} ->
+      build_note_transaction_attrs(note, com, user, opts)
+    end)
+  end
+
+  defp build_note_transaction_attrs(note, com, user, opts) do
     header_account_id = Accounting.get_account_by_name(opts[:header_account], com, user).id
     detail_assoc = opts[:detail_assoc]
 
-    multi
-    |> Multi.insert_all(:insert_transactions, Transaction, fn %{^name => note} ->
-      note =
-        Repo.preload(note, [
-          {detail_assoc, [:account, :tax_code]},
-          transaction_matchers: :transaction
-        ])
+    note =
+      Repo.preload(note, [
+        {detail_assoc, [:account, :tax_code]},
+        transaction_matchers: :transaction
+      ])
 
-      now = Timex.now() |> DateTime.truncate(:second)
+    now = Timex.now() |> DateTime.truncate(:second)
 
-      (build_detail_transactions(note, com, now, opts) ++
-         build_matcher_transactions(note, com, now, opts) ++
-         build_header_transaction(note, com, now, header_account_id, opts))
-      |> Enum.reject(&is_nil/1)
+    (build_detail_transactions(note, com, now, opts) ++
+       build_matcher_transactions(note, com, now, opts) ++
+       build_header_transaction(note, com, now, header_account_id, opts))
+    |> Enum.reject(&is_nil/1)
+  end
+
+  defp update_note_multi(multi, step_name, schema, note, attrs, com, user, txn_opts) do
+    doc_type = Keyword.fetch!(txn_opts, :doc_type)
+    cs = make_changeset(schema, note, attrs, com, user)
+
+    multi =
+      multi
+      |> Multi.update(step_name, cs)
+      |> Sys.insert_log_for(step_name, attrs, com, user)
+
+    if cs.valid? and note_transactions_unchanged?(cs, note.note_no, doc_type, com, user, txn_opts) do
+      multi
+    else
+      multi
+      |> Multi.delete_all(
+        :delete_transaction,
+        from(txn in Transaction,
+          where: txn.doc_type == ^doc_type,
+          where: txn.doc_no == ^note.note_no,
+          where: txn.company_id == ^com.id
+        )
+      )
+      |> create_note_transactions(step_name, com, user, txn_opts)
+    end
+  end
+
+  defp note_transactions_unchanged?(cs, note_no, doc_type, com, user, txn_opts) do
+    detail_assoc = Keyword.fetch!(txn_opts, :detail_assoc)
+
+    target_note =
+      cs
+      |> Ecto.Changeset.apply_changes()
+      |> Map.update!(detail_assoc, fn details ->
+        details
+        |> Enum.reject(&(Map.get(&1, :delete) == true))
+        |> Repo.preload([:account, :tax_code])
+      end)
+
+    target_attrs = build_note_transaction_attrs(target_note, com, user, txn_opts)
+    existing = fetch_existing_note_txn_rows(note_no, doc_type, com.id)
+
+    note_txn_fingerprint(target_attrs) == note_txn_fingerprint(existing)
+  end
+
+  defp fetch_existing_note_txn_rows(note_no, doc_type, com_id) do
+    Repo.all(
+      from t in Transaction,
+        where: t.doc_no == ^note_no,
+        where: t.doc_type == ^doc_type,
+        where: t.company_id == ^com_id,
+        select: %{
+          doc_date: t.doc_date,
+          account_id: t.account_id,
+          contact_id: t.contact_id,
+          amount: t.amount
+        }
+    )
+  end
+
+  # GL-affecting fields only. See billing.ex's txn_fingerprint/1 for rationale.
+  defp note_txn_fingerprint(rows) do
+    rows
+    |> Enum.map(fn r ->
+      {
+        Map.get(r, :doc_date),
+        Map.get(r, :account_id),
+        Map.get(r, :contact_id),
+        decimal_to_string(Map.get(r, :amount))
+      }
     end)
+    |> Enum.sort()
+  end
+
+  defp decimal_to_string(nil), do: nil
+  defp decimal_to_string(%Decimal{} = d), do: Decimal.to_string(Decimal.normalize(d), :normal)
+  defp decimal_to_string(other), do: to_string(other)
+
+  defp classify_postgrex_error(%Postgrex.Error{postgres: pg}) do
+    constraint = Map.get(pg, :constraint, "")
+    message = Map.get(pg, :message, "")
+
+    cond do
+      is_binary(constraint) and constraint =~ "transaction_matchers" ->
+        {:error, :has_matchers}
+
+      String.contains?(message, "CLOSED transaction") ->
+        {:error, :closed}
+
+      true ->
+        {:sql_error, message}
+    end
   end
 
   defp build_detail_transactions(note, com, now, opts) do

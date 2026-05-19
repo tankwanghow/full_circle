@@ -248,6 +248,27 @@ defmodule FullCircle.Sys.UserSetting do
     ]
   end
 
+  def default_settings("EpfSocsoEis", cuid) do
+    [
+      %{
+        page: "EpfSocsoEis",
+        code: "report",
+        display_name: "Report",
+        values: %{"EPF" => "EPF", "SOCSO" => "SOCSO", "EIS" => "EIS", "SOCSO+EIS" => "SOCSO+EIS"},
+        value: "EPF",
+        company_user_id: cuid
+      },
+      %{
+        page: "EpfSocsoEis",
+        code: "code",
+        display_name: "Employer Code",
+        values: %{"default" => ""},
+        value: "",
+        company_user_id: cuid
+      }
+    ]
+  end
+
   def default_settings("HouseFeed", cuid) do
     [
       %{

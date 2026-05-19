@@ -185,17 +185,75 @@ defmodule FullCircle.TaggedBill do
   end
 
   def transport_commission(tags, fdate, tdate, com_id) do
-    tag = tags |> String.split(" ", trim: true) |> Enum.at(0)
+    tag_list = resolve_tags(tags, fdate, tdate, com_id)
+
+    tag_list
+    |> Enum.flat_map(fn tag -> rows_for_tag(tag, fdate, tdate, com_id) end)
+    |> Enum.sort_by(fn x -> {x.employee_tag, x.invoice_date, x.doc_no} end)
+  end
+
+  defp resolve_tags(tags, fdate, tdate, com_id) do
+    trimmed = String.trim(tags || "")
+
+    if String.downcase(trimmed) == "all" do
+      discover_tags(fdate, tdate, com_id)
+    else
+      trimmed
+      |> String.split(~r/\s+/, trim: true)
+      |> Enum.map(&String.trim_leading(&1, "#"))
+      |> Enum.reject(&(&1 == ""))
+      |> Enum.uniq()
+    end
+  end
+
+  defp discover_tags(fdate, tdate, com_id) do
+    inv_tags =
+      from(i in FullCircle.Billing.Invoice,
+        where: i.company_id == ^com_id,
+        where: i.invoice_date >= ^fdate,
+        where: i.invoice_date <= ^tdate,
+        select:
+          fragment(
+            "string_to_array(coalesce(?, '') || ' ' || coalesce(?, ''), ' ')",
+            i.loader_tags,
+            i.delivery_man_tags
+          )
+      )
+
+    pur_inv_tags =
+      from(i in FullCircle.Billing.PurInvoice,
+        where: i.company_id == ^com_id,
+        where: i.pur_invoice_date >= ^fdate,
+        where: i.pur_invoice_date <= ^tdate,
+        select:
+          fragment(
+            "string_to_array(coalesce(?, '') || ' ' || coalesce(?, ''), ' ')",
+            i.loader_tags,
+            i.delivery_man_tags
+          )
+      )
+
+    union_all(inv_tags, ^pur_inv_tags)
+    |> Repo.all()
+    |> List.flatten()
+    |> Enum.map(&(&1 |> String.trim() |> String.trim_leading("#")))
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.uniq()
+    |> Enum.sort()
+  end
+
+  defp rows_for_tag(tag, fdate, tdate, com_id) do
+    pattern = "(^|[[:space:]])#?#{Regex.escape(tag)}([[:space:]]|$)"
 
     inv_ids_qry =
       from(i in FullCircle.Billing.Invoice,
         where:
           fragment(
-            "? ilike ? or ? ilike ?",
+            "(? ~* ?) or (? ~* ?)",
             i.loader_tags,
-            ^"%#{tag}%",
+            ^pattern,
             i.delivery_man_tags,
-            ^"%#{tag}%"
+            ^pattern
           ),
         where: i.company_id == ^com_id,
         where: i.invoice_date >= ^fdate,
@@ -207,11 +265,11 @@ defmodule FullCircle.TaggedBill do
       from(i in FullCircle.Billing.PurInvoice,
         where:
           fragment(
-            "? ilike ? or ? ilike ?",
+            "(? ~* ?) or (? ~* ?)",
             i.loader_tags,
-            ^"%#{tag}%",
+            ^pattern,
             i.delivery_man_tags,
-            ^"%#{tag}%"
+            ^pattern
           ),
         where: i.company_id == ^com_id,
         where: i.pur_invoice_date >= ^fdate,
@@ -294,41 +352,41 @@ defmodule FullCircle.TaggedBill do
     end)
     |> Enum.map(fn x ->
       Map.merge(x, %{
+        employee_tag: tag,
         load_wages:
-          if(x.loader_tags_count > 0,
-            do:
-              (wages_parse(x.loader_wages_tags, tag, x.loader_tags) * Decimal.to_float(x.quantity) /
-                 x.loader_tags_count)
-              |> Float.round(2),
-            else: 0
-          ),
+          if x.loader_tags_count > 0 and tag_in?(tag, x.loader_tags) do
+            (wage_amount(x.loader_wages_tags) * Decimal.to_float(x.quantity) /
+               x.loader_tags_count)
+            |> Float.round(2)
+          else
+            0.0
+          end,
         delivery_wages:
-          if(x.delivery_man_tags_count > 0,
-            do:
-              (wages_parse(x.delivery_wages_tags, tag, x.delivery_man_tags) *
-                 Decimal.to_float(x.quantity) /
-                 x.delivery_man_tags_count)
-              |> Float.round(2),
-            else: 0
-          )
+          if x.delivery_man_tags_count > 0 and tag_in?(tag, x.delivery_man_tags) do
+            (wage_amount(x.delivery_wages_tags) * Decimal.to_float(x.quantity) /
+               x.delivery_man_tags_count)
+            |> Float.round(2)
+          else
+            0.0
+          end
       })
     end)
   end
 
-  defp wages_parse(tag, emp_tag, data_tags) do
-    tag = tag || ""
+  defp tag_in?(tag, data_tags_str) do
+    data_tags_str
+    |> String.split(",")
+    |> Enum.map(&(&1 |> String.trim() |> String.trim_leading("#")))
+    |> Enum.member?(tag)
+  end
 
+  defp wage_amount(wages_str) do
     {wage, _} =
-      (Regex.scan(~r/(?<=\[).+?(?=\])/, tag) |> List.flatten() |> List.first() ||
-         "0.0")
+      (Regex.scan(~r/(?<=\[).+?(?=\])/, wages_str || "")
+       |> List.flatten()
+       |> List.first() || "0.0")
       |> Float.parse()
 
-    data_tags = data_tags |> String.split(",") |> Enum.map(fn x -> String.trim(x) end)
-
-    if !is_nil(Enum.find(data_tags, fn x -> x == emp_tag end)) do
-      wage
-    else
-      0.0
-    end
+    wage
   end
 end

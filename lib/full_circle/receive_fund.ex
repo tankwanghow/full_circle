@@ -554,14 +554,12 @@ defmodule FullCircle.ReceiveFund do
   def update_receipt(%Receipt{} = receipt, attrs, com, user) do
     attrs = remove_field_if_new_flag(attrs, "receipt_no")
 
-    case can?(user, :update_receipt, com) do
-      true ->
-        Multi.new()
-        |> update_receipt_multi(receipt, attrs, com, user)
-        |> Repo.transaction()
-
-      false ->
-        :not_authorise
+    with true <- can?(user, :update_receipt, com) || :not_authorise,
+         :ok <-
+           Accounting.assert_doc_editable(receipt.id, "Receipt", com.id, check_matchers: false) do
+      Multi.new()
+      |> update_receipt_multi(receipt, attrs, com, user)
+      |> Repo.transaction()
     end
   rescue
     e in Postgrex.Error ->

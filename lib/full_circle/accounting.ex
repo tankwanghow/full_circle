@@ -12,11 +12,53 @@ defmodule FullCircle.Accounting do
     Contact,
     FixedAssetDepreciation,
     FixedAssetDisposal,
-    Transaction
+    Transaction,
+    TransactionMatcher
   }
 
   alias FullCircle.{Repo, Sys, StdInterface}
   alias FullCircle.Sys.Company
+
+  @doc """
+  Returns `:ok` if the document's transactions can be deleted/recreated by a save,
+  or `{:error, :closed}` / `{:error, :has_matchers}` otherwise.
+
+  Pass `check_matchers: false` for docs that own their own matchers (Receipt, Payment) —
+  the cast_assoc on the parent deletes those matchers before the transactions are dropped,
+  so the matcher FK never fires from that side.
+  """
+  def assert_doc_editable(doc_id, doc_type, com_id, opts \\ []) do
+    check_matchers? = Keyword.get(opts, :check_matchers, true)
+
+    closed_q =
+      from t in Transaction,
+        where: t.closed == true,
+        where: t.doc_type == ^doc_type,
+        where: t.doc_id == ^doc_id,
+        where: t.company_id == ^com_id
+
+    cond do
+      Repo.exists?(closed_q) ->
+        {:error, :closed}
+
+      check_matchers? and matchers_exist_for_doc?(doc_id, doc_type, com_id) ->
+        {:error, :has_matchers}
+
+      true ->
+        :ok
+    end
+  end
+
+  defp matchers_exist_for_doc?(doc_id, doc_type, com_id) do
+    Repo.exists?(
+      from t in Transaction,
+        join: m in TransactionMatcher,
+        on: m.transaction_id == t.id,
+        where: t.doc_type == ^doc_type,
+        where: t.doc_id == ^doc_id,
+        where: t.company_id == ^com_id
+    )
+  end
 
   def account_types do
     balance_sheet_account_types() ++ profit_loss_account_types()
