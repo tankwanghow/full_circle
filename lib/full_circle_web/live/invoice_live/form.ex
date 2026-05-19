@@ -48,23 +48,28 @@ defmodule FullCircleWeb.InvoiceLive.Form do
         %{invoice_no: "...new..."}
       end
 
+    cs =
+      Billing.make_changeset(
+        Invoice,
+        %Invoice{},
+        attrs,
+        socket.assigns.current_company,
+        socket.assigns.current_user
+      )
+
+    cs =
+      if Ecto.Changeset.get_assoc(cs, :invoice_details) == [] do
+        FullCircleWeb.Helpers.add_line(cs, :invoice_details)
+      else
+        cs
+      end
+
     socket
     |> assign(live_action: :new)
     |> assign(id: "new")
     |> assign(page_title: gettext("New Invoice"))
     |> assign(matched_trans: [])
-    |> assign(
-      :form,
-      to_form(
-        Billing.make_changeset(
-          Invoice,
-          %Invoice{},
-          attrs,
-          socket.assigns.current_company,
-          socket.assigns.current_user
-        )
-      )
-    )
+    |> assign(:form, to_form(cs))
   end
 
   defp parse_egg_quantities(egg_str) do
@@ -475,7 +480,14 @@ defmodule FullCircleWeb.InvoiceLive.Form do
     <div class="w-11/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
       <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <.error_box changeset={@form.source} />
-      <.form for={@form} id="object-form" autocomplete="off" phx-change="validate" phx-submit="save">
+      <.form
+        for={@form}
+        id="object-form"
+        autocomplete="off"
+        phx-change="validate"
+        phx-submit="save"
+        phx-hook="ctrlEnterAddDetail"
+      >
         <.input type="hidden" field={@form[:invoice_no]} />
         <div class="flex flex-row flex-nowrap">
           <div class="w-1/4 grow shrink">

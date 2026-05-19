@@ -204,7 +204,7 @@ defmodule FullCircle.ReceiveFund do
         page: page,
         per_page: per_page
       ) do
-    from(inv in subquery(receipt_raw_query(com, user)))
+    from(inv in subquery(receipt_raw_query(com, user, date_from)))
     |> apply_simple_filters(terms, date_from,
       search_fields: [:receipt_no, :contact_name, :particulars],
       date_field: :receipt_date
@@ -215,24 +215,23 @@ defmodule FullCircle.ReceiveFund do
   end
 
   def get_receipt_by_id_index_component_field!(id, com, user) do
-    from(i in subquery(receipt_raw_query(com, user)),
+    from(i in subquery(receipt_raw_query(com, user, "")),
       where: i.id == ^id
     )
     |> Repo.one!()
   end
 
-  defp receipt_raw_query(company, _user) do
-    # Define the CTE for receipt_details aggregation
+  defp receipt_raw_query(company, _user, date_from) do
     details_agg =
       from rd in ReceiptDetail,
         group_by: rd.receipt_id,
         select: %{
           receipt_id: rd.receipt_id,
+          details_count: count(rd.id),
           details_amount: sum(rd.quantity * rd.unit_price + rd.discount),
           tax_amount: sum((rd.quantity * rd.unit_price + rd.discount) * rd.tax_rate)
         }
 
-    # Define the CTE for transaction_matchers aggregation
     matchers_agg =
       from tm in TransactionMatcher,
         group_by: tm.doc_id,
@@ -241,7 +240,6 @@ defmodule FullCircle.ReceiveFund do
           matched_amount: sum(tm.match_amount)
         }
 
-    # Define the CTE for received_cheques aggregation
     cheques_agg =
       from rc in ReceivedCheque,
         group_by: rc.receipt_id,
@@ -250,15 +248,13 @@ defmodule FullCircle.ReceiveFund do
           cheques_amount: sum(rc.amount)
         }
 
-    # Build the main query
     base_query =
       from st0 in Transaction,
+        as: :txn,
         left_join: sr1 in Receipt,
         on: st0.doc_id == sr1.id,
         join: sc2 in Contact,
         on: sc2.id == coalesce(sr1.contact_id, st0.contact_id),
-        left_join: sr4 in ReceiptDetail,
-        on: sr4.receipt_id == sr1.id,
         left_join: da in "details_agg",
         on: da.receipt_id == sr1.id,
         left_join: ma in "matchers_agg",
@@ -279,11 +275,11 @@ defmodule FullCircle.ReceiveFund do
           st0.old_data,
           sr1.funds_amount,
           ca.cheques_amount,
+          da.details_count,
           da.details_amount,
           da.tax_amount,
           ma.matched_amount
         ],
-        order_by: [desc: st0.doc_no],
         select: %{
           id: coalesce(st0.doc_id, st0.id),
           doc_type: "Receipt",
@@ -291,7 +287,7 @@ defmodule FullCircle.ReceiveFund do
           receipt_no: st0.doc_no,
           e_inv_uuid: sr1.e_inv_uuid,
           e_inv_internal_id: sr1.e_inv_internal_id,
-          got_details: count(sr4.id),
+          got_details: coalesce(da.details_count, 0),
           particulars:
             fragment(
               "STRING_AGG(DISTINCT COALESCE(?, ?), ', ')",
@@ -311,6 +307,11 @@ defmodule FullCircle.ReceiveFund do
           checked: false,
           old_data: st0.old_data
         }
+
+    base_query =
+      if date_from != "",
+        do: from([txn: txn] in base_query, where: txn.doc_date >= ^date_from),
+        else: base_query
 
     base_query
     |> with_cte("details_agg", as: ^details_agg)

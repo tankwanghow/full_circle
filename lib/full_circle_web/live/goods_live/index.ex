@@ -14,6 +14,7 @@ defmodule FullCircleWeb.GoodLive.Index do
       <.search_form
         search_val={@search.terms}
         placeholder={gettext("Name, Unit, Account Name and TaxCode...")}
+        live
       />
       <div class="text-center mb-2">
         <.link
@@ -87,7 +88,7 @@ defmodule FullCircleWeb.GoodLive.Index do
 
     url = "/companies/#{socket.assigns.current_company.id}/goods?#{URI.encode_query(qry)}"
 
-    {:noreply, socket |> push_navigate(to: url)}
+    {:noreply, socket |> push_patch(to: url)}
   end
 
   defp filter_objects(socket, terms, reset, page) when page >= 1 do

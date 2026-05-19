@@ -13,6 +13,7 @@ defmodule FullCircleWeb.ContactLive.Index do
     <div class="w-5/12 mx-auto">
       <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <.search_form
+        live
         search_val={@search.terms}
         placeholder={gettext("Name, City, State, Email, Phone and Descriptions...")}
       />
@@ -84,7 +85,7 @@ defmodule FullCircleWeb.ContactLive.Index do
 
     url = "/companies/#{socket.assigns.current_company.id}/contacts?#{URI.encode_query(qry)}"
 
-    {:noreply, socket |> push_navigate(to: url)}
+    {:noreply, socket |> push_patch(to: url)}
   end
 
   defp filter_objects(socket, terms, reset, page) do

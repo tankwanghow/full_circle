@@ -15,6 +15,7 @@ defmodule FullCircleWeb.EmployeeLive.Index do
       <.search_form
         search_val={@search.terms}
         placeholder={gettext("Name, Id No, Nationality and Status...")}
+        live
       />
       <div class="text-center mb-2">
         <.link
@@ -103,7 +104,7 @@ defmodule FullCircleWeb.EmployeeLive.Index do
 
     url = "/companies/#{socket.assigns.current_company.id}/employees?#{URI.encode_query(qry)}"
 
-    {:noreply, socket |> push_navigate(to: url)}
+    {:noreply, socket |> push_patch(to: url)}
   end
 
   @impl true

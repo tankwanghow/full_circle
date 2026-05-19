@@ -164,7 +164,7 @@ defmodule FullCircle.Billing do
         page: page,
         per_page: per_page
       ) do
-    from(inv in subquery(invoice_transactions(com, user)))
+    from(inv in subquery(invoice_transactions(com, user, date_from, due_date_from)))
     |> apply_index_filters(terms, date_from, due_date_from, bal,
       search_fields: [:invoice_no, :contact_name, :particulars],
       date_field: :invoice_date,
@@ -176,20 +176,30 @@ defmodule FullCircle.Billing do
   end
 
   def get_invoice_by_id_index_component_field!(id, com, _user) do
+    stxm_sum =
+      from m in SeedTransactionMatcher,
+        where: m.transaction_id == parent_as(:txn).id,
+        select: %{sum: coalesce(sum(m.match_amount), 0)}
+
+    atxm_sum =
+      from m in TransactionMatcher,
+        where: m.transaction_id == parent_as(:txn).id,
+        select: %{sum: coalesce(sum(m.match_amount), 0)}
+
     Repo.one!(
       from txn in Transaction,
+        as: :txn,
         join: cont in Contact,
         on: cont.id == txn.contact_id,
         left_join: inv in Invoice,
         on: inv.id == txn.doc_id,
-        left_join: stxm in SeedTransactionMatcher,
-        on: stxm.transaction_id == txn.id,
-        left_join: atxm in TransactionMatcher,
-        on: atxm.transaction_id == txn.id,
+        inner_lateral_join: s in subquery(stxm_sum),
+        on: true,
+        inner_lateral_join: a in subquery(atxm_sum),
+        on: true,
         where: txn.company_id == ^com.id,
         where: txn.doc_type == "Invoice",
         where: txn.doc_id == ^id or (is_nil(txn.doc_id) and txn.id == ^id),
-        group_by: [txn.id, cont.id, inv.id],
         select: %{
           doc_type: "Invoice",
           doc_id: coalesce(txn.doc_id, txn.id),
@@ -204,47 +214,61 @@ defmodule FullCircle.Billing do
           reg_no: cont.reg_no,
           tax_id: cont.tax_id,
           invoice_amount: txn.amount,
-          balance:
-            txn.amount + coalesce(sum(stxm.match_amount), 0) +
-              coalesce(sum(atxm.match_amount), 0),
+          balance: txn.amount + s.sum + a.sum,
           checked: false,
           old_data: txn.old_data
         }
     )
   end
 
-  defp invoice_transactions(company, _user) do
-    from txn in Transaction,
-      join: cont in Contact,
-      on: cont.id == txn.contact_id,
-      left_join: inv in Invoice,
-      on: inv.id == txn.doc_id,
-      left_join: stxm in SeedTransactionMatcher,
-      on: stxm.transaction_id == txn.id,
-      left_join: atxm in TransactionMatcher,
-      on: atxm.transaction_id == txn.id,
-      where: txn.company_id == ^company.id,
-      where: txn.doc_type == "Invoice",
-      select: %{
-        doc_type: "Invoice",
-        doc_id: coalesce(txn.doc_id, txn.id),
-        id: coalesce(txn.doc_id, txn.id),
-        invoice_no: txn.doc_no,
-        e_inv_uuid: inv.e_inv_uuid,
-        e_inv_internal_id: inv.e_inv_internal_id,
-        particulars: coalesce(txn.contact_particulars, txn.particulars),
-        invoice_date: txn.doc_date,
-        due_date: txn.doc_date,
-        contact_name: cont.name,
-        reg_no: cont.reg_no,
-        tax_id: cont.tax_id,
-        invoice_amount: txn.amount,
-        balance:
-          txn.amount + coalesce(sum(stxm.match_amount), 0) + coalesce(sum(atxm.match_amount), 0),
-        checked: false,
-        old_data: txn.old_data
-      },
-      group_by: [txn.id, cont.id, inv.id]
+  defp invoice_transactions(company, _user, date_from, due_date_from) do
+    stxm_sum =
+      from m in SeedTransactionMatcher,
+        where: m.transaction_id == parent_as(:txn).id,
+        select: %{sum: coalesce(sum(m.match_amount), 0)}
+
+    atxm_sum =
+      from m in TransactionMatcher,
+        where: m.transaction_id == parent_as(:txn).id,
+        select: %{sum: coalesce(sum(m.match_amount), 0)}
+
+    q =
+      from txn in Transaction,
+        as: :txn,
+        join: cont in Contact,
+        on: cont.id == txn.contact_id,
+        left_join: inv in Invoice,
+        on: inv.id == txn.doc_id,
+        inner_lateral_join: s in subquery(stxm_sum),
+        on: true,
+        inner_lateral_join: a in subquery(atxm_sum),
+        on: true,
+        where: txn.company_id == ^company.id,
+        where: txn.doc_type == "Invoice",
+        select: %{
+          doc_type: "Invoice",
+          doc_id: coalesce(txn.doc_id, txn.id),
+          id: coalesce(txn.doc_id, txn.id),
+          invoice_no: txn.doc_no,
+          e_inv_uuid: inv.e_inv_uuid,
+          e_inv_internal_id: inv.e_inv_internal_id,
+          particulars: coalesce(txn.contact_particulars, txn.particulars),
+          invoice_date: txn.doc_date,
+          due_date: txn.doc_date,
+          contact_name: cont.name,
+          reg_no: cont.reg_no,
+          tax_id: cont.tax_id,
+          invoice_amount: txn.amount,
+          balance: txn.amount + s.sum + a.sum,
+          checked: false,
+          old_data: txn.old_data
+        }
+
+    q = if date_from != "", do: from([txn: txn] in q, where: txn.doc_date >= ^date_from), else: q
+
+    if due_date_from != "",
+      do: from([txn: txn] in q, where: txn.doc_date >= ^due_date_from),
+      else: q
   end
 
   defp update_doc_multi(multi, step_name, schema, doc, doc_no, attrs, com, user, txn_opts) do
@@ -542,7 +566,7 @@ defmodule FullCircle.Billing do
         page: page,
         per_page: per_page
       ) do
-    from(inv in subquery(pur_invoice_transactions(com, user)))
+    from(inv in subquery(pur_invoice_transactions(com, user, date_from, due_date_from)))
     |> apply_index_filters(terms, date_from, due_date_from, bal,
       search_fields: [:pur_invoice_no, :e_inv_internal_id, :contact_name, :particulars],
       date_field: :pur_invoice_date,
@@ -554,20 +578,30 @@ defmodule FullCircle.Billing do
   end
 
   def get_pur_invoice_by_id_index_component_field!(id, com, _user) do
+    stxm_sum =
+      from m in SeedTransactionMatcher,
+        where: m.transaction_id == parent_as(:txn).id,
+        select: %{sum: coalesce(sum(m.match_amount), 0)}
+
+    atxm_sum =
+      from m in TransactionMatcher,
+        where: m.transaction_id == parent_as(:txn).id,
+        select: %{sum: coalesce(sum(m.match_amount), 0)}
+
     Repo.one!(
       from txn in Transaction,
+        as: :txn,
         join: cont in Contact,
         on: cont.id == txn.contact_id,
         left_join: inv in PurInvoice,
         on: txn.doc_id == inv.id,
-        left_join: stxm in SeedTransactionMatcher,
-        on: stxm.transaction_id == txn.id,
-        left_join: atxm in TransactionMatcher,
-        on: atxm.transaction_id == txn.id,
+        inner_lateral_join: s in subquery(stxm_sum),
+        on: true,
+        inner_lateral_join: a in subquery(atxm_sum),
+        on: true,
         where: txn.company_id == ^com.id,
         where: txn.doc_type == "PurInvoice",
         where: txn.doc_id == ^id or (is_nil(txn.doc_id) and txn.id == ^id),
-        group_by: [txn.id, cont.id, inv.id],
         select: %{
           id: coalesce(txn.doc_id, txn.id),
           doc_type: "PurInvoice",
@@ -582,47 +616,61 @@ defmodule FullCircle.Billing do
           reg_no: cont.reg_no,
           tax_id: cont.tax_id,
           pur_invoice_amount: txn.amount,
-          balance:
-            txn.amount + coalesce(sum(stxm.match_amount), 0) +
-              coalesce(sum(atxm.match_amount), 0),
+          balance: txn.amount + s.sum + a.sum,
           checked: false,
           old_data: txn.old_data
         }
     )
   end
 
-  defp pur_invoice_transactions(company, _user) do
-    from txn in Transaction,
-      join: cont in Contact,
-      on: cont.id == txn.contact_id,
-      left_join: inv in PurInvoice,
-      on: txn.doc_id == inv.id,
-      left_join: stxm in SeedTransactionMatcher,
-      on: stxm.transaction_id == txn.id,
-      left_join: atxm in TransactionMatcher,
-      on: atxm.transaction_id == txn.id,
-      where: txn.company_id == ^company.id,
-      where: txn.doc_type == "PurInvoice",
-      select: %{
-        id: coalesce(txn.doc_id, txn.id),
-        doc_type: "PurInvoice",
-        doc_id: coalesce(txn.doc_id, txn.id),
-        pur_invoice_no: txn.doc_no,
-        e_inv_internal_id: inv.e_inv_internal_id,
-        e_inv_uuid: inv.e_inv_uuid,
-        particulars: coalesce(txn.contact_particulars, txn.particulars),
-        pur_invoice_date: txn.doc_date,
-        due_date: txn.doc_date,
-        contact_name: cont.name,
-        reg_no: cont.reg_no,
-        tax_id: cont.tax_id,
-        pur_invoice_amount: txn.amount,
-        balance:
-          txn.amount + coalesce(sum(stxm.match_amount), 0) + coalesce(sum(atxm.match_amount), 0),
-        checked: false,
-        old_data: txn.old_data
-      },
-      group_by: [txn.id, cont.id, inv.id]
+  defp pur_invoice_transactions(company, _user, date_from, due_date_from) do
+    stxm_sum =
+      from m in SeedTransactionMatcher,
+        where: m.transaction_id == parent_as(:txn).id,
+        select: %{sum: coalesce(sum(m.match_amount), 0)}
+
+    atxm_sum =
+      from m in TransactionMatcher,
+        where: m.transaction_id == parent_as(:txn).id,
+        select: %{sum: coalesce(sum(m.match_amount), 0)}
+
+    q =
+      from txn in Transaction,
+        as: :txn,
+        join: cont in Contact,
+        on: cont.id == txn.contact_id,
+        left_join: inv in PurInvoice,
+        on: txn.doc_id == inv.id,
+        inner_lateral_join: s in subquery(stxm_sum),
+        on: true,
+        inner_lateral_join: a in subquery(atxm_sum),
+        on: true,
+        where: txn.company_id == ^company.id,
+        where: txn.doc_type == "PurInvoice",
+        select: %{
+          id: coalesce(txn.doc_id, txn.id),
+          doc_type: "PurInvoice",
+          doc_id: coalesce(txn.doc_id, txn.id),
+          pur_invoice_no: txn.doc_no,
+          e_inv_internal_id: inv.e_inv_internal_id,
+          e_inv_uuid: inv.e_inv_uuid,
+          particulars: coalesce(txn.contact_particulars, txn.particulars),
+          pur_invoice_date: txn.doc_date,
+          due_date: txn.doc_date,
+          contact_name: cont.name,
+          reg_no: cont.reg_no,
+          tax_id: cont.tax_id,
+          pur_invoice_amount: txn.amount,
+          balance: txn.amount + s.sum + a.sum,
+          checked: false,
+          old_data: txn.old_data
+        }
+
+    q = if date_from != "", do: from([txn: txn] in q, where: txn.doc_date >= ^date_from), else: q
+
+    if due_date_from != "",
+      do: from([txn: txn] in q, where: txn.doc_date >= ^due_date_from),
+      else: q
   end
 
   def create_pur_invoice(attrs, com, user) do

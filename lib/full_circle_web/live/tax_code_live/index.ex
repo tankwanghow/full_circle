@@ -15,6 +15,7 @@ defmodule FullCircleWeb.TaxCodeLive.Index do
       <.search_form
         search_val={@search.terms}
         placeholder={gettext("Code, Tax Type, Account Name and Descriptions...")}
+        live
       />
       <div class="text-center mb-2">
         <.link
@@ -88,7 +89,7 @@ defmodule FullCircleWeb.TaxCodeLive.Index do
 
     url = "/companies/#{socket.assigns.current_company.id}/tax_codes?#{URI.encode_query(qry)}"
 
-    {:noreply, socket |> push_navigate(to: url)}
+    {:noreply, socket |> push_patch(to: url)}
   end
 
   defp filter_objects(socket, terms, reset, page) do

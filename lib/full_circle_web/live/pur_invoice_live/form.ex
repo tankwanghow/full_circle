@@ -32,23 +32,22 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
     attrs =
       %{pur_invoice_no: "...new..."}
 
+    cs =
+      Billing.make_changeset(
+        PurInvoice,
+        %PurInvoice{},
+        attrs,
+        socket.assigns.current_company,
+        socket.assigns.current_user
+      )
+      |> FullCircleWeb.Helpers.add_line(:pur_invoice_details)
+
     socket
     |> assign(live_action: :new)
     |> assign(id: "new")
     |> assign(page_title: gettext("New Purchase Invoice"))
     |> assign(matched_trans: [])
-    |> assign(
-      :form,
-      to_form(
-        Billing.make_changeset(
-          PurInvoice,
-          %PurInvoice{},
-          attrs,
-          socket.assigns.current_company,
-          socket.assigns.current_user
-        )
-      )
-    )
+    |> assign(:form, to_form(cs))
   end
 
   defp mount_new(obj, socket) do
@@ -543,7 +542,14 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
     <div class="w-11/12 mx-auto border rounded-lg border-pink-500 bg-pink-100 p-4">
       <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <.error_box changeset={@form.source} />
-      <.form for={@form} id="object-form" autocomplete="off" phx-change="validate" phx-submit="save">
+      <.form
+        for={@form}
+        id="object-form"
+        autocomplete="off"
+        phx-change="validate"
+        phx-submit="save"
+        phx-hook="ctrlEnterAddDetail"
+      >
         <.input type="hidden" field={@form[:pur_invoice_no]} />
         <input type="hidden" id="live_action" value={@live_action} />
         <div class="flex flex-row flex-nowrap">

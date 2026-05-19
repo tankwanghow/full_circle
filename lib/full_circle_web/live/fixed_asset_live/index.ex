@@ -15,6 +15,7 @@ defmodule FullCircleWeb.FixedAssetLive.Index do
       <.search_form
         search_val={@search.terms}
         placeholder={gettext("Name, Asset Account, Depreciation Account or Descriptions...")}
+        live
       />
       <div class="text-center mb-2">
         <.link navigate={~p"/companies/#{@current_company.id}/fixed_assets/new"} class="blue button">
@@ -92,7 +93,7 @@ defmodule FullCircleWeb.FixedAssetLive.Index do
 
     url = "/companies/#{socket.assigns.current_company.id}/fixed_assets?#{URI.encode_query(qry)}"
 
-    {:noreply, socket |> push_navigate(to: url)}
+    {:noreply, socket |> push_patch(to: url)}
   end
 
   defp filter_objects(socket, terms, reset, page) do

@@ -120,7 +120,7 @@ defmodule FullCircle.DebCre do
         page: page,
         per_page: per_page
       ) do
-    from(inv in subquery(credit_note_raw_query(com, user)))
+    from(inv in subquery(credit_note_raw_query(com, user, date_from)))
     |> apply_simple_filters(terms, date_from,
       search_fields: [:note_no, :contact_name, :particulars],
       date_field: :note_date
@@ -131,57 +131,62 @@ defmodule FullCircle.DebCre do
   end
 
   def get_credit_note_by_id_index_component_field!(id, com, user) do
-    from(i in subquery(credit_note_raw_query(com, user)),
+    from(i in subquery(credit_note_raw_query(com, user, "")),
       where: i.id == ^id
     )
     |> Repo.one!()
   end
 
-  defp credit_note_raw_query(company, user) do
-    from txn in Transaction,
-      join: com in subquery(Sys.user_company(company, user)),
-      on: com.id == txn.company_id and txn.doc_type == "CreditNote",
-      left_join: cont in Contact,
-      on: cont.id == txn.contact_id,
-      left_join: ac in Account,
-      on: ac.id == txn.account_id,
-      left_join: obj in CreditNote,
-      on: txn.doc_no == obj.note_no,
-      order_by: [desc: txn.doc_date],
-      where: txn.amount < 0,
-      select: %{
-        id: coalesce(txn.doc_id, txn.id),
-        doc_type: "CreditNote",
-        doc_id: coalesce(txn.doc_id, txn.id),
-        note_no: txn.doc_no,
-        e_inv_uuid: obj.e_inv_uuid,
-        e_inv_internal_id: obj.e_inv_internal_id,
-        particulars:
-          fragment(
-            "string_agg(distinct coalesce(?, ?), ', ')",
-            txn.contact_particulars,
-            txn.particulars
-          ),
-        note_date: txn.doc_date,
-        company_id: com.id,
-        contact_name: coalesce(cont.name, ac.name),
-        amount: sum(txn.amount),
-        reg_no: cont.reg_no,
-        tax_id: cont.tax_id,
-        checked: false,
-        old_data: txn.old_data
-      },
-      group_by: [
-        coalesce(txn.doc_id, txn.id),
-        obj.id,
-        txn.doc_no,
-        cont.id,
-        txn.doc_date,
-        txn.company_id,
-        txn.old_data,
-        com.id,
-        coalesce(cont.name, ac.name)
-      ]
+  defp credit_note_raw_query(company, user, date_from) do
+    q =
+      from txn in Transaction,
+        as: :txn,
+        join: com in subquery(Sys.user_company(company, user)),
+        on: com.id == txn.company_id and txn.doc_type == "CreditNote",
+        left_join: cont in Contact,
+        on: cont.id == txn.contact_id,
+        left_join: ac in Account,
+        on: ac.id == txn.account_id,
+        left_join: obj in CreditNote,
+        on: txn.doc_no == obj.note_no,
+        where: txn.amount < 0,
+        select: %{
+          id: coalesce(txn.doc_id, txn.id),
+          doc_type: "CreditNote",
+          doc_id: coalesce(txn.doc_id, txn.id),
+          note_no: txn.doc_no,
+          e_inv_uuid: obj.e_inv_uuid,
+          e_inv_internal_id: obj.e_inv_internal_id,
+          particulars:
+            fragment(
+              "string_agg(distinct coalesce(?, ?), ', ')",
+              txn.contact_particulars,
+              txn.particulars
+            ),
+          note_date: txn.doc_date,
+          company_id: com.id,
+          contact_name: coalesce(cont.name, ac.name),
+          amount: sum(txn.amount),
+          reg_no: cont.reg_no,
+          tax_id: cont.tax_id,
+          checked: false,
+          old_data: txn.old_data
+        },
+        group_by: [
+          coalesce(txn.doc_id, txn.id),
+          obj.id,
+          txn.doc_no,
+          cont.id,
+          txn.doc_date,
+          txn.company_id,
+          txn.old_data,
+          com.id,
+          coalesce(cont.name, ac.name)
+        ]
+
+    if date_from != "",
+      do: from([txn: txn] in q, where: txn.doc_date >= ^date_from),
+      else: q
   end
 
   def make_changeset(schema, struct, attrs, com, user) do
@@ -350,7 +355,7 @@ defmodule FullCircle.DebCre do
         page: page,
         per_page: per_page
       ) do
-    from(inv in subquery(debit_note_raw_query(com, user)))
+    from(inv in subquery(debit_note_raw_query(com, user, date_from)))
     |> apply_simple_filters(terms, date_from,
       search_fields: [:note_no, :contact_name, :particulars],
       date_field: :note_date
@@ -361,57 +366,62 @@ defmodule FullCircle.DebCre do
   end
 
   def get_debit_note_by_id_index_component_field!(id, com, user) do
-    from(i in subquery(debit_note_raw_query(com, user)),
+    from(i in subquery(debit_note_raw_query(com, user, "")),
       where: i.id == ^id
     )
     |> Repo.one!()
   end
 
-  defp debit_note_raw_query(company, user) do
-    from txn in Transaction,
-      join: com in subquery(Sys.user_company(company, user)),
-      on: com.id == txn.company_id and txn.doc_type == "DebitNote",
-      left_join: cont in Contact,
-      on: cont.id == txn.contact_id,
-      left_join: ac in Account,
-      on: ac.id == txn.account_id,
-      left_join: obj in DebitNote,
-      on: txn.doc_no == obj.note_no,
-      order_by: [desc: txn.doc_date],
-      where: txn.amount > 0,
-      select: %{
-        id: coalesce(txn.doc_id, txn.id),
-        doc_type: "DebitNote",
-        doc_id: coalesce(txn.doc_id, txn.id),
-        note_no: txn.doc_no,
-        e_inv_uuid: obj.e_inv_uuid,
-        e_inv_internal_id: obj.e_inv_internal_id,
-        particulars:
-          fragment(
-            "string_agg(distinct coalesce(?, ?), ', ')",
-            txn.contact_particulars,
-            txn.particulars
-          ),
-        note_date: txn.doc_date,
-        company_id: com.id,
-        contact_name: coalesce(cont.name, ac.name),
-        amount: sum(txn.amount),
-        reg_no: cont.reg_no,
-        tax_id: cont.tax_id,
-        checked: false,
-        old_data: txn.old_data
-      },
-      group_by: [
-        coalesce(txn.doc_id, txn.id),
-        obj.id,
-        txn.doc_no,
-        cont.id,
-        txn.doc_date,
-        txn.company_id,
-        txn.old_data,
-        com.id,
-        coalesce(cont.name, ac.name)
-      ]
+  defp debit_note_raw_query(company, user, date_from) do
+    q =
+      from txn in Transaction,
+        as: :txn,
+        join: com in subquery(Sys.user_company(company, user)),
+        on: com.id == txn.company_id and txn.doc_type == "DebitNote",
+        left_join: cont in Contact,
+        on: cont.id == txn.contact_id,
+        left_join: ac in Account,
+        on: ac.id == txn.account_id,
+        left_join: obj in DebitNote,
+        on: txn.doc_no == obj.note_no,
+        where: txn.amount > 0,
+        select: %{
+          id: coalesce(txn.doc_id, txn.id),
+          doc_type: "DebitNote",
+          doc_id: coalesce(txn.doc_id, txn.id),
+          note_no: txn.doc_no,
+          e_inv_uuid: obj.e_inv_uuid,
+          e_inv_internal_id: obj.e_inv_internal_id,
+          particulars:
+            fragment(
+              "string_agg(distinct coalesce(?, ?), ', ')",
+              txn.contact_particulars,
+              txn.particulars
+            ),
+          note_date: txn.doc_date,
+          company_id: com.id,
+          contact_name: coalesce(cont.name, ac.name),
+          amount: sum(txn.amount),
+          reg_no: cont.reg_no,
+          tax_id: cont.tax_id,
+          checked: false,
+          old_data: txn.old_data
+        },
+        group_by: [
+          coalesce(txn.doc_id, txn.id),
+          obj.id,
+          txn.doc_no,
+          cont.id,
+          txn.doc_date,
+          txn.company_id,
+          txn.old_data,
+          com.id,
+          coalesce(cont.name, ac.name)
+        ]
+
+    if date_from != "",
+      do: from([txn: txn] in q, where: txn.doc_date >= ^date_from),
+      else: q
   end
 
   def create_debit_note(attrs, com, user) do

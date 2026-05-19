@@ -129,6 +129,21 @@ Hooks.localStorageInput = {
 }
 
 
+Hooks.ctrlEnterAddDetail = {
+  mounted() {
+    this.handleKey = (event) => {
+      if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+        event.preventDefault()
+        this.pushEvent("add_detail", {})
+      }
+    }
+    this.el.addEventListener("keydown", this.handleKey)
+  },
+  destroyed() {
+    this.el.removeEventListener("keydown", this.handleKey)
+  }
+}
+
 Hooks.copyAndOpen = {
   mounted() {
     this.handleClick = (event) => {

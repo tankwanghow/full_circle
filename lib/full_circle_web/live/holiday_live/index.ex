@@ -12,7 +12,7 @@ defmodule FullCircleWeb.HolidayLive.Index do
     ~H"""
     <div class="mx-auto w-6/12">
       <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
-      <.search_form search_val={@search.terms} placeholder={gettext("Name or Short Name...")} />
+      <.search_form search_val={@search.terms} placeholder={gettext("Name or Short Name...")} live />
       <div class="text-center mb-2">
         <.link
           navigate={~p"/companies/#{@current_company.id}/holidays/new"}
@@ -96,7 +96,7 @@ defmodule FullCircleWeb.HolidayLive.Index do
 
     url = "/companies/#{socket.assigns.current_company.id}/holidays?#{URI.encode_query(qry)}"
 
-    {:noreply, socket |> push_navigate(to: url)}
+    {:noreply, socket |> push_patch(to: url)}
   end
 
   defp filter_objects(socket, terms, reset, page) do
