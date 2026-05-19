@@ -70,7 +70,8 @@ defmodule FullCircle.MixProject do
       {:qr_code, "~> 3.2.0"},
       {:castore, "~> 1.0"},
       {:req, "~> 0.5.0"},
-      {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:tidewave, "~> 0.5", only: :dev}
     ]
   end
 

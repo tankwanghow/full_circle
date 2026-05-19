@@ -56,7 +56,9 @@
       "Bash(tar -xzf zxing-wasm.tgz -C zxing-wasm-pkg)",
       "Bash(git rm *)",
       "Bash(awk '{print $5, $9}')",
-      "Bash(echo \"EXIT: $?\")"
+      "Bash(echo \"EXIT: $?\")",
+      "mcp__tidewave__execute_sql_query",
+      "mcp__tidewave__project_eval"
     ]
   }
 }
