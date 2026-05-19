@@ -42,7 +42,6 @@ defmodule FullCircle.MixProject do
       {:phoenix_html, "~> 4.1"},
       {:phoenix_live_reload, "~> 1.2", only: :dev},
       {:phoenix_live_view, "~> 1.1"},
-      {:floki, ">= 0.30.0", only: :test},
       {:lazy_html, "~> 0.1", only: :test},
       {:esbuild, "~> 0.10", runtime: Mix.env() == :dev},
       {:tailwind, "~> 0.4", runtime: Mix.env() == :dev},
@@ -70,7 +69,6 @@ defmodule FullCircle.MixProject do
       {:qr_code, "~> 3.2.0"},
       {:castore, "~> 1.0"},
       {:req, "~> 0.5.0"},
-      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:tidewave, "~> 0.5", only: :dev}
     ]
   end
