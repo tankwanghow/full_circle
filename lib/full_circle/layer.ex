@@ -122,7 +122,10 @@ defmodule FullCircle.Layer do
     "F" => 42.5
   }
 
-  @avg_fallback_weight_g 55.0
+  # Last-resort weight: the mean of the grade-weight table. Used only when a
+  # company has no graded (AA-F) history at all to derive an average from.
+  @grade_table_mean_g (@grade_weights_g |> Map.values() |> Enum.sum()) /
+                        map_size(@grade_weights_g)
 
   def default_feed_good_names, do: @default_feed_good_names
 
@@ -131,6 +134,7 @@ defmodule FullCircle.Layer do
     td = to_date(td)
     group_days = max(group_days, 1)
     feed_names = normalize_feed_names(feed_names)
+    weight_by_name = build_grade_weight_map(com_id)
 
     feeds =
       from(w in FullCircle.WeightBridge.Weighing,
@@ -163,6 +167,15 @@ defmodule FullCircle.Layer do
         grade_map = Map.new(row.quantities, fn {g, v} -> {g, parse_int(v)} end)
         {row.date, grade_map}
       end)
+
+    total_graded_grades =
+      Enum.reduce(graded_grades_by_date, %{}, fn {_d, m}, acc -> sum_grade_maps(acc, m) end)
+
+    # Report-wide graded-egg average — the fallback weight when a single bucket
+    # has no graded AA-F eggs of its own. Grade-table mean only if the whole
+    # report range has no graded eggs at all.
+    report_graded_avg_g =
+      graded_avg_weight_g(total_graded_grades, weight_by_name) || @grade_table_mean_g
 
     expired_grades_by_date =
       from(d in FullCircle.EggStock.EggStockDay,
@@ -212,8 +225,14 @@ defmodule FullCircle.Layer do
         net_eggs = graded_eggs - expired_eggs
         net_trays = bucket_graded_trays - bucket_expired_trays
 
-        graded_mass_kg = egg_mass_kg(graded_grades)
-        expired_mass_kg = egg_mass_kg(expired_grades)
+        # Unknown-grade eggs (Cr/Dr/W) and expired eggs are valued at this
+        # bucket's own graded-egg average; if the bucket has no graded AA-F
+        # eggs, fall back to the report-wide graded average.
+        bucket_graded_avg_g =
+          graded_avg_weight_g(graded_grades, weight_by_name) || report_graded_avg_g
+
+        graded_mass_kg = egg_mass_kg(graded_grades, weight_by_name, report_graded_avg_g)
+        expired_mass_kg = egg_mass_kg(expired_grades, weight_by_name, bucket_graded_avg_g)
         net_mass_kg = graded_mass_kg - expired_mass_kg
 
         feed_tons = bucket_feed_kg / 1000
@@ -221,6 +240,7 @@ defmodule FullCircle.Layer do
         fcr_net = if net_mass_kg > 0, do: bucket_feed_kg / net_mass_kg, else: 0
         eggs_per_ton_gross = if feed_tons > 0, do: eggs_count / feed_tons, else: 0
         eggs_per_ton_net = if feed_tons > 0, do: net_eggs / feed_tons, else: 0
+        avg_egg_weight = if graded_eggs > 0, do: graded_mass_kg * 1000 / graded_eggs, else: 0
 
         %{
           from_date: bstart,
@@ -233,6 +253,7 @@ defmodule FullCircle.Layer do
           graded_trays: bucket_graded_trays,
           graded_eggs: graded_eggs,
           graded_mass_kg: graded_mass_kg,
+          avg_egg_weight: avg_egg_weight,
           expired_trays: bucket_expired_trays,
           expired_eggs: expired_eggs,
           expired_mass_kg: expired_mass_kg,
@@ -258,18 +279,20 @@ defmodule FullCircle.Layer do
     total_net_trays = total_graded_trays - total_expired_trays
     total_feed_tons = total_feed_kg / 1000
 
-    total_graded_grades =
-      Enum.reduce(graded_grades_by_date, %{}, fn {_d, m}, acc -> sum_grade_maps(acc, m) end)
-
     total_expired_grades =
       Enum.reduce(expired_grades_by_date, %{}, fn {_d, m}, acc -> sum_grade_maps(acc, m) end)
 
-    total_graded_mass_kg = egg_mass_kg(total_graded_grades)
-    total_expired_mass_kg = egg_mass_kg(total_expired_grades)
+    total_graded_mass_kg = egg_mass_kg(total_graded_grades, weight_by_name, report_graded_avg_g)
+
+    total_expired_mass_kg =
+      egg_mass_kg(total_expired_grades, weight_by_name, report_graded_avg_g)
     total_net_mass_kg = total_graded_mass_kg - total_expired_mass_kg
 
     total_fcr = if total_graded_mass_kg > 0, do: total_feed_kg / total_graded_mass_kg, else: 0
     total_fcr_net = if total_net_mass_kg > 0, do: total_feed_kg / total_net_mass_kg, else: 0
+
+    total_avg_egg_weight =
+      if total_graded_eggs > 0, do: total_graded_mass_kg * 1000 / total_graded_eggs, else: 0
 
     total_eggs_per_ton_gross =
       if total_feed_tons > 0, do: total_eggs / total_feed_tons, else: 0
@@ -285,6 +308,7 @@ defmodule FullCircle.Layer do
         feed_tons: total_feed_tons,
         trays: total_trays,
         graded_mass_kg: total_graded_mass_kg,
+        avg_egg_weight: total_avg_egg_weight,
         expired_mass_kg: total_expired_mass_kg,
         net_mass_kg: total_net_mass_kg,
         fcr: total_fcr,
@@ -310,27 +334,60 @@ defmodule FullCircle.Layer do
     Enum.reduce(m, 0, fn {_k, v}, acc -> acc + v end)
   end
 
-  defp grade_weight_g(grade) do
-    key = grade |> to_string() |> String.trim() |> String.upcase()
-    Map.get(@grade_weights_g, key)
+  # Grade maps are keyed by the full grade name ("Egg Grade AA"); the weight
+  # table is keyed by the symbol ("AA"). Build a per-company name -> weight map
+  # by resolving each grade's nickname (the symbol) against @grade_weights_g.
+  # Grades whose nickname isn't in the table (Cr/Dr/W) or is blank map to nil.
+  defp build_grade_weight_map(com_id) do
+    FullCircle.EggStock.list_grades(com_id)
+    |> Map.new(fn g ->
+      symbol = (g.nickname || "") |> String.trim() |> String.upcase()
+      {String.trim(g.name), Map.get(@grade_weights_g, symbol)}
+    end)
   end
 
-  defp egg_mass_kg(grade_qty_map_trays) do
+  defp grade_weight_g(grade, weight_by_name) do
+    Map.get(weight_by_name, grade |> to_string() |> String.trim())
+  end
+
+  defp egg_mass_kg(grade_qty_map_trays, weight_by_name, fallback_weight_g) do
     {weighted_eggs, weighted_mass_g, unweighted_eggs} =
       Enum.reduce(grade_qty_map_trays, {0, 0.0, 0}, fn {grade, trays}, {we, wmg, ue} ->
         eggs = parse_int(trays) * 30
 
-        case grade_weight_g(grade) do
+        case grade_weight_g(grade, weight_by_name) do
           nil -> {we, wmg, ue + eggs}
           w_g -> {we + eggs, wmg + eggs * w_g, ue}
         end
       end)
 
+    # Unknown-grade (Cr/Dr/W) eggs are valued at this period's own graded-egg
+    # average; if the period has no graded AA-F eggs at all, fall back to the
+    # weight passed in by the caller.
     avg_weight_g =
-      if weighted_eggs > 0, do: weighted_mass_g / weighted_eggs, else: @avg_fallback_weight_g
+      if weighted_eggs > 0, do: weighted_mass_g / weighted_eggs, else: fallback_weight_g
 
     total_mass_g = weighted_mass_g + unweighted_eggs * avg_weight_g
     total_mass_g / 1000
+  end
+
+  # Weighted average egg weight of the known (AA-F) grades in a grade map, or
+  # nil when the map has no graded eggs. The trays->eggs x30 factor cancels in
+  # the ratio, so trays are summed directly.
+  defp graded_avg_weight_g(grade_qty_map_trays, weight_by_name) do
+    {known_trays, known_mass_g} =
+      Enum.reduce(grade_qty_map_trays, {0, 0.0}, fn {grade, trays}, {t_acc, m_acc} ->
+        case grade_weight_g(grade, weight_by_name) do
+          nil ->
+            {t_acc, m_acc}
+
+          w_g ->
+            t = parse_int(trays)
+            {t_acc + t, m_acc + t * w_g}
+        end
+      end)
+
+    if known_trays > 0, do: known_mass_g / known_trays, else: nil
   end
 
   defp parse_int(nil), do: 0

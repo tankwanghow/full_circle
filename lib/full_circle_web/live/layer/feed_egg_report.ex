@@ -141,7 +141,7 @@ defmodule FullCircleWeb.LayerLive.FeedEggReport do
 
       <.async_html result={@result}>
         <:result_html>
-          <% widths = ~w(15% 5% 8% 9% 9% 10% 9% 9% 9% 9% 8%) %>
+          <% widths = ~w(14% 5% 7% 8% 8% 9% 8% 8% 9% 8% 8% 8%) %>
           {FullCircleWeb.CsvHtml.headers(
             [
               gettext("Period"),
@@ -153,6 +153,7 @@ defmodule FullCircleWeb.LayerLive.FeedEggReport do
               gettext("Eggs/T (Gross)"),
               gettext("Eggs/T (Net)"),
               gettext("Egg Mass (kg)"),
+              gettext("Avg Egg Wt (g)"),
               gettext("FCR"),
               gettext("FCR (net)")
             ],
@@ -165,7 +166,7 @@ defmodule FullCircleWeb.LayerLive.FeedEggReport do
           <div id="lists">
             <%= for row <- @result.result.rows do %>
               <div class="flex flex-row text-center tracking-tighter">
-                <div class="w-[15%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
+                <div class="w-[14%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
                   <%= if Date.compare(row.from_date, row.to_date) == :eq do %>
                     {row.from_date}
                   <% else %>
@@ -175,28 +176,31 @@ defmodule FullCircleWeb.LayerLive.FeedEggReport do
                 <div class="w-[5%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
                   {row.days}
                 </div>
-                <div class="w-[8%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
+                <div class="w-[7%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
                   {fmt(row.feed_tons, 3)}
                 </div>
-                <div class="w-[9%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
+                <div class="w-[8%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
                   {fmt(row.trays)}
                 </div>
-                <div class="w-[9%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
+                <div class="w-[8%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
                   {fmt(row.graded_trays)}
                 </div>
-                <div class="w-[10%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
+                <div class="w-[9%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
                   {fmt(row.net_trays)}
                 </div>
-                <div class="w-[9%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
+                <div class="w-[8%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
                   {fmt(row.eggs_per_ton_gross)}
                 </div>
-                <div class="w-[9%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
+                <div class="w-[8%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
                   {fmt(row.eggs_per_ton_net)}
                 </div>
                 <div class="w-[9%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
                   {fmt(row.graded_mass_kg, 1)}
                 </div>
-                <div class="w-[9%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
+                <div class="w-[8%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
+                  {fmt(row.avg_egg_weight, 1)}
+                </div>
+                <div class="w-[8%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
                   {fmt(row.fcr, 3)}
                 </div>
                 <div class="w-[8%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
@@ -208,34 +212,37 @@ defmodule FullCircleWeb.LayerLive.FeedEggReport do
 
           <div :if={Enum.count(@result.result.rows) > 0} id="footer">
             <div class="flex flex-row text-center font-bold tracking-tighter mt-1">
-              <div class="w-[15%] border rounded bg-amber-200 border-amber-400 px-2 py-1">
+              <div class="w-[14%] border rounded bg-amber-200 border-amber-400 px-2 py-1">
                 {gettext("Total")}
               </div>
               <div class="w-[5%] border rounded bg-amber-200 border-amber-400 px-2 py-1">
                 {@result.result.total.days}
               </div>
-              <div class="w-[8%] border rounded bg-amber-200 border-amber-400 px-2 py-1">
+              <div class="w-[7%] border rounded bg-amber-200 border-amber-400 px-2 py-1">
                 {fmt(@result.result.total.feed_tons, 3)}
               </div>
-              <div class="w-[9%] border rounded bg-amber-200 border-amber-400 px-2 py-1">
+              <div class="w-[8%] border rounded bg-amber-200 border-amber-400 px-2 py-1">
                 {fmt(@result.result.total.trays)}
               </div>
-              <div class="w-[9%] border rounded bg-amber-200 border-amber-400 px-2 py-1">
+              <div class="w-[8%] border rounded bg-amber-200 border-amber-400 px-2 py-1">
                 {fmt(@result.result.total.graded_trays)}
               </div>
-              <div class="w-[10%] border rounded bg-amber-200 border-amber-400 px-2 py-1">
+              <div class="w-[9%] border rounded bg-amber-200 border-amber-400 px-2 py-1">
                 {fmt(@result.result.total.net_trays)}
               </div>
-              <div class="w-[9%] border rounded bg-amber-200 border-amber-400 px-2 py-1">
+              <div class="w-[8%] border rounded bg-amber-200 border-amber-400 px-2 py-1">
                 {fmt(@result.result.total.eggs_per_ton_gross)}
               </div>
-              <div class="w-[9%] border rounded bg-amber-200 border-amber-400 px-2 py-1">
+              <div class="w-[8%] border rounded bg-amber-200 border-amber-400 px-2 py-1">
                 {fmt(@result.result.total.eggs_per_ton_net)}
               </div>
               <div class="w-[9%] border rounded bg-amber-200 border-amber-400 px-2 py-1">
                 {fmt(@result.result.total.graded_mass_kg, 1)}
               </div>
-              <div class="w-[9%] border rounded bg-amber-200 border-amber-400 px-2 py-1">
+              <div class="w-[8%] border rounded bg-amber-200 border-amber-400 px-2 py-1">
+                {fmt(@result.result.total.avg_egg_weight, 1)}
+              </div>
+              <div class="w-[8%] border rounded bg-amber-200 border-amber-400 px-2 py-1">
                 {fmt(@result.result.total.fcr, 3)}
               </div>
               <div class="w-[8%] border rounded bg-amber-200 border-amber-400 px-2 py-1">
