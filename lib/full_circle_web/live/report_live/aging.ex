@@ -353,7 +353,7 @@ defmodule FullCircleWeb.ReportLive.Aging do
       <.async_html result={@result}>
         <:result_html>
           <% rows = sort_rows(@result.result, @sort_by, @sort_dir) %>
-          <% widths = ["4%", "11%", "21%", "8%", "8%", "8%", "8%", "8%", "10%", "10%", "4%"] %>
+          <% widths = ["3%", "10%", "26%", "8%", "8%", "8%", "8%", "8%", "9%", "8%", "4%"] %>
           <% header_row_class = "font-medium flex flex-row text-center tracking-tighter mb-1" %>
           <% header_col_class = "border rounded bg-gray-200 border-gray-400 px-2 py-1" %>
           <% data_row_class = "flex flex-row text-center tracking-tighter max-h-20" %>
