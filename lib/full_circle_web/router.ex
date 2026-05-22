@@ -98,6 +98,9 @@ defmodule FullCircleWeb.Router do
 
     post("/update_active_company", ActiveCompanyController, :create)
     get("/delete_active_company", ActiveCompanyController, :delete)
+
+    get("/email_document/new", DocumentEmailController, :new)
+    post("/email_document", DocumentEmailController, :create)
   end
 
   scope "/companies/:company_id", FullCircleWeb do
