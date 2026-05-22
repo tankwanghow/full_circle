@@ -160,3 +160,35 @@ if config_env() == :prod do
 
   config :full_circle, :mail_from, {"FullCircle", mail_from}
 end
+
+# Development: opt in to real email sending by setting the MAIL_* env vars.
+# Without them, dev keeps the Local adapter and emails appear at /dev/mailbox.
+# For Gmail: MAIL_HOST=smtp.gmail.com, MAIL_PORT=587, MAIL_USERNAME and
+# MAIL_FROM both set to the Gmail address, MAIL_PASSWORD set to a Gmail
+# App Password (a normal account password will not work).
+if config_env() == :dev and System.get_env("MAIL_HOST") do
+  dev_mail_host = System.get_env("MAIL_HOST")
+  dev_mail_port = String.to_integer(System.get_env("MAIL_PORT") || "587")
+
+  config :full_circle, FullCircle.Mailer,
+    adapter: Swoosh.Adapters.SMTP,
+    relay: dev_mail_host,
+    port: dev_mail_port,
+    username: System.get_env("MAIL_USERNAME"),
+    password: System.get_env("MAIL_PASSWORD"),
+    ssl: dev_mail_port == 465,
+    tls: :always,
+    auth: :always,
+    retries: 1,
+    tls_options: [
+      versions: [:"tlsv1.2", :"tlsv1.3"],
+      verify: :verify_peer,
+      cacerts: :public_key.cacerts_get(),
+      server_name_indication: String.to_charlist(dev_mail_host),
+      depth: 99
+    ]
+
+  if System.get_env("MAIL_FROM") do
+    config :full_circle, :mail_from, {"FullCircle", System.get_env("MAIL_FROM")}
+  end
+end
