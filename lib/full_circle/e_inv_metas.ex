@@ -28,6 +28,16 @@ defmodule FullCircle.EInvMetas do
 
   def default_unit_codes, do: @default_unit_codes
 
+  # LHDN production is frequently slow; give each request far more room than
+  # Req's 15s default so a busy server does not look like a hard failure.
+  @lhdn_receive_timeout 60_000
+  # Small pause between page requests to stay under LHDN's rate limit.
+  @lhdn_page_delay_ms 300
+  # A manual sync should fail fast: one retry, then surface the error so the
+  # user can try again later instead of staring at a spinner for minutes.
+  @lhdn_max_attempts 2
+  @lhdn_retry_delay_ms 1500
+
   # Helper to get active environment config from meta
   defp env_config(meta) do
     case meta.environment do
@@ -1493,24 +1503,46 @@ defmodule FullCircle.EInvMetas do
     |> Repo.all()
   end
 
+  # Returns {:ok, list_of_raw_e_invoices} or {:error, message}. Never raises:
+  # a slow or non-200 LHDN response becomes an {:error, _} the caller can show.
   defp get_e_invoices_from_cloud(sd, ed, com, user) do
     meta = get_by_company_id!(com, user)
 
-    meta_url =
-      build_e_inv_url(id_base(meta), path(meta, "search"), [],
-        submissionDateFrom: sd,
-        submissionDateTo: ed,
-        pageSize: 1,
-        pageNo: 1
-      )
+    if is_nil(meta) do
+      {:error, "E-Invoice meta not configured"}
+    else
+      window = "#{String.slice(sd, 0..9)} to #{String.slice(ed, 0..9)}"
+      broadcast_sync_status(com, "#{window}: checking…")
 
-    %{"metadata" => %{"totalCount" => total_count}, "result" => _} =
-      Req.get!(meta_url, headers: [Authorization: meta.token]).body
+      meta_url =
+        build_e_inv_url(id_base(meta), path(meta, "search"), [],
+          submissionDateFrom: sd,
+          submissionDateTo: ed,
+          pageSize: 1,
+          pageNo: 1
+        )
 
-    pages = (total_count / 100) |> Float.ceil() |> trunc()
-    pages = if pages == 0, do: 1, else: pages
+      case lhdn_get(meta_url, meta.token, retry_reporter(com, window)) do
+        {:ok, %{"metadata" => %{"totalCount" => total_count}}} ->
+          pages = (total_count / 100) |> Float.ceil() |> trunc()
+          pages = if pages == 0, do: 1, else: pages
+          fetch_e_invoice_pages(meta, sd, ed, window, pages, com)
 
-    Enum.map(1..pages, fn p ->
+        {:ok, body} ->
+          {:error,
+           "LHDN returned an unexpected response: #{inspect(body) |> String.slice(0, 300)}"}
+
+        {:error, _} = err ->
+          err
+      end
+    end
+  end
+
+  defp fetch_e_invoice_pages(meta, sd, ed, window, pages, com) do
+    1..pages
+    |> Enum.reduce_while({:ok, []}, fn p, {:ok, acc} ->
+      broadcast_sync_status(com, "#{window}: page #{p}/#{pages}")
+
       url =
         build_e_inv_url(id_base(meta), path(meta, "search"), [],
           submissionDateFrom: sd,
@@ -1519,19 +1551,93 @@ defmodule FullCircle.EInvMetas do
           pageNo: p
         )
 
-      PubSub.broadcast(
-        FullCircle.PubSub,
-        "#{com.id}_e_invoice_sync_status",
-        {:update_sync_status, sd, ed, p}
-      )
+      case lhdn_get(url, meta.token, retry_reporter(com, window)) do
+        {:ok, body} ->
+          if p < pages, do: Process.sleep(@lhdn_page_delay_ms)
+          page_result = body["result"] || []
+          {:cont, {:ok, [page_result | acc]}}
 
-      %{"metadata" => _, "result" => res} =
-        Req.get!(url, headers: [Authorization: meta.token]).body
-
-      res
+        {:error, _} = err ->
+          {:halt, err}
+      end
     end)
-    |> List.flatten()
+    |> case do
+      {:ok, results} -> {:ok, results |> Enum.reverse() |> List.flatten()}
+      {:error, _} = err -> err
+    end
   end
+
+  defp broadcast_sync_status(com, text) do
+    PubSub.broadcast(
+      FullCircle.PubSub,
+      "#{com.id}_e_invoice_sync_status",
+      {:sync_status, text}
+    )
+  end
+
+  # Builds the callback lhdn_get/4 invokes before each retry, so the spinner
+  # can show what LHDN did instead of sitting blank.
+  defp retry_reporter(com, window) do
+    fn attempt, reason ->
+      broadcast_sync_status(com, "#{window}: #{reason}, retry #{attempt + 1}…")
+    end
+  end
+
+  # Single LHDN GET with its own fail-fast retry. Returns {:ok, body} or
+  # {:error, message} and never raises. Req's own retry is disabled so the
+  # retry count and on_retry reporting stay under our control.
+  defp lhdn_get(url, token, on_retry, attempt \\ 1) do
+    Req.get(url,
+      headers: [Authorization: token],
+      receive_timeout: @lhdn_receive_timeout,
+      retry: false
+    )
+    |> classify_lhdn_response()
+    |> case do
+      {:ok, body} ->
+        {:ok, body}
+
+      {:retry, reason} when attempt < @lhdn_max_attempts ->
+        on_retry.(attempt, reason)
+        Process.sleep(@lhdn_retry_delay_ms)
+        lhdn_get(url, token, on_retry, attempt + 1)
+
+      {:retry, reason} ->
+        {:error, "#{reason} — gave up after #{attempt} attempts. Try Sync again later."}
+
+      {:error, _} = err ->
+        err
+    end
+  end
+
+  # Req.get (non-bang) only returns {:error, _} on transport failures; non-2xx
+  # HTTP responses come back as {:ok, _} and must be checked here. {:retry, _}
+  # marks an outcome worth one more attempt; {:error, _} is final.
+  defp classify_lhdn_response({:ok, %{status: 200, body: body}}) when is_map(body),
+    do: {:ok, body}
+
+  defp classify_lhdn_response({:ok, %{status: 200, body: body}}),
+    do: {:error, "LHDN returned an unexpected body: #{inspect(body) |> String.slice(0, 300)}"}
+
+  defp classify_lhdn_response({:ok, %{status: 401}}),
+    do:
+      {:error, "LHDN rejected the access token (HTTP 401). Check the E-Invoice Meta credentials."}
+
+  defp classify_lhdn_response({:ok, %{status: 429}}),
+    do: {:retry, "LHDN rate limit reached (HTTP 429)"}
+
+  defp classify_lhdn_response({:ok, %{status: status}})
+       when status in [408, 500, 502, 503, 504],
+       do: {:retry, "LHDN server busy (HTTP #{status})"}
+
+  defp classify_lhdn_response({:ok, %{status: status, body: body}}),
+    do: {:error, "LHDN returned HTTP #{status}: #{inspect(body) |> String.slice(0, 300)}"}
+
+  defp classify_lhdn_response({:error, %{reason: :timeout}}),
+    do: {:retry, "LHDN did not respond in time (timeout)"}
+
+  defp classify_lhdn_response({:error, reason}),
+    do: {:retry, "Could not reach LHDN (#{inspect(reason)})"}
 
   def e_invoice_last_sync_datetime(com, user) do
     from(ei in EInvoice,
@@ -1546,32 +1652,53 @@ defmodule FullCircle.EInvMetas do
     |> FullCircle.Repo.one() || ~U[2024-07-01 00:00:00Z]
   end
 
+  # Returns :ok on a full sync, or {:error, message} if a window failed.
+  # Each window is committed independently, so a partial sync is preserved and
+  # clicking Sync again resumes from where it stopped.
   def sync_e_invoices(com, user) do
     last_sync = e_invoice_last_sync_datetime(com, user) |> DateTime.add(-3, :day)
 
     now = DateTime.utc_now()
     range = get_date_range(last_sync, now) |> Enum.chunk_every(2, 1, :discard)
 
-    Enum.each(range, fn [a, b] ->
-      lt =
-        get_e_invoices_from_cloud(
-          Timex.format!(a, "%Y-%m-%dT%H:%M:%S", :strftime),
-          Timex.format!(b, "%Y-%m-%dT%H:%M:%S", :strftime),
-          com,
-          user
-        )
-        |> Enum.map(fn x -> Map.merge(x, %{"company_id" => com.id}) end)
-        |> Enum.map(fn x -> EInvoice.changeset(%EInvoice{}, x) end)
-        |> Enum.map(fn x -> x.changes end)
+    result =
+      Enum.reduce_while(range, :ok, fn [a, b], _acc ->
+        case get_e_invoices_from_cloud(
+               Timex.format!(a, "%Y-%m-%dT%H:%M:%S", :strftime),
+               Timex.format!(b, "%Y-%m-%dT%H:%M:%S", :strftime),
+               com,
+               user
+             ) do
+          {:ok, raw_list} ->
+            lt =
+              raw_list
+              |> Enum.map(fn x -> Map.merge(x, %{"company_id" => com.id}) end)
+              |> Enum.map(fn x -> EInvoice.changeset(%EInvoice{}, x) end)
+              |> Enum.map(fn x -> x.changes end)
 
-      Repo.insert_all(EInvoice, lt,
-        on_conflict: :replace_all,
-        conflict_target: [:uuid],
-        returning: true
-      )
-    end)
+            if lt != [] do
+              Repo.insert_all(EInvoice, lt,
+                on_conflict: :replace_all,
+                conflict_target: [:uuid],
+                returning: true
+              )
+            end
 
-    remove_uuid_from_invalid_e_invoices(last_sync, now, com, user)
+            {:cont, :ok}
+
+          {:error, _} = err ->
+            {:halt, err}
+        end
+      end)
+
+    case result do
+      :ok ->
+        remove_uuid_from_invalid_e_invoices(last_sync, now, com, user)
+        :ok
+
+      {:error, _} = err ->
+        err
+    end
   end
 
   defp get_date_range(a, b) do

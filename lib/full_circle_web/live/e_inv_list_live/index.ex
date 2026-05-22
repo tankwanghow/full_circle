@@ -21,6 +21,7 @@ defmodule FullCircleWeb.EInvListLive.Index do
       socket
       |> assign(update_action: "stream")
       |> assign(syncing: false)
+      |> assign(sync_status: "")
       |> stream_configure(:objects, dom_id: & &1.uuid)
       |> assign(page_title: gettext("E-Invoices Listing"))
       |> assign(
@@ -98,18 +99,35 @@ defmodule FullCircleWeb.EInvListLive.Index do
   @impl true
   def handle_event("sync", _, socket) do
     pid = self()
+    com = socket.assigns.current_company
+    user = socket.assigns.current_user
 
+    # try/rescue keeps the linked Task.async from propagating a crash to this
+    # LiveView — any failure comes back as {:finished_sync, {:error, msg}}.
     Task.async(fn ->
-      EInvMetas.sync_e_invoices(socket.assigns.current_company, socket.assigns.current_user)
-      send(pid, :finished_sync)
+      result =
+        try do
+          EInvMetas.sync_e_invoices(com, user)
+        rescue
+          e -> {:error, Exception.message(e)}
+        catch
+          kind, reason -> {:error, "#{kind}: #{inspect(reason)}"}
+        end
+
+      send(pid, {:finished_sync, result})
     end)
 
-    {:noreply,
-     socket |> assign(syncing: true) |> assign(sd: "") |> assign(ed: "") |> assign(page: "")}
+    {:noreply, socket |> assign(syncing: true) |> assign(sync_status: gettext("starting…"))}
   end
 
   @impl true
-  def handle_info(:finished_sync, socket) do
+  def handle_info({:finished_sync, result}, socket) do
+    socket =
+      case result do
+        {:error, msg} -> put_flash(socket, :error, gettext("E-Invoice sync stopped: ") <> msg)
+        _ -> socket
+      end
+
     {:noreply,
      socket
      |> assign(update_action: "stream")
@@ -125,12 +143,8 @@ defmodule FullCircleWeb.EInvListLive.Index do
   end
 
   @impl true
-  def handle_info({:update_sync_status, sd, ed, page}, socket) do
-    {:noreply,
-     socket
-     |> assign(sd: String.slice(sd, 0..9))
-     |> assign(ed: String.slice(ed, 0..9))
-     |> assign(page: page)}
+  def handle_info({:sync_status, text}, socket) do
+    {:noreply, assign(socket, sync_status: text)}
   end
 
   @impl true
@@ -187,7 +201,7 @@ defmodule FullCircleWeb.EInvListLive.Index do
         <div class="">
           <%= if @syncing do %>
             <div class="text-lg red button" id="syncing">
-              {gettext("Syncing E-Invoice ")}{"#{@sd} - #{@ed} page #{@page}"}...
+              {gettext("Syncing E-Invoice")} {@sync_status}
               <.icon name="hero-arrow-path" class="ml-1 h-3 w-3 animate-spin" />
             </div>
           <% else %>
