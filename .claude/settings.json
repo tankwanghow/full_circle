@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(echo \"exit=$?\")"
+      "Bash(echo \"exit=$?\")",
+      "Bash(git --no-pager diff)",
+      "Bash(git --no-pager diff lib/full_circle_web/live/e_inv_list_live/index.ex)",
+      "Bash(awk '{print $1}')"
     ]
   }
 }
