@@ -115,9 +115,14 @@
           recipient = data.recipient || "";
         } catch (e) { /* fall back to an empty prompt */ }
 
-        const to = window.prompt("Email this document to:", recipient);
-        if (!to || !to.trim()) { return; }
-        const addr = to.trim();
+        const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        let entered = window.prompt("Email this document to:", recipient);
+        while (entered !== null && !emailRe.test(entered.trim())) {
+          entered = window.prompt(
+            "That is not a valid email address. Please re-enter:", entered.trim());
+        }
+        if (entered === null) { return; }
+        const addr = entered.trim();
 
         const label = el.textContent;
         el.dataset.busy = "1";

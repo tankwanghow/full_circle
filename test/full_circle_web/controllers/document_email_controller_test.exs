@@ -65,6 +65,18 @@ defmodule FullCircleWeb.DocumentEmailControllerTest do
 
       assert %{"ok" => false} = json_response(conn, 200)
     end
+
+    test "rejects a malformed recipient", %{conn: conn, company: company, invoice: invoice} do
+      conn =
+        post(conn, ~p"/email_document", %{
+          "company_id" => company.id,
+          "doc_type" => "Invoice",
+          "doc_id" => invoice.id,
+          "email" => "not-an-email"
+        })
+
+      assert %{"ok" => false} = json_response(conn, 200)
+    end
   end
 
   describe "GET /email_document/new" do

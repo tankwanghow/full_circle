@@ -39,21 +39,20 @@ defmodule FullCircleWeb.DocumentEmailController do
       }) do
     user = conn.assigns.current_user
 
-    with true <- is_binary(email) and String.trim(email) != "",
+    with {:ok, recipient} <- validate_email(email),
          {:ok, _doc, name, _assoc} <- load_document(user, company_id, doc_type, doc_id),
          company <- Sys.get_company!(company_id),
          token <- SharedDocument.sign(doc_type, doc_id, company_id, user.id),
          url <- shared_document_url(doc_type, doc_id, token),
          {:ok, _email} <-
            DocumentNotifier.deliver_document_link(
-             String.trim(email),
+             recipient,
              "Your #{name} from #{company.name}",
              url,
              company
            ) do
       json(conn, %{ok: true})
     else
-      false -> json(conn, %{ok: false, error: "A recipient email is required."})
       {:error, reason} -> json(conn, %{ok: false, error: error_message(reason)})
       _ -> json(conn, %{ok: false, error: "Could not send the email."})
     end
@@ -104,6 +103,20 @@ defmodule FullCircleWeb.DocumentEmailController do
     "#{FullCircleWeb.Endpoint.url()}/shared/#{doc_type}/#{doc_id}/print?#{query}"
   end
 
+  # Pragmatic email-format check, matching the pattern used elsewhere in the app.
+  defp validate_email(email) when is_binary(email) do
+    trimmed = String.trim(email)
+
+    if Regex.match?(~r/^[^\s@]+@[^\s@]+\.[^\s@]+$/, trimmed) do
+      {:ok, trimmed}
+    else
+      {:error, :invalid_email}
+    end
+  end
+
+  defp validate_email(_), do: {:error, :invalid_email}
+
+  defp error_message(:invalid_email), do: "Please enter a valid email address."
   defp error_message(:unknown_doc_type), do: "Unknown document type."
   defp error_message(:not_found), do: "Document not found or access denied."
   defp error_message(_other), do: "Could not send the email."
