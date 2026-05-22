@@ -386,6 +386,67 @@ defmodule FullCircleWeb.Router do
     end
   end
 
+  # Public, no-login document links emailed to customers.
+  scope "/", FullCircleWeb do
+    pipe_through([:browser])
+
+    get("/shared/expired", SharedDocumentController, :expired)
+
+    live_session :public_shared_invoice,
+      root_layout: {FullCircleWeb.Layouts, :print_root},
+      on_mount: [
+        {FullCircleWeb.Locale, :set_locale},
+        {FullCircleWeb.SharedDocument, {:verify_token, "Invoice"}}
+      ] do
+      live("/shared/Invoice/:id/print", InvoiceLive.Print, :print)
+    end
+
+    live_session :public_shared_receipt,
+      root_layout: {FullCircleWeb.Layouts, :print_root},
+      on_mount: [
+        {FullCircleWeb.Locale, :set_locale},
+        {FullCircleWeb.SharedDocument, {:verify_token, "Receipt"}}
+      ] do
+      live("/shared/Receipt/:id/print", ReceiptLive.Print, :print)
+    end
+
+    live_session :public_shared_credit_note,
+      root_layout: {FullCircleWeb.Layouts, :print_root},
+      on_mount: [
+        {FullCircleWeb.Locale, :set_locale},
+        {FullCircleWeb.SharedDocument, {:verify_token, "CreditNote"}}
+      ] do
+      live("/shared/CreditNote/:id/print", CreditNoteLive.Print, :print)
+    end
+
+    live_session :public_shared_debit_note,
+      root_layout: {FullCircleWeb.Layouts, :print_root},
+      on_mount: [
+        {FullCircleWeb.Locale, :set_locale},
+        {FullCircleWeb.SharedDocument, {:verify_token, "DebitNote"}}
+      ] do
+      live("/shared/DebitNote/:id/print", DebitNoteLive.Print, :print)
+    end
+
+    live_session :public_shared_delivery,
+      root_layout: {FullCircleWeb.Layouts, :print_root},
+      on_mount: [
+        {FullCircleWeb.Locale, :set_locale},
+        {FullCircleWeb.SharedDocument, {:verify_token, "Delivery"}}
+      ] do
+      live("/shared/Delivery/:id/print", DeliveryLive.Print, :print)
+    end
+
+    live_session :public_shared_order,
+      root_layout: {FullCircleWeb.Layouts, :print_root},
+      on_mount: [
+        {FullCircleWeb.Locale, :set_locale},
+        {FullCircleWeb.SharedDocument, {:verify_token, "Order"}}
+      ] do
+      live("/shared/Order/:id/print", OrderLive.Print, :print)
+    end
+  end
+
   scope "/", FullCircleWeb do
     pipe_through([:browser])
 
