@@ -26,8 +26,8 @@ defmodule FullCircleWeb.SharedDocumentLiveTest do
       live(conn, ~p"/shared/Invoice/#{invoice.id}/print?pre_print=false&token=#{token}")
 
     assert html =~ invoice.invoice_no
-    # the Email button must not appear on the customer's shared view
-    refute html =~ "email-btn"
+    # the Email button element must not appear on the customer's shared view
+    refute html =~ ~s(id="email-btn")
   end
 
   test "an invalid token redirects to the expired page", %{conn: conn, invoice: invoice} do

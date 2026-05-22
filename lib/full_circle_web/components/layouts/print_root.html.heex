@@ -31,6 +31,11 @@
       .is-size-7 { font-size: 0.75rem !important;}
       .font-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
       .border { border: solid 1px black; }
+      #email-status { text-align: center; margin-top: 8px; font-weight: bold; min-height: 1.3em; }
+      #email-status.ok { color: #15803d; }
+      #email-status.err { color: #b91c1c; }
+      #email-btn.is-busy { opacity: 0.55; pointer-events: none; animation: fcpulse 1.1s ease-in-out infinite; }
+      @keyframes fcpulse { 50% { opacity: 0.2; } }
     </style>
   </head>
   <body>
@@ -47,6 +52,7 @@
       >{gettext("Email")}</a>
       <a href="#" onclick="closeTab()">{gettext("Close")}</a>
     </div>
+    <div id="email-status"></div>
     {@inner_content}
     <script>
       document.addEventListener("keydown", evt => {
@@ -81,7 +87,16 @@
         document.body.innerHTML = originalContents;
       }
 
+      function setEmailStatus(kind, msg) {
+        const status = document.getElementById("email-status");
+        if (!status) { return; }
+        status.className = kind;
+        status.textContent = msg;
+      }
+
       async function emailDocument(el) {
+        if (el.dataset.busy === "1") { return; }
+
         const meta = document.querySelector("meta[name='csrf-token']");
         const csrf = meta ? meta.content : "";
         const companyId = el.dataset.companyId;
@@ -102,23 +117,35 @@
 
         const to = window.prompt("Email this document to:", recipient);
         if (!to || !to.trim()) { return; }
+        const addr = to.trim();
+
+        const label = el.textContent;
+        el.dataset.busy = "1";
+        el.classList.add("is-busy");
+        el.textContent = "Sending…";
+        setEmailStatus("", "");
 
         try {
           const res = await fetch("/email_document", {
             method: "POST",
             headers: { "content-type": "application/json", "x-csrf-token": csrf },
             body: JSON.stringify({
-              company_id: companyId, doc_type: docType, doc_id: docId, email: to.trim()
+              company_id: companyId, doc_type: docType, doc_id: docId, email: addr
             })
           });
           const data = await res.json();
           if (data.ok) {
-            alert("Document link emailed to " + to.trim() + ".");
+            setEmailStatus("ok", "✓ Document link emailed to " + addr);
+            setTimeout(function () { setEmailStatus("", ""); }, 8000);
           } else {
-            alert("Could not send: " + (data.error || "unknown error"));
+            setEmailStatus("err", "✗ " + (data.error || "Could not send the email."));
           }
         } catch (e) {
-          alert("Could not send the email: " + e);
+          setEmailStatus("err", "✗ Could not send the email — check your connection and try again.");
+        } finally {
+          el.dataset.busy = "";
+          el.classList.remove("is-busy");
+          el.textContent = label;
         }
       }
     </script>
