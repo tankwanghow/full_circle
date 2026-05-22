@@ -23,7 +23,7 @@ defmodule FullCircle.DocumentNotifier do
 
       Hello,
 
-      #{company.name} has shared a document with you. You can view and print it
+      #{company.name} has shared a E-Invoice document with you. You can view and print it
       using the link below:
 
       #{url}

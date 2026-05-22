@@ -47,7 +47,7 @@ defmodule FullCircleWeb.DocumentEmailController do
          {:ok, _email} <-
            DocumentNotifier.deliver_document_link(
              recipient,
-             "Your #{name} from #{company.name}",
+             "Your #{name} with E-Invoice QRCode from #{company.name}",
              url,
              company
            ) do
