@@ -106,5 +106,5 @@ defmodule FullCircleWeb.DocumentEmailController do
 
   defp error_message(:unknown_doc_type), do: "Unknown document type."
   defp error_message(:not_found), do: "Document not found or access denied."
-  defp error_message(other), do: "Could not send the email (#{inspect(other)})."
+  defp error_message(_other), do: "Could not send the email."
 end
