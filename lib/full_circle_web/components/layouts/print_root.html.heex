@@ -4,6 +4,7 @@
     <title>
       {"Print"}
     </title>
+    <meta name="csrf-token" content={Plug.CSRFProtection.get_csrf_token()} />
     <style>
       body { width: 100%; height: 100%; margin: 0; padding: 0; background-color: #FAFAFA; font-family: system-ui, Arial, Helvetica, sans-serif;}
       * { box-sizing: border-box; -moz-box-sizing: border-box; }
@@ -35,6 +36,15 @@
   <body>
     <div id="button">
       <a href="#" onclick="printElement('print-me')">{gettext("Print")}</a>
+      <a
+        :if={assigns[:email_doc] && !assigns[:shared_view?]}
+        id="email-btn"
+        href="#"
+        data-company-id={@email_doc.company_id}
+        data-doc-type={@email_doc.type}
+        data-doc-id={@email_doc.id}
+        onclick="emailDocument(this); return false;"
+      >{gettext("Email")}</a>
       <a href="#" onclick="closeTab()">{gettext("Close")}</a>
     </div>
     {@inner_content}
@@ -69,6 +79,47 @@
         document.body.innerHTML = printContents;
         window.print();
         document.body.innerHTML = originalContents;
+      }
+
+      async function emailDocument(el) {
+        const meta = document.querySelector("meta[name='csrf-token']");
+        const csrf = meta ? meta.content : "";
+        const companyId = el.dataset.companyId;
+        const docType = el.dataset.docType;
+        const docId = el.dataset.docId;
+
+        let recipient = "";
+        try {
+          const q = `company_id=${encodeURIComponent(companyId)}` +
+                    `&doc_type=${encodeURIComponent(docType)}` +
+                    `&doc_id=${encodeURIComponent(docId)}`;
+          const res = await fetch(`/email_document/new?${q}`, {
+            headers: { "x-csrf-token": csrf }
+          });
+          const data = await res.json();
+          recipient = data.recipient || "";
+        } catch (e) { /* fall back to an empty prompt */ }
+
+        const to = window.prompt("Email this document to:", recipient);
+        if (!to || !to.trim()) { return; }
+
+        try {
+          const res = await fetch("/email_document", {
+            method: "POST",
+            headers: { "content-type": "application/json", "x-csrf-token": csrf },
+            body: JSON.stringify({
+              company_id: companyId, doc_type: docType, doc_id: docId, email: to.trim()
+            })
+          });
+          const data = await res.json();
+          if (data.ok) {
+            alert("Document link emailed to " + to.trim() + ".");
+          } else {
+            alert("Could not send: " + (data.error || "unknown error"));
+          }
+        } catch (e) {
+          alert("Could not send the email: " + e);
+        }
       }
     </script>
   </body>
