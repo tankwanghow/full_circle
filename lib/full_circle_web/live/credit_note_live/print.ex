@@ -13,7 +13,12 @@ defmodule FullCircleWeb.CreditNoteLive.Print do
      |> assign(page_title: gettext("Print"))
      |> assign(:pre_print, pre_print)
      |> set_page_defaults()
-     |> fill_credit_notes(ids)}
+     |> fill_credit_notes(ids)
+     |> assign(:email_doc, %{
+       type: "CreditNote",
+       id: id,
+       company_id: socket.assigns.current_company.id
+     })}
   end
 
   @impl true

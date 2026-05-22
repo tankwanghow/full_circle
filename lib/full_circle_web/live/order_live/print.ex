@@ -13,7 +13,12 @@ defmodule FullCircleWeb.OrderLive.Print do
      |> assign(page_title: gettext("Print"))
      |> assign(:pre_print, pre_print)
      |> set_page_defaults()
-     |> fill_orders(ids)}
+     |> fill_orders(ids)
+     |> assign(:email_doc, %{
+       type: "Order",
+       id: id,
+       company_id: socket.assigns.current_company.id
+     })}
   end
 
   @impl true

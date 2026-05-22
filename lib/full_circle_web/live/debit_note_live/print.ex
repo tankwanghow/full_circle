@@ -13,7 +13,12 @@ defmodule FullCircleWeb.DebitNoteLive.Print do
      |> assign(page_title: gettext("Print"))
      |> assign(:pre_print, pre_print)
      |> set_page_defaults()
-     |> fill_debit_notes(ids)}
+     |> fill_debit_notes(ids)
+     |> assign(:email_doc, %{
+       type: "DebitNote",
+       id: id,
+       company_id: socket.assigns.current_company.id
+     })}
   end
 
   @impl true

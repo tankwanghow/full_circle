@@ -13,7 +13,12 @@ defmodule FullCircleWeb.ReceiptLive.Print do
      |> assign(page_title: gettext("Print"))
      |> assign(:pre_print, pre_print)
      |> set_page_defaults()
-     |> fill_receipts(ids)}
+     |> fill_receipts(ids)
+     |> assign(:email_doc, %{
+       type: "Receipt",
+       id: id,
+       company_id: socket.assigns.current_company.id
+     })}
   end
 
   @impl true
