@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>{gettext("Link expired")}</title>
+    <style>
+      body { font-family: system-ui, Arial, sans-serif; background: #FAFAFA;
+             display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+      .box { background: white; border: 1px solid #D3D3D3; border-radius: 8px;
+             padding: 40px; max-width: 460px; text-align: center;
+             box-shadow: 0 0 8px rgba(0,0,0,0.08); }
+    </style>
+  </head>
+  <body>
+    <div class="box">
+      <h1>{gettext("This link is no longer valid")}</h1>
+      <p>
+        {gettext(
+          "The document link has expired or is invalid. Please contact the company to request a new copy."
+        )}
+      </p>
+    </div>
+  </body>
+</html>
