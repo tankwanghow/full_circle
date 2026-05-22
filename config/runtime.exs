@@ -114,31 +114,49 @@ if config_env() == :prod do
   #
   # Check `Plug.SSL` for all available options in `force_ssl`.
 
-  # ## Configuring the mailer
-  #
-  # In production you need to configure the mailer to use a different adapter.
-  # Also, you may need to configure the Swoosh API client of your choice if you
-  # are not using SMTP. Here is an example of the configuration:
-  #
-  #     config :full_circle, FullCircle.Mailer,
-  #       adapter: Swoosh.Adapters.Mailgun,
-  #       api_key: System.get_env("MAILGUN_API_KEY"),
-  #       domain: System.get_env("MAILGUN_DOMAIN")
-  #
-  # For this example you need include a HTTP client required by Swoosh API client.
-  # Swoosh supports Hackney and Finch out of the box:
-  #
-  #     config :swoosh, :api_client, Swoosh.ApiClient.Hackney
-  #
-  # See https://hexdocs.pm/swoosh/Swoosh.html#module-installation for details.
+  # Mailer — SMTP in production, provider-agnostic. The MAIL_* env vars must
+  # be present in the production environment. Boot crashes with a clear message
+  # if any are missing so misconfiguration is loud rather than silent (would-be
+  # password-reset emails getting dropped is worse than a failed deploy).
+  mail_host =
+    System.get_env("MAIL_HOST") ||
+      raise "environment variable MAIL_HOST is missing."
+
+  mail_port =
+    System.get_env("MAIL_PORT") ||
+      raise "environment variable MAIL_PORT is missing."
+
+  mail_username =
+    System.get_env("MAIL_USERNAME") ||
+      raise "environment variable MAIL_USERNAME is missing."
+
+  mail_password =
+    System.get_env("MAIL_PASSWORD") ||
+      raise "environment variable MAIL_PASSWORD is missing."
+
+  mail_from =
+    System.get_env("MAIL_FROM") ||
+      raise "environment variable MAIL_FROM is missing."
+
+  mail_port = String.to_integer(mail_port)
 
   config :full_circle, FullCircle.Mailer,
-    adapter: Swoosh.Adapters.Mailjet,
-    api_key: System.get_env("MAILJET_API_KEY"),
-    secret: System.get_env("MAILJET_SECRET")
+    adapter: Swoosh.Adapters.SMTP,
+    relay: mail_host,
+    port: mail_port,
+    username: mail_username,
+    password: mail_password,
+    ssl: mail_port == 465,
+    tls: :always,
+    auth: :always,
+    retries: 1,
+    tls_options: [
+      versions: [:"tlsv1.2", :"tlsv1.3"],
+      verify: :verify_peer,
+      cacerts: :public_key.cacerts_get(),
+      server_name_indication: String.to_charlist(mail_host),
+      depth: 99
+    ]
 
-  # For this example you need include a HTTP client required by Swoosh API client.
-  # Swoosh supports Hackney and Finch out of the box:
-  # config :swoosh, :api_client, Swoosh.ApiClient.Hackney
-  config :swoosh, api_client: Swoosh.ApiClient.Finch, finch_name: FullCircle.Finch
+  config :full_circle, :mail_from, {"FullCircle", mail_from}
 end
