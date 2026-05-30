@@ -9,7 +9,12 @@ DOMAIN_NAME=$5
 IMAGE_NAME=$6
 DOCKER_HUB_USERNAME=$7
 DOCKER_CONTAINER_NAME=$8
-APP_COMPOSE="/home/$IMAGE_NAME/docker-compose-${IMAGE_NAME}.yml"
+MAIL_HOST=${10}
+MAIL_PORT=${11}
+MAIL_USERNAME=${12}
+MAIL_PASSWORD=${13}
+MAIL_FROM=${14}
+APP_COMPOSE="/home/$IMAGE_NAME/docker-compose-$IMAGE_NAME.yml"
 NGINX_CONF="${IMAGE_NAME}-nginx.conf"
 
 echo "Creating ${APP_COMPOSE} file..."
@@ -27,8 +32,11 @@ services:
       - PHX_HOST=${DOMAIN_NAME}
       - MIX_ENV=prod
       - PORT=$PORT
-      - MAILJET_API_KEY=135721f0f369c66a2a181e096cd61505
-      - MAILJET_SECRET=dd53cb5862212dcbe5610bc8aee8371f
+      - MAIL_HOST=${MAIL_HOST}
+      - MAIL_PORT=${MAIL_PORT}
+      - MAIL_USERNAME=${MAIL_USERNAME}
+      - MAIL_PASSWORD=${MAIL_PASSWORD}
+      - MAIL_FROM=${MAIL_FROM}
     network_mode: host
 EOF
 
