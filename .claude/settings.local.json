@@ -60,5 +60,19 @@
       "mcp__tidewave__execute_sql_query",
       "mcp__tidewave__project_eval"
     ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "statusMessage": "Checking docs/skills for drift...",
+            "command": "cmd=$(jq -r '.tool_input.command // empty' 2>/dev/null); case \"$cmd\" in *'git commit'*) printf '{\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"additionalContext\":\"A git commit just landed. Check whether this commit'\\''s code changes caused CLAUDE.md or any .claude/commands/*.md skill file to drift from the code (run git show --stat HEAD and git show HEAD to see the changes). If something drifted, summarize the drift and ASK the user'\\''s permission before updating those files — never edit docs/skills silently.\"}}' ;; esac"
+          }
+        ]
+      }
+    ]
   }
 }
