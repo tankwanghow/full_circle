@@ -40,6 +40,14 @@ exist ... Got value: nil
 It only triggers when sync encounters an **invalid** (`status != "Valid"`)
 e-invoice whose UUID is matched to a local document, so it is intermittent.
 
+## `EInvoice` has no `id` column
+
+The `EInvoice` schema is declared `@primary_key false` (its natural key is
+`:uuid`, the upsert conflict target). There is **no `id` field** — any query
+that does `select: ei.id` / `count(ei.id)` raises *"field `id` in `select`
+does not exist in schema FullCircle.EInvMetas.EInvoice"*. Select or count by
+`:uuid` instead.
+
 ## `sync_e_invoices/2` return contract
 
 Returns `{:ok, new_count}` on a full sync, or `{:error, message}` if a window
