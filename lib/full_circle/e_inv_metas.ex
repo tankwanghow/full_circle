@@ -1721,7 +1721,7 @@ defmodule FullCircle.EInvMetas do
       existing =
         from(ei in EInvoice,
           where: ei.company_id == ^com.id and ei.uuid in ^uuids,
-          select: count(ei.id)
+          select: count(ei.uuid)
         )
         |> Repo.one()
 
