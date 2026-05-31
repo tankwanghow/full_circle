@@ -1652,7 +1652,10 @@ defmodule FullCircle.EInvMetas do
     |> FullCircle.Repo.one() || ~U[2024-07-01 00:00:00Z]
   end
 
-  # Returns :ok on a full sync, or {:error, message} if a window failed.
+  # Returns {:ok, new_count} on a full sync, or {:error, message} if a window
+  # failed. new_count is the number of genuinely new e-invoices inserted —
+  # rows re-fetched within the 3-day overlap window are upserted but not
+  # counted, so a sync that found nothing new reports {:ok, 0}.
   # Each window is committed independently, so a partial sync is preserved and
   # clicking Sync again resumes from where it stopped.
   def sync_e_invoices(com, user) do
@@ -1662,7 +1665,7 @@ defmodule FullCircle.EInvMetas do
     range = get_date_range(last_sync, now) |> Enum.chunk_every(2, 1, :discard)
 
     result =
-      Enum.reduce_while(range, :ok, fn [a, b], _acc ->
+      Enum.reduce_while(range, 0, fn [a, b], acc ->
         case get_e_invoices_from_cloud(
                Timex.format!(a, "%Y-%m-%dT%H:%M:%S", :strftime),
                Timex.format!(b, "%Y-%m-%dT%H:%M:%S", :strftime),
@@ -1676,6 +1679,8 @@ defmodule FullCircle.EInvMetas do
               |> Enum.map(fn x -> EInvoice.changeset(%EInvoice{}, x) end)
               |> Enum.map(fn x -> x.changes end)
 
+            new_count = count_new_e_invoices(lt, com)
+
             if lt != [] do
               Repo.insert_all(EInvoice, lt,
                 on_conflict: :replace_all,
@@ -1684,7 +1689,7 @@ defmodule FullCircle.EInvMetas do
               )
             end
 
-            {:cont, :ok}
+            {:cont, acc + new_count}
 
           {:error, _} = err ->
             {:halt, err}
@@ -1692,12 +1697,35 @@ defmodule FullCircle.EInvMetas do
       end)
 
     case result do
-      :ok ->
-        remove_uuid_from_invalid_e_invoices(last_sync, now, com, user)
-        :ok
-
       {:error, _} = err ->
         err
+
+      new_count when is_integer(new_count) ->
+        remove_uuid_from_invalid_e_invoices(last_sync, now, com, user)
+        {:ok, new_count}
+    end
+  end
+
+  # Counts how many of the fetched changesets carry a uuid not already stored
+  # for this company, so the 3-day overlap re-fetch isn't reported as "new".
+  defp count_new_e_invoices(lt, com) do
+    uuids =
+      lt
+      |> Enum.map(& &1[:uuid])
+      |> Enum.reject(&is_nil/1)
+      |> Enum.uniq()
+
+    if uuids == [] do
+      0
+    else
+      existing =
+        from(ei in EInvoice,
+          where: ei.company_id == ^com.id and ei.uuid in ^uuids,
+          select: count(ei.id)
+        )
+        |> Repo.one()
+
+      length(uuids) - existing
     end
   end
 
@@ -1876,47 +1904,51 @@ defmodule FullCircle.EInvMetas do
     end)
   end
 
+  # Returns a string-keyed map (%{"doc_id", "doc_type", "uuid"}) so the result
+  # matches the JSON-decoded shape unmatch/3 consumes from the web. Using atom
+  # keys here makes unmatch/3's fc_doc["doc_type"] lookup return nil, which
+  # crashes the sync with "Ecto.Queryable not implemented for Atom".
   def get_fc_doc_by_uuid(uuid, com) do
     inv_qry =
       from(obj in Invoice,
         where: obj.company_id == ^com.id,
         where: obj.e_inv_uuid == ^uuid,
-        select: %{doc_id: obj.id, doc_type: "Invoice"}
+        select: %{"doc_id" => obj.id, "doc_type" => "Invoice", "uuid" => obj.e_inv_uuid}
       )
 
     pur_inv_qry =
       from(obj in PurInvoice,
         where: obj.company_id == ^com.id,
         where: obj.e_inv_uuid == ^uuid,
-        select: %{doc_id: obj.id, doc_type: "PurInvoice"}
+        select: %{"doc_id" => obj.id, "doc_type" => "PurInvoice", "uuid" => obj.e_inv_uuid}
       )
 
     pay_qry =
       from(obj in Payment,
         where: obj.company_id == ^com.id,
         where: obj.e_inv_uuid == ^uuid,
-        select: %{doc_id: obj.id, doc_type: "Payment"}
+        select: %{"doc_id" => obj.id, "doc_type" => "Payment", "uuid" => obj.e_inv_uuid}
       )
 
     rec_qry =
       from(obj in Receipt,
         where: obj.company_id == ^com.id,
         where: obj.e_inv_uuid == ^uuid,
-        select: %{doc_id: obj.id, doc_type: "Receipt"}
+        select: %{"doc_id" => obj.id, "doc_type" => "Receipt", "uuid" => obj.e_inv_uuid}
       )
 
     db_note_qry =
       from(obj in DebitNote,
         where: obj.company_id == ^com.id,
         where: obj.e_inv_uuid == ^uuid,
-        select: %{doc_id: obj.id, doc_type: "DebitNote"}
+        select: %{"doc_id" => obj.id, "doc_type" => "DebitNote", "uuid" => obj.e_inv_uuid}
       )
 
     cr_note_qry =
       from(obj in CreditNote,
         where: obj.company_id == ^com.id,
         where: obj.e_inv_uuid == ^uuid,
-        select: %{doc_id: obj.id, doc_type: "CreditNote"}
+        select: %{"doc_id" => obj.id, "doc_type" => "CreditNote", "uuid" => obj.e_inv_uuid}
       )
 
     inv_qry

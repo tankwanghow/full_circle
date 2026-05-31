@@ -124,8 +124,21 @@ defmodule FullCircleWeb.EInvListLive.Index do
   def handle_info({:finished_sync, result}, socket) do
     socket =
       case result do
-        {:error, msg} -> put_flash(socket, :error, gettext("E-Invoice sync stopped: ") <> msg)
-        _ -> socket
+        {:error, msg} ->
+          put_flash(socket, :error, gettext("E-Invoice sync stopped: ") <> msg)
+
+        {:ok, 0} ->
+          put_flash(socket, :info, gettext("E-Invoice sync complete — no new invoices."))
+
+        {:ok, n} ->
+          put_flash(
+            socket,
+            :info,
+            gettext("E-Invoice sync complete — %{count} new invoice(s).", count: n)
+          )
+
+        _ ->
+          socket
       end
 
     {:noreply,
