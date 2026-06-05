@@ -48,6 +48,7 @@ defmodule FullCircleWeb.PayRunLive.IndexComponent do
         obj={@obj}
         company={@company}
         col_class={col_class(idx)}
+        current?={idx == 0}
       />
     </div>
     """
@@ -64,40 +65,35 @@ defmodule FullCircleWeb.PayRunLive.IndexComponent do
     <div class={[@col_class, "border border-gray-300 flex items-center px-1 py-1 gap-1 text-sm"]}>
       <%= case @state do %>
         <% :done -> %>
-          <span class="w-[8%]">
-            <input
-              id={"checkbox_#{@pay.slip_id}"}
-              name={"checkbox[#{@pay.slip_id}]"}
-              type="checkbox"
-              class="rounded border-green-600 checked:bg-green-600"
-              phx-click="check_click"
-              phx-value-object-id={@pay.slip_id}
-            />
-          </span>
+          <input
+            id={"checkbox_#{@pay.slip_id}"}
+            name={"checkbox[#{@pay.slip_id}]"}
+            type="checkbox"
+            class="shrink-0 rounded border-green-600 checked:bg-green-600"
+            phx-click="check_click"
+            phx-value-object-id={@pay.slip_id}
+          />
           <.link
             navigate={"/companies/#{@company.id}/PaySlip/#{@pay.slip_id}/view"}
-            class="w-[18%] text-green-700 hover:font-bold"
+            class="shrink-0 w-16 text-left text-green-700 hover:font-bold"
           >
             {@pay.slip_no}
           </.link>
-          <span class="w-[26%] text-right font-mono">{money(@pay.net_pay)}</span>
-          <span class="w-[40%]"></span>
+          <span class="grow text-right font-mono">{money(@pay.net_pay)}</span>
           <.link
             navigate={card_url(@pay.year, @pay.month, @obj.employee_name, @company)}
-            class="w-[8%] text-orange-600 hover:font-bold"
+            class="shrink-0 text-orange-600 hover:font-bold"
           >
             {gettext("Card")}
           </.link>
         <% :pending -> %>
-          <span class="w-[8%]"></span>
           <.link
             navigate={new_payslip_url(@obj.id, @pay.year, @pay.month, @company)}
-            class="w-[18%] text-blue-600 hover:font-bold"
+            class="shrink-0 text-blue-600 hover:font-bold"
           >
             {gettext("New Pay")}
           </.link>
-          <span class="w-[26%]"></span>
-          <span class="w-[40%] flex gap-1 justify-center flex-wrap">
+          <span :if={@current?} class="grow flex gap-1 justify-center flex-wrap">
             <span
               :if={@pay.unproc_note_count > 0}
               class="bg-amber-200 rounded px-1"
@@ -113,9 +109,10 @@ defmodule FullCircleWeb.PayRunLive.IndexComponent do
               $ {@pay.unproc_adv_count}/{money(@pay.unproc_adv_sum)}
             </span>
           </span>
+          <span :if={not @current?} class="grow"></span>
           <.link
             navigate={card_url(@pay.year, @pay.month, @obj.employee_name, @company)}
-            class="w-[8%] text-orange-600 hover:font-bold"
+            class="shrink-0 text-orange-600 hover:font-bold"
           >
             {gettext("Card")}
           </.link>
