@@ -173,4 +173,71 @@ defmodule FullCircle.StatutoryTest do
       assert row.id_no == "890703085395"
     end
   end
+
+  alias FullCircle.HR.Statutory.{EpfFormat, SocsoFormat, EisFormat, SocsoEisFormat}
+
+  # Normalize cells to strings so Decimal vs string differences don't mask real diffs.
+  defp norm({col, rows}), do: {col, Enum.map(rows, fn r -> Enum.map(r, &to_string/1) end)}
+
+  describe "formatter parity with legacy SQL" do
+    setup :setup_statutory
+
+    setup ctx do
+      e1 =
+        employee_fixture(
+          %{name: "Bbb", epf_no: "E1", socso_no: "S1", tax_no: "111", id_no: "900101015555"},
+          ctx.com,
+          ctx.admin
+        )
+
+      e2 =
+        employee_fixture(
+          %{name: "Aaa", epf_no: "E2", socso_no: "", tax_no: "222", id_no: "910202025555"},
+          ctx.com,
+          ctx.admin
+        )
+
+      slip(e1, 5, 2026, %{
+        "Monthly Salary" => "3000",
+        "EPF By Employer" => "390",
+        "EPF By Employee" => "330",
+        "SOCSO By Employer" => "51.65",
+        "SOCSO By Employee" => "14.75",
+        "EIS By Employer" => "5.90",
+        "EIS By Employee" => "5.90"
+      }, ctx)
+
+      slip(e2, 5, 2026, %{
+        "Monthly Salary" => "2000",
+        "EPF By Employer" => "260",
+        "EPF By Employee" => "220",
+        "SOCSO By Employer" => "34.45",
+        "SOCSO By Employee" => "9.85",
+        "EIS By Employer" => "3.90",
+        "EIS By Employee" => "3.90"
+      }, ctx)
+
+      Map.put(ctx, :contribs, HR.statutory_contributions(5, 2026, ctx.com.id))
+    end
+
+    test "EPF matches legacy", ctx do
+      assert norm(EpfFormat.rows(ctx.contribs, "EPFCODE")) ==
+               norm(HR.epf_submit_file_format_query(5, 2026, "EPFCODE", ctx.com.id))
+    end
+
+    test "SOCSO matches legacy", ctx do
+      assert norm(SocsoFormat.rows(ctx.contribs, "SOCSOCODE")) ==
+               norm(HR.socso_submit_file_format_query(5, 2026, "SOCSOCODE", ctx.com.id))
+    end
+
+    test "EIS matches legacy", ctx do
+      assert norm(EisFormat.rows(ctx.contribs, "EISCODE")) ==
+               norm(HR.eis_submit_file_format_query(5, 2026, "EISCODE", ctx.com.id))
+    end
+
+    test "SOCSO+EIS matches legacy", ctx do
+      assert norm(SocsoEisFormat.rows(ctx.contribs, "EMPCODE")) ==
+               norm(HR.socso_eis_submit_file_format_query(5, 2026, "EMPCODE", ctx.com.id))
+    end
+  end
 end
