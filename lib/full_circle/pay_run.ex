@@ -5,6 +5,41 @@ defmodule FullCircle.PayRun do
   alias FullCircle.Sys.Company
   alias FullCircle.HR.{Employee, SalaryNote, SalaryType}
 
+  @doc """
+  Classifies a month cell for an employee: :done (slip exists),
+  :pending (active or has unprocessed items, no slip), or :na
+  (resigned with no slip and nothing pending).
+  """
+  def cell_state(status, pay) do
+    cond do
+      not is_nil(pay.slip_no) -> :done
+      status == "Active" or pay.unproc_note_count > 0 or pay.unproc_adv_count > 0 -> :pending
+      true -> :na
+    end
+  end
+
+  @doc """
+  Per-month summary across all rows: `%{{year, month} => %{done, pending, payroll}}`.
+  `payroll` sums net pay over done cells; `pending` counts cells in :pending state.
+  """
+  def pay_run_totals(objects) do
+    objects
+    |> Enum.flat_map(fn o -> Enum.map(o.pay_list, fn p -> {o.status, p} end) end)
+    |> Enum.group_by(fn {_status, p} -> {p.year, p.month} end)
+    |> Map.new(fn {ym, pairs} ->
+      states = Enum.map(pairs, fn {status, p} -> {cell_state(status, p), p} end)
+      done = Enum.count(states, fn {s, _} -> s == :done end)
+      pending = Enum.count(states, fn {s, _} -> s == :pending end)
+
+      payroll =
+        states
+        |> Enum.filter(fn {s, _} -> s == :done end)
+        |> Enum.reduce(Decimal.new(0), fn {_s, p}, acc -> Decimal.add(acc, p.net_pay) end)
+
+      {ym, %{done: done, pending: pending, payroll: payroll}}
+    end)
+  end
+
   def employee_leave_summary(emp_id, year, com) do
     from(sn in SalaryNote,
       join: comp in Company,

@@ -240,4 +240,65 @@ defmodule FullCircle.PayRunTest do
       assert is_nil(find_row(rows, resigned))
     end
   end
+
+  describe "cell_state/2" do
+    defp cell(attrs) do
+      Map.merge(
+        %{slip_no: nil, unproc_note_count: 0, unproc_adv_count: 0},
+        Map.new(attrs)
+      )
+    end
+
+    test "done when a slip exists" do
+      assert PayRun.cell_state("Active", cell(slip_no: "PS-1")) == :done
+      assert PayRun.cell_state("Resigned", cell(slip_no: "PS-1")) == :done
+    end
+
+    test "pending when active with no slip" do
+      assert PayRun.cell_state("Active", cell([])) == :pending
+    end
+
+    test "pending when resigned but has unprocessed items" do
+      assert PayRun.cell_state("Resigned", cell(unproc_note_count: 1)) == :pending
+      assert PayRun.cell_state("Resigned", cell(unproc_adv_count: 2)) == :pending
+    end
+
+    test "na when resigned, no slip, no unprocessed items" do
+      assert PayRun.cell_state("Resigned", cell([])) == :na
+    end
+  end
+
+  describe "pay_run_totals/1" do
+    test "aggregates done/pending counts and payroll per month" do
+      objects = [
+        %{
+          status: "Active",
+          pay_list: [
+            %{year: 2026, month: 5, slip_no: "PS-1", net_pay: Decimal.new("3000"),
+              unproc_note_count: 0, unproc_adv_count: 0},
+            %{year: 2026, month: 4, slip_no: nil, net_pay: nil,
+              unproc_note_count: 1, unproc_adv_count: 0}
+          ]
+        },
+        %{
+          status: "Active",
+          pay_list: [
+            %{year: 2026, month: 5, slip_no: nil, net_pay: nil,
+              unproc_note_count: 0, unproc_adv_count: 0},
+            %{year: 2026, month: 4, slip_no: "PS-2", net_pay: Decimal.new("2000"),
+              unproc_note_count: 0, unproc_adv_count: 0}
+          ]
+        }
+      ]
+
+      totals = PayRun.pay_run_totals(objects)
+
+      assert totals[{2026, 5}].done == 1
+      assert totals[{2026, 5}].pending == 1
+      assert Decimal.eq?(totals[{2026, 5}].payroll, Decimal.new("3000"))
+      assert totals[{2026, 4}].done == 1
+      assert totals[{2026, 4}].pending == 1
+      assert Decimal.eq?(totals[{2026, 4}].payroll, Decimal.new("2000"))
+    end
+  end
 end
