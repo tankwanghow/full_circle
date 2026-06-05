@@ -128,6 +128,34 @@ defmodule FullCircle.HR do
     ]
   end
 
+  @statutory_categories ~w(epf_employer epf_employee socso_employer socso_employee
+                           socso_employer_only eis_employer eis_employee eis_employer_only
+                           pcb_employee)
+
+  def statutory_contributions(month, year, com_id) do
+    sums =
+      Enum.map_join(@statutory_categories, ",\n", fn c ->
+        """
+        coalesce((select sum(sn.quantity * sn.unit_price)
+                    from salary_notes sn join salary_types st on st.id = sn.salary_type_id
+                   where sn.pay_slip_id = ps.id and st.statutory_code = '#{c}'), 0) as #{c}
+        """
+      end)
+
+    """
+    select emp.name, emp.id_no, emp.tax_no, emp.socso_no, emp.epf_no, emp.service_since,
+           ps.pay_month, ps.pay_year,
+           coalesce((select sum(sn.quantity * sn.unit_price)
+                       from salary_notes sn join salary_types st on st.id = sn.salary_type_id
+                      where sn.pay_slip_id = ps.id and st.type = 'Addition'), 0) as wages,
+           #{sums}
+      from pay_slips ps join employees emp on emp.id = ps.employee_id
+     where ps.pay_month = #{month} and ps.pay_year = #{year} and ps.company_id = '#{com_id}'
+     order by emp.name
+    """
+    |> FullCircle.Helpers.exec_query_map()
+  end
+
   def epf_submit_file_format_query(month, year, epf_code, com_id) do
     """
     with step_1 as (
