@@ -254,14 +254,44 @@ defmodule FullCircle.Sys.UserSetting do
         page: "EpfSocsoEis",
         code: "report",
         display_name: "Report",
-        values: %{"EPF" => "EPF", "SOCSO" => "SOCSO", "EIS" => "EIS", "SOCSO+EIS" => "SOCSO+EIS"},
+        values: %{
+          "EPF" => "EPF",
+          "SOCSO" => "SOCSO",
+          "EIS" => "EIS",
+          "SOCSO+EIS" => "SOCSO+EIS",
+          "PCB" => "PCB"
+        },
         value: "EPF",
         company_user_id: cuid
       },
       %{
         page: "EpfSocsoEis",
-        code: "code",
-        display_name: "Employer Code",
+        code: "epf_code",
+        display_name: "EPF Employer No.",
+        values: %{"default" => ""},
+        value: "",
+        company_user_id: cuid
+      },
+      %{
+        page: "EpfSocsoEis",
+        code: "socso_code",
+        display_name: "SOCSO Employer Code",
+        values: %{"default" => ""},
+        value: "",
+        company_user_id: cuid
+      },
+      %{
+        page: "EpfSocsoEis",
+        code: "eis_code",
+        display_name: "EIS Employer Code",
+        values: %{"default" => ""},
+        value: "",
+        company_user_id: cuid
+      },
+      %{
+        page: "EpfSocsoEis",
+        code: "pcb_code",
+        display_name: "PCB Employer TIN",
         values: %{"default" => ""},
         value: "",
         company_user_id: cuid

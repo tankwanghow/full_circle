@@ -22,10 +22,10 @@ defmodule FullCircleWeb.ReportLive.EpfSocsoEis do
   def handle_params(params, _uri, socket) do
     params = params["search"] || %{}
 
-    report = params["report"] || find_setting(socket.assigns.settings, "report").value
-    code = params["code"] || find_setting(socket.assigns.settings, "code").value
+    report = params["report"] || setting_value(socket.assigns.settings, "report", "EPF")
     month = params["month"] || Timex.today().month
     year = params["year"] || Timex.today().year
+    code = params["code"] || setting_value(socket.assigns.settings, code_key(report), "")
 
     {:noreply,
      socket
@@ -34,17 +34,22 @@ defmodule FullCircleWeb.ReportLive.EpfSocsoEis do
      |> filter_transactions(report, month, year, code)}
   end
 
-  defp find_setting(settings, code) do
-    Enum.find(settings, fn s -> s.code == code end)
+  defp code_key(report), do: FullCircle.HR.Statutory.code_key(report)
+
+  defp setting_value(settings, key, default) do
+    case Enum.find(settings, fn s -> s.code == key end) do
+      nil -> default
+      s -> s.value
+    end
   end
 
   defp persist_settings(socket, report, code) do
     settings =
       Enum.map(socket.assigns.settings, fn s ->
-        case s.code do
-          "report" -> if s.value == report, do: s, else: FullCircle.Sys.update_setting(s, report)
-          "code" -> if s.value == code, do: s, else: FullCircle.Sys.update_setting(s, code)
-          _ -> s
+        cond do
+          s.code == "report" and s.value != report -> FullCircle.Sys.update_setting(s, report)
+          s.code == code_key(report) and s.value != code -> FullCircle.Sys.update_setting(s, code)
+          true -> s
         end
       end)
 
@@ -52,11 +57,19 @@ defmodule FullCircleWeb.ReportLive.EpfSocsoEis do
   end
 
   @impl true
-  def handle_event("changed", _, socket) do
+  def handle_event("changed", %{"search" => %{"report" => report}}, socket) do
+    code = setting_value(socket.assigns.settings, code_key(report), "")
+
     {:noreply,
      socket
+     |> assign(search: %{socket.assigns.search | report: report, code: code})
      |> assign(row: [])
      |> assign(col: [])}
+  end
+
+  @impl true
+  def handle_event("changed", _params, socket) do
+    {:noreply, socket |> assign(row: []) |> assign(col: [])}
   end
 
   @impl true
@@ -116,7 +129,8 @@ defmodule FullCircleWeb.ReportLive.EpfSocsoEis do
                   "EPF",
                   "SOCSO",
                   "EIS",
-                  "SOCSO+EIS"
+                  "SOCSO+EIS",
+                  "PCB"
                 ]}
                 type="select"
                 label={gettext("Report")}

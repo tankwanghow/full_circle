@@ -234,6 +234,17 @@ defmodule FullCircleWeb.SalaryTypeLive.Form do
           </div>
         </div>
         <div class="grid grid-cols-12 gap-1">
+          <div class="col-span-4">
+            <.input
+              field={@form[:statutory_code]}
+              type="select"
+              label={gettext("Statutory Code")}
+              prompt={gettext("— none —")}
+              options={FullCircle.HR.SalaryType.statutory_codes()}
+            />
+          </div>
+        </div>
+        <div class="grid grid-cols-12 gap-1">
           <div class="col-span-6">
             <.input type="hidden" field={@form[:db_ac_id]} />
             <.input
