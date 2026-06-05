@@ -19,20 +19,21 @@ defmodule FullCircle.StatutoryTest do
 
     monthly = HR.get_salary_type_by_name("Monthly Salary", com, admin)
 
-    salary_type_fixture(
-      %{
-        name: "Employee PCB",
-        type: "Deduction",
-        cal_func: "pcb_employee",
-        statutory_code: "pcb_employee",
-        db_ac_name: cr_ac.name,
-        db_ac_id: cr_ac.id,
-        cr_ac_name: cr_ac.name,
-        cr_ac_id: cr_ac.id
-      },
-      com,
-      admin
-    )
+    pcb =
+      salary_type_fixture(
+        %{
+          name: "Employee PCB",
+          type: "Deduction",
+          cal_func: "pcb_employee",
+          statutory_code: "pcb_employee",
+          db_ac_name: cr_ac.name,
+          db_ac_id: cr_ac.id,
+          cr_ac_name: cr_ac.name,
+          cr_ac_id: cr_ac.id
+        },
+        com,
+        admin
+      )
 
     stat = fn name, code ->
       salary_type_fixture(
@@ -56,6 +57,7 @@ defmodule FullCircle.StatutoryTest do
       funds_ac: funds_ac,
       monthly: monthly,
       st: %{
+        "Employee PCB" => pcb,
         "EPF By Employer" => stat.("EPF By Employer", "epf_employer"),
         "EPF By Employee" => stat.("EPF By Employee", "epf_employee"),
         "SOCSO By Employer" => stat.("SOCSO By Employer", "socso_employer"),
@@ -238,6 +240,74 @@ defmodule FullCircle.StatutoryTest do
     test "SOCSO+EIS matches legacy", ctx do
       assert norm(SocsoEisFormat.rows(ctx.contribs, "EMPCODE")) ==
                norm(HR.socso_eis_submit_file_format_query(5, 2026, "EMPCODE", ctx.com.id))
+    end
+  end
+
+  alias FullCircle.HR.Statutory.PcbFormat
+
+  describe "PcbFormat (CP39 / e-Data PCB)" do
+    setup :setup_statutory
+
+    test "produces a spec-correct header and detail lines", ctx do
+      e1 =
+        employee_fixture(
+          %{name: "Nasrul Bin Nayan", tax_no: "55491986090", id_no: "890703085395"},
+          ctx.com,
+          ctx.admin
+        )
+
+      e2 =
+        employee_fixture(
+          %{name: "Tan Su Yen", tax_no: "50358107000", id_no: "001206080961"},
+          ctx.com,
+          ctx.admin
+        )
+
+      # employee with zero PCB must be excluded
+      e3 =
+        employee_fixture(
+          %{name: "Zero Pcb", tax_no: "999", id_no: "000101010000"},
+          ctx.com,
+          ctx.admin
+        )
+
+      slip(e1, 5, 2026, %{"Monthly Salary" => "5000", "Employee PCB" => "79.20"}, ctx)
+      slip(e2, 5, 2026, %{"Monthly Salary" => "8000", "Employee PCB" => "318.90"}, ctx)
+      slip(e3, 5, 2026, %{"Monthly Salary" => "1000"}, ctx)
+
+      contribs = HR.statutory_contributions(5, 2026, ctx.com.id)
+      text = PcbFormat.text(contribs, "0093787203", 5, 2026)
+      lines = String.split(text, "\r\n", trim: true)
+
+      # CRLF used, no other line endings
+      assert text =~ "\r\n"
+      refute String.contains?(String.replace(text, "\r\n", ""), "\n")
+
+      [header | details] = lines
+      assert String.length(header) == 57
+      # H + tin(10) + tin(10) + year(4) + month(2) is fully deterministic:
+      assert String.starts_with?(header, "H00937872030093787203202605")
+      assert String.slice(header, 1, 10) == "0093787203"
+      assert String.slice(header, 11, 10) == "0093787203"
+      assert String.slice(header, 21, 4) == "2026"
+      assert String.slice(header, 25, 2) == "05"
+      assert String.slice(header, 27, 10) == "0000039810"
+      assert String.slice(header, 37, 5) == "00002"
+      assert String.slice(header, 42, 10) == "0000000000"
+      assert String.slice(header, 52, 5) == "00000"
+
+      assert length(details) == 2
+      d = Enum.find(details, &String.contains?(&1, "Nasrul"))
+      assert String.length(d) == 136
+      assert String.starts_with?(d, "D55491986090")
+      assert String.slice(d, 12, 60) == String.pad_trailing("Nasrul Bin Nayan", 60)
+      assert String.slice(d, 72, 12) == String.pad_trailing("", 12)
+      assert String.slice(d, 84, 12) == "890703085395"
+      assert String.slice(d, 96, 12) == String.pad_trailing("", 12)
+      assert String.slice(d, 108, 2) == "MY"
+      assert String.slice(d, 110, 8) == "00007920"
+      assert String.slice(d, 118, 8) == "00000000"
+      assert String.slice(d, 126, 10) == String.pad_trailing("", 10)
     end
   end
 end
