@@ -35,37 +35,33 @@ defmodule FullCircleWeb.PayRunLive.Index do
   end
 
   @impl true
-  def handle_event("prev", _, socket), do: {:noreply, shift_to(socket, -1)}
-
-  @impl true
-  def handle_event("next", _, socket), do: {:noreply, shift_to(socket, 1)}
+  def handle_event("goto_month", %{"month" => m, "year" => y}, socket) do
+    {:noreply, navigate_to(socket, String.to_integer(m), String.to_integer(y))}
+  end
 
   @impl true
   def handle_event("current", _, socket) do
-    d = Timex.today() |> Timex.shift(months: -1)
-    {:noreply, navigate_to(socket, d.month, d.year)}
-  end
-
-  defp shift_to(socket, months) do
-    d =
-      Timex.end_of_month(socket.assigns.search.year, socket.assigns.search.month)
-      |> Timex.shift(months: months)
-
-    navigate_to(socket, d.month, d.year)
+    {m, y} = default_base()
+    {:noreply, navigate_to(socket, m, y)}
   end
 
   defp navigate_to(socket, month, year) do
+    {month, year} = clamp_base(month, year)
     qry = %{"search[month]" => month, "search[year]" => year}
-    push_navigate(socket, to: "/companies/#{socket.assigns.current_company.id}/PayRun?#{URI.encode_query(qry)}")
+
+    push_navigate(socket,
+      to: "/companies/#{socket.assigns.current_company.id}/PayRun?#{URI.encode_query(qry)}"
+    )
   end
 
   @impl true
   def handle_params(params, _uri, socket) do
     params = params["search"]
-    d = Timex.today() |> Timex.shift(months: -1)
+    {def_m, def_y} = default_base()
 
-    month = String.to_integer(params["month"] || "#{d.month}")
-    year = String.to_integer(params["year"] || "#{d.year}")
+    month = String.to_integer(params["month"] || "#{def_m}")
+    year = String.to_integer(params["year"] || "#{def_y}")
+    {month, year} = clamp_base(month, year)
 
     objects = PayRun.pay_run_index(month, year, socket.assigns.current_company)
 
@@ -80,14 +76,39 @@ defmodule FullCircleWeb.PayRunLive.Index do
      |> assign(can_print: false)}
   end
 
-  # [latest, previous] — matches pay_run_index ordering (latest month first/leftmost).
+  # Default/"Current" base = the current pay month (one month in arrears).
+  defp default_base do
+    d = Timex.today() |> Timex.shift(months: -1)
+    {d.month, d.year}
+  end
+
+  # The window's newest month may not exceed current pay month + 1 (next month).
+  defp clamp_base(month, year) do
+    max_d = Timex.today() |> Timex.beginning_of_month()
+    req_d = Date.new!(year, month, 1)
+
+    if Date.compare(req_d, max_d) == :gt do
+      {max_d.month, max_d.year}
+    else
+      {month, year}
+    end
+  end
+
+  # Three months, latest first — matches pay_run_index ordering (latest month leftmost).
   defp window_months(month, year) do
-    [0, -1]
+    [0, -1, -2]
     |> Enum.map(fn x -> Timex.end_of_month(year, month) |> Timex.shift(months: x) end)
     |> Enum.map(fn d -> {d.year, d.month} end)
   end
 
   defp month_label({yr, mth}), do: "#{Timex.month_shortname(mth)} #{yr}"
+
+  defp totals_for(totals, ym),
+    do: Map.get(totals, ym, %{done: 0, pending: 0, payroll: Decimal.new(0)})
+
+  # Current (newest) month is wide — it carries unprocessed notes/advances; older months are tight.
+  defp col_class(0), do: "w-[40%]"
+  defp col_class(_), do: "w-[22%]"
 
   defp fmt(d), do: Number.Delimit.number_to_delimited(d)
 
@@ -97,16 +118,28 @@ defmodule FullCircleWeb.PayRunLive.Index do
     <div class="mx-auto w-9/12">
       <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
 
-      <div class="flex justify-center items-center gap-2 mb-2">
-        <.button phx-click="prev" class="h-9">◀</.button>
-        <div class="font-semibold text-lg w-48 text-center">
-          {month_label(Enum.at(@months, 0))} – {month_label(Enum.at(@months, 1))}
-        </div>
-        <.button phx-click="next" class="h-9">▶</.button>
-        <.button phx-click="current" class="h-9 gray">{gettext("Current")}</.button>
+      <div class="flex flex-wrap justify-center items-stretch gap-2 mb-2">
+        <.button
+          :for={ym <- @months}
+          phx-click="goto_month"
+          phx-value-month={elem(ym, 1)}
+          phx-value-year={elem(ym, 0)}
+          class={
+            "grow basis-0 h-auto py-1 text-sm leading-tight whitespace-normal" <>
+              if(ym == hd(@months), do: " ring-2 ring-blue-600", else: "")
+          }
+        >
+          <span class="font-bold">{month_label(ym)}</span>
+          <br />{gettext("Done")} {totals_for(@totals, ym).done} · {gettext("Pending")} {totals_for(
+            @totals,
+            ym
+          ).pending} · {fmt(totals_for(@totals, ym).payroll)}
+        </.button>
+        <.button phx-click="current" class="grow-0 gray h-auto py-1">{gettext("Current")}</.button>
+      </div>
 
+      <div :if={@can_print} class="flex justify-center gap-2 mb-2">
         <.link
-          :if={@can_print}
           navigate={~p"/companies/#{@current_company.id}/PaySlip/print_multi?pre_print=false&ids=#{@ids}"}
           target="_blank"
           class="blue button"
@@ -114,7 +147,6 @@ defmodule FullCircleWeb.PayRunLive.Index do
           {gettext("Print")}{"(#{Enum.count(@selected)})"}
         </.link>
         <.link
-          :if={@can_print}
           navigate={~p"/companies/#{@current_company.id}/PaySlip/print_multi?pre_print=true&ids=#{@ids}"}
           target="_blank"
           class="blue button"
@@ -123,20 +155,11 @@ defmodule FullCircleWeb.PayRunLive.Index do
         </.link>
       </div>
 
-      <div :if={Enum.count(@objects) > 0} class="mb-2">
-        <%= for ym <- @months do %>
-          <div class="text-center text-sm bg-amber-100 border border-amber-300">
-            <span class="font-bold">{month_label(ym)}</span>
-            · {gettext("Done")} {@totals[ym].done}
-            · {gettext("Pending")} {@totals[ym].pending}
-            · {gettext("Payroll")} {fmt(@totals[ym].payroll)}
-          </div>
-        <% end %>
-      </div>
-
       <div :if={Enum.count(@objects) > 0} class="flex bg-amber-200 text-center font-bold">
         <div class="w-[16%] border border-rose-400">{gettext("Name")}</div>
-        <div :for={ym <- @months} class="w-[42%] border border-rose-400">{month_label(ym)}</div>
+        <%= for {ym, idx} <- Enum.with_index(@months) do %>
+          <div class={[col_class(idx), "border border-rose-400"]}>{month_label(ym)}</div>
+        <% end %>
       </div>
 
       <div
@@ -155,11 +178,6 @@ defmodule FullCircleWeb.PayRunLive.Index do
           company={@current_company}
           ex_class=""
         />
-      </div>
-
-      <div :if={Enum.count(@objects) > 0} class="flex bg-amber-200 text-center font-bold">
-        <div class="w-[16%] border border-rose-400">{gettext("Total")}</div>
-        <div :for={ym <- @months} class="w-[42%] border border-rose-400">{fmt(@totals[ym].payroll)}</div>
       </div>
     </div>
     """

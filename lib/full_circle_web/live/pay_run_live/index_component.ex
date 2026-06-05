@@ -42,16 +42,26 @@ defmodule FullCircleWeb.PayRunLive.IndexComponent do
         </div>
       </div>
 
-      <.month_block :for={pay <- @obj.pay_list} pay={pay} obj={@obj} company={@company} />
+      <.month_block
+        :for={{pay, idx} <- Enum.with_index(@obj.pay_list)}
+        pay={pay}
+        obj={@obj}
+        company={@company}
+        col_class={col_class(idx)}
+      />
     </div>
     """
   end
+
+  # Current (newest) month is wide — it carries unprocessed notes/advances; older months are tight.
+  defp col_class(0), do: "w-[40%]"
+  defp col_class(_), do: "w-[22%]"
 
   defp month_block(assigns) do
     assigns = assign(assigns, :state, PayRun.cell_state(assigns.obj.status, assigns.pay))
 
     ~H"""
-    <div class="w-[42%] border border-gray-300 flex items-center px-1 py-1 gap-1 text-sm">
+    <div class={[@col_class, "border border-gray-300 flex items-center px-1 py-1 gap-1 text-sm"]}>
       <%= case @state do %>
         <% :done -> %>
           <span class="w-[8%]">
