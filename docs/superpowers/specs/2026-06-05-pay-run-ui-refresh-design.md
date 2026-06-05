@@ -1,0 +1,117 @@
+# Pay Run UI Refresh — Two-Month Rich Rows
+
+**Date:** 2026-06-05
+**Status:** Approved design, pending spec review
+
+## Problem
+
+The Pay Run screen ([pay_run_live/index.ex](../../../lib/full_circle_web/live/pay_run_live/index.ex))
+is the month-end hub for payroll, but it is hard to work from day-to-day:
+
+- **Clunky month navigation** — two number `<input>` boxes + a magnifier button; no
+  prev/next arrows or "jump to current month".
+- **No money visible** — the grid shows slip numbers but never the pay amounts, so figures
+  can't be sanity-checked without opening each slip.
+- **No status at a glance** — nothing summarises how many slips are done vs pending, and there
+  are no totals.
+- **Pending work is invisible** — unprocessed salary notes and advances (entered but not yet
+  pulled into a payslip) don't show, so the user can't tell who has pending items to process.
+
+Root cause: the current grid is a Name column + **three** narrow month cells, each cramming
+two links together. It's too narrow to carry status + money + pending-item signals.
+
+## Goal
+
+Redesign Pay Run as **two-month rich rows**: the selected pay month plus the previous month,
+side by side, each month block showing status, net pay, and unprocessed notes/advances, with
+a summary band and totals.
+
+## Non-Goals (YAGNI)
+
+- Batch generate / batch recalculate payslips — separate feature.
+- Print-cap changes (current 15-slip checkbox print stays as-is).
+- Department grouping — no `department` field exists on `Employee`.
+- **No-punch warning** (zero attendance that month) — deferred; would need a
+  `time_attendances` join. May be added later.
+
+## Layout
+
+```
+Pay Run        ◀  Apr–May 2026  ▶   [ This month ]
+
+ Apr 2026  ·  Done 45 · Pending 5 · Payroll 130,200.00
+ May 2026  ·  Done 42 · Pending 8 · Payroll 128,540.00
+──────────────────────────────────────────────────────────────
+              │            Apr 2026          │            May 2026
+ Name         │ Status NetPay  Notes  Adv  ▸ │ Status NetPay  Notes  Adv  ▸
+──────────────────────────────────────────────────────────────
+ Ali bin Abu  │ ●Done 2,450.00   –     –  PS │ ●Done 2,450.00   –     –  PS
+ Siti Aminah  │ ●Done 1,980.00   –     –  PS │ ○Pend    –     2/300 1/500 New
+──────────────────────────────────────────────────────────────
+ TOTAL        │       130,200.00             │       128,540.00
+```
+
+- **Header:** `◀` / `▶` shift the two-month window one month at a time. **This month** resets
+  to current + previous month. Window state lives in URL query params (`base_month`,
+  `base_year`), preserving the existing `push_navigate` + shareable-URL pattern.
+- **Frozen Name column** on the left, then two month blocks.
+- **Summary band:** one line per month — Done count, Pending count, payroll total.
+- **Totals row** at the bottom — payroll total per month.
+
+The window is `[base_month, base_month − 1]` (latest on the right, matching the mockup's left→right
+chronological order Apr then May; final column ordering to be confirmed during implementation —
+default latest month rightmost).
+
+## Per-Month Cell Behaviour
+
+- **Done** (green ●): show `net_pay`, the slip-no as a link to the slip view, a **Card** link to
+  the punch card, and the existing print checkbox.
+- **Pending** (amber ○): show a **New Pay** link + **Card** link. If unprocessed items exist,
+  show badges:
+  - **Notes** `count/sum` (amber)
+  - **Adv** `count/sum` (blue)
+
+  Net pay is blank when pending.
+- "Unprocessed" = `salary_notes` (by `note_date`) or `advances` (by `slip_date`) dated in that
+  pay month with `pay_slip_id IS NULL`.
+
+## Data Layer — rewrite `pay_run_index/3`
+
+In [pay_run.ex](../../../lib/full_circle/pay_run.ex). Change the window from 3 months (`-2..0`)
+to 2 months (`-1..0`). For each employee × month, in addition to today's `slip_no` / `slip_id`,
+return:
+
+| Field | Meaning |
+|-------|---------|
+| `net_pay` | For an existing slip: `Σ additions + Σ bonuses − Σ deductions − Σ advances` over rows linked by `pay_slip_id`. Matches `PaySlip.compute_fields/1`. Salary-note amount = `quantity * unit_price`; advance amount = `advances.amount`. |
+| `unproc_note_count`, `unproc_note_sum` | `salary_notes` with `pay_slip_id IS NULL`, `note_date` in the month. |
+| `unproc_adv_count`, `unproc_adv_sum` | `advances` with `pay_slip_id IS NULL`, `slip_date` in the month. |
+
+Per-month aggregates (done count, pending count, payroll total) for the summary band and totals
+row — computed in Elixir from the returned rows, or via a small companion query. Net pay must
+exclude `Contribution` and `LeaveTaken` salary types (they don't affect take-home), consistent
+with `compute_fields/1`.
+
+## UI Files
+
+- [pay_run_live/index.ex](../../../lib/full_circle_web/live/pay_run_live/index.ex):
+  replace the number-box search form with window state (`base_month` / `base_year`) and
+  `prev` / `next` / `this_month` events that `push_navigate` with query params. Render the
+  summary band and totals row. Keep the existing checkbox-selection + print/pre-print links.
+- [pay_run_live/index_component.ex](../../../lib/full_circle_web/live/pay_run_live/index_component.ex):
+  render the two rich month blocks per employee, with status badges, net pay, unprocessed-item
+  badges, and the Card / New Pay / slip links.
+
+## Testing
+
+- `pay_run_index/2` (context): an employee with an existing slip reports correct `net_pay`
+  (additions + bonuses − deductions − advances; contributions/leaves excluded); an employee with
+  unlinked salary notes / advances in the month reports correct unprocessed counts and sums;
+  per-month done/pending counts and payroll totals are correct.
+- LiveView: prev/next/this-month navigation updates the two-month window and URL params; Done
+  cells link to the slip and expose the print checkbox; Pending cells show New Pay + unprocessed
+  badges; summary band and totals render expected numbers.
+
+## Open Questions
+
+- Final left↔right ordering of the two month columns (default: latest month rightmost).
