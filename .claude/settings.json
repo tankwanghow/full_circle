@@ -8,7 +8,19 @@
       "Bash(MIX_ENV=test mix ecto.drop -r FullCircle.Repo)",
       "Bash(MIX_ENV=test mix ecto.create -r FullCircle.Repo)",
       "Bash(MIX_ENV=test mix ecto.migrate -r FullCircle.Repo)",
-      "Bash(echo \"--- exit $? ---\")"
+      "Bash(echo \"--- exit $? ---\")",
+      "Bash(sed -n '/def compute_fields/,/^  end/p' lib/full_circle/HR/pay_slip.ex)",
+      "Bash(sed -n '/defp get_uncount_salary_notes/,/^  end/p;/defp get_uncount_advances/,/^  end/p' lib/full_circle/pay_slip_op.ex)",
+      "Bash(mix compile *)",
+      "Bash(MIX_ENV=test mix test test/full_circle/pay_run_test.exs)",
+      "Bash(MIX_ENV=test mix run /tmp/tx.exs)",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(echo \"exit: $?\")",
+      "Bash(echo \"compile exit: $?\")",
+      "Bash(echo \"format done exit: $?\")"
+    ],
+    "additionalDirectories": [
+      "/tmp"
     ]
   }
 }
