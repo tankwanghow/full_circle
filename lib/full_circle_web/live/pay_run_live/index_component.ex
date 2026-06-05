@@ -54,10 +54,9 @@ defmodule FullCircleWeb.PayRunLive.IndexComponent do
     <div class="w-[42%] border border-gray-300 flex items-center px-1 py-1 gap-1 text-sm">
       <%= case @state do %>
         <% :done -> %>
-          <span class="w-[16%] text-green-700 font-semibold">● {gettext("Done")}</span>
-          <span class="w-[26%] text-right font-mono">{money(@pay.net_pay)}</span>
-          <span class="w-[28%]"></span>
-          <span class="w-[6%]">
+          <span class="w-[28%] text-right font-mono">{money(@pay.net_pay)}</span>
+          <span class="w-[34%]"></span>
+          <span class="w-[8%]">
             <input
               id={"checkbox_#{@pay.slip_id}"}
               name={"checkbox[#{@pay.slip_id}]"}
@@ -69,7 +68,7 @@ defmodule FullCircleWeb.PayRunLive.IndexComponent do
           </span>
           <.link
             navigate={"/companies/#{@company.id}/PaySlip/#{@pay.slip_id}/view"}
-            class="w-[16%] text-green-700 hover:font-bold"
+            class="w-[22%] text-green-700 hover:font-bold"
           >
             {@pay.slip_no}
           </.link>
@@ -80,8 +79,7 @@ defmodule FullCircleWeb.PayRunLive.IndexComponent do
             {gettext("Card")}
           </.link>
         <% :pending -> %>
-          <span class="w-[16%] text-amber-600 font-semibold">○ {gettext("Pend")}</span>
-          <span class="w-[26%]"></span>
+          <span class="w-[28%]"></span>
           <span class="w-[34%] flex gap-1 justify-center flex-wrap">
             <span
               :if={@pay.unproc_note_count > 0}
@@ -98,9 +96,10 @@ defmodule FullCircleWeb.PayRunLive.IndexComponent do
               $ {@pay.unproc_adv_count}/{money(@pay.unproc_adv_sum)}
             </span>
           </span>
+          <span class="w-[8%]"></span>
           <.link
             navigate={new_payslip_url(@obj.id, @pay.year, @pay.month, @company)}
-            class="w-[16%] text-blue-600 hover:font-bold"
+            class="w-[22%] text-blue-600 hover:font-bold"
           >
             {gettext("New Pay")}
           </.link>
