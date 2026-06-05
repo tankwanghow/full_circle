@@ -8,8 +8,12 @@ defmodule FullCircle.Repo.Migrations.CreateBankStatementBalances do
       add :to_date, :date, null: false
       add :opening_balance, :decimal
       add :closing_balance, :decimal
-      add :account_id, references(:accounts, type: :binary_id, on_delete: :delete_all), null: false
-      add :company_id, references(:companies, type: :binary_id, on_delete: :delete_all), null: false
+
+      add :account_id, references(:accounts, type: :binary_id, on_delete: :delete_all),
+        null: false
+
+      add :company_id, references(:companies, type: :binary_id, on_delete: :delete_all),
+        null: false
 
       timestamps(type: :utc_datetime)
     end

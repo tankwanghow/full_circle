@@ -145,7 +145,11 @@ defmodule FullCircleWeb.EInvListLive.IndexReceivedComponent do
           >
             {gettext("New Pur Invoice")}
           </.link>
-          <.link target="_blank" navigate={~p"/companies/#{@company.id}/Payment/new"} class="green button">
+          <.link
+            target="_blank"
+            navigate={~p"/companies/#{@company.id}/Payment/new"}
+            class="green button"
+          >
             {gettext("New Payment")}
           </.link>
         <% type when type in ["Credit Note", "Self-billed Debit Note"] -> %>

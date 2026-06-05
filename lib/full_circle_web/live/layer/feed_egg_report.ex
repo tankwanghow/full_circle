@@ -21,9 +21,7 @@ defmodule FullCircleWeb.LayerLive.FeedEggReport do
     socket =
       socket
       |> assign(page_title: gettext("Feed Consumption vs Egg Production"))
-      |> assign(
-        search: %{f_date: f_date, t_date: t_date, group_days: group_days, glist: glist}
-      )
+      |> assign(search: %{f_date: f_date, t_date: t_date, group_days: group_days, glist: glist})
 
     {:noreply,
      if t_date == "" or f_date == "" do

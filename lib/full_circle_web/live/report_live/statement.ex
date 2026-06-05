@@ -201,16 +201,44 @@ defmodule FullCircleWeb.ReportLive.Statement do
               />
             </div>
             <div :if={@search.preset == "Custom"} class="col-span-1">
-              <.input label="P1" name="search[c1]" type="number" id="search_c1" step="1" value={@search.c1} />
+              <.input
+                label="P1"
+                name="search[c1]"
+                type="number"
+                id="search_c1"
+                step="1"
+                value={@search.c1}
+              />
             </div>
             <div :if={@search.preset == "Custom"} class="col-span-1">
-              <.input label="P2" name="search[c2]" type="number" id="search_c2" step="1" value={@search.c2} />
+              <.input
+                label="P2"
+                name="search[c2]"
+                type="number"
+                id="search_c2"
+                step="1"
+                value={@search.c2}
+              />
             </div>
             <div :if={@search.preset == "Custom"} class="col-span-1">
-              <.input label="P3" name="search[c3]" type="number" id="search_c3" step="1" value={@search.c3} />
+              <.input
+                label="P3"
+                name="search[c3]"
+                type="number"
+                id="search_c3"
+                step="1"
+                value={@search.c3}
+              />
             </div>
             <div :if={@search.preset == "Custom"} class="col-span-1">
-              <.input label="P4" name="search[c4]" type="number" id="search_c4" step="1" value={@search.c4} />
+              <.input
+                label="P4"
+                name="search[c4]"
+                type="number"
+                id="search_c4"
+                step="1"
+                value={@search.c4}
+              />
             </div>
             <div class="col-span-4 mt-4">
               <.button>

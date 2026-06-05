@@ -74,7 +74,8 @@ defmodule FullCircleWeb.EggStockLive.ProductionReport do
     end
   end
 
-  defp group_rows(rows, 1, _grades), do: Enum.map(rows, &Map.put(&1, :label, Date.to_iso8601(&1.date)))
+  defp group_rows(rows, 1, _grades),
+    do: Enum.map(rows, &Map.put(&1, :label, Date.to_iso8601(&1.date)))
 
   defp group_rows(rows, n, grades) do
     grade_names = Enum.map(grades, & &1.name)
@@ -184,7 +185,10 @@ defmodule FullCircleWeb.EggStockLive.ProductionReport do
           |> Enum.with_index()
           |> Enum.map(fn {row, ri} ->
             x = if n <= 1, do: 0.0, else: ri / (n - 1)
-            qty = Enum.reduce(actual_keys, 0, fn k, acc -> acc + Map.get(row.quantities, k, 0) end)
+
+            qty =
+              Enum.reduce(actual_keys, 0, fn k, acc -> acc + Map.get(row.quantities, k, 0) end)
+
             pct = if row.total > 0, do: qty / row.total * 100, else: 0.0
             {x, pct, row.label, qty}
           end)
@@ -266,6 +270,7 @@ defmodule FullCircleWeb.EggStockLive.ProductionReport do
     |> Enum.with_index()
     |> Enum.map(fn {{x, y, _, _}, i} ->
       cmd = if i == 0, do: "M", else: "L"
+
       "#{cmd}#{Float.round(sx(x, width, pad_l, pad_r), 2)},#{Float.round(sy(y, height, pad_t, pad_b, yr), 2)}"
     end)
     |> Enum.join(" ")
@@ -428,7 +433,10 @@ defmodule FullCircleWeb.EggStockLive.ProductionReport do
           </div>
           <%= for g <- @grades do %>
             <div class="flex-1 border rounded bg-blue-100 border-blue-300 px-1 py-1">
-              {fmt(Map.get(row.quantities, g.name, 0))} / {pct(Map.get(row.quantities, g.name, 0), row.total)}
+              {fmt(Map.get(row.quantities, g.name, 0))} / {pct(
+                Map.get(row.quantities, g.name, 0),
+                row.total
+              )}
             </div>
           <% end %>
           <div class="flex-1 border rounded bg-blue-200 border-blue-400 px-1 py-1">
@@ -443,7 +451,10 @@ defmodule FullCircleWeb.EggStockLive.ProductionReport do
         </div>
         <%= for g <- @grades do %>
           <div class="flex-1 border rounded bg-amber-200 border-amber-400 px-1 py-1">
-            {fmt(Map.get(@averages.quantities, g.name, 0))} / {pct(Map.get(@averages.quantities, g.name, 0), @averages.total)}
+            {fmt(Map.get(@averages.quantities, g.name, 0))} / {pct(
+              Map.get(@averages.quantities, g.name, 0),
+              @averages.total
+            )}
           </div>
         <% end %>
         <div class="flex-1 border rounded bg-amber-300 border-amber-500 px-1 py-1">

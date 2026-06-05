@@ -46,7 +46,14 @@ defmodule FullCircleWeb.ChequeLive.DepositForm do
         socket.assigns.current_user
       )
 
-    cs = Cheque.make_changeset(Deposit, object, %{}, socket.assigns.current_company, socket.assigns.current_user)
+    cs =
+      Cheque.make_changeset(
+        Deposit,
+        object,
+        %{},
+        socket.assigns.current_company,
+        socket.assigns.current_user
+      )
 
     socket
     |> assign(live_action: :edit)
@@ -227,7 +234,13 @@ defmodule FullCircleWeb.ChequeLive.DepositForm do
 
   defp validate(params, socket) do
     dep_cs =
-      Cheque.make_changeset(Deposit, socket.assigns.form.data, params, socket.assigns.current_company, socket.assigns.current_user)
+      Cheque.make_changeset(
+        Deposit,
+        socket.assigns.form.data,
+        params,
+        socket.assigns.current_company,
+        socket.assigns.current_user
+      )
       |> Map.merge(%{action: socket.assigns.live_action})
 
     socket = assign(socket, form: to_form(dep_cs))

@@ -143,7 +143,15 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
     |> assign(page_title: gettext("Edit Purchase Invoice") <> " " <> object.pur_invoice_no)
     |> assign(
       :form,
-      to_form(Billing.make_changeset(PurInvoice, object, %{}, socket.assigns.current_company, socket.assigns.current_user))
+      to_form(
+        Billing.make_changeset(
+          PurInvoice,
+          object,
+          %{},
+          socket.assigns.current_company,
+          socket.assigns.current_user
+        )
+      )
     )
   end
 
@@ -662,7 +670,9 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
             </.link>
           </div>
           <div
-            :if={@live_action == :new and !is_nil(@form[:e_inv_uuid].value) and is_nil(@e_inv_preview)}
+            :if={
+              @live_action == :new and !is_nil(@form[:e_inv_uuid].value) and is_nil(@e_inv_preview)
+            }
             class="ml-3 mt-5"
           >
             <.link phx-click="show_e_inv" class="blue button text-sm">
@@ -723,7 +733,10 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
         </div>
       </.form>
 
-      <div :if={@live_action == :new and @e_inv_preview} class="mt-4 border rounded-lg border-blue-500 bg-blue-50 p-4">
+      <div
+        :if={@live_action == :new and @e_inv_preview}
+        class="mt-4 border rounded-lg border-blue-500 bg-blue-50 p-4"
+      >
         <div class="flex justify-between items-center mb-3">
           <p class="text-xl font-medium">{gettext("E-Invoice Document")}</p>
           <.link phx-click="close_e_inv_preview" class="orange button text-sm">
@@ -768,30 +781,56 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
                     <tr class="border-b">
                       <td class="p-1">{idx}</td>
                       <td class="p-1">{line.descriptions}</td>
-                      <td class="text-right p-1">{:erlang.float_to_binary(line.quantity / 1, decimals: 2)}</td>
+                      <td class="text-right p-1">
+                        {:erlang.float_to_binary(line.quantity / 1, decimals: 2)}
+                      </td>
                       <td class="p-1">{line.unit}</td>
-                      <td class="text-right p-1">{:erlang.float_to_binary(line.unit_price / 1, decimals: 2)}</td>
-                      <td class="text-right p-1">{:erlang.float_to_binary(line.discount / 1, decimals: 2)}</td>
-                      <td class="text-right p-1">{:erlang.float_to_binary((line.quantity * line.unit_price - line.discount) / 1, decimals: 2)}</td>
-                      <td class="text-right p-1">{:erlang.float_to_binary(line.tax_rate / 1, decimals: 2)}</td>
-                      <td class="text-right p-1">{:erlang.float_to_binary(Float.round((line.quantity * line.unit_price - line.discount) * line.tax_rate / 100, 2) / 1, decimals: 2)}</td>
+                      <td class="text-right p-1">
+                        {:erlang.float_to_binary(line.unit_price / 1, decimals: 2)}
+                      </td>
+                      <td class="text-right p-1">
+                        {:erlang.float_to_binary(line.discount / 1, decimals: 2)}
+                      </td>
+                      <td class="text-right p-1">
+                        {:erlang.float_to_binary(
+                          (line.quantity * line.unit_price - line.discount) / 1, decimals: 2)}
+                      </td>
+                      <td class="text-right p-1">
+                        {:erlang.float_to_binary(line.tax_rate / 1, decimals: 2)}
+                      </td>
+                      <td class="text-right p-1">
+                        {:erlang.float_to_binary(
+                          Float.round(
+                            (line.quantity * line.unit_price - line.discount) * line.tax_rate / 100,
+                            2
+                          ) / 1, decimals: 2)}
+                      </td>
                       <td class="p-1">{line.tax_code_id_lhdn} ({line.tax_scheme})</td>
                     </tr>
                   <% end %>
                 </tbody>
               </table>
-              <%
-                subtotal = Enum.reduce(parsed.invoice_lines, 0.0, fn line, acc ->
+              <% subtotal =
+                Enum.reduce(parsed.invoice_lines, 0.0, fn line, acc ->
                   acc + (line.quantity * line.unit_price - line.discount)
                 end)
-                tax = Enum.reduce(parsed.invoice_lines, 0.0, fn line, acc ->
-                  acc + Float.round((line.quantity * line.unit_price - line.discount) * line.tax_rate / 100, 2)
-                end)
-              %>
+
+              tax =
+                Enum.reduce(parsed.invoice_lines, 0.0, fn line, acc ->
+                  acc +
+                    Float.round(
+                      (line.quantity * line.unit_price - line.discount) * line.tax_rate / 100,
+                      2
+                    )
+                end) %>
               <div class="flex justify-end gap-6 mt-2 font-bold">
-                <span>{gettext("Subtotal")}: {:erlang.float_to_binary(subtotal / 1, decimals: 2)}</span>
+                <span>
+                  {gettext("Subtotal")}: {:erlang.float_to_binary(subtotal / 1, decimals: 2)}
+                </span>
                 <span>{gettext("Tax")}: {:erlang.float_to_binary(tax / 1, decimals: 2)}</span>
-                <span>{gettext("Total")}: {:erlang.float_to_binary((subtotal + tax) / 1, decimals: 2)}</span>
+                <span>
+                  {gettext("Total")}: {:erlang.float_to_binary((subtotal + tax) / 1, decimals: 2)}
+                </span>
               </div>
             </div>
           <% {:error, reason} -> %>

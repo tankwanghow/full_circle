@@ -18,7 +18,16 @@ defmodule FullCircle.BankReconciliation.BankStatementBalance do
 
   def changeset(balance, attrs) do
     balance
-    |> cast(attrs, [:from_date, :to_date, :opening_balance, :closing_balance, :report_snapshot, :finalized_at, :account_id, :company_id])
+    |> cast(attrs, [
+      :from_date,
+      :to_date,
+      :opening_balance,
+      :closing_balance,
+      :report_snapshot,
+      :finalized_at,
+      :account_id,
+      :company_id
+    ])
     |> validate_required([:from_date, :to_date, :account_id, :company_id])
     |> unique_constraint([:account_id, :company_id, :from_date, :to_date])
   end

@@ -54,7 +54,13 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
       )
 
     cs =
-      DebCre.make_changeset(CreditNote, object, %{}, socket.assigns.current_company, socket.assigns.current_user)
+      DebCre.make_changeset(
+        CreditNote,
+        object,
+        %{},
+        socket.assigns.current_company,
+        socket.assigns.current_user
+      )
 
     socket
     |> assign(live_action: :edit)

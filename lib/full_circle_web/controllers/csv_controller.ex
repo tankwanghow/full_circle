@@ -173,12 +173,15 @@ defmodule FullCircleWeb.CsvController do
     send_csv_map(conn, data, fields, filename)
   end
 
-  def show(conn, %{
-        "company_id" => com_id,
-        "rep" => rep,
-        "report" => "aging",
-        "tdate" => tdate
-      } = params) do
+  def show(
+        conn,
+        %{
+          "company_id" => com_id,
+          "rep" => rep,
+          "report" => "aging",
+          "tdate" => tdate
+        } = params
+      ) do
     tdate = tdate |> Timex.parse!("{YYYY}-{0M}-{0D}") |> NaiveDateTime.to_date()
     cutoffs = FullCircle.Reporting.AgingBuckets.parse_cutoffs(params)
 

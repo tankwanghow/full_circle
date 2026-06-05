@@ -39,11 +39,14 @@ defmodule FullCircleWeb.ReceiptLive.Form do
     attrs =
       if params["egg"] do
         egg_quantities = parse_egg_quantities(params["egg"])
-        details = FullCircle.Billing.build_invoice_details_from_egg_order(
-          egg_quantities,
-          socket.assigns.current_company,
-          socket.assigns.current_user
-        )
+
+        details =
+          FullCircle.Billing.build_invoice_details_from_egg_order(
+            egg_quantities,
+            socket.assigns.current_company,
+            socket.assigns.current_user
+          )
+
         %{
           receipt_no: "...new...",
           contact_name: params["contact_name"],
@@ -95,7 +98,13 @@ defmodule FullCircleWeb.ReceiptLive.Form do
       )
 
     cs =
-      ReceiveFund.make_changeset(Receipt, object, %{}, socket.assigns.current_company, socket.assigns.current_user)
+      ReceiveFund.make_changeset(
+        Receipt,
+        object,
+        %{},
+        socket.assigns.current_company,
+        socket.assigns.current_user
+      )
 
     socket
     |> assign(live_action: :edit)
@@ -583,7 +592,10 @@ defmodule FullCircleWeb.ReceiptLive.Form do
             <.input field={@form[:load_date]} label={gettext("Load Date")} type="date" />
           </div>
         </div>
-        <div :if={@contact_advances != []} class="px-2 py-1 my-1 bg-amber-100 border border-amber-400 rounded text-amber-800 text-sm">
+        <div
+          :if={@contact_advances != []}
+          class="px-2 py-1 my-1 bg-amber-100 border border-amber-400 rounded text-amber-800 text-sm"
+        >
           <span class="font-semibold">{gettext("Advance Balance")}:</span>
           <%= for adv <- @contact_advances do %>
             <.link

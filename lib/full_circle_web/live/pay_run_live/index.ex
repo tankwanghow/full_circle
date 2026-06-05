@@ -140,14 +140,18 @@ defmodule FullCircleWeb.PayRunLive.Index do
 
       <div :if={@can_print} class="flex justify-center gap-2 mb-2">
         <.link
-          navigate={~p"/companies/#{@current_company.id}/PaySlip/print_multi?pre_print=false&ids=#{@ids}"}
+          navigate={
+            ~p"/companies/#{@current_company.id}/PaySlip/print_multi?pre_print=false&ids=#{@ids}"
+          }
           target="_blank"
           class="blue button"
         >
           {gettext("Print")}{"(#{Enum.count(@selected)})"}
         </.link>
         <.link
-          navigate={~p"/companies/#{@current_company.id}/PaySlip/print_multi?pre_print=true&ids=#{@ids}"}
+          navigate={
+            ~p"/companies/#{@current_company.id}/PaySlip/print_multi?pre_print=true&ids=#{@ids}"
+          }
           target="_blank"
           class="blue button"
         >

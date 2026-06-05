@@ -357,7 +357,12 @@ defmodule FullCircle.ReceiveFund do
           where: not is_nil(t.doc_id),
           group_by: [t.doc_type, t.doc_no, t.doc_id],
           having: sum(t.amount) < 0,
-          select: %{doc_type: t.doc_type, doc_no: t.doc_no, doc_id: t.doc_id, amount: sum(t.amount)}
+          select: %{
+            doc_type: t.doc_type,
+            doc_no: t.doc_no,
+            doc_id: t.doc_id,
+            amount: sum(t.amount)
+          }
       )
     else
       []

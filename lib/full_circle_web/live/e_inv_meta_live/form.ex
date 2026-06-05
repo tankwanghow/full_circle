@@ -207,7 +207,9 @@ defmodule FullCircleWeb.EInvMetaLive.Form do
         <div class="mt-2">
           <label class="font-medium text-sm">
             {gettext("Production")}
-            <span class="text-xs text-gray-500">(api_base, id_base, client_id, client_secret1, client_secret2, expiration)</span>
+            <span class="text-xs text-gray-500">
+              (api_base, id_base, client_id, client_secret1, client_secret2, expiration)
+            </span>
           </label>
           <textarea
             name="prod_text"
@@ -219,7 +221,9 @@ defmodule FullCircleWeb.EInvMetaLive.Form do
         <div class="mt-2">
           <label class="font-medium text-sm">
             {gettext("Sandbox")}
-            <span class="text-xs text-gray-500">(api_base, id_base, client_id, client_secret1, client_secret2, expiration)</span>
+            <span class="text-xs text-gray-500">
+              (api_base, id_base, client_id, client_secret1, client_secret2, expiration)
+            </span>
           </label>
           <textarea
             name="sandbox_text"
@@ -231,7 +235,9 @@ defmodule FullCircleWeb.EInvMetaLive.Form do
         <div class="mt-2">
           <label class="font-medium text-sm">
             {gettext("API Paths")}
-            <span class="text-xs text-gray-500">(login, search, get_doc, get_doc_details, submit)</span>
+            <span class="text-xs text-gray-500">
+              (login, search, get_doc, get_doc_details, submit)
+            </span>
           </label>
           <textarea
             name="paths_text"

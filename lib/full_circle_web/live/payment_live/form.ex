@@ -61,7 +61,13 @@ defmodule FullCircleWeb.PaymentLive.Form do
       )
 
     cs =
-      BillPay.make_changeset(Payment, object, %{}, socket.assigns.current_company, socket.assigns.current_user)
+      BillPay.make_changeset(
+        Payment,
+        object,
+        %{},
+        socket.assigns.current_company,
+        socket.assigns.current_user
+      )
 
     socket
     |> assign(live_action: :edit)

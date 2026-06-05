@@ -153,8 +153,7 @@ defmodule FullCircle.ReceiveFund.Receipt do
     matched = fetch_field!(cs, :matched_amount) |> Decimal.abs()
 
     if Decimal.gt?(matched, receipt_amount) do
-      add_error(cs, :matched_amount,
-        gettext("cannot exceed Receipt Amount"))
+      add_error(cs, :matched_amount, gettext("cannot exceed Receipt Amount"))
     else
       cs
     end

@@ -31,11 +31,14 @@ defmodule FullCircleWeb.InvoiceLive.Form do
     attrs =
       if params["egg"] do
         egg_quantities = parse_egg_quantities(params["egg"])
-        details = Billing.build_invoice_details_from_egg_order(
-          egg_quantities,
-          socket.assigns.current_company,
-          socket.assigns.current_user
-        )
+
+        details =
+          Billing.build_invoice_details_from_egg_order(
+            egg_quantities,
+            socket.assigns.current_company,
+            socket.assigns.current_user
+          )
+
         %{
           invoice_no: "...new...",
           contact_name: params["contact_name"],
@@ -99,7 +102,15 @@ defmodule FullCircleWeb.InvoiceLive.Form do
     |> assign(matched_trans: Billing.get_matcher_by("Invoice", id))
     |> assign(
       :form,
-      to_form(Billing.make_changeset(Invoice, object, %{}, socket.assigns.current_company, socket.assigns.current_user))
+      to_form(
+        Billing.make_changeset(
+          Invoice,
+          object,
+          %{},
+          socket.assigns.current_company,
+          socket.assigns.current_user
+        )
+      )
     )
   end
 
@@ -370,7 +381,8 @@ defmodule FullCircleWeb.InvoiceLive.Form do
          socket
          |> assign(e_inv_preview: nil)
          |> push_navigate(
-           to: ~p"/companies/#{socket.assigns.current_company.id}/Invoice/#{socket.assigns.id}/edit"
+           to:
+             ~p"/companies/#{socket.assigns.current_company.id}/Invoice/#{socket.assigns.id}/edit"
          )
          |> put_flash(:info, "#{gettext("E-Invoice submitted successfully.")} UUID: #{uuid}")}
 
@@ -675,7 +687,10 @@ defmodule FullCircleWeb.InvoiceLive.Form do
         </div>
         <%= case @e_inv_preview do %>
           <% {:ok, preview} -> %>
-            <div :if={preview.warnings != []} class="mb-3 p-3 bg-red-100 border border-red-400 rounded text-sm text-red-700">
+            <div
+              :if={preview.warnings != []}
+              class="mb-3 p-3 bg-red-100 border border-red-400 rounded text-sm text-red-700"
+            >
               <p class="font-bold mb-1">{gettext("Validation Warnings (fix before submitting):")}</p>
               <ul class="list-disc ml-4">
                 <li :for={w <- preview.warnings}>{w}</li>
@@ -688,25 +703,75 @@ defmodule FullCircleWeb.InvoiceLive.Form do
                   <p class="font-medium">{preview.supplier.name}</p>
                   <div class="grid grid-cols-2 gap-1 mt-1">
                     <label class="text-xs text-gray-500">TIN</label>
-                    <input type="text" name="preview[supplier_tin]" value={preview.supplier.tin} class="text-sm border rounded px-1" />
+                    <input
+                      type="text"
+                      name="preview[supplier_tin]"
+                      value={preview.supplier.tin}
+                      class="text-sm border rounded px-1"
+                    />
                     <label class="text-xs text-gray-500">BRN</label>
-                    <input type="text" name="preview[supplier_brn]" value={preview.supplier.brn} class="text-sm border rounded px-1" />
+                    <input
+                      type="text"
+                      name="preview[supplier_brn]"
+                      value={preview.supplier.brn}
+                      class="text-sm border rounded px-1"
+                    />
                     <label class="text-xs text-gray-500">SST</label>
-                    <input type="text" name="preview[supplier_sst]" value={preview.supplier.sst} class="text-sm border rounded px-1" />
+                    <input
+                      type="text"
+                      name="preview[supplier_sst]"
+                      value={preview.supplier.sst}
+                      class="text-sm border rounded px-1"
+                    />
                     <label class="text-xs text-gray-500">MSIC</label>
-                    <input type="text" name="preview[supplier_msic]" value={preview.supplier.msic} class="text-sm border rounded px-1" />
+                    <input
+                      type="text"
+                      name="preview[supplier_msic]"
+                      value={preview.supplier.msic}
+                      class="text-sm border rounded px-1"
+                    />
                     <label class="text-xs text-gray-500">Tel</label>
-                    <input type="text" name="preview[supplier_tel]" value={preview.supplier.tel} class="text-sm border rounded px-1" />
+                    <input
+                      type="text"
+                      name="preview[supplier_tel]"
+                      value={preview.supplier.tel}
+                      class="text-sm border rounded px-1"
+                    />
                     <label class="text-xs text-gray-500">Email</label>
-                    <input type="text" name="preview[supplier_email]" value={preview.supplier.email} class="text-sm border rounded px-1" />
+                    <input
+                      type="text"
+                      name="preview[supplier_email]"
+                      value={preview.supplier.email}
+                      class="text-sm border rounded px-1"
+                    />
                     <label class="text-xs text-gray-500">{gettext("Address")}</label>
-                    <input type="text" name="preview[supplier_address]" value={preview.supplier.address} class="text-sm border rounded px-1" />
+                    <input
+                      type="text"
+                      name="preview[supplier_address]"
+                      value={preview.supplier.address}
+                      class="text-sm border rounded px-1"
+                    />
                     <label class="text-xs text-gray-500">{gettext("City")}</label>
-                    <input type="text" name="preview[supplier_city]" value={preview.supplier.city} class="text-sm border rounded px-1" />
+                    <input
+                      type="text"
+                      name="preview[supplier_city]"
+                      value={preview.supplier.city}
+                      class="text-sm border rounded px-1"
+                    />
                     <label class="text-xs text-gray-500">{gettext("Postal Code")}</label>
-                    <input type="text" name="preview[supplier_zipcode]" value={preview.supplier.zipcode} class="text-sm border rounded px-1" />
+                    <input
+                      type="text"
+                      name="preview[supplier_zipcode]"
+                      value={preview.supplier.zipcode}
+                      class="text-sm border rounded px-1"
+                    />
                     <label class="text-xs text-gray-500">{gettext("State")}</label>
-                    <input type="text" name="preview[supplier_state]" value={preview.supplier.state} class="text-sm border rounded px-1" />
+                    <input
+                      type="text"
+                      name="preview[supplier_state]"
+                      value={preview.supplier.state}
+                      class="text-sm border rounded px-1"
+                    />
                   </div>
                 </div>
                 <div class="border rounded p-3 bg-white">
@@ -714,30 +779,77 @@ defmodule FullCircleWeb.InvoiceLive.Form do
                   <p class="font-medium">{preview.customer.name}</p>
                   <div class="grid grid-cols-2 gap-1 mt-1">
                     <label class="text-xs text-gray-500">TIN</label>
-                    <input type="text" name="preview[customer_tin]" value={preview.customer.tin} class="text-sm border rounded px-1" />
+                    <input
+                      type="text"
+                      name="preview[customer_tin]"
+                      value={preview.customer.tin}
+                      class="text-sm border rounded px-1"
+                    />
                     <label class="text-xs text-gray-500">BRN</label>
-                    <input type="text" name="preview[customer_brn]" value={preview.customer.brn} class="text-sm border rounded px-1" />
+                    <input
+                      type="text"
+                      name="preview[customer_brn]"
+                      value={preview.customer.brn}
+                      class="text-sm border rounded px-1"
+                    />
                     <label class="text-xs text-gray-500">SST</label>
-                    <input type="text" name="preview[customer_sst]" value={preview.customer.sst} class="text-sm border rounded px-1" />
+                    <input
+                      type="text"
+                      name="preview[customer_sst]"
+                      value={preview.customer.sst}
+                      class="text-sm border rounded px-1"
+                    />
                     <label class="text-xs text-gray-500">Tel</label>
-                    <input type="text" name="preview[customer_tel]" value={preview.customer.tel} class="text-sm border rounded px-1" />
+                    <input
+                      type="text"
+                      name="preview[customer_tel]"
+                      value={preview.customer.tel}
+                      class="text-sm border rounded px-1"
+                    />
                     <label class="text-xs text-gray-500">Email</label>
-                    <input type="text" name="preview[customer_email]" value={preview.customer.email} class="text-sm border rounded px-1" />
+                    <input
+                      type="text"
+                      name="preview[customer_email]"
+                      value={preview.customer.email}
+                      class="text-sm border rounded px-1"
+                    />
                     <label class="text-xs text-gray-500">{gettext("Address")}</label>
-                    <input type="text" name="preview[customer_address]" value={preview.customer.address} class="text-sm border rounded px-1" />
+                    <input
+                      type="text"
+                      name="preview[customer_address]"
+                      value={preview.customer.address}
+                      class="text-sm border rounded px-1"
+                    />
                     <label class="text-xs text-gray-500">{gettext("City")}</label>
-                    <input type="text" name="preview[customer_city]" value={preview.customer.city} class="text-sm border rounded px-1" />
+                    <input
+                      type="text"
+                      name="preview[customer_city]"
+                      value={preview.customer.city}
+                      class="text-sm border rounded px-1"
+                    />
                     <label class="text-xs text-gray-500">{gettext("Postal Code")}</label>
-                    <input type="text" name="preview[customer_zipcode]" value={preview.customer.zipcode} class="text-sm border rounded px-1" />
+                    <input
+                      type="text"
+                      name="preview[customer_zipcode]"
+                      value={preview.customer.zipcode}
+                      class="text-sm border rounded px-1"
+                    />
                     <label class="text-xs text-gray-500">{gettext("State")}</label>
-                    <input type="text" name="preview[customer_state]" value={preview.customer.state} class="text-sm border rounded px-1" />
+                    <input
+                      type="text"
+                      name="preview[customer_state]"
+                      value={preview.customer.state}
+                      class="text-sm border rounded px-1"
+                    />
                   </div>
                 </div>
               </div>
             </form>
             <div class="mt-3 border rounded p-3 bg-white text-sm">
               <div class="flex gap-4 mb-2">
-                <span><span class="font-bold">{gettext("Invoice No")}:</span> {preview.invoice_no}</span>
+                <span>
+                  <span class="font-bold">{gettext("Invoice No")}:</span> {preview.invoice_no}
+                </span>
                 <span><span class="font-bold">{gettext("Date")}:</span> {preview.invoice_date}</span>
                 <span><span class="font-bold">{gettext("Currency")}:</span> MYR</span>
                 <span><span class="font-bold">{gettext("Type")}:</span> Invoice (01)</span>

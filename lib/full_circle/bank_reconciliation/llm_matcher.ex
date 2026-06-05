@@ -131,7 +131,8 @@ defmodule FullCircle.BankReconciliation.LlmMatcher do
   # Ensure no item appears in multiple groups
   defp deduplicate_matches(matches) do
     {result, _, _} =
-      Enum.reduce(matches, {[], MapSet.new(), MapSet.new()}, fn {stmt_ids, txn_ids, score}, {acc, used_stmts, used_txns} ->
+      Enum.reduce(matches, {[], MapSet.new(), MapSet.new()}, fn {stmt_ids, txn_ids, score},
+                                                                {acc, used_stmts, used_txns} ->
         clean_stmts = Enum.reject(stmt_ids, &MapSet.member?(used_stmts, &1))
         clean_txns = Enum.reject(txn_ids, &MapSet.member?(used_txns, &1))
 

@@ -328,7 +328,12 @@ defmodule FullCircle.EggStock do
         |> Enum.map(&{&1.doc_type, &1.doc_id})
         |> Enum.uniq()
 
-      %{contact_id: contact_id, contact_name: contact_name, quantities: quantities, doc_links: doc_links}
+      %{
+        contact_id: contact_id,
+        contact_name: contact_name,
+        quantities: quantities,
+        doc_links: doc_links
+      }
     end)
     |> Enum.sort_by(& &1.contact_name)
   end
@@ -397,7 +402,8 @@ defmodule FullCircle.EggStock do
           contact_id: r.contact_id,
           contact_name: c.name,
           good_name: g.name,
-          dow: fragment("EXTRACT(ISODOW FROM COALESCE(?, ?))::integer", r.load_date, r.receipt_date),
+          dow:
+            fragment("EXTRACT(ISODOW FROM COALESCE(?, ?))::integer", r.load_date, r.receipt_date),
           qty_trays:
             fragment("?::numeric / COALESCE(NULLIF(?, 0), 30)", rd.quantity, pkg.unit_multiplier)
         }

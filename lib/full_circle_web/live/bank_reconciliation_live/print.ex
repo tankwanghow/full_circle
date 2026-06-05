@@ -149,7 +149,10 @@ defmodule FullCircleWeb.BankReconciliationLive.Print do
     <div id="print-me" class="print-here">
       {style(assigns)}
       <div class="page">
-        <div class="title has-text-weight-bold is-size-5" style="text-align: center; padding-bottom: 3mm;">
+        <div
+          class="title has-text-weight-bold is-size-5"
+          style="text-align: center; padding-bottom: 3mm;"
+        >
           {gettext("Bank Reconciliation Statement")}
         </div>
         <div style="text-align: center; padding-bottom: 1mm;">
@@ -289,7 +292,9 @@ defmodule FullCircleWeb.BankReconciliationLive.Print do
           <div class="line is-size-7">
             <span class="desc">{gettext("Matched")}:</span>
             <span class="total">
-              {@summary.statement_matched} | {gettext("Unmatched")}: {gettext("Stmt")}: {@summary.statement_unmatched} | {gettext("Book")}: {@summary.book_unreconciled}
+              {@summary.statement_matched} | {gettext("Unmatched")}: {gettext("Stmt")}: {@summary.statement_unmatched} | {gettext(
+                "Book"
+              )}: {@summary.book_unreconciled}
             </span>
           </div>
         </div>

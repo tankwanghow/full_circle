@@ -148,8 +148,7 @@ defmodule FullCircleWeb.ReportLive.Aging do
         hi
       )
 
-    {:noreply,
-     assign(socket, drill: %{contact_name: name, bucket_label: label, rows: rows})}
+    {:noreply, assign(socket, drill: %{contact_name: name, bucket_label: label, rows: rows})}
   end
 
   def handle_event("close_drill", _params, socket) do
@@ -310,16 +309,44 @@ defmodule FullCircleWeb.ReportLive.Aging do
               />
             </div>
             <div :if={@search.preset == "Custom"} class="col-span-1">
-              <.input label="P1" name="search[c1]" type="number" id="search_c1" step="1" value={@search.c1} />
+              <.input
+                label="P1"
+                name="search[c1]"
+                type="number"
+                id="search_c1"
+                step="1"
+                value={@search.c1}
+              />
             </div>
             <div :if={@search.preset == "Custom"} class="col-span-1">
-              <.input label="P2" name="search[c2]" type="number" id="search_c2" step="1" value={@search.c2} />
+              <.input
+                label="P2"
+                name="search[c2]"
+                type="number"
+                id="search_c2"
+                step="1"
+                value={@search.c2}
+              />
             </div>
             <div :if={@search.preset == "Custom"} class="col-span-1">
-              <.input label="P3" name="search[c3]" type="number" id="search_c3" step="1" value={@search.c3} />
+              <.input
+                label="P3"
+                name="search[c3]"
+                type="number"
+                id="search_c3"
+                step="1"
+                value={@search.c3}
+              />
             </div>
             <div :if={@search.preset == "Custom"} class="col-span-1">
-              <.input label="P4" name="search[c4]" type="number" id="search_c4" step="1" value={@search.c4} />
+              <.input
+                label="P4"
+                name="search[c4]"
+                type="number"
+                id="search_c4"
+                step="1"
+                value={@search.c4}
+              />
             </div>
             <div class="col-span-2 mt-4">
               <.button>
@@ -366,22 +393,27 @@ defmodule FullCircleWeb.ReportLive.Aging do
                 :if={@search.report == "Debtors Aging"}
                 type="checkbox"
                 phx-click="toggle_all"
-                checked={MapSet.size(@selected_ids) > 0 and Enum.all?(rows, fn r -> MapSet.member?(@selected_ids, r.contact_id) end)}
+                checked={
+                  MapSet.size(@selected_ids) > 0 and
+                    Enum.all?(rows, fn r -> MapSet.member?(@selected_ids, r.contact_id) end)
+                }
               />
             </div>
             <div
-              :for={{label, field, w} <- [
-                {gettext("Category"), :category, Enum.at(widths, 1)},
-                {gettext("Account"), :contact_name, Enum.at(widths, 2)},
-                {Enum.at(@bucket_labels, 0), :p1, Enum.at(widths, 3)},
-                {Enum.at(@bucket_labels, 1), :p2, Enum.at(widths, 4)},
-                {Enum.at(@bucket_labels, 2), :p3, Enum.at(widths, 5)},
-                {Enum.at(@bucket_labels, 3), :p4, Enum.at(widths, 6)},
-                {Enum.at(@bucket_labels, 4), :p5, Enum.at(widths, 7)},
-                {gettext("Total"), :total, Enum.at(widths, 8)},
-                {gettext("PD Amt"), :pd_amt, Enum.at(widths, 9)},
-                {gettext("Chqs"), :pd_chqs, Enum.at(widths, 10)}
-              ]}
+              :for={
+                {label, field, w} <- [
+                  {gettext("Category"), :category, Enum.at(widths, 1)},
+                  {gettext("Account"), :contact_name, Enum.at(widths, 2)},
+                  {Enum.at(@bucket_labels, 0), :p1, Enum.at(widths, 3)},
+                  {Enum.at(@bucket_labels, 1), :p2, Enum.at(widths, 4)},
+                  {Enum.at(@bucket_labels, 2), :p3, Enum.at(widths, 5)},
+                  {Enum.at(@bucket_labels, 3), :p4, Enum.at(widths, 6)},
+                  {Enum.at(@bucket_labels, 4), :p5, Enum.at(widths, 7)},
+                  {gettext("Total"), :total, Enum.at(widths, 8)},
+                  {gettext("PD Amt"), :pd_amt, Enum.at(widths, 9)},
+                  {gettext("Chqs"), :pd_chqs, Enum.at(widths, 10)}
+                ]
+              }
               class={"w-[#{w}] #{header_col_class} cursor-pointer hover:bg-gray-300"}
               phx-click="sort"
               phx-value-field={field}
@@ -408,7 +440,14 @@ defmodule FullCircleWeb.ReportLive.Aging do
             <div class={"w-[#{Enum.at(widths, 1)}] #{data_col_class}"}>{d.category}</div>
             <div class={"w-[#{Enum.at(widths, 2)}] #{data_col_class} text-left"}>
               <.link
-                navigate={contact_txn_url(@current_company.id, d.contact_name, d.oldest_unpaid, @search.t_date)}
+                navigate={
+                  contact_txn_url(
+                    @current_company.id,
+                    d.contact_name,
+                    d.oldest_unpaid,
+                    @search.t_date
+                  )
+                }
                 target="_blank"
                 class="text-blue-700 dark:text-blue-300 hover:underline"
               >
@@ -416,13 +455,15 @@ defmodule FullCircleWeb.ReportLive.Aging do
               </.link>
             </div>
             <div
-              :for={{bucket, value, w} <- [
-                {"p1", d.p1, Enum.at(widths, 3)},
-                {"p2", d.p2, Enum.at(widths, 4)},
-                {"p3", d.p3, Enum.at(widths, 5)},
-                {"p4", d.p4, Enum.at(widths, 6)},
-                {"p5", d.p5, Enum.at(widths, 7)}
-              ]}
+              :for={
+                {bucket, value, w} <- [
+                  {"p1", d.p1, Enum.at(widths, 3)},
+                  {"p2", d.p2, Enum.at(widths, 4)},
+                  {"p3", d.p3, Enum.at(widths, 5)},
+                  {"p4", d.p4, Enum.at(widths, 6)},
+                  {"p5", d.p5, Enum.at(widths, 7)}
+                ]
+              }
               class={"w-[#{w}] #{if zero?(value), do: num_class, else: num_drill_class}"}
               phx-click={if zero?(value), do: nil, else: "drill"}
               phx-value-contact_id={d.contact_id}
@@ -440,15 +481,33 @@ defmodule FullCircleWeb.ReportLive.Aging do
           <div :if={rows != []} class={data_row_class}>
             <div class={"w-[#{Enum.at(widths, 0)}] #{total_col_class}"}></div>
             <div class={"w-[#{Enum.at(widths, 1)}] #{total_col_class}"}></div>
-            <div class={"w-[#{Enum.at(widths, 2)}] #{total_col_class} text-right"}>{gettext("Totals")}</div>
-            <div class={"w-[#{Enum.at(widths, 3)}] #{num_total_class}"}>{fmt(sum_field(rows, :p1))}</div>
-            <div class={"w-[#{Enum.at(widths, 4)}] #{num_total_class}"}>{fmt(sum_field(rows, :p2))}</div>
-            <div class={"w-[#{Enum.at(widths, 5)}] #{num_total_class}"}>{fmt(sum_field(rows, :p3))}</div>
-            <div class={"w-[#{Enum.at(widths, 6)}] #{num_total_class}"}>{fmt(sum_field(rows, :p4))}</div>
-            <div class={"w-[#{Enum.at(widths, 7)}] #{num_total_class}"}>{fmt(sum_field(rows, :p5))}</div>
-            <div class={"w-[#{Enum.at(widths, 8)}] #{num_total_class}"}>{fmt(sum_field(rows, :total))}</div>
-            <div class={"w-[#{Enum.at(widths, 9)}] #{num_total_class}"}>{fmt(sum_field(rows, :pd_amt))}</div>
-            <div class={"w-[#{Enum.at(widths, 10)}] #{num_total_class}"}>{sum_field(rows, :pd_chqs) |> trunc()}</div>
+            <div class={"w-[#{Enum.at(widths, 2)}] #{total_col_class} text-right"}>
+              {gettext("Totals")}
+            </div>
+            <div class={"w-[#{Enum.at(widths, 3)}] #{num_total_class}"}>
+              {fmt(sum_field(rows, :p1))}
+            </div>
+            <div class={"w-[#{Enum.at(widths, 4)}] #{num_total_class}"}>
+              {fmt(sum_field(rows, :p2))}
+            </div>
+            <div class={"w-[#{Enum.at(widths, 5)}] #{num_total_class}"}>
+              {fmt(sum_field(rows, :p3))}
+            </div>
+            <div class={"w-[#{Enum.at(widths, 6)}] #{num_total_class}"}>
+              {fmt(sum_field(rows, :p4))}
+            </div>
+            <div class={"w-[#{Enum.at(widths, 7)}] #{num_total_class}"}>
+              {fmt(sum_field(rows, :p5))}
+            </div>
+            <div class={"w-[#{Enum.at(widths, 8)}] #{num_total_class}"}>
+              {fmt(sum_field(rows, :total))}
+            </div>
+            <div class={"w-[#{Enum.at(widths, 9)}] #{num_total_class}"}>
+              {fmt(sum_field(rows, :pd_amt))}
+            </div>
+            <div class={"w-[#{Enum.at(widths, 10)}] #{num_total_class}"}>
+              {sum_field(rows, :pd_chqs) |> trunc()}
+            </div>
           </div>
 
           <div class="mb-10" />
@@ -465,20 +524,32 @@ defmodule FullCircleWeb.ReportLive.Aging do
             <div class="w-[15%] border rounded bg-gray-200 border-gray-400 px-2 py-1">Doc Type</div>
             <div class="w-[18%] border rounded bg-gray-200 border-gray-400 px-2 py-1">Doc No</div>
             <div class="w-[10%] border rounded bg-gray-200 border-gray-400 px-2 py-1">Age</div>
-            <div class="w-[20%] border rounded bg-gray-200 border-gray-400 px-2 py-1 text-right">Balance</div>
+            <div class="w-[20%] border rounded bg-gray-200 border-gray-400 px-2 py-1 text-right">
+              Balance
+            </div>
           </div>
           <div :if={@drill.rows == []} class="text-center italic text-zinc-500 py-4">
             No transactions in this bucket.
           </div>
           <div :for={t <- @drill.rows} class="flex flex-row tracking-tighter">
-            <div class="w-[15%] border rounded bg-blue-50 border-blue-200 px-2 py-1">{t.doc_date}</div>
-            <div class="w-[15%] border rounded bg-blue-50 border-blue-200 px-2 py-1">{t.doc_type}</div>
+            <div class="w-[15%] border rounded bg-blue-50 border-blue-200 px-2 py-1">
+              {t.doc_date}
+            </div>
+            <div class="w-[15%] border rounded bg-blue-50 border-blue-200 px-2 py-1">
+              {t.doc_type}
+            </div>
             <div class="w-[18%] border rounded bg-blue-50 border-blue-200 px-2 py-1">{t.doc_no}</div>
-            <div class="w-[10%] border rounded bg-blue-50 border-blue-200 px-2 py-1 text-right tabular-nums">{t.age_days}</div>
-            <div class="w-[20%] border rounded bg-blue-50 border-blue-200 px-2 py-1 text-right tabular-nums">{fmt(t.balance)}</div>
+            <div class="w-[10%] border rounded bg-blue-50 border-blue-200 px-2 py-1 text-right tabular-nums">
+              {t.age_days}
+            </div>
+            <div class="w-[20%] border rounded bg-blue-50 border-blue-200 px-2 py-1 text-right tabular-nums">
+              {fmt(t.balance)}
+            </div>
           </div>
           <div :if={@drill.rows != []} class="flex flex-row tracking-tighter mt-1">
-            <div class="w-[58%] border rounded bg-gray-300 border-gray-500 px-2 py-1 text-right font-bold">Total</div>
+            <div class="w-[58%] border rounded bg-gray-300 border-gray-500 px-2 py-1 text-right font-bold">
+              Total
+            </div>
             <div class="w-[20%] border rounded bg-gray-300 border-gray-500 px-2 py-1 text-right tabular-nums font-bold">
               {fmt(sum_field(@drill.rows, :balance))}
             </div>

@@ -149,10 +149,18 @@ defmodule FullCircleWeb.EInvListLive.IndexSentComponent do
     <div class="w-[99%] flex">
       <%= case @obj.typeName do %>
         <% type when type in ["Invoice", "Self-billed Invoice"] -> %>
-          <.link target="_blank" navigate={~p"/companies/#{@company.id}/Invoice/new"} class="blue button">
+          <.link
+            target="_blank"
+            navigate={~p"/companies/#{@company.id}/Invoice/new"}
+            class="blue button"
+          >
             {gettext("New Invoice")}
           </.link>
-          <.link target="_blank" navigate={~p"/companies/#{@company.id}/Receipt/new"} class="green button">
+          <.link
+            target="_blank"
+            navigate={~p"/companies/#{@company.id}/Receipt/new"}
+            class="green button"
+          >
             {gettext("New Receipt")}
           </.link>
         <% type when type in ["Credit Note", "Self-billed Debit Note"] -> %>

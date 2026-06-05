@@ -403,7 +403,8 @@ defmodule FullCircle.Billing do
           "unit" => good.unit,
           "unit_multiplier" => good.unit_multiplier || 1,
           "package_qty" => tray_qty,
-          "quantity" => Decimal.mult(Decimal.new("#{tray_qty}"), Decimal.new("#{good.unit_multiplier || 1}")),
+          "quantity" =>
+            Decimal.mult(Decimal.new("#{tray_qty}"), Decimal.new("#{good.unit_multiplier || 1}")),
           "unit_price" => 0,
           "discount" => 0,
           "_persistent_id" => idx

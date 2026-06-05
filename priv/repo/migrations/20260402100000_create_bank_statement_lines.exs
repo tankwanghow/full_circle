@@ -10,8 +10,12 @@ defmodule FullCircle.Repo.Migrations.CreateBankStatementLines do
       add :amount, :decimal, null: false
       add :reference, :text
       add :source_format, :string, null: false
-      add :account_id, references(:accounts, type: :binary_id, on_delete: :delete_all), null: false
-      add :company_id, references(:companies, type: :binary_id, on_delete: :delete_all), null: false
+
+      add :account_id, references(:accounts, type: :binary_id, on_delete: :delete_all),
+        null: false
+
+      add :company_id, references(:companies, type: :binary_id, on_delete: :delete_all),
+        null: false
 
       add :matched_transaction_id,
           references(:transactions, type: :binary_id, on_delete: :nilify_all)

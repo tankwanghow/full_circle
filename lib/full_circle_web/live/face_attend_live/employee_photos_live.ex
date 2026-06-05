@@ -17,7 +17,9 @@ defmodule FullCircleWeb.EmployeePhotosLive do
      |> assign(page_title: "Employee Photos")
      |> assign(full_screen_app?: true)
      |> assign(emp: emp)
-     |> assign(photos: FullCircle.HR.get_employee_photos(emp.id, socket.assigns.current_company.id))}
+     |> assign(
+       photos: FullCircle.HR.get_employee_photos(emp.id, socket.assigns.current_company.id)
+     )}
   end
 
   @impl true
@@ -33,7 +35,11 @@ defmodule FullCircleWeb.EmployeePhotosLive do
     {:noreply,
      socket
      |> assign(
-       photos: FullCircle.HR.get_employee_photos(socket.assigns.emp.id, socket.assigns.current_company.id)
+       photos:
+         FullCircle.HR.get_employee_photos(
+           socket.assigns.emp.id,
+           socket.assigns.current_company.id
+         )
      )}
   end
 

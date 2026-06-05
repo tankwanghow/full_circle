@@ -89,7 +89,8 @@ defmodule FullCircleWeb.TakePhotoLive do
     {:noreply,
      socket
      |> push_navigate(
-       to: ~p"/companies/#{socket.assigns.current_company.id}/take_photo/#{socket.assigns.emp.id}/photos"
+       to:
+         ~p"/companies/#{socket.assigns.current_company.id}/take_photo/#{socket.assigns.emp.id}/photos"
      )}
   end
 
@@ -114,8 +115,14 @@ defmodule FullCircleWeb.TakePhotoLive do
         <div id="autoEnrollBtn" class="button blue w-1/2 mx-auto mt-1">
           Auto Enroll (30s)
         </div>
-        <div id="enrollPrompt" class="mt-2 text-center text-2xl font-bold text-blue-700" style="display: none;"></div>
-        <div id="enrollStatus" class="mt-1 text-center text-sm text-gray-700" style="display: none;"></div>
+        <div
+          id="enrollPrompt"
+          class="mt-2 text-center text-2xl font-bold text-blue-700"
+          style="display: none;"
+        >
+        </div>
+        <div id="enrollStatus" class="mt-1 text-center text-sm text-gray-700" style="display: none;">
+        </div>
         <div id="log" class="mt-1 text-center"></div>
         <audio id="shutter-sound" src="/sounds/beep.mp3" type="audio/mpeg" preload="auto"></audio>
       </div>

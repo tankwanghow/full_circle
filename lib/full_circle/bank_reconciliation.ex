@@ -417,11 +417,12 @@ defmodule FullCircle.BankReconciliation do
         where: sl.statement_date >= ^from_date,
         where: sl.statement_date <= ^to_date,
         select: %{
-          total_pos: coalesce(sum(fragment("case when ? > 0 then ? else 0 end", sl.amount, sl.amount)), 0),
-          total_neg: coalesce(sum(fragment("case when ? < 0 then ? else 0 end", sl.amount, sl.amount)), 0),
+          total_pos:
+            coalesce(sum(fragment("case when ? > 0 then ? else 0 end", sl.amount, sl.amount)), 0),
+          total_neg:
+            coalesce(sum(fragment("case when ? < 0 then ? else 0 end", sl.amount, sl.amount)), 0),
           count: count(sl.id),
-          matched_count:
-            fragment("count(case when ? is not null then 1 end)", sl.match_group_id)
+          matched_count: fragment("count(case when ? is not null then 1 end)", sl.match_group_id)
         }
       )
       |> Repo.one()
@@ -433,11 +434,18 @@ defmodule FullCircle.BankReconciliation do
         where: txn.doc_date >= ^from_date,
         where: txn.doc_date <= ^to_date,
         select: %{
-          total_pos: coalesce(sum(fragment("case when ? > 0 then ? else 0 end", txn.amount, txn.amount)), 0),
-          total_neg: coalesce(sum(fragment("case when ? < 0 then ? else 0 end", txn.amount, txn.amount)), 0),
+          total_pos:
+            coalesce(
+              sum(fragment("case when ? > 0 then ? else 0 end", txn.amount, txn.amount)),
+              0
+            ),
+          total_neg:
+            coalesce(
+              sum(fragment("case when ? < 0 then ? else 0 end", txn.amount, txn.amount)),
+              0
+            ),
           count: count(txn.id),
-          reconciled_count:
-            fragment("count(case when ? = true then 1 end)", txn.reconciled)
+          reconciled_count: fragment("count(case when ? = true then 1 end)", txn.reconciled)
         }
       )
       |> Repo.one()

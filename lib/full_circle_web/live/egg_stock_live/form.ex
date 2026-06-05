@@ -13,6 +13,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
 
     weeks = Sys.get_setting(settings, "EggStock", "lookback-weeks") |> String.to_integer()
     days = Sys.get_setting(settings, "EggStock", "lookback-days") |> String.to_integer()
+
     autosave_delay =
       case Enum.find(settings, fn x -> x.page == "EggStock" and x.code == "autosave-delay" end) do
         nil -> 2
@@ -370,7 +371,8 @@ defmodule FullCircleWeb.EggStockLive.Form do
 
     {:noreply,
      push_patch(socket,
-       to: ~p"/companies/#{socket.assigns.current_company.id}/egg_stock/#{Date.to_iso8601(new_date)}"
+       to:
+         ~p"/companies/#{socket.assigns.current_company.id}/egg_stock/#{Date.to_iso8601(new_date)}"
      )}
   end
 
@@ -380,9 +382,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
     {:noreply,
      socket
      |> assign(active_tab: "now")
-     |> push_patch(
-       to: ~p"/companies/#{socket.assigns.current_company.id}/egg_stock/#{date_str}"
-     )}
+     |> push_patch(to: ~p"/companies/#{socket.assigns.current_company.id}/egg_stock/#{date_str}")}
   end
 
   # --- Now tab: validate/save ---
@@ -708,7 +708,8 @@ defmodule FullCircleWeb.EggStockLive.Form do
         {:noreply, assign(socket, form: to_form(cs), save_status: :error)}
 
       :not_authorise ->
-        {:noreply, assign(socket, save_status: :error)
+        {:noreply,
+         assign(socket, save_status: :error)
          |> put_flash(:error, gettext("You are not authorised to perform this action"))}
     end
   end
@@ -835,16 +836,19 @@ defmodule FullCircleWeb.EggStockLive.Form do
   # --- Render ---
 
   defp save_status(%{status: nil} = assigns), do: ~H""
+
   defp save_status(%{status: :saving} = assigns) do
     ~H"""
     <span class="text-sm text-gray-500 animate-pulse">{gettext("Saving...")}</span>
     """
   end
+
   defp save_status(%{status: :saved} = assigns) do
     ~H"""
     <span class="text-sm text-green-600">{gettext("Saved")}</span>
     """
   end
+
   defp save_status(%{status: :error} = assigns) do
     ~H"""
     <span class="text-sm text-red-600">{gettext("Save failed")}</span>
@@ -1547,15 +1551,15 @@ defmodule FullCircleWeb.EggStockLive.Form do
           {Enum.reduce(@grades, 0, fn g, acc -> acc + to_int((row.quantities || %{})[g]) end)}
         </span>
         <span :for={{doc_type, doc_id} <- row.doc_links || []} class="inline-flex">
-            <a
-              href={doc_link_path(@company_id, doc_type, doc_id)}
-              target="_blank"
-              class="text-blue-600 hover:text-blue-800"
-              title={doc_type}
-            >
-              <.icon name={doc_icon(doc_type)} class="h-3 w-3" />
-            </a>
-          </span>
+          <a
+            href={doc_link_path(@company_id, doc_type, doc_id)}
+            target="_blank"
+            class="text-blue-600 hover:text-blue-800"
+            title={doc_type}
+          >
+            <.icon name={doc_icon(doc_type)} class="h-3 w-3" />
+          </a>
+        </span>
       </div>
       <div class="flex gap-1 mt-1 font-semibold text-sm text-gray-700 border-t pt-1">
         <div class="w-40 text-right">{gettext("Total")}</div>
@@ -1631,7 +1635,11 @@ defmodule FullCircleWeb.EggStockLive.Form do
             type="button"
             phx-click="toggle_ignore"
             phx-value-index={dtl.index}
-            class={if ignored, do: "text-green-500 hover:text-green-700", else: "text-red-500 hover:text-red-700"}
+            class={
+              if ignored,
+                do: "text-green-500 hover:text-green-700",
+                else: "text-red-500 hover:text-red-700"
+            }
             title={if ignored, do: gettext("Enable"), else: gettext("Ignore")}
           >
             <.icon name={if ignored, do: "hero-eye", else: "hero-eye-slash"} class="h-4 w-4" />

@@ -159,17 +159,33 @@ defmodule FullCircleWeb.WeighingLive.GoodsReport do
         <:result_html>
           <% {headers, fields, formatters, widths} =
             if @search.group_note == "true" do
-              {[gettext("Month"), gettext("Year"), gettext("Goods"), gettext("Amount"), gettext("Unit"), gettext("Note")],
-               [:month, :year, :good_name, :total, :unit, :note],
-               [nil, nil, nil, fn n -> Number.Delimit.number_to_delimited(n, precision: 0) end, nil, nil],
-               ["15%", "20%", "15%", "20%", "15%", "15%"]}
+              {[
+                 gettext("Month"),
+                 gettext("Year"),
+                 gettext("Goods"),
+                 gettext("Amount"),
+                 gettext("Unit"),
+                 gettext("Note")
+               ], [:month, :year, :good_name, :total, :unit, :note],
+               [
+                 nil,
+                 nil,
+                 nil,
+                 fn n -> Number.Delimit.number_to_delimited(n, precision: 0) end,
+                 nil,
+                 nil
+               ], ["15%", "20%", "15%", "20%", "15%", "15%"]}
             else
-              {[gettext("Month"), gettext("Year"), gettext("Goods"), gettext("Amount"), gettext("Unit")],
-               [:month, :year, :good_name, :total, :unit],
+              {[
+                 gettext("Month"),
+                 gettext("Year"),
+                 gettext("Goods"),
+                 gettext("Amount"),
+                 gettext("Unit")
+               ], [:month, :year, :good_name, :total, :unit],
                [nil, nil, nil, fn n -> Number.Delimit.number_to_delimited(n, precision: 0) end, nil],
                ["15%", "20%", "20%", "25%", "20%"]}
-            end
-          %>
+            end %>
           {FullCircleWeb.CsvHtml.headers(
             headers,
             "font-medium flex flex-row text-center tracking-tighter mb-1",

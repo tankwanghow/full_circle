@@ -14,15 +14,41 @@ defmodule FullCircle.EInvMetas do
 
   @default_unit_codes %{
     "-" => "C62",
-    "pcs" => "C62", "Pcs" => "C62", "unit" => "C62", "Unit" => "C62", "Chic" => "C62",
-    "kg" => "KGM", "Kg" => "KGM", "KG" => "KGM", "Kgs" => "KGM", "g" => "GRM",
-    "mt" => "TNE", "Mt" => "TNE",
-    "L" => "LTR", "lit" => "LTR", "LIT" => "LTR", "Liter" => "LTR", "Little" => "LTR",
-    "ml" => "MLT", "Ml" => "MLT", "ML" => "MLT",
-    "bot" => "C62", "Bot" => "C62", "Bots" => "C62", "bottle" => "C62", "btl" => "C62",
-    "box" => "C62", "Bag" => "C62", "Bundle" => "C62", "Drum" => "C62", "Tin" => "C62",
-    "pkts" => "C62", "VIAL" => "C62",
-    "Dose" => "C62", "Doses" => "C62", "DS" => "C62",
+    "pcs" => "C62",
+    "Pcs" => "C62",
+    "unit" => "C62",
+    "Unit" => "C62",
+    "Chic" => "C62",
+    "kg" => "KGM",
+    "Kg" => "KGM",
+    "KG" => "KGM",
+    "Kgs" => "KGM",
+    "g" => "GRM",
+    "mt" => "TNE",
+    "Mt" => "TNE",
+    "L" => "LTR",
+    "lit" => "LTR",
+    "LIT" => "LTR",
+    "Liter" => "LTR",
+    "Little" => "LTR",
+    "ml" => "MLT",
+    "Ml" => "MLT",
+    "ML" => "MLT",
+    "bot" => "C62",
+    "Bot" => "C62",
+    "Bots" => "C62",
+    "bottle" => "C62",
+    "btl" => "C62",
+    "box" => "C62",
+    "Bag" => "C62",
+    "Bundle" => "C62",
+    "Drum" => "C62",
+    "Tin" => "C62",
+    "pkts" => "C62",
+    "VIAL" => "C62",
+    "Dose" => "C62",
+    "Doses" => "C62",
+    "DS" => "C62",
     "kWh" => "KWH"
   }
 
@@ -521,10 +547,8 @@ defmodule FullCircle.EInvMetas do
             xml_tag_text(line, ~r/<PriceAmount[^>]*>(.+?)<\/PriceAmount>/s) |> parse_number(),
           discount: 0,
           tax_rate: xml_tag_text(line, ~r/<Percent>(.+?)<\/Percent>/s) |> parse_number(),
-          tax_scheme:
-            xml_tag_text(line, ~r/<TaxScheme>\s*<ID[^>]*>(.+?)<\/ID>\s*<\/TaxScheme>/s),
-          tax_code_id_lhdn:
-            xml_tag_text(line, ~r/<TaxCategory>\s*<ID[^>]*>(.+?)<\/ID>/s),
+          tax_scheme: xml_tag_text(line, ~r/<TaxScheme>\s*<ID[^>]*>(.+?)<\/ID>\s*<\/TaxScheme>/s),
+          tax_code_id_lhdn: xml_tag_text(line, ~r/<TaxCategory>\s*<ID[^>]*>(.+?)<\/ID>/s),
           unit: xml_tag_text(line, ~r/<InvoicedQuantity[^>]*\bunitCode="([^"]+)"/)
         }
       end)
@@ -582,7 +606,12 @@ defmodule FullCircle.EInvMetas do
     else
       com = Repo.get!(Company, com.id)
       meta = get_by_company_id!(com, user)
-      unit_map = if meta, do: Map.merge(@default_unit_codes, meta.unit_code_map || %{}), else: @default_unit_codes
+
+      unit_map =
+        if meta,
+          do: Map.merge(@default_unit_codes, meta.unit_code_map || %{}),
+          else: @default_unit_codes
+
       contact = invoice.contact
 
       lines =
@@ -593,7 +622,8 @@ defmodule FullCircle.EInvMetas do
 
           %{
             idx: idx,
-            description: Enum.join([d.good_name, d.descriptions] |> Enum.reject(&is_nil/1), " - "),
+            description:
+              Enum.join([d.good_name, d.descriptions] |> Enum.reject(&is_nil/1), " - "),
             quantity: Number.Delimit.number_to_delimited(d.quantity),
             unit: d.unit,
             lhdn_unit: to_lhdn_unit(d.unit, unit_map),
@@ -1031,7 +1061,9 @@ defmodule FullCircle.EInvMetas do
   defp validate_unit_codes(warnings, details, unit_map) do
     details
     |> Enum.reject(fn d -> unit_mapped?(d.unit, unit_map) end)
-    |> Enum.map(fn d -> "Unit '#{d.unit}' (#{d.good_name}) not in LHDN unit mapping, defaulting to C62. Add mapping in E-Invoice Meta settings." end)
+    |> Enum.map(fn d ->
+      "Unit '#{d.unit}' (#{d.good_name}) not in LHDN unit mapping, defaulting to C62. Add mapping in E-Invoice Meta settings."
+    end)
     |> Enum.uniq()
     |> Enum.reduce(warnings, fn w, acc -> [w | acc] end)
   end
@@ -1047,11 +1079,21 @@ defmodule FullCircle.EInvMetas do
 
     line = %{
       "ID" => [%{"_" => "#{idx}"}],
-      "InvoicedQuantity" => [%{"_" => num(quantity), "unitCode" => to_lhdn_unit(detail.unit, unit_map)}],
+      "InvoicedQuantity" => [
+        %{"_" => num(quantity), "unitCode" => to_lhdn_unit(detail.unit, unit_map)}
+      ],
       "LineExtensionAmount" => [%{"_" => num(good_amount), "currencyID" => "MYR"}],
       "Item" => [
         %{
-          "Description" => [%{"_" => Enum.join([detail.good_name, detail.descriptions] |> Enum.reject(&is_nil/1), " - ")}],
+          "Description" => [
+            %{
+              "_" =>
+                Enum.join(
+                  [detail.good_name, detail.descriptions] |> Enum.reject(&is_nil/1),
+                  " - "
+                )
+            }
+          ],
           "CommodityClassification" => [
             %{"ItemClassificationCode" => [%{"_" => "022", "listID" => "CLASS"}]}
           ]
@@ -1201,9 +1243,14 @@ defmodule FullCircle.EInvMetas do
     clean = String.replace(phone, ~r/[\s\-()]/, "")
 
     cond do
-      String.length(clean) > 20 -> ["#{label} exceeds 20 chars" | warnings]
-      !Regex.match?(~r/^\+?[0-9]+$/, clean) -> ["#{label} has invalid format (use digits, optional +)" | warnings]
-      true -> warnings
+      String.length(clean) > 20 ->
+        ["#{label} exceeds 20 chars" | warnings]
+
+      !Regex.match?(~r/^\+?[0-9]+$/, clean) ->
+        ["#{label} has invalid format (use digits, optional +)" | warnings]
+
+      true ->
+        warnings
     end
   end
 

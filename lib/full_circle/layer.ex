@@ -286,6 +286,7 @@ defmodule FullCircle.Layer do
 
     total_expired_mass_kg =
       egg_mass_kg(total_expired_grades, weight_by_name, report_graded_avg_g)
+
     total_net_mass_kg = total_graded_mass_kg - total_expired_mass_kg
 
     total_fcr = if total_graded_mass_kg > 0, do: total_feed_kg / total_graded_mass_kg, else: 0
@@ -537,7 +538,9 @@ defmodule FullCircle.Layer do
   defp normalize_sort(sort_by, sort_dir) do
     field =
       case sort_by do
-        atom when is_atom(atom) -> if atom in @valid_sort_fields, do: atom, else: :house_no
+        atom when is_atom(atom) ->
+          if atom in @valid_sort_fields, do: atom, else: :house_no
+
         bin when is_binary(bin) ->
           try do
             atom = String.to_existing_atom(bin)
@@ -545,7 +548,9 @@ defmodule FullCircle.Layer do
           rescue
             ArgumentError -> :house_no
           end
-        _ -> :house_no
+
+        _ ->
+          :house_no
       end
 
     dir =

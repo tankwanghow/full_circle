@@ -11,7 +11,10 @@ defmodule FullCircleWeb.EggStockLive.Print do
     grade_names = Enum.map(grades, & &1.name)
     grade_labels = Map.new(grades, fn g -> {g.name, g.nickname || g.name} end)
 
-    day = EggStock.get_day(company.id, date) || %{closing_bal: %{}, expired: %{}, ungraded_bal: 0, note: nil}
+    day =
+      EggStock.get_day(company.id, date) ||
+        %{closing_bal: %{}, expired: %{}, ungraded_bal: 0, note: nil}
+
     opening = EggStock.get_previous_closing_bal(company.id, date)
     actual_sales = EggStock.actual_sales_for_date(company.id, date)
     actual_purchases = EggStock.actual_purchases_for_date(company.id, date)
@@ -142,7 +145,9 @@ defmodule FullCircleWeb.EggStockLive.Print do
             <tr>
               <td class="label-col">{gettext("Opening")}</td>
               <td :for={g <- @grade_names} class="num">{to_int((@opening || %{})[g])}</td>
-              <td class="num">{Enum.reduce(@grade_names, 0, fn g, acc -> acc + to_int((@opening || %{})[g]) end)}</td>
+              <td class="num">
+                {Enum.reduce(@grade_names, 0, fn g, acc -> acc + to_int((@opening || %{})[g]) end)}
+              </td>
             </tr>
 
             <%!-- Purchases --%>
@@ -152,12 +157,20 @@ defmodule FullCircleWeb.EggStockLive.Print do
             <tr :for={row <- @actual_purchases}>
               <td class="contact-name">{row.contact_name}</td>
               <td :for={g <- @grade_names} class="num">{(row.quantities || %{})[g] || 0}</td>
-              <td class="num">{Enum.reduce(@grade_names, 0, fn g, acc -> acc + to_int((row.quantities || %{})[g]) end)}</td>
+              <td class="num">
+                {Enum.reduce(@grade_names, 0, fn g, acc ->
+                  acc + to_int((row.quantities || %{})[g])
+                end)}
+              </td>
             </tr>
             <tr :if={@actual_purchases != []} class="total-row">
               <td class="label-col">{gettext("Total Purchases")}</td>
               <td :for={g <- @grade_names} class="num">{actual_total(@actual_purchases, g)}</td>
-              <td class="num">{Enum.reduce(@grade_names, 0, fn g, acc -> acc + actual_total(@actual_purchases, g) end)}</td>
+              <td class="num">
+                {Enum.reduce(@grade_names, 0, fn g, acc ->
+                  acc + actual_total(@actual_purchases, g)
+                end)}
+              </td>
             </tr>
 
             <%!-- Sales --%>
@@ -167,19 +180,27 @@ defmodule FullCircleWeb.EggStockLive.Print do
             <tr :for={row <- @actual_sales}>
               <td class="contact-name">{row.contact_name}</td>
               <td :for={g <- @grade_names} class="num">{(row.quantities || %{})[g] || 0}</td>
-              <td class="num">{Enum.reduce(@grade_names, 0, fn g, acc -> acc + to_int((row.quantities || %{})[g]) end)}</td>
+              <td class="num">
+                {Enum.reduce(@grade_names, 0, fn g, acc ->
+                  acc + to_int((row.quantities || %{})[g])
+                end)}
+              </td>
             </tr>
             <tr :if={@actual_sales != []} class="total-row">
               <td class="label-col">{gettext("Total Sales")}</td>
               <td :for={g <- @grade_names} class="num">{actual_total(@actual_sales, g)}</td>
-              <td class="num">{Enum.reduce(@grade_names, 0, fn g, acc -> acc + actual_total(@actual_sales, g) end)}</td>
+              <td class="num">
+                {Enum.reduce(@grade_names, 0, fn g, acc -> acc + actual_total(@actual_sales, g) end)}
+              </td>
             </tr>
 
             <%!-- Expired --%>
             <tr>
               <td class="label-col">{gettext("Expired")}</td>
               <td :for={g <- @grade_names} class="num">{to_int(@expired[g])}</td>
-              <td class="num">{Enum.reduce(@grade_names, 0, fn g, acc -> acc + to_int(@expired[g]) end)}</td>
+              <td class="num">
+                {Enum.reduce(@grade_names, 0, fn g, acc -> acc + to_int(@expired[g]) end)}
+              </td>
             </tr>
           </tbody>
         </table>
@@ -211,7 +232,9 @@ defmodule FullCircleWeb.EggStockLive.Print do
               <tr style="background: #f0fdf4;">
                 <td class="label-col">{gettext("Production")}</td>
                 <td :for={g <- @grade_names} class="num">{to_int(@productions[g])}</td>
-                <td class="num">{Enum.reduce(@grade_names, 0, fn g, acc -> acc + to_int(@productions[g]) end)}</td>
+                <td class="num">
+                  {Enum.reduce(@grade_names, 0, fn g, acc -> acc + to_int(@productions[g]) end)}
+                </td>
               </tr>
 
               <%!-- Yield --%>

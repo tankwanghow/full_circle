@@ -275,19 +275,43 @@ defmodule FullCircle.PayRunTest do
         %{
           status: "Active",
           pay_list: [
-            %{year: 2026, month: 5, slip_no: "PS-1", net_pay: Decimal.new("3000"),
-              unproc_note_count: 0, unproc_adv_count: 0},
-            %{year: 2026, month: 4, slip_no: nil, net_pay: nil,
-              unproc_note_count: 1, unproc_adv_count: 0}
+            %{
+              year: 2026,
+              month: 5,
+              slip_no: "PS-1",
+              net_pay: Decimal.new("3000"),
+              unproc_note_count: 0,
+              unproc_adv_count: 0
+            },
+            %{
+              year: 2026,
+              month: 4,
+              slip_no: nil,
+              net_pay: nil,
+              unproc_note_count: 1,
+              unproc_adv_count: 0
+            }
           ]
         },
         %{
           status: "Active",
           pay_list: [
-            %{year: 2026, month: 5, slip_no: nil, net_pay: nil,
-              unproc_note_count: 0, unproc_adv_count: 0},
-            %{year: 2026, month: 4, slip_no: "PS-2", net_pay: Decimal.new("2000"),
-              unproc_note_count: 0, unproc_adv_count: 0}
+            %{
+              year: 2026,
+              month: 5,
+              slip_no: nil,
+              net_pay: nil,
+              unproc_note_count: 0,
+              unproc_adv_count: 0
+            },
+            %{
+              year: 2026,
+              month: 4,
+              slip_no: "PS-2",
+              net_pay: Decimal.new("2000"),
+              unproc_note_count: 0,
+              unproc_adv_count: 0
+            }
           ]
         }
       ]

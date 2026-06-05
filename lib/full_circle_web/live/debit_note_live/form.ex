@@ -70,7 +70,13 @@ defmodule FullCircleWeb.DebitNoteLive.Form do
       )
 
     cs =
-      DebCre.make_changeset(DebitNote, object, %{}, socket.assigns.current_company, socket.assigns.current_user)
+      DebCre.make_changeset(
+        DebitNote,
+        object,
+        %{},
+        socket.assigns.current_company,
+        socket.assigns.current_user
+      )
 
     socket
     |> assign(live_action: :edit)
@@ -98,7 +104,13 @@ defmodule FullCircleWeb.DebitNoteLive.Form do
       }
 
     cs =
-      DebCre.make_changeset(DebitNote, object, attrs, socket.assigns.current_company, socket.assigns.current_user)
+      DebCre.make_changeset(
+        DebitNote,
+        object,
+        attrs,
+        socket.assigns.current_company,
+        socket.assigns.current_user
+      )
 
     socket
     |> assign(live_action: :edit)

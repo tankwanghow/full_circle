@@ -66,7 +66,15 @@ defmodule FullCircle.BankReconciliation.LlmClient do
         model = non_blank(settings["llm-model"], config.model)
         api_key = settings["llm-api-key"] || ""
 
-        request_with_pdf(config.format, endpoint, model, api_key, system_prompt, user_prompt, pdf_base64)
+        request_with_pdf(
+          config.format,
+          endpoint,
+          model,
+          api_key,
+          system_prompt,
+          user_prompt,
+          pdf_base64
+        )
     end
   end
 

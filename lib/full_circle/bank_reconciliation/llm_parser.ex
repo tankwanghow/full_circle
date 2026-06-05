@@ -164,7 +164,14 @@ defmodule FullCircle.BankReconciliation.LlmParser do
         case parse_continuation_response(text) do
           {:ok, new_lines} ->
             merged_usage = merge_usage(total_usage, usage)
-            process_remaining_batches(rest, settings, all_lines ++ new_lines, merged_usage, balances)
+
+            process_remaining_batches(
+              rest,
+              settings,
+              all_lines ++ new_lines,
+              merged_usage,
+              balances
+            )
 
           {:error, reason} ->
             {:error, reason}
@@ -249,15 +256,17 @@ defmodule FullCircle.BankReconciliation.LlmParser do
       |> String.trim()
 
     # Extract JSON candidates from LLM response (may contain thinking/reasoning text)
-    obj_match = case Regex.run(~r/(\{[\s\S]*\})/s, cleaned) do
-      [_, m] -> m
-      _ -> nil
-    end
+    obj_match =
+      case Regex.run(~r/(\{[\s\S]*\})/s, cleaned) do
+        [_, m] -> m
+        _ -> nil
+      end
 
-    arr_match = case Regex.run(~r/(\[[\s\S]*\])/s, cleaned) do
-      [_, m] -> m
-      _ -> nil
-    end
+    arr_match =
+      case Regex.run(~r/(\[[\s\S]*\])/s, cleaned) do
+        [_, m] -> m
+        _ -> nil
+      end
 
     # Try candidates in order: object first (preserves balances), then array, then wrap as array
     candidates =
