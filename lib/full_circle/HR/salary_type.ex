@@ -4,10 +4,17 @@ defmodule FullCircle.HR.SalaryType do
   use Gettext, backend: FullCircleWeb.Gettext
   import FullCircle.Helpers
 
+  @statutory_codes ~w(epf_employer epf_employee socso_employer socso_employee
+                      socso_employer_only eis_employer eis_employee eis_employer_only
+                      pcb_employee)
+
+  def statutory_codes, do: @statutory_codes
+
   schema "salary_types" do
     field(:name, :string)
     field(:type, :string)
     field(:cal_func, :string)
+    field(:statutory_code, :string)
 
     belongs_to(:company, FullCircle.Sys.Company)
     belongs_to(:db_ac, FullCircle.Accounting.Account)
@@ -26,6 +33,7 @@ defmodule FullCircle.HR.SalaryType do
       :name,
       :type,
       :cal_func,
+      :statutory_code,
       :company_id,
       :db_ac_name,
       :cr_ac_name,
@@ -37,6 +45,10 @@ defmodule FullCircle.HR.SalaryType do
       :type,
       :company_id
     ])
+    |> update_change(:statutory_code, fn v -> if v in ["", nil], do: nil, else: v end)
+    |> validate_inclusion(:statutory_code, @statutory_codes,
+      message: gettext("is not a valid statutory code")
+    )
     |> validate_ac_names()
     |> unsafe_validate_unique([:name, :company_id], FullCircle.Repo,
       message: gettext("has already been taken")
