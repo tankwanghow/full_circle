@@ -27,27 +27,88 @@ defmodule FullCircle.PayRun do
   end
 
   def pay_run_index(month, year, com) do
-    pay_month_year_list =
-      -2..0
-      |> Enum.map(fn x ->
-        Timex.end_of_month(year, month)
-        |> Timex.shift(months: x)
-      end)
-      |> Enum.map_join(" union ", fn x ->
-        "select #{x.month} as pay_month, #{x.year} as pay_year"
+    months =
+      [0, -1]
+      |> Enum.map(fn x -> Timex.end_of_month(year, month) |> Timex.shift(months: x) end)
+      |> Enum.map(fn d -> {d.year, d.month} end)
+
+    months_sql =
+      months
+      |> Enum.map_join(" union all ", fn {y, m} ->
+        "select #{m} as pay_month, #{y} as pay_year"
       end)
 
-    "select el0.employee_id as id, el0.name as employee_name,
-            array_agg(coalesce(p5.slip_no, '') || '|' || coalesce(p5.id::varchar, '') || '|' ||
-                      el0.pay_year::varchar || '|' || el0.pay_month::varchar order by el0.pay_year desc, el0.pay_month desc) as pay_list
-       from (select e0.id as employee_id, e0.name, c1.id as company_id, l0.pay_month, l0.pay_year
-               from employees as e0 inner join companies as c1 on c1.id = '#{com.id}'
-                and e0.company_id = c1.id
-                and e0.status = 'Active', (#{pay_month_year_list}) as l0) as el0
-       left outer join pay_slips as p5 on p5.employee_id = el0.employee_id
-        and p5.company_id = el0.company_id and p5.pay_month = el0.pay_month
-        and p5.pay_year = el0.pay_year group by el0.employee_id, el0.name
-      order by el0.name" |> Helpers.exec_query_map() |> unzip_pay_lists()
+    cid = com.id
+
+    """
+    with months as (#{months_sql}),
+    candidates as (
+      select e.id as employee_id, e.name, e.status
+        from employees e
+       where e.company_id = '#{cid}'
+         and (
+           e.status = 'Active'
+           or exists (select 1 from pay_slips p join months mm
+                        on mm.pay_month = p.pay_month and mm.pay_year = p.pay_year
+                       where p.employee_id = e.id and p.company_id = e.company_id)
+           or exists (select 1 from salary_notes sn join months mm
+                        on mm.pay_month = extract(month from sn.note_date)::int
+                       and mm.pay_year = extract(year from sn.note_date)::int
+                       where sn.employee_id = e.id and sn.company_id = e.company_id)
+           or exists (select 1 from advances av join months mm
+                        on mm.pay_month = extract(month from av.slip_date)::int
+                       and mm.pay_year = extract(year from av.slip_date)::int
+                       where av.employee_id = e.id and av.company_id = e.company_id)
+         )
+    ),
+    emp_month as (
+      select c.employee_id, c.name, c.status, m.pay_month, m.pay_year
+        from candidates c cross join months m
+    )
+    select em.employee_id as id, em.name as employee_name, em.status,
+           array_agg(
+             coalesce(p.slip_no, '') || '|' || coalesce(p.id::varchar, '') || '|' ||
+             em.pay_year::varchar || '|' || em.pay_month::varchar || '|' ||
+             coalesce((
+               select sum(case st.type
+                            when 'Addition' then sn.quantity * sn.unit_price
+                            when 'Bonus' then sn.quantity * sn.unit_price
+                            when 'Deduction' then -(sn.quantity * sn.unit_price)
+                            else 0 end)
+                 from salary_notes sn join salary_types st on st.id = sn.salary_type_id
+                where sn.pay_slip_id = p.id), 0)
+             - coalesce((select sum(av.amount) from advances av where av.pay_slip_id = p.id), 0) || '|' ||
+             (select count(*) from salary_notes sn
+               where sn.employee_id = em.employee_id and sn.company_id = '#{cid}'
+                 and sn.pay_slip_id is null
+                 and extract(month from sn.note_date)::int = em.pay_month
+                 and extract(year from sn.note_date)::int = em.pay_year)::varchar || '|' ||
+             coalesce((select sum(sn.quantity * sn.unit_price) from salary_notes sn
+               where sn.employee_id = em.employee_id and sn.company_id = '#{cid}'
+                 and sn.pay_slip_id is null
+                 and extract(month from sn.note_date)::int = em.pay_month
+                 and extract(year from sn.note_date)::int = em.pay_year), 0)::varchar || '|' ||
+             (select count(*) from advances av
+               where av.employee_id = em.employee_id and av.company_id = '#{cid}'
+                 and av.pay_slip_id is null
+                 and extract(month from av.slip_date)::int = em.pay_month
+                 and extract(year from av.slip_date)::int = em.pay_year)::varchar || '|' ||
+             coalesce((select sum(av.amount) from advances av
+               where av.employee_id = em.employee_id and av.company_id = '#{cid}'
+                 and av.pay_slip_id is null
+                 and extract(month from av.slip_date)::int = em.pay_month
+                 and extract(year from av.slip_date)::int = em.pay_year), 0)::varchar
+             order by em.pay_year desc, em.pay_month desc
+           ) as pay_list
+      from emp_month em
+      left join pay_slips p
+        on p.employee_id = em.employee_id and p.company_id = '#{cid}'
+       and p.pay_month = em.pay_month and p.pay_year = em.pay_year
+     group by em.employee_id, em.name, em.status
+     order by em.name
+    """
+    |> Helpers.exec_query_map()
+    |> unzip_pay_lists()
   end
 
   defp unzip_pay_lists(lists) do
@@ -59,9 +120,21 @@ defmodule FullCircle.PayRun do
   end
 
   defp unzip_pay_list_string(str) do
-    [ps, ps_id, yr, mth] = str |> String.split("|")
+    [ps, ps_id, yr, mth, net, nc, ns, ac, as] = String.split(str, "|")
 
-    {if(ps == "", do: nil, else: ps), if(ps_id == "", do: nil, else: ps_id),
-     String.to_integer(yr), String.to_integer(mth)}
+    %{
+      slip_no: blank_to_nil(ps),
+      slip_id: blank_to_nil(ps_id),
+      year: String.to_integer(yr),
+      month: String.to_integer(mth),
+      net_pay: if(ps == "", do: nil, else: Decimal.new(net)),
+      unproc_note_count: String.to_integer(nc),
+      unproc_note_sum: Decimal.new(ns),
+      unproc_adv_count: String.to_integer(ac),
+      unproc_adv_sum: Decimal.new(as)
+    }
   end
+
+  defp blank_to_nil(""), do: nil
+  defp blank_to_nil(v), do: v
 end

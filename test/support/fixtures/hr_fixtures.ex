@@ -87,12 +87,14 @@ defmodule FullCircle.HRFixtures do
   end
 
   def salary_note_fixture(attrs, company, user) do
-    {:ok, salary_note} = FullCircle.HR.create_salary_note(attrs, company, user)
+    {:ok, %{create_salary_note: salary_note}} =
+      FullCircle.HR.create_salary_note(attrs, company, user)
+
     salary_note
   end
 
   def advance_fixture(attrs, company, user) do
-    {:ok, advance} = FullCircle.HR.create_advance(attrs, company, user)
+    {:ok, %{create_advance: advance}} = FullCircle.HR.create_advance(attrs, company, user)
     advance
   end
 end
