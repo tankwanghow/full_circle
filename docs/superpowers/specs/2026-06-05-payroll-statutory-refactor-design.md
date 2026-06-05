@@ -16,8 +16,8 @@ design is fragile and manual:
 2. **File formatting is encoded inside SQL** with `rpad`/`to_char` padding — unreadable against
    the agency spec, untestable, and brittle (e.g. breaks if a name exceeds the pad width).
 3. **Four ~95% identical query functions** — adding PCB means a fifth copy.
-4. **The employer `code` is retyped every run** (single shared setting), and reports are run one
-   at a time. *(UX deferred — see Non-Goals.)*
+4. **The employer `code` is retyped every run** — it's a single shared setting, so switching
+   report type carries over the wrong agency's code and you re-enter it each time.
 5. **No PCB (LHDN CP39) monthly file** at all, despite the PCB amount already being computed.
 
 ## Goal
@@ -28,6 +28,8 @@ Refactor statutory reporting onto a single, testable pipeline, and add PCB:
 - Replace the four SQL blobs with **one structured aggregation query**.
 - Move file formatting into **per-agency Elixir formatter modules**, unit-tested.
 - Add the **PCB / CP39 (e-Data PCB)** file.
+- **Store the employer code per agency** and auto-fill it when the report type is selected, so it
+  is never retyped.
 
 **Hard requirement:** the new EPF/SOCSO/EIS/SOCSO+EIS output must be **byte-identical** to the
 current SQL output for the same data, so existing portal uploads keep working. This is enforced
@@ -35,8 +37,9 @@ by a golden test comparing old vs new.
 
 ## Non-Goals (YAGNI)
 
-- **UX improvements** (per-agency stored employer codes, one-screen-all-agencies, default to last
-  month) — a separate follow-up increment. Employer codes stay in `Sys` settings as today.
+- **Further UX** (showing all agencies on one screen at once, defaulting the month to last month)
+  — a separate follow-up. This increment keeps the one-report-at-a-time dropdown, but with the
+  employer code auto-filled per agency (see §6).
 - **CP38** support — the system computes PCB only; CP38 amounts/counts are always zero.
 - **GL reconciliation**, e-PCB payment flow, statutory rate-table management — out of scope.
 
@@ -144,12 +147,36 @@ Rule enforced by data: besides Nama, at least two of {tax no, old IC, new IC, pa
 filled — we supply **tax no + new IC**. Only employees with `pcb_employee` amount > 0 are
 included. Filename pattern: `pcb List_<YYYYMMDDhhmmss>.txt` (matching the existing tool).
 
-### 5. Screen + CSV wiring
+### 5. Per-agency employer codes (auto-fill)
+
+Today the report stores a single shared `code` setting on the `EpfSocsoEis` settings page. Replace
+it with **one code per agency**, stored via the same `Sys` settings mechanism
+(`load_settings`/`update_setting`) — no schema change:
+
+| Report | Setting key | Meaning |
+|---|---|---|
+| EPF | `epf_code` | EPF employer no. |
+| SOCSO | `socso_code` | SOCSO employer code |
+| EIS | `eis_code` | EIS employer code |
+| SOCSO+EIS | `socso_code` | shares the SOCSO employer code |
+| PCB | `pcb_code` | 10-digit employer TIN (digits of the `E…` number) |
+
+Behaviour in [epf_socso_eis.ex](../../../lib/full_circle_web/live/report_live/epf_socso_eis.ex):
+
+- On load and whenever the **report select changes**, auto-fill the `code` field from that report's
+  saved setting (so picking EPF shows the EPF code, picking PCB shows the PCB TIN, etc.).
+- The `code` field stays editable. On **Query**, persist the entered value back to that report's
+  setting key (replacing the old single-`code` persistence).
+
+Net effect: each agency's code is entered once, then auto-fills forever — no retyping when
+switching report types.
+
+### 6. Screen + CSV wiring
 
 - [epf_socso_eis.ex](../../../lib/full_circle_web/live/report_live/epf_socso_eis.ex): add `PCB`
   to the report dropdown; call `statutory_contributions/3` and render a **human-readable preview
   table** (employee, IC, wages, employer/employee amounts per category) instead of raw
-  fixed-width strings. Employer `code` still from settings (unchanged).
+  fixed-width strings. The employer `code` auto-fills per agency (§5).
 - [csv_controller.ex](../../../lib/full_circle_web/controllers/csv_controller.ex): the
   `report=epfsocsoeis` branch calls `HR.statutory_file/5` (which now also handles `PCB`) instead
   of the four old functions. Download bytes are produced by the formatters.
@@ -174,6 +201,10 @@ included. Filename pattern: `pcb List_<YYYYMMDDhhmmss>.txt` (matching the existi
   codes from the name map and leaves unknowns blank.
 - **Aggregation query:** an employee with tagged statutory salary notes reports the correct
   per-category sums and `wages`; untagged notes are excluded.
+- **Per-agency codes:** the report→setting-key mapping (§5) resolves correctly and round-trips
+  through `Sys` settings (save under the right key, auto-fill from it). The LiveView wiring itself
+  is verified by `mix compile` + manual check, consistent with the codebase's lack of
+  company-scoped LiveView tests.
 
 ## Open Questions
 
