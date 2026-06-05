@@ -81,42 +81,16 @@ defmodule FullCircleWeb.ReportLive.EpfSocsoEis do
   end
 
   defp filter_transactions(socket, report, month, year, code) do
+    com_id = socket.assigns.current_company.id
+    month = String.to_integer("#{month}")
+    year = String.to_integer("#{year}")
+
     {col, row} =
-      cond do
-        report == "EPF" ->
-          FullCircle.HR.epf_submit_file_format_query(
-            month,
-            year,
-            code,
-            socket.assigns.current_company.id
-          )
-
-        report == "SOCSO" ->
-          FullCircle.HR.socso_submit_file_format_query(
-            month,
-            year,
-            code,
-            socket.assigns.current_company.id
-          )
-
-        report == "EIS" ->
-          FullCircle.HR.eis_submit_file_format_query(
-            month,
-            year,
-            code,
-            socket.assigns.current_company.id
-          )
-
-        report == "SOCSO+EIS" ->
-          FullCircle.HR.socso_eis_submit_file_format_query(
-            month,
-            year,
-            code,
-            socket.assigns.current_company.id
-          )
-
-        true ->
-          {[], []}
+      if report == "PCB" do
+        text = FullCircle.HR.Statutory.pcb_text(month, year, code, com_id)
+        {["textstr"], text |> String.split("\r\n", trim: true) |> Enum.map(&[&1])}
+      else
+        FullCircle.HR.Statutory.rows(report, month, year, code, com_id)
       end
 
     socket

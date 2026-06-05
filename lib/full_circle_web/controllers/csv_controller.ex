@@ -4,52 +4,47 @@ defmodule FullCircleWeb.CsvController do
   def show(conn, %{
         "company_id" => com_id,
         "report" => "epfsocsoeis",
+        "rep" => "PCB",
+        "code" => code,
+        "month" => month,
+        "year" => year
+      }) do
+    text =
+      FullCircle.HR.Statutory.pcb_text(
+        String.to_integer(month),
+        String.to_integer(year),
+        code,
+        com_id
+      )
+
+    conn
+    |> put_resp_content_type("text/plain")
+    |> put_resp_header(
+      "content-disposition",
+      "attachment; filename=\"#{FullCircle.HR.Statutory.PcbFormat.filename()}\""
+    )
+    |> put_root_layout(false)
+    |> send_resp(200, text)
+  end
+
+  def show(conn, %{
+        "company_id" => com_id,
+        "report" => "epfsocsoeis",
         "rep" => rep,
         "code" => code,
         "month" => month,
         "year" => year
       }) do
     {col, row} =
-      cond do
-        rep == "EPF" ->
-          FullCircle.HR.epf_submit_file_format_query(
-            month,
-            year,
-            code,
-            com_id
-          )
+      FullCircle.HR.Statutory.rows(
+        rep,
+        String.to_integer(month),
+        String.to_integer(year),
+        code,
+        com_id
+      )
 
-        rep == "SOCSO" ->
-          FullCircle.HR.socso_submit_file_format_query(
-            month,
-            year,
-            code,
-            com_id
-          )
-
-        rep == "EIS" ->
-          FullCircle.HR.eis_submit_file_format_query(
-            month,
-            year,
-            code,
-            com_id
-          )
-
-        rep == "SOCSO+EIS" ->
-          FullCircle.HR.socso_eis_submit_file_format_query(
-            month,
-            year,
-            code,
-            com_id
-          )
-
-        true ->
-          []
-      end
-
-    filename = "#{rep}_#{month}_#{year}"
-
-    send_csv_row_col(conn, row, col, filename)
+    send_csv_row_col(conn, row, col, "#{rep}_#{month}_#{year}")
   end
 
   def show(conn, %{

@@ -224,22 +224,50 @@ defmodule FullCircle.StatutoryTest do
 
     test "EPF matches legacy", ctx do
       assert norm(EpfFormat.rows(ctx.contribs, "EPFCODE")) ==
-               norm(HR.epf_submit_file_format_query(5, 2026, "EPFCODE", ctx.com.id))
+               norm(FullCircle.LegacyStatutory.epf_submit_file_format_query(5, 2026, "EPFCODE", ctx.com.id))
     end
 
     test "SOCSO matches legacy", ctx do
       assert norm(SocsoFormat.rows(ctx.contribs, "SOCSOCODE")) ==
-               norm(HR.socso_submit_file_format_query(5, 2026, "SOCSOCODE", ctx.com.id))
+               norm(FullCircle.LegacyStatutory.socso_submit_file_format_query(5, 2026, "SOCSOCODE", ctx.com.id))
     end
 
     test "EIS matches legacy", ctx do
       assert norm(EisFormat.rows(ctx.contribs, "EISCODE")) ==
-               norm(HR.eis_submit_file_format_query(5, 2026, "EISCODE", ctx.com.id))
+               norm(FullCircle.LegacyStatutory.eis_submit_file_format_query(5, 2026, "EISCODE", ctx.com.id))
     end
 
     test "SOCSO+EIS matches legacy", ctx do
       assert norm(SocsoEisFormat.rows(ctx.contribs, "EMPCODE")) ==
-               norm(HR.socso_eis_submit_file_format_query(5, 2026, "EMPCODE", ctx.com.id))
+               norm(FullCircle.LegacyStatutory.socso_eis_submit_file_format_query(5, 2026, "EMPCODE", ctx.com.id))
+    end
+  end
+
+  alias FullCircle.HR.Statutory
+
+  describe "Statutory dispatcher" do
+    setup :setup_statutory
+
+    test "report->setting-key mapping" do
+      assert Statutory.code_key("EPF") == "epf_code"
+      assert Statutory.code_key("SOCSO") == "socso_code"
+      assert Statutory.code_key("EIS") == "eis_code"
+      assert Statutory.code_key("SOCSO+EIS") == "socso_code"
+      assert Statutory.code_key("PCB") == "pcb_code"
+    end
+
+    test "rows/5 returns {col, rows} for EPF", ctx do
+      e1 =
+        employee_fixture(
+          %{name: "Aaa", epf_no: "E1", tax_no: "1", id_no: "900101015555"},
+          ctx.com,
+          ctx.admin
+        )
+
+      slip(e1, 5, 2026, %{"Monthly Salary" => "3000", "EPF By Employee" => "330"}, ctx)
+      {col, rows} = Statutory.rows("EPF", 5, 2026, "EPFCODE", ctx.com.id)
+      assert col == ["epf_no", "id_number", "name", "wages", "employer", "employee"]
+      assert length(rows) == 1
     end
   end
 
