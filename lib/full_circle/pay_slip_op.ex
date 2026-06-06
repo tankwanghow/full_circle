@@ -381,11 +381,25 @@ defmodule FullCircle.PaySlipOp do
       Enum.reject(add, fn a ->
         !is_nil(Enum.find_index(ps.additions, fn n -> a._id == n._id end))
       end)
+      |> Enum.reject(fn a ->
+        !is_nil(
+          Enum.find_index(ps.additions, fn n ->
+            a.note_no == "...new..." and a.salary_type_id == n.salary_type_id
+          end)
+        )
+      end)
       |> Enum.map(fn x -> Map.merge(x, %{id: x._id, __struct__: SalaryNote}) end)
 
     bon =
       Enum.reject(bon, fn a ->
         !is_nil(Enum.find_index(ps.bonuses, fn n -> a._id == n._id end))
+      end)
+      |> Enum.reject(fn a ->
+        !is_nil(
+          Enum.find_index(ps.bonuses, fn n ->
+            a.note_no == "...new..." and a.salary_type_id == n.salary_type_id
+          end)
+        )
       end)
       |> Enum.map(fn x -> Map.merge(x, %{id: x._id, __struct__: SalaryNote}) end)
 
@@ -418,6 +432,13 @@ defmodule FullCircle.PaySlipOp do
     lea =
       Enum.reject(lea, fn a ->
         !is_nil(Enum.find_index(ps.leaves, fn n -> a._id == n._id end))
+      end)
+      |> Enum.reject(fn a ->
+        !is_nil(
+          Enum.find_index(ps.leaves, fn n ->
+            a.note_no == "...new..." and a.salary_type_id == n.salary_type_id
+          end)
+        )
       end)
       |> Enum.map(fn x -> Map.merge(x, %{id: x._id, __struct__: SalaryNote}) end)
 
