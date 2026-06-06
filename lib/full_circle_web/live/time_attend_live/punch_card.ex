@@ -97,26 +97,23 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
             value={@pay_prep && @pay_prep.funds_account_id}
           />
         </.form>
-        <.link phx-click="calculate_statutory" class="h-10 mt-5 blue button">
+        <.link
+          :if={is_nil(@statutory_preview)}
+          phx-click="calculate_statutory"
+          class="h-10 mt-5 blue button"
+        >
           {gettext("Calculate Statutory")}
         </.link>
-        <label class="h-10 mt-5 flex items-center gap-1 px-2 border rounded">
-          <input type="checkbox" checked={@pay_prep && @pay_prep.verified} phx-click="toggle_correct" disabled={!correct_enabled?(@pay_prep, @statutory_preview)} />
-          {gettext("Correct")}
-        </label>
-        <.link :if={@pay_prep && @pay_prep.verified} phx-click="pay" class="h-10 mt-5 green button">
+        <.link
+          :if={@statutory_preview}
+          phx-click="pay"
+          class="h-10 mt-5 green button"
+        >
           {gettext("Save PaySlip")}
         </.link>
         <span :if={@net_pay} class="h-10 mt-5 font-bold">
           {gettext("Net Pay")}: {@net_pay |> Number.Delimit.number_to_delimited()}
         </span>
-      </div>
-
-      <div
-        :if={@employee && @pay_slip && @pay_prep && !@pay_prep.verified}
-        class="text-center bg-amber-200 border border-amber-500 rounded p-1 mb-2"
-      >
-        ⚠ {gettext("Inputs changed since last pay — recalculate and re-pay.")}
       </div>
 
       <div :if={@employee} class="text-center">
@@ -452,28 +449,11 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
   end
 
   @impl true
-  def handle_event("toggle_correct", _, socket) do
-    %{employee: emp, search: s, pay_prep: pp, current_company: com, current_user: user} = socket.assigns
-
-    case FullCircle.HR.set_pay_prep_verified(
-           emp.id, String.to_integer("#{s.month}"), String.to_integer("#{s.year}"),
-           !pp.verified, com, user) do
-      {:ok, pp} ->
-        {:noreply, assign(socket, pay_prep: pp)}
-
-      {:error, _cs} ->
-        {:noreply,
-         put_flash(socket, :error,
-           gettext("Select a payment account and Calculate Statutory before marking Correct."))}
-    end
-  end
-
-  @impl true
   def handle_event("pay", _, socket) do
     %{employee: emp, search: s, pay_prep: pp, current_company: com, current_user: user} =
       socket.assigns
 
-    if pp && pp.verified && pp.funds_account_id do
+    if pp && pp.funds_account_id do
       case FullCircle.PaySlipOp.pay(
              emp,
              String.to_integer("#{s.month}"),
@@ -502,7 +482,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
        put_flash(
          socket,
          :error,
-         gettext("Mark Correct (with a payment account) before paying.")
+         gettext("Select a payment account before saving.")
        )}
     end
   end
@@ -859,11 +839,6 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
   defp ot_day_worked(objs) do
     Enum.map(objs, fn x -> x.ot / x.work_hours_per_day end)
     |> Enum.sum()
-  end
-
-  defp correct_enabled?(nil, _preview), do: false
-  defp correct_enabled?(pp, preview) do
-    pp.verified or (not is_nil(pp.funds_account_id) and not is_nil(preview))
   end
 
   # Earnings/manual notes (no cal_func) stay as editable components. Once statutory is
