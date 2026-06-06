@@ -621,6 +621,7 @@ defmodule FullCircle.HR do
       true ->
         Multi.new()
         |> create_salary_note_multi(attrs, com, user)
+        |> clear_pay_prep_step(:create_salary_note, com)
         |> Repo.transaction()
 
       false ->
@@ -733,6 +734,7 @@ defmodule FullCircle.HR do
       true ->
         Multi.new()
         |> update_salary_note_multi(salary_note, attrs, com, user)
+        |> clear_pay_prep_step(:update_salary_note, com)
         |> Repo.transaction()
 
       false ->
@@ -781,6 +783,7 @@ defmodule FullCircle.HR do
       true ->
         Multi.new()
         |> delete_salary_note_multi(salary_note, com, user)
+        |> clear_pay_prep_step(:delete_salary_note, com)
         |> Repo.transaction()
 
       false ->
@@ -915,6 +918,7 @@ defmodule FullCircle.HR do
       true ->
         Multi.new()
         |> create_advance_multi(attrs, com, user)
+        |> clear_pay_prep_step(:create_advance, com)
         |> Repo.transaction()
 
       false ->
@@ -976,6 +980,7 @@ defmodule FullCircle.HR do
       true ->
         Multi.new()
         |> update_advance_multi(advance, attrs, com, user)
+        |> clear_pay_prep_step(:update_advance, com)
         |> Repo.transaction()
 
       false ->
@@ -1327,6 +1332,23 @@ defmodule FullCircle.HR do
     get_or_init_pay_prep(employee_id, month, year, com)
     |> FullCircle.HR.PayPrep.changeset(attrs)
     |> Repo.insert_or_update()
+  end
+
+  defp clear_pay_prep_step(multi, entity_key, com) do
+    Multi.run(multi, {:clear_pay_prep, entity_key}, fn _repo, changes ->
+      case Map.get(changes, entity_key) do
+        %{employee_id: emp_id, note_date: %Date{} = d} ->
+          clear_pay_prep(com, emp_id, d.month, d.year)
+          {:ok, :cleared}
+
+        %{employee_id: emp_id, slip_date: %Date{} = d} ->
+          clear_pay_prep(com, emp_id, d.month, d.year)
+          {:ok, :cleared}
+
+        _ ->
+          {:ok, :noop}
+      end
+    end)
   end
 
   def clear_pay_prep(com, employee_id, month, year) do

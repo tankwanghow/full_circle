@@ -61,5 +61,53 @@ defmodule FullCircle.PayPrepTest do
       HR.clear_pay_prep(com, emp.id, 5, 2026)
       refute HR.get_or_init_pay_prep(emp.id, 5, 2026, com).verified
     end
+
+    test "creating/updating/deleting a salary note clears verified for that month", %{
+      com: com, emp: emp, admin: admin
+    } do
+      st = HR.get_salary_type_by_name("Monthly Salary", com, admin)
+      funds = FullCircle.AccountingFixtures.account_fixture(
+        %{name: "Cash on Hand", account_type: "Cash or Equivalent"}, com, admin)
+      {:ok, _} = HR.set_pay_prep_account(emp.id, 5, 2026, funds.id, com, admin)
+      {:ok, _} = HR.set_pay_prep_verified(emp.id, 5, 2026, true, com, admin)
+
+      sn_attrs = %{
+        "note_date" => "2026-05-15", "quantity" => "1", "unit_price" => "100",
+        "employee_name" => emp.name, "employee_id" => emp.id,
+        "salary_type_name" => st.name, "salary_type_id" => st.id, "descriptions" => "x"
+      }
+
+      {:ok, %{create_salary_note: sn}} = HR.create_salary_note(sn_attrs, com, admin)
+      refute HR.get_or_init_pay_prep(emp.id, 5, 2026, com).verified
+
+      {:ok, _} = HR.set_pay_prep_verified(emp.id, 5, 2026, true, com, admin)
+      upd_attrs = sn_attrs |> Map.put("unit_price", "200") |> Map.put("note_no", sn.note_no)
+      {:ok, _} = HR.update_salary_note(sn, upd_attrs, com, admin)
+      refute HR.get_or_init_pay_prep(emp.id, 5, 2026, com).verified
+
+      {:ok, _} = HR.set_pay_prep_verified(emp.id, 5, 2026, true, com, admin)
+      sn = HR.get_salary_note!(sn.id, com, admin)
+      {:ok, _} = HR.delete_salary_note(sn, com, admin)
+      refute HR.get_or_init_pay_prep(emp.id, 5, 2026, com).verified
+    end
+
+    test "note in a different month does not clear another month's prep", %{
+      com: com, emp: emp, admin: admin
+    } do
+      st = HR.get_salary_type_by_name("Monthly Salary", com, admin)
+      funds = FullCircle.AccountingFixtures.account_fixture(
+        %{name: "Cash on Hand", account_type: "Cash or Equivalent"}, com, admin)
+      {:ok, _} = HR.set_pay_prep_account(emp.id, 6, 2026, funds.id, com, admin)
+      {:ok, _} = HR.set_pay_prep_verified(emp.id, 6, 2026, true, com, admin)
+
+      {:ok, _} =
+        HR.create_salary_note(%{
+          "note_date" => "2026-05-20", "quantity" => "1", "unit_price" => "100",
+          "employee_name" => emp.name, "employee_id" => emp.id,
+          "salary_type_name" => st.name, "salary_type_id" => st.id, "descriptions" => "x"
+        }, com, admin)
+
+      assert HR.get_or_init_pay_prep(emp.id, 6, 2026, com).verified
+    end
   end
 end
