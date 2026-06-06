@@ -872,14 +872,19 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
   defp editable_notes(notes, nil), do: notes
   defp editable_notes(notes, _preview), do: Enum.reject(notes, fn n -> computed?(Map.get(n, :cal_func)) end)
 
-  # The computed (cal_func) lines from the preview — existing statutory recomputed + newly
-  # generated — at their recomputed values. Zero ones are omitted (they're deleted from the slip
-  # on Save). Map.get because recal builds partial "fake structs" missing keys like :descriptions.
+  # The lines Calculate adds/recomputes vs. the editable earnings: computed (cal_func) lines —
+  # existing statutory recomputed + newly generated — AND newly-generated lines (note_no
+  # "...new...": recurrings and new salary types). Existing non-computed earnings stay as editable
+  # components, so they're excluded here. Zero lines are omitted (not saved / deleted on Save).
+  # Map.get because recal builds partial "fake structs" missing keys like :descriptions.
   defp computed_preview_lines(nil), do: []
 
   defp computed_preview_lines(ps) do
     (ps.additions ++ ps.bonuses ++ ps.deductions ++ ps.contributions ++ ps.leaves)
-    |> Enum.filter(fn n -> computed?(Map.get(n, :cal_func)) and not zero?(Map.get(n, :amount)) end)
+    |> Enum.filter(fn n ->
+      (computed?(Map.get(n, :cal_func)) or Map.get(n, :note_no) == "...new...") and
+        not zero?(Map.get(n, :amount))
+    end)
     |> Enum.map(fn n ->
       %{
         note_date: fmt_date(Map.get(n, :note_date)),
