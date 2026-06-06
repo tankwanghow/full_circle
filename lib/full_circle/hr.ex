@@ -1289,4 +1289,52 @@ defmodule FullCircle.HR do
       |> Enum.map(fn [t, i, s, f] -> [Timex.parse!(t, "{RFC3339}"), i, s, f] end)
     end
   end
+
+  def get_or_init_pay_prep(employee_id, month, year, com) do
+    Repo.get_by(FullCircle.HR.PayPrep,
+      company_id: com.id,
+      employee_id: employee_id,
+      pay_month: month,
+      pay_year: year
+    ) ||
+      %FullCircle.HR.PayPrep{
+        company_id: com.id,
+        employee_id: employee_id,
+        pay_month: month,
+        pay_year: year,
+        verified: false
+      }
+  end
+
+  def set_pay_prep_account(employee_id, month, year, funds_account_id, com, _user) do
+    get_or_init_pay_prep(employee_id, month, year, com)
+    |> FullCircle.HR.PayPrep.changeset(%{"funds_account_id" => funds_account_id})
+    |> Repo.insert_or_update()
+  end
+
+  def set_pay_prep_verified(employee_id, month, year, verified, com, user) do
+    attrs =
+      if verified do
+        %{
+          "verified" => true,
+          "verified_at" => DateTime.utc_now() |> DateTime.truncate(:second),
+          "verified_by_id" => user.id
+        }
+      else
+        %{"verified" => false, "verified_at" => nil, "verified_by_id" => nil}
+      end
+
+    get_or_init_pay_prep(employee_id, month, year, com)
+    |> FullCircle.HR.PayPrep.changeset(attrs)
+    |> Repo.insert_or_update()
+  end
+
+  def clear_pay_prep(com, employee_id, month, year) do
+    from(p in FullCircle.HR.PayPrep,
+      where:
+        p.company_id == ^com.id and p.employee_id == ^employee_id and
+          p.pay_month == ^month and p.pay_year == ^year
+    )
+    |> Repo.update_all(set: [verified: false, verified_at: nil, verified_by_id: nil])
+  end
 end
