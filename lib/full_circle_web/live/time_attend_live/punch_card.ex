@@ -97,18 +97,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
             value={@pay_prep && @pay_prep.funds_account_id}
           />
         </.form>
-        <.link
-          :if={is_nil(@statutory_preview)}
-          phx-click="calculate_statutory"
-          class="h-10 mt-5 blue button"
-        >
-          {gettext("Calculate Statutory")}
-        </.link>
-        <.link
-          :if={@statutory_preview}
-          phx-click="pay"
-          class="h-10 mt-5 green button"
-        >
+        <.link :if={@statutory_preview} phx-click="pay" class="h-10 mt-5 green button">
           {gettext("Save PaySlip")}
         </.link>
         <span :if={@net_pay} class="h-10 mt-5 font-bold">
@@ -431,24 +420,6 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
   end
 
   @impl true
-  def handle_event("calculate_statutory", _, socket) do
-    %{employee: emp, search: s, current_company: com, current_user: user} = socket.assigns
-
-    cs =
-      FullCircle.PaySlipOp.preview(
-        emp,
-        String.to_integer("#{s.month}"),
-        String.to_integer("#{s.year}"),
-        com,
-        user
-      )
-
-    ps = Ecto.Changeset.apply_changes(cs)
-
-    {:noreply, socket |> assign(statutory_preview: ps) |> assign(net_pay: ps.pay_slip_amount)}
-  end
-
-  @impl true
   def handle_event("pay", _, socket) do
     %{employee: emp, search: s, pay_prep: pp, current_company: com, current_user: user} =
       socket.assigns
@@ -757,8 +728,23 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
               socket.assigns.current_company
             )
         )
-        |> assign(statutory_preview: nil)
-        |> assign(net_pay: nil)
+        |> then(fn skt ->
+          # Statutory preview is derived, not a manual step: recompute on every load and after
+          # every note/advance change (this runs in both), so it can never be stale.
+          preview =
+            PaySlipOp.preview(
+              emp,
+              String.to_integer(month),
+              String.to_integer(year),
+              socket.assigns.current_company,
+              socket.assigns.current_user
+            )
+            |> Ecto.Changeset.apply_changes()
+
+          skt
+          |> assign(statutory_preview: preview)
+          |> assign(net_pay: preview.pay_slip_amount)
+        end)
 
       socket |> update_punch_card(punches)
     end
