@@ -290,5 +290,26 @@ defmodule FullCircle.PaySlipOpTest do
       assert Enum.count(loaded.advances) == 1
       assert Decimal.eq?(hd(loaded.advances).amount, Decimal.new("500"))
     end
+
+    test "loaded salary notes carry cal_func so recal can recompute them", %{
+      com: com, admin: admin, employee: emp
+    } do
+      # "EPF By Employee" (cal_func "epf_employee") is created by this describe's setup.
+      epf = FullCircle.HR.get_salary_type_by_name("EPF By Employee", com, admin)
+
+      {:ok, _} = FullCircle.HR.create_salary_note(%{
+        "note_date" => "2026-05-31", "quantity" => "1", "unit_price" => "330",
+        "employee_name" => emp.name, "employee_id" => emp.id,
+        "salary_type_name" => epf.name, "salary_type_id" => epf.id, "descriptions" => "epf"
+      }, com, admin)
+
+      notes = FullCircle.HR.get_salary_notes(emp.id, 5, 2026, com, admin)
+      note = Enum.find(notes, &(&1.salary_type_name == "EPF By Employee"))
+
+      # cal_func is virtual; without repopulating it from the salary type on load,
+      # calculate_pay would skip this line on recal (the reported bug).
+      assert note
+      assert note.cal_func == "epf_employee"
+    end
   end
 end
