@@ -80,22 +80,51 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
         >
           {gettext("+ Advance")}
         </.link>
-        <.link
-          :if={is_nil(@pay_slip)}
-          navigate={@new_pay_slip_url}
-          class="w-[10%] h-10 mt-5 blue button ml-2"
-          id="new_payslip"
-        >
-          {gettext("+ Pay")}
+      </div>
+
+      <div :if={@employee} class="flex flex-row gap-2 items-end justify-center my-2">
+        <.form for={%{}} phx-change="validate" id="payprep-form" class="w-[26%]">
+          <.input
+            name="pay_prep[funds_account_name]"
+            value={@pay_prep && @pay_prep.funds_account_id && account_name(@pay_prep.funds_account_id)}
+            label={gettext("Payment Account")}
+            phx-hook="tributeAutoComplete"
+            url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=fundsaccount&name="}
+          />
+          <.input
+            type="hidden"
+            name="pay_prep[funds_account_id]"
+            value={@pay_prep && @pay_prep.funds_account_id}
+          />
+        </.form>
+        <.link phx-click="calculate_statutory" class="h-10 mt-5 blue button">
+          {gettext("Calculate Statutory")}
         </.link>
-        <.link
-          :if={!is_nil(@pay_slip)}
-          navigate={"/companies/#{@current_company.id}/PaySlip/#{@pay_slip.id}/recal"}
-          class="w-[11%] h-10 mt-5 blue button ml-2"
-          id="recal_payslip"
-        >
-          {gettext("Recal Pay")}
+        <label class="h-10 mt-5 flex items-center gap-1 px-2 border rounded">
+          <input type="checkbox" checked={@pay_prep && @pay_prep.verified} phx-click="toggle_correct" />
+          {gettext("Correct")}
+        </label>
+        <.link :if={@pay_prep && @pay_prep.verified} phx-click="pay" class="h-10 mt-5 green button">
+          {gettext("Pay")}
         </.link>
+        <span :if={@net_pay} class="h-10 mt-5 font-bold">
+          {gettext("Net Pay")}: {@net_pay |> Number.Delimit.number_to_delimited()}
+        </span>
+      </div>
+
+      <div
+        :if={@employee && @pay_slip && @pay_prep && !@pay_prep.verified}
+        class="text-center bg-amber-200 border border-amber-500 rounded p-1 mb-2"
+      >
+        ⚠ {gettext("Inputs changed since last pay — recalculate and re-pay.")}
+      </div>
+
+      <div :if={@statutory_preview} class="text-center text-sm mb-2">
+        <%= for n <- @statutory_preview.deductions ++ @statutory_preview.contributions, !is_nil(n.cal_func) do %>
+          <span class="mx-1">
+            {n.salary_type_name}: {n.amount |> Number.Delimit.number_to_delimited()}
+          </span>
+        <% end %>
       </div>
 
       <div :if={@employee} class="text-center">
@@ -360,6 +389,133 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
      )}
   end
 
+  @impl true
+  def handle_event(
+        "validate",
+        %{"_target" => ["pay_prep", "funds_account_name"], "pay_prep" => params},
+        socket
+      ) do
+    {params, socket, _} =
+      FullCircleWeb.Helpers.assign_autocomplete_id(
+        socket,
+        params,
+        "funds_account_name",
+        "funds_account_id",
+        &FullCircle.Accounting.get_account_by_name/3
+      )
+
+    %{employee: emp, search: s, current_company: com, current_user: user} = socket.assigns
+
+    {:ok, pp} =
+      FullCircle.HR.set_pay_prep_account(
+        emp.id,
+        String.to_integer("#{s.month}"),
+        String.to_integer("#{s.year}"),
+        params["funds_account_id"],
+        com,
+        user
+      )
+
+    {:noreply, assign(socket, pay_prep: pp)}
+  end
+
+  @impl true
+  def handle_event("validate", _, socket) do
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("select_account", %{"funds_account_id" => id}, socket) do
+    %{employee: emp, search: s, current_company: com, current_user: user} = socket.assigns
+
+    {:ok, pp} =
+      FullCircle.HR.set_pay_prep_account(
+        emp.id,
+        String.to_integer("#{s.month}"),
+        String.to_integer("#{s.year}"),
+        id,
+        com,
+        user
+      )
+
+    {:noreply, assign(socket, pay_prep: pp)}
+  end
+
+  @impl true
+  def handle_event("calculate_statutory", _, socket) do
+    %{employee: emp, search: s, current_company: com, current_user: user} = socket.assigns
+
+    cs =
+      FullCircle.PaySlipOp.preview(
+        emp,
+        String.to_integer("#{s.month}"),
+        String.to_integer("#{s.year}"),
+        com,
+        user
+      )
+
+    ps = Ecto.Changeset.apply_changes(cs)
+
+    {:noreply, socket |> assign(statutory_preview: ps) |> assign(net_pay: ps.pay_slip_amount)}
+  end
+
+  @impl true
+  def handle_event("toggle_correct", _, socket) do
+    %{employee: emp, search: s, pay_prep: pp, current_company: com, current_user: user} =
+      socket.assigns
+
+    {:ok, pp} =
+      FullCircle.HR.set_pay_prep_verified(
+        emp.id,
+        String.to_integer("#{s.month}"),
+        String.to_integer("#{s.year}"),
+        !pp.verified,
+        com,
+        user
+      )
+
+    {:noreply, assign(socket, pay_prep: pp)}
+  end
+
+  @impl true
+  def handle_event("pay", _, socket) do
+    %{employee: emp, search: s, pay_prep: pp, current_company: com, current_user: user} =
+      socket.assigns
+
+    if pp && pp.verified && pp.funds_account_id do
+      case FullCircle.PaySlipOp.pay(
+             emp,
+             String.to_integer("#{s.month}"),
+             String.to_integer("#{s.year}"),
+             pp.funds_account_id,
+             com,
+             user
+           ) do
+        {:ok, _} ->
+          {:noreply,
+           socket
+           |> put_flash(:info, gettext("Pay Slip saved."))
+           |> push_navigate(
+             to:
+               "/companies/#{com.id}/PunchCard?#{URI.encode_query(%{"search[employee_name]" => emp.name, "search[month]" => s.month, "search[year]" => s.year})}"
+           )}
+
+        {:error, _op, cs, _} ->
+          {:noreply, put_flash(socket, :error, inspect(cs.errors))}
+
+        other ->
+          {:noreply, put_flash(socket, :error, "#{inspect(other)}")}
+      end
+    else
+      {:noreply,
+       put_flash(
+         socket,
+         :error,
+         gettext("Mark Correct (with a payment account) before paying.")
+       )}
+    end
+  end
+
   def handle_event("new_salarynote", _, socket) do
     {:noreply,
      socket
@@ -557,6 +713,9 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
       |> assign(sunday_pay_days: 0)
       |> assign(holiday_pay_days: 0)
       |> assign(new_pay_slip_url: nil)
+      |> assign(pay_prep: nil)
+      |> assign(statutory_preview: nil)
+      |> assign(net_pay: nil)
       |> assign(search: %{employee_name: emp_name, month: month, year: year})
     else
       punches =
@@ -618,6 +777,17 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
           new_pay_slip_url:
             "/companies/#{socket.assigns.current_company.id}/PaySlip/new?#{URI.encode_query(qry)}"
         )
+        |> assign(
+          pay_prep:
+            FullCircle.HR.get_or_init_pay_prep(
+              emp.id,
+              String.to_integer(month),
+              String.to_integer(year),
+              socket.assigns.current_company
+            )
+        )
+        |> assign(statutory_preview: nil)
+        |> assign(net_pay: nil)
 
       socket |> update_punch_card(punches)
     end
@@ -698,5 +868,12 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
   defp ot_day_worked(objs) do
     Enum.map(objs, fn x -> x.ot / x.work_hours_per_day end)
     |> Enum.sum()
+  end
+
+  defp account_name(id) do
+    case FullCircle.Repo.get(FullCircle.Accounting.Account, id) do
+      nil -> ""
+      acc -> acc.name
+    end
   end
 end
