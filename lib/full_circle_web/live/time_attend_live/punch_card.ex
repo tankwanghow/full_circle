@@ -869,8 +869,22 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
   defp preview_new_lines(nil), do: []
 
   defp preview_new_lines(ps) do
+    # Normalize to plain maps with Map.get — recal builds partial "fake structs"
+    # (Map.merge with __struct__) that may be missing keys like :descriptions.
     (ps.additions ++ ps.bonuses ++ ps.deductions ++ ps.contributions ++ ps.leaves)
-    |> Enum.filter(fn n -> n.note_no == "...new..." or not is_nil(n.cal_func) end)
+    |> Enum.filter(fn n ->
+      Map.get(n, :note_no) == "...new..." or not is_nil(Map.get(n, :cal_func))
+    end)
+    |> Enum.map(fn n ->
+      %{
+        note_date: Map.get(n, :note_date),
+        salary_type_name: Map.get(n, :salary_type_name),
+        descriptions: Map.get(n, :descriptions),
+        quantity: Map.get(n, :quantity) || 0,
+        unit_price: Map.get(n, :unit_price) || 0,
+        amount: Map.get(n, :amount) || 0
+      }
+    end)
   end
 
   defp account_name(id, com) do
