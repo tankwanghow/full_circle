@@ -795,20 +795,18 @@ defmodule FullCircle.HR do
       {:sql_error, e.postgres.message}
   end
 
-  def delete_salary_note_multi(multi, salary_note, com, user) do
-    salary_note_name = :delete_salary_note
-
+  def delete_salary_note_multi(multi, salary_note, com, user, name \\ :delete_salary_note) do
     multi
-    |> Multi.delete(salary_note_name, StdInterface.changeset(SalaryNote, salary_note, %{}, com))
+    |> Multi.delete(name, StdInterface.changeset(SalaryNote, salary_note, %{}, com))
     |> Multi.delete_all(
-      :delete_transaction,
+      "#{name}_delete_transaction" |> String.to_atom(),
       from(txn in Transaction,
         where: txn.doc_type == "SalaryNote",
         where: txn.doc_no == ^salary_note.note_no,
         where: txn.company_id == ^com.id
       )
     )
-    |> Sys.insert_log_for(salary_note_name, %{"deleted_id_is" => salary_note.id}, com, user)
+    |> Sys.insert_log_for(name, %{"deleted_id_is" => salary_note.id}, com, user)
   end
 
   def get_advance!(id, com, user) do

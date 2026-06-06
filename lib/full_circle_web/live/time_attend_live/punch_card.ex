@@ -887,7 +887,12 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
 
   defp unified_preview_lines(ps) do
     (ps.additions ++ ps.bonuses ++ ps.deductions ++ ps.contributions ++ ps.leaves)
-    |> Enum.reject(fn n -> Map.get(n, :note_no) == "...new..." and zero?(Map.get(n, :amount)) end)
+    # Drop lines that won't be saved: new zero lines, and computed (cal_func) lines that
+    # recompute to 0 (those existing get deleted from the slip on Save).
+    |> Enum.reject(fn n ->
+      zero?(Map.get(n, :amount)) and
+        (Map.get(n, :note_no) == "...new..." or computed?(Map.get(n, :cal_func)))
+    end)
     |> Enum.map(fn n ->
       %{
         note_date: fmt_date(Map.get(n, :note_date)),
@@ -921,6 +926,8 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
   defp zero?(%Decimal{} = d), do: Decimal.eq?(d, 0)
   defp zero?(n) when is_number(n), do: n == 0
   defp zero?(_), do: false
+
+  defp computed?(cf), do: cf not in [nil, ""]
 
   defp num(nil), do: "0.00"
   defp num(v), do: Number.Delimit.number_to_delimited(v)

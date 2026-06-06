@@ -633,15 +633,45 @@ defmodule FullCircle.PaySlipOp do
   end
 
   defp process_notes(multi, notes, name, com, user) do
-    existing_notes = Enum.filter(notes, fn {_, a} -> a["_id"] != "" end)
+    existing = Enum.filter(notes, fn {_, a} -> a["_id"] != "" end)
+
+    # An already-saved computed (cal_func) line that recomputes to 0 is removed from the slip,
+    # not kept as a 0 line (e.g. statutory no longer applicable after an income change).
+    {to_delete, to_update} =
+      Enum.split_with(existing, fn {_, a} -> computed_zero?(a) end)
 
     new_notes =
       notes
       |> Enum.filter(fn {_, a} -> a["_id"] == "" end)
-      |> Enum.reject(fn {_, a} -> String.to_float(a["amount"]) == 0 end)
+      |> Enum.reject(fn {_, a} -> amount_zero?(a["amount"]) end)
 
-    process_existing_notes(multi, existing_notes, name, com, user)
+    multi
+    |> process_existing_notes(to_update, name, com, user)
+    |> process_deleted_notes(to_delete, com, user)
     |> process_new_notes(new_notes, name, com, user)
+  end
+
+  defp process_deleted_notes(multi, notes, com, user) do
+    Enum.reduce(notes, multi, fn {_, note}, m ->
+      HR.delete_salary_note_multi(
+        m,
+        HR.get_salary_note!(note["_id"], com, user),
+        com,
+        user,
+        "ps_delete_note_#{gen_temp_id()}" |> String.to_atom()
+      )
+    end)
+  end
+
+  defp computed_zero?(a) do
+    a["cal_func"] not in [nil, ""] and amount_zero?(a["amount"])
+  end
+
+  defp amount_zero?(s) do
+    case Decimal.parse(to_string(s)) do
+      {d, _} -> Decimal.eq?(d, 0)
+      :error -> true
+    end
   end
 
   defp process_new_notes(multi, notes, name, com, user) do

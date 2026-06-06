@@ -291,6 +291,36 @@ defmodule FullCircle.PaySlipOpTest do
       assert Decimal.eq?(hd(loaded.advances).amount, Decimal.new("500"))
     end
 
+    test "a statutory line that recomputes to 0 is deleted from the slip on re-pay", %{
+      com: com, admin: admin, employee: emp, salary_type: st, funds_ac: funds
+    } do
+      # High salary so PCB (a cal_func line) computes non-zero and gets saved.
+      {:ok, %{create_salary_note: sn}} = FullCircle.HR.create_salary_note(%{
+        "note_date" => "2026-05-31", "quantity" => "1", "unit_price" => "30000",
+        "employee_name" => emp.name, "employee_id" => emp.id,
+        "salary_type_name" => st.name, "salary_type_id" => st.id, "descriptions" => "salary"
+      }, com, admin)
+
+      {:ok, %{create_pay_slip: ps}} = PaySlipOp.pay(emp, 5, 2026, funds.id, com, admin)
+      pcb1 = Enum.find(PaySlipOp.get_pay_slip!(ps.id, com).deductions,
+               &(&1.salary_type_name == "Employee PCB"))
+      assert pcb1, "PCB should be present and non-zero at high income"
+      refute Decimal.eq?(pcb1.amount, Decimal.new(0))
+
+      # Drop income so PCB recomputes to 0.
+      {:ok, _} = FullCircle.HR.update_salary_note(sn, %{
+        "note_no" => sn.note_no, "note_date" => "2026-05-31", "quantity" => "1",
+        "unit_price" => "3000", "employee_name" => emp.name, "employee_id" => emp.id,
+        "salary_type_name" => st.name, "salary_type_id" => st.id, "descriptions" => "salary"
+      }, com, admin)
+
+      {:ok, _} = PaySlipOp.pay(emp, 5, 2026, funds.id, com, admin)
+
+      refute Enum.any?(PaySlipOp.get_pay_slip!(ps.id, com).deductions,
+               &(&1.salary_type_name == "Employee PCB")),
+             "zero-recomputed PCB should be deleted from the slip"
+    end
+
     test "loaded salary notes carry cal_func so recal can recompute them", %{
       com: com, admin: admin, employee: emp
     } do
