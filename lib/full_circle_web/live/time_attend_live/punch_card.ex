@@ -235,56 +235,43 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
           {gettext("Amount")}
         </div>
       </div>
-      <div
-        :if={@statutory_preview}
-        class="text-center font-medium italic bg-green-200 border border-green-500 rounded p-1 mb-1"
-      >
-        {gettext("Preview — exactly what \"Save PaySlip\" will record. Edit a note or advance to change it.")}
-      </div>
-
       <div id="notes_list" class="mb-5">
-        <%= if @statutory_preview do %>
-          <div :for={n <- unified_preview_lines(@statutory_preview)} class="flex flex-row text-center bg-green-100">
-            <div class="w-[10%]">{n.note_date}</div>
-            <div class="w-[10%]">{n.note_no}</div>
-            <div class="w-[10%]">{n.pay_slip_no}</div>
-            <div class="w-[20%]">{n.salary_type_name}</div>
-            <div class="w-[26%]">{n.descriptions}</div>
-            <div class="w-[8%]">{n.quantity}</div>
-            <div class="w-[8%]">{n.unit_price}</div>
-            <div class="w-[8%]">{n.amount}</div>
-          </div>
-          <div :for={a <- preview_advances(@statutory_preview)} class="flex flex-row text-center bg-green-100">
-            <div class="w-[10%]">{a.slip_date}</div>
-            <div class="w-[10%]">{a.slip_no}</div>
-            <div class="w-[10%]">{a.pay_slip_no}</div>
-            <div class="w-[20%]">{gettext("Advance")}</div>
-            <div class="w-[26%]">{a.note}</div>
-            <div class="w-[8%]"></div>
-            <div class="w-[8%]"></div>
-            <div class="w-[8%]">{a.amount}</div>
-          </div>
-        <% else %>
-          <%= for obj <- @salary_notes do %>
-            <.live_component
-              module={SalaryNoteComponent}
-              id={obj.id}
-              obj={obj}
-              company={@current_company}
-              shake_obj={@shake_obj}
-            />
-          <% end %>
-
-          <%= for obj <- @advances do %>
-            <.live_component
-              module={AdvanceComponent}
-              id={obj.id}
-              obj={obj}
-              company={@current_company}
-              shake_obj={@shake_obj}
-            />
-          <% end %>
+        <%= for obj <- @salary_notes do %>
+          <.live_component
+            module={SalaryNoteComponent}
+            id={obj.id}
+            obj={obj}
+            company={@current_company}
+            shake_obj={@shake_obj}
+          />
         <% end %>
+
+        <%= for obj <- @advances do %>
+          <.live_component
+            module={AdvanceComponent}
+            id={obj.id}
+            obj={obj}
+            company={@current_company}
+            shake_obj={@shake_obj}
+          />
+        <% end %>
+
+        <div
+          :if={@statutory_preview}
+          class="text-center text-sm italic bg-green-200 border border-green-500 py-1"
+        >
+          {gettext("Computed statutory (preview) — added on Save PaySlip. Edit a note/advance to recompute.")}
+        </div>
+        <div :for={n <- generated_new_lines(@statutory_preview)} class="flex flex-row text-center italic bg-green-100">
+          <div class="w-[10%]">{n.note_date}</div>
+          <div class="w-[10%]">{n.note_no}</div>
+          <div class="w-[10%]"></div>
+          <div class="w-[20%]">{n.salary_type_name}</div>
+          <div class="w-[26%]">{n.descriptions}</div>
+          <div class="w-[8%]">{n.quantity}</div>
+          <div class="w-[8%]">{n.unit_price}</div>
+          <div class="w-[8%]">{n.amount}</div>
+        </div>
       </div>
 
       <div class="font-medium flex flex-row text-center tracking-tighter bg-amber-200">
@@ -879,25 +866,20 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
     pp.verified or (not is_nil(pp.funds_account_id) and not is_nil(preview))
   end
 
-  # The full computed pay-slip preview as one WYSIWYG list — exactly what Save PaySlip will
-  # record: existing notes (recomputed) + genuinely-new non-zero lines. Zero-amount new lines
-  # are dropped (process_notes rejects them on save). Normalized via Map.get because recal
-  # builds partial "fake structs" (Map.merge with __struct__) missing keys like :descriptions.
-  defp unified_preview_lines(nil), do: []
+  # The genuinely-new computed lines that Calculate adds (statutory deductions/contributions,
+  # PCB, new employee salary types) — note_no "...new...", not yet saved, shown read-only below
+  # the (editable) saved notes. Zero-amount lines are dropped (they aren't saved). The saved
+  # notes stay as their normal editable components, and dedup in get_recal_pay_slip keeps these
+  # from repeating an already-saved type. Map.get because recal builds partial structs.
+  defp generated_new_lines(nil), do: []
 
-  defp unified_preview_lines(ps) do
+  defp generated_new_lines(ps) do
     (ps.additions ++ ps.bonuses ++ ps.deductions ++ ps.contributions ++ ps.leaves)
-    # Drop lines that won't be saved: new zero lines, and computed (cal_func) lines that
-    # recompute to 0 (those existing get deleted from the slip on Save).
-    |> Enum.reject(fn n ->
-      zero?(Map.get(n, :amount)) and
-        (Map.get(n, :note_no) == "...new..." or computed?(Map.get(n, :cal_func)))
-    end)
+    |> Enum.filter(fn n -> Map.get(n, :note_no) == "...new..." and not zero?(Map.get(n, :amount)) end)
     |> Enum.map(fn n ->
       %{
         note_date: fmt_date(Map.get(n, :note_date)),
         note_no: new_or(Map.get(n, :note_no)),
-        pay_slip_no: Map.get(n, :pay_slip_no) || "",
         salary_type_name: Map.get(n, :salary_type_name),
         descriptions: Map.get(n, :descriptions) || "",
         quantity: num(Map.get(n, :quantity)),
@@ -907,27 +889,10 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
     end)
   end
 
-  defp preview_advances(nil), do: []
-
-  defp preview_advances(ps) do
-    (Map.get(ps, :advances) || [])
-    |> Enum.map(fn a ->
-      %{
-        slip_date: fmt_date(Map.get(a, :slip_date)),
-        slip_no: new_or(Map.get(a, :slip_no)),
-        pay_slip_no: Map.get(a, :pay_slip_no) || "",
-        note: Map.get(a, :note) || "",
-        amount: num(Map.get(a, :amount))
-      }
-    end)
-  end
-
   defp zero?(nil), do: true
   defp zero?(%Decimal{} = d), do: Decimal.eq?(d, 0)
   defp zero?(n) when is_number(n), do: n == 0
   defp zero?(_), do: false
-
-  defp computed?(cf), do: cf not in [nil, ""]
 
   defp num(nil), do: "0.00"
   defp num(v), do: Number.Delimit.number_to_delimited(v)
