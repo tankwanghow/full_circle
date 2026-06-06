@@ -236,7 +236,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
         </div>
       </div>
       <div id="notes_list" class="mb-5">
-        <%= for obj <- @salary_notes do %>
+        <%= for obj <- editable_notes(@salary_notes, @statutory_preview) do %>
           <.live_component
             module={SalaryNoteComponent}
             id={obj.id}
@@ -260,9 +260,9 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
           :if={@statutory_preview}
           class="text-center text-sm italic bg-green-200 border border-green-500 py-1"
         >
-          {gettext("Computed statutory (preview) — added on Save PaySlip. Edit a note/advance to recompute.")}
+          {gettext("Computed statutory (preview) — saved on Save PaySlip. Edit a note/advance to recompute.")}
         </div>
-        <div :for={n <- generated_new_lines(@statutory_preview)} class="flex flex-row text-center italic bg-green-100">
+        <div :for={n <- computed_preview_lines(@statutory_preview)} class="flex flex-row text-center italic bg-green-100">
           <div class="w-[10%]">{n.note_date}</div>
           <div class="w-[10%]">{n.note_no}</div>
           <div class="w-[10%]"></div>
@@ -866,16 +866,20 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
     pp.verified or (not is_nil(pp.funds_account_id) and not is_nil(preview))
   end
 
-  # The genuinely-new computed lines that Calculate adds (statutory deductions/contributions,
-  # PCB, new employee salary types) — note_no "...new...", not yet saved, shown read-only below
-  # the (editable) saved notes. Zero-amount lines are dropped (they aren't saved). The saved
-  # notes stay as their normal editable components, and dedup in get_recal_pay_slip keeps these
-  # from repeating an already-saved type. Map.get because recal builds partial structs.
-  defp generated_new_lines(nil), do: []
+  # Earnings/manual notes (no cal_func) stay as editable components. Once statutory is
+  # calculated, computed (cal_func) lines move to the read-only preview below (so their
+  # recomputed value shows and zero ones disappear), instead of the stale saved component.
+  defp editable_notes(notes, nil), do: notes
+  defp editable_notes(notes, _preview), do: Enum.reject(notes, fn n -> computed?(Map.get(n, :cal_func)) end)
 
-  defp generated_new_lines(ps) do
+  # The computed (cal_func) lines from the preview — existing statutory recomputed + newly
+  # generated — at their recomputed values. Zero ones are omitted (they're deleted from the slip
+  # on Save). Map.get because recal builds partial "fake structs" missing keys like :descriptions.
+  defp computed_preview_lines(nil), do: []
+
+  defp computed_preview_lines(ps) do
     (ps.additions ++ ps.bonuses ++ ps.deductions ++ ps.contributions ++ ps.leaves)
-    |> Enum.filter(fn n -> Map.get(n, :note_no) == "...new..." and not zero?(Map.get(n, :amount)) end)
+    |> Enum.filter(fn n -> computed?(Map.get(n, :cal_func)) and not zero?(Map.get(n, :amount)) end)
     |> Enum.map(fn n ->
       %{
         note_date: fmt_date(Map.get(n, :note_date)),
@@ -893,6 +897,8 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
   defp zero?(%Decimal{} = d), do: Decimal.eq?(d, 0)
   defp zero?(n) when is_number(n), do: n == 0
   defp zero?(_), do: false
+
+  defp computed?(cf), do: cf not in [nil, ""]
 
   defp num(nil), do: "0.00"
   defp num(v), do: Number.Delimit.number_to_delimited(v)
