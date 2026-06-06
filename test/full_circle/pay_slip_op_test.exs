@@ -268,5 +268,27 @@ defmodule FullCircle.PaySlipOpTest do
       assert {:ok, %{update_pay_slip: _}} = PaySlipOp.pay(emp, 5, 2026, funds.id, com, admin)
       assert PaySlipOp.get_pay_slip_by_period(emp, 5, 2026, com)
     end
+
+    test "pay round-trips an advance", %{
+      com: com, admin: admin, employee: emp, salary_type: st, funds_ac: funds
+    } do
+      {:ok, _} = FullCircle.HR.create_salary_note(%{
+        "note_date" => "2026-05-31", "quantity" => "1", "unit_price" => "3000",
+        "employee_name" => emp.name, "employee_id" => emp.id,
+        "salary_type_name" => st.name, "salary_type_id" => st.id, "descriptions" => "salary"
+      }, com, admin)
+
+      {:ok, _} = FullCircle.HR.create_advance(%{
+        "slip_date" => "2026-05-31", "amount" => "500",
+        "employee_name" => emp.name, "employee_id" => emp.id,
+        "funds_account_name" => funds.name, "funds_account_id" => funds.id, "note" => "advance"
+      }, com, admin)
+
+      {:ok, %{create_pay_slip: ps}} = PaySlipOp.pay(emp, 5, 2026, funds.id, com, admin)
+      loaded = PaySlipOp.get_pay_slip!(ps.id, com)
+
+      assert Enum.count(loaded.advances) == 1
+      assert Decimal.eq?(hd(loaded.advances).amount, Decimal.new("500"))
+    end
   end
 end

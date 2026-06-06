@@ -86,7 +86,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
         <.form for={%{}} phx-change="validate" id="payprep-form" class="w-[26%]">
           <.input
             name="pay_prep[funds_account_name]"
-            value={@pay_prep && @pay_prep.funds_account_id && account_name(@pay_prep.funds_account_id)}
+            value={@pay_prep && @pay_prep.funds_account_id && account_name(@pay_prep.funds_account_id, @current_company)}
             label={gettext("Payment Account")}
             phx-hook="tributeAutoComplete"
             url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=fundsaccount&name="}
@@ -101,7 +101,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
           {gettext("Calculate Statutory")}
         </.link>
         <label class="h-10 mt-5 flex items-center gap-1 px-2 border rounded">
-          <input type="checkbox" checked={@pay_prep && @pay_prep.verified} phx-click="toggle_correct" />
+          <input type="checkbox" checked={@pay_prep && @pay_prep.verified} phx-click="toggle_correct" disabled={!correct_enabled?(@pay_prep, @statutory_preview)} />
           {gettext("Correct")}
         </label>
         <.link :if={@pay_prep && @pay_prep.verified} phx-click="pay" class="h-10 mt-5 green button">
@@ -425,23 +425,6 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
   end
 
   @impl true
-  def handle_event("select_account", %{"funds_account_id" => id}, socket) do
-    %{employee: emp, search: s, current_company: com, current_user: user} = socket.assigns
-
-    {:ok, pp} =
-      FullCircle.HR.set_pay_prep_account(
-        emp.id,
-        String.to_integer("#{s.month}"),
-        String.to_integer("#{s.year}"),
-        id,
-        com,
-        user
-      )
-
-    {:noreply, assign(socket, pay_prep: pp)}
-  end
-
-  @impl true
   def handle_event("calculate_statutory", _, socket) do
     %{employee: emp, search: s, current_company: com, current_user: user} = socket.assigns
 
@@ -461,20 +444,19 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
 
   @impl true
   def handle_event("toggle_correct", _, socket) do
-    %{employee: emp, search: s, pay_prep: pp, current_company: com, current_user: user} =
-      socket.assigns
+    %{employee: emp, search: s, pay_prep: pp, current_company: com, current_user: user} = socket.assigns
 
-    {:ok, pp} =
-      FullCircle.HR.set_pay_prep_verified(
-        emp.id,
-        String.to_integer("#{s.month}"),
-        String.to_integer("#{s.year}"),
-        !pp.verified,
-        com,
-        user
-      )
+    case FullCircle.HR.set_pay_prep_verified(
+           emp.id, String.to_integer("#{s.month}"), String.to_integer("#{s.year}"),
+           !pp.verified, com, user) do
+      {:ok, pp} ->
+        {:noreply, assign(socket, pay_prep: pp)}
 
-    {:noreply, assign(socket, pay_prep: pp)}
+      {:error, _cs} ->
+        {:noreply,
+         put_flash(socket, :error,
+           gettext("Select a payment account and Calculate Statutory before marking Correct."))}
+    end
   end
 
   @impl true
@@ -870,8 +852,13 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
     |> Enum.sum()
   end
 
-  defp account_name(id) do
-    case FullCircle.Repo.get(FullCircle.Accounting.Account, id) do
+  defp correct_enabled?(nil, _preview), do: false
+  defp correct_enabled?(pp, preview) do
+    pp.verified or (not is_nil(pp.funds_account_id) and not is_nil(preview))
+  end
+
+  defp account_name(id, com) do
+    case FullCircle.Repo.get_by(FullCircle.Accounting.Account, id: id, company_id: com.id) do
       nil -> ""
       acc -> acc.name
     end
