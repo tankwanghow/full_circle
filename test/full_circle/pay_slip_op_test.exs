@@ -216,4 +216,57 @@ defmodule FullCircle.PaySlipOpTest do
       assert :not_authorise == PaySlipOp.create_pay_slip(attrs, com, guest)
     end
   end
+
+  describe "preview/pay" do
+    setup :setup_payroll
+
+    setup %{com: com, admin: admin} do
+      cr = FullCircle.Accounting.get_account_by_name("Salaries and Wages Payable", com, admin)
+      # statutory types so calculate_pay has cal_func lines to compute
+      for {n, f} <- [{"EPF By Employee", "epf_employee"}, {"EPF By Employer", "epf_employer"}] do
+        FullCircle.HRFixtures.salary_type_fixture(%{name: n, type: "Deduction", cal_func: f,
+          db_ac_name: cr.name, db_ac_id: cr.id, cr_ac_name: cr.name, cr_ac_id: cr.id}, com, admin)
+      end
+      :ok
+    end
+
+    test "preview returns a calculated changeset with the salary", %{
+      com: com, admin: admin, employee: emp, salary_type: st
+    } do
+      {:ok, _} = FullCircle.HR.create_salary_note(%{
+        "note_date" => "2026-05-31", "quantity" => "1", "unit_price" => "3000",
+        "employee_name" => emp.name, "employee_id" => emp.id,
+        "salary_type_name" => st.name, "salary_type_id" => st.id, "descriptions" => "salary"
+      }, com, admin)
+
+      cs = PaySlipOp.preview(emp, 5, 2026, com, admin)
+      ps = Ecto.Changeset.apply_changes(cs)
+      assert Enum.any?(ps.additions, fn a -> Decimal.eq?(a.amount, Decimal.new("3000")) end)
+      assert Decimal.gt?(ps.pay_slip_amount, Decimal.new("0"))
+    end
+
+    test "pay creates a slip; second pay updates it", %{
+      com: com, admin: admin, employee: emp, salary_type: st, funds_ac: funds
+    } do
+      {:ok, _} = FullCircle.HR.create_salary_note(%{
+        "note_date" => "2026-05-31", "quantity" => "1", "unit_price" => "3000",
+        "employee_name" => emp.name, "employee_id" => emp.id,
+        "salary_type_name" => st.name, "salary_type_id" => st.id, "descriptions" => "salary"
+      }, com, admin)
+
+      {:ok, %{create_pay_slip: ps}} = PaySlipOp.pay(emp, 5, 2026, funds.id, com, admin)
+      loaded = PaySlipOp.get_pay_slip!(ps.id, com)
+      assert loaded.slip_no =~ "PS-"
+      assert Enum.count(loaded.additions) >= 1
+
+      {:ok, _} = FullCircle.HR.create_salary_note(%{
+        "note_date" => "2026-05-30", "quantity" => "1", "unit_price" => "100",
+        "employee_name" => emp.name, "employee_id" => emp.id,
+        "salary_type_name" => st.name, "salary_type_id" => st.id, "descriptions" => "bonus-ish"
+      }, com, admin)
+
+      assert {:ok, %{update_pay_slip: _}} = PaySlipOp.pay(emp, 5, 2026, funds.id, com, admin)
+      assert PaySlipOp.get_pay_slip_by_period(emp, 5, 2026, com)
+    end
+  end
 end

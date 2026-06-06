@@ -20,6 +20,85 @@ defmodule FullCircle.PaySlipOp do
   alias FullCircle.Sys.Company
   alias FullCircle.{Repo, Sys, StdInterface, HR}
 
+  @doc "In-memory calculated changeset for an employee/month (no save)."
+  def preview(emp, mth, yr, com, user) do
+    case get_pay_slip_by_period(emp, mth, yr, com) do
+      nil ->
+        generate_new_changeset_for(emp, mth, yr, com, user) |> calculate_pay(emp)
+
+      ps ->
+        get_recal_pay_slip(ps.id, com, user)
+        |> PaySlip.changeset(%{})
+        |> calculate_pay(emp)
+    end
+  end
+
+  @doc "Create or update the payslip for an employee/month from the calculated preview."
+  def pay(emp, mth, yr, funds_account_id, com, user) do
+    acc = StdInterface.get!(Account, funds_account_id)
+    attrs = changeset_to_pay_attrs(preview(emp, mth, yr, com, user), acc)
+
+    case get_pay_slip_by_period(emp, mth, yr, com) do
+      nil -> create_pay_slip(attrs, com, user)
+      ps -> update_pay_slip(ps, attrs, com, user)
+    end
+  end
+
+  @doc false
+  def changeset_to_pay_attrs(cs, acc) do
+    ps = Ecto.Changeset.apply_changes(cs)
+
+    %{
+      "employee_id" => ps.employee_id,
+      "employee_name" => ps.employee_name,
+      "slip_date" => to_string(ps.slip_date || Date.utc_today()),
+      "pay_month" => "#{ps.pay_month}",
+      "pay_year" => "#{ps.pay_year}",
+      "funds_account_id" => acc.id,
+      "funds_account_name" => acc.name,
+      "pay_slip_amount" => to_string(ps.pay_slip_amount || 0),
+      "slip_no" => ps.slip_no,
+      "additions" => index_notes(ps.additions),
+      "bonuses" => index_notes(ps.bonuses),
+      "deductions" => index_notes(ps.deductions),
+      "contributions" => index_notes(ps.contributions),
+      "leaves" => index_notes(ps.leaves),
+      "advances" => index_advances(ps.advances)
+    }
+  end
+
+  defp index_notes(list), do: list |> Enum.with_index() |> Map.new(fn {n, i} -> {"#{i}", note_attrs(n)} end)
+  defp index_advances(list), do: list |> Enum.with_index() |> Map.new(fn {a, i} -> {"#{i}", adv_attrs(a)} end)
+
+  defp note_attrs(n) do
+    %{
+      "_id" => to_string(Map.get(n, :_id)),
+      "note_no" => Map.get(n, :note_no),
+      "note_date" => to_string(Map.get(n, :note_date)),
+      "quantity" => to_string(Map.get(n, :quantity)),
+      "unit_price" => to_string(Map.get(n, :unit_price)),
+      "amount" => to_string(Map.get(n, :amount)),
+      "salary_type_id" => Map.get(n, :salary_type_id),
+      "salary_type_name" => Map.get(n, :salary_type_name),
+      "salary_type_type" => Map.get(n, :salary_type_type),
+      "cal_func" => Map.get(n, :cal_func),
+      "recurring_id" => Map.get(n, :recurring_id),
+      "employee_id" => Map.get(n, :employee_id),
+      "descriptions" => Map.get(n, :descriptions)
+    }
+  end
+
+  defp adv_attrs(a) do
+    %{
+      "_id" => to_string(Map.get(a, :_id)),
+      "slip_no" => Map.get(a, :slip_no),
+      "slip_date" => to_string(Map.get(a, :slip_date)),
+      "amount" => to_string(Map.get(a, :amount)),
+      "employee_id" => Map.get(a, :employee_id),
+      "note" => Map.get(a, :note)
+    }
+  end
+
   def calculate_pay(cs, emp) do
     sns =
       (fetch_field!(cs, :additions) ++

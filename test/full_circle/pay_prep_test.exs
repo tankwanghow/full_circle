@@ -109,5 +109,31 @@ defmodule FullCircle.PayPrepTest do
 
       assert HR.get_or_init_pay_prep(emp.id, 6, 2026, com).verified
     end
+
+    test "paying (linking notes) does NOT clear verified", %{com: com, emp: emp, admin: admin} do
+      alias FullCircle.{PaySlipOp, Accounting}
+      cr = Accounting.get_account_by_name("Salaries and Wages Payable", com, admin)
+      funds = FullCircle.AccountingFixtures.account_fixture(
+        %{name: "Cash on Hand", account_type: "Cash or Equivalent"}, com, admin)
+      st = HR.get_salary_type_by_name("Monthly Salary", com, admin)
+
+      FullCircle.HRFixtures.salary_type_fixture(%{name: "Employee PCB", type: "Deduction",
+        cal_func: "pcb_employee", db_ac_name: cr.name, db_ac_id: cr.id,
+        cr_ac_name: cr.name, cr_ac_id: cr.id}, com, admin)
+
+      {:ok, %{create_salary_note: _}} =
+        HR.create_salary_note(%{
+          "note_date" => "2026-05-31", "quantity" => "1", "unit_price" => "3000",
+          "employee_name" => emp.name, "employee_id" => emp.id,
+          "salary_type_name" => st.name, "salary_type_id" => st.id, "descriptions" => "salary"
+        }, com, admin)
+
+      {:ok, _} = HR.set_pay_prep_account(emp.id, 5, 2026, funds.id, com, admin)
+      {:ok, _} = HR.set_pay_prep_verified(emp.id, 5, 2026, true, com, admin)
+
+      {:ok, _} = PaySlipOp.pay(emp, 5, 2026, funds.id, com, admin)
+
+      assert HR.get_or_init_pay_prep(emp.id, 5, 2026, com).verified
+    end
   end
 end
