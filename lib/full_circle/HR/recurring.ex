@@ -58,7 +58,7 @@ defmodule FullCircle.HR.Recurring do
     |> validate_date(:recur_date, days_before: 5)
     |> validate_length(:descriptions, max: 230)
     |> validate_date(:recur_date, days_after: 5)
-    |> validate_date(:start_date, days_before: 0)
+    |> validate_date(:start_date, days_before: 60)
     |> unsafe_validate_unique([:recur_no, :company_id], FullCircle.Repo,
       message: gettext("has already been taken")
     )

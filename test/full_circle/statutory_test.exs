@@ -75,8 +75,10 @@ defmodule FullCircle.StatutoryTest do
   def slip(emp, mth, yr, lines, ctx) do
     date = Timex.end_of_month(yr, mth)
 
-    salary_type = fn "Monthly Salary" -> ctx.monthly
-                     n -> ctx.st[n] end
+    salary_type = fn
+      "Monthly Salary" -> ctx.monthly
+      n -> ctx.st[n]
+    end
 
     # create each note first, returns {name, amt, sn}
     notes =
@@ -154,13 +156,19 @@ defmodule FullCircle.StatutoryTest do
           ctx.admin
         )
 
-      slip(emp, 5, 2026, %{
-        "Monthly Salary" => "3000",
-        "EPF By Employer" => "390",
-        "EPF By Employee" => "330",
-        "SOCSO By Employer" => "51.65",
-        "SOCSO By Employee" => "14.75"
-      }, ctx)
+      slip(
+        emp,
+        5,
+        2026,
+        %{
+          "Monthly Salary" => "3000",
+          "EPF By Employer" => "390",
+          "EPF By Employee" => "330",
+          "SOCSO By Employer" => "51.65",
+          "SOCSO By Employee" => "14.75"
+        },
+        ctx
+      )
 
       rows = HR.statutory_contributions(5, 2026, ctx.com.id)
       row = Enum.find(rows, &(&1.name == emp.name))
@@ -199,47 +207,87 @@ defmodule FullCircle.StatutoryTest do
           ctx.admin
         )
 
-      slip(e1, 5, 2026, %{
-        "Monthly Salary" => "3000",
-        "EPF By Employer" => "390",
-        "EPF By Employee" => "330",
-        "SOCSO By Employer" => "51.65",
-        "SOCSO By Employee" => "14.75",
-        "EIS By Employer" => "5.90",
-        "EIS By Employee" => "5.90"
-      }, ctx)
+      slip(
+        e1,
+        5,
+        2026,
+        %{
+          "Monthly Salary" => "3000",
+          "EPF By Employer" => "390",
+          "EPF By Employee" => "330",
+          "SOCSO By Employer" => "51.65",
+          "SOCSO By Employee" => "14.75",
+          "EIS By Employer" => "5.90",
+          "EIS By Employee" => "5.90"
+        },
+        ctx
+      )
 
-      slip(e2, 5, 2026, %{
-        "Monthly Salary" => "2000",
-        "EPF By Employer" => "260",
-        "EPF By Employee" => "220",
-        "SOCSO By Employer" => "34.45",
-        "SOCSO By Employee" => "9.85",
-        "EIS By Employer" => "3.90",
-        "EIS By Employee" => "3.90"
-      }, ctx)
+      slip(
+        e2,
+        5,
+        2026,
+        %{
+          "Monthly Salary" => "2000",
+          "EPF By Employer" => "260",
+          "EPF By Employee" => "220",
+          "SOCSO By Employer" => "34.45",
+          "SOCSO By Employee" => "9.85",
+          "EIS By Employer" => "3.90",
+          "EIS By Employee" => "3.90"
+        },
+        ctx
+      )
 
       Map.put(ctx, :contribs, HR.statutory_contributions(5, 2026, ctx.com.id))
     end
 
     test "EPF matches legacy", ctx do
       assert norm(EpfFormat.rows(ctx.contribs, "EPFCODE")) ==
-               norm(FullCircle.LegacyStatutory.epf_submit_file_format_query(5, 2026, "EPFCODE", ctx.com.id))
+               norm(
+                 FullCircle.LegacyStatutory.epf_submit_file_format_query(
+                   5,
+                   2026,
+                   "EPFCODE",
+                   ctx.com.id
+                 )
+               )
     end
 
     test "SOCSO matches legacy", ctx do
       assert norm(SocsoFormat.rows(ctx.contribs, "SOCSOCODE")) ==
-               norm(FullCircle.LegacyStatutory.socso_submit_file_format_query(5, 2026, "SOCSOCODE", ctx.com.id))
+               norm(
+                 FullCircle.LegacyStatutory.socso_submit_file_format_query(
+                   5,
+                   2026,
+                   "SOCSOCODE",
+                   ctx.com.id
+                 )
+               )
     end
 
     test "EIS matches legacy", ctx do
       assert norm(EisFormat.rows(ctx.contribs, "EISCODE")) ==
-               norm(FullCircle.LegacyStatutory.eis_submit_file_format_query(5, 2026, "EISCODE", ctx.com.id))
+               norm(
+                 FullCircle.LegacyStatutory.eis_submit_file_format_query(
+                   5,
+                   2026,
+                   "EISCODE",
+                   ctx.com.id
+                 )
+               )
     end
 
     test "SOCSO+EIS matches legacy", ctx do
       assert norm(SocsoEisFormat.rows(ctx.contribs, "EMPCODE")) ==
-               norm(FullCircle.LegacyStatutory.socso_eis_submit_file_format_query(5, 2026, "EMPCODE", ctx.com.id))
+               norm(
+                 FullCircle.LegacyStatutory.socso_eis_submit_file_format_query(
+                   5,
+                   2026,
+                   "EMPCODE",
+                   ctx.com.id
+                 )
+               )
     end
   end
 

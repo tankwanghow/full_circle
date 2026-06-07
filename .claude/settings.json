@@ -17,7 +17,8 @@
       "Bash(echo \"EXIT:$?\")",
       "Bash(echo \"exit: $?\")",
       "Bash(echo \"compile exit: $?\")",
-      "Bash(echo \"format done exit: $?\")"
+      "Bash(echo \"format done exit: $?\")",
+      "Bash(echo \"compile: $?\")"
     ],
     "additionalDirectories": [
       "/tmp"

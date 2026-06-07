@@ -243,9 +243,7 @@ defmodule FullCircleWeb.SalaryTypeLive.Form do
               options={FullCircle.HR.SalaryType.statutory_codes()}
             />
           </div>
-        </div>
-        <div class="grid grid-cols-12 gap-1">
-          <div class="col-span-6">
+          <div class="col-span-4">
             <.input type="hidden" field={@form[:db_ac_id]} />
             <.input
               field={@form[:db_ac_name]}
@@ -254,7 +252,7 @@ defmodule FullCircleWeb.SalaryTypeLive.Form do
               url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=account&name="}
             />
           </div>
-          <div class="col-span-6">
+          <div class="col-span-4">
             <.input type="hidden" field={@form[:cr_ac_id]} />
             <.input
               field={@form[:cr_ac_name]}

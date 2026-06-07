@@ -58,7 +58,20 @@
       "Bash(awk '{print $5, $9}')",
       "Bash(echo \"EXIT: $?\")",
       "mcp__tidewave__execute_sql_query",
-      "mcp__tidewave__project_eval"
+      "mcp__tidewave__project_eval",
+      "Bash(npx --version)",
+      "Bash(timeout 30 npx -y @upstash/context7-mcp)",
+      "Bash(claude mcp *)",
+      "Bash(awk '/def exec_query_row_col/,/^  end/' lib/full_circle/helpers.ex)",
+      "Bash(awk '/def calculate_value\\\\\\(:pcb_employee/,/^  end/' lib/full_circle/salary_note_cal_func.ex)",
+      "Bash(sed -n '/schema \"user_settings\"/,/timestamps/p' lib/full_circle/sys/user_setting.ex)",
+      "Bash(awk '/def default_settings\\\\\\(\"EpfSocsoEis\"/,/^  end/' lib/full_circle/sys/user_setting.ex)",
+      "Bash(awk '/send_csv_row_col/,/^  end/' lib/full_circle_web/controllers/csv_controller.ex)",
+      "Bash(MIX_ENV=test mix ecto.migrate)",
+      "Bash(sed -i '159,271d' lib/full_circle/hr.ex)",
+      "Bash(sed -n '153,165p' lib/full_circle/hr.ex)",
+      "Bash(sed -n '295,320p' lib/full_circle/pay_slip_op.ex)",
+      "Bash(sed -n '8,60p' lib/full_circle_web/live/time_attend_live/punch_card.ex)"
     ]
   },
   "hooks": {
@@ -68,8 +81,8 @@
         "hooks": [
           {
             "type": "command",
-            "statusMessage": "Checking docs/skills for drift...",
-            "command": "cmd=$(jq -r '.tool_input.command // empty' 2>/dev/null); case \"$cmd\" in *'git commit'*) printf '{\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"additionalContext\":\"A git commit just landed. Check whether this commit'\\''s code changes caused CLAUDE.md or any .claude/commands/*.md skill file to drift from the code (run git show --stat HEAD and git show HEAD to see the changes). If something drifted, summarize the drift and ASK the user'\\''s permission before updating those files — never edit docs/skills silently.\"}}' ;; esac"
+            "command": "cmd=$(jq -r '.tool_input.command // empty' 2>/dev/null); case \"$cmd\" in *'git commit'*) printf '{\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"additionalContext\":\"A git commit just landed. Check whether this commit'\\''s code changes caused CLAUDE.md or any .claude/commands/*.md skill file to drift from the code (run git show --stat HEAD and git show HEAD to see the changes). If something drifted, summarize the drift and ASK the user'\\''s permission before updating those files — never edit docs/skills silently.\"}}' ;; esac",
+            "statusMessage": "Checking docs/skills for drift..."
           }
         ]
       }
