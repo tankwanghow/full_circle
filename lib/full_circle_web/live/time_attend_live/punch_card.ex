@@ -890,6 +890,10 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
       (computed?(Map.get(n, :cal_func)) or Map.get(n, :note_no) == "...new...") and
         not zero?(Map.get(n, :amount))
     end)
+    # Deductions first, then contributions, then others; by salary type within each group.
+    |> Enum.sort_by(fn n ->
+      {type_rank(Map.get(n, :salary_type_type)), to_string(Map.get(n, :salary_type_name))}
+    end)
     |> Enum.map(fn n ->
       %{
         note_date: fmt_date(Map.get(n, :note_date)),
@@ -902,6 +906,10 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
       }
     end)
   end
+
+  defp type_rank("Deduction"), do: 0
+  defp type_rank("Contribution"), do: 1
+  defp type_rank(_), do: 2
 
   defp zero?(nil), do: true
   defp zero?(%Decimal{} = d), do: Decimal.eq?(d, 0)
