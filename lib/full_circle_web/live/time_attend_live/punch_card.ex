@@ -378,8 +378,8 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
     emp_name = params["search"]["employee_name"] || ""
     d = Timex.today() |> Timex.shift(months: -1)
 
-    month = params["search"]["month"] || d.month
-    year = params["search"]["year"] || d.year
+    month = clamp_int(params["search"]["month"], d.month, 1, 12)
+    year = clamp_int(params["search"]["year"], d.year, 2000, 2099)
 
     socket =
       socket
@@ -698,6 +698,19 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
     punches = socket.assigns.punches |> List.replace_at(i, new)
 
     {:noreply, socket |> assign(punches: punches) |> update_punch_card(punches)}
+  end
+
+  # Coerce a search input (string/integer/nil/blank/out-of-range) to a valid
+  # integer-string in [min, max], falling back to `default` so downstream
+  # String.to_integer never raises on a bad month/year.
+  defp clamp_int(val, default, min, max) do
+    n =
+      case Integer.parse("#{val}") do
+        {i, _} when i >= min and i <= max -> i
+        _ -> default
+      end
+
+    Integer.to_string(n)
   end
 
   defp filter_punches(socket, month, year, emp_name) do
