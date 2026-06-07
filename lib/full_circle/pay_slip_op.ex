@@ -552,16 +552,44 @@ defmodule FullCircle.PaySlipOp do
   end
 
   @doc """
-  Void a pay slip: unlink its notes/advances (they survive as unprocessed — NOT deleted),
-  reverse the slip's GL transactions, then delete the slip. Notes are unlinked before the
-  delete, so the schema's cascade has nothing to remove.
+  Void a pay slip:
+  - **Delete** its computed (cal_func) statutory notes + their GL — they're derived and would
+    otherwise become unprocessed and get regenerated (duplicated) on the next preview/Save.
+  - **Unlink** the remaining notes (earnings, recurrings) and advances — they survive as
+    unprocessed (kept, not deleted).
+  - Reverse the slip's own GL, then delete the slip.
+  Notes are unlinked/deleted before the slip delete, so the schema cascade has nothing to remove.
   """
   def void_pay_slip(pay_slip_id, com, user) do
     case can?(user, :update_pay_slip, com) do
       true ->
         ps = get_pay_slip!(pay_slip_id, com)
 
+        stat =
+          from(sn in SalaryNote,
+            join: st in SalaryType,
+            on: st.id == sn.salary_type_id,
+            where: sn.pay_slip_id == ^ps.id and sn.company_id == ^com.id,
+            where: not is_nil(st.cal_func) and st.cal_func != "",
+            select: %{id: sn.id, note_no: sn.note_no}
+          )
+          |> Repo.all()
+
+        stat_ids = Enum.map(stat, & &1.id)
+        stat_nos = Enum.map(stat, & &1.note_no)
+
         Multi.new()
+        |> Multi.delete_all(
+          :delete_stat_notes_gl,
+          from(t in Transaction,
+            where:
+              t.doc_type == "SalaryNote" and t.company_id == ^com.id and t.doc_no in ^stat_nos
+          )
+        )
+        |> Multi.delete_all(
+          :delete_stat_notes,
+          from(sn in SalaryNote, where: sn.id in ^stat_ids)
+        )
         |> Multi.update_all(
           :unlink_notes,
           from(sn in SalaryNote, where: sn.pay_slip_id == ^ps.id and sn.company_id == ^com.id),

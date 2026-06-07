@@ -427,5 +427,42 @@ defmodule FullCircle.PaySlipOpTest do
 
       assert gl_count == 0
     end
+
+    test "deletes computed (cal_func) statutory notes but keeps earnings", %{
+      com: com, admin: admin, employee: emp, salary_type: st, funds_ac: funds
+    } do
+      cr = FullCircle.Accounting.get_account_by_name("Salaries and Wages Payable", com, admin)
+
+      FullCircle.HRFixtures.salary_type_fixture(%{name: "EPF By Employee", type: "Deduction",
+        cal_func: "epf_employee", db_ac_name: cr.name, db_ac_id: cr.id,
+        cr_ac_name: cr.name, cr_ac_id: cr.id}, com, admin)
+
+      epf = FullCircle.HR.get_salary_type_by_name("EPF By Employee", com, admin)
+
+      {:ok, _} = FullCircle.HR.create_salary_note(%{
+        "note_date" => "2026-05-31", "quantity" => "1", "unit_price" => "3000",
+        "employee_name" => emp.name, "employee_id" => emp.id,
+        "salary_type_name" => st.name, "salary_type_id" => st.id, "descriptions" => "salary"
+      }, com, admin)
+
+      {:ok, _} = FullCircle.HR.create_salary_note(%{
+        "note_date" => "2026-05-31", "quantity" => "1", "unit_price" => "330",
+        "employee_name" => emp.name, "employee_id" => emp.id,
+        "salary_type_name" => epf.name, "salary_type_id" => epf.id, "descriptions" => "epf"
+      }, com, admin)
+
+      {:ok, %{create_pay_slip: ps}} = PaySlipOp.pay(emp, 5, 2026, funds.id, com, admin)
+      assert {:ok, _} = PaySlipOp.void_pay_slip(ps.id, com, admin)
+
+      notes = FullCircle.HR.get_salary_notes(emp.id, 5, 2026, com, admin)
+
+      # earning (no cal_func) survives, unlinked
+      earning = Enum.find(notes, &(&1.salary_type_name == st.name))
+      assert earning
+      assert is_nil(earning.pay_slip_id)
+
+      # computed statutory note (cal_func) is deleted, not just unlinked
+      refute Enum.any?(notes, &(&1.salary_type_name == "EPF By Employee"))
+    end
   end
 end
