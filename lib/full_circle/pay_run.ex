@@ -99,46 +99,67 @@ defmodule FullCircle.PayRun do
     emp_month as (
       select c.employee_id, c.name, c.status, m.pay_month, m.pay_year
         from candidates c cross join months m
+    ),
+    -- Pre-aggregate once per source instead of per-cell correlated subqueries
+    -- (the original ran 6 seq scans of salary_notes/advances for every cell).
+    unproc_notes as (
+      select sn.employee_id,
+             extract(year from sn.note_date)::int as yr,
+             extract(month from sn.note_date)::int as mth,
+             count(*) as cnt,
+             sum(sn.quantity * sn.unit_price) as amt
+        from salary_notes sn
+       where sn.company_id = '#{cid}' and sn.pay_slip_id is null
+       group by 1, 2, 3
+    ),
+    unproc_advs as (
+      select av.employee_id,
+             extract(year from av.slip_date)::int as yr,
+             extract(month from av.slip_date)::int as mth,
+             count(*) as cnt,
+             sum(av.amount) as amt
+        from advances av
+       where av.company_id = '#{cid}' and av.pay_slip_id is null
+       group by 1, 2, 3
+    ),
+    slip_notes as (
+      select sn.pay_slip_id,
+             sum(case st.type
+                   when 'Addition' then sn.quantity * sn.unit_price
+                   when 'Bonus' then sn.quantity * sn.unit_price
+                   when 'Deduction' then -(sn.quantity * sn.unit_price)
+                   else 0 end) as amt
+        from salary_notes sn join salary_types st on st.id = sn.salary_type_id
+       where sn.company_id = '#{cid}' and sn.pay_slip_id is not null
+       group by sn.pay_slip_id
+    ),
+    slip_advs as (
+      select av.pay_slip_id, sum(av.amount) as amt
+        from advances av
+       where av.company_id = '#{cid}' and av.pay_slip_id is not null
+       group by av.pay_slip_id
     )
     select em.employee_id as id, em.name as employee_name, em.status,
            array_agg(
              coalesce(p.slip_no, '') || '|' || coalesce(p.id::varchar, '') || '|' ||
              em.pay_year::varchar || '|' || em.pay_month::varchar || '|' ||
-             coalesce((
-               select sum(case st.type
-                            when 'Addition' then sn.quantity * sn.unit_price
-                            when 'Bonus' then sn.quantity * sn.unit_price
-                            when 'Deduction' then -(sn.quantity * sn.unit_price)
-                            else 0 end)
-                 from salary_notes sn join salary_types st on st.id = sn.salary_type_id
-                where sn.pay_slip_id = p.id), 0)
-             - coalesce((select sum(av.amount) from advances av where av.pay_slip_id = p.id), 0) || '|' ||
-             (select count(*) from salary_notes sn
-               where sn.employee_id = em.employee_id and sn.company_id = '#{cid}'
-                 and sn.pay_slip_id is null
-                 and extract(month from sn.note_date)::int = em.pay_month
-                 and extract(year from sn.note_date)::int = em.pay_year)::varchar || '|' ||
-             coalesce((select sum(sn.quantity * sn.unit_price) from salary_notes sn
-               where sn.employee_id = em.employee_id and sn.company_id = '#{cid}'
-                 and sn.pay_slip_id is null
-                 and extract(month from sn.note_date)::int = em.pay_month
-                 and extract(year from sn.note_date)::int = em.pay_year), 0)::varchar || '|' ||
-             (select count(*) from advances av
-               where av.employee_id = em.employee_id and av.company_id = '#{cid}'
-                 and av.pay_slip_id is null
-                 and extract(month from av.slip_date)::int = em.pay_month
-                 and extract(year from av.slip_date)::int = em.pay_year)::varchar || '|' ||
-             coalesce((select sum(av.amount) from advances av
-               where av.employee_id = em.employee_id and av.company_id = '#{cid}'
-                 and av.pay_slip_id is null
-                 and extract(month from av.slip_date)::int = em.pay_month
-                 and extract(year from av.slip_date)::int = em.pay_year), 0)::varchar
+             (coalesce(sln.amt, 0) - coalesce(sla.amt, 0)) || '|' ||
+             coalesce(un.cnt, 0)::varchar || '|' ||
+             coalesce(un.amt, 0)::varchar || '|' ||
+             coalesce(ua.cnt, 0)::varchar || '|' ||
+             coalesce(ua.amt, 0)::varchar
              order by em.pay_year desc, em.pay_month desc
            ) as pay_list
       from emp_month em
       left join pay_slips p
         on p.employee_id = em.employee_id and p.company_id = '#{cid}'
        and p.pay_month = em.pay_month and p.pay_year = em.pay_year
+      left join slip_notes sln on sln.pay_slip_id = p.id
+      left join slip_advs sla on sla.pay_slip_id = p.id
+      left join unproc_notes un
+        on un.employee_id = em.employee_id and un.yr = em.pay_year and un.mth = em.pay_month
+      left join unproc_advs ua
+        on ua.employee_id = em.employee_id and ua.yr = em.pay_year and ua.mth = em.pay_month
      group by em.employee_id, em.name, em.status
      order by em.name
     """
