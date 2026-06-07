@@ -13,6 +13,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
       <.form
         for={%{}}
         id="search-form"
+        phx-change="search"
         phx-submit="search"
         autocomplete="off"
         class="mx-auto w-11/12 mb-2"
@@ -25,6 +26,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
               type="search"
               value={@search.employee_name}
               label={gettext("Employee")}
+              phx-debounce="blur"
               phx-hook="tributeAutoComplete"
               url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=employee&name="}
             />
@@ -38,6 +40,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
               value={@search.month}
               id="search_month"
               label={gettext("Month")}
+              phx-debounce="blur"
             />
           </div>
           <div class="w-[9%]">
@@ -49,9 +52,9 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
               value={@search.year}
               id="search_year"
               label={gettext("Year")}
+              phx-debounce="blur"
             />
           </div>
-          <.button class="w-[5%] mt-5 h-10 grow-0 shrink-0">🔍</.button>
           <a onclick="history.back();" class="w-[7%] h-10 mt-5 blue button">{gettext("Back")}</a>
         </div>
       </.form>
@@ -142,6 +145,98 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
         </span>
       </div>
 
+      <div
+        id="timeAttendList"
+        class="font-medium flex flex-row text-center tracking-tighter bg-blue-200"
+      >
+        <div class="w-[10%] border-b border-t border-blue-400 py-1">
+          {gettext("Date")}
+        </div>
+        <div class="w-[10%] border-b border-t border-blue-400 py-1">
+          {gettext("Note No")}
+        </div>
+        <div class="w-[10%] border-b border-t border-blue-400 py-1">
+          {gettext("Pay Slip No")}
+        </div>
+        <div class="w-[20%] border-b border-t border-blue-400 py-1">
+          {gettext("Salary Type")}
+        </div>
+        <div class="w-[26%] border-b border-t border-blue-400 py-1">
+          {gettext("Descriptions")}
+        </div>
+        <div class="w-[8%] border-b border-t border-blue-400 py-1">
+          {gettext("Quantity")}
+        </div>
+        <div class="w-[8%] border-b border-t border-blue-400 py-1">
+          {gettext("Price")}
+        </div>
+        <div class="w-[8%] border-b border-t border-blue-400 py-1">
+          {gettext("Amount")}
+        </div>
+      </div>
+      <div id="notes_list" class="mb-5">
+        <%= for obj <- editable_notes(@salary_notes, @statutory_preview) do %>
+          <.live_component
+            module={SalaryNoteComponent}
+            id={obj.id}
+            obj={obj}
+            company={@current_company}
+            shake_obj={@shake_obj}
+          />
+        <% end %>
+
+        <%= for obj <- @advances do %>
+          <.live_component
+            module={AdvanceComponent}
+            id={obj.id}
+            obj={obj}
+            company={@current_company}
+            shake_obj={@shake_obj}
+          />
+        <% end %>
+
+        <!---<div
+          :if={@statutory_preview}
+          class="text-center text-sm italic bg-green-200 border border-green-500 py-1"
+        >
+          {gettext("Computed (preview) — saved on Save PaySlip. Edit a note/advance to recompute.")}
+        </div> !--->
+
+        <%!-- new earning lines (recurrings / new salary types) --%>
+        <.preview_row
+          :for={n <- preview_lines(@statutory_preview, ["Addition", "Bonus"])}
+          n={n}
+          klass="bg-green-100"
+        />
+
+        <%!-- deductions --%>
+        <.preview_row
+          :for={n <- preview_lines(@statutory_preview, ["Deduction"])}
+          n={n}
+          klass="bg-red-100"
+        />
+
+        <%!-- net pay, right after the deductions --%>
+        <div :if={@statutory_preview} class="flex flex-row text-center font-bold bg-amber-100">
+          <div class="w-[92%] text-right pr-2 py-1">{gettext("Net Pay")}</div>
+          <div class="w-[8%] py-1">{@net_pay |> Number.Delimit.number_to_delimited()}</div>
+        </div>
+
+        <%!-- employer contributions --%>
+        <.preview_row
+          :for={n <- preview_lines(@statutory_preview, ["Contribution"])}
+          n={n}
+          klass="bg-blue-100"
+        />
+
+        <%!-- leaves / other computed lines --%>
+        <.preview_row
+          :for={n <- preview_lines(@statutory_preview, ["LeaveTaken", "Recording"])}
+          n={n}
+          klass="bg-gray-100"
+        />
+      </div>
+
       <div class="flex flex-row justify-around gap-2 h-8 w-full mb-2 border-y border-purple-600 bg-purple-200">
         <span class="mt-1">
           Total:
@@ -200,98 +295,6 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
             {@holiday_pay_days |> Number.Delimit.number_to_delimited()}
           </.link>
         </span>
-      </div>
-
-      <div
-        id="timeAttendList"
-        class="font-medium flex flex-row text-center tracking-tighter bg-blue-200"
-      >
-        <div class="w-[10%] border-b border-t border-blue-400 py-1">
-          {gettext("Date")}
-        </div>
-        <div class="w-[10%] border-b border-t border-blue-400 py-1">
-          {gettext("Note No")}
-        </div>
-        <div class="w-[10%] border-b border-t border-blue-400 py-1">
-          {gettext("Pay Slip No")}
-        </div>
-        <div class="w-[20%] border-b border-t border-blue-400 py-1">
-          {gettext("Salary Type")}
-        </div>
-        <div class="w-[26%] border-b border-t border-blue-400 py-1">
-          {gettext("Descriptions")}
-        </div>
-        <div class="w-[8%] border-b border-t border-blue-400 py-1">
-          {gettext("Quantity")}
-        </div>
-        <div class="w-[8%] border-b border-t border-blue-400 py-1">
-          {gettext("Price")}
-        </div>
-        <div class="w-[8%] border-b border-t border-blue-400 py-1">
-          {gettext("Amount")}
-        </div>
-      </div>
-      <div id="notes_list" class="mb-5">
-        <%= for obj <- editable_notes(@salary_notes, @statutory_preview) do %>
-          <.live_component
-            module={SalaryNoteComponent}
-            id={obj.id}
-            obj={obj}
-            company={@current_company}
-            shake_obj={@shake_obj}
-          />
-        <% end %>
-
-        <%= for obj <- @advances do %>
-          <.live_component
-            module={AdvanceComponent}
-            id={obj.id}
-            obj={obj}
-            company={@current_company}
-            shake_obj={@shake_obj}
-          />
-        <% end %>
-
-        <div
-          :if={@statutory_preview}
-          class="text-center text-sm italic bg-green-200 border border-green-500 py-1"
-        >
-          {gettext("Computed (preview) — saved on Save PaySlip. Edit a note/advance to recompute.")}
-        </div>
-
-        <%!-- new earning lines (recurrings / new salary types) --%>
-        <.preview_row
-          :for={n <- preview_lines(@statutory_preview, ["Addition", "Bonus"])}
-          n={n}
-          klass="bg-green-100"
-        />
-
-        <%!-- deductions --%>
-        <.preview_row
-          :for={n <- preview_lines(@statutory_preview, ["Deduction"])}
-          n={n}
-          klass="bg-red-100"
-        />
-
-        <%!-- net pay, right after the deductions --%>
-        <div :if={@statutory_preview} class="flex flex-row text-center font-bold bg-amber-100">
-          <div class="w-[92%] text-right pr-2 py-1">{gettext("Net Pay")}</div>
-          <div class="w-[8%] py-1">{@net_pay |> Number.Delimit.number_to_delimited()}</div>
-        </div>
-
-        <%!-- employer contributions --%>
-        <.preview_row
-          :for={n <- preview_lines(@statutory_preview, ["Contribution"])}
-          n={n}
-          klass="bg-blue-100"
-        />
-
-        <%!-- leaves / other computed lines --%>
-        <.preview_row
-          :for={n <- preview_lines(@statutory_preview, ["LeaveTaken", "Recording"])}
-          n={n}
-          klass="bg-gray-100"
-        />
       </div>
 
       <div class="font-medium flex flex-row text-center tracking-tighter bg-amber-200">
