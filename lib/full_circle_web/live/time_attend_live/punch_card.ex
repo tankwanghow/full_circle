@@ -85,6 +85,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
       <div :if={@employee} class="flex flex-row gap-2 items-end justify-center my-2">
         <.form for={%{}} phx-change="validate" id="payprep-form" class="w-[26%]">
           <.input
+            id="payprep_funds_account_name"
             name="pay_prep[funds_account_name]"
             value={@pay_prep && @pay_prep.funds_account_id && account_name(@pay_prep.funds_account_id, @current_company)}
             label={gettext("Payment Account")}
