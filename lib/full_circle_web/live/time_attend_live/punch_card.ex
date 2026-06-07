@@ -219,7 +219,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
         <%!-- net pay, right after the deductions --%>
         <div :if={@statutory_preview} class="flex flex-row text-center font-bold bg-amber-100">
           <div class="w-[92%] text-right pr-2 py-1">{gettext("Net Pay")}</div>
-          <div class="w-[8%] py-1">{@net_pay |> Number.Delimit.number_to_delimited()}</div>
+          <div class="w-[8%] py-1 text-right px-2">{@net_pay |> Number.Delimit.number_to_delimited()}</div>
         </div>
 
         <%!-- employer contributions --%>
@@ -926,9 +926,9 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
       <div class="w-[10%]"></div>
       <div class="w-[20%]">{@n.salary_type_name}</div>
       <div class="w-[26%]">{@n.descriptions}</div>
-      <div class="w-[8%]">{@n.quantity}</div>
-      <div class="w-[8%]">{@n.unit_price}</div>
-      <div class="w-[8%]">{@n.amount}</div>
+      <div class="w-[8%] text-right px-2">{@n.quantity}</div>
+      <div class="w-[8%] text-right px-2">{@n.unit_price}</div>
+      <div class="w-[8%] text-right px-2">{@n.amount}</div>
     </div>
     """
   end

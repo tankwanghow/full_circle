@@ -49,13 +49,13 @@ defmodule FullCircleWeb.TimeAttendLive.SalaryNoteComponent do
       <div class="w-[26%] border-b text-center border-gray-400 py-1">
         <span class="font-light">{@obj.descriptions}</span>
       </div>
-      <div class="w-[8%] border-b border-gray-400 py-1">
+      <div class="w-[8%] border-b border-gray-400 py-1 text-right">
         {Number.Delimit.number_to_delimited(@obj.quantity)}
       </div>
-      <div class="w-[8%] border-b border-gray-400 py-1">
+      <div class="w-[8%] border-b border-gray-400 py-1 text-right">
         {Number.Currency.number_to_currency(@obj.unit_price)}
       </div>
-      <div class="w-[8%] border-b border-gray-400 py-1">
+      <div class="w-[8%] border-b border-gray-400 py-1 text-right px-2">
         {Number.Currency.number_to_currency(Decimal.mult(@obj.quantity, @obj.unit_price))}
       </div>
     </div>

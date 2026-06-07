@@ -40,7 +40,7 @@ defmodule FullCircleWeb.TimeAttendLive.AdvanceComponent do
       </div>
       <div class="w-[8%] border-b border-gray-400 py-1"></div>
       <div class="w-[8%] border-b border-gray-400 py-1"></div>
-      <div class="w-[8%] border-b border-gray-400 py-1">
+      <div class="w-[8%] border-b border-gray-400 py-1 text-right px-2">
         {Number.Currency.number_to_currency(@obj.amount)}
       </div>
     </div>
