@@ -22,6 +22,7 @@ defmodule FullCircleWeb.SalaryNoteLive.Form do
     socket
     |> assign(live_action: :new)
     |> assign(id: "new")
+    |> assign(readonly: false)
     |> assign(page_title: gettext("New Salary Note"))
     |> assign(
       :form,
@@ -40,25 +41,19 @@ defmodule FullCircleWeb.SalaryNoteLive.Form do
     obj =
       HR.get_salary_note!(id, socket.assigns.current_company, socket.assigns.current_user)
 
-    if is_nil(obj.pay_slip_id) do
-      socket
-      |> assign(live_action: :edit)
-      |> assign(id: id)
-      |> assign(page_title: gettext("Edit Salary Note") <> " " <> obj.note_no)
-      |> assign(
-        :form,
-        to_form(StdInterface.changeset(SalaryNote, obj, %{}, socket.assigns.current_company))
-      )
-    else
-      socket
-      |> put_flash(
-        :error,
-        gettext("This salary note is on Pay Slip %{no} — manage it from the Punch Card.",
-          no: obj.pay_slip_no
-        )
-      )
-      |> push_navigate(to: "/companies/#{socket.assigns.current_company.id}/SalaryNote")
-    end
+    # A note already on a pay slip is shown read-only here; edit it via the Punch Card.
+    readonly = not is_nil(obj.pay_slip_id)
+    title = if readonly, do: gettext("View Salary Note"), else: gettext("Edit Salary Note")
+
+    socket
+    |> assign(live_action: :edit)
+    |> assign(id: id)
+    |> assign(readonly: readonly)
+    |> assign(page_title: title <> " " <> obj.note_no)
+    |> assign(
+      :form,
+      to_form(StdInterface.changeset(SalaryNote, obj, %{}, socket.assigns.current_company))
+    )
   end
 
   def handle_event(
@@ -188,6 +183,14 @@ defmodule FullCircleWeb.SalaryNoteLive.Form do
          )
          |> put_flash(:info, "#{gettext("Salary Note updated successfully.")}")}
 
+      {:error, :on_payslip} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           gettext("This salary note is on a pay slip — edit it via the Punch Card.")
+         )}
+
       {:error, failed_operation, changeset, _} ->
         {:noreply,
          socket
@@ -236,6 +239,12 @@ defmodule FullCircleWeb.SalaryNoteLive.Form do
           )}
         </.link>
       </div>
+      <div
+        :if={@readonly}
+        class="text-center bg-amber-200 border border-amber-500 rounded p-1 my-2"
+      >
+        {gettext("Read only — this item is on a pay slip. Edit it via the Punch Card.")}
+      </div>
       <.form
         for={@form}
         id="object-form"
@@ -247,13 +256,20 @@ defmodule FullCircleWeb.SalaryNoteLive.Form do
         <.input type="hidden" field={@form[:note_no]} />
         <div class="grid grid-cols-12 gap-1">
           <div class="col-span-3">
-            <.input field={@form[:note_date]} label={gettext("Date")} type="date" feedback={true} />
+            <.input
+              field={@form[:note_date]}
+              label={gettext("Date")}
+              type="date"
+              feedback={true}
+              readonly={@readonly}
+            />
           </div>
           <div class="col-span-5">
             <.input type="hidden" field={@form[:employee_id]} />
             <.input
               field={@form[:employee_name]}
               label={gettext("Employee")}
+              readonly={@readonly}
               phx-hook="tributeAutoComplete"
               url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=employee&name="}
             />
@@ -263,6 +279,7 @@ defmodule FullCircleWeb.SalaryNoteLive.Form do
             <.input
               field={@form[:salary_type_name]}
               label={gettext("Salary Type")}
+              readonly={@readonly}
               phx-hook="tributeAutoComplete"
               url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=salarytype&name="}
             />
@@ -270,7 +287,7 @@ defmodule FullCircleWeb.SalaryNoteLive.Form do
         </div>
         <div class="grid grid-cols-12 gap-1">
           <div class="col-span-12">
-            <.input field={@form[:descriptions]} label={gettext("Descriptions")} />
+            <.input field={@form[:descriptions]} label={gettext("Descriptions")} readonly={@readonly} />
           </div>
         </div>
         <div class="grid grid-cols-12 gap-1">
@@ -281,6 +298,7 @@ defmodule FullCircleWeb.SalaryNoteLive.Form do
               phx-hook="calculatorInput"
               klass="text-right"
               step="0.0001"
+              readonly={@readonly}
             />
           </div>
           <div class="col-span-4">
@@ -290,6 +308,7 @@ defmodule FullCircleWeb.SalaryNoteLive.Form do
               phx-hook="calculatorInput"
               klass="text-right"
               step="0.0001"
+              readonly={@readonly}
             />
           </div>
           <div class="col-span-4">
@@ -305,12 +324,13 @@ defmodule FullCircleWeb.SalaryNoteLive.Form do
 
         <div class="flex justify-center gap-x-1 mt-1">
           <.form_action_button
+            :if={!@readonly}
             form={@form}
             live_action={@live_action}
             current_company={@current_company}
             type="SalaryNote"
           />
-          <%= if @live_action == :edit and FullCircle.Authorization.can?(@current_user, :delete_salary_note, @current_company) do %>
+          <%= if not @readonly and @live_action == :edit and FullCircle.Authorization.can?(@current_user, :delete_salary_note, @current_company) do %>
             <.delete_confirm_modal
               id="delete-object"
               msg1={gettext("Deleting Salary Note")}

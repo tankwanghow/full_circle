@@ -22,6 +22,7 @@ defmodule FullCircleWeb.AdvanceLive.Form do
     socket
     |> assign(live_action: :new)
     |> assign(id: "new")
+    |> assign(readonly: false)
     |> assign(page_title: gettext("New Advance"))
     |> assign(
       :form,
@@ -40,23 +41,19 @@ defmodule FullCircleWeb.AdvanceLive.Form do
     obj =
       HR.get_advance!(id, socket.assigns.current_company, socket.assigns.current_user)
 
-    if is_nil(obj.pay_slip_id) do
-      socket
-      |> assign(live_action: :edit)
-      |> assign(id: id)
-      |> assign(page_title: gettext("Edit Advance") <> " " <> obj.slip_no)
-      |> assign(
-        :form,
-        to_form(StdInterface.changeset(Advance, obj, %{}, socket.assigns.current_company))
-      )
-    else
-      socket
-      |> put_flash(
-        :error,
-        gettext("This advance is on a pay slip — manage it from the Punch Card.")
-      )
-      |> push_navigate(to: "/companies/#{socket.assigns.current_company.id}/Advance")
-    end
+    # An advance already on a pay slip is shown read-only here; edit it via the Punch Card.
+    readonly = not is_nil(obj.pay_slip_id)
+    title = if readonly, do: gettext("View Advance"), else: gettext("Edit Advance")
+
+    socket
+    |> assign(live_action: :edit)
+    |> assign(id: id)
+    |> assign(readonly: readonly)
+    |> assign(page_title: title <> " " <> obj.slip_no)
+    |> assign(
+      :form,
+      to_form(StdInterface.changeset(Advance, obj, %{}, socket.assigns.current_company))
+    )
   end
 
   def handle_event(
@@ -149,6 +146,14 @@ defmodule FullCircleWeb.AdvanceLive.Form do
          )
          |> put_flash(:info, "#{gettext("Advance updated successfully.")}")}
 
+      {:error, :on_payslip} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           gettext("This advance is on a pay slip — edit it via the Punch Card.")
+         )}
+
       {:error, failed_operation, changeset, _} ->
         {:noreply,
          socket
@@ -188,6 +193,12 @@ defmodule FullCircleWeb.AdvanceLive.Form do
       <p :if={!is_nil(@form.source.data.pay_slip_no)} class="w-full text-xl text-center font-bold">
         {@form.source.data.pay_slip_no}
       </p>
+      <div
+        :if={@readonly}
+        class="text-center bg-amber-200 border border-amber-500 rounded p-1 my-2"
+      >
+        {gettext("Read only — this advance is on a pay slip. Edit it via the Punch Card.")}
+      </div>
       <.form
         for={@form}
         id="object-form"
@@ -199,13 +210,14 @@ defmodule FullCircleWeb.AdvanceLive.Form do
         <.input field={@form[:slip_no]} type="hidden" />
         <div class="grid grid-cols-12 gap-1">
           <div class="col-span-3">
-            <.input field={@form[:slip_date]} label={gettext("Date")} type="date" />
+            <.input field={@form[:slip_date]} label={gettext("Date")} type="date" readonly={@readonly} />
           </div>
           <div class="col-span-5">
             <.input field={@form[:employee_id]} type="hidden" />
             <.input
               field={@form[:employee_name]}
               label={gettext("Employee")}
+              readonly={@readonly}
               phx-hook="tributeAutoComplete"
               url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=employee&name="}
             />
@@ -215,6 +227,7 @@ defmodule FullCircleWeb.AdvanceLive.Form do
             <.input
               field={@form[:funds_account_name]}
               label={gettext("Funds From")}
+              readonly={@readonly}
               phx-hook="tributeAutoComplete"
               url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=fundsaccount&name="}
             />
@@ -222,15 +235,22 @@ defmodule FullCircleWeb.AdvanceLive.Form do
         </div>
         <div class="grid grid-cols-12 gap-1">
           <div class="col-span-9">
-            <.input field={@form[:note]} label={gettext("Note")} />
+            <.input field={@form[:note]} label={gettext("Note")} readonly={@readonly} />
           </div>
           <div class="col-span-3">
-            <.input field={@form[:amount]} label={gettext("Amount")} type="number" step="0.0001" />
+            <.input
+              field={@form[:amount]}
+              label={gettext("Amount")}
+              type="number"
+              step="0.0001"
+              readonly={@readonly}
+            />
           </div>
         </div>
 
         <div class="flex justify-center gap-x-1 mt-1">
           <.form_action_button
+            :if={!@readonly}
             form={@form}
             live_action={@live_action}
             type="Advance"
