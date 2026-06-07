@@ -60,7 +60,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
       </.form>
       <div class="text-center my-4">
         <.link
-          :if={@search.employee_name != ""}
+          :if={@employee}
           navigate={"/companies/#{@current_company.id}/employees/#{@employee.id}/edit"}
           class="w-[14%] h-10 mt-5 blue button ml-2"
           id="new_timeattend"
@@ -68,7 +68,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
           {gettext("Edit Employee")}
         </.link>
         <.link
-          :if={@search.employee_name != ""}
+          :if={@employee}
           phx-click={:new_salarynote}
           class="w-[9%] h-10 mt-5 blue button ml-2"
           id="new_salarynote"
@@ -76,7 +76,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
           {gettext("+ Note")}
         </.link>
         <.link
-          :if={@search.employee_name != ""}
+          :if={@employee}
           phx-click={:new_advance}
           class="w-[9%] h-10 mt-5 blue button ml-2"
           id="new_advance"
