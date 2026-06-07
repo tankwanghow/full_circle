@@ -113,9 +113,6 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
         >
           {gettext("Void PaySlip")}
         </.link>
-        <span :if={@net_pay} class="h-10 mt-5 font-bold">
-          {gettext("Net Pay")}: {@net_pay |> Number.Delimit.number_to_delimited()}
-        </span>
       </div>
 
       <div :if={@employee} class="text-center">
@@ -259,18 +256,42 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
           :if={@statutory_preview}
           class="text-center text-sm italic bg-green-200 border border-green-500 py-1"
         >
-          {gettext("Computed statutory (preview) — saved on Save PaySlip. Edit a note/advance to recompute.")}
+          {gettext("Computed (preview) — saved on Save PaySlip. Edit a note/advance to recompute.")}
         </div>
-        <div :for={n <- computed_preview_lines(@statutory_preview)} class="flex flex-row text-center italic bg-green-100">
-          <div class="w-[10%]">{n.note_date}</div>
-          <div class="w-[10%]">{n.note_no}</div>
-          <div class="w-[10%]"></div>
-          <div class="w-[20%]">{n.salary_type_name}</div>
-          <div class="w-[26%]">{n.descriptions}</div>
-          <div class="w-[8%]">{n.quantity}</div>
-          <div class="w-[8%]">{n.unit_price}</div>
-          <div class="w-[8%]">{n.amount}</div>
+
+        <%!-- new earning lines (recurrings / new salary types) --%>
+        <.preview_row
+          :for={n <- preview_lines(@statutory_preview, ["Addition", "Bonus"])}
+          n={n}
+          klass="bg-green-100"
+        />
+
+        <%!-- deductions --%>
+        <.preview_row
+          :for={n <- preview_lines(@statutory_preview, ["Deduction"])}
+          n={n}
+          klass="bg-red-100"
+        />
+
+        <%!-- net pay, right after the deductions --%>
+        <div :if={@statutory_preview} class="flex flex-row text-center font-bold bg-amber-100">
+          <div class="w-[92%] text-right pr-2 py-1">{gettext("Net Pay")}</div>
+          <div class="w-[8%] py-1">{@net_pay |> Number.Delimit.number_to_delimited()}</div>
         </div>
+
+        <%!-- employer contributions --%>
+        <.preview_row
+          :for={n <- preview_lines(@statutory_preview, ["Contribution"])}
+          n={n}
+          klass="bg-blue-100"
+        />
+
+        <%!-- leaves / other computed lines --%>
+        <.preview_row
+          :for={n <- preview_lines(@statutory_preview, ["LeaveTaken", "Recording"])}
+          n={n}
+          klass="bg-gray-100"
+        />
       </div>
 
       <div class="font-medium flex flex-row text-center tracking-tighter bg-amber-200">
@@ -877,23 +898,40 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
   defp editable_notes(notes, nil), do: notes
   defp editable_notes(notes, _preview), do: Enum.reject(notes, fn n -> computed?(Map.get(n, :cal_func)) end)
 
-  # The lines Calculate adds/recomputes vs. the editable earnings: computed (cal_func) lines —
-  # existing statutory recomputed + newly generated — AND newly-generated lines (note_no
-  # "...new...": recurrings and new salary types). Existing non-computed earnings stay as editable
-  # components, so they're excluded here. Zero lines are omitted (not saved / deleted on Save).
-  # Map.get because recal builds partial "fake structs" missing keys like :descriptions.
-  defp computed_preview_lines(nil), do: []
+  # One read-only preview row (matches the salary-notes table columns).
+  attr :n, :map, required: true
+  attr :klass, :string, default: ""
 
-  defp computed_preview_lines(ps) do
+  defp preview_row(assigns) do
+    ~H"""
+    <div class={["flex flex-row text-center italic", @klass]}>
+      <div class="w-[10%]">{@n.note_date}</div>
+      <div class="w-[10%]">{@n.note_no}</div>
+      <div class="w-[10%]"></div>
+      <div class="w-[20%]">{@n.salary_type_name}</div>
+      <div class="w-[26%]">{@n.descriptions}</div>
+      <div class="w-[8%]">{@n.quantity}</div>
+      <div class="w-[8%]">{@n.unit_price}</div>
+      <div class="w-[8%]">{@n.amount}</div>
+    </div>
+    """
+  end
+
+  # Preview rows of the given salary-type types — the lines Calculate adds/recomputes vs. the
+  # editable earnings: computed (cal_func) lines + newly-generated ones (note_no "...new...":
+  # recurrings, new salary types). Existing non-computed earnings stay as editable components.
+  # Zero lines are omitted (not saved / deleted on Save). Map.get because recal builds partial
+  # "fake structs" missing keys like :descriptions.
+  defp preview_lines(nil, _types), do: []
+
+  defp preview_lines(ps, types) do
     (ps.additions ++ ps.bonuses ++ ps.deductions ++ ps.contributions ++ ps.leaves)
     |> Enum.filter(fn n ->
-      (computed?(Map.get(n, :cal_func)) or Map.get(n, :note_no) == "...new...") and
+      Map.get(n, :salary_type_type) in types and
+        (computed?(Map.get(n, :cal_func)) or Map.get(n, :note_no) == "...new...") and
         not zero?(Map.get(n, :amount))
     end)
-    # Deductions first, then contributions, then others; by salary type within each group.
-    |> Enum.sort_by(fn n ->
-      {type_rank(Map.get(n, :salary_type_type)), to_string(Map.get(n, :salary_type_name))}
-    end)
+    |> Enum.sort_by(fn n -> to_string(Map.get(n, :salary_type_name)) end)
     |> Enum.map(fn n ->
       %{
         note_date: fmt_date(Map.get(n, :note_date)),
@@ -906,10 +944,6 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
       }
     end)
   end
-
-  defp type_rank("Deduction"), do: 0
-  defp type_rank("Contribution"), do: 1
-  defp type_rank(_), do: 2
 
   defp zero?(nil), do: true
   defp zero?(%Decimal{} = d), do: Decimal.eq?(d, 0)
