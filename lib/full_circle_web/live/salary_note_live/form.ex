@@ -40,14 +40,25 @@ defmodule FullCircleWeb.SalaryNoteLive.Form do
     obj =
       HR.get_salary_note!(id, socket.assigns.current_company, socket.assigns.current_user)
 
-    socket
-    |> assign(live_action: :edit)
-    |> assign(id: id)
-    |> assign(page_title: gettext("Edit Salary Note") <> " " <> obj.note_no)
-    |> assign(
-      :form,
-      to_form(StdInterface.changeset(SalaryNote, obj, %{}, socket.assigns.current_company))
-    )
+    if is_nil(obj.pay_slip_id) do
+      socket
+      |> assign(live_action: :edit)
+      |> assign(id: id)
+      |> assign(page_title: gettext("Edit Salary Note") <> " " <> obj.note_no)
+      |> assign(
+        :form,
+        to_form(StdInterface.changeset(SalaryNote, obj, %{}, socket.assigns.current_company))
+      )
+    else
+      socket
+      |> put_flash(
+        :error,
+        gettext("This salary note is on Pay Slip %{no} — manage it from the Punch Card.",
+          no: obj.pay_slip_no
+        )
+      )
+      |> push_navigate(to: "/companies/#{socket.assigns.current_company.id}/SalaryNote")
+    end
   end
 
   def handle_event(

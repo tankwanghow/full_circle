@@ -40,14 +40,23 @@ defmodule FullCircleWeb.AdvanceLive.Form do
     obj =
       HR.get_advance!(id, socket.assigns.current_company, socket.assigns.current_user)
 
-    socket
-    |> assign(live_action: :edit)
-    |> assign(id: id)
-    |> assign(page_title: gettext("Edit Advance") <> " " <> obj.slip_no)
-    |> assign(
-      :form,
-      to_form(StdInterface.changeset(Advance, obj, %{}, socket.assigns.current_company))
-    )
+    if is_nil(obj.pay_slip_id) do
+      socket
+      |> assign(live_action: :edit)
+      |> assign(id: id)
+      |> assign(page_title: gettext("Edit Advance") <> " " <> obj.slip_no)
+      |> assign(
+        :form,
+        to_form(StdInterface.changeset(Advance, obj, %{}, socket.assigns.current_company))
+      )
+    else
+      socket
+      |> put_flash(
+        :error,
+        gettext("This advance is on a pay slip — manage it from the Punch Card.")
+      )
+      |> push_navigate(to: "/companies/#{socket.assigns.current_company.id}/Advance")
+    end
   end
 
   def handle_event(

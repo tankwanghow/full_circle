@@ -100,6 +100,18 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
         <.link :if={@statutory_preview} phx-click="pay" class="h-10 mt-5 green button">
           {gettext("Save PaySlip")}
         </.link>
+        <.link
+          :if={@pay_slip}
+          phx-click="void"
+          data-confirm={
+            gettext(
+              "Void this Pay Slip? Its notes/advances stay as unprocessed; the slip and its GL postings are removed."
+            )
+          }
+          class="h-10 mt-5 red button"
+        >
+          {gettext("Void PaySlip")}
+        </.link>
         <span :if={@net_pay} class="h-10 mt-5 font-bold">
           {gettext("Net Pay")}: {@net_pay |> Number.Delimit.number_to_delimited()}
         </span>
@@ -455,6 +467,37 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
          :error,
          gettext("Select a payment account before saving.")
        )}
+    end
+  end
+
+  @impl true
+  def handle_event("void", _, socket) do
+    %{pay_slip: ps, search: s, employee: emp, current_company: com, current_user: user} =
+      socket.assigns
+
+    if ps do
+      case FullCircle.PaySlipOp.void_pay_slip(ps.id, com, user) do
+        {:ok, _} ->
+          {:noreply,
+           socket
+           |> put_flash(:info, gettext("Pay Slip voided."))
+           |> push_navigate(
+             to:
+               "/companies/#{com.id}/PunchCard?#{URI.encode_query(%{"search[employee_name]" => emp.name, "search[month]" => s.month, "search[year]" => s.year})}"
+           )}
+
+        :not_authorise ->
+          {:noreply,
+           put_flash(socket, :error, gettext("You are not authorised to perform this action"))}
+
+        {:sql_error, msg} ->
+          {:noreply, put_flash(socket, :error, "#{gettext("Failed")} #{msg}")}
+
+        other ->
+          {:noreply, put_flash(socket, :error, "#{inspect(other)}")}
+      end
+    else
+      {:noreply, socket}
     end
   end
 

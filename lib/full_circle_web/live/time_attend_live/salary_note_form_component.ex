@@ -84,7 +84,8 @@ defmodule FullCircleWeb.TimeAttendLive.SalaryNoteFormComponent do
     case HR.delete_salary_note(
            socket.assigns.form.data,
            socket.assigns.current_company,
-           socket.assigns.current_user
+           socket.assigns.current_user,
+           true
          ) do
       {:ok, %{delete_salary_note: obj}} ->
         send(self(), {:refresh_page_sn, obj})
@@ -127,7 +128,8 @@ defmodule FullCircleWeb.TimeAttendLive.SalaryNoteFormComponent do
            socket.assigns.form.data,
            params,
            socket.assigns.current_company,
-           socket.assigns.current_user
+           socket.assigns.current_user,
+           true
          ) do
       {:ok, %{update_salary_note: obj}} ->
         send(self(), {:refresh_page_sn, obj})

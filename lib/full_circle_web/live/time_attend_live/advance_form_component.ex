@@ -98,7 +98,8 @@ defmodule FullCircleWeb.TimeAttendLive.AdvanceFormComponent do
            socket.assigns.form.data,
            params,
            socket.assigns.current_company,
-           socket.assigns.current_user
+           socket.assigns.current_user,
+           true
          ) do
       {:ok, %{update_advance: obj}} ->
         send(self(), {:refresh_page_sn, obj})

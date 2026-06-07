@@ -728,18 +728,21 @@ defmodule FullCircle.HR do
     end)
   end
 
-  def update_salary_note(%SalaryNote{} = salary_note, attrs, com, user) do
+  def update_salary_note(%SalaryNote{} = salary_note, attrs, com, user, from_punchcard? \\ false) do
     attrs = remove_field_if_new_flag(attrs, "note_no")
 
-    case can?(user, :update_salary_note, com) do
+    cond do
+      not can?(user, :update_salary_note, com) ->
+        :not_authorise
+
+      not is_nil(salary_note.pay_slip_id) and not from_punchcard? ->
+        {:error, :on_payslip}
+
       true ->
         Multi.new()
         |> update_salary_note_multi(salary_note, attrs, com, user)
         |> clear_pay_prep_step(:update_salary_note, com)
         |> Repo.transaction()
-
-      false ->
-        :not_authorise
     end
   rescue
     e in Postgrex.Error ->
@@ -779,16 +782,19 @@ defmodule FullCircle.HR do
     |> create_salary_note_transactions(name, com, user)
   end
 
-  def delete_salary_note(%SalaryNote{} = salary_note, com, user) do
-    case can?(user, :delete_salary_note, com) do
+  def delete_salary_note(%SalaryNote{} = salary_note, com, user, from_punchcard? \\ false) do
+    cond do
+      not can?(user, :delete_salary_note, com) ->
+        :not_authorise
+
+      not is_nil(salary_note.pay_slip_id) and not from_punchcard? ->
+        {:error, :on_payslip}
+
       true ->
         Multi.new()
         |> delete_salary_note_multi(salary_note, com, user)
         |> clear_pay_prep_step(:delete_salary_note, com)
         |> Repo.transaction()
-
-      false ->
-        :not_authorise
     end
   rescue
     e in Postgrex.Error ->
@@ -972,18 +978,21 @@ defmodule FullCircle.HR do
     end)
   end
 
-  def update_advance(%Advance{} = advance, attrs, com, user) do
+  def update_advance(%Advance{} = advance, attrs, com, user, from_punchcard? \\ false) do
     attrs = remove_field_if_new_flag(attrs, "slip_no")
 
-    case can?(user, :update_advance, com) do
+    cond do
+      not can?(user, :update_advance, com) ->
+        :not_authorise
+
+      not is_nil(advance.pay_slip_id) and not from_punchcard? ->
+        {:error, :on_payslip}
+
       true ->
         Multi.new()
         |> update_advance_multi(advance, attrs, com, user)
         |> clear_pay_prep_step(:update_advance, com)
         |> Repo.transaction()
-
-      false ->
-        :not_authorise
     end
   rescue
     e in Postgrex.Error ->

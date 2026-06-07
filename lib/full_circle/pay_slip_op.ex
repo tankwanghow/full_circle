@@ -551,6 +551,51 @@ defmodule FullCircle.PaySlipOp do
       {:sql_error, e.postgres.message}
   end
 
+  @doc """
+  Void a pay slip: unlink its notes/advances (they survive as unprocessed — NOT deleted),
+  reverse the slip's GL transactions, then delete the slip. Notes are unlinked before the
+  delete, so the schema's cascade has nothing to remove.
+  """
+  def void_pay_slip(pay_slip_id, com, user) do
+    case can?(user, :update_pay_slip, com) do
+      true ->
+        ps = get_pay_slip!(pay_slip_id, com)
+
+        Multi.new()
+        |> Multi.update_all(
+          :unlink_notes,
+          from(sn in SalaryNote, where: sn.pay_slip_id == ^ps.id and sn.company_id == ^com.id),
+          set: [pay_slip_id: nil]
+        )
+        |> Multi.update_all(
+          :unlink_advances,
+          from(a in Advance, where: a.pay_slip_id == ^ps.id and a.company_id == ^com.id),
+          set: [pay_slip_id: nil]
+        )
+        |> Multi.delete_all(
+          :reverse_pay_slip_gl,
+          from(t in Transaction,
+            where:
+              t.doc_type == "PaySlip" and t.doc_no == ^ps.slip_no and t.company_id == ^com.id
+          )
+        )
+        |> Multi.delete(:void_pay_slip, ps)
+        |> FullCircle.Sys.insert_log_for(
+          :void_pay_slip,
+          %{"slip_no" => ps.slip_no, "employee_name" => ps.employee_name},
+          com,
+          user
+        )
+        |> Repo.transaction()
+
+      false ->
+        :not_authorise
+    end
+  rescue
+    e in Postgrex.Error ->
+      {:sql_error, e.postgres.message}
+  end
+
   defp prepare_pay_slip(attrs) do
     add =
       (attrs["additions"] || %{}) |> Map.to_list() |> Enum.map(fn {k, v} -> {"#{k}add", v} end)

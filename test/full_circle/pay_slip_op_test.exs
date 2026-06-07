@@ -342,4 +342,90 @@ defmodule FullCircle.PaySlipOpTest do
       assert note.cal_func == "epf_employee"
     end
   end
+
+  describe "linked-note edit guard" do
+    setup :setup_payroll
+
+    test "payslip-linked note can't be edited/deleted outside the punch card", %{
+      com: com, admin: admin, employee: emp, salary_type: st, funds_ac: funds
+    } do
+      {:ok, _} = FullCircle.HR.create_salary_note(%{
+        "note_date" => "2026-05-31", "quantity" => "1", "unit_price" => "3000",
+        "employee_name" => emp.name, "employee_id" => emp.id,
+        "salary_type_name" => st.name, "salary_type_id" => st.id, "descriptions" => "salary"
+      }, com, admin)
+
+      {:ok, %{create_pay_slip: _}} = PaySlipOp.pay(emp, 5, 2026, funds.id, com, admin)
+
+      note =
+        FullCircle.HR.get_salary_notes(emp.id, 5, 2026, com, admin)
+        |> Enum.find(&(&1.salary_type_name == st.name))
+
+      refute is_nil(note.pay_slip_id)
+
+      attrs = %{
+        "note_no" => note.note_no, "note_date" => "2026-05-31", "quantity" => "1",
+        "unit_price" => "4000", "employee_name" => emp.name, "employee_id" => emp.id,
+        "salary_type_name" => st.name, "salary_type_id" => st.id, "descriptions" => "salary"
+      }
+
+      # outside the punch card (default) -> blocked
+      assert {:error, :on_payslip} = FullCircle.HR.update_salary_note(note, attrs, com, admin)
+      assert {:error, :on_payslip} = FullCircle.HR.delete_salary_note(note, com, admin)
+
+      # from the punch card -> past the guard (not :on_payslip; may then pass or hit the 7-day rule)
+      refute match?({:error, :on_payslip}, FullCircle.HR.update_salary_note(note, attrs, com, admin, true))
+    end
+  end
+
+  describe "void_pay_slip" do
+    setup :setup_payroll
+
+    test "unlinks notes/advances, removes the slip and its GL", %{
+      com: com, admin: admin, employee: emp, salary_type: st, funds_ac: funds
+    } do
+      {:ok, _} = FullCircle.HR.create_salary_note(%{
+        "note_date" => "2026-05-31", "quantity" => "1", "unit_price" => "3000",
+        "employee_name" => emp.name, "employee_id" => emp.id,
+        "salary_type_name" => st.name, "salary_type_id" => st.id, "descriptions" => "salary"
+      }, com, admin)
+
+      {:ok, _} = FullCircle.HR.create_advance(%{
+        "slip_date" => "2026-05-31", "amount" => "500",
+        "employee_name" => emp.name, "employee_id" => emp.id,
+        "funds_account_name" => funds.name, "funds_account_id" => funds.id, "note" => "advance"
+      }, com, admin)
+
+      {:ok, %{create_pay_slip: ps}} = PaySlipOp.pay(emp, 5, 2026, funds.id, com, admin)
+
+      assert {:ok, _} = PaySlipOp.void_pay_slip(ps.id, com, admin)
+
+      # slip is gone
+      assert_raise Ecto.NoResultsError, fn -> PaySlipOp.get_pay_slip!(ps.id, com) end
+
+      # note survives but is unlinked (unprocessed)
+      note =
+        FullCircle.HR.get_salary_notes(emp.id, 5, 2026, com, admin)
+        |> Enum.find(&(&1.salary_type_name == st.name))
+
+      assert note
+      assert is_nil(note.pay_slip_id)
+
+      # advance survives but is unlinked
+      adv = FullCircle.HR.get_advances(emp.id, 5, 2026, com, admin) |> List.first()
+      assert adv
+      assert is_nil(adv.pay_slip_id)
+
+      # the slip's GL postings are removed
+      gl_count =
+        FullCircle.Repo.aggregate(
+          from(t in FullCircle.Accounting.Transaction,
+            where: t.doc_type == "PaySlip" and t.doc_no == ^ps.slip_no and t.company_id == ^com.id
+          ),
+          :count
+        )
+
+      assert gl_count == 0
+    end
+  end
 end
