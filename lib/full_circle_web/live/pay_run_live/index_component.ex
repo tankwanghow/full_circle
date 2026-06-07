@@ -18,11 +18,6 @@ defmodule FullCircleWeb.PayRunLive.IndexComponent do
     "/companies/#{com.id}/PunchCard?#{URI.encode_query(qry)}"
   end
 
-  defp new_payslip_url(id, yr, mth, com) do
-    qry = %{"emp_id" => id, "month" => mth, "year" => yr}
-    "/companies/#{com.id}/PaySlip/new?#{URI.encode_query(qry)}"
-  end
-
   defp money(nil), do: ""
   defp money(d), do: Number.Delimit.number_to_delimited(d)
 
@@ -82,15 +77,9 @@ defmodule FullCircleWeb.PayRunLive.IndexComponent do
             </.link>
           </div>
           <span>{money(@pay.net_pay)}</span>
-          <.link
-            navigate={card_url(@pay.year, @pay.month, @obj.employee_name, @company)}
-            class="text-orange-600 hover:font-bold"
-          >
-            {gettext("Card")}
-          </.link>
         <% :pending -> %>
           <.link
-            navigate={new_payslip_url(@obj.id, @pay.year, @pay.month, @company)}
+            navigate={card_url(@pay.year, @pay.month, @obj.employee_name, @company)}
             class="text-blue-600 hover:font-bold"
           >
             {gettext("New Pay")}
@@ -111,13 +100,6 @@ defmodule FullCircleWeb.PayRunLive.IndexComponent do
               ADV-{@pay.unproc_adv_count}({money(@pay.unproc_adv_sum)})
             </span>
           </span>
-          <span :if={not @current?} class="grow"></span>
-          <.link
-            navigate={card_url(@pay.year, @pay.month, @obj.employee_name, @company)}
-            class="text-orange-600 hover:font-bold"
-          >
-            {gettext("Card")}
-          </.link>
         <% :na -> %>
           <span class="w-full text-rose-400 italic">— {gettext("Resigned")} —</span>
       <% end %>

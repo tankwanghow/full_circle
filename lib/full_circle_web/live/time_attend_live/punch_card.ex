@@ -104,18 +104,6 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
         <.link :if={@statutory_preview} phx-click="pay" class="h-10 mt-5 green button">
           {gettext("Save PaySlip")}
         </.link>
-        <.link
-          :if={@pay_slip}
-          phx-click="void"
-          data-confirm={
-            gettext(
-              "Void this Pay Slip? Its notes/advances stay as unprocessed; the slip and its GL postings are removed."
-            )
-          }
-          class="h-10 mt-5 red button"
-        >
-          {gettext("Void PaySlip")}
-        </.link>
       </div>
 
       <div :if={@employee} class="text-center">
@@ -470,14 +458,13 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
              com,
              user
            ) do
-        {:ok, _} ->
+        {:ok, result} ->
+          ps = result[:create_pay_slip] || result[:update_pay_slip]
+
           {:noreply,
            socket
            |> put_flash(:info, gettext("Pay Slip saved."))
-           |> push_navigate(
-             to:
-               "/companies/#{com.id}/PunchCard?#{URI.encode_query(%{"search[employee_name]" => emp.name, "search[month]" => s.month, "search[year]" => s.year})}"
-           )}
+           |> push_navigate(to: "/companies/#{com.id}/PaySlip/#{ps.id}/view")}
 
         {:error, _op, cs, _} ->
           {:noreply, put_flash(socket, :error, inspect(cs.errors))}
@@ -492,37 +479,6 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
          :error,
          gettext("Select a payment account before saving.")
        )}
-    end
-  end
-
-  @impl true
-  def handle_event("void", _, socket) do
-    %{pay_slip: ps, search: s, employee: emp, current_company: com, current_user: user} =
-      socket.assigns
-
-    if ps do
-      case FullCircle.PaySlipOp.void_pay_slip(ps.id, com, user) do
-        {:ok, _} ->
-          {:noreply,
-           socket
-           |> put_flash(:info, gettext("Pay Slip voided."))
-           |> push_navigate(
-             to:
-               "/companies/#{com.id}/PunchCard?#{URI.encode_query(%{"search[employee_name]" => emp.name, "search[month]" => s.month, "search[year]" => s.year})}"
-           )}
-
-        :not_authorise ->
-          {:noreply,
-           put_flash(socket, :error, gettext("You are not authorised to perform this action"))}
-
-        {:sql_error, msg} ->
-          {:noreply, put_flash(socket, :error, "#{gettext("Failed")} #{msg}")}
-
-        other ->
-          {:noreply, put_flash(socket, :error, "#{inspect(other)}")}
-      end
-    else
-      {:noreply, socket}
     end
   end
 
@@ -727,7 +683,6 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
       |> assign(salary_notes: [])
       |> assign(advances: [])
       |> assign(employee: nil)
-      |> assign(pay_slip: nil)
       |> assign(days_in_month: 0)
       |> assign(sunday_count: 0)
       |> assign(total_day_worked: 0)
@@ -735,7 +690,6 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
       |> assign(normal_pay_days: 0)
       |> assign(sunday_pay_days: 0)
       |> assign(holiday_pay_days: 0)
-      |> assign(new_pay_slip_url: nil)
       |> assign(pay_prep: nil)
       |> assign(statutory_preview: nil)
       |> assign(net_pay: nil)
@@ -774,20 +728,6 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
           socket.assigns.current_company
         )
 
-      ps =
-        PaySlipOp.get_pay_slip_by_period(
-          emp,
-          month |> String.to_integer(),
-          year |> String.to_integer(),
-          socket.assigns.current_company
-        )
-
-      qry = %{
-        "emp_id" => emp.id,
-        "month" => month,
-        "year" => year
-      }
-
       socket =
         socket
         |> assign(punches: punches)
@@ -795,11 +735,6 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
         |> assign(salary_notes: salary_notes)
         |> assign(advances: advances)
         |> assign(leaves: leaves)
-        |> assign(pay_slip: ps)
-        |> assign(
-          new_pay_slip_url:
-            "/companies/#{socket.assigns.current_company.id}/PaySlip/new?#{URI.encode_query(qry)}"
-        )
         |> assign(
           pay_prep:
             FullCircle.HR.get_or_init_pay_prep(

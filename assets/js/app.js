@@ -184,6 +184,8 @@ window.addEventListener("phx:invalidate_autocomplete_cache", () => {
   import("./tri_autocomplete").then(mod => mod.invalidateAutocompleteCache())
 })
 
+window.addEventListener("phx:history_back", () => window.history.back())
+
 // connect if there are any LiveViews on the page
 liveSocket.connect()
 

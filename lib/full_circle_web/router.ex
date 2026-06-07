@@ -287,8 +287,6 @@ defmodule FullCircleWeb.Router do
 
       live("/PayRun", PayRunLive.Index, :index)
 
-      live("/PaySlip/new", PaySlipLive.Form, :new)
-      live("/PaySlip/:pay_slip_id/recal", PaySlipLive.Form, :recal)
       live("/PaySlip/:pay_slip_id/view", PaySlipLive.Form, :view)
 
       live("/POS", PosLive)

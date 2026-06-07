@@ -3,55 +3,17 @@ defmodule FullCircleWeb.PaySlipLive.Form do
 
   alias FullCircle.PaySlipOp
   alias FullCircleWeb.PaySlipLive.{SalaryNoteComponent, AdvanceComponent}
-  alias FullCircle.StdInterface
   alias FullCircle.HR.PaySlip
 
   @impl true
   def mount(params, _session, socket) do
-    month = params["month"]
-    year = params["year"]
-    emp_id = params["emp_id"]
-    id = params["pay_slip_id"]
-
-    socket =
-      case socket.assigns.live_action do
-        :new ->
-          mount_new(socket, emp_id, month |> String.to_integer(), year |> String.to_integer())
-
-        :view ->
-          mount_view(socket, id)
-
-        :recal ->
-          mount_recal(socket, id)
-      end
-
-    {:ok, socket}
-  end
-
-  defp mount_new(socket, emp_id, month, year) do
-    emp =
-      FullCircle.HR.get_employee!(
-        emp_id,
-        socket.assigns.current_company,
-        socket.assigns.current_user
-      )
-
-    cs =
-      PaySlipOp.generate_new_changeset_for(
-        emp,
-        month,
-        year,
-        socket.assigns.current_company,
-        socket.assigns.current_user
-      )
-      |> PaySlipOp.calculate_pay(emp)
-
-    socket
-    |> assign(live_action: :new)
-    |> assign(id: "new")
-    |> assign(page_title: gettext("New Pay Slip"))
-    |> assign(employee: emp)
-    |> assign(form: to_form(cs))
+    {:ok, mount_view(socket, params["pay_slip_id"])}
+  rescue
+    Ecto.NoResultsError ->
+      {:ok,
+       socket
+       |> put_flash(:error, gettext("Pay slip not found. It may have been voided."))
+       |> push_navigate(to: ~p"/companies/#{socket.assigns.current_company.id}/PayRun")}
   end
 
   defp mount_view(socket, id) do
@@ -71,156 +33,31 @@ defmodule FullCircleWeb.PaySlipLive.Form do
     |> assign(live_action: :view)
     |> assign(id: id)
     |> assign(employee: emp)
-    |> assign(page_title: gettext("Edit Pay Slip") <> " " <> obj.slip_no)
-    |> assign(form: to_form(cs))
-  end
-
-  defp mount_recal(socket, id) do
-    obj =
-      PaySlipOp.get_recal_pay_slip(
-        id,
-        socket.assigns.current_company,
-        socket.assigns.current_user
-      )
-
-    emp =
-      FullCircle.HR.get_employee!(
-        obj.employee_id,
-        socket.assigns.current_company,
-        socket.assigns.current_user
-      )
-
-    cs = PaySlip.changeset(obj, %{})
-
-    socket
-    |> assign(live_action: :edit)
-    |> assign(id: id)
-    |> assign(employee: emp)
-    |> assign(page_title: gettext("Edit Pay Slip") <> " " <> obj.slip_no)
+    |> assign(page_title: gettext("View Pay Slip") <> " " <> obj.slip_no)
+    |> assign(
+      punch_card_url:
+        ~p"/companies/#{socket.assigns.current_company.id}/PunchCard?#{%{"search[employee_name]" => emp.name, "search[month]" => obj.pay_month, "search[year]" => obj.pay_year}}"
+    )
     |> assign(form: to_form(cs))
   end
 
   @impl true
-  def handle_event("exec_cal_func", _, socket) do
-    cs = PaySlipOp.calculate_pay(socket.assigns.form.source, socket.assigns.employee)
-
-    socket = assign(socket, form: to_form(cs))
-
-    {:noreply, socket}
-  end
-
-  @impl true
-  def handle_event("save", %{"pay_slip" => params}, socket) do
-    save(socket, socket.assigns.live_action, params)
-  end
-
-  @impl true
-  def handle_event(
-        "validate",
-        %{"_target" => ["pay_slip", "funds_account_name"], "pay_slip" => params},
-        socket
-      ) do
-    {params, socket, _} =
-      FullCircleWeb.Helpers.assign_autocomplete_id(
-        socket,
-        params,
-        "funds_account_name",
-        "funds_account_id",
-        &FullCircle.Accounting.get_account_by_name/3
-      )
-
-    validate(params, socket)
-  end
-
-  @impl true
-  def handle_event("validate", %{"pay_slip" => params}, socket) do
-    validate(params, socket)
-  end
-
-  defp save(socket, :new, params) do
-    case PaySlipOp.create_pay_slip(
-           params,
+  def handle_event("void", _, socket) do
+    case PaySlipOp.void_pay_slip(
+           socket.assigns.id,
            socket.assigns.current_company,
            socket.assigns.current_user
          ) do
-      {:ok, %{create_pay_slip: obj}} ->
-        {:noreply,
-         socket
-         |> push_navigate(
-           to: ~p"/companies/#{socket.assigns.current_company.id}/PaySlip/#{obj.id}/view"
-         )
-         |> put_flash(:info, "#{gettext("Pay Slip created successfully.")}")}
-
-      {:error, failed_operation, changeset, _} ->
-        {:noreply,
-         socket
-         |> assign(form: to_form(changeset))
-         |> put_flash(
-           :error,
-           "#{gettext("Failed")} #{failed_operation}. #{list_errors_to_string(changeset.errors)}"
-         )}
-
-      {:sql_error, msg} ->
-        {:noreply,
-         socket
-         |> put_flash(:error, "#{gettext("Failed")} #{msg}")}
+      {:ok, _} ->
+        {:noreply, push_event(socket, "history_back", %{})}
 
       :not_authorise ->
         {:noreply,
-         socket
-         |> put_flash(:error, gettext("You are not authorised to perform this action"))}
-    end
-  end
-
-  defp save(socket, :edit, params) do
-    case PaySlipOp.update_pay_slip(
-           socket.assigns.form.data,
-           params,
-           socket.assigns.current_company,
-           socket.assigns.current_user
-         ) do
-      {:ok, %{update_pay_slip: obj}} ->
-        {:noreply,
-         socket
-         |> push_navigate(
-           to: ~p"/companies/#{socket.assigns.current_company.id}/PaySlip/#{obj.id}/view"
-         )
-         |> put_flash(:info, "#{gettext("Pay Slip Updated successfully.")}")}
-
-      {:error, failed_operation, changeset, _} ->
-        {:noreply,
-         socket
-         |> assign(form: to_form(changeset))
-         |> put_flash(
-           :error,
-           "#{gettext("Failed")} #{failed_operation}. #{list_errors_to_string(changeset.errors)}"
-         )}
+         put_flash(socket, :error, gettext("You are not authorised to perform this action"))}
 
       {:sql_error, msg} ->
-        {:noreply,
-         socket
-         |> put_flash(:error, "#{gettext("Failed")} #{msg}")}
-
-      :not_authorise ->
-        {:noreply,
-         socket
-         |> put_flash(:error, gettext("You are not authorised to perform this action"))}
+        {:noreply, put_flash(socket, :error, "#{gettext("Failed")} #{msg}")}
     end
-  end
-
-  defp validate(params, socket) do
-    changeset =
-      StdInterface.changeset(
-        PaySlip,
-        socket.assigns.form.data,
-        params,
-        socket.assigns.current_company
-      )
-      |> Map.put(:action, socket.assigns.live_action)
-
-    socket = assign(socket, form: to_form(changeset))
-
-    {:noreply, socket}
   end
 
   @impl true
@@ -228,14 +65,7 @@ defmodule FullCircleWeb.PaySlipLive.Form do
     ~H"""
     <div class="w-8/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
       <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
-      <.form
-        for={@form}
-        id="object-form"
-        autocomplete="off"
-        phx-change="validate"
-        phx-submit="save"
-        class="mx-auto"
-      >
+      <.form for={@form} id="object-form" autocomplete="off" class="mx-auto">
         <.input type="hidden" field={@form[:slip_no]} />
         <div class="flex flex-nowrap gap-1 mb-2">
           <div class="w-[25%]">
@@ -243,11 +73,10 @@ defmodule FullCircleWeb.PaySlipLive.Form do
             <.input field={@form[:employee_name]} label={gettext("Employee")} readonly tabindex="-1" />
           </div>
           <div class="w-[15%]">
-            <.input feedback={true} field={@form[:slip_date]} label={gettext("Date")} type="date" />
+            <.input field={@form[:slip_date]} label={gettext("Date")} type="date" readonly tabindex="-1" />
           </div>
           <div class="w-[7%]">
             <.input
-              feedback={true}
               field={@form[:pay_month]}
               label={gettext("Month")}
               type="number"
@@ -269,17 +98,10 @@ defmodule FullCircleWeb.PaySlipLive.Form do
             <.input
               field={@form[:funds_account_name]}
               label={gettext("Funds From")}
-              phx-hook="tributeAutoComplete"
-              url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=fundsaccount&name="}
+              readonly
+              tabindex="-1"
             />
           </div>
-          <.link
-            :if={@live_action == :edit}
-            phx-click={JS.push("exec_cal_func")}
-            class="mt-4 blue button"
-          >
-            {gettext("Calculate")}
-          </.link>
         </div>
 
         <div class="flex flex-row text-center font-semibold">
@@ -368,26 +190,37 @@ defmodule FullCircleWeb.PaySlipLive.Form do
         />
 
         <div class="flex flex-row justify-center gap-x-1 mt-1">
-          <%= if @live_action != :view do %>
-            <.save_button form={@form} />
-          <% end %>
+          <.link navigate={@punch_card_url} class="orange button">
+            {gettext("Edit in Punch Card")}
+          </.link>
+          <.link navigate={~p"/companies/#{@current_company.id}/PayRun"} class="blue button">
+            {gettext("Pay Run")}
+          </.link>
+          <.link
+            phx-click="void"
+            data-confirm={
+              gettext(
+                "Void this Pay Slip? Its notes/advances stay as unprocessed; the slip and its GL postings are removed."
+              )
+            }
+            class="red button"
+          >
+            {gettext("Void PaySlip")}
+          </.link>
           <a onclick="history.back();" class="blue button">{gettext("Back")}</a>
           <.print_button
-            :if={@live_action == :view}
             company={@current_company}
             doc_type="PaySlip"
             doc_id={@id}
             class="gray button"
           />
           <.pre_print_button
-            :if={@live_action == :view}
             company={@current_company}
             doc_type="PaySlip"
             doc_id={@id}
             class="gray button"
           />
           <.live_component
-            :if={@live_action == :view}
             module={FullCircleWeb.LogLive.Component}
             current_company={@current_company}
             id={"log_#{@id}"}
@@ -396,7 +229,6 @@ defmodule FullCircleWeb.PaySlipLive.Form do
             entity_id={@id}
           />
           <.live_component
-            :if={@live_action == :view}
             module={FullCircleWeb.JournalEntryViewLive.Component}
             id={"journal_#{@id}"}
             show_journal={false}
