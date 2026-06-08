@@ -44,8 +44,14 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
       socket.assigns.current_user
     )
 
-    {:noreply, socket |> assign(imported: true)}
+    {:noreply,
+     socket
+     |> assign(imported: true)
+     |> put_flash(:info, gettext("Attendance imported."))}
   end
+
+  @impl true
+  def handle_event("upload", _params, socket), do: {:noreply, socket}
 
   @impl true
   def handle_event("refresh", _params, socket) do
@@ -80,26 +86,38 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
     {_done, still_uploading} = uploaded_entries(socket, :xlsx_file)
 
     if still_uploading == [] do
-      raw_files =
+      results =
         consume_uploaded_entries(socket, :xlsx_file, fn %{path: path}, _entry ->
           {:ok, read_excel_files(path)}
         end)
 
-      case FullCircle.HR.FingerPrintImport.parse_files_rows(raw_files) do
-        {:ok, []} ->
-          {:noreply, socket |> put_flash(:error, gettext("No punches found in the file(s)."))}
-
-        {:ok, raw_attendances} ->
-          {:noreply, build_attendances_assigns(socket, raw_files, raw_attendances)}
-
-        {:error, {:date_range_mismatch, _ranges}} ->
-          {:noreply,
-           socket
-           |> put_flash(:error,
-             gettext("Uploaded files cover different months. Upload one month's machines together."))}
+      if Enum.any?(results, &match?({:error, _}, &1)) do
+        {:noreply,
+         socket
+         |> put_flash(:error,
+           gettext("A file could not be read — make sure it is a fingerprint 'Att.log report' export."))}
+      else
+        raw_files = Enum.map(results, fn {:ok, rows} -> rows end)
+        handle_parsed_files(socket, raw_files)
       end
     else
       {:noreply, socket}
+    end
+  end
+
+  defp handle_parsed_files(socket, raw_files) do
+    case FullCircle.HR.FingerPrintImport.parse_files_rows(raw_files) do
+      {:ok, []} ->
+        {:noreply, socket |> put_flash(:error, gettext("No punches found in the file(s)."))}
+
+      {:ok, raw_attendances} ->
+        {:noreply, build_attendances_assigns(socket, raw_files, raw_attendances)}
+
+      {:error, {:date_range_mismatch, _ranges}} ->
+        {:noreply,
+         socket
+         |> put_flash(:error,
+           gettext("Uploaded files cover different months. Upload one month's machines together."))}
     end
   end
 
@@ -170,11 +188,11 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
   defp insert_time_attendence_from_logs(entries, com, user) do
     case FullCircle.Authorization.can?(user, :create_time_attendence, com) do
       true ->
-        Enum.each(entries, fn x ->
-          if x.employee_id != "!! Not Found !!" do
-            HR.insert_time_attendence_from_log(x, com)
-          end
-        end)
+        entries
+        # drop unmatched people and any flag-less punch (a rare 7th+ daily punch
+        # gets flag: nil, which fails the TimeAttend changeset's required-flag check)
+        |> Enum.reject(fn x -> x.employee_id == "!! Not Found !!" or is_nil(x.flag) end)
+        |> Enum.each(fn x -> HR.insert_time_attendence_from_log(x, com) end)
 
       false ->
         :not_authorise
@@ -186,10 +204,12 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
   defp error_to_string(:not_accepted), do: "You have selected an unacceptable file type"
 
   def read_excel_files(file) do
-    blob = File.read!(file)
-    {:ok, package} = XlsxReader.open(blob, source: :binary)
-    {:ok, rows} = XlsxReader.sheet(package, "Att.log report")
-    rows
+    with {:ok, package} <- XlsxReader.open(File.read!(file), source: :binary),
+         {:ok, rows} <- XlsxReader.sheet(package, "Att.log report") do
+      {:ok, rows}
+    else
+      _ -> {:error, :unreadable}
+    end
   end
 
   def fill_in_employee_info(res, com, user) do
