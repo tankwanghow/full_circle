@@ -446,7 +446,9 @@ defmodule FullCircle.Sys do
     |> Multi.run(:create_upload_directory, fn _, %{create_company: c} ->
       path = Path.join([Application.get_env(:full_circle, :uploads_dir), "#{c.id}"])
 
-      with :ok <- File.mkdir(path) do
+      # mkdir_p creates the base uploads dir (uploads_dir) too if it doesn't
+      # exist yet, so a fresh deploy / empty mounted volume self-initialises.
+      with :ok <- File.mkdir_p(path) do
         {:ok, nil}
       end
     end)

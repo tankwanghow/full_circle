@@ -24,7 +24,7 @@ services:
     image: ${DOCKER_HUB_USERNAME}/${IMAGE_NAME}:latest
     container_name: ${DOCKER_CONTAINER_NAME}
     volumes:
-      - /home/${IMAGE_NAME}/uploads:/uploads
+      - /home/${IMAGE_NAME}/uploads:/app/uploads
     environment:
       - DATABASE_URL=postgres://${DB_USER}:${DB_PWD}@localhost:5432/${DB_NAME}
       - DATABASE_QUERY_URL=postgres://${DB_USER}_query:${DB_PWD}@localhost:5432/${DB_NAME}
@@ -37,6 +37,7 @@ services:
       - MAIL_USERNAME=${MAIL_USERNAME}
       - MAIL_PASSWORD=${MAIL_PASSWORD}
       - MAIL_FROM=${MAIL_FROM}
+      - UPLOADS_DIR=/app/uploads
     network_mode: host
 EOF
 

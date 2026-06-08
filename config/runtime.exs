@@ -37,7 +37,7 @@ if config_env() == :prod do
 
   maybe_ipv6 = if System.get_env("ECTO_IPV6") in ~w(true 1), do: [:inet6], else: []
 
-  config :full_circle, uploads_dir: "/app/uploads"
+  config :full_circle, uploads_dir: System.get_env("UPLOADS_DIR") || "/app/uploads"
 
   config :full_circle, FullCircle.Repo,
     # ssl: true,
