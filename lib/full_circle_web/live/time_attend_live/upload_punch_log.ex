@@ -25,7 +25,8 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
         from_date: "NA",
         to_date: "NA",
         filename: "NA",
-        imported: false
+        imported: false,
+        import_result: nil
       )
 
     {:ok, socket}
@@ -38,16 +39,27 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
 
   @impl true
   def handle_event("import", _params, socket) do
-    insert_time_attendence_from_logs(
-      socket.assigns.attendances,
-      socket.assigns.current_company,
-      socket.assigns.current_user
-    )
+    case insert_time_attendence_from_logs(
+           socket.assigns.attendances,
+           socket.assigns.current_company,
+           socket.assigns.current_user
+         ) do
+      :not_authorise ->
+        {:noreply,
+         socket |> put_flash(:error, gettext("You are not authorised to import attendance."))}
 
-    {:noreply,
-     socket
-     |> assign(imported: true)
-     |> put_flash(:info, gettext("Attendance imported."))}
+      result ->
+        {:noreply,
+         socket
+         |> assign(imported: true, import_result: result)
+         |> put_flash(
+           :info,
+           gettext("Imported %{n} new punches for %{e} employees.",
+             n: result.total_inserted,
+             e: Enum.count(result.employees)
+           )
+         )}
+    end
   end
 
   @impl true
@@ -141,7 +153,8 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
       total_employees: Enum.count(people),
       from_date: Timex.to_date(fromdate),
       to_date: Timex.to_date(todate),
-      imported: false
+      imported: false,
+      import_result: nil
     )
   end
 
@@ -185,14 +198,38 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
     end
   end
 
+  # Inserts matched, flagged punches and returns a per-employee tally:
+  # %{employees: [%{name, inserted, skipped}], unmatched: [name], total_inserted, total_skipped}.
+  # insert_time_attendence_from_log/2 returns {:ok, _} on a real insert and nil when it
+  # skips an already-present punch (±5-min idempotency), so we count {:ok, _} as inserted.
   defp insert_time_attendence_from_logs(entries, com, user) do
     case FullCircle.Authorization.can?(user, :create_time_attendence, com) do
       true ->
-        entries
-        # drop unmatched people and any flag-less punch (a rare 7th+ daily punch
-        # gets flag: nil, which fails the TimeAttend changeset's required-flag check)
-        |> Enum.reject(fn x -> x.employee_id == "!! Not Found !!" or is_nil(x.flag) end)
-        |> Enum.each(fn x -> HR.insert_time_attendence_from_log(x, com) end)
+        {matched, unmatched} =
+          Enum.split_with(entries, fn x -> x.employee_id != "!! Not Found !!" end)
+
+        employees =
+          matched
+          # skip flag-less punches (a rare 7th+ daily punch gets flag: nil, which fails
+          # the TimeAttend changeset's required-flag check)
+          |> Enum.reject(fn x -> is_nil(x.flag) end)
+          |> Enum.group_by(fn x -> x.employee_name end)
+          |> Enum.map(fn {name, list} ->
+            inserted =
+              list
+              |> Enum.map(fn x -> HR.insert_time_attendence_from_log(x, com) end)
+              |> Enum.count(&match?({:ok, _}, &1))
+
+            %{name: name, inserted: inserted, skipped: Enum.count(list) - inserted}
+          end)
+          |> Enum.sort_by(& &1.name)
+
+        %{
+          employees: employees,
+          unmatched: unmatched |> Enum.map(fn x -> x[:Name] end) |> Enum.uniq() |> Enum.sort(),
+          total_inserted: Enum.sum(Enum.map(employees, & &1.inserted)),
+          total_skipped: Enum.sum(Enum.map(employees, & &1.skipped))
+        }
 
       false ->
         :not_authorise
@@ -316,7 +353,7 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
         <span class="text-xl">To: </span><span class="text-xl font-bold">{@to_date}</span>
       </div>
     </div>
-    <div class="w-10/12 mx-auto p-4 mb-1 border rounded-lg border-green-500 bg-green-200">
+    <div :if={!@imported} class="w-10/12 mx-auto p-4 mb-1 border rounded-lg border-green-500 bg-green-200">
       <div class="my-2 text-center mx-auto font-bold text-2xl">
         <.link phx-click="refresh" class="button blue">{gettext("Refresh")}</.link>
       </div>
@@ -361,8 +398,40 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
         </div>
       <% end %>
     </div>
-    <div class="mt-3 text-center mx-auto font-bold text-2xl">
+    <div :if={!@imported} class="mt-3 text-center mx-auto font-bold text-2xl">
       <.link :if={Enum.count(@people) > 0} phx-click="import" class="button blue">Import</.link>
+    </div>
+
+    <div
+      :if={@imported and is_map(@import_result)}
+      class="w-10/12 mx-auto p-4 mb-1 border rounded-lg border-green-500 bg-green-200"
+    >
+      <p class="text-2xl font-bold text-center mb-1">{gettext("Import complete")}</p>
+      <p class="text-center mb-3">
+        {gettext("Inserted")}
+        <span class="font-bold">{@import_result.total_inserted}</span>
+        {gettext("new punches for")}
+        <span class="font-bold">{Enum.count(@import_result.employees)}</span>
+        {gettext("employees")} ·
+        <span class="font-bold">{@import_result.total_skipped}</span>
+        {gettext("already present (skipped)")}
+      </p>
+
+      <%= for e <- @import_result.employees do %>
+        <div class="m-1 p-2 border rounded bg-green-100 border-green-500 flex flex-wrap items-center gap-3">
+          <div class="w-[45%] font-bold">{e.name}</div>
+          <div class="text-green-800 font-bold">+{e.inserted} {gettext("new")}</div>
+          <div :if={e.skipped > 0}>{e.skipped} {gettext("skipped")}</div>
+        </div>
+      <% end %>
+
+      <div
+        :if={@import_result.unmatched != []}
+        class="mt-3 p-2 border rounded bg-rose-200 border-rose-400"
+      >
+        <p class="font-bold">{gettext("Not imported — unmatched")}:</p>
+        <p>{Enum.join(@import_result.unmatched, ", ")}</p>
+      </div>
     </div>
     """
   end
