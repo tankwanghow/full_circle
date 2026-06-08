@@ -173,18 +173,24 @@ Hooks.XlsToXlsxUpload = {
     this.el.addEventListener("change", async (e) => {
       const files = Array.from(e.target.files || [])
       if (files.length === 0) return
-      const XLSX = await import("../vendor/sheetjs/xlsx.mjs")
-      const converted = []
-      for (const f of files) {
-        const buf = await f.arrayBuffer()
-        const wb = XLSX.read(buf, { type: "array" })
-        const out = XLSX.write(wb, { bookType: "xlsx", type: "array" })
-        const base = f.name.replace(/\.(xls|xlsx)$/i, "")
-        converted.push(new File([out], `${base}.xlsx`,
-          { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }))
+      try {
+        const XLSX = await import("../vendor/sheetjs/xlsx.mjs")
+        const converted = []
+        for (const f of files) {
+          const buf = await f.arrayBuffer()
+          const wb = XLSX.read(new Uint8Array(buf), { type: "array" })
+          const out = XLSX.write(wb, { bookType: "xlsx", type: "array" })
+          const base = f.name.replace(/\.(xls|xlsx)$/i, "")
+          converted.push(new File([out], `${base}.xlsx`,
+            { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }))
+        }
+        // this.upload targets the hidden <.live_file_input upload={@uploads.xlsx_file}>
+        this.upload("xlsx_file", converted)
+        e.target.value = "" // allow re-selecting the same file
+      } catch (err) {
+        console.error("XlsToXlsxUpload failed:", err)
+        alert("Could not read the attendance file: " + ((err && err.message) || err))
       }
-      this.upload("xlsx_file", converted)
-      e.target.value = "" // allow re-selecting the same file
     })
   }
 }

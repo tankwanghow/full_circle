@@ -259,6 +259,10 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
           phx-hook="XlsToXlsxUpload"
           phx-update="ignore"
         />
+        <%!-- Hidden real upload input: the XlsToXlsxUpload hook converts the picked
+              .xls to .xlsx in-browser and feeds it here via this.upload("xlsx_file", ...).
+              LiveView's programmatic upload requires this live_file_input to exist. --%>
+        <.live_file_input upload={@uploads.xlsx_file} class="hidden" />
         <div phx-drop-target={@uploads.xlsx_file.ref} class="p-2">
           <%= for entry <- @uploads.xlsx_file.entries do %>
             <div class="mt-2 gap-2 flex flex-row tracking-tighter border-2 border-green-600 place-items-center p-2 rounded-lg">
