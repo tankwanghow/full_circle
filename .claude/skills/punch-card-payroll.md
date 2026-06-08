@@ -75,6 +75,31 @@ contributions/leaves, so the merged preview has no internal repeats.
 Delete/unlink BEFORE the slip delete — do **not** rely on the schema `has_many on_delete: :delete_all`
 cascade (it would delete the earning notes).
 
+## Punch (attendance) editing — frozen once a payslip exists
+
+The per-day time inputs (`PunchTimeComponent`, rendered via `PunchCardComponent`) create/update/delete
+`time_attendences` inline on blur (`phx-change="punch_time_changed"`). Rules:
+- **No fixed date window.** `TimeAttend.data_entry_changeset` has NO `days_before` cap (only
+  `days_after: 0`, no future-dating) — historical/imported months are editable. (There used to be a
+  `days_before: 40` cap that silently blocked editing imported attendance; removed.)
+- **Frozen by payslip, not by age.** `HR.create_time_attendence_by_entry` / `update_time_attendence` /
+  `delete_time_attendence_by_id` return `{:error, :on_payslip}` when `HR.pay_slip_exists_for_period?(emp_id, date, com)`
+  is true (a PaySlip exists for that punch's employee + month/year). **Void the payslip to re-open editing.**
+- The Punch Card computes `@payslip_locked?` (via `PaySlipOp.get_pay_slip_by_period/4`) in `filter_punches`
+  and passes it down so the inputs render **read-only + greyed with a tooltip** when locked — belt to the
+  backend guard's braces.
+- The kiosk path (`create_time_attendence_by_punch`) is NOT guarded — live punches are for the current
+  month, which has no payslip yet.
+
+## Holiday pay days (`punch_card.ex` `holiday_pay_days/2` → `HR.punch_by_date/3`)
+
+Only runs for a day with a holiday (`sholi_list`) where hours worked exceed half a workday — so it stays
+dormant until an employee actually has **punches on a holiday** (which fingerprint import can produce).
+Because it was dormant it shipped broken; when touching it: `holiday_pay_days` must be passed the **company
+struct** (not `current_company.id`), and `punch_by_date(emp_id, date, com)` needs a **`Date`** (it coerces
+via `Timex.to_date/1`) and filters on **`eidsh.id`** (the CTE has no `employee_id` column). It returns a
+per-day map with `:wh`/`:nh`; the rule pays the holiday only if both adjacent days were worked (`wh > 0`).
+
 ## pay_preps / PayPrep (currently dormant gating)
 
 - `pay_preps` is keyed by `(company, employee, pay_month, pay_year)` and holds `funds_account_id` +

@@ -25,8 +25,16 @@ The fingerprint machines emit legacy `.xls` (BIFF/OLE2); `xlsx_reader` **cannot*
 in-browser via vendored SheetJS (`assets/vendor/sheetjs/xlsx.mjs`, dynamically imported so it's a lazy
 chunk, not in the main bundle), then `this.upload("xlsx_file", convertedFiles)`. The server's
 `allow_upload(:xlsx_file, accept: ~w(.xlsx))` therefore only ever sees `.xlsx` — **don't change the
-server read path to handle `.xls`**. The input is a plain `<input phx-hook="XlsToXlsxUpload"
-phx-update="ignore">`, NOT `live_file_input`.
+server read path to handle `.xls`**.
+
+The visible picker is a plain `<input phx-hook="XlsToXlsxUpload" phx-update="ignore" accept=".xls,.xlsx">`
+(NOT a `live_file_input`) — the hook reads/converts the picked file. **But `this.upload(name, files)`
+injects into a `live_file_input` for that upload; one MUST exist in the DOM** or it fails with
+`"no live file inputs found matching the name 'xlsx_file'"` and nothing uploads. So render a hidden
+`<.live_file_input upload={@uploads.xlsx_file} class="hidden" />` alongside the picker as the upload
+target. The hook wraps conversion in `try/catch` (errors `alert` + `console.error`) and reads bytes as
+`new Uint8Array(arrayBuffer)` for `XLSX.read(..., type: "array")`. Drag-drop onto a `phx-drop-target`
+feeds the **raw** `.xls` to the server (bypasses conversion) and fails gracefully — use the picker.
 
 ## `FullCircle.HR.FingerPrintImport` (pure, no IO/DB)
 
