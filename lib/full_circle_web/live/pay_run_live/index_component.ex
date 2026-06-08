@@ -25,7 +25,7 @@ defmodule FullCircleWeb.PayRunLive.IndexComponent do
   def render(assigns) do
     ~H"""
     <div id={@id} class={"#{@ex_class} flex bg-gray-200 hover:bg-gray-300 text-center"}>
-      <div class="w-[24%] border border-gray-300 py-1">
+      <div class="w-[16%] border border-gray-300 py-1">
         <.link
           class="hover:font-bold"
           navigate={~p"/companies/#{@company.id}/employees/#{@obj.id}/edit"}
@@ -40,14 +40,15 @@ defmodule FullCircleWeb.PayRunLive.IndexComponent do
         obj={@obj}
         company={@company}
         col_class={col_class(idx)}
-        current?={idx == 0}
+        current?={idx == 1}
       />
     </div>
     """
   end
 
-  # Current (newest) month is wide — it carries unprocessed notes/advances; older months are tight.
-  defp col_class(0), do: "w-[32%]"
+  # Current month is the middle column and is wide — it carries unprocessed notes/advances;
+  # the flanking prev/next months are tight. Widths match the header row in index.ex.
+  defp col_class(1), do: "w-[40%]"
   defp col_class(_), do: "w-[22%]"
 
   defp month_block(assigns) do
@@ -56,7 +57,8 @@ defmodule FullCircleWeb.PayRunLive.IndexComponent do
     ~H"""
     <div class={[
       @col_class,
-      "border border-gray-300 flex items-center justify-between px-3 py-1 gap-1 text-sm"
+      "border border-gray-300 flex items-center justify-between px-3 py-1 gap-1 text-sm",
+      @current? && "bg-sky-100"
     ]}>
       <%= case @state do %>
         <% :done -> %>

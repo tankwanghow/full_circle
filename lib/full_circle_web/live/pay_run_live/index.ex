@@ -94,20 +94,24 @@ defmodule FullCircleWeb.PayRunLive.Index do
     end
   end
 
-  # Three months, latest first — matches pay_run_index ordering (latest month leftmost).
+  # Three months oldest→newest (prev · current · next) — matches pay_run_index ordering, so the
+  # active/current month sits in the middle column.
   defp window_months(month, year) do
-    [0, -1, -2]
+    [-1, 0, 1]
     |> Enum.map(fn x -> Timex.end_of_month(year, month) |> Timex.shift(months: x) end)
     |> Enum.map(fn d -> {d.year, d.month} end)
   end
 
   defp month_label({yr, mth}), do: "#{Timex.month_shortname(mth)} #{yr}"
 
+  defp active?(ym, search), do: ym == {search.year, search.month}
+
   defp totals_for(totals, ym),
     do: Map.get(totals, ym, %{done: 0, pending: 0, payroll: Decimal.new(0)})
 
-  # Current (newest) month is wide — it carries unprocessed notes/advances; older months are tight.
-  defp col_class(0), do: "w-[40%]"
+  # Current month is the middle column and is wide — it carries unprocessed notes/advances;
+  # the flanking prev/next months are tight.
+  defp col_class(1), do: "w-[40%]"
   defp col_class(_), do: "w-[22%]"
 
   defp fmt(d), do: Number.Delimit.number_to_delimited(d)
@@ -126,7 +130,10 @@ defmodule FullCircleWeb.PayRunLive.Index do
           phx-value-year={elem(ym, 0)}
           class={
             "grow basis-0 h-auto py-1 text-sm leading-tight whitespace-normal" <>
-              if(ym == hd(@months), do: " ring-2 ring-blue-600", else: "")
+              if(active?(ym, @search),
+                do: " ring-2 ring-blue-600 !bg-sky-700 hover:!bg-sky-600",
+                else: ""
+              )
           }
         >
           <span class="font-bold">{month_label(ym)}</span>
@@ -162,7 +169,13 @@ defmodule FullCircleWeb.PayRunLive.Index do
       <div :if={Enum.count(@objects) > 0} class="flex bg-amber-200 text-center font-bold">
         <div class="w-[16%] border border-rose-400">{gettext("Name")}</div>
         <%= for {ym, idx} <- Enum.with_index(@months) do %>
-          <div class={[col_class(idx), "border border-rose-400"]}>{month_label(ym)}</div>
+          <div class={[
+            col_class(idx),
+            "border border-rose-400",
+            active?(ym, @search) && "bg-sky-300"
+          ]}>
+            {month_label(ym)}
+          </div>
         <% end %>
       </div>
 

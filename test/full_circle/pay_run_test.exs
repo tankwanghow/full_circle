@@ -173,16 +173,16 @@ defmodule FullCircle.PayRunTest do
   describe "pay_run_index" do
     setup :setup_payroll
 
-    test "returns a 3-month window, latest month first", ctx do
+    test "returns a 3-month window: prev, current, next (current centered)", ctx do
       base = ~D[2026-05-15]
       rows = PayRun.pay_run_index(base.month, base.year, ctx.com)
       row = find_row(rows, ctx.employee)
 
       assert length(row.pay_list) == 3
       [first, second, third] = row.pay_list
-      assert {first.year, first.month} == {2026, 5}
-      assert {second.year, second.month} == {2026, 4}
-      assert {third.year, third.month} == {2026, 3}
+      assert {first.year, first.month} == {2026, 4}
+      assert {second.year, second.month} == {2026, 5}
+      assert {third.year, third.month} == {2026, 6}
     end
 
     test "reports net pay for a processed pay slip", ctx do

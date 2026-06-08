@@ -63,7 +63,7 @@ defmodule FullCircle.PayRun do
 
   def pay_run_index(month, year, com) do
     months =
-      [0, -1, -2]
+      [-1, 0, 1]
       |> Enum.map(fn x -> Timex.end_of_month(year, month) |> Timex.shift(months: x) end)
       |> Enum.map(fn d -> {d.year, d.month} end)
 
@@ -148,7 +148,7 @@ defmodule FullCircle.PayRun do
              coalesce(un.amt, 0)::varchar || '|' ||
              coalesce(ua.cnt, 0)::varchar || '|' ||
              coalesce(ua.amt, 0)::varchar
-             order by em.pay_year desc, em.pay_month desc
+             order by em.pay_year asc, em.pay_month asc
            ) as pay_list
       from emp_month em
       left join pay_slips p
