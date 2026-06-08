@@ -2,7 +2,6 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
   use FullCircleWeb, :live_view
 
   alias FullCircle.HR
-  alias FullCircle.HR.FingerPrintImport
 
   @impl true
   def mount(_params, _session, socket) do
@@ -11,20 +10,22 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
       |> assign(page_title: gettext("Time Attendence Import"))
       |> allow_upload(:xlsx_file,
         accept: ~w(.xlsx),
-        max_file_size: 6_000_000,
+        max_entries: 4,
+        max_file_size: 12_000_000,
         auto_upload: true,
         progress: &handle_progress/3
       )
       |> assign(
-        employees: [],
-        attendences: [],
+        people: [],
+        all_employees: [],
+        attendances: [],
+        raw_attendances: [],
         total_employees: 0,
         total_attendence_entries: 0,
         from_date: "NA",
         to_date: "NA",
         filename: "NA",
-        imported: false,
-        raw_attendences: []
+        imported: false
       )
 
     {:ok, socket}
@@ -38,7 +39,7 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
   @impl true
   def handle_event("import", _params, socket) do
     insert_time_attendence_from_logs(
-      socket.assigns.attendences,
+      socket.assigns.attendances,
       socket.assigns.current_company,
       socket.assigns.current_user
     )
@@ -48,28 +49,122 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
 
   @impl true
   def handle_event("refresh", _params, socket) do
-    attendences =
-      fill_in_employee_info(
-        FingerPrintImport.parse_file_rows(socket.assigns.raw_attendences),
-        socket.assigns.current_company,
-        socket.assigns.current_user
-      )
+    case FullCircle.HR.FingerPrintImport.parse_files_rows(socket.assigns.raw_attendances) do
+      {:ok, raw_attendances} ->
+        {:noreply, build_attendances_assigns(socket, socket.assigns.raw_attendances, raw_attendances)}
 
-    employees = attendences |> Enum.uniq_by(fn x -> x.employee_name end)
-
-    {:noreply,
-     socket
-     |> assign(
-       employees: employees |> Enum.sort_by(fn x -> x.employee_name end),
-       total_attendence_entries: Enum.count(attendences),
-       total_employees: employees |> Enum.count(),
-       attendences: attendences
-     )}
+      _ ->
+        {:noreply, socket}
+    end
   end
 
   @impl true
   def handle_event("validate", _params, socket) do
     {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("confirm_match", %{"card-id" => card_id, "emp-id" => emp_id}, socket) do
+    {:noreply, do_match(socket, card_id, emp_id)}
+  end
+
+  @impl true
+  def handle_event("manual_match", %{"card_id" => card_id, "employee_id" => emp_id}, socket)
+      when emp_id != "" do
+    {:noreply, do_match(socket, card_id, emp_id)}
+  end
+
+  def handle_event("manual_match", _params, socket), do: {:noreply, socket}
+
+  def handle_progress(:xlsx_file, _entry, socket) do
+    {_done, still_uploading} = uploaded_entries(socket, :xlsx_file)
+
+    if still_uploading == [] do
+      raw_files =
+        consume_uploaded_entries(socket, :xlsx_file, fn %{path: path}, _entry ->
+          {:ok, read_excel_files(path)}
+        end)
+
+      case FullCircle.HR.FingerPrintImport.parse_files_rows(raw_files) do
+        {:ok, []} ->
+          {:noreply, socket |> put_flash(:error, gettext("No punches found in the file(s)."))}
+
+        {:ok, raw_attendances} ->
+          {:noreply, build_attendances_assigns(socket, raw_files, raw_attendances)}
+
+        {:error, {:date_range_mismatch, _ranges}} ->
+          {:noreply,
+           socket
+           |> put_flash(:error,
+             gettext("Uploaded files cover different months. Upload one month's machines together."))}
+      end
+    else
+      {:noreply, socket}
+    end
+  end
+
+  defp build_attendances_assigns(socket, raw_files, raw_attendances) do
+    com = socket.assigns.current_company
+    user = socket.assigns.current_user
+
+    attendances = fill_in_employee_info(raw_attendances, com, user)
+
+    people = build_people(attendances, com, user)
+    todate = attendances |> Enum.max_by(& &1.punch_time_local) |> Map.get(:punch_time_local)
+    fromdate = attendances |> Enum.min_by(& &1.punch_time_local) |> Map.get(:punch_time_local)
+
+    socket
+    |> assign(
+      raw_attendances: raw_files,
+      attendances: attendances,
+      people: people,
+      all_employees: HR.match_employee_candidates("", com, user, 10_000),
+      total_attendence_entries: Enum.count(attendances),
+      total_employees: Enum.count(people),
+      from_date: Timex.to_date(fromdate),
+      to_date: Timex.to_date(todate),
+      imported: false
+    )
+  end
+
+  # One row per distinct fingerprint person that has >= 1 punch.
+  defp build_people(attendances, com, user) do
+    attendances
+    |> Enum.group_by(& &1.punch_card_id)
+    |> Enum.map(fn {card_id, list} ->
+      first = hd(list)
+      matched? = first.employee_id != "!! Not Found !!"
+
+      %{
+        punch_card_id: card_id,
+        finger_name: first[:Name],
+        punch_count: Enum.count(list),
+        employee_id: if(matched?, do: first.employee_id, else: nil),
+        employee_name: if(matched?, do: first.employee_name, else: nil),
+        candidates:
+          if(matched?, do: [], else: HR.match_employee_candidates(first[:Name], com, user, 3))
+      }
+    end)
+    |> Enum.sort_by(& &1.finger_name)
+  end
+
+  defp do_match(socket, card_id, emp_id) do
+    com = socket.assigns.current_company
+    user = socket.assigns.current_user
+
+    case HR.set_employee_punch_card_id(emp_id, card_id, com, user) do
+      {:ok, _emp} ->
+        attendances = fill_in_employee_info(socket.assigns.attendances, com, user)
+
+        socket
+        |> assign(
+          attendances: attendances,
+          people: build_people(attendances, com, user)
+        )
+
+      _ ->
+        socket |> put_flash(:error, gettext("Could not match employee."))
+    end
   end
 
   defp insert_time_attendence_from_logs(entries, com, user) do
@@ -83,42 +178,6 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
 
       false ->
         :not_authorise
-    end
-  end
-
-  def handle_progress(:xlsx_file, entry, socket) do
-    if entry.done? do
-      raw_attendences =
-        consume_uploaded_entry(socket, entry, fn %{path: path} ->
-          {:ok, read_excel_files(path)}
-        end)
-
-      attendences =
-        fill_in_employee_info(
-          FingerPrintImport.parse_file_rows(raw_attendences),
-          socket.assigns.current_company,
-          socket.assigns.current_user
-        )
-
-      todate = attendences |> Enum.max_by(fn x -> x.punch_time_local end)
-      fromdate = attendences |> Enum.min_by(fn x -> x.punch_time_local end)
-      employees = attendences |> Enum.uniq_by(fn x -> x.employee_name end)
-
-      {:noreply,
-       socket
-       |> assign(
-         employees: employees |> Enum.sort_by(fn x -> x.employee_name end),
-         total_attendence_entries: Enum.count(attendences),
-         total_employees: employees |> Enum.count(),
-         from_date: fromdate.punch_time_local |> Timex.to_date(),
-         to_date: todate.punch_time_local |> Timex.to_date(),
-         attendences: attendences,
-         raw_attendences: raw_attendences,
-         filename: entry.client_name,
-         imported: false
-       )}
-    else
-      {:noreply, socket}
     end
   end
 
@@ -171,7 +230,15 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
       >
         {"Maximum file size is #{@uploads.xlsx_file.max_file_size / 1_000_000} MB"}
 
-        <.live_file_input upload={@uploads.xlsx_file} />
+        <input
+          type="file"
+          id="xls-picker"
+          name="xls-picker"
+          accept=".xls,.xlsx"
+          multiple
+          phx-hook="XlsToXlsxUpload"
+          phx-update="ignore"
+        />
         <div phx-drop-target={@uploads.xlsx_file.ref} class="p-2">
           <%= for entry <- @uploads.xlsx_file.entries do %>
             <div class="mt-2 gap-2 flex flex-row tracking-tighter border-2 border-green-600 place-items-center p-2 rounded-lg">
@@ -227,67 +294,51 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
     </div>
     <div class="w-10/12 mx-auto p-4 mb-1 border rounded-lg border-green-500 bg-green-200">
       <div class="my-2 text-center mx-auto font-bold text-2xl">
-        <.link phx-click="refresh" class="button blue">Refresh</.link>
+        <.link phx-click="refresh" class="button blue">{gettext("Refresh")}</.link>
       </div>
-      <%= for emps <- @employees |> Enum.chunk_every(5) do %>
-        <div class="flex">
-          <%= for emp <- emps do %>
-            <% qry = %{
-              "search[emp_name]" => emp.employee_name,
-              "search[sdate]" => @from_date,
-              "search[edate]" => @to_date
-            } %>
-            <%= if emp.employee_id == "!! Not Found !!" do %>
-              <div
-                :if={!@imported}
-                class="w-[20%] m-1 border rounded bg-rose-200 border-rose-400 p-2 text-center"
-              >
-                <div class="mb-1">
-                  {emp.employee_name}
-                </div>
-                <% clean_name =
-                  Regex.run(~r/^(.+)\.\d+\..+$/, emp.employee_name)
-                  |> Enum.at(1)
-                  |> String.replace(~r/[^a-zA-Z0-9]/, "")
-                  |> String.downcase() %>
 
-                <a
-                  id={emp.employee_name}
-                  href="#"
-                  phx-hook="copyAndOpen"
-                  copy-text={emp.employee_name}
-                  goto-url={
-                    ~p"/companies/#{@current_company.id}/employees?search%5Bterms%5D=#{clean_name}"
-                  }
-                  class="bg-red-300 border rounded-xl border-red-600 py-1 px-2 font-bold"
+      <%= for person <- @people do %>
+        <div class={"m-1 p-2 border rounded flex flex-wrap items-center gap-2 " <>
+              if(person.employee_id, do: "bg-green-100 border-green-500",
+                 else: "bg-rose-100 border-rose-400")}>
+          <div class="w-[28%] font-bold">
+            {person.finger_name}
+            <span class="font-normal text-sm">({person.punch_count} {gettext("punches")})</span>
+          </div>
+
+          <%= if person.employee_id do %>
+            <div class="text-green-800">✓ {person.employee_name}</div>
+          <% else %>
+            <div class="flex flex-wrap items-center gap-1">
+              <%= for cand <- person.candidates do %>
+                <button
+                  type="button"
+                  phx-click="confirm_match"
+                  phx-value-card-id={person.punch_card_id}
+                  phx-value-emp-id={cand.id}
+                  class="button orange"
                 >
-                  {gettext("Match Employee")}
-                </a>
-              </div>
-            <% else %>
-              <.link
-                :if={@imported}
-                navigate={"/companies/#{@current_company.id}/PunchIndex?#{URI.encode_query(qry)}"}
-                target="_blank"
-                class="w-[20%] m-1 button orange"
-              >
-                {emp.employee_name}
-              </.link>
-              <.live_component
-                :if={!@imported}
-                module={FullCircleWeb.PreviewAttendenceLive.Component}
-                id={"id_" <> (emp.punch_card_id |> Base.encode16)}
-                show_preview={false}
-                raw_attendences={@raw_attendences}
-                label={"Preview #{emp.employee_name}"}
-              />
-            <% end %>
+                  {cand.name}
+                  <span :if={cand.status != "Active"} class="text-xs">({cand.status})</span>
+                </button>
+              <% end %>
+
+              <form phx-change="manual_match" class="inline">
+                <input type="hidden" name="card_id" value={person.punch_card_id} />
+                <select name="employee_id" class="border rounded p-1">
+                  <option value="">{gettext("— pick manually —")}</option>
+                  <%= for e <- @all_employees do %>
+                    <option value={e.id}>{e.name}</option>
+                  <% end %>
+                </select>
+              </form>
+            </div>
           <% end %>
         </div>
       <% end %>
     </div>
     <div class="mt-3 text-center mx-auto font-bold text-2xl">
-      <.link :if={Enum.count(@employees) > 0} phx-click="import" class="button blue">Import</.link>
+      <.link :if={Enum.count(@people) > 0} phx-click="import" class="button blue">Import</.link>
     </div>
     """
   end
