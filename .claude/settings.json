@@ -18,7 +18,20 @@
       "Bash(echo \"exit: $?\")",
       "Bash(echo \"compile exit: $?\")",
       "Bash(echo \"format done exit: $?\")",
-      "Bash(echo \"compile: $?\")"
+      "Bash(echo \"compile: $?\")",
+      "Bash(git reset *)",
+      "Bash(./xlsenv/bin/pip install *)",
+      "Bash(./xlsenv/bin/python -c \"import xlrd; print\\('xlrd', xlrd.__version__\\)\")",
+      "Bash(./xlsenv/bin/python inspect.py \"/home/tankwanghow/Projects/elixir/full_circle/docs/JAN 2026.xls\")",
+      "Bash(./xlsenv/bin/python readxls.py \"/home/tankwanghow/Projects/elixir/full_circle/docs/JAN 2026.xls\")",
+      "Bash(cat)",
+      "Bash(./xlsenv/bin/python cmp.py \"/home/tankwanghow/Projects/elixir/full_circle/docs/JAN 2026.xls\" \"/home/tankwanghow/Projects/elixir/full_circle/docs/JAN 2026a.xls\")",
+      "Bash(./xlsenv/bin/python names.py \"/home/tankwanghow/Projects/elixir/full_circle/docs/JAN 2026.xls\" \"/home/tankwanghow/Projects/elixir/full_circle/docs/JAN 2026a.xls\")",
+      "Bash(sed -n '1,30p' assets/js/face_id.js)",
+      "Bash(sed -n '160,210p' assets/js/app.js)",
+      "Bash(sed -n '88,110p' lib/full_circle/helpers.ex)",
+      "Bash(sed -n '165,185p' lib/full_circle/hr.ex)",
+      "Bash(sed -n '29,66p' test/support/fixtures/hr_fixtures.ex)"
     ],
     "additionalDirectories": [
       "/tmp"

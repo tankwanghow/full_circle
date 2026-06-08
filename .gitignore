@@ -56,3 +56,5 @@ secret.txt
 
 deploy.conf
 /.elixir_ls
+# Fingerprint machine monthly exports (binary, employee PII) — kept local only
+docs/*.xls
