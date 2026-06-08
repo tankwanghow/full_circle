@@ -1095,6 +1095,38 @@ defmodule FullCircle.HR do
     |> Repo.all()
   end
 
+  @doc """
+  Up to `limit` employees ranked by name similarity to `name`, across ALL statuses
+  (Active ranked first). Used by the fingerprint import matcher so resigned employees
+  with real punches can still be matched.
+  """
+  def match_employee_candidates(name, company, user, limit \\ 3) do
+    from(e in subquery(employee_query(company, user)),
+      order_by: [asc: fragment("CASE WHEN ? = 'Active' THEN 0 ELSE 1 END", e.status)],
+      order_by: ^similarity_order([:name], name),
+      limit: ^limit,
+      select: %{id: e.id, name: e.name, status: e.status, punch_card_id: e.punch_card_id}
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  Persist a fingerprint `punch_card_id` onto an employee so future imports auto-match
+  it at the exact tier. Returns `{:ok, employee}`.
+  """
+  def set_employee_punch_card_id(employee_id, punch_card_id, company, user) do
+    emp = get_employee!(employee_id, company, user)
+
+    StdInterface.update(
+      Employee,
+      "employee",
+      emp,
+      %{"punch_card_id" => punch_card_id, "name" => emp.name},
+      company,
+      user
+    )
+  end
+
   def get_employee!(id, company, user) do
     from(emp in Employee,
       join: com in subquery(Sys.user_company(company, user)),

@@ -477,4 +477,52 @@ defmodule FullCircle.HRTest do
       assert HR.ot(5.0, 7.5) == 0.0
     end
   end
+
+  describe "fingerprint employee matching" do
+    setup do
+      admin = user_fixture()
+      com = company_fixture(admin, %{})
+      %{admin: admin, com: com}
+    end
+
+    test "match_employee_candidates/4 ranks by name similarity, Active first, max 3",
+         %{admin: admin, com: com} do
+      employee_fixture(%{name: "Gurung Bir Bahadur", status: "Active"}, com, admin)
+      employee_fixture(%{name: "Gurung Bijay", status: "Active"}, com, admin)
+      employee_fixture(%{name: "Gurung Bahadur Old", status: "Resigned"}, com, admin)
+      employee_fixture(%{name: "Totally Unrelated", status: "Active"}, com, admin)
+
+      names =
+        HR.match_employee_candidates("Gurung Bir Bahadur", com, admin, 3)
+        |> Enum.map(& &1.name)
+
+      assert length(names) <= 3
+      assert hd(names) == "Gurung Bir Bahadur"
+      # the closest Active match leads; the unrelated name is not the top suggestion
+      refute hd(names) == "Totally Unrelated"
+    end
+
+    test "match_employee_candidates/4 includes resigned employees", %{admin: admin, com: com} do
+      employee_fixture(%{name: "Zzz Resigned Person", status: "Resigned"}, com, admin)
+
+      names =
+        HR.match_employee_candidates("Zzz Resigned Person", com, admin, 3)
+        |> Enum.map(& &1.name)
+
+      assert "Zzz Resigned Person" in names
+    end
+
+    test "set_employee_punch_card_id/4 persists and is then exact-matchable",
+         %{admin: admin, com: com} do
+      emp = employee_fixture(%{name: "Mansur"}, com, admin)
+
+      {:ok, updated} =
+        HR.set_employee_punch_card_id(emp.id, "Mansur.6.Office", com, admin)
+
+      assert updated.punch_card_id == "Mansur.6.Office"
+
+      found = HR.get_employees_by_punch_card_ids(["Mansur.6.Office"], com, admin)
+      assert Enum.map(found, & &1.id) == [emp.id]
+    end
+  end
 end
