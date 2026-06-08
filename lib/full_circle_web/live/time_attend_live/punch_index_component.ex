@@ -12,7 +12,22 @@ defmodule FullCircleWeb.TimeAttendLive.PunchIndexComponent do
   def update(assigns, socket) do
     yw = FullCircleWeb.Helpers.work_week(assigns.obj.dd)
     tis = FullCircleWeb.Helpers.make_timeattend_list(assigns.obj.time_list, assigns.company)
-    {:ok, socket |> assign(assigns) |> assign(yw: yw) |> assign(tis: tis)}
+
+    # Per row: lock editing if a payslip exists for this row's employee + month
+    # (rows span employees/dates, so this is computed per row, not once).
+    locked? =
+      FullCircle.HR.pay_slip_exists_for_period?(
+        assigns.obj.employee_id,
+        Timex.to_date(assigns.obj.dd),
+        assigns.company
+      )
+
+    {:ok,
+     socket
+     |> assign(assigns)
+     |> assign(yw: yw)
+     |> assign(tis: tis)
+     |> assign(payslip_locked?: locked?)}
   end
 
   @impl true
@@ -43,6 +58,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchIndexComponent do
           tis={@tis}
           company={@company}
           user={@user}
+          payslip_locked?={@payslip_locked?}
         />
       </div>
     </div>
