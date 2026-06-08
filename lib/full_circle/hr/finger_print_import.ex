@@ -23,6 +23,19 @@ defmodule FullCircle.HR.FingerPrintImport do
   end
 
   @doc """
+  Parse multiple files' rows. Returns `{:ok, attrs}` (concatenated punch maps) when
+  every file covers the same date range, or `{:error, {:date_range_mismatch, ranges}}`.
+  """
+  def parse_files_rows(files) when is_list(files) do
+    ranges = files |> Enum.map(&file_date_range/1) |> Enum.uniq()
+
+    case ranges do
+      [_single] -> {:ok, Enum.flat_map(files, &parse_file_rows/1)}
+      many -> {:error, {:date_range_mismatch, many}}
+    end
+  end
+
+  @doc """
   Extract the `2026-01-01 ~ 2026-01-31` date span from a file's row-2 cell as
   `{from_date, to_date}`.
   """
@@ -81,7 +94,7 @@ defmodule FullCircle.HR.FingerPrintImport do
     end)
   end
 
-  def fill_flags_to_map(tl) do
+  defp fill_flags_to_map(tl) do
     Enum.map(Enum.with_index(tl, 1), fn {t, index} ->
       cond do
         index == 1 -> %{stamp: t, flag: "1_IN_1"}

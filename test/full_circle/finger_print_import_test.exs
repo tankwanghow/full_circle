@@ -1,4 +1,4 @@
-defmodule FullCircle.FingerPrintImportTest do
+defmodule FullCircle.HR.FingerPrintImportTest do
   use ExUnit.Case, async: true
 
   alias FullCircle.HR.FingerPrintImport
@@ -40,5 +40,42 @@ defmodule FullCircle.FingerPrintImportTest do
     # punch_card_id is "Name.ID.Dept" with spaces removed
     assert hd(d1).punch_card_id == "GurungBirBahadur.7.ChickenFarm"
     assert hd(d1)[:Name] == "Gurung Bir Bahadur"
+  end
+
+  defp file_rows(name_id_dept, day_cells, range) do
+    [name, id, dept] = name_id_dept
+    info = ["ID:", "", id, "", "", "", "", "", "Name:", "", name,
+            "", "", "", "", "", "", "Dept:", dept]
+    [
+      ["Attendance Record Report"],
+      [],
+      ["Att. Time", "", range],
+      Enum.map(1..length(day_cells), &(&1 / 1)),
+      info,
+      day_cells
+    ]
+  end
+
+  test "parse_files_rows/1 concatenates punches from both machine files" do
+    f1 = file_rows(["Gurung Bir Bahadur", "7", "Chicken Farm"],
+                   ["07:5512:01"], "2026-01-01 ~ 2026-01-01")
+    f2 = file_rows(["Linda Santika", "4", "Office"],
+                   ["08:0017:00"], "2026-01-01 ~ 2026-01-01")
+
+    {:ok, attrs} = FingerPrintImport.parse_files_rows([f1, f2])
+
+    cards = attrs |> Enum.map(& &1.punch_card_id) |> Enum.uniq() |> Enum.sort()
+    assert cards == ["GurungBirBahadur.7.ChickenFarm", "LindaSantika.4.Office"]
+  end
+
+  test "parse_files_rows/1 rejects files covering different months" do
+    f1 = file_rows(["A", "1", "X"], ["07:5512:01"], "2026-01-01 ~ 2026-01-31")
+    f2 = file_rows(["B", "2", "Y"], ["07:5512:01"], "2026-02-01 ~ 2026-02-28")
+
+    assert {:error, {:date_range_mismatch, ranges}} =
+             FingerPrintImport.parse_files_rows([f1, f2])
+
+    assert {~D[2026-01-01], ~D[2026-01-31]} in ranges
+    assert {~D[2026-02-01], ~D[2026-02-28]} in ranges
   end
 end
