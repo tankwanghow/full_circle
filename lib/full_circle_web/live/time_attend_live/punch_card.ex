@@ -86,7 +86,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
       </div>
 
       <div :if={@employee} class="flex flex-row gap-2 items-end justify-center my-2">
-        <.form for={%{}} phx-change="validate" id="payprep-form" class="w-[26%]">
+        <.form for={%{}} phx-change="validate" id="payprep-form" class="w-[26%]" autocomplete="off">
           <.input
             id="payprep_funds_account_name"
             name="pay_prep[funds_account_name]"

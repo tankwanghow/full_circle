@@ -398,7 +398,7 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
         </div>
       <% end %>
     </div>
-    <div :if={!@imported} class="mt-3 text-center mx-auto font-bold text-2xl">
+    <div :if={!@imported} class="mt-3 text-center mx-auto font-bold text-2xl mb-10">
       <.link :if={Enum.count(@people) > 0} phx-click="import" class="button blue">Import</.link>
     </div>
 
