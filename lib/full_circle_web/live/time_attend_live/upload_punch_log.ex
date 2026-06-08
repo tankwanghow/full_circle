@@ -300,7 +300,7 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
       <%= for person <- @people do %>
         <div class={"m-1 p-2 border rounded flex flex-wrap items-center gap-2 " <>
               if(person.employee_id, do: "bg-green-100 border-green-500",
-                 else: "bg-rose-100 border-rose-400")}>
+                 else: "bg-rose-200 border-rose-400")}>
           <div class="w-[28%] font-bold">
             {person.finger_name}
             <span class="font-normal text-sm">({person.punch_count} {gettext("punches")})</span>
