@@ -58,6 +58,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCardComponent do
           tis={@tis}
           company={@company}
           user={@user}
+          payslip_locked?={@payslip_locked?}
         />
       </div>
     </div>

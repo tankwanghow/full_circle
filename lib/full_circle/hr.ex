@@ -254,10 +254,35 @@ defmodule FullCircle.HR do
     end
   end
 
+  @doc """
+  True when a PaySlip already exists for `employee_id` in the month/year of `date`
+  (company-scoped). Used to freeze attendance editing once payroll is finalized.
+  """
+  def pay_slip_exists_for_period?(employee_id, %Date{} = date, com) do
+    from(ps in PaySlip,
+      where: ps.employee_id == ^employee_id,
+      where: ps.company_id == ^com.id,
+      where: ps.pay_month == ^date.month,
+      where: ps.pay_year == ^date.year
+    )
+    |> Repo.exists?()
+  end
+
+  defp punch_locked_by_payslip?(emp_id, %NaiveDateTime{} = ptl, com),
+    do: pay_slip_exists_for_period?(emp_id, NaiveDateTime.to_date(ptl), com)
+
+  defp punch_locked_by_payslip?(_emp_id, _ptl, _com), do: false
+
   def create_time_attendence_by_entry(attrs, com, user) do
     case can?(user, :create_time_attendence, com) do
       true ->
-        Repo.insert(TimeAttend.data_entry_changeset(%TimeAttend{}, attrs))
+        cs = TimeAttend.data_entry_changeset(%TimeAttend{}, attrs)
+        emp_id = Ecto.Changeset.get_field(cs, :employee_id)
+        ptl = Ecto.Changeset.get_field(cs, :punch_time_local)
+
+        if punch_locked_by_payslip?(emp_id, ptl, com),
+          do: {:error, :on_payslip},
+          else: Repo.insert(cs)
 
       false ->
         :not_authorise
@@ -267,7 +292,13 @@ defmodule FullCircle.HR do
   def update_time_attendence(ta, attrs, com, user) do
     case can?(user, :update_time_attendence, com) do
       true ->
-        Repo.update(TimeAttend.data_entry_changeset(ta, attrs))
+        cs = TimeAttend.data_entry_changeset(ta, attrs)
+        emp_id = Ecto.Changeset.get_field(cs, :employee_id)
+        ptl = Ecto.Changeset.get_field(cs, :punch_time_local)
+
+        if punch_locked_by_payslip?(emp_id, ptl, com),
+          do: {:error, :on_payslip},
+          else: Repo.update(cs)
 
       false ->
         :not_authorise
@@ -287,8 +318,22 @@ defmodule FullCircle.HR do
   def delete_time_attendence_by_id(id, com, user) do
     case can?(user, :delete_time_attendence, com) do
       true ->
-        from(ta in TimeAttend, where: ta.id == ^id, where: ta.company_id == ^com.id)
-        |> Repo.delete_all()
+        ta = Repo.get_by(TimeAttend, id: id, company_id: com.id)
+
+        cond do
+          is_nil(ta) ->
+            {:ok, :not_found}
+
+          pay_slip_exists_for_period?(
+            ta.employee_id,
+            ta.punch_time |> Timex.to_datetime(com.timezone) |> Timex.to_date(),
+            com
+          ) ->
+            {:error, :on_payslip}
+
+          true ->
+            Repo.delete(ta)
+        end
 
       false ->
         :not_authorise

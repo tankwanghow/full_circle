@@ -318,6 +318,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
             obj={obj}
             user={@current_user}
             company={@current_company}
+            payslip_locked?={@payslip_locked?}
           />
         <% end %>
       </div>
@@ -683,6 +684,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
       |> assign(salary_notes: [])
       |> assign(advances: [])
       |> assign(employee: nil)
+      |> assign(payslip_locked?: false)
       |> assign(days_in_month: 0)
       |> assign(sunday_count: 0)
       |> assign(total_day_worked: 0)
@@ -735,6 +737,17 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
         |> assign(salary_notes: salary_notes)
         |> assign(advances: advances)
         |> assign(leaves: leaves)
+        |> assign(
+          payslip_locked?:
+            !is_nil(
+              PaySlipOp.get_pay_slip_by_period(
+                emp,
+                String.to_integer(month),
+                String.to_integer(year),
+                socket.assigns.current_company
+              )
+            )
+        )
         |> assign(
           pay_prep:
             FullCircle.HR.get_or_init_pay_prep(

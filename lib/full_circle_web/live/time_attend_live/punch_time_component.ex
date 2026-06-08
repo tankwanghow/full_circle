@@ -8,6 +8,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchTimeComponent do
     {:ok,
      socket
      |> assign(bg_color: "bg-transparent")
+     |> assign(payslip_locked?: false)
      |> assign(wh: 0)
      |> assign(nh: 0)
      |> assign(ot: 0)}
@@ -280,7 +281,12 @@ defmodule FullCircleWeb.TimeAttendLive.PunchTimeComponent do
               name="punch_time"
               type="time"
               value={time}
-              class={"rounded h-6 #{@bg_color} w-full text-center text-black"}
+              readonly={@payslip_locked?}
+              title={@payslip_locked? && gettext("Locked: a pay slip exists for this month")}
+              class={[
+                "rounded h-6 w-full text-center text-black",
+                (@payslip_locked? && "bg-gray-300 cursor-not-allowed") || @bg_color
+              ]}
               phx-debounce="blur"
               id={id}
             />
