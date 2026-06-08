@@ -165,6 +165,30 @@ Hooks.copyAndOpen = {
   }
 };
 
+// Converts machine .xls (and passes through .xlsx) to .xlsx in-browser, then
+// hands the result to the LiveView uploader. Keeps the server on xlsx_reader.
+// SheetJS is dynamically imported so it only loads on the import page.
+Hooks.XlsToXlsxUpload = {
+  mounted() {
+    this.el.addEventListener("change", async (e) => {
+      const files = Array.from(e.target.files || [])
+      if (files.length === 0) return
+      const XLSX = await import("../vendor/sheetjs/xlsx.mjs")
+      const converted = []
+      for (const f of files) {
+        const buf = await f.arrayBuffer()
+        const wb = XLSX.read(buf, { type: "array" })
+        const out = XLSX.write(wb, { bookType: "xlsx", type: "array" })
+        const base = f.name.replace(/\.(xls|xlsx)$/i, "")
+        converted.push(new File([out], `${base}.xlsx`,
+          { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }))
+      }
+      this.upload("xlsx_file", converted)
+      e.target.value = "" // allow re-selecting the same file
+    })
+  }
+}
+
 let liveSocket = new LiveSocket("/live", Socket, {
   hooks: Hooks,
   params: { _csrf_token: csrfToken }
