@@ -85,9 +85,12 @@ The per-day time inputs (`PunchTimeComponent`, rendered via `PunchCardComponent`
 - **Frozen by payslip, not by age.** `HR.create_time_attendence_by_entry` / `update_time_attendence` /
   `delete_time_attendence_by_id` return `{:error, :on_payslip}` when `HR.pay_slip_exists_for_period?(emp_id, date, com)`
   is true (a PaySlip exists for that punch's employee + month/year). **Void the payslip to re-open editing.**
-- The Punch Card computes `@payslip_locked?` (via `PaySlipOp.get_pay_slip_by_period/4`) in `filter_punches`
-  and passes it down so the inputs render **read-only + greyed with a tooltip** when locked — belt to the
-  backend guard's braces.
+- Both editing surfaces pass `payslip_locked?` to `PunchTimeComponent` so the inputs render **read-only +
+  greyed with a tooltip** when locked (belt to the backend guard's braces): the **Punch Card** computes one
+  flag per card in `filter_punches` (via `PaySlipOp.get_pay_slip_by_period/4`, since it's one employee/month);
+  **PunchIndex** computes it **per row** in `PunchIndexComponent.update/2` (rows span employees/dates) via
+  `HR.pay_slip_exists_for_period?/3`. A surface that forgets to pass the flag still can't write (backend
+  guard) but degrades to a silent red field.
 - The kiosk path (`create_time_attendence_by_punch`) is NOT guarded — live punches are for the current
   month, which has no payslip yet.
 
