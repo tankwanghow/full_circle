@@ -14,7 +14,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchIndex do
       <div class="flex justify-center mb-2">
         <.form for={%{}} id="search-form" phx-submit="search" autocomplete="off" class="w-full">
           <div class=" flex flex-row flex-wrap tracking-tighter text-sm">
-            <div class="w-[50%]">
+            <div class="w-[40%]">
               <.input
                 id="search_emp_name"
                 name="search[emp_name]"
@@ -39,6 +39,15 @@ defmodule FullCircleWeb.TimeAttendLive.PunchIndex do
                 value={@search.edate}
                 id="search_edate"
                 label={gettext("End Date")}
+              />
+            </div>
+            <div class="w-[10%] flex items-center justify-center mt-5">
+              <.input
+                id="search_active_only"
+                name="search[active_only]"
+                type="checkbox"
+                value={@search.active_only}
+                label={gettext("Active only")}
               />
             </div>
             <.button class="mt-5 h-10 w-10 grow-0 shrink-0">🔍</.button>
@@ -98,6 +107,8 @@ defmodule FullCircleWeb.TimeAttendLive.PunchIndex do
     emp_name = params["search"]["emp_name"] || ""
     sdate = params["search"]["sdate"] || Timex.today()
     edate = params["search"]["edate"] || Timex.today() |> Timex.shift(days: 1)
+    # default to active-only; a present param of "false" turns it off
+    active_only = (params["search"]["active_only"] || "true") == "true"
 
     socket =
       socket
@@ -106,7 +117,8 @@ defmodule FullCircleWeb.TimeAttendLive.PunchIndex do
         search: %{
           emp_name: emp_name,
           sdate: sdate,
-          edate: edate
+          edate: edate,
+          active_only: active_only
         }
       )
       |> filter_objects(emp_name, true, sdate, edate, 1)
@@ -156,24 +168,21 @@ defmodule FullCircleWeb.TimeAttendLive.PunchIndex do
   @impl true
   def handle_event(
         "search",
-        %{
-          "search" => %{
-            "emp_name" => emp_name,
-            "sdate" => sd,
-            "edate" => ed
-          }
-        },
+        %{"search" => %{"emp_name" => emp_name, "sdate" => sd, "edate" => ed} = search},
         socket
       ) do
+    active_only = (search["active_only"] || "false") == "true"
+
     qry = %{
       "search[emp_name]" => emp_name,
       "search[sdate]" => sd,
-      "search[edate]" => ed
+      "search[edate]" => ed,
+      "search[active_only]" => to_string(active_only)
     }
 
     {:noreply,
      socket
-     |> assign(search: %{emp_name: emp_name, sdate: sd, edate: ed})
+     |> assign(search: %{emp_name: emp_name, sdate: sd, edate: ed, active_only: active_only})
      |> push_navigate(
        to: "/companies/#{socket.assigns.current_company.id}/PunchIndex?#{URI.encode_query(qry)}"
      )}
@@ -198,7 +207,8 @@ defmodule FullCircleWeb.TimeAttendLive.PunchIndex do
           emp_name,
           socket.assigns.current_company,
           page: page,
-          per_page: @per_page
+          per_page: @per_page,
+          active_only: socket.assigns.search.active_only
         )
       end
 

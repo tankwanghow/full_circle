@@ -1289,15 +1289,17 @@ defmodule FullCircle.HR do
     |> Enum.at(0)
   end
 
-  def punch_query(sdate, edate, terms, com,
-        page: page,
-        per_page: per_page
-      ) do
+  def punch_query(sdate, edate, terms, com, opts) do
+    page = Keyword.get(opts, :page, 1)
+    per_page = Keyword.get(opts, :per_page, 100)
+    active_only = Keyword.get(opts, :active_only, false)
+
     (punch_query_by_company_id(sdate, edate, com) <>
        if(terms != "",
          do: " and (eidsh.name ilike '%#{terms}%' or eidsh.id_no ilike '%#{terms}%')",
          else: ""
        ) <>
+       if(active_only, do: " and eidsh.status = 'Active'", else: "") <>
        " order by eidsh.name, eidsh.dd" <>
        " limit #{per_page} offset (#{page} - 1) * #{per_page} ")
     |> exec_query_map()
