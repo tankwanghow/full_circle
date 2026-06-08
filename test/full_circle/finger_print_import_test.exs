@@ -37,8 +37,8 @@ defmodule FullCircle.HR.FingerPrintImportTest do
     assert Enum.map(d2, & &1.stamp) == [~T[07:51:00], ~T[12:01:00]]
     assert Enum.map(d2, & &1.flag) == ["1_IN_1", "1_OUT_1"]
 
-    # punch_card_id is "Name.ID.Dept" with spaces removed
-    assert hd(d1).punch_card_id == "GurungBirBahadur.7.ChickenFarm"
+    # punch_card_id is the canonical "<id>.<name>" key (department excluded)
+    assert hd(d1).punch_card_id == "7.Gurung Bir Bahadur"
     assert hd(d1)[:Name] == "Gurung Bir Bahadur"
   end
 
@@ -65,7 +65,7 @@ defmodule FullCircle.HR.FingerPrintImportTest do
     {:ok, attrs} = FingerPrintImport.parse_files_rows([f1, f2])
 
     cards = attrs |> Enum.map(& &1.punch_card_id) |> Enum.uniq() |> Enum.sort()
-    assert cards == ["GurungBirBahadur.7.ChickenFarm", "LindaSantika.4.Office"]
+    assert cards == ["4.Linda Santika", "7.Gurung Bir Bahadur"]
   end
 
   test "parse_files_rows/1 rejects files covering different months" do

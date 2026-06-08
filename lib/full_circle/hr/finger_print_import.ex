@@ -8,6 +8,7 @@ defmodule FullCircle.HR.FingerPrintImport do
   @doc """
   Parse one file's sheet `rows` (list of row-lists) into a flat list of punch maps:
   `%{stamp: Time, flag: String|nil, ID:, Name:, Department:, punch_card_id:, punch_time_local:}`.
+  `punch_card_id` is the canonical `"<id>.<name>"` key (e.g. `"4.Linda Santika"`).
   """
   def parse_file_rows(rows) do
     date_range = Enum.at(rows, 2) |> Enum.at(2) |> extract_date_range()
@@ -86,9 +87,11 @@ defmodule FullCircle.HR.FingerPrintImport do
         ID: Enum.at(info, 1),
         Name: Enum.at(info, 3),
         Department: Enum.at(info, 5),
-        punch_card_id:
-          "#{Enum.at(info, 3)}.#{Enum.at(info, 1)}.#{Enum.at(info, 5)}"
-          |> String.replace(" ", ""),
+        # Canonical key is "<id>.<name>" (department deliberately excluded): the
+        # fingerprint ID alone collides across the two machines (the same number is a
+        # different person on each), while a person's department can differ between
+        # machines, so id+name is the stable, cross-machine-unique identity.
+        punch_card_id: "#{Enum.at(info, 1)}.#{Enum.at(info, 3)}",
         punch_time_local: NaiveDateTime.new!(dt, x.stamp)
       })
     end)
