@@ -1213,8 +1213,10 @@ defmodule FullCircle.HR do
   end
 
   def punch_by_date(emp_id, pdate, com) do
+    pdate = Timex.to_date(pdate)
+
     (punch_query_by_company_id(pdate, pdate, com) <>
-       " and eidsh.employee_id = '#{emp_id}'" <>
+       " and eidsh.id = '#{emp_id}'" <>
        " order by eidsh.dd")
     |> exec_query_map()
     |> unzip_all_time_list()
