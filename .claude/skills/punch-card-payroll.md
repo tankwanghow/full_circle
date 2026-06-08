@@ -9,6 +9,24 @@ The Punch Card screen is the single per-employee/month payroll workspace: add sa
 advances → the statutory preview updates live → **Save PaySlip**. Below are the non-obvious rules
 behind it (most caused real bugs).
 
+## Where create / edit / void live (Punch Card vs PaySlip Form)
+
+The Punch Card is the **only** create/edit path; the PaySlip Form (`pay_slip_live/form.ex`) is a
+**view/print-only document** screen. There are no `:new`/`:recal` form routes — only
+`/PaySlip/:id/view`. Don't re-add form-based create/edit (it would be a second editing path → the
+`cal_func`/duplicate-statutory bugs below).
+
+- **Save PaySlip** (Punch Card `pay` event) `push_navigate`s to the saved slip's `/PaySlip/:id/view`
+  (extracts the slip from the multi result's `:create_pay_slip`/`:update_pay_slip` key).
+- **Void** lives on the PaySlip Form, not the Punch Card (the Punch Card has no void button/handler).
+  It calls `PaySlipOp.void_pay_slip/3`, then returns to wherever the user came from via
+  `push_event(socket, "history_back", %{})` → `window.history.back()` (listener in `app.js`).
+- The Form's `mount` rescues `Ecto.NoResultsError` and redirects to Pay Run — so Back/refresh into a
+  just-voided slip URL never 500s.
+- Pay Run's "New Pay"/"Card" links and the Form's "Edit in Punch Card" button all route to the Punch
+  Card for that employee/month/year (note: if a slip already exists, its notes are linked & locked —
+  void to unlock for re-edit).
+
 ## Auto-derived statutory preview (no manual "Calculate")
 
 - `filter_punches/4` computes `@statutory_preview = PaySlipOp.preview(emp, m, y, com, user) |> Ecto.Changeset.apply_changes()` on **every load and after every note/advance change**, so it's never stale.
