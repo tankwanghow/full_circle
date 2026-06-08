@@ -778,7 +778,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
     |> assign(ot_day_worked: ot_day_worked)
     |> assign(days_in_month: days_in_month)
     |> assign(sunday_count: sunday_count)
-    |> assign(holiday_pay_days: holiday_pay_days(punches, socket.assigns.current_company.id))
+    |> assign(holiday_pay_days: holiday_pay_days(punches, socket.assigns.current_company))
     |> assign(normal_pay_days: normal_pay_days)
     |> assign(
       sunday_pay_days:
