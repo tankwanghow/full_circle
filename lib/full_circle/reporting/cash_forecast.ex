@@ -6,12 +6,51 @@ defmodule FullCircle.Reporting.CashForecast do
 
   # added in later tasks
   alias FullCircle.{QueryRepo, Accounting}
+  alias FullCircle.Repo
   alias FullCircle.Accounting.{Account, Transaction}
   import Ecto.Query, warn: false
   import FullCircle.Helpers, only: [exec_query_map: 3]
   # dump_uuid!/1 is not exported from FullCircle.Helpers; added in later tasks
 
   @zero Decimal.new(0)
+
+  @liquid_types ["Cash or Equivalent", "Bank"]
+
+  def liquid_account_types, do: @liquid_types
+
+  @doc "Account ids of liquid type for the company. `:all` or a list of ids to restrict."
+  def liquid_account_ids(com, :all) do
+    from(a in Account,
+      where: a.company_id == ^com.id and a.account_type in ^@liquid_types,
+      select: a.id
+    )
+    |> Repo.all()
+  end
+
+  def liquid_account_ids(com, ids) when is_list(ids) do
+    from(a in Account,
+      where:
+        a.company_id == ^com.id and a.account_type in ^@liquid_types and a.id in ^ids,
+      select: a.id
+    )
+    |> Repo.all()
+  end
+
+  @doc "Balance of liquid accounts strictly before `start_date`."
+  def opening_liquid_balance(account_ids, start_date, com) do
+    from(t in Transaction,
+      where:
+        t.company_id == ^com.id and t.account_id in ^account_ids and
+          t.doc_date < ^start_date,
+      select: coalesce(sum(t.amount), 0)
+    )
+    |> Repo.one()
+    |> to_decimal()
+  end
+
+  defp to_decimal(nil), do: @zero
+  defp to_decimal(%Decimal{} = d), do: d
+  defp to_decimal(n), do: Decimal.new("#{n}")
 
   @doc """
   Build the forecast from already-fetched raw inputs.

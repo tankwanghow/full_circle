@@ -64,3 +64,57 @@ defmodule FullCircle.Reporting.CashForecastTest do
     end
   end
 end
+
+defmodule FullCircle.Reporting.CashForecastDBTest do
+  use FullCircle.DataCase, async: true
+
+  import FullCircle.SysFixtures
+  import FullCircle.UserAccountsFixtures
+  import FullCircle.AccountingFixtures
+
+  alias FullCircle.Reporting.CashForecast
+  alias FullCircle.Accounting.Transaction
+  alias FullCircle.Repo
+  import Ecto.Query
+
+  defp d(n), do: Decimal.new("#{n}")
+
+  defp txn!(com, account_id, date, amount, attrs \\ %{}) do
+    %Transaction{}
+    |> Transaction.changeset(
+      Map.merge(
+        %{
+          doc_type: "Journal", doc_no: "J#{System.unique_integer([:positive])}",
+          doc_date: date, particulars: "t", amount: amount,
+          company_id: com.id, account_id: account_id
+        },
+        attrs
+      )
+    )
+    |> Repo.insert!()
+  end
+
+  setup do
+    admin = user_fixture()
+    com = company_fixture(admin, %{})
+
+    # company_fixture does NOT seed Bank/Cash accounts; create one explicitly
+    bank = account_fixture(%{account_type: "Bank", name: "Test Bank"}, com, admin)
+
+    %{admin: admin, com: com, bank: bank}
+  end
+
+  describe "opening_liquid_balance/3" do
+    test "sums liquid txns strictly before start_date", %{com: com, bank: bank} do
+      txn!(com, bank.id, ~D[2026-06-01], d(1000))
+      txn!(com, bank.id, ~D[2026-06-07], d(-300))
+      txn!(com, bank.id, ~D[2026-06-08], d(999))  # on start date -> excluded from opening
+
+      ids = CashForecast.liquid_account_ids(com, :all)
+      assert bank.id in ids
+
+      bal = CashForecast.opening_liquid_balance(ids, ~D[2026-06-08], com)
+      assert bal == d(700)
+    end
+  end
+end
