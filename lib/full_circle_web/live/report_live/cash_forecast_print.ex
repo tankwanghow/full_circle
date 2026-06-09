@@ -104,6 +104,28 @@ defmodule FullCircleWeb.ReportLive.CashForecastPrint do
           </tbody>
         </table>
 
+        <p class="bold" style="margin-top:4mm;">{gettext("Recent actual cash flow")} ({gettext("real data")})</p>
+        <table class="forecast">
+          <thead>
+            <tr>
+              <th>{gettext("From")}</th>
+              <th>{gettext("To")}</th>
+              <th>{gettext("Actual In")}</th>
+              <th>{gettext("Actual Out")}</th>
+              <th>{gettext("Net")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr :for={h <- @forecast.history}>
+              <td class="ctr">{Date.to_iso8601(h.period_start)}</td>
+              <td class="ctr">{Date.to_iso8601(h.period_end)}</td>
+              <td>{fmt(h.in)}</td>
+              <td>{fmt(h.out)}</td>
+              <td class="bold">{fmt(h.net)}</td>
+            </tr>
+          </tbody>
+        </table>
+
         <div class="legend">
           <p class="bold">{gettext("How to read this report")}</p>
           <p>

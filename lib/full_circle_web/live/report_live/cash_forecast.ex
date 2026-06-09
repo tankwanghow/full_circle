@@ -157,6 +157,7 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
           <div :if={is_map(f)}>
             <.ladder_box ladder={f.ladder} />
             <.period_table periods={f.periods} />
+            <.history_panel history={f.history} />
             <.legend
               period_days={f.period_days}
               buffer_periods={f.buffer_periods}
@@ -233,6 +234,46 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
           </tr>
         </tbody>
       </table>
+    </div>
+    """
+  end
+
+  attr :history, :list, required: true
+
+  defp history_panel(assigns) do
+    ~H"""
+    <div class="my-4">
+      <p class="font-medium text-center">
+        {gettext("Recent actual cash flow")}
+        <span class="text-gray-500 dark:text-gray-400 text-sm">
+          ({gettext("real data — same operating basis as the run-rate")})
+        </span>
+      </p>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm text-right border dark:border-gray-700">
+          <thead class="bg-gray-200 dark:bg-gray-700 dark:text-gray-100">
+            <tr>
+              <th class="text-center px-1">{gettext("From")}</th>
+              <th class="text-center px-1">{gettext("To")}</th>
+              <th class="px-1">{gettext("Actual In")}</th>
+              <th class="px-1">{gettext("Actual Out")}</th>
+              <th class="px-1">{gettext("Net")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              :for={h <- @history}
+              class="border-b dark:border-gray-700 odd:bg-white even:bg-gray-50 dark:odd:bg-gray-800 dark:even:bg-gray-900 dark:text-gray-200"
+            >
+              <td class="text-center px-1">{Date.to_iso8601(h.period_start)}</td>
+              <td class="text-center px-1">{Date.to_iso8601(h.period_end)}</td>
+              <td class="font-mono px-1">{fmt(h.in)}</td>
+              <td class="font-mono px-1">{fmt(h.out)}</td>
+              <td class="font-mono px-1 font-bold">{fmt(h.net)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
     """
   end
