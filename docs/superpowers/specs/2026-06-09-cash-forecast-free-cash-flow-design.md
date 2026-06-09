@@ -58,14 +58,17 @@ are placed in **week 1** (assumed collectible/payable immediately).
 ### Stream B — Run-rate baseline (ESTIMATED)
 
 From the trailing **52 weeks** of liquid-account transactions (trailing window
-configurable), compute average weekly inflow and outflow — **excluding** the
-doc_types Stream A already represents (sales-invoice receipts, purchase-invoice
-payments, cheque clearings). This leaves recurring operational flows (cash sales,
-payroll, utilities, sundries) and avoids double-counting. Apply
+configurable), compute average weekly inflow and outflow — restricted to
+transactions with **`contact_id IS NULL`**. Rationale: every customer/supplier
+(contact-bearing) cash movement is already modeled by Stream A's AR/AP and cheque
+streams, so excluding them avoids double-counting; what remains is recurring
+operational flow (payroll, utilities, bank charges, owner draws). Apply
 `baseline_in` / `baseline_out` evenly to each of the 13 weeks.
 
-The exact excluded doc_type list is finalized during implementation by
-inspecting distinct `doc_type` values posted to liquid accounts.
+**Known limitation:** if cash sales are recorded against a contact, they are
+treated as immediately-settled AR (net ~0 outstanding) and thus appear in neither
+stream — understating future inflow. This is conservative (won't over-lock FDs)
+and acceptable for v1.
 
 ## Weekly roll-forward
 
