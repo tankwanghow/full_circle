@@ -4,12 +4,8 @@ defmodule FullCircle.Reporting.CashForecastTest do
 
   defp d(n), do: Decimal.new("#{n}")
 
-  defp periods_from(start, n, period_days),
-    do: for(i <- 0..(n - 1), do: Date.add(start, i * period_days))
-
   describe "fd_ladder/2" do
     test "rolling minimums and non-negative tenure increments (30-day periods)" do
-      # free_cash by period 1..12, first period the lowest
       frees = [55, 60, 58, 70, 72, 80, 65, 90, 100, 100, 110, 120]
       periods = for {f, i} <- Enum.with_index(frees, 1), do: %{n: i, free_cash: d(f)}
 
@@ -42,11 +38,10 @@ defmodule FullCircle.Reporting.CashForecastTest do
     end
 
     test "14-day periods map tenures onto more buckets" do
-      # 26 periods of 14 days ~ 1 year. ceil(30/14)=3, ceil(90/14)=7, ceil(180/14)=13.
       frees = for i <- 1..26, do: %{n: i, free_cash: d(i * 10)}
       ladder = CashForecast.fd_ladder(frees, 14)
 
-      assert ladder.lockable_1mo == d(10)   # min of first 3 -> period 1 = 10
+      assert ladder.lockable_1mo == d(10)   # min of first ceil(30/14)=3 -> period 1
       assert ladder.lockable_3mo == d(10)   # min of first 7
       assert ladder.lockable_6mo == d(10)   # min of first 13
     end
@@ -60,59 +55,11 @@ defmodule FullCircle.Reporting.CashForecastTest do
     end
   end
 
-  describe "distribute_outstanding/4" do
-    test "spreads outstanding across periods per the lag profile" do
-      start = ~D[2026-06-01]
-      periods = periods_from(start, 12, 30)
-      open = [%{due_date: ~D[2026-06-15], amount: d(1000)}]
-      profile = %{0 => Decimal.new("0.5"), 1 => Decimal.new("0.3"), 2 => Decimal.new("0.2")}
-
-      res = CashForecast.distribute_outstanding(open, profile, periods, 30)
-
-      assert Decimal.equal?(Enum.at(res, 0), d(500))
-      assert Decimal.equal?(Enum.at(res, 1), d(300))
-      assert Decimal.equal?(Enum.at(res, 2), d(200))
-      assert Decimal.equal?(Enum.at(res, 3), d(0))
-    end
-
-    test "overdue invoice drops already-elapsed lag buckets (conservative, no renormalize)" do
-      start = ~D[2026-06-01]
-      periods = periods_from(start, 12, 30)
-      # due 2 periods (60 days) before start -> due_idx = -2; period 0 has lag 2
-      open = [%{due_date: Date.add(start, -60), amount: d(1000)}]
-
-      profile = %{
-        0 => Decimal.new("0.5"),
-        1 => Decimal.new("0.3"),
-        2 => Decimal.new("0.15"),
-        3 => Decimal.new("0.05")
-      }
-
-      res = CashForecast.distribute_outstanding(open, profile, periods, 30)
-
-      assert Decimal.equal?(Enum.at(res, 0), d(150))
-      assert Decimal.equal?(Enum.at(res, 1), d(50))
-      assert Decimal.equal?(Enum.at(res, 2), d(0))
-      total = Enum.reduce(res, Decimal.new(0), &Decimal.add(&2, &1))
-      assert Decimal.equal?(total, d(200))
-    end
-
-    test "future-dated invoice beyond the horizon contributes ~nothing" do
-      start = ~D[2026-06-01]
-      periods = periods_from(start, 12, 30)
-      open = [%{due_date: Date.add(start, 20 * 30), amount: d(1000)}]
-      profile = %{0 => Decimal.new("1.0")}
-
-      res = CashForecast.distribute_outstanding(open, profile, periods, 30)
-      total = Enum.reduce(res, Decimal.new(0), &Decimal.add(&2, &1))
-      assert Decimal.equal?(total, d(0))
-    end
-  end
-
   describe "build_forecast/3 roll-forward" do
-    test "buckets events into periods and rolls balance forward" do
+    test "adds run-rate to every period, buckets known events, rolls balance forward" do
       start = ~D[2026-06-08]
 
+      # known events (overlay)
       events = [
         %{date: ~D[2026-06-10], in: d(1000), out: d(0), kind: :known},   # period 1
         %{date: ~D[2026-06-12], in: d(0), out: d(400), kind: :known},    # period 1
@@ -121,7 +68,7 @@ defmodule FullCircle.Reporting.CashForecastTest do
 
       res =
         CashForecast.build_forecast(
-          %{opening: d(5000), baseline_in: d(0), baseline_out: d(0), events: events},
+          %{opening: d(5000), baseline_in: d(100), baseline_out: d(50), events: events},
           start,
           period_days: 30, periods_count: 12, buffer_periods: 1
         )
@@ -131,10 +78,13 @@ defmodule FullCircle.Reporting.CashForecastTest do
       assert p1.opening == d(5000)
       assert p1.known_in == d(1000)
       assert p1.known_out == d(400)
-      assert p1.closing == d(5600)            # 5000 + 1000 - 400
-      assert p2.opening == d(5600)
-      assert p2.known_out == d(700)
-      assert p2.closing == d(4900)            # 5600 - 700
+      assert p1.baseline_in == d(100)
+      assert p1.baseline_out == d(50)
+      # 5000 + (1000 + 100) - (400 + 50)
+      assert p1.closing == d(5650)
+      # 5650 + (0 + 100) - (700 + 50)
+      assert p2.opening == d(5650)
+      assert p2.closing == d(5000)
       assert length(res.periods) == 12
     end
   end
@@ -172,10 +122,7 @@ defmodule FullCircle.Reporting.CashForecastDBTest do
   setup do
     admin = user_fixture()
     com = company_fixture(admin, %{})
-
-    # company_fixture does NOT seed Bank/Cash accounts; create one explicitly
     bank = account_fixture(%{account_type: "Bank", name: "Test Bank"}, com, admin)
-
     %{admin: admin, com: com, bank: bank}
   end
 
@@ -211,111 +158,38 @@ defmodule FullCircle.Reporting.CashForecastDBTest do
     end
   end
 
-  describe "outstanding_ar_by_due/1" do
-    test "unpaid sales invoice surfaces with its outstanding on its due_date", %{com: com} do
+  describe "run_rate_flows/5" do
+    test "scales ALL contact-null liquid churn from the trailing window to a period",
+         %{com: com, bank: bank} do
+      # the run-rate must include customer/supplier cash (Receipt/Payment/Deposit) and
+      # operating flows (Journal) alike — it is the full liquid throughput.
+      txn!(com, bank.id, ~D[2026-04-01], d(1200))                              # Journal in
+      txn!(com, bank.id, ~D[2026-04-02], d(9000), %{doc_type: "Receipt"})      # customer in
+      txn!(com, bank.id, ~D[2026-04-03], d(500), %{doc_type: "Deposit"})       # banked-in
+      txn!(com, bank.id, ~D[2026-04-04], d(-8000), %{doc_type: "Payment"})     # supplier out
+
+      # contact-bearing flow is ignored (bank-side lines are contact-null)
       cont =
-        Repo.insert!(%FullCircle.Accounting.Contact{
-          name: "AR Cont #{System.unique_integer([:positive])}", company_id: com.id})
+        Repo.one(from c in FullCircle.Accounting.Contact, where: c.company_id == ^com.id, limit: 1) ||
+          Repo.insert!(%FullCircle.Accounting.Contact{
+            name: "C#{System.unique_integer([:positive])}", company_id: com.id})
 
-      debtor =
-        Repo.one!(from a in FullCircle.Accounting.Account,
-          where: a.company_id == ^com.id and a.account_type == "Current Asset",
-          limit: 1)
+      txn!(com, bank.id, ~D[2026-05-02], d(9_999_999), %{contact_id: cont.id})
 
-      inv =
-        %FullCircle.Billing.Invoice{}
-        |> Ecto.Changeset.change(%{
-          invoice_no: "INV-T1", invoice_date: ~D[2026-06-01], due_date: ~D[2026-06-20],
-          company_id: com.id, contact_id: cont.id
-        })
-        |> Repo.insert!()
+      {rin, rout} =
+        CashForecast.run_rate_flows(
+          CashForecast.liquid_account_ids(com, :all), ~D[2026-06-08], 365, 30, com)
 
-      # AR transaction: positive contact balance, doc_id points to the invoice
-      %Transaction{}
-      |> Transaction.changeset(%{
-        doc_type: "Invoice", doc_no: "INV-T1", doc_date: ~D[2026-06-01],
-        particulars: "sale", amount: d(800),
-        company_id: com.id, account_id: debtor.id, contact_id: cont.id
-      })
-      |> Repo.insert!()
-      |> Ecto.Changeset.change(%{doc_id: inv.id})
-      |> Repo.update!()
-
-      rows = CashForecast.outstanding_ar_by_due(com)
-
-      assert Enum.any?(rows, &(&1.due_date == ~D[2026-06-20] and Decimal.equal?(&1.amount, d(800))))
-    end
-
-    test "ignores the contra (non-contact) GL lines of the invoice", %{com: com} do
-      # A real invoice posts BOTH a receivable line (contact set, +amount) and
-      # offsetting revenue/tax lines (contact_id nil, -amount) that net the
-      # document to zero. Only the receivable line is money owed; the contra
-      # lines must NOT be counted (regression for the 23x AR overstatement).
-      cont =
-        Repo.insert!(%FullCircle.Accounting.Contact{
-          name: "AR Cont #{System.unique_integer([:positive])}",
-          company_id: com.id
-        })
-
-      debtor =
-        Repo.one!(
-          from a in FullCircle.Accounting.Account,
-            where: a.company_id == ^com.id and a.account_type == "Current Asset",
-            limit: 1
-        )
-
-      revenue =
-        Repo.one!(
-          from a in FullCircle.Accounting.Account,
-            where: a.company_id == ^com.id and a.account_type == "Revenue",
-            limit: 1
-        )
-
-      inv =
-        %FullCircle.Billing.Invoice{}
-        |> Ecto.Changeset.change(%{
-          invoice_no: "INV-T2",
-          invoice_date: ~D[2026-06-01],
-          due_date: ~D[2026-06-20],
-          company_id: com.id,
-          contact_id: cont.id
-        })
-        |> Repo.insert!()
-
-      # Receivable line: contact set, +800
-      %Transaction{}
-      |> Transaction.changeset(%{
-        doc_type: "Invoice", doc_no: "INV-T2", doc_date: ~D[2026-06-01],
-        particulars: "debtor", amount: d(800),
-        company_id: com.id, account_id: debtor.id, contact_id: cont.id
-      })
-      |> Repo.insert!()
-      |> Ecto.Changeset.change(%{doc_id: inv.id})
-      |> Repo.update!()
-
-      # Contra revenue line: NO contact, -800 (nets the document to zero)
-      %Transaction{}
-      |> Transaction.changeset(%{
-        doc_type: "Invoice", doc_no: "INV-T2", doc_date: ~D[2026-06-01],
-        particulars: "sales", amount: d(-800),
-        company_id: com.id, account_id: revenue.id
-      })
-      |> Repo.insert!()
-      |> Ecto.Changeset.change(%{doc_id: inv.id})
-      |> Repo.update!()
-
-      rows = CashForecast.outstanding_ar_by_due(com)
-      matching = Enum.filter(rows, &(&1.due_date == ~D[2026-06-20]))
-
-      total = Enum.reduce(matching, Decimal.new(0), fn r, a -> Decimal.add(a, r.amount) end)
-      assert Decimal.equal?(total, d(800))
+      factor = Decimal.div(d(30), d(365))
+      assert Decimal.equal?(rin, Decimal.mult(d(10_700), factor))   # 1200 + 9000 + 500
+      assert Decimal.equal?(rout, Decimal.mult(d(8000), factor))
     end
   end
 
   describe "cash_forecast/2 end-to-end" do
-    test "produces N periods, opening, and a 1/3/6/12 ladder", %{com: com, bank: bank} do
+    test "produces N periods, opening, run-rate, and a 1/3/6/12 ladder", %{com: com, bank: bank} do
       txn!(com, bank.id, ~D[2026-06-01], d(10_000))     # opening (before start)
-      txn!(com, bank.id, ~D[2026-06-10], d(2000))       # posted future inflow
+      txn!(com, bank.id, ~D[2026-06-10], d(2000))       # posted future inflow (overlay)
 
       res =
         CashForecast.cash_forecast(
@@ -327,49 +201,8 @@ defmodule FullCircle.Reporting.CashForecastDBTest do
       assert Decimal.equal?(res.opening, d(10_000))
       assert length(res.periods) == 12
       assert Decimal.equal?(hd(res.periods).opening, d(10_000))
+      assert Map.has_key?(res, :baseline_in)
       assert Map.has_key?(res.ladder, :place_12mo)
-    end
-  end
-
-  describe "baseline_flows/5" do
-    test "scales contact-null liquid flows from the trailing window to a period", %{com: com, bank: bank} do
-      txn!(com, bank.id, ~D[2026-04-01], d(1300))   # contact_id nil -> in
-      txn!(com, bank.id, ~D[2026-05-01], d(-650))   # contact_id nil -> out
-
-      # contact-bearing flow must be IGNORED by baseline:
-      cont =
-        Repo.one(from c in FullCircle.Accounting.Contact,
-          where: c.company_id == ^com.id, limit: 1) ||
-          Repo.insert!(%FullCircle.Accounting.Contact{name: "Baseline Cont #{System.unique_integer([:positive])}", company_id: com.id})
-
-      txn!(com, bank.id, ~D[2026-05-02], d(9999), %{contact_id: cont.id})
-
-      # trailing 365 days, 30-day period -> per period = total * 30/365
-      {bin, bout} =
-        CashForecast.baseline_flows(
-          CashForecast.liquid_account_ids(com, :all), ~D[2026-06-08], 365, 30, com)
-
-      factor = Decimal.div(d(30), d(365))
-      assert Decimal.equal?(bin, Decimal.mult(d(1300), factor))
-      assert Decimal.equal?(bout, Decimal.mult(d(650), factor))
-    end
-
-    test "excludes Receipt/Payment/Deposit (AR/AP cash already in Expected In/Out)", %{com: com, bank: bank} do
-      # Journal stays in the baseline...
-      txn!(com, bank.id, ~D[2026-04-01], d(1200))
-      # ...but customer/supplier cash settlements must NOT (they are modelled as
-      # Expected In/Out; counting them here double-counts).
-      txn!(com, bank.id, ~D[2026-04-02], d(9_000_000), %{doc_type: "Receipt"})
-      txn!(com, bank.id, ~D[2026-04-03], d(-8_000_000), %{doc_type: "Payment"})
-      txn!(com, bank.id, ~D[2026-04-04], d(500_000), %{doc_type: "Deposit"})
-
-      {bin, bout} =
-        CashForecast.baseline_flows(
-          CashForecast.liquid_account_ids(com, :all), ~D[2026-06-08], 365, 30, com)
-
-      factor = Decimal.div(d(30), d(365))
-      assert Decimal.equal?(bin, Decimal.mult(d(1200), factor))   # only the Journal
-      assert Decimal.equal?(bout, d(0))
     end
   end
 end

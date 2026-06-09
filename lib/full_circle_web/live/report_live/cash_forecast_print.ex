@@ -78,10 +78,10 @@ defmodule FullCircleWeb.ReportLive.CashForecastPrint do
               <th>{gettext("From")}</th>
               <th>{gettext("To")}</th>
               <th>{gettext("Opening")}</th>
-              <th>{gettext("Expected In")}</th>
-              <th>{gettext("Base In")}</th>
-              <th>{gettext("Expected Out")}</th>
-              <th>{gettext("Base Out")}</th>
+              <th>{gettext("Known In")}</th>
+              <th>{gettext("Run-rate In")}</th>
+              <th>{gettext("Known Out")}</th>
+              <th>{gettext("Run-rate Out")}</th>
               <th>{gettext("Closing")}</th>
               <th>{gettext("Buffer")}</th>
               <th>{gettext("Free Cash")}</th>
@@ -109,15 +109,14 @@ defmodule FullCircleWeb.ReportLive.CashForecastPrint do
           <p>
             <b>{gettext("Opening")}</b>: {gettext("cash & bank balance at the start of the period (previous period's Closing")}).
             <b>{gettext("Closing")}</b>: {gettext("Opening + all inflows − all outflows")}.
-            <b>{gettext("Expected In")}</b>: {gettext("collections from unpaid sales invoices, spread by how this company has actually been paid in the past (vs due date), plus in-hand cheques & posted future receipts on their own dates")}.
-            <b>{gettext("Expected Out")}</b>: {gettext("payments for unpaid purchase invoices, spread by how this company has actually paid suppliers in the past (vs due date), plus posted future payments on their own dates")}.
-            <b>{gettext("Base In")}</b> / <b>{gettext("Base Out")}</b>: {gettext("estimated recurring operating in/out — past non-customer/supplier cash & bank activity scaled to one period (cash sales, payroll, utilities)")}.
-            <b>{gettext("Buffer")}</b>: {gettext("cash that must stay liquid — total projected outflow over the next %{n} period(s)", n: @forecast.buffer_periods)}.
+            <b>{gettext("Run-rate In")}</b> / <b>{gettext("Run-rate Out")}</b>: {gettext("the backbone — this company's actual average cash & bank throughput per period from the trailing window (captures the whole ongoing business)")}.
+            <b>{gettext("Known In")}</b> / <b>{gettext("Known Out")}</b>: {gettext("specific dated cash already certain and on top of the run-rate — in-hand post-dated cheques and already-posted future-dated transactions")}.
+            <b>{gettext("Buffer")}</b>: {gettext("cash that must stay liquid — projected net cash drain (outflow − inflow, floored at 0) over the next %{n} period(s)", n: @forecast.buffer_periods)}.
             <b>{gettext("Free Cash")}</b>: {gettext("Closing − Buffer (never below 0) — surplus safe to put to work")}.
           </p>
           <p>
             <b>{gettext("Fixed Deposit Tenure Ladder")}</b>: {gettext("the most you can lock away for ~1/3/6/12 months without any period dropping below its Buffer")}.
-            {gettext("Expected amounts are real (owed on documents) but timed from past payment behaviour; a slow-paying tail beyond the window is not counted, so this is conservative")}.
+            {gettext("The run-rate projects the recent past forward; Known items are certain")}.
           </p>
         </div>
       </div>

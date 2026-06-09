@@ -203,10 +203,10 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
             <th class="text-center px-1">{gettext("From")}</th>
             <th class="text-center px-1">{gettext("To")}</th>
             <th class="px-1">{gettext("Opening")}</th>
-            <th class="px-1">{gettext("Expected In")}</th>
-            <th class="px-1 text-gray-500 dark:text-gray-400">{gettext("Base In")}</th>
-            <th class="px-1">{gettext("Expected Out")}</th>
-            <th class="px-1 text-gray-500 dark:text-gray-400">{gettext("Base Out")}</th>
+            <th class="px-1">{gettext("Known In")}</th>
+            <th class="px-1 text-gray-500 dark:text-gray-400">{gettext("Run-rate In")}</th>
+            <th class="px-1">{gettext("Known Out")}</th>
+            <th class="px-1 text-gray-500 dark:text-gray-400">{gettext("Run-rate Out")}</th>
             <th class="px-1">{gettext("Closing")}</th>
             <th class="px-1">{gettext("Buffer")}</th>
             <th class="px-1 text-green-700 dark:text-green-400">{gettext("Free Cash")}</th>
@@ -264,41 +264,25 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
           </dd>
         </div>
         <div>
-          <dt class="inline font-semibold">{gettext("Expected In")}:</dt>
+          <dt class="inline font-semibold">{gettext("Run-rate In")} / {gettext("Run-rate Out")}:</dt>
           <dd class="inline">
             {gettext(
-              "Collections from unpaid sales invoices, spread across the periods by how this company has actually been paid in the past (relative to each invoice's due date), plus in-hand cheques and already-posted future receipts on their own dates. Amounts are real; the timing is estimated from payment history."
+              "The forecast backbone — this company's actual average cash & bank throughput per period, measured from the trailing window. It captures the whole ongoing business (collections, payments, payroll, everything), not just invoices already on the books."
             )}
           </dd>
         </div>
         <div>
-          <dt class="inline font-semibold">{gettext("Expected Out")}:</dt>
+          <dt class="inline font-semibold">{gettext("Known In")} / {gettext("Known Out")}:</dt>
           <dd class="inline">
             {gettext(
-              "Payments for unpaid purchase invoices, spread across the periods by how this company has actually paid suppliers in the past (relative to each invoice's due date), plus already-posted future payments on their own dates. Amounts are real; the timing is estimated."
-            )}
-          </dd>
-        </div>
-        <div>
-          <dt class="inline font-semibold">{gettext("Base In")}:</dt>
-          <dd class="inline">
-            {gettext(
-              "Estimated recurring operating inflow — past non-customer cash/bank receipts scaled to one period (e.g. cash sales, sundry income)."
-            )}
-          </dd>
-        </div>
-        <div>
-          <dt class="inline font-semibold">{gettext("Base Out")}:</dt>
-          <dd class="inline">
-            {gettext(
-              "Estimated recurring operating outflow — past non-supplier cash/bank payments scaled to one period (e.g. payroll, utilities, bank charges)."
+              "Specific dated cash that is already certain and on top of the run-rate — in-hand post-dated cheques and transactions already entered with a future date, placed in the period they fall due."
             )}
           </dd>
         </div>
         <div>
           <dt class="inline font-semibold">{gettext("Buffer")}:</dt>
           <dd class="inline">
-            {gettext("Cash that must stay liquid — the total projected outflow over the next %{n} period(s).",
+            {gettext("Cash that must stay liquid — the projected net cash drain (outflow − inflow, floored at 0) over the next %{n} period(s).",
               n: @buffer_periods
             )}
           </dd>
@@ -317,7 +301,7 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
         )}
       </p>
       <p class="mt-1 italic text-gray-500 dark:text-gray-400">
-        {gettext("Expected figures are amounts owed on real documents, timed by past payment behaviour; Base figures are recurring operating flows estimated from past activity. A slow-paying tail beyond the forecast window is deliberately not counted, so this is a conservative estimate.")}
+        {gettext("The run-rate projects the recent past forward, so it assumes business continues at a similar pace; Known items are certain. A longer trailing window smooths seasonality, a shorter one tracks recent changes.")}
       </p>
     </div>
     """
