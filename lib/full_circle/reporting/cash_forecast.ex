@@ -4,13 +4,19 @@ defmodule FullCircle.Reporting.CashForecast do
   Pure core (`build_forecast/3`, `fd_ladder/1`) plus DB query helpers.
   """
 
-  # added in later tasks
-  alias FullCircle.{QueryRepo, Accounting}
   alias FullCircle.Repo
   alias FullCircle.Accounting.{Account, Transaction}
   import Ecto.Query, warn: false
   import FullCircle.Helpers, only: [exec_query_map: 3]
-  # dump_uuid!/1 is not exported from FullCircle.Helpers; added in later tasks
+
+  defp dump_uuid!(<<_::binary-size(16)>> = bin), do: bin
+
+  defp dump_uuid!(uuid) when is_binary(uuid) do
+    case Ecto.UUID.dump(uuid) do
+      {:ok, bin} -> bin
+      :error -> raise ArgumentError, "invalid UUID: #{inspect(uuid)}"
+    end
+  end
 
   @zero Decimal.new(0)
 
@@ -91,6 +97,75 @@ defmodule FullCircle.Reporting.CashForecast do
     outs = to_decimal(rows && rows.outs)
     wk = Decimal.new("#{weeks}")
     {Decimal.div(ins, wk), Decimal.div(outs, wk)}
+  end
+
+  @doc "Clamp a due date to the forecast start (past-due items become due immediately)."
+  def clamp_due(due_date, start_date) do
+    if Date.compare(due_date, start_date) == :lt, do: start_date, else: due_date
+  end
+
+  @doc "Unpaid sales-invoice balances as inflow events on their (clamped) due_date."
+  def outstanding_ar_events(start_date, end_date, com),
+    do: outstanding_invoice_events(:ar, start_date, end_date, com)
+
+  @doc "Unpaid purchase-invoice balances as outflow events on their (clamped) due_date."
+  def outstanding_ap_events(start_date, end_date, com),
+    do: outstanding_invoice_events(:ap, start_date, end_date, com)
+
+  # direction: :ar -> sales invoices, inflow; :ap -> purchase invoices, outflow
+  defp outstanding_invoice_events(direction, start_date, end_date, com) do
+    {doc_type, inv_table, date_col} =
+      case direction do
+        :ar -> {"Invoice", "invoices", "due_date"}
+        :ap -> {"PurInvoice", "pur_invoices", "due_date"}
+      end
+
+    com_id_bin = dump_uuid!(com.id)
+
+    sql = """
+      with outstanding as (
+        select t.doc_id,
+               t.amount
+                 + coalesce(sum(stm.match_amount), 0)
+                 + coalesce(sum(tm.match_amount), 0) as balance
+          from transactions t
+          left outer join seed_transaction_matchers stm on stm.transaction_id = t.id
+          left outer join transaction_matchers tm on tm.transaction_id = t.id
+         where t.company_id = $1
+           and t.doc_type = $2
+           and t.doc_id is not null
+         group by t.id
+        having t.amount
+                 + coalesce(sum(stm.match_amount), 0)
+                 + coalesce(sum(tm.match_amount), 0) <> 0
+      )
+      select inv.#{date_col} as due_date, sum(o.balance) as balance
+        from outstanding o
+        join #{inv_table} inv on inv.id = o.doc_id
+       group by inv.#{date_col}
+      having sum(o.balance) <> 0
+    """
+
+    exec_query_map(sql, [com_id_bin, doc_type], FullCircle.Repo)
+    |> Enum.map(fn %{due_date: due, balance: bal} ->
+      %{date: clamp_due(due, start_date), balance: Decimal.abs(to_decimal(bal))}
+    end)
+    |> Enum.reject(&(Date.compare(&1.date, end_date) == :gt))
+    |> Enum.map(fn %{date: due, balance: bal} ->
+      case direction do
+        :ar -> %{date: due, in: bal, out: @zero, kind: :known}
+        :ap -> %{date: due, in: @zero, out: bal, kind: :known}
+      end
+    end)
+  end
+
+  @doc "In-hand received cheques (not deposited, not returned) as inflow on due_date."
+  def known_inflow_cheques(start_date, end_date, com) do
+    FullCircle.Reporting.post_dated_cheques("", "In-Hand", "", Date.to_iso8601(end_date), com)
+    |> Enum.filter(fn c -> c.due_date && Date.compare(c.due_date, end_date) != :gt end)
+    |> Enum.map(fn c ->
+      %{date: clamp_due(c.due_date, start_date), in: to_decimal(c.amount), out: @zero, kind: :known}
+    end)
   end
 
   defp to_decimal(nil), do: @zero

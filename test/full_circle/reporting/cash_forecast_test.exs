@@ -35,6 +35,14 @@ defmodule FullCircle.Reporting.CashForecastTest do
     end
   end
 
+  describe "clamp_due/2" do
+    test "past-due dates clamp to start_date, future dates pass through" do
+      start = ~D[2026-06-08]
+      assert FullCircle.Reporting.CashForecast.clamp_due(~D[2026-05-01], start) == start
+      assert FullCircle.Reporting.CashForecast.clamp_due(~D[2026-07-01], start) == ~D[2026-07-01]
+    end
+  end
+
   describe "build_forecast/3 roll-forward" do
     test "buckets events into weeks and rolls balance forward" do
       start = ~D[2026-06-08]  # a Monday
@@ -133,6 +141,43 @@ defmodule FullCircle.Reporting.CashForecastDBTest do
       assert Enum.any?(ins, &(&1.date == ~D[2026-06-10] and &1.in == d(1000)))
       assert Enum.any?(outs, &(&1.date == ~D[2026-06-12] and &1.out == d(400)))
       refute Enum.any?(events, &(&1.date == ~D[2026-12-31]))
+    end
+  end
+
+  describe "outstanding_ar_events/3" do
+    test "unpaid sales invoice surfaces as inflow on its due_date", %{com: com} do
+      cont =
+        Repo.insert!(%FullCircle.Accounting.Contact{
+          name: "AR Cont #{System.unique_integer([:positive])}", company_id: com.id})
+
+      debtor =
+        Repo.one!(from a in FullCircle.Accounting.Account,
+          where: a.company_id == ^com.id and a.account_type == "Current Asset",
+          limit: 1)
+
+      inv =
+        %FullCircle.Billing.Invoice{}
+        |> Ecto.Changeset.change(%{
+          invoice_no: "INV-T1", invoice_date: ~D[2026-06-01], due_date: ~D[2026-06-20],
+          company_id: com.id, contact_id: cont.id
+        })
+        |> Repo.insert!()
+
+      # AR transaction: positive contact balance, doc_id points to the invoice
+      %Transaction{}
+      |> Transaction.changeset(%{
+        doc_type: "Invoice", doc_no: "INV-T1", doc_date: ~D[2026-06-01],
+        particulars: "sale", amount: d(800),
+        company_id: com.id, account_id: debtor.id, contact_id: cont.id
+      })
+      |> Repo.insert!()
+      |> Ecto.Changeset.change(%{doc_id: inv.id})
+      |> Repo.update!()
+
+      end_date = ~D[2026-09-06]
+      events = CashForecast.outstanding_ar_events(~D[2026-06-08], end_date, com)
+
+      assert Enum.any?(events, &(&1.date == ~D[2026-06-20] and Decimal.equal?(&1.in, d(800))))
     end
   end
 
