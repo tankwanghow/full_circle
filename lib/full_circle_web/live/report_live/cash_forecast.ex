@@ -114,21 +114,12 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
                 value={@search.trailing_weeks}
               />
             </div>
-            <div class="col-span-3 mt-6">
+            <div class="col-span-3 mt-6 flex items-center gap-2">
               <.button>
                 {gettext("Query")}
               </.button>
-            </div>
-          </div>
-        </.form>
-      </div>
-
-      <.async_html result={@result}>
-        <:result_html>
-          <% f = @result.result %>
-          <div :if={is_map(f)}>
-            <div class="text-center my-2">
               <.link
+                :if={@result.ok? && is_map(@result.result)}
                 navigate={
                   ~p"/companies/#{@current_company.id}/cash_forecast/print?#{[s_date: @search.s_date, buffer_weeks: @search.buffer_weeks, trailing_weeks: @search.trailing_weeks]}"
                 }
@@ -138,6 +129,14 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
                 {gettext("Print")}
               </.link>
             </div>
+          </div>
+        </.form>
+      </div>
+
+      <.async_html result={@result}>
+        <:result_html>
+          <% f = @result.result %>
+          <div :if={is_map(f)}>
             <.ladder_box ladder={f.ladder} />
             <.week_table weeks={f.weeks} />
           </div>
