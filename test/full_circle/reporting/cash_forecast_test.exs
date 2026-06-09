@@ -179,6 +179,71 @@ defmodule FullCircle.Reporting.CashForecastDBTest do
 
       assert Enum.any?(events, &(&1.date == ~D[2026-06-20] and Decimal.equal?(&1.in, d(800))))
     end
+
+    test "ignores the contra (non-contact) GL lines of the invoice", %{com: com} do
+      # A real invoice posts BOTH a receivable line (contact set, +amount) and
+      # offsetting revenue/tax lines (contact_id nil, -amount) that net the
+      # document to zero. Only the receivable line is money owed; the contra
+      # lines must NOT be counted (regression for the 23x AR overstatement).
+      cont =
+        Repo.insert!(%FullCircle.Accounting.Contact{
+          name: "AR Cont #{System.unique_integer([:positive])}",
+          company_id: com.id
+        })
+
+      debtor =
+        Repo.one!(
+          from a in FullCircle.Accounting.Account,
+            where: a.company_id == ^com.id and a.account_type == "Current Asset",
+            limit: 1
+        )
+
+      revenue =
+        Repo.one!(
+          from a in FullCircle.Accounting.Account,
+            where: a.company_id == ^com.id and a.account_type == "Revenue",
+            limit: 1
+        )
+
+      inv =
+        %FullCircle.Billing.Invoice{}
+        |> Ecto.Changeset.change(%{
+          invoice_no: "INV-T2",
+          invoice_date: ~D[2026-06-01],
+          due_date: ~D[2026-06-20],
+          company_id: com.id,
+          contact_id: cont.id
+        })
+        |> Repo.insert!()
+
+      # Receivable line: contact set, +800
+      %Transaction{}
+      |> Transaction.changeset(%{
+        doc_type: "Invoice", doc_no: "INV-T2", doc_date: ~D[2026-06-01],
+        particulars: "debtor", amount: d(800),
+        company_id: com.id, account_id: debtor.id, contact_id: cont.id
+      })
+      |> Repo.insert!()
+      |> Ecto.Changeset.change(%{doc_id: inv.id})
+      |> Repo.update!()
+
+      # Contra revenue line: NO contact, -800 (nets the document to zero)
+      %Transaction{}
+      |> Transaction.changeset(%{
+        doc_type: "Invoice", doc_no: "INV-T2", doc_date: ~D[2026-06-01],
+        particulars: "sales", amount: d(-800),
+        company_id: com.id, account_id: revenue.id
+      })
+      |> Repo.insert!()
+      |> Ecto.Changeset.change(%{doc_id: inv.id})
+      |> Repo.update!()
+
+      events = CashForecast.outstanding_ar_events(~D[2026-06-08], ~D[2026-09-06], com)
+      inv_events = Enum.filter(events, &(&1.date == ~D[2026-06-20]))
+
+      total = Enum.reduce(inv_events, Decimal.new(0), fn e, a -> Decimal.add(a, e.in) end)
+      assert Decimal.equal?(total, d(800))
+    end
   end
 
   describe "cash_forecast/2 end-to-end" do

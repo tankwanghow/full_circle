@@ -122,6 +122,10 @@ defmodule FullCircle.Reporting.CashForecast do
 
     com_id_bin = dump_uuid!(com.id)
 
+    # An invoice posts BOTH a receivable/payable line (contact set) and contra
+    # revenue/cost lines (contact_id nil) that net the document to zero. Only the
+    # contact-bearing line is money owed — `contact_id is not null` filters out
+    # the contra lines (without it, AR/AP outstanding is massively overstated).
     sql = """
       with outstanding as (
         select t.doc_id,
@@ -134,6 +138,7 @@ defmodule FullCircle.Reporting.CashForecast do
          where t.company_id = $1
            and t.doc_type = $2
            and t.doc_id is not null
+           and t.contact_id is not null
          group by t.id
         having t.amount
                  + coalesce(sum(stm.match_amount), 0)
