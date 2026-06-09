@@ -26,6 +26,11 @@ defmodule FullCircle.Reporting.CashForecast do
 
   @liquid_types ["Cash or Equivalent", "Bank"]
 
+  # Doc types whose liquid-account cash IS the settlement of an AR/AP invoice — it
+  # is already modelled by Expected In/Out, so it must NOT also feed the baseline
+  # run-rate (otherwise customer collections / supplier payments are double-counted).
+  @baseline_excluded_doc_types ["Receipt", "Payment", "Deposit"]
+
   def liquid_account_types, do: @liquid_types
 
   @doc "Account ids of liquid type for the company. `:all` or a list of ids to restrict."
@@ -90,6 +95,7 @@ defmodule FullCircle.Reporting.CashForecast do
         where:
           t.company_id == ^com.id and t.account_id in ^account_ids and
             is_nil(t.contact_id) and
+            t.doc_type not in ^@baseline_excluded_doc_types and
             t.doc_date >= ^window_start and t.doc_date < ^start_date,
         select: %{
           ins: sum(fragment("case when ? > 0 then ? else 0 end", t.amount, t.amount)),

@@ -353,5 +353,23 @@ defmodule FullCircle.Reporting.CashForecastDBTest do
       assert Decimal.equal?(bin, Decimal.mult(d(1300), factor))
       assert Decimal.equal?(bout, Decimal.mult(d(650), factor))
     end
+
+    test "excludes Receipt/Payment/Deposit (AR/AP cash already in Expected In/Out)", %{com: com, bank: bank} do
+      # Journal stays in the baseline...
+      txn!(com, bank.id, ~D[2026-04-01], d(1200))
+      # ...but customer/supplier cash settlements must NOT (they are modelled as
+      # Expected In/Out; counting them here double-counts).
+      txn!(com, bank.id, ~D[2026-04-02], d(9_000_000), %{doc_type: "Receipt"})
+      txn!(com, bank.id, ~D[2026-04-03], d(-8_000_000), %{doc_type: "Payment"})
+      txn!(com, bank.id, ~D[2026-04-04], d(500_000), %{doc_type: "Deposit"})
+
+      {bin, bout} =
+        CashForecast.baseline_flows(
+          CashForecast.liquid_account_ids(com, :all), ~D[2026-06-08], 365, 30, com)
+
+      factor = Decimal.div(d(30), d(365))
+      assert Decimal.equal?(bin, Decimal.mult(d(1200), factor))   # only the Journal
+      assert Decimal.equal?(bout, d(0))
+    end
   end
 end
