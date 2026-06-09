@@ -299,6 +299,7 @@ defmodule FullCircle.Reporting.CashForecast do
       start_date,
       period_days: period_days, periods_count: periods_count, buffer_periods: buffer_periods
     )
+    |> Map.put(:trailing_days, trailing_days)
   end
 
   defp to_decimal(nil), do: @zero

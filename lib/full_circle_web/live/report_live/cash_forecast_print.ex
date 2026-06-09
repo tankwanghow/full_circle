@@ -15,7 +15,7 @@ defmodule FullCircleWeb.ReportLive.CashForecastPrint do
               period_days: safe_int(params["period_days"], 30),
               periods_count: safe_int(params["periods_count"], 12),
               buffer_periods: safe_int(params["buffer_periods"], 1),
-              trailing_days: 365,
+              trailing_days: safe_int(params["trailing_days"], 365),
               account_ids: :all
             },
             com
@@ -52,6 +52,7 @@ defmodule FullCircleWeb.ReportLive.CashForecastPrint do
         </h1>
         <p class="text-center">
           {Date.to_iso8601(@forecast.start_date)} — {@forecast.periods_count} × {@forecast.period_days} {gettext("day periods")}
+          · {gettext("base/timing from last %{t} days", t: @forecast.trailing_days)}
         </p>
 
         <div class="ladder">
