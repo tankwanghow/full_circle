@@ -4,32 +4,37 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
 
   @impl true
   def mount(_params, _session, socket) do
-    socket =
-      socket
-      |> assign(page_title: gettext("Cash Forecast"))
-
-    {:ok, socket}
+    {:ok, assign(socket, page_title: gettext("Cash Forecast"))}
   end
 
   @impl true
   def handle_params(params, _uri, socket) do
     p = params["search"] || %{}
     s_date = p["s_date"] || ""
-    buffer_weeks = p["buffer_weeks"] || "2"
-    trailing_weeks = p["trailing_weeks"] || "52"
+    period_days = p["period_days"] || "30"
+    periods_count = p["periods_count"] || "12"
+    buffer_periods = p["buffer_periods"] || "1"
 
     {:noreply,
      socket
-     |> assign(search: %{s_date: s_date, buffer_weeks: buffer_weeks, trailing_weeks: trailing_weeks})
-     |> run_forecast(s_date, buffer_weeks, trailing_weeks)}
+     |> assign(
+       search: %{
+         s_date: s_date,
+         period_days: period_days,
+         periods_count: periods_count,
+         buffer_periods: buffer_periods
+       }
+     )
+     |> run_forecast(s_date, period_days, periods_count, buffer_periods)}
   end
 
   @impl true
   def handle_event("query", %{"search" => s}, socket) do
     qry = %{
       "search[s_date]" => s["s_date"],
-      "search[buffer_weeks]" => s["buffer_weeks"],
-      "search[trailing_weeks]" => s["trailing_weeks"]
+      "search[period_days]" => s["period_days"],
+      "search[periods_count]" => s["periods_count"],
+      "search[buffer_periods]" => s["buffer_periods"]
     }
 
     {:noreply,
@@ -39,7 +44,7 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
      )}
   end
 
-  defp run_forecast(socket, s_date, buffer_weeks, trailing_weeks) do
+  defp run_forecast(socket, s_date, period_days, periods_count, buffer_periods) do
     current_company = socket.assigns.current_company
 
     parsed =
@@ -47,9 +52,10 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
         {:ok, date} ->
           %{
             start_date: date,
-            weeks_count: 13,
-            buffer_weeks: safe_int(buffer_weeks, 2),
-            trailing_weeks: safe_int(trailing_weeks, 52),
+            period_days: safe_int(period_days, 30),
+            periods_count: safe_int(periods_count, 12),
+            buffer_periods: safe_int(buffer_periods, 1),
+            trailing_days: 365,
             account_ids: :all
           }
 
@@ -62,11 +68,7 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
       {:ok,
        %{
          result:
-           if parsed do
-             Reporting.cash_forecast(parsed, current_company)
-           else
-             []
-           end
+           if(parsed, do: Reporting.cash_forecast(parsed, current_company), else: [])
        }}
     end)
   end
@@ -81,7 +83,7 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="w-10/12 mx-auto mb-10">
+    <div class="w-11/12 mx-auto mb-10">
       <p class="text-2xl text-center font-medium">{"#{@page_title}"}</p>
 
       <div class="border rounded bg-amber-200 dark:bg-amber-900 dark:border-amber-700 text-center p-2">
@@ -96,22 +98,31 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
                 value={@search.s_date}
               />
             </div>
-            <div class="col-span-3">
+            <div class="col-span-2">
               <.input
-                label={gettext("Buffer Weeks")}
-                name="search[buffer_weeks]"
+                label={gettext("Period (days)")}
+                name="search[period_days]"
                 type="number"
-                id="search_buffer_weeks"
-                value={@search.buffer_weeks}
+                id="search_period_days"
+                value={@search.period_days}
               />
             </div>
-            <div class="col-span-3">
+            <div class="col-span-2">
               <.input
-                label={gettext("Trailing Weeks")}
-                name="search[trailing_weeks]"
+                label={gettext("No. of Periods")}
+                name="search[periods_count]"
                 type="number"
-                id="search_trailing_weeks"
-                value={@search.trailing_weeks}
+                id="search_periods_count"
+                value={@search.periods_count}
+              />
+            </div>
+            <div class="col-span-2">
+              <.input
+                label={gettext("Buffer (periods)")}
+                name="search[buffer_periods]"
+                type="number"
+                id="search_buffer_periods"
+                value={@search.buffer_periods}
               />
             </div>
             <div class="col-span-3 mt-6 flex items-center gap-2">
@@ -121,7 +132,7 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
               <.link
                 :if={@result.ok? && is_map(@result.result)}
                 navigate={
-                  ~p"/companies/#{@current_company.id}/cash_forecast/print?#{[s_date: @search.s_date, buffer_weeks: @search.buffer_weeks, trailing_weeks: @search.trailing_weeks]}"
+                  ~p"/companies/#{@current_company.id}/cash_forecast/print?#{[s_date: @search.s_date, period_days: @search.period_days, periods_count: @search.periods_count, buffer_periods: @search.buffer_periods]}"
                 }
                 target="_blank"
                 class="blue button"
@@ -138,8 +149,8 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
           <% f = @result.result %>
           <div :if={is_map(f)}>
             <.ladder_box ladder={f.ladder} />
-            <.week_table weeks={f.weeks} />
-            <.legend buffer_weeks={f.buffer_weeks} />
+            <.period_table periods={f.periods} />
+            <.legend period_days={f.period_days} buffer_periods={f.buffer_periods} />
           </div>
         </:result_html>
       </.async_html>
@@ -153,45 +164,33 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
     ~H"""
     <div class="my-4 p-3 border rounded bg-green-100 dark:bg-green-900 dark:border-green-700">
       <p class="font-bold text-center">{gettext("Fixed Deposit Tenure Ladder")}</p>
-      <div class="grid grid-cols-3 text-center mt-2 text-sm">
-        <div>
-          {gettext("~1 mo (4 wk)")}: <span class="font-mono">{fmt(@ladder.place_1mo)}</span>
-        </div>
-        <div>
-          {gettext("~2 mo (8 wk)")}: <span class="font-mono">{fmt(@ladder.place_2mo)}</span>
-        </div>
-        <div>
-          {gettext("~3 mo (13 wk)")}: <span class="font-mono">{fmt(@ladder.place_3mo)}</span>
-        </div>
+      <div class="grid grid-cols-4 text-center mt-2 text-sm">
+        <div>~1 mo: <span class="font-mono">{fmt(@ladder.place_1mo)}</span></div>
+        <div>~3 mo: <span class="font-mono">{fmt(@ladder.place_3mo)}</span></div>
+        <div>~6 mo: <span class="font-mono">{fmt(@ladder.place_6mo)}</span></div>
+        <div>~12 mo: <span class="font-mono">{fmt(@ladder.place_12mo)}</span></div>
       </div>
-      <div class="grid grid-cols-3 text-center mt-1 text-sm text-gray-500 dark:text-gray-400">
-        <div>
-          {gettext("Lockable 1mo")}: <span class="font-mono">{fmt(@ladder.lockable_1mo)}</span>
-        </div>
-        <div>
-          {gettext("Lockable 2mo")}: <span class="font-mono">{fmt(@ladder.lockable_2mo)}</span>
-        </div>
-        <div>
-          {gettext("Lockable 3mo")}: <span class="font-mono">{fmt(@ladder.lockable_3mo)}</span>
-        </div>
-      </div>
-      <div class="text-center mt-1 text-sm">
-        {gettext("On-call")}: <span class="font-mono">{fmt(@ladder.on_call)}</span>
+      <div class="grid grid-cols-4 text-center mt-1 text-sm text-gray-500 dark:text-gray-400">
+        <div>{gettext("Lockable")} 1mo: <span class="font-mono">{fmt(@ladder.lockable_1mo)}</span></div>
+        <div>{gettext("Lockable")} 3mo: <span class="font-mono">{fmt(@ladder.lockable_3mo)}</span></div>
+        <div>{gettext("Lockable")} 6mo: <span class="font-mono">{fmt(@ladder.lockable_6mo)}</span></div>
+        <div>{gettext("Lockable")} 12mo: <span class="font-mono">{fmt(@ladder.lockable_12mo)}</span></div>
       </div>
     </div>
     """
   end
 
-  attr :weeks, :list, required: true
+  attr :periods, :list, required: true
 
-  defp week_table(assigns) do
+  defp period_table(assigns) do
     ~H"""
     <div class="overflow-x-auto">
       <table class="w-full text-sm text-right border dark:border-gray-700">
         <thead class="bg-gray-200 dark:bg-gray-700 dark:text-gray-100">
           <tr>
-            <th class="text-center px-1">{gettext("Wk")}</th>
-            <th class="text-center px-1">{gettext("Start")}</th>
+            <th class="text-center px-1">#</th>
+            <th class="text-center px-1">{gettext("From")}</th>
+            <th class="text-center px-1">{gettext("To")}</th>
             <th class="px-1">{gettext("Opening")}</th>
             <th class="px-1">{gettext("Expected In")}</th>
             <th class="px-1 text-gray-500 dark:text-gray-400">{gettext("Base In")}</th>
@@ -204,20 +203,21 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
         </thead>
         <tbody>
           <tr
-            :for={w <- @weeks}
+            :for={p <- @periods}
             class="border-b dark:border-gray-700 odd:bg-white even:bg-gray-50 dark:odd:bg-gray-800 dark:even:bg-gray-900 dark:text-gray-200"
           >
-            <td class="text-center px-1">{w.n}</td>
-            <td class="text-center px-1">{Date.to_iso8601(w.week_start)}</td>
-            <td class="font-mono px-1">{fmt(w.opening)}</td>
-            <td class="font-mono px-1">{fmt(w.known_in)}</td>
-            <td class="font-mono px-1 text-gray-500 dark:text-gray-400">{fmt(w.baseline_in)}</td>
-            <td class="font-mono px-1">{fmt(w.known_out)}</td>
-            <td class="font-mono px-1 text-gray-500 dark:text-gray-400">{fmt(w.baseline_out)}</td>
-            <td class="font-mono px-1 font-bold">{fmt(w.closing)}</td>
-            <td class="font-mono px-1">{fmt(w.buffer)}</td>
+            <td class="text-center px-1">{p.n}</td>
+            <td class="text-center px-1">{Date.to_iso8601(p.period_start)}</td>
+            <td class="text-center px-1">{Date.to_iso8601(p.period_end)}</td>
+            <td class="font-mono px-1">{fmt(p.opening)}</td>
+            <td class="font-mono px-1">{fmt(p.known_in)}</td>
+            <td class="font-mono px-1 text-gray-500 dark:text-gray-400">{fmt(p.baseline_in)}</td>
+            <td class="font-mono px-1">{fmt(p.known_out)}</td>
+            <td class="font-mono px-1 text-gray-500 dark:text-gray-400">{fmt(p.baseline_out)}</td>
+            <td class="font-mono px-1 font-bold">{fmt(p.closing)}</td>
+            <td class="font-mono px-1">{fmt(p.buffer)}</td>
             <td class="font-mono px-1 font-bold text-green-700 dark:text-green-400">
-              {fmt(w.free_cash)}
+              {fmt(p.free_cash)}
             </td>
           </tr>
         </tbody>
@@ -226,30 +226,36 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
     """
   end
 
-  attr :buffer_weeks, :integer, required: true
+  attr :period_days, :integer, required: true
+  attr :buffer_periods, :integer, required: true
 
   defp legend(assigns) do
     ~H"""
     <div class="my-4 p-3 border rounded bg-gray-50 dark:bg-gray-800 dark:border-gray-700 text-sm">
-      <p class="font-bold mb-2">{gettext("How to read this report")}</p>
+      <p class="font-bold mb-2">
+        {gettext("How to read this report")}
+        <span class="font-normal text-gray-500 dark:text-gray-400">
+          ({gettext("each period is %{d} days", d: @period_days)})
+        </span>
+      </p>
       <dl class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1">
         <div>
           <dt class="inline font-semibold">{gettext("Opening")}:</dt>
           <dd class="inline">
-            {gettext("Cash & bank balance at the start of the week (last week's Closing).")}
+            {gettext("Cash & bank balance at the start of the period (the previous period's Closing).")}
           </dd>
         </div>
         <div>
           <dt class="inline font-semibold">{gettext("Closing")}:</dt>
           <dd class="inline">
-            {gettext("Opening + all inflows − all outflows for the week.")}
+            {gettext("Opening + all inflows − all outflows for the period.")}
           </dd>
         </div>
         <div>
           <dt class="inline font-semibold">{gettext("Expected In")}:</dt>
           <dd class="inline">
             {gettext(
-              "Collections from unpaid sales invoices, spread across the weeks by how this company has actually been paid in the past (relative to each invoice's due date), plus in-hand cheques and already-posted future receipts on their own dates. Amounts are real; the timing is estimated from payment history."
+              "Collections from unpaid sales invoices, spread across the periods by how this company has actually been paid in the past (relative to each invoice's due date), plus in-hand cheques and already-posted future receipts on their own dates. Amounts are real; the timing is estimated from payment history."
             )}
           </dd>
         </div>
@@ -257,7 +263,7 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
           <dt class="inline font-semibold">{gettext("Expected Out")}:</dt>
           <dd class="inline">
             {gettext(
-              "Payments for unpaid purchase invoices, spread across the weeks by how this company has actually paid suppliers in the past (relative to each invoice's due date), plus already-posted future payments on their own dates. Amounts are real; the timing is estimated."
+              "Payments for unpaid purchase invoices, spread across the periods by how this company has actually paid suppliers in the past (relative to each invoice's due date), plus already-posted future payments on their own dates. Amounts are real; the timing is estimated."
             )}
           </dd>
         </div>
@@ -265,7 +271,7 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
           <dt class="inline font-semibold">{gettext("Base In")}:</dt>
           <dd class="inline">
             {gettext(
-              "Estimated recurring operating inflow — the weekly average of past non-customer cash/bank receipts (e.g. cash sales, sundry income)."
+              "Estimated recurring operating inflow — past non-customer cash/bank receipts scaled to one period (e.g. cash sales, sundry income)."
             )}
           </dd>
         </div>
@@ -273,15 +279,15 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
           <dt class="inline font-semibold">{gettext("Base Out")}:</dt>
           <dd class="inline">
             {gettext(
-              "Estimated recurring operating outflow — the weekly average of past non-supplier cash/bank payments (e.g. payroll, utilities, bank charges)."
+              "Estimated recurring operating outflow — past non-supplier cash/bank payments scaled to one period (e.g. payroll, utilities, bank charges)."
             )}
           </dd>
         </div>
         <div>
           <dt class="inline font-semibold">{gettext("Buffer")}:</dt>
           <dd class="inline">
-            {gettext("Cash that must stay liquid — the total projected outflow over the next %{n} week(s).",
-              n: @buffer_weeks
+            {gettext("Cash that must stay liquid — the total projected outflow over the next %{n} period(s).",
+              n: @buffer_periods
             )}
           </dd>
         </div>
@@ -295,7 +301,7 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
       <p class="mt-2">
         <span class="font-semibold">{gettext("Fixed Deposit Tenure Ladder")}:</span>
         {gettext(
-          "the most you can lock away for ~1/2/3 months without any week dropping below its Buffer. \"Place\" is how much to put at each tenure; \"Lockable\" is the sustainable amount across that whole window."
+          "the most you can lock away for ~1/3/6/12 months without any period dropping below its Buffer. \"Place\" is how much to put at each tenure; \"Lockable\" is the sustainable amount across that whole window."
         )}
       </p>
       <p class="mt-1 italic text-gray-500 dark:text-gray-400">

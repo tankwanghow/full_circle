@@ -12,9 +12,10 @@ defmodule FullCircleWeb.ReportLive.CashForecastPrint do
           Reporting.cash_forecast(
             %{
               start_date: date,
-              weeks_count: 13,
-              buffer_weeks: safe_int(params["buffer_weeks"], 2),
-              trailing_weeks: safe_int(params["trailing_weeks"], 52),
+              period_days: safe_int(params["period_days"], 30),
+              periods_count: safe_int(params["periods_count"], 12),
+              buffer_periods: safe_int(params["buffer_periods"], 1),
+              trailing_days: 365,
               account_ids: :all
             },
             com
@@ -50,29 +51,31 @@ defmodule FullCircleWeb.ReportLive.CashForecastPrint do
           {gettext("Cash Forecast & Free Cash Flow")}
         </h1>
         <p class="text-center">
-          {Date.to_iso8601(@forecast.start_date)} — {@forecast.weeks_count} {gettext("weeks")}
+          {Date.to_iso8601(@forecast.start_date)} — {@forecast.periods_count} × {@forecast.period_days} {gettext("day periods")}
         </p>
 
         <div class="ladder">
           <p class="font-bold">{gettext("Fixed Deposit Tenure Ladder")}</p>
           <div class="ladder-row">
-            <div>{gettext("~1 mo (4 wk)")}: {fmt(@forecast.ladder.place_1mo)}</div>
-            <div>{gettext("~2 mo (8 wk)")}: {fmt(@forecast.ladder.place_2mo)}</div>
-            <div>{gettext("~3 mo (13 wk)")}: {fmt(@forecast.ladder.place_3mo)}</div>
+            <div>~1 mo: {fmt(@forecast.ladder.place_1mo)}</div>
+            <div>~3 mo: {fmt(@forecast.ladder.place_3mo)}</div>
+            <div>~6 mo: {fmt(@forecast.ladder.place_6mo)}</div>
+            <div>~12 mo: {fmt(@forecast.ladder.place_12mo)}</div>
           </div>
           <div class="ladder-row muted">
-            <div>{gettext("Lockable 1mo")}: {fmt(@forecast.ladder.lockable_1mo)}</div>
-            <div>{gettext("Lockable 2mo")}: {fmt(@forecast.ladder.lockable_2mo)}</div>
-            <div>{gettext("Lockable 3mo")}: {fmt(@forecast.ladder.lockable_3mo)}</div>
+            <div>{gettext("Lockable")} 1mo: {fmt(@forecast.ladder.lockable_1mo)}</div>
+            <div>{gettext("Lockable")} 3mo: {fmt(@forecast.ladder.lockable_3mo)}</div>
+            <div>{gettext("Lockable")} 6mo: {fmt(@forecast.ladder.lockable_6mo)}</div>
+            <div>{gettext("Lockable")} 12mo: {fmt(@forecast.ladder.lockable_12mo)}</div>
           </div>
-          <p class="muted">{gettext("On-call")}: {fmt(@forecast.ladder.on_call)}</p>
         </div>
 
         <table class="forecast">
           <thead>
             <tr>
-              <th>{gettext("Wk")}</th>
-              <th>{gettext("Start")}</th>
+              <th>#</th>
+              <th>{gettext("From")}</th>
+              <th>{gettext("To")}</th>
               <th>{gettext("Opening")}</th>
               <th>{gettext("Expected In")}</th>
               <th>{gettext("Base In")}</th>
@@ -84,17 +87,18 @@ defmodule FullCircleWeb.ReportLive.CashForecastPrint do
             </tr>
           </thead>
           <tbody>
-            <tr :for={w <- @forecast.weeks}>
-              <td class="ctr">{w.n}</td>
-              <td class="ctr">{Date.to_iso8601(w.week_start)}</td>
-              <td>{fmt(w.opening)}</td>
-              <td>{fmt(w.known_in)}</td>
-              <td>{fmt(w.baseline_in)}</td>
-              <td>{fmt(w.known_out)}</td>
-              <td>{fmt(w.baseline_out)}</td>
-              <td class="bold">{fmt(w.closing)}</td>
-              <td>{fmt(w.buffer)}</td>
-              <td class="bold">{fmt(w.free_cash)}</td>
+            <tr :for={p <- @forecast.periods}>
+              <td class="ctr">{p.n}</td>
+              <td class="ctr">{Date.to_iso8601(p.period_start)}</td>
+              <td class="ctr">{Date.to_iso8601(p.period_end)}</td>
+              <td>{fmt(p.opening)}</td>
+              <td>{fmt(p.known_in)}</td>
+              <td>{fmt(p.baseline_in)}</td>
+              <td>{fmt(p.known_out)}</td>
+              <td>{fmt(p.baseline_out)}</td>
+              <td class="bold">{fmt(p.closing)}</td>
+              <td>{fmt(p.buffer)}</td>
+              <td class="bold">{fmt(p.free_cash)}</td>
             </tr>
           </tbody>
         </table>
@@ -102,16 +106,16 @@ defmodule FullCircleWeb.ReportLive.CashForecastPrint do
         <div class="legend">
           <p class="bold">{gettext("How to read this report")}</p>
           <p>
-            <b>{gettext("Opening")}</b>: {gettext("cash & bank balance at the start of the week (last week's Closing")}).
+            <b>{gettext("Opening")}</b>: {gettext("cash & bank balance at the start of the period (previous period's Closing")}).
             <b>{gettext("Closing")}</b>: {gettext("Opening + all inflows − all outflows")}.
             <b>{gettext("Expected In")}</b>: {gettext("collections from unpaid sales invoices, spread by how this company has actually been paid in the past (vs due date), plus in-hand cheques & posted future receipts on their own dates")}.
             <b>{gettext("Expected Out")}</b>: {gettext("payments for unpaid purchase invoices, spread by how this company has actually paid suppliers in the past (vs due date), plus posted future payments on their own dates")}.
-            <b>{gettext("Base In")}</b> / <b>{gettext("Base Out")}</b>: {gettext("estimated recurring operating in/out — weekly average of past non-customer/supplier cash & bank activity (cash sales, payroll, utilities)")}.
-            <b>{gettext("Buffer")}</b>: {gettext("cash that must stay liquid — total projected outflow over the next %{n} week(s)", n: @forecast.buffer_weeks)}.
+            <b>{gettext("Base In")}</b> / <b>{gettext("Base Out")}</b>: {gettext("estimated recurring operating in/out — past non-customer/supplier cash & bank activity scaled to one period (cash sales, payroll, utilities)")}.
+            <b>{gettext("Buffer")}</b>: {gettext("cash that must stay liquid — total projected outflow over the next %{n} period(s)", n: @forecast.buffer_periods)}.
             <b>{gettext("Free Cash")}</b>: {gettext("Closing − Buffer (never below 0) — surplus safe to put to work")}.
           </p>
           <p>
-            <b>{gettext("Fixed Deposit Tenure Ladder")}</b>: {gettext("the most you can lock away for ~1/2/3 months without any week dropping below its Buffer")}.
+            <b>{gettext("Fixed Deposit Tenure Ladder")}</b>: {gettext("the most you can lock away for ~1/3/6/12 months without any period dropping below its Buffer")}.
             {gettext("Expected amounts are real (owed on documents) but timed from past payment behaviour; a slow-paying tail beyond the window is not counted, so this is conservative")}.
           </p>
         </div>

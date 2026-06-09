@@ -1,7 +1,8 @@
 defmodule FullCircle.Reporting.CashForecast do
   @moduledoc """
-  Rolling weekly cash forecast and fixed-deposit tenure ladder.
-  Pure core (`build_forecast/3`, `fd_ladder/1`) plus DB query helpers.
+  Rolling cash forecast and fixed-deposit tenure ladder over fixed-length periods
+  (a configurable number of days per bucket). Pure core (`build_forecast/3`,
+  `fd_ladder/2`, `distribute_outstanding/4`) plus DB query helpers.
   """
 
   alias FullCircle.Repo
@@ -19,6 +20,9 @@ defmodule FullCircle.Reporting.CashForecast do
   end
 
   @zero Decimal.new(0)
+
+  # Fixed-deposit ladder tenures, expressed in days (~1, 3, 6, 12 months).
+  @tenure_days [{:"1mo", 30}, {:"3mo", 90}, {:"6mo", 180}, {:"12mo", 365}]
 
   @liquid_types ["Cash or Equivalent", "Bank"]
 
@@ -74,11 +78,12 @@ defmodule FullCircle.Reporting.CashForecast do
   end
 
   @doc """
-  Average weekly in/out from contact-null liquid txns over the `weeks`-long
-  window ending the day before `start_date`. Returns `{baseline_in, baseline_out}`.
+  Per-period average in/out from contact-null liquid txns over the trailing
+  `trailing_days` ending the day before `start_date`, scaled to a `period_days`
+  bucket. Returns `{baseline_in, baseline_out}`.
   """
-  def baseline_flows(account_ids, start_date, weeks, com) do
-    window_start = Date.add(start_date, -weeks * 7)
+  def baseline_flows(account_ids, start_date, trailing_days, period_days, com) do
+    window_start = Date.add(start_date, -trailing_days)
 
     rows =
       from(t in Transaction,
@@ -93,10 +98,10 @@ defmodule FullCircle.Reporting.CashForecast do
       )
       |> Repo.one()
 
-    ins = to_decimal(rows && rows.ins)
-    outs = to_decimal(rows && rows.outs)
-    wk = Decimal.new("#{weeks}")
-    {Decimal.div(ins, wk), Decimal.div(outs, wk)}
+    # daily rate over the window, scaled up to one period
+    factor = Decimal.div(Decimal.new("#{period_days}"), Decimal.new("#{trailing_days}"))
+    {Decimal.mult(to_decimal(rows && rows.ins), factor),
+     Decimal.mult(to_decimal(rows && rows.outs), factor)}
   end
 
   @doc "Clamp a due date to the forecast start (past-due items become due immediately)."
@@ -156,13 +161,13 @@ defmodule FullCircle.Reporting.CashForecast do
   end
 
   @doc """
-  Empirical payment-lag profile from the trailing `trailing_months` of matching
-  history: `%{week_lag => fraction_of_value}`, where `week_lag` is the number of
-  whole weeks between an invoice's due_date and when it was actually paid
-  (negative = paid early). Falls back to `%{0 => 1}` (pay on the due week) when
-  there is no history. Company-scoped.
+  Empirical payment-lag profile from the trailing `trailing_days` of matching
+  history: `%{period_lag => fraction_of_value}`, where `period_lag` is the number
+  of whole `period_days`-length periods between an invoice's due_date and when it
+  was actually paid (negative = paid early). Falls back to `%{0 => 1}` (pay in the
+  due period) when there is no history. Company-scoped.
   """
-  def payment_lag_profile(direction, com, trailing_months \\ 12) do
+  def payment_lag_profile(direction, com, period_days, trailing_days \\ 365) do
     {doc_type, inv_table, date_col} =
       case direction do
         :ar -> {"Invoice", "invoices", "due_date"}
@@ -170,12 +175,12 @@ defmodule FullCircle.Reporting.CashForecast do
       end
 
     com_id_bin = dump_uuid!(com.id)
-    cutoff = Date.add(Date.utc_today(), -trailing_months * 30)
+    cutoff = Date.add(Date.utc_today(), -trailing_days)
 
     # Matchers attach to the invoice's contact line via transaction_id; tm.doc_date
-    # is the actual settlement date. Lag is measured from the invoice's due_date.
+    # is the actual settlement date. Lag is whole periods from the due_date.
     sql = """
-      select floor((tm.doc_date - inv.#{date_col})::numeric / 7)::int as lag,
+      select floor((tm.doc_date - inv.#{date_col})::numeric / $4)::int as lag,
              sum(abs(tm.match_amount)) as amt
         from transaction_matchers tm
         join transactions t on t.id = tm.transaction_id
@@ -187,7 +192,7 @@ defmodule FullCircle.Reporting.CashForecast do
        group by 1
     """
 
-    rows = exec_query_map(sql, [com_id_bin, doc_type, cutoff], FullCircle.Repo)
+    rows = exec_query_map(sql, [com_id_bin, doc_type, cutoff, period_days], FullCircle.Repo)
     total = Enum.reduce(rows, @zero, fn r, a -> Decimal.add(a, to_decimal(r.amt)) end)
 
     if Decimal.compare(total, @zero) == :gt do
@@ -198,26 +203,28 @@ defmodule FullCircle.Reporting.CashForecast do
   end
 
   @doc """
-  Spread each open document's outstanding across the forecast weeks using the lag
-  `profile`. `open` is `[%{due_date, amount}]`; `week_starts` is the ordered list
-  of week-start dates. Returns weekly totals (same length as `week_starts`).
+  Spread each open document's outstanding across the forecast periods using the lag
+  `profile`. `open` is `[%{due_date, amount}]`; `period_starts` the ordered list of
+  period-start dates; `period_days` the bucket length. Returns per-period totals
+  (same length as `period_starts`).
 
-  A document's payment lands in week `due_week + lag`. Lag buckets that fall before
-  the first week (already elapsed, for overdue invoices) or after the last week
-  (the slow tail) are simply not placed — a conservative, non-renormalized estimate.
+  A document's payment lands in period `due_period + lag`. Lag buckets that fall
+  before the first period (already elapsed, for overdue invoices) or after the last
+  period (the slow tail) are simply not placed — a conservative, non-renormalized
+  estimate.
   """
-  def distribute_outstanding(open, profile, week_starts) do
-    start = hd(week_starts)
-    zeros = List.duplicate(@zero, length(week_starts))
+  def distribute_outstanding(open, profile, period_starts, period_days) do
+    start = hd(period_starts)
+    zeros = List.duplicate(@zero, length(period_starts))
 
     Enum.reduce(open, zeros, fn %{due_date: due, amount: amt}, acc ->
-      due_idx = Integer.floor_div(Date.diff(due, start), 7)
+      due_idx = Integer.floor_div(Date.diff(due, start), period_days)
 
       acc
       |> Enum.with_index()
-      |> Enum.map(fn {wk_total, w} ->
-        frac = Map.get(profile, w - due_idx, @zero)
-        Decimal.add(wk_total, Decimal.mult(amt, frac))
+      |> Enum.map(fn {period_total, p} ->
+        frac = Map.get(profile, p - due_idx, @zero)
+        Decimal.add(period_total, Decimal.mult(amt, frac))
       end)
     end)
   end
@@ -232,37 +239,48 @@ defmodule FullCircle.Reporting.CashForecast do
   end
 
   @doc """
-  Full forecast. `opts` is a map with `:start_date`, `:weeks_count` (default 13),
-  `:buffer_weeks` (default 2), `:trailing_weeks` (default 52), `:account_ids`
-  (`:all` or list).
+  Full forecast. `opts` is a map with `:start_date`, `:period_days` (default 30),
+  `:periods_count` (default 12), `:buffer_periods` (default 1), `:trailing_days`
+  (default 365), `:account_ids` (`:all` or list).
   """
   def cash_forecast(opts, com) do
     start_date = Map.fetch!(opts, :start_date)
-    weeks_count = Map.get(opts, :weeks_count, 13)
-    buffer_weeks = Map.get(opts, :buffer_weeks, 2)
-    trailing_weeks = Map.get(opts, :trailing_weeks, 52)
+    period_days = Map.get(opts, :period_days, 30)
+    periods_count = Map.get(opts, :periods_count, 12)
+    buffer_periods = Map.get(opts, :buffer_periods, 1)
+    trailing_days = Map.get(opts, :trailing_days, 365)
     account_sel = Map.get(opts, :account_ids, :all)
 
-    end_date = Date.add(start_date, weeks_count * 7 - 1)
+    end_date = Date.add(start_date, period_days * periods_count - 1)
     ids = liquid_account_ids(com, account_sel)
 
     opening = opening_liquid_balance(ids, start_date, com)
-    {bin, bout} = baseline_flows(ids, start_date, trailing_weeks, com)
+    {bin, bout} = baseline_flows(ids, start_date, trailing_days, period_days, com)
 
-    week_starts = for i <- 0..(weeks_count - 1), do: Date.add(start_date, i * 7)
+    period_starts = for i <- 0..(periods_count - 1), do: Date.add(start_date, i * period_days)
 
-    ar_weekly =
-      distribute_outstanding(outstanding_ar_by_due(com), payment_lag_profile(:ar, com), week_starts)
+    ar_periodly =
+      distribute_outstanding(
+        outstanding_ar_by_due(com),
+        payment_lag_profile(:ar, com, period_days, trailing_days),
+        period_starts,
+        period_days
+      )
 
-    ap_weekly =
-      distribute_outstanding(outstanding_ap_by_due(com), payment_lag_profile(:ap, com), week_starts)
+    ap_periodly =
+      distribute_outstanding(
+        outstanding_ap_by_due(com),
+        payment_lag_profile(:ap, com, period_days, trailing_days),
+        period_starts,
+        period_days
+      )
 
     spread_events =
-      Enum.map(Enum.zip(ar_weekly, week_starts), fn {amt, ws} ->
-        %{date: ws, in: amt, out: @zero, kind: :known}
+      Enum.map(Enum.zip(ar_periodly, period_starts), fn {amt, ps} ->
+        %{date: ps, in: amt, out: @zero, kind: :known}
       end) ++
-        Enum.map(Enum.zip(ap_weekly, week_starts), fn {amt, ws} ->
-          %{date: ws, in: @zero, out: amt, kind: :known}
+        Enum.map(Enum.zip(ap_periodly, period_starts), fn {amt, ps} ->
+          %{date: ps, in: @zero, out: amt, kind: :known}
         end)
 
     events =
@@ -273,7 +291,7 @@ defmodule FullCircle.Reporting.CashForecast do
     build_forecast(
       %{opening: opening, baseline_in: bin, baseline_out: bout, events: events},
       start_date,
-      weeks_count: weeks_count, buffer_weeks: buffer_weeks
+      period_days: period_days, periods_count: periods_count, buffer_periods: buffer_periods
     )
   end
 
@@ -285,78 +303,71 @@ defmodule FullCircle.Reporting.CashForecast do
   Build the forecast from already-fetched raw inputs.
 
   `raw` is `%{opening, baseline_in, baseline_out, events}` where events is a list
-  of `%{date, in, out, kind}`. Returns the forecast result map (see plan header).
+  of `%{date, in, out, kind}`. `opts` carries `:period_days`, `:periods_count`,
+  `:buffer_periods`. Returns the forecast result map.
   """
   def build_forecast(raw, start_date, opts) do
-    weeks_count = Keyword.fetch!(opts, :weeks_count)
-    buffer_weeks = Keyword.fetch!(opts, :buffer_weeks)
+    period_days = Keyword.fetch!(opts, :period_days)
+    periods_count = Keyword.fetch!(opts, :periods_count)
+    buffer_periods = Keyword.fetch!(opts, :buffer_periods)
 
-    bounds = week_bounds(start_date, weeks_count)
-    known = bucket_events(raw.events, bounds)
+    bounds = period_bounds(start_date, period_days, periods_count)
+    known = bucket_events(raw.events, start_date, period_days, periods_count)
 
-    weeks =
+    periods =
       bounds
       |> Enum.with_index(1)
       |> roll_forward(known, raw.opening, raw.baseline_in, raw.baseline_out)
-      |> apply_buffer(buffer_weeks)
+      |> apply_buffer(buffer_periods)
 
     %{
       start_date: start_date,
-      weeks_count: weeks_count,
-      buffer_weeks: buffer_weeks,
+      period_days: period_days,
+      periods_count: periods_count,
+      buffer_periods: buffer_periods,
       opening: raw.opening,
       baseline_in: raw.baseline_in,
       baseline_out: raw.baseline_out,
-      weeks: weeks,
-      ladder: fd_ladder(weeks)
+      periods: periods,
+      ladder: fd_ladder(periods, period_days)
     }
   end
 
-  # List of {week_start, week_end} for n consecutive 7-day windows.
-  defp week_bounds(start_date, n) do
+  # List of {period_start, period_end} for n consecutive period_days-length windows.
+  defp period_bounds(start_date, period_days, n) do
     for i <- 0..(n - 1) do
-      ws = Date.add(start_date, i * 7)
-      {ws, Date.add(ws, 6)}
+      ps = Date.add(start_date, i * period_days)
+      {ps, Date.add(ps, period_days - 1)}
     end
   end
 
-  # Returns %{week_index => %{in: Decimal, out: Decimal}} for events inside the horizon.
-  # Events before start_date land in week 1; events after the horizon are dropped.
-  defp bucket_events(events, bounds) do
-    {first_start, _} = hd(bounds)
-    {_, last_end} = List.last(bounds)
+  # %{period_index(1-based) => %{in, out}} for events inside the horizon.
+  # Events before start land in period 1; events after the horizon are dropped.
+  defp bucket_events(events, start_date, period_days, n) do
+    last_end = Date.add(start_date, period_days * n - 1)
 
     Enum.reduce(events, %{}, fn ev, acc ->
-      cond do
-        Date.compare(ev.date, last_end) == :gt ->
-          acc
-
-        true ->
-          idx = week_index_for(ev.date, first_start, length(bounds))
-          cur = Map.get(acc, idx, %{in: @zero, out: @zero})
-          Map.put(acc, idx, %{in: Decimal.add(cur.in, ev.in), out: Decimal.add(cur.out, ev.out)})
+      if Date.compare(ev.date, last_end) == :gt do
+        acc
+      else
+        i = Integer.floor_div(Date.diff(ev.date, start_date), period_days)
+        idx = (i + 1) |> max(1) |> min(n)
+        cur = Map.get(acc, idx, %{in: @zero, out: @zero})
+        Map.put(acc, idx, %{in: Decimal.add(cur.in, ev.in), out: Decimal.add(cur.out, ev.out)})
       end
     end)
   end
 
-  defp week_index_for(date, first_start, n) do
-    days = Date.diff(date, first_start)
-    cond do
-      days < 0 -> 1
-      true -> min(div(days, 7) + 1, n)
-    end
-  end
-
   defp roll_forward(indexed_bounds, known, opening, baseline_in, baseline_out) do
     {rows, _} =
-      Enum.map_reduce(indexed_bounds, opening, fn {{ws, we}, idx}, open ->
+      Enum.map_reduce(indexed_bounds, opening, fn {{ps, pe}, idx}, open ->
         k = Map.get(known, idx, %{in: @zero, out: @zero})
         total_in = Decimal.add(k.in, baseline_in)
         total_out = Decimal.add(k.out, baseline_out)
         closing = open |> Decimal.add(total_in) |> Decimal.sub(total_out)
 
         row = %{
-          n: idx, week_start: ws, week_end: we,
+          n: idx, period_start: ps, period_end: pe,
           opening: open, known_in: k.in, baseline_in: baseline_in,
           known_out: k.out, baseline_out: baseline_out,
           total_in: total_in, total_out: total_out,
@@ -369,9 +380,9 @@ defmodule FullCircle.Reporting.CashForecast do
     rows
   end
 
-  # buffer[w] = sum of total_out over weeks w+1 .. w+buffer_weeks
-  # free_cash[w] = max(0, closing - buffer)
-  defp apply_buffer(rows, buffer_weeks) do
+  # buffer[p] = sum of total_out over periods p+1 .. p+buffer_periods
+  # free_cash[p] = max(0, closing - buffer)
+  defp apply_buffer(rows, buffer_periods) do
     outs = Enum.map(rows, & &1.total_out)
 
     rows
@@ -379,7 +390,7 @@ defmodule FullCircle.Reporting.CashForecast do
     |> Enum.map(fn {row, i} ->
       buffer =
         outs
-        |> Enum.slice((i + 1)..(i + buffer_weeks))
+        |> Enum.slice((i + 1)..(i + buffer_periods))
         |> Enum.reduce(@zero, &Decimal.add(&2, &1))
 
       free = Decimal.sub(row.closing, buffer)
@@ -389,24 +400,34 @@ defmodule FullCircle.Reporting.CashForecast do
   end
 
   @doc """
-  Sustainable lock-up amount per tenure = rolling minimum of free cash:
-  ~1mo = min(weeks 1-4), ~2mo = min(weeks 1-8), ~3mo = min(weeks 1-13).
-  Placement increments are non-negative differences (longest tenure first).
+  Sustainable lock-up amount per tenure = rolling minimum of free cash. Tenures are
+  ~1/3/6/12 months (30/90/180/365 days), each covering the first
+  `ceil(tenure_days / period_days)` periods (capped at the horizon). Placement
+  increments are non-negative differences (longest tenure first).
   """
-  def fd_ladder(weeks) do
-    frees = weeks |> Enum.sort_by(& &1.n) |> Enum.map(& &1.free_cash)
+  def fd_ladder(periods, period_days) do
+    frees = periods |> Enum.sort_by(& &1.n) |> Enum.map(& &1.free_cash)
+    n = length(frees)
 
-    l1 = min_slice(frees, 4)
-    l2 = min_slice(frees, 8)
-    l3 = min_slice(frees, 13)
+    k = fn tenure_days -> min(n, max(1, ceil(tenure_days / period_days))) end
+
+    locks =
+      Map.new(@tenure_days, fn {key, days} -> {key, min_slice(frees, k.(days))} end)
+
+    l1 = locks[:"1mo"]
+    l3 = locks[:"3mo"]
+    l6 = locks[:"6mo"]
+    l12 = locks[:"12mo"]
 
     %{
       lockable_1mo: l1,
-      lockable_2mo: l2,
       lockable_3mo: l3,
-      place_3mo: l3,
-      place_2mo: nonneg(Decimal.sub(l2, l3)),
-      place_1mo: nonneg(Decimal.sub(l1, l2)),
+      lockable_6mo: l6,
+      lockable_12mo: l12,
+      place_12mo: l12,
+      place_6mo: nonneg(Decimal.sub(l6, l12)),
+      place_3mo: nonneg(Decimal.sub(l3, l6)),
+      place_1mo: nonneg(Decimal.sub(l1, l3)),
       on_call: @zero
     }
   end

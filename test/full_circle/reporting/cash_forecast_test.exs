@@ -4,57 +4,70 @@ defmodule FullCircle.Reporting.CashForecastTest do
 
   defp d(n), do: Decimal.new("#{n}")
 
-  describe "fd_ladder/1" do
-    test "rolling minimums and non-negative tenure increments" do
-      # free_cash by week 1..13
-      frees = [55, 60, 58, 70, 72, 80, 65, 90, 100, 100, 110, 120, 130]
-      weeks = for {f, i} <- Enum.with_index(frees, 1), do: %{n: i, free_cash: d(f)}
+  defp periods_from(start, n, period_days),
+    do: for(i <- 0..(n - 1), do: Date.add(start, i * period_days))
 
-      ladder = FullCircle.Reporting.CashForecast.fd_ladder(weeks)
+  describe "fd_ladder/2" do
+    test "rolling minimums and non-negative tenure increments (30-day periods)" do
+      # free_cash by period 1..12, first period the lowest
+      frees = [55, 60, 58, 70, 72, 80, 65, 90, 100, 100, 110, 120]
+      periods = for {f, i} <- Enum.with_index(frees, 1), do: %{n: i, free_cash: d(f)}
 
-      assert ladder.lockable_1mo == d(55)   # min weeks 1-4
-      assert ladder.lockable_2mo == d(55)   # min weeks 1-8
-      assert ladder.lockable_3mo == d(55)   # min weeks 1-13
-      assert ladder.place_3mo == d(55)
-      assert ladder.place_2mo == d(0)       # lockable_2mo - lockable_3mo
-      assert ladder.place_1mo == d(0)       # lockable_1mo - lockable_2mo
+      ladder = CashForecast.fd_ladder(periods, 30)
+
+      assert ladder.lockable_1mo == d(55)
+      assert ladder.lockable_3mo == d(55)
+      assert ladder.lockable_6mo == d(55)
+      assert ladder.lockable_12mo == d(55)
+      assert ladder.place_12mo == d(55)
+      assert ladder.place_6mo == d(0)
+      assert ladder.place_3mo == d(0)
+      assert ladder.place_1mo == d(0)
     end
 
-    test "decreasing free cash gives a real ladder" do
-      frees = [100, 100, 100, 100, 80, 80, 80, 80, 60, 60, 60, 60, 60]
-      weeks = for {f, i} <- Enum.with_index(frees, 1), do: %{n: i, free_cash: d(f)}
+    test "stepping-down free cash gives a real ladder (30-day periods)" do
+      frees = [100, 100, 100, 80, 80, 80, 60, 60, 60, 50, 50, 50]
+      periods = for {f, i} <- Enum.with_index(frees, 1), do: %{n: i, free_cash: d(f)}
 
-      ladder = FullCircle.Reporting.CashForecast.fd_ladder(weeks)
+      ladder = CashForecast.fd_ladder(periods, 30)
 
-      assert ladder.lockable_1mo == d(100)  # min 1-4
-      assert ladder.lockable_2mo == d(80)   # min 1-8
-      assert ladder.lockable_3mo == d(60)   # min 1-13
-      assert ladder.place_3mo == d(60)
-      assert ladder.place_2mo == d(20)      # 80 - 60
-      assert ladder.place_1mo == d(20)      # 100 - 80
+      assert ladder.lockable_1mo == d(100)  # min period 1 (ceil(30/30)=1)
+      assert ladder.lockable_3mo == d(100)  # min 1-3 (ceil(90/30)=3)
+      assert ladder.lockable_6mo == d(80)   # min 1-6 (ceil(180/30)=6)
+      assert ladder.lockable_12mo == d(50)  # min 1-12 (ceil(365/30)->capped 12)
+      assert ladder.place_12mo == d(50)
+      assert ladder.place_6mo == d(30)      # 80 - 50
+      assert ladder.place_3mo == d(20)      # 100 - 80
+      assert ladder.place_1mo == d(0)       # 100 - 100
+    end
+
+    test "14-day periods map tenures onto more buckets" do
+      # 26 periods of 14 days ~ 1 year. ceil(30/14)=3, ceil(90/14)=7, ceil(180/14)=13.
+      frees = for i <- 1..26, do: %{n: i, free_cash: d(i * 10)}
+      ladder = CashForecast.fd_ladder(frees, 14)
+
+      assert ladder.lockable_1mo == d(10)   # min of first 3 -> period 1 = 10
+      assert ladder.lockable_3mo == d(10)   # min of first 7
+      assert ladder.lockable_6mo == d(10)   # min of first 13
     end
   end
 
   describe "clamp_due/2" do
     test "past-due dates clamp to start_date, future dates pass through" do
       start = ~D[2026-06-08]
-      assert FullCircle.Reporting.CashForecast.clamp_due(~D[2026-05-01], start) == start
-      assert FullCircle.Reporting.CashForecast.clamp_due(~D[2026-07-01], start) == ~D[2026-07-01]
+      assert CashForecast.clamp_due(~D[2026-05-01], start) == start
+      assert CashForecast.clamp_due(~D[2026-07-01], start) == ~D[2026-07-01]
     end
   end
 
-  describe "distribute_outstanding/3" do
-    alias FullCircle.Reporting.CashForecast
-
-    defp weeks_from(start, n), do: for(i <- 0..(n - 1), do: Date.add(start, i * 7))
-
-    test "spreads outstanding across weeks per the lag profile" do
-      start = ~D[2026-06-08]
-      weeks = weeks_from(start, 13)
-      open = [%{due_date: start, amount: d(1000)}]
+  describe "distribute_outstanding/4" do
+    test "spreads outstanding across periods per the lag profile" do
+      start = ~D[2026-06-01]
+      periods = periods_from(start, 12, 30)
+      open = [%{due_date: ~D[2026-06-15], amount: d(1000)}]
       profile = %{0 => Decimal.new("0.5"), 1 => Decimal.new("0.3"), 2 => Decimal.new("0.2")}
 
-      res = CashForecast.distribute_outstanding(open, profile, weeks)
+      res = CashForecast.distribute_outstanding(open, profile, periods, 30)
 
       assert Decimal.equal?(Enum.at(res, 0), d(500))
       assert Decimal.equal?(Enum.at(res, 1), d(300))
@@ -63,10 +76,10 @@ defmodule FullCircle.Reporting.CashForecastTest do
     end
 
     test "overdue invoice drops already-elapsed lag buckets (conservative, no renormalize)" do
-      start = ~D[2026-06-08]
-      weeks = weeks_from(start, 13)
-      # due 2 weeks before start -> due_idx = -2; week 0 has lag 2, week 1 lag 3
-      open = [%{due_date: Date.add(start, -14), amount: d(1000)}]
+      start = ~D[2026-06-01]
+      periods = periods_from(start, 12, 30)
+      # due 2 periods (60 days) before start -> due_idx = -2; period 0 has lag 2
+      open = [%{due_date: Date.add(start, -60), amount: d(1000)}]
 
       profile = %{
         0 => Decimal.new("0.5"),
@@ -75,55 +88,54 @@ defmodule FullCircle.Reporting.CashForecastTest do
         3 => Decimal.new("0.05")
       }
 
-      res = CashForecast.distribute_outstanding(open, profile, weeks)
+      res = CashForecast.distribute_outstanding(open, profile, periods, 30)
 
       assert Decimal.equal?(Enum.at(res, 0), d(150))
       assert Decimal.equal?(Enum.at(res, 1), d(50))
       assert Decimal.equal?(Enum.at(res, 2), d(0))
-      # The elapsed lag-0/lag-1 mass (0.8) is dropped, not collected -> conservative
       total = Enum.reduce(res, Decimal.new(0), &Decimal.add(&2, &1))
       assert Decimal.equal?(total, d(200))
     end
 
     test "future-dated invoice beyond the horizon contributes ~nothing" do
-      start = ~D[2026-06-08]
-      weeks = weeks_from(start, 13)
-      # due 20 weeks out: all in-horizon lags are negative -> profile lookups miss
-      open = [%{due_date: Date.add(start, 140), amount: d(1000)}]
+      start = ~D[2026-06-01]
+      periods = periods_from(start, 12, 30)
+      open = [%{due_date: Date.add(start, 20 * 30), amount: d(1000)}]
       profile = %{0 => Decimal.new("1.0")}
 
-      res = CashForecast.distribute_outstanding(open, profile, weeks)
+      res = CashForecast.distribute_outstanding(open, profile, periods, 30)
       total = Enum.reduce(res, Decimal.new(0), &Decimal.add(&2, &1))
       assert Decimal.equal?(total, d(0))
     end
   end
 
   describe "build_forecast/3 roll-forward" do
-    test "buckets events into weeks and rolls balance forward" do
-      start = ~D[2026-06-08]  # a Monday
+    test "buckets events into periods and rolls balance forward" do
+      start = ~D[2026-06-08]
 
       events = [
-        %{date: ~D[2026-06-10], in: d(1000), out: d(0), kind: :known},   # week 1
-        %{date: ~D[2026-06-12], in: d(0), out: d(400), kind: :known},    # week 1
-        %{date: ~D[2026-06-16], in: d(0), out: d(700), kind: :known}     # week 2
+        %{date: ~D[2026-06-10], in: d(1000), out: d(0), kind: :known},   # period 1
+        %{date: ~D[2026-06-12], in: d(0), out: d(400), kind: :known},    # period 1
+        %{date: ~D[2026-07-16], in: d(0), out: d(700), kind: :known}     # period 2 (day 38)
       ]
 
       res =
         CashForecast.build_forecast(
           %{opening: d(5000), baseline_in: d(0), baseline_out: d(0), events: events},
           start,
-          weeks_count: 13, buffer_weeks: 2
+          period_days: 30, periods_count: 12, buffer_periods: 1
         )
 
-      [w1, w2 | _] = res.weeks
-      assert w1.opening == d(5000)
-      assert w1.known_in == d(1000)
-      assert w1.known_out == d(400)
-      assert w1.closing == d(5600)            # 5000 + 1000 - 400
-      assert w2.opening == d(5600)
-      assert w2.known_out == d(700)
-      assert w2.closing == d(4900)            # 5600 - 700
-      assert length(res.weeks) == 13
+      [p1, p2 | _] = res.periods
+      assert p1.period_start == ~D[2026-06-08]
+      assert p1.opening == d(5000)
+      assert p1.known_in == d(1000)
+      assert p1.known_out == d(400)
+      assert p1.closing == d(5600)            # 5000 + 1000 - 400
+      assert p2.opening == d(5600)
+      assert p2.known_out == d(700)
+      assert p2.closing == d(4900)            # 5600 - 700
+      assert length(res.periods) == 12
     end
   end
 end
@@ -185,17 +197,17 @@ defmodule FullCircle.Reporting.CashForecastDBTest do
     test "returns dated events split by sign within horizon", %{com: com, bank: bank} do
       txn!(com, bank.id, ~D[2026-06-10], d(1000))
       txn!(com, bank.id, ~D[2026-06-12], d(-400))
-      txn!(com, bank.id, ~D[2026-12-31], d(5000)) # beyond 13 weeks -> excluded
+      txn!(com, bank.id, ~D[2027-12-31], d(5000)) # beyond horizon -> excluded
 
       ids = CashForecast.liquid_account_ids(com, :all)
-      end_date = ~D[2026-09-06]  # ~13 weeks from 2026-06-08
+      end_date = ~D[2026-09-06]
       events = CashForecast.posted_future_flows(ids, ~D[2026-06-08], end_date, com)
 
       ins = Enum.filter(events, &(Decimal.compare(&1.in, d(0)) == :gt))
       outs = Enum.filter(events, &(Decimal.compare(&1.out, d(0)) == :gt))
       assert Enum.any?(ins, &(&1.date == ~D[2026-06-10] and &1.in == d(1000)))
       assert Enum.any?(outs, &(&1.date == ~D[2026-06-12] and &1.out == d(400)))
-      refute Enum.any?(events, &(&1.date == ~D[2026-12-31]))
+      refute Enum.any?(events, &(&1.date == ~D[2027-12-31]))
     end
   end
 
@@ -301,27 +313,26 @@ defmodule FullCircle.Reporting.CashForecastDBTest do
   end
 
   describe "cash_forecast/2 end-to-end" do
-    test "produces 13 weeks, opening, and a ladder", %{com: com, bank: bank} do
+    test "produces N periods, opening, and a 1/3/6/12 ladder", %{com: com, bank: bank} do
       txn!(com, bank.id, ~D[2026-06-01], d(10_000))     # opening (before start)
       txn!(com, bank.id, ~D[2026-06-10], d(2000))       # posted future inflow
 
       res =
         CashForecast.cash_forecast(
-          %{start_date: ~D[2026-06-08], weeks_count: 13, buffer_weeks: 2,
-            trailing_weeks: 13, account_ids: :all},
+          %{start_date: ~D[2026-06-08], period_days: 30, periods_count: 12,
+            buffer_periods: 1, trailing_days: 365, account_ids: :all},
           com
         )
 
       assert Decimal.equal?(res.opening, d(10_000))
-      assert length(res.weeks) == 13
-      assert Decimal.equal?(hd(res.weeks).opening, d(10_000))
-      assert Map.has_key?(res.ladder, :place_3mo)
+      assert length(res.periods) == 12
+      assert Decimal.equal?(hd(res.periods).opening, d(10_000))
+      assert Map.has_key?(res.ladder, :place_12mo)
     end
   end
 
-  describe "baseline_flows/4" do
-    test "averages contact-null liquid flows over the trailing window", %{com: com, bank: bank} do
-      # 13-week trailing window before 2026-06-08
+  describe "baseline_flows/5" do
+    test "scales contact-null liquid flows from the trailing window to a period", %{com: com, bank: bank} do
       txn!(com, bank.id, ~D[2026-04-01], d(1300))   # contact_id nil -> in
       txn!(com, bank.id, ~D[2026-05-01], d(-650))   # contact_id nil -> out
 
@@ -333,12 +344,14 @@ defmodule FullCircle.Reporting.CashForecastDBTest do
 
       txn!(com, bank.id, ~D[2026-05-02], d(9999), %{contact_id: cont.id})
 
+      # trailing 365 days, 30-day period -> per period = total * 30/365
       {bin, bout} =
         CashForecast.baseline_flows(
-          CashForecast.liquid_account_ids(com, :all), ~D[2026-06-08], 13, com)
+          CashForecast.liquid_account_ids(com, :all), ~D[2026-06-08], 365, 30, com)
 
-      assert Decimal.equal?(bin, Decimal.div(d(1300), d(13)))   # 100/week
-      assert Decimal.equal?(bout, Decimal.div(d(650), d(13)))   # 50/week
+      factor = Decimal.div(d(30), d(365))
+      assert Decimal.equal?(bin, Decimal.mult(d(1300), factor))
+      assert Decimal.equal?(bout, Decimal.mult(d(650), factor))
     end
   end
 end
