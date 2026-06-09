@@ -214,27 +214,6 @@ defmodule FullCircle.Reporting.CashForecastDBTest do
     end
   end
 
-  describe "historical_actuals/5" do
-    test "returns real per-period liquid in/out for the periods before start", %{com: com, bank: bank} do
-      # start 2026-06-08, 30-day periods, 2 back:
-      # period 0 = 2026-04-09..05-08, period 1 = 2026-05-09..06-07
-      txn!(com, bank.id, ~D[2026-04-15], d(1000))
-      txn!(com, bank.id, ~D[2026-04-20], d(-300))
-      txn!(com, bank.id, ~D[2026-05-20], d(500))
-
-      [p0, p1] =
-        CashForecast.historical_actuals(
-          CashForecast.liquid_account_ids(com, :all), ~D[2026-06-08], 30, 2, com)
-
-      assert p0.period_start == ~D[2026-04-09]
-      assert Decimal.equal?(p0.in, d(1000))
-      assert Decimal.equal?(p0.out, d(300))
-      assert Decimal.equal?(p0.net, d(700))
-      assert Decimal.equal?(p1.in, d(500))
-      assert Decimal.equal?(p1.net, d(500))
-    end
-  end
-
   describe "cash_forecast/2 end-to-end" do
     test "produces N periods, opening, run-rate, and a 1/3/6/12 ladder", %{com: com, bank: bank} do
       txn!(com, bank.id, ~D[2026-06-01], d(10_000))     # opening (before start)

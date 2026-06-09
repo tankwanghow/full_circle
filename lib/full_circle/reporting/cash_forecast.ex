@@ -111,70 +111,25 @@ defmodule FullCircle.Reporting.CashForecast do
       from(t in Transaction,
         where:
           t.company_id == ^com.id and t.account_id in ^account_ids and
-            t.doc_date >= ^window_start and t.doc_date < ^start_date,
+            is_nil(t.contact_id) and
+            t.doc_date >= ^window_start and t.doc_date < ^start_date and
+            (is_nil(t.doc_id) or
+               fragment(
+                 "exists (select 1 from transactions x join accounts xa on xa.id = x.account_id where x.doc_id = ? and x.company_id = ? and (x.contact_id is not null or xa.account_type <> all(?)))",
+                 t.doc_id,
+                 t.company_id,
+                 ^@asset_types
+               )),
         select: %{
           ins: sum(fragment("case when ? > 0 then ? else 0 end", t.amount, t.amount)),
           outs: sum(fragment("case when ? < 0 then -? else 0 end", t.amount, t.amount))
         }
       )
-      |> where(^operating_only())
       |> Repo.one()
 
     factor = Decimal.div(Decimal.new("#{period_days}"), Decimal.new("#{trailing_days}"))
     {Decimal.mult(to_decimal(rows && rows.ins), factor),
      Decimal.mult(to_decimal(rows && rows.outs), factor)}
-  end
-
-  @doc """
-  Real per-period liquid cash in/out for the `n_periods` periods immediately before
-  `start_date` — actual historical figures on the same operating (treasury-excluded)
-  basis as the run-rate. Returns `[%{period_start, period_end, in, out, net}]`
-  oldest first, with empty periods zero-filled.
-  """
-  def historical_actuals(account_ids, start_date, period_days, n_periods, com) do
-    window_start = Date.add(start_date, -n_periods * period_days)
-
-    rows =
-      from(t in Transaction,
-        where:
-          t.company_id == ^com.id and t.account_id in ^account_ids and
-            t.doc_date >= ^window_start and t.doc_date < ^start_date,
-        select: %{
-          idx: selected_as(fragment("(? - ?) / ?", t.doc_date, ^window_start, ^period_days), :idx),
-          ins: sum(fragment("case when ? > 0 then ? else 0 end", t.amount, t.amount)),
-          outs: sum(fragment("case when ? < 0 then -? else 0 end", t.amount, t.amount))
-        },
-        group_by: selected_as(:idx)
-      )
-      |> where(^operating_only())
-      |> Repo.all()
-
-    by_idx = Map.new(rows, fn r -> {r.idx, r} end)
-
-    for i <- 0..(n_periods - 1) do
-      ps = Date.add(window_start, i * period_days)
-      r = Map.get(by_idx, i, %{ins: @zero, outs: @zero})
-      ins = to_decimal(r.ins)
-      outs = to_decimal(r.outs)
-      %{period_start: ps, period_end: Date.add(ps, period_days - 1), in: ins, out: outs, net: Decimal.sub(ins, outs)}
-    end
-  end
-
-  # Operating-flow filter shared by the run-rate and the historical actuals:
-  # contact-null liquid lines, excluding pure treasury transfers (whole document
-  # has no contact and only asset-account legs — cash <-> FD/investment/bank).
-  defp operating_only do
-    dynamic(
-      [t],
-      is_nil(t.contact_id) and
-        (is_nil(t.doc_id) or
-           fragment(
-             "exists (select 1 from transactions x join accounts xa on xa.id = x.account_id where x.doc_id = ? and x.company_id = ? and (x.contact_id is not null or xa.account_type <> all(?)))",
-             t.doc_id,
-             t.company_id,
-             ^@asset_types
-           ))
-    )
   end
 
   @doc "Clamp a due date to the forecast start (past-due items become due immediately)."
@@ -215,15 +170,12 @@ defmodule FullCircle.Reporting.CashForecast do
       posted_future_flows(ids, start_date, end_date, com) ++
         known_inflow_cheques(start_date, end_date, com)
 
-    history = historical_actuals(ids, start_date, period_days, min(periods_count, 6), com)
-
     build_forecast(
       %{opening: opening, baseline_in: rr_in, baseline_out: rr_out, events: events},
       start_date,
       period_days: period_days, periods_count: periods_count, buffer_periods: buffer_periods
     )
     |> Map.put(:trailing_days, trailing_days)
-    |> Map.put(:history, history)
   end
 
   defp to_decimal(nil), do: @zero
