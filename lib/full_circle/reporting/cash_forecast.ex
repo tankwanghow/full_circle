@@ -168,6 +168,37 @@ defmodule FullCircle.Reporting.CashForecast do
     end)
   end
 
+  @doc """
+  Full forecast. `opts` is a map with `:start_date`, `:weeks_count` (default 13),
+  `:buffer_weeks` (default 2), `:trailing_weeks` (default 52), `:account_ids`
+  (`:all` or list).
+  """
+  def cash_forecast(opts, com) do
+    start_date = Map.fetch!(opts, :start_date)
+    weeks_count = Map.get(opts, :weeks_count, 13)
+    buffer_weeks = Map.get(opts, :buffer_weeks, 2)
+    trailing_weeks = Map.get(opts, :trailing_weeks, 52)
+    account_sel = Map.get(opts, :account_ids, :all)
+
+    end_date = Date.add(start_date, weeks_count * 7 - 1)
+    ids = liquid_account_ids(com, account_sel)
+
+    opening = opening_liquid_balance(ids, start_date, com)
+    {bin, bout} = baseline_flows(ids, start_date, trailing_weeks, com)
+
+    events =
+      posted_future_flows(ids, start_date, end_date, com) ++
+        known_inflow_cheques(start_date, end_date, com) ++
+        outstanding_ar_events(start_date, end_date, com) ++
+        outstanding_ap_events(start_date, end_date, com)
+
+    build_forecast(
+      %{opening: opening, baseline_in: bin, baseline_out: bout, events: events},
+      start_date,
+      weeks_count: weeks_count, buffer_weeks: buffer_weeks
+    )
+  end
+
   defp to_decimal(nil), do: @zero
   defp to_decimal(%Decimal{} = d), do: d
   defp to_decimal(n), do: Decimal.new("#{n}")

@@ -8,6 +8,8 @@ defmodule FullCircle.Reporting do
   alias FullCircle.ReceiveFund.{ReceivedCheque, Receipt}
   import FullCircle.Helpers
 
+  defdelegate cash_forecast(opts, com), to: FullCircle.Reporting.CashForecast
+
   def post_dated_cheques(terms, flag, rdate, ddate, com) do
     qry = from(q in subquery(post_dated_chq_raw_query(com)))
 

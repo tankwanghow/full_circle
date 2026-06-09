@@ -181,6 +181,25 @@ defmodule FullCircle.Reporting.CashForecastDBTest do
     end
   end
 
+  describe "cash_forecast/2 end-to-end" do
+    test "produces 13 weeks, opening, and a ladder", %{com: com, bank: bank} do
+      txn!(com, bank.id, ~D[2026-06-01], d(10_000))     # opening (before start)
+      txn!(com, bank.id, ~D[2026-06-10], d(2000))       # posted future inflow
+
+      res =
+        CashForecast.cash_forecast(
+          %{start_date: ~D[2026-06-08], weeks_count: 13, buffer_weeks: 2,
+            trailing_weeks: 13, account_ids: :all},
+          com
+        )
+
+      assert Decimal.equal?(res.opening, d(10_000))
+      assert length(res.weeks) == 13
+      assert Decimal.equal?(hd(res.weeks).opening, d(10_000))
+      assert Map.has_key?(res.ladder, :place_3mo)
+    end
+  end
+
   describe "baseline_flows/4" do
     test "averages contact-null liquid flows over the trailing window", %{com: com, bank: bank} do
       # 13-week trailing window before 2026-06-08
