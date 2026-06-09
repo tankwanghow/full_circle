@@ -120,6 +120,43 @@ defmodule FullCircle.Reporting.CashForecast do
     end)
   end
 
-  # Placeholder so the module compiles; real impl in Task 2.
-  def fd_ladder(_weeks), do: %{}
+  @doc """
+  Sustainable lock-up amount per tenure = rolling minimum of free cash:
+  ~1mo = min(weeks 1-4), ~2mo = min(weeks 1-8), ~3mo = min(weeks 1-13).
+  Placement increments are non-negative differences (longest tenure first).
+  """
+  def fd_ladder(weeks) do
+    frees = weeks |> Enum.sort_by(& &1.n) |> Enum.map(& &1.free_cash)
+
+    l1 = min_slice(frees, 4)
+    l2 = min_slice(frees, 8)
+    l3 = min_slice(frees, 13)
+
+    %{
+      lockable_1mo: l1,
+      lockable_2mo: l2,
+      lockable_3mo: l3,
+      place_3mo: l3,
+      place_2mo: nonneg(Decimal.sub(l2, l3)),
+      place_1mo: nonneg(Decimal.sub(l1, l2)),
+      on_call: @zero
+    }
+  end
+
+  defp min_slice([], _n), do: @zero
+  defp min_slice(list, n) do
+    list
+    |> Enum.take(n)
+    |> Enum.reduce(nil, fn x, acc ->
+      cond do
+        is_nil(acc) -> x
+        Decimal.compare(x, acc) == :lt -> x
+        true -> acc
+      end
+    end) || @zero
+  end
+
+  defp nonneg(dec) do
+    if Decimal.compare(dec, @zero) == :lt, do: @zero, else: dec
+  end
 end

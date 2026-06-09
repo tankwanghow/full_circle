@@ -4,6 +4,37 @@ defmodule FullCircle.Reporting.CashForecastTest do
 
   defp d(n), do: Decimal.new("#{n}")
 
+  describe "fd_ladder/1" do
+    test "rolling minimums and non-negative tenure increments" do
+      # free_cash by week 1..13
+      frees = [55, 60, 58, 70, 72, 80, 65, 90, 100, 100, 110, 120, 130]
+      weeks = for {f, i} <- Enum.with_index(frees, 1), do: %{n: i, free_cash: d(f)}
+
+      ladder = FullCircle.Reporting.CashForecast.fd_ladder(weeks)
+
+      assert ladder.lockable_1mo == d(55)   # min weeks 1-4
+      assert ladder.lockable_2mo == d(55)   # min weeks 1-8
+      assert ladder.lockable_3mo == d(55)   # min weeks 1-13
+      assert ladder.place_3mo == d(55)
+      assert ladder.place_2mo == d(0)       # lockable_2mo - lockable_3mo
+      assert ladder.place_1mo == d(0)       # lockable_1mo - lockable_2mo
+    end
+
+    test "decreasing free cash gives a real ladder" do
+      frees = [100, 100, 100, 100, 80, 80, 80, 80, 60, 60, 60, 60, 60]
+      weeks = for {f, i} <- Enum.with_index(frees, 1), do: %{n: i, free_cash: d(f)}
+
+      ladder = FullCircle.Reporting.CashForecast.fd_ladder(weeks)
+
+      assert ladder.lockable_1mo == d(100)  # min 1-4
+      assert ladder.lockable_2mo == d(80)   # min 1-8
+      assert ladder.lockable_3mo == d(60)   # min 1-13
+      assert ladder.place_3mo == d(60)
+      assert ladder.place_2mo == d(20)      # 80 - 60
+      assert ladder.place_1mo == d(20)      # 100 - 80
+    end
+  end
+
   describe "build_forecast/3 roll-forward" do
     test "buckets events into weeks and rolls balance forward" do
       start = ~D[2026-06-08]  # a Monday
