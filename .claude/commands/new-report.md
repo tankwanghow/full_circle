@@ -19,7 +19,9 @@ Pick one of three patterns based on complexity:
 
 **Hard rule**: every query MUST scope by `company_id` (passed as `com.id` or `com_id`). This is the multi-tenant boundary — a missing scope is a data leak. Use `dump_uuid!/1` when binding company/contact IDs into raw SQL.
 
-**Repo choice**: heavy/long-running reports use `FullCircle.QueryRepo` (read-only DB user). Most reports use `FullCircle.Repo` via `exec_query_map(sql, params, FullCircle.Repo)`.
+> ⚠️ **`dump_uuid!/1` is NOT in `FullCircle.Helpers`** — it's a private `defp` in `reporting.ex` (and `layer.ex`). If your query lives directly in `reporting.ex`, it's already in scope. If you put it in a separate `reporting/<name>.ex` helper module, you must **copy the two clauses locally** or just use `Ecto.UUID.dump!(com.id)` (a string UUID → 16-byte binary).
+
+**Repo choice**: ⚠️ **`FullCircle.QueryRepo` has NO database configured in the `test` environment** — any query a test exercises will fail against it. Because this skill makes tenant-isolation tests **mandatory** (see Tests), in practice **virtually every report must use `FullCircle.Repo`** via `exec_query_map(sql, params, FullCircle.Repo)` (or `Repo.all/one` for Ecto-composed queries). Reserve `QueryRepo` for genuinely heavy, *untested* ad-hoc queries only — never for anything you intend to cover with a test. The existing tested reporting functions (aging, balance sheet, etc.) all use `Repo` for this reason.
 
 ## Steps
 
@@ -115,11 +117,12 @@ If the report should be reachable from the menu, add a link in the relevant layo
 
 Only add if users need a paper/PDF version. Two files:
 
-- `lib/full_circle_web/live/report_live/<name>_print.ex` — uses `print_root` layout, accepts the same filters via URL params, calls the same `Reporting.<name>/n` function, renders print-only HTML.
-- Add route: `live("/<companies>/:company_id/reports/my_report/print", ReportLive.MyReportPrint)`
+- `lib/full_circle_web/live/report_live/<name>_print.ex` — accepts the same filters via URL params, calls the same `Reporting.<name>/n` function, renders print-only HTML inside `<div id="print-me" class="print-here">`.
+- Add the route **inside the separate `:require_authenticated_user_n_active_company_print` live_session** in `router.ex`. That session already sets `root_layout: {FullCircleWeb.Layouts, :print_root}` — so the print module must **NOT** set a layout itself in `mount` (no `layout:` tuple). Just placing the route in that session applies the print layout automatically.
+- Parse params defensively (e.g. `Date.from_iso8601/1`, not `!`) so a hand-edited/bookmarked print URL renders a graceful message instead of a 500.
 - Support a `pre_print=true` URL param if pre-printed letterhead is a thing for this report (data-only rendering).
 
-Reference: `FullCircleWeb.ReportLive.HouseFeedPrint`, `StatementPrint`.
+Reference: `FullCircleWeb.ReportLive.HouseFeedPrint`, `StatementPrint`, `CashForecastPrint`.
 
 ### 5. Authorization
 
@@ -134,9 +137,11 @@ Then guard mount with `Authorization.can?/3` (look at any existing report LiveVi
 
 ### 6. Tests
 
-- Context test in `test/full_circle/reporting_test.exs` — assert the query returns expected shape, scopes by company, handles empty filters.
+- Context test in `test/full_circle/reporting_test.exs` — assert the query returns expected shape, scopes by company, handles empty filters. Remember: tested queries use `FullCircle.Repo` (see Repo choice above).
 - **Tenant isolation test** is mandatory: seed two companies, insert rows for both, call the report for company A, assert no company B rows leak.
-- LiveView smoke test in `test/full_circle_web/live/report_live/<name>_test.exs` — mount with a logged-in user, assert page renders, filters update results.
+- LiveView smoke test in `test/full_circle_web/live/report_live/<name>_test.exs` — mount with a logged-in user, assert page renders, filters update results. For company-scoped routes, copy the auth + active-company `setup` from `test/full_circle_web/live/account_live_test.exs`. If the report uses `assign_async`, call `render_async(lv)` before asserting on results.
+
+> **Test fixtures gotcha:** `company_fixture/2` (via `Sys.create_company`) seeds **9 default accounts — none of type `Cash or Equivalent` or `Bank`** (it does seed `Account Receivables`/`Account Payables` as `Current Asset`). There is **no `contact_fixture`**. So tests that need a liquid account, or a contact, must create them explicitly: `account_fixture(%{account_type: "Bank", name: "..."}, com, admin)` and `Repo.insert!(%Accounting.Contact{name: "...", company_id: com.id})` (only `name` + `company_id` are required). Transactions are normally created by DB triggers when documents post; for query unit tests you can insert `%Accounting.Transaction{}` rows directly.
 
 ### 7. Run
 
@@ -155,13 +160,16 @@ mise exec -- mix phx.server
 - [ ] Bucket/cutoff parsing has explicit validation (see `to_cutoffs!/1`)
 - [ ] Tenant isolation test present
 - [ ] Authorization check in LiveView `mount`
-- [ ] Heavy reports route through `FullCircle.QueryRepo`
+- [ ] Tested queries use `FullCircle.Repo` (not `QueryRepo` — it has no `test` DB)
+- [ ] Print route (if any) lives in the `:..._print` live_session; print module sets no layout
 
 ## Reference files
 
 - Context module: `lib/full_circle/reporting.ex`
 - Bucket helper pattern: `lib/full_circle/reporting/aging_buckets.ex`
-- LiveView pattern: `lib/full_circle_web/live/report_live/aging.ex`
+- LiveView pattern (stream + drill-down): `lib/full_circle_web/live/report_live/aging.ex`
+- LiveView pattern (single-result, `assign_async` + `<.async_html>` + form→`push_navigate`): `lib/full_circle_web/live/report_live/fixed_assets.ex`, `cash_forecast.ex`
+- Pure-core-vs-query separation for testability: `lib/full_circle/reporting/cash_forecast.ex`
 - Print pattern: `lib/full_circle_web/live/report_live/statement_print.ex`
 - Drill-down pattern: aging report's `:drill` assign + `contact_bucket_transactions/5`
 - Raw-SQL CTE pattern: `Reporting.contact_aging_query/4`
