@@ -43,6 +43,61 @@ defmodule FullCircle.Reporting.CashForecastTest do
     end
   end
 
+  describe "distribute_outstanding/3" do
+    alias FullCircle.Reporting.CashForecast
+
+    defp weeks_from(start, n), do: for(i <- 0..(n - 1), do: Date.add(start, i * 7))
+
+    test "spreads outstanding across weeks per the lag profile" do
+      start = ~D[2026-06-08]
+      weeks = weeks_from(start, 13)
+      open = [%{due_date: start, amount: d(1000)}]
+      profile = %{0 => Decimal.new("0.5"), 1 => Decimal.new("0.3"), 2 => Decimal.new("0.2")}
+
+      res = CashForecast.distribute_outstanding(open, profile, weeks)
+
+      assert Decimal.equal?(Enum.at(res, 0), d(500))
+      assert Decimal.equal?(Enum.at(res, 1), d(300))
+      assert Decimal.equal?(Enum.at(res, 2), d(200))
+      assert Decimal.equal?(Enum.at(res, 3), d(0))
+    end
+
+    test "overdue invoice drops already-elapsed lag buckets (conservative, no renormalize)" do
+      start = ~D[2026-06-08]
+      weeks = weeks_from(start, 13)
+      # due 2 weeks before start -> due_idx = -2; week 0 has lag 2, week 1 lag 3
+      open = [%{due_date: Date.add(start, -14), amount: d(1000)}]
+
+      profile = %{
+        0 => Decimal.new("0.5"),
+        1 => Decimal.new("0.3"),
+        2 => Decimal.new("0.15"),
+        3 => Decimal.new("0.05")
+      }
+
+      res = CashForecast.distribute_outstanding(open, profile, weeks)
+
+      assert Decimal.equal?(Enum.at(res, 0), d(150))
+      assert Decimal.equal?(Enum.at(res, 1), d(50))
+      assert Decimal.equal?(Enum.at(res, 2), d(0))
+      # The elapsed lag-0/lag-1 mass (0.8) is dropped, not collected -> conservative
+      total = Enum.reduce(res, Decimal.new(0), &Decimal.add(&2, &1))
+      assert Decimal.equal?(total, d(200))
+    end
+
+    test "future-dated invoice beyond the horizon contributes ~nothing" do
+      start = ~D[2026-06-08]
+      weeks = weeks_from(start, 13)
+      # due 20 weeks out: all in-horizon lags are negative -> profile lookups miss
+      open = [%{due_date: Date.add(start, 140), amount: d(1000)}]
+      profile = %{0 => Decimal.new("1.0")}
+
+      res = CashForecast.distribute_outstanding(open, profile, weeks)
+      total = Enum.reduce(res, Decimal.new(0), &Decimal.add(&2, &1))
+      assert Decimal.equal?(total, d(0))
+    end
+  end
+
   describe "build_forecast/3 roll-forward" do
     test "buckets events into weeks and rolls balance forward" do
       start = ~D[2026-06-08]  # a Monday
@@ -144,8 +199,8 @@ defmodule FullCircle.Reporting.CashForecastDBTest do
     end
   end
 
-  describe "outstanding_ar_events/3" do
-    test "unpaid sales invoice surfaces as inflow on its due_date", %{com: com} do
+  describe "outstanding_ar_by_due/1" do
+    test "unpaid sales invoice surfaces with its outstanding on its due_date", %{com: com} do
       cont =
         Repo.insert!(%FullCircle.Accounting.Contact{
           name: "AR Cont #{System.unique_integer([:positive])}", company_id: com.id})
@@ -174,10 +229,9 @@ defmodule FullCircle.Reporting.CashForecastDBTest do
       |> Ecto.Changeset.change(%{doc_id: inv.id})
       |> Repo.update!()
 
-      end_date = ~D[2026-09-06]
-      events = CashForecast.outstanding_ar_events(~D[2026-06-08], end_date, com)
+      rows = CashForecast.outstanding_ar_by_due(com)
 
-      assert Enum.any?(events, &(&1.date == ~D[2026-06-20] and Decimal.equal?(&1.in, d(800))))
+      assert Enum.any?(rows, &(&1.due_date == ~D[2026-06-20] and Decimal.equal?(&1.amount, d(800))))
     end
 
     test "ignores the contra (non-contact) GL lines of the invoice", %{com: com} do
@@ -238,10 +292,10 @@ defmodule FullCircle.Reporting.CashForecastDBTest do
       |> Ecto.Changeset.change(%{doc_id: inv.id})
       |> Repo.update!()
 
-      events = CashForecast.outstanding_ar_events(~D[2026-06-08], ~D[2026-09-06], com)
-      inv_events = Enum.filter(events, &(&1.date == ~D[2026-06-20]))
+      rows = CashForecast.outstanding_ar_by_due(com)
+      matching = Enum.filter(rows, &(&1.due_date == ~D[2026-06-20]))
 
-      total = Enum.reduce(inv_events, Decimal.new(0), fn e, a -> Decimal.add(a, e.in) end)
+      total = Enum.reduce(matching, Decimal.new(0), fn r, a -> Decimal.add(a, r.amount) end)
       assert Decimal.equal?(total, d(800))
     end
   end

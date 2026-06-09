@@ -193,9 +193,9 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
             <th class="text-center px-1">{gettext("Wk")}</th>
             <th class="text-center px-1">{gettext("Start")}</th>
             <th class="px-1">{gettext("Opening")}</th>
-            <th class="px-1">{gettext("Known In")}</th>
+            <th class="px-1">{gettext("Expected In")}</th>
             <th class="px-1 text-gray-500 dark:text-gray-400">{gettext("Base In")}</th>
-            <th class="px-1">{gettext("Known Out")}</th>
+            <th class="px-1">{gettext("Expected Out")}</th>
             <th class="px-1 text-gray-500 dark:text-gray-400">{gettext("Base Out")}</th>
             <th class="px-1">{gettext("Closing")}</th>
             <th class="px-1">{gettext("Buffer")}</th>
@@ -246,18 +246,18 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
           </dd>
         </div>
         <div>
-          <dt class="inline font-semibold">{gettext("Known In")}:</dt>
+          <dt class="inline font-semibold">{gettext("Expected In")}:</dt>
           <dd class="inline">
             {gettext(
-              "Scheduled inflows on a known date — unpaid sales invoices on their due date, in-hand cheques, and already-posted future-dated receipts."
+              "Collections from unpaid sales invoices, spread across the weeks by how this company has actually been paid in the past (relative to each invoice's due date), plus in-hand cheques and already-posted future receipts on their own dates. Amounts are real; the timing is estimated from payment history."
             )}
           </dd>
         </div>
         <div>
-          <dt class="inline font-semibold">{gettext("Known Out")}:</dt>
+          <dt class="inline font-semibold">{gettext("Expected Out")}:</dt>
           <dd class="inline">
             {gettext(
-              "Scheduled outflows on a known date — unpaid purchase invoices on their due date and already-posted future-dated payments."
+              "Payments for unpaid purchase invoices, spread across the weeks by how this company has actually paid suppliers in the past (relative to each invoice's due date), plus already-posted future payments on their own dates. Amounts are real; the timing is estimated."
             )}
           </dd>
         </div>
@@ -299,7 +299,7 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
         )}
       </p>
       <p class="mt-1 italic text-gray-500 dark:text-gray-400">
-        {gettext("Known figures come from documents already in the system; Base figures are estimates from past activity.")}
+        {gettext("Expected figures are amounts owed on real documents, timed by past payment behaviour; Base figures are recurring operating flows estimated from past activity. A slow-paying tail beyond the forecast window is deliberately not counted, so this is a conservative estimate.")}
       </p>
     </div>
     """

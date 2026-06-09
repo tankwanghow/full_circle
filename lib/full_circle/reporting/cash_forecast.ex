@@ -104,16 +104,14 @@ defmodule FullCircle.Reporting.CashForecast do
     if Date.compare(due_date, start_date) == :lt, do: start_date, else: due_date
   end
 
-  @doc "Unpaid sales-invoice balances as inflow events on their (clamped) due_date."
-  def outstanding_ar_events(start_date, end_date, com),
-    do: outstanding_invoice_events(:ar, start_date, end_date, com)
+  @doc "Open sales-invoice balances grouped by due_date: `[%{due_date, amount}]` (amount >= 0)."
+  def outstanding_ar_by_due(com), do: outstanding_by_due(:ar, com)
 
-  @doc "Unpaid purchase-invoice balances as outflow events on their (clamped) due_date."
-  def outstanding_ap_events(start_date, end_date, com),
-    do: outstanding_invoice_events(:ap, start_date, end_date, com)
+  @doc "Open purchase-invoice balances grouped by due_date: `[%{due_date, amount}]` (amount >= 0)."
+  def outstanding_ap_by_due(com), do: outstanding_by_due(:ap, com)
 
-  # direction: :ar -> sales invoices, inflow; :ap -> purchase invoices, outflow
-  defp outstanding_invoice_events(direction, start_date, end_date, com) do
+  # direction: :ar -> sales invoices; :ap -> purchase invoices
+  defp outstanding_by_due(direction, com) do
     {doc_type, inv_table, date_col} =
       case direction do
         :ar -> {"Invoice", "invoices", "due_date"}
@@ -153,14 +151,74 @@ defmodule FullCircle.Reporting.CashForecast do
 
     exec_query_map(sql, [com_id_bin, doc_type], FullCircle.Repo)
     |> Enum.map(fn %{due_date: due, balance: bal} ->
-      %{date: clamp_due(due, start_date), balance: Decimal.abs(to_decimal(bal))}
+      %{due_date: due, amount: Decimal.abs(to_decimal(bal))}
     end)
-    |> Enum.reject(&(Date.compare(&1.date, end_date) == :gt))
-    |> Enum.map(fn %{date: due, balance: bal} ->
+  end
+
+  @doc """
+  Empirical payment-lag profile from the trailing `trailing_months` of matching
+  history: `%{week_lag => fraction_of_value}`, where `week_lag` is the number of
+  whole weeks between an invoice's due_date and when it was actually paid
+  (negative = paid early). Falls back to `%{0 => 1}` (pay on the due week) when
+  there is no history. Company-scoped.
+  """
+  def payment_lag_profile(direction, com, trailing_months \\ 12) do
+    {doc_type, inv_table, date_col} =
       case direction do
-        :ar -> %{date: due, in: bal, out: @zero, kind: :known}
-        :ap -> %{date: due, in: @zero, out: bal, kind: :known}
+        :ar -> {"Invoice", "invoices", "due_date"}
+        :ap -> {"PurInvoice", "pur_invoices", "due_date"}
       end
+
+    com_id_bin = dump_uuid!(com.id)
+    cutoff = Date.add(Date.utc_today(), -trailing_months * 30)
+
+    # Matchers attach to the invoice's contact line via transaction_id; tm.doc_date
+    # is the actual settlement date. Lag is measured from the invoice's due_date.
+    sql = """
+      select floor((tm.doc_date - inv.#{date_col})::numeric / 7)::int as lag,
+             sum(abs(tm.match_amount)) as amt
+        from transaction_matchers tm
+        join transactions t on t.id = tm.transaction_id
+        join #{inv_table} inv on inv.id = t.doc_id
+       where t.company_id = $1
+         and t.doc_type = $2
+         and t.contact_id is not null
+         and tm.doc_date >= $3
+       group by 1
+    """
+
+    rows = exec_query_map(sql, [com_id_bin, doc_type, cutoff], FullCircle.Repo)
+    total = Enum.reduce(rows, @zero, fn r, a -> Decimal.add(a, to_decimal(r.amt)) end)
+
+    if Decimal.compare(total, @zero) == :gt do
+      Map.new(rows, fn r -> {r.lag, Decimal.div(to_decimal(r.amt), total)} end)
+    else
+      %{0 => Decimal.new(1)}
+    end
+  end
+
+  @doc """
+  Spread each open document's outstanding across the forecast weeks using the lag
+  `profile`. `open` is `[%{due_date, amount}]`; `week_starts` is the ordered list
+  of week-start dates. Returns weekly totals (same length as `week_starts`).
+
+  A document's payment lands in week `due_week + lag`. Lag buckets that fall before
+  the first week (already elapsed, for overdue invoices) or after the last week
+  (the slow tail) are simply not placed — a conservative, non-renormalized estimate.
+  """
+  def distribute_outstanding(open, profile, week_starts) do
+    start = hd(week_starts)
+    zeros = List.duplicate(@zero, length(week_starts))
+
+    Enum.reduce(open, zeros, fn %{due_date: due, amount: amt}, acc ->
+      due_idx = Integer.floor_div(Date.diff(due, start), 7)
+
+      acc
+      |> Enum.with_index()
+      |> Enum.map(fn {wk_total, w} ->
+        frac = Map.get(profile, w - due_idx, @zero)
+        Decimal.add(wk_total, Decimal.mult(amt, frac))
+      end)
     end)
   end
 
@@ -191,11 +249,26 @@ defmodule FullCircle.Reporting.CashForecast do
     opening = opening_liquid_balance(ids, start_date, com)
     {bin, bout} = baseline_flows(ids, start_date, trailing_weeks, com)
 
+    week_starts = for i <- 0..(weeks_count - 1), do: Date.add(start_date, i * 7)
+
+    ar_weekly =
+      distribute_outstanding(outstanding_ar_by_due(com), payment_lag_profile(:ar, com), week_starts)
+
+    ap_weekly =
+      distribute_outstanding(outstanding_ap_by_due(com), payment_lag_profile(:ap, com), week_starts)
+
+    spread_events =
+      Enum.map(Enum.zip(ar_weekly, week_starts), fn {amt, ws} ->
+        %{date: ws, in: amt, out: @zero, kind: :known}
+      end) ++
+        Enum.map(Enum.zip(ap_weekly, week_starts), fn {amt, ws} ->
+          %{date: ws, in: @zero, out: amt, kind: :known}
+        end)
+
     events =
       posted_future_flows(ids, start_date, end_date, com) ++
         known_inflow_cheques(start_date, end_date, com) ++
-        outstanding_ar_events(start_date, end_date, com) ++
-        outstanding_ap_events(start_date, end_date, com)
+        spread_events
 
     build_forecast(
       %{opening: opening, baseline_in: bin, baseline_out: bout, events: events},
