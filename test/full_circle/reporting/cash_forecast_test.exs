@@ -184,6 +184,34 @@ defmodule FullCircle.Reporting.CashForecastDBTest do
       assert Decimal.equal?(rin, Decimal.mult(d(10_700), factor))   # 1200 + 9000 + 500
       assert Decimal.equal?(rout, Decimal.mult(d(8000), factor))
     end
+
+    test "excludes pure asset transfers (cash -> fixed deposit) but keeps operating cash",
+         %{com: com, bank: bank, admin: admin} do
+      fd = account_fixture(%{account_type: "Non-current Asset", name: "FD #{System.unique_integer([:positive])}"}, com, admin)
+
+      # Bank -> Fixed Deposit transfer: no contact, all legs asset accounts -> excluded
+      did = Ecto.UUID.generate()
+      com
+      |> txn!(bank.id, ~D[2026-04-10], d(-5000))
+      |> Ecto.Changeset.change(%{doc_id: did})
+      |> Repo.update!()
+
+      com
+      |> txn!(fd.id, ~D[2026-04-10], d(5000))
+      |> Ecto.Changeset.change(%{doc_id: did})
+      |> Repo.update!()
+
+      # a normal operating bank inflow (doc-less) -> kept
+      txn!(com, bank.id, ~D[2026-04-11], d(1200))
+
+      {rin, rout} =
+        CashForecast.run_rate_flows(
+          CashForecast.liquid_account_ids(com, :all), ~D[2026-06-08], 365, 30, com)
+
+      factor = Decimal.div(d(30), d(365))
+      assert Decimal.equal?(rin, Decimal.mult(d(1200), factor))  # only the operating inflow
+      assert Decimal.equal?(rout, d(0))                          # the FD transfer is excluded
+    end
   end
 
   describe "cash_forecast/2 end-to-end" do

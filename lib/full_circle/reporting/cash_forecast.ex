@@ -24,6 +24,27 @@ defmodule FullCircle.Reporting.CashForecast do
 
   @liquid_types ["Cash or Equivalent", "Bank"]
 
+  # Balance-sheet ASSET account types used to detect treasury transfers. A document
+  # whose every leg is one of these and which carries no contact is the company
+  # moving its own money (cash <-> FD, cash <-> investment, bank <-> bank) — not
+  # operating cash flow — so it is excluded from the run-rate. Receipts/payments
+  # carry a contact, and payroll/tax settlements hit a liability or P&L leg, so
+  # those are kept.
+  #
+  # NOTE: "Post Dated Cheques" is deliberately EXCLUDED from this list — a cheque
+  # clearing (Dr Bank / Cr Post Dated Cheques) is real operating cash arriving in
+  # the bank, not a treasury transfer, so it must stay in the run-rate.
+  @asset_types [
+    "Cash or Equivalent",
+    "Bank",
+    "Current Asset",
+    "Fixed Asset",
+    "Inventory",
+    "Non-current Asset",
+    "Prepayment",
+    "Intangible Asset"
+  ]
+
   def liquid_account_types, do: @liquid_types
 
   @doc "Account ids of liquid type for the company. `:all` or a list of ids to restrict."
@@ -91,7 +112,14 @@ defmodule FullCircle.Reporting.CashForecast do
         where:
           t.company_id == ^com.id and t.account_id in ^account_ids and
             is_nil(t.contact_id) and
-            t.doc_date >= ^window_start and t.doc_date < ^start_date,
+            t.doc_date >= ^window_start and t.doc_date < ^start_date and
+            (is_nil(t.doc_id) or
+               fragment(
+                 "exists (select 1 from transactions x join accounts xa on xa.id = x.account_id where x.doc_id = ? and x.company_id = ? and (x.contact_id is not null or xa.account_type <> all(?)))",
+                 t.doc_id,
+                 t.company_id,
+                 ^@asset_types
+               )),
         select: %{
           ins: sum(fragment("case when ? > 0 then ? else 0 end", t.amount, t.amount)),
           outs: sum(fragment("case when ? < 0 then -? else 0 end", t.amount, t.amount))
