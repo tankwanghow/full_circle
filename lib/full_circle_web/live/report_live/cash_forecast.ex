@@ -127,6 +127,17 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
         <:result_html>
           <% f = @result.result %>
           <div :if={is_map(f)}>
+            <div class="text-center my-2">
+              <.link
+                navigate={
+                  ~p"/companies/#{@current_company.id}/cash_forecast/print?#{[s_date: @search.s_date, buffer_weeks: @search.buffer_weeks, trailing_weeks: @search.trailing_weeks]}"
+                }
+                target="_blank"
+                class="blue button"
+              >
+                {gettext("Print")}
+              </.link>
+            </div>
             <.ladder_box ladder={f.ladder} />
             <.week_table weeks={f.weeks} />
           </div>

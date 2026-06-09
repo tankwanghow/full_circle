@@ -357,6 +357,7 @@ defmodule FullCircleWeb.Router do
       live("/print/harvwagrepo", LayerLive.HarvestWageReportPrint, :print)
       live("/print/tbplbs", ReportLive.TbPlBs, :print)
       live("/print/house_feed", ReportLive.HouseFeedPrint, :print)
+      live("/cash_forecast/print", ReportLive.CashForecastPrint, :print)
       live("/eaform/print", ReportLive.EAFormPrint, :print)
 
       live("/EggStock/:date/print", EggStockLive.Print, :print)
