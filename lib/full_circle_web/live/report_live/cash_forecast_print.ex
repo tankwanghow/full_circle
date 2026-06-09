@@ -3,21 +3,31 @@ defmodule FullCircleWeb.ReportLive.CashForecastPrint do
   alias FullCircle.Reporting
 
   @impl true
-  def mount(%{"s_date" => s_date} = params, _session, socket) do
+  def mount(params, _session, socket) do
     com = socket.assigns.current_company
 
-    opts = %{
-      start_date: Date.from_iso8601!(s_date),
-      weeks_count: 13,
-      buffer_weeks: safe_int(params["buffer_weeks"], 2),
-      trailing_weeks: safe_int(params["trailing_weeks"], 52),
-      account_ids: :all
-    }
+    forecast =
+      case Date.from_iso8601(to_string(params["s_date"])) do
+        {:ok, date} ->
+          Reporting.cash_forecast(
+            %{
+              start_date: date,
+              weeks_count: 13,
+              buffer_weeks: safe_int(params["buffer_weeks"], 2),
+              trailing_weeks: safe_int(params["trailing_weeks"], 52),
+              account_ids: :all
+            },
+            com
+          )
+
+        _ ->
+          nil
+      end
 
     {:ok,
      socket
      |> assign(page_title: gettext("Cash Forecast"))
-     |> assign(:forecast, Reporting.cash_forecast(opts, com))}
+     |> assign(:forecast, forecast)}
   end
 
   defp safe_int(s, default) do
@@ -32,12 +42,15 @@ defmodule FullCircleWeb.ReportLive.CashForecastPrint do
     ~H"""
     <div id="print-me" class="print-here">
       {style(assigns)}
-      <div class="page">
+      <div :if={is_nil(@forecast)} class="page">
+        <p class="text-center">{gettext("Invalid or missing start date.")}</p>
+      </div>
+      <div :if={@forecast} class="page">
         <h1 class="text-center text-xl font-bold">
           {gettext("Cash Forecast & Free Cash Flow")}
         </h1>
         <p class="text-center">
-          {Date.to_iso8601(@forecast.start_date)} — {gettext("13 weeks")}
+          {Date.to_iso8601(@forecast.start_date)} — {@forecast.weeks_count} {gettext("weeks")}
         </p>
 
         <div class="ladder">
