@@ -139,6 +139,7 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
           <div :if={is_map(f)}>
             <.ladder_box ladder={f.ladder} />
             <.week_table weeks={f.weeks} />
+            <.legend buffer_weeks={f.buffer_weeks} />
           </div>
         </:result_html>
       </.async_html>
@@ -221,6 +222,85 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
           </tr>
         </tbody>
       </table>
+    </div>
+    """
+  end
+
+  attr :buffer_weeks, :integer, required: true
+
+  defp legend(assigns) do
+    ~H"""
+    <div class="my-4 p-3 border rounded bg-gray-50 dark:bg-gray-800 dark:border-gray-700 text-sm">
+      <p class="font-bold mb-2">{gettext("How to read this report")}</p>
+      <dl class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1">
+        <div>
+          <dt class="inline font-semibold">{gettext("Opening")}:</dt>
+          <dd class="inline">
+            {gettext("Cash & bank balance at the start of the week (last week's Closing).")}
+          </dd>
+        </div>
+        <div>
+          <dt class="inline font-semibold">{gettext("Closing")}:</dt>
+          <dd class="inline">
+            {gettext("Opening + all inflows − all outflows for the week.")}
+          </dd>
+        </div>
+        <div>
+          <dt class="inline font-semibold">{gettext("Known In")}:</dt>
+          <dd class="inline">
+            {gettext(
+              "Scheduled inflows on a known date — unpaid sales invoices on their due date, in-hand cheques, and already-posted future-dated receipts."
+            )}
+          </dd>
+        </div>
+        <div>
+          <dt class="inline font-semibold">{gettext("Known Out")}:</dt>
+          <dd class="inline">
+            {gettext(
+              "Scheduled outflows on a known date — unpaid purchase invoices on their due date and already-posted future-dated payments."
+            )}
+          </dd>
+        </div>
+        <div>
+          <dt class="inline font-semibold">{gettext("Base In")}:</dt>
+          <dd class="inline">
+            {gettext(
+              "Estimated recurring operating inflow — the weekly average of past non-customer cash/bank receipts (e.g. cash sales, sundry income)."
+            )}
+          </dd>
+        </div>
+        <div>
+          <dt class="inline font-semibold">{gettext("Base Out")}:</dt>
+          <dd class="inline">
+            {gettext(
+              "Estimated recurring operating outflow — the weekly average of past non-supplier cash/bank payments (e.g. payroll, utilities, bank charges)."
+            )}
+          </dd>
+        </div>
+        <div>
+          <dt class="inline font-semibold">{gettext("Buffer")}:</dt>
+          <dd class="inline">
+            {gettext("Cash that must stay liquid — the total projected outflow over the next %{n} week(s).",
+              n: @buffer_weeks
+            )}
+          </dd>
+        </div>
+        <div>
+          <dt class="inline font-semibold">{gettext("Free Cash")}:</dt>
+          <dd class="inline">
+            {gettext("Closing − Buffer (never below 0) — surplus safe to put to work.")}
+          </dd>
+        </div>
+      </dl>
+      <p class="mt-2">
+        <span class="font-semibold">{gettext("Fixed Deposit Tenure Ladder")}:</span>
+        {gettext(
+          "the most you can lock away for ~1/2/3 months without any week dropping below its Buffer. \"Place\" is how much to put at each tenure; \"Lockable\" is the sustainable amount across that whole window."
+        )}
+      </p>
+      <p class="mt-1 italic text-gray-500 dark:text-gray-400">
+        {gettext("Known figures come from documents already in the system; Base figures are estimates from past activity.")}
+      </p>
     </div>
     """
   end

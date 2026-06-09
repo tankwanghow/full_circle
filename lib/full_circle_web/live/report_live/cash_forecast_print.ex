@@ -98,6 +98,23 @@ defmodule FullCircleWeb.ReportLive.CashForecastPrint do
             </tr>
           </tbody>
         </table>
+
+        <div class="legend">
+          <p class="bold">{gettext("How to read this report")}</p>
+          <p>
+            <b>{gettext("Opening")}</b>: {gettext("cash & bank balance at the start of the week (last week's Closing")}).
+            <b>{gettext("Closing")}</b>: {gettext("Opening + all inflows − all outflows")}.
+            <b>{gettext("Known In")}</b>: {gettext("scheduled inflows on a known date — unpaid sales invoices on due date, in-hand cheques, posted future receipts")}.
+            <b>{gettext("Known Out")}</b>: {gettext("scheduled outflows on a known date — unpaid purchase invoices on due date, posted future payments")}.
+            <b>{gettext("Base In")}</b> / <b>{gettext("Base Out")}</b>: {gettext("estimated recurring operating in/out — weekly average of past non-customer/supplier cash & bank activity (cash sales, payroll, utilities)")}.
+            <b>{gettext("Buffer")}</b>: {gettext("cash that must stay liquid — total projected outflow over the next %{n} week(s)", n: @forecast.buffer_weeks)}.
+            <b>{gettext("Free Cash")}</b>: {gettext("Closing − Buffer (never below 0) — surplus safe to put to work")}.
+          </p>
+          <p>
+            <b>{gettext("Fixed Deposit Tenure Ladder")}</b>: {gettext("the most you can lock away for ~1/2/3 months without any week dropping below its Buffer")}.
+            {gettext("Known figures come from documents already in the system; Base figures are estimates from past activity")}.
+          </p>
+        </div>
       </div>
     </div>
     """
@@ -119,6 +136,8 @@ defmodule FullCircleWeb.ReportLive.CashForecastPrint do
       table.forecast th, table.forecast td { border: 1px solid gray; padding: 1px 3px; }
       table.forecast .ctr { text-align: center; }
       table.forecast .bold { font-weight: bold; }
+      .legend { margin-top: 4mm; font-size: 11px; text-align: left; }
+      .legend .bold { font-weight: bold; }
     </style>
     """
   end
