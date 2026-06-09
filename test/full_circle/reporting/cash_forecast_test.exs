@@ -56,7 +56,7 @@ defmodule FullCircle.Reporting.CashForecastTest do
   end
 
   describe "build_forecast/3 roll-forward" do
-    test "adds run-rate to every period, buckets known events, rolls balance forward" do
+    test "adds per-period base to known events and rolls balance forward" do
       start = ~D[2026-06-08]
 
       # known events (overlay)
@@ -68,13 +68,20 @@ defmodule FullCircle.Reporting.CashForecastTest do
 
       res =
         CashForecast.build_forecast(
-          %{opening: d(5000), baseline_in: d(100), baseline_out: d(50), events: events},
+          %{
+            opening: d(5000),
+            base_in: List.duplicate(d(100), 12),
+            base_out: List.duplicate(d(50), 12),
+            sources: List.duplicate(:forecast, 12),
+            events: events
+          },
           start,
           period_days: 30, periods_count: 12, buffer_periods: 1
         )
 
       [p1, p2 | _] = res.periods
       assert p1.period_start == ~D[2026-06-08]
+      assert p1.source == :forecast
       assert p1.opening == d(5000)
       assert p1.known_in == d(1000)
       assert p1.known_out == d(400)
@@ -86,6 +93,32 @@ defmodule FullCircle.Reporting.CashForecastTest do
       assert p2.opening == d(5650)
       assert p2.closing == d(5000)
       assert length(res.periods) == 12
+    end
+
+    test "actual periods carry their own base flow and source, ladder uses forecast only" do
+      start = ~D[2026-06-08]
+
+      res =
+        CashForecast.build_forecast(
+          %{
+            opening: d(1000),
+            # period 1 actual (real flow), periods 2-3 forecast
+            base_in: [d(500), d(100), d(100)],
+            base_out: [d(200), d(50), d(50)],
+            sources: [:actual, :forecast, :forecast],
+            events: []
+          },
+          start,
+          period_days: 30, periods_count: 3, buffer_periods: 1
+        )
+
+      [p1, p2, _p3] = res.periods
+      assert p1.source == :actual
+      assert p1.baseline_in == d(500)
+      assert p1.closing == d(1300)        # 1000 + 500 - 200
+      assert p2.source == :forecast
+      assert p2.closing == d(1350)        # 1300 + 100 - 50
+      assert Map.has_key?(res.ladder, :place_12mo)
     end
   end
 end
@@ -229,7 +262,7 @@ defmodule FullCircle.Reporting.CashForecastDBTest do
       assert Decimal.equal?(res.opening, d(10_000))
       assert length(res.periods) == 12
       assert Decimal.equal?(hd(res.periods).opening, d(10_000))
-      assert Map.has_key?(res, :baseline_in)
+      assert hd(res.periods).source in [:actual, :forecast]
       assert Map.has_key?(res.ladder, :place_12mo)
     end
   end

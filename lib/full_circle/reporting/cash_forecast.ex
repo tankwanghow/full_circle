@@ -158,24 +158,72 @@ defmodule FullCircle.Reporting.CashForecast do
     buffer_periods = Map.get(opts, :buffer_periods, 1)
     trailing_days = Map.get(opts, :trailing_days, 365)
     account_sel = Map.get(opts, :account_ids, :all)
+    today = Date.utc_today()
 
     end_date = Date.add(start_date, period_days * periods_count - 1)
     ids = liquid_account_ids(com, account_sel)
+    bounds = period_bounds(start_date, period_days, periods_count)
 
     opening = opening_liquid_balance(ids, start_date, com)
-    {rr_in, rr_out} = run_rate_flows(ids, start_date, trailing_days, period_days, com)
 
-    # Known dated items not yet realised in the run-rate's history.
+    # Forecast periods use the run-rate anchored at TODAY (freshest trailing window).
+    {rr_in, rr_out} = run_rate_flows(ids, today, trailing_days, period_days, com)
+
+    # Elapsed periods (end <= today) use their REAL total liquid cash flow.
+    actuals = period_actuals(ids, start_date, period_days, periods_count, today, com)
+
+    {base_in, base_out, sources} =
+      bounds
+      |> Enum.with_index()
+      |> Enum.reduce({[], [], []}, fn {{_ps, pe}, i}, {bi, bo, ss} ->
+        if Date.compare(pe, today) != :gt do
+          a = Map.get(actuals, i, %{in: @zero, out: @zero})
+          {[a.in | bi], [a.out | bo], [:actual | ss]}
+        else
+          {[rr_in | bi], [rr_out | bo], [:forecast | ss]}
+        end
+      end)
+      |> then(fn {bi, bo, ss} -> {Enum.reverse(bi), Enum.reverse(bo), Enum.reverse(ss)} end)
+
+    # Known overlay applies only to FUTURE dates; anything on/before today is already
+    # captured in the actual periods.
     events =
-      posted_future_flows(ids, start_date, end_date, com) ++
-        known_inflow_cheques(start_date, end_date, com)
+      (posted_future_flows(ids, start_date, end_date, com) ++
+         known_inflow_cheques(start_date, end_date, com))
+      |> Enum.filter(fn ev -> Date.compare(ev.date, today) == :gt end)
 
     build_forecast(
-      %{opening: opening, baseline_in: rr_in, baseline_out: rr_out, events: events},
+      %{opening: opening, base_in: base_in, base_out: base_out, sources: sources, events: events},
       start_date,
       period_days: period_days, periods_count: periods_count, buffer_periods: buffer_periods
     )
     |> Map.put(:trailing_days, trailing_days)
+  end
+
+  # Real total liquid cash in/out (every movement, no filters) per period, for the
+  # periods between `start_date` and `today` — the elapsed portion of the horizon.
+  # Returns `%{period_index(0-based) => %{in, out}}`.
+  defp period_actuals(account_ids, start_date, period_days, periods_count, today, com) do
+    horizon_end = Date.add(start_date, period_days * periods_count)
+    upper = if Date.compare(today, horizon_end) == :lt, do: today, else: horizon_end
+
+    if Date.compare(upper, start_date) != :gt do
+      %{}
+    else
+      from(t in Transaction,
+        where:
+          t.company_id == ^com.id and t.account_id in ^account_ids and
+            t.doc_date >= ^start_date and t.doc_date < ^upper,
+        select: %{
+          idx: selected_as(fragment("(? - ?) / ?", t.doc_date, ^start_date, ^period_days), :idx),
+          ins: sum(fragment("case when ? > 0 then ? else 0 end", t.amount, t.amount)),
+          outs: sum(fragment("case when ? < 0 then -? else 0 end", t.amount, t.amount))
+        },
+        group_by: selected_as(:idx)
+      )
+      |> Repo.all()
+      |> Map.new(fn r -> {r.idx, %{in: to_decimal(r.ins), out: to_decimal(r.outs)}} end)
+    end
   end
 
   defp to_decimal(nil), do: @zero
@@ -185,9 +233,11 @@ defmodule FullCircle.Reporting.CashForecast do
   @doc """
   Build the forecast from already-fetched raw inputs.
 
-  `raw` is `%{opening, baseline_in, baseline_out, events}` where `baseline_*` is the
-  per-period run-rate and events is a list of `%{date, in, out, kind}` known items.
-  `opts` carries `:period_days`, `:periods_count`, `:buffer_periods`.
+  `raw` is `%{opening, base_in, base_out, sources, events}` where `base_in`/`base_out`
+  are per-period lists (the actual flow for elapsed periods, the run-rate for future
+  ones), `sources` a per-period list of `:actual | :forecast`, and events a list of
+  `%{date, in, out, kind}` known overlay items. `opts` carries `:period_days`,
+  `:periods_count`, `:buffer_periods`.
   """
   def build_forecast(raw, start_date, opts) do
     period_days = Keyword.fetch!(opts, :period_days)
@@ -200,8 +250,12 @@ defmodule FullCircle.Reporting.CashForecast do
     periods =
       bounds
       |> Enum.with_index(1)
-      |> roll_forward(known, raw.opening, raw.baseline_in, raw.baseline_out)
+      |> roll_forward(known, raw.opening, raw.base_in, raw.base_out, raw.sources)
       |> apply_buffer(buffer_periods)
+
+    # The FD ladder is forward-looking: only the forecast periods can be locked.
+    forecast = Enum.filter(periods, &(&1.source == :forecast))
+    ladder_input = if forecast == [], do: periods, else: forecast
 
     %{
       start_date: start_date,
@@ -209,10 +263,8 @@ defmodule FullCircle.Reporting.CashForecast do
       periods_count: periods_count,
       buffer_periods: buffer_periods,
       opening: raw.opening,
-      baseline_in: raw.baseline_in,
-      baseline_out: raw.baseline_out,
       periods: periods,
-      ladder: fd_ladder(periods, period_days)
+      ladder: fd_ladder(ladder_input, period_days)
     }
   end
 
@@ -241,18 +293,21 @@ defmodule FullCircle.Reporting.CashForecast do
     end)
   end
 
-  defp roll_forward(indexed_bounds, known, opening, baseline_in, baseline_out) do
+  defp roll_forward(indexed_bounds, known, opening, base_in_list, base_out_list, sources) do
     {rows, _} =
       Enum.map_reduce(indexed_bounds, opening, fn {{ps, pe}, idx}, open ->
         k = Map.get(known, idx, %{in: @zero, out: @zero})
-        total_in = Decimal.add(k.in, baseline_in)
-        total_out = Decimal.add(k.out, baseline_out)
+        base_in = Enum.at(base_in_list, idx - 1)
+        base_out = Enum.at(base_out_list, idx - 1)
+        source = Enum.at(sources, idx - 1)
+        total_in = Decimal.add(k.in, base_in)
+        total_out = Decimal.add(k.out, base_out)
         closing = open |> Decimal.add(total_in) |> Decimal.sub(total_out)
 
         row = %{
-          n: idx, period_start: ps, period_end: pe,
-          opening: open, known_in: k.in, baseline_in: baseline_in,
-          known_out: k.out, baseline_out: baseline_out,
+          n: idx, period_start: ps, period_end: pe, source: source,
+          opening: open, known_in: k.in, baseline_in: base_in,
+          known_out: k.out, baseline_out: base_out,
           total_in: total_in, total_out: total_out,
           closing: closing, buffer: @zero, free_cash: @zero
         }

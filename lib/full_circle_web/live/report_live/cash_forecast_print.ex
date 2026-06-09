@@ -77,26 +77,28 @@ defmodule FullCircleWeb.ReportLive.CashForecastPrint do
               <th>#</th>
               <th>{gettext("From")}</th>
               <th>{gettext("To")}</th>
+              <th>{gettext("Type")}</th>
               <th>{gettext("Opening")}</th>
+              <th>{gettext("Base In")}</th>
               <th>{gettext("Known In")}</th>
-              <th>{gettext("Run-rate In")}</th>
+              <th>{gettext("Base Out")}</th>
               <th>{gettext("Known Out")}</th>
-              <th>{gettext("Run-rate Out")}</th>
               <th>{gettext("Closing")}</th>
               <th>{gettext("Buffer")}</th>
               <th>{gettext("Free Cash")}</th>
             </tr>
           </thead>
           <tbody>
-            <tr :for={p <- @forecast.periods}>
+            <tr :for={p <- @forecast.periods} class={if p.source == :actual, do: "actual", else: ""}>
               <td class="ctr">{p.n}</td>
               <td class="ctr">{Date.to_iso8601(p.period_start)}</td>
               <td class="ctr">{Date.to_iso8601(p.period_end)}</td>
+              <td class="ctr">{if p.source == :actual, do: gettext("Actual"), else: gettext("Forecast")}</td>
               <td>{fmt(p.opening)}</td>
-              <td>{fmt(p.known_in)}</td>
               <td>{fmt(p.baseline_in)}</td>
-              <td>{fmt(p.known_out)}</td>
+              <td>{fmt(p.known_in)}</td>
               <td>{fmt(p.baseline_out)}</td>
+              <td>{fmt(p.known_out)}</td>
               <td class="bold">{fmt(p.closing)}</td>
               <td>{fmt(p.buffer)}</td>
               <td class="bold">{fmt(p.free_cash)}</td>
@@ -109,8 +111,9 @@ defmodule FullCircleWeb.ReportLive.CashForecastPrint do
           <p>
             <b>{gettext("Opening")}</b>: {gettext("cash & bank balance at the start of the period (previous period's Closing")}).
             <b>{gettext("Closing")}</b>: {gettext("Opening + all inflows − all outflows")}.
-            <b>{gettext("Run-rate In")}</b> / <b>{gettext("Run-rate Out")}</b>: {gettext("the backbone — this company's actual average cash & bank throughput per period from the trailing window (captures the whole ongoing business)")}.
-            <b>{gettext("Known In")}</b> / <b>{gettext("Known Out")}</b>: {gettext("specific dated cash already certain and on top of the run-rate — in-hand post-dated cheques and already-posted future-dated transactions")}.
+            <b>{gettext("Type")}</b>: {gettext("Actual = period already passed, real cash in/out (shaded); Forecast = projected")}.
+            <b>{gettext("Base In")}</b> / <b>{gettext("Base Out")}</b>: {gettext("the period's underlying flow — real total for Actual periods, the run-rate (average operating throughput, treasury excluded) for Forecast periods")}.
+            <b>{gettext("Known In")}</b> / <b>{gettext("Known Out")}</b>: {gettext("forecast periods only — dated certain cash on top of the run-rate (in-hand cheques, posted future-dated transactions)")}.
             <b>{gettext("Buffer")}</b>: {gettext("cash that must stay liquid — projected net cash drain (outflow − inflow, floored at 0) over the next %{n} period(s)", n: @forecast.buffer_periods)}.
             <b>{gettext("Free Cash")}</b>: {gettext("Closing − Buffer (never below 0) — surplus safe to put to work")}.
           </p>
@@ -140,6 +143,7 @@ defmodule FullCircleWeb.ReportLive.CashForecastPrint do
       table.forecast th, table.forecast td { border: 1px solid gray; padding: 1px 3px; }
       table.forecast .ctr { text-align: center; }
       table.forecast .bold { font-weight: bold; }
+      table.forecast tr.actual td { background: #eef6ff; }
       .legend { margin-top: 4mm; font-size: 11px; text-align: left; }
       .legend .bold { font-weight: bold; }
     </style>

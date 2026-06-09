@@ -202,11 +202,12 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
             <th class="text-center px-1">#</th>
             <th class="text-center px-1">{gettext("From")}</th>
             <th class="text-center px-1">{gettext("To")}</th>
+            <th class="text-center px-1">{gettext("Type")}</th>
             <th class="px-1">{gettext("Opening")}</th>
+            <th class="px-1 text-gray-500 dark:text-gray-400">{gettext("Base In")}</th>
             <th class="px-1">{gettext("Known In")}</th>
-            <th class="px-1 text-gray-500 dark:text-gray-400">{gettext("Run-rate In")}</th>
+            <th class="px-1 text-gray-500 dark:text-gray-400">{gettext("Base Out")}</th>
             <th class="px-1">{gettext("Known Out")}</th>
-            <th class="px-1 text-gray-500 dark:text-gray-400">{gettext("Run-rate Out")}</th>
             <th class="px-1">{gettext("Closing")}</th>
             <th class="px-1">{gettext("Buffer")}</th>
             <th class="px-1 text-green-700 dark:text-green-400">{gettext("Free Cash")}</th>
@@ -215,16 +216,31 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
         <tbody>
           <tr
             :for={p <- @periods}
-            class="border-b dark:border-gray-700 odd:bg-white even:bg-gray-50 dark:odd:bg-gray-800 dark:even:bg-gray-900 dark:text-gray-200"
+            class={[
+              "border-b dark:border-gray-700 dark:text-gray-200",
+              if(p.source == :actual,
+                do: "bg-sky-50 dark:bg-sky-950",
+                else: "odd:bg-white even:bg-gray-50 dark:odd:bg-gray-800 dark:even:bg-gray-900"
+              )
+            ]}
           >
             <td class="text-center px-1">{p.n}</td>
             <td class="text-center px-1">{Date.to_iso8601(p.period_start)}</td>
             <td class="text-center px-1">{Date.to_iso8601(p.period_end)}</td>
+            <td class={[
+              "text-center px-1 font-medium",
+              if(p.source == :actual,
+                do: "text-sky-700 dark:text-sky-300",
+                else: "text-gray-500 dark:text-gray-400"
+              )
+            ]}>
+              {if p.source == :actual, do: gettext("Actual"), else: gettext("Forecast")}
+            </td>
             <td class="font-mono px-1">{fmt(p.opening)}</td>
-            <td class="font-mono px-1">{fmt(p.known_in)}</td>
             <td class="font-mono px-1 text-gray-500 dark:text-gray-400">{fmt(p.baseline_in)}</td>
-            <td class="font-mono px-1">{fmt(p.known_out)}</td>
+            <td class="font-mono px-1">{fmt(p.known_in)}</td>
             <td class="font-mono px-1 text-gray-500 dark:text-gray-400">{fmt(p.baseline_out)}</td>
+            <td class="font-mono px-1">{fmt(p.known_out)}</td>
             <td class="font-mono px-1 font-bold">{fmt(p.closing)}</td>
             <td class="font-mono px-1">{fmt(p.buffer)}</td>
             <td class="font-mono px-1 font-bold text-green-700 dark:text-green-400">
@@ -247,27 +263,29 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
       <p class="font-bold mb-2">
         {gettext("How to read this report")}
         <span class="font-normal text-gray-500 dark:text-gray-400">
-          ({gettext("each period is %{d} days; Base In/Out and payment timing are sampled from the last %{t} days", d: @period_days, t: @trailing_days)})
+          ({gettext("each period is %{d} days; the run-rate is sampled from the last %{t} days", d: @period_days, t: @trailing_days)})
         </span>
       </p>
       <dl class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1">
         <div>
-          <dt class="inline font-semibold">{gettext("Opening")}:</dt>
-          <dd class="inline">
-            {gettext("Cash & bank balance at the start of the period (the previous period's Closing).")}
-          </dd>
-        </div>
-        <div>
-          <dt class="inline font-semibold">{gettext("Closing")}:</dt>
-          <dd class="inline">
-            {gettext("Opening + all inflows − all outflows for the period.")}
-          </dd>
-        </div>
-        <div>
-          <dt class="inline font-semibold">{gettext("Run-rate In")} / {gettext("Run-rate Out")}:</dt>
+          <dt class="inline font-semibold">{gettext("Type")}:</dt>
           <dd class="inline">
             {gettext(
-              "The forecast backbone — this company's actual average cash & bank throughput per period, measured from the trailing window. It captures the whole ongoing business (collections, payments, payroll, everything), not just invoices already on the books."
+              "Actual = the period has already fully passed, so its figures are this company's REAL cash in/out for those dates (shaded). Forecast = the period is still open or in the future, so it is projected."
+            )}
+          </dd>
+        </div>
+        <div>
+          <dt class="inline font-semibold">{gettext("Opening")} / {gettext("Closing")}:</dt>
+          <dd class="inline">
+            {gettext("Balance at the start / end of the period (Opening + all inflows − all outflows). One continuous line across actual and forecast.")}
+          </dd>
+        </div>
+        <div>
+          <dt class="inline font-semibold">{gettext("Base In")} / {gettext("Base Out")}:</dt>
+          <dd class="inline">
+            {gettext(
+              "The period's underlying cash flow. For an Actual period it is the REAL total throughput. For a Forecast period it is the run-rate — this company's average operating throughput per period from the trailing window (treasury transfers excluded)."
             )}
           </dd>
         </div>
@@ -275,7 +293,7 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
           <dt class="inline font-semibold">{gettext("Known In")} / {gettext("Known Out")}:</dt>
           <dd class="inline">
             {gettext(
-              "Specific dated cash that is already certain and on top of the run-rate — in-hand post-dated cheques and transactions already entered with a future date, placed in the period they fall due."
+              "Forecast periods only — specific dated cash already certain and on top of the run-rate: in-hand post-dated cheques and transactions already entered with a future date."
             )}
           </dd>
         </div>
@@ -301,7 +319,7 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
         )}
       </p>
       <p class="mt-1 italic text-gray-500 dark:text-gray-400">
-        {gettext("The run-rate projects the recent past forward, so it assumes business continues at a similar pace; Known items are certain. A longer trailing window smooths seasonality, a shorter one tracks recent changes.")}
+        {gettext("Set the Start Date in the past to see real actuals for the elapsed periods alongside the forecast for the rest. The run-rate (used for forecast periods) is always taken from the most recent days; a longer trailing window smooths seasonality, a shorter one tracks recent changes.")}
       </p>
     </div>
     """
