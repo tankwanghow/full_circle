@@ -117,4 +117,45 @@ defmodule FullCircle.Reporting.CashForecastDBTest do
       assert bal == d(700)
     end
   end
+
+  describe "posted_future_flows/4" do
+    test "returns dated events split by sign within horizon", %{com: com, bank: bank} do
+      txn!(com, bank.id, ~D[2026-06-10], d(1000))
+      txn!(com, bank.id, ~D[2026-06-12], d(-400))
+      txn!(com, bank.id, ~D[2026-12-31], d(5000)) # beyond 13 weeks -> excluded
+
+      ids = CashForecast.liquid_account_ids(com, :all)
+      end_date = ~D[2026-09-06]  # ~13 weeks from 2026-06-08
+      events = CashForecast.posted_future_flows(ids, ~D[2026-06-08], end_date, com)
+
+      ins = Enum.filter(events, &(Decimal.compare(&1.in, d(0)) == :gt))
+      outs = Enum.filter(events, &(Decimal.compare(&1.out, d(0)) == :gt))
+      assert Enum.any?(ins, &(&1.date == ~D[2026-06-10] and &1.in == d(1000)))
+      assert Enum.any?(outs, &(&1.date == ~D[2026-06-12] and &1.out == d(400)))
+      refute Enum.any?(events, &(&1.date == ~D[2026-12-31]))
+    end
+  end
+
+  describe "baseline_flows/4" do
+    test "averages contact-null liquid flows over the trailing window", %{com: com, bank: bank} do
+      # 13-week trailing window before 2026-06-08
+      txn!(com, bank.id, ~D[2026-04-01], d(1300))   # contact_id nil -> in
+      txn!(com, bank.id, ~D[2026-05-01], d(-650))   # contact_id nil -> out
+
+      # contact-bearing flow must be IGNORED by baseline:
+      cont =
+        Repo.one(from c in FullCircle.Accounting.Contact,
+          where: c.company_id == ^com.id, limit: 1) ||
+          Repo.insert!(%FullCircle.Accounting.Contact{name: "Baseline Cont #{System.unique_integer([:positive])}", company_id: com.id})
+
+      txn!(com, bank.id, ~D[2026-05-02], d(9999), %{contact_id: cont.id})
+
+      {bin, bout} =
+        CashForecast.baseline_flows(
+          CashForecast.liquid_account_ids(com, :all), ~D[2026-06-08], 13, com)
+
+      assert Decimal.equal?(bin, Decimal.div(d(1300), d(13)))   # 100/week
+      assert Decimal.equal?(bout, Decimal.div(d(650), d(13)))   # 50/week
+    end
+  end
 end

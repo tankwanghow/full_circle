@@ -48,6 +48,51 @@ defmodule FullCircle.Reporting.CashForecast do
     |> to_decimal()
   end
 
+  @doc "Already-posted liquid transactions dated on/after start within the horizon."
+  def posted_future_flows(account_ids, start_date, end_date, com) do
+    from(t in Transaction,
+      where:
+        t.company_id == ^com.id and t.account_id in ^account_ids and
+          t.doc_date >= ^start_date and t.doc_date <= ^end_date,
+      select: %{date: t.doc_date, amount: t.amount}
+    )
+    |> Repo.all()
+    |> Enum.map(fn %{date: date, amount: amt} ->
+      amt = to_decimal(amt)
+      if Decimal.compare(amt, @zero) == :lt do
+        %{date: date, in: @zero, out: Decimal.abs(amt), kind: :posted}
+      else
+        %{date: date, in: amt, out: @zero, kind: :posted}
+      end
+    end)
+  end
+
+  @doc """
+  Average weekly in/out from contact-null liquid txns over the `weeks`-long
+  window ending the day before `start_date`. Returns `{baseline_in, baseline_out}`.
+  """
+  def baseline_flows(account_ids, start_date, weeks, com) do
+    window_start = Date.add(start_date, -weeks * 7)
+
+    rows =
+      from(t in Transaction,
+        where:
+          t.company_id == ^com.id and t.account_id in ^account_ids and
+            is_nil(t.contact_id) and
+            t.doc_date >= ^window_start and t.doc_date < ^start_date,
+        select: %{
+          ins: sum(fragment("case when ? > 0 then ? else 0 end", t.amount, t.amount)),
+          outs: sum(fragment("case when ? < 0 then -? else 0 end", t.amount, t.amount))
+        }
+      )
+      |> Repo.one()
+
+    ins = to_decimal(rows && rows.ins)
+    outs = to_decimal(rows && rows.outs)
+    wk = Decimal.new("#{weeks}")
+    {Decimal.div(ins, wk), Decimal.div(outs, wk)}
+  end
+
   defp to_decimal(nil), do: @zero
   defp to_decimal(%Decimal{} = d), do: d
   defp to_decimal(n), do: Decimal.new("#{n}")
