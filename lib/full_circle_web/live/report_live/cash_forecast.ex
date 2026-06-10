@@ -290,10 +290,8 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
             <th class="text-center px-1">{gettext("To")}</th>
             <th class="text-center px-1">{gettext("Type")}</th>
             <th class="px-1">{gettext("Opening")}</th>
-            <th class="px-1 text-gray-500 dark:text-gray-400">{gettext("Base In")}</th>
-            <th class="px-1">{gettext("Known In")}</th>
-            <th class="px-1 text-gray-500 dark:text-gray-400">{gettext("Base Out")}</th>
-            <th class="px-1">{gettext("Known Out")}</th>
+            <th class="px-1">{gettext("Base In")}</th>
+            <th class="px-1">{gettext("Base Out")}</th>
             <th class="px-1">{gettext("Closing")}</th>
             <th class="px-1">{gettext("Buffer")}</th>
             <th class="px-1 text-green-700 dark:text-green-400">{gettext("Free Cash")}</th>
@@ -323,7 +321,7 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
               {if p.source == :actual, do: gettext("Actual"), else: gettext("Forecast")}
             </td>
             <td class="font-mono px-1">{fmt(p.opening)}</td>
-            <td class="font-mono px-1 text-gray-500 dark:text-gray-400">
+            <td class="font-mono px-1">
               <span
                 :if={p.source == :actual}
                 class="cursor-pointer underline decoration-dotted hover:text-sky-700 dark:hover:text-sky-300"
@@ -333,10 +331,11 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
                 phx-value-dir="in"
                 phx-value-n={p.n}
               >{fmt(p.baseline_in)}</span>
-              <span :if={p.source != :actual}>{fmt(p.baseline_in)}</span>
+              <span :if={p.source != :actual} class="text-gray-500 dark:text-gray-400">
+                {fmt(p.baseline_in)}
+              </span>
             </td>
-            <td class="font-mono px-1">{fmt(p.known_in)}</td>
-            <td class="font-mono px-1 text-gray-500 dark:text-gray-400">
+            <td class="font-mono px-1">
               <span
                 :if={p.source == :actual}
                 class="cursor-pointer underline decoration-dotted hover:text-sky-700 dark:hover:text-sky-300"
@@ -346,9 +345,10 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
                 phx-value-dir="out"
                 phx-value-n={p.n}
               >{fmt(p.baseline_out)}</span>
-              <span :if={p.source != :actual}>{fmt(p.baseline_out)}</span>
+              <span :if={p.source != :actual} class="text-gray-500 dark:text-gray-400">
+                {fmt(p.baseline_out)}
+              </span>
             </td>
-            <td class="font-mono px-1">{fmt(p.known_out)}</td>
             <td class="font-mono px-1 font-bold">{fmt(p.closing)}</td>
             <td class="font-mono px-1">{fmt(p.buffer)}</td>
             <td class="font-mono px-1 font-bold text-green-700 dark:text-green-400">
@@ -393,15 +393,7 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
           <dt class="inline font-semibold">{gettext("Base In")} / {gettext("Base Out")}:</dt>
           <dd class="inline">
             {gettext(
-              "The period's underlying cash flow. For an Actual period it is the REAL total throughput. For a Forecast period it is the run-rate — this company's average operating throughput per period from the trailing window (treasury transfers excluded)."
-            )}
-          </dd>
-        </div>
-        <div>
-          <dt class="inline font-semibold">{gettext("Known In")} / {gettext("Known Out")}:</dt>
-          <dd class="inline">
-            {gettext(
-              "Forecast periods only — specific dated cash already certain and on top of the run-rate: in-hand post-dated cheques and transactions already entered with a future date."
+              "The period's cash in/out. For an Actual period it is the REAL total throughput (click it to see the transactions). For a Forecast period it is the run-rate — this company's average operating throughput per period from the trailing window (treasury transfers excluded)."
             )}
           </dd>
         </div>

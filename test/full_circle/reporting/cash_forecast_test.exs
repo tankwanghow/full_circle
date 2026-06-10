@@ -47,24 +47,9 @@ defmodule FullCircle.Reporting.CashForecastTest do
     end
   end
 
-  describe "clamp_due/2" do
-    test "past-due dates clamp to start_date, future dates pass through" do
-      start = ~D[2026-06-08]
-      assert CashForecast.clamp_due(~D[2026-05-01], start) == start
-      assert CashForecast.clamp_due(~D[2026-07-01], start) == ~D[2026-07-01]
-    end
-  end
-
   describe "build_forecast/3 roll-forward" do
-    test "adds per-period base to known events and rolls balance forward" do
+    test "rolls balance forward from per-period base flows" do
       start = ~D[2026-06-08]
-
-      # known events (overlay)
-      events = [
-        %{date: ~D[2026-06-10], in: d(1000), out: d(0), kind: :known},   # period 1
-        %{date: ~D[2026-06-12], in: d(0), out: d(400), kind: :known},    # period 1
-        %{date: ~D[2026-07-16], in: d(0), out: d(700), kind: :known}     # period 2 (day 38)
-      ]
 
       res =
         CashForecast.build_forecast(
@@ -72,8 +57,7 @@ defmodule FullCircle.Reporting.CashForecastTest do
             opening: d(5000),
             base_in: List.duplicate(d(100), 12),
             base_out: List.duplicate(d(50), 12),
-            sources: List.duplicate(:forecast, 12),
-            events: events
+            sources: List.duplicate(:forecast, 12)
           },
           start,
           period_days: 30, periods_count: 12, buffer_periods: 1
@@ -83,15 +67,11 @@ defmodule FullCircle.Reporting.CashForecastTest do
       assert p1.period_start == ~D[2026-06-08]
       assert p1.source == :forecast
       assert p1.opening == d(5000)
-      assert p1.known_in == d(1000)
-      assert p1.known_out == d(400)
       assert p1.baseline_in == d(100)
       assert p1.baseline_out == d(50)
-      # 5000 + (1000 + 100) - (400 + 50)
-      assert p1.closing == d(5650)
-      # 5650 + (0 + 100) - (700 + 50)
-      assert p2.opening == d(5650)
-      assert p2.closing == d(5000)
+      assert p1.closing == d(5050)         # 5000 + 100 - 50
+      assert p2.opening == d(5050)
+      assert p2.closing == d(5100)         # 5050 + 100 - 50
       assert length(res.periods) == 12
     end
 
@@ -105,8 +85,7 @@ defmodule FullCircle.Reporting.CashForecastTest do
             # period 1 actual (real flow), periods 2-3 forecast
             base_in: [d(500), d(100), d(100)],
             base_out: [d(200), d(50), d(50)],
-            sources: [:actual, :forecast, :forecast],
-            events: []
+            sources: [:actual, :forecast, :forecast]
           },
           start,
           period_days: 30, periods_count: 3, buffer_periods: 1
@@ -170,24 +149,6 @@ defmodule FullCircle.Reporting.CashForecastDBTest do
 
       bal = CashForecast.opening_liquid_balance(ids, ~D[2026-06-08], com)
       assert bal == d(700)
-    end
-  end
-
-  describe "posted_future_flows/4" do
-    test "returns dated events split by sign within horizon", %{com: com, bank: bank} do
-      txn!(com, bank.id, ~D[2026-06-10], d(1000))
-      txn!(com, bank.id, ~D[2026-06-12], d(-400))
-      txn!(com, bank.id, ~D[2027-12-31], d(5000)) # beyond horizon -> excluded
-
-      ids = CashForecast.liquid_account_ids(com, :all)
-      end_date = ~D[2026-09-06]
-      events = CashForecast.posted_future_flows(ids, ~D[2026-06-08], end_date, com)
-
-      ins = Enum.filter(events, &(Decimal.compare(&1.in, d(0)) == :gt))
-      outs = Enum.filter(events, &(Decimal.compare(&1.out, d(0)) == :gt))
-      assert Enum.any?(ins, &(&1.date == ~D[2026-06-10] and &1.in == d(1000)))
-      assert Enum.any?(outs, &(&1.date == ~D[2026-06-12] and &1.out == d(400)))
-      refute Enum.any?(events, &(&1.date == ~D[2027-12-31]))
     end
   end
 

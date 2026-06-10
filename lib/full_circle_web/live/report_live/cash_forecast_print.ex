@@ -80,9 +80,7 @@ defmodule FullCircleWeb.ReportLive.CashForecastPrint do
               <th>{gettext("Type")}</th>
               <th>{gettext("Opening")}</th>
               <th>{gettext("Base In")}</th>
-              <th>{gettext("Known In")}</th>
               <th>{gettext("Base Out")}</th>
-              <th>{gettext("Known Out")}</th>
               <th>{gettext("Closing")}</th>
               <th>{gettext("Buffer")}</th>
               <th>{gettext("Free Cash")}</th>
@@ -96,9 +94,7 @@ defmodule FullCircleWeb.ReportLive.CashForecastPrint do
               <td class="ctr">{if p.source == :actual, do: gettext("Actual"), else: gettext("Forecast")}</td>
               <td>{fmt(p.opening)}</td>
               <td>{fmt(p.baseline_in)}</td>
-              <td>{fmt(p.known_in)}</td>
               <td>{fmt(p.baseline_out)}</td>
-              <td>{fmt(p.known_out)}</td>
               <td class="bold">{fmt(p.closing)}</td>
               <td>{fmt(p.buffer)}</td>
               <td class="bold">{fmt(p.free_cash)}</td>
@@ -112,8 +108,7 @@ defmodule FullCircleWeb.ReportLive.CashForecastPrint do
             <b>{gettext("Opening")}</b>: {gettext("cash & bank balance at the start of the period (previous period's Closing")}).
             <b>{gettext("Closing")}</b>: {gettext("Opening + all inflows − all outflows")}.
             <b>{gettext("Type")}</b>: {gettext("Actual = period already passed, real cash in/out (shaded); Forecast = projected")}.
-            <b>{gettext("Base In")}</b> / <b>{gettext("Base Out")}</b>: {gettext("the period's underlying flow — real total for Actual periods, the run-rate (average operating throughput, treasury excluded) for Forecast periods")}.
-            <b>{gettext("Known In")}</b> / <b>{gettext("Known Out")}</b>: {gettext("forecast periods only — dated certain cash on top of the run-rate (in-hand cheques, posted future-dated transactions)")}.
+            <b>{gettext("Base In")}</b> / <b>{gettext("Base Out")}</b>: {gettext("the period's cash in/out — real total for Actual periods, the run-rate (average operating throughput, treasury excluded) for Forecast periods")}.
             <b>{gettext("Buffer")}</b>: {gettext("cash that must stay liquid — projected net cash drain (outflow − inflow, floored at 0) over the next %{n} period(s)", n: @forecast.buffer_periods)}.
             <b>{gettext("Free Cash")}</b>: {gettext("Closing − Buffer (never below 0) — surplus safe to put to work")}.
           </p>
