@@ -19,7 +19,7 @@ defmodule FullCircleWeb.ProfitLossForecastLiveTest do
 
     test "with query params renders the category table (Net Profit row)", %{conn: conn, company: company} do
       {:ok, lv, _html} =
-        live(conn, ~p"/companies/#{company.id}/profit_loss_forecast?search[s_date]=2026-01-01")
+        live(conn, ~p"/companies/#{company.id}/profit_loss_forecast?search[fy_year]=2026&search[granularity]=monthly")
 
       html = render_async(lv)
       assert html =~ "Net Profit"

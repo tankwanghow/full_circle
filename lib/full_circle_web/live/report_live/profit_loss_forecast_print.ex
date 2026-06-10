@@ -19,25 +19,12 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecastPrint do
   ]
 
   @impl true
-  def mount(%{"s_date" => s_date} = params, _session, socket) do
+  def mount(params, _session, socket) do
     com = PLF.company_with_settings(socket.assigns.current_company)
+    gran = if params["granularity"] == "quarterly", do: :quarterly, else: :monthly
+    year = safe_int(params["fy_year"], Date.utc_today().year)
 
-    forecast =
-      case Date.from_iso8601(to_string(s_date)) do
-        {:ok, date} ->
-          PLF.pl_forecast(
-            %{
-              start_date: date,
-              period_days: safe_int(params["period_days"], 30),
-              periods_count: safe_int(params["periods_count"], 12),
-              trailing_days: safe_int(params["trailing_days"], 365)
-            },
-            com
-          )
-
-        _ ->
-          nil
-      end
+    forecast = PLF.pl_forecast(%{fy_year: year, granularity: gran}, com)
 
     {:ok,
      socket
@@ -62,7 +49,8 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecastPrint do
       <div :if={@forecast} class="page">
         <h1 class="text-center text-xl font-bold">{gettext("Profit & Loss Forecast")}</h1>
         <p class="text-center">
-          {Date.to_iso8601(@forecast.start_date)} — {@forecast.periods_count} × {@forecast.period_days} {gettext("day periods")}
+          {gettext("Financial year")} {Date.to_iso8601(@forecast.start_date)} → {Date.to_iso8601(@forecast.fy_end)}
+          · {if @forecast.granularity == :quarterly, do: gettext("Quarterly"), else: gettext("Monthly")}
           · {gettext("forecast from last %{t} days", t: @forecast.trailing_days)}
         </p>
 

@@ -63,26 +63,38 @@ defmodule FullCircle.Reporting.ProfitLossForecastDBTest do
 
   setup do
     admin = user_fixture()
-    com = company_fixture(admin, %{})
+    # closing 31 Dec -> financial year == calendar year
+    com = company_fixture(admin, %{closing_month: 12, closing_day: 31})
     rev = account_fixture(%{account_type: "Revenue", name: "Sales #{System.unique_integer([:positive])}"}, com, admin)
     exp = account_fixture(%{account_type: "Expenses", name: "Rent #{System.unique_integer([:positive])}"}, com, admin)
     %{admin: admin, com: com, rev: rev, exp: exp}
   end
 
   describe "pl_forecast/2 actual periods" do
-    test "shows real per-category P&L for an elapsed period (sign-normalized)", %{com: com, rev: rev, exp: exp} do
+    test "shows real per-category P&L for the first month of the FY (sign-normalized)", %{com: com, rev: rev, exp: exp} do
       # Revenue is credit-normal: a sale posts a NEGATIVE amount on the revenue account.
       txn!(com, rev.id, ~D[2026-01-10], d(-1000))
       txn!(com, exp.id, ~D[2026-01-12], d(300))
 
-      res = PLF.pl_forecast(%{start_date: ~D[2026-01-01], period_days: 30, periods_count: 12}, com)
+      res = PLF.pl_forecast(%{fy_year: 2026, granularity: :monthly}, com)
       p1 = hd(res.periods)
 
+      assert res.start_date == ~D[2026-01-01]
+      assert p1.period_start == ~D[2026-01-01]
+      assert p1.period_end == ~D[2026-01-31]
       assert p1.source == :actual
       assert Decimal.equal?(p1.revenue, d(1000))        # flipped to positive income
       assert Decimal.equal?(p1.expenses, d(300))
       assert Decimal.equal?(p1.net_profit, d(700))      # 1000 - 300
       assert length(res.periods) == 12
+    end
+
+    test "quarterly produces 4 periods aligned to the closing day", %{com: com} do
+      res = PLF.pl_forecast(%{fy_year: 2026, granularity: :quarterly}, com)
+      assert length(res.periods) == 4
+      assert hd(res.periods).period_start == ~D[2026-01-01]
+      assert hd(res.periods).period_end == ~D[2026-03-31]
+      assert List.last(res.periods).period_end == ~D[2026-12-31]
     end
   end
 

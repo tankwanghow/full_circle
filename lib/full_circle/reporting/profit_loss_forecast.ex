@@ -75,39 +75,62 @@ defmodule FullCircle.Reporting.ProfitLossForecast do
   `:periods_count` (default 12), `:trailing_days` (default 365).
   """
   def pl_forecast(opts, com) do
-    start_date = Map.fetch!(opts, :start_date)
-    period_days = Map.get(opts, :period_days, 30)
-    periods_count = Map.get(opts, :periods_count, 12)
+    fy_year = Map.fetch!(opts, :fy_year)
+    granularity = Map.get(opts, :granularity, :monthly)
     trailing_days = Map.get(opts, :trailing_days, 365)
     today = Date.utc_today()
 
-    bounds = period_bounds(start_date, period_days, periods_count)
+    {period_months, periods_count} =
+      case granularity do
+        :quarterly -> {3, 4}
+        _ -> {1, 12}
+      end
+
+    pc = prev_close(com, fy_year)
+    fy_end = add_months(pc, period_months * periods_count)
+    bounds = period_bounds(pc, period_months, periods_count)
     excluded = excluded_account_ids(com)
 
-    run_rate = run_rate_by_type(trailing_days, period_days, today, com, excluded)
-    actuals = actuals_by_type(start_date, period_days, periods_count, today, com)
+    daily = run_rate_daily_by_type(trailing_days, today, com, excluded)
+    actuals = actuals_by_type(pc, period_months, today, fy_end, com)
 
     by_type =
       bounds
       |> Enum.with_index()
-      |> Enum.map(fn {{_ps, pe}, i} ->
+      |> Enum.map(fn {{ps, pe}, i} ->
         if Date.compare(pe, today) != :gt do
           {Map.get(actuals, i, %{}), :actual}
         else
-          {run_rate, :forecast}
+          days = Decimal.new("#{Date.diff(pe, ps) + 1}")
+          {Map.new(daily, fn {t, r} -> {t, Decimal.mult(r, days)} end), :forecast}
         end
       end)
 
     periods = build_periods(bounds, by_type)
 
     %{
-      start_date: start_date,
-      period_days: period_days,
+      fy_year: fy_year,
+      granularity: granularity,
+      start_date: Date.add(pc, 1),
+      fy_end: fy_end,
+      period_months: period_months,
       periods_count: periods_count,
       trailing_days: trailing_days,
       periods: periods,
       totals: totals(periods)
     }
+  end
+
+  @doc """
+  The financial-year closing date one period before the FY that ENDS in `year` —
+  i.e. the day before the FY starts. Uses the company's `closing_month` /
+  `closing_day` (defaults to 31 December = calendar year). All period boundaries are
+  anchored on this closing day.
+  """
+  def prev_close(com, year) do
+    cm = com.closing_month || 12
+    cd = com.closing_day || 31
+    clamp_date(year - 1, cm, cd)
   end
 
   @doc "Build the per-period P&L line rows (with subtotals, margins, cumulative net) — pure."
@@ -217,12 +240,22 @@ defmodule FullCircle.Reporting.ProfitLossForecast do
   defp normalize(type, raw) when type in @income_types, do: Decimal.negate(to_decimal(raw))
   defp normalize(_type, raw), do: to_decimal(raw)
 
-  # %{period_index(0-based) => %{account_type => normalized value}} for elapsed periods.
-  defp actuals_by_type(start_date, period_days, periods_count, today, com) do
-    horizon_end = Date.add(start_date, period_days * periods_count)
-    upper = if Date.compare(today, horizon_end) == :lt, do: today, else: horizon_end
+  # Closing-day-anchored period bounds. `pc` is the day before the FY starts; each
+  # period spans (pc + (i-1)*period_months .. pc + i*period_months], on the closing day.
+  defp period_bounds(pc, period_months, n) do
+    for i <- 1..n do
+      {Date.add(add_months(pc, (i - 1) * period_months), 1), add_months(pc, i * period_months)}
+    end
+  end
 
-    if Date.compare(upper, start_date) != :gt do
+  # %{period_index(0-based) => %{account_type => normalized value}} for elapsed periods.
+  # Periods are closing-day anchored: a transaction's period is determined by how many
+  # closing anchors after `pc` it falls (a day after the closing day rolls to next period).
+  defp actuals_by_type(pc, period_months, today, fy_end, com) do
+    upper = if Date.compare(today, fy_end) == :lt, do: today, else: fy_end
+    fy_start = Date.add(pc, 1)
+
+    if Date.compare(upper, fy_start) == :lt do
       %{}
     else
       from(t in Transaction,
@@ -230,9 +263,22 @@ defmodule FullCircle.Reporting.ProfitLossForecast do
         on: a.id == t.account_id,
         where:
           t.company_id == ^com.id and a.account_type in ^@pl_types and
-            t.doc_date >= ^start_date and t.doc_date < ^upper,
+            t.doc_date >= ^fy_start and t.doc_date <= ^upper,
         select: %{
-          idx: selected_as(fragment("(? - ?) / ?", t.doc_date, ^start_date, ^period_days), :idx),
+          idx:
+            selected_as(
+              fragment(
+                "floor((((extract(year from ?) - extract(year from ?::date)) * 12 + (extract(month from ?) - extract(month from ?::date)) + (case when extract(day from ?) > extract(day from ?::date) then 1 else 0 end) - 1) / ?))::int",
+                t.doc_date,
+                ^pc,
+                t.doc_date,
+                ^pc,
+                t.doc_date,
+                ^pc,
+                ^period_months
+              ),
+              :idx
+            ),
           type: a.account_type,
           sum: sum(t.amount)
         },
@@ -247,8 +293,9 @@ defmodule FullCircle.Reporting.ProfitLossForecast do
     end
   end
 
-  # %{account_type => normalized per-period run-rate value}, anchored at today.
-  defp run_rate_by_type(trailing_days, period_days, today, com, excluded_ids) do
+  # %{account_type => normalized per-DAY run-rate value}, from the trailing window
+  # ending today. The caller multiplies by each period's day-count.
+  defp run_rate_daily_by_type(trailing_days, today, com, excluded_ids) do
     window_start = Date.add(today, -trailing_days)
 
     base =
@@ -267,18 +314,23 @@ defmodule FullCircle.Reporting.ProfitLossForecast do
         do: base,
         else: from([t, _a] in base, where: t.account_id not in ^excluded_ids)
 
-    factor = Decimal.div(Decimal.new("#{period_days}"), Decimal.new("#{trailing_days}"))
+    td = Decimal.new("#{trailing_days}")
 
     query
     |> Repo.all()
-    |> Map.new(fn r -> {r.type, normalize(r.type, Decimal.mult(to_decimal(r.sum), factor))} end)
+    |> Map.new(fn r -> {r.type, normalize(r.type, Decimal.div(to_decimal(r.sum), td))} end)
   end
 
-  defp period_bounds(start_date, period_days, n) do
-    for i <- 0..(n - 1) do
-      ps = Date.add(start_date, i * period_days)
-      {ps, Date.add(ps, period_days - 1)}
-    end
+  # Shift `date` by `n` calendar months, clamping the day to the target month's length.
+  defp add_months(date, n) do
+    total = date.year * 12 + (date.month - 1) + n
+    y = div(total, 12)
+    m = rem(total, 12) + 1
+    clamp_date(y, m, date.day)
+  end
+
+  defp clamp_date(y, m, d) do
+    Date.new!(y, m, min(d, Date.days_in_month(Date.new!(y, m, 1))))
   end
 
   defp to_decimal(nil), do: @zero

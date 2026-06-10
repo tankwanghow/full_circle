@@ -22,19 +22,7 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
 
   @impl true
   def mount(_params, _session, socket) do
-    com = PLF.company_with_settings(socket.assigns.current_company)
-
-    {:ok,
-     assign(socket,
-       page_title: gettext("Profit & Loss Forecast"),
-       current_company: com,
-       rows: @rows,
-       drill: nil,
-       settings_open: false,
-       accounts: [],
-       exclude_set: MapSet.new(),
-       acct_filter: ""
-     )}
+    {:ok, assign(socket, page_title: gettext("Profit & Loss Forecast"), rows: @rows, drill: nil)}
   end
 
   @impl true
@@ -42,10 +30,8 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
     p = params["search"] || %{}
 
     search = %{
-      s_date: p["s_date"] || "",
-      period_days: p["period_days"] || "30",
-      periods_count: p["periods_count"] || "12",
-      trailing_days: p["trailing_days"] || "365"
+      fy_year: p["fy_year"] || "#{default_fy_year(socket.assigns.current_company)}",
+      granularity: p["granularity"] || "monthly"
     }
 
     {:noreply, socket |> assign(search: search) |> run_forecast(search)}
@@ -54,10 +40,8 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
   @impl true
   def handle_event("query", %{"search" => s}, socket) do
     qry = %{
-      "search[s_date]" => s["s_date"],
-      "search[period_days]" => s["period_days"],
-      "search[periods_count]" => s["periods_count"],
-      "search[trailing_days]" => s["trailing_days"]
+      "search[fy_year]" => s["fy_year"],
+      "search[granularity]" => s["granularity"]
     }
 
     {:noreply,
@@ -83,65 +67,20 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
   @impl true
   def handle_event("close_drill", _params, socket), do: {:noreply, assign(socket, drill: nil)}
 
-  @impl true
-  def handle_event("open_settings", _params, socket) do
-    com = socket.assigns.current_company
-
-    {:noreply,
-     assign(socket,
-       settings_open: true,
-       accounts: PLF.list_pl_accounts(com),
-       exclude_set: MapSet.new(PLF.excluded_account_ids(com)),
-       acct_filter: ""
-     )}
-  end
-
-  @impl true
-  def handle_event("close_settings", _params, socket), do: {:noreply, assign(socket, settings_open: false)}
-
-  @impl true
-  def handle_event("filter_accounts", %{"filter" => f}, socket),
-    do: {:noreply, assign(socket, acct_filter: f)}
-
-  @impl true
-  def handle_event("toggle_exclude", %{"id" => id}, socket) do
-    set = socket.assigns.exclude_set
-    set = if MapSet.member?(set, id), do: MapSet.delete(set, id), else: MapSet.put(set, id)
-    {:noreply, assign(socket, exclude_set: set)}
-  end
-
-  @impl true
-  def handle_event("save_settings", _params, socket) do
-    com = socket.assigns.current_company
-    {:ok, _} = PLF.save_excluded_account_ids(com, MapSet.to_list(socket.assigns.exclude_set))
-    com = PLF.company_with_settings(com)
-
-    {:noreply,
-     socket
-     |> assign(current_company: com, settings_open: false)
-     |> run_forecast(socket.assigns.search)}
-  end
-
   defp run_forecast(socket, search) do
     com = socket.assigns.current_company
-
-    parsed =
-      case Date.from_iso8601(search.s_date) do
-        {:ok, date} ->
-          %{
-            start_date: date,
-            period_days: safe_int(search.period_days, 30),
-            periods_count: safe_int(search.periods_count, 12),
-            trailing_days: safe_int(search.trailing_days, 365)
-          }
-
-        _ ->
-          nil
-      end
+    year = safe_int(search.fy_year, Date.utc_today().year)
+    gran = if search.granularity == "quarterly", do: :quarterly, else: :monthly
 
     assign_async(socket, :result, fn ->
-      {:ok, %{result: if(parsed, do: PLF.pl_forecast(parsed, com), else: [])}}
+      {:ok, %{result: PLF.pl_forecast(%{fy_year: year, granularity: gran}, com)}}
     end)
+  end
+
+  defp default_fy_year(com) do
+    today = Date.utc_today()
+    fy_end_this = PLF.prev_close(com, today.year + 1)
+    if Date.compare(today, fy_end_this) != :gt, do: today.year, else: today.year + 1
   end
 
   defp safe_int(s, default) do
@@ -161,30 +100,25 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
         <.form for={%{}} id="search-form" phx-submit="query" autocomplete="off">
           <div class="grid grid-cols-12 gap-2 tracking-tighter">
             <div class="col-span-3">
-              <.input label={gettext("Start Date")} name="search[s_date]" type="date"
-                id="search_s_date" value={@search.s_date} />
+              <.input label={gettext("For The Year")} name="search[fy_year]" type="number"
+                id="search_fy_year" value={@search.fy_year} />
             </div>
-            <div class="col-span-2">
-              <.input label={gettext("Period (days)")} name="search[period_days]" type="number"
-                id="search_period_days" value={@search.period_days} />
+            <div class="col-span-3">
+              <.input
+                label={gettext("Period")}
+                name="search[granularity]"
+                type="select"
+                id="search_granularity"
+                options={[{gettext("Monthly"), "monthly"}, {gettext("Quarterly"), "quarterly"}]}
+                value={@search.granularity}
+              />
             </div>
-            <div class="col-span-2">
-              <.input label={gettext("No. of Periods")} name="search[periods_count]" type="number"
-                id="search_periods_count" value={@search.periods_count} />
-            </div>
-            <div class="col-span-2">
-              <.input label={gettext("Trailing (days)")} name="search[trailing_days]" type="number"
-                id="search_trailing_days" value={@search.trailing_days} />
-            </div>
-            <div class="col-span-3 mt-6 flex items-center gap-2 flex-wrap">
+            <div class="col-span-4 mt-6 flex items-center gap-2 flex-wrap">
               <.button>{gettext("Query")}</.button>
-              <button type="button" phx-click="open_settings" class="gray button">
-                {gettext("Settings")}
-              </button>
               <.link
                 :if={@result.ok? && is_map(@result.result)}
                 navigate={
-                  ~p"/companies/#{@current_company.id}/profit_loss_forecast/print?#{[s_date: @search.s_date, period_days: @search.period_days, periods_count: @search.periods_count, trailing_days: @search.trailing_days]}"
+                  ~p"/companies/#{@current_company.id}/profit_loss_forecast/print?#{[fy_year: @search.fy_year, granularity: @search.granularity]}"
                 }
                 target="_blank"
                 class="blue button"
@@ -200,16 +134,18 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
         <:result_html>
           <% f = @result.result %>
           <div :if={is_map(f)} class="mt-3">
+            <p class="text-center font-medium mb-1">
+              {gettext("Financial year")} {Date.to_iso8601(f.start_date)} → {Date.to_iso8601(f.fy_end)}
+            </p>
             <.pl_table rows={@rows} periods={f.periods} totals={f.totals} />
             <p class="text-sm text-gray-500 dark:text-gray-400 mt-2">
-              {gettext("Income is shown positive; expenses positive. Actual columns are the real posted P&L for elapsed periods (click a figure to see the transactions); Forecast columns project each category from the last %{t} days, excluding any accounts set in Settings.", t: f.trailing_days)}
+              {gettext("Income and expenses both shown positive. Actual columns are the real posted P&L for elapsed periods (click a figure to see the transactions); Forecast columns project each category from the last %{t} days.", t: f.trailing_days)}
             </p>
           </div>
         </:result_html>
       </.async_html>
 
       <.drill_modal :if={@drill} drill={@drill} />
-      <.settings_modal :if={@settings_open} accounts={@accounts} exclude_set={@exclude_set} filter={@acct_filter} />
     </div>
     """
   end
@@ -221,7 +157,7 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
   defp pl_table(assigns) do
     ~H"""
     <div class="overflow-x-auto">
-      <table class="text-sm text-right border dark:border-gray-700 whitespace-nowrap">
+      <table class="text-sm text-right border dark:border-gray-700 whitespace-nowrap mx-auto">
         <thead class="bg-gray-200 dark:bg-gray-700 dark:text-gray-100">
           <tr>
             <th class="text-left px-2 sticky left-0 bg-gray-200 dark:bg-gray-700">{gettext("Category")}</th>
@@ -338,57 +274,6 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
             </tr>
           </tfoot>
         </table>
-      </div>
-    </div>
-    """
-  end
-
-  attr :accounts, :list, required: true
-  attr :exclude_set, :any, required: true
-  attr :filter, :string, required: true
-
-  defp settings_modal(assigns) do
-    flt = String.downcase(assigns.filter)
-
-    filtered =
-      if flt == "",
-        do: assigns.accounts,
-        else: Enum.filter(assigns.accounts, &String.contains?(String.downcase(&1.name), flt))
-
-    assigns = assign(assigns, :filtered, filtered)
-
-    ~H"""
-    <div class="fixed inset-0 z-50 flex items-center justify-center">
-      <div class="absolute inset-0 bg-black/40" phx-click="close_settings"></div>
-      <div class="relative z-10 w-11/12 max-w-2xl max-h-[85vh] flex flex-col rounded shadow-lg bg-white dark:bg-gray-800 dark:text-gray-100 p-4">
-        <p class="font-bold">{gettext("Profit & Loss Forecast Settings")}</p>
-        <p class="font-medium mt-1">{gettext("Exclude accounts from the run-rate")}</p>
-        <p class="text-sm text-gray-500 dark:text-gray-400 mb-2">
-          {gettext("Tick one-off / discretionary P&L accounts you don't want projected forward. Affects Forecast columns only — Actual columns always show the real posted P&L. Saved per company.")}
-        </p>
-        <form phx-change="filter_accounts">
-          <input type="text" name="filter" value={@filter} phx-debounce="200" autocomplete="off"
-            placeholder={gettext("Filter accounts…")}
-            class="w-full border rounded px-2 py-1 mb-2 dark:bg-gray-700 dark:border-gray-600" />
-        </form>
-        <div class="overflow-auto border rounded dark:border-gray-700 flex-1">
-          <label :for={a <- @filtered}
-            class="flex items-center gap-2 px-2 py-1 border-b dark:border-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700">
-            <input type="checkbox" checked={MapSet.member?(@exclude_set, a.id)}
-              phx-click="toggle_exclude" phx-value-id={a.id} />
-            <span class="flex-1">{a.name}</span>
-            <span class="text-xs text-gray-500 dark:text-gray-400">{a.account_type}</span>
-          </label>
-        </div>
-        <div class="flex items-center justify-between mt-3">
-          <span class="text-sm text-gray-500 dark:text-gray-400">
-            {MapSet.size(@exclude_set)} {gettext("excluded")}
-          </span>
-          <div class="flex gap-2">
-            <button type="button" phx-click="close_settings" class="gray button">{gettext("Cancel")}</button>
-            <button type="button" phx-click="save_settings" class="blue button">{gettext("Save")}</button>
-          </div>
-        </div>
       </div>
     </div>
     """
