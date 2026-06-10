@@ -182,7 +182,8 @@ defmodule FullCircle.Reporting.CashForecast do
     buffer_periods = Map.get(opts, :buffer_periods, 1)
     trailing_days = Map.get(opts, :trailing_days, 365)
     account_sel = Map.get(opts, :account_ids, :all)
-    today = Date.utc_today()
+    # "today" / as-of date: anchors the trailing window and the actual/forecast split.
+    today = Map.get(opts, :as_of) || Date.utc_today()
 
     ids = liquid_account_ids(com, account_sel)
     bounds = period_bounds(start_date, period_days, periods_count)
@@ -216,6 +217,7 @@ defmodule FullCircle.Reporting.CashForecast do
       period_days: period_days, periods_count: periods_count, buffer_periods: buffer_periods
     )
     |> Map.put(:trailing_days, trailing_days)
+    |> Map.put(:as_of, today)
   end
 
   # Real total liquid cash in/out (every movement, no filters) per period, for the

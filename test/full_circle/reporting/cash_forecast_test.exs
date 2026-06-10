@@ -273,5 +273,19 @@ defmodule FullCircle.Reporting.CashForecastDBTest do
       assert hd(res.periods).source in [:actual, :forecast]
       assert Map.has_key?(res.ladder, :place_12mo)
     end
+
+    test "as_of anchors the actual/forecast split", %{com: com} do
+      res =
+        CashForecast.cash_forecast(
+          %{start_date: ~D[2026-01-01], period_days: 30, periods_count: 12,
+            buffer_periods: 1, trailing_days: 365, as_of: ~D[2026-03-15], account_ids: :all},
+          com
+        )
+
+      assert res.as_of == ~D[2026-03-15]
+      # 30-day periods from 01-01: p1 ends 01-30, p2 ends 03-01 (both <= 03-15);
+      # p3 ends 03-31 -> forecast.
+      assert Enum.count(res.periods, &(&1.source == :actual)) == 2
+    end
   end
 end

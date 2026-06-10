@@ -28,7 +28,8 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
       period_days: p["period_days"] || "30",
       periods_count: p["periods_count"] || "12",
       buffer_periods: p["buffer_periods"] || "1",
-      trailing_days: p["trailing_days"] || "365"
+      trailing_days: p["trailing_days"] || "365",
+      as_of: p["as_of"] || Date.to_iso8601(Date.utc_today())
     }
 
     {:noreply,
@@ -44,7 +45,8 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
       "search[period_days]" => s["period_days"],
       "search[periods_count]" => s["periods_count"],
       "search[buffer_periods]" => s["buffer_periods"],
-      "search[trailing_days]" => s["trailing_days"]
+      "search[trailing_days]" => s["trailing_days"],
+      "search[as_of]" => s["as_of"]
     }
 
     {:noreply,
@@ -125,6 +127,12 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
   defp run_forecast(socket, search) do
     current_company = socket.assigns.current_company
 
+    as_of =
+      case Date.from_iso8601(to_string(search.as_of)) do
+        {:ok, date} -> date
+        _ -> Date.utc_today()
+      end
+
     parsed =
       case Date.from_iso8601(search.s_date) do
         {:ok, date} ->
@@ -134,6 +142,7 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
             periods_count: safe_int(search.periods_count, 12),
             buffer_periods: safe_int(search.buffer_periods, 1),
             trailing_days: safe_int(search.trailing_days, 365),
+            as_of: as_of,
             account_ids: :all
           }
 
@@ -166,8 +175,8 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
 
       <div class="border rounded bg-amber-200 dark:bg-amber-900 dark:border-amber-700 text-center p-2">
         <.form for={%{}} id="search-form" phx-submit="query" autocomplete="off">
-          <div class="grid grid-cols-12 gap-2 tracking-tighter">
-            <div class="col-span-2">
+          <div class="grid grid-cols-24 gap-1 tracking-tighter">
+            <div class="col-span-3">
               <.input
                 label={gettext("Start Date")}
                 name="search[s_date]"
@@ -176,7 +185,7 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
                 value={@search.s_date}
               />
             </div>
-            <div class="col-span-2">
+            <div class="col-span-3">
               <.input
                 label={gettext("Period (days)")}
                 name="search[period_days]"
@@ -185,7 +194,7 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
                 value={@search.period_days}
               />
             </div>
-            <div class="col-span-2">
+            <div class="col-span-3">
               <.input
                 label={gettext("No. of Periods")}
                 name="search[periods_count]"
@@ -194,7 +203,7 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
                 value={@search.periods_count}
               />
             </div>
-            <div class="col-span-2">
+            <div class="col-span-3">
               <.input
                 label={gettext("Buffer (periods)")}
                 name="search[buffer_periods]"
@@ -203,7 +212,7 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
                 value={@search.buffer_periods}
               />
             </div>
-            <div class="col-span-2">
+            <div class="col-span-3">
               <.input
                 label={gettext("Trailing (days)")}
                 name="search[trailing_days]"
@@ -212,7 +221,16 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
                 value={@search.trailing_days}
               />
             </div>
-            <div class="col-span-2 mt-6 flex items-center gap-2 flex-wrap">
+            <div class="col-span-3">
+              <.input
+                label={gettext("Trailing From")}
+                name="search[as_of]"
+                type="date"
+                id="search_as_of"
+                value={@search.as_of}
+              />
+            </div>
+            <div class="col-span-6 mt-6 flex items-center gap-2 flex-wrap">
               <.button>
                 {gettext("Query")}
               </.button>
@@ -222,7 +240,7 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
               <.link
                 :if={@result.ok? && is_map(@result.result)}
                 navigate={
-                  ~p"/companies/#{@current_company.id}/cash_forecast/print?#{[s_date: @search.s_date, period_days: @search.period_days, periods_count: @search.periods_count, buffer_periods: @search.buffer_periods, trailing_days: @search.trailing_days]}"
+                  ~p"/companies/#{@current_company.id}/cash_forecast/print?#{[s_date: @search.s_date, period_days: @search.period_days, periods_count: @search.periods_count, buffer_periods: @search.buffer_periods, trailing_days: @search.trailing_days, as_of: @search.as_of]}"
                 }
                 target="_blank"
                 class="blue button"

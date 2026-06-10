@@ -6,6 +6,12 @@ defmodule FullCircleWeb.ReportLive.CashForecastPrint do
   def mount(params, _session, socket) do
     com = FullCircle.Reporting.CashForecast.company_with_settings(socket.assigns.current_company)
 
+    as_of =
+      case Date.from_iso8601(to_string(params["as_of"])) do
+        {:ok, date} -> date
+        _ -> Date.utc_today()
+      end
+
     forecast =
       case Date.from_iso8601(to_string(params["s_date"])) do
         {:ok, date} ->
@@ -16,6 +22,7 @@ defmodule FullCircleWeb.ReportLive.CashForecastPrint do
               periods_count: safe_int(params["periods_count"], 12),
               buffer_periods: safe_int(params["buffer_periods"], 1),
               trailing_days: safe_int(params["trailing_days"], 365),
+              as_of: as_of,
               account_ids: :all
             },
             com
