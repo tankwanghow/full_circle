@@ -206,6 +206,35 @@ defmodule FullCircle.Reporting.CashForecastDBTest do
       assert Decimal.equal?(rin, Decimal.mult(d(1200), factor))  # only the operating inflow
       assert Decimal.equal?(rout, d(0))                          # the FD transfer is excluded
     end
+
+    test "excludes documents touching a user-listed account (e.g. director fee)",
+         %{com: com, bank: bank, admin: admin} do
+      dirfee = account_fixture(%{account_type: "Expenses", name: "Director Fee #{System.unique_integer([:positive])}"}, com, admin)
+
+      did = Ecto.UUID.generate()
+      # Director fee payment: Dr Director Fee / Cr Bank — has a P&L leg, so by default
+      # it stays in the run-rate. Listing the account excludes the whole document.
+      com |> txn!(bank.id, ~D[2026-04-10], d(-5000)) |> Ecto.Changeset.change(%{doc_id: did}) |> Repo.update!()
+      com |> txn!(dirfee.id, ~D[2026-04-10], d(5000)) |> Ecto.Changeset.change(%{doc_id: did}) |> Repo.update!()
+      txn!(com, bank.id, ~D[2026-04-11], d(1200))  # operating inflow, kept
+
+      ids = CashForecast.liquid_account_ids(com, :all)
+      factor = Decimal.div(d(30), d(365))
+
+      {_in0, out0} = CashForecast.run_rate_flows(ids, ~D[2026-06-08], 365, 30, com, [])
+      assert Decimal.equal?(out0, Decimal.mult(d(5000), factor))   # included by default
+
+      {in1, out1} = CashForecast.run_rate_flows(ids, ~D[2026-06-08], 365, 30, com, [dirfee.id])
+      assert Decimal.equal?(out1, d(0))                            # excluded
+      assert Decimal.equal?(in1, Decimal.mult(d(1200), factor))   # operating inflow kept
+    end
+
+    test "save/read excluded account ids via company settings", %{com: com, bank: bank} do
+      assert CashForecast.excluded_account_ids(com) == []
+      {:ok, com2} = CashForecast.save_excluded_account_ids(com, [bank.id])
+      assert CashForecast.excluded_account_ids(com2) == [bank.id]
+      assert CashForecast.excluded_account_ids(CashForecast.company_with_settings(com)) == [bank.id]
+    end
   end
 
   describe "period_liquid_transactions/5" do

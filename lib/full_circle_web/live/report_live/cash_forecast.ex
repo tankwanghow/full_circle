@@ -5,7 +5,18 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
 
   @impl true
   def mount(_params, _session, socket) do
-    {:ok, assign(socket, page_title: gettext("Cash Forecast"), drill: nil)}
+    com = CashForecast.company_with_settings(socket.assigns.current_company)
+
+    {:ok,
+     assign(socket,
+       page_title: gettext("Cash Forecast"),
+       current_company: com,
+       drill: nil,
+       settings_open: false,
+       accounts: [],
+       exclude_set: MapSet.new(),
+       acct_filter: ""
+     )}
   end
 
   @impl true
@@ -67,6 +78,48 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
   @impl true
   def handle_event("close_drill", _params, socket) do
     {:noreply, assign(socket, drill: nil)}
+  end
+
+  @impl true
+  def handle_event("open_settings", _params, socket) do
+    com = socket.assigns.current_company
+
+    {:noreply,
+     assign(socket,
+       settings_open: true,
+       accounts: CashForecast.list_accounts(com),
+       exclude_set: MapSet.new(CashForecast.excluded_account_ids(com)),
+       acct_filter: ""
+     )}
+  end
+
+  @impl true
+  def handle_event("close_settings", _params, socket) do
+    {:noreply, assign(socket, settings_open: false)}
+  end
+
+  @impl true
+  def handle_event("filter_accounts", %{"filter" => f}, socket) do
+    {:noreply, assign(socket, acct_filter: f)}
+  end
+
+  @impl true
+  def handle_event("toggle_exclude", %{"id" => id}, socket) do
+    set = socket.assigns.exclude_set
+    set = if MapSet.member?(set, id), do: MapSet.delete(set, id), else: MapSet.put(set, id)
+    {:noreply, assign(socket, exclude_set: set)}
+  end
+
+  @impl true
+  def handle_event("save_settings", _params, socket) do
+    com = socket.assigns.current_company
+    {:ok, _} = CashForecast.save_excluded_account_ids(com, MapSet.to_list(socket.assigns.exclude_set))
+    com = CashForecast.company_with_settings(com)
+
+    {:noreply,
+     socket
+     |> assign(current_company: com, settings_open: false)
+     |> run_forecast(socket.assigns.search)}
   end
 
   defp run_forecast(socket, search) do
@@ -159,10 +212,13 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
                 value={@search.trailing_days}
               />
             </div>
-            <div class="col-span-2 mt-6 flex items-center gap-2">
+            <div class="col-span-2 mt-6 flex items-center gap-2 flex-wrap">
               <.button>
                 {gettext("Query")}
               </.button>
+              <button type="button" phx-click="open_settings" class="gray button">
+                {gettext("Settings")}
+              </button>
               <.link
                 :if={@result.ok? && is_map(@result.result)}
                 navigate={
@@ -194,6 +250,79 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
       </.async_html>
 
       <.drill_modal :if={@drill} drill={@drill} />
+      <.settings_modal
+        :if={@settings_open}
+        accounts={@accounts}
+        exclude_set={@exclude_set}
+        filter={@acct_filter}
+      />
+    </div>
+    """
+  end
+
+  attr :accounts, :list, required: true
+  attr :exclude_set, :any, required: true
+  attr :filter, :string, required: true
+
+  defp settings_modal(assigns) do
+    flt = String.downcase(assigns.filter)
+
+    filtered =
+      if flt == "",
+        do: assigns.accounts,
+        else: Enum.filter(assigns.accounts, &String.contains?(String.downcase(&1.name), flt))
+
+    assigns = assign(assigns, :filtered, filtered)
+
+    ~H"""
+    <div class="fixed inset-0 z-50 flex items-center justify-center">
+      <div class="absolute inset-0 bg-black/40" phx-click="close_settings"></div>
+      <div class="relative z-10 w-11/12 max-w-2xl max-h-[85vh] flex flex-col rounded shadow-lg bg-white dark:bg-gray-800 dark:text-gray-100 p-4">
+        <p class="font-bold">{gettext("Cash Forecast Settings")}</p>
+        <p class="font-medium mt-1">{gettext("Exclude accounts from the run-rate")}</p>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mb-2">
+          {gettext("Tick discretionary accounts (director fees, dividends, …) you don't want projected into the forecast. Affects Forecast periods only — Actual periods always show real cash. Saved per company.")}
+        </p>
+        <form phx-change="filter_accounts">
+          <input
+            type="text"
+            name="filter"
+            value={@filter}
+            phx-debounce="200"
+            autocomplete="off"
+            placeholder={gettext("Filter accounts…")}
+            class="w-full border rounded px-2 py-1 mb-2 dark:bg-gray-700 dark:border-gray-600"
+          />
+        </form>
+        <div class="overflow-auto border rounded dark:border-gray-700 flex-1">
+          <label
+            :for={a <- @filtered}
+            class="flex items-center gap-2 px-2 py-1 border-b dark:border-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
+          >
+            <input
+              type="checkbox"
+              checked={MapSet.member?(@exclude_set, a.id)}
+              phx-click="toggle_exclude"
+              phx-value-id={a.id}
+            />
+            <span class="flex-1">{a.name}</span>
+            <span class="text-xs text-gray-500 dark:text-gray-400">{a.account_type}</span>
+          </label>
+        </div>
+        <div class="flex items-center justify-between mt-3">
+          <span class="text-sm text-gray-500 dark:text-gray-400">
+            {MapSet.size(@exclude_set)} {gettext("excluded")}
+          </span>
+          <div class="flex gap-2">
+            <button type="button" phx-click="close_settings" class="gray button">
+              {gettext("Cancel")}
+            </button>
+            <button type="button" phx-click="save_settings" class="blue button">
+              {gettext("Save")}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
     """
   end

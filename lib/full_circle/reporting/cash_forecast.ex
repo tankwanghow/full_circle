@@ -3,21 +3,24 @@ defmodule FullCircle.Reporting.CashForecast do
   Rolling cash forecast and fixed-deposit tenure ladder over fixed-length periods
   (a configurable number of days per bucket).
 
-  Model: a **run-rate backbone** (per-period average of the company's actual liquid
-  cash churn, from trailing history) plus a **known-items overlay** (in-hand
-  post-dated cheques and already-posted future-dated transactions placed on their
-  own dates). A backtest against real data showed a pure document-by-due-date
-  forecast misses ongoing new business and reads far too pessimistic; the run-rate
-  tracks reality, with the overlay adding the genuinely-known dated lumps.
+  Model: elapsed periods show the company's REAL liquid cash flow; future periods
+  use a **run-rate backbone** (per-period average of operating liquid churn from the
+  trailing window, treasury transfers excluded). Accounts the company marks as
+  discretionary (director fees, dividends, …) can also be excluded from the run-rate
+  via the company's settings.
 
   Pure core: `build_forecast/3`, `fd_ladder/2`.
   """
 
   alias FullCircle.Repo
   alias FullCircle.Accounting.{Account, Transaction}
+  alias FullCircle.Sys.Company
   import Ecto.Query, warn: false
 
   @zero Decimal.new(0)
+
+  # Company-settings key holding the list of account ids excluded from the run-rate.
+  @exclude_key "cash_forecast_exclude_accounts"
 
   # Fixed-deposit ladder tenures, expressed in days (~1, 3, 6, 12 months).
   @tenure_days [{:"1mo", 30}, {:"3mo", 90}, {:"6mo", 180}, {:"12mo", 365}]
@@ -65,6 +68,31 @@ defmodule FullCircle.Reporting.CashForecast do
     |> Repo.all()
   end
 
+  @doc "Account ids excluded from the run-rate (read from the company's settings)."
+  def excluded_account_ids(com), do: Map.get(com.settings || %{}, @exclude_key, [])
+
+  @doc "Persist the run-rate exclusion account-id list to the company settings."
+  def save_excluded_account_ids(com, ids) when is_list(ids) do
+    settings = Map.put(com.settings || %{}, @exclude_key, ids)
+    com |> Ecto.Changeset.change(settings: settings) |> Repo.update()
+  end
+
+  @doc "Return `com` with its settings re-read fresh from the DB (avoids stale session data)."
+  def company_with_settings(com) do
+    settings = Repo.one(from c in Company, where: c.id == ^com.id, select: c.settings)
+    %{com | settings: settings || %{}}
+  end
+
+  @doc "All accounts for the company, for the exclusion picker."
+  def list_accounts(com) do
+    from(a in Account,
+      where: a.company_id == ^com.id,
+      order_by: [a.account_type, a.name],
+      select: %{id: a.id, name: a.name, account_type: a.account_type}
+    )
+    |> Repo.all()
+  end
+
   @doc "Balance of liquid accounts strictly before `start_date`."
   def opening_liquid_balance(account_ids, start_date, com) do
     from(t in Transaction,
@@ -85,32 +113,58 @@ defmodule FullCircle.Reporting.CashForecast do
   Restricted to `contact_id IS NULL` rows (the bank-side of every cash movement),
   which is the full liquid throughput. Returns `{runrate_in, runrate_out}`.
   """
-  def run_rate_flows(account_ids, start_date, trailing_days, period_days, com) do
+  def run_rate_flows(account_ids, start_date, trailing_days, period_days, com, excluded_ids \\ []) do
     window_start = Date.add(start_date, -trailing_days)
 
     rows =
       from(t in Transaction,
         where:
           t.company_id == ^com.id and t.account_id in ^account_ids and
-            is_nil(t.contact_id) and
-            t.doc_date >= ^window_start and t.doc_date < ^start_date and
-            (is_nil(t.doc_id) or
-               fragment(
-                 "exists (select 1 from transactions x join accounts xa on xa.id = x.account_id where x.doc_id = ? and x.company_id = ? and (x.contact_id is not null or xa.account_type <> all(?)))",
-                 t.doc_id,
-                 t.company_id,
-                 ^@asset_types
-               )),
+            t.doc_date >= ^window_start and t.doc_date < ^start_date,
         select: %{
           ins: sum(fragment("case when ? > 0 then ? else 0 end", t.amount, t.amount)),
           outs: sum(fragment("case when ? < 0 then -? else 0 end", t.amount, t.amount))
         }
       )
+      |> where(^operating_only(excluded_ids))
       |> Repo.one()
 
     factor = Decimal.div(Decimal.new("#{period_days}"), Decimal.new("#{trailing_days}"))
     {Decimal.mult(to_decimal(rows && rows.ins), factor),
      Decimal.mult(to_decimal(rows && rows.outs), factor)}
+  end
+
+  # Run-rate operating filter: contact-null liquid lines, excluding pure treasury
+  # transfers (no contact + all-asset legs), and excluding any document that touches
+  # a user-listed `excluded_ids` account (director fees, dividends, …).
+  defp operating_only(excluded_ids) do
+    base =
+      dynamic(
+        [t],
+        is_nil(t.contact_id) and
+          (is_nil(t.doc_id) or
+             fragment(
+               "exists (select 1 from transactions x join accounts xa on xa.id = x.account_id where x.doc_id = ? and x.company_id = ? and (x.contact_id is not null or xa.account_type <> all(?)))",
+               t.doc_id,
+               t.company_id,
+               ^@asset_types
+             ))
+      )
+
+    if excluded_ids == [] do
+      base
+    else
+      dynamic(
+        [t],
+        ^base and
+          fragment(
+            "not exists (select 1 from transactions x where x.doc_id = ? and x.company_id = ? and x.account_id::text = any(?))",
+            t.doc_id,
+            t.company_id,
+            ^excluded_ids
+          )
+      )
+    end
   end
 
   @doc """
@@ -135,8 +189,10 @@ defmodule FullCircle.Reporting.CashForecast do
 
     opening = opening_liquid_balance(ids, start_date, com)
 
-    # Forecast periods use the run-rate anchored at TODAY (freshest trailing window).
-    {rr_in, rr_out} = run_rate_flows(ids, today, trailing_days, period_days, com)
+    # Forecast periods use the run-rate anchored at TODAY (freshest trailing window),
+    # excluding treasury transfers and any user-listed discretionary accounts.
+    {rr_in, rr_out} =
+      run_rate_flows(ids, today, trailing_days, period_days, com, excluded_account_ids(com))
 
     # Elapsed periods (end <= today) use their REAL total liquid cash flow.
     actuals = period_actuals(ids, start_date, period_days, periods_count, today, com)

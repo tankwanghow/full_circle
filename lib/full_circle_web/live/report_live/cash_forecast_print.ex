@@ -4,7 +4,7 @@ defmodule FullCircleWeb.ReportLive.CashForecastPrint do
 
   @impl true
   def mount(params, _session, socket) do
-    com = socket.assigns.current_company
+    com = FullCircle.Reporting.CashForecast.company_with_settings(socket.assigns.current_company)
 
     forecast =
       case Date.from_iso8601(to_string(params["s_date"])) do
