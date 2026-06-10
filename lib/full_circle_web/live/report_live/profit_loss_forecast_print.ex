@@ -51,7 +51,6 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecastPrint do
         <p class="text-center">
           {gettext("Financial year")} {Date.to_iso8601(@forecast.start_date)} → {Date.to_iso8601(@forecast.fy_end)}
           · {if @forecast.granularity == :quarterly, do: gettext("Quarterly"), else: gettext("Monthly")}
-          · {gettext("forecast from last %{t} days", t: @forecast.trailing_days)}
         </p>
 
         <table class="pl">

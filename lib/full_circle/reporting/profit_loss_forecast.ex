@@ -22,7 +22,19 @@ defmodule FullCircle.Reporting.ProfitLossForecast do
   @expense_types ["Cost Of Goods Sold", "Direct Costs", "Overhead", "Expenses", "Depreciation"]
   @pl_types @income_types ++ @expense_types
 
-  @exclude_key "pl_forecast_exclude_accounts"
+  # Categories in display order, with their per-category trailing-days setting.
+  @categories [
+    "Revenue",
+    "Cost Of Goods Sold",
+    "Direct Costs",
+    "Overhead",
+    "Expenses",
+    "Other Income",
+    "Depreciation"
+  ]
+
+  @trailing_key "pl_forecast_trailing"
+  @default_trailing 365
 
   # The category line keys that sum across periods for the Total column.
   @sum_keys [
@@ -40,15 +52,31 @@ defmodule FullCircle.Reporting.ProfitLossForecast do
 
   def income_types, do: @income_types
   def expense_types, do: @expense_types
+  def categories, do: @categories
+  def default_trailing, do: @default_trailing
 
-  # ---- company settings (exclusion list) ----
+  # ---- company settings (per-category trailing days) ----
 
-  @doc "Account ids excluded from the P&L run-rate (from the company's settings)."
-  def excluded_account_ids(com), do: Map.get(com.settings || %{}, @exclude_key, [])
+  @doc """
+  Per-category trailing-days window for the run-rate, read from the company
+  settings: `%{account_type => days}`, each category defaulting to 365.
+  """
+  def category_trailing(com) do
+    saved = Map.get(com.settings || %{}, @trailing_key, %{})
 
-  @doc "Persist the P&L run-rate exclusion account-id list to the company settings."
-  def save_excluded_account_ids(com, ids) when is_list(ids) do
-    settings = Map.put(com.settings || %{}, @exclude_key, ids)
+    Map.new(@categories, fn type ->
+      {type, to_pos_int(Map.get(saved, type), @default_trailing)}
+    end)
+  end
+
+  @doc "Persist the per-category trailing-days map (`%{account_type => days}`) to settings."
+  def save_category_trailing(com, map) do
+    cleaned =
+      Map.new(@categories, fn type ->
+        {type, to_pos_int(Map.get(map, type), @default_trailing)}
+      end)
+
+    settings = Map.put(com.settings || %{}, @trailing_key, cleaned)
     com |> Ecto.Changeset.change(settings: settings) |> Repo.update()
   end
 
@@ -58,26 +86,30 @@ defmodule FullCircle.Reporting.ProfitLossForecast do
     %{com | settings: settings || %{}}
   end
 
-  @doc "P&L accounts for the company, for the exclusion picker."
-  def list_pl_accounts(com) do
-    from(a in Account,
-      where: a.company_id == ^com.id and a.account_type in ^@pl_types,
-      order_by: [a.account_type, a.name],
-      select: %{id: a.id, name: a.name, account_type: a.account_type}
-    )
-    |> Repo.all()
+  defp to_pos_int(v, default) do
+    case v do
+      n when is_integer(n) and n > 0 -> n
+      s when is_binary(s) -> (Integer.parse(s) |> elem_or(default)) |> pos_or(default)
+      _ -> default
+    end
   end
+
+  defp elem_or(:error, default), do: default
+  defp elem_or({n, _}, _default), do: n
+  defp pos_or(n, _default) when is_integer(n) and n > 0, do: n
+  defp pos_or(_, default), do: default
 
   # ---- forecast ----
 
   @doc """
-  Full P&L forecast. `opts`: `:start_date`, `:period_days` (default 30),
-  `:periods_count` (default 12), `:trailing_days` (default 365).
+  Full P&L forecast. `opts`: `:fy_year` (required), `:granularity`
+  (`:monthly` | `:quarterly`). Per-category trailing windows come from the company
+  settings.
   """
   def pl_forecast(opts, com) do
     fy_year = Map.fetch!(opts, :fy_year)
     granularity = Map.get(opts, :granularity, :monthly)
-    trailing_days = Map.get(opts, :trailing_days, 365)
+    trailing = category_trailing(com)
     today = Date.utc_today()
 
     {period_months, periods_count} =
@@ -89,9 +121,8 @@ defmodule FullCircle.Reporting.ProfitLossForecast do
     pc = prev_close(com, fy_year)
     fy_end = add_months(pc, period_months * periods_count)
     bounds = period_bounds(pc, period_months, periods_count)
-    excluded = excluded_account_ids(com)
 
-    daily = run_rate_daily_by_type(trailing_days, today, com, excluded)
+    daily = run_rate_daily_by_type(trailing, today, com)
     actuals = actuals_by_type(pc, period_months, today, fy_end, com)
 
     by_type =
@@ -115,7 +146,7 @@ defmodule FullCircle.Reporting.ProfitLossForecast do
       fy_end: fy_end,
       period_months: period_months,
       periods_count: periods_count,
-      trailing_days: trailing_days,
+      trailing: trailing,
       periods: periods,
       totals: totals(periods)
     }
@@ -293,32 +324,27 @@ defmodule FullCircle.Reporting.ProfitLossForecast do
     end
   end
 
-  # %{account_type => normalized per-DAY run-rate value}, from the trailing window
-  # ending today. The caller multiplies by each period's day-count.
-  defp run_rate_daily_by_type(trailing_days, today, com, excluded_ids) do
-    window_start = Date.add(today, -trailing_days)
+  # %{account_type => normalized per-DAY run-rate value}. Each category uses its own
+  # trailing window (`trailing` is `%{account_type => days}`). The caller multiplies
+  # by each period's day-count.
+  defp run_rate_daily_by_type(trailing, today, com) do
+    Map.new(@categories, fn type ->
+      days = Map.get(trailing, type, @default_trailing)
+      window_start = Date.add(today, -days)
 
-    base =
-      from(t in Transaction,
-        join: a in Account,
-        on: a.id == t.account_id,
-        where:
-          t.company_id == ^com.id and a.account_type in ^@pl_types and
-            t.doc_date >= ^window_start and t.doc_date < ^today,
-        select: %{type: a.account_type, sum: sum(t.amount)},
-        group_by: a.account_type
-      )
+      sum =
+        from(t in Transaction,
+          join: a in Account,
+          on: a.id == t.account_id,
+          where:
+            t.company_id == ^com.id and a.account_type == ^type and
+              t.doc_date >= ^window_start and t.doc_date < ^today,
+          select: coalesce(sum(t.amount), 0)
+        )
+        |> Repo.one()
 
-    query =
-      if excluded_ids == [],
-        do: base,
-        else: from([t, _a] in base, where: t.account_id not in ^excluded_ids)
-
-    td = Decimal.new("#{trailing_days}")
-
-    query
-    |> Repo.all()
-    |> Map.new(fn r -> {r.type, normalize(r.type, Decimal.div(to_decimal(r.sum), td))} end)
+      {type, normalize(type, Decimal.div(to_decimal(sum), Decimal.new("#{days}")))}
+    end)
   end
 
   # Shift `date` by `n` calendar months, clamping the day to the target month's length.

@@ -22,7 +22,17 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
 
   @impl true
   def mount(_params, _session, socket) do
-    {:ok, assign(socket, page_title: gettext("Profit & Loss Forecast"), rows: @rows, drill: nil)}
+    com = PLF.company_with_settings(socket.assigns.current_company)
+
+    {:ok,
+     assign(socket,
+       page_title: gettext("Profit & Loss Forecast"),
+       current_company: com,
+       rows: @rows,
+       drill: nil,
+       settings_open: false,
+       trailing: %{}
+     )}
   end
 
   @impl true
@@ -66,6 +76,31 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
 
   @impl true
   def handle_event("close_drill", _params, socket), do: {:noreply, assign(socket, drill: nil)}
+
+  @impl true
+  def handle_event("open_settings", _params, socket) do
+    {:noreply,
+     assign(socket,
+       settings_open: true,
+       trailing: PLF.category_trailing(socket.assigns.current_company)
+     )}
+  end
+
+  @impl true
+  def handle_event("close_settings", _params, socket),
+    do: {:noreply, assign(socket, settings_open: false)}
+
+  @impl true
+  def handle_event("save_settings", %{"trailing" => trailing}, socket) do
+    com = socket.assigns.current_company
+    {:ok, _} = PLF.save_category_trailing(com, trailing)
+    com = PLF.company_with_settings(com)
+
+    {:noreply,
+     socket
+     |> assign(current_company: com, settings_open: false)
+     |> run_forecast(socket.assigns.search)}
+  end
 
   defp run_forecast(socket, search) do
     com = socket.assigns.current_company
@@ -115,6 +150,9 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
             </div>
             <div class="col-span-4 mt-6 flex items-center gap-2 flex-wrap">
               <.button>{gettext("Query")}</.button>
+              <button type="button" phx-click="open_settings" class="gray button">
+                {gettext("Trailing")}
+              </button>
               <.link
                 :if={@result.ok? && is_map(@result.result)}
                 navigate={
@@ -139,13 +177,49 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
             </p>
             <.pl_table rows={@rows} periods={f.periods} totals={f.totals} />
             <p class="text-sm text-gray-500 dark:text-gray-400 mt-2">
-              {gettext("Income and expenses both shown positive. Actual columns are the real posted P&L for elapsed periods (click a figure to see the transactions); Forecast columns project each category from the last %{t} days.", t: f.trailing_days)}
+              {gettext("Income and expenses both shown positive. Actual columns are the real posted P&L for elapsed periods (click a figure to see the transactions); Forecast columns project each category from its own trailing window (set via the Trailing button).")}
             </p>
           </div>
         </:result_html>
       </.async_html>
 
       <.drill_modal :if={@drill} drill={@drill} />
+      <.settings_modal :if={@settings_open} trailing={@trailing} />
+    </div>
+    """
+  end
+
+  attr :trailing, :map, required: true
+
+  defp settings_modal(assigns) do
+    ~H"""
+    <div class="fixed inset-0 z-50 flex items-center justify-center">
+      <div class="absolute inset-0 bg-black/40" phx-click="close_settings"></div>
+      <div class="relative z-10 w-11/12 max-w-md rounded shadow-lg bg-white dark:bg-gray-800 dark:text-gray-100 p-4">
+        <p class="font-bold">{gettext("Run-rate Trailing Days per Category")}</p>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mb-3">
+          {gettext("How many days of recent history each category's forecast is averaged from. Saved per company.")}
+        </p>
+        <form phx-submit="save_settings">
+          <div class="grid grid-cols-2 gap-2 items-center">
+            <%= for type <- FullCircle.Reporting.ProfitLossForecast.categories() do %>
+              <label class="text-sm" for={"tr_#{type}"}>{type}</label>
+              <input
+                type="number"
+                min="1"
+                id={"tr_#{type}"}
+                name={"trailing[#{type}]"}
+                value={Map.get(@trailing, type, FullCircle.Reporting.ProfitLossForecast.default_trailing())}
+                class="border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600"
+              />
+            <% end %>
+          </div>
+          <div class="flex justify-end gap-2 mt-4">
+            <button type="button" phx-click="close_settings" class="gray button">{gettext("Cancel")}</button>
+            <.button class="blue button">{gettext("Save")}</.button>
+          </div>
+        </form>
+      </div>
     </div>
     """
   end

@@ -110,12 +110,32 @@ defmodule FullCircle.Reporting.ProfitLossForecastDBTest do
     end
   end
 
-  describe "settings" do
-    test "save/read excluded account ids", %{com: com, rev: rev} do
-      assert PLF.excluded_account_ids(com) == []
-      {:ok, com2} = PLF.save_excluded_account_ids(com, [rev.id])
-      assert PLF.excluded_account_ids(com2) == [rev.id]
-      assert PLF.excluded_account_ids(PLF.company_with_settings(com)) == [rev.id]
+  describe "settings (per-category trailing days)" do
+    test "defaults to 365 and saves per-category overrides", %{com: com} do
+      t = PLF.category_trailing(com)
+      assert t["Revenue"] == 365
+      assert t["Depreciation"] == 365
+
+      {:ok, com2} = PLF.save_category_trailing(com, %{"Revenue" => 90, "Depreciation" => "730"})
+      t2 = PLF.category_trailing(com2)
+      assert t2["Revenue"] == 90
+      assert t2["Depreciation"] == 730        # string coerced to int
+      assert t2["Overhead"] == 365            # untouched -> default
+      assert PLF.category_trailing(PLF.company_with_settings(com))["Revenue"] == 90
+    end
+
+    test "a category's run-rate uses only its own trailing window", %{com: com, rev: rev} do
+      today = Date.utc_today()
+      txn!(com, rev.id, Date.add(today, -70), d(-7000))  # outside a 30-day window
+      txn!(com, rev.id, Date.add(today, -10), d(-1000))  # inside it
+
+      {:ok, com} = PLF.save_category_trailing(com, %{"Revenue" => 30})
+      res = PLF.pl_forecast(%{fy_year: today.year, granularity: :monthly}, com)
+
+      fc = Enum.find(res.periods, &(&1.source == :forecast))
+      days = Date.diff(fc.period_end, fc.period_start) + 1
+      expected = Decimal.mult(Decimal.div(d(1000), d(30)), d(days))
+      assert Decimal.equal?(fc.revenue, expected)
     end
   end
 end
