@@ -110,7 +110,8 @@ defmodule FullCircle.Reporting.ProfitLossForecast do
     fy_year = Map.fetch!(opts, :fy_year)
     granularity = Map.get(opts, :granularity, :monthly)
     trailing = category_trailing(com)
-    today = Date.utc_today()
+    # "today" / as-of date: anchors the trailing window and the actual/forecast split.
+    today = Map.get(opts, :as_of) || Date.utc_today()
 
     {period_months, periods_count} =
       case granularity do
@@ -192,6 +193,7 @@ defmodule FullCircle.Reporting.ProfitLossForecast do
     %{
       fy_year: fy_year,
       granularity: granularity,
+      as_of: today,
       start_date: Date.add(pc, 1),
       fy_end: fy_end,
       period_months: period_months,

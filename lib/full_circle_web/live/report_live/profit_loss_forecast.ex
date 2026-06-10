@@ -41,7 +41,8 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
 
     search = %{
       fy_year: p["fy_year"] || "#{default_fy_year(socket.assigns.current_company)}",
-      granularity: p["granularity"] || "monthly"
+      granularity: p["granularity"] || "monthly",
+      as_of: p["as_of"] || Date.to_iso8601(Date.utc_today())
     }
 
     {:noreply, socket |> assign(search: search) |> run_forecast(search)}
@@ -51,7 +52,8 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
   def handle_event("query", %{"search" => s}, socket) do
     qry = %{
       "search[fy_year]" => s["fy_year"],
-      "search[granularity]" => s["granularity"]
+      "search[granularity]" => s["granularity"],
+      "search[as_of]" => s["as_of"]
     }
 
     {:noreply,
@@ -111,8 +113,14 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
     year = safe_int(search.fy_year, Date.utc_today().year)
     gran = if search.granularity == "quarterly", do: :quarterly, else: :monthly
 
+    as_of =
+      case Date.from_iso8601(to_string(search.as_of)) do
+        {:ok, date} -> date
+        _ -> Date.utc_today()
+      end
+
     assign_async(socket, :result, fn ->
-      {:ok, %{result: PLF.pl_forecast(%{fy_year: year, granularity: gran}, com)}}
+      {:ok, %{result: PLF.pl_forecast(%{fy_year: year, granularity: gran, as_of: as_of}, com)}}
     end)
   end
 
@@ -138,11 +146,11 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
       <div class="border rounded bg-amber-200 dark:bg-amber-900 dark:border-amber-700 text-center p-2 w-10/12 mx-auto">
         <.form for={%{}} id="search-form" phx-submit="query" autocomplete="off">
           <div class="grid grid-cols-12 gap-2 tracking-tighter">
-            <div class="col-span-3">
+            <div class="col-span-2">
               <.input label={gettext("For The Year")} name="search[fy_year]" type="number"
                 id="search_fy_year" value={@search.fy_year} />
             </div>
-            <div class="col-span-3">
+            <div class="col-span-2">
               <.input
                 label={gettext("Period")}
                 name="search[granularity]"
@@ -152,7 +160,11 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
                 value={@search.granularity}
               />
             </div>
-            <div class="col-span-4 mt-6 flex items-center gap-2 flex-wrap">
+            <div class="col-span-3">
+              <.input label={gettext("Trailing From")} name="search[as_of]" type="date"
+                id="search_as_of" value={@search.as_of} />
+            </div>
+            <div class="col-span-5 mt-6 flex items-center gap-2 flex-wrap">
               <.button>{gettext("Query")}</.button>
               <button type="button" phx-click="open_settings" class="gray button">
                 {gettext("Trailing")}
@@ -160,7 +172,7 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
               <.link
                 :if={@result.ok? && is_map(@result.result)}
                 navigate={
-                  ~p"/companies/#{@current_company.id}/profit_loss_forecast/print?#{[fy_year: @search.fy_year, granularity: @search.granularity]}"
+                  ~p"/companies/#{@current_company.id}/profit_loss_forecast/print?#{[fy_year: @search.fy_year, granularity: @search.granularity, as_of: @search.as_of]}"
                 }
                 target="_blank"
                 class="blue button"

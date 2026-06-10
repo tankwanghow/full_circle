@@ -96,6 +96,13 @@ defmodule FullCircle.Reporting.ProfitLossForecastDBTest do
       assert hd(res.periods).period_end == ~D[2026-03-31]
       assert List.last(res.periods).period_end == ~D[2026-12-31]
     end
+
+    test "as_of anchors the actual/forecast split", %{com: com} do
+      res = PLF.pl_forecast(%{fy_year: 2026, granularity: :monthly, as_of: ~D[2026-03-15]}, com)
+      assert res.as_of == ~D[2026-03-15]
+      # Jan and Feb fully elapsed; March ends 03-31 > 03-15 -> forecast
+      assert Enum.count(res.periods, &(&1.source == :actual)) == 2
+    end
   end
 
   describe "period_category_transactions/4" do

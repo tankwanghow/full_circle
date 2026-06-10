@@ -24,7 +24,13 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecastPrint do
     gran = if params["granularity"] == "quarterly", do: :quarterly, else: :monthly
     year = safe_int(params["fy_year"], Date.utc_today().year)
 
-    forecast = PLF.pl_forecast(%{fy_year: year, granularity: gran}, com)
+    as_of =
+      case Date.from_iso8601(to_string(params["as_of"])) do
+        {:ok, date} -> date
+        _ -> Date.utc_today()
+      end
+
+    forecast = PLF.pl_forecast(%{fy_year: year, granularity: gran, as_of: as_of}, com)
 
     {:ok,
      socket
