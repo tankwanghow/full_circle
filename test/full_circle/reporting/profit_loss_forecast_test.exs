@@ -138,4 +138,32 @@ defmodule FullCircle.Reporting.ProfitLossForecastDBTest do
       assert Decimal.equal?(fc.revenue, expected)
     end
   end
+
+  describe "previous-FY fallback for zero-run-rate categories" do
+    test "depreciation booked once last year is spread over the whole forecast year", %{com: com, admin: admin} do
+      dep = account_fixture(%{account_type: "Depreciation", name: "Dep #{System.unique_integer([:positive])}"}, com, admin)
+      # annual depreciation booked once in the previous FY (2025), outside the 365-day window
+      txn!(com, dep.id, ~D[2025-01-15], d(12_000))
+
+      res = PLF.pl_forecast(%{fy_year: 2026, granularity: :monthly}, com)
+
+      assert "Depreciation" in res.estimated_types
+
+      # every period (here the elapsed January) carries 12000/365 * days_in_period
+      jan = hd(res.periods)
+      assert jan.source == :actual
+      assert jan.period_end == ~D[2026-01-31]
+      expected = Decimal.mult(Decimal.div(d(12_000), d(365)), d(31))
+      assert Decimal.equal?(jan.depreciation, expected)
+    end
+
+    test "does nothing when the previous FY is also zero", %{com: com, admin: admin} do
+      _dep = account_fixture(%{account_type: "Depreciation", name: "Dep #{System.unique_integer([:positive])}"}, com, admin)
+
+      res = PLF.pl_forecast(%{fy_year: 2026, granularity: :monthly}, com)
+
+      refute "Depreciation" in res.estimated_types
+      assert Decimal.equal?(hd(res.periods).depreciation, d(0))
+    end
+  end
 end

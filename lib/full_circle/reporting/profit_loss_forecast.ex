@@ -122,18 +122,48 @@ defmodule FullCircle.Reporting.ProfitLossForecast do
     fy_end = add_months(pc, period_months * periods_count)
     bounds = period_bounds(pc, period_months, periods_count)
 
-    daily = run_rate_daily_by_type(trailing, today, com)
+    trailing_daily = run_rate_daily_by_type(trailing, today, com)
+
+    # For a category whose trailing run-rate is zero (e.g. depreciation, booked once a
+    # year at year-end), fall back to the PREVIOUS financial year's total spread evenly.
+    # If the previous year is also zero, leave it at zero (do nothing).
+    prev_start = Date.add(prev_close(com, fy_year - 1), 1)
+    prev_totals = prev_fy_by_type(prev_start, pc, com)
+    prev_days = Decimal.new("#{Date.diff(pc, prev_start) + 1}")
+
+    {daily, estimated} =
+      Enum.reduce(@categories, {%{}, []}, fn type, {d, est} ->
+        tr = Map.get(trailing_daily, type, @zero)
+        pf = Map.get(prev_totals, type, @zero)
+
+        if Decimal.equal?(tr, @zero) and not Decimal.equal?(pf, @zero) do
+          {Map.put(d, type, Decimal.div(pf, prev_days)), [type | est]}
+        else
+          {Map.put(d, type, tr), est}
+        end
+      end)
+
+    estimated_set = MapSet.new(estimated)
     actuals = actuals_by_type(pc, period_months, today, fy_end, com)
 
     by_type =
       bounds
       |> Enum.with_index()
       |> Enum.map(fn {{ps, pe}, i} ->
+        days = Decimal.new("#{Date.diff(pe, ps) + 1}")
+        spread = Map.new(daily, fn {t, r} -> {t, Decimal.mult(r, days)} end)
+
         if Date.compare(pe, today) != :gt do
-          {Map.get(actuals, i, %{}), :actual}
+          # estimated categories override the (lumpy / absent) real actuals for the
+          # whole row; everything else keeps its real posted figure.
+          bt =
+            Enum.reduce(estimated_set, Map.get(actuals, i, %{}), fn t, acc ->
+              Map.put(acc, t, Map.get(spread, t, @zero))
+            end)
+
+          {bt, :actual}
         else
-          days = Decimal.new("#{Date.diff(pe, ps) + 1}")
-          {Map.new(daily, fn {t, r} -> {t, Decimal.mult(r, days)} end), :forecast}
+          {spread, :forecast}
         end
       end)
 
@@ -147,6 +177,7 @@ defmodule FullCircle.Reporting.ProfitLossForecast do
       period_months: period_months,
       periods_count: periods_count,
       trailing: trailing,
+      estimated_types: estimated,
       periods: periods,
       totals: totals(periods)
     }
@@ -345,6 +376,21 @@ defmodule FullCircle.Reporting.ProfitLossForecast do
 
       {type, normalize(type, Decimal.div(to_decimal(sum), Decimal.new("#{days}")))}
     end)
+  end
+
+  # %{account_type => normalized total} over the previous financial year [from..to].
+  defp prev_fy_by_type(from_date, to_date, com) do
+    from(t in Transaction,
+      join: a in Account,
+      on: a.id == t.account_id,
+      where:
+        t.company_id == ^com.id and a.account_type in ^@pl_types and
+          t.doc_date >= ^from_date and t.doc_date <= ^to_date,
+      select: %{type: a.account_type, sum: sum(t.amount)},
+      group_by: a.account_type
+    )
+    |> Repo.all()
+    |> Map.new(fn r -> {r.type, normalize(r.type, r.sum)} end)
   end
 
   # Shift `date` by `n` calendar months, clamping the day to the target month's length.

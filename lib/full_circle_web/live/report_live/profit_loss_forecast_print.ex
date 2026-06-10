@@ -3,16 +3,16 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecastPrint do
   alias FullCircle.Reporting.ProfitLossForecast, as: PLF
 
   @rows [
-    %{label: "Revenue", key: :revenue, kind: :line},
-    %{label: "Cost of Goods Sold", key: :cogs, kind: :line},
+    %{label: "Revenue", key: :revenue, type: "Revenue", kind: :line},
+    %{label: "Cost of Goods Sold", key: :cogs, type: "Cost Of Goods Sold", kind: :line},
     %{label: "Gross Profit", key: :gross_profit, kind: :subtotal},
     %{label: "Gross Margin %", key: :gross_margin, kind: :margin},
-    %{label: "Direct Costs", key: :direct_costs, kind: :line},
-    %{label: "Overhead", key: :overhead, kind: :line},
-    %{label: "Expenses", key: :expenses, kind: :line},
+    %{label: "Direct Costs", key: :direct_costs, type: "Direct Costs", kind: :line},
+    %{label: "Overhead", key: :overhead, type: "Overhead", kind: :line},
+    %{label: "Expenses", key: :expenses, type: "Expenses", kind: :line},
     %{label: "Operating Profit", key: :operating_profit, kind: :subtotal},
-    %{label: "Other Income", key: :other_income, kind: :line},
-    %{label: "Depreciation", key: :depreciation, kind: :line},
+    %{label: "Other Income", key: :other_income, type: "Other Income", kind: :line},
+    %{label: "Depreciation", key: :depreciation, type: "Depreciation", kind: :line},
     %{label: "Net Profit", key: :net_profit, kind: :subtotal},
     %{label: "Net Margin %", key: :net_margin, kind: :margin},
     %{label: "Cumulative (YTD)", key: :cumulative_net, kind: :cumulative}
@@ -66,7 +66,7 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecastPrint do
           </thead>
           <tbody>
             <tr :for={row <- @rows} class={row.kind}>
-              <td class="lbl">{row.label}</td>
+              <td class="lbl">{row.label}{if Map.get(row, :type) in @forecast.estimated_types, do: "*", else: ""}</td>
               <td :for={p <- @forecast.periods} class={if p.source == :actual, do: "actual", else: ""}>
                 {cell(p, row)}
               </td>

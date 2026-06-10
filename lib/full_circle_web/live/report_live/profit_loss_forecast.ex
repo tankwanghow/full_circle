@@ -175,9 +175,12 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
             <p class="text-center font-medium mb-1">
               {gettext("Financial year")} {Date.to_iso8601(f.start_date)} → {Date.to_iso8601(f.fy_end)}
             </p>
-            <.pl_table rows={@rows} periods={f.periods} totals={f.totals} />
+            <.pl_table rows={@rows} periods={f.periods} totals={f.totals} estimated={f.estimated_types} />
             <p class="text-sm text-gray-500 dark:text-gray-400 mt-2">
               {gettext("Income and expenses both shown positive. Actual columns are the real posted P&L for elapsed periods (click a figure to see the transactions); Forecast columns project each category from its own trailing window (set via the Trailing button).")}
+            </p>
+            <p :if={f.estimated_types != []} class="text-sm text-amber-700 dark:text-amber-400 mt-1">
+              {gettext("* No activity in the trailing window — estimated evenly across the whole year from last year's total (e.g. depreciation booked once at year-end). Applies to every column, including Actual.")}
             </p>
           </div>
         </:result_html>
@@ -227,6 +230,7 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
   attr :rows, :list, required: true
   attr :periods, :list, required: true
   attr :totals, :map, required: true
+  attr :estimated, :list, default: []
 
   defp pl_table(assigns) do
     ~H"""
@@ -247,7 +251,9 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
         </thead>
         <tbody>
           <tr :for={row <- @rows} class={["border-b dark:border-gray-700", row_class(row)]}>
-            <td class={["text-left px-2 sticky left-0", row_label_bg(row)]}>{row.label}</td>
+            <td class={["text-left px-2 sticky left-0", row_label_bg(row)]}>
+              {row.label}<span :if={Map.get(row, :type) in @estimated} class="text-amber-600 dark:text-amber-400">*</span>
+            </td>
             <td
               :for={p <- @periods}
               class={["font-mono px-2", p.source == :actual && "bg-sky-50 dark:bg-sky-950/40"]}
