@@ -98,7 +98,19 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecastPrint do
   defp total_cell(totals, _p, %{kind: :margin, key: key}), do: pct(Map.get(totals, key))
   defp total_cell(totals, _p, %{key: key}), do: money(Map.get(totals, key))
 
-  defp money(%Decimal{} = d), do: Number.Delimit.number_to_delimited(d)
+  # Compact, readable money for the printed table: 1.35M / 1.34K / plain.
+  defp money(%Decimal{} = d) do
+    f = Decimal.to_float(d)
+    a = abs(f)
+
+    cond do
+      a >= 1.0e9 -> :erlang.float_to_binary(f / 1.0e9, decimals: 2) <> "B"
+      a >= 1.0e6 -> :erlang.float_to_binary(f / 1.0e6, decimals: 2) <> "M"
+      a >= 1.0e3 -> :erlang.float_to_binary(f / 1.0e3, decimals: 2) <> "K"
+      true -> :erlang.float_to_binary(f, decimals: 0)
+    end
+  end
+
   defp money(other), do: to_string(other)
 
   defp pct(%Decimal{} = d), do: "#{Decimal.round(d, 1)}%"

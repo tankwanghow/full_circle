@@ -211,13 +211,69 @@ defmodule FullCircle.Reporting.CashForecast do
       end)
       |> then(fn {bi, bo, ss} -> {Enum.reverse(bi), Enum.reverse(bo), Enum.reverse(ss)} end)
 
-    build_forecast(
-      %{opening: opening, base_in: base_in, base_out: base_out, sources: sources},
-      start_date,
-      period_days: period_days, periods_count: periods_count, buffer_periods: buffer_periods
-    )
-    |> Map.put(:trailing_days, trailing_days)
-    |> Map.put(:as_of, today)
+    result =
+      build_forecast(
+        %{opening: opening, base_in: base_in, base_out: base_out, sources: sources},
+        start_date,
+        period_days: period_days, periods_count: periods_count, buffer_periods: buffer_periods
+      )
+      |> Map.put(:trailing_days, trailing_days)
+      |> Map.put(:as_of, today)
+
+    arap = arap_per_period(com, bounds, today, trailing_days, period_days)
+
+    periods =
+      Enum.zip(result.periods, arap)
+      |> Enum.map(fn {p, {recv, pay}} -> Map.merge(p, %{receivable: recv, payable: pay}) end)
+
+    %{result | periods: periods}
+  end
+
+  # Total outstanding receivable (customers owing) and payable (owed to suppliers) from
+  # contact balances as of `at_date`.
+  @doc "Receivable / payable totals from contact balances as of `at_date` -> {recv, pay}."
+  def ar_ap_balance(com, at_date) do
+    per_contact =
+      from(t in Transaction,
+        where:
+          t.company_id == ^com.id and not is_nil(t.contact_id) and t.doc_date <= ^at_date,
+        group_by: t.contact_id,
+        select: %{bal: sum(t.amount)}
+      )
+
+    row =
+      from(s in subquery(per_contact),
+        select: %{
+          recv: sum(fragment("case when ? > 0 then ? else 0 end", s.bal, s.bal)),
+          pay: sum(fragment("case when ? < 0 then -? else 0 end", s.bal, s.bal))
+        }
+      )
+      |> Repo.one()
+
+    {to_decimal(row && row.recv), to_decimal(row && row.pay)}
+  end
+
+  # Receivable/payable per period: real balance for elapsed periods, and a trailing
+  # run-rate trend (avg change per period) projected forward for forecast periods.
+  defp arap_per_period(com, bounds, today, trailing_days, period_days) do
+    {recv_now, pay_now} = ar_ap_balance(com, today)
+    {recv_then, pay_then} = ar_ap_balance(com, Date.add(today, -trailing_days))
+    n_window = Decimal.div(Decimal.new("#{trailing_days}"), Decimal.new("#{period_days}"))
+    recv_rate = Decimal.div(Decimal.sub(recv_now, recv_then), n_window)
+    pay_rate = Decimal.div(Decimal.sub(pay_now, pay_then), n_window)
+    n_actual = Enum.count(bounds, fn {_ps, pe} -> Date.compare(pe, today) != :gt end)
+
+    bounds
+    |> Enum.with_index(1)
+    |> Enum.map(fn {{_ps, pe}, i} ->
+      if Date.compare(pe, today) != :gt do
+        ar_ap_balance(com, pe)
+      else
+        offset = Decimal.new("#{i - n_actual}")
+        {nonneg(Decimal.add(recv_now, Decimal.mult(recv_rate, offset))),
+         nonneg(Decimal.add(pay_now, Decimal.mult(pay_rate, offset)))}
+      end
+    end)
   end
 
   # Real total liquid cash in/out (every movement, no filters) per period, for the

@@ -91,6 +91,8 @@ defmodule FullCircleWeb.ReportLive.CashForecastPrint do
               <th>{gettext("Closing")}</th>
               <th>{gettext("Buffer")}</th>
               <th>{gettext("Free Cash")}</th>
+              <th>{gettext("Receivable")}</th>
+              <th>{gettext("Payable")}</th>
             </tr>
           </thead>
           <tbody>
@@ -105,6 +107,8 @@ defmodule FullCircleWeb.ReportLive.CashForecastPrint do
               <td class="bold">{fmt(p.closing)}</td>
               <td>{fmt(p.buffer)}</td>
               <td class="bold">{fmt(p.free_cash)}</td>
+              <td>{fmt(p.receivable)}</td>
+              <td>{fmt(p.payable)}</td>
             </tr>
           </tbody>
         </table>
@@ -152,6 +156,18 @@ defmodule FullCircleWeb.ReportLive.CashForecastPrint do
     """
   end
 
-  defp fmt(%Decimal{} = d), do: Number.Delimit.number_to_delimited(d)
+  # Compact, readable money for the printed table: 1.35M / 1.34K / plain.
+  defp fmt(%Decimal{} = d) do
+    f = Decimal.to_float(d)
+    a = abs(f)
+
+    cond do
+      a >= 1.0e9 -> :erlang.float_to_binary(f / 1.0e9, decimals: 2) <> "B"
+      a >= 1.0e6 -> :erlang.float_to_binary(f / 1.0e6, decimals: 2) <> "M"
+      a >= 1.0e3 -> :erlang.float_to_binary(f / 1.0e3, decimals: 2) <> "K"
+      true -> :erlang.float_to_binary(f, decimals: 0)
+    end
+  end
+
   defp fmt(other), do: to_string(other)
 end

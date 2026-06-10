@@ -160,11 +160,11 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
                 value={@search.granularity}
               />
             </div>
-            <div class="col-span-3">
+            <div class="col-span-2">
               <.input label={gettext("Trailing From")} name="search[as_of]" type="date"
                 id="search_as_of" value={@search.as_of} />
             </div>
-            <div class="col-span-5 mt-6 flex items-center gap-2 flex-wrap">
+            <div class="col-span-3 mt-6 flex items-center gap-2 flex-wrap">
               <.button>{gettext("Query")}</.button>
               <button type="button" phx-click="open_settings" class="gray button">
                 {gettext("Trailing")}
@@ -305,20 +305,36 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
   defp row_label_bg(_), do: "bg-white dark:bg-gray-900"
 
   defp cell(period, %{kind: :margin, key: key}), do: pct(Map.get(period, key))
-  defp cell(period, %{key: key}), do: money(Map.get(period, key))
+  defp cell(period, %{key: key}), do: compact(Map.get(period, key))
 
   defp total_cell(_totals, periods, %{kind: :cumulative}) do
     case List.last(periods) do
-      nil -> money(Decimal.new(0))
-      p -> money(p.cumulative_net)
+      nil -> compact(Decimal.new(0))
+      p -> compact(p.cumulative_net)
     end
   end
 
   defp total_cell(totals, _periods, %{kind: :margin, key: key}), do: pct(Map.get(totals, key))
-  defp total_cell(totals, _periods, %{key: key}), do: money(Map.get(totals, key))
+  defp total_cell(totals, _periods, %{key: key}), do: compact(Map.get(totals, key))
 
+  # Exact (drill-down). Table cells use compact/1.
   defp money(%Decimal{} = d), do: Number.Delimit.number_to_delimited(d)
   defp money(other), do: to_string(other)
+
+  # Compact, readable money: 1.35M / 1.34K / plain.
+  defp compact(%Decimal{} = d) do
+    f = Decimal.to_float(d)
+    a = abs(f)
+
+    cond do
+      a >= 1.0e9 -> :erlang.float_to_binary(f / 1.0e9, decimals: 2) <> "B"
+      a >= 1.0e6 -> :erlang.float_to_binary(f / 1.0e6, decimals: 2) <> "M"
+      a >= 1.0e3 -> :erlang.float_to_binary(f / 1.0e3, decimals: 2) <> "K"
+      true -> :erlang.float_to_binary(f, decimals: 0)
+    end
+  end
+
+  defp compact(other), do: to_string(other)
 
   defp pct(%Decimal{} = d), do: "#{Decimal.round(d, 1)}%"
   defp pct(other), do: to_string(other)

@@ -170,7 +170,7 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="w-11/12 mx-auto mb-10">
+    <div class="w-8/12 mx-auto mb-10">
       <p class="text-2xl text-center font-medium">{"#{@page_title}"}</p>
 
       <div class="border rounded bg-amber-200 dark:bg-amber-900 dark:border-amber-700 text-center p-2">
@@ -442,6 +442,8 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
             <th class="px-1">{gettext("Closing")}</th>
             <th class="px-1">{gettext("Buffer")}</th>
             <th class="px-1 text-green-700 dark:text-green-400">{gettext("Free Cash")}</th>
+            <th class="px-1 border-l dark:border-gray-600 text-gray-500 dark:text-gray-400">{gettext("Receivable")}</th>
+            <th class="px-1 text-gray-500 dark:text-gray-400">{gettext("Payable")}</th>
           </tr>
         </thead>
         <tbody>
@@ -467,7 +469,7 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
             ]}>
               {if p.source == :actual, do: gettext("Actual"), else: gettext("Forecast")}
             </td>
-            <td class="font-mono px-1">{fmt(p.opening)}</td>
+            <td class="font-mono px-1">{compact(p.opening)}</td>
             <td class="font-mono px-1">
               <span
                 :if={p.source == :actual}
@@ -477,9 +479,9 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
                 phx-value-to={Date.to_iso8601(p.period_end)}
                 phx-value-dir="in"
                 phx-value-n={p.n}
-              >{fmt(p.baseline_in)}</span>
+              >{compact(p.baseline_in)}</span>
               <span :if={p.source != :actual} class="text-gray-500 dark:text-gray-400">
-                {fmt(p.baseline_in)}
+                {compact(p.baseline_in)}
               </span>
             </td>
             <td class="font-mono px-1">
@@ -491,16 +493,20 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
                 phx-value-to={Date.to_iso8601(p.period_end)}
                 phx-value-dir="out"
                 phx-value-n={p.n}
-              >{fmt(p.baseline_out)}</span>
+              >{compact(p.baseline_out)}</span>
               <span :if={p.source != :actual} class="text-gray-500 dark:text-gray-400">
-                {fmt(p.baseline_out)}
+                {compact(p.baseline_out)}
               </span>
             </td>
-            <td class="font-mono px-1 font-bold">{fmt(p.closing)}</td>
-            <td class="font-mono px-1">{fmt(p.buffer)}</td>
+            <td class="font-mono px-1 font-bold">{compact(p.closing)}</td>
+            <td class="font-mono px-1">{compact(p.buffer)}</td>
             <td class="font-mono px-1 font-bold text-green-700 dark:text-green-400">
-              {fmt(p.free_cash)}
+              {compact(p.free_cash)}
             </td>
+            <td class="font-mono px-1 border-l dark:border-gray-600 text-gray-500 dark:text-gray-400">
+              {compact(p.receivable)}
+            </td>
+            <td class="font-mono px-1 text-gray-500 dark:text-gray-400">{compact(p.payable)}</td>
           </tr>
         </tbody>
       </table>
@@ -574,4 +580,19 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
 
   defp fmt(%Decimal{} = d), do: Number.Delimit.number_to_delimited(d)
   defp fmt(other), do: to_string(other)
+
+  # Compact, readable money: 1.35M / 1.34K / plain. Drill-downs keep exact figures.
+  defp compact(%Decimal{} = d) do
+    f = Decimal.to_float(d)
+    a = abs(f)
+
+    cond do
+      a >= 1.0e9 -> :erlang.float_to_binary(f / 1.0e9, decimals: 2) <> "B"
+      a >= 1.0e6 -> :erlang.float_to_binary(f / 1.0e6, decimals: 2) <> "M"
+      a >= 1.0e3 -> :erlang.float_to_binary(f / 1.0e3, decimals: 2) <> "K"
+      true -> :erlang.float_to_binary(f, decimals: 0)
+    end
+  end
+
+  defp compact(other), do: to_string(other)
 end

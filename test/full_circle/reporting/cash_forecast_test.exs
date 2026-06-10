@@ -255,6 +255,21 @@ defmodule FullCircle.Reporting.CashForecastDBTest do
     end
   end
 
+  describe "ar_ap_balance/2" do
+    test "totals debtor (receivable) and creditor (payable) contact balances", %{com: com, bank: bank} do
+      cust = Repo.insert!(%FullCircle.Accounting.Contact{name: "Cust #{System.unique_integer([:positive])}", company_id: com.id})
+      supp = Repo.insert!(%FullCircle.Accounting.Contact{name: "Supp #{System.unique_integer([:positive])}", company_id: com.id})
+
+      txn!(com, bank.id, ~D[2026-04-01], d(1000), %{contact_id: cust.id})    # customer owes us
+      txn!(com, bank.id, ~D[2026-04-02], d(-600), %{contact_id: supp.id})    # we owe supplier
+      txn!(com, bank.id, ~D[2026-07-01], d(500), %{contact_id: cust.id})     # after the as-of date
+
+      {recv, pay} = CashForecast.ar_ap_balance(com, ~D[2026-06-30])
+      assert Decimal.equal?(recv, d(1000))
+      assert Decimal.equal?(pay, d(600))
+    end
+  end
+
   describe "cash_forecast/2 end-to-end" do
     test "produces N periods, opening, run-rate, and a 1/3/6/12 ladder", %{com: com, bank: bank} do
       txn!(com, bank.id, ~D[2026-06-01], d(10_000))     # opening (before start)
