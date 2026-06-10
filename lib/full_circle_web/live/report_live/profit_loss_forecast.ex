@@ -180,7 +180,7 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
               {gettext("Income and expenses both shown positive. Actual columns are the real posted P&L for elapsed periods (click a figure to see the transactions); Forecast columns project each category from its own trailing window (set via the Trailing button).")}
             </p>
             <p :if={f.estimated_types != []} class="text-sm text-amber-700 dark:text-amber-400 mt-1">
-              {gettext("* No activity in the trailing window — estimated evenly across the whole year from last year's total (e.g. depreciation booked once at year-end). Applies to every column, including Actual.")}
+              {gettext("* Not posted during the year (booked as a single annual lump, e.g. depreciation) — estimated evenly across the whole year. Applies to every column, including Actual.")}
             </p>
           </div>
         </:result_html>

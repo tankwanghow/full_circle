@@ -157,6 +157,19 @@ defmodule FullCircle.Reporting.ProfitLossForecastDBTest do
       assert Decimal.equal?(jan.depreciation, expected)
     end
 
+    test "spreads over actuals even when the lump is inside the trailing window", %{com: com, admin: admin} do
+      dep = account_fixture(%{account_type: "Depreciation", name: "Dep #{System.unique_integer([:positive])}"}, com, admin)
+      # annual lump booked at last year-end, which IS inside the 365-day trailing window
+      txn!(com, dep.id, ~D[2025-12-31], d(12_000))
+
+      res = PLF.pl_forecast(%{fy_year: 2026, granularity: :monthly}, com)
+
+      assert "Depreciation" in res.estimated_types
+      jan = hd(res.periods)
+      assert jan.source == :actual
+      refute Decimal.equal?(jan.depreciation, d(0))   # spread across the row, not zero
+    end
+
     test "does nothing when the previous FY is also zero", %{com: com, admin: admin} do
       _dep = account_fixture(%{account_type: "Depreciation", name: "Dep #{System.unique_integer([:positive])}"}, com, admin)
 

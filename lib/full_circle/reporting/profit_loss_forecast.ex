@@ -124,27 +124,47 @@ defmodule FullCircle.Reporting.ProfitLossForecast do
 
     trailing_daily = run_rate_daily_by_type(trailing, today, com)
 
-    # For a category whose trailing run-rate is zero (e.g. depreciation, booked once a
-    # year at year-end), fall back to the PREVIOUS financial year's total spread evenly.
-    # If the previous year is also zero, leave it at zero (do nothing).
+    # Previous financial year totals — the fallback source for a category with no data
+    # in its trailing window.
     prev_start = Date.add(prev_close(com, fy_year - 1), 1)
     prev_totals = prev_fy_by_type(prev_start, pc, com)
     prev_days = Decimal.new("#{Date.diff(pc, prev_start) + 1}")
 
-    {daily, estimated} =
-      Enum.reduce(@categories, {%{}, []}, fn type, {d, est} ->
+    # Per-category daily rate: the trailing run-rate, or last year's total if the window
+    # has nothing (and zero if last year is also empty).
+    daily =
+      Map.new(@categories, fn type ->
         tr = Map.get(trailing_daily, type, @zero)
-        pf = Map.get(prev_totals, type, @zero)
 
-        if Decimal.equal?(tr, @zero) and not Decimal.equal?(pf, @zero) do
-          {Map.put(d, type, Decimal.div(pf, prev_days)), [type | est]}
+        if Decimal.equal?(tr, @zero) do
+          pf = Map.get(prev_totals, type, @zero)
+          {type, if(Decimal.equal?(pf, @zero), do: @zero, else: Decimal.div(pf, prev_days))}
         else
-          {Map.put(d, type, tr), est}
+          {type, tr}
         end
       end)
 
-    estimated_set = MapSet.new(estimated)
     actuals = actuals_by_type(pc, period_months, today, fy_end, com)
+    n_elapsed = Enum.count(bounds, fn {_ps, pe} -> Date.compare(pe, today) != :gt end)
+
+    elapsed_sum =
+      Enum.reduce(Map.values(actuals), %{}, fn pm, acc ->
+        Enum.reduce(pm, acc, fn {t, v}, a -> Map.update(a, t, v, &Decimal.add(&1, v)) end)
+      end)
+
+    # A category booked in annual lumps shows ZERO across the elapsed months even though
+    # it has a non-zero rate — spread it evenly across the WHOLE year (actual + forecast).
+    estimated =
+      if n_elapsed > 0 do
+        Enum.filter(@categories, fn type ->
+          Decimal.equal?(Map.get(elapsed_sum, type, @zero), @zero) and
+            not Decimal.equal?(Map.get(daily, type, @zero), @zero)
+        end)
+      else
+        []
+      end
+
+    estimated_set = MapSet.new(estimated)
 
     by_type =
       bounds
