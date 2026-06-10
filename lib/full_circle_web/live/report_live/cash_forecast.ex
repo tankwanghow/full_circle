@@ -1,10 +1,11 @@
 defmodule FullCircleWeb.ReportLive.CashForecast do
   use FullCircleWeb, :live_view
   alias FullCircle.Reporting
+  alias FullCircle.Reporting.CashForecast
 
   @impl true
   def mount(_params, _session, socket) do
-    {:ok, assign(socket, page_title: gettext("Cash Forecast"))}
+    {:ok, assign(socket, page_title: gettext("Cash Forecast"), drill: nil)}
   end
 
   @impl true
@@ -40,6 +41,32 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
        to:
          "/companies/#{socket.assigns.current_company.id}/cash_forecast?#{URI.encode_query(qry)}"
      )}
+  end
+
+  @impl true
+  def handle_event("drill", %{"from" => from, "to" => to, "dir" => dir, "n" => n}, socket) do
+    com = socket.assigns.current_company
+    ids = CashForecast.liquid_account_ids(com, :all)
+    dir_atom = if dir == "in", do: :in, else: :out
+
+    rows =
+      CashForecast.period_liquid_transactions(
+        ids,
+        Date.from_iso8601!(from),
+        Date.from_iso8601!(to),
+        dir_atom,
+        com
+      )
+
+    total = Enum.reduce(rows, Decimal.new(0), fn r, a -> Decimal.add(a, r.amount) end)
+
+    {:noreply,
+     assign(socket, drill: %{n: n, dir: dir, from: from, to: to, rows: rows, total: total})}
+  end
+
+  @impl true
+  def handle_event("close_drill", _params, socket) do
+    {:noreply, assign(socket, drill: nil)}
   end
 
   defp run_forecast(socket, search) do
@@ -165,6 +192,65 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
           </div>
         </:result_html>
       </.async_html>
+
+      <.drill_modal :if={@drill} drill={@drill} />
+    </div>
+    """
+  end
+
+  attr :drill, :map, required: true
+
+  defp drill_modal(assigns) do
+    ~H"""
+    <div class="fixed inset-0 z-50 flex items-center justify-center">
+      <div class="absolute inset-0 bg-black/40" phx-click="close_drill"></div>
+      <div class="relative z-10 w-11/12 max-w-3xl max-h-[80vh] overflow-auto rounded shadow-lg bg-white dark:bg-gray-800 dark:text-gray-100 p-4">
+        <div class="flex items-center justify-between mb-2">
+          <p class="font-bold">
+            {gettext("Period")} {@drill.n} ·
+            {if @drill.dir == "in", do: gettext("Base In"), else: gettext("Base Out")}
+            <span class="font-normal text-gray-500 dark:text-gray-400 text-sm">
+              ({@drill.from} → {@drill.to})
+            </span>
+          </p>
+          <button type="button" phx-click="close_drill" class="text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 text-xl leading-none">
+            ×
+          </button>
+        </div>
+        <table class="w-full text-sm text-right">
+          <thead class="bg-gray-200 dark:bg-gray-700 dark:text-gray-100">
+            <tr>
+              <th class="text-center px-1">{gettext("Date")}</th>
+              <th class="text-left px-1">{gettext("Type")}</th>
+              <th class="text-left px-1">{gettext("Doc No")}</th>
+              <th class="text-left px-1">{gettext("Account")}</th>
+              <th class="text-left px-1">{gettext("Particulars")}</th>
+              <th class="px-1">{gettext("Amount")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr :for={r <- @drill.rows} class="border-b dark:border-gray-700">
+              <td class="text-center px-1">{Date.to_iso8601(r.date)}</td>
+              <td class="text-left px-1">{r.doc_type}</td>
+              <td class="text-left px-1">{r.doc_no}</td>
+              <td class="text-left px-1">{r.account}</td>
+              <td class="text-left px-1">{r.particulars}</td>
+              <td class="font-mono px-1">{fmt(r.amount)}</td>
+            </tr>
+            <tr :if={@drill.rows == []}>
+              <td colspan="6" class="text-center px-1 py-2 text-gray-500">
+                {gettext("No transactions.")}
+              </td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr class="border-t-2 dark:border-gray-600 font-bold">
+              <td colspan="5" class="text-right px-1">{gettext("Total")}</td>
+              <td class="font-mono px-1">{fmt(@drill.total)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
     </div>
     """
   end
@@ -237,9 +323,31 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
               {if p.source == :actual, do: gettext("Actual"), else: gettext("Forecast")}
             </td>
             <td class="font-mono px-1">{fmt(p.opening)}</td>
-            <td class="font-mono px-1 text-gray-500 dark:text-gray-400">{fmt(p.baseline_in)}</td>
+            <td class="font-mono px-1 text-gray-500 dark:text-gray-400">
+              <span
+                :if={p.source == :actual}
+                class="cursor-pointer underline decoration-dotted hover:text-sky-700 dark:hover:text-sky-300"
+                phx-click="drill"
+                phx-value-from={Date.to_iso8601(p.period_start)}
+                phx-value-to={Date.to_iso8601(p.period_end)}
+                phx-value-dir="in"
+                phx-value-n={p.n}
+              >{fmt(p.baseline_in)}</span>
+              <span :if={p.source != :actual}>{fmt(p.baseline_in)}</span>
+            </td>
             <td class="font-mono px-1">{fmt(p.known_in)}</td>
-            <td class="font-mono px-1 text-gray-500 dark:text-gray-400">{fmt(p.baseline_out)}</td>
+            <td class="font-mono px-1 text-gray-500 dark:text-gray-400">
+              <span
+                :if={p.source == :actual}
+                class="cursor-pointer underline decoration-dotted hover:text-sky-700 dark:hover:text-sky-300"
+                phx-click="drill"
+                phx-value-from={Date.to_iso8601(p.period_start)}
+                phx-value-to={Date.to_iso8601(p.period_end)}
+                phx-value-dir="out"
+                phx-value-n={p.n}
+              >{fmt(p.baseline_out)}</span>
+              <span :if={p.source != :actual}>{fmt(p.baseline_out)}</span>
+            </td>
             <td class="font-mono px-1">{fmt(p.known_out)}</td>
             <td class="font-mono px-1 font-bold">{fmt(p.closing)}</td>
             <td class="font-mono px-1">{fmt(p.buffer)}</td>

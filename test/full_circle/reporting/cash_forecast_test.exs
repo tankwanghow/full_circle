@@ -247,6 +247,24 @@ defmodule FullCircle.Reporting.CashForecastDBTest do
     end
   end
 
+  describe "period_liquid_transactions/5" do
+    test "lists the liquid txns making up a period's in / out", %{com: com, bank: bank} do
+      txn!(com, bank.id, ~D[2026-04-05], d(1000))
+      txn!(com, bank.id, ~D[2026-04-10], d(-300))
+      txn!(com, bank.id, ~D[2026-04-15], d(200))
+
+      ids = CashForecast.liquid_account_ids(com, :all)
+
+      ins = CashForecast.period_liquid_transactions(ids, ~D[2026-04-01], ~D[2026-04-30], :in, com)
+      outs = CashForecast.period_liquid_transactions(ids, ~D[2026-04-01], ~D[2026-04-30], :out, com)
+
+      assert length(ins) == 2
+      assert Enum.reduce(ins, Decimal.new(0), &Decimal.add(&2, &1.amount)) |> Decimal.equal?(d(1200))
+      assert length(outs) == 1
+      assert Decimal.equal?(hd(outs).amount, d(300))   # positive magnitude
+    end
+  end
+
   describe "cash_forecast/2 end-to-end" do
     test "produces N periods, opening, run-rate, and a 1/3/6/12 ladder", %{com: com, bank: bank} do
       txn!(com, bank.id, ~D[2026-06-01], d(10_000))     # opening (before start)

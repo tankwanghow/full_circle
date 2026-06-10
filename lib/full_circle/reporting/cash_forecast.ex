@@ -226,6 +226,42 @@ defmodule FullCircle.Reporting.CashForecast do
     end
   end
 
+  @doc """
+  The individual liquid transactions making up an actual period's cash in (`:in`)
+  or out (`:out`) — for the Base In / Base Out drill-down. Returns
+  `[%{date, doc_type, doc_no, account, particulars, amount}]` (amount as a positive
+  magnitude), ordered by date.
+  """
+  def period_liquid_transactions(account_ids, from_date, to_date, direction, com) do
+    base =
+      from(t in Transaction,
+        join: a in Account,
+        on: a.id == t.account_id,
+        where:
+          t.company_id == ^com.id and t.account_id in ^account_ids and
+            t.doc_date >= ^from_date and t.doc_date <= ^to_date,
+        select: %{
+          date: t.doc_date,
+          doc_type: t.doc_type,
+          doc_no: t.doc_no,
+          account: a.name,
+          particulars: t.particulars,
+          amount: t.amount
+        },
+        order_by: [t.doc_date, t.doc_no]
+      )
+
+    query =
+      case direction do
+        :in -> where(base, [t], t.amount > 0)
+        :out -> where(base, [t], t.amount < 0)
+      end
+
+    query
+    |> Repo.all()
+    |> Enum.map(fn r -> %{r | amount: Decimal.abs(to_decimal(r.amount))} end)
+  end
+
   defp to_decimal(nil), do: @zero
   defp to_decimal(%Decimal{} = d), do: d
   defp to_decimal(n), do: Decimal.new("#{n}")
