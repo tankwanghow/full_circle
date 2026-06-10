@@ -206,7 +206,7 @@ defmodule FullCircleWeb.DashboardLive do
         >
           {gettext("Driver Commission")}
         </.link>
-        <.link navigate={~p"/companies/#{@current_company.id}/fixed_assets_report"} class="button red">
+        <.link :if={@current_role == "admin"} navigate={~p"/companies/#{@current_company.id}/fixed_assets_report"} class="button red">
           {gettext("Fixed Assets")}
         </.link>
         <.link
@@ -215,16 +215,16 @@ defmodule FullCircleWeb.DashboardLive do
         >
           {gettext("Post Dated Cheques")}
         </.link>
-        <.link navigate={~p"/companies/#{@current_company.id}/tbplbs"} class="button red">
+        <.link :if={@current_role == "admin"} navigate={~p"/companies/#{@current_company.id}/tbplbs"} class="button red">
           {gettext("TB/PL/BS")}
         </.link>
         <.link navigate={~p"/companies/#{@current_company.id}/aging"} class="button red">
           {gettext("Agings")}
         </.link>
-        <.link navigate={~p"/companies/#{@current_company.id}/cash_forecast"} class="button red">
+        <.link :if={@current_role == "admin"} navigate={~p"/companies/#{@current_company.id}/cash_forecast"} class="button red">
           {gettext("Cash Forecast")}
         </.link>
-        <.link navigate={~p"/companies/#{@current_company.id}/profit_loss_forecast"} class="button red">
+        <.link :if={@current_role == "admin"} navigate={~p"/companies/#{@current_company.id}/profit_loss_forecast"} class="button red">
           {gettext("P&L Forecast")}
         </.link>
         <.link

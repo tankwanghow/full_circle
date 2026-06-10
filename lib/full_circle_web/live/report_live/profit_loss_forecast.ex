@@ -66,12 +66,16 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
     com = socket.assigns.current_company
 
     rows =
-      PLF.period_category_transactions(type, Date.from_iso8601!(from), Date.from_iso8601!(to), com)
+      PLF.period_category_transactions(
+        type,
+        Date.from_iso8601!(from),
+        Date.from_iso8601!(to),
+        com
+      )
 
     total = Enum.reduce(rows, Decimal.new(0), fn r, a -> Decimal.add(a, r.amount) end)
 
-    {:noreply,
-     assign(socket, drill: %{type: type, from: from, to: to, rows: rows, total: total})}
+    {:noreply, assign(socket, drill: %{type: type, from: from, to: to, rows: rows, total: total})}
   end
 
   @impl true
@@ -165,6 +169,12 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
               </.link>
             </div>
           </div>
+          <p class="text-sm text-gray-500 dark:text-gray-400 mt-2">
+              {gettext("Income and expenses both shown positive. Actual columns are the real posted P&L for elapsed periods (click a figure to see the transactions); Forecast columns project each category from its own trailing window (set via the Trailing button).")}
+            </p>
+            <p class="text-sm text-amber-700 dark:text-amber-400 mt-1">
+              {gettext("* Not posted during the year (booked as a single annual lump, e.g. depreciation) — estimated evenly across the whole year. Applies to every column, including Actual.")}
+            </p>
         </.form>
       </div>
 
@@ -176,12 +186,6 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
               {gettext("Financial year")} {Date.to_iso8601(f.start_date)} → {Date.to_iso8601(f.fy_end)}
             </p>
             <.pl_table rows={@rows} periods={f.periods} totals={f.totals} estimated={f.estimated_types} />
-            <p class="text-sm text-gray-500 dark:text-gray-400 mt-2">
-              {gettext("Income and expenses both shown positive. Actual columns are the real posted P&L for elapsed periods (click a figure to see the transactions); Forecast columns project each category from its own trailing window (set via the Trailing button).")}
-            </p>
-            <p :if={f.estimated_types != []} class="text-sm text-amber-700 dark:text-amber-400 mt-1">
-              {gettext("* Not posted during the year (booked as a single annual lump, e.g. depreciation) — estimated evenly across the whole year. Applies to every column, including Actual.")}
-            </p>
           </div>
         </:result_html>
       </.async_html>
