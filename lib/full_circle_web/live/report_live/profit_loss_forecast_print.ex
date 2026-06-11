@@ -78,7 +78,7 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecastPrint do
           </thead>
           <tbody>
             <tr :for={row <- @rows} class={row.kind}>
-              <td class="lbl">{row.label}{if Map.get(row, :type) in @forecast.estimated_types, do: "*", else: ""}</td>
+              <td class="lbl">{row_label(row, @forecast.tax_rate)}{if Map.get(row, :type) in @forecast.estimated_types, do: "*", else: ""}</td>
               <td :for={p <- @forecast.periods} class={if p.source == :actual, do: "actual", else: ""}>
                 {cell(p, row)}
               </td>
@@ -90,6 +90,12 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecastPrint do
     </div>
     """
   end
+
+  defp row_label(%{key: :estimated_tax}, tax_rate), do: "Estimated Tax (#{rate_label(tax_rate)}%)"
+  defp row_label(row, _tax_rate), do: row.label
+
+  defp rate_label(%Decimal{} = r), do: r |> Decimal.normalize() |> Decimal.to_string(:normal)
+  defp rate_label(_), do: "0"
 
   defp cell(period, %{kind: :margin, key: key}), do: pct(Map.get(period, key))
   defp cell(period, %{key: key}), do: money(Map.get(period, key))
