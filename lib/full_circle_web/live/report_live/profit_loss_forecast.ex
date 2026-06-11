@@ -40,6 +40,7 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
          settings_open: false,
          trailing: %{},
          tax_rate: Decimal.new(0),
+         full_amounts: false,
          plan: nil,
          plan_schedule: []
        )}
@@ -112,6 +113,10 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
 
   @impl true
   def handle_event("close_drill", _params, socket), do: {:noreply, assign(socket, drill: nil)}
+
+  @impl true
+  def handle_event("toggle_full_amounts", _params, socket),
+    do: {:noreply, assign(socket, full_amounts: !socket.assigns.full_amounts)}
 
   @impl true
   def handle_event("open_settings", _params, socket) do
@@ -260,6 +265,10 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
               >
                 {gettext("Print")}
               </.link>
+              <label class="flex items-center gap-1 text-sm whitespace-nowrap">
+                <input type="checkbox" phx-click="toggle_full_amounts" checked={@full_amounts} />
+                {gettext("Full amount")}
+              </label>
             </div>
           </div>
           <p class="text-sm text-gray-500 dark:text-gray-400 mt-2">
@@ -278,7 +287,7 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
             <p class="text-center font-medium mb-1">
               {gettext("Financial year")} {Date.to_iso8601(f.start_date)} → {Date.to_iso8601(f.fy_end)}
             </p>
-            <.pl_table rows={@rows} periods={f.periods} totals={f.totals} estimated={f.estimated_types} tax_rate={f.tax_rate} />
+            <.pl_table rows={@rows} periods={f.periods} totals={f.totals} estimated={f.estimated_types} tax_rate={f.tax_rate} full={@full_amounts} />
             <.tax_plan_section
               :if={is_map(f) and @plan}
               forecast_tax={f.totals.estimated_tax}
@@ -321,7 +330,7 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
       )
 
     ~H"""
-    <div class="mt-6 w-full">
+    <div class="mt-6 w-8/12 mx-auto">
       <p class="text-xl font-semibold text-center mb-3">{gettext("CP204 Tax Instalment Plan")}</p>
 
       <%!-- Under-estimation banner --%>
@@ -393,7 +402,7 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
         </div>
 
         <%!-- Instalment schedule table --%>
-        <div class="overflow-x-auto">
+        <div class="overflow-x-auto w-full">
           <table class="text-sm text-right border dark:border-gray-700 whitespace-nowrap w-full">
             <thead class="bg-gray-200 dark:bg-gray-700 dark:text-gray-100">
               <tr>
@@ -487,6 +496,7 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
   attr :totals, :map, required: true
   attr :estimated, :list, default: []
   attr :tax_rate, :any, default: nil
+  attr :full, :boolean, default: false
 
   defp pl_table(assigns) do
     assigns = assign(assigns, :rows, visible_rows(assigns.rows, assigns.tax_rate))
@@ -523,10 +533,10 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
                 phx-value-type={row.type}
                 phx-value-from={Date.to_iso8601(p.period_start)}
                 phx-value-to={Date.to_iso8601(p.period_end)}
-              >{cell(p, row)}</span>
-              <span :if={!drillable?(row, p)}>{cell(p, row)}</span>
+              >{cell(p, row, @full)}</span>
+              <span :if={!drillable?(row, p)}>{cell(p, row, @full)}</span>
             </td>
-            <td class="font-mono px-2 border-l-2 dark:border-gray-600 font-semibold">{total_cell(@totals, @periods, row)}</td>
+            <td class="font-mono px-2 border-l-2 dark:border-gray-600 font-semibold">{total_cell(@totals, @periods, row, @full)}</td>
           </tr>
         </tbody>
       </table>
@@ -561,13 +571,17 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
   defp row_label_bg(%{kind: :tax}), do: "bg-amber-50 dark:bg-amber-900"
   defp row_label_bg(_), do: "bg-white dark:bg-gray-900"
 
-  defp cell(period, %{kind: :margin, key: key}), do: pct(Map.get(period, key))
-  defp cell(period, %{key: key}), do: compact(Map.get(period, key))
+  defp cell(period, %{kind: :margin, key: key}, _full), do: pct(Map.get(period, key))
+  defp cell(period, %{key: key}, full), do: amount(Map.get(period, key), full)
 
-  defp total_cell(totals, _periods, %{kind: :margin, key: key}), do: pct(Map.get(totals, key))
-  defp total_cell(totals, _periods, %{key: key}), do: compact(Map.get(totals, key))
+  defp total_cell(totals, _periods, %{kind: :margin, key: key}, _full), do: pct(Map.get(totals, key))
+  defp total_cell(totals, _periods, %{key: key}, full), do: amount(Map.get(totals, key), full)
 
-  # Exact (drill-down). Table cells use compact/1.
+  # Table cell amount: full delimited (e.g. 1,350,000.00) when toggled on, else compact B/M/K.
+  defp amount(d, true), do: money(d)
+  defp amount(d, false), do: compact(d)
+
+  # Exact delimited (drill-down + full-amount toggle).
   defp money(%Decimal{} = d), do: Number.Delimit.number_to_delimited(d)
   defp money(other), do: to_string(other)
 

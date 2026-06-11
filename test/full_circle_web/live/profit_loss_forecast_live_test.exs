@@ -46,6 +46,33 @@ defmodule FullCircleWeb.ProfitLossForecastLiveTest do
       assert html =~ "Gross Margin"
     end
 
+    test "toggling 'Full amount' switches table cells between compact (K/M) and delimited", %{
+      conn: conn,
+      user: user
+    } do
+      # 31-Dec close so FY 2026 == calendar 2026; Jan 2026 is an elapsed period (exact actual).
+      company = company_fixture(user, %{closing_month: 12, closing_day: 31})
+
+      rev =
+        account_fixture(
+          %{account_type: "Revenue", name: "Sales #{System.unique_integer([:positive])}"},
+          company,
+          user
+        )
+
+      # Income is credit-normal; the forecast flips the sign to a positive 1,234,567.
+      txn!(company, rev.id, ~D[2026-01-10], -1_234_567)
+
+      {:ok, lv, _} =
+        live(conn, ~p"/companies/#{company.id}/profit_loss_forecast?search[fy_year]=2026&search[granularity]=monthly")
+
+      html = render_async(lv)
+      assert html =~ "1.23M"
+
+      html2 = lv |> element("input[phx-click=toggle_full_amounts]") |> render_click()
+      assert html2 =~ "1,234,567"
+    end
+
     test "tax rows hidden at rate 0, shown after setting a rate", %{conn: conn, company: company} do
       {:ok, lv, html} = live(conn, ~p"/companies/#{company.id}/profit_loss_forecast")
       refute html =~ "Net Profit After Tax"
