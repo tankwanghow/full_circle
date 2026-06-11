@@ -6,7 +6,9 @@ defmodule FullCircle.Tax do
   """
 
   import Ecto.Query, warn: false
+  alias Ecto.Multi
   alias FullCircle.Repo
+  alias FullCircle.Sys
   alias FullCircle.Accounting.Transaction
   alias FullCircle.Tax.InstalmentPlan
   alias FullCircle.Reporting.ProfitLossForecast, as: PLF
@@ -116,17 +118,26 @@ defmodule FullCircle.Tax do
     Repo.one(from p in InstalmentPlan, where: p.company_id == ^com.id and p.fy_year == ^fy_year)
   end
 
-  @doc "Create or update the (company, fy_year) singleton plan."
-  def create_or_update_plan(attrs, com, _user) do
+  @doc "Create or update the (company, fy_year) singleton plan, with an audit log entry."
+  def create_or_update_plan(attrs, com, user) do
     fy_year = attrs["fy_year"] || attrs[:fy_year]
     plan = get_plan(com, fy_year) || %InstalmentPlan{}
     attrs = Map.put(attrs, "company_id", com.id)
+    name = :update_instalment_plan
 
-    plan
-    |> InstalmentPlan.changeset(attrs)
-    |> Repo.insert_or_update()
+    Multi.new()
+    |> Multi.insert_or_update(name, InstalmentPlan.changeset(plan, attrs))
+    |> Sys.insert_log_for(name, attrs, com, user)
+    |> Repo.transaction()
+    |> case do
+      {:ok, %{^name => saved}} -> {:ok, saved}
+      {:error, ^name, cs, _} -> {:error, cs}
+      {:error, _step, reason, _} -> {:error, reason}
+    end
   end
 
+  # Sums the SIGNED GL amount per FY month: debits (instalment payments to a
+  # debit-normal tax-paid account) increase paid; credits (e.g. refunds) decrease it.
   defp gl_paid_by_month(nil, _bounds, _com), do: %{}
 
   defp gl_paid_by_month(account_id, bounds, com) do

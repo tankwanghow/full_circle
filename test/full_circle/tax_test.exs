@@ -200,4 +200,35 @@ defmodule FullCircle.TaxDBTest do
       assert Decimal.equal?(Map.get(pm, 1, d(0)), d(0))
     end
   end
+
+  describe "paid_by_month/2 FY window" do
+    test "excludes transactions outside the financial year", %{com: com, admin: admin, tax_acc: tax_acc} do
+      txn!(com, tax_acc.id, ~D[2025-12-31], 1000)   # before FY 2026
+      txn!(com, tax_acc.id, ~D[2027-01-02], 2000)   # after FY 2026
+      txn!(com, tax_acc.id, ~D[2026-03-15], 7000)   # inside
+
+      {:ok, plan} = Tax.create_or_update_plan(%{"fy_year" => 2026, "tax_paid_account_id" => tax_acc.id}, com, admin)
+      pm = Tax.paid_by_month(plan, com)
+      assert Decimal.equal?(Map.get(pm, 3), d(7000))
+      # the out-of-window txns must not appear in any month
+      total = Enum.reduce(pm, Decimal.new(0), fn {_m, v}, a -> Decimal.add(a, v) end)
+      assert Decimal.equal?(total, d(7000))
+    end
+  end
+
+  describe "schedule/2" do
+    test "builds a 12-row schedule from plan estimate + GL paid", %{com: com, admin: admin, tax_acc: tax_acc} do
+      txn!(com, tax_acc.id, ~D[2026-01-10], 1000)
+      {:ok, plan} =
+        Tax.create_or_update_plan(
+          %{"fy_year" => 2026, "tax_paid_account_id" => tax_acc.id, "estimate" => "120000", "estimate_month" => 1},
+          com, admin
+        )
+
+      rows = Tax.schedule(plan, com)
+      assert length(rows) == 12
+      assert Decimal.equal?(Enum.at(rows, 0).paid, d(1000))     # Jan GL paid
+      assert Decimal.equal?(Enum.at(rows, 0).instalment_due, d(10000))  # 120000/12
+    end
+  end
 end
