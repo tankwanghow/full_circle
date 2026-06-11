@@ -3,7 +3,7 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
   alias FullCircle.Reporting.ProfitLossForecast, as: PLF
 
   # Display rows: account-type lines are drillable (carry :type); subtotals, margins
-  # and the cumulative line are computed.
+  # and the tax rows are computed. Tax rows (:tax) render only when tax_rate > 0.
   @rows [
     %{label: "Revenue", key: :revenue, type: "Revenue", kind: :line},
     %{label: "Cost of Goods Sold", key: :cogs, type: "Cost Of Goods Sold", kind: :line},
