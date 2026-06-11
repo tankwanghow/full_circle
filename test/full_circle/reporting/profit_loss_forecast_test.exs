@@ -84,6 +84,23 @@ defmodule FullCircle.Reporting.ProfitLossForecastTest do
     end
   end
 
+  describe "fy_month_bounds/2" do
+    test "returns 12 calendar months for a 31-Dec closing company" do
+      com = %{closing_month: 12, closing_day: 31}
+      bounds = PLF.fy_month_bounds(com, 2026)
+      assert length(bounds) == 12
+      assert hd(bounds) == {~D[2026-01-01], ~D[2026-01-31]}
+      assert List.last(bounds) == {~D[2026-12-01], ~D[2026-12-31]}
+    end
+
+    test "anchors on a non-calendar closing day" do
+      com = %{closing_month: 6, closing_day: 30}
+      bounds = PLF.fy_month_bounds(com, 2026)
+      assert hd(bounds) == {~D[2025-07-01], ~D[2025-07-30]}
+      assert List.last(bounds) == {~D[2026-05-31], ~D[2026-06-30]}
+    end
+  end
+
   describe "tax_rate/1" do
     test "defaults to 0 when unset" do
       assert Decimal.equal?(PLF.tax_rate(%{settings: %{}}), d(0))

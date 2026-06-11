@@ -252,6 +252,14 @@ defmodule FullCircle.Reporting.ProfitLossForecast do
     clamp_date(year - 1, cm, cd)
   end
 
+  @doc """
+  The 12 closing-day-anchored monthly `{start_date, end_date}` tuples for the
+  financial year ending in `fy_year`. Same boundaries the forecast uses.
+  """
+  def fy_month_bounds(com, fy_year) do
+    period_bounds(prev_close(com, fy_year), 1, 12)
+  end
+
   @doc "Build the per-period P&L line rows (with subtotals and margins) — pure."
   def build_periods(bounds, by_type) do
     Enum.zip(bounds, by_type)
