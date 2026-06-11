@@ -9,10 +9,7 @@ defmodule FullCircle.Tax.InstalmentPlan do
     field(:estimate_month, :integer, default: 1)
     field(:paid_overrides, :map, default: %{})
 
-    field(:tax_paid_account_name, :string, virtual: true)
-
     belongs_to(:company, FullCircle.Sys.Company)
-    belongs_to(:tax_paid_account, FullCircle.Accounting.Account)
 
     timestamps(type: :utc_datetime)
   end
@@ -26,9 +23,7 @@ defmodule FullCircle.Tax.InstalmentPlan do
       :estimate,
       :estimate_month,
       :paid_overrides,
-      :tax_paid_account_name,
-      :company_id,
-      :tax_paid_account_id
+      :company_id
     ])
     |> validate_required([:company_id, :fy_year])
     |> validate_number(:fy_year, greater_than: 1900, less_than: 2200)

@@ -63,15 +63,12 @@ defmodule FullCircleWeb.TaxLive.InstalmentPlan do
 
     plan = %{plan | estimate: estimate}
 
-    account_name = resolve_account_name(plan)
-
     assign(socket,
       plan: plan,
       forecast_tax: forecast_tax,
       suggested: suggested,
       schedule: schedule_for(plan, com),
-      under: Tax.under_estimated?(estimate, forecast_tax, tolerance),
-      account_name: account_name
+      under: Tax.under_estimated?(estimate, forecast_tax, tolerance)
     )
   end
 
@@ -86,48 +83,12 @@ defmodule FullCircleWeb.TaxLive.InstalmentPlan do
 
   defp schedule_for(plan, com), do: Tax.schedule(plan, com)
 
-  defp resolve_account_name(%InstalmentPlan{tax_paid_account_id: nil}), do: ""
-  defp resolve_account_name(%InstalmentPlan{tax_paid_account_id: id}) when not is_nil(id) do
-    case FullCircle.Repo.get(FullCircle.Accounting.Account, id) do
-      nil -> ""
-      acc -> acc.name
-    end
-  end
-
-  defp resolve_account_name(_), do: ""
-
   @impl true
   def handle_event("query", %{"fy_year" => fy, "as_of" => as_of}, socket) do
     {:noreply,
      push_navigate(socket,
        to:
          "/companies/#{socket.assigns.current_company.id}/tax_instalment_plan?#{URI.encode_query(%{fy_year: fy, as_of: as_of})}"
-     )}
-  end
-
-  @impl true
-  def handle_event(
-        "validate",
-        %{"_target" => ["plan", "tax_paid_account_name"], "plan" => params},
-        socket
-      ) do
-    {params, socket, _} =
-      FullCircleWeb.Helpers.assign_autocomplete_id(
-        socket,
-        params,
-        "tax_paid_account_name",
-        "tax_paid_account_id",
-        &FullCircle.Accounting.get_account_by_name/3
-      )
-
-    # Write resolved id back into the plan struct so the hidden field renders the
-    # latest value (not the stale/nil value that was there before the user typed).
-    plan = %{socket.assigns.plan | tax_paid_account_id: params["tax_paid_account_id"]}
-
-    {:noreply,
-     assign(socket,
-       plan: plan,
-       account_name: params["tax_paid_account_name"] || ""
      )}
   end
 
@@ -151,18 +112,12 @@ defmodule FullCircleWeb.TaxLive.InstalmentPlan do
       "paid_overrides" => plan.paid_overrides || %{}
     }
 
-    attrs =
-      if plan.tax_paid_account_id,
-        do: Map.put(attrs, "tax_paid_account_id", plan.tax_paid_account_id),
-        else: attrs
-
     {:noreply, save_plan(socket, attrs)}
   end
 
   @impl true
   def handle_event("save", %{"plan" => params}, socket) do
-    # Saving snapshots all 12 paid cells (incl. GL-prefilled values) as overrides;
-    # after a save those amounts are frozen and no longer track new GL postings.
+    # Saving persists the 12 manually-entered paid cells as paid_overrides.
     {:noreply, save_plan(socket, params)}
   end
 
@@ -230,7 +185,7 @@ defmodule FullCircleWeb.TaxLive.InstalmentPlan do
         </.form>
         <p class="text-sm text-gray-600 dark:text-gray-300 mt-2 text-left">
           {gettext(
-            "CP204 planning aid built on the P&L forecast's estimated tax (an accounting-profit proxy, not a filed tax computation). 'Tax paid' sums postings to the nominated GL account — debits add, credits/refunds subtract."
+            "CP204 planning aid built on the P&L forecast's estimated tax (an accounting-profit proxy, not a filed tax computation). Tax-paid amounts are entered manually in the schedule below."
           )}
         </p>
       </div>
@@ -288,17 +243,6 @@ defmodule FullCircleWeb.TaxLive.InstalmentPlan do
             </div>
           </div>
           <div class="grid grid-cols-2 md:grid-cols-4 gap-3 items-end mt-2">
-            <div class="col-span-2">
-              <input type="hidden" name="plan[tax_paid_account_id]" value={@plan.tax_paid_account_id} />
-              <.input
-                name="plan[tax_paid_account_name]"
-                id="plan_tax_paid_account_name"
-                label={gettext("Tax paid GL account")}
-                value={@account_name}
-                phx-hook="tributeAutoComplete"
-                url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=account&name="}
-              />
-            </div>
             <input type="hidden" name="plan[fy_year]" value={@fy_year} />
             <input type="hidden" name="plan[estimate_month]" value={@plan.estimate_month || 1} />
             <div class="flex gap-2 items-end">

@@ -4,7 +4,6 @@ defmodule FullCircleWeb.TaxLive.InstalmentPlanTest do
   import Phoenix.LiveViewTest
   import FullCircle.SysFixtures
   import FullCircle.UserAccountsFixtures
-  import FullCircle.AccountingFixtures
 
   setup %{conn: conn} do
     user = user_fixture()
@@ -54,48 +53,6 @@ defmodule FullCircleWeb.TaxLive.InstalmentPlanTest do
 
       # After push_navigate the test conn follows the redirect
       assert_redirect(lv, "/companies/#{company.id}/tax_instalment_plan?fy_year=2025&as_of=2025-06-01")
-    end
-
-    test "resolving account name via validate persists tax_paid_account_id on save", %{
-      conn: conn,
-      company: company,
-      user: user
-    } do
-      # Create an account to link to the plan
-      acc =
-        account_fixture(%{name: "Tax Paid Test Account", account_type: "Current Asset"}, company, user)
-
-      {:ok, lv, html} = live(conn, ~p"/companies/#{company.id}/tax_instalment_plan")
-
-      # Read the fy_year the LiveView defaulted to from the rendered hidden input.
-      # The company fixture uses a random closing_month, so we cannot assume a
-      # fixed year — extract it directly from the DOM instead.
-      [fy_year_str] =
-        Regex.run(~r/name="plan\[fy_year\]" value="(\d+)"/, html, capture: :all_but_first)
-
-      fy_year = String.to_integer(fy_year_str)
-
-      # Step 1: fire the validate event with _target pointing at the account-name
-      # field. The validate handler resolves the name → id and stores it in
-      # @plan.tax_paid_account_id, which re-renders into the hidden input.
-      lv
-      |> element("#plan-form")
-      |> render_change(%{
-        "_target" => ["plan", "tax_paid_account_name"],
-        "plan" => %{"tax_paid_account_name" => acc.name}
-      })
-
-      # Step 2: submit the FULL rendered form without overriding params so the
-      # hidden plan[fy_year] and the now-resolved plan[tax_paid_account_id] from
-      # the DOM are submitted as-is.
-      lv
-      |> form("#plan-form")
-      |> render_submit()
-
-      # The plan saved to DB must have the resolved account id (not nil)
-      plan = FullCircle.Tax.get_plan(company, fy_year)
-      assert plan != nil
-      assert plan.tax_paid_account_id == acc.id
     end
 
     # Security: non-admin users must be redirected away from the planner at mount.

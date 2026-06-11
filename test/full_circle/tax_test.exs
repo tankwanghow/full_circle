@@ -137,29 +137,15 @@ defmodule FullCircle.TaxDBTest do
 
   import FullCircle.SysFixtures
   import FullCircle.UserAccountsFixtures
-  import FullCircle.AccountingFixtures
 
   alias FullCircle.Tax
-  alias FullCircle.Accounting.Transaction
-  alias FullCircle.Repo
 
   defp d(n), do: Decimal.new("#{n}")
-
-  defp txn!(com, account_id, date, amount) do
-    %Transaction{}
-    |> Transaction.changeset(%{
-      doc_type: "Journal", doc_no: "J#{System.unique_integer([:positive])}",
-      doc_date: date, particulars: "t", amount: amount,
-      company_id: com.id, account_id: account_id
-    })
-    |> Repo.insert!()
-  end
 
   setup do
     admin = user_fixture()
     com = company_fixture(admin, %{closing_month: 12, closing_day: 31})
-    tax_acc = account_fixture(%{account_type: "Current Asset", name: "Tax Paid #{System.unique_integer([:positive])}"}, com, admin)
-    %{admin: admin, com: com, tax_acc: tax_acc}
+    %{admin: admin, com: com}
   end
 
   describe "create_or_update_plan/3 and get_plan/2" do
@@ -175,60 +161,33 @@ defmodule FullCircle.TaxDBTest do
     end
   end
 
-  describe "paid_by_month/2" do
-    test "sums GL postings into FY months and applies overrides", %{com: com, admin: admin, tax_acc: tax_acc} do
-      txn!(com, tax_acc.id, ~D[2026-02-10], 5000)
-      txn!(com, tax_acc.id, ~D[2026-02-20], 3000)
-      txn!(com, tax_acc.id, ~D[2026-05-01], 4000)
-
-      {:ok, plan} =
-        Tax.create_or_update_plan(
-          %{"fy_year" => 2026, "tax_paid_account_id" => tax_acc.id, "paid_overrides" => %{"5" => "9999"}},
-          com, admin
-        )
-
-      pm = Tax.paid_by_month(plan, com)
+  describe "paid_by_month/1" do
+    test "reads manual overrides from the plan", %{com: com, admin: admin} do
+      {:ok, plan} = Tax.create_or_update_plan(%{"fy_year" => 2026, "paid_overrides" => %{"2" => "8000", "5" => "9999"}}, com, admin)
+      pm = Tax.paid_by_month(plan)
       assert Decimal.equal?(Map.get(pm, 2), d(8000))
       assert Decimal.equal?(Map.get(pm, 5), d(9999))
       assert Decimal.equal?(Map.get(pm, 1, d(0)), d(0))
     end
 
-    test "no account -> zeros plus overrides only", %{com: com, admin: admin} do
-      {:ok, plan} = Tax.create_or_update_plan(%{"fy_year" => 2026, "paid_overrides" => %{"3" => "100"}}, com, admin)
-      pm = Tax.paid_by_month(plan, com)
-      assert Decimal.equal?(Map.get(pm, 3), d(100))
+    test "no overrides -> empty map", %{com: com, admin: admin} do
+      {:ok, plan} = Tax.create_or_update_plan(%{"fy_year" => 2026}, com, admin)
+      pm = Tax.paid_by_month(plan)
       assert Decimal.equal?(Map.get(pm, 1, d(0)), d(0))
     end
   end
 
-  describe "paid_by_month/2 FY window" do
-    test "excludes transactions outside the financial year", %{com: com, admin: admin, tax_acc: tax_acc} do
-      txn!(com, tax_acc.id, ~D[2025-12-31], 1000)   # before FY 2026
-      txn!(com, tax_acc.id, ~D[2027-01-02], 2000)   # after FY 2026
-      txn!(com, tax_acc.id, ~D[2026-03-15], 7000)   # inside
-
-      {:ok, plan} = Tax.create_or_update_plan(%{"fy_year" => 2026, "tax_paid_account_id" => tax_acc.id}, com, admin)
-      pm = Tax.paid_by_month(plan, com)
-      assert Decimal.equal?(Map.get(pm, 3), d(7000))
-      # the out-of-window txns must not appear in any month
-      total = Enum.reduce(pm, Decimal.new(0), fn {_m, v}, a -> Decimal.add(a, v) end)
-      assert Decimal.equal?(total, d(7000))
-    end
-  end
-
   describe "schedule/2" do
-    test "builds a 12-row schedule from plan estimate + GL paid", %{com: com, admin: admin, tax_acc: tax_acc} do
-      txn!(com, tax_acc.id, ~D[2026-01-10], 1000)
+    test "builds a 12-row schedule from plan estimate + manual paid", %{com: com, admin: admin} do
       {:ok, plan} =
         Tax.create_or_update_plan(
-          %{"fy_year" => 2026, "tax_paid_account_id" => tax_acc.id, "estimate" => "120000", "estimate_month" => 1},
+          %{"fy_year" => 2026, "paid_overrides" => %{"1" => "1000"}, "estimate" => "120000", "estimate_month" => 1},
           com, admin
         )
-
       rows = Tax.schedule(plan, com)
       assert length(rows) == 12
-      assert Decimal.equal?(Enum.at(rows, 0).paid, d(1000))     # Jan GL paid
-      assert Decimal.equal?(Enum.at(rows, 0).instalment_due, d(10000))  # 120000/12
+      assert Decimal.equal?(Enum.at(rows, 0).paid, d(1000))
+      assert Decimal.equal?(Enum.at(rows, 0).instalment_due, d(10000))
     end
   end
 end
