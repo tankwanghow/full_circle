@@ -120,8 +120,15 @@ defmodule FullCircleWeb.TaxLive.InstalmentPlan do
         &FullCircle.Accounting.get_account_by_name/3
       )
 
-    # Update account_name display from resolved params
-    {:noreply, assign(socket, account_name: params["tax_paid_account_name"] || "")}
+    # Write resolved id back into the plan struct so the hidden field renders the
+    # latest value (not the stale/nil value that was there before the user typed).
+    plan = %{socket.assigns.plan | tax_paid_account_id: params["tax_paid_account_id"]}
+
+    {:noreply,
+     assign(socket,
+       plan: plan,
+       account_name: params["tax_paid_account_name"] || ""
+     )}
   end
 
   def handle_event("validate", _params, socket), do: {:noreply, socket}
