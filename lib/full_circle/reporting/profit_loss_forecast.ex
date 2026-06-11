@@ -35,6 +35,7 @@ defmodule FullCircle.Reporting.ProfitLossForecast do
 
   @trailing_key "pl_forecast_trailing"
   @default_trailing 365
+  @tax_rate_key "pl_forecast_tax_rate"
 
   # The category line keys that sum across periods for the Total column.
   @sum_keys [
@@ -79,6 +80,33 @@ defmodule FullCircle.Reporting.ProfitLossForecast do
     settings = Map.put(com.settings || %{}, @trailing_key, cleaned)
     com |> Ecto.Changeset.change(settings: settings) |> Repo.update()
   end
+
+  @doc "Flat income-tax rate (percent) for the forecast, from company settings. 0 when unset/invalid."
+  def tax_rate(com) do
+    (com.settings || %{})
+    |> Map.get(@tax_rate_key)
+    |> to_non_neg_decimal()
+  end
+
+  @doc "Persist the flat tax-rate percent to settings (blank/invalid/negative -> 0)."
+  def save_tax_rate(com, value) do
+    rate = to_non_neg_decimal(value)
+    settings = Map.put(com.settings || %{}, @tax_rate_key, Decimal.to_string(rate))
+    com |> Ecto.Changeset.change(settings: settings) |> Repo.update()
+  end
+
+  defp to_non_neg_decimal(nil), do: @zero
+  defp to_non_neg_decimal(%Decimal{} = d), do: if(Decimal.compare(d, @zero) == :lt, do: @zero, else: d)
+  defp to_non_neg_decimal(n) when is_integer(n) or is_float(n), do: to_non_neg_decimal(Decimal.new("#{n}"))
+
+  defp to_non_neg_decimal(s) when is_binary(s) do
+    case Decimal.parse(String.trim(s)) do
+      {d, ""} -> to_non_neg_decimal(d)
+      _ -> @zero
+    end
+  end
+
+  defp to_non_neg_decimal(_), do: @zero
 
   @doc "Return `com` with settings re-read fresh from the DB."
   def company_with_settings(com) do

@@ -36,6 +36,24 @@ defmodule FullCircle.Reporting.ProfitLossForecastTest do
       assert Decimal.equal?(p1.gross_margin, d(0))
     end
   end
+
+  describe "tax_rate/1" do
+    test "defaults to 0 when unset" do
+      assert Decimal.equal?(PLF.tax_rate(%{settings: %{}}), d(0))
+      assert Decimal.equal?(PLF.tax_rate(%{settings: nil}), d(0))
+    end
+
+    test "reads a saved numeric or string rate" do
+      assert Decimal.equal?(PLF.tax_rate(%{settings: %{"pl_forecast_tax_rate" => 24}}), d(24))
+      assert Decimal.equal?(PLF.tax_rate(%{settings: %{"pl_forecast_tax_rate" => "17.5"}}), d("17.5"))
+    end
+
+    test "blank, invalid or negative becomes 0" do
+      assert Decimal.equal?(PLF.tax_rate(%{settings: %{"pl_forecast_tax_rate" => ""}}), d(0))
+      assert Decimal.equal?(PLF.tax_rate(%{settings: %{"pl_forecast_tax_rate" => "abc"}}), d(0))
+      assert Decimal.equal?(PLF.tax_rate(%{settings: %{"pl_forecast_tax_rate" => -5}}), d(0))
+    end
+  end
 end
 
 defmodule FullCircle.Reporting.ProfitLossForecastDBTest do
@@ -143,6 +161,19 @@ defmodule FullCircle.Reporting.ProfitLossForecastDBTest do
       days = Date.diff(fc.period_end, fc.period_start) + 1
       expected = Decimal.mult(Decimal.div(d(1000), d(30)), d(days))
       assert Decimal.equal?(fc.revenue, expected)
+    end
+  end
+
+  describe "save_tax_rate/2 and tax_rate/1" do
+    test "round-trips through settings", %{com: com} do
+      assert Decimal.equal?(PLF.tax_rate(com), d(0))
+      {:ok, _} = PLF.save_tax_rate(com, "24")
+      com = PLF.company_with_settings(com)
+      assert Decimal.equal?(PLF.tax_rate(com), d(24))
+
+      {:ok, _} = PLF.save_tax_rate(com, "")
+      com = PLF.company_with_settings(com)
+      assert Decimal.equal?(PLF.tax_rate(com), d(0))
     end
   end
 
