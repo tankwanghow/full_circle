@@ -226,7 +226,6 @@ defmodule FullCircleWeb.Router do
       live("/post_dated_cheque_listing", ReportLive.PostDatedCheques, :index)
       live("/cash_forecast", ReportLive.CashForecast, :index)
       live("/profit_loss_forecast", ReportLive.ProfitLossForecast, :index)
-      live("/tax_instalment_plan", TaxLive.InstalmentPlan, :index)
 
       live("/bank_reconciliation", BankReconciliationLive.Index, :index)
 

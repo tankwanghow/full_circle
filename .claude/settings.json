@@ -35,7 +35,9 @@
       "Bash(echo \"Exit: $?\")",
       "Bash(echo \"exit code: $?\")",
       "Bash(sed -n '39,49p' lib/full_circle_web/live/time_attend_live/upload_punch_log.ex)",
-      "Bash(sed -n '/defp insert_time_attendence_from_logs/,/^  end/p' lib/full_circle_web/live/time_attend_live/upload_punch_log.ex)"
+      "Bash(sed -n '/defp insert_time_attendence_from_logs/,/^  end/p' lib/full_circle_web/live/time_attend_live/upload_punch_log.ex)",
+      "Bash(git -C /home/tankwanghow/Projects/elixir/full_circle add lib/full_circle/reporting/cash_forecast.ex test/full_circle/reporting/cash_forecast_test.exs)",
+      "Bash(git -C /home/tankwanghow/Projects/elixir/full_circle commit -m ' *)"
     ],
     "additionalDirectories": [
       "/tmp"
