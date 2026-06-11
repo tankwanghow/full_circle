@@ -21,11 +21,9 @@ defmodule FullCircle.Reporting.ProfitLossForecastTest do
       assert Decimal.equal?(p1.net_profit, d(500))
       assert Decimal.equal?(p1.gross_margin, d("60.0"))     # 600/1000*100
       assert Decimal.equal?(p1.net_margin, d("50.0"))
-      assert Decimal.equal?(p1.cumulative_net, d(500))
 
       assert p2.source == :forecast
       assert Decimal.equal?(p2.net_profit, d(300))          # 500 - 200
-      assert Decimal.equal?(p2.cumulative_net, d(800))      # running 500 + 300
     end
 
     test "zero revenue gives zero margin (no divide-by-zero)" do
@@ -34,6 +32,38 @@ defmodule FullCircle.Reporting.ProfitLossForecastTest do
       assert Decimal.equal?(p1.revenue, d(0))
       assert Decimal.equal?(p1.net_profit, d(-100))
       assert Decimal.equal?(p1.gross_margin, d(0))
+    end
+  end
+
+  describe "apply_tax/3" do
+    defp periods(nets), do: Enum.map(nets, fn n -> %{net_profit: d(n)} end)
+    defp tot(net), do: %{net_profit: d(net)}
+
+    test "rate 0 -> zero tax, after-tax equals net" do
+      {ps, ts} = PLF.apply_tax(periods([600, 400]), tot(1000), d(0))
+      assert Decimal.equal?(ts.estimated_tax, d(0))
+      assert Decimal.equal?(ts.net_profit_after_tax, d(1000))
+      assert Enum.all?(ps, &Decimal.equal?(&1.estimated_tax, d(0)))
+      assert Decimal.equal?(hd(ps).net_profit_after_tax, d(600))
+    end
+
+    test "flat 24% on a profitable year; per-period tax sums to the total" do
+      {ps, ts} = PLF.apply_tax(periods([600, 400]), tot(1000), d(24))
+      assert Decimal.equal?(ts.estimated_tax, d(240))
+      assert Decimal.equal?(ts.net_profit_after_tax, d(760))
+      [p1, p2] = ps
+      assert Decimal.equal?(p1.estimated_tax, d(144))
+      assert Decimal.equal?(p2.estimated_tax, d(96))
+      assert Decimal.equal?(p1.net_profit_after_tax, d(456))
+      sum = Decimal.add(p1.estimated_tax, p2.estimated_tax)
+      assert Decimal.equal?(sum, ts.estimated_tax)
+    end
+
+    test "annual loss -> zero tax, after-tax equals net" do
+      {ps, ts} = PLF.apply_tax(periods([-300, -100]), tot(-400), d(24))
+      assert Decimal.equal?(ts.estimated_tax, d(0))
+      assert Decimal.equal?(ts.net_profit_after_tax, d(-400))
+      assert Enum.all?(ps, &Decimal.equal?(&1.estimated_tax, d(0)))
     end
   end
 

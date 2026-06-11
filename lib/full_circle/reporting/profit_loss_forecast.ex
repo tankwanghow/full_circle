@@ -221,6 +221,8 @@ defmodule FullCircle.Reporting.ProfitLossForecast do
       end)
 
     periods = build_periods(bounds, by_type)
+    rate = tax_rate(com)
+    {periods, totals} = apply_tax(periods, totals(periods), rate)
 
     %{
       fy_year: fy_year,
@@ -233,7 +235,8 @@ defmodule FullCircle.Reporting.ProfitLossForecast do
       trailing: trailing,
       estimated_types: estimated,
       periods: periods,
-      totals: totals(periods)
+      totals: totals,
+      tax_rate: rate
     }
   end
 
@@ -249,30 +252,22 @@ defmodule FullCircle.Reporting.ProfitLossForecast do
     clamp_date(year - 1, cm, cd)
   end
 
-  @doc "Build the per-period P&L line rows (with subtotals, margins, cumulative net) — pure."
+  @doc "Build the per-period P&L line rows (with subtotals and margins) — pure."
   def build_periods(bounds, by_type) do
-    {rows, _} =
-      Enum.zip(bounds, by_type)
-      |> Enum.with_index(1)
-      |> Enum.map_reduce(@zero, fn {{{ps, pe}, {bt, src}}, idx}, cum ->
-        l = lines(bt)
-        cum2 = Decimal.add(cum, l.net_profit)
+    Enum.zip(bounds, by_type)
+    |> Enum.with_index(1)
+    |> Enum.map(fn {{{ps, pe}, {bt, src}}, idx} ->
+      l = lines(bt)
 
-        row =
-          Map.merge(l, %{
-            n: idx,
-            period_start: ps,
-            period_end: pe,
-            source: src,
-            gross_margin: margin(l.gross_profit, l.revenue),
-            net_margin: margin(l.net_profit, l.revenue),
-            cumulative_net: cum2
-          })
-
-        {row, cum2}
-      end)
-
-    rows
+      Map.merge(l, %{
+        n: idx,
+        period_start: ps,
+        period_end: pe,
+        source: src,
+        gross_margin: margin(l.gross_profit, l.revenue),
+        net_margin: margin(l.net_profit, l.revenue)
+      })
+    end)
   end
 
   @doc "The P&L transactions behind an actual period's category — for drill-down."
@@ -352,6 +347,36 @@ defmodule FullCircle.Reporting.ProfitLossForecast do
     |> Map.put(:gross_margin, margin(base.gross_profit, base.revenue))
     |> Map.put(:net_margin, margin(base.net_profit, base.revenue))
   end
+
+  @doc """
+  Augment each period and the totals map with `:estimated_tax` and
+  `:net_profit_after_tax`, using a flat `rate` (percent). Tax is charged on the
+  full-year net profit (loss => 0); per-period tax is allocated by the effective
+  rate so the per-period figures sum to the annual total. Pure.
+  """
+  def apply_tax(periods, totals, %Decimal{} = rate) do
+    net = totals.net_profit
+    tax_total = Decimal.mult(max_zero(net), Decimal.div(rate, Decimal.new(100)))
+
+    eff =
+      if Decimal.compare(net, @zero) == :gt, do: Decimal.div(tax_total, net), else: @zero
+
+    periods =
+      Enum.map(periods, fn p ->
+        tax = Decimal.mult(p.net_profit, eff)
+        Map.merge(p, %{estimated_tax: tax, net_profit_after_tax: Decimal.sub(p.net_profit, tax)})
+      end)
+
+    totals =
+      Map.merge(totals, %{
+        estimated_tax: tax_total,
+        net_profit_after_tax: Decimal.sub(net, tax_total)
+      })
+
+    {periods, totals}
+  end
+
+  defp max_zero(d), do: if(Decimal.compare(d, @zero) == :lt, do: @zero, else: d)
 
   defp normalize(type, raw) when type in @income_types, do: Decimal.negate(to_decimal(raw))
   defp normalize(_type, raw), do: to_decimal(raw)
