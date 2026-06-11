@@ -1,3 +1,77 @@
+defmodule FullCircle.TaxComputeTest do
+  use ExUnit.Case, async: true
+  alias FullCircle.Tax
+
+  defp d(n), do: Decimal.new("#{n}")
+
+  describe "suggested_estimate/2" do
+    test "reduces by the tolerance" do
+      assert Decimal.equal?(Tax.suggested_estimate(d(130000), d(30)), d(100000))
+    end
+
+    test "tolerance 0 returns the forecast unchanged" do
+      assert Decimal.equal?(Tax.suggested_estimate(d(50000), d(0)), d(50000))
+    end
+
+    test "non-positive forecast returns 0" do
+      assert Decimal.equal?(Tax.suggested_estimate(d(0), d(30)), d(0))
+      assert Decimal.equal?(Tax.suggested_estimate(d(-100), d(30)), d(0))
+    end
+  end
+
+  describe "under_estimated?/3" do
+    test "true below the floor, false at/above it" do
+      assert Tax.under_estimated?(d(99999), d(130000), d(30))
+      refute Tax.under_estimated?(d(100000), d(130000), d(30))
+      refute Tax.under_estimated?(d(120000), d(130000), d(30))
+    end
+  end
+
+  describe "build_schedule/4" do
+    defp bounds do
+      for m <- 1..12, do: {Date.new!(2026, m, 1), Date.new!(2026, m, Date.days_in_month(Date.new!(2026, m, 1)))}
+    end
+
+    test "spreads estimate evenly from month 1 with no paid" do
+      rows = Tax.build_schedule(bounds(), %{}, d(120000), 1)
+      assert length(rows) == 12
+      assert Enum.all?(rows, &Decimal.equal?(&1.instalment_due, d(10000)))
+      # no paid -> balance = estimate - cumulative_paid(0) = estimate, every month
+      assert Decimal.equal?(hd(rows).balance, d(120000))
+      assert Decimal.equal?(List.last(rows).balance, d(120000))
+    end
+
+    test "re-spreads remaining balance from estimate_month over remaining months" do
+      paid = %{1 => d(10000), 2 => d(10000), 3 => d(10000)}
+      rows = Tax.build_schedule(bounds(), paid, d(120000), 4)
+      assert Decimal.equal?(Enum.at(rows, 0).instalment_due, d(0))
+      assert Decimal.equal?(Enum.at(rows, 3).instalment_due, d(10000))
+      assert Decimal.equal?(Enum.at(rows, 11).instalment_due, d(10000))
+    end
+
+    test "forward instalment floored at 0 when already over-paid" do
+      paid = %{1 => d(200000)}
+      rows = Tax.build_schedule(bounds(), paid, d(120000), 2)
+      assert Decimal.equal?(Enum.at(rows, 1).instalment_due, d(0))
+    end
+
+    test "estimate 0 -> all due 0" do
+      rows = Tax.build_schedule(bounds(), %{}, d(0), 1)
+      assert Enum.all?(rows, &Decimal.equal?(&1.instalment_due, d(0)))
+    end
+  end
+
+  describe "current_fy_month/3" do
+    test "maps a date to its FY month index, clamped to 1..12" do
+      com = %{closing_month: 12, closing_day: 31}
+      assert Tax.current_fy_month(com, 2026, ~D[2026-01-15]) == 1
+      assert Tax.current_fy_month(com, 2026, ~D[2026-07-10]) == 7
+      assert Tax.current_fy_month(com, 2026, ~D[2025-01-01]) == 1
+      assert Tax.current_fy_month(com, 2026, ~D[2027-05-01]) == 12
+    end
+  end
+end
+
 defmodule FullCircle.TaxSchemaTest do
   use ExUnit.Case, async: true
   alias FullCircle.Tax.InstalmentPlan
