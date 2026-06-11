@@ -65,13 +65,19 @@ defmodule FullCircleWeb.TaxLive.InstalmentPlanTest do
       acc =
         account_fixture(%{name: "Tax Paid Test Account", account_type: "Current Asset"}, company, user)
 
-      {:ok, lv, _html} = live(conn, ~p"/companies/#{company.id}/tax_instalment_plan")
+      {:ok, lv, html} = live(conn, ~p"/companies/#{company.id}/tax_instalment_plan")
 
-      # Default fy_year for a company with closing month 12 and today 2026-06-11 is 2026
-      fy_year = Date.utc_today().year
+      # Read the fy_year the LiveView defaulted to from the rendered hidden input.
+      # The company fixture uses a random closing_month, so we cannot assume a
+      # fixed year — extract it directly from the DOM instead.
+      [fy_year_str] =
+        Regex.run(~r/name="plan\[fy_year\]" value="(\d+)"/, html, capture: :all_but_first)
 
-      # Step 1: simulate the tributeAutoComplete hook firing "validate" with the
-      # account name in _target — this should resolve the id and update @plan
+      fy_year = String.to_integer(fy_year_str)
+
+      # Step 1: fire the validate event with _target pointing at the account-name
+      # field. The validate handler resolves the name → id and stores it in
+      # @plan.tax_paid_account_id, which re-renders into the hidden input.
       lv
       |> element("#plan-form")
       |> render_change(%{
@@ -79,21 +85,38 @@ defmodule FullCircleWeb.TaxLive.InstalmentPlanTest do
         "plan" => %{"tax_paid_account_name" => acc.name}
       })
 
-      # Step 2: submit save — use form/3 so Phoenix reads the rendered DOM including
-      # the hidden plan[tax_paid_account_id] field whose value was updated by the
-      # fixed validate handler (it now reflects acc.id, not nil)
+      # Step 2: submit the FULL rendered form without overriding params so the
+      # hidden plan[fy_year] and the now-resolved plan[tax_paid_account_id] from
+      # the DOM are submitted as-is.
       lv
-      |> form("#plan-form", %{
-        "plan" => %{
-          "tax_paid_account_name" => acc.name
-        }
-      })
+      |> form("#plan-form")
       |> render_submit()
 
       # The plan saved to DB must have the resolved account id (not nil)
       plan = FullCircle.Tax.get_plan(company, fy_year)
       assert plan != nil
       assert plan.tax_paid_account_id == acc.id
+    end
+
+    # Security: non-admin users must be redirected away from the planner at mount.
+    # The set_active_company plug reads the user's role from the CompanyUser record
+    # and writes it into the session; on_mount then assigns it to the socket so the
+    # LiveView's admin guard fires.
+    test "non-admin (clerk) user is redirected away from the instalment plan page", %{
+      conn: conn,
+      company: company,
+      user: admin
+    } do
+      clerk = user_fixture()
+      {:ok, _} = FullCircle.Sys.allow_user_to_access(company, clerk, "clerk", admin)
+
+      clerk_conn = log_in_user(conn, clerk)
+
+      # mount's push_navigate produces a live_redirect (not a plain redirect)
+      assert {:error, {:live_redirect, %{to: path}}} =
+               live(clerk_conn, ~p"/companies/#{company.id}/tax_instalment_plan")
+
+      assert path =~ "/companies/#{company.id}"
     end
   end
 end

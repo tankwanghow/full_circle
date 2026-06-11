@@ -19,7 +19,7 @@ defmodule FullCircleWeb.TaxLive.InstalmentPlan do
 
   @impl true
   def handle_params(params, _uri, socket) do
-    # If the mount redirected, handle_params still fires — bail out safely.
+    # Defensive: re-check admin in case handle_params is reached without a fresh mount.
     if socket.assigns.current_role != "admin" do
       {:noreply, socket}
     else
@@ -161,6 +161,8 @@ defmodule FullCircleWeb.TaxLive.InstalmentPlan do
 
   @impl true
   def handle_event("save", %{"plan" => params}, socket) do
+    # Saving snapshots all 12 paid cells (incl. GL-prefilled values) as overrides;
+    # after a save those amounts are frozen and no longer track new GL postings.
     {:noreply, save_plan(socket, params)}
   end
 
