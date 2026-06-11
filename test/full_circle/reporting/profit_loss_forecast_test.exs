@@ -5,7 +5,7 @@ defmodule FullCircle.Reporting.ProfitLossForecastTest do
   defp d(n), do: Decimal.new("#{n}")
 
   describe "build_periods/2" do
-    test "computes category lines, subtotals, margins and cumulative net" do
+    test "computes category lines, subtotals and margins" do
       bounds = [{~D[2026-01-01], ~D[2026-01-30]}, {~D[2026-01-31], ~D[2026-03-01]}]
 
       # values are already sign-normalized (income & expense both positive)
@@ -64,6 +64,23 @@ defmodule FullCircle.Reporting.ProfitLossForecastTest do
       assert Decimal.equal?(ts.estimated_tax, d(0))
       assert Decimal.equal?(ts.net_profit_after_tax, d(-400))
       assert Enum.all?(ps, &Decimal.equal?(&1.estimated_tax, d(0)))
+    end
+
+    test "net = 0 exactly -> zero tax, no divide-by-zero" do
+      {ps, ts} = PLF.apply_tax(periods([100, -100]), tot(0), d(24))
+      assert Decimal.equal?(ts.estimated_tax, d(0))
+      assert Decimal.equal?(ts.net_profit_after_tax, d(0))
+      assert Enum.all?(ps, &Decimal.equal?(&1.estimated_tax, d(0)))
+    end
+
+    test "mixed-sign periods in a profitable year still reconcile" do
+      {ps, ts} = PLF.apply_tax(periods([1000, -100]), tot(900), d(24))
+      [p1, p2] = ps
+      # full-year tax = 900 * 0.24 = 216; loss period gets a proportional credit
+      assert Decimal.equal?(ts.estimated_tax, d(216))
+      assert Decimal.compare(p2.estimated_tax, d(0)) == :lt
+      sum = Decimal.add(p1.estimated_tax, p2.estimated_tax)
+      assert Decimal.equal?(sum, ts.estimated_tax)
     end
   end
 
