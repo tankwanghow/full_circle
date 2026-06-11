@@ -23,18 +23,27 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
 
   @impl true
   def mount(_params, _session, socket) do
-    com = PLF.company_with_settings(socket.assigns.current_company)
+    if socket.assigns[:current_role] != "admin" do
+      {:ok,
+       socket
+       |> put_flash(:error, gettext("Not authorized."))
+       |> push_navigate(to: "/companies/#{socket.assigns.current_company.id}")}
+    else
+      com = PLF.company_with_settings(socket.assigns.current_company)
 
-    {:ok,
-     assign(socket,
-       page_title: gettext("Profit & Loss Forecast"),
-       current_company: com,
-       rows: @rows,
-       drill: nil,
-       settings_open: false,
-       trailing: %{},
-       tax_rate: Decimal.new(0)
-     )}
+      {:ok,
+       assign(socket,
+         page_title: gettext("Profit & Loss Forecast"),
+         current_company: com,
+         rows: @rows,
+         drill: nil,
+         settings_open: false,
+         trailing: %{},
+         tax_rate: Decimal.new(0),
+         plan: nil,
+         plan_schedule: []
+       )}
+    end
   end
 
   @impl true
@@ -47,7 +56,26 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
       as_of: p["as_of"] || Date.to_iso8601(Date.utc_today())
     }
 
-    {:noreply, socket |> assign(search: search) |> run_forecast(search)}
+    com = socket.assigns.current_company
+    fy_year = safe_int(search.fy_year, default_fy_year(com))
+
+    as_of =
+      case Date.from_iso8601(to_string(search.as_of)) do
+        {:ok, date} -> date
+        _ -> Date.utc_today()
+      end
+
+    plan =
+      FullCircle.Tax.get_plan(com, fy_year) ||
+        %FullCircle.Tax.InstalmentPlan{
+          fy_year: fy_year,
+          estimate_month: FullCircle.Tax.current_fy_month(com, fy_year, as_of)
+        }
+
+    {:noreply,
+     socket
+     |> assign(search: search, plan: plan, plan_schedule: FullCircle.Tax.schedule(plan, com))
+     |> run_forecast(search)}
   end
 
   @impl true
@@ -110,6 +138,52 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
      socket
      |> assign(current_company: com, settings_open: false)
      |> run_forecast(socket.assigns.search)}
+  end
+
+  @impl true
+  def handle_event("save_plan", %{"plan" => params}, socket) do
+    com = socket.assigns.current_company
+
+    case FullCircle.Tax.create_or_update_plan(params, com, socket.assigns.current_user) do
+      {:ok, plan} ->
+        {:noreply, assign(socket, plan: plan, plan_schedule: FullCircle.Tax.schedule(plan, com))}
+
+      {:error, _cs} ->
+        {:noreply, put_flash(socket, :error, gettext("Could not save the tax plan."))}
+    end
+  end
+
+  @impl true
+  def handle_event("revise_plan", _params, socket) do
+    com = socket.assigns.current_company
+    fy_year = safe_int(socket.assigns.search.fy_year, default_fy_year(com))
+
+    as_of =
+      case Date.from_iso8601(to_string(socket.assigns.search.as_of)) do
+        {:ok, date} -> date
+        _ -> Date.utc_today()
+      end
+
+    plan = socket.assigns.plan
+    tol = (plan && plan.tolerance_pct) || Decimal.new(30)
+    forecast_tax = FullCircle.Tax.forecast_annual_tax(com, fy_year, as_of)
+    suggested = FullCircle.Tax.suggested_estimate(forecast_tax, tol)
+
+    attrs = %{
+      "fy_year" => fy_year,
+      "tolerance_pct" => Decimal.to_string(tol),
+      "estimate" => Decimal.to_string(suggested),
+      "estimate_month" => FullCircle.Tax.current_fy_month(com, fy_year, as_of),
+      "paid_overrides" => (plan && plan.paid_overrides) || %{}
+    }
+
+    case FullCircle.Tax.create_or_update_plan(attrs, com, socket.assigns.current_user) do
+      {:ok, plan} ->
+        {:noreply, assign(socket, plan: plan, plan_schedule: FullCircle.Tax.schedule(plan, com))}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, gettext("Could not revise the estimate."))}
+    end
   end
 
   defp run_forecast(socket, search) do
@@ -202,6 +276,13 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
               {gettext("Financial year")} {Date.to_iso8601(f.start_date)} → {Date.to_iso8601(f.fy_end)}
             </p>
             <.pl_table rows={@rows} periods={f.periods} totals={f.totals} estimated={f.estimated_types} tax_rate={f.tax_rate} />
+            <.tax_plan_section
+              :if={is_map(f) and @plan}
+              forecast_tax={f.totals.estimated_tax}
+              plan={@plan}
+              schedule={@plan_schedule}
+              fy_year={@search.fy_year}
+            />
           </div>
         </:result_html>
       </.async_html>
@@ -211,6 +292,153 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
     </div>
     """
   end
+
+  attr :forecast_tax, :any, required: true
+  attr :plan, :any, required: true
+  attr :schedule, :list, required: true
+  attr :fy_year, :any, required: true
+
+  defp tax_plan_section(assigns) do
+    tol = assigns.plan.tolerance_pct || Decimal.new(30)
+    suggested = FullCircle.Tax.suggested_estimate(assigns.forecast_tax, tol)
+
+    chosen =
+      if assigns.plan.estimate && Decimal.compare(assigns.plan.estimate, Decimal.new(0)) == :gt,
+        do: assigns.plan.estimate,
+        else: suggested
+
+    under = FullCircle.Tax.under_estimated?(chosen, assigns.forecast_tax, tol)
+
+    assigns =
+      assign(assigns,
+        tol: tol,
+        suggested: suggested,
+        chosen: chosen,
+        under: under
+      )
+
+    ~H"""
+    <div class="mt-6 w-full">
+      <p class="text-xl font-semibold text-center mb-3">{gettext("CP204 Tax Instalment Plan")}</p>
+
+      <%!-- Summary box --%>
+      <div class="border rounded bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800 p-3 mb-3">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 items-end">
+          <div>
+            <p class="text-xs text-gray-500 dark:text-gray-400">{gettext("Forecast annual tax")}</p>
+            <p class="font-mono font-semibold text-sm">{plan_money(@forecast_tax)}</p>
+          </div>
+          <div>
+            <p class="text-xs text-gray-500 dark:text-gray-400">{gettext("Suggested estimate")}</p>
+            <p class="font-mono text-sm">{plan_money(@suggested)}</p>
+          </div>
+        </div>
+        <p
+          :if={Decimal.compare(@forecast_tax, Decimal.new(0)) != :gt}
+          class="text-sm text-gray-500 dark:text-gray-400 mt-2"
+        >
+          {gettext("Set a tax rate in Trailing settings to get a suggested estimate.")}
+        </p>
+      </div>
+
+      <%!-- Under-estimation banner --%>
+      <div
+        :if={@under}
+        class="mb-3 rounded border border-red-400 bg-red-100 dark:bg-red-950/40 dark:border-red-700 px-3 py-2 text-red-700 dark:text-red-400 font-medium"
+      >
+        {gettext(
+          "Chosen estimate is below the penalty-free floor — under-estimation penalty risk."
+        )}
+      </div>
+
+      <%!-- Plan form --%>
+      <.form
+        for={%{}}
+        id="plan-form"
+        phx-submit="save_plan"
+        autocomplete="off"
+        class="w-full"
+      >
+        <input type="hidden" name="plan[fy_year]" value={@fy_year} />
+        <input type="hidden" name="plan[estimate_month]" value={@plan.estimate_month || 1} />
+
+        <div class="border rounded bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800 p-3 mb-3">
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3 items-end">
+            <div>
+              <.input
+                name="plan[tolerance_pct]"
+                id="plan_tolerance_pct"
+                type="number"
+                step="0.01"
+                min="0"
+                label={gettext("Tolerance %")}
+                value={Decimal.to_string(@tol)}
+              />
+            </div>
+            <div>
+              <.input
+                name="plan[estimate]"
+                id="plan_estimate"
+                type="number"
+                step="0.01"
+                min="0"
+                label={gettext("Chosen estimate")}
+                value={Decimal.to_string(@chosen)}
+              />
+            </div>
+            <div class="flex gap-2 items-end">
+              <.button class="blue button">{gettext("Save")}</.button>
+              <button type="button" phx-click="revise_plan" class="gray button">
+                {gettext("Revise")}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <%!-- Instalment schedule table --%>
+        <div class="overflow-x-auto">
+          <table class="text-sm text-right border dark:border-gray-700 whitespace-nowrap w-full">
+            <thead class="bg-gray-200 dark:bg-gray-700 dark:text-gray-100">
+              <tr>
+                <th class="px-2 text-left">{gettext("Month")}</th>
+                <th class="px-2">{gettext("Instalment Due")}</th>
+                <th class="px-2">{gettext("Tax Paid (editable)")}</th>
+                <th class="px-2">{gettext("Balance")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                :for={r <- @schedule}
+                class="border-b dark:border-gray-700 odd:bg-white even:bg-gray-50 dark:odd:bg-gray-800 dark:even:bg-gray-900"
+              >
+                <td class="px-2 text-left">
+                  {Date.to_iso8601(r.period_start)} → {Date.to_iso8601(r.period_end)}
+                </td>
+                <td class="px-2 font-mono">{plan_money(r.instalment_due)}</td>
+                <td class="px-2 font-mono">
+                  <input
+                    type="number"
+                    step="0.01"
+                    name={"plan[paid_overrides][#{r.month_no}]"}
+                    value={Decimal.to_string(Decimal.round(r.paid, 2))}
+                    class="w-32 text-right border rounded px-1 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+                  />
+                </td>
+                <td class="px-2 font-mono">{plan_money(r.balance)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </.form>
+    </div>
+    """
+  end
+
+  defp plan_money(%Decimal{} = d),
+    do: Number.Delimit.number_to_delimited(Decimal.round(d, 2))
+
+  defp plan_money(nil), do: "0.00"
+  defp plan_money(other), do: to_string(other)
 
   attr :trailing, :map, required: true
   attr :tax_rate, :any, required: true
