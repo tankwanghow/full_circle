@@ -92,6 +92,8 @@ defmodule FullCircleWeb.TaxLive.InstalmentPlan do
      )}
   end
 
+  # Form uses phx-change="validate" but we don't preview unsaved edits — Save persists
+  # and reloads, recomputing the schedule from the stored plan.
   def handle_event("validate", _params, socket), do: {:noreply, socket}
 
   @impl true

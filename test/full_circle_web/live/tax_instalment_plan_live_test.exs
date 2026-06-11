@@ -4,11 +4,31 @@ defmodule FullCircleWeb.TaxLive.InstalmentPlanTest do
   import Phoenix.LiveViewTest
   import FullCircle.SysFixtures
   import FullCircle.UserAccountsFixtures
+  import FullCircle.AccountingFixtures
+
+  alias FullCircle.Reporting.ProfitLossForecast, as: PLF
+  alias FullCircle.Accounting.Transaction
+  alias FullCircle.Repo
 
   setup %{conn: conn} do
     user = user_fixture()
     company = company_fixture(user, %{})
     %{conn: log_in_user(conn, user), user: user, company: company}
+  end
+
+  # Mirrors the forecast DB test: posts a raw double-entry-style Journal line.
+  defp txn!(com, account_id, date, amount) do
+    %Transaction{}
+    |> Transaction.changeset(%{
+      doc_type: "Journal",
+      doc_no: "J#{System.unique_integer([:positive])}",
+      doc_date: date,
+      particulars: "t",
+      amount: amount,
+      company_id: com.id,
+      account_id: account_id
+    })
+    |> Repo.insert!()
   end
 
   describe "Tax Instalment Plan LiveView" do
@@ -74,6 +94,61 @@ defmodule FullCircleWeb.TaxLive.InstalmentPlanTest do
                live(clerk_conn, ~p"/companies/#{company.id}/tax_instalment_plan")
 
       assert path =~ "/companies/#{company.id}"
+    end
+
+    # The red under-estimation banner renders when the chosen estimate is below the
+    # penalty-free floor (Tax.under_estimated?/3). By default the company's
+    # pl_forecast_tax_rate is 0, so forecast tax = 0, suggested = 0 and nothing can be
+    # "under". This drives the real LiveView path: a positive tax rate + a profitable
+    # FY window give a positive forecast tax (so suggested > 0), and a saved plan with a
+    # deliberately tiny estimate (1) sits below that floor.
+    test "renders the under-estimation banner when the saved estimate is below the penalty-free floor",
+         %{conn: conn, user: user} do
+      # 31-Dec close -> FY == calendar year; default fy_year for 2026-06-11 is 2026.
+      com = company_fixture(user, %{closing_month: 12, closing_day: 31})
+
+      # Positive net profit in the elapsed FY window: revenue is credit-normal
+      # (negative amount), expense debit-normal (positive amount).
+      rev =
+        account_fixture(
+          %{account_type: "Revenue", name: "Sales #{System.unique_integer([:positive])}"},
+          com,
+          user
+        )
+
+      exp =
+        account_fixture(
+          %{account_type: "Expenses", name: "Rent #{System.unique_integer([:positive])}"},
+          com,
+          user
+        )
+
+      txn!(com, rev.id, ~D[2026-01-10], Decimal.new("-100000"))
+      txn!(com, exp.id, ~D[2026-01-12], Decimal.new("20000"))
+
+      # 24% on ~80k net profit -> positive forecast tax -> positive suggested floor.
+      {:ok, _} = PLF.save_tax_rate(com, "24")
+
+      # Persisted plan with a tiny estimate so load/3 keeps it (estimate > 0) instead of
+      # falling back to the suggested value, putting it below the floor.
+      {:ok, _} =
+        FullCircle.Tax.create_or_update_plan(
+          %{"fy_year" => 2026, "estimate" => "1", "tolerance_pct" => "30", "estimate_month" => 6},
+          com,
+          user
+        )
+
+      {:ok, _lv, html} = live(conn, ~p"/companies/#{com.id}/tax_instalment_plan?fy_year=2026")
+
+      assert html =~ "below the penalty-free floor"
+    end
+
+    test "does not render the under-estimation banner for a default zero-tax-rate company", %{
+      conn: conn,
+      company: company
+    } do
+      {:ok, _lv, html} = live(conn, ~p"/companies/#{company.id}/tax_instalment_plan")
+      refute html =~ "below the penalty-free floor"
     end
   end
 end
