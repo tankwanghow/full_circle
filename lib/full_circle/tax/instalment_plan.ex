@@ -31,6 +31,7 @@ defmodule FullCircle.Tax.InstalmentPlan do
       :tax_paid_account_id
     ])
     |> validate_required([:company_id, :fy_year])
+    |> validate_number(:fy_year, greater_than: 1900, less_than: 2200)
     |> validate_number(:tolerance_pct, greater_than_or_equal_to: 0)
     |> validate_number(:estimate, greater_than_or_equal_to: 0)
     |> validate_inclusion(:estimate_month, 1..12)

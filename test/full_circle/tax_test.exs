@@ -6,9 +6,10 @@ defmodule FullCircle.TaxSchemaTest do
 
   describe "changeset/2" do
     test "requires company_id and fy_year" do
-      refute chg(%{}).valid?
       cs = chg(%{})
-      assert %{company_id: _, fy_year: _} = Ecto.Changeset.traverse_errors(cs, & &1)
+      refute cs.valid?
+      assert cs.errors[:company_id]
+      assert cs.errors[:fy_year]
     end
 
     test "valid with the minimum fields" do
@@ -20,6 +21,11 @@ defmodule FullCircle.TaxSchemaTest do
       refute chg(%{company_id: Ecto.UUID.generate(), fy_year: 2026, tolerance_pct: -1}).valid?
       refute chg(%{company_id: Ecto.UUID.generate(), fy_year: 2026, estimate_month: 0}).valid?
       refute chg(%{company_id: Ecto.UUID.generate(), fy_year: 2026, estimate_month: 13}).valid?
+    end
+
+    test "rejects an out-of-range fy_year" do
+      refute chg(%{company_id: Ecto.UUID.generate(), fy_year: 1800}).valid?
+      refute chg(%{company_id: Ecto.UUID.generate(), fy_year: 3000}).valid?
     end
 
     test "accepts a paid_overrides map" do
