@@ -291,6 +291,7 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
             <.tax_plan_section
               :if={is_map(f) and @plan}
               forecast_tax={f.totals.estimated_tax}
+              tax_rate={f.tax_rate}
               plan={@plan}
               schedule={@plan_schedule}
               fy_year={@search.fy_year}
@@ -306,6 +307,7 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
   end
 
   attr :forecast_tax, :any, required: true
+  attr :tax_rate, :any, default: nil
   attr :plan, :any, required: true
   attr :schedule, :list, required: true
   attr :fy_year, :any, required: true
@@ -331,6 +333,19 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
     headroom = Decimal.sub(ceiling, assigns.forecast_tax)
     show_penalty = Decimal.compare(assigns.forecast_tax, Decimal.new(0)) == :gt
 
+    # Convert the tax ceiling to a net-profit ceiling using the flat forecast rate:
+    # actual tax = profit × rate/100, so penalty-free profit = ceiling × 100 / rate.
+    rate = assigns.tax_rate || Decimal.new(0)
+    rate_pos = Decimal.compare(rate, Decimal.new(0)) == :gt
+
+    profit_ceiling =
+      if rate_pos, do: Decimal.div(Decimal.mult(ceiling, Decimal.new(100)), rate), else: Decimal.new(0)
+
+    excess_profit =
+      if rate_pos,
+        do: Decimal.div(Decimal.mult(Decimal.max(excess, Decimal.new(0)), Decimal.new(100)), rate),
+        else: Decimal.new(0)
+
     assigns =
       assign(assigns,
         tol: tol,
@@ -341,7 +356,11 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
         excess: excess,
         penalty: penalty,
         headroom: headroom,
-        show_penalty: show_penalty
+        show_penalty: show_penalty,
+        rate: rate,
+        rate_pos: rate_pos,
+        profit_ceiling: profit_ceiling,
+        excess_profit: excess_profit
       )
 
     ~H"""
@@ -365,6 +384,15 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
           <span class="font-mono font-semibold">{plan_money(@ceiling)}</span>
           · {gettext("forecast / actual tax")}:
           <span class="font-mono font-semibold">{plan_money(@forecast_tax)}</span>
+        </p>
+        <p :if={@rate_pos} class="mt-1">
+          {gettext("Net-profit ceiling before penalty")} ({rate_label(@rate)}%):
+          <span class="font-mono font-semibold">{plan_money(@profit_ceiling)}</span>
+          <span :if={@under}>
+            — {gettext("net profit must be")}
+            <span class="font-mono">{plan_money(@excess_profit)}</span>
+            {gettext("lower to clear the threshold.")}
+          </span>
         </p>
         <p :if={@under} class="mt-1 text-red-700 dark:text-red-400 font-medium">
           {gettext("Chosen estimate is below the penalty-free floor")} — {gettext(

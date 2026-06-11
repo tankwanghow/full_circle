@@ -197,6 +197,8 @@ defmodule FullCircleWeb.ProfitLossForecastLiveTest do
       assert html =~ "below the penalty-free floor"
       # the penalty-check panel also shows the estimated 10% penalty figure
       assert html =~ "Estimated penalty (10%)"
+      # ...and the net-profit ceiling (tax ceiling converted via the forecast rate)
+      assert html =~ "Net-profit ceiling before penalty"
     end
 
     # Revise recomputes the estimate from a fresh forecast + the last saved plan, then
