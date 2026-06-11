@@ -131,3 +131,73 @@ defmodule FullCircle.TaxSchemaTest do
     end
   end
 end
+
+defmodule FullCircle.TaxDBTest do
+  use FullCircle.DataCase, async: true
+
+  import FullCircle.SysFixtures
+  import FullCircle.UserAccountsFixtures
+  import FullCircle.AccountingFixtures
+
+  alias FullCircle.Tax
+  alias FullCircle.Accounting.Transaction
+  alias FullCircle.Repo
+
+  defp d(n), do: Decimal.new("#{n}")
+
+  defp txn!(com, account_id, date, amount) do
+    %Transaction{}
+    |> Transaction.changeset(%{
+      doc_type: "Journal", doc_no: "J#{System.unique_integer([:positive])}",
+      doc_date: date, particulars: "t", amount: amount,
+      company_id: com.id, account_id: account_id
+    })
+    |> Repo.insert!()
+  end
+
+  setup do
+    admin = user_fixture()
+    com = company_fixture(admin, %{closing_month: 12, closing_day: 31})
+    tax_acc = account_fixture(%{account_type: "Current Asset", name: "Tax Paid #{System.unique_integer([:positive])}"}, com, admin)
+    %{admin: admin, com: com, tax_acc: tax_acc}
+  end
+
+  describe "create_or_update_plan/3 and get_plan/2" do
+    test "creates then updates the singleton per (company, fy)", %{com: com, admin: admin} do
+      assert is_nil(Tax.get_plan(com, 2026))
+      {:ok, plan} = Tax.create_or_update_plan(%{"fy_year" => 2026, "tolerance_pct" => "30", "estimate" => "100000", "estimate_month" => 1}, com, admin)
+      assert plan.fy_year == 2026
+
+      {:ok, plan2} = Tax.create_or_update_plan(%{"fy_year" => 2026, "estimate" => "120000"}, com, admin)
+      assert plan2.id == plan.id
+      assert Decimal.equal?(plan2.estimate, d(120000))
+      assert Tax.get_plan(com, 2026).id == plan.id
+    end
+  end
+
+  describe "paid_by_month/2" do
+    test "sums GL postings into FY months and applies overrides", %{com: com, admin: admin, tax_acc: tax_acc} do
+      txn!(com, tax_acc.id, ~D[2026-02-10], 5000)
+      txn!(com, tax_acc.id, ~D[2026-02-20], 3000)
+      txn!(com, tax_acc.id, ~D[2026-05-01], 4000)
+
+      {:ok, plan} =
+        Tax.create_or_update_plan(
+          %{"fy_year" => 2026, "tax_paid_account_id" => tax_acc.id, "paid_overrides" => %{"5" => "9999"}},
+          com, admin
+        )
+
+      pm = Tax.paid_by_month(plan, com)
+      assert Decimal.equal?(Map.get(pm, 2), d(8000))
+      assert Decimal.equal?(Map.get(pm, 5), d(9999))
+      assert Decimal.equal?(Map.get(pm, 1, d(0)), d(0))
+    end
+
+    test "no account -> zeros plus overrides only", %{com: com, admin: admin} do
+      {:ok, plan} = Tax.create_or_update_plan(%{"fy_year" => 2026, "paid_overrides" => %{"3" => "100"}}, com, admin)
+      pm = Tax.paid_by_month(plan, com)
+      assert Decimal.equal?(Map.get(pm, 3), d(100))
+      assert Decimal.equal?(Map.get(pm, 1, d(0)), d(0))
+    end
+  end
+end

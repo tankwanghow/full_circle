@@ -5,6 +5,10 @@ defmodule FullCircle.Tax do
   forecast tax and GL-paid amounts. A planning aid, not a filed tax computation.
   """
 
+  import Ecto.Query, warn: false
+  alias FullCircle.Repo
+  alias FullCircle.Accounting.Transaction
+  alias FullCircle.Tax.InstalmentPlan
   alias FullCircle.Reporting.ProfitLossForecast, as: PLF
 
   @zero Decimal.new(0)
@@ -81,4 +85,78 @@ defmodule FullCircle.Tax do
   end
 
   defp max_zero(d), do: if(Decimal.compare(d, @zero) == :lt, do: @zero, else: d)
+
+  # ---- DB / integration ----
+
+  @doc "The forecast's estimated annual tax for the FY, as of `as_of`."
+  def forecast_annual_tax(com, fy_year, as_of) do
+    PLF.pl_forecast(%{fy_year: fy_year, granularity: :monthly, as_of: as_of}, com).totals.estimated_tax
+  end
+
+  @doc "`%{month_no => Decimal}` paid amounts: GL sum per FY month for the nominated account, overridden by `paid_overrides`."
+  def paid_by_month(%InstalmentPlan{} = plan, com) do
+    bounds = PLF.fy_month_bounds(com, plan.fy_year)
+    gl = gl_paid_by_month(plan.tax_paid_account_id, bounds, com)
+
+    overrides =
+      for {k, v} <- plan.paid_overrides || %{}, into: %{} do
+        {to_int(k), to_decimal(v)}
+      end
+
+    Map.merge(gl, overrides)
+  end
+
+  @doc "Full schedule for the plan: pure `build_schedule/4` fed with forecast/GL data."
+  def schedule(%InstalmentPlan{} = plan, com) do
+    bounds = PLF.fy_month_bounds(com, plan.fy_year)
+    build_schedule(bounds, paid_by_month(plan, com), plan.estimate || @zero, plan.estimate_month || 1)
+  end
+
+  def get_plan(com, fy_year) do
+    Repo.one(from p in InstalmentPlan, where: p.company_id == ^com.id and p.fy_year == ^fy_year)
+  end
+
+  @doc "Create or update the (company, fy_year) singleton plan."
+  def create_or_update_plan(attrs, com, _user) do
+    fy_year = attrs["fy_year"] || attrs[:fy_year]
+    plan = get_plan(com, fy_year) || %InstalmentPlan{}
+    attrs = Map.put(attrs, "company_id", com.id)
+
+    plan
+    |> InstalmentPlan.changeset(attrs)
+    |> Repo.insert_or_update()
+  end
+
+  defp gl_paid_by_month(nil, _bounds, _com), do: %{}
+
+  defp gl_paid_by_month(account_id, bounds, com) do
+    fy_start = elem(hd(bounds), 0)
+    fy_end = elem(List.last(bounds), 1)
+
+    txns =
+      from(t in Transaction,
+        where:
+          t.company_id == ^com.id and t.account_id == ^account_id and
+            t.doc_date >= ^fy_start and t.doc_date <= ^fy_end,
+        select: %{date: t.doc_date, amount: t.amount}
+      )
+      |> Repo.all()
+
+    indexed = Enum.with_index(bounds, 1)
+
+    Enum.reduce(txns, %{}, fn %{date: dt, amount: amt}, acc ->
+      case Enum.find(indexed, fn {{ps, pe}, _m} ->
+             Date.compare(dt, ps) != :lt and Date.compare(dt, pe) != :gt
+           end) do
+        {_b, m} -> Map.update(acc, m, to_decimal(amt), &Decimal.add(&1, to_decimal(amt)))
+        nil -> acc
+      end
+    end)
+  end
+
+  defp to_int(i) when is_integer(i), do: i
+  defp to_int(s) when is_binary(s), do: String.to_integer(s)
+  defp to_decimal(nil), do: @zero
+  defp to_decimal(%Decimal{} = d), do: d
+  defp to_decimal(n), do: Decimal.new("#{n}")
 end
