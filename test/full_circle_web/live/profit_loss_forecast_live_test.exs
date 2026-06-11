@@ -195,6 +195,8 @@ defmodule FullCircleWeb.ProfitLossForecastLiveTest do
       html = render_async(lv)
 
       assert html =~ "below the penalty-free floor"
+      # the penalty-check panel also shows the estimated 10% penalty figure
+      assert html =~ "Estimated penalty (10%)"
     end
 
     # Revise recomputes the estimate from a fresh forecast + the last saved plan, then

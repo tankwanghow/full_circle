@@ -321,26 +321,68 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
 
     under = FullCircle.Tax.under_estimated?(chosen, assigns.forecast_tax, tol)
 
+    # Under-estimation penalty check (S.107C(10)): a 10% penalty applies when the
+    # actual tax exceeds the estimate by more than the tolerance %, i.e. when
+    # actual > estimate × (1 + tol/100). All figures in tax-RM.
+    multiplier = Decimal.add(Decimal.new(1), Decimal.div(tol, Decimal.new(100)))
+    ceiling = Decimal.mult(chosen, multiplier)
+    excess = Decimal.sub(assigns.forecast_tax, ceiling)
+    penalty = Decimal.mult(Decimal.max(excess, Decimal.new(0)), Decimal.new("0.10"))
+    headroom = Decimal.sub(ceiling, assigns.forecast_tax)
+    show_penalty = Decimal.compare(assigns.forecast_tax, Decimal.new(0)) == :gt
+
     assigns =
       assign(assigns,
         tol: tol,
         suggested: suggested,
         chosen: chosen,
-        under: under
+        under: under,
+        ceiling: ceiling,
+        excess: excess,
+        penalty: penalty,
+        headroom: headroom,
+        show_penalty: show_penalty
       )
 
     ~H"""
     <div class="mt-6 w-8/12 mx-auto">
       <p class="text-xl font-semibold text-center mb-3">{gettext("CP204 Tax Instalment Plan")}</p>
 
-      <%!-- Under-estimation banner --%>
+      <%!-- Under-estimation penalty check (tax figures) --%>
       <div
-        :if={@under}
-        class="mb-3 rounded border border-red-400 bg-red-100 dark:bg-red-950/40 dark:border-red-700 px-3 py-2 text-red-700 dark:text-red-400 font-medium"
+        :if={@show_penalty}
+        class={[
+          "mb-3 rounded border px-3 py-2 text-sm",
+          @under && "border-red-400 bg-red-100 dark:bg-red-950/40 dark:border-red-700",
+          !@under && "border-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 dark:border-emerald-700"
+        ]}
       >
-        {gettext(
-          "Chosen estimate is below the penalty-free floor — under-estimation penalty risk."
-        )}
+        <p class="font-semibold">
+          {gettext("Under-estimation penalty check")} ({rate_label(@tol)}% {gettext("margin")})
+        </p>
+        <p class="mt-1">
+          {gettext("Penalty-free ceiling")} ({gettext("estimate")} + {rate_label(@tol)}%):
+          <span class="font-mono font-semibold">{plan_money(@ceiling)}</span>
+          · {gettext("forecast / actual tax")}:
+          <span class="font-mono font-semibold">{plan_money(@forecast_tax)}</span>
+        </p>
+        <p :if={@under} class="mt-1 text-red-700 dark:text-red-400 font-medium">
+          {gettext("Chosen estimate is below the penalty-free floor")} — {gettext(
+            "forecast tax exceeds the ceiling by"
+          )}
+          <span class="font-mono">{plan_money(@excess)}</span>. {gettext("Estimated penalty (10%)")}:
+          <span class="font-mono">{plan_money(@penalty)}</span>. {gettext(
+            "To avoid, raise the estimate to at least"
+          )}
+          <span class="font-mono">{plan_money(@suggested)}</span>, {gettext(
+            "or the actual tax must be"
+          )}
+          <span class="font-mono">{plan_money(@excess)}</span> {gettext("lower.")}
+        </p>
+        <p :if={!@under} class="mt-1 text-emerald-700 dark:text-emerald-400 font-medium">
+          {gettext("Within the margin — no under-estimation penalty.")} {gettext("Headroom")}:
+          <span class="font-mono">{plan_money(@headroom)}</span>
+        </p>
       </div>
 
       <%!-- Plan form (summary + inputs on one row) --%>
