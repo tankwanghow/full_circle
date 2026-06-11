@@ -15,7 +15,8 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecastPrint do
     %{label: "Depreciation", key: :depreciation, type: "Depreciation", kind: :line},
     %{label: "Net Profit", key: :net_profit, kind: :subtotal},
     %{label: "Net Margin %", key: :net_margin, kind: :margin},
-    %{label: "Cumulative (YTD)", key: :cumulative_net, kind: :cumulative}
+    %{label: "Estimated Tax", key: :estimated_tax, kind: :tax},
+    %{label: "Net Profit After Tax", key: :net_profit_after_tax, kind: :tax}
   ]
 
   @impl true
@@ -32,9 +33,14 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecastPrint do
 
     forecast = PLF.pl_forecast(%{fy_year: year, granularity: gran, as_of: as_of}, com)
 
+    rows =
+      if is_map(forecast) and Decimal.compare(forecast.tax_rate, Decimal.new(0)) == :gt,
+        do: @rows,
+        else: Enum.reject(@rows, &(&1.kind == :tax))
+
     {:ok,
      socket
-     |> assign(page_title: gettext("Profit & Loss Forecast"), rows: @rows, forecast: forecast)}
+     |> assign(page_title: gettext("Profit & Loss Forecast"), rows: rows, forecast: forecast)}
   end
 
   defp safe_int(s, default) do
@@ -88,13 +94,6 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecastPrint do
   defp cell(period, %{kind: :margin, key: key}), do: pct(Map.get(period, key))
   defp cell(period, %{key: key}), do: money(Map.get(period, key))
 
-  defp total_cell(_t, periods, %{kind: :cumulative}) do
-    case List.last(periods) do
-      nil -> money(Decimal.new(0))
-      p -> money(p.cumulative_net)
-    end
-  end
-
   defp total_cell(totals, _p, %{kind: :margin, key: key}), do: pct(Map.get(totals, key))
   defp total_cell(totals, _p, %{key: key}), do: money(Map.get(totals, key))
 
@@ -131,7 +130,7 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecastPrint do
       table.pl .sub { font-weight: normal; font-size: 9px; }
       table.pl tr.subtotal td { font-weight: bold; background: #f0f0f0; }
       table.pl tr.margin td { font-style: italic; color: #555; }
-      table.pl tr.cumulative td { font-weight: bold; background: #eefaf0; }
+      table.pl tr.tax td { font-weight: bold; background: #fff7e6; }
       table.pl td.actual, table.pl th.actual { background: #eef6ff; }
       table.pl td.tot { font-weight: bold; }
     </style>
