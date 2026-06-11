@@ -52,6 +52,9 @@ defmodule FullCircle.Reporting.ProfitLossForecastTest do
       assert Decimal.equal?(PLF.tax_rate(%{settings: %{"pl_forecast_tax_rate" => ""}}), d(0))
       assert Decimal.equal?(PLF.tax_rate(%{settings: %{"pl_forecast_tax_rate" => "abc"}}), d(0))
       assert Decimal.equal?(PLF.tax_rate(%{settings: %{"pl_forecast_tax_rate" => -5}}), d(0))
+      assert Decimal.equal?(PLF.tax_rate(%{settings: %{"pl_forecast_tax_rate" => "NaN"}}), d(0))
+      assert Decimal.equal?(PLF.tax_rate(%{settings: %{"pl_forecast_tax_rate" => "Infinity"}}), d(0))
+      assert Decimal.equal?(PLF.tax_rate(%{settings: %{"pl_forecast_tax_rate" => Decimal.new("-5")}}), d(0))
     end
   end
 end

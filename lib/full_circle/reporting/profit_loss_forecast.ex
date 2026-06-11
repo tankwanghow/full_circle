@@ -96,7 +96,11 @@ defmodule FullCircle.Reporting.ProfitLossForecast do
   end
 
   defp to_non_neg_decimal(nil), do: @zero
-  defp to_non_neg_decimal(%Decimal{} = d), do: if(Decimal.compare(d, @zero) == :lt, do: @zero, else: d)
+
+  defp to_non_neg_decimal(%Decimal{coef: coef} = d) when is_integer(coef) do
+    if Decimal.compare(d, @zero) == :lt, do: @zero, else: d
+  end
+
   defp to_non_neg_decimal(n) when is_integer(n) or is_float(n), do: to_non_neg_decimal(Decimal.new("#{n}"))
 
   defp to_non_neg_decimal(s) when is_binary(s) do
