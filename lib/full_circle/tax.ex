@@ -2,7 +2,8 @@ defmodule FullCircle.Tax do
   @moduledoc """
   CP204 income-tax instalment planning. Pure computation (estimate, schedule
   re-spread, under-estimation check) plus DB/integration helpers that pull the
-  forecast tax and GL-paid amounts. A planning aid, not a filed tax computation.
+  forecast tax; instalment-paid amounts are entered manually. A planning aid,
+  not a filed tax computation.
   """
 
   import Ecto.Query, warn: false

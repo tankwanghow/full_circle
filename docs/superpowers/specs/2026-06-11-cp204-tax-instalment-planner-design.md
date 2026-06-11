@@ -1,7 +1,15 @@
 # CP204 Tax Instalment Planner
 
 **Date:** 2026-06-11
-**Status:** Approved (pending spec review)
+**Status:** Implemented
+
+> **Amendment (post-implementation):** the GL-account prefill for "tax paid" was
+> removed at the user's request. Instalment-paid amounts are **manual entry only**
+> (stored in `paid_overrides`). The `tax_paid_account_id` column was dropped and the
+> account picker removed from the planner. Ignore the `tax_paid_account_id`,
+> `gl_paid_by_month`, and "GL prefill" references below — they describe the original
+> design, not the shipped feature. `paid_by_month/1` now reads only the manual
+> overrides.
 
 ## Goal
 
