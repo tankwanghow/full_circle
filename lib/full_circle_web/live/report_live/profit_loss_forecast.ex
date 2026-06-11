@@ -155,6 +155,9 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
 
   @impl true
   def handle_event("revise_plan", _params, socket) do
+    # Revise recomputes the estimate from a fresh forecast and the LAST SAVED plan
+    # (socket.assigns.plan) — unsaved form edits (paid cells, tolerance) are
+    # intentionally ignored; Save first to keep them.
     com = socket.assigns.current_company
     fy_year = safe_int(socket.assigns.search.fy_year, default_fy_year(com))
 

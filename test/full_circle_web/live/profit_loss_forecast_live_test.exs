@@ -169,5 +169,55 @@ defmodule FullCircleWeb.ProfitLossForecastLiveTest do
 
       assert html =~ "below the penalty-free floor"
     end
+
+    # Revise recomputes the estimate from a fresh forecast + the last saved plan, then
+    # persists it. We assert the plan is saved with a positive estimate and the current
+    # FY instalment month. The exact estimate value depends on the forecast projection
+    # (trailing run-rate over the whole year), so locking it would be flaky; asserting
+    # estimate > 0 and the expected estimate_month robustly captures the revise behavior.
+    test "Revise recomputes and persists a positive estimate for the current FY month", %{
+      conn: _conn,
+      user: user
+    } do
+      # 31-Dec close -> FY == calendar year; default fy_year for 2026-06-11 is 2026.
+      com = company_fixture(user, %{closing_month: 12, closing_day: 31})
+
+      rev =
+        account_fixture(
+          %{account_type: "Revenue", name: "Sales #{System.unique_integer([:positive])}"},
+          com,
+          user
+        )
+
+      exp =
+        account_fixture(
+          %{account_type: "Expenses", name: "Rent #{System.unique_integer([:positive])}"},
+          com,
+          user
+        )
+
+      # Profitable FY window -> positive forecast tax at 24%.
+      txn!(com, rev.id, ~D[2026-01-10], Decimal.new("-100000"))
+      txn!(com, exp.id, ~D[2026-01-12], Decimal.new("20000"))
+      {:ok, _} = PLF.save_tax_rate(com, "24")
+
+      {:ok, lv, _html} =
+        live(
+          log_in_user(build_conn(), user),
+          ~p"/companies/#{com.id}/profit_loss_forecast?search[fy_year]=2026"
+        )
+
+      _html = render_async(lv)
+
+      lv |> element("button", "Revise") |> render_click()
+
+      fy_year = 2026
+      plan = FullCircle.Tax.get_plan(com, fy_year)
+      assert plan != nil
+      assert Decimal.compare(plan.estimate, Decimal.new(0)) == :gt
+
+      assert plan.estimate_month ==
+               FullCircle.Tax.current_fy_month(com, fy_year, Date.utc_today())
+    end
   end
 end
