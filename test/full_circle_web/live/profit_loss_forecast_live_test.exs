@@ -25,5 +25,20 @@ defmodule FullCircleWeb.ProfitLossForecastLiveTest do
       assert html =~ "Net Profit"
       assert html =~ "Gross Margin"
     end
+
+    test "tax rows hidden at rate 0, shown after setting a rate", %{conn: conn, company: company} do
+      {:ok, lv, html} = live(conn, ~p"/companies/#{company.id}/profit_loss_forecast")
+      refute html =~ "Net Profit After Tax"
+
+      lv |> element("button", "Trailing") |> render_click()
+
+      lv
+      |> form("form[phx-submit=save_settings]")
+      |> render_submit(%{"tax_rate" => "24", "trailing" => %{}})
+
+      html2 = render_async(lv)
+      assert html2 =~ "Net Profit After Tax"
+      assert html2 =~ "Estimated Tax"
+    end
   end
 end

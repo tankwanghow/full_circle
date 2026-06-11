@@ -17,7 +17,8 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
     %{label: "Depreciation", key: :depreciation, type: "Depreciation", kind: :line},
     %{label: "Net Profit", key: :net_profit, kind: :subtotal},
     %{label: "Net Margin %", key: :net_margin, kind: :margin},
-    %{label: "Cumulative (YTD)", key: :cumulative_net, kind: :cumulative}
+    %{label: "Estimated Tax", key: :estimated_tax, kind: :tax},
+    %{label: "Net Profit After Tax", key: :net_profit_after_tax, kind: :tax}
   ]
 
   @impl true
@@ -31,7 +32,8 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
        rows: @rows,
        drill: nil,
        settings_open: false,
-       trailing: %{}
+       trailing: %{},
+       tax_rate: Decimal.new(0)
      )}
   end
 
@@ -88,7 +90,8 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
     {:noreply,
      assign(socket,
        settings_open: true,
-       trailing: PLF.category_trailing(socket.assigns.current_company)
+       trailing: PLF.category_trailing(socket.assigns.current_company),
+       tax_rate: PLF.tax_rate(socket.assigns.current_company)
      )}
   end
 
@@ -97,9 +100,10 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
     do: {:noreply, assign(socket, settings_open: false)}
 
   @impl true
-  def handle_event("save_settings", %{"trailing" => trailing}, socket) do
+  def handle_event("save_settings", %{"trailing" => trailing} = params, socket) do
     com = socket.assigns.current_company
     {:ok, _} = PLF.save_category_trailing(com, trailing)
+    {:ok, _} = PLF.save_tax_rate(com, params["tax_rate"])
     com = PLF.company_with_settings(com)
 
     {:noreply,
@@ -197,18 +201,19 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
             <p class="text-center font-medium mb-1">
               {gettext("Financial year")} {Date.to_iso8601(f.start_date)} → {Date.to_iso8601(f.fy_end)}
             </p>
-            <.pl_table rows={@rows} periods={f.periods} totals={f.totals} estimated={f.estimated_types} />
+            <.pl_table rows={@rows} periods={f.periods} totals={f.totals} estimated={f.estimated_types} tax_rate={f.tax_rate} />
           </div>
         </:result_html>
       </.async_html>
 
       <.drill_modal :if={@drill} drill={@drill} />
-      <.settings_modal :if={@settings_open} trailing={@trailing} />
+      <.settings_modal :if={@settings_open} trailing={@trailing} tax_rate={@tax_rate} />
     </div>
     """
   end
 
   attr :trailing, :map, required: true
+  attr :tax_rate, :any, required: true
 
   defp settings_modal(assigns) do
     ~H"""
@@ -233,6 +238,15 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
               />
             <% end %>
           </div>
+          <div class="mt-4">
+            <label class="text-sm font-medium" for="tax_rate">{gettext("Estimated tax rate %")}</label>
+            <input type="number" min="0" step="0.01" id="tax_rate" name="tax_rate"
+              value={Decimal.to_string(@tax_rate)}
+              class="border rounded px-2 py-1 w-full dark:bg-gray-700 dark:border-gray-600" />
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              {gettext("Flat percentage of forecast net profit — a planning estimate, not a tax computation. 0 hides the tax rows.")}
+            </p>
+          </div>
           <div class="flex justify-end gap-2 mt-4">
             <button type="button" phx-click="close_settings" class="gray button">{gettext("Cancel")}</button>
             <.button class="blue button">{gettext("Save")}</.button>
@@ -247,8 +261,11 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
   attr :periods, :list, required: true
   attr :totals, :map, required: true
   attr :estimated, :list, default: []
+  attr :tax_rate, :any, default: nil
 
   defp pl_table(assigns) do
+    assigns = assign(assigns, :rows, visible_rows(assigns.rows, assigns.tax_rate))
+
     ~H"""
     <div class="overflow-x-auto">
       <table class="text-sm text-right border dark:border-gray-700 whitespace-nowrap mx-auto">
@@ -268,7 +285,7 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
         <tbody>
           <tr :for={row <- @rows} class={["border-b dark:border-gray-700", row_class(row)]}>
             <td class={["text-left px-2 sticky left-0", row_label_bg(row)]}>
-              {row.label}<span :if={Map.get(row, :type) in @estimated} class="text-amber-600 dark:text-amber-400">*</span>
+              {row_label(row, @tax_rate)}<span :if={Map.get(row, :type) in @estimated} class="text-amber-600 dark:text-amber-400">*</span>
             </td>
             <td
               :for={p <- @periods}
@@ -292,27 +309,35 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
     """
   end
 
+  defp visible_rows(rows, tax_rate) do
+    if tax_positive?(tax_rate),
+      do: rows,
+      else: Enum.reject(rows, &(&1.kind == :tax))
+  end
+
+  defp tax_positive?(%Decimal{} = r), do: Decimal.compare(r, Decimal.new(0)) == :gt
+  defp tax_positive?(_), do: false
+
+  defp row_label(%{key: :estimated_tax}, tax_rate), do: "Estimated Tax (#{rate_label(tax_rate)}%)"
+  defp row_label(row, _tax_rate), do: row.label
+
+  defp rate_label(%Decimal{} = r), do: r |> Decimal.normalize() |> Decimal.to_string(:normal)
+  defp rate_label(_), do: "0"
+
   defp drillable?(%{kind: :line, type: _}, %{source: :actual}), do: true
   defp drillable?(_, _), do: false
 
   defp row_class(%{kind: :subtotal}), do: "font-bold bg-gray-50 dark:bg-gray-800/60"
+  defp row_class(%{kind: :tax}), do: "font-bold bg-amber-50 dark:bg-amber-900/30"
   defp row_class(%{kind: :margin}), do: "italic text-gray-600 dark:text-gray-400"
-  defp row_class(%{kind: :cumulative}), do: "font-semibold bg-green-50 dark:bg-green-900/40"
   defp row_class(_), do: "odd:bg-white even:bg-gray-50 dark:odd:bg-gray-800 dark:even:bg-gray-900"
 
   defp row_label_bg(%{kind: :subtotal}), do: "bg-gray-50 dark:bg-gray-800"
-  defp row_label_bg(%{kind: :cumulative}), do: "bg-green-50 dark:bg-green-900"
+  defp row_label_bg(%{kind: :tax}), do: "bg-amber-50 dark:bg-amber-900"
   defp row_label_bg(_), do: "bg-white dark:bg-gray-900"
 
   defp cell(period, %{kind: :margin, key: key}), do: pct(Map.get(period, key))
   defp cell(period, %{key: key}), do: compact(Map.get(period, key))
-
-  defp total_cell(_totals, periods, %{kind: :cumulative}) do
-    case List.last(periods) do
-      nil -> compact(Decimal.new(0))
-      p -> compact(p.cumulative_net)
-    end
-  end
 
   defp total_cell(totals, _periods, %{kind: :margin, key: key}), do: pct(Map.get(totals, key))
   defp total_cell(totals, _periods, %{key: key}), do: compact(Map.get(totals, key))
