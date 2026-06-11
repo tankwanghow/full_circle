@@ -324,26 +324,6 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
     <div class="mt-6 w-full">
       <p class="text-xl font-semibold text-center mb-3">{gettext("CP204 Tax Instalment Plan")}</p>
 
-      <%!-- Summary box --%>
-      <div class="border rounded bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800 p-3 mb-3">
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 items-end">
-          <div>
-            <p class="text-xs text-gray-500 dark:text-gray-400">{gettext("Forecast annual tax")}</p>
-            <p class="font-mono font-semibold text-sm">{plan_money(@forecast_tax)}</p>
-          </div>
-          <div>
-            <p class="text-xs text-gray-500 dark:text-gray-400">{gettext("Suggested estimate")}</p>
-            <p class="font-mono text-sm">{plan_money(@suggested)}</p>
-          </div>
-        </div>
-        <p
-          :if={Decimal.compare(@forecast_tax, Decimal.new(0)) != :gt}
-          class="text-sm text-gray-500 dark:text-gray-400 mt-2"
-        >
-          {gettext("Set a tax rate in Trailing settings to get a suggested estimate.")}
-        </p>
-      </div>
-
       <%!-- Under-estimation banner --%>
       <div
         :if={@under}
@@ -354,7 +334,7 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
         )}
       </div>
 
-      <%!-- Plan form --%>
+      <%!-- Plan form (summary + inputs on one row) --%>
       <.form
         for={%{}}
         id="plan-form"
@@ -366,7 +346,15 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
         <input type="hidden" name="plan[estimate_month]" value={@plan.estimate_month || 1} />
 
         <div class="border rounded bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800 p-3 mb-3">
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-3 items-end">
+          <div class="grid grid-cols-2 md:grid-cols-5 gap-3 items-end">
+            <div>
+              <p class="text-xs text-gray-500 dark:text-gray-400">{gettext("Forecast annual tax")}</p>
+              <p class="font-mono font-semibold text-sm">{plan_money(@forecast_tax)}</p>
+            </div>
+            <div>
+              <p class="text-xs text-gray-500 dark:text-gray-400">{gettext("Suggested estimate")}</p>
+              <p class="font-mono text-sm">{plan_money(@suggested)}</p>
+            </div>
             <div>
               <.input
                 name="plan[tolerance_pct]"
@@ -396,6 +384,12 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
               </button>
             </div>
           </div>
+          <p
+            :if={Decimal.compare(@forecast_tax, Decimal.new(0)) != :gt}
+            class="text-sm text-gray-500 dark:text-gray-400 mt-2"
+          >
+            {gettext("Set a tax rate in Trailing settings to get a suggested estimate.")}
+          </p>
         </div>
 
         <%!-- Instalment schedule table --%>
