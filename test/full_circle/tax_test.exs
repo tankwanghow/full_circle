@@ -59,6 +59,20 @@ defmodule FullCircle.TaxComputeTest do
       rows = Tax.build_schedule(bounds(), %{}, d(0), 1)
       assert Enum.all?(rows, &Decimal.equal?(&1.instalment_due, d(0)))
     end
+
+    test "estimate_month = 12 puts the entire remaining balance in the last month" do
+      paid = %{1 => d(5000)}
+      rows = Tax.build_schedule(bounds(), paid, d(120000), 12)
+      # paid_to_date = 5000 (months < 12); remaining = 1; forward = 115000
+      assert Decimal.equal?(Enum.at(rows, 11).instalment_due, d(115000))
+      assert Enum.all?(Enum.take(rows, 11), &Decimal.equal?(&1.instalment_due, d(0)))
+    end
+
+    test "balance goes negative when over-paid (outstanding semantic)" do
+      paid = %{1 => d(200000)}
+      rows = Tax.build_schedule(bounds(), paid, d(120000), 2)
+      assert Decimal.compare(Enum.at(rows, 0).balance, d(0)) == :lt
+    end
   end
 
   describe "current_fy_month/3" do
@@ -68,6 +82,14 @@ defmodule FullCircle.TaxComputeTest do
       assert Tax.current_fy_month(com, 2026, ~D[2026-07-10]) == 7
       assert Tax.current_fy_month(com, 2026, ~D[2025-01-01]) == 1
       assert Tax.current_fy_month(com, 2026, ~D[2027-05-01]) == 12
+    end
+
+    test "works for a non-calendar (30-Jun closing) financial year" do
+      com = %{closing_month: 6, closing_day: 30}
+      # FY 2026 runs 2025-07-01 .. 2026-06-30
+      assert Tax.current_fy_month(com, 2026, ~D[2025-07-15]) == 1
+      assert Tax.current_fy_month(com, 2026, ~D[2026-06-20]) == 12
+      assert Tax.current_fy_month(com, 2026, ~D[2025-12-15]) == 6
     end
   end
 end
