@@ -321,96 +321,124 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
         do: assigns.plan.estimate,
         else: suggested
 
-    under = FullCircle.Tax.under_estimated?(chosen, assigns.forecast_tax, tol)
-
-    # Under-estimation penalty check (S.107C(10)): a 10% penalty applies when the
-    # actual tax exceeds the estimate by more than the tolerance %, i.e. when
-    # actual > estimate × (1 + tol/100). All figures in tax-RM.
-    multiplier = Decimal.add(Decimal.new(1), Decimal.div(tol, Decimal.new(100)))
-    ceiling = Decimal.mult(chosen, multiplier)
-    excess = Decimal.sub(assigns.forecast_tax, ceiling)
-    penalty = Decimal.mult(Decimal.max(excess, Decimal.new(0)), Decimal.new("0.10"))
-    headroom = Decimal.sub(ceiling, assigns.forecast_tax)
-    show_penalty = Decimal.compare(assigns.forecast_tax, Decimal.new(0)) == :gt
-
-    # Convert the tax ceiling to a net-profit ceiling using the flat forecast rate:
-    # actual tax = profit × rate/100, so penalty-free profit = ceiling × 100 / rate.
     rate = assigns.tax_rate || Decimal.new(0)
     rate_pos = Decimal.compare(rate, Decimal.new(0)) == :gt
+    show_panel = Decimal.compare(assigns.forecast_tax, Decimal.new(0)) == :gt
 
-    profit_ceiling =
-      if rate_pos, do: Decimal.div(Decimal.mult(ceiling, Decimal.new(100)), rate), else: Decimal.new(0)
+    analysis =
+      FullCircle.Tax.Remedy.penalty_analysis(assigns.forecast_tax, chosen, tol, rate)
 
-    excess_profit =
-      if rate_pos,
-        do: Decimal.div(Decimal.mult(Decimal.max(excess, Decimal.new(0)), Decimal.new(100)), rate),
-        else: Decimal.new(0)
+    instalments_paid =
+      Enum.reduce(assigns.schedule, Decimal.new(0), fn r, acc ->
+        Decimal.add(acc, r.paid)
+      end)
+
+    over =
+      FullCircle.Tax.Remedy.over_analysis(
+        assigns.forecast_tax,
+        chosen,
+        tol,
+        rate,
+        instalments_paid
+      )
+
+    comparison =
+      case analysis.position do
+        :under ->
+          FullCircle.Tax.Remedy.under_remedy_comparison(
+            analysis,
+            rate,
+            assigns.plan.remedy_director_count || 1,
+            assigns.plan.remedy_existing_income || Decimal.new(0)
+          )
+
+        :over ->
+          FullCircle.Tax.Remedy.over_remedy_comparison(over)
+
+        :within ->
+          nil
+      end
+
+    headroom = Decimal.sub(analysis.penalty_ceiling, assigns.forecast_tax)
 
     assigns =
       assign(assigns,
         tol: tol,
         suggested: suggested,
         chosen: chosen,
-        under: under,
-        ceiling: ceiling,
-        excess: excess,
-        penalty: penalty,
+        analysis: analysis,
+        over: over,
+        comparison: comparison,
         headroom: headroom,
-        show_penalty: show_penalty,
+        show_panel: show_panel,
         rate: rate,
-        rate_pos: rate_pos,
-        profit_ceiling: profit_ceiling,
-        excess_profit: excess_profit
+        rate_pos: rate_pos
       )
 
     ~H"""
     <div class="mt-6 w-8/12 mx-auto">
       <p class="text-xl font-semibold text-center mb-3">{gettext("CP204 Tax Instalment Plan")}</p>
 
-      <%!-- Under-estimation penalty check (tax figures) --%>
+      <%!-- Estimate position banner --%>
       <div
-        :if={@show_penalty}
-        class={[
-          "mb-3 rounded border px-3 py-2 text-sm",
-          @under && "border-red-400 bg-red-100 dark:bg-red-950/40 dark:border-red-700",
-          !@under && "border-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 dark:border-emerald-700"
-        ]}
+        :if={@show_panel}
+        class={["mb-3 rounded border px-3 py-2 text-sm", position_banner_class(@analysis.position)]}
       >
-        <p class="font-semibold">
-          {gettext("Under-estimation penalty check")} ({rate_label(@tol)}% {gettext("margin")})
-        </p>
-        <p class="mt-1">
-          {gettext("Penalty-free ceiling")} ({gettext("estimate")} + {rate_label(@tol)}%):
-          <span class="font-mono font-semibold">{plan_money(@ceiling)}</span>
-          · {gettext("forecast / actual tax")}:
-          <span class="font-mono font-semibold">{plan_money(@forecast_tax)}</span>
-        </p>
-        <p :if={@rate_pos} class="mt-1">
-          {gettext("Net-profit ceiling before penalty")} ({rate_label(@rate)}%):
-          <span class="font-mono font-semibold">{plan_money(@profit_ceiling)}</span>
-          <span :if={@under}>
-            — {gettext("net profit must be")}
-            <span class="font-mono">{plan_money(@excess_profit)}</span>
-            {gettext("lower to clear the threshold.")}
-          </span>
-        </p>
-        <p :if={@under} class="mt-1 text-red-700 dark:text-red-400 font-medium">
-          {gettext("Chosen estimate is below the penalty-free floor")} — {gettext(
-            "forecast tax exceeds the ceiling by"
-          )}
-          <span class="font-mono">{plan_money(@excess)}</span>. {gettext("Estimated penalty (10%)")}:
-          <span class="font-mono">{plan_money(@penalty)}</span>. {gettext(
-            "To avoid, raise the estimate to at least"
-          )}
-          <span class="font-mono">{plan_money(@suggested)}</span>, {gettext(
-            "or the actual tax must be"
-          )}
-          <span class="font-mono">{plan_money(@excess)}</span> {gettext("lower.")}
-        </p>
-        <p :if={!@under} class="mt-1 text-emerald-700 dark:text-emerald-400 font-medium">
-          {gettext("Within the margin — no under-estimation penalty.")} {gettext("Headroom")}:
-          <span class="font-mono">{plan_money(@headroom)}</span>
-        </p>
+        <%= cond do %>
+          <% @analysis.position == :under -> %>
+            <p class="font-semibold">
+              {gettext("Under-estimation penalty check")} ({rate_label(@tol)}% {gettext("margin")})
+            </p>
+            <p class="mt-1">
+              {gettext("Penalty-free ceiling")} ({gettext("estimate")} + {rate_label(@tol)}%):
+              <span class="font-mono font-semibold">{plan_money(@analysis.penalty_ceiling)}</span>
+              · {gettext("forecast / actual tax")}:
+              <span class="font-mono font-semibold">{plan_money(@forecast_tax)}</span>
+            </p>
+            <p :if={@rate_pos} class="mt-1">
+              {gettext("Net-profit ceiling before penalty")} ({rate_label(@rate)}%):
+              <span class="font-mono font-semibold">{plan_money(@analysis.profit_ceiling)}</span>
+              — {gettext("net profit must be")}
+              <span class="font-mono">{plan_money(@analysis.excess_profit)}</span>
+              {gettext("lower to clear the threshold.")}
+            </p>
+            <p class="mt-1 text-red-700 dark:text-red-400 font-medium">
+              {gettext("Chosen estimate is below the penalty-free floor")} — {gettext(
+                "forecast tax exceeds the ceiling by"
+              )}
+              <span class="font-mono">{plan_money(@analysis.excess_tax)}</span>.
+              {gettext("Estimated penalty (10%)")}:
+              <span class="font-mono">{plan_money(@analysis.penalty)}</span>.
+              {gettext("To avoid, raise the estimate to at least")}
+              <span class="font-mono">{plan_money(@suggested)}</span>, {gettext(
+                "or the actual tax must be"
+              )}
+              <span class="font-mono">{plan_money(@analysis.excess_tax)}</span> {gettext("lower.")}
+            </p>
+          <% @analysis.position == :over -> %>
+            <p class="font-semibold">{gettext("Over-estimated")}</p>
+            <p class="mt-1">
+              {gettext("Forecast tax")}:
+              <span class="font-mono font-semibold">{plan_money(@forecast_tax)}</span>
+              · {gettext("Chosen estimate")}:
+              <span class="font-mono font-semibold">{plan_money(@chosen)}</span>
+            </p>
+            <p class="mt-1 text-amber-800 dark:text-amber-300 font-medium">
+              {gettext("Expected refund (instalments paid − forecast tax)")}:
+              <span class="font-mono">{plan_money(@over.expected_refund)}</span>.
+              {gettext("Deferring")}
+              <span class="font-mono">{plan_money(@over.deferral_needed)}</span>
+              {gettext("of director remuneration would align tax to the estimate.")}
+            </p>
+          <% true -> %>
+            <p class="font-semibold">
+              {gettext("Within the margin")} — {gettext("no under-estimation penalty.")}
+            </p>
+            <p class="mt-1 text-emerald-700 dark:text-emerald-400 font-medium">
+              {gettext("Headroom")}:
+              <span class="font-mono">{plan_money(@headroom)}</span>
+            </p>
+        <% end %>
       </div>
 
       <%!-- Plan form (summary + inputs on one row) --%>
@@ -471,6 +499,15 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
           </p>
         </div>
 
+        <.remedy_panel
+          :if={@comparison}
+          analysis={@analysis}
+          over={@over}
+          comparison={@comparison}
+          plan={@plan}
+          rate={@rate}
+        />
+
         <%!-- Instalment schedule table --%>
         <div class="overflow-x-auto w-full">
           <table class="text-sm text-right border dark:border-gray-700 whitespace-nowrap w-full">
@@ -508,6 +545,140 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
       </.form>
     </div>
     """
+  end
+
+  attr :analysis, :map, required: true
+  attr :over, :map, required: true
+  attr :comparison, :map, required: true
+  attr :plan, :any, required: true
+  attr :rate, :any, required: true
+
+  defp remedy_panel(assigns) do
+    ~H"""
+    <div class="mb-3 rounded border border-blue-300 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-700 px-3 py-2 text-sm">
+      <p class="font-semibold">{gettext("Remedy comparison")}</p>
+
+      <div :if={@analysis.position == :under} class="grid grid-cols-2 gap-3 mt-2 items-end">
+        <.input
+          name="plan[remedy_director_count]"
+          type="number"
+          min="1"
+          max="20"
+          label={gettext("Directors")}
+          value={@plan.remedy_director_count || 1}
+        />
+        <.input
+          name="plan[remedy_existing_income]"
+          type="number"
+          step="0.01"
+          min="0"
+          label={gettext("Existing income per director (RM)")}
+          value={Decimal.to_string(@plan.remedy_existing_income || 0)}
+        />
+      </div>
+
+      <%= if @analysis.position == :under do %>
+        <table class="mt-3 w-full text-sm border dark:border-gray-700">
+          <thead class="bg-gray-200 dark:bg-gray-700">
+            <tr>
+              <th class="px-2 text-left"></th>
+              <th class="px-2 text-right">{gettext("Pay penalty")}</th>
+              <th class="px-2 text-right">{gettext("Director fee")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="border-b dark:border-gray-700">
+              <td class="px-2">{gettext("Company tax")}</td>
+              <td class="px-2 font-mono text-right">{plan_money(@comparison.pay_penalty.company_tax)}</td>
+              <td class="px-2 font-mono text-right">{plan_money(@comparison.director_fee.company_tax)}</td>
+            </tr>
+            <tr class="border-b dark:border-gray-700">
+              <td class="px-2">{gettext("CP204 penalty")}</td>
+              <td class="px-2 font-mono text-right">{plan_money(@comparison.pay_penalty.penalty)}</td>
+              <td class="px-2 font-mono text-right">{plan_money(@comparison.director_fee.penalty)}</td>
+            </tr>
+            <tr class="border-b dark:border-gray-700">
+              <td class="px-2">{gettext("Director personal tax")}</td>
+              <td class="px-2 font-mono text-right">{plan_money(@comparison.pay_penalty.personal_tax)}</td>
+              <td class="px-2 font-mono text-right">{plan_money(@comparison.director_fee.personal_tax)}</td>
+            </tr>
+            <tr class="font-semibold">
+              <td class="px-2">{gettext("TOTAL")}</td>
+              <td class="px-2 font-mono text-right">{plan_money(@comparison.pay_penalty.total)}</td>
+              <td class="px-2 font-mono text-right">{plan_money(@comparison.director_fee.total)}</td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="mt-2 font-medium">{remedy_recommendation_text(@comparison, :under)}</p>
+        <p class="mt-1">
+          {gettext("Breakeven effective rate on fee")}:
+          <span class="font-mono">{rate_label(@comparison.breakeven_effective_rate)}%</span>
+          · {gettext("Extra cash movement (director fee)")}:
+          <span class="font-mono">{plan_money(@comparison.director_fee.extra_cash_movement)}</span>
+        </p>
+      <% else %>
+        <table class="mt-3 w-full text-sm border dark:border-gray-700">
+          <thead class="bg-gray-200 dark:bg-gray-700">
+            <tr>
+              <th class="px-2 text-left"></th>
+              <th class="px-2 text-right">{gettext("Accept refund")}</th>
+              <th class="px-2 text-right">{gettext("Defer remuneration")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="border-b dark:border-gray-700">
+              <td class="px-2">{gettext("Group tax")}</td>
+              <td class="px-2 font-mono text-right">{plan_money(@comparison.accept_refund.group_tax)}</td>
+              <td class="px-2 font-mono text-right">{plan_money(@comparison.defer_remuneration.group_tax)}</td>
+            </tr>
+            <tr class="border-b dark:border-gray-700">
+              <td class="px-2">{gettext("Expected refund")}</td>
+              <td class="px-2 font-mono text-right">{plan_money(@comparison.accept_refund.expected_refund)}</td>
+              <td class="px-2 font-mono text-right">{plan_money(@comparison.defer_remuneration.expected_refund)}</td>
+            </tr>
+            <tr class="border-b dark:border-gray-700">
+              <td class="px-2">{gettext("Deferral needed")}</td>
+              <td class="px-2 font-mono text-right">—</td>
+              <td class="px-2 font-mono text-right">{plan_money(@comparison.defer_remuneration.deferral_needed)}</td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="mt-2 font-medium">{gettext("Accept refund is usually preferable — same group tax, cash returned from LHDN.")}</p>
+        <p class="mt-1 text-amber-700 dark:text-amber-400">
+          {gettext("Warning: paying additional director fees now would increase the refund further.")}
+        </p>
+      <% end %>
+
+      <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+        {gettext("Planning aid only — not filed tax advice. Personal tax excludes reliefs and EPF.")}
+      </p>
+    </div>
+    """
+  end
+
+  defp position_banner_class(:under),
+    do: "border-red-400 bg-red-100 dark:bg-red-950/40 dark:border-red-700"
+
+  defp position_banner_class(:over),
+    do: "border-amber-400 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-700"
+
+  defp position_banner_class(_),
+    do: "border-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 dark:border-emerald-700"
+
+  defp remedy_recommendation_text(%{recommendation: :pay_penalty, delta: delta}, :under) do
+    gettext("Pay penalty saves %{amount} in total group tax.",
+      amount: plan_money(delta)
+    )
+  end
+
+  defp remedy_recommendation_text(%{recommendation: :director_fee, delta: delta}, :under) do
+    gettext("Director fee saves %{amount} in total group tax.",
+      amount: plan_money(Decimal.abs(delta))
+    )
+  end
+
+  defp remedy_recommendation_text(%{recommendation: :marginal}, :under) do
+    gettext("Options are roughly equivalent — difference is within RM 5,000.")
   end
 
   defp plan_money(%Decimal{} = d),

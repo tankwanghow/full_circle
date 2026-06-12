@@ -250,5 +250,139 @@ defmodule FullCircleWeb.ProfitLossForecastLiveTest do
       assert plan.estimate_month ==
                FullCircle.Tax.current_fy_month(com, fy_year, Date.utc_today())
     end
+
+    test "remedy panel shows under-estimation comparison when estimate too low", %{conn: _conn, user: user} do
+      com = company_fixture(user, %{closing_month: 12, closing_day: 31})
+
+      rev =
+        account_fixture(
+          %{account_type: "Revenue", name: "Sales #{System.unique_integer([:positive])}"},
+          com,
+          user
+        )
+
+      exp =
+        account_fixture(
+          %{account_type: "Expenses", name: "Rent #{System.unique_integer([:positive])}"},
+          com,
+          user
+        )
+
+      txn!(com, rev.id, ~D[2026-01-10], Decimal.new("-100000"))
+      txn!(com, exp.id, ~D[2026-01-12], Decimal.new("20000"))
+      {:ok, _} = PLF.save_tax_rate(com, "24")
+
+      {:ok, _} =
+        FullCircle.Tax.create_or_update_plan(
+          %{"fy_year" => 2026, "estimate" => "1", "tolerance_pct" => "30", "estimate_month" => 6},
+          com,
+          user
+        )
+
+      {:ok, lv, _html} =
+        live(
+          log_in_user(build_conn(), user),
+          ~p"/companies/#{com.id}/profit_loss_forecast?search[fy_year]=2026"
+        )
+
+      html = render_async(lv)
+      assert html =~ "Remedy comparison"
+      assert html =~ "Pay penalty"
+      assert html =~ "Director fee"
+    end
+
+    test "remedy panel shows over-estimation comparison when estimate too high", %{conn: _conn, user: user} do
+      com = company_fixture(user, %{closing_month: 12, closing_day: 31})
+
+      rev =
+        account_fixture(
+          %{account_type: "Revenue", name: "Sales #{System.unique_integer([:positive])}"},
+          com,
+          user
+        )
+
+      exp =
+        account_fixture(
+          %{account_type: "Expenses", name: "Rent #{System.unique_integer([:positive])}"},
+          com,
+          user
+        )
+
+      txn!(com, rev.id, ~D[2026-01-10], Decimal.new("-100000"))
+      txn!(com, exp.id, ~D[2026-01-12], Decimal.new("20000"))
+      {:ok, _} = PLF.save_tax_rate(com, "24")
+
+      {:ok, _} =
+        FullCircle.Tax.create_or_update_plan(
+          %{
+            "fy_year" => 2026,
+            "estimate" => "100000",
+            "tolerance_pct" => "30",
+            "estimate_month" => 6,
+            "paid_overrides" => %{"1" => "50000"}
+          },
+          com,
+          user
+        )
+
+      {:ok, lv, _html} =
+        live(
+          log_in_user(build_conn(), user),
+          ~p"/companies/#{com.id}/profit_loss_forecast?search[fy_year]=2026"
+        )
+
+      html = render_async(lv)
+      assert html =~ "Over-estimated"
+      assert html =~ "Remedy comparison"
+      assert html =~ "Accept refund"
+      assert html =~ "Defer remuneration"
+    end
+
+    test "no remedy panel when within tolerance", %{conn: _conn, user: user} do
+      com = company_fixture(user, %{closing_month: 12, closing_day: 31})
+
+      rev =
+        account_fixture(
+          %{account_type: "Revenue", name: "Sales #{System.unique_integer([:positive])}"},
+          com,
+          user
+        )
+
+      exp =
+        account_fixture(
+          %{account_type: "Expenses", name: "Rent #{System.unique_integer([:positive])}"},
+          com,
+          user
+        )
+
+      txn!(com, rev.id, ~D[2026-01-10], Decimal.new("-100000"))
+      txn!(com, exp.id, ~D[2026-01-12], Decimal.new("20000"))
+      {:ok, _} = PLF.save_tax_rate(com, "24")
+
+      forecast_tax =
+        FullCircle.Tax.forecast_annual_tax(com, 2026, Date.utc_today())
+
+      {:ok, _} =
+        FullCircle.Tax.create_or_update_plan(
+          %{
+            "fy_year" => 2026,
+            "estimate" => Decimal.to_string(forecast_tax),
+            "tolerance_pct" => "30",
+            "estimate_month" => 6
+          },
+          com,
+          user
+        )
+
+      {:ok, lv, _html} =
+        live(
+          log_in_user(build_conn(), user),
+          ~p"/companies/#{com.id}/profit_loss_forecast?search[fy_year]=2026"
+        )
+
+      html = render_async(lv)
+      assert html =~ "Within the margin"
+      refute html =~ "Remedy comparison"
+    end
   end
 end
