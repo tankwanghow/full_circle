@@ -129,6 +129,23 @@ defmodule FullCircle.TaxSchemaTest do
       assert cs.valid?
       assert Ecto.Changeset.get_field(cs, :paid_overrides) == %{"3" => "100.00"}
     end
+
+    test "accepts remedy director fields" do
+      cs =
+        chg(%{
+          company_id: Ecto.UUID.generate(),
+          fy_year: 2026,
+          remedy_director_count: 3,
+          remedy_existing_income: "360000"
+        })
+
+      assert cs.valid?
+      assert Ecto.Changeset.get_field(cs, :remedy_director_count) == 3
+    end
+
+    test "rejects remedy_director_count < 1" do
+      refute chg(%{company_id: Ecto.UUID.generate(), fy_year: 2026, remedy_director_count: 0}).valid?
+    end
   end
 end
 

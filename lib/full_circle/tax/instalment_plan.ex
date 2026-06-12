@@ -8,6 +8,8 @@ defmodule FullCircle.Tax.InstalmentPlan do
     field(:estimate, :decimal, default: Decimal.new("0"))
     field(:estimate_month, :integer, default: 1)
     field(:paid_overrides, :map, default: %{})
+    field(:remedy_director_count, :integer, default: 1)
+    field(:remedy_existing_income, :decimal, default: Decimal.new(0))
 
     belongs_to(:company, FullCircle.Sys.Company)
 
@@ -23,6 +25,8 @@ defmodule FullCircle.Tax.InstalmentPlan do
       :estimate,
       :estimate_month,
       :paid_overrides,
+      :remedy_director_count,
+      :remedy_existing_income,
       :company_id
     ])
     |> validate_required([:company_id, :fy_year])
@@ -30,6 +34,8 @@ defmodule FullCircle.Tax.InstalmentPlan do
     |> validate_number(:tolerance_pct, greater_than_or_equal_to: 0)
     |> validate_number(:estimate, greater_than_or_equal_to: 0)
     |> validate_inclusion(:estimate_month, 1..12)
+    |> validate_number(:remedy_director_count, greater_than_or_equal_to: 1, less_than_or_equal_to: 20)
+    |> validate_number(:remedy_existing_income, greater_than_or_equal_to: 0)
     |> unique_constraint([:company_id, :fy_year],
       name: :tax_instalment_plans_unique_period,
       message: "already exists"
