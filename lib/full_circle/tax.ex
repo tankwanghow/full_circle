@@ -33,6 +33,20 @@ defmodule FullCircle.Tax do
     Decimal.compare(estimate, suggested_estimate(forecast_tax, tolerance_pct)) == :lt
   end
 
+  defdelegate estimate_position(forecast_tax, chosen_estimate, tolerance_pct),
+    to: FullCircle.Tax.Remedy
+
+  defdelegate penalty_analysis(forecast_tax, chosen_estimate, tolerance_pct, corp_rate),
+    to: FullCircle.Tax.Remedy
+
+  defdelegate under_remedy_comparison(analysis, corp_rate, director_count, existing_income),
+    to: FullCircle.Tax.Remedy
+
+  defdelegate over_analysis(forecast_tax, chosen_estimate, tolerance_pct, corp_rate, instalments_paid),
+    to: FullCircle.Tax.Remedy
+
+  defdelegate over_remedy_comparison(analysis), to: FullCircle.Tax.Remedy
+
   @doc """
   Build the 12-month instalment schedule. `month_bounds` is the list of 12
   `{start, end}` tuples; `paid_by_month` is `%{month_no => Decimal}`. The whole
