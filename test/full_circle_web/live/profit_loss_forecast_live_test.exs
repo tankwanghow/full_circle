@@ -334,8 +334,8 @@ defmodule FullCircleWeb.ProfitLossForecastLiveTest do
       html = render_async(lv)
       assert html =~ "Over-estimated"
       assert html =~ "Remedy comparison"
-      assert html =~ "Accept refund"
-      assert html =~ "Defer remuneration"
+      assert html =~ "revise the CP204 estimate"
+      refute html =~ "Defer remuneration"
     end
 
     test "no remedy panel when within tolerance", %{conn: _conn, user: user} do

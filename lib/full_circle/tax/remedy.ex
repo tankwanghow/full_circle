@@ -1,7 +1,7 @@
 defmodule FullCircle.Tax.Remedy do
   @moduledoc """
   CP204 remedy analysis: under-estimation (penalty vs director fee) and
-  over-estimation (refund vs defer remuneration). Pure Decimal math.
+  over-estimation (revise estimate down). Pure Decimal math.
   """
 
   alias FullCircle.Tax.PersonalIncome
@@ -126,60 +126,30 @@ defmodule FullCircle.Tax.Remedy do
     }
   end
 
-  def over_analysis(forecast_tax, chosen_estimate, tolerance_pct, corp_rate, instalments_paid) do
+  def over_analysis(forecast_tax, chosen_estimate, tolerance_pct, instalments_paid) do
     position = estimate_position(forecast_tax, chosen_estimate, tolerance_pct)
-    overpayment_tax = max_zero(Decimal.sub(chosen_estimate, forecast_tax))
+    overpayment_tax = max_zero(Decimal.sub(chosen_estimate, forecast_tax)) |> money()
     ceiling = penalty_ceiling(chosen_estimate, tolerance_pct)
     headroom_tax = max_zero(Decimal.sub(ceiling, forecast_tax))
-    rate = corp_rate_percent(corp_rate)
-
-    deferral_needed =
-      if Decimal.compare(rate, @zero) == :gt do
-        overpayment_tax |> Decimal.div(Decimal.div(rate, @hundred)) |> money()
-      else
-        @zero
-      end
 
     %{
       position: position,
       forecast_tax: forecast_tax,
       chosen_estimate: chosen_estimate,
       overpayment_tax: overpayment_tax,
-      expected_refund: max_zero(Decimal.sub(instalments_paid, forecast_tax)),
+      expected_refund: max_zero(Decimal.sub(instalments_paid, forecast_tax)) |> money(),
       headroom_tax: headroom_tax,
-      deferral_needed: deferral_needed,
-      revised_estimate: forecast_tax,
+      suggested_revised_estimate: suggested_floor(forecast_tax, tolerance_pct) |> money(),
       instalments_paid: instalments_paid
     }
   end
 
   def over_remedy_comparison(analysis) do
-    accept_refund = %{
-      group_tax: analysis.forecast_tax,
-      expected_refund: analysis.expected_refund,
-      personal_tax: @zero,
-      note: :cash_returned_from_lhdn
-    }
-
-    defer = %{
-      group_tax: analysis.chosen_estimate,
-      expected_refund: max_zero(Decimal.sub(analysis.instalments_paid, analysis.chosen_estimate)),
-      personal_tax: @zero,
-      deferral_needed: analysis.deferral_needed,
-      note: :fees_deferred_to_next_ya
-    }
-
-    revise = %{
-      saving_vs_current: analysis.overpayment_tax,
-      revised_estimate: analysis.revised_estimate,
-      note: :use_revise_button
-    }
-
     %{
-      accept_refund: accept_refund,
-      defer_remuneration: defer,
-      revise_estimate: revise,
-      recommendation: :accept_refund
+      recommendation: :revise_estimate,
+      revised_estimate: analysis.suggested_revised_estimate,
+      overpayment_tax: analysis.overpayment_tax,
+      expected_refund: analysis.expected_refund
     }
   end
 

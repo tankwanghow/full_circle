@@ -338,7 +338,6 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
         assigns.forecast_tax,
         chosen,
         tol,
-        rate,
         instalments_paid
       )
 
@@ -426,9 +425,8 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
             <p class="mt-1 text-amber-800 dark:text-amber-300 font-medium">
               {gettext("Expected refund (instalments paid − forecast tax)")}:
               <span class="font-mono">{plan_money(@over.expected_refund)}</span>.
-              {gettext("Deferring")}
-              <span class="font-mono">{plan_money(@over.deferral_needed)}</span>
-              {gettext("of director remuneration would align tax to the estimate.")}
+              {gettext("Use Revise to lower the estimate to")}
+              <span class="font-mono">{plan_money(@suggested)}</span>.
             </p>
           <% true -> %>
             <p class="font-semibold">
@@ -617,35 +615,18 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
           <span class="font-mono">{plan_money(@comparison.director_fee.extra_cash_movement)}</span>
         </p>
       <% else %>
-        <table class="mt-3 w-full text-sm border dark:border-gray-700">
-          <thead class="bg-gray-200 dark:bg-gray-700">
-            <tr>
-              <th class="px-2 text-left"></th>
-              <th class="px-2 text-right">{gettext("Accept refund")}</th>
-              <th class="px-2 text-right">{gettext("Defer remuneration")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr class="border-b dark:border-gray-700">
-              <td class="px-2">{gettext("Group tax")}</td>
-              <td class="px-2 font-mono text-right">{plan_money(@comparison.accept_refund.group_tax)}</td>
-              <td class="px-2 font-mono text-right">{plan_money(@comparison.defer_remuneration.group_tax)}</td>
-            </tr>
-            <tr class="border-b dark:border-gray-700">
-              <td class="px-2">{gettext("Expected refund")}</td>
-              <td class="px-2 font-mono text-right">{plan_money(@comparison.accept_refund.expected_refund)}</td>
-              <td class="px-2 font-mono text-right">{plan_money(@comparison.defer_remuneration.expected_refund)}</td>
-            </tr>
-            <tr class="border-b dark:border-gray-700">
-              <td class="px-2">{gettext("Deferral needed")}</td>
-              <td class="px-2 font-mono text-right">—</td>
-              <td class="px-2 font-mono text-right">{plan_money(@comparison.defer_remuneration.deferral_needed)}</td>
-            </tr>
-          </tbody>
-        </table>
-        <p class="mt-2 font-medium">{gettext("Accept refund is usually preferable — same group tax, cash returned from LHDN.")}</p>
-        <p class="mt-1 text-amber-700 dark:text-amber-400">
-          {gettext("Warning: paying additional director fees now would increase the refund further.")}
+        <p class="mt-2">
+          {gettext("Chosen estimate exceeds forecast tax by")}:
+          <span class="font-mono font-semibold">{plan_money(@comparison.overpayment_tax)}</span>
+        </p>
+        <p class="mt-1 font-medium">
+          {gettext("Suggested remedy: revise the CP204 estimate down to")}:
+          <span class="font-mono font-semibold">{plan_money(@comparison.revised_estimate)}</span>
+          {gettext("— click Revise above, then Save.")}
+        </p>
+        <p class="mt-1">
+          {gettext("Expected refund if instalments continue at the current estimate")}:
+          <span class="font-mono">{plan_money(@comparison.expected_refund)}</span>
         </p>
       <% end %>
 

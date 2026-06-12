@@ -66,32 +66,31 @@ defmodule FullCircle.Tax.RemedyTest do
     end
   end
 
-  describe "over_analysis/5" do
+  describe "over_analysis/4" do
     test "computes overpayment and expected refund" do
-      a = Remedy.over_analysis(d(400000), d(500000), d(30), d(24), d(480000))
+      a = Remedy.over_analysis(d(400000), d(500000), d(30), d(480000))
 
       assert a.position == :over
       assert Decimal.equal?(a.overpayment_tax, d(100000))
       assert Decimal.equal?(a.expected_refund, d(80000))
-      assert Decimal.equal?(a.deferral_needed, d("416666.67"))
+      assert Decimal.equal?(a.suggested_revised_estimate, d("307692.31"))
     end
 
     test "headroom_tax before crossing into penalty zone" do
-      a = Remedy.over_analysis(d(400000), d(500000), d(30), d(24), d(500000))
+      a = Remedy.over_analysis(d(400000), d(500000), d(30), d(500000))
       assert Decimal.equal?(a.headroom_tax, d(250000))
     end
   end
 
-  describe "over_remedy_comparison/2" do
-    test "defer vs refund — same group tax, different timing" do
-      a = Remedy.over_analysis(d(400000), d(500000), d(30), d(24), d(500000))
+  describe "over_remedy_comparison/1" do
+    test "suggests revising the estimate down" do
+      a = Remedy.over_analysis(d(400000), d(500000), d(30), d(500000))
       c = Remedy.over_remedy_comparison(a)
 
-      assert Decimal.equal?(c.accept_refund.group_tax, d(400000))
-      assert Decimal.equal?(c.defer_remuneration.group_tax, d(500000))
-      assert c.recommendation == :accept_refund
-      assert Decimal.equal?(c.accept_refund.expected_refund, d(100000))
-      assert Decimal.equal?(c.defer_remuneration.expected_refund, d(0))
+      assert c.recommendation == :revise_estimate
+      assert Decimal.equal?(c.revised_estimate, d("307692.31"))
+      assert Decimal.equal?(c.overpayment_tax, d(100000))
+      assert Decimal.equal?(c.expected_refund, d(100000))
     end
   end
 end

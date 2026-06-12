@@ -42,7 +42,7 @@ defmodule FullCircle.Tax do
   defdelegate under_remedy_comparison(analysis, corp_rate, director_count, existing_income),
     to: FullCircle.Tax.Remedy
 
-  defdelegate over_analysis(forecast_tax, chosen_estimate, tolerance_pct, corp_rate, instalments_paid),
+  defdelegate over_analysis(forecast_tax, chosen_estimate, tolerance_pct, instalments_paid),
     to: FullCircle.Tax.Remedy
 
   defdelegate over_remedy_comparison(analysis), to: FullCircle.Tax.Remedy
