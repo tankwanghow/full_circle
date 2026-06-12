@@ -4,7 +4,7 @@ defmodule FullCircle.BankReconciliation.LlmParser do
   Splits large statements into batches to avoid model output limits.
   """
 
-  alias FullCircle.BankReconciliation.LlmClient
+  alias FullCircle.BankReconciliation.{LlmClient, PdfText}
 
   @system_prompt "You parse bank statements (CSV or PDF) into JSON. Return only valid JSON."
 
@@ -81,13 +81,14 @@ defmodule FullCircle.BankReconciliation.LlmParser do
   This is a continuation of a bank statement — only extract transactions, no balances needed.
 
   Return ONLY a JSON array of transaction objects. Each object must have exactly these fields:
-  - "statement_date": date in "YYYY-MM-DD" format
+  - "statement_date": date in "YYYY-MM-DD" format (convert DD-MM-YYYY if needed)
   - "description": combine the transaction type/description with ALL reference columns into one string. Join non-empty values with " | ". Include company names, invoice numbers, payment references.
   - "cheque_no": cheque number string or null
   - "amount": number (positive for credits/deposits, negative for debits/withdrawals)
 
   Rules:
   - Extract EVERY transaction line — do not skip or summarize
+  - Lines without a date may continue the previous transaction — merge them into one transaction
   - Skip header rows and summary rows
   - Skip rows with zero amount
   - Return ONLY the JSON array, no markdown, no explanation
@@ -106,6 +107,35 @@ defmodule FullCircle.BankReconciliation.LlmParser do
   end
 
   def parse_pdf(pdf_path, settings) do
+    case PdfText.pages(pdf_path) do
+      {:ok, [single_page]} ->
+        parse_content(single_page, settings)
+
+      {:ok, pages} ->
+        parse_pdf_pages(pages, settings)
+
+      {:error, _} ->
+        parse_pdf_vision(pdf_path, settings)
+    end
+  end
+
+  defp parse_pdf_pages(pages, settings) do
+    [first | rest] = pages
+
+    case call_first_batch(first, settings) do
+      {:ok, "llm", first_lines, first_usage, balances} ->
+        page_batches = Enum.map(rest, &String.split(&1, "\n"))
+        process_remaining_batches(page_batches, settings, first_lines, first_usage, balances)
+
+      error ->
+        error
+    end
+  end
+
+  defp parse_pdf_vision(pdf_path, settings) do
+    require Logger
+    Logger.info("PDF text extraction unavailable; using vision PDF parsing")
+
     pdf_base64 = pdf_path |> File.read!() |> Base.encode64()
 
     case LlmClient.call_with_pdf(settings, @system_prompt, @pdf_prompt, pdf_base64) do
@@ -113,6 +143,9 @@ defmodule FullCircle.BankReconciliation.LlmParser do
       {:error, reason} -> {:error, reason}
     end
   end
+
+  @doc false
+  def normalize_transaction(item), do: normalize_line(item)
 
   def parse_content(content, settings) do
     lines = String.split(content, "\n")
@@ -328,7 +361,23 @@ defmodule FullCircle.BankReconciliation.LlmParser do
   defp normalize_line(_), do: nil
 
   defp parse_date(nil), do: :error
-  defp parse_date(str) when is_binary(str), do: Date.from_iso8601(str)
+
+  defp parse_date(str) when is_binary(str) do
+    case Date.from_iso8601(str) do
+      {:ok, date} ->
+        {:ok, date}
+
+      {:error, _} ->
+        parse_dmy_date(str)
+    end
+  end
+
+  defp parse_dmy_date(str) do
+    case Regex.run(~r/^(\d{2})-(\d{2})-(\d{4})$/, String.trim(str)) do
+      [_, dd, mm, yyyy] -> Date.from_iso8601("#{yyyy}-#{mm}-#{dd}")
+      _ -> :error
+    end
+  end
 
   defp parse_amount(n) when is_integer(n), do: Decimal.new(n)
   defp parse_amount(n) when is_float(n), do: Decimal.from_float(n)
