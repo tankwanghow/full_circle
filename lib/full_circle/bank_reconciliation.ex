@@ -5,7 +5,7 @@ defmodule FullCircle.BankReconciliation do
   alias FullCircle.Accounting
   alias FullCircle.Accounting.Transaction
   alias FullCircle.BankReconciliation.BankStatementLine
-  alias FullCircle.BankReconciliation.LlmMatcher
+  alias FullCircle.BankReconciliation.{AutoMatcher, LlmMatcher}
 
   def import_statement(account_id, company_id, parsed_lines, source_format) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
@@ -226,7 +226,7 @@ defmodule FullCircle.BankReconciliation do
   """
   def auto_match(account_id, company_id, from_date, to_date) do
     {stmts, txns} = unmatched_data(account_id, company_id, from_date, to_date)
-    greedy_match(stmts, txns)
+    AutoMatcher.match(stmts, txns)
   end
 
   def ai_match(account_id, company_id, from_date, to_date, llm_settings) do
@@ -242,7 +242,13 @@ defmodule FullCircle.BankReconciliation do
         where: sl.statement_date >= ^from_date,
         where: sl.statement_date <= ^to_date,
         where: is_nil(sl.match_group_id),
-        select: %{id: sl.id, date: sl.statement_date, amount: sl.amount, cheque_no: sl.cheque_no}
+        select: %{
+          id: sl.id,
+          date: sl.statement_date,
+          amount: sl.amount,
+          cheque_no: sl.cheque_no,
+          description: sl.description
+        }
       )
       |> Repo.all()
 
@@ -254,7 +260,13 @@ defmodule FullCircle.BankReconciliation do
         where: txn.doc_date <= ^to_date,
         where: txn.reconciled == false,
         where: is_nil(txn.match_group_id),
-        select: %{id: txn.id, date: txn.doc_date, amount: txn.amount, doc_no: txn.doc_no}
+        select: %{
+          id: txn.id,
+          date: txn.doc_date,
+          amount: txn.amount,
+          doc_no: txn.doc_no,
+          particulars: coalesce(txn.contact_particulars, txn.particulars)
+        }
       )
       |> Repo.all()
 
@@ -300,55 +312,6 @@ defmodule FullCircle.BankReconciliation do
       |> Repo.all()
 
     {stmts, txns}
-  end
-
-  defp greedy_match(stmts, txns) do
-    candidates =
-      for stmt <- stmts, txn <- txns, Decimal.eq?(stmt.amount, txn.amount) do
-        score = match_score(stmt, txn)
-        {stmt.id, txn.id, score}
-      end
-
-    candidates
-    |> Enum.sort_by(fn {_, _, score} -> -score end)
-    |> pick_matches(MapSet.new(), MapSet.new(), [])
-  end
-
-  defp pick_matches([], _used_stmts, _used_txns, acc), do: Enum.reverse(acc)
-
-  defp pick_matches([{stmt_id, txn_id, score} | rest], used_stmts, used_txns, acc) do
-    if MapSet.member?(used_stmts, stmt_id) or MapSet.member?(used_txns, txn_id) do
-      pick_matches(rest, used_stmts, used_txns, acc)
-    else
-      pick_matches(
-        rest,
-        MapSet.put(used_stmts, stmt_id),
-        MapSet.put(used_txns, txn_id),
-        [{[stmt_id], [txn_id], score} | acc]
-      )
-    end
-  end
-
-  defp match_score(stmt, txn) do
-    date_diff = abs(Date.diff(stmt.date, txn.date))
-
-    date_score =
-      cond do
-        date_diff == 0 -> 40
-        date_diff <= 3 -> 20
-        date_diff <= 7 -> 10
-        true -> 0
-      end
-
-    cheque_score =
-      if stmt.cheque_no && txn.doc_no &&
-           String.contains?(txn.doc_no, stmt.cheque_no) do
-        50
-      else
-        0
-      end
-
-    date_score + cheque_score
   end
 
   @doc """
