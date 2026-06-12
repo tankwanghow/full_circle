@@ -39,6 +39,7 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
         |> assign(processing_ai_match: false, ai_match_task: nil)
         |> assign(book_entry_mode: false, book_entry_lines: [], book_entry_contra: "")
         |> assign(manual_stmt_mode: false, manual_stmt: new_manual_stmt())
+        |> assign(hide_matched: false)
         |> assign(llm_settings: llm_settings)
         |> allow_upload(:csv_file,
           accept: ~w(.csv .pdf),
@@ -110,6 +111,11 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
   @impl true
   def handle_event("clear_selection", _, socket) do
     {:noreply, assign(socket, selected_stmt_ids: MapSet.new(), selected_txn_ids: MapSet.new())}
+  end
+
+  @impl true
+  def handle_event("toggle_hide_matched", _, socket) do
+    {:noreply, assign(socket, hide_matched: not socket.assigns.hide_matched)}
   end
 
   @impl true
@@ -783,6 +789,14 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
     %{statement_date: "", description: "", cheque_no: "", amount: ""}
   end
 
+  defp visible_lines(lines, true, :match_group_id),
+    do: Enum.reject(lines, & &1.match_group_id)
+
+  defp visible_lines(lines, true, :reconciled),
+    do: Enum.reject(lines, & &1.reconciled)
+
+  defp visible_lines(lines, false, _), do: lines
+
   defp load_llm_settings(socket) do
     defaults = %{
       "llm-provider" => "none",
@@ -808,13 +822,18 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
         MapSet.size(assigns.selected_txn_ids) == 0 and
         Decimal.eq?(stmt_sel_total, 0)
 
+    visible_statement_lines = visible_lines(assigns.statement_lines, assigns.hide_matched, :match_group_id)
+    visible_book_transactions = visible_lines(assigns.book_transactions, assigns.hide_matched, :reconciled)
+
     assigns =
       assign(assigns,
         suggested_stmt: suggested_stmt,
         suggested_txn: suggested_txn,
         stmt_sel_total: stmt_sel_total,
         txn_sel_total: txn_sel_total,
-        bank_to_bank?: bank_to_bank?
+        bank_to_bank?: bank_to_bank?,
+        visible_statement_lines: visible_statement_lines,
+        visible_book_transactions: visible_book_transactions
       )
 
     ~H"""
@@ -1129,6 +1148,15 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
 
       <%!-- Action Buttons + Selection Info --%>
       <div :if={@queried? and @account} class="flex items-center gap-2 mb-2 flex-wrap">
+        <label class="inline-flex items-center gap-1 text-sm cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={@hide_matched}
+            phx-click="toggle_hide_matched"
+            class="rounded border-gray-400"
+          />
+          {gettext("Hide matched")}
+        </label>
         <button
           phx-click="auto_match"
           class="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600"
@@ -1365,7 +1393,10 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
         <%!-- Left: Bank Statement Lines --%>
         <div class="flex flex-col min-h-0">
           <div class="font-semibold text-center bg-amber-200 rounded p-1 mb-1 text-sm">
-            {gettext("Bank Statement")} ({length(@statement_lines)})
+            {gettext("Bank Statement")} ({length(@visible_statement_lines)}<span
+              :if={@hide_matched}
+              class="text-gray-600"
+            >/{length(@statement_lines)}</span>)
           </div>
           <div class="font-medium flex flex-row text-center tracking-tighter text-xs mb-1">
             <div class="w-[3%]"></div>
@@ -1386,7 +1417,7 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
             </div>
           </div>
           <div id="stmt-scroll" class="overflow-y-auto flex-1 min-h-0 border-b-4 border-amber-400">
-            <%= for line <- @statement_lines do %>
+            <%= for line <- @visible_statement_lines do %>
               <% matched? = not is_nil(line.match_group_id) %>
               <% suggested? = MapSet.member?(@suggested_stmt, line.id) %>
               <% selected? = MapSet.member?(@selected_stmt_ids, line.id) %>
@@ -1445,8 +1476,12 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
                 </div>
               </div>
             <% end %>
-            <div :if={@statement_lines == []} class="text-center text-gray-500 p-4 text-sm">
-              {gettext("No statement lines. Upload a CSV file.")}
+            <div :if={@visible_statement_lines == []} class="text-center text-gray-500 p-4 text-sm">
+              <%= if @statement_lines == [] do %>
+                {gettext("No statement lines. Upload a CSV file.")}
+              <% else %>
+                {gettext("No unmatched statement lines.")}
+              <% end %>
             </div>
           </div>
         </div>
@@ -1454,7 +1489,10 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
         <%!-- Right: Book Transactions --%>
         <div class="flex flex-col min-h-0">
           <div class="font-semibold text-center bg-blue-200 rounded p-1 mb-1 text-sm">
-            {gettext("Book Transactions")} ({length(@book_transactions)})
+            {gettext("Book Transactions")} ({length(@visible_book_transactions)}<span
+              :if={@hide_matched}
+              class="text-gray-600"
+            >/{length(@book_transactions)}</span>)
           </div>
           <div class="font-medium flex flex-row text-center tracking-tighter text-xs mb-1">
             <div class="w-[3%]"></div>
@@ -1478,7 +1516,7 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
             </div>
           </div>
           <div id="txn-scroll" class="overflow-y-auto flex-1 min-h-0 border-b-4 border-blue-400">
-            <%= for txn <- @book_transactions do %>
+            <%= for txn <- @visible_book_transactions do %>
               <% matched? = txn.reconciled %>
               <% suggested? = MapSet.member?(@suggested_txn, txn.id) %>
               <% selected? = MapSet.member?(@selected_txn_ids, txn.id) %>
@@ -1541,8 +1579,12 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
                 </div>
               </div>
             <% end %>
-            <div :if={@book_transactions == []} class="text-center text-gray-500 p-4 text-sm">
-              {gettext("No transactions found for this period.")}
+            <div :if={@visible_book_transactions == []} class="text-center text-gray-500 p-4 text-sm">
+              <%= if @book_transactions == [] do %>
+                {gettext("No transactions found for this period.")}
+              <% else %>
+                {gettext("No unreconciled book transactions.")}
+              <% end %>
             </div>
           </div>
         </div>
