@@ -7,6 +7,15 @@
 # General application configuration
 import Config
 
+workspace_assets_config = Path.expand("../../shared_config/assets.exs", __DIR__)
+
+if File.exists?(workspace_assets_config) do
+  import_config workspace_assets_config
+else
+  config :esbuild, version: "0.28.1"
+  config :tailwind, version: "4.3.1"
+end
+
 config :number,
   currency: [
     unit: "",
@@ -44,9 +53,8 @@ config :full_circle, FullCircleWeb.Endpoint,
   pubsub_server: FullCircle.PubSub,
   live_view: [signing_salt: "D+1ROsdl"]
 
-# Configure esbuild (the version is required)
+# Configure esbuild
 config :esbuild,
-  version: "0.27.4",
   full_circle: [
     args: ~w(js/app.js js/tri_autocomplete.js js/take_photo_human.js
              js/face_id.js js/qr_attend.js
@@ -58,9 +66,8 @@ config :esbuild,
     env: %{"NODE_PATH" => Path.expand("../deps", __DIR__)}
   ]
 
-# Configure tailwind (the version is required)
+# Configure tailwind
 config :tailwind,
-  version: "4.1.8",
   full_circle: [
     args: ~w(
       --input=assets/css/app.css
