@@ -79,7 +79,6 @@ defmodule FullCircleWeb.ReceiptLive.QryMatcherComponent do
               {obj.t_doc_no}
             <% else %>
               <.doc_link
-                target="_blank"
                 current_company={@current_company}
                 doc_obj={%{doc_id: obj.t_doc_id, doc_type: obj.t_doc_type, doc_no: obj.t_doc_no}}
               />
