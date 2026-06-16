@@ -80,14 +80,22 @@ sshpass -p $LINODE_PWD ssh root@$LINODE_IP "bash /home/${IMAGE_NAME}/$SETUP_CERT
 
 sshpass -p $LINODE_PWD ssh root@$LINODE_IP "bash /home/${IMAGE_NAME}/$GEN_FILE $DB_NAME $DB_USER $DB_PWD $PORT $DOMAIN_NAME $IMAGE_NAME $DOCKER_HUB_USERNAME $DOCKER_CONTAINER_NAME"
 
+# shellcheck source=../../shared_config/docker_deploy.sh
+source "$(cd "$script_path/../.." && pwd)/shared_config/docker_deploy.sh"
+docker_deploy_init "$script_path"
+ensure_global_assets
+stage_dockerignore
+
 IMAGE_TAG="latest"
-GIT_SHA=$(git -C "$script_path/.." rev-parse --short HEAD)
+GIT_SHA=$(git -C "$PROJECT_ROOT" rev-parse --short HEAD)
 FULL_IMAGE="$DOCKER_HUB_USERNAME/$IMAGE_NAME:$IMAGE_TAG"
 SHA_IMAGE="$DOCKER_HUB_USERNAME/$IMAGE_NAME:$GIT_SHA"
 
-# Build Docker image
-echo "Building Docker image..."
-docker build --builder default -t $FULL_IMAGE -t $SHA_IMAGE -f $script_path/../Dockerfile $script_path/..
+echo "Building Docker image (monorepo context: $MONOREPO_ROOT)..."
+docker build --builder default \
+    -t $FULL_IMAGE -t $SHA_IMAGE \
+    -f "$PROJECT_ROOT/Dockerfile" \
+    "$MONOREPO_ROOT"
 
 # Verify the new image was tagged correctly
 NEW_IMAGE_ID=$(docker image inspect $FULL_IMAGE --format='{{.ID}}')
