@@ -1,72 +1,64 @@
 # Deployment Skills
 
-This file documents deployment processes and Cline commands for the Full Circle project.
+Deployment guide for Full Circle on Linode. For shared monorepo asset tooling, see
+`~/Projects/elixir/shared_config/WORKSPACE_ASSETS.md`.
 
-## Deployment Overview
+## Overview
 
-Full Circle uses Docker for containerization and deploys to Linode servers. The process involves building a Docker image, pushing to Docker Hub, and updating the remote server via SSH.
+Full Circle uses a two-stage `Dockerfile` Mix release deployed to Debian/Linode. Images are
+built on the dev machine and streamed to the server over SSH (no Docker Hub push required).
 
-## Scripts in deploy_to_linode/
+## Prerequisites
 
-- `deploy.sh`: Main deployment script (build, push, remote update)
-- `deploy_at_server.sh`: Runs on server to pull image and restart containers
-- `setup_barebone_debian_at_server.sh`: Initial server setup (Debian, Docker, etc.)
-- `setup_db_at_server.sh`: Database setup
-- `setup_certbot_at_server.sh`: SSL certificate setup
-- `setup_samba_share.sh`: Samba file sharing setup
-- `generate_files_at_server.sh`: Generate config files on server
-- `launch.sh`: Launch the app on server
+```bash
+# Once per machine (monorepo root)
+~/Projects/elixir/.global_assets/setup.sh
+```
 
-## Deployment Steps
+## Scripts in `deploy_to_linode/`
 
-### Initial Server Setup (One-time)
+| Script | Purpose |
+|---|---|
+| `deploy.sh` | Build image, stream to server, recreate container, migrate |
+| `launch.sh` | First-time provision + deploy |
+| `deploy_at_server.sh` | Pull/tag image, `docker compose` restart, migrate |
+| `setup_barebone_debian_at_server.sh` | Docker, Nginx, PostgreSQL 17 |
+| `setup_db_at_server.sh` | Database user/database |
+| `setup_certbot_at_server.sh` | SSL via certbot |
+| `setup_samba_share.sh` | Samba file sharing |
+| `generate_files_at_server.sh` | docker-compose, env files on server |
 
-1. Provision Linode server with Debian.
-2. Run `setup_barebone_debian_at_server.sh` to install Docker, etc.
-3. Run `setup_db_at_server.sh` for PostgreSQL.
-4. Run `setup_certbot_at_server.sh` for SSL.
-5. Run `generate_files_at_server.sh` to create docker-compose.yml, etc.
+## Regular deployment
 
-### Regular Deployment
+1. Prepare `deploy.conf` (gitignored) with `LINODE_IP`, `DOCKER_HUB_USERNAME`, `IMAGE_NAME`,
+   `DOCKER_CONTAINER_NAME`, etc.
 
-1. **Prepare setup file**: Create a text file with variables:
+2. Deploy:
+
+   ```bash
+   ./deploy_to_linode/deploy.sh deploy.conf
    ```
-   LINODE_IP=your.server.ip
-   DOCKER_HUB_USERNAME=your_dockerhub_user
-   IMAGE_NAME=full_circle
-   DOCKER_CONTAINER_NAME=full_circle_app
+
+   The script sources `shared_config/docker_deploy.sh`, ensures global assets exist, stages
+   `full_circle/.dockerignore` at the monorepo root, and runs:
+
+   ```bash
+   docker build -f full_circle/Dockerfile ~/Projects/elixir/
    ```
 
-2. **Run deployment**: Use `execute_command`:
-   ```
-   ./deploy_to_linode/deploy.sh path/to/setup_file.txt
-   ```
-   - Prompts for server password.
-   - Builds Docker image locally.
-   - Pushes to Docker Hub.
-   - SSH to server, pulls image, docker compose down/up, runs migrations.
-
-3. **Verify**: Check app loads at server URL.
-
-## Cline Commands for Deployment
-
-- **Deploy**: `execute_command` with `./deploy_to_linode/deploy.sh setup.txt`
-- **Check server logs**: `execute_command` with `ssh root@server_ip "docker logs full_circle_app"`
-- **Restart app**: `execute_command` with `ssh root@server_ip "docker compose -f /home/full_circle/docker-compose-full_circle.yml restart"`
-- **Run migrations manually**: `execute_command` with `ssh root@server_ip "docker exec full_circle_app ./bin/migrate"`
+3. Verify the app loads at the server URL.
 
 ## Troubleshooting
 
-- If build fails: Check Dockerfile and assets build.
-- If push fails: Verify Docker Hub credentials.
-- If server update fails: Check SSH access and docker-compose.yml on server.
-- Migrations fail: Check DB connection in prod config.
+- **Build fails on assets** — run `~/Projects/elixir/.global_assets/setup.sh`
+- **Wrong files in image** — confirm build context is the monorepo root, not `full_circle/` alone
+- **Server update fails** — check SSH access and `docker-compose-*.yml` on the server
+- **Migrations fail** — check `DATABASE_URL` in the container env
 
-## Pre-deployment Checklist
+## Pre-deployment checklist
 
-- [ ] Code committed and pushed to git
-- [ ] Tests pass: `mix test`
-- [ ] Assets built: `mix assets.deploy`
-- [ ] No credo issues: `mix credo`
-- [ ] Setup file ready with correct vars
-- [ ] Server accessible via SSH
+- [ ] Code committed
+- [ ] `mix test` passes
+- [ ] `mix precommit` or `mix credo` clean
+- [ ] `deploy.conf` ready
+- [ ] Server reachable via SSH

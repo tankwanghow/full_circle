@@ -54,6 +54,19 @@ mix assets.build                 # Build CSS (Tailwind) and JS (esbuild)
 mix assets.deploy                # Minified build + phx.digest for production
 ```
 
+### Shared workspace assets & Docker deploy
+
+Asset binaries live in `~/Projects/elixir/.global_assets` (see
+`~/Projects/elixir/shared_config/WORKSPACE_ASSETS.md`). Run `.global_assets/setup.sh` once.
+
+Linode deploy uses the monorepo root as Docker build context:
+
+```bash
+./deploy_to_linode/deploy.sh deploy.conf
+```
+
+See also `deploy_skills.md` for the full deploy flow.
+
 ## Architecture
 
 ### Multi-Tenancy
