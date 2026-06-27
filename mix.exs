@@ -35,7 +35,7 @@ defmodule FullCircle.MixProject do
   defp deps do
     [
       {:bcrypt_elixir, "~> 3.0"},
-      {:phoenix, "~> 1.8.5"},
+      {:phoenix, "~> 1.8"},
       {:phoenix_ecto, "~> 4.5"},
       {:ecto_sql, "~> 3.13"},
       {:postgrex, ">= 0.0.0"},
@@ -44,7 +44,7 @@ defmodule FullCircle.MixProject do
       {:phoenix_live_view, "~> 1.2"},
       {:lazy_html, "~> 0.1", only: :test},
       {:esbuild, "~> 0.10", runtime: Mix.env() == :dev},
-      {:tailwind, "~> 0.3", runtime: Mix.env() == :dev},
+      {:tailwind, "~> 0.5", runtime: Mix.env() == :dev},
       heroicons_dep(),
       {:swoosh, "~> 1.5"},
       {:gen_smtp, "~> 1.2"},
@@ -55,16 +55,16 @@ defmodule FullCircle.MixProject do
       {:jason, "~> 1.2"},
       {:dns_cluster, "~> 0.2.0"},
       {:bandit, "~> 1.5"},
-      {:tzdata, "~> 1.1.1"},
+      {:tzdata, "~> 1.1"},
       {:timex, "~> 3.0"},
       {:number, "~> 1.0"},
       {:countries, "~> 1.6"},
       {:nimble_csv, "~> 1.2"},
-      {:xlsx_reader, "~> 0.8.0"},
-      {:qr_code, "~> 3.2.0"},
+      {:xlsx_reader, "~> 0.8"},
+      {:qr_code, "~> 3.2"},
       {:castore, "~> 1.0"},
-      {:req, "~> 0.5.0"},
-      {:tidewave, "~> 0.5", only: :dev}
+      {:req, "~> 0.6"},
+      {:tidewave, "~> 0.6", only: :dev}
     ]
   end
 
