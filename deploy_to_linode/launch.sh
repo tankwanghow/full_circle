@@ -80,8 +80,37 @@ sshpass -p $LINODE_PWD ssh root@$LINODE_IP "bash /home/${IMAGE_NAME}/$SETUP_CERT
 
 sshpass -p $LINODE_PWD ssh root@$LINODE_IP "bash /home/${IMAGE_NAME}/$GEN_FILE $DB_NAME $DB_USER $DB_PWD $PORT $DOMAIN_NAME $IMAGE_NAME $DOCKER_HUB_USERNAME $DOCKER_CONTAINER_NAME"
 
+umbrella_root="$(cd "$script_path/../.." && pwd)"
+if [ ! -f "$umbrella_root/shared_config/docker_deploy.sh" ]; then
+  cat <<'EOF'
+Error: global assets / monorepo layout not found.
+
+This app must be deployed from inside the phoenix_app_umbrella monorepo, which
+provides shared_config/ and .global_assets/. To set it up:
+
+  1. Clone the umbrella (global assets) repo:
+       git clone https://github.com/tankwanghow/phoenix_app_umbrella.git
+
+  2. Clone this app inside it, beside shared_config/:
+       cd phoenix_app_umbrella
+       git clone https://github.com/tankwanghow/full_circle.git full_circle
+
+  3. Download the global asset binaries:
+       bash .global_assets/setup.sh
+
+  4. Deploy from inside the app, e.g.:
+       cd full_circle && ./deploy_to_linode/deploy.sh deploy.conf
+
+Expected layout:
+  phoenix_app_umbrella/
+  |- shared_config/
+  |- .global_assets/
+  \- full_circle/        <- this repo
+EOF
+  exit 1
+fi
 # shellcheck source=../../shared_config/docker_deploy.sh
-source "$(cd "$script_path/../.." && pwd)/shared_config/docker_deploy.sh"
+source "$umbrella_root/shared_config/docker_deploy.sh"
 docker_deploy_init "$script_path"
 ensure_global_assets
 stage_dockerignore
