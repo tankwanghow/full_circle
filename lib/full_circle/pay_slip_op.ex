@@ -586,7 +586,15 @@ defmodule FullCircle.PaySlipOp do
   end
 
   @doc """
-  Void a pay slip:
+  Last day a slip for this pay period may be voided: the 15th of the
+  following month (a 05/2026 slip is voidable through 2026-06-15).
+  """
+  def void_deadline(pay_month, pay_year) do
+    Date.new!(pay_year, pay_month, 15) |> Timex.shift(months: 1)
+  end
+
+  @doc """
+  Void a pay slip (only until `void_deadline/2`, else `{:period_closed, deadline}`):
   - **Delete** its computed (cal_func) statutory notes + their GL — they're derived and would
     otherwise become unprocessed and get regenerated (duplicated) on the next preview/Save.
   - **Unlink** the remaining notes (earnings, recurrings) and advances — they survive as
@@ -598,57 +606,13 @@ defmodule FullCircle.PaySlipOp do
     case can?(user, :update_pay_slip, com) do
       true ->
         ps = get_pay_slip!(pay_slip_id, com)
+        deadline = void_deadline(ps.pay_month, ps.pay_year)
 
-        stat =
-          from(sn in SalaryNote,
-            join: st in SalaryType,
-            on: st.id == sn.salary_type_id,
-            where: sn.pay_slip_id == ^ps.id and sn.company_id == ^com.id,
-            where: not is_nil(st.cal_func) and st.cal_func != "",
-            select: %{id: sn.id, note_no: sn.note_no}
-          )
-          |> Repo.all()
-
-        stat_ids = Enum.map(stat, & &1.id)
-        stat_nos = Enum.map(stat, & &1.note_no)
-
-        Multi.new()
-        |> Multi.delete_all(
-          :delete_stat_notes_gl,
-          from(t in Transaction,
-            where:
-              t.doc_type == "SalaryNote" and t.company_id == ^com.id and t.doc_no in ^stat_nos
-          )
-        )
-        |> Multi.delete_all(
-          :delete_stat_notes,
-          from(sn in SalaryNote, where: sn.id in ^stat_ids)
-        )
-        |> Multi.update_all(
-          :unlink_notes,
-          from(sn in SalaryNote, where: sn.pay_slip_id == ^ps.id and sn.company_id == ^com.id),
-          set: [pay_slip_id: nil]
-        )
-        |> Multi.update_all(
-          :unlink_advances,
-          from(a in Advance, where: a.pay_slip_id == ^ps.id and a.company_id == ^com.id),
-          set: [pay_slip_id: nil]
-        )
-        |> Multi.delete_all(
-          :reverse_pay_slip_gl,
-          from(t in Transaction,
-            where:
-              t.doc_type == "PaySlip" and t.doc_no == ^ps.slip_no and t.company_id == ^com.id
-          )
-        )
-        |> Multi.delete(:void_pay_slip, ps)
-        |> FullCircle.Sys.insert_log_for(
-          :void_pay_slip,
-          %{"slip_no" => ps.slip_no, "employee_name" => ps.employee_name},
-          com,
-          user
-        )
-        |> Repo.transaction()
+        if Date.compare(Timex.today(), deadline) == :gt do
+          {:period_closed, deadline}
+        else
+          do_void_pay_slip(ps, com, user)
+        end
 
       false ->
         :not_authorise
@@ -656,6 +620,59 @@ defmodule FullCircle.PaySlipOp do
   rescue
     e in Postgrex.Error ->
       {:sql_error, e.postgres.message}
+  end
+
+  defp do_void_pay_slip(ps, com, user) do
+    stat =
+      from(sn in SalaryNote,
+        join: st in SalaryType,
+        on: st.id == sn.salary_type_id,
+        where: sn.pay_slip_id == ^ps.id and sn.company_id == ^com.id,
+        where: not is_nil(st.cal_func) and st.cal_func != "",
+        select: %{id: sn.id, note_no: sn.note_no}
+      )
+      |> Repo.all()
+
+    stat_ids = Enum.map(stat, & &1.id)
+    stat_nos = Enum.map(stat, & &1.note_no)
+
+    Multi.new()
+    |> Multi.delete_all(
+      :delete_stat_notes_gl,
+      from(t in Transaction,
+        where:
+          t.doc_type == "SalaryNote" and t.company_id == ^com.id and t.doc_no in ^stat_nos
+      )
+    )
+    |> Multi.delete_all(
+      :delete_stat_notes,
+      from(sn in SalaryNote, where: sn.id in ^stat_ids)
+    )
+    |> Multi.update_all(
+      :unlink_notes,
+      from(sn in SalaryNote, where: sn.pay_slip_id == ^ps.id and sn.company_id == ^com.id),
+      set: [pay_slip_id: nil]
+    )
+    |> Multi.update_all(
+      :unlink_advances,
+      from(a in Advance, where: a.pay_slip_id == ^ps.id and a.company_id == ^com.id),
+      set: [pay_slip_id: nil]
+    )
+    |> Multi.delete_all(
+      :reverse_pay_slip_gl,
+      from(t in Transaction,
+        where:
+          t.doc_type == "PaySlip" and t.doc_no == ^ps.slip_no and t.company_id == ^com.id
+      )
+    )
+    |> Multi.delete(:void_pay_slip, ps)
+    |> FullCircle.Sys.insert_log_for(
+      :void_pay_slip,
+      %{"slip_no" => ps.slip_no, "employee_name" => ps.employee_name},
+      com,
+      user
+    )
+    |> Repo.transaction()
   end
 
   defp prepare_pay_slip(attrs) do

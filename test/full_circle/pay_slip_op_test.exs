@@ -493,4 +493,53 @@ defmodule FullCircle.PaySlipOpTest do
       refute Enum.any?(notes, &(&1.salary_type_name == "EPF By Employee"))
     end
   end
+
+  describe "void deadline" do
+    test "void_deadline/2 is the 15th of the following month" do
+      assert PaySlipOp.void_deadline(5, 2026) == ~D[2026-06-15]
+      assert PaySlipOp.void_deadline(12, 2026) == ~D[2027-01-15]
+    end
+
+    defp insert_bare_slip(com, admin, month, year) do
+      emp = employee_fixture(%{}, com, admin)
+
+      funds =
+        account_fixture(%{name: "Void Cash", account_type: "Cash or Equivalent"}, com, admin)
+
+      FullCircle.Repo.insert!(%FullCircle.HR.PaySlip{
+        slip_no: "PS-VOID-#{month}#{year}",
+        slip_date: Date.new!(year, month, 28),
+        pay_month: month,
+        pay_year: year,
+        employee_id: emp.id,
+        funds_account_id: funds.id,
+        company_id: com.id
+      })
+    end
+
+    test "voiding is blocked after the 15th of the next month" do
+      admin = user_fixture()
+      com = company_fixture(admin, %{})
+
+      closed = Timex.shift(Timex.today(), months: -2)
+      ps = insert_bare_slip(com, admin, closed.month, closed.year)
+
+      deadline = PaySlipOp.void_deadline(closed.month, closed.year)
+      assert {:period_closed, ^deadline} = PaySlipOp.void_pay_slip(ps.id, com, admin)
+
+      # slip untouched
+      assert FullCircle.Repo.get(FullCircle.HR.PaySlip, ps.id)
+    end
+
+    test "voiding still works within the window" do
+      admin = user_fixture()
+      com = company_fixture(admin, %{})
+
+      today = Timex.today()
+      ps = insert_bare_slip(com, admin, today.month, today.year)
+
+      assert {:ok, _} = PaySlipOp.void_pay_slip(ps.id, com, admin)
+      refute FullCircle.Repo.get(FullCircle.HR.PaySlip, ps.id)
+    end
+  end
 end

@@ -55,6 +55,14 @@ defmodule FullCircleWeb.PaySlipLive.Form do
         {:noreply,
          put_flash(socket, :error, gettext("You are not authorised to perform this action"))}
 
+      {:period_closed, deadline} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           gettext("Voiding for this pay period closed on %{date}", date: deadline)
+         )}
+
       {:sql_error, msg} ->
         {:noreply, put_flash(socket, :error, "#{gettext("Failed")} #{msg}")}
     end
