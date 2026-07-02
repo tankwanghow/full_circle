@@ -46,9 +46,9 @@ defmodule FullCircle.HR.SalaryType do
       :company_id
     ])
     |> update_change(:statutory_code, fn v -> if v in ["", nil], do: nil, else: v end)
-    |> validate_inclusion(:statutory_code, @statutory_codes,
-      message: gettext("is not a valid statutory code")
-    )
+    |> update_change(:cal_func, fn v -> if v in ["", nil], do: nil, else: v end)
+    |> validate_statutory_code()
+    |> validate_cal_func()
     |> validate_ac_names()
     |> unsafe_validate_unique([:name, :company_id], FullCircle.Repo,
       message: gettext("has already been taken")
@@ -57,6 +57,47 @@ defmodule FullCircle.HR.SalaryType do
       name: :salary_types_unique_name_in_company,
       message: gettext("has already been taken")
     )
+  end
+
+  defp validate_statutory_code(cs) do
+    code = fetch_field!(cs, :statutory_code)
+    com_id = fetch_field!(cs, :company_id)
+
+    cond do
+      is_nil(code) ->
+        cs
+
+      code in @statutory_codes ->
+        cs
+
+      not is_nil(com_id) and code in FullCircle.StatutoryConfig.calc_codes(com_id) ->
+        cs
+
+      true ->
+        add_error(cs, :statutory_code, gettext("is not a valid statutory code"))
+    end
+  end
+
+  # cal_func picks the statutory_calcs script (or the legacy function) that
+  # computes the note amount at pay time; an unknown code would only surface
+  # as a crash when running pay, so reject it here.
+  defp validate_cal_func(cs) do
+    func = fetch_field!(cs, :cal_func)
+    com_id = fetch_field!(cs, :company_id)
+
+    cond do
+      is_nil(func) ->
+        cs
+
+      func in FullCircle.PaySlipOp.legacy_cal_funcs() ->
+        cs
+
+      not is_nil(com_id) and func in FullCircle.StatutoryConfig.calc_codes(com_id) ->
+        cs
+
+      true ->
+        add_error(cs, :cal_func, gettext("is not a valid calculation function"))
+    end
   end
 
   defp validate_ac_names(cs) do

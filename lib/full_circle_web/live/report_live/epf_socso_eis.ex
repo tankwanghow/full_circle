@@ -1,6 +1,8 @@
 defmodule FullCircleWeb.ReportLive.EpfSocsoEis do
   use FullCircleWeb, :live_view
 
+  alias FullCircle.HR
+
   @impl true
   def mount(_params, _session, socket) do
     socket =
@@ -34,6 +36,8 @@ defmodule FullCircleWeb.ReportLive.EpfSocsoEis do
      |> filter_transactions(report, month, year, code)}
   end
 
+  # Contributions has no employer-code setting; nil never matches a setting code.
+  defp code_key("Contributions"), do: nil
   defp code_key(report), do: FullCircle.HR.Statutory.code_key(report)
 
   defp setting_value(settings, key, default) do
@@ -54,6 +58,10 @@ defmodule FullCircleWeb.ReportLive.EpfSocsoEis do
       end)
 
     assign(socket, settings: settings)
+  end
+
+  defp humanize_category(code) do
+    code |> String.replace("_", " ") |> String.upcase()
   end
 
   @impl true
@@ -99,11 +107,16 @@ defmodule FullCircleWeb.ReportLive.EpfSocsoEis do
     year = String.to_integer("#{year}")
 
     {col, row} =
-      if report == "PCB" do
-        text = FullCircle.HR.Statutory.pcb_text(month, year, code, com_id)
-        {["textstr"], text |> String.split("\r\n", trim: true) |> Enum.map(&[&1])}
-      else
-        FullCircle.HR.Statutory.rows(report, month, year, code, com_id)
+      cond do
+        report == "PCB" ->
+          text = FullCircle.HR.Statutory.pcb_text(month, year, code, com_id)
+          {["textstr"], text |> String.split("\r\n", trim: true) |> Enum.map(&[&1])}
+
+        report == "Contributions" ->
+          HR.contributions_report(month, year, com_id)
+
+        true ->
+          FullCircle.HR.Statutory.rows(report, month, year, code, com_id)
       end
 
     socket
@@ -130,7 +143,8 @@ defmodule FullCircleWeb.ReportLive.EpfSocsoEis do
                   "SOCSO",
                   "EIS",
                   "SOCSO+EIS",
-                  "PCB"
+                  "PCB",
+                  "Contributions"
                 ]}
                 type="select"
                 label={gettext("Report")}
@@ -191,8 +205,8 @@ defmodule FullCircleWeb.ReportLive.EpfSocsoEis do
 
       <div :if={Enum.count(@col) > 0} class="flex flex-row">
         <%= for h <- @col do %>
-          <div class={"w-[#{trunc(Float.ceil(100/Enum.count(@col)))}%] text-center font-bold border rounded bg-gray-200 border-gray-500"}>
-            {h}
+          <div class={"w-[#{trunc(Float.ceil(100/Enum.count(@col)))}%] text-center font-bold border rounded bg-gray-200 dark:bg-gray-700 border-gray-500"}>
+            {if(h in ["name", "id_no", "wages", "textstr"], do: String.upcase(h), else: humanize_category(h))}
           </div>
         <% end %>
       </div>

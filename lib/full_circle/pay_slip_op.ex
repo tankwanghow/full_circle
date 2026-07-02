@@ -3,6 +3,7 @@ defmodule FullCircle.PaySlipOp do
   import Ecto.Changeset
   import FullCircle.Helpers
   import FullCircle.Authorization
+  require Logger
   alias FullCircle.Sys.Log
   alias Ecto.Multi
 
@@ -16,9 +17,24 @@ defmodule FullCircle.PaySlipOp do
   }
 
   alias FullCircle.Accounting.{Account, Transaction}
-  alias FullCircle.{Accounting, SalaryNoteCalFunc}
+  alias FullCircle.{Accounting, SalaryNoteCalFunc, StatutoryConfig}
   alias FullCircle.Sys.Company
   alias FullCircle.{Repo, Sys, StdInterface, HR}
+
+  @legacy_cal_funcs %{
+    "epf_employer" => :epf_employer,
+    "epf_employee" => :epf_employee,
+    "socso_employer" => :socso_employer,
+    "socso_employee" => :socso_employee,
+    "socso_employer_only" => :socso_employer_only,
+    "socso_24hour" => :socso_24hour,
+    "eis_employer" => :eis_employer,
+    "eis_employee" => :eis_employee,
+    "pcb_employee" => :pcb_employee
+  }
+
+  @doc "cal_func codes the legacy SalaryNoteCalFunc module can compute."
+  def legacy_cal_funcs, do: Map.keys(@legacy_cal_funcs)
 
   @doc "In-memory calculated changeset for an employee/month (no save)."
   def preview(emp, mth, yr, com, user) do
@@ -99,6 +115,8 @@ defmodule FullCircle.PaySlipOp do
     }
   end
 
+  defp legacy_cal_func!(code), do: Map.fetch!(@legacy_cal_funcs, code)
+
   def calculate_pay(cs, emp) do
     sns =
       (fetch_field!(cs, :additions) ++
@@ -108,11 +126,27 @@ defmodule FullCircle.PaySlipOp do
       |> Enum.map(fn x ->
         if !is_nil(x.cal_func) do
           val =
-            SalaryNoteCalFunc.calculate_value(
-              x.cal_func |> String.to_atom(),
-              emp,
-              cs
-            )
+            case StatutoryConfig.calculate(x.cal_func, emp, cs) do
+              {:ok, dec} ->
+                dec
+
+              # the registry knows this code but no version is effective for
+              # this pay period — the line doesn't apply yet (or any more)
+              :not_effective ->
+                Decimal.new(0)
+
+              :not_found ->
+                Logger.warning(
+                  "legacy statutory fallback: company #{emp.company_id} has no " <>
+                    "statutory_calc '#{x.cal_func}' " <>
+                    "(employee #{emp.name}, period #{fetch_field!(cs, :pay_month)}/#{fetch_field!(cs, :pay_year)})"
+                )
+
+                SalaryNoteCalFunc.calculate_value(legacy_cal_func!(x.cal_func), emp, cs)
+
+              {:error, e} ->
+                raise e
+            end
 
           SalaryNote.changeset_on_payslip(x, %{
             unit_price: val,

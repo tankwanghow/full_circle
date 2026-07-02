@@ -8,6 +8,9 @@ defmodule FullCircle.Authorization do
   @allow true
   @forbid false
 
+  def can?(user, :manage_statutory_config, company),
+    do: allow_roles(~w(admin), company, user)
+
   def can?(user, :seed_taxcodes, company),
     do: allow_roles(~w(admin), company, user)
 

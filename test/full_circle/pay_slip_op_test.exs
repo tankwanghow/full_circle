@@ -321,6 +321,34 @@ defmodule FullCircle.PaySlipOpTest do
              "zero-recomputed PCB should be deleted from the slip"
     end
 
+    test "calculate_pay surfaces PayScript.Error for poisoned script", %{
+      com: com, admin: admin, employee: emp, salary_type: st
+    } do
+      FullCircle.StatutoryConfig.seed_company!(com.id)
+
+      {:ok, _} =
+        FullCircle.StatutoryConfig.save_calc(
+          %{
+            code: "epf_employee",
+            name: "EPF Employee",
+            effective_from: ~D[2026-01-01],
+            script: "result = 1/0"
+          },
+          com,
+          admin
+        )
+
+      {:ok, _} = FullCircle.HR.create_salary_note(%{
+        "note_date" => "2026-06-30", "quantity" => "1", "unit_price" => "3000",
+        "employee_name" => emp.name, "employee_id" => emp.id,
+        "salary_type_name" => st.name, "salary_type_id" => st.id, "descriptions" => "salary"
+      }, com, admin)
+
+      assert_raise FullCircle.PayScript.Error, ~r/in 'result': division by zero/, fn ->
+        PaySlipOp.preview(emp, 6, 2026, com, admin)
+      end
+    end
+
     test "loaded salary notes carry cal_func so recal can recompute them", %{
       com: com, admin: admin, employee: emp
     } do

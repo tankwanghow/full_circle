@@ -443,6 +443,10 @@ defmodule FullCircle.Sys do
         end)
       end
     )
+    |> Multi.run(:create_default_statutory_config, fn _repo, %{create_company: c} ->
+      FullCircle.StatutoryConfig.seed_company!(c.id)
+      {:ok, nil}
+    end)
     |> Multi.run(:create_upload_directory, fn _, %{create_company: c} ->
       path = Path.join([Application.get_env(:full_circle, :uploads_dir), "#{c.id}"])
 

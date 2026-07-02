@@ -138,6 +138,41 @@ defmodule FullCircleWeb.DashboardLive do
         <.link navigate={~p"/companies/#{@current_company.id}/eaform"} class="button orange">
           {gettext("EA Form")}
         </.link>
+        <.link
+          :if={@current_role == "admin"}
+          navigate={~p"/companies/#{@current_company.id}/statutory_calcs"}
+          class="button orange"
+        >
+          {gettext("Statutory Calcs")}
+        </.link>
+        <.link
+          :if={@current_role == "admin"}
+          navigate={~p"/companies/#{@current_company.id}/statutory_rate_tables"}
+          class="button orange"
+        >
+          {gettext("Statutory Rate Tables")}
+        </.link>
+        <.link
+          :if={@current_role == "admin"}
+          navigate={~p"/companies/#{@current_company.id}/statutory_file_formats"}
+          class="button orange"
+        >
+          {gettext("Statutory File Formats")}
+        </.link>
+        <.link
+          :if={@current_role == "admin"}
+          navigate={~p"/companies/#{@current_company.id}/statutory_bundle/import"}
+          class="button orange"
+        >
+          {gettext("Import Statutory Bundle")}
+        </.link>
+        <.link
+          :if={@current_role == "admin"}
+          href={~p"/companies/#{@current_company.id}/statutory_bundle/export"}
+          class="button orange"
+        >
+          {gettext("Export Statutory Bundle")}
+        </.link>
       </div>
 
       <div class="font-medium text-xl">Operations</div>

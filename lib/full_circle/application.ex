@@ -13,6 +13,7 @@ defmodule FullCircle.Application do
       # Start the Ecto repository
       FullCircle.Repo,
       FullCircle.QueryRepo,
+      FullCircle.StatutoryConfig.Cache,
       # Start the PubSub system
       {Phoenix.PubSub, name: FullCircle.PubSub},
       # Start Finch

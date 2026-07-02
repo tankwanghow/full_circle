@@ -760,19 +760,27 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
         |> then(fn skt ->
           # Statutory preview is derived, not a manual step: recompute on every load and after
           # every note/advance change (this runs in both), so it can never be stale.
-          preview =
-            PaySlipOp.preview(
-              emp,
-              String.to_integer(month),
-              String.to_integer(year),
-              socket.assigns.current_company,
-              socket.assigns.current_user
-            )
-            |> Ecto.Changeset.apply_changes()
+          try do
+            preview =
+              PaySlipOp.preview(
+                emp,
+                String.to_integer(month),
+                String.to_integer(year),
+                socket.assigns.current_company,
+                socket.assigns.current_user
+              )
+              |> Ecto.Changeset.apply_changes()
 
-          skt
-          |> assign(statutory_preview: preview)
-          |> assign(net_pay: preview.pay_slip_amount)
+            skt
+            |> assign(statutory_preview: preview)
+            |> assign(net_pay: preview.pay_slip_amount)
+          rescue
+            e in FullCircle.PayScript.Error ->
+              skt
+              |> put_flash(:error, Exception.message(e))
+              |> assign(statutory_preview: nil)
+              |> assign(net_pay: nil)
+          end
         end)
 
       socket |> update_punch_card(punches)

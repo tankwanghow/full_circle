@@ -128,13 +128,37 @@ defmodule FullCircle.HR do
     ]
   end
 
-  @statutory_categories ~w(epf_employer epf_employee socso_employer socso_employee
-                           socso_employer_only socso_24hour eis_employer eis_employee
-                           eis_employer_only pcb_employee)
+  def statutory_categories(com_id) do
+    legacy = FullCircle.HR.SalaryType.statutory_codes()
+
+    new_codes =
+      FullCircle.StatutoryConfig.calc_codes(com_id)
+      |> Enum.reject(&(&1 in legacy))
+      |> Enum.filter(&Regex.match?(~r/^[a-z0-9_]+$/, &1))
+      |> Enum.sort()
+
+    legacy ++ new_codes
+  end
+
+  @doc "{col, rows} listing every statutory category per employee, for screen/CSV."
+  def contributions_report(month, year, com_id) do
+    categories = statutory_categories(com_id)
+    col = ["name", "id_no", "wages" | categories]
+
+    rows =
+      statutory_contributions(month, year, com_id)
+      |> Enum.map(fn row ->
+        [row.name, row.id_no, row.wages | Enum.map(categories, &Map.get(row, String.to_atom(&1)))]
+      end)
+
+    {col, rows}
+  end
 
   def statutory_contributions(month, year, com_id) do
+    categories = statutory_categories(com_id)
+
     sums =
-      Enum.map_join(@statutory_categories, ",\n", fn c ->
+      Enum.map_join(categories, ",\n", fn c ->
         """
         coalesce((select sum(sn.quantity * sn.unit_price)
                     from salary_notes sn join salary_types st on st.id = sn.salary_type_id

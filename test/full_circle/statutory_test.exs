@@ -182,6 +182,80 @@ defmodule FullCircle.StatutoryTest do
       assert row.tax_no == "55491986090"
       assert row.id_no == "890703085395"
     end
+
+    test "includes a novel calc code column", ctx do
+      {:ok, _} =
+        FullCircle.StatutoryConfig.save_calc(
+          %{
+            code: "hrdf_levy",
+            name: "HRDF Levy",
+            effective_from: ~D[2026-01-01],
+            script: "result = 1"
+          },
+          ctx.com,
+          ctx.admin
+        )
+
+      cr = FullCircle.Accounting.get_account_by_name("Salaries and Wages Payable", ctx.com, ctx.admin)
+
+      {:ok, st} =
+        FullCircle.StdInterface.create(
+          FullCircle.HR.SalaryType,
+          "salary_type",
+          %{
+            name: "HRDF Levy Deduction",
+            type: "Deduction",
+            statutory_code: "hrdf_levy",
+            db_ac_name: cr.name,
+            db_ac_id: cr.id,
+            cr_ac_name: cr.name,
+            cr_ac_id: cr.id
+          },
+          ctx.com,
+          ctx.admin
+        )
+
+      emp =
+        employee_fixture(
+          %{epf_no: "E999", socso_no: "S999", tax_no: "55491986090", id_no: "890703085395"},
+          ctx.com,
+          ctx.admin
+        )
+
+      slip(
+        emp,
+        6,
+        2026,
+        %{
+          "Monthly Salary" => "3000",
+          "HRDF Levy Deduction" => "25"
+        },
+        Map.put(ctx, :st, Map.put(ctx.st, "HRDF Levy Deduction", st))
+      )
+
+      row =
+        HR.statutory_contributions(6, 2026, ctx.com.id)
+        |> Enum.find(&(&1.name == emp.name))
+
+      assert Decimal.eq?(row.hrdf_levy, Decimal.new("25"))
+    end
+
+    test "filters malicious calc codes from SQL", ctx do
+      time = DateTime.truncate(DateTime.utc_now(), :second)
+
+      FullCircle.Repo.insert!(%FullCircle.HR.StatutoryCalc{
+        id: Ecto.UUID.generate(),
+        company_id: ctx.com.id,
+        code: "bad;drop",
+        name: "Evil",
+        effective_from: ~D[2026-01-01],
+        script: "result = 1",
+        inserted_at: time,
+        updated_at: time
+      })
+
+      refute "bad;drop" in HR.statutory_categories(ctx.com.id)
+    end
   end
 
   alias FullCircle.HR.Statutory.{EpfFormat, SocsoFormat, EisFormat, SocsoEisFormat}

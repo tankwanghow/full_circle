@@ -1,31 +1,7 @@
 defmodule FullCircleWeb.CsvController do
   use FullCircleWeb, :controller
 
-  def show(conn, %{
-        "company_id" => com_id,
-        "report" => "epfsocsoeis",
-        "rep" => "PCB",
-        "code" => code,
-        "month" => month,
-        "year" => year
-      }) do
-    text =
-      FullCircle.HR.Statutory.pcb_text(
-        String.to_integer(month),
-        String.to_integer(year),
-        code,
-        com_id
-      )
-
-    conn
-    |> put_resp_content_type("text/plain")
-    |> put_resp_header(
-      "content-disposition",
-      "attachment; filename=\"#{FullCircle.HR.Statutory.PcbFormat.filename()}\""
-    )
-    |> put_root_layout(false)
-    |> send_resp(200, text)
-  end
+  alias FullCircle.{HR, StatutoryConfig}
 
   def show(conn, %{
         "company_id" => com_id,
@@ -35,16 +11,20 @@ defmodule FullCircleWeb.CsvController do
         "month" => month,
         "year" => year
       }) do
-    {col, row} =
-      FullCircle.HR.Statutory.rows(
-        rep,
-        String.to_integer(month),
-        String.to_integer(year),
-        code,
-        com_id
-      )
+    month = String.to_integer(month)
+    year = String.to_integer(year)
 
-    send_csv_row_col(conn, row, col, "#{rep}_#{month}_#{year}")
+    case render_epfsocsoeis(com_id, rep, month, year, code) do
+      {:ok, {filename, text}} ->
+        conn
+        |> put_resp_content_type("text/plain")
+        |> put_resp_header("content-disposition", "attachment; filename=\"#{filename}\"")
+        |> put_root_layout(false)
+        |> send_resp(200, text)
+
+      {:legacy, payload} ->
+        send_epfsocsoeis_legacy(conn, rep, payload, month, year)
+    end
   end
 
   def show(conn, %{
@@ -316,6 +296,46 @@ defmodule FullCircleWeb.CsvController do
     fields = [:type, :name, :balance]
     filename = "#{rep |> String.replace(" ", "") |> Macro.underscore()}_#{tdate}"
     send_csv_map(conn, data, fields, filename)
+  end
+
+  defp render_epfsocsoeis(com_id, rep, month, year, employer_code) do
+    case StatutoryConfig.report_format_code(rep) do
+      nil ->
+        {:legacy, legacy_payload(rep, month, year, employer_code, com_id)}
+
+      format_code ->
+        case StatutoryConfig.render_file(com_id, format_code, month, year, employer_code) do
+          {:ok, result} -> {:ok, result}
+          {:error, _} -> {:legacy, legacy_payload(rep, month, year, employer_code, com_id)}
+        end
+    end
+  end
+
+  defp legacy_payload("PCB", month, year, code, com_id) do
+    {:pcb, HR.Statutory.pcb_text(month, year, code, com_id)}
+  end
+
+  defp legacy_payload("Contributions", month, year, _code, com_id) do
+    {:rows, HR.contributions_report(month, year, com_id)}
+  end
+
+  defp legacy_payload(rep, month, year, code, com_id) do
+    {:rows, HR.Statutory.rows(rep, month, year, code, com_id)}
+  end
+
+  defp send_epfsocsoeis_legacy(conn, "PCB", {:pcb, text}, _month, _year) do
+    conn
+    |> put_resp_content_type("text/plain")
+    |> put_resp_header(
+      "content-disposition",
+      "attachment; filename=\"#{HR.Statutory.PcbFormat.filename()}\""
+    )
+    |> put_root_layout(false)
+    |> send_resp(200, text)
+  end
+
+  defp send_epfsocsoeis_legacy(conn, rep, {:rows, {col, row}}, month, year) do
+    send_csv_row_col(conn, row, col, "#{rep}_#{month}_#{year}")
   end
 
   defp transactions_csv(conn, name, fdate, tdate, com_id, name_func, trans_func) do

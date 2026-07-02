@@ -5,7 +5,7 @@ defmodule FullCircle.SalaryNoteCalFunc do
   alias FullCircle.HR.{SalaryNote, SalaryType}
   alias FullCircle.Repo
 
-  defp eis_table() do
+  def eis_table() do
     [
       [0, 30, 0.05, 0.05, 0.10],
       [30, 50, 0.10, 0.10, 0.20],
@@ -79,7 +79,7 @@ defmodule FullCircle.SalaryNoteCalFunc do
   #           employer_only (second category), employee_24hour (SKBBK / Lindung 24 Jam)]
   # The 24-hour (SKBBK / non-employment injury) share is fully employee-borne and
   # applies to both categories (all ages), effective 1 June 2026.
-  defp socso_table() do
+  def socso_table() do
     [
       [1, 30, 0.4, 0.1, 0.3, 0.2],
       [30, 50, 0.7, 0.2, 0.5, 0.3],
@@ -149,7 +149,7 @@ defmodule FullCircle.SalaryNoteCalFunc do
     ]
   end
 
-  defp pcb_table_normal() do
+  def pcb_table_normal() do
     [
       [5001.0, 20_000.0, 5000.0, 0.01, -400.0, -800.0],
       [20_001.0, 35_000.0, 20_000.0, 0.03, -250.0, -650.0],

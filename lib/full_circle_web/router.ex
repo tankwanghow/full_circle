@@ -107,6 +107,7 @@ defmodule FullCircleWeb.Router do
     pipe_through([:browser, :require_authenticated_user])
 
     get "/csv", CsvController, :show
+    get "/statutory_bundle/export", BundleController, :export
     get "/download/:filename", FileDownloadController, :show
 
     live_session :require_authenticated_user_n_active_company,
@@ -139,6 +140,17 @@ defmodule FullCircleWeb.Router do
       live("/salary_types", SalaryTypeLive.Index, :index)
       live("/salary_types/new", SalaryTypeLive.Form, :new)
       live("/salary_types/:type_id/edit", SalaryTypeLive.Form, :edit)
+
+      live("/statutory_rate_tables", StatutoryRateTableLive.Index, :index)
+      live("/statutory_rate_tables/new", StatutoryRateTableLive.Form, :new)
+
+      live("/statutory_calcs", StatutoryCalcLive.Index, :index)
+      live("/statutory_calcs/new", StatutoryCalcLive.Form, :new)
+
+      live("/statutory_file_formats", StatutoryFileFormatLive.Index, :index)
+      live("/statutory_file_formats/new", StatutoryFileFormatLive.Form, :new)
+
+      live("/statutory_bundle/import", StatutoryBundleLive.Import, :new)
 
       live("/goods", GoodLive.Index, :index)
       live("/goods/new", GoodLive.Form, :new)
