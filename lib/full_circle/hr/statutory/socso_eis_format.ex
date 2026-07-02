@@ -1,5 +1,13 @@
 defmodule FullCircle.HR.Statutory.SocsoEisFormat do
-  @moduledoc "Combined SOCSO+EIS submission line, mirroring legacy socso_eis_submit_file_format_query."
+  @moduledoc """
+  Combined SOCSO+EIS submission line.
+
+  Follows PERKESO "Combine SOCSO + EIS Contribution Text File Format" V2.0
+  (dated 13 Feb 2026), which inserts the SKBBK / Lindung 24 Jam employee
+  contribution as field 11 at positions 239-244, carved from the old trailing
+  filler (40 -> 6 + 34). Total line length remains 278. V2.0 is mandatory from
+  1 October 2026.
+  """
   import FullCircle.HR.Statutory.FixedWidth
 
   def rows(contribs, code) do
@@ -7,7 +15,8 @@ defmodule FullCircle.HR.Statutory.SocsoEisFormat do
       contribs
       |> Enum.filter(fn c ->
         pos?(c.socso_employer) or pos?(c.socso_employee) or pos?(c.socso_employer_only) or
-          pos?(c.eis_employer) or pos?(c.eis_employee) or pos?(c.eis_employer_only)
+          pos?(c.eis_employer) or pos?(c.eis_employee) or pos?(c.eis_employer_only) or
+          pos?(c.socso_24hour)
       end)
       |> Enum.map(fn c ->
         socso_er = c.socso_employer |> dec() |> add(c.socso_employer_only)
@@ -25,7 +34,8 @@ defmodule FullCircle.HR.Statutory.SocsoEisFormat do
           cents(c.socso_employee, 6),
           cents(eis_er, 6),
           cents(c.eis_employee, 6),
-          pad_t("", 40)
+          cents(c.socso_24hour, 6),
+          pad_t("", 34)
         ]
         |> Enum.join()
       end)

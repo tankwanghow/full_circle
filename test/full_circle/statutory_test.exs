@@ -278,16 +278,29 @@ defmodule FullCircle.StatutoryTest do
                )
     end
 
-    test "SOCSO+EIS matches legacy", ctx do
-      assert norm(SocsoEisFormat.rows(ctx.contribs, "EMPCODE")) ==
-               norm(
-                 FullCircle.LegacyStatutory.socso_eis_submit_file_format_query(
-                   5,
-                   2026,
-                   "EMPCODE",
-                   ctx.com.id
-                 )
-               )
+    # The combined SOCSO+EIS format was upgraded to PERKESO V2.0 (13 Feb 2026),
+    # which inserts the SKBBK employee field at positions 239-244, carved from the
+    # old 40-char trailing filler (-> 6 + 34). Positions 1-238 stay identical to the
+    # legacy V1.0 layout; the total line length remains 278. With no SKBBK note in
+    # this fixture, the SKBBK field is zero-filled.
+    test "SOCSO+EIS follows V2.0 (legacy layout plus SKBBK field)", ctx do
+      {["textstr"], v2_rows} = SocsoEisFormat.rows(ctx.contribs, "EMPCODE")
+
+      {["textstr"], v1_rows} =
+        FullCircle.LegacyStatutory.socso_eis_submit_file_format_query(
+          5,
+          2026,
+          "EMPCODE",
+          ctx.com.id
+        )
+
+      for {[v2], [v1]} <- Enum.zip(v2_rows, v1_rows) do
+        assert String.length(v2) == 278
+        assert String.length(v1) == 278
+        assert String.slice(v2, 0, 238) == String.slice(v1, 0, 238)
+        assert String.slice(v2, 238, 6) == "000000"
+        assert String.slice(v2, 244, 34) == String.duplicate(" ", 34)
+      end
     end
   end
 

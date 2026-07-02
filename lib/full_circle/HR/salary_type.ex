@@ -5,8 +5,8 @@ defmodule FullCircle.HR.SalaryType do
   import FullCircle.Helpers
 
   @statutory_codes ~w(epf_employer epf_employee socso_employer socso_employee
-                      socso_employer_only eis_employer eis_employee eis_employer_only
-                      pcb_employee)
+                      socso_employer_only socso_24hour eis_employer eis_employee
+                      eis_employer_only pcb_employee)
 
   def statutory_codes, do: @statutory_codes
 

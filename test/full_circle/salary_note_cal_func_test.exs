@@ -181,11 +181,71 @@ defmodule FullCircle.SalaryNoteCalFuncTest do
   describe "SOCSO employer only calculations" do
     test "always returns empro column regardless of age" do
       emp = make_employee(dob: ~D[1990-01-15])
-      # Income 1500, table row [1400, 1500, 25.35, 7.25, 18.1] -> empro = 18.1
+      # Income 1500, table row [1400, 1500, 25.35, 7.25, 18.1, 10.85] -> empro = 18.1
       cs = make_pay_slip_changeset("1500", "0", 1, 2025)
 
       result = SalaryNoteCalFunc.calculate_value(:socso_employer_only, emp, cs)
       assert Decimal.eq?(result, Decimal.from_float(18.1))
+    end
+  end
+
+  describe "SOCSO age 60 boundary (Second Category at 60 and above)" do
+    test "exactly age 60: employee share drops to 0" do
+      # Born 1965-06, pay end of June 2025 -> exactly 60 years old
+      emp = make_employee(dob: ~D[1965-06-15])
+      cs = make_pay_slip_changeset("1500", "0", 6, 2025)
+
+      assert Decimal.eq?(
+               SalaryNoteCalFunc.calculate_value(:socso_employee, emp, cs),
+               Decimal.from_float(0.0)
+             )
+    end
+
+    test "exactly age 60: employer switches to empro (Second Category)" do
+      emp = make_employee(dob: ~D[1965-06-15])
+      # Income 1500, row [1400, 1500, 25.35, 7.25, 18.1, 10.85] -> empro = 18.1
+      cs = make_pay_slip_changeset("1500", "0", 6, 2025)
+
+      assert Decimal.eq?(
+               SalaryNoteCalFunc.calculate_value(:socso_employer, emp, cs),
+               Decimal.from_float(18.1)
+             )
+    end
+  end
+
+  describe "SOCSO 24-hour (SKBBK / Lindung 24 Jam) calculations" do
+    test "table lookup on the SKBBK column" do
+      emp = make_employee(dob: ~D[1990-01-15])
+      # Income 1500, row [1400, 1500, 25.35, 7.25, 18.1, 10.85] -> skbbk = 10.85
+      cs = make_pay_slip_changeset("1500", "0", 6, 2026)
+
+      result = SalaryNoteCalFunc.calculate_value(:socso_24hour, emp, cs)
+      assert Decimal.eq?(result, Decimal.from_float(10.85))
+    end
+
+    test "applies regardless of age (also charged to employees 60 and above)" do
+      emp = make_employee(dob: ~D[1955-01-15])
+      cs = make_pay_slip_changeset("1500", "0", 6, 2026)
+
+      result = SalaryNoteCalFunc.calculate_value(:socso_24hour, emp, cs)
+      assert Decimal.eq?(result, Decimal.from_float(10.85))
+    end
+
+    test "applies regardless of nationality (foreign workers under Act 4)" do
+      emp = make_employee(nationality: "Bangladeshi", dob: ~D[1990-01-15])
+      cs = make_pay_slip_changeset("1500", "0", 6, 2026)
+
+      result = SalaryNoteCalFunc.calculate_value(:socso_24hour, emp, cs)
+      assert Decimal.eq?(result, Decimal.from_float(10.85))
+    end
+
+    test "capped at the RM6,000 wage ceiling" do
+      emp = make_employee(dob: ~D[1990-01-15])
+      # Income 7000 -> row [6000, 999_999, 104.15, 29.75, 74.40, 44.65] -> skbbk = 44.65
+      cs = make_pay_slip_changeset("7000", "0", 6, 2026)
+
+      result = SalaryNoteCalFunc.calculate_value(:socso_24hour, emp, cs)
+      assert Decimal.eq?(result, Decimal.from_float(44.65))
     end
   end
 
@@ -224,6 +284,28 @@ defmodule FullCircle.SalaryNoteCalFuncTest do
 
       result = SalaryNoteCalFunc.calculate_value(:eis_employer, emp, cs)
       assert Decimal.eq?(result, Decimal.from_float(0.0))
+    end
+  end
+
+  describe "EIS excludes foreign workers (Malaysian citizens/PRs only)" do
+    test "non-Malaysian under 60: employee share is 0" do
+      emp = make_employee(nationality: "Indonesian", dob: ~D[1990-01-15])
+      cs = make_pay_slip_changeset("1500", "0", 1, 2025)
+
+      assert Decimal.eq?(
+               SalaryNoteCalFunc.calculate_value(:eis_employee, emp, cs),
+               Decimal.from_float(0.0)
+             )
+    end
+
+    test "non-Malaysian under 60: employer share is 0" do
+      emp = make_employee(nationality: "Bangladeshi", dob: ~D[1990-01-15])
+      cs = make_pay_slip_changeset("1500", "0", 1, 2025)
+
+      assert Decimal.eq?(
+               SalaryNoteCalFunc.calculate_value(:eis_employer, emp, cs),
+               Decimal.from_float(0.0)
+             )
     end
   end
 

@@ -129,8 +129,8 @@ defmodule FullCircle.HR do
   end
 
   @statutory_categories ~w(epf_employer epf_employee socso_employer socso_employee
-                           socso_employer_only eis_employer eis_employee eis_employer_only
-                           pcb_employee)
+                           socso_employer_only socso_24hour eis_employer eis_employee
+                           eis_employer_only pcb_employee)
 
   def statutory_contributions(month, year, com_id) do
     sums =
