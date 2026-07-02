@@ -274,9 +274,9 @@ heavy grid editing:
 
 Plus an **"Install/refresh standard Malaysia set"** action that seeds or
 updates all three kinds from templates shipped in the app (same pattern as
-`HR.default_salary_types/1`), and a copy-from-another-company option for
-groups running multiple companies. Shipped templates are a convenience;
-companies can always hand-edit ahead of an app release.
+`HR.default_salary_types/1`). Groups running multiple companies copy config
+between companies via bundle export/import (section 7). Shipped templates are
+a convenience; companies can always hand-edit ahead of an app release.
 
 ## 6. Seeding, migration, rollout
 
@@ -291,7 +291,52 @@ companies can always hand-edit ahead of an app release.
 - Rollout order: registry dispatch with legacy fallback → parity verified →
   hardcoded `SalaryNoteCalFunc` and `hr/statutory/*_format.ex` deleted.
 
-## 7. Testing
+## 7. Agent-assisted updates: statutory bundles
+
+Because every statutory artifact is validated data, a coding agent (e.g.
+Claude Code) can prepare a government update without DB or production access.
+The handoff surface is a **statutory bundle** — one canonical JSON file
+carrying a complete or partial set:
+
+```json
+{
+  "bundle_version": 1,
+  "source": "PERKESO circular 3/2026 — SKBBK rate revision",
+  "rate_tables":  [ { "code": "socso", "effective_from": "2026-06-01",
+                      "columns": ["wage_from", "wage_to", "..."], "rows": [[1, 30, 0.4]] } ],
+  "calcs":        [ { "code": "socso_24hour", "name": "SOCSO Lindung 24 Jam",
+                      "effective_from": "2026-06-01", "script": "result = ..." } ],
+  "file_formats": [ { "code": "socso_eis_text", "name": "SOCSO+EIS text file",
+                      "effective_from": "2026-06-01", "renderer": "text", "spec": {} } ]
+}
+```
+
+Three touchpoints:
+
+1. **Export** (admin UI): download the company's currently effective set as a
+   bundle. Doubles as backup and as the copy-between-companies mechanism
+   (section 5), and gives an agent ground truth to edit from.
+2. **Import** (admin UI): upload a bundle. The app runs the same save-time
+   validation as manual editing (script parsing, bracket contiguity, `calc()`
+   cycles, FileSpec shape), then shows a **diff and computed-value preview**
+   against the currently effective versions. Versions are created only when
+   the admin clicks Apply — the human stays the activation gate.
+3. **Offline validator**: `mix statutory.validate bundle.json`, reusing the
+   exact validation code, so an agent can iterate locally until the bundle is
+   clean before anyone touches the app.
+
+Agent workflow: the user tells the agent about a government change (circular
+URL/PDF); the agent starts from an exported bundle, edits the affected
+tables/scripts/specs, runs `mix statutory.validate`, and hands back
+`bundle.json`; the admin imports, checks the preview values against the
+circular, and applies. No deploy.
+
+To make agents reliable at this, a project skill
+(`.claude/skills/statutory-bundle.md`) documents the bundle schema, PayScript
+grammar, FileSpec rules, and the validate command, per this repo's skill
+authoring convention.
+
+## 8. Testing
 
 - **PayScript unit tests**: lexer/parser (precedence, associativity, errors),
   evaluator, each builtin, save-time validation (unknown identifier, missing
@@ -306,8 +351,12 @@ companies can always hand-edit ahead of an app release.
   June 2026 uses the 6-column one.
 - **Upload validation tests**: bracket gap/overlap, bad column count,
   non-numeric cell, invalid JSON spec.
+- **Bundle tests**: export → import round-trip is lossless; import rejects the
+  same invalid inputs as manual editing; `mix statutory.validate` agrees with
+  in-app validation; import preview diff reflects exactly the versions that
+  Apply creates.
 
-## 8. Implementation phases
+## 9. Implementation phases
 
 Each phase gets its own implementation plan and lands independently:
 
@@ -316,10 +365,12 @@ Each phase gets its own implementation plan and lands independently:
    library, heavily unit-tested.
 2. **Statutory config** — three schemas + migrations, effective-date
    resolution, ETS cache, `calculate_pay` dispatch with legacy fallback,
-   seeding templates + data migration, golden parity tests.
+   seeding templates + data migration, golden parity tests; bundle format,
+   export, and `mix statutory.validate`.
 3. **Admin LiveViews + dynamic reporting** — the three screens, preview
-   panels, `SalaryType` validation change, dynamic
-   `statutory_contributions` columns and report rendering.
+   panels, bundle import with diff/preview/apply, `SalaryType` validation
+   change, dynamic `statutory_contributions` columns and report rendering;
+   write the `statutory-bundle` project skill.
 4. **FileSpec** — spec validation + text renderer, seed five formats, switch
    download points, byte-parity tests, delete legacy formatter modules and
    `SalaryNoteCalFunc`.
@@ -331,4 +382,7 @@ Each phase gets its own implementation plan and lands independently:
 - E-invoice, non-statutory payroll behavior, and pay-slip printing are
   untouched.
 - Cross-company template distribution beyond the shipped defaults and
-  copy-from-company.
+  bundle export/import.
+- A direct API/MCP endpoint for agents to push draft versions into the app —
+  the human-reviewed bundle import achieves the same outcome with far less
+  security surface; revisit only if the manual import step proves burdensome.
