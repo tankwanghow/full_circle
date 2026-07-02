@@ -31,7 +31,7 @@ FullCircle stores Malaysia statutory payroll config (rate tables, PayScript calc
   ],
   "file_formats": [
     {
-      "code": "socso_eis_text",
+      "code": "socso_eis_txt",
       "name": "SOCSO+EIS text file",
       "effective_from": "2026-06-01",
       "renderer": "text",
@@ -44,6 +44,10 @@ FullCircle stores Malaysia statutory payroll config (rate tables, PayScript calc
 - `bundle_version` must be `1`.
 - `source` — record the official circular / URL / PDF reference (KWSP, PERKESO, LHDN).
 - Each entry is keyed by `(code, effective_from)`; importing the same key replaces content.
+- **Bundles must be self-contained**: every `calc("x")` reference in a script must
+  resolve to a code inside the *same* bundle. A partial bundle that references an
+  existing company calc not included in the bundle fails validation — start from a
+  full export or the template, not from a hand-built fragment.
 
 ## PayScript grammar (calcs)
 
@@ -70,7 +74,16 @@ Save-time validation rejects parse errors, unknown identifiers/tables, missing `
 
 - For pay month M / year Y, the engine uses the calc/table/format version where `effective_from <= end_of_month(Y, M)` and is the latest such version per `code`.
 - New rates take effect on the **first day** of the month in `effective_from` (or later if the circular says so).
-- Append a new row with a later `effective_from` rather than editing history.
+- Once a company has *any* version of a calc code, the registry owns it: pay
+  periods **before the first effective version compute zero** (the line is
+  dropped from the slip). The legacy hardcoded module is consulted only for
+  codes the company has never had. So a scheme starting mid-year (e.g. SKBBK
+  effective 2026-06-01) correctly yields nothing for earlier months.
+- **Rule changed** → append a new version with a later `effective_from`; history
+  stays recalculable. **Script was simply wrong** → replace it in place: import
+  a bundle entry with the *same* `(code, effective_from)`, or use the calc
+  form's **Replace this version** button. Already-paid slips keep their old
+  values until re-paid.
 
 ## Workflow
 
