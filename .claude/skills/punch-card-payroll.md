@@ -44,6 +44,17 @@ The Punch Card is the **only** create/edit path; the PaySlip Form (`pay_slip_liv
 - **Earnings/manual = no `cal_func`** (Daily/Monthly/OT/etc.). User-entered, survive `calculate_pay` unchanged, rendered as editable components.
 - Reporting (EPF/SOCSO/EIS/PCB submission files in `HR.Statutory`) keys off a **separate** `SalaryType.statutory_code` field, not `cal_func`.
 
+## Statutory rate rules (Malaysia) in `SalaryNoteCalFunc`
+
+Each `calculate_value(:code, emp, cs)` clause branches differently — don't assume they share the same age/nationality logic:
+
+- **EPF** — Malaysian <60: EE 11% / ER 13% (≤5000) or 12% (>5000); Malaysian ≥60: EE 0% / ER 4%; non-Malaysian: 2%/2% (mandatory foreign EPF). No rate change at 55.
+- **SOCSO** — age branch is `>= 60` (Second Category = employer-only `empro`; employee 0). Foreign workers <60 are **First Category, same as locals** (since 1 Jul 2024), so the SOCSO functions key on **age only, not nationality**.
+- **EIS** — covered only for Malaysians/PRs **and** age <60. Both `eis_employer`/`eis_employee` guard on `is_malaysian` (via `nationality` starts-with "malays") — foreign workers get 0.
+- **`socso_24hour` (SKBBK / Lindung 24 Jam)** — new employee-borne "Non-Employment Injury" deduction, effective **1 Jun 2026** (Phase 1 0.75%). Unlike the others it applies to **all ages and all nationalities** under Act 4, capped at RM6,000 — pure band lookup, no age/nationality branch.
+- `socso_table` rows are `[lower, upper, employer, employee_invalidity, employer_only, employee_24hour]` (6 cols); band predicate is `income > u and income <= l`, so a salary on a round boundary uses the **lower** band (matches PERKESO "exceed X but not exceed Y" wording).
+- Submission files: the **combined SOCSO+EIS** format (`SocsoEisFormat`) is PERKESO **V2.0** — SKBBK employee amount at positions 239–244, trailing filler 34, line length 278 (mandatory 1 Oct 2026). The **SOCSO-only** format (`SocsoFormat`) does **not** yet include SKBBK.
+
 ## Reading preview children: always `Map.get`
 
 `get_recal_pay_slip` builds partial "fake structs" via `Map.merge(map, %{__struct__: SalaryNote})`
