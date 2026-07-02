@@ -65,6 +65,9 @@ server {
     include /etc/letsencrypt/options-ssl-nginx.conf; # Managed by Certbot
     ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem; # Managed by Certbot
 
+    # Allow large uploads (PDFs etc.); nginx default is only 1 MB.
+    client_max_body_size 50M;
+
     location / {
         proxy_pass http://localhost:$PORT; # ${IMAGE_NAME} container uses host network
         proxy_set_header Host \$host;
