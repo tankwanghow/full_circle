@@ -318,6 +318,7 @@ defmodule FullCircleWeb.SalaryNoteLive.Form do
               label={gettext("Amount")}
               type="number"
               readonly
+              tabindex="-1"
             />
           </div>
         </div>

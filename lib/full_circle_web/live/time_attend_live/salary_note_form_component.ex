@@ -230,6 +230,7 @@ defmodule FullCircleWeb.TimeAttendLive.SalaryNoteFormComponent do
               field={@form[:amount]}
               label={gettext("Amount")}
               type="number"
+              tabindex="-1"
               readonly
             />
           </div>

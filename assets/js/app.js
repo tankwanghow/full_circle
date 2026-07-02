@@ -105,7 +105,11 @@ Hooks.calculatorInput = {
       if (!/[a-zA-Z]+/.test(this.el.value)) {
         try {
           var eval2 = eval
-          this.el.value = eval2(this.el.value)
+          var result = eval2(this.el.value)
+          if (result !== undefined && `${result}` !== this.el.value) {
+            this.el.value = result
+            this.el.dispatchEvent(new Event("input", { bubbles: true }))
+          }
         } catch (error) {
           console.log(error)
         }
