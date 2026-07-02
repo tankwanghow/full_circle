@@ -73,7 +73,8 @@
       "Bash(sed -n '295,320p' lib/full_circle/pay_slip_op.ex)",
       "Bash(sed -n '8,60p' lib/full_circle_web/live/time_attend_live/punch_card.ex)",
       "Bash(git stash *)",
-      "WebFetch(domain:www.hasil.gov.my)"
+      "WebFetch(domain:www.hasil.gov.my)",
+      "WebFetch(domain:www.perkeso.gov.my)"
     ]
   },
   "hooks": {
