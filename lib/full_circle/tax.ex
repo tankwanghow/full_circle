@@ -16,6 +16,13 @@ defmodule FullCircle.Tax do
   @zero Decimal.new(0)
   @hundred Decimal.new(100)
 
+  # LHDN allows CP204 revision (Form CP204A) in the 6th, 9th and — permanently
+  # from YA 2024 (s.107C amendment) — 11th month of the basis period.
+  @revision_months [6, 9, 11]
+
+  @doc "FY basis-period months in which LHDN allows a CP204 revision (Form CP204A)."
+  def revision_months, do: @revision_months
+
   # ---- pure computation ----
 
   @doc "Safe minimum CP204 estimate = forecast_tax / (1 + tolerance/100). 0 when forecast <= 0."
@@ -51,6 +58,7 @@ defmodule FullCircle.Tax do
   Build the 12-month instalment schedule. `month_bounds` is the list of 12
   `{start, end}` tuples; `paid_by_month` is `%{month_no => Decimal}`. The whole
   schedule reflects only the current `estimate`, re-spread from `estimate_month`.
+  A month with tax already paid is settled — its instalment due shows 0.
   """
   def build_schedule(month_bounds, paid_by_month, estimate, estimate_month) do
     paid_to_date =
@@ -65,8 +73,15 @@ defmodule FullCircle.Tax do
       month_bounds
       |> Enum.with_index(1)
       |> Enum.map_reduce(@zero, fn {{ps, pe}, m}, cum_paid ->
-        due = if m >= estimate_month, do: forward, else: @zero
         paid = Map.get(paid_by_month, m, @zero)
+
+        due =
+          cond do
+            Decimal.compare(paid, @zero) == :gt -> @zero
+            m >= estimate_month -> forward
+            true -> @zero
+          end
+
         cum_paid2 = Decimal.add(cum_paid, paid)
 
         row = %{
@@ -109,11 +124,39 @@ defmodule FullCircle.Tax do
     PLF.pl_forecast(%{fy_year: fy_year, granularity: :monthly, as_of: as_of}, com).totals.estimated_tax
   end
 
-  @doc "`%{month_no => Decimal}` paid amounts from the plan's manual overrides."
+  @doc """
+  `%{month_no => Decimal}` paid amounts from the plan's manual overrides.
+  Non-month keys (e.g. LiveView's `_unused_*` form-tracking keys) are dropped.
+  """
   def paid_by_month(%InstalmentPlan{} = plan) do
-    for {k, v} <- plan.paid_overrides || %{}, into: %{} do
-      {to_int(k), to_decimal(v)}
-    end
+    Enum.reduce(plan.paid_overrides || %{}, %{}, fn {k, v}, acc ->
+      case to_month(k) do
+        nil -> acc
+        m -> Map.put(acc, m, to_decimal(v))
+      end
+    end)
+  end
+
+  @doc """
+  `%{revision_month => Decimal}` CP204A revised annual estimates from the plan.
+  Only months 6/9/11 are honoured; blank/unparseable values are dropped
+  (blank means "not revised"); an explicit 0 is a valid revision.
+  """
+  def revisions_by_month(%InstalmentPlan{} = plan) do
+    Enum.reduce(plan.revisions || %{}, %{}, fn {k, v}, acc ->
+      m = to_month(k)
+
+      case if(m in @revision_months, do: parse_decimal(v)) do
+        %Decimal{} = dec -> Map.put(acc, m, dec)
+        _ -> acc
+      end
+    end)
+  end
+
+  @doc "The estimate in force at year end: latest revision (11 -> 9 -> 6) or the original."
+  def latest_estimate(%InstalmentPlan{} = plan) do
+    rev = revisions_by_month(plan)
+    rev[11] || rev[9] || rev[6] || plan.estimate || @zero
   end
 
   @doc "Full schedule for the plan: pure `build_schedule/4` fed with manual paid data."
@@ -130,7 +173,11 @@ defmodule FullCircle.Tax do
   def create_or_update_plan(attrs, com, user) do
     fy_year = attrs["fy_year"] || attrs[:fy_year]
     plan = get_plan(com, fy_year) || %InstalmentPlan{}
-    attrs = Map.put(attrs, "company_id", com.id)
+
+    attrs =
+      attrs
+      |> Map.put("company_id", com.id)
+      |> Map.replace_lazy("paid_overrides", &sanitize_overrides/1)
     name = :update_instalment_plan
 
     Multi.new()
@@ -144,9 +191,47 @@ defmodule FullCircle.Tax do
     end
   end
 
-  defp to_int(i) when is_integer(i), do: i
-  defp to_int(s) when is_binary(s), do: String.to_integer(s)
+  # Keep only real month keys — form params carry `_unused_*` tracking keys.
+  defp sanitize_overrides(m) when is_map(m) do
+    for {k, v} <- m, to_month(k) != nil, into: %{}, do: {k, v}
+  end
+
+  defp sanitize_overrides(other), do: other
+
+  defp to_month(m) when is_integer(m), do: m
+
+  defp to_month(s) when is_binary(s) do
+    case Integer.parse(s) do
+      {m, ""} -> m
+      _ -> nil
+    end
+  end
+
+  defp to_month(_), do: nil
+  # Unlike to_decimal/1, returns nil (not 0) for blank/junk — a revision
+  # value must distinguish "not revised" from "revised to 0".
+  defp parse_decimal(%Decimal{} = dec), do: dec
+  defp parse_decimal(n) when is_integer(n) or is_float(n), do: Decimal.new("#{n}")
+
+  defp parse_decimal(s) when is_binary(s) do
+    case Decimal.parse(String.trim(s)) do
+      {dec, _} -> dec
+      :error -> nil
+    end
+  end
+
+  defp parse_decimal(_), do: nil
+
   defp to_decimal(nil), do: @zero
   defp to_decimal(%Decimal{} = d), do: d
+
+  # Form values arrive as strings and may be blank/garbage mid-edit.
+  defp to_decimal(s) when is_binary(s) do
+    case Decimal.parse(String.trim(s)) do
+      {d, _} -> d
+      :error -> @zero
+    end
+  end
+
   defp to_decimal(n), do: Decimal.new("#{n}")
 end

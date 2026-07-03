@@ -104,6 +104,43 @@ defmodule FullCircle.TaxComputeTest do
     end
   end
 
+  describe "revisions_by_month/1 and latest_estimate/1" do
+    test "keeps only revision months with parseable values" do
+      plan = %FullCircle.Tax.InstalmentPlan{
+        revisions: %{"6" => "5000", "7" => "1234", "9" => "", "11" => "abc", "_unused_6" => ""}
+      }
+
+      r = Tax.revisions_by_month(plan)
+      assert Decimal.equal?(r[6], d(5000))
+      assert map_size(r) == 1
+    end
+
+    test "explicit zero is a valid revision" do
+      plan = %FullCircle.Tax.InstalmentPlan{revisions: %{"9" => "0"}}
+      assert Decimal.equal?(Tax.revisions_by_month(plan)[9], d(0))
+    end
+
+    test "latest_estimate precedence is 11 -> 9 -> 6 -> original" do
+      base = %FullCircle.Tax.InstalmentPlan{estimate: d(8500)}
+      assert Decimal.equal?(Tax.latest_estimate(base), d(8500))
+      assert Decimal.equal?(Tax.latest_estimate(%{base | revisions: %{"6" => "5000"}}), d(5000))
+
+      assert Decimal.equal?(
+               Tax.latest_estimate(%{base | revisions: %{"6" => "5000", "9" => "7000"}}),
+               d(7000)
+             )
+
+      assert Decimal.equal?(
+               Tax.latest_estimate(%{base | revisions: %{"6" => "5000", "11" => "6000"}}),
+               d(6000)
+             )
+    end
+
+    test "revision_months/0" do
+      assert Tax.revision_months() == [6, 9, 11]
+    end
+  end
+
   describe "current_fy_month/3" do
     test "maps a date to its FY month index, clamped to 1..12" do
       com = %{closing_month: 12, closing_day: 31}
