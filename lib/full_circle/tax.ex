@@ -216,6 +216,7 @@ defmodule FullCircle.Tax do
       attrs
       |> Map.put("company_id", com.id)
       |> Map.replace_lazy("paid_overrides", &sanitize_overrides/1)
+      |> Map.replace_lazy("revisions", &sanitize_revisions/1)
     name = :update_instalment_plan
 
     Multi.new()
@@ -235,6 +236,13 @@ defmodule FullCircle.Tax do
   end
 
   defp sanitize_overrides(other), do: other
+
+  # Keep only CP204A revision months with parseable values (blank = not revised).
+  defp sanitize_revisions(m) when is_map(m) do
+    for {k, v} <- m, to_month(k) in @revision_months, parse_decimal(v) != nil, into: %{}, do: {k, v}
+  end
+
+  defp sanitize_revisions(other), do: other
 
   defp to_month(m) when is_integer(m), do: m
 

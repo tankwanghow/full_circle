@@ -299,6 +299,20 @@ defmodule FullCircle.TaxDBTest do
       assert Decimal.equal?(plan2.estimate, d(120000))
       assert Tax.get_plan(com, 2026).id == plan.id
     end
+
+    test "saving keeps only valid CP204A revisions", %{com: com, admin: admin} do
+      {:ok, plan} =
+        Tax.create_or_update_plan(
+          %{
+            "fy_year" => 2026,
+            "revisions" => %{"6" => "5000", "7" => "999", "9" => "", "11" => "0", "_unused_6" => ""}
+          },
+          com,
+          admin
+        )
+
+      assert plan.revisions == %{"6" => "5000", "11" => "0"}
+    end
   end
 
   describe "paid_by_month/1" do
