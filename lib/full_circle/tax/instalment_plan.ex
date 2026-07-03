@@ -8,6 +8,8 @@ defmodule FullCircle.Tax.InstalmentPlan do
     field(:estimate, :decimal, default: Decimal.new("0"))
     field(:estimate_month, :integer, default: 1)
     field(:paid_overrides, :map, default: %{})
+    # CP204A: %{revision_month => revised annual estimate} — only "6"/"9"/"11" are honoured
+    field(:revisions, :map, default: %{})
     field(:remedy_director_count, :integer, default: 1)
     field(:remedy_existing_income, :decimal, default: Decimal.new(0))
 
@@ -25,6 +27,7 @@ defmodule FullCircle.Tax.InstalmentPlan do
       :estimate,
       :estimate_month,
       :paid_overrides,
+      :revisions,
       :remedy_director_count,
       :remedy_existing_income,
       :company_id

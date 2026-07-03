@@ -55,6 +55,15 @@ defmodule FullCircle.TaxComputeTest do
       assert Decimal.equal?(Enum.at(rows, 1).instalment_due, d(0))
     end
 
+    test "a month with tax paid is settled -> its due is 0" do
+      paid = %{3 => d(5000)}
+      rows = Tax.build_schedule(bounds(), paid, d(120000), 1)
+      assert Decimal.equal?(Enum.at(rows, 2).instalment_due, d(0))
+      # untouched months keep the spread instalment
+      assert Decimal.equal?(Enum.at(rows, 1).instalment_due, d(10000))
+      assert Decimal.equal?(Enum.at(rows, 3).instalment_due, d(10000))
+    end
+
     test "estimate 0 -> all due 0" do
       rows = Tax.build_schedule(bounds(), %{}, d(0), 1)
       assert Enum.all?(rows, &Decimal.equal?(&1.instalment_due, d(0)))
@@ -72,6 +81,26 @@ defmodule FullCircle.TaxComputeTest do
       paid = %{1 => d(200000)}
       rows = Tax.build_schedule(bounds(), paid, d(120000), 2)
       assert Decimal.compare(Enum.at(rows, 0).balance, d(0)) == :lt
+    end
+  end
+
+  describe "paid_by_month/1" do
+    test "blank or invalid form values read as 0" do
+      plan = %FullCircle.Tax.InstalmentPlan{paid_overrides: %{"2" => "", "3" => "abc", "4" => " 7500.50 "}}
+      pm = Tax.paid_by_month(plan)
+      assert Decimal.equal?(Map.get(pm, 2), d(0))
+      assert Decimal.equal?(Map.get(pm, 3), d(0))
+      assert Decimal.equal?(Map.get(pm, 4), d("7500.50"))
+    end
+
+    test "drops LiveView _unused_* form-tracking keys" do
+      plan = %FullCircle.Tax.InstalmentPlan{
+        paid_overrides: %{"1" => "1000", "_unused_1" => "", "_unused_12" => ""}
+      }
+
+      pm = Tax.paid_by_month(plan)
+      assert Decimal.equal?(Map.get(pm, 1), d(1000))
+      assert map_size(pm) == 1
     end
   end
 
@@ -128,6 +157,12 @@ defmodule FullCircle.TaxSchemaTest do
       cs = chg(%{company_id: Ecto.UUID.generate(), fy_year: 2026, paid_overrides: %{"3" => "100.00"}})
       assert cs.valid?
       assert Ecto.Changeset.get_field(cs, :paid_overrides) == %{"3" => "100.00"}
+    end
+
+    test "accepts a revisions map" do
+      cs = chg(%{company_id: Ecto.UUID.generate(), fy_year: 2026, revisions: %{"6" => "5000"}})
+      assert cs.valid?
+      assert Ecto.Changeset.get_field(cs, :revisions) == %{"6" => "5000"}
     end
 
     test "accepts remedy director fields" do
@@ -187,6 +222,16 @@ defmodule FullCircle.TaxDBTest do
       assert Decimal.equal?(Map.get(pm, 1, d(0)), d(0))
     end
 
+    test "saving strips _unused_* form-tracking keys from paid_overrides", %{com: com, admin: admin} do
+      {:ok, plan} =
+        Tax.create_or_update_plan(
+          %{"fy_year" => 2026, "paid_overrides" => %{"2" => "8000", "_unused_2" => "", "_unused_5" => ""}},
+          com, admin
+        )
+
+      assert plan.paid_overrides == %{"2" => "8000"}
+    end
+
     test "no overrides -> empty map", %{com: com, admin: admin} do
       {:ok, plan} = Tax.create_or_update_plan(%{"fy_year" => 2026}, com, admin)
       pm = Tax.paid_by_month(plan)
@@ -204,7 +249,9 @@ defmodule FullCircle.TaxDBTest do
       rows = Tax.schedule(plan, com)
       assert length(rows) == 12
       assert Decimal.equal?(Enum.at(rows, 0).paid, d(1000))
-      assert Decimal.equal?(Enum.at(rows, 0).instalment_due, d(10000))
+      # month 1 has tax paid -> settled, no instalment due
+      assert Decimal.equal?(Enum.at(rows, 0).instalment_due, d(0))
+      assert Decimal.equal?(Enum.at(rows, 1).instalment_due, d(10000))
     end
   end
 end
