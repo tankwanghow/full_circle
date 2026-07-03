@@ -177,9 +177,10 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
 
   @impl true
   def handle_event("revise_plan", _params, socket) do
-    # Revise recomputes the estimate from a fresh forecast and the on-screen plan
-    # (socket.assigns.plan, kept live by "plan_changed" — includes unsaved paid
-    # cells and tolerance edits), then saves the result.
+    # Revise fills the NEXT open CP204A window (6/9/11) at/after the as-of
+    # month with the forecast-suggested estimate, then saves. It works off the
+    # on-screen plan (kept live by "plan_changed") and never touches the
+    # original estimate/estimate_month.
     com = socket.assigns.current_company
     fy_year = safe_int(socket.assigns.search.fy_year, default_fy_year(com))
 
@@ -189,25 +190,36 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
         _ -> Date.utc_today()
       end
 
-    plan = socket.assigns.plan
-    tol = (plan && plan.tolerance_pct) || Decimal.new(30)
-    forecast_tax = FullCircle.Tax.forecast_annual_tax(com, fy_year, as_of)
-    suggested = FullCircle.Tax.suggested_estimate(forecast_tax, tol)
+    cur = FullCircle.Tax.current_fy_month(com, fy_year, as_of)
 
-    attrs = %{
-      "fy_year" => fy_year,
-      "tolerance_pct" => Decimal.to_string(tol),
-      "estimate" => Decimal.to_string(suggested),
-      "estimate_month" => FullCircle.Tax.current_fy_month(com, fy_year, as_of),
-      "paid_overrides" => (plan && plan.paid_overrides) || %{}
-    }
+    case Enum.find(FullCircle.Tax.revision_months(), &(&1 >= cur)) do
+      nil ->
+        {:noreply, put_flash(socket, :error, gettext("No CP204A window left this year."))}
 
-    case FullCircle.Tax.create_or_update_plan(attrs, com, socket.assigns.current_user) do
-      {:ok, plan} ->
-        {:noreply, assign(socket, plan: plan, plan_schedule: FullCircle.Tax.schedule(plan, com))}
+      window ->
+        plan = socket.assigns.plan
+        tol = plan.tolerance_pct || Decimal.new(30)
+        forecast_tax = FullCircle.Tax.forecast_annual_tax(com, fy_year, as_of)
+        suggested = FullCircle.Tax.suggested_estimate(forecast_tax, tol)
 
-      {:error, _} ->
-        {:noreply, put_flash(socket, :error, gettext("Could not revise the estimate."))}
+        attrs = %{
+          "fy_year" => fy_year,
+          "tolerance_pct" => Decimal.to_string(tol),
+          "estimate" => Decimal.to_string(plan.estimate || Decimal.new(0)),
+          "estimate_month" => plan.estimate_month || 1,
+          "paid_overrides" => plan.paid_overrides || %{},
+          "revisions" =>
+            Map.put(plan.revisions || %{}, "#{window}", Decimal.to_string(suggested))
+        }
+
+        case FullCircle.Tax.create_or_update_plan(attrs, com, socket.assigns.current_user) do
+          {:ok, plan} ->
+            {:noreply,
+             assign(socket, plan: plan, plan_schedule: FullCircle.Tax.schedule(plan, com))}
+
+          {:error, _} ->
+            {:noreply, put_flash(socket, :error, gettext("Could not revise the estimate."))}
+        end
     end
   end
 
