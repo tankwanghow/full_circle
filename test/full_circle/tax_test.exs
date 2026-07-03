@@ -27,7 +27,7 @@ defmodule FullCircle.TaxComputeTest do
     end
   end
 
-  describe "build_schedule/4" do
+  describe "build_schedule" do
     defp bounds do
       for m <- 1..12, do: {Date.new!(2026, m, 1), Date.new!(2026, m, Date.days_in_month(Date.new!(2026, m, 1)))}
     end
@@ -75,6 +75,57 @@ defmodule FullCircle.TaxComputeTest do
       # paid_to_date = 5000 (months < 12); remaining = 1; forward = 115000
       assert Decimal.equal?(Enum.at(rows, 11).instalment_due, d(115000))
       assert Enum.all?(Enum.take(rows, 11), &Decimal.equal?(&1.instalment_due, d(0)))
+    end
+
+    test "single revision at month 6 re-spreads from month 6" do
+      rows = Tax.build_schedule(bounds(), %{}, d(8500), 1, %{6 => d(5000)})
+      assert Decimal.equal?(Decimal.round(Enum.at(rows, 0).instalment_due, 2), d("708.33"))
+      assert Decimal.equal?(Decimal.round(Enum.at(rows, 4).instalment_due, 2), d("708.33"))
+      # payable before 6 = 5 x 708.33..; (5000 - 3541.66..) / 7
+      assert Decimal.equal?(Decimal.round(Enum.at(rows, 5).instalment_due, 2), d("208.33"))
+      assert Decimal.equal?(Decimal.round(Enum.at(rows, 11).instalment_due, 2), d("208.33"))
+      assert Decimal.equal?(Enum.at(rows, 4).estimate_in_force, d(8500))
+      assert Decimal.equal?(Enum.at(rows, 5).estimate_in_force, d(5000))
+    end
+
+    test "later revision supersedes the earlier one" do
+      rows = Tax.build_schedule(bounds(), %{}, d(12000), 1, %{6 => d(9000), 9 => d(15000)})
+      assert Decimal.equal?(Enum.at(rows, 0).instalment_due, d(1000))
+      # (9000 - 5000) / 7
+      assert Decimal.equal?(Decimal.round(Enum.at(rows, 5).instalment_due, 2), d("571.43"))
+      # payable before 9 = 5000 + 3 x 571.42..; (15000 - 6714.28..) / 4
+      assert Decimal.equal?(Decimal.round(Enum.at(rows, 8).instalment_due, 2), d("2071.43"))
+      assert Decimal.equal?(Enum.at(rows, 11).estimate_in_force, d(15000))
+    end
+
+    test "revision below what is already payable floors remaining dues at 0" do
+      rows = Tax.build_schedule(bounds(), %{}, d(12000), 1, %{9 => d(5000)})
+      assert Decimal.equal?(Enum.at(rows, 8).instalment_due, d(0))
+      assert Decimal.equal?(Enum.at(rows, 11).instalment_due, d(0))
+    end
+
+    test "revision before estimate_month is ignored" do
+      rows = Tax.build_schedule(bounds(), %{}, d(12000), 8, %{6 => d(5000)})
+      assert Decimal.equal?(Enum.at(rows, 5).instalment_due, d(0))
+      assert Decimal.equal?(Enum.at(rows, 7).instalment_due, d(2400))
+      assert Decimal.equal?(Enum.at(rows, 7).estimate_in_force, d(12000))
+    end
+
+    test "balance tracks the estimate in force; settled months still count as payable" do
+      rows = Tax.build_schedule(bounds(), %{1 => d(1000)}, d(12000), 1, %{6 => d(6000)})
+      # month 1 paid -> displayed due 0, but its scheduled 1000 still counts toward payable
+      assert Decimal.equal?(Enum.at(rows, 0).instalment_due, d(0))
+      assert Decimal.equal?(Enum.at(rows, 0).balance, d(11000))
+      # (6000 - 5 x 1000) / 7
+      assert Decimal.equal?(Decimal.round(Enum.at(rows, 5).instalment_due, 2), d("142.86"))
+      assert Decimal.equal?(Enum.at(rows, 5).balance, d(5000))
+    end
+
+    test "no revisions -> original spread, estimate-based balance, in_force = estimate (regression)" do
+      rows = Tax.build_schedule(bounds(), %{1 => d(1000)}, d(120000), 1)
+      assert Decimal.equal?(Enum.at(rows, 1).instalment_due, d(10000))
+      assert Decimal.equal?(Enum.at(rows, 0).balance, d(119000))
+      assert Enum.all?(rows, &Decimal.equal?(&1.estimate_in_force, d(120000)))
     end
 
     test "balance goes negative when over-paid (outstanding semantic)" do
