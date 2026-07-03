@@ -42,7 +42,8 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
          tax_rate: Decimal.new(0),
          full_amounts: false,
          plan: nil,
-         plan_schedule: []
+         plan_schedule: [],
+         prior_latest: nil
        )}
     end
   end
@@ -73,9 +74,17 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
           estimate_month: FullCircle.Tax.current_fy_month(com, fy_year, as_of)
         }
 
+    prior_plan = FullCircle.Tax.get_plan(com, fy_year - 1)
+    prior_latest = prior_plan && FullCircle.Tax.latest_estimate(prior_plan)
+
     {:noreply,
      socket
-     |> assign(search: search, plan: plan, plan_schedule: FullCircle.Tax.schedule(plan, com))
+     |> assign(
+       search: search,
+       plan: plan,
+       plan_schedule: FullCircle.Tax.schedule(plan, com),
+       prior_latest: prior_latest
+     )
      |> run_forecast(search)}
   end
 
@@ -324,6 +333,7 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
               plan={@plan}
               schedule={@plan_schedule}
               fy_year={@search.fy_year}
+              prior_latest={@prior_latest}
             />
           </div>
         </:result_html>
@@ -340,6 +350,7 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
   attr :plan, :any, required: true
   attr :schedule, :list, required: true
   attr :fy_year, :any, required: true
+  attr :prior_latest, :any, default: nil
 
   defp tax_plan_section(assigns) do
     tol = assigns.plan.tolerance_pct || Decimal.new(30)
@@ -397,6 +408,16 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
 
     headroom = Decimal.sub(analysis.penalty_ceiling, assigns.forecast_tax)
 
+    floor =
+      if assigns.prior_latest && Decimal.compare(assigns.prior_latest, Decimal.new(0)) == :gt,
+        do: Decimal.mult(assigns.prior_latest, Decimal.new("0.85")),
+        else: nil
+
+    floor_breach? =
+      floor != nil and assigns.plan.estimate != nil and
+        Decimal.compare(assigns.plan.estimate, Decimal.new(0)) == :gt and
+        Decimal.compare(assigns.plan.estimate, floor) == :lt
+
     assigns =
       assign(assigns,
         tol: tol,
@@ -407,6 +428,8 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
         over: over,
         comparison: comparison,
         headroom: headroom,
+        floor: floor,
+        floor_breach?: floor_breach?,
         show_panel: show_panel,
         rate: rate,
         rate_pos: rate_pos
@@ -415,6 +438,23 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
     ~H"""
     <div class="mt-6 w-8/12 mx-auto">
       <p class="text-xl font-semibold text-center mb-3">{gettext("CP204 Tax Instalment Plan")}</p>
+
+      <%!-- s.107C(3): estimate must be >= 85% of last year's latest estimate --%>
+      <div
+        :if={@floor_breach?}
+        class="mb-3 rounded border border-amber-400 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-700 px-3 py-2 text-sm"
+      >
+        <p class="font-semibold">{gettext("Below the 85% floor (s.107C(3))")}</p>
+        <p class="mt-1">
+          {gettext("Original estimate")}
+          <span class="font-mono font-semibold">{plan_money(@plan.estimate)}</span>
+          {gettext("is below 85% of last year's latest estimate")}
+          <span class="font-mono">{plan_money(@prior_latest)}</span>
+          — {gettext("floor")}
+          <span class="font-mono font-semibold">{plan_money(@floor)}</span>.
+          {gettext("File at least the floor and revise down at the 6th month (CP204A), or appeal to LHDN.")}
+        </p>
+      </div>
 
       <%!-- Estimate position banner --%>
       <div
