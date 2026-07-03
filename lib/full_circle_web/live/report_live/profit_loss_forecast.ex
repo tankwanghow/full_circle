@@ -146,6 +146,23 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
   end
 
   @impl true
+  def handle_event("plan_changed", %{"plan" => params}, socket) do
+    # Live preview: apply the form edits to the in-memory plan (nothing is
+    # persisted) so Instalment Due / Balance and the analysis panels recompute
+    # as the user types. Blank/invalid values are treated as unchanged or 0.
+    plan =
+      socket.assigns.plan
+      |> FullCircle.Tax.InstalmentPlan.changeset(params)
+      |> Ecto.Changeset.apply_changes()
+
+    {:noreply,
+     assign(socket,
+       plan: plan,
+       plan_schedule: FullCircle.Tax.schedule(plan, socket.assigns.current_company)
+     )}
+  end
+
+  @impl true
   def handle_event("save_plan", %{"plan" => params}, socket) do
     com = socket.assigns.current_company
 
@@ -160,9 +177,9 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
 
   @impl true
   def handle_event("revise_plan", _params, socket) do
-    # Revise recomputes the estimate from a fresh forecast and the LAST SAVED plan
-    # (socket.assigns.plan) — unsaved form edits (paid cells, tolerance) are
-    # intentionally ignored; Save first to keep them.
+    # Revise recomputes the estimate from a fresh forecast and the on-screen plan
+    # (socket.assigns.plan, kept live by "plan_changed" — includes unsaved paid
+    # cells and tolerance edits), then saves the result.
     com = socket.assigns.current_company
     fy_year = safe_int(socket.assigns.search.fy_year, default_fy_year(com))
 
@@ -316,9 +333,17 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
     tol = assigns.plan.tolerance_pct || Decimal.new(30)
     suggested = FullCircle.Tax.suggested_estimate(assigns.forecast_tax, tol)
 
-    chosen =
+    original =
       if assigns.plan.estimate && Decimal.compare(assigns.plan.estimate, Decimal.new(0)) == :gt,
         do: assigns.plan.estimate,
+        else: suggested
+
+    latest = FullCircle.Tax.latest_estimate(assigns.plan)
+
+    # Penalty/remedy checks run against the estimate in force (latest CP204A).
+    chosen =
+      if Decimal.compare(latest, Decimal.new(0)) == :gt,
+        do: latest,
         else: suggested
 
     rate = assigns.tax_rate || Decimal.new(0)
@@ -364,6 +389,7 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
       assign(assigns,
         tol: tol,
         suggested: suggested,
+        original: original,
         chosen: chosen,
         analysis: analysis,
         over: over,
@@ -444,6 +470,7 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
         for={%{}}
         id="plan-form"
         phx-submit="save_plan"
+        phx-change="plan_changed"
         autocomplete="off"
         class="w-full"
       >
@@ -478,8 +505,8 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
                 type="number"
                 step="0.01"
                 min="0"
-                label={gettext("Chosen estimate")}
-                value={Decimal.to_string(@chosen)}
+                label={gettext("Original estimate")}
+                value={Decimal.to_string(@original)}
               />
             </div>
             <div class="flex gap-2 items-end">
@@ -489,6 +516,22 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
               </button>
             </div>
           </div>
+          <div class="grid grid-cols-3 gap-3 items-end mt-2">
+            <div :for={r <- FullCircle.Tax.revision_months()}>
+              <.input
+                name={"plan[revisions][#{r}]"}
+                id={"plan_revision_#{r}"}
+                type="number"
+                step="0.01"
+                min="0"
+                label={gettext("CP204A @ month %{m}", m: r)}
+                value={Map.get(@plan.revisions || %{}, "#{r}")}
+              />
+            </div>
+          </div>
+          <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            {gettext("Enter the revised annual estimate (not the monthly instalment). Blank = not revised. Instalments re-spread from the revision month.")}
+          </p>
           <p
             :if={Decimal.compare(@forecast_tax, Decimal.new(0)) != :gt}
             class="text-sm text-gray-500 dark:text-gray-400 mt-2"
@@ -524,6 +567,12 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
               >
                 <td class="px-2 text-left">
                   {Date.to_iso8601(r.period_start)} → {Date.to_iso8601(r.period_end)}
+                  <span
+                    :if={revision_month?(r.month_no)}
+                    class="ml-1 inline-block align-middle rounded px-1.5 py-0.5 text-[10px] font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300"
+                  >
+                    {gettext("CP204A revision")}
+                  </span>
                 </td>
                 <td class="px-2 font-mono">{plan_money(r.instalment_due)}</td>
                 <td class="px-2 font-mono">
@@ -539,6 +588,9 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
               </tr>
             </tbody>
           </table>
+          <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 text-left">
+            {gettext("The CP204 estimate can be revised (Form CP204A) in the 6th, 9th and 11th month of the basis period — marked above. Enter revisions in the CP204A fields; instalments re-spread from that month.")}
+          </p>
         </div>
       </.form>
     </div>
@@ -636,6 +688,8 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
     </div>
     """
   end
+
+  defp revision_month?(month_no), do: month_no in FullCircle.Tax.revision_months()
 
   defp position_banner_class(:under),
     do: "border-red-400 bg-red-100 dark:bg-red-950/40 dark:border-red-700"
