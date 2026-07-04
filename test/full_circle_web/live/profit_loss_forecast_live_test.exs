@@ -201,11 +201,11 @@ defmodule FullCircleWeb.ProfitLossForecastLiveTest do
       assert html =~ "Net-profit ceiling before penalty"
     end
 
-    # Revise recomputes the estimate from a fresh forecast + the last saved plan, then
-    # persists it. We assert the plan is saved with a positive estimate and the current
-    # FY instalment month. The exact estimate value depends on the forecast projection
-    # (trailing run-rate over the whole year), so locking it would be flaky; asserting
-    # estimate > 0 and the expected estimate_month robustly captures the revise behavior.
+    # Revise fills the NEXT open CP204A window (6/9/11) at/after the as-of month with
+    # the forecast-suggested estimate and persists it; the original estimate and
+    # estimate_month are untouched. The exact suggested value depends on the forecast
+    # projection, so we assert it is positive rather than locking a figure. Past month
+    # 11 (Dec run) there is no window left and nothing is saved.
     test "Revise recomputes and persists a positive estimate for the current FY month", %{
       conn: _conn,
       user: user
@@ -243,12 +243,23 @@ defmodule FullCircleWeb.ProfitLossForecastLiveTest do
       lv |> element("button", "Revise") |> render_click()
 
       fy_year = 2026
-      plan = FullCircle.Tax.get_plan(com, fy_year)
-      assert plan != nil
-      assert Decimal.compare(plan.estimate, Decimal.new(0)) == :gt
+      cur = FullCircle.Tax.current_fy_month(com, fy_year, Date.utc_today())
 
-      assert plan.estimate_month ==
-               FullCircle.Tax.current_fy_month(com, fy_year, Date.utc_today())
+      case Enum.find(FullCircle.Tax.revision_months(), &(&1 >= cur)) do
+        nil ->
+          # December run: no CP204A window left, Revise saves nothing.
+          assert FullCircle.Tax.get_plan(com, fy_year) == nil
+
+        window ->
+          plan = FullCircle.Tax.get_plan(com, fy_year)
+          assert plan != nil
+          # the original estimate is untouched (this plan had none)
+          assert Decimal.compare(plan.estimate, Decimal.new(0)) == :eq
+          # the revision landed in the next open window with a positive suggestion
+          revised = Map.fetch!(plan.revisions, "#{window}")
+          assert Decimal.compare(Decimal.new(revised), Decimal.new(0)) == :gt
+          assert Decimal.compare(FullCircle.Tax.latest_estimate(plan), Decimal.new(0)) == :gt
+      end
     end
 
     test "remedy panel shows under-estimation comparison when estimate too low", %{conn: _conn, user: user} do
