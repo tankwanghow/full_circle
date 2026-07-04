@@ -121,6 +121,21 @@ defmodule FullCircle.TaxComputeTest do
       assert Decimal.equal?(Enum.at(rows, 5).balance, d(5000))
     end
 
+    test "re-spread deducts actual payments when they exceed the schedule" do
+      # Screenshot scenario: original 3.3M from month 5, paid 275k in months 1-9
+      # (2,475,000 total), revised to 1.6M at 6/9/11 — everything after month 9
+      # is already covered by actual payments, so no further instalments are due.
+      paid = for m <- 1..9, into: %{}, do: {m, d(275_000)}
+      revs = %{6 => d(1_600_000), 9 => d(1_600_000), 11 => d(1_600_000)}
+      rows = Tax.build_schedule(bounds(), paid, d(3_300_000), 5, revs)
+
+      assert Decimal.equal?(Enum.at(rows, 9).instalment_due, d(0))
+      assert Decimal.equal?(Enum.at(rows, 10).instalment_due, d(0))
+      assert Decimal.equal?(Enum.at(rows, 11).instalment_due, d(0))
+      # balance vs the in-force 1.6M estimate: 1.6M - 2,475,000 paid
+      assert Decimal.equal?(List.last(rows).balance, d(-875_000))
+    end
+
     test "no revisions -> original spread, estimate-based balance, in_force = estimate (regression)" do
       rows = Tax.build_schedule(bounds(), %{1 => d(1000)}, d(120000), 1)
       assert Decimal.equal?(Enum.at(rows, 1).instalment_due, d(10000))

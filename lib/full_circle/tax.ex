@@ -60,10 +60,11 @@ defmodule FullCircle.Tax do
   `revisions` is `%{revision_month => revised annual estimate}` (see
   `revisions_by_month/1`). The original `estimate` spreads evenly from
   `estimate_month`; at each revision month the instalment re-spreads as
-  `(revised estimate - payable so far) / remaining months`, where payable =
-  paid before `estimate_month` + scheduled instalments since. A month with
-  tax already paid is settled — its displayed due is 0, but its scheduled
-  instalment still counts toward payable. `balance` and `estimate_in_force`
+  `(revised estimate - payable so far) / remaining months`, where payable
+  accumulates, per month, the HIGHER of the scheduled instalment and the
+  actual paid amount (LHDN's CP204A deducts payments made; scheduled covers
+  future months not yet paid when planning ahead). A month with tax already
+  paid is settled — its displayed due is 0. `balance` and `estimate_in_force`
   track the estimate in force each month.
   """
   def build_schedule(month_bounds, paid_by_month, estimate, estimate_month, revisions \\ %{}) do
@@ -75,7 +76,7 @@ defmodule FullCircle.Tax do
     remaining = 12 - estimate_month + 1
     forward = Decimal.div(max_zero(Decimal.sub(estimate, paid_to_date)), Decimal.new(remaining))
 
-    init = %{forward: forward, in_force: estimate, payable: paid_to_date}
+    init = %{forward: forward, in_force: estimate, payable: @zero}
 
     {months, _} =
       Enum.map_reduce(1..12, init, fn m, acc ->
@@ -95,9 +96,10 @@ defmodule FullCircle.Tax do
           end
 
         scheduled = if m >= estimate_month, do: acc.forward, else: @zero
+        paid = Map.get(paid_by_month, m, @zero)
 
         {%{scheduled: scheduled, in_force: acc.in_force},
-         %{acc | payable: Decimal.add(acc.payable, scheduled)}}
+         %{acc | payable: Decimal.add(acc.payable, Decimal.max(scheduled, paid))}}
       end)
 
     {rows, _cum_paid} =

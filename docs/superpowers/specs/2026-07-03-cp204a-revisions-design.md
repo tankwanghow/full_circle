@@ -62,15 +62,17 @@ kept — it is a valid revised estimate).
     estimate_month) ÷ remaining months`, floored at 0 (unchanged).
   - At each revision month `r` (only when `r ≥ estimate_month`), with revised
     estimate `E_r`: instalment from `r` onward =
-    `max(E_r − payable_before_r, 0) ÷ (12 − r + 1)`, where **payable** =
-    actual paid in months before `estimate_month` (the amount already deducted
-    from the original spread) **plus** the cumulative *scheduled* instalments
-    from `estimate_month` to `r − 1` — deterministic, so editing a Tax Paid
-    cell for a scheduled month never reshuffles future dues. A later revision
-    supersedes an earlier one.
+    `max(E_r − payable_before_r, 0) ÷ (12 − r + 1)`, where **payable**
+    accumulates, per month before `r`, the **higher of the scheduled
+    instalment and the actual paid amount**. LHDN's CP204A formula deducts
+    payments made — so payments exceeding the schedule reduce future dues
+    (possibly to 0) — while the scheduled amount still counts for future
+    months not yet paid when planning ahead. A later revision supersedes an
+    earlier one. *(Amended 2026-07-04: originally scheduled-only, which
+    wrongly kept charging instalments after actual payments already exceeded
+    the revised estimate.)*
   - Display rule (existing): a month with `paid > 0` shows Instalment Due 0
-    ("settled"), but its **underlying scheduled instalment still counts toward
-    payable**.
+    ("settled"); it counts toward payable at `max(scheduled, paid)`.
   - Row shape gains `estimate_in_force`; `balance(m) = estimate_in_force(m) −
     cumulative paid(m)`. With no revisions this equals today's
     `estimate − cum_paid` exactly (no behavior change).
