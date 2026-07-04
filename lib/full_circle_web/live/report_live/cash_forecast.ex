@@ -444,6 +444,7 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
             <th class="px-1 text-green-700 dark:text-green-400">{gettext("Free Cash")}</th>
             <th class="px-1 border-l dark:border-gray-600 text-gray-500 dark:text-gray-400">{gettext("Receivable")}</th>
             <th class="px-1 text-gray-500 dark:text-gray-400">{gettext("Payable")}</th>
+            <th class="px-1 text-gray-500 dark:text-gray-400">{gettext("Discr. Out")}</th>
           </tr>
         </thead>
         <tbody>
@@ -483,6 +484,9 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
               <span :if={p.source != :actual} class="text-gray-500 dark:text-gray-400">
                 {compact(p.baseline_in)}
               </span>
+              <div :if={p.source == :actual && split_line(p, :in)} class="text-xs text-gray-500 dark:text-gray-400 leading-tight whitespace-nowrap">
+                {split_line(p, :in)}
+              </div>
             </td>
             <td class="font-mono px-1">
               <span
@@ -497,6 +501,9 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
               <span :if={p.source != :actual} class="text-gray-500 dark:text-gray-400">
                 {compact(p.baseline_out)}
               </span>
+              <div :if={p.source == :actual && split_line(p, :out)} class="text-xs text-gray-500 dark:text-gray-400 leading-tight whitespace-nowrap">
+                {split_line(p, :out)}
+              </div>
             </td>
             <td class="font-mono px-1 font-bold">{compact(p.closing)}</td>
             <td class="font-mono px-1">{compact(p.buffer)}</td>
@@ -507,6 +514,9 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
               {compact(p.receivable)}
             </td>
             <td class="font-mono px-1 text-gray-500 dark:text-gray-400">{compact(p.payable)}</td>
+            <td class="font-mono px-1 text-gray-500 dark:text-gray-400">
+              {compact(p.disc_out)}<span :if={p.source != :actual} class="text-xs italic"> {gettext("LY")}</span>
+            </td>
           </tr>
         </tbody>
       </table>
@@ -546,7 +556,15 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
           <dt class="inline font-semibold">{gettext("Base In")} / {gettext("Base Out")}:</dt>
           <dd class="inline">
             {gettext(
-              "The period's cash in/out. For an Actual period it is the REAL total throughput (click it to see the transactions). For a Forecast period it is the run-rate — this company's average operating throughput per period from the trailing window (treasury transfers excluded)."
+              "The period's cash in/out. For an Actual period it is the REAL total throughput (click it to see the transactions); the small line beneath splits it into op = operating (the part comparable to Forecast rows), tr = treasury (the company's own money moving: FD, interbank), di = discretionary (excluded accounts). For a Forecast period it is the run-rate — this company's average operating throughput per period from the trailing window (treasury transfers excluded)."
+            )}
+          </dd>
+        </div>
+        <div>
+          <dt class="inline font-semibold">{gettext("Discr. Out")}:</dt>
+          <dd class="inline">
+            {gettext(
+              "Discretionary cash paid out (dividends, director fees — the accounts excluded in Settings). Actual periods show what was really paid; Forecast periods show the same calendar window one year earlier (LY) as a reminder — it is NOT included in Closing or Free Cash."
             )}
           </dd>
         </div>
@@ -576,6 +594,24 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
       </p>
     </div>
     """
+  end
+
+  # "op 4.13M · tr 8.63M · di 7.04M" under an actual Base In/Out figure — only
+  # when the total contains treasury or discretionary flow, else nil (no line).
+  defp split_line(p, dir) do
+    {oper, treas, disc} =
+      case dir do
+        :in -> {p.oper_in, p.treas_in, p.disc_in}
+        :out -> {p.oper_out, p.treas_out, p.disc_out}
+      end
+
+    zero = Decimal.new(0)
+
+    if Decimal.compare(treas, zero) == :gt or Decimal.compare(disc, zero) == :gt do
+      [{"op", oper}, {"tr", treas}, {"di", disc}]
+      |> Enum.filter(fn {_, v} -> Decimal.compare(v, zero) == :gt end)
+      |> Enum.map_join(" · ", fn {k, v} -> "#{k} #{compact(v)}" end)
+    end
   end
 
   defp fmt(%Decimal{} = d), do: Number.Delimit.number_to_delimited(d)

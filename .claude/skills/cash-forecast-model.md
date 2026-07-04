@@ -70,6 +70,11 @@ discretionary flows, by design.
 - The Receivable/Payable columns are contact-balance levels (actual balances
   for elapsed periods, trailing trend projected forward) — informational only,
   they do NOT feed the closing/free-cash math.
+- Every period also carries a display split (`oper_/treas_/disc_ in/out`):
+  actual rows partition their total Base In/Out into operating + treasury +
+  discretionary (excluded-account docs); forecast rows set `disc_out` to the
+  same calendar window one year earlier (the "Discr. Out … LY" memo column).
+  All of these are display-only — the roll-forward uses `baseline_in/out`.
 - Tests asserting forecast amounts must mirror the implementation's Decimal
   operation order (e.g. `Decimal.mult(sum, Decimal.div(d(30), d(365)))`, not
   `sum × 30 ÷ 365`) or 28-digit rounding breaks `Decimal.equal?`; use a

@@ -377,9 +377,36 @@ defmodule FullCircle.Reporting.CashForecast do
 
     arap = arap_per_period(com, bounds, today, trailing_days, period_days)
 
+    # Display split for actual rows (their Base In/Out is total flow) and the
+    # last-year discretionary memo for forecast rows. Neither feeds the roll-forward.
+    splits = period_splits(ids, start_date, period_days, periods_count, today, com, excluded)
+    disc_ly = discretionary_ly_out(ids, fbounds, period_days, com, excluded)
+    n_actual = periods_count - length(fbounds)
+
     periods =
       Enum.zip(result.periods, arap)
-      |> Enum.map(fn {p, {recv, pay}} -> Map.merge(p, %{receivable: recv, payable: pay}) end)
+      |> Enum.with_index()
+      |> Enum.map(fn {{p, {recv, pay}}, i} ->
+        extra =
+          if p.source == :actual do
+            s = Map.get(splits, i, %{treas_in: @zero, treas_out: @zero, disc_in: @zero, disc_out: @zero})
+
+            %{
+              oper_in: p.baseline_in |> Decimal.sub(s.treas_in) |> Decimal.sub(s.disc_in),
+              oper_out: p.baseline_out |> Decimal.sub(s.treas_out) |> Decimal.sub(s.disc_out),
+              treas_in: s.treas_in, treas_out: s.treas_out,
+              disc_in: s.disc_in, disc_out: s.disc_out
+            }
+          else
+            %{
+              oper_in: p.baseline_in, oper_out: p.baseline_out,
+              treas_in: @zero, treas_out: @zero,
+              disc_in: @zero, disc_out: Enum.at(disc_ly, i - n_actual, @zero)
+            }
+          end
+
+        p |> Map.merge(extra) |> Map.merge(%{receivable: recv, payable: pay})
+      end)
 
     %{result | periods: periods}
   end
@@ -443,6 +470,84 @@ defmodule FullCircle.Reporting.CashForecast do
     else
       bucketed_flows(account_ids, start_date, period_days, upper, com)
     end
+  end
+
+  # Rows whose document touches a user-excluded (discretionary) account.
+  defp touches_excluded(excluded_ids) do
+    dynamic(
+      [t],
+      not is_nil(t.doc_id) and
+        fragment(
+          "exists (select 1 from transactions x where x.doc_id = ? and x.company_id = ? and x.account_id::text = any(?))",
+          t.doc_id,
+          t.company_id,
+          ^excluded_ids
+        )
+    )
+  end
+
+  # Pure treasury transfers: contact-null document whose every leg is an asset-type
+  # account (bank <-> FD, bank <-> bank) and which is not already discretionary.
+  defp treasury_only(excluded_ids) do
+    base =
+      dynamic(
+        [t],
+        is_nil(t.contact_id) and not is_nil(t.doc_id) and
+          not fragment(
+            "exists (select 1 from transactions x join accounts xa on xa.id = x.account_id where x.doc_id = ? and x.company_id = ? and (x.contact_id is not null or xa.account_type <> all(?)))",
+            t.doc_id,
+            t.company_id,
+            ^@asset_types
+          )
+      )
+
+    if excluded_ids == [] do
+      base
+    else
+      dynamic([t], ^base and not (^touches_excluded(excluded_ids)))
+    end
+  end
+
+  # Treasury / discretionary in-out per elapsed period, for the actual rows'
+  # display split (operating = total - treasury - discretionary).
+  defp period_splits(account_ids, start_date, period_days, periods_count, today, com, excluded_ids) do
+    horizon_end = Date.add(start_date, period_days * periods_count)
+    upper = if Date.compare(today, horizon_end) == :lt, do: today, else: horizon_end
+
+    if Date.compare(upper, start_date) != :gt do
+      %{}
+    else
+      treas = bucketed_flows(account_ids, start_date, period_days, upper, com, treasury_only(excluded_ids))
+
+      disc =
+        if excluded_ids == [],
+          do: %{},
+          else: bucketed_flows(account_ids, start_date, period_days, upper, com, touches_excluded(excluded_ids))
+
+      for i <- 0..(periods_count - 1), into: %{} do
+        t = Map.get(treas, i, %{in: @zero, out: @zero})
+        d = Map.get(disc, i, %{in: @zero, out: @zero})
+        {i, %{treas_in: t.in, treas_out: t.out, disc_in: d.in, disc_out: d.out}}
+      end
+    end
+  end
+
+  # Discretionary outflow in the same calendar window one year earlier, one value
+  # per forecast period — a memo of what the company chose to pay out last year
+  # (dividends, director fees, …). Informational only; never fed into closing.
+  defp discretionary_ly_out(_ids, [], _period_days, _com, _excluded_ids), do: []
+
+  defp discretionary_ly_out(_ids, fbounds, _period_days, _com, []),
+    do: List.duplicate(@zero, length(fbounds))
+
+  defp discretionary_ly_out(ids, fbounds, period_days, com, excluded_ids) do
+    {first_ps, _} = hd(fbounds)
+    n = length(fbounds)
+    start = Date.add(first_ps, -@season_shift_days)
+    upper = Date.add(start, period_days * n)
+
+    flows = bucketed_flows(ids, start, period_days, upper, com, touches_excluded(excluded_ids))
+    for i <- 0..(n - 1), do: Map.get(flows, i, %{in: @zero, out: @zero}).out
   end
 
   # In/out sums grouped into `period_days`-length buckets from `start_date` (index

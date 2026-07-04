@@ -441,6 +441,77 @@ defmodule FullCircle.Reporting.CashForecastDBTest do
       assert Decimal.equal?(p3.baseline_in, Decimal.mult(level, d("1.25")))
     end
 
+    test "actual periods carry an operating/treasury/discretionary split", %{com: com, bank: bank, admin: admin} do
+      fd = account_fixture(%{account_type: "Non-current Asset", name: "FD #{System.unique_integer([:positive])}"}, com, admin)
+      div_acc = account_fixture(%{account_type: "Current Liability", name: "Div Payable #{System.unique_integer([:positive])}"}, com, admin)
+      {:ok, com} = CashForecast.save_excluded_account_ids(com, [div_acc.id])
+      com = CashForecast.company_with_settings(com)
+
+      # operating inflow (doc-less journal)
+      txn!(com, bank.id, ~D[2026-06-05], d(1000))
+
+      # treasury transfer: bank -> FD, no contact, all-asset legs
+      tid = Ecto.UUID.generate()
+      com |> txn!(bank.id, ~D[2026-06-10], d(-500)) |> Ecto.Changeset.change(%{doc_id: tid}) |> Repo.update!()
+      com |> txn!(fd.id, ~D[2026-06-10], d(500)) |> Ecto.Changeset.change(%{doc_id: tid}) |> Repo.update!()
+
+      # discretionary payment: bank -> excluded dividend account
+      did = Ecto.UUID.generate()
+      com |> txn!(bank.id, ~D[2026-06-15], d(-700)) |> Ecto.Changeset.change(%{doc_id: did}) |> Repo.update!()
+      com |> txn!(div_acc.id, ~D[2026-06-15], d(700)) |> Ecto.Changeset.change(%{doc_id: did}) |> Repo.update!()
+
+      res =
+        CashForecast.cash_forecast(
+          %{start_date: ~D[2026-06-01], period_days: 30, periods_count: 2,
+            buffer_periods: 1, trailing_days: 365, as_of: ~D[2026-06-30], account_ids: :all},
+          com
+        )
+
+      [p1, p2] = res.periods
+      assert p1.source == :actual
+      # totals unchanged: Base In/Out remain the full real flows
+      assert Decimal.equal?(p1.baseline_in, d(1000))
+      assert Decimal.equal?(p1.baseline_out, d(1200))
+      # split: 1000 operating in; out = 500 treasury + 700 discretionary
+      assert Decimal.equal?(p1.oper_in, d(1000))
+      assert Decimal.equal?(p1.oper_out, d(0))
+      assert Decimal.equal?(p1.treas_out, d(500))
+      assert Decimal.equal?(p1.disc_out, d(700))
+      assert Decimal.equal?(p1.treas_in, d(0))
+      assert Decimal.equal?(p1.disc_in, d(0))
+      # forecast rows: baseline IS operating, treasury zero
+      assert p2.source == :forecast
+      assert Decimal.equal?(p2.oper_in, p2.baseline_in)
+      assert Decimal.equal?(p2.treas_in, d(0))
+    end
+
+    test "forecast periods carry last year's same-window discretionary out as a memo", %{com: com, bank: bank, admin: admin} do
+      div_acc = account_fixture(%{account_type: "Current Liability", name: "Div Payable #{System.unique_integer([:positive])}"}, com, admin)
+      {:ok, com} = CashForecast.save_excluded_account_ids(com, [div_acc.id])
+      com = CashForecast.company_with_settings(com)
+
+      # dividend paid 2025-07-21 -> falls in p2's window one year later
+      did = Ecto.UUID.generate()
+      com |> txn!(bank.id, ~D[2025-07-21], d(-800)) |> Ecto.Changeset.change(%{doc_id: did}) |> Repo.update!()
+      com |> txn!(div_acc.id, ~D[2025-07-21], d(800)) |> Ecto.Changeset.change(%{doc_id: did}) |> Repo.update!()
+
+      as_of = ~D[2026-06-08]
+
+      res =
+        CashForecast.cash_forecast(
+          %{start_date: as_of, period_days: 30, periods_count: 3,
+            buffer_periods: 1, trailing_days: 365, as_of: as_of, account_ids: :all},
+          com
+        )
+
+      [p1, p2, p3] = res.periods
+      assert Decimal.equal?(p1.disc_out, d(0))
+      assert Decimal.equal?(p2.disc_out, d(800))
+      assert Decimal.equal?(p3.disc_out, d(0))
+      # the memo must NOT feed the roll-forward
+      assert Decimal.equal?(p2.closing, Decimal.add(p2.opening, Decimal.sub(p2.baseline_in, p2.baseline_out)))
+    end
+
     test "as_of anchors the actual/forecast split", %{com: com} do
       res =
         CashForecast.cash_forecast(
