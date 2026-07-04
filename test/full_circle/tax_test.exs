@@ -253,6 +253,13 @@ defmodule FullCircle.TaxSchemaTest do
       assert Ecto.Changeset.get_field(cs, :revisions) == %{"6" => "5000"}
     end
 
+    test "accepts prior_year_estimate, rejects negative" do
+      cs = chg(%{company_id: Ecto.UUID.generate(), fy_year: 2026, prior_year_estimate: "10000"})
+      assert cs.valid?
+      assert Decimal.equal?(Ecto.Changeset.get_field(cs, :prior_year_estimate), Decimal.new(10000))
+      refute chg(%{company_id: Ecto.UUID.generate(), fy_year: 2026, prior_year_estimate: -1}).valid?
+    end
+
     test "accepts remedy director fields" do
       cs =
         chg(%{

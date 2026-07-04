@@ -217,6 +217,7 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
           "estimate" => Decimal.to_string(plan.estimate || Decimal.new(0)),
           "estimate_month" => plan.estimate_month || 1,
           "paid_overrides" => plan.paid_overrides || %{},
+          "prior_year_estimate" => Decimal.to_string(plan.prior_year_estimate || Decimal.new(0)),
           "revisions" =>
             Map.put(plan.revisions || %{}, "#{window}", Decimal.to_string(suggested))
         }
@@ -408,10 +409,24 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
 
     headroom = Decimal.sub(analysis.penalty_ceiling, assigns.forecast_tax)
 
+    # 85% floor base: manually entered last-year estimate wins; otherwise the
+    # prior-year plan stored in the app (nil when neither exists).
+    manual_prior = assigns.plan.prior_year_estimate
+
+    effective_prior =
+      cond do
+        manual_prior && Decimal.compare(manual_prior, Decimal.new(0)) == :gt ->
+          manual_prior
+
+        assigns.prior_latest && Decimal.compare(assigns.prior_latest, Decimal.new(0)) == :gt ->
+          assigns.prior_latest
+
+        true ->
+          nil
+      end
+
     floor =
-      if assigns.prior_latest && Decimal.compare(assigns.prior_latest, Decimal.new(0)) == :gt,
-        do: Decimal.mult(assigns.prior_latest, Decimal.new("0.85")),
-        else: nil
+      if effective_prior, do: Decimal.mult(effective_prior, Decimal.new("0.85")), else: nil
 
     floor_breach? =
       floor != nil and assigns.plan.estimate != nil and
@@ -428,6 +443,8 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
         over: over,
         comparison: comparison,
         headroom: headroom,
+        effective_prior: effective_prior,
+        manual_prior: manual_prior,
         floor: floor,
         floor_breach?: floor_breach?,
         show_panel: show_panel,
@@ -449,7 +466,7 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
           {gettext("Original estimate")}
           <span class="font-mono font-semibold">{plan_money(@plan.estimate)}</span>
           {gettext("is below 85% of last year's latest estimate")}
-          <span class="font-mono">{plan_money(@prior_latest)}</span>
+          <span class="font-mono">{plan_money(@effective_prior)}</span>
           — {gettext("floor")}
           <span class="font-mono font-semibold">{plan_money(@floor)}</span>.
           {gettext("File at least the floor and revise down at the 6th month (CP204A), or appeal to LHDN.")}
@@ -568,7 +585,7 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
               </button>
             </div>
           </div>
-          <div class="grid grid-cols-3 gap-3 items-end mt-2">
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3 items-end mt-2">
             <div :for={r <- FullCircle.Tax.revision_months()}>
               <.input
                 name={"plan[revisions][#{r}]"}
@@ -580,9 +597,25 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
                 value={Map.get(@plan.revisions || %{}, "#{r}")}
               />
             </div>
+            <div>
+              <.input
+                name="plan[prior_year_estimate]"
+                id="plan_prior_year_estimate"
+                type="number"
+                step="0.01"
+                min="0"
+                label={gettext("Last year estimate")}
+                value={
+                  if @manual_prior && Decimal.compare(@manual_prior, Decimal.new(0)) == :gt,
+                    do: Decimal.to_string(@manual_prior)
+                }
+                placeholder={@prior_latest && Decimal.to_string(Decimal.round(@prior_latest, 2))}
+              />
+            </div>
           </div>
           <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
             {gettext("Enter the revised annual estimate (not the monthly instalment). Blank = not revised. Instalments re-spread from the revision month.")}
+            {gettext("Last year estimate = the preceding YA's latest CP204/CP204A figure, used for the 85% floor check; leave blank to use last year's plan in the app.")}
           </p>
           <p
             :if={Decimal.compare(@forecast_tax, Decimal.new(0)) != :gt}

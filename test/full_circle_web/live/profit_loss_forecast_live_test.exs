@@ -262,6 +262,39 @@ defmodule FullCircleWeb.ProfitLossForecastLiveTest do
       end
     end
 
+    # s.107C(3) floor: with no prior-year plan in the app, the manually entered
+    # last-year estimate drives the 85% warning banner.
+    test "85% floor banner renders from a manually entered last-year estimate", %{
+      conn: _conn,
+      user: user
+    } do
+      com = company_fixture(user, %{closing_month: 12, closing_day: 31})
+
+      # Original estimate 5,000 vs manual last-year 10,000 -> floor 8,500 -> breach.
+      {:ok, _} =
+        FullCircle.Tax.create_or_update_plan(
+          %{
+            "fy_year" => 2026,
+            "estimate" => "5000",
+            "tolerance_pct" => "30",
+            "estimate_month" => 1,
+            "prior_year_estimate" => "10000"
+          },
+          com,
+          user
+        )
+
+      {:ok, lv, _html} =
+        live(
+          log_in_user(build_conn(), user),
+          ~p"/companies/#{com.id}/profit_loss_forecast?search[fy_year]=2026"
+        )
+
+      html = render_async(lv)
+      assert html =~ "Below the 85% floor"
+      assert html =~ "8,500"
+    end
+
     test "remedy panel shows under-estimation comparison when estimate too low", %{conn: _conn, user: user} do
       com = company_fixture(user, %{closing_month: 12, closing_day: 31})
 
