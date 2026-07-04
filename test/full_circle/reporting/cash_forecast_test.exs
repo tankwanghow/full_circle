@@ -317,7 +317,51 @@ defmodule FullCircle.Reporting.CashForecastDBTest do
       assert Map.has_key?(res.ladder, :place_12mo)
     end
 
-    test "forecast level blends the trailing-window rate with a 90-day rate", %{com: com, bank: bank} do
+    test "forecast level uses the YoY ratio when the prior-year 90-day window has data",
+         %{com: com, bank: bank} do
+      txn!(com, bank.id, ~D[2026-05-09], d(1800))   # last 90d + long window
+      txn!(com, bank.id, ~D[2025-10-15], d(1850))   # long window only
+      txn!(com, bank.id, ~D[2025-04-20], d(600))    # same 90d one year earlier only
+
+      as_of = ~D[2026-06-08]
+
+      res =
+        CashForecast.cash_forecast(
+          %{start_date: as_of, period_days: 30, periods_count: 3,
+            buffer_periods: 1, trailing_days: 365, as_of: as_of, account_ids: :all},
+          com
+        )
+
+      long = Decimal.mult(d(1800 + 1850), Decimal.div(d(30), d(365)))
+      # ratio = 1800 / 600 = 3 -> level = long * (1 + 3) / 2
+      level = Decimal.mult(long, d(1) |> Decimal.add(d(3)) |> Decimal.div(d(2)))
+
+      assert Enum.all?(res.periods, &(&1.source == :forecast))
+      for p <- res.periods, do: assert(Decimal.equal?(p.baseline_in, level))
+    end
+
+    test "YoY ratio is clamped so a tiny prior-year window cannot explode the level",
+         %{com: com, bank: bank} do
+      txn!(com, bank.id, ~D[2026-05-09], d(1800))   # last 90d + long window
+      txn!(com, bank.id, ~D[2025-04-20], d(10))     # prior-year 90d -> raw ratio 180
+
+      as_of = ~D[2026-06-08]
+
+      res =
+        CashForecast.cash_forecast(
+          %{start_date: as_of, period_days: 30, periods_count: 3,
+            buffer_periods: 1, trailing_days: 365, as_of: as_of, account_ids: :all},
+          com
+        )
+
+      long = Decimal.mult(d(1800), Decimal.div(d(30), d(365)))
+      # ratio clamped to 4 -> level = long * (1 + 4) / 2
+      level = Decimal.mult(long, d(1) |> Decimal.add(d(4)) |> Decimal.div(d(2)))
+
+      for p <- res.periods, do: assert(Decimal.equal?(p.baseline_in, level))
+    end
+
+    test "forecast level falls back to the 90-day blend when the prior-year window is empty", %{com: com, bank: bank} do
       # inflow 236 days before as_of: inside the 365-day window, outside the 90-day one,
       # and outside the horizon's year-earlier shape windows (2025-06-08..2025-09-05).
       txn!(com, bank.id, ~D[2025-10-15], d(3650))
@@ -367,6 +411,34 @@ defmodule FullCircle.Reporting.CashForecastDBTest do
       total = [p1, p2, p3] |> Enum.reduce(d(0), &Decimal.add(&2, &1.baseline_in))
       diff = total |> Decimal.sub(Decimal.mult(rate, d(3))) |> Decimal.abs()
       assert Decimal.compare(diff, d("0.0001")) == :lt
+    end
+
+    test "seasonal shape averages up to 3 prior years with equal weight per year",
+         %{com: com, bank: bank} do
+      as_of = ~D[2026-06-08]
+      # horizon: p1 06-08..07-07, p2 07-08..08-06, p3 08-07..09-05 (all forecast).
+      # Year-1 shape has a p2 spike; year-2 has a p3 spike 100x bigger. Each year
+      # is normalized before averaging, so p2 and p3 get the SAME factor — a
+      # high-volume old year must not drown out a low-volume recent one.
+      txn!(com, bank.id, ~D[2025-07-21], d(300))      # year-1, p2 window
+      txn!(com, bank.id, ~D[2024-08-20], d(30_000))   # year-2, p3 window
+
+      res =
+        CashForecast.cash_forecast(
+          %{start_date: as_of, period_days: 30, periods_count: 3,
+            buffer_periods: 1, trailing_days: 365, as_of: as_of, account_ids: :all},
+          com
+        )
+
+      [p1, p2, p3] = res.periods
+      # level: only the 300 is in the trailing window; prior-year 90d empty -> long/2
+      level = Decimal.mult(d(300), Decimal.div(d(30), d(365))) |> Decimal.div(d(2))
+
+      # normalized shapes [0,1,0] + [0,0,1] -> raw factors [0, 1.5, 1.5]
+      # -> shrunk [0.5, 1.25, 1.25]
+      assert Decimal.equal?(p1.baseline_in, Decimal.mult(level, d("0.5")))
+      assert Decimal.equal?(p2.baseline_in, Decimal.mult(level, d("1.25")))
+      assert Decimal.equal?(p3.baseline_in, Decimal.mult(level, d("1.25")))
     end
 
     test "as_of anchors the actual/forecast split", %{com: com} do

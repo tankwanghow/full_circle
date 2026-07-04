@@ -5,12 +5,13 @@ defmodule FullCircle.Reporting.CashForecast do
 
   Model: elapsed periods show the company's REAL liquid cash flow; future periods
   use a **run-rate backbone** (per-period average of operating liquid churn from the
-  trailing window, treasury transfers excluded). The run-rate LEVEL blends the long
-  trailing window 50/50 with a 90-day window so a growing or shrinking business is
-  not lagged by half a year, and the per-period SHAPE follows the same calendar
-  windows one year earlier (seasonality, shrunk 50% toward flat). Accounts the
-  company marks as discretionary (director fees, dividends, …) can also be excluded
-  from the run-rate via the company's settings.
+  trailing window, treasury transfers excluded). The run-rate LEVEL is trend-adjusted
+  by the seasonality-free YoY ratio of the last 90 days vs the same 90 days one year
+  earlier (falling back to a 50/50 blend with the raw 90-day rate when there is no
+  prior-year data), and the per-period SHAPE averages the same calendar windows over
+  up to 3 prior years, each year weighted equally (seasonality, shrunk 50% toward
+  flat). Accounts the company marks as discretionary (director fees, dividends, …)
+  can also be excluded from the run-rate via the company's settings.
 
   Pure core: `build_forecast/3`, `fd_ladder/2`.
   """
@@ -28,13 +29,20 @@ defmodule FullCircle.Reporting.CashForecast do
   # Fixed-deposit ladder tenures, expressed in days (~1, 3, 6, 12 months).
   @tenure_days [{:"1mo", 30}, {:"3mo", 90}, {:"6mo", 180}, {:"12mo", 365}]
 
-  # Short recent window blended 50/50 with the long trailing window so the
+  # Recent window used for the trend signal: its flow is compared against the
+  # same window one year earlier (a seasonality-free growth ratio) so the
   # forecast level tracks a growing/shrinking business instead of lagging it.
   @short_trailing_days 90
 
+  # The YoY trend ratio is clamped so a near-empty prior-year window cannot
+  # explode or zero out the level.
+  @trend_ratio_min Decimal.new("0.25")
+  @trend_ratio_max Decimal.new(4)
+
   # Seasonal shape compares each forecast period to the same calendar window
-  # this many days earlier (one year).
+  # this many days earlier (one year), averaged over up to this many years.
   @season_shift_days 365
+  @season_years 3
 
   @liquid_types ["Cash or Equivalent", "Bank"]
 
@@ -126,12 +134,19 @@ defmodule FullCircle.Reporting.CashForecast do
   """
   def run_rate_flows(account_ids, start_date, trailing_days, period_days, com, excluded_ids \\ []) do
     window_start = Date.add(start_date, -trailing_days)
+    {ins, outs} = window_operating_flows(account_ids, window_start, start_date, com, excluded_ids)
 
+    factor = Decimal.div(Decimal.new("#{period_days}"), Decimal.new("#{trailing_days}"))
+    {Decimal.mult(ins, factor), Decimal.mult(outs, factor)}
+  end
+
+  # Raw operating in/out sums over doc dates in [from_date, to_date).
+  defp window_operating_flows(account_ids, from_date, to_date, com, excluded_ids) do
     rows =
       from(t in Transaction,
         where:
           t.company_id == ^com.id and t.account_id in ^account_ids and
-            t.doc_date >= ^window_start and t.doc_date < ^start_date,
+            t.doc_date >= ^from_date and t.doc_date < ^to_date,
         select: %{
           ins: sum(fragment("case when ? > 0 then ? else 0 end", t.amount, t.amount)),
           outs: sum(fragment("case when ? < 0 then -? else 0 end", t.amount, t.amount))
@@ -140,9 +155,7 @@ defmodule FullCircle.Reporting.CashForecast do
       |> where(^operating_only(excluded_ids))
       |> Repo.one()
 
-    factor = Decimal.div(Decimal.new("#{period_days}"), Decimal.new("#{trailing_days}"))
-    {Decimal.mult(to_decimal(rows && rows.ins), factor),
-     Decimal.mult(to_decimal(rows && rows.outs), factor)}
+    {to_decimal(rows && rows.ins), to_decimal(rows && rows.outs)}
   end
 
   # Run-rate operating filter: contact-null liquid lines, excluding pure treasury
@@ -178,22 +191,53 @@ defmodule FullCircle.Reporting.CashForecast do
     end
   end
 
-  # Level = 50/50 blend of the long trailing-window rate and a 90-day rate. Skipped
-  # when the long window is already 90 days or shorter.
-  defp blended_run_rate(ids, today, trailing_days, period_days, com, excluded_ids) do
+  # Level = long trailing-window rate, trend-adjusted by the YoY ratio of the last
+  # 90 days vs the same 90 days one year earlier. The ratio is seasonality-free (it
+  # compares like calendar windows), so a seasonally strong recent quarter is not
+  # mistaken for growth. With no prior-year data it falls back to a 50/50 blend
+  # with the raw 90-day rate. Skipped when the long window is 90 days or shorter.
+  defp trend_level(ids, today, trailing_days, period_days, com, excluded_ids) do
     {long_in, long_out} = run_rate_flows(ids, today, trailing_days, period_days, com, excluded_ids)
 
     if trailing_days > @short_trailing_days do
-      {short_in, short_out} =
-        run_rate_flows(ids, today, @short_trailing_days, period_days, com, excluded_ids)
+      {cur_in, cur_out} =
+        window_operating_flows(ids, Date.add(today, -@short_trailing_days), today, com, excluded_ids)
 
-      {mid(long_in, short_in), mid(long_out, short_out)}
+      {prev_in, prev_out} =
+        window_operating_flows(
+          ids,
+          Date.add(today, -@short_trailing_days - @season_shift_days),
+          Date.add(today, -@season_shift_days),
+          com,
+          excluded_ids
+        )
+
+      {leveled(long_in, cur_in, prev_in, period_days),
+       leveled(long_out, cur_out, prev_out, period_days)}
     else
       {long_in, long_out}
     end
   end
 
+  defp leveled(long, cur, prev, period_days) do
+    if Decimal.compare(prev, @zero) == :gt do
+      ratio = cur |> Decimal.div(prev) |> clamp(@trend_ratio_min, @trend_ratio_max)
+      Decimal.mult(long, Decimal.new(1) |> Decimal.add(ratio) |> Decimal.div(2))
+    else
+      short = Decimal.mult(cur, Decimal.div(Decimal.new(period_days), @short_trailing_days))
+      mid(long, short)
+    end
+  end
+
   defp mid(a, b), do: a |> Decimal.add(b) |> Decimal.div(2)
+
+  defp clamp(d, lo, hi) do
+    cond do
+      Decimal.compare(d, lo) == :lt -> lo
+      Decimal.compare(d, hi) == :gt -> hi
+      true -> d
+    end
+  end
 
   @doc """
   Seasonal multipliers from last year's per-period flow sums. Factors average 1
@@ -209,29 +253,54 @@ defmodule FullCircle.Reporting.CashForecast do
     if Decimal.compare(total, @zero) == :eq do
       List.duplicate(Decimal.new(1), length(values))
     else
-      mean = Decimal.div(total, length(values))
+      # raw factor = v / mean = v * n / total (one division, better precision)
+      n = length(values)
 
       Enum.map(values, fn v ->
-        v |> Decimal.div(mean) |> Decimal.add(1) |> Decimal.div(2)
+        v |> Decimal.mult(n) |> Decimal.div(total) |> Decimal.add(1) |> Decimal.div(2)
       end)
     end
   end
 
   # In/out seasonal factors for the forecast periods: operating flows (same filters
-  # as the run-rate) in the same calendar windows one year earlier.
+  # as the run-rate) in the same calendar windows over up to @season_years prior
+  # years, each year weighted equally.
   defp seasonal_shape(_ids, [], _period_days, _com, _excluded_ids), do: {[], []}
 
   defp seasonal_shape(ids, fbounds, period_days, com, excluded_ids) do
     {first_ps, _} = hd(fbounds)
     n = length(fbounds)
-    shape_start = Date.add(first_ps, -@season_shift_days)
 
-    flows = operating_period_flows(ids, shape_start, period_days, n, com, excluded_ids)
+    {ins, outs} =
+      Enum.map(1..@season_years, fn y ->
+        start = Date.add(first_ps, -y * @season_shift_days)
+        flows = operating_period_flows(ids, start, period_days, n, com, excluded_ids)
 
-    ins = for i <- 0..(n - 1), do: Map.get(flows, i, %{in: @zero, out: @zero}).in
-    outs = for i <- 0..(n - 1), do: Map.get(flows, i, %{in: @zero, out: @zero}).out
+        {for(i <- 0..(n - 1), do: Map.get(flows, i, %{in: @zero, out: @zero}).in),
+         for(i <- 0..(n - 1), do: Map.get(flows, i, %{in: @zero, out: @zero}).out)}
+      end)
+      |> Enum.unzip()
 
-    {seasonal_factors(ins), seasonal_factors(outs)}
+    {seasonal_factors(equal_weight_sum(ins, n)), seasonal_factors(equal_weight_sum(outs, n))}
+  end
+
+  # Sum the years' shapes after normalizing each to total 1, so every year with
+  # data contributes equally — a high-volume old year must not drown out a
+  # low-volume recent one. Years with no data contribute nothing.
+  defp equal_weight_sum(year_lists, n) do
+    year_lists
+    |> Enum.map(fn list ->
+      total = Enum.reduce(list, @zero, &Decimal.add(&2, &1))
+
+      if Decimal.compare(total, @zero) == :gt do
+        Enum.map(list, &Decimal.div(&1, total))
+      else
+        List.duplicate(@zero, n)
+      end
+    end)
+    |> Enum.reduce(List.duplicate(@zero, n), fn list, acc ->
+      Enum.zip_with(list, acc, &Decimal.add/2)
+    end)
   end
 
   # Operating liquid in/out per period (run-rate filters applied), bucketed into
@@ -268,8 +337,8 @@ defmodule FullCircle.Reporting.CashForecast do
 
     # Forecast periods use the run-rate anchored at TODAY (freshest trailing window),
     # excluding treasury transfers and any user-listed discretionary accounts. The
-    # level is a 50/50 blend of the long trailing window and a 90-day window.
-    {rr_in, rr_out} = blended_run_rate(ids, today, trailing_days, period_days, com, excluded)
+    # level is the long trailing window trend-adjusted by a YoY 90-day ratio.
+    {rr_in, rr_out} = trend_level(ids, today, trailing_days, period_days, com, excluded)
 
     # Elapsed periods (end <= today) use their REAL total liquid cash flow.
     actuals = period_actuals(ids, start_date, period_days, periods_count, today, com)

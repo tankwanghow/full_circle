@@ -16,13 +16,18 @@ actual/forecast split.
   (`Cash or Equivalent`, `Bank`), *no filters* — positives = Base In,
   negatives = Base Out.
 - **Forecast periods**: run-rate backbone, two parts:
-  - **Level** = 50/50 blend of the trailing-window rate and a 90-day rate
-    (`blended_run_rate`; skipped when `trailing_days ≤ 90`). Tracks recent
-    growth/decline instead of lagging by half a year.
-  - **Shape** = seasonal factors from the same calendar windows one year
-    earlier (`seasonal_shape` → `seasonal_factors/1`): normalized to mean 1
-    (level preserved), shrunk 50% toward flat so a gap or spike last year
-    can't zero out or dominate a period. No data a year back → flat.
+  - **Level** = long trailing-window rate × `(1 + yoy_ratio)/2`, where
+    `yoy_ratio` = last-90-days operating flow ÷ same 90 days one year earlier
+    (`trend_level`/`leveled`; ratio clamped to [0.25, 4]). The ratio compares
+    like calendar windows, so it is seasonality-free — a naive "blend with the
+    recent 90-day rate" reads a seasonally strong quarter as growth (backtested:
+    that pushed the level the WRONG direction). Falls back to the naive 50/50
+    blend when the prior-year window is empty; skipped when `trailing_days ≤ 90`.
+  - **Shape** = seasonal factors from the same calendar windows over up to 3
+    prior years, each year normalized to total 1 before summing so years weigh
+    equally regardless of volume (`seasonal_shape` → `equal_weight_sum` →
+    `seasonal_factors/1`). Factors are normalized to mean 1 (level preserved)
+    and shrunk 50% toward flat. No data in any prior year → flat.
 - **Run-rate operating filter** (`operating_only`): contact-null rows only
   (bank-side legs), pure treasury transfers excluded (no contact + all legs
   asset-type), plus documents touching user-listed discretionary accounts
@@ -44,6 +49,19 @@ If a known-items overlay is ever attempted again, the run-rate must first be
 **decomposed**: forecast = open items by due date + run-rate of only the
 non-settlement ("other") flows, blending back to full run-rate once the
 horizon outruns the AR/AP book. Never add open items to the full run-rate.
+
+## Backtesting the model
+
+Run the report blind (as_of = start_date) and compare against a later as_of
+where those periods are actual. But compare like-for-like: actual Base In/Out
+are UNFILTERED (they include treasury transfers and excluded discretionary
+docs), while forecast rows are operating-only. A raw comparison wildly
+overstates error — e.g. one real January showed 12.76M "Base In" of which
+8.6M was FD redemptions, and 13.6M "Base Out" of which 7.0M was dividends on
+an excluded account. Strip both (contact-null + treasury filter + exclude
+list) to get the model's true target. Also: forecast-period closings are on
+this operating basis — real closings additionally move with treasury and
+discretionary flows, by design.
 
 ## Gotchas
 
