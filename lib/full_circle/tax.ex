@@ -59,13 +59,14 @@ defmodule FullCircle.Tax do
   `{start, end}` tuples; `paid_by_month` is `%{month_no => Decimal}`;
   `revisions` is `%{revision_month => revised annual estimate}` (see
   `revisions_by_month/1`). The original `estimate` spreads evenly from
-  `estimate_month`; at each revision month the instalment re-spreads as
-  `(revised estimate - payable so far) / remaining months`, where payable
+  `estimate_month`. A CP204A filed in window month `r` locks every
+  instalment through `r` — the re-spread takes effect from `r + 1`:
+  `(revised estimate - payable through r) / (12 - r)`, where payable
   accumulates, per month, the HIGHER of the scheduled instalment and the
   actual paid amount (LHDN's CP204A deducts payments made; scheduled covers
   future months not yet paid when planning ahead). A month with tax already
   paid is settled — its displayed due is 0. `balance` and `estimate_in_force`
-  track the estimate in force each month.
+  track the estimate in force each month (flipping from `r + 1`).
   """
   def build_schedule(month_bounds, paid_by_month, estimate, estimate_month, revisions \\ %{}) do
     paid_to_date =
@@ -80,13 +81,15 @@ defmodule FullCircle.Tax do
 
     {months, _} =
       Enum.map_reduce(1..12, init, fn m, acc ->
+        # A revision filed in window month r = m - 1 (instalments 1..r are
+        # locked) re-spreads from this month over the 12 - r months left.
         acc =
-          case Map.fetch(revisions, m) do
-            {:ok, revised} when m >= estimate_month ->
+          case Map.fetch(revisions, m - 1) do
+            {:ok, revised} when m - 1 >= estimate_month ->
               new_forward =
                 Decimal.div(
                   max_zero(Decimal.sub(revised, acc.payable)),
-                  Decimal.new(12 - m + 1)
+                  Decimal.new(12 - (m - 1))
                 )
 
               %{acc | forward: new_forward, in_force: revised}
@@ -121,6 +124,7 @@ defmodule FullCircle.Tax do
           period_start: ps,
           period_end: pe,
           instalment_due: due,
+          scheduled: month.scheduled,
           paid: paid,
           estimate_in_force: month.in_force,
           balance: Decimal.sub(month.in_force, cum_paid2)

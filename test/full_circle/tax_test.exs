@@ -77,30 +77,34 @@ defmodule FullCircle.TaxComputeTest do
       assert Enum.all?(Enum.take(rows, 11), &Decimal.equal?(&1.instalment_due, d(0)))
     end
 
-    test "single revision at month 6 re-spreads from month 6" do
+    test "revision filed at month 6 locks months 1-6 and re-spreads from month 7" do
       rows = Tax.build_schedule(bounds(), %{}, d(8500), 1, %{6 => d(5000)})
       assert Decimal.equal?(Decimal.round(Enum.at(rows, 0).instalment_due, 2), d("708.33"))
-      assert Decimal.equal?(Decimal.round(Enum.at(rows, 4).instalment_due, 2), d("708.33"))
-      # payable before 6 = 5 x 708.33..; (5000 - 3541.66..) / 7
-      assert Decimal.equal?(Decimal.round(Enum.at(rows, 5).instalment_due, 2), d("208.33"))
-      assert Decimal.equal?(Decimal.round(Enum.at(rows, 11).instalment_due, 2), d("208.33"))
-      assert Decimal.equal?(Enum.at(rows, 4).estimate_in_force, d(8500))
-      assert Decimal.equal?(Enum.at(rows, 5).estimate_in_force, d(5000))
+      # the filing month itself is still locked at the old instalment
+      assert Decimal.equal?(Decimal.round(Enum.at(rows, 5).instalment_due, 2), d("708.33"))
+      # payable through 6 = 6 x 708.33.. = 4250; (5000 - 4250) / 6
+      assert Decimal.equal?(Decimal.round(Enum.at(rows, 6).instalment_due, 2), d("125.00"))
+      assert Decimal.equal?(Decimal.round(Enum.at(rows, 11).instalment_due, 2), d("125.00"))
+      assert Decimal.equal?(Enum.at(rows, 5).estimate_in_force, d(8500))
+      assert Decimal.equal?(Enum.at(rows, 6).estimate_in_force, d(5000))
     end
 
     test "later revision supersedes the earlier one" do
       rows = Tax.build_schedule(bounds(), %{}, d(12000), 1, %{6 => d(9000), 9 => d(15000)})
-      assert Decimal.equal?(Enum.at(rows, 0).instalment_due, d(1000))
-      # (9000 - 5000) / 7
-      assert Decimal.equal?(Decimal.round(Enum.at(rows, 5).instalment_due, 2), d("571.43"))
-      # payable before 9 = 5000 + 3 x 571.42..; (15000 - 6714.28..) / 4
-      assert Decimal.equal?(Decimal.round(Enum.at(rows, 8).instalment_due, 2), d("2071.43"))
+      assert Decimal.equal?(Enum.at(rows, 5).instalment_due, d(1000))
+      # months 7-9: (9000 - 6000) / 6
+      assert Decimal.equal?(Decimal.round(Enum.at(rows, 6).instalment_due, 2), d("500.00"))
+      assert Decimal.equal?(Decimal.round(Enum.at(rows, 8).instalment_due, 2), d("500.00"))
+      # months 10-12: payable through 9 = 6000 + 3 x 500; (15000 - 7500) / 3
+      assert Decimal.equal?(Decimal.round(Enum.at(rows, 9).instalment_due, 2), d("2500.00"))
       assert Decimal.equal?(Enum.at(rows, 11).estimate_in_force, d(15000))
     end
 
     test "revision below what is already payable floors remaining dues at 0" do
       rows = Tax.build_schedule(bounds(), %{}, d(12000), 1, %{9 => d(5000)})
-      assert Decimal.equal?(Enum.at(rows, 8).instalment_due, d(0))
+      # month 9 (the filing month) stays locked; relief starts month 10
+      assert Decimal.equal?(Enum.at(rows, 8).instalment_due, d(1000))
+      assert Decimal.equal?(Enum.at(rows, 9).instalment_due, d(0))
       assert Decimal.equal?(Enum.at(rows, 11).instalment_due, d(0))
     end
 
@@ -116,9 +120,12 @@ defmodule FullCircle.TaxComputeTest do
       # month 1 paid -> displayed due 0, but its scheduled 1000 still counts toward payable
       assert Decimal.equal?(Enum.at(rows, 0).instalment_due, d(0))
       assert Decimal.equal?(Enum.at(rows, 0).balance, d(11000))
-      # (6000 - 5 x 1000) / 7
-      assert Decimal.equal?(Decimal.round(Enum.at(rows, 5).instalment_due, 2), d("142.86"))
-      assert Decimal.equal?(Enum.at(rows, 5).balance, d(5000))
+      # month 6 (filing month) locked at the old instalment and old estimate
+      assert Decimal.equal?(Enum.at(rows, 5).instalment_due, d(1000))
+      assert Decimal.equal?(Enum.at(rows, 5).balance, d(11000))
+      # months 7-12: payable through 6 = 6000 -> (6000 - 6000) / 6 = 0
+      assert Decimal.equal?(Enum.at(rows, 6).instalment_due, d(0))
+      assert Decimal.equal?(Enum.at(rows, 6).balance, d(5000))
     end
 
     test "re-spread deducts actual payments when they exceed the schedule" do
