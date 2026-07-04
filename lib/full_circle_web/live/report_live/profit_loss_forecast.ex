@@ -443,6 +443,7 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
         over: over,
         comparison: comparison,
         headroom: headroom,
+        instalments_paid: instalments_paid,
         effective_prior: effective_prior,
         manual_prior: manual_prior,
         floor: floor,
@@ -672,6 +673,14 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
                 <td class="px-2 font-mono">{plan_money(r.balance)}</td>
               </tr>
             </tbody>
+            <tfoot>
+              <tr class="border-t-2 dark:border-gray-600 font-semibold bg-gray-100 dark:bg-gray-800 dark:text-gray-100">
+                <td class="px-2 text-left">{gettext("Total tax paid")}</td>
+                <td class="px-2"></td>
+                <td class="px-2 font-mono pr-3">{plan_money(@instalments_paid)}</td>
+                <td class="px-2"></td>
+              </tr>
+            </tfoot>
           </table>
           <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 text-left">
             {gettext("The CP204 estimate can be revised (Form CP204A) in the 6th, 9th and 11th month of the basis period — marked above. Enter revisions in the CP204A fields; instalments re-spread from that month.")}
