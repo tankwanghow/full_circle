@@ -105,8 +105,11 @@ via `Tax.suggest_revisions/4` and **fills the CP204A fields without saving**
 `r ≥ estimate_month`, and no tax has been paid for a month after `r`.
 Earliest open window parks the estimate at payable-through-it (stopping later
 instalments); middle open windows are cleared; the last open window carries
-the penalty-free floor (forecast ÷ (1 + tolerance), rounded up). Passed
-windows keep their saved values. No window → flash "No CP204A window left
+the penalty-free floor (forecast ÷ (1 + tolerance), rounded up) — but *only
+when that filing is useful*: the in-force estimate is below the floor, or the
+filing cuts the dues remaining after the window. A downward revision that
+changes nothing is skipped *(amended 2026-07-04)*. Passed windows keep their
+saved values. No window → flash "No CP204A window left
 this year." An info flash warns that the last suggested filing is mandatory
 to stay penalty-free.
 

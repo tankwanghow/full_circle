@@ -253,10 +253,6 @@ defmodule FullCircle.Tax do
         kept =
           for {k, v} <- plan.revisions || %{}, to_month(k) not in windows, into: %{}, do: {k, v}
 
-        final =
-          if Decimal.compare(floor_estimate, @zero) == :gt,
-            do: Decimal.round(floor_estimate, 2, :ceiling)
-
         parking =
           if first != last do
             %{plan | revisions: kept}
@@ -265,7 +261,36 @@ defmodule FullCircle.Tax do
             |> Decimal.round(2)
           end
 
-        {:ok, kept |> put_positive("#{last}", final) |> put_positive("#{first}", parking)}
+        preview = put_positive(kept, "#{first}", parking)
+        rows = schedule(%{plan | revisions: preview}, com)
+
+        {:ok, put_positive(preview, "#{last}", final_revision(rows, last, floor_estimate))}
+    end
+  end
+
+  # The last-window revision is only worth filing when it protects against
+  # the under-estimation penalty (estimate in force below the floor) or when
+  # it actually cuts the instalments still due after that window. Filing a
+  # DOWNWARD revision that changes nothing (dues already 0, estimate already
+  # above the floor) just lowers the estimate in force for no benefit.
+  defp final_revision(rows, last, floor_estimate) do
+    if Decimal.compare(floor_estimate, @zero) == :gt do
+      floor = Decimal.round(floor_estimate, 2, :ceiling)
+      in_force = Enum.at(rows, last - 1).estimate_in_force
+
+      # Compare at 2dp — rounding the parked value leaves sub-sen residues in
+      # the raw schedule that must not count as "dues worth cutting".
+      new_dues =
+        Decimal.round(max_zero(Decimal.sub(floor, payable_through(rows, last))), 2)
+
+      old_dues =
+        rows
+        |> Enum.filter(&(&1.month_no > last))
+        |> Enum.reduce(@zero, fn r, acc -> Decimal.add(acc, r.scheduled) end)
+        |> Decimal.round(2)
+
+      if Decimal.compare(floor, in_force) == :gt or Decimal.compare(new_dues, old_dues) == :lt,
+        do: floor
     end
   end
 

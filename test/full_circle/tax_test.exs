@@ -224,12 +224,14 @@ defmodule FullCircle.TaxComputeTest do
       )
     end
 
-    test "paid through month 7 -> park at 9, penalty floor at 11" do
+    test "paid through month 7 -> park at 9; floor filing skipped (parking already covers it)" do
       paid = for m <- 1..7, into: %{}, do: {"#{m}", "708.33"}
       {:ok, revs} = Tax.suggest_revisions(plan_8500(%{paid_overrides: paid}), com12(), 7, d(5000))
-      # payable through 9 = 9 x 708.33.. = 6375
+      # payable through 9 = 9 x 708.33.. = 6375, which is already >= the 5000
+      # floor and leaves no dues after month 11 — a downward CP204A at 11
+      # would achieve nothing, so it is not suggested.
       assert Decimal.equal?(Decimal.new(revs["9"]), d("6375.00"))
-      assert Decimal.equal?(Decimal.new(revs["11"]), d("5000.00"))
+      refute Map.has_key?(revs, "11")
       refute Map.has_key?(revs, "6")
     end
 
@@ -248,9 +250,9 @@ defmodule FullCircle.TaxComputeTest do
 
       assert revs["6"] == "7000"
       # 6->7000 locked: months 7-12 = (7000 - 4250) / 6 = 458.33..;
-      # payable through 9 = 4250 + 3 x 458.33.. = 5625
+      # payable through 9 = 4250 + 3 x 458.33.. = 5625 >= floor -> no 11 filing
       assert Decimal.equal?(Decimal.new(revs["9"]), d("5625.00"))
-      assert Decimal.equal?(Decimal.new(revs["11"]), d("5000.00"))
+      refute Map.has_key?(revs, "11")
     end
 
     test "payment after month 9 -> only month 11 usable, single floor revision" do

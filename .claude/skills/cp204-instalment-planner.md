@@ -38,7 +38,7 @@ amendments): `docs/superpowers/specs/2026-07-03-cp204a-revisions-design.md`.
 | Plan → schedule | `Tax.schedule/2` |
 | Revision parse | `Tax.revisions_by_month/1` — only 6/9/11; blank/junk/0 dropped (**0 = not revised**, a deliberate money-input decision) |
 | Estimate in force | `Tax.latest_estimate/1` — precedence 11 → 9 → 6 → original |
-| Suggest plan | `Tax.suggest_revisions/4` — park at earliest open window (= payable through it), clear middle, penalty floor at last; window open iff `r ≥ cur_month`, `r ≥ estimate_month`, and **no tax paid for any month after r** |
+| Suggest plan | `Tax.suggest_revisions/4` — park at earliest open window (= payable through it), clear middle; penalty floor at last window **only when useful** (in-force estimate below floor, or it cuts remaining dues — a no-op downward filing is skipped); window open iff `r ≥ cur_month`, `r ≥ estimate_month`, and **no tax paid for any month after r** |
 | Schema | `Tax.InstalmentPlan`: `estimate` (original filed), `estimate_month`, `revisions` (string-keyed map), `paid_overrides`, `prior_year_estimate` |
 | UI | `ReportLive.ProfitLossForecast.tax_plan_section` — Suggest button fills fields **without saving**; `plan_changed` live-previews via `changeset |> apply_changes` |
 | Tests | `test/full_circle/tax_test.exs`, `test/full_circle_web/live/profit_loss_forecast_live_test.exs` |
