@@ -181,9 +181,9 @@ defmodule FullCircle.TaxComputeTest do
       assert map_size(r) == 1
     end
 
-    test "explicit zero is a valid revision" do
-      plan = %FullCircle.Tax.InstalmentPlan{revisions: %{"9" => "0"}}
-      assert Decimal.equal?(Tax.revisions_by_month(plan)[9], d(0))
+    test "zero means not revised (money-input footgun), same as blank" do
+      plan = %FullCircle.Tax.InstalmentPlan{revisions: %{"9" => "0", "11" => "0.00"}}
+      assert Tax.revisions_by_month(plan) == %{}
     end
 
     test "latest_estimate precedence is 11 -> 9 -> 6 -> original" do
@@ -333,7 +333,7 @@ defmodule FullCircle.TaxDBTest do
           admin
         )
 
-      assert plan.revisions == %{"6" => "5000", "11" => "0"}
+      assert plan.revisions == %{"6" => "5000"}
     end
   end
 

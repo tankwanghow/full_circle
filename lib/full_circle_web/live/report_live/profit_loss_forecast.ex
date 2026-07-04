@@ -614,7 +614,7 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
             </div>
           </div>
           <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            {gettext("Enter the revised annual estimate (not the monthly instalment). Blank = not revised. Instalments re-spread from the revision month.")}
+            {gettext("Enter the revised annual estimate (not the monthly instalment). Blank or 0 = not revised. Instalments re-spread from the revision month.")}
             {gettext("Last year estimate = the preceding YA's latest CP204/CP204A figure, used for the 85% floor check; leave blank to use last year's plan in the app.")}
           </p>
           <p

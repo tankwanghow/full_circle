@@ -172,16 +172,19 @@ defmodule FullCircle.Tax do
 
   @doc """
   `%{revision_month => Decimal}` CP204A revised annual estimates from the plan.
-  Only months 6/9/11 are honoured; blank/unparseable values are dropped
-  (blank means "not revised"); an explicit 0 is a valid revision.
+  Only months 6/9/11 are honoured; blank, zero or unparseable values are
+  dropped — in a money input 0 reads as "not revised", not "revised to nil".
   """
   def revisions_by_month(%InstalmentPlan{} = plan) do
     Enum.reduce(plan.revisions || %{}, %{}, fn {k, v}, acc ->
       m = to_month(k)
 
       case if(m in @revision_months, do: parse_decimal(v)) do
-        %Decimal{} = dec -> Map.put(acc, m, dec)
-        _ -> acc
+        %Decimal{} = dec ->
+          if Decimal.compare(dec, @zero) == :gt, do: Map.put(acc, m, dec), else: acc
+
+        _ ->
+          acc
       end
     end)
   end
@@ -239,9 +242,14 @@ defmodule FullCircle.Tax do
 
   defp sanitize_overrides(other), do: other
 
-  # Keep only CP204A revision months with parseable values (blank = not revised).
+  # Keep only CP204A revision months with positive values (blank/0 = not revised).
   defp sanitize_revisions(m) when is_map(m) do
-    for {k, v} <- m, to_month(k) in @revision_months, parse_decimal(v) != nil, into: %{}, do: {k, v}
+    for {k, v} <- m,
+        to_month(k) in @revision_months,
+        dec = parse_decimal(v),
+        dec != nil and Decimal.compare(dec, @zero) == :gt,
+        into: %{},
+        do: {k, v}
   end
 
   defp sanitize_revisions(other), do: other
