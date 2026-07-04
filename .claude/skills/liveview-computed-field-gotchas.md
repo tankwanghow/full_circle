@@ -36,6 +36,19 @@ value set in a hook, dispatch:
 this.el.dispatchEvent(new Event("input", { bubbles: true }))
 ```
 
+## 3. `phx-change` params carry `_unused_*` tracking keys
+
+LiveView injects a synthetic `_unused_<field>` key into `phx-change` params
+for every input the user hasn't touched — including inside nested maps like
+`plan[paid_overrides][3]` (arriving as `"_unused_3" => ""`). Code that
+iterates raw form maps and assumes numeric keys crashes:
+`String.to_integer("_unused_1")` → `ArgumentError`, killing the LiveView.
+
+**Fix:** parse form-map keys tolerantly (`Integer.parse`/`Decimal.parse`,
+drop non-matches) and strip the `_unused_*` keys before persisting a raw
+`:map` cast. Example: `FullCircle.Tax.paid_by_month/1` + `sanitize_overrides/1`
+(see [[cp204-instalment-planner]]).
+
 ## Where this pattern lives
 
 Forms using `calculatorInput` inputs feeding a readonly computed field: salary note
