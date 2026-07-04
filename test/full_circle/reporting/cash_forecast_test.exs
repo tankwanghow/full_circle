@@ -302,5 +302,70 @@ defmodule FullCircle.Reporting.CashForecastDBTest do
       # p3 ends 03-31 -> forecast.
       assert Enum.count(res.periods, &(&1.source == :actual)) == 2
     end
+
+    test "as_of 2026-06-30 marks six elapsed periods actual from Jan start", %{com: com, bank: bank} do
+      txn!(com, bank.id, ~D[2026-03-15], d(1000))
+
+      res =
+        CashForecast.cash_forecast(
+          %{start_date: ~D[2026-01-01], period_days: 30, periods_count: 12,
+            buffer_periods: 1, trailing_days: 365, as_of: ~D[2026-06-30], account_ids: :all},
+          com
+        )
+
+      assert Enum.count(res.periods, &(&1.source == :actual)) == 6
+      assert Enum.count(res.periods, &(&1.source == :forecast)) == 6
+      assert res.latest_liquid_date == ~D[2026-03-15]
+    end
+
+    test "forecast period includes known AR due in that month", %{com: com, bank: bank} do
+      cust = Repo.insert!(%FullCircle.Accounting.Contact{name: "Cust #{System.unique_integer([:positive])}", company_id: com.id})
+      txn!(com, bank.id, ~D[2025-12-01], d(10_000))  # opening before horizon
+
+      inv =
+        %FullCircle.Billing.Invoice{}
+        |> Ecto.Changeset.change(%{
+          invoice_no: "INV#{System.unique_integer([:positive])}",
+          invoice_date: ~D[2026-05-01],
+          due_date: ~D[2026-08-15],
+          company_id: com.id,
+          contact_id: cust.id,
+          contact_name: cust.name
+        })
+        |> Repo.insert!()
+
+      txn!(com, bank.id, ~D[2026-05-01], d(5000), %{
+        doc_type: "Invoice",
+        doc_id: inv.id,
+        doc_no: inv.invoice_no,
+        contact_id: cust.id
+      })
+
+      res =
+        CashForecast.cash_forecast(
+          %{start_date: ~D[2026-01-01], period_days: 30, periods_count: 12,
+            buffer_periods: 1, trailing_days: 365, as_of: ~D[2026-06-30], account_ids: :all},
+          com
+        )
+
+      # Aug 15 falls in period 8 (index 7): 2026-07-30 .. 2026-08-28
+      p8 = Enum.at(res.periods, 7)
+      assert p8.source == :forecast
+      assert Decimal.compare(p8.baseline_in, d(0)) == :gt
+    end
+  end
+
+  describe "latest_liquid_transaction_date/2" do
+    test "returns max doc_date on liquid accounts", %{com: com, bank: bank} do
+      txn!(com, bank.id, ~D[2026-04-10], d(100))
+      txn!(com, bank.id, ~D[2026-06-20], d(200))
+      ids = CashForecast.liquid_account_ids(com, :all)
+      assert CashForecast.latest_liquid_transaction_date(ids, com) == ~D[2026-06-20]
+    end
+
+    test "nil when no transactions", %{com: com} do
+      ids = CashForecast.liquid_account_ids(com, :all)
+      assert CashForecast.latest_liquid_transaction_date(ids, com) == nil
+    end
   end
 end

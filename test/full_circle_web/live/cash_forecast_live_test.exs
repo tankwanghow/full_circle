@@ -43,5 +43,33 @@ defmodule FullCircleWeb.CashForecastLiveTest do
       html = render_async(lv)
       assert html =~ "Fixed Deposit Tenure Ladder"
     end
+
+    test "shows As of date label and latest liquid hint", %{conn: conn, user: user, company: company} do
+      import FullCircle.AccountingFixtures
+      bank = account_fixture(%{account_type: "Bank", name: "Hint Bank"}, company, user)
+
+      %FullCircle.Accounting.Transaction{}
+      |> FullCircle.Accounting.Transaction.changeset(%{
+        doc_type: "Journal",
+        doc_no: "J1",
+        doc_date: ~D[2026-06-30],
+        particulars: "t",
+        amount: Decimal.new(1000),
+        company_id: company.id,
+        account_id: bank.id
+      })
+      |> FullCircle.Repo.insert!()
+
+      {:ok, lv, _html} =
+        live(
+          conn,
+          ~p"/companies/#{company.id}/cash_forecast?search[s_date]=2026-01-01&search[as_of]=2026-06-30"
+        )
+
+      html = render_async(lv)
+      assert html =~ "As of date"
+      assert html =~ "Latest liquid transaction"
+      assert html =~ "2026-06-30"
+    end
   end
 end

@@ -3,17 +3,21 @@ defmodule FullCircle.Reporting.CashForecast do
   Rolling cash forecast and fixed-deposit tenure ladder over fixed-length periods
   (a configurable number of days per bucket).
 
-  Model: elapsed periods show the company's REAL liquid cash flow; future periods
-  use a **run-rate backbone** (per-period average of operating liquid churn from the
-  trailing window, treasury transfers excluded). Accounts the company marks as
-  discretionary (director fees, dividends, …) can also be excluded from the run-rate
-  via the company's settings.
+  Model: elapsed periods show the company's REAL operating liquid cash flow (same
+  treasury/discretionary filters as the run-rate); future periods use a **run-rate
+  backbone** plus **known dated commitments** (unpaid sales/purchase invoices and
+  undeposited cheques by due date). Accounts the company marks as discretionary
+  can also be excluded from the run-rate via the company's settings.
 
   Pure core: `build_forecast/3`, `fd_ladder/2`.
   """
 
   alias FullCircle.Repo
-  alias FullCircle.Accounting.{Account, Transaction}
+  alias FullCircle.Accounting.{Account, Transaction, TransactionMatcher}
+  alias FullCircle.Accounting.SeedTransactionMatcher
+  alias FullCircle.Billing.{Invoice, PurInvoice}
+  alias FullCircle.Cheque.{Deposit, ReturnCheque}
+  alias FullCircle.ReceiveFund.{Receipt, ReceivedCheque}
   alias FullCircle.Sys.Company
   import Ecto.Query, warn: false
 
@@ -91,6 +95,15 @@ defmodule FullCircle.Reporting.CashForecast do
       select: %{id: a.id, name: a.name, account_type: a.account_type}
     )
     |> Repo.all()
+  end
+
+  @doc "Latest `doc_date` posted to any of the liquid accounts (nil when empty)."
+  def latest_liquid_transaction_date(account_ids, com) do
+    Repo.one(
+      from t in Transaction,
+        where: t.company_id == ^com.id and t.account_id in ^account_ids,
+        select: max(t.doc_date)
+    )
   end
 
   @doc "Balance of liquid accounts strictly before `start_date`."
@@ -195,8 +208,10 @@ defmodule FullCircle.Reporting.CashForecast do
     {rr_in, rr_out} =
       run_rate_flows(ids, today, trailing_days, period_days, com, excluded_account_ids(com))
 
-    # Elapsed periods (end <= today) use their REAL total liquid cash flow.
-    actuals = period_actuals(ids, start_date, period_days, periods_count, today, com)
+    excluded = excluded_account_ids(com)
+
+    # Elapsed periods (end <= today) use REAL operating liquid cash flow.
+    actuals = period_actuals(ids, start_date, period_days, periods_count, today, com, excluded)
 
     {base_in, base_out, sources} =
       bounds
@@ -211,6 +226,19 @@ defmodule FullCircle.Reporting.CashForecast do
       end)
       |> then(fn {bi, bo, ss} -> {Enum.reverse(bi), Enum.reverse(bo), Enum.reverse(ss)} end)
 
+    known = known_due_per_period(com, start_date, period_days, periods_count, today, sources)
+
+    {base_in, base_out} =
+      Enum.zip([base_in, base_out, known, sources])
+      |> Enum.map(fn {inn, out, {kin, kout}, src} ->
+        if src == :forecast do
+          {Decimal.add(inn, kin), Decimal.add(out, kout)}
+        else
+          {inn, out}
+        end
+      end)
+      |> Enum.unzip()
+
     result =
       build_forecast(
         %{opening: opening, base_in: base_in, base_out: base_out, sources: sources},
@@ -219,6 +247,7 @@ defmodule FullCircle.Reporting.CashForecast do
       )
       |> Map.put(:trailing_days, trailing_days)
       |> Map.put(:as_of, today)
+      |> Map.put(:latest_liquid_date, latest_liquid_transaction_date(ids, com))
 
     arap = arap_per_period(com, bounds, today, trailing_days, period_days)
 
@@ -276,10 +305,9 @@ defmodule FullCircle.Reporting.CashForecast do
     end)
   end
 
-  # Real total liquid cash in/out (every movement, no filters) per period, for the
-  # periods between `start_date` and `today` — the elapsed portion of the horizon.
+  # Operating liquid cash in/out per period (same filters as the run-rate).
   # Returns `%{period_index(0-based) => %{in, out}}`.
-  defp period_actuals(account_ids, start_date, period_days, periods_count, today, com) do
+  defp period_actuals(account_ids, start_date, period_days, periods_count, today, com, excluded_ids) do
     horizon_end = Date.add(start_date, period_days * periods_count)
     upper = if Date.compare(today, horizon_end) == :lt, do: today, else: horizon_end
 
@@ -297,9 +325,152 @@ defmodule FullCircle.Reporting.CashForecast do
         },
         group_by: selected_as(:idx)
       )
+      |> where(^operating_only(excluded_ids))
       |> Repo.all()
       |> Map.new(fn r -> {r.idx, %{in: to_decimal(r.ins), out: to_decimal(r.outs)}} end)
     end
+  end
+
+  # Per-period known in/out from open AR/AP and undeposited cheques (forecast overlay).
+  defp known_due_per_period(com, start_date, period_days, periods_count, as_of, sources) do
+    first_forecast_idx = Enum.find_index(sources, &(&1 == :forecast))
+
+    buckets =
+      Enum.reduce(outstanding_due_items(com, as_of), %{}, fn item, acc ->
+        case bucket_due_index(
+               item.due_date,
+               start_date,
+               period_days,
+               periods_count,
+               as_of,
+               first_forecast_idx
+             ) do
+          nil ->
+            acc
+
+          idx ->
+            Map.update(acc, {idx, item.dir}, item.amount, &Decimal.add(&1, item.amount))
+        end
+      end)
+
+    for i <- 0..(periods_count - 1) do
+      {Map.get(buckets, {i, :in}, @zero), Map.get(buckets, {i, :out}, @zero)}
+    end
+  end
+
+  defp bucket_due_index(_due, _start, _pd, _n, _as_of, nil), do: nil
+
+  defp bucket_due_index(due, start_date, period_days, periods_count, as_of, first_forecast_idx) do
+    idx =
+      cond do
+        Date.compare(due, as_of) != :gt ->
+          first_forecast_idx
+
+        Date.compare(due, start_date) == :lt ->
+          first_forecast_idx
+
+        true ->
+          due
+          |> Date.diff(start_date)
+          |> div(period_days)
+          |> min(periods_count - 1)
+      end
+
+    if idx >= first_forecast_idx, do: idx, else: first_forecast_idx
+  end
+
+  defp outstanding_due_items(com, as_of) do
+    outstanding_invoices(com, "Invoice", :in, as_of) ++
+      outstanding_invoices(com, "PurInvoice", :out, as_of) ++
+      outstanding_cheques(com, as_of)
+  end
+
+  defp outstanding_invoices(com, doc_type, dir, as_of) do
+    stxm_sum =
+      from m in SeedTransactionMatcher,
+        where: m.transaction_id == parent_as(:txn).id,
+        select: %{sum: coalesce(sum(m.match_amount), 0)}
+
+    atxm_sum =
+      from m in TransactionMatcher,
+        where: m.transaction_id == parent_as(:txn).id,
+        select: %{sum: coalesce(sum(m.match_amount), 0)}
+
+    query =
+      case doc_type do
+        "Invoice" ->
+          from(txn in Transaction,
+            as: :txn,
+            left_join: inv in Invoice,
+            on: inv.id == txn.doc_id,
+            inner_lateral_join: s in subquery(stxm_sum),
+            on: true,
+            inner_lateral_join: a in subquery(atxm_sum),
+            on: true,
+            where: txn.company_id == ^com.id,
+            where: txn.doc_type == "Invoice",
+            where: txn.doc_date <= ^as_of,
+            select: %{
+              due_date: coalesce(inv.due_date, txn.doc_date),
+              balance: txn.amount + s.sum + a.sum
+            }
+          )
+
+        "PurInvoice" ->
+          from(txn in Transaction,
+            as: :txn,
+            left_join: inv in PurInvoice,
+            on: inv.id == txn.doc_id,
+            inner_lateral_join: s in subquery(stxm_sum),
+            on: true,
+            inner_lateral_join: a in subquery(atxm_sum),
+            on: true,
+            where: txn.company_id == ^com.id,
+            where: txn.doc_type == "PurInvoice",
+            where: txn.doc_date <= ^as_of,
+            select: %{
+              due_date: coalesce(inv.due_date, txn.doc_date),
+              balance: txn.amount + s.sum + a.sum
+            }
+          )
+      end
+
+    query
+    |> Repo.all()
+    |> Enum.filter(fn row ->
+      case dir do
+        :in -> Decimal.compare(row.balance, @zero) == :gt
+        :out -> Decimal.compare(row.balance, @zero) == :lt
+      end
+    end)
+    |> Enum.map(fn row ->
+      %{
+        due_date: row.due_date,
+        amount: if(dir == :in, do: row.balance, else: Decimal.abs(row.balance)),
+        dir: dir
+      }
+    end)
+  end
+
+  defp outstanding_cheques(com, as_of) do
+    from(chq in ReceivedCheque,
+      join: rec in Receipt,
+      on: rec.id == chq.receipt_id,
+      left_join: dep in Deposit,
+      on: dep.id == chq.deposit_id,
+      left_join: rtn in ReturnCheque,
+      on: rtn.id == chq.return_cheque_id,
+      where: rec.company_id == ^com.id,
+      where: rec.receipt_date <= ^as_of,
+      where:
+        (is_nil(dep.deposit_date) and is_nil(rtn.return_date)) or
+          dep.deposit_date > ^as_of or rtn.return_date > ^as_of,
+      select: %{due_date: chq.due_date, amount: chq.amount}
+    )
+    |> Repo.all()
+    |> Enum.map(fn row ->
+      %{due_date: row.due_date, amount: to_decimal(row.amount), dir: :in}
+    end)
   end
 
   @doc """
