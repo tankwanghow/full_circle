@@ -707,7 +707,7 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
           type="number"
           step="0.01"
           min="0"
-          label={gettext("Existing income per director (RM)")}
+          label={gettext("Director YA income before remedy fee (salary + other)")}
           value={Decimal.to_string(@plan.remedy_existing_income || 0)}
         />
       </div>
