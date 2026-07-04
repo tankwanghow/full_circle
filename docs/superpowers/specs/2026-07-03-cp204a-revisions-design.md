@@ -61,8 +61,11 @@ kept — it is a valid revised estimate).
   - From `estimate_month`: instalment = `(estimate − paid before
     estimate_month) ÷ remaining months`, floored at 0 (unchanged).
   - At each revision month `r` (only when `r ≥ estimate_month`), with revised
-    estimate `E_r`: instalment from `r` onward =
-    `max(E_r − payable_before_r, 0) ÷ (12 − r + 1)`, where **payable**
+    estimate `E_r`: instalments **through the filing month `r` are locked**
+    (s.107C — months 1–6 are fixed by the 85%-floored initial CP204); the
+    re-spread takes effect from `r + 1`:
+    `max(E_r − payable_through_r, 0) ÷ (12 − r)` *(amended 2026-07-04:
+    originally effective from `r` itself)*, where **payable**
     accumulates, per month before `r`, the **higher of the scheduled
     instalment and the actual paid amount**. LHDN's CP204A formula deducts
     payments made — so payments exceeding the schedule reduce future dues
@@ -95,11 +98,17 @@ new wiring; `plan_changed`'s changeset-apply already casts the new map field.
 becomes `latest_estimate(plan)`, falling back to the suggested estimate when
 ≤ 0 (current fallback behavior preserved).
 
-**Revise button** (`revise_plan`): finds the first `r ∈ [6, 9, 11]` with
-`r ≥ current_fy_month(com, fy_year, as_of)`. If none, flash error ("No CP204A
-window left this year."). Otherwise it merges `revisions[r] = suggested` into
-the on-screen plan's attrs and saves via `create_or_update_plan` (audit-logged
-as today). `estimate` and `estimate_month` are not touched.
+**Suggest button** (`suggest_plan`) *(amended 2026-07-04: replaces the
+auto-saving Revise button)*: computes the minimum-payment, penalty-free plan
+via `Tax.suggest_revisions/4` and **fills the CP204A fields without saving**
+(user reviews, then Saves). A window is open when `r ≥ current_fy_month`,
+`r ≥ estimate_month`, and no tax has been paid for a month after `r`.
+Earliest open window parks the estimate at payable-through-it (stopping later
+instalments); middle open windows are cleared; the last open window carries
+the penalty-free floor (forecast ÷ (1 + tolerance), rounded up). Passed
+windows keep their saved values. No window → flash "No CP204A window left
+this year." An info flash warns that the last suggested filing is mandatory
+to stay penalty-free.
 
 **85% floor banner**: `handle_params` loads `get_plan(com, fy_year − 1)` and
 assigns `prior_latest = latest_estimate(prev_plan)` (nil when no prior plan).

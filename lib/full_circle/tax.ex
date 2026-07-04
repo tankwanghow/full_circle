@@ -212,6 +212,76 @@ defmodule FullCircle.Tax do
     )
   end
 
+  @doc """
+  Suggest CP204A values for the open revision windows: the minimum-payment,
+  penalty-free plan. A window is open when it is at/after `cur_month`, not
+  before the plan started, and no tax has been paid for a month after it
+  (instalments through the filing month are locked — s.107C). Passed windows
+  keep their saved values; open middle windows are cleared. The earliest open
+  window "parks" the estimate at the amount already payable through it
+  (dropping later instalments to 0) and the last open window carries
+  `floor_estimate` (the penalty-free minimum, forecast tax / 1.3). Returns
+  `{:ok, revisions}` with string keys/values ready for the plan form, or
+  `{:error, :no_window}`.
+  """
+  def suggest_revisions(%InstalmentPlan{} = plan, com, cur_month, floor_estimate) do
+    paid = paid_by_month(plan)
+
+    last_paid_month =
+      paid
+      |> Enum.filter(fn {_m, v} -> Decimal.compare(v, @zero) == :gt end)
+      |> Enum.map(fn {m, _} -> m end)
+      |> case do
+        [] -> 0
+        months -> Enum.max(months)
+      end
+
+    est_month = plan.estimate_month || 1
+
+    open =
+      Enum.filter(@revision_months, fn r ->
+        r >= cur_month and r >= est_month and last_paid_month <= r
+      end)
+
+    case open do
+      [] ->
+        {:error, :no_window}
+
+      [first | _] = windows ->
+        last = List.last(windows)
+
+        kept =
+          for {k, v} <- plan.revisions || %{}, to_month(k) not in windows, into: %{}, do: {k, v}
+
+        final =
+          if Decimal.compare(floor_estimate, @zero) == :gt,
+            do: Decimal.round(floor_estimate, 2, :ceiling)
+
+        parking =
+          if first != last do
+            %{plan | revisions: kept}
+            |> schedule(com)
+            |> payable_through(first)
+            |> Decimal.round(2)
+          end
+
+        {:ok, kept |> put_positive("#{last}", final) |> put_positive("#{first}", parking)}
+    end
+  end
+
+  @doc "Cumulative payable (per month, the higher of scheduled and paid) through `month_no`."
+  def payable_through(rows, month_no) do
+    rows
+    |> Enum.filter(&(&1.month_no <= month_no))
+    |> Enum.reduce(@zero, fn r, acc -> Decimal.add(acc, Decimal.max(r.scheduled, r.paid)) end)
+  end
+
+  defp put_positive(map, _key, nil), do: map
+
+  defp put_positive(map, key, %Decimal{} = v) do
+    if Decimal.compare(v, @zero) == :gt, do: Map.put(map, key, Decimal.to_string(v)), else: map
+  end
+
   def get_plan(com, fy_year) do
     Repo.one(from p in InstalmentPlan, where: p.company_id == ^com.id and p.fy_year == ^fy_year)
   end

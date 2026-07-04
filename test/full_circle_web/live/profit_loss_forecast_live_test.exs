@@ -201,12 +201,10 @@ defmodule FullCircleWeb.ProfitLossForecastLiveTest do
       assert html =~ "Net-profit ceiling before penalty"
     end
 
-    # Revise fills the NEXT open CP204A window (6/9/11) at/after the as-of month with
-    # the forecast-suggested estimate and persists it; the original estimate and
-    # estimate_month are untouched. The exact suggested value depends on the forecast
-    # projection, so we assert it is positive rather than locking a figure. Past month
-    # 11 (Dec run) there is no window left and nothing is saved.
-    test "Revise recomputes and persists a positive estimate for the current FY month", %{
+    # Suggest fills the open CP204A windows (park at earliest, penalty floor at the
+    # last) WITHOUT saving; submitting the form afterwards persists them. Past month
+    # 11 (Dec run) there is no window left and nothing changes.
+    test "Suggest fills open CP204A windows without saving; Save persists them", %{
       conn: _conn,
       user: user
     } do
@@ -240,23 +238,30 @@ defmodule FullCircleWeb.ProfitLossForecastLiveTest do
 
       _html = render_async(lv)
 
-      lv |> element("button", "Revise") |> render_click()
+      lv |> element("button", "Suggest") |> render_click()
 
       fy_year = 2026
       cur = FullCircle.Tax.current_fy_month(com, fy_year, Date.utc_today())
+      open = Enum.filter(FullCircle.Tax.revision_months(), &(&1 >= cur))
 
-      case Enum.find(FullCircle.Tax.revision_months(), &(&1 >= cur)) do
-        nil ->
-          # December run: no CP204A window left, Revise saves nothing.
+      case open do
+        [] ->
+          # December run: no CP204A window left, nothing filled or saved.
           assert FullCircle.Tax.get_plan(com, fy_year) == nil
 
-        window ->
+        windows ->
+          # Suggest is a preview — nothing persisted until Save.
+          assert FullCircle.Tax.get_plan(com, fy_year) == nil
+
+          # Save persists the suggested revisions from the filled form.
+          lv |> form("#plan-form") |> render_submit(%{})
+
           plan = FullCircle.Tax.get_plan(com, fy_year)
           assert plan != nil
-          # the original estimate is untouched (this plan had none)
-          assert Decimal.compare(plan.estimate, Decimal.new(0)) == :eq
-          # the revision landed in the next open window with a positive suggestion
-          revised = Map.fetch!(plan.revisions, "#{window}")
+          # the last open window carries the penalty-free floor (> 0 here,
+          # since the forecast tax is positive)
+          last = List.last(windows)
+          revised = Map.fetch!(plan.revisions, "#{last}")
           assert Decimal.compare(Decimal.new(revised), Decimal.new(0)) == :gt
           assert Decimal.compare(FullCircle.Tax.latest_estimate(plan), Decimal.new(0)) == :gt
       end

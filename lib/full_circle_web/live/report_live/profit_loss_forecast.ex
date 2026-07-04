@@ -185,11 +185,11 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
   end
 
   @impl true
-  def handle_event("revise_plan", _params, socket) do
-    # Revise fills the NEXT open CP204A window (6/9/11) at/after the as-of
-    # month with the forecast-suggested estimate, then saves. It works off the
-    # on-screen plan (kept live by "plan_changed") and never touches the
-    # original estimate/estimate_month.
+  def handle_event("suggest_plan", _params, socket) do
+    # Suggest fills the open CP204A windows with the minimum-payment plan
+    # (park the estimate at the earliest open window, penalty floor at the
+    # last) WITHOUT saving — the user reviews the fields and clicks Save.
+    # Windows already passed, or with tax paid after them, are untouched.
     com = socket.assigns.current_company
     fy_year = safe_int(socket.assigns.search.fy_year, default_fy_year(com))
 
@@ -200,36 +200,27 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
       end
 
     cur = FullCircle.Tax.current_fy_month(com, fy_year, as_of)
+    plan = socket.assigns.plan
+    tol = plan.tolerance_pct || Decimal.new(30)
+    forecast_tax = FullCircle.Tax.forecast_annual_tax(com, fy_year, as_of)
+    floor = FullCircle.Tax.suggested_estimate(forecast_tax, tol)
 
-    case Enum.find(FullCircle.Tax.revision_months(), &(&1 >= cur)) do
-      nil ->
+    case FullCircle.Tax.suggest_revisions(plan, com, cur, floor) do
+      {:error, :no_window} ->
         {:noreply, put_flash(socket, :error, gettext("No CP204A window left this year."))}
 
-      window ->
-        plan = socket.assigns.plan
-        tol = plan.tolerance_pct || Decimal.new(30)
-        forecast_tax = FullCircle.Tax.forecast_annual_tax(com, fy_year, as_of)
-        suggested = FullCircle.Tax.suggested_estimate(forecast_tax, tol)
+      {:ok, revisions} ->
+        plan = %{plan | revisions: revisions}
 
-        attrs = %{
-          "fy_year" => fy_year,
-          "tolerance_pct" => Decimal.to_string(tol),
-          "estimate" => Decimal.to_string(plan.estimate || Decimal.new(0)),
-          "estimate_month" => plan.estimate_month || 1,
-          "paid_overrides" => plan.paid_overrides || %{},
-          "prior_year_estimate" => Decimal.to_string(plan.prior_year_estimate || Decimal.new(0)),
-          "revisions" =>
-            Map.put(plan.revisions || %{}, "#{window}", Decimal.to_string(suggested))
-        }
-
-        case FullCircle.Tax.create_or_update_plan(attrs, com, socket.assigns.current_user) do
-          {:ok, plan} ->
-            {:noreply,
-             assign(socket, plan: plan, plan_schedule: FullCircle.Tax.schedule(plan, com))}
-
-          {:error, _} ->
-            {:noreply, put_flash(socket, :error, gettext("Could not revise the estimate."))}
-        end
+        {:noreply,
+         socket
+         |> assign(plan: plan, plan_schedule: FullCircle.Tax.schedule(plan, com))
+         |> put_flash(
+           :info,
+           gettext(
+             "CP204A suggestions filled — review and Save. Filing the last suggested window is required to stay penalty-free."
+           )
+         )}
     end
   end
 
@@ -521,7 +512,7 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
             <p class="mt-1 text-amber-800 dark:text-amber-300 font-medium">
               {gettext("Expected refund (instalments paid − forecast tax)")}:
               <span class="font-mono">{plan_money(@over.expected_refund)}</span>.
-              {gettext("Use Revise to lower the estimate to")}
+              {gettext("Click Suggest to plan the CP204A revisions down to")}
               <span class="font-mono">{plan_money(@suggested)}</span>.
             </p>
           <% true -> %>
@@ -581,8 +572,8 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
             </div>
             <div class="flex gap-2 items-end">
               <.button class="blue button">{gettext("Save")}</.button>
-              <button type="button" phx-click="revise_plan" class="gray button">
-                {gettext("Revise")}
+              <button type="button" phx-click="suggest_plan" class="gray button">
+                {gettext("Suggest")}
               </button>
             </div>
           </div>
@@ -768,7 +759,7 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
         <p class="mt-1 font-medium">
           {gettext("Suggested remedy: revise the CP204 estimate down to")}:
           <span class="font-mono font-semibold">{plan_money(@comparison.revised_estimate)}</span>
-          {gettext("— click Revise above, then Save.")}
+          {gettext("— click Suggest above, then Save.")}
         </p>
         <p class="mt-1">
           {gettext("Expected refund if instalments continue at the current estimate")}:

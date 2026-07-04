@@ -214,6 +214,57 @@ defmodule FullCircle.TaxComputeTest do
     end
   end
 
+  describe "suggest_revisions/4" do
+    defp com12, do: %{closing_month: 12, closing_day: 31}
+
+    defp plan_8500(attrs) do
+      struct!(
+        %FullCircle.Tax.InstalmentPlan{fy_year: 2026, estimate: Decimal.new(8500), estimate_month: 1},
+        attrs
+      )
+    end
+
+    test "paid through month 7 -> park at 9, penalty floor at 11" do
+      paid = for m <- 1..7, into: %{}, do: {"#{m}", "708.33"}
+      {:ok, revs} = Tax.suggest_revisions(plan_8500(%{paid_overrides: paid}), com12(), 7, d(5000))
+      # payable through 9 = 9 x 708.33.. = 6375
+      assert Decimal.equal?(Decimal.new(revs["9"]), d("6375.00"))
+      assert Decimal.equal?(Decimal.new(revs["11"]), d("5000.00"))
+      refute Map.has_key?(revs, "6")
+    end
+
+    test "all windows open -> park at 6, clear stale 9, floor at 11" do
+      {:ok, revs} =
+        Tax.suggest_revisions(plan_8500(%{revisions: %{"9" => "999999"}}), com12(), 1, d(5000))
+
+      assert Decimal.equal?(Decimal.new(revs["6"]), d("4250.00"))
+      refute Map.has_key?(revs, "9")
+      assert Decimal.equal?(Decimal.new(revs["11"]), d("5000.00"))
+    end
+
+    test "passed window keeps its saved value and feeds the parking amount" do
+      {:ok, revs} =
+        Tax.suggest_revisions(plan_8500(%{revisions: %{"6" => "7000"}}), com12(), 8, d(5000))
+
+      assert revs["6"] == "7000"
+      # 6->7000 locked: months 7-12 = (7000 - 4250) / 6 = 458.33..;
+      # payable through 9 = 4250 + 3 x 458.33.. = 5625
+      assert Decimal.equal?(Decimal.new(revs["9"]), d("5625.00"))
+      assert Decimal.equal?(Decimal.new(revs["11"]), d("5000.00"))
+    end
+
+    test "payment after month 9 -> only month 11 usable, single floor revision" do
+      {:ok, revs} =
+        Tax.suggest_revisions(plan_8500(%{paid_overrides: %{"10" => "1"}}), com12(), 10, d(5000))
+
+      assert revs == %{"11" => "5000.00"}
+    end
+
+    test "no window left" do
+      assert {:error, :no_window} = Tax.suggest_revisions(plan_8500(%{}), com12(), 12, d(5000))
+    end
+  end
+
   describe "current_fy_month/3" do
     test "maps a date to its FY month index, clamped to 1..12" do
       com = %{closing_month: 12, closing_day: 31}
