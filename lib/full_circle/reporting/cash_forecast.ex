@@ -5,9 +5,12 @@ defmodule FullCircle.Reporting.CashForecast do
 
   Model: elapsed periods show the company's REAL liquid cash flow; future periods
   use a **run-rate backbone** (per-period average of operating liquid churn from the
-  trailing window, treasury transfers excluded). Accounts the company marks as
-  discretionary (director fees, dividends, …) can also be excluded from the run-rate
-  via the company's settings.
+  trailing window, treasury transfers excluded). The run-rate LEVEL blends the long
+  trailing window 50/50 with a 90-day window so a growing or shrinking business is
+  not lagged by half a year, and the per-period SHAPE follows the same calendar
+  windows one year earlier (seasonality, shrunk 50% toward flat). Accounts the
+  company marks as discretionary (director fees, dividends, …) can also be excluded
+  from the run-rate via the company's settings.
 
   Pure core: `build_forecast/3`, `fd_ladder/2`.
   """
@@ -24,6 +27,14 @@ defmodule FullCircle.Reporting.CashForecast do
 
   # Fixed-deposit ladder tenures, expressed in days (~1, 3, 6, 12 months).
   @tenure_days [{:"1mo", 30}, {:"3mo", 90}, {:"6mo", 180}, {:"12mo", 365}]
+
+  # Short recent window blended 50/50 with the long trailing window so the
+  # forecast level tracks a growing/shrinking business instead of lagging it.
+  @short_trailing_days 90
+
+  # Seasonal shape compares each forecast period to the same calendar window
+  # this many days earlier (one year).
+  @season_shift_days 365
 
   @liquid_types ["Cash or Equivalent", "Bank"]
 
@@ -167,6 +178,69 @@ defmodule FullCircle.Reporting.CashForecast do
     end
   end
 
+  # Level = 50/50 blend of the long trailing-window rate and a 90-day rate. Skipped
+  # when the long window is already 90 days or shorter.
+  defp blended_run_rate(ids, today, trailing_days, period_days, com, excluded_ids) do
+    {long_in, long_out} = run_rate_flows(ids, today, trailing_days, period_days, com, excluded_ids)
+
+    if trailing_days > @short_trailing_days do
+      {short_in, short_out} =
+        run_rate_flows(ids, today, @short_trailing_days, period_days, com, excluded_ids)
+
+      {mid(long_in, short_in), mid(long_out, short_out)}
+    else
+      {long_in, long_out}
+    end
+  end
+
+  defp mid(a, b), do: a |> Decimal.add(b) |> Decimal.div(2)
+
+  @doc """
+  Seasonal multipliers from last year's per-period flow sums. Factors average 1
+  (the run-rate level is preserved) and are shrunk 50% toward flat, so a window
+  that was empty or spiky a year ago cannot zero out or dominate a forecast
+  period. All-zero input (no data a year back) gives flat 1s.
+  """
+  def seasonal_factors([]), do: []
+
+  def seasonal_factors(values) do
+    total = Enum.reduce(values, @zero, &Decimal.add(&2, &1))
+
+    if Decimal.compare(total, @zero) == :eq do
+      List.duplicate(Decimal.new(1), length(values))
+    else
+      mean = Decimal.div(total, length(values))
+
+      Enum.map(values, fn v ->
+        v |> Decimal.div(mean) |> Decimal.add(1) |> Decimal.div(2)
+      end)
+    end
+  end
+
+  # In/out seasonal factors for the forecast periods: operating flows (same filters
+  # as the run-rate) in the same calendar windows one year earlier.
+  defp seasonal_shape(_ids, [], _period_days, _com, _excluded_ids), do: {[], []}
+
+  defp seasonal_shape(ids, fbounds, period_days, com, excluded_ids) do
+    {first_ps, _} = hd(fbounds)
+    n = length(fbounds)
+    shape_start = Date.add(first_ps, -@season_shift_days)
+
+    flows = operating_period_flows(ids, shape_start, period_days, n, com, excluded_ids)
+
+    ins = for i <- 0..(n - 1), do: Map.get(flows, i, %{in: @zero, out: @zero}).in
+    outs = for i <- 0..(n - 1), do: Map.get(flows, i, %{in: @zero, out: @zero}).out
+
+    {seasonal_factors(ins), seasonal_factors(outs)}
+  end
+
+  # Operating liquid in/out per period (run-rate filters applied), bucketed into
+  # `n` consecutive `period_days` windows from `start_date`.
+  defp operating_period_flows(account_ids, start_date, period_days, n, com, excluded_ids) do
+    upper = Date.add(start_date, period_days * n)
+    bucketed_flows(account_ids, start_date, period_days, upper, com, operating_only(excluded_ids))
+  end
+
   @doc """
   Full forecast. `opts` is a map with `:start_date`, `:period_days` (default 30),
   `:periods_count` (default 12), `:buffer_periods` (default 1), `:trailing_days`
@@ -190,26 +264,38 @@ defmodule FullCircle.Reporting.CashForecast do
 
     opening = opening_liquid_balance(ids, start_date, com)
 
+    excluded = excluded_account_ids(com)
+
     # Forecast periods use the run-rate anchored at TODAY (freshest trailing window),
-    # excluding treasury transfers and any user-listed discretionary accounts.
-    {rr_in, rr_out} =
-      run_rate_flows(ids, today, trailing_days, period_days, com, excluded_account_ids(com))
+    # excluding treasury transfers and any user-listed discretionary accounts. The
+    # level is a 50/50 blend of the long trailing window and a 90-day window.
+    {rr_in, rr_out} = blended_run_rate(ids, today, trailing_days, period_days, com, excluded)
 
     # Elapsed periods (end <= today) use their REAL total liquid cash flow.
     actuals = period_actuals(ids, start_date, period_days, periods_count, today, com)
 
-    {base_in, base_out, sources} =
+    # Seasonal shape: multipliers from the same calendar windows one year earlier,
+    # one per forecast period, averaging 1 so the blended level is preserved.
+    fbounds = Enum.filter(bounds, fn {_ps, pe} -> Date.compare(pe, today) == :gt end)
+    {in_factors, out_factors} = seasonal_shape(ids, fbounds, period_days, com, excluded)
+
+    {rows, _} =
       bounds
       |> Enum.with_index()
-      |> Enum.reduce({[], [], []}, fn {{_ps, pe}, i}, {bi, bo, ss} ->
+      |> Enum.map_reduce(0, fn {{_ps, pe}, i}, fc_idx ->
         if Date.compare(pe, today) != :gt do
           a = Map.get(actuals, i, %{in: @zero, out: @zero})
-          {[a.in | bi], [a.out | bo], [:actual | ss]}
+          {{a.in, a.out, :actual}, fc_idx}
         else
-          {[rr_in | bi], [rr_out | bo], [:forecast | ss]}
+          fin = Decimal.mult(rr_in, Enum.at(in_factors, fc_idx))
+          fout = Decimal.mult(rr_out, Enum.at(out_factors, fc_idx))
+          {{fin, fout, :forecast}, fc_idx + 1}
         end
       end)
-      |> then(fn {bi, bo, ss} -> {Enum.reverse(bi), Enum.reverse(bo), Enum.reverse(ss)} end)
+
+    base_in = Enum.map(rows, &elem(&1, 0))
+    base_out = Enum.map(rows, &elem(&1, 1))
+    sources = Enum.map(rows, &elem(&1, 2))
 
     result =
       build_forecast(
@@ -286,20 +372,27 @@ defmodule FullCircle.Reporting.CashForecast do
     if Date.compare(upper, start_date) != :gt do
       %{}
     else
-      from(t in Transaction,
-        where:
-          t.company_id == ^com.id and t.account_id in ^account_ids and
-            t.doc_date >= ^start_date and t.doc_date < ^upper,
-        select: %{
-          idx: selected_as(fragment("(? - ?) / ?", t.doc_date, ^start_date, ^period_days), :idx),
-          ins: sum(fragment("case when ? > 0 then ? else 0 end", t.amount, t.amount)),
-          outs: sum(fragment("case when ? < 0 then -? else 0 end", t.amount, t.amount))
-        },
-        group_by: selected_as(:idx)
-      )
-      |> Repo.all()
-      |> Map.new(fn r -> {r.idx, %{in: to_decimal(r.ins), out: to_decimal(r.outs)}} end)
+      bucketed_flows(account_ids, start_date, period_days, upper, com)
     end
+  end
+
+  # In/out sums grouped into `period_days`-length buckets from `start_date` (index
+  # 0-based), over doc dates in [start_date, upper), optionally filtered.
+  defp bucketed_flows(account_ids, start_date, period_days, upper, com, filter \\ true) do
+    from(t in Transaction,
+      where:
+        t.company_id == ^com.id and t.account_id in ^account_ids and
+          t.doc_date >= ^start_date and t.doc_date < ^upper,
+      select: %{
+        idx: selected_as(fragment("(? - ?) / ?", t.doc_date, ^start_date, ^period_days), :idx),
+        ins: sum(fragment("case when ? > 0 then ? else 0 end", t.amount, t.amount)),
+        outs: sum(fragment("case when ? < 0 then -? else 0 end", t.amount, t.amount))
+      },
+      group_by: selected_as(:idx)
+    )
+    |> where(^filter)
+    |> Repo.all()
+    |> Map.new(fn r -> {r.idx, %{in: to_decimal(r.ins), out: to_decimal(r.outs)}} end)
   end
 
   @doc """

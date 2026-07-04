@@ -47,6 +47,34 @@ defmodule FullCircle.Reporting.CashForecastTest do
     end
   end
 
+  describe "seasonal_factors/1" do
+    test "empty list gives no factors" do
+      assert CashForecast.seasonal_factors([]) == []
+    end
+
+    test "all-zero shape falls back to flat (all 1)" do
+      assert CashForecast.seasonal_factors([d(0), d(0), d(0)]) == [d(1), d(1), d(1)]
+    end
+
+    test "normalizes to mean 1 and shrinks 50% toward flat" do
+      # raw factors for [0, 3000, 0] are [0, 3, 0]; shrunk halfway to 1 -> [0.5, 2, 0.5]
+      factors = CashForecast.seasonal_factors([d(0), d(3000), d(0)])
+
+      assert Enum.map(factors, &Decimal.to_string/1) == ["0.5", "2", "0.5"]
+    end
+
+    test "factors average to 1 so the run-rate level is preserved" do
+      factors = CashForecast.seasonal_factors([d(100), d(200), d(300), d(400)])
+
+      mean =
+        factors
+        |> Enum.reduce(d(0), &Decimal.add(&2, &1))
+        |> Decimal.div(d(4))
+
+      assert Decimal.equal?(mean, d(1))
+    end
+  end
+
   describe "build_forecast/3 roll-forward" do
     test "rolls balance forward from per-period base flows" do
       start = ~D[2026-06-08]
@@ -287,6 +315,58 @@ defmodule FullCircle.Reporting.CashForecastDBTest do
       assert Decimal.equal?(hd(res.periods).opening, d(10_000))
       assert hd(res.periods).source in [:actual, :forecast]
       assert Map.has_key?(res.ladder, :place_12mo)
+    end
+
+    test "forecast level blends the trailing-window rate with a 90-day rate", %{com: com, bank: bank} do
+      # inflow 236 days before as_of: inside the 365-day window, outside the 90-day one,
+      # and outside the horizon's year-earlier shape windows (2025-06-08..2025-09-05).
+      txn!(com, bank.id, ~D[2025-10-15], d(3650))
+      # inflow 30 days before as_of: inside both windows.
+      txn!(com, bank.id, ~D[2026-05-09], d(1800))
+
+      as_of = ~D[2026-06-08]
+
+      res =
+        CashForecast.cash_forecast(
+          %{start_date: as_of, period_days: 30, periods_count: 3,
+            buffer_periods: 1, trailing_days: 365, as_of: as_of, account_ids: :all},
+          com
+        )
+
+      long = Decimal.mult(d(3650 + 1800), Decimal.div(d(30), d(365)))
+      short = Decimal.mult(d(1800), Decimal.div(d(30), d(90)))
+      blended = long |> Decimal.add(short) |> Decimal.div(d(2))
+
+      # no flow a year before the horizon -> flat shape, every forecast period = blend
+      assert Enum.all?(res.periods, &(&1.source == :forecast))
+      for p <- res.periods, do: assert(Decimal.equal?(p.baseline_in, blended))
+    end
+
+    test "forecast shape follows the same calendar window one year earlier", %{com: com, bank: bank} do
+      as_of = ~D[2026-06-08]
+      # horizon: p1 06-08..07-07, p2 07-08..08-06, p3 08-07..09-05 (all forecast).
+      # Shape windows are those bounds shifted -365 days; 2025-07-21 falls in p2's window.
+      txn!(com, bank.id, ~D[2025-07-21], d(3000))
+
+      res =
+        CashForecast.cash_forecast(
+          %{start_date: as_of, period_days: 30, periods_count: 3,
+            buffer_periods: 1, trailing_days: 365, as_of: as_of, account_ids: :all},
+          com
+        )
+
+      [p1, p2, p3] = res.periods
+      # 90-day rate is 0, so blended level = long-window rate / 2
+      rate = Decimal.mult(d(3000), Decimal.div(d(30), d(365))) |> Decimal.div(d(2))
+
+      # raw shape [0, 3000, 0] -> factors [0.5, 2, 0.5] applied to the blended rate
+      assert Decimal.equal?(p1.baseline_in, Decimal.mult(rate, d("0.5")))
+      assert Decimal.equal?(p2.baseline_in, Decimal.mult(rate, d(2)))
+      assert Decimal.equal?(p3.baseline_in, Decimal.mult(rate, d("0.5")))
+      # level preserved: the three periods still sum to ~3x the blended rate
+      total = [p1, p2, p3] |> Enum.reduce(d(0), &Decimal.add(&2, &1.baseline_in))
+      diff = total |> Decimal.sub(Decimal.mult(rate, d(3))) |> Decimal.abs()
+      assert Decimal.compare(diff, d("0.0001")) == :lt
     end
 
     test "as_of anchors the actual/forecast split", %{com: com} do
