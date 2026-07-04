@@ -23,11 +23,12 @@ actual/forecast split.
     recent 90-day rate" reads a seasonally strong quarter as growth (backtested:
     that pushed the level the WRONG direction). Falls back to the naive 50/50
     blend when the prior-year window is empty; skipped when `trailing_days ≤ 90`.
-  - **Shape** = seasonal factors from the same calendar windows over up to 3
-    prior years, each year normalized to total 1 before summing so years weigh
-    equally regardless of volume (`seasonal_shape` → `equal_weight_sum` →
-    `seasonal_factors/1`). Factors are normalized to mean 1 (level preserved)
-    and shrunk 50% toward flat. No data in any prior year → flat.
+  - **Shape** = seasonal factors from the same calendar windows one year
+    earlier (`seasonal_shape` → `seasonal_factors/1`): normalized to mean 1
+    (level preserved), shrunk 50% toward flat so a gap or spike last year
+    can't zero out or dominate a period. No data a year back → flat.
+    (A multi-year equal-weighted shape was tried and reverted by user choice —
+    ask before reintroducing.)
 - **Run-rate operating filter** (`operating_only`): contact-null rows only
   (bank-side legs), pure treasury transfers excluded (no contact + all legs
   asset-type), plus documents touching user-listed discretionary accounts
@@ -72,9 +73,10 @@ discretionary flows, by design.
   they do NOT feed the closing/free-cash math.
 - Every period also carries a display split (`oper_/treas_/disc_ in/out`):
   actual rows partition their total Base In/Out into operating + treasury +
-  discretionary (excluded-account docs); forecast rows set `disc_out` to the
-  same calendar window one year earlier (the "Discr. Out … LY" memo column).
-  All of these are display-only — the roll-forward uses `baseline_in/out`.
+  discretionary (excluded-account docs), shown as the small "op · tr · di"
+  line under actual Base In/Out; forecast rows carry zeros. Display-only —
+  the roll-forward uses `baseline_in/out`. (A "Discr. Out (LY)" memo column
+  for forecast rows was tried and reverted by user choice.)
 - Tests asserting forecast amounts must mirror the implementation's Decimal
   operation order (e.g. `Decimal.mult(sum, Decimal.div(d(30), d(365)))`, not
   `sum × 30 ÷ 365`) or 28-digit rounding breaks `Decimal.equal?`; use a

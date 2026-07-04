@@ -93,7 +93,6 @@ defmodule FullCircleWeb.ReportLive.CashForecastPrint do
               <th>{gettext("Free Cash")}</th>
               <th>{gettext("Receivable")}</th>
               <th>{gettext("Payable")}</th>
-              <th>{gettext("Discr. Out")}</th>
             </tr>
           </thead>
           <tbody>
@@ -110,7 +109,6 @@ defmodule FullCircleWeb.ReportLive.CashForecastPrint do
               <td class="bold">{fmt(p.free_cash)}</td>
               <td>{fmt(p.receivable)}</td>
               <td>{fmt(p.payable)}</td>
-              <td>{fmt(p.disc_out)}{if p.source == :forecast, do: " " <> gettext("LY")}</td>
             </tr>
           </tbody>
         </table>
@@ -124,7 +122,6 @@ defmodule FullCircleWeb.ReportLive.CashForecastPrint do
             <b>{gettext("Base In")}</b> / <b>{gettext("Base Out")}</b>: {gettext("the period's cash in/out — real total for Actual periods, the run-rate (average operating throughput, treasury excluded) for Forecast periods")}.
             <b>{gettext("Buffer")}</b>: {gettext("cash that must stay liquid — projected net cash drain (outflow − inflow, floored at 0) over the next %{n} period(s)", n: @forecast.buffer_periods)}.
             <b>{gettext("Free Cash")}</b>: {gettext("Closing − Buffer (never below 0) — surplus safe to put to work")}.
-            <b>{gettext("Discr. Out")}</b>: {gettext("discretionary payouts (excluded accounts) — real for Actual periods, same window last year (LY) as a memo for Forecast periods; not in Closing/Free Cash")}.
           </p>
           <p>
             <b>{gettext("Fixed Deposit Tenure Ladder")}</b>: {gettext("the most you can lock away for ~1/3/6/12 months without any period dropping below its Buffer")}.

@@ -444,7 +444,6 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
             <th class="px-1 text-green-700 dark:text-green-400">{gettext("Free Cash")}</th>
             <th class="px-1 border-l dark:border-gray-600 text-gray-500 dark:text-gray-400">{gettext("Receivable")}</th>
             <th class="px-1 text-gray-500 dark:text-gray-400">{gettext("Payable")}</th>
-            <th class="px-1 text-gray-500 dark:text-gray-400">{gettext("Discr. Out")}</th>
           </tr>
         </thead>
         <tbody>
@@ -514,9 +513,6 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
               {compact(p.receivable)}
             </td>
             <td class="font-mono px-1 text-gray-500 dark:text-gray-400">{compact(p.payable)}</td>
-            <td class="font-mono px-1 text-gray-500 dark:text-gray-400">
-              {compact(p.disc_out)}<span :if={p.source != :actual} class="text-xs italic"> {gettext("LY")}</span>
-            </td>
           </tr>
         </tbody>
       </table>
@@ -557,14 +553,6 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
           <dd class="inline">
             {gettext(
               "The period's cash in/out. For an Actual period it is the REAL total throughput (click it to see the transactions); the small line beneath splits it into op = operating (the part comparable to Forecast rows), tr = treasury (the company's own money moving: FD, interbank), di = discretionary (excluded accounts). For a Forecast period it is the run-rate — this company's average operating throughput per period from the trailing window (treasury transfers excluded)."
-            )}
-          </dd>
-        </div>
-        <div>
-          <dt class="inline font-semibold">{gettext("Discr. Out")}:</dt>
-          <dd class="inline">
-            {gettext(
-              "Discretionary cash paid out (dividends, director fees — the accounts excluded in Settings). Actual periods show what was really paid; Forecast periods show the same calendar window one year earlier (LY) as a reminder — it is NOT included in Closing or Free Cash."
             )}
           </dd>
         </div>

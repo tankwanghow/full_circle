@@ -413,34 +413,6 @@ defmodule FullCircle.Reporting.CashForecastDBTest do
       assert Decimal.compare(diff, d("0.0001")) == :lt
     end
 
-    test "seasonal shape averages up to 3 prior years with equal weight per year",
-         %{com: com, bank: bank} do
-      as_of = ~D[2026-06-08]
-      # horizon: p1 06-08..07-07, p2 07-08..08-06, p3 08-07..09-05 (all forecast).
-      # Year-1 shape has a p2 spike; year-2 has a p3 spike 100x bigger. Each year
-      # is normalized before averaging, so p2 and p3 get the SAME factor — a
-      # high-volume old year must not drown out a low-volume recent one.
-      txn!(com, bank.id, ~D[2025-07-21], d(300))      # year-1, p2 window
-      txn!(com, bank.id, ~D[2024-08-20], d(30_000))   # year-2, p3 window
-
-      res =
-        CashForecast.cash_forecast(
-          %{start_date: as_of, period_days: 30, periods_count: 3,
-            buffer_periods: 1, trailing_days: 365, as_of: as_of, account_ids: :all},
-          com
-        )
-
-      [p1, p2, p3] = res.periods
-      # level: only the 300 is in the trailing window; prior-year 90d empty -> long/2
-      level = Decimal.mult(d(300), Decimal.div(d(30), d(365))) |> Decimal.div(d(2))
-
-      # normalized shapes [0,1,0] + [0,0,1] -> raw factors [0, 1.5, 1.5]
-      # -> shrunk [0.5, 1.25, 1.25]
-      assert Decimal.equal?(p1.baseline_in, Decimal.mult(level, d("0.5")))
-      assert Decimal.equal?(p2.baseline_in, Decimal.mult(level, d("1.25")))
-      assert Decimal.equal?(p3.baseline_in, Decimal.mult(level, d("1.25")))
-    end
-
     test "actual periods carry an operating/treasury/discretionary split", %{com: com, bank: bank, admin: admin} do
       fd = account_fixture(%{account_type: "Non-current Asset", name: "FD #{System.unique_integer([:positive])}"}, com, admin)
       div_acc = account_fixture(%{account_type: "Current Liability", name: "Div Payable #{System.unique_integer([:positive])}"}, com, admin)
@@ -483,33 +455,6 @@ defmodule FullCircle.Reporting.CashForecastDBTest do
       assert p2.source == :forecast
       assert Decimal.equal?(p2.oper_in, p2.baseline_in)
       assert Decimal.equal?(p2.treas_in, d(0))
-    end
-
-    test "forecast periods carry last year's same-window discretionary out as a memo", %{com: com, bank: bank, admin: admin} do
-      div_acc = account_fixture(%{account_type: "Current Liability", name: "Div Payable #{System.unique_integer([:positive])}"}, com, admin)
-      {:ok, com} = CashForecast.save_excluded_account_ids(com, [div_acc.id])
-      com = CashForecast.company_with_settings(com)
-
-      # dividend paid 2025-07-21 -> falls in p2's window one year later
-      did = Ecto.UUID.generate()
-      com |> txn!(bank.id, ~D[2025-07-21], d(-800)) |> Ecto.Changeset.change(%{doc_id: did}) |> Repo.update!()
-      com |> txn!(div_acc.id, ~D[2025-07-21], d(800)) |> Ecto.Changeset.change(%{doc_id: did}) |> Repo.update!()
-
-      as_of = ~D[2026-06-08]
-
-      res =
-        CashForecast.cash_forecast(
-          %{start_date: as_of, period_days: 30, periods_count: 3,
-            buffer_periods: 1, trailing_days: 365, as_of: as_of, account_ids: :all},
-          com
-        )
-
-      [p1, p2, p3] = res.periods
-      assert Decimal.equal?(p1.disc_out, d(0))
-      assert Decimal.equal?(p2.disc_out, d(800))
-      assert Decimal.equal?(p3.disc_out, d(0))
-      # the memo must NOT feed the roll-forward
-      assert Decimal.equal?(p2.closing, Decimal.add(p2.opening, Decimal.sub(p2.baseline_in, p2.baseline_out)))
     end
 
     test "as_of anchors the actual/forecast split", %{com: com} do

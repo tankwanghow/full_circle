@@ -8,10 +8,10 @@ defmodule FullCircle.Reporting.CashForecast do
   trailing window, treasury transfers excluded). The run-rate LEVEL is trend-adjusted
   by the seasonality-free YoY ratio of the last 90 days vs the same 90 days one year
   earlier (falling back to a 50/50 blend with the raw 90-day rate when there is no
-  prior-year data), and the per-period SHAPE averages the same calendar windows over
-  up to 3 prior years, each year weighted equally (seasonality, shrunk 50% toward
-  flat). Accounts the company marks as discretionary (director fees, dividends, …)
-  can also be excluded from the run-rate via the company's settings.
+  prior-year data), and the per-period SHAPE follows the same calendar windows one
+  year earlier (seasonality, shrunk 50% toward flat). Accounts the company marks as
+  discretionary (director fees, dividends, …) can also be excluded from the run-rate
+  via the company's settings.
 
   Pure core: `build_forecast/3`, `fd_ladder/2`.
   """
@@ -40,9 +40,8 @@ defmodule FullCircle.Reporting.CashForecast do
   @trend_ratio_max Decimal.new(4)
 
   # Seasonal shape compares each forecast period to the same calendar window
-  # this many days earlier (one year), averaged over up to this many years.
+  # this many days earlier (one year).
   @season_shift_days 365
-  @season_years 3
 
   @liquid_types ["Cash or Equivalent", "Bank"]
 
@@ -263,44 +262,20 @@ defmodule FullCircle.Reporting.CashForecast do
   end
 
   # In/out seasonal factors for the forecast periods: operating flows (same filters
-  # as the run-rate) in the same calendar windows over up to @season_years prior
-  # years, each year weighted equally.
+  # as the run-rate) in the same calendar windows one year earlier.
   defp seasonal_shape(_ids, [], _period_days, _com, _excluded_ids), do: {[], []}
 
   defp seasonal_shape(ids, fbounds, period_days, com, excluded_ids) do
     {first_ps, _} = hd(fbounds)
     n = length(fbounds)
+    shape_start = Date.add(first_ps, -@season_shift_days)
 
-    {ins, outs} =
-      Enum.map(1..@season_years, fn y ->
-        start = Date.add(first_ps, -y * @season_shift_days)
-        flows = operating_period_flows(ids, start, period_days, n, com, excluded_ids)
+    flows = operating_period_flows(ids, shape_start, period_days, n, com, excluded_ids)
 
-        {for(i <- 0..(n - 1), do: Map.get(flows, i, %{in: @zero, out: @zero}).in),
-         for(i <- 0..(n - 1), do: Map.get(flows, i, %{in: @zero, out: @zero}).out)}
-      end)
-      |> Enum.unzip()
+    ins = for i <- 0..(n - 1), do: Map.get(flows, i, %{in: @zero, out: @zero}).in
+    outs = for i <- 0..(n - 1), do: Map.get(flows, i, %{in: @zero, out: @zero}).out
 
-    {seasonal_factors(equal_weight_sum(ins, n)), seasonal_factors(equal_weight_sum(outs, n))}
-  end
-
-  # Sum the years' shapes after normalizing each to total 1, so every year with
-  # data contributes equally — a high-volume old year must not drown out a
-  # low-volume recent one. Years with no data contribute nothing.
-  defp equal_weight_sum(year_lists, n) do
-    year_lists
-    |> Enum.map(fn list ->
-      total = Enum.reduce(list, @zero, &Decimal.add(&2, &1))
-
-      if Decimal.compare(total, @zero) == :gt do
-        Enum.map(list, &Decimal.div(&1, total))
-      else
-        List.duplicate(@zero, n)
-      end
-    end)
-    |> Enum.reduce(List.duplicate(@zero, n), fn list, acc ->
-      Enum.zip_with(list, acc, &Decimal.add/2)
-    end)
+    {seasonal_factors(ins), seasonal_factors(outs)}
   end
 
   # Operating liquid in/out per period (run-rate filters applied), bucketed into
@@ -377,11 +352,9 @@ defmodule FullCircle.Reporting.CashForecast do
 
     arap = arap_per_period(com, bounds, today, trailing_days, period_days)
 
-    # Display split for actual rows (their Base In/Out is total flow) and the
-    # last-year discretionary memo for forecast rows. Neither feeds the roll-forward.
+    # Display split for actual rows (their Base In/Out is total flow, unlike the
+    # operating-only forecast rows). Never feeds the roll-forward.
     splits = period_splits(ids, start_date, period_days, periods_count, today, com, excluded)
-    disc_ly = discretionary_ly_out(ids, fbounds, period_days, com, excluded)
-    n_actual = periods_count - length(fbounds)
 
     periods =
       Enum.zip(result.periods, arap)
@@ -401,7 +374,7 @@ defmodule FullCircle.Reporting.CashForecast do
             %{
               oper_in: p.baseline_in, oper_out: p.baseline_out,
               treas_in: @zero, treas_out: @zero,
-              disc_in: @zero, disc_out: Enum.at(disc_ly, i - n_actual, @zero)
+              disc_in: @zero, disc_out: @zero
             }
           end
 
@@ -530,24 +503,6 @@ defmodule FullCircle.Reporting.CashForecast do
         {i, %{treas_in: t.in, treas_out: t.out, disc_in: d.in, disc_out: d.out}}
       end
     end
-  end
-
-  # Discretionary outflow in the same calendar window one year earlier, one value
-  # per forecast period — a memo of what the company chose to pay out last year
-  # (dividends, director fees, …). Informational only; never fed into closing.
-  defp discretionary_ly_out(_ids, [], _period_days, _com, _excluded_ids), do: []
-
-  defp discretionary_ly_out(_ids, fbounds, _period_days, _com, []),
-    do: List.duplicate(@zero, length(fbounds))
-
-  defp discretionary_ly_out(ids, fbounds, period_days, com, excluded_ids) do
-    {first_ps, _} = hd(fbounds)
-    n = length(fbounds)
-    start = Date.add(first_ps, -@season_shift_days)
-    upper = Date.add(start, period_days * n)
-
-    flows = bucketed_flows(ids, start, period_days, upper, com, touches_excluded(excluded_ids))
-    for i <- 0..(n - 1), do: Map.get(flows, i, %{in: @zero, out: @zero}).out
   end
 
   # In/out sums grouped into `period_days`-length buckets from `start_date` (index

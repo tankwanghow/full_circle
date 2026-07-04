@@ -36,14 +36,6 @@ defmodule FullCircleWeb.CashForecastLiveTest do
       assert html =~ "Free Cash"
     end
 
-    test "table has the Discr. Out memo column", %{conn: conn, company: company} do
-      {:ok, lv, _html} =
-        live(conn, ~p"/companies/#{company.id}/cash_forecast?search[s_date]=2026-06-08")
-
-      html = render_async(lv)
-      assert html =~ "Discr. Out"
-    end
-
     test "with query params renders the FD ladder box", %{conn: conn, company: company} do
       {:ok, lv, _html} =
         live(conn, ~p"/companies/#{company.id}/cash_forecast?search[s_date]=2026-06-08")
