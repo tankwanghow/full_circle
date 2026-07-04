@@ -223,7 +223,7 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
             </div>
             <div class="col-span-3">
               <.input
-                label={gettext("As of date")}
+                label={gettext("Trailing From")}
                 name="search[as_of]"
                 type="date"
                 id="search_as_of"
@@ -256,7 +256,6 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
         <:result_html>
           <% f = @result.result %>
           <div :if={is_map(f)}>
-            <.as_of_hint forecast={f} search={@search} />
             <.ladder_box ladder={f.ladder} />
             <.period_table periods={f.periods} />
             <.legend
@@ -399,43 +398,6 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
           </tfoot>
         </table>
       </div>
-    </div>
-    """
-  end
-
-  attr :forecast, :map, required: true
-  attr :search, :map, required: true
-
-  defp as_of_hint(assigns) do
-    latest = assigns.forecast.latest_liquid_date
-
-    as_of =
-      case Date.from_iso8601(to_string(assigns.search.as_of)) do
-        {:ok, d} -> d
-        _ -> assigns.forecast.as_of
-      end
-
-    stale? = latest && Date.compare(as_of, latest) == :lt
-
-    assigns = assign(assigns, latest: latest, as_of: as_of, stale?: stale?)
-
-    ~H"""
-    <div class="my-2 text-center text-sm">
-      <span :if={@latest}>
-        {gettext("Latest liquid transaction")}:
-        <span class="font-mono font-medium">{Date.to_iso8601(@latest)}</span>
-      </span>
-      <span :if={!@latest} class="text-gray-500 dark:text-gray-400">
-        {gettext("No liquid transactions on file.")}
-      </span>
-      <span
-        :if={@stale?}
-        class="ml-2 rounded border border-amber-400 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-700 px-2 py-0.5 text-amber-900 dark:text-amber-200"
-      >
-        {gettext("As of date is before latest data — set it to %{d} or later for actual periods.",
-          d: Date.to_iso8601(@latest)
-        )}
-      </span>
     </div>
     """
   end
@@ -584,7 +546,7 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
           <dt class="inline font-semibold">{gettext("Base In")} / {gettext("Base Out")}:</dt>
           <dd class="inline">
             {gettext(
-              "The period's cash in/out. Actual = REAL operating throughput (click to drill down; treasury transfers excluded). Forecast = trailing run-rate plus known dated AR/AP invoices and undeposited cheques placed by due date (overdue items land in the first forecast period)."
+              "The period's cash in/out. For an Actual period it is the REAL total throughput (click it to see the transactions). For a Forecast period it is the run-rate — this company's average operating throughput per period from the trailing window (treasury transfers excluded)."
             )}
           </dd>
         </div>
@@ -610,7 +572,7 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
         )}
       </p>
       <p class="mt-1 italic text-gray-500 dark:text-gray-400">
-        {gettext("Set As of date to your latest books (usually today or month-end) so elapsed periods show Actuals. Start Date can be in the past to review the full horizon. The run-rate is anchored at As of date; a longer trailing window smooths seasonality, a shorter one tracks recent changes.")}
+        {gettext("Set the Start Date in the past to see real actuals for the elapsed periods alongside the forecast for the rest. The run-rate (used for forecast periods) is always taken from the most recent days; a longer trailing window smooths seasonality, a shorter one tracks recent changes.")}
       </p>
     </div>
     """
