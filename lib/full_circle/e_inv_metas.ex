@@ -63,6 +63,12 @@ defmodule FullCircle.EInvMetas do
   # user can try again later instead of staring at a spinner for minutes.
   @lhdn_max_attempts 2
   @lhdn_retry_delay_ms 1500
+  # UUID reconciliation calls LHDN's Get Document endpoint (60 RPM per client).
+  # Space calls ~1.2s apart (≈50/min) to stay comfortably under that ceiling,
+  # and cap how many are attempted per sync so a backlog is drained over several
+  # syncs instead of one long throttled burst. The rest resume next sync.
+  @lhdn_get_doc_delay_ms 1200
+  @reconcile_max_per_run 50
 
   # Helper to get active environment config from meta
   defp env_config(meta) do
@@ -1749,8 +1755,212 @@ defmodule FullCircle.EInvMetas do
 
       new_count when is_integer(new_count) ->
         remove_uuid_from_invalid_e_invoices(last_sync, now, com, user)
+
+        # Final UUID-based reconciliation. The date window above can miss a
+        # document that validates more than 3 days out of order, or whose
+        # issue date has aged past LHDN's 31-day search limit. Reconciling
+        # directly by the UUIDs we already hold locally closes that gap.
+        # Best-effort: an LHDN failure here must not fail an otherwise good
+        # sync, so its error is swallowed and only its extra new rows count.
+        case reconcile_e_invoices_by_uuid(com, user) do
+          {:ok, extra} -> {:ok, new_count + extra}
+          {:error, _} -> {:ok, new_count}
+        end
+    end
+  end
+
+  # Reconciles locally-matched e-invoice UUIDs against LHDN by direct UUID
+  # lookup (the Get Document endpoint / authoritative store), independent of the
+  # date-windowed sync. This is the only reliable path for documents that exist
+  # and are Valid in LHDN yet never surface in documents/search — a real
+  # LHDN-side search-index gap that the date window can never recover.
+  #
+  # For each local document (Invoice/PurInvoice/Payment/Receipt/DebitNote/
+  # CreditNote) carrying an e_inv_uuid whose stored EInvoice row is missing or
+  # not yet "Valid", it fetches the document by UUID and upserts an accurate
+  # row. Any that come back "Invalid" are unmatched from their local document.
+  #
+  # At most @reconcile_max_per_run UUIDs are attempted per call (throttled to
+  # stay under Get Document's 60 RPM); a larger backlog drains over successive
+  # syncs. Returns {:ok, new_count} (rows that did not previously exist) or
+  # {:error, message}.
+  def reconcile_e_invoices_by_uuid(com, user) do
+    meta = get_by_company_id!(com, user)
+
+    if is_nil(meta) do
+      {:error, "E-Invoice meta not configured"}
+    else
+      uuids = uuids_needing_reconciliation(com) |> Enum.take(@reconcile_max_per_run)
+      reconcile_uuids(meta, uuids, com, user)
+    end
+  end
+
+  defp reconcile_uuids(_meta, [], _com, _user), do: {:ok, 0}
+
+  defp reconcile_uuids(meta, uuids, com, user) do
+    total = length(uuids)
+
+    result =
+      uuids
+      |> Enum.with_index(1)
+      |> Enum.reduce_while({:ok, []}, fn {uuid, i}, {:ok, acc} ->
+        broadcast_sync_status(com, "reconciling #{i}/#{total}")
+
+        case fetch_e_invoice_by_uuid(meta, uuid, com) do
+          {:ok, nil} ->
+            {:cont, {:ok, acc}}
+
+          {:ok, changes} ->
+            # Throttle to Get Document's 60 RPM ceiling.
+            if i < total, do: Process.sleep(@lhdn_get_doc_delay_ms)
+            {:cont, {:ok, [changes | acc]}}
+
+          {:error, _} = err ->
+            {:halt, err}
+        end
+      end)
+
+    case result do
+      {:error, _} = err ->
+        err
+
+      {:ok, rows} ->
+        new_count = count_new_e_invoices(rows, com)
+
+        if rows != [] do
+          Repo.insert_all(EInvoice, rows,
+            on_conflict: :replace_all,
+            conflict_target: [:uuid]
+          )
+        end
+
+        unmatch_reconciled_invalid(rows, com, user)
         {:ok, new_count}
     end
+  end
+
+  # Direct UUID lookup via the Get Document endpoint (documents/{uuid}/raw), the
+  # authoritative store. Unlike documents/search this is not backed by the
+  # search index, so it reliably returns documents that search silently omits,
+  # and it takes no date range (no 31-day window). Rate-limit-safe: a 404 is
+  # treated as "no such document" and skipped, while 429/5xx halt the batch so
+  # we back off entirely and resume next sync rather than hammering LHDN.
+  # Returns {:ok, changes_map}, {:ok, nil}, or {:error, message}.
+  defp fetch_e_invoice_by_uuid(meta, uuid, com) do
+    url = build_e_inv_url(api_base(meta), path(meta, "get_doc"), documentUUID: uuid)
+
+    case Req.get(url,
+           headers: [Authorization: meta.token],
+           receive_timeout: @lhdn_receive_timeout,
+           retry: false
+         ) do
+      {:ok, %{status: 200, body: %{"uuid" => ^uuid} = body}} ->
+        {:ok, map_get_doc_to_einvoice(body, com.id)}
+
+      {:ok, %{status: status}} when status in [200, 404] ->
+        {:ok, nil}
+
+      {:ok, %{status: status}} ->
+        {:error, "Get Document #{uuid} returned HTTP #{status}"}
+
+      {:error, reason} ->
+        {:error, "Get Document #{uuid} failed: #{inspect(reason)}"}
+    end
+  end
+
+  # The Get Document endpoint returns the DocumentInfo shape (issuerTin /
+  # issuerName / receiverId / longID), which differs from the DocumentSummary
+  # shape the search sync stores. Map it onto the EInvoice columns. Issuer maps
+  # to both issuer* and supplier*, receiver to both receiver* and buyer*.
+  # Summary-only fields (submissionChannel, documentCurrency, receiverTIN,
+  # buyerTIN, intermediary*) are absent here and left null — harmless, since the
+  # functional fields (status, issuerTIN for the Sent/Received split, dates,
+  # totals, names) are all present. Returns the changeset changes map (atom
+  # keys) ready for insert_all.
+  defp map_get_doc_to_einvoice(body, company_id) do
+    %{
+      "uuid" => body["uuid"],
+      "status" => body["status"],
+      "internalId" => body["internalId"],
+      "longId" => body["longID"],
+      "issuerTIN" => body["issuerTin"],
+      "supplierTIN" => body["issuerTin"],
+      "supplierName" => body["issuerName"],
+      "receiverID" => body["receiverId"],
+      "receiverName" => body["receiverName"],
+      "buyerName" => body["receiverName"],
+      "typeName" => body["typeName"],
+      "typeVersionName" => body["typeVersionName"],
+      "dateTimeIssued" => body["dateTimeIssued"],
+      "dateTimeReceived" => body["dateTimeReceived"],
+      "dateTimeValidated" => body["dateTimeValidated"],
+      "cancelDateTime" => body["cancelDateTime"],
+      "rejectRequestDateTime" => body["rejectRequestDateTime"],
+      "documentStatusReason" => body["documentStatusReason"],
+      "createdByUserId" => body["createdByUserId"],
+      "totalExcludingTax" => body["totalExcludingTax"],
+      "totalDiscount" => body["totalDiscount"],
+      "totalNetAmount" => body["totalNetAmount"],
+      "totalPayableAmount" => body["totalPayableAmount"],
+      "submissionUid" => body["submissionUid"],
+      "company_id" => company_id
+    }
+    |> then(&EInvoice.changeset(%EInvoice{}, &1).changes)
+  end
+
+  # Distinct e_inv_uuids held by local documents whose stored EInvoice row is
+  # missing or not "Valid" — the set worth re-checking directly against LHDN.
+  defp uuids_needing_reconciliation(com) do
+    local = local_matched_uuids(com)
+
+    if local == [] do
+      []
+    else
+      valid =
+        from(ei in EInvoice,
+          where: ei.company_id == ^com.id,
+          where: ei.status == "Valid",
+          where: ei.uuid in ^local,
+          select: ei.uuid
+        )
+        |> Repo.all()
+        |> MapSet.new()
+
+      Enum.reject(local, &MapSet.member?(valid, &1))
+    end
+  end
+
+  # Every non-nil e_inv_uuid across the six document types that can be matched
+  # to an e-invoice, deduplicated by the UNION.
+  defp local_matched_uuids(com) do
+    matched = fn schema ->
+      from(o in schema,
+        where: o.company_id == ^com.id,
+        where: not is_nil(o.e_inv_uuid),
+        select: o.e_inv_uuid
+      )
+    end
+
+    matched.(Invoice)
+    |> union(^matched.(PurInvoice))
+    |> union(^matched.(Payment))
+    |> union(^matched.(Receipt))
+    |> union(^matched.(DebitNote))
+    |> union(^matched.(CreditNote))
+    |> Repo.all()
+  end
+
+  # An "Invalid" e-invoice failed LHDN validation, so its local document should
+  # no longer claim that UUID. "Submitted" (still pending) stays matched.
+  defp unmatch_reconciled_invalid(rows, com, user) do
+    rows
+    |> Enum.filter(fn r -> r[:status] == "Invalid" end)
+    |> Enum.each(fn r ->
+      case get_fc_doc_by_uuid(r[:uuid], com) do
+        nil -> :ok
+        fc_doc -> unmatch(fc_doc, com, user)
+      end
+    end)
   end
 
   # Counts how many of the fetched changesets carry a uuid not already stored

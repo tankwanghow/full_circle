@@ -76,6 +76,55 @@ in `try/rescue/catch`, so any crash comes back as
 Live progress (`"<window>: page p/pages"`, retry notices) is pushed via
 PubSub topic `"#{com.id}_e_invoice_sync_status"` and shown on the spinner.
 
+## UUID-based reconciliation (closes the date-window gap)
+
+`sync_e_invoices/2` is built entirely on LHDN's **search index**
+(`documents/search`, filtered on submission date, `last_sync − 3 days → now`).
+That index misses documents in ways the date window can never fix:
+
+- **Search-index gaps (the decisive one).** `documents/search` (and the
+  MyInvois portal's own search) can fail to return a document that genuinely
+  exists and is `Valid` — confirmed in production: a `Valid` document
+  retrievable by UUID via `documents/{uuid}/raw` was absent from
+  `documents/search` for its own submission window. This is an LHDN-side index
+  problem; no window tweak recovers it because search never returns the row.
+- Out-of-order validation beyond the 3-day overlap (stale local row).
+- LHDN's **31-day** issued-within limit on the search date range.
+
+`reconcile_e_invoices_by_uuid/2` runs as a **best-effort final pass inside
+`sync_e_invoices/2`** (an LHDN failure there does not fail the sync). It:
+
+1. Collects every non-nil `e_inv_uuid` across the six matchable document types
+   (`local_matched_uuids/1`, a six-way `UNION`) whose stored `EInvoice` row is
+   **missing or not `"Valid"`** (`uuids_needing_reconciliation/1`), capped at
+   `@reconcile_max_per_run` per call.
+2. Fetches each **directly by UUID** via the **Get Document** endpoint
+   (`documents/{uuid}/raw`, `path(meta, "get_doc")`) — the *authoritative
+   store*, not the search index, so it returns documents search omits and takes
+   no date range. **Not** `documents/search`, which requires a date range
+   (a `uuid`-only call returns HTTP 400) and hits the same faulty index.
+3. `map_get_doc_to_einvoice/2` remaps the response — Get Document returns the
+   **DocumentInfo** shape (`issuerTin`/`issuerName`/`receiverId`/`longID`),
+   different from the **DocumentSummary** shape the search sync stores. Issuer →
+   both `issuer*` and `supplier*`; receiver → both `receiver*` and `buyer*`;
+   `longID` → `longId`. Summary-only fields (`submissionChannel`,
+   `documentCurrency`, `receiverTIN`, `buyerTIN`, `intermediary*`) are absent
+   and left null — harmless; the functional fields (`status`, `issuerTIN` for
+   the Sent/Received split, dates, totals, names) are all present.
+4. Upserts accurate rows (`Repo.insert_all`, conflict target `:uuid`) and
+   **unmatches only rows that come back `"Invalid"`** (`Submitted`/pending stays
+   matched). The set self-drains: once a doc is `Valid` it drops out.
+
+### Rate limits (why it is throttled + capped)
+
+Get Document is **60 RPM** per client (Search Documents is only **12 RPM** +
+1 req/5s per taxpayer — do **not** build reconciliation on it). So the pass
+spaces calls `@lhdn_get_doc_delay_ms` (~1.2s ⇒ ≈50/min) and attempts at most
+`@reconcile_max_per_run` UUIDs per sync; a backlog drains over successive syncs.
+`fetch_e_invoice_by_uuid/2` uses a raw `Req.get` (not `lhdn_get`): a **404 is
+skipped** (`{:ok, nil}`), while **429/5xx halt the batch** so it backs off
+entirely and resumes next sync instead of hammering a throttled endpoint.
+
 ## LHDN HTTP handling
 
 `lhdn_get/4` does its own fail-fast retry (Req's retry is disabled) and never
