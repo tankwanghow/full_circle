@@ -10,6 +10,32 @@ defmodule FullCircle.BankReconciliation.LlmParser do
 
   @batch_size 100
 
+  # Shared balance-finding guidance. Reused across every prompt so the rules for
+  # opening/closing balance never drift between the PDF-vision, first-batch, and
+  # dedicated balance passes.
+  #
+  # The critical rule is the multi-page carry-forward trap: many banks (e.g. Public
+  # Bank) end EVERY page with "Balance C/F" and start the next with "Balance B/F".
+  # These are per-page running subtotals, NOT the statement's opening/closing balance.
+  @balance_guidance """
+  IMPORTANT — Finding the statement's OPENING and CLOSING balance:
+  - OPENING balance = the account balance BEFORE the first transaction of this
+    statement period. Labels: "Opening Balance", "Beginning Balance",
+    "Balance From Last Statement", "BAKI AWAL".
+  - CLOSING balance = the account balance AFTER the LAST transaction of the whole
+    statement period. Labels: "Closing Balance", "Closing Balance In This Statement",
+    "Ending Balance", "Baki Penutup", "BAKI AKHIR", or the value labelled
+    "Closing Balance" in a statement SUMMARY box.
+  - If a SUMMARY box shows "Closing Balance" / "Baki Penutup", that value is
+    AUTHORITATIVE for the closing balance — prefer it over any running-column value.
+  - CRITICAL — carry-forward trap: "Balance C/F", "Balance Carried Forward",
+    "Balance B/F", "Balance Brought Forward" are PER-PAGE subtotals that carry the
+    running balance from one page to the next in multi-page statements. They are NOT
+    the statement opening or closing balance. NEVER use a C/F or B/F value as the
+    opening or closing balance.
+  - Balances are ALWAYS positive numbers representing the account balance.
+  """
+
   @pdf_prompt """
   You are a bank statement parser. The attached PDF is a bank statement.
   Extract ALL transaction lines and balances from it.
@@ -21,13 +47,7 @@ defmodule FullCircle.BankReconciliation.LlmParser do
     "transactions": [...]
   }
 
-  IMPORTANT — Finding balances:
-  - Look carefully for opening and closing balances
-  - Opening balance: "Opening Balance", "Beginning Balance", "B/F", "Balance Brought Forward", "BAKI AWAL", or the first "Balance" column value
-  - Closing balance: "Closing Balance", "Ending Balance", "C/F", "Balance Carried Forward", "BAKI AKHIR", or the last "Balance" column value
-  - These are ALWAYS positive numbers representing the account balance
-  - If the statement shows a running balance column, opening_balance is the first value and closing_balance is the last value
-
+  #{@balance_guidance}
   Each transaction object must have exactly these fields:
   - "statement_date": date in "YYYY-MM-DD" format
   - "description": combine the transaction type/description with ALL reference columns into one string. Join non-empty values with " | ". Include company names, invoice numbers, payment references.
@@ -53,13 +73,7 @@ defmodule FullCircle.BankReconciliation.LlmParser do
     "transactions": [...]
   }
 
-  IMPORTANT — Finding balances:
-  - Look carefully for opening and closing balances
-  - Opening balance: "Opening Balance", "Beginning Balance", "B/F", "Balance Brought Forward", "BAKI AWAL", or the first "Balance" column value
-  - Closing balance: "Closing Balance", "Ending Balance", "C/F", "Balance Carried Forward", "BAKI AKHIR", or the last "Balance" column value
-  - These are ALWAYS positive numbers representing the account balance
-  - If the statement shows a running balance column, opening_balance is the first value and closing_balance is the last value
-
+  #{@balance_guidance}
   Each transaction object must have exactly these fields:
   - "statement_date": date in "YYYY-MM-DD" format
   - "description": combine the transaction type/description with ALL reference columns into one string. Join non-empty values with " | ". Include company names, invoice numbers, payment references.
@@ -69,9 +83,23 @@ defmodule FullCircle.BankReconciliation.LlmParser do
   Rules:
   - Extract EVERY transaction line — do not skip or summarize
   - Do NOT include opening/closing balance rows as transactions
+  - Do NOT include "Balance C/F" / "Balance B/F" carry-forward rows as transactions
   - Skip header rows and summary rows
   - Skip rows with zero amount
   - Return ONLY the JSON object, no markdown, no explanation
+
+  Content:
+  """
+
+  @balance_only_prompt """
+  You extract ONLY the opening and closing balance from a bank statement.
+  The content below is the full text of one bank statement (all pages).
+
+  #{@balance_guidance}
+  Return ONLY a JSON object with this exact structure, nothing else:
+  {"opening_balance": number or null, "closing_balance": number or null}
+
+  Do NOT return transactions. No markdown, no explanation.
 
   Content:
   """
@@ -123,12 +151,44 @@ defmodule FullCircle.BankReconciliation.LlmParser do
     [first | rest] = pages
 
     case call_first_batch(first, settings) do
-      {:ok, "llm", first_lines, first_usage, balances} ->
+      {:ok, "llm", first_lines, first_usage, page1_balances} ->
+        # Balances can live in a page-1 summary box OR only on the last transaction
+        # page (with a trailing notes page after it). Extract them from the whole
+        # statement in one dedicated pass, decoupled from transaction batching, so
+        # per-page "Balance C/F" subtotals never get mistaken for the closing balance.
+        {balances, usage} = extract_balances(pages, settings, page1_balances, first_usage)
         page_batches = Enum.map(rest, &String.split(&1, "\n"))
-        process_remaining_batches(page_batches, settings, first_lines, first_usage, balances)
+        process_remaining_batches(page_batches, settings, first_lines, usage, balances)
 
       error ->
         error
+    end
+  end
+
+  # Dedicated whole-statement balance pass. Falls back to the page-1 balances if the
+  # call fails, and to page-1 values for any field the balance pass leaves null.
+  defp extract_balances(pages, settings, fallback, usage) do
+    content = Enum.join(pages, "\n\n")
+
+    case LlmClient.call(settings, @system_prompt, @balance_only_prompt <> content) do
+      {:ok, text, bal_usage} ->
+        case decode_json(text) do
+          {:ok, resp} when is_map(resp) ->
+            balances = %{
+              opening_balance:
+                parse_balance(resp["opening_balance"]) || fallback.opening_balance,
+              closing_balance:
+                parse_balance(resp["closing_balance"]) || fallback.closing_balance
+            }
+
+            {balances, merge_usage(usage, bal_usage)}
+
+          _ ->
+            {fallback, usage}
+        end
+
+      {:error, _} ->
+        {fallback, usage}
     end
   end
 
