@@ -51,7 +51,7 @@ Also required:
 
 | Layer | Responsibility |
 |-------|----------------|
-| **New Trading domain** in FullCircle | Supply contracts & POs, sales contracts & SOs, soft holds, dispatches (loads/drops), drivers, transport agents, position/open-sales/dispatch boards, driver/agent registers |
+| **New Trading domain** in FullCircle | Supply positions (vessel + local PO as one type), sales contracts & SOs, soft holds, dispatches (loads/drops), drivers, transport agents, position/open-sales/dispatch boards, driver/agent registers |
 | **Existing FullCircle** | Company, contacts, goods, auth, **Invoice**, **PurInvoice**, GL, payments, statutory |
 | **Tugas** | Out of scope for this feature |
 | **New monorepo app** | Not for v1; keep module boundaries clean enough that extraction later is possible |
@@ -68,15 +68,42 @@ Also required:
 
 ### 3.1 Supply (sources)
 
-| Object | Role | Example |
-|--------|------|---------|
-| **SupplyContract** | Import / vessel position | Vessel JON DOE, May 2026, 1000 MT maize, price, remaining |
-| **PurchaseOrder** | Local supplier PO | Supplier X, 100 MT wheat pollard, price, remaining |
-| **Warehouse** (source/destination) | Own stock | Stock derived from warehouse in/out on dispatches; avoid double-entry lot master in v1 if possible |
+**One entity, two commercial labels.** Vessel contracts and local purchase orders do the same job in the system (position, soft hold, load source, PurInvoice link). They are **not** separate domain types.
 
-Both SupplyContract and PurchaseOrder are **supply sources** with: company, supplier (contact), product (good), quantity, unit (typically MT), unit price, status, identifiers (vessel name, period, PO ref).
+| Object | Role |
+|--------|------|
+| **SupplyPosition** | Single supply-source record: open qty, remaining, price, product, supplier, status |
+| **Warehouse** (source/destination) | Own stock derived from warehouse in/out on dispatches; avoid double-entry lot master in v1 if possible |
 
-**Position board** presents all open sources with a type badge: Vessel / Local PO / Warehouse.
+#### SupplyPosition
+
+```
+SupplyPosition
+  company_id
+  type: vessel | local_po     # UI labels: "Vessel" / "Local PO"
+  supplier_id                 # contact
+  product_id                  # good
+  quantity                    # contracted / ordered MT
+  unit                        # typically MT (from product)
+  unit_price
+  status: open | closed
+  # type-specific / optional identity fields:
+  vessel_name?                # e.g. JON DOE (type = vessel)
+  period? / eta?              # e.g. May 2026
+  external_ref?               # PO number, contract no., supplier ref
+  notes?
+```
+
+| `type` | Real-world meaning | Typical extra fields |
+|--------|--------------------|----------------------|
+| `vessel` | Import / shipment lot | vessel_name, period/ETA |
+| `local_po` | Local supplier purchase | external_ref (PO #) |
+
+**Same functions for every type:** appear on the position board; be a soft-hold target on SalesOrder; be a load/drop **source** on Dispatch; contribute to remaining math; optionally link to PurInvoice at settlement.
+
+**Position board** lists SupplyPositions (plus warehouse stock) with a type badge: Vessel / Local PO / Warehouse.
+
+**UI copy** may still say “New vessel position” or “New local PO” — both create a `SupplyPosition` with the appropriate `type`.
 
 ### 3.2 Demand (commitments)
 
@@ -108,7 +135,7 @@ Dispatch
   notes?
 
   loads[]   # 1..n
-    source (SupplyContract | PurchaseOrder | warehouse)
+    source (SupplyPosition | warehouse)
     load_location (text / site label)
     planned_mt
     actual_mt?
@@ -117,7 +144,7 @@ Dispatch
   drops[]   # 1..n
     destination: sales_order_id? | warehouse
     drop_location (text / site label)
-    source (which supply this drop draws from)
+    source (SupplyPosition | warehouse this drop draws from)
     planned_mt
     actual_mt?
     driver_id?          # drop driver (own transport)
@@ -167,9 +194,9 @@ Invoice / PurInvoice remain source of truth for **AR/AP and GL**.
 
 ### Flow A — Import vessel position
 
-1. Create **SupplyContract** (vessel, period, product, MT, price, supplier).  
+1. Create **SupplyPosition** with `type = vessel` (vessel name, period, product, MT, price, supplier).  
 2. Position board shows open MT.  
-3. Create **SalesOrder**(s) or call-offs with preferred source = vessel (soft hold).  
+3. Create **SalesOrder**(s) or call-offs with preferred source = that SupplyPosition (soft hold).  
 4. Create **Dispatch**: one or more loads from port/godowns; one or more drops to customer sites and/or warehouse; transport mode + agent/drivers as applicable.  
 5. Enter **actual** MT on loads and drops; variance notes when planned vs actual diverges materially.  
 6. Balances update from **completed** actuals.  
@@ -179,15 +206,15 @@ Invoice / PurInvoice remain source of truth for **AR/AP and GL**.
 
 ### Flow B — Local back-to-back (supplier → customer)
 
-1. **PurchaseOrder** open with supplier.  
-2. **SalesOrder** with soft-hold preferred PO/supplier.  
+1. Create **SupplyPosition** with `type = local_po` (supplier, product, MT, price, PO ref).  
+2. **SalesOrder** with soft-hold preferred that SupplyPosition.  
 3. **Dispatch** from supplier warehouse to customer drop location(s); mode may be company_own, agent, or customer_arranged.  
 4. Actuals → balances; fulfill SO case-by-case; Invoice / PurInvoice as appropriate.  
 5. No mandatory stop at own warehouse.
 
 ### Flow C — Small order via own warehouse
 
-1. Dispatch **in**: load from supplier/vessel → drop warehouse.  
+1. Dispatch **in**: load from SupplyPosition (vessel or local_po) → drop warehouse.  
 2. Later dispatch **out**: load warehouse → drop customer site(s).  
 3. Same multi-load/multi-drop and driver/agent rules.
 
@@ -243,7 +270,7 @@ agent_mt         = Σ drop.actual_mt (default) for dispatches with agent = A
 
 | Object | Statuses |
 |--------|----------|
-| SupplyContract / PurchaseOrder | `open` → `closed` |
+| SupplyPosition | `open` → `closed` |
 | SalesContract | `open` → `closed` |
 | SalesOrder | `draft` → `open` → `fulfilled` / `cancelled` |
 | Dispatch | `draft` → `planned` → `completed` / `cancelled` |
@@ -270,7 +297,7 @@ Trading
 ├── Position board
 ├── Open sales
 ├── Dispatches
-├── Supply (contracts / POs)
+├── Supply positions
 ├── Sales contracts
 ├── Transport agents
 ├── Drivers
@@ -285,7 +312,7 @@ Trading
 1. **Position board** — remaining by source; soft-held column; price; open/closed; drill to detail.  
 2. **Open sales** — ordered / delivered / undelivered; soft hold; mark fulfilled; warnings.  
 3. **Dispatch board + form** — multi-load, multi-drop, transport mode, agent, load/drop drivers, planned/actual, warnings.  
-4. **Supply / sales forms** — contracts, POs, SOs, call-offs.  
+4. **Supply / sales forms** — SupplyPosition (vessel or local PO), SOs, call-offs, sales contracts.  
 5. **Driver load register** — load salary quantity by driver + date.  
 6. **Driver drop register** — drop salary quantity by driver + date.  
 7. **Agent delivery register** — quantities to check agent invoices.  
@@ -310,7 +337,7 @@ Users: **office sales/ops on desktop** only in v1.
 | Phase | Deliverable |
 |-------|-------------|
 | **0** | Module skeleton, nav, auth hooks, Driver + TransportAgent masters |
-| **1** | SupplyContract + PurchaseOrder + **Position board** |
+| **1** | SupplyPosition (`vessel` \| `local_po`) + **Position board** |
 | **2** | SalesContract + SalesOrder + soft hold + **Open sales** + manual fulfill |
 | **3** | Dispatch multi-load/multi-drop + actuals + balance updates + **Dispatch board** |
 | **4** | Driver load/drop registers + agent delivery register |
@@ -360,6 +387,7 @@ Phases 1 and 2 may overlap once supply sources exist for soft-hold references.
 | Finance home | FullCircle Invoice / PurInvoice; trading links in |
 | Host app | FullCircle trading module |
 | Clients | Desktop office v1 |
+| Supply model | **One entity `SupplyPosition`** with `type`: `vessel` \| `local_po` (not separate SupplyContract + PurchaseOrder) |
 
 ---
 
@@ -379,11 +407,12 @@ Phases 1 and 2 may overlap once supply sources exist for soft-hold references.
 
 These do not change the design intent; resolve during planning/implementation:
 
-- Exact Ecto schema names and table names.  
+- Exact Ecto schema / table names (e.g. `supply_positions`).  
 - Whether TransportAgent/Driver link to `Contact` or standalone tables.  
 - Variance threshold default (e.g. % or absolute MT).  
 - Exact FullCircle role matrix mapping for new actions.  
-- Whether warehouse is a synthetic source row or only a destination type with computed stock.
+- Whether warehouse is a synthetic SupplyPosition-like row or only a destination type with computed stock.  
+- Which type-specific fields are required vs optional per `type`.
 
 ---
 
