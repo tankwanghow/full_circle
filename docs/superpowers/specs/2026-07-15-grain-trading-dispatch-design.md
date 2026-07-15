@@ -1,0 +1,390 @@
+# Grain Trading Desk — Orders, Positions & Dispatch Design
+
+**Date:** 2026-07-15  
+**Status:** Approved for implementation planning (pending user review of this file)  
+**App:** FullCircle (`full_circle`)  
+**Scope:** Grain trading only (v1). Swine and poultry sales stay on existing FullCircle invoicing until a later phase.
+
+---
+
+## 1. Problem & goals
+
+### Business context
+
+The company runs multiple lines (grain trading, swine, poultry). **v1 builds only the grain trading desk.**
+
+Grain trade combines:
+
+- **Import / vessel positions** — e.g. May 2026 vessel JON DOE 1000 MT maize; Jun 2026 vessel MARY JAIN 3000 MT.
+- **Local product** — often back-to-back; e.g. customer orders 35 MT wheat pollard; lift from supplier warehouse, sometimes direct to customer.
+- **Own warehouse** — small orders (e.g. ~5 MT) may stock into company warehouse first; large orders (e.g. full lorry ~60 MT, 1–2 drop sites) usually leave stock at **supplier warehouse / port** until lift.
+
+### v1 success criteria (equal priority)
+
+1. **Position board** — remaining MT by vessel / local PO / warehouse / product.  
+2. **Open commitments** — what was promised to customers (SOs + call-offs) and what is still undelivered.  
+3. **Movements** — what was loaded and dropped, from which sources, to which locations, with transport and driver accountability.
+
+Also required:
+
+- **Price** on supply and sales commercial documents (not full margin/P&L dashboards in v1).  
+- **Logistics** — multi-load, multi-drop, transport mode, agents, drivers.  
+- **Driver pay trail** — load salary and drop salary both based on actual quantities.  
+- **Transport agent trail** — quantities to check agent bills to the company.  
+- **Settlement** — final Invoice / PurInvoice remain in FullCircle finance (office-triggered from trading actuals).
+
+### Non-goals (v1)
+
+- Swine (live pig) and poultry (eggs, retired layer, dung) order/dispatch modules.  
+- Driver / field mobile app.  
+- Hard blocks on oversell or over-allocate (warn only).  
+- Full payroll engine, payslips, or automatic agent AP posting (qty registers first).  
+- Deal-level margin / P&L dashboards.  
+- Silent auto-create of Invoice / PurInvoice without office action.  
+- Multi-product lines on a single dispatch (one product per dispatch; use multiple dispatches if needed).
+
+---
+
+## 2. Architecture placement
+
+**Approach: FullCircle trading module (Approach 1).**
+
+| Layer | Responsibility |
+|-------|----------------|
+| **New Trading domain** in FullCircle | Supply contracts & POs, sales contracts & SOs, soft holds, dispatches (loads/drops), drivers, transport agents, position/open-sales/dispatch boards, driver/agent registers |
+| **Existing FullCircle** | Company, contacts, goods, auth, **Invoice**, **PurInvoice**, GL, payments, statutory |
+| **Tugas** | Out of scope for this feature |
+| **New monorepo app** | Not for v1; keep module boundaries clean enough that extraction later is possible |
+
+### Module boundary
+
+- Suggested contexts: `FullCircle.Trading` (commercial + masters) and/or nested dispatch under the same umbrella.  
+- **Do not** overload Invoice / PurInvoice as the order or dispatch document.  
+- Trading documents **link** to Invoice / PurInvoice at settlement time.
+
+---
+
+## 3. Domain model
+
+### 3.1 Supply (sources)
+
+| Object | Role | Example |
+|--------|------|---------|
+| **SupplyContract** | Import / vessel position | Vessel JON DOE, May 2026, 1000 MT maize, price, remaining |
+| **PurchaseOrder** | Local supplier PO | Supplier X, 100 MT wheat pollard, price, remaining |
+| **Warehouse** (source/destination) | Own stock | Stock derived from warehouse in/out on dispatches; avoid double-entry lot master in v1 if possible |
+
+Both SupplyContract and PurchaseOrder are **supply sources** with: company, supplier (contact), product (good), quantity, unit (typically MT), unit price, status, identifiers (vessel name, period, PO ref).
+
+**Position board** presents all open sources with a type badge: Vessel / Local PO / Warehouse.
+
+### 3.2 Demand (commitments)
+
+| Object | Role | Example |
+|--------|------|---------|
+| **SalesContract** | Longer customer agreement | Customer A, 1000 MT maize over a period, price terms, remaining |
+| **SalesOrder** | Concrete commitment or call-off | 60 MT or 35 MT, price, preferred source, undelivered |
+
+- One-off deal: SO only (no parent contract).  
+- Call-off: SO under a SalesContract.  
+- One SO may be fulfilled over **many** dispatches, sources, and days.  
+- **Soft hold:** preferred supply source on the SO; changeable; does **not** hard-reserve stock.
+
+### 3.3 Movement (dispatch)
+
+**One Dispatch = one logistics job** (one operational trip / job), which may:
+
+- **Load from multiple locations** (multiple load lines).  
+- **Drop to multiple locations** (multiple drop lines: customers and/or own warehouse).
+
+```
+Dispatch
+  company_id
+  date
+  product (one product per dispatch in v1)
+  transport_mode: company_own | agent | customer_arranged
+  transport_agent_id?   # when mode = agent
+  status: draft | planned | completed | cancelled
+  notes?
+
+  loads[]   # 1..n
+    source (SupplyContract | PurchaseOrder | warehouse)
+    load_location (text / site label)
+    planned_mt
+    actual_mt?
+    driver_id?          # load driver (own transport)
+
+  drops[]   # 1..n
+    destination: sales_order_id? | warehouse
+    drop_location (text / site label)
+    source (which supply this drop draws from)
+    planned_mt
+    actual_mt?
+    driver_id?          # drop driver (own transport)
+    variance_note?
+    invoice_id?         # settlement link when created
+```
+
+**Transport modes**
+
+| Mode | Agent | Drivers | Money trail |
+|------|--------|---------|-------------|
+| `company_own` | No | Load driver + drop driver (per line) | Load salary + drop salary from actual MT |
+| `agent` | Yes | Optional external driver name as note only | Agent bills company — register by agent + actual MT |
+| `customer_arranged` | No | Usually empty | No own driver pay / no agent bill |
+
+**Driver pay**
+
+- Drivers are paid on **loading quantity** and **dropping quantity** separately (**load salary** and **drop salary**).  
+- Load driver and drop driver may differ on the same job.  
+- Different drop lines may have different drop drivers.  
+- v1 records **who + actual MT**; rate tables / payroll posting are optional later.
+
+**Transport agent**
+
+- Track deliveries under each agent so their invoice to the company can be checked.  
+- Default register quantity: **drop actual MT** (load actuals also stored and visible).
+
+### 3.4 Settlement (existing finance)
+
+| Situation | Document |
+|-----------|----------|
+| Delivered to customer | **Invoice** (prefill from drop actuals + SO price) |
+| Purchase recognized / goods into commercial purchase | **PurInvoice** (prefill from supply + actuals) |
+
+Trading remains source of truth for **position and logistics**.  
+Invoice / PurInvoice remain source of truth for **AR/AP and GL**.
+
+### 3.5 Masters
+
+- **Driver** — company drivers (name, contact, active).  
+- **TransportAgent** — hauliers who bill the company.  
+- Customers / suppliers / products — existing FullCircle contacts and goods.
+
+---
+
+## 4. Day-to-day flows
+
+### Flow A — Import vessel position
+
+1. Create **SupplyContract** (vessel, period, product, MT, price, supplier).  
+2. Position board shows open MT.  
+3. Create **SalesOrder**(s) or call-offs with preferred source = vessel (soft hold).  
+4. Create **Dispatch**: one or more loads from port/godowns; one or more drops to customer sites and/or warehouse; transport mode + agent/drivers as applicable.  
+5. Enter **actual** MT on loads and drops; variance notes when planned vs actual diverges materially.  
+6. Balances update from **completed** actuals.  
+7. SO may remain open even if short (e.g. 33.5 of 35); office **marks fulfilled** case-by-case.  
+8. Office **Create Invoice** from delivered actuals when billing.  
+9. **PurInvoice** when purchase is recognized (timing is commercial; not forced to a single automatic event).
+
+### Flow B — Local back-to-back (supplier → customer)
+
+1. **PurchaseOrder** open with supplier.  
+2. **SalesOrder** with soft-hold preferred PO/supplier.  
+3. **Dispatch** from supplier warehouse to customer drop location(s); mode may be company_own, agent, or customer_arranged.  
+4. Actuals → balances; fulfill SO case-by-case; Invoice / PurInvoice as appropriate.  
+5. No mandatory stop at own warehouse.
+
+### Flow C — Small order via own warehouse
+
+1. Dispatch **in**: load from supplier/vessel → drop warehouse.  
+2. Later dispatch **out**: load warehouse → drop customer site(s).  
+3. Same multi-load/multi-drop and driver/agent rules.
+
+### Flow D — Multi-load, multi-drop job
+
+1. One Dispatch.  
+2. Multiple load lines (different locations/sources).  
+3. Multiple drop lines (different customers/sites and/or warehouse); each drop names its **source**.  
+4. One transport mode (and agent if applicable) for the job; drivers per load/drop line.
+
+---
+
+## 5. Quantity & status rules
+
+### Balance formulas
+
+```
+supply_remaining = supply_qty − Σ load.actual_mt
+                   (completed dispatches only, that source)
+
+so_delivered     = Σ drop.actual_mt (completed, that SO)
+so_undelivered   = so_qty − so_delivered
+                   (may remain > 0 even when status = fulfilled)
+
+warehouse_qty    = inflows − outflows via warehouse loads/drops
+
+soft_held        = Σ so_undelivered where preferred_source = this supply
+                   (display only; does not lock)
+
+driver_load_mt   = Σ load.actual_mt where load.driver = D
+driver_drop_mt   = Σ drop.actual_mt where drop.driver = D
+
+agent_mt         = Σ drop.actual_mt (default) for dispatches with agent = A
+                   (load actuals available for dispute/weighbridge view)
+```
+
+### Rules
+
+| Rule | Behavior |
+|------|----------|
+| What consumes position | **Completed** dispatch **load actuals** only |
+| What reduces SO undelivered | **Completed** dispatch **drop actuals** only |
+| Draft / planned | Do not reduce remaining; optional “planned” columns in UI |
+| Oversell / over-allocate / negative remaining | **Warn, allow save** |
+| Planned vs actual large gap | Require **note** on the line |
+| Σ load actual vs Σ drop actual on one dispatch | **Warn** if mismatch |
+| Soft hold | Preferred source only; never hard reserve |
+| SO fulfillment | **Manual / case-by-case** (e.g. accept 33.5 MT of 35 MT) |
+| One product per dispatch | v1 constraint |
+| Each drop names a source | Required so multi-load positions stay correct |
+
+### Statuses
+
+| Object | Statuses |
+|--------|----------|
+| SupplyContract / PurchaseOrder | `open` → `closed` |
+| SalesContract | `open` → `closed` |
+| SalesOrder | `draft` → `open` → `fulfilled` / `cancelled` |
+| Dispatch | `draft` → `planned` → `completed` / `cancelled` |
+
+### Cancel / edge cases
+
+| Case | Behavior |
+|------|----------|
+| Cancel completed dispatch | Block if already invoiced; otherwise reverse balance impact |
+| Change preferred source after partial delivery | Allowed; historical actuals stay on sources used |
+| Mark SO fulfilled with undelivered &gt; 0 | Allowed; note recommended |
+| Missing load/drop driver on `company_own` complete | Warn (stronger for drop) |
+| Missing agent on `agent` complete | Warn |
+| FC invoice voided | Trading link shows unlinked / warn; no heavy sync engine in v1 |
+
+---
+
+## 6. UI (desktop, office staff)
+
+### Navigation
+
+```
+Trading
+├── Position board
+├── Open sales
+├── Dispatches
+├── Supply (contracts / POs)
+├── Sales contracts
+├── Transport agents
+├── Drivers
+├── Driver load register
+├── Driver drop register
+└── Agent delivery register
+(+ existing Invoice / PurInvoice)
+```
+
+### Screens (summary)
+
+1. **Position board** — remaining by source; soft-held column; price; open/closed; drill to detail.  
+2. **Open sales** — ordered / delivered / undelivered; soft hold; mark fulfilled; warnings.  
+3. **Dispatch board + form** — multi-load, multi-drop, transport mode, agent, load/drop drivers, planned/actual, warnings.  
+4. **Supply / sales forms** — contracts, POs, SOs, call-offs.  
+5. **Driver load register** — load salary quantity by driver + date.  
+6. **Driver drop register** — drop salary quantity by driver + date.  
+7. **Agent delivery register** — quantities to check agent invoices.  
+8. **Settlement actions** — Create Invoice / PurInvoice prefilled from actuals; store links.
+
+Users: **office sales/ops on desktop** only in v1.
+
+---
+
+## 7. FullCircle integration
+
+- **Company-scoped** like the rest of FullCircle.  
+- Reuse contacts (customer/supplier) and goods (product + unit).  
+- Authorization: view/manage trading aligned with existing sales/purchase-style permissions; creating Invoice/PurInvoice uses existing invoice permissions.  
+- Settlement is **office-triggered**, prefilled from trading actuals and commercial prices.  
+- No replacement of existing egg/layer/swine operational modules in v1.
+
+---
+
+## 8. Implementation phases
+
+| Phase | Deliverable |
+|-------|-------------|
+| **0** | Module skeleton, nav, auth hooks, Driver + TransportAgent masters |
+| **1** | SupplyContract + PurchaseOrder + **Position board** |
+| **2** | SalesContract + SalesOrder + soft hold + **Open sales** + manual fulfill |
+| **3** | Dispatch multi-load/multi-drop + actuals + balance updates + **Dispatch board** |
+| **4** | Driver load/drop registers + agent delivery register |
+| **5** | Create Invoice / PurInvoice from actuals + links |
+| **6** | Polish (DO print, attachments, variance threshold config, optional rates) |
+
+**First demo milestone:** Phases 0–3 (live position + open SO + dispatch).  
+**Phases 4–5** follow so driver/agent money trails and finance settlement catch up.
+
+```
+0 → 1 → 2 → 3 → 4
+              ↘ 5 → 6
+```
+
+Phases 1 and 2 may overlap once supply sources exist for soft-hold references.
+
+---
+
+## 9. Testing focus
+
+- Multi-load / multi-drop balance math (supply remaining, SO undelivered, warehouse).  
+- Load driver ≠ drop driver → both registers correct.  
+- Agent register totals.  
+- Manual fulfill with short delivery (35 ordered, 33.5 delivered).  
+- Soft hold does not lock or reduce remaining.  
+- Warn-only oversell / load≠drop mismatch.  
+- Invoice prefill quantity = drop actuals.  
+- Cancel/invoiced guards.
+
+---
+
+## 10. Decisions log
+
+| Decision | Choice |
+|----------|--------|
+| Business lines in v1 | Grain only; swine/poultry later |
+| Stock + linked deals | Both; soft hold preferred source |
+| Inventory locations | Supplier/port primary for large; own warehouse for some small |
+| Soft hold | Preferred early; firm at actual load/drop; switchable |
+| Dispatch unit | Logistics job; multi-load + multi-drop |
+| Qty truth | Planned + actual; balances use completed actuals |
+| Oversell | Warn only |
+| SO fulfillment | Case-by-case manual, not auto from math |
+| Transport | `company_own` / `agent` / `customer_arranged` |
+| Drivers | Per load line and per drop line; load salary + drop salary |
+| Agent | Per dispatch; bill check via delivery register |
+| Finance home | FullCircle Invoice / PurInvoice; trading links in |
+| Host app | FullCircle trading module |
+| Clients | Desktop office v1 |
+
+---
+
+## 11. Future (explicitly later)
+
+- Swine / poultry trading or farm-sales modules reusing generic source/destination/unit ideas.  
+- Mobile capture for drivers.  
+- Driver rate tables and payroll integration.  
+- Agent PurInvoice generation from register.  
+- Margin / P&L by contract.  
+- Hard reservation modes if operations ever need them.  
+- Multi-product single dispatch if proven necessary.
+
+---
+
+## 12. Open implementation details (non-blocking)
+
+These do not change the design intent; resolve during planning/implementation:
+
+- Exact Ecto schema names and table names.  
+- Whether TransportAgent/Driver link to `Contact` or standalone tables.  
+- Variance threshold default (e.g. % or absolute MT).  
+- Exact FullCircle role matrix mapping for new actions.  
+- Whether warehouse is a synthetic source row or only a destination type with computed stock.
+
+---
+
+*End of design. Next step after user approval of this file: implementation plan (`writing-plans`), then build phase-by-phase.*
