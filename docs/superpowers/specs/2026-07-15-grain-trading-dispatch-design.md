@@ -22,7 +22,7 @@ Grain trade combines:
 ### v1 success criteria (equal priority)
 
 1. **Position board** — remaining MT by vessel / local PO / warehouse / product.  
-2. **Open commitments** — what was promised to customers (SOs + call-offs) and what is still undelivered.  
+2. **Open commitments** — what was promised to customers (sales positions: contracts and orders) and what is still undelivered.  
 3. **Movements** — what was loaded and dropped, from which sources, to which locations, with transport and driver accountability.
 
 Also required:
@@ -51,7 +51,7 @@ Also required:
 
 | Layer | Responsibility |
 |-------|----------------|
-| **New Trading domain** in FullCircle | Supply positions (vessel + local PO as one type), sales contracts & SOs, soft holds, dispatches (loads/drops), drivers, transport agents, position/open-sales/dispatch boards, driver/agent registers |
+| **New Trading domain** in FullCircle | Supply positions (vessel + local PO), sales positions (contract + order), soft holds, dispatches (loads/drops), drivers, transport agents, position/open-sales/dispatch boards, driver/agent registers |
 | **Existing FullCircle** | Company, contacts, goods, auth, **Invoice**, **PurInvoice**, GL, payments, statutory |
 | **Tugas** | Out of scope for this feature |
 | **New monorepo app** | Not for v1; keep module boundaries clean enough that extraction later is possible |
@@ -99,7 +99,7 @@ SupplyPosition
 | `vessel` | Import / shipment lot | vessel_name, period/ETA |
 | `local_po` | Local supplier purchase | external_ref (PO #) |
 
-**Same functions for every type:** appear on the position board; be a soft-hold target on SalesOrder; be a load/drop **source** on Dispatch; contribute to remaining math; optionally link to PurInvoice at settlement.
+**Same functions for every type:** appear on the position board; be a soft-hold target on a SalesPosition; be a load/drop **source** on Dispatch; contribute to remaining math; optionally link to PurInvoice at settlement.
 
 **Position board** lists SupplyPositions (plus warehouse stock) with a type badge: Vessel / Local PO / Warehouse.
 
@@ -107,15 +107,54 @@ SupplyPosition
 
 ### 3.2 Demand (commitments)
 
-| Object | Role | Example |
-|--------|------|---------|
-| **SalesContract** | Longer customer agreement | Customer A, 1000 MT maize over a period, price terms, remaining |
-| **SalesOrder** | Concrete commitment or call-off | 60 MT or 35 MT, price, preferred source, undelivered |
+**One entity, two commercial labels.** Long customer contracts and one-off / call-off orders do the same job in the system (promise qty, soft hold, receive drops, undelivered, manual fulfill, Invoice link). They are **not** separate domain types.
 
-- One-off deal: SO only (no parent contract).  
-- Call-off: SO under a SalesContract.  
-- One SO may be fulfilled over **many** dispatches, sources, and days.  
-- **Soft hold:** preferred supply source on the SO; changeable; does **not** hard-reserve stock.
+| Object | Role |
+|--------|------|
+| **SalesPosition** | Single customer-commitment record: ordered qty, delivered, undelivered, price, preferred supply, status |
+
+#### SalesPosition
+
+```
+SalesPosition
+  company_id
+  type: contract | order      # UI labels: "Sales contract" / "Sales order"
+  parent_id?                  # optional: order under a contract (call-off)
+  customer_id                 # contact
+  product_id                  # good
+  quantity                    # promised MT
+  unit
+  unit_price
+  preferred_supply_id?        # soft hold → SupplyPosition
+  status: draft | open | fulfilled | cancelled
+  # optional identity / commercial fields:
+  period?                     # e.g. covering June (common for type = contract)
+  external_ref?               # customer PO / our ref
+  notes?
+  fulfilled_note?             # when manually fulfilled short/over
+```
+
+| `type` | Real-world meaning | Typical use |
+|--------|--------------------|-------------|
+| `contract` | Longer customer agreement (e.g. 1000 MT over a period) | Often parent of call-off orders; may also receive drops directly |
+| `order` | One-off commitment or call-off | Day-to-day deliveries; optional `parent_id` → contract |
+
+**Same functions for every type:**
+
+- Appear on **Open sales** (filter by type if useful).  
+- Hold **soft-hold** preferred `SupplyPosition`.  
+- Be a **drop destination** on Dispatch.  
+- Track delivered / undelivered from completed drop actuals.  
+- **Manual fulfill** case-by-case (e.g. 33.5 of 35).  
+- Link to **Invoice** at settlement.
+
+**Parent / call-off (optional link, not a second product):**
+
+- One-off: `type = order`, no parent.  
+- Call-off: `type = order`, `parent_id` = a `type = contract` SalesPosition.  
+- Contract rollup (display): e.g. sum of child order quantities or sum of deliveries under the contract tree — implementation detail; operational truth for a line is still that line’s own qty and drop actuals.
+
+**UI copy** may say “New sales contract” / “New sales order” — both create a `SalesPosition` with the appropriate `type`.
 
 ### 3.3 Movement (dispatch)
 
@@ -142,7 +181,7 @@ Dispatch
     driver_id?          # load driver (own transport)
 
   drops[]   # 1..n
-    destination: sales_order_id? | warehouse
+    destination: sales_position_id? | warehouse
     drop_location (text / site label)
     source (SupplyPosition | warehouse this drop draws from)
     planned_mt
@@ -176,7 +215,7 @@ Dispatch
 
 | Situation | Document |
 |-----------|----------|
-| Delivered to customer | **Invoice** (prefill from drop actuals + SO price) |
+| Delivered to customer | **Invoice** (prefill from drop actuals + SalesPosition price) |
 | Purchase recognized / goods into commercial purchase | **PurInvoice** (prefill from supply + actuals) |
 
 Trading remains source of truth for **position and logistics**.  
@@ -196,20 +235,20 @@ Invoice / PurInvoice remain source of truth for **AR/AP and GL**.
 
 1. Create **SupplyPosition** with `type = vessel` (vessel name, period, product, MT, price, supplier).  
 2. Position board shows open MT.  
-3. Create **SalesOrder**(s) or call-offs with preferred source = that SupplyPosition (soft hold).  
+3. Create **SalesPosition**(s) (`order` and/or `contract`, optional parent call-off) with preferred source = that SupplyPosition (soft hold).  
 4. Create **Dispatch**: one or more loads from port/godowns; one or more drops to customer sites and/or warehouse; transport mode + agent/drivers as applicable.  
 5. Enter **actual** MT on loads and drops; variance notes when planned vs actual diverges materially.  
 6. Balances update from **completed** actuals.  
-7. SO may remain open even if short (e.g. 33.5 of 35); office **marks fulfilled** case-by-case.  
+7. SalesPosition may remain open even if short (e.g. 33.5 of 35); office **marks fulfilled** case-by-case.  
 8. Office **Create Invoice** from delivered actuals when billing.  
 9. **PurInvoice** when purchase is recognized (timing is commercial; not forced to a single automatic event).
 
 ### Flow B — Local back-to-back (supplier → customer)
 
 1. Create **SupplyPosition** with `type = local_po` (supplier, product, MT, price, PO ref).  
-2. **SalesOrder** with soft-hold preferred that SupplyPosition.  
+2. **SalesPosition** (`type = order`) with soft-hold preferred that SupplyPosition.  
 3. **Dispatch** from supplier warehouse to customer drop location(s); mode may be company_own, agent, or customer_arranged.  
-4. Actuals → balances; fulfill SO case-by-case; Invoice / PurInvoice as appropriate.  
+4. Actuals → balances; fulfill SalesPosition case-by-case; Invoice / PurInvoice as appropriate.  
 5. No mandatory stop at own warehouse.
 
 ### Flow C — Small order via own warehouse
@@ -235,13 +274,13 @@ Invoice / PurInvoice remain source of truth for **AR/AP and GL**.
 supply_remaining = supply_qty − Σ load.actual_mt
                    (completed dispatches only, that source)
 
-so_delivered     = Σ drop.actual_mt (completed, that SO)
-so_undelivered   = so_qty − so_delivered
+sales_delivered  = Σ drop.actual_mt (completed, that SalesPosition)
+sales_undelivered = sales_qty − sales_delivered
                    (may remain > 0 even when status = fulfilled)
 
 warehouse_qty    = inflows − outflows via warehouse loads/drops
 
-soft_held        = Σ so_undelivered where preferred_source = this supply
+soft_held        = Σ sales_undelivered where preferred_supply = this SupplyPosition
                    (display only; does not lock)
 
 driver_load_mt   = Σ load.actual_mt where load.driver = D
@@ -256,13 +295,13 @@ agent_mt         = Σ drop.actual_mt (default) for dispatches with agent = A
 | Rule | Behavior |
 |------|----------|
 | What consumes position | **Completed** dispatch **load actuals** only |
-| What reduces SO undelivered | **Completed** dispatch **drop actuals** only |
+| What reduces sales undelivered | **Completed** dispatch **drop actuals** only |
 | Draft / planned | Do not reduce remaining; optional “planned” columns in UI |
 | Oversell / over-allocate / negative remaining | **Warn, allow save** |
 | Planned vs actual large gap | Require **note** on the line |
 | Σ load actual vs Σ drop actual on one dispatch | **Warn** if mismatch |
-| Soft hold | Preferred source only; never hard reserve |
-| SO fulfillment | **Manual / case-by-case** (e.g. accept 33.5 MT of 35 MT) |
+| Soft hold | Preferred SupplyPosition only; never hard reserve |
+| Sales fulfillment | **Manual / case-by-case** (e.g. accept 33.5 MT of 35 MT) |
 | One product per dispatch | v1 constraint |
 | Each drop names a source | Required so multi-load positions stay correct |
 
@@ -271,8 +310,7 @@ agent_mt         = Σ drop.actual_mt (default) for dispatches with agent = A
 | Object | Statuses |
 |--------|----------|
 | SupplyPosition | `open` → `closed` |
-| SalesContract | `open` → `closed` |
-| SalesOrder | `draft` → `open` → `fulfilled` / `cancelled` |
+| SalesPosition | `draft` → `open` → `fulfilled` / `cancelled` (same for `contract` and `order`) |
 | Dispatch | `draft` → `planned` → `completed` / `cancelled` |
 
 ### Cancel / edge cases
@@ -281,7 +319,7 @@ agent_mt         = Σ drop.actual_mt (default) for dispatches with agent = A
 |------|----------|
 | Cancel completed dispatch | Block if already invoiced; otherwise reverse balance impact |
 | Change preferred source after partial delivery | Allowed; historical actuals stay on sources used |
-| Mark SO fulfilled with undelivered &gt; 0 | Allowed; note recommended |
+| Mark SalesPosition fulfilled with undelivered &gt; 0 | Allowed; note recommended |
 | Missing load/drop driver on `company_own` complete | Warn (stronger for drop) |
 | Missing agent on `agent` complete | Warn |
 | FC invoice voided | Trading link shows unlinked / warn; no heavy sync engine in v1 |
@@ -298,7 +336,7 @@ Trading
 ├── Open sales
 ├── Dispatches
 ├── Supply positions
-├── Sales contracts
+├── Sales positions
 ├── Transport agents
 ├── Drivers
 ├── Driver load register
@@ -310,9 +348,9 @@ Trading
 ### Screens (summary)
 
 1. **Position board** — remaining by source; soft-held column; price; open/closed; drill to detail.  
-2. **Open sales** — ordered / delivered / undelivered; soft hold; mark fulfilled; warnings.  
+2. **Open sales** — SalesPositions (contract + order); ordered / delivered / undelivered; soft hold; mark fulfilled; warnings; filter by type / parent.  
 3. **Dispatch board + form** — multi-load, multi-drop, transport mode, agent, load/drop drivers, planned/actual, warnings.  
-4. **Supply / sales forms** — SupplyPosition (vessel or local PO), SOs, call-offs, sales contracts.  
+4. **Supply / sales forms** — SupplyPosition (vessel or local_po), SalesPosition (contract or order, optional parent).  
 5. **Driver load register** — load salary quantity by driver + date.  
 6. **Driver drop register** — drop salary quantity by driver + date.  
 7. **Agent delivery register** — quantities to check agent invoices.  
@@ -338,7 +376,7 @@ Users: **office sales/ops on desktop** only in v1.
 |-------|-------------|
 | **0** | Module skeleton, nav, auth hooks, Driver + TransportAgent masters |
 | **1** | SupplyPosition (`vessel` \| `local_po`) + **Position board** |
-| **2** | SalesContract + SalesOrder + soft hold + **Open sales** + manual fulfill |
+| **2** | SalesPosition (`contract` \| `order`, optional parent) + soft hold + **Open sales** + manual fulfill |
 | **3** | Dispatch multi-load/multi-drop + actuals + balance updates + **Dispatch board** |
 | **4** | Driver load/drop registers + agent delivery register |
 | **5** | Create Invoice / PurInvoice from actuals + links |
@@ -358,13 +396,14 @@ Phases 1 and 2 may overlap once supply sources exist for soft-hold references.
 
 ## 9. Testing focus
 
-- Multi-load / multi-drop balance math (supply remaining, SO undelivered, warehouse).  
+- Multi-load / multi-drop balance math (supply remaining, sales undelivered, warehouse).  
 - Load driver ≠ drop driver → both registers correct.  
 - Agent register totals.  
 - Manual fulfill with short delivery (35 ordered, 33.5 delivered).  
 - Soft hold does not lock or reduce remaining.  
 - Warn-only oversell / load≠drop mismatch.  
 - Invoice prefill quantity = drop actuals.  
+- Call-off order with parent contract still receives drops on the order line.  
 - Cancel/invoiced guards.
 
 ---
@@ -387,7 +426,8 @@ Phases 1 and 2 may overlap once supply sources exist for soft-hold references.
 | Finance home | FullCircle Invoice / PurInvoice; trading links in |
 | Host app | FullCircle trading module |
 | Clients | Desktop office v1 |
-| Supply model | **One entity `SupplyPosition`** with `type`: `vessel` \| `local_po` (not separate SupplyContract + PurchaseOrder) |
+| Supply model | **One entity `SupplyPosition`** with `type`: `vessel` \| `local_po` |
+| Sales model | **One entity `SalesPosition`** with `type`: `contract` \| `order`; optional `parent_id` for call-offs (not separate SalesContract + SalesOrder) |
 
 ---
 
@@ -407,12 +447,13 @@ Phases 1 and 2 may overlap once supply sources exist for soft-hold references.
 
 These do not change the design intent; resolve during planning/implementation:
 
-- Exact Ecto schema / table names (e.g. `supply_positions`).  
+- Exact Ecto schema / table names (e.g. `supply_positions`, `sales_positions`).  
 - Whether TransportAgent/Driver link to `Contact` or standalone tables.  
 - Variance threshold default (e.g. % or absolute MT).  
 - Exact FullCircle role matrix mapping for new actions.  
 - Whether warehouse is a synthetic SupplyPosition-like row or only a destination type with computed stock.  
-- Which type-specific fields are required vs optional per `type`.
+- Which type-specific fields are required vs optional per `type`.  
+- Contract rollup display (sum of children vs deliveries on contract only).
 
 ---
 
