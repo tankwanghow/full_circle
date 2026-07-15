@@ -382,7 +382,7 @@ Users: **office sales/ops on desktop** only in v1.
 | **5** | Create Invoice / PurInvoice from actuals + links |
 | **6** | Polish (DO print, attachments, variance threshold config, optional rates) |
 
-**First demo milestone:** Phases 0–3 (live position + open SO + dispatch).  
+**First demo milestone:** Phases 0–3 (live supply position + open sales position + dispatch).  
 **Phases 4–5** follow so driver/agent money trails and finance settlement catch up.
 
 ```
