@@ -242,13 +242,17 @@ Trip
 | `agent` | Yes (Contact) | Optional (own staff assisting); agent’s crew not required as employees | Agent bills company — register by agent + **from Location → to Location** + MT |
 | `customer_arranged` | No | Usually empty | No own worker pay / no agent bill |
 
-**Worker pay (load salary / drop salary)**
+**Worker pay trail (trading) vs salary (payroll)**
 
-- Paid on **loading quantity** and **dropping quantity** separately.  
+| Layer | Responsibility |
+|-------|----------------|
+| **Trading** | Who worked which load/drop, and **full participation qty** (`actual_mt` of that line for each assigned employee). Employee load/drop registers export this trail. |
+| **Payroll** | **Load salary** and **drop salary** amounts — rates, and **how pay is split** among people, live in Payroll (not in Trading). |
+
 - **Multiple employees** may be assigned to one load or one drop (cargo handling often needs several people).  
 - Load crew and drop crew are independent lists (can overlap or differ).  
-- **v1 pay qty rule (participation):** each employee on a load line gets that line’s **full `actual_mt`** for the **load register**; each employee on a drop line gets that line’s **full `actual_mt`** for the **drop register**. (Not split MT unless you later choose to add share %.)  
-- Rate tables / payroll posting remain optional later.
+- **Trading qty rule (full participation):** each employee on a load line is recorded with that line’s **full `actual_mt`** on the load register; same for drops. Trading does **not** split MT or compute RM.  
+- Payroll later consumes these registers (or equivalent) and applies load/drop salary rules and splitting.
 
 **Transport agent**
 

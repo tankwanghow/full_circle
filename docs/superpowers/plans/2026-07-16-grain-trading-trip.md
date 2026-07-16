@@ -390,7 +390,7 @@ has_many :employees, through: [:trip_drop_employees, :employee]  # many workers 
 # trading_trip_drop_employees (trip_drop_id, employee_id) unique pair
 ```
 
-**Pay qty (participation):** each employee on a load/drop gets that line’s full `actual_mt` in the load/drop register (not split).
+**Pay qty (full participation in Trading):** each employee on a load/drop is recorded with that line’s full `actual_mt` in the employee load/drop register. **Loading/dropping salary and any split among workers are handled in Payroll**, not Trading.
 
 **Changeset rules:**
 - `location_id` required on load and drop
