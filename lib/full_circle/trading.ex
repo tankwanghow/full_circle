@@ -218,7 +218,7 @@ defmodule FullCircle.Trading do
       q =
         from(s in SalesPosition,
           where: s.company_id == ^company.id,
-          preload: [:customer, :good, :preferred_supply, :parent],
+          preload: [:customer, :good, :preferred_supply],
           order_by: [desc: s.inserted_at]
         )
 
@@ -242,7 +242,7 @@ defmodule FullCircle.Trading do
     if Authorization.can?(user, :view_trading, company) do
       from(s in SalesPosition,
         where: s.company_id == ^company.id and s.status in ["draft", "open"],
-        preload: [:customer, :good, :preferred_supply, :parent],
+        preload: [:customer, :good, :preferred_supply],
         order_by: [desc: s.inserted_at]
       )
       |> Repo.all()
@@ -256,7 +256,7 @@ defmodule FullCircle.Trading do
 
     from(s in SalesPosition,
       where: s.id == ^id and s.company_id == ^company.id,
-      preload: [:customer, :good, :preferred_supply, :parent]
+      preload: [:customer, :good, :preferred_supply]
     )
     |> Repo.one!()
   end

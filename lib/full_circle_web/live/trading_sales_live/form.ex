@@ -40,8 +40,7 @@ defmodule FullCircleWeb.TradingSalesLive.Form do
           SalesPosition.changeset(s, %{
             "customer_name" => s.customer && s.customer.name,
             "good_name" => s.good && s.good.name,
-            "preferred_supply_title" => s.preferred_supply && s.preferred_supply.title,
-            "parent_title" => s.parent && s.parent.title
+            "preferred_supply_title" => s.preferred_supply && s.preferred_supply.title
           })
 
         {:ok,
@@ -96,15 +95,6 @@ defmodule FullCircleWeb.TradingSalesLive.Form do
         socket
       ) do
     params = resolve_preferred_supply(params, socket)
-    validate(params, socket)
-  end
-
-  def handle_event(
-        "validate",
-        %{"_target" => ["sales_position", "parent_title"], "sales_position" => params},
-        socket
-      ) do
-    params = resolve_parent(params, socket)
     validate(params, socket)
   end
 
@@ -233,9 +223,9 @@ defmodule FullCircleWeb.TradingSalesLive.Form do
         _ -> params
       end
 
-    params
-    |> resolve_preferred_supply(%{assigns: %{current_company: company, current_user: user}})
-    |> resolve_parent(%{assigns: %{current_company: company, current_user: user}})
+    resolve_preferred_supply(params, %{
+      assigns: %{current_company: company, current_user: user}
+    })
   end
 
   defp resolve_preferred_supply(params, socket) do
@@ -257,32 +247,8 @@ defmodule FullCircleWeb.TradingSalesLive.Form do
     end
   end
 
-  defp resolve_parent(params, socket) do
-    company = socket.assigns.current_company
-    user = socket.assigns.current_user
-    title = String.trim(params["parent_title"] || "")
-
-    cond do
-      title == "" ->
-        params
-        |> Map.put("parent_id", nil)
-        |> Map.put("parent_title", "")
-
-      true ->
-        case find_sales_by_title(title, company, user) do
-          %{id: id} -> Map.put(params, "parent_id", id)
-          _ -> Map.put(params, "parent_id", nil)
-        end
-    end
-  end
-
   defp find_supply_by_title(title, company, user) do
     Trading.list_supply_positions(company, user)
-    |> Enum.find(fn s -> s.title && String.downcase(s.title) == String.downcase(title) end)
-  end
-
-  defp find_sales_by_title(title, company, user) do
-    Trading.list_sales_positions(company, user)
     |> Enum.find(fn s -> s.title && String.downcase(s.title) == String.downcase(title) end)
   end
 
@@ -302,20 +268,8 @@ defmodule FullCircleWeb.TradingSalesLive.Form do
         <.input
           field={@form[:title]}
           label={gettext("Name / ref")}
-          placeholder={gettext("e.g. Annual maize 2026, Spot 35MT pollard")}
+          placeholder={gettext("e.g. Annual maize 2026, PO-8841, Spot 35MT pollard")}
         />
-        <div class="flex gap-2">
-          <.input field={@form[:reference_no]} label={gettext("Reference no")} />
-          <.input field={@form[:period]} label={gettext("Period")} placeholder={gettext("e.g. June")} />
-          <div class="w-[25%]">
-            <.input
-              field={@form[:status]}
-              type="select"
-              label={gettext("Status")}
-              options={Enum.map(SalesPosition.statuses(), &{&1, &1})}
-            />
-          </div>
-        </div>
         <div class="flex gap-2">
           <div class="w-[60%]">
             <.input
@@ -325,15 +279,18 @@ defmodule FullCircleWeb.TradingSalesLive.Form do
               url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
             />
           </div>
-          <.input
-            field={@form[:parent_title]}
-            label={gettext("Parent deal (call-off)")}
-            placeholder={gettext("Optional parent sales title")}
-          />
+          <.input field={@form[:period]} label={gettext("Period")} placeholder={gettext("e.g. June")} />
+          <div class="w-[20%]">
+            <.input
+              field={@form[:status]}
+              type="select"
+              label={gettext("Status")}
+              options={Enum.map(SalesPosition.statuses(), &{&1, &1})}
+            />
+          </div>
         </div>
         <.input type="hidden" field={@form[:customer_id]} />
         <.input type="hidden" field={@form[:good_id]} />
-        <.input type="hidden" field={@form[:parent_id]} />
         <.input type="hidden" field={@form[:preferred_supply_id]} />
 
         <div class="flex gap-2">

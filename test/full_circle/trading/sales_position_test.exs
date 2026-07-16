@@ -145,44 +145,6 @@ defmodule FullCircle.Trading.SalesPositionTest do
     refute fulfilled.id in ids
   end
 
-  test "parent call-off must be same company", %{admin: admin, company: company} do
-    parent = sales_position_fixture(company, admin, %{"title" => "Annual maize 2026"})
-
-    assert {:ok, child} =
-             Trading.create_sales_position(
-               %{
-                 "title" => "June call-off",
-                 "quantity" => "50",
-                 "customer_id" => parent.customer_id,
-                 "good_id" => parent.good_id,
-                 "parent_id" => parent.id
-               },
-               company,
-               admin
-             )
-
-    assert child.parent_id == parent.id
-
-    other_admin = FullCircle.UserAccountsFixtures.user_fixture()
-    other_company = FullCircle.SysFixtures.company_fixture(other_admin, %{})
-    foreign = sales_position_fixture(other_company, other_admin)
-
-    assert {:error, cs} =
-             Trading.create_sales_position(
-               %{
-                 "title" => "Cross-company parent",
-                 "quantity" => "10",
-                 "customer_id" => parent.customer_id,
-                 "good_id" => parent.good_id,
-                 "parent_id" => foreign.id
-               },
-               company,
-               admin
-             )
-
-    assert %{parent_id: _} = errors_on(cs)
-  end
-
   test "requires quantity > 0, customer and good", %{admin: admin, company: company} do
     assert {:error, cs} =
              Trading.create_sales_position(%{"quantity" => "0"}, company, admin)

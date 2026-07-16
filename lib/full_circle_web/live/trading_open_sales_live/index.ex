@@ -122,7 +122,7 @@ defmodule FullCircleWeb.TradingOpenSalesLive.Index do
                 }
                 class="text-blue-600"
               >
-                {row.sales.title || row.sales.reference_no || "—"}
+                {row.sales.title || "—"}
               </.link>
             </div>
             <div>{row.sales.customer && row.sales.customer.name}</div>
