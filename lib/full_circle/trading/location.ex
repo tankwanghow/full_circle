@@ -48,23 +48,50 @@ defmodule FullCircle.Trading.Location do
   """
   def google_maps_url(%__MODULE__{} = loc), do: google_maps_url(loc.latitude, loc.longitude)
 
-  def google_maps_url(lat, lng)
-      when not is_nil(lat) and not is_nil(lng) do
-    "https://www.google.com/maps?q=#{Decimal.to_string(to_decimal(lat))},#{Decimal.to_string(to_decimal(lng))}"
+  def google_maps_url(lat, lng) do
+    with {:ok, lat_d} <- parse_coord(lat),
+         {:ok, lng_d} <- parse_coord(lng) do
+      "https://www.google.com/maps?q=#{Decimal.to_string(lat_d)},#{Decimal.to_string(lng_d)}"
+    else
+      _ -> nil
+    end
   end
-
-  def google_maps_url(_, _), do: nil
 
   @doc """
   Human-readable "lat, lng" for display, or nil.
   """
   def gps_label(%__MODULE__{} = loc), do: gps_label(loc.latitude, loc.longitude)
 
-  def gps_label(lat, lng) when not is_nil(lat) and not is_nil(lng) do
-    "#{Decimal.to_string(to_decimal(lat))}, #{Decimal.to_string(to_decimal(lng))}"
+  def gps_label(lat, lng) do
+    with {:ok, lat_d} <- parse_coord(lat),
+         {:ok, lng_d} <- parse_coord(lng) do
+      "#{Decimal.to_string(lat_d)}, #{Decimal.to_string(lng_d)}"
+    else
+      _ -> nil
+    end
   end
 
-  def gps_label(_, _), do: nil
+  defp parse_coord(nil), do: :error
+  defp parse_coord(""), do: :error
+  defp parse_coord(%Decimal{} = d), do: {:ok, d}
+
+  defp parse_coord(n) when is_float(n), do: {:ok, Decimal.from_float(n)}
+  defp parse_coord(n) when is_integer(n), do: {:ok, Decimal.new(n)}
+
+  defp parse_coord(n) when is_binary(n) do
+    case String.trim(n) do
+      "" ->
+        :error
+
+      s ->
+        case Decimal.parse(s) do
+          {d, ""} -> {:ok, d}
+          _ -> :error
+        end
+    end
+  end
+
+  defp parse_coord(_), do: :error
 
   defp validate_gps_pair(changeset) do
     lat = get_field(changeset, :latitude)
@@ -84,9 +111,4 @@ defmodule FullCircle.Trading.Location do
         add_error(changeset, :longitude, "required when latitude is set")
     end
   end
-
-  defp to_decimal(%Decimal{} = d), do: d
-  defp to_decimal(n) when is_float(n), do: Decimal.from_float(n)
-  defp to_decimal(n) when is_integer(n), do: Decimal.new(n)
-  defp to_decimal(n) when is_binary(n), do: Decimal.new(n)
 end

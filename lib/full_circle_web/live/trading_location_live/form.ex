@@ -41,16 +41,19 @@ defmodule FullCircleWeb.TradingLocationLive.Form do
 
   @impl true
   def handle_event("validate", %{"location" => params}, socket) do
-    params = Map.put(params, "company_id", socket.assigns.current_company.id)
+    validate(params, socket)
+  end
 
-    cs =
-      case socket.assigns.live_action do
-        :new -> Location.changeset(%Location{}, params)
-        :edit -> Location.changeset(socket.assigns.location, params)
-      end
-      |> Map.put(:action, :validate)
+  def handle_event("map_pick", %{"latitude" => lat, "longitude" => lng}, socket) do
+    params =
+      socket.assigns.form.params
+      |> Map.put("company_id", socket.assigns.current_company.id)
+      |> Map.put("latitude", blank_to_nil(lat))
+      |> Map.put("longitude", blank_to_nil(lng))
 
-    {:noreply, assign(socket, form: to_form(cs))}
+    # Prefer current form params so other fields are not wiped when map is clicked
+    params = merge_form_params(socket, params)
+    validate(params, socket)
   end
 
   def handle_event("save", %{"location" => params}, socket) do
@@ -79,10 +82,46 @@ defmodule FullCircleWeb.TradingLocationLive.Form do
     end
   end
 
+  defp validate(params, socket) do
+    params = Map.put(params, "company_id", socket.assigns.current_company.id)
+
+    cs =
+      case socket.assigns.live_action do
+        :new -> Location.changeset(%Location{}, params)
+        :edit -> Location.changeset(socket.assigns.location, params)
+      end
+      |> Map.put(:action, :validate)
+
+    {:noreply, assign(socket, form: to_form(cs))}
+  end
+
+  defp merge_form_params(socket, pick) do
+    base =
+      case socket.assigns.form do
+        %{params: params} when is_map(params) and map_size(params) > 0 ->
+          params
+
+        %{source: %Ecto.Changeset{} = cs} ->
+          cs
+          |> Ecto.Changeset.apply_changes()
+          |> Map.from_struct()
+          |> Map.drop([:__meta__, :company, :contact])
+          |> Map.new(fn {k, v} -> {to_string(k), v} end)
+
+        _ ->
+          %{}
+      end
+
+    Map.merge(base, pick)
+  end
+
+  defp blank_to_nil(""), do: nil
+  defp blank_to_nil(v), do: v
+
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="mx-auto w-6/12">
+    <div class="mx-auto w-7/12">
       <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <.form
         for={@form}
@@ -100,33 +139,66 @@ defmodule FullCircleWeb.TradingLocationLive.Form do
           options={Enum.map(Location.kinds(), &{&1, &1})}
         />
         <.input field={@form[:address_note]} type="textarea" label={gettext("Address note")} />
-        <div class="flex gap-2">
-          <.input
-            field={@form[:latitude]}
-            type="number"
-            step="any"
-            label={gettext("Latitude (GPS)")}
-            placeholder="e.g. 3.1390"
-          />
-          <.input
-            field={@form[:longitude]}
-            type="number"
-            step="any"
-            label={gettext("Longitude (GPS)")}
-            placeholder="e.g. 101.6869"
-          />
-        </div>
-        <p :if={maps_url(@form)} class="text-sm">
-          <a
-            href={maps_url(@form)}
-            target="_blank"
-            rel="noopener noreferrer"
-            class="text-blue-600 underline"
+
+        <div class="space-y-1">
+          <label class="block text-sm font-semibold leading-6 text-zinc-800 dark:text-zinc-200">
+            {gettext("GPS location")}
+          </label>
+          <p class="text-xs text-gray-500">
+            {gettext("Click the map to drop a pin, drag the pin, or use your current location.")}
+          </p>
+
+          <div
+            id="gps-map-picker"
+            phx-hook="GpsMapPicker"
+            phx-update="ignore"
+            data-lat-input="location_latitude"
+            data-lng-input="location_longitude"
+            data-lat={@form[:latitude].value}
+            data-lng={@form[:longitude].value}
+            class="border rounded overflow-hidden bg-zinc-50 dark:bg-zinc-900"
           >
-            {gettext("Open in Google Maps")}
-          </a>
-          <span class="text-gray-500 ml-2">({gps_label(@form)})</span>
-        </p>
+            <div data-gps-map class="w-full h-72 z-0"></div>
+            <div class="flex flex-wrap gap-2 p-2 items-center border-t bg-white dark:bg-zinc-800">
+              <button type="button" data-gps-locate class="blue button text-sm">
+                {gettext("Use my location")}
+              </button>
+              <button type="button" data-gps-clear class="gray button text-sm">
+                {gettext("Clear GPS")}
+              </button>
+              <a
+                :if={maps_url(@form)}
+                href={maps_url(@form)}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="teal button text-sm"
+              >
+                {gettext("Open in Google Maps")}
+              </a>
+              <span data-gps-status class="text-xs text-gray-600 font-mono ml-auto">
+                {gps_label(@form)}
+              </span>
+            </div>
+          </div>
+
+          <div class="flex gap-2">
+            <.input
+              field={@form[:latitude]}
+              type="number"
+              step="any"
+              label={gettext("Latitude")}
+              placeholder="e.g. 3.1390"
+            />
+            <.input
+              field={@form[:longitude]}
+              type="number"
+              step="any"
+              label={gettext("Longitude")}
+              placeholder="e.g. 101.6869"
+            />
+          </div>
+        </div>
+
         <.input field={@form[:active]} type="checkbox" label={gettext("Active")} />
         <div class="text-center mt-4">
           <.button>{gettext("Save")}</.button>

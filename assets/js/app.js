@@ -169,6 +169,19 @@ Hooks.copyAndOpen = {
   }
 };
 
+// Click map / use browser GPS to fill latitude & longitude on location form
+Hooks.GpsMapPicker = {
+  mounted() {
+    import("./gps_map_picker").then((m) => {
+      this._gps = m
+      m.initGpsMapPicker(this)
+    })
+  },
+  destroyed() {
+    if (this._gps?.destroyGpsMapPicker) this._gps.destroyGpsMapPicker(this)
+  }
+}
+
 // Converts machine .xls (and passes through .xlsx) to .xlsx in-browser, then
 // hands the result to the LiveView uploader. Keeps the server on xlsx_reader.
 // SheetJS is dynamically imported so it only loads on the import page.
