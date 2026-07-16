@@ -96,65 +96,63 @@ defmodule FullCircleWeb.TradingOpenSalesLive.Index do
         </.link>
       </div>
 
-      <div class="overflow-x-auto">
-        <div class="bg-amber-200 border-y-2 border-amber-500 font-bold p-2 grid grid-cols-11 gap-1 text-xs md:text-sm min-w-[1080px]">
-          <div>{gettext("Sales")}</div>
-          <div>{gettext("Needed by")}</div>
-          <div>{gettext("Customer")}</div>
-          <div>{gettext("Good")}</div>
-          <div class="text-center">{gettext("Unit")}</div>
-          <div class="text-right">{gettext("Ordered")}</div>
-          <div class="text-right">{gettext("Delivered")}</div>
-          <div class="text-right">{gettext("Undelivered")}</div>
-          <div>{gettext("Preferred supply")}</div>
-          <div>{gettext("Status")}</div>
-          <div></div>
-        </div>
-        <div id="open_sales" class="min-w-[1080px]">
-          <div
-            :for={row <- @rows}
-            id={"open-sales-#{row.sales.id}"}
-            class="grid grid-cols-11 gap-1 border-b p-2 text-xs md:text-sm hover:bg-gray-100 dark:hover:bg-zinc-800"
-          >
-            <div>
-              <.link
-                navigate={
-                  ~p"/companies/#{@current_company.id}/trading/sales_positions/#{row.sales.id}/edit"
-                }
-                class="text-blue-600"
-              >
-                {row.sales.title || "—"}
-              </.link>
-            </div>
-            <div>{row.sales.available_from}</div>
-            <div>{row.sales.customer && row.sales.customer.name}</div>
-            <div>{row.sales.good && row.sales.good.name}</div>
-            <div class="text-center font-medium">{row.sales.good && row.sales.good.unit}</div>
-            <div class="text-right">{row.ordered}</div>
-            <div class="text-right">{row.delivered}</div>
-            <div class={[
-              "text-right font-semibold",
-              undelivered_class(row.undelivered)
-            ]}>
-              {row.undelivered}
-            </div>
-            <div>
-              {row.sales.preferred_supply && (row.sales.preferred_supply.title || "—")}
-            </div>
-            <div>{row.sales.status}</div>
-            <div class="text-center">
-              <button
-                :if={Authorization.can?(@current_user, :manage_trading, @current_company)}
-                type="button"
-                id={"fulfill-#{row.sales.id}"}
-                phx-click="fulfill"
-                phx-value-id={row.sales.id}
-                class="orange button text-xs"
-                data-confirm={gettext("Mark fulfilled even if undelivered remains?")}
-              >
-                {gettext("Mark fulfilled")}
-              </button>
-            </div>
+      <div class="bg-amber-200 border-y-2 border-amber-500 font-bold p-2 flex gap-1 text-xs md:text-sm">
+        <div class="w-2/12">{gettext("Sales")}</div>
+        <div class="w-1/12">{gettext("Needed by")}</div>
+        <div class="w-2/12">{gettext("Customer")}</div>
+        <div class="w-1/12">{gettext("Good")}</div>
+        <div class="w-1/12 text-center">{gettext("Unit")}</div>
+        <div class="w-1/12 text-right">{gettext("Ordered")}</div>
+        <div class="w-1/12 text-right">{gettext("Delivered")}</div>
+        <div class="w-1/12 text-right">{gettext("Undelivered")}</div>
+        <div class="w-1/12">{gettext("Preferred supply")}</div>
+        <div class="w-1/12">{gettext("Status")}</div>
+        <div class="w-1/12"></div>
+      </div>
+      <div id="open_sales">
+        <div
+          :for={row <- @rows}
+          id={"open-sales-#{row.sales.id}"}
+          class="flex gap-1 border-b p-2 text-xs md:text-sm hover:bg-gray-100 dark:hover:bg-zinc-800"
+        >
+          <div class="w-2/12">
+            <.link
+              navigate={
+                ~p"/companies/#{@current_company.id}/trading/sales_positions/#{row.sales.id}/edit"
+              }
+              class="text-blue-600"
+            >
+              {row.sales.title || "—"}
+            </.link>
+          </div>
+          <div class="w-1/12">{row.sales.available_from}</div>
+          <div class="w-2/12">{row.sales.customer && row.sales.customer.name}</div>
+          <div class="w-1/12">{row.sales.good && row.sales.good.name}</div>
+          <div class="w-1/12 text-center font-medium">{row.sales.good && row.sales.good.unit}</div>
+          <div class="w-1/12 text-right">{row.ordered}</div>
+          <div class="w-1/12 text-right">{row.delivered}</div>
+          <div class={[
+            "w-1/12 text-right font-semibold",
+            undelivered_class(row.undelivered)
+          ]}>
+            {row.undelivered}
+          </div>
+          <div class="w-1/12">
+            {row.sales.preferred_supply && (row.sales.preferred_supply.title || "—")}
+          </div>
+          <div class="w-1/12">{row.sales.status}</div>
+          <div class="w-1/12 text-center">
+            <button
+              :if={Authorization.can?(@current_user, :manage_trading, @current_company)}
+              type="button"
+              id={"fulfill-#{row.sales.id}"}
+              phx-click="fulfill"
+              phx-value-id={row.sales.id}
+              class="orange button text-xs"
+              data-confirm={gettext("Mark fulfilled even if undelivered remains?")}
+            >
+              {gettext("Mark fulfilled")}
+            </button>
           </div>
         </div>
       </div>
@@ -175,4 +173,3 @@ defmodule FullCircleWeb.TradingOpenSalesLive.Index do
     end
   end
 end
-
