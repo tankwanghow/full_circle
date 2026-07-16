@@ -4,9 +4,9 @@ defmodule FullCircle.Repo.Migrations.CreateTradingSalesPositions do
   def change do
     create table(:trading_sales_positions, primary_key: false) do
       add :id, :binary_id, primary_key: true
-      add :title, :string
-      add :reference_no, :string
-      add :period, :string
+      # draft | open | hold | fulfilled | cancelled
+      add :title, :string, null: false
+      add :available_from, :date
       add :quantity, :decimal, null: false
       add :unit_price, :decimal
       add :status, :string, null: false, default: "draft"
@@ -19,8 +19,6 @@ defmodule FullCircle.Repo.Migrations.CreateTradingSalesPositions do
       add :customer_id, references(:contacts, type: :binary_id, on_delete: :restrict), null: false
       add :good_id, references(:goods, type: :binary_id, on_delete: :restrict), null: false
 
-      add :parent_id, references(:trading_sales_positions, type: :binary_id, on_delete: :nilify_all)
-
       add :preferred_supply_id,
           references(:trading_supply_positions, type: :binary_id, on_delete: :nilify_all)
 
@@ -29,9 +27,9 @@ defmodule FullCircle.Repo.Migrations.CreateTradingSalesPositions do
 
     create index(:trading_sales_positions, [:company_id])
     create index(:trading_sales_positions, [:company_id, :status])
+    create index(:trading_sales_positions, [:company_id, :available_from])
     create index(:trading_sales_positions, [:customer_id])
     create index(:trading_sales_positions, [:good_id])
-    create index(:trading_sales_positions, [:parent_id])
     create index(:trading_sales_positions, [:preferred_supply_id])
   end
 end

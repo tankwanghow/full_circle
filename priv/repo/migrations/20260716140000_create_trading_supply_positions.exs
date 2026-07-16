@@ -4,12 +4,10 @@ defmodule FullCircle.Repo.Migrations.CreateTradingSupplyPositions do
   def change do
     create table(:trading_supply_positions, primary_key: false) do
       add :id, :binary_id, primary_key: true
-      add :title, :string
-      add :reference_no, :string
-      add :vessel_name, :string
-      add :period, :string
+      # open | hold | collect | closed
+      add :title, :string, null: false
+      add :available_from, :date
       add :quantity, :decimal, null: false
-      add :unit, :string
       add :unit_price, :decimal
       add :status, :string, null: false, default: "open"
       add :notes, :text
@@ -25,6 +23,7 @@ defmodule FullCircle.Repo.Migrations.CreateTradingSupplyPositions do
 
     create index(:trading_supply_positions, [:company_id])
     create index(:trading_supply_positions, [:company_id, :status])
+    create index(:trading_supply_positions, [:company_id, :available_from])
     create index(:trading_supply_positions, [:supplier_id])
     create index(:trading_supply_positions, [:good_id])
   end
