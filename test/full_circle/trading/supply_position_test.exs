@@ -35,10 +35,18 @@ defmodule FullCircle.Trading.SupplyPositionTest do
     assert Decimal.eq?(Balances.supply_loaded(s), Decimal.new(0))
   end
 
-  test "close_supply_position sets status closed", %{admin: admin, company: company} do
+  test "status transitions: open → hold → collect → close", %{admin: admin, company: company} do
     s = supply_position_fixture(company, admin)
-    assert {:ok, closed} = Trading.close_supply_position(s, company, admin)
-    assert closed.status == "closed"
+    assert s.status == "open"
+
+    assert {:ok, held} = Trading.hold_supply_position(s, company, admin)
+    assert held.status == "hold"
+
+    assert {:ok, collecting} = Trading.collect_supply_position(held, company, admin)
+    assert collecting.status == "collect"
+
+    assert {:ok, closed} = Trading.close_supply_position(collecting, company, admin)
+    assert closed.status == "close"
   end
 
   test "requires title, quantity > 0, supplier and good", %{admin: admin, company: company} do
@@ -67,7 +75,6 @@ defmodule FullCircle.Trading.SupplyPositionTest do
     assert %{title: _} = errors_on(cs)
   end
 
-
   test "position_board lists open supplies with remaining", %{admin: admin, company: company} do
     s = supply_position_fixture(company, admin, %{"quantity" => "50", "title" => "Board row"})
     board = Trading.position_board(company, admin)
@@ -78,10 +85,51 @@ defmodule FullCircle.Trading.SupplyPositionTest do
     assert Decimal.eq?(row.soft_held, Decimal.new(0))
   end
 
-  test "closed supply not on open position board", %{admin: admin, company: company} do
-    s = supply_position_fixture(company, admin)
-    {:ok, _} = Trading.close_supply_position(s, company, admin)
+  test "closed supply not on position board; hold and collect are", %{
+    admin: admin,
+    company: company
+  } do
+    open = supply_position_fixture(company, admin, %{"title" => "Open one"})
+    hold = supply_position_fixture(company, admin, %{"title" => "Held one"})
+    collect = supply_position_fixture(company, admin, %{"title" => "Collect one"})
+    closed = supply_position_fixture(company, admin, %{"title" => "Closed one"})
+
+    {:ok, _} = Trading.hold_supply_position(hold, company, admin)
+    {:ok, _} = Trading.collect_supply_position(collect, company, admin)
+    {:ok, _} = Trading.close_supply_position(closed, company, admin)
+
     board = Trading.position_board(company, admin)
-    refute Enum.any?(board, &(&1.supply.id == s.id))
+    ids = Enum.map(board, & &1.supply.id)
+
+    assert open.id in ids
+    assert hold.id in ids
+    assert collect.id in ids
+    refute closed.id in ids
+  end
+
+  test "soft-hold typeahead includes open/hold/collect not close", %{
+    admin: admin,
+    company: company
+  } do
+    open = supply_position_fixture(company, admin, %{"title" => "Type open maize"})
+    hold = supply_position_fixture(company, admin, %{"title" => "Type hold maize"})
+    collect = supply_position_fixture(company, admin, %{"title" => "Type collect maize"})
+    closed = supply_position_fixture(company, admin, %{"title" => "Type close maize"})
+
+    {:ok, _} = Trading.hold_supply_position(hold, company, admin)
+    {:ok, _} = Trading.collect_supply_position(collect, company, admin)
+    {:ok, _} = Trading.close_supply_position(closed, company, admin)
+
+    names = Trading.open_supply_position_names("maize", company, admin) |> Enum.map(& &1.value)
+    assert "Type open maize" in names
+    assert "Type hold maize" in names
+    assert "Type collect maize" in names
+    refute "Type close maize" in names
+
+    assert %{id: id} =
+             Trading.get_open_supply_position_by_title("Type open maize", company, admin)
+
+    assert id == open.id
+    assert Trading.get_open_supply_position_by_title("Type close maize", company, admin) == nil
   end
 end

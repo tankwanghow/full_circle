@@ -34,7 +34,7 @@ defmodule FullCircle.Trading.SalesPositionTest do
     assert Decimal.eq?(Balances.sales_undelivered(s), Decimal.new("35"))
   end
 
-  test "open supply typeahead lists open titles only", %{admin: admin, company: company} do
+  test "active supply typeahead excludes closed supplies", %{admin: admin, company: company} do
     open =
       supply_position_fixture(company, admin, %{
         "title" => "Open vessel maize",
@@ -194,7 +194,6 @@ defmodule FullCircle.Trading.SalesPositionTest do
 
     assert %{title: _} = errors_on(cs)
   end
-
 
   test "guest cannot create sales position", %{company: company} do
     guest = FullCircle.UserAccountsFixtures.user_fixture()

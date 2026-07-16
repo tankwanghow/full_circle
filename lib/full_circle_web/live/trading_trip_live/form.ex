@@ -61,7 +61,12 @@ defmodule FullCircleWeb.TradingTripLive.Form do
     |> assign(trip: trip)
     |> assign(form: to_form(cs))
     |> assign(locations: Trading.list_locations(company, user, active_only: true))
-    |> assign(supplies: Trading.list_supply_positions(company, user, status: "open"))
+    |> assign(
+      supplies:
+        Trading.list_supply_positions(company, user,
+          statuses: FullCircle.Trading.SupplyPosition.collectable_statuses()
+        )
+    )
     |> assign(sales: Trading.list_open_sales(company, user))
     |> assign(warnings: if(trip, do: Trading.trip_warnings(trip), else: []))
   end
@@ -163,7 +168,8 @@ defmodule FullCircleWeb.TradingTripLive.Form do
         {:noreply, assign(socket, form: to_form(cs))}
 
       {:error, :trip_locked} ->
-        {:noreply, put_flash(socket, :error, gettext("Completed or cancelled trips cannot be edited."))}
+        {:noreply,
+         put_flash(socket, :error, gettext("Completed or cancelled trips cannot be edited."))}
 
       :not_authorise ->
         {:noreply,
@@ -194,10 +200,12 @@ defmodule FullCircleWeb.TradingTripLive.Form do
         {:noreply, put_flash(socket, :error, gettext("All loads and drops need actual MT."))}
 
       {:error, :good_mismatch} ->
-        {:noreply, put_flash(socket, :error, gettext("Load/drop product does not match trip good."))}
+        {:noreply,
+         put_flash(socket, :error, gettext("Load/drop product does not match trip good."))}
 
       {:error, reason} when is_atom(reason) ->
-        {:noreply, put_flash(socket, :error, gettext("Could not complete trip (%{reason})", reason: reason))}
+        {:noreply,
+         put_flash(socket, :error, gettext("Could not complete trip (%{reason})", reason: reason))}
 
       _ ->
         {:noreply, put_flash(socket, :error, gettext("Could not complete trip."))}
@@ -354,16 +362,31 @@ defmodule FullCircleWeb.TradingTripLive.Form do
                 />
               </div>
               <div class="col-span-2">
-                <.input field={load[:planned_mt]} type="number" step="any" label={gettext("Planned MT")} />
+                <.input
+                  field={load[:planned_mt]}
+                  type="number"
+                  step="any"
+                  label={gettext("Planned MT")}
+                />
               </div>
               <div class="col-span-2">
-                <.input field={load[:actual_mt]} type="number" step="any" label={gettext("Actual MT")} />
+                <.input
+                  field={load[:actual_mt]}
+                  type="number"
+                  step="any"
+                  label={gettext("Actual MT")}
+                />
               </div>
               <div class="col-span-1">
                 <.input field={load[:location_note]} label={gettext("Note")} />
               </div>
               <div class="col-span-1 pb-1">
-                <button type="button" phx-click="delete_load" phx-value-index={load.index} class="red button text-xs">
+                <button
+                  type="button"
+                  phx-click="delete_load"
+                  phx-value-index={load.index}
+                  class="red button text-xs"
+                >
                   {gettext("Del")}
                 </button>
               </div>
@@ -408,16 +431,31 @@ defmodule FullCircleWeb.TradingTripLive.Form do
                 />
               </div>
               <div class="col-span-2">
-                <.input field={drop[:planned_mt]} type="number" step="any" label={gettext("Planned MT")} />
+                <.input
+                  field={drop[:planned_mt]}
+                  type="number"
+                  step="any"
+                  label={gettext("Planned MT")}
+                />
               </div>
               <div class="col-span-2">
-                <.input field={drop[:actual_mt]} type="number" step="any" label={gettext("Actual MT")} />
+                <.input
+                  field={drop[:actual_mt]}
+                  type="number"
+                  step="any"
+                  label={gettext("Actual MT")}
+                />
               </div>
               <div class="col-span-1">
                 <.input field={drop[:variance_note]} label={gettext("Variance")} />
               </div>
               <div class="col-span-1 pb-1">
-                <button type="button" phx-click="delete_drop" phx-value-index={drop.index} class="red button text-xs">
+                <button
+                  type="button"
+                  phx-click="delete_drop"
+                  phx-value-index={drop.index}
+                  class="red button text-xs"
+                >
                   {gettext("Del")}
                 </button>
               </div>

@@ -2,7 +2,17 @@ defmodule FullCircle.Trading.SupplyPosition do
   use FullCircle.Schema
   import Ecto.Changeset
 
-  @statuses ~w(open closed)
+  # open     — collection date not confirmed
+  # hold     — stock exists; supplier is holding collection
+  # collect  — stock exists; supplier allows collection
+  # close    — stock ended / collection finished
+  @statuses ~w(open hold collect close)
+
+  # Still have stock (shown on position board / soft-hold targets)
+  @active_statuses ~w(open hold collect)
+
+  # Supplier allows lift (trip load supply options)
+  @collectable_statuses ~w(collect)
 
   schema "trading_supply_positions" do
     # Single free-text identity: vessel name, PO ref, short description, etc.
@@ -25,6 +35,14 @@ defmodule FullCircle.Trading.SupplyPosition do
   end
 
   def statuses, do: @statuses
+  def active_statuses, do: @active_statuses
+  def collectable_statuses, do: @collectable_statuses
+
+  def status_label("open"), do: "open — collection date not confirmed"
+  def status_label("hold"), do: "hold — stock exists, collection held by supplier"
+  def status_label("collect"), do: "collect — stock exists, supplier allows collection"
+  def status_label("close"), do: "close — stock ended"
+  def status_label(other), do: other
 
   def changeset(position, attrs) do
     position
@@ -53,4 +71,3 @@ defmodule FullCircle.Trading.SupplyPosition do
   defp trim_title(title) when is_binary(title), do: String.trim(title)
   defp trim_title(title), do: title
 end
-

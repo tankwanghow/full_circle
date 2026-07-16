@@ -63,8 +63,9 @@ defmodule FullCircleWeb.TradingPositionBoardLive.Index do
       </div>
 
       <div class="overflow-x-auto">
-        <div class="bg-amber-200 border-y-2 border-amber-500 font-bold p-2 grid grid-cols-10 gap-1 text-xs md:text-sm min-w-[960px]">
+        <div class="bg-amber-200 border-y-2 border-amber-500 font-bold p-2 grid grid-cols-11 gap-1 text-xs md:text-sm min-w-[1040px]">
           <div>{gettext("Supply")}</div>
+          <div>{gettext("Status")}</div>
           <div>{gettext("Available")}</div>
           <div>{gettext("Supplier")}</div>
           <div>{gettext("Good")}</div>
@@ -75,11 +76,11 @@ defmodule FullCircleWeb.TradingPositionBoardLive.Index do
           <div class="text-right">{gettext("Soft-held")}</div>
           <div class="text-right">{gettext("Price")}</div>
         </div>
-        <div id="position_board" class="min-w-[960px]">
+        <div id="position_board" class="min-w-[1040px]">
           <div
             :for={row <- @rows}
             id={"board-#{row.supply.id}"}
-            class="grid grid-cols-10 gap-1 border-b p-2 text-xs md:text-sm hover:bg-gray-100 dark:hover:bg-zinc-800"
+            class="grid grid-cols-11 gap-1 border-b p-2 text-xs md:text-sm hover:bg-gray-100 dark:hover:bg-zinc-800"
           >
             <div>
               <.link
@@ -91,6 +92,7 @@ defmodule FullCircleWeb.TradingPositionBoardLive.Index do
                 {display_supply(row.supply)}
               </.link>
             </div>
+            <div>{row.supply.status}</div>
             <div>{row.supply.available_from}</div>
             <div>{row.supply.supplier && row.supply.supplier.name}</div>
             <div>{row.supply.good && row.supply.good.name}</div>

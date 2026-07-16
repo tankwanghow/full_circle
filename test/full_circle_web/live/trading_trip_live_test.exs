@@ -17,7 +17,14 @@ defmodule FullCircleWeb.TradingTripLiveTest do
 
   test "trips index and create trip with load/drop", %{conn: conn, company: company, user: user} do
     good = good_fixture(company, user)
-    supply = supply_position_fixture(company, user, %{"good_id" => good.id, "quantity" => "100"})
+
+    supply =
+      supply_position_fixture(company, user, %{
+        "good_id" => good.id,
+        "quantity" => "100",
+        "status" => "collect"
+      })
+
     load_loc = location_fixture(company, user, %{"kind" => "supplier_site"})
     drop_loc = location_fixture(company, user, %{"kind" => "own_warehouse"})
 

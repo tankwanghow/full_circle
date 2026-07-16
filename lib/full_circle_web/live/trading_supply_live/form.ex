@@ -118,19 +118,43 @@ defmodule FullCircleWeb.TradingSupplyLive.Form do
     end
   end
 
+  def handle_event("hold", _params, socket) do
+    set_supply_status(
+      socket,
+      &Trading.hold_supply_position/3,
+      gettext("Supply marked hold (collection held by supplier).")
+    )
+  end
+
+  def handle_event("collect", _params, socket) do
+    set_supply_status(
+      socket,
+      &Trading.collect_supply_position/3,
+      gettext("Supply marked collect (supplier allows collection).")
+    )
+  end
+
   def handle_event("close", _params, socket) do
+    set_supply_status(
+      socket,
+      &Trading.close_supply_position/3,
+      gettext("Supply position closed.")
+    )
+  end
+
+  defp set_supply_status(socket, fun, ok_msg) do
     company = socket.assigns.current_company
     user = socket.assigns.current_user
 
-    case Trading.close_supply_position(socket.assigns.supply, company, user) do
+    case fun.(socket.assigns.supply, company, user) do
       {:ok, _} ->
         {:noreply,
          socket
-         |> put_flash(:info, gettext("Supply position closed."))
+         |> put_flash(:info, ok_msg)
          |> push_navigate(to: ~p"/companies/#{company.id}/trading/supply_positions")}
 
       _ ->
-        {:noreply, put_flash(socket, :error, gettext("Could not close supply position."))}
+        {:noreply, put_flash(socket, :error, gettext("Could not update supply status."))}
     end
   end
 
@@ -158,6 +182,12 @@ defmodule FullCircleWeb.TradingSupplyLive.Form do
       %{id: id} -> Map.put(params, "good_id", id)
       _ -> params
     end
+  end
+
+  defp status_options do
+    Enum.map(SupplyPosition.statuses(), fn s ->
+      {gettext("%{label}", label: SupplyPosition.status_label(s)), s}
+    end)
   end
 
   @impl true
@@ -194,12 +224,12 @@ defmodule FullCircleWeb.TradingSupplyLive.Form do
             type="date"
             label={gettext("Est. available to load")}
           />
-          <div class="w-[20%]">
+          <div class="w-[28%]">
             <.input
               field={@form[:status]}
               type="select"
               label={gettext("Status")}
-              options={Enum.map(SupplyPosition.statuses(), &{&1, &1})}
+              options={status_options()}
             />
           </div>
         </div>
@@ -236,13 +266,29 @@ defmodule FullCircleWeb.TradingSupplyLive.Form do
         <div class="text-center mt-4 gap-1 flex flex-wrap justify-center">
           <.button>{gettext("Save")}</.button>
           <button
-            :if={@live_action == :edit && @supply.status == "open"}
+            :if={@live_action == :edit && @supply.status in ["open", "collect"]}
+            type="button"
+            phx-click="hold"
+            class="blue button"
+          >
+            {gettext("Mark hold")}
+          </button>
+          <button
+            :if={@live_action == :edit && @supply.status in ["open", "hold"]}
+            type="button"
+            phx-click="collect"
+            class="teal button"
+          >
+            {gettext("Mark collect")}
+          </button>
+          <button
+            :if={@live_action == :edit && @supply.status != "close"}
             type="button"
             phx-click="close"
             class="orange button"
-            data-confirm={gettext("Close this supply position?")}
+            data-confirm={gettext("Close this supply position? Stock ended.")}
           >
-            {gettext("Close position")}
+            {gettext("Close")}
           </button>
           <.link
             navigate={~p"/companies/#{@current_company.id}/trading/supply_positions"}

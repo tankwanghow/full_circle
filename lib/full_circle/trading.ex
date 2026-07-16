@@ -138,6 +138,7 @@ defmodule FullCircle.Trading do
   def list_supply_positions(company, user, opts \\ []) do
     if Authorization.can?(user, :view_trading, company) do
       status = Keyword.get(opts, :status)
+      statuses = Keyword.get(opts, :statuses)
 
       q =
         from(s in SupplyPosition,
@@ -147,10 +148,15 @@ defmodule FullCircle.Trading do
         )
 
       q =
-        if status do
-          from(s in q, where: s.status == ^status)
-        else
-          q
+        cond do
+          is_list(statuses) and statuses != [] ->
+            from(s in q, where: s.status in ^statuses)
+
+          is_binary(status) ->
+            from(s in q, where: s.status == ^status)
+
+          true ->
+            q
         end
 
       Repo.all(q)
@@ -189,18 +195,37 @@ defmodule FullCircle.Trading do
     end
   end
 
-  def close_supply_position(%SupplyPosition{} = position, company, user) do
-    update_supply_position(position, %{"status" => "closed"}, company, user)
+  @doc """
+  Supplier holding collection (stock still exists).
+  """
+  def hold_supply_position(%SupplyPosition{} = position, company, user) do
+    update_supply_position(position, %{"status" => "hold"}, company, user)
   end
 
   @doc """
-  Autocomplete list of open supply positions by title (soft-hold targets).
+  Supplier allows collection / lift.
+  """
+  def collect_supply_position(%SupplyPosition{} = position, company, user) do
+    update_supply_position(position, %{"status" => "collect"}, company, user)
+  end
+
+  @doc """
+  Stock ended / collection finished.
+  """
+  def close_supply_position(%SupplyPosition{} = position, company, user) do
+    update_supply_position(position, %{"status" => "close"}, company, user)
+  end
+
+  @doc """
+  Autocomplete: active supplies (open/hold/collect) by title for soft-hold targets.
   """
   def open_supply_position_names(terms, company, user) do
     if Authorization.can?(user, :view_trading, company) do
+      active = SupplyPosition.active_statuses()
+
       from(s in SupplyPosition,
         where: s.company_id == ^company.id,
-        where: s.status == "open",
+        where: s.status in ^active,
         where: not is_nil(s.title) and s.title != "",
         where: ilike(s.title, ^"%#{terms}%"),
         select: %{id: s.id, value: s.title},
@@ -213,17 +238,18 @@ defmodule FullCircle.Trading do
   end
 
   @doc """
-  Resolve an open supply position by exact title (for soft-hold typeahead).
+  Resolve active supply (open/hold/collect) by exact title (soft-hold typeahead).
   """
   def get_open_supply_position_by_title(title, company, user) do
     title = title |> to_string() |> String.trim()
+    active = SupplyPosition.active_statuses()
 
     if title == "" or not Authorization.can?(user, :view_trading, company) do
       nil
     else
       from(s in SupplyPosition,
         where: s.company_id == ^company.id,
-        where: s.status == "open",
+        where: s.status in ^active,
         where: s.title == ^title,
         preload: [:supplier, :good]
       )
@@ -232,11 +258,11 @@ defmodule FullCircle.Trading do
   end
 
   @doc """
-  Position board rows: supply + loaded / remaining / soft_held.
+  Position board rows: active supplies (open/hold/collect) + loaded / remaining / soft_held.
   """
   def position_board(company, user) do
     company
-    |> list_supply_positions(user, status: "open")
+    |> list_supply_positions(user, statuses: SupplyPosition.active_statuses())
     |> Enum.map(fn s ->
       %{
         supply: s,
