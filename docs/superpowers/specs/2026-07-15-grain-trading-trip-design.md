@@ -30,7 +30,7 @@ Also required:
 - **Price** on supply and sales commercial documents (not full margin/P&L dashboards in v1).  
 - **Logistics** — multi-load, multi-drop, transport mode, agents, drivers.  
 - **Driver pay trail** — load salary and drop salary both based on actual quantities.  
-- **Transport agent trail** — quantities to check agent bills to the company.  
+- **Transport agent trail** — deliveries by agent with **source and destination** (and MT) so haulage invoices priced by origin–destination mileage can be checked.  
 - **Settlement** — final Invoice / PurInvoice remain in FullCircle finance (office-triggered from trading actuals).
 
 ### Non-goals (v1)
