@@ -12,7 +12,7 @@ defmodule FullCircleWeb.TradingOpenSalesLiveTest do
     %{conn: log_in_user(conn, user), user: user, company: company}
   end
 
-  test "open sales lists draft and open commitments", %{conn: conn, company: company, user: user} do
+  test "open sales lists active commitments", %{conn: conn, company: company, user: user} do
     sales_position_fixture(company, user, %{
       "title" => "Spot pollard 35",
       "quantity" => "35",

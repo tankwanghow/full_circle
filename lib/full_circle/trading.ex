@@ -300,12 +300,14 @@ defmodule FullCircle.Trading do
   end
 
   @doc """
-  Open commitments board: draft + open sales with undelivered / soft-hold info.
+  Open commitments board: draft + open + hold sales with undelivered / soft-hold info.
   """
   def list_open_sales(company, user) do
     if Authorization.can?(user, :view_trading, company) do
+      active = SalesPosition.active_statuses()
+
       from(s in SalesPosition,
-        where: s.company_id == ^company.id and s.status in ["draft", "open"],
+        where: s.company_id == ^company.id and s.status in ^active,
         preload: [:customer, :good, :preferred_supply],
         order_by: [desc: s.inserted_at]
       )
@@ -349,6 +351,10 @@ defmodule FullCircle.Trading do
     update_sales_position(position, %{"status" => "open"}, company, user)
   end
 
+  def hold_sales_position(%SalesPosition{} = position, company, user) do
+    update_sales_position(position, %{"status" => "hold"}, company, user)
+  end
+
   @doc """
   Manual fulfill — allowed even when undelivered > 0 (short deliveries).
   Optional attrs: `fulfilled_note`.
@@ -371,7 +377,7 @@ defmodule FullCircle.Trading do
     attrs =
       attrs
       |> stringify_attr_keys()
-      |> Map.put("status", "cancelled")
+      |> Map.put("status", "canceled")
 
     update_sales_position(position, attrs, company, user)
   end

@@ -3,8 +3,8 @@ defmodule FullCircle.Trading.Balances do
   Qty balances for supply/sales positions and own-warehouse locations.
 
   Loaded / delivered only count **completed** trips.
-  Soft holds sum undelivered qty on draft/open sales with a preferred supply —
-  they do **not** reduce supply remaining.
+  Soft holds sum undelivered qty on active sales (draft/open/hold) with a preferred
+  supply — they do **not** reduce supply remaining.
   """
 
   import Ecto.Query, warn: false
@@ -65,12 +65,15 @@ defmodule FullCircle.Trading.Balances do
   def sales_undelivered(_), do: @zero
 
   @doc """
-  Soft hold against a supply: sum of undelivered qty on draft/open sales
-  that name this supply as preferred. Does **not** reduce supply remaining.
+  Soft hold against a supply: sum of undelivered qty on active sales
+  (draft/open/hold) that name this supply as preferred.
+  Does **not** reduce supply remaining.
   """
   def soft_held_for_supply(supply_id) when is_binary(supply_id) do
+    active = FullCircle.Trading.SalesPosition.active_statuses()
+
     from(s in SalesPosition,
-      where: s.preferred_supply_id == ^supply_id and s.status in ["draft", "open"]
+      where: s.preferred_supply_id == ^supply_id and s.status in ^active
     )
     |> Repo.all()
     |> Enum.reduce(@zero, fn sales, acc ->

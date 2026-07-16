@@ -138,19 +138,21 @@ defmodule FullCircleWeb.TradingSalesLive.Form do
   end
 
   def handle_event("open", _params, socket) do
-    company = socket.assigns.current_company
-    user = socket.assigns.current_user
+    set_sales_status(
+      socket,
+      &Trading.open_sales_position/3,
+      gettext("Sales position opened."),
+      :open_sales
+    )
+  end
 
-    case Trading.open_sales_position(socket.assigns.sales, company, user) do
-      {:ok, _} ->
-        {:noreply,
-         socket
-         |> put_flash(:info, gettext("Sales position opened."))
-         |> push_navigate(to: ~p"/companies/#{company.id}/trading/open_sales")}
-
-      _ ->
-        {:noreply, put_flash(socket, :error, gettext("Could not open sales position."))}
-    end
+  def handle_event("hold", _params, socket) do
+    set_sales_status(
+      socket,
+      &Trading.hold_sales_position/3,
+      gettext("Sales position on hold."),
+      :open_sales
+    )
   end
 
   def handle_event("fulfill", %{"fulfilled_note" => note}, socket) do
@@ -176,11 +178,27 @@ defmodule FullCircleWeb.TradingSalesLive.Form do
       {:ok, _} ->
         {:noreply,
          socket
-         |> put_flash(:info, gettext("Sales position cancelled."))
+         |> put_flash(:info, gettext("Sales position canceled."))
          |> push_navigate(to: ~p"/companies/#{company.id}/trading/sales_positions")}
 
       _ ->
         {:noreply, put_flash(socket, :error, gettext("Could not cancel sales position."))}
+    end
+  end
+
+  defp set_sales_status(socket, fun, ok_msg, :open_sales) do
+    company = socket.assigns.current_company
+    user = socket.assigns.current_user
+
+    case fun.(socket.assigns.sales, company, user) do
+      {:ok, _} ->
+        {:noreply,
+         socket
+         |> put_flash(:info, ok_msg)
+         |> push_navigate(to: ~p"/companies/#{company.id}/trading/open_sales")}
+
+      _ ->
+        {:noreply, put_flash(socket, :error, gettext("Could not update sales status."))}
     end
   end
 
@@ -216,6 +234,12 @@ defmodule FullCircleWeb.TradingSalesLive.Form do
       |> Map.put(:action, :validate)
 
     {:noreply, assign(socket, form: to_form(cs))}
+  end
+
+  defp status_options do
+    Enum.map(SalesPosition.statuses(), fn s ->
+      {gettext("%{label}", label: SalesPosition.status_label(s)), s}
+    end)
   end
 
   defp ensure_ids(params, company, user) do
@@ -275,12 +299,12 @@ defmodule FullCircleWeb.TradingSalesLive.Form do
             type="date"
             label={gettext("Est. needed by")}
           />
-          <div class="w-[20%]">
+          <div class="w-[28%]">
             <.input
               field={@form[:status]}
               type="select"
               label={gettext("Status")}
-              options={Enum.map(SalesPosition.statuses(), &{&1, &1})}
+              options={status_options()}
             />
           </div>
         </div>
@@ -331,7 +355,7 @@ defmodule FullCircleWeb.TradingSalesLive.Form do
         <div class="text-center mt-4 gap-1 flex flex-wrap justify-center">
           <.button>{gettext("Save")}</.button>
           <button
-            :if={@live_action == :edit && @sales.status == "draft"}
+            :if={@live_action == :edit && @sales.status in ["draft", "hold"]}
             type="button"
             phx-click="open"
             class="blue button"
@@ -341,6 +365,14 @@ defmodule FullCircleWeb.TradingSalesLive.Form do
           <button
             :if={@live_action == :edit && @sales.status in ["draft", "open"]}
             type="button"
+            phx-click="hold"
+            class="teal button"
+          >
+            {gettext("Mark hold")}
+          </button>
+          <button
+            :if={@live_action == :edit && @sales.status in ["draft", "open", "hold"]}
+            type="button"
             phx-click="fulfill"
             class="orange button"
             data-confirm={gettext("Mark this sales position fulfilled even if undelivered remains?")}
@@ -348,7 +380,7 @@ defmodule FullCircleWeb.TradingSalesLive.Form do
             {gettext("Mark fulfilled")}
           </button>
           <button
-            :if={@live_action == :edit && @sales.status in ["draft", "open"]}
+            :if={@live_action == :edit && @sales.status in ["draft", "open", "hold"]}
             type="button"
             phx-click="cancel_sales"
             class="red button"

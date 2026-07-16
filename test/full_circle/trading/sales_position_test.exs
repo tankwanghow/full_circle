@@ -82,7 +82,10 @@ defmodule FullCircle.Trading.SalesPositionTest do
     assert sales.preferred_supply_id == supply.id
   end
 
-  test "soft_held only counts draft and open preferred sales", %{admin: admin, company: company} do
+  test "soft_held only counts draft, open and hold preferred sales", %{
+    admin: admin,
+    company: company
+  } do
     supply = supply_position_fixture(company, admin, %{"quantity" => "100"})
 
     sales_position_fixture(company, admin, %{
@@ -95,6 +98,12 @@ defmodule FullCircle.Trading.SalesPositionTest do
       "quantity" => "20",
       "preferred_supply_id" => supply.id,
       "status" => "open"
+    })
+
+    sales_position_fixture(company, admin, %{
+      "quantity" => "5",
+      "preferred_supply_id" => supply.id,
+      "status" => "hold"
     })
 
     fulfilled =
@@ -112,17 +121,17 @@ defmodule FullCircle.Trading.SalesPositionTest do
                admin
              )
 
-    cancelled =
+    canceled =
       sales_position_fixture(company, admin, %{
         "quantity" => "15",
         "preferred_supply_id" => supply.id,
         "status" => "open"
       })
 
-    assert {:ok, _} = Trading.cancel_sales_position(cancelled, %{}, company, admin)
+    assert {:ok, _} = Trading.cancel_sales_position(canceled, %{}, company, admin)
 
-    # draft 10 + open 20 = 30; fulfilled and cancelled excluded
-    assert Decimal.eq?(Balances.soft_held_for_supply(supply.id), Decimal.new("30"))
+    # draft 10 + open 20 + hold 5 = 35; fulfilled and canceled excluded
+    assert Decimal.eq?(Balances.soft_held_for_supply(supply.id), Decimal.new("35"))
   end
 
   test "fulfill allowed with undelivered remaining", %{admin: admin, company: company} do
@@ -147,17 +156,25 @@ defmodule FullCircle.Trading.SalesPositionTest do
     assert opened.status == "open"
   end
 
-  test "cancel_sales_position sets status cancelled", %{admin: admin, company: company} do
+  test "hold_sales_position sets status hold", %{admin: admin, company: company} do
     s = sales_position_fixture(company, admin, %{"status" => "open"})
-    assert {:ok, cancelled} = Trading.cancel_sales_position(s, %{}, company, admin)
-    assert cancelled.status == "cancelled"
+    assert {:ok, held} = Trading.hold_sales_position(s, company, admin)
+    assert held.status == "hold"
   end
 
-  test "list_open_sales returns open and draft only", %{admin: admin, company: company} do
+  test "cancel_sales_position sets status canceled", %{admin: admin, company: company} do
+    s = sales_position_fixture(company, admin, %{"status" => "open"})
+    assert {:ok, canceled} = Trading.cancel_sales_position(s, %{}, company, admin)
+    assert canceled.status == "canceled"
+  end
+
+  test "list_open_sales returns draft, open and hold only", %{admin: admin, company: company} do
     open = sales_position_fixture(company, admin, %{"status" => "open", "title" => "Open deal"})
 
     draft =
       sales_position_fixture(company, admin, %{"status" => "draft", "title" => "Draft deal"})
+
+    hold = sales_position_fixture(company, admin, %{"status" => "hold", "title" => "Held deal"})
 
     fulfilled = sales_position_fixture(company, admin, %{"status" => "open"})
     {:ok, _} = Trading.fulfill_sales_position(fulfilled, %{}, company, admin)
@@ -166,6 +183,7 @@ defmodule FullCircle.Trading.SalesPositionTest do
     ids = Enum.map(list, & &1.id)
     assert open.id in ids
     assert draft.id in ids
+    assert hold.id in ids
     refute fulfilled.id in ids
   end
 

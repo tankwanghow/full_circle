@@ -5,7 +5,15 @@ defmodule FullCircle.Trading.SalesPosition do
   alias FullCircle.Repo
   alias FullCircle.Trading.SupplyPosition
 
-  @statuses ~w(draft open fulfilled cancelled)
+  # draft      — not yet committed
+  # open       — active commitment
+  # hold       — on hold (paused delivery)
+  # fulfilled  — done (may be short)
+  # canceled   — cancelled
+  @statuses ~w(draft open hold fulfilled canceled)
+
+  # Still open commitments (open sales board, soft hold, trip drop targets)
+  @active_statuses ~w(draft open hold)
 
   schema "trading_sales_positions" do
     # Single free-text identity: deal name, customer PO #, short description, etc.
@@ -31,6 +39,14 @@ defmodule FullCircle.Trading.SalesPosition do
   end
 
   def statuses, do: @statuses
+  def active_statuses, do: @active_statuses
+
+  def status_label("draft"), do: "draft — not yet committed"
+  def status_label("open"), do: "open — active commitment"
+  def status_label("hold"), do: "hold — delivery paused"
+  def status_label("fulfilled"), do: "fulfilled — done"
+  def status_label("canceled"), do: "canceled"
+  def status_label(other), do: other
 
   def changeset(position, attrs) do
     position
@@ -63,7 +79,6 @@ defmodule FullCircle.Trading.SalesPosition do
 
   defp trim_title(title) when is_binary(title), do: String.trim(title)
   defp trim_title(title), do: title
-
 
   defp validate_preferred_supply_same_company(changeset) do
     supply_id = get_field(changeset, :preferred_supply_id)
