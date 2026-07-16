@@ -88,20 +88,20 @@ SupplyPosition
   status: open | closed
   # optional identity / description (any combination; all optional):
   title?                      # free label for lists, e.g. "JON DOE May maize" or "Ah Huat pollard PO"
+  reference_no?               # human-entered ref (PO #, contract #, supplier ref) — not auto-generated
   vessel_name?                # e.g. JON DOE when import
   period? / eta?              # e.g. May 2026
-  external_ref?               # PO number, contract no., supplier ref
   notes?
 ```
 
 **Functions (every row):** position board; soft-hold target on SalesPosition; load/drop **source** on Dispatch; remaining math; optional PurInvoice link.
 
-**How staff tell deals apart:** `title`, vessel_name, external_ref, supplier, product — not a system `type`.  
+**How staff tell deals apart:** `title`, `reference_no`, vessel_name, supplier, product — not a system `type`.  
 Examples:
 
-- Import: fill `vessel_name` + `period` (+ title if useful).  
-- Local PO: fill `external_ref` (PO #).  
-- Filters: search / has vessel name / open only — no required type filter.
+- Import: fill `vessel_name` + `period` (+ title / reference_no if useful).  
+- Local PO: fill `reference_no` with the PO number.  
+- Filters: search on title/reference_no/vessel; open only — no required type filter.
 
 ### 3.2 Demand (commitments)
 
@@ -126,8 +126,8 @@ SalesPosition
   status: draft | open | fulfilled | cancelled
   # optional identity / description:
   title?                      # free label, e.g. "Annual maize 2026" or "Spot 35MT pollard"
+  reference_no?               # human-entered ref (customer PO #, our paper ref) — not auto-generated
   period?                     # e.g. covering June
-  external_ref?               # customer PO / our ref
   notes?
   fulfilled_note?             # when manually fulfilled short/over
 ```
@@ -237,7 +237,7 @@ Invoice / PurInvoice remain source of truth for **AR/AP and GL**.
 
 ### Flow B — Local back-to-back (supplier → customer)
 
-1. Create **SupplyPosition** (supplier, product, MT, price, external_ref = PO #).  
+1. Create **SupplyPosition** (supplier, product, MT, price, reference_no = PO #).  
 2. **SalesPosition** with soft-hold preferred that SupplyPosition.  
 3. **Dispatch** from supplier warehouse to customer drop location(s); mode may be company_own, agent, or customer_arranged.  
 4. Actuals → balances; fulfill SalesPosition case-by-case; Invoice / PurInvoice as appropriate.  
@@ -339,10 +339,10 @@ Trading
 
 ### Screens (summary)
 
-1. **Position board** — remaining by source; soft-held column; price; open/closed; title/vessel/ref for identity; drill to detail.  
-2. **Open sales** — SalesPositions; ordered / delivered / undelivered; soft hold; mark fulfilled; warnings; filter/search; optional parent grouping.  
+1. **Position board** — remaining by source; soft-held column; price; open/closed; title / reference_no / vessel for identity; drill to detail.  
+2. **Open sales** — SalesPositions; ordered / delivered / undelivered; soft hold; mark fulfilled; warnings; filter/search on title/reference_no; optional parent grouping.  
 3. **Dispatch board + form** — multi-load, multi-drop, transport mode, agent, load/drop drivers, planned/actual, warnings.  
-4. **Supply / sales forms** — one SupplyPosition form, one SalesPosition form (optional parent on sales).  
+4. **Supply / sales forms** — one SupplyPosition form, one SalesPosition form (optional parent on sales; optional **reference_no** human-entered on both).  
 5. **Driver load register** — load salary quantity by driver + date.  
 6. **Driver drop register** — drop salary quantity by driver + date.  
 7. **Agent delivery register** — quantities to check agent invoices.  
@@ -418,8 +418,9 @@ Phases 1 and 2 may overlap once supply sources exist for soft-hold references.
 | Finance home | FullCircle Invoice / PurInvoice; trading links in |
 | Host app | FullCircle trading module |
 | Clients | Desktop office v1 |
-| Supply model | **One entity `SupplyPosition`** — no type enum; optional vessel_name / external_ref / title |
-| Sales model | **One entity `SalesPosition`** — no type enum; optional `parent_id` for call-offs under a larger deal |
+| Supply model | **One entity `SupplyPosition`** — no type enum; optional vessel_name / title / **reference_no** (human-entered) |
+| Sales model | **One entity `SalesPosition`** — no type enum; optional `parent_id`; optional **reference_no** (human-entered) |
+| Document numbers | No mandatory auto SO/PO number; optional human-entered `reference_no` only (plus system UUID PK) |
 
 ---
 
