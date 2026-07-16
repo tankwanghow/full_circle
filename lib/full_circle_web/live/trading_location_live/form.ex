@@ -74,7 +74,8 @@ defmodule FullCircleWeb.TradingLocationLive.Form do
         {:noreply, assign(socket, form: to_form(cs))}
 
       :not_authorise ->
-        {:noreply, put_flash(socket, :error, gettext("You are not authorised to perform this action"))}
+        {:noreply,
+         put_flash(socket, :error, gettext("You are not authorised to perform this action"))}
     end
   end
 

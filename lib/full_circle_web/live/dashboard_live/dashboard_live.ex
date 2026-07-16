@@ -80,12 +80,6 @@ defmodule FullCircleWeb.DashboardLive do
         <.link navigate={~p"/companies/#{@current_company.id}/trading/locations"} class="button teal">
           {gettext("Locations")}
         </.link>
-        <.link navigate={~p"/companies/#{@current_company.id}/employees"} class="button teal">
-          {gettext("Drivers (Employees)")}
-        </.link>
-        <.link navigate={~p"/companies/#{@current_company.id}/contacts"} class="button teal">
-          {gettext("Transport Agents (Contacts)")}
-        </.link>
       </div>
 
       <div class="font-medium text-xl">Sales Purchase</div>
@@ -229,7 +223,11 @@ defmodule FullCircleWeb.DashboardLive do
         >
           {gettext("Driver Commission")}
         </.link>
-        <.link :if={@current_role == "admin"} navigate={~p"/companies/#{@current_company.id}/fixed_assets_report"} class="button red">
+        <.link
+          :if={@current_role == "admin"}
+          navigate={~p"/companies/#{@current_company.id}/fixed_assets_report"}
+          class="button red"
+        >
           {gettext("Fixed Assets")}
         </.link>
         <.link
@@ -238,16 +236,28 @@ defmodule FullCircleWeb.DashboardLive do
         >
           {gettext("Post Dated Cheques")}
         </.link>
-        <.link :if={@current_role == "admin"} navigate={~p"/companies/#{@current_company.id}/tbplbs"} class="button red">
+        <.link
+          :if={@current_role == "admin"}
+          navigate={~p"/companies/#{@current_company.id}/tbplbs"}
+          class="button red"
+        >
           {gettext("TB/PL/BS")}
         </.link>
         <.link navigate={~p"/companies/#{@current_company.id}/aging"} class="button red">
           {gettext("Agings")}
         </.link>
-        <.link :if={@current_role == "admin"} navigate={~p"/companies/#{@current_company.id}/cash_forecast"} class="button red">
+        <.link
+          :if={@current_role == "admin"}
+          navigate={~p"/companies/#{@current_company.id}/cash_forecast"}
+          class="button red"
+        >
           {gettext("Cash Forecast")}
         </.link>
-        <.link :if={@current_role == "admin"} navigate={~p"/companies/#{@current_company.id}/profit_loss_forecast"} class="button red">
+        <.link
+          :if={@current_role == "admin"}
+          navigate={~p"/companies/#{@current_company.id}/profit_loss_forecast"}
+          class="button red"
+        >
           {gettext("P&L Forecast")}
         </.link>
         <.link

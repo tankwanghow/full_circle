@@ -56,10 +56,14 @@ defmodule FullCircleWeb.TradingLocationLive.Index do
             {loc.name}
           </.link>
           <div class="w-40">{loc.kind}</div>
-          <div class="w-20 text-center">{if(loc.active, do: gettext("Yes"), else: gettext("No"))}</div>
+          <div class="w-20 text-center">
+            {if(loc.active, do: gettext("Yes"), else: gettext("No"))}
+          </div>
         </div>
       </div>
-      <p :if={@locations == []} class="text-center p-4 text-gray-500">{gettext("No locations yet.")}</p>
+      <p :if={@locations == []} class="text-center p-4 text-gray-500">
+        {gettext("No locations yet.")}
+      </p>
     </div>
     """
   end

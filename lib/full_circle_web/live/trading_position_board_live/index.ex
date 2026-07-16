@@ -41,9 +41,6 @@ defmodule FullCircleWeb.TradingPositionBoardLive.Index do
         >
           {gettext("New Supply")}
         </.link>
-        <.link navigate={~p"/companies/#{@current_company.id}/dashboard"} class="gray button">
-          {gettext("Dashboard")}
-        </.link>
       </div>
 
       <div class="overflow-x-auto">

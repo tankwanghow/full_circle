@@ -178,36 +178,49 @@ defmodule FullCircleWeb.TradingSupplyLive.Form do
           label={gettext("Name / ref")}
           placeholder={gettext("e.g. JON DOE May maize, PO-8841, Ah Huat pollard")}
         />
-        <.input
-          field={@form[:available_from]}
-          type="date"
-          label={gettext("Est. available to load")}
-        />
-        <div class="grid grid-cols-2 gap-2">
-          <.input type="hidden" field={@form[:supplier_id]} />
+        <div class="flex gap-2">
+          <div class="w-[60%]">
+            <.input
+              field={@form[:supplier_name]}
+              label={gettext("Supplier")}
+              phx-hook="tributeAutoComplete"
+              url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
+            />
+          </div>
           <.input
-            field={@form[:supplier_name]}
-            label={gettext("Supplier")}
-            phx-hook="tributeAutoComplete"
-            url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
+            field={@form[:available_from]}
+            type="date"
+            label={gettext("Est. available to load")}
           />
-          <.input type="hidden" field={@form[:good_id]} />
-          <.input
-            field={@form[:good_name]}
-            label={gettext("Good")}
-            phx-hook="tributeAutoComplete"
-            url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=good&name="}
-          />
+          <div class="w-[20%]">
+            <.input
+              field={@form[:status]}
+              type="select"
+              label={gettext("Status")}
+              options={Enum.map(SupplyPosition.statuses(), &{&1, &1})}
+            />
+          </div>
         </div>
-        <div class="grid grid-cols-3 gap-2 items-end">
+        <.input type="hidden" field={@form[:supplier_id]} />
+        <.input type="hidden" field={@form[:good_id]} />
+
+        <div class="flex gap-2">
+          <div class="w-[50%]">
+            <.input
+              field={@form[:good_name]}
+              label={gettext("Good")}
+              phx-hook="tributeAutoComplete"
+              url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=good&name="}
+            />
+          </div>
           <.input field={@form[:quantity]} type="number" step="any" label={gettext("Quantity")} />
-          <div>
+          <div class="w-[10%]">
             <label class="block text-sm font-semibold leading-6 text-zinc-800 dark:text-zinc-200">
               {gettext("Unit")}
             </label>
             <div
               id="good-unit-display"
-              class="mt-2 flex h-10 items-center rounded-lg border border-zinc-300 bg-zinc-100 px-3 text-sm font-medium dark:border-zinc-600 dark:bg-zinc-800"
+              class="flex h-8.5 rounded items-center border border-zinc-300 bg-zinc-100 px-3 text-sm font-medium dark:border-zinc-600 dark:bg-zinc-800"
             >
               {if @good_unit, do: @good_unit, else: gettext("(from Good)")}
             </div>
@@ -219,12 +232,6 @@ defmodule FullCircleWeb.TradingSupplyLive.Form do
             label={gettext("Unit price")}
           />
         </div>
-        <.input
-          field={@form[:status]}
-          type="select"
-          label={gettext("Status")}
-          options={Enum.map(SupplyPosition.statuses(), &{&1, &1})}
-        />
         <.input field={@form[:notes]} type="textarea" label={gettext("Notes")} />
         <div class="text-center mt-4 gap-1 flex flex-wrap justify-center">
           <.button>{gettext("Save")}</.button>

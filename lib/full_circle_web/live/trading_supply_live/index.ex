@@ -42,9 +42,6 @@ defmodule FullCircleWeb.TradingSupplyLive.Index do
         >
           {gettext("Position Board")}
         </.link>
-        <.link navigate={~p"/companies/#{@current_company.id}/dashboard"} class="gray button">
-          {gettext("Dashboard")}
-        </.link>
       </div>
       <div class="bg-amber-200 border-y-2 border-amber-500 font-bold p-2 grid grid-cols-8 gap-1 text-sm">
         <div>{gettext("Name / ref")}</div>
@@ -79,7 +76,9 @@ defmodule FullCircleWeb.TradingSupplyLive.Index do
           <div></div>
         </div>
       </div>
-      <p :if={@supplies == []} class="text-center p-4 text-gray-500">{gettext("No supply positions yet.")}</p>
+      <p :if={@supplies == []} class="text-center p-4 text-gray-500">
+        {gettext("No supply positions yet.")}
+      </p>
     </div>
     """
   end
