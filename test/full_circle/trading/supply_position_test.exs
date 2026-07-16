@@ -35,7 +35,7 @@ defmodule FullCircle.Trading.SupplyPositionTest do
     assert Decimal.eq?(Balances.supply_loaded(s), Decimal.new(0))
   end
 
-  test "status transitions: open → hold → collect → close", %{admin: admin, company: company} do
+  test "status transitions: open → hold → collect → closed", %{admin: admin, company: company} do
     s = supply_position_fixture(company, admin)
     assert s.status == "open"
 
@@ -46,8 +46,9 @@ defmodule FullCircle.Trading.SupplyPositionTest do
     assert collecting.status == "collect"
 
     assert {:ok, closed} = Trading.close_supply_position(collecting, company, admin)
-    assert closed.status == "close"
+    assert closed.status == "closed"
   end
+
 
   test "requires title, quantity > 0, supplier and good", %{admin: admin, company: company} do
     assert {:error, cs} =

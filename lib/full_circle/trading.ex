@@ -213,7 +213,7 @@ defmodule FullCircle.Trading do
   Stock ended / collection finished.
   """
   def close_supply_position(%SupplyPosition{} = position, company, user) do
-    update_supply_position(position, %{"status" => "close"}, company, user)
+    update_supply_position(position, %{"status" => "closed"}, company, user)
   end
 
   @doc """
@@ -377,7 +377,7 @@ defmodule FullCircle.Trading do
     attrs =
       attrs
       |> stringify_attr_keys()
-      |> Map.put("status", "canceled")
+      |> Map.put("status", "cancelled")
 
     update_sales_position(position, attrs, company, user)
   end

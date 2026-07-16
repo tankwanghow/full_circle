@@ -5,8 +5,8 @@ defmodule FullCircle.Trading.SupplyPosition do
   # open     — collection date not confirmed
   # hold     — stock exists; supplier is holding collection
   # collect  — stock exists; supplier allows collection
-  # close    — stock ended / collection finished
-  @statuses ~w(open hold collect close)
+  # closed    — stock ended / collection finished
+  @statuses ~w(open hold collect closed)
 
   # Still have stock (shown on position board / soft-hold targets)
   @active_statuses ~w(open hold collect)
@@ -41,7 +41,7 @@ defmodule FullCircle.Trading.SupplyPosition do
   def status_label("open"), do: "open — collection date not confirmed"
   def status_label("hold"), do: "hold — stock exists, collection held by supplier"
   def status_label("collect"), do: "collect — stock exists, supplier allows collection"
-  def status_label("close"), do: "close — stock ended"
+  def status_label("closed"), do: "closed — stock ended"
   def status_label(other), do: other
 
   def changeset(position, attrs) do

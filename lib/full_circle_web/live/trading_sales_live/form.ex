@@ -178,7 +178,7 @@ defmodule FullCircleWeb.TradingSalesLive.Form do
       {:ok, _} ->
         {:noreply,
          socket
-         |> put_flash(:info, gettext("Sales position canceled."))
+         |> put_flash(:info, gettext("Sales position cancelled."))
          |> push_navigate(to: ~p"/companies/#{company.id}/trading/sales_positions")}
 
       _ ->

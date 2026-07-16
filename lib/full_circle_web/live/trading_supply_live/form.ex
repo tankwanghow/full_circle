@@ -202,13 +202,24 @@ defmodule FullCircleWeb.TradingSupplyLive.Form do
         phx-submit="save"
         autocomplete="off"
         class="p-4 border rounded space-y-2"
-      >
+      ><div class="flex gap-2">
+      <div class="w-[55%]">
         <.input
           field={@form[:title]}
           label={gettext("Name / ref")}
           placeholder={gettext("e.g. JON DOE May maize, PO-8841, Ah Huat pollard")}
           required
         />
+        </div>
+        <div class="w-[45%]">
+            <.input
+              field={@form[:status]}
+              type="select"
+              label={gettext("Status")}
+              options={status_options()}
+            />
+          </div>
+          </div>
         <div class="flex gap-2">
           <div class="w-[60%]">
             <.input
@@ -224,14 +235,6 @@ defmodule FullCircleWeb.TradingSupplyLive.Form do
             type="date"
             label={gettext("Est. available to load")}
           />
-          <div class="w-[28%]">
-            <.input
-              field={@form[:status]}
-              type="select"
-              label={gettext("Status")}
-              options={status_options()}
-            />
-          </div>
         </div>
         <div class="flex gap-2">
           <div class="w-[50%]">
@@ -282,7 +285,7 @@ defmodule FullCircleWeb.TradingSupplyLive.Form do
             {gettext("Mark collect")}
           </button>
           <button
-            :if={@live_action == :edit && @supply.status != "close"}
+            :if={@live_action == :edit && @supply.status != "closed"}
             type="button"
             phx-click="close"
             class="orange button"

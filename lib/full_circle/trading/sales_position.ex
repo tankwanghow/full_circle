@@ -9,8 +9,8 @@ defmodule FullCircle.Trading.SalesPosition do
   # open       — active commitment
   # hold       — on hold (paused delivery)
   # fulfilled  — done (may be short)
-  # canceled   — cancelled
-  @statuses ~w(draft open hold fulfilled canceled)
+  # cancelled   — cancelled
+  @statuses ~w(draft open hold fulfilled cancelled)
 
   # Still open commitments (open sales board, soft hold, trip drop targets)
   @active_statuses ~w(draft open hold)
@@ -45,7 +45,7 @@ defmodule FullCircle.Trading.SalesPosition do
   def status_label("open"), do: "open — active commitment"
   def status_label("hold"), do: "hold — delivery paused"
   def status_label("fulfilled"), do: "fulfilled — done"
-  def status_label("canceled"), do: "canceled"
+  def status_label("cancelled"), do: "cancelled"
   def status_label(other), do: other
 
   def changeset(position, attrs) do
