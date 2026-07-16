@@ -12,7 +12,7 @@ defmodule FullCircle.Trading do
 
   alias FullCircle.Repo
   alias FullCircle.Authorization
-  alias FullCircle.Trading.Location
+  alias FullCircle.Trading.{Location, SupplyPosition, Balances}
   alias FullCircle.HR.Employee
   alias FullCircle.Accounting.Contact
   alias FullCircle.Sys
@@ -131,6 +131,82 @@ defmodule FullCircle.Trading do
       where: c.id == ^id
     )
     |> Repo.one!()
+  end
+
+  # --- Supply positions ---
+
+  def list_supply_positions(company, user, opts \\ []) do
+    if Authorization.can?(user, :view_trading, company) do
+      status = Keyword.get(opts, :status)
+
+      q =
+        from(s in SupplyPosition,
+          where: s.company_id == ^company.id,
+          preload: [:supplier, :good],
+          order_by: [desc: s.inserted_at]
+        )
+
+      q =
+        if status do
+          from(s in q, where: s.status == ^status)
+        else
+          q
+        end
+
+      Repo.all(q)
+    else
+      []
+    end
+  end
+
+  def get_supply_position!(id, company, user) do
+    unless Authorization.can?(user, :view_trading, company), do: raise("not authorised")
+
+    from(s in SupplyPosition,
+      where: s.id == ^id and s.company_id == ^company.id,
+      preload: [:supplier, :good]
+    )
+    |> Repo.one!()
+  end
+
+  def create_supply_position(attrs, company, user) do
+    with :ok <- authorize(user, :manage_trading, company) do
+      %SupplyPosition{}
+      |> SupplyPosition.changeset(put_company(attrs, company))
+      |> Repo.insert()
+    end
+  end
+
+  def update_supply_position(%SupplyPosition{} = position, attrs, company, user) do
+    with :ok <- authorize(user, :manage_trading, company),
+         true <- position.company_id == company.id do
+      position
+      |> SupplyPosition.changeset(attrs)
+      |> Repo.update()
+    else
+      false -> :not_authorise
+      other -> other
+    end
+  end
+
+  def close_supply_position(%SupplyPosition{} = position, company, user) do
+    update_supply_position(position, %{"status" => "closed"}, company, user)
+  end
+
+  @doc """
+  Position board rows: supply + loaded / remaining / soft_held.
+  """
+  def position_board(company, user) do
+    company
+    |> list_supply_positions(user, status: "open")
+    |> Enum.map(fn s ->
+      %{
+        supply: s,
+        loaded: Balances.supply_loaded(s),
+        remaining: Balances.supply_remaining(s),
+        soft_held: Balances.soft_held_for_supply(s.id)
+      }
+    end)
   end
 
   # --- helpers ---

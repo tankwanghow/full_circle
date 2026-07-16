@@ -459,7 +459,7 @@ Form: header fields; dynamic load/drop lines (add/remove); location selects filt
 ```elixir
 @spec employee_load_register(company, user, %{from: Date.t(), to: Date.t(), employee_id: id | nil}) ::
   [%{employee, trip, date, location, supply_position, actual_mt}]
-  # one row per (employee, load line); actual_mt = full load.actual_mt (participation)
+  # one row per (employee, load line); actual_mt = full load.actual_mt (full participation for Payroll)
 
 @spec employee_drop_register(company, user, filters) ::
   [%{employee, trip, date, location, sales_position, actual_mt}]
@@ -533,7 +533,7 @@ Totals by employee / by agent / by from→to pair.
 ## Out of this plan (spec Phase 6+)
 
 - DO print, weighbridge attachments  
-- Driver rate tables / payroll  
+- Payroll load/drop salary rates and split rules (consumes trading registers) 
 - Agent PurInvoice auto-generation  
 - Mileage matrix  
 - Mobile app  

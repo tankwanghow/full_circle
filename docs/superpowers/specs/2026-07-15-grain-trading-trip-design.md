@@ -343,9 +343,10 @@ own_warehouse_qty(location) =
 soft_held        = Σ sales_undelivered where preferred_supply = this SupplyPosition
                    (display only; does not lock)
 
-# Participation: full line MT for each employee assigned to that line
+# Full participation qty for payroll (trading does not split money)
 employee_load_mt(E) = Σ load.actual_mt for completed loads where E ∈ load.employees
 employee_drop_mt(E) = Σ drop.actual_mt for completed drops where E ∈ drop.employees
+# Payroll turns these qty trails into load/drop salary and applies split rules there.
 
 agent_delivery_lines =
   for each completed trip with agent = A, each drop line:
@@ -424,8 +425,8 @@ Trading
 3. **Trip board + form** — multi-load, multi-drop; each line picks **Location** (+ note), **multiple employees**, supply/sales links; transport mode, agent, planned/actual, warnings.  
 4. **Supply / sales forms** — SupplyPosition, SalesPosition (optional parent; optional **reference_no**).  
 5. **Locations** — CRUD for ports, supplier sites, customer sites, own warehouses.  
-6. **Employee load register** — load salary qty by employee + date (full MT per load they worked).  
-7. **Employee drop register** — drop salary qty by employee + date (full MT per drop they worked).  
+6. **Employee load register** — participation qty by employee + date (full MT per load they worked); input for Payroll load salary.  
+7. **Employee drop register** — participation qty by employee + date (full MT per drop they worked); input for Payroll drop salary.  
 8. **Agent delivery register** — per agent/date: **from Location → to Location** + MT; check haulage bills.  
 9. **Settlement actions** — Create Invoice / PurInvoice prefilled from actuals; store links.
 
@@ -495,7 +496,7 @@ Phases 1 and 2 may overlap once supply sources exist for soft-hold references.
 | Oversell | Warn only |
 | Sales fulfillment | Case-by-case manual, not auto from math |
 | Transport | `company_own` / `agent` / `customer_arranged` |
-| Workers | **Many employees per load and per drop**; load salary + drop salary; participation = full line MT each |
+| Workers | **Many employees per load and per drop**; trading = full participation MT each; **Payroll** computes/splits load & drop salary |
 | Agent | Per trip; bill check via **from Location → to Location** + MT (haulage by O–D; no auto rate calc in v1) |
 | Finance home | FullCircle Invoice / PurInvoice; trading links in |
 | Host app | FullCircle trading module |
@@ -515,7 +516,7 @@ Phases 1 and 2 may overlap once supply sources exist for soft-hold references.
 
 - Swine / poultry trading or farm-sales modules reusing generic source/destination/unit ideas.  
 - Mobile capture for drivers.  
-- Driver rate tables and payroll integration.  
+- Payroll load/drop salary rates and split rules consuming trading employee registers.  
 - Agent PurInvoice generation from register.  
 - Margin / P&L by contract.  
 - Hard reservation modes if operations ever need them.  
