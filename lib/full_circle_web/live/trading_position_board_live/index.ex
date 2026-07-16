@@ -62,54 +62,52 @@ defmodule FullCircleWeb.TradingPositionBoardLive.Index do
         </.link>
       </div>
 
-      <div class="overflow-x-auto">
-        <div class="bg-amber-200 border-y-2 border-amber-500 font-bold p-2 grid grid-cols-11 gap-1 text-xs md:text-sm min-w-[1040px]">
-          <div>{gettext("Supply")}</div>
-          <div>{gettext("Status")}</div>
-          <div>{gettext("Available")}</div>
-          <div>{gettext("Supplier")}</div>
-          <div>{gettext("Good")}</div>
-          <div class="text-center">{gettext("Unit")}</div>
-          <div class="text-right">{gettext("Contracted")}</div>
-          <div class="text-right">{gettext("Loaded")}</div>
-          <div class="text-right">{gettext("Remaining")}</div>
-          <div class="text-right">{gettext("Soft-held")}</div>
-          <div class="text-right">{gettext("Price")}</div>
-        </div>
-        <div id="position_board" class="min-w-[1040px]">
-          <div
-            :for={row <- @rows}
-            id={"board-#{row.supply.id}"}
-            class="grid grid-cols-11 gap-1 border-b p-2 text-xs md:text-sm hover:bg-gray-100 dark:hover:bg-zinc-800"
-          >
-            <div>
-              <.link
-                navigate={
-                  ~p"/companies/#{@current_company.id}/trading/supply_positions/#{row.supply.id}/edit"
-                }
-                class="text-blue-600"
-              >
-                {display_supply(row.supply)}
-              </.link>
-            </div>
-            <div>{row.supply.status}</div>
-            <div>{row.supply.available_from}</div>
-            <div>{row.supply.supplier && row.supply.supplier.name}</div>
-            <div>{row.supply.good && row.supply.good.name}</div>
-            <div class="text-center font-medium">
-              {row.supply.good && row.supply.good.unit}
-            </div>
-            <div class="text-right">{row.supply.quantity}</div>
-            <div class="text-right">{row.loaded}</div>
-            <div class={[
-              "text-right font-semibold",
-              remaining_class(row.remaining)
-            ]}>
-              {row.remaining}
-            </div>
-            <div class="text-right">{row.soft_held}</div>
-            <div class="text-right">{row.supply.unit_price}</div>
+      <div class="bg-amber-200 border-y-2 border-amber-500 font-bold p-2 flex gap-1 text-xs md:text-sm">
+        <div class="w-2/12">{gettext("Supply")}</div>
+        <div class="w-1/12">{gettext("Status")}</div>
+        <div class="w-1/12">{gettext("Available")}</div>
+        <div class="w-2/12">{gettext("Supplier")}</div>
+        <div class="w-1/12">{gettext("Good")}</div>
+        <div class="w-1/12 text-center">{gettext("Unit")}</div>
+        <div class="w-1/12 text-right">{gettext("Contracted")}</div>
+        <div class="w-1/12 text-right">{gettext("Loaded")}</div>
+        <div class="w-1/12 text-right">{gettext("Remaining")}</div>
+        <div class="w-1/12 text-right">{gettext("Soft-held")}</div>
+        <div class="w-1/12 text-right">{gettext("Price")}</div>
+      </div>
+      <div id="position_board">
+        <div
+          :for={row <- @rows}
+          id={"board-#{row.supply.id}"}
+          class="flex gap-1 border-b p-2 text-xs md:text-sm hover:bg-gray-100 dark:hover:bg-zinc-800"
+        >
+          <div class="w-2/12">
+            <.link
+              navigate={
+                ~p"/companies/#{@current_company.id}/trading/supply_positions/#{row.supply.id}/edit"
+              }
+              class="text-blue-600"
+            >
+              {display_supply(row.supply)}
+            </.link>
           </div>
+          <div class="w-1/12">{row.supply.status}</div>
+          <div class="w-1/12">{row.supply.available_from}</div>
+          <div class="w-2/12">{row.supply.supplier && row.supply.supplier.name}</div>
+          <div class="w-1/12">{row.supply.good && row.supply.good.name}</div>
+          <div class="w-1/12 text-center font-medium">
+            {row.supply.good && row.supply.good.unit}
+          </div>
+          <div class="w-1/12 text-right">{row.supply.quantity}</div>
+          <div class="w-1/12 text-right">{row.loaded}</div>
+          <div class={[
+            "w-1/12 text-right font-semibold",
+            remaining_class(row.remaining)
+          ]}>
+            {row.remaining}
+          </div>
+          <div class="w-1/12 text-right">{row.soft_held}</div>
+          <div class="w-1/12 text-right">{row.supply.unit_price}</div>
         </div>
       </div>
       <p :if={@rows == []} class="text-center p-4 text-gray-500">
