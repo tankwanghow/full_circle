@@ -23,8 +23,7 @@ defmodule FullCircleWeb.TradingSupplyLive.Form do
         cs =
           SupplyPosition.changeset(%SupplyPosition{}, %{
             "company_id" => company.id,
-            "status" => "open",
-            "unit" => "MT"
+            "status" => "open"
           })
 
         {:ok,
@@ -145,11 +144,18 @@ defmodule FullCircleWeb.TradingSupplyLive.Form do
           <.input field={@form[:supplier_name]} label={gettext("Supplier")} phx-debounce="300" />
           <.input field={@form[:good_name]} label={gettext("Good")} phx-debounce="300" />
         </div>
-        <div class="grid grid-cols-3 gap-2">
+        <div class="grid grid-cols-2 gap-2">
           <.input field={@form[:quantity]} type="number" step="any" label={gettext("Quantity")} />
-          <.input field={@form[:unit]} label={gettext("Unit")} />
-          <.input field={@form[:unit_price]} type="number" step="any" label={gettext("Unit price")} />
+          <.input
+            field={@form[:unit_price]}
+            type="number"
+            step="any"
+            label={gettext("Unit price")}
+          />
         </div>
+        <p class="text-sm text-gray-500 dark:text-gray-400">
+          {gettext("Unit follows the Good master (not edited here).")}
+        </p>
         <.input
           field={@form[:status]}
           type="select"

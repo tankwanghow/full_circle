@@ -29,7 +29,6 @@ defmodule FullCircle.TradingFixtures do
     defaults = %{
       "title" => "supply-#{System.unique_integer([:positive])}",
       "quantity" => "100",
-      "unit" => "MT",
       "unit_price" => "1200",
       "status" => "open",
       "supplier_id" => contact.id,

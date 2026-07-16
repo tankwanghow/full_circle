@@ -22,7 +22,6 @@ defmodule FullCircle.Trading.SupplyPositionTest do
                  "vessel_name" => "JON DOE",
                  "period" => "May 2026",
                  "quantity" => "100",
-                 "unit" => "MT",
                  "unit_price" => "1100",
                  "supplier_id" => contact.id,
                  "good_id" => good.id

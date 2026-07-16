@@ -10,7 +10,6 @@ defmodule FullCircle.Trading.SupplyPosition do
     field :vessel_name, :string
     field :period, :string
     field :quantity, :decimal
-    field :unit, :string
     field :unit_price, :decimal
     field :status, :string, default: "open"
     field :notes, :string
@@ -35,7 +34,6 @@ defmodule FullCircle.Trading.SupplyPosition do
       :vessel_name,
       :period,
       :quantity,
-      :unit,
       :unit_price,
       :status,
       :notes,

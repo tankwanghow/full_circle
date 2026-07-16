@@ -75,7 +75,9 @@ defmodule FullCircleWeb.TradingPositionBoardLive.Index do
             </div>
             <div>{row.supply.supplier && row.supply.supplier.name}</div>
             <div>{row.supply.good && row.supply.good.name}</div>
-            <div class="text-right">{row.supply.quantity} {row.supply.unit}</div>
+            <div class="text-right">
+              {row.supply.quantity} {row.supply.good && row.supply.good.unit}
+            </div>
             <div class="text-right">{row.loaded}</div>
             <div class={[
               "text-right font-semibold",

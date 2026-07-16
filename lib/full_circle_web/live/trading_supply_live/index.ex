@@ -70,7 +70,9 @@ defmodule FullCircleWeb.TradingSupplyLive.Index do
           </div>
           <div>{s.supplier && s.supplier.name}</div>
           <div>{s.good && s.good.name}</div>
-          <div class="text-right">{s.quantity} {s.unit}</div>
+          <div class="text-right">
+            {s.quantity} {s.good && s.good.unit}
+          </div>
           <div>{s.status}</div>
           <div></div>
         </div>

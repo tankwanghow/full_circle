@@ -84,8 +84,7 @@ SupplyPosition
   company_id
   supplier_id                 # contact
   product_id                  # good
-  quantity                    # contracted / ordered MT
-  unit                        # typically MT (from product)
+  quantity                    # contracted / ordered qty (unit from Good, not stored here)
   unit_price
   status: open | closed
   # optional identity / description (any combination; all optional):
@@ -121,8 +120,7 @@ SalesPosition
   parent_id?                  # optional: this line is under a larger SalesPosition
   customer_id                 # contact
   product_id                  # good
-  quantity                    # promised MT
-  unit
+  quantity                    # promised qty (unit from Good, not stored here)
   unit_price
   preferred_supply_id?        # soft hold → SupplyPosition
   status: draft | open | fulfilled | cancelled

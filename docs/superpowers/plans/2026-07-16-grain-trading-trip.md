@@ -201,13 +201,12 @@ schema "trading_supply_positions" do
   field :vessel_name, :string
   field :period, :string
   field :quantity, :decimal
-  field :unit, :string
   field :unit_price, :decimal
   field :status, :string, default: "open"  # open | closed
   field :notes, :string
   belongs_to :company, FullCircle.Sys.Company
   belongs_to :supplier, FullCircle.Accounting.Contact
-  belongs_to :good, FullCircle.Product.Good  # verify module name in codebase (Good vs Goods)
+  belongs_to :good, FullCircle.Product.Good  # unit always from good.unit — do not store unit on position
   timestamps(type: :utc_datetime)
 end
 ```
