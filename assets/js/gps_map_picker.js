@@ -1,4 +1,5 @@
-// Interactive map picker (Leaflet + OpenStreetMap).
+// Interactive map picker (Leaflet).
+// Default basemap: satellite (Esri World Imagery). Street map optional.
 // Click the map (or "Use my location") to fill latitude / longitude.
 // Google Maps is used for the open-link only (no Google Maps API key required).
 
@@ -7,6 +8,19 @@ const LEAFLET_JS = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
 // Default center: Klang Valley / Malaysia
 const DEFAULT_CENTER = [3.1390, 101.6869]
 const DEFAULT_ZOOM = 12
+
+// Esri World Imagery (satellite) — free for many non-commercial apps
+const SATELLITE_URL =
+  "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+const SATELLITE_ATTR =
+  "Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community"
+// Optional place names over satellite
+const LABELS_URL =
+  "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
+const STREET_URL = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+const STREET_ATTR =
+  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+
 
 let leafletLoading = null
 
