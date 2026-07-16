@@ -6,6 +6,7 @@ defmodule FullCircleWeb.TradingSupplyLive.Form do
   alias FullCircle.Authorization
   alias FullCircle.Accounting
   alias FullCircle.Product
+  alias FullCircle.Util
 
   @impl true
   def mount(params, _session, socket) do
@@ -53,24 +54,49 @@ defmodule FullCircleWeb.TradingSupplyLive.Form do
   end
 
   @impl true
+  def handle_event(
+        "validate",
+        %{"_target" => ["supply_position", "supplier_name"], "supply_position" => params},
+        socket
+      ) do
+    {params, socket, _} =
+      FullCircleWeb.Helpers.assign_autocomplete_id(
+        socket,
+        params,
+        "supplier_name",
+        "supplier_id",
+        &Accounting.get_contact_by_name/3
+      )
+
+    validate(params, socket)
+  end
+
+  def handle_event(
+        "validate",
+        %{"_target" => ["supply_position", "good_name"], "supply_position" => params},
+        socket
+      ) do
+    {params, socket, good} =
+      FullCircleWeb.Helpers.assign_autocomplete_id(
+        socket,
+        params,
+        "good_name",
+        "good_id",
+        &Product.get_good_by_name/3
+      )
+
+    socket = assign(socket, good_unit: Util.attempt(good, :unit))
+    validate(params, socket)
+  end
+
   def handle_event("validate", %{"supply_position" => params}, socket) do
-    {params, good_unit} = resolve_names(params, socket)
-    params = Map.put(params, "company_id", socket.assigns.current_company.id)
-
-    cs =
-      case socket.assigns.live_action do
-        :new -> SupplyPosition.changeset(%SupplyPosition{}, params)
-        :edit -> SupplyPosition.changeset(socket.assigns.supply, params)
-      end
-      |> Map.put(:action, :validate)
-
-    {:noreply, socket |> assign(form: to_form(cs)) |> assign(good_unit: good_unit)}
+    validate(params, socket)
   end
 
   def handle_event("save", %{"supply_position" => params}, socket) do
-    {params, good_unit} = resolve_names(params, socket)
     company = socket.assigns.current_company
     user = socket.assigns.current_user
+    params = ensure_ids(params, company, user)
 
     result =
       case socket.assigns.live_action do
@@ -86,10 +112,11 @@ defmodule FullCircleWeb.TradingSupplyLive.Form do
          |> push_navigate(to: ~p"/companies/#{company.id}/trading/supply_positions")}
 
       {:error, %Ecto.Changeset{} = cs} ->
-        {:noreply, socket |> assign(form: to_form(cs)) |> assign(good_unit: good_unit)}
+        {:noreply, assign(socket, form: to_form(cs))}
 
       :not_authorise ->
-        {:noreply, put_flash(socket, :error, gettext("You are not authorised to perform this action"))}
+        {:noreply,
+         put_flash(socket, :error, gettext("You are not authorised to perform this action"))}
     end
   end
 
@@ -109,10 +136,20 @@ defmodule FullCircleWeb.TradingSupplyLive.Form do
     end
   end
 
-  defp resolve_names(params, socket) do
-    company = socket.assigns.current_company
-    user = socket.assigns.current_user
+  defp validate(params, socket) do
+    params = Map.put(params, "company_id", socket.assigns.current_company.id)
 
+    cs =
+      case socket.assigns.live_action do
+        :new -> SupplyPosition.changeset(%SupplyPosition{}, params)
+        :edit -> SupplyPosition.changeset(socket.assigns.supply, params)
+      end
+      |> Map.put(:action, :validate)
+
+    {:noreply, assign(socket, form: to_form(cs))}
+  end
+
+  defp ensure_ids(params, company, user) do
     params =
       case Accounting.get_contact_by_name(params["supplier_name"] || "", company, user) do
         %{id: id} -> Map.put(params, "supplier_id", id)
@@ -120,11 +157,8 @@ defmodule FullCircleWeb.TradingSupplyLive.Form do
       end
 
     case Product.get_good_by_name(params["good_name"] || "", company, user) do
-      %{id: id, unit: unit} ->
-        {Map.put(params, "good_id", id), unit}
-
-      _ ->
-        {params, nil}
+      %{id: id} -> Map.put(params, "good_id", id)
+      _ -> params
     end
   end
 
@@ -146,8 +180,20 @@ defmodule FullCircleWeb.TradingSupplyLive.Form do
         <.input field={@form[:vessel_name]} label={gettext("Vessel name")} />
         <.input field={@form[:period]} label={gettext("Period")} />
         <div class="grid grid-cols-2 gap-2">
-          <.input field={@form[:supplier_name]} label={gettext("Supplier")} phx-debounce="300" />
-          <.input field={@form[:good_name]} label={gettext("Good")} phx-debounce="300" />
+          <.input type="hidden" field={@form[:supplier_id]} />
+          <.input
+            field={@form[:supplier_name]}
+            label={gettext("Supplier")}
+            phx-hook="tributeAutoComplete"
+            url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
+          />
+          <.input type="hidden" field={@form[:good_id]} />
+          <.input
+            field={@form[:good_name]}
+            label={gettext("Good")}
+            phx-hook="tributeAutoComplete"
+            url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=good&name="}
+          />
         </div>
         <div class="grid grid-cols-3 gap-2 items-end">
           <.input field={@form[:quantity]} type="number" step="any" label={gettext("Quantity")} />
@@ -199,4 +245,3 @@ defmodule FullCircleWeb.TradingSupplyLive.Form do
     """
   end
 end
-
