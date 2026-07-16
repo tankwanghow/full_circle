@@ -95,8 +95,12 @@ defmodule FullCircleWeb.DashboardLive.Menu do
       [
         %{label: gettext("Invoices"), path: "Invoice", class: "button teal"},
         %{label: gettext("Purchase Invoices"), path: "PurInvoice", class: "button teal"},
+        %{label: gettext("E-Invoices"), path: "e_invoices", class: "button teal"},
         %{label: gettext("Receipts"), path: "Receipt", class: "button blue"},
         %{label: gettext("Payments"), path: "Payment", class: "button blue"},
+        %{label: gettext("Account Transactions"), path: "account_transactions", class: "button red"},
+        %{label: gettext("Contact Transactions"), path: "contact_transactions", class: "button red"},
+        %{label: gettext("Salary Notes"), path: "SalaryNote", class: "button orange"},
         %{label: gettext("Pay Run"), path: "PayRun", class: "button orange"},
         %{label: gettext("Egg Stock"), path: "egg_stock", class: "button gray"}
       ]
