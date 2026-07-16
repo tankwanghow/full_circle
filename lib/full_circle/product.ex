@@ -1,6 +1,7 @@
 defmodule FullCircle.Product do
   import Ecto.Query, warn: false
   import FullCircle.Helpers
+  use Gettext, backend: FullCircleWeb.Gettext
 
   alias FullCircle.Accounting.{Account, TaxCode}
 
@@ -16,6 +17,85 @@ defmodule FullCircle.Product do
   end
 
   # GOODS
+
+  @doc """
+  Counts document/trading rows that store quantity for this good.
+  Used to warn when changing the good's unit (legacy qty would be misinterpreted).
+  """
+  def quantity_line_usage(good_id) when is_binary(good_id) do
+    counts = %{
+      invoice_details: count_by_good(FullCircle.Billing.InvoiceDetail, good_id),
+      pur_invoice_details: count_by_good(FullCircle.Billing.PurInvoiceDetail, good_id),
+      receipt_details: count_by_good(FullCircle.ReceiveFund.ReceiptDetail, good_id),
+      payment_details: count_by_good(FullCircle.BillPay.PaymentDetail, good_id),
+      trading_supply_positions: count_by_good_if_loaded(FullCircle.Trading.SupplyPosition, good_id),
+      trading_sales_positions: count_by_good_if_loaded(FullCircle.Trading.SalesPosition, good_id)
+    }
+
+    total =
+      counts
+      |> Map.values()
+      |> Enum.sum()
+
+    Map.put(counts, :total, total)
+  end
+
+  def quantity_line_usage(_), do: %{total: 0}
+
+  @doc """
+  True when unit would change and the good already has qty lines referencing it.
+  """
+  def unit_change_risk?(good_id, old_unit, new_unit) when is_binary(good_id) do
+    old_u = old_unit |> to_string() |> String.trim()
+    new_u = new_unit |> to_string() |> String.trim()
+    old_u != new_u and new_u != "" and quantity_line_usage(good_id).total > 0
+  end
+
+  def unit_change_risk?(_, _, _), do: false
+
+  def unit_change_warning_message(good_id) when is_binary(good_id) do
+    usage = quantity_line_usage(good_id)
+
+    if usage.total == 0 do
+      nil
+    else
+      parts =
+        [
+          {usage.invoice_details, gettext("invoice lines")},
+          {usage.pur_invoice_details, gettext("purchase invoice lines")},
+          {usage.receipt_details, gettext("receipt lines")},
+          {usage.payment_details, gettext("payment lines")},
+          {usage.trading_supply_positions, gettext("trading supply positions")},
+          {usage.trading_sales_positions, gettext("trading sales positions")}
+        ]
+        |> Enum.filter(fn {n, _} -> n > 0 end)
+        |> Enum.map(fn {n, label} -> "#{n} #{label}" end)
+        |> Enum.join(", ")
+
+      gettext(
+        "Warning: this good already has quantity data (%{parts}). Changing the unit can make existing quantities wrong or misleading. Prefer creating a new good if the unit really changed.",
+        parts: parts
+      )
+    end
+  end
+
+  def unit_change_warning_message(_), do: nil
+
+  defp count_by_good(schema, good_id) do
+    from(r in schema, where: r.good_id == ^good_id, select: count(r.id))
+    |> Repo.one()
+    |> Kernel.||(0)
+  rescue
+    _ -> 0
+  end
+
+  defp count_by_good_if_loaded(mod, good_id) do
+    if Code.ensure_loaded?(mod) and function_exported?(mod, :__schema__, 1) do
+      count_by_good(mod, good_id)
+    else
+      0
+    end
+  end
 
   def get_good!(id, company, user) do
     from(good in subquery(good_query(company, user)),

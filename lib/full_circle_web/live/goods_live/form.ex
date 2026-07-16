@@ -24,6 +24,7 @@ defmodule FullCircleWeb.GoodLive.Form do
     |> assign(live_action: :new)
     |> assign(id: "new")
     |> assign(page_title: gettext("New Good"))
+    |> assign(:unit_change_warning, nil)
     |> assign(
       :form,
       to_form(StdInterface.changeset(Good, %Good{}, %{}, socket.assigns.current_company))
@@ -38,6 +39,7 @@ defmodule FullCircleWeb.GoodLive.Form do
     |> assign(live_action: :edit)
     |> assign(id: id)
     |> assign(page_title: gettext("Edit Good"))
+    |> assign(:unit_change_warning, nil)
     |> assign(
       :form,
       to_form(StdInterface.changeset(Good, obj, %{}, socket.assigns.current_company))
@@ -51,6 +53,7 @@ defmodule FullCircleWeb.GoodLive.Form do
     |> assign(live_action: :new)
     |> assign(id: "new")
     |> assign(page_title: gettext("Copying Good"))
+    |> assign(:unit_change_warning, nil)
     |> assign(current_company: socket.assigns.current_company)
     |> assign(current_user: socket.assigns.current_user)
     |> assign(
@@ -227,6 +230,8 @@ defmodule FullCircleWeb.GoodLive.Form do
   end
 
   defp save(socket, :edit, params) do
+    warning = unit_change_warning(socket.assigns.form.data, params)
+
     case StdInterface.update(
            Good,
            "good",
@@ -236,18 +241,26 @@ defmodule FullCircleWeb.GoodLive.Form do
            socket.assigns.current_user
          ) do
       {:ok, ac} ->
+        info =
+          if warning do
+            "#{gettext("Good updated successfully.")} #{warning}"
+          else
+            gettext("Good updated successfully.")
+          end
+
         {:noreply,
          socket
          |> push_navigate(
            to: ~p"/companies/#{socket.assigns.current_company.id}/goods/#{ac.id}/edit"
          )
          |> push_event("invalidate_autocomplete_cache", %{})
-         |> put_flash(:info, "#{gettext("Good updated successfully.")}")}
+         |> put_flash(:info, info)}
 
       {:error, failed_operation, changeset, _} ->
         {:noreply,
          socket
          |> assign(form: to_form(changeset))
+         |> assign(unit_change_warning: warning)
          |> put_flash(
            :error,
            "#{gettext("Failed")} #{failed_operation}. #{list_errors_to_string(changeset.errors)}"
@@ -270,10 +283,25 @@ defmodule FullCircleWeb.GoodLive.Form do
       )
       |> Map.put(:action, socket.assigns.live_action)
 
-    socket = assign(socket, form: to_form(changeset))
+    warning = unit_change_warning(socket.assigns.form.data, params)
 
-    {:noreply, socket}
+    {:noreply,
+     socket
+     |> assign(form: to_form(changeset))
+     |> assign(unit_change_warning: warning)}
   end
+
+  defp unit_change_warning(%Good{id: id, unit: old_unit}, params) when is_binary(id) do
+    new_unit = params["unit"] || params[:unit]
+
+    if Product.unit_change_risk?(id, old_unit, new_unit) do
+      Product.unit_change_warning_message(id)
+    else
+      nil
+    end
+  end
+
+  defp unit_change_warning(_, _), do: nil
 
   defp dup_good(object) do
     %{
@@ -309,6 +337,13 @@ defmodule FullCircleWeb.GoodLive.Form do
     ~H"""
     <div class="w-6/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
       <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
+      <div
+        :if={@unit_change_warning}
+        id="unit-change-warning"
+        class="mb-3 rounded border-2 border-red-500 bg-red-100 p-3 text-sm text-red-800 dark:bg-red-950 dark:text-red-200"
+      >
+        {@unit_change_warning}
+      </div>
       <.form
         for={@form}
         id="object-form"
