@@ -72,8 +72,10 @@ Also required:
 
 | Object | Role |
 |--------|------|
-| **SupplyPosition** | Supply source: open qty, remaining, price, product, supplier, status |
-| **Warehouse** (source/destination) | Own stock derived from warehouse in/out on trips; avoid double-entry lot master in v1 if possible |
+| **SupplyPosition** | Commercial supply source: open qty, remaining, price, product, supplier, status |
+| **Location** | Physical place for loading/dropping (see §3.3 / §3.5). Own warehouse is a Location, not a separate stock master. |
+
+**What vs where:** SupplyPosition answers *which stock deal*; Location answers *where the lorry was*. Contact mailing address is **not** used as a trip site.
 
 #### SupplyPosition
 
