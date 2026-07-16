@@ -5,15 +5,12 @@ defmodule FullCircleWeb.DocumentEmailController do
   alias FullCircleWeb.SharedDocument
 
   # doc_type => {schema module, display name, customer association}.
-  # Invoice/Receipt/Credit/Debit Notes associate the customer as `:contact`;
-  # Delivery and Order associate it as `:customer`.
+  # These documents associate the customer as `:contact`.
   @doc_types %{
     "Invoice" => {FullCircle.Billing.Invoice, "Invoice", :contact},
     "Receipt" => {FullCircle.ReceiveFund.Receipt, "Receipt", :contact},
     "CreditNote" => {FullCircle.DebCre.CreditNote, "Credit Note", :contact},
-    "DebitNote" => {FullCircle.DebCre.DebitNote, "Debit Note", :contact},
-    "Delivery" => {FullCircle.Product.Delivery, "Delivery Order", :customer},
-    "Order" => {FullCircle.Product.Order, "Order", :customer}
+    "DebitNote" => {FullCircle.DebCre.DebitNote, "Debit Note", :contact}
   }
 
   # GET /email_document/new — returns the document customer's email to pre-fill

@@ -19,16 +19,6 @@ defmodule FullCircle.Sys do
         company_id: company_id
       },
       %{
-        doc_type: "Order",
-        current: 0,
-        company_id: company_id
-      },
-      %{
-        doc_type: "Load",
-        current: 0,
-        company_id: company_id
-      },
-      %{
         doc_type: "PurInvoice",
         current: 0,
         company_id: company_id

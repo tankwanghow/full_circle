@@ -18,7 +18,6 @@ defmodule FullCircle.Billing.InvoiceDetail do
     belongs_to :account, FullCircle.Accounting.Account
     belongs_to :tax_code, FullCircle.Accounting.TaxCode
     belongs_to :package, FullCircle.Product.Packaging
-    belongs_to :delivery_detail, FullCircle.Product.DeliveryDetail
 
     field :package_name, :string, virtual: true
     field :account_name, :string, virtual: true
@@ -52,7 +51,6 @@ defmodule FullCircle.Billing.InvoiceDetail do
       :package_id,
       :package_qty,
       :unit_multiplier,
-      :delivery_detail_id,
       :delete
     ])
     |> validate_required([

@@ -81,6 +81,20 @@ defmodule FullCircleWeb.StatutoryCalcLive.Index do
         >
           {gettext("Import bundle")}
         </.link>
+        <.link
+          :if={@current_role == "admin"}
+          navigate={~p"/companies/#{@current_company.id}/statutory_rate_tables"}
+          class="button orange"
+        >
+          {gettext("Statutory Rate Tables")}
+        </.link>
+        <.link
+          :if={@current_role == "admin"}
+          navigate={~p"/companies/#{@current_company.id}/statutory_file_formats"}
+          class="button orange"
+        >
+          {gettext("Statutory File Formats")}
+        </.link>
       </div>
       <div class="text-center">
         <div class="bg-amber-200 border-y-2 border-amber-500 font-bold p-2">

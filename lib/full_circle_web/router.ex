@@ -190,18 +190,6 @@ defmodule FullCircleWeb.Router do
       live("/Invoice/:invoice_id/edit", InvoiceLive.Form, :edit)
       live("/Invoice/:invoice_id/match_e_inv", InvoiceLive.Form, :match)
 
-      live("/Delivery", DeliveryLive.Index, :index)
-      live("/Delivery/new", DeliveryLive.Form, :new)
-      live("/Delivery/:delivery_id/edit", DeliveryLive.Form, :edit)
-
-      live("/Order", OrderLive.Index, :index)
-      live("/Order/new", OrderLive.Form, :new)
-      live("/Order/:order_id/edit", OrderLive.Form, :edit)
-
-      live("/Load", LoadLive.Index, :index)
-      live("/Load/new", LoadLive.Form, :new)
-      live("/Load/:load_id/edit", LoadLive.Form, :edit)
-
       live("/Advance", AdvanceLive.Index, :index)
       live("/Advance/new", AdvanceLive.Form, :new)
       live("/Advance/:slip_id/edit", AdvanceLive.Form, :edit)
@@ -350,15 +338,6 @@ defmodule FullCircleWeb.Router do
       live("/PaySlip/:id/print", PaySlipLive.Print, :print)
       live("/PaySlip/print_multi", PaySlipLive.Print, :print)
 
-      live("/Load/:id/print", LoadLive.Print, :print)
-      live("/Load/print_multi", LoadLive.Print, :print)
-
-      live("/Order/:id/print", OrderLive.Print, :print)
-      live("/Order/print_multi", OrderLive.Print, :print)
-
-      live("/Delivery/:id/print", DeliveryLive.Print, :print)
-      live("/Delivery/print_multi", DeliveryLive.Print, :print)
-
       live("/Weighing/:id/print", WeighingLive.Print, :print)
       live("/Weighing/print_multi", WeighingLive.Print, :print)
 
@@ -445,23 +424,6 @@ defmodule FullCircleWeb.Router do
       live("/shared/DebitNote/:id/print", DebitNoteLive.Print, :print)
     end
 
-    live_session :public_shared_delivery,
-      root_layout: {FullCircleWeb.Layouts, :print_root},
-      on_mount: [
-        {FullCircleWeb.Locale, :set_locale},
-        {FullCircleWeb.SharedDocument, {:verify_token, "Delivery"}}
-      ] do
-      live("/shared/Delivery/:id/print", DeliveryLive.Print, :print)
-    end
-
-    live_session :public_shared_order,
-      root_layout: {FullCircleWeb.Layouts, :print_root},
-      on_mount: [
-        {FullCircleWeb.Locale, :set_locale},
-        {FullCircleWeb.SharedDocument, {:verify_token, "Order"}}
-      ] do
-      live("/shared/Order/:id/print", OrderLive.Print, :print)
-    end
   end
 
   scope "/", FullCircleWeb do
