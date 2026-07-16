@@ -49,24 +49,23 @@ defmodule FullCircleWeb.TradingSalesLive.Index do
           {gettext("Position Board")}
         </.link>
       </div>
-      <div class="bg-amber-200 border-y-2 border-amber-500 font-bold p-2 grid grid-cols-9 gap-1 text-sm">
-        <div>{gettext("Name / ref")}</div>
-        <div>{gettext("Needed by")}</div>
-        <div>{gettext("Customer")}</div>
-        <div>{gettext("Good")}</div>
-        <div class="text-right">{gettext("Qty")}</div>
-        <div class="text-center">{gettext("Unit")}</div>
-        <div>{gettext("Preferred supply")}</div>
-        <div>{gettext("Status")}</div>
-        <div></div>
+      <div class="bg-amber-200 border-y-2 border-amber-500 font-bold p-2 flex gap-1 text-sm">
+        <div class="w-2/12">{gettext("Name / ref")}</div>
+        <div class="w-1/12">{gettext("Needed by")}</div>
+        <div class="w-2/12">{gettext("Customer")}</div>
+        <div class="w-2/12">{gettext("Good")}</div>
+        <div class="w-1/12 text-right">{gettext("Qty")}</div>
+        <div class="w-1/12 text-center">{gettext("Unit")}</div>
+        <div class="w-2/12">{gettext("Preferred supply")}</div>
+        <div class="w-1/12">{gettext("Status")}</div>
       </div>
       <div id="sales_list">
         <div
           :for={s <- @sales}
           id={"sales-#{s.id}"}
-          class="grid grid-cols-9 gap-1 border-b p-2 text-sm hover:bg-gray-100 dark:hover:bg-zinc-800"
+          class="flex gap-1 border-b p-2 text-sm hover:bg-gray-100 dark:hover:bg-zinc-800"
         >
-          <div>
+          <div class="w-2/12">
             <.link
               navigate={~p"/companies/#{@current_company.id}/trading/sales_positions/#{s.id}/edit"}
               class="text-blue-600"
@@ -74,14 +73,13 @@ defmodule FullCircleWeb.TradingSalesLive.Index do
               {s.title || "—"}
             </.link>
           </div>
-          <div>{s.available_from}</div>
-          <div>{s.customer && s.customer.name}</div>
-          <div>{s.good && s.good.name}</div>
-          <div class="text-right">{s.quantity}</div>
-          <div class="text-center font-medium">{s.good && s.good.unit}</div>
-          <div>{s.preferred_supply && (s.preferred_supply.title || "—")}</div>
-          <div>{s.status}</div>
-          <div></div>
+          <div class="w-1/12">{s.available_from}</div>
+          <div class="w-2/12">{s.customer && s.customer.name}</div>
+          <div class="w-2/12">{s.good && s.good.name}</div>
+          <div class="w-1/12 text-right">{s.quantity}</div>
+          <div class="w-1/12 text-center font-medium">{s.good && s.good.unit}</div>
+          <div class="w-2/12">{s.preferred_supply && (s.preferred_supply.title || "—")}</div>
+          <div class="w-1/12">{s.status}</div>
         </div>
       </div>
       <p :if={@sales == []} class="text-center p-4 text-gray-500">
