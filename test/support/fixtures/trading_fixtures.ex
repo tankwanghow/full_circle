@@ -43,6 +43,38 @@ defmodule FullCircle.TradingFixtures do
     supply
   end
 
+  def sales_position_fixture(company, user, attrs \\ %{}) do
+    attrs = stringify_keys(attrs)
+
+    contact =
+      if attrs["customer_id"] do
+        nil
+      else
+        contact_fixture(company, user)
+      end
+
+    good =
+      if attrs["good_id"] do
+        nil
+      else
+        good_fixture(company, user)
+      end
+
+    defaults = %{
+      "title" => "sales-#{System.unique_integer([:positive])}",
+      "quantity" => "35",
+      "unit_price" => "1400",
+      "status" => "draft",
+      "customer_id" => (contact && contact.id) || attrs["customer_id"],
+      "good_id" => (good && good.id) || attrs["good_id"]
+    }
+
+    {:ok, sales} =
+      Trading.create_sales_position(Map.merge(defaults, attrs), company, user)
+
+    sales
+  end
+
   defp stringify_keys(attrs) do
     Map.new(attrs, fn
       {k, v} when is_atom(k) -> {Atom.to_string(k), v}

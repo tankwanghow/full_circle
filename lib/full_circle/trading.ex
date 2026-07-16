@@ -12,7 +12,7 @@ defmodule FullCircle.Trading do
 
   alias FullCircle.Repo
   alias FullCircle.Authorization
-  alias FullCircle.Trading.{Location, SupplyPosition, Balances}
+  alias FullCircle.Trading.{Location, SupplyPosition, SalesPosition, Balances}
   alias FullCircle.HR.Employee
   alias FullCircle.Accounting.Contact
   alias FullCircle.Sys
@@ -209,6 +209,109 @@ defmodule FullCircle.Trading do
     end)
   end
 
+  # --- Sales positions ---
+
+  def list_sales_positions(company, user, opts \\ []) do
+    if Authorization.can?(user, :view_trading, company) do
+      status = Keyword.get(opts, :status)
+
+      q =
+        from(s in SalesPosition,
+          where: s.company_id == ^company.id,
+          preload: [:customer, :good, :preferred_supply, :parent],
+          order_by: [desc: s.inserted_at]
+        )
+
+      q =
+        if status do
+          from(s in q, where: s.status == ^status)
+        else
+          q
+        end
+
+      Repo.all(q)
+    else
+      []
+    end
+  end
+
+  @doc """
+  Open commitments board: draft + open sales with undelivered / soft-hold info.
+  """
+  def list_open_sales(company, user) do
+    if Authorization.can?(user, :view_trading, company) do
+      from(s in SalesPosition,
+        where: s.company_id == ^company.id and s.status in ["draft", "open"],
+        preload: [:customer, :good, :preferred_supply, :parent],
+        order_by: [desc: s.inserted_at]
+      )
+      |> Repo.all()
+    else
+      []
+    end
+  end
+
+  def get_sales_position!(id, company, user) do
+    unless Authorization.can?(user, :view_trading, company), do: raise("not authorised")
+
+    from(s in SalesPosition,
+      where: s.id == ^id and s.company_id == ^company.id,
+      preload: [:customer, :good, :preferred_supply, :parent]
+    )
+    |> Repo.one!()
+  end
+
+  def create_sales_position(attrs, company, user) do
+    with :ok <- authorize(user, :manage_trading, company) do
+      %SalesPosition{}
+      |> SalesPosition.changeset(put_company(attrs, company))
+      |> Repo.insert()
+    end
+  end
+
+  def update_sales_position(%SalesPosition{} = position, attrs, company, user) do
+    with :ok <- authorize(user, :manage_trading, company),
+         true <- position.company_id == company.id do
+      position
+      |> SalesPosition.changeset(attrs)
+      |> Repo.update()
+    else
+      false -> :not_authorise
+      other -> other
+    end
+  end
+
+  def open_sales_position(%SalesPosition{} = position, company, user) do
+    update_sales_position(position, %{"status" => "open"}, company, user)
+  end
+
+  @doc """
+  Manual fulfill — allowed even when undelivered > 0 (short deliveries).
+  Optional attrs: `fulfilled_note`.
+  """
+  def fulfill_sales_position(%SalesPosition{} = position, attrs, company, user) do
+    attrs =
+      attrs
+      |> stringify_attr_keys()
+      |> Map.put("status", "fulfilled")
+
+    update_sales_position(position, attrs, company, user)
+  end
+
+  def cancel_sales_position(%SalesPosition{} = position, company, user) do
+    cancel_sales_position(position, %{}, company, user)
+  end
+
+  def cancel_sales_position(%SalesPosition{} = position, attrs, company, user)
+      when is_map(attrs) do
+    attrs =
+      attrs
+      |> stringify_attr_keys()
+      |> Map.put("status", "cancelled")
+
+    update_sales_position(position, attrs, company, user)
+  end
+
   # --- helpers ---
 
   defp authorize(user, action, company) do
@@ -236,4 +339,11 @@ defmodule FullCircle.Trading do
   end
 
   defp maybe_employee_active_only(query, _), do: query
+
+  defp stringify_attr_keys(attrs) when is_map(attrs) do
+    Map.new(attrs, fn
+      {k, v} when is_atom(k) -> {Atom.to_string(k), v}
+      {k, v} -> {k, v}
+    end)
+  end
 end

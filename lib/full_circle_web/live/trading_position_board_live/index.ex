@@ -35,11 +35,24 @@ defmodule FullCircleWeb.TradingPositionBoardLive.Index do
           {gettext("Supply Positions")}
         </.link>
         <.link
+          navigate={~p"/companies/#{@current_company.id}/trading/open_sales"}
+          class="blue button"
+        >
+          {gettext("Open Sales")}
+        </.link>
+        <.link
           :if={Authorization.can?(@current_user, :manage_trading, @current_company)}
           navigate={~p"/companies/#{@current_company.id}/trading/supply_positions/new"}
           class="blue button"
         >
           {gettext("New Supply")}
+        </.link>
+        <.link
+          :if={Authorization.can?(@current_user, :manage_trading, @current_company)}
+          navigate={~p"/companies/#{@current_company.id}/trading/sales_positions/new"}
+          class="blue button"
+        >
+          {gettext("New Sales")}
         </.link>
       </div>
 
