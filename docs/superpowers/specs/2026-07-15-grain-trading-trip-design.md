@@ -150,12 +150,43 @@ SalesPosition
 - Parent and child are the same entity; both can receive drops.  
 - Rollup display (sum of children) is optional UI; operational truth is each row’s own qty and drop actuals.
 
-### 3.3 Movement (trip)
+### 3.3 Locations (physical places)
+
+FullCircle today stores **mailing addresses** on contacts (bill-to / correspondence). That is **not** enough for loading, dropping, own warehouses, or agent haulage by origin–destination.
+
+Trading adds a company-scoped **Location** master:
+
+```
+Location
+  company_id
+  name                      # "Port Klang - North Godown", "Main silo", "Customer X - Kajang farm"
+  kind                      # port | supplier_site | customer_site | own_warehouse | other
+  contact_id?               # optional link to supplier/customer contact
+  address_note?             # free text / directions (not a replacement for Contact mail address)
+  active
+```
+
+| Kind | Typical use |
+|------|-------------|
+| `own_warehouse` | Company stock points; stock-in/out via trip loads/drops |
+| `port` | Vessel / port godown load points |
+| `supplier_site` | Supplier warehouse load points |
+| `customer_site` | Customer drop points (many sites per customer) |
+| `other` | Catch-all |
+
+**Rules**
+
+- Contact **mailing address** remains for Invoice/finance identity only — **not** selected as a trip load/drop site.  
+- Own warehouse stock is **derived** from trips to/from Locations with `kind = own_warehouse` (no separate warehouse lot master required in v1).  
+- Staff maintain Locations as they repeat; one-off detail goes in `location_note` on the load/drop line.  
+- Agent O–D pairs use **Location → Location** (stable names), not free-typed strings alone.
+
+### 3.4 Movement (trip)
 
 **One Trip = one loading + delivery process** (one lorry job). It may:
 
 - **Load from multiple locations** (multiple load lines).  
-- **Drop to multiple locations** (multiple drop lines: customers and/or own warehouse).
+- **Drop to multiple locations** (multiple drop lines: sales positions and/or own warehouse Locations).
 
 ```
 Trip
@@ -166,33 +197,44 @@ Trip
   transport_agent_id?   # when mode = agent
   status: draft | planned | completed | cancelled
   notes?
-  # optional:
   reference_no?         # human-entered trip / DO / ticket ref
 
   loads[]   # 1..n
-    source (SupplyPosition | warehouse)
-    load_location (text / site label)
+    supply_position_id?       # commercial stock (omit or N/A only if pure warehouse re-handle — prefer always set when leaving a supply deal)
+    location_id               # physical load place (Location) — required
+    location_note?            # optional one-off detail ("Gate 3")
     planned_mt
     actual_mt?
-    driver_id?          # load driver (own transport)
+    driver_id?                # load driver (own transport)
 
   drops[]   # 1..n
-    destination: sales_position_id? | warehouse
-    drop_location (text / site label)
-    source (SupplyPosition | warehouse this drop draws from)
+    sales_position_id?        # customer commitment (null if drop is own warehouse stock-in)
+    location_id               # physical drop place (Location) — required
+    location_note?            # optional one-off detail
+    supply_position_id?       # which supply this drop draws from (when applicable)
     planned_mt
     actual_mt?
-    driver_id?          # drop driver (own transport)
+    driver_id?                # drop driver (own transport)
     variance_note?
-    invoice_id?         # settlement link when created
+    invoice_id?               # settlement link when created
 ```
+
+**What vs where on a line**
+
+| Field | Meaning |
+|-------|---------|
+| `supply_position_id` | *Which* commercial supply (vessel/PO position) |
+| `sales_position_id` | *Which* customer commitment |
+| `location_id` | *Where* physically loaded or dropped |
+| Own warehouse drop | `sales_position_id` null; `location_id` = Location with `kind = own_warehouse` |
+| Own warehouse load (later out) | `supply_position_id` may be null if leaving warehouse stock; `location_id` = own warehouse Location |
 
 **Transport modes**
 
 | Mode | Agent | Drivers | Money trail |
 |------|--------|---------|-------------|
 | `company_own` | No | Load driver + drop driver (per line) | Load salary + drop salary from actual MT |
-| `agent` | Yes | Optional external driver name as note only | Agent bills company — register by agent + source + destination + MT |
+| `agent` | Yes | Optional external driver name as note only | Agent bills company — register by agent + **from Location → to Location** + MT |
 | `customer_arranged` | No | Usually empty | No own driver pay / no agent bill |
 
 **Driver pay**
@@ -207,17 +249,15 @@ Trip
 Agents bill the company for haulage. Their charge is typically based on **source → destination mileage** (and quantity), not MT alone.
 
 - Track every agent job so their invoice can be checked line-by-line.  
-- Each register line must show at least:
-  - **Agent**
-  - **Date / trip**
-  - **Source** — supply position and/or **load location** (origin)
-  - **Destination** — customer/warehouse and/or **drop location**
-  - **Actual MT** (drop actual; load actual also visible on the trip)
-- Data already on the trip supports this: load lines have source + `load_location`; drop lines have destination + `drop_location` + which source they draw from.  
-- **Agent delivery register** is a list of those legs (prefer **one row per drop** with its source and locations), filterable by agent + date range, with MT totals **and** the ability to group/filter by origin–destination pair.  
-- v1 does **not** store a mileage matrix or auto-calculate haulage RM — office matches the agent’s bill using source, destination, and MT from the register. Mileage rates can come later.
+- Each register line (prefer **one row per drop**) shows:
+  - **Agent**, **date / trip**
+  - **From Location** (load place / origin) + commercial supply if any
+  - **To Location** (drop place / destination) + sales position or own warehouse
+  - **Actual MT**
+- Group/filter by agent, date, and **origin Location → destination Location**.  
+- v1 does **not** store a mileage matrix or auto-calculate haulage RM — office matches the agent’s bill using Locations + MT. Mileage rates can come later.
 
-### 3.4 Settlement (existing finance)
+### 3.5 Settlement (existing finance)
 
 | Situation | Document |
 |-----------|----------|
@@ -225,13 +265,15 @@ Agents bill the company for haulage. Their charge is typically based on **source
 | Purchase recognized / goods into commercial purchase | **PurInvoice** (prefill from supply + actuals) |
 
 Trading remains source of truth for **position and logistics**.  
-Invoice / PurInvoice remain source of truth for **AR/AP and GL**.
+Invoice / PurInvoice remain source of truth for **AR/AP and GL**.  
+Contact mailing address continues to feed finance docs as today — separate from Location.
 
-### 3.5 Masters
+### 3.6 Masters
 
+- **Location** — physical load/drop/own-warehouse places (company-scoped).  
 - **Driver** — company drivers (name, contact, active).  
 - **TransportAgent** — hauliers who bill the company.  
-- Customers / suppliers / products — existing FullCircle contacts and goods.
+- Customers / suppliers / products — existing FullCircle contacts and goods (mail address on contact for finance only).
 
 ---
 
@@ -284,7 +326,9 @@ sales_delivered  = Σ drop.actual_mt (completed, that SalesPosition)
 sales_undelivered = sales_qty − sales_delivered
                    (may remain > 0 even when status = fulfilled)
 
-warehouse_qty    = inflows − outflows via warehouse loads/drops
+own_warehouse_qty(location) =
+  Σ drops into that Location − Σ loads out of that Location
+  (Location.kind = own_warehouse; completed trips only)
 
 soft_held        = Σ sales_undelivered where preferred_supply = this SupplyPosition
                    (display only; does not lock)
@@ -295,14 +339,13 @@ driver_drop_mt   = Σ drop.actual_mt where drop.driver = D
 agent_delivery_lines =
   for each completed trip with agent = A, each drop line:
     { agent, trip, date,
-      source (SupplyPosition / warehouse),
-      load_location (from matching load / source),
-      destination (SalesPosition / warehouse),
-      drop_location,
+      from_location_id,     # load Location (origin)
+      to_location_id,       # drop Location (destination)
+      supply_position?, sales_position?,
       actual_mt }
 
 agent_mt_total   = Σ actual_mt on those lines
-                   (also filterable/groupable by source+destination pair)
+                   (filterable/groupable by from_location → to_location)
 ```
 
 ### Rules
@@ -318,7 +361,9 @@ agent_mt_total   = Σ actual_mt on those lines
 | Soft hold | Preferred SupplyPosition only; never hard reserve |
 | Sales fulfillment | **Manual / case-by-case** (e.g. accept 33.5 MT of 35 MT) |
 | One product per trip | v1 constraint |
-| Each drop names a source | Required so multi-load positions stay correct |
+| Each load/drop has location_id | Required physical place (Location master) |
+| Each drop names supply when drawing commercial stock | Required so multi-load positions stay correct |
+| Contact mailing address | Finance/identity only — not a trip site |
 
 ### Statuses
 
@@ -352,6 +397,7 @@ Trading
 ├── Trips
 ├── Supply positions
 ├── Sales positions
+├── Locations
 ├── Transport agents
 ├── Drivers
 ├── Driver load register
@@ -362,14 +408,15 @@ Trading
 
 ### Screens (summary)
 
-1. **Position board** — remaining by source; soft-held column; price; open/closed; title / reference_no / vessel for identity; drill to detail.  
+1. **Position board** — remaining by supply; soft-held column; price; open/closed; title / reference_no / vessel; own-warehouse stock by Location; drill to detail.  
 2. **Open sales** — SalesPositions; ordered / delivered / undelivered; soft hold; mark fulfilled; warnings; filter/search on title/reference_no; optional parent grouping.  
-3. **Trip board + form** — multi-load, multi-drop, transport mode, agent, load/drop drivers, planned/actual, warnings.  
-4. **Supply / sales forms** — one SupplyPosition form, one SalesPosition form (optional parent on sales; optional **reference_no** human-entered on both).  
-5. **Driver load register** — load salary quantity by driver + date.  
-6. **Driver drop register** — drop salary quantity by driver + date.  
-7. **Agent delivery register** — per agent/date: **source + load location → destination + drop location**, actual MT; check haulage bills (mileage-based).  
-8. **Settlement actions** — Create Invoice / PurInvoice prefilled from actuals; store links.
+3. **Trip board + form** — multi-load, multi-drop; each line picks **Location** (+ optional note); supply/sales commercial links; transport mode, agent, load/drop drivers, planned/actual, warnings.  
+4. **Supply / sales forms** — SupplyPosition, SalesPosition (optional parent; optional **reference_no**).  
+5. **Locations** — CRUD for ports, supplier sites, customer sites, own warehouses.  
+6. **Driver load register** — load salary quantity by driver + date.  
+7. **Driver drop register** — drop salary quantity by driver + date.  
+8. **Agent delivery register** — per agent/date: **from Location → to Location** + MT; check haulage bills.  
+9. **Settlement actions** — Create Invoice / PurInvoice prefilled from actuals; store links.
 
 Users: **office sales/ops on desktop** only in v1.
 
@@ -389,11 +436,11 @@ Users: **office sales/ops on desktop** only in v1.
 
 | Phase | Deliverable |
 |-------|-------------|
-| **0** | Module skeleton, nav, auth hooks, Driver + TransportAgent masters |
+| **0** | Module skeleton, nav, auth hooks, **Location** + Driver + TransportAgent masters |
 | **1** | SupplyPosition + **Position board** |
 | **2** | SalesPosition (optional parent) + soft hold + **Open sales** + manual fulfill |
-| **3** | Trip multi-load/multi-drop + actuals + balance updates + **Trip board** |
-| **4** | Driver load/drop registers + agent delivery register (source + destination + MT) |
+| **3** | Trip multi-load/multi-drop (location_id on lines) + actuals + balance updates + **Trip board** |
+| **4** | Driver load/drop registers + agent delivery register (**from/to Location** + MT) |
 | **5** | Create Invoice / PurInvoice from actuals + links |
 | **6** | Polish (DO print, attachments, variance threshold config, optional rates) |
 
@@ -411,9 +458,10 @@ Phases 1 and 2 may overlap once supply sources exist for soft-hold references.
 
 ## 9. Testing focus
 
-- Multi-load / multi-drop balance math (supply remaining, sales undelivered, warehouse).  
+- Multi-load / multi-drop balance math (supply remaining, sales undelivered, own-warehouse Location stock).  
+- Load/drop require location_id; contact mail address not used as site.  
 - Load driver ≠ drop driver → both registers correct.  
-- Agent register shows source + destination locations and MT per drop; filter by agent/date/O–D.  
+- Agent register shows from Location → to Location and MT per drop; filter by agent/date/O–D.  
 - Manual fulfill with short delivery (35 ordered, 33.5 delivered).  
 - Soft hold does not lock or reduce remaining.  
 - Warn-only oversell / load≠drop mismatch.  
@@ -437,13 +485,16 @@ Phases 1 and 2 may overlap once supply sources exist for soft-hold references.
 | Sales fulfillment | Case-by-case manual, not auto from math |
 | Transport | `company_own` / `agent` / `customer_arranged` |
 | Drivers | Per load line and per drop line; load salary + drop salary |
-| Agent | Per trip; bill check via delivery register with **source + destination + MT** (haulage by O–D mileage; no auto rate calc in v1) |
+| Agent | Per trip; bill check via **from Location → to Location** + MT (haulage by O–D; no auto rate calc in v1) |
 | Finance home | FullCircle Invoice / PurInvoice; trading links in |
 | Host app | FullCircle trading module |
 | Clients | Desktop office v1 |
 | Supply model | **One entity `SupplyPosition`** — no type enum; optional vessel_name / title / **reference_no** (human-entered) |
 | Sales model | **One entity `SalesPosition`** — no type enum; optional `parent_id`; optional **reference_no** (human-entered) |
 | Document numbers | No mandatory auto SO/PO number; optional human-entered `reference_no` only (plus system UUID PK) |
+| Physical places | **Location** master (port / supplier_site / customer_site / own_warehouse / other); required on load/drop |
+| Contact address | Mailing/finance only — not trip load/drop sites |
+| Own warehouse | Location with `kind = own_warehouse`; stock from trip in/out |
 
 ---
 
@@ -463,12 +514,13 @@ Phases 1 and 2 may overlap once supply sources exist for soft-hold references.
 
 These do not change the design intent; resolve during planning/implementation:
 
-- Exact Ecto schema / table names (e.g. `supply_positions`, `sales_positions`).  
-- Whether TransportAgent/Driver link to `Contact` or standalone tables.  
+- Exact Ecto schema / table names (e.g. `supply_positions`, `sales_positions`, `trading_locations`).  
+- Whether TransportAgent/Driver/Location link to `Contact` or standalone tables.  
 - Variance threshold default (e.g. % or absolute MT).  
 - Exact FullCircle role matrix mapping for new actions.  
-- Whether warehouse is a synthetic SupplyPosition-like row or only a destination type with computed stock.  
-- Parent rollup display (sum of children vs deliveries on parent only).
+- Whether load may omit supply_position when leaving own warehouse only.  
+- Parent rollup display (sum of children vs deliveries on parent only).  
+- Later: lat/lng or zone table for auto mileage.
 
 ---
 
