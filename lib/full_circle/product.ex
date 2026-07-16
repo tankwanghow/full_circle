@@ -81,8 +81,132 @@ defmodule FullCircle.Product do
 
   def unit_change_warning_message(_), do: nil
 
+  @doc """
+  Counts document lines that reference a packaging (package_id).
+  Used to warn when changing packaging unit_multiplier.
+  """
+  def packaging_line_usage(package_id) when is_binary(package_id) do
+    counts = %{
+      invoice_details: count_by_package(FullCircle.Billing.InvoiceDetail, package_id),
+      pur_invoice_details: count_by_package(FullCircle.Billing.PurInvoiceDetail, package_id),
+      receipt_details: count_by_package(FullCircle.ReceiveFund.ReceiptDetail, package_id),
+      payment_details: count_by_package(FullCircle.BillPay.PaymentDetail, package_id)
+    }
+
+    total = counts |> Map.values() |> Enum.sum()
+    Map.put(counts, :total, total)
+  end
+
+  def packaging_line_usage(_), do: %{total: 0}
+
+  def packaging_unit_multiplier_change_risk?(package_id, old_mult, new_mult)
+      when is_binary(package_id) do
+    decimal_changed?(old_mult, new_mult) and packaging_line_usage(package_id).total > 0
+  end
+
+  def packaging_unit_multiplier_change_risk?(_, _, _), do: false
+
+  def packaging_unit_multiplier_warning_message(package_id, package_name \\ nil)
+
+  def packaging_unit_multiplier_warning_message(package_id, package_name)
+      when is_binary(package_id) do
+    usage = packaging_line_usage(package_id)
+
+    if usage.total == 0 do
+      nil
+    else
+      parts =
+        [
+          {usage.invoice_details, gettext("invoice lines")},
+          {usage.pur_invoice_details, gettext("purchase invoice lines")},
+          {usage.receipt_details, gettext("receipt lines")},
+          {usage.payment_details, gettext("payment lines")}
+        ]
+        |> Enum.filter(fn {n, _} -> n > 0 end)
+        |> Enum.map(fn {n, label} -> "#{n} #{label}" end)
+        |> Enum.join(", ")
+
+      name = package_name || gettext("this packaging")
+
+      gettext(
+        "Warning: packaging \"%{name}\" is already used on quantity lines (%{parts}). Changing unit multiplier can make existing package quantities wrong. Prefer a new packaging if the multiplier really changed.",
+        name: name,
+        parts: parts
+      )
+    end
+  end
+
+  def packaging_unit_multiplier_warning_message(_, _), do: nil
+
+  @doc """
+  Warnings for packagings whose unit_multiplier changed vs original and are already referenced.
+  `original_packagings` is the list of %Packaging{} currently stored; `params_packagings` is the form map.
+  """
+  def packaging_multiplier_change_warnings(original_packagings, params_packagings)
+      when is_list(original_packagings) and is_map(params_packagings) do
+    originals = Map.new(original_packagings, fn p -> {p.id, p} end)
+
+    params_packagings
+    |> Enum.flat_map(fn {_idx, p} ->
+      id = p["id"] || p[:id]
+      name = p["name"] || p[:name]
+      new_mult = p["unit_multiplier"] || p[:unit_multiplier]
+
+      cond do
+        not is_binary(id) or id == "" ->
+          []
+
+        match?(%{id: ^id}, originals[id]) == false and is_nil(originals[id]) ->
+          []
+
+        true ->
+          old = originals[id]
+
+          if packaging_unit_multiplier_change_risk?(id, old.unit_multiplier, new_mult) do
+            case packaging_unit_multiplier_warning_message(id, name || old.name) do
+              nil -> []
+              msg -> [msg]
+            end
+          else
+            []
+          end
+      end
+    end)
+  end
+
+  def packaging_multiplier_change_warnings(_, _), do: []
+
+  defp decimal_changed?(old, new) do
+    old_d = to_decimal(old)
+    new_d = to_decimal(new)
+    old_d != nil and new_d != nil and not Decimal.eq?(old_d, new_d)
+  end
+
+  defp to_decimal(%Decimal{} = d), do: d
+  defp to_decimal(nil), do: nil
+  defp to_decimal(""), do: nil
+
+  defp to_decimal(v) when is_binary(v) do
+    case Decimal.parse(v) do
+      {d, _} -> d
+      :error -> nil
+    end
+  end
+
+  defp to_decimal(v) when is_integer(v), do: Decimal.new(v)
+  defp to_decimal(v) when is_float(v), do: Decimal.from_float(v)
+  defp to_decimal(_), do: nil
+
   defp count_by_good(schema, good_id) do
     from(r in schema, where: r.good_id == ^good_id, select: count(r.id))
+    |> Repo.one()
+    |> Kernel.||(0)
+  rescue
+    _ -> 0
+  end
+
+  defp count_by_package(schema, package_id) do
+    from(r in schema, where: r.package_id == ^package_id, select: count(r.id))
     |> Repo.one()
     |> Kernel.||(0)
   rescue

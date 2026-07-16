@@ -25,6 +25,7 @@ defmodule FullCircleWeb.GoodLive.Form do
     |> assign(id: "new")
     |> assign(page_title: gettext("New Good"))
     |> assign(:unit_change_warning, nil)
+    |> assign(:packaging_change_warnings, [])
     |> assign(
       :form,
       to_form(StdInterface.changeset(Good, %Good{}, %{}, socket.assigns.current_company))
@@ -40,6 +41,7 @@ defmodule FullCircleWeb.GoodLive.Form do
     |> assign(id: id)
     |> assign(page_title: gettext("Edit Good"))
     |> assign(:unit_change_warning, nil)
+    |> assign(:packaging_change_warnings, [])
     |> assign(
       :form,
       to_form(StdInterface.changeset(Good, obj, %{}, socket.assigns.current_company))
@@ -54,6 +56,7 @@ defmodule FullCircleWeb.GoodLive.Form do
     |> assign(id: "new")
     |> assign(page_title: gettext("Copying Good"))
     |> assign(:unit_change_warning, nil)
+    |> assign(:packaging_change_warnings, [])
     |> assign(current_company: socket.assigns.current_company)
     |> assign(current_user: socket.assigns.current_user)
     |> assign(
@@ -230,7 +233,8 @@ defmodule FullCircleWeb.GoodLive.Form do
   end
 
   defp save(socket, :edit, params) do
-    warning = unit_change_warning(socket.assigns.form.data, params)
+    unit_warning = unit_change_warning(socket.assigns.form.data, params)
+    pack_warnings = packaging_change_warnings(socket.assigns.form.data, params)
 
     case StdInterface.update(
            Good,
@@ -241,11 +245,16 @@ defmodule FullCircleWeb.GoodLive.Form do
            socket.assigns.current_user
          ) do
       {:ok, ac} ->
+        extra =
+          [unit_warning | pack_warnings]
+          |> Enum.reject(&is_nil/1)
+          |> Enum.join(" ")
+
         info =
-          if warning do
-            "#{gettext("Good updated successfully.")} #{warning}"
-          else
+          if extra == "" do
             gettext("Good updated successfully.")
+          else
+            "#{gettext("Good updated successfully.")} #{extra}"
           end
 
         {:noreply,
@@ -260,7 +269,8 @@ defmodule FullCircleWeb.GoodLive.Form do
         {:noreply,
          socket
          |> assign(form: to_form(changeset))
-         |> assign(unit_change_warning: warning)
+         |> assign(unit_change_warning: unit_warning)
+         |> assign(packaging_change_warnings: pack_warnings)
          |> put_flash(
            :error,
            "#{gettext("Failed")} #{failed_operation}. #{list_errors_to_string(changeset.errors)}"
@@ -283,12 +293,14 @@ defmodule FullCircleWeb.GoodLive.Form do
       )
       |> Map.put(:action, socket.assigns.live_action)
 
-    warning = unit_change_warning(socket.assigns.form.data, params)
+    unit_warning = unit_change_warning(socket.assigns.form.data, params)
+    pack_warnings = packaging_change_warnings(socket.assigns.form.data, params)
 
     {:noreply,
      socket
      |> assign(form: to_form(changeset))
-     |> assign(unit_change_warning: warning)}
+     |> assign(unit_change_warning: unit_warning)
+     |> assign(packaging_change_warnings: pack_warnings)}
   end
 
   defp unit_change_warning(%Good{id: id, unit: old_unit}, params) when is_binary(id) do
@@ -302,6 +314,14 @@ defmodule FullCircleWeb.GoodLive.Form do
   end
 
   defp unit_change_warning(_, _), do: nil
+
+  defp packaging_change_warnings(%Good{id: id, packagings: packs}, params) when is_binary(id) do
+    packs = packs || []
+    params_packs = params["packagings"] || params[:packagings] || %{}
+    Product.packaging_multiplier_change_warnings(packs, params_packs)
+  end
+
+  defp packaging_change_warnings(_, _), do: []
 
   defp dup_good(object) do
     %{
@@ -343,6 +363,13 @@ defmodule FullCircleWeb.GoodLive.Form do
         class="mb-3 rounded border-2 border-red-500 bg-red-100 p-3 text-sm text-red-800 dark:bg-red-950 dark:text-red-200"
       >
         {@unit_change_warning}
+      </div>
+      <div
+        :for={msg <- @packaging_change_warnings}
+        id="packaging-change-warning"
+        class="mb-3 rounded border-2 border-red-500 bg-red-100 p-3 text-sm text-red-800 dark:bg-red-950 dark:text-red-200"
+      >
+        {msg}
       </div>
       <.form
         for={@form}

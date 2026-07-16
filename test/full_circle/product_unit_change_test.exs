@@ -49,4 +49,55 @@ defmodule FullCircle.ProductUnitChangeTest do
     assert is_binary(msg)
     assert msg =~ "trading supply" or msg =~ "Warning"
   end
+
+  test "packaging unit_multiplier change risks when package is referenced", %{
+    admin: admin,
+    company: company,
+    good: good
+  } do
+    good = Product.get_good!(good.id, company, admin)
+    pack = hd(good.packagings)
+
+    # no document refs yet
+    refute Product.packaging_unit_multiplier_change_risk?(
+             pack.id,
+             pack.unit_multiplier,
+             Decimal.add(pack.unit_multiplier, 1)
+           )
+
+    # Simulate a document line pointing at this packaging
+    %FullCircle.Billing.InvoiceDetail{}
+    |> Ecto.Changeset.change(%{
+      good_id: good.id,
+      package_id: pack.id,
+      quantity: Decimal.new("1"),
+      unit_price: Decimal.new("1"),
+      discount: Decimal.new("0"),
+      tax_rate: Decimal.new("0"),
+      package_qty: Decimal.new("1")
+    })
+    |> FullCircle.Repo.insert!()
+
+    assert Product.packaging_unit_multiplier_change_risk?(
+             pack.id,
+             pack.unit_multiplier,
+             Decimal.add(pack.unit_multiplier, 1)
+           )
+
+    msg = Product.packaging_unit_multiplier_warning_message(pack.id, pack.name)
+    assert is_binary(msg)
+    assert msg =~ pack.name or msg =~ "packaging"
+
+    warnings =
+      Product.packaging_multiplier_change_warnings(good.packagings, %{
+        "0" => %{
+          "id" => pack.id,
+          "name" => pack.name,
+          "unit_multiplier" => Decimal.to_string(Decimal.add(pack.unit_multiplier, 1))
+        }
+      })
+
+    assert length(warnings) >= 1
+  end
 end
+
