@@ -371,7 +371,7 @@ field :location_note, :string
 belongs_to :trip, Trip
 belongs_to :supply_position, SupplyPosition
 belongs_to :location, Location  # required
-belongs_to :driver, Driver
+has_many :employees, through: [:trip_load_employees, :employee]  # many workers per load
 
 # TripDrop
 field :planned_mt, :decimal
@@ -382,9 +382,15 @@ belongs_to :trip, Trip
 belongs_to :sales_position, SalesPosition
 belongs_to :location, Location  # required
 belongs_to :supply_position, SupplyPosition
-belongs_to :driver, Driver
 belongs_to :invoice, FullCircle.Billing.Invoice  # null until Task 8
+has_many :employees, through: [:trip_drop_employees, :employee]  # many workers per drop
+
+# Join tables
+# trading_trip_load_employees (trip_load_id, employee_id) unique pair
+# trading_trip_drop_employees (trip_drop_id, employee_id) unique pair
 ```
+
+**Pay qty (participation):** each employee on a load/drop gets that line’s full `actual_mt` in the load/drop register (not split).
 
 **Changeset rules:**
 - `location_id` required on load and drop
@@ -411,7 +417,7 @@ Similar for sales_delivered, own_warehouse_qty(location_id).
 **Warn helpers (return list of strings, do not block save):**
 - remaining < 0 after complete
 - abs(sum load actual − sum drop actual) > 0
-- company_own complete missing drivers
+- company_own complete with empty employee lists on load/drop (warn only)
 - agent mode missing agent
 
 Store warnings in flash or show on form; still allow complete.

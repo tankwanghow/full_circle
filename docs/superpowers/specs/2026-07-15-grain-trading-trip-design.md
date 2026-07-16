@@ -23,13 +23,13 @@ Grain trade combines:
 
 1. **Position board** — remaining MT by supply position / warehouse / product.  
 2. **Open commitments** — what was promised to customers (sales positions) and what is still undelivered.  
-3. **Movements** — what was loaded and dropped, from which sources, to which locations, with transport and driver accountability.
+3. **Movements** — what was loaded and dropped, from which sources, to which locations, with transport and **worker (employee)** accountability.
 
 Also required:
 
 - **Price** on supply and sales commercial documents (not full margin/P&L dashboards in v1).  
-- **Logistics** — multi-load, multi-drop, transport mode, agents, drivers.  
-- **Driver pay trail** — load salary and drop salary both based on actual quantities.  
+- **Logistics** — multi-load, multi-drop, transport mode, agents, **one or more employees per load/drop**.  
+- **Worker pay trail** — load salary and drop salary both based on actual quantities; multiple people may share a load or drop job.  
 - **Transport agent trail** — deliveries by agent with **source and destination** (and MT) so haulage invoices priced by origin–destination mileage can be checked.  
 - **Settlement** — final Invoice / PurInvoice remain in FullCircle finance (office-triggered from trading actuals).
 
