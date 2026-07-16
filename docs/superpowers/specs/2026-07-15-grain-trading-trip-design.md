@@ -190,7 +190,7 @@ Trip
 | Mode | Agent | Drivers | Money trail |
 |------|--------|---------|-------------|
 | `company_own` | No | Load driver + drop driver (per line) | Load salary + drop salary from actual MT |
-| `agent` | Yes | Optional external driver name as note only | Agent bills company — register by agent + actual MT |
+| `agent` | Yes | Optional external driver name as note only | Agent bills company — register by agent + source + destination + MT |
 | `customer_arranged` | No | Usually empty | No own driver pay / no agent bill |
 
 **Driver pay**
@@ -202,8 +202,18 @@ Trip
 
 **Transport agent**
 
-- Track deliveries under each agent so their invoice to the company can be checked.  
-- Default register quantity: **drop actual MT** (load actuals also stored and visible).
+Agents bill the company for haulage. Their charge is typically based on **source → destination mileage** (and quantity), not MT alone.
+
+- Track every agent job so their invoice can be checked line-by-line.  
+- Each register line must show at least:
+  - **Agent**
+  - **Date / trip**
+  - **Source** — supply position and/or **load location** (origin)
+  - **Destination** — customer/warehouse and/or **drop location**
+  - **Actual MT** (drop actual; load actual also visible on the trip)
+- Data already on the trip supports this: load lines have source + `load_location`; drop lines have destination + `drop_location` + which source they draw from.  
+- **Agent delivery register** is a list of those legs (prefer **one row per drop** with its source and locations), filterable by agent + date range, with MT totals **and** the ability to group/filter by origin–destination pair.  
+- v1 does **not** store a mileage matrix or auto-calculate haulage RM — office matches the agent’s bill using source, destination, and MT from the register. Mileage rates can come later.
 
 ### 3.4 Settlement (existing finance)
 
@@ -280,8 +290,17 @@ soft_held        = Σ sales_undelivered where preferred_supply = this SupplyPosi
 driver_load_mt   = Σ load.actual_mt where load.driver = D
 driver_drop_mt   = Σ drop.actual_mt where drop.driver = D
 
-agent_mt         = Σ drop.actual_mt (default) for trips with agent = A
-                   (load actuals available for dispute/weighbridge view)
+agent_delivery_lines =
+  for each completed trip with agent = A, each drop line:
+    { agent, trip, date,
+      source (SupplyPosition / warehouse),
+      load_location (from matching load / source),
+      destination (SalesPosition / warehouse),
+      drop_location,
+      actual_mt }
+
+agent_mt_total   = Σ actual_mt on those lines
+                   (also filterable/groupable by source+destination pair)
 ```
 
 ### Rules
@@ -347,7 +366,7 @@ Trading
 4. **Supply / sales forms** — one SupplyPosition form, one SalesPosition form (optional parent on sales; optional **reference_no** human-entered on both).  
 5. **Driver load register** — load salary quantity by driver + date.  
 6. **Driver drop register** — drop salary quantity by driver + date.  
-7. **Agent delivery register** — quantities to check agent invoices.  
+7. **Agent delivery register** — per agent/date: **source + load location → destination + drop location**, actual MT; check haulage bills (mileage-based).  
 8. **Settlement actions** — Create Invoice / PurInvoice prefilled from actuals; store links.
 
 Users: **office sales/ops on desktop** only in v1.
@@ -372,7 +391,7 @@ Users: **office sales/ops on desktop** only in v1.
 | **1** | SupplyPosition + **Position board** |
 | **2** | SalesPosition (optional parent) + soft hold + **Open sales** + manual fulfill |
 | **3** | Trip multi-load/multi-drop + actuals + balance updates + **Trip board** |
-| **4** | Driver load/drop registers + agent delivery register |
+| **4** | Driver load/drop registers + agent delivery register (source + destination + MT) |
 | **5** | Create Invoice / PurInvoice from actuals + links |
 | **6** | Polish (DO print, attachments, variance threshold config, optional rates) |
 
@@ -392,7 +411,7 @@ Phases 1 and 2 may overlap once supply sources exist for soft-hold references.
 
 - Multi-load / multi-drop balance math (supply remaining, sales undelivered, warehouse).  
 - Load driver ≠ drop driver → both registers correct.  
-- Agent register totals.  
+- Agent register shows source + destination locations and MT per drop; filter by agent/date/O–D.  
 - Manual fulfill with short delivery (35 ordered, 33.5 delivered).  
 - Soft hold does not lock or reduce remaining.  
 - Warn-only oversell / load≠drop mismatch.  
@@ -416,7 +435,7 @@ Phases 1 and 2 may overlap once supply sources exist for soft-hold references.
 | Sales fulfillment | Case-by-case manual, not auto from math |
 | Transport | `company_own` / `agent` / `customer_arranged` |
 | Drivers | Per load line and per drop line; load salary + drop salary |
-| Agent | Per trip; bill check via delivery register |
+| Agent | Per trip; bill check via delivery register with **source + destination + MT** (haulage by O–D mileage; no auto rate calc in v1) |
 | Finance home | FullCircle Invoice / PurInvoice; trading links in |
 | Host app | FullCircle trading module |
 | Clients | Desktop office v1 |
