@@ -173,10 +173,16 @@ defmodule FullCircleWeb.TradingSupplyLive.Form do
         autocomplete="off"
         class="p-4 border rounded space-y-2"
       >
-        <.input field={@form[:title]} label={gettext("Title")} />
-        <.input field={@form[:reference_no]} label={gettext("Reference no")} />
-        <.input field={@form[:vessel_name]} label={gettext("Vessel name")} />
-        <.input field={@form[:period]} label={gettext("Period")} />
+        <.input
+          field={@form[:title]}
+          label={gettext("Name / ref")}
+          placeholder={gettext("e.g. JON DOE May maize, PO-8841, Ah Huat pollard")}
+        />
+        <.input
+          field={@form[:available_from]}
+          type="date"
+          label={gettext("Est. available to load")}
+        />
         <div class="grid grid-cols-2 gap-2">
           <.input type="hidden" field={@form[:supplier_id]} />
           <.input

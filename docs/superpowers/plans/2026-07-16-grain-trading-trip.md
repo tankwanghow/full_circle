@@ -280,14 +280,13 @@ schema "trading_sales_positions" do
   field :reference_no, :string
   field :period, :string
   field :quantity, :decimal
-  field :unit, :string
   field :unit_price, :decimal
   field :status, :string, default: "draft" # draft | open | fulfilled | cancelled
   field :notes, :string
   field :fulfilled_note, :string
   belongs_to :company, FullCircle.Sys.Company
   belongs_to :customer, FullCircle.Accounting.Contact
-  belongs_to :good, FullCircle.Product.Good
+  belongs_to :good, FullCircle.Product.Good  # unit always from good.unit — do not store unit on position
   belongs_to :parent, __MODULE__
   belongs_to :preferred_supply, FullCircle.Trading.SupplyPosition
   timestamps(type: :utc_datetime)

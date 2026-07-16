@@ -18,9 +18,8 @@ defmodule FullCircle.Trading.SupplyPositionTest do
     assert {:ok, %SupplyPosition{} = s} =
              Trading.create_supply_position(
                %{
-                 "title" => "JON DOE maize",
-                 "vessel_name" => "JON DOE",
-                 "period" => "May 2026",
+                 "title" => "JON DOE May maize",
+                 "available_from" => "2026-05-15",
                  "quantity" => "100",
                  "unit_price" => "1100",
                  "supplier_id" => contact.id,

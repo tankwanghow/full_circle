@@ -87,22 +87,17 @@ SupplyPosition
   quantity                    # contracted / ordered qty (unit from Good, not stored here)
   unit_price
   status: open | closed
-  # optional identity / description (any combination; all optional):
-  title?                      # free label for lists, e.g. "JON DOE May maize" or "Ah Huat pollard PO"
-  reference_no?               # human-entered ref (PO #, contract #, supplier ref) — not auto-generated
-  vessel_name?                # e.g. JON DOE when import
-  period? / eta?              # e.g. May 2026
+  # optional identity / timing:
+  title?                      # single free-text name/ref (vessel, PO #, short description)
+  available_from?             # date — estimated stock available to load
   notes?
 ```
 
 **Functions (every row):** position board; soft-hold target on SalesPosition; load/drop **source** on Trip; remaining math; optional PurInvoice link.
 
-**How staff tell deals apart:** `title`, `reference_no`, vessel_name, supplier, product — not a system `type`.  
-Examples:
-
-- Import: fill `vessel_name` + `period` (+ title / reference_no if useful).  
-- Local PO: fill `reference_no` with the PO number.  
-- Filters: search on title/reference_no/vessel; open only — no required type filter.
+**Identity:** one field `title` for vessel name, PO ref, or any short label (not three separate fields).  
+**Timing:** `available_from` = estimated date stock is ready to load (not a vague period string).  
+**Unit:** always from Good — not stored on the position.
 
 ### 3.2 Demand (commitments)
 
@@ -499,8 +494,8 @@ Phases 1 and 2 may overlap once supply sources exist for soft-hold references.
 | Finance home | FullCircle Invoice / PurInvoice; trading links in |
 | Host app | FullCircle trading module |
 | Clients | Desktop office v1 |
-| Supply model | **One entity `SupplyPosition`** — no type enum; optional vessel_name / title / **reference_no** (human-entered) |
-| Sales model | **One entity `SalesPosition`** — no type enum; optional `parent_id`; optional **reference_no** (human-entered) |
+| Supply model | **One entity `SupplyPosition`** — no type enum; optional vessel_name / title / **reference_no**; **unit from Good only** |
+| Sales model | **One entity `SalesPosition`** — no type enum; optional `parent_id` / **reference_no**; **unit from Good only** |
 | Document numbers | No mandatory auto SO/PO number; optional human-entered `reference_no` only (plus system UUID PK) |
 | Physical places | **Location** new table (port / supplier_site / customer_site / own_warehouse / other); required on load/drop |
 | Workers | Existing **Employee** rows; join tables on load/drop (not single driver_id) |

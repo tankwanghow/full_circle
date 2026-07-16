@@ -5,10 +5,10 @@ defmodule FullCircle.Trading.SupplyPosition do
   @statuses ~w(open closed)
 
   schema "trading_supply_positions" do
+    # Single free-text identity: vessel name, PO ref, short description, etc.
     field :title, :string
-    field :reference_no, :string
-    field :vessel_name, :string
-    field :period, :string
+    # Estimated date stock is available to load
+    field :available_from, :date
     field :quantity, :decimal
     field :unit_price, :decimal
     field :status, :string, default: "open"
@@ -30,9 +30,7 @@ defmodule FullCircle.Trading.SupplyPosition do
     position
     |> cast(attrs, [
       :title,
-      :reference_no,
-      :vessel_name,
-      :period,
+      :available_from,
       :quantity,
       :unit_price,
       :status,
@@ -51,4 +49,3 @@ defmodule FullCircle.Trading.SupplyPosition do
     |> foreign_key_constraint(:good_id)
   end
 end
-
