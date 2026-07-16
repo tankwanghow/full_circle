@@ -75,6 +75,27 @@ defmodule FullCircle.TradingFixtures do
     sales
   end
 
+  def trip_fixture(company, user, attrs \\ %{}) do
+    attrs = stringify_keys(attrs)
+
+    good_id =
+      attrs["good_id"] ||
+        good_fixture(company, user).id
+
+    defaults = %{
+      "date" => Date.utc_today() |> Date.to_iso8601(),
+      "transport_mode" => "company_own",
+      "status" => "draft",
+      "good_id" => good_id,
+      "reference_no" => "trip-#{System.unique_integer([:positive])}"
+    }
+
+    {:ok, trip} =
+      Trading.create_trip(Map.merge(defaults, attrs), company, user)
+
+    trip
+  end
+
   defp stringify_keys(attrs) do
     Map.new(attrs, fn
       {k, v} when is_atom(k) -> {Atom.to_string(k), v}

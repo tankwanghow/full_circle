@@ -129,6 +129,9 @@ defmodule FullCircleWeb.Router do
       live("/trading/sales_positions", TradingSalesLive.Index, :index)
       live("/trading/sales_positions/new", TradingSalesLive.Form, :new)
       live("/trading/sales_positions/:id/edit", TradingSalesLive.Form, :edit)
+      live("/trading/trips", TradingTripLive.Index, :index)
+      live("/trading/trips/new", TradingTripLive.Form, :new)
+      live("/trading/trips/:id/edit", TradingTripLive.Form, :edit)
 
       live("/users/new", UserLive.New, :new)
       live("/users", UserLive.Index, :index)

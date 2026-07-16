@@ -72,6 +72,12 @@ defmodule FullCircleWeb.DashboardLive do
           {gettext("Position Board")}
         </.link>
         <.link
+          navigate={~p"/companies/#{@current_company.id}/trading/trips"}
+          class="button teal"
+        >
+          {gettext("Trips")}
+        </.link>
+        <.link
           navigate={~p"/companies/#{@current_company.id}/trading/open_sales"}
           class="button teal"
         >

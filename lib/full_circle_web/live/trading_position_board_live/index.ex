@@ -35,6 +35,12 @@ defmodule FullCircleWeb.TradingPositionBoardLive.Index do
           {gettext("Supply Positions")}
         </.link>
         <.link
+          navigate={~p"/companies/#{@current_company.id}/trading/trips"}
+          class="blue button"
+        >
+          {gettext("Trips")}
+        </.link>
+        <.link
           navigate={~p"/companies/#{@current_company.id}/trading/open_sales"}
           class="blue button"
         >

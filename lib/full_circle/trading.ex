@@ -12,7 +12,7 @@ defmodule FullCircle.Trading do
 
   alias FullCircle.Repo
   alias FullCircle.Authorization
-  alias FullCircle.Trading.{Location, SupplyPosition, SalesPosition, Balances}
+  alias FullCircle.Trading.{Location, SupplyPosition, SalesPosition, Balances, Trip}
   alias FullCircle.HR.Employee
   alias FullCircle.Accounting.Contact
   alias FullCircle.Sys
@@ -350,6 +350,163 @@ defmodule FullCircle.Trading do
     update_sales_position(position, attrs, company, user)
   end
 
+  # --- Trips ---
+
+  def list_trips(company, user, opts \\ []) do
+    if Authorization.can?(user, :view_trading, company) do
+      status = Keyword.get(opts, :status)
+
+      q =
+        from(t in Trip,
+          where: t.company_id == ^company.id,
+          preload: [
+            :good,
+            :transport_agent,
+            loads: [:location, :supply_position],
+            drops: [:location, :sales_position]
+          ],
+          order_by: [desc: t.date, desc: t.inserted_at]
+        )
+
+      q =
+        if status do
+          from(t in q, where: t.status == ^status)
+        else
+          q
+        end
+
+      Repo.all(q)
+    else
+      []
+    end
+  end
+
+  def get_trip!(id, company, user) do
+    unless Authorization.can?(user, :view_trading, company), do: raise("not authorised")
+
+    from(t in Trip,
+      where: t.id == ^id and t.company_id == ^company.id,
+      preload: [
+        :good,
+        :transport_agent,
+        loads: [:location, :supply_position, trip_load_employees: :employee],
+        drops: [:location, :sales_position, :supply_position, trip_drop_employees: :employee]
+      ]
+    )
+    |> Repo.one!()
+  end
+
+  def create_trip(attrs, company, user) do
+    with :ok <- authorize(user, :manage_trading, company) do
+      %Trip{}
+      |> Trip.changeset(put_company(attrs, company))
+      |> validate_trip_goods()
+      |> Repo.insert()
+      |> preload_trip_result()
+    end
+  end
+
+  def update_trip(%Trip{} = trip, attrs, company, user) do
+    with :ok <- authorize(user, :manage_trading, company),
+         true <- trip.company_id == company.id do
+      if trip.status in ["completed", "cancelled"] do
+        {:error, :trip_locked}
+      else
+        trip
+        |> Repo.preload([:loads, :drops])
+        |> Trip.changeset(attrs)
+        |> validate_trip_goods()
+        |> Repo.update()
+        |> preload_trip_result()
+      end
+    else
+      false -> :not_authorise
+      other -> other
+    end
+  end
+
+  @doc """
+  Mark trip completed. Requires actual_mt on every load and drop.
+  Returns `{:ok, trip, warnings}` — warnings never block completion.
+  """
+  def complete_trip(%Trip{} = trip, company, user) do
+    with :ok <- authorize(user, :manage_trading, company),
+         true <- trip.company_id == company.id do
+      trip = get_trip!(trip.id, company, user)
+
+      cond do
+        trip.status == "completed" ->
+          {:error, :already_completed}
+
+        trip.status == "cancelled" ->
+          {:error, :cancelled}
+
+        missing_actuals?(trip) ->
+          {:error, :missing_actuals}
+
+        goods_mismatch?(trip) ->
+          {:error, :good_mismatch}
+
+        true ->
+          case trip
+               |> Ecto.Changeset.change(%{status: "completed"})
+               |> Repo.update() do
+            {:ok, _} ->
+              trip = get_trip!(trip.id, company, user)
+              {:ok, trip, trip_warnings(trip)}
+
+            error ->
+              error
+          end
+      end
+    else
+      false -> :not_authorise
+      other -> other
+    end
+  end
+
+  @doc """
+  Cancel a trip. Completed trips can be cancelled only if no drop is invoiced.
+  """
+  def cancel_trip(%Trip{} = trip, company, user) do
+    with :ok <- authorize(user, :manage_trading, company),
+         true <- trip.company_id == company.id do
+      trip = get_trip!(trip.id, company, user)
+
+      cond do
+        trip.status == "cancelled" ->
+          {:error, :already_cancelled}
+
+        trip.status == "completed" and Enum.any?(trip.drops, & &1.invoice_id) ->
+          {:error, :has_invoices}
+
+        true ->
+          case trip
+               |> Ecto.Changeset.change(%{status: "cancelled"})
+               |> Repo.update() do
+            {:ok, _} -> {:ok, get_trip!(trip.id, company, user)}
+            error -> error
+          end
+      end
+    else
+      false -> :not_authorise
+      other -> other
+    end
+  end
+
+  @doc """
+  Non-blocking warnings for a trip (used on complete and form display).
+  """
+  def trip_warnings(%Trip{} = trip) do
+    trip = ensure_trip_lines(trip)
+
+    []
+    |> warn_load_drop_mismatch(trip)
+    |> warn_negative_remaining(trip)
+    |> warn_missing_agent(trip)
+    |> warn_empty_crews(trip)
+  end
+
   # --- helpers ---
 
   defp authorize(user, action, company) do
@@ -382,6 +539,171 @@ defmodule FullCircle.Trading do
     Map.new(attrs, fn
       {k, v} when is_atom(k) -> {Atom.to_string(k), v}
       {k, v} -> {k, v}
+    end)
+  end
+
+  defp preload_trip_result({:ok, trip}) do
+    {:ok,
+     Repo.preload(trip, [
+       :good,
+       :transport_agent,
+       loads: [:location, :supply_position, trip_load_employees: :employee],
+       drops: [:location, :sales_position, :supply_position, trip_drop_employees: :employee]
+     ])}
+  end
+
+  defp preload_trip_result(other), do: other
+
+  defp validate_trip_goods(%Ecto.Changeset{valid?: false} = cs), do: cs
+
+  defp validate_trip_goods(%Ecto.Changeset{} = cs) do
+    good_id = Ecto.Changeset.get_field(cs, :good_id)
+    loads = Ecto.Changeset.get_field(cs, :loads) || []
+    drops = Ecto.Changeset.get_field(cs, :drops) || []
+
+    if is_nil(good_id) do
+      cs
+    else
+      supply_ids =
+        loads
+        |> Enum.map(& &1.supply_position_id)
+        |> Enum.reject(&is_nil/1)
+
+      sales_ids =
+        drops
+        |> Enum.map(& &1.sales_position_id)
+        |> Enum.reject(&is_nil/1)
+
+      bad_supply =
+        if supply_ids == [] do
+          false
+        else
+          from(s in SupplyPosition, where: s.id in ^supply_ids and s.good_id != ^good_id)
+          |> Repo.exists?()
+        end
+
+      bad_sales =
+        if sales_ids == [] do
+          false
+        else
+          from(s in SalesPosition, where: s.id in ^sales_ids and s.good_id != ^good_id)
+          |> Repo.exists?()
+        end
+
+      cond do
+        bad_supply ->
+          Ecto.Changeset.add_error(cs, :good_id, "does not match supply position product")
+
+        bad_sales ->
+          Ecto.Changeset.add_error(cs, :good_id, "does not match sales position product")
+
+        true ->
+          cs
+      end
+    end
+  end
+
+  defp missing_actuals?(%Trip{} = trip) do
+    loads = trip.loads || []
+    drops = trip.drops || []
+
+    Enum.any?(loads, &is_nil(&1.actual_mt)) or Enum.any?(drops, &is_nil(&1.actual_mt)) or
+      loads == [] or drops == []
+  end
+
+  defp goods_mismatch?(%Trip{} = trip) do
+    good_id = trip.good_id
+
+    Enum.any?(trip.loads || [], fn l ->
+      l.supply_position && l.supply_position.good_id != good_id
+    end) or
+      Enum.any?(trip.drops || [], fn d ->
+        d.sales_position && d.sales_position.good_id != good_id
+      end)
+  end
+
+  defp ensure_trip_lines(%Trip{loads: loads, drops: drops} = trip)
+       when is_list(loads) and is_list(drops),
+       do: trip
+
+  defp ensure_trip_lines(%Trip{} = trip) do
+    Repo.preload(trip,
+      loads: [:supply_position, trip_load_employees: :employee],
+      drops: [:sales_position, trip_drop_employees: :employee]
+    )
+  end
+
+  defp warn_load_drop_mismatch(warnings, trip) do
+    load_sum = sum_actuals(trip.loads)
+    drop_sum = sum_actuals(trip.drops)
+
+    if Decimal.eq?(load_sum, drop_sum) do
+      warnings
+    else
+      ["Load actuals (#{load_sum}) do not equal drop actuals (#{drop_sum})" | warnings]
+    end
+  end
+
+  defp warn_negative_remaining(warnings, trip) do
+    supply_ids =
+      (trip.loads || [])
+      |> Enum.map(& &1.supply_position_id)
+      |> Enum.reject(&is_nil/1)
+      |> Enum.uniq()
+
+    negative =
+      Enum.any?(supply_ids, fn id ->
+        case Repo.get(SupplyPosition, id) do
+          nil -> false
+          s -> Decimal.compare(Balances.supply_remaining(s), 0) == :lt
+        end
+      end)
+
+    if negative do
+      ["Supply remaining is negative after this trip" | warnings]
+    else
+      warnings
+    end
+  end
+
+  defp warn_missing_agent(warnings, trip) do
+    if trip.transport_mode == "agent" and is_nil(trip.transport_agent_id) do
+      ["Agent transport mode without transport agent" | warnings]
+    else
+      warnings
+    end
+  end
+
+  defp warn_empty_crews(warnings, trip) do
+    if trip.transport_mode == "company_own" do
+      empty_load =
+        Enum.any?(trip.loads || [], fn l ->
+          employees = Map.get(l, :trip_load_employees) || []
+          employees == []
+        end)
+
+      empty_drop =
+        Enum.any?(trip.drops || [], fn d ->
+          employees = Map.get(d, :trip_drop_employees) || []
+          employees == []
+        end)
+
+      cond do
+        empty_load or empty_drop ->
+          ["Company-own trip has load/drop lines without employees" | warnings]
+
+        true ->
+          warnings
+      end
+    else
+      warnings
+    end
+  end
+
+  defp sum_actuals(lines) do
+    (lines || [])
+    |> Enum.reduce(Decimal.new(0), fn line, acc ->
+      Decimal.add(acc, line.actual_mt || Decimal.new(0))
     end)
   end
 end
