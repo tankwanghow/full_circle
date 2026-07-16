@@ -1,7 +1,7 @@
 # Grain Trading Desk — Orders, Positions & Trip Design
 
 **Date:** 2026-07-15  
-**Status:** Approved for implementation planning (pending user review of this file)  
+**Status:** Approved — implementation plan: `docs/superpowers/plans/2026-07-16-grain-trading-trip.md`  
 **App:** FullCircle (`full_circle`)  
 **Scope:** Grain trading only (v1). Swine and poultry sales stay on existing FullCircle invoicing until a later phase.
 
