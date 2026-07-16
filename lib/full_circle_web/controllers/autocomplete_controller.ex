@@ -80,6 +80,13 @@ defmodule FullCircleWeb.AutoCompleteController do
             %{id: params["user_id"]}
           )
 
+        "opensupply" ->
+          FullCircle.Trading.open_supply_position_names(
+            name,
+            %{id: params["company_id"]},
+            %{id: params["user_id"]}
+          )
+
         _ ->
           []
       end

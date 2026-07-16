@@ -194,6 +194,44 @@ defmodule FullCircle.Trading do
   end
 
   @doc """
+  Autocomplete list of open supply positions by title (soft-hold targets).
+  """
+  def open_supply_position_names(terms, company, user) do
+    if Authorization.can?(user, :view_trading, company) do
+      from(s in SupplyPosition,
+        where: s.company_id == ^company.id,
+        where: s.status == "open",
+        where: not is_nil(s.title) and s.title != "",
+        where: ilike(s.title, ^"%#{terms}%"),
+        select: %{id: s.id, value: s.title},
+        order_by: [asc: s.title]
+      )
+      |> Repo.all()
+    else
+      []
+    end
+  end
+
+  @doc """
+  Resolve an open supply position by exact title (for soft-hold typeahead).
+  """
+  def get_open_supply_position_by_title(title, company, user) do
+    title = title |> to_string() |> String.trim()
+
+    if title == "" or not Authorization.can?(user, :view_trading, company) do
+      nil
+    else
+      from(s in SupplyPosition,
+        where: s.company_id == ^company.id,
+        where: s.status == "open",
+        where: s.title == ^title,
+        preload: [:supplier, :good]
+      )
+      |> Repo.one()
+    end
+  end
+
+  @doc """
   Position board rows: supply + loaded / remaining / soft_held.
   """
   def position_board(company, user) do

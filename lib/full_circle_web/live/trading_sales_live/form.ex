@@ -94,7 +94,15 @@ defmodule FullCircleWeb.TradingSalesLive.Form do
         %{"_target" => ["sales_position", "preferred_supply_title"], "sales_position" => params},
         socket
       ) do
-    params = resolve_preferred_supply(params, socket)
+    {params, socket, _} =
+      FullCircleWeb.Helpers.assign_autocomplete_id(
+        socket,
+        params,
+        "preferred_supply_title",
+        "preferred_supply_id",
+        &Trading.get_open_supply_position_by_title/3
+      )
+
     validate(params, socket)
   end
 
@@ -223,33 +231,14 @@ defmodule FullCircleWeb.TradingSalesLive.Form do
         _ -> params
       end
 
-    resolve_preferred_supply(params, %{
-      assigns: %{current_company: company, current_user: user}
-    })
-  end
-
-  defp resolve_preferred_supply(params, socket) do
-    company = socket.assigns.current_company
-    user = socket.assigns.current_user
-    title = String.trim(params["preferred_supply_title"] || "")
-
-    cond do
-      title == "" ->
-        params
-        |> Map.put("preferred_supply_id", nil)
-        |> Map.put("preferred_supply_title", "")
-
-      true ->
-        case find_supply_by_title(title, company, user) do
-          %{id: id} -> Map.put(params, "preferred_supply_id", id)
-          _ -> Map.put(params, "preferred_supply_id", nil)
-        end
+    case Trading.get_open_supply_position_by_title(
+           params["preferred_supply_title"] || "",
+           company,
+           user
+         ) do
+      %{id: id} -> Map.put(params, "preferred_supply_id", id)
+      _ -> Map.put(params, "preferred_supply_id", nil)
     end
-  end
-
-  defp find_supply_by_title(title, company, user) do
-    Trading.list_supply_positions(company, user)
-    |> Enum.find(fn s -> s.title && String.downcase(s.title) == String.downcase(title) end)
   end
 
   @impl true
@@ -294,9 +283,6 @@ defmodule FullCircleWeb.TradingSalesLive.Form do
             />
           </div>
         </div>
-        <.input type="hidden" field={@form[:good_id]} />
-        <.input type="hidden" field={@form[:preferred_supply_id]} />
-
         <div class="flex gap-2">
           <div class="w-[50%]">
             <.input
@@ -305,6 +291,7 @@ defmodule FullCircleWeb.TradingSalesLive.Form do
               phx-hook="tributeAutoComplete"
               url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=good&name="}
             />
+            <.input type="hidden" field={@form[:good_id]} />
           </div>
           <.input field={@form[:quantity]} type="number" step="any" label={gettext("Quantity")} />
           <div class="w-[10%]">
@@ -328,8 +315,11 @@ defmodule FullCircleWeb.TradingSalesLive.Form do
         <.input
           field={@form[:preferred_supply_title]}
           label={gettext("Preferred supply (soft hold)")}
-          placeholder={gettext("Supply name / ref — does not reduce remaining")}
+          placeholder={gettext("Open supply name / ref — does not reduce remaining")}
+          phx-hook="tributeAutoComplete"
+          url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=opensupply&name="}
         />
+        <.input type="hidden" field={@form[:preferred_supply_id]} />
         <.input field={@form[:notes]} type="textarea" label={gettext("Notes")} />
         <.input
           :if={@live_action == :edit}

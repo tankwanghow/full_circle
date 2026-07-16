@@ -34,6 +34,30 @@ defmodule FullCircle.Trading.SalesPositionTest do
     assert Decimal.eq?(Balances.sales_undelivered(s), Decimal.new("35"))
   end
 
+  test "open supply typeahead lists open titles only", %{admin: admin, company: company} do
+    open =
+      supply_position_fixture(company, admin, %{
+        "title" => "Open vessel maize",
+        "status" => "open"
+      })
+
+    closed =
+      supply_position_fixture(company, admin, %{"title" => "Closed vessel", "status" => "open"})
+
+    {:ok, _} = Trading.close_supply_position(closed, company, admin)
+
+    names = Trading.open_supply_position_names("vessel", company, admin)
+    values = Enum.map(names, & &1.value)
+    assert "Open vessel maize" in values
+    refute "Closed vessel" in values
+
+    assert %{id: id} =
+             Trading.get_open_supply_position_by_title("Open vessel maize", company, admin)
+
+    assert id == open.id
+    assert Trading.get_open_supply_position_by_title("Closed vessel", company, admin) == nil
+  end
+
   test "soft hold does not change supply remaining", %{admin: admin, company: company} do
     supply = supply_position_fixture(company, admin, %{"quantity" => "100"})
     remaining_before = Balances.supply_remaining(supply)
