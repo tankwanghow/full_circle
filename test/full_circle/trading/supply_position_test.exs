@@ -41,13 +41,32 @@ defmodule FullCircle.Trading.SupplyPositionTest do
     assert closed.status == "closed"
   end
 
-  test "requires quantity > 0, supplier and good", %{admin: admin, company: company} do
+  test "requires title, quantity > 0, supplier and good", %{admin: admin, company: company} do
     assert {:error, cs} =
              Trading.create_supply_position(%{"quantity" => "0"}, company, admin)
 
     errs = errors_on(cs)
+    assert Map.has_key?(errs, :title)
     assert Map.has_key?(errs, :quantity) or Map.has_key?(errs, :supplier_id)
+
+    contact = contact_fixture(company, admin)
+    good = good_fixture(company, admin)
+
+    assert {:error, cs} =
+             Trading.create_supply_position(
+               %{
+                 "title" => "   ",
+                 "quantity" => "10",
+                 "supplier_id" => contact.id,
+                 "good_id" => good.id
+               },
+               company,
+               admin
+             )
+
+    assert %{title: _} = errors_on(cs)
   end
+
 
   test "position_board lists open supplies with remaining", %{admin: admin, company: company} do
     s = supply_position_fixture(company, admin, %{"quantity" => "50", "title" => "Board row"})

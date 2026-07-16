@@ -50,7 +50,8 @@ defmodule FullCircle.Trading.SalesPosition do
       :good_name,
       :preferred_supply_title
     ])
-    |> validate_required([:quantity, :company_id, :customer_id, :good_id, :status])
+    |> update_change(:title, &trim_title/1)
+    |> validate_required([:title, :quantity, :company_id, :customer_id, :good_id, :status])
     |> validate_inclusion(:status, @statuses)
     |> validate_number(:quantity, greater_than: 0)
     |> validate_preferred_supply_same_company()
@@ -59,6 +60,10 @@ defmodule FullCircle.Trading.SalesPosition do
     |> foreign_key_constraint(:good_id)
     |> foreign_key_constraint(:preferred_supply_id)
   end
+
+  defp trim_title(title) when is_binary(title), do: String.trim(title)
+  defp trim_title(title), do: title
+
 
   defp validate_preferred_supply_same_company(changeset) do
     supply_id = get_field(changeset, :preferred_supply_id)

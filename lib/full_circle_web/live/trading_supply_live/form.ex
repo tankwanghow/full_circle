@@ -177,6 +177,7 @@ defmodule FullCircleWeb.TradingSupplyLive.Form do
           field={@form[:title]}
           label={gettext("Name / ref")}
           placeholder={gettext("e.g. JON DOE May maize, PO-8841, Ah Huat pollard")}
+          required
         />
         <div class="flex gap-2">
           <div class="w-[60%]">
@@ -186,6 +187,7 @@ defmodule FullCircleWeb.TradingSupplyLive.Form do
               phx-hook="tributeAutoComplete"
               url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
             />
+            <.input type="hidden" field={@form[:supplier_id]} />
           </div>
           <.input
             field={@form[:available_from]}
@@ -201,9 +203,6 @@ defmodule FullCircleWeb.TradingSupplyLive.Form do
             />
           </div>
         </div>
-        <.input type="hidden" field={@form[:supplier_id]} />
-        <.input type="hidden" field={@form[:good_id]} />
-
         <div class="flex gap-2">
           <div class="w-[50%]">
             <.input
@@ -212,6 +211,7 @@ defmodule FullCircleWeb.TradingSupplyLive.Form do
               phx-hook="tributeAutoComplete"
               url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=good&name="}
             />
+            <.input type="hidden" field={@form[:good_id]} />
           </div>
           <.input field={@form[:quantity]} type="number" step="any" label={gettext("Quantity")} />
           <div class="w-[10%]">

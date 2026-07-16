@@ -169,13 +169,32 @@ defmodule FullCircle.Trading.SalesPositionTest do
     refute fulfilled.id in ids
   end
 
-  test "requires quantity > 0, customer and good", %{admin: admin, company: company} do
+  test "requires title, quantity > 0, customer and good", %{admin: admin, company: company} do
     assert {:error, cs} =
              Trading.create_sales_position(%{"quantity" => "0"}, company, admin)
 
     errs = errors_on(cs)
+    assert Map.has_key?(errs, :title)
     assert Map.has_key?(errs, :quantity) or Map.has_key?(errs, :customer_id)
+
+    customer = contact_fixture(company, admin)
+    good = good_fixture(company, admin)
+
+    assert {:error, cs} =
+             Trading.create_sales_position(
+               %{
+                 "title" => "   ",
+                 "quantity" => "10",
+                 "customer_id" => customer.id,
+                 "good_id" => good.id
+               },
+               company,
+               admin
+             )
+
+    assert %{title: _} = errors_on(cs)
   end
+
 
   test "guest cannot create sales position", %{company: company} do
     guest = FullCircle.UserAccountsFixtures.user_fixture()

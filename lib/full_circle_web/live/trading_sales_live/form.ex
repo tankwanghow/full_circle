@@ -258,6 +258,7 @@ defmodule FullCircleWeb.TradingSalesLive.Form do
           field={@form[:title]}
           label={gettext("Name / ref")}
           placeholder={gettext("e.g. Annual maize 2026, PO-8841, Spot 35MT pollard")}
+          required
         />
         <div class="flex gap-2">
           <div class="w-[60%]">

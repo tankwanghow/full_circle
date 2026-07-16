@@ -41,11 +41,16 @@ defmodule FullCircle.Trading.SupplyPosition do
       :supplier_name,
       :good_name
     ])
-    |> validate_required([:quantity, :company_id, :supplier_id, :good_id, :status])
+    |> update_change(:title, &trim_title/1)
+    |> validate_required([:title, :quantity, :company_id, :supplier_id, :good_id, :status])
     |> validate_inclusion(:status, @statuses)
     |> validate_number(:quantity, greater_than: 0)
     |> foreign_key_constraint(:company_id)
     |> foreign_key_constraint(:supplier_id)
     |> foreign_key_constraint(:good_id)
   end
+
+  defp trim_title(title) when is_binary(title), do: String.trim(title)
+  defp trim_title(title), do: title
 end
+
