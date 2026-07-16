@@ -6,8 +6,6 @@ defmodule FullCircleWeb.TradingSupplyLive.Form do
   alias FullCircle.Authorization
   alias FullCircle.Accounting
   alias FullCircle.Product
-  alias FullCircle.Util
-
   @impl true
   def mount(params, _session, socket) do
     company = socket.assigns.current_company
@@ -85,7 +83,7 @@ defmodule FullCircleWeb.TradingSupplyLive.Form do
         &Product.get_good_by_name/3
       )
 
-    socket = assign(socket, good_unit: Util.attempt(good, :unit))
+    socket = assign(socket, good_unit: good && Map.get(good, :unit))
     validate(params, socket)
   end
 
