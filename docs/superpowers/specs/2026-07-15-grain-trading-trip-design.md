@@ -1,4 +1,4 @@
-# Grain Trading Desk — Orders, Positions & Dispatch Design
+# Grain Trading Desk — Orders, Positions & Trip Design
 
 **Date:** 2026-07-15  
 **Status:** Approved for implementation planning (pending user review of this file)  
@@ -35,13 +35,13 @@ Also required:
 
 ### Non-goals (v1)
 
-- Swine (live pig) and poultry (eggs, retired layer, dung) order/dispatch modules.  
+- Swine (live pig) and poultry (eggs, retired layer, dung) order/trip modules.  
 - Driver / field mobile app.  
 - Hard blocks on oversell or over-allocate (warn only).  
 - Full payroll engine, payslips, or automatic agent AP posting (qty registers first).  
 - Deal-level margin / P&L dashboards.  
 - Silent auto-create of Invoice / PurInvoice without office action.  
-- Multi-product lines on a single dispatch (one product per dispatch; use multiple dispatches if needed).
+- Multi-product lines on a single trip (one product per trip; use multiple trips if needed).
 
 ---
 
@@ -51,15 +51,15 @@ Also required:
 
 | Layer | Responsibility |
 |-------|----------------|
-| **New Trading domain** in FullCircle | Supply positions, sales positions, soft holds, dispatches (loads/drops), drivers, transport agents, position/open-sales/dispatch boards, driver/agent registers |
+| **New Trading domain** in FullCircle | Supply positions, sales positions, soft holds, trips (loads/drops), drivers, transport agents, position/open-sales/trip boards, driver/agent registers |
 | **Existing FullCircle** | Company, contacts, goods, auth, **Invoice**, **PurInvoice**, GL, payments, statutory |
 | **Tugas** | Out of scope for this feature |
 | **New monorepo app** | Not for v1; keep module boundaries clean enough that extraction later is possible |
 
 ### Module boundary
 
-- Suggested contexts: `FullCircle.Trading` (commercial + masters) and/or nested dispatch under the same umbrella.  
-- **Do not** overload Invoice / PurInvoice as the order or dispatch document.  
+- Suggested contexts: `FullCircle.Trading` (commercial + masters) and/or nested trip under the same umbrella.  
+- **Do not** overload Invoice / PurInvoice as the order or trip document.  
 - Trading documents **link** to Invoice / PurInvoice at settlement time.
 
 ---
@@ -73,7 +73,7 @@ Also required:
 | Object | Role |
 |--------|------|
 | **SupplyPosition** | Supply source: open qty, remaining, price, product, supplier, status |
-| **Warehouse** (source/destination) | Own stock derived from warehouse in/out on dispatches; avoid double-entry lot master in v1 if possible |
+| **Warehouse** (source/destination) | Own stock derived from warehouse in/out on trips; avoid double-entry lot master in v1 if possible |
 
 #### SupplyPosition
 
@@ -94,7 +94,7 @@ SupplyPosition
   notes?
 ```
 
-**Functions (every row):** position board; soft-hold target on SalesPosition; load/drop **source** on Dispatch; remaining math; optional PurInvoice link.
+**Functions (every row):** position board; soft-hold target on SalesPosition; load/drop **source** on Trip; remaining math; optional PurInvoice link.
 
 **How staff tell deals apart:** `title`, `reference_no`, vessel_name, supplier, product — not a system `type`.  
 Examples:
@@ -136,7 +136,7 @@ SalesPosition
 
 - Appear on **Open sales**.  
 - Soft-hold preferred `SupplyPosition`.  
-- **Drop destination** on Dispatch.  
+- **Drop destination** on Trip.  
 - Delivered / undelivered from completed drop actuals.  
 - **Manual fulfill** case-by-case (e.g. 33.5 of 35).  
 - Link to **Invoice** at settlement.
@@ -148,22 +148,24 @@ SalesPosition
 - Parent and child are the same entity; both can receive drops.  
 - Rollup display (sum of children) is optional UI; operational truth is each row’s own qty and drop actuals.
 
-### 3.3 Movement (dispatch)
+### 3.3 Movement (trip)
 
-**One Dispatch = one logistics job** (one operational trip / job), which may:
+**One Trip = one loading + delivery process** (one lorry job). It may:
 
 - **Load from multiple locations** (multiple load lines).  
 - **Drop to multiple locations** (multiple drop lines: customers and/or own warehouse).
 
 ```
-Dispatch
+Trip
   company_id
   date
-  product (one product per dispatch in v1)
+  product (one product per trip in v1)
   transport_mode: company_own | agent | customer_arranged
   transport_agent_id?   # when mode = agent
   status: draft | planned | completed | cancelled
   notes?
+  # optional:
+  reference_no?         # human-entered trip / DO / ticket ref
 
   loads[]   # 1..n
     source (SupplyPosition | warehouse)
@@ -228,7 +230,7 @@ Invoice / PurInvoice remain source of truth for **AR/AP and GL**.
 1. Create **SupplyPosition** (vessel name, period, product, MT, price, supplier; title optional).  
 2. Position board shows open MT.  
 3. Create **SalesPosition**(s) (optional parent for call-offs) with preferred source = that SupplyPosition (soft hold).  
-4. Create **Dispatch**: one or more loads from port/godowns; one or more drops to customer sites and/or warehouse; transport mode + agent/drivers as applicable.  
+4. Create **Trip**: one or more loads from port/godowns; one or more drops to customer sites and/or warehouse; transport mode + agent/drivers as applicable.  
 5. Enter **actual** MT on loads and drops; variance notes when planned vs actual diverges materially.  
 6. Balances update from **completed** actuals.  
 7. SalesPosition may remain open even if short (e.g. 33.5 of 35); office **marks fulfilled** case-by-case.  
@@ -239,19 +241,19 @@ Invoice / PurInvoice remain source of truth for **AR/AP and GL**.
 
 1. Create **SupplyPosition** (supplier, product, MT, price, reference_no = PO #).  
 2. **SalesPosition** with soft-hold preferred that SupplyPosition.  
-3. **Dispatch** from supplier warehouse to customer drop location(s); mode may be company_own, agent, or customer_arranged.  
+3. **Trip** from supplier warehouse to customer drop location(s); mode may be company_own, agent, or customer_arranged.  
 4. Actuals → balances; fulfill SalesPosition case-by-case; Invoice / PurInvoice as appropriate.  
 5. No mandatory stop at own warehouse.
 
 ### Flow C — Small order via own warehouse
 
-1. Dispatch **in**: load from SupplyPosition → drop warehouse.  
-2. Later dispatch **out**: load warehouse → drop customer site(s).  
+1. Trip **in**: load from SupplyPosition → drop warehouse.  
+2. Later trip **out**: load warehouse → drop customer site(s).  
 3. Same multi-load/multi-drop and driver/agent rules.
 
 ### Flow D — Multi-load, multi-drop job
 
-1. One Dispatch.  
+1. One Trip.  
 2. Multiple load lines (different locations/sources).  
 3. Multiple drop lines (different customers/sites and/or warehouse); each drop names its **source**.  
 4. One transport mode (and agent if applicable) for the job; drivers per load/drop line.
@@ -264,7 +266,7 @@ Invoice / PurInvoice remain source of truth for **AR/AP and GL**.
 
 ```
 supply_remaining = supply_qty − Σ load.actual_mt
-                   (completed dispatches only, that source)
+                   (completed trips only, that source)
 
 sales_delivered  = Σ drop.actual_mt (completed, that SalesPosition)
 sales_undelivered = sales_qty − sales_delivered
@@ -278,7 +280,7 @@ soft_held        = Σ sales_undelivered where preferred_supply = this SupplyPosi
 driver_load_mt   = Σ load.actual_mt where load.driver = D
 driver_drop_mt   = Σ drop.actual_mt where drop.driver = D
 
-agent_mt         = Σ drop.actual_mt (default) for dispatches with agent = A
+agent_mt         = Σ drop.actual_mt (default) for trips with agent = A
                    (load actuals available for dispute/weighbridge view)
 ```
 
@@ -286,15 +288,15 @@ agent_mt         = Σ drop.actual_mt (default) for dispatches with agent = A
 
 | Rule | Behavior |
 |------|----------|
-| What consumes position | **Completed** dispatch **load actuals** only |
-| What reduces sales undelivered | **Completed** dispatch **drop actuals** only |
+| What consumes position | **Completed** trip **load actuals** only |
+| What reduces sales undelivered | **Completed** trip **drop actuals** only |
 | Draft / planned | Do not reduce remaining; optional “planned” columns in UI |
 | Oversell / over-allocate / negative remaining | **Warn, allow save** |
 | Planned vs actual large gap | Require **note** on the line |
-| Σ load actual vs Σ drop actual on one dispatch | **Warn** if mismatch |
+| Σ load actual vs Σ drop actual on one trip | **Warn** if mismatch |
 | Soft hold | Preferred SupplyPosition only; never hard reserve |
 | Sales fulfillment | **Manual / case-by-case** (e.g. accept 33.5 MT of 35 MT) |
-| One product per dispatch | v1 constraint |
+| One product per trip | v1 constraint |
 | Each drop names a source | Required so multi-load positions stay correct |
 
 ### Statuses
@@ -303,13 +305,13 @@ agent_mt         = Σ drop.actual_mt (default) for dispatches with agent = A
 |--------|----------|
 | SupplyPosition | `open` → `closed` |
 | SalesPosition | `draft` → `open` → `fulfilled` / `cancelled` |
-| Dispatch | `draft` → `planned` → `completed` / `cancelled` |
+| Trip | `draft` → `planned` → `completed` / `cancelled` |
 
 ### Cancel / edge cases
 
 | Case | Behavior |
 |------|----------|
-| Cancel completed dispatch | Block if already invoiced; otherwise reverse balance impact |
+| Cancel completed trip | Block if already invoiced; otherwise reverse balance impact |
 | Change preferred source after partial delivery | Allowed; historical actuals stay on sources used |
 | Mark SalesPosition fulfilled with undelivered &gt; 0 | Allowed; note recommended |
 | Missing load/drop driver on `company_own` complete | Warn (stronger for drop) |
@@ -326,7 +328,7 @@ agent_mt         = Σ drop.actual_mt (default) for dispatches with agent = A
 Trading
 ├── Position board
 ├── Open sales
-├── Dispatches
+├── Trips
 ├── Supply positions
 ├── Sales positions
 ├── Transport agents
@@ -341,7 +343,7 @@ Trading
 
 1. **Position board** — remaining by source; soft-held column; price; open/closed; title / reference_no / vessel for identity; drill to detail.  
 2. **Open sales** — SalesPositions; ordered / delivered / undelivered; soft hold; mark fulfilled; warnings; filter/search on title/reference_no; optional parent grouping.  
-3. **Dispatch board + form** — multi-load, multi-drop, transport mode, agent, load/drop drivers, planned/actual, warnings.  
+3. **Trip board + form** — multi-load, multi-drop, transport mode, agent, load/drop drivers, planned/actual, warnings.  
 4. **Supply / sales forms** — one SupplyPosition form, one SalesPosition form (optional parent on sales; optional **reference_no** human-entered on both).  
 5. **Driver load register** — load salary quantity by driver + date.  
 6. **Driver drop register** — drop salary quantity by driver + date.  
@@ -369,12 +371,12 @@ Users: **office sales/ops on desktop** only in v1.
 | **0** | Module skeleton, nav, auth hooks, Driver + TransportAgent masters |
 | **1** | SupplyPosition + **Position board** |
 | **2** | SalesPosition (optional parent) + soft hold + **Open sales** + manual fulfill |
-| **3** | Dispatch multi-load/multi-drop + actuals + balance updates + **Dispatch board** |
+| **3** | Trip multi-load/multi-drop + actuals + balance updates + **Trip board** |
 | **4** | Driver load/drop registers + agent delivery register |
 | **5** | Create Invoice / PurInvoice from actuals + links |
 | **6** | Polish (DO print, attachments, variance threshold config, optional rates) |
 
-**First demo milestone:** Phases 0–3 (live supply position + open sales position + dispatch).  
+**First demo milestone:** Phases 0–3 (live supply position + open sales position + trip).  
 **Phases 4–5** follow so driver/agent money trails and finance settlement catch up.
 
 ```
@@ -408,13 +410,13 @@ Phases 1 and 2 may overlap once supply sources exist for soft-hold references.
 | Stock + linked deals | Both; soft hold preferred source |
 | Inventory locations | Supplier/port primary for large; own warehouse for some small |
 | Soft hold | Preferred early; firm at actual load/drop; switchable |
-| Dispatch unit | Logistics job; multi-load + multi-drop |
+| Trip unit | Loading + delivery process; multi-load + multi-drop; formerly called “dispatch” |
 | Qty truth | Planned + actual; balances use completed actuals |
 | Oversell | Warn only |
 | Sales fulfillment | Case-by-case manual, not auto from math |
 | Transport | `company_own` / `agent` / `customer_arranged` |
 | Drivers | Per load line and per drop line; load salary + drop salary |
-| Agent | Per dispatch; bill check via delivery register |
+| Agent | Per trip; bill check via delivery register |
 | Finance home | FullCircle Invoice / PurInvoice; trading links in |
 | Host app | FullCircle trading module |
 | Clients | Desktop office v1 |
@@ -432,7 +434,7 @@ Phases 1 and 2 may overlap once supply sources exist for soft-hold references.
 - Agent PurInvoice generation from register.  
 - Margin / P&L by contract.  
 - Hard reservation modes if operations ever need them.  
-- Multi-product single dispatch if proven necessary.
+- Multi-product single trip if proven necessary.
 
 ---
 
