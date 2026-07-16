@@ -3,10 +3,14 @@ defmodule FullCircle.Trading.MastersTest do
 
   alias FullCircle.Trading
   alias FullCircle.Trading.Location
+  alias FullCircle.HR.Employee
+  alias FullCircle.Accounting.Contact
 
   import FullCircle.TradingFixtures
   import FullCircle.UserAccountsFixtures
   import FullCircle.SysFixtures
+  import FullCircle.BillingFixtures
+  import FullCircle.HRFixtures
 
   setup do
     trading_setup()
@@ -24,7 +28,7 @@ defmodule FullCircle.Trading.MastersTest do
     )
   end
 
-  describe "locations" do
+  describe "locations (new table)" do
     test "admin can create location with own_warehouse kind", %{admin: admin, company: company} do
       assert {:ok, %Location{} = loc} =
                Trading.create_location(
@@ -94,18 +98,27 @@ defmodule FullCircle.Trading.MastersTest do
     end
   end
 
-  describe "drivers and agents" do
-    test "create driver and agent", %{admin: admin, company: company} do
-      assert {:ok, driver} =
-               Trading.create_driver(%{"name" => "Ali", "phone" => "012"}, company, admin)
+  describe "drivers are employees" do
+    test "list_drivers returns company employees", %{admin: admin, company: company} do
+      emp = employee_fixture(%{"name" => "Driver Ali", "status" => "Active"}, company, admin)
 
-      assert {:ok, agent} =
-               Trading.create_transport_agent(%{"name" => "Swift"}, company, admin)
+      drivers = Trading.list_drivers(company, admin)
+      assert Enum.any?(drivers, &(&1.id == emp.id))
+      assert %Employee{} = Trading.get_driver!(emp.id, company, admin)
+    end
+  end
 
-      assert driver.name == "Ali"
-      assert agent.name == "Swift"
-      assert length(Trading.list_drivers(company, admin)) == 1
-      assert length(Trading.list_transport_agents(company, admin)) == 1
+  describe "transport agents are contacts" do
+    test "list_transport_agents returns company contacts", %{admin: admin, company: company} do
+      contact = contact_fixture(company, admin, %{"name" => "Swift Haul", "category" => "Transporter"})
+
+      agents = Trading.list_transport_agents(company, admin)
+      assert Enum.any?(agents, &(&1.id == contact.id))
+
+      filtered = Trading.list_transport_agents(company, admin, category: "Transporter")
+      assert Enum.any?(filtered, &(&1.id == contact.id))
+
+      assert %Contact{} = Trading.get_transport_agent!(contact.id, company, admin)
     end
   end
 end

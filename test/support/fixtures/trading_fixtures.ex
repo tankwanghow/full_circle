@@ -21,28 +21,6 @@ defmodule FullCircle.TradingFixtures do
     loc
   end
 
-  def driver_fixture(company, user, attrs \\ %{}) do
-    defaults = %{
-      "name" => "driver-#{System.unique_integer([:positive])}",
-      "active" => true
-    }
-
-    {:ok, driver} = Trading.create_driver(Map.merge(defaults, stringify_keys(attrs)), company, user)
-    driver
-  end
-
-  def transport_agent_fixture(company, user, attrs \\ %{}) do
-    defaults = %{
-      "name" => "agent-#{System.unique_integer([:positive])}",
-      "active" => true
-    }
-
-    {:ok, agent} =
-      Trading.create_transport_agent(Map.merge(defaults, stringify_keys(attrs)), company, user)
-
-    agent
-  end
-
   defp stringify_keys(attrs) do
     Map.new(attrs, fn
       {k, v} when is_atom(k) -> {Atom.to_string(k), v}

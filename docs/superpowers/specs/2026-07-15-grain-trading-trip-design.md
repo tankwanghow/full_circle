@@ -270,9 +270,9 @@ Contact mailing address continues to feed finance docs as today — separate fro
 
 ### 3.6 Masters
 
-- **Location** — physical load/drop/own-warehouse places (company-scoped).  
-- **Driver** — company drivers (name, contact, active).  
-- **TransportAgent** — hauliers who bill the company.  
+- **Location** — **new table** `trading_locations` for physical load/drop/own-warehouse places (company-scoped).  
+- **Driver** — **existing `employees`** (HR). Trip load/drop `driver_id` → `employees.id`.  
+- **Transport agent** — **existing `contacts`**. Trip `transport_agent_id` → `contacts.id` (optional category e.g. Transporter).  
 - Customers / suppliers / products — existing FullCircle contacts and goods (mail address on contact for finance only).
 
 ---
@@ -492,7 +492,9 @@ Phases 1 and 2 may overlap once supply sources exist for soft-hold references.
 | Supply model | **One entity `SupplyPosition`** — no type enum; optional vessel_name / title / **reference_no** (human-entered) |
 | Sales model | **One entity `SalesPosition`** — no type enum; optional `parent_id`; optional **reference_no** (human-entered) |
 | Document numbers | No mandatory auto SO/PO number; optional human-entered `reference_no` only (plus system UUID PK) |
-| Physical places | **Location** master (port / supplier_site / customer_site / own_warehouse / other); required on load/drop |
+| Physical places | **Location** new table (port / supplier_site / customer_site / own_warehouse / other); required on load/drop |
+| Drivers | Existing **Employee** rows (not a separate trading_drivers table) |
+| Transport agents | Existing **Contact** rows (not a separate trading_transport_agents table) |
 | Contact address | Mailing/finance only — not trip load/drop sites |
 | Own warehouse | Location with `kind = own_warehouse`; stock from trip in/out |
 

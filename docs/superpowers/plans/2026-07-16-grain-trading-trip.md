@@ -32,9 +32,9 @@
 | Path | Responsibility |
 |------|----------------|
 | `lib/full_circle/trading.ex` | Public context API |
-| `lib/full_circle/trading/location.ex` | Location schema |
-| `lib/full_circle/trading/driver.ex` | Driver schema |
-| `lib/full_circle/trading/transport_agent.ex` | Transport agent schema |
+| `lib/full_circle/trading/location.ex` | Location schema (only new master table) |
+| Drivers | Existing `FullCircle.HR.Employee` — no trading_drivers table |
+| Transport agents | Existing `FullCircle.Accounting.Contact` — no trading_transport_agents table |
 | `lib/full_circle/trading/supply_position.ex` | Supply position schema |
 | `lib/full_circle/trading/sales_position.ex` | Sales position schema |
 | `lib/full_circle/trading/trip.ex` | Trip header + embeds/assocs |

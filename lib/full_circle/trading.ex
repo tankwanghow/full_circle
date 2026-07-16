@@ -1,15 +1,23 @@
 defmodule FullCircle.Trading do
   @moduledoc """
-  Grain trading desk: masters, supply/sales positions, trips, and settlement helpers.
+  Grain trading desk.
+
+  Masters:
+  - **Location** — new `trading_locations` table (physical load/drop sites)
+  - **Driver** — existing `employees` (HR)
+  - **Transport agent** — existing `contacts` (Accounting)
   """
 
   import Ecto.Query, warn: false
 
   alias FullCircle.Repo
   alias FullCircle.Authorization
-  alias FullCircle.Trading.{Location, Driver, TransportAgent}
+  alias FullCircle.Trading.Location
+  alias FullCircle.HR.Employee
+  alias FullCircle.Accounting.Contact
+  alias FullCircle.Sys
 
-  # --- Locations ---
+  # --- Locations (new table) ---
 
   def list_locations(company, user, opts \\ []) do
     if Authorization.can?(user, :view_trading, company) do
@@ -51,17 +59,22 @@ defmodule FullCircle.Trading do
     end
   end
 
-  # --- Drivers ---
+  # --- Drivers = Employees ---
 
+  @doc """
+  Employees usable as trip load/drop drivers.
+  Active employees only when `active_only: true` (status == \"Active\").
+  """
   def list_drivers(company, user, opts \\ []) do
     if Authorization.can?(user, :view_trading, company) do
       active_only? = Keyword.get(opts, :active_only, false)
 
-      from(d in Driver,
-        where: d.company_id == ^company.id,
-        order_by: [asc: d.name]
+      from(e in Employee,
+        join: com in subquery(Sys.user_company(company, user)),
+        on: com.id == e.company_id,
+        order_by: [asc: e.name]
       )
-      |> maybe_active_only(active_only?)
+      |> maybe_employee_active_only(active_only?)
       |> Repo.all()
     else
       []
@@ -70,41 +83,40 @@ defmodule FullCircle.Trading do
 
   def get_driver!(id, company, user) do
     unless Authorization.can?(user, :view_trading, company), do: raise("not authorised")
-    Repo.get_by!(Driver, id: id, company_id: company.id)
+
+    from(e in Employee,
+      join: com in subquery(Sys.user_company(company, user)),
+      on: com.id == e.company_id,
+      where: e.id == ^id
+    )
+    |> Repo.one!()
   end
 
-  def create_driver(attrs, company, user) do
-    with :ok <- authorize(user, :manage_trading, company) do
-      %Driver{}
-      |> Driver.changeset(put_company(attrs, company))
-      |> Repo.insert()
-    end
-  end
+  # --- Transport agents = Contacts ---
 
-  def update_driver(%Driver{} = driver, attrs, company, user) do
-    with :ok <- authorize(user, :manage_trading, company),
-         true <- driver.company_id == company.id do
-      driver
-      |> Driver.changeset(attrs)
-      |> Repo.update()
-    else
-      false -> :not_authorise
-      other -> other
-    end
-  end
-
-  # --- Transport agents ---
-
+  @doc """
+  Contacts usable as transport agents (haulage companies).
+  Optional `category` filter (e.g. \"Transporter\") when you tag contacts that way.
+  """
   def list_transport_agents(company, user, opts \\ []) do
     if Authorization.can?(user, :view_trading, company) do
-      active_only? = Keyword.get(opts, :active_only, false)
+      category = Keyword.get(opts, :category)
 
-      from(a in TransportAgent,
-        where: a.company_id == ^company.id,
-        order_by: [asc: a.name]
-      )
-      |> maybe_active_only(active_only?)
-      |> Repo.all()
+      q =
+        from(c in Contact,
+          join: com in subquery(Sys.user_company(company, user)),
+          on: com.id == c.company_id,
+          order_by: [asc: c.name]
+        )
+
+      q =
+        if category do
+          from(c in q, where: c.category == ^category)
+        else
+          q
+        end
+
+      Repo.all(q)
     else
       []
     end
@@ -112,27 +124,13 @@ defmodule FullCircle.Trading do
 
   def get_transport_agent!(id, company, user) do
     unless Authorization.can?(user, :view_trading, company), do: raise("not authorised")
-    Repo.get_by!(TransportAgent, id: id, company_id: company.id)
-  end
 
-  def create_transport_agent(attrs, company, user) do
-    with :ok <- authorize(user, :manage_trading, company) do
-      %TransportAgent{}
-      |> TransportAgent.changeset(put_company(attrs, company))
-      |> Repo.insert()
-    end
-  end
-
-  def update_transport_agent(%TransportAgent{} = agent, attrs, company, user) do
-    with :ok <- authorize(user, :manage_trading, company),
-         true <- agent.company_id == company.id do
-      agent
-      |> TransportAgent.changeset(attrs)
-      |> Repo.update()
-    else
-      false -> :not_authorise
-      other -> other
-    end
+    from(c in Contact,
+      join: com in subquery(Sys.user_company(company, user)),
+      on: com.id == c.company_id,
+      where: c.id == ^id
+    )
+    |> Repo.one!()
   end
 
   # --- helpers ---
@@ -146,7 +144,7 @@ defmodule FullCircle.Trading do
       Map.has_key?(attrs, "company_id") or Map.has_key?(attrs, :company_id) ->
         attrs
 
-      is_map_key_string_map?(attrs) ->
+      match?([k | _] when is_binary(k), Map.keys(attrs)) ->
         Map.put(attrs, "company_id", company.id)
 
       true ->
@@ -154,13 +152,12 @@ defmodule FullCircle.Trading do
     end
   end
 
-  defp is_map_key_string_map?(attrs) do
-    case Enum.at(Map.keys(attrs), 0) do
-      key when is_binary(key) -> true
-      _ -> false
-    end
-  end
-
   defp maybe_active_only(query, true), do: from(r in query, where: r.active == true)
   defp maybe_active_only(query, _), do: query
+
+  defp maybe_employee_active_only(query, true) do
+    from(e in query, where: e.status == "Active" or is_nil(e.status))
+  end
+
+  defp maybe_employee_active_only(query, _), do: query
 end
