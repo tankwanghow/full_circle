@@ -49,8 +49,9 @@ defmodule FullCircleWeb.TradingSalesLive.Index do
           {gettext("Position Board")}
         </.link>
       </div>
-      <div class="bg-amber-200 border-y-2 border-amber-500 font-bold p-2 grid grid-cols-8 gap-1 text-sm">
+      <div class="bg-amber-200 border-y-2 border-amber-500 font-bold p-2 grid grid-cols-9 gap-1 text-sm">
         <div>{gettext("Name / ref")}</div>
+        <div>{gettext("Needed by")}</div>
         <div>{gettext("Customer")}</div>
         <div>{gettext("Good")}</div>
         <div class="text-right">{gettext("Qty")}</div>
@@ -63,7 +64,7 @@ defmodule FullCircleWeb.TradingSalesLive.Index do
         <div
           :for={s <- @sales}
           id={"sales-#{s.id}"}
-          class="grid grid-cols-8 gap-1 border-b p-2 text-sm hover:bg-gray-100 dark:hover:bg-zinc-800"
+          class="grid grid-cols-9 gap-1 border-b p-2 text-sm hover:bg-gray-100 dark:hover:bg-zinc-800"
         >
           <div>
             <.link
@@ -73,6 +74,7 @@ defmodule FullCircleWeb.TradingSalesLive.Index do
               {s.title || "—"}
             </.link>
           </div>
+          <div>{s.available_from}</div>
           <div>{s.customer && s.customer.name}</div>
           <div>{s.good && s.good.name}</div>
           <div class="text-right">{s.quantity}</div>

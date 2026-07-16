@@ -10,7 +10,8 @@ defmodule FullCircle.Trading.SalesPosition do
   schema "trading_sales_positions" do
     # Single free-text identity: deal name, customer PO #, short description, etc.
     field :title, :string
-    field :period, :string
+    # Estimated date stock is needed / to be delivered
+    field :available_from, :date
     field :quantity, :decimal
     field :unit_price, :decimal
     field :status, :string, default: "draft"
@@ -35,7 +36,7 @@ defmodule FullCircle.Trading.SalesPosition do
     position
     |> cast(attrs, [
       :title,
-      :period,
+      :available_from,
       :quantity,
       :unit_price,
       :status,

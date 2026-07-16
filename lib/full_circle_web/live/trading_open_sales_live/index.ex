@@ -97,8 +97,9 @@ defmodule FullCircleWeb.TradingOpenSalesLive.Index do
       </div>
 
       <div class="overflow-x-auto">
-        <div class="bg-amber-200 border-y-2 border-amber-500 font-bold p-2 grid grid-cols-10 gap-1 text-xs md:text-sm min-w-[1000px]">
+        <div class="bg-amber-200 border-y-2 border-amber-500 font-bold p-2 grid grid-cols-11 gap-1 text-xs md:text-sm min-w-[1080px]">
           <div>{gettext("Sales")}</div>
+          <div>{gettext("Needed by")}</div>
           <div>{gettext("Customer")}</div>
           <div>{gettext("Good")}</div>
           <div class="text-center">{gettext("Unit")}</div>
@@ -109,11 +110,11 @@ defmodule FullCircleWeb.TradingOpenSalesLive.Index do
           <div>{gettext("Status")}</div>
           <div></div>
         </div>
-        <div id="open_sales" class="min-w-[1000px]">
+        <div id="open_sales" class="min-w-[1080px]">
           <div
             :for={row <- @rows}
             id={"open-sales-#{row.sales.id}"}
-            class="grid grid-cols-10 gap-1 border-b p-2 text-xs md:text-sm hover:bg-gray-100 dark:hover:bg-zinc-800"
+            class="grid grid-cols-11 gap-1 border-b p-2 text-xs md:text-sm hover:bg-gray-100 dark:hover:bg-zinc-800"
           >
             <div>
               <.link
@@ -125,6 +126,7 @@ defmodule FullCircleWeb.TradingOpenSalesLive.Index do
                 {row.sales.title || "—"}
               </.link>
             </div>
+            <div>{row.sales.available_from}</div>
             <div>{row.sales.customer && row.sales.customer.name}</div>
             <div>{row.sales.good && row.sales.good.name}</div>
             <div class="text-center font-medium">{row.sales.good && row.sales.good.unit}</div>

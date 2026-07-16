@@ -278,8 +278,13 @@ defmodule FullCircleWeb.TradingSalesLive.Form do
               phx-hook="tributeAutoComplete"
               url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
             />
+            <.input type="hidden" field={@form[:customer_id]} />
           </div>
-          <.input field={@form[:period]} label={gettext("Period")} placeholder={gettext("e.g. June")} />
+          <.input
+            field={@form[:available_from]}
+            type="date"
+            label={gettext("Est. needed by")}
+          />
           <div class="w-[20%]">
             <.input
               field={@form[:status]}
@@ -289,7 +294,6 @@ defmodule FullCircleWeb.TradingSalesLive.Form do
             />
           </div>
         </div>
-        <.input type="hidden" field={@form[:customer_id]} />
         <.input type="hidden" field={@form[:good_id]} />
         <.input type="hidden" field={@form[:preferred_supply_id]} />
 
