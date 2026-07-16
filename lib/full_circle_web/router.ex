@@ -117,7 +117,6 @@ defmodule FullCircleWeb.Router do
         {FullCircleWeb.ActiveCompany, :assign_active_company}
       ] do
       live("/dashboard", DashboardLive)
-      live("/dashboard/:hub", DashboardLive.Hub)
       live("/users/new", UserLive.New, :new)
       live("/users", UserLive.Index, :index)
       live("/rouge_users", UserLive.RougeUserIndex, :index)

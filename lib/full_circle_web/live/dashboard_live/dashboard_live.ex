@@ -1,66 +1,253 @@
 defmodule FullCircleWeb.DashboardLive do
   use FullCircleWeb, :live_view
 
-  alias FullCircleWeb.DashboardLive.Menu
-
-  @impl true
-  def mount(_params, _session, socket) do
-    role = socket.assigns.current_role
-    user = socket.assigns.current_user
-    company = socket.assigns.current_company
-
-    {:ok,
-     socket
-     |> assign(:back_to_route, "#")
-     |> assign(page_title: gettext("Dashboard"))
-     |> assign(:hubs, Menu.hubs(user, company, role))
-     |> assign(:quick_links, Menu.quick_links(user, company, role))}
-  end
-
-  @impl true
-  def handle_params(_, _uri, socket) do
-    {:noreply, socket}
-  end
-
   @impl true
   def render(assigns) do
     ~H"""
-    <p class="w-full text-3xl text-center font-medium mb-4">{@page_title}</p>
-
-    <div :if={@current_role != "punch_camera"} class="mx-auto w-11/12 md:w-10/12 max-w-5xl">
-      <div :if={@quick_links != []} class="mb-8">
-        <p class="font-medium text-xl text-center mb-2">{gettext("Daily")}</p>
-        <div class="gap-1 flex flex-wrap justify-center">
-          <.link
-            :for={link <- @quick_links}
-            navigate={"/companies/#{@current_company.id}/#{link.path}"}
-            class={link.class}
-          >
-            {link.label}
-          </.link>
-        </div>
+    <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
+    <div :if={@current_role != "punch_camera"} class="mx-auto w-6/12 text-center">
+      <div :if={@current_role == "admin"} class="font-medium text-xl">
+        Administrator Functions
+      </div>
+      <div :if={@current_role == "admin"} class="mb-4 gap-1 flex flex-wrap justify-center">
+        <.link navigate={~p"/companies/#{@current_company.id}/seeds"} class="button red">
+          {gettext("Seeding")}
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/users"} class="button red">
+          {gettext("Users")}
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/rouge_users"} class="button red">
+          {gettext("Rouge Users")}
+        </.link>
+      </div>
+      <div class="font-medium text-xl">Accounting</div>
+      <div class="mb-4 gap-1 flex flex-wrap justify-center">
+        <.link navigate={~p"/companies/#{@current_company.id}/accounts"} class="button blue">
+          {gettext("Accounts")}
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/contacts"} class="button blue">
+          {gettext("Contacts")}
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/fixed_assets"} class="button blue">
+          {gettext("Fixed Assets")}
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/Receipt"} class="button blue">
+          {gettext("Receipts")}
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/Payment"} class="button blue">
+          {gettext("Payments")}
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/Deposit"} class="button blue">
+          {gettext("Deposits")}
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/CreditNote"} class="button blue">
+          {gettext("Credit Notes")}
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/DebitNote"} class="button blue">
+          {gettext("Debit Notes")}
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/ReturnCheque"} class="button blue">
+          {gettext("Return Cheques")}
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/Journal"} class="button blue">
+          {gettext("Journal Entries")}
+        </.link>
+        <.link
+          :if={
+            FullCircle.Authorization.can?(@current_user, :view_bank_reconciliation, @current_company)
+          }
+          navigate={~p"/companies/#{@current_company.id}/bank_reconciliation"}
+          class="button blue"
+        >
+          {gettext("Bank Reconciliation")}
+        </.link>
       </div>
 
-      <p class="font-medium text-xl text-center mb-3">{gettext("Menus")}</p>
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-8">
+      <div class="font-medium text-xl">Sales Purchase</div>
+      <div class="mb-4 gap-1 flex flex-wrap justify-center">
+        <.link navigate={~p"/companies/#{@current_company.id}/goods"} class="button teal">
+          {gettext("Goods")}
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/tax_codes"} class="button teal">
+          {gettext("TaxCodes")}
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/e_inv_meta"} class="button teal">
+          {gettext("E-Invoice Meta Data")}
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/e_invoices"} class="button teal">
+          {gettext("E-Invoices")}
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/Invoice"} class="button teal">
+          {gettext("Invoices")}
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/PurInvoice"} class="button teal">
+          {gettext("Purchase Invoices")}
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/good_sales"} class="button teal">
+          {gettext("Good Sales")}
+        </.link>
+      </div>
+
+      <div class="font-medium text-xl">Payroll</div>
+      <div class="mb-4 gap-1 flex flex-wrap justify-center">
+        <.link navigate={~p"/companies/#{@current_company.id}/employees"} class="button orange">
+          {gettext("Employees")}
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/import_attend"} class="blue button">
+          {gettext("Import Attendence File")}
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/holidays"} class="button orange">
+          {gettext("Holiday")}
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/salary_types"} class="button orange">
+          {gettext("Salary Types")}
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/Advance"} class="button orange">
+          {gettext("Advances")}
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/SalaryNote"} class="button orange">
+          {gettext("Salary Notes")}
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/recurrings"} class="button orange">
+          {gettext("Recurrings")}
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/TimeAttend"} class="button orange">
+          {gettext("Punching RAW Listing")}
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/PunchIndex"} class="button orange">
+          {gettext("Punch IO index")}
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/PunchCard"} class="button orange">
+          {gettext("Punch Card")}
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/PayRun"} class="button orange">
+          {gettext("Pay Run")}
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/epfsocsoeis"} class="button orange">
+          {gettext("EPF/SOCSO/EIS")}
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/eaform"} class="button orange">
+          {gettext("EA Form")}
+        </.link>
         <.link
-          :for={hub <- @hubs}
-          navigate={~p"/companies/#{@current_company.id}/dashboard/#{hub.id}"}
-          class={[
-            "block rounded-xl border-2 p-4 text-left shadow-sm transition hover:shadow-md",
-            hub_card_class(hub.color)
-          ]}
+          :if={@current_role == "admin"}
+          navigate={~p"/companies/#{@current_company.id}/statutory_calcs"}
+          class="button orange"
         >
-          <div class="text-lg font-semibold mb-1">{hub.title}</div>
-          <div class="text-sm opacity-80">{hub.blurb}</div>
+          {gettext("Statutory Calcs")}
+        </.link>
+      </div>
+
+      <div class="font-medium text-xl">Operations</div>
+      <div class="mb-4 gap-1 flex flex-wrap justify-center">
+        <.link navigate={~p"/companies/#{@current_company.id}/Weighing"} class="button gray">
+          {gettext("Weighings")}
+        </.link>
+        <.link
+          navigate={~p"/companies/#{@current_company.id}/weighed_goods_report"}
+          class="button gray"
+        >
+          {gettext("Weight Goods Report")}
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/houses"} class="button gray">
+          {gettext("House")}
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/flocks"} class="button gray">
+          {gettext("Flock")}
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/harvests"} class="button gray">
+          {gettext("Harvest")}
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/harvest_report"} class="button gray">
+          {gettext("Harvest Report")}
+        </.link>
+        <.link
+          navigate={~p"/companies/#{@current_company.id}/harvest_wage_report"}
+          class="button gray"
+        >
+          {gettext("Harvest Wages Report")}
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/house_feed"} class="button gray">
+          {gettext("House Feed")}
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/feed_egg_report"} class="button gray">
+          {gettext("Feed vs Egg Report")}
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/egg_stock"} class="button gray">
+          {gettext("Egg Stock")}
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/upload_files"} class="button gray">
+          {gettext("Files")}
+        </.link>
+      </div>
+
+      <div class="font-medium text-xl">Accounting Reports</div>
+      <div class="mb-4 gap-1 flex flex-wrap justify-center">
+        <.link
+          navigate={~p"/companies/#{@current_company.id}/account_transactions"}
+          class="button red"
+        >
+          {gettext("Account Transactions")}
+        </.link>
+        <.link
+          navigate={~p"/companies/#{@current_company.id}/contact_transactions"}
+          class="button red"
+        >
+          {gettext("Contact Transactions")}
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/debtor_statement"} class="button red">
+          {gettext("Contact Statement")}
+        </.link>
+        <.link
+          navigate={~p"/companies/#{@current_company.id}/transport_commission"}
+          class="button red"
+        >
+          {gettext("Driver Commission")}
+        </.link>
+        <.link :if={@current_role == "admin"} navigate={~p"/companies/#{@current_company.id}/fixed_assets_report"} class="button red">
+          {gettext("Fixed Assets")}
+        </.link>
+        <.link
+          navigate={~p"/companies/#{@current_company.id}/post_dated_cheque_listing"}
+          class="button red"
+        >
+          {gettext("Post Dated Cheques")}
+        </.link>
+        <.link :if={@current_role == "admin"} navigate={~p"/companies/#{@current_company.id}/tbplbs"} class="button red">
+          {gettext("TB/PL/BS")}
+        </.link>
+        <.link navigate={~p"/companies/#{@current_company.id}/aging"} class="button red">
+          {gettext("Agings")}
+        </.link>
+        <.link :if={@current_role == "admin"} navigate={~p"/companies/#{@current_company.id}/cash_forecast"} class="button red">
+          {gettext("Cash Forecast")}
+        </.link>
+        <.link :if={@current_role == "admin"} navigate={~p"/companies/#{@current_company.id}/profit_loss_forecast"} class="button red">
+          {gettext("P&L Forecast")}
+        </.link>
+        <.link
+          :if={@current_role == "admin"}
+          navigate={~p"/companies/#{@current_company.id}/queries"}
+          class="button red"
+        >
+          {gettext("Queries")}
         </.link>
       </div>
     </div>
-
     <div
       :if={FullCircle.Authorization.can?(@current_user, :create_time_attendence, @current_company)}
       class="mx-auto text-center mb-4"
     >
+      <%!-- <div class="mt-10 text-2xl font-bold">
+        <.link navigate={~p"/companies/#{@current_company.id}/PunchCamera"} class="blue button">
+          {gettext("Start Punch Camera")}
+        </.link>
+      </div>
+      <div class="mt-10 text-2xl font-bold">
+        <.link navigate={~p"/companies/#{@current_company.id}/POS"} class="blue button">
+          {gettext("POS")}
+        </.link>
+      </div> --%>
       <div class="font-bold">
         <.link navigate={~p"/companies/#{@current_company.id}/take_photo"} class="blue button">
           {gettext("Take A Photo")}
@@ -75,21 +262,13 @@ defmodule FullCircleWeb.DashboardLive do
     """
   end
 
-  defp hub_card_class("teal"),
-    do: "border-teal-500 bg-teal-50 dark:bg-teal-950/40 hover:border-teal-600"
+  @impl true
+  def mount(_params, _session, socket) do
+    {:ok, socket |> assign(:back_to_route, "#") |> assign(page_title: gettext("Dashboard"))}
+  end
 
-  defp hub_card_class("blue"),
-    do: "border-blue-500 bg-blue-50 dark:bg-blue-950/40 hover:border-blue-600"
-
-  defp hub_card_class("orange"),
-    do: "border-orange-500 bg-orange-50 dark:bg-orange-950/40 hover:border-orange-600"
-
-  defp hub_card_class("red"),
-    do: "border-red-500 bg-red-50 dark:bg-red-950/40 hover:border-red-600"
-
-  defp hub_card_class("gray"),
-    do: "border-zinc-400 bg-zinc-50 dark:bg-zinc-900/40 hover:border-zinc-500"
-
-  defp hub_card_class(_),
-    do: "border-zinc-400 bg-zinc-50 dark:bg-zinc-900/40"
+  @impl true
+  def handle_params(_, _uri, socket) do
+    {:noreply, socket}
+  end
 end
