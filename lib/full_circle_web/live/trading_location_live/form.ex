@@ -90,7 +90,7 @@ defmodule FullCircleWeb.TradingLocationLive.Form do
         phx-change="validate"
         phx-submit="save"
         autocomplete="off"
-        class="p-4 border rounded"
+        class="p-4 border rounded space-y-2"
       >
         <.input field={@form[:name]} label={gettext("Name")} />
         <.input
@@ -100,6 +100,33 @@ defmodule FullCircleWeb.TradingLocationLive.Form do
           options={Enum.map(Location.kinds(), &{&1, &1})}
         />
         <.input field={@form[:address_note]} type="textarea" label={gettext("Address note")} />
+        <div class="flex gap-2">
+          <.input
+            field={@form[:latitude]}
+            type="number"
+            step="any"
+            label={gettext("Latitude (GPS)")}
+            placeholder="e.g. 3.1390"
+          />
+          <.input
+            field={@form[:longitude]}
+            type="number"
+            step="any"
+            label={gettext("Longitude (GPS)")}
+            placeholder="e.g. 101.6869"
+          />
+        </div>
+        <p :if={maps_url(@form)} class="text-sm">
+          <a
+            href={maps_url(@form)}
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-blue-600 underline"
+          >
+            {gettext("Open in Google Maps")}
+          </a>
+          <span class="text-gray-500 ml-2">({gps_label(@form)})</span>
+        </p>
         <.input field={@form[:active]} type="checkbox" label={gettext("Active")} />
         <div class="text-center mt-4">
           <.button>{gettext("Save")}</.button>
@@ -113,5 +140,13 @@ defmodule FullCircleWeb.TradingLocationLive.Form do
       </.form>
     </div>
     """
+  end
+
+  defp maps_url(form) do
+    Location.google_maps_url(form[:latitude].value, form[:longitude].value)
+  end
+
+  defp gps_label(form) do
+    Location.gps_label(form[:latitude].value, form[:longitude].value)
   end
 end

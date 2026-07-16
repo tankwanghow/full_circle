@@ -32,7 +32,12 @@ defmodule FullCircle.Trading.MastersTest do
     test "admin can create location with own_warehouse kind", %{admin: admin, company: company} do
       assert {:ok, %Location{} = loc} =
                Trading.create_location(
-                 %{"name" => "Main silo", "kind" => "own_warehouse"},
+                 %{
+                   "name" => "Main silo",
+                   "kind" => "own_warehouse",
+                   "latitude" => "3.1390",
+                   "longitude" => "101.6869"
+                 },
                  company,
                  admin
                )
@@ -41,7 +46,27 @@ defmodule FullCircle.Trading.MastersTest do
       assert loc.kind == "own_warehouse"
       assert loc.company_id == company.id
       assert loc.active == true
+      assert Decimal.eq?(loc.latitude, Decimal.new("3.1390"))
+      assert Decimal.eq?(loc.longitude, Decimal.new("101.6869"))
+
+      maps = Location.google_maps_url(loc)
+      assert maps =~ "google.com/maps"
+      assert maps =~ "3.1390"
+      assert maps =~ "101.6869"
     end
+
+    test "gps requires both latitude and longitude", %{admin: admin, company: company} do
+      assert {:error, cs} =
+               Trading.create_location(
+                 %{"name" => "X", "kind" => "port", "latitude" => "3.1"},
+                 company,
+                 admin
+               )
+
+      assert %{longitude: _} = errors_on(cs)
+    end
+
+
 
     test "rejects invalid kind", %{admin: admin, company: company} do
       assert {:error, cs} =

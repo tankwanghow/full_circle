@@ -7,7 +7,12 @@ defmodule FullCircle.Repo.Migrations.CreateTradingLocations do
       add :name, :string, null: false
       add :kind, :string, null: false
       add :address_note, :text
+      # Optional GPS; Google Maps link is built from these
+      add :latitude, :decimal
+      add :longitude, :decimal
       add :active, :boolean, null: false, default: true
+
+
 
       add :company_id, references(:companies, type: :binary_id, on_delete: :delete_all),
         null: false
