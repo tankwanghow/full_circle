@@ -21,9 +21,7 @@ defmodule FullCircleWeb.StatutoryFileFormatLive.IndexComponent do
       >
         {@obj.code}
       </.link>
-      &#8226; {@obj.name}
-      &#8226; {@obj.effective_from}
-      &#8226; {@obj.renderer}
+      &#8226; {@obj.name} &#8226; {@obj.effective_from} &#8226; {@obj.renderer}
     </div>
     """
   end

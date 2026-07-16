@@ -96,9 +96,9 @@ defmodule FullCircleWeb.AdvanceLive.Print do
     ~H"""
     <div class="is-size-4">
       <span><span class="has-text-weight-semibold">Pay By:</span>
-        {@adv.funds_account.name}</span>
+      {@adv.funds_account.name}</span>
       <span class="amount"><span class="has-text-weight-semibold">Amount:</span>
-        {Number.Delimit.number_to_delimited(@adv.amount)}</span>
+      {Number.Delimit.number_to_delimited(@adv.amount)}</span>
     </div>
     """
   end

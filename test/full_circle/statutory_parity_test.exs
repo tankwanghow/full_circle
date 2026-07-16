@@ -284,10 +284,16 @@ defmodule FullCircle.StatutoryParityTest do
       cs_fallback = PaySlipOp.calculate_pay(cs, emp)
 
       epf_seeded =
-        Enum.find(Ecto.Changeset.get_field(cs_seeded, :deductions), &(&1.cal_func == "epf_employee"))
+        Enum.find(
+          Ecto.Changeset.get_field(cs_seeded, :deductions),
+          &(&1.cal_func == "epf_employee")
+        )
 
       epf_fallback =
-        Enum.find(Ecto.Changeset.get_field(cs_fallback, :deductions), &(&1.cal_func == "epf_employee"))
+        Enum.find(
+          Ecto.Changeset.get_field(cs_fallback, :deductions),
+          &(&1.cal_func == "epf_employee")
+        )
 
       assert epf_seeded
       assert epf_fallback

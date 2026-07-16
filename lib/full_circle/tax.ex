@@ -141,8 +141,12 @@ defmodule FullCircle.Tax do
     bounds = PLF.fy_month_bounds(com, fy_year)
 
     cond do
-      Date.compare(as_of, elem(hd(bounds), 0)) == :lt -> 1
-      Date.compare(as_of, elem(List.last(bounds), 1)) == :gt -> 12
+      Date.compare(as_of, elem(hd(bounds), 0)) == :lt ->
+        1
+
+      Date.compare(as_of, elem(List.last(bounds), 1)) == :gt ->
+        12
+
       true ->
         bounds
         |> Enum.with_index(1)
@@ -321,6 +325,7 @@ defmodule FullCircle.Tax do
       |> Map.put("company_id", com.id)
       |> Map.replace_lazy("paid_overrides", &sanitize_overrides/1)
       |> Map.replace_lazy("revisions", &sanitize_revisions/1)
+
     name = :update_instalment_plan
 
     Multi.new()

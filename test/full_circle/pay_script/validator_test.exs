@@ -38,9 +38,12 @@ defmodule FullCircle.PayScript.ValidatorTest do
   end
 
   test "lookup table and column must be literals that exist" do
-    assert ["in 'result': unknown table 'nope'"] = errors(~s|result = lookup("nope", 1, "employee")|)
+    assert ["in 'result': unknown table 'nope'"] =
+             errors(~s|result = lookup("nope", 1, "employee")|)
+
     assert ["in 'result': unknown column 'nope' in table 'socso'"] =
              errors(~s|result = lookup("socso", 1, "nope")|)
+
     assert ["in 'result': lookup() table and column must be string literals"] =
              errors(~s|result = lookup("so" + "cso", 1, "employee")|)
   end
@@ -63,6 +66,7 @@ defmodule FullCircle.PayScript.ValidatorTest do
   test "calc code checked against schema when given" do
     assert :ok = PayScript.validate(~s|result = calc("epf_employee")|, @schema)
     assert ["in 'result': unknown calc 'nope'"] = errors(~s|result = calc("nope")|)
+
     assert ["in 'result': calc() argument must be a string literal"] =
              errors("result = calc(wages)", %{})
   end
@@ -132,7 +136,9 @@ defmodule FullCircle.PayScript.ValidatorTest do
   end
 
   test "validate_expression rejects wrong builtin arity" do
-    assert {:error, [%Error{message: msg}]} = PayScript.validate_expression(~s|replace(name)|, %{variables: ["name"]})
+    assert {:error, [%Error{message: msg}]} =
+             PayScript.validate_expression(~s|replace(name)|, %{variables: ["name"]})
+
     assert msg =~ "replace()"
   end
 end

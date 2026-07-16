@@ -62,7 +62,15 @@ defmodule FullCircle.BankReconciliation.PdfText do
     Enum.map(1..count, fn page ->
       case System.cmd(
              "pdftotext",
-             ["-f", Integer.to_string(page), "-l", Integer.to_string(page), "-layout", pdf_path, "-"],
+             [
+               "-f",
+               Integer.to_string(page),
+               "-l",
+               Integer.to_string(page),
+               "-layout",
+               pdf_path,
+               "-"
+             ],
              stderr_to_stdout: true
            ) do
         {text, 0} -> text

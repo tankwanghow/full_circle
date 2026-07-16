@@ -37,7 +37,10 @@ defmodule FullCircleWeb.StatutoryRateTableLive.Index do
   @impl true
   def handle_event("search", %{"search" => %{"terms" => terms}}, socket) do
     qry = %{"search[terms]" => terms}
-    url = "/companies/#{socket.assigns.current_company.id}/statutory_rate_tables?#{URI.encode_query(qry)}"
+
+    url =
+      "/companies/#{socket.assigns.current_company.id}/statutory_rate_tables?#{URI.encode_query(qry)}"
+
     {:noreply, push_patch(socket, to: url)}
   end
 
@@ -60,7 +63,11 @@ defmodule FullCircleWeb.StatutoryRateTableLive.Index do
     ~H"""
     <div class="w-6/12 mx-auto">
       <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
-      <.search_form search_val={@search.terms} placeholder={gettext("Code or effective date...")} live />
+      <.search_form
+        search_val={@search.terms}
+        placeholder={gettext("Code or effective date...")}
+        live
+      />
       <div class="text-center mb-2">
         <.link
           navigate={~p"/companies/#{@current_company.id}/statutory_rate_tables/new"}

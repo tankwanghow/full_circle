@@ -263,8 +263,13 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
         <.form for={%{}} id="search-form" phx-submit="query" autocomplete="off">
           <div class="grid grid-cols-12 gap-2 tracking-tighter">
             <div class="col-span-2">
-              <.input label={gettext("For The Year")} name="search[fy_year]" type="number"
-                id="search_fy_year" value={@search.fy_year} />
+              <.input
+                label={gettext("For The Year")}
+                name="search[fy_year]"
+                type="number"
+                id="search_fy_year"
+                value={@search.fy_year}
+              />
             </div>
             <div class="col-span-2">
               <.input
@@ -277,8 +282,13 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
               />
             </div>
             <div class="col-span-2">
-              <.input label={gettext("Trailing From")} name="search[as_of]" type="date"
-                id="search_as_of" value={@search.as_of} />
+              <.input
+                label={gettext("Trailing From")}
+                name="search[as_of]"
+                type="date"
+                id="search_as_of"
+                value={@search.as_of}
+              />
             </div>
             <div class="col-span-3 mt-6 flex items-center gap-2 flex-wrap">
               <.button>{gettext("Query")}</.button>
@@ -302,11 +312,15 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
             </div>
           </div>
           <p class="text-sm text-gray-500 dark:text-gray-400 mt-2">
-              {gettext("Income and expenses both shown positive. Actual columns are the real posted P&L for elapsed periods (click a figure to see the transactions); Forecast columns project each category from its own trailing window (set via the Trailing button).")}
-            </p>
-            <p class="text-sm text-amber-700 dark:text-amber-400 mt-1">
-              {gettext("* Not posted during the year (booked as a single annual lump, e.g. depreciation) — estimated evenly across the whole year. Applies to every column, including Actual.")}
-            </p>
+            {gettext(
+              "Income and expenses both shown positive. Actual columns are the real posted P&L for elapsed periods (click a figure to see the transactions); Forecast columns project each category from its own trailing window (set via the Trailing button)."
+            )}
+          </p>
+          <p class="text-sm text-amber-700 dark:text-amber-400 mt-1">
+            {gettext(
+              "* Not posted during the year (booked as a single annual lump, e.g. depreciation) — estimated evenly across the whole year. Applies to every column, including Actual."
+            )}
+          </p>
         </.form>
       </div>
 
@@ -317,7 +331,14 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
             <p class="text-center font-medium mb-1">
               {gettext("Financial year")} {Date.to_iso8601(f.start_date)} → {Date.to_iso8601(f.fy_end)}
             </p>
-            <.pl_table rows={@rows} periods={f.periods} totals={f.totals} estimated={f.estimated_types} tax_rate={f.tax_rate} full={@full_amounts} />
+            <.pl_table
+              rows={@rows}
+              periods={f.periods}
+              totals={f.totals}
+              estimated={f.estimated_types}
+              tax_rate={f.tax_rate}
+              full={@full_amounts}
+            />
             <.tax_plan_section
               :if={is_map(f) and @plan}
               forecast_tax={f.totals.estimated_tax}
@@ -460,8 +481,9 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
           {gettext("is below 85% of last year's latest estimate")}
           <span class="font-mono">{plan_money(@effective_prior)}</span>
           — {gettext("floor")}
-          <span class="font-mono font-semibold">{plan_money(@floor)}</span>.
-          {gettext("File at least the floor and revise down at the 6th month (CP204A), or appeal to LHDN.")}
+          <span class="font-mono font-semibold">{plan_money(@floor)}</span>. {gettext(
+            "File at least the floor and revise down at the 6th month (CP204A), or appeal to LHDN."
+          )}
         </p>
       </div>
 
@@ -492,10 +514,11 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
               {gettext("Chosen estimate is below the penalty-free floor")} — {gettext(
                 "forecast tax exceeds the ceiling by"
               )}
-              <span class="font-mono">{plan_money(@analysis.excess_tax)}</span>.
-              {gettext("Estimated penalty (10%)")}:
-              <span class="font-mono">{plan_money(@analysis.penalty)}</span>.
-              {gettext("To avoid, raise the estimate to at least")}
+              <span class="font-mono">{plan_money(@analysis.excess_tax)}</span>. {gettext(
+                "Estimated penalty (10%)"
+              )}: <span class="font-mono">{plan_money(@analysis.penalty)}</span>. {gettext(
+                "To avoid, raise the estimate to at least"
+              )}
               <span class="font-mono">{plan_money(@suggested)}</span>, {gettext(
                 "or the actual tax must be"
               )}
@@ -510,9 +533,9 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
               <span class="font-mono font-semibold">{plan_money(@chosen)}</span>
             </p>
             <p class="mt-1 text-amber-800 dark:text-amber-300 font-medium">
-              {gettext("Expected refund (instalments paid − forecast tax)")}:
-              <span class="font-mono">{plan_money(@over.expected_refund)}</span>.
-              {gettext("Click Suggest to plan the CP204A revisions down to")}
+              {gettext("Expected refund (instalments paid − forecast tax)")}: <span class="font-mono">{plan_money(@over.expected_refund)}</span>. {gettext(
+                "Click Suggest to plan the CP204A revisions down to"
+              )}
               <span class="font-mono">{plan_money(@suggested)}</span>.
             </p>
           <% true -> %>
@@ -520,8 +543,7 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
               {gettext("Within the margin")} — {gettext("no under-estimation penalty.")}
             </p>
             <p class="mt-1 text-emerald-700 dark:text-emerald-400 font-medium">
-              {gettext("Headroom")}:
-              <span class="font-mono">{plan_money(@headroom)}</span>
+              {gettext("Headroom")}: <span class="font-mono">{plan_money(@headroom)}</span>
             </p>
         <% end %>
       </div>
@@ -606,8 +628,12 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
             </div>
           </div>
           <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            {gettext("Enter the revised annual estimate (not the monthly instalment). Blank or 0 = not revised. Instalments re-spread from the revision month.")}
-            {gettext("Last year estimate = the preceding YA's latest CP204/CP204A figure, used for the 85% floor check; leave blank to use last year's plan in the app.")}
+            {gettext(
+              "Enter the revised annual estimate (not the monthly instalment). Blank or 0 = not revised. Instalments re-spread from the revision month."
+            )}
+            {gettext(
+              "Last year estimate = the preceding YA's latest CP204/CP204A figure, used for the 85% floor check; leave blank to use last year's plan in the app."
+            )}
           </p>
           <p
             :if={Decimal.compare(@forecast_tax, Decimal.new(0)) != :gt}
@@ -674,7 +700,9 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
             </tfoot>
           </table>
           <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 text-left">
-            {gettext("The CP204 estimate can be revised (Form CP204A) in the 6th, 9th and 11th month of the basis period — marked above. Enter revisions in the CP204A fields; instalments re-spread from that month.")}
+            {gettext(
+              "The CP204 estimate can be revised (Form CP204A) in the 6th, 9th and 11th month of the basis period — marked above. Enter revisions in the CP204A fields; instalments re-spread from that month."
+            )}
           </p>
         </div>
       </.form>
@@ -724,18 +752,28 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
           <tbody>
             <tr class="border-b dark:border-gray-700">
               <td class="px-2">{gettext("Company tax")}</td>
-              <td class="px-2 font-mono text-right">{plan_money(@comparison.pay_penalty.company_tax)}</td>
-              <td class="px-2 font-mono text-right">{plan_money(@comparison.director_fee.company_tax)}</td>
+              <td class="px-2 font-mono text-right">
+                {plan_money(@comparison.pay_penalty.company_tax)}
+              </td>
+              <td class="px-2 font-mono text-right">
+                {plan_money(@comparison.director_fee.company_tax)}
+              </td>
             </tr>
             <tr class="border-b dark:border-gray-700">
               <td class="px-2">{gettext("CP204 penalty")}</td>
               <td class="px-2 font-mono text-right">{plan_money(@comparison.pay_penalty.penalty)}</td>
-              <td class="px-2 font-mono text-right">{plan_money(@comparison.director_fee.penalty)}</td>
+              <td class="px-2 font-mono text-right">
+                {plan_money(@comparison.director_fee.penalty)}
+              </td>
             </tr>
             <tr class="border-b dark:border-gray-700">
               <td class="px-2">{gettext("Director personal tax")}</td>
-              <td class="px-2 font-mono text-right">{plan_money(@comparison.pay_penalty.personal_tax)}</td>
-              <td class="px-2 font-mono text-right">{plan_money(@comparison.director_fee.personal_tax)}</td>
+              <td class="px-2 font-mono text-right">
+                {plan_money(@comparison.pay_penalty.personal_tax)}
+              </td>
+              <td class="px-2 font-mono text-right">
+                {plan_money(@comparison.director_fee.personal_tax)}
+              </td>
             </tr>
             <tr class="font-semibold">
               <td class="px-2">{gettext("TOTAL")}</td>
@@ -817,7 +855,9 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
       <div class="relative z-10 w-11/12 max-w-md rounded shadow-lg bg-white dark:bg-gray-800 dark:text-gray-100 p-4">
         <p class="font-bold">{gettext("Run-rate Trailing Days per Category")}</p>
         <p class="text-sm text-gray-500 dark:text-gray-400 mb-3">
-          {gettext("How many days of recent history each category's forecast is averaged from. Saved per company.")}
+          {gettext(
+            "How many days of recent history each category's forecast is averaged from. Saved per company."
+          )}
         </p>
         <form phx-submit="save_settings">
           <div class="grid grid-cols-2 gap-2 items-center">
@@ -828,18 +868,28 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
                 min="1"
                 id={"tr_#{type}"}
                 name={"trailing[#{type}]"}
-                value={Map.get(@trailing, type, FullCircle.Reporting.ProfitLossForecast.default_trailing())}
+                value={
+                  Map.get(@trailing, type, FullCircle.Reporting.ProfitLossForecast.default_trailing())
+                }
                 class="border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600"
               />
             <% end %>
           </div>
           <div class="mt-4">
             <label class="text-sm font-medium" for="tax_rate">{gettext("Estimated tax rate %")}</label>
-            <input type="number" min="0" step="0.01" id="tax_rate" name="tax_rate"
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              id="tax_rate"
+              name="tax_rate"
               value={Decimal.to_string(@tax_rate)}
-              class="border rounded px-2 py-1 w-full dark:bg-gray-700 dark:border-gray-600" />
+              class="border rounded px-2 py-1 w-full dark:bg-gray-700 dark:border-gray-600"
+            />
             <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              {gettext("Flat percentage of forecast net profit — a planning estimate, not a tax computation. 0 hides the tax rows.")}
+              {gettext(
+                "Flat percentage of forecast net profit — a planning estimate, not a tax computation. 0 hides the tax rows."
+              )}
             </p>
           </div>
           <div class="flex justify-end gap-2 mt-4">
@@ -867,12 +917,18 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
       <table class="text-sm text-right border dark:border-gray-700 whitespace-nowrap mx-auto">
         <thead class="bg-gray-200 dark:bg-gray-700 dark:text-gray-100">
           <tr>
-            <th class="text-left px-2 sticky left-0 bg-gray-200 dark:bg-gray-700">{gettext("Category")}</th>
-            <th :for={p <- @periods} class={["px-2", p.source == :actual && "bg-sky-100 dark:bg-sky-950"]}>
+            <th class="text-left px-2 sticky left-0 bg-gray-200 dark:bg-gray-700">
+              {gettext("Category")}
+            </th>
+            <th
+              :for={p <- @periods}
+              class={["px-2", p.source == :actual && "bg-sky-100 dark:bg-sky-950"]}
+            >
               <div>{Date.to_iso8601(p.period_start)}</div>
               <div class="text-[10px] font-normal">
-                {Date.to_iso8601(p.period_end)} ·
-                {if p.source == :actual, do: gettext("Actual"), else: gettext("Forecast")}
+                {Date.to_iso8601(p.period_end)} · {if p.source == :actual,
+                  do: gettext("Actual"),
+                  else: gettext("Forecast")}
               </div>
             </th>
             <th class="px-2 border-l-2 dark:border-gray-600">{gettext("Total")}</th>
@@ -881,7 +937,10 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
         <tbody>
           <tr :for={row <- @rows} class={["border-b dark:border-gray-700", row_class(row)]}>
             <td class={["text-left px-2 sticky left-0", row_label_bg(row)]}>
-              {row_label(row, @tax_rate)}<span :if={Map.get(row, :type) in @estimated} class="text-amber-600 dark:text-amber-400">*</span>
+              {row_label(row, @tax_rate)}<span
+                :if={Map.get(row, :type) in @estimated}
+                class="text-amber-600 dark:text-amber-400"
+              >*</span>
             </td>
             <td
               :for={p <- @periods}
@@ -897,7 +956,9 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
               >{cell(p, row, @full)}</span>
               <span :if={!drillable?(row, p)}>{cell(p, row, @full)}</span>
             </td>
-            <td class="font-mono px-2 border-l-2 dark:border-gray-600 font-semibold">{total_cell(@totals, @periods, row, @full)}</td>
+            <td class="font-mono px-2 border-l-2 dark:border-gray-600 font-semibold">
+              {total_cell(@totals, @periods, row, @full)}
+            </td>
           </tr>
         </tbody>
       </table>
@@ -935,7 +996,9 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
   defp cell(period, %{kind: :margin, key: key}, _full), do: pct(Map.get(period, key))
   defp cell(period, %{key: key}, full), do: amount(Map.get(period, key), full)
 
-  defp total_cell(totals, _periods, %{kind: :margin, key: key}, _full), do: pct(Map.get(totals, key))
+  defp total_cell(totals, _periods, %{kind: :margin, key: key}, _full),
+    do: pct(Map.get(totals, key))
+
   defp total_cell(totals, _periods, %{key: key}, full), do: amount(Map.get(totals, key), full)
 
   # Table cell amount: full delimited (e.g. 1,350,000.00) when toggled on, else compact B/M/K.
@@ -978,7 +1041,11 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
               ({@drill.from} → {@drill.to})
             </span>
           </p>
-          <button type="button" phx-click="close_drill" class="text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 text-xl leading-none">×</button>
+          <button
+            type="button"
+            phx-click="close_drill"
+            class="text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 text-xl leading-none"
+          >×</button>
         </div>
         <table class="w-full text-sm text-right">
           <thead class="bg-gray-200 dark:bg-gray-700 dark:text-gray-100">
@@ -1001,7 +1068,9 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
               <td class="font-mono px-1">{money(r.amount)}</td>
             </tr>
             <tr :if={@drill.rows == []}>
-              <td colspan="6" class="text-center px-1 py-2 text-gray-500">{gettext("No transactions.")}</td>
+              <td colspan="6" class="text-center px-1 py-2 text-gray-500">
+                {gettext("No transactions.")}
+              </td>
             </tr>
           </tbody>
           <tfoot>

@@ -432,7 +432,6 @@ defmodule FullCircleWeb.Router do
       ] do
       live("/shared/DebitNote/:id/print", DebitNoteLive.Print, :print)
     end
-
   end
 
   scope "/", FullCircleWeb do

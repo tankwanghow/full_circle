@@ -149,7 +149,13 @@ defmodule FullCircle.FileSpec do
         fields
         |> Enum.with_index(1)
         |> Enum.reduce(errors, fn {field, fidx}, acc ->
-          validate_field(field, "#{prefix}, field #{fidx}", delimiter, variables, allow_aggregates) ++
+          validate_field(
+            field,
+            "#{prefix}, field #{fidx}",
+            delimiter,
+            variables,
+            allow_aggregates
+          ) ++
             acc
         end)
 
@@ -193,7 +199,8 @@ defmodule FullCircle.FileSpec do
     end
   end
 
-  defp validate_field_width(errors, _field, _prefix, delimiter) when not is_nil(delimiter), do: errors
+  defp validate_field_width(errors, _field, _prefix, delimiter) when not is_nil(delimiter),
+    do: errors
 
   defp validate_field_width(errors, field, prefix, nil) do
     case field["width"] do
@@ -223,8 +230,10 @@ defmodule FullCircle.FileSpec do
         end
 
       other ->
-        ["#{prefix}: format must be text, cents, digits, decimal:<n>, or date:<pattern>, got #{inspect(other)}" |
-          errors]
+        [
+          "#{prefix}: format must be text, cents, digits, decimal:<n>, or date:<pattern>, got #{inspect(other)}"
+          | errors
+        ]
     end
   end
 
@@ -290,7 +299,9 @@ defmodule FullCircle.FileSpec do
   end
 
   defp walk_calls({:call, "count", args}, acc), do: walk_calls_args(args, [{:count, args} | acc])
-  defp walk_calls({:call, "sum", args}, acc), do: walk_calls_args(args, [{:sum, sum_col(args)} | acc])
+
+  defp walk_calls({:call, "sum", args}, acc),
+    do: walk_calls_args(args, [{:sum, sum_col(args)} | acc])
 
   defp walk_calls({:neg, e}, acc), do: walk_calls(e, acc)
   defp walk_calls({:not, e}, acc), do: walk_calls(e, acc)
@@ -370,7 +381,14 @@ defmodule FullCircle.FileSpec do
     end
   end
 
-  defp render_section(%{"kind" => "detail"} = section, rows, _filtered_detail, _ctx, delimiter, _aggregates) do
+  defp render_section(
+         %{"kind" => "detail"} = section,
+         rows,
+         _filtered_detail,
+         _ctx,
+         delimiter,
+         _aggregates
+       ) do
     rows
     |> apply_filter(Map.get(section, "filter"))
     |> apply_sort(Map.get(section, "sort"))
@@ -464,14 +482,18 @@ defmodule FullCircle.FileSpec do
   end
 
   defp substitute_aggregates({:if, c, t, e}, agg) do
-    {:if, substitute_aggregates(c, agg), substitute_aggregates(t, agg), substitute_aggregates(e, agg)}
+    {:if, substitute_aggregates(c, agg), substitute_aggregates(t, agg),
+     substitute_aggregates(e, agg)}
   end
 
   defp substitute_aggregates({:list, items}, agg),
     do: {:list, Enum.map(items, &substitute_aggregates(&1, agg))}
 
   defp substitute_aggregates({:kw, key, e}, agg), do: {:kw, key, substitute_aggregates(e, agg)}
-  defp substitute_aggregates({:call, name, args}, agg), do: {:call, name, Enum.map(args, &substitute_aggregates(&1, agg))}
+
+  defp substitute_aggregates({:call, name, args}, agg),
+    do: {:call, name, Enum.map(args, &substitute_aggregates(&1, agg))}
+
   defp substitute_aggregates(other, _agg), do: other
 
   defp format_value(value, "text"), do: format_text(value)

@@ -101,7 +101,8 @@ defmodule FullCircle.Reporting.ProfitLossForecast do
     if Decimal.compare(d, @zero) == :lt, do: @zero, else: d
   end
 
-  defp to_non_neg_decimal(n) when is_integer(n) or is_float(n), do: to_non_neg_decimal(Decimal.new("#{n}"))
+  defp to_non_neg_decimal(n) when is_integer(n) or is_float(n),
+    do: to_non_neg_decimal(Decimal.new("#{n}"))
 
   defp to_non_neg_decimal(s) when is_binary(s) do
     case Decimal.parse(String.trim(s)) do
@@ -121,7 +122,7 @@ defmodule FullCircle.Reporting.ProfitLossForecast do
   defp to_pos_int(v, default) do
     case v do
       n when is_integer(n) and n > 0 -> n
-      s when is_binary(s) -> (Integer.parse(s) |> elem_or(default)) |> pos_or(default)
+      s when is_binary(s) -> Integer.parse(s) |> elem_or(default) |> pos_or(default)
       _ -> default
     end
   end

@@ -187,8 +187,7 @@ defmodule FullCircleWeb.StatutoryCalcLive.Form do
   end
 
   defp fetch_employee(id, socket) do
-    {:ok,
-     HR.get_employee!(id, socket.assigns.current_company, socket.assigns.current_user)}
+    {:ok, HR.get_employee!(id, socket.assigns.current_company, socket.assigns.current_user)}
   rescue
     Ecto.NoResultsError -> {:error, gettext("employee not found")}
   end

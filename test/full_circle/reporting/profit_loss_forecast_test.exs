@@ -16,14 +16,18 @@ defmodule FullCircle.Reporting.ProfitLossForecastTest do
 
       assert p1.source == :actual
       assert Decimal.equal?(p1.revenue, d(1000))
-      assert Decimal.equal?(p1.gross_profit, d(600))        # 1000 - 400
-      assert Decimal.equal?(p1.operating_profit, d(500))    # 600 - 100
+      # 1000 - 400
+      assert Decimal.equal?(p1.gross_profit, d(600))
+      # 600 - 100
+      assert Decimal.equal?(p1.operating_profit, d(500))
       assert Decimal.equal?(p1.net_profit, d(500))
-      assert Decimal.equal?(p1.gross_margin, d("60.0"))     # 600/1000*100
+      # 600/1000*100
+      assert Decimal.equal?(p1.gross_margin, d("60.0"))
       assert Decimal.equal?(p1.net_margin, d("50.0"))
 
       assert p2.source == :forecast
-      assert Decimal.equal?(p2.net_profit, d(300))          # 500 - 200
+      # 500 - 200
+      assert Decimal.equal?(p2.net_profit, d(300))
     end
 
     test "zero revenue gives zero margin (no divide-by-zero)" do
@@ -109,7 +113,11 @@ defmodule FullCircle.Reporting.ProfitLossForecastTest do
 
     test "reads a saved numeric or string rate" do
       assert Decimal.equal?(PLF.tax_rate(%{settings: %{"pl_forecast_tax_rate" => 24}}), d(24))
-      assert Decimal.equal?(PLF.tax_rate(%{settings: %{"pl_forecast_tax_rate" => "17.5"}}), d("17.5"))
+
+      assert Decimal.equal?(
+               PLF.tax_rate(%{settings: %{"pl_forecast_tax_rate" => "17.5"}}),
+               d("17.5")
+             )
     end
 
     test "blank, invalid or negative becomes 0" do
@@ -117,8 +125,16 @@ defmodule FullCircle.Reporting.ProfitLossForecastTest do
       assert Decimal.equal?(PLF.tax_rate(%{settings: %{"pl_forecast_tax_rate" => "abc"}}), d(0))
       assert Decimal.equal?(PLF.tax_rate(%{settings: %{"pl_forecast_tax_rate" => -5}}), d(0))
       assert Decimal.equal?(PLF.tax_rate(%{settings: %{"pl_forecast_tax_rate" => "NaN"}}), d(0))
-      assert Decimal.equal?(PLF.tax_rate(%{settings: %{"pl_forecast_tax_rate" => "Infinity"}}), d(0))
-      assert Decimal.equal?(PLF.tax_rate(%{settings: %{"pl_forecast_tax_rate" => Decimal.new("-5")}}), d(0))
+
+      assert Decimal.equal?(
+               PLF.tax_rate(%{settings: %{"pl_forecast_tax_rate" => "Infinity"}}),
+               d(0)
+             )
+
+      assert Decimal.equal?(
+               PLF.tax_rate(%{settings: %{"pl_forecast_tax_rate" => Decimal.new("-5")}}),
+               d(0)
+             )
     end
   end
 end
@@ -139,9 +155,13 @@ defmodule FullCircle.Reporting.ProfitLossForecastDBTest do
   defp txn!(com, account_id, date, amount) do
     %Transaction{}
     |> Transaction.changeset(%{
-      doc_type: "Journal", doc_no: "J#{System.unique_integer([:positive])}",
-      doc_date: date, particulars: "t", amount: amount,
-      company_id: com.id, account_id: account_id
+      doc_type: "Journal",
+      doc_no: "J#{System.unique_integer([:positive])}",
+      doc_date: date,
+      particulars: "t",
+      amount: amount,
+      company_id: com.id,
+      account_id: account_id
     })
     |> Repo.insert!()
   end
@@ -150,13 +170,30 @@ defmodule FullCircle.Reporting.ProfitLossForecastDBTest do
     admin = user_fixture()
     # closing 31 Dec -> financial year == calendar year
     com = company_fixture(admin, %{closing_month: 12, closing_day: 31})
-    rev = account_fixture(%{account_type: "Revenue", name: "Sales #{System.unique_integer([:positive])}"}, com, admin)
-    exp = account_fixture(%{account_type: "Expenses", name: "Rent #{System.unique_integer([:positive])}"}, com, admin)
+
+    rev =
+      account_fixture(
+        %{account_type: "Revenue", name: "Sales #{System.unique_integer([:positive])}"},
+        com,
+        admin
+      )
+
+    exp =
+      account_fixture(
+        %{account_type: "Expenses", name: "Rent #{System.unique_integer([:positive])}"},
+        com,
+        admin
+      )
+
     %{admin: admin, com: com, rev: rev, exp: exp}
   end
 
   describe "pl_forecast/2 actual periods" do
-    test "shows real per-category P&L for the first month of the FY (sign-normalized)", %{com: com, rev: rev, exp: exp} do
+    test "shows real per-category P&L for the first month of the FY (sign-normalized)", %{
+      com: com,
+      rev: rev,
+      exp: exp
+    } do
       # Revenue is credit-normal: a sale posts a NEGATIVE amount on the revenue account.
       txn!(com, rev.id, ~D[2026-01-10], d(-1000))
       txn!(com, exp.id, ~D[2026-01-12], d(300))
@@ -168,9 +205,11 @@ defmodule FullCircle.Reporting.ProfitLossForecastDBTest do
       assert p1.period_start == ~D[2026-01-01]
       assert p1.period_end == ~D[2026-01-31]
       assert p1.source == :actual
-      assert Decimal.equal?(p1.revenue, d(1000))        # flipped to positive income
+      # flipped to positive income
+      assert Decimal.equal?(p1.revenue, d(1000))
       assert Decimal.equal?(p1.expenses, d(300))
-      assert Decimal.equal?(p1.net_profit, d(700))      # 1000 - 300
+      # 1000 - 300
+      assert Decimal.equal?(p1.net_profit, d(700))
       assert length(res.periods) == 12
     end
 
@@ -198,7 +237,9 @@ defmodule FullCircle.Reporting.ProfitLossForecastDBTest do
       rows = PLF.period_category_transactions("Revenue", ~D[2026-01-01], ~D[2026-01-30], com)
 
       assert length(rows) == 2
-      assert Enum.reduce(rows, Decimal.new(0), &Decimal.add(&2, &1.amount)) |> Decimal.equal?(d(1250))
+
+      assert Enum.reduce(rows, Decimal.new(0), &Decimal.add(&2, &1.amount))
+             |> Decimal.equal?(d(1250))
     end
   end
 
@@ -211,15 +252,19 @@ defmodule FullCircle.Reporting.ProfitLossForecastDBTest do
       {:ok, com2} = PLF.save_category_trailing(com, %{"Revenue" => 90, "Depreciation" => "730"})
       t2 = PLF.category_trailing(com2)
       assert t2["Revenue"] == 90
-      assert t2["Depreciation"] == 730        # string coerced to int
-      assert t2["Overhead"] == 365            # untouched -> default
+      # string coerced to int
+      assert t2["Depreciation"] == 730
+      # untouched -> default
+      assert t2["Overhead"] == 365
       assert PLF.category_trailing(PLF.company_with_settings(com))["Revenue"] == 90
     end
 
     test "a category's run-rate uses only its own trailing window", %{com: com, rev: rev} do
       today = Date.utc_today()
-      txn!(com, rev.id, Date.add(today, -70), d(-7000))  # outside a 30-day window
-      txn!(com, rev.id, Date.add(today, -10), d(-1000))  # inside it
+      # outside a 30-day window
+      txn!(com, rev.id, Date.add(today, -70), d(-7000))
+      # inside it
+      txn!(com, rev.id, Date.add(today, -10), d(-1000))
 
       {:ok, com} = PLF.save_category_trailing(com, %{"Revenue" => 30})
       res = PLF.pl_forecast(%{fy_year: today.year, granularity: :monthly}, com)
@@ -245,8 +290,17 @@ defmodule FullCircle.Reporting.ProfitLossForecastDBTest do
   end
 
   describe "previous-FY fallback for zero-run-rate categories" do
-    test "depreciation booked once last year is spread over the whole forecast year", %{com: com, admin: admin} do
-      dep = account_fixture(%{account_type: "Depreciation", name: "Dep #{System.unique_integer([:positive])}"}, com, admin)
+    test "depreciation booked once last year is spread over the whole forecast year", %{
+      com: com,
+      admin: admin
+    } do
+      dep =
+        account_fixture(
+          %{account_type: "Depreciation", name: "Dep #{System.unique_integer([:positive])}"},
+          com,
+          admin
+        )
+
       # annual depreciation booked once in the previous FY (2025), outside the 365-day window
       txn!(com, dep.id, ~D[2025-01-15], d(12_000))
 
@@ -262,8 +316,17 @@ defmodule FullCircle.Reporting.ProfitLossForecastDBTest do
       assert Decimal.equal?(jan.depreciation, expected)
     end
 
-    test "spreads over actuals even when the lump is inside the trailing window", %{com: com, admin: admin} do
-      dep = account_fixture(%{account_type: "Depreciation", name: "Dep #{System.unique_integer([:positive])}"}, com, admin)
+    test "spreads over actuals even when the lump is inside the trailing window", %{
+      com: com,
+      admin: admin
+    } do
+      dep =
+        account_fixture(
+          %{account_type: "Depreciation", name: "Dep #{System.unique_integer([:positive])}"},
+          com,
+          admin
+        )
+
       # annual lump booked at last year-end, which IS inside the 365-day trailing window
       txn!(com, dep.id, ~D[2025-12-31], d(12_000))
 
@@ -272,11 +335,17 @@ defmodule FullCircle.Reporting.ProfitLossForecastDBTest do
       assert "Depreciation" in res.estimated_types
       jan = hd(res.periods)
       assert jan.source == :actual
-      refute Decimal.equal?(jan.depreciation, d(0))   # spread across the row, not zero
+      # spread across the row, not zero
+      refute Decimal.equal?(jan.depreciation, d(0))
     end
 
     test "does nothing when the previous FY is also zero", %{com: com, admin: admin} do
-      _dep = account_fixture(%{account_type: "Depreciation", name: "Dep #{System.unique_integer([:positive])}"}, com, admin)
+      _dep =
+        account_fixture(
+          %{account_type: "Depreciation", name: "Dep #{System.unique_integer([:positive])}"},
+          com,
+          admin
+        )
 
       res = PLF.pl_forecast(%{fy_year: 2026, granularity: :monthly}, com)
 

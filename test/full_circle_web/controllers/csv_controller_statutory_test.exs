@@ -14,7 +14,10 @@ defmodule FullCircleWeb.CsvControllerStatutoryTest do
     StatutoryConfig.seed_company!(com.id)
 
     cr_ac = Accounting.get_account_by_name("Salaries and Wages Payable", com, admin)
-    funds_ac = account_fixture(%{name: "Cash on Hand", account_type: "Cash or Equivalent"}, com, admin)
+
+    funds_ac =
+      account_fixture(%{name: "Cash on Hand", account_type: "Cash or Equivalent"}, com, admin)
+
     monthly = HR.get_salary_type_by_name("Monthly Salary", com, admin)
 
     socso_er =
@@ -49,7 +52,13 @@ defmodule FullCircleWeb.CsvControllerStatutoryTest do
 
     emp =
       employee_fixture(
-        %{name: "Amy", epf_no: "E1", socso_no: "S1", tax_no: "55491986090", id_no: "890703085395"},
+        %{
+          name: "Amy",
+          epf_no: "E1",
+          socso_no: "S1",
+          tax_no: "55491986090",
+          id_no: "890703085395"
+        },
         com,
         admin
       )
@@ -129,7 +138,11 @@ defmodule FullCircleWeb.CsvControllerStatutoryTest do
     }
   end
 
-  test "SOCSO download body matches render_file output", %{conn: conn, com: com, expected_text: text} do
+  test "SOCSO download body matches render_file output", %{
+    conn: conn,
+    com: com,
+    expected_text: text
+  } do
     conn =
       get(
         conn,
@@ -138,6 +151,7 @@ defmodule FullCircleWeb.CsvControllerStatutoryTest do
 
     assert response(conn, 200) == text
     assert get_resp_header(conn, "content-type") == ["text/plain; charset=utf-8"]
+
     assert get_resp_header(conn, "content-disposition") == [
              ~s|attachment; filename="socso_txt_6_2026.txt"|
            ]

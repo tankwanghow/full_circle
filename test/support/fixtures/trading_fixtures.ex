@@ -18,7 +18,9 @@ defmodule FullCircle.TradingFixtures do
       "active" => true
     }
 
-    {:ok, loc} = Trading.create_location(Map.merge(defaults, stringify_keys(attrs)), company, user)
+    {:ok, loc} =
+      Trading.create_location(Map.merge(defaults, stringify_keys(attrs)), company, user)
+
     loc
   end
 
@@ -48,4 +50,3 @@ defmodule FullCircle.TradingFixtures do
     end)
   end
 end
-

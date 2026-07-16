@@ -81,7 +81,13 @@ defmodule FullCircleWeb.PaySlipLive.Form do
             <.input field={@form[:employee_name]} label={gettext("Employee")} readonly tabindex="-1" />
           </div>
           <div class="w-[15%]">
-            <.input field={@form[:slip_date]} label={gettext("Date")} type="date" readonly tabindex="-1" />
+            <.input
+              field={@form[:slip_date]}
+              label={gettext("Date")}
+              type="date"
+              readonly
+              tabindex="-1"
+            />
           </div>
           <div class="w-[7%]">
             <.input

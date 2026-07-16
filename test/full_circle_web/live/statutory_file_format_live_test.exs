@@ -21,7 +21,8 @@ defmodule FullCircleWeb.StatutoryFileFormatLiveTest do
   test "form saves a new version visible in index", %{conn: conn, com: com} do
     {:ok, lv, _html} = live(conn, ~p"/companies/#{com.id}/statutory_file_formats/new")
 
-    spec = ~s|{"renderer":"text","line_ending":"\\r\\n","sections":[{"kind":"detail","source":"statutory_rows","fields":[{"expr":"name","width":5}]}]}|
+    spec =
+      ~s|{"renderer":"text","line_ending":"\\r\\n","sections":[{"kind":"detail","source":"statutory_rows","fields":[{"expr":"name","width":5}]}]}|
 
     assert lv
            |> form("#object-form", %{

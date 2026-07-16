@@ -16,7 +16,14 @@ defmodule FullCircle.PayScriptTest do
         %{
           tables: %{
             "socso" => %{
-              columns: ["wage_from", "wage_to", "employer", "employee", "employer_only", "employee_24hour"],
+              columns: [
+                "wage_from",
+                "wage_to",
+                "employer",
+                "employee",
+                "employer_only",
+                "employee_24hour"
+              ],
               rows: @socso_rows
             }
           },
@@ -41,21 +48,33 @@ defmodule FullCircle.PayScriptTest do
 
   test "lookup finds the bracket row and column" do
     assert {:ok, dec} =
-             PayScript.eval(~s|result = lookup("socso", wages, "employee")|, %{"wages" => 2950.0}, env())
+             PayScript.eval(
+               ~s|result = lookup("socso", wages, "employee")|,
+               %{"wages" => 2950.0},
+               env()
+             )
 
     assert Decimal.equal?(dec, Decimal.new("14.75"))
   end
 
   test "lookup boundary: value equal to wage_to belongs to the lower bracket" do
     assert {:ok, dec} =
-             PayScript.eval(~s|result = lookup("socso", wages, "employee")|, %{"wages" => 3000.0}, env())
+             PayScript.eval(
+               ~s|result = lookup("socso", wages, "employee")|,
+               %{"wages" => 3000.0},
+               env()
+             )
 
     assert Decimal.equal?(dec, Decimal.new("14.75"))
   end
 
   test "lookup outside all brackets returns 0.0" do
     assert {:ok, dec} =
-             PayScript.eval(~s|result = lookup("socso", wages, "employee")|, %{"wages" => 99_999.0}, env())
+             PayScript.eval(
+               ~s|result = lookup("socso", wages, "employee")|,
+               %{"wages" => 99_999.0},
+               env()
+             )
 
     assert Decimal.equal?(dec, Decimal.new("0"))
   end

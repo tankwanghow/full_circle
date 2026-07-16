@@ -6,7 +6,7 @@ defmodule FullCircle.TaxComputeTest do
 
   describe "suggested_estimate/2" do
     test "reduces by the tolerance" do
-      assert Decimal.equal?(Tax.suggested_estimate(d(130000), d(30)), d(100000))
+      assert Decimal.equal?(Tax.suggested_estimate(d(130_000), d(30)), d(100_000))
     end
 
     test "tolerance 0 returns the forecast unchanged" do
@@ -21,43 +21,45 @@ defmodule FullCircle.TaxComputeTest do
 
   describe "under_estimated?/3" do
     test "true below the floor, false at/above it" do
-      assert Tax.under_estimated?(d(99999), d(130000), d(30))
-      refute Tax.under_estimated?(d(100000), d(130000), d(30))
-      refute Tax.under_estimated?(d(120000), d(130000), d(30))
+      assert Tax.under_estimated?(d(99999), d(130_000), d(30))
+      refute Tax.under_estimated?(d(100_000), d(130_000), d(30))
+      refute Tax.under_estimated?(d(120_000), d(130_000), d(30))
     end
   end
 
   describe "build_schedule" do
     defp bounds do
-      for m <- 1..12, do: {Date.new!(2026, m, 1), Date.new!(2026, m, Date.days_in_month(Date.new!(2026, m, 1)))}
+      for m <- 1..12,
+          do:
+            {Date.new!(2026, m, 1), Date.new!(2026, m, Date.days_in_month(Date.new!(2026, m, 1)))}
     end
 
     test "spreads estimate evenly from month 1 with no paid" do
-      rows = Tax.build_schedule(bounds(), %{}, d(120000), 1)
+      rows = Tax.build_schedule(bounds(), %{}, d(120_000), 1)
       assert length(rows) == 12
       assert Enum.all?(rows, &Decimal.equal?(&1.instalment_due, d(10000)))
       # no paid -> balance = estimate - cumulative_paid(0) = estimate, every month
-      assert Decimal.equal?(hd(rows).balance, d(120000))
-      assert Decimal.equal?(List.last(rows).balance, d(120000))
+      assert Decimal.equal?(hd(rows).balance, d(120_000))
+      assert Decimal.equal?(List.last(rows).balance, d(120_000))
     end
 
     test "re-spreads remaining balance from estimate_month over remaining months" do
       paid = %{1 => d(10000), 2 => d(10000), 3 => d(10000)}
-      rows = Tax.build_schedule(bounds(), paid, d(120000), 4)
+      rows = Tax.build_schedule(bounds(), paid, d(120_000), 4)
       assert Decimal.equal?(Enum.at(rows, 0).instalment_due, d(0))
       assert Decimal.equal?(Enum.at(rows, 3).instalment_due, d(10000))
       assert Decimal.equal?(Enum.at(rows, 11).instalment_due, d(10000))
     end
 
     test "forward instalment floored at 0 when already over-paid" do
-      paid = %{1 => d(200000)}
-      rows = Tax.build_schedule(bounds(), paid, d(120000), 2)
+      paid = %{1 => d(200_000)}
+      rows = Tax.build_schedule(bounds(), paid, d(120_000), 2)
       assert Decimal.equal?(Enum.at(rows, 1).instalment_due, d(0))
     end
 
     test "a month with tax paid is settled -> its due is 0" do
       paid = %{3 => d(5000)}
-      rows = Tax.build_schedule(bounds(), paid, d(120000), 1)
+      rows = Tax.build_schedule(bounds(), paid, d(120_000), 1)
       assert Decimal.equal?(Enum.at(rows, 2).instalment_due, d(0))
       # untouched months keep the spread instalment
       assert Decimal.equal?(Enum.at(rows, 1).instalment_due, d(10000))
@@ -71,9 +73,9 @@ defmodule FullCircle.TaxComputeTest do
 
     test "estimate_month = 12 puts the entire remaining balance in the last month" do
       paid = %{1 => d(5000)}
-      rows = Tax.build_schedule(bounds(), paid, d(120000), 12)
+      rows = Tax.build_schedule(bounds(), paid, d(120_000), 12)
       # paid_to_date = 5000 (months < 12); remaining = 1; forward = 115000
-      assert Decimal.equal?(Enum.at(rows, 11).instalment_due, d(115000))
+      assert Decimal.equal?(Enum.at(rows, 11).instalment_due, d(115_000))
       assert Enum.all?(Enum.take(rows, 11), &Decimal.equal?(&1.instalment_due, d(0)))
     end
 
@@ -144,22 +146,25 @@ defmodule FullCircle.TaxComputeTest do
     end
 
     test "no revisions -> original spread, estimate-based balance, in_force = estimate (regression)" do
-      rows = Tax.build_schedule(bounds(), %{1 => d(1000)}, d(120000), 1)
+      rows = Tax.build_schedule(bounds(), %{1 => d(1000)}, d(120_000), 1)
       assert Decimal.equal?(Enum.at(rows, 1).instalment_due, d(10000))
-      assert Decimal.equal?(Enum.at(rows, 0).balance, d(119000))
-      assert Enum.all?(rows, &Decimal.equal?(&1.estimate_in_force, d(120000)))
+      assert Decimal.equal?(Enum.at(rows, 0).balance, d(119_000))
+      assert Enum.all?(rows, &Decimal.equal?(&1.estimate_in_force, d(120_000)))
     end
 
     test "balance goes negative when over-paid (outstanding semantic)" do
-      paid = %{1 => d(200000)}
-      rows = Tax.build_schedule(bounds(), paid, d(120000), 2)
+      paid = %{1 => d(200_000)}
+      rows = Tax.build_schedule(bounds(), paid, d(120_000), 2)
       assert Decimal.compare(Enum.at(rows, 0).balance, d(0)) == :lt
     end
   end
 
   describe "paid_by_month/1" do
     test "blank or invalid form values read as 0" do
-      plan = %FullCircle.Tax.InstalmentPlan{paid_overrides: %{"2" => "", "3" => "abc", "4" => " 7500.50 "}}
+      plan = %FullCircle.Tax.InstalmentPlan{
+        paid_overrides: %{"2" => "", "3" => "abc", "4" => " 7500.50 "}
+      }
+
       pm = Tax.paid_by_month(plan)
       assert Decimal.equal?(Map.get(pm, 2), d(0))
       assert Decimal.equal?(Map.get(pm, 3), d(0))
@@ -219,7 +224,11 @@ defmodule FullCircle.TaxComputeTest do
 
     defp plan_8500(attrs) do
       struct!(
-        %FullCircle.Tax.InstalmentPlan{fy_year: 2026, estimate: Decimal.new(8500), estimate_month: 1},
+        %FullCircle.Tax.InstalmentPlan{
+          fy_year: 2026,
+          estimate: Decimal.new(8500),
+          estimate_month: 1
+        },
         attrs
       )
     end
@@ -317,7 +326,13 @@ defmodule FullCircle.TaxSchemaTest do
     end
 
     test "accepts a paid_overrides map" do
-      cs = chg(%{company_id: Ecto.UUID.generate(), fy_year: 2026, paid_overrides: %{"3" => "100.00"}})
+      cs =
+        chg(%{
+          company_id: Ecto.UUID.generate(),
+          fy_year: 2026,
+          paid_overrides: %{"3" => "100.00"}
+        })
+
       assert cs.valid?
       assert Ecto.Changeset.get_field(cs, :paid_overrides) == %{"3" => "100.00"}
     end
@@ -331,7 +346,12 @@ defmodule FullCircle.TaxSchemaTest do
     test "accepts prior_year_estimate, rejects negative" do
       cs = chg(%{company_id: Ecto.UUID.generate(), fy_year: 2026, prior_year_estimate: "10000"})
       assert cs.valid?
-      assert Decimal.equal?(Ecto.Changeset.get_field(cs, :prior_year_estimate), Decimal.new(10000))
+
+      assert Decimal.equal?(
+               Ecto.Changeset.get_field(cs, :prior_year_estimate),
+               Decimal.new(10000)
+             )
+
       refute chg(%{company_id: Ecto.UUID.generate(), fy_year: 2026, prior_year_estimate: -1}).valid?
     end
 
@@ -373,12 +393,26 @@ defmodule FullCircle.TaxDBTest do
   describe "create_or_update_plan/3 and get_plan/2" do
     test "creates then updates the singleton per (company, fy)", %{com: com, admin: admin} do
       assert is_nil(Tax.get_plan(com, 2026))
-      {:ok, plan} = Tax.create_or_update_plan(%{"fy_year" => 2026, "tolerance_pct" => "30", "estimate" => "100000", "estimate_month" => 1}, com, admin)
+
+      {:ok, plan} =
+        Tax.create_or_update_plan(
+          %{
+            "fy_year" => 2026,
+            "tolerance_pct" => "30",
+            "estimate" => "100000",
+            "estimate_month" => 1
+          },
+          com,
+          admin
+        )
+
       assert plan.fy_year == 2026
 
-      {:ok, plan2} = Tax.create_or_update_plan(%{"fy_year" => 2026, "estimate" => "120000"}, com, admin)
+      {:ok, plan2} =
+        Tax.create_or_update_plan(%{"fy_year" => 2026, "estimate" => "120000"}, com, admin)
+
       assert plan2.id == plan.id
-      assert Decimal.equal?(plan2.estimate, d(120000))
+      assert Decimal.equal?(plan2.estimate, d(120_000))
       assert Tax.get_plan(com, 2026).id == plan.id
     end
 
@@ -387,7 +421,13 @@ defmodule FullCircle.TaxDBTest do
         Tax.create_or_update_plan(
           %{
             "fy_year" => 2026,
-            "revisions" => %{"6" => "5000", "7" => "999", "9" => "", "11" => "0", "_unused_6" => ""}
+            "revisions" => %{
+              "6" => "5000",
+              "7" => "999",
+              "9" => "",
+              "11" => "0",
+              "_unused_6" => ""
+            }
           },
           com,
           admin
@@ -399,18 +439,31 @@ defmodule FullCircle.TaxDBTest do
 
   describe "paid_by_month/1" do
     test "reads manual overrides from the plan", %{com: com, admin: admin} do
-      {:ok, plan} = Tax.create_or_update_plan(%{"fy_year" => 2026, "paid_overrides" => %{"2" => "8000", "5" => "9999"}}, com, admin)
+      {:ok, plan} =
+        Tax.create_or_update_plan(
+          %{"fy_year" => 2026, "paid_overrides" => %{"2" => "8000", "5" => "9999"}},
+          com,
+          admin
+        )
+
       pm = Tax.paid_by_month(plan)
       assert Decimal.equal?(Map.get(pm, 2), d(8000))
       assert Decimal.equal?(Map.get(pm, 5), d(9999))
       assert Decimal.equal?(Map.get(pm, 1, d(0)), d(0))
     end
 
-    test "saving strips _unused_* form-tracking keys from paid_overrides", %{com: com, admin: admin} do
+    test "saving strips _unused_* form-tracking keys from paid_overrides", %{
+      com: com,
+      admin: admin
+    } do
       {:ok, plan} =
         Tax.create_or_update_plan(
-          %{"fy_year" => 2026, "paid_overrides" => %{"2" => "8000", "_unused_2" => "", "_unused_5" => ""}},
-          com, admin
+          %{
+            "fy_year" => 2026,
+            "paid_overrides" => %{"2" => "8000", "_unused_2" => "", "_unused_5" => ""}
+          },
+          com,
+          admin
         )
 
       assert plan.paid_overrides == %{"2" => "8000"}
@@ -427,9 +480,16 @@ defmodule FullCircle.TaxDBTest do
     test "builds a 12-row schedule from plan estimate + manual paid", %{com: com, admin: admin} do
       {:ok, plan} =
         Tax.create_or_update_plan(
-          %{"fy_year" => 2026, "paid_overrides" => %{"1" => "1000"}, "estimate" => "120000", "estimate_month" => 1},
-          com, admin
+          %{
+            "fy_year" => 2026,
+            "paid_overrides" => %{"1" => "1000"},
+            "estimate" => "120000",
+            "estimate_month" => 1
+          },
+          com,
+          admin
         )
+
       rows = Tax.schedule(plan, com)
       assert length(rows) == 12
       assert Decimal.equal?(Enum.at(rows, 0).paid, d(1000))

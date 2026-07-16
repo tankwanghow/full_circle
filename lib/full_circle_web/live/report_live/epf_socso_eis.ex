@@ -206,7 +206,10 @@ defmodule FullCircleWeb.ReportLive.EpfSocsoEis do
       <div :if={Enum.count(@col) > 0} class="flex flex-row">
         <%= for h <- @col do %>
           <div class={"w-[#{trunc(Float.ceil(100/Enum.count(@col)))}%] text-center font-bold border rounded bg-gray-200 dark:bg-gray-700 border-gray-500"}>
-            {if(h in ["name", "id_no", "wages", "textstr"], do: String.upcase(h), else: humanize_category(h))}
+            {if(h in ["name", "id_no", "wages", "textstr"],
+              do: String.upcase(h),
+              else: humanize_category(h)
+            )}
           </div>
         <% end %>
       </div>

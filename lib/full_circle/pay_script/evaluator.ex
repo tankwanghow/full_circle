@@ -176,8 +176,7 @@ defmodule FullCircle.PayScript.Evaluator do
   end
 
   defp eval_call("ytd_sum", _args, _vars, _env) do
-    {:error,
-     %Error{message: "ytd_sum expects a single 'code:', 'type:' or 'name:' argument"}}
+    {:error, %Error{message: "ytd_sum expects a single 'code:', 'type:' or 'name:' argument"}}
   end
 
   defp eval_call("calc", [e], vars, env) do

@@ -80,7 +80,12 @@ defmodule FullCircle.SalaryTypeStatutoryTest do
 
       {:ok, _} =
         StatutoryConfig.save_calc(
-          %{code: "hrdf_levy", name: "HRDF", effective_from: ~D[2026-01-01], script: "result = 1"},
+          %{
+            code: "hrdf_levy",
+            name: "HRDF",
+            effective_from: ~D[2026-01-01],
+            script: "result = 1"
+          },
           com,
           admin
         )

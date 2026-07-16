@@ -793,7 +793,9 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
                       </td>
                       <td class="text-right p-1">
                         {:erlang.float_to_binary(
-                          (line.quantity * line.unit_price - line.discount) / 1, decimals: 2)}
+                          (line.quantity * line.unit_price - line.discount) / 1,
+                          decimals: 2
+                        )}
                       </td>
                       <td class="text-right p-1">
                         {:erlang.float_to_binary(line.tax_rate / 1, decimals: 2)}
@@ -803,7 +805,9 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
                           Float.round(
                             (line.quantity * line.unit_price - line.discount) * line.tax_rate / 100,
                             2
-                          ) / 1, decimals: 2)}
+                          ) / 1,
+                          decimals: 2
+                        )}
                       </td>
                       <td class="p-1">{line.tax_code_id_lhdn} ({line.tax_scheme})</td>
                     </tr>

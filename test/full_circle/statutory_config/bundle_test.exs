@@ -169,12 +169,14 @@ defmodule FullCircle.StatutoryConfig.BundleTest do
       table_count =
         from(t in StatutoryRateTable, where: t.company_id == ^com.id) |> Repo.aggregate(:count)
 
-      calc_count = from(c in StatutoryCalc, where: c.company_id == ^com.id) |> Repo.aggregate(:count)
+      calc_count =
+        from(c in StatutoryCalc, where: c.company_id == ^com.id) |> Repo.aggregate(:count)
 
       StatutoryConfig.seed_company!(com.id)
 
       assert table_count ==
-               from(t in StatutoryRateTable, where: t.company_id == ^com.id) |> Repo.aggregate(:count)
+               from(t in StatutoryRateTable, where: t.company_id == ^com.id)
+               |> Repo.aggregate(:count)
 
       assert calc_count ==
                from(c in StatutoryCalc, where: c.company_id == ^com.id) |> Repo.aggregate(:count)

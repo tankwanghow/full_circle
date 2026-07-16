@@ -19,7 +19,13 @@ defmodule FullCircle.FileSpecTest do
             "fields" => [
               %{"expr" => "employer_code", "width" => 4},
               %{"expr" => "name", "width" => 6},
-              %{"expr" => "socso_employee", "width" => 5, "format" => "cents", "pad" => "0", "align" => "right"}
+              %{
+                "expr" => "socso_employee",
+                "width" => 5,
+                "format" => "cents",
+                "pad" => "0",
+                "align" => "right"
+              }
             ]
           }
         ]
@@ -34,12 +40,17 @@ defmodule FullCircle.FileSpecTest do
     end
 
     test "requires non-empty sections" do
-      assert {:error, msgs} = FileSpec.validate(%{"renderer" => "text", "sections" => []}, @variables)
+      assert {:error, msgs} =
+               FileSpec.validate(%{"renderer" => "text", "sections" => []}, @variables)
+
       assert Enum.any?(msgs, &(&1 =~ "sections"))
     end
 
     test "rejects unknown section kind" do
-      spec = put_in(socso_spec()["sections"], [%{"kind" => "body", "fields" => [%{"expr" => "1", "width" => 1}]}])
+      spec =
+        put_in(socso_spec()["sections"], [
+          %{"kind" => "body", "fields" => [%{"expr" => "1", "width" => 1}]}
+        ])
 
       assert {:error, [msg]} = FileSpec.validate(spec, @variables)
       assert msg =~ "kind"
@@ -156,7 +167,9 @@ defmodule FullCircle.FileSpecTest do
 
     test "detail rows see employer_code from header context" do
       rows = [%{name: "amy", socso_employee: 1}]
-      assert {:ok, "CODEamy   00100\r\n"} = FileSpec.render(socso_spec(), rows, %{"employer_code" => "CODE"})
+
+      assert {:ok, "CODEamy   00100\r\n"} =
+               FileSpec.render(socso_spec(), rows, %{"employer_code" => "CODE"})
     end
 
     test "delimited mode joins fields" do
@@ -194,8 +207,20 @@ defmodule FullCircle.FileSpecTest do
           %{
             "kind" => "footer",
             "fields" => [
-              %{"expr" => "count()", "width" => 2, "format" => "decimal:0", "pad" => "0", "align" => "right"},
-              %{"expr" => "sum(\"socso_employee\")", "width" => 5, "format" => "cents", "pad" => "0", "align" => "right"}
+              %{
+                "expr" => "count()",
+                "width" => 2,
+                "format" => "decimal:0",
+                "pad" => "0",
+                "align" => "right"
+              },
+              %{
+                "expr" => "sum(\"socso_employee\")",
+                "width" => 5,
+                "format" => "cents",
+                "pad" => "0",
+                "align" => "right"
+              }
             ]
           }
         ]
@@ -230,7 +255,13 @@ defmodule FullCircle.FileSpecTest do
             "kind" => "detail",
             "source" => "statutory_rows",
             "fields" => [
-              %{"expr" => "socso_employee", "width" => 3, "format" => "cents", "pad" => "0", "align" => "right"}
+              %{
+                "expr" => "socso_employee",
+                "width" => 3,
+                "format" => "cents",
+                "pad" => "0",
+                "align" => "right"
+              }
             ]
           }
         ])

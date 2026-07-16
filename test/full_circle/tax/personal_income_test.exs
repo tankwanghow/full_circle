@@ -25,9 +25,9 @@ defmodule FullCircle.Tax.PersonalIncomeTest do
 
   describe "tax_on_additional/2" do
     test "marginal tax on top of existing income" do
-      base = PersonalIncome.tax_on_income(d(360000))
-      total = PersonalIncome.tax_on_income(d(860000))
-      extra = PersonalIncome.tax_on_additional(d(360000), d(500000))
+      base = PersonalIncome.tax_on_income(d(360_000))
+      total = PersonalIncome.tax_on_income(d(860_000))
+      extra = PersonalIncome.tax_on_additional(d(360_000), d(500_000))
       assert Decimal.equal?(extra, Decimal.sub(total, base))
     end
   end

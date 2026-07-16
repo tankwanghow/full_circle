@@ -196,11 +196,23 @@ defmodule FullCircle.PayScriptAcceptanceTest do
   describe "socso scripts (parity with socso_table lookups)" do
     test "socso_employee at wages 2950 -> 14.75; 60+ -> 0" do
       assert_eval(@socso_employee_script, context(%{"wages" => 2950.0}), env(), "14.75")
-      assert_eval(@socso_employee_script, context(%{"wages" => 2950.0, "age" => 60}), env(), "0.0")
+
+      assert_eval(
+        @socso_employee_script,
+        context(%{"wages" => 2950.0, "age" => 60}),
+        env(),
+        "0.0"
+      )
     end
 
     test "socso_24hour applies regardless of age, ceiling bracket above 6000" do
-      assert_eval(@socso_24hour_script, context(%{"wages" => 2950.0, "age" => 61}), env(), "22.15")
+      assert_eval(
+        @socso_24hour_script,
+        context(%{"wages" => 2950.0, "age" => 61}),
+        env(),
+        "22.15"
+      )
+
       assert_eval(@socso_24hour_script, context(%{"wages" => 20_000.0}), env(), "44.65")
     end
   end

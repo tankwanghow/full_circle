@@ -33,7 +33,10 @@ defmodule FullCircle.HR.StatutoryFileFormat do
     spec = get_field(changeset, :spec)
 
     if company_id && is_map(spec) && map_size(spec) > 0 do
-      case FullCircle.FileSpec.validate(spec, FullCircle.StatutoryConfig.file_format_variables(company_id)) do
+      case FullCircle.FileSpec.validate(
+             spec,
+             FullCircle.StatutoryConfig.file_format_variables(company_id)
+           ) do
         :ok -> changeset
         {:error, errors} -> Enum.reduce(errors, changeset, &add_error(&2, :spec, &1))
       end

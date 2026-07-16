@@ -3,7 +3,9 @@ defmodule FullCircle.Repo.Migrations.CreateStatutoryConfig do
 
   def change do
     create table(:statutory_rate_tables) do
-      add :company_id, references(:companies, type: :binary_id, on_delete: :delete_all), null: false
+      add :company_id, references(:companies, type: :binary_id, on_delete: :delete_all),
+        null: false
+
       add :code, :string, null: false
       add :effective_from, :date, null: false
       add :columns, {:array, :string}, null: false
@@ -16,7 +18,9 @@ defmodule FullCircle.Repo.Migrations.CreateStatutoryConfig do
            )
 
     create table(:statutory_calcs) do
-      add :company_id, references(:companies, type: :binary_id, on_delete: :delete_all), null: false
+      add :company_id, references(:companies, type: :binary_id, on_delete: :delete_all),
+        null: false
+
       add :code, :string, null: false
       add :name, :string, null: false
       add :effective_from, :date, null: false
@@ -29,7 +33,9 @@ defmodule FullCircle.Repo.Migrations.CreateStatutoryConfig do
            )
 
     create table(:statutory_file_formats) do
-      add :company_id, references(:companies, type: :binary_id, on_delete: :delete_all), null: false
+      add :company_id, references(:companies, type: :binary_id, on_delete: :delete_all),
+        null: false
+
       add :code, :string, null: false
       add :name, :string, null: false
       add :effective_from, :date, null: false

@@ -28,7 +28,8 @@ defmodule FullCircle.Product do
       pur_invoice_details: count_by_good(FullCircle.Billing.PurInvoiceDetail, good_id),
       receipt_details: count_by_good(FullCircle.ReceiveFund.ReceiptDetail, good_id),
       payment_details: count_by_good(FullCircle.BillPay.PaymentDetail, good_id),
-      trading_supply_positions: count_by_good_if_loaded(FullCircle.Trading.SupplyPosition, good_id),
+      trading_supply_positions:
+        count_by_good_if_loaded(FullCircle.Trading.SupplyPosition, good_id),
       trading_sales_positions: count_by_good_if_loaded(FullCircle.Trading.SalesPosition, good_id)
     }
 

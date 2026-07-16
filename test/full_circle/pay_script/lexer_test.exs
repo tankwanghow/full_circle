@@ -83,7 +83,8 @@ defmodule FullCircle.PayScript.LexerTest do
   end
 
   test "errors on unterminated string" do
-    assert {:error, %Error{line: 1, message: "unterminated string"}} = Lexer.tokenize(~s(a = "oops))
+    assert {:error, %Error{line: 1, message: "unterminated string"}} =
+             Lexer.tokenize(~s(a = "oops))
   end
 
   test "Error message includes line or binding prefix" do

@@ -54,7 +54,12 @@ defmodule FullCircle.StatutoryConfigTest do
 
   test "rate table rejects row width mismatch, non-contiguous and inverted brackets" do
     assert %{rows: [_ | _]} =
-             errors_on(StatutoryRateTable.changeset(%StatutoryRateTable{}, table_attrs(%{rows: [[0.0, 30.0]]})))
+             errors_on(
+               StatutoryRateTable.changeset(
+                 %StatutoryRateTable{},
+                 table_attrs(%{rows: [[0.0, 30.0]]})
+               )
+             )
 
     assert %{rows: [msg | _]} =
              errors_on(
@@ -67,7 +72,12 @@ defmodule FullCircle.StatutoryConfigTest do
     assert msg =~ "contiguous"
 
     assert %{rows: [_ | _]} =
-             errors_on(StatutoryRateTable.changeset(%StatutoryRateTable{}, table_attrs(%{rows: [[30.0, 0.0, 0.1]]})))
+             errors_on(
+               StatutoryRateTable.changeset(
+                 %StatutoryRateTable{},
+                 table_attrs(%{rows: [[30.0, 0.0, 0.1]]})
+               )
+             )
   end
 
   test "calc script must parse and validate" do
@@ -242,21 +252,35 @@ defmodule FullCircle.StatutoryConfigTest do
     test "save_calc persists and effective_calc resolves by date", %{com: com, user: user} do
       {:ok, _v1} =
         StatutoryConfig.save_calc(
-          %{code: "versioned_calc", name: "Versioned", effective_from: ~D[2026-06-01], script: "result = 1"},
+          %{
+            code: "versioned_calc",
+            name: "Versioned",
+            effective_from: ~D[2026-06-01],
+            script: "result = 1"
+          },
           com,
           user
         )
 
       {:ok, _v2} =
         StatutoryConfig.save_calc(
-          %{code: "versioned_calc", name: "Versioned", effective_from: ~D[2027-01-01], script: "result = 2"},
+          %{
+            code: "versioned_calc",
+            name: "Versioned",
+            effective_from: ~D[2027-01-01],
+            script: "result = 2"
+          },
           com,
           user
         )
 
       assert StatutoryConfig.effective_calc(com.id, "versioned_calc", ~D[2026-05-31]) == nil
-      assert %{script: "result = 1"} = StatutoryConfig.effective_calc(com.id, "versioned_calc", ~D[2026-06-30])
-      assert %{script: "result = 2"} = StatutoryConfig.effective_calc(com.id, "versioned_calc", ~D[2027-03-31])
+
+      assert %{script: "result = 1"} =
+               StatutoryConfig.effective_calc(com.id, "versioned_calc", ~D[2026-06-30])
+
+      assert %{script: "result = 2"} =
+               StatutoryConfig.effective_calc(com.id, "versioned_calc", ~D[2027-03-31])
     end
 
     test "save_calc replace: true corrects a version in place", %{com: com, user: user} do
@@ -276,7 +300,9 @@ defmodule FullCircle.StatutoryConfigTest do
 
       # same row updated, not a new version
       assert v2.id == v1.id
-      assert %{script: "result = 2"} = StatutoryConfig.effective_calc(com.id, "fix_me", ~D[2026-06-30])
+
+      assert %{script: "result = 2"} =
+               StatutoryConfig.effective_calc(com.id, "fix_me", ~D[2026-06-30])
 
       assert [_only_one] =
                StatutoryConfig.list_versions(:calc, com.id) |> Enum.filter(&(&1.code == "fix_me"))
@@ -307,7 +333,12 @@ defmodule FullCircle.StatutoryConfigTest do
 
       assert {:error, cs} =
                StatutoryConfig.save_calc(
-                 %{code: "c", name: "C", effective_from: ~D[2026-01-01], script: ~s|result = calc("b")|},
+                 %{
+                   code: "c",
+                   name: "C",
+                   effective_from: ~D[2026-01-01],
+                   script: ~s|result = calc("b")|
+                 },
                  com,
                  user
                )

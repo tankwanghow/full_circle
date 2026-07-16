@@ -112,7 +112,8 @@ defmodule FullCircle.BankReconciliation.AutoMatcher do
 
   defp bank_cheque_in_texts?({num, bank}, texts) do
     Enum.any?(texts, fn text ->
-      bank_aliases(bank) |> Enum.any?(fn code -> String.contains?(text, num) and String.contains?(text, code) end)
+      bank_aliases(bank)
+      |> Enum.any?(fn code -> String.contains?(text, num) and String.contains?(text, code) end)
     end)
   end
 

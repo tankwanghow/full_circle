@@ -79,8 +79,7 @@ defmodule FullCircle.Reporting.CashForecast do
 
   def liquid_account_ids(com, ids) when is_list(ids) do
     from(a in Account,
-      where:
-        a.company_id == ^com.id and a.account_type in ^@liquid_types and a.id in ^ids,
+      where: a.company_id == ^com.id and a.account_type in ^@liquid_types and a.id in ^ids,
       select: a.id
     )
     |> Repo.all()
@@ -196,11 +195,18 @@ defmodule FullCircle.Reporting.CashForecast do
   # mistaken for growth. With no prior-year data it falls back to a 50/50 blend
   # with the raw 90-day rate. Skipped when the long window is 90 days or shorter.
   defp trend_level(ids, today, trailing_days, period_days, com, excluded_ids) do
-    {long_in, long_out} = run_rate_flows(ids, today, trailing_days, period_days, com, excluded_ids)
+    {long_in, long_out} =
+      run_rate_flows(ids, today, trailing_days, period_days, com, excluded_ids)
 
     if trailing_days > @short_trailing_days do
       {cur_in, cur_out} =
-        window_operating_flows(ids, Date.add(today, -@short_trailing_days), today, com, excluded_ids)
+        window_operating_flows(
+          ids,
+          Date.add(today, -@short_trailing_days),
+          today,
+          com,
+          excluded_ids
+        )
 
       {prev_in, prev_out} =
         window_operating_flows(
@@ -345,7 +351,9 @@ defmodule FullCircle.Reporting.CashForecast do
       build_forecast(
         %{opening: opening, base_in: base_in, base_out: base_out, sources: sources},
         start_date,
-        period_days: period_days, periods_count: periods_count, buffer_periods: buffer_periods
+        period_days: period_days,
+        periods_count: periods_count,
+        buffer_periods: buffer_periods
       )
       |> Map.put(:trailing_days, trailing_days)
       |> Map.put(:as_of, today)
@@ -362,19 +370,30 @@ defmodule FullCircle.Reporting.CashForecast do
       |> Enum.map(fn {{p, {recv, pay}}, i} ->
         extra =
           if p.source == :actual do
-            s = Map.get(splits, i, %{treas_in: @zero, treas_out: @zero, disc_in: @zero, disc_out: @zero})
+            s =
+              Map.get(splits, i, %{
+                treas_in: @zero,
+                treas_out: @zero,
+                disc_in: @zero,
+                disc_out: @zero
+              })
 
             %{
               oper_in: p.baseline_in |> Decimal.sub(s.treas_in) |> Decimal.sub(s.disc_in),
               oper_out: p.baseline_out |> Decimal.sub(s.treas_out) |> Decimal.sub(s.disc_out),
-              treas_in: s.treas_in, treas_out: s.treas_out,
-              disc_in: s.disc_in, disc_out: s.disc_out
+              treas_in: s.treas_in,
+              treas_out: s.treas_out,
+              disc_in: s.disc_in,
+              disc_out: s.disc_out
             }
           else
             %{
-              oper_in: p.baseline_in, oper_out: p.baseline_out,
-              treas_in: @zero, treas_out: @zero,
-              disc_in: @zero, disc_out: @zero
+              oper_in: p.baseline_in,
+              oper_out: p.baseline_out,
+              treas_in: @zero,
+              treas_out: @zero,
+              disc_in: @zero,
+              disc_out: @zero
             }
           end
 
@@ -390,8 +409,7 @@ defmodule FullCircle.Reporting.CashForecast do
   def ar_ap_balance(com, at_date) do
     per_contact =
       from(t in Transaction,
-        where:
-          t.company_id == ^com.id and not is_nil(t.contact_id) and t.doc_date <= ^at_date,
+        where: t.company_id == ^com.id and not is_nil(t.contact_id) and t.doc_date <= ^at_date,
         group_by: t.contact_id,
         select: %{bal: sum(t.amount)}
       )
@@ -425,6 +443,7 @@ defmodule FullCircle.Reporting.CashForecast do
         ar_ap_balance(com, pe)
       else
         offset = Decimal.new("#{i - n_actual}")
+
         {nonneg(Decimal.add(recv_now, Decimal.mult(recv_rate, offset))),
          nonneg(Decimal.add(pay_now, Decimal.mult(pay_rate, offset)))}
       end
@@ -483,19 +502,43 @@ defmodule FullCircle.Reporting.CashForecast do
 
   # Treasury / discretionary in-out per elapsed period, for the actual rows'
   # display split (operating = total - treasury - discretionary).
-  defp period_splits(account_ids, start_date, period_days, periods_count, today, com, excluded_ids) do
+  defp period_splits(
+         account_ids,
+         start_date,
+         period_days,
+         periods_count,
+         today,
+         com,
+         excluded_ids
+       ) do
     horizon_end = Date.add(start_date, period_days * periods_count)
     upper = if Date.compare(today, horizon_end) == :lt, do: today, else: horizon_end
 
     if Date.compare(upper, start_date) != :gt do
       %{}
     else
-      treas = bucketed_flows(account_ids, start_date, period_days, upper, com, treasury_only(excluded_ids))
+      treas =
+        bucketed_flows(
+          account_ids,
+          start_date,
+          period_days,
+          upper,
+          com,
+          treasury_only(excluded_ids)
+        )
 
       disc =
         if excluded_ids == [],
           do: %{},
-          else: bucketed_flows(account_ids, start_date, period_days, upper, com, touches_excluded(excluded_ids))
+          else:
+            bucketed_flows(
+              account_ids,
+              start_date,
+              period_days,
+              upper,
+              com,
+              touches_excluded(excluded_ids)
+            )
 
       for i <- 0..(periods_count - 1), into: %{} do
         t = Map.get(treas, i, %{in: @zero, out: @zero})
@@ -617,10 +660,18 @@ defmodule FullCircle.Reporting.CashForecast do
         closing = open |> Decimal.add(base_in) |> Decimal.sub(base_out)
 
         row = %{
-          n: idx, period_start: ps, period_end: pe, source: source,
-          opening: open, baseline_in: base_in, baseline_out: base_out,
-          total_in: base_in, total_out: base_out,
-          closing: closing, buffer: @zero, free_cash: @zero
+          n: idx,
+          period_start: ps,
+          period_end: pe,
+          source: source,
+          opening: open,
+          baseline_in: base_in,
+          baseline_out: base_out,
+          total_in: base_in,
+          total_out: base_out,
+          closing: closing,
+          buffer: @zero,
+          free_cash: @zero
         }
 
         {row, closing}
@@ -684,6 +735,7 @@ defmodule FullCircle.Reporting.CashForecast do
   end
 
   defp min_slice([], _n), do: @zero
+
   defp min_slice(list, n) do
     list
     |> Enum.take(n)

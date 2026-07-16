@@ -100,4 +100,3 @@ defmodule FullCircle.ProductUnitChangeTest do
     assert length(warnings) >= 1
   end
 end
-

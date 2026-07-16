@@ -61,8 +61,11 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecastPrint do
       <div :if={@forecast} class="page">
         <h1 class="text-center text-xl font-bold">{gettext("Profit & Loss Forecast")}</h1>
         <p class="text-center">
-          {gettext("Financial year")} {Date.to_iso8601(@forecast.start_date)} → {Date.to_iso8601(@forecast.fy_end)}
-          · {if @forecast.granularity == :quarterly, do: gettext("Quarterly"), else: gettext("Monthly")}
+          {gettext("Financial year")} {Date.to_iso8601(@forecast.start_date)} → {Date.to_iso8601(
+            @forecast.fy_end
+          )} · {if @forecast.granularity == :quarterly,
+            do: gettext("Quarterly"),
+            else: gettext("Monthly")}
         </p>
 
         <table class="pl">
@@ -71,14 +74,20 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecastPrint do
               <th class="lbl">{gettext("Category")}</th>
               <th :for={p <- @forecast.periods} class={if p.source == :actual, do: "actual", else: ""}>
                 {Date.to_iso8601(p.period_start)}<br />
-                <span class="sub">{if p.source == :actual, do: gettext("Actual"), else: gettext("Forecast")}</span>
+                <span class="sub">{if p.source == :actual,
+                  do: gettext("Actual"),
+                  else: gettext("Forecast")}</span>
               </th>
               <th>{gettext("Total")}</th>
             </tr>
           </thead>
           <tbody>
             <tr :for={row <- @rows} class={row.kind}>
-              <td class="lbl">{row_label(row, @forecast.tax_rate)}{if Map.get(row, :type) in @forecast.estimated_types, do: "*", else: ""}</td>
+              <td class="lbl">
+                {row_label(row, @forecast.tax_rate)}{if Map.get(row, :type) in @forecast.estimated_types,
+                  do: "*",
+                  else: ""}
+              </td>
               <td :for={p <- @forecast.periods} class={if p.source == :actual, do: "actual", else: ""}>
                 {cell(p, row)}
               </td>

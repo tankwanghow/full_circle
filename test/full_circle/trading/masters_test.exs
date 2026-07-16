@@ -110,7 +110,8 @@ defmodule FullCircle.Trading.MastersTest do
 
   describe "transport agents are contacts" do
     test "list_transport_agents returns company contacts", %{admin: admin, company: company} do
-      contact = contact_fixture(company, admin, %{"name" => "Swift Haul", "category" => "Transporter"})
+      contact =
+        contact_fixture(company, admin, %{"name" => "Swift Haul", "category" => "Transporter"})
 
       agents = Trading.list_transport_agents(company, admin)
       assert Enum.any?(agents, &(&1.id == contact.id))

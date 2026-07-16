@@ -28,7 +28,9 @@ defmodule FullCircle.StatutoryConfig do
 
   def effective_calc(company_id, code, date), do: effective(:calc, company_id, code, date)
   def effective_table(company_id, code, date), do: effective(:table, company_id, code, date)
-  def effective_file_format(company_id, code, date), do: effective(:file_format, company_id, code, date)
+
+  def effective_file_format(company_id, code, date),
+    do: effective(:file_format, company_id, code, date)
 
   defp effective(kind, company_id, code, date) do
     versions(kind, company_id, code)
@@ -50,7 +52,10 @@ defmodule FullCircle.StatutoryConfig do
   def list_versions(kind, company_id) do
     schema = @kinds[kind]
 
-    from(r in schema, where: r.company_id == ^company_id, order_by: [asc: r.code, desc: r.effective_from])
+    from(r in schema,
+      where: r.company_id == ^company_id,
+      order_by: [asc: r.code, desc: r.effective_from]
+    )
     |> Repo.all()
   end
 
@@ -60,7 +65,11 @@ defmodule FullCircle.StatutoryConfig do
   end
 
   def tables_map(company_id, date) do
-    from(t in StatutoryRateTable, where: t.company_id == ^company_id, distinct: true, select: t.code)
+    from(t in StatutoryRateTable,
+      where: t.company_id == ^company_id,
+      distinct: true,
+      select: t.code
+    )
     |> Repo.all()
     |> Map.new(fn code ->
       case effective_table(company_id, code, date) do
@@ -182,8 +191,11 @@ defmodule FullCircle.StatutoryConfig do
 
     cs =
       case PayScript.validate(script, schema) do
-        :ok -> cs
-        {:error, errors} -> Enum.reduce(errors, cs, &add_error(&2, :script, Exception.message(&1)))
+        :ok ->
+          cs
+
+        {:error, errors} ->
+          Enum.reduce(errors, cs, &add_error(&2, :script, Exception.message(&1)))
       end
 
     sources =
@@ -262,7 +274,9 @@ defmodule FullCircle.StatutoryConfig do
           []
 
         list when is_list(list) ->
-          if Enum.all?(list, &is_map/1), do: [], else: ["#{key}: every entry must be a JSON object"]
+          if Enum.all?(list, &is_map/1),
+            do: [],
+            else: ["#{key}: every entry must be a JSON object"]
 
         _ ->
           ["#{key} must be a list"]
@@ -288,9 +302,19 @@ defmodule FullCircle.StatutoryConfig do
 
           multi =
             Multi.new()
-            |> import_bundle_kind(bundle["rate_tables"] || [], company.id, time, StatutoryRateTable)
+            |> import_bundle_kind(
+              bundle["rate_tables"] || [],
+              company.id,
+              time,
+              StatutoryRateTable
+            )
             |> import_bundle_kind(bundle["calcs"] || [], company.id, time, StatutoryCalc)
-            |> import_bundle_kind(bundle["file_formats"] || [], company.id, time, StatutoryFileFormat)
+            |> import_bundle_kind(
+              bundle["file_formats"] || [],
+              company.id,
+              time,
+              StatutoryFileFormat
+            )
 
           case Repo.transaction(multi) do
             {:ok, results} ->

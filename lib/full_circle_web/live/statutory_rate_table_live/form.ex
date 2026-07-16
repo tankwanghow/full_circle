@@ -178,13 +178,17 @@ defmodule FullCircleWeb.StatutoryRateTableLive.Form do
             <tbody>
               <tr :for={row <- preview_rows(@preview.rows)}>
                 <td
-                  :if={row}
                   :for={cell <- row}
+                  :if={row}
                   class="border px-2 py-1 text-center font-mono"
                 >
                   {cell}
                 </td>
-                <td :if={is_nil(row)} colspan={length(@preview.columns)} class="border px-2 py-1 text-center">
+                <td
+                  :if={is_nil(row)}
+                  colspan={length(@preview.columns)}
+                  class="border px-2 py-1 text-center"
+                >
                   …
                 </td>
               </tr>
@@ -194,7 +198,10 @@ defmodule FullCircleWeb.StatutoryRateTableLive.Form do
 
         <div class="flex justify-center mt-4">
           <button type="submit" class="blue button">{gettext("Save")}</button>
-          <.link navigate={~p"/companies/#{@current_company.id}/statutory_rate_tables"} class="blue button ml-2">
+          <.link
+            navigate={~p"/companies/#{@current_company.id}/statutory_rate_tables"}
+            class="blue button ml-2"
+          >
             {gettext("Cancel")}
           </.link>
         </div>

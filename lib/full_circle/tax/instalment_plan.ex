@@ -42,7 +42,10 @@ defmodule FullCircle.Tax.InstalmentPlan do
     |> validate_number(:estimate, greater_than_or_equal_to: 0)
     |> validate_number(:prior_year_estimate, greater_than_or_equal_to: 0)
     |> validate_inclusion(:estimate_month, 1..12)
-    |> validate_number(:remedy_director_count, greater_than_or_equal_to: 1, less_than_or_equal_to: 20)
+    |> validate_number(:remedy_director_count,
+      greater_than_or_equal_to: 1,
+      less_than_or_equal_to: 20
+    )
     |> validate_number(:remedy_existing_income, greater_than_or_equal_to: 0)
     |> unique_constraint([:company_id, :fy_year],
       name: :tax_instalment_plans_unique_period,

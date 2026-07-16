@@ -37,7 +37,9 @@ defmodule FullCircle.PayScript.Parser do
   defp expect_line_end([{:eof, _}] = rest), do: {:ok, rest}
 
   defp expect_line_end([tok | _]),
-    do: {:error, %Error{line: tok_line(tok), message: "expected end of line, got #{tok_label(tok)}"}}
+    do:
+      {:error,
+       %Error{line: tok_line(tok), message: "expected end of line, got #{tok_label(tok)}"}}
 
   defp expect_end_of_expression([{:eof, _}]), do: :ok
 

@@ -58,8 +58,9 @@ defmodule FullCircleWeb.ReportLive.CashForecastPrint do
           {gettext("Cash Forecast & Free Cash Flow")}
         </h1>
         <p class="text-center">
-          {Date.to_iso8601(@forecast.start_date)} — {@forecast.periods_count} × {@forecast.period_days} {gettext("day periods")}
-          · {gettext("base/timing from last %{t} days", t: @forecast.trailing_days)}
+          {Date.to_iso8601(@forecast.start_date)} — {@forecast.periods_count} × {@forecast.period_days} {gettext(
+            "day periods"
+          )} · {gettext("base/timing from last %{t} days", t: @forecast.trailing_days)}
         </p>
 
         <div class="ladder">
@@ -100,7 +101,9 @@ defmodule FullCircleWeb.ReportLive.CashForecastPrint do
               <td class="ctr">{p.n}</td>
               <td class="ctr">{Date.to_iso8601(p.period_start)}</td>
               <td class="ctr">{Date.to_iso8601(p.period_end)}</td>
-              <td class="ctr">{if p.source == :actual, do: gettext("Actual"), else: gettext("Forecast")}</td>
+              <td class="ctr">
+                {if p.source == :actual, do: gettext("Actual"), else: gettext("Forecast")}
+              </td>
               <td>{fmt(p.opening)}</td>
               <td>{fmt(p.baseline_in)}</td>
               <td>{fmt(p.baseline_out)}</td>
@@ -116,16 +119,24 @@ defmodule FullCircleWeb.ReportLive.CashForecastPrint do
         <div class="legend">
           <p class="bold">{gettext("How to read this report")}</p>
           <p>
-            <b>{gettext("Opening")}</b>: {gettext("cash & bank balance at the start of the period (previous period's Closing")}).
-            <b>{gettext("Closing")}</b>: {gettext("Opening + all inflows − all outflows")}.
-            <b>{gettext("Type")}</b>: {gettext("Actual = period already passed, real cash in/out (shaded); Forecast = projected")}.
-            <b>{gettext("Base In")}</b> / <b>{gettext("Base Out")}</b>: {gettext("the period's cash in/out — real total for Actual periods, the run-rate (average operating throughput, treasury excluded) for Forecast periods")}.
-            <b>{gettext("Buffer")}</b>: {gettext("cash that must stay liquid — projected net cash drain (outflow − inflow, floored at 0) over the next %{n} period(s)", n: @forecast.buffer_periods)}.
-            <b>{gettext("Free Cash")}</b>: {gettext("Closing − Buffer (never below 0) — surplus safe to put to work")}.
+            <b>{gettext("Opening")}</b>: {gettext(
+              "cash & bank balance at the start of the period (previous period's Closing"
+            )}). <b>{gettext("Closing")}</b>: {gettext("Opening + all inflows − all outflows")}. <b>{gettext("Type")}</b>: {gettext(
+              "Actual = period already passed, real cash in/out (shaded); Forecast = projected"
+            )}. <b>{gettext("Base In")}</b>
+            / <b>{gettext("Base Out")}</b>: {gettext(
+              "the period's cash in/out — real total for Actual periods, the run-rate (average operating throughput, treasury excluded) for Forecast periods"
+            )}. <b>{gettext("Buffer")}</b>: {gettext(
+              "cash that must stay liquid — projected net cash drain (outflow − inflow, floored at 0) over the next %{n} period(s)",
+              n: @forecast.buffer_periods
+            )}. <b>{gettext("Free Cash")}</b>: {gettext(
+              "Closing − Buffer (never below 0) — surplus safe to put to work"
+            )}.
           </p>
           <p>
-            <b>{gettext("Fixed Deposit Tenure Ladder")}</b>: {gettext("the most you can lock away for ~1/3/6/12 months without any period dropping below its Buffer")}.
-            {gettext("The run-rate projects the recent past forward; Known items are certain")}.
+            <b>{gettext("Fixed Deposit Tenure Ladder")}</b>: {gettext(
+              "the most you can lock away for ~1/3/6/12 months without any period dropping below its Buffer"
+            )}. {gettext("The run-rate projects the recent past forward; Known items are certain")}.
           </p>
         </div>
       </div>

@@ -90,7 +90,10 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
           <.input
             id="payprep_funds_account_name"
             name="pay_prep[funds_account_name]"
-            value={@pay_prep && @pay_prep.funds_account_id && account_name(@pay_prep.funds_account_id, @current_company)}
+            value={
+              @pay_prep && @pay_prep.funds_account_id &&
+                account_name(@pay_prep.funds_account_id, @current_company)
+            }
             label={gettext("Payment Account")}
             phx-hook="tributeAutoComplete"
             url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=fundsaccount&name="}
@@ -207,7 +210,9 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
         <%!-- net pay, right after the deductions --%>
         <div :if={@statutory_preview} class="flex flex-row text-center font-bold bg-amber-100">
           <div class="w-[92%] text-right pr-2 py-1">{gettext("Net Pay")}</div>
-          <div class="w-[8%] py-1 text-right px-2">{@net_pay |> Number.Delimit.number_to_delimited()}</div>
+          <div class="w-[8%] py-1 text-right px-2">
+            {@net_pay |> Number.Delimit.number_to_delimited()}
+          </div>
         </div>
 
         <%!-- employer contributions --%>
@@ -868,7 +873,9 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
   # calculated, computed (cal_func) lines move to the read-only preview below (so their
   # recomputed value shows and zero ones disappear), instead of the stale saved component.
   defp editable_notes(notes, nil), do: notes
-  defp editable_notes(notes, _preview), do: Enum.reject(notes, fn n -> computed?(Map.get(n, :cal_func)) end)
+
+  defp editable_notes(notes, _preview),
+    do: Enum.reject(notes, fn n -> computed?(Map.get(n, :cal_func)) end)
 
   # One read-only preview row (matches the salary-notes table columns).
   attr :n, :map, required: true

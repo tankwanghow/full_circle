@@ -15,7 +15,8 @@ defmodule FullCircleWeb.StatutoryFileFormatLive.Form do
 
       {name, renderer, spec_json} =
         if code != "" do
-          case StatutoryConfig.list_versions(:file_format, com_id) |> Enum.find(&(&1.code == code)) do
+          case StatutoryConfig.list_versions(:file_format, com_id)
+               |> Enum.find(&(&1.code == code)) do
             nil ->
               {"", "text", "{}"}
 
@@ -106,7 +107,11 @@ defmodule FullCircleWeb.StatutoryFileFormatLive.Form do
         spec: spec
       }
 
-      case StatutoryConfig.save_file_format(attrs, socket.assigns.current_company, socket.assigns.current_user) do
+      case StatutoryConfig.save_file_format(
+             attrs,
+             socket.assigns.current_company,
+             socket.assigns.current_user
+           ) do
         {:ok, _} ->
           {:noreply,
            socket
@@ -138,7 +143,11 @@ defmodule FullCircleWeb.StatutoryFileFormatLive.Form do
 
   defp decode_and_validate_spec(json, socket) when is_binary(json) do
     with {:ok, spec} <- Jason.decode(json),
-         :ok <- FileSpec.validate(spec, StatutoryConfig.file_format_variables(socket.assigns.current_company.id)) do
+         :ok <-
+           FileSpec.validate(
+             spec,
+             StatutoryConfig.file_format_variables(socket.assigns.current_company.id)
+           ) do
       {:ok, spec}
     else
       {:error, %Jason.DecodeError{}} -> {:error, gettext("invalid JSON")}
@@ -151,7 +160,10 @@ defmodule FullCircleWeb.StatutoryFileFormatLive.Form do
     errors =
       case Jason.decode(spec_json) do
         {:ok, spec} ->
-          case FileSpec.validate(spec, StatutoryConfig.file_format_variables(socket.assigns.current_company.id)) do
+          case FileSpec.validate(
+                 spec,
+                 StatutoryConfig.file_format_variables(socket.assigns.current_company.id)
+               ) do
             :ok -> []
             {:error, errs} -> errs
           end
@@ -268,7 +280,10 @@ defmodule FullCircleWeb.StatutoryFileFormatLive.Form do
             </div>
           </div>
           <p :if={@preview_error} class="text-rose-600 mt-2">{@preview_error}</p>
-          <pre :if={@preview_lines} class="mt-2 font-mono text-xs overflow-x-auto bg-gray-100 dark:bg-gray-900 p-2 rounded">
+          <pre
+            :if={@preview_lines}
+            class="mt-2 font-mono text-xs overflow-x-auto bg-gray-100 dark:bg-gray-900 p-2 rounded"
+          >
             {Enum.join(@preview_lines, "\n")}
           </pre>
         </div>

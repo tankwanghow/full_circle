@@ -33,7 +33,8 @@ defmodule FullCircle.PayScript.ParserTest do
     end
 
     test "comparison binds tighter than not, and, or" do
-      assert {:binop, :or, {:binop, :and, {:not, {:binop, :gt, {:var, "a"}, {:num, 1.0}}}, {:var, "b"}},
+      assert {:binop, :or,
+              {:binop, :and, {:not, {:binop, :gt, {:var, "a"}, {:num, 1.0}}}, {:var, "b"}},
               {:var, "c"}} = parse_one("not a > 1 and b or c")
     end
 
@@ -68,7 +69,12 @@ defmodule FullCircle.PayScript.ParserTest do
 
   describe "script structure" do
     test "parses multiple bindings in order" do
-      assert {:ok, [{"a", {:num, 1.0}}, {"b", {:binop, :add, {:var, "a"}, {:num, 2.0}}}, {"result", {:var, "b"}}]} =
+      assert {:ok,
+              [
+                {"a", {:num, 1.0}},
+                {"b", {:binop, :add, {:var, "a"}, {:num, 2.0}}},
+                {"result", {:var, "b"}}
+              ]} =
                parse("a = 1\nb = a + 2\nresult = b")
     end
 

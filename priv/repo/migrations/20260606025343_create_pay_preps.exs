@@ -3,8 +3,12 @@ defmodule FullCircle.Repo.Migrations.CreatePayPreps do
 
   def change do
     create table(:pay_preps) do
-      add :company_id, references(:companies, type: :binary_id, on_delete: :delete_all), null: false
-      add :employee_id, references(:employees, type: :binary_id, on_delete: :delete_all), null: false
+      add :company_id, references(:companies, type: :binary_id, on_delete: :delete_all),
+        null: false
+
+      add :employee_id, references(:employees, type: :binary_id, on_delete: :delete_all),
+        null: false
+
       add :funds_account_id, references(:accounts, type: :binary_id, on_delete: :nilify_all)
       add :verified_by_id, references(:users, type: :binary_id, on_delete: :nilify_all)
       add :pay_month, :integer, null: false

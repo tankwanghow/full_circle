@@ -94,8 +94,7 @@ defmodule FullCircle.Tax.Remedy do
       personal_tax: personal_tax,
       total: company_tax_after |> Decimal.add(personal_tax) |> money(),
       fee_amount: fee,
-      extra_cash_movement:
-        Decimal.sub(fee, Decimal.add(analysis.excess_tax, analysis.penalty))
+      extra_cash_movement: Decimal.sub(fee, Decimal.add(analysis.excess_tax, analysis.penalty))
     }
 
     delta = Decimal.sub(director_fee.total, pay_penalty.total)

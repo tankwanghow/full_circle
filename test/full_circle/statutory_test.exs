@@ -196,7 +196,12 @@ defmodule FullCircle.StatutoryTest do
           ctx.admin
         )
 
-      cr = FullCircle.Accounting.get_account_by_name("Salaries and Wages Payable", ctx.com, ctx.admin)
+      cr =
+        FullCircle.Accounting.get_account_by_name(
+          "Salaries and Wages Payable",
+          ctx.com,
+          ctx.admin
+        )
 
       {:ok, st} =
         FullCircle.StdInterface.create(

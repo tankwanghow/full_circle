@@ -29,7 +29,8 @@ defmodule FullCircle.BankReconciliation.PdfTextTest do
     end
 
     test "returns error for missing file" do
-      assert {:error, "PDF file not found"} = PdfText.pages("/tmp/does-not-exist-#{:rand.uniform(999_999)}.pdf")
+      assert {:error, "PDF file not found"} =
+               PdfText.pages("/tmp/does-not-exist-#{:rand.uniform(999_999)}.pdf")
     end
   end
 end

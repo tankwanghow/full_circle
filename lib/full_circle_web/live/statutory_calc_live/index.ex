@@ -37,7 +37,10 @@ defmodule FullCircleWeb.StatutoryCalcLive.Index do
   @impl true
   def handle_event("search", %{"search" => %{"terms" => terms}}, socket) do
     qry = %{"search[terms]" => terms}
-    url = "/companies/#{socket.assigns.current_company.id}/statutory_calcs?#{URI.encode_query(qry)}"
+
+    url =
+      "/companies/#{socket.assigns.current_company.id}/statutory_calcs?#{URI.encode_query(qry)}"
+
     {:noreply, push_patch(socket, to: url)}
   end
 

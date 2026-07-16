@@ -33,9 +33,8 @@ defmodule FullCircleWeb.StatutoryRateTableLive.IndexComponent do
         title={gettext("Click to show/hide values")}
       >
         <span class="font-bold text-blue-600 dark:text-blue-300">{@obj.code}</span>
-        &#8226; {@obj.effective_from}
-        &#8226; {Enum.join(@obj.columns, ", ")}
-        &#8226; {gettext("%{count} rows", count: length(@obj.rows))}
+        &#8226; {@obj.effective_from} &#8226; {Enum.join(@obj.columns, ", ")} &#8226; {gettext(
+          "%{count} rows", count: length(@obj.rows))}
         <span class="text-gray-500 dark:text-gray-400">{if @expanded, do: "▲", else: "▼"}</span>
       </div>
       <div :if={@expanded} class="border-b border-gray-500 py-2">

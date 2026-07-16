@@ -67,8 +67,20 @@ defmodule Mix.Tasks.Statutory.GenTemplate do
           %{"expr" => ~s|""|, "width" => 20},
           %{"expr" => @id_number_expr, "width" => 12},
           %{"expr" => "upper(name)", "width" => 150},
-          %{"expr" => "pay_month", "width" => 2, "format" => "decimal:0", "pad" => "0", "align" => "right"},
-          %{"expr" => "pay_year", "width" => 4, "format" => "decimal:0", "pad" => "0", "align" => "right"},
+          %{
+            "expr" => "pay_month",
+            "width" => 2,
+            "format" => "decimal:0",
+            "pad" => "0",
+            "align" => "right"
+          },
+          %{
+            "expr" => "pay_year",
+            "width" => 4,
+            "format" => "decimal:0",
+            "pad" => "0",
+            "align" => "right"
+          },
           %{
             "expr" => "socso_employer + socso_employee + socso_employer_only",
             "width" => 14,
@@ -96,8 +108,20 @@ defmodule Mix.Tasks.Statutory.GenTemplate do
           %{"expr" => ~s|""|, "width" => 20},
           %{"expr" => @id_number_expr, "width" => 12},
           %{"expr" => "upper(name)", "width" => 150},
-          %{"expr" => "pay_month", "width" => 2, "format" => "decimal:0", "pad" => "0", "align" => "right"},
-          %{"expr" => "pay_year", "width" => 4, "format" => "decimal:0", "pad" => "0", "align" => "right"},
+          %{
+            "expr" => "pay_month",
+            "width" => 2,
+            "format" => "decimal:0",
+            "pad" => "0",
+            "align" => "right"
+          },
+          %{
+            "expr" => "pay_year",
+            "width" => 4,
+            "format" => "decimal:0",
+            "pad" => "0",
+            "align" => "right"
+          },
           %{
             "expr" => "eis_employer + eis_employee + eis_employer_only",
             "width" => 14,
@@ -148,9 +172,27 @@ defmodule Mix.Tasks.Statutory.GenTemplate do
           %{"expr" => ~s|""|, "width" => 20},
           %{"expr" => @id_number_expr, "width" => 12},
           %{"expr" => "upper(name)", "width" => 150},
-          %{"expr" => "pay_month", "width" => 2, "format" => "decimal:0", "pad" => "0", "align" => "right"},
-          %{"expr" => "pay_year", "width" => 4, "format" => "decimal:0", "pad" => "0", "align" => "right"},
-          %{"expr" => "wages", "width" => 14, "format" => "cents", "pad" => "0", "align" => "right"},
+          %{
+            "expr" => "pay_month",
+            "width" => 2,
+            "format" => "decimal:0",
+            "pad" => "0",
+            "align" => "right"
+          },
+          %{
+            "expr" => "pay_year",
+            "width" => 4,
+            "format" => "decimal:0",
+            "pad" => "0",
+            "align" => "right"
+          },
+          %{
+            "expr" => "wages",
+            "width" => 14,
+            "format" => "cents",
+            "pad" => "0",
+            "align" => "right"
+          },
           %{
             "expr" => "socso_employer + socso_employer_only",
             "width" => 6,
@@ -158,7 +200,13 @@ defmodule Mix.Tasks.Statutory.GenTemplate do
             "pad" => "0",
             "align" => "right"
           },
-          %{"expr" => "socso_employee", "width" => 6, "format" => "cents", "pad" => "0", "align" => "right"},
+          %{
+            "expr" => "socso_employee",
+            "width" => 6,
+            "format" => "cents",
+            "pad" => "0",
+            "align" => "right"
+          },
           %{
             "expr" => "eis_employer + eis_employer_only",
             "width" => 6,
@@ -166,8 +214,20 @@ defmodule Mix.Tasks.Statutory.GenTemplate do
             "pad" => "0",
             "align" => "right"
           },
-          %{"expr" => "eis_employee", "width" => 6, "format" => "cents", "pad" => "0", "align" => "right"},
-          %{"expr" => "socso_24hour", "width" => 6, "format" => "cents", "pad" => "0", "align" => "right"},
+          %{
+            "expr" => "eis_employee",
+            "width" => 6,
+            "format" => "cents",
+            "pad" => "0",
+            "align" => "right"
+          },
+          %{
+            "expr" => "socso_24hour",
+            "width" => 6,
+            "format" => "cents",
+            "pad" => "0",
+            "align" => "right"
+          },
           %{"expr" => ~s|""|, "width" => 34}
         ]
       }
@@ -182,14 +242,62 @@ defmodule Mix.Tasks.Statutory.GenTemplate do
         "kind" => "header",
         "fields" => [
           %{"expr" => ~s|"H"|, "width" => 1},
-          %{"expr" => "employer_code", "width" => 10, "format" => "digits", "pad" => "0", "align" => "right"},
-          %{"expr" => "employer_code", "width" => 10, "format" => "digits", "pad" => "0", "align" => "right"},
-          %{"expr" => "pay_year", "width" => 4, "format" => "digits", "pad" => "0", "align" => "right"},
-          %{"expr" => "pay_month", "width" => 2, "format" => "digits", "pad" => "0", "align" => "right"},
-          %{"expr" => ~s|sum("pcb_employee")|, "width" => 10, "format" => "cents", "pad" => "0", "align" => "right"},
-          %{"expr" => "count()", "width" => 5, "format" => "decimal:0", "pad" => "0", "align" => "right"},
-          %{"expr" => "0", "width" => 10, "format" => "decimal:0", "pad" => "0", "align" => "right"},
-          %{"expr" => "0", "width" => 5, "format" => "decimal:0", "pad" => "0", "align" => "right"}
+          %{
+            "expr" => "employer_code",
+            "width" => 10,
+            "format" => "digits",
+            "pad" => "0",
+            "align" => "right"
+          },
+          %{
+            "expr" => "employer_code",
+            "width" => 10,
+            "format" => "digits",
+            "pad" => "0",
+            "align" => "right"
+          },
+          %{
+            "expr" => "pay_year",
+            "width" => 4,
+            "format" => "digits",
+            "pad" => "0",
+            "align" => "right"
+          },
+          %{
+            "expr" => "pay_month",
+            "width" => 2,
+            "format" => "digits",
+            "pad" => "0",
+            "align" => "right"
+          },
+          %{
+            "expr" => ~s|sum("pcb_employee")|,
+            "width" => 10,
+            "format" => "cents",
+            "pad" => "0",
+            "align" => "right"
+          },
+          %{
+            "expr" => "count()",
+            "width" => 5,
+            "format" => "decimal:0",
+            "pad" => "0",
+            "align" => "right"
+          },
+          %{
+            "expr" => "0",
+            "width" => 10,
+            "format" => "decimal:0",
+            "pad" => "0",
+            "align" => "right"
+          },
+          %{
+            "expr" => "0",
+            "width" => 5,
+            "format" => "decimal:0",
+            "pad" => "0",
+            "align" => "right"
+          }
         ]
       },
       %{
@@ -199,14 +307,32 @@ defmodule Mix.Tasks.Statutory.GenTemplate do
         "sort" => "name",
         "fields" => [
           %{"expr" => ~s|"D"|, "width" => 1},
-          %{"expr" => "tax_no", "width" => 11, "format" => "digits", "pad" => "0", "align" => "right"},
+          %{
+            "expr" => "tax_no",
+            "width" => 11,
+            "format" => "digits",
+            "pad" => "0",
+            "align" => "right"
+          },
           %{"expr" => "name", "width" => 60},
           %{"expr" => ~s|""|, "width" => 12},
           %{"expr" => "id_no", "width" => 12, "format" => "digits"},
           %{"expr" => ~s|""|, "width" => 12},
           %{"expr" => ~s|"MY"|, "width" => 2},
-          %{"expr" => "pcb_employee", "width" => 8, "format" => "cents", "pad" => "0", "align" => "right"},
-          %{"expr" => "0", "width" => 8, "format" => "decimal:0", "pad" => "0", "align" => "right"},
+          %{
+            "expr" => "pcb_employee",
+            "width" => 8,
+            "format" => "cents",
+            "pad" => "0",
+            "align" => "right"
+          },
+          %{
+            "expr" => "0",
+            "width" => 8,
+            "format" => "decimal:0",
+            "pad" => "0",
+            "align" => "right"
+          },
           %{"expr" => ~s|""|, "width" => 10}
         ]
       }
@@ -249,40 +375,66 @@ defmodule Mix.Tasks.Statutory.GenTemplate do
       "bundle_version" => 1,
       "source" => "legacy SalaryNoteCalFunc + pay_script_acceptance_test reference scripts",
       "rate_tables" => [
-        table_entry("socso", ~D[1957-01-01],
+        table_entry(
+          "socso",
+          ~D[1957-01-01],
           ["wage_from", "wage_to", "employer", "employee", "employer_only", "employee_24hour"],
           SalaryNoteCalFunc.socso_table()
         ),
-        table_entry("eis", ~D[1957-01-01],
+        table_entry(
+          "eis",
+          ~D[1957-01-01],
           ["wage_from", "wage_to", "employer", "employee", "total"],
           SalaryNoteCalFunc.eis_table()
         ),
-        table_entry("pcb_normal", ~D[1957-01-01],
+        table_entry(
+          "pcb_normal",
+          ~D[1957-01-01],
           ["p_from", "p_to", "m", "r", "b13", "b2"],
           SalaryNoteCalFunc.pcb_table_normal()
         )
       ],
       "calcs" => [
         constant_calc("epf_relief_cap", "EPF Relief Cap", ~D[1957-01-01], 4000),
-        constant_calc("pcb_individual_deduction", "PCB Individual Deduction", ~D[1957-01-01], 9000),
+        constant_calc(
+          "pcb_individual_deduction",
+          "PCB Individual Deduction",
+          ~D[1957-01-01],
+          9000
+        ),
         constant_calc("pcb_spouse_deduction", "PCB Spouse Deduction", ~D[1957-01-01], 4000),
         constant_calc("pcb_child_deduction", "PCB Child Deduction", ~D[1957-01-01], 2000),
         calc_entry("epf_employer", "EPF Employer", ~D[1957-01-01], @epf_employer_script),
         calc_entry("epf_employee", "EPF Employee", ~D[1957-01-01], @epf_employee_script),
         calc_entry("socso_employer", "SOCSO Employer", ~D[1957-01-01], @socso_employer_script),
         calc_entry("socso_employee", "SOCSO Employee", ~D[1957-01-01], @socso_employee_script),
-        calc_entry("socso_employer_only", "SOCSO Employer Only", ~D[1957-01-01], @socso_employer_only_script),
+        calc_entry(
+          "socso_employer_only",
+          "SOCSO Employer Only",
+          ~D[1957-01-01],
+          @socso_employer_only_script
+        ),
         calc_entry("socso_24hour", "SOCSO 24 Hour (SKBBK)", ~D[2026-06-01], @socso_24hour_script),
         calc_entry("eis_employer", "EIS Employer", ~D[1957-01-01], @eis_employer_script),
         calc_entry("eis_employee", "EIS Employee", ~D[1957-01-01], @eis_employee_script),
-        calc_entry("eis_employer_only", "EIS Employer Only", ~D[1957-01-01], @eis_employer_only_script),
+        calc_entry(
+          "eis_employer_only",
+          "EIS Employer Only",
+          ~D[1957-01-01],
+          @eis_employer_only_script
+        ),
         calc_entry("pcb_employee", "PCB Employee", ~D[1957-01-01], @pcb_script)
       ],
       "file_formats" => [
         file_format_entry("socso_txt", "SOCSO text file", ~D[1957-01-01], @socso_txt_spec),
         file_format_entry("eis_txt", "EIS text file", ~D[1957-01-01], @eis_txt_spec),
         file_format_entry("epf_form_a", "EPF Form A", ~D[1957-01-01], @epf_form_a_spec),
-        file_format_entry("socso_eis_txt", "SOCSO+EIS text file", ~D[1957-01-01], @socso_eis_txt_spec),
+        file_format_entry(
+          "socso_eis_txt",
+          "SOCSO+EIS text file",
+          ~D[1957-01-01],
+          @socso_eis_txt_spec
+        ),
         file_format_entry("pcb_cp39", "PCB CP39", ~D[1957-01-01], @pcb_cp39_spec)
       ]
     }

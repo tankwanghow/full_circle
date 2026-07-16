@@ -83,8 +83,11 @@ defmodule FullCircle.PaySlipOp do
     }
   end
 
-  defp index_notes(list), do: list |> Enum.with_index() |> Map.new(fn {n, i} -> {"#{i}", note_attrs(n)} end)
-  defp index_advances(list), do: list |> Enum.with_index() |> Map.new(fn {a, i} -> {"#{i}", adv_attrs(a)} end)
+  defp index_notes(list),
+    do: list |> Enum.with_index() |> Map.new(fn {n, i} -> {"#{i}", note_attrs(n)} end)
+
+  defp index_advances(list),
+    do: list |> Enum.with_index() |> Map.new(fn {a, i} -> {"#{i}", adv_attrs(a)} end)
 
   defp note_attrs(n) do
     %{
@@ -640,8 +643,7 @@ defmodule FullCircle.PaySlipOp do
     |> Multi.delete_all(
       :delete_stat_notes_gl,
       from(t in Transaction,
-        where:
-          t.doc_type == "SalaryNote" and t.company_id == ^com.id and t.doc_no in ^stat_nos
+        where: t.doc_type == "SalaryNote" and t.company_id == ^com.id and t.doc_no in ^stat_nos
       )
     )
     |> Multi.delete_all(
@@ -661,8 +663,7 @@ defmodule FullCircle.PaySlipOp do
     |> Multi.delete_all(
       :reverse_pay_slip_gl,
       from(t in Transaction,
-        where:
-          t.doc_type == "PaySlip" and t.doc_no == ^ps.slip_no and t.company_id == ^com.id
+        where: t.doc_type == "PaySlip" and t.doc_no == ^ps.slip_no and t.company_id == ^com.id
       )
     )
     |> Multi.delete(:void_pay_slip, ps)

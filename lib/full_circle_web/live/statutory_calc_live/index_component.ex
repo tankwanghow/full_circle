@@ -23,15 +23,12 @@ defmodule FullCircleWeb.StatutoryCalcLive.IndexComponent do
     >
       <.link
         class="hover:font-bold text-blue-600 dark:text-blue-300"
-        navigate={
-          ~p"/companies/#{@current_company.id}/statutory_calcs/new?#{%{"code" => @obj.code}}"
-        }
+        navigate={~p"/companies/#{@current_company.id}/statutory_calcs/new?#{%{"code" => @obj.code}}"}
       >
         {@obj.code}
       </.link>
-      &#8226; {@obj.name}
-      &#8226; {@obj.effective_from}
-      &#8226; <span class="font-mono text-sm">{first_script_line(@obj.script)}</span>
+      &#8226; {@obj.name} &#8226; {@obj.effective_from} &#8226;
+      <span class="font-mono text-sm">{first_script_line(@obj.script)}</span>
     </div>
     """
   end

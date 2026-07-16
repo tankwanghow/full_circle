@@ -69,7 +69,8 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
   def handle_event("refresh", _params, socket) do
     case FullCircle.HR.FingerPrintImport.parse_files_rows(socket.assigns.raw_attendances) do
       {:ok, raw_attendances} ->
-        {:noreply, build_attendances_assigns(socket, socket.assigns.raw_attendances, raw_attendances)}
+        {:noreply,
+         build_attendances_assigns(socket, socket.assigns.raw_attendances, raw_attendances)}
 
       _ ->
         {:noreply, socket}
@@ -106,8 +107,12 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
       if Enum.any?(results, &match?({:error, _}, &1)) do
         {:noreply,
          socket
-         |> put_flash(:error,
-           gettext("A file could not be read — make sure it is a fingerprint 'Att.log report' export."))}
+         |> put_flash(
+           :error,
+           gettext(
+             "A file could not be read — make sure it is a fingerprint 'Att.log report' export."
+           )
+         )}
       else
         raw_files = Enum.map(results, fn {:ok, rows} -> rows end)
         handle_parsed_files(socket, raw_files)
@@ -128,8 +133,10 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
       {:error, {:date_range_mismatch, _ranges}} ->
         {:noreply,
          socket
-         |> put_flash(:error,
-           gettext("Uploaded files cover different months. Upload one month's machines together."))}
+         |> put_flash(
+           :error,
+           gettext("Uploaded files cover different months. Upload one month's machines together.")
+         )}
     end
   end
 
@@ -353,7 +360,10 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
         <span class="text-xl">To: </span><span class="text-xl font-bold">{@to_date}</span>
       </div>
     </div>
-    <div :if={!@imported} class="w-10/12 mx-auto p-4 mb-1 border rounded-lg border-green-500 bg-green-200">
+    <div
+      :if={!@imported}
+      class="w-10/12 mx-auto p-4 mb-1 border rounded-lg border-green-500 bg-green-200"
+    >
       <div class="my-2 text-center mx-auto font-bold text-2xl">
         <.link phx-click="refresh" class="button blue">{gettext("Refresh")}</.link>
       </div>
@@ -412,8 +422,7 @@ defmodule FullCircleWeb.UploadPunchLog.Index do
         <span class="font-bold">{@import_result.total_inserted}</span>
         {gettext("new punches for")}
         <span class="font-bold">{Enum.count(@import_result.employees)}</span>
-        {gettext("employees")} ·
-        <span class="font-bold">{@import_result.total_skipped}</span>
+        {gettext("employees")} · <span class="font-bold">{@import_result.total_skipped}</span>
         {gettext("already present (skipped)")}
       </p>
 

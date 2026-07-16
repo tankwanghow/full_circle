@@ -19,7 +19,10 @@ defmodule FullCircle.FileSpecParityTest do
     StatutoryConfig.seed_company!(com.id)
 
     cr_ac = Accounting.get_account_by_name("Salaries and Wages Payable", com, admin)
-    funds_ac = account_fixture(%{name: "Cash on Hand", account_type: "Cash or Equivalent"}, com, admin)
+
+    funds_ac =
+      account_fixture(%{name: "Cash on Hand", account_type: "Cash or Equivalent"}, com, admin)
+
     monthly = HR.get_salary_type_by_name("Monthly Salary", com, admin)
 
     stat = fn name, code ->
@@ -69,7 +72,13 @@ defmodule FullCircle.FileSpecParityTest do
 
     e2 =
       employee_fixture(
-        %{name: "Alice Upper", epf_no: "E2", socso_no: "", tax_no: "50358107000", id_no: "910202025555"},
+        %{
+          name: "Alice Upper",
+          epf_no: "E2",
+          socso_no: "",
+          tax_no: "50358107000",
+          id_no: "910202025555"
+        },
         com,
         admin
       )
@@ -184,7 +193,8 @@ defmodule FullCircle.FileSpecParityTest do
       "deductions" => deductions
     }
 
-    {:ok, %{create_pay_slip: _ps}} = FullCircle.PaySlipOp.create_pay_slip(attrs, ctx.com, ctx.admin)
+    {:ok, %{create_pay_slip: _ps}} =
+      FullCircle.PaySlipOp.create_pay_slip(attrs, ctx.com, ctx.admin)
   end
 
   defp effective_spec(com_id, code) do

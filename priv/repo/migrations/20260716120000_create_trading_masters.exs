@@ -8,7 +8,10 @@ defmodule FullCircle.Repo.Migrations.CreateTradingMasters do
       add :kind, :string, null: false
       add :address_note, :text
       add :active, :boolean, null: false, default: true
-      add :company_id, references(:companies, type: :binary_id, on_delete: :delete_all), null: false
+
+      add :company_id, references(:companies, type: :binary_id, on_delete: :delete_all),
+        null: false
+
       add :contact_id, references(:contacts, type: :binary_id, on_delete: :nilify_all)
 
       timestamps(type: :utc_datetime)
@@ -24,7 +27,10 @@ defmodule FullCircle.Repo.Migrations.CreateTradingMasters do
       add :name, :string, null: false
       add :phone, :string
       add :active, :boolean, null: false, default: true
-      add :company_id, references(:companies, type: :binary_id, on_delete: :delete_all), null: false
+
+      add :company_id, references(:companies, type: :binary_id, on_delete: :delete_all),
+        null: false
+
       add :contact_id, references(:contacts, type: :binary_id, on_delete: :nilify_all)
 
       timestamps(type: :utc_datetime)
@@ -39,7 +45,10 @@ defmodule FullCircle.Repo.Migrations.CreateTradingMasters do
       add :name, :string, null: false
       add :phone, :string
       add :active, :boolean, null: false, default: true
-      add :company_id, references(:companies, type: :binary_id, on_delete: :delete_all), null: false
+
+      add :company_id, references(:companies, type: :binary_id, on_delete: :delete_all),
+        null: false
+
       add :contact_id, references(:contacts, type: :binary_id, on_delete: :nilify_all)
 
       timestamps(type: :utc_datetime)

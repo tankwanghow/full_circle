@@ -175,10 +175,8 @@ defmodule FullCircle.BankReconciliation.LlmParser do
         case decode_json(text) do
           {:ok, resp} when is_map(resp) ->
             balances = %{
-              opening_balance:
-                parse_balance(resp["opening_balance"]) || fallback.opening_balance,
-              closing_balance:
-                parse_balance(resp["closing_balance"]) || fallback.closing_balance
+              opening_balance: parse_balance(resp["opening_balance"]) || fallback.opening_balance,
+              closing_balance: parse_balance(resp["closing_balance"]) || fallback.closing_balance
             }
 
             {balances, merge_usage(usage, bal_usage)}

@@ -37,9 +37,15 @@ defmodule FullCircleWeb.ProfitLossForecastLiveTest do
       assert html =~ "Profit &amp; Loss Forecast" or html =~ "Profit & Loss Forecast"
     end
 
-    test "with query params renders the category table (Net Profit row)", %{conn: conn, company: company} do
+    test "with query params renders the category table (Net Profit row)", %{
+      conn: conn,
+      company: company
+    } do
       {:ok, lv, _html} =
-        live(conn, ~p"/companies/#{company.id}/profit_loss_forecast?search[fy_year]=2026&search[granularity]=monthly")
+        live(
+          conn,
+          ~p"/companies/#{company.id}/profit_loss_forecast?search[fy_year]=2026&search[granularity]=monthly"
+        )
 
       html = render_async(lv)
       assert html =~ "Net Profit"
@@ -64,7 +70,10 @@ defmodule FullCircleWeb.ProfitLossForecastLiveTest do
       txn!(company, rev.id, ~D[2026-01-10], -1_234_567)
 
       {:ok, lv, _} =
-        live(conn, ~p"/companies/#{company.id}/profit_loss_forecast?search[fy_year]=2026&search[granularity]=monthly")
+        live(
+          conn,
+          ~p"/companies/#{company.id}/profit_loss_forecast?search[fy_year]=2026&search[granularity]=monthly"
+        )
 
       html = render_async(lv)
       assert html =~ "1.23M"
@@ -111,7 +120,10 @@ defmodule FullCircleWeb.ProfitLossForecastLiveTest do
       company: company
     } do
       {:ok, lv, _html} =
-        live(conn, ~p"/companies/#{company.id}/profit_loss_forecast?search[fy_year]=2026&search[granularity]=monthly")
+        live(
+          conn,
+          ~p"/companies/#{company.id}/profit_loss_forecast?search[fy_year]=2026&search[granularity]=monthly"
+        )
 
       html = render_async(lv)
       assert html =~ "Instalment Due"
@@ -125,7 +137,10 @@ defmodule FullCircleWeb.ProfitLossForecastLiveTest do
       user: _user
     } do
       {:ok, lv, _html} =
-        live(conn, ~p"/companies/#{company.id}/profit_loss_forecast?search[fy_year]=2026&search[granularity]=monthly")
+        live(
+          conn,
+          ~p"/companies/#{company.id}/profit_loss_forecast?search[fy_year]=2026&search[granularity]=monthly"
+        )
 
       _html = render_async(lv)
 
@@ -300,7 +315,10 @@ defmodule FullCircleWeb.ProfitLossForecastLiveTest do
       assert html =~ "8,500"
     end
 
-    test "remedy panel shows under-estimation comparison when estimate too low", %{conn: _conn, user: user} do
+    test "remedy panel shows under-estimation comparison when estimate too low", %{
+      conn: _conn,
+      user: user
+    } do
       com = company_fixture(user, %{closing_month: 12, closing_day: 31})
 
       rev =
@@ -340,7 +358,10 @@ defmodule FullCircleWeb.ProfitLossForecastLiveTest do
       assert html =~ "Director fee"
     end
 
-    test "remedy panel shows over-estimation comparison when estimate too high", %{conn: _conn, user: user} do
+    test "remedy panel shows over-estimation comparison when estimate too high", %{
+      conn: _conn,
+      user: user
+    } do
       com = company_fixture(user, %{closing_month: 12, closing_day: 31})
 
       rev =

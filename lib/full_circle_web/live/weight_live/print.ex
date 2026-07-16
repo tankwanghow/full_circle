@@ -96,11 +96,11 @@ defmodule FullCircleWeb.WeighingLive.Print do
     ~H"""
     <div class="is-size-5 font-mono">
       <span class="weight"><span class="has-text-weight-semibold">Gross: </span>
-        {Number.Delimit.number_to_delimited(@wei.gross, precision: 0)}</span>
+      {Number.Delimit.number_to_delimited(@wei.gross, precision: 0)}</span>
       <span class="weight"><span class="has-text-weight-semibold">Tare:</span>
-        {Number.Delimit.number_to_delimited(@wei.tare, precision: 0)}</span>
+      {Number.Delimit.number_to_delimited(@wei.tare, precision: 0)}</span>
       <span class="weight"><span class="has-text-weight-semibold">Nett:</span>
-        {Number.Delimit.number_to_delimited(@wei.gross - @wei.tare, precision: 0)}</span>
+      {Number.Delimit.number_to_delimited(@wei.gross - @wei.tare, precision: 0)}</span>
     </div>
     """
   end

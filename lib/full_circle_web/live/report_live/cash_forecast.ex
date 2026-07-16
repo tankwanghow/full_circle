@@ -115,7 +115,10 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
   @impl true
   def handle_event("save_settings", _params, socket) do
     com = socket.assigns.current_company
-    {:ok, _} = CashForecast.save_excluded_account_ids(com, MapSet.to_list(socket.assigns.exclude_set))
+
+    {:ok, _} =
+      CashForecast.save_excluded_account_ids(com, MapSet.to_list(socket.assigns.exclude_set))
+
     com = CashForecast.company_with_settings(com)
 
     {:noreply,
@@ -154,8 +157,7 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
     |> assign_async(:result, fn ->
       {:ok,
        %{
-         result:
-           if(parsed, do: Reporting.cash_forecast(parsed, current_company), else: [])
+         result: if(parsed, do: Reporting.cash_forecast(parsed, current_company), else: [])
        }}
     end)
   end
@@ -299,7 +301,9 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
         <p class="font-bold">{gettext("Cash Forecast Settings")}</p>
         <p class="font-medium mt-1">{gettext("Exclude accounts from the run-rate")}</p>
         <p class="text-sm text-gray-500 dark:text-gray-400 mb-2">
-          {gettext("Tick discretionary accounts (director fees, dividends, …) you don't want projected into the forecast. Affects Forecast periods only — Actual periods always show real cash. Saved per company.")}
+          {gettext(
+            "Tick discretionary accounts (director fees, dividends, …) you don't want projected into the forecast. Affects Forecast periods only — Actual periods always show real cash. Saved per company."
+          )}
         </p>
         <form phx-change="filter_accounts">
           <input
@@ -354,13 +358,18 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
       <div class="relative z-10 w-11/12 max-w-3xl max-h-[80vh] overflow-auto rounded shadow-lg bg-white dark:bg-gray-800 dark:text-gray-100 p-4">
         <div class="flex items-center justify-between mb-2">
           <p class="font-bold">
-            {gettext("Period")} {@drill.n} ·
-            {if @drill.dir == "in", do: gettext("Base In"), else: gettext("Base Out")}
+            {gettext("Period")} {@drill.n} · {if @drill.dir == "in",
+              do: gettext("Base In"),
+              else: gettext("Base Out")}
             <span class="font-normal text-gray-500 dark:text-gray-400 text-sm">
               ({@drill.from} → {@drill.to})
             </span>
           </p>
-          <button type="button" phx-click="close_drill" class="text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 text-xl leading-none">
+          <button
+            type="button"
+            phx-click="close_drill"
+            class="text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 text-xl leading-none"
+          >
             ×
           </button>
         </div>
@@ -415,10 +424,18 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
         <div>~12 mo: <span class="font-mono">{fmt(@ladder.place_12mo)}</span></div>
       </div>
       <div class="grid grid-cols-4 text-center mt-1 text-sm text-gray-500 dark:text-gray-400">
-        <div>{gettext("Lockable")} 1mo: <span class="font-mono">{fmt(@ladder.lockable_1mo)}</span></div>
-        <div>{gettext("Lockable")} 3mo: <span class="font-mono">{fmt(@ladder.lockable_3mo)}</span></div>
-        <div>{gettext("Lockable")} 6mo: <span class="font-mono">{fmt(@ladder.lockable_6mo)}</span></div>
-        <div>{gettext("Lockable")} 12mo: <span class="font-mono">{fmt(@ladder.lockable_12mo)}</span></div>
+        <div>
+          {gettext("Lockable")} 1mo: <span class="font-mono">{fmt(@ladder.lockable_1mo)}</span>
+        </div>
+        <div>
+          {gettext("Lockable")} 3mo: <span class="font-mono">{fmt(@ladder.lockable_3mo)}</span>
+        </div>
+        <div>
+          {gettext("Lockable")} 6mo: <span class="font-mono">{fmt(@ladder.lockable_6mo)}</span>
+        </div>
+        <div>
+          {gettext("Lockable")} 12mo: <span class="font-mono">{fmt(@ladder.lockable_12mo)}</span>
+        </div>
       </div>
     </div>
     """
@@ -442,7 +459,9 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
             <th class="px-1">{gettext("Closing")}</th>
             <th class="px-1">{gettext("Buffer")}</th>
             <th class="px-1 text-green-700 dark:text-green-400">{gettext("Free Cash")}</th>
-            <th class="px-1 border-l dark:border-gray-600 text-gray-500 dark:text-gray-400">{gettext("Receivable")}</th>
+            <th class="px-1 border-l dark:border-gray-600 text-gray-500 dark:text-gray-400">
+              {gettext("Receivable")}
+            </th>
             <th class="px-1 text-gray-500 dark:text-gray-400">{gettext("Payable")}</th>
           </tr>
         </thead>
@@ -483,7 +502,10 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
               <span :if={p.source != :actual} class="text-gray-500 dark:text-gray-400">
                 {compact(p.baseline_in)}
               </span>
-              <div :if={p.source == :actual && split_line(p, :in)} class="text-xs text-gray-500 dark:text-gray-400 leading-tight whitespace-nowrap">
+              <div
+                :if={p.source == :actual && split_line(p, :in)}
+                class="text-xs text-gray-500 dark:text-gray-400 leading-tight whitespace-nowrap"
+              >
                 {split_line(p, :in)}
               </div>
             </td>
@@ -500,7 +522,10 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
               <span :if={p.source != :actual} class="text-gray-500 dark:text-gray-400">
                 {compact(p.baseline_out)}
               </span>
-              <div :if={p.source == :actual && split_line(p, :out)} class="text-xs text-gray-500 dark:text-gray-400 leading-tight whitespace-nowrap">
+              <div
+                :if={p.source == :actual && split_line(p, :out)}
+                class="text-xs text-gray-500 dark:text-gray-400 leading-tight whitespace-nowrap"
+              >
                 {split_line(p, :out)}
               </div>
             </td>
@@ -530,7 +555,10 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
       <p class="font-bold mb-2">
         {gettext("How to read this report")}
         <span class="font-normal text-gray-500 dark:text-gray-400">
-          ({gettext("each period is %{d} days; the run-rate is sampled from the last %{t} days", d: @period_days, t: @trailing_days)})
+          ({gettext("each period is %{d} days; the run-rate is sampled from the last %{t} days",
+            d: @period_days,
+            t: @trailing_days
+          )})
         </span>
       </p>
       <dl class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1">
@@ -545,7 +573,9 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
         <div>
           <dt class="inline font-semibold">{gettext("Opening")} / {gettext("Closing")}:</dt>
           <dd class="inline">
-            {gettext("Balance at the start / end of the period (Opening + all inflows − all outflows). One continuous line across actual and forecast.")}
+            {gettext(
+              "Balance at the start / end of the period (Opening + all inflows − all outflows). One continuous line across actual and forecast."
+            )}
           </dd>
         </div>
         <div>
@@ -559,7 +589,8 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
         <div>
           <dt class="inline font-semibold">{gettext("Buffer")}:</dt>
           <dd class="inline">
-            {gettext("Cash that must stay liquid — the projected net cash drain (outflow − inflow, floored at 0) over the next %{n} period(s).",
+            {gettext(
+              "Cash that must stay liquid — the projected net cash drain (outflow − inflow, floored at 0) over the next %{n} period(s).",
               n: @buffer_periods
             )}
           </dd>
@@ -578,7 +609,9 @@ defmodule FullCircleWeb.ReportLive.CashForecast do
         )}
       </p>
       <p class="mt-1 italic text-gray-500 dark:text-gray-400">
-        {gettext("Set the Start Date in the past to see real actuals for the elapsed periods alongside the forecast for the rest. The run-rate (used for forecast periods) is always taken from the most recent days; a longer trailing window smooths seasonality, a shorter one tracks recent changes.")}
+        {gettext(
+          "Set the Start Date in the past to see real actuals for the elapsed periods alongside the forecast for the rest. The run-rate (used for forecast periods) is always taken from the most recent days; a longer trailing window smooths seasonality, a shorter one tracks recent changes."
+        )}
       </p>
     </div>
     """

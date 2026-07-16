@@ -3,7 +3,9 @@ defmodule FullCircle.Repo.Migrations.CreateTaxInstalmentPlans do
 
   def change do
     create table(:tax_instalment_plans) do
-      add :company_id, references(:companies, type: :binary_id, on_delete: :delete_all), null: false
+      add :company_id, references(:companies, type: :binary_id, on_delete: :delete_all),
+        null: false
+
       add :tax_paid_account_id, references(:accounts, type: :binary_id, on_delete: :nilify_all)
       add :fy_year, :integer, null: false
       add :tolerance_pct, :decimal, null: false, default: 30

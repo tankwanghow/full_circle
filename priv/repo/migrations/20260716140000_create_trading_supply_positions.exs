@@ -13,7 +13,10 @@ defmodule FullCircle.Repo.Migrations.CreateTradingSupplyPositions do
       add :unit_price, :decimal
       add :status, :string, null: false, default: "open"
       add :notes, :text
-      add :company_id, references(:companies, type: :binary_id, on_delete: :delete_all), null: false
+
+      add :company_id, references(:companies, type: :binary_id, on_delete: :delete_all),
+        null: false
+
       add :supplier_id, references(:contacts, type: :binary_id, on_delete: :restrict), null: false
       add :good_id, references(:goods, type: :binary_id, on_delete: :restrict), null: false
 

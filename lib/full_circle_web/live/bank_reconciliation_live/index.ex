@@ -822,8 +822,11 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
         MapSet.size(assigns.selected_txn_ids) == 0 and
         Decimal.eq?(stmt_sel_total, 0)
 
-    visible_statement_lines = visible_lines(assigns.statement_lines, assigns.hide_matched, :match_group_id)
-    visible_book_transactions = visible_lines(assigns.book_transactions, assigns.hide_matched, :reconciled)
+    visible_statement_lines =
+      visible_lines(assigns.statement_lines, assigns.hide_matched, :match_group_id)
+
+    visible_book_transactions =
+      visible_lines(assigns.book_transactions, assigns.hide_matched, :reconciled)
 
     assigns =
       assign(assigns,

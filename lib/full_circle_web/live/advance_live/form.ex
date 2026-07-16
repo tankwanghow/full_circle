@@ -210,7 +210,12 @@ defmodule FullCircleWeb.AdvanceLive.Form do
         <.input field={@form[:slip_no]} type="hidden" />
         <div class="grid grid-cols-12 gap-1">
           <div class="col-span-3">
-            <.input field={@form[:slip_date]} label={gettext("Date")} type="date" readonly={@readonly} />
+            <.input
+              field={@form[:slip_date]}
+              label={gettext("Date")}
+              type="date"
+              readonly={@readonly}
+            />
           </div>
           <div class="col-span-5">
             <.input field={@form[:employee_id]} type="hidden" />
