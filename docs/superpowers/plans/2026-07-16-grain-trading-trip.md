@@ -446,22 +446,23 @@ Form: header fields; dynamic load/drop lines (add/remove); location selects filt
 
 ---
 
-### Task 7: Driver load/drop registers + agent delivery register
+### Task 7: Employee load/drop registers + agent delivery register
 
 **Files:**
 - Modify: `trading.ex` — query functions
-- Create: `lib/full_circle_web/live/trading_driver_register_live/index.ex` (tabs or mode: load | drop)
+- Create: `lib/full_circle_web/live/trading_employee_register_live/index.ex` (tabs or mode: load | drop)
 - Create: `lib/full_circle_web/live/trading_agent_register_live/index.ex`
 - Router + nav + tests
 
 **Interfaces:**
 
 ```elixir
-@spec driver_load_register(company, user, %{from: Date.t(), to: Date.t(), driver_id: id | nil}) ::
-  [%{driver, trip, date, location, supply_position, actual_mt}]
+@spec employee_load_register(company, user, %{from: Date.t(), to: Date.t(), employee_id: id | nil}) ::
+  [%{employee, trip, date, location, supply_position, actual_mt}]
+  # one row per (employee, load line); actual_mt = full load.actual_mt (participation)
 
-@spec driver_drop_register(company, user, filters) ::
-  [%{driver, trip, date, location, sales_position, actual_mt}]
+@spec employee_drop_register(company, user, filters) ::
+  [%{employee, trip, date, location, sales_position, actual_mt}]
 
 @spec agent_delivery_register(company, user, filters) ::
   [%{agent, trip, date, from_location, to_location, supply_position, sales_position, actual_mt}]
@@ -469,11 +470,11 @@ Form: header fields; dynamic load/drop lines (add/remove); location selects filt
 
 Agent rows: one per **drop** on completed trips with `transport_mode == "agent"`.  
 `from_location`: resolve from a load on same trip sharing `supply_position_id` with the drop when possible; else first load location on trip (document choice in code comment).  
-Totals by driver / by agent / by from→to pair.
+Totals by employee / by agent / by from→to pair.
 
-**Tests:** different load vs drop drivers; agent O–D columns present; date filter.
+**Tests:** three employees on one load each get full MT; two on drop each get full MT; agent O–D columns; date filter.
 
-- [ ] Implement + commit `feat(trading): driver and agent delivery registers`
+- [ ] Implement + commit `feat(trading): employee and agent delivery registers`
 
 ---
 

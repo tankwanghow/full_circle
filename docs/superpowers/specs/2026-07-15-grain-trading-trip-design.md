@@ -51,7 +51,7 @@ Also required:
 
 | Layer | Responsibility |
 |-------|----------------|
-| **New Trading domain** in FullCircle | Supply positions, sales positions, soft holds, trips (loads/drops), drivers, transport agents, position/open-sales/trip boards, driver/agent registers |
+| **New Trading domain** in FullCircle | Supply positions, sales positions, soft holds, trips (loads/drops with multi-employee), locations, position/open-sales/trip boards, worker/agent registers |
 | **Existing FullCircle** | Company, contacts, goods, auth, **Invoice**, **PurInvoice**, GL, payments, statutory |
 | **Tugas** | Out of scope for this feature |
 | **New monorepo app** | Not for v1; keep module boundaries clean enough that extraction later is possible |
@@ -205,7 +205,7 @@ Trip
     location_note?            # optional one-off detail ("Gate 3")
     planned_mt
     actual_mt?
-    driver_id?                # load driver (own transport)
+    employee_ids[]            # 0..n HR.Employee — people who handled this load (cargo can need several)
 
   drops[]   # 1..n
     sales_position_id?        # customer commitment (null if drop is own warehouse stock-in)
@@ -214,10 +214,14 @@ Trip
     supply_position_id?       # which supply this drop draws from (when applicable)
     planned_mt
     actual_mt?
-    driver_id?                # drop driver (own transport)
+    employee_ids[]            # 0..n HR.Employee — people who handled this drop
     variance_note?
     invoice_id?               # settlement link when created
 ```
+
+**Join tables (implementation):**  
+`trading_trip_load_employees (trip_load_id, employee_id)` and  
+`trading_trip_drop_employees (trip_drop_id, employee_id)` — many employees per load/drop line.
 
 **What vs where on a line**
 
@@ -226,23 +230,25 @@ Trip
 | `supply_position_id` | *Which* commercial supply (vessel/PO position) |
 | `sales_position_id` | *Which* customer commitment |
 | `location_id` | *Where* physically loaded or dropped |
+| `employee_ids[]` | *Who* handled cargo on this load or drop (can be multiple) |
 | Own warehouse drop | `sales_position_id` null; `location_id` = Location with `kind = own_warehouse` |
 | Own warehouse load (later out) | `supply_position_id` may be null if leaving warehouse stock; `location_id` = own warehouse Location |
 
 **Transport modes**
 
-| Mode | Agent | Drivers | Money trail |
-|------|--------|---------|-------------|
-| `company_own` | No | Load driver + drop driver (per line) | Load salary + drop salary from actual MT |
-| `agent` | Yes | Optional external driver name as note only | Agent bills company — register by agent + **from Location → to Location** + MT |
-| `customer_arranged` | No | Usually empty | No own driver pay / no agent bill |
+| Mode | Agent | Employees on load/drop | Money trail |
+|------|--------|------------------------|-------------|
+| `company_own` | No | One or more employees per load line and per drop line | Load salary + drop salary from actual MT (per employee who participated) |
+| `agent` | Yes (Contact) | Optional (own staff assisting); agent’s crew not required as employees | Agent bills company — register by agent + **from Location → to Location** + MT |
+| `customer_arranged` | No | Usually empty | No own worker pay / no agent bill |
 
-**Driver pay**
+**Worker pay (load salary / drop salary)**
 
-- Drivers are paid on **loading quantity** and **dropping quantity** separately (**load salary** and **drop salary**).  
-- Load driver and drop driver may differ on the same job.  
-- Different drop lines may have different drop drivers.  
-- v1 records **who + actual MT**; rate tables / payroll posting are optional later.
+- Paid on **loading quantity** and **dropping quantity** separately.  
+- **Multiple employees** may be assigned to one load or one drop (cargo handling often needs several people).  
+- Load crew and drop crew are independent lists (can overlap or differ).  
+- **v1 pay qty rule (participation):** each employee on a load line gets that line’s **full `actual_mt`** for the **load register**; each employee on a drop line gets that line’s **full `actual_mt`** for the **drop register**. (Not split MT unless you later choose to add share %.)  
+- Rate tables / payroll posting remain optional later.
 
 **Transport agent**
 
@@ -271,7 +277,7 @@ Contact mailing address continues to feed finance docs as today — separate fro
 ### 3.6 Masters
 
 - **Location** — **new table** `trading_locations` for physical load/drop/own-warehouse places (company-scoped).  
-- **Driver** — **existing `employees`** (HR). Trip load/drop `driver_id` → `employees.id`.  
+- **Workers / drivers** — **existing `employees`** (HR). Many per load/drop via join tables → `employees.id`.  
 - **Transport agent** — **existing `contacts`**. Trip `transport_agent_id` → `contacts.id` (optional category e.g. Transporter).  
 - Customers / suppliers / products — existing FullCircle contacts and goods (mail address on contact for finance only).
 
@@ -284,7 +290,7 @@ Contact mailing address continues to feed finance docs as today — separate fro
 1. Create **SupplyPosition** (vessel name, period, product, MT, price, supplier; title optional).  
 2. Position board shows open MT.  
 3. Create **SalesPosition**(s) (optional parent for call-offs) with preferred source = that SupplyPosition (soft hold).  
-4. Create **Trip**: one or more loads from port/godowns; one or more drops to customer sites and/or warehouse; transport mode + agent/drivers as applicable.  
+4. Create **Trip**: one or more loads from port/godowns; one or more drops to customer sites and/or warehouse; transport mode + agent; **assign one or more employees** on each load/drop as needed.  
 5. Enter **actual** MT on loads and drops; variance notes when planned vs actual diverges materially.  
 6. Balances update from **completed** actuals.  
 7. SalesPosition may remain open even if short (e.g. 33.5 of 35); office **marks fulfilled** case-by-case.  
@@ -303,14 +309,14 @@ Contact mailing address continues to feed finance docs as today — separate fro
 
 1. Trip **in**: load from SupplyPosition → drop warehouse.  
 2. Later trip **out**: load warehouse → drop customer site(s).  
-3. Same multi-load/multi-drop and driver/agent rules.
+3. Same multi-load/multi-drop and multi-employee / agent rules.
 
 ### Flow D — Multi-load, multi-drop job
 
 1. One Trip.  
 2. Multiple load lines (different locations/sources).  
 3. Multiple drop lines (different customers/sites and/or warehouse); each drop names its **source**.  
-4. One transport mode (and agent if applicable) for the job; drivers per load/drop line.
+4. One transport mode (and agent if applicable) for the job; **employee lists** per load/drop line (0..n each).
 
 ---
 
@@ -333,8 +339,9 @@ own_warehouse_qty(location) =
 soft_held        = Σ sales_undelivered where preferred_supply = this SupplyPosition
                    (display only; does not lock)
 
-driver_load_mt   = Σ load.actual_mt where load.driver = D
-driver_drop_mt   = Σ drop.actual_mt where drop.driver = D
+# Participation: full line MT for each employee assigned to that line
+employee_load_mt(E) = Σ load.actual_mt for completed loads where E ∈ load.employees
+employee_drop_mt(E) = Σ drop.actual_mt for completed drops where E ∈ drop.employees
 
 agent_delivery_lines =
   for each completed trip with agent = A, each drop line:
@@ -380,7 +387,7 @@ agent_mt_total   = Σ actual_mt on those lines
 | Cancel completed trip | Block if already invoiced; otherwise reverse balance impact |
 | Change preferred source after partial delivery | Allowed; historical actuals stay on sources used |
 | Mark SalesPosition fulfilled with undelivered &gt; 0 | Allowed; note recommended |
-| Missing load/drop driver on `company_own` complete | Warn (stronger for drop) |
+| Missing employees on load/drop when `company_own` complete | Warn if either list empty (cargo often needs people; still allow save) |
 | Missing agent on `agent` complete | Warn |
 | FC invoice voided | Trading link shows unlinked / warn; no heavy sync engine in v1 |
 
@@ -399,9 +406,9 @@ Trading
 ├── Sales positions
 ├── Locations
 ├── Transport agents
-├── Drivers
-├── Driver load register
-├── Driver drop register
+├── (Drivers via Employees page)
+├── Employee load register
+├── Employee drop register
 └── Agent delivery register
 (+ existing Invoice / PurInvoice)
 ```
@@ -410,11 +417,11 @@ Trading
 
 1. **Position board** — remaining by supply; soft-held column; price; open/closed; title / reference_no / vessel; own-warehouse stock by Location; drill to detail.  
 2. **Open sales** — SalesPositions; ordered / delivered / undelivered; soft hold; mark fulfilled; warnings; filter/search on title/reference_no; optional parent grouping.  
-3. **Trip board + form** — multi-load, multi-drop; each line picks **Location** (+ optional note); supply/sales commercial links; transport mode, agent, load/drop drivers, planned/actual, warnings.  
+3. **Trip board + form** — multi-load, multi-drop; each line picks **Location** (+ note), **multiple employees**, supply/sales links; transport mode, agent, planned/actual, warnings.  
 4. **Supply / sales forms** — SupplyPosition, SalesPosition (optional parent; optional **reference_no**).  
 5. **Locations** — CRUD for ports, supplier sites, customer sites, own warehouses.  
-6. **Driver load register** — load salary quantity by driver + date.  
-7. **Driver drop register** — drop salary quantity by driver + date.  
+6. **Employee load register** — load salary qty by employee + date (full MT per load they worked).  
+7. **Employee drop register** — drop salary qty by employee + date (full MT per drop they worked).  
 8. **Agent delivery register** — per agent/date: **from Location → to Location** + MT; check haulage bills.  
 9. **Settlement actions** — Create Invoice / PurInvoice prefilled from actuals; store links.
 
@@ -436,11 +443,11 @@ Users: **office sales/ops on desktop** only in v1.
 
 | Phase | Deliverable |
 |-------|-------------|
-| **0** | Module skeleton, nav, auth hooks, **Location** + Driver + TransportAgent masters |
+| **0** | Module skeleton, nav, auth hooks, **Location** master; drivers=employees, agents=contacts |
 | **1** | SupplyPosition + **Position board** |
 | **2** | SalesPosition (optional parent) + soft hold + **Open sales** + manual fulfill |
-| **3** | Trip multi-load/multi-drop (location_id on lines) + actuals + balance updates + **Trip board** |
-| **4** | Driver load/drop registers + agent delivery register (**from/to Location** + MT) |
+| **3** | Trip multi-load/multi-drop (location_id + **multi-employee** on lines) + actuals + balances + **Trip board** |
+| **4** | Employee load/drop registers + agent delivery register (**from/to Location** + MT) |
 | **5** | Create Invoice / PurInvoice from actuals + links |
 | **6** | Polish (DO print, attachments, variance threshold config, optional rates) |
 
@@ -460,7 +467,7 @@ Phases 1 and 2 may overlap once supply sources exist for soft-hold references.
 
 - Multi-load / multi-drop balance math (supply remaining, sales undelivered, own-warehouse Location stock).  
 - Load/drop require location_id; contact mail address not used as site.  
-- Load driver ≠ drop driver → both registers correct.  
+- Multiple employees on one load and on one drop → each gets full line MT in their register.  
 - Agent register shows from Location → to Location and MT per drop; filter by agent/date/O–D.  
 - Manual fulfill with short delivery (35 ordered, 33.5 delivered).  
 - Soft hold does not lock or reduce remaining.  
@@ -484,7 +491,7 @@ Phases 1 and 2 may overlap once supply sources exist for soft-hold references.
 | Oversell | Warn only |
 | Sales fulfillment | Case-by-case manual, not auto from math |
 | Transport | `company_own` / `agent` / `customer_arranged` |
-| Drivers | Per load line and per drop line; load salary + drop salary |
+| Workers | **Many employees per load and per drop**; load salary + drop salary; participation = full line MT each |
 | Agent | Per trip; bill check via **from Location → to Location** + MT (haulage by O–D; no auto rate calc in v1) |
 | Finance home | FullCircle Invoice / PurInvoice; trading links in |
 | Host app | FullCircle trading module |
@@ -493,7 +500,7 @@ Phases 1 and 2 may overlap once supply sources exist for soft-hold references.
 | Sales model | **One entity `SalesPosition`** — no type enum; optional `parent_id`; optional **reference_no** (human-entered) |
 | Document numbers | No mandatory auto SO/PO number; optional human-entered `reference_no` only (plus system UUID PK) |
 | Physical places | **Location** new table (port / supplier_site / customer_site / own_warehouse / other); required on load/drop |
-| Drivers | Existing **Employee** rows (not a separate trading_drivers table) |
+| Workers | Existing **Employee** rows; join tables on load/drop (not single driver_id) |
 | Transport agents | Existing **Contact** rows (not a separate trading_transport_agents table) |
 | Contact address | Mailing/finance only — not trip load/drop sites |
 | Own warehouse | Location with `kind = own_warehouse`; stock from trip in/out |
