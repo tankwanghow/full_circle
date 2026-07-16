@@ -46,11 +46,12 @@ defmodule FullCircleWeb.TradingSupplyLive.Index do
           {gettext("Dashboard")}
         </.link>
       </div>
-      <div class="bg-amber-200 border-y-2 border-amber-500 font-bold p-2 grid grid-cols-6 gap-1 text-sm">
+      <div class="bg-amber-200 border-y-2 border-amber-500 font-bold p-2 grid grid-cols-7 gap-1 text-sm">
         <div>{gettext("Title / Ref")}</div>
         <div>{gettext("Supplier")}</div>
         <div>{gettext("Good")}</div>
         <div class="text-right">{gettext("Qty")}</div>
+        <div class="text-center">{gettext("Unit")}</div>
         <div>{gettext("Status")}</div>
         <div></div>
       </div>
@@ -58,7 +59,7 @@ defmodule FullCircleWeb.TradingSupplyLive.Index do
         <div
           :for={s <- @supplies}
           id={"supply-#{s.id}"}
-          class="grid grid-cols-6 gap-1 border-b p-2 text-sm hover:bg-gray-100 dark:hover:bg-zinc-800"
+          class="grid grid-cols-7 gap-1 border-b p-2 text-sm hover:bg-gray-100 dark:hover:bg-zinc-800"
         >
           <div>
             <.link
@@ -70,9 +71,8 @@ defmodule FullCircleWeb.TradingSupplyLive.Index do
           </div>
           <div>{s.supplier && s.supplier.name}</div>
           <div>{s.good && s.good.name}</div>
-          <div class="text-right">
-            {s.quantity} {s.good && s.good.unit}
-          </div>
+          <div class="text-right">{s.quantity}</div>
+          <div class="text-center font-medium">{s.good && s.good.unit}</div>
           <div>{s.status}</div>
           <div></div>
         </div>

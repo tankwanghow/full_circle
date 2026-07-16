@@ -30,7 +30,8 @@ defmodule FullCircleWeb.TradingSupplyLive.Form do
          socket
          |> assign(page_title: gettext("New Supply Position"))
          |> assign(live_action: :new)
-         |> assign(form: to_form(cs))}
+         |> assign(form: to_form(cs))
+         |> assign(good_unit: nil)}
 
       true ->
         s = Trading.get_supply_position!(params["id"], company, user)
@@ -46,13 +47,14 @@ defmodule FullCircleWeb.TradingSupplyLive.Form do
          |> assign(page_title: gettext("Edit Supply Position"))
          |> assign(live_action: :edit)
          |> assign(supply: s)
-         |> assign(form: to_form(cs))}
+         |> assign(form: to_form(cs))
+         |> assign(good_unit: s.good && s.good.unit)}
     end
   end
 
   @impl true
   def handle_event("validate", %{"supply_position" => params}, socket) do
-    params = resolve_names(params, socket)
+    {params, good_unit} = resolve_names(params, socket)
     params = Map.put(params, "company_id", socket.assigns.current_company.id)
 
     cs =
@@ -62,11 +64,11 @@ defmodule FullCircleWeb.TradingSupplyLive.Form do
       end
       |> Map.put(:action, :validate)
 
-    {:noreply, assign(socket, form: to_form(cs))}
+    {:noreply, socket |> assign(form: to_form(cs)) |> assign(good_unit: good_unit)}
   end
 
   def handle_event("save", %{"supply_position" => params}, socket) do
-    params = resolve_names(params, socket)
+    {params, good_unit} = resolve_names(params, socket)
     company = socket.assigns.current_company
     user = socket.assigns.current_user
 
@@ -84,7 +86,7 @@ defmodule FullCircleWeb.TradingSupplyLive.Form do
          |> push_navigate(to: ~p"/companies/#{company.id}/trading/supply_positions")}
 
       {:error, %Ecto.Changeset{} = cs} ->
-        {:noreply, assign(socket, form: to_form(cs))}
+        {:noreply, socket |> assign(form: to_form(cs)) |> assign(good_unit: good_unit)}
 
       :not_authorise ->
         {:noreply, put_flash(socket, :error, gettext("You are not authorised to perform this action"))}
@@ -118,8 +120,11 @@ defmodule FullCircleWeb.TradingSupplyLive.Form do
       end
 
     case Product.get_good_by_name(params["good_name"] || "", company, user) do
-      %{id: id} -> Map.put(params, "good_id", id)
-      _ -> params
+      %{id: id, unit: unit} ->
+        {Map.put(params, "good_id", id), unit}
+
+      _ ->
+        {params, nil}
     end
   end
 
@@ -144,8 +149,19 @@ defmodule FullCircleWeb.TradingSupplyLive.Form do
           <.input field={@form[:supplier_name]} label={gettext("Supplier")} phx-debounce="300" />
           <.input field={@form[:good_name]} label={gettext("Good")} phx-debounce="300" />
         </div>
-        <div class="grid grid-cols-2 gap-2">
+        <div class="grid grid-cols-3 gap-2 items-end">
           <.input field={@form[:quantity]} type="number" step="any" label={gettext("Quantity")} />
+          <div>
+            <label class="block text-sm font-semibold leading-6 text-zinc-800 dark:text-zinc-200">
+              {gettext("Unit")}
+            </label>
+            <div
+              id="good-unit-display"
+              class="mt-2 flex h-10 items-center rounded-lg border border-zinc-300 bg-zinc-100 px-3 text-sm font-medium dark:border-zinc-600 dark:bg-zinc-800"
+            >
+              {if @good_unit, do: @good_unit, else: gettext("(from Good)")}
+            </div>
+          </div>
           <.input
             field={@form[:unit_price]}
             type="number"
@@ -153,9 +169,6 @@ defmodule FullCircleWeb.TradingSupplyLive.Form do
             label={gettext("Unit price")}
           />
         </div>
-        <p class="text-sm text-gray-500 dark:text-gray-400">
-          {gettext("Unit follows the Good master (not edited here).")}
-        </p>
         <.input
           field={@form[:status]}
           type="select"
@@ -186,3 +199,4 @@ defmodule FullCircleWeb.TradingSupplyLive.Form do
     """
   end
 end
+

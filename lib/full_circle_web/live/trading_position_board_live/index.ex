@@ -47,21 +47,22 @@ defmodule FullCircleWeb.TradingPositionBoardLive.Index do
       </div>
 
       <div class="overflow-x-auto">
-        <div class="bg-amber-200 border-y-2 border-amber-500 font-bold p-2 grid grid-cols-8 gap-1 text-xs md:text-sm min-w-[800px]">
+        <div class="bg-amber-200 border-y-2 border-amber-500 font-bold p-2 grid grid-cols-9 gap-1 text-xs md:text-sm min-w-[900px]">
           <div>{gettext("Supply")}</div>
           <div>{gettext("Supplier")}</div>
           <div>{gettext("Good")}</div>
+          <div class="text-center">{gettext("Unit")}</div>
           <div class="text-right">{gettext("Contracted")}</div>
           <div class="text-right">{gettext("Loaded")}</div>
           <div class="text-right">{gettext("Remaining")}</div>
           <div class="text-right">{gettext("Soft-held")}</div>
           <div class="text-right">{gettext("Price")}</div>
         </div>
-        <div id="position_board" class="min-w-[800px]">
+        <div id="position_board" class="min-w-[900px]">
           <div
             :for={row <- @rows}
             id={"board-#{row.supply.id}"}
-            class="grid grid-cols-8 gap-1 border-b p-2 text-xs md:text-sm hover:bg-gray-100 dark:hover:bg-zinc-800"
+            class="grid grid-cols-9 gap-1 border-b p-2 text-xs md:text-sm hover:bg-gray-100 dark:hover:bg-zinc-800"
           >
             <div>
               <.link
@@ -75,9 +76,10 @@ defmodule FullCircleWeb.TradingPositionBoardLive.Index do
             </div>
             <div>{row.supply.supplier && row.supply.supplier.name}</div>
             <div>{row.supply.good && row.supply.good.name}</div>
-            <div class="text-right">
-              {row.supply.quantity} {row.supply.good && row.supply.good.unit}
+            <div class="text-center font-medium">
+              {row.supply.good && row.supply.good.unit}
             </div>
+            <div class="text-right">{row.supply.quantity}</div>
             <div class="text-right">{row.loaded}</div>
             <div class={[
               "text-right font-semibold",
