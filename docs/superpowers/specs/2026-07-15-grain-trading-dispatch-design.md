@@ -21,8 +21,8 @@ Grain trade combines:
 
 ### v1 success criteria (equal priority)
 
-1. **Position board** — remaining MT by vessel / local PO / warehouse / product.  
-2. **Open commitments** — what was promised to customers (sales positions: contracts and orders) and what is still undelivered.  
+1. **Position board** — remaining MT by supply position / warehouse / product.  
+2. **Open commitments** — what was promised to customers (sales positions) and what is still undelivered.  
 3. **Movements** — what was loaded and dropped, from which sources, to which locations, with transport and driver accountability.
 
 Also required:
@@ -51,7 +51,7 @@ Also required:
 
 | Layer | Responsibility |
 |-------|----------------|
-| **New Trading domain** in FullCircle | Supply positions (vessel + local PO), sales positions (contract + order), soft holds, dispatches (loads/drops), drivers, transport agents, position/open-sales/dispatch boards, driver/agent registers |
+| **New Trading domain** in FullCircle | Supply positions, sales positions, soft holds, dispatches (loads/drops), drivers, transport agents, position/open-sales/dispatch boards, driver/agent registers |
 | **Existing FullCircle** | Company, contacts, goods, auth, **Invoice**, **PurInvoice**, GL, payments, statutory |
 | **Tugas** | Out of scope for this feature |
 | **New monorepo app** | Not for v1; keep module boundaries clean enough that extraction later is possible |
@@ -419,7 +419,7 @@ Phases 1 and 2 may overlap once supply sources exist for soft-hold references.
 | Dispatch unit | Logistics job; multi-load + multi-drop |
 | Qty truth | Planned + actual; balances use completed actuals |
 | Oversell | Warn only |
-| SO fulfillment | Case-by-case manual, not auto from math |
+| Sales fulfillment | Case-by-case manual, not auto from math |
 | Transport | `company_own` / `agent` / `customer_arranged` |
 | Drivers | Per load line and per drop line; load salary + drop salary |
 | Agent | Per dispatch; bill check via delivery register |
