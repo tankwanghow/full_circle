@@ -65,6 +65,9 @@ defmodule FullCircleWeb.DashboardLive do
 
       <div class="font-medium text-xl">Trading</div>
       <div class="mb-4 gap-1 flex flex-wrap justify-center">
+        <.link navigate={~p"/companies/#{@current_company.id}/trading/desk"} class="button teal">
+          {gettext("Trading Desk")}
+        </.link>
         <.link
           navigate={~p"/companies/#{@current_company.id}/trading/position_board"}
           class="button teal"
