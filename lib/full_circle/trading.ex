@@ -273,6 +273,33 @@ defmodule FullCircle.Trading do
     end)
   end
 
+  @doc """
+  Small warehouse board: own_warehouse locations with on-hand stock from
+  completed trip drops in − loads out.
+  """
+  def warehouse_board(company, user) do
+    if Authorization.can?(user, :view_trading, company) do
+      company
+      |> list_locations(user)
+      |> Enum.filter(&(&1.kind == "own_warehouse"))
+      |> Enum.sort_by(& &1.name)
+      |> Enum.map(fn loc ->
+        inbound = Balances.own_warehouse_inbound(loc.id)
+        outbound = Balances.own_warehouse_outbound(loc.id)
+        on_hand = Decimal.sub(inbound, outbound)
+
+        %{
+          location: loc,
+          inbound: inbound,
+          outbound: outbound,
+          on_hand: on_hand
+        }
+      end)
+    else
+      []
+    end
+  end
+
   # --- Sales positions ---
 
   def list_sales_positions(company, user, opts \\ []) do

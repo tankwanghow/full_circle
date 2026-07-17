@@ -176,6 +176,86 @@ defmodule FullCircle.Trading.TripTest do
     assert Decimal.eq?(Balances.sales_undelivered(sales), Decimal.new("0"))
   end
 
+  test "warehouse_board shows on hand after stock in and out", %{admin: admin, company: company} do
+    good = good_fixture(company, admin)
+    supply = supply_position_fixture(company, admin, %{"quantity" => "100", "good_id" => good.id})
+    wh = location_fixture(company, admin, %{"kind" => "own_warehouse", "name" => "Silo board"})
+    supplier_loc = location_fixture(company, admin, %{"kind" => "supplier_site"})
+    customer_loc = location_fixture(company, admin, %{"kind" => "customer_site"})
+
+    sales =
+      sales_position_fixture(company, admin, %{
+        "quantity" => "10",
+        "good_id" => good.id,
+        "status" => "open"
+      })
+
+    {:ok, in_trip} =
+      Trading.create_trip(
+        %{
+          "date" => "2026-07-21",
+          "transport_mode" => "company_own",
+          "good_id" => good.id,
+          "loads" => [
+            %{
+              "planned_mt" => "40",
+              "actual_mt" => "40",
+              "location_id" => supplier_loc.id,
+              "supply_position_id" => supply.id
+            }
+          ],
+          "drops" => [
+            %{
+              "planned_mt" => "40",
+              "actual_mt" => "40",
+              "location_id" => wh.id,
+              "supply_position_id" => supply.id
+            }
+          ]
+        },
+        company,
+        admin
+      )
+
+    assert {:ok, _, _} = Trading.complete_trip(in_trip, company, admin)
+
+    board = Trading.warehouse_board(company, admin)
+    row = Enum.find(board, &(&1.location.id == wh.id))
+    assert row
+    assert Decimal.eq?(row.on_hand, Decimal.new("40"))
+    assert Decimal.eq?(row.inbound, Decimal.new("40"))
+    assert Decimal.eq?(row.outbound, Decimal.new(0))
+
+    {:ok, out_trip} =
+      Trading.create_trip(
+        %{
+          "date" => "2026-07-22",
+          "transport_mode" => "company_own",
+          "good_id" => good.id,
+          "loads" => [
+            %{"planned_mt" => "15", "actual_mt" => "15", "location_id" => wh.id}
+          ],
+          "drops" => [
+            %{
+              "planned_mt" => "15",
+              "actual_mt" => "15",
+              "location_id" => customer_loc.id,
+              "sales_position_id" => sales.id
+            }
+          ]
+        },
+        company,
+        admin
+      )
+
+    assert {:ok, _, _} = Trading.complete_trip(out_trip, company, admin)
+
+    board = Trading.warehouse_board(company, admin)
+    row = Enum.find(board, &(&1.location.id == wh.id))
+    assert Decimal.eq?(row.on_hand, Decimal.new("25"))
+    assert Decimal.eq?(row.outbound, Decimal.new("15"))
+  end
+
   test "own warehouse drop in then load out", %{admin: admin, company: company} do
     good = good_fixture(company, admin)
     supply = supply_position_fixture(company, admin, %{"quantity" => "100", "good_id" => good.id})

@@ -25,7 +25,7 @@ defmodule FullCircleWeb.TradingPositionBoardLive.Index do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="mx-auto w-11/12">
+    <div class="mx-auto w-10/12">
       <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <div class="text-center mb-3 gap-1 flex flex-wrap justify-center">
         <.link
@@ -33,6 +33,12 @@ defmodule FullCircleWeb.TradingPositionBoardLive.Index do
           class="blue button"
         >
           {gettext("Supply Positions")}
+        </.link>
+        <.link
+          navigate={~p"/companies/#{@current_company.id}/trading/warehouse_board"}
+          class="blue button"
+        >
+          {gettext("Warehouse Board")}
         </.link>
         <.link
           navigate={~p"/companies/#{@current_company.id}/trading/trips"}
@@ -63,17 +69,17 @@ defmodule FullCircleWeb.TradingPositionBoardLive.Index do
       </div>
 
       <div class="bg-amber-200 border-y-2 border-amber-500 font-bold p-2 flex gap-1 text-xs md:text-sm">
-        <div class="w-2/12">{gettext("Supply")}</div>
-        <div class="w-1/12">{gettext("Status")}</div>
-        <div class="w-1/12">{gettext("Available")}</div>
-        <div class="w-2/12">{gettext("Supplier")}</div>
-        <div class="w-1/12">{gettext("Good")}</div>
-        <div class="w-1/12 text-center">{gettext("Unit")}</div>
-        <div class="w-1/12 text-right">{gettext("Contracted")}</div>
-        <div class="w-1/12 text-right">{gettext("Loaded")}</div>
-        <div class="w-1/12 text-right">{gettext("Remaining")}</div>
-        <div class="w-1/12 text-right">{gettext("Soft-held")}</div>
-        <div class="w-1/12 text-right">{gettext("Price")}</div>
+        <div class="w-5/30">{gettext("Supply")}</div>
+        <div class="w-2/30">{gettext("Status")}</div>
+        <div class="w-2/30">{gettext("Available")}</div>
+        <div class="w-5/30">{gettext("Supplier")}</div>
+        <div class="w-4/30">{gettext("Good")}</div>
+        <div class="w-2/30 text-center">{gettext("Unit")}</div>
+        <div class="w-2/30 text-right">{gettext("Contracted")}</div>
+        <div class="w-2/30 text-right">{gettext("Loaded")}</div>
+        <div class="w-2/30 text-right">{gettext("Remaining")}</div>
+        <div class="w-2/30 text-right">{gettext("Soft-held")}</div>
+        <div class="w-2/30 text-right">{gettext("Price")}</div>
       </div>
       <div id="position_board">
         <div
@@ -81,7 +87,7 @@ defmodule FullCircleWeb.TradingPositionBoardLive.Index do
           id={"board-#{row.supply.id}"}
           class="flex gap-1 border-b p-2 text-xs md:text-sm hover:bg-gray-100 dark:hover:bg-zinc-800"
         >
-          <div class="w-2/12">
+          <div class="w-5/30">
             <.link
               navigate={
                 ~p"/companies/#{@current_company.id}/trading/supply_positions/#{row.supply.id}/edit"
@@ -91,23 +97,23 @@ defmodule FullCircleWeb.TradingPositionBoardLive.Index do
               {display_supply(row.supply)}
             </.link>
           </div>
-          <div class="w-1/12">{row.supply.status}</div>
-          <div class="w-1/12">{row.supply.available_from}</div>
-          <div class="w-2/12">{row.supply.supplier && row.supply.supplier.name}</div>
-          <div class="w-1/12">{row.supply.good && row.supply.good.name}</div>
-          <div class="w-1/12 text-center font-medium">
+          <div class="w-2/30">{row.supply.status}</div>
+          <div class="w-2/30">{row.supply.available_from}</div>
+          <div class="w-5/30">{row.supply.supplier && row.supply.supplier.name}</div>
+          <div class="w-4/30">{row.supply.good && row.supply.good.name}</div>
+          <div class="w-2/30 text-center font-medium">
             {row.supply.good && row.supply.good.unit}
           </div>
-          <div class="w-1/12 text-right">{row.supply.quantity}</div>
-          <div class="w-1/12 text-right">{row.loaded}</div>
+          <div class="w-2/30 text-right">{row.supply.quantity}</div>
+          <div class="w-2/30 text-right">{row.loaded}</div>
           <div class={[
-            "w-1/12 text-right font-semibold",
+            "w-2/30 text-right font-semibold",
             remaining_class(row.remaining)
           ]}>
             {row.remaining}
           </div>
-          <div class="w-1/12 text-right">{row.soft_held}</div>
-          <div class="w-1/12 text-right">{row.supply.unit_price}</div>
+          <div class="w-2/30 text-right">{row.soft_held}</div>
+          <div class="w-2/30 text-right">{row.supply.unit_price}</div>
         </div>
       </div>
       <p :if={@rows == []} class="text-center p-4 text-gray-500">

@@ -91,30 +91,36 @@ defmodule FullCircle.Trading.Balances do
   def own_warehouse_qty(%Location{}), do: @zero
 
   def own_warehouse_qty(location_id) when is_binary(location_id) do
-    inbound =
-      from(d in TripDrop,
-        join: t in Trip,
-        on: t.id == d.trip_id,
-        where: t.status == "completed" and d.location_id == ^location_id,
-        select: coalesce(sum(d.actual_mt), 0)
-      )
-      |> Repo.one()
-      |> to_decimal()
-
-    outbound =
-      from(l in TripLoad,
-        join: t in Trip,
-        on: t.id == l.trip_id,
-        where: t.status == "completed" and l.location_id == ^location_id,
-        select: coalesce(sum(l.actual_mt), 0)
-      )
-      |> Repo.one()
-      |> to_decimal()
-
-    Decimal.sub(inbound, outbound)
+    Decimal.sub(own_warehouse_inbound(location_id), own_warehouse_outbound(location_id))
   end
 
   def own_warehouse_qty(_), do: @zero
+
+  def own_warehouse_inbound(location_id) when is_binary(location_id) do
+    from(d in TripDrop,
+      join: t in Trip,
+      on: t.id == d.trip_id,
+      where: t.status == "completed" and d.location_id == ^location_id,
+      select: coalesce(sum(d.actual_mt), 0)
+    )
+    |> Repo.one()
+    |> to_decimal()
+  end
+
+  def own_warehouse_inbound(_), do: @zero
+
+  def own_warehouse_outbound(location_id) when is_binary(location_id) do
+    from(l in TripLoad,
+      join: t in Trip,
+      on: t.id == l.trip_id,
+      where: t.status == "completed" and l.location_id == ^location_id,
+      select: coalesce(sum(l.actual_mt), 0)
+    )
+    |> Repo.one()
+    |> to_decimal()
+  end
+
+  def own_warehouse_outbound(_), do: @zero
 
   defp to_decimal(%Decimal{} = d), do: d
   defp to_decimal(n) when is_integer(n), do: Decimal.new(n)
