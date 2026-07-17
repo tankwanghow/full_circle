@@ -54,6 +54,7 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
       case kind do
         :supply -> gettext("Supply position saved successfully.")
         :sales -> gettext("Sales position saved successfully.")
+        :trip -> gettext("Trip saved successfully.")
         _ -> gettext("Saved successfully.")
       end
 
@@ -119,6 +120,17 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
           class="blue button"
         >
           {gettext("New Sales")}
+        </button>
+        <button
+          :if={@can_manage}
+          type="button"
+          id="desk-new-trip"
+          phx-click="open_modal"
+          phx-value-kind="trip"
+          phx-value-action="new"
+          class="blue button"
+        >
+          {gettext("New Trip")}
         </button>
         <.link
           navigate={~p"/companies/#{@current_company.id}/trading/position_board"}
@@ -286,16 +298,16 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
         <div
           :for={t <- @trips}
           id={"desk-trip-#{t.id}"}
-          class="flex gap-1 border-b p-2 text-xs md:text-sm hover:bg-gray-100 dark:hover:bg-zinc-800"
+          phx-click={if @can_manage, do: "open_modal"}
+          phx-value-kind="trip"
+          phx-value-action="edit"
+          phx-value-id={t.id}
+          class={[
+            "flex gap-1 border-b p-2 text-xs md:text-sm hover:bg-gray-100 dark:hover:bg-zinc-800",
+            @can_manage && "cursor-pointer"
+          ]}
         >
-          <div class="w-2/14">
-            <.link
-              navigate={~p"/companies/#{@current_company.id}/trading/trips/#{t.id}/edit"}
-              class="text-blue-600"
-            >
-              {t.date}
-            </.link>
-          </div>
+          <div class="w-2/14 text-blue-600">{t.date}</div>
           <div class="w-2/14">{t.reference_no || "—"}</div>
           <div class="w-3/14">{t.good && t.good.name}</div>
           <div class="w-2/14">{t.transport_mode}</div>
@@ -332,6 +344,15 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
           user={@current_user}
           action={@modal.action}
           sales_id={@modal.id}
+        />
+        <.live_component
+          :if={@modal.kind == :trip}
+          module={FullCircleWeb.TradingDeskLive.TripFormComponent}
+          id="desk-trip-form-lc"
+          company={@current_company}
+          user={@current_user}
+          action={@modal.action}
+          trip_id={@modal.id}
         />
       </.modal>
     </div>

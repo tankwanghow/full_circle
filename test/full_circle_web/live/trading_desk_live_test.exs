@@ -103,4 +103,47 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
     assert has_element?(lv, "#desk-supply-form")
     assert render(lv) =~ "Edit me supply"
   end
+
+  test "desk new trip modal saves and lists trip", %{conn: conn, company: company, user: user} do
+    good = good_fixture(company, user)
+
+    supply =
+      supply_position_fixture(company, user, %{
+        "good_id" => good.id,
+        "status" => "open",
+        "title" => "S1"
+      })
+
+    load_loc = location_fixture(company, user, %{"kind" => "supplier_site"})
+    drop_loc = location_fixture(company, user, %{"kind" => "own_warehouse"})
+
+    {:ok, lv, _} = live(conn, ~p"/companies/#{company.id}/trading/desk")
+    lv |> element("#desk-new-trip") |> render_click()
+    assert has_element?(lv, "#desk-trip-form")
+
+    lv
+    |> form("#desk-trip-form",
+      trip: %{
+        date: "2026-07-25",
+        transport_mode: "company_own",
+        status: "draft",
+        good_name: good.name,
+        reference_no: "DESK-T1",
+        loads: %{
+          "0" => %{
+            location_id: load_loc.id,
+            supply_position_id: supply.id,
+            planned_mt: "10",
+            actual_mt: "10"
+          }
+        },
+        drops: %{
+          "0" => %{location_id: drop_loc.id, planned_mt: "10", actual_mt: "10"}
+        }
+      }
+    )
+    |> render_submit()
+
+    assert render(lv) =~ "DESK-T1"
+  end
 end
