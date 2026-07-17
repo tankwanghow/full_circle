@@ -32,6 +32,12 @@ defmodule FullCircleWeb.TradingWarehouseBoardLive.Index do
       </p>
       <div class="text-center mb-3 gap-1 flex flex-wrap justify-center">
         <.link
+          navigate={~p"/companies/#{@current_company.id}/trading/desk"}
+          class="teal button"
+        >
+          {gettext("Trading Desk")}
+        </.link>
+        <.link
           navigate={~p"/companies/#{@current_company.id}/trading/position_board"}
           class="blue button"
         >

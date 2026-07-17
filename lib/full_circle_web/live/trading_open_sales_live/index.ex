@@ -76,6 +76,12 @@ defmodule FullCircleWeb.TradingOpenSalesLive.Index do
       <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <div class="text-center mb-3 gap-1 flex flex-wrap justify-center">
         <.link
+          navigate={~p"/companies/#{@current_company.id}/trading/desk"}
+          class="teal button"
+        >
+          {gettext("Trading Desk")}
+        </.link>
+        <.link
           :if={Authorization.can?(@current_user, :manage_trading, @current_company)}
           navigate={~p"/companies/#{@current_company.id}/trading/sales_positions/new"}
           class="blue button"
