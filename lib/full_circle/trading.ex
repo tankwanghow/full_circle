@@ -434,6 +434,7 @@ defmodule FullCircle.Trading do
       |> Trip.changeset(put_company(attrs, company))
       |> validate_trip_goods()
       |> Repo.insert()
+      |> maybe_promote_open_supplies_to_collect()
       |> preload_trip_result()
     end
   end
@@ -449,6 +450,7 @@ defmodule FullCircle.Trading do
         |> Trip.changeset(attrs)
         |> validate_trip_goods()
         |> Repo.update()
+        |> maybe_promote_open_supplies_to_collect()
         |> preload_trip_result()
       end
     else
@@ -585,6 +587,31 @@ defmodule FullCircle.Trading do
   end
 
   defp preload_trip_result(other), do: other
+
+  # When a load is saved against an open supply, mark that supply as collect
+  # (supplier is effectively allowing collection via the trip plan).
+  defp maybe_promote_open_supplies_to_collect({:ok, trip}) do
+    trip = Repo.preload(trip, :loads)
+
+    supply_ids =
+      (trip.loads || [])
+      |> Enum.map(& &1.supply_position_id)
+      |> Enum.reject(&is_nil/1)
+      |> Enum.uniq()
+
+    if supply_ids != [] do
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      from(s in SupplyPosition,
+        where: s.id in ^supply_ids and s.status == "open"
+      )
+      |> Repo.update_all(set: [status: "collect", updated_at: now])
+    end
+
+    {:ok, trip}
+  end
+
+  defp maybe_promote_open_supplies_to_collect(other), do: other
 
   defp validate_trip_goods(%Ecto.Changeset{valid?: false} = cs), do: cs
 

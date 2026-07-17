@@ -11,8 +11,9 @@ defmodule FullCircle.Trading.SupplyPosition do
   # Still have stock (shown on position board / soft-hold targets)
   @active_statuses ~w(open hold collect)
 
-  # Supplier allows lift (trip load supply options)
-  @collectable_statuses ~w(collect)
+  # Available on trip load/drop supply selects (not closed)
+  # open may be auto-promoted to collect when a load is saved
+  @loadable_statuses ~w(open hold collect)
 
   schema "trading_supply_positions" do
     # Single free-text identity: vessel name, PO ref, short description, etc.
@@ -36,7 +37,10 @@ defmodule FullCircle.Trading.SupplyPosition do
 
   def statuses, do: @statuses
   def active_statuses, do: @active_statuses
-  def collectable_statuses, do: @collectable_statuses
+  def loadable_statuses, do: @loadable_statuses
+
+  @doc "Deprecated alias — use loadable_statuses/0"
+  def collectable_statuses, do: @loadable_statuses
 
   def status_label("open"), do: "open — collection date not confirmed"
   def status_label("hold"), do: "hold — stock exists, collection held by supplier"

@@ -353,6 +353,49 @@ defmodule FullCircle.Trading.TripTest do
     assert Trading.complete_trip(trip, company, admin) == {:error, :missing_actuals}
   end
 
+  test "creating load on open supply auto-promotes status to collect", %{
+    admin: admin,
+    company: company
+  } do
+    good = good_fixture(company, admin)
+
+    supply =
+      supply_position_fixture(company, admin, %{
+        "quantity" => "100",
+        "good_id" => good.id,
+        "status" => "open"
+      })
+
+    assert supply.status == "open"
+    loc = location_fixture(company, admin)
+    drop_loc = location_fixture(company, admin)
+
+    assert {:ok, _trip} =
+             Trading.create_trip(
+               %{
+                 "date" => "2026-07-12",
+                 "transport_mode" => "company_own",
+                 "good_id" => good.id,
+                 "loads" => [
+                   %{
+                     "planned_mt" => "10",
+                     "actual_mt" => "10",
+                     "location_id" => loc.id,
+                     "supply_position_id" => supply.id
+                   }
+                 ],
+                 "drops" => [
+                   %{"planned_mt" => "10", "actual_mt" => "10", "location_id" => drop_loc.id}
+                 ]
+               },
+               company,
+               admin
+             )
+
+    reloaded = Trading.get_supply_position!(supply.id, company, admin)
+    assert reloaded.status == "collect"
+  end
+
   test "mismatched good on supply is rejected", %{admin: admin, company: company} do
     good_a = good_fixture(company, admin)
     good_b = good_fixture(company, admin)

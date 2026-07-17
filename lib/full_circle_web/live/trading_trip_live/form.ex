@@ -64,7 +64,7 @@ defmodule FullCircleWeb.TradingTripLive.Form do
     |> assign(
       supplies:
         Trading.list_supply_positions(company, user,
-          statuses: FullCircle.Trading.SupplyPosition.collectable_statuses()
+          statuses: FullCircle.Trading.SupplyPosition.loadable_statuses()
         )
     )
     |> assign(sales: Trading.list_open_sales(company, user))
@@ -263,7 +263,20 @@ defmodule FullCircleWeb.TradingTripLive.Form do
   end
 
   defp supply_options(supplies) do
-    [{gettext("(none)"), ""} | Enum.map(supplies, &{&1.title, &1.id})]
+    [
+      {gettext("(none)"), ""}
+      | Enum.map(supplies, fn s ->
+          label =
+            case s.status do
+              "open" -> "#{s.title} (open)"
+              "hold" -> "#{s.title} (hold)"
+              "collect" -> "#{s.title} (collect)"
+              other -> "#{s.title} (#{other})"
+            end
+
+          {label, s.id}
+        end)
+    ]
   end
 
   defp sales_options(sales) do
