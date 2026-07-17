@@ -21,8 +21,11 @@ const STREET_URL = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
 const STREET_ATTR =
   '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
 
+// Free place search (OpenStreetMap via Photon / Komoot) — no API key
+const PHOTON_URL = "https://photon.komoot.io/api/"
 
 let leafletLoading = null
+
 
 function loadLeaflet() {
   if (window.L) return Promise.resolve(window.L)
@@ -66,6 +69,27 @@ function setInputValue(input, value) {
   input.dispatchEvent(new Event("change", { bubbles: true }))
 }
 
+function formatPlaceLabel(props) {
+  if (!props) return "Unknown place"
+  const parts = [
+    props.name,
+    props.city || props.town || props.village || props.municipality,
+    props.county || props.state,
+    props.country
+  ].filter((p, i, arr) => p && arr.indexOf(p) === i)
+  return parts.join(", ") || props.type || "Place"
+}
+
+function zoomForPlace(props) {
+  const t = (props?.osm_value || props?.type || "").toLowerCase()
+  if (["country"].includes(t)) return 6
+  if (["state", "region"].includes(t)) return 8
+  if (["county", "district"].includes(t)) return 10
+  if (["city", "town", "municipality"].includes(t)) return 13
+  if (["village", "suburb", "neighbourhood", "hamlet"].includes(t)) return 15
+  return 14
+}
+
 export function initGpsMapPicker(hook) {
   const el = hook.el
   const mapEl = el.querySelector("[data-gps-map]")
@@ -78,13 +102,128 @@ export function initGpsMapPicker(hook) {
   const locateBtn = el.querySelector("[data-gps-locate]")
   const clearBtn = el.querySelector("[data-gps-clear]")
   const statusEl = el.querySelector("[data-gps-status]")
+  const searchInput = el.querySelector("[data-gps-search]")
+  const searchResults = el.querySelector("[data-gps-search-results]")
+  const searchBtn = el.querySelector("[data-gps-search-btn]")
 
   let map = null
   let marker = null
   let L = null
+  let searchTimer = null
+  let searchAbort = null
 
   const setStatus = (text) => {
     if (statusEl) statusEl.textContent = text || ""
+  }
+
+  const hideResults = () => {
+    if (!searchResults) return
+    searchResults.innerHTML = ""
+    searchResults.classList.add("hidden")
+  }
+
+  const showResults = (items) => {
+    if (!searchResults) return
+    searchResults.innerHTML = ""
+    if (!items.length) {
+      searchResults.innerHTML =
+        '<div class="px-3 py-2 text-sm text-gray-500">No places found</div>'
+      searchResults.classList.remove("hidden")
+      return
+    }
+
+    items.forEach((item) => {
+      const btn = document.createElement("button")
+      btn.type = "button"
+      btn.className =
+        "block w-full text-left px-3 py-2 text-sm hover:bg-amber-100 dark:hover:bg-zinc-700 border-b border-zinc-100 dark:border-zinc-700 last:border-0"
+      btn.textContent = item.label
+      btn.addEventListener("click", (e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        goToPlace(item)
+        hideResults()
+        if (searchInput) searchInput.value = item.label
+      })
+      searchResults.appendChild(btn)
+    })
+    searchResults.classList.remove("hidden")
+  }
+
+  const goToPlace = (item) => {
+    if (!map) return
+    const zoom = item.zoom || 13
+    // Fit bbox when available (better for cities/towns)
+    if (item.bbox && L) {
+      try {
+        // Photon extent is [minLon, minLat, maxLon, maxLat] sometimes missing
+        const [west, south, east, north] = item.bbox
+        if ([west, south, east, north].every((n) => Number.isFinite(n))) {
+          map.fitBounds(
+            [
+              [south, west],
+              [north, east]
+            ],
+            { padding: [24, 24], maxZoom: 16 }
+          )
+          // Do not force pin — user clicks exact site; only zoom for navigation
+          setStatus(`Zoomed to ${item.label}`)
+          return
+        }
+      } catch (_) {
+        /* fall through */
+      }
+    }
+    map.setView([item.lat, item.lng], zoom)
+    setStatus(`Zoomed to ${item.label}`)
+  }
+
+  const searchPlaces = async (query) => {
+    const q = (query || "").trim()
+    if (q.length < 2) {
+      hideResults()
+      return
+    }
+
+    if (searchAbort) searchAbort.abort()
+    searchAbort = new AbortController()
+
+    setStatus("Searching…")
+    try {
+      const url = `${PHOTON_URL}?q=${encodeURIComponent(q)}&limit=8&lang=en`
+      const res = await fetch(url, { signal: searchAbort.signal })
+      if (!res.ok) throw new Error(`Search failed (${res.status})`)
+      const data = await res.json()
+      const features = data.features || []
+      const items = features
+        .map((f) => {
+          const coords = f.geometry?.coordinates
+          if (!coords || coords.length < 2) return null
+          const [lng, lat] = coords
+          const props = f.properties || {}
+          return {
+            lat,
+            lng,
+            label: formatPlaceLabel(props),
+            zoom: zoomForPlace(props),
+            bbox: props.extent || null
+          }
+        })
+        .filter(Boolean)
+
+      showResults(items)
+      setStatus(items.length ? `${items.length} place(s)` : "No places found")
+    } catch (err) {
+      if (err.name === "AbortError") return
+      console.error(err)
+      setStatus("Search failed")
+      hideResults()
+    }
+  }
+
+  const scheduleSearch = (query) => {
+    if (searchTimer) clearTimeout(searchTimer)
+    searchTimer = setTimeout(() => searchPlaces(query), 350)
   }
 
   const readCoords = () => {
@@ -137,15 +276,43 @@ export function initGpsMapPicker(hook) {
       const zoom = lat != null && lng != null ? 15 : DEFAULT_ZOOM
 
       map = L.map(mapEl, { scrollWheelZoom: true }).setView(center, zoom)
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+
+      const satellite = L.tileLayer(SATELLITE_URL, {
         maxZoom: 19,
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-      }).addTo(map)
+        attribution: SATELLITE_ATTR
+      })
+      const labels = L.tileLayer(LABELS_URL, {
+        maxZoom: 19,
+        pane: "overlayPane",
+        opacity: 0.9
+      })
+      const street = L.tileLayer(STREET_URL, {
+        maxZoom: 19,
+        attribution: STREET_ATTR
+      })
+
+      // Satellite + place labels by default
+      satellite.addTo(map)
+      labels.addTo(map)
+
+      L.control
+        .layers(
+          {
+            Satellite: satellite,
+            Street: street
+          },
+          {
+            Labels: labels
+          },
+          { position: "topright", collapsed: true }
+        )
+        .addTo(map)
 
       if (lat != null && lng != null) placeMarker(lat, lng, { pan: false })
 
       map.on("click", (e) => {
         applyCoords(e.latlng.lat, e.latlng.lng)
+        hideResults()
       })
 
       // Fix tile size when container becomes visible
@@ -158,6 +325,43 @@ export function initGpsMapPicker(hook) {
       console.error(err)
       setStatus("Map failed to load")
     })
+
+  if (searchInput) {
+    searchInput.addEventListener("input", (e) => {
+      scheduleSearch(e.target.value)
+    })
+    searchInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault()
+        e.stopPropagation()
+        if (searchTimer) clearTimeout(searchTimer)
+        searchPlaces(searchInput.value)
+      } else if (e.key === "Escape") {
+        hideResults()
+      }
+    })
+    // Prevent LiveView form submit / phx-change noise from the search box
+    searchInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") e.preventDefault()
+    })
+  }
+
+  if (searchBtn) {
+    searchBtn.addEventListener("click", (e) => {
+      e.preventDefault()
+      if (searchTimer) clearTimeout(searchTimer)
+      searchPlaces(searchInput?.value || "")
+    })
+  }
+
+  // Close results when clicking elsewhere in the picker (not on results)
+  const onDocClick = (e) => {
+    if (!searchResults || searchResults.classList.contains("hidden")) return
+    if (el.contains(e.target) && !searchResults.contains(e.target) && e.target !== searchInput) {
+      hideResults()
+    }
+  }
+  document.addEventListener("click", onDocClick)
 
   if (locateBtn) {
     locateBtn.addEventListener("click", (e) => {
@@ -195,6 +399,9 @@ export function initGpsMapPicker(hook) {
   lngInput?.addEventListener("change", onManualInput)
 
   el._gpsCleanup = () => {
+    if (searchTimer) clearTimeout(searchTimer)
+    if (searchAbort) searchAbort.abort()
+    document.removeEventListener("click", onDocClick)
     latInput?.removeEventListener("change", onManualInput)
     lngInput?.removeEventListener("change", onManualInput)
     if (map) {

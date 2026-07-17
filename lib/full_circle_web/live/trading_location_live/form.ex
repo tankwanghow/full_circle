@@ -131,13 +131,20 @@ defmodule FullCircleWeb.TradingLocationLive.Form do
         autocomplete="off"
         class="p-4 border rounded space-y-2"
       >
-        <.input field={@form[:name]} label={gettext("Name")} />
-        <.input
-          field={@form[:kind]}
-          type="select"
-          label={gettext("Kind")}
-          options={Enum.map(Location.kinds(), &{&1, &1})}
-        />
+        <div class="flex gap-2">
+          <div class="w-3/4">
+            <.input field={@form[:name]} label={gettext("Name")} />
+          </div>
+          <div class="w-1/4">
+            <.input
+              field={@form[:kind]}
+              type="select"
+              label={gettext("Kind")}
+              options={Enum.map(Location.kinds(), &{&1, &1})}
+            />
+          </div>
+        </div>
+
         <.input field={@form[:address_note]} type="textarea" label={gettext("Address note")} />
 
         <div class="space-y-1">
@@ -145,7 +152,9 @@ defmodule FullCircleWeb.TradingLocationLive.Form do
             {gettext("GPS location")}
           </label>
           <p class="text-xs text-gray-500">
-            {gettext("Click the map to drop a pin, drag the pin, or use your current location.")}
+            {gettext(
+              "Search a city/town to zoom the map, then click to drop a pin (or drag / use my location)."
+            )}
           </p>
 
           <div
@@ -158,6 +167,25 @@ defmodule FullCircleWeb.TradingLocationLive.Form do
             data-lng={@form[:longitude].value}
             class="border rounded overflow-hidden bg-zinc-50 dark:bg-zinc-900"
           >
+            <div class="relative p-2 border-b bg-white dark:bg-zinc-800">
+              <div class="flex gap-1">
+                <input
+                  type="search"
+                  data-gps-search
+                  autocomplete="off"
+                  placeholder={gettext("Search city or town… e.g. Kajang, Port Klang")}
+                  class="flex-1 rounded border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 px-3 py-1.5 text-sm"
+                />
+                <button type="button" data-gps-search-btn class="blue button text-sm shrink-0">
+                  {gettext("Search")}
+                </button>
+              </div>
+              <div
+                data-gps-search-results
+                class="hidden absolute left-2 right-2 z-[1000] mt-1 max-h-56 overflow-y-auto rounded border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 shadow-lg"
+              >
+              </div>
+            </div>
             <div data-gps-map class="w-full h-72 z-0"></div>
             <div class="flex flex-wrap gap-2 p-2 items-center border-t bg-white dark:bg-zinc-800">
               <button type="button" data-gps-locate class="blue button text-sm">
