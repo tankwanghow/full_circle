@@ -54,6 +54,8 @@ Rejected for v1:
 
 ### 3.1 Desktop wireframe
 
+Left column stacks **stock sources** (supply then warehouse). Right column is **demand** (open sales). Trips stay full width under both.
+
 ```
 ┌─ Trading Desk ─────────────────────────────────────────────────────┐
 │ [Good ▾]  [Refresh]     [+ Supply] [+ Sales] [+ Trip] [+ Location?] │
@@ -62,15 +64,26 @@ Rejected for v1:
 │ title · status · remaining  │ title · customer · undelivered       │
 │ soft-held · price           │ preferred supply · status            │
 │ (click → edit modal)        │ (click → edit modal)                 │
+│ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─  │                                      │
+│ WAREHOUSE (own_warehouse)   │                                      │
+│ name · in · out · on hand   │                                      │
+│ (same left column partition)│                                      │
 ├─────────────────────────────┴──────────────────────────────────────┤
-│ WAREHOUSE (own_warehouse)                                          │
-│ name · in · out · on hand · active  (click → location modal?)      │
-├────────────────────────────────────────────────────────────────────┤
 │ TRIPS (recent first; filter draft/planned/completed optional)      │
 │ date · ref · good · mode · status · loads/drops counts             │
 │ (click → large trip modal)  [Complete] on row optional             │
 └────────────────────────────────────────────────────────────────────┘
 ```
+
+**Column model**
+
+| Column | Partitions (stacked) | Role |
+|--------|----------------------|------|
+| **Left** | (1) Supply (2) Warehouse | Physical / commercial **sources** |
+| **Right** | Open sales | **Demand** / commitments |
+| **Bottom** | Trips (full width) | **Movements** |
+
+Warehouse is **not** a full-width band under both columns; it sits under supply in the left column, separated by a clear partition (border / sub-heading).
 
 ### 3.2 Panel content (data sources)
 
