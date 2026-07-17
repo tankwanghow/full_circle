@@ -49,21 +49,23 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
   end
 
   @impl true
-  def handle_info({:desk_modal_saved, kind}, socket) do
-    msg =
-      case kind do
-        :supply -> gettext("Supply position saved successfully.")
-        :sales -> gettext("Sales position saved successfully.")
-        :trip -> gettext("Trip saved successfully.")
-        _ -> gettext("Saved successfully.")
-      end
+  def handle_info({:desk_modal_saved, kind}, socket),
+    do: handle_info({:desk_modal_saved, kind, nil}, socket)
+
+  def handle_info({:desk_modal_saved, kind, msg}, socket) do
+    msg = msg || default_msg(kind)
 
     {:noreply,
      socket
-     |> assign(modal: nil)
      |> put_flash(:info, msg)
+     |> assign(modal: nil)
      |> load_panels()}
   end
+
+  defp default_msg(:supply), do: gettext("Supply position saved successfully.")
+  defp default_msg(:sales), do: gettext("Sales position saved successfully.")
+  defp default_msg(:trip), do: gettext("Trip saved successfully.")
+  defp default_msg(_), do: gettext("Saved successfully.")
 
   defp load_panels(socket) do
     company = socket.assigns.current_company
@@ -287,13 +289,13 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
       <div class="mt-3" id="desk_trips">
         <p class="font-semibold text-lg mb-1">{gettext("Trips")}</p>
         <div class="bg-amber-200 border-y-2 border-amber-500 font-bold p-2 flex gap-1 text-xs md:text-sm">
-          <div class="w-2/14">{gettext("Date")}</div>
-          <div class="w-2/14">{gettext("Ref")}</div>
-          <div class="w-3/14">{gettext("Good")}</div>
-          <div class="w-2/14">{gettext("Mode")}</div>
-          <div class="w-2/14">{gettext("Status")}</div>
-          <div class="w-1/14 text-center">{gettext("Loads")}</div>
-          <div class="w-1/14 text-center">{gettext("Drops")}</div>
+          <div class="w-2/12">{gettext("Date")}</div>
+          <div class="w-2/12">{gettext("Ref")}</div>
+          <div class="w-2/12">{gettext("Good")}</div>
+          <div class="w-2/12">{gettext("Mode")}</div>
+          <div class="w-2/12">{gettext("Status")}</div>
+          <div class="w-1/12 text-center">{gettext("Loads")}</div>
+          <div class="w-1/12 text-center">{gettext("Drops")}</div>
         </div>
         <div
           :for={t <- @trips}
@@ -307,13 +309,13 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
             @can_manage && "cursor-pointer"
           ]}
         >
-          <div class="w-2/14 text-blue-600">{t.date}</div>
-          <div class="w-2/14">{t.reference_no || "—"}</div>
-          <div class="w-3/14">{t.good && t.good.name}</div>
-          <div class="w-2/14">{t.transport_mode}</div>
-          <div class="w-2/14">{t.status}</div>
-          <div class="w-1/14 text-center">{length(t.loads || [])}</div>
-          <div class="w-1/14 text-center">{length(t.drops || [])}</div>
+          <div class="w-2/12 text-blue-600">{t.date}</div>
+          <div class="w-2/12">{t.reference_no || "—"}</div>
+          <div class="w-2/12">{t.good && t.good.name}</div>
+          <div class="w-2/12">{t.transport_mode}</div>
+          <div class="w-2/12">{t.status}</div>
+          <div class="w-1/12 text-center">{length(t.loads || [])}</div>
+          <div class="w-1/12 text-center">{length(t.drops || [])}</div>
         </div>
         <p :if={@trips == []} class="text-center p-3 text-gray-500 text-sm">
           {gettext("No trips yet.")}

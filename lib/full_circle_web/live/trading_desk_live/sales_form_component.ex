@@ -137,11 +137,11 @@ defmodule FullCircleWeb.TradingDeskLive.SalesFormComponent do
   end
 
   def handle_event("open", _params, socket) do
-    set_sales_status(socket, &Trading.open_sales_position/3)
+    set_sales_status(socket, &Trading.open_sales_position/3, gettext("Sales position opened."))
   end
 
   def handle_event("hold", _params, socket) do
-    set_sales_status(socket, &Trading.hold_sales_position/3)
+    set_sales_status(socket, &Trading.hold_sales_position/3, gettext("Sales position held."))
   end
 
   def handle_event("fulfill", %{"fulfilled_note" => note}, socket) do
@@ -165,7 +165,7 @@ defmodule FullCircleWeb.TradingDeskLive.SalesFormComponent do
 
     case Trading.cancel_sales_position(socket.assigns.sales, company, user) do
       {:ok, _} ->
-        send(self(), {:desk_modal_saved, :sales})
+        send(self(), {:desk_modal_saved, :sales, gettext("Sales position cancelled.")})
         {:noreply, socket}
 
       _ ->
@@ -173,13 +173,13 @@ defmodule FullCircleWeb.TradingDeskLive.SalesFormComponent do
     end
   end
 
-  defp set_sales_status(socket, fun) do
+  defp set_sales_status(socket, fun, ok_msg) do
     company = socket.assigns.current_company
     user = socket.assigns.current_user
 
     case fun.(socket.assigns.sales, company, user) do
       {:ok, _} ->
-        send(self(), {:desk_modal_saved, :sales})
+        send(self(), {:desk_modal_saved, :sales, ok_msg})
         {:noreply, socket}
 
       _ ->
@@ -198,7 +198,7 @@ defmodule FullCircleWeb.TradingDeskLive.SalesFormComponent do
            user
          ) do
       {:ok, _} ->
-        send(self(), {:desk_modal_saved, :sales})
+        send(self(), {:desk_modal_saved, :sales, gettext("Sales position fulfilled.")})
         {:noreply, socket}
 
       _ ->

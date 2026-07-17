@@ -142,13 +142,13 @@ defmodule FullCircleWeb.TradingDeskLive.SupplyFormComponent do
     )
   end
 
-  defp set_supply_status(socket, fun, _ok_msg) do
+  defp set_supply_status(socket, fun, ok_msg) do
     company = socket.assigns.current_company
     user = socket.assigns.current_user
 
     case fun.(socket.assigns.supply, company, user) do
       {:ok, _} ->
-        send(self(), {:desk_modal_saved, :supply})
+        send(self(), {:desk_modal_saved, :supply, ok_msg})
         {:noreply, socket}
 
       _ ->

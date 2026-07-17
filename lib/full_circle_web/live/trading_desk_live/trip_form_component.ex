@@ -183,8 +183,15 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
     trip = socket.assigns.trip
 
     case Trading.complete_trip(trip, company, user) do
-      {:ok, _trip, _warnings} ->
-        send(self(), {:desk_modal_saved, :trip})
+      {:ok, _trip, warnings} ->
+        msg =
+          if warnings == [] do
+            gettext("Trip completed.")
+          else
+            gettext("Trip completed with warnings: ") <> Enum.join(warnings, "; ")
+          end
+
+        send(self(), {:desk_modal_saved, :trip, msg})
         {:noreply, socket}
 
       {:error, :missing_actuals} ->
@@ -209,7 +216,7 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
 
     case Trading.cancel_trip(socket.assigns.trip, company, user) do
       {:ok, _} ->
-        send(self(), {:desk_modal_saved, :trip})
+        send(self(), {:desk_modal_saved, :trip, gettext("Trip cancelled.")})
         {:noreply, socket}
 
       {:error, :has_invoices} ->
