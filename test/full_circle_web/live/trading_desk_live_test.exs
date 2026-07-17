@@ -29,4 +29,78 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
     assert html =~ "Desk sales B"
     assert html =~ "Trips"
   end
+
+  test "create supply from desk modal appears on board", %{
+    conn: conn,
+    company: company,
+    user: user
+  } do
+    contact = contact_fixture(company, user)
+    good = good_fixture(company, user)
+
+    {:ok, lv, _html} = live(conn, ~p"/companies/#{company.id}/trading/desk")
+
+    lv |> element("#desk-new-supply") |> render_click()
+    assert has_element?(lv, "#desk-modal")
+
+    lv
+    |> form("#desk-supply-form",
+      supply_position: %{
+        title: "Modal supply X",
+        quantity: "50",
+        unit_price: "1000",
+        supplier_name: contact.name,
+        good_name: good.name,
+        status: "open"
+      }
+    )
+    |> render_submit()
+
+    html = render(lv)
+    assert html =~ "Modal supply X"
+    refute has_element?(lv, "#desk-modal")
+  end
+
+  test "create sales from desk modal appears on open sales", %{
+    conn: conn,
+    company: company,
+    user: user
+  } do
+    contact = contact_fixture(company, user)
+    good = good_fixture(company, user)
+
+    {:ok, lv, _html} = live(conn, ~p"/companies/#{company.id}/trading/desk")
+
+    lv |> element("#desk-new-sales") |> render_click()
+    assert has_element?(lv, "#desk-modal")
+
+    lv
+    |> form("#desk-sales-form",
+      sales_position: %{
+        title: "Modal sales Y",
+        quantity: "20",
+        unit_price: "1500",
+        customer_name: contact.name,
+        good_name: good.name,
+        status: "open"
+      }
+    )
+    |> render_submit()
+
+    html = render(lv)
+    assert html =~ "Modal sales Y"
+    refute has_element?(lv, "#desk-modal")
+  end
+
+  test "row click opens supply edit modal", %{conn: conn, company: company, user: user} do
+    supply =
+      supply_position_fixture(company, user, %{"title" => "Edit me supply"})
+
+    {:ok, lv, _html} = live(conn, ~p"/companies/#{company.id}/trading/desk")
+
+    lv |> element("#desk-supply-#{supply.id}") |> render_click()
+    assert has_element?(lv, "#desk-modal")
+    assert has_element?(lv, "#desk-supply-form")
+    assert render(lv) =~ "Edit me supply"
+  end
 end
