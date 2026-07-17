@@ -179,6 +179,14 @@ defmodule FullCircleWeb.TradingLocationLive.Form do
                 <button type="button" data-gps-search-btn class="blue button text-sm shrink-0">
                   {gettext("Search")}
                 </button>
+                <button
+                  type="button"
+                  data-gps-expand
+                  class="gray button text-sm shrink-0"
+                  title={gettext("Expand map")}
+                >
+                  {gettext("Expand")}
+                </button>
               </div>
               <div
                 data-gps-search-results
@@ -186,7 +194,7 @@ defmodule FullCircleWeb.TradingLocationLive.Form do
               >
               </div>
             </div>
-            <div data-gps-map class="w-full h-72 z-0"></div>
+            <div data-gps-map class="w-full z-0" style="height: 18rem;"></div>
             <div class="flex flex-wrap gap-2 p-2 items-center border-t bg-white dark:bg-zinc-800">
               <button type="button" data-gps-locate class="blue button text-sm">
                 {gettext("Use my location")}

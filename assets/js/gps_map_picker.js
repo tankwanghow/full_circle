@@ -105,12 +105,18 @@ export function initGpsMapPicker(hook) {
   const searchInput = el.querySelector("[data-gps-search]")
   const searchResults = el.querySelector("[data-gps-search-results]")
   const searchBtn = el.querySelector("[data-gps-search-btn]")
+  const expandBtn = el.querySelector("[data-gps-expand]")
+
+  const MAP_HEIGHT_NORMAL = "18rem" // h-72
+  const MAP_HEIGHT_EXPANDED = "36rem" // double
 
   let map = null
   let marker = null
   let L = null
   let searchTimer = null
   let searchAbort = null
+  let mapExpanded = false
+
 
   const setStatus = (text) => {
     if (statusEl) statusEl.textContent = text || ""
@@ -351,6 +357,26 @@ export function initGpsMapPicker(hook) {
       e.preventDefault()
       if (searchTimer) clearTimeout(searchTimer)
       searchPlaces(searchInput?.value || "")
+    })
+  }
+
+  if (expandBtn) {
+    const updateExpandLabel = () => {
+      expandBtn.textContent = mapExpanded ? "Collapse" : "Expand"
+      expandBtn.title = mapExpanded ? "Collapse map" : "Expand map"
+    }
+    updateExpandLabel()
+
+    expandBtn.addEventListener("click", (e) => {
+      e.preventDefault()
+      mapExpanded = !mapExpanded
+      mapEl.style.height = mapExpanded ? MAP_HEIGHT_EXPANDED : MAP_HEIGHT_NORMAL
+      updateExpandLabel()
+      // Leaflet must recalculate tiles after container resize
+      if (map) {
+        setTimeout(() => map.invalidateSize(), 50)
+        setTimeout(() => map.invalidateSize(), 200)
+      }
     })
   }
 
