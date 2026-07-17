@@ -182,7 +182,7 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
                 @can_manage && "cursor-pointer"
               ]}
             >
-              <div class="w-4/12 text-blue-600">
+              <div class="w-4/12 min-w-0 text-blue-600 truncate" title={row.supply.title}>
                 {row.supply.title || "—"}
               </div>
               <div class="w-2/12">{row.supply.status}</div>
@@ -217,12 +217,13 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
               id={"desk-wh-#{row.location.id}"}
               class="flex gap-1 border-b p-2 text-xs md:text-sm hover:bg-gray-100 dark:hover:bg-zinc-800"
             >
-              <div class="w-4/12">
+              <div class="w-4/12 min-w-0 truncate">
                 <.link
                   navigate={
                     ~p"/companies/#{@current_company.id}/trading/locations/#{row.location.id}/edit"
                   }
-                  class="text-blue-600"
+                  class="text-blue-600 block truncate"
+                  title={row.location.name}
                 >
                   {row.location.name}
                 </.link>
@@ -264,17 +265,25 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
               @can_manage && "cursor-pointer"
             ]}
           >
-            <div class="w-3/12 text-blue-600">
+            <div class="w-3/12 min-w-0 text-blue-600 truncate" title={row.sales.title}>
               {row.sales.title || "—"}
             </div>
-            <div class="w-3/12">{row.sales.customer && row.sales.customer.name}</div>
+            <div
+              class="w-3/12 min-w-0 truncate"
+              title={row.sales.customer && row.sales.customer.name}
+            >
+              {row.sales.customer && row.sales.customer.name}
+            </div>
             <div class={[
               "w-2/12 text-right font-semibold",
               undelivered_class(row.undelivered)
             ]}>
               {row.undelivered}
             </div>
-            <div class="w-2/12">
+            <div
+              class="w-2/12 min-w-0 truncate"
+              title={row.sales.preferred_supply && row.sales.preferred_supply.title}
+            >
               {row.sales.preferred_supply && (row.sales.preferred_supply.title || "—")}
             </div>
             <div class="w-2/12">{row.sales.status}</div>
@@ -310,8 +319,10 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
           ]}
         >
           <div class="w-2/12 text-blue-600">{t.date}</div>
-          <div class="w-2/12">{t.reference_no || "—"}</div>
-          <div class="w-2/12">{t.good && t.good.name}</div>
+          <div class="w-2/12 min-w-0 truncate" title={t.reference_no}>{t.reference_no || "—"}</div>
+          <div class="w-2/12 min-w-0 truncate" title={t.good && t.good.name}>
+            {t.good && t.good.name}
+          </div>
           <div class="w-2/12">{t.transport_mode}</div>
           <div class="w-2/12">{t.status}</div>
           <div class="w-1/12 text-center">{length(t.loads || [])}</div>
