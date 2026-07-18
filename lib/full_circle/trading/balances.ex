@@ -2,9 +2,12 @@ defmodule FullCircle.Trading.Balances do
   @moduledoc """
   Qty balances for supply/sales positions and own-warehouse locations.
 
-  Loaded / delivered only count **completed** trips.
+  Loaded / delivered / on-hand only count **completed** trips.
   Soft holds sum undelivered qty on active sales (draft/open/hold) with a preferred
-  supply — they do **not** reduce supply remaining.
+  supply — they do **not** lock remaining.
+
+  **In transit** (draft + planned trips) uses `coalesce(actual_mt, planned_mt)` so
+  desks can show goods already committed on open trips without moving physical stock.
   """
 
   import Ecto.Query, warn: false
@@ -13,6 +16,10 @@ defmodule FullCircle.Trading.Balances do
   alias FullCircle.Trading.{SupplyPosition, SalesPosition, Trip, TripLoad, TripDrop, Location}
 
   @zero Decimal.new(0)
+  # Not yet completed — goods may be on the road
+  @open_trip_statuses ~w(draft planned)
+
+  def open_trip_statuses, do: @open_trip_statuses
 
   def supply_loaded(%SupplyPosition{id: id}), do: supply_loaded(id)
 
@@ -63,6 +70,42 @@ defmodule FullCircle.Trading.Balances do
   end
 
   def sales_undelivered(_), do: @zero
+
+  @doc """
+  MT loaded on draft/planned trips for this supply (not yet completed).
+  """
+  def supply_in_transit(%SupplyPosition{id: id}), do: supply_in_transit(id)
+
+  def supply_in_transit(supply_id) when is_binary(supply_id) do
+    from(l in TripLoad,
+      join: t in Trip,
+      on: t.id == l.trip_id,
+      where: t.status in ^@open_trip_statuses and l.supply_position_id == ^supply_id,
+      select: coalesce(sum(fragment("coalesce(?, ?)", l.actual_mt, l.planned_mt)), 0)
+    )
+    |> Repo.one()
+    |> to_decimal()
+  end
+
+  def supply_in_transit(_), do: @zero
+
+  @doc """
+  MT on draft/planned trip drops targeting this sales position.
+  """
+  def sales_in_transit(%SalesPosition{id: id}), do: sales_in_transit(id)
+
+  def sales_in_transit(sales_id) when is_binary(sales_id) do
+    from(d in TripDrop,
+      join: t in Trip,
+      on: t.id == d.trip_id,
+      where: t.status in ^@open_trip_statuses and d.sales_position_id == ^sales_id,
+      select: coalesce(sum(fragment("coalesce(?, ?)", d.actual_mt, d.planned_mt)), 0)
+    )
+    |> Repo.one()
+    |> to_decimal()
+  end
+
+  def sales_in_transit(_), do: @zero
 
   @doc """
   Soft hold against a supply: sum of undelivered qty on active sales
@@ -121,6 +164,78 @@ defmodule FullCircle.Trading.Balances do
   end
 
   def own_warehouse_outbound(_), do: @zero
+
+  @doc """
+  Completed drop-in qty at a location, grouped by trip good_id.
+  Returns `%{good_id => Decimal}`.
+  """
+  def own_warehouse_inbound_by_good(location_id) when is_binary(location_id) do
+    from(d in TripDrop,
+      join: t in Trip,
+      on: t.id == d.trip_id,
+      where: t.status == "completed" and d.location_id == ^location_id,
+      group_by: d.good_id,
+      select: {d.good_id, coalesce(sum(d.actual_mt), 0)}
+    )
+    |> Repo.all()
+    |> Map.new(fn {id, qty} -> {id, to_decimal(qty)} end)
+  end
+
+  def own_warehouse_inbound_by_good(_), do: %{}
+
+  @doc """
+  Completed load-out qty at a location, grouped by load good_id.
+  Returns `%{good_id => Decimal}`.
+  """
+  def own_warehouse_outbound_by_good(location_id) when is_binary(location_id) do
+    from(l in TripLoad,
+      join: t in Trip,
+      on: t.id == l.trip_id,
+      where: t.status == "completed" and l.location_id == ^location_id,
+      group_by: l.good_id,
+      select: {l.good_id, coalesce(sum(l.actual_mt), 0)}
+    )
+    |> Repo.all()
+    |> Map.new(fn {id, qty} -> {id, to_decimal(qty)} end)
+  end
+
+  def own_warehouse_outbound_by_good(_), do: %{}
+
+  @doc """
+  Draft/planned drops into a location, grouped by drop good_id (incoming / in transit in).
+  Returns `%{good_id => Decimal}`.
+  """
+  def own_warehouse_incoming_by_good(location_id) when is_binary(location_id) do
+    from(d in TripDrop,
+      join: t in Trip,
+      on: t.id == d.trip_id,
+      where: t.status in ^@open_trip_statuses and d.location_id == ^location_id,
+      group_by: d.good_id,
+      select: {d.good_id, coalesce(sum(fragment("coalesce(?, ?)", d.actual_mt, d.planned_mt)), 0)}
+    )
+    |> Repo.all()
+    |> Map.new(fn {id, qty} -> {id, to_decimal(qty)} end)
+  end
+
+  def own_warehouse_incoming_by_good(_), do: %{}
+
+  @doc """
+  Draft/planned loads out of a location, grouped by load good_id (outgoing / in transit out).
+  Returns `%{good_id => Decimal}`.
+  """
+  def own_warehouse_outgoing_by_good(location_id) when is_binary(location_id) do
+    from(l in TripLoad,
+      join: t in Trip,
+      on: t.id == l.trip_id,
+      where: t.status in ^@open_trip_statuses and l.location_id == ^location_id,
+      group_by: l.good_id,
+      select: {l.good_id, coalesce(sum(fragment("coalesce(?, ?)", l.actual_mt, l.planned_mt)), 0)}
+    )
+    |> Repo.all()
+    |> Map.new(fn {id, qty} -> {id, to_decimal(qty)} end)
+  end
+
+  def own_warehouse_outgoing_by_good(_), do: %{}
 
   defp to_decimal(%Decimal{} = d), do: d
   defp to_decimal(n) when is_integer(n), do: Decimal.new(n)

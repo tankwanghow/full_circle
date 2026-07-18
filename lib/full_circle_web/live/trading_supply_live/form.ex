@@ -22,7 +22,8 @@ defmodule FullCircleWeb.TradingSupplyLive.Form do
         cs =
           SupplyPosition.changeset(%SupplyPosition{}, %{
             "company_id" => company.id,
-            "status" => "open"
+            "status" => "open",
+            "title" => "...new..."
           })
 
         {:ok,
@@ -159,7 +160,10 @@ defmodule FullCircleWeb.TradingSupplyLive.Form do
   end
 
   defp validate(params, socket) do
-    params = Map.put(params, "company_id", socket.assigns.current_company.id)
+    params =
+      params
+      |> Map.put("company_id", socket.assigns.current_company.id)
+      |> put_system_title(socket)
 
     cs =
       case socket.assigns.live_action do
@@ -170,6 +174,14 @@ defmodule FullCircleWeb.TradingSupplyLive.Form do
 
     {:noreply, assign(socket, form: to_form(cs))}
   end
+
+  defp put_system_title(params, %{assigns: %{live_action: :new}}),
+    do: Map.put(params, "title", "...new...")
+
+  defp put_system_title(params, %{assigns: %{supply: %{title: title}}}),
+    do: Map.put(params, "title", title)
+
+  defp put_system_title(params, _), do: params
 
   defp ensure_ids(params, company, user) do
     params =
@@ -202,16 +214,17 @@ defmodule FullCircleWeb.TradingSupplyLive.Form do
         phx-submit="save"
         autocomplete="off"
         class="p-4 border rounded space-y-2"
-      ><div class="flex gap-2">
-      <div class="w-[55%]">
-        <.input
-          field={@form[:title]}
-          label={gettext("Name / ref")}
-          placeholder={gettext("e.g. JON DOE May maize, PO-8841, Ah Huat pollard")}
-          required
-        />
-        </div>
-        <div class="w-[45%]">
+      >
+        <div class="flex gap-2">
+          <div class="w-[40%]">
+            <.input
+              field={@form[:title]}
+              label={gettext("Supply no")}
+              readonly
+              tabindex="-1"
+            />
+          </div>
+          <div class="w-[60%]">
             <.input
               field={@form[:status]}
               type="select"
@@ -219,7 +232,7 @@ defmodule FullCircleWeb.TradingSupplyLive.Form do
               options={status_options()}
             />
           </div>
-          </div>
+        </div>
         <div class="flex gap-2">
           <div class="w-[60%]">
             <.input

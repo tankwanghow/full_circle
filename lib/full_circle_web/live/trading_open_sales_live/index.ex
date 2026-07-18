@@ -103,17 +103,17 @@ defmodule FullCircleWeb.TradingOpenSalesLive.Index do
       </div>
 
       <div class="bg-amber-200 border-y-2 border-amber-500 font-bold p-2 flex gap-1 text-xs md:text-sm">
-        <div class="w-2/12">{gettext("Sales")}</div>
-        <div class="w-1/12">{gettext("Needed by")}</div>
-        <div class="w-2/12">{gettext("Customer")}</div>
-        <div class="w-1/12">{gettext("Good")}</div>
-        <div class="w-1/12 text-center">{gettext("Unit")}</div>
-        <div class="w-1/12 text-right">{gettext("Ordered")}</div>
-        <div class="w-1/12 text-right">{gettext("Delivered")}</div>
-        <div class="w-1/12 text-right">{gettext("Undelivered")}</div>
-        <div class="w-1/12">{gettext("Preferred supply")}</div>
-        <div class="w-1/12">{gettext("Status")}</div>
-        <div class="w-1/12"></div>
+        <div class="w-5/33">{gettext("Sales")}</div>
+        <div class="w-2/33">{gettext("Needed by")}</div>
+        <div class="w-5/33">{gettext("Customer")}</div>
+        <div class="w-3/33">{gettext("Good")}</div>
+        <div class="w-2/33 text-center">{gettext("Unit")}</div>
+        <div class="w-2/33 text-center">{gettext("Ordered")}</div>
+        <div class="w-2/33 text-center">{gettext("Delivered")}</div>
+        <div class="w-3/33 text-center">{gettext("Undelivered")}</div>
+        <div class="w-5/33">{gettext("Preferred supply")}</div>
+        <div class="w-2/33">{gettext("Status")}</div>
+        <div class="w-2/33"></div>
       </div>
       <div id="open_sales">
         <div
@@ -121,7 +121,7 @@ defmodule FullCircleWeb.TradingOpenSalesLive.Index do
           id={"open-sales-#{row.sales.id}"}
           class="flex gap-1 border-b p-2 text-xs md:text-sm hover:bg-gray-100 dark:hover:bg-zinc-800"
         >
-          <div class="w-2/12">
+          <div class="w-5/33">
             <.link
               navigate={
                 ~p"/companies/#{@current_company.id}/trading/sales_positions/#{row.sales.id}/edit"
@@ -131,23 +131,23 @@ defmodule FullCircleWeb.TradingOpenSalesLive.Index do
               {row.sales.title || "—"}
             </.link>
           </div>
-          <div class="w-1/12">{row.sales.available_from}</div>
-          <div class="w-2/12">{row.sales.customer && row.sales.customer.name}</div>
-          <div class="w-1/12">{row.sales.good && row.sales.good.name}</div>
-          <div class="w-1/12 text-center font-medium">{row.sales.good && row.sales.good.unit}</div>
-          <div class="w-1/12 text-right">{row.ordered}</div>
-          <div class="w-1/12 text-right">{row.delivered}</div>
+          <div class="w-2/33">{row.sales.available_from}</div>
+          <div class="w-5/33">{row.sales.customer && row.sales.customer.name}</div>
+          <div class="w-3/33">{row.sales.good && row.sales.good.name}</div>
+          <div class="w-2/33 text-center font-medium">{row.sales.good && row.sales.good.unit}</div>
+          <div class="w-2/33 text-center">{row.ordered}</div>
+          <div class="w-2/33 text-center">{row.delivered}</div>
           <div class={[
-            "w-1/12 text-right font-semibold",
+            "w-3/33 text-center font-semibold",
             undelivered_class(row.undelivered)
           ]}>
             {row.undelivered}
           </div>
-          <div class="w-1/12">
+          <div class="w-5/33">
             {row.sales.preferred_supply && (row.sales.preferred_supply.title || "—")}
           </div>
-          <div class="w-1/12">{row.sales.status}</div>
-          <div class="w-1/12 text-center">
+          <div class="w-2/33">{row.sales.status}</div>
+          <div class="w-2/33 text-center">
             <button
               :if={Authorization.can?(@current_user, :manage_trading, @current_company)}
               type="button"

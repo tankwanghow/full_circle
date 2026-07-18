@@ -23,7 +23,8 @@ defmodule FullCircleWeb.TradingDeskLive.SalesFormComponent do
           cs =
             SalesPosition.changeset(%SalesPosition{}, %{
               "company_id" => company.id,
-              "status" => "draft"
+              "status" => "draft",
+              "title" => "...new..."
             })
 
           socket
@@ -207,7 +208,10 @@ defmodule FullCircleWeb.TradingDeskLive.SalesFormComponent do
   end
 
   defp validate(params, socket) do
-    params = Map.put(params, "company_id", socket.assigns.current_company.id)
+    params =
+      params
+      |> Map.put("company_id", socket.assigns.current_company.id)
+      |> put_system_title(socket)
 
     cs =
       case socket.assigns.live_action do
@@ -218,6 +222,14 @@ defmodule FullCircleWeb.TradingDeskLive.SalesFormComponent do
 
     {:noreply, assign(socket, form: to_form(cs))}
   end
+
+  defp put_system_title(params, %{assigns: %{live_action: :new}}),
+    do: Map.put(params, "title", "...new...")
+
+  defp put_system_title(params, %{assigns: %{sales: %{title: title}}}),
+    do: Map.put(params, "title", title)
+
+  defp put_system_title(params, _), do: params
 
   defp status_options do
     Enum.map(SalesPosition.statuses(), fn s ->
@@ -262,14 +274,16 @@ defmodule FullCircleWeb.TradingDeskLive.SalesFormComponent do
         autocomplete="off"
         class="space-y-2"
       >
-        <.input
-          field={@form[:title]}
-          label={gettext("Name / ref")}
-          placeholder={gettext("e.g. Annual maize 2026, PO-8841, Spot 35MT pollard")}
-          required
-        />
         <div class="flex gap-2">
-          <div class="w-[60%]">
+          <div class="w-[30%]">
+            <.input
+              field={@form[:title]}
+              label={gettext("Sales no")}
+              readonly
+              tabindex="-1"
+            />
+          </div>
+          <div class="w-[40%]">
             <.input
               field={@form[:customer_name]}
               label={gettext("Customer")}
@@ -283,7 +297,7 @@ defmodule FullCircleWeb.TradingDeskLive.SalesFormComponent do
             type="date"
             label={gettext("Est. needed by")}
           />
-          <div class="w-[28%]">
+          <div class="w-[20%]">
             <.input
               field={@form[:status]}
               type="select"
@@ -321,7 +335,7 @@ defmodule FullCircleWeb.TradingDeskLive.SalesFormComponent do
         <.input
           field={@form[:preferred_supply_title]}
           label={gettext("Preferred supply (soft hold)")}
-          placeholder={gettext("Open supply name / ref — does not reduce remaining")}
+          placeholder={gettext("Supply no — does not reduce remaining")}
           phx-hook="tributeAutoComplete"
           url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=opensupply&name="}
         />

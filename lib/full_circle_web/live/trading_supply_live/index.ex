@@ -43,23 +43,22 @@ defmodule FullCircleWeb.TradingSupplyLive.Index do
           {gettext("Position Board")}
         </.link>
       </div>
-      <div class="bg-amber-200 border-y-2 border-amber-500 font-bold p-2 grid grid-cols-8 gap-1 text-sm">
-        <div>{gettext("Name / ref")}</div>
-        <div>{gettext("Available")}</div>
-        <div>{gettext("Supplier")}</div>
-        <div>{gettext("Good")}</div>
-        <div class="text-right">{gettext("Qty")}</div>
-        <div class="text-center">{gettext("Unit")}</div>
-        <div>{gettext("Status")}</div>
-        <div></div>
+      <div class="bg-amber-200 border-y-2 border-amber-500 font-bold p-2 flex gap-1 text-sm">
+        <div class="w-3/12">{gettext("Name / ref")}</div>
+        <div class="w-1/12">{gettext("Available")}</div>
+        <div class="w-3/12">{gettext("Supplier")}</div>
+        <div class="w-2/12">{gettext("Good")}</div>
+        <div class="w-1/12 text-right">{gettext("Qty")}</div>
+        <div class="w-1/12 text-center">{gettext("Unit")}</div>
+        <div class="w-1/12">{gettext("Status")}</div>
       </div>
       <div id="supplies_list">
         <div
           :for={s <- @supplies}
           id={"supply-#{s.id}"}
-          class="grid grid-cols-8 gap-1 border-b p-2 text-sm hover:bg-gray-100 dark:hover:bg-zinc-800"
+          class="flex gap-1 border-b p-2 text-sm hover:bg-gray-100 dark:hover:bg-zinc-800"
         >
-          <div>
+          <div class="w-3/12">
             <.link
               navigate={~p"/companies/#{@current_company.id}/trading/supply_positions/#{s.id}/edit"}
               class="text-blue-600"
@@ -67,13 +66,12 @@ defmodule FullCircleWeb.TradingSupplyLive.Index do
               {s.title || "—"}
             </.link>
           </div>
-          <div>{s.available_from}</div>
-          <div>{s.supplier && s.supplier.name}</div>
-          <div>{s.good && s.good.name}</div>
-          <div class="text-right">{s.quantity}</div>
-          <div class="text-center font-medium">{s.good && s.good.unit}</div>
-          <div>{s.status}</div>
-          <div></div>
+          <div class="w-1/12">{s.available_from}</div>
+          <div class="w-3/12">{s.supplier && s.supplier.name}</div>
+          <div class="w-2/12">{s.good && s.good.name}</div>
+          <div class="w-1/12 text-right">{s.quantity}</div>
+          <div class="w-1/12 text-center font-medium">{s.good && s.good.unit}</div>
+          <div class="w-1/12">{s.status}</div>
         </div>
       </div>
       <p :if={@supplies == []} class="text-center p-4 text-gray-500">

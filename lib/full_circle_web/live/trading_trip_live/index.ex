@@ -52,12 +52,12 @@ defmodule FullCircleWeb.TradingTripLive.Index do
       <div class="bg-amber-200 border-y-2 border-amber-500 font-bold p-2 grid grid-cols-8 gap-1 text-sm">
         <div>{gettext("Date")}</div>
         <div>{gettext("Ref")}</div>
+        <div>{gettext("Vehicle")}</div>
         <div>{gettext("Good")}</div>
         <div>{gettext("Mode")}</div>
         <div class="text-center">{gettext("Loads")}</div>
         <div class="text-center">{gettext("Drops")}</div>
         <div>{gettext("Status")}</div>
-        <div></div>
       </div>
       <div id="trips_list">
         <div
@@ -74,12 +74,18 @@ defmodule FullCircleWeb.TradingTripLive.Index do
             </.link>
           </div>
           <div>{t.reference_no || "—"}</div>
-          <div>{t.good && t.good.name}</div>
+          <div>{t.vehicle_number || "—"}</div>
+          <div>
+            {t
+             |> FullCircle.Trading.Trip.goods()
+             |> Enum.map(& &1.name)
+             |> Enum.join(", ")
+             |> then(fn s -> if s == "", do: "—", else: s end)}
+          </div>
           <div>{t.transport_mode}</div>
           <div class="text-center">{length(t.loads || [])}</div>
           <div class="text-center">{length(t.drops || [])}</div>
           <div>{t.status}</div>
-          <div></div>
         </div>
       </div>
       <p :if={@trips == []} class="text-center p-4 text-gray-500">

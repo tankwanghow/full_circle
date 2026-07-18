@@ -10,9 +10,11 @@ defmodule FullCircle.Trading.TripLoad do
     # UI / form helpers
     field :location_name, :string, virtual: true
     field :supply_title, :string, virtual: true
+    field :good_name, :string, virtual: true
     field :delete, :boolean, virtual: true, default: false
 
     belongs_to :trip, FullCircle.Trading.Trip
+    belongs_to :good, FullCircle.Product.Good
     belongs_to :supply_position, FullCircle.Trading.SupplyPosition
     belongs_to :location, FullCircle.Trading.Location
 
@@ -27,22 +29,25 @@ defmodule FullCircle.Trading.TripLoad do
 
   def changeset(load, attrs) do
     load
-    |> cast(blank_to_nil(attrs, ["supply_position_id", "location_id"]), [
+    |> cast(blank_to_nil(attrs, ["supply_position_id", "location_id", "good_id"]), [
       :planned_mt,
       :actual_mt,
       :location_note,
       :trip_id,
+      :good_id,
       :supply_position_id,
       :location_id,
       :location_name,
       :supply_title,
+      :good_name,
       :delete
     ])
     |> cast_assoc(:trip_load_employees, with: &FullCircle.Trading.TripLoadEmployee.changeset/2)
-    |> validate_required([:location_id])
+    |> validate_required([:location_id, :good_id])
     |> validate_number(:planned_mt, greater_than_or_equal_to: 0)
     |> validate_number(:actual_mt, greater_than_or_equal_to: 0)
     |> foreign_key_constraint(:trip_id)
+    |> foreign_key_constraint(:good_id)
     |> foreign_key_constraint(:supply_position_id)
     |> foreign_key_constraint(:location_id)
     |> maybe_mark_for_deletion()

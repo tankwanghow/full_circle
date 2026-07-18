@@ -11,9 +11,11 @@ defmodule FullCircle.Trading.TripDrop do
     field :location_name, :string, virtual: true
     field :sales_title, :string, virtual: true
     field :supply_title, :string, virtual: true
+    field :good_name, :string, virtual: true
     field :delete, :boolean, virtual: true, default: false
 
     belongs_to :trip, FullCircle.Trading.Trip
+    belongs_to :good, FullCircle.Product.Good
     belongs_to :sales_position, FullCircle.Trading.SalesPosition
     belongs_to :supply_position, FullCircle.Trading.SupplyPosition
     belongs_to :location, FullCircle.Trading.Location
@@ -31,13 +33,20 @@ defmodule FullCircle.Trading.TripDrop do
   def changeset(drop, attrs) do
     drop
     |> cast(
-      blank_to_nil(attrs, ["sales_position_id", "supply_position_id", "location_id", "invoice_id"]),
+      blank_to_nil(attrs, [
+        "sales_position_id",
+        "supply_position_id",
+        "location_id",
+        "invoice_id",
+        "good_id"
+      ]),
       [
         :planned_mt,
         :actual_mt,
         :location_note,
         :variance_note,
         :trip_id,
+        :good_id,
         :sales_position_id,
         :supply_position_id,
         :location_id,
@@ -45,14 +54,16 @@ defmodule FullCircle.Trading.TripDrop do
         :location_name,
         :sales_title,
         :supply_title,
+        :good_name,
         :delete
       ]
     )
     |> cast_assoc(:trip_drop_employees, with: &FullCircle.Trading.TripDropEmployee.changeset/2)
-    |> validate_required([:location_id])
+    |> validate_required([:location_id, :good_id])
     |> validate_number(:planned_mt, greater_than_or_equal_to: 0)
     |> validate_number(:actual_mt, greater_than_or_equal_to: 0)
     |> foreign_key_constraint(:trip_id)
+    |> foreign_key_constraint(:good_id)
     |> foreign_key_constraint(:sales_position_id)
     |> foreign_key_constraint(:supply_position_id)
     |> foreign_key_constraint(:location_id)

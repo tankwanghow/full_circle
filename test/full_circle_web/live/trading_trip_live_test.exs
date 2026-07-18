@@ -22,7 +22,6 @@ defmodule FullCircleWeb.TradingTripLiveTest do
       supply_position_fixture(company, user, %{
         "good_id" => good.id,
         "quantity" => "100",
-        "title" => "Open vessel for trip",
         "status" => "open"
       })
 
@@ -33,10 +32,9 @@ defmodule FullCircleWeb.TradingTripLiveTest do
     assert html =~ "Trips"
 
     {:ok, lv, html} = live(conn, ~p"/companies/#{company.id}/trading/trips/new")
-    # open supplies appear in the load supply select
-    assert html =~ "Open vessel for trip"
+    # open supplies appear in the load supply select (system supply no)
+    assert html =~ supply.title
 
-    # good_id resolved server-side from good_name (hidden empty fields can't be forced in LVTest)
     {:ok, _, html} =
       lv
       |> form("#trip-form",
@@ -44,10 +42,9 @@ defmodule FullCircleWeb.TradingTripLiveTest do
           date: "2026-07-10",
           transport_mode: "company_own",
           status: "draft",
-          good_name: good.name,
-          reference_no: "T-100",
           loads: %{
             "0" => %{
+              good_id: good.id,
               location_id: load_loc.id,
               supply_position_id: supply.id,
               planned_mt: "40",
@@ -56,6 +53,7 @@ defmodule FullCircleWeb.TradingTripLiveTest do
           },
           drops: %{
             "0" => %{
+              good_id: good.id,
               location_id: drop_loc.id,
               supply_position_id: supply.id,
               planned_mt: "40",
@@ -67,10 +65,10 @@ defmodule FullCircleWeb.TradingTripLiveTest do
       |> render_submit()
       |> follow_redirect(conn, ~p"/companies/#{company.id}/trading/trips")
 
-    assert html =~ "T-100" or html =~ "Trip saved"
+    assert html =~ "Trip saved" or html =~ "TRP-"
 
     trips = Trading.list_trips(company, user)
-    assert Enum.any?(trips, &(&1.reference_no == "T-100"))
+    assert Enum.any?(trips, &(&1.reference_no =~ ~r/^TRP-\d{6}$/))
 
     # open supply was promoted to collect because a load was created
     reloaded = Trading.get_supply_position!(supply.id, company, user)
@@ -86,7 +84,6 @@ defmodule FullCircleWeb.TradingTripLiveTest do
 
     supply =
       supply_position_fixture(company, user, %{
-        "title" => "Board supply",
         "good_id" => good.id,
         "quantity" => "100"
       })
@@ -99,9 +96,9 @@ defmodule FullCircleWeb.TradingTripLiveTest do
         %{
           "date" => "2026-07-11",
           "transport_mode" => "company_own",
-          "good_id" => good.id,
           "loads" => [
             %{
+              "good_id" => good.id,
               "location_id" => load_loc.id,
               "supply_position_id" => supply.id,
               "planned_mt" => "40",
@@ -110,6 +107,7 @@ defmodule FullCircleWeb.TradingTripLiveTest do
           ],
           "drops" => [
             %{
+              "good_id" => good.id,
               "location_id" => drop_loc.id,
               "planned_mt" => "40",
               "actual_mt" => "40"
@@ -127,7 +125,7 @@ defmodule FullCircleWeb.TradingTripLiveTest do
     |> render_click()
 
     {:ok, _lv, html} = live(conn, ~p"/companies/#{company.id}/trading/position_board")
-    assert html =~ "Board supply"
+    assert html =~ supply.title
     assert html =~ "60"
   end
 end

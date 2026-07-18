@@ -62,27 +62,31 @@ defmodule FullCircleWeb.TradingWarehouseBoardLive.Index do
       </div>
 
       <div class="bg-amber-200 border-y-2 border-amber-500 font-bold p-2 flex gap-1 text-sm">
-        <div class="w-4/12">{gettext("Warehouse")}</div>
+        <div class="w-3/12">{gettext("Location")}</div>
+        <div class="w-3/12">{gettext("Good")}</div>
         <div class="w-2/12 text-right">{gettext("In")}</div>
         <div class="w-2/12 text-right">{gettext("Out")}</div>
         <div class="w-2/12 text-right">{gettext("On hand")}</div>
-        <div class="w-2/12 text-center">{gettext("Active")}</div>
       </div>
       <div id="warehouse_board">
         <div
           :for={row <- @rows}
-          id={"wh-#{row.location.id}"}
+          id={"wh-#{row.location.id}-#{row.good && row.good.id || "none"}"}
           class="flex gap-1 border-b p-2 text-sm hover:bg-gray-100 dark:hover:bg-zinc-800"
         >
-          <div class="w-4/12">
+          <div class="w-3/12 min-w-0 truncate">
             <.link
               navigate={
                 ~p"/companies/#{@current_company.id}/trading/locations/#{row.location.id}/edit"
               }
               class="text-blue-600"
+              title={row.location.name}
             >
               {row.location.name}
             </.link>
+          </div>
+          <div class="w-3/12 min-w-0 truncate" title={row.good && row.good.name}>
+            {(row.good && row.good.name) || "—"}
           </div>
           <div class="w-2/12 text-right">{row.inbound}</div>
           <div class="w-2/12 text-right">{row.outbound}</div>
@@ -91,9 +95,6 @@ defmodule FullCircleWeb.TradingWarehouseBoardLive.Index do
             on_hand_class(row.on_hand)
           ]}>
             {row.on_hand}
-          </div>
-          <div class="w-2/12 text-center">
-            {if(row.location.active, do: gettext("Yes"), else: gettext("No"))}
           </div>
         </div>
       </div>

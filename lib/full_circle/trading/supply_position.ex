@@ -16,7 +16,7 @@ defmodule FullCircle.Trading.SupplyPosition do
   @loadable_statuses ~w(open hold collect)
 
   schema "trading_supply_positions" do
-    # Single free-text identity: vessel name, PO ref, short description, etc.
+    # System-generated unique number (SUP-000001) via gapless_doc_ids
     field :title, :string
     # Estimated date stock is available to load
     field :available_from, :date
@@ -67,6 +67,9 @@ defmodule FullCircle.Trading.SupplyPosition do
     |> validate_required([:title, :quantity, :company_id, :supplier_id, :good_id, :status])
     |> validate_inclusion(:status, @statuses)
     |> validate_number(:quantity, greater_than: 0)
+    |> unique_constraint([:company_id, :title],
+      name: :trading_supply_positions_unique_title_per_company
+    )
     |> foreign_key_constraint(:company_id)
     |> foreign_key_constraint(:supplier_id)
     |> foreign_key_constraint(:good_id)

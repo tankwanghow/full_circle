@@ -35,6 +35,7 @@ defmodule FullCircleWeb.TradingWarehouseBoardLiveTest do
             %{
               "planned_mt" => "30",
               "actual_mt" => "30",
+              "good_id" => good.id,
               "location_id" => supplier.id,
               "supply_position_id" => supply.id
             }
@@ -43,6 +44,7 @@ defmodule FullCircleWeb.TradingWarehouseBoardLiveTest do
             %{
               "planned_mt" => "30",
               "actual_mt" => "30",
+              "good_id" => good.id,
               "location_id" => wh.id,
               "supply_position_id" => supply.id
             }

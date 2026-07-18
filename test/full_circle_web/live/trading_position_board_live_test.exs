@@ -13,14 +13,14 @@ defmodule FullCircleWeb.TradingPositionBoardLiveTest do
   end
 
   test "board shows open supply remaining", %{conn: conn, company: company, user: user} do
-    supply_position_fixture(company, user, %{
-      "title" => "May vessel maize",
-      "quantity" => "100"
-    })
+    supply =
+      supply_position_fixture(company, user, %{
+        "quantity" => "100"
+      })
 
     {:ok, _lv, html} = live(conn, ~p"/companies/#{company.id}/trading/position_board")
     assert html =~ "Position Board"
-    assert html =~ "May vessel maize"
+    assert html =~ supply.title
     assert html =~ "100"
   end
 end

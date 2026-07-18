@@ -350,6 +350,77 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   @apply border-gray-600 bg-gray-700;
 }
 
+/* 24-column fractions (desk tables — finer than Tailwind's default /12) */
+.w-1\/24 {
+  width: 4.16666667%;
+}
+.w-2\/24 {
+  width: 8.33333333%;
+}
+.w-3\/24 {
+  width: 12.5%;
+}
+.w-4\/24 {
+  width: 16.66666667%;
+}
+.w-5\/24 {
+  width: 20.83333333%;
+}
+.w-6\/24 {
+  width: 25%;
+}
+.w-7\/24 {
+  width: 29.16666667%;
+}
+.w-8\/24 {
+  width: 33.33333333%;
+}
+.w-9\/24 {
+  width: 37.5%;
+}
+.w-10\/24 {
+  width: 41.66666667%;
+}
+.w-11\/24 {
+  width: 45.83333333%;
+}
+.w-12\/24 {
+  width: 50%;
+}
+.w-13\/24 {
+  width: 54.16666667%;
+}
+.w-14\/24 {
+  width: 58.33333333%;
+}
+.w-15\/24 {
+  width: 62.5%;
+}
+.w-16\/24 {
+  width: 66.66666667%;
+}
+.w-17\/24 {
+  width: 70.83333333%;
+}
+.w-18\/24 {
+  width: 75%;
+}
+.w-19\/24 {
+  width: 79.16666667%;
+}
+.w-20\/24 {
+  width: 83.33333333%;
+}
+.w-21\/24 {
+  width: 87.5%;
+}
+.w-22\/24 {
+  width: 91.66666667%;
+}
+.w-23\/24 {
+  width: 95.83333333%;
+}
+
 .flash-shake {
   animation: flash-shake 0.2s;
   animation-iteration-count: 10;

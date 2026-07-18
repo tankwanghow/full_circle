@@ -16,7 +16,7 @@ defmodule FullCircle.Trading.SalesPosition do
   @active_statuses ~w(draft open hold)
 
   schema "trading_sales_positions" do
-    # Single free-text identity: deal name, customer PO #, short description, etc.
+    # System-generated unique number (SAL-000001) via gapless_doc_ids
     field :title, :string
     # Estimated date stock is needed / to be delivered
     field :available_from, :date
@@ -70,6 +70,9 @@ defmodule FullCircle.Trading.SalesPosition do
     |> validate_required([:title, :quantity, :company_id, :customer_id, :good_id, :status])
     |> validate_inclusion(:status, @statuses)
     |> validate_number(:quantity, greater_than: 0)
+    |> unique_constraint([:company_id, :title],
+      name: :trading_sales_positions_unique_title_per_company
+    )
     |> validate_preferred_supply_same_company()
     |> foreign_key_constraint(:company_id)
     |> foreign_key_constraint(:customer_id)

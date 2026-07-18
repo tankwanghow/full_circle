@@ -77,6 +77,21 @@ defmodule FullCircle.Sys do
         doc_type: "Receipt",
         current: 0,
         company_id: company_id
+      },
+      %{
+        doc_type: "TradingSupply",
+        current: 0,
+        company_id: company_id
+      },
+      %{
+        doc_type: "TradingSales",
+        current: 0,
+        company_id: company_id
+      },
+      %{
+        doc_type: "TradingTrip",
+        current: 0,
+        company_id: company_id
       }
     ]
   end

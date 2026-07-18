@@ -29,7 +29,6 @@ defmodule FullCircle.TradingFixtures do
     good = good_fixture(company, user)
 
     defaults = %{
-      "title" => "supply-#{System.unique_integer([:positive])}",
       "quantity" => "100",
       "unit_price" => "1200",
       "status" => "open",
@@ -37,14 +36,17 @@ defmodule FullCircle.TradingFixtures do
       "good_id" => good.id
     }
 
+    # title is system-generated (SUP-######); drop if passed so create assigns it
+    attrs = stringify_keys(attrs) |> Map.drop(["title"])
+
     {:ok, supply} =
-      Trading.create_supply_position(Map.merge(defaults, stringify_keys(attrs)), company, user)
+      Trading.create_supply_position(Map.merge(defaults, attrs), company, user)
 
     supply
   end
 
   def sales_position_fixture(company, user, attrs \\ %{}) do
-    attrs = stringify_keys(attrs)
+    attrs = stringify_keys(attrs) |> Map.drop(["title"])
 
     contact =
       if attrs["customer_id"] do
@@ -61,7 +63,6 @@ defmodule FullCircle.TradingFixtures do
       end
 
     defaults = %{
-      "title" => "sales-#{System.unique_integer([:positive])}",
       "quantity" => "35",
       "unit_price" => "1400",
       "status" => "draft",
@@ -76,7 +77,8 @@ defmodule FullCircle.TradingFixtures do
   end
 
   def trip_fixture(company, user, attrs \\ %{}) do
-    attrs = stringify_keys(attrs)
+    # reference_no is system-generated (TRP-######)
+    attrs = stringify_keys(attrs) |> Map.drop(["reference_no"])
 
     good_id =
       attrs["good_id"] ||
@@ -85,10 +87,31 @@ defmodule FullCircle.TradingFixtures do
     defaults = %{
       "date" => Date.utc_today() |> Date.to_iso8601(),
       "transport_mode" => "company_own",
-      "status" => "draft",
-      "good_id" => good_id,
-      "reference_no" => "trip-#{System.unique_integer([:positive])}"
+      "status" => "draft"
     }
+
+    attrs =
+      attrs
+      |> Map.put_new("loads", [
+        %{
+          "planned_mt" => "1",
+          "actual_mt" => "1",
+          "good_id" => good_id,
+          "location_id" =>
+            attrs["load_location_id"] || location_fixture(company, user, %{"kind" => "port"}).id
+        }
+      ])
+      |> Map.put_new("drops", [
+        %{
+          "planned_mt" => "1",
+          "actual_mt" => "1",
+          "good_id" => good_id,
+          "location_id" =>
+            attrs["drop_location_id"] ||
+              location_fixture(company, user, %{"kind" => "customer_site"}).id
+        }
+      ])
+      |> Map.drop(["good_id", "load_location_id", "drop_location_id"])
 
     {:ok, trip} =
       Trading.create_trip(Map.merge(defaults, attrs), company, user)

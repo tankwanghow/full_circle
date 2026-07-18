@@ -105,8 +105,8 @@ Use **flex** layouts (not CSS grid) for panel rows, consistent with recent tradi
 
 ### 3.4 Responsive
 
-- Desktop: 2×2 top (supply | sales), full-width warehouse, full-width trips.  
-- Narrow: stack all four vertically. No mobile redesign beyond stack.
+- Desktop: two columns — left = supply + warehouse (partitioned stack), right = open sales; trips full width below.  
+- Narrow: stack supply → warehouse → sales → trips. No mobile redesign beyond stack.
 
 ---
 

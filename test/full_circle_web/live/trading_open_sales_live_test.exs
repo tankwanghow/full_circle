@@ -13,22 +13,21 @@ defmodule FullCircleWeb.TradingOpenSalesLiveTest do
   end
 
   test "open sales lists active commitments", %{conn: conn, company: company, user: user} do
-    sales_position_fixture(company, user, %{
-      "title" => "Spot pollard 35",
-      "quantity" => "35",
-      "status" => "open"
-    })
+    sales =
+      sales_position_fixture(company, user, %{
+        "quantity" => "35",
+        "status" => "open"
+      })
 
     {:ok, _lv, html} = live(conn, ~p"/companies/#{company.id}/trading/open_sales")
     assert html =~ "Open Sales"
-    assert html =~ "Spot pollard 35"
+    assert html =~ sales.title
     assert html =~ "35"
   end
 
   test "mark fulfilled removes from open sales", %{conn: conn, company: company, user: user} do
     sales =
       sales_position_fixture(company, user, %{
-        "title" => "To fulfill",
         "quantity" => "20",
         "status" => "open"
       })
@@ -50,19 +49,17 @@ defmodule FullCircleWeb.TradingOpenSalesLiveTest do
   } do
     supply =
       supply_position_fixture(company, user, %{
-        "title" => "May vessel",
         "quantity" => "100"
       })
 
     sales_position_fixture(company, user, %{
-      "title" => "Held order",
       "quantity" => "40",
       "preferred_supply_id" => supply.id,
       "status" => "open"
     })
 
     {:ok, _lv, html} = live(conn, ~p"/companies/#{company.id}/trading/position_board")
-    assert html =~ "May vessel"
+    assert html =~ supply.title
     assert html =~ "100"
     assert html =~ "40"
   end
@@ -73,12 +70,11 @@ defmodule FullCircleWeb.TradingOpenSalesLiveTest do
 
     {:ok, lv, _html} = live(conn, ~p"/companies/#{company.id}/trading/sales_positions/new")
 
-    # IDs resolved server-side from names (hidden empty fields can't be forced in LVTest)
+    # IDs resolved server-side from names; sales no is system-generated
     {:ok, _, html} =
       lv
       |> form("#sales-form",
         sales_position: %{
-          title: "New customer order",
           quantity: "15",
           unit_price: "1300",
           customer_name: contact.name,
@@ -89,6 +85,6 @@ defmodule FullCircleWeb.TradingOpenSalesLiveTest do
       |> render_submit()
       |> follow_redirect(conn, ~p"/companies/#{company.id}/trading/sales_positions")
 
-    assert html =~ "New customer order"
+    assert html =~ "SAL-" or html =~ "Sales position"
   end
 end

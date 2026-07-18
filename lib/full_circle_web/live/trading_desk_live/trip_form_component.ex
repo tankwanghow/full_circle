@@ -3,8 +3,9 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
 
   alias FullCircle.Trading
   alias FullCircle.Trading.{Trip, TripLoad, TripDrop}
-  alias FullCircle.Product
   alias FullCircle.Accounting
+  import Ecto.Query, warn: false
+  import FullCircleWeb.TradingTripLive.DetailLines
 
   @impl true
   def update(assigns, socket) do
@@ -20,16 +21,26 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
     socket =
       case action do
         :new ->
-          cs =
-            Trip.changeset(%Trip{}, %{
-              "company_id" => company.id,
-              "status" => "draft",
-              "date" => Date.utc_today() |> Date.to_iso8601(),
-              "transport_mode" => "company_own",
-              "loads" => [%{}],
-              "drops" => [%{}]
-            })
+          prefill = Map.get(assigns, :prefill) || %{}
 
+          base = %{
+            "company_id" => company.id,
+            "status" => "draft",
+            "date" => Date.utc_today() |> Date.to_iso8601(),
+            "transport_mode" => "company_own",
+            "reference_no" => "...new...",
+            "loads" => [%{}],
+            "drops" => [%{}]
+          }
+
+          # Prefill from desk selection; cast_assoc expects index maps ("%{"0" => ...}")
+          attrs =
+            base
+            |> Map.merge(stringify_map(prefill))
+            |> normalize_assoc_params("loads")
+            |> normalize_assoc_params("drops")
+
+          cs = Trip.changeset(%Trip{}, attrs)
           assign_form(socket, cs, :new, nil)
 
         :edit ->
@@ -37,7 +48,6 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
 
           cs =
             Trip.changeset(trip, %{
-              "good_name" => trip.good && trip.good.name,
               "transport_agent_name" => trip.transport_agent && trip.transport_agent.name
             })
 
@@ -47,6 +57,38 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
     {:ok, socket}
   end
 
+  defp stringify_map(map) when is_map(map) do
+    Map.new(map, fn
+      {k, v} when is_atom(k) -> {Atom.to_string(k), stringify_val(v)}
+      {k, v} -> {to_string(k), stringify_val(v)}
+    end)
+  end
+
+  defp stringify_map(_), do: %{}
+
+  defp stringify_val(list) when is_list(list), do: Enum.map(list, &stringify_val/1)
+  defp stringify_val(map) when is_map(map), do: stringify_map(map)
+  defp stringify_val(other), do: other
+
+  # Ecto cast_assoc for forms uses string indexes; accept list or map prefill.
+  defp normalize_assoc_params(attrs, key) do
+    case Map.get(attrs, key) do
+      list when is_list(list) and list != [] ->
+        indexed =
+          list
+          |> Enum.with_index()
+          |> Map.new(fn {item, i} -> {Integer.to_string(i), stringify_val(item)} end)
+
+        Map.put(attrs, key, indexed)
+
+      map when is_map(map) and map_size(map) > 0 ->
+        Map.put(attrs, key, stringify_map(map))
+
+      _ ->
+        Map.put(attrs, key, %{"0" => %{}})
+    end
+  end
+
   defp assign_form(socket, cs, live_action, trip) do
     company = socket.assigns.current_company
     user = socket.assigns.current_user
@@ -54,8 +96,15 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
     title =
       case live_action do
         :new -> gettext("New Trip")
-        :edit -> gettext("Edit Trip")
+        :edit -> gettext("Edit Trip") <> " " <> (trip.reference_no || "")
       end
+
+    goods =
+      FullCircle.Repo.all(
+        from g in FullCircle.Product.Good,
+          where: g.company_id == ^company.id,
+          order_by: g.name
+      )
 
     socket
     |> assign(page_title: title)
@@ -63,6 +112,7 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
     |> assign(trip: trip)
     |> assign(form: to_form(cs))
     |> assign(locations: Trading.list_locations(company, user, active_only: true))
+    |> assign(goods: goods)
     |> assign(
       supplies:
         Trading.list_supply_positions(company, user,
@@ -74,23 +124,6 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
   end
 
   @impl true
-  def handle_event(
-        "validate",
-        %{"_target" => ["trip", "good_name"], "trip" => params},
-        socket
-      ) do
-    {params, socket, _} =
-      FullCircleWeb.Helpers.assign_autocomplete_id(
-        socket,
-        params,
-        "good_name",
-        "good_id",
-        &Product.get_good_by_name/3
-      )
-
-    validate(params, socket)
-  end
-
   def handle_event(
         "validate",
         %{"_target" => ["trip", "transport_agent_name"], "trip" => params},
@@ -199,7 +232,7 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
 
       {:error, :good_mismatch} ->
         {:noreply,
-         put_flash(socket, :error, gettext("Load/drop product does not match trip good."))}
+         put_flash(socket, :error, gettext("Load/drop product does not match the line good."))}
 
       {:error, reason} when is_atom(reason) ->
         {:noreply,
@@ -229,7 +262,11 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
   end
 
   defp validate(params, socket) do
-    params = Map.put(params, "company_id", socket.assigns.current_company.id)
+    params =
+      params
+      |> Map.put("company_id", socket.assigns.current_company.id)
+      |> put_system_reference_no(socket)
+      |> fill_load_goods({socket.assigns.supplies, socket.assigns.sales})
 
     cs =
       case socket.assigns.live_action do
@@ -241,51 +278,101 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
     {:noreply, assign(socket, form: to_form(cs))}
   end
 
+  defp put_system_reference_no(params, %{assigns: %{live_action: :new}}),
+    do: Map.put(params, "reference_no", "...new...")
+
+  defp put_system_reference_no(params, %{assigns: %{trip: %{reference_no: ref}}}),
+    do: Map.put(params, "reference_no", ref)
+
+  defp put_system_reference_no(params, _), do: params
+
   defp ensure_ids(params, company, user) do
     params =
-      case Product.get_good_by_name(params["good_name"] || "", company, user) do
-        %{id: id} -> Map.put(params, "good_id", id)
+      case Accounting.get_contact_by_name(params["transport_agent_name"] || "", company, user) do
+        %{id: id} -> Map.put(params, "transport_agent_id", id)
         _ -> params
       end
 
-    case Accounting.get_contact_by_name(params["transport_agent_name"] || "", company, user) do
-      %{id: id} -> Map.put(params, "transport_agent_id", id)
-      _ -> params
-    end
+    params
+    |> fill_load_goods(socket_supplies_sales(company, user))
   end
 
-  defp location_options(locations) do
-    Enum.map(locations, &{&1.name, &1.id})
+  # supplies/sales from DB for ensure_ids (no socket)
+  defp socket_supplies_sales(company, user) do
+    supplies =
+      Trading.list_supply_positions(company, user,
+        statuses: FullCircle.Trading.SupplyPosition.loadable_statuses()
+      )
+
+    sales = Trading.list_open_sales(company, user)
+    {supplies, sales}
   end
 
-  defp supply_options(supplies) do
-    [
-      {gettext("(none)"), ""}
-      | Enum.map(supplies, fn s ->
-          label =
-            case s.status do
-              "open" -> "#{s.title} (open)"
-              "hold" -> "#{s.title} (hold)"
-              "collect" -> "#{s.title} (collect)"
-              other -> "#{s.title} (#{other})"
-            end
+  defp fill_load_goods(params, {supplies, sales}) do
+    supply_map = Map.new(supplies, &{&1.id, &1})
+    sales_map = Map.new(sales, &{&1.id, &1})
 
-          {label, s.id}
-        end)
-    ]
+    loads =
+      (params["loads"] || %{})
+      |> Map.new(fn {k, load} ->
+        load = stringify_keys_one(load)
+        sid = load["supply_position_id"]
+
+        load =
+          if sid not in [nil, ""] and Map.has_key?(supply_map, sid) do
+            s = supply_map[sid]
+            load
+            |> Map.put("good_id", s.good_id)
+            |> Map.put("good_name", s.good && s.good.name)
+          else
+            load
+          end
+
+        {k, load}
+      end)
+
+    drops =
+      (params["drops"] || %{})
+      |> Map.new(fn {k, drop} ->
+        drop = stringify_keys_one(drop)
+        sales_id = drop["sales_position_id"]
+
+        drop =
+          if sales_id not in [nil, ""] and Map.has_key?(sales_map, sales_id) do
+            s = sales_map[sales_id]
+            drop
+            |> Map.put("good_id", s.good_id)
+            |> Map.put("good_name", s.good && s.good.name)
+          else
+            drop
+          end
+
+        {k, drop}
+      end)
+
+    params
+    |> Map.put("loads", loads)
+    |> Map.put("drops", drops)
   end
 
-  defp sales_options(sales) do
-    [{gettext("(none)"), ""} | Enum.map(sales, &{&1.title, &1.id})]
+  defp stringify_keys_one(map) when is_map(map) do
+    Map.new(map, fn
+      {k, v} when is_atom(k) -> {Atom.to_string(k), v}
+      {k, v} -> {to_string(k), v}
+    end)
   end
 
   @impl true
   def render(assigns) do
     ~H"""
     <div>
-      <p class="w-full text-2xl text-center font-medium mb-2">{@page_title}</p>
+      <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
+      <.error_box changeset={@form.source} />
 
-      <div :if={@warnings != []} class="mb-3 p-2 bg-amber-100 border border-amber-400 text-sm rounded">
+      <div
+        :if={@warnings != []}
+        class="mb-3 p-2 bg-amber-100 border border-amber-400 text-sm rounded"
+      >
         <p class="font-semibold">{gettext("Warnings")}</p>
         <ul class="list-disc ml-5">
           <li :for={w <- @warnings}>{w}</li>
@@ -299,12 +386,20 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
         phx-submit="save"
         phx-target={@myself}
         autocomplete="off"
-        class="space-y-3"
       >
-        <div class="flex gap-2 flex-wrap">
-          <.input field={@form[:date]} type="date" label={gettext("Date")} />
-          <.input field={@form[:reference_no]} label={gettext("Reference")} />
-          <div class="w-[25%]">
+        <div class="flex flex-row flex-nowrap gap-1">
+          <div class="w-[14%] grow shrink">
+            <.input
+              field={@form[:reference_no]}
+              label={gettext("Trip no")}
+              readonly
+              tabindex="-1"
+            />
+          </div>
+          <div class="w-[14%] grow shrink">
+            <.input field={@form[:date]} type="date" label={gettext("Date")} />
+          </div>
+          <div class="w-[18%] grow shrink">
             <.input
               field={@form[:transport_mode]}
               type="select"
@@ -312,28 +407,10 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
               options={Enum.map(Trip.transport_modes(), &{&1, &1})}
             />
           </div>
-          <div class="w-[15%]">
-            <.input
-              field={@form[:status]}
-              type="select"
-              label={gettext("Status")}
-              options={Enum.map(Trip.statuses(), &{&1, &1})}
-              disabled={@live_action == :edit && @trip && @trip.status in ["completed", "cancelled"]}
-            />
+          <div class="w-[14%] grow shrink">
+            <.input field={@form[:vehicle_number]} label={gettext("Vehicle no")} />
           </div>
-        </div>
-
-        <div class="flex gap-2">
-          <div class="w-[40%]">
-            <.input
-              field={@form[:good_name]}
-              label={gettext("Good")}
-              phx-hook="tributeAutoComplete"
-              url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=good&name="}
-            />
-            <.input type="hidden" field={@form[:good_id]} />
-          </div>
-          <div class="w-[40%]">
+          <div class="w-[28%] grow shrink">
             <.input
               field={@form[:transport_agent_name]}
               label={gettext("Transport agent")}
@@ -344,151 +421,39 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
           </div>
         </div>
 
-        <.input field={@form[:notes]} type="textarea" label={gettext("Notes")} />
-
-        <div class="border-t pt-2">
-          <p class="font-semibold text-lg mb-1">{gettext("Loads")}</p>
-          <.inputs_for :let={load} field={@form[:loads]}>
-            <div class={[
-              "grid grid-cols-12 gap-1 mb-2 items-end",
-              if(load[:delete].value in [true, "true"], do: "hidden")
-            ]}>
-              <.input type="hidden" field={load[:delete]} />
-              <div class="col-span-3">
-                <.input
-                  field={load[:location_id]}
-                  type="select"
-                  label={gettext("Location")}
-                  options={location_options(@locations)}
-                  prompt={gettext("Select…")}
-                />
-              </div>
-              <div class="col-span-3">
-                <.input
-                  field={load[:supply_position_id]}
-                  type="select"
-                  label={gettext("Supply")}
-                  options={supply_options(@supplies)}
-                />
-              </div>
-              <div class="col-span-2">
-                <.input
-                  field={load[:planned_mt]}
-                  type="number"
-                  step="any"
-                  label={gettext("Planned MT")}
-                />
-              </div>
-              <div class="col-span-2">
-                <.input
-                  field={load[:actual_mt]}
-                  type="number"
-                  step="any"
-                  label={gettext("Actual MT")}
-                />
-              </div>
-              <div class="col-span-1">
-                <.input field={load[:location_note]} label={gettext("Note")} />
-              </div>
-              <div class="col-span-1 pb-1">
-                <button
-                  type="button"
-                  phx-click="delete_load"
-                  phx-value-index={load.index}
-                  phx-target={@myself}
-                  class="red button text-xs"
-                >
-                  {gettext("Del")}
-                </button>
-              </div>
-            </div>
-          </.inputs_for>
-          <button
-            type="button"
-            phx-click="add_load"
-            phx-target={@myself}
-            class="blue button text-sm"
-          >
-            {gettext("Add load")}
-          </button>
+        <div class="flex flex-row flex-nowrap mt-1">
+          <div class="w-full">
+            <.input field={@form[:notes]} label={gettext("Notes")} />
+          </div>
+          <div class="w-[12%] grow shrink">
+            <.input
+              field={@form[:status]}
+              type="select"
+              label={gettext("Status")}
+              options={Enum.map(Trip.statuses(), &{&1, &1})}
+              disabled={@live_action == :edit && @trip && @trip.status in ["completed", "cancelled"]}
+            />
+          </div>
         </div>
 
-        <div class="border-t pt-2">
-          <p class="font-semibold text-lg mb-1">{gettext("Drops")}</p>
-          <.inputs_for :let={drop} field={@form[:drops]}>
-            <div class={[
-              "grid grid-cols-12 gap-1 mb-2 items-end",
-              if(drop[:delete].value in [true, "true"], do: "hidden")
-            ]}>
-              <.input type="hidden" field={drop[:delete]} />
-              <div class="col-span-2">
-                <.input
-                  field={drop[:location_id]}
-                  type="select"
-                  label={gettext("Location")}
-                  options={location_options(@locations)}
-                  prompt={gettext("Select…")}
-                />
-              </div>
-              <div class="col-span-2">
-                <.input
-                  field={drop[:sales_position_id]}
-                  type="select"
-                  label={gettext("Sales")}
-                  options={sales_options(@sales)}
-                />
-              </div>
-              <div class="col-span-2">
-                <.input
-                  field={drop[:supply_position_id]}
-                  type="select"
-                  label={gettext("Supply")}
-                  options={supply_options(@supplies)}
-                />
-              </div>
-              <div class="col-span-2">
-                <.input
-                  field={drop[:planned_mt]}
-                  type="number"
-                  step="any"
-                  label={gettext("Planned MT")}
-                />
-              </div>
-              <div class="col-span-2">
-                <.input
-                  field={drop[:actual_mt]}
-                  type="number"
-                  step="any"
-                  label={gettext("Actual MT")}
-                />
-              </div>
-              <div class="col-span-1">
-                <.input field={drop[:variance_note]} label={gettext("Variance")} />
-              </div>
-              <div class="col-span-1 pb-1">
-                <button
-                  type="button"
-                  phx-click="delete_drop"
-                  phx-value-index={drop.index}
-                  phx-target={@myself}
-                  class="red button text-xs"
-                >
-                  {gettext("Del")}
-                </button>
-              </div>
-            </div>
-          </.inputs_for>
-          <button
-            type="button"
-            phx-click="add_drop"
-            phx-target={@myself}
-            class="blue button text-sm"
-          >
-            {gettext("Add drop")}
-          </button>
-        </div>
+        <.loads_section
+          form={@form}
+          goods={@goods}
+          locations={@locations}
+          supplies={@supplies}
+          phx_target={@myself}
+        />
 
-        <div class="text-center mt-4 gap-1 flex flex-wrap justify-center">
+        <.drops_section
+          form={@form}
+          goods={@goods}
+          locations={@locations}
+          supplies={@supplies}
+          sales={@sales}
+          phx_target={@myself}
+        />
+
+        <div class="flex flex-row justify-center gap-x-1 mt-3 flex-wrap">
           <.button :if={is_nil(@trip) or @trip.status not in ["completed", "cancelled"]}>
             {gettext("Save")}
           </.button>
