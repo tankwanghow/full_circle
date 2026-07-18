@@ -5,8 +5,8 @@ defmodule FullCircle.Trading.SalesPosition do
   alias FullCircle.Repo
   alias FullCircle.Trading.SupplyPosition
 
-  # draft      — not yet committed
-  # open       — active commitment
+  # draft      — not committed
+  # open       — committed
   # hold       — on hold (paused delivery)
   # fulfilled  — done (may be short)
   # cancelled   — cancelled
@@ -41,8 +41,8 @@ defmodule FullCircle.Trading.SalesPosition do
   def statuses, do: @statuses
   def active_statuses, do: @active_statuses
 
-  def status_label("draft"), do: "draft — not yet committed"
-  def status_label("open"), do: "open — active commitment"
+  def status_label("draft"), do: "draft — not committed"
+  def status_label("open"), do: "open — committed"
   def status_label("hold"), do: "hold — delivery paused"
   def status_label("fulfilled"), do: "fulfilled — done"
   def status_label("cancelled"), do: "cancelled"

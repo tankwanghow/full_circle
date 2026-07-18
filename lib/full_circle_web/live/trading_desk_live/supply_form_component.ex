@@ -215,7 +215,7 @@ defmodule FullCircleWeb.TradingDeskLive.SupplyFormComponent do
         class="space-y-2"
       >
         <div class="flex gap-2">
-          <div class="w-[40%]">
+          <div class="w-[15%]">
             <.input
               field={@form[:title]}
               label={gettext("Supply no")}
@@ -223,17 +223,7 @@ defmodule FullCircleWeb.TradingDeskLive.SupplyFormComponent do
               tabindex="-1"
             />
           </div>
-          <div class="w-[60%]">
-            <.input
-              field={@form[:status]}
-              type="select"
-              label={gettext("Status")}
-              options={status_options()}
-            />
-          </div>
-        </div>
-        <div class="flex gap-2">
-          <div class="w-[60%]">
+          <div class="w-[35%]">
             <.input
               field={@form[:supplier_name]}
               label={gettext("Supplier")}
@@ -242,11 +232,21 @@ defmodule FullCircleWeb.TradingDeskLive.SupplyFormComponent do
             />
             <.input type="hidden" field={@form[:supplier_id]} />
           </div>
+          <div class="w-[35%]">
+            <.input
+              field={@form[:status]}
+              type="select"
+              label={gettext("Status")}
+              options={status_options()}
+            />
+          </div>
+          <div class="w-[15%]">
           <.input
             field={@form[:available_from]}
             type="date"
-            label={gettext("Est. available to load")}
+            label={gettext("Est. available from")}
           />
+          </div>
         </div>
         <div class="flex gap-2">
           <div class="w-[50%]">

@@ -275,7 +275,7 @@ defmodule FullCircleWeb.TradingDeskLive.SalesFormComponent do
         class="space-y-2"
       >
         <div class="flex gap-2">
-          <div class="w-[30%]">
+          <div class="w-[20%]">
             <.input
               field={@form[:title]}
               label={gettext("Sales no")}
@@ -283,7 +283,7 @@ defmodule FullCircleWeb.TradingDeskLive.SalesFormComponent do
               tabindex="-1"
             />
           </div>
-          <div class="w-[40%]">
+          <div class="w-[45%]">
             <.input
               field={@form[:customer_name]}
               label={gettext("Customer")}
@@ -297,7 +297,7 @@ defmodule FullCircleWeb.TradingDeskLive.SalesFormComponent do
             type="date"
             label={gettext("Est. needed by")}
           />
-          <div class="w-[20%]">
+          <div class="w-[30%]">
             <.input
               field={@form[:status]}
               type="select"

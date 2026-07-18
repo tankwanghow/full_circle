@@ -537,4 +537,98 @@ defmodule FullCircle.Trading.TripTest do
     errs = errors_on(cs)
     assert errs != %{}
   end
+
+  test "trip_from_names and trip_to_names summarise multi-party trips", %{
+    admin: admin,
+    company: company
+  } do
+    good = good_fixture(company, admin)
+    sup_a = contact_fixture(company, admin, %{"name" => "Supplier Alpha"})
+    sup_b = contact_fixture(company, admin, %{"name" => "Supplier Beta"})
+    cust = contact_fixture(company, admin, %{"name" => "Customer Gamma"})
+
+    supply_a =
+      supply_position_fixture(company, admin, %{
+        "good_id" => good.id,
+        "supplier_id" => sup_a.id,
+        "quantity" => "50"
+      })
+
+    supply_b =
+      supply_position_fixture(company, admin, %{
+        "good_id" => good.id,
+        "supplier_id" => sup_b.id,
+        "quantity" => "50"
+      })
+
+    sales =
+      sales_position_fixture(company, admin, %{
+        "good_id" => good.id,
+        "customer_id" => cust.id,
+        "quantity" => "40",
+        "status" => "open"
+      })
+
+    load_loc = location_fixture(company, admin, %{"kind" => "port", "name" => "Port X"})
+    drop_loc = location_fixture(company, admin, %{"kind" => "customer_site", "name" => "Farm Z"})
+    silo = location_fixture(company, admin, %{"kind" => "own_warehouse", "name" => "Silo Y"})
+
+    {:ok, trip} =
+      Trading.create_trip(
+        %{
+          "date" => "2026-07-20",
+          "transport_mode" => "company_own",
+          "loads" => [
+            %{
+              "planned_mt" => "20",
+              "actual_mt" => "20",
+              "good_id" => good.id,
+              "location_id" => load_loc.id,
+              "supply_position_id" => supply_a.id
+            },
+            %{
+              "planned_mt" => "20",
+              "actual_mt" => "20",
+              "good_id" => good.id,
+              "location_id" => load_loc.id,
+              "supply_position_id" => supply_b.id
+            }
+          ],
+          "drops" => [
+            %{
+              "planned_mt" => "25",
+              "actual_mt" => "25",
+              "good_id" => good.id,
+              "location_id" => drop_loc.id,
+              "sales_position_id" => sales.id
+            },
+            %{
+              "planned_mt" => "15",
+              "actual_mt" => "15",
+              "good_id" => good.id,
+              "location_id" => silo.id
+            }
+          ]
+        },
+        company,
+        admin
+      )
+
+    trip = Trading.get_trip!(trip.id, company, admin)
+    # list_trips preload includes nested supplier/customer; get_trip! may not —
+    # re-list to exercise desk preload path
+    listed = Trading.list_trips(company, admin) |> Enum.find(&(&1.id == trip.id))
+
+    froms = Trading.trip_from_names(listed)
+    tos = Trading.trip_to_names(listed)
+
+    assert "Supplier Alpha" in froms
+    assert "Supplier Beta" in froms
+    assert "Customer Gamma" in tos
+    assert "Silo Y" in tos
+
+    assert Trading.trip_parties_label(froms) == "Supplier Alpha, Supplier Beta"
+    assert Trading.trip_parties_label(["A", "B", "C", "D"]) == "A, B +2"
+    assert Trading.trip_parties_label([]) == ""
+  end
 end

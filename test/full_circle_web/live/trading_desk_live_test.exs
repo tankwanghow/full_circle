@@ -424,6 +424,82 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
     assert has_element?(lv, "#{out_id}[disabled]")
   end
 
+  test "status filter can load closed supplies and fulfilled sales", %{
+    conn: conn,
+    company: company,
+    user: user
+  } do
+    good = good_fixture(company, user)
+    supplier = contact_fixture(company, user, %{"name" => "Closed Supplier Co"})
+    customer = contact_fixture(company, user, %{"name" => "Fulfilled Customer Co"})
+
+    closed =
+      supply_position_fixture(company, user, %{
+        "good_id" => good.id,
+        "supplier_id" => supplier.id,
+        "quantity" => "10",
+        "status" => "closed"
+      })
+
+    open_supply =
+      supply_position_fixture(company, user, %{
+        "good_id" => good.id,
+        "quantity" => "20",
+        "status" => "open"
+      })
+
+    fulfilled =
+      sales_position_fixture(company, user, %{
+        "good_id" => good.id,
+        "customer_id" => customer.id,
+        "quantity" => "5",
+        "status" => "fulfilled"
+      })
+
+    open_sales =
+      sales_position_fixture(company, user, %{
+        "good_id" => good.id,
+        "quantity" => "8",
+        "status" => "open"
+      })
+
+    {:ok, lv, html} = live(conn, ~p"/companies/#{company.id}/trading/desk")
+    # default: active only
+    refute html =~ closed.title
+    refute html =~ fulfilled.title
+    assert html =~ open_supply.title
+    assert html =~ open_sales.title
+
+    lv
+    |> form("#desk-filter-supply-status", %{
+      "table" => "supply",
+      "field" => "status",
+      "value" => "closed"
+    })
+    |> render_change()
+
+    html = render(lv)
+    assert html =~ closed.title
+    assert html =~ "closed"
+    # open still in dataset until status filter narrows; "closed" does not match "open"
+    refute html =~ open_supply.title
+    # closed rows are not selectable for trips
+    refute has_element?(lv, "#sel-supply-#{closed.id}")
+
+    lv
+    |> form("#desk-filter-sales-status", %{
+      "table" => "sales",
+      "field" => "status",
+      "value" => "fulfilled"
+    })
+    |> render_change()
+
+    html = render(lv)
+    assert html =~ fulfilled.title
+    refute html =~ open_sales.title
+    refute has_element?(lv, "#sel-sales-#{fulfilled.id}")
+  end
+
   test "stock-in: supply + warehouse enables create trip without sales", %{
     conn: conn,
     company: company,

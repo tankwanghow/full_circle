@@ -20,12 +20,12 @@ defmodule FullCircleWeb.TradingTripLive.DetailLines do
       class="text-center border bg-sky-100 dark:bg-sky-950/40 mt-2 p-3 rounded-lg border-sky-400"
     >
       <div class="font-medium flex flex-row text-center tracking-tighter sticky top-0 z-10">
-        <div class="detail-header w-[17%]">{gettext("Good")}</div>
-        <div class="detail-header w-[18%]">{gettext("Location")}</div>
-        <div class="detail-header w-[18%]">{gettext("Supply")}</div>
-        <div class="detail-header w-[15%]">{gettext("Planned MT")}</div>
-        <div class="detail-header w-[15%]">{gettext("Actual MT")}</div>
-        <div class="detail-header w-[16%]">{gettext("Note")}</div>
+        <div class="detail-header w-[16%]">{gettext("Good")}</div>
+        <div class="detail-header w-[28%]">{gettext("Location")}</div>
+        <div class="detail-header w-[19%]">{gettext("Supply")}</div>
+        <div class="detail-header w-[9%]">{gettext("Plan MT")}</div>
+        <div class="detail-header w-[9%]">{gettext("Actual MT")}</div>
+        <div class="detail-header w-[17%]">{gettext("Note")}</div>
         <div class="w-[2%]"></div>
       </div>
 
@@ -36,7 +36,7 @@ defmodule FullCircleWeb.TradingTripLive.DetailLines do
           if(!load.source.valid?, do: "bg-rose-50 border-l-4 border-l-rose-500")
         ]}>
           <.input type="hidden" field={load[:delete]} value={"#{load[:delete].value}"} />
-          <div class="w-[17%]">
+          <div class="w-[16%]">
             <.input
               field={load[:good_id]}
               type="select"
@@ -44,7 +44,7 @@ defmodule FullCircleWeb.TradingTripLive.DetailLines do
               prompt={gettext("Select…")}
             />
           </div>
-          <div class="w-[18%]">
+          <div class="w-[28%]">
             <.input
               field={load[:location_id]}
               type="select"
@@ -52,20 +52,20 @@ defmodule FullCircleWeb.TradingTripLive.DetailLines do
               prompt={gettext("Select…")}
             />
           </div>
-          <div class="w-[18%]">
+          <div class="w-[19%]">
             <.input
               field={load[:supply_position_id]}
               type="select"
               options={supply_options(@supplies)}
             />
           </div>
-          <div class="w-[15%]">
+          <div class="w-[9%]">
             <.input field={load[:planned_mt]} type="number" step="any" klass="text-right" />
           </div>
-          <div class="w-[15%]">
+          <div class="w-[9%]">
             <.input field={load[:actual_mt]} type="number" step="any" klass="text-right" />
           </div>
-          <div class="w-[16%]">
+          <div class="w-[17%]">
             <.input field={load[:location_note]} />
           </div>
           <div class="w-[2%] mt-1 text-rose-500">
@@ -106,13 +106,13 @@ defmodule FullCircleWeb.TradingTripLive.DetailLines do
       class="text-center border bg-violet-100 dark:bg-violet-950/40 mt-2 p-3 rounded-lg border-violet-400"
     >
       <div class="font-medium flex flex-row text-center tracking-tighter sticky top-0 z-10">
-        <div class="detail-header w-[14%]">{gettext("Good")}</div>
-        <div class="detail-header w-[14%]">{gettext("Location")}</div>
-        <div class="detail-header w-[14%]">{gettext("Sales")}</div>
-        <div class="detail-header w-[15%]">{gettext("Supply")}</div>
-        <div class="detail-header w-[13%]">{gettext("Planned MT")}</div>
-        <div class="detail-header w-[13%]">{gettext("Actual MT")}</div>
-        <div class="detail-header w-[15%]">{gettext("Variance")}</div>
+        <div class="detail-header w-[16%]">{gettext("Good")}</div>
+        <div class="detail-header w-[28%]">{gettext("Location")}</div>
+        <div class="detail-header w-[11%]">{gettext("Sales")}</div>
+        <div class="detail-header w-[17%]">{gettext("Supply")}</div>
+        <div class="detail-header w-[7%]">{gettext("Plan MT")}</div>
+        <div class="detail-header w-[7%]">{gettext("Actual MT")}</div>
+        <div class="detail-header w-[12%]">{gettext("Variance")}</div>
         <div class="w-[2%]"></div>
       </div>
 
@@ -123,7 +123,7 @@ defmodule FullCircleWeb.TradingTripLive.DetailLines do
           if(!drop.source.valid?, do: "bg-rose-50 border-l-4 border-l-rose-500")
         ]}>
           <.input type="hidden" field={drop[:delete]} value={"#{drop[:delete].value}"} />
-          <div class="w-[14%]">
+          <div class="w-[16%]">
             <.input
               field={drop[:good_id]}
               type="select"
@@ -131,7 +131,7 @@ defmodule FullCircleWeb.TradingTripLive.DetailLines do
               prompt={gettext("Select…")}
             />
           </div>
-          <div class="w-[14%]">
+          <div class="w-[28%]">
             <.input
               field={drop[:location_id]}
               type="select"
@@ -139,27 +139,27 @@ defmodule FullCircleWeb.TradingTripLive.DetailLines do
               prompt={gettext("Select…")}
             />
           </div>
-          <div class="w-[14%]">
+          <div class="w-[11%]">
             <.input
               field={drop[:sales_position_id]}
               type="select"
               options={sales_options(@sales)}
             />
           </div>
-          <div class="w-[15%]">
+          <div class="w-[17%]">
             <.input
               field={drop[:supply_position_id]}
               type="select"
               options={supply_options(@supplies)}
             />
           </div>
-          <div class="w-[13%]">
+          <div class="w-[7%]">
             <.input field={drop[:planned_mt]} type="number" step="any" klass="text-right" />
           </div>
-          <div class="w-[13%]">
+          <div class="w-[7%]">
             <.input field={drop[:actual_mt]} type="number" step="any" klass="text-right" />
           </div>
-          <div class="w-[15%]">
+          <div class="w-[12%]">
             <.input field={drop[:variance_note]} />
           </div>
           <div class="w-[2%] mt-1 text-rose-500">

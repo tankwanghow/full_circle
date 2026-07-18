@@ -2,9 +2,9 @@ defmodule FullCircle.Trading.SupplyPosition do
   use FullCircle.Schema
   import Ecto.Changeset
 
-  # open     — collection date not confirmed
-  # hold     — stock exists; supplier is holding collection
-  # collect  — stock exists; supplier allows collection
+  # open     — no collection date yet
+  # hold     — supplier halts collection
+  # collect  — supplier allows collection
   # closed    — stock ended / collection finished
   @statuses ~w(open hold collect closed)
 
@@ -18,7 +18,7 @@ defmodule FullCircle.Trading.SupplyPosition do
   schema "trading_supply_positions" do
     # System-generated unique number (SUP-000001) via gapless_doc_ids
     field :title, :string
-    # Estimated date stock is available to load
+    # Estimated date stock is available from
     field :available_from, :date
     field :quantity, :decimal
     field :unit_price, :decimal
@@ -42,9 +42,9 @@ defmodule FullCircle.Trading.SupplyPosition do
   @doc "Deprecated alias — use loadable_statuses/0"
   def collectable_statuses, do: @loadable_statuses
 
-  def status_label("open"), do: "open — collection date not confirmed"
-  def status_label("hold"), do: "hold — stock exists, collection held by supplier"
-  def status_label("collect"), do: "collect — stock exists, supplier allows collection"
+  def status_label("open"), do: "open — no collection date yet"
+  def status_label("hold"), do: "hold — supplier halts collection"
+  def status_label("collect"), do: "collect — supplier allows collection"
   def status_label("closed"), do: "closed — stock ended"
   def status_label(other), do: other
 

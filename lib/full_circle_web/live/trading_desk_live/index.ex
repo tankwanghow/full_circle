@@ -2,14 +2,13 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
   use FullCircleWeb, :live_view
 
   alias FullCircle.Trading
-  alias FullCircle.Trading.Balances
   alias FullCircle.Authorization
 
   @filter_fields %{
     "supply" => ~w(no supplier good status),
     "warehouse" => ~w(location good),
     "sales" => ~w(no customer good status need_by),
-    "trips" => ~w(date ref vehicle agent good mode status)
+    "trips" => ~w(date ref vehicle from to good agent status)
   }
 
   @impl true
@@ -99,26 +98,6 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
     end
   end
 
-  defp transit_list_query("supply_transit", %{"id" => id}) do
-    {:supply_transit, [supply_id: id], gettext("In-transit loads for supply")}
-  end
-
-  defp transit_list_query("sales_transit", %{"id" => id}) do
-    {:sales_transit, [sales_id: id], gettext("In-transit drops for sales")}
-  end
-
-  defp transit_list_query("warehouse_incoming", %{"location_id" => loc, "good_id" => good}) do
-    {:warehouse_incoming, [location_id: loc, good_id: good],
-     gettext("Incoming trips to warehouse")}
-  end
-
-  defp transit_list_query("warehouse_outgoing", %{"location_id" => loc, "good_id" => good}) do
-    {:warehouse_outgoing, [location_id: loc, good_id: good],
-     gettext("Outgoing trips from warehouse")}
-  end
-
-  defp transit_list_query(_, _), do: {nil, [], gettext("Open trips")}
-
   def handle_event("filter", params, socket) do
     table = params["table"]
     field = params["field"]
@@ -132,7 +111,13 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
       filters =
         put_in(socket.assigns.filters, [Access.key!(t), Access.key!(f)], value)
 
-      {:noreply, socket |> assign(:filters, filters) |> apply_filters()}
+      socket =
+        socket
+        |> assign(:filters, filters)
+        |> maybe_reload_for_status_filter(t, f)
+        |> apply_filters()
+
+      {:noreply, socket}
     else
       {:noreply, socket}
     end
@@ -192,6 +177,26 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
        )}
     end
   end
+
+  defp transit_list_query("supply_transit", %{"id" => id}) do
+    {:supply_transit, [supply_id: id], gettext("In-transit loads for supply")}
+  end
+
+  defp transit_list_query("sales_transit", %{"id" => id}) do
+    {:sales_transit, [sales_id: id], gettext("In-transit drops for sales")}
+  end
+
+  defp transit_list_query("warehouse_incoming", %{"location_id" => loc, "good_id" => good}) do
+    {:warehouse_incoming, [location_id: loc, good_id: good],
+     gettext("Incoming trips to warehouse")}
+  end
+
+  defp transit_list_query("warehouse_outgoing", %{"location_id" => loc, "good_id" => good}) do
+    {:warehouse_outgoing, [location_id: loc, good_id: good],
+     gettext("Outgoing trips from warehouse")}
+  end
+
+  defp transit_list_query(_, _), do: {nil, [], gettext("Open trips")}
 
   @impl true
   def handle_info({:desk_modal_saved, kind}, socket),
@@ -353,26 +358,14 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
       supply: %{no: "", supplier: "", good: "", status: ""},
       warehouse: %{location: "", good: ""},
       sales: %{no: "", customer: "", good: "", status: "", need_by: ""},
-      trips: %{date: "", ref: "", vehicle: "", agent: "", good: "", mode: "", status: ""}
+      trips: %{date: "", ref: "", vehicle: "", from: "", to: "", good: "", agent: "", status: ""}
     }
   end
 
   defp load_panels(socket) do
     company = socket.assigns.current_company
     user = socket.assigns.current_user
-
-    sales_rows =
-      company
-      |> Trading.list_open_sales(user)
-      |> Enum.map(fn s ->
-        %{
-          sales: s,
-          ordered: s.quantity,
-          delivered: Balances.sales_delivered(s),
-          undelivered: Balances.sales_undelivered(s),
-          in_transit: Balances.sales_in_transit(s)
-        }
-      end)
+    f = socket.assigns.filters
 
     trips =
       company
@@ -380,11 +373,77 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
       |> Enum.take(50)
 
     socket
-    |> assign(:supply_all, Trading.position_board(company, user))
-    |> assign(:sales_all, sales_rows)
+    |> assign(
+      :supply_all,
+      Trading.position_board(company, user,
+        statuses: supply_statuses_for_filter(f.supply.status)
+      )
+    )
+    |> assign(
+      :sales_all,
+      Trading.sales_board(company, user, statuses: sales_statuses_for_filter(f.sales.status))
+    )
     |> assign(:warehouse_all, Trading.warehouse_board(company, user))
     |> assign(:trips_all, trips)
     |> apply_filters()
+  end
+
+  # Status filter may request inactive rows (closed / fulfilled / cancelled).
+  # Reload those panels from the server when the status box changes.
+  defp maybe_reload_for_status_filter(socket, :supply, :status) do
+    company = socket.assigns.current_company
+    user = socket.assigns.current_user
+    statuses = supply_statuses_for_filter(socket.assigns.filters.supply.status)
+
+    assign(socket, :supply_all, Trading.position_board(company, user, statuses: statuses))
+  end
+
+  defp maybe_reload_for_status_filter(socket, :sales, :status) do
+    company = socket.assigns.current_company
+    user = socket.assigns.current_user
+    statuses = sales_statuses_for_filter(socket.assigns.filters.sales.status)
+
+    assign(socket, :sales_all, Trading.sales_board(company, user, statuses: statuses))
+  end
+
+  defp maybe_reload_for_status_filter(socket, _, _), do: socket
+
+  # Empty status → active only. If the typed text matches an inactive status
+  # (prefix or substring), include those so the client filter can surface them.
+  defp supply_statuses_for_filter(status_q) do
+    expand_statuses_for_filter(
+      status_q,
+      FullCircle.Trading.SupplyPosition.active_statuses(),
+      FullCircle.Trading.SupplyPosition.statuses()
+    )
+  end
+
+  defp sales_statuses_for_filter(status_q) do
+    expand_statuses_for_filter(
+      status_q,
+      FullCircle.Trading.SalesPosition.active_statuses(),
+      FullCircle.Trading.SalesPosition.statuses()
+    )
+  end
+
+  defp expand_statuses_for_filter(status_q, active, all) do
+    q = status_q |> to_string() |> String.trim() |> String.downcase()
+    inactive = all -- active
+
+    if q == "" do
+      active
+    else
+      matched_inactive =
+        Enum.filter(inactive, fn s ->
+          String.starts_with?(s, q) or String.contains?(s, q)
+        end)
+
+      if matched_inactive == [] do
+        active
+      else
+        Enum.uniq(active ++ matched_inactive)
+      end
+    end
   end
 
   defp apply_filters(socket) do
@@ -415,6 +474,12 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
     |> assign(:selection_summary, selection_summary(socket))
     |> assign(:selection_active, selection_active?(socket))
   end
+
+  defp supply_selectable?(status),
+    do: status in FullCircle.Trading.SupplyPosition.active_statuses()
+
+  defp sales_selectable?(status),
+    do: status in FullCircle.Trading.SalesPosition.active_statuses()
 
   defp selection_active?(socket) do
     MapSet.size(socket.assigns.selected_supply_ids) > 0 or
@@ -549,9 +614,10 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
   defp trip_field(t, :date), do: t.date
   defp trip_field(t, :ref), do: t.reference_no
   defp trip_field(t, :vehicle), do: t.vehicle_number
+  defp trip_field(t, :from), do: Enum.join(Trading.trip_from_names(t), ", ")
+  defp trip_field(t, :to), do: Enum.join(Trading.trip_to_names(t), ", ")
   defp trip_field(t, :agent), do: t.transport_agent && t.transport_agent.name
   defp trip_field(t, :good), do: trip_goods_label(t)
-  defp trip_field(t, :mode), do: t.transport_mode
   defp trip_field(t, :status), do: t.status
   defp trip_field(_, _), do: ""
 
@@ -561,6 +627,11 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
     |> Enum.map(& &1.name)
     |> Enum.join(", ")
   end
+
+  defp trip_from_label(t), do: Trading.trip_parties_label(Trading.trip_from_names(t))
+  defp trip_to_label(t), do: Trading.trip_parties_label(Trading.trip_to_names(t))
+  defp trip_from_title(t), do: Enum.join(Trading.trip_from_names(t), ", ")
+  defp trip_to_title(t), do: Enum.join(Trading.trip_to_names(t), ", ")
 
   defp nested_name(nil, _assoc), do: ""
   defp nested_name(parent, assoc) do
@@ -577,8 +648,11 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
   attr :value, :string, default: ""
   attr :class, :string, default: ""
   attr :align, :string, default: "left"
+  attr :title, :string, default: nil
 
   defp filter_col(assigns) do
+    assigns = assign(assigns, :tip, assigns.title || assigns.label)
+
     ~H"""
     <div class={[@class, "min-w-0 flex items-center"]}>
       <form
@@ -600,7 +674,7 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
             @align == "center" && "text-center"
           ]}
           placeholder={@label}
-          title={@label}
+          title={@tip}
           aria-label={@label}
           autocomplete="off"
         />
@@ -685,6 +759,7 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
                     field="status"
                     label={gettext("Status")}
                     value={@filters.supply.status}
+                    title={gettext("Type closed to include closed supplies")}
                   />
                   <.plain_col class="w-3/24" label={gettext("Remain")} align="right" />
                   <.plain_col class="w-2/24" label={gettext("Transit")} align="right" />
@@ -697,12 +772,13 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
                 id={"desk-supply-#{row.supply.id}"}
                 class={[
                   "flex gap-1 border-b px-2 py-1 text-xs md:text-sm items-center hover:bg-gray-100 dark:hover:bg-zinc-800",
-                  MapSet.member?(@selected_supply_ids, row.supply.id) && "bg-amber-50 dark:bg-amber-950/30"
+                  MapSet.member?(@selected_supply_ids, row.supply.id) && "bg-amber-50 dark:bg-amber-950/30",
+                  row.supply.status == "closed" && "opacity-70"
                 ]}
               >
                 <div class="w-6 shrink-0 flex items-center justify-center">
                   <input
-                    :if={@can_manage}
+                    :if={@can_manage && supply_selectable?(row.supply.status)}
                     type="checkbox"
                     id={"sel-supply-#{row.supply.id}"}
                     phx-click="toggle_select"
@@ -959,6 +1035,7 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
                   field="status"
                   label={gettext("Status")}
                   value={@filters.sales.status}
+                  title={gettext("Type fulfilled or cancelled to include those sales")}
                 />
                 <.filter_col
                   class="w-3/24"
@@ -975,12 +1052,13 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
               class={[
                 "flex gap-1 border-b px-2 py-1 text-xs md:text-sm items-center hover:bg-gray-100 dark:hover:bg-zinc-800",
                 MapSet.member?(@selected_sales_ids, row.sales.id) &&
-                  "bg-emerald-50 dark:bg-emerald-950/30"
+                  "bg-emerald-50 dark:bg-emerald-950/30",
+                row.sales.status in ["fulfilled", "cancelled"] && "opacity-70"
               ]}
             >
               <div class="w-6 shrink-0 flex items-center justify-center">
                 <input
-                  :if={@can_manage}
+                  :if={@can_manage && sales_selectable?(row.sales.status)}
                   type="checkbox"
                   id={"sel-sales-#{row.sales.id}"}
                   phx-click="toggle_select"
@@ -1173,23 +1251,32 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
               <.filter_col
                 class="w-5/24"
                 table="trips"
-                field="agent"
-                label={gettext("Agent")}
-                value={@filters.trips.agent}
+                field="from"
+                label={gettext("From")}
+                value={@filters.trips.from}
+                title={gettext("Suppliers / load locations")}
               />
               <.filter_col
                 class="w-5/24"
+                table="trips"
+                field="to"
+                label={gettext("To")}
+                value={@filters.trips.to}
+                title={gettext("Customers / drop locations")}
+              />
+              <.filter_col
+                class="w-3/24"
                 table="trips"
                 field="good"
                 label={gettext("Good")}
                 value={@filters.trips.good}
               />
               <.filter_col
-                class="w-2/24"
+                class="w-3/24"
                 table="trips"
-                field="mode"
-                label={gettext("Mode")}
-                value={@filters.trips.mode}
+                field="agent"
+                label={gettext("Agent")}
+                value={@filters.trips.agent}
               />
               <.filter_col
                 class="w-2/24"
@@ -1198,8 +1285,6 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
                 label={gettext("Status")}
                 value={@filters.trips.status}
               />
-              <.plain_col class="w-2/24" label={gettext("Loads")} align="center" />
-              <.plain_col class="w-2/24" label={gettext("Drops")} align="center" />
             </div>
           </div>
           <div
@@ -1225,19 +1310,22 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
               <div class="w-2/24 min-w-0 truncate" title={t.vehicle_number}>
                 {t.vehicle_number || "—"}
               </div>
+              <div class="w-5/24 min-w-0 truncate" title={trip_from_title(t)}>
+                {trip_from_label(t) |> then(fn s -> if s == "", do: "—", else: s end)}
+              </div>
+              <div class="w-5/24 min-w-0 truncate" title={trip_to_title(t)}>
+                {trip_to_label(t) |> then(fn s -> if s == "", do: "—", else: s end)}
+              </div>
+              <div class="w-3/24 min-w-0 truncate" title={trip_goods_label(t)}>
+                {trip_goods_label(t) |> then(fn s -> if s == "", do: "—", else: s end)}
+              </div>
               <div
-                class="w-5/24 min-w-0 truncate"
+                class="w-3/24 min-w-0 truncate"
                 title={t.transport_agent && t.transport_agent.name}
               >
                 {(t.transport_agent && t.transport_agent.name) || "—"}
               </div>
-              <div class="w-5/24 min-w-0 truncate" title={trip_goods_label(t)}>
-                {trip_goods_label(t) |> then(fn s -> if s == "", do: "—", else: s end)}
-              </div>
-              <div class="w-2/24 min-w-0 truncate" title={t.transport_mode}>{t.transport_mode}</div>
               <div class="w-2/24 min-w-0 truncate">{t.status}</div>
-              <div class="w-2/24 min-w-0 text-center">{length(t.loads || [])}</div>
-              <div class="w-2/24 min-w-0 text-center">{length(t.drops || [])}</div>
             </div>
           </div>
           <p :if={@trips == []} class="text-center p-2 text-gray-500 text-sm">
@@ -1257,12 +1345,12 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
         <div id="desk-transit-list">
           <p class="text-xl font-medium text-center mb-2">{@transit_list.title}</p>
           <div class="bg-violet-200 border-y-2 border-violet-500 font-bold p-2 flex gap-1 text-sm">
-            <div class="w-4/24">{gettext("Date")}</div>
-            <div class="w-4/24">{gettext("Trip No")}</div>
-            <div class="w-4/24">{gettext("Vehicle")}</div>
-            <div class="w-4/24">{gettext("Agent")}</div>
-            <div class="w-4/24">{gettext("Status")}</div>
-            <div class="w-4/24 text-right">{gettext("Qty")}</div>
+            <div class="w-3/24">{gettext("Date")}</div>
+            <div class="w-3/24">{gettext("Trip No")}</div>
+            <div class="w-3/24">{gettext("Vehicle")}</div>
+            <div class="w-9/24">{gettext("Agent")}</div>
+            <div class="w-3/24">{gettext("Status")}</div>
+            <div class="w-3/24 text-right">{gettext("Qty")}</div>
           </div>
           <button
             :for={t <- @transit_list.trips}
@@ -1272,12 +1360,12 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
             phx-value-id={t.id}
             class="w-full flex gap-1 border-b p-2 text-sm text-left hover:bg-violet-50 dark:hover:bg-violet-950/40 cursor-pointer"
           >
-            <div class="w-4/24 text-blue-600">{t.date}</div>
-            <div class="w-4/24 min-w-0 truncate" title={t.reference_no}>{t.reference_no || "—"}</div>
-            <div class="w-4/24 min-w-0 truncate">{t.vehicle_number || "—"}</div>
-            <div class="w-4/24 min-w-0 truncate" title={t.agent_name}>{t.agent_name || "—"}</div>
-            <div class="w-4/24">{t.status}</div>
-            <div class="w-4/24 text-right font-semibold text-violet-700">{t.qty}</div>
+            <div class="w-3/24 text-blue-600">{t.date}</div>
+            <div class="w-3/24 min-w-0 truncate" title={t.reference_no}>{t.reference_no || "—"}</div>
+            <div class="w-3/24 min-w-0 truncate">{t.vehicle_number || "—"}</div>
+            <div class="w-9/24 min-w-0 truncate" title={t.agent_name}>{t.agent_name || "—"}</div>
+            <div class="w-3/24">{t.status}</div>
+            <div class="w-3/24 text-right font-semibold text-violet-700">{t.qty}</div>
           </button>
           <p :if={@transit_list.trips == []} class="text-center p-4 text-gray-500 text-sm">
             {gettext("No open trips for this quantity.")}
@@ -1294,7 +1382,7 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
         :if={@modal}
         id="desk-modal"
         show
-        max_w={if @modal.kind == :trip, do: "max-w-7xl", else: "max-w-3xl"}
+        max_w={if @modal.kind == :trip, do: "max-w-7xl", else: "max-w-5xl"}
         on_cancel={JS.push("close_modal")}
       >
         <.live_component

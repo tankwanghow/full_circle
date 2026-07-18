@@ -285,11 +285,16 @@ defmodule FullCircle.Trading do
   end
 
   @doc """
-  Position board rows: active supplies (open/hold/collect) + loaded / remaining / soft_held.
+  Position board rows: supplies + loaded / remaining / soft_held / in_transit.
+
+  By default only **active** statuses (`open` / `hold` / `collect`).
+  Pass `statuses:` to include inactive (e.g. `closed`) when the desk status filter asks for them.
   """
-  def position_board(company, user) do
+  def position_board(company, user, opts \\ []) do
+    statuses = Keyword.get(opts, :statuses) || SupplyPosition.active_statuses()
+
     company
-    |> list_supply_positions(user, statuses: SupplyPosition.active_statuses())
+    |> list_supply_positions(user, statuses: statuses)
     |> Enum.map(fn s ->
       %{
         supply: s,
@@ -389,6 +394,7 @@ defmodule FullCircle.Trading do
   def list_sales_positions(company, user, opts \\ []) do
     if Authorization.can?(user, :view_trading, company) do
       status = Keyword.get(opts, :status)
+      statuses = Keyword.get(opts, :statuses)
 
       q =
         from(s in SalesPosition,
@@ -398,10 +404,15 @@ defmodule FullCircle.Trading do
         )
 
       q =
-        if status do
-          from(s in q, where: s.status == ^status)
-        else
-          q
+        cond do
+          is_list(statuses) and statuses != [] ->
+            from(s in q, where: s.status in ^statuses)
+
+          is_binary(status) ->
+            from(s in q, where: s.status == ^status)
+
+          true ->
+            q
         end
 
       Repo.all(q)
@@ -411,21 +422,29 @@ defmodule FullCircle.Trading do
   end
 
   @doc """
-  Open commitments board: draft + open + hold sales with undelivered / soft-hold info.
+  Open commitments board: draft + open + hold sales by default.
+  Pass `statuses:` to include fulfilled / cancelled when the desk status filter asks for them.
   """
-  def list_open_sales(company, user) do
-    if Authorization.can?(user, :view_trading, company) do
-      active = SalesPosition.active_statuses()
+  def list_open_sales(company, user, opts \\ []) do
+    statuses = Keyword.get(opts, :statuses) || SalesPosition.active_statuses()
+    list_sales_positions(company, user, statuses: statuses)
+  end
 
-      from(s in SalesPosition,
-        where: s.company_id == ^company.id and s.status in ^active,
-        preload: [:customer, :good, :preferred_supply],
-        order_by: [desc: s.inserted_at]
-      )
-      |> Repo.all()
-    else
-      []
-    end
+  @doc """
+  Desk sales rows with undelivered / in-transit balances.
+  """
+  def sales_board(company, user, opts \\ []) do
+    company
+    |> list_open_sales(user, opts)
+    |> Enum.map(fn s ->
+      %{
+        sales: s,
+        ordered: s.quantity,
+        delivered: Balances.sales_delivered(s),
+        undelivered: Balances.sales_undelivered(s),
+        in_transit: Balances.sales_in_transit(s)
+      }
+    end)
   end
 
   def get_sales_position!(id, company, user) do
@@ -521,8 +540,8 @@ defmodule FullCircle.Trading do
           where: t.company_id == ^company.id,
           preload: [
             :transport_agent,
-            loads: [:location, :supply_position, :good],
-            drops: [:location, :sales_position, :supply_position, :good]
+            loads: [:location, :good, supply_position: :supplier],
+            drops: [:location, :good, :supply_position, sales_position: :customer]
           ],
           order_by: [desc: t.date, desc: t.inserted_at]
         )
@@ -537,6 +556,89 @@ defmodule FullCircle.Trading do
       Repo.all(q)
     else
       []
+    end
+  end
+
+  @doc """
+  Unique source labels for a trip's loads (supplier name, else load location).
+  """
+  def trip_from_names(%Trip{} = trip) do
+    trip
+    |> trip_lines(:loads)
+    |> Enum.map(fn load ->
+      supplier_name =
+        case load.supply_position do
+          %{supplier: %{name: name}} when is_binary(name) and name != "" -> name
+          _ -> nil
+        end
+
+      location_name =
+        case load.location do
+          %{name: name} when is_binary(name) and name != "" -> name
+          _ -> nil
+        end
+
+      supplier_name || location_name
+    end)
+    |> Enum.reject(&is_nil/1)
+    |> Enum.uniq()
+  end
+
+  def trip_from_names(_), do: []
+
+  @doc """
+  Unique destination labels for a trip's drops (customer name, else drop location).
+  """
+  def trip_to_names(%Trip{} = trip) do
+    trip
+    |> trip_lines(:drops)
+    |> Enum.map(fn drop ->
+      customer_name =
+        case drop.sales_position do
+          %{customer: %{name: name}} when is_binary(name) and name != "" -> name
+          _ -> nil
+        end
+
+      location_name =
+        case drop.location do
+          %{name: name} when is_binary(name) and name != "" -> name
+          _ -> nil
+        end
+
+      customer_name || location_name
+    end)
+    |> Enum.reject(&is_nil/1)
+    |> Enum.uniq()
+  end
+
+  def trip_to_names(_), do: []
+
+  @doc """
+  Compact label for multi-party columns: `A`, `A, B`, or `A, B +N`.
+  """
+  def trip_parties_label(names, max_show \\ 2)
+  def trip_parties_label([], _), do: ""
+  def trip_parties_label(names, max_show) when is_list(names) do
+    case names do
+      [one] ->
+        one
+
+      many when length(many) <= max_show ->
+        Enum.join(many, ", ")
+
+      many ->
+        shown = Enum.take(many, max_show)
+        rest = length(many) - max_show
+        Enum.join(shown, ", ") <> " +#{rest}"
+    end
+  end
+
+  def trip_parties_label(_, _), do: ""
+
+  defp trip_lines(trip, field) do
+    case Map.get(trip, field) do
+      list when is_list(list) -> list
+      _ -> []
     end
   end
 
@@ -721,12 +823,17 @@ defmodule FullCircle.Trading do
       where: t.id == ^id and t.company_id == ^company.id,
       preload: [
         :transport_agent,
-        loads: [:location, :supply_position, :good, trip_load_employees: :employee],
+        loads: [
+          :location,
+          :good,
+          supply_position: :supplier,
+          trip_load_employees: :employee
+        ],
         drops: [
           :location,
-          :sales_position,
-          :supply_position,
           :good,
+          :supply_position,
+          sales_position: :customer,
           trip_drop_employees: :employee
         ]
       ]
