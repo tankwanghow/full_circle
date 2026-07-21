@@ -1220,6 +1220,140 @@ defmodule FullCircle.Trading do
 
   def list_sales_line_history(_, _, _), do: []
 
+  @doc """
+  Recent load/drop movements for an own-warehouse location (optionally × good).
+
+  Returns at most `limit` rows (default 20), newest first. Each row:
+  `%{kind: "in" | "out", line_id, trip_id, date, reference_no, status,
+    vehicle_number, qty, unit, good_name, notes}`.
+
+  - **in**  — drop into this warehouse (stock-in)
+  - **out** — load out of this warehouse
+
+  Designed for large tables: each side is queried with SQL `LIMIT`, then merged.
+  """
+  def list_warehouse_recent_movements(location_id, good_id, company, user, opts \\ [])
+
+  def list_warehouse_recent_movements(location_id, good_id, company, user, opts)
+      when is_binary(location_id) do
+    if Authorization.can?(user, :view_trading, company) do
+      limit = Keyword.get(opts, :limit, 20) |> max(1) |> min(50)
+      # Fetch recent of each direction, then keep the newest `limit` overall.
+      per_side = limit
+
+      outs =
+        warehouse_movement_query(
+          :out,
+          location_id,
+          good_id,
+          company.id,
+          per_side
+        )
+
+      ins =
+        warehouse_movement_query(
+          :in,
+          location_id,
+          good_id,
+          company.id,
+          per_side
+        )
+
+      (outs ++ ins)
+      |> Enum.sort_by(
+        &{&1.date || ~D[1970-01-01], &1.inserted_at || ~U[1970-01-01 00:00:00Z]},
+        :desc
+      )
+      |> Enum.take(limit)
+    else
+      []
+    end
+  end
+
+  def list_warehouse_recent_movements(_, _, _, _, _), do: []
+
+  defp warehouse_movement_query(:out, location_id, good_id, company_id, limit) do
+    q =
+      from(l in TripLoad,
+        join: t in Trip,
+        on: t.id == l.trip_id,
+        left_join: g in FullCircle.Product.Good,
+        on: g.id == l.good_id,
+        where: t.company_id == ^company_id and l.location_id == ^location_id,
+        order_by: [desc: t.date, desc: t.inserted_at],
+        limit: ^limit,
+        select: %{
+          kind: "out",
+          line_id: l.id,
+          trip_id: t.id,
+          date: t.date,
+          reference_no: t.reference_no,
+          status: t.status,
+          vehicle_number: t.vehicle_number,
+          inserted_at: t.inserted_at,
+          qty: fragment("coalesce(?, ?)", l.actual_mt, l.planned_mt),
+          unit: g.unit,
+          good_name: g.name,
+          notes: l.location_note
+        }
+      )
+
+    q =
+      if warehouse_good_filter?(good_id) do
+        from([l, t, g] in q, where: l.good_id == ^good_id)
+      else
+        q
+      end
+
+    q
+    |> Repo.all()
+    |> Enum.map(&Map.update!(&1, :qty, fn qty -> open_trip_qty_to_dec(qty) end))
+  end
+
+  defp warehouse_movement_query(:in, location_id, good_id, company_id, limit) do
+    q =
+      from(d in TripDrop,
+        join: t in Trip,
+        on: t.id == d.trip_id,
+        left_join: g in FullCircle.Product.Good,
+        on: g.id == d.good_id,
+        where: t.company_id == ^company_id and d.location_id == ^location_id,
+        order_by: [desc: t.date, desc: t.inserted_at],
+        limit: ^limit,
+        select: %{
+          kind: "in",
+          line_id: d.id,
+          trip_id: t.id,
+          date: t.date,
+          reference_no: t.reference_no,
+          status: t.status,
+          vehicle_number: t.vehicle_number,
+          inserted_at: t.inserted_at,
+          qty: fragment("coalesce(?, ?)", d.actual_mt, d.planned_mt),
+          unit: g.unit,
+          good_name: g.name,
+          notes: fragment("coalesce(?, ?)", d.variance_note, d.location_note)
+        }
+      )
+
+    q =
+      if warehouse_good_filter?(good_id) do
+        from([d, t, g] in q, where: d.good_id == ^good_id)
+      else
+        q
+      end
+
+    q
+    |> Repo.all()
+    |> Enum.map(&Map.update!(&1, :qty, fn qty -> open_trip_qty_to_dec(qty) end))
+  end
+
+  defp warehouse_good_filter?(good_id)
+       when is_binary(good_id) and good_id != "" and good_id != "any",
+       do: true
+
+  defp warehouse_good_filter?(_), do: false
+
   # Pair load/drop lines by trip_id into one display row each.
   defp merge_trip_movements(loads, drops) do
     load_by_trip = Enum.group_by(loads, & &1.trip_id)

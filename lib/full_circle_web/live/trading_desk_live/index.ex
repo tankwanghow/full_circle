@@ -22,7 +22,8 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
        |> assign(page_title: gettext("Trading Desk"))
        |> assign(modal: nil)
        |> assign(transit_list: nil)
-       |> assign(trips_expanded: false)
+       |> assign(warehouse_history: nil)
+       |> assign(trips_expanded: true)
        |> assign(can_manage: Authorization.can?(user, :manage_trading, company))
        |> assign(filters: empty_filters())
        |> assign_empty_selection()
@@ -36,6 +37,11 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
   end
 
   @impl true
+  def handle_params(params, _uri, socket) do
+    {:noreply, apply_modal_from_live_action(socket, params)}
+  end
+
+  @impl true
   def handle_event("open_modal", %{"kind" => kind, "action" => action} = params, socket) do
     company = socket.assigns.current_company
     user = socket.assigns.current_user
@@ -44,7 +50,8 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
       modal = %{
         kind: String.to_existing_atom(kind),
         action: String.to_existing_atom(action),
-        id: params["id"]
+        id: params["id"],
+        form_key: params["id"] || System.unique_integer([:positive])
       }
 
       {:noreply, assign(socket, modal: modal)}
@@ -55,7 +62,7 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
   end
 
   def handle_event("close_modal", _params, socket) do
-    {:noreply, assign(socket, modal: nil)}
+    {:noreply, close_modal_and_normalize_url(socket)}
   end
 
   def handle_event("toggle_trips_panel", _, socket) do
@@ -64,6 +71,58 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
 
   def handle_event("close_transit_list", _, socket) do
     {:noreply, assign(socket, transit_list: nil)}
+  end
+
+  def handle_event("close_warehouse_history", _, socket) do
+    {:noreply, assign(socket, warehouse_history: nil)}
+  end
+
+  def handle_event(
+        "show_warehouse_history",
+        %{
+          "location_id" => location_id
+        } = params,
+        socket
+      ) do
+    company = socket.assigns.current_company
+    user = socket.assigns.current_user
+    good_id = params["good_id"]
+    good_id = if good_id in [nil, "", "any"], do: nil, else: good_id
+
+    movements =
+      Trading.list_warehouse_recent_movements(location_id, good_id, company, user, limit: 20)
+
+    remaining = qty_dec(params["on_hand"])
+
+    unit = params["unit"]
+    location_name = params["location_name"] || gettext("Warehouse")
+    good_name = params["good_name"]
+
+    hist = %{
+      location_id: location_id,
+      good_id: good_id,
+      location_name: location_name,
+      good_name: good_name,
+      unit: unit,
+      remaining: remaining,
+      movements: movements
+    }
+
+    {:noreply, assign(socket, warehouse_history: hist)}
+  end
+
+  def handle_event("open_warehouse_history_trip", %{"id" => id}, socket) do
+    if socket.assigns.can_manage do
+      modal = %{kind: :trip, action: :edit, id: id, form_key: id}
+
+      {:noreply,
+       socket
+       |> assign(warehouse_history: nil)
+       |> assign(modal: modal)}
+    else
+      {:noreply,
+       put_flash(socket, :error, gettext("You are not authorised to perform this action"))}
+    end
   end
 
   def handle_event("show_transit_trips", %{"kind" => kind} = params, socket) do
@@ -208,14 +267,85 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
     socket =
       socket
       |> put_flash(:info, msg)
-      |> assign(modal: nil)
       |> then(fn s ->
         if kind == :trip, do: assign_empty_selection(s), else: s
       end)
       |> load_panels()
+      |> close_modal_and_normalize_url()
 
     {:noreply, socket}
   end
+
+  # Deep links: /supply_positions/:id/edit, /trips/new, etc. → desk + modal
+  defp apply_modal_from_live_action(socket, params) do
+    if socket.assigns.can_manage do
+      case socket.assigns.live_action do
+        :new_supply ->
+          assign(socket, modal: %{kind: :supply, action: :new, id: nil})
+
+        :edit_supply ->
+          assign(socket,
+            modal: %{kind: :supply, action: :edit, id: params["id"], form_key: params["id"]}
+          )
+
+        :new_sales ->
+          assign(socket, modal: %{kind: :sales, action: :new, id: nil})
+
+        :edit_sales ->
+          assign(socket,
+            modal: %{kind: :sales, action: :edit, id: params["id"], form_key: params["id"]}
+          )
+
+        :new_trip ->
+          assign(socket,
+            modal: %{
+              kind: :trip,
+              action: :new,
+              id: nil,
+              form_key: System.unique_integer([:positive])
+            }
+          )
+
+        :edit_trip ->
+          assign(socket,
+            modal: %{kind: :trip, action: :edit, id: params["id"], form_key: params["id"]}
+          )
+
+        :index ->
+          # Keep event-opened modal when already on desk; clear only if nothing open
+          socket
+
+        _ ->
+          socket
+      end
+    else
+      case socket.assigns.live_action do
+        action when action in [:new_supply, :edit_supply, :new_sales, :edit_sales, :new_trip, :edit_trip] ->
+          socket
+          |> put_flash(:error, gettext("You are not authorised to perform this action"))
+          |> push_patch(to: desk_path(socket))
+
+        _ ->
+          socket
+      end
+    end
+  end
+
+  defp close_modal_and_normalize_url(socket) do
+    company = socket.assigns.current_company
+    path = ~p"/companies/#{company.id}/trading/desk"
+
+    socket = assign(socket, modal: nil)
+
+    if socket.assigns.live_action != :index do
+      push_patch(socket, to: path)
+    else
+      socket
+    end
+  end
+
+  defp desk_path(socket),
+    do: ~p"/companies/#{socket.assigns.current_company.id}/trading/desk"
 
   defp assign_empty_selection(socket) do
     socket
@@ -928,24 +1058,38 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
                   />
                 </div>
                 <div class="flex flex-1 min-w-0 gap-1 items-center">
-                  <div class="w-6/24 min-w-0 truncate">
-                    <.link
-                      navigate={
-                        ~p"/companies/#{@current_company.id}/trading/locations/#{row.location.id}/edit"
-                      }
-                      class="text-blue-600 block truncate"
-                      title={row.location.name}
-                    >
-                      {row.location.name}
-                    </.link>
-                  </div>
+                  <button
+                    type="button"
+                    class="w-6/24 min-w-0 truncate text-left text-blue-600 hover:underline bg-transparent border-0 p-0 cursor-pointer"
+                    title={gettext("Recent load/drop history")}
+                    phx-click="show_warehouse_history"
+                    phx-value-location_id={row.location.id}
+                    phx-value-good_id={(row.good && row.good.id) || ""}
+                    phx-value-location_name={row.location.name}
+                    phx-value-good_name={(row.good && row.good.name) || ""}
+                    phx-value-unit={(row.good && row.good.unit) || ""}
+                    phx-value-on_hand={to_string(row.on_hand || 0)}
+                  >
+                    {row.location.name}
+                  </button>
                   <div class="w-6/24 min-w-0 truncate" title={row.good && row.good.name}>
                     {(row.good && row.good.name) || "—"}
                   </div>
-                  <div class={[
-                    "w-4/24 min-w-0 text-right font-semibold",
-                    on_hand_class(row.on_hand)
-                  ]}>
+                  <button
+                    type="button"
+                    class={[
+                      "w-4/24 min-w-0 text-right font-semibold bg-transparent border-0 p-0 cursor-pointer hover:underline",
+                      on_hand_class(row.on_hand)
+                    ]}
+                    title={gettext("Recent load/drop history")}
+                    phx-click="show_warehouse_history"
+                    phx-value-location_id={row.location.id}
+                    phx-value-good_id={(row.good && row.good.id) || ""}
+                    phx-value-location_name={row.location.name}
+                    phx-value-good_name={(row.good && row.good.name) || ""}
+                    phx-value-unit={(row.good && row.good.unit) || ""}
+                    phx-value-on_hand={to_string(row.on_hand || 0)}
+                  >
                     {row.on_hand}
                     <span
                       :if={row.good && row.good.unit}
@@ -953,7 +1097,7 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
                     >
                       {row.good.unit}
                     </span>
-                  </div>
+                  </button>
                   <div class="w-2/24 min-w-0 text-right">
                     <.transit_qty
                       :if={row.good}
@@ -1333,6 +1477,94 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
           </p>
         </div>
       </div>
+
+      <%!-- Own-warehouse recent load/drop history --%>
+      <.modal
+        :if={@warehouse_history}
+        id="desk-warehouse-history-modal"
+        show
+        max_w="max-w-4xl"
+        on_cancel={JS.push("close_warehouse_history")}
+      >
+        <div id="desk-warehouse-history">
+          <p class="text-xl font-medium text-center mb-1">
+            {@warehouse_history.location_name}
+            <span :if={@warehouse_history.good_name} class="text-zinc-600">
+              · {@warehouse_history.good_name}
+            </span>
+          </p>
+          <p class="text-center text-sm mb-3">
+            <span class="text-zinc-500">{gettext("Remaining")}</span>
+            <span class={[
+              "font-semibold tabular-nums ml-1",
+              on_hand_class(@warehouse_history.remaining)
+            ]}>
+              {@warehouse_history.remaining}
+            </span>
+            <span
+              :if={@warehouse_history.unit && @warehouse_history.unit != ""}
+              class="text-zinc-500 text-xs ml-0.5"
+            >
+              {@warehouse_history.unit}
+            </span>
+            <span class="text-zinc-400 text-xs ml-2">
+              ({gettext("last %{count}", count: length(@warehouse_history.movements))})
+            </span>
+          </p>
+
+          <div class="bg-sky-200 border-y-2 border-sky-500 font-bold p-2 flex gap-1 text-sm text-sky-950">
+            <div class="w-2/24">{gettext("Dir")}</div>
+            <div class="w-3/24">{gettext("Date")}</div>
+            <div class="w-3/24">{gettext("Trip")}</div>
+            <div class="w-3/24">{gettext("Status")}</div>
+            <div class="w-3/24">{gettext("Vehicle")}</div>
+            <div class="w-4/24 text-right">{gettext("Qty")}</div>
+            <div class="w-6/24">{gettext("Note")}</div>
+          </div>
+          <button
+            :for={m <- @warehouse_history.movements}
+            type="button"
+            id={"wh-move-#{m.kind}-#{m.line_id}"}
+            phx-click="open_warehouse_history_trip"
+            phx-value-id={m.trip_id}
+            class={[
+              "w-full flex gap-1 border-b p-2 text-sm text-left hover:bg-sky-50 dark:hover:bg-sky-950/40 cursor-pointer",
+              m.status == "cancelled" && "line-through opacity-70"
+            ]}
+          >
+            <div class={[
+              "w-2/24 font-semibold",
+              m.kind == "in" && "text-teal-700",
+              m.kind == "out" && "text-violet-700"
+            ]}>
+              {if m.kind == "in", do: gettext("In"), else: gettext("Out")}
+            </div>
+            <div class="w-3/24">{m.date}</div>
+            <div class="w-3/24 min-w-0 truncate text-blue-600 font-medium" title={m.reference_no}>
+              {m.reference_no || "—"}
+            </div>
+            <div class="w-3/24">{m.status}</div>
+            <div class="w-3/24 min-w-0 truncate">{m.vehicle_number || "—"}</div>
+            <div class={[
+              "w-4/24 text-right font-semibold tabular-nums",
+              m.kind == "in" && "text-teal-800",
+              m.kind == "out" && "text-violet-800"
+            ]}>
+              {m.qty}
+              <span :if={m.unit} class="font-normal text-xs text-zinc-500 ml-0.5">{m.unit}</span>
+            </div>
+            <div class="w-6/24 min-w-0 truncate text-zinc-500" title={m.notes}>{m.notes || ""}</div>
+          </button>
+          <p :if={@warehouse_history.movements == []} class="text-center p-4 text-gray-500 text-sm">
+            {gettext("No recent loads or drops for this warehouse.")}
+          </p>
+          <div class="text-center mt-3">
+            <button type="button" phx-click="close_warehouse_history" class="teal button">
+              {gettext("Close")}
+            </button>
+          </div>
+        </div>
+      </.modal>
 
       <%!-- In-transit trip list (from Transit / Inc / Outg click) --%>
       <.modal

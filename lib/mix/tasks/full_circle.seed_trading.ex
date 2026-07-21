@@ -44,7 +44,7 @@ defmodule Mix.Tasks.FullCircle.SeedTrading do
         Trips:
         #{format_pairs(summary.trips)}
 
-        ~12 supply / sales / trip rows with mixed statuses; multi-warehouse stock.
+        ~50 supply / sales / trip rows with mixed statuses; multi-warehouse stock.
         Log in and open the desk URL above.
         """)
 

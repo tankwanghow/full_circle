@@ -3,8 +3,8 @@ defmodule FullCircle.Trading.SampleData do
   Dev/demo sample data for the Trading Desk.
 
   Prefer `mix full_circle.seed_trading` (see Mix.Tasks.FullCircle.SeedTrading).
-  Creates ~12 rows per desk table (supply, sales, trips) plus multi-location
-  warehouse stock so scrolling and status variety can be tested.
+  Creates ~50 supplies, ~50 sales, and ~50 trips (mixed statuses) plus warehouse
+  stock so scrolling and filters can be tested.
   """
 
   import Ecto.Query, warn: false
@@ -21,6 +21,7 @@ defmodule FullCircle.Trading.SampleData do
   alias FullCircle.Trading
 
   @batch_prefix "DEMO"
+  @sample_count 50
 
   @doc """
   Seed sample trading data for a company as an authorized user.
@@ -132,27 +133,33 @@ defmodule FullCircle.Trading.SampleData do
     end)
   end
 
-  # --- supplies: 12 active + 1 closed (closed not on desk board) ---
+  # --- supplies: ~50 with mixed statuses ---
 
   defp create_supplies!(company, user, batch, suppliers, maize, pollard, soy) do
-    specs = [
-      {"Vessel JON DOE Maize", "collect", "1000", "1150", suppliers.vessel, maize, ~D[2026-05-15]},
-      {"Jun Vessel MARY JAIN", "open", "500", "1180", suppliers.vessel, maize, ~D[2026-06-20]},
-      {"Local Pollard PO", "hold", "200", "980", suppliers.local, pollard, ~D[2026-07-01]},
-      {"Thai SBM July", "open", "300", "1850", suppliers.thai, soy, ~D[2026-07-05]},
-      {"Indo Maize Aug", "hold", "800", "1165", suppliers.indon, maize, ~D[2026-08-01]},
-      {"Mekong Pollard", "collect", "150", "990", suppliers.vietnam, pollard, ~D[2026-06-28]},
-      {"Central Depot Spot", "open", "120", "1200", suppliers.domestic, maize, ~D[2026-07-10]},
-      {"Vessel OCEAN STAR", "collect", "2000", "1140", suppliers.vessel, maize, ~D[2026-04-20]},
-      {"Thai Maize Spot", "open", "250", "1195", suppliers.thai, maize, ~D[2026-07-15]},
-      {"Indo Pollard Hold", "hold", "180", "970", suppliers.indon, pollard, ~D[2026-07-08]},
-      {"Local Soymeal", "collect", "100", "1900", suppliers.local, soy, ~D[2026-07-12]},
-      {"Vietnam Maize", "open", "400", "1175", suppliers.vietnam, maize, ~D[2026-07-22]},
-      # closed — not shown on supply board, still useful in history
-      {"Closed Vessel OLD", "closed", "600", "1100", suppliers.vessel, maize, ~D[2026-03-01]}
+    supplier_list = Map.values(suppliers)
+    goods = [maize, pollard, soy]
+    # Weighted toward board-visible statuses
+    statuses = ~w(open open open collect collect hold hold closed)
+
+    labels = [
+      "Vessel lot",
+      "Local PO",
+      "Spot buy",
+      "Contract fill",
+      "Depot draw",
+      "Import parcel",
+      "Mill intake"
     ]
 
-    Enum.map(specs, fn {label, status, qty, price, supplier, good, from} ->
+    for i <- 1..@sample_count do
+      supplier = Enum.at(supplier_list, rem(i - 1, length(supplier_list)))
+      good = Enum.at(goods, rem(i - 1, length(goods)))
+      status = Enum.at(statuses, rem(i - 1, length(statuses)))
+      label = Enum.at(labels, rem(i - 1, length(labels)))
+      qty = Integer.to_string(80 + rem(i * 17, 920))
+      price = Integer.to_string(950 + rem(i * 23, 1100))
+      from = Date.add(~D[2026-05-01], rem(i * 3, 100))
+
       {:ok, s} =
         Trading.create_supply_position(
           %{
@@ -162,56 +169,52 @@ defmodule FullCircle.Trading.SampleData do
             "available_from" => Date.to_iso8601(from),
             "supplier_id" => supplier.id,
             "good_id" => good.id,
-            "notes" => "#{@batch_prefix} #{label} #{batch}"
+            "notes" => "#{@batch_prefix} #{label} ##{i} #{batch}"
           },
           company,
           user
         )
 
       s
-    end)
+    end
   end
 
-  # --- sales: 12 active (draft/open/hold) + fulfilled + cancelled ---
+  # --- sales: ~50 with mixed statuses ---
 
   defp create_sales!(company, user, batch, customers, supplies, maize, pollard, soy) do
-    # Index supplies created above for preferred links
-    [
-      s_vessel,
-      s_open,
-      s_hold,
-      s_thai_soy,
-      s_indo,
-      s_mekong,
-      s_central,
-      s_ocean,
-      s_thai_m,
-      s_indo_p,
-      s_local_soy,
-      s_viet,
-      _closed
-    ] = supplies
+    customer_list = Map.values(customers)
+    goods = [maize, pollard, soy]
+    statuses = ~w(open open open open draft draft hold hold fulfilled cancelled)
+    active_supplies = Enum.reject(supplies, &(&1.status == "closed"))
 
-    specs = [
-      {"Spot 60MT Maize", "open", "60", "1320", customers.farm_a, maize, s_vessel, ~D[2026-07-18]},
-      {"Draft Pollard 35MT", "draft", "35", "1100", customers.farm_b, pollard, s_hold, ~D[2026-07-25]},
-      {"Held 40MT Maize", "hold", "40", "1300", customers.farm_b, maize, s_open, ~D[2026-07-20]},
-      {"Partial 50MT Maize", "open", "50", "1310", customers.farm_a, maize, s_vessel, ~D[2026-07-12]},
-      {"Ipoh 25MT SBM", "open", "25", "2100", customers.farm_c, soy, s_thai_soy, ~D[2026-07-19]},
-      {"Malacca Pollard", "draft", "40", "1080", customers.farm_d, pollard, s_mekong, ~D[2026-07-28]},
-      {"Johor 80MT Maize", "open", "80", "1295", customers.farm_e, maize, s_ocean, ~D[2026-07-16]},
-      {"Trader Spot 15", "hold", "15", "1340", customers.trader, maize, s_central, ~D[2026-07-14]},
-      {"Feedmill 100MT", "open", "100", "1280", customers.mill, maize, s_indo, ~D[2026-07-21]},
-      {"Seremban 30 Pollard", "open", "30", "1110", customers.farm_b, pollard, s_indo_p, ~D[2026-07-17]},
-      {"Kajang SBM 20", "draft", "20", "2050", customers.farm_a, soy, s_local_soy, ~D[2026-08-01]},
-      {"Ipoh Maize Hold", "hold", "45", "1315", customers.farm_c, maize, s_thai_m, ~D[2026-07-23]},
-      {"Viet link 55", "open", "55", "1305", customers.farm_e, maize, s_viet, ~D[2026-07-26]},
-      # not on open-sales board
-      {"Fulfilled old deal", "fulfilled", "10", "1250", customers.farm_a, maize, s_vessel, ~D[2026-06-01]},
-      {"Cancelled quote", "cancelled", "12", "1400", customers.trader, maize, nil, ~D[2026-06-15]}
+    labels = [
+      "Spot order",
+      "Call-off",
+      "Farm delivery",
+      "Mill draw",
+      "Trader lot",
+      "Contract month",
+      "Urgent lift"
     ]
 
-    Enum.map(specs, fn {label, status, qty, price, customer, good, preferred, from} ->
+    for i <- 1..@sample_count do
+      customer = Enum.at(customer_list, rem(i - 1, length(customer_list)))
+      good = Enum.at(goods, rem(i - 1, length(goods)))
+      status = Enum.at(statuses, rem(i - 1, length(statuses)))
+      label = Enum.at(labels, rem(i - 1, length(labels)))
+      qty = Integer.to_string(10 + rem(i * 11, 120))
+      price = Integer.to_string(1050 + rem(i * 19, 1200))
+      from = Date.add(~D[2026-06-01], rem(i * 2, 90))
+
+      # Prefer a supply of the same good when possible
+      preferred =
+        active_supplies
+        |> Enum.filter(&(&1.good_id == good.id))
+        |> case do
+          [] -> Enum.at(active_supplies, rem(i - 1, max(length(active_supplies), 1)))
+          same -> Enum.at(same, rem(i - 1, length(same)))
+        end
+
       attrs = %{
         "quantity" => qty,
         "unit_price" => price,
@@ -219,22 +222,23 @@ defmodule FullCircle.Trading.SampleData do
         "available_from" => Date.to_iso8601(from),
         "customer_id" => customer.id,
         "good_id" => good.id,
-        "notes" => "#{@batch_prefix} #{label} #{batch}"
+        "notes" => "#{@batch_prefix} #{label} ##{i} #{batch}"
       }
 
+      # Skip preferred supply on cancelled quotes sometimes
       attrs =
-        if preferred do
-          Map.put(attrs, "preferred_supply_id", preferred.id)
-        else
+        if status == "cancelled" and rem(i, 3) == 0 do
           attrs
+        else
+          if preferred, do: Map.put(attrs, "preferred_supply_id", preferred.id), else: attrs
         end
 
       {:ok, s} = Trading.create_sales_position(attrs, company, user)
       s
-    end)
+    end
   end
 
-  # --- trips: stock warehouse rows + ~12 trip list rows ---
+  # --- trips: ~50 (stock-in, deliveries, draft/planned/cancelled mix) ---
 
   defp create_trips!(
          company,
@@ -248,301 +252,126 @@ defmodule FullCircle.Trading.SampleData do
          pollard,
          soy
        ) do
-    [
-      s_vessel,
-      _s_open,
-      _s_hold,
-      s_thai_soy,
-      _s_indo,
-      s_mekong,
-      _s_central,
-      s_ocean,
-      _s_thai_m,
-      _s_indo_p,
-      s_local_soy,
-      _s_viet,
-      _closed
-    ] = supplies
+    goods = [maize, pollard, soy]
+    load_locs = [locs.port, locs.supplier_wh, locs.silo, locs.feed_bay, locs.silo_b]
+    wh_locs = [locs.silo, locs.feed_bay, locs.silo_b, locs.silo_c, locs.silo_d, locs.silo_e]
+    drop_locs = [locs.farm_a, locs.farm_b, locs.farm_c, locs.farm_d, locs.farm_e]
+    agents = [customers.mill, customers.trader]
 
-    [
-      sales_open,
-      _draft,
-      _hold,
-      sales_partial,
-      sales_ipoh_soy,
-      _malacca,
-      sales_johor,
-      _trader,
-      _sales_mill,
-      sales_seremban_p,
-      _kajang_soy,
-      _ipoh_hold,
-      sales_viet,
-      _fulfilled,
-      _cancelled
-    ] = sales
+    active_supplies = Enum.reject(supplies, &(&1.status == "closed"))
+    open_sales = Enum.filter(sales, &(&1.status in ~w(draft open hold)))
 
-    # Stock-in movements → multiple warehouse × good on-hand rows
-    stock_ins = [
-      {~D[2026-07-01], s_vessel, maize, locs.port, locs.silo, "120", "BKK 1234"},
-      {~D[2026-07-02], s_vessel, maize, locs.port, locs.feed_bay, "40", "BKK 2345"},
-      {~D[2026-07-03], s_ocean, maize, locs.port, locs.silo_b, "90", "WXY 3456"},
-      {~D[2026-07-04], s_mekong, pollard, locs.supplier_wh, locs.silo_c, "55", "VKL 4567"},
-      {~D[2026-07-05], s_thai_soy, soy, locs.port, locs.silo_d, "35", "JHB 5678"},
-      {~D[2026-07-06], s_local_soy, soy, locs.supplier_wh, locs.silo, "20", "SGR 6789"},
-      {~D[2026-07-07], s_mekong, pollard, locs.supplier_wh, locs.feed_bay, "25", "BKK 7890"},
-      {~D[2026-07-08], s_vessel, maize, locs.port, locs.silo_e, "50", "TRG 8901"}
-    ]
+    # Status mix: many completed, then draft/planned/cancelled
+    trip_statuses =
+      List.duplicate("completed", 35) ++
+        List.duplicate("draft", 6) ++
+        List.duplicate("planned", 6) ++
+        List.duplicate("cancelled", 3)
 
-    completed_stock =
-      Enum.map(stock_ins, fn {date, supply, good, load_loc, drop_loc, mt, vehicle} ->
-        complete_trip!(
-          company,
-          user,
-          %{
-            "date" => Date.to_iso8601(date),
-            "transport_mode" => "company_own",
-            "status" => "draft",
-            "good_id" => good.id,
-            "vehicle_number" => vehicle,
-            "notes" => "#{@batch_prefix} stock-in #{batch}",
-            "loads" => [
-              %{
-                "planned_mt" => mt,
-                "actual_mt" => mt,
-                "good_id" => good.id,
-                "location_id" => load_loc.id,
-                "supply_position_id" => supply.id
-              }
-            ],
-            "drops" => [
-              %{
-                "planned_mt" => mt,
-                "actual_mt" => mt,
-                "good_id" => good.id,
-                "location_id" => drop_loc.id,
-                "supply_position_id" => supply.id
-              }
-            ]
+    for i <- 1..@sample_count do
+      status = Enum.at(trip_statuses, rem(i - 1, length(trip_statuses)))
+      good = Enum.at(goods, rem(i - 1, length(goods)))
+      supply =
+        active_supplies
+        |> Enum.filter(&(&1.good_id == good.id))
+        |> case do
+          [] -> Enum.at(active_supplies, rem(i - 1, length(active_supplies)))
+          same -> Enum.at(same, rem(i - 1, length(same)))
+        end
+
+      sales_row =
+        open_sales
+        |> Enum.filter(&(&1.good_id == good.id))
+        |> case do
+          [] -> Enum.at(open_sales, rem(i - 1, max(length(open_sales), 1)))
+          same -> Enum.at(same, rem(i - 1, length(same)))
+        end
+
+      mt = Integer.to_string(8 + rem(i * 7, 55))
+      vehicle = "DEMO #{1000 + i}"
+      date = Date.add(~D[2026-06-15], rem(i * 2, 60))
+      # Alternate stock-in vs delivery for variety
+      stock_in? = rem(i, 3) == 0
+
+      {load_loc, drop_loc, drop_sales_id, drop_supply_id, notes_tag} =
+        if stock_in? do
+          {
+            Enum.at(load_locs, rem(i - 1, length(load_locs))),
+            Enum.at(wh_locs, rem(i - 1, length(wh_locs))),
+            nil,
+            supply.id,
+            "stock-in"
           }
-        )
-      end)
-
-    # Deliveries out of warehouse
-    deliveries = [
-      {~D[2026-07-10], maize, locs.silo, locs.farm_a, sales_partial, s_vessel, "33.5", "BKK 1122"},
-      {~D[2026-07-11], maize, locs.silo_b, locs.farm_e, sales_johor, s_ocean, "40", "JHB 2233"},
-      {~D[2026-07-12], soy, locs.silo_d, locs.farm_c, sales_ipoh_soy, s_thai_soy, "15", "IPH 3344"},
-      {~D[2026-07-13], pollard, locs.silo_c, locs.farm_b, sales_seremban_p, s_mekong, "18", "NSN 4455"}
-    ]
-
-    completed_del =
-      Enum.map(deliveries, fn {date, good, load_loc, drop_loc, sales, supply, mt, vehicle} ->
-        complete_trip!(
-          company,
-          user,
-          %{
-            "date" => Date.to_iso8601(date),
-            "transport_mode" => "company_own",
-            "status" => "draft",
-            "good_id" => good.id,
-            "vehicle_number" => vehicle,
-            "notes" => "#{@batch_prefix} delivery #{batch}",
-            "loads" => [
-              %{
-                "planned_mt" => mt,
-                "actual_mt" => mt,
-                "good_id" => good.id,
-                "location_id" => load_loc.id
-              }
-            ],
-            "drops" => [
-              %{
-                "planned_mt" => mt,
-                "actual_mt" => mt,
-                "good_id" => good.id,
-                "location_id" => drop_loc.id,
-                "sales_position_id" => sales.id,
-                "supply_position_id" => supply.id
-              }
-            ]
+        else
+          {
+            Enum.at(wh_locs, rem(i - 1, length(wh_locs))),
+            Enum.at(drop_locs, rem(i - 1, length(drop_locs))),
+            sales_row && sales_row.id,
+            supply.id,
+            "delivery"
           }
-        )
-      end)
+        end
 
-    # Draft / planned trips (visible on desk, not completed)
-    {:ok, draft1} =
-      Trading.create_trip(
-        %{
-          "date" => Date.to_iso8601(Date.utc_today()),
-          "transport_mode" => "agent",
-          "status" => "draft",
-          "good_id" => maize.id,
-          "notes" => "#{@batch_prefix}-DRAFT-A-#{batch}",
-          "vehicle_number" => "AGT 5566",
-          "transport_agent_id" => customers.mill.id,
-          "loads" => [
-            %{
-              "planned_mt" => "25",
-              "actual_mt" => "25",
-              "good_id" => maize.id,
-              "location_id" => locs.port.id,
-              "supply_position_id" => s_vessel.id
-            }
-          ],
-          "drops" => [
-            %{
-              "planned_mt" => "25",
-              "actual_mt" => "25",
-              "good_id" => maize.id,
-              "location_id" => locs.farm_a.id,
-              "sales_position_id" => sales_open.id,
-              "supply_position_id" => s_vessel.id
-            }
-          ]
-        },
-        company,
-        user
-      )
+      agent? = rem(i, 5) == 0
+      agent = Enum.at(agents, rem(i - 1, length(agents)))
 
-    {:ok, draft2} =
-      Trading.create_trip(
-        %{
-          "date" => Date.to_iso8601(Date.add(Date.utc_today(), 1)),
-          "transport_mode" => "company_own",
-          "status" => "draft",
-          "good_id" => pollard.id,
-          "notes" => "#{@batch_prefix}-DRAFT-B-#{batch}",
-          "vehicle_number" => "BKK 6677",
-          "loads" => [
-            %{
-              "planned_mt" => "12",
-              "actual_mt" => "12",
-              "good_id" => pollard.id,
-              "location_id" => locs.feed_bay.id
-            }
-          ],
-          "drops" => [
-            %{
-              "planned_mt" => "12",
-              "actual_mt" => "12",
-              "good_id" => pollard.id,
-              "location_id" => locs.farm_b.id,
-              "sales_position_id" => sales_seremban_p.id
-            }
-          ]
-        },
-        company,
-        user
-      )
+      load_line = %{
+        "planned_mt" => mt,
+        "actual_mt" => mt,
+        "good_id" => good.id,
+        "location_id" => load_loc.id,
+        "supply_position_id" => supply.id
+      }
 
-    {:ok, planned1} =
-      Trading.create_trip(
-        %{
-          "date" => Date.to_iso8601(Date.add(Date.utc_today(), 2)),
-          "transport_mode" => "company_own",
-          "status" => "planned",
-          "good_id" => maize.id,
-          "notes" => "#{@batch_prefix}-PLAN-A-#{batch}",
-          "vehicle_number" => "JHB 7788",
-          "loads" => [
-            %{
-              "planned_mt" => "30",
-              "actual_mt" => "30",
-              "good_id" => maize.id,
-              "location_id" => locs.silo.id
-            }
-          ],
-          "drops" => [
-            %{
-              "planned_mt" => "30",
-              "actual_mt" => "30",
-              "good_id" => maize.id,
-              "location_id" => locs.farm_e.id,
-              "sales_position_id" => sales_johor.id
-            }
-          ]
-        },
-        company,
-        user
-      )
+      drop_line = %{
+        "planned_mt" => mt,
+        "actual_mt" => mt,
+        "good_id" => good.id,
+        "location_id" => drop_loc.id,
+        "supply_position_id" => drop_supply_id
+      }
 
-    {:ok, planned2} =
-      Trading.create_trip(
-        %{
-          "date" => Date.to_iso8601(Date.add(Date.utc_today(), 3)),
-          "transport_mode" => "agent",
-          "status" => "planned",
-          "good_id" => soy.id,
-          "notes" => "#{@batch_prefix}-PLAN-B-#{batch}",
-          "vehicle_number" => "IPH 8899",
-          "transport_agent_id" => customers.trader.id,
-          "loads" => [
-            %{
-              "planned_mt" => "10",
-              "actual_mt" => "10",
-              "good_id" => soy.id,
-              "location_id" => locs.silo_d.id
-            }
-          ],
-          "drops" => [
-            %{
-              "planned_mt" => "10",
-              "actual_mt" => "10",
-              "good_id" => soy.id,
-              "location_id" => locs.farm_c.id,
-              "sales_position_id" => sales_ipoh_soy.id
-            }
-          ]
-        },
-        company,
-        user
-      )
+      drop_line =
+        if drop_sales_id, do: Map.put(drop_line, "sales_position_id", drop_sales_id), else: drop_line
 
-    # One cancelled trip (create draft then cancel if API exists; else leave draft)
-    cancelled =
-      case Trading.create_trip(
-             %{
-               "date" => Date.to_iso8601(~D[2026-07-09]),
-               "transport_mode" => "company_own",
-               "status" => "draft",
-               "good_id" => maize.id,
-               "notes" => "#{@batch_prefix}-CXL-#{batch}",
-               "vehicle_number" => "CXL 9900",
-               "loads" => [
-                 %{
-                   "planned_mt" => "5",
-                   "actual_mt" => "5",
-                   "good_id" => maize.id,
-                   "location_id" => locs.silo.id
-                 }
-               ],
-               "drops" => [
-                 %{
-                   "planned_mt" => "5",
-                   "actual_mt" => "5",
-                   "good_id" => maize.id,
-                   "location_id" => locs.farm_d.id,
-                   "sales_position_id" => sales_viet.id
-                 }
-               ]
-             },
-             company,
-             user
-           ) do
-        {:ok, t} ->
+      attrs = %{
+        "date" => Date.to_iso8601(date),
+        "transport_mode" => if(agent?, do: "agent", else: "company_own"),
+        "status" => "draft",
+        "vehicle_number" => vehicle,
+        "notes" => "#{@batch_prefix} #{notes_tag} ##{i} #{batch}",
+        "loads" => [load_line],
+        "drops" => [drop_line]
+      }
+
+      attrs =
+        if agent? do
+          attrs
+          |> Map.put("transport_agent_id", agent.id)
+          |> Map.put("transport_agent_name", agent.name)
+        else
+          attrs
+        end
+
+      case status do
+        "completed" ->
+          complete_trip!(company, user, attrs)
+
+        "cancelled" ->
+          {:ok, t} = Trading.create_trip(attrs, company, user)
+
           case cancel_trip_if_possible(t, company, user) do
             {:ok, t2} -> t2
             _ -> t
           end
 
-        _ ->
-          nil
+        other when other in ~w(draft planned) ->
+          {:ok, t} =
+            Trading.create_trip(Map.put(attrs, "status", other), company, user)
+
+          t
       end
-
-    open_trips = [draft1, draft2, planned1, planned2] ++ List.wrap(cancelled)
-
-    completed_stock ++ completed_del ++ open_trips
+    end
   end
 
   defp complete_trip!(company, user, attrs) do
