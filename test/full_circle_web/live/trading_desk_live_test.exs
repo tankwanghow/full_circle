@@ -80,6 +80,7 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
         %{
           "date" => "2026-07-22",
           "transport_mode" => "company_own",
+          "vehicle_number" => "ABC1234",
           "status" => "planned",
           "loads" => [
             %{
@@ -270,35 +271,39 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
     html = render(lv)
     assert html =~ "AsmMaize"
     assert html =~ "20"
+    # Typeahead labels prefilled from selection
+    assert html =~ supply.title
+    assert html =~ sales.title
+    assert html =~ "Asm Supplier"
+    assert html =~ "Asm Customer"
+    assert html =~ ~s(value="#{supply.title})
+    assert html =~ ~s(name="trip[loads][0][supply_title]")
+    assert html =~ ~s(name="trip[drops][0][sales_title]")
 
-    # Save prefilled trip (set locations required by form)
+    # Resolve locations via typeahead (hidden ids filled by validate), then save
     lv
     |> form("#desk-trip-form",
       trip: %{
         date: "2026-07-26",
-        transport_mode: "company_own",
-        status: "draft",
         loads: %{
           "0" => %{
-            good_id: good_a.id,
-            location_id: load_loc.id,
-            supply_position_id: supply.id,
+            location_name: "#{load_loc.name} (#{load_loc.kind})",
             planned_mt: "20",
             actual_mt: "20"
           }
         },
         drops: %{
           "0" => %{
-            good_id: good_a.id,
-            location_id: drop_loc.id,
-            sales_position_id: sales.id,
+            location_name: "#{drop_loc.name} (#{drop_loc.kind})",
             planned_mt: "20",
             actual_mt: "20"
           }
         }
       }
     )
-    |> render_submit()
+    |> render_change()
+
+    lv |> form("#desk-trip-form") |> render_submit()
 
     assert render(lv) =~ "Trip saved successfully"
     refute has_element?(lv, "#desk-selection-tray")
@@ -382,6 +387,7 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
         %{
           "date" => "2026-07-01",
           "transport_mode" => "company_own",
+          "vehicle_number" => "ABC1234",
           "loads" => [
             %{
               "good_id" => good.id,
@@ -535,33 +541,34 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
 
     lv |> element("#desk-create-trip-selection") |> render_click()
     assert has_element?(lv, "#desk-trip-form")
+    html = render(lv)
+    assert html =~ supply.title
+    assert html =~ "StockInMaize"
 
+    # Prefill already has supply/good; resolve load location if needed then save
     lv
     |> form("#desk-trip-form",
       trip: %{
         date: "2026-07-27",
-        transport_mode: "company_own",
-        status: "draft",
         loads: %{
           "0" => %{
-            good_id: good.id,
-            location_id: load_loc.id,
-            supply_position_id: supply.id,
+            location_name: "#{load_loc.name} (#{load_loc.kind})",
             planned_mt: "50",
             actual_mt: "50"
           }
         },
         drops: %{
           "0" => %{
-            good_id: good.id,
-            location_id: wh.id,
+            location_name: "#{wh.name} (#{wh.kind})",
             planned_mt: "50",
             actual_mt: "50"
           }
         }
       }
     )
-    |> render_submit()
+    |> render_change()
+
+    lv |> form("#desk-trip-form") |> render_submit()
 
     assert render(lv) =~ "Trip saved successfully"
     lv |> element("#desk-trips-toggle") |> render_click()
@@ -612,22 +619,22 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
   end
 
   test "desk new trip modal saves and lists trip", %{conn: conn, company: company, user: user} do
-    good = good_fixture(company, user)
+    good = good_fixture(company, user, %{"name" => "BlankTripGood"})
 
     supply =
       supply_position_fixture(company, user, %{
         "good_id" => good.id,
-        "status" => "open",
-        "title" => "S1"
+        "status" => "open"
       })
 
-    load_loc = location_fixture(company, user, %{"kind" => "supplier_site"})
-    drop_loc = location_fixture(company, user, %{"kind" => "own_warehouse"})
+    load_loc = location_fixture(company, user, %{"kind" => "supplier_site", "name" => "BlankLoadLoc"})
+    drop_loc = location_fixture(company, user, %{"kind" => "own_warehouse", "name" => "BlankDropWh"})
 
     {:ok, lv, _} = live(conn, ~p"/companies/#{company.id}/trading/desk")
     lv |> element("#desk-new-trip") |> render_click()
     assert has_element?(lv, "#desk-trip-form")
 
+    # Empty new trip: fill typeaheads then save
     lv
     |> form("#desk-trip-form",
       trip: %{
@@ -636,24 +643,39 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
         status: "draft",
         loads: %{
           "0" => %{
-            good_id: good.id,
-            location_id: load_loc.id,
-            supply_position_id: supply.id,
+            good_name: good.name,
+            location_name: "#{load_loc.name} (#{load_loc.kind})",
+            supply_title: "#{supply.title} · ",
             planned_mt: "10",
             actual_mt: "10"
           }
         },
         drops: %{
           "0" => %{
-            good_id: good.id,
-            location_id: drop_loc.id,
+            good_name: good.name,
+            location_name: "#{drop_loc.name} (#{drop_loc.kind})",
             planned_mt: "10",
             actual_mt: "10"
           }
         }
       }
     )
-    |> render_submit()
+    |> render_change()
+
+    # supply_title needs full label — set from resolved or exact title
+    lv
+    |> form("#desk-trip-form",
+      trip: %{
+        loads: %{
+          "0" => %{
+            supply_title: supply.title
+          }
+        }
+      }
+    )
+    |> render_change()
+
+    lv |> form("#desk-trip-form") |> render_submit()
 
     assert render(lv) =~ "Trip saved successfully"
     lv |> element("#desk-trips-toggle") |> render_click()

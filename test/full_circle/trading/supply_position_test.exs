@@ -125,18 +125,54 @@ defmodule FullCircle.Trading.SupplyPositionTest do
     {:ok, _} = Trading.collect_supply_position(collect, company, admin)
     {:ok, _} = Trading.close_supply_position(closed, company, admin)
 
-    # System numbers look like SUP-000001 — match the prefix
+    # Labels are "SUP-000001 · SupplierName"
     names = Trading.open_supply_position_names("SUP-", company, admin) |> Enum.map(& &1.value)
-    assert open.title in names
-    assert hold.title in names
-    assert collect.title in names
-    refute closed.title in names
+    assert Enum.any?(names, &String.starts_with?(&1, open.title <> " · "))
+    assert Enum.any?(names, &String.starts_with?(&1, hold.title <> " · "))
+    assert Enum.any?(names, &String.starts_with?(&1, collect.title <> " · "))
+    refute Enum.any?(names, &String.starts_with?(&1, closed.title))
+
+    full = Enum.find(names, &String.starts_with?(&1, open.title <> " · "))
 
     assert %{id: id} =
-             Trading.get_open_supply_position_by_title(open.title, company, admin)
+             Trading.get_open_supply_position_by_title(full, company, admin)
 
     assert id == open.id
+    assert %{id: ^id} = Trading.get_open_supply_position_by_title(open.title, company, admin)
     assert Trading.get_open_supply_position_by_title(closed.title, company, admin) == nil
+  end
+
+  test "open supply typeahead filters by good_id and good_ids", %{admin: admin, company: company} do
+    good_a = good_fixture(company, admin, %{"name" => "FilterMaizeA"})
+    good_b = good_fixture(company, admin, %{"name" => "FilterMaizeB"})
+
+    sa =
+      supply_position_fixture(company, admin, %{
+        "good_id" => good_a.id,
+        "quantity" => "10",
+        "status" => "open"
+      })
+
+    sb =
+      supply_position_fixture(company, admin, %{
+        "good_id" => good_b.id,
+        "quantity" => "10",
+        "status" => "open"
+      })
+
+    only_a =
+      Trading.open_supply_position_names("SUP-", company, admin, good_id: good_a.id)
+      |> Enum.map(& &1.id)
+
+    assert sa.id in only_a
+    refute sb.id in only_a
+
+    both =
+      Trading.open_supply_position_names("SUP-", company, admin, good_ids: [good_a.id, good_b.id])
+      |> Enum.map(& &1.id)
+
+    assert sa.id in both
+    assert sb.id in both
   end
 
   test "update cannot change system supply no", %{admin: admin, company: company} do

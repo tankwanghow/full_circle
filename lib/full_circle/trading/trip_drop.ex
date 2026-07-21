@@ -7,11 +7,15 @@ defmodule FullCircle.Trading.TripDrop do
     field :actual_mt, :decimal
     field :location_note, :string
     field :variance_note, :string
+    # Delivery / unload order: 1 = first unload (often reverse of load order)
+    field :seq, :integer, default: 0
 
     field :location_name, :string, virtual: true
     field :sales_title, :string, virtual: true
     field :supply_title, :string, virtual: true
     field :good_name, :string, virtual: true
+    # Customer contact for location typeahead filter (from sales)
+    field :party_contact_id, :binary_id, virtual: true
     field :delete, :boolean, virtual: true, default: false
 
     belongs_to :trip, FullCircle.Trading.Trip
@@ -38,13 +42,15 @@ defmodule FullCircle.Trading.TripDrop do
         "supply_position_id",
         "location_id",
         "invoice_id",
-        "good_id"
+        "good_id",
+        "party_contact_id"
       ]),
       [
         :planned_mt,
         :actual_mt,
         :location_note,
         :variance_note,
+        :seq,
         :trip_id,
         :good_id,
         :sales_position_id,
@@ -55,6 +61,7 @@ defmodule FullCircle.Trading.TripDrop do
         :sales_title,
         :supply_title,
         :good_name,
+        :party_contact_id,
         :delete
       ]
     )

@@ -13,6 +13,8 @@ defmodule FullCircle.Trading.Location do
     field :latitude, :decimal
     field :longitude, :decimal
     field :active, :boolean, default: true
+    # Form typeahead for linked supplier/customer contact (1 contact → many sites)
+    field :contact_name, :string, virtual: true
 
     belongs_to :company, FullCircle.Sys.Company
     belongs_to :contact, FullCircle.Accounting.Contact
@@ -24,7 +26,7 @@ defmodule FullCircle.Trading.Location do
 
   def changeset(location, attrs) do
     location
-    |> cast(attrs, [
+    |> cast(blank_to_nil(attrs, ["contact_id"]), [
       :name,
       :kind,
       :address_note,
@@ -32,7 +34,8 @@ defmodule FullCircle.Trading.Location do
       :longitude,
       :active,
       :company_id,
-      :contact_id
+      :contact_id,
+      :contact_name
     ])
     |> validate_required([:name, :kind, :company_id])
     |> validate_inclusion(:kind, @kinds)
@@ -92,6 +95,18 @@ defmodule FullCircle.Trading.Location do
   end
 
   defp parse_coord(_), do: :error
+
+  defp blank_to_nil(attrs, keys) when is_map(attrs) do
+    Enum.reduce(keys, attrs, fn key, acc ->
+      atom = String.to_atom(key)
+
+      cond do
+        Map.has_key?(acc, key) and acc[key] in ["", nil] -> Map.put(acc, key, nil)
+        Map.has_key?(acc, atom) and acc[atom] in ["", nil] -> Map.put(acc, atom, nil)
+        true -> acc
+      end
+    end)
+  end
 
   defp validate_gps_pair(changeset) do
     lat = get_field(changeset, :latitude)

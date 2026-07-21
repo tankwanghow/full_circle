@@ -83,6 +83,92 @@ defmodule FullCircleWeb.Helpers do
     Ecto.Changeset.put_assoc(cs, lines_name, existing ++ [params])
   end
 
+  @doc """
+  Move a detail line up or down among non-deleted rows, then renumber `:seq` 1..n.
+  """
+  def move_line(cs, index, lines_name, direction)
+      when direction in [:up, :down, "up", "down"] do
+    index = if is_binary(index), do: String.to_integer(index), else: index
+    direction = if is_binary(direction), do: String.to_existing_atom(direction), else: direction
+    existing = Ecto.Changeset.get_assoc(cs, lines_name) || []
+
+    active_idxs =
+      existing
+      |> Enum.with_index()
+      |> Enum.reject(fn {line, _} -> line_marked_delete?(line) end)
+      |> Enum.map(fn {_, i} -> i end)
+
+    pos = Enum.find_index(active_idxs, &(&1 == index))
+
+    cond do
+      is_nil(pos) ->
+        cs
+
+      direction == :up and pos == 0 ->
+        cs
+
+      direction == :down and pos == length(active_idxs) - 1 ->
+        cs
+
+      true ->
+        swap_with =
+          case direction do
+            :up -> Enum.at(active_idxs, pos - 1)
+            :down -> Enum.at(active_idxs, pos + 1)
+          end
+
+        a = Enum.at(existing, index)
+        b = Enum.at(existing, swap_with)
+
+        existing =
+          existing
+          |> List.replace_at(index, b)
+          |> List.replace_at(swap_with, a)
+
+        renumber_assoc_seq(cs, lines_name, existing)
+    end
+  end
+
+  @doc "Reverse non-deleted lines (e.g. FILO drop order), keep deleted at end."
+  def reverse_lines(cs, lines_name) do
+    existing = Ecto.Changeset.get_assoc(cs, lines_name) || []
+    {active, deleted} = Enum.split_with(existing, &(not line_marked_delete?(&1)))
+    renumber_assoc_seq(cs, lines_name, Enum.reverse(active) ++ deleted)
+  end
+
+  @doc "Renumber `:seq` 1..n on non-deleted lines (e.g. after delete)."
+  def renumber_lines(cs, lines_name) do
+    existing = Ecto.Changeset.get_assoc(cs, lines_name) || []
+    renumber_assoc_seq(cs, lines_name, existing)
+  end
+
+  defp renumber_assoc_seq(cs, lines_name, lines) do
+    {active, deleted} = Enum.split_with(lines, &(not line_marked_delete?(&1)))
+
+    renumbered =
+      active
+      |> Enum.with_index(1)
+      |> Enum.map(fn {line, i} -> put_line_seq(line, i) end)
+
+    Ecto.Changeset.put_assoc(cs, lines_name, renumbered ++ deleted)
+  end
+
+  defp put_line_seq(%Ecto.Changeset{} = line_cs, seq),
+    do: Ecto.Changeset.put_change(line_cs, :seq, seq)
+
+  defp put_line_seq(%{__struct__: _} = struct, seq),
+    do: Ecto.Changeset.change(struct, seq: seq)
+
+  defp put_line_seq(params, seq) when is_map(params),
+    do: Map.put(params, :seq, seq) |> Map.put("seq", seq)
+
+  defp line_marked_delete?(%Ecto.Changeset{} = cs),
+    do: Ecto.Changeset.get_field(cs, :delete) in [true, "true"]
+
+  defp line_marked_delete?(%{delete: d}), do: d in [true, "true"]
+  defp line_marked_delete?(%{"delete" => d}), do: d in [true, "true"]
+  defp line_marked_delete?(_), do: false
+
   def format_unit_price(number) do
     if Decimal.eq?(number, 0) do
       "FOC"

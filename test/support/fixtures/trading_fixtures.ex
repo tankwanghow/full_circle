@@ -87,6 +87,7 @@ defmodule FullCircle.TradingFixtures do
     defaults = %{
       "date" => Date.utc_today() |> Date.to_iso8601(),
       "transport_mode" => "company_own",
+      "vehicle_number" => "ABC1234",
       "status" => "draft"
     }
 

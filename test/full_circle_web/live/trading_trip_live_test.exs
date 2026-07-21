@@ -96,6 +96,7 @@ defmodule FullCircleWeb.TradingTripLiveTest do
         %{
           "date" => "2026-07-11",
           "transport_mode" => "company_own",
+          "vehicle_number" => "ABC1234",
           "loads" => [
             %{
               "good_id" => good.id,

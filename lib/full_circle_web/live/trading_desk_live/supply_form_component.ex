@@ -5,6 +5,7 @@ defmodule FullCircleWeb.TradingDeskLive.SupplyFormComponent do
   alias FullCircle.Trading.SupplyPosition
   alias FullCircle.Accounting
   alias FullCircle.Product
+  import FullCircleWeb.TradingComponents
 
   @impl true
   def update(assigns, socket) do
@@ -33,9 +34,11 @@ defmodule FullCircleWeb.TradingDeskLive.SupplyFormComponent do
           |> assign(supply: nil)
           |> assign(form: to_form(cs))
           |> assign(good_unit: nil)
+          |> assign(movement_history: [])
 
         :edit ->
           s = Trading.get_supply_position!(assigns.supply_id, company, user)
+          history = Trading.list_supply_line_history(s.id, company, user)
 
           cs =
             SupplyPosition.changeset(s, %{
@@ -49,6 +52,7 @@ defmodule FullCircleWeb.TradingDeskLive.SupplyFormComponent do
           |> assign(supply: s)
           |> assign(form: to_form(cs))
           |> assign(good_unit: s.good && s.good.unit)
+          |> assign(movement_history: history)
       end
 
     {:ok, socket}
@@ -275,41 +279,71 @@ defmodule FullCircleWeb.TradingDeskLive.SupplyFormComponent do
           />
         </div>
         <.input field={@form[:notes]} type="textarea" label={gettext("Notes")} />
-        <div class="text-center mt-4 gap-1 flex flex-wrap justify-center">
-          <.button>{gettext("Save")}</.button>
-          <button
-            :if={@live_action == :edit && @supply.status in ["open", "collect"]}
-            type="button"
-            phx-click="hold"
-            phx-target={@myself}
-            class="blue button"
+        <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
+          <%!-- Form actions (left) --%>
+          <div class="flex flex-wrap gap-1">
+            <.button>{gettext("Save")}</.button>
+            <button type="button" phx-click="close_modal" class="gray button">
+              {gettext("Cancel")}
+            </button>
+          </div>
+          <%!-- Status transitions (right) --%>
+          <div
+            :if={
+              @live_action == :edit &&
+                @supply.status in ["open", "hold", "collect"]
+            }
+            class="flex flex-wrap items-center gap-1 sm:border-l sm:border-zinc-200 sm:pl-3"
           >
-            {gettext("Mark hold")}
-          </button>
-          <button
-            :if={@live_action == :edit && @supply.status in ["open", "hold"]}
-            type="button"
-            phx-click="collect"
-            phx-target={@myself}
-            class="teal button"
-          >
-            {gettext("Mark collect")}
-          </button>
-          <button
-            :if={@live_action == :edit && @supply.status != "closed"}
-            type="button"
-            phx-click="close"
-            phx-target={@myself}
-            class="orange button"
-            data-confirm={gettext("Close this supply position? Stock ended.")}
-          >
-            {gettext("Close")}
-          </button>
-          <button type="button" phx-click="close_modal" class="gray button">
-            {gettext("Cancel")}
-          </button>
+            <span class="text-xs font-medium text-zinc-500 mr-1">
+              {gettext("Update status")}
+            </span>
+            <button
+              :if={@supply.status in ["open", "collect"]}
+              type="button"
+              phx-click="hold"
+              phx-target={@myself}
+              class="blue button"
+            >
+              {gettext("Mark hold")}
+            </button>
+            <button
+              :if={@supply.status in ["open", "hold"]}
+              type="button"
+              phx-click="collect"
+              phx-target={@myself}
+              class="teal button"
+            >
+              {gettext("Mark collect")}
+            </button>
+            <button
+              type="button"
+              phx-click="close"
+              phx-target={@myself}
+              class="orange button"
+              data-confirm={gettext("Close this supply position? Stock ended.")}
+            >
+              {gettext("Close supply")}
+            </button>
+          </div>
         </div>
       </.form>
+
+      <div :if={@live_action == :edit}>
+        <.movement_history
+          title={gettext("Loads & drops")}
+          rows={@movement_history}
+          company_id={@current_company.id}
+          empty_text={gettext("No loads or drops for this supply yet.")}
+          base_qty={@supply && @supply.quantity}
+          unit={@good_unit}
+          remaining_from={:load}
+          print_href={
+            @supply &&
+              ~p"/companies/#{@current_company.id}/trading/supply_positions/#{@supply.id}/history/print"
+          }
+        />
+      </div>
     </div>
     """
   end

@@ -147,4 +147,60 @@ defmodule FullCircle.Trading.MastersTest do
       assert %Contact{} = Trading.get_transport_agent!(contact.id, company, admin)
     end
   end
+
+  describe "location contact link" do
+    test "location contact_id filters typeahead and sole_location_for_contact", %{
+      admin: admin,
+      company: company
+    } do
+      supplier = contact_fixture(company, admin, %{"name" => "LocSupplierX"})
+      other = contact_fixture(company, admin, %{"name" => "LocOtherY"})
+
+      {:ok, site} =
+        Trading.create_location(
+          %{
+            "name" => "Supplier Gate A",
+            "kind" => "supplier_site",
+            "contact_id" => supplier.id
+          },
+          company,
+          admin
+        )
+
+      {:ok, _other_site} =
+        Trading.create_location(
+          %{
+            "name" => "Other Gate",
+            "kind" => "supplier_site",
+            "contact_id" => other.id
+          },
+          company,
+          admin
+        )
+
+      names =
+        Trading.location_names("Gate", company, admin, contact_id: supplier.id)
+        |> Enum.map(& &1.id)
+
+      assert site.id in names
+      refute Enum.any?(names, &(&1 != site.id))
+
+      assert %{} = sole = Trading.sole_location_for_contact(supplier.id, company, admin)
+      assert sole.id == site.id
+
+      # Two sites → no sole auto-select
+      {:ok, _} =
+        Trading.create_location(
+          %{
+            "name" => "Supplier Gate B",
+            "kind" => "supplier_site",
+            "contact_id" => supplier.id
+          },
+          company,
+          admin
+        )
+
+      assert Trading.sole_location_for_contact(supplier.id, company, admin) == nil
+    end
+  end
 end

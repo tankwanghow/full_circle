@@ -5,6 +5,7 @@ defmodule FullCircleWeb.TradingDeskLive.SalesFormComponent do
   alias FullCircle.Trading.SalesPosition
   alias FullCircle.Accounting
   alias FullCircle.Product
+  import FullCircleWeb.TradingComponents
 
   @impl true
   def update(assigns, socket) do
@@ -33,9 +34,11 @@ defmodule FullCircleWeb.TradingDeskLive.SalesFormComponent do
           |> assign(sales: nil)
           |> assign(form: to_form(cs))
           |> assign(good_unit: nil)
+          |> assign(drop_history: [])
 
         :edit ->
           s = Trading.get_sales_position!(assigns.sales_id, company, user)
+          drops = Trading.list_sales_line_history(s.id, company, user)
 
           cs =
             SalesPosition.changeset(s, %{
@@ -50,6 +53,7 @@ defmodule FullCircleWeb.TradingDeskLive.SalesFormComponent do
           |> assign(sales: s)
           |> assign(form: to_form(cs))
           |> assign(good_unit: s.good && s.good.unit)
+          |> assign(drop_history: drops)
       end
 
     {:ok, socket}
@@ -347,51 +351,89 @@ defmodule FullCircleWeb.TradingDeskLive.SalesFormComponent do
           type="textarea"
           label={gettext("Fulfilled note")}
         />
-        <div class="text-center mt-4 gap-1 flex flex-wrap justify-center">
-          <.button>{gettext("Save")}</.button>
-          <button
-            :if={@live_action == :edit && @sales.status in ["draft", "hold"]}
-            type="button"
-            phx-click="open"
-            phx-target={@myself}
-            class="blue button"
+        <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
+          <%!-- Form actions (left) --%>
+          <div class="flex flex-wrap gap-1">
+            <.button>{gettext("Save")}</.button>
+            <.print_button
+              :if={@live_action == :edit && @sales}
+              doc_type="trading/sales_positions"
+              doc_id={@sales.id}
+              company={@current_company}
+              class="blue button"
+            />
+            <button type="button" phx-click="close_modal" class="gray button">
+              {gettext("Cancel")}
+            </button>
+          </div>
+          <%!-- Status transitions (right) --%>
+          <div
+            :if={
+              @live_action == :edit &&
+                @sales.status in ["draft", "open", "hold"]
+            }
+            class="flex flex-wrap items-center gap-1 sm:border-l sm:border-zinc-200 sm:pl-3"
           >
-            {gettext("Open")}
-          </button>
-          <button
-            :if={@live_action == :edit && @sales.status in ["draft", "open"]}
-            type="button"
-            phx-click="hold"
-            phx-target={@myself}
-            class="teal button"
-          >
-            {gettext("Mark hold")}
-          </button>
-          <button
-            :if={@live_action == :edit && @sales.status in ["draft", "open", "hold"]}
-            type="button"
-            phx-click="fulfill"
-            phx-target={@myself}
-            class="orange button"
-            data-confirm={gettext("Mark this sales position fulfilled even if undelivered remains?")}
-          >
-            {gettext("Mark fulfilled")}
-          </button>
-          <button
-            :if={@live_action == :edit && @sales.status in ["draft", "open", "hold"]}
-            type="button"
-            phx-click="cancel_sales"
-            phx-target={@myself}
-            class="red button"
-            data-confirm={gettext("Cancel this sales position?")}
-          >
-            {gettext("Cancel")}
-          </button>
-          <button type="button" phx-click="close_modal" class="gray button">
-            {gettext("Close")}
-          </button>
+            <span class="text-xs font-medium text-zinc-500 mr-1">
+              {gettext("Update status")}
+            </span>
+            <button
+              :if={@sales.status in ["draft", "hold"]}
+              type="button"
+              phx-click="open"
+              phx-target={@myself}
+              class="blue button"
+            >
+              {gettext("Open")}
+            </button>
+            <button
+              :if={@sales.status in ["draft", "open"]}
+              type="button"
+              phx-click="hold"
+              phx-target={@myself}
+              class="teal button"
+            >
+              {gettext("Mark hold")}
+            </button>
+            <button
+              :if={@sales.status in ["draft", "open", "hold"]}
+              type="button"
+              phx-click="fulfill"
+              phx-target={@myself}
+              class="orange button"
+              data-confirm={gettext("Mark this sales position fulfilled even if undelivered remains?")}
+            >
+              {gettext("Mark fulfilled")}
+            </button>
+            <button
+              :if={@sales.status in ["draft", "open", "hold"]}
+              type="button"
+              phx-click="cancel_sales"
+              phx-target={@myself}
+              class="red button"
+              data-confirm={gettext("Cancel this sales position?")}
+            >
+              {gettext("Cancel sales")}
+            </button>
+          </div>
         </div>
       </.form>
+
+      <div :if={@live_action == :edit}>
+        <.movement_history
+          title={gettext("Loads & drops")}
+          rows={@drop_history}
+          company_id={@current_company.id}
+          empty_text={gettext("No drops to this sales yet.")}
+          base_qty={@sales && @sales.quantity}
+          unit={@good_unit}
+          remaining_from={:drop}
+          print_href={
+            @sales &&
+              ~p"/companies/#{@current_company.id}/trading/sales_positions/#{@sales.id}/history/print"
+          }
+        />
+      </div>
     </div>
     """
   end

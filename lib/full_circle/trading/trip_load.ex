@@ -6,11 +6,15 @@ defmodule FullCircle.Trading.TripLoad do
     field :planned_mt, :decimal
     field :actual_mt, :decimal
     field :location_note, :string
+    # Load order: 1 = first onto truck (deepest / FILO)
+    field :seq, :integer, default: 0
 
     # UI / form helpers
     field :location_name, :string, virtual: true
     field :supply_title, :string, virtual: true
     field :good_name, :string, virtual: true
+    # Supplier contact for location typeahead filter (from supply)
+    field :party_contact_id, :binary_id, virtual: true
     field :delete, :boolean, virtual: true, default: false
 
     belongs_to :trip, FullCircle.Trading.Trip
@@ -29,19 +33,24 @@ defmodule FullCircle.Trading.TripLoad do
 
   def changeset(load, attrs) do
     load
-    |> cast(blank_to_nil(attrs, ["supply_position_id", "location_id", "good_id"]), [
-      :planned_mt,
-      :actual_mt,
-      :location_note,
-      :trip_id,
-      :good_id,
-      :supply_position_id,
-      :location_id,
-      :location_name,
-      :supply_title,
-      :good_name,
-      :delete
-    ])
+    |> cast(
+      blank_to_nil(attrs, ["supply_position_id", "location_id", "good_id", "party_contact_id"]),
+      [
+        :planned_mt,
+        :actual_mt,
+        :location_note,
+        :seq,
+        :trip_id,
+        :good_id,
+        :supply_position_id,
+        :location_id,
+        :location_name,
+        :supply_title,
+        :good_name,
+        :party_contact_id,
+        :delete
+      ]
+    )
     |> cast_assoc(:trip_load_employees, with: &FullCircle.Trading.TripLoadEmployee.changeset/2)
     |> validate_required([:location_id, :good_id])
     |> validate_number(:planned_mt, greater_than_or_equal_to: 0)

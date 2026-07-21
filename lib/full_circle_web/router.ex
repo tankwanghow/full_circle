@@ -360,6 +360,11 @@ defmodule FullCircleWeb.Router do
       live("/Weighing/:id/print", WeighingLive.Print, :print)
       live("/Weighing/print_multi", WeighingLive.Print, :print)
 
+      live("/trading/sales_positions/:id/print", TradingSalesLive.Print, :print)
+      live("/trading/sales_positions/:id/history/print", TradingHistoryLive.Print, :sales)
+      live("/trading/supply_positions/:id/history/print", TradingHistoryLive.Print, :supply)
+      live("/trading/trips/:id/print", TradingTripLive.Print, :print)
+
       live("/Statement/print_multi", ReportLive.Statement.Print, :print)
 
       live("/print/transactions", ReportLive.Print, :print)

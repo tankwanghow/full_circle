@@ -326,12 +326,26 @@ defmodule FullCircleWeb.CoreComponents do
     |> input()
   end
 
+  # Bare hidden — no wrapper. A w-full wrapper inside flex rows breaks layouts
+  # (e.g. trip load/drop lines with many hidden ids).
+  def input(%{type: "hidden"} = assigns) do
+    ~H"""
+    <input
+      type="hidden"
+      name={@name}
+      id={@id}
+      value={Phoenix.HTML.Form.normalize_value("hidden", @value)}
+      {@rest}
+    />
+    """
+  end
+
   def input(%{type: "checkbox", value: value} = assigns) do
     assigns =
       assign_new(assigns, :checked, fn -> Phoenix.HTML.Form.normalize_value("checkbox", value) end)
 
     ~H"""
-    <div>
+    <div class="w-full min-w-0 flex flex-col">
       <label class="flex items-center gap-4 text-sm leading-6 text-zinc-600">
         <input type="hidden" name={@name} value="false" />
         <input
@@ -353,7 +367,7 @@ defmodule FullCircleWeb.CoreComponents do
 
   def input(%{type: "select"} = assigns) do
     ~H"""
-    <div>
+    <div class="w-full min-w-0 flex flex-col">
       <.label :if={@label} for={@id}>{@label}</.label>
       <select
         id={@id}
@@ -376,7 +390,7 @@ defmodule FullCircleWeb.CoreComponents do
 
   def input(%{type: "textarea"} = assigns) do
     ~H"""
-    <div>
+    <div class="w-full min-w-0 flex flex-col">
       <.label :if={@label} for={@id}>{@label}</.label>
       <textarea
         id={@id}
@@ -399,7 +413,7 @@ defmodule FullCircleWeb.CoreComponents do
   # All other inputs text, datetime-local, url, password, etc. are handled here...
   def input(assigns) do
     ~H"""
-    <div>
+    <div class="w-full min-w-0 flex flex-col">
       <.label :if={@label} for={@id}>{@label}</.label>
       <input
         type={@type}
@@ -442,8 +456,8 @@ defmodule FullCircleWeb.CoreComponents do
 
   def error(assigns) do
     ~H"""
-    <p class="flex text-xs leading-5 text-rose-600">
-      <.icon name="hero-exclamation-circle-mini" class="mt-0.5 h-4 w-4 flex-none" />
+    <p class="mt-0.5 block w-full min-w-0 text-xs leading-snug text-rose-600 break-words">
+      <.icon name="hero-exclamation-circle-mini" class="inline h-3.5 w-3.5 align-text-bottom mr-0.5" />
       {render_slot(@inner_block)}
     </p>
     """
@@ -725,13 +739,18 @@ defmodule FullCircleWeb.CoreComponents do
       id="error-summary"
       class="bg-rose-50 border border-rose-400 rounded-lg p-3 mb-3"
     >
-      <div class="flex items-center gap-2 text-rose-700 font-semibold text-sm mb-1">
+      <p class="text-rose-700 font-semibold text-sm mb-1">
         <.icon name="hero-exclamation-triangle-mini" class="h-5 w-5" />
         {gettext("Please fix the following errors:")}
-      </div>
-      <ul class="list-disc list-inside text-sm text-rose-600 space-y-0.5">
-        <li :for={{label, msg} <- @errors}><span class="font-medium">{label}</span> — {msg}</li>
-      </ul>
+
+      <span class="text-sm text-rose-600 space-y-1.5 pl-1">
+        <span :for={{label, msg} <- @errors} class="min-w-0">
+          <span class="font-medium text-rose-700">
+            [{label}<span class="text-rose-400"> - {msg}</span>]
+          </span>
+        </span>
+      </span>
+      </p>
     </div>
     """
   end

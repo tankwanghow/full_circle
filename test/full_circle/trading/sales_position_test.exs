@@ -37,6 +37,57 @@ defmodule FullCircle.Trading.SalesPositionTest do
     assert Decimal.eq?(Balances.sales_undelivered(s), Decimal.new("35"))
   end
 
+  test "create sales auto-creates customer delivery location when missing", %{
+    admin: admin,
+    company: company
+  } do
+    customer =
+      contact_fixture(company, admin, %{
+        "name" => "Very Long Customer Name That Exceeds Twenty",
+        "address1" => "12 Farm Road",
+        "city" => "Kajang",
+        "state" => "Selangor",
+        "zipcode" => "43000"
+      })
+
+    good = good_fixture(company, admin)
+
+    assert Trading.list_locations_for_contact(customer.id, company, admin) == []
+
+    assert {:ok, _s} =
+             Trading.create_sales_position(
+               %{
+                 "quantity" => "10",
+                 "customer_id" => customer.id,
+                 "good_id" => good.id
+               },
+               company,
+               admin
+             )
+
+    [loc] = Trading.list_locations_for_contact(customer.id, company, admin)
+    assert loc.kind == "customer_site"
+    assert loc.contact_id == customer.id
+    assert loc.name == "Very Long Customer N"
+    assert String.length(loc.name) <= 20
+    assert loc.address_note =~ "12 Farm Road"
+    assert loc.address_note =~ "Kajang"
+
+    # Second sales for same customer does not create another location
+    assert {:ok, _} =
+             Trading.create_sales_position(
+               %{
+                 "quantity" => "5",
+                 "customer_id" => customer.id,
+                 "good_id" => good.id
+               },
+               company,
+               admin
+             )
+
+    assert length(Trading.list_locations_for_contact(customer.id, company, admin)) == 1
+  end
+
   test "active supply typeahead excludes closed supplies", %{admin: admin, company: company} do
     open = supply_position_fixture(company, admin, %{"status" => "open"})
     closed = supply_position_fixture(company, admin, %{"status" => "open"})
@@ -45,11 +96,13 @@ defmodule FullCircle.Trading.SalesPositionTest do
 
     names = Trading.open_supply_position_names("SUP-", company, admin)
     values = Enum.map(names, & &1.value)
-    assert open.title in values
-    refute closed.title in values
+    assert Enum.any?(values, &String.starts_with?(&1, open.title <> " · "))
+    refute Enum.any?(values, &String.starts_with?(&1, closed.title))
+
+    full = Enum.find(values, &String.starts_with?(&1, open.title <> " · "))
 
     assert %{id: id} =
-             Trading.get_open_supply_position_by_title(open.title, company, admin)
+             Trading.get_open_supply_position_by_title(full, company, admin)
 
     assert id == open.id
     assert Trading.get_open_supply_position_by_title(closed.title, company, admin) == nil

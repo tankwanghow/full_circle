@@ -30,6 +30,7 @@ defmodule FullCircleWeb.TradingWarehouseBoardLiveTest do
         %{
           "date" => "2026-07-20",
           "transport_mode" => "company_own",
+          "vehicle_number" => "ABC1234",
           "good_id" => good.id,
           "loads" => [
             %{

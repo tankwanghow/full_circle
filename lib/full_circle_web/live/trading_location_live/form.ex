@@ -4,6 +4,7 @@ defmodule FullCircleWeb.TradingLocationLive.Form do
   alias FullCircle.Trading
   alias FullCircle.Trading.Location
   alias FullCircle.Authorization
+  alias FullCircle.Accounting
 
   @impl true
   def mount(params, _session, socket) do
@@ -28,7 +29,11 @@ defmodule FullCircleWeb.TradingLocationLive.Form do
 
       true ->
         loc = Trading.get_location!(params["id"], company, user)
-        cs = Location.changeset(loc, %{})
+
+        cs =
+          Location.changeset(loc, %{
+            "contact_name" => loc.contact && loc.contact.name
+          })
 
         {:ok,
          socket
@@ -40,6 +45,23 @@ defmodule FullCircleWeb.TradingLocationLive.Form do
   end
 
   @impl true
+  def handle_event(
+        "validate",
+        %{"_target" => ["location", "contact_name"], "location" => params},
+        socket
+      ) do
+    {params, socket, _} =
+      FullCircleWeb.Helpers.assign_autocomplete_id(
+        socket,
+        params,
+        "contact_name",
+        "contact_id",
+        &Accounting.get_contact_by_name/3
+      )
+
+    validate(params, socket)
+  end
+
   def handle_event("validate", %{"location" => params}, socket) do
     validate(params, socket)
   end
@@ -59,6 +81,12 @@ defmodule FullCircleWeb.TradingLocationLive.Form do
   def handle_event("save", %{"location" => params}, socket) do
     company = socket.assigns.current_company
     user = socket.assigns.current_user
+
+    params =
+      case Accounting.get_contact_by_name(params["contact_name"] || "", company, user) do
+        %{id: id} -> Map.put(params, "contact_id", id)
+        _ -> Map.put(params, "contact_id", nil)
+      end
 
     result =
       case socket.assigns.live_action do
@@ -132,7 +160,7 @@ defmodule FullCircleWeb.TradingLocationLive.Form do
         class="p-4 border rounded space-y-2"
       >
         <div class="flex gap-2">
-          <div class="w-3/4">
+          <div class="w-1/2">
             <.input field={@form[:name]} label={gettext("Name")} />
           </div>
           <div class="w-1/4">
@@ -143,7 +171,21 @@ defmodule FullCircleWeb.TradingLocationLive.Form do
               options={Enum.map(Location.kinds(), &{&1, &1})}
             />
           </div>
+          <div class="w-1/4">
+            <.input
+              field={@form[:contact_name]}
+              label={gettext("Contact (supplier/customer)")}
+              phx-hook="tributeAutoComplete"
+              url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
+            />
+            <.input type="hidden" field={@form[:contact_id]} />
+          </div>
         </div>
+        <p class="text-xs text-gray-500 -mt-1">
+          {gettext(
+            "Optional. Link a contact so trip loads/drops can filter and auto-pick this site for that supplier or customer."
+          )}
+        </p>
 
         <.input field={@form[:address_note]} type="textarea" label={gettext("Address note")} />
 

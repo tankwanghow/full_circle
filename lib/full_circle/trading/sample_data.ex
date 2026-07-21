@@ -41,7 +41,7 @@ defmodule FullCircle.Trading.SampleData do
 
     suppliers = ensure_suppliers!(company, user)
     customers = ensure_customers!(company, user)
-    locs = ensure_locations!(company, user)
+    locs = ensure_locations!(company, user, suppliers, customers)
 
     supplies = create_supplies!(company, user, batch, suppliers, maize, pollard, soy)
     sales = create_sales!(company, user, batch, customers, supplies, maize, pollard, soy)
@@ -100,30 +100,32 @@ defmodule FullCircle.Trading.SampleData do
     end)
   end
 
-  defp ensure_locations!(company, user) do
+  defp ensure_locations!(company, user, suppliers, customers) do
+    # contact_id links site → supplier/customer for trip form auto-filter/select
     specs = [
-      port: {"Port Klang Godown", "port", "3.0010", "101.3910"},
-      supplier_wh: {"Supplier WH - Kapar", "supplier_site", "3.1200", "101.3800"},
-      silo: {"Main Silo", "own_warehouse", "3.0500", "101.5500"},
-      feed_bay: {"Feedmill Bay", "own_warehouse", "3.0510", "101.5510"},
-      silo_b: {"North Silo B", "own_warehouse", "3.0550", "101.5520"},
-      silo_c: {"South Bag Store", "own_warehouse", "3.0480", "101.5490"},
-      silo_d: {"Transit Bay 2", "own_warehouse", "3.0520", "101.5530"},
-      silo_e: {"Old Godown C", "own_warehouse", "3.0460", "101.5480"},
-      farm_a: {"Kajang Farm Gate", "customer_site", "2.9930", "101.7900"},
-      farm_b: {"Seremban Farm", "customer_site", "2.7260", "101.9420"},
-      farm_c: {"Ipoh Farm Gate", "customer_site", "4.5970", "101.0900"},
-      farm_d: {"Malacca Drop", "customer_site", "2.1890", "102.2500"},
-      farm_e: {"Johor Integrator Gate", "customer_site", "1.4927", "103.7414"}
+      port: {"Port Klang Godown", "port", "3.0010", "101.3910", suppliers.vessel.id},
+      supplier_wh: {"Supplier WH - Kapar", "supplier_site", "3.1200", "101.3800", suppliers.local.id},
+      silo: {"Main Silo", "own_warehouse", "3.0500", "101.5500", nil},
+      feed_bay: {"Feedmill Bay", "own_warehouse", "3.0510", "101.5510", nil},
+      silo_b: {"North Silo B", "own_warehouse", "3.0550", "101.5520", nil},
+      silo_c: {"South Bag Store", "own_warehouse", "3.0480", "101.5490", nil},
+      silo_d: {"Transit Bay 2", "own_warehouse", "3.0520", "101.5530", nil},
+      silo_e: {"Old Godown C", "own_warehouse", "3.0460", "101.5480", nil},
+      farm_a: {"Kajang Farm Gate", "customer_site", "2.9930", "101.7900", customers.farm_a.id},
+      farm_b: {"Seremban Farm", "customer_site", "2.7260", "101.9420", customers.farm_b.id},
+      farm_c: {"Ipoh Farm Gate", "customer_site", "4.5970", "101.0900", customers.farm_c.id},
+      farm_d: {"Malacca Drop", "customer_site", "2.1890", "102.2500", customers.farm_d.id},
+      farm_e: {"Johor Integrator Gate", "customer_site", "1.4927", "103.7414", customers.farm_e.id}
     ]
 
-    Map.new(specs, fn {key, {name, kind, lat, lng}} ->
+    Map.new(specs, fn {key, {name, kind, lat, lng, contact_id}} ->
       loc =
         ensure_location!(company, user, %{
           "name" => "#{@batch_prefix} #{name}",
           "kind" => kind,
           "latitude" => lat,
-          "longitude" => lng
+          "longitude" => lng,
+          "contact_id" => contact_id
         })
 
       {key, loc}
@@ -347,7 +349,12 @@ defmodule FullCircle.Trading.SampleData do
             "vehicle_number" => vehicle,
             "notes" => "#{@batch_prefix} delivery #{batch}",
             "loads" => [
-              %{"planned_mt" => mt, "actual_mt" => mt, "location_id" => load_loc.id}
+              %{
+                "planned_mt" => mt,
+                "actual_mt" => mt,
+                "good_id" => good.id,
+                "location_id" => load_loc.id
+              }
             ],
             "drops" => [
               %{
@@ -559,19 +566,21 @@ defmodule FullCircle.Trading.SampleData do
         end
 
       id when is_binary(id) ->
-        cond do
-          match?({:ok, _}, Ecto.UUID.cast(id)) ->
-            Sys.get_company!(id)
+        # Prefer name match first: Ecto.UUID.cast/1 accepts any 16-byte string as a UUID
+        # (e.g. "Kim Poh Sitt Tat"), which is not a real company id.
+        case Repo.one(
+               from c in Company,
+                 where: ilike(c.name, ^"%#{id}%"),
+                 order_by: c.name,
+                 limit: 1
+             ) do
+          %Company{} = c ->
+            c
 
-          true ->
-            case Repo.one(
-                   from c in Company,
-                     where: ilike(c.name, ^"%#{id}%"),
-                     order_by: c.name,
-                     limit: 1
-                 ) do
-              nil -> raise "Company not found matching #{inspect(id)}"
-              c -> c
+          nil ->
+            case Ecto.UUID.cast(id) do
+              {:ok, uuid} -> Sys.get_company!(uuid)
+              :error -> raise "Company not found matching #{inspect(id)}"
             end
         end
     end
@@ -703,7 +712,17 @@ defmodule FullCircle.Trading.SampleData do
         loc
 
       loc ->
-        loc
+        # Backfill contact_id when re-seeding existing demo locations
+        contact_id = attrs["contact_id"]
+
+        if contact_id && is_nil(loc.contact_id) do
+          case Trading.update_location(loc, %{"contact_id" => contact_id}, company, user) do
+            {:ok, updated} -> updated
+            _ -> loc
+          end
+        else
+          loc
+        end
     end
   end
 end

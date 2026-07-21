@@ -288,34 +288,45 @@ defmodule FullCircle.Product do
   end
 
   def get_packaging_by_name(terms, good_id) do
-    terms = terms |> String.trim()
+    terms = terms |> to_string() |> String.trim()
 
-    from(pack in Packaging,
-      where: pack.name == ^terms,
-      where: pack.good_id == ^good_id,
-      select: %{
-        id: pack.id,
-        value: pack.name,
-        unit_multiplier: pack.unit_multiplier,
-        default: pack.default
-      }
-    )
-    |> Repo.one()
+    if terms == "" or blank_id?(good_id) do
+      nil
+    else
+      from(pack in Packaging,
+        where: pack.name == ^terms,
+        where: pack.good_id == ^good_id,
+        select: %{
+          id: pack.id,
+          value: pack.name,
+          unit_multiplier: pack.unit_multiplier,
+          default: pack.default
+        }
+      )
+      |> Repo.one()
+    end
   end
 
   def package_names(terms, good_id) do
-    from(pack in Packaging,
-      where: ilike(pack.name, ^"%#{terms}%"),
-      where: pack.good_id == ^good_id,
-      select: %{
-        id: pack.id,
-        value: pack.name,
-        unit_multiplier: pack.unit_multiplier,
-        default: pack.default
-      }
-    )
-    |> Repo.all()
+    if blank_id?(good_id) do
+      []
+    else
+      from(pack in Packaging,
+        where: ilike(pack.name, ^"%#{terms}%"),
+        where: pack.good_id == ^good_id,
+        select: %{
+          id: pack.id,
+          value: pack.name,
+          unit_multiplier: pack.unit_multiplier,
+          default: pack.default
+        }
+      )
+      |> Repo.all()
+    end
   end
+
+  defp blank_id?(id) when id in [nil, ""], do: true
+  defp blank_id?(_), do: false
 
   defp good_query(company, user) do
     from(good in Good,

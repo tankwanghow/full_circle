@@ -46,7 +46,10 @@ defmodule FullCircle.Trading do
 
   def get_location!(id, company, user) do
     unless Authorization.can?(user, :view_trading, company), do: raise("not authorised")
-    Repo.get_by!(Location, id: id, company_id: company.id)
+
+    Location
+    |> Repo.get_by!(id: id, company_id: company.id)
+    |> Repo.preload(:contact)
   end
 
   def create_location(attrs, company, user) do
@@ -244,31 +247,46 @@ defmodule FullCircle.Trading do
   end
 
   @doc """
-  Autocomplete: active supplies (open/hold/collect) by title for soft-hold targets.
+  Autocomplete: active supplies (open/hold/collect) by title or supplier name.
+  Value is unique supply title (system no); list shows \"title · supplier\".
   """
-  def open_supply_position_names(terms, company, user) do
+  def open_supply_position_names(terms, company, user, opts \\ []) do
     if Authorization.can?(user, :view_trading, company) do
       active = SupplyPosition.active_statuses()
+      good_ids = typeahead_good_ids(opts)
 
-      from(s in SupplyPosition,
-        where: s.company_id == ^company.id,
-        where: s.status in ^active,
-        where: not is_nil(s.title) and s.title != "",
-        where: ilike(s.title, ^"%#{terms}%"),
-        select: %{id: s.id, value: s.title},
-        order_by: [asc: s.title]
-      )
-      |> Repo.all()
+      q =
+        from(s in SupplyPosition,
+          join: c in assoc(s, :supplier),
+          where: s.company_id == ^company.id,
+          where: s.status in ^active,
+          where: not is_nil(s.title) and s.title != "",
+          where: ilike(s.title, ^"%#{terms}%") or ilike(c.name, ^"%#{terms}%"),
+          select: %{
+            id: s.id,
+            value: fragment("? || ' · ' || ?", s.title, c.name)
+          },
+          order_by: [asc: s.title]
+        )
+
+      q =
+        case good_ids do
+          [] -> q
+          ids -> from(s in q, where: s.good_id in ^ids)
+        end
+
+      Repo.all(q)
     else
       []
     end
   end
 
   @doc """
-  Resolve active supply (open/hold/collect) by exact title (soft-hold typeahead).
+  Resolve loadable/active supply by typeahead label or exact title.
+  Accepts \"SUP-000001 · Supplier\" or \"SUP-000001\".
   """
-  def get_open_supply_position_by_title(title, company, user) do
-    title = title |> to_string() |> String.trim()
+  def get_open_supply_position_by_title(label, company, user) do
+    title = typeahead_key(label)
     active = SupplyPosition.active_statuses()
 
     if title == "" or not Authorization.can?(user, :view_trading, company) do
@@ -281,6 +299,174 @@ defmodule FullCircle.Trading do
         preload: [:supplier, :good]
       )
       |> Repo.one()
+    end
+  end
+
+  @doc "Autocomplete: open sales by title or customer name. Optional `good_id:` filter."
+  def open_sales_position_names(terms, company, user, opts \\ []) do
+    if Authorization.can?(user, :view_trading, company) do
+      active = SalesPosition.active_statuses()
+      good_id = Keyword.get(opts, :good_id) |> blank_to_nil()
+
+      q =
+        from(s in SalesPosition,
+          join: c in assoc(s, :customer),
+          where: s.company_id == ^company.id,
+          where: s.status in ^active,
+          where: not is_nil(s.title) and s.title != "",
+          where: ilike(s.title, ^"%#{terms}%") or ilike(c.name, ^"%#{terms}%"),
+          select: %{
+            id: s.id,
+            value: fragment("? || ' · ' || ?", s.title, c.name)
+          },
+          order_by: [asc: s.title]
+        )
+
+      q =
+        if good_id do
+          from(s in q, where: s.good_id == ^good_id)
+        else
+          q
+        end
+
+      Repo.all(q)
+    else
+      []
+    end
+  end
+
+  @doc "Resolve open sales by typeahead label or exact title."
+  def get_open_sales_position_by_title(label, company, user) do
+    title = typeahead_key(label)
+    active = SalesPosition.active_statuses()
+
+    if title == "" or not Authorization.can?(user, :view_trading, company) do
+      nil
+    else
+      from(s in SalesPosition,
+        where: s.company_id == ^company.id,
+        where: s.status in ^active,
+        where: s.title == ^title,
+        preload: [:customer, :good]
+      )
+      |> Repo.one()
+    end
+  end
+
+  @doc """
+  Autocomplete: active trading locations by name or kind.
+
+  Optional `contact_id:` filters to sites linked to that supplier/customer.
+  """
+  def location_names(terms, company, user, opts \\ []) do
+    if Authorization.can?(user, :view_trading, company) do
+      contact_id = Keyword.get(opts, :contact_id) |> blank_to_nil()
+
+      q =
+        from(l in Location,
+          where: l.company_id == ^company.id,
+          where: l.active == true,
+          where: ilike(l.name, ^"%#{terms}%") or ilike(l.kind, ^"%#{terms}%"),
+          select: %{
+            id: l.id,
+            value: fragment("? || ' (' || ? || ')'", l.name, l.kind)
+          },
+          order_by: [asc: l.name],
+          limit: 40
+        )
+
+      q =
+        if contact_id do
+          from(l in q, where: l.contact_id == ^contact_id)
+        else
+          q
+        end
+
+      Repo.all(q)
+    else
+      []
+    end
+  end
+
+  @doc """
+  Active locations linked to a contact (supplier/customer sites).
+  """
+  def list_locations_for_contact(contact_id, company, user)
+      when is_binary(contact_id) and contact_id != "" do
+    if Authorization.can?(user, :view_trading, company) do
+      from(l in Location,
+        where: l.company_id == ^company.id,
+        where: l.contact_id == ^contact_id,
+        where: l.active == true,
+        order_by: [asc: l.name]
+      )
+      |> Repo.all()
+    else
+      []
+    end
+  end
+
+  def list_locations_for_contact(_, _, _), do: []
+
+  @doc """
+  When the contact has exactly one active location, return it (for auto-select on trip form).
+  """
+  def sole_location_for_contact(contact_id, company, user) do
+    case list_locations_for_contact(contact_id, company, user) do
+      [one] -> one
+      _ -> nil
+    end
+  end
+
+  @doc "Resolve location by typeahead label \"Name (kind)\" or exact name."
+  def get_location_by_name(label, company, user, opts \\ []) do
+    label = label |> to_string() |> String.trim()
+
+    if label == "" or not Authorization.can?(user, :view_trading, company) do
+      nil
+    else
+      {name, kind} = parse_location_label(label)
+      contact_id = Keyword.get(opts, :contact_id) |> blank_to_nil()
+
+      q =
+        from(l in Location,
+          where: l.company_id == ^company.id,
+          where: l.active == true,
+          where: l.name == ^name
+        )
+
+      q =
+        if kind do
+          from(l in q, where: l.kind == ^kind)
+        else
+          q
+        end
+
+      q =
+        if contact_id do
+          from(l in q, where: l.contact_id == ^contact_id)
+        else
+          q
+        end
+
+      Repo.one(from(l in q, order_by: [asc: l.name], limit: 1))
+    end
+  end
+
+  defp typeahead_key(label) do
+    label
+    |> to_string()
+    |> String.trim()
+    |> String.split(" · ")
+    |> List.first()
+    |> to_string()
+    |> String.trim()
+  end
+
+  defp parse_location_label(label) do
+    case Regex.run(~r/^(.*)\s+\(([^)]+)\)\s*$/, label) do
+      [_, name, kind] -> {String.trim(name), String.trim(kind)}
+      _ -> {label, nil}
     end
   end
 
@@ -470,8 +656,73 @@ defmodule FullCircle.Trading do
         |> Map.put("title", doc)
         |> then(&SalesPosition.changeset(%SalesPosition{}, &1))
       end)
+      |> Multi.run(:ensure_customer_location, fn _, %{create_sales: sales} ->
+        ensure_customer_delivery_location(sales.customer_id, company, user)
+      end)
       |> Repo.transaction()
       |> unwrap_multi(:create_sales)
+    end
+  end
+
+  @doc """
+  If the customer has no linked delivery location, create a default `customer_site`
+  named with the first 20 characters of the customer name (no suffix), using the
+  contact mailing address as `address_note`.
+  """
+  def ensure_customer_delivery_location(customer_id, company, user)
+      when is_binary(customer_id) and customer_id != "" do
+    with :ok <- authorize(user, :manage_trading, company) do
+      existing =
+        list_locations_for_contact(customer_id, company, user)
+        |> Enum.filter(&(&1.kind == "customer_site"))
+
+      if existing != [] do
+        {:ok, :already_present}
+      else
+        case Repo.get_by(Contact, id: customer_id, company_id: company.id) do
+          nil ->
+            {:ok, :no_customer}
+
+          customer ->
+            attrs = %{
+              "name" => customer_delivery_location_name(customer),
+              "kind" => "customer_site",
+              "contact_id" => customer.id,
+              "address_note" => contact_mailing_address(customer),
+              "active" => true,
+              "company_id" => company.id
+            }
+
+            case create_location(attrs, company, user) do
+              {:ok, loc} -> {:ok, loc}
+              {:error, cs} -> {:error, cs}
+              :not_authorise -> {:error, :not_authorise}
+            end
+        end
+      end
+    end
+  end
+
+  def ensure_customer_delivery_location(_, _, _), do: {:ok, :skipped}
+
+  defp customer_delivery_location_name(%{name: name}) do
+    name
+    |> to_string()
+    |> String.trim()
+    |> String.slice(0, 20)
+  end
+
+  defp contact_mailing_address(%Contact{} = c) do
+    [c.address1, c.address2, c.city, c.state, c.zipcode, c.country]
+    |> Enum.map(fn
+      nil -> ""
+      v -> v |> to_string() |> String.trim()
+    end)
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.join(", ")
+    |> case do
+      "" -> nil
+      addr -> addr
     end
   end
 
@@ -816,6 +1067,229 @@ defmodule FullCircle.Trading do
   defp open_trip_qty_to_dec(nil), do: Decimal.new(0)
   defp open_trip_qty_to_dec(other), do: Decimal.new("#{other}")
 
+  @doc """
+  Trip-level movement history for a supply (one row per trip).
+
+  Each row pairs loads **from** this supply with drops **drawing** this supply:
+  `%{trip_id, date, reference_no, status, vehicle_number, unit,
+    loads: [%{place, qty}], drops: [%{place, qty}], notes}`.
+  """
+  def list_supply_line_history(supply_id, company, user)
+      when is_binary(supply_id) do
+    if Authorization.can?(user, :view_trading, company) do
+      loads =
+        from(l in TripLoad,
+          join: t in Trip,
+          on: t.id == l.trip_id,
+          left_join: loc in Location,
+          on: loc.id == l.location_id,
+          left_join: g in FullCircle.Product.Good,
+          on: g.id == l.good_id,
+          where: t.company_id == ^company.id and l.supply_position_id == ^supply_id,
+          order_by: [asc: l.seq],
+          select: %{
+            trip_id: t.id,
+            date: t.date,
+            reference_no: t.reference_no,
+            status: t.status,
+            vehicle_number: t.vehicle_number,
+            inserted_at: t.inserted_at,
+            location_name: loc.name,
+            unit: g.unit,
+            planned_mt: l.planned_mt,
+            actual_mt: l.actual_mt,
+            notes: l.location_note
+          }
+        )
+        |> Repo.all()
+
+      drops =
+        from(d in TripDrop,
+          join: t in Trip,
+          on: t.id == d.trip_id,
+          left_join: loc in Location,
+          on: loc.id == d.location_id,
+          left_join: g in FullCircle.Product.Good,
+          on: g.id == d.good_id,
+          left_join: s in SalesPosition,
+          on: s.id == d.sales_position_id,
+          left_join: c in Contact,
+          on: c.id == s.customer_id,
+          where: t.company_id == ^company.id and d.supply_position_id == ^supply_id,
+          order_by: [asc: d.seq],
+          select: %{
+            trip_id: t.id,
+            date: t.date,
+            reference_no: t.reference_no,
+            status: t.status,
+            vehicle_number: t.vehicle_number,
+            inserted_at: t.inserted_at,
+            location_name: loc.name,
+            unit: g.unit,
+            party_name: fragment("coalesce(?, ?)", c.name, s.title),
+            planned_mt: d.planned_mt,
+            actual_mt: d.actual_mt,
+            notes: fragment("coalesce(?, ?)", d.variance_note, d.location_note)
+          }
+        )
+        |> Repo.all()
+
+      merge_trip_movements(loads, drops)
+    else
+      []
+    end
+  end
+
+  def list_supply_line_history(_, _, _), do: []
+
+  @doc """
+  Trip-level movement history for a sales position (one row per trip).
+
+  Each row pairs the trip’s load locations with drops **to** this sales:
+  `%{trip_id, date, reference_no, status, vehicle_number, unit,
+    loads: [%{place, qty}], drops: [%{place, qty}], notes}`.
+  """
+  def list_sales_line_history(sales_id, company, user) when is_binary(sales_id) do
+    if Authorization.can?(user, :view_trading, company) do
+      drops =
+        from(d in TripDrop,
+          join: t in Trip,
+          on: t.id == d.trip_id,
+          left_join: loc in Location,
+          on: loc.id == d.location_id,
+          left_join: g in FullCircle.Product.Good,
+          on: g.id == d.good_id,
+          left_join: sp in SupplyPosition,
+          on: sp.id == d.supply_position_id,
+          where: t.company_id == ^company.id and d.sales_position_id == ^sales_id,
+          order_by: [asc: d.seq],
+          select: %{
+            trip_id: t.id,
+            date: t.date,
+            reference_no: t.reference_no,
+            status: t.status,
+            vehicle_number: t.vehicle_number,
+            inserted_at: t.inserted_at,
+            location_name: loc.name,
+            unit: g.unit,
+            party_name: sp.title,
+            planned_mt: d.planned_mt,
+            actual_mt: d.actual_mt,
+            notes: fragment("coalesce(?, ?)", d.variance_note, d.location_note)
+          }
+        )
+        |> Repo.all()
+
+      trip_ids = drops |> Enum.map(& &1.trip_id) |> Enum.uniq()
+
+      loads =
+        if trip_ids == [] do
+          []
+        else
+          from(l in TripLoad,
+            join: t in Trip,
+            on: t.id == l.trip_id,
+            left_join: loc in Location,
+            on: loc.id == l.location_id,
+            left_join: g in FullCircle.Product.Good,
+            on: g.id == l.good_id,
+            where: t.id in ^trip_ids,
+            order_by: [asc: l.seq],
+            select: %{
+              trip_id: t.id,
+              date: t.date,
+              reference_no: t.reference_no,
+              status: t.status,
+              vehicle_number: t.vehicle_number,
+              inserted_at: t.inserted_at,
+              location_name: loc.name,
+              unit: g.unit,
+              planned_mt: l.planned_mt,
+              actual_mt: l.actual_mt,
+              notes: l.location_note
+            }
+          )
+          |> Repo.all()
+        end
+
+      merge_trip_movements(loads, drops)
+    else
+      []
+    end
+  end
+
+  def list_sales_line_history(_, _, _), do: []
+
+  # Pair load/drop lines by trip_id into one display row each.
+  defp merge_trip_movements(loads, drops) do
+    load_by_trip = Enum.group_by(loads, & &1.trip_id)
+    drop_by_trip = Enum.group_by(drops, & &1.trip_id)
+
+    (Map.keys(load_by_trip) ++ Map.keys(drop_by_trip))
+    |> Enum.uniq()
+    |> Enum.map(fn trip_id ->
+      trip_loads = Map.get(load_by_trip, trip_id, [])
+      trip_drops = Map.get(drop_by_trip, trip_id, [])
+      head = List.first(trip_loads) || List.first(trip_drops)
+
+      unit =
+        (trip_loads ++ trip_drops)
+        |> Enum.map(& &1.unit)
+        |> Enum.find(&(is_binary(&1) and &1 != ""))
+
+      %{
+        trip_id: trip_id,
+        date: head.date,
+        reference_no: head.reference_no,
+        status: head.status,
+        vehicle_number: head.vehicle_number,
+        inserted_at: head.inserted_at,
+        unit: unit,
+        loads: format_side_parts(trip_loads, :load),
+        drops: format_side_parts(trip_drops, :drop),
+        notes: combine_notes(trip_loads ++ trip_drops)
+      }
+    end)
+    |> Enum.sort_by(&{&1.date || ~D[1970-01-01], &1.inserted_at}, :desc)
+  end
+
+  defp format_side_parts([], _), do: []
+
+  defp format_side_parts(lines, :load) do
+    Enum.map(lines, fn l ->
+      %{place: l.location_name || "?", qty: effective_mt(l)}
+    end)
+  end
+
+  defp format_side_parts(lines, :drop) do
+    Enum.map(lines, fn d ->
+      # Drop destination: location name only (not customer/sales title)
+      %{place: d.location_name || "?", qty: effective_mt(d)}
+    end)
+  end
+
+  defp effective_mt(%{actual_mt: %Decimal{} = a}), do: Decimal.to_string(a)
+  defp effective_mt(%{planned_mt: %Decimal{} = p}), do: Decimal.to_string(p)
+  defp effective_mt(%{actual_mt: a}) when not is_nil(a), do: to_string(a)
+  defp effective_mt(%{planned_mt: p}) when not is_nil(p), do: to_string(p)
+  defp effective_mt(_), do: nil
+
+  defp combine_notes(lines) do
+    lines
+    |> Enum.map(& &1.notes)
+    |> Enum.filter(&present_str?/1)
+    |> Enum.uniq()
+    |> Enum.join("; ")
+    |> case do
+      "" -> nil
+      s -> s
+    end
+  end
+
+  defp present_str?(nil), do: false
+  defp present_str?(""), do: false
+  defp present_str?(_), do: true
+
   def get_trip!(id, company, user) do
     unless Authorization.can?(user, :view_trading, company), do: raise("not authorised")
 
@@ -832,7 +1306,7 @@ defmodule FullCircle.Trading do
         drops: [
           :location,
           :good,
-          :supply_position,
+          supply_position: :supplier,
           sales_position: :customer,
           trip_drop_employees: :employee
         ]
@@ -879,16 +1353,21 @@ defmodule FullCircle.Trading do
       supplies = Enum.map(supply_ids, fn id -> get_supply_position!(id, company, user) end)
       sales = Enum.map(sales_ids, fn id -> get_sales_position!(id, company, user) end)
 
-      load_loc_id = default_load_location_id(company, user)
+      load_loc = default_load_location(company, user)
+      load_loc_id = load_loc && load_loc.id
 
       loads =
         Enum.map(supplies, fn s ->
           s
-          |> supply_load_attrs()
+          |> supply_load_attrs(company, user)
           |> then(fn attrs ->
-            if is_nil(attrs["location_id"]),
-              do: Map.put(attrs, "location_id", load_loc_id),
-              else: attrs
+            if is_nil(attrs["location_id"]) and load_loc_id do
+              attrs
+              |> Map.put("location_id", load_loc_id)
+              |> Map.put("location_name", location_typeahead_label(load_loc))
+            else
+              put_location_typeahead_name(attrs)
+            end
           end)
         end) ++ warehouse_load_lines(warehouse_load_keys)
 
@@ -912,7 +1391,10 @@ defmodule FullCircle.Trading do
             list
         end
 
-      drops = sales_drops ++ warehouse_drops
+      drops =
+        (sales_drops ++ warehouse_drops)
+        |> Enum.map(&put_location_typeahead_name/1)
+        |> Enum.map(&put_supply_typeahead_title(&1, supplies))
 
       if loads == [] or drops == [] do
         {:error, :incomplete_selection}
@@ -943,6 +1425,7 @@ defmodule FullCircle.Trading do
                 "good_id" => g_id,
                 "good_name" => good.name,
                 "location_id" => loc_id,
+                "location_name" => location_name_by_id(loc_id),
                 "supply_position_id" => nil
               }
             ]
@@ -960,20 +1443,18 @@ defmodule FullCircle.Trading do
 
       same_good_supplies = Enum.filter(supplies, &(&1.good_id == s.good_id))
 
-      supply_pos_id =
+      preferred =
+        s.preferred_supply_id &&
+          Enum.find(same_good_supplies, &(&1.id == s.preferred_supply_id))
+
+      supply =
         cond do
-          s.preferred_supply_id &&
-              Enum.any?(same_good_supplies, &(&1.id == s.preferred_supply_id)) ->
-            s.preferred_supply_id
-
-          match?([_], same_good_supplies) ->
-            hd(same_good_supplies).id
-
-          true ->
-            nil
+          preferred -> preferred
+          match?([_], same_good_supplies) -> hd(same_good_supplies)
+          true -> nil
         end
 
-      loc_id = customer_site_location_id(company, user, s.customer_id)
+      loc = customer_site_location(company, user, s.customer_id)
 
       %{
         "planned_mt" => mt,
@@ -981,8 +1462,12 @@ defmodule FullCircle.Trading do
         "good_id" => s.good_id,
         "good_name" => good && good.name,
         "sales_position_id" => s.id,
-        "supply_position_id" => supply_pos_id,
-        "location_id" => loc_id
+        "sales_title" => sales_typeahead_label(s),
+        "supply_position_id" => supply && supply.id,
+        "supply_title" => supply && supply_typeahead_label(supply),
+        "party_contact_id" => s.customer_id,
+        "location_id" => loc && loc.id,
+        "location_name" => loc && location_typeahead_label(loc)
       }
     end)
   end
@@ -1012,6 +1497,7 @@ defmodule FullCircle.Trading do
               "good_id" => g_id,
               "good_name" => good.name,
               "location_id" => loc_id,
+              "location_name" => location_name_by_id(loc_id),
               "sales_position_id" => nil,
               "supply_position_id" => nil
             }
@@ -1038,14 +1524,18 @@ defmodule FullCircle.Trading do
       "good_id" => s.good_id,
       "good_name" => good && good.name,
       "location_id" => loc_id,
+      "location_name" => location_name_by_id(loc_id),
       "sales_position_id" => nil,
-      "supply_position_id" => s.id
+      "supply_position_id" => s.id,
+      "supply_title" => supply_typeahead_label(s)
     }
   end
 
-  defp supply_load_attrs(s) do
+  defp supply_load_attrs(s, company, user) do
     mt = Balances.supply_remaining(s) |> decimal_str()
     good = s.good || Repo.get!(FullCircle.Product.Good, s.good_id)
+    supplier_id = s.supplier_id
+    loc = supplier_site_location(company, user, supplier_id)
 
     %{
       "planned_mt" => mt,
@@ -1053,29 +1543,91 @@ defmodule FullCircle.Trading do
       "good_id" => s.good_id,
       "good_name" => good && good.name,
       "supply_position_id" => s.id,
-      "location_id" => nil
+      "supply_title" => supply_typeahead_label(s),
+      "party_contact_id" => supplier_id,
+      "location_id" => loc && loc.id,
+      "location_name" => loc && location_typeahead_label(loc)
     }
   end
 
-  defp default_load_location_id(company, user) do
+  defp default_load_location(company, user) do
     company
     |> list_locations(user, active_only: true)
     |> Enum.find(&(&1.kind in ~w(port supplier_site)))
-    |> case do
+  end
+
+  defp location_typeahead_label(%{name: name, kind: kind}) when is_binary(name),
+    do: if(kind && kind != "", do: "#{name} (#{kind})", else: name)
+
+  defp location_typeahead_label(_), do: nil
+
+  defp supply_typeahead_label(%{title: title, supplier: %{name: sn}}) when is_binary(title),
+    do: "#{title} · #{sn}"
+
+  defp supply_typeahead_label(%{title: title}) when is_binary(title), do: title
+  defp supply_typeahead_label(_), do: nil
+
+  defp sales_typeahead_label(%{title: title, customer: %{name: cn}}) when is_binary(title),
+    do: "#{title} · #{cn}"
+
+  defp sales_typeahead_label(%{title: title}) when is_binary(title), do: title
+  defp sales_typeahead_label(_), do: nil
+
+  defp location_name_by_id(nil), do: nil
+
+  defp location_name_by_id(id) do
+    case Repo.get(Location, id) do
       nil -> nil
-      loc -> loc.id
+      loc -> location_typeahead_label(loc)
     end
   end
+
+  defp put_location_typeahead_name(%{"location_name" => name} = attrs)
+       when is_binary(name) and name != "",
+       do: attrs
+
+  defp put_location_typeahead_name(%{"location_id" => id} = attrs)
+       when is_binary(id) and id != "" do
+    Map.put(attrs, "location_name", location_name_by_id(id))
+  end
+
+  defp put_location_typeahead_name(attrs), do: attrs
+
+  defp put_supply_typeahead_title(%{"supply_title" => t} = attrs, _supplies)
+       when is_binary(t) and t != "",
+       do: attrs
+
+  defp put_supply_typeahead_title(%{"supply_position_id" => id} = attrs, supplies)
+       when is_binary(id) and id != "" do
+    case Enum.find(supplies, &(&1.id == id)) do
+      nil -> attrs
+      s -> Map.put(attrs, "supply_title", supply_typeahead_label(s))
+    end
+  end
+
+  defp put_supply_typeahead_title(attrs, _supplies), do: attrs
 
   defp base_trip_attrs(loads, drops) do
     %{
       "date" => Date.utc_today() |> Date.to_iso8601(),
       "status" => "draft",
       "transport_mode" => "company_own",
-      "loads" => loads,
-      "drops" => drops
+      "loads" => stamp_line_seq(loads),
+      "drops" => stamp_line_seq(drops)
     }
   end
+
+  defp stamp_line_seq(lines) when is_list(lines) do
+    lines
+    |> Enum.with_index(1)
+    |> Enum.map(fn {line, i} ->
+      line
+      |> stringify_attr_keys()
+      |> Map.put("seq", i)
+    end)
+  end
+
+  defp stamp_line_seq(lines), do: lines
 
   defp warehouse_on_hand(location_id, good_id)
        when is_binary(location_id) and is_binary(good_id) do
@@ -1086,18 +1638,56 @@ defmodule FullCircle.Trading do
 
   defp warehouse_on_hand(_, _), do: Decimal.new(0)
 
-  defp customer_site_location_id(company, user, customer_id)
+  defp customer_site_location(company, user, customer_id)
        when is_binary(customer_id) do
-    company
-    |> list_locations(user, active_only: true)
-    |> Enum.find(fn l -> l.kind == "customer_site" and l.contact_id == customer_id end)
-    |> case do
-      nil -> nil
-      loc -> loc.id
+    linked = list_locations_for_contact(customer_id, company, user)
+
+    case linked do
+      [one] ->
+        one
+
+      many when is_list(many) and many != [] ->
+        Enum.find(many, &(&1.kind == "customer_site")) || hd(many)
+
+      _ ->
+        # Fallback: match location name to customer name (legacy rows without contact_id)
+        locs = list_locations(company, user, active_only: true)
+
+        case Repo.get(Contact, customer_id) do
+          %{name: name} when is_binary(name) and name != "" ->
+            down = String.downcase(name)
+
+            Enum.find(locs, fn l ->
+              l.kind == "customer_site" and is_binary(l.name) and
+                String.contains?(String.downcase(l.name), down)
+            end)
+
+          _ ->
+            nil
+        end
     end
   end
 
-  defp customer_site_location_id(_, _, _), do: nil
+  defp customer_site_location(_, _, _), do: nil
+
+  defp supplier_site_location(company, user, supplier_id)
+       when is_binary(supplier_id) do
+    linked = list_locations_for_contact(supplier_id, company, user)
+
+    case linked do
+      [one] ->
+        one
+
+      many when is_list(many) and many != [] ->
+        Enum.find(many, &(&1.kind == "supplier_site")) ||
+          Enum.find(many, &(&1.kind == "port")) || hd(many)
+
+      _ ->
+        nil
+    end
+  end
+
+  defp supplier_site_location(_, _, _), do: nil
 
   defp decimal_str(%Decimal{} = d), do: Decimal.to_string(d)
   defp decimal_str(n) when is_integer(n), do: Integer.to_string(n)
@@ -1108,16 +1698,29 @@ defmodule FullCircle.Trading do
   def create_trip(attrs, company, user) do
     with :ok <- authorize(user, :manage_trading, company) do
       gapless_name = String.to_atom("update_gapless_doc" <> gen_temp_id())
+      attrs = stringify_attr_keys(attrs)
 
       Multi.new()
       |> get_gapless_doc_id(gapless_name, "TradingTrip", "TRP", company)
       |> Multi.insert(:create_trip, fn %{^gapless_name => doc} ->
         attrs
-        |> stringify_attr_keys()
         |> put_company(company)
         |> Map.put("reference_no", doc)
         |> then(&Trip.changeset(%Trip{}, &1))
         |> validate_trip_goods()
+      end)
+      |> Multi.insert(:create_trip_log, fn %{create_trip: entity} ->
+        Sys.log_changeset(
+          :create_trip,
+          entity,
+          trip_log_attrs(
+            attrs
+            |> put_company(company)
+            |> Map.put("reference_no", entity.reference_no)
+          ),
+          company,
+          user
+        )
       end)
       |> Repo.transaction()
       |> unwrap_multi(:create_trip)
@@ -1139,11 +1742,19 @@ defmodule FullCircle.Trading do
           |> Map.drop(["reference_no"])
           |> Map.put("reference_no", trip.reference_no)
 
-        trip
-        |> Repo.preload([:loads, :drops])
-        |> Trip.changeset(attrs)
-        |> validate_trip_goods()
-        |> Repo.update()
+        cs =
+          trip
+          |> Repo.preload([:loads, :drops])
+          |> Trip.changeset(attrs)
+          |> validate_trip_goods()
+
+        Multi.new()
+        |> Multi.update(:update_trip, cs)
+        |> Multi.insert(:update_trip_log, fn %{update_trip: entity} ->
+          Sys.log_changeset(:update_trip, entity, trip_log_attrs(attrs), company, user)
+        end)
+        |> Repo.transaction()
+        |> unwrap_multi(:update_trip)
         |> maybe_promote_open_supplies_to_collect()
         |> preload_trip_result()
       end
@@ -1176,15 +1787,28 @@ defmodule FullCircle.Trading do
           {:error, :good_mismatch}
 
         true ->
-          case trip
-               |> Ecto.Changeset.change(%{status: "completed"})
-               |> Repo.update() do
+          Multi.new()
+          |> Multi.update(:complete_trip, Ecto.Changeset.change(trip, %{status: "completed"}))
+          |> Multi.insert(:complete_trip_log, fn %{complete_trip: entity} ->
+            Sys.log_changeset(
+              :complete_trip,
+              entity,
+              trip_lifecycle_log_attrs(trip, "completed"),
+              company,
+              user
+            )
+          end)
+          |> Repo.transaction()
+          |> case do
             {:ok, _} ->
               trip = get_trip!(trip.id, company, user)
               {:ok, trip, trip_warnings(trip)}
 
-            error ->
-              error
+            {:error, :complete_trip, %Ecto.Changeset{} = cs, _} ->
+              {:error, cs}
+
+            {:error, _step, reason, _} ->
+              {:error, reason}
           end
       end
     else
@@ -1209,11 +1833,27 @@ defmodule FullCircle.Trading do
           {:error, :has_invoices}
 
         true ->
-          case trip
-               |> Ecto.Changeset.change(%{status: "cancelled"})
-               |> Repo.update() do
-            {:ok, _} -> {:ok, get_trip!(trip.id, company, user)}
-            error -> error
+          Multi.new()
+          |> Multi.update(:cancel_trip, Ecto.Changeset.change(trip, %{status: "cancelled"}))
+          |> Multi.insert(:cancel_trip_log, fn %{cancel_trip: entity} ->
+            Sys.log_changeset(
+              :cancel_trip,
+              entity,
+              trip_lifecycle_log_attrs(trip, "cancelled"),
+              company,
+              user
+            )
+          end)
+          |> Repo.transaction()
+          |> case do
+            {:ok, _} ->
+              {:ok, get_trip!(trip.id, company, user)}
+
+            {:error, :cancel_trip, %Ecto.Changeset{} = cs, _} ->
+              {:error, cs}
+
+            {:error, _step, reason, _} ->
+              {:error, reason}
           end
       end
     else
@@ -1254,6 +1894,30 @@ defmodule FullCircle.Trading do
     end
   end
 
+  defp blank_to_nil(nil), do: nil
+  defp blank_to_nil(""), do: nil
+  defp blank_to_nil(v) when is_binary(v), do: v
+  defp blank_to_nil(_), do: nil
+
+  # Accept `good_id:` and/or `good_ids:` (list or comma-separated string).
+  defp typeahead_good_ids(opts) when is_list(opts) do
+    from_list =
+      case Keyword.get(opts, :good_ids) do
+        ids when is_list(ids) -> ids
+        s when is_binary(s) and s != "" -> String.split(s, ",", trim: true)
+        _ -> []
+      end
+
+    single = Keyword.get(opts, :good_id) |> blank_to_nil()
+
+    ([single] ++ from_list)
+    |> Enum.map(&blank_to_nil/1)
+    |> Enum.reject(&is_nil/1)
+    |> Enum.uniq()
+  end
+
+  defp typeahead_good_ids(_), do: []
+
   defp maybe_active_only(query, true), do: from(r in query, where: r.active == true)
   defp maybe_active_only(query, _), do: query
 
@@ -1275,6 +1939,111 @@ defmodule FullCircle.Trading do
   defp unwrap_multi({:error, key, %Ecto.Changeset{} = cs, _}, key), do: {:error, cs}
 
   defp unwrap_multi({:error, _step, reason, _}, _key), do: {:error, reason}
+
+  # Snapshot attrs for Sys.Log (readable names + MT; `_id` keys stripped by Sys.attr_to_string).
+  defp trip_log_attrs(attrs) when is_map(attrs) do
+    attrs
+    |> Map.take([
+      "date",
+      "transport_mode",
+      "status",
+      "notes",
+      "reference_no",
+      "vehicle_number",
+      "transport_agent_name",
+      "loads",
+      "drops"
+    ])
+    |> Map.update("loads", %{}, &normalize_log_lines/1)
+    |> Map.update("drops", %{}, &normalize_log_lines/1)
+  end
+
+  defp trip_lifecycle_log_attrs(%Trip{} = trip, status) do
+    %{
+      "status" => status,
+      "reference_no" => trip.reference_no,
+      "date" => trip.date && Date.to_iso8601(trip.date),
+      "transport_mode" => trip.transport_mode,
+      "vehicle_number" => trip.vehicle_number,
+      "transport_agent_name" => trip.transport_agent && trip.transport_agent.name,
+      "notes" => trip.notes,
+      "loads" => snapshot_lines(trip.loads || [], :load),
+      "drops" => snapshot_lines(trip.drops || [], :drop)
+    }
+  end
+
+  defp normalize_log_lines(lines) when is_map(lines) do
+    Map.new(lines, fn {k, line} ->
+      {to_string(k), take_line_log_fields(stringify_attr_keys(line))}
+    end)
+  end
+
+  defp normalize_log_lines(lines) when is_list(lines) do
+    lines
+    |> Enum.with_index()
+    |> Map.new(fn {line, i} ->
+      {"#{i}", take_line_log_fields(stringify_attr_keys(line))}
+    end)
+  end
+
+  defp normalize_log_lines(_), do: %{}
+
+  defp take_line_log_fields(line) when is_map(line) do
+    Map.take(line, [
+      "seq",
+      "planned_mt",
+      "actual_mt",
+      "location_note",
+      "variance_note",
+      "good_name",
+      "location_name",
+      "supply_title",
+      "sales_title"
+    ])
+  end
+
+  defp take_line_log_fields(_), do: %{}
+
+  defp snapshot_lines(lines, kind) do
+    lines
+    |> Enum.with_index()
+    |> Map.new(fn {line, i} ->
+      base = %{
+        "seq" => line.seq && to_string(line.seq),
+        "planned_mt" => decimal_str(line.planned_mt),
+        "actual_mt" => decimal_str(line.actual_mt),
+        "location_note" => line.location_note,
+        "good_name" => assoc_name(line, :good),
+        "location_name" => assoc_name(line, :location),
+        "supply_title" => assoc_title(line, :supply_position)
+      }
+
+      fields =
+        if kind == :drop do
+          base
+          |> Map.put("variance_note", line.variance_note)
+          |> Map.put("sales_title", assoc_title(line, :sales_position))
+        else
+          base
+        end
+
+      {"#{i}", fields}
+    end)
+  end
+
+  defp assoc_name(line, key) do
+    case Map.get(line, key) do
+      %{name: name} -> name
+      _ -> nil
+    end
+  end
+
+  defp assoc_title(line, key) do
+    case Map.get(line, key) do
+      %{title: title} -> title
+      _ -> nil
+    end
+  end
 
   defp preload_trip_result({:ok, trip}) do
     {:ok,

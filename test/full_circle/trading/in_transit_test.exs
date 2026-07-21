@@ -49,6 +49,7 @@ defmodule FullCircle.Trading.InTransitTest do
         %{
           "date" => "2026-07-20",
           "transport_mode" => "company_own",
+          "vehicle_number" => "ABC1234",
           "status" => "draft",
           "loads" => [
             %{
@@ -123,6 +124,7 @@ defmodule FullCircle.Trading.InTransitTest do
         %{
           "date" => "2026-07-18",
           "transport_mode" => "company_own",
+          "vehicle_number" => "ABC1234",
           "loads" => [
             %{
               "good_id" => good.id,
@@ -153,6 +155,7 @@ defmodule FullCircle.Trading.InTransitTest do
         %{
           "date" => "2026-07-21",
           "transport_mode" => "company_own",
+          "vehicle_number" => "ABC1234",
           "status" => "planned",
           "loads" => [
             %{

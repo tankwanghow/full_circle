@@ -84,7 +84,25 @@ defmodule FullCircleWeb.AutoCompleteController do
           FullCircle.Trading.open_supply_position_names(
             name,
             %{id: params["company_id"]},
-            %{id: params["user_id"]}
+            %{id: params["user_id"]},
+            good_id: params["good_id"],
+            good_ids: params["good_ids"]
+          )
+
+        "opensales" ->
+          FullCircle.Trading.open_sales_position_names(
+            name,
+            %{id: params["company_id"]},
+            %{id: params["user_id"]},
+            good_id: params["good_id"]
+          )
+
+        "tradinglocation" ->
+          FullCircle.Trading.location_names(
+            name,
+            %{id: params["company_id"]},
+            %{id: params["user_id"]},
+            contact_id: params["contact_id"]
           )
 
         _ ->

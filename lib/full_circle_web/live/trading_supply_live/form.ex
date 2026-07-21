@@ -6,6 +6,8 @@ defmodule FullCircleWeb.TradingSupplyLive.Form do
   alias FullCircle.Authorization
   alias FullCircle.Accounting
   alias FullCircle.Product
+  import FullCircleWeb.TradingComponents
+
   @impl true
   def mount(params, _session, socket) do
     company = socket.assigns.current_company
@@ -31,10 +33,12 @@ defmodule FullCircleWeb.TradingSupplyLive.Form do
          |> assign(page_title: gettext("New Supply Position"))
          |> assign(live_action: :new)
          |> assign(form: to_form(cs))
-         |> assign(good_unit: nil)}
+         |> assign(good_unit: nil)
+         |> assign(movement_history: [])}
 
       true ->
         s = Trading.get_supply_position!(params["id"], company, user)
+        history = Trading.list_supply_line_history(s.id, company, user)
 
         cs =
           SupplyPosition.changeset(s, %{
@@ -47,6 +51,7 @@ defmodule FullCircleWeb.TradingSupplyLive.Form do
          |> assign(page_title: gettext("Edit Supply Position"))
          |> assign(live_action: :edit)
          |> assign(supply: s)
+         |> assign(movement_history: history)
          |> assign(form: to_form(cs))
          |> assign(good_unit: s.good && s.good.unit)}
     end
@@ -205,7 +210,7 @@ defmodule FullCircleWeb.TradingSupplyLive.Form do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="mx-auto w-6/12">
+    <div class="mx-auto w-10/12 max-w-5xl">
       <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <.form
         for={@form}
@@ -279,41 +284,71 @@ defmodule FullCircleWeb.TradingSupplyLive.Form do
           />
         </div>
         <.input field={@form[:notes]} type="textarea" label={gettext("Notes")} />
-        <div class="text-center mt-4 gap-1 flex flex-wrap justify-center">
-          <.button>{gettext("Save")}</.button>
-          <button
-            :if={@live_action == :edit && @supply.status in ["open", "collect"]}
-            type="button"
-            phx-click="hold"
-            class="blue button"
+        <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
+          <%!-- Form actions (left) --%>
+          <div class="flex flex-wrap gap-1">
+            <.button>{gettext("Save")}</.button>
+            <.link
+              navigate={~p"/companies/#{@current_company.id}/trading/supply_positions"}
+              class="gray button"
+            >
+              {gettext("Back")}
+            </.link>
+          </div>
+          <%!-- Status transitions (right) --%>
+          <div
+            :if={
+              @live_action == :edit &&
+                @supply.status in ["open", "hold", "collect"]
+            }
+            class="flex flex-wrap items-center gap-1 sm:border-l sm:border-zinc-200 sm:pl-3"
           >
-            {gettext("Mark hold")}
-          </button>
-          <button
-            :if={@live_action == :edit && @supply.status in ["open", "hold"]}
-            type="button"
-            phx-click="collect"
-            class="teal button"
-          >
-            {gettext("Mark collect")}
-          </button>
-          <button
-            :if={@live_action == :edit && @supply.status != "closed"}
-            type="button"
-            phx-click="close"
-            class="orange button"
-            data-confirm={gettext("Close this supply position? Stock ended.")}
-          >
-            {gettext("Close")}
-          </button>
-          <.link
-            navigate={~p"/companies/#{@current_company.id}/trading/supply_positions"}
-            class="gray button"
-          >
-            {gettext("Back")}
-          </.link>
+            <span class="text-xs font-medium text-zinc-500 mr-1">
+              {gettext("Update status")}
+            </span>
+            <button
+              :if={@supply.status in ["open", "collect"]}
+              type="button"
+              phx-click="hold"
+              class="blue button"
+            >
+              {gettext("Mark hold")}
+            </button>
+            <button
+              :if={@supply.status in ["open", "hold"]}
+              type="button"
+              phx-click="collect"
+              class="teal button"
+            >
+              {gettext("Mark collect")}
+            </button>
+            <button
+              type="button"
+              phx-click="close"
+              class="orange button"
+              data-confirm={gettext("Close this supply position? Stock ended.")}
+            >
+              {gettext("Close supply")}
+            </button>
+          </div>
         </div>
       </.form>
+
+      <div :if={@live_action == :edit}>
+        <.movement_history
+          title={gettext("Loads & drops")}
+          rows={@movement_history}
+          company_id={@current_company.id}
+          empty_text={gettext("No loads or drops for this supply yet.")}
+          base_qty={@supply && @supply.quantity}
+          unit={@good_unit}
+          remaining_from={:load}
+          print_href={
+            @supply &&
+              ~p"/companies/#{@current_company.id}/trading/supply_positions/#{@supply.id}/history/print"
+          }
+        />
+      </div>
     </div>
     """
   end

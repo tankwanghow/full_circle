@@ -5,7 +5,7 @@ defmodule FullCircleWeb.TradingTripLive.Form do
   alias FullCircle.Trading.{Trip, TripLoad, TripDrop}
   alias FullCircle.Authorization
   alias FullCircle.Accounting
-  import Ecto.Query, warn: false
+  alias FullCircle.Product
   import FullCircleWeb.TradingTripLive.DetailLines
 
   @impl true
@@ -36,10 +36,11 @@ defmodule FullCircleWeb.TradingTripLive.Form do
 
       true ->
         trip = Trading.get_trip!(params["id"], company, user)
+        trip = put_line_display_names(trip)
 
         cs =
           Trip.changeset(trip, %{
-              "transport_agent_name" => trip.transport_agent && trip.transport_agent.name
+            "transport_agent_name" => trip.transport_agent && trip.transport_agent.name
           })
 
         {:ok, assign_form(socket, cs, :edit, trip)}
@@ -47,9 +48,6 @@ defmodule FullCircleWeb.TradingTripLive.Form do
   end
 
   defp assign_form(socket, cs, live_action, trip) do
-    company = socket.assigns.current_company
-    user = socket.assigns.current_user
-
     title =
       case live_action do
         :new -> gettext("New Trip")
@@ -61,28 +59,55 @@ defmodule FullCircleWeb.TradingTripLive.Form do
     |> assign(live_action: live_action)
     |> assign(trip: trip)
     |> assign(form: to_form(cs))
-    |> assign(locations: Trading.list_locations(company, user, active_only: true))
-    |> assign(
-      goods:
-        FullCircle.Repo.all(
-          from(g in FullCircle.Product.Good,
-            where: g.company_id == ^company.id,
-            order_by: g.name
-          )
-        )
-    )
-    |> assign(
-      supplies:
-        Trading.list_supply_positions(company, user,
-          statuses: FullCircle.Trading.SupplyPosition.loadable_statuses()
-        )
-    )
-    |> assign(sales: Trading.list_open_sales(company, user))
     |> assign(warnings: if(trip, do: Trading.trip_warnings(trip), else: []))
   end
 
+  defp put_line_display_names(%Trip{} = trip) do
+    loads =
+      Enum.map(List.wrap(trip.loads), fn l ->
+        %{
+          l
+          | good_name: l.good && l.good.name,
+            location_name: location_label(l.location),
+            supply_title: supply_label(l.supply_position),
+            party_contact_id: l.supply_position && l.supply_position.supplier_id
+        }
+      end)
+
+    drops =
+      Enum.map(List.wrap(trip.drops), fn d ->
+        %{
+          d
+          | good_name: d.good && d.good.name,
+            location_name: location_label(d.location),
+            sales_title: sales_label(d.sales_position),
+            supply_title: supply_label(d.supply_position),
+            party_contact_id: d.sales_position && d.sales_position.customer_id
+        }
+      end)
+
+    %{trip | loads: loads, drops: drops}
+  end
+
+  defp location_label(%{name: name, kind: kind}) when is_binary(name),
+    do: if(kind && kind != "", do: "#{name} (#{kind})", else: name)
+
+  defp location_label(_), do: nil
+
+  defp supply_label(%{title: title, supplier: %{name: sn}}) when is_binary(title),
+    do: "#{title} · #{sn}"
+
+  defp supply_label(%{title: title}) when is_binary(title), do: title
+  defp supply_label(_), do: nil
+
+  defp sales_label(%{title: title, customer: %{name: cn}}) when is_binary(title),
+    do: "#{title} · #{cn}"
+
+  defp sales_label(%{title: title}) when is_binary(title), do: title
+  defp sales_label(_), do: nil
+
   @impl true
-    def handle_event(
+  def handle_event(
         "validate",
         %{"_target" => ["trip", "transport_agent_name"], "trip" => params},
         socket
@@ -99,6 +124,32 @@ defmodule FullCircleWeb.TradingTripLive.Form do
     validate(params, socket)
   end
 
+  def handle_event(
+        "validate",
+        %{"_target" => ["trip", "loads", id, field], "trip" => params},
+        socket
+      )
+      when field in ["good_name", "location_name", "supply_title"] do
+    company = socket.assigns.current_company
+    user = socket.assigns.current_user
+    detail = resolve_load_typeahead(params["loads"][id], field, company, user)
+    params = FullCircleWeb.Helpers.merge_detail(params, "loads", id, detail)
+    validate(params, socket)
+  end
+
+  def handle_event(
+        "validate",
+        %{"_target" => ["trip", "drops", id, field], "trip" => params},
+        socket
+      )
+      when field in ["good_name", "location_name", "sales_title", "supply_title"] do
+    company = socket.assigns.current_company
+    user = socket.assigns.current_user
+    detail = resolve_drop_typeahead(params["drops"][id], field, company, user)
+    params = FullCircleWeb.Helpers.merge_detail(params, "drops", id, detail)
+    validate(params, socket)
+  end
+
   def handle_event("validate", %{"trip" => params}, socket) do
     validate(params, socket)
   end
@@ -106,7 +157,7 @@ defmodule FullCircleWeb.TradingTripLive.Form do
   def handle_event("add_load", _, socket) do
     cs =
       socket.assigns.form.source
-      |> FullCircleWeb.Helpers.add_line(:loads, %TripLoad{})
+      |> FullCircleWeb.Helpers.add_line(:loads, %TripLoad{seq: next_seq(socket, :loads)})
       |> Map.put(:action, :validate)
 
     {:noreply, assign(socket, form: to_form(cs))}
@@ -115,7 +166,7 @@ defmodule FullCircleWeb.TradingTripLive.Form do
   def handle_event("add_drop", _, socket) do
     cs =
       socket.assigns.form.source
-      |> FullCircleWeb.Helpers.add_line(:drops, %TripDrop{})
+      |> FullCircleWeb.Helpers.add_line(:drops, %TripDrop{seq: next_seq(socket, :drops)})
       |> Map.put(:action, :validate)
 
     {:noreply, assign(socket, form: to_form(cs))}
@@ -125,6 +176,7 @@ defmodule FullCircleWeb.TradingTripLive.Form do
     cs =
       socket.assigns.form.source
       |> FullCircleWeb.Helpers.delete_line(index, :loads)
+      |> FullCircleWeb.Helpers.renumber_lines(:loads)
       |> Map.put(:action, :validate)
 
     {:noreply, assign(socket, form: to_form(cs))}
@@ -134,6 +186,43 @@ defmodule FullCircleWeb.TradingTripLive.Form do
     cs =
       socket.assigns.form.source
       |> FullCircleWeb.Helpers.delete_line(index, :drops)
+      |> FullCircleWeb.Helpers.renumber_lines(:drops)
+      |> Map.put(:action, :validate)
+
+    {:noreply, assign(socket, form: to_form(cs))}
+  end
+
+  def handle_event("move_load", %{"index" => index, "dir" => dir}, socket) do
+    cs =
+      socket.assigns.form.source
+      |> FullCircleWeb.Helpers.move_line(index, :loads, dir)
+      |> Map.put(:action, :validate)
+
+    {:noreply, assign(socket, form: to_form(cs))}
+  end
+
+  def handle_event("move_drop", %{"index" => index, "dir" => dir}, socket) do
+    cs =
+      socket.assigns.form.source
+      |> FullCircleWeb.Helpers.move_line(index, :drops, dir)
+      |> Map.put(:action, :validate)
+
+    {:noreply, assign(socket, form: to_form(cs))}
+  end
+
+  def handle_event("reverse_loads", _, socket) do
+    cs =
+      socket.assigns.form.source
+      |> FullCircleWeb.Helpers.reverse_lines(:loads)
+      |> Map.put(:action, :validate)
+
+    {:noreply, assign(socket, form: to_form(cs))}
+  end
+
+  def handle_event("reverse_drops", _, socket) do
+    cs =
+      socket.assigns.form.source
+      |> FullCircleWeb.Helpers.reverse_lines(:drops)
       |> Map.put(:action, :validate)
 
     {:noreply, assign(socket, form: to_form(cs))}
@@ -225,11 +314,31 @@ defmodule FullCircleWeb.TradingTripLive.Form do
     end
   end
 
+  defp next_seq(socket, assoc) do
+    lines = Ecto.Changeset.get_assoc(socket.assigns.form.source, assoc) || []
+
+    lines
+    |> Enum.reject(fn line ->
+      case line do
+        %Ecto.Changeset{} = cs -> Ecto.Changeset.get_field(cs, :delete) in [true, "true"]
+        %{delete: d} -> d in [true, "true"]
+        _ -> false
+      end
+    end)
+    |> length()
+    |> Kernel.+(1)
+  end
+
   defp validate(params, socket) do
+    company = socket.assigns.current_company
+    user = socket.assigns.current_user
+
     params =
       params
-      |> Map.put("company_id", socket.assigns.current_company.id)
+      |> Map.put("company_id", company.id)
       |> put_system_reference_no(socket)
+      |> clear_agent_if_not_agent_mode()
+      |> resolve_all_line_typeaheads(company, user)
 
     cs =
       case socket.assigns.live_action do
@@ -249,55 +358,311 @@ defmodule FullCircleWeb.TradingTripLive.Form do
 
   defp put_system_reference_no(params, _), do: params
 
-  defp ensure_ids(params, company, user) do
-    params =
-      case Accounting.get_contact_by_name(params["transport_agent_name"] || "", company, user) do
-        %{id: id} -> Map.put(params, "transport_agent_id", id)
-        _ -> params
-      end
-
-    supplies =
-      Trading.list_supply_positions(company, user,
-        statuses: FullCircle.Trading.SupplyPosition.loadable_statuses()
-      )
-    sales = Trading.list_open_sales(company, user)
-    fill_line_goods(params, supplies, sales)
+  # Agent only applies when transport_mode is "agent"; clear otherwise so hidden fields don't stick.
+  defp clear_agent_if_not_agent_mode(%{"transport_mode" => mode} = params)
+       when mode != "agent" do
+    params
+    |> Map.put("transport_agent_id", nil)
+    |> Map.put("transport_agent_name", nil)
   end
 
-  defp fill_line_goods(params, supplies, sales) do
-    supply_map = Map.new(supplies, &{&1.id, &1})
-    sales_map = Map.new(sales, &{&1.id, &1})
+  defp clear_agent_if_not_agent_mode(params), do: params
 
-    loads =
-      Map.new(params["loads"] || %{}, fn {k, load} ->
-        load = Map.new(load, fn {kk, vv} -> {to_string(kk), vv} end)
-        sid = load["supply_position_id"]
-        load =
-          if sid not in [nil, ""] and Map.has_key?(supply_map, sid) do
-            s = supply_map[sid]
-            Map.put(load, "good_id", s.good_id)
-          else
-            load
+  defp ensure_ids(params, company, user) do
+    params = clear_agent_if_not_agent_mode(params)
+
+    params =
+      if params["transport_mode"] == "agent" do
+        case Accounting.get_contact_by_name(params["transport_agent_name"] || "", company, user) do
+          %{id: id} -> Map.put(params, "transport_agent_id", id)
+          _ -> params
+        end
+      else
+        params
+      end
+
+    resolve_all_line_typeaheads(params, company, user)
+  end
+
+  defp resolve_load_typeahead(detail, field, company, user) do
+    detail = stringify_keys_one(detail)
+
+    case field do
+      "good_name" ->
+        if supply_present?(detail) do
+          resolve_load_typeahead(detail, "supply_title", company, user)
+        else
+          resolve_named(
+            detail,
+            "good_name",
+            "good_id",
+            fn name -> Product.get_good_by_name(name, company, user) end,
+            fn
+              %{id: id, value: name} -> %{"good_id" => id, "good_name" => name}
+              _ -> %{}
+            end,
+            fn id ->
+              case FullCircle.Repo.get(FullCircle.Product.Good, id) do
+                %{name: name} -> %{"good_name" => name}
+                _ -> %{}
+              end
+            end
+          )
+        end
+
+      "location_name" ->
+        resolve_named(
+          detail,
+          "location_name",
+          "location_id",
+          fn name -> Trading.get_location_by_name(name, company, user) end,
+          fn
+            %{} = loc -> %{"location_id" => loc.id, "location_name" => location_label(loc)}
+            _ -> %{}
+          end,
+          fn id ->
+            try do
+              loc = Trading.get_location!(id, company, user)
+              %{"location_name" => location_label(loc)}
+            rescue
+              _ -> %{}
+            end
           end
-        {k, load}
-      end)
+        )
 
+      "supply_title" ->
+        resolve_named(
+          detail,
+          "supply_title",
+          "supply_position_id",
+          fn name -> Trading.get_open_supply_position_by_title(name, company, user) end,
+          fn
+            %{} = s ->
+              %{
+                "supply_position_id" => s.id,
+                "supply_title" => supply_label(s),
+                "good_id" => s.good_id,
+                "good_name" => s.good && s.good.name
+              }
+
+            _ ->
+              %{}
+          end,
+          fn id ->
+            try do
+              s = Trading.get_supply_position!(id, company, user)
+
+              %{
+                "supply_title" => supply_label(s),
+                "good_id" => s.good_id,
+                "good_name" => s.good && s.good.name
+              }
+            rescue
+              _ -> %{}
+            end
+          end
+        )
+    end
+  end
+
+  defp supply_present?(detail) do
+    sid = detail["supply_position_id"]
+    title = detail["supply_title"] |> to_string() |> String.trim()
+    present_id?(sid) or title != ""
+  end
+
+  defp resolve_drop_typeahead(detail, field, company, user) do
+    detail = stringify_keys_one(detail)
+
+    case field do
+      "good_name" ->
+        if sales_present?(detail) do
+          detail
+          |> resolve_drop_typeahead("sales_title", company, user)
+          |> drop_mismatched_supply(company, user)
+        else
+          detail
+          |> resolve_load_typeahead("good_name", company, user)
+          |> drop_mismatched_supply(company, user)
+        end
+
+      "location_name" ->
+        resolve_load_typeahead(detail, "location_name", company, user)
+
+      "sales_title" ->
+        resolve_named(
+          detail,
+          "sales_title",
+          "sales_position_id",
+          fn name -> Trading.get_open_sales_position_by_title(name, company, user) end,
+          fn
+            %{} = s ->
+              %{
+                "sales_position_id" => s.id,
+                "sales_title" => sales_label(s),
+                "good_id" => s.good_id,
+                "good_name" => s.good && s.good.name
+              }
+
+            _ ->
+              %{}
+          end,
+          fn id ->
+            try do
+              s = Trading.get_sales_position!(id, company, user)
+
+              %{
+                "sales_title" => sales_label(s),
+                "good_id" => s.good_id,
+                "good_name" => s.good && s.good.name
+              }
+            rescue
+              _ -> %{}
+            end
+          end
+        )
+        |> drop_mismatched_supply(company, user)
+
+      "supply_title" ->
+        line_good = detail["good_id"]
+
+        resolve_named(
+          detail,
+          "supply_title",
+          "supply_position_id",
+          fn name ->
+            case Trading.get_open_supply_position_by_title(name, company, user) do
+              %{} = s ->
+                if matching_good?(line_good, s.good_id), do: s, else: nil
+
+              _ ->
+                nil
+            end
+          end,
+          fn
+            %{} = s ->
+              %{"supply_position_id" => s.id, "supply_title" => supply_label(s)}
+
+            _ ->
+              %{}
+          end,
+          fn id ->
+            try do
+              s = Trading.get_supply_position!(id, company, user)
+
+              if matching_good?(line_good, s.good_id) or line_good in [nil, ""] do
+                %{"supply_title" => supply_label(s)}
+              else
+                %{}
+              end
+            rescue
+              _ -> %{}
+            end
+          end
+        )
+    end
+  end
+
+  defp sales_present?(detail) do
+    sid = detail["sales_position_id"]
+    title = detail["sales_title"] |> to_string() |> String.trim()
+    present_id?(sid) or title != ""
+  end
+
+  defp matching_good?(line_good, _pos_good) when line_good in [nil, ""], do: true
+
+  defp matching_good?(line_good, pos_good),
+    do: to_string(line_good) == to_string(pos_good)
+
+  defp drop_mismatched_supply(detail, company, user) do
+    good_id = detail["good_id"]
+    sid = detail["supply_position_id"]
+
+    cond do
+      good_id in [nil, ""] or sid in [nil, ""] ->
+        detail
+
+      true ->
+        try do
+          s = Trading.get_supply_position!(sid, company, user)
+
+          if matching_good?(good_id, s.good_id) do
+            detail
+          else
+            detail
+            |> Map.put("supply_position_id", nil)
+            |> Map.put("supply_title", nil)
+          end
+        rescue
+          _ ->
+            detail
+            |> Map.put("supply_position_id", nil)
+            |> Map.put("supply_title", nil)
+        end
+    end
+  end
+
+  defp resolve_named(detail, name_key, id_key, lookup_by_name, from_record, from_id) do
+    name = detail[name_key] |> to_string() |> String.trim()
+    id = detail[id_key]
+
+    cond do
+      name != "" ->
+        case lookup_by_name.(name) do
+          nil -> detail |> Map.put(id_key, nil)
+          rec -> Map.merge(detail, from_record.(rec))
+        end
+
+      present_id?(id) ->
+        Map.merge(detail, from_id.(id))
+
+      true ->
+        detail
+    end
+  end
+
+  defp present_id?(id) when id in [nil, ""], do: false
+  defp present_id?(_), do: true
+
+  defp resolve_all_line_typeaheads(params, company, user) do
     drops =
       Map.new(params["drops"] || %{}, fn {k, drop} ->
-        drop = Map.new(drop, fn {kk, vv} -> {to_string(kk), vv} end)
-        sales_id = drop["sales_position_id"]
         drop =
-          if sales_id not in [nil, ""] and Map.has_key?(sales_map, sales_id) do
-            s = sales_map[sales_id]
-            Map.put(drop, "good_id", s.good_id)
-          else
-            drop
-          end
+          drop
+          |> stringify_keys_one()
+          |> resolve_drop_typeahead("sales_title", company, user)
+          |> resolve_drop_typeahead("good_name", company, user)
+          |> resolve_drop_typeahead("location_name", company, user)
+          |> resolve_drop_typeahead("supply_title", company, user)
+
         {k, drop}
       end)
 
-    params |> Map.put("loads", loads) |> Map.put("drops", drops)
+    loads =
+      Map.new(params["loads"] || %{}, fn {k, load} ->
+        load =
+          load
+          |> stringify_keys_one()
+          |> resolve_load_typeahead("supply_title", company, user)
+          |> resolve_load_typeahead("good_name", company, user)
+          |> resolve_load_typeahead("location_name", company, user)
+
+        {k, load}
+      end)
+
+    params
+    |> Map.put("loads", loads)
+    |> Map.put("drops", drops)
   end
+
+  defp stringify_keys_one(map) when is_map(map) do
+    Map.new(map, fn
+      {k, v} when is_atom(k) -> {Atom.to_string(k), v}
+      {k, v} -> {to_string(k), v}
+    end)
+  end
+
+  defp stringify_keys_one(other), do: other
 
   @impl true
   def render(assigns) do
@@ -316,15 +681,9 @@ defmodule FullCircleWeb.TradingTripLive.Form do
         </ul>
       </div>
 
-      <.form
-        for={@form}
-        id="trip-form"
-        phx-change="validate"
-        phx-submit="save"
-        autocomplete="off"
-      >
+      <.form for={@form} id="trip-form" phx-change="validate" phx-submit="save" autocomplete="off">
         <div class="flex flex-row flex-nowrap gap-1">
-        <div class="w-[14%] grow shrink">
+          <div class="w-[14%] grow shrink">
             <.input
               field={@form[:reference_no]}
               label={gettext("Trip no")}
@@ -346,7 +705,7 @@ defmodule FullCircleWeb.TradingTripLive.Form do
           <div class="w-[14%] grow shrink">
             <.input field={@form[:vehicle_number]} label={gettext("Vehicle no")} />
           </div>
-          <div class="w-[28%] grow shrink">
+          <div :if={@form[:transport_mode].value == "agent"} class="w-[28%] grow shrink">
             <.input
               field={@form[:transport_agent_name]}
               label={gettext("Transport agent")}
@@ -357,8 +716,8 @@ defmodule FullCircleWeb.TradingTripLive.Form do
           </div>
         </div>
 
-        <div class="flex flex-row flex-nowrap mt-1">
-          <div class="w-full">
+        <div class="flex flex-row flex-nowrap gap-1 mt-1">
+          <div class="w-[88%]">
             <.input field={@form[:notes]} label={gettext("Notes")} />
           </div>
           <div class="w-[12%] grow shrink">
@@ -372,40 +731,76 @@ defmodule FullCircleWeb.TradingTripLive.Form do
           </div>
         </div>
 
-        <.loads_section form={@form} goods={@goods} locations={@locations} supplies={@supplies} />
         <.drops_section
           form={@form}
-          goods={@goods}
-          locations={@locations}
-          supplies={@supplies}
-          sales={@sales}
+          company_id={@current_company.id}
+          user_id={@current_user.id}
+          show_errors={!!@form.source.action}
+        />
+        <.loads_section
+          form={@form}
+          company_id={@current_company.id}
+          user_id={@current_user.id}
+          drop_good_ids={FullCircleWeb.TradingTripLive.DetailLines.drop_good_ids(@form)}
+          show_errors={!!@form.source.action}
         />
 
-        <div class="flex flex-row justify-center gap-x-1 mt-3 flex-wrap">
-          <.button :if={is_nil(@trip) or @trip.status not in ["completed", "cancelled"]}>
-            {gettext("Save")}
-          </.button>
-          <button
-            :if={@live_action == :edit && @trip && @trip.status in ["draft", "planned"]}
-            type="button"
-            phx-click="complete"
-            class="orange button"
-            data-confirm={gettext("Complete this trip? Actuals will update balances.")}
+        <div class="mt-3 flex flex-wrap items-center justify-between gap-3">
+          <%!-- Form actions (left) --%>
+          <div class="flex flex-wrap gap-1">
+            <.button :if={is_nil(@trip) or @trip.status not in ["completed", "cancelled"]}>
+              {gettext("Save")}
+            </.button>
+            <.print_button
+              :if={@live_action == :edit && @trip}
+              doc_type="trading/trips"
+              doc_id={@trip.id}
+              company={@current_company}
+              class="blue button"
+            />
+            <.live_component
+              :if={@live_action == :edit && @trip}
+              module={FullCircleWeb.LogLive.Component}
+              current_company={@current_company}
+              id={"log_#{@trip.id}"}
+              show_log={false}
+              entity="trading_trips"
+              entity_id={@trip.id}
+            />
+            <.link navigate={~p"/companies/#{@current_company.id}/trading/trips"} class="gray button">
+              {gettext("Back")}
+            </.link>
+          </div>
+          <%!-- Status transitions (right) --%>
+          <div
+            :if={
+              @live_action == :edit && @trip &&
+                @trip.status in ["draft", "planned", "completed"]
+            }
+            class="flex flex-wrap items-center gap-1 sm:border-l sm:border-zinc-200 sm:pl-3"
           >
-            {gettext("Complete trip")}
-          </button>
-          <button
-            :if={@live_action == :edit && @trip && @trip.status != "cancelled"}
-            type="button"
-            phx-click="cancel_trip"
-            class="red button"
-            data-confirm={gettext("Cancel this trip?")}
-          >
-            {gettext("Cancel trip")}
-          </button>
-          <.link navigate={~p"/companies/#{@current_company.id}/trading/trips"} class="gray button">
-            {gettext("Back")}
-          </.link>
+            <span class="text-xs font-medium text-zinc-500 mr-1">
+              {gettext("Update status")}
+            </span>
+            <button
+              :if={@trip.status in ["draft", "planned"]}
+              type="button"
+              phx-click="complete"
+              class="orange button"
+              data-confirm={gettext("Complete this trip? Actuals will update balances.")}
+            >
+              {gettext("Complete trip")}
+            </button>
+            <button
+              :if={@trip.status != "cancelled"}
+              type="button"
+              phx-click="cancel_trip"
+              class="red button"
+              data-confirm={gettext("Cancel this trip?")}
+            >
+              {gettext("Cancel trip")}
+            </button>
+          </div>
         </div>
       </.form>
     </div>

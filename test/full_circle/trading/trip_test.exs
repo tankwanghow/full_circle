@@ -22,6 +22,7 @@ defmodule FullCircle.Trading.TripTest do
         %{
           "date" => "2026-07-01",
           "transport_mode" => "company_own",
+          "vehicle_number" => "ABC1234",
           "good_id" => good.id,
           "loads" => [
             %{
@@ -74,6 +75,7 @@ defmodule FullCircle.Trading.TripTest do
         %{
           "date" => "2026-07-02",
           "transport_mode" => "company_own",
+          "vehicle_number" => "ABC1234",
           "good_id" => good.id,
           "loads" => [
             %{
@@ -136,6 +138,7 @@ defmodule FullCircle.Trading.TripTest do
         %{
           "date" => "2026-07-03",
           "transport_mode" => "company_own",
+          "vehicle_number" => "ABC1234",
           "good_id" => good.id,
           "loads" => [
             %{
@@ -203,6 +206,7 @@ defmodule FullCircle.Trading.TripTest do
         %{
           "date" => "2026-07-21",
           "transport_mode" => "company_own",
+          "vehicle_number" => "ABC1234",
           "good_id" => good.id,
           "loads" => [
             %{
@@ -241,6 +245,7 @@ defmodule FullCircle.Trading.TripTest do
         %{
           "date" => "2026-07-22",
           "transport_mode" => "company_own",
+          "vehicle_number" => "ABC1234",
           "good_id" => good.id,
           "loads" => [
             %{"planned_mt" => "15", "actual_mt" => "15", "good_id" => good.id, "location_id" => wh.id}
@@ -287,6 +292,7 @@ defmodule FullCircle.Trading.TripTest do
         %{
           "date" => "2026-07-04",
           "transport_mode" => "company_own",
+          "vehicle_number" => "ABC1234",
           "good_id" => good.id,
           "loads" => [
             %{
@@ -320,6 +326,7 @@ defmodule FullCircle.Trading.TripTest do
         %{
           "date" => "2026-07-05",
           "transport_mode" => "company_own",
+          "vehicle_number" => "ABC1234",
           "good_id" => good.id,
           "loads" => [
             %{"planned_mt" => "20", "actual_mt" => "20", "good_id" => good.id, "location_id" => wh.id}
@@ -354,6 +361,7 @@ defmodule FullCircle.Trading.TripTest do
         %{
           "date" => "2026-07-06",
           "transport_mode" => "company_own",
+          "vehicle_number" => "ABC1234",
           "good_id" => good.id,
           "status" => "draft",
           "loads" => [
@@ -403,6 +411,7 @@ defmodule FullCircle.Trading.TripTest do
         %{
           "date" => "2026-07-07",
           "transport_mode" => "company_own",
+          "vehicle_number" => "ABC1234",
           "good_id" => good.id,
           "loads" => [
             %{
@@ -438,6 +447,7 @@ defmodule FullCircle.Trading.TripTest do
         %{
           "date" => "2026-07-08",
           "transport_mode" => "company_own",
+          "vehicle_number" => "ABC1234",
           "loads" => [
             %{"planned_mt" => "10", "good_id" => good.id, "location_id" => loc.id}
           ],
@@ -474,6 +484,7 @@ defmodule FullCircle.Trading.TripTest do
                %{
                  "date" => "2026-07-12",
                  "transport_mode" => "company_own",
+                 "vehicle_number" => "ABC1234",
                  "good_id" => good.id,
                  "loads" => [
                    %{
@@ -512,6 +523,7 @@ defmodule FullCircle.Trading.TripTest do
                %{
                  "date" => "2026-07-09",
                  "transport_mode" => "company_own",
+                 "vehicle_number" => "ABC1234",
                  "loads" => [
                    %{
                      "planned_mt" => "10",
@@ -578,6 +590,7 @@ defmodule FullCircle.Trading.TripTest do
         %{
           "date" => "2026-07-20",
           "transport_mode" => "company_own",
+          "vehicle_number" => "ABC1234",
           "loads" => [
             %{
               "planned_mt" => "20",
@@ -630,5 +643,301 @@ defmodule FullCircle.Trading.TripTest do
     assert Trading.trip_parties_label(froms) == "Supplier Alpha, Supplier Beta"
     assert Trading.trip_parties_label(["A", "B", "C", "D"]) == "A, B +2"
     assert Trading.trip_parties_label([]) == ""
+  end
+
+  test "load and drop seq are assigned in form order and reverse drops works", %{
+    admin: admin,
+    company: company
+  } do
+    good = good_fixture(company, admin)
+    loc_a = location_fixture(company, admin, %{"kind" => "port", "name" => "Port A"})
+    loc_b = location_fixture(company, admin, %{"kind" => "port", "name" => "Port B"})
+    drop_a = location_fixture(company, admin, %{"kind" => "customer_site", "name" => "Farm A"})
+    drop_b = location_fixture(company, admin, %{"kind" => "customer_site", "name" => "Farm B"})
+
+    {:ok, trip} =
+      Trading.create_trip(
+        %{
+          "date" => "2026-07-21",
+          "transport_mode" => "company_own",
+          "vehicle_number" => "ABC1234",
+          "loads" => [
+            %{
+              "seq" => 1,
+              "planned_mt" => "10",
+              "actual_mt" => "10",
+              "good_id" => good.id,
+              "location_id" => loc_a.id
+            },
+            %{
+              "seq" => 2,
+              "planned_mt" => "10",
+              "actual_mt" => "10",
+              "good_id" => good.id,
+              "location_id" => loc_b.id
+            }
+          ],
+          "drops" => [
+            %{
+              "seq" => 1,
+              "planned_mt" => "10",
+              "actual_mt" => "10",
+              "good_id" => good.id,
+              "location_id" => drop_a.id
+            },
+            %{
+              "seq" => 2,
+              "planned_mt" => "10",
+              "actual_mt" => "10",
+              "good_id" => good.id,
+              "location_id" => drop_b.id
+            }
+          ]
+        },
+        company,
+        admin
+      )
+
+    trip = Trading.get_trip!(trip.id, company, admin)
+    assert Enum.map(trip.loads, & &1.seq) == [1, 2]
+    assert Enum.map(trip.loads, & &1.location_id) == [loc_a.id, loc_b.id]
+    assert Enum.map(trip.drops, & &1.seq) == [1, 2]
+    assert Enum.map(trip.drops, & &1.location_id) == [drop_a.id, drop_b.id]
+
+    # Reverse drop order on update (FILO helper)
+    {:ok, updated} =
+      Trading.update_trip(
+        trip,
+        %{
+          "drops" => [
+            %{
+              "id" => Enum.at(trip.drops, 1).id,
+              "seq" => 1,
+              "planned_mt" => "10",
+              "actual_mt" => "10",
+              "good_id" => good.id,
+              "location_id" => drop_b.id
+            },
+            %{
+              "id" => Enum.at(trip.drops, 0).id,
+              "seq" => 2,
+              "planned_mt" => "10",
+              "actual_mt" => "10",
+              "good_id" => good.id,
+              "location_id" => drop_a.id
+            }
+          ]
+        },
+        company,
+        admin
+      )
+
+    assert Enum.map(updated.drops, & &1.location_id) == [drop_b.id, drop_a.id]
+    assert Enum.map(updated.drops, & &1.seq) == [1, 2]
+  end
+
+  test "agent transport mode requires transport agent", %{company: company} do
+    alias FullCircle.Trading.Trip
+
+    base = %{
+      "date" => "2026-07-01",
+      "status" => "draft",
+      "reference_no" => "TRP-TEST-001",
+      "vehicle_number" => "ABC1234",
+      "company_id" => company.id
+    }
+
+    cs =
+      Trip.changeset(%Trip{}, Map.put(base, "transport_mode", "agent"))
+
+    refute cs.valid?
+    assert {"can't be blank", _} = Keyword.get(cs.errors, :transport_agent_name)
+
+    cs_ok =
+      Trip.changeset(
+        %Trip{},
+        base
+        |> Map.put("transport_mode", "agent")
+        |> Map.put("transport_agent_name", "Haulage Co")
+        |> Map.put("transport_agent_id", Ecto.UUID.generate())
+      )
+
+    assert cs_ok.valid? or not Keyword.has_key?(cs_ok.errors, :transport_agent_name)
+
+    for mode <- ["company_own", "customer_arranged"] do
+      cs_other = Trip.changeset(%Trip{}, Map.put(base, "transport_mode", mode))
+      refute Keyword.has_key?(cs_other.errors, :transport_agent_name)
+    end
+  end
+
+  test "create/update/complete/cancel write Sys logs for diversion trail", %{
+    admin: admin,
+    company: company
+  } do
+    good = good_fixture(company, admin)
+    load_loc = location_fixture(company, admin, %{"kind" => "supplier_site", "name" => "Port A"})
+    drop_loc = location_fixture(company, admin, %{"kind" => "customer_site", "name" => "Farm A"})
+    alt_loc = location_fixture(company, admin, %{"kind" => "own_warehouse", "name" => "Own WH"})
+
+    {:ok, trip} =
+      Trading.create_trip(
+        %{
+          "date" => "2026-07-01",
+          "transport_mode" => "company_own",
+          "vehicle_number" => "ABC1234",
+          "loads" => [
+            %{
+              "planned_mt" => "10",
+              "actual_mt" => "10",
+              "good_id" => good.id,
+              "good_name" => good.name,
+              "location_id" => load_loc.id,
+              "location_name" => load_loc.name
+            }
+          ],
+          "drops" => [
+            %{
+              "planned_mt" => "10",
+              "actual_mt" => "10",
+              "good_id" => good.id,
+              "good_name" => good.name,
+              "location_id" => drop_loc.id,
+              "location_name" => drop_loc.name
+            }
+          ]
+        },
+        company,
+        admin
+      )
+
+    create_logs = FullCircle.Sys.list_logs("trading_trips", trip.id)
+    assert length(create_logs) == 1
+    assert hd(create_logs).action == "create_trip"
+    assert create_logs |> hd() |> Map.get(:delta) =~ "vehicle_number"
+
+    # Divert: change drop location (and note)
+    trip = Trading.get_trip!(trip.id, company, admin)
+    drop = hd(trip.drops)
+    load = hd(trip.loads)
+
+    {:ok, trip} =
+      Trading.update_trip(
+        trip,
+        %{
+          "date" => "2026-07-01",
+          "transport_mode" => "company_own",
+          "vehicle_number" => "ABC1234",
+          "notes" => "Diverted to own warehouse — customer postponed",
+          "loads" => [
+            %{
+              "id" => load.id,
+              "planned_mt" => "10",
+              "actual_mt" => "10",
+              "good_id" => good.id,
+              "good_name" => good.name,
+              "location_id" => load_loc.id,
+              "location_name" => load_loc.name
+            }
+          ],
+          "drops" => [
+            %{
+              "id" => drop.id,
+              "planned_mt" => "10",
+              "actual_mt" => "10",
+              "good_id" => good.id,
+              "good_name" => good.name,
+              "location_id" => alt_loc.id,
+              "location_name" => alt_loc.name,
+              "variance_note" => "Customer postponed; stock into WH"
+            }
+          ]
+        },
+        company,
+        admin
+      )
+
+    logs = FullCircle.Sys.list_logs("trading_trips", trip.id)
+    assert length(logs) == 2
+    update_log = Enum.find(logs, &(&1.action == "update_trip"))
+    assert update_log
+    assert update_log.delta =~ "Own WH" or update_log.delta =~ "own warehouse" or update_log.delta =~ "Diverted"
+    assert update_log.delta =~ "variance_note" or update_log.delta =~ "Customer postponed"
+
+    {:ok, trip, _warnings} = Trading.complete_trip(trip, company, admin)
+    logs = FullCircle.Sys.list_logs("trading_trips", trip.id)
+    assert Enum.any?(logs, &(&1.action == "complete_trip"))
+
+    {:ok, trip} = Trading.cancel_trip(trip, company, admin)
+    logs = FullCircle.Sys.list_logs("trading_trips", trip.id)
+    assert Enum.any?(logs, &(&1.action == "cancel_trip"))
+    assert length(logs) == 4
+  end
+
+  test "list_supply/sales line history includes loads and drops", %{
+    admin: admin,
+    company: company
+  } do
+    good = good_fixture(company, admin)
+    supply = supply_position_fixture(company, admin, %{"quantity" => "100", "good_id" => good.id})
+
+    sales =
+      sales_position_fixture(company, admin, %{
+        "quantity" => "40",
+        "good_id" => good.id,
+        "status" => "open"
+      })
+
+    load_loc = location_fixture(company, admin, %{"kind" => "supplier_site", "name" => "Port"})
+    drop_loc = location_fixture(company, admin, %{"kind" => "customer_site", "name" => "Farm"})
+
+    {:ok, trip} =
+      Trading.create_trip(
+        %{
+          "date" => "2026-07-15",
+          "transport_mode" => "company_own",
+          "vehicle_number" => "XYZ999",
+          "loads" => [
+            %{
+              "planned_mt" => "40",
+              "actual_mt" => "40",
+              "good_id" => good.id,
+              "location_id" => load_loc.id,
+              "supply_position_id" => supply.id
+            }
+          ],
+          "drops" => [
+            %{
+              "planned_mt" => "40",
+              "actual_mt" => "40",
+              "good_id" => good.id,
+              "location_id" => drop_loc.id,
+              "sales_position_id" => sales.id,
+              "supply_position_id" => supply.id
+            }
+          ]
+        },
+        company,
+        admin
+      )
+
+    history = Trading.list_supply_line_history(supply.id, company, admin)
+    assert length(history) == 1
+    row = hd(history)
+    assert row.trip_id == trip.id
+    assert row.reference_no == trip.reference_no
+    assert hd(row.loads).place == "Port"
+    assert hd(row.loads).qty == "40"
+    assert hd(row.drops).place == "Farm"
+    assert hd(row.drops).qty == "40"
+    assert is_binary(row.unit) and row.unit != ""
+
+    sales_hist = Trading.list_sales_line_history(sales.id, company, admin)
+    assert length(sales_hist) == 1
+    srow = hd(sales_hist)
+    assert srow.trip_id == trip.id
+    assert hd(srow.loads).place == "Port"
+    assert hd(srow.drops).place == "Farm"
+    assert hd(srow.drops).qty == "40"
+    assert is_binary(srow.unit) and srow.unit != ""
   end
 end
