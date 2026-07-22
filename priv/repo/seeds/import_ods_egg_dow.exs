@@ -1,5 +1,21 @@
-# Import ODS weekly sales (1-7) and purchase (P1-P7) books into egg_stock_dow_template_lines.
-# Usage: mix run priv/repo/seeds/import_ods_egg_dow.exs
+# Import weekly sales (1–7) and purchase (P1–P7) books into egg_stock_dow_template_lines
+# for Kim Poh Sitt Tat Feedmill Sdn Bhd (Egg Stock LiveView weekly books).
+#
+# Reads priv/repo/seeds/egg_dow_books.json (regenerate from ODS with parse_egg_ods_to_json.py).
+#
+# -----------------------------------------------------------------------------
+# Local (dev DB):
+#   mix run priv/repo/seeds/import_ods_egg_dow.exs
+#
+# Production DB from this machine (recommended — release image has no mix):
+#   DATABASE_URL='ecto://USER:PASS@HOST/fullcircle' \
+#     mix run priv/repo/seeds/import_ods_egg_dow.exs
+#
+# Optional env:
+#   EGG_DOW_COMPANY   — company name substring (default: "Kim Poh Sitt Tat")
+#   EGG_DOW_JSON      — path to books JSON (default: priv/repo/seeds/egg_dow_books.json)
+#   EGG_DOW_DRY_RUN=1 — match & print only, no DB writes
+# -----------------------------------------------------------------------------
 
 import Ecto.Query
 
@@ -10,20 +26,51 @@ alias FullCircle.Accounting.Contact
 alias FullCircle.Sys.{Company, CompanyUser}
 alias FullCircle.UserAccounts.User
 
-company_id = "a2edcb0f-e9fb-4a8d-888b-61cd334210ba"
-company = Repo.get!(Company, company_id)
+dry_run? = System.get_env("EGG_DOW_DRY_RUN") in ["1", "true", "yes"]
+company_query = System.get_env("EGG_DOW_COMPANY") || "Kim Poh Sitt Tat"
+
+books_path =
+  System.get_env("EGG_DOW_JSON") ||
+    Path.expand("egg_dow_books.json", Path.dirname(__ENV__.file))
+
+unless File.exists?(books_path) do
+  Mix.raise("""
+  Missing books JSON: #{books_path}
+
+  Generate it from the ODS first:
+    python3 priv/repo/seeds/parse_egg_ods_to_json.py "/path/to/Egg Est Left.ods"
+  """)
+end
+
+books = books_path |> File.read!() |> Jason.decode!()
+
+company =
+  from(c in Company,
+    where: ilike(c.name, ^"%#{company_query}%"),
+    order_by: c.name,
+    limit: 1
+  )
+  |> Repo.one() ||
+    Mix.raise("No company matching %#{company_query}%")
+
+company_id = company.id
 
 user =
   from(u in User,
     join: cu in CompanyUser,
     on: cu.user_id == u.id,
     where: cu.company_id == ^company_id,
+    order_by: [asc: u.email],
     limit: 1
   )
-  |> Repo.one!()
+  |> Repo.one() ||
+    Mix.raise("No user linked to company #{company.name}")
 
-IO.puts("Company: #{company.name}")
-IO.puts("User: #{user.email}")
+IO.puts("Company: #{company.name} (#{company_id})")
+IO.puts("User:    #{user.email}")
+IO.puts("Books:   #{books_path}")
+IO.puts("Source:  #{get_in(books, ["meta", "source"]) || "?"}")
+IO.puts(if(dry_run?, do: "MODE:    DRY RUN (no writes)\n", else: "MODE:    IMPORT\n"))
 
 grades =
   from(g in FullCircle.EggStock.EggGrade,
@@ -32,12 +79,37 @@ grades =
   )
   |> Repo.all()
 
+if grades == [] do
+  Mix.raise("""
+  No egg grades for #{company.name}.
+  Open Egg Stock → Settings and create grades (AA, A, B, C, D, E, F, Cr, W, …) first.
+  """)
+end
+
 grade_by_nick =
   Map.new(grades, fn g ->
-    {String.upcase(String.trim(g.nickname || g.name)), g.name}
+    nick =
+      (g.nickname || g.name)
+      |> to_string()
+      |> String.trim()
+      |> String.upcase()
+
+    {nick, g.name}
   end)
 
-IO.puts("Grades: #{inspect(Map.keys(grade_by_nick))}")
+# Also accept full grade name / stripped variants
+grade_by_nick =
+  Enum.reduce(grades, grade_by_nick, fn g, acc ->
+    name = g.name |> to_string() |> String.trim()
+    up = String.upcase(name)
+    acc |> Map.put(up, g.name) |> Map.put(name, g.name)
+  end)
+
+IO.puts("Grades (nick → name):")
+
+Enum.each(grades, fn g ->
+  IO.puts("  #{inspect(g.nickname)} → #{inspect(g.name)}")
+end)
 
 contacts =
   from(c in Contact, where: c.company_id == ^company_id, select: {c.id, c.name})
@@ -52,19 +124,51 @@ normalize = fn s ->
   |> String.replace(~r/\s+/, " ")
 end
 
+# Explicit ODS short names → preferred FullCircle contact (normalized keys)
 aliases = %{
   "ylf" => "yeong lai foong",
-  "qing" => "qing",
+  "yeong lai foong" => "yeong lai foong",
+  "qing" => "soon kim yuan",
+  "ah qing" => "soon kim yuan",
   "zl" => "zl nutrieggs",
-  "syl marketing" => "sin yew lee",
-  "sin yew lee marketing" => "sin yew lee",
-  "wong brother" => "wong brothers",
+  "syl marketing" => "sin yew lee marketing",
+  "sin yew lee marketing" => "sin yew lee marketing",
+  "wong brother" => "wong brothers trading co",
+  "wwb" => "wwb top trading",
   "xin seng tat" => "xin seng tat",
-  "easy by shop" => "easy by shop"
+  "easy by shop" => "easy by shop",
+  "swee heng" => "chop swee heng",
+  "foong kin" => "foong kin trading",
+  "hock hen" => "hock hen khoon",
+  "heng huat" => "heng huat",
+  "jnj" => "jnj lgk",
+  "chang jiang" => "chop chang jiang",
+  "new weng fatt" => "new weng fatt agricultural",
+  "golden sunrise" => "golden sunrise trading",
+  "sem ah yem" => "pasaraya sem ah yem",
+  "sheng wai" => "sheng wai food",
+  "shun loong" => "shun loong trading",
+  "meng fatt" => "meng fatt trading",
+  "hong you" => "hong you trading",
+  "teet chong" => "teet chong",
+  "sum kee" => "sum kee trading",
+  "sin kean hin" => "sin kean hin mart",
+  "hua hing" => "hua hing enterprise",
+  "mvd" => "mvd express",
+  "huat soon" => "huat soon trading",
+  "hocksoon" => "hock soon poultry",
+  "hock soon" => "hock soon poultry",
+  "cm best" => "cm best holdings",
+  "joo how" => "joo how trading",
+  "cindy" => "cindy",
+  "fukuro" => "fukuro",
+  "extra" => "extra",
+  "extra+" => "extra"
 }
 
 find_contact = fn ods_name ->
-  key = normalize.(Map.get(aliases, normalize.(ods_name), ods_name))
+  raw_key = normalize.(ods_name)
+  key = normalize.(Map.get(aliases, raw_key, ods_name))
 
   scored =
     contacts
@@ -76,7 +180,10 @@ find_contact = fn ods_name ->
           n == key ->
             100
 
-          String.contains?(n, key) ->
+          String.starts_with?(n, key) and String.length(key) >= 4 ->
+            90 + String.length(key)
+
+          String.contains?(n, key) and String.length(key) >= 4 ->
             80 + String.length(key)
 
           String.contains?(key, n) and String.length(n) >= 4 ->
@@ -107,92 +214,118 @@ find_contact = fn ods_name ->
 end
 
 map_qty = fn qty_map ->
-  Enum.reduce(qty_map, %{}, fn {k, v}, acc ->
-    nick = String.upcase(String.trim(to_string(k)))
+  Enum.reduce(qty_map || %{}, %{}, fn {k, v}, acc ->
+    nick = k |> to_string() |> String.trim() |> String.upcase()
+    # ODS uses Cr; grades may use CR / Crack nickname
+    nick = if nick in ["CR", "CRACK", "PECAH"], do: "CR", else: nick
+    nick = if nick in ["W", "WHITE", "PUTIH"], do: "W", else: nick
+    nick = if nick in ["DR", "DIRTY", "TAHI"], do: "DR", else: nick
 
-    case Map.get(grade_by_nick, nick) do
-      nil ->
-        IO.puts("  WARN unknown grade #{inspect(k)}")
+    # Prefer exact nickname key; also try CR when nick is CR
+    gname =
+      Map.get(grade_by_nick, nick) ||
+        Map.get(grade_by_nick, String.replace_prefix(nick, "EGG GRADE ", ""))
+
+    cond do
+      is_nil(gname) ->
+        IO.puts("  WARN unknown grade #{inspect(k)} (nick=#{nick})")
         acc
 
-      gname ->
+      true ->
         Map.put(acc, gname, trunc(v))
     end
   end)
 end
 
-books_path = "/tmp/egg_dow_books.json"
-books = books_path |> File.read!() |> Jason.decode!()
+# Build params list for one DOW book
+build_params = fn lines ->
+  Enum.map(lines, fn line ->
+    if line["separator"] in [true, "true"] do
+      %{
+        "id" => "",
+        "contact_id" => nil,
+        "contact_name" => "",
+        "quantities" => %{},
+        "is_separator" => true,
+        "group_name" => line["name"] || "",
+        "delete" => "false"
+      }
+    else
+      ods_name = line["name"]
+      quantities = map_qty.(line["quantities"] || %{})
 
-{deleted, _} =
-  from(l in DowTemplateLine, where: l.company_id == ^company_id)
-  |> Repo.delete_all()
+      {contact_id, contact_name, note} =
+        case find_contact.(ods_name) do
+          {:ok, id, name, s} -> {id, name, "ok:#{s}"}
+          {:weak, id, name, s} -> {id, name, "weak:#{s}"}
+          # Ad-hoc: store ODS label with no contact_id (egg stock accepts free-text names)
+          :none -> {nil, ods_name, "ADHOC"}
+        end
 
-IO.puts("Cleared #{deleted} existing DOW lines\n")
+      sum = quantities |> Map.values() |> Enum.sum()
 
-unmatched = :ets.new(:unmatched, [:set])
+      IO.puts(
+        "  #{ods_name} → #{contact_name} (#{note}) sum=#{sum} q=#{inspect(line["quantities"])}"
+      )
 
-for kind <- ["sales", "purchase"] do
-  for {dow_str, lines} <- books[kind] do
-    dow = String.to_integer(dow_str)
-
-    params =
-      Enum.map(lines, fn line ->
-        ods_name = line["name"]
-        quantities = map_qty.(line["quantities"] || %{})
-
-        {contact_id, contact_name, note} =
-          case find_contact.(ods_name) do
-            {:ok, id, name, s} -> {id, name, "ok:#{s}"}
-            {:weak, id, name, s} -> {id, name, "weak:#{s}"}
-            :none -> {nil, ods_name, "NONE"}
-          end
-
-        if note == "NONE", do: :ets.insert(unmatched, {ods_name, true})
-
-        IO.puts(
-          "[#{kind} #{dow}] #{ods_name} -> #{contact_name} (#{note}) sum=#{Enum.sum(Map.values(quantities))}"
-        )
-
-        %{
-          "id" => "",
-          "contact_id" => contact_id,
-          "contact_name" => contact_name,
-          "quantities" => quantities,
-          "delete" => "false"
-        }
-      end)
-
-    case EggStock.save_dow_lines(company_id, kind, dow, params, company, user) do
-      {:ok, saved} ->
-        IO.puts("  => saved #{length(saved)} lines\n")
-
-      {:error, cs} ->
-        IO.inspect(cs, label: "ERROR #{kind} #{dow}")
-
-      :not_authorise ->
-        IO.puts("NOT AUTHORISED for #{kind} #{dow}")
+      %{
+        "id" => "",
+        "contact_id" => contact_id,
+        "contact_name" => contact_name,
+        "quantities" => quantities,
+        "is_separator" => false,
+        "group_name" => "",
+        "delete" => "false"
+      }
     end
-  end
+  end)
 end
 
-counts =
-  from(l in DowTemplateLine,
-    where: l.company_id == ^company_id,
-    group_by: [l.kind, l.dow],
-    select: {l.kind, l.dow, count(l.id)},
-    order_by: [l.kind, l.dow]
-  )
-  |> Repo.all()
+if dry_run? do
+  for kind <- ["sales", "purchase"] do
+    for {dow_str, lines} <- books[kind] || %{} do
+      IO.puts("\n=== DRY #{kind} DOW #{dow_str} (#{length(lines)} raw lines) ===")
+      _ = build_params.(lines)
+    end
+  end
 
-IO.puts("\nFinal line counts (kind, dow, count):")
-Enum.each(counts, &IO.inspect/1)
-
-unmatched_names = :ets.tab2list(unmatched) |> Enum.map(&elem(&1, 0)) |> Enum.sort()
-
-if unmatched_names != [] do
-  IO.puts("\nUnmatched ODS contacts (stored with name only, no contact_id):")
-  Enum.each(unmatched_names, &IO.puts("  - #{&1}"))
+  IO.puts("\nDry run complete — no changes written.")
 else
-  IO.puts("\nAll ODS contacts matched to FullCircle contacts.")
+  {deleted, _} =
+    from(l in DowTemplateLine, where: l.company_id == ^company_id)
+    |> Repo.delete_all()
+
+  IO.puts("Cleared #{deleted} existing DOW lines\n")
+
+  for kind <- ["sales", "purchase"] do
+    for {dow_str, lines} <- books[kind] || %{} do
+      dow = String.to_integer(dow_str)
+      IO.puts("=== #{kind} DOW #{dow} ===")
+      params = build_params.(lines)
+
+      case EggStock.save_dow_lines(company_id, kind, dow, params, company, user) do
+        {:ok, saved} ->
+          IO.puts("  => saved #{length(saved)} lines\n")
+
+        {:error, cs} ->
+          IO.inspect(cs, label: "ERROR #{kind} #{dow}")
+
+        :not_authorise ->
+          IO.puts("NOT AUTHORISED for #{kind} #{dow} (user needs update_egg_stock_day)")
+      end
+    end
+  end
+
+  counts =
+    from(l in DowTemplateLine,
+      where: l.company_id == ^company_id,
+      group_by: [l.kind, l.dow],
+      select: {l.kind, l.dow, count(l.id)},
+      order_by: [l.kind, l.dow]
+    )
+    |> Repo.all()
+
+  IO.puts("\nFinal line counts (kind, dow, count):")
+  Enum.each(counts, &IO.inspect/1)
+  IO.puts("\nDone. Open Egg Stock → Weekly Sales / Weekly Purchases to verify.")
 end

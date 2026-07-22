@@ -137,6 +137,31 @@ defmodule FullCircle.EggStockTest do
                  admin
                )
     end
+
+    test "accepts ad-hoc contact name without contact_id", %{company: company, admin: admin} do
+      params = [
+        %{
+          "id" => "",
+          "contact_id" => "",
+          "contact_name" => "CINDY",
+          "quantities" => %{"AA" => "3", "A" => "0", "B" => "0"},
+          "delete" => "false"
+        }
+      ]
+
+      assert {:ok, [line]} =
+               EggStock.save_dow_lines(company.id, :sales, 4, params, company, admin)
+
+      assert is_nil(line.contact_id)
+      assert line.contact_name == "CINDY"
+      assert EggStock.to_int(line.quantities["AA"]) == 3
+
+      reloaded = EggStock.list_dow_lines(company.id, :sales, 4)
+      assert length(reloaded) == 1
+      assert hd(reloaded).contact_name == "CINDY"
+      assert is_nil(hd(reloaded).contact_id)
+      assert EggStock.dow_totals(company.id, :sales, 4)["AA"] == 3
+    end
   end
 
   describe "planned sales/purchases resolution" do
@@ -315,6 +340,138 @@ defmodule FullCircle.EggStockTest do
   end
 
   describe "stock day basics" do
+    test "planned line accepts ad-hoc contact name without contact_id", %{
+      company: company,
+      admin: admin
+    } do
+      date = ~D[2026-06-10]
+      {:ok, day} = EggStock.get_or_create_day(company.id, date)
+
+      assert {:ok, day} =
+               EggStock.save_day(
+                 day,
+                 %{
+                   "egg_stock_day_details" => %{
+                     "0" => %{
+                       "section" => "planned_order",
+                       "contact_id" => "",
+                       "contact_name" => "CASH SALE",
+                       "quantities" => %{"AA" => "5", "A" => "0", "B" => "0"},
+                       "ignore" => "false",
+                       "is_separator" => "false",
+                       "position" => "0"
+                     }
+                   }
+                 },
+                 company,
+                 admin
+               )
+
+      detail =
+        day.egg_stock_day_details
+        |> Enum.find(&(&1.section == "planned_order"))
+
+      assert detail
+      assert is_nil(detail.contact_id)
+      assert detail.contact_name == "CASH SALE"
+
+      reloaded = EggStock.get_day(company.id, date)
+      d = Enum.find(reloaded.egg_stock_day_details, &(&1.section == "planned_order"))
+      assert d.contact_name == "CASH SALE"
+      assert is_nil(d.contact_id)
+    end
+
+    test "attach_contact_from_document updates ad-hoc planned line", %{
+      company: company,
+      admin: admin,
+      contact: contact
+    } do
+      date = ~D[2026-06-11]
+      {:ok, day} = EggStock.get_or_create_day(company.id, date)
+
+      assert {:ok, day} =
+               EggStock.save_day(
+                 day,
+                 %{
+                   "egg_stock_day_details" => %{
+                     "0" => %{
+                       "section" => "planned_order",
+                       "contact_id" => "",
+                       "contact_name" => "CINDY",
+                       "quantities" => %{"AA" => "2", "A" => "0", "B" => "0"},
+                       "ignore" => "false",
+                       "is_separator" => "false",
+                       "position" => "0"
+                     }
+                   }
+                 },
+                 company,
+                 admin
+               )
+
+      detail = Enum.find(day.egg_stock_day_details, &(&1.section == "planned_order"))
+      assert is_nil(detail.contact_id)
+
+      assert {:ok, :updated} =
+               EggStock.attach_contact_from_document(company, admin, %{
+                 detail_id: detail.id,
+                 load_date: date,
+                 side: :sales,
+                 original_name: "CINDY",
+                 contact_id: contact.id,
+                 contact_name: contact.name
+               })
+
+      reloaded = EggStock.get_day(company.id, date)
+      d = Enum.find(reloaded.egg_stock_day_details, &(&1.id == detail.id))
+      assert d.contact_id == contact.id
+      assert d.contact_name == contact.name
+    end
+
+    test "sync_day_details_from_actuals links ad-hoc line by name", %{
+      company: company,
+      admin: admin,
+      contact: contact
+    } do
+      date = ~D[2026-06-12]
+      {:ok, day} = EggStock.get_or_create_day(company.id, date)
+
+      assert {:ok, day} =
+               EggStock.save_day(
+                 day,
+                 %{
+                   "egg_stock_day_details" => %{
+                     "0" => %{
+                       "section" => "planned_order",
+                       "contact_id" => "",
+                       "contact_name" => contact.name,
+                       "quantities" => %{"AA" => "1", "A" => "0", "B" => "0"},
+                       "ignore" => "false",
+                       "is_separator" => "false",
+                       "position" => "0"
+                     }
+                   }
+                 },
+                 company,
+                 admin
+               )
+
+      actuals = [
+        %{
+          contact_id: contact.id,
+          contact_name: contact.name,
+          quantities: %{"AA" => 9},
+          doc_links: [{"Invoice", Ecto.UUID.generate()}]
+        }
+      ]
+
+      {synced, changed?} = EggStock.sync_day_details_from_actuals(day, actuals, [])
+      assert changed?
+      d = Enum.find(synced.egg_stock_day_details, &(&1.section == "planned_order"))
+      assert d.contact_id == contact.id
+      assert EggStock.to_int(d.quantities["AA"]) == 9
+    end
+
     test "get_or_create_day and opening from previous closing", %{company: company, admin: admin} do
       d1 = ~D[2026-06-01]
       d2 = ~D[2026-06-02]

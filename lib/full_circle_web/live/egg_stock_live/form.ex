@@ -1533,6 +1533,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
             name={"dow_lines[#{idx}][contact_name]"}
             value={line["contact_name"]}
             class="w-56 border rounded px-2 py-1"
+            placeholder={gettext("Contact or free name")}
             phx-hook="tributeAutoComplete"
             url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
           />
@@ -2193,6 +2194,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
               value={dtl[:contact_name].value}
               class={"w-56 border rounded px-2 py-1 #{if locked, do: "bg-gray-100 text-gray-600 cursor-not-allowed", else: ""}"}
               readonly={locked or !@editable}
+              placeholder={if line_editable, do: gettext("Contact or free name"), else: nil}
               phx-hook={if line_editable, do: "tributeAutoComplete", else: nil}
               url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
             />
@@ -2221,12 +2223,9 @@ defmodule FullCircleWeb.EggStockLive.Form do
               <.icon name={doc_icon(doc_type)} class="h-4 w-4" />
             </a>
 
-            <%!-- No documents yet: allow create --%>
+            <%!-- Create even without contact_id; contact chosen on the document form --%>
             <a
-              :if={
-                @editable and !has_docs and @section == "planned_order" and
-                  dtl[:contact_id].value not in [nil, ""]
-              }
+              :if={@editable and !has_docs and !separator? and @section == "planned_order"}
               href={egg_order_doc_url(@current_company.id, @date, dtl, @grades, "Invoice")}
               target="_blank"
               class="text-green-600 hover:text-green-800"
@@ -2236,10 +2235,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
             </a>
 
             <a
-              :if={
-                @editable and !has_docs and @section == "planned_order" and
-                  dtl[:contact_id].value not in [nil, ""]
-              }
+              :if={@editable and !has_docs and !separator? and @section == "planned_order"}
               href={egg_order_doc_url(@current_company.id, @date, dtl, @grades, "Receipt")}
               target="_blank"
               class="text-amber-600 hover:text-amber-800"
@@ -2249,10 +2245,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
             </a>
 
             <a
-              :if={
-                @editable and !has_docs and @section == "planned_purchase" and
-                  dtl[:contact_id].value not in [nil, ""]
-              }
+              :if={@editable and !has_docs and !separator? and @section == "planned_purchase"}
               href={egg_order_doc_url(@current_company.id, @date, dtl, @grades, "PurInvoice")}
               target="_blank"
               class="text-green-600 hover:text-green-800"
@@ -2262,10 +2255,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
             </a>
 
             <a
-              :if={
-                @editable and !has_docs and @section == "planned_purchase" and
-                  dtl[:contact_id].value not in [nil, ""]
-              }
+              :if={@editable and !has_docs and !separator? and @section == "planned_purchase"}
               href={egg_order_doc_url(@current_company.id, @date, dtl, @grades, "Payment")}
               target="_blank"
               class="text-amber-600 hover:text-amber-800"
@@ -2302,6 +2292,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
   defp egg_order_doc_url(company_id, date, dtl, grades, doc_type) do
     contact_name = dtl[:contact_name].value || ""
     contact_id = dtl[:contact_id].value || ""
+    detail_id = dtl[:id].value || ""
     quantities = dtl[:quantities].value || %{}
 
     egg =
@@ -2313,13 +2304,18 @@ defmodule FullCircleWeb.EggStockLive.Form do
       |> Enum.map(fn g -> "#{URI.encode(g)}:#{quantities[g]}" end)
       |> Enum.join(",")
 
-    "/companies/#{company_id}/#{doc_type}/new?" <>
-      URI.encode_query(%{
+    query =
+      %{
         "contact_name" => contact_name,
         "contact_id" => contact_id,
         "date" => Date.to_iso8601(date),
         "egg" => egg
-      })
+      }
+      |> then(fn q ->
+        if detail_id in [nil, ""], do: q, else: Map.put(q, "egg_detail_id", detail_id)
+      end)
+
+    "/companies/#{company_id}/#{doc_type}/new?" <> URI.encode_query(query)
   end
 
   defp section_totals(assigns) do

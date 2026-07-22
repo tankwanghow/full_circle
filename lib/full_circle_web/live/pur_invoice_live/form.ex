@@ -69,7 +69,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
     attrs = %{
       pur_invoice_no: "...new...",
       contact_name: params["contact_name"],
-      contact_id: params["contact_id"],
+      contact_id: blank_id(params["contact_id"]),
       pur_invoice_date: params["date"],
       load_date: params["date"],
       pur_invoice_details: details
@@ -96,7 +96,61 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
     |> assign(id: "new")
     |> assign(page_title: gettext("New Purchase Invoice"))
     |> assign(matched_trans: [])
+    |> assign_egg_link(params, :purchase)
     |> assign(:form, to_form(cs))
+  end
+
+  defp blank_id(nil), do: nil
+  defp blank_id(""), do: nil
+  defp blank_id(id), do: id
+
+  defp assign_egg_link(socket, params, side) do
+    if params["egg"] do
+      socket
+      |> assign(:egg_detail_id, blank_id(params["egg_detail_id"]))
+      |> assign(:egg_contact_name, params["contact_name"] || "")
+      |> assign(:egg_load_date, params["date"])
+      |> assign(:egg_side, side)
+    else
+      socket
+      |> assign(:egg_detail_id, nil)
+      |> assign(:egg_contact_name, nil)
+      |> assign(:egg_load_date, nil)
+      |> assign(:egg_side, nil)
+    end
+  end
+
+  defp maybe_attach_egg_planned(socket, obj, params) do
+    if socket.assigns[:egg_detail_id] || socket.assigns[:egg_load_date] do
+      load_date =
+        Map.get(obj, :load_date) || Map.get(obj, :pur_invoice_date) ||
+          socket.assigns[:egg_load_date]
+
+      FullCircle.EggStock.attach_contact_from_document(
+        socket.assigns.current_company,
+        socket.assigns.current_user,
+        %{
+          detail_id: socket.assigns[:egg_detail_id],
+          load_date: parse_date(load_date),
+          side: socket.assigns[:egg_side] || :purchase,
+          original_name: socket.assigns[:egg_contact_name],
+          contact_id: obj.contact_id,
+          contact_name: params["contact_name"] || obj.contact_name
+        }
+      )
+    end
+
+    socket
+  end
+
+  defp parse_date(%Date{} = d), do: d
+  defp parse_date(nil), do: nil
+
+  defp parse_date(str) when is_binary(str) do
+    case Date.from_iso8601(str) do
+      {:ok, d} -> d
+      _ -> nil
+    end
   end
 
   defp parse_egg_quantities(egg_str) do
@@ -453,6 +507,8 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
            socket.assigns.current_user
          ) do
       {:ok, %{create_pur_invoice: obj}} ->
+        socket = maybe_attach_egg_planned(socket, obj, params)
+
         {:noreply,
          socket
          |> push_navigate(

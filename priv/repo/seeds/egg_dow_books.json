@@ -1,0 +1,629 @@
+{
+  "sales": {
+    "1": [
+      {
+        "name": "YEONG LAI FOONG",
+        "quantities": {
+          "A": 30,
+          "B": 200,
+          "C": 200
+        },
+        "separator": false
+      },
+      {
+        "name": "SWEE HENG",
+        "quantities": {
+          "B": 60,
+          "C": 240,
+          "D": 120,
+          "E": 60
+        },
+        "separator": false
+      },
+      {
+        "name": "Foong Kin",
+        "quantities": {
+          "B": 50,
+          "C": 200,
+          "D": 200,
+          "E": 50,
+          "F": 10,
+          "Cr": 20
+        },
+        "separator": false
+      },
+      {
+        "separator": true,
+        "name": ""
+      },
+      {
+        "name": "SHENG WAI",
+        "quantities": {},
+        "separator": false
+      },
+      {
+        "name": "NEW WENG FATT",
+        "quantities": {
+          "AA": 10,
+          "A": 20,
+          "B": 50,
+          "C": 50,
+          "D": 30,
+          "E": 20
+        },
+        "separator": false
+      },
+      {
+        "name": "ZL",
+        "quantities": {
+          "C": 200,
+          "D": 300,
+          "E": 300,
+          "F": 100
+        },
+        "separator": false
+      },
+      {
+        "name": "GOLDEN SUNRISE",
+        "quantities": {
+          "A": 10,
+          "B": 30,
+          "C": 80,
+          "D": 30
+        },
+        "separator": false
+      },
+      {
+        "name": "SEM AH YEM",
+        "quantities": {
+          "B": 50,
+          "C": 200,
+          "D": 200,
+          "F": 50
+        },
+        "separator": false
+      },
+      {
+        "name": "SIN YEW LEE MARKETING",
+        "quantities": {
+          "A": 20,
+          "B": 80,
+          "C": 200,
+          "D": 200,
+          "E": 100,
+          "F": 100
+        },
+        "separator": false
+      }
+    ],
+    "2": [
+      {
+        "name": "HOCK HEN",
+        "quantities": {
+          "D": 700,
+          "E": 300,
+          "F": 200
+        },
+        "separator": false
+      },
+      {
+        "name": "HENG HUAT",
+        "quantities": {
+          "C": 300,
+          "D": 500
+        },
+        "separator": false
+      },
+      {
+        "name": "JOO HOW",
+        "quantities": {
+          "C": 200,
+          "D": 700,
+          "F": 100
+        },
+        "separator": false
+      },
+      {
+        "separator": true,
+        "name": ""
+      },
+      {
+        "name": "CM BEST",
+        "quantities": {},
+        "separator": false
+      },
+      {
+        "separator": true,
+        "name": ""
+      },
+      {
+        "name": "CHANG JIANG",
+        "quantities": {
+          "A": 50,
+          "B": 200,
+          "C": 1000,
+          "D": 750,
+          "E": 300
+        },
+        "separator": false
+      }
+    ],
+    "3": [
+      {
+        "name": "QING",
+        "quantities": {
+          "AA": 40,
+          "A": 40,
+          "B": 350,
+          "C": 550,
+          "D": 80,
+          "Cr": 40,
+          "W": 80
+        },
+        "separator": false
+      },
+      {
+        "name": "EXTRA+",
+        "quantities": {},
+        "separator": false
+      },
+      {
+        "separator": true,
+        "name": ""
+      },
+      {
+        "name": "FUKURO",
+        "quantities": {},
+        "separator": false
+      },
+      {
+        "name": "SHUN LOONG",
+        "quantities": {
+          "C": 200,
+          "D": 200,
+          "E": 100
+        },
+        "separator": false
+      },
+      {
+        "name": "YLF",
+        "quantities": {
+          "A": 30,
+          "B": 100,
+          "C": 150,
+          "D": 20
+        },
+        "separator": false
+      },
+      {
+        "name": "Swee Heng",
+        "quantities": {
+          "B": 60,
+          "C": 240,
+          "D": 240
+        },
+        "separator": false
+      },
+      {
+        "name": "Foong Kin",
+        "quantities": {
+          "B": 50,
+          "C": 300,
+          "D": 200
+        },
+        "separator": false
+      },
+      {
+        "separator": true,
+        "name": ""
+      },
+      {
+        "name": "MENG FATT",
+        "quantities": {
+          "B": 100,
+          "C": 100
+        },
+        "separator": false
+      },
+      {
+        "name": "NEW WENG FATT",
+        "quantities": {
+          "AA": 10,
+          "A": 10,
+          "B": 50,
+          "C": 50,
+          "D": 50,
+          "E": 10
+        },
+        "separator": false
+      },
+      {
+        "name": "ZL",
+        "quantities": {
+          "C": 200,
+          "D": 300,
+          "E": 300,
+          "F": 100
+        },
+        "separator": false
+      },
+      {
+        "name": "GOLDEN SUNRISE",
+        "quantities": {
+          "A": 20,
+          "B": 60,
+          "C": 80,
+          "D": 30
+        },
+        "separator": false
+      },
+      {
+        "name": "SEM AH YEM",
+        "quantities": {
+          "B": 30,
+          "C": 100,
+          "D": 100,
+          "F": 50
+        },
+        "separator": false
+      },
+      {
+        "name": "SUM KEE",
+        "quantities": {},
+        "separator": false
+      }
+    ],
+    "4": [
+      {
+        "name": "JNJ",
+        "quantities": {
+          "A": 100,
+          "B": 300,
+          "C": 800,
+          "D": 1200,
+          "E": 300
+        },
+        "separator": false
+      },
+      {
+        "separator": true,
+        "name": ""
+      },
+      {
+        "name": "HOCK HEN",
+        "quantities": {
+          "D": 700,
+          "E": 300,
+          "F": 200
+        },
+        "separator": false
+      },
+      {
+        "separator": true,
+        "name": ""
+      },
+      {
+        "name": "HONG YOU",
+        "quantities": {
+          "C": 300,
+          "D": 300
+        },
+        "separator": false
+      },
+      {
+        "separator": true,
+        "name": ""
+      },
+      {
+        "name": "SWEE HENG",
+        "quantities": {
+          "B": 60,
+          "C": 360,
+          "D": 360,
+          "E": 120
+        },
+        "separator": false
+      },
+      {
+        "separator": true,
+        "name": ""
+      },
+      {
+        "name": "CHANG JIANG",
+        "quantities": {
+          "B": 200,
+          "C": 1000,
+          "D": 800,
+          "E": 300
+        },
+        "separator": false
+      },
+      {
+        "name": "TEET CHONG",
+        "quantities": {
+          "B": 100,
+          "C": 500
+        },
+        "separator": false
+      },
+      {
+        "separator": true,
+        "name": ""
+      },
+      {
+        "name": "EASY BY SHOP",
+        "quantities": {
+          "A": 10,
+          "B": 80,
+          "C": 100,
+          "D": 180
+        },
+        "separator": false
+      },
+      {
+        "separator": true,
+        "name": ""
+      },
+      {
+        "name": "CINDY",
+        "quantities": {},
+        "separator": false
+      }
+    ],
+    "5": [
+      {
+        "name": "Foong Kin",
+        "quantities": {
+          "B": 50,
+          "C": 300,
+          "D": 200,
+          "E": 50
+        },
+        "separator": false
+      },
+      {
+        "name": "FUKURO",
+        "quantities": {},
+        "separator": false
+      },
+      {
+        "separator": true,
+        "name": ""
+      },
+      {
+        "name": "MENG FATT",
+        "quantities": {
+          "B": 50,
+          "C": 100
+        },
+        "separator": false
+      },
+      {
+        "name": "NEW WENG FATT",
+        "quantities": {
+          "AA": 10,
+          "A": 10,
+          "B": 50,
+          "C": 50,
+          "D": 50
+        },
+        "separator": false
+      },
+      {
+        "name": "ZL",
+        "quantities": {
+          "C": 200,
+          "D": 300,
+          "E": 200,
+          "F": 100
+        },
+        "separator": false
+      },
+      {
+        "name": "GOLDEN SUNRISE",
+        "quantities": {
+          "A": 10,
+          "B": 30,
+          "C": 80,
+          "D": 30
+        },
+        "separator": false
+      },
+      {
+        "name": "SEM AH YEM",
+        "quantities": {
+          "B": 30,
+          "C": 100,
+          "D": 100,
+          "F": 50
+        },
+        "separator": false
+      },
+      {
+        "name": "SYL MARKETING",
+        "quantities": {
+          "A": 20,
+          "B": 100,
+          "C": 200,
+          "D": 200,
+          "E": 150,
+          "F": 100
+        },
+        "separator": false
+      },
+      {
+        "separator": true,
+        "name": ""
+      },
+      {
+        "name": "XIN SENG TAT",
+        "quantities": {
+          "AA": 70,
+          "A": 100,
+          "B": 300,
+          "C": 400,
+          "D": 200
+        },
+        "separator": false
+      },
+      {
+        "separator": true,
+        "name": ""
+      },
+      {
+        "name": "CINDY",
+        "quantities": {},
+        "separator": false
+      }
+    ],
+    "6": [
+      {
+        "name": "WONG BROTHER",
+        "quantities": {
+          "B": 300,
+          "C": 300
+        },
+        "separator": false
+      },
+      {
+        "name": "MVD",
+        "quantities": {
+          "A": 50,
+          "B": 300,
+          "C": 300,
+          "D": 200
+        },
+        "separator": false
+      },
+      {
+        "name": "Hua Hing",
+        "quantities": {
+          "C": 200,
+          "D": 400
+        },
+        "separator": false
+      },
+      {
+        "name": "SIN KEAN HIN",
+        "quantities": {
+          "C": 50,
+          "D": 500
+        },
+        "separator": false
+      },
+      {
+        "separator": true,
+        "name": ""
+      },
+      {
+        "name": "CM BEST",
+        "quantities": {
+          "E": 500,
+          "F": 700
+        },
+        "separator": false
+      },
+      {
+        "separator": true,
+        "name": ""
+      },
+      {
+        "name": "SWEE HENG",
+        "quantities": {
+          "B": 60,
+          "C": 360,
+          "D": 360,
+          "E": 360
+        },
+        "separator": false
+      },
+      {
+        "separator": true,
+        "name": ""
+      },
+      {
+        "name": "CINDY",
+        "quantities": {},
+        "separator": false
+      }
+    ],
+    "7": [
+      {
+        "name": "EASY BY SHOP",
+        "quantities": {
+          "AA": 10,
+          "A": 30,
+          "B": 160,
+          "C": 150,
+          "D": 320,
+          "E": 10
+        },
+        "separator": false
+      },
+      {
+        "separator": true,
+        "name": ""
+      },
+      {
+        "name": "CHANG JIANG",
+        "quantities": {
+          "B": 200,
+          "C": 1000,
+          "D": 800,
+          "E": 300
+        },
+        "separator": false
+      },
+      {
+        "name": "HUAT SOON",
+        "quantities": {
+          "B": 100,
+          "C": 400,
+          "D": 500,
+          "E": 200
+        },
+        "separator": false
+      },
+      {
+        "separator": true,
+        "name": ""
+      },
+      {
+        "name": "JNJ",
+        "quantities": {
+          "A": 100,
+          "B": 300,
+          "C": 800,
+          "D": 1200,
+          "E": 300
+        },
+        "separator": false
+      }
+    ]
+  },
+  "purchase": {
+    "1": [],
+    "2": [
+      {
+        "name": "HockSoon",
+        "quantities": {
+          "AA": 300,
+          "A": 700,
+          "B": 1000,
+          "C": 1045
+        },
+        "separator": false
+      }
+    ],
+    "3": [],
+    "4": [],
+    "5": [],
+    "6": [],
+    "7": []
+  },
+  "meta": {
+    "source": "Egg Est Left 2026(New)1.ods",
+    "section": 1,
+    "note": "Section 1 of sheets 1-7 / P1-P7 (matches Est SO totals). Blank gaps → separators."
+  }
+}

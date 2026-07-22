@@ -129,7 +129,8 @@ defmodule FullCircle.EggStock do
         asc: dd.id
       ],
       select: dd,
-      select_merge: %{contact_name: c.name}
+      # Linked contact name wins; ad-hoc lines keep stored contact_name
+      select_merge: %{contact_name: fragment("coalesce(?, ?)", c.name, dd.contact_name)}
     )
   end
 
@@ -217,7 +218,8 @@ defmodule FullCircle.EggStock do
       where: l.company_id == ^company_id and l.kind == ^kind and l.dow == ^dow,
       order_by: [asc: l.position, asc: l.id],
       select: l,
-      select_merge: %{contact_name: c.name}
+      # Linked contact name wins; ad-hoc lines keep stored contact_name
+      select_merge: %{contact_name: fragment("coalesce(?, ?)", c.name, l.contact_name)}
     )
     |> Repo.all()
   end
@@ -530,50 +532,206 @@ defmodule FullCircle.EggStock do
   end
 
   @doc """
-  Sync day detail structs' quantities from actual sales/purchases (in-memory).
-  Returns `{day, changed?}` where changed? is true if any line quantities differed.
+  Sync day detail structs from actual sales/purchases (in-memory).
+
+  Matches by `contact_id` first; ad-hoc lines (nil contact_id) can match an
+  actual row by normalized contact name and pick up its contact_id + quantities.
+
+  Returns `{day, changed?}`.
   """
   def sync_day_details_from_actuals(day, actual_sales, actual_purchases) do
-    sales_by =
-      (actual_sales || [])
-      |> Enum.filter(fn r -> r.contact_id not in [nil, ""] end)
-      |> Map.new(fn r -> {to_string(r.contact_id), normalize_qty_map(r.quantities || %{})} end)
+    sales = actual_sales || []
+    purchases = actual_purchases || []
 
-    purchases_by =
-      (actual_purchases || [])
-      |> Enum.filter(fn r -> r.contact_id not in [nil, ""] end)
-      |> Map.new(fn r -> {to_string(r.contact_id), normalize_qty_map(r.quantities || %{})} end)
+    used0 =
+      (day.egg_stock_day_details || [])
+      |> Enum.map(& &1.contact_id)
+      |> Enum.reject(&is_nil/1)
+      |> MapSet.new(&to_string/1)
 
-    {details, changed?} =
-      Enum.map_reduce(day.egg_stock_day_details || [], false, fn d, ch ->
-        cid = d.contact_id && to_string(d.contact_id)
+    {details, {changed?, _used}} =
+      Enum.map_reduce(day.egg_stock_day_details || [], {false, used0}, fn d, {ch, used} ->
+        cond do
+          d.is_separator ->
+            {d, {ch, used}}
 
-        actual_qty =
-          cond do
-            cid && d.section in planned_sales_sections() -> Map.get(sales_by, cid)
-            cid && d.section in planned_purchase_sections() -> Map.get(purchases_by, cid)
-            true -> nil
-          end
+          d.section in planned_sales_sections() ->
+            sync_one_detail(d, sales, ch, used)
 
-        if actual_qty do
-          current = normalize_qty_map(d.quantities || %{})
+          d.section in planned_purchase_sections() ->
+            sync_one_detail(d, purchases, ch, used)
 
-          if current == actual_qty do
-            {d, ch}
-          else
-            # Keep full grade map for form display (zeros for missing grades)
-            {%{d | quantities: actual_qty}, true}
-          end
-        else
-          {d, ch}
+          true ->
+            {d, {ch, used}}
         end
       end)
 
     {%{day | egg_stock_day_details: details}, changed?}
   end
 
+  defp sync_one_detail(d, actuals, ch, used) do
+    cid = d.contact_id && to_string(d.contact_id)
+
+    actual =
+      cond do
+        cid ->
+          Enum.find(actuals, fn r -> to_string(r.contact_id) == cid end)
+
+        true ->
+          Enum.find(actuals, fn r ->
+            rid = r.contact_id && to_string(r.contact_id)
+            rid && not MapSet.member?(used, rid) and names_match?(d.contact_name, r.contact_name)
+          end)
+      end
+
+    case actual do
+      nil ->
+        {d, {ch, used}}
+
+      row ->
+        actual_qty = normalize_qty_map(row.quantities || %{})
+        current = normalize_qty_map(d.quantities || %{})
+        new_cid = row.contact_id
+        new_name = row.contact_name || d.contact_name || ""
+
+        qty_changed? = current != actual_qty
+        contact_changed? = d.contact_id != new_cid or (d.contact_name || "") != new_name
+
+        if qty_changed? or contact_changed? do
+          d = %{d | quantities: actual_qty, contact_id: new_cid, contact_name: new_name}
+          used = if new_cid, do: MapSet.put(used, to_string(new_cid)), else: used
+          {d, {true, used}}
+        else
+          used = if new_cid, do: MapSet.put(used, to_string(new_cid)), else: used
+          {d, {ch, used}}
+        end
+    end
+  end
+
+  defp names_match?(a, b) do
+    na = normalize_contact_label(a)
+    nb = normalize_contact_label(b)
+    na != "" and nb != "" and (na == nb or String.contains?(nb, na) or String.contains?(na, nb))
+  end
+
+  defp normalize_contact_label(nil), do: ""
+
+  defp normalize_contact_label(s) do
+    s
+    |> to_string()
+    |> String.downcase()
+    |> String.replace(~r/[^a-z0-9]+/, " ")
+    |> String.trim()
+    |> String.replace(~r/\s+/, " ")
+  end
+
   @doc """
-  Persist planned-detail quantities that were synced from documents.
+  After creating Invoice/Receipt/PurInvoice/Payment from an egg-stock planned
+  line, copy the document contact onto that planned line.
+
+  Prefers `detail_id`. Falls back to load_date + side + original ad-hoc name.
+  """
+  def attach_contact_from_document(company, user, attrs) when is_map(attrs) do
+    case can?(user, :update_egg_stock_day, company) do
+      false ->
+        {:error, :not_authorise}
+
+      true ->
+        contact_id = blank_to_nil(attrs[:contact_id] || attrs["contact_id"])
+        contact_name = attrs[:contact_name] || attrs["contact_name"] || ""
+
+        if is_nil(contact_id) do
+          {:ok, :skipped}
+        else
+          do_attach_contact_from_document(company.id, attrs, contact_id, contact_name)
+        end
+    end
+  end
+
+  defp do_attach_contact_from_document(company_id, attrs, contact_id, contact_name) do
+    detail_id = blank_to_nil(attrs[:detail_id] || attrs["detail_id"] || attrs[:egg_detail_id])
+    load_date = attrs[:load_date] || attrs["load_date"]
+    side = attrs[:side] || attrs["side"] || :sales
+    original_name = attrs[:original_name] || attrs["original_name"] || ""
+
+    detail =
+      cond do
+        detail_id ->
+          from(dd in EggStockDayDetail,
+            join: d in EggStockDay,
+            on: d.id == dd.egg_stock_day_id,
+            where: dd.id == ^detail_id and d.company_id == ^company_id,
+            select: dd
+          )
+          |> Repo.one()
+
+        load_date ->
+          find_adhoc_detail_for_attach(company_id, load_date, side, original_name)
+
+        true ->
+          nil
+      end
+
+    case detail do
+      nil ->
+        {:ok, :no_detail}
+
+      %EggStockDayDetail{} = dd ->
+        name = contact_name |> to_string() |> String.trim()
+
+        name =
+          if name == "" do
+            case Repo.get(Contact, contact_id) do
+              %Contact{name: n} -> n
+              _ -> dd.contact_name || ""
+            end
+          else
+            name
+          end
+
+        {n, _} =
+          from(x in EggStockDayDetail, where: x.id == ^dd.id)
+          |> Repo.update_all(set: [contact_id: contact_id, contact_name: name])
+
+        if n > 0, do: {:ok, :updated}, else: {:ok, :no_detail}
+    end
+  end
+
+  defp find_adhoc_detail_for_attach(company_id, load_date, side, original_name) do
+    sections =
+      if to_string(side) in ["purchase", "purchases"],
+        do: planned_purchase_sections(),
+        else: planned_sales_sections()
+
+    details =
+      from(dd in EggStockDayDetail,
+        join: d in EggStockDay,
+        on: d.id == dd.egg_stock_day_id,
+        where: d.company_id == ^company_id and d.stock_date == ^load_date,
+        where: dd.section in ^sections,
+        where: is_nil(dd.contact_id),
+        where: dd.is_separator == false,
+        order_by: [asc: dd.position, asc: dd.id]
+      )
+      |> Repo.all()
+
+    orig = normalize_contact_label(original_name)
+
+    cond do
+      orig != "" ->
+        Enum.find(details, &names_match?(&1.contact_name, original_name)) ||
+          Enum.find(details, fn d -> normalize_contact_label(d.contact_name) == "" end)
+
+      length(details) == 1 ->
+        hd(details)
+
+      true ->
+        Enum.find(details, fn d -> normalize_contact_label(d.contact_name) == "" end)
+    end
+  end
+
+  @doc """
+  Persist planned-detail quantities (and contact) that were synced from documents.
 
   Uses direct updates (not cast_assoc) so map quantity changes are always written.
   Returns the day reloaded with details.
@@ -588,7 +746,13 @@ defmodule FullCircle.EggStock do
         |> Enum.filter(& &1.id)
         |> Enum.each(fn d ->
           from(dd in EggStockDayDetail, where: dd.id == ^d.id)
-          |> Repo.update_all(set: [quantities: normalize_qty_map(d.quantities || %{})])
+          |> Repo.update_all(
+            set: [
+              quantities: normalize_qty_map(d.quantities || %{}),
+              contact_id: d.contact_id,
+              contact_name: d.contact_name || ""
+            ]
+          )
         end)
 
         from(d in EggStockDay, where: d.id == ^day.id)
