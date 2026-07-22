@@ -2210,24 +2210,6 @@ defmodule FullCircleWeb.EggStockLive.Form do
               {dtl_line_qty_total(dtl, @grades)}
             </div>
 
-            <button
-              :if={line_editable}
-              type="button"
-              phx-click="delete_detail"
-              phx-value-index={dtl.index}
-              class="text-red-500 hover:text-red-700"
-              title={gettext("Delete line")}
-            >
-              <.icon name="hero-trash" class="h-4 w-4" />
-            </button>
-            <span
-              :if={@editable and locked}
-              class="text-gray-400 cursor-not-allowed"
-              title={gettext("Edit the linked document to change this line")}
-            >
-              <.icon name="hero-lock-closed" class="h-4 w-4" />
-            </span>
-
             <%!-- Existing documents: open only (no create) --%>
             <a
               :for={{doc_type, doc_id} <- issued_docs}
@@ -2291,6 +2273,25 @@ defmodule FullCircleWeb.EggStockLive.Form do
             >
               <.icon name="hero-banknotes" class="h-4 w-4" />
             </a>
+
+            <span
+              :if={@editable and locked}
+              class="text-gray-400 cursor-not-allowed"
+              title={gettext("Edit the linked document to change this line")}
+            >
+              <.icon name="hero-lock-closed" class="h-4 w-4" />
+            </span>
+
+            <button
+              :if={line_editable}
+              type="button"
+              phx-click="delete_detail"
+              phx-value-index={dtl.index}
+              class="text-red-500 hover:text-red-700"
+              title={gettext("Delete line")}
+            >
+              <.icon name="hero-trash" class="h-4 w-4" />
+            </button>
           </div>
         </div>
       </.inputs_for>
