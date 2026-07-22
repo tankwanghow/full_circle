@@ -2,6 +2,7 @@ defmodule FullCircleWeb.EggStockLive.Print do
   use FullCircleWeb, :live_view
 
   alias FullCircle.EggStock
+  alias FullCircle.EggStock.EggStockDayDetail
 
   @impl true
   def mount(%{"date" => date_str}, _session, socket) do
@@ -10,10 +11,17 @@ defmodule FullCircleWeb.EggStockLive.Print do
     grades = EggStock.list_grades(company.id)
     grade_names = Enum.map(grades, & &1.name)
     grade_labels = Map.new(grades, fn g -> {g.name, g.nickname || g.name} end)
+    is_today = Date.compare(date, Date.utc_today()) == :eq
 
     day =
       EggStock.get_day(company.id, date) ||
-        %{closing_bal: %{}, expired: %{}, ungraded_bal: 0, note: nil}
+        %{
+          closing_bal: %{},
+          expired: %{},
+          ungraded_bal: 0,
+          note: nil,
+          egg_stock_day_details: []
+        }
 
     opening = EggStock.get_previous_closing_bal(company.id, date)
     actual_sales = EggStock.actual_sales_for_date(company.id, date)
@@ -21,21 +29,109 @@ defmodule FullCircleWeb.EggStockLive.Print do
     harvested = EggStock.harvest_total_for_date(company.id, date)
     yesterday_ug = EggStock.get_previous_ungraded_bal(company.id, date)
 
+    {purchase_lines, sales_lines} =
+      if is_today do
+        day
+        |> prepare_today_board(company.id, date, actual_sales, actual_purchases)
+        |> board_lines_by_section()
+      else
+        {[], []}
+      end
+
     {:ok,
      socket
      |> assign(
        page_title: gettext("Egg Stock Report"),
        date: date,
+       is_today: is_today,
        day: day,
        opening: opening,
        grade_names: grade_names,
        grade_labels: grade_labels,
        actual_sales: actual_sales,
        actual_purchases: actual_purchases,
+       purchase_lines: purchase_lines,
+       sales_lines: sales_lines,
        harvested: harvested,
        yesterday_ug: yesterday_ug,
        company: FullCircle.Sys.get_company!(company.id)
      )}
+  end
+
+  # Seed from weekly book (if empty), mix in doc-only contacts, overlay actual qtys.
+  defp prepare_today_board(day, company_id, date, actual_sales, actual_purchases) do
+    day = seed_planned_from_book(day, company_id, date)
+    {day, _} = EggStock.ensure_planned_lines_for_actuals(day, actual_sales, actual_purchases)
+    {day, _} = EggStock.sync_day_details_from_actuals(day, actual_sales, actual_purchases)
+    day
+  end
+
+  defp seed_planned_from_book(day, company_id, date) do
+    details = day.egg_stock_day_details || []
+    dow = Date.day_of_week(date)
+
+    details =
+      seed_section_from_book(
+        details,
+        company_id,
+        dow,
+        :sales,
+        EggStock.planned_sales_section(),
+        EggStock.planned_sales_sections()
+      )
+
+    details =
+      seed_section_from_book(
+        details,
+        company_id,
+        dow,
+        :purchase,
+        EggStock.planned_purchase_section(),
+        EggStock.planned_purchase_sections()
+      )
+
+    %{day | egg_stock_day_details: details}
+  end
+
+  defp seed_section_from_book(details, company_id, dow, kind, section, sections) do
+    if Enum.any?(details, &(&1.section in sections)) do
+      details
+    else
+      book_details =
+        EggStock.list_dow_lines(company_id, kind, dow)
+        |> Enum.with_index()
+        |> Enum.map(fn {line, idx} ->
+          %EggStockDayDetail{
+            section: section,
+            contact_id: line.contact_id,
+            contact_name: line.contact_name,
+            quantities: line.quantities || %{},
+            group_name: line.group_name || "",
+            group_position: line.group_position || 0,
+            is_separator: line.is_separator || false,
+            position: line.position || idx,
+            ignore: false
+          }
+        end)
+
+      details ++ book_details
+    end
+  end
+
+  defp board_lines_by_section(day) do
+    details = day.egg_stock_day_details || []
+
+    purchases =
+      details
+      |> Enum.filter(&(&1.section in EggStock.planned_purchase_sections()))
+      |> Enum.sort_by(&{&1.position || 0, &1.id || ""})
+
+    sales =
+      details
+      |> Enum.filter(&(&1.section in EggStock.planned_sales_sections()))
+      |> Enum.sort_by(&{&1.position || 0, &1.id || ""})
+
+    {purchases, sales}
   end
 
   @impl true
@@ -115,6 +211,18 @@ defmodule FullCircleWeb.EggStockLive.Print do
         .total-row td { font-weight: 700; border-top: 2px solid #666; }
         .contact-name { text-align: left; padding-left: 10px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .num { text-align: center; }
+        .separator-row td {
+          border-left: none;
+          border-right: none;
+          border-top: 1px dashed #888;
+          border-bottom: 1px dashed #888;
+          background: #fafafa;
+          text-align: center;
+          font-style: italic;
+          color: #555;
+          font-weight: 600;
+          padding: 2px 5px;
+        }
         h1 { text-align: center; font-size: 18px; font-weight: 700; margin-bottom: 2px; }
         h2 { text-align: center; font-size: 14px; font-weight: 600; color: #555; margin-bottom: 10px; }
         .company-name { text-align: center; font-size: 14px; font-weight: 600; margin-bottom: 2px; }
@@ -150,49 +258,37 @@ defmodule FullCircleWeb.EggStockLive.Print do
               </td>
             </tr>
 
-            <%!-- Purchases --%>
-            <tr :if={@actual_purchases != []}>
-              <td colspan={length(@grade_names) + 2} class="section-title">{gettext("Purchases")}</td>
-            </tr>
-            <tr :for={row <- @actual_purchases}>
-              <td class="contact-name">{row.contact_name}</td>
-              <td :for={g <- @grade_names} class="num">{(row.quantities || %{})[g] || 0}</td>
-              <td class="num">
-                {Enum.reduce(@grade_names, 0, fn g, acc ->
-                  acc + to_int((row.quantities || %{})[g])
-                end)}
-              </td>
-            </tr>
-            <tr :if={@actual_purchases != []} class="total-row">
-              <td class="label-col">{gettext("Total Purchases")}</td>
-              <td :for={g <- @grade_names} class="num">{actual_total(@actual_purchases, g)}</td>
-              <td class="num">
-                {Enum.reduce(@grade_names, 0, fn g, acc ->
-                  acc + actual_total(@actual_purchases, g)
-                end)}
-              </td>
-            </tr>
+            <%!-- Purchases: today = board order + separators; history = actual docs --%>
+            <%= if @is_today do %>
+              <.board_section
+                title={gettext("Purchases")}
+                lines={@purchase_lines}
+                grades={@grade_names}
+              />
+            <% else %>
+              <.actual_section
+                title={gettext("Purchases")}
+                total_label={gettext("Total Purchases")}
+                rows={@actual_purchases}
+                grades={@grade_names}
+              />
+            <% end %>
 
             <%!-- Sales --%>
-            <tr :if={@actual_sales != []}>
-              <td colspan={length(@grade_names) + 2} class="section-title">{gettext("Sales")}</td>
-            </tr>
-            <tr :for={row <- @actual_sales}>
-              <td class="contact-name">{row.contact_name}</td>
-              <td :for={g <- @grade_names} class="num">{(row.quantities || %{})[g] || 0}</td>
-              <td class="num">
-                {Enum.reduce(@grade_names, 0, fn g, acc ->
-                  acc + to_int((row.quantities || %{})[g])
-                end)}
-              </td>
-            </tr>
-            <tr :if={@actual_sales != []} class="total-row">
-              <td class="label-col">{gettext("Total Sales")}</td>
-              <td :for={g <- @grade_names} class="num">{actual_total(@actual_sales, g)}</td>
-              <td class="num">
-                {Enum.reduce(@grade_names, 0, fn g, acc -> acc + actual_total(@actual_sales, g) end)}
-              </td>
-            </tr>
+            <%= if @is_today do %>
+              <.board_section
+                title={gettext("Sales")}
+                lines={@sales_lines}
+                grades={@grade_names}
+              />
+            <% else %>
+              <.actual_section
+                title={gettext("Sales")}
+                total_label={gettext("Total Sales")}
+                rows={@actual_sales}
+                grades={@grade_names}
+              />
+            <% end %>
 
             <%!-- Expired --%>
             <tr>
@@ -269,6 +365,79 @@ defmodule FullCircleWeb.EggStockLive.Print do
       </div>
     </div>
     """
+  end
+
+  # Today: planned board order + separators (quantities from day details / docs overlay)
+  defp board_section(assigns) do
+    content_lines = Enum.reject(assigns.lines || [], &separator?/1)
+    has_content? = content_lines != [] or Enum.any?(assigns.lines || [], &separator?/1)
+
+    assigns =
+      assigns
+      |> assign(:content_lines, content_lines)
+      |> assign(:has_content?, has_content?)
+
+    ~H"""
+    <tr :if={@has_content?}>
+      <td colspan={length(@grades) + 2} class="section-title">{@title}</td>
+    </tr>
+    <tr :for={line <- @lines} class={if separator?(line), do: "separator-row"}>
+      <%= if separator?(line) do %>
+        <td colspan={length(@grades) + 2}>
+          {separator_label(line)}
+        </td>
+      <% else %>
+        <td class="contact-name">{line.contact_name}</td>
+        <td :for={g <- @grades} class="num">{qty(line, g)}</td>
+        <td class="num">
+          {Enum.reduce(@grades, 0, fn g, acc -> acc + qty(line, g) end)}
+        </td>
+      <% end %>
+    </tr>
+    <tr :if={@content_lines != []} class="total-row">
+      <td class="label-col">{gettext("Total")}</td>
+      <td :for={g <- @grades} class="num">{lines_total(@content_lines, g)}</td>
+      <td class="num">
+        {Enum.reduce(@grades, 0, fn g, acc -> acc + lines_total(@content_lines, g) end)}
+      </td>
+    </tr>
+    """
+  end
+
+  # History: flat document actuals (no board order / separators)
+  defp actual_section(assigns) do
+    ~H"""
+    <tr :if={@rows != []}>
+      <td colspan={length(@grades) + 2} class="section-title">{@title}</td>
+    </tr>
+    <tr :for={row <- @rows}>
+      <td class="contact-name">{row.contact_name}</td>
+      <td :for={g <- @grades} class="num">{(row.quantities || %{})[g] || 0}</td>
+      <td class="num">
+        {Enum.reduce(@grades, 0, fn g, acc -> acc + to_int((row.quantities || %{})[g]) end)}
+      </td>
+    </tr>
+    <tr :if={@rows != []} class="total-row">
+      <td class="label-col">{@total_label}</td>
+      <td :for={g <- @grades} class="num">{actual_total(@rows, g)}</td>
+      <td class="num">
+        {Enum.reduce(@grades, 0, fn g, acc -> acc + actual_total(@rows, g) end)}
+      </td>
+    </tr>
+    """
+  end
+
+  defp separator?(line), do: Map.get(line, :is_separator) == true
+
+  defp separator_label(line) do
+    label = line.group_name || ""
+    if String.trim(to_string(label)) == "", do: "—", else: label
+  end
+
+  defp qty(line, grade), do: to_int((line.quantities || %{})[grade])
+
+  defp lines_total(lines, grade) do
+    Enum.reduce(lines, 0, fn line, acc -> acc + qty(line, grade) end)
   end
 
   defp to_int(nil), do: 0

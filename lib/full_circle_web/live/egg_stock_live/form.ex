@@ -28,8 +28,6 @@ defmodule FullCircleWeb.EggStockLive.Form do
      |> assign(save_status: nil)
      |> assign(dow_kind: "sales")
      |> assign(dow: Date.day_of_week(Date.utc_today()))
-     |> assign(orphan_sales_ids: MapSet.new())
-     |> assign(orphan_purchase_ids: MapSet.new())
      |> assign(page_title: gettext("Egg Stock"))}
   end
 
@@ -152,9 +150,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
       actual_sales: [],
       actual_purchases: [],
       harvested: 0,
-      yesterday_ug: 0,
-      orphan_sales_ids: MapSet.new(),
-      orphan_purchase_ids: MapSet.new()
+      yesterday_ug: 0
     )
     |> assign_day_form(day)
   end
@@ -179,11 +175,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
         day
       end
 
-    # Contacts on weekly book for this weekday (for orphan markers)
-    book_sales_ids = book_contact_ids(company.id, :sales, date)
-    book_purchase_ids = book_contact_ids(company.id, :purchase, date)
-
-    # Orphan documents (no planned line) → planned rows mixed into existing groups
+    # Documents without a planned line → add lines (same board, no special marker)
     {day, _orphans_added?} =
       if socket.assigns.editable do
         EggStock.ensure_planned_lines_for_actuals(day, actual_sales, actual_purchases)
@@ -203,8 +195,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
                socket.assigns.current_user
              ) do
           {:ok, reloaded} ->
-            # Re-apply orphans + overlay after reload (orphans may be unsaved)
-            {with_orphans, _} =
+            {with_docs, _} =
               EggStock.ensure_planned_lines_for_actuals(
                 reloaded,
                 actual_sales,
@@ -213,7 +204,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
 
             {synced, _} =
               EggStock.sync_day_details_from_actuals(
-                with_orphans,
+                with_docs,
                 actual_sales,
                 actual_purchases
               )
@@ -226,10 +217,6 @@ defmodule FullCircleWeb.EggStockLive.Form do
       else
         day
       end
-
-    # Orphan = has document activity but not on the weekly book
-    orphan_sales_ids = orphan_contact_ids(actual_sales, book_sales_ids)
-    orphan_purchase_ids = orphan_contact_ids(actual_purchases, book_purchase_ids)
 
     planned_sales = planned_rows_from_day(day, :sales)
     planned_purchases = planned_rows_from_day(day, :purchase)
@@ -262,29 +249,9 @@ defmodule FullCircleWeb.EggStockLive.Form do
       est_opening: nil,
       est_production: est_production,
       est_harvest: est_harvest,
-      est_closing: est_closing,
-      orphan_sales_ids: orphan_sales_ids,
-      orphan_purchase_ids: orphan_purchase_ids
+      est_closing: est_closing
     )
     |> assign_day_form(day)
-  end
-
-  defp book_contact_ids(company_id, kind, date) do
-    EggStock.list_dow_lines(company_id, kind, Date.day_of_week(date))
-    |> Enum.map(& &1.contact_id)
-    |> Enum.reject(&is_nil/1)
-    |> MapSet.new(&to_string/1)
-  end
-
-  defp orphan_contact_ids(actual_rows, book_ids) do
-    (actual_rows || [])
-    |> Enum.filter(fn r ->
-      r.contact_id not in [nil, ""] and
-        (r.doc_links || []) != [] and
-        not MapSet.member?(book_ids, to_string(r.contact_id))
-    end)
-    |> Enum.map(&to_string(&1.contact_id))
-    |> MapSet.new()
   end
 
   # Always editable planned grids: if day has no saved planned lines, seed from weekly book
@@ -322,7 +289,8 @@ defmodule FullCircleWeb.EggStockLive.Form do
     else
       book_details =
         EggStock.list_dow_lines(company_id, kind, dow)
-        |> Enum.map(fn line ->
+        |> Enum.with_index()
+        |> Enum.map(fn {line, idx} ->
           %EggStockDayDetail{
             section: section,
             contact_id: line.contact_id,
@@ -330,6 +298,8 @@ defmodule FullCircleWeb.EggStockLive.Form do
             quantities: line.quantities || %{},
             group_name: line.group_name || "",
             group_position: line.group_position || 0,
+            is_separator: line.is_separator || false,
+            position: line.position || idx,
             ignore: false
           }
         end)
@@ -399,7 +369,9 @@ defmodule FullCircleWeb.EggStockLive.Form do
   end
 
   defp dow_lines_to_params(lines) do
-    Enum.map(lines, fn l ->
+    lines
+    |> Enum.with_index()
+    |> Enum.map(fn {l, idx} ->
       %{
         "id" => l.id,
         "contact_id" => l.contact_id,
@@ -407,7 +379,8 @@ defmodule FullCircleWeb.EggStockLive.Form do
         "quantities" => l.quantities || %{},
         "group_name" => l.group_name || "",
         "group_position" => l.group_position || 0,
-        "position" => l.position || 0,
+        "position" => l.position || idx,
+        "is_separator" => l.is_separator || false,
         "delete" => "false"
       }
     end)
@@ -440,19 +413,23 @@ defmodule FullCircleWeb.EggStockLive.Form do
       Enum.reduce(details, {Map.new(grades, &{&1, 0}), Map.new(grades, &{&1, 0})}, fn {_k, detail},
                                                                                       {sales,
                                                                                        purchases} ->
-        quantities = detail["quantities"] || %{}
+        if detail["is_separator"] in [true, "true"] do
+          {sales, purchases}
+        else
+          quantities = detail["quantities"] || %{}
 
-        case detail["section"] do
-          s when s in ["planned_order", "actual_order"] ->
-            {Map.merge(sales, quantities, fn _k, v1, v2 -> to_int(v1) + to_int(v2) end),
-             purchases}
+          case detail["section"] do
+            s when s in ["planned_order", "actual_order"] ->
+              {Map.merge(sales, quantities, fn _k, v1, v2 -> to_int(v1) + to_int(v2) end),
+               purchases}
 
-          s when s in ["planned_purchase", "actual_purchase"] ->
-            {sales,
-             Map.merge(purchases, quantities, fn _k, v1, v2 -> to_int(v1) + to_int(v2) end)}
+            s when s in ["planned_purchase", "actual_purchase"] ->
+              {sales,
+               Map.merge(purchases, quantities, fn _k, v1, v2 -> to_int(v1) + to_int(v2) end)}
 
-          _ ->
-            {sales, purchases}
+            _ ->
+              {sales, purchases}
+          end
         end
       end)
 
@@ -540,14 +517,29 @@ defmodule FullCircleWeb.EggStockLive.Form do
      )}
   end
 
-  def handle_event("goto_date", %{"date" => date_str}, socket) do
-    socket = flush_autosave(socket)
+  def handle_event("goto_date", %{"date" => date_str}, socket)
+      when is_binary(date_str) and date_str != "" do
+    case Date.from_iso8601(date_str) do
+      {:ok, date} ->
+        if Date.compare(date, socket.assigns.date) == :eq do
+          {:noreply, socket}
+        else
+          socket = flush_autosave(socket)
 
-    {:noreply,
-     socket
-     |> assign(active_tab: "now")
-     |> push_patch(to: ~p"/companies/#{socket.assigns.current_company.id}/egg_stock/#{date_str}")}
+          {:noreply,
+           socket
+           |> assign(active_tab: "now")
+           |> push_patch(
+             to: ~p"/companies/#{socket.assigns.current_company.id}/egg_stock/#{date_str}"
+           )}
+        end
+
+      {:error, _} ->
+        {:noreply, socket}
+    end
   end
+
+  def handle_event("goto_date", _params, socket), do: {:noreply, socket}
 
   def handle_event("select_dow", %{"dow" => dow_str}, socket) do
     socket = flush_autosave(socket)
@@ -582,15 +574,22 @@ defmodule FullCircleWeb.EggStockLive.Form do
     {:noreply, socket}
   end
 
-  def handle_event("add_detail", %{"section" => section}, socket) do
+  def handle_event("add_detail", %{"section" => section} = params, socket) do
     cs = socket.assigns.form.source
     existing = Ecto.Changeset.get_assoc(cs, :egg_stock_day_details)
+    separator? = params["separator"] in ["true", true]
+
+    section_count =
+      Enum.count(existing, &(Ecto.Changeset.get_field(&1, :section) == section))
 
     new_detail = %EggStockDayDetail{
       section: section,
       quantities: %{},
       group_name: "",
       group_position: 0,
+      is_separator: separator?,
+      position: section_count,
+      contact_name: if(separator?, do: "", else: nil),
       _persistent_id: Enum.count(existing)
     }
 
@@ -599,7 +598,61 @@ defmodule FullCircleWeb.EggStockLive.Form do
       |> Ecto.Changeset.put_assoc(:egg_stock_day_details, existing ++ [new_detail])
       |> Map.put(:action, :validate)
 
-    {:noreply, assign(socket, form: to_form(cs))}
+    params = changeset_to_params(cs)
+    socket = assign(socket, form: to_form(cs))
+    socket = schedule_autosave(socket, {:day, params})
+    {:noreply, socket}
+  end
+
+  def handle_event("move_detail", %{"index" => idx_str, "dir" => dir}, socket) do
+    idx = String.to_integer(idx_str)
+    cs = socket.assigns.form.source
+    details = Ecto.Changeset.get_assoc(cs, :egg_stock_day_details)
+    detail = Enum.at(details, idx)
+
+    if is_nil(detail) do
+      {:noreply, socket}
+    else
+      section = Ecto.Changeset.get_field(detail, :section)
+
+      section_idxs =
+        details
+        |> Enum.with_index()
+        |> Enum.filter(fn {d, _} -> Ecto.Changeset.get_field(d, :section) == section end)
+        |> Enum.map(fn {_, i} -> i end)
+
+      pos_in_section = Enum.find_index(section_idxs, &(&1 == idx))
+
+      swap_pos =
+        case dir do
+          "up" -> if pos_in_section && pos_in_section > 0, do: pos_in_section - 1
+          "down" -> if pos_in_section && pos_in_section < length(section_idxs) - 1, do: pos_in_section + 1
+          _ -> nil
+        end
+
+      if is_nil(swap_pos) do
+        {:noreply, socket}
+      else
+        other_idx = Enum.at(section_idxs, swap_pos)
+        a = Enum.at(details, idx)
+        b = Enum.at(details, other_idx)
+        details = details |> List.replace_at(idx, b) |> List.replace_at(other_idx, a)
+
+        # Renumber positions within section
+        details =
+          renumber_section_positions(details, section)
+
+        cs =
+          cs
+          |> Ecto.Changeset.put_assoc(:egg_stock_day_details, details)
+          |> Map.put(:action, :validate)
+
+        params = changeset_to_params(cs)
+        socket = assign(socket, form: to_form(cs))
+        socket = schedule_autosave(socket, {:day, params})
+        {:noreply, socket}
+      end
+    end
   end
 
   def handle_event("delete_detail", %{"index" => index}, socket) do
@@ -688,7 +741,10 @@ defmodule FullCircleWeb.EggStockLive.Form do
     {:noreply, socket}
   end
 
-  def handle_event("add_dow_line", _, socket) do
+  def handle_event("add_dow_line", params, socket) do
+    separator? = params["separator"] in ["true", true]
+    visible = Enum.reject(socket.assigns.dow_params, &(&1["delete"] == "true"))
+
     new_line = %{
       "id" => "",
       "contact_id" => "",
@@ -696,11 +752,22 @@ defmodule FullCircleWeb.EggStockLive.Form do
       "quantities" => %{},
       "group_name" => "",
       "group_position" => 0,
-      "position" => length(socket.assigns.dow_params),
+      "position" => length(visible),
+      "is_separator" => separator?,
       "delete" => "false"
     }
 
-    {:noreply, assign(socket, dow_params: socket.assigns.dow_params ++ [new_line])}
+    params = socket.assigns.dow_params ++ [new_line]
+    socket = assign(socket, dow_params: params)
+
+    socket =
+      if separator? do
+        schedule_autosave(socket, {:dow, params})
+      else
+        socket
+      end
+
+    {:noreply, socket}
   end
 
   def handle_event("delete_dow_line", %{"index" => idx_str}, socket) do
@@ -715,9 +782,47 @@ defmodule FullCircleWeb.EggStockLive.Form do
         List.delete_at(params, idx)
       end
 
+    params = renumber_dow_positions(params)
     socket = assign(socket, dow_params: params)
     socket = schedule_autosave(socket, {:dow, params})
     {:noreply, socket}
+  end
+
+  def handle_event("move_dow_line", %{"index" => idx_str, "dir" => dir}, socket) do
+    idx = String.to_integer(idx_str)
+    params = socket.assigns.dow_params
+
+    # Work on visible indices only
+    visible =
+      params
+      |> Enum.with_index()
+      |> Enum.reject(fn {line, _} -> line["delete"] == "true" end)
+
+    vis_pos = Enum.find_index(visible, fn {_, i} -> i == idx end)
+
+    swap_vis =
+      case dir do
+        "up" -> if vis_pos && vis_pos > 0, do: vis_pos - 1
+        "down" -> if vis_pos && vis_pos < length(visible) - 1, do: vis_pos + 1
+        _ -> nil
+      end
+
+    if is_nil(swap_vis) do
+      {:noreply, socket}
+    else
+      {_, other_idx} = Enum.at(visible, swap_vis)
+      a = Enum.at(params, idx)
+      b = Enum.at(params, other_idx)
+      params = params |> List.replace_at(idx, b) |> List.replace_at(other_idx, a)
+      params = renumber_dow_positions(params)
+
+      socket =
+        socket
+        |> assign(dow_params: params)
+        |> schedule_autosave({:dow, params})
+
+      {:noreply, socket}
+    end
   end
 
   # --- Settings events ---
@@ -822,6 +927,33 @@ defmodule FullCircleWeb.EggStockLive.Form do
 
   # --- Helpers ---
 
+  defp renumber_section_positions(details, section) do
+    {details, _} =
+      Enum.map_reduce(Enum.with_index(details), 0, fn {d, i}, pos ->
+        if Ecto.Changeset.get_field(d, :section) == section do
+          d = Ecto.Changeset.put_change(d, :position, pos)
+          {{d, i}, pos + 1}
+        else
+          {{d, i}, pos}
+        end
+      end)
+
+    Enum.map(details, fn {d, _} -> d end)
+  end
+
+  defp renumber_dow_positions(params) do
+    {params, _} =
+      Enum.map_reduce(params, 0, fn line, pos ->
+        if line["delete"] == "true" do
+          {line, pos}
+        else
+          {Map.put(line, "position", pos), pos + 1}
+        end
+      end)
+
+    params
+  end
+
   defp changeset_to_params(cs) do
     details =
       Ecto.Changeset.get_assoc(cs, :egg_stock_day_details)
@@ -836,6 +968,8 @@ defmodule FullCircleWeb.EggStockLive.Form do
            "quantities" => Ecto.Changeset.get_field(d, :quantities) || %{},
            "group_name" => Ecto.Changeset.get_field(d, :group_name) || "",
            "group_position" => Ecto.Changeset.get_field(d, :group_position) || 0,
+           "is_separator" => Ecto.Changeset.get_field(d, :is_separator) || false,
+           "position" => Ecto.Changeset.get_field(d, :position) || i,
            "_persistent_id" => i
          }}
       end)
@@ -1146,7 +1280,9 @@ defmodule FullCircleWeb.EggStockLive.Form do
 
   defp sum_quantities(details, section, grade) when is_list(details) do
     details
-    |> Enum.filter(&(&1.section == section))
+    |> Enum.filter(fn d ->
+      d.section == section and Map.get(d, :is_separator) != true
+    end)
     |> Enum.reduce(0, fn d, acc ->
       acc + to_int((d.quantities || %{})[grade])
     end)
@@ -1200,9 +1336,16 @@ defmodule FullCircleWeb.EggStockLive.Form do
         >
           <.icon name="hero-chevron-left" class="h-5 w-5" />
         </button>
-        <span class="text-lg font-semibold px-2">
-          {FullCircleWeb.Helpers.format_date(@date)}
-        </span>
+        <form phx-change="goto_date" class="inline-flex items-center">
+          <input
+            type="date"
+            name="date"
+            id="egg-stock-date"
+            value={Date.to_iso8601(@date)}
+            class="text-lg font-semibold border border-gray-300 rounded px-2 py-1 cursor-pointer hover:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            title={gettext("Pick a date")}
+          />
+        </form>
         <button
           type="button"
           phx-click="nav_date"
@@ -1211,19 +1354,11 @@ defmodule FullCircleWeb.EggStockLive.Form do
         >
           <.icon name="hero-chevron-right" class="h-5 w-5" />
         </button>
-        <button
-          type="button"
-          phx-click="goto_date"
-          phx-value-date={Date.to_iso8601(Date.utc_today())}
-          class="px-2 py-1 text-sm text-blue-600 hover:text-blue-800 border border-blue-300 rounded"
-        >
-          {gettext("Today")}
-        </button>
         <.save_status status={@save_status} />
       </div>
 
       <%!-- Tabs --%>
-      <div class="flex flex-wrap gap-1 mb-4 border-b border-gray-300">
+      <div class="flex flex-wrap items-end justify-center gap-x-0.5 gap-y-0 mb-3 border-b border-gray-200">
         <.tab_button tab="now" active={@active_tab} label={gettext("Stock")} />
         <.tab_button tab="weekly_sales" active={@active_tab} label={gettext("Weekly Sales")} />
         <.tab_button tab="weekly_purchases" active={@active_tab} label={gettext("Weekly Purchases")} />
@@ -1231,7 +1366,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
         <.tab_button tab="settings" active={@active_tab} label={gettext("Settings")} />
         <.link
           navigate={~p"/companies/#{@current_company.id}/egg_stock/production_report"}
-          class="ml-auto px-3 py-1 text-sm text-blue-700 hover:underline self-end"
+          class="px-2 py-1 text-xs text-blue-600 hover:text-blue-800 hover:underline self-center ml-2"
         >
           {gettext("Production Report")}
         </.link>
@@ -1254,8 +1389,6 @@ defmodule FullCircleWeb.EggStockLive.Form do
           est_production={@est_production}
           est_harvest={@est_harvest}
           est_closing={@est_closing}
-          orphan_sales_ids={@orphan_sales_ids}
-          orphan_purchase_ids={@orphan_purchase_ids}
           current_company={@current_company}
           current_user={@current_user}
         />
@@ -1301,7 +1434,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
       type="button"
       phx-click="switch_tab"
       phx-value-tab={@tab}
-      class={"px-3 py-2 text-sm font-medium #{if @tab == @active, do: "border-b-2 border-blue-500 text-blue-600", else: "text-gray-500 hover:text-gray-700"}"}
+      class={"px-2.5 py-1 text-xs font-medium -mb-px #{if @tab == @active, do: "border-b-2 border-blue-500 text-blue-600", else: "border-b-2 border-transparent text-gray-500 hover:text-gray-700"}"}
     >
       {@label}
     </button>
@@ -1312,6 +1445,8 @@ defmodule FullCircleWeb.EggStockLive.Form do
 
   defp weekly_tab(assigns) do
     ~H"""
+    <div class="flex flex-col items-center">
+    <div class="w-fit max-w-full">
     <div class="mb-3 flex flex-wrap items-center gap-2">
       <span class="text-sm font-semibold text-gray-600">
         {if @kind == "sales", do: gettext("Sales book"), else: gettext("Purchase book")}
@@ -1327,9 +1462,10 @@ defmodule FullCircleWeb.EggStockLive.Form do
       </button>
     </div>
 
-    <.form for={%{}} id="dow-form" autocomplete="off" phx-change="validate_dow">
+    <.form for={%{}} id="dow-form" autocomplete="off" phx-change="validate_dow" class="w-fit max-w-full">
       <div class="flex gap-1 mb-1">
-        <div class="w-40 text-sm font-semibold text-gray-600">{gettext("Contact")}</div>
+        <div class="w-12 shrink-0"></div>
+        <div class="w-56 text-sm font-semibold text-gray-600">{gettext("Contact")}</div>
         <div :for={grade <- @grades} class="w-20 text-center text-sm font-semibold text-gray-600">
           {@grade_labels[grade]}
         </div>
@@ -1340,21 +1476,63 @@ defmodule FullCircleWeb.EggStockLive.Form do
         <input type="hidden" name={"dow_lines[#{idx}][id]"} value={line["id"]} />
         <input type="hidden" name={"dow_lines[#{idx}][delete]"} value={line["delete"] || "false"} />
         <input type="hidden" name={"dow_lines[#{idx}][contact_id]"} value={line["contact_id"]} />
-        <input type="hidden" name={"dow_lines[#{idx}][group_name]"} value={line["group_name"] || ""} />
+        <input
+          :if={line["is_separator"] not in [true, "true"]}
+          type="hidden"
+          name={"dow_lines[#{idx}][group_name]"}
+          value={line["group_name"] || ""}
+        />
         <input
           type="hidden"
           name={"dow_lines[#{idx}][group_position]"}
           value={line["group_position"] || 0}
         />
         <input type="hidden" name={"dow_lines[#{idx}][position]"} value={line["position"] || idx} />
+        <input
+          type="hidden"
+          name={"dow_lines[#{idx}][is_separator]"}
+          value={to_string(line["is_separator"] in [true, "true"])}
+        />
 
-        <div :if={line["delete"] != "true"} class="flex items-center gap-1 mb-1">
+        <div :if={line["delete"] != "true" and line["is_separator"] in [true, "true"]} class="flex items-center gap-1 my-2">
+          <div class="flex items-center w-12 shrink-0">
+            <button type="button" phx-click="move_dow_line" phx-value-index={idx} phx-value-dir="up" class="text-gray-400 hover:text-gray-700" title={gettext("Move up")}>
+              <.icon name="hero-chevron-up" class="h-3 w-3" />
+            </button>
+            <button type="button" phx-click="move_dow_line" phx-value-index={idx} phx-value-dir="down" class="text-gray-400 hover:text-gray-700" title={gettext("Move down")}>
+              <.icon name="hero-chevron-down" class="h-3 w-3" />
+            </button>
+          </div>
+          <div class="flex-1 border-t-2 border-dashed border-gray-400"></div>
+          <input type="hidden" name={"dow_lines[#{idx}][contact_name]"} value="" />
+          <input
+            type="text"
+            name={"dow_lines[#{idx}][group_name]"}
+            value={line["group_name"] || ""}
+            placeholder={gettext("Label (optional)")}
+            class="w-56 text-xs border rounded px-2 py-0.5 text-gray-600"
+          />
+          <div class="flex-1 border-t-2 border-dashed border-gray-400"></div>
+          <button type="button" phx-click="delete_dow_line" phx-value-index={idx} class="text-red-500 hover:text-red-700" title={gettext("Delete separator")}>
+            <.icon name="hero-trash" class="h-4 w-4" />
+          </button>
+        </div>
+
+        <div :if={line["delete"] != "true" and line["is_separator"] not in [true, "true"]} class="flex items-center gap-1 mb-1">
+          <div class="flex items-center w-12 shrink-0">
+            <button type="button" phx-click="move_dow_line" phx-value-index={idx} phx-value-dir="up" class="text-gray-400 hover:text-gray-700" title={gettext("Move up")}>
+              <.icon name="hero-chevron-up" class="h-3 w-3" />
+            </button>
+            <button type="button" phx-click="move_dow_line" phx-value-index={idx} phx-value-dir="down" class="text-gray-400 hover:text-gray-700" title={gettext("Move down")}>
+              <.icon name="hero-chevron-down" class="h-3 w-3" />
+            </button>
+          </div>
           <input
             type="text"
             id={"dow-contact-#{@kind}-#{idx}"}
             name={"dow_lines[#{idx}][contact_name]"}
             value={line["contact_name"]}
-            class="w-40 border rounded px-2 py-1"
+            class="w-56 border rounded px-2 py-1"
             phx-hook="tributeAutoComplete"
             url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
           />
@@ -1381,10 +1559,11 @@ defmodule FullCircleWeb.EggStockLive.Form do
       </div>
 
       <div class="flex gap-1 mt-1 font-semibold text-sm text-gray-700 border-t pt-1">
-        <div class="w-40 text-right">{gettext("Total")}</div>
+        <div class="w-12 shrink-0"></div>
+        <div class="w-56 text-right">{gettext("Total")}</div>
         <div :for={grade <- @grades} class="w-20 text-center">
           {Enum.reduce(@dow_params, 0, fn line, acc ->
-            if line["delete"] == "true",
+            if line["delete"] == "true" or line["is_separator"] in [true, "true"],
               do: acc,
               else: acc + to_int((line["quantities"] || %{})[grade])
           end)}
@@ -1393,7 +1572,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
           {Enum.reduce(@grades, 0, fn g, acc ->
             acc +
               Enum.reduce(@dow_params, 0, fn line, a ->
-                if line["delete"] == "true",
+                if line["delete"] == "true" or line["is_separator"] in [true, "true"],
                   do: a,
                   else: a + to_int((line["quantities"] || %{})[g])
               end)
@@ -1402,13 +1581,25 @@ defmodule FullCircleWeb.EggStockLive.Form do
       </div>
     </.form>
 
-    <button
-      type="button"
-      phx-click="add_dow_line"
-      class="mt-2 text-blue-600 hover:text-blue-800 flex items-center gap-1 text-sm"
-    >
-      <.icon name="hero-plus-circle" class="h-5 w-5" /> {gettext("Add line")}
-    </button>
+    <div class="mt-2 flex gap-3">
+      <button
+        type="button"
+        phx-click="add_dow_line"
+        class="text-blue-600 hover:text-blue-800 flex items-center gap-1 text-sm"
+      >
+        <.icon name="hero-plus-circle" class="h-5 w-5" /> {gettext("Add line")}
+      </button>
+      <button
+        type="button"
+        phx-click="add_dow_line"
+        phx-value-separator="true"
+        class="text-gray-600 hover:text-gray-800 flex items-center gap-1 text-sm"
+      >
+        <.icon name="hero-minus" class="h-5 w-5" /> {gettext("Add separator")}
+      </button>
+    </div>
+    </div>
+    </div>
     """
   end
 
@@ -1416,181 +1607,193 @@ defmodule FullCircleWeb.EggStockLive.Form do
 
   defp now_tab(assigns) do
     ~H"""
-    <div class="flex gap-1 mb-1">
-      <div class="w-40"></div>
-      <div :for={grade <- @grades} class="w-20 text-center text-sm font-semibold text-gray-600">
-        {@grade_labels[grade]}
-      </div>
-      <div class="w-20 text-center text-sm font-semibold text-gray-600">{gettext("Total")}</div>
-    </div>
-
-    <%!-- Past date (read-only history) --%>
-    <div :if={!@editable}>
-      <.summary_row
-        label={gettext("Opening")}
-        grades={@grades}
-        values={@day.opening_bal || %{}}
-        bg="bg-gray-100"
-      />
-
-      <.actual_data_section
-        title={gettext("Purchases")}
-        rows={@actual_purchases}
-        grades={@grades}
-        bg_class="bg-emerald-50"
-        title_class="text-emerald-700"
-        company_id={@current_company.id}
-      />
-
-      <.actual_data_section
-        title={gettext("Sales")}
-        rows={@actual_sales}
-        grades={@grades}
-        bg_class="bg-blue-50"
-        title_class="text-blue-700"
-        company_id={@current_company.id}
-      />
-
-      <.form
-        for={@form}
-        id="day-form-readonly"
-        autocomplete="off"
-        phx-change="validate"
-        phx-submit="save"
-      >
-        <.expired_closing_block form={@form} grades={@grades} />
-        <.production_block
-          day={@day}
-          form={@form}
-          grades={@grades}
-          actual_sales={@actual_sales}
-          actual_purchases={@actual_purchases}
-        />
-        <.harvest_ug_loss_block
-          form={@form}
-          day={@day}
-          grades={@grades}
-          harvested={@harvested}
-          yesterday_ug={@yesterday_ug}
-          est_harvest={nil}
-          actual_sales={@actual_sales}
-          actual_purchases={@actual_purchases}
-        />
-        <.note_block form={@form} />
-      </.form>
-
-      <div class="flex justify-end mt-2">
-        <a
-          href={~p"/companies/#{@current_company.id}/EggStock/#{Date.to_iso8601(@date)}/print"}
-          target="_blank"
-          class="text-blue-600 hover:text-blue-800 flex items-center gap-1 text-sm"
-        >
-          <.icon name="hero-printer" class="h-4 w-4" /> {gettext("Print Report")}
-        </a>
-      </div>
-    </div>
-
-    <%!-- Today / Future --%>
-    <div :if={@editable}>
-      <.summary_row
-        :if={!@is_future}
-        label={gettext("Opening")}
-        grades={@grades}
-        values={@day.opening_bal || %{}}
-        bg="bg-gray-100"
-      />
-      <.summary_row
-        :if={@is_future}
-        label={gettext("Est Opening")}
-        grades={@grades}
-        values={@est_opening || %{}}
-        bg="bg-gray-100"
-      />
-
-      <.form for={@form} id="day-form" autocomplete="off" phx-change="validate" phx-submit="save">
-        <.planned_section
-          title={gettext("Planned Purchases")}
-          form={@form}
-          section={EggStock.planned_purchase_section()}
-          grades={@grades}
-          grade_labels={@grade_labels}
-          current_company={@current_company}
-          current_user={@current_user}
-          date={@date}
-          day_details={@day.egg_stock_day_details}
-          locked_contact_ids={locked_contact_ids(@actual_purchases)}
-          docs_by_contact={docs_by_contact(@actual_purchases)}
-          orphan_contact_ids={@orphan_purchase_ids}
-        />
-
-        <.planned_section
-          title={gettext("Planned Sales")}
-          form={@form}
-          section={EggStock.planned_sales_section()}
-          grades={@grades}
-          grade_labels={@grade_labels}
-          current_company={@current_company}
-          current_user={@current_user}
-          date={@date}
-          day_details={@day.egg_stock_day_details}
-          locked_contact_ids={locked_contact_ids(@actual_sales)}
-          docs_by_contact={docs_by_contact(@actual_sales)}
-          orphan_contact_ids={@orphan_sales_ids}
-        />
-
-        <.summary_row
-          :if={@est_production}
-          label={gettext("Est Production")}
-          grades={@grades}
-          values={@est_production}
-          bg="bg-green-50"
-        />
-
-        <div :if={@is_future} class="flex gap-1 mb-1">
-          <div class="w-40 font-bold text-sm py-1">{gettext("Est Harvest")}</div>
-          <div class="w-20 text-center border rounded px-2 py-1 bg-amber-50">{@est_harvest}</div>
+    <div class="flex flex-col items-center">
+      <div class="w-fit max-w-full">
+        <div class="flex gap-1 mb-1">
+          <div class="w-12 shrink-0"></div>
+          <div class="w-56"></div>
+          <div :for={grade <- @grades} class="w-20 text-center text-sm font-semibold text-gray-600">
+            {@grade_labels[grade]}
+          </div>
+          <div class="w-20 text-center text-sm font-semibold text-gray-600">{gettext("Total")}</div>
         </div>
 
-        <.summary_row
-          :if={@est_closing}
-          label={gettext("Est Closing")}
-          grades={@grades}
-          values={@est_closing}
-          bg="bg-purple-50"
-        />
+        <%!-- Past date (read-only history) --%>
+        <div :if={!@editable}>
+          <.summary_row
+            label={gettext("Opening")}
+            grades={@grades}
+            values={@day.opening_bal || %{}}
+            bg="bg-gray-100"
+          />
 
-        <div :if={!@is_future}>
-          <.expired_closing_block form={@form} grades={@grades} />
-          <.production_block
-            day={@day}
-            form={@form}
+          <.actual_data_section
+            title={gettext("Purchases")}
+            rows={@actual_purchases}
             grades={@grades}
-            actual_sales={@actual_sales}
-            actual_purchases={@actual_purchases}
+            bg_class="bg-emerald-50"
+            title_class="text-emerald-700"
+            company_id={@current_company.id}
           />
-          <.harvest_ug_loss_block
-            form={@form}
-            day={@day}
+
+          <.actual_data_section
+            title={gettext("Sales")}
+            rows={@actual_sales}
             grades={@grades}
-            harvested={@harvested}
-            yesterday_ug={@yesterday_ug}
-            est_harvest={@est_harvest}
-            actual_sales={@actual_sales}
-            actual_purchases={@actual_purchases}
+            bg_class="bg-blue-50"
+            title_class="text-blue-700"
+            company_id={@current_company.id}
           />
+
+          <.form
+            for={@form}
+            id="day-form-readonly"
+            autocomplete="off"
+            phx-change="validate"
+            phx-submit="save"
+            class="w-fit max-w-full"
+          >
+            <.expired_closing_block form={@form} grades={@grades} />
+            <.production_block
+              day={@day}
+              form={@form}
+              grades={@grades}
+              actual_sales={@actual_sales}
+              actual_purchases={@actual_purchases}
+            />
+            <.harvest_ug_loss_block
+              form={@form}
+              day={@day}
+              grades={@grades}
+              harvested={@harvested}
+              yesterday_ug={@yesterday_ug}
+              est_harvest={nil}
+              actual_sales={@actual_sales}
+              actual_purchases={@actual_purchases}
+            />
+            <.note_block form={@form} />
+          </.form>
+
+          <div class="flex justify-end mt-2">
+            <a
+              href={~p"/companies/#{@current_company.id}/EggStock/#{Date.to_iso8601(@date)}/print"}
+              target="_blank"
+              class="text-blue-600 hover:text-blue-800 flex items-center gap-1 text-sm"
+            >
+              <.icon name="hero-printer" class="h-4 w-4" /> {gettext("Print Report")}
+            </a>
+          </div>
         </div>
 
-        <.note_block form={@form} />
-      </.form>
+        <%!-- Today / Future --%>
+        <div :if={@editable}>
+          <.summary_row
+            :if={!@is_future}
+            label={gettext("Opening")}
+            grades={@grades}
+            values={@day.opening_bal || %{}}
+            bg="bg-gray-100"
+          />
+          <.summary_row
+            :if={@is_future}
+            label={gettext("Est Opening")}
+            grades={@grades}
+            values={@est_opening || %{}}
+            bg="bg-gray-100"
+          />
 
-      <div :if={!@is_future} class="flex justify-end mt-2">
-        <a
-          href={~p"/companies/#{@current_company.id}/EggStock/#{Date.to_iso8601(@date)}/print"}
-          target="_blank"
-          class="text-blue-600 hover:text-blue-800 flex items-center gap-1 text-sm"
-        >
-          <.icon name="hero-printer" class="h-4 w-4" /> {gettext("Print Report")}
-        </a>
+          <.form
+            for={@form}
+            id="day-form"
+            autocomplete="off"
+            phx-change="validate"
+            phx-submit="save"
+            class="w-fit max-w-full"
+          >
+            <.planned_section
+              title={gettext("Planned Purchases")}
+              form={@form}
+              section={EggStock.planned_purchase_section()}
+              grades={@grades}
+              grade_labels={@grade_labels}
+              current_company={@current_company}
+              current_user={@current_user}
+              date={@date}
+              day_details={@day.egg_stock_day_details}
+              locked_contact_ids={locked_contact_ids(@actual_purchases)}
+              docs_by_contact={docs_by_contact(@actual_purchases)}
+            />
+
+            <.planned_section
+              title={gettext("Planned Sales")}
+              form={@form}
+              section={EggStock.planned_sales_section()}
+              grades={@grades}
+              grade_labels={@grade_labels}
+              current_company={@current_company}
+              current_user={@current_user}
+              date={@date}
+              day_details={@day.egg_stock_day_details}
+              locked_contact_ids={locked_contact_ids(@actual_sales)}
+              docs_by_contact={docs_by_contact(@actual_sales)}
+            />
+
+            <.summary_row
+              :if={@est_production}
+              label={gettext("Est Production")}
+              grades={@grades}
+              values={@est_production}
+              bg="bg-green-50"
+            />
+
+            <div :if={@is_future} class="flex gap-1 mb-1">
+              <div class="w-12 shrink-0"></div>
+              <div class="w-56 font-bold text-sm py-1">{gettext("Est Harvest")}</div>
+              <div class="w-20 text-center border rounded px-2 py-1 bg-amber-50">{@est_harvest}</div>
+            </div>
+
+            <.summary_row
+              :if={@est_closing}
+              label={gettext("Est Closing")}
+              grades={@grades}
+              values={@est_closing}
+              bg="bg-purple-50"
+            />
+
+            <div :if={!@is_future}>
+              <.expired_closing_block form={@form} grades={@grades} />
+              <.production_block
+                day={@day}
+                form={@form}
+                grades={@grades}
+                actual_sales={@actual_sales}
+                actual_purchases={@actual_purchases}
+              />
+              <.harvest_ug_loss_block
+                form={@form}
+                day={@day}
+                grades={@grades}
+                harvested={@harvested}
+                yesterday_ug={@yesterday_ug}
+                est_harvest={@est_harvest}
+                actual_sales={@actual_sales}
+                actual_purchases={@actual_purchases}
+              />
+            </div>
+
+            <.note_block form={@form} />
+          </.form>
+
+          <div :if={!@is_future} class="flex justify-end mt-2">
+            <a
+              href={~p"/companies/#{@current_company.id}/EggStock/#{Date.to_iso8601(@date)}/print"}
+              target="_blank"
+              class="text-blue-600 hover:text-blue-800 flex items-center gap-1 text-sm"
+            >
+              <.icon name="hero-printer" class="h-4 w-4" /> {gettext("Print Report")}
+            </a>
+          </div>
+        </div>
       </div>
     </div>
     """
@@ -1613,6 +1816,16 @@ defmodule FullCircleWeb.EggStockLive.Form do
         >
           <.icon name="hero-plus-circle" class="h-5 w-5" />
         </button>
+        <button
+          type="button"
+          phx-click="add_detail"
+          phx-value-section={@section}
+          phx-value-separator="true"
+          class="text-gray-600 hover:text-gray-800 text-sm flex items-center gap-1"
+          title={gettext("Add separator")}
+        >
+          <.icon name="hero-minus" class="h-4 w-4" /> {gettext("Separator")}
+        </button>
       </div>
 
       <.detail_lines
@@ -1626,7 +1839,6 @@ defmodule FullCircleWeb.EggStockLive.Form do
         date={@date}
         locked_contact_ids={@locked_contact_ids}
         docs_by_contact={@docs_by_contact}
-        orphan_contact_ids={@orphan_contact_ids}
       />
       <.section_totals details={@day_details} section={@section} grades={@grades} />
     </div>
@@ -1636,7 +1848,8 @@ defmodule FullCircleWeb.EggStockLive.Form do
   defp expired_closing_block(assigns) do
     ~H"""
     <div class="flex gap-1 mb-1">
-      <div class="w-40 font-bold text-sm py-1">{gettext("Expired")}</div>
+      <div class="w-12 shrink-0"></div>
+      <div class="w-56 font-bold text-sm py-1">{gettext("Expired")}</div>
       <input
         :for={grade <- @grades}
         type="number"
@@ -1651,7 +1864,8 @@ defmodule FullCircleWeb.EggStockLive.Form do
     </div>
 
     <div class="flex gap-1 mb-1">
-      <div class="w-40 font-bold text-sm py-1">{gettext("Closing")}</div>
+      <div class="w-12 shrink-0"></div>
+      <div class="w-56 font-bold text-sm py-1">{gettext("Closing")}</div>
       <input
         :for={grade <- @grades}
         type="number"
@@ -1718,7 +1932,8 @@ defmodule FullCircleWeb.EggStockLive.Form do
 
     ~H"""
     <div class="flex gap-1 mb-1">
-      <div class="w-40 font-bold text-sm py-1">{gettext("Harvest/UG/Loss")}</div>
+      <div class="w-12 shrink-0"></div>
+      <div class="w-56 font-bold text-sm py-1">{gettext("Harvest/UG/Loss")}</div>
       <div class={"w-20 text-center border rounded px-2 py-1 #{if @harvested == 0 && @est_harvest, do: "bg-purple-50", else: "bg-amber-50"}"}>
         {@harvest_display}
       </div>
@@ -1751,7 +1966,8 @@ defmodule FullCircleWeb.EggStockLive.Form do
       </div>
     </div>
     <div class="flex gap-1 mb-2 text-xs text-gray-500">
-      <div class="w-40"></div>
+      <div class="w-12 shrink-0"></div>
+      <div class="w-56"></div>
       <div class="w-20 text-center">
         {if @harvested == 0 && @est_harvest, do: gettext("Est Harvest"), else: gettext("Harvested")}
       </div>
@@ -1768,7 +1984,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
     ~H"""
     <div class="mb-4 mt-2">
       <label class="font-bold">{gettext("Note")}</label>
-      <textarea name="egg_stock_day[note]" class="w-full border rounded p-2" rows="2">{@form[:note].value}</textarea>
+      <textarea name="egg_stock_day[note]" class="block w-full border rounded p-2" rows="2">{@form[:note].value}</textarea>
     </div>
     """
   end
@@ -1778,7 +1994,8 @@ defmodule FullCircleWeb.EggStockLive.Form do
 
     ~H"""
     <div class="flex gap-1 mb-1">
-      <div class="w-40 font-bold text-sm py-1">{@label}</div>
+      <div class="w-12 shrink-0"></div>
+      <div class="w-56 font-bold text-sm py-1">{@label}</div>
       <div :for={grade <- @grades} class={"w-20 text-center border rounded px-2 py-1 #{@bg}"}>
         {display_val(@values[grade])}{@suffix}
       </div>
@@ -1795,7 +2012,8 @@ defmodule FullCircleWeb.EggStockLive.Form do
     <div :if={@rows != []} class="mb-2">
       <h3 class={"font-bold text-sm mb-1 #{@title_class}"}>{@title}</h3>
       <div :for={row <- @rows} class={"flex gap-1 text-sm #{@bg_class}"}>
-        <span class="w-40 truncate flex items-center gap-1" title={row.contact_name}>
+        <span class="w-12 shrink-0"></span>
+        <span class="w-56 truncate flex items-center gap-1" title={row.contact_name}>
           {row.contact_name}
         </span>
         <span :for={grade <- @grades} class="w-20 text-center">
@@ -1816,7 +2034,8 @@ defmodule FullCircleWeb.EggStockLive.Form do
         </span>
       </div>
       <div class="flex gap-1 mt-1 font-semibold text-sm text-gray-700 border-t pt-1">
-        <div class="w-40 text-right">{gettext("Total")}</div>
+        <div class="w-12 shrink-0"></div>
+        <div class="w-56 text-right">{gettext("Total")}</div>
         <div :for={grade <- @grades} class="w-20 text-center">
           {actual_total(@rows, grade)}
         </div>
@@ -1849,156 +2068,230 @@ defmodule FullCircleWeb.EggStockLive.Form do
     ~H"""
     <div>
       <.inputs_for :let={dtl} field={@form[:egg_stock_day_details]}>
+        <% separator? = dtl[:is_separator].value in [true, "true"] %>
         <% contact_key =
           if dtl[:contact_id].value in [nil, ""], do: nil, else: to_string(dtl[:contact_id].value) %>
         <% issued_docs = if contact_key, do: Map.get(@docs_by_contact, contact_key, []), else: [] %>
         <% has_docs = issued_docs != [] %>
         <% locked =
           contact_key != nil and MapSet.member?(@locked_contact_ids, contact_key) %>
-        <% orphan_ids = @orphan_contact_ids || MapSet.new() %>
-        <% orphan =
-          contact_key != nil and MapSet.member?(orphan_ids, contact_key) %>
         <% line_editable = @editable and !locked %>
-        <div
-          :if={dtl[:section].value == @section}
-          class={"flex items-center gap-1 #{if locked, do: "opacity-75"}"}
-          title={
-            cond do
-              orphan ->
-                gettext("Not on weekly book — from document only; edit quantities on the document")
 
-              locked ->
-                gettext("Linked to a document — edit quantities on the document")
-
-              true ->
-                nil
-            end
-          }
-        >
+        <div :if={dtl[:section].value == @section}>
           <input :if={dtl[:id].value} type="hidden" name={dtl[:id].name} value={dtl[:id].value} />
           <input type="hidden" name={dtl[:section].name} value={@section} />
           <input type="hidden" name={dtl[:contact_id].name} value={dtl[:contact_id].value} />
           <input type="hidden" name={dtl[:_persistent_id].name} value={dtl.index} />
-          <input type="hidden" name={"#{dtl.name}[group_name]"} value={dtl[:group_name].value || ""} />
+          <input
+            :if={!separator?}
+            type="hidden"
+            name={"#{dtl.name}[group_name]"}
+            value={dtl[:group_name].value || ""}
+          />
           <input
             type="hidden"
             name={"#{dtl.name}[group_position]"}
             value={dtl[:group_position].value || 0}
           />
-
-          <%!-- readonly (not disabled) so values still submit on autosave of other fields --%>
           <input
-            type="text"
-            id={"dtl-contact-#{@section}-#{dtl.index}"}
-            name={dtl[:contact_name].name}
-            value={dtl[:contact_name].value}
-            class={"w-40 border rounded px-2 py-1 #{if locked, do: "bg-gray-100 text-gray-600 cursor-not-allowed", else: ""}"}
-            readonly={locked or !@editable}
-            phx-hook={if line_editable, do: "tributeAutoComplete", else: nil}
-            url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
+            type="hidden"
+            name={"#{dtl.name}[is_separator]"}
+            value={to_string(separator?)}
+          />
+          <input
+            type="hidden"
+            name={"#{dtl.name}[position]"}
+            value={dtl[:position].value || 0}
           />
 
-          <input
-            :for={grade <- @grades}
-            type="number"
-            name={"#{dtl.name}[quantities][#{grade}]"}
-            value={(dtl[:quantities].value || %{})[grade] || ""}
-            class={"w-20 text-center border rounded px-1 py-1 #{if locked, do: "bg-gray-100 text-gray-600 cursor-not-allowed", else: ""}"}
-            readonly={locked or !@editable}
-          />
-
-          <div class="w-20 text-center font-semibold py-1">
-            {dtl_line_qty_total(dtl, @grades)}
+          <%!-- Separator row (label stored in group_name) --%>
+          <div :if={separator?} class="flex items-center gap-1 my-2">
+            <div :if={@editable} class="flex items-center w-12 shrink-0">
+              <button
+                type="button"
+                phx-click="move_detail"
+                phx-value-index={dtl.index}
+                phx-value-dir="up"
+                class="text-gray-400 hover:text-gray-700"
+                title={gettext("Move up")}
+              >
+                <.icon name="hero-chevron-up" class="h-3 w-3" />
+              </button>
+              <button
+                type="button"
+                phx-click="move_detail"
+                phx-value-index={dtl.index}
+                phx-value-dir="down"
+                class="text-gray-400 hover:text-gray-700"
+                title={gettext("Move down")}
+              >
+                <.icon name="hero-chevron-down" class="h-3 w-3" />
+              </button>
+            </div>
+            <div :if={!@editable} class="w-12 shrink-0"></div>
+            <div class="flex-1 border-t-2 border-dashed border-gray-400"></div>
+            <input type="hidden" name={dtl[:contact_name].name} value="" />
+            <input
+              type="text"
+              name={"#{dtl.name}[group_name]"}
+              value={dtl[:group_name].value || ""}
+              placeholder={gettext("Label (optional)")}
+              class="w-56 text-xs border rounded px-2 py-0.5 text-gray-600"
+              readonly={!@editable}
+            />
+            <div class="flex-1 border-t-2 border-dashed border-gray-400"></div>
+            <button
+              :if={@editable}
+              type="button"
+              phx-click="delete_detail"
+              phx-value-index={dtl.index}
+              class="text-red-500 hover:text-red-700"
+              title={gettext("Delete separator")}
+            >
+              <.icon name="hero-trash" class="h-4 w-4" />
+            </button>
           </div>
 
-          <button
-            :if={line_editable}
-            type="button"
-            phx-click="delete_detail"
-            phx-value-index={dtl.index}
-            class="text-red-500 hover:text-red-700"
-            title={gettext("Delete line")}
-          >
-            <.icon name="hero-trash" class="h-4 w-4" />
-          </button>
-          <span
-            :if={@editable and locked}
-            class="text-gray-400 cursor-not-allowed"
-            title={gettext("Edit the linked document to change this line")}
-          >
-            <.icon name="hero-lock-closed" class="h-4 w-4" />
-          </span>
-
-          <%!-- Existing documents: open only (no create) --%>
-          <a
-            :for={{doc_type, doc_id} <- issued_docs}
-            href={doc_link_path(@current_company.id, doc_type, doc_id)}
-            target="_blank"
-            class="text-blue-600 hover:text-blue-800"
-            title={gettext("Open %{type}", type: doc_type)}
-          >
-            <.icon name={doc_icon(doc_type)} class="h-4 w-4" />
-          </a>
-
-          <%!-- No documents yet: allow create --%>
-          <a
-            :if={
-              @editable and !has_docs and @section == "planned_order" and
-                dtl[:contact_id].value not in [nil, ""]
+          <%!-- Contact line --%>
+          <div
+            :if={!separator?}
+            class={"flex items-center gap-1 mb-1 #{if locked, do: "opacity-75"}"}
+            title={
+              if locked,
+                do: gettext("Linked to a document — edit quantities on the document")
             }
-            href={egg_order_doc_url(@current_company.id, @date, dtl, @grades, "Invoice")}
-            target="_blank"
-            class="text-green-600 hover:text-green-800"
-            title={gettext("Create Invoice")}
           >
-            <.icon name="hero-document-plus" class="h-4 w-4" />
-          </a>
+            <div :if={@editable} class="flex items-center w-12 shrink-0">
+              <button
+                type="button"
+                phx-click="move_detail"
+                phx-value-index={dtl.index}
+                phx-value-dir="up"
+                class="text-gray-400 hover:text-gray-700"
+                title={gettext("Move up")}
+              >
+                <.icon name="hero-chevron-up" class="h-3 w-3" />
+              </button>
+              <button
+                type="button"
+                phx-click="move_detail"
+                phx-value-index={dtl.index}
+                phx-value-dir="down"
+                class="text-gray-400 hover:text-gray-700"
+                title={gettext("Move down")}
+              >
+                <.icon name="hero-chevron-down" class="h-3 w-3" />
+              </button>
+            </div>
+            <div :if={!@editable} class="w-12 shrink-0"></div>
 
-          <a
-            :if={
-              @editable and !has_docs and @section == "planned_order" and
-                dtl[:contact_id].value not in [nil, ""]
-            }
-            href={egg_order_doc_url(@current_company.id, @date, dtl, @grades, "Receipt")}
-            target="_blank"
-            class="text-amber-600 hover:text-amber-800"
-            title={gettext("Create Receipt")}
-          >
-            <.icon name="hero-banknotes" class="h-4 w-4" />
-          </a>
+            <%!-- readonly (not disabled) so values still submit on autosave of other fields --%>
+            <input
+              type="text"
+              id={"dtl-contact-#{@section}-#{dtl.index}"}
+              name={dtl[:contact_name].name}
+              value={dtl[:contact_name].value}
+              class={"w-56 border rounded px-2 py-1 #{if locked, do: "bg-gray-100 text-gray-600 cursor-not-allowed", else: ""}"}
+              readonly={locked or !@editable}
+              phx-hook={if line_editable, do: "tributeAutoComplete", else: nil}
+              url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
+            />
 
-          <a
-            :if={
-              @editable and !has_docs and @section == "planned_purchase" and
-                dtl[:contact_id].value not in [nil, ""]
-            }
-            href={egg_order_doc_url(@current_company.id, @date, dtl, @grades, "PurInvoice")}
-            target="_blank"
-            class="text-green-600 hover:text-green-800"
-            title={gettext("Create Purchase Invoice")}
-          >
-            <.icon name="hero-document-plus" class="h-4 w-4" />
-          </a>
+            <input
+              :for={grade <- @grades}
+              type="number"
+              name={"#{dtl.name}[quantities][#{grade}]"}
+              value={(dtl[:quantities].value || %{})[grade] || ""}
+              class={"w-20 text-center border rounded px-1 py-1 #{if locked, do: "bg-gray-100 text-gray-600 cursor-not-allowed", else: ""}"}
+              readonly={locked or !@editable}
+            />
 
-          <a
-            :if={
-              @editable and !has_docs and @section == "planned_purchase" and
-                dtl[:contact_id].value not in [nil, ""]
-            }
-            href={egg_order_doc_url(@current_company.id, @date, dtl, @grades, "Payment")}
-            target="_blank"
-            class="text-amber-600 hover:text-amber-800"
-            title={gettext("Create Payment")}
-          >
-            <.icon name="hero-banknotes" class="h-4 w-4" />
-          </a>
-                    <span
-            :if={orphan}
-            class="shrink-0 text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300"
-            title={gettext("Orphan document — not on weekly book")}
-          >
-            {gettext("Doc")}
-          </span>
+            <div class="w-20 text-center font-semibold py-1">
+              {dtl_line_qty_total(dtl, @grades)}
+            </div>
+
+            <button
+              :if={line_editable}
+              type="button"
+              phx-click="delete_detail"
+              phx-value-index={dtl.index}
+              class="text-red-500 hover:text-red-700"
+              title={gettext("Delete line")}
+            >
+              <.icon name="hero-trash" class="h-4 w-4" />
+            </button>
+            <span
+              :if={@editable and locked}
+              class="text-gray-400 cursor-not-allowed"
+              title={gettext("Edit the linked document to change this line")}
+            >
+              <.icon name="hero-lock-closed" class="h-4 w-4" />
+            </span>
+
+            <%!-- Existing documents: open only (no create) --%>
+            <a
+              :for={{doc_type, doc_id} <- issued_docs}
+              href={doc_link_path(@current_company.id, doc_type, doc_id)}
+              target="_blank"
+              class="text-blue-600 hover:text-blue-800"
+              title={gettext("Open %{type}", type: doc_type)}
+            >
+              <.icon name={doc_icon(doc_type)} class="h-4 w-4" />
+            </a>
+
+            <%!-- No documents yet: allow create --%>
+            <a
+              :if={
+                @editable and !has_docs and @section == "planned_order" and
+                  dtl[:contact_id].value not in [nil, ""]
+              }
+              href={egg_order_doc_url(@current_company.id, @date, dtl, @grades, "Invoice")}
+              target="_blank"
+              class="text-green-600 hover:text-green-800"
+              title={gettext("Create Invoice")}
+            >
+              <.icon name="hero-document-plus" class="h-4 w-4" />
+            </a>
+
+            <a
+              :if={
+                @editable and !has_docs and @section == "planned_order" and
+                  dtl[:contact_id].value not in [nil, ""]
+              }
+              href={egg_order_doc_url(@current_company.id, @date, dtl, @grades, "Receipt")}
+              target="_blank"
+              class="text-amber-600 hover:text-amber-800"
+              title={gettext("Create Receipt")}
+            >
+              <.icon name="hero-banknotes" class="h-4 w-4" />
+            </a>
+
+            <a
+              :if={
+                @editable and !has_docs and @section == "planned_purchase" and
+                  dtl[:contact_id].value not in [nil, ""]
+              }
+              href={egg_order_doc_url(@current_company.id, @date, dtl, @grades, "PurInvoice")}
+              target="_blank"
+              class="text-green-600 hover:text-green-800"
+              title={gettext("Create Purchase Invoice")}
+            >
+              <.icon name="hero-document-plus" class="h-4 w-4" />
+            </a>
+
+            <a
+              :if={
+                @editable and !has_docs and @section == "planned_purchase" and
+                  dtl[:contact_id].value not in [nil, ""]
+              }
+              href={egg_order_doc_url(@current_company.id, @date, dtl, @grades, "Payment")}
+              target="_blank"
+              class="text-amber-600 hover:text-amber-800"
+              title={gettext("Create Payment")}
+            >
+              <.icon name="hero-banknotes" class="h-4 w-4" />
+            </a>
+          </div>
         </div>
       </.inputs_for>
     </div>
@@ -2040,7 +2333,8 @@ defmodule FullCircleWeb.EggStockLive.Form do
 
     ~H"""
     <div class="flex gap-1 mt-1 font-semibold text-sm text-gray-700 border-t pt-1">
-      <div class="w-40 text-right">{gettext("Total")}</div>
+      <div class="w-12 shrink-0"></div>
+      <div class="w-56 text-right">{gettext("Total")}</div>
       <div :for={grade <- @grades} class="w-20 text-center">
         {Enum.reduce(@sections, 0, fn sec, acc -> acc + sum_quantities(@details || [], sec, grade) end)}
       </div>
@@ -2058,118 +2352,97 @@ defmodule FullCircleWeb.EggStockLive.Form do
 
   defp estimated_tab(assigns) do
     ~H"""
-    <div class="overflow-x-auto">
-      <p class="text-sm text-gray-500 mb-3">
-        {gettext(
-          "7-day forecast: production from recent history; sales/purchases from weekly books (or day overrides)."
-        )}
-      </p>
-      <table class="w-full text-sm">
-        <thead>
-          <tr class="border-b">
-            <th class="text-left py-2 px-2 w-28">{gettext("Date")}</th>
-            <th class="text-left py-2 px-1 w-16">{gettext("Day")}</th>
-            <th :for={grade <- @grades} class="text-center py-2 px-1 w-20">
-              {@grade_labels[grade]}
-            </th>
-            <th class="text-center py-2 px-1 w-20">{gettext("Total")}</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr
-            :for={row <- @forecast}
-            class="border-b hover:bg-blue-100 cursor-pointer"
-            phx-click="goto_date"
-            phx-value-date={Date.to_iso8601(row.date)}
-          >
-            <td class="py-1 px-2 font-medium">
-              {FullCircleWeb.Helpers.format_date(row.date)}
-            </td>
-            <td class="py-1 px-1 text-gray-500">
-              {Calendar.strftime(row.date, "%a")}
-            </td>
-            <td
-              :for={grade <- @grades}
-              class={"text-center py-1 px-1 #{if to_int(row.closing[grade]) < 0, do: "text-red-600"}"}
-            >
-              {display_val(row.closing[grade])}
-            </td>
-            <% total = Enum.reduce(@grades, 0, fn g, acc -> acc + to_int(row.closing[g]) end) %>
-            <td class={"text-center py-1 px-1 font-semibold #{if total < 0, do: "text-red-600"}"}>
-              {total}
-            </td>
-          </tr>
-        </tbody>
-      </table>
+    <div class="flex flex-col items-center">
+      <div class="w-fit max-w-full">
+        <p class="text-xs text-gray-500 mb-3 max-w-xl">
+          {gettext(
+            "7-day forecast: production from recent history; sales/purchases from weekly books (or day overrides)."
+          )}
+        </p>
 
-      <div class="mt-6">
-        <h3 class="font-bold text-sm mb-2">{gettext("Est. Daily Sales (weekly book)")}</h3>
-        <table class="w-full text-sm">
-          <thead>
-            <tr class="border-b">
-              <th class="text-left py-2 px-2 w-28">{gettext("Date")}</th>
-              <th class="text-left py-2 px-1 w-16">{gettext("Day")}</th>
-              <th :for={grade <- @grades} class="text-center py-2 px-1 w-20">
-                {@grade_labels[grade]}
-              </th>
-              <th class="text-center py-2 px-1 w-20">{gettext("Total")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              :for={row <- @forecast}
-              class="border-b hover:bg-blue-100 cursor-pointer"
-              phx-click="goto_date"
-              phx-value-date={Date.to_iso8601(row.date)}
-            >
-              <td class="py-1 px-2 font-medium">
-                {FullCircleWeb.Helpers.format_date(row.date)}
-              </td>
-              <td class="py-1 px-1 text-gray-500">
-                {Calendar.strftime(row.date, "%a")}
-              </td>
-              <td :for={grade <- @grades} class="text-center py-1 px-1">
-                {display_val(row.sales[grade])}
-              </td>
-              <td class="text-center py-1 px-1 font-semibold">
-                {Enum.reduce(@grades, 0, fn g, acc -> acc + to_int(row.sales[g]) end)}
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <.forecast_table
+          title={gettext("Est. Closing")}
+          forecast={@forecast}
+          grades={@grades}
+          grade_labels={@grade_labels}
+          value_key={:closing}
+          row_hover="hover:bg-blue-100"
+        />
+
+        <.forecast_table
+          title={gettext("Est. Daily Sales (weekly book)")}
+          forecast={@forecast}
+          grades={@grades}
+          grade_labels={@grade_labels}
+          value_key={:sales}
+          row_hover="hover:bg-blue-100"
+          class="mt-5"
+        />
+
+        <.forecast_table
+          title={gettext("Est. Daily Purchases (weekly book)")}
+          forecast={@forecast}
+          grades={@grades}
+          grade_labels={@grade_labels}
+          value_key={:purchases}
+          row_hover="hover:bg-emerald-100"
+          class="mt-5"
+        />
       </div>
+    </div>
+    """
+  end
 
-      <div class="mt-4">
-        <h3 class="font-bold text-sm mb-2">{gettext("Est. Daily Purchases (weekly book)")}</h3>
-        <table class="w-full text-sm">
+  defp forecast_table(assigns) do
+    assigns = assign_new(assigns, :class, fn -> "" end)
+
+    ~H"""
+    <div class={@class}>
+      <h3 class="font-semibold text-sm mb-1.5 text-gray-700">{@title}</h3>
+      <div class="overflow-x-auto border rounded">
+        <table class="text-sm border-collapse">
           <thead>
-            <tr class="border-b">
-              <th class="text-left py-2 px-2 w-28">{gettext("Date")}</th>
-              <th class="text-left py-2 px-1 w-16">{gettext("Day")}</th>
-              <th :for={grade <- @grades} class="text-center py-2 px-1 w-20">
+            <tr class="border-b bg-gray-50">
+              <th class="text-left py-1.5 px-2 whitespace-nowrap font-semibold text-gray-600">
+                {gettext("Date")}
+              </th>
+              <th class="text-left py-1.5 px-1.5 whitespace-nowrap font-semibold text-gray-600">
+                {gettext("Day")}
+              </th>
+              <th
+                :for={grade <- @grades}
+                class="text-center py-1.5 px-1.5 min-w-[2.75rem] font-semibold text-gray-600"
+              >
                 {@grade_labels[grade]}
               </th>
-              <th class="text-center py-2 px-1 w-20">{gettext("Total")}</th>
+              <th class="text-center py-1.5 px-1.5 min-w-[3rem] font-semibold text-gray-600">
+                {gettext("Total")}
+              </th>
             </tr>
           </thead>
           <tbody>
             <tr
               :for={row <- @forecast}
-              class="border-b hover:bg-emerald-100 cursor-pointer"
+              class={"border-b last:border-0 cursor-pointer #{@row_hover}"}
               phx-click="goto_date"
               phx-value-date={Date.to_iso8601(row.date)}
             >
-              <td class="py-1 px-2 font-medium">
+              <td class="py-1 px-2 font-medium whitespace-nowrap">
                 {FullCircleWeb.Helpers.format_date(row.date)}
               </td>
-              <td class="py-1 px-1 text-gray-500">
+              <td class="py-1 px-1.5 text-gray-500">
                 {Calendar.strftime(row.date, "%a")}
               </td>
-              <td :for={grade <- @grades} class="text-center py-1 px-1">
-                {display_val(row.purchases[grade])}
+              <% values = Map.get(row, @value_key) || %{} %>
+              <td
+                :for={grade <- @grades}
+                class={"text-center py-1 px-1.5 tabular-nums #{if @value_key == :closing and to_int(values[grade]) < 0, do: "text-red-600"}"}
+              >
+                {display_val(values[grade])}
               </td>
-              <td class="text-center py-1 px-1 font-semibold">
-                {Enum.reduce(@grades, 0, fn g, acc -> acc + to_int(row.purchases[g]) end)}
+              <% total = Enum.reduce(@grades, 0, fn g, acc -> acc + to_int(values[g]) end) %>
+              <td class={"text-center py-1 px-1.5 font-semibold tabular-nums #{if @value_key == :closing and total < 0, do: "text-red-600"}"}>
+                {total}
               </td>
             </tr>
           </tbody>
@@ -2183,55 +2456,55 @@ defmodule FullCircleWeb.EggStockLive.Form do
 
   defp settings_tab(assigns) do
     ~H"""
-    <div class="space-y-6">
-      <div class="border rounded p-4">
-        <h3 class="font-bold mb-3">{gettext("Estimation Settings")}</h3>
+    <div class="flex flex-col items-center">
+      <div class="w-full max-w-lg space-y-4">
+        <div class="border rounded p-3">
+          <h3 class="font-semibold text-sm mb-3">{gettext("Estimation Settings")}</h3>
 
-        <.form for={%{}} id="autosave-delay-form" phx-change="change_autosave_delay">
-          <div class="flex items-center gap-1 mb-3">
-            <label class="text-sm font-semibold text-gray-600 w-64">
-              {gettext("Autosave delay (seconds)")}:
-            </label>
-            <select name="autosave_delay" class="border rounded px-8 py-1 text-sm">
-              <option :for={s <- [1, 2, 3, 5, 10]} value={s} selected={s == @autosave_delay}>
-                {s}
-              </option>
-            </select>
-          </div>
-        </.form>
+          <.form for={%{}} id="autosave-delay-form" phx-change="change_autosave_delay">
+            <div class="flex items-center gap-3 mb-3">
+              <label class="text-sm text-gray-600 w-44 shrink-0">
+                {gettext("Autosave delay")}
+              </label>
+              <select name="autosave_delay" class="border rounded px-2 py-1 text-sm w-20">
+                <option :for={s <- [1, 2, 3, 5, 10]} value={s} selected={s == @autosave_delay}>
+                  {s}s
+                </option>
+              </select>
+            </div>
+          </.form>
 
-        <.form for={%{}} id="lookback-days-form" phx-change="change_lookback_days">
-          <div class="flex items-center gap-1">
-            <label class="text-sm font-semibold text-gray-600 w-64">
-              {gettext("Production lookback days")}:
-            </label>
-            <select name="lookback_days" class="border rounded px-8 py-1 text-sm">
-              <option :for={d <- [2, 3, 4, 5, 6, 7]} value={d} selected={d == @lookback_days}>
-                {d}
-              </option>
-            </select>
-          </div>
-          <p class="text-xs text-gray-500 mt-1 ml-0 md:ml-64">
-            {gettext("Average production from recent days with a real closing balance.")}
-          </p>
-        </.form>
-      </div>
+          <.form for={%{}} id="lookback-days-form" phx-change="change_lookback_days">
+            <div class="flex items-center gap-3">
+              <label class="text-sm text-gray-600 w-44 shrink-0">
+                {gettext("Production lookback")}
+              </label>
+              <select name="lookback_days" class="border rounded px-2 py-1 text-sm w-20">
+                <option :for={d <- [2, 3, 4, 5, 6, 7]} value={d} selected={d == @lookback_days}>
+                  {d} {gettext("days")}
+                </option>
+              </select>
+            </div>
+            <p class="text-xs text-gray-500 mt-1.5 pl-0 sm:pl-[11.75rem]">
+              {gettext("Average production from recent days with a real closing balance.")}
+            </p>
+          </.form>
+        </div>
 
-      <div class="border rounded p-4">
-        <h3 class="font-bold mb-3">{gettext("Egg Grades")}</h3>
+        <div class="border rounded p-3">
+          <h3 class="font-semibold text-sm mb-3">{gettext("Egg Grades")}</h3>
 
-        <.form
-          for={%{}}
-          id="grades-form"
-          autocomplete="off"
-          phx-change="validate_grades"
-          phx-submit="save_grades"
-        >
-          <div class="max-w-md">
-            <div class="flex gap-1 mb-2 text-sm font-semibold text-gray-600">
-              <div class="w-8">#</div>
-              <div class="w-48">{gettext("Good Name")}</div>
-              <div class="w-32">{gettext("Nickname")}</div>
+          <.form
+            for={%{}}
+            id="grades-form"
+            autocomplete="off"
+            phx-change="validate_grades"
+            phx-submit="save_grades"
+          >
+            <div class="flex gap-1 mb-1.5 text-xs font-semibold text-gray-500">
+              <div class="w-6">#</div>
+              <div class="w-40">{gettext("Good Name")}</div>
+              <div class="w-24">{gettext("Nickname")}</div>
             </div>
 
             <div :for={{grade, idx} <- Enum.with_index(@grades_params)} class="mb-1">
@@ -2251,14 +2524,14 @@ defmodule FullCircleWeb.EggStockLive.Form do
               />
 
               <div :if={grade["delete"] != "true"} class="flex items-center gap-1">
-                <span class="w-8 text-sm text-gray-500">{idx + 1}</span>
+                <span class="w-6 text-xs text-gray-400">{idx + 1}</span>
 
                 <input
                   type="text"
                   id={"grade-name-#{idx}"}
                   name={"grades[#{idx}][name]"}
                   value={grade["name"]}
-                  class="w-48 border rounded px-2 py-1"
+                  class="w-40 border rounded px-2 py-1 text-sm"
                   phx-hook="tributeAutoComplete"
                   url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=good&name="}
                 />
@@ -2267,48 +2540,56 @@ defmodule FullCircleWeb.EggStockLive.Form do
                   type="text"
                   name={"grades[#{idx}][nickname]"}
                   value={grade["nickname"]}
-                  class="w-32 border rounded px-2 py-1"
+                  class="w-24 border rounded px-2 py-1 text-sm"
                 />
 
-                <button
-                  type="button"
-                  phx-click="move_grade"
-                  phx-value-index={idx}
-                  phx-value-dir="up"
-                  class="text-gray-500 hover:text-gray-700"
-                >
-                  <.icon name="hero-chevron-up-solid" class="h-4 w-4" />
-                </button>
-                <button
-                  type="button"
-                  phx-click="move_grade"
-                  phx-value-index={idx}
-                  phx-value-dir="down"
-                  class="text-gray-500 hover:text-gray-700"
-                >
-                  <.icon name="hero-chevron-down-solid" class="h-4 w-4" />
-                </button>
+                <div class="flex items-center shrink-0 ml-0.5">
+                  <button
+                    type="button"
+                    phx-click="move_grade"
+                    phx-value-index={idx}
+                    phx-value-dir="up"
+                    class="text-gray-400 hover:text-gray-700"
+                    title={gettext("Move up")}
+                  >
+                    <.icon name="hero-chevron-up" class="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    phx-click="move_grade"
+                    phx-value-index={idx}
+                    phx-value-dir="down"
+                    class="text-gray-400 hover:text-gray-700"
+                    title={gettext("Move down")}
+                  >
+                    <.icon name="hero-chevron-down" class="h-3.5 w-3.5" />
+                  </button>
+                </div>
                 <button
                   type="button"
                   phx-click="delete_grade"
                   phx-value-index={idx}
                   class="text-red-500 hover:text-red-700"
+                  title={gettext("Delete")}
                 >
                   <.icon name="hero-trash" class="h-4 w-4" />
                 </button>
               </div>
             </div>
-          </div>
 
-          <div class="flex gap-2 mt-3">
-            <button type="button" phx-click="add_grade" class="text-blue-600 text-sm">
-              {gettext("Add grade")}
-            </button>
-            <button type="submit" class="px-3 py-1 bg-blue-600 text-white rounded text-sm">
-              {gettext("Save grades")}
-            </button>
-          </div>
-        </.form>
+            <div class="flex items-center gap-3 mt-3">
+              <button type="button" phx-click="add_grade" class="text-blue-600 hover:text-blue-800 text-sm">
+                {gettext("Add grade")}
+              </button>
+              <button
+                type="submit"
+                class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm"
+              >
+                {gettext("Save grades")}
+              </button>
+            </div>
+          </.form>
+        </div>
       </div>
     </div>
     """

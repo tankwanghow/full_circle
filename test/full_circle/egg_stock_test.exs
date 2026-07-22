@@ -51,32 +51,36 @@ defmodule FullCircle.EggStockTest do
       assert EggStock.dow_totals(company.id, :sales, 2)["AA"] == 0
     end
 
-    test "save lines with named groups ordered by group_position", %{
+    test "save lines with separators ordered by list position", %{
       company: company,
       admin: admin,
       contact: contact
     } do
-      contact2 = contact_fixture(company, admin, %{"name" => "Second Contact #{System.unique_integer()}"})
+      contact2 =
+        contact_fixture(company, admin, %{"name" => "Second Contact #{System.unique_integer()}"})
 
       params = [
         %{
           "id" => "",
-          "contact_id" => contact2.id,
-          "contact_name" => contact2.name,
-          "group_name" => "Afternoon",
-          "group_position" => "1",
-          "position" => "0",
-          "quantities" => %{"AA" => "5"},
+          "contact_id" => contact.id,
+          "contact_name" => contact.name,
+          "quantities" => %{"AA" => "9"},
           "delete" => "false"
         },
         %{
           "id" => "",
-          "contact_id" => contact.id,
-          "contact_name" => contact.name,
-          "group_name" => "Morning",
-          "group_position" => "0",
-          "position" => "0",
-          "quantities" => %{"AA" => "9"},
+          "contact_id" => "",
+          "contact_name" => "",
+          "group_name" => "Morning batch",
+          "is_separator" => "true",
+          "quantities" => %{},
+          "delete" => "false"
+        },
+        %{
+          "id" => "",
+          "contact_id" => contact2.id,
+          "contact_name" => contact2.name,
+          "quantities" => %{"AA" => "5"},
           "delete" => "false"
         }
       ]
@@ -84,9 +88,16 @@ defmodule FullCircle.EggStockTest do
       assert {:ok, lines} =
                EggStock.save_dow_lines(company.id, :sales, 5, params, company, admin)
 
-      assert length(lines) == 2
-      assert Enum.map(lines, & &1.group_name) == ["Morning", "Afternoon"]
-      assert hd(lines).contact_id == contact.id
+      assert length(lines) == 3
+      assert Enum.map(lines, & &1.position) == [0, 1, 2]
+      assert Enum.at(lines, 0).contact_id == contact.id
+      assert Enum.at(lines, 1).is_separator == true
+      assert Enum.at(lines, 1).group_name == "Morning batch"
+      assert Enum.at(lines, 2).contact_id == contact2.id
+
+      # Separators do not contribute to totals
+      totals = EggStock.dow_totals(company.id, :sales, 5)
+      assert totals["AA"] == 14
     end
 
     test "replace semantics purge removed lines", %{company: company, admin: admin, contact: contact} do

@@ -9,6 +9,7 @@ defmodule FullCircle.EggStock.DowTemplateLine do
     field :position, :integer, default: 0
     field :group_name, :string, default: ""
     field :group_position, :integer, default: 0
+    field :is_separator, :boolean, default: false
     field :quantities, :map, default: %{}
     field :delete, :boolean, virtual: true, default: false
     field :_persistent_id, :integer, virtual: true
@@ -28,6 +29,7 @@ defmodule FullCircle.EggStock.DowTemplateLine do
       :position,
       :group_name,
       :group_position,
+      :is_separator,
       :quantities,
       :contact_id,
       :contact_name,
@@ -39,8 +41,27 @@ defmodule FullCircle.EggStock.DowTemplateLine do
     |> validate_inclusion(:kind, ["sales", "purchase"])
     |> validate_inclusion(:dow, 1..7)
     |> update_change(:group_name, &normalize_group_name/1)
-    |> validate_id(:contact_name, :contact_id)
+    |> maybe_clear_contact_for_separator()
+    |> maybe_validate_contact()
     |> maybe_mark_for_deletion()
+  end
+
+  defp maybe_clear_contact_for_separator(cs) do
+    if get_field(cs, :is_separator) do
+      cs
+      |> put_change(:contact_id, nil)
+      |> put_change(:quantities, %{})
+    else
+      cs
+    end
+  end
+
+  defp maybe_validate_contact(cs) do
+    if get_field(cs, :is_separator) do
+      cs
+    else
+      validate_id(cs, :contact_name, :contact_id)
+    end
   end
 
   defp normalize_group_name(nil), do: ""

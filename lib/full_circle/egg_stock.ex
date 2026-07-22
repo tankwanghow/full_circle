@@ -125,9 +125,7 @@ defmodule FullCircle.EggStock do
       on: c.id == dd.contact_id,
       order_by: [
         asc: dd.section,
-        asc: dd.group_position,
-        asc: dd.group_name,
-        asc: c.name,
+        asc: dd.position,
         asc: dd.id
       ],
       select: dd,
@@ -217,13 +215,7 @@ defmodule FullCircle.EggStock do
       left_join: c in Contact,
       on: c.id == l.contact_id,
       where: l.company_id == ^company_id and l.kind == ^kind and l.dow == ^dow,
-      order_by: [
-        asc: l.group_position,
-        asc: l.group_name,
-        asc: l.position,
-        asc: c.name,
-        asc: l.id
-      ],
+      order_by: [asc: l.position, asc: l.id],
       select: l,
       select_merge: %{contact_name: c.name}
     )
@@ -234,6 +226,7 @@ defmodule FullCircle.EggStock do
     grades = grades || grade_names(company_id)
 
     list_dow_lines(company_id, kind, dow)
+    |> Enum.reject(& &1.is_separator)
     |> sum_line_quantities(grades)
   end
 
@@ -257,46 +250,51 @@ defmodule FullCircle.EggStock do
           lines_params
           |> normalize_indexed_params()
           |> Enum.with_index()
-          |> Enum.reduce(Ecto.Multi.new(), fn {params, idx}, multi ->
+          |> Enum.reduce({Ecto.Multi.new(), 0}, fn {params, idx}, {multi, next_pos} ->
+            delete? = params["delete"] in [true, "true"]
+            is_separator = params["is_separator"] in [true, "true"]
+
+            {params, next_pos} =
+              if delete? do
+                {params, next_pos}
+              else
+                {Map.put(params, "position", next_pos), next_pos + 1}
+              end
+
             params =
               params
               |> Map.put("company_id", company_id)
               |> Map.put("kind", kind)
               |> Map.put("dow", dow)
-              |> Map.put_new("position", idx)
               |> Map.put_new("group_name", "")
               |> Map.put_new("group_position", 0)
+              |> Map.put("is_separator", is_separator)
               |> normalize_group_fields()
               |> normalize_quantities()
 
-            # Prefer client position; fall back to list order
-            params =
-              if blank_to_nil(params["position"]) in [nil, ""] do
-                Map.put(params, "position", idx)
-              else
-                Map.update!(params, "position", &to_int/1)
+            id = blank_to_nil(params["id"])
+
+            multi =
+              cond do
+                id && Map.has_key?(existing, id) && delete? ->
+                  Ecto.Multi.delete(multi, {:delete_dow, idx}, Map.fetch!(existing, id))
+
+                id && Map.has_key?(existing, id) ->
+                  line = Map.fetch!(existing, id)
+                  cs = DowTemplateLine.changeset(line, params)
+                  Ecto.Multi.update(multi, {:update_dow, idx}, cs)
+
+                !delete? && has_line_content?(params) ->
+                  cs = DowTemplateLine.changeset(%DowTemplateLine{}, params)
+                  Ecto.Multi.insert(multi, {:insert_dow, idx}, cs)
+
+                true ->
+                  multi
               end
 
-            id = blank_to_nil(params["id"])
-            delete? = params["delete"] in [true, "true"]
-
-            cond do
-              id && Map.has_key?(existing, id) && delete? ->
-                Ecto.Multi.delete(multi, {:delete_dow, idx}, Map.fetch!(existing, id))
-
-              id && Map.has_key?(existing, id) ->
-                line = Map.fetch!(existing, id)
-                cs = DowTemplateLine.changeset(line, params)
-                Ecto.Multi.update(multi, {:update_dow, idx}, cs)
-
-              !delete? && has_line_content?(params) ->
-                cs = DowTemplateLine.changeset(%DowTemplateLine{}, params)
-                Ecto.Multi.insert(multi, {:insert_dow, idx}, cs)
-
-              true ->
-                multi
-            end
+            {multi, next_pos}
           end)
+          |> elem(0)
 
         # Delete existing lines not present in params (full replace semantics for listed ids only;
         # lines omitted without delete flag stay unless client sends full list — we expect full list)
@@ -324,12 +322,16 @@ defmodule FullCircle.EggStock do
   end
 
   defp has_line_content?(params) do
-    name = String.trim(params["contact_name"] || "")
-    contact_id = blank_to_nil(params["contact_id"])
-    quantities = params["quantities"] || %{}
+    if params["is_separator"] in [true, "true"] do
+      true
+    else
+      name = String.trim(params["contact_name"] || "")
+      contact_id = blank_to_nil(params["contact_id"])
+      quantities = params["quantities"] || %{}
 
-    (name != "" or not is_nil(contact_id)) or
-      Enum.any?(quantities, fn {_k, v} -> to_int(v) != 0 end)
+      (name != "" or not is_nil(contact_id)) or
+        Enum.any?(quantities, fn {_k, v} -> to_int(v) != 0 end)
+    end
   end
 
   defp normalize_group_fields(params) do
@@ -401,9 +403,11 @@ defmodule FullCircle.EggStock do
       if day && Enum.any?(day.egg_stock_day_details || [], &(&1.section in sections)) do
         day.egg_stock_day_details
         |> Enum.filter(&(&1.section in sections))
+        |> Enum.reject(& &1.is_separator)
         |> Enum.map(&detail_to_planned_row/1)
       else
         list_dow_lines(company_id, kind, Date.day_of_week(date))
+        |> Enum.reject(& &1.is_separator)
         |> Enum.map(&dow_to_planned_row/1)
       end
 
@@ -480,7 +484,7 @@ defmodule FullCircle.EggStock do
   defp ensure_section_lines_for_actuals(details, actual_rows, section, sections) do
     existing_ids =
       details
-      |> Enum.filter(&(&1.section in sections))
+      |> Enum.filter(&(&1.section in sections and !&1.is_separator))
       |> Enum.map(& &1.contact_id)
       |> Enum.reject(&is_nil/1)
       |> MapSet.new(&to_string/1)
@@ -497,6 +501,12 @@ defmodule FullCircle.EggStock do
     if orphans == [] do
       {details, false}
     else
+      base_pos =
+        details
+        |> Enum.filter(&(&1.section in sections))
+        |> Enum.map(&(&1.position || 0))
+        |> Enum.max(fn -> -1 end)
+
       new_lines =
         orphans
         |> Enum.with_index()
@@ -508,6 +518,8 @@ defmodule FullCircle.EggStock do
             quantities: normalize_qty_map(row.quantities || %{}),
             group_name: "",
             group_position: 0,
+            is_separator: false,
+            position: base_pos + 1 + i,
             ignore: false,
             _persistent_id: length(details) + i
           }
@@ -611,6 +623,8 @@ defmodule FullCircle.EggStock do
       contact_name: d.contact_name,
       quantities: d.quantities || %{},
       ignore: d.ignore || false,
+      is_separator: d.is_separator || false,
+      position: d.position || 0,
       group_name: d.group_name || "",
       group_position: d.group_position || 0,
       source: :day
@@ -624,6 +638,8 @@ defmodule FullCircle.EggStock do
       contact_name: l.contact_name,
       quantities: l.quantities || %{},
       ignore: false,
+      is_separator: l.is_separator || false,
+      position: l.position || 0,
       group_name: l.group_name || "",
       group_position: l.group_position || 0,
       source: :book
@@ -632,12 +648,16 @@ defmodule FullCircle.EggStock do
 
   defp sum_planned_rows(rows, grades) do
     rows
-    |> Enum.reject(& &1[:ignore])
+    |> Enum.reject(&(&1[:ignore] || &1[:is_separator]))
     |> sum_line_quantities(grades)
   end
 
   defp sum_line_quantities(lines, grades) do
-    Enum.reduce(lines, Map.new(grades, &{&1, 0}), fn line, acc ->
+    lines
+    |> Enum.reject(fn line ->
+      Map.get(line, :is_separator) || Map.get(line, "is_separator") in [true, "true"]
+    end)
+    |> Enum.reduce(Map.new(grades, &{&1, 0}), fn line, acc ->
       quantities = Map.get(line, :quantities) || Map.get(line, "quantities") || %{}
       Map.merge(acc, quantities, fn _k, v1, v2 -> to_int(v1) + to_int(v2) end)
     end)
@@ -672,6 +692,8 @@ defmodule FullCircle.EggStock do
               "quantities" => line.quantities || %{},
               "group_name" => line.group_name || "",
               "group_position" => line.group_position || 0,
+              "is_separator" => line.is_separator || false,
+              "position" => line.position || idx,
               "ignore" => "false",
               "_persistent_id" => idx
             }
@@ -741,6 +763,8 @@ defmodule FullCircle.EggStock do
       "quantities" => d.quantities || %{},
       "group_name" => d.group_name || "",
       "group_position" => d.group_position || 0,
+      "is_separator" => d.is_separator || false,
+      "position" => d.position || 0,
       "ignore" => to_string(d.ignore || false)
     }
   end
