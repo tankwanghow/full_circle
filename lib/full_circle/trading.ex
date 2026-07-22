@@ -201,10 +201,54 @@ defmodule FullCircle.Trading do
         |> Map.put("title", doc)
         |> then(&SupplyPosition.changeset(%SupplyPosition{}, &1))
       end)
+      |> Multi.run(:ensure_supplier_location, fn _, %{create_supply: supply} ->
+        ensure_supplier_site_location(supply.supplier_id, company, user)
+      end)
       |> Repo.transaction()
       |> unwrap_multi(:create_supply)
     end
   end
+
+  @doc """
+  If the supplier has no linked `supplier_site` location, create a default one
+  named with the first 20 characters of the supplier name (no suffix), using the
+  contact mailing address as `address_note`.
+  """
+  def ensure_supplier_site_location(supplier_id, company, user)
+      when is_binary(supplier_id) and supplier_id != "" do
+    with :ok <- authorize(user, :manage_trading, company) do
+      existing =
+        list_locations_for_contact(supplier_id, company, user)
+        |> Enum.filter(&(&1.kind == "supplier_site"))
+
+      if existing != [] do
+        {:ok, :already_present}
+      else
+        case Repo.get_by(Contact, id: supplier_id, company_id: company.id) do
+          nil ->
+            {:ok, :no_supplier}
+
+          supplier ->
+            attrs = %{
+              "name" => contact_site_location_name(supplier),
+              "kind" => "supplier_site",
+              "contact_id" => supplier.id,
+              "address_note" => contact_mailing_address(supplier),
+              "active" => true,
+              "company_id" => company.id
+            }
+
+            case create_location(attrs, company, user) do
+              {:ok, loc} -> {:ok, loc}
+              {:error, cs} -> {:error, cs}
+              :not_authorise -> {:error, :not_authorise}
+            end
+        end
+      end
+    end
+  end
+
+  def ensure_supplier_site_location(_, _, _), do: {:ok, :skipped}
 
   def update_supply_position(%SupplyPosition{} = position, attrs, company, user) do
     with :ok <- authorize(user, :manage_trading, company),
@@ -685,7 +729,7 @@ defmodule FullCircle.Trading do
 
           customer ->
             attrs = %{
-              "name" => customer_delivery_location_name(customer),
+              "name" => contact_site_location_name(customer),
               "kind" => "customer_site",
               "contact_id" => customer.id,
               "address_note" => contact_mailing_address(customer),
@@ -705,7 +749,7 @@ defmodule FullCircle.Trading do
 
   def ensure_customer_delivery_location(_, _, _), do: {:ok, :skipped}
 
-  defp customer_delivery_location_name(%{name: name}) do
+  defp contact_site_location_name(%{name: name}) do
     name
     |> to_string()
     |> String.trim()

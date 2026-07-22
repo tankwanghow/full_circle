@@ -38,6 +38,57 @@ defmodule FullCircle.Trading.SupplyPositionTest do
     assert Decimal.eq?(Balances.supply_loaded(s), Decimal.new(0))
   end
 
+  test "create supply auto-creates supplier site location when missing", %{
+    admin: admin,
+    company: company
+  } do
+    supplier =
+      contact_fixture(company, admin, %{
+        "name" => "Very Long Supplier Name That Exceeds Twenty",
+        "address1" => "88 Port Road",
+        "city" => "Klang",
+        "state" => "Selangor",
+        "zipcode" => "42000"
+      })
+
+    good = good_fixture(company, admin)
+
+    assert Trading.list_locations_for_contact(supplier.id, company, admin) == []
+
+    assert {:ok, _s} =
+             Trading.create_supply_position(
+               %{
+                 "quantity" => "10",
+                 "supplier_id" => supplier.id,
+                 "good_id" => good.id
+               },
+               company,
+               admin
+             )
+
+    [loc] = Trading.list_locations_for_contact(supplier.id, company, admin)
+    assert loc.kind == "supplier_site"
+    assert loc.contact_id == supplier.id
+    assert loc.name == "Very Long Supplier N"
+    assert String.length(loc.name) <= 20
+    assert loc.address_note =~ "88 Port Road"
+    assert loc.address_note =~ "Klang"
+
+    # Second supply for same supplier does not create another location
+    assert {:ok, _} =
+             Trading.create_supply_position(
+               %{
+                 "quantity" => "5",
+                 "supplier_id" => supplier.id,
+                 "good_id" => good.id
+               },
+               company,
+               admin
+             )
+
+    assert length(Trading.list_locations_for_contact(supplier.id, company, admin)) == 1
+  end
+
   test "status transitions: open → hold → collect → closed", %{admin: admin, company: company} do
     s = supply_position_fixture(company, admin)
     assert s.status == "open"
