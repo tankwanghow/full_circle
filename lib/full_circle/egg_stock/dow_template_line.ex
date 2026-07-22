@@ -7,6 +7,8 @@ defmodule FullCircle.EggStock.DowTemplateLine do
     field :kind, :string
     field :dow, :integer
     field :position, :integer, default: 0
+    field :group_name, :string, default: ""
+    field :group_position, :integer, default: 0
     field :quantities, :map, default: %{}
     field :delete, :boolean, virtual: true, default: false
     field :_persistent_id, :integer, virtual: true
@@ -24,6 +26,8 @@ defmodule FullCircle.EggStock.DowTemplateLine do
       :kind,
       :dow,
       :position,
+      :group_name,
+      :group_position,
       :quantities,
       :contact_id,
       :contact_name,
@@ -34,9 +38,13 @@ defmodule FullCircle.EggStock.DowTemplateLine do
     |> validate_required([:kind, :dow, :company_id])
     |> validate_inclusion(:kind, ["sales", "purchase"])
     |> validate_inclusion(:dow, 1..7)
+    |> update_change(:group_name, &normalize_group_name/1)
     |> validate_id(:contact_name, :contact_id)
     |> maybe_mark_for_deletion()
   end
+
+  defp normalize_group_name(nil), do: ""
+  defp normalize_group_name(name), do: name |> to_string() |> String.trim()
 
   defp maybe_mark_for_deletion(%{data: %{id: nil}} = changeset), do: changeset
 

@@ -7,6 +7,8 @@ defmodule FullCircle.EggStock.EggStockDayDetail do
     field :section, :string
     field :quantities, :map, default: %{}
     field :ignore, :boolean, default: false
+    field :group_name, :string, default: ""
+    field :group_position, :integer, default: 0
     field :_persistent_id, :integer, virtual: true
 
     belongs_to :egg_stock_day, FullCircle.EggStock.EggStockDay
@@ -17,8 +19,21 @@ defmodule FullCircle.EggStock.EggStockDayDetail do
 
   def changeset(detail, attrs) do
     detail
-    |> cast(attrs, [:section, :quantities, :contact_id, :contact_name, :_persistent_id, :ignore])
+    |> cast(attrs, [
+      :section,
+      :quantities,
+      :contact_id,
+      :contact_name,
+      :_persistent_id,
+      :ignore,
+      :group_name,
+      :group_position
+    ])
     |> validate_required([:section])
+    |> update_change(:group_name, &normalize_group_name/1)
     |> validate_id(:contact_name, :contact_id)
   end
+
+  defp normalize_group_name(nil), do: ""
+  defp normalize_group_name(name), do: name |> to_string() |> String.trim()
 end

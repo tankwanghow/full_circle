@@ -123,7 +123,13 @@ defmodule FullCircle.EggStock do
     from(dd in EggStockDayDetail,
       left_join: c in Contact,
       on: c.id == dd.contact_id,
-      order_by: [asc: dd.section, asc: c.name, asc: dd.id],
+      order_by: [
+        asc: dd.section,
+        asc: dd.group_position,
+        asc: dd.group_name,
+        asc: c.name,
+        asc: dd.id
+      ],
       select: dd,
       select_merge: %{contact_name: c.name}
     )
@@ -211,7 +217,13 @@ defmodule FullCircle.EggStock do
       left_join: c in Contact,
       on: c.id == l.contact_id,
       where: l.company_id == ^company_id and l.kind == ^kind and l.dow == ^dow,
-      order_by: [asc: l.position, asc: c.name, asc: l.id],
+      order_by: [
+        asc: l.group_position,
+        asc: l.group_name,
+        asc: l.position,
+        asc: c.name,
+        asc: l.id
+      ],
       select: l,
       select_merge: %{contact_name: c.name}
     )
@@ -251,8 +263,19 @@ defmodule FullCircle.EggStock do
               |> Map.put("company_id", company_id)
               |> Map.put("kind", kind)
               |> Map.put("dow", dow)
-              |> Map.put("position", idx)
+              |> Map.put_new("position", idx)
+              |> Map.put_new("group_name", "")
+              |> Map.put_new("group_position", 0)
+              |> normalize_group_fields()
               |> normalize_quantities()
+
+            # Prefer client position; fall back to list order
+            params =
+              if blank_to_nil(params["position"]) in [nil, ""] do
+                Map.put(params, "position", idx)
+              else
+                Map.update!(params, "position", &to_int/1)
+              end
 
             id = blank_to_nil(params["id"])
             delete? = params["delete"] in [true, "true"]
@@ -307,6 +330,15 @@ defmodule FullCircle.EggStock do
 
     (name != "" or not is_nil(contact_id)) or
       Enum.any?(quantities, fn {_k, v} -> to_int(v) != 0 end)
+  end
+
+  defp normalize_group_fields(params) do
+    group_name = params["group_name"] |> to_string() |> String.trim()
+    group_position = to_int(params["group_position"] || 0)
+
+    params
+    |> Map.put("group_name", group_name)
+    |> Map.put("group_position", group_position)
   end
 
   defp normalize_quantities(params) do
@@ -419,6 +451,73 @@ defmodule FullCircle.EggStock do
   end
 
   @doc """
+  Ensure every contact with actual document activity has a planned line.
+  Orphan docs (no matching planned contact) get a new locked planned row.
+  In-memory only; returns `{day, added?}`.
+  """
+  def ensure_planned_lines_for_actuals(day, actual_sales, actual_purchases) do
+    details = day.egg_stock_day_details || []
+
+    {details, added_sales?} =
+      ensure_section_lines_for_actuals(
+        details,
+        actual_sales,
+        planned_sales_section(),
+        planned_sales_sections()
+      )
+
+    {details, added_purchases?} =
+      ensure_section_lines_for_actuals(
+        details,
+        actual_purchases,
+        planned_purchase_section(),
+        planned_purchase_sections()
+      )
+
+    {%{day | egg_stock_day_details: details}, added_sales? or added_purchases?}
+  end
+
+  defp ensure_section_lines_for_actuals(details, actual_rows, section, sections) do
+    existing_ids =
+      details
+      |> Enum.filter(&(&1.section in sections))
+      |> Enum.map(& &1.contact_id)
+      |> Enum.reject(&is_nil/1)
+      |> MapSet.new(&to_string/1)
+
+    orphans =
+      (actual_rows || [])
+      |> Enum.filter(fn r ->
+        r.contact_id not in [nil, ""] and
+          not MapSet.member?(existing_ids, to_string(r.contact_id))
+      end)
+      # one row per contact (actuals already aggregated by contact)
+      |> Enum.uniq_by(&to_string(&1.contact_id))
+
+    if orphans == [] do
+      {details, false}
+    else
+      new_lines =
+        orphans
+        |> Enum.with_index()
+        |> Enum.map(fn {row, i} ->
+          %EggStockDayDetail{
+            section: section,
+            contact_id: row.contact_id,
+            contact_name: row.contact_name,
+            quantities: normalize_qty_map(row.quantities || %{}),
+            group_name: "",
+            group_position: 0,
+            ignore: false,
+            _persistent_id: length(details) + i
+          }
+        end)
+
+      {details ++ new_lines, true}
+    end
+  end
+
+  @doc """
   Sync day detail structs' quantities from actual sales/purchases (in-memory).
   Returns `{day, changed?}` where changed? is true if any line quantities differed.
   """
@@ -512,6 +611,8 @@ defmodule FullCircle.EggStock do
       contact_name: d.contact_name,
       quantities: d.quantities || %{},
       ignore: d.ignore || false,
+      group_name: d.group_name || "",
+      group_position: d.group_position || 0,
       source: :day
     }
   end
@@ -523,6 +624,8 @@ defmodule FullCircle.EggStock do
       contact_name: l.contact_name,
       quantities: l.quantities || %{},
       ignore: false,
+      group_name: l.group_name || "",
+      group_position: l.group_position || 0,
       source: :book
     }
   end
@@ -567,6 +670,8 @@ defmodule FullCircle.EggStock do
               "contact_id" => line.contact_id,
               "contact_name" => line.contact_name,
               "quantities" => line.quantities || %{},
+              "group_name" => line.group_name || "",
+              "group_position" => line.group_position || 0,
               "ignore" => "false",
               "_persistent_id" => idx
             }
@@ -634,6 +739,8 @@ defmodule FullCircle.EggStock do
       "contact_id" => d.contact_id,
       "contact_name" => d.contact_name,
       "quantities" => d.quantities || %{},
+      "group_name" => d.group_name || "",
+      "group_position" => d.group_position || 0,
       "ignore" => to_string(d.ignore || false)
     }
   end

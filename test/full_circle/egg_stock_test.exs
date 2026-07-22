@@ -51,6 +51,44 @@ defmodule FullCircle.EggStockTest do
       assert EggStock.dow_totals(company.id, :sales, 2)["AA"] == 0
     end
 
+    test "save lines with named groups ordered by group_position", %{
+      company: company,
+      admin: admin,
+      contact: contact
+    } do
+      contact2 = contact_fixture(company, admin, %{"name" => "Second Contact #{System.unique_integer()}"})
+
+      params = [
+        %{
+          "id" => "",
+          "contact_id" => contact2.id,
+          "contact_name" => contact2.name,
+          "group_name" => "Afternoon",
+          "group_position" => "1",
+          "position" => "0",
+          "quantities" => %{"AA" => "5"},
+          "delete" => "false"
+        },
+        %{
+          "id" => "",
+          "contact_id" => contact.id,
+          "contact_name" => contact.name,
+          "group_name" => "Morning",
+          "group_position" => "0",
+          "position" => "0",
+          "quantities" => %{"AA" => "9"},
+          "delete" => "false"
+        }
+      ]
+
+      assert {:ok, lines} =
+               EggStock.save_dow_lines(company.id, :sales, 5, params, company, admin)
+
+      assert length(lines) == 2
+      assert Enum.map(lines, & &1.group_name) == ["Morning", "Afternoon"]
+      assert hd(lines).contact_id == contact.id
+    end
+
     test "replace semantics purge removed lines", %{company: company, admin: admin, contact: contact} do
       {:ok, [line]} =
         EggStock.save_dow_lines(
@@ -282,6 +320,61 @@ defmodule FullCircle.EggStockTest do
 
       assert EggStock.get_previous_closing_bal(company.id, d2)["AA"] in [12, "12"]
       assert %EggStockDay{} = EggStock.get_day(company.id, d1)
+    end
+  end
+
+  describe "orphan documents become planned lines" do
+    test "ensure_planned_lines_for_actuals adds missing contacts", %{contact: contact} do
+      day = %FullCircle.EggStock.EggStockDay{
+        egg_stock_day_details: []
+      }
+
+      actual_sales = [
+        %{
+          contact_id: contact.id,
+          contact_name: contact.name,
+          quantities: %{"AA" => 12, "A" => 3},
+          doc_links: [{"Invoice", Ecto.UUID.generate()}]
+        }
+      ]
+
+      {day, added?} = EggStock.ensure_planned_lines_for_actuals(day, actual_sales, [])
+      assert added?
+      assert length(day.egg_stock_day_details) == 1
+      d = hd(day.egg_stock_day_details)
+      assert d.section == "planned_order"
+      assert d.contact_id == contact.id
+      assert d.quantities["AA"] == 12
+      # Mixed into normal groups (ungrouped when no prior lines)
+      assert d.group_name == ""
+    end
+
+    test "does not duplicate existing planned contact", %{contact: contact} do
+      day = %FullCircle.EggStock.EggStockDay{
+        egg_stock_day_details: [
+          %FullCircle.EggStock.EggStockDayDetail{
+            section: "planned_order",
+            contact_id: contact.id,
+            contact_name: contact.name,
+            quantities: %{"AA" => 1},
+            group_name: "",
+            group_position: 0
+          }
+        ]
+      }
+
+      actual_sales = [
+        %{
+          contact_id: contact.id,
+          contact_name: contact.name,
+          quantities: %{"AA" => 99},
+          doc_links: [{"Invoice", Ecto.UUID.generate()}]
+        }
+      ]
+
+      {day, added?} = EggStock.ensure_planned_lines_for_actuals(day, actual_sales, [])
+      refute added?
+      assert length(day.egg_stock_day_details) == 1
     end
   end
 

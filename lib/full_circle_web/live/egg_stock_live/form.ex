@@ -28,6 +28,8 @@ defmodule FullCircleWeb.EggStockLive.Form do
      |> assign(save_status: nil)
      |> assign(dow_kind: "sales")
      |> assign(dow: Date.day_of_week(Date.utc_today()))
+     |> assign(orphan_sales_ids: MapSet.new())
+     |> assign(orphan_purchase_ids: MapSet.new())
      |> assign(page_title: gettext("Egg Stock"))}
   end
 
@@ -150,7 +152,9 @@ defmodule FullCircleWeb.EggStockLive.Form do
       actual_sales: [],
       actual_purchases: [],
       harvested: 0,
-      yesterday_ug: 0
+      yesterday_ug: 0,
+      orphan_sales_ids: MapSet.new(),
+      orphan_purchase_ids: MapSet.new()
     )
     |> assign_day_form(day)
   end
@@ -175,6 +179,18 @@ defmodule FullCircleWeb.EggStockLive.Form do
         day
       end
 
+    # Contacts on weekly book for this weekday (for orphan markers)
+    book_sales_ids = book_contact_ids(company.id, :sales, date)
+    book_purchase_ids = book_contact_ids(company.id, :purchase, date)
+
+    # Orphan documents (no planned line) → planned rows mixed into existing groups
+    {day, _orphans_added?} =
+      if socket.assigns.editable do
+        EggStock.ensure_planned_lines_for_actuals(day, actual_sales, actual_purchases)
+      else
+        {day, false}
+      end
+
     # Linked documents are source of truth for planned line quantities
     {day, qty_changed?} =
       EggStock.sync_day_details_from_actuals(day, actual_sales, actual_purchases)
@@ -187,9 +203,20 @@ defmodule FullCircleWeb.EggStockLive.Form do
                socket.assigns.current_user
              ) do
           {:ok, reloaded} ->
-            # Re-apply overlay in case reload raced; prefer in-memory synced qtys for display
+            # Re-apply orphans + overlay after reload (orphans may be unsaved)
+            {with_orphans, _} =
+              EggStock.ensure_planned_lines_for_actuals(
+                reloaded,
+                actual_sales,
+                actual_purchases
+              )
+
             {synced, _} =
-              EggStock.sync_day_details_from_actuals(reloaded, actual_sales, actual_purchases)
+              EggStock.sync_day_details_from_actuals(
+                with_orphans,
+                actual_sales,
+                actual_purchases
+              )
 
             synced
 
@@ -199,6 +226,10 @@ defmodule FullCircleWeb.EggStockLive.Form do
       else
         day
       end
+
+    # Orphan = has document activity but not on the weekly book
+    orphan_sales_ids = orphan_contact_ids(actual_sales, book_sales_ids)
+    orphan_purchase_ids = orphan_contact_ids(actual_purchases, book_purchase_ids)
 
     planned_sales = planned_rows_from_day(day, :sales)
     planned_purchases = planned_rows_from_day(day, :purchase)
@@ -231,9 +262,29 @@ defmodule FullCircleWeb.EggStockLive.Form do
       est_opening: nil,
       est_production: est_production,
       est_harvest: est_harvest,
-      est_closing: est_closing
+      est_closing: est_closing,
+      orphan_sales_ids: orphan_sales_ids,
+      orphan_purchase_ids: orphan_purchase_ids
     )
     |> assign_day_form(day)
+  end
+
+  defp book_contact_ids(company_id, kind, date) do
+    EggStock.list_dow_lines(company_id, kind, Date.day_of_week(date))
+    |> Enum.map(& &1.contact_id)
+    |> Enum.reject(&is_nil/1)
+    |> MapSet.new(&to_string/1)
+  end
+
+  defp orphan_contact_ids(actual_rows, book_ids) do
+    (actual_rows || [])
+    |> Enum.filter(fn r ->
+      r.contact_id not in [nil, ""] and
+        (r.doc_links || []) != [] and
+        not MapSet.member?(book_ids, to_string(r.contact_id))
+    end)
+    |> Enum.map(&to_string(&1.contact_id))
+    |> MapSet.new()
   end
 
   # Always editable planned grids: if day has no saved planned lines, seed from weekly book
@@ -277,6 +328,8 @@ defmodule FullCircleWeb.EggStockLive.Form do
             contact_id: line.contact_id,
             contact_name: line.contact_name,
             quantities: line.quantities || %{},
+            group_name: line.group_name || "",
+            group_position: line.group_position || 0,
             ignore: false
           }
         end)
@@ -311,9 +364,14 @@ defmodule FullCircleWeb.EggStockLive.Form do
       |> Enum.map(fn d ->
         section =
           cond do
-            d.section in EggStock.planned_sales_sections() -> EggStock.planned_sales_section()
-            d.section in EggStock.planned_purchase_sections() -> EggStock.planned_purchase_section()
-            true -> d.section
+            d.section in EggStock.planned_sales_sections() ->
+              EggStock.planned_sales_section()
+
+            d.section in EggStock.planned_purchase_sections() ->
+              EggStock.planned_purchase_section()
+
+            true ->
+              d.section
           end
 
         %{d | section: section}
@@ -347,6 +405,9 @@ defmodule FullCircleWeb.EggStockLive.Form do
         "contact_id" => l.contact_id,
         "contact_name" => l.contact_name,
         "quantities" => l.quantities || %{},
+        "group_name" => l.group_name || "",
+        "group_position" => l.group_position || 0,
+        "position" => l.position || 0,
         "delete" => "false"
       }
     end)
@@ -383,10 +444,12 @@ defmodule FullCircleWeb.EggStockLive.Form do
 
         case detail["section"] do
           s when s in ["planned_order", "actual_order"] ->
-            {Map.merge(sales, quantities, fn _k, v1, v2 -> to_int(v1) + to_int(v2) end), purchases}
+            {Map.merge(sales, quantities, fn _k, v1, v2 -> to_int(v1) + to_int(v2) end),
+             purchases}
 
           s when s in ["planned_purchase", "actual_purchase"] ->
-            {sales, Map.merge(purchases, quantities, fn _k, v1, v2 -> to_int(v1) + to_int(v2) end)}
+            {sales,
+             Map.merge(purchases, quantities, fn _k, v1, v2 -> to_int(v1) + to_int(v2) end)}
 
           _ ->
             {sales, purchases}
@@ -526,6 +589,8 @@ defmodule FullCircleWeb.EggStockLive.Form do
     new_detail = %EggStockDayDetail{
       section: section,
       quantities: %{},
+      group_name: "",
+      group_position: 0,
       _persistent_id: Enum.count(existing)
     }
 
@@ -619,9 +684,23 @@ defmodule FullCircleWeb.EggStockLive.Form do
     validate_dow(params_to_list(params), socket)
   end
 
+  def handle_event("validate_dow", _params, socket) do
+    {:noreply, socket}
+  end
+
   def handle_event("add_dow_line", _, socket) do
-    params = socket.assigns.dow_params ++ [%{"id" => "", "contact_id" => "", "contact_name" => "", "quantities" => %{}, "delete" => "false"}]
-    {:noreply, assign(socket, dow_params: params)}
+    new_line = %{
+      "id" => "",
+      "contact_id" => "",
+      "contact_name" => "",
+      "quantities" => %{},
+      "group_name" => "",
+      "group_position" => 0,
+      "position" => length(socket.assigns.dow_params),
+      "delete" => "false"
+    }
+
+    {:noreply, assign(socket, dow_params: socket.assigns.dow_params ++ [new_line])}
   end
 
   def handle_event("delete_dow_line", %{"index" => idx_str}, socket) do
@@ -755,6 +834,8 @@ defmodule FullCircleWeb.EggStockLive.Form do
            "contact_id" => Ecto.Changeset.get_field(d, :contact_id),
            "contact_name" => Ecto.Changeset.get_field(d, :contact_name),
            "quantities" => Ecto.Changeset.get_field(d, :quantities) || %{},
+           "group_name" => Ecto.Changeset.get_field(d, :group_name) || "",
+           "group_position" => Ecto.Changeset.get_field(d, :group_position) || 0,
            "_persistent_id" => i
          }}
       end)
@@ -767,6 +848,12 @@ defmodule FullCircleWeb.EggStockLive.Form do
       "ungraded_bal" => to_string(Ecto.Changeset.get_field(cs, :ungraded_bal) || 0),
       "note" => Ecto.Changeset.get_field(cs, :note) || ""
     }
+  end
+
+  defp dtl_line_qty_total(dtl, grades) do
+    Enum.reduce(grades, 0, fn g, acc ->
+      acc + to_int((dtl[:quantities].value || %{})[g])
+    end)
   end
 
   # --- Autosave ---
@@ -1167,6 +1254,8 @@ defmodule FullCircleWeb.EggStockLive.Form do
           est_production={@est_production}
           est_harvest={@est_harvest}
           est_closing={@est_closing}
+          orphan_sales_ids={@orphan_sales_ids}
+          orphan_purchase_ids={@orphan_purchase_ids}
           current_company={@current_company}
           current_user={@current_user}
         />
@@ -1251,6 +1340,13 @@ defmodule FullCircleWeb.EggStockLive.Form do
         <input type="hidden" name={"dow_lines[#{idx}][id]"} value={line["id"]} />
         <input type="hidden" name={"dow_lines[#{idx}][delete]"} value={line["delete"] || "false"} />
         <input type="hidden" name={"dow_lines[#{idx}][contact_id]"} value={line["contact_id"]} />
+        <input type="hidden" name={"dow_lines[#{idx}][group_name]"} value={line["group_name"] || ""} />
+        <input
+          type="hidden"
+          name={"dow_lines[#{idx}][group_position]"}
+          value={line["group_position"] || 0}
+        />
+        <input type="hidden" name={"dow_lines[#{idx}][position]"} value={line["position"] || idx} />
 
         <div :if={line["delete"] != "true"} class="flex items-center gap-1 mb-1">
           <input
@@ -1424,6 +1520,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
           day_details={@day.egg_stock_day_details}
           locked_contact_ids={locked_contact_ids(@actual_purchases)}
           docs_by_contact={docs_by_contact(@actual_purchases)}
+          orphan_contact_ids={@orphan_purchase_ids}
         />
 
         <.planned_section
@@ -1438,27 +1535,8 @@ defmodule FullCircleWeb.EggStockLive.Form do
           day_details={@day.egg_stock_day_details}
           locked_contact_ids={locked_contact_ids(@actual_sales)}
           docs_by_contact={docs_by_contact(@actual_sales)}
+          orphan_contact_ids={@orphan_sales_ids}
         />
-
-        <div :if={!@is_future}>
-          <.actual_data_section
-            title={gettext("Purchases")}
-            rows={@actual_purchases}
-            grades={@grades}
-            bg_class="bg-emerald-50"
-            title_class="text-emerald-700"
-            company_id={@current_company.id}
-          />
-
-          <.actual_data_section
-            title={gettext("Sales")}
-            rows={@actual_sales}
-            grades={@grades}
-            bg_class="bg-blue-50"
-            title_class="text-blue-700"
-            company_id={@current_company.id}
-          />
-        </div>
 
         <.summary_row
           :if={@est_production}
@@ -1531,6 +1609,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
           phx-click="add_detail"
           phx-value-section={@section}
           class="text-blue-600 hover:text-blue-800"
+          title={gettext("Add line")}
         >
           <.icon name="hero-plus-circle" class="h-5 w-5" />
         </button>
@@ -1547,6 +1626,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
         date={@date}
         locked_contact_ids={@locked_contact_ids}
         docs_by_contact={@docs_by_contact}
+        orphan_contact_ids={@orphan_contact_ids}
       />
       <.section_totals details={@day_details} section={@section} grades={@grades} />
     </div>
@@ -1775,20 +1855,36 @@ defmodule FullCircleWeb.EggStockLive.Form do
         <% has_docs = issued_docs != [] %>
         <% locked =
           contact_key != nil and MapSet.member?(@locked_contact_ids, contact_key) %>
+        <% orphan_ids = @orphan_contact_ids || MapSet.new() %>
+        <% orphan =
+          contact_key != nil and MapSet.member?(orphan_ids, contact_key) %>
         <% line_editable = @editable and !locked %>
         <div
           :if={dtl[:section].value == @section}
-          class={"flex items-center gap-1 #{if locked, do: "opacity-75 bg-slate-50 rounded"}"}
+          class={"flex items-center gap-1 #{if locked, do: "opacity-75"}"}
           title={
-            if locked,
-              do: gettext("Linked to a document — edit quantities on the document"),
-              else: nil
+            cond do
+              orphan ->
+                gettext("Not on weekly book — from document only; edit quantities on the document")
+
+              locked ->
+                gettext("Linked to a document — edit quantities on the document")
+
+              true ->
+                nil
+            end
           }
         >
           <input :if={dtl[:id].value} type="hidden" name={dtl[:id].name} value={dtl[:id].value} />
           <input type="hidden" name={dtl[:section].name} value={@section} />
           <input type="hidden" name={dtl[:contact_id].name} value={dtl[:contact_id].value} />
           <input type="hidden" name={dtl[:_persistent_id].name} value={dtl.index} />
+          <input type="hidden" name={"#{dtl.name}[group_name]"} value={dtl[:group_name].value || ""} />
+          <input
+            type="hidden"
+            name={"#{dtl.name}[group_position]"}
+            value={dtl[:group_position].value || 0}
+          />
 
           <%!-- readonly (not disabled) so values still submit on autosave of other fields --%>
           <input
@@ -1812,7 +1908,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
           />
 
           <div class="w-20 text-center font-semibold py-1">
-            {Enum.reduce(@grades, 0, fn g, acc -> acc + to_int((dtl[:quantities].value || %{})[g]) end)}
+            {dtl_line_qty_total(dtl, @grades)}
           </div>
 
           <button
@@ -1896,6 +1992,13 @@ defmodule FullCircleWeb.EggStockLive.Form do
           >
             <.icon name="hero-banknotes" class="h-4 w-4" />
           </a>
+                    <span
+            :if={orphan}
+            class="shrink-0 text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300"
+            title={gettext("Orphan document — not on weekly book")}
+          >
+            {gettext("Doc")}
+          </span>
         </div>
       </.inputs_for>
     </div>
