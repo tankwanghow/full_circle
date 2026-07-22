@@ -7,14 +7,18 @@
 # Local (dev DB):
 #   mix run priv/repo/seeds/import_ods_egg_dow.exs
 #
-# Production DB from this machine (recommended — release image has no mix):
-#   DATABASE_URL='ecto://USER:PASS@HOST/fullcircle' \
+# Production DB from this machine (SSH tunnel — Postgres is loopback-only on server):
+#   ssh -N -L 15432:127.0.0.1:5432 root@SERVER
+#   DATABASE_URL='postgres://deployer:PASS@127.0.0.1:15432/fullcircle' \
 #     mix run priv/repo/seeds/import_ods_egg_dow.exs
+#
+# Or: LINODE_PWD=… ./scripts/import_egg_dow_to_prod.sh
 #
 # Optional env:
 #   EGG_DOW_COMPANY   — company name substring (default: "Kim Poh Sitt Tat")
 #   EGG_DOW_JSON      — path to books JSON (default: priv/repo/seeds/egg_dow_books.json)
 #   EGG_DOW_DRY_RUN=1 — match & print only, no DB writes
+#   DATABASE_URL      — when set, overrides Repo URL (even under MIX_ENV=dev)
 # -----------------------------------------------------------------------------
 
 import Ecto.Query
@@ -25,6 +29,31 @@ alias FullCircle.EggStock.DowTemplateLine
 alias FullCircle.Accounting.Contact
 alias FullCircle.Sys.{Company, CompanyUser}
 alias FullCircle.UserAccounts.User
+
+# mix run defaults to :dev (ignores runtime DATABASE_URL). Honour DATABASE_URL when set.
+if database_url = System.get_env("DATABASE_URL") do
+  for repo <- [FullCircle.Repo, FullCircle.QueryRepo] do
+    current = Application.get_env(:full_circle, repo, [])
+
+    Application.put_env(
+      :full_circle,
+      repo,
+      Keyword.merge(current,
+        url: database_url,
+        username: nil,
+        password: nil,
+        hostname: nil,
+        database: nil,
+        pool_size: 5
+      )
+    )
+  end
+
+  # Restart the app so Repo/QueryRepo reconnect with the new URL
+  Application.stop(:full_circle)
+  {:ok, _} = Application.ensure_all_started(:full_circle)
+  IO.puts("Repo URL overridden from DATABASE_URL (app restarted)")
+end
 
 dry_run? = System.get_env("EGG_DOW_DRY_RUN") in ["1", "true", "yes"]
 company_query = System.get_env("EGG_DOW_COMPANY") || "Kim Poh Sitt Tat"

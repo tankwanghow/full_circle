@@ -50,11 +50,19 @@ do
     declare "$key=$value"
 done < "$SETUP_FILE"
 
-stty -echo
-echo -n "Please enter password of the server: "
-read LINODE_PWD
-stty echo
-echo
+if [ -z "${LINODE_PWD:-}" ]; then
+  if [ -t 0 ]; then
+    stty -echo
+    echo -n "Please enter password of the server: "
+    read LINODE_PWD
+    stty echo
+    echo
+  else
+    echo "Error: LINODE_PWD is not set and no TTY for password prompt."
+    echo "Re-run with: LINODE_PWD='…' ./deploy_to_linode/deploy.sh deploy.conf"
+    exit 1
+  fi
+fi
 
 ensure_global_assets
 stage_dockerignore
