@@ -206,23 +206,6 @@ defmodule FullCircle.Sys.UserSetting do
     [
       %{
         page: "EggStock",
-        code: "lookback-weeks",
-        display_name: "Lookback Weeks",
-        values: %{
-          "1" => "1",
-          "2" => "2",
-          "3" => "3",
-          "4" => "4",
-          "5" => "5",
-          "6" => "6",
-          "7" => "7",
-          "8" => "8"
-        },
-        value: "4",
-        company_user_id: cuid
-      },
-      %{
-        page: "EggStock",
         code: "autosave-delay",
         display_name: "Autosave Delay (seconds)",
         values: %{"1" => "1", "2" => "2", "3" => "3", "5" => "5", "10" => "10"},
@@ -232,7 +215,7 @@ defmodule FullCircle.Sys.UserSetting do
       %{
         page: "EggStock",
         code: "lookback-days",
-        display_name: "Lookback Days",
+        display_name: "Production Lookback Days",
         values: %{
           "1" => "1",
           "2" => "2",

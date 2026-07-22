@@ -11,8 +11,15 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
 
     socket =
       case socket.assigns.live_action do
-        :new -> if(obj, do: mount_new(obj, socket), else: mount_new(socket))
-        :edit -> mount_edit(socket, id)
+        :new ->
+          cond do
+            obj -> mount_new(obj, socket)
+            params["egg"] -> mount_new_from_egg(socket, params)
+            true -> mount_new(socket)
+          end
+
+        :edit ->
+          mount_edit(socket, id)
       end
 
     {:ok,
@@ -29,8 +36,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
   end
 
   defp mount_new(socket) do
-    attrs =
-      %{pur_invoice_no: "...new..."}
+    attrs = %{pur_invoice_no: "...new..."}
 
     cs =
       Billing.make_changeset(
@@ -48,6 +54,61 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
     |> assign(page_title: gettext("New Purchase Invoice"))
     |> assign(matched_trans: [])
     |> assign(:form, to_form(cs))
+  end
+
+  defp mount_new_from_egg(socket, params) do
+    egg_quantities = parse_egg_quantities(params["egg"])
+
+    details =
+      Billing.build_purchase_details_from_egg_order(
+        egg_quantities,
+        socket.assigns.current_company,
+        socket.assigns.current_user
+      )
+
+    attrs = %{
+      pur_invoice_no: "...new...",
+      contact_name: params["contact_name"],
+      contact_id: params["contact_id"],
+      pur_invoice_date: params["date"],
+      load_date: params["date"],
+      pur_invoice_details: details
+    }
+
+    cs =
+      Billing.make_changeset(
+        PurInvoice,
+        %PurInvoice{},
+        attrs,
+        socket.assigns.current_company,
+        socket.assigns.current_user
+      )
+
+    cs =
+      if Ecto.Changeset.get_assoc(cs, :pur_invoice_details) == [] do
+        FullCircleWeb.Helpers.add_line(cs, :pur_invoice_details)
+      else
+        cs
+      end
+
+    socket
+    |> assign(live_action: :new)
+    |> assign(id: "new")
+    |> assign(page_title: gettext("New Purchase Invoice"))
+    |> assign(matched_trans: [])
+    |> assign(:form, to_form(cs))
+  end
+
+  defp parse_egg_quantities(egg_str) do
+    egg_str
+    |> String.split(",")
+    |> Enum.map(fn part ->
+      case String.split(part, ":", parts: 2) do
+        [grade, qty] -> {URI.decode(grade), qty}
+        _ -> nil
+      end
+    end)
+    |> Enum.reject(&is_nil/1)
   end
 
   defp mount_new(obj, socket) do

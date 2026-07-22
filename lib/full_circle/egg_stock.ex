@@ -3,13 +3,27 @@ defmodule FullCircle.EggStock do
   import FullCircle.Authorization
 
   alias FullCircle.Repo
-  alias FullCircle.EggStock.{EggGrade, EggStockDay, EggStockDayDetail}
+  alias FullCircle.EggStock.{EggGrade, EggStockDay, EggStockDayDetail, DowTemplateLine}
   alias FullCircle.Accounting.Contact
   alias FullCircle.Billing.{Invoice, InvoiceDetail, PurInvoice, PurInvoiceDetail}
   alias FullCircle.ReceiveFund.{Receipt, ReceiptDetail}
   alias FullCircle.BillPay.{Payment, PaymentDetail}
   alias FullCircle.Product.{Good, Packaging}
   alias FullCircle.Layer.{Harvest, HarvestDetail}
+
+  @planned_sales "planned_order"
+  @planned_purchase "planned_purchase"
+  @legacy_planned_sales "actual_order"
+  @legacy_planned_purchase "actual_purchase"
+
+  def planned_sales_section, do: @planned_sales
+  def planned_purchase_section, do: @planned_purchase
+
+  def planned_sales_sections, do: [@planned_sales, @legacy_planned_sales]
+  def planned_purchase_sections, do: [@planned_purchase, @legacy_planned_purchase]
+
+  def planned_sections,
+    do: planned_sales_sections() ++ planned_purchase_sections()
 
   # --- Grades ---
 
@@ -188,7 +202,454 @@ defmodule FullCircle.EggStock do
     end
   end
 
-  # --- Actual Sales/Purchases ---
+  # --- Weekly DOW books (ODS-style 1–7) ---
+
+  def list_dow_lines(company_id, kind, dow) when kind in [:sales, :purchase, "sales", "purchase"] do
+    kind = to_string(kind)
+
+    from(l in DowTemplateLine,
+      left_join: c in Contact,
+      on: c.id == l.contact_id,
+      where: l.company_id == ^company_id and l.kind == ^kind and l.dow == ^dow,
+      order_by: [asc: l.position, asc: c.name, asc: l.id],
+      select: l,
+      select_merge: %{contact_name: c.name}
+    )
+    |> Repo.all()
+  end
+
+  def dow_totals(company_id, kind, dow, grades \\ nil) do
+    grades = grades || grade_names(company_id)
+
+    list_dow_lines(company_id, kind, dow)
+    |> sum_line_quantities(grades)
+  end
+
+  def save_dow_lines(company_id, kind, dow, lines_params, company, user)
+      when kind in [:sales, :purchase, "sales", "purchase"] do
+    kind = to_string(kind)
+
+    case can?(user, :update_egg_stock_day, company) do
+      false ->
+        :not_authorise
+
+      true ->
+        existing =
+          from(l in DowTemplateLine,
+            where: l.company_id == ^company_id and l.kind == ^kind and l.dow == ^dow
+          )
+          |> Repo.all()
+          |> Map.new(&{&1.id, &1})
+
+        multi =
+          lines_params
+          |> normalize_indexed_params()
+          |> Enum.with_index()
+          |> Enum.reduce(Ecto.Multi.new(), fn {params, idx}, multi ->
+            params =
+              params
+              |> Map.put("company_id", company_id)
+              |> Map.put("kind", kind)
+              |> Map.put("dow", dow)
+              |> Map.put("position", idx)
+              |> normalize_quantities()
+
+            id = blank_to_nil(params["id"])
+            delete? = params["delete"] in [true, "true"]
+
+            cond do
+              id && Map.has_key?(existing, id) && delete? ->
+                Ecto.Multi.delete(multi, {:delete_dow, idx}, Map.fetch!(existing, id))
+
+              id && Map.has_key?(existing, id) ->
+                line = Map.fetch!(existing, id)
+                cs = DowTemplateLine.changeset(line, params)
+                Ecto.Multi.update(multi, {:update_dow, idx}, cs)
+
+              !delete? && has_line_content?(params) ->
+                cs = DowTemplateLine.changeset(%DowTemplateLine{}, params)
+                Ecto.Multi.insert(multi, {:insert_dow, idx}, cs)
+
+              true ->
+                multi
+            end
+          end)
+
+        # Delete existing lines not present in params (full replace semantics for listed ids only;
+        # lines omitted without delete flag stay unless client sends full list — we expect full list)
+        submitted_ids =
+          lines_params
+          |> normalize_indexed_params()
+          |> Enum.map(&blank_to_nil(&1["id"]))
+          |> Enum.reject(&is_nil/1)
+          |> MapSet.new()
+
+        multi =
+          Enum.reduce(existing, multi, fn {id, line}, multi ->
+            if MapSet.member?(submitted_ids, id) do
+              multi
+            else
+              Ecto.Multi.delete(multi, {:purge_dow, id}, line)
+            end
+          end)
+
+        case Repo.transaction(multi) do
+          {:ok, _} -> {:ok, list_dow_lines(company_id, kind, dow)}
+          {:error, _op, cs, _} -> {:error, cs}
+        end
+    end
+  end
+
+  defp has_line_content?(params) do
+    name = String.trim(params["contact_name"] || "")
+    contact_id = blank_to_nil(params["contact_id"])
+    quantities = params["quantities"] || %{}
+
+    (name != "" or not is_nil(contact_id)) or
+      Enum.any?(quantities, fn {_k, v} -> to_int(v) != 0 end)
+  end
+
+  defp normalize_quantities(params) do
+    quantities =
+      (params["quantities"] || %{})
+      |> Enum.map(fn {k, v} -> {k, to_int(v)} end)
+      |> Map.new()
+
+    Map.put(params, "quantities", quantities)
+  end
+
+  defp normalize_indexed_params(params) when is_list(params), do: params
+
+  defp normalize_indexed_params(params) when is_map(params) do
+    params
+    |> Enum.sort_by(fn {k, _} ->
+      case Integer.parse(to_string(k)) do
+        {n, _} -> n
+        :error -> 0
+      end
+    end)
+    |> Enum.map(fn {_k, v} -> v end)
+  end
+
+  defp blank_to_nil(nil), do: nil
+  defp blank_to_nil(""), do: nil
+  defp blank_to_nil(v), do: v
+
+  # --- Planned SO/PO for a date (day override wins over DOW book) ---
+
+  def day_has_planned_section?(day, section) when is_binary(section) do
+    sections =
+      case section do
+        s when s in [@planned_sales, @legacy_planned_sales] -> planned_sales_sections()
+        s when s in [@planned_purchase, @legacy_planned_purchase] -> planned_purchase_sections()
+        _ -> [section]
+      end
+
+    day &&
+      Enum.any?(day.egg_stock_day_details || [], fn d ->
+        d.section in sections
+      end)
+  end
+
+  def day_has_planned_sales?(day), do: day_has_planned_section?(day, @planned_sales)
+  def day_has_planned_purchases?(day), do: day_has_planned_section?(day, @planned_purchase)
+
+  def planned_sales_for_date(company_id, date) do
+    planned_lines_for_date(company_id, date, :sales, planned_sales_sections())
+  end
+
+  def planned_purchases_for_date(company_id, date) do
+    planned_lines_for_date(company_id, date, :purchase, planned_purchase_sections())
+  end
+
+  defp planned_lines_for_date(company_id, date, kind, sections) do
+    day = get_day(company_id, date)
+
+    rows =
+      if day && Enum.any?(day.egg_stock_day_details || [], &(&1.section in sections)) do
+        day.egg_stock_day_details
+        |> Enum.filter(&(&1.section in sections))
+        |> Enum.map(&detail_to_planned_row/1)
+      else
+        list_dow_lines(company_id, kind, Date.day_of_week(date))
+        |> Enum.map(&dow_to_planned_row/1)
+      end
+
+    # Linked documents are source of truth for quantities
+    actuals =
+      case kind do
+        :sales -> actual_sales_for_date(company_id, date)
+        :purchase -> actual_purchases_for_date(company_id, date)
+        "sales" -> actual_sales_for_date(company_id, date)
+        "purchase" -> actual_purchases_for_date(company_id, date)
+      end
+
+    overlay_actual_quantities(rows, actuals)
+  end
+
+  def planned_sales_totals(company_id, date, grades \\ nil) do
+    grades = grades || grade_names(company_id)
+    planned_sales_for_date(company_id, date) |> sum_planned_rows(grades)
+  end
+
+  def planned_purchases_totals(company_id, date, grades \\ nil) do
+    grades = grades || grade_names(company_id)
+    planned_purchases_for_date(company_id, date) |> sum_planned_rows(grades)
+  end
+
+  @doc """
+  For planned lines that have matching actual document rows (same contact),
+  replace quantities with the document totals so planned reflects issued docs.
+  """
+  def overlay_actual_quantities(planned_rows, actual_rows) do
+    by_contact =
+      (actual_rows || [])
+      |> Enum.filter(fn r -> r.contact_id not in [nil, ""] end)
+      |> Map.new(fn r -> {to_string(r.contact_id), r.quantities || %{}} end)
+
+    Enum.map(planned_rows || [], fn row ->
+      cid = row[:contact_id] || row["contact_id"]
+
+      if cid not in [nil, ""] and Map.has_key?(by_contact, to_string(cid)) do
+        Map.put(row, :quantities, normalize_qty_map(by_contact[to_string(cid)]))
+      else
+        row
+      end
+    end)
+  end
+
+  @doc """
+  Sync day detail structs' quantities from actual sales/purchases (in-memory).
+  Returns `{day, changed?}` where changed? is true if any line quantities differed.
+  """
+  def sync_day_details_from_actuals(day, actual_sales, actual_purchases) do
+    sales_by =
+      (actual_sales || [])
+      |> Enum.filter(fn r -> r.contact_id not in [nil, ""] end)
+      |> Map.new(fn r -> {to_string(r.contact_id), normalize_qty_map(r.quantities || %{})} end)
+
+    purchases_by =
+      (actual_purchases || [])
+      |> Enum.filter(fn r -> r.contact_id not in [nil, ""] end)
+      |> Map.new(fn r -> {to_string(r.contact_id), normalize_qty_map(r.quantities || %{})} end)
+
+    {details, changed?} =
+      Enum.map_reduce(day.egg_stock_day_details || [], false, fn d, ch ->
+        cid = d.contact_id && to_string(d.contact_id)
+
+        actual_qty =
+          cond do
+            cid && d.section in planned_sales_sections() -> Map.get(sales_by, cid)
+            cid && d.section in planned_purchase_sections() -> Map.get(purchases_by, cid)
+            true -> nil
+          end
+
+        if actual_qty do
+          current = normalize_qty_map(d.quantities || %{})
+
+          if current == actual_qty do
+            {d, ch}
+          else
+            # Keep full grade map for form display (zeros for missing grades)
+            {%{d | quantities: actual_qty}, true}
+          end
+        else
+          {d, ch}
+        end
+      end)
+
+    {%{day | egg_stock_day_details: details}, changed?}
+  end
+
+  @doc """
+  Persist planned-detail quantities that were synced from documents.
+
+  Uses direct updates (not cast_assoc) so map quantity changes are always written.
+  Returns the day reloaded with details.
+  """
+  def persist_synced_detail_quantities(day, company, user) do
+    case can?(user, :update_egg_stock_day, company) do
+      false ->
+        {:error, :not_authorise}
+
+      true ->
+        day.egg_stock_day_details
+        |> Enum.filter(& &1.id)
+        |> Enum.each(fn d ->
+          from(dd in EggStockDayDetail, where: dd.id == ^d.id)
+          |> Repo.update_all(set: [quantities: normalize_qty_map(d.quantities || %{})])
+        end)
+
+        from(d in EggStockDay, where: d.id == ^day.id)
+        |> Repo.update_all(set: [updated_at: DateTime.utc_now() |> DateTime.truncate(:second)])
+
+        reloaded =
+          get_day(day.company_id, day.stock_date) ||
+            Repo.preload(day, [egg_stock_day_details: __day_details_query__()], force: true)
+
+        {:ok, reloaded}
+    end
+  end
+
+  # Drop Phoenix _unused_ keys and zero values for stable compare/store
+  def normalize_qty_map(map) when is_map(map) do
+    map
+    |> Enum.reject(fn {k, _v} ->
+      ks = to_string(k)
+      String.starts_with?(ks, "_unused")
+    end)
+    |> Map.new(fn {k, v} -> {to_string(k), to_int(v)} end)
+    |> Enum.reject(fn {_k, v} -> v == 0 end)
+    |> Map.new()
+  end
+
+  def normalize_qty_map(_), do: %{}
+
+  defp detail_to_planned_row(d) do
+    %{
+      id: d.id,
+      contact_id: d.contact_id,
+      contact_name: d.contact_name,
+      quantities: d.quantities || %{},
+      ignore: d.ignore || false,
+      source: :day
+    }
+  end
+
+  defp dow_to_planned_row(l) do
+    %{
+      id: l.id,
+      contact_id: l.contact_id,
+      contact_name: l.contact_name,
+      quantities: l.quantities || %{},
+      ignore: false,
+      source: :book
+    }
+  end
+
+  defp sum_planned_rows(rows, grades) do
+    rows
+    |> Enum.reject(& &1[:ignore])
+    |> sum_line_quantities(grades)
+  end
+
+  defp sum_line_quantities(lines, grades) do
+    Enum.reduce(lines, Map.new(grades, &{&1, 0}), fn line, acc ->
+      quantities = Map.get(line, :quantities) || Map.get(line, "quantities") || %{}
+      Map.merge(acc, quantities, fn _k, v1, v2 -> to_int(v1) + to_int(v2) end)
+    end)
+  end
+
+  def copy_dow_book_to_day(day, kind, company, user)
+      when kind in [:sales, :purchase, "sales", "purchase"] do
+    kind = to_string(kind)
+    section = if kind == "sales", do: @planned_sales, else: @planned_purchase
+    sections = if kind == "sales", do: planned_sales_sections(), else: planned_purchase_sections()
+
+    case can?(user, :update_egg_stock_day, company) do
+      false ->
+        :not_authorise
+
+      true ->
+        book_lines = list_dow_lines(day.company_id, kind, Date.day_of_week(day.stock_date))
+
+        keep =
+          (day.egg_stock_day_details || [])
+          |> Enum.reject(&(&1.section in sections))
+          |> Enum.map(&detail_to_attr/1)
+
+        new_lines =
+          book_lines
+          |> Enum.with_index()
+          |> Enum.map(fn {line, idx} ->
+            %{
+              "section" => section,
+              "contact_id" => line.contact_id,
+              "contact_name" => line.contact_name,
+              "quantities" => line.quantities || %{},
+              "ignore" => "false",
+              "_persistent_id" => idx
+            }
+          end)
+
+        attrs = %{
+          "egg_stock_day_details" =>
+            (keep ++ new_lines)
+            |> Enum.with_index()
+            |> Map.new(fn {v, i} -> {to_string(i), stringify_keys(v)} end)
+        }
+
+        day
+        |> Map.put(:egg_stock_day_details, Enum.filter(day.egg_stock_day_details || [], & &1.id))
+        |> save_day(attrs, company, user)
+        |> case do
+          {:ok, updated} ->
+            {:ok, Repo.preload(updated, [egg_stock_day_details: __day_details_query__()], force: true)}
+
+          other ->
+            other
+        end
+    end
+  end
+
+  def clear_day_planned_section(day, kind, company, user)
+      when kind in [:sales, :purchase, "sales", "purchase"] do
+    kind = to_string(kind)
+    sections = if kind == "sales", do: planned_sales_sections(), else: planned_purchase_sections()
+
+    case can?(user, :update_egg_stock_day, company) do
+      false ->
+        :not_authorise
+
+      true ->
+        keep =
+          (day.egg_stock_day_details || [])
+          |> Enum.reject(&(&1.section in sections))
+          |> Enum.map(&detail_to_attr/1)
+
+        attrs = %{
+          "egg_stock_day_details" =>
+            keep
+            |> Enum.with_index()
+            |> Map.new(fn {v, i} -> {to_string(i), stringify_keys(v)} end)
+        }
+
+        day
+        |> Map.put(:egg_stock_day_details, Enum.filter(day.egg_stock_day_details || [], & &1.id))
+        |> save_day(attrs, company, user)
+        |> case do
+          {:ok, updated} ->
+            {:ok, Repo.preload(updated, [egg_stock_day_details: __day_details_query__()], force: true)}
+
+          other ->
+            other
+        end
+    end
+  end
+
+  defp detail_to_attr(d) do
+    %{
+      "id" => d.id,
+      "section" => normalize_section(d.section),
+      "contact_id" => d.contact_id,
+      "contact_name" => d.contact_name,
+      "quantities" => d.quantities || %{},
+      "ignore" => to_string(d.ignore || false)
+    }
+  end
+
+  defp normalize_section(@legacy_planned_sales), do: @planned_sales
+  defp normalize_section(@legacy_planned_purchase), do: @planned_purchase
+  defp normalize_section(s), do: s
+
+  defp stringify_keys(map) when is_map(map) do
+    Map.new(map, fn
+      {k, v} when is_atom(k) -> {Atom.to_string(k), v}
+      {k, v} -> {k, v}
+    end)
+  end
+
+  # --- Actual Sales/Purchases (history from documents) ---
 
   def actual_sales_for_date(company_id, date) do
     grade_names = grade_names(company_id)
@@ -338,171 +799,9 @@ defmodule FullCircle.EggStock do
     |> Enum.sort_by(& &1.contact_name)
   end
 
-  # --- DOW Averages ---
+  # --- Estimation / forecast (hybrid) ---
 
-  def sales_averages_by_dow(company_id, lookback_weeks) do
-    grade_names = grade_names(company_id)
-    trimmed_names = Enum.map(grade_names, &String.trim/1)
-    name_map = Enum.zip(trimmed_names, grade_names) |> Map.new()
-    compute_sales_averages(company_id, trimmed_names, name_map, lookback_weeks)
-  end
-
-  def purchase_averages_by_dow(company_id, lookback_weeks) do
-    grade_names = grade_names(company_id)
-    trimmed_names = Enum.map(grade_names, &String.trim/1)
-    name_map = Enum.zip(trimmed_names, grade_names) |> Map.new()
-    compute_purchase_averages(company_id, trimmed_names, name_map, lookback_weeks)
-  end
-
-  defp compute_sales_averages(company_id, grade_names, name_map, lookback_weeks) do
-    cutoff = Date.add(Date.utc_today(), -(lookback_weeks * 7))
-
-    invoice_query =
-      from(id in InvoiceDetail,
-        join: inv in Invoice,
-        on: id.invoice_id == inv.id,
-        join: g in Good,
-        on: id.good_id == g.id,
-        join: c in Contact,
-        on: inv.contact_id == c.id,
-        left_join: pkg in Packaging,
-        on: id.package_id == pkg.id,
-        where: inv.company_id == ^company_id,
-        where: g.name in ^grade_names,
-        where: fragment("COALESCE(?, ?)", inv.load_date, inv.invoice_date) >= ^cutoff,
-        select: %{
-          contact_id: inv.contact_id,
-          contact_name: c.name,
-          good_name: g.name,
-          dow:
-            fragment(
-              "EXTRACT(ISODOW FROM COALESCE(?, ?))::integer",
-              inv.load_date,
-              inv.invoice_date
-            ),
-          qty_trays:
-            fragment("?::numeric / COALESCE(NULLIF(?, 0), 30)", id.quantity, pkg.unit_multiplier)
-        }
-      )
-
-    receipt_query =
-      from(rd in ReceiptDetail,
-        join: r in Receipt,
-        on: rd.receipt_id == r.id,
-        join: g in Good,
-        on: rd.good_id == g.id,
-        join: c in Contact,
-        on: r.contact_id == c.id,
-        left_join: pkg in Packaging,
-        on: rd.package_id == pkg.id,
-        where: r.company_id == ^company_id,
-        where: g.name in ^grade_names,
-        where: fragment("COALESCE(?, ?)", r.load_date, r.receipt_date) >= ^cutoff,
-        select: %{
-          contact_id: r.contact_id,
-          contact_name: c.name,
-          good_name: g.name,
-          dow:
-            fragment("EXTRACT(ISODOW FROM COALESCE(?, ?))::integer", r.load_date, r.receipt_date),
-          qty_trays:
-            fragment("?::numeric / COALESCE(NULLIF(?, 0), 30)", rd.quantity, pkg.unit_multiplier)
-        }
-      )
-
-    aggregate_dow_results(invoice_query, receipt_query, name_map, lookback_weeks)
-  end
-
-  defp compute_purchase_averages(company_id, grade_names, name_map, lookback_weeks) do
-    cutoff = Date.add(Date.utc_today(), -(lookback_weeks * 7))
-
-    pur_invoice_query =
-      from(pid in PurInvoiceDetail,
-        join: pi in PurInvoice,
-        on: pid.pur_invoice_id == pi.id,
-        join: g in Good,
-        on: pid.good_id == g.id,
-        join: c in Contact,
-        on: pi.contact_id == c.id,
-        left_join: pkg in Packaging,
-        on: pid.package_id == pkg.id,
-        where: pi.company_id == ^company_id,
-        where: g.name in ^grade_names,
-        where: fragment("COALESCE(?, ?)", pi.load_date, pi.pur_invoice_date) >= ^cutoff,
-        select: %{
-          contact_id: pi.contact_id,
-          contact_name: c.name,
-          good_name: g.name,
-          dow:
-            fragment(
-              "EXTRACT(ISODOW FROM COALESCE(?, ?))::integer",
-              pi.load_date,
-              pi.pur_invoice_date
-            ),
-          qty_trays:
-            fragment("?::numeric / COALESCE(NULLIF(?, 0), 30)", pid.quantity, pkg.unit_multiplier)
-        }
-      )
-
-    payment_query =
-      from(pd in PaymentDetail,
-        join: p in Payment,
-        on: pd.payment_id == p.id,
-        join: g in Good,
-        on: pd.good_id == g.id,
-        join: c in Contact,
-        on: p.contact_id == c.id,
-        left_join: pkg in Packaging,
-        on: pd.package_id == pkg.id,
-        where: p.company_id == ^company_id,
-        where: g.name in ^grade_names,
-        where: p.payment_date >= ^cutoff,
-        select: %{
-          contact_id: p.contact_id,
-          contact_name: c.name,
-          good_name: g.name,
-          dow: fragment("EXTRACT(ISODOW FROM ?)::integer", p.payment_date),
-          qty_trays:
-            fragment("?::numeric / COALESCE(NULLIF(?, 0), 30)", pd.quantity, pkg.unit_multiplier)
-        }
-      )
-
-    aggregate_dow_results(pur_invoice_query, payment_query, name_map, lookback_weeks)
-  end
-
-  defp aggregate_dow_results(query1, query2, name_map, lookback_weeks) do
-    rows1 = Repo.all(query1)
-    rows2 = Repo.all(query2)
-    all_rows = rows1 ++ rows2
-
-    all_rows
-    |> Enum.group_by(fn r -> {r.dow, r.contact_id, r.contact_name} end)
-    |> Enum.map(fn {{dow, contact_id, contact_name}, rows} ->
-      quantities =
-        rows
-        |> Enum.group_by(& &1.good_name)
-        |> Map.new(fn {goods_name, grade_rows} ->
-          total =
-            Enum.reduce(grade_rows, Decimal.new(0), fn r, acc ->
-              Decimal.add(acc, r.qty_trays || Decimal.new(0))
-            end)
-
-          avg =
-            Decimal.div(total, Decimal.new(lookback_weeks))
-            |> Decimal.round(0)
-            |> Decimal.to_integer()
-
-          grade_name = Map.get(name_map, goods_name, goods_name)
-          {grade_name, avg}
-        end)
-
-      {dow, %{contact_id: contact_id, contact_name: contact_name, quantities: quantities}}
-    end)
-    |> Enum.group_by(fn {dow, _} -> dow end, fn {_, row} -> row end)
-  end
-
-  # --- Estimation ---
-
-  def compute_estimated_opening(company_id, target_date, lookback_weeks, lookback_days) do
+  def compute_estimated_opening(company_id, target_date, lookback_days) do
     grades = grade_names(company_id)
 
     case get_latest_actual_closing(company_id, target_date) do
@@ -514,8 +813,6 @@ defmodule FullCircle.EggStock do
           start_closing
         else
           avg_prod = compute_avg_production(company_id, lookback_days)
-          sales_by_dow = sales_averages_by_dow(company_id, lookback_weeks)
-          purchases_by_dow = purchase_averages_by_dow(company_id, lookback_weeks)
 
           Date.range(Date.add(start_date, 1), Date.add(target_date, -1))
           |> Enum.reduce(start_closing, fn date, prev_closing ->
@@ -524,20 +821,8 @@ defmodule FullCircle.EggStock do
             if day && has_actual_closing?(day.closing_bal) do
               day.closing_bal
             else
-              dow = Date.day_of_week(date)
-
-              {day_sales, day_purchases} =
-                if day &&
-                     Enum.any?(
-                       day.egg_stock_day_details,
-                       &(&1.section in ["actual_order", "actual_purchase"])
-                     ) do
-                  {sum_section(day.egg_stock_day_details, "actual_order", grades),
-                   sum_section(day.egg_stock_day_details, "actual_purchase", grades)}
-                else
-                  {sum_dow_quantities(sales_by_dow[dow] || [], grades),
-                   sum_dow_quantities(purchases_by_dow[dow] || [], grades)}
-                end
+              day_sales = planned_sales_totals(company_id, date, grades)
+              day_purchases = planned_purchases_totals(company_id, date, grades)
 
               Map.new(grades, fn g ->
                 o = to_int(prev_closing[g])
@@ -633,73 +918,19 @@ defmodule FullCircle.EggStock do
     end)
   end
 
-  # --- Helpers ---
-
-  defp has_actual_closing?(nil), do: false
-  defp has_actual_closing?(bal) when bal == %{}, do: false
-
-  defp has_actual_closing?(bal) when is_map(bal) do
-    Enum.any?(bal, fn {_k, v} -> v != "" and v != "0" and v != nil end)
-  end
-
-  defp sum_section(details, section, grades) do
-    details
-    |> Enum.filter(&(&1.section == section and !&1.ignore))
-    |> Enum.reduce(Map.new(grades, fn g -> {g, 0} end), fn detail, acc ->
-      Map.merge(acc, detail.quantities || %{}, fn _k, v1, v2 ->
-        to_int(v1) + to_int(v2)
-      end)
-    end)
-  end
-
-  defp sum_dow_quantities(rows, grades) do
-    rows
-    |> Enum.reduce(Map.new(grades, fn g -> {g, 0} end), fn row, acc ->
-      Map.merge(acc, row.quantities || %{}, fn _k, v1, v2 ->
-        to_int(v1) + to_int(v2)
-      end)
-    end)
-  end
-
-  defp to_int(nil), do: 0
-  defp to_int(v) when is_integer(v), do: v
-
-  defp to_int(v) when is_binary(v) do
-    case Integer.parse(v) do
-      {n, _} -> n
-      :error -> 0
-    end
-  end
-
-  defp to_int(v) when is_float(v), do: round(v)
-
-  def compute_7day_forecast(company_id, start_date, lookback_weeks, lookback_days) do
+  def compute_7day_forecast(company_id, start_date, lookback_days) do
     grades = grade_names(company_id)
     avg_prod = compute_avg_production(company_id, lookback_days)
-    sales_by_dow = sales_averages_by_dow(company_id, lookback_weeks)
-    purchases_by_dow = purchase_averages_by_dow(company_id, lookback_weeks)
 
-    opening =
-      compute_estimated_opening(company_id, start_date, lookback_weeks, lookback_days)
+    opening = compute_estimated_opening(company_id, start_date, lookback_days)
 
     0..6
     |> Enum.map_reduce(opening, fn offset, prev_closing ->
       date = Date.add(start_date, offset)
       day = get_day(company_id, date)
-      dow = Date.day_of_week(date)
 
-      {day_sales, day_purchases} =
-        if day &&
-             Enum.any?(
-               day.egg_stock_day_details,
-               &(&1.section in ["actual_order", "actual_purchase"])
-             ) do
-          {sum_section(day.egg_stock_day_details, "actual_order", grades),
-           sum_section(day.egg_stock_day_details, "actual_purchase", grades)}
-        else
-          {sum_dow_quantities(sales_by_dow[dow] || [], grades),
-           sum_dow_quantities(purchases_by_dow[dow] || [], grades)}
-        end
+      day_sales = planned_sales_totals(company_id, date, grades)
+      day_purchases = planned_purchases_totals(company_id, date, grades)
 
       closing =
         if day && has_actual_closing?(day.closing_bal) do
@@ -714,8 +945,37 @@ defmodule FullCircle.EggStock do
           end)
         end
 
-      {%{date: date, closing: closing, sales: day_sales, purchases: day_purchases}, closing}
+      {%{
+         date: date,
+         closing: closing,
+         sales: day_sales,
+         purchases: day_purchases,
+         production: avg_prod
+       }, closing}
     end)
     |> elem(0)
   end
+
+  # --- Helpers ---
+
+  defp has_actual_closing?(nil), do: false
+  defp has_actual_closing?(bal) when bal == %{}, do: false
+
+  defp has_actual_closing?(bal) when is_map(bal) do
+    Enum.any?(bal, fn {_k, v} -> v != "" and v != "0" and v != nil and to_int(v) != 0 end)
+  end
+
+  def to_int(nil), do: 0
+  def to_int(v) when is_integer(v), do: v
+
+  def to_int(v) when is_binary(v) do
+    case Integer.parse(String.trim(v)) do
+      {n, _} -> n
+      :error -> 0
+    end
+  end
+
+  def to_int(v) when is_float(v), do: round(v)
+  def to_int(%Decimal{} = v), do: v |> Decimal.round(0) |> Decimal.to_integer()
+  def to_int(_), do: 0
 end

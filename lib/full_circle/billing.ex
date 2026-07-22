@@ -383,6 +383,15 @@ defmodule FullCircle.Billing do
   end
 
   def build_invoice_details_from_egg_order(egg_quantities, com, user) do
+    build_egg_order_details(egg_quantities, com, user, :sales)
+  end
+
+  def build_purchase_details_from_egg_order(egg_quantities, com, user) do
+    build_egg_order_details(egg_quantities, com, user, :purchase)
+  end
+
+  defp build_egg_order_details(egg_quantities, com, user, side)
+       when side in [:sales, :purchase] do
     egg_quantities
     |> Enum.reject(fn {_grade, qty} -> qty in [nil, "", "0", 0] end)
     |> Enum.with_index()
@@ -390,14 +399,25 @@ defmodule FullCircle.Billing do
       good = FullCircle.Product.get_good_by_name(String.trim(grade_name), com, user)
 
       if good do
+        {account_name, account_id, tax_name, tax_id, tax_rate} =
+          case side do
+            :sales ->
+              {good.sales_account_name, good.sales_account_id, good.sales_tax_code_name,
+               good.sales_tax_code_id, good.sales_tax_rate || 0}
+
+            :purchase ->
+              {good.purchase_account_name, good.purchase_account_id, good.purchase_tax_code_name,
+               good.purchase_tax_code_id, good.purchase_tax_rate || 0}
+          end
+
         %{
           "good_name" => good.value,
           "good_id" => good.id,
-          "account_name" => good.sales_account_name,
-          "account_id" => good.sales_account_id,
-          "tax_code_name" => good.sales_tax_code_name,
-          "tax_code_id" => good.sales_tax_code_id,
-          "tax_rate" => good.sales_tax_rate || 0,
+          "account_name" => account_name,
+          "account_id" => account_id,
+          "tax_code_name" => tax_name,
+          "tax_code_id" => tax_id,
+          "tax_rate" => tax_rate,
           "package_name" => good.package_name,
           "package_id" => good.package_id,
           "unit" => good.unit,

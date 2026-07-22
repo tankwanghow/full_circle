@@ -11,7 +11,6 @@ defmodule FullCircleWeb.EggStockLive.Form do
     settings =
       Sys.load_settings("EggStock", socket.assigns.current_company, socket.assigns.current_user)
 
-    weeks = Sys.get_setting(settings, "EggStock", "lookback-weeks") |> String.to_integer()
     days = Sys.get_setting(settings, "EggStock", "lookback-days") |> String.to_integer()
 
     autosave_delay =
@@ -24,11 +23,11 @@ defmodule FullCircleWeb.EggStockLive.Form do
      socket
      |> assign(active_tab: "now")
      |> assign(settings: settings)
-     |> assign(lookback_weeks: weeks)
      |> assign(lookback_days: days)
      |> assign(autosave_delay: autosave_delay)
      |> assign(save_status: nil)
-     |> assign(show_ignored: true)
+     |> assign(dow_kind: "sales")
+     |> assign(dow: Date.day_of_week(Date.utc_today()))
      |> assign(page_title: gettext("Egg Stock"))}
   end
 
@@ -70,15 +69,14 @@ defmodule FullCircleWeb.EggStockLive.Form do
     company = socket.assigns.current_company
     date = socket.assigns.date
     is_future = socket.assigns.is_future
-    lookback_weeks = socket.assigns.lookback_weeks
     lookback_days = socket.assigns.lookback_days
 
     case EggStock.get_or_create_day(company.id, date) do
       {:ok, day} ->
         if is_future do
-          load_future_day(socket, day, company, date, lookback_weeks, lookback_days)
+          load_future_day(socket, day, company, date, lookback_days)
         else
-          load_today_or_past_day(socket, day, company, date, lookback_weeks, lookback_days)
+          load_today_or_past_day(socket, day, company, date, lookback_days)
         end
 
       {:error, _cs} ->
@@ -89,13 +87,18 @@ defmodule FullCircleWeb.EggStockLive.Form do
   defp load_tab_data(socket, "estimated") do
     company = socket.assigns.current_company
     date = socket.assigns.date
-    lookback_weeks = socket.assigns.lookback_weeks
     lookback_days = socket.assigns.lookback_days
 
-    forecast =
-      EggStock.compute_7day_forecast(company.id, date, lookback_weeks, lookback_days)
-
+    forecast = EggStock.compute_7day_forecast(company.id, date, lookback_days)
     assign(socket, forecast: forecast)
+  end
+
+  defp load_tab_data(socket, "weekly_sales") do
+    load_weekly_tab(socket, "sales")
+  end
+
+  defp load_tab_data(socket, "weekly_purchases") do
+    load_weekly_tab(socket, "purchase")
   end
 
   defp load_tab_data(socket, "settings") do
@@ -106,26 +109,34 @@ defmodule FullCircleWeb.EggStockLive.Form do
 
   defp load_tab_data(socket, _), do: socket
 
-  defp load_future_day(socket, day, company, date, lookback_weeks, lookback_days) do
-    est_opening =
-      EggStock.compute_estimated_opening(
-        company.id,
-        date,
-        lookback_weeks,
-        lookback_days
-      )
+  defp load_weekly_tab(socket, kind) do
+    company = socket.assigns.current_company
+    dow = socket.assigns.dow
+    lines = EggStock.list_dow_lines(company.id, kind, dow)
 
+    socket
+    |> assign(dow_kind: kind)
+    |> assign(dow_lines: lines)
+    |> assign(dow_params: dow_lines_to_params(lines))
+  end
+
+  defp load_future_day(socket, day, company, date, lookback_days) do
+    est_opening = EggStock.compute_estimated_opening(company.id, date, lookback_days)
     est_production = EggStock.compute_avg_production(company.id, lookback_days)
     est_harvest = EggStock.compute_avg_harvest(company.id, lookback_days)
 
     day = %{day | opening_bal: est_opening}
-    day = prepopulate_orders(day, company.id, date, lookback_weeks, [], [])
+    day = seed_planned_details_from_book(day, company.id, date)
+
+    planned_sales = planned_rows_from_day(day, :sales)
+    planned_purchases = planned_rows_from_day(day, :purchase)
 
     est_closing =
       compute_est_closing(
         est_opening,
         est_production,
-        day.egg_stock_day_details,
+        planned_sales,
+        planned_purchases,
         socket.assigns.grade_names
       )
 
@@ -144,7 +155,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
     |> assign_day_form(day)
   end
 
-  defp load_today_or_past_day(socket, day, company, date, lookback_weeks, lookback_days) do
+  defp load_today_or_past_day(socket, day, company, date, lookback_days) do
     opening = EggStock.get_previous_closing_bal(company.id, date)
     day = %{day | opening_bal: opening}
 
@@ -153,20 +164,45 @@ defmodule FullCircleWeb.EggStockLive.Form do
     harvested = EggStock.harvest_total_for_date(company.id, date)
 
     est_harvest =
-      if harvested == 0,
-        do: EggStock.compute_avg_harvest(company.id, lookback_days),
-        else: nil
+      if harvested == 0, do: EggStock.compute_avg_harvest(company.id, lookback_days), else: nil
 
     yesterday_ug = EggStock.get_previous_ungraded_bal(company.id, date)
 
     day =
       if socket.assigns.editable do
-        prepopulate_orders(day, company.id, date, lookback_weeks, actual_sales, actual_purchases)
+        seed_planned_details_from_book(day, company.id, date)
       else
         day
       end
 
-    # For today, compute est_closing and est_production
+    # Linked documents are source of truth for planned line quantities
+    {day, qty_changed?} =
+      EggStock.sync_day_details_from_actuals(day, actual_sales, actual_purchases)
+
+    day =
+      if qty_changed? do
+        case EggStock.persist_synced_detail_quantities(
+               day,
+               company,
+               socket.assigns.current_user
+             ) do
+          {:ok, reloaded} ->
+            # Re-apply overlay in case reload raced; prefer in-memory synced qtys for display
+            {synced, _} =
+              EggStock.sync_day_details_from_actuals(reloaded, actual_sales, actual_purchases)
+
+            synced
+
+          _ ->
+            day
+        end
+      else
+        day
+      end
+
+    planned_sales = planned_rows_from_day(day, :sales)
+    planned_purchases = planned_rows_from_day(day, :purchase)
+
     {est_production, est_closing} =
       if socket.assigns.editable do
         prod = EggStock.compute_avg_production(company.id, lookback_days)
@@ -175,7 +211,8 @@ defmodule FullCircleWeb.EggStockLive.Form do
           compute_est_closing(
             opening,
             prod,
-            day.egg_stock_day_details,
+            planned_sales,
+            planned_purchases,
             socket.assigns.grade_names
           )
 
@@ -199,9 +236,88 @@ defmodule FullCircleWeb.EggStockLive.Form do
     |> assign_day_form(day)
   end
 
-  defp assign_day_form(socket, day) do
+  # Always editable planned grids: if day has no saved planned lines, seed from weekly book
+  # (in-memory / form only until autosave).
+  defp seed_planned_details_from_book(day, company_id, date) do
+    details = day.egg_stock_day_details || []
+    dow = Date.day_of_week(date)
+
     details =
-      Enum.filter(day.egg_stock_day_details, &(&1.section in ["actual_order", "actual_purchase"]))
+      seed_section_from_book(
+        details,
+        company_id,
+        dow,
+        :sales,
+        EggStock.planned_sales_section(),
+        EggStock.planned_sales_sections()
+      )
+
+    details =
+      seed_section_from_book(
+        details,
+        company_id,
+        dow,
+        :purchase,
+        EggStock.planned_purchase_section(),
+        EggStock.planned_purchase_sections()
+      )
+
+    %{day | egg_stock_day_details: details}
+  end
+
+  defp seed_section_from_book(details, company_id, dow, kind, section, sections) do
+    if Enum.any?(details, &(&1.section in sections)) do
+      details
+    else
+      book_details =
+        EggStock.list_dow_lines(company_id, kind, dow)
+        |> Enum.map(fn line ->
+          %EggStockDayDetail{
+            section: section,
+            contact_id: line.contact_id,
+            contact_name: line.contact_name,
+            quantities: line.quantities || %{},
+            ignore: false
+          }
+        end)
+
+      details ++ book_details
+    end
+  end
+
+  defp planned_rows_from_day(day, kind) do
+    sections =
+      if kind == :sales,
+        do: EggStock.planned_sales_sections(),
+        else: EggStock.planned_purchase_sections()
+
+    (day.egg_stock_day_details || [])
+    |> Enum.filter(&(&1.section in sections))
+    |> Enum.map(fn d ->
+      %{
+        contact_id: d.contact_id,
+        contact_name: d.contact_name,
+        quantities: d.quantities || %{},
+        ignore: d.ignore || false
+      }
+    end)
+  end
+
+  defp assign_day_form(socket, day) do
+    sections = EggStock.planned_sections()
+
+    details =
+      Enum.filter(day.egg_stock_day_details || [], &(&1.section in sections))
+      |> Enum.map(fn d ->
+        section =
+          cond do
+            d.section in EggStock.planned_sales_sections() -> EggStock.planned_sales_section()
+            d.section in EggStock.planned_purchase_sections() -> EggStock.planned_purchase_section()
+            true -> d.section
+          end
+
+        %{d | section: section}
+      end)
 
     scoped_day = %{day | egg_stock_day_details: []}
 
@@ -210,70 +326,6 @@ defmodule FullCircleWeb.EggStockLive.Form do
       |> Ecto.Changeset.put_assoc(:egg_stock_day_details, details)
 
     assign(socket, form: to_form(cs))
-  end
-
-  defp prepopulate_orders(day, company_id, date, lookback_weeks, actual_sales, actual_purchases) do
-    has_orders = Enum.any?(day.egg_stock_day_details, &(&1.section == "actual_order"))
-    has_purchases = Enum.any?(day.egg_stock_day_details, &(&1.section == "actual_purchase"))
-
-    if has_orders or has_purchases do
-      day
-    else
-      dow = Date.day_of_week(date)
-      sales_avgs = EggStock.sales_averages_by_dow(company_id, lookback_weeks)
-      purchase_avgs = EggStock.purchase_averages_by_dow(company_id, lookback_weeks)
-
-      sales_rows = sales_avgs[dow] || []
-      purchase_rows = purchase_avgs[dow] || []
-
-      sold_contact_ids = MapSet.new(actual_sales, & &1.contact_id)
-      bought_contact_ids = MapSet.new(actual_purchases, & &1.contact_id)
-
-      order_details =
-        if sales_rows != [] do
-          templates_to_details(sales_rows, "actual_order", sold_contact_ids)
-        else
-          actuals_to_details(actual_sales, "actual_order")
-        end
-        |> Enum.sort_by(& &1.contact_name)
-
-      purchase_details =
-        if purchase_rows != [] do
-          templates_to_details(purchase_rows, "actual_purchase", bought_contact_ids)
-        else
-          actuals_to_details(actual_purchases, "actual_purchase")
-        end
-        |> Enum.sort_by(& &1.contact_name)
-
-      %{
-        day
-        | egg_stock_day_details: day.egg_stock_day_details ++ order_details ++ purchase_details
-      }
-    end
-  end
-
-  defp templates_to_details(template_rows, section, exclude_contact_ids) do
-    template_rows
-    |> Enum.reject(fn row -> MapSet.member?(exclude_contact_ids, row.contact_id) end)
-    |> Enum.map(fn row ->
-      %EggStockDayDetail{
-        section: section,
-        contact_id: row.contact_id,
-        contact_name: row.contact_name,
-        quantities: row.quantities || %{}
-      }
-    end)
-  end
-
-  defp actuals_to_details(actual_rows, section) do
-    Enum.map(actual_rows, fn row ->
-      %EggStockDayDetail{
-        section: section,
-        contact_id: row.contact_id,
-        contact_name: row.contact_name,
-        quantities: row.quantities || %{}
-      }
-    end)
   end
 
   defp grades_to_params(grades) do
@@ -288,20 +340,21 @@ defmodule FullCircleWeb.EggStockLive.Form do
     end)
   end
 
-  defp compute_est_closing(opening, est_production, details, grades) do
-    sales_total =
-      details
-      |> Enum.filter(&(&1.section == "actual_order" and !&1.ignore))
-      |> Enum.reduce(Map.new(grades, &{&1, 0}), fn d, acc ->
-        Map.merge(acc, d.quantities || %{}, fn _k, v1, v2 -> to_int(v1) + to_int(v2) end)
-      end)
+  defp dow_lines_to_params(lines) do
+    Enum.map(lines, fn l ->
+      %{
+        "id" => l.id,
+        "contact_id" => l.contact_id,
+        "contact_name" => l.contact_name,
+        "quantities" => l.quantities || %{},
+        "delete" => "false"
+      }
+    end)
+  end
 
-    purchase_total =
-      details
-      |> Enum.filter(&(&1.section == "actual_purchase" and !&1.ignore))
-      |> Enum.reduce(Map.new(grades, &{&1, 0}), fn d, acc ->
-        Map.merge(acc, d.quantities || %{}, fn _k, v1, v2 -> to_int(v1) + to_int(v2) end)
-      end)
+  defp compute_est_closing(opening, est_production, sales_rows, purchase_rows, grades) do
+    sales_total = sum_planned_rows(sales_rows, grades)
+    purchase_total = sum_planned_rows(purchase_rows, grades)
 
     Map.new(grades, fn g ->
       o = to_int(opening[g])
@@ -312,6 +365,13 @@ defmodule FullCircleWeb.EggStockLive.Form do
     end)
   end
 
+  defp sum_planned_rows(rows, grades) do
+    Enum.reduce(rows, Map.new(grades, &{&1, 0}), fn row, acc ->
+      quantities = row[:quantities] || row["quantities"] || %{}
+      Map.merge(acc, quantities, fn _k, v1, v2 -> to_int(v1) + to_int(v2) end)
+    end)
+  end
+
   defp compute_est_closing_from_params(opening, est_production, params, grades) do
     details = params["egg_stock_day_details"] || %{}
 
@@ -319,23 +379,17 @@ defmodule FullCircleWeb.EggStockLive.Form do
       Enum.reduce(details, {Map.new(grades, &{&1, 0}), Map.new(grades, &{&1, 0})}, fn {_k, detail},
                                                                                       {sales,
                                                                                        purchases} ->
-        if detail["ignore"] == "true" do
-          {sales, purchases}
-        else
-          quantities = detail["quantities"] || %{}
+        quantities = detail["quantities"] || %{}
 
-          case detail["section"] do
-            "actual_order" ->
-              {Map.merge(sales, quantities, fn _k, v1, v2 -> to_int(v1) + to_int(v2) end),
-               purchases}
+        case detail["section"] do
+          s when s in ["planned_order", "actual_order"] ->
+            {Map.merge(sales, quantities, fn _k, v1, v2 -> to_int(v1) + to_int(v2) end), purchases}
 
-            "actual_purchase" ->
-              {sales,
-               Map.merge(purchases, quantities, fn _k, v1, v2 -> to_int(v1) + to_int(v2) end)}
+          s when s in ["planned_purchase", "actual_purchase"] ->
+            {sales, Map.merge(purchases, quantities, fn _k, v1, v2 -> to_int(v1) + to_int(v2) end)}
 
-            _ ->
-              {sales, purchases}
-          end
+          _ ->
+            {sales, purchases}
         end
       end)
 
@@ -348,20 +402,67 @@ defmodule FullCircleWeb.EggStockLive.Form do
     end)
   end
 
+  defp detail_line_locked?(section, contact_id, actual_sales, actual_purchases) do
+    cond do
+      contact_id in [nil, ""] ->
+        false
+
+      section in EggStock.planned_sales_sections() ->
+        contact_has_issued_docs?(actual_sales, contact_id)
+
+      section in EggStock.planned_purchase_sections() ->
+        contact_has_issued_docs?(actual_purchases, contact_id)
+
+      true ->
+        false
+    end
+  end
+
+  defp contact_has_issued_docs?(rows, contact_id) do
+    cid = to_string(contact_id)
+
+    Enum.any?(rows || [], fn row ->
+      to_string(row.contact_id) == cid and (row.doc_links || []) != []
+    end)
+  end
+
+  defp locked_contact_ids(rows) do
+    (rows || [])
+    |> Enum.filter(fn row -> (row.doc_links || []) != [] end)
+    |> Enum.map(&to_string(&1.contact_id))
+    |> MapSet.new()
+  end
+
+  # contact_id string => list of {doc_type, doc_id}
+  defp docs_by_contact(rows) do
+    (rows || [])
+    |> Enum.filter(fn row -> row.contact_id not in [nil, ""] and (row.doc_links || []) != [] end)
+    |> Enum.reduce(%{}, fn row, acc ->
+      key = to_string(row.contact_id)
+      existing = Map.get(acc, key, [])
+      Map.put(acc, key, Enum.uniq(existing ++ (row.doc_links || [])))
+    end)
+  end
+
   # --- Events ---
 
   @impl true
   def handle_event("switch_tab", %{"tab" => tab}, socket) do
     socket = flush_autosave(socket)
 
-    {:noreply,
-     socket
-     |> assign(active_tab: tab)
-     |> load_tab_data(tab)}
-  end
+    socket =
+      socket
+      |> assign(active_tab: tab)
+      |> then(fn s ->
+        if tab in ["weekly_sales", "weekly_purchases"] do
+          assign(s, dow: Date.day_of_week(s.assigns.date))
+        else
+          s
+        end
+      end)
+      |> load_tab_data(tab)
 
-  def handle_event("toggle_show_ignored", _, socket) do
-    {:noreply, assign(socket, show_ignored: !socket.assigns.show_ignored)}
+    {:noreply, socket}
   end
 
   def handle_event("nav_date", %{"dir" => dir}, socket) do
@@ -383,6 +484,17 @@ defmodule FullCircleWeb.EggStockLive.Form do
      socket
      |> assign(active_tab: "now")
      |> push_patch(to: ~p"/companies/#{socket.assigns.current_company.id}/egg_stock/#{date_str}")}
+  end
+
+  def handle_event("select_dow", %{"dow" => dow_str}, socket) do
+    socket = flush_autosave(socket)
+    dow = String.to_integer(dow_str)
+    kind = socket.assigns.dow_kind
+
+    {:noreply,
+     socket
+     |> assign(dow: dow)
+     |> load_weekly_tab(kind)}
   end
 
   # --- Now tab: validate/save ---
@@ -425,75 +537,118 @@ defmodule FullCircleWeb.EggStockLive.Form do
     {:noreply, assign(socket, form: to_form(cs))}
   end
 
-  def handle_event("toggle_ignore", %{"index" => index}, socket) do
+  def handle_event("delete_detail", %{"index" => index}, socket) do
     index = String.to_integer(index)
     cs = socket.assigns.form.source
+    details = Ecto.Changeset.get_assoc(cs, :egg_stock_day_details)
+    detail_cs = Enum.at(details, index)
 
-    details =
-      Ecto.Changeset.get_assoc(cs, :egg_stock_day_details)
-      |> Enum.with_index()
-      |> Enum.map(fn {detail_cs, i} ->
-        if i == index do
-          current = Ecto.Changeset.get_field(detail_cs, :ignore) || false
-          Ecto.Changeset.put_change(detail_cs, :ignore, !current)
-        else
-          detail_cs
-        end
-      end)
+    if is_nil(detail_cs) do
+      {:noreply, socket}
+    else
+      section = Ecto.Changeset.get_field(detail_cs, :section)
+      contact_id = Ecto.Changeset.get_field(detail_cs, :contact_id)
 
-    cs =
-      cs
-      |> Ecto.Changeset.put_assoc(:egg_stock_day_details, details)
-      |> Map.put(:action, :validate)
+      locked? =
+        detail_line_locked?(
+          section,
+          contact_id,
+          socket.assigns[:actual_sales] || [],
+          socket.assigns[:actual_purchases] || []
+        )
 
-    params = changeset_to_params(cs)
-    socket = assign(socket, form: to_form(cs))
-
-    socket =
-      if socket.assigns[:est_production] do
-        opening =
-          if socket.assigns.is_future,
-            do: socket.assigns.est_opening,
-            else: socket.assigns.day.opening_bal
-
-        est_closing =
-          compute_est_closing_from_params(
-            opening,
-            socket.assigns.est_production,
-            params,
-            socket.assigns.grade_names
-          )
-
-        assign(socket, est_closing: est_closing)
+      if locked? do
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           gettext("Cannot delete: invoice or receipt already issued for this contact today")
+         )}
       else
+        details = List.delete_at(details, index)
+
+        cs =
+          cs
+          |> Ecto.Changeset.put_assoc(:egg_stock_day_details, details)
+          |> Map.put(:action, :validate)
+
+        params = changeset_to_params(cs)
+        socket = assign(socket, form: to_form(cs))
+
+        socket =
+          if socket.assigns[:est_production] do
+            opening =
+              if socket.assigns.is_future,
+                do: socket.assigns.est_opening,
+                else: socket.assigns.day.opening_bal
+
+            est_closing =
+              compute_est_closing_from_params(
+                opening,
+                socket.assigns.est_production,
+                params,
+                socket.assigns.grade_names
+              )
+
+            assign(socket, est_closing: est_closing)
+          else
+            socket
+          end
+
+        socket = schedule_autosave(socket, {:day, params})
+        {:noreply, socket}
+      end
+    end
+  end
+
+  # --- Weekly book events ---
+
+  def handle_event(
+        "validate_dow",
+        %{
+          "_target" => ["dow_lines", _idx, "contact_name"],
+          "dow_lines" => params
+        },
         socket
+      ) do
+    params_list = resolve_dow_contacts(params_to_list(params), socket)
+    validate_dow(params_list, socket)
+  end
+
+  def handle_event("validate_dow", %{"dow_lines" => params}, socket) do
+    validate_dow(params_to_list(params), socket)
+  end
+
+  def handle_event("add_dow_line", _, socket) do
+    params = socket.assigns.dow_params ++ [%{"id" => "", "contact_id" => "", "contact_name" => "", "quantities" => %{}, "delete" => "false"}]
+    {:noreply, assign(socket, dow_params: params)}
+  end
+
+  def handle_event("delete_dow_line", %{"index" => idx_str}, socket) do
+    idx = String.to_integer(idx_str)
+    params = socket.assigns.dow_params
+    line = Enum.at(params, idx)
+
+    params =
+      if line["id"] && line["id"] != "" do
+        List.replace_at(params, idx, Map.put(line, "delete", "true"))
+      else
+        List.delete_at(params, idx)
       end
 
-    socket = schedule_autosave(socket, params)
-
+    socket = assign(socket, dow_params: params)
+    socket = schedule_autosave(socket, {:dow, params})
     {:noreply, socket}
   end
 
   # --- Settings events ---
 
-  def handle_event("change_lookback", %{"lookback_weeks" => weeks_str}, socket) do
-    weeks = String.to_integer(weeks_str)
-    setting = Enum.find(socket.assigns.settings, &(&1.code == "lookback-weeks"))
-    Sys.update_setting(setting, weeks_str)
-
-    {:noreply,
-     socket
-     |> assign(lookback_weeks: weeks)}
-  end
-
   def handle_event("change_lookback_days", %{"lookback_days" => days_str}, socket) do
     days = String.to_integer(days_str)
     setting = Enum.find(socket.assigns.settings, &(&1.code == "lookback-days"))
-    Sys.update_setting(setting, days_str)
+    if setting, do: Sys.update_setting(setting, days_str)
 
-    {:noreply,
-     socket
-     |> assign(lookback_days: days)}
+    {:noreply, assign(socket, lookback_days: days)}
   end
 
   def handle_event("change_autosave_delay", %{"autosave_delay" => delay_str}, socket) do
@@ -501,9 +656,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
     setting = Enum.find(socket.assigns.settings, &(&1.code == "autosave-delay"))
     if setting, do: Sys.update_setting(setting, delay_str)
 
-    {:noreply,
-     socket
-     |> assign(autosave_delay: delay)}
+    {:noreply, assign(socket, autosave_delay: delay)}
   end
 
   def handle_event("validate_grades", %{"grades" => params}, socket) do
@@ -602,7 +755,6 @@ defmodule FullCircleWeb.EggStockLive.Form do
            "contact_id" => Ecto.Changeset.get_field(d, :contact_id),
            "contact_name" => Ecto.Changeset.get_field(d, :contact_name),
            "quantities" => Ecto.Changeset.get_field(d, :quantities) || %{},
-           "ignore" => to_string(Ecto.Changeset.get_field(d, :ignore) || false),
            "_persistent_id" => i
          }}
       end)
@@ -620,41 +772,55 @@ defmodule FullCircleWeb.EggStockLive.Form do
   # --- Autosave ---
 
   @impl true
-  def handle_info({:autosave, params}, socket) do
+  def handle_info({:autosave, {:day, params}}, socket) do
     socket = assign(socket, save_status: :saving)
-    do_save(params, socket)
+    do_save_day(params, socket)
+  end
+
+  def handle_info({:autosave, {:dow, params}}, socket) do
+    socket = assign(socket, save_status: :saving)
+    do_save_dow(params, socket)
   end
 
   def handle_info(:clear_save_status, socket) do
     {:noreply, assign(socket, save_status: nil)}
   end
 
-  defp schedule_autosave(socket, params) do
+  defp schedule_autosave(socket, payload) do
     if timer = socket.assigns[:autosave_timer], do: Process.cancel_timer(timer)
     delay = socket.assigns.autosave_delay * 1_000
-    timer = Process.send_after(self(), {:autosave, params}, delay)
-    assign(socket, autosave_timer: timer, autosave_params: params)
+    timer = Process.send_after(self(), {:autosave, payload}, delay)
+    assign(socket, autosave_timer: timer, autosave_params: payload)
   end
 
   defp flush_autosave(socket) do
     if timer = socket.assigns[:autosave_timer] do
       Process.cancel_timer(timer)
-      params = socket.assigns[:autosave_params]
-      {:noreply, socket} = do_save(params, socket)
-      assign(socket, autosave_timer: nil, autosave_params: nil)
+
+      case socket.assigns[:autosave_params] do
+        {:day, params} ->
+          {:noreply, socket} = do_save_day(params, socket)
+          assign(socket, autosave_timer: nil, autosave_params: nil)
+
+        {:dow, params} ->
+          {:noreply, socket} = do_save_dow(params, socket)
+          assign(socket, autosave_timer: nil, autosave_params: nil)
+
+        _ ->
+          assign(socket, autosave_timer: nil, autosave_params: nil)
+      end
     else
       socket
     end
   end
 
-  defp do_save(params, socket) do
+  defp do_save_day(params, socket) do
     day = socket.assigns.day
+    planned = EggStock.planned_sections()
 
     all_other_details =
       day.egg_stock_day_details
-      |> Enum.filter(fn d ->
-        d.section not in ["actual_order", "actual_purchase"]
-      end)
+      |> Enum.filter(fn d -> d.section not in planned end)
       |> Enum.with_index()
       |> Enum.map(fn {d, i} ->
         {to_string(i),
@@ -714,7 +880,35 @@ defmodule FullCircleWeb.EggStockLive.Form do
     end
   end
 
-  # --- Helpers ---
+  defp do_save_dow(params, socket) do
+    case EggStock.save_dow_lines(
+           socket.assigns.current_company.id,
+           socket.assigns.dow_kind,
+           socket.assigns.dow,
+           params,
+           socket.assigns.current_company,
+           socket.assigns.current_user
+         ) do
+      {:ok, lines} ->
+        Process.send_after(self(), :clear_save_status, 2_000)
+
+        {:noreply,
+         socket
+         |> assign(
+           dow_lines: lines,
+           dow_params: dow_lines_to_params(lines),
+           save_status: :saved
+         )}
+
+      {:error, _cs} ->
+        {:noreply, assign(socket, save_status: :error)}
+
+      :not_authorise ->
+        {:noreply,
+         assign(socket, save_status: :error)
+         |> put_flash(:error, gettext("You are not authorised to perform this action"))}
+    end
+  end
 
   defp resolve_detail_contacts(params, socket) do
     details = params["egg_stock_day_details"] || %{}
@@ -741,14 +935,31 @@ defmodule FullCircleWeb.EggStockLive.Form do
     Map.put(params, "egg_stock_day_details", details)
   end
 
+  defp resolve_dow_contacts(params_list, socket) do
+    Enum.map(params_list, fn v ->
+      name = String.trim(v["contact_name"] || "")
+
+      if name != "" do
+        contact =
+          Accounting.get_contact_by_name(
+            name,
+            socket.assigns.current_company,
+            socket.assigns.current_user
+          )
+
+        Map.put(v, "contact_id", if(contact, do: contact.id))
+      else
+        Map.put(v, "contact_id", nil)
+      end
+    end)
+  end
+
   defp validate_day(params, socket) do
     day = socket.assigns.day
+    sections = EggStock.planned_sections()
 
     scoped_details =
-      Enum.filter(
-        day.egg_stock_day_details,
-        &(&1.id && &1.section in ["actual_order", "actual_purchase"])
-      )
+      Enum.filter(day.egg_stock_day_details, &(&1.id && &1.section in sections))
 
     scoped_day = %{day | egg_stock_day_details: scoped_details}
 
@@ -758,7 +969,6 @@ defmodule FullCircleWeb.EggStockLive.Form do
 
     socket = assign(socket, form: to_form(cs))
 
-    # Recompute est_closing from form params
     socket =
       if socket.assigns[:est_production] do
         opening =
@@ -779,10 +989,32 @@ defmodule FullCircleWeb.EggStockLive.Form do
         socket
       end
 
-    socket = schedule_autosave(socket, params)
+    socket = schedule_autosave(socket, {:day, params})
 
     {:noreply, socket}
   end
+
+  defp validate_dow(params_list, socket) do
+    socket =
+      socket
+      |> assign(dow_params: params_list)
+      |> schedule_autosave({:dow, params_list})
+
+    {:noreply, socket}
+  end
+
+  defp params_to_list(params) when is_map(params) do
+    params
+    |> Enum.sort_by(fn {k, _} ->
+      case Integer.parse(to_string(k)) do
+        {n, _} -> n
+        :error -> 0
+      end
+    end)
+    |> Enum.map(fn {_k, v} -> v end)
+  end
+
+  defp params_to_list(params) when is_list(params), do: params
 
   defp params_to_grades_list(params) when is_map(params) do
     params
@@ -827,11 +1059,19 @@ defmodule FullCircleWeb.EggStockLive.Form do
 
   defp sum_quantities(details, section, grade) when is_list(details) do
     details
-    |> Enum.filter(&(&1.section == section and !&1.ignore))
+    |> Enum.filter(&(&1.section == section))
     |> Enum.reduce(0, fn d, acc ->
       acc + to_int((d.quantities || %{})[grade])
     end)
   end
+
+  defp dow_label(1), do: gettext("Mon")
+  defp dow_label(2), do: gettext("Tue")
+  defp dow_label(3), do: gettext("Wed")
+  defp dow_label(4), do: gettext("Thu")
+  defp dow_label(5), do: gettext("Fri")
+  defp dow_label(6), do: gettext("Sat")
+  defp dow_label(7), do: gettext("Sun")
 
   # --- Render ---
 
@@ -858,7 +1098,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="mx-auto w-8/12 mb-10">
+    <div class="mx-auto w-10/12 mb-10">
       <div class="text-center mb-2">
         <span class="text-xl font-bold">{gettext("Egg Stock")}</span>
       </div>
@@ -896,8 +1136,10 @@ defmodule FullCircleWeb.EggStockLive.Form do
       </div>
 
       <%!-- Tabs --%>
-      <div class="flex gap-1 mb-4 border-b border-gray-300">
+      <div class="flex flex-wrap gap-1 mb-4 border-b border-gray-300">
         <.tab_button tab="now" active={@active_tab} label={gettext("Stock")} />
+        <.tab_button tab="weekly_sales" active={@active_tab} label={gettext("Weekly Sales")} />
+        <.tab_button tab="weekly_purchases" active={@active_tab} label={gettext("Weekly Purchases")} />
         <.tab_button tab="estimated" active={@active_tab} label={gettext("Estimated")} />
         <.tab_button tab="settings" active={@active_tab} label={gettext("Settings")} />
         <.link
@@ -908,7 +1150,6 @@ defmodule FullCircleWeb.EggStockLive.Form do
         </.link>
       </div>
 
-      <%!-- Tab content --%>
       <div :if={@active_tab == "now"}>
         <.now_tab
           form={@form}
@@ -928,7 +1169,18 @@ defmodule FullCircleWeb.EggStockLive.Form do
           est_closing={@est_closing}
           current_company={@current_company}
           current_user={@current_user}
-          show_ignored={@show_ignored}
+        />
+      </div>
+
+      <div :if={@active_tab in ["weekly_sales", "weekly_purchases"]}>
+        <.weekly_tab
+          kind={@dow_kind}
+          dow={@dow}
+          dow_params={@dow_params}
+          grades={@grade_names}
+          grade_labels={@grade_labels}
+          current_company={@current_company}
+          current_user={@current_user}
         />
       </div>
 
@@ -944,10 +1196,8 @@ defmodule FullCircleWeb.EggStockLive.Form do
       <div :if={@active_tab == "settings"}>
         <.settings_tab
           grades_params={@grades_params}
-          lookback_weeks={@lookback_weeks}
           lookback_days={@lookback_days}
           autosave_delay={@autosave_delay}
-          show_ignored={@show_ignored}
           current_company={@current_company}
           current_user={@current_user}
         />
@@ -956,17 +1206,112 @@ defmodule FullCircleWeb.EggStockLive.Form do
     """
   end
 
-  # --- Components ---
-
   defp tab_button(assigns) do
     ~H"""
     <button
       type="button"
       phx-click="switch_tab"
       phx-value-tab={@tab}
-      class={"px-4 py-2 text-sm font-medium #{if @tab == @active, do: "border-b-2 border-blue-500 text-blue-600", else: "text-gray-500 hover:text-gray-700"}"}
+      class={"px-3 py-2 text-sm font-medium #{if @tab == @active, do: "border-b-2 border-blue-500 text-blue-600", else: "text-gray-500 hover:text-gray-700"}"}
     >
       {@label}
+    </button>
+    """
+  end
+
+  # --- Weekly Tab ---
+
+  defp weekly_tab(assigns) do
+    ~H"""
+    <div class="mb-3 flex flex-wrap items-center gap-2">
+      <span class="text-sm font-semibold text-gray-600">
+        {if @kind == "sales", do: gettext("Sales book"), else: gettext("Purchase book")}
+      </span>
+      <button
+        :for={d <- 1..7}
+        type="button"
+        phx-click="select_dow"
+        phx-value-dow={d}
+        class={"px-3 py-1 text-sm rounded border #{if d == @dow, do: "bg-blue-600 text-white border-blue-600", else: "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"}"}
+      >
+        {dow_label(d)}
+      </button>
+    </div>
+
+    <.form for={%{}} id="dow-form" autocomplete="off" phx-change="validate_dow">
+      <div class="flex gap-1 mb-1">
+        <div class="w-40 text-sm font-semibold text-gray-600">{gettext("Contact")}</div>
+        <div :for={grade <- @grades} class="w-20 text-center text-sm font-semibold text-gray-600">
+          {@grade_labels[grade]}
+        </div>
+        <div class="w-20 text-center text-sm font-semibold text-gray-600">{gettext("Total")}</div>
+      </div>
+
+      <div :for={{line, idx} <- Enum.with_index(@dow_params)}>
+        <input type="hidden" name={"dow_lines[#{idx}][id]"} value={line["id"]} />
+        <input type="hidden" name={"dow_lines[#{idx}][delete]"} value={line["delete"] || "false"} />
+        <input type="hidden" name={"dow_lines[#{idx}][contact_id]"} value={line["contact_id"]} />
+
+        <div :if={line["delete"] != "true"} class="flex items-center gap-1 mb-1">
+          <input
+            type="text"
+            id={"dow-contact-#{@kind}-#{idx}"}
+            name={"dow_lines[#{idx}][contact_name]"}
+            value={line["contact_name"]}
+            class="w-40 border rounded px-2 py-1"
+            phx-hook="tributeAutoComplete"
+            url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
+          />
+          <input
+            :for={grade <- @grades}
+            type="number"
+            name={"dow_lines[#{idx}][quantities][#{grade}]"}
+            value={(line["quantities"] || %{})[grade] || ""}
+            class="w-20 text-center border rounded px-1 py-1"
+          />
+          <div class="w-20 text-center font-semibold py-1">
+            {Enum.reduce(@grades, 0, fn g, acc -> acc + to_int((line["quantities"] || %{})[g]) end)}
+          </div>
+          <button
+            type="button"
+            phx-click="delete_dow_line"
+            phx-value-index={idx}
+            class="text-red-500 hover:text-red-700"
+            title={gettext("Delete")}
+          >
+            <.icon name="hero-trash" class="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      <div class="flex gap-1 mt-1 font-semibold text-sm text-gray-700 border-t pt-1">
+        <div class="w-40 text-right">{gettext("Total")}</div>
+        <div :for={grade <- @grades} class="w-20 text-center">
+          {Enum.reduce(@dow_params, 0, fn line, acc ->
+            if line["delete"] == "true",
+              do: acc,
+              else: acc + to_int((line["quantities"] || %{})[grade])
+          end)}
+        </div>
+        <div class="w-20 text-center">
+          {Enum.reduce(@grades, 0, fn g, acc ->
+            acc +
+              Enum.reduce(@dow_params, 0, fn line, a ->
+                if line["delete"] == "true",
+                  do: a,
+                  else: a + to_int((line["quantities"] || %{})[g])
+              end)
+          end)}
+        </div>
+      </div>
+    </.form>
+
+    <button
+      type="button"
+      phx-click="add_dow_line"
+      class="mt-2 text-blue-600 hover:text-blue-800 flex items-center gap-1 text-sm"
+    >
+      <.icon name="hero-plus-circle" class="h-5 w-5" /> {gettext("Add line")}
     </button>
     """
   end
@@ -975,7 +1320,6 @@ defmodule FullCircleWeb.EggStockLive.Form do
 
   defp now_tab(assigns) do
     ~H"""
-    <%!-- Grade column headers --%>
     <div class="flex gap-1 mb-1">
       <div class="w-40"></div>
       <div :for={grade <- @grades} class="w-20 text-center text-sm font-semibold text-gray-600">
@@ -984,7 +1328,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
       <div class="w-20 text-center text-sm font-semibold text-gray-600">{gettext("Total")}</div>
     </div>
 
-    <%!-- Past date (read-only) --%>
+    <%!-- Past date (read-only history) --%>
     <div :if={!@editable}>
       <.summary_row
         label={gettext("Opening")}
@@ -1018,128 +1362,27 @@ defmodule FullCircleWeb.EggStockLive.Form do
         phx-change="validate"
         phx-submit="save"
       >
-        <%!-- Expired --%>
-        <div class="flex gap-1 mb-1">
-          <div class="w-40 font-bold text-sm py-1">{gettext("Expired")}</div>
-          <input
-            :for={grade <- @grades}
-            type="number"
-            name={"egg_stock_day[expired][#{grade}]"}
-            value={(@form[:expired].value || %{})[grade] || ""}
-            class="w-20 text-center border rounded px-1 py-1"
-            phx-debounce="blur"
-          />
-          <div class="w-20 text-center font-semibold border rounded px-2 py-1 bg-gray-50">
-            {Enum.reduce(@grades, 0, fn g, acc -> acc + to_int((@form[:expired].value || %{})[g]) end)}
-          </div>
-        </div>
-
-        <%!-- Closing Balance --%>
-        <div class="flex gap-1 mb-1">
-          <div class="w-40 font-bold text-sm py-1">{gettext("Closing")}</div>
-          <input
-            :for={grade <- @grades}
-            type="number"
-            name={"egg_stock_day[closing_bal][#{grade}]"}
-            value={(@form[:closing_bal].value || %{})[grade] || ""}
-            class="w-20 text-center border rounded px-1 py-1"
-            phx-debounce="blur"
-          />
-          <div class="w-20 text-center font-semibold border rounded px-2 py-1 bg-gray-50">
-            {Enum.reduce(@grades, 0, fn g, acc ->
-              acc + to_int((@form[:closing_bal].value || %{})[g])
-            end)}
-          </div>
-        </div>
-
-        <%!-- Production = sold + expired + closing - opening - purchased --%>
-        <% productions =
-          Map.new(@grades, fn g ->
-            o = to_int((@day.opening_bal || %{})[g])
-            c = to_int((@form[:closing_bal].value || %{})[g])
-            b = actual_total(@actual_purchases, g)
-            s = actual_total(@actual_sales, g)
-            e = to_int((@form[:expired].value || %{})[g])
-            {g, s + e + c - o - b}
-          end) %>
-        <.summary_row
-          label={gettext("Production")}
+        <.expired_closing_block form={@form} grades={@grades} />
+        <.production_block
+          day={@day}
+          form={@form}
           grades={@grades}
-          values={productions}
-          bg="bg-green-50"
+          actual_sales={@actual_sales}
+          actual_purchases={@actual_purchases}
         />
-
-        <%!-- Harvested / Yesterday UG / UG --%>
-        <div class="flex gap-1 mb-1">
-          <div class="w-40 font-bold text-sm py-1">{gettext("Harvest/UG/Loss")}</div>
-          <div class="w-20 text-center border rounded px-2 py-1 bg-amber-50">{@harvested}</div>
-          <div class="w-20 text-center border rounded px-2 py-1 bg-gray-100">{@yesterday_ug}</div>
-          <input
-            type="number"
-            name="egg_stock_day[ungraded_bal]"
-            value={@form[:ungraded_bal].value || 0}
-            class="w-20 text-center border rounded px-1 py-1"
-            phx-debounce="blur"
-          />
-          <%!-- Loss --%>
-          <% closing_total =
-            Enum.reduce(@grades, 0, fn g, acc ->
-              acc + to_int((@form[:closing_bal].value || %{})[g])
-            end) %>
-          <% has_closing = closing_total > 0 %>
-          <div :if={has_closing} class="flex gap-1 mb-1">
-            <% opening_total =
-              Enum.reduce(@grades, 0, fn g, acc -> acc + to_int((@day.opening_bal || %{})[g]) end) %>
-            <% sold_total =
-              Enum.reduce(@grades, 0, fn g, acc -> acc + actual_total(@actual_sales, g) end) %>
-            <% purchased_total =
-              Enum.reduce(@grades, 0, fn g, acc -> acc + actual_total(@actual_purchases, g) end) %>
-            <% expired_total =
-              Enum.reduce(@grades, 0, fn g, acc -> acc + to_int((@form[:expired].value || %{})[g]) end) %>
-            <% ug_today = to_int(@form[:ungraded_bal].value) %>
-            <% loss =
-              @harvested + opening_total + purchased_total + @yesterday_ug - ug_today - sold_total -
-                closing_total - expired_total %>
-            <div class={"w-20 text-center border rounded px-2 py-1 #{if loss < 0, do: "bg-red-100 text-red-700", else: "bg-orange-50"}"}>
-              {loss}
-            </div>
-          </div>
-        </div>
-        <div class="flex gap-1 mb-2 text-xs text-gray-500">
-          <div class="w-40"></div>
-          <div class="w-20 text-center">{gettext("Harvested")}</div>
-          <div class="w-20 text-center">{gettext("Ytd UG")}</div>
-          <div class="w-20 text-center">{gettext("UG")}</div>
-          <div class="w-20 text-center">{gettext("Loss")}</div>
-        </div>
-
-        <%!-- Yield per grade --%>
-        <% harvest_plus_ug = @harvested + @yesterday_ug %>
-        <% yields =
-          Map.new(@grades, fn g ->
-            p = to_int(productions[g])
-            {g, if(harvest_plus_ug > 0, do: Float.round(p / harvest_plus_ug * 100, 2), else: 0.0)}
-          end) %>
-        <.summary_row
-          label={gettext("Yield %")}
+        <.harvest_ug_loss_block
+          form={@form}
+          day={@day}
           grades={@grades}
-          values={yields}
-          bg="bg-yellow-50"
-          suffix="%"
+          harvested={@harvested}
+          yesterday_ug={@yesterday_ug}
+          est_harvest={nil}
+          actual_sales={@actual_sales}
+          actual_purchases={@actual_purchases}
         />
-
-        <%!-- Note --%>
-        <div class="mb-4 mt-2">
-          <label class="font-bold">{gettext("Note")}</label>
-          <textarea
-            name="egg_stock_day[note]"
-            class="w-full border rounded p-2"
-            rows="2"
-          >{@form[:note].value}</textarea>
-        </div>
+        <.note_block form={@form} />
       </.form>
 
-      <%!-- Print button for past dates with closing balance --%>
       <div class="flex justify-end mt-2">
         <a
           href={~p"/companies/#{@current_company.id}/EggStock/#{Date.to_iso8601(@date)}/print"}
@@ -1151,99 +1394,72 @@ defmodule FullCircleWeb.EggStockLive.Form do
       </div>
     </div>
 
-    <%!-- Today (editable, not future) --%>
-    <div :if={@editable and !@is_future}>
+    <%!-- Today / Future --%>
+    <div :if={@editable}>
       <.summary_row
+        :if={!@is_future}
         label={gettext("Opening")}
         grades={@grades}
         values={@day.opening_bal || %{}}
         bg="bg-gray-100"
       />
+      <.summary_row
+        :if={@is_future}
+        label={gettext("Est Opening")}
+        grades={@grades}
+        values={@est_opening || %{}}
+        bg="bg-gray-100"
+      />
 
       <.form for={@form} id="day-form" autocomplete="off" phx-change="validate" phx-submit="save">
-        <%!-- Purchase Orders Section --%>
-        <div class="mb-2">
-          <div class="flex items-center gap-1 mb-1">
-            <h3 class="font-bold text-sm">{gettext("Purchase Orders")}</h3>
-            <button
-              type="button"
-              phx-click="add_detail"
-              phx-value-section="actual_purchase"
-              class="text-blue-600 hover:text-blue-800"
-            >
-              <.icon name="hero-plus-circle" class="h-5 w-5" />
-            </button>
-          </div>
-          <.detail_lines
-            form={@form}
-            section="actual_purchase"
+        <.planned_section
+          title={gettext("Planned Purchases")}
+          form={@form}
+          section={EggStock.planned_purchase_section()}
+          grades={@grades}
+          grade_labels={@grade_labels}
+          current_company={@current_company}
+          current_user={@current_user}
+          date={@date}
+          day_details={@day.egg_stock_day_details}
+          locked_contact_ids={locked_contact_ids(@actual_purchases)}
+          docs_by_contact={docs_by_contact(@actual_purchases)}
+        />
+
+        <.planned_section
+          title={gettext("Planned Sales")}
+          form={@form}
+          section={EggStock.planned_sales_section()}
+          grades={@grades}
+          grade_labels={@grade_labels}
+          current_company={@current_company}
+          current_user={@current_user}
+          date={@date}
+          day_details={@day.egg_stock_day_details}
+          locked_contact_ids={locked_contact_ids(@actual_sales)}
+          docs_by_contact={docs_by_contact(@actual_sales)}
+        />
+
+        <div :if={!@is_future}>
+          <.actual_data_section
+            title={gettext("Purchases")}
+            rows={@actual_purchases}
             grades={@grades}
-            grade_labels={@grade_labels}
-            editable={@editable}
-            current_company={@current_company}
-            current_user={@current_user}
-            date={@date}
-            show_ignored={@show_ignored}
+            bg_class="bg-emerald-50"
+            title_class="text-emerald-700"
+            company_id={@current_company.id}
           />
-          <.section_totals
-            details={@day.egg_stock_day_details}
-            section="actual_purchase"
+
+          <.actual_data_section
+            title={gettext("Sales")}
+            rows={@actual_sales}
             grades={@grades}
+            bg_class="bg-blue-50"
+            title_class="text-blue-700"
+            company_id={@current_company.id}
           />
         </div>
 
-        <%!-- Sales Order Section --%>
-        <div class="mb-2">
-          <div class="flex items-center gap-1 mb-1">
-            <h3 class="font-bold text-sm">{gettext("Sales Orders")}</h3>
-            <button
-              type="button"
-              phx-click="add_detail"
-              phx-value-section="actual_order"
-              class="text-blue-600 hover:text-blue-800"
-            >
-              <.icon name="hero-plus-circle" class="h-5 w-5" />
-            </button>
-          </div>
-          <.detail_lines
-            form={@form}
-            section="actual_order"
-            grades={@grades}
-            grade_labels={@grade_labels}
-            editable={@editable}
-            current_company={@current_company}
-            current_user={@current_user}
-            date={@date}
-            show_ignored={@show_ignored}
-          />
-          <.section_totals
-            details={@day.egg_stock_day_details}
-            section="actual_order"
-            grades={@grades}
-          />
-        </div>
-
-        <%!-- Actual Purchases --%>
-        <.actual_data_section
-          title={gettext("Purchases")}
-          rows={@actual_purchases}
-          grades={@grades}
-          bg_class="bg-emerald-50"
-          title_class="text-emerald-700"
-          company_id={@current_company.id}
-        />
-
-        <%!-- Actual Sales --%>
-        <.actual_data_section
-          title={gettext("Sales")}
-          rows={@actual_sales}
-          grades={@grades}
-          bg_class="bg-blue-50"
-          title_class="text-blue-700"
-          company_id={@current_company.id}
-        />
-
-        <%!-- Est Production --%>
         <.summary_row
           :if={@est_production}
           label={gettext("Est Production")}
@@ -1252,7 +1468,11 @@ defmodule FullCircleWeb.EggStockLive.Form do
           bg="bg-green-50"
         />
 
-        <%!-- Est Closing --%>
+        <div :if={@is_future} class="flex gap-1 mb-1">
+          <div class="w-40 font-bold text-sm py-1">{gettext("Est Harvest")}</div>
+          <div class="w-20 text-center border rounded px-2 py-1 bg-amber-50">{@est_harvest}</div>
+        </div>
+
         <.summary_row
           :if={@est_closing}
           label={gettext("Est Closing")}
@@ -1261,139 +1481,31 @@ defmodule FullCircleWeb.EggStockLive.Form do
           bg="bg-purple-50"
         />
 
-        <%!-- Expired --%>
-        <div class="flex gap-1 mb-1">
-          <div class="w-40 font-bold text-sm py-1">{gettext("Expired")}</div>
-          <input
-            :for={grade <- @grades}
-            type="number"
-            name={"egg_stock_day[expired][#{grade}]"}
-            value={(@form[:expired].value || %{})[grade] || ""}
-            class="w-20 text-center border rounded px-1 py-1"
-            phx-debounce="blur"
+        <div :if={!@is_future}>
+          <.expired_closing_block form={@form} grades={@grades} />
+          <.production_block
+            day={@day}
+            form={@form}
+            grades={@grades}
+            actual_sales={@actual_sales}
+            actual_purchases={@actual_purchases}
           />
-          <div class="w-20 text-center font-semibold border rounded px-2 py-1 bg-gray-50">
-            {Enum.reduce(@grades, 0, fn g, acc -> acc + to_int((@form[:expired].value || %{})[g]) end)}
-          </div>
-        </div>
-
-        <%!-- Closing Balance --%>
-        <div class="flex gap-1 mb-1">
-          <div class="w-40 font-bold text-sm py-1">{gettext("Closing")}</div>
-          <input
-            :for={grade <- @grades}
-            type="number"
-            name={"egg_stock_day[closing_bal][#{grade}]"}
-            value={(@form[:closing_bal].value || %{})[grade] || ""}
-            class="w-20 text-center border rounded px-1 py-1"
-            phx-debounce="blur"
+          <.harvest_ug_loss_block
+            form={@form}
+            day={@day}
+            grades={@grades}
+            harvested={@harvested}
+            yesterday_ug={@yesterday_ug}
+            est_harvest={@est_harvest}
+            actual_sales={@actual_sales}
+            actual_purchases={@actual_purchases}
           />
-          <div class="w-20 text-center font-semibold border rounded px-2 py-1 bg-gray-50">
-            {Enum.reduce(@grades, 0, fn g, acc ->
-              acc + to_int((@form[:closing_bal].value || %{})[g])
-            end)}
-          </div>
         </div>
 
-        <%!-- Production = sold + expired + closing - opening - purchased --%>
-        <% productions_ed =
-          Map.new(@grades, fn g ->
-            o = to_int((@day.opening_bal || %{})[g])
-            c = to_int((@form[:closing_bal].value || %{})[g])
-            b = actual_total(@actual_purchases, g)
-            s = actual_total(@actual_sales, g)
-            e = to_int((@form[:expired].value || %{})[g])
-            {g, s + e + c - o - b}
-          end) %>
-        <.summary_row
-          label={gettext("Production")}
-          grades={@grades}
-          values={productions_ed}
-          bg="bg-green-50"
-        />
-
-        <%!-- Harvested / Yesterday UG / UG --%>
-        <% harvest_display = if @harvested == 0 && @est_harvest, do: @est_harvest, else: @harvested %>
-        <div class="flex gap-1 mb-1">
-          <div class="w-40 font-bold text-sm py-1">{gettext("Harvest/UG")}</div>
-          <div class={"w-20 text-center border rounded px-2 py-1 #{if @harvested == 0 && @est_harvest, do: "bg-purple-50", else: "bg-amber-50"}"}>
-            {harvest_display}
-          </div>
-          <div class="w-20 text-center border rounded px-2 py-1 bg-gray-100">{@yesterday_ug}</div>
-          <input
-            type="number"
-            name="egg_stock_day[ungraded_bal]"
-            value={@form[:ungraded_bal].value || 0}
-            class="w-20 text-center border rounded px-1 py-1"
-            phx-debounce="blur"
-          />
-          <%!-- Loss --%>
-          <% closing_total_ed =
-            Enum.reduce(@grades, 0, fn g, acc ->
-              acc + to_int((@form[:closing_bal].value || %{})[g])
-            end) %>
-          <% has_closing_ed = closing_total_ed > 0 %>
-          <div :if={has_closing_ed} class="flex gap-1 mb-1">
-            <% opening_total_ed =
-              Enum.reduce(@grades, 0, fn g, acc -> acc + to_int((@day.opening_bal || %{})[g]) end) %>
-            <% sold_total_ed =
-              Enum.reduce(@grades, 0, fn g, acc -> acc + actual_total(@actual_sales, g) end) %>
-            <% purchased_total_ed =
-              Enum.reduce(@grades, 0, fn g, acc -> acc + actual_total(@actual_purchases, g) end) %>
-            <% expired_total_ed =
-              Enum.reduce(@grades, 0, fn g, acc -> acc + to_int((@form[:expired].value || %{})[g]) end) %>
-            <% ug_today_ed = to_int(@form[:ungraded_bal].value) %>
-            <% loss_ed =
-              harvest_display + opening_total_ed + purchased_total_ed + @yesterday_ug - ug_today_ed -
-                sold_total_ed - closing_total_ed - expired_total_ed %>
-            <div class={"w-20 text-center font-semibold border rounded px-2 py-1 #{if loss_ed < 0, do: "bg-red-100 text-red-700", else: "bg-orange-50"}"}>
-              {loss_ed}
-            </div>
-          </div>
-        </div>
-        <div class="flex gap-1 mb-2 text-xs text-gray-500">
-          <div class="w-40"></div>
-          <div class="w-20 text-center">
-            {if @harvested == 0 && @est_harvest,
-              do: gettext("Est Harvest"),
-              else: gettext("Harvested")}
-          </div>
-          <div class="w-20 text-center">{gettext("Ytd UG")}</div>
-          <div class="w-20 text-center">{gettext("UG")}</div>
-        </div>
-
-        <%!-- Yield per grade --%>
-        <% harvest_plus_ug_editable = harvest_display + @yesterday_ug %>
-        <% yields_ed =
-          Map.new(@grades, fn g ->
-            p = to_int(productions_ed[g])
-
-            {g,
-             if(harvest_plus_ug_editable > 0,
-               do: Float.round(p / harvest_plus_ug_editable * 100, 2),
-               else: 0.0
-             )}
-          end) %>
-        <.summary_row
-          label={gettext("Yield %")}
-          grades={@grades}
-          values={yields_ed}
-          bg="bg-yellow-50"
-          suffix="%"
-        />
-
-        <%!-- Note --%>
-        <div class="mb-4 mt-2">
-          <label class="font-bold">{gettext("Note")}</label>
-          <textarea
-            name="egg_stock_day[note]"
-            class="w-full border rounded p-2"
-            rows="2"
-          >{@form[:note].value}</textarea>
-        </div>
+        <.note_block form={@form} />
       </.form>
 
-      <div class="flex justify-end mt-2">
+      <div :if={!@is_future} class="flex justify-end mt-2">
         <a
           href={~p"/companies/#{@current_company.id}/EggStock/#{Date.to_iso8601(@date)}/print"}
           target="_blank"
@@ -1403,118 +1515,180 @@ defmodule FullCircleWeb.EggStockLive.Form do
         </a>
       </div>
     </div>
+    """
+  end
 
-    <%!-- Future date --%>
-    <div :if={@is_future}>
-      <%!-- Est Opening --%>
-      <.summary_row
-        label={gettext("Est Opening")}
+  defp planned_section(assigns) do
+    ~H"""
+    <div class="mb-3 border rounded p-2">
+      <div class="flex items-center gap-2 mb-1 flex-wrap">
+        <h3 class="font-bold text-sm">{@title}</h3>
+        <span class="text-xs text-gray-500">
+          {gettext("Seeded from weekly book — edit freely for this day")}
+        </span>
+        <button
+          type="button"
+          phx-click="add_detail"
+          phx-value-section={@section}
+          class="text-blue-600 hover:text-blue-800"
+        >
+          <.icon name="hero-plus-circle" class="h-5 w-5" />
+        </button>
+      </div>
+
+      <.detail_lines
+        form={@form}
+        section={@section}
         grades={@grades}
-        values={@est_opening || %{}}
-        bg="bg-gray-100"
+        grade_labels={@grade_labels}
+        editable={true}
+        current_company={@current_company}
+        current_user={@current_user}
+        date={@date}
+        locked_contact_ids={@locked_contact_ids}
+        docs_by_contact={@docs_by_contact}
       />
+      <.section_totals details={@day_details} section={@section} grades={@grades} />
+    </div>
+    """
+  end
 
-      <.form
-        for={@form}
-        id="day-form-future"
-        autocomplete="off"
-        phx-change="validate"
-        phx-submit="save"
-      >
-        <%!-- Purchase Orders Section --%>
-        <div class="mb-2">
-          <div class="flex items-center gap-1 mb-1">
-            <h3 class="font-bold text-sm">{gettext("Purchase Orders")}</h3>
-            <button
-              type="button"
-              phx-click="add_detail"
-              phx-value-section="actual_purchase"
-              class="text-blue-600 hover:text-blue-800"
-            >
-              <.icon name="hero-plus-circle" class="h-5 w-5" />
-            </button>
-          </div>
-          <.detail_lines
-            form={@form}
-            section="actual_purchase"
-            grades={@grades}
-            grade_labels={@grade_labels}
-            editable={true}
-            current_company={@current_company}
-            current_user={@current_user}
-            date={@date}
-            show_ignored={@show_ignored}
-          />
-          <.section_totals
-            details={@day.egg_stock_day_details}
-            section="actual_purchase"
-            grades={@grades}
-          />
+  defp expired_closing_block(assigns) do
+    ~H"""
+    <div class="flex gap-1 mb-1">
+      <div class="w-40 font-bold text-sm py-1">{gettext("Expired")}</div>
+      <input
+        :for={grade <- @grades}
+        type="number"
+        name={"egg_stock_day[expired][#{grade}]"}
+        value={(@form[:expired].value || %{})[grade] || ""}
+        class="w-20 text-center border rounded px-1 py-1"
+        phx-debounce="blur"
+      />
+      <div class="w-20 text-center font-semibold border rounded px-2 py-1 bg-gray-50">
+        {Enum.reduce(@grades, 0, fn g, acc -> acc + to_int((@form[:expired].value || %{})[g]) end)}
+      </div>
+    </div>
+
+    <div class="flex gap-1 mb-1">
+      <div class="w-40 font-bold text-sm py-1">{gettext("Closing")}</div>
+      <input
+        :for={grade <- @grades}
+        type="number"
+        name={"egg_stock_day[closing_bal][#{grade}]"}
+        value={(@form[:closing_bal].value || %{})[grade] || ""}
+        class="w-20 text-center border rounded px-1 py-1"
+        phx-debounce="blur"
+      />
+      <div class="w-20 text-center font-semibold border rounded px-2 py-1 bg-gray-50">
+        {Enum.reduce(@grades, 0, fn g, acc ->
+          acc + to_int((@form[:closing_bal].value || %{})[g])
+        end)}
+      </div>
+    </div>
+    """
+  end
+
+  defp production_block(assigns) do
+    productions =
+      Map.new(assigns.grades, fn g ->
+        o = to_int((assigns.day.opening_bal || %{})[g])
+        c = to_int((assigns.form[:closing_bal].value || %{})[g])
+        b = actual_total(assigns.actual_purchases, g)
+        s = actual_total(assigns.actual_sales, g)
+        e = to_int((assigns.form[:expired].value || %{})[g])
+        {g, s + e + c - o - b}
+      end)
+
+    assigns = assign(assigns, :productions, productions)
+
+    ~H"""
+    <.summary_row label={gettext("Production")} grades={@grades} values={@productions} bg="bg-green-50" />
+    """
+  end
+
+  defp harvest_ug_loss_block(assigns) do
+    harvest_display =
+      if assigns.harvested == 0 && assigns.est_harvest,
+        do: assigns.est_harvest,
+        else: assigns.harvested
+
+    productions =
+      Map.new(assigns.grades, fn g ->
+        o = to_int((assigns.day.opening_bal || %{})[g])
+        c = to_int((assigns.form[:closing_bal].value || %{})[g])
+        b = actual_total(assigns.actual_purchases, g)
+        s = actual_total(assigns.actual_sales, g)
+        e = to_int((assigns.form[:expired].value || %{})[g])
+        {g, s + e + c - o - b}
+      end)
+
+    harvest_plus_ug = harvest_display + assigns.yesterday_ug
+
+    yields =
+      Map.new(assigns.grades, fn g ->
+        p = to_int(productions[g])
+        {g, if(harvest_plus_ug > 0, do: Float.round(p / harvest_plus_ug * 100, 2), else: 0.0)}
+      end)
+
+    assigns =
+      assigns
+      |> assign(:harvest_display, harvest_display)
+      |> assign(:yields, yields)
+
+    ~H"""
+    <div class="flex gap-1 mb-1">
+      <div class="w-40 font-bold text-sm py-1">{gettext("Harvest/UG/Loss")}</div>
+      <div class={"w-20 text-center border rounded px-2 py-1 #{if @harvested == 0 && @est_harvest, do: "bg-purple-50", else: "bg-amber-50"}"}>
+        {@harvest_display}
+      </div>
+      <div class="w-20 text-center border rounded px-2 py-1 bg-gray-100">{@yesterday_ug}</div>
+      <input
+        type="number"
+        name="egg_stock_day[ungraded_bal]"
+        value={@form[:ungraded_bal].value || 0}
+        class="w-20 text-center border rounded px-1 py-1"
+        phx-debounce="blur"
+      />
+      <% closing_total =
+        Enum.reduce(@grades, 0, fn g, acc -> acc + to_int((@form[:closing_bal].value || %{})[g]) end) %>
+      <div :if={closing_total > 0} class="flex gap-1">
+        <% opening_total =
+          Enum.reduce(@grades, 0, fn g, acc -> acc + to_int((@day.opening_bal || %{})[g]) end) %>
+        <% sold_total =
+          Enum.reduce(@grades, 0, fn g, acc -> acc + actual_total(@actual_sales, g) end) %>
+        <% purchased_total =
+          Enum.reduce(@grades, 0, fn g, acc -> acc + actual_total(@actual_purchases, g) end) %>
+        <% expired_total =
+          Enum.reduce(@grades, 0, fn g, acc -> acc + to_int((@form[:expired].value || %{})[g]) end) %>
+        <% ug_today = to_int(@form[:ungraded_bal].value) %>
+        <% loss =
+          @harvest_display + opening_total + purchased_total + @yesterday_ug - ug_today - sold_total -
+            closing_total - expired_total %>
+        <div class={"w-20 text-center border rounded px-2 py-1 #{if loss < 0, do: "bg-red-100 text-red-700", else: "bg-orange-50"}"}>
+          {loss}
         </div>
+      </div>
+    </div>
+    <div class="flex gap-1 mb-2 text-xs text-gray-500">
+      <div class="w-40"></div>
+      <div class="w-20 text-center">
+        {if @harvested == 0 && @est_harvest, do: gettext("Est Harvest"), else: gettext("Harvested")}
+      </div>
+      <div class="w-20 text-center">{gettext("Ytd UG")}</div>
+      <div class="w-20 text-center">{gettext("UG")}</div>
+      <div class="w-20 text-center">{gettext("Loss")}</div>
+    </div>
 
-        <%!-- Sales Order Section --%>
-        <div class="mb-2">
-          <div class="flex items-center gap-1 mb-1">
-            <h3 class="font-bold text-sm">{gettext("Sales Orders")}</h3>
-            <button
-              type="button"
-              phx-click="add_detail"
-              phx-value-section="actual_order"
-              class="text-blue-600 hover:text-blue-800"
-            >
-              <.icon name="hero-plus-circle" class="h-5 w-5" />
-            </button>
-          </div>
-          <.detail_lines
-            form={@form}
-            section="actual_order"
-            grades={@grades}
-            grade_labels={@grade_labels}
-            editable={true}
-            current_company={@current_company}
-            current_user={@current_user}
-            date={@date}
-            show_ignored={@show_ignored}
-          />
-          <.section_totals
-            details={@day.egg_stock_day_details}
-            section="actual_purchase"
-            grades={@grades}
-          />
-        </div>
+    <.summary_row label={gettext("Yield %")} grades={@grades} values={@yields} bg="bg-yellow-50" suffix="%" />
+    """
+  end
 
-        <%!-- Est Production --%>
-        <.summary_row
-          label={gettext("Est Production")}
-          grades={@grades}
-          values={@est_production || %{}}
-          bg="bg-green-50"
-        />
-
-        <%!-- Est Harvest --%>
-        <div class="flex gap-1 mb-1">
-          <div class="w-40 font-bold text-sm py-1">{gettext("Est Harvest")}</div>
-          <div class="w-20 text-center border rounded px-2 py-1 bg-amber-50">{@est_harvest}</div>
-        </div>
-
-        <%!-- Est Closing --%>
-        <.summary_row
-          label={gettext("Est Closing")}
-          grades={@grades}
-          values={@est_closing || %{}}
-          bg="bg-purple-50"
-        />
-
-        <%!-- Note --%>
-        <div class="mb-4 mt-2">
-          <label class="font-bold">{gettext("Note")}</label>
-          <textarea
-            name="egg_stock_day[note]"
-            class="w-full border rounded p-2"
-            rows="2"
-          >{@form[:note].value}</textarea>
-        </div>
-      </.form>
+  defp note_block(assigns) do
+    ~H"""
+    <div class="mb-4 mt-2">
+      <label class="font-bold">{gettext("Note")}</label>
+      <textarea name="egg_stock_day[note]" class="w-full border rounded p-2" rows="2">{@form[:note].value}</textarea>
     </div>
     """
   end
@@ -1595,25 +1769,36 @@ defmodule FullCircleWeb.EggStockLive.Form do
     ~H"""
     <div>
       <.inputs_for :let={dtl} field={@form[:egg_stock_day_details]}>
-        <% ignored = dtl[:ignore].value in [true, "true"] %>
+        <% contact_key =
+          if dtl[:contact_id].value in [nil, ""], do: nil, else: to_string(dtl[:contact_id].value) %>
+        <% issued_docs = if contact_key, do: Map.get(@docs_by_contact, contact_key, []), else: [] %>
+        <% has_docs = issued_docs != [] %>
+        <% locked =
+          contact_key != nil and MapSet.member?(@locked_contact_ids, contact_key) %>
+        <% line_editable = @editable and !locked %>
         <div
-          :if={dtl[:section].value == @section and (@show_ignored or !ignored)}
-          class={"flex items-center gap-1 #{if ignored, do: "opacity-40"}"}
+          :if={dtl[:section].value == @section}
+          class={"flex items-center gap-1 #{if locked, do: "opacity-75 bg-slate-50 rounded"}"}
+          title={
+            if locked,
+              do: gettext("Linked to a document — edit quantities on the document"),
+              else: nil
+          }
         >
           <input :if={dtl[:id].value} type="hidden" name={dtl[:id].name} value={dtl[:id].value} />
           <input type="hidden" name={dtl[:section].name} value={@section} />
           <input type="hidden" name={dtl[:contact_id].name} value={dtl[:contact_id].value} />
-          <input type="hidden" name={dtl[:ignore].name} value={"#{dtl[:ignore].value}"} />
           <input type="hidden" name={dtl[:_persistent_id].name} value={dtl.index} />
 
+          <%!-- readonly (not disabled) so values still submit on autosave of other fields --%>
           <input
             type="text"
             id={"dtl-contact-#{@section}-#{dtl.index}"}
             name={dtl[:contact_name].name}
             value={dtl[:contact_name].value}
-            class="w-40 border rounded px-2 py-1"
-            disabled={!@editable}
-            phx-hook="tributeAutoComplete"
+            class={"w-40 border rounded px-2 py-1 #{if locked, do: "bg-gray-100 text-gray-600 cursor-not-allowed", else: ""}"}
+            readonly={locked or !@editable}
+            phx-hook={if line_editable, do: "tributeAutoComplete", else: nil}
             url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
           />
 
@@ -1622,8 +1807,8 @@ defmodule FullCircleWeb.EggStockLive.Form do
             type="number"
             name={"#{dtl.name}[quantities][#{grade}]"}
             value={(dtl[:quantities].value || %{})[grade] || ""}
-            class="w-20 text-center border rounded px-1 py-1"
-            disabled={!@editable}
+            class={"w-20 text-center border rounded px-1 py-1 #{if locked, do: "bg-gray-100 text-gray-600 cursor-not-allowed", else: ""}"}
+            readonly={locked or !@editable}
           />
 
           <div class="w-20 text-center font-semibold py-1">
@@ -1631,22 +1816,40 @@ defmodule FullCircleWeb.EggStockLive.Form do
           </div>
 
           <button
-            :if={@editable}
+            :if={line_editable}
             type="button"
-            phx-click="toggle_ignore"
+            phx-click="delete_detail"
             phx-value-index={dtl.index}
-            class={
-              if ignored,
-                do: "text-green-500 hover:text-green-700",
-                else: "text-red-500 hover:text-red-700"
-            }
-            title={if ignored, do: gettext("Enable"), else: gettext("Ignore")}
+            class="text-red-500 hover:text-red-700"
+            title={gettext("Delete line")}
           >
-            <.icon name={if ignored, do: "hero-eye", else: "hero-eye-slash"} class="h-4 w-4" />
+            <.icon name="hero-trash" class="h-4 w-4" />
           </button>
+          <span
+            :if={@editable and locked}
+            class="text-gray-400 cursor-not-allowed"
+            title={gettext("Edit the linked document to change this line")}
+          >
+            <.icon name="hero-lock-closed" class="h-4 w-4" />
+          </span>
 
+          <%!-- Existing documents: open only (no create) --%>
           <a
-            :if={@editable and @section == "actual_order" and dtl[:contact_id].value not in [nil, ""]}
+            :for={{doc_type, doc_id} <- issued_docs}
+            href={doc_link_path(@current_company.id, doc_type, doc_id)}
+            target="_blank"
+            class="text-blue-600 hover:text-blue-800"
+            title={gettext("Open %{type}", type: doc_type)}
+          >
+            <.icon name={doc_icon(doc_type)} class="h-4 w-4" />
+          </a>
+
+          <%!-- No documents yet: allow create --%>
+          <a
+            :if={
+              @editable and !has_docs and @section == "planned_order" and
+                dtl[:contact_id].value not in [nil, ""]
+            }
             href={egg_order_doc_url(@current_company.id, @date, dtl, @grades, "Invoice")}
             target="_blank"
             class="text-green-600 hover:text-green-800"
@@ -1656,11 +1859,40 @@ defmodule FullCircleWeb.EggStockLive.Form do
           </a>
 
           <a
-            :if={@editable and @section == "actual_order" and dtl[:contact_id].value not in [nil, ""]}
+            :if={
+              @editable and !has_docs and @section == "planned_order" and
+                dtl[:contact_id].value not in [nil, ""]
+            }
             href={egg_order_doc_url(@current_company.id, @date, dtl, @grades, "Receipt")}
             target="_blank"
             class="text-amber-600 hover:text-amber-800"
             title={gettext("Create Receipt")}
+          >
+            <.icon name="hero-banknotes" class="h-4 w-4" />
+          </a>
+
+          <a
+            :if={
+              @editable and !has_docs and @section == "planned_purchase" and
+                dtl[:contact_id].value not in [nil, ""]
+            }
+            href={egg_order_doc_url(@current_company.id, @date, dtl, @grades, "PurInvoice")}
+            target="_blank"
+            class="text-green-600 hover:text-green-800"
+            title={gettext("Create Purchase Invoice")}
+          >
+            <.icon name="hero-document-plus" class="h-4 w-4" />
+          </a>
+
+          <a
+            :if={
+              @editable and !has_docs and @section == "planned_purchase" and
+                dtl[:contact_id].value not in [nil, ""]
+            }
+            href={egg_order_doc_url(@current_company.id, @date, dtl, @grades, "Payment")}
+            target="_blank"
+            class="text-amber-600 hover:text-amber-800"
+            title={gettext("Create Payment")}
           >
             <.icon name="hero-banknotes" class="h-4 w-4" />
           </a>
@@ -1694,14 +1926,26 @@ defmodule FullCircleWeb.EggStockLive.Form do
   end
 
   defp section_totals(assigns) do
+    sections =
+      case assigns.section do
+        "planned_order" -> EggStock.planned_sales_sections()
+        "planned_purchase" -> EggStock.planned_purchase_sections()
+        s -> [s]
+      end
+
+    assigns = assign(assigns, :sections, sections)
+
     ~H"""
     <div class="flex gap-1 mt-1 font-semibold text-sm text-gray-700 border-t pt-1">
       <div class="w-40 text-right">{gettext("Total")}</div>
       <div :for={grade <- @grades} class="w-20 text-center">
-        {sum_quantities(@details, @section, grade)}
+        {Enum.reduce(@sections, 0, fn sec, acc -> acc + sum_quantities(@details || [], sec, grade) end)}
       </div>
       <div class="w-20 text-center">
-        {Enum.reduce(@grades, 0, fn g, acc -> acc + sum_quantities(@details, @section, g) end)}
+        {Enum.reduce(@grades, 0, fn g, acc ->
+          acc +
+            Enum.reduce(@sections, 0, fn sec, a -> a + sum_quantities(@details || [], sec, g) end)
+        end)}
       </div>
     </div>
     """
@@ -1712,6 +1956,11 @@ defmodule FullCircleWeb.EggStockLive.Form do
   defp estimated_tab(assigns) do
     ~H"""
     <div class="overflow-x-auto">
+      <p class="text-sm text-gray-500 mb-3">
+        {gettext(
+          "7-day forecast: production from recent history; sales/purchases from weekly books (or day overrides)."
+        )}
+      </p>
       <table class="w-full text-sm">
         <thead>
           <tr class="border-b">
@@ -1750,9 +1999,8 @@ defmodule FullCircleWeb.EggStockLive.Form do
         </tbody>
       </table>
 
-      <%!-- Sales/Purchases breakdown --%>
       <div class="mt-6">
-        <h3 class="font-bold text-sm mb-2">{gettext("Est. Daily Sales")}</h3>
+        <h3 class="font-bold text-sm mb-2">{gettext("Est. Daily Sales (weekly book)")}</h3>
         <table class="w-full text-sm">
           <thead>
             <tr class="border-b">
@@ -1789,7 +2037,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
       </div>
 
       <div class="mt-4">
-        <h3 class="font-bold text-sm mb-2">{gettext("Est. Daily Purchases")}</h3>
+        <h3 class="font-bold text-sm mb-2">{gettext("Est. Daily Purchases (weekly book)")}</h3>
         <table class="w-full text-sm">
           <thead>
             <tr class="border-b">
@@ -1833,50 +2081,15 @@ defmodule FullCircleWeb.EggStockLive.Form do
   defp settings_tab(assigns) do
     ~H"""
     <div class="space-y-6">
-      <%!-- Display settings --%>
-      <div class="border rounded p-4">
-        <h3 class="font-bold mb-3">{gettext("Display Settings")}</h3>
-        <div class="flex items-center gap-1">
-          <label class="text-sm font-semibold text-gray-600">{gettext("Show ignored rows")}:</label>
-          <button
-            type="button"
-            phx-click="toggle_show_ignored"
-            class="flex items-center gap-1 px-3 py-1 rounded border text-sm font-semibold"
-          >
-            <.icon :if={@show_ignored} name="hero-eye" class="w-4 h-4 text-blue-600" />
-            <.icon :if={!@show_ignored} name="hero-eye-slash" class="w-4 h-4 text-gray-400" />
-            <span>{if @show_ignored, do: gettext("Showing"), else: gettext("Hidden")}</span>
-          </button>
-        </div>
-      </div>
-
-      <%!-- Lookback settings --%>
       <div class="border rounded p-4">
         <h3 class="font-bold mb-3">{gettext("Estimation Settings")}</h3>
-
-        <.form for={%{}} id="lookback-weeks-form" phx-change="change_lookback">
-          <div class="flex items-center gap-1 mb-3">
-            <label class="text-sm font-semibold text-gray-600 w-64">
-              {gettext("Sales/Purchase lookback weeks")}:
-            </label>
-            <select
-              name="lookback_weeks"
-              class="border rounded px-8 py-1 text-sm"
-            >
-              <option :for={w <- [1, 2, 3, 4]} value={w} selected={w == @lookback_weeks}>{w}</option>
-            </select>
-          </div>
-        </.form>
 
         <.form for={%{}} id="autosave-delay-form" phx-change="change_autosave_delay">
           <div class="flex items-center gap-1 mb-3">
             <label class="text-sm font-semibold text-gray-600 w-64">
               {gettext("Autosave delay (seconds)")}:
             </label>
-            <select
-              name="autosave_delay"
-              class="border rounded px-8 py-1 text-sm"
-            >
+            <select name="autosave_delay" class="border rounded px-8 py-1 text-sm">
               <option :for={s <- [1, 2, 3, 5, 10]} value={s} selected={s == @autosave_delay}>
                 {s}
               </option>
@@ -1887,21 +2100,20 @@ defmodule FullCircleWeb.EggStockLive.Form do
         <.form for={%{}} id="lookback-days-form" phx-change="change_lookback_days">
           <div class="flex items-center gap-1">
             <label class="text-sm font-semibold text-gray-600 w-64">
-              {gettext("Harvest/Production lookback days")}:
+              {gettext("Production lookback days")}:
             </label>
-            <select
-              name="lookback_days"
-              class="border rounded px-8 py-1 text-sm"
-            >
-              <option :for={d <- [2, 3, 4, 5, 6]} value={d} selected={d == @lookback_days}>
+            <select name="lookback_days" class="border rounded px-8 py-1 text-sm">
+              <option :for={d <- [2, 3, 4, 5, 6, 7]} value={d} selected={d == @lookback_days}>
                 {d}
               </option>
             </select>
           </div>
+          <p class="text-xs text-gray-500 mt-1 ml-0 md:ml-64">
+            {gettext("Average production from recent days with a real closing balance.")}
+          </p>
         </.form>
       </div>
 
-      <%!-- Grades management --%>
       <div class="border rounded p-4">
         <h3 class="font-bold mb-3">{gettext("Egg Grades")}</h3>
 
@@ -1979,17 +2191,19 @@ defmodule FullCircleWeb.EggStockLive.Form do
                   phx-value-index={idx}
                   class="text-red-500 hover:text-red-700"
                 >
-                  <.icon name="hero-trash-solid" class="h-4 w-4" />
+                  <.icon name="hero-trash" class="h-4 w-4" />
                 </button>
               </div>
             </div>
+          </div>
 
-            <div class="flex gap-1 mt-3">
-              <button type="button" phx-click="add_grade" class="text-blue-600 hover:text-blue-800">
-                <.icon name="hero-plus-circle" class="h-5 w-5" /> {gettext("Add Grade")}
-              </button>
-              <button type="submit" class="blue button">{gettext("Save")}</button>
-            </div>
+          <div class="flex gap-2 mt-3">
+            <button type="button" phx-click="add_grade" class="text-blue-600 text-sm">
+              {gettext("Add grade")}
+            </button>
+            <button type="submit" class="px-3 py-1 bg-blue-600 text-white rounded text-sm">
+              {gettext("Save grades")}
+            </button>
           </div>
         </.form>
       </div>

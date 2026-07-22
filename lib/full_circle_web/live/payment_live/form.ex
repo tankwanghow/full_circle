@@ -13,7 +13,7 @@ defmodule FullCircleWeb.PaymentLive.Form do
 
     socket =
       case socket.assigns.live_action do
-        :new -> mount_new(socket)
+        :new -> mount_new(socket, params)
         :edit -> mount_edit(socket, id)
       end
 
@@ -33,7 +33,29 @@ defmodule FullCircleWeb.PaymentLive.Form do
      )}
   end
 
-  defp mount_new(socket) do
+  defp mount_new(socket, params) do
+    attrs =
+      if params["egg"] do
+        egg_quantities = parse_egg_quantities(params["egg"])
+
+        details =
+          FullCircle.Billing.build_purchase_details_from_egg_order(
+            egg_quantities,
+            socket.assigns.current_company,
+            socket.assigns.current_user
+          )
+
+        %{
+          payment_no: "...new...",
+          contact_name: params["contact_name"],
+          contact_id: params["contact_id"],
+          payment_date: params["date"],
+          payment_details: details
+        }
+      else
+        %{payment_no: "...new..."}
+      end
+
     socket
     |> assign(live_action: :new)
     |> assign(id: "new")
@@ -44,12 +66,24 @@ defmodule FullCircleWeb.PaymentLive.Form do
         BillPay.make_changeset(
           Payment,
           %Payment{},
-          %{payment_no: "...new..."},
+          attrs,
           socket.assigns.current_company,
           socket.assigns.current_user
         )
       )
     )
+  end
+
+  defp parse_egg_quantities(egg_str) do
+    egg_str
+    |> String.split(",")
+    |> Enum.map(fn part ->
+      case String.split(part, ":", parts: 2) do
+        [grade, qty] -> {URI.decode(grade), qty}
+        _ -> nil
+      end
+    end)
+    |> Enum.reject(&is_nil/1)
   end
 
   defp mount_edit(socket, id) do
