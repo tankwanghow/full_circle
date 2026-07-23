@@ -48,10 +48,14 @@ Use `mise exec --` prefix for all mix/elixir commands
 | `cheque.ex` | Deposit, ReturnCheque | Cheque deposits & returns |
 | `accounting.ex` | Account, Contact, TaxCode, Transaction, TransactionMatcher, FixedAsset, Journal | GL & master data |
 | `hr.ex` | Employee, SalaryType, EmployeeSalaryType, TimeAttend, Advance, SalaryNote, PaySlip | Payroll & HR |
-| `product.ex` | Good, Packaging, Delivery, Order, Load | Inventory & logistics |
+| `product.ex` | Good, Packaging | Inventory masters (Order/Load/Delivery removed) |
 | `layer.ex` | House, Flock, Harvest, HarvestDetail, Movement, HouseHarvestWage | Agriculture |
+| `egg_stock.ex` | EggGrade, EggStockDay, EggStockDayDetail, DowTemplateLine | Egg day board & DOW books |
+| `trading.ex` | SupplyPosition, SalesPosition, Location, Trip, TripLoad, TripDrop, … | Grain trading desk |
+| `bank_reconciliation.ex` | *(bank recon schemas)* | Statement import & match |
 | `e_inv_metas.ex` | EInvoice, EInvMeta | Malaysia e-invoice (LHDN) |
 | `reporting.ex` | *(queries only)* | Reports |
+| `statutory_config.ex` / `pay_script.ex` / `tax.ex` | Statutory rates, pay scripts, tax | Malaysia payroll statutory |
 | `sys.ex` | Company, CompanyUser, Log, GaplessDocId, UserSetting | System administration |
 | `user_accounts.ex` | User, UserToken | Authentication |
 | `seeding.ex` | *(no schemas)* | Data import/seeding |
@@ -59,69 +63,29 @@ Use `mise exec --` prefix for all mix/elixir commands
 | `pay_run.ex` | *(uses PaySlip)* | Payroll batch processing |
 | `tagged_bill.ex` | *(uses Invoice/PurInvoice)* | Tag-based billing queries |
 
-### All Schema Files (61 schemas)
+### Schema files (representative; see tree under `lib/full_circle/`)
 ```
-lib/full_circle/accounting/account.ex
-lib/full_circle/accounting/contact.ex
-lib/full_circle/accounting/fixed_asset.ex
-lib/full_circle/accounting/fixed_asset_depreciation.ex
-lib/full_circle/accounting/fixed_asset_disposal.ex
-lib/full_circle/accounting/journal.ex
-lib/full_circle/accounting/seed_transaction_matcher.ex
-lib/full_circle/accounting/tax_code.ex
-lib/full_circle/accounting/transaction.ex
-lib/full_circle/accounting/transaction_matcher.ex
-lib/full_circle/billing/invoice.ex
-lib/full_circle/billing/invoice_detail.ex
-lib/full_circle/billing/pur_invoice.ex
-lib/full_circle/billing/pur_invoice_detail.ex
-lib/full_circle/bill_pay/payment.ex
-lib/full_circle/bill_pay/payment_detail.ex
-lib/full_circle/cheque/deposit.ex
-lib/full_circle/cheque/return_cheque.ex
-lib/full_circle/debcre/credit_note.ex
-lib/full_circle/debcre/credit_note_detail.ex
-lib/full_circle/debcre/debit_note.ex
-lib/full_circle/debcre/debit_note_detail.ex
-lib/full_circle/e_inv_metas/e_inv_meta.ex
-lib/full_circle/e_inv_metas/e_invoice.ex
-lib/full_circle/HR/advance.ex
-lib/full_circle/HR/employee.ex
-lib/full_circle/HR/employee_photo.ex
-lib/full_circle/HR/employee_salary_type.ex
-lib/full_circle/HR/holiday.ex
-lib/full_circle/HR/pay_slip.ex
-lib/full_circle/HR/recurring.ex
-lib/full_circle/HR/salary_note.ex
-lib/full_circle/HR/salary_type.ex
-lib/full_circle/HR/timeattend.ex
-lib/full_circle/layer/flocks.ex
-lib/full_circle/layer/harvest_details.ex
-lib/full_circle/layer/harvests.ex
-lib/full_circle/layer/house_harvest_wages.ex
-lib/full_circle/layer/houses.ex
-lib/full_circle/layer/movements.ex
-lib/full_circle/product/deliver_detail.ex
-lib/full_circle/product/delivery.ex
-lib/full_circle/product/good.ex
-lib/full_circle/product/load.ex
-lib/full_circle/product/load_detail.ex
-lib/full_circle/product/order.ex
-lib/full_circle/product/order_detail.ex
-lib/full_circle/product/packaging.ex
-lib/full_circle/receive_funds/receipt.ex
-lib/full_circle/receive_funds/receipt_detail.ex
-lib/full_circle/receive_funds/received_cheque.ex
-lib/full_circle/sys/company.ex
-lib/full_circle/sys/company_user.ex
-lib/full_circle/sys/gapless_doc_id.ex
-lib/full_circle/sys/log.ex
-lib/full_circle/sys/user_setting.ex
-lib/full_circle/user_accounts/user.ex
-lib/full_circle/user_accounts/user_token.ex
+lib/full_circle/accounting/*.ex
+lib/full_circle/billing/*.ex
+lib/full_circle/bill_pay/*.ex
+lib/full_circle/cheque/*.ex
+lib/full_circle/debcre/*.ex
+lib/full_circle/e_inv_metas/*.ex
+lib/full_circle/egg_stock/{egg_grade,egg_stock_day,egg_stock_day_detail,dow_template_line}.ex
+lib/full_circle/HR/*.ex
+lib/full_circle/layer/*.ex
+lib/full_circle/product/{good,packaging}.ex
+lib/full_circle/receive_funds/*.ex
+lib/full_circle/sys/*.ex
+lib/full_circle/trading/{supply_position,sales_position,location,trip,trip_load,trip_drop,
+  trip_load_employee,trip_drop_employee,balances,sample_data}.ex
+lib/full_circle/user_accounts/*.ex
 lib/full_circle/user_queries/query.ex
 lib/full_circle/weight_bridge/weighings.ex
 ```
+
+Domain skills (gotchas / contracts): `.claude/skills/` — especially
+`grain-trading-desk.md` and `egg-stock-day-board.md`.
 
 ---
 

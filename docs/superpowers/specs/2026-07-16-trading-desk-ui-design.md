@@ -1,10 +1,11 @@
 # Trading Desk UI — Unified Screen + Modal Forms
 
 **Date:** 2026-07-16  
-**Status:** Draft for review  
+**Status:** Implemented — primary trading UX is desk-only; legacy board/list routes redirect to desk modals  
 **App:** FullCircle (`full_circle`)  
 **Depends on:** Grain trading domain already in place (supply, sales, locations, trips, warehouse board)  
-**Parent design:** `docs/superpowers/specs/2026-07-15-grain-trading-trip-design.md`
+**Parent design:** `docs/superpowers/specs/2026-07-15-grain-trading-trip-design.md`  
+**Skill:** `.claude/skills/grain-trading-desk.md`
 
 ---
 

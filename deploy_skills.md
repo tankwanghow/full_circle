@@ -59,6 +59,12 @@ built on the dev machine and streamed to the server over SSH (no Docker Hub push
 
 - [ ] Code committed
 - [ ] `mix test` passes
-- [ ] `mix precommit` or `mix credo` clean
+- [ ] `mix precommit` or `mix credo` clean (note: Credo may be absent from deps — verify before requiring it)
 - [ ] `deploy.conf` ready
 - [ ] Server reachable via SSH
+
+## Related ops scripts (repo root `scripts/`)
+
+| Script | Purpose |
+|---|---|
+| `scripts/restore_backup.sh` | Drop/recreate local `full_circle_dev`, restore a `pg_dump -Ft` archive, optionally `mix ecto.migrate`. Prefer this over `pg_restore -c` when local has tables newer than the dump (e.g. `trading_*`). |

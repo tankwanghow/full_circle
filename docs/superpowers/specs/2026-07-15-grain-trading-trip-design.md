@@ -1,9 +1,13 @@
 # Grain Trading Desk — Orders, Positions & Trip Design
 
 **Date:** 2026-07-15  
-**Status:** Approved — implementation plan: `docs/superpowers/plans/2026-07-16-grain-trading-trip.md`  
+**Status:** Implemented (desk-only UX; multi-good trips — see later specs for deltas)  
+**Plan:** `docs/superpowers/plans/2026-07-16-grain-trading-trip.md`  
+**Skill:** `.claude/skills/grain-trading-desk.md`  
 **App:** FullCircle (`full_circle`)  
 **Scope:** Grain trading only (v1). Swine and poultry sales stay on existing FullCircle invoicing until a later phase.
+
+> **As-built deltas (do not re-read early non-goals as current truth):** multi-product lines **are** allowed on one trip (product on load/drop lines); supply status is `open|hold|collect|closed`; sales status is `draft|open|hold|fulfilled|cancelled`; UI is unified trading desk with modals; Location has optional GPS; system gapless titles SUP-/SAL-/TRP-.
 
 ---
 

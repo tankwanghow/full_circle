@@ -67,6 +67,13 @@ Linode deploy uses the monorepo root as Docker build context:
 
 See also `deploy_skills.md` for the full deploy flow.
 
+### Ops scripts
+
+```bash
+# Restore a prod pg_dump -Ft into local full_circle_dev (drop/recreate — safer than pg_restore -c)
+./scripts/restore_backup.sh backup_at_YYYYMMDDHHMMSS.tar
+```
+
 ## Architecture
 
 ### Multi-Tenancy
@@ -87,20 +94,27 @@ Every entity belongs to a `Company`. Routes are scoped as `/companies/:company_i
 | Context | Purpose |
 |---------|---------|
 | `Accounting` | GL accounts, transactions, tax codes, fixed assets, contacts |
-| `Billing` | Sales invoices (`Invoice`) |
-| `Billing` | Purchase invoices (`PurInvoice`) — same context |
+| `Billing` | Sales invoices (`Invoice`) and purchase invoices (`PurInvoice`) |
 | `ReceiveFund` | Cash receipts, received cheques |
 | `BillPay` | Payments |
 | `Cheque` | Deposits, returns, post-dated cheques |
 | `DebCre` | Debit/credit notes |
 | `HR` | Employees, salary types, pay slips, time attendance, holidays |
-| `Product` | Goods and packaging |
+| `Product` | Goods and packaging (Order/Load/Delivery removed — grain uses Trading) |
 | `Layer` | Agricultural: houses, flocks, harvests, weighing, movements |
+| `EggStock` | Daily egg stock board, weekly DOW books, hybrid forecast |
+| `Trading` | Grain trading desk: supply/sales positions, locations, multi-good trips |
+| `BankReconciliation` | Bank statement import/match (LLM parser skill) |
 | `EInvMetas` | E-invoice metadata (Malaysia LHDN integration) |
-| `Reporting` | Report queries |
+| `Reporting` | Report queries (cash forecast, CP204, etc.) |
+| `StatutoryConfig` / `PayScript` / `Tax` | Malaysia statutory rates, pay scripts, tax helpers |
 | `Sys` | Companies, users, logging |
 | `UserAccounts` | Authentication (bcrypt, session tokens) |
 | `Authorization` | Role-based access via `can?(user, :action, company)` |
+
+Project skills (non-obvious domain contracts) live in `.claude/skills/` — notably
+`grain-trading-desk.md`, `egg-stock-day-board.md`, `e-invoice-sync.md`,
+`cash-forecast-model.md`, `punch-card-payroll.md`, `statutory-bundle.md`.
 
 ### StdInterface Pattern (`lib/full_circle/std_interface.ex`)
 
@@ -143,9 +157,11 @@ Supports English (`en`) and Chinese (`zh`) via Gettext. Locale stored in session
 
 ### Key Conventions
 
-- Document numbers are gapless per company (see `create_gapless_doc_number` migration)
+- Document numbers are gapless per company (see `create_gapless_doc_number` migration); trading uses SUP-/SAL-/TRP- prefixes
 - Transactions use a double-entry pattern with `Transaction` and `TransactionMatcher` tables
 - Database triggers handle transaction posting automatically (see `create_transaction_trigger` migration)
 - Print views support `pre_print` parameter (true = data only for pre-printed forms, false = full letterhead)
 - Company deletion cascades via database triggers (see `create_triggers_when_delete_company` migration)
 - PostgreSQL `pg_trgm` extension used for fuzzy search (see `create_fuzzy_search` migration)
+- Design docs / plans: `docs/superpowers/specs/` and `docs/superpowers/plans/`
+- Commit on `master` directly (solo workflow — no feature branches unless asked)

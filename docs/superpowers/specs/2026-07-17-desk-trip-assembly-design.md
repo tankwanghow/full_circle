@@ -1,10 +1,11 @@
 # Desk trip assembly — select sales + sources → prefilled trip
 
 **Date:** 2026-07-17  
-**Status:** Approved for planning  
+**Status:** Implemented — `Trading.build_trip_attrs_from_selection/3` + desk checkboxes (multi-good)  
 **App:** FullCircle (`full_circle`)  
 **Depends on:** Trading Desk UI (`2026-07-16-trading-desk-ui-design.md`), trip domain (`2026-07-15-grain-trading-trip-design.md`)  
-**Route:** `/companies/:company_id/trading/desk`
+**Route:** `/companies/:company_id/trading/desk`  
+**Skill:** `.claude/skills/grain-trading-desk.md`
 
 ---
 
