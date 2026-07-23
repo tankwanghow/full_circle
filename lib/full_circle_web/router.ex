@@ -122,6 +122,7 @@ defmodule FullCircleWeb.Router do
       live("/trading/locations/new", TradingLocationLive.Form, :new)
       live("/trading/locations/:id/edit", TradingLocationLive.Form, :edit)
       live("/trading/desk", TradingDeskLive.Index, :index)
+      live("/trading/settlement", TradingSettlementLive.Index, :index)
 
       # Legacy board/index URLs → desk
       live("/trading/position_board", TradingDeskLive.Index, :index)

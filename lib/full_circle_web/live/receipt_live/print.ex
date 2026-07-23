@@ -33,15 +33,22 @@ defmodule FullCircleWeb.ReceiptLive.Print do
      |> fill_receipts(ids)}
   end
 
+  @detail_height_plain 8
+  @detail_height_with_desc 12
+
   defp set_page_defaults(socket) do
     socket
     |> assign(:detail_body_height, 160)
-    |> assign(:detail_height, 9)
+    |> assign(:detail_height_plain, @detail_height_plain)
+    |> assign(:detail_height_with_desc, @detail_height_with_desc)
+    |> assign(:detail_height, @detail_height_plain)
     |> assign(:company, FullCircle.Sys.get_company!(socket.assigns.current_company.id))
   end
 
   defp fill_receipts(socket, ids) do
-    chunk = (socket.assigns.detail_body_height / socket.assigns.detail_height) |> floor
+    body = socket.assigns.detail_body_height
+    plain = socket.assigns.detail_height_plain
+    with_desc = socket.assigns.detail_height_with_desc
 
     receipts =
       ReceiveFund.get_print_receipts!(
@@ -59,32 +66,50 @@ defmodule FullCircleWeb.ReceiptLive.Print do
         fill_head_foot_for(r, :transaction_matchers, "match_head", "match_foot")
       end)
       |> Enum.map(fn receipt ->
+        items =
+          receipt.receipt_details ++
+            receipt.transaction_matchers ++
+            receipt.received_cheques ++
+            [%{__struct__: "funds_head"}, receipt, %{__struct__: "funds_foot"}]
+
+        all_chunks =
+          chunk_by_height(items, body, fn item ->
+            receipt_item_height(item, plain, with_desc)
+          end)
+
         receipt
         |> Map.merge(%{
-          chunk_number:
-            Enum.chunk_every(
-              receipt.receipt_details ++
-                receipt.transaction_matchers ++
-                receipt.received_cheques ++
-                [%{__struct__: "funds_head"}, receipt, %{__struct__: "funds_foot"}],
-              chunk
-            )
-            |> Enum.count()
-        })
-        |> Map.merge(%{
-          all_chunks:
-            Enum.chunk_every(
-              receipt.receipt_details ++
-                receipt.transaction_matchers ++
-                receipt.received_cheques ++
-                [%{__struct__: "funds_head"}, receipt, %{__struct__: "funds_foot"}],
-              chunk
-            )
+          chunk_number: length(all_chunks),
+          all_chunks: all_chunks
         })
       end)
 
     socket
     |> assign(:receipts, receipts)
+  end
+
+  defp receipt_item_height(%ReceiveFund.ReceiptDetail{} = d, plain, with_desc) do
+    if d.descriptions not in [nil, ""], do: with_desc, else: plain
+  end
+
+  defp receipt_item_height(_item, plain, _with_desc), do: plain
+
+  defp chunk_by_height(items, max_height, height_fn) do
+    {chunks, current, _h} =
+      Enum.reduce(items, {[], [], 0}, fn item, {chunks, cur, h} ->
+        ih = height_fn.(item)
+
+        if cur != [] and h + ih > max_height do
+          {chunks ++ [Enum.reverse(cur)], [item], ih}
+        else
+          {chunks, [item | cur], h + ih}
+        end
+      end)
+
+    case current do
+      [] -> chunks
+      cur -> chunks ++ [Enum.reverse(cur)]
+    end
   end
 
   defp fill_head_foot_for(map, list_atom, header, footer) do
@@ -200,53 +225,57 @@ defmodule FullCircleWeb.ReceiptLive.Print do
     """
   end
 
-  def receipt_detail(recd, assigns) do
-    assigns = assign(assigns, :recd, recd)
+  def receipt_detail(%ReceiveFund.ReceiptDetail{} = recd, assigns) do
+    assigns =
+      assigns
+      |> assign(:recd, recd)
+      |> assign(:has_desc, recd.descriptions not in [nil, ""])
 
     ~H"""
-    <div :if={@recd.__struct__ == ReceiveFund.ReceiptDetail} class="detail">
-      <div class="particular">
-        <div>
-          {if(@recd.good_name != "Note", do: @recd.good_name, else: "")}
-          {if(Decimal.gt?(@recd.package_qty, 0), do: " - #{@recd.package_qty}", else: "")}
-          {if(!is_nil(@recd.package_name) and @recd.package_name != "-",
-            do: "(#{@recd.package_name})",
-            else: ""
-          )}
-        </div>
-        <div class={if(@recd.good_name != "Note", do: "is-size-7", else: "")}>
-          {if(@recd.descriptions != "" and !is_nil(@recd.descriptions),
-            do: "#{@recd.descriptions}",
-            else: ""
-          )}
-        </div>
-      </div>
-      <div class="qty">
-        {if Decimal.integer?(@recd.quantity),
-          do: Decimal.to_integer(@recd.quantity),
-          else: @recd.quantity} {if @recd.unit == "-", do: "", else: @recd.unit}
-      </div>
-      <div class="price">{format_unit_price(@recd.unit_price)}</div>
-      <div class="disc">
-        {if(Decimal.eq?(@recd.discount, 0),
-          do: "-",
-          else: Number.Delimit.number_to_delimited(@recd.discount)
-        )}
-      </div>
-      <div class="total">
-        <div>{Number.Delimit.number_to_delimited(@recd.good_amount)}</div>
-
-        <%= if Decimal.gt?(@recd.tax_amount, 0) do %>
-          <div class="is-size-7">
-            {@recd.tax_code_name}
-            {Number.Percentage.number_to_percentage(Decimal.mult(@recd.tax_rate, 100))}
-            {Number.Delimit.number_to_delimited(@recd.tax_amount)}
+    <div class={["detail", @has_desc && "detail-with-desc"]}>
+      <div class="detail-row">
+        <div class="particular">
+          <div class="good-name">
+            {@recd.good_name}
+            {if(Decimal.gt?(@recd.package_qty, 0), do: " - #{@recd.package_qty}", else: "")}
+            {if(!is_nil(@recd.package_name) and @recd.package_name != "-",
+              do: "(#{@recd.package_name})",
+              else: ""
+            )}
           </div>
-        <% end %>
+        </div>
+        <div class="qty">
+          {if Decimal.integer?(@recd.quantity),
+            do: Decimal.to_integer(@recd.quantity),
+            else: @recd.quantity} {if @recd.unit == "-", do: "", else: @recd.unit}
+        </div>
+        <div class="price">{format_unit_price(@recd.unit_price)}</div>
+        <div class="disc">
+          {if(Decimal.eq?(@recd.discount, 0),
+            do: "-",
+            else: Number.Delimit.number_to_delimited(@recd.discount)
+          )}
+        </div>
+        <div class="total">
+          <div>{Number.Delimit.number_to_delimited(@recd.good_amount)}</div>
+
+          <%= if Decimal.gt?(@recd.tax_amount, 0) do %>
+            <div class="is-size-7">
+              {@recd.tax_code_name}
+              {Number.Percentage.number_to_percentage(Decimal.mult(@recd.tax_rate, 100))}
+              {Number.Delimit.number_to_delimited(@recd.tax_amount)}
+            </div>
+          <% end %>
+        </div>
+      </div>
+      <div :if={@has_desc} class="detail-desc">
+        {@recd.descriptions}
       </div>
     </div>
     """
   end
+
+  def receipt_detail(_recd, _assigns), do: ""
 
   def match_tran_footer(recd, receipt, assigns) do
     assigns = assigns |> assign(:receipt, receipt) |> assign(:recd, recd)
@@ -476,10 +505,37 @@ defmodule FullCircleWeb.ReceiptLive.Print do
     <style>
       .details-body { min-height: <%= @detail_body_height %>mm; max-height: <%= @detail_body_height %>mm; }
       .details-body div { vertical-align: top; }
-      .detail { display: flex; height: <%= @detail_height %>mm; vertical-align: middle; align-items: center; }
-      .cheque { display: flex; height: <%= @detail_height %>mm; vertical-align: middle;  align-items: center; }
-      .funds { display: flex; height: <%= @detail_height %>mm; vertical-align: middle;  align-items: center; }
-      .matched { display: flex; height: <%= @detail_height %>mm; vertical-align: middle;  align-items: center; }
+      /* Short line without description; taller when description present */
+      .detail {
+        display: block;
+        min-height: <%= @detail_height_plain %>mm;
+        height: auto;
+        padding-bottom: 0.6mm;
+        box-sizing: border-box;
+      }
+      .detail.detail-with-desc {
+        min-height: <%= @detail_height_with_desc %>mm;
+        padding-bottom: 1.2mm;
+      }
+      .detail-row {
+        display: flex;
+        align-items: flex-start;
+        width: 100%;
+      }
+      .detail-desc {
+        width: 100%;
+        box-sizing: border-box;
+        font-size: 4mm;
+        line-height: 0.8;
+        padding-top: 0mm;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+      }
+      .good-name { line-height: 1.2; }
+      .cheque { display: flex; height: <%= @detail_height_plain %>mm; vertical-align: middle;  align-items: center; }
+      .funds { display: flex; height: <%= @detail_height_plain %>mm; vertical-align: middle;  align-items: center; }
+      .matched { display: flex; height: <%= @detail_height_plain %>mm; vertical-align: middle;  align-items: center; }
       .page { width: 210mm; min-height: 290mm; padding: 5mm; }
 
       @media print {
@@ -499,7 +555,6 @@ defmodule FullCircleWeb.ReceiptLive.Print do
       .receipt-info div { margin-bottom: 2mm; text-align: right; }
       .details-header { display: flex; padding-bottom: 1mm; padding-top: 1mm; border-bottom: 0.5mm dotted black; margin-bottom: 3px;}
       .particular { width: 80mm; text-align: left; }
-      .particular div { margin-bottom: 0.5mm; }
       .qty { width: 32mm; text-align: center; }
       .price { width: 25mm; text-align: center; }
       .disc { width: 24mm; text-align: center; }

@@ -18,6 +18,7 @@ defmodule FullCircle.Trading do
     SupplyPosition,
     SalesPosition,
     Balances,
+    Settlement,
     Trip,
     TripLoad,
     TripDrop
@@ -1940,6 +1941,24 @@ defmodule FullCircle.Trading do
       false -> :not_authorise
       other -> other
     end
+  end
+
+  # --- Settlement (customer invoice from completed drops) ---
+
+  def list_uninvoiced_drops(company, user, opts \\ []) do
+    Settlement.list_uninvoiced_drops(company, user, opts)
+  end
+
+  def build_invoice_attrs_from_drop_ids(drop_ids, company, user) do
+    Settlement.build_invoice_attrs_from_drop_ids(drop_ids, company, user)
+  end
+
+  def link_drops_to_invoice(drop_ids, invoice, company, user) do
+    Settlement.link_drops_to_invoice(drop_ids, invoice, company, user)
+  end
+
+  def create_invoice_from_drops(drop_ids, attrs, company, user) do
+    Settlement.create_invoice_from_drops(drop_ids, attrs, company, user)
   end
 
   @doc """

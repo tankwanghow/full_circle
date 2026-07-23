@@ -34,18 +34,18 @@ defmodule Mix.Tasks.FullCircle.SeedTrading do
         User    : #{summary.user}
         Batch   : #{summary.batch}
         Desk    : #{summary.desk_path}
+        Settlement (customer invoice): #{summary.settlement_path}
 
-        Supplies:
-        #{format_pairs(summary.supplies)}
+        Uninvoiced sales drops ready to bill: #{summary.uninvoiced_drop_count}
+        Settlement-ready trips: #{Enum.join(summary.settlement_trips, ", ")}
 
-        Sales:
-        #{format_pairs(summary.sales)}
+        Supplies: #{length(summary.supplies)}  Sales: #{length(summary.sales)}  Trips: #{length(summary.trips)}
 
-        Trips:
-        #{format_pairs(summary.trips)}
+        Sample trip statuses:
+        #{format_pairs(Enum.take(summary.trips, 12))}
+        ...
 
-        ~50 supply / sales / trip rows with mixed statuses; multi-warehouse stock.
-        Log in and open the desk URL above.
+        Log in → Trading Desk or Settlement → select drops → Create Invoice.
         """)
 
       other ->

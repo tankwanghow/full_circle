@@ -835,6 +835,15 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
     ~H"""
     <%!-- Fill viewport under app nav; tables scroll inside panels only --%>
     <div class="mx-auto w-11/12 h-[calc(100dvh-5.5rem)] flex flex-col overflow-hidden gap-1">
+      <div class="flex justify-end gap-2 shrink-0 text-xs">
+        <.link
+          navigate={~p"/companies/#{@current_company.id}/trading/settlement"}
+          class="text-blue-700 hover:underline"
+          id="desk-settlement-link"
+        >
+          {gettext("Customer invoicing")}
+        </.link>
+      </div>
       <%!-- Top: supply + warehouse | open sales --%>
       <div class="flex-1 min-h-0 flex flex-col lg:flex-row gap-2">
         <div class="lg:w-1/2 min-h-0 flex flex-col gap-2">

@@ -48,6 +48,23 @@ defmodule FullCircle.Trading.SampleData do
     sales = create_sales!(company, user, batch, customers, supplies, maize, pollard, soy)
     trips = create_trips!(company, user, batch, locs, supplies, sales, customers, maize, pollard, soy)
 
+    # Dedicated settlement-ready deliveries (completed + sales drop, never stock-in-only)
+    settlement_trips =
+      create_settlement_ready_trips!(
+        company,
+        user,
+        batch,
+        locs,
+        supplies,
+        sales,
+        maize,
+        pollard,
+        soy
+      )
+
+    trips = trips ++ settlement_trips
+    uninvoiced = Trading.list_uninvoiced_drops(company, user)
+
     summary = %{
       company: company.name,
       company_id: company.id,
@@ -62,7 +79,10 @@ defmodule FullCircle.Trading.SampleData do
       supplies: Enum.map(supplies, &{&1.title, &1.status}),
       sales: Enum.map(sales, &{&1.title, &1.status}),
       trips: Enum.map(trips, &{&1.reference_no, &1.status}),
-      desk_path: "/companies/#{company.id}/trading/desk"
+      settlement_trips: Enum.map(settlement_trips, & &1.reference_no),
+      uninvoiced_drop_count: length(uninvoiced),
+      desk_path: "/companies/#{company.id}/trading/desk",
+      settlement_path: "/companies/#{company.id}/trading/settlement"
     }
 
     {:ok, summary}
@@ -382,6 +402,81 @@ defmodule FullCircle.Trading.SampleData do
 
   defp cancel_trip_if_possible(trip, company, user) do
     Trading.cancel_trip(trip, company, user)
+  end
+
+  # Explicit completed customer deliveries for Phase A invoicing tests.
+  # Grouped so several drops share a customer (multi-drop invoice).
+  defp create_settlement_ready_trips!(
+         company,
+         user,
+         batch,
+         locs,
+         supplies,
+         sales,
+         maize,
+         pollard,
+         soy
+       ) do
+    goods = [maize, pollard, soy]
+    open_sales = Enum.filter(sales, &(&1.status in ~w(draft open hold)))
+    active_supplies = Enum.reject(supplies, &(&1.status == "closed"))
+    farm_locs = [locs.farm_a, locs.farm_b, locs.farm_c, locs.farm_d, locs.farm_e]
+
+    if open_sales == [] or active_supplies == [] do
+      []
+    else
+      # 12 completed deliveries: pair indices share sales when possible
+      for i <- 1..12 do
+        good = Enum.at(goods, rem(i - 1, length(goods)))
+
+        supply =
+          active_supplies
+          |> Enum.filter(&(&1.good_id == good.id))
+          |> case do
+            [] -> Enum.at(active_supplies, rem(i - 1, length(active_supplies)))
+            same -> Enum.at(same, rem(i - 1, length(same)))
+          end
+
+        pair_idx = div(i - 1, 2)
+
+        sales_for_good = Enum.filter(open_sales, &(&1.good_id == good.id))
+        sales_pool = if sales_for_good == [], do: open_sales, else: sales_for_good
+        sales_row = Enum.at(sales_pool, rem(pair_idx, length(sales_pool)))
+
+        mt = Integer.to_string(15 + rem(i * 3, 40))
+        date = Date.add(Date.utc_today(), -rem(i, 10))
+        farm = Enum.at(farm_locs, rem(i - 1, length(farm_locs)))
+
+        attrs = %{
+          "date" => Date.to_iso8601(date),
+          "transport_mode" => "company_own",
+          "status" => "draft",
+          "vehicle_number" => "BILL #{2000 + i}",
+          "notes" => "#{@batch_prefix} settlement-ready delivery ##{i} #{batch}",
+          "loads" => [
+            %{
+              "planned_mt" => mt,
+              "actual_mt" => mt,
+              "good_id" => good.id,
+              "location_id" => locs.port.id,
+              "supply_position_id" => supply.id
+            }
+          ],
+          "drops" => [
+            %{
+              "planned_mt" => mt,
+              "actual_mt" => mt,
+              "good_id" => good.id,
+              "location_id" => farm.id,
+              "sales_position_id" => sales_row.id,
+              "supply_position_id" => supply.id
+            }
+          ]
+        }
+
+        complete_trip!(company, user, attrs)
+      end
+    end
   end
 
   # --- helpers ---

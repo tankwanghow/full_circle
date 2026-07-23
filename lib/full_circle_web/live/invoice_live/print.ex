@@ -33,15 +33,24 @@ defmodule FullCircleWeb.InvoiceLive.Print do
      |> fill_invoices(ids)}
   end
 
+  # mm — short line (good only) vs line with full-width description row
+  @detail_height_plain 8
+  @detail_height_with_desc 12
+
   defp set_page_defaults(socket) do
     socket
     |> assign(:detail_body_height, 150)
-    |> assign(:detail_height, 11)
+    |> assign(:detail_height_plain, @detail_height_plain)
+    |> assign(:detail_height_with_desc, @detail_height_with_desc)
+    # kept for any leftover CSS refs; plain is the common case
+    |> assign(:detail_height, @detail_height_plain)
     |> assign(:company, FullCircle.Sys.get_company!(socket.assigns.current_company.id))
   end
 
   defp fill_invoices(socket, ids) do
-    chunk = (socket.assigns.detail_body_height / socket.assigns.detail_height) |> floor
+    body = socket.assigns.detail_body_height
+    plain = socket.assigns.detail_height_plain
+    with_desc = socket.assigns.detail_height_with_desc
 
     invoices =
       Billing.get_print_invoices!(
@@ -50,17 +59,41 @@ defmodule FullCircleWeb.InvoiceLive.Print do
         socket.assigns.current_user
       )
       |> Enum.map(fn invoice ->
+        detail_chunks =
+          chunk_by_height(invoice.invoice_details, body, fn d ->
+            if has_line_desc?(d), do: with_desc, else: plain
+          end)
+
         invoice
         |> Map.merge(%{
-          chunk_number: Enum.chunk_every(invoice.invoice_details, chunk) |> Enum.count()
-        })
-        |> Map.merge(%{
-          detail_chunks: Enum.chunk_every(invoice.invoice_details, chunk)
+          chunk_number: length(detail_chunks),
+          detail_chunks: detail_chunks
         })
       end)
 
     socket
     |> assign(:invoices, invoices)
+  end
+
+  defp has_line_desc?(%{descriptions: d}) when d not in [nil, ""], do: true
+  defp has_line_desc?(_), do: false
+
+  defp chunk_by_height(items, max_height, height_fn) do
+    {chunks, current, _h} =
+      Enum.reduce(items, {[], [], 0}, fn item, {chunks, cur, h} ->
+        ih = height_fn.(item)
+
+        if cur != [] and h + ih > max_height do
+          {chunks ++ [Enum.reverse(cur)], [item], ih}
+        else
+          {chunks, [item | cur], h + ih}
+        end
+      end)
+
+    case current do
+      [] -> chunks
+      cur -> chunks ++ [Enum.reverse(cur)]
+    end
   end
 
   @impl true
@@ -101,48 +134,50 @@ defmodule FullCircleWeb.InvoiceLive.Print do
   end
 
   def invoice_detail(invd, assigns) do
-    assigns = assign(assigns, :invd, invd)
+    assigns =
+      assigns
+      |> assign(:invd, invd)
+      |> assign(:has_desc, invd.descriptions not in [nil, ""])
 
     ~H"""
-    <div class="detail">
-      <div class="particular">
-        <div :if={@invd.good_name != "Note"}>
-          {@invd.good_name}
-          {if(Decimal.gt?(@invd.package_qty, 0), do: " - #{@invd.package_qty}", else: "")}
-          {if(!is_nil(@invd.package_name) and @invd.package_name != "-",
-            do: "(#{@invd.package_name})",
-            else: ""
-          )}
-        </div>
-        <div>
-          {if(@invd.descriptions != "" and !is_nil(@invd.descriptions),
-            do: "#{@invd.descriptions}",
-            else: ""
-          )}
-        </div>
-      </div>
-      <div class="qty">
-        {if Decimal.integer?(@invd.quantity),
-          do: Decimal.to_integer(@invd.quantity),
-          else: @invd.quantity} {if @invd.unit == "-", do: "", else: @invd.unit}
-      </div>
-      <div class="price">{format_unit_price(@invd.unit_price)}</div>
-      <div class="disc">
-        {if(Decimal.eq?(@invd.discount, 0),
-          do: "-",
-          else: Number.Delimit.number_to_delimited(@invd.discount)
-        )}
-      </div>
-      <div class="total">
-        <div>{Number.Delimit.number_to_delimited(@invd.good_amount)}</div>
-
-        <%= if Decimal.gt?(@invd.tax_amount, 0) do %>
-          <div class="is-size-7 is-italic">
-            {@invd.tax_code_name}
-            {Number.Percentage.number_to_percentage(Decimal.mult(@invd.tax_rate, 100))}
-            {Number.Delimit.number_to_delimited(@invd.tax_amount)}
+    <div class={["detail", @has_desc && "detail-with-desc"]}>
+      <div class="detail-row">
+        <div class="particular">
+          <div class="good-name">
+            {@invd.good_name}
+            {if(Decimal.gt?(@invd.package_qty, 0), do: " - #{@invd.package_qty}", else: "")}
+            {if(!is_nil(@invd.package_name) and @invd.package_name != "-",
+              do: "(#{@invd.package_name})",
+              else: ""
+            )}
           </div>
-        <% end %>
+        </div>
+        <div class="qty">
+          {if Decimal.integer?(@invd.quantity),
+            do: Decimal.to_integer(@invd.quantity),
+            else: @invd.quantity} {if @invd.unit == "-", do: "", else: @invd.unit}
+        </div>
+        <div class="price">{format_unit_price(@invd.unit_price)}</div>
+        <div class="disc">
+          {if(Decimal.eq?(@invd.discount, 0),
+            do: "-",
+            else: Number.Delimit.number_to_delimited(@invd.discount)
+          )}
+        </div>
+        <div class="total">
+          <div>{Number.Delimit.number_to_delimited(@invd.good_amount)}</div>
+
+          <%= if Decimal.gt?(@invd.tax_amount, 0) do %>
+            <div class="is-size-7 is-italic">
+              {@invd.tax_code_name}
+              {Number.Percentage.number_to_percentage(Decimal.mult(@invd.tax_rate, 100))}
+              {Number.Delimit.number_to_delimited(@invd.tax_amount)}
+            </div>
+          <% end %>
+        </div>
+      </div>
+      <div :if={@has_desc} class="detail-desc">
+        {@invd.descriptions}
       </div>
     </div>
     """
@@ -283,7 +318,34 @@ defmodule FullCircleWeb.InvoiceLive.Print do
     <style>
       .details-body { height: <%= @detail_body_height %>mm; }
       .details-body div { vertical-align: top; }
-      .detail { display: flex; height: <%= @detail_height %>mm; align-items : center; }
+      /* Short line without description; taller when description present */
+      .detail {
+        display: block;
+        min-height: <%= @detail_height_plain %>mm;
+        height: auto;
+        padding-bottom: 0.6mm;
+        box-sizing: border-box;
+      }
+      .detail.detail-with-desc {
+        min-height: <%= @detail_height_with_desc %>mm;
+        padding-bottom: 1.2mm;
+      }
+      .detail-row {
+        display: flex;
+        align-items: flex-start;
+        width: 100%;
+      }
+      .detail-desc {
+        width: 100%;
+        box-sizing: border-box;
+        font-size: 4mm;
+        line-height: 0.8;
+        padding-top: 0mm;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+      }
+      .good-name { line-height: 1.2; }
       .page { width: 210mm; min-height: 290mm; padding: 5mm; }
 
       @media print {
@@ -299,11 +361,11 @@ defmodule FullCircleWeb.InvoiceLive.Print do
       .customer { padding-left: 2mm; float: left;}
       .invoice-info div { margin-bottom: 1mm; text-align: right; }
       .details-header { display: flex; text-align: center; padding-bottom: 2mm; padding-top: 2mm; border-bottom: 0.5mm solid black; margin-bottom: 2mm;}
-      .particular { width: 80mm; text-align: left;  height: 100%; }
+      .particular { width: 80mm; text-align: left; height: 100%; }
       .qty { width: 32mm; text-align: center; height: 100%; }
-      .price { width: 25mm; text-align: center;  height: 100%; }
-      .disc { width: 24mm; text-align: center;  height: 100%; }
-      .total { width: 45mm; text-align: right;  height: 100%; }
+      .price { width: 25mm; text-align: center; height: 100%; }
+      .disc { width: 24mm; text-align: center; height: 100%; }
+      .total { width: 45mm; text-align: right; height: 100%; }
 
       .invoice-footer { min-height: 10mm; }
       .descriptions { min-height: 6mm; }

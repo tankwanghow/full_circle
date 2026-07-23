@@ -28,27 +28,57 @@ defmodule FullCircleWeb.InvoiceLive.Form do
   end
 
   defp mount_new(socket, params) do
-    attrs =
-      if params["egg"] do
-        egg_quantities = parse_egg_quantities(params["egg"])
+    {attrs, trading_drop_ids, flash} =
+      cond do
+        params["trading_drops"] not in [nil, ""] ->
+          ids = parse_id_list(params["trading_drops"])
 
-        details =
-          Billing.build_invoice_details_from_egg_order(
-            egg_quantities,
-            socket.assigns.current_company,
-            socket.assigns.current_user
-          )
+          case FullCircle.Trading.build_invoice_attrs_from_drop_ids(
+                 ids,
+                 socket.assigns.current_company,
+                 socket.assigns.current_user
+               ) do
+            {:ok, trading_attrs} ->
+              {trading_attrs, ids, nil}
 
-        %{
-          invoice_no: "...new...",
-          contact_name: params["contact_name"],
-          contact_id: blank_id(params["contact_id"]),
-          invoice_date: params["date"],
-          load_date: params["date"],
-          invoice_details: details
-        }
-      else
-        %{invoice_no: "...new..."}
+            {:error, :mixed_customers} ->
+              {%{"invoice_no" => "...new..."}, [],
+               gettext("Selected drops must belong to the same customer")}
+
+            {:error, :ineligible_drops} ->
+              {%{"invoice_no" => "...new..."}, [],
+               gettext("Some drops are no longer eligible for invoicing")}
+
+            :not_authorise ->
+              {%{"invoice_no" => "...new..."}, [],
+               gettext("You are not authorised to perform this action")}
+
+            {:error, _} ->
+              {%{"invoice_no" => "...new..."}, [],
+               gettext("Cannot prefill invoice from trading drops")}
+          end
+
+        params["egg"] ->
+          egg_quantities = parse_egg_quantities(params["egg"])
+
+          details =
+            Billing.build_invoice_details_from_egg_order(
+              egg_quantities,
+              socket.assigns.current_company,
+              socket.assigns.current_user
+            )
+
+          {%{
+             invoice_no: "...new...",
+             contact_name: params["contact_name"],
+             contact_id: blank_id(params["contact_id"]),
+             invoice_date: params["date"],
+             load_date: params["date"],
+             invoice_details: details
+           }, [], nil}
+
+        true ->
+          {%{invoice_no: "...new..."}, [], nil}
       end
 
     cs =
@@ -67,18 +97,36 @@ defmodule FullCircleWeb.InvoiceLive.Form do
         cs
       end
 
-    socket
-    |> assign(live_action: :new)
-    |> assign(id: "new")
-    |> assign(page_title: gettext("New Invoice"))
-    |> assign(matched_trans: [])
-    |> assign_egg_link(params, :sales)
-    |> assign(:form, to_form(cs))
+    socket =
+      socket
+      |> assign(live_action: :new)
+      |> assign(id: "new")
+      |> assign(page_title: gettext("New Invoice"))
+      |> assign(matched_trans: [])
+      |> assign(trading_drop_ids: trading_drop_ids)
+      |> assign_egg_link(params, :sales)
+      |> assign(:form, to_form(cs))
+
+    if flash do
+      put_flash(socket, :error, flash)
+    else
+      socket
+    end
   end
 
   defp blank_id(nil), do: nil
   defp blank_id(""), do: nil
   defp blank_id(id), do: id
+
+  defp parse_id_list(nil), do: []
+  defp parse_id_list(""), do: []
+
+  defp parse_id_list(str) when is_binary(str) do
+    str
+    |> String.split(",", trim: true)
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
+  end
 
   defp assign_egg_link(socket, params, side) do
     if params["egg"] do
@@ -151,6 +199,7 @@ defmodule FullCircleWeb.InvoiceLive.Form do
     socket
     |> assign(live_action: :edit)
     |> assign(id: id)
+    |> assign(trading_drop_ids: [])
     |> assign(page_title: gettext("Edit Invoice") <> " " <> object.invoice_no)
     |> assign(matched_trans: Billing.get_matcher_by("Invoice", id))
     |> assign(
@@ -453,20 +502,51 @@ defmodule FullCircleWeb.InvoiceLive.Form do
   end
 
   defp save(socket, :new, params) do
-    case Billing.create_invoice(
-           params |> Map.merge(%{"invoice_no" => "...new..."}),
-           socket.assigns.current_company,
-           socket.assigns.current_user
-         ) do
+    params = params |> Map.merge(%{"invoice_no" => "...new..."})
+    company = socket.assigns.current_company
+    user = socket.assigns.current_user
+    drop_ids = socket.assigns[:trading_drop_ids] || []
+
+    result =
+      if drop_ids != [] do
+        FullCircle.Trading.create_invoice_from_drops(drop_ids, params, company, user)
+      else
+        Billing.create_invoice(params, company, user)
+      end
+
+    case result do
       {:ok, %{create_invoice: obj}} ->
         socket = maybe_attach_egg_planned(socket, obj, params)
 
+        flash =
+          if drop_ids != [] do
+            gettext("Invoice created and trading drops linked successfully.")
+          else
+            gettext("Invoice created successfully.")
+          end
+
         {:noreply,
          socket
-         |> push_navigate(
-           to: ~p"/companies/#{socket.assigns.current_company.id}/Invoice/#{obj.id}/edit"
-         )
-         |> put_flash(:info, "#{gettext("Invoice created successfully.")}")}
+         |> push_navigate(to: ~p"/companies/#{company.id}/Invoice/#{obj.id}/edit")
+         |> put_flash(:info, flash)}
+
+      {:error, :drops_already_invoiced} ->
+        {:noreply,
+         socket
+         |> put_flash(
+           :error,
+           gettext("Some drops were already invoiced. Invoice was not created.")
+         )}
+
+      {:error, :ineligible_drops} ->
+        {:noreply,
+         socket
+         |> put_flash(:error, gettext("Some drops are no longer eligible for invoicing"))}
+
+      {:error, :mixed_customers} ->
+        {:noreply,
+         socket
+         |> put_flash(:error, gettext("Selected drops must belong to the same customer"))}
 
       {:error, failed_operation, changeset, _} ->
         {:noreply,

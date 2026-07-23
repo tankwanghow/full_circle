@@ -21,6 +21,10 @@ desk/multi-good docs (as-built may supersede early non-goals).
 | **Balances** | Remaining / undelivered / warehouse on-hand only from **completed** trips. |
 
 Settlement Invoice / PurInvoice stay in finance — trading does not auto-post them.
+**Phase A (customer):** uninvoiced completed sales drops →
+`/trading/settlement` → prefill Invoice → link `trip_drops.invoice_id`.
+Gate is trip `completed` only. See
+`docs/superpowers/specs/2026-07-23-trading-settlement-invoicing-design.md`.
 
 ## Status machines
 

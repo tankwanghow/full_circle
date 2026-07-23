@@ -89,6 +89,12 @@ defmodule FullCircleWeb.DashboardLive do
         <.link navigate={~p"/companies/#{@current_company.id}/trading/desk"} class="button teal">
           {gettext("Trading Desk")}
         </.link>
+        <.link
+          navigate={~p"/companies/#{@current_company.id}/trading/settlement"}
+          class="button teal"
+        >
+          {gettext("Trading Settlement")}
+        </.link>
         <.link navigate={~p"/companies/#{@current_company.id}/trading/locations"} class="button teal">
           {gettext("Locations")}
         </.link>
