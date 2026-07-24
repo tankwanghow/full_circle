@@ -14,6 +14,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
         :new ->
           cond do
             obj -> mount_new(obj, socket)
+            params["trading_loads"] not in [nil, ""] -> mount_new_from_trading(socket, params)
             params["egg"] -> mount_new_from_egg(socket, params)
             true -> mount_new(socket)
           end
@@ -24,6 +25,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
 
     {:ok,
      socket
+     |> assign_new(:trading_load_ids, fn -> [] end)
      |> assign(e_inv_preview: nil)
      |> assign(
        settings:
@@ -51,9 +53,78 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
     socket
     |> assign(live_action: :new)
     |> assign(id: "new")
+    |> assign(trading_load_ids: [])
     |> assign(page_title: gettext("New Purchase Invoice"))
     |> assign(matched_trans: [])
     |> assign(:form, to_form(cs))
+  end
+
+  defp mount_new_from_trading(socket, params) do
+    ids = parse_id_list(params["trading_loads"])
+
+    {attrs, load_ids, flash} =
+      case FullCircle.Trading.build_pur_invoice_attrs_from_load_ids(
+             ids,
+             socket.assigns.current_company,
+             socket.assigns.current_user
+           ) do
+        {:ok, trading_attrs} ->
+          {trading_attrs, ids, nil}
+
+        {:error, :mixed_suppliers} ->
+          {%{"pur_invoice_no" => "...new..."}, [],
+           gettext("Selected loads must belong to the same supplier")}
+
+        {:error, :ineligible_loads} ->
+          {%{"pur_invoice_no" => "...new..."}, [],
+           gettext("Some loads are no longer eligible for billing")}
+
+        :not_authorise ->
+          {%{"pur_invoice_no" => "...new..."}, [],
+           gettext("You are not authorised to perform this action")}
+
+        {:error, _} ->
+          {%{"pur_invoice_no" => "...new..."}, [],
+           gettext("Cannot prefill purchase invoice from trading loads")}
+      end
+
+    cs =
+      Billing.make_changeset(
+        PurInvoice,
+        %PurInvoice{},
+        attrs,
+        socket.assigns.current_company,
+        socket.assigns.current_user
+      )
+
+    cs =
+      if Ecto.Changeset.get_assoc(cs, :pur_invoice_details) == [] do
+        FullCircleWeb.Helpers.add_line(cs, :pur_invoice_details)
+      else
+        cs
+      end
+
+    socket =
+      socket
+      |> assign(live_action: :new)
+      |> assign(id: "new")
+      |> assign(trading_load_ids: load_ids)
+      |> assign(page_title: gettext("New Purchase Invoice"))
+      |> assign(matched_trans: [])
+      |> assign_egg_link(%{}, :purchase)
+      |> assign(:form, to_form(cs))
+
+    if flash, do: put_flash(socket, :error, flash), else: socket
+  end
+
+  defp parse_id_list(nil), do: []
+  defp parse_id_list(""), do: []
+
+  defp parse_id_list(str) when is_binary(str) do
+    str
+    |> String.split(",", trim: true)
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
   end
 
   defp mount_new_from_egg(socket, params) do
@@ -501,20 +572,51 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
   end
 
   defp save(socket, :new, params) do
-    case Billing.create_pur_invoice(
-           params |> Map.merge(%{"pur_invoice_no" => "...new..."}),
-           socket.assigns.current_company,
-           socket.assigns.current_user
-         ) do
+    params = params |> Map.merge(%{"pur_invoice_no" => "...new..."})
+    company = socket.assigns.current_company
+    user = socket.assigns.current_user
+    load_ids = socket.assigns[:trading_load_ids] || []
+
+    result =
+      if load_ids != [] do
+        FullCircle.Trading.create_pur_invoice_from_loads(load_ids, params, company, user)
+      else
+        Billing.create_pur_invoice(params, company, user)
+      end
+
+    case result do
       {:ok, %{create_pur_invoice: obj}} ->
         socket = maybe_attach_egg_planned(socket, obj, params)
 
+        flash =
+          if load_ids != [] do
+            gettext("Purchase invoice created and trading loads linked successfully.")
+          else
+            gettext("Purchase Invoice created successfully.")
+          end
+
         {:noreply,
          socket
-         |> push_navigate(
-           to: ~p"/companies/#{socket.assigns.current_company.id}/PurInvoice/#{obj.id}/edit"
-         )
-         |> put_flash(:info, "#{gettext("Purchase Invoice created successfully.")}")}
+         |> push_navigate(to: ~p"/companies/#{company.id}/PurInvoice/#{obj.id}/edit")
+         |> put_flash(:info, flash)}
+
+      {:error, :loads_already_billed} ->
+        {:noreply,
+         socket
+         |> put_flash(
+           :error,
+           gettext("Some loads were already billed. Purchase invoice was not created.")
+         )}
+
+      {:error, :ineligible_loads} ->
+        {:noreply,
+         socket
+         |> put_flash(:error, gettext("Some loads are no longer eligible for billing"))}
+
+      {:error, :mixed_suppliers} ->
+        {:noreply,
+         socket
+         |> put_flash(:error, gettext("Selected loads must belong to the same supplier"))}
 
       {:error, failed_operation, changeset, _} ->
         {:noreply,

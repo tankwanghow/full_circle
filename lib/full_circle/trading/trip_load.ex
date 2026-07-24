@@ -21,6 +21,7 @@ defmodule FullCircle.Trading.TripLoad do
     belongs_to :good, FullCircle.Product.Good
     belongs_to :supply_position, FullCircle.Trading.SupplyPosition
     belongs_to :location, FullCircle.Trading.Location
+    belongs_to :pur_invoice, FullCircle.Billing.PurInvoice
 
     has_many :trip_load_employees, FullCircle.Trading.TripLoadEmployee,
       on_replace: :delete,
@@ -34,7 +35,13 @@ defmodule FullCircle.Trading.TripLoad do
   def changeset(load, attrs) do
     load
     |> cast(
-      blank_to_nil(attrs, ["supply_position_id", "location_id", "good_id", "party_contact_id"]),
+      blank_to_nil(attrs, [
+        "supply_position_id",
+        "location_id",
+        "good_id",
+        "party_contact_id",
+        "pur_invoice_id"
+      ]),
       [
         :planned_mt,
         :actual_mt,
@@ -44,6 +51,7 @@ defmodule FullCircle.Trading.TripLoad do
         :good_id,
         :supply_position_id,
         :location_id,
+        :pur_invoice_id,
         :location_name,
         :supply_title,
         :good_name,
@@ -59,6 +67,7 @@ defmodule FullCircle.Trading.TripLoad do
     |> foreign_key_constraint(:good_id)
     |> foreign_key_constraint(:supply_position_id)
     |> foreign_key_constraint(:location_id)
+    |> foreign_key_constraint(:pur_invoice_id)
     |> maybe_mark_for_deletion()
   end
 

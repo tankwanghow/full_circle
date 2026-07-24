@@ -1,7 +1,7 @@
 # Trading Desk Settlement — Customer Invoice, Supplier Bill, Transport Bill
 
 **Date:** 2026-07-23  
-**Status:** Phase A implemented (customer invoice from completed drops); B–D pending  
+**Status:** Phase A–B implemented (customer Invoice + supplier PurInvoice); C–D pending  
 **Parent:** `docs/superpowers/specs/2026-07-15-grain-trading-trip-design.md` (§3.5 Settlement)  
 **Skill:** `.claude/skills/grain-trading-desk.md` (update when implemented)  
 **App:** FullCircle (`full_circle`)  

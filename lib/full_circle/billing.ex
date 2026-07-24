@@ -803,7 +803,7 @@ defmodule FullCircle.Billing do
       make_changeset(
         PurInvoice,
         %PurInvoice{},
-        Map.merge(attrs, %{"pur_invoice_no" => doc}),
+        Map.merge(attrs, %{"pur_invoice_no" => doc, "e_inv_internal_id" => doc}),
         com,
         user
       )

@@ -12,12 +12,14 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
     if Authorization.can?(user, :view_trading, company) do
       {:ok,
        socket
-       |> assign(page_title: gettext("Trading Settlement — Customer Invoices"))
+       |> assign(page_title: gettext("Trading Settlement"))
+       |> assign(tab: "customer")
        |> assign(selected: MapSet.new())
        |> assign(modal: nil)
        |> assign(can_manage: Authorization.can?(user, :manage_trading, company))
        |> assign(can_invoice: Authorization.can?(user, :create_invoice, company))
-       |> assign(filters: %{"customer_id" => "", "from_date" => "", "to_date" => ""})
+       |> assign(can_pur_invoice: Authorization.can?(user, :create_pur_invoice, company))
+       |> assign(filters: %{"party_id" => "", "from_date" => "", "to_date" => ""})
        |> load_rows()}
     else
       {:ok,
@@ -28,6 +30,15 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
   end
 
   @impl true
+  def handle_event("set_tab", %{"tab" => tab}, socket) when tab in ["customer", "supplier"] do
+    {:noreply,
+     socket
+     |> assign(tab: tab)
+     |> assign(selected: MapSet.new())
+     |> assign(filters: %{"party_id" => "", "from_date" => "", "to_date" => ""})
+     |> load_rows()}
+  end
+
   def handle_event("open_trip", %{"id" => id}, socket) do
     if socket.assigns.can_manage do
       {:noreply,
@@ -46,8 +57,9 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
 
   def handle_event("toggle", %{"id" => id}, socket) do
     row = Enum.find(socket.assigns.rows, &(&1.id == id))
+    selectable? = row && selectable?(row, socket.assigns.tab)
 
-    if row && row.invoiceable do
+    if selectable? do
       selected =
         if MapSet.member?(socket.assigns.selected, id) do
           MapSet.delete(socket.assigns.selected, id)
@@ -61,10 +73,10 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
     end
   end
 
-  def handle_event("toggle_customer", %{"customer_id" => customer_id}, socket) do
+  def handle_event("toggle_party", %{"party_id" => party_id}, socket) do
     ids =
       socket.assigns.rows
-      |> Enum.filter(&(&1.customer_id == customer_id and &1.invoiceable))
+      |> Enum.filter(&(party_id_of(&1, socket.assigns.tab) == party_id and selectable?(&1, socket.assigns.tab)))
       |> Enum.map(& &1.id)
 
     all_selected? = ids != [] and Enum.all?(ids, &MapSet.member?(socket.assigns.selected, &1))
@@ -87,7 +99,36 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
      |> load_rows()}
   end
 
-  def handle_event("create_invoice", _params, socket) do
+  def handle_event("create_doc", _params, socket) do
+    case socket.assigns.tab do
+      "customer" -> create_customer_invoice(socket)
+      "supplier" -> create_supplier_pur_invoice(socket)
+    end
+  end
+
+  @impl true
+  def handle_info({:desk_modal_saved, kind}, socket),
+    do: handle_info({:desk_modal_saved, kind, nil}, socket)
+
+  def handle_info({:desk_modal_saved, :trip, msg}, socket) do
+    msg = msg || gettext("Trip saved.")
+
+    {:noreply,
+     socket
+     |> put_flash(:info, msg)
+     |> assign(modal: nil)
+     |> load_rows()}
+  end
+
+  def handle_info({:desk_modal_saved, _kind, msg}, socket) do
+    {:noreply,
+     socket
+     |> put_flash(:info, msg || gettext("Saved."))
+     |> assign(modal: nil)
+     |> load_rows()}
+  end
+
+  defp create_customer_invoice(socket) do
     company = socket.assigns.current_company
     user = socket.assigns.current_user
     ids = MapSet.to_list(socket.assigns.selected)
@@ -134,54 +175,97 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
     end
   end
 
-  @impl true
-  def handle_info({:desk_modal_saved, kind}, socket),
-    do: handle_info({:desk_modal_saved, kind, nil}, socket)
+  defp create_supplier_pur_invoice(socket) do
+    company = socket.assigns.current_company
+    user = socket.assigns.current_user
+    ids = MapSet.to_list(socket.assigns.selected)
 
-  def handle_info({:desk_modal_saved, :trip, msg}, socket) do
-    msg = msg || gettext("Trip saved.")
+    cond do
+      not socket.assigns.can_pur_invoice ->
+        {:noreply,
+         put_flash(socket, :error, gettext("You are not authorised to perform this action"))}
 
-    {:noreply,
-     socket
-     |> put_flash(:info, msg)
-     |> assign(modal: nil)
-     |> load_rows()}
-  end
+      ids == [] ->
+        {:noreply, put_flash(socket, :error, gettext("Select at least one load"))}
 
-  def handle_info({:desk_modal_saved, _kind, msg}, socket) do
-    {:noreply,
-     socket
-     |> put_flash(:info, msg || gettext("Saved."))
-     |> assign(modal: nil)
-     |> load_rows()}
+      true ->
+        case Trading.build_pur_invoice_attrs_from_load_ids(ids, company, user) do
+          {:ok, _attrs} ->
+            {:noreply,
+             push_navigate(socket,
+               to:
+                 ~p"/companies/#{company.id}/PurInvoice/new?#{%{trading_loads: Enum.join(ids, ",")}}"
+             )}
+
+          {:error, :mixed_suppliers} ->
+            {:noreply,
+             put_flash(
+               socket,
+               :error,
+               gettext("Selected loads must belong to the same supplier")
+             )}
+
+          {:error, :ineligible_loads} ->
+            {:noreply,
+             socket
+             |> put_flash(:error, gettext("Some loads are no longer eligible for billing"))
+             |> assign(selected: MapSet.new())
+             |> load_rows()}
+
+          :not_authorise ->
+            {:noreply,
+             put_flash(socket, :error, gettext("You are not authorised to perform this action"))}
+
+          {:error, _} ->
+            {:noreply,
+             put_flash(socket, :error, gettext("Cannot create purchase invoice from selection"))}
+        end
+    end
   end
 
   defp load_rows(socket) do
     company = socket.assigns.current_company
     user = socket.assigns.current_user
     filters = socket.assigns.filters
+    tab = socket.assigns.tab
 
     opts =
       []
-      |> maybe_opt(:customer_id, blank_to_nil(filters["customer_id"]))
+      |> maybe_opt(party_opt_key(tab), blank_to_nil(filters["party_id"]))
       |> maybe_opt(:from_date, parse_date(filters["from_date"]))
       |> maybe_opt(:to_date, parse_date(filters["to_date"]))
 
-    rows = Trading.list_uninvoiced_drops(company, user, opts)
-    # Keep only valid selections after reload
-    invoiceable_ids = rows |> Enum.filter(& &1.invoiceable) |> MapSet.new(& &1.id)
+    rows =
+      case tab do
+        "customer" -> Trading.list_uninvoiced_drops(company, user, opts)
+        "supplier" -> Trading.list_unbilled_loads(company, user, opts)
+      end
 
-    selected =
-      socket.assigns.selected
-      |> MapSet.intersection(invoiceable_ids)
+    selectable_ids =
+      rows
+      |> Enum.filter(&selectable?(&1, tab))
+      |> MapSet.new(& &1.id)
 
-    groups = Enum.group_by(rows, &{&1.customer_id, &1.customer_name})
+    selected = MapSet.intersection(socket.assigns.selected, selectable_ids)
+    groups = Enum.group_by(rows, &party_key(&1, tab))
 
     socket
     |> assign(rows: rows)
     |> assign(selected: selected)
     |> assign(groups: groups)
   end
+
+  defp party_opt_key("customer"), do: :customer_id
+  defp party_opt_key("supplier"), do: :supplier_id
+
+  defp party_key(row, "customer"), do: {row.customer_id, row.customer_name}
+  defp party_key(row, "supplier"), do: {row.supplier_id, row.supplier_name}
+
+  defp party_id_of(row, "customer"), do: row.customer_id
+  defp party_id_of(row, "supplier"), do: row.supplier_id
+
+  defp selectable?(row, "customer"), do: row.invoiceable
+  defp selectable?(row, "supplier"), do: row.billable
 
   defp maybe_opt(opts, _key, nil), do: opts
   defp maybe_opt(opts, key, val), do: Keyword.put(opts, key, val)
@@ -200,22 +284,25 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
     end
   end
 
-  defp selected_total_mt(rows, selected) do
-    rows
-    |> Enum.filter(&MapSet.member?(selected, &1.id))
-    |> Enum.reduce(Decimal.new(0), fn r, acc ->
-      Decimal.add(acc, display_mt(r) || 0)
-    end)
-  end
-
   defp display_mt(%{actual_mt: %Decimal{} = a}), do: a
   defp display_mt(%{actual_mt: a}) when not is_nil(a), do: a
   defp display_mt(%{planned_mt: p}), do: p
   defp display_mt(_), do: Decimal.new(0)
 
-  defp customer_options(rows) do
+  defp selected_total_mt(rows, selected) do
     rows
-    |> Enum.map(&{&1.customer_name, &1.customer_id})
+    |> Enum.filter(&MapSet.member?(selected, &1.id))
+    |> Enum.reduce(Decimal.new(0), fn r, acc -> Decimal.add(acc, display_mt(r) || 0) end)
+  end
+
+  defp party_options(rows, tab) do
+    rows
+    |> Enum.map(fn r ->
+      case tab do
+        "customer" -> {r.customer_name, r.customer_id}
+        "supplier" -> {r.supplier_name, r.supplier_id}
+      end
+    end)
     |> Enum.uniq_by(fn {_n, id} -> id end)
     |> Enum.sort_by(fn {n, _} -> n end)
   end
@@ -230,11 +317,45 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
   defp status_class("draft"), do: "bg-gray-100 text-gray-600"
   defp status_class(_), do: "bg-gray-100 text-gray-600"
 
-  defp group_invoiceable_count(rows), do: Enum.count(rows, & &1.invoiceable)
+  defp group_selectable_count(rows, tab), do: Enum.count(rows, &selectable?(&1, tab))
 
   defp group_mt(rows) do
     Enum.reduce(rows, Decimal.new(0), fn r, a -> Decimal.add(a, display_mt(r) || 0) end)
   end
+
+  defp position_title(row, "customer"), do: row.sales_title
+  defp position_title(row, "supplier"), do: row.supply_title
+
+  defp action_label("customer"), do: gettext("Create Invoice")
+  defp action_label("supplier"), do: gettext("Create Purchase Invoice")
+
+  defp can_create?(%{tab: "customer", can_invoice: true}), do: true
+  defp can_create?(%{tab: "supplier", can_pur_invoice: true}), do: true
+  defp can_create?(_), do: false
+
+  defp help_text("customer") do
+    gettext(
+      "Sales drops on draft, planned, and completed trips (not yet invoiced). Only completed drops with actual MT can be selected for invoicing."
+    )
+  end
+
+  defp help_text("supplier") do
+    gettext(
+      "Commercial loads (with supply position) on draft, planned, and completed trips not yet billed. Only completed loads with actual MT can be selected."
+    )
+  end
+
+  defp empty_text("customer"), do: gettext("No sales deliveries to show.")
+  defp empty_text("supplier"), do: gettext("No commercial loads to show.")
+
+  defp party_filter_label("customer"), do: gettext("Customer")
+  defp party_filter_label("supplier"), do: gettext("Supplier")
+
+  defp all_parties_label("customer"), do: gettext("All customers")
+  defp all_parties_label("supplier"), do: gettext("All suppliers")
+
+  defp position_col_label("customer"), do: gettext("Sales")
+  defp position_col_label("supplier"), do: gettext("Supply")
 
   @impl true
   def render(assigns) do
@@ -251,15 +372,36 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
         <.link navigate={~p"/companies/#{@current_company.id}/trading/desk"} class="gray button">
           {gettext("Trading Desk")}
         </.link>
-        <.link navigate={~p"/companies/#{@current_company.id}/dashboard"} class="gray button">
-          {gettext("Dashboard")}
-        </.link>
+        <button
+          type="button"
+          id="tab-customer"
+          phx-click="set_tab"
+          phx-value-tab="customer"
+          class={[
+            "button",
+            @tab == "customer" && "blue",
+            @tab != "customer" && "gray"
+          ]}
+        >
+          {gettext("Customer invoices")}
+        </button>
+        <button
+          type="button"
+          id="tab-supplier"
+          phx-click="set_tab"
+          phx-value-tab="supplier"
+          class={[
+            "button",
+            @tab == "supplier" && "blue",
+            @tab != "supplier" && "gray"
+          ]}
+        >
+          {gettext("Supplier bills")}
+        </button>
       </div>
 
       <p class="text-sm text-center text-gray-600 mb-4">
-        {gettext(
-          "Sales drops on draft, planned, and completed trips (not yet invoiced). Only completed drops with actual MT can be selected for invoicing."
-        )}
+        {help_text(@tab)}
       </p>
 
       <.form
@@ -270,13 +412,13 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
         class="mb-4 flex flex-wrap gap-2 items-end justify-center text-sm"
       >
         <div>
-          <label class="block text-xs font-medium">{gettext("Customer")}</label>
-          <select name="filters[customer_id]" class="border rounded px-2 py-1 min-w-[12rem]">
-            <option value="">{gettext("All customers")}</option>
+          <label class="block text-xs font-medium">{party_filter_label(@tab)}</label>
+          <select name="filters[party_id]" class="border rounded px-2 py-1 min-w-[12rem]">
+            <option value="">{all_parties_label(@tab)}</option>
             <option
-              :for={{name, id} <- customer_options(@rows)}
+              :for={{name, id} <- party_options(@rows, @tab)}
               value={id}
-              selected={@filters["customer_id"] == id}
+              selected={@filters["party_id"] == id}
             >
               {name}
             </option>
@@ -308,48 +450,50 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
           · {gettext("MT")}: <strong>{@selected_mt}</strong>
         </span>
         <button
-          :if={@can_invoice}
+          :if={can_create?(assigns)}
           type="button"
-          phx-click="create_invoice"
-          id="create-trading-invoice"
+          phx-click="create_doc"
+          id="create-trading-doc"
           class="blue button"
           disabled={@selected_count == 0}
         >
-          {gettext("Create Invoice")}
+          {action_label(@tab)}
         </button>
-        <span :if={!@can_invoice} class="text-sm text-amber-700">
-          {gettext("You need invoice permission to settle drops.")}
+        <span :if={!can_create?(assigns)} class="text-sm text-amber-700">
+          {if @tab == "customer",
+            do: gettext("You need invoice permission to settle drops."),
+            else: gettext("You need purchase-invoice permission to bill loads.")}
         </span>
       </div>
 
       <div :if={@rows == []} class="text-center text-gray-500 py-8 border rounded">
-        {gettext("No sales deliveries to show.")}
+        {empty_text(@tab)}
       </div>
 
       <div
-        :for={{{customer_id, customer_name}, group_rows} <- @groups}
+        :for={{{party_id, party_name}, group_rows} <- @groups}
         class="mb-6 border rounded overflow-hidden"
       >
         <div class="bg-amber-200 border-b border-amber-500 font-bold p-2 flex gap-2 items-center text-sm">
           <button
-            :if={group_invoiceable_count(group_rows) > 0}
+            :if={group_selectable_count(group_rows, @tab) > 0}
             type="button"
-            phx-click="toggle_customer"
-            phx-value-customer_id={customer_id}
+            phx-click="toggle_party"
+            phx-value-party_id={party_id}
             class="underline text-blue-800"
-            id={"toggle-customer-#{customer_id}"}
+            id={"toggle-party-#{party_id}"}
           >
             {gettext("Toggle all billable")}
           </button>
           <span
-            :if={group_invoiceable_count(group_rows) == 0}
+            :if={group_selectable_count(group_rows, @tab) == 0}
             class="text-xs font-normal text-gray-600"
           >
             {gettext("None billable yet")}
           </span>
-          <span class="flex-1">{customer_name}</span>
+          <span class="flex-1">{party_name}</span>
           <span class="font-normal text-xs">
-            {group_invoiceable_count(group_rows)}/{length(group_rows)} {gettext("billable")} ·
+            {group_selectable_count(group_rows, @tab)}/{length(group_rows)} {gettext("billable")} ·
             {group_mt(group_rows)} {gettext("MT")}
           </span>
         </div>
@@ -358,7 +502,7 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
           <div class="w-2/12">{gettext("Date")}</div>
           <div class="w-2/12">{gettext("Trip")}</div>
           <div class="w-1/12">{gettext("Status")}</div>
-          <div class="w-2/12">{gettext("Sales")}</div>
+          <div class="w-2/12">{position_col_label(@tab)}</div>
           <div class="w-2/12">{gettext("Good")}</div>
           <div class="w-2/12">{gettext("Location")}</div>
           <div class="w-1/12 text-right">{gettext("MT")}</div>
@@ -366,26 +510,26 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
         </div>
         <div
           :for={row <- group_rows}
-          id={"uninvoiced-drop-#{row.id}"}
+          id={"settlement-row-#{row.id}"}
           class={[
             "flex gap-1 border-b p-2 text-sm items-center",
-            row.invoiceable && "hover:bg-gray-50",
-            !row.invoiceable && "opacity-60 bg-gray-50/80"
+            selectable?(row, @tab) && "hover:bg-gray-50",
+            !selectable?(row, @tab) && "opacity-60 bg-gray-50/80"
           ]}
         >
           <div class="w-8">
             <input
-              :if={row.invoiceable}
+              :if={selectable?(row, @tab)}
               type="checkbox"
               phx-click="toggle"
               phx-value-id={row.id}
               checked={MapSet.member?(@selected, row.id)}
-              id={"select-drop-#{row.id}"}
+              id={"select-row-#{row.id}"}
             />
             <span
-              :if={!row.invoiceable}
+              :if={!selectable?(row, @tab)}
               class="inline-block w-4 text-center text-gray-400"
-              title={gettext("Complete the trip before invoicing")}
+              title={gettext("Complete the trip before billing")}
             >
               —
             </span>
@@ -395,7 +539,7 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
             <button
               :if={@can_manage}
               type="button"
-              id={"open-trip-#{row.trip_id}"}
+              id={"open-trip-#{row.trip_id}-#{row.id}"}
               phx-click="open_trip"
               phx-value-id={row.trip_id}
               class="text-blue-600 hover:underline font-medium text-left"
@@ -410,7 +554,7 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
               {status_label(row.trip_status)}
             </span>
           </div>
-          <div class="w-2/12 font-mono text-xs">{row.sales_title}</div>
+          <div class="w-2/12 font-mono text-xs">{position_title(row, @tab)}</div>
           <div class="w-2/12">{row.good_name}</div>
           <div class="w-2/12">{row.location_name}</div>
           <div class="w-1/12 text-right tabular-nums">

@@ -1961,6 +1961,18 @@ defmodule FullCircle.Trading do
     Settlement.create_invoice_from_drops(drop_ids, attrs, company, user)
   end
 
+  def list_unbilled_loads(company, user, opts \\ []) do
+    Settlement.list_unbilled_loads(company, user, opts)
+  end
+
+  def build_pur_invoice_attrs_from_load_ids(load_ids, company, user) do
+    Settlement.build_pur_invoice_attrs_from_load_ids(load_ids, company, user)
+  end
+
+  def create_pur_invoice_from_loads(load_ids, attrs, company, user) do
+    Settlement.create_pur_invoice_from_loads(load_ids, attrs, company, user)
+  end
+
   @doc """
   Mark trip completed. Requires actual_mt on every load and drop.
   Returns `{:ok, trip, warnings}` — warnings never block completion.
@@ -2026,7 +2038,9 @@ defmodule FullCircle.Trading do
         trip.status == "cancelled" ->
           {:error, :already_cancelled}
 
-        trip.status == "completed" and Enum.any?(trip.drops, & &1.invoice_id) ->
+        trip.status == "completed" and
+            (Enum.any?(trip.drops, & &1.invoice_id) or
+               Enum.any?(trip.loads, & &1.pur_invoice_id)) ->
           {:error, :has_invoices}
 
         true ->

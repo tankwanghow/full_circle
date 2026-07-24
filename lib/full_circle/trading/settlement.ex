@@ -1,9 +1,12 @@
 defmodule FullCircle.Trading.Settlement do
   @moduledoc """
-  Trading desk settlement (Phase A: customer invoicing from completed drops).
+  Trading desk settlement.
 
-  Trading remains logistics truth; Invoice remains AR/GL truth.
-  Eligibility gate: trip `status == "completed"` only.
+  - **Phase A:** customer Invoice from completed sales drops
+  - **Phase B:** supplier PurInvoice from completed commercial loads
+
+  Trading remains logistics truth; finance docs remain AR/AP/GL truth.
+  Eligibility gate for billing: trip `status == "completed"` only.
   """
 
   import Ecto.Query, warn: false
@@ -15,7 +18,14 @@ defmodule FullCircle.Trading.Settlement do
   alias FullCircle.Billing
   alias FullCircle.Accounting.Contact
   alias FullCircle.Product.Good
-  alias FullCircle.Trading.{Trip, TripDrop, SalesPosition, Location}
+  alias FullCircle.Trading.{
+    Trip,
+    TripDrop,
+    TripLoad,
+    SalesPosition,
+    SupplyPosition,
+    Location
+  }
 
   @doc """
   Sales drops for the customer-invoicing board.
@@ -192,6 +202,127 @@ defmodule FullCircle.Trading.Settlement do
 
   def create_invoice_from_drops(_, _, _, _), do: {:error, :invalid_drops}
 
+  # --- Phase B: supplier PurInvoice from commercial loads ---
+
+  @doc """
+  Commercial loads for the supplier-billing board.
+
+  Includes draft/planned (visible, not selectable) and completed unbilled
+  loads with `supply_position_id` (selectable when `actual_mt` present).
+
+  Options: `:supplier_id`, `:from_date`, `:to_date`
+  """
+  def list_unbilled_loads(company, user, opts \\ []) do
+    if Authorization.can?(user, :view_trading, company) do
+      supplier_id = Keyword.get(opts, :supplier_id)
+      from_date = Keyword.get(opts, :from_date)
+      to_date = Keyword.get(opts, :to_date)
+
+      from(l in TripLoad,
+        join: t in Trip,
+        on: t.id == l.trip_id,
+        join: s in SupplyPosition,
+        on: s.id == l.supply_position_id,
+        join: c in Contact,
+        on: c.id == s.supplier_id,
+        join: g in Good,
+        on: g.id == l.good_id,
+        join: loc in Location,
+        on: loc.id == l.location_id,
+        where: t.company_id == ^company.id,
+        where: t.status in ["draft", "planned", "completed"],
+        where: is_nil(l.pur_invoice_id),
+        where: not is_nil(l.supply_position_id),
+        order_by: [desc: t.date, asc: t.reference_no, asc: l.seq],
+        select: %{
+          id: l.id,
+          planned_mt: l.planned_mt,
+          actual_mt: l.actual_mt,
+          seq: l.seq,
+          trip_id: t.id,
+          trip_date: t.date,
+          trip_reference_no: t.reference_no,
+          trip_status: t.status,
+          vehicle_number: t.vehicle_number,
+          supply_position_id: s.id,
+          supply_title: s.title,
+          unit_price: s.unit_price,
+          supplier_id: c.id,
+          supplier_name: c.name,
+          good_id: g.id,
+          good_name: g.name,
+          good_unit: g.unit,
+          location_id: loc.id,
+          location_name: loc.name,
+          billable: t.status == "completed" and not is_nil(l.actual_mt)
+        }
+      )
+      |> maybe_filter_supplier(supplier_id)
+      |> maybe_filter_load_from_date(from_date)
+      |> maybe_filter_load_to_date(to_date)
+      |> Repo.all()
+    else
+      []
+    end
+  end
+
+  def build_pur_invoice_attrs_from_load_ids(load_ids, company, user)
+      when is_list(load_ids) do
+    with :ok <- authorize_view(user, company),
+         {:ok, loads} <- load_eligible_loads(load_ids, company),
+         :ok <- same_supplier?(loads) do
+      {:ok, pur_invoice_attrs_from_loads(loads, company, user)}
+    end
+  end
+
+  def build_pur_invoice_attrs_from_load_ids(_, _, _), do: {:error, :invalid_loads}
+
+  def create_pur_invoice_from_loads(load_ids, attrs, company, user)
+      when is_list(load_ids) and load_ids != [] do
+    with :ok <- authorize_pur_invoice(user, company),
+         {:ok, loads} <- load_eligible_loads(load_ids, company),
+         :ok <- same_supplier?(loads) do
+      base = pur_invoice_attrs_from_loads(loads, company, user)
+      merged = deep_merge_string_maps(base, stringify_keys(attrs))
+
+      Multi.new()
+      |> Billing.create_pur_invoice_multi(merged, company, user)
+      |> Multi.run(:link_trading_loads, fn repo, %{create_pur_invoice: pinv} ->
+        ids = Enum.map(loads, & &1.id)
+        now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+        {n, _} =
+          from(l in TripLoad,
+            where: l.id in ^ids,
+            where: is_nil(l.pur_invoice_id)
+          )
+          |> repo.update_all(set: [pur_invoice_id: pinv.id, updated_at: now])
+
+        if n == length(ids) do
+          {:ok, n}
+        else
+          {:error, :loads_already_billed}
+        end
+      end)
+      |> Repo.transaction()
+      |> case do
+        {:ok, %{create_pur_invoice: pinv} = result} ->
+          {:ok, Map.put(result, :create_pur_invoice, pinv)}
+
+        {:error, :create_pur_invoice, %Ecto.Changeset{} = cs, _} ->
+          {:error, :create_pur_invoice, cs, %{}}
+
+        {:error, :link_trading_loads, reason, _} ->
+          {:error, reason}
+
+        {:error, step, reason, _} ->
+          {:error, step, reason, %{}}
+      end
+    end
+  end
+
+  def create_pur_invoice_from_loads(_, _, _, _), do: {:error, :invalid_loads}
+
   # --- private ---
 
   defp authorize_view(user, company) do
@@ -202,11 +333,22 @@ defmodule FullCircle.Trading.Settlement do
     if Authorization.can?(user, :create_invoice, company), do: :ok, else: :not_authorise
   end
 
+  defp authorize_pur_invoice(user, company) do
+    if Authorization.can?(user, :create_pur_invoice, company), do: :ok, else: :not_authorise
+  end
+
   defp maybe_filter_customer(q, nil), do: q
   defp maybe_filter_customer(q, ""), do: q
 
   defp maybe_filter_customer(q, customer_id) do
     from([d, t, s, c, g, l] in q, where: s.customer_id == ^customer_id)
+  end
+
+  defp maybe_filter_supplier(q, nil), do: q
+  defp maybe_filter_supplier(q, ""), do: q
+
+  defp maybe_filter_supplier(q, supplier_id) do
+    from([l, t, s, c, g, loc] in q, where: s.supplier_id == ^supplier_id)
   end
 
   defp maybe_filter_from_date(q, nil), do: q
@@ -216,6 +358,22 @@ defmodule FullCircle.Trading.Settlement do
   defp maybe_filter_to_date(q, nil), do: q
   defp maybe_filter_to_date(q, %Date{} = d), do: from([d0, t, s, c, g, l] in q, where: t.date <= ^d)
   defp maybe_filter_to_date(q, _), do: q
+
+  defp maybe_filter_load_from_date(q, nil), do: q
+
+  defp maybe_filter_load_from_date(q, %Date{} = d) do
+    from([l, t, s, c, g, loc] in q, where: t.date >= ^d)
+  end
+
+  defp maybe_filter_load_from_date(q, _), do: q
+
+  defp maybe_filter_load_to_date(q, nil), do: q
+
+  defp maybe_filter_load_to_date(q, %Date{} = d) do
+    from([l, t, s, c, g, loc] in q, where: t.date <= ^d)
+  end
+
+  defp maybe_filter_load_to_date(q, _), do: q
 
   defp load_eligible_drops(drop_ids, company) do
     ids = drop_ids |> Enum.reject(&(&1 in [nil, ""])) |> Enum.uniq()
@@ -357,6 +515,139 @@ defmodule FullCircle.Trading.Settlement do
     location = drop.location && blank_to_nil(drop.location.name)
 
     [date, vehicle, sales_no, location]
+    |> Enum.reject(&is_nil/1)
+    |> Enum.join(" · ")
+  end
+
+  defp load_eligible_loads(load_ids, company) do
+    ids = load_ids |> Enum.reject(&(&1 in [nil, ""])) |> Enum.uniq()
+
+    if ids == [] do
+      {:error, :invalid_loads}
+    else
+      loads =
+        from(l in TripLoad,
+          join: t in Trip,
+          on: t.id == l.trip_id,
+          where: l.id in ^ids,
+          where: t.company_id == ^company.id,
+          where: t.status == "completed",
+          where: is_nil(l.pur_invoice_id),
+          where: not is_nil(l.supply_position_id),
+          where: not is_nil(l.actual_mt),
+          order_by: [asc: t.date, asc: l.seq]
+        )
+        |> Repo.all()
+        |> Repo.preload([:trip, :location, :good, supply_position: :supplier])
+
+      loads =
+        Enum.sort_by(loads, fn l ->
+          {l.trip.date, l.trip.reference_no || "", l.seq || 0}
+        end)
+
+      if length(loads) == length(ids) do
+        {:ok, loads}
+      else
+        {:error, :ineligible_loads}
+      end
+    end
+  end
+
+  defp same_supplier?([first | rest]) do
+    supplier_id = first.supply_position.supplier_id
+
+    if Enum.all?(rest, &(&1.supply_position.supplier_id == supplier_id)) do
+      :ok
+    else
+      {:error, :mixed_suppliers}
+    end
+  end
+
+  defp same_supplier?([]), do: {:error, :invalid_loads}
+
+  defp pur_invoice_attrs_from_loads(loads, company, user) do
+    [first | _] = loads
+    supplier = first.supply_position.supplier
+
+    details =
+      loads
+      |> Enum.with_index()
+      |> Enum.map(fn {load, idx} ->
+        detail_attrs_for_load(load, idx, company, user)
+      end)
+      |> Enum.with_index()
+      |> Enum.into(%{}, fn {detail, idx} -> {to_string(idx), detail} end)
+
+    inv_date = first.trip.date || Date.utc_today()
+
+    %{
+      "pur_invoice_date" => Date.to_iso8601(inv_date),
+      "due_date" => Date.to_iso8601(Date.add(inv_date, 30)),
+      "load_date" => Date.to_iso8601(inv_date),
+      "contact_name" => supplier.name,
+      "contact_id" => supplier.id,
+      "descriptions" => "",
+      "pur_invoice_no" => "...new...",
+      "pur_invoice_details" => details
+    }
+  end
+
+  defp detail_attrs_for_load(load, idx, company, user) do
+    supply = load.supply_position
+    good = load_good_for_invoice(load.good_id, company, user)
+    qty = load.actual_mt
+    price = supply.unit_price || Decimal.new(0)
+
+    base = %{
+      "good_id" => load.good_id,
+      "quantity" => decimal_str(qty),
+      "unit_price" => decimal_str(price),
+      "discount" => "0",
+      "descriptions" => load_line_description(load),
+      "_persistent_id" => idx,
+      "package_qty" => "0",
+      "unit_multiplier" => "0"
+    }
+
+    if good do
+      pkg = default_package(good)
+
+      Map.merge(base, %{
+        "good_name" => good.name,
+        "account_name" => good.purchase_account_name,
+        "account_id" => good.purchase_account_id,
+        "tax_code_name" => good.purchase_tax_code_name,
+        "tax_code_id" => good.purchase_tax_code_id,
+        "tax_rate" => decimal_str(good.purchase_tax_rate || 0),
+        "unit" => good.unit,
+        "package_name" => (pkg && pkg.name) || "",
+        "package_id" => pkg && pkg.id
+      })
+    else
+      Map.merge(base, %{
+        "good_name" => "",
+        "account_name" => "",
+        "tax_code_name" => "",
+        "tax_rate" => "0",
+        "package_name" => "",
+        "unit" => ""
+      })
+    end
+  end
+
+  # Line description: load date, vehicle no, supply no, location name
+  defp load_line_description(load) do
+    date =
+      case load.trip && load.trip.date do
+        %Date{} = d -> Date.to_iso8601(d)
+        _ -> nil
+      end
+
+    vehicle = load.trip && blank_to_nil(load.trip.vehicle_number)
+    supply_no = load.supply_position && blank_to_nil(load.supply_position.title)
+    location = load.location && blank_to_nil(load.location.name)
+
+    [date, vehicle, supply_no, location]
     |> Enum.reject(&is_nil/1)
     |> Enum.join(" · ")
   end

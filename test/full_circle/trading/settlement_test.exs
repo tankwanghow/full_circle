@@ -263,4 +263,72 @@ defmodule FullCircle.Trading.SettlementTest do
 
     assert {:error, :has_invoices} = Trading.cancel_trip(trip, company, user)
   end
+
+  test "list_unbilled_loads shows completed commercial loads as billable", %{
+    user: user,
+    company: company
+  } do
+    %{trip: trip, customer: customer} = completed_sales_drop(company, user)
+    load = hd(trip.loads)
+
+    rows = Trading.list_unbilled_loads(company, user)
+    by_id = Map.new(rows, &{&1.id, &1})
+
+    assert Map.has_key?(by_id, load.id)
+    assert by_id[load.id].billable == true
+    assert by_id[load.id].trip_status == "completed"
+    # customer not on load list — has supplier
+    assert is_binary(by_id[load.id].supplier_name)
+    refute Map.has_key?(by_id[load.id], :customer_id) or by_id[load.id][:customer_id] == customer.id
+  end
+
+  test "create_pur_invoice_from_loads creates pur invoice and links load", %{
+    user: user,
+    company: company
+  } do
+    %{trip: trip, good: good} =
+      completed_sales_drop(company, user, actual_mt: "18.0", unit_price: "900")
+
+    load = hd(trip.loads)
+    supply = FullCircle.Repo.get!(FullCircle.Trading.SupplyPosition, load.supply_position_id)
+
+    assert {:ok, attrs} =
+             Trading.build_pur_invoice_attrs_from_load_ids([load.id], company, user)
+
+    assert attrs["contact_id"] == supply.supplier_id
+    detail = attrs["pur_invoice_details"]["0"]
+    assert detail["good_id"] == good.id
+    assert detail["quantity"] == "18.0"
+    assert detail["unit_price"] == "900" or detail["unit_price"] == Decimal.to_string(supply.unit_price)
+    assert attrs["descriptions"] in [nil, ""]
+    assert detail["descriptions"] =~ "SUP-"
+
+    assert {:ok, %{create_pur_invoice: pinv}} =
+             Trading.create_pur_invoice_from_loads([load.id], attrs, company, user)
+
+    reloaded = FullCircle.Repo.get!(FullCircle.Trading.TripLoad, load.id)
+    assert reloaded.pur_invoice_id == pinv.id
+
+    rows = Trading.list_unbilled_loads(company, user)
+    refute Enum.any?(rows, &(&1.id == load.id))
+  end
+
+  test "cannot double-bill same load", %{user: user, company: company} do
+    %{trip: trip} = completed_sales_drop(company, user)
+    load = hd(trip.loads)
+    {:ok, attrs} = Trading.build_pur_invoice_attrs_from_load_ids([load.id], company, user)
+    assert {:ok, _} = Trading.create_pur_invoice_from_loads([load.id], attrs, company, user)
+
+    assert {:error, :ineligible_loads} =
+             Trading.create_pur_invoice_from_loads([load.id], attrs, company, user)
+  end
+
+  test "cancel completed trip blocked when load billed", %{user: user, company: company} do
+    %{trip: trip} = completed_sales_drop(company, user)
+    load = hd(trip.loads)
+    {:ok, attrs} = Trading.build_pur_invoice_attrs_from_load_ids([load.id], company, user)
+    assert {:ok, _} = Trading.create_pur_invoice_from_loads([load.id], attrs, company, user)
+
+    assert {:error, :has_invoices} = Trading.cancel_trip(trip, company, user)
+  end
 end

@@ -70,11 +70,11 @@ defmodule FullCircleWeb.TradingSettlementLiveTest do
       )
 
     {:ok, trip, _} = Trading.complete_trip(trip, company, user)
-    {trip, hd(trip.drops), customer}
+    {trip, hd(trip.drops), hd(trip.loads), customer, supplier}
   end
 
   test "settlement page lists uninvoiced drop", %{conn: conn, company: company, user: user} do
-    {trip, drop, customer} = completed_drop(company, user)
+    {trip, drop, _load, customer, _supplier} = completed_drop(company, user)
 
     {:ok, _lv, html} = live(conn, ~p"/companies/#{company.id}/trading/settlement")
 
@@ -83,24 +83,92 @@ defmodule FullCircleWeb.TradingSettlementLiveTest do
     assert html =~ "Settle maize"
     assert html =~ "Settle farm"
     assert html =~ "29.5"
-    assert html =~ ~s(id="uninvoiced-drop-#{drop.id}")
-    assert html =~ ~s(id="select-drop-#{drop.id}")
-    assert html =~ ~s(id="open-trip-#{trip.id}")
+    assert html =~ ~s(id="settlement-row-#{drop.id}")
+    assert html =~ ~s(id="select-row-#{drop.id}")
+    assert html =~ ~s(id="open-trip-#{trip.id}-#{drop.id}")
   end
 
   test "clicking trip no opens trip form modal", %{conn: conn, company: company, user: user} do
-    {trip, _drop, _customer} = completed_drop(company, user)
+    {trip, drop, _load, _customer, _supplier} = completed_drop(company, user)
 
     {:ok, lv, _html} = live(conn, ~p"/companies/#{company.id}/trading/settlement")
 
     html =
       lv
-      |> element("#open-trip-#{trip.id}")
+      |> element("#open-trip-#{trip.id}-#{drop.id}")
       |> render_click()
 
     assert html =~ "Edit Trip"
     assert html =~ trip.reference_no
     assert has_element?(lv, "#settlement-trip-modal")
+  end
+
+  test "create invoice navigates to invoice form with prefill", %{
+    conn: conn,
+    company: company,
+    user: user
+  } do
+    {_trip, drop, _load, customer, _supplier} = completed_drop(company, user)
+
+    {:ok, lv, _html} = live(conn, ~p"/companies/#{company.id}/trading/settlement")
+
+    lv
+    |> element("#select-row-#{drop.id}")
+    |> render_click()
+
+    assert {:error, {:live_redirect, %{to: path}}} =
+             lv
+             |> element("#create-trading-doc")
+             |> render_click()
+
+    assert path =~ "/Invoice/new"
+    assert path =~ "trading_drops="
+    assert path =~ drop.id
+
+    {:ok, _inv_lv, html} = live(conn, path)
+
+    assert html =~ "New Invoice"
+    assert html =~ customer.name
+    assert html =~ "29.5" or html =~ "29.50"
+    assert html =~ "SET1234"
+    assert html =~ "SAL-"
+    assert html =~ "Settle farm"
+  end
+
+  test "supplier tab lists unbilled load and creates pur invoice", %{
+    conn: conn,
+    company: company,
+    user: user
+  } do
+    {_trip, _drop, load, _customer, supplier} = completed_drop(company, user)
+
+    {:ok, lv, _html} = live(conn, ~p"/companies/#{company.id}/trading/settlement")
+
+    html =
+      lv
+      |> element("#tab-supplier")
+      |> render_click()
+
+    assert html =~ supplier.name
+    assert html =~ ~s(id="settlement-row-#{load.id}")
+    assert html =~ ~s(id="select-row-#{load.id}")
+
+    lv
+    |> element("#select-row-#{load.id}")
+    |> render_click()
+
+    assert {:error, {:live_redirect, %{to: path}}} =
+             lv
+             |> element("#create-trading-doc")
+             |> render_click()
+
+    assert path =~ "/PurInvoice/new"
+    assert path =~ "trading_loads="
+    assert path =~ load.id
+
+    {:ok, _lv, html} = live(conn, path)
+    assert html =~ "New Purchase Invoice" or html =~ "Purchase Invoice"
+    assert html =~ supplier.name
   end
 
   test "draft drops are listed without checkbox", %{conn: conn, company: company, user: user} do
@@ -160,60 +228,8 @@ defmodule FullCircleWeb.TradingSettlementLiveTest do
 
     assert html =~ "Draft customer"
     assert html =~ "Draft site"
-    assert html =~ ~s(id="uninvoiced-drop-#{drop.id}")
-    refute html =~ ~s(id="select-drop-#{drop.id}")
+    assert html =~ ~s(id="settlement-row-#{drop.id}")
+    refute html =~ ~s(id="select-row-#{drop.id}")
     assert html =~ "draft"
-  end
-
-  test "create invoice navigates to invoice form with prefill", %{
-    conn: conn,
-    company: company,
-    user: user
-  } do
-    {_trip, drop, customer} = completed_drop(company, user)
-
-    {:ok, lv, _html} = live(conn, ~p"/companies/#{company.id}/trading/settlement")
-
-    lv
-    |> element("#select-drop-#{drop.id}")
-    |> render_click()
-
-    assert {:error, {:live_redirect, %{to: path}}} =
-             lv
-             |> element("#create-trading-invoice")
-             |> render_click()
-
-    assert path =~ "/Invoice/new"
-    assert path =~ "trading_drops="
-    assert path =~ drop.id
-
-    {:ok, _inv_lv, html} = live(conn, path)
-
-    assert html =~ "New Invoice"
-    assert html =~ customer.name
-    assert html =~ "29.5" or html =~ "29.50"
-    assert html =~ "SET1234"
-    assert html =~ "SAL-"
-    assert html =~ "Settle farm"
-  end
-
-  test "invoice new with trading_drops prefills form", %{
-    conn: conn,
-    company: company,
-    user: user
-  } do
-    {_trip, drop, customer} = completed_drop(company, user)
-
-    {:ok, _inv_lv, html} =
-      live(
-        conn,
-        ~p"/companies/#{company.id}/Invoice/new?#{%{trading_drops: drop.id}}"
-      )
-
-    assert html =~ "New Invoice"
-    assert html =~ customer.name
-    assert html =~ "SET1234"
-    assert html =~ "Settle farm"
-    assert html =~ "29.5" or html =~ "29.50"
   end
 end
