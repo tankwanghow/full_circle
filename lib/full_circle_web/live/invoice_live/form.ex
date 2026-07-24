@@ -504,6 +504,35 @@ defmodule FullCircleWeb.InvoiceLive.Form do
     end
   end
 
+  def handle_event("unlink_trading_settlement", _, socket) do
+    company = socket.assigns.current_company
+    user = socket.assigns.current_user
+    invoice = socket.assigns.form.data
+
+    case FullCircle.Trading.unlink_invoice_settlement(invoice, company, user) do
+      {:ok, %{unlinked: n}} ->
+        settlement = FullCircle.Trading.invoice_settlement_info(invoice.id, company)
+
+        {:noreply,
+         socket
+         |> assign(trading_settlement: settlement)
+         |> put_flash(
+           :info,
+           gettext("Unlinked %{n} trading drop(s). They can be settled again.", n: n)
+         )}
+
+      {:error, :not_linked} ->
+        {:noreply, put_flash(socket, :info, gettext("No trading links on this invoice."))}
+
+      :not_authorise ->
+        {:noreply,
+         put_flash(socket, :error, gettext("You are not authorised to perform this action"))}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, gettext("Failed to unlink trading settlement"))}
+    end
+  end
+
   @impl true
   def handle_params(_params, uri, socket) do
     {:noreply, socket |> assign(cancel_url: uri)}
@@ -574,35 +603,6 @@ defmodule FullCircleWeb.InvoiceLive.Form do
         {:noreply,
          socket
          |> put_flash(:error, gettext("You are not authorised to perform this action"))}
-    end
-  end
-
-  def handle_event("unlink_trading_settlement", _, socket) do
-    company = socket.assigns.current_company
-    user = socket.assigns.current_user
-    invoice = socket.assigns.form.data
-
-    case FullCircle.Trading.unlink_invoice_settlement(invoice, company, user) do
-      {:ok, %{unlinked: n}} ->
-        settlement = FullCircle.Trading.invoice_settlement_info(invoice.id, company)
-
-        {:noreply,
-         socket
-         |> assign(trading_settlement: settlement)
-         |> put_flash(
-           :info,
-           gettext("Unlinked %{n} trading drop(s). They can be settled again.", n: n)
-         )}
-
-      {:error, :not_linked} ->
-        {:noreply, put_flash(socket, :info, gettext("No trading links on this invoice."))}
-
-      :not_authorise ->
-        {:noreply,
-         put_flash(socket, :error, gettext("You are not authorised to perform this action"))}
-
-      {:error, _} ->
-        {:noreply, put_flash(socket, :error, gettext("Failed to unlink trading settlement"))}
     end
   end
 

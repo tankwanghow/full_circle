@@ -554,6 +554,7 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
     trips =
       company
       |> Trading.list_trips(user)
+      # list_trips is already most-recent-first; take newest 50 for the desk
       |> Enum.take(50)
 
     socket
@@ -647,6 +648,7 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
       socket.assigns.trips_all
       |> filter_rows(f.trips, &trip_field/2)
       |> filter_trips_by_settlement(socket.assigns.trip_settle_filters)
+      |> sort_trips_most_recent_first()
 
     socket
     |> assign(:supply_rows, supply_rows)
@@ -669,6 +671,20 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
         Enum.any?(filters, &settlement_filter_match?(&1, badges))
       end)
     end
+  end
+
+  defp sort_trips_most_recent_first(trips) do
+    Enum.sort_by(
+      trips,
+      fn t ->
+        {
+          t.date || ~D[0001-01-01],
+          t.reference_no || "",
+          t.inserted_at || ~U[0001-01-01 00:00:00Z]
+        }
+      end,
+      :desc
+    )
   end
 
   defp settlement_filter_match?("any", badges) do
@@ -950,15 +966,6 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
     ~H"""
     <%!-- Fill viewport under app nav; tables scroll inside panels only --%>
     <div class="mx-auto w-11/12 h-[calc(100dvh-5.5rem)] flex flex-col overflow-hidden gap-1">
-      <div class="flex justify-end gap-2 shrink-0 text-xs">
-        <.link
-          navigate={~p"/companies/#{@current_company.id}/trading/settlement"}
-          class="text-blue-700 hover:underline"
-          id="desk-settlement-link"
-        >
-          {gettext("Customer invoicing")}
-        </.link>
-      </div>
       <%!-- Top: supply + warehouse | open sales (hidden when trips maximized) --%>
       <div
         :if={@trips_panel != :maximized}
@@ -1532,6 +1539,13 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
               >
                 {gettext("Clear")}
               </button>
+              <.link
+                navigate={~p"/companies/#{@current_company.id}/trading/settlement"}
+                class="ml-5 border-1 rounded-xl px-2 py-0.5 bg-blue-200 text-blue-700 hover:bg-blue-300"
+                id="desk-settlement-link"
+              >
+                {gettext("Invoice / Bill / Transport Bill")}
+              </.link>
             </div>
             <span class="shrink-0 flex items-center gap-1 font-normal">
               <button

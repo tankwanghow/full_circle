@@ -841,7 +841,8 @@ defmodule FullCircle.Trading do
             loads: [:location, :good, supply_position: :supplier],
             drops: [:location, :good, :supply_position, sales_position: :customer]
           ],
-          order_by: [desc: t.date, desc: t.inserted_at]
+          # Most recent first: trip date, then TRP- no, then insert time
+          order_by: [desc: t.date, desc: t.reference_no, desc: t.inserted_at]
         )
 
       q =

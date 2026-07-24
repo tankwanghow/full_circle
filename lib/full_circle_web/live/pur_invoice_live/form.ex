@@ -640,6 +640,40 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
     {:noreply, socket |> assign(e_inv_preview: nil)}
   end
 
+  def handle_event("unlink_trading_settlement", _, socket) do
+    company = socket.assigns.current_company
+    user = socket.assigns.current_user
+    pinv = socket.assigns.form.data
+
+    case FullCircle.Trading.unlink_pur_invoice_settlement(pinv, company, user) do
+      {:ok, %{loads_unlinked: n_l, transport_unlinked: n_t}} ->
+        settlement = FullCircle.Trading.pur_invoice_settlement_info(pinv.id, company)
+
+        {:noreply,
+         socket
+         |> assign(trading_settlement: settlement)
+         |> put_flash(
+           :info,
+           gettext(
+             "Unlinked %{loads} load(s) and %{hauls} transport haul(s). They can be settled again.",
+             loads: n_l,
+             hauls: n_t
+           )
+         )}
+
+      {:error, :not_linked} ->
+        {:noreply,
+         put_flash(socket, :info, gettext("No trading links on this purchase invoice."))}
+
+      :not_authorise ->
+        {:noreply,
+         put_flash(socket, :error, gettext("You are not authorised to perform this action"))}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, gettext("Failed to unlink trading settlement"))}
+    end
+  end
+
   defp save(socket, :new, params) do
     params = params |> Map.merge(%{"pur_invoice_no" => "...new..."})
     company = socket.assigns.current_company
@@ -745,40 +779,6 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
     end
   end
 
-  def handle_event("unlink_trading_settlement", _, socket) do
-    company = socket.assigns.current_company
-    user = socket.assigns.current_user
-    pinv = socket.assigns.form.data
-
-    case FullCircle.Trading.unlink_pur_invoice_settlement(pinv, company, user) do
-      {:ok, %{loads_unlinked: n_l, transport_unlinked: n_t}} ->
-        settlement = FullCircle.Trading.pur_invoice_settlement_info(pinv.id, company)
-
-        {:noreply,
-         socket
-         |> assign(trading_settlement: settlement)
-         |> put_flash(
-           :info,
-           gettext(
-             "Unlinked %{loads} load(s) and %{hauls} transport haul(s). They can be settled again.",
-             loads: n_l,
-             hauls: n_t
-           )
-         )}
-
-      {:error, :not_linked} ->
-        {:noreply,
-         put_flash(socket, :info, gettext("No trading links on this purchase invoice."))}
-
-      :not_authorise ->
-        {:noreply,
-         put_flash(socket, :error, gettext("You are not authorised to perform this action"))}
-
-      {:error, _} ->
-        {:noreply, put_flash(socket, :error, gettext("Failed to unlink trading settlement"))}
-    end
-  end
-
   defp save(socket, :edit, params) do
     pinv = socket.assigns.form.data
     company = socket.assigns.current_company
@@ -795,53 +795,6 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
        )}
     else
       do_update_pur_invoice(socket, pinv, params, company, user)
-    end
-  end
-
-  defp do_update_pur_invoice(socket, pinv, params, company, user) do
-    case Billing.update_pur_invoice(pinv, params, company, user) do
-      {:ok, %{update_pur_invoice: obj}} ->
-        {:noreply,
-         socket
-         |> push_navigate(to: ~p"/companies/#{company.id}/PurInvoice/#{obj.id}/edit")
-         |> put_flash(:info, "#{gettext("Purchase Invoice updated successfully.")}")}
-
-      {:error, failed_operation, changeset, _} ->
-        {:noreply,
-         socket
-         |> assign(form: to_form(changeset))
-         |> put_flash(
-           :error,
-           "#{gettext("Failed")} #{failed_operation}. #{list_errors_to_string(changeset.errors)}"
-         )}
-
-      {:error, :has_matchers} ->
-        {:noreply,
-         socket
-         |> put_flash(
-           :error,
-           gettext(
-             "Cannot save: this document has been matched by another document. Remove the matching Receipt/Payment/Credit/Debit Note first."
-           )
-         )}
-
-      {:error, :closed} ->
-        {:noreply,
-         socket
-         |> put_flash(
-           :error,
-           gettext("Cannot save: this document is in a closed accounting period.")
-         )}
-
-      {:sql_error, msg} ->
-        {:noreply,
-         socket
-         |> put_flash(:error, "#{gettext("Failed")} #{msg}")}
-
-      :not_authorise ->
-        {:noreply,
-         socket
-         |> put_flash(:error, gettext("You are not authorised to perform this action"))}
     end
   end
 
@@ -903,6 +856,53 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
          |> put_flash(
            :error,
            "#{gettext("Failed")} #{failed_operation}. #{list_errors_to_string(changeset.errors)}"
+         )}
+
+      {:sql_error, msg} ->
+        {:noreply,
+         socket
+         |> put_flash(:error, "#{gettext("Failed")} #{msg}")}
+
+      :not_authorise ->
+        {:noreply,
+         socket
+         |> put_flash(:error, gettext("You are not authorised to perform this action"))}
+    end
+  end
+
+  defp do_update_pur_invoice(socket, pinv, params, company, user) do
+    case Billing.update_pur_invoice(pinv, params, company, user) do
+      {:ok, %{update_pur_invoice: obj}} ->
+        {:noreply,
+         socket
+         |> push_navigate(to: ~p"/companies/#{company.id}/PurInvoice/#{obj.id}/edit")
+         |> put_flash(:info, "#{gettext("Purchase Invoice updated successfully.")}")}
+
+      {:error, failed_operation, changeset, _} ->
+        {:noreply,
+         socket
+         |> assign(form: to_form(changeset))
+         |> put_flash(
+           :error,
+           "#{gettext("Failed")} #{failed_operation}. #{list_errors_to_string(changeset.errors)}"
+         )}
+
+      {:error, :has_matchers} ->
+        {:noreply,
+         socket
+         |> put_flash(
+           :error,
+           gettext(
+             "Cannot save: this document has been matched by another document. Remove the matching Receipt/Payment/Credit/Debit Note first."
+           )
+         )}
+
+      {:error, :closed} ->
+        {:noreply,
+         socket
+         |> put_flash(
+           :error,
+           gettext("Cannot save: this document is in a closed accounting period.")
          )}
 
       {:sql_error, msg} ->
