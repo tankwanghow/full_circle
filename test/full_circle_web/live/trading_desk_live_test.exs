@@ -343,7 +343,8 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
     assert html =~ sales.title
     assert html =~ "Asm Supplier"
     assert html =~ "Asm Customer"
-    assert html =~ ~s(value="#{supply.title})
+    # Typeahead fields render as textareas (not value= inputs) with title · party labels
+    assert html =~ supply.title
     assert html =~ ~s(name="trip[loads][0][supply_title]")
     assert html =~ ~s(name="trip[drops][0][sales_title]")
 
@@ -351,7 +352,8 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
     lv
     |> form("#desk-trip-form",
       trip: %{
-        date: "2026-07-26",
+        date: Date.utc_today() |> Date.to_iso8601(),
+        vehicle_number: "TEST1234",
         loads: %{
           "0" => %{
             location_name: "#{load_loc.name} (#{load_loc.kind})",
@@ -375,6 +377,8 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
     assert render(lv) =~ "Trip saved successfully"
     refute has_element?(lv, "#desk-selection-tray")
     assert has_element?(lv, "#desk-supply-#{other_supply.id}")
+    # Default Bill filter "Needs bill" hides draft trips
+    lv |> element("#desk-trip-settle-clear") |> render_click()
     assert render(lv) =~ "TRP-"
   end
 
@@ -614,7 +618,8 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
     lv
     |> form("#desk-trip-form",
       trip: %{
-        date: "2026-07-27",
+        date: Date.utc_today() |> Date.to_iso8601(),
+        vehicle_number: "TEST1234",
         loads: %{
           "0" => %{
             location_name: "#{load_loc.name} (#{load_loc.kind})",
@@ -636,6 +641,8 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
     lv |> form("#desk-trip-form") |> render_submit()
 
     assert render(lv) =~ "Trip saved successfully"
+    # Default Bill filter "Needs bill" hides draft trips
+    lv |> element("#desk-trip-settle-clear") |> render_click()
     assert render(lv) =~ "TRP-"
   end
 
@@ -957,7 +964,8 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
     lv
     |> form("#desk-trip-form",
       trip: %{
-        date: "2026-07-25",
+        date: Date.utc_today() |> Date.to_iso8601(),
+        vehicle_number: "TEST1234",
         transport_mode: "company_own",
         status: "draft",
         loads: %{
@@ -997,6 +1005,8 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
     lv |> form("#desk-trip-form") |> render_submit()
 
     assert render(lv) =~ "Trip saved successfully"
+    # Default Bill filter "Needs bill" hides draft trips
+    lv |> element("#desk-trip-settle-clear") |> render_click()
     assert render(lv) =~ "TRP-"
   end
 end

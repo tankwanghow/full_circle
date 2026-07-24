@@ -215,7 +215,13 @@ defmodule FullCircle.Trading.TripAssemblyTest do
         "preferred_supply_id" => supply.id
       })
 
-    port = location_fixture(company, user, %{"kind" => "port", "name" => "Port A"})
+    # create_supply_position auto-creates a supplier_site for the supplier; prefill
+    # prefers that over a generic port default.
+    supplier_site =
+      Trading.list_locations_for_contact(supplier.id, company, user)
+      |> Enum.find(&(&1.kind == "supplier_site"))
+
+    assert supplier_site
 
     assert {:ok, attrs} =
              Trading.build_trip_attrs_from_selection(
@@ -236,7 +242,7 @@ defmodule FullCircle.Trading.TripAssemblyTest do
     assert is_binary(load["supply_title"]) and load["supply_title"] != ""
     assert String.contains?(load["supply_title"], supply.title)
     assert load["good_name"] == good.name
-    assert load["location_id"] == port.id
+    assert load["location_id"] == supplier_site.id
     assert is_binary(load["location_name"]) and load["location_name"] != ""
 
     assert drop["sales_position_id"] == sales.id

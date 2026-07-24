@@ -132,12 +132,14 @@ defmodule FullCircle.PayRunTest do
   end
 
   # Builds a pay slip for `emp` in (mth/yr) with a single addition note of `amount`.
+  # Doc dates use `Date.utc_today()` when the period is the current month so they
+  # stay inside PaySlip/SalaryNote validate_date windows.
   defp pay_slip_with_addition(emp, mth, yr, amount, ctx) do
-    date = Timex.end_of_month(yr, mth)
+    date = safe_doc_date(yr, mth)
     sn = addition_note(emp, date, 1, amount, ctx)
 
     ps_attrs = %{
-      "slip_date" => to_string(date),
+      "slip_date" => Date.to_iso8601(date),
       "pay_month" => to_string(mth),
       "pay_year" => to_string(yr),
       "employee_name" => emp.name,
@@ -149,7 +151,7 @@ defmodule FullCircle.PayRunTest do
         "0" => %{
           "_id" => sn.id,
           "note_no" => sn.note_no,
-          "note_date" => to_string(date),
+          "note_date" => Date.to_iso8601(date),
           "quantity" => "1",
           "unit_price" => to_string(amount),
           "amount" => to_string(amount),
@@ -165,43 +167,62 @@ defmodule FullCircle.PayRunTest do
     ps
   end
 
+  defp safe_doc_date(yr, mth) do
+    today = Date.utc_today()
+    bom = Date.new!(yr, mth, 1)
+    eom = Date.end_of_month(bom)
+
+    cond do
+      Date.compare(today, bom) != :lt and Date.compare(today, eom) != :gt -> today
+      Date.compare(today, eom) == :gt -> eom
+      true -> bom
+    end
+  end
+
   defp find_row(rows, emp), do: Enum.find(rows, fn r -> r.id == emp.id end)
 
   defp month_cell(row, yr, mth),
     do: Enum.find(row.pay_list, fn p -> p.year == yr and p.month == mth end)
 
+  defp shift_month(%Date{year: y, month: m}, delta) do
+    total = y * 12 + (m - 1) + delta
+    {div(total, 12), rem(total, 12) + 1}
+  end
+
   describe "pay_run_index" do
     setup :setup_payroll
 
     test "returns a 3-month window: prev, current, next (current centered)", ctx do
-      base = ~D[2026-05-15]
+      base = Date.utc_today()
       rows = PayRun.pay_run_index(base.month, base.year, ctx.com)
       row = find_row(rows, ctx.employee)
 
       assert length(row.pay_list) == 3
       [first, second, third] = row.pay_list
-      assert {first.year, first.month} == {2026, 4}
-      assert {second.year, second.month} == {2026, 5}
-      assert {third.year, third.month} == {2026, 6}
+      assert {first.year, first.month} == shift_month(base, -1)
+      assert {second.year, second.month} == {base.year, base.month}
+      assert {third.year, third.month} == shift_month(base, 1)
     end
 
     test "reports net pay for a processed pay slip", ctx do
-      pay_slip_with_addition(ctx.employee, 5, 2026, "3000", ctx)
+      today = Date.utc_today()
+      pay_slip_with_addition(ctx.employee, today.month, today.year, "3000", ctx)
 
-      rows = PayRun.pay_run_index(5, 2026, ctx.com)
-      cell = ctx.employee |> then(&find_row(rows, &1)) |> month_cell(2026, 5)
+      rows = PayRun.pay_run_index(today.month, today.year, ctx.com)
+      cell = ctx.employee |> then(&find_row(rows, &1)) |> month_cell(today.year, today.month)
 
       refute is_nil(cell.slip_no)
       assert Decimal.eq?(cell.net_pay, Decimal.new("3000"))
     end
 
     test "reports unprocessed note and advance counts/sums for a pending employee", ctx do
+      today = Date.utc_today()
       emp = employee_fixture(%{}, ctx.com, ctx.admin)
-      addition_note(emp, ~D[2026-05-10], 2, 100, ctx)
+      addition_note(emp, today, 2, 100, ctx)
 
       advance_fixture(
         %{
-          "slip_date" => "2026-05-12",
+          "slip_date" => Date.to_iso8601(today),
           "amount" => "500",
           "employee_name" => emp.name,
           "employee_id" => emp.id,
@@ -213,8 +234,8 @@ defmodule FullCircle.PayRunTest do
         ctx.admin
       )
 
-      rows = PayRun.pay_run_index(5, 2026, ctx.com)
-      cell = find_row(rows, emp) |> month_cell(2026, 5)
+      rows = PayRun.pay_run_index(today.month, today.year, ctx.com)
+      cell = find_row(rows, emp) |> month_cell(today.year, today.month)
 
       assert is_nil(cell.slip_no)
       assert cell.unproc_note_count == 1
@@ -224,19 +245,21 @@ defmodule FullCircle.PayRunTest do
     end
 
     test "includes a resigned employee that has activity in the window", ctx do
+      today = Date.utc_today()
       resigned = employee_fixture(%{status: "Resigned"}, ctx.com, ctx.admin)
-      addition_note(resigned, ~D[2026-05-08], 1, 250, ctx)
+      addition_note(resigned, today, 1, 250, ctx)
 
-      rows = PayRun.pay_run_index(5, 2026, ctx.com)
+      rows = PayRun.pay_run_index(today.month, today.year, ctx.com)
 
       assert find_row(rows, resigned)
       assert find_row(rows, resigned).status == "Resigned"
     end
 
     test "excludes a resigned employee with no activity in the window", ctx do
+      today = Date.utc_today()
       resigned = employee_fixture(%{status: "Resigned"}, ctx.com, ctx.admin)
 
-      rows = PayRun.pay_run_index(5, 2026, ctx.com)
+      rows = PayRun.pay_run_index(today.month, today.year, ctx.com)
 
       assert is_nil(find_row(rows, resigned))
     end

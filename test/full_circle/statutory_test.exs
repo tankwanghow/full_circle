@@ -51,11 +51,15 @@ defmodule FullCircle.StatutoryTest do
       )
     end
 
+    {pay_month, pay_year} = current_pay_period()
+
     %{
       admin: admin,
       com: com,
       funds_ac: funds_ac,
       monthly: monthly,
+      pay_month: pay_month,
+      pay_year: pay_year,
       st: %{
         "Employee PCB" => pcb,
         "EPF By Employer" => stat.("EPF By Employer", "epf_employer"),
@@ -72,8 +76,11 @@ defmodule FullCircle.StatutoryTest do
   # %{"Monthly Salary" => "3000", "EPF By Employer" => "390", ...}
   # Salary notes are created first (unprocessed), then linked into the slip — matching the
   # real flow where create_pay_slip links existing notes via their `_id`.
+  #
+  # Doc dates use a day inside both SalaryNote/PaySlip validate_date windows and the
+  # slip's pay-period ±31d rule (see PaySlip.validate_pay_month_year/1).
   def slip(emp, mth, yr, lines, ctx) do
-    date = Timex.end_of_month(yr, mth)
+    date = safe_doc_date(yr, mth)
 
     salary_type = fn
       "Monthly Salary" -> ctx.monthly
@@ -89,7 +96,7 @@ defmodule FullCircle.StatutoryTest do
         sn =
           salary_note_fixture(
             %{
-              "note_date" => to_string(date),
+              "note_date" => Date.to_iso8601(date),
               "quantity" => "1",
               "unit_price" => amt,
               "employee_name" => emp.name,
@@ -113,7 +120,7 @@ defmodule FullCircle.StatutoryTest do
          %{
            "_id" => sn.id,
            "note_no" => sn.note_no,
-           "note_date" => to_string(date),
+           "note_date" => Date.to_iso8601(date),
            "quantity" => "1",
            "unit_price" => amt,
            "amount" => amt,
@@ -129,7 +136,7 @@ defmodule FullCircle.StatutoryTest do
     deductions = notes |> Enum.reject(fn {n, _, _} -> n == "Monthly Salary" end) |> line_attrs.()
 
     attrs = %{
-      "slip_date" => to_string(date),
+      "slip_date" => Date.to_iso8601(date),
       "pay_month" => to_string(mth),
       "pay_year" => to_string(yr),
       "employee_name" => emp.name,
@@ -145,6 +152,26 @@ defmodule FullCircle.StatutoryTest do
     ps
   end
 
+  # Prefer today when the period is the current month; otherwise end-of-month when still
+  # inside the 15-day PaySlip lookback (and 31-day SalaryNote lookback).
+  def safe_doc_date(yr, mth) do
+    today = Date.utc_today()
+    bom = Date.new!(yr, mth, 1)
+    eom = Date.end_of_month(bom)
+
+    cond do
+      today.year == yr and today.month == mth -> today
+      Date.diff(today, eom) >= 0 and Date.diff(today, eom) <= 15 -> eom
+      Date.diff(bom, today) >= 0 and Date.diff(bom, today) <= 14 -> bom
+      true -> today
+    end
+  end
+
+  def current_pay_period do
+    today = Date.utc_today()
+    {today.month, today.year}
+  end
+
   describe "statutory_contributions/3" do
     setup :setup_statutory
 
@@ -158,8 +185,8 @@ defmodule FullCircle.StatutoryTest do
 
       slip(
         emp,
-        5,
-        2026,
+        ctx.pay_month,
+        ctx.pay_year,
         %{
           "Monthly Salary" => "3000",
           "EPF By Employer" => "390",
@@ -170,7 +197,7 @@ defmodule FullCircle.StatutoryTest do
         ctx
       )
 
-      rows = HR.statutory_contributions(5, 2026, ctx.com.id)
+      rows = HR.statutory_contributions(ctx.pay_month, ctx.pay_year, ctx.com.id)
       row = Enum.find(rows, &(&1.name == emp.name))
 
       assert Decimal.eq?(row.wages, Decimal.new("3000"))
@@ -229,8 +256,8 @@ defmodule FullCircle.StatutoryTest do
 
       slip(
         emp,
-        6,
-        2026,
+        ctx.pay_month,
+        ctx.pay_year,
         %{
           "Monthly Salary" => "3000",
           "HRDF Levy Deduction" => "25"
@@ -239,7 +266,7 @@ defmodule FullCircle.StatutoryTest do
       )
 
       row =
-        HR.statutory_contributions(6, 2026, ctx.com.id)
+        HR.statutory_contributions(ctx.pay_month, ctx.pay_year, ctx.com.id)
         |> Enum.find(&(&1.name == emp.name))
 
       assert Decimal.eq?(row.hrdf_levy, Decimal.new("25"))
@@ -288,8 +315,8 @@ defmodule FullCircle.StatutoryTest do
 
       slip(
         e1,
-        5,
-        2026,
+        ctx.pay_month,
+        ctx.pay_year,
         %{
           "Monthly Salary" => "3000",
           "EPF By Employer" => "390",
@@ -304,8 +331,8 @@ defmodule FullCircle.StatutoryTest do
 
       slip(
         e2,
-        5,
-        2026,
+        ctx.pay_month,
+        ctx.pay_year,
         %{
           "Monthly Salary" => "2000",
           "EPF By Employer" => "260",
@@ -318,15 +345,14 @@ defmodule FullCircle.StatutoryTest do
         ctx
       )
 
-      Map.put(ctx, :contribs, HR.statutory_contributions(5, 2026, ctx.com.id))
+      Map.put(ctx, :contribs, HR.statutory_contributions(ctx.pay_month, ctx.pay_year, ctx.com.id))
     end
 
     test "EPF matches legacy", ctx do
       assert norm(EpfFormat.rows(ctx.contribs, "EPFCODE")) ==
                norm(
                  FullCircle.LegacyStatutory.epf_submit_file_format_query(
-                   5,
-                   2026,
+                   ctx.pay_month, ctx.pay_year,
                    "EPFCODE",
                    ctx.com.id
                  )
@@ -337,8 +363,7 @@ defmodule FullCircle.StatutoryTest do
       assert norm(SocsoFormat.rows(ctx.contribs, "SOCSOCODE")) ==
                norm(
                  FullCircle.LegacyStatutory.socso_submit_file_format_query(
-                   5,
-                   2026,
+                   ctx.pay_month, ctx.pay_year,
                    "SOCSOCODE",
                    ctx.com.id
                  )
@@ -349,8 +374,7 @@ defmodule FullCircle.StatutoryTest do
       assert norm(EisFormat.rows(ctx.contribs, "EISCODE")) ==
                norm(
                  FullCircle.LegacyStatutory.eis_submit_file_format_query(
-                   5,
-                   2026,
+                   ctx.pay_month, ctx.pay_year,
                    "EISCODE",
                    ctx.com.id
                  )
@@ -367,8 +391,7 @@ defmodule FullCircle.StatutoryTest do
 
       {["textstr"], v1_rows} =
         FullCircle.LegacyStatutory.socso_eis_submit_file_format_query(
-          5,
-          2026,
+          ctx.pay_month, ctx.pay_year,
           "EMPCODE",
           ctx.com.id
         )
@@ -404,8 +427,8 @@ defmodule FullCircle.StatutoryTest do
           ctx.admin
         )
 
-      slip(e1, 5, 2026, %{"Monthly Salary" => "3000", "EPF By Employee" => "330"}, ctx)
-      {col, rows} = Statutory.rows("EPF", 5, 2026, "EPFCODE", ctx.com.id)
+      slip(e1, ctx.pay_month, ctx.pay_year, %{"Monthly Salary" => "3000", "EPF By Employee" => "330"}, ctx)
+      {col, rows} = Statutory.rows("EPF", ctx.pay_month, ctx.pay_year, "EPFCODE", ctx.com.id)
       assert col == ["epf_no", "id_number", "name", "wages", "employer", "employee"]
       assert length(rows) == 1
     end
@@ -439,12 +462,12 @@ defmodule FullCircle.StatutoryTest do
           ctx.admin
         )
 
-      slip(e1, 5, 2026, %{"Monthly Salary" => "5000", "Employee PCB" => "79.20"}, ctx)
-      slip(e2, 5, 2026, %{"Monthly Salary" => "8000", "Employee PCB" => "318.90"}, ctx)
-      slip(e3, 5, 2026, %{"Monthly Salary" => "1000"}, ctx)
+      slip(e1, ctx.pay_month, ctx.pay_year, %{"Monthly Salary" => "5000", "Employee PCB" => "79.20"}, ctx)
+      slip(e2, ctx.pay_month, ctx.pay_year, %{"Monthly Salary" => "8000", "Employee PCB" => "318.90"}, ctx)
+      slip(e3, ctx.pay_month, ctx.pay_year, %{"Monthly Salary" => "1000"}, ctx)
 
-      contribs = HR.statutory_contributions(5, 2026, ctx.com.id)
-      text = PcbFormat.text(contribs, "0093787203", 5, 2026)
+      contribs = HR.statutory_contributions(ctx.pay_month, ctx.pay_year, ctx.com.id)
+      text = PcbFormat.text(contribs, "0093787203", ctx.pay_month, ctx.pay_year)
       lines = String.split(text, "\r\n", trim: true)
 
       # CRLF used, no other line endings
@@ -453,12 +476,15 @@ defmodule FullCircle.StatutoryTest do
 
       [header | details] = lines
       assert String.length(header) == 57
-      # H + tin(10) + tin(10) + year(4) + month(2) is fully deterministic:
-      assert String.starts_with?(header, "H00937872030093787203202605")
+      # H + tin(10) + tin(10) + year(4) + month(2)
+      year_s = ctx.pay_year |> Integer.to_string() |> String.pad_leading(4, "0")
+      month_s = ctx.pay_month |> Integer.to_string() |> String.pad_leading(2, "0")
+
+      assert String.starts_with?(header, "H00937872030093787203#{year_s}#{month_s}")
       assert String.slice(header, 1, 10) == "0093787203"
       assert String.slice(header, 11, 10) == "0093787203"
-      assert String.slice(header, 21, 4) == "2026"
-      assert String.slice(header, 25, 2) == "05"
+      assert String.slice(header, 21, 4) == year_s
+      assert String.slice(header, 25, 2) == month_s
       assert String.slice(header, 27, 10) == "0000039810"
       assert String.slice(header, 37, 5) == "00002"
       assert String.slice(header, 42, 10) == "0000000000"

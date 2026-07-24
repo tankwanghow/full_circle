@@ -78,6 +78,10 @@ defmodule FullCircle.PayPrepTest do
       emp: emp,
       admin: admin
     } do
+      # note_date must stay inside SalaryNote validate_date windows (31 days before / 14 after today)
+      today = Date.utc_today()
+      m = today.month
+      y = today.year
       st = HR.get_salary_type_by_name("Monthly Salary", com, admin)
 
       funds =
@@ -87,11 +91,11 @@ defmodule FullCircle.PayPrepTest do
           admin
         )
 
-      {:ok, _} = HR.set_pay_prep_account(emp.id, 5, 2026, funds.id, com, admin)
-      {:ok, _} = HR.set_pay_prep_verified(emp.id, 5, 2026, true, com, admin)
+      {:ok, _} = HR.set_pay_prep_account(emp.id, m, y, funds.id, com, admin)
+      {:ok, _} = HR.set_pay_prep_verified(emp.id, m, y, true, com, admin)
 
       sn_attrs = %{
-        "note_date" => "2026-05-15",
+        "note_date" => Date.to_iso8601(today),
         "quantity" => "1",
         "unit_price" => "100",
         "employee_name" => emp.name,
@@ -102,17 +106,17 @@ defmodule FullCircle.PayPrepTest do
       }
 
       {:ok, %{create_salary_note: sn}} = HR.create_salary_note(sn_attrs, com, admin)
-      refute HR.get_or_init_pay_prep(emp.id, 5, 2026, com).verified
+      refute HR.get_or_init_pay_prep(emp.id, m, y, com).verified
 
-      {:ok, _} = HR.set_pay_prep_verified(emp.id, 5, 2026, true, com, admin)
+      {:ok, _} = HR.set_pay_prep_verified(emp.id, m, y, true, com, admin)
       upd_attrs = sn_attrs |> Map.put("unit_price", "200") |> Map.put("note_no", sn.note_no)
       {:ok, _} = HR.update_salary_note(sn, upd_attrs, com, admin)
-      refute HR.get_or_init_pay_prep(emp.id, 5, 2026, com).verified
+      refute HR.get_or_init_pay_prep(emp.id, m, y, com).verified
 
-      {:ok, _} = HR.set_pay_prep_verified(emp.id, 5, 2026, true, com, admin)
+      {:ok, _} = HR.set_pay_prep_verified(emp.id, m, y, true, com, admin)
       sn = HR.get_salary_note!(sn.id, com, admin)
       {:ok, _} = HR.delete_salary_note(sn, com, admin)
-      refute HR.get_or_init_pay_prep(emp.id, 5, 2026, com).verified
+      refute HR.get_or_init_pay_prep(emp.id, m, y, com).verified
     end
 
     test "note in a different month does not clear another month's prep", %{
@@ -120,6 +124,11 @@ defmodule FullCircle.PayPrepTest do
       emp: emp,
       admin: admin
     } do
+      today = Date.utc_today()
+      m = today.month
+      y = today.year
+      # Previous month end is always within SalaryNote's 31-day lookback
+      other_date = Date.beginning_of_month(today) |> Date.add(-1)
       st = HR.get_salary_type_by_name("Monthly Salary", com, admin)
 
       funds =
@@ -129,13 +138,13 @@ defmodule FullCircle.PayPrepTest do
           admin
         )
 
-      {:ok, _} = HR.set_pay_prep_account(emp.id, 6, 2026, funds.id, com, admin)
-      {:ok, _} = HR.set_pay_prep_verified(emp.id, 6, 2026, true, com, admin)
+      {:ok, _} = HR.set_pay_prep_account(emp.id, m, y, funds.id, com, admin)
+      {:ok, _} = HR.set_pay_prep_verified(emp.id, m, y, true, com, admin)
 
       {:ok, _} =
         HR.create_salary_note(
           %{
-            "note_date" => "2026-05-20",
+            "note_date" => Date.to_iso8601(other_date),
             "quantity" => "1",
             "unit_price" => "100",
             "employee_name" => emp.name,
@@ -148,11 +157,15 @@ defmodule FullCircle.PayPrepTest do
           admin
         )
 
-      assert HR.get_or_init_pay_prep(emp.id, 6, 2026, com).verified
+      assert HR.get_or_init_pay_prep(emp.id, m, y, com).verified
     end
 
     test "paying (linking notes) does NOT clear verified", %{com: com, emp: emp, admin: admin} do
       alias FullCircle.{PaySlipOp, Accounting}
+
+      today = Date.utc_today()
+      m = today.month
+      y = today.year
       cr = Accounting.get_account_by_name("Salaries and Wages Payable", com, admin)
 
       funds =
@@ -181,7 +194,7 @@ defmodule FullCircle.PayPrepTest do
       {:ok, %{create_salary_note: _}} =
         HR.create_salary_note(
           %{
-            "note_date" => "2026-05-31",
+            "note_date" => Date.to_iso8601(today),
             "quantity" => "1",
             "unit_price" => "3000",
             "employee_name" => emp.name,
@@ -194,12 +207,12 @@ defmodule FullCircle.PayPrepTest do
           admin
         )
 
-      {:ok, _} = HR.set_pay_prep_account(emp.id, 5, 2026, funds.id, com, admin)
-      {:ok, _} = HR.set_pay_prep_verified(emp.id, 5, 2026, true, com, admin)
+      {:ok, _} = HR.set_pay_prep_account(emp.id, m, y, funds.id, com, admin)
+      {:ok, _} = HR.set_pay_prep_verified(emp.id, m, y, true, com, admin)
 
-      {:ok, _} = PaySlipOp.pay(emp, 5, 2026, funds.id, com, admin)
+      {:ok, _} = PaySlipOp.pay(emp, m, y, funds.id, com, admin)
 
-      assert HR.get_or_init_pay_prep(emp.id, 5, 2026, com).verified
+      assert HR.get_or_init_pay_prep(emp.id, m, y, com).verified
     end
   end
 end

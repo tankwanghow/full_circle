@@ -63,12 +63,15 @@ defmodule FullCircleWeb.CsvControllerStatutoryTest do
         admin
       )
 
-    date = Timex.end_of_month(2026, 6)
+    today = Date.utc_today()
+    month = today.month
+    year = today.year
+    date = today
 
     note = fn st, amt ->
       salary_note_fixture(
         %{
-          "note_date" => to_string(date),
+          "note_date" => Date.to_iso8601(date),
           "quantity" => "1",
           "unit_price" => amt,
           "employee_name" => emp.name,
@@ -96,7 +99,7 @@ defmodule FullCircleWeb.CsvControllerStatutoryTest do
          %{
            "_id" => sn.id,
            "note_no" => sn.note_no,
-           "note_date" => to_string(date),
+           "note_date" => Date.to_iso8601(date),
            "quantity" => "1",
            "unit_price" => amt,
            "amount" => amt,
@@ -114,9 +117,9 @@ defmodule FullCircleWeb.CsvControllerStatutoryTest do
     {:ok, _} =
       PaySlipOp.create_pay_slip(
         %{
-          "slip_date" => to_string(date),
-          "pay_month" => "6",
-          "pay_year" => "2026",
+          "slip_date" => Date.to_iso8601(date),
+          "pay_month" => to_string(month),
+          "pay_year" => to_string(year),
           "employee_name" => emp.name,
           "employee_id" => emp.id,
           "funds_account_name" => funds_ac.name,
@@ -129,39 +132,48 @@ defmodule FullCircleWeb.CsvControllerStatutoryTest do
         admin
       )
 
-    {:ok, render} = StatutoryConfig.render_file(com.id, "socso_txt", 6, 2026, "SOCSOCODE")
+    {:ok, render} = StatutoryConfig.render_file(com.id, "socso_txt", month, year, "SOCSOCODE")
 
     %{
       conn: log_in_user(conn, admin),
       com: com,
-      expected_text: elem(render, 1)
+      expected_text: elem(render, 1),
+      month: month,
+      year: year
     }
   end
 
   test "SOCSO download body matches render_file output", %{
     conn: conn,
     com: com,
-    expected_text: text
+    expected_text: text,
+    month: month,
+    year: year
   } do
     conn =
       get(
         conn,
-        ~p"/companies/#{com.id}/csv?report=epfsocsoeis&rep=SOCSO&month=6&year=2026&code=SOCSOCODE"
+        ~p"/companies/#{com.id}/csv?report=epfsocsoeis&rep=SOCSO&month=#{month}&year=#{year}&code=SOCSOCODE"
       )
 
     assert response(conn, 200) == text
     assert get_resp_header(conn, "content-type") == ["text/plain; charset=utf-8"]
 
     assert get_resp_header(conn, "content-disposition") == [
-             ~s|attachment; filename="socso_txt_6_2026.txt"|
+             ~s|attachment; filename="socso_txt_#{month}_#{year}.txt"|
            ]
   end
 
-  test "Contributions download returns per-employee category CSV", %{conn: conn, com: com} do
+  test "Contributions download returns per-employee category CSV", %{
+    conn: conn,
+    com: com,
+    month: month,
+    year: year
+  } do
     conn =
       get(
         conn,
-        ~p"/companies/#{com.id}/csv?report=epfsocsoeis&rep=Contributions&month=6&year=2026&code="
+        ~p"/companies/#{com.id}/csv?report=epfsocsoeis&rep=Contributions&month=#{month}&year=#{year}&code="
       )
 
     body = response(conn, 200)

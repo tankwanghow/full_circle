@@ -39,6 +39,8 @@ defmodule FullCircle.PaySlipOpTest do
       admin
     )
 
+    today = Date.utc_today()
+
     %{
       admin: admin,
       com: com,
@@ -46,7 +48,10 @@ defmodule FullCircle.PaySlipOpTest do
       salary_type: salary_type,
       funds_ac: funds_ac,
       db_ac: db_ac,
-      cr_ac: cr_ac
+      cr_ac: cr_ac,
+      pay_month: today.month,
+      pay_year: today.year,
+      today: today
     }
   end
 
@@ -57,7 +62,8 @@ defmodule FullCircle.PaySlipOpTest do
       admin: admin,
       com: com,
       employee: employee,
-      salary_type: salary_type
+      salary_type: salary_type,
+      today: today
     } do
       today = Date.utc_today()
 
@@ -95,7 +101,8 @@ defmodule FullCircle.PaySlipOpTest do
       admin: admin,
       com: com,
       employee: employee,
-      funds_ac: funds_ac
+      funds_ac: funds_ac,
+      today: today
     } do
       today = Date.utc_today()
 
@@ -115,7 +122,8 @@ defmodule FullCircle.PaySlipOpTest do
       assert length(advances) >= 1
     end
 
-    test "returns empty when no advances exist", %{com: com, employee: employee} do
+    test "returns empty when no advances exist", %{com: com, employee: employee
+    } do
       advances = PaySlipOp.get_uncount_advances(employee.id, 1, 2099, com)
       assert advances == []
     end
@@ -217,6 +225,7 @@ defmodule FullCircle.PaySlipOpTest do
     end
   end
 
+
   describe "preview/pay" do
     setup :setup_payroll
 
@@ -246,12 +255,15 @@ defmodule FullCircle.PaySlipOpTest do
       com: com,
       admin: admin,
       employee: emp,
-      salary_type: st
+      salary_type: st,
+      pay_month: mth,
+      pay_year: yr,
+      today: today
     } do
       {:ok, _} =
         FullCircle.HR.create_salary_note(
           %{
-            "note_date" => "2026-05-31",
+            "note_date" => Date.to_iso8601(today),
             "quantity" => "1",
             "unit_price" => "3000",
             "employee_name" => emp.name,
@@ -264,7 +276,7 @@ defmodule FullCircle.PaySlipOpTest do
           admin
         )
 
-      cs = PaySlipOp.preview(emp, 5, 2026, com, admin)
+      cs = PaySlipOp.preview(emp, mth, yr, com, admin)
       ps = Ecto.Changeset.apply_changes(cs)
       assert Enum.any?(ps.additions, fn a -> Decimal.eq?(a.amount, Decimal.new("3000")) end)
       assert Decimal.gt?(ps.pay_slip_amount, Decimal.new("0"))
@@ -275,12 +287,15 @@ defmodule FullCircle.PaySlipOpTest do
       admin: admin,
       employee: emp,
       salary_type: st,
-      funds_ac: funds
+      funds_ac: funds,
+      pay_month: mth,
+      pay_year: yr,
+      today: today
     } do
       {:ok, _} =
         FullCircle.HR.create_salary_note(
           %{
-            "note_date" => "2026-05-31",
+            "note_date" => Date.to_iso8601(today),
             "quantity" => "1",
             "unit_price" => "3000",
             "employee_name" => emp.name,
@@ -293,7 +308,7 @@ defmodule FullCircle.PaySlipOpTest do
           admin
         )
 
-      {:ok, %{create_pay_slip: ps}} = PaySlipOp.pay(emp, 5, 2026, funds.id, com, admin)
+      {:ok, %{create_pay_slip: ps}} = PaySlipOp.pay(emp, mth, yr, funds.id, com, admin)
       loaded = PaySlipOp.get_pay_slip!(ps.id, com)
       assert loaded.slip_no =~ "PS-"
       assert Enum.count(loaded.additions) >= 1
@@ -301,7 +316,7 @@ defmodule FullCircle.PaySlipOpTest do
       {:ok, _} =
         FullCircle.HR.create_salary_note(
           %{
-            "note_date" => "2026-05-30",
+            "note_date" => Date.to_iso8601(Date.add(today, -1)),
             "quantity" => "1",
             "unit_price" => "100",
             "employee_name" => emp.name,
@@ -314,8 +329,8 @@ defmodule FullCircle.PaySlipOpTest do
           admin
         )
 
-      assert {:ok, %{update_pay_slip: _}} = PaySlipOp.pay(emp, 5, 2026, funds.id, com, admin)
-      assert PaySlipOp.get_pay_slip_by_period(emp, 5, 2026, com)
+      assert {:ok, %{update_pay_slip: _}} = PaySlipOp.pay(emp, mth, yr, funds.id, com, admin)
+      assert PaySlipOp.get_pay_slip_by_period(emp, mth, yr, com)
     end
 
     test "pay round-trips an advance", %{
@@ -323,12 +338,15 @@ defmodule FullCircle.PaySlipOpTest do
       admin: admin,
       employee: emp,
       salary_type: st,
-      funds_ac: funds
+      funds_ac: funds,
+      pay_month: mth,
+      pay_year: yr,
+      today: today
     } do
       {:ok, _} =
         FullCircle.HR.create_salary_note(
           %{
-            "note_date" => "2026-05-31",
+            "note_date" => Date.to_iso8601(today),
             "quantity" => "1",
             "unit_price" => "3000",
             "employee_name" => emp.name,
@@ -344,7 +362,7 @@ defmodule FullCircle.PaySlipOpTest do
       {:ok, _} =
         FullCircle.HR.create_advance(
           %{
-            "slip_date" => "2026-05-31",
+            "slip_date" => Date.to_iso8601(today),
             "amount" => "500",
             "employee_name" => emp.name,
             "employee_id" => emp.id,
@@ -356,7 +374,7 @@ defmodule FullCircle.PaySlipOpTest do
           admin
         )
 
-      {:ok, %{create_pay_slip: ps}} = PaySlipOp.pay(emp, 5, 2026, funds.id, com, admin)
+      {:ok, %{create_pay_slip: ps}} = PaySlipOp.pay(emp, mth, yr, funds.id, com, admin)
       loaded = PaySlipOp.get_pay_slip!(ps.id, com)
 
       assert Enum.count(loaded.advances) == 1
@@ -368,13 +386,16 @@ defmodule FullCircle.PaySlipOpTest do
       admin: admin,
       employee: emp,
       salary_type: st,
-      funds_ac: funds
+      funds_ac: funds,
+      pay_month: mth,
+      pay_year: yr,
+      today: today
     } do
       # High salary so PCB (a cal_func line) computes non-zero and gets saved.
       {:ok, %{create_salary_note: sn}} =
         FullCircle.HR.create_salary_note(
           %{
-            "note_date" => "2026-05-31",
+            "note_date" => Date.to_iso8601(today),
             "quantity" => "1",
             "unit_price" => "30000",
             "employee_name" => emp.name,
@@ -387,7 +408,7 @@ defmodule FullCircle.PaySlipOpTest do
           admin
         )
 
-      {:ok, %{create_pay_slip: ps}} = PaySlipOp.pay(emp, 5, 2026, funds.id, com, admin)
+      {:ok, %{create_pay_slip: ps}} = PaySlipOp.pay(emp, mth, yr, funds.id, com, admin)
 
       pcb1 =
         Enum.find(
@@ -404,7 +425,7 @@ defmodule FullCircle.PaySlipOpTest do
           sn,
           %{
             "note_no" => sn.note_no,
-            "note_date" => "2026-05-31",
+            "note_date" => Date.to_iso8601(today),
             "quantity" => "1",
             "unit_price" => "3000",
             "employee_name" => emp.name,
@@ -417,7 +438,7 @@ defmodule FullCircle.PaySlipOpTest do
           admin
         )
 
-      {:ok, _} = PaySlipOp.pay(emp, 5, 2026, funds.id, com, admin)
+      {:ok, _} = PaySlipOp.pay(emp, mth, yr, funds.id, com, admin)
 
       refute Enum.any?(
                PaySlipOp.get_pay_slip!(ps.id, com).deductions,
@@ -430,7 +451,10 @@ defmodule FullCircle.PaySlipOpTest do
       com: com,
       admin: admin,
       employee: emp,
-      salary_type: st
+      salary_type: st,
+      pay_month: mth,
+      pay_year: yr,
+      today: today
     } do
       FullCircle.StatutoryConfig.seed_company!(com.id)
 
@@ -449,7 +473,7 @@ defmodule FullCircle.PaySlipOpTest do
       {:ok, _} =
         FullCircle.HR.create_salary_note(
           %{
-            "note_date" => "2026-06-30",
+            "note_date" => Date.to_iso8601(today),
             "quantity" => "1",
             "unit_price" => "3000",
             "employee_name" => emp.name,
@@ -463,14 +487,17 @@ defmodule FullCircle.PaySlipOpTest do
         )
 
       assert_raise FullCircle.PayScript.Error, ~r/in 'result': division by zero/, fn ->
-        PaySlipOp.preview(emp, 6, 2026, com, admin)
+        PaySlipOp.preview(emp, mth, yr, com, admin)
       end
     end
 
     test "loaded salary notes carry cal_func so recal can recompute them", %{
       com: com,
       admin: admin,
-      employee: emp
+      employee: emp,
+      pay_month: mth,
+      pay_year: yr,
+      today: today
     } do
       # "EPF By Employee" (cal_func "epf_employee") is created by this describe's setup.
       epf = FullCircle.HR.get_salary_type_by_name("EPF By Employee", com, admin)
@@ -478,7 +505,7 @@ defmodule FullCircle.PaySlipOpTest do
       {:ok, _} =
         FullCircle.HR.create_salary_note(
           %{
-            "note_date" => "2026-05-31",
+            "note_date" => Date.to_iso8601(today),
             "quantity" => "1",
             "unit_price" => "330",
             "employee_name" => emp.name,
@@ -491,7 +518,7 @@ defmodule FullCircle.PaySlipOpTest do
           admin
         )
 
-      notes = FullCircle.HR.get_salary_notes(emp.id, 5, 2026, com, admin)
+      notes = FullCircle.HR.get_salary_notes(emp.id, mth, yr, com, admin)
       note = Enum.find(notes, &(&1.salary_type_name == "EPF By Employee"))
 
       # cal_func is virtual; without repopulating it from the salary type on load,
@@ -509,12 +536,15 @@ defmodule FullCircle.PaySlipOpTest do
       admin: admin,
       employee: emp,
       salary_type: st,
-      funds_ac: funds
+      funds_ac: funds,
+      pay_month: mth,
+      pay_year: yr,
+      today: today
     } do
       {:ok, _} =
         FullCircle.HR.create_salary_note(
           %{
-            "note_date" => "2026-05-31",
+            "note_date" => Date.to_iso8601(today),
             "quantity" => "1",
             "unit_price" => "3000",
             "employee_name" => emp.name,
@@ -527,17 +557,17 @@ defmodule FullCircle.PaySlipOpTest do
           admin
         )
 
-      {:ok, %{create_pay_slip: _}} = PaySlipOp.pay(emp, 5, 2026, funds.id, com, admin)
+      {:ok, %{create_pay_slip: _}} = PaySlipOp.pay(emp, mth, yr, funds.id, com, admin)
 
       note =
-        FullCircle.HR.get_salary_notes(emp.id, 5, 2026, com, admin)
+        FullCircle.HR.get_salary_notes(emp.id, mth, yr, com, admin)
         |> Enum.find(&(&1.salary_type_name == st.name))
 
       refute is_nil(note.pay_slip_id)
 
       attrs = %{
         "note_no" => note.note_no,
-        "note_date" => "2026-05-31",
+        "note_date" => Date.to_iso8601(today),
         "quantity" => "1",
         "unit_price" => "4000",
         "employee_name" => emp.name,
@@ -567,12 +597,15 @@ defmodule FullCircle.PaySlipOpTest do
       admin: admin,
       employee: emp,
       salary_type: st,
-      funds_ac: funds
+      funds_ac: funds,
+      pay_month: mth,
+      pay_year: yr,
+      today: today
     } do
       {:ok, _} =
         FullCircle.HR.create_salary_note(
           %{
-            "note_date" => "2026-05-31",
+            "note_date" => Date.to_iso8601(today),
             "quantity" => "1",
             "unit_price" => "3000",
             "employee_name" => emp.name,
@@ -588,7 +621,7 @@ defmodule FullCircle.PaySlipOpTest do
       {:ok, _} =
         FullCircle.HR.create_advance(
           %{
-            "slip_date" => "2026-05-31",
+            "slip_date" => Date.to_iso8601(today),
             "amount" => "500",
             "employee_name" => emp.name,
             "employee_id" => emp.id,
@@ -600,7 +633,7 @@ defmodule FullCircle.PaySlipOpTest do
           admin
         )
 
-      {:ok, %{create_pay_slip: ps}} = PaySlipOp.pay(emp, 5, 2026, funds.id, com, admin)
+      {:ok, %{create_pay_slip: ps}} = PaySlipOp.pay(emp, mth, yr, funds.id, com, admin)
 
       assert {:ok, _} = PaySlipOp.void_pay_slip(ps.id, com, admin)
 
@@ -609,14 +642,14 @@ defmodule FullCircle.PaySlipOpTest do
 
       # note survives but is unlinked (unprocessed)
       note =
-        FullCircle.HR.get_salary_notes(emp.id, 5, 2026, com, admin)
+        FullCircle.HR.get_salary_notes(emp.id, mth, yr, com, admin)
         |> Enum.find(&(&1.salary_type_name == st.name))
 
       assert note
       assert is_nil(note.pay_slip_id)
 
       # advance survives but is unlinked
-      adv = FullCircle.HR.get_advances(emp.id, 5, 2026, com, admin) |> List.first()
+      adv = FullCircle.HR.get_advances(emp.id, mth, yr, com, admin) |> List.first()
       assert adv
       assert is_nil(adv.pay_slip_id)
 
@@ -637,7 +670,10 @@ defmodule FullCircle.PaySlipOpTest do
       admin: admin,
       employee: emp,
       salary_type: st,
-      funds_ac: funds
+      funds_ac: funds,
+      pay_month: mth,
+      pay_year: yr,
+      today: today
     } do
       cr = FullCircle.Accounting.get_account_by_name("Salaries and Wages Payable", com, admin)
 
@@ -660,7 +696,7 @@ defmodule FullCircle.PaySlipOpTest do
       {:ok, _} =
         FullCircle.HR.create_salary_note(
           %{
-            "note_date" => "2026-05-31",
+            "note_date" => Date.to_iso8601(today),
             "quantity" => "1",
             "unit_price" => "3000",
             "employee_name" => emp.name,
@@ -676,7 +712,7 @@ defmodule FullCircle.PaySlipOpTest do
       {:ok, _} =
         FullCircle.HR.create_salary_note(
           %{
-            "note_date" => "2026-05-31",
+            "note_date" => Date.to_iso8601(today),
             "quantity" => "1",
             "unit_price" => "330",
             "employee_name" => emp.name,
@@ -689,10 +725,10 @@ defmodule FullCircle.PaySlipOpTest do
           admin
         )
 
-      {:ok, %{create_pay_slip: ps}} = PaySlipOp.pay(emp, 5, 2026, funds.id, com, admin)
+      {:ok, %{create_pay_slip: ps}} = PaySlipOp.pay(emp, mth, yr, funds.id, com, admin)
       assert {:ok, _} = PaySlipOp.void_pay_slip(ps.id, com, admin)
 
-      notes = FullCircle.HR.get_salary_notes(emp.id, 5, 2026, com, admin)
+      notes = FullCircle.HR.get_salary_notes(emp.id, mth, yr, com, admin)
 
       # earning (no cal_func) survives, unlinked
       earning = Enum.find(notes, &(&1.salary_type_name == st.name))

@@ -9,11 +9,15 @@ defmodule FullCircle.FileSpecParityTest do
   import FullCircle.AccountingFixtures
   import FullCircle.HRFixtures
 
-  @month 6
-  @year 2026
   @line_ending "\r\n"
 
   setup do
+    # PaySlip allows slip_date within 15 days of today; SalaryNote within 31/14.
+    # Use the current calendar month with today's date so fixtures never age out.
+    today = Date.utc_today()
+    month = today.month
+    year = today.year
+
     admin = user_fixture()
     com = company_fixture(admin, %{})
     StatutoryConfig.seed_company!(com.id)
@@ -91,7 +95,7 @@ defmodule FullCircle.FileSpecParityTest do
       )
 
     slip = fn emp, lines ->
-      slip_fixture(emp, @month, @year, lines, ctx)
+      slip_fixture(emp, month, year, today, lines, ctx)
     end
 
     slip.(e1, %{
@@ -122,12 +126,10 @@ defmodule FullCircle.FileSpecParityTest do
       "EPF By Employee" => "110"
     })
 
-    %{com: com, ctx: ctx}
+    %{com: com, ctx: ctx, month: month, year: year}
   end
 
-  defp slip_fixture(emp, mth, yr, lines, ctx) do
-    date = Timex.end_of_month(yr, mth)
-
+  defp slip_fixture(emp, mth, yr, date, lines, ctx) do
     salary_type = fn
       "Monthly Salary" -> ctx.monthly
       n -> ctx.st[n]
@@ -141,7 +143,7 @@ defmodule FullCircle.FileSpecParityTest do
         sn =
           salary_note_fixture(
             %{
-              "note_date" => to_string(date),
+              "note_date" => Date.to_iso8601(date),
               "quantity" => "1",
               "unit_price" => amt,
               "employee_name" => emp.name,
@@ -165,7 +167,7 @@ defmodule FullCircle.FileSpecParityTest do
          %{
            "_id" => sn.id,
            "note_no" => sn.note_no,
-           "note_date" => to_string(date),
+           "note_date" => Date.to_iso8601(date),
            "quantity" => "1",
            "unit_price" => amt,
            "amount" => amt,
@@ -181,7 +183,7 @@ defmodule FullCircle.FileSpecParityTest do
     deductions = notes |> Enum.reject(fn {n, _, _} -> n == "Monthly Salary" end) |> line_attrs.()
 
     attrs = %{
-      "slip_date" => to_string(date),
+      "slip_date" => Date.to_iso8601(date),
       "pay_month" => to_string(mth),
       "pay_year" => to_string(yr),
       "employee_name" => emp.name,
@@ -197,31 +199,31 @@ defmodule FullCircle.FileSpecParityTest do
       FullCircle.PaySlipOp.create_pay_slip(attrs, ctx.com, ctx.admin)
   end
 
-  defp effective_spec(com_id, code) do
-    date = Timex.end_of_month(@year, @month)
+  defp effective_spec(com_id, code, month, year) do
+    date = Date.end_of_month(Date.new!(year, month, 1))
     %{spec: spec} = StatutoryConfig.effective_file_format(com_id, code, date)
     spec
   end
 
-  defp header_ctx(code) do
+  defp header_ctx(code, month, year) do
     %{
       "employer_code" => code,
       "company_name" => "Test Co",
-      "pay_month" => @month,
-      "pay_year" => @year
+      "pay_month" => month,
+      "pay_year" => year
     }
   end
 
-  defp render_file_spec(com_id, code, employer_code) do
-    rows = HR.statutory_contributions(@month, @year, com_id)
-    spec = effective_spec(com_id, code)
+  defp render_file_spec(com_id, code, employer_code, month, year) do
+    rows = HR.statutory_contributions(month, year, com_id)
+    spec = effective_spec(com_id, code, month, year)
 
-    {:ok, text} = FileSpec.render(spec, rows, header_ctx(employer_code))
+    {:ok, text} = FileSpec.render(spec, rows, header_ctx(employer_code, month, year))
     String.split(text, @line_ending, trim: true)
   end
 
-  defp legacy_text_lines(report, employer_code, com_id) do
-    {_col, rows} = Statutory.rows(report, @month, @year, employer_code, com_id)
+  defp legacy_text_lines(report, employer_code, com_id, month, year) do
+    {_col, rows} = Statutory.rows(report, month, year, employer_code, com_id)
 
     Enum.map(rows, fn
       [line] -> line
@@ -238,17 +240,25 @@ defmodule FullCircle.FileSpecParityTest do
         {"EPF", "epf_form_a", "EPFCODE"},
         {"SOCSO+EIS", "socso_eis_txt", "EMPCODE"}
       ] do
-    test "#{report} (#{code}) matches legacy formatter line-for-line", %{com: com} do
-      legacy = legacy_text_lines(unquote(report), unquote(employer_code), com.id)
-      rendered = render_file_spec(com.id, unquote(code), unquote(employer_code))
+    test "#{report} (#{code}) matches legacy formatter line-for-line", %{
+      com: com,
+      month: month,
+      year: year
+    } do
+      legacy = legacy_text_lines(unquote(report), unquote(employer_code), com.id, month, year)
+      rendered = render_file_spec(com.id, unquote(code), unquote(employer_code), month, year)
       assert rendered == legacy
     end
   end
 
-  test "PCB (pcb_cp39) matches legacy formatter byte-for-byte", %{com: com} do
+  test "PCB (pcb_cp39) matches legacy formatter byte-for-byte", %{
+    com: com,
+    month: month,
+    year: year
+  } do
     employer_code = "0093787203"
-    legacy = Statutory.pcb_text(@month, @year, employer_code, com.id)
-    rendered_lines = render_file_spec(com.id, "pcb_cp39", employer_code)
+    legacy = Statutory.pcb_text(month, year, employer_code, com.id)
+    rendered_lines = render_file_spec(com.id, "pcb_cp39", employer_code, month, year)
     rendered = Enum.join(rendered_lines, @line_ending) <> @line_ending
     assert rendered == legacy
   end
