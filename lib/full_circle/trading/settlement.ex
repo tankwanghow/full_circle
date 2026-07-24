@@ -23,6 +23,7 @@ defmodule FullCircle.Trading.Settlement do
   alias FullCircle.Accounting
   alias FullCircle.Accounting.{Contact, TaxCode}
   alias FullCircle.StdInterface
+
   alias FullCircle.Trading.{
     Trip,
     TripDrop,
@@ -455,8 +456,7 @@ defmodule FullCircle.Trading.Settlement do
         Map.merge(d, %{
           from_location_id: origin && origin.location_id,
           from_location_name: origin && origin.location_name,
-          billable:
-            d.trip_status == "completed" and not is_nil(d.actual_mt) and is_nil(d.doc_id),
+          billable: d.trip_status == "completed" and not is_nil(d.actual_mt) and is_nil(d.doc_id),
           # alias for shared settlement UI (party = agent)
           supplier_id: d.agent_id,
           supplier_name: d.agent_name,
@@ -597,6 +597,7 @@ defmodule FullCircle.Trading.Settlement do
 
     rows = loads ++ transport
     info = build_settlement_info(rows, :purchase)
+
     Map.merge(info, %{supplier_load_count: length(loads), transport_drop_count: length(transport)})
   end
 
@@ -919,11 +920,17 @@ defmodule FullCircle.Trading.Settlement do
   end
 
   defp maybe_filter_from_date(q, nil), do: q
-  defp maybe_filter_from_date(q, %Date{} = d), do: from([d0, t, s, c, g, l] in q, where: t.date >= ^d)
+
+  defp maybe_filter_from_date(q, %Date{} = d),
+    do: from([d0, t, s, c, g, l] in q, where: t.date >= ^d)
+
   defp maybe_filter_from_date(q, _), do: q
 
   defp maybe_filter_to_date(q, nil), do: q
-  defp maybe_filter_to_date(q, %Date{} = d), do: from([d0, t, s, c, g, l] in q, where: t.date <= ^d)
+
+  defp maybe_filter_to_date(q, %Date{} = d),
+    do: from([d0, t, s, c, g, l] in q, where: t.date <= ^d)
+
   defp maybe_filter_to_date(q, _), do: q
 
   defp maybe_filter_load_from_date(q, nil), do: q
@@ -1488,7 +1495,10 @@ defmodule FullCircle.Trading.Settlement do
 
   defp blank_to_nil(nil), do: nil
   defp blank_to_nil(""), do: nil
-  defp blank_to_nil(s) when is_binary(s), do: String.trim(s) |> then(fn t -> if t == "", do: nil, else: t end)
+
+  defp blank_to_nil(s) when is_binary(s),
+    do: String.trim(s) |> then(fn t -> if t == "", do: nil, else: t end)
+
   defp blank_to_nil(other), do: to_string(other)
 
   defp load_good_for_invoice(good_id, company, user) when is_binary(good_id) do

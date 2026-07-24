@@ -103,7 +103,6 @@ defmodule FullCircle.Trading.SupplyPositionTest do
     assert closed.status == "closed"
   end
 
-
   test "requires quantity > 0, supplier and good; supply no assigned by system", %{
     admin: admin,
     company: company
@@ -231,7 +230,12 @@ defmodule FullCircle.Trading.SupplyPositionTest do
     original = s.title
 
     assert {:ok, updated} =
-             Trading.update_supply_position(s, %{"title" => "HACKED", "notes" => "x"}, company, admin)
+             Trading.update_supply_position(
+               s,
+               %{"title" => "HACKED", "notes" => "x"},
+               company,
+               admin
+             )
 
     assert updated.title == original
     assert updated.notes == "x"

@@ -7,11 +7,11 @@ defmodule FullCircle.Repo.Migrations.WarehouseMovementIndexes do
 
   def change do
     create_if_not_exists index(:trading_trip_loads, [:location_id, :good_id],
-      name: :trading_trip_loads_location_good_index
-    )
+                           name: :trading_trip_loads_location_good_index
+                         )
 
     create_if_not_exists index(:trading_trip_drops, [:location_id, :good_id],
-      name: :trading_trip_drops_location_good_index
-    )
+                           name: :trading_trip_drops_location_good_index
+                         )
   end
 end

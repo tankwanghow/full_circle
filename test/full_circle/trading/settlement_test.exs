@@ -94,7 +94,10 @@ defmodule FullCircle.Trading.SettlementTest do
 
     # warehouse drop only (no sales) — not listable
     good = good_fixture(company, user)
-    supply = supply_position_fixture(company, user, %{"good_id" => good.id, "status" => "collect"})
+
+    supply =
+      supply_position_fixture(company, user, %{"good_id" => good.id, "status" => "collect"})
+
     port = location_fixture(company, user, %{"kind" => "port"})
     wh = location_fixture(company, user, %{"kind" => "own_warehouse"})
 
@@ -292,10 +295,12 @@ defmodule FullCircle.Trading.SettlementTest do
     load = hd(trip.loads)
 
     {:ok, inv_attrs} = Trading.build_invoice_attrs_from_drop_ids([drop.id], company, user)
+
     assert {:ok, %{create_invoice: inv}} =
              Trading.create_invoice_from_drops([drop.id], inv_attrs, company, user)
 
     {:ok, load_attrs} = Trading.build_pur_invoice_attrs_from_load_ids([load.id], company, user)
+
     assert {:ok, %{create_pur_invoice: pinv}} =
              Trading.create_pur_invoice_from_loads([load.id], load_attrs, company, user)
 
@@ -335,7 +340,9 @@ defmodule FullCircle.Trading.SettlementTest do
     assert by_id[load.id].trip_status == "completed"
     # customer not on load list — has supplier
     assert is_binary(by_id[load.id].supplier_name)
-    refute Map.has_key?(by_id[load.id], :customer_id) or by_id[load.id][:customer_id] == customer.id
+
+    refute Map.has_key?(by_id[load.id], :customer_id) or
+             by_id[load.id][:customer_id] == customer.id
   end
 
   test "create_pur_invoice_from_loads creates pur invoice and links load", %{
@@ -355,7 +362,10 @@ defmodule FullCircle.Trading.SettlementTest do
     detail = attrs["pur_invoice_details"]["0"]
     assert detail["good_id"] == good.id
     assert detail["quantity"] == "18.0"
-    assert detail["unit_price"] == "900" or detail["unit_price"] == Decimal.to_string(supply.unit_price)
+
+    assert detail["unit_price"] == "900" or
+             detail["unit_price"] == Decimal.to_string(supply.unit_price)
+
     assert attrs["descriptions"] in [nil, ""]
     assert detail["descriptions"] =~ "SUP-"
 
@@ -392,7 +402,12 @@ defmodule FullCircle.Trading.SettlementTest do
     good = Keyword.get_lazy(opts, :good, fn -> good_fixture(company, user) end)
     customer = Keyword.get_lazy(opts, :customer, fn -> contact_fixture(company, user) end)
     supplier = Keyword.get_lazy(opts, :supplier, fn -> contact_fixture(company, user) end)
-    agent = Keyword.get_lazy(opts, :agent, fn -> contact_fixture(company, user, %{"name" => "Haul Co"}) end)
+
+    agent =
+      Keyword.get_lazy(opts, :agent, fn ->
+        contact_fixture(company, user, %{"name" => "Haul Co"})
+      end)
+
     actual = Keyword.get(opts, :actual_mt, "20")
 
     supply =
@@ -493,6 +508,7 @@ defmodule FullCircle.Trading.SettlementTest do
              "Note",
              "Haulage"
            ]
+
     assert detail["descriptions"] =~ "Agent Port"
     assert detail["descriptions"] =~ "Agent Farm"
     assert detail["descriptions"] =~ "AGT 9001"
@@ -514,7 +530,10 @@ defmodule FullCircle.Trading.SettlementTest do
 
   test "cancel trip blocked when transport haul billed", %{user: user, company: company} do
     %{trip: trip, drop: drop} = completed_agent_drop(company, user)
-    {:ok, attrs} = Trading.build_pur_invoice_attrs_from_transport_drop_ids([drop.id], company, user)
+
+    {:ok, attrs} =
+      Trading.build_pur_invoice_attrs_from_transport_drop_ids([drop.id], company, user)
+
     detail = Map.put(attrs["pur_invoice_details"]["0"], "unit_price", "10")
     attrs = put_in(attrs, ["pur_invoice_details", "0"], detail)
 
@@ -530,6 +549,7 @@ defmodule FullCircle.Trading.SettlementTest do
   } do
     %{drop: drop, customer: customer} = completed_sales_drop(company, user)
     {:ok, attrs} = Trading.build_invoice_attrs_from_drop_ids([drop.id], company, user)
+
     assert {:ok, %{create_invoice: inv}} =
              Trading.create_invoice_from_drops([drop.id], attrs, company, user)
 
@@ -559,10 +579,12 @@ defmodule FullCircle.Trading.SettlementTest do
     %{trip: trip} = completed_sales_drop(company, user)
     load = hd(trip.loads)
     {:ok, attrs} = Trading.build_pur_invoice_attrs_from_load_ids([load.id], company, user)
+
     assert {:ok, %{create_pur_invoice: pinv}} =
              Trading.create_pur_invoice_from_loads([load.id], attrs, company, user)
 
     assert Trading.pur_invoice_settlement_info(pinv.id, company).linked?
+
     assert {:ok, %{loads_unlinked: 1, transport_unlinked: 0}} =
              Trading.unlink_pur_invoice_settlement(pinv, company, user)
 

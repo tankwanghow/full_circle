@@ -248,7 +248,12 @@ defmodule FullCircle.Trading.TripTest do
           "vehicle_number" => "ABC1234",
           "good_id" => good.id,
           "loads" => [
-            %{"planned_mt" => "15", "actual_mt" => "15", "good_id" => good.id, "location_id" => wh.id}
+            %{
+              "planned_mt" => "15",
+              "actual_mt" => "15",
+              "good_id" => good.id,
+              "location_id" => wh.id
+            }
           ],
           "drops" => [
             %{
@@ -329,7 +334,12 @@ defmodule FullCircle.Trading.TripTest do
           "vehicle_number" => "ABC1234",
           "good_id" => good.id,
           "loads" => [
-            %{"planned_mt" => "20", "actual_mt" => "20", "good_id" => good.id, "location_id" => wh.id}
+            %{
+              "planned_mt" => "20",
+              "actual_mt" => "20",
+              "good_id" => good.id,
+              "location_id" => wh.id
+            }
           ],
           "drops" => [
             %{
@@ -374,7 +384,12 @@ defmodule FullCircle.Trading.TripTest do
             }
           ],
           "drops" => [
-            %{"planned_mt" => "40", "actual_mt" => "40", "good_id" => good.id, "location_id" => drop_loc.id}
+            %{
+              "planned_mt" => "40",
+              "actual_mt" => "40",
+              "good_id" => good.id,
+              "location_id" => drop_loc.id
+            }
           ]
         },
         company,
@@ -423,7 +438,12 @@ defmodule FullCircle.Trading.TripTest do
             }
           ],
           "drops" => [
-            %{"planned_mt" => "40", "actual_mt" => "40", "good_id" => good.id, "location_id" => drop_loc.id}
+            %{
+              "planned_mt" => "40",
+              "actual_mt" => "40",
+              "good_id" => good.id,
+              "location_id" => drop_loc.id
+            }
           ]
         },
         company,
@@ -860,7 +880,10 @@ defmodule FullCircle.Trading.TripTest do
     assert length(logs) == 2
     update_log = Enum.find(logs, &(&1.action == "update_trip"))
     assert update_log
-    assert update_log.delta =~ "Own WH" or update_log.delta =~ "own warehouse" or update_log.delta =~ "Diverted"
+
+    assert update_log.delta =~ "Own WH" or update_log.delta =~ "own warehouse" or
+             update_log.delta =~ "Diverted"
+
     assert update_log.delta =~ "variance_note" or update_log.delta =~ "Customer postponed"
 
     {:ok, trip, _warnings} = Trading.complete_trip(trip, company, admin)

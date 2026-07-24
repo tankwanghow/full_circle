@@ -24,7 +24,11 @@ defmodule FullCircle.EggStockTest do
   end
 
   describe "weekly DOW books" do
-    test "save and list sales lines by weekday", %{company: company, admin: admin, contact: contact} do
+    test "save and list sales lines by weekday", %{
+      company: company,
+      admin: admin,
+      contact: contact
+    } do
       params = [
         %{
           "id" => "",
@@ -100,7 +104,11 @@ defmodule FullCircle.EggStockTest do
       assert totals["AA"] == 14
     end
 
-    test "replace semantics purge removed lines", %{company: company, admin: admin, contact: contact} do
+    test "replace semantics purge removed lines", %{
+      company: company,
+      admin: admin,
+      contact: contact
+    } do
       {:ok, [line]} =
         EggStock.save_dow_lines(
           company.id,
@@ -238,7 +246,11 @@ defmodule FullCircle.EggStockTest do
           admin
         )
 
-      day = FullCircle.Repo.preload(day, [egg_stock_day_details: EggStock.__day_details_query__()], force: true)
+      day =
+        FullCircle.Repo.preload(day, [egg_stock_day_details: EggStock.__day_details_query__()],
+          force: true
+        )
+
       assert EggStock.day_has_planned_sales?(day)
       assert EggStock.planned_sales_totals(company.id, monday)["AA"] == 3
     end

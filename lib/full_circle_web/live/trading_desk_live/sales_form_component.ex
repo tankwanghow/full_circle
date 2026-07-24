@@ -401,7 +401,9 @@ defmodule FullCircleWeb.TradingDeskLive.SalesFormComponent do
               phx-click="fulfill"
               phx-target={@myself}
               class="orange button"
-              data-confirm={gettext("Mark this sales position fulfilled even if undelivered remains?")}
+              data-confirm={
+                gettext("Mark this sales position fulfilled even if undelivered remains?")
+              }
             >
               {gettext("Mark fulfilled")}
             </button>

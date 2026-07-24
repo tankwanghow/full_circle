@@ -46,7 +46,9 @@ defmodule FullCircle.Trading.SampleData do
 
     supplies = create_supplies!(company, user, batch, suppliers, maize, pollard, soy)
     sales = create_sales!(company, user, batch, customers, supplies, maize, pollard, soy)
-    trips = create_trips!(company, user, batch, locs, supplies, sales, customers, maize, pollard, soy)
+
+    trips =
+      create_trips!(company, user, batch, locs, supplies, sales, customers, maize, pollard, soy)
 
     # Dedicated settlement-ready deliveries (completed + sales drop, never stock-in-only)
     settlement_trips =
@@ -147,7 +149,8 @@ defmodule FullCircle.Trading.SampleData do
     # contact_id links site → supplier/customer for trip form auto-filter/select
     specs = [
       port: {"Port Klang Godown", "port", "3.0010", "101.3910", suppliers.vessel.id},
-      supplier_wh: {"Supplier WH - Kapar", "supplier_site", "3.1200", "101.3800", suppliers.local.id},
+      supplier_wh:
+        {"Supplier WH - Kapar", "supplier_site", "3.1200", "101.3800", suppliers.local.id},
       silo: {"Main Silo", "own_warehouse", "3.0500", "101.5500", nil},
       feed_bay: {"Feedmill Bay", "own_warehouse", "3.0510", "101.5510", nil},
       silo_b: {"North Silo B", "own_warehouse", "3.0550", "101.5520", nil},
@@ -158,7 +161,8 @@ defmodule FullCircle.Trading.SampleData do
       farm_b: {"Seremban Farm", "customer_site", "2.7260", "101.9420", customers.farm_b.id},
       farm_c: {"Ipoh Farm Gate", "customer_site", "4.5970", "101.0900", customers.farm_c.id},
       farm_d: {"Malacca Drop", "customer_site", "2.1890", "102.2500", customers.farm_d.id},
-      farm_e: {"Johor Integrator Gate", "customer_site", "1.4927", "103.7414", customers.farm_e.id}
+      farm_e:
+        {"Johor Integrator Gate", "customer_site", "1.4927", "103.7414", customers.farm_e.id}
     ]
 
     Map.new(specs, fn {key, {name, kind, lat, lng, contact_id}} ->
@@ -313,6 +317,7 @@ defmodule FullCircle.Trading.SampleData do
     for i <- 1..@sample_count do
       status = Enum.at(trip_statuses, rem(i - 1, length(trip_statuses)))
       good = Enum.at(goods, rem(i - 1, length(goods)))
+
       supply =
         active_supplies
         |> Enum.filter(&(&1.good_id == good.id))
@@ -374,7 +379,9 @@ defmodule FullCircle.Trading.SampleData do
       }
 
       drop_line =
-        if drop_sales_id, do: Map.put(drop_line, "sales_position_id", drop_sales_id), else: drop_line
+        if drop_sales_id,
+          do: Map.put(drop_line, "sales_position_id", drop_sales_id),
+          else: drop_line
 
       attrs = %{
         "date" => Date.to_iso8601(date),

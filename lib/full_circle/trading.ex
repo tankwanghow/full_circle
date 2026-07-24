@@ -13,6 +13,7 @@ defmodule FullCircle.Trading do
 
   alias FullCircle.Repo
   alias FullCircle.Authorization
+
   alias FullCircle.Trading.{
     Location,
     SupplyPosition,
@@ -23,6 +24,7 @@ defmodule FullCircle.Trading do
     TripLoad,
     TripDrop
   }
+
   alias FullCircle.HR.Employee
   alias FullCircle.Accounting.Contact
   alias FullCircle.Sys
@@ -914,6 +916,7 @@ defmodule FullCircle.Trading do
   """
   def trip_parties_label(names, max_show \\ 2)
   def trip_parties_label([], _), do: ""
+
   def trip_parties_label(names, max_show) when is_list(names) do
     case names do
       [one] ->
@@ -984,8 +987,7 @@ defmodule FullCircle.Trading do
                 status: t.status,
                 vehicle_number: t.vehicle_number,
                 agent_name: a.name,
-                qty:
-                  coalesce(sum(fragment("coalesce(?, ?)", l.actual_mt, l.planned_mt)), 0)
+                qty: coalesce(sum(fragment("coalesce(?, ?)", l.actual_mt, l.planned_mt)), 0)
               }
             )
             |> Repo.all()
@@ -1018,8 +1020,7 @@ defmodule FullCircle.Trading do
                 status: t.status,
                 vehicle_number: t.vehicle_number,
                 agent_name: a.name,
-                qty:
-                  coalesce(sum(fragment("coalesce(?, ?)", d.actual_mt, d.planned_mt)), 0)
+                qty: coalesce(sum(fragment("coalesce(?, ?)", d.actual_mt, d.planned_mt)), 0)
               }
             )
             |> Repo.all()
@@ -1053,8 +1054,7 @@ defmodule FullCircle.Trading do
                 status: t.status,
                 vehicle_number: t.vehicle_number,
                 agent_name: a.name,
-                qty:
-                  coalesce(sum(fragment("coalesce(?, ?)", d.actual_mt, d.planned_mt)), 0)
+                qty: coalesce(sum(fragment("coalesce(?, ?)", d.actual_mt, d.planned_mt)), 0)
               }
             )
             |> Repo.all()
@@ -1088,8 +1088,7 @@ defmodule FullCircle.Trading do
                 status: t.status,
                 vehicle_number: t.vehicle_number,
                 agent_name: a.name,
-                qty:
-                  coalesce(sum(fragment("coalesce(?, ?)", l.actual_mt, l.planned_mt)), 0)
+                qty: coalesce(sum(fragment("coalesce(?, ?)", l.actual_mt, l.planned_mt)), 0)
               }
             )
             |> Repo.all()
@@ -1810,8 +1809,12 @@ defmodule FullCircle.Trading do
 
   defp warehouse_on_hand(location_id, good_id)
        when is_binary(location_id) and is_binary(good_id) do
-    inbound = Map.get(Balances.own_warehouse_inbound_by_good(location_id), good_id, Decimal.new(0))
-    outbound = Map.get(Balances.own_warehouse_outbound_by_good(location_id), good_id, Decimal.new(0))
+    inbound =
+      Map.get(Balances.own_warehouse_inbound_by_good(location_id), good_id, Decimal.new(0))
+
+    outbound =
+      Map.get(Balances.own_warehouse_outbound_by_good(location_id), good_id, Decimal.new(0))
+
     Decimal.sub(inbound, outbound)
   end
 

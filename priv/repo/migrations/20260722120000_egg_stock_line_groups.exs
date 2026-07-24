@@ -7,7 +7,9 @@ defmodule FullCircle.Repo.Migrations.EggStockLineGroups do
       add :group_position, :integer, null: false, default: 0
     end
 
-    create index(:egg_stock_dow_template_lines, [:company_id, :kind, :dow, :group_position, :position],
+    create index(
+             :egg_stock_dow_template_lines,
+             [:company_id, :kind, :dow, :group_position, :position],
              name: :egg_stock_dow_lines_group_order
            )
 

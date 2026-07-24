@@ -743,13 +743,13 @@ defmodule FullCircleWeb.CoreComponents do
         <.icon name="hero-exclamation-triangle-mini" class="h-5 w-5" />
         {gettext("Please fix the following errors:")}
 
-      <span class="text-sm text-rose-600 space-y-1.5 pl-1">
-        <span :for={{label, msg} <- @errors} class="min-w-0">
-          <span class="font-medium text-rose-700">
-            [{label}<span class="text-rose-400"> - {msg}</span>]
+        <span class="text-sm text-rose-600 space-y-1.5 pl-1">
+          <span :for={{label, msg} <- @errors} class="min-w-0">
+            <span class="font-medium text-rose-700">
+              [{label}<span class="text-rose-400"> - {msg}</span>]
+            </span>
           </span>
         </span>
-      </span>
       </p>
     </div>
     """

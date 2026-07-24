@@ -949,16 +949,10 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
               {gettext("Cancel trip")}
             </button>
             <span
-              :if={
-                @trip.status == "completed" and Trading.trip_has_settlement_docs?(@trip)
-              }
+              :if={@trip.status == "completed" and Trading.trip_has_settlement_docs?(@trip)}
               id="desk-trip-cancel-blocked"
               class="text-xs text-zinc-500 max-w-[14rem]"
-              title={
-                gettext(
-                  "Unlink Invoice / PurInvoice settlement before cancelling this trip."
-                )
-              }
+              title={gettext("Unlink Invoice / PurInvoice settlement before cancelling this trip.")}
             >
               {gettext("Cancel blocked (settled)")}
             </span>

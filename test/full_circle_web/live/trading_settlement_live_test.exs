@@ -38,7 +38,9 @@ defmodule FullCircleWeb.TradingSettlementLiveTest do
       })
 
     port = location_fixture(company, user, %{"kind" => "port", "name" => "Settle port #{tag}"})
-    site = location_fixture(company, user, %{"kind" => "customer_site", "name" => "Settle farm #{tag}"})
+
+    site =
+      location_fixture(company, user, %{"kind" => "customer_site", "name" => "Settle farm #{tag}"})
 
     {:ok, trip} =
       Trading.create_trip(
@@ -130,6 +132,7 @@ defmodule FullCircleWeb.TradingSettlementLiveTest do
   } do
     {trip, drop, _load, _customer, _supplier} = completed_drop(company, user, tag: "Bill")
     {:ok, attrs} = Trading.build_invoice_attrs_from_drop_ids([drop.id], company, user)
+
     assert {:ok, %{create_invoice: inv}} =
              Trading.create_invoice_from_drops([drop.id], attrs, company, user)
 

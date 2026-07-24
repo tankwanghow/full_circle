@@ -150,7 +150,11 @@ defmodule FullCircle.Trading.TripAssemblyTest do
     assert length(attrs["drops"]) == 2
 
     assert Enum.any?(attrs["drops"], &(&1["sales_position_id"] == sales.id))
-    assert Enum.any?(attrs["drops"], &(&1["location_id"] == wh.id and is_nil(&1["sales_position_id"])))
+
+    assert Enum.any?(
+             attrs["drops"],
+             &(&1["location_id"] == wh.id and is_nil(&1["sales_position_id"]))
+           )
   end
 
   test "stock-in selection: supply + warehouse, no sales", %{user: user, company: company} do

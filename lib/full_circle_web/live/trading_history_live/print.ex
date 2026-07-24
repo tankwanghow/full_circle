@@ -121,8 +121,7 @@ defmodule FullCircleWeb.TradingHistoryLive.Print do
             <div class="is-size-6">{@party_label}</div>
             <div class="is-size-4 has-text-weight-semibold">{@party_name || "—"}</div>
             <div class="is-size-6 mt-2">
-              {gettext("Good")}:
-              <span class="has-text-weight-semibold">{@good_name || "—"}</span>
+              {gettext("Good")}: <span class="has-text-weight-semibold">{@good_name || "—"}</span>
               <span :if={@unit}> ({@unit})</span>
             </div>
           </div>
@@ -132,13 +131,12 @@ defmodule FullCircleWeb.TradingHistoryLive.Print do
               <span class="has-text-weight-semibold">{@doc_no}</span>
             </div>
             <div>
-              {gettext("Status")}:
-              <span class="has-text-weight-semibold">{@status}</span>
+              {gettext("Status")}: <span class="has-text-weight-semibold">{@status}</span>
             </div>
             <div>
               {gettext("Position qty")}:
               <span class="has-text-weight-semibold">{fmt_dec(@base_qty)}</span>
-              <span :if={@unit}> {@unit}</span>
+              <span :if={@unit}>{@unit}</span>
             </div>
           </div>
         </div>
@@ -171,8 +169,9 @@ defmodule FullCircleWeb.TradingHistoryLive.Print do
         </div>
 
         <div class="section-title is-size-5 has-text-weight-semibold">
-          {if @show_loads, do: gettext("Loads & drops"), else: gettext("Delivery history")}
-          ({length(@rows)})
+          {if @show_loads, do: gettext("Loads & drops"), else: gettext("Delivery history")} ({length(
+            @rows
+          )})
         </div>
 
         <table class="line-table is-size-6">

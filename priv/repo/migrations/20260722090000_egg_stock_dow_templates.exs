@@ -4,7 +4,10 @@ defmodule FullCircle.Repo.Migrations.EggStockDowTemplates do
   def up do
     create table(:egg_stock_dow_template_lines, primary_key: false) do
       add :id, :binary_id, primary_key: true
-      add :company_id, references(:companies, type: :binary_id, on_delete: :delete_all), null: false
+
+      add :company_id, references(:companies, type: :binary_id, on_delete: :delete_all),
+        null: false
+
       add :kind, :string, null: false
       add :dow, :integer, null: false
       add :contact_id, references(:contacts, type: :binary_id, on_delete: :nilify_all)

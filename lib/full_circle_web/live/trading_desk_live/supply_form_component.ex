@@ -245,11 +245,11 @@ defmodule FullCircleWeb.TradingDeskLive.SupplyFormComponent do
             />
           </div>
           <div class="w-[15%]">
-          <.input
-            field={@form[:available_from]}
-            type="date"
-            label={gettext("Est. available from")}
-          />
+            <.input
+              field={@form[:available_from]}
+              type="date"
+              label={gettext("Est. available from")}
+            />
           </div>
         </div>
         <div class="flex gap-2">

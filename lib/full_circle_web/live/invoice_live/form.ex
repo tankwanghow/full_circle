@@ -104,7 +104,9 @@ defmodule FullCircleWeb.InvoiceLive.Form do
       |> assign(page_title: gettext("New Invoice"))
       |> assign(matched_trans: [])
       |> assign(trading_drop_ids: trading_drop_ids)
-      |> assign(trading_settlement: %{linked?: false, line_count: 0, actual_mt_sum: 0, trip_refs: []})
+      |> assign(
+        trading_settlement: %{linked?: false, line_count: 0, actual_mt_sum: 0, trip_refs: []}
+      )
       |> assign_egg_link(params, :sales)
       |> assign(:form, to_form(cs))
 
@@ -772,9 +774,7 @@ defmodule FullCircleWeb.InvoiceLive.Form do
             <.input
               field={@form[:contact_name]}
               label={gettext("Customer")}
-              phx-hook={
-                if(@trading_settlement.linked?, do: nil, else: "tributeAutoComplete")
-              }
+              phx-hook={if(@trading_settlement.linked?, do: nil, else: "tributeAutoComplete")}
               readonly={@trading_settlement.linked?}
               url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
             />

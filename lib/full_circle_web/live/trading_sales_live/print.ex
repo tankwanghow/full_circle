@@ -53,12 +53,10 @@ defmodule FullCircleWeb.TradingSalesLive.Print do
           </div>
           <div class="right is-size-5">
             <div>
-              {gettext("Sales no")}:
-              <span class="has-text-weight-semibold">{@sales.title}</span>
+              {gettext("Sales no")}: <span class="has-text-weight-semibold">{@sales.title}</span>
             </div>
             <div>
-              {gettext("Status")}:
-              <span class="has-text-weight-semibold">{@sales.status}</span>
+              {gettext("Status")}: <span class="has-text-weight-semibold">{@sales.status}</span>
             </div>
             <div>
               {gettext("Needed by")}:

@@ -66,8 +66,6 @@ defmodule FullCircle.Trading.MastersTest do
       assert %{longitude: _} = errors_on(cs)
     end
 
-
-
     test "rejects invalid kind", %{admin: admin, company: company} do
       assert {:error, cs} =
                Trading.create_location(

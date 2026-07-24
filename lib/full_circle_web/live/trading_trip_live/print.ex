@@ -128,16 +128,14 @@ defmodule FullCircleWeb.TradingTripLive.Print do
     <div class="doc-header">
       <div class="left is-size-5">
         <div>
-          {gettext("Date")}:
-          <span class="has-text-weight-semibold">{format_date(@trip.date)}</span>
+          {gettext("Date")}: <span class="has-text-weight-semibold">{format_date(@trip.date)}</span>
         </div>
         <div>
           {gettext("Vehicle")}:
           <span class="has-text-weight-semibold">{@trip.vehicle_number || "—"}</span>
         </div>
         <div>
-          {gettext("Transport")}:
-          <span class="has-text-weight-semibold">{@trip.transport_mode}</span>
+          {gettext("Transport")}: <span class="has-text-weight-semibold">{@trip.transport_mode}</span>
           <span :if={@trip.transport_agent}>
             — {@trip.transport_agent.name}
           </span>
@@ -145,12 +143,10 @@ defmodule FullCircleWeb.TradingTripLive.Print do
       </div>
       <div class="right is-size-5">
         <div>
-          {gettext("Trip no")}:
-          <span class="has-text-weight-semibold">{@trip.reference_no}</span>
+          {gettext("Trip no")}: <span class="has-text-weight-semibold">{@trip.reference_no}</span>
         </div>
         <div>
-          {gettext("Status")}:
-          <span class="has-text-weight-semibold">{@trip.status}</span>
+          {gettext("Status")}: <span class="has-text-weight-semibold">{@trip.status}</span>
         </div>
       </div>
     </div>

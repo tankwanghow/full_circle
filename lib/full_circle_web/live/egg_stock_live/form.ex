@@ -625,9 +625,14 @@ defmodule FullCircleWeb.EggStockLive.Form do
 
       swap_pos =
         case dir do
-          "up" -> if pos_in_section && pos_in_section > 0, do: pos_in_section - 1
-          "down" -> if pos_in_section && pos_in_section < length(section_idxs) - 1, do: pos_in_section + 1
-          _ -> nil
+          "up" ->
+            if pos_in_section && pos_in_section > 0, do: pos_in_section - 1
+
+          "down" ->
+            if pos_in_section && pos_in_section < length(section_idxs) - 1, do: pos_in_section + 1
+
+          _ ->
+            nil
         end
 
       if is_nil(swap_pos) do
@@ -1446,160 +1451,206 @@ defmodule FullCircleWeb.EggStockLive.Form do
   defp weekly_tab(assigns) do
     ~H"""
     <div class="flex flex-col items-center">
-    <div class="w-fit max-w-full">
-    <div class="mb-3 flex flex-wrap items-center gap-2">
-      <span class="text-sm font-semibold text-gray-600">
-        {if @kind == "sales", do: gettext("Sales book"), else: gettext("Purchase book")}
-      </span>
-      <button
-        :for={d <- 1..7}
-        type="button"
-        phx-click="select_dow"
-        phx-value-dow={d}
-        class={"px-3 py-1 text-sm rounded border #{if d == @dow, do: "bg-blue-600 text-white border-blue-600", else: "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"}"}
-      >
-        {dow_label(d)}
-      </button>
-    </div>
-
-    <.form for={%{}} id="dow-form" autocomplete="off" phx-change="validate_dow" class="w-fit max-w-full">
-      <div class="flex gap-1 mb-1">
-        <div class="w-12 shrink-0"></div>
-        <div class="w-56 text-sm font-semibold text-gray-600">{gettext("Contact")}</div>
-        <div :for={grade <- @grades} class="w-20 text-center text-sm font-semibold text-gray-600">
-          {@grade_labels[grade]}
-        </div>
-        <div class="w-20 text-center text-sm font-semibold text-gray-600">{gettext("Total")}</div>
-      </div>
-
-      <div :for={{line, idx} <- Enum.with_index(@dow_params)}>
-        <input type="hidden" name={"dow_lines[#{idx}][id]"} value={line["id"]} />
-        <input type="hidden" name={"dow_lines[#{idx}][delete]"} value={line["delete"] || "false"} />
-        <input type="hidden" name={"dow_lines[#{idx}][contact_id]"} value={line["contact_id"]} />
-        <input
-          :if={line["is_separator"] not in [true, "true"]}
-          type="hidden"
-          name={"dow_lines[#{idx}][group_name]"}
-          value={line["group_name"] || ""}
-        />
-        <input
-          type="hidden"
-          name={"dow_lines[#{idx}][group_position]"}
-          value={line["group_position"] || 0}
-        />
-        <input type="hidden" name={"dow_lines[#{idx}][position]"} value={line["position"] || idx} />
-        <input
-          type="hidden"
-          name={"dow_lines[#{idx}][is_separator]"}
-          value={to_string(line["is_separator"] in [true, "true"])}
-        />
-
-        <div :if={line["delete"] != "true" and line["is_separator"] in [true, "true"]} class="flex items-center gap-1 my-2">
-          <div class="flex items-center w-12 shrink-0">
-            <button type="button" phx-click="move_dow_line" phx-value-index={idx} phx-value-dir="up" class="text-gray-400 hover:text-gray-700" title={gettext("Move up")}>
-              <.icon name="hero-chevron-up" class="h-3 w-3" />
-            </button>
-            <button type="button" phx-click="move_dow_line" phx-value-index={idx} phx-value-dir="down" class="text-gray-400 hover:text-gray-700" title={gettext("Move down")}>
-              <.icon name="hero-chevron-down" class="h-3 w-3" />
-            </button>
-          </div>
-          <div class="flex-1 border-t-2 border-dashed border-gray-400"></div>
-          <input type="hidden" name={"dow_lines[#{idx}][contact_name]"} value="" />
-          <input
-            type="text"
-            name={"dow_lines[#{idx}][group_name]"}
-            value={line["group_name"] || ""}
-            placeholder={gettext("Label (optional)")}
-            class="w-56 text-xs border rounded px-2 py-0.5 text-gray-600"
-          />
-          <div class="flex-1 border-t-2 border-dashed border-gray-400"></div>
-          <button type="button" phx-click="delete_dow_line" phx-value-index={idx} class="text-red-500 hover:text-red-700" title={gettext("Delete separator")}>
-            <.icon name="hero-trash" class="h-4 w-4" />
+      <div class="w-fit max-w-full">
+        <div class="mb-3 flex flex-wrap items-center gap-2">
+          <span class="text-sm font-semibold text-gray-600">
+            {if @kind == "sales", do: gettext("Sales book"), else: gettext("Purchase book")}
+          </span>
+          <button
+            :for={d <- 1..7}
+            type="button"
+            phx-click="select_dow"
+            phx-value-dow={d}
+            class={"px-3 py-1 text-sm rounded border #{if d == @dow, do: "bg-blue-600 text-white border-blue-600", else: "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"}"}
+          >
+            {dow_label(d)}
           </button>
         </div>
 
-        <div :if={line["delete"] != "true" and line["is_separator"] not in [true, "true"]} class="flex items-center gap-1 mb-1">
-          <div class="flex items-center w-12 shrink-0">
-            <button type="button" phx-click="move_dow_line" phx-value-index={idx} phx-value-dir="up" class="text-gray-400 hover:text-gray-700" title={gettext("Move up")}>
-              <.icon name="hero-chevron-up" class="h-3 w-3" />
-            </button>
-            <button type="button" phx-click="move_dow_line" phx-value-index={idx} phx-value-dir="down" class="text-gray-400 hover:text-gray-700" title={gettext("Move down")}>
-              <.icon name="hero-chevron-down" class="h-3 w-3" />
-            </button>
+        <.form
+          for={%{}}
+          id="dow-form"
+          autocomplete="off"
+          phx-change="validate_dow"
+          class="w-fit max-w-full"
+        >
+          <div class="flex gap-1 mb-1">
+            <div class="w-12 shrink-0"></div>
+            <div class="w-56 text-sm font-semibold text-gray-600">{gettext("Contact")}</div>
+            <div :for={grade <- @grades} class="w-20 text-center text-sm font-semibold text-gray-600">
+              {@grade_labels[grade]}
+            </div>
+            <div class="w-20 text-center text-sm font-semibold text-gray-600">{gettext("Total")}</div>
           </div>
-          <input
-            type="text"
-            id={"dow-contact-#{@kind}-#{idx}"}
-            name={"dow_lines[#{idx}][contact_name]"}
-            value={line["contact_name"]}
-            class="w-56 border rounded px-2 py-1"
-            placeholder={gettext("Contact or free name")}
-            phx-hook="tributeAutoComplete"
-            url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
-          />
-          <input
-            :for={grade <- @grades}
-            type="number"
-            name={"dow_lines[#{idx}][quantities][#{grade}]"}
-            value={(line["quantities"] || %{})[grade] || ""}
-            class="w-20 text-center border rounded px-1 py-1"
-          />
-          <div class="w-20 text-center font-semibold py-1">
-            {Enum.reduce(@grades, 0, fn g, acc -> acc + to_int((line["quantities"] || %{})[g]) end)}
+
+          <div :for={{line, idx} <- Enum.with_index(@dow_params)}>
+            <input type="hidden" name={"dow_lines[#{idx}][id]"} value={line["id"]} />
+            <input type="hidden" name={"dow_lines[#{idx}][delete]"} value={line["delete"] || "false"} />
+            <input type="hidden" name={"dow_lines[#{idx}][contact_id]"} value={line["contact_id"]} />
+            <input
+              :if={line["is_separator"] not in [true, "true"]}
+              type="hidden"
+              name={"dow_lines[#{idx}][group_name]"}
+              value={line["group_name"] || ""}
+            />
+            <input
+              type="hidden"
+              name={"dow_lines[#{idx}][group_position]"}
+              value={line["group_position"] || 0}
+            />
+            <input type="hidden" name={"dow_lines[#{idx}][position]"} value={line["position"] || idx} />
+            <input
+              type="hidden"
+              name={"dow_lines[#{idx}][is_separator]"}
+              value={to_string(line["is_separator"] in [true, "true"])}
+            />
+
+            <div
+              :if={line["delete"] != "true" and line["is_separator"] in [true, "true"]}
+              class="flex items-center gap-1 my-2"
+            >
+              <div class="flex items-center w-12 shrink-0">
+                <button
+                  type="button"
+                  phx-click="move_dow_line"
+                  phx-value-index={idx}
+                  phx-value-dir="up"
+                  class="text-gray-400 hover:text-gray-700"
+                  title={gettext("Move up")}
+                >
+                  <.icon name="hero-chevron-up" class="h-3 w-3" />
+                </button>
+                <button
+                  type="button"
+                  phx-click="move_dow_line"
+                  phx-value-index={idx}
+                  phx-value-dir="down"
+                  class="text-gray-400 hover:text-gray-700"
+                  title={gettext("Move down")}
+                >
+                  <.icon name="hero-chevron-down" class="h-3 w-3" />
+                </button>
+              </div>
+              <div class="flex-1 border-t-2 border-dashed border-gray-400"></div>
+              <input type="hidden" name={"dow_lines[#{idx}][contact_name]"} value="" />
+              <input
+                type="text"
+                name={"dow_lines[#{idx}][group_name]"}
+                value={line["group_name"] || ""}
+                placeholder={gettext("Label (optional)")}
+                class="w-56 text-xs border rounded px-2 py-0.5 text-gray-600"
+              />
+              <div class="flex-1 border-t-2 border-dashed border-gray-400"></div>
+              <button
+                type="button"
+                phx-click="delete_dow_line"
+                phx-value-index={idx}
+                class="text-red-500 hover:text-red-700"
+                title={gettext("Delete separator")}
+              >
+                <.icon name="hero-trash" class="h-4 w-4" />
+              </button>
+            </div>
+
+            <div
+              :if={line["delete"] != "true" and line["is_separator"] not in [true, "true"]}
+              class="flex items-center gap-1 mb-1"
+            >
+              <div class="flex items-center w-12 shrink-0">
+                <button
+                  type="button"
+                  phx-click="move_dow_line"
+                  phx-value-index={idx}
+                  phx-value-dir="up"
+                  class="text-gray-400 hover:text-gray-700"
+                  title={gettext("Move up")}
+                >
+                  <.icon name="hero-chevron-up" class="h-3 w-3" />
+                </button>
+                <button
+                  type="button"
+                  phx-click="move_dow_line"
+                  phx-value-index={idx}
+                  phx-value-dir="down"
+                  class="text-gray-400 hover:text-gray-700"
+                  title={gettext("Move down")}
+                >
+                  <.icon name="hero-chevron-down" class="h-3 w-3" />
+                </button>
+              </div>
+              <input
+                type="text"
+                id={"dow-contact-#{@kind}-#{idx}"}
+                name={"dow_lines[#{idx}][contact_name]"}
+                value={line["contact_name"]}
+                class="w-56 border rounded px-2 py-1"
+                placeholder={gettext("Contact or free name")}
+                phx-hook="tributeAutoComplete"
+                url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
+              />
+              <input
+                :for={grade <- @grades}
+                type="number"
+                name={"dow_lines[#{idx}][quantities][#{grade}]"}
+                value={(line["quantities"] || %{})[grade] || ""}
+                class="w-20 text-center border rounded px-1 py-1"
+              />
+              <div class="w-20 text-center font-semibold py-1">
+                {Enum.reduce(@grades, 0, fn g, acc -> acc + to_int((line["quantities"] || %{})[g]) end)}
+              </div>
+              <button
+                type="button"
+                phx-click="delete_dow_line"
+                phx-value-index={idx}
+                class="text-red-500 hover:text-red-700"
+                title={gettext("Delete")}
+              >
+                <.icon name="hero-trash" class="h-4 w-4" />
+              </button>
+            </div>
           </div>
+
+          <div class="flex gap-1 mt-1 font-semibold text-sm text-gray-700 border-t pt-1">
+            <div class="w-12 shrink-0"></div>
+            <div class="w-56 text-right">{gettext("Total")}</div>
+            <div :for={grade <- @grades} class="w-20 text-center">
+              {Enum.reduce(@dow_params, 0, fn line, acc ->
+                if line["delete"] == "true" or line["is_separator"] in [true, "true"],
+                  do: acc,
+                  else: acc + to_int((line["quantities"] || %{})[grade])
+              end)}
+            </div>
+            <div class="w-20 text-center">
+              {Enum.reduce(@grades, 0, fn g, acc ->
+                acc +
+                  Enum.reduce(@dow_params, 0, fn line, a ->
+                    if line["delete"] == "true" or line["is_separator"] in [true, "true"],
+                      do: a,
+                      else: a + to_int((line["quantities"] || %{})[g])
+                  end)
+              end)}
+            </div>
+          </div>
+        </.form>
+
+        <div class="mt-2 flex gap-3">
           <button
             type="button"
-            phx-click="delete_dow_line"
-            phx-value-index={idx}
-            class="text-red-500 hover:text-red-700"
-            title={gettext("Delete")}
+            phx-click="add_dow_line"
+            class="text-blue-600 hover:text-blue-800 flex items-center gap-1 text-sm"
           >
-            <.icon name="hero-trash" class="h-4 w-4" />
+            <.icon name="hero-plus-circle" class="h-5 w-5" /> {gettext("Add line")}
+          </button>
+          <button
+            type="button"
+            phx-click="add_dow_line"
+            phx-value-separator="true"
+            class="text-gray-600 hover:text-gray-800 flex items-center gap-1 text-sm"
+          >
+            <.icon name="hero-minus" class="h-5 w-5" /> {gettext("Add separator")}
           </button>
         </div>
       </div>
-
-      <div class="flex gap-1 mt-1 font-semibold text-sm text-gray-700 border-t pt-1">
-        <div class="w-12 shrink-0"></div>
-        <div class="w-56 text-right">{gettext("Total")}</div>
-        <div :for={grade <- @grades} class="w-20 text-center">
-          {Enum.reduce(@dow_params, 0, fn line, acc ->
-            if line["delete"] == "true" or line["is_separator"] in [true, "true"],
-              do: acc,
-              else: acc + to_int((line["quantities"] || %{})[grade])
-          end)}
-        </div>
-        <div class="w-20 text-center">
-          {Enum.reduce(@grades, 0, fn g, acc ->
-            acc +
-              Enum.reduce(@dow_params, 0, fn line, a ->
-                if line["delete"] == "true" or line["is_separator"] in [true, "true"],
-                  do: a,
-                  else: a + to_int((line["quantities"] || %{})[g])
-              end)
-          end)}
-        </div>
-      </div>
-    </.form>
-
-    <div class="mt-2 flex gap-3">
-      <button
-        type="button"
-        phx-click="add_dow_line"
-        class="text-blue-600 hover:text-blue-800 flex items-center gap-1 text-sm"
-      >
-        <.icon name="hero-plus-circle" class="h-5 w-5" /> {gettext("Add line")}
-      </button>
-      <button
-        type="button"
-        phx-click="add_dow_line"
-        phx-value-separator="true"
-        class="text-gray-600 hover:text-gray-800 flex items-center gap-1 text-sm"
-      >
-        <.icon name="hero-minus" class="h-5 w-5" /> {gettext("Add separator")}
-      </button>
-    </div>
-    </div>
     </div>
     """
   end
@@ -1898,7 +1949,12 @@ defmodule FullCircleWeb.EggStockLive.Form do
     assigns = assign(assigns, :productions, productions)
 
     ~H"""
-    <.summary_row label={gettext("Production")} grades={@grades} values={@productions} bg="bg-green-50" />
+    <.summary_row
+      label={gettext("Production")}
+      grades={@grades}
+      values={@productions}
+      bg="bg-green-50"
+    />
     """
   end
 
@@ -1977,7 +2033,13 @@ defmodule FullCircleWeb.EggStockLive.Form do
       <div class="w-20 text-center">{gettext("Loss")}</div>
     </div>
 
-    <.summary_row label={gettext("Yield %")} grades={@grades} values={@yields} bg="bg-yellow-50" suffix="%" />
+    <.summary_row
+      label={gettext("Yield %")}
+      grades={@grades}
+      values={@yields}
+      bg="bg-yellow-50"
+      suffix="%"
+    />
     """
   end
 
@@ -2575,7 +2637,11 @@ defmodule FullCircleWeb.EggStockLive.Form do
             </div>
 
             <div class="flex items-center gap-3 mt-3">
-              <button type="button" phx-click="add_grade" class="text-blue-600 hover:text-blue-800 text-sm">
+              <button
+                type="button"
+                phx-click="add_grade"
+                class="text-blue-600 hover:text-blue-800 text-sm"
+              >
                 {gettext("Add grade")}
               </button>
               <button

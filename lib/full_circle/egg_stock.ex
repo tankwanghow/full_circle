@@ -209,7 +209,8 @@ defmodule FullCircle.EggStock do
 
   # --- Weekly DOW books (ODS-style 1–7) ---
 
-  def list_dow_lines(company_id, kind, dow) when kind in [:sales, :purchase, "sales", "purchase"] do
+  def list_dow_lines(company_id, kind, dow)
+      when kind in [:sales, :purchase, "sales", "purchase"] do
     kind = to_string(kind)
 
     from(l in DowTemplateLine,
@@ -331,7 +332,7 @@ defmodule FullCircle.EggStock do
       contact_id = blank_to_nil(params["contact_id"])
       quantities = params["quantities"] || %{}
 
-      (name != "" or not is_nil(contact_id)) or
+      name != "" or not is_nil(contact_id) or
         Enum.any?(quantities, fn {_k, v} -> to_int(v) != 0 end)
     end
   end
@@ -580,7 +581,9 @@ defmodule FullCircle.EggStock do
         true ->
           Enum.find(actuals, fn r ->
             rid = r.contact_id && to_string(r.contact_id)
-            rid && not MapSet.member?(used, rid) and names_match?(d.contact_name, r.contact_name)
+
+            (rid && not MapSet.member?(used, rid)) and
+              names_match?(d.contact_name, r.contact_name)
           end)
       end
 
@@ -875,7 +878,8 @@ defmodule FullCircle.EggStock do
         |> save_day(attrs, company, user)
         |> case do
           {:ok, updated} ->
-            {:ok, Repo.preload(updated, [egg_stock_day_details: __day_details_query__()], force: true)}
+            {:ok,
+             Repo.preload(updated, [egg_stock_day_details: __day_details_query__()], force: true)}
 
           other ->
             other
@@ -910,7 +914,8 @@ defmodule FullCircle.EggStock do
         |> save_day(attrs, company, user)
         |> case do
           {:ok, updated} ->
-            {:ok, Repo.preload(updated, [egg_stock_day_details: __day_details_query__()], force: true)}
+            {:ok,
+             Repo.preload(updated, [egg_stock_day_details: __day_details_query__()], force: true)}
 
           other ->
             other

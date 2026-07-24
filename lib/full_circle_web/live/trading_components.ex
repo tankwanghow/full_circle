@@ -159,8 +159,8 @@ defmodule FullCircleWeb.TradingComponents do
     <span :for={{part, i} <- Enum.with_index(@parts)}>
       <span :if={i > 0} class="text-zinc-400 mx-0.5">+</span>
       <span class={@place_cls}>{part.place}</span>
-      <span :if={part.qty} class={@qty_cls}> {part.qty}</span>
-      <span :if={part.qty && present?(@unit)} class={@unit_cls}> {@unit}</span>
+      <span :if={part.qty} class={@qty_cls}>{part.qty}</span>
+      <span :if={part.qty && present?(@unit)} class={@unit_cls}>{@unit}</span>
     </span>
     """
   end

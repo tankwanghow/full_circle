@@ -13,8 +13,12 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
       case socket.assigns.live_action do
         :new ->
           cond do
-            obj -> mount_new(obj, socket)
-            params["trading_loads"] not in [nil, ""] -> mount_new_from_trading(socket, params)
+            obj ->
+              mount_new(obj, socket)
+
+            params["trading_loads"] not in [nil, ""] ->
+              mount_new_from_trading(socket, params)
+
             params["trading_transport_drops"] not in [nil, ""] ->
               mount_new_from_transport(socket, params)
 
@@ -763,7 +767,8 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
          )}
 
       {:error, :not_linked} ->
-        {:noreply, put_flash(socket, :info, gettext("No trading links on this purchase invoice."))}
+        {:noreply,
+         put_flash(socket, :info, gettext("No trading links on this purchase invoice."))}
 
       :not_authorise ->
         {:noreply,
@@ -1008,9 +1013,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
             <.input
               field={@form[:contact_name]}
               label={gettext("Supplier")}
-              phx-hook={
-                if(@trading_settlement.linked?, do: nil, else: "tributeAutoComplete")
-              }
+              phx-hook={if(@trading_settlement.linked?, do: nil, else: "tributeAutoComplete")}
               readonly={@trading_settlement.linked?}
               url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
             />

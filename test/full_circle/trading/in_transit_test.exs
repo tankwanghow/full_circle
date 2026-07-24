@@ -88,7 +88,7 @@ defmodule FullCircle.Trading.InTransitTest do
     assert Decimal.eq?(Balances.supply_remaining(supply), Decimal.new("100"))
 
     board = Trading.warehouse_board(company, user)
-    row = Enum.find(board, &(&1.location.id == wh.id and &1.good && &1.good.id == good.id))
+    row = Enum.find(board, &((&1.location.id == wh.id and &1.good) && &1.good.id == good.id))
     assert row
     assert Decimal.eq?(row.on_hand, Decimal.new(0))
     assert Decimal.eq?(row.incoming, Decimal.new("20"))
@@ -180,7 +180,7 @@ defmodule FullCircle.Trading.InTransitTest do
       )
 
     board = Trading.warehouse_board(company, user)
-    row = Enum.find(board, &(&1.location.id == wh.id and &1.good && &1.good.id == good.id))
+    row = Enum.find(board, &((&1.location.id == wh.id and &1.good) && &1.good.id == good.id))
     assert row
     assert Decimal.eq?(row.on_hand, Decimal.new("40"))
     assert Decimal.eq?(row.outgoing, Decimal.new("15"))

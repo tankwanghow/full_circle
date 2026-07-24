@@ -184,7 +184,6 @@ defmodule FullCircle.Trading.SalesPositionTest do
     assert Decimal.eq?(Balances.soft_held_for_supply(supply.id), Decimal.new("35"))
   end
 
-
   test "fulfill allowed with undelivered remaining", %{admin: admin, company: company} do
     s = sales_position_fixture(company, admin, %{"quantity" => "35", "status" => "open"})
     assert Decimal.eq?(Balances.sales_undelivered(s), Decimal.new("35"))
@@ -218,7 +217,6 @@ defmodule FullCircle.Trading.SalesPositionTest do
     assert {:ok, cancelled} = Trading.cancel_sales_position(s, %{}, company, admin)
     assert cancelled.status == "cancelled"
   end
-
 
   test "list_open_sales returns draft, open and hold only", %{admin: admin, company: company} do
     open = sales_position_fixture(company, admin, %{"status" => "open"})

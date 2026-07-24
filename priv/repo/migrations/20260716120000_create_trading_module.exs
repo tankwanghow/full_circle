@@ -83,8 +83,8 @@ defmodule FullCircle.Repo.Migrations.CreateTradingModule do
     create index(:trading_supply_positions, [:good_id])
 
     create unique_index(:trading_supply_positions, [:company_id, :title],
-      name: :trading_supply_positions_unique_title_per_company
-    )
+             name: :trading_supply_positions_unique_title_per_company
+           )
   end
 
   defp create_sales_positions do
@@ -120,8 +120,8 @@ defmodule FullCircle.Repo.Migrations.CreateTradingModule do
     create index(:trading_sales_positions, [:preferred_supply_id])
 
     create unique_index(:trading_sales_positions, [:company_id, :title],
-      name: :trading_sales_positions_unique_title_per_company
-    )
+             name: :trading_sales_positions_unique_title_per_company
+           )
   end
 
   defp create_trips do
@@ -151,8 +151,8 @@ defmodule FullCircle.Repo.Migrations.CreateTradingModule do
     create index(:trading_trips, [:transport_agent_id])
 
     create unique_index(:trading_trips, [:company_id, :reference_no],
-      name: :trading_trips_unique_reference_no_per_company
-    )
+             name: :trading_trips_unique_reference_no_per_company
+           )
 
     create table(:trading_trip_loads, primary_key: false) do
       add :id, :binary_id, primary_key: true
@@ -221,10 +221,11 @@ defmodule FullCircle.Repo.Migrations.CreateTradingModule do
     create table(:trading_trip_load_employees, primary_key: false) do
       add :id, :binary_id, primary_key: true
 
-      add :trip_load_id, references(:trading_trip_loads, type: :binary_id, on_delete: :delete_all),
-        null: false
+      add :trip_load_id,
+          references(:trading_trip_loads, type: :binary_id, on_delete: :delete_all), null: false
 
-      add :employee_id, references(:employees, type: :binary_id, on_delete: :restrict), null: false
+      add :employee_id, references(:employees, type: :binary_id, on_delete: :restrict),
+        null: false
 
       timestamps(type: :utc_datetime)
     end
@@ -235,10 +236,11 @@ defmodule FullCircle.Repo.Migrations.CreateTradingModule do
     create table(:trading_trip_drop_employees, primary_key: false) do
       add :id, :binary_id, primary_key: true
 
-      add :trip_drop_id, references(:trading_trip_drops, type: :binary_id, on_delete: :delete_all),
-        null: false
+      add :trip_drop_id,
+          references(:trading_trip_drops, type: :binary_id, on_delete: :delete_all), null: false
 
-      add :employee_id, references(:employees, type: :binary_id, on_delete: :restrict), null: false
+      add :employee_id, references(:employees, type: :binary_id, on_delete: :restrict),
+        null: false
 
       timestamps(type: :utc_datetime)
     end

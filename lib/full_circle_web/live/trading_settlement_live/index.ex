@@ -775,8 +775,9 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
       <div class={["px-3 py-2 border-b font-bold flex flex-wrap gap-2 items-center", @header_class]}>
         <span class="text-base">{@title}</span>
         <span class="font-normal text-xs ml-auto">
-          {group_selectable_count(@rows, @stream)}/{length(@rows)} {gettext("billable")} ·
-          {group_mt(@rows)} {gettext("MT")}
+          {group_selectable_count(@rows, @stream)}/{length(@rows)} {gettext("billable")} · {group_mt(
+            @rows
+          )} {gettext("MT")}
         </span>
       </div>
 
@@ -1006,8 +1007,9 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
           </span>
           <span class="flex-1">{party_name}</span>
           <span class="font-normal text-xs">
-            {group_selectable_count(group_rows, @tab)}/{length(group_rows)} {gettext("billable")} ·
-            {group_mt(group_rows)} {gettext("MT")}
+            {group_selectable_count(group_rows, @tab)}/{length(group_rows)} {gettext("billable")} · {group_mt(
+              group_rows
+            )} {gettext("MT")}
           </span>
         </div>
         <.settlement_table
@@ -1061,7 +1063,7 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
         "flex gap-1 border-b p-2 text-sm items-center",
         selectable?(row, @stream) && "hover:bg-gray-50",
         settled?(row) && "bg-emerald-50/50",
-        !selectable?(row, @stream) and not settled?(row) && "opacity-60 bg-gray-50/80"
+        (!selectable?(row, @stream) and not settled?(row)) && "opacity-60 bg-gray-50/80"
       ]}
     >
       <div class="w-8">

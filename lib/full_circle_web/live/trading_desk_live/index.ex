@@ -361,7 +361,8 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
       end
     else
       case socket.assigns.live_action do
-        action when action in [:new_supply, :edit_supply, :new_sales, :edit_sales, :new_trip, :edit_trip] ->
+        action
+        when action in [:new_supply, :edit_supply, :new_sales, :edit_sales, :new_trip, :edit_trip] ->
           socket
           |> put_flash(:error, gettext("You are not authorised to perform this action"))
           |> push_patch(to: desk_path(socket))
@@ -430,7 +431,9 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
     end)
   end
 
-  defp warehouse_key(location_id, good_id) when is_binary(good_id), do: "#{location_id}:#{good_id}"
+  defp warehouse_key(location_id, good_id) when is_binary(good_id),
+    do: "#{location_id}:#{good_id}"
+
   defp warehouse_key(location_id, _), do: "#{location_id}:any"
 
   defp warehouse_row_selected?(load_keys, drop_keys, row) do
@@ -454,11 +457,21 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
 
   # Out and In are mutually exclusive per warehouse row (same location×good key).
   defp toggle_selection(socket, "warehouse_load", key, _good_id) do
-    toggle_warehouse_exclusive(socket, :selected_warehouse_load_keys, :selected_warehouse_drop_keys, key)
+    toggle_warehouse_exclusive(
+      socket,
+      :selected_warehouse_load_keys,
+      :selected_warehouse_drop_keys,
+      key
+    )
   end
 
   defp toggle_selection(socket, "warehouse_drop", key, _good_id) do
-    toggle_warehouse_exclusive(socket, :selected_warehouse_drop_keys, :selected_warehouse_load_keys, key)
+    toggle_warehouse_exclusive(
+      socket,
+      :selected_warehouse_drop_keys,
+      :selected_warehouse_load_keys,
+      key
+    )
   end
 
   defp toggle_selection(socket, _, _, _), do: socket
@@ -546,9 +559,7 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
     socket
     |> assign(
       :supply_all,
-      Trading.position_board(company, user,
-        statuses: supply_statuses_for_filter(f.supply.status)
-      )
+      Trading.position_board(company, user, statuses: supply_statuses_for_filter(f.supply.status))
     )
     |> assign(
       :sales_all,
@@ -843,6 +854,7 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
   defp trip_to_title(t), do: Enum.join(Trading.trip_to_names(t), ", ")
 
   defp nested_name(nil, _assoc), do: ""
+
   defp nested_name(parent, assoc) do
     case Map.get(parent, assoc) do
       nil -> ""
@@ -1017,7 +1029,8 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
                 id={"desk-supply-#{row.supply.id}"}
                 class={[
                   "flex gap-1 border-b px-2 py-1 text-xs md:text-sm items-center hover:bg-gray-100 dark:hover:bg-zinc-800",
-                  MapSet.member?(@selected_supply_ids, row.supply.id) && "bg-amber-50 dark:bg-amber-950/30",
+                  MapSet.member?(@selected_supply_ids, row.supply.id) &&
+                    "bg-amber-50 dark:bg-amber-950/30",
                   row.supply.status == "closed" && "opacity-70"
                 ]}
               >
@@ -1487,7 +1500,9 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
               <.trip_settle_chip
                 key="any"
                 label={gettext("Needs bill")}
-                title={gettext("Completed trips with any customer, supplier, or transport still unbilled")}
+                title={
+                  gettext("Completed trips with any customer, supplier, or transport still unbilled")
+                }
                 active?={MapSet.member?(@trip_settle_filters, "any")}
               />
               <.trip_settle_chip
@@ -1590,7 +1605,7 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
                   label={gettext("Vehicle")}
                   value={@filters.trips.vehicle}
                 />
-                <.filter_col  
+                <.filter_col
                   class="w-5/24"
                   table="trips"
                   field="from"
@@ -1978,9 +1993,7 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
         />
         <.link
           id={"desk-trip-settlement-#{@trip.id}"}
-          navigate={
-            ~p"/companies/#{@company.id}/trading/settlement?#{%{trip_id: @trip.id}}"
-          }
+          navigate={~p"/companies/#{@company.id}/trading/settlement?#{%{trip_id: @trip.id}}"}
           class="text-[10px] text-blue-600 hover:underline ml-1"
         >
           {gettext("Settlement")}

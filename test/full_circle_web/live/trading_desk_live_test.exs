@@ -682,7 +682,6 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
     assert html =~ "Beta Supplier Co"
   end
 
-
   test "trip settle filter chips filter unbilled completed trips", %{
     conn: conn,
     company: company,
@@ -784,7 +783,11 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
     refute has_element?(lv, "#desk-trip-#{draft.id}")
   end
 
-  test "settlement badges on completed trip and expand lines", %{conn: conn, company: company, user: user} do
+  test "settlement badges on completed trip and expand lines", %{
+    conn: conn,
+    company: company,
+    user: user
+  } do
     good = good_fixture(company, user)
     customer = contact_fixture(company, user)
     supplier = contact_fixture(company, user)
@@ -916,7 +919,9 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
     {:ok, trip, _} = FullCircle.Trading.complete_trip(trip, company, user)
     drop = hd(trip.drops)
     {:ok, attrs} = FullCircle.Trading.build_invoice_attrs_from_drop_ids([drop.id], company, user)
-    assert {:ok, _} = FullCircle.Trading.create_invoice_from_drops([drop.id], attrs, company, user)
+
+    assert {:ok, _} =
+             FullCircle.Trading.create_invoice_from_drops([drop.id], attrs, company, user)
 
     {:ok, lv, _} = live(conn, ~p"/companies/#{company.id}/trading/desk")
 
@@ -938,8 +943,11 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
         "status" => "open"
       })
 
-    load_loc = location_fixture(company, user, %{"kind" => "supplier_site", "name" => "BlankLoadLoc"})
-    drop_loc = location_fixture(company, user, %{"kind" => "own_warehouse", "name" => "BlankDropWh"})
+    load_loc =
+      location_fixture(company, user, %{"kind" => "supplier_site", "name" => "BlankLoadLoc"})
+
+    drop_loc =
+      location_fixture(company, user, %{"kind" => "own_warehouse", "name" => "BlankDropWh"})
 
     {:ok, lv, _} = live(conn, ~p"/companies/#{company.id}/trading/desk")
     lv |> element("#desk-new-trip") |> render_click()
