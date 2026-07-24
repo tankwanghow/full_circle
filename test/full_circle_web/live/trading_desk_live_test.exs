@@ -84,9 +84,7 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
 
     {:ok, lv, _html} = live(conn, ~p"/companies/#{company.id}/trading/desk")
 
-    # Default bill filter is "Needs bill" — clear so draft trips are visible
-    lv |> element("#desk-trip-settle-clear") |> render_click()
-
+    # Mount defaults status to "draft, planned" — draft trips are visible without clearing Bill chips
     assert has_element?(lv, "#desk_trips[data-trips-panel=shown]")
     assert has_element?(lv, "#desk-trip-#{trip.id}")
     assert has_element?(lv, "#desk_supply")
@@ -377,8 +375,7 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
     assert render(lv) =~ "Trip saved successfully"
     refute has_element?(lv, "#desk-selection-tray")
     assert has_element?(lv, "#desk-supply-#{other_supply.id}")
-    # Default Bill filter "Needs bill" hides draft trips
-    lv |> element("#desk-trip-settle-clear") |> render_click()
+    # Ops default status includes draft — new trips appear without clearing Bill chips
     assert render(lv) =~ "TRP-"
   end
 
@@ -539,7 +536,9 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
       })
 
     {:ok, lv, html} = live(conn, ~p"/companies/#{company.id}/trading/desk")
-    # default: active only
+    # default: active statuses prefilled in status boxes
+    assert html =~ ~s(value="open, hold, collect")
+    assert html =~ ~s(value="draft, open, hold")
     refute html =~ closed.title
     refute html =~ fulfilled.title
     assert html =~ open_supply.title
@@ -641,8 +640,6 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
     lv |> form("#desk-trip-form") |> render_submit()
 
     assert render(lv) =~ "Trip saved successfully"
-    # Default Bill filter "Needs bill" hides draft trips
-    lv |> element("#desk-trip-settle-clear") |> render_click()
     assert render(lv) =~ "TRP-"
   end
 
@@ -777,13 +774,22 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
 
     {:ok, lv, html} = live(conn, ~p"/companies/#{company.id}/trading/desk")
     assert has_element?(lv, "#desk-trip-settle-filters")
-    # Default: Needs bill is on
+    # Ops default: draft + planned; Bill chips off; completed trips hidden by status
     assert html =~ ~s(id="desk-trip-settle-any")
+    assert html =~ ~s(value="draft, planned") or html =~ "draft, planned"
+    assert has_element?(lv, "#desk-trip-#{draft.id}")
+    refute has_element?(lv, "#desk-trip-#{open_trip.id}")
+
+    # Bill chip forces status=completed and shows unbilled completed trips
+    lv |> element("#desk-trip-settle-any") |> render_click()
     assert has_element?(lv, "#desk-trip-#{open_trip.id}")
     refute has_element?(lv, "#desk-trip-#{draft.id}")
+    assert render(lv) =~ ~s(value="completed") or render(lv) =~ ">completed<"
 
     lv |> element("#desk-trip-settle-clear") |> render_click()
+    # Clear removes Bill chips and status filter — both draft and completed show
     assert has_element?(lv, "#desk-trip-#{draft.id}")
+    assert has_element?(lv, "#desk-trip-#{open_trip.id}")
 
     lv |> element("#desk-trip-settle-customer") |> render_click()
     assert has_element?(lv, "#desk-trip-#{open_trip.id}")
@@ -850,6 +856,9 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
     {:ok, trip, _} = FullCircle.Trading.complete_trip(trip, company, user)
 
     {:ok, lv, _html} = live(conn, ~p"/companies/#{company.id}/trading/desk")
+
+    # Ops default hides completed; Bill chip forces status=completed
+    lv |> element("#desk-trip-settle-any") |> render_click()
 
     html = render(lv)
     assert html =~ trip.reference_no
@@ -932,6 +941,15 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
 
     {:ok, lv, _} = live(conn, ~p"/companies/#{company.id}/trading/desk")
 
+    # Clear status filter so completed trips appear (ops default is draft, planned)
+    lv
+    |> form("#desk-filter-trips-status", %{
+      "table" => "trips",
+      "field" => "status",
+      "value" => "completed"
+    })
+    |> render_change()
+
     lv
     |> element("#desk-trip-#{trip.id} [phx-value-action=edit]")
     |> render_click()
@@ -1005,8 +1023,50 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
     lv |> form("#desk-trip-form") |> render_submit()
 
     assert render(lv) =~ "Trip saved successfully"
-    # Default Bill filter "Needs bill" hides draft trips
-    lv |> element("#desk-trip-settle-clear") |> render_click()
     assert render(lv) =~ "TRP-"
+  end
+
+  test "desk column filters support comma-OR tokens", %{
+    conn: conn,
+    company: company,
+    user: user
+  } do
+    good_open = good_fixture(company, user, %{"name" => "OrOpenGood"})
+    good_hold = good_fixture(company, user, %{"name" => "OrHoldGood"})
+    good_collect = good_fixture(company, user, %{"name" => "OrCollectGood"})
+
+    s_open =
+      supply_position_fixture(company, user, %{
+        "good_id" => good_open.id,
+        "status" => "open"
+      })
+
+    s_hold =
+      supply_position_fixture(company, user, %{
+        "good_id" => good_hold.id,
+        "status" => "hold"
+      })
+
+    s_collect =
+      supply_position_fixture(company, user, %{
+        "good_id" => good_collect.id,
+        "status" => "collect"
+      })
+
+    {:ok, lv, html} = live(conn, ~p"/companies/#{company.id}/trading/desk")
+    # Trip status default is comma-OR for ops statuses
+    assert html =~ "draft, planned"
+
+    lv
+    |> form("#desk-filter-supply-status", %{
+      "table" => "supply",
+      "field" => "status",
+      "value" => "open, hold"
+    })
+    |> render_change()
+
+    assert has_element?(lv, "#desk-supply-#{s_open.id}")
+    assert has_element?(lv, "#desk-supply-#{s_hold.id}")
+    refute has_element?(lv, "#desk-supply-#{s_collect.id}")
   end
 end

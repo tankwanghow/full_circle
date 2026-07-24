@@ -11,6 +11,13 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
     "trips" => ~w(date ref vehicle from to good agent status)
   }
 
+  # Default status text shown in filter boxes (comma = OR in filter_rows).
+  @supply_active_status "open, hold, collect"
+  @sales_active_status "draft, open, hold"
+  # Ops-default trip status. Bill chips force "completed".
+  @trip_ops_status "draft, planned"
+  @trip_billing_status "completed"
+
   @impl true
   def mount(_params, _session, socket) do
     company = socket.assigns.current_company
@@ -25,7 +32,8 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
        |> assign(warehouse_history: nil)
        |> assign(trips_panel: :shown)
        |> assign(trip_detail_ids: MapSet.new())
-       |> assign(trip_settle_filters: MapSet.new(["any"]))
+       # Ops-first: no Bill chips on mount (billing only applies to completed trips)
+       |> assign(trip_settle_filters: MapSet.new())
        |> assign(can_manage: Authorization.can?(user, :manage_trading, company))
        |> assign(filters: empty_filters())
        |> assign_empty_selection()
@@ -90,11 +98,31 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
         MapSet.put(set, key)
       end
 
-    {:noreply, socket |> assign(trip_settle_filters: set) |> apply_filters()}
+    # Bill chips only make sense for completed trips. Turning the last chip off
+    # restores the ops default (draft + planned).
+    status =
+      if MapSet.size(set) > 0 do
+        @trip_billing_status
+      else
+        @trip_ops_status
+      end
+
+    filters = put_in(socket.assigns.filters, [Access.key!(:trips), Access.key!(:status)], status)
+
+    {:noreply,
+     socket
+     |> assign(trip_settle_filters: set, filters: filters)
+     |> apply_filters()}
   end
 
   def handle_event("clear_trip_settle_filters", _, socket) do
-    {:noreply, socket |> assign(trip_settle_filters: MapSet.new()) |> apply_filters()}
+    # Clear Bill chips and the status text box (does not restore ops default)
+    filters = put_in(socket.assigns.filters, [Access.key!(:trips), Access.key!(:status)], "")
+
+    {:noreply,
+     socket
+     |> assign(trip_settle_filters: MapSet.new(), filters: filters)
+     |> apply_filters()}
   end
 
   def handle_event("toggle_trip_detail", %{"id" => id}, socket) do
@@ -539,10 +567,25 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
 
   defp empty_filters do
     %{
-      supply: %{no: "", supplier: "", good: "", status: ""},
+      supply: %{no: "", supplier: "", good: "", status: @supply_active_status},
       warehouse: %{location: "", good: ""},
-      sales: %{no: "", customer: "", good: "", status: "", need_by: ""},
-      trips: %{date: "", ref: "", vehicle: "", from: "", to: "", good: "", agent: "", status: ""}
+      sales: %{
+        no: "",
+        customer: "",
+        good: "",
+        status: @sales_active_status,
+        need_by: ""
+      },
+      trips: %{
+        date: "",
+        ref: "",
+        vehicle: "",
+        from: "",
+        to: "",
+        good: "",
+        agent: "",
+        status: @trip_ops_status
+      }
     }
   end
 
@@ -591,8 +634,8 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
 
   defp maybe_reload_for_status_filter(socket, _, _), do: socket
 
-  # Empty status → active only. If the typed text matches an inactive status
-  # (prefix or substring), include those so the client filter can surface them.
+  # Empty status → active only. Comma-OR tokens that match inactive statuses
+  # (e.g. "closed" or "open, closed") are included so the client filter can show them.
   defp supply_statuses_for_filter(status_q) do
     expand_statuses_for_filter(
       status_q,
@@ -610,21 +653,24 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
   end
 
   defp expand_statuses_for_filter(status_q, active, all) do
-    q = status_q |> to_string() |> String.trim() |> String.downcase()
-    inactive = all -- active
+    tokens = filter_tokens(status_q)
 
-    if q == "" do
+    if tokens == [] do
       active
     else
-      matched_inactive =
-        Enum.filter(inactive, fn s ->
-          String.starts_with?(s, q) or String.contains?(s, q)
+      matched =
+        Enum.filter(all, fn s ->
+          Enum.any?(tokens, fn t ->
+            String.starts_with?(s, t) or String.contains?(s, t)
+          end)
         end)
 
-      if matched_inactive == [] do
+      if matched == [] do
         active
       else
-        Enum.uniq(active ++ matched_inactive)
+        # Keep active rows loaded so a partial token does not empty the board
+        # before the client filter applies; inactive matches are added for typing.
+        Enum.uniq(active ++ matched)
       end
     end
   end
@@ -801,22 +847,34 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
     }
   end
 
+  # Comma-delimited tokens are OR'd (trimmed, case-insensitive substring match).
+  # Example: status "draft, planned" matches draft OR planned.
   defp filter_rows(rows, filters, field_fn) do
     Enum.reduce(filters, rows, fn {field, query}, acc ->
-      q = query |> as_text() |> String.trim() |> String.downcase()
+      tokens = filter_tokens(query)
 
-      if q == "" do
+      if tokens == [] do
         acc
       else
         Enum.filter(acc, fn row ->
-          row
-          |> field_fn.(field)
-          |> as_text()
-          |> String.downcase()
-          |> String.contains?(q)
+          value =
+            row
+            |> field_fn.(field)
+            |> as_text()
+            |> String.downcase()
+
+          Enum.any?(tokens, &String.contains?(value, &1))
         end)
       end
     end)
+  end
+
+  defp filter_tokens(query) do
+    query
+    |> as_text()
+    |> String.split(",", trim: true)
+    |> Enum.map(&(&1 |> String.trim() |> String.downcase()))
+    |> Enum.reject(&(&1 == ""))
   end
 
   defp as_text(nil), do: ""
@@ -1080,7 +1138,7 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
                   >
                     {row.supply.good && row.supply.good.name}
                   </div>
-                  <div class="w-3/24 min-w-0 truncate">{row.supply.status}</div>
+                  <div class="w-3/24 min-w-0 truncate text-center">{row.supply.status}</div>
                   <div class={[
                     "w-3/24 min-w-0 text-right font-semibold",
                     remaining_class(row.remaining)
@@ -1306,10 +1364,10 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
                   label={gettext("Good")}
                   value={@filters.sales.good}
                 />
-                <.plain_col class="w-3/24" label={gettext("Undeliv")} align="right" />
+                <.plain_col class="w-2/24" label={gettext("Undeliv")} align="right" />
                 <.plain_col class="w-2/24" label={gettext("Transit")} align="right" />
                 <.filter_col
-                  class="w-2/24"
+                  class="w-3/24"
                   table="sales"
                   field="status"
                   label={gettext("Status")}
@@ -1375,7 +1433,7 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
                   {row.sales.good && row.sales.good.name}
                 </div>
                 <div class={[
-                  "w-3/24 min-w-0 text-right font-semibold",
+                  "w-2/24 min-w-0 text-right font-semibold",
                   undelivered_class(row.undelivered)
                 ]}>
                   {row.undelivered}
@@ -1393,7 +1451,7 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
                     id={row.sales.id}
                   />
                 </div>
-                <div class="w-2/24 min-w-0 truncate">{row.sales.status}</div>
+                <div class="w-3/24 min-w-0 truncate text-center">{row.sales.status}</div>
                 <div class="w-3/24 min-w-0 truncate">{row.sales.available_from || "—"}</div>
               </div>
             </div>
@@ -1979,7 +2037,7 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
           >
             {(@trip.transport_agent && @trip.transport_agent.name) || "—"}
           </div>
-          <div class="w-2/24 min-w-0 truncate">{@trip.status}</div>
+          <div class="w-2/24 min-w-0 truncate text-center">{@trip.status}</div>
         </div>
       </div>
       <div

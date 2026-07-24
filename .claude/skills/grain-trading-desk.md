@@ -49,10 +49,18 @@ inline (still one trip, not split into multi rows).
 **Desk trips panel:** `trips_panel` assign `:shown` (default ~28% height) | `:hidden`
 (header only) | `:maximized` (hides supply/warehouse/sales, trips fill remaining height).
 Controls: Show / Hide / Maximize / Restore on the trips header.
-**Trip bill filters:** sticky chips under trips header — **Needs bill** (default on) /
+**Column filters:** comma-separated tokens are **OR** (trimmed, case-insensitive
+substring). Status boxes show defaults on mount:
+- Supplies: `open, hold, collect`
+- Sales: `draft, open, hold`
+- Trips: `draft, planned`
+
+**Trip bill filters:** sticky chips under trips header — **Needs bill** /
 **Cust unbilled** / **Supp unbilled** / **Haul unbilled** (multi-select OR on
-`trip_settlement_badges` open|partial). **Clear** resets. Title shows `shown/all`
-when any filter active.
+`trip_settlement_badges` open|partial). Mount is **ops-first**: Bill chips off.
+Turning a Bill chip on forces trip status `completed`; last chip off restores
+`draft, planned`. **Clear** clears chips **and** the trip status box. Title shows
+`shown/all` when any filter active.
 See `docs/superpowers/specs/2026-07-23-trading-settlement-invoicing-design.md`.
 
 ## Status machines
