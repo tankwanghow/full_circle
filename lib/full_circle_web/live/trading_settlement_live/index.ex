@@ -4,6 +4,8 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
   alias FullCircle.Trading
   alias FullCircle.Authorization
 
+  @streams ~w(customer supplier transport)
+
   @impl true
   def mount(_params, _session, socket) do
     company = socket.assigns.current_company
@@ -15,12 +17,18 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
        |> assign(page_title: gettext("Trading Settlement"))
        |> assign(tab: "customer")
        |> assign(selected: MapSet.new())
+       |> assign(selected_by_stream: empty_selected_by_stream())
        |> assign(modal: nil)
+       |> assign(trip_filter: nil)
        |> assign(can_manage: Authorization.can?(user, :manage_trading, company))
        |> assign(can_invoice: Authorization.can?(user, :create_invoice, company))
        |> assign(can_pur_invoice: Authorization.can?(user, :create_pur_invoice, company))
        |> assign(filters: %{"party_id" => "", "from_date" => "", "to_date" => ""})
-       |> load_rows()}
+       |> assign(rows: [])
+       |> assign(groups: %{})
+       |> assign(customer_rows: [])
+       |> assign(supplier_rows: [])
+       |> assign(transport_rows: [])}
     else
       {:ok,
        socket
@@ -30,13 +38,23 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
   end
 
   @impl true
-  def handle_event("set_tab", %{"tab" => tab}, socket) when tab in ["customer", "supplier"] do
-    {:noreply,
-     socket
-     |> assign(tab: tab)
-     |> assign(selected: MapSet.new())
-     |> assign(filters: %{"party_id" => "", "from_date" => "", "to_date" => ""})
-     |> load_rows()}
+  def handle_params(params, _uri, socket) do
+    {:noreply, socket |> apply_trip_filter(params["trip_id"]) |> load_rows()}
+  end
+
+  @impl true
+  def handle_event("set_tab", %{"tab" => tab}, socket)
+      when tab in @streams do
+    if socket.assigns.trip_filter do
+      {:noreply, socket}
+    else
+      {:noreply,
+       socket
+       |> assign(tab: tab)
+       |> assign(selected: MapSet.new())
+       |> assign(filters: %{"party_id" => "", "from_date" => "", "to_date" => ""})
+       |> load_rows()}
+    end
   end
 
   def handle_event("open_trip", %{"id" => id}, socket) do
@@ -53,6 +71,30 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
 
   def handle_event("close_modal", _params, socket) do
     {:noreply, assign(socket, modal: nil)}
+  end
+
+  def handle_event("toggle", %{"id" => id, "stream" => stream}, socket)
+      when stream in @streams do
+    rows = rows_for_stream(socket, stream)
+    row = Enum.find(rows, &(&1.id == id))
+
+    if row && selectable?(row, stream) do
+      selected_set = Map.get(socket.assigns.selected_by_stream, stream, MapSet.new())
+
+      selected_set =
+        if MapSet.member?(selected_set, id) do
+          MapSet.delete(selected_set, id)
+        else
+          MapSet.put(selected_set, id)
+        end
+
+      {:noreply,
+       assign(socket,
+         selected_by_stream: Map.put(socket.assigns.selected_by_stream, stream, selected_set)
+       )}
+    else
+      {:noreply, socket}
+    end
   end
 
   def handle_event("toggle", %{"id" => id}, socket) do
@@ -73,10 +115,37 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
     end
   end
 
+  def handle_event("toggle_party", %{"party_id" => party_id, "stream" => stream}, socket)
+      when stream in @streams do
+    rows = rows_for_stream(socket, stream)
+
+    ids =
+      rows
+      |> Enum.filter(&(party_id_of(&1, stream) == party_id and selectable?(&1, stream)))
+      |> Enum.map(& &1.id)
+
+    selected_set = Map.get(socket.assigns.selected_by_stream, stream, MapSet.new())
+    all_selected? = ids != [] and Enum.all?(ids, &MapSet.member?(selected_set, &1))
+
+    selected_set =
+      if all_selected? do
+        Enum.reduce(ids, selected_set, &MapSet.delete(&2, &1))
+      else
+        Enum.reduce(ids, selected_set, &MapSet.put(&2, &1))
+      end
+
+    {:noreply,
+     assign(socket,
+       selected_by_stream: Map.put(socket.assigns.selected_by_stream, stream, selected_set)
+     )}
+  end
+
   def handle_event("toggle_party", %{"party_id" => party_id}, socket) do
+    tab = socket.assigns.tab
+
     ids =
       socket.assigns.rows
-      |> Enum.filter(&(party_id_of(&1, socket.assigns.tab) == party_id and selectable?(&1, socket.assigns.tab)))
+      |> Enum.filter(&(party_id_of(&1, tab) == party_id and selectable?(&1, tab)))
       |> Enum.map(& &1.id)
 
     all_selected? = ids != [] and Enum.all?(ids, &MapSet.member?(socket.assigns.selected, &1))
@@ -92,17 +161,37 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
   end
 
   def handle_event("filter", %{"filters" => filters}, socket) do
-    {:noreply,
-     socket
-     |> assign(filters: filters)
-     |> assign(selected: MapSet.new())
-     |> load_rows()}
+    if socket.assigns.trip_filter do
+      {:noreply, socket}
+    else
+      {:noreply,
+       socket
+       |> assign(filters: filters)
+       |> assign(selected: MapSet.new())
+       |> load_rows()}
+    end
+  end
+
+  def handle_event("create_doc", %{"stream" => stream}, socket) when stream in @streams do
+    ids =
+      socket.assigns.selected_by_stream
+      |> Map.get(stream, MapSet.new())
+      |> MapSet.to_list()
+
+    case stream do
+      "customer" -> create_customer_invoice(socket, ids, stream)
+      "supplier" -> create_supplier_pur_invoice(socket, ids, stream)
+      "transport" -> create_transport_pur_invoice(socket, ids, stream)
+    end
   end
 
   def handle_event("create_doc", _params, socket) do
+    ids = MapSet.to_list(socket.assigns.selected)
+
     case socket.assigns.tab do
-      "customer" -> create_customer_invoice(socket)
-      "supplier" -> create_supplier_pur_invoice(socket)
+      "customer" -> create_customer_invoice(socket, ids, nil)
+      "supplier" -> create_supplier_pur_invoice(socket, ids, nil)
+      "transport" -> create_transport_pur_invoice(socket, ids, nil)
     end
   end
 
@@ -128,10 +217,9 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
      |> load_rows()}
   end
 
-  defp create_customer_invoice(socket) do
+  defp create_customer_invoice(socket, ids, stream) do
     company = socket.assigns.current_company
     user = socket.assigns.current_user
-    ids = MapSet.to_list(socket.assigns.selected)
 
     cond do
       not socket.assigns.can_invoice ->
@@ -162,7 +250,7 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
             {:noreply,
              socket
              |> put_flash(:error, gettext("Some drops are no longer eligible for invoicing"))
-             |> assign(selected: MapSet.new())
+             |> clear_selection(stream)
              |> load_rows()}
 
           :not_authorise ->
@@ -175,10 +263,9 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
     end
   end
 
-  defp create_supplier_pur_invoice(socket) do
+  defp create_supplier_pur_invoice(socket, ids, stream) do
     company = socket.assigns.current_company
     user = socket.assigns.current_user
-    ids = MapSet.to_list(socket.assigns.selected)
 
     cond do
       not socket.assigns.can_pur_invoice ->
@@ -209,7 +296,7 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
             {:noreply,
              socket
              |> put_flash(:error, gettext("Some loads are no longer eligible for billing"))
-             |> assign(selected: MapSet.new())
+             |> clear_selection(stream)
              |> load_rows()}
 
           :not_authorise ->
@@ -223,7 +310,111 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
     end
   end
 
+  defp create_transport_pur_invoice(socket, ids, stream) do
+    company = socket.assigns.current_company
+    user = socket.assigns.current_user
+
+    cond do
+      not socket.assigns.can_pur_invoice ->
+        {:noreply,
+         put_flash(socket, :error, gettext("You are not authorised to perform this action"))}
+
+      ids == [] ->
+        {:noreply, put_flash(socket, :error, gettext("Select at least one haul line"))}
+
+      true ->
+        case Trading.build_pur_invoice_attrs_from_transport_drop_ids(ids, company, user) do
+          {:ok, _attrs} ->
+            {:noreply,
+             push_navigate(socket,
+               to:
+                 ~p"/companies/#{company.id}/PurInvoice/new?#{%{trading_transport_drops: Enum.join(ids, ",")}}"
+             )}
+
+          {:error, :mixed_agents} ->
+            {:noreply,
+             put_flash(
+               socket,
+               :error,
+               gettext("Selected haul lines must belong to the same transport agent")
+             )}
+
+          {:error, :ineligible_transport} ->
+            {:noreply,
+             socket
+             |> put_flash(:error, gettext("Some haul lines are no longer eligible for billing"))
+             |> clear_selection(stream)
+             |> load_rows()}
+
+          :not_authorise ->
+            {:noreply,
+             put_flash(socket, :error, gettext("You are not authorised to perform this action"))}
+
+          {:error, _} ->
+            {:noreply,
+             put_flash(socket, :error, gettext("Cannot create purchase invoice from selection"))}
+        end
+    end
+  end
+
+  defp apply_trip_filter(socket, trip_id) when trip_id in [nil, ""] do
+    assign(socket, trip_filter: nil)
+  end
+
+  defp apply_trip_filter(socket, trip_id) when is_binary(trip_id) do
+    company = socket.assigns.current_company
+    user = socket.assigns.current_user
+
+    try do
+      trip = Trading.get_trip!(trip_id, company, user)
+
+      assign(socket,
+        trip_filter: %{id: trip.id, reference_no: trip.reference_no},
+        selected_by_stream: empty_selected_by_stream()
+      )
+    rescue
+      Ecto.NoResultsError ->
+        socket
+        |> put_flash(:error, gettext("Trip not found for settlement filter"))
+        |> assign(trip_filter: nil)
+    end
+  end
+
   defp load_rows(socket) do
+    if socket.assigns.trip_filter do
+      load_trip_page(socket)
+    else
+      load_board_tab(socket)
+    end
+  end
+
+  defp load_trip_page(socket) do
+    company = socket.assigns.current_company
+    user = socket.assigns.current_user
+    trip_id = socket.assigns.trip_filter.id
+    opts = [trip_id: trip_id]
+
+    customer_rows = Trading.list_uninvoiced_drops(company, user, opts)
+    supplier_rows = Trading.list_unbilled_loads(company, user, opts)
+    transport_rows = Trading.list_unbilled_transport_lines(company, user, opts)
+
+    by =
+      socket.assigns.selected_by_stream
+      |> prune_selected("customer", customer_rows)
+      |> prune_selected("supplier", supplier_rows)
+      |> prune_selected("transport", transport_rows)
+
+    socket
+    |> assign(customer_rows: customer_rows)
+    |> assign(supplier_rows: supplier_rows)
+    |> assign(transport_rows: transport_rows)
+    |> assign(selected_by_stream: by)
+    |> assign(rows: [])
+    |> assign(groups: %{})
+    |> assign(selected: MapSet.new())
+  end
+
+  defp load_board_tab(socket) do
     company = socket.assigns.current_company
     user = socket.assigns.current_user
     filters = socket.assigns.filters
@@ -239,6 +430,7 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
       case tab do
         "customer" -> Trading.list_uninvoiced_drops(company, user, opts)
         "supplier" -> Trading.list_unbilled_loads(company, user, opts)
+        "transport" -> Trading.list_unbilled_transport_lines(company, user, opts)
       end
 
     selectable_ids =
@@ -246,26 +438,73 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
       |> Enum.filter(&selectable?(&1, tab))
       |> MapSet.new(& &1.id)
 
-    selected = MapSet.intersection(socket.assigns.selected, selectable_ids)
+    selected = MapSet.intersection(socket.assigns.selected || MapSet.new(), selectable_ids)
     groups = Enum.group_by(rows, &party_key(&1, tab))
 
     socket
     |> assign(rows: rows)
     |> assign(selected: selected)
     |> assign(groups: groups)
+    |> assign(customer_rows: [])
+    |> assign(supplier_rows: [])
+    |> assign(transport_rows: [])
   end
+
+  defp empty_selected_by_stream do
+    %{"customer" => MapSet.new(), "supplier" => MapSet.new(), "transport" => MapSet.new()}
+  end
+
+  defp prune_selected(by, stream, rows) do
+    ids =
+      rows
+      |> Enum.filter(&selectable?(&1, stream))
+      |> MapSet.new(& &1.id)
+
+    Map.put(by, stream, MapSet.intersection(Map.get(by, stream, MapSet.new()), ids))
+  end
+
+  defp clear_selection(socket, nil), do: assign(socket, selected: MapSet.new())
+
+  defp clear_selection(socket, stream) when stream in @streams do
+    by = Map.put(socket.assigns.selected_by_stream, stream, MapSet.new())
+    assign(socket, selected_by_stream: by, selected: MapSet.new())
+  end
+
+  defp rows_for_stream(socket, "customer"), do: socket.assigns.customer_rows
+  defp rows_for_stream(socket, "supplier"), do: socket.assigns.supplier_rows
+  defp rows_for_stream(socket, "transport"), do: socket.assigns.transport_rows
+  defp rows_for_stream(_, _), do: []
 
   defp party_opt_key("customer"), do: :customer_id
   defp party_opt_key("supplier"), do: :supplier_id
+  defp party_opt_key("transport"), do: :agent_id
 
   defp party_key(row, "customer"), do: {row.customer_id, row.customer_name}
   defp party_key(row, "supplier"), do: {row.supplier_id, row.supplier_name}
+  defp party_key(row, "transport"), do: {row.agent_id, row.agent_name}
 
   defp party_id_of(row, "customer"), do: row.customer_id
   defp party_id_of(row, "supplier"), do: row.supplier_id
+  defp party_id_of(row, "transport"), do: row.agent_id
 
   defp selectable?(row, "customer"), do: row.invoiceable
   defp selectable?(row, "supplier"), do: row.billable
+  defp selectable?(row, "transport"), do: row.billable
+
+  defp settled?(%{doc_id: id}) when not is_nil(id), do: true
+  defp settled?(_), do: false
+
+  defp settlement_doc_path(company, %{doc_id: id, doc_kind: "invoice"}) when not is_nil(id) do
+    ~p"/companies/#{company.id}/Invoice/#{id}/edit"
+  end
+
+  defp settlement_doc_path(company, %{doc_id: id, doc_kind: "pur_invoice"}) when not is_nil(id) do
+    ~p"/companies/#{company.id}/PurInvoice/#{id}/edit"
+  end
+
+  defp settlement_doc_path(company, %{doc_id: id}) when not is_nil(id) do
+    ~p"/companies/#{company.id}/Invoice/#{id}/edit"
+  end
 
   defp maybe_opt(opts, _key, nil), do: opts
   defp maybe_opt(opts, key, val), do: Keyword.put(opts, key, val)
@@ -301,6 +540,7 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
       case tab do
         "customer" -> {r.customer_name, r.customer_id}
         "supplier" -> {r.supplier_name, r.supplier_id}
+        "transport" -> {r.agent_name, r.agent_id}
       end
     end)
     |> Enum.uniq_by(fn {_n, id} -> id end)
@@ -317,7 +557,7 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
   defp status_class("draft"), do: "bg-gray-100 text-gray-600"
   defp status_class(_), do: "bg-gray-100 text-gray-600"
 
-  defp group_selectable_count(rows, tab), do: Enum.count(rows, &selectable?(&1, tab))
+  defp group_selectable_count(rows, stream), do: Enum.count(rows, &selectable?(&1, stream))
 
   defp group_mt(rows) do
     Enum.reduce(rows, Decimal.new(0), fn r, a -> Decimal.add(a, display_mt(r) || 0) end)
@@ -325,12 +565,18 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
 
   defp position_title(row, "customer"), do: row.sales_title
   defp position_title(row, "supplier"), do: row.supply_title
+  defp position_title(row, "transport"), do: row.from_location_name || "—"
+
+  defp location_display(row, "transport"), do: row.to_location_name || row.location_name
+  defp location_display(row, _), do: row.location_name
 
   defp action_label("customer"), do: gettext("Create Invoice")
   defp action_label("supplier"), do: gettext("Create Purchase Invoice")
+  defp action_label("transport"), do: gettext("Create Transport Bill")
 
   defp can_create?(%{tab: "customer", can_invoice: true}), do: true
   defp can_create?(%{tab: "supplier", can_pur_invoice: true}), do: true
+  defp can_create?(%{tab: "transport", can_pur_invoice: true}), do: true
   defp can_create?(_), do: false
 
   defp help_text("customer") do
@@ -345,20 +591,273 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
     )
   end
 
-  defp empty_text("customer"), do: gettext("No sales deliveries to show.")
-  defp empty_text("supplier"), do: gettext("No commercial loads to show.")
+  defp help_text("transport") do
+    gettext(
+      "Agent haul lines (one per drop with origin→destination). Only completed agent trips with actual MT can be selected. Enter haulage RM on the purchase invoice."
+    )
+  end
+
+  defp empty_text("customer"), do: gettext("No sales deliveries for this trip.")
+  defp empty_text("supplier"), do: gettext("No commercial loads for this trip.")
+  defp empty_text("transport"), do: gettext("No transport haul lines for this trip.")
+
+  defp board_empty_text("customer"), do: gettext("No sales deliveries to show.")
+  defp board_empty_text("supplier"), do: gettext("No commercial loads to show.")
+  defp board_empty_text("transport"), do: gettext("No transport haul lines to show.")
 
   defp party_filter_label("customer"), do: gettext("Customer")
   defp party_filter_label("supplier"), do: gettext("Supplier")
+  defp party_filter_label("transport"), do: gettext("Transport agent")
 
   defp all_parties_label("customer"), do: gettext("All customers")
   defp all_parties_label("supplier"), do: gettext("All suppliers")
+  defp all_parties_label("transport"), do: gettext("All agents")
 
   defp position_col_label("customer"), do: gettext("Sales")
   defp position_col_label("supplier"), do: gettext("Supply")
+  defp position_col_label("transport"), do: gettext("From")
+
+  defp location_col_label("transport"), do: gettext("To")
+  defp location_col_label(_), do: gettext("Location")
+
+  defp stream_title("customer"), do: gettext("Customer Invoice")
+  defp stream_title("supplier"), do: gettext("Supplier Bill")
+  defp stream_title("transport"), do: gettext("Transport Bill")
+
+  defp stream_header_class("customer"), do: "bg-emerald-200 border-emerald-500 text-emerald-950"
+  defp stream_header_class("supplier"), do: "bg-amber-200 border-amber-500 text-amber-950"
+  defp stream_header_class("transport"), do: "bg-sky-200 border-sky-500 text-sky-950"
 
   @impl true
   def render(assigns) do
+    ~H"""
+    <div class="mx-auto w-11/12 max-w-6xl">
+      <%= if @trip_filter do %>
+        <.trip_settlement_page
+          trip_filter={@trip_filter}
+          current_company={@current_company}
+          can_manage={@can_manage}
+          can_invoice={@can_invoice}
+          can_pur_invoice={@can_pur_invoice}
+          customer_rows={@customer_rows}
+          supplier_rows={@supplier_rows}
+          transport_rows={@transport_rows}
+          selected_by_stream={@selected_by_stream}
+          modal={@modal}
+          current_user={@current_user}
+        />
+      <% else %>
+        <.board_settlement_page
+          page_title={@page_title}
+          tab={@tab}
+          filters={@filters}
+          rows={@rows}
+          groups={@groups}
+          selected={@selected}
+          current_company={@current_company}
+          can_manage={@can_manage}
+          can_invoice={@can_invoice}
+          can_pur_invoice={@can_pur_invoice}
+          modal={@modal}
+          current_user={@current_user}
+        />
+      <% end %>
+    </div>
+    """
+  end
+
+  # --- Trip-only page: all three bill streams, no tabs/filters ---
+
+  attr :trip_filter, :map, required: true
+  attr :current_company, :any, required: true
+  attr :current_user, :any, required: true
+  attr :can_manage, :boolean, required: true
+  attr :can_invoice, :boolean, required: true
+  attr :can_pur_invoice, :boolean, required: true
+  attr :customer_rows, :list, required: true
+  attr :supplier_rows, :list, required: true
+  attr :transport_rows, :list, required: true
+  attr :selected_by_stream, :map, required: true
+  attr :modal, :any, required: true
+
+  defp trip_settlement_page(assigns) do
+    ~H"""
+    <div id="settlement-trip-page">
+      <p class="w-full text-3xl text-center font-medium">
+        {gettext("Trip Settlement")}
+        <span class="font-mono text-2xl text-violet-800">{@trip_filter.reference_no}</span>
+      </p>
+      <div class="text-center mb-4">
+        <.link
+          id="settlement-back-desk"
+          navigate={~p"/companies/#{@current_company.id}/trading/desk"}
+          class="gray button"
+        >
+          {gettext("Back to Trading Desk")}
+        </.link>
+      </div>
+      <p class="text-sm text-center text-gray-600 mb-6">
+        {gettext(
+          "Customer invoice, supplier bill, and transport bill for this trip. Select unbilled lines and create a document; billed lines link to the existing Invoice or PurInvoice."
+        )}
+      </p>
+
+      <.stream_panel
+        stream="customer"
+        title={stream_title("customer")}
+        header_class={stream_header_class("customer")}
+        rows={@customer_rows}
+        selected={Map.get(@selected_by_stream, "customer", MapSet.new())}
+        current_company={@current_company}
+        can_manage={@can_manage}
+        can_create={@can_invoice}
+        create_id="create-trading-doc-customer"
+      />
+      <.stream_panel
+        stream="supplier"
+        title={stream_title("supplier")}
+        header_class={stream_header_class("supplier")}
+        rows={@supplier_rows}
+        selected={Map.get(@selected_by_stream, "supplier", MapSet.new())}
+        current_company={@current_company}
+        can_manage={@can_manage}
+        can_create={@can_pur_invoice}
+        create_id="create-trading-doc-supplier"
+      />
+      <.stream_panel
+        stream="transport"
+        title={stream_title("transport")}
+        header_class={stream_header_class("transport")}
+        rows={@transport_rows}
+        selected={Map.get(@selected_by_stream, "transport", MapSet.new())}
+        current_company={@current_company}
+        can_manage={@can_manage}
+        can_create={@can_pur_invoice}
+        create_id="create-trading-doc-transport"
+      />
+
+      <.settlement_trip_modal
+        modal={@modal}
+        current_company={@current_company}
+        current_user={@current_user}
+      />
+    </div>
+    """
+  end
+
+  attr :stream, :string, required: true
+  attr :title, :string, required: true
+  attr :header_class, :string, required: true
+  attr :rows, :list, required: true
+  attr :selected, :any, required: true
+  attr :current_company, :any, required: true
+  attr :can_manage, :boolean, required: true
+  attr :can_create, :boolean, required: true
+  attr :create_id, :string, required: true
+
+  defp stream_panel(assigns) do
+    groups = Enum.group_by(assigns.rows, &party_key(&1, assigns.stream))
+    selected_count = MapSet.size(assigns.selected)
+    selected_mt = selected_total_mt(assigns.rows, assigns.selected)
+
+    assigns =
+      assign(assigns,
+        groups: groups,
+        selected_count: selected_count,
+        selected_mt: selected_mt
+      )
+
+    ~H"""
+    <section
+      id={"settlement-stream-#{@stream}"}
+      class="mb-8 border-2 rounded-lg overflow-hidden border-zinc-300 bg-white dark:bg-zinc-900"
+    >
+      <div class={["px-3 py-2 border-b font-bold flex flex-wrap gap-2 items-center", @header_class]}>
+        <span class="text-base">{@title}</span>
+        <span class="font-normal text-xs ml-auto">
+          {group_selectable_count(@rows, @stream)}/{length(@rows)} {gettext("billable")} ·
+          {group_mt(@rows)} {gettext("MT")}
+        </span>
+      </div>
+
+      <div class="flex flex-wrap gap-3 items-center px-3 py-2 border-b bg-zinc-50 text-sm">
+        <span>
+          {gettext("Selected")}: <strong>{@selected_count}</strong>
+          · {gettext("MT")}: <strong>{@selected_mt}</strong>
+        </span>
+        <button
+          :if={@can_create}
+          type="button"
+          phx-click="create_doc"
+          phx-value-stream={@stream}
+          id={@create_id}
+          class="blue button text-sm py-0.5"
+          disabled={@selected_count == 0}
+        >
+          {action_label(@stream)}
+        </button>
+        <span :if={!@can_create} class="text-amber-700 text-xs">
+          {case @stream do
+            "customer" -> gettext("You need invoice permission to settle drops.")
+            _ -> gettext("You need purchase-invoice permission to bill.")
+          end}
+        </span>
+      </div>
+
+      <div :if={@rows == []} class="text-center text-gray-500 py-6 text-sm">
+        {empty_text(@stream)}
+      </div>
+
+      <div
+        :for={{{party_id, party_name}, group_rows} <- @groups}
+        class="border-t border-zinc-200"
+      >
+        <div class="bg-zinc-100 px-3 py-1.5 flex gap-2 items-center text-sm font-semibold">
+          <button
+            :if={group_selectable_count(group_rows, @stream) > 0}
+            type="button"
+            phx-click="toggle_party"
+            phx-value-party_id={party_id}
+            phx-value-stream={@stream}
+            class="underline text-blue-800 font-normal text-xs"
+            id={"toggle-party-#{@stream}-#{party_id}"}
+          >
+            {gettext("Toggle all billable")}
+          </button>
+          <span class="flex-1">{party_name}</span>
+          <span class="font-normal text-xs text-zinc-600">
+            {group_selectable_count(group_rows, @stream)}/{length(group_rows)} {gettext("billable")}
+          </span>
+        </div>
+        <.settlement_table
+          stream={@stream}
+          group_rows={group_rows}
+          selected={@selected}
+          current_company={@current_company}
+          can_manage={@can_manage}
+          compact_trip={true}
+        />
+      </div>
+    </section>
+    """
+  end
+
+  # --- Full settlement board (unfiltered) ---
+
+  attr :page_title, :string, required: true
+  attr :tab, :string, required: true
+  attr :filters, :map, required: true
+  attr :rows, :list, required: true
+  attr :groups, :map, required: true
+  attr :selected, :any, required: true
+  attr :current_company, :any, required: true
+  attr :current_user, :any, required: true
+  attr :can_manage, :boolean, required: true
+  attr :can_invoice, :boolean, required: true
+  attr :can_pur_invoice, :boolean, required: true
+  attr :modal, :any, required: true
+
+  defp board_settlement_page(assigns) do
     assigns =
       assign(assigns,
         selected_count: MapSet.size(assigns.selected),
@@ -366,7 +865,7 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
       )
 
     ~H"""
-    <div class="mx-auto w-11/12 max-w-6xl">
+    <div id="settlement-board-page">
       <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <div class="text-center mb-3 flex flex-wrap gap-2 justify-center">
         <.link navigate={~p"/companies/#{@current_company.id}/trading/desk"} class="gray button">
@@ -397,6 +896,19 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
           ]}
         >
           {gettext("Supplier bills")}
+        </button>
+        <button
+          type="button"
+          id="tab-transport"
+          phx-click="set_tab"
+          phx-value-tab="transport"
+          class={[
+            "button",
+            @tab == "transport" && "blue",
+            @tab != "transport" && "gray"
+          ]}
+        >
+          {gettext("Transport bills")}
         </button>
       </div>
 
@@ -460,14 +972,15 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
           {action_label(@tab)}
         </button>
         <span :if={!can_create?(assigns)} class="text-sm text-amber-700">
-          {if @tab == "customer",
-            do: gettext("You need invoice permission to settle drops."),
-            else: gettext("You need purchase-invoice permission to bill loads.")}
+          {case @tab do
+            "customer" -> gettext("You need invoice permission to settle drops.")
+            _ -> gettext("You need purchase-invoice permission to bill.")
+          end}
         </span>
       </div>
 
       <div :if={@rows == []} class="text-center text-gray-500 py-8 border rounded">
-        {empty_text(@tab)}
+        {board_empty_text(@tab)}
       </div>
 
       <div
@@ -497,99 +1010,174 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
             {group_mt(group_rows)} {gettext("MT")}
           </span>
         </div>
-        <div class="bg-gray-100 font-semibold p-2 flex gap-1 text-xs border-b">
-          <div class="w-8"></div>
-          <div class="w-2/12">{gettext("Date")}</div>
-          <div class="w-2/12">{gettext("Trip")}</div>
-          <div class="w-1/12">{gettext("Status")}</div>
-          <div class="w-2/12">{position_col_label(@tab)}</div>
-          <div class="w-2/12">{gettext("Good")}</div>
-          <div class="w-2/12">{gettext("Location")}</div>
-          <div class="w-1/12 text-right">{gettext("MT")}</div>
-          <div class="w-1/12 text-right">{gettext("Price")}</div>
-        </div>
-        <div
-          :for={row <- group_rows}
-          id={"settlement-row-#{row.id}"}
-          class={[
-            "flex gap-1 border-b p-2 text-sm items-center",
-            selectable?(row, @tab) && "hover:bg-gray-50",
-            !selectable?(row, @tab) && "opacity-60 bg-gray-50/80"
-          ]}
-        >
-          <div class="w-8">
-            <input
-              :if={selectable?(row, @tab)}
-              type="checkbox"
-              phx-click="toggle"
-              phx-value-id={row.id}
-              checked={MapSet.member?(@selected, row.id)}
-              id={"select-row-#{row.id}"}
-            />
-            <span
-              :if={!selectable?(row, @tab)}
-              class="inline-block w-4 text-center text-gray-400"
-              title={gettext("Complete the trip before billing")}
-            >
-              —
-            </span>
-          </div>
-          <div class="w-2/12">{row.trip_date}</div>
-          <div class="w-2/12 font-mono text-xs">
-            <button
-              :if={@can_manage}
-              type="button"
-              id={"open-trip-#{row.trip_id}-#{row.id}"}
-              phx-click="open_trip"
-              phx-value-id={row.trip_id}
-              class="text-blue-600 hover:underline font-medium text-left"
-              title={gettext("Edit trip")}
-            >
-              {row.trip_reference_no}
-            </button>
-            <span :if={!@can_manage}>{row.trip_reference_no}</span>
-          </div>
-          <div class="w-1/12">
-            <span class={["px-1.5 py-0.5 rounded text-xs font-medium", status_class(row.trip_status)]}>
-              {status_label(row.trip_status)}
-            </span>
-          </div>
-          <div class="w-2/12 font-mono text-xs">{position_title(row, @tab)}</div>
-          <div class="w-2/12">{row.good_name}</div>
-          <div class="w-2/12">{row.location_name}</div>
-          <div class="w-1/12 text-right tabular-nums">
-            {display_mt(row)}
-            <span
-              :if={is_nil(row.actual_mt) and not is_nil(row.planned_mt)}
-              class="text-xs text-gray-400"
-              title={gettext("Planned (no actual yet)")}
-            >
-              *
-            </span>
-          </div>
-          <div class="w-1/12 text-right tabular-nums">{row.unit_price || "—"}</div>
-        </div>
+        <.settlement_table
+          stream={@tab}
+          group_rows={group_rows}
+          selected={@selected}
+          current_company={@current_company}
+          can_manage={@can_manage}
+          compact_trip={false}
+        />
       </div>
 
-      <.modal
-        :if={@modal}
-        id="settlement-trip-modal"
-        show
-        max_w="max-w-7xl"
-        on_cancel={JS.push("close_modal")}
-      >
-        <.live_component
-          :if={@modal.kind == :trip}
-          module={FullCircleWeb.TradingDeskLive.TripFormComponent}
-          id={"settlement-trip-form-lc-#{@modal[:form_key] || @modal[:id] || "new"}"}
-          company={@current_company}
-          user={@current_user}
-          action={@modal.action}
-          trip_id={@modal.id}
-          prefill={@modal[:prefill]}
-        />
-      </.modal>
+      <.settlement_trip_modal
+        modal={@modal}
+        current_company={@current_company}
+        current_user={@current_user}
+      />
     </div>
+    """
+  end
+
+  attr :stream, :string, required: true
+  attr :group_rows, :list, required: true
+  attr :selected, :any, required: true
+  attr :current_company, :any, required: true
+  attr :can_manage, :boolean, required: true
+  attr :compact_trip, :boolean, default: false
+
+  defp settlement_table(assigns) do
+    ~H"""
+    <div class="bg-gray-100 font-semibold p-2 flex gap-1 text-xs border-b">
+      <div class="w-8"></div>
+      <div :if={!@compact_trip} class="w-2/12">{gettext("Date")}</div>
+      <div :if={!@compact_trip} class="w-2/12">{gettext("Trip")}</div>
+      <div :if={!@compact_trip} class="w-1/12">{gettext("Status")}</div>
+      <div class={if(@compact_trip, do: "w-3/12", else: "w-2/12")}>
+        {position_col_label(@stream)}
+      </div>
+      <div class="w-2/12">{gettext("Good")}</div>
+      <div class={if(@compact_trip, do: "w-3/12", else: "w-2/12")}>
+        {location_col_label(@stream)}
+      </div>
+      <div class="w-1/12 text-right">{gettext("MT")}</div>
+      <div class="w-1/12 text-right">{gettext("Price")}</div>
+      <div class="w-2/12">{gettext("Bill")}</div>
+    </div>
+    <div
+      :for={row <- @group_rows}
+      id={"settlement-row-#{row.id}"}
+      class={[
+        "flex gap-1 border-b p-2 text-sm items-center",
+        selectable?(row, @stream) && "hover:bg-gray-50",
+        settled?(row) && "bg-emerald-50/50",
+        !selectable?(row, @stream) and not settled?(row) && "opacity-60 bg-gray-50/80"
+      ]}
+    >
+      <div class="w-8">
+        <input
+          :if={selectable?(row, @stream) and @compact_trip}
+          type="checkbox"
+          phx-click="toggle"
+          phx-value-id={row.id}
+          phx-value-stream={@stream}
+          checked={MapSet.member?(@selected, row.id)}
+          id={"select-row-#{row.id}"}
+        />
+        <input
+          :if={selectable?(row, @stream) and not @compact_trip}
+          type="checkbox"
+          phx-click="toggle"
+          phx-value-id={row.id}
+          checked={MapSet.member?(@selected, row.id)}
+          id={"select-row-#{row.id}"}
+        />
+        <span
+          :if={settled?(row)}
+          class="inline-block w-4 text-center text-emerald-600"
+          title={gettext("Already billed")}
+        >
+          ✓
+        </span>
+        <span
+          :if={!selectable?(row, @stream) and not settled?(row)}
+          class="inline-block w-4 text-center text-gray-400"
+          title={gettext("Complete the trip before billing")}
+        >
+          —
+        </span>
+      </div>
+      <div :if={!@compact_trip} class="w-2/12">{row.trip_date}</div>
+      <div :if={!@compact_trip} class="w-2/12 font-mono text-xs">
+        <button
+          :if={@can_manage}
+          type="button"
+          id={"open-trip-#{row.trip_id}-#{row.id}"}
+          phx-click="open_trip"
+          phx-value-id={row.trip_id}
+          class="text-blue-600 hover:underline font-medium text-left"
+          title={gettext("Edit trip")}
+        >
+          {row.trip_reference_no}
+        </button>
+        <span :if={!@can_manage}>{row.trip_reference_no}</span>
+      </div>
+      <div :if={!@compact_trip} class="w-1/12">
+        <span class={["px-1.5 py-0.5 rounded text-xs font-medium", status_class(row.trip_status)]}>
+          {status_label(row.trip_status)}
+        </span>
+      </div>
+      <div class={[
+        "font-mono text-xs",
+        if(@compact_trip, do: "w-3/12", else: "w-2/12")
+      ]}>
+        {position_title(row, @stream)}
+      </div>
+      <div class="w-2/12">{row.good_name}</div>
+      <div class={if(@compact_trip, do: "w-3/12", else: "w-2/12")}>
+        {location_display(row, @stream)}
+      </div>
+      <div class="w-1/12 text-right tabular-nums">
+        {display_mt(row)}
+        <span
+          :if={is_nil(row.actual_mt) and not is_nil(row.planned_mt)}
+          class="text-xs text-gray-400"
+          title={gettext("Planned (no actual yet)")}
+        >
+          *
+        </span>
+      </div>
+      <div class="w-1/12 text-right tabular-nums">{row.unit_price || "—"}</div>
+      <div class="w-2/12 min-w-0">
+        <.link
+          :if={settled?(row)}
+          id={"settlement-doc-#{row.id}"}
+          navigate={settlement_doc_path(@current_company, row)}
+          class="text-xs font-medium text-emerald-800 hover:underline truncate block"
+          title={gettext("Open billed document")}
+        >
+          {row.doc_no || gettext("Open bill")}
+        </.link>
+        <span :if={not settled?(row)} class="text-xs text-gray-400">—</span>
+      </div>
+    </div>
+    """
+  end
+
+  attr :modal, :any, required: true
+  attr :current_company, :any, required: true
+  attr :current_user, :any, required: true
+
+  defp settlement_trip_modal(assigns) do
+    ~H"""
+    <.modal
+      :if={@modal}
+      id="settlement-trip-modal"
+      show
+      max_w="max-w-7xl"
+      on_cancel={JS.push("close_modal")}
+    >
+      <.live_component
+        :if={@modal.kind == :trip}
+        module={FullCircleWeb.TradingDeskLive.TripFormComponent}
+        id={"settlement-trip-form-lc-#{@modal[:form_key] || @modal[:id] || "new"}"}
+        company={@current_company}
+        user={@current_user}
+        action={@modal.action}
+        trip_id={@modal.id}
+        prefill={@modal[:prefill]}
+      />
+    </.modal>
     """
   end
 end

@@ -44,9 +44,76 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
     assert has_element?(lv, "#desk_supply")
     assert has_element?(lv, "#desk_warehouse")
     assert has_element?(lv, "#desk_sales")
-    # trips panel collapsed by default
-    assert has_element?(lv, "#desk-trips-toggle")
+    # trips panel shown by default (no rows until trips exist)
+    assert has_element?(lv, "#desk_trips[data-trips-panel=shown]")
+    assert has_element?(lv, "#desk-trips-hide")
+    assert has_element?(lv, "#desk-trips-maximize")
     refute has_element?(lv, "#desk-trip-")
+  end
+
+  test "trips panel show hide maximize", %{conn: conn, company: company, user: user} do
+    good = good_fixture(company, user)
+    load_loc = location_fixture(company, user, %{"kind" => "supplier_site"})
+    drop_loc = location_fixture(company, user, %{"kind" => "own_warehouse"})
+
+    {:ok, trip} =
+      FullCircle.Trading.create_trip(
+        %{
+          "date" => Date.utc_today() |> Date.to_iso8601(),
+          "transport_mode" => "company_own",
+          "vehicle_number" => "MAX001",
+          "status" => "draft",
+          "loads" => [
+            %{
+              "planned_mt" => "10",
+              "good_id" => good.id,
+              "location_id" => load_loc.id
+            }
+          ],
+          "drops" => [
+            %{
+              "planned_mt" => "10",
+              "good_id" => good.id,
+              "location_id" => drop_loc.id
+            }
+          ]
+        },
+        company,
+        user
+      )
+
+    {:ok, lv, _html} = live(conn, ~p"/companies/#{company.id}/trading/desk")
+
+    # Default bill filter is "Needs bill" — clear so draft trips are visible
+    lv |> element("#desk-trip-settle-clear") |> render_click()
+
+    assert has_element?(lv, "#desk_trips[data-trips-panel=shown]")
+    assert has_element?(lv, "#desk-trip-#{trip.id}")
+    assert has_element?(lv, "#desk_supply")
+
+    lv |> element("#desk-trips-hide") |> render_click()
+    assert has_element?(lv, "#desk_trips[data-trips-panel=hidden]")
+    refute has_element?(lv, "#desk-trip-#{trip.id}")
+    assert has_element?(lv, "#desk-trips-show")
+    assert has_element?(lv, "#desk_supply")
+
+    lv |> element("#desk-trips-show") |> render_click()
+    assert has_element?(lv, "#desk_trips[data-trips-panel=shown]")
+    assert has_element?(lv, "#desk-trip-#{trip.id}")
+
+    lv |> element("#desk-trips-maximize") |> render_click()
+    assert has_element?(lv, "#desk_trips[data-trips-panel=maximized]")
+    assert has_element?(lv, "#desk-trip-#{trip.id}")
+    refute has_element?(lv, "#desk_supply")
+    refute has_element?(lv, "#desk_warehouse")
+    refute has_element?(lv, "#desk_sales")
+    assert has_element?(lv, "#desk-trips-restore")
+    assert has_element?(lv, "#desk-trips-hide")
+
+    lv |> element("#desk-trips-restore") |> render_click()
+    assert has_element?(lv, "#desk_trips[data-trips-panel=shown]")
+    assert has_element?(lv, "#desk_supply")
+    assert has_element?(lv, "#desk-trip-#{trip.id}")
   end
 
   test "click transit qty opens trip list then trip modal", %{
@@ -308,8 +375,6 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
     assert render(lv) =~ "Trip saved successfully"
     refute has_element?(lv, "#desk-selection-tray")
     assert has_element?(lv, "#desk-supply-#{other_supply.id}")
-
-    lv |> element("#desk-trips-toggle") |> render_click()
     assert render(lv) =~ "TRP-"
   end
 
@@ -571,7 +636,6 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
     lv |> form("#desk-trip-form") |> render_submit()
 
     assert render(lv) =~ "Trip saved successfully"
-    lv |> element("#desk-trips-toggle") |> render_click()
     assert render(lv) =~ "TRP-"
   end
 
@@ -616,6 +680,253 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
 
     assert html =~ "Alpha Supplier Co"
     assert html =~ "Beta Supplier Co"
+  end
+
+
+  test "trip settle filter chips filter unbilled completed trips", %{
+    conn: conn,
+    company: company,
+    user: user
+  } do
+    good = good_fixture(company, user)
+    customer = contact_fixture(company, user)
+    supplier = contact_fixture(company, user)
+
+    supply =
+      supply_position_fixture(company, user, %{
+        "good_id" => good.id,
+        "supplier_id" => supplier.id,
+        "status" => "collect",
+        "quantity" => "100"
+      })
+
+    sales =
+      sales_position_fixture(company, user, %{
+        "good_id" => good.id,
+        "customer_id" => customer.id,
+        "status" => "open"
+      })
+
+    port = location_fixture(company, user, %{"kind" => "port"})
+    site = location_fixture(company, user, %{"kind" => "customer_site"})
+    wh = location_fixture(company, user, %{"kind" => "own_warehouse"})
+
+    {:ok, open_trip} =
+      FullCircle.Trading.create_trip(
+        %{
+          "date" => "2026-07-20",
+          "transport_mode" => "company_own",
+          "vehicle_number" => "OPEN1",
+          "loads" => [
+            %{
+              "planned_mt" => "10",
+              "actual_mt" => "10",
+              "good_id" => good.id,
+              "location_id" => port.id,
+              "supply_position_id" => supply.id
+            }
+          ],
+          "drops" => [
+            %{
+              "planned_mt" => "10",
+              "actual_mt" => "10",
+              "good_id" => good.id,
+              "location_id" => site.id,
+              "sales_position_id" => sales.id,
+              "supply_position_id" => supply.id
+            }
+          ]
+        },
+        company,
+        user
+      )
+
+    {:ok, open_trip, _} = FullCircle.Trading.complete_trip(open_trip, company, user)
+
+    {:ok, draft} =
+      FullCircle.Trading.create_trip(
+        %{
+          "date" => "2026-07-21",
+          "transport_mode" => "company_own",
+          "vehicle_number" => "DRAFT1",
+          "loads" => [
+            %{
+              "planned_mt" => "5",
+              "good_id" => good.id,
+              "location_id" => port.id,
+              "supply_position_id" => supply.id
+            }
+          ],
+          "drops" => [
+            %{
+              "planned_mt" => "5",
+              "good_id" => good.id,
+              "location_id" => wh.id
+            }
+          ]
+        },
+        company,
+        user
+      )
+
+    {:ok, lv, html} = live(conn, ~p"/companies/#{company.id}/trading/desk")
+    assert has_element?(lv, "#desk-trip-settle-filters")
+    # Default: Needs bill is on
+    assert html =~ ~s(id="desk-trip-settle-any")
+    assert has_element?(lv, "#desk-trip-#{open_trip.id}")
+    refute has_element?(lv, "#desk-trip-#{draft.id}")
+
+    lv |> element("#desk-trip-settle-clear") |> render_click()
+    assert has_element?(lv, "#desk-trip-#{draft.id}")
+
+    lv |> element("#desk-trip-settle-customer") |> render_click()
+    assert has_element?(lv, "#desk-trip-#{open_trip.id}")
+    refute has_element?(lv, "#desk-trip-#{draft.id}")
+  end
+
+  test "settlement badges on completed trip and expand lines", %{conn: conn, company: company, user: user} do
+    good = good_fixture(company, user)
+    customer = contact_fixture(company, user)
+    supplier = contact_fixture(company, user)
+
+    supply =
+      supply_position_fixture(company, user, %{
+        "good_id" => good.id,
+        "supplier_id" => supplier.id,
+        "status" => "collect",
+        "quantity" => "100"
+      })
+
+    sales =
+      sales_position_fixture(company, user, %{
+        "good_id" => good.id,
+        "customer_id" => customer.id,
+        "status" => "open"
+      })
+
+    port = location_fixture(company, user, %{"kind" => "port"})
+    site = location_fixture(company, user, %{"kind" => "customer_site"})
+
+    {:ok, trip} =
+      FullCircle.Trading.create_trip(
+        %{
+          "date" => "2026-07-20",
+          "transport_mode" => "company_own",
+          "vehicle_number" => "BADGE1",
+          "loads" => [
+            %{
+              "planned_mt" => "10",
+              "actual_mt" => "10",
+              "good_id" => good.id,
+              "location_id" => port.id,
+              "supply_position_id" => supply.id
+            }
+          ],
+          "drops" => [
+            %{
+              "planned_mt" => "10",
+              "actual_mt" => "10",
+              "good_id" => good.id,
+              "location_id" => site.id,
+              "sales_position_id" => sales.id,
+              "supply_position_id" => supply.id
+            }
+          ]
+        },
+        company,
+        user
+      )
+
+    {:ok, trip, _} = FullCircle.Trading.complete_trip(trip, company, user)
+
+    {:ok, lv, _html} = live(conn, ~p"/companies/#{company.id}/trading/desk")
+
+    html = render(lv)
+    assert html =~ trip.reference_no
+    assert html =~ "Customer uninvoiced"
+    assert html =~ "Supplier unbilled"
+    assert html =~ "Transport n/a"
+    assert has_element?(lv, "#desk-trip-settle-#{trip.id}")
+
+    lv |> element("#desk-trip-expand-#{trip.id}") |> render_click()
+    html = render(lv)
+    assert html =~ "Loads"
+    assert html =~ "Drops"
+    assert html =~ supply.title
+    assert html =~ sales.title
+  end
+
+  test "edit completed settled trip hides cancel action", %{
+    conn: conn,
+    company: company,
+    user: user
+  } do
+    good = good_fixture(company, user)
+    customer = contact_fixture(company, user)
+    supplier = contact_fixture(company, user)
+
+    supply =
+      supply_position_fixture(company, user, %{
+        "good_id" => good.id,
+        "supplier_id" => supplier.id,
+        "status" => "collect",
+        "quantity" => "100"
+      })
+
+    sales =
+      sales_position_fixture(company, user, %{
+        "good_id" => good.id,
+        "customer_id" => customer.id,
+        "status" => "open"
+      })
+
+    port = location_fixture(company, user, %{"kind" => "port"})
+    site = location_fixture(company, user, %{"kind" => "customer_site"})
+
+    {:ok, trip} =
+      FullCircle.Trading.create_trip(
+        %{
+          "date" => "2026-07-21",
+          "transport_mode" => "company_own",
+          "vehicle_number" => "NOCAN1",
+          "loads" => [
+            %{
+              "planned_mt" => "5",
+              "actual_mt" => "5",
+              "good_id" => good.id,
+              "location_id" => port.id,
+              "supply_position_id" => supply.id
+            }
+          ],
+          "drops" => [
+            %{
+              "planned_mt" => "5",
+              "actual_mt" => "5",
+              "good_id" => good.id,
+              "location_id" => site.id,
+              "sales_position_id" => sales.id,
+              "supply_position_id" => supply.id
+            }
+          ]
+        },
+        company,
+        user
+      )
+
+    {:ok, trip, _} = FullCircle.Trading.complete_trip(trip, company, user)
+    drop = hd(trip.drops)
+    {:ok, attrs} = FullCircle.Trading.build_invoice_attrs_from_drop_ids([drop.id], company, user)
+    assert {:ok, _} = FullCircle.Trading.create_invoice_from_drops([drop.id], attrs, company, user)
+
+    {:ok, lv, _} = live(conn, ~p"/companies/#{company.id}/trading/desk")
+
+    lv
+    |> element("#desk-trip-#{trip.id} [phx-value-action=edit]")
+    |> render_click()
+
+    assert has_element?(lv, "#desk-trip-form")
+    refute has_element?(lv, "#desk-trip-cancel")
+    assert has_element?(lv, "#desk-trip-cancel-blocked")
   end
 
   test "desk new trip modal saves and lists trip", %{conn: conn, company: company, user: user} do
@@ -678,7 +989,6 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
     lv |> form("#desk-trip-form") |> render_submit()
 
     assert render(lv) =~ "Trip saved successfully"
-    lv |> element("#desk-trips-toggle") |> render_click()
     assert render(lv) =~ "TRP-"
   end
 end

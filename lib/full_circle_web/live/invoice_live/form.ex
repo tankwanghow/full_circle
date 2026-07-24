@@ -104,6 +104,7 @@ defmodule FullCircleWeb.InvoiceLive.Form do
       |> assign(page_title: gettext("New Invoice"))
       |> assign(matched_trans: [])
       |> assign(trading_drop_ids: trading_drop_ids)
+      |> assign(trading_settlement: %{linked?: false, line_count: 0, actual_mt_sum: 0, trip_refs: []})
       |> assign_egg_link(params, :sales)
       |> assign(:form, to_form(cs))
 
@@ -189,17 +190,22 @@ defmodule FullCircleWeb.InvoiceLive.Form do
   end
 
   defp mount_edit(socket, id) do
+    company = socket.assigns.current_company
+
     object =
       Billing.get_invoice!(
         id,
-        socket.assigns.current_company,
+        company,
         socket.assigns.current_user
       )
+
+    settlement = FullCircle.Trading.invoice_settlement_info(id, company)
 
     socket
     |> assign(live_action: :edit)
     |> assign(id: id)
     |> assign(trading_drop_ids: [])
+    |> assign(trading_settlement: settlement)
     |> assign(page_title: gettext("Edit Invoice") <> " " <> object.invoice_no)
     |> assign(matched_trans: Billing.get_matcher_by("Invoice", id))
     |> assign(
@@ -209,7 +215,7 @@ defmodule FullCircleWeb.InvoiceLive.Form do
           Invoice,
           object,
           %{},
-          socket.assigns.current_company,
+          company,
           socket.assigns.current_user
         )
       )
@@ -569,19 +575,60 @@ defmodule FullCircleWeb.InvoiceLive.Form do
     end
   end
 
+  def handle_event("unlink_trading_settlement", _, socket) do
+    company = socket.assigns.current_company
+    user = socket.assigns.current_user
+    invoice = socket.assigns.form.data
+
+    case FullCircle.Trading.unlink_invoice_settlement(invoice, company, user) do
+      {:ok, %{unlinked: n}} ->
+        settlement = FullCircle.Trading.invoice_settlement_info(invoice.id, company)
+
+        {:noreply,
+         socket
+         |> assign(trading_settlement: settlement)
+         |> put_flash(
+           :info,
+           gettext("Unlinked %{n} trading drop(s). They can be settled again.", n: n)
+         )}
+
+      {:error, :not_linked} ->
+        {:noreply, put_flash(socket, :info, gettext("No trading links on this invoice."))}
+
+      :not_authorise ->
+        {:noreply,
+         put_flash(socket, :error, gettext("You are not authorised to perform this action"))}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, gettext("Failed to unlink trading settlement"))}
+    end
+  end
+
   defp save(socket, :edit, params) do
-    case Billing.update_invoice(
-           socket.assigns.form.data,
-           params,
-           socket.assigns.current_company,
-           socket.assigns.current_user
-         ) do
+    invoice = socket.assigns.form.data
+    company = socket.assigns.current_company
+    user = socket.assigns.current_user
+
+    if FullCircle.Trading.contact_change_blocked_for_invoice?(invoice, params) do
+      {:noreply,
+       put_flash(
+         socket,
+         :error,
+         gettext(
+           "Customer cannot be changed while this invoice is linked to trading drops. Unlink trading settlement first."
+         )
+       )}
+    else
+      do_update_invoice(socket, invoice, params, company, user)
+    end
+  end
+
+  defp do_update_invoice(socket, invoice, params, company, user) do
+    case Billing.update_invoice(invoice, params, company, user) do
       {:ok, %{update_invoice: obj}} ->
         {:noreply,
          socket
-         |> push_navigate(
-           to: ~p"/companies/#{socket.assigns.current_company.id}/Invoice/#{obj.id}/edit"
-         )
+         |> push_navigate(to: ~p"/companies/#{company.id}/Invoice/#{obj.id}/edit")
          |> put_flash(:info, "#{gettext("Invoice updated successfully.")}")}
 
       {:error, failed_operation, changeset, _} ->
@@ -624,6 +671,41 @@ defmodule FullCircleWeb.InvoiceLive.Form do
   end
 
   defp validate(params, socket) do
+    if socket.assigns.live_action == :edit and
+         FullCircle.Trading.contact_change_blocked_for_invoice?(
+           socket.assigns.form.data,
+           params
+         ) do
+      # Keep previous contact on form; surface error via flash-style assign on changeset
+      params =
+        params
+        |> Map.put("contact_id", socket.assigns.form.data.contact_id)
+        |> Map.put(
+          "contact_name",
+          socket.assigns.form.data.contact_name || socket.assigns.form[:contact_name].value
+        )
+
+      changeset =
+        Billing.make_changeset(
+          Invoice,
+          socket.assigns.form.data,
+          params,
+          socket.assigns.current_company,
+          socket.assigns.current_user
+        )
+        |> Map.put(:action, socket.assigns.live_action)
+        |> Ecto.Changeset.add_error(
+          :contact_name,
+          gettext("locked while linked to trading drops — unlink first")
+        )
+
+      {:noreply, assign(socket, form: to_form(changeset))}
+    else
+      validate_invoice_params(params, socket)
+    end
+  end
+
+  defp validate_invoice_params(params, socket) do
     changeset =
       Billing.make_changeset(
         Invoice,
@@ -645,6 +727,36 @@ defmodule FullCircleWeb.InvoiceLive.Form do
     <div class="w-11/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
       <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <.error_box changeset={@form.source} />
+      <div
+        :if={@live_action == :edit and @trading_settlement.linked?}
+        class="mb-3 rounded border border-amber-600 bg-amber-50 px-3 py-2 text-sm"
+        id="trading-settlement-banner"
+      >
+        <p class="font-medium text-amber-900">
+          {gettext("Linked to trading settlement")}
+        </p>
+        <p class="text-amber-800 mt-1">
+          {gettext(
+            "%{n} drop(s) · %{mt} MT · trips: %{trips}. Customer is locked. Unlink if the match was wrong; commercial qty/price edits are allowed.",
+            n: @trading_settlement.line_count,
+            mt: @trading_settlement.actual_mt_sum,
+            trips: Enum.join(@trading_settlement.trip_refs, ", ")
+          )}
+        </p>
+        <button
+          type="button"
+          id="unlink-trading-settlement"
+          phx-click="unlink_trading_settlement"
+          data-confirm={
+            gettext(
+              "Unlink this invoice from trading drops? Drops will reappear on the settlement queue and can be invoiced again."
+            )
+          }
+          class="mt-2 orange button text-sm"
+        >
+          {gettext("Unlink trading settlement")}
+        </button>
+      </div>
       <.form
         for={@form}
         id="object-form"
@@ -660,7 +772,10 @@ defmodule FullCircleWeb.InvoiceLive.Form do
             <.input
               field={@form[:contact_name]}
               label={gettext("Customer")}
-              phx-hook="tributeAutoComplete"
+              phx-hook={
+                if(@trading_settlement.linked?, do: nil, else: "tributeAutoComplete")
+              }
+              readonly={@trading_settlement.linked?}
               url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
             />
           </div>

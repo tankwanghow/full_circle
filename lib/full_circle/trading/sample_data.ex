@@ -3,8 +3,8 @@ defmodule FullCircle.Trading.SampleData do
   Dev/demo sample data for the Trading Desk.
 
   Prefer `mix full_circle.seed_trading` (see Mix.Tasks.FullCircle.SeedTrading).
-  Creates ~50 supplies, ~50 sales, and ~50 trips (mixed statuses) plus warehouse
-  stock so scrolling and filters can be tested.
+  Creates ~50 supplies, ~50 sales, and ~50 trips (mixed statuses), settlement-ready
+  singles, and explicit **multi-load / multi-drop** trips for workflow testing.
   """
 
   import Ecto.Query, warn: false
@@ -62,8 +62,24 @@ defmodule FullCircle.Trading.SampleData do
         soy
       )
 
-    trips = trips ++ settlement_trips
+    multi_trips =
+      create_multi_line_trips!(
+        company,
+        user,
+        batch,
+        locs,
+        supplies,
+        sales,
+        customers,
+        maize,
+        pollard,
+        soy
+      )
+
+    trips = trips ++ settlement_trips ++ multi_trips
     uninvoiced = Trading.list_uninvoiced_drops(company, user)
+    unbilled_loads = Trading.list_unbilled_loads(company, user)
+    unbilled_transport = Trading.list_unbilled_transport_lines(company, user)
 
     summary = %{
       company: company.name,
@@ -80,7 +96,13 @@ defmodule FullCircle.Trading.SampleData do
       sales: Enum.map(sales, &{&1.title, &1.status}),
       trips: Enum.map(trips, &{&1.reference_no, &1.status}),
       settlement_trips: Enum.map(settlement_trips, & &1.reference_no),
+      multi_line_trips:
+        Enum.map(multi_trips, fn t ->
+          {t.reference_no, t.status, length(t.loads || []), length(t.drops || [])}
+        end),
       uninvoiced_drop_count: length(uninvoiced),
+      unbilled_load_count: length(unbilled_loads),
+      unbilled_transport_count: length(unbilled_transport),
       desk_path: "/companies/#{company.id}/trading/desk",
       settlement_path: "/companies/#{company.id}/trading/settlement"
     }
@@ -477,6 +499,264 @@ defmodule FullCircle.Trading.SampleData do
         complete_trip!(company, user, attrs)
       end
     end
+  end
+
+  # Multi-load / multi-drop trips for desk + settlement workflow testing.
+  # Covers company-own and agent modes, multi-customer, multi-supplier, multi-good.
+  defp create_multi_line_trips!(
+         company,
+         user,
+         batch,
+         locs,
+         supplies,
+         sales,
+         customers,
+         maize,
+         pollard,
+         soy
+       ) do
+    open_sales = Enum.filter(sales, &(&1.status in ~w(draft open hold)))
+    active_supplies = Enum.reject(supplies, &(&1.status == "closed"))
+
+    if open_sales == [] or active_supplies == [] do
+      []
+    else
+      by_good = fn list, good ->
+        case Enum.filter(list, &(&1.good_id == good.id)) do
+          [] -> list
+          same -> same
+        end
+      end
+
+      pick = fn list, good, i ->
+        pool = by_good.(list, good)
+        Enum.at(pool, rem(i, length(pool)))
+      end
+
+      agent_a = customers.mill
+      agent_b = customers.trader
+      today = Date.utc_today()
+
+      scenarios = [
+        # 1) 2 loads (same supply) → 2 drops (same customer) — company own
+        #    Test: multi-select same customer invoice + multi-select supplier bill
+        fn ->
+          good = maize
+          supply = pick.(active_supplies, good, 0)
+          sales_row = pick.(open_sales, good, 0)
+
+          attrs = %{
+            "date" => Date.to_iso8601(Date.add(today, -2)),
+            "transport_mode" => "company_own",
+            "vehicle_number" => "MULTI L2D2",
+            "notes" => "#{@batch_prefix} multi 2L→2D same customer #{batch}",
+            "loads" => [
+              load_line(good, locs.port, supply, "18", "18"),
+              load_line(good, locs.supplier_wh, supply, "12", "12")
+            ],
+            "drops" => [
+              drop_line(good, locs.farm_a, sales_row, supply, "18", "18"),
+              drop_line(good, locs.farm_a, sales_row, supply, "12", "11.5")
+            ]
+          }
+
+          complete_trip!(company, user, attrs)
+        end,
+
+        # 2) 2 loads (2 supplies, same supplier if possible) → 2 drops (2 customers)
+        #    Test: separate customer invoices; one or two supplier bills
+        fn ->
+          good = pollard
+          s1 = pick.(active_supplies, good, 1)
+          s2 = pick.(active_supplies, good, 2)
+          sale_a = pick.(open_sales, good, 1)
+          sale_b = pick.(open_sales, good, 2)
+
+          attrs = %{
+            "date" => Date.to_iso8601(Date.add(today, -3)),
+            "transport_mode" => "company_own",
+            "vehicle_number" => "MULTI 2SUP 2CUS",
+            "notes" => "#{@batch_prefix} multi 2 supplies → 2 customers #{batch}",
+            "loads" => [
+              load_line(good, locs.port, s1, "20", "20"),
+              load_line(good, locs.supplier_wh, s2, "15", "15")
+            ],
+            "drops" => [
+              drop_line(good, locs.farm_b, sale_a, s1, "20", "19.8"),
+              drop_line(good, locs.farm_c, sale_b, s2, "15", "15")
+            ]
+          }
+
+          complete_trip!(company, user, attrs)
+        end,
+
+        # 3) Agent: 1 load → 3 drops (different farms) — transport origin = single load
+        #    Test: transport tab 3 haul lines Port → Farm*; customer multi-invoice if same cust
+        fn ->
+          good = maize
+          supply = pick.(active_supplies, good, 3)
+          sale_a = pick.(open_sales, good, 3)
+          sale_b = pick.(open_sales, good, 4)
+          sale_c = pick.(open_sales, good, 5)
+
+          attrs = %{
+            "date" => Date.to_iso8601(Date.add(today, -1)),
+            "transport_mode" => "agent",
+            "transport_agent_id" => agent_a.id,
+            "transport_agent_name" => agent_a.name,
+            "vehicle_number" => "MULTI AGT 1L3D",
+            "notes" => "#{@batch_prefix} multi agent 1L→3D #{batch}",
+            "loads" => [
+              load_line(good, locs.port, supply, "45", "45")
+            ],
+            "drops" => [
+              drop_line(good, locs.farm_a, sale_a, supply, "15", "15"),
+              drop_line(good, locs.farm_b, sale_b, supply, "15", "14.5"),
+              drop_line(good, locs.farm_c, sale_c, supply, "15", "15")
+            ]
+          }
+
+          complete_trip!(company, user, attrs)
+        end,
+
+        # 4) Agent: 2 loads (2 origins) → 1 drop — transport N loads → 1 drop
+        #    Test: origin resolution prefers matching supply on drop
+        fn ->
+          good = soy
+          s1 = pick.(active_supplies, good, 0)
+          s2 = pick.(active_supplies, good, 1)
+          sale = pick.(open_sales, good, 0)
+
+          attrs = %{
+            "date" => Date.to_iso8601(Date.add(today, -4)),
+            "transport_mode" => "agent",
+            "transport_agent_id" => agent_b.id,
+            "transport_agent_name" => agent_b.name,
+            "vehicle_number" => "MULTI AGT 2L1D",
+            "notes" => "#{@batch_prefix} multi agent 2L→1D #{batch}",
+            "loads" => [
+              load_line(good, locs.port, s1, "22", "22"),
+              load_line(good, locs.supplier_wh, s2, "10", "10")
+            ],
+            "drops" => [
+              drop_line(good, locs.farm_d, sale, s1, "32", "31.5")
+            ]
+          }
+
+          complete_trip!(company, user, attrs)
+        end,
+
+        # 5) Agent: 2 loads × 2 drops, multi-good (maize + pollard) N×N
+        #    Test: origin matches drop.supply_position_id; mixed goods on one trip
+        fn ->
+          s_maize = pick.(active_supplies, maize, 4)
+          s_pollard = pick.(active_supplies, pollard, 4)
+          sale_m = pick.(open_sales, maize, 6)
+          sale_p = pick.(open_sales, pollard, 6)
+
+          attrs = %{
+            "date" => Date.to_iso8601(Date.add(today, -5)),
+            "transport_mode" => "agent",
+            "transport_agent_id" => agent_a.id,
+            "transport_agent_name" => agent_a.name,
+            "vehicle_number" => "MULTI AGT MIX",
+            "notes" => "#{@batch_prefix} multi agent 2L2D multi-good #{batch}",
+            "loads" => [
+              load_line(maize, locs.port, s_maize, "25", "25"),
+              load_line(pollard, locs.supplier_wh, s_pollard, "18", "18")
+            ],
+            "drops" => [
+              drop_line(maize, locs.farm_e, sale_m, s_maize, "25", "24.8"),
+              drop_line(pollard, locs.farm_d, sale_p, s_pollard, "18", "18")
+            ]
+          }
+
+          complete_trip!(company, user, attrs)
+        end,
+
+        # 6) Company-own: 3 loads → warehouse + customer (mixed drop types)
+        #    Test: warehouse drop not on customer invoice queue; load still supplier-billable
+        fn ->
+          good = maize
+          supply = pick.(active_supplies, good, 5)
+          sale = pick.(open_sales, good, 7)
+
+          attrs = %{
+            "date" => Date.to_iso8601(Date.add(today, -6)),
+            "transport_mode" => "company_own",
+            "vehicle_number" => "MULTI WH+CUST",
+            "notes" => "#{@batch_prefix} multi 2L → warehouse + customer #{batch}",
+            "loads" => [
+              load_line(good, locs.port, supply, "30", "30"),
+              load_line(good, locs.supplier_wh, supply, "10", "10")
+            ],
+            "drops" => [
+              %{
+                "planned_mt" => "20",
+                "actual_mt" => "20",
+                "good_id" => good.id,
+                "location_id" => locs.silo.id,
+                "supply_position_id" => supply.id
+              },
+              drop_line(good, locs.farm_a, sale, supply, "20", "19.5")
+            ]
+          }
+
+          complete_trip!(company, user, attrs)
+        end,
+
+        # 7) Draft multi-line agent trip (visible, not billable yet)
+        fn ->
+          good = soy
+          supply = pick.(active_supplies, good, 2)
+          sale_a = pick.(open_sales, good, 2)
+          sale_b = pick.(open_sales, good, 3)
+
+          attrs = %{
+            "date" => Date.to_iso8601(Date.add(today, 1)),
+            "transport_mode" => "agent",
+            "transport_agent_id" => agent_b.id,
+            "transport_agent_name" => agent_b.name,
+            "status" => "planned",
+            "vehicle_number" => "MULTI PLANNED",
+            "notes" => "#{@batch_prefix} multi planned agent 1L2D #{batch}",
+            "loads" => [
+              load_line(good, locs.port, supply, "28", "28")
+            ],
+            "drops" => [
+              drop_line(good, locs.farm_b, sale_a, supply, "14", "14"),
+              drop_line(good, locs.farm_c, sale_b, supply, "14", "14")
+            ]
+          }
+
+          {:ok, t} = Trading.create_trip(attrs, company, user)
+          t
+        end
+      ]
+
+      Enum.map(scenarios, fn fun -> fun.() end)
+    end
+  end
+
+  defp load_line(good, location, supply, planned, actual) do
+    %{
+      "planned_mt" => planned,
+      "actual_mt" => actual,
+      "good_id" => good.id,
+      "location_id" => location.id,
+      "supply_position_id" => supply.id
+    }
+  end
+
+  defp drop_line(good, location, sales, supply, planned, actual) do
+    %{
+      "planned_mt" => planned,
+      "actual_mt" => actual,
+      "good_id" => good.id,
+      "location_id" => location.id,
+      "sales_position_id" => sales.id,
+      "supply_position_id" => supply.id
+    }
   end
 
   # --- helpers ---

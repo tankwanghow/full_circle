@@ -34,18 +34,21 @@ defmodule Mix.Tasks.FullCircle.SeedTrading do
         User    : #{summary.user}
         Batch   : #{summary.batch}
         Desk    : #{summary.desk_path}
-        Settlement (customer invoice): #{summary.settlement_path}
+        Settlement: #{summary.settlement_path}
 
-        Uninvoiced sales drops ready to bill: #{summary.uninvoiced_drop_count}
-        Settlement-ready trips: #{Enum.join(summary.settlement_trips, ", ")}
+        Uninvoiced customer drops: #{summary.uninvoiced_drop_count}
+        Unbilled supplier loads:   #{summary.unbilled_load_count}
+        Unbilled transport hauls:  #{summary.unbilled_transport_count}
+
+        Settlement singles: #{Enum.join(summary.settlement_trips, ", ")}
+
+        Multi-load / multi-drop trips (ref · status · loads×drops):
+        #{format_multi(summary.multi_line_trips)}
 
         Supplies: #{length(summary.supplies)}  Sales: #{length(summary.sales)}  Trips: #{length(summary.trips)}
 
-        Sample trip statuses:
-        #{format_pairs(Enum.take(summary.trips, 12))}
-        ...
-
-        Log in → Trading Desk or Settlement → select drops → Create Invoice.
+        Log in → Desk (see MULTI vehicles) or Settlement tabs:
+          Customer invoices | Supplier bills | Transport bills
         """)
 
       other ->
@@ -56,6 +59,14 @@ defmodule Mix.Tasks.FullCircle.SeedTrading do
   defp format_pairs(list) do
     list
     |> Enum.map(fn {title, status} -> "  - [#{status}] #{title}" end)
+    |> Enum.join("\n")
+  end
+
+  defp format_multi(list) do
+    list
+    |> Enum.map(fn {ref, status, n_loads, n_drops} ->
+      "  - [#{status}] #{ref}  #{n_loads}L × #{n_drops}D"
+    end)
     |> Enum.join("\n")
   end
 end

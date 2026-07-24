@@ -24,7 +24,35 @@ Settlement Invoice / PurInvoice stay in finance — trading does not auto-post t
 **Settlement** (`/trading/settlement`):
 - **Phase A (customer):** sales drops → Invoice → `trip_drops.invoice_id`
 - **Phase B (supplier):** commercial loads → PurInvoice → `trip_loads.pur_invoice_id`
+- **Phase C (transport):** agent haul lines (drop + origin) → PurInvoice →
+  `trip_drops.transport_pur_invoice_id`; line good priority:
+  Transport Services Purchase → Transport Charges → Note
+  (else create Haulage); unit price clerk-entered (no rate matrix)
+- **Desk deep-link:** trip row **Settlement** →
+  `/trading/settlement?trip_id=<id>` opens a **single-trip page** (not the
+  tabbed board): Customer Invoice + Supplier Bill + Transport Bill sections on
+  one screen. No tabs, party/date filters, or “show all”. Only **Back to Trading
+  Desk** and per-section **Create …** actions. Includes billed + unbilled lines
+  (`doc_id` / `doc_no` / `doc_kind` link to Invoice/PurInvoice). Global board
+  (`/trading/settlement` without trip_id) still uses tabs/filters and hides settled.
 Gate for billing is trip `completed` only (draft/planned shown, not selectable).
+**Link hygiene:** link means “settled via” (not live mirror). While linked, **party
+(contact) is locked** on Invoice/PurInvoice; qty/price may still be edited.
+**Unlink trading settlement** clears FKs so lines reappear on settlement queues
+(no void/delete on finance docs).
+**Cancel trip:** completed trips with any linked Invoice / supplier PurInvoice /
+transport PurInvoice return `{:error, :has_invoices}` and the desk hides **Cancel trip**
+(`trip_has_settlement_docs?/1`). Unlink settlement first, then cancel if needed.
+**Desk trip row (Option C):** one row per trip; completed trips show a second line of
+settlement chips (Customer / Supplier / Transport). Chevron expands load/drop lines
+inline (still one trip, not split into multi rows).
+**Desk trips panel:** `trips_panel` assign `:shown` (default ~28% height) | `:hidden`
+(header only) | `:maximized` (hides supply/warehouse/sales, trips fill remaining height).
+Controls: Show / Hide / Maximize / Restore on the trips header.
+**Trip bill filters:** sticky chips under trips header — **Needs bill** (default on) /
+**Cust unbilled** / **Supp unbilled** / **Haul unbilled** (multi-select OR on
+`trip_settlement_badges` open|partial). **Clear** resets. Title shows `shown/all`
+when any filter active.
 See `docs/superpowers/specs/2026-07-23-trading-settlement-invoicing-design.md`.
 
 ## Status machines

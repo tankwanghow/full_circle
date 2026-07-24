@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Trading Desk — Settlement badges mockup</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: ui-sans-serif, system-ui, sans-serif; }
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.2rem;
+      font-size: 10px;
+      line-height: 1;
+      font-weight: 600;
+      padding: 0.2rem 0.4rem;
+      border-radius: 9999px;
+      white-space: nowrap;
+      border: 1px solid transparent;
+    }
+  </style>
+</head>
+<body class="bg-zinc-100 p-6 text-zinc-900">
+  <div class="max-w-6xl mx-auto space-y-10">
+    <header>
+      <h1 class="text-2xl font-semibold">Trading Desk — settlement badges (mockup)</h1>
+      <p class="text-sm text-zinc-600 mt-1">
+        Not live UI. Compare options A–C. Badges only show on <strong>completed</strong> trips (draft/planned stay as today).
+      </p>
+      <ul class="text-xs text-zinc-500 mt-2 list-disc ml-5 space-y-0.5">
+        <li><strong>Cust</strong> = customer invoice (sales drops)</li>
+        <li><strong>Sup</strong> = supplier bill (commercial loads)</li>
+        <li><strong>Haul</strong> = transport agent bill (agent trips only; otherwise n/a)</li>
+        <li>States: empty/open · partial · done · n/a</li>
+      </ul>
+    </header>
+
+    <!-- ========== OPTION A ========== -->
+    <section class="bg-white border-2 border-amber-500 rounded overflow-hidden shadow-sm">
+      <div class="bg-amber-200 border-b-2 border-amber-500 px-3 py-2 font-bold text-sm text-amber-950 flex justify-between">
+        <span>Option A — Compact chips after status (recommended)</span>
+        <span class="font-normal text-xs">Least width · easy to scan</span>
+      </div>
+      <div class="bg-gray-100 font-semibold px-2 py-1 flex gap-1 text-xs border-b text-zinc-700">
+        <div class="w-[8%]">Date</div>
+        <div class="w-[10%]">Trip</div>
+        <div class="w-[10%]">Vehicle</div>
+        <div class="w-[18%]">From</div>
+        <div class="w-[18%]">To</div>
+        <div class="w-[10%]">Good</div>
+        <div class="w-[10%]">Agent</div>
+        <div class="w-[8%]">Status</div>
+        <div class="w-[8%] text-right">Settle</div>
+      </div>
+
+      <!-- fully open -->
+      <div class="flex gap-1 border-b px-2 py-1.5 text-xs items-center hover:bg-gray-50">
+        <div class="w-[8%]">2026-07-20</div>
+        <div class="w-[10%] font-medium text-blue-600">TRP-000127</div>
+        <div class="w-[10%]">MULTI AGT 1L3D</div>
+        <div class="w-[18%] truncate">DEMO Port Klang</div>
+        <div class="w-[18%] truncate">3 farms…</div>
+        <div class="w-[10%]">Maize</div>
+        <div class="w-[10%] truncate">DEMO Internal Feed</div>
+        <div class="w-[8%]">completed</div>
+        <div class="w-[8%] flex flex-wrap gap-0.5 justify-end">
+          <span class="chip bg-amber-100 text-amber-900 border-amber-300" title="Customer: uninvoiced">Cust ·</span>
+          <span class="chip bg-amber-100 text-amber-900 border-amber-300" title="Supplier: unbilled">Sup ·</span>
+          <span class="chip bg-amber-100 text-amber-900 border-amber-300" title="Transport: unbilled">Haul ·</span>
+        </div>
+      </div>
+
+      <!-- partial -->
+      <div class="flex gap-1 border-b px-2 py-1.5 text-xs items-center hover:bg-gray-50">
+        <div class="w-[8%]">2026-07-18</div>
+        <div class="w-[10%] font-medium text-blue-600">TRP-000125</div>
+        <div class="w-[10%]">MULTI L2D2</div>
+        <div class="w-[18%] truncate">Port + Supplier WH</div>
+        <div class="w-[18%] truncate">Kajang Farm Gate</div>
+        <div class="w-[10%]">Maize</div>
+        <div class="w-[10%]">—</div>
+        <div class="w-[8%]">completed</div>
+        <div class="w-[8%] flex flex-wrap gap-0.5 justify-end">
+          <span class="chip bg-sky-100 text-sky-900 border-sky-300" title="Customer: partial">Cust ½</span>
+          <span class="chip bg-emerald-100 text-emerald-900 border-emerald-300" title="Supplier: billed">Sup ✓</span>
+          <span class="chip bg-zinc-100 text-zinc-500 border-zinc-300" title="Transport: n/a (not agent)">Haul —</span>
+        </div>
+      </div>
+
+      <!-- all done agent -->
+      <div class="flex gap-1 border-b px-2 py-1.5 text-xs items-center hover:bg-gray-50">
+        <div class="w-[8%]">2026-07-15</div>
+        <div class="w-[10%] font-medium text-blue-600">TRP-000129</div>
+        <div class="w-[10%]">MULTI AGT MIX</div>
+        <div class="w-[18%] truncate">Port · Supplier WH</div>
+        <div class="w-[18%] truncate">Johor · Malacca</div>
+        <div class="w-[10%]">2 goods</div>
+        <div class="w-[10%] truncate">DEMO Internal Feed</div>
+        <div class="w-[8%]">completed</div>
+        <div class="w-[8%] flex flex-wrap gap-0.5 justify-end">
+          <span class="chip bg-emerald-100 text-emerald-900 border-emerald-300">Cust ✓</span>
+          <span class="chip bg-emerald-100 text-emerald-900 border-emerald-300">Sup ✓</span>
+          <span class="chip bg-emerald-100 text-emerald-900 border-emerald-300">Haul ✓</span>
+        </div>
+      </div>
+
+      <!-- draft: no badges -->
+      <div class="flex gap-1 border-b px-2 py-1.5 text-xs items-center opacity-70">
+        <div class="w-[8%]">2026-07-25</div>
+        <div class="w-[10%] font-medium text-blue-600">TRP-000131</div>
+        <div class="w-[10%]">MULTI PLANNED</div>
+        <div class="w-[18%] truncate">DEMO Port Klang</div>
+        <div class="w-[18%] truncate">2 farms…</div>
+        <div class="w-[10%]">Soy</div>
+        <div class="w-[10%] truncate">DEMO Spot Trader</div>
+        <div class="w-[8%]">planned</div>
+        <div class="w-[8%] text-right text-zinc-400 text-[10px]">—</div>
+      </div>
+    </section>
+
+    <!-- ========== OPTION B ========== -->
+    <section class="bg-white border-2 border-sky-500 rounded overflow-hidden shadow-sm">
+      <div class="bg-sky-100 border-b-2 border-sky-500 px-3 py-2 font-bold text-sm text-sky-950 flex justify-between">
+        <span>Option B — Single “Settle” pill with letters</span>
+        <span class="font-normal text-xs">One control · denser</span>
+      </div>
+      <div class="bg-gray-100 font-semibold px-2 py-1 flex gap-1 text-xs border-b">
+        <div class="w-[10%]">Trip</div>
+        <div class="w-[12%]">Vehicle</div>
+        <div class="w-[20%]">From → To</div>
+        <div class="w-[10%]">Status</div>
+        <div class="flex-1">Settlement</div>
+      </div>
+
+      <div class="flex gap-2 border-b px-2 py-2 text-xs items-center">
+        <div class="w-[10%] font-medium text-blue-600">TRP-000127</div>
+        <div class="w-[12%]">MULTI AGT 1L3D</div>
+        <div class="w-[20%] truncate">Port → 3 farms</div>
+        <div class="w-[10%]">completed</div>
+        <div class="flex-1">
+          <span class="chip bg-amber-50 text-amber-950 border-amber-400 tracking-wide" title="Cust open · Sup open · Haul open">
+            <span class="text-amber-700">C·</span>
+            <span class="text-amber-700">S·</span>
+            <span class="text-amber-700">H·</span>
+            <span class="font-normal text-zinc-500 ml-1">all open</span>
+          </span>
+        </div>
+      </div>
+
+      <div class="flex gap-2 border-b px-2 py-2 text-xs items-center">
+        <div class="w-[10%] font-medium text-blue-600">TRP-000125</div>
+        <div class="w-[12%]">MULTI L2D2</div>
+        <div class="w-[20%] truncate">Port → Kajang</div>
+        <div class="w-[10%]">completed</div>
+        <div class="flex-1">
+          <span class="chip bg-sky-50 text-sky-950 border-sky-400 tracking-wide">
+            <span class="text-sky-700">C½</span>
+            <span class="text-emerald-700">S✓</span>
+            <span class="text-zinc-400">H—</span>
+            <span class="font-normal text-zinc-500 ml-1">partial</span>
+          </span>
+        </div>
+      </div>
+
+      <div class="flex gap-2 border-b px-2 py-2 text-xs items-center">
+        <div class="w-[10%] font-medium text-blue-600">TRP-000129</div>
+        <div class="w-[12%]">MULTI AGT MIX</div>
+        <div class="w-[20%] truncate">2 origins → 2 farms</div>
+        <div class="w-[10%]">completed</div>
+        <div class="flex-1">
+          <span class="chip bg-emerald-50 text-emerald-950 border-emerald-400 tracking-wide">
+            <span class="text-emerald-700">C✓</span>
+            <span class="text-emerald-700">S✓</span>
+            <span class="text-emerald-700">H✓</span>
+            <span class="font-normal text-zinc-500 ml-1">settled</span>
+          </span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== OPTION C ========== -->
+    <section class="bg-white border-2 border-violet-500 rounded overflow-hidden shadow-sm">
+      <div class="bg-violet-100 border-b-2 border-violet-500 px-3 py-2 font-bold text-sm text-violet-950 flex justify-between">
+        <span>Option C — Second line under trip ref (wordy, clearest for new users)</span>
+        <span class="font-normal text-xs">Uses vertical space</span>
+      </div>
+
+      <div class="border-b px-3 py-2 text-xs hover:bg-gray-50">
+        <div class="flex gap-3 items-baseline">
+          <span class="font-medium text-blue-600">TRP-000127</span>
+          <span class="text-zinc-500">2026-07-20 · MULTI AGT 1L3D · completed</span>
+        </div>
+        <div class="mt-1 flex flex-wrap gap-1.5 items-center pl-0">
+          <span class="chip bg-amber-100 text-amber-900 border-amber-300">Customer uninvoiced</span>
+          <span class="chip bg-amber-100 text-amber-900 border-amber-300">Supplier unbilled</span>
+          <span class="chip bg-amber-100 text-amber-900 border-amber-300">Transport unbilled</span>
+        </div>
+      </div>
+
+      <div class="border-b px-3 py-2 text-xs hover:bg-gray-50">
+        <div class="flex gap-3 items-baseline">
+          <span class="font-medium text-blue-600">TRP-000125</span>
+          <span class="text-zinc-500">2026-07-18 · MULTI L2D2 · completed</span>
+        </div>
+        <div class="mt-1 flex flex-wrap gap-1.5">
+          <span class="chip bg-sky-100 text-sky-900 border-sky-300">Customer partial</span>
+          <span class="chip bg-emerald-100 text-emerald-900 border-emerald-300">Supplier billed</span>
+          <span class="chip bg-zinc-100 text-zinc-500 border-zinc-300">Transport n/a</span>
+        </div>
+      </div>
+
+      <div class="border-b px-3 py-2 text-xs hover:bg-gray-50">
+        <div class="flex gap-3 items-baseline">
+          <span class="font-medium text-blue-600">TRP-000129</span>
+          <span class="text-zinc-500">2026-07-15 · MULTI AGT MIX · completed</span>
+        </div>
+        <div class="mt-1 flex flex-wrap gap-1.5">
+          <span class="chip bg-emerald-100 text-emerald-900 border-emerald-300">Customer invoiced</span>
+          <span class="chip bg-emerald-100 text-emerald-900 border-emerald-300">Supplier billed</span>
+          <span class="chip bg-emerald-100 text-emerald-900 border-emerald-300">Transport billed</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Legend + interaction -->
+    <section class="bg-white border rounded p-4 text-sm space-y-3">
+      <h2 class="font-semibold">Colour legend (all options)</h2>
+      <div class="flex flex-wrap gap-2">
+        <span class="chip bg-amber-100 text-amber-900 border-amber-300">· open / uninvoiced / unbilled</span>
+        <span class="chip bg-sky-100 text-sky-900 border-sky-300">½ partial</span>
+        <span class="chip bg-emerald-100 text-emerald-900 border-emerald-300">✓ done</span>
+        <span class="chip bg-zinc-100 text-zinc-500 border-zinc-300">— n/a (not agent trip)</span>
+      </div>
+      <h2 class="font-semibold pt-2">Suggested interaction</h2>
+      <ul class="list-disc ml-5 text-zinc-700 space-y-1 text-xs">
+        <li>Hover chip → tooltip with counts (e.g. “Customer: 1 of 3 drops invoiced”).</li>
+        <li>Click chip → open Settlement on that tab (optional: filter by trip ref later).</li>
+        <li>Draft / planned / cancelled → no chips (status column only).</li>
+      </ul>
+      <p class="text-xs text-zinc-500 pt-2">
+        File: <code>docs/superpowers/mockups/2026-07-24-trading-desk-settlement-badges.html</code>
+        — open in a browser to review.
+      </p>
+    </section>
+  </div>
+</body>
+</html>

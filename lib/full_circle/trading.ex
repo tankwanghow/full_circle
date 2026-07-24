@@ -1973,6 +1973,61 @@ defmodule FullCircle.Trading do
     Settlement.create_pur_invoice_from_loads(load_ids, attrs, company, user)
   end
 
+  def list_unbilled_transport_lines(company, user, opts \\ []) do
+    Settlement.list_unbilled_transport_lines(company, user, opts)
+  end
+
+  def build_pur_invoice_attrs_from_transport_drop_ids(drop_ids, company, user) do
+    Settlement.build_pur_invoice_attrs_from_transport_drop_ids(drop_ids, company, user)
+  end
+
+  def create_pur_invoice_from_transport_drops(drop_ids, attrs, company, user) do
+    Settlement.create_pur_invoice_from_transport_drops(drop_ids, attrs, company, user)
+  end
+
+  def invoice_settlement_info(invoice_id, company) do
+    Settlement.invoice_settlement_info(invoice_id, company)
+  end
+
+  def pur_invoice_settlement_info(pur_invoice_id, company) do
+    Settlement.pur_invoice_settlement_info(pur_invoice_id, company)
+  end
+
+  def contact_change_blocked_for_invoice?(invoice, attrs) do
+    Settlement.contact_change_blocked_for_invoice?(invoice, attrs)
+  end
+
+  def contact_change_blocked_for_pur_invoice?(pinv, attrs) do
+    Settlement.contact_change_blocked_for_pur_invoice?(pinv, attrs)
+  end
+
+  def unlink_invoice_settlement(invoice, company, user) do
+    Settlement.unlink_invoice_settlement(invoice, company, user)
+  end
+
+  def unlink_pur_invoice_settlement(pinv, company, user) do
+    Settlement.unlink_pur_invoice_settlement(pinv, company, user)
+  end
+
+  def trip_settlement_badges(trip) do
+    Settlement.trip_settlement_badges(trip)
+  end
+
+  @doc """
+  True when any load/drop is linked to a customer Invoice, supplier PurInvoice,
+  or transport PurInvoice. Completed trips with settlement links cannot be cancelled.
+  """
+  def trip_has_settlement_docs?(%Trip{} = trip) do
+    loads = List.wrap(trip.loads)
+    drops = List.wrap(trip.drops)
+
+    Enum.any?(drops, & &1.invoice_id) or
+      Enum.any?(loads, & &1.pur_invoice_id) or
+      Enum.any?(drops, & &1.transport_pur_invoice_id)
+  end
+
+  def trip_has_settlement_docs?(_), do: false
+
   @doc """
   Mark trip completed. Requires actual_mt on every load and drop.
   Returns `{:ok, trip, warnings}` — warnings never block completion.
@@ -2027,7 +2082,8 @@ defmodule FullCircle.Trading do
   end
 
   @doc """
-  Cancel a trip. Completed trips can be cancelled only if no drop is invoiced.
+  Cancel a trip. Completed trips with linked Invoice / PurInvoice (customer,
+  supplier, or transport) cannot be cancelled — unlink settlement first.
   """
   def cancel_trip(%Trip{} = trip, company, user) do
     with :ok <- authorize(user, :manage_trading, company),
@@ -2038,9 +2094,7 @@ defmodule FullCircle.Trading do
         trip.status == "cancelled" ->
           {:error, :already_cancelled}
 
-        trip.status == "completed" and
-            (Enum.any?(trip.drops, & &1.invoice_id) or
-               Enum.any?(trip.loads, & &1.pur_invoice_id)) ->
+        trip.status == "completed" and trip_has_settlement_docs?(trip) ->
           {:error, :has_invoices}
 
         true ->

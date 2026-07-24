@@ -345,7 +345,13 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
 
       {:error, :has_invoices} ->
         {:noreply,
-         put_flash(socket, :error, gettext("Cannot cancel: a drop is already invoiced."))}
+         put_flash(
+           socket,
+           :error,
+           gettext(
+             "Cannot cancel: trip has a linked Invoice or PurInvoice. Unlink settlement first."
+           )
+         )}
 
       _ ->
         {:noreply, put_flash(socket, :error, gettext("Could not cancel trip."))}
@@ -932,8 +938,9 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
               {gettext("Complete trip")}
             </button>
             <button
-              :if={@trip.status != "cancelled"}
+              :if={@trip.status != "cancelled" and not Trading.trip_has_settlement_docs?(@trip)}
               type="button"
+              id="desk-trip-cancel"
               phx-click="cancel_trip"
               phx-target={@myself}
               class="red button"
@@ -941,6 +948,20 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
             >
               {gettext("Cancel trip")}
             </button>
+            <span
+              :if={
+                @trip.status == "completed" and Trading.trip_has_settlement_docs?(@trip)
+              }
+              id="desk-trip-cancel-blocked"
+              class="text-xs text-zinc-500 max-w-[14rem]"
+              title={
+                gettext(
+                  "Unlink Invoice / PurInvoice settlement before cancelling this trip."
+                )
+              }
+            >
+              {gettext("Cancel blocked (settled)")}
+            </span>
           </div>
         </div>
       </.form>

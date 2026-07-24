@@ -15,8 +15,14 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
           cond do
             obj -> mount_new(obj, socket)
             params["trading_loads"] not in [nil, ""] -> mount_new_from_trading(socket, params)
-            params["egg"] -> mount_new_from_egg(socket, params)
-            true -> mount_new(socket)
+            params["trading_transport_drops"] not in [nil, ""] ->
+              mount_new_from_transport(socket, params)
+
+            params["egg"] ->
+              mount_new_from_egg(socket, params)
+
+            true ->
+              mount_new(socket)
           end
 
         :edit ->
@@ -26,6 +32,17 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
     {:ok,
      socket
      |> assign_new(:trading_load_ids, fn -> [] end)
+     |> assign_new(:trading_transport_drop_ids, fn -> [] end)
+     |> assign_new(:trading_settlement, fn ->
+       %{
+         linked?: false,
+         line_count: 0,
+         actual_mt_sum: 0,
+         trip_refs: [],
+         supplier_load_count: 0,
+         transport_drop_count: 0
+       }
+     end)
      |> assign(e_inv_preview: nil)
      |> assign(
        settings:
@@ -54,6 +71,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
     |> assign(live_action: :new)
     |> assign(id: "new")
     |> assign(trading_load_ids: [])
+    |> assign(trading_transport_drop_ids: [])
     |> assign(page_title: gettext("New Purchase Invoice"))
     |> assign(matched_trans: [])
     |> assign(:form, to_form(cs))
@@ -88,6 +106,48 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
            gettext("Cannot prefill purchase invoice from trading loads")}
       end
 
+    finish_trading_prefill(socket, attrs, flash,
+      trading_load_ids: load_ids,
+      trading_transport_drop_ids: []
+    )
+  end
+
+  defp mount_new_from_transport(socket, params) do
+    ids = parse_id_list(params["trading_transport_drops"])
+
+    {attrs, drop_ids, flash} =
+      case FullCircle.Trading.build_pur_invoice_attrs_from_transport_drop_ids(
+             ids,
+             socket.assigns.current_company,
+             socket.assigns.current_user
+           ) do
+        {:ok, trading_attrs} ->
+          {trading_attrs, ids, nil}
+
+        {:error, :mixed_agents} ->
+          {%{"pur_invoice_no" => "...new..."}, [],
+           gettext("Selected haul lines must belong to the same transport agent")}
+
+        {:error, :ineligible_transport} ->
+          {%{"pur_invoice_no" => "...new..."}, [],
+           gettext("Some haul lines are no longer eligible for billing")}
+
+        :not_authorise ->
+          {%{"pur_invoice_no" => "...new..."}, [],
+           gettext("You are not authorised to perform this action")}
+
+        {:error, _} ->
+          {%{"pur_invoice_no" => "...new..."}, [],
+           gettext("Cannot prefill purchase invoice from transport lines")}
+      end
+
+    finish_trading_prefill(socket, attrs, flash,
+      trading_load_ids: [],
+      trading_transport_drop_ids: drop_ids
+    )
+  end
+
+  defp finish_trading_prefill(socket, attrs, flash, assigns) do
     cs =
       Billing.make_changeset(
         PurInvoice,
@@ -108,7 +168,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
       socket
       |> assign(live_action: :new)
       |> assign(id: "new")
-      |> assign(trading_load_ids: load_ids)
+      |> assign(assigns)
       |> assign(page_title: gettext("New Purchase Invoice"))
       |> assign(matched_trans: [])
       |> assign_egg_link(%{}, :purchase)
@@ -315,16 +375,21 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
   end
 
   defp mount_edit(socket, id) do
+    company = socket.assigns.current_company
+
     object =
       Billing.get_pur_invoice!(
         id,
-        socket.assigns.current_company,
+        company,
         socket.assigns.current_user
       )
+
+    settlement = FullCircle.Trading.pur_invoice_settlement_info(id, company)
 
     socket
     |> assign(live_action: :edit)
     |> assign(id: id)
+    |> assign(trading_settlement: settlement)
     |> assign(matched_trans: Billing.get_matcher_by("PurInvoice", id))
     |> assign(page_title: gettext("Edit Purchase Invoice") <> " " <> object.pur_invoice_no)
     |> assign(
@@ -334,7 +399,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
           PurInvoice,
           object,
           %{},
-          socket.assigns.current_company,
+          company,
           socket.assigns.current_user
         )
       )
@@ -576,12 +641,23 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
     company = socket.assigns.current_company
     user = socket.assigns.current_user
     load_ids = socket.assigns[:trading_load_ids] || []
+    transport_ids = socket.assigns[:trading_transport_drop_ids] || []
 
     result =
-      if load_ids != [] do
-        FullCircle.Trading.create_pur_invoice_from_loads(load_ids, params, company, user)
-      else
-        Billing.create_pur_invoice(params, company, user)
+      cond do
+        load_ids != [] ->
+          FullCircle.Trading.create_pur_invoice_from_loads(load_ids, params, company, user)
+
+        transport_ids != [] ->
+          FullCircle.Trading.create_pur_invoice_from_transport_drops(
+            transport_ids,
+            params,
+            company,
+            user
+          )
+
+        true ->
+          Billing.create_pur_invoice(params, company, user)
       end
 
     case result do
@@ -589,10 +665,15 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
         socket = maybe_attach_egg_planned(socket, obj, params)
 
         flash =
-          if load_ids != [] do
-            gettext("Purchase invoice created and trading loads linked successfully.")
-          else
-            gettext("Purchase Invoice created successfully.")
+          cond do
+            load_ids != [] ->
+              gettext("Purchase invoice created and trading loads linked successfully.")
+
+            transport_ids != [] ->
+              gettext("Purchase invoice created and transport haul lines linked successfully.")
+
+            true ->
+              gettext("Purchase Invoice created successfully.")
           end
 
         {:noreply,
@@ -608,15 +689,36 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
            gettext("Some loads were already billed. Purchase invoice was not created.")
          )}
 
+      {:error, :transport_already_billed} ->
+        {:noreply,
+         socket
+         |> put_flash(
+           :error,
+           gettext("Some haul lines were already billed. Purchase invoice was not created.")
+         )}
+
       {:error, :ineligible_loads} ->
         {:noreply,
          socket
          |> put_flash(:error, gettext("Some loads are no longer eligible for billing"))}
 
+      {:error, :ineligible_transport} ->
+        {:noreply,
+         socket
+         |> put_flash(:error, gettext("Some haul lines are no longer eligible for billing"))}
+
       {:error, :mixed_suppliers} ->
         {:noreply,
          socket
          |> put_flash(:error, gettext("Selected loads must belong to the same supplier"))}
+
+      {:error, :mixed_agents} ->
+        {:noreply,
+         socket
+         |> put_flash(
+           :error,
+           gettext("Selected haul lines must belong to the same transport agent")
+         )}
 
       {:error, failed_operation, changeset, _} ->
         {:noreply,
@@ -639,19 +741,64 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
     end
   end
 
+  def handle_event("unlink_trading_settlement", _, socket) do
+    company = socket.assigns.current_company
+    user = socket.assigns.current_user
+    pinv = socket.assigns.form.data
+
+    case FullCircle.Trading.unlink_pur_invoice_settlement(pinv, company, user) do
+      {:ok, %{loads_unlinked: n_l, transport_unlinked: n_t}} ->
+        settlement = FullCircle.Trading.pur_invoice_settlement_info(pinv.id, company)
+
+        {:noreply,
+         socket
+         |> assign(trading_settlement: settlement)
+         |> put_flash(
+           :info,
+           gettext(
+             "Unlinked %{loads} load(s) and %{hauls} transport haul(s). They can be settled again.",
+             loads: n_l,
+             hauls: n_t
+           )
+         )}
+
+      {:error, :not_linked} ->
+        {:noreply, put_flash(socket, :info, gettext("No trading links on this purchase invoice."))}
+
+      :not_authorise ->
+        {:noreply,
+         put_flash(socket, :error, gettext("You are not authorised to perform this action"))}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, gettext("Failed to unlink trading settlement"))}
+    end
+  end
+
   defp save(socket, :edit, params) do
-    case Billing.update_pur_invoice(
-           socket.assigns.form.data,
-           params,
-           socket.assigns.current_company,
-           socket.assigns.current_user
-         ) do
+    pinv = socket.assigns.form.data
+    company = socket.assigns.current_company
+    user = socket.assigns.current_user
+
+    if FullCircle.Trading.contact_change_blocked_for_pur_invoice?(pinv, params) do
+      {:noreply,
+       put_flash(
+         socket,
+         :error,
+         gettext(
+           "Supplier/agent cannot be changed while this purchase invoice is linked to trading. Unlink trading settlement first."
+         )
+       )}
+    else
+      do_update_pur_invoice(socket, pinv, params, company, user)
+    end
+  end
+
+  defp do_update_pur_invoice(socket, pinv, params, company, user) do
+    case Billing.update_pur_invoice(pinv, params, company, user) do
       {:ok, %{update_pur_invoice: obj}} ->
         {:noreply,
          socket
-         |> push_navigate(
-           to: ~p"/companies/#{socket.assigns.current_company.id}/PurInvoice/#{obj.id}/edit"
-         )
+         |> push_navigate(to: ~p"/companies/#{company.id}/PurInvoice/#{obj.id}/edit")
          |> put_flash(:info, "#{gettext("Purchase Invoice updated successfully.")}")}
 
       {:error, failed_operation, changeset, _} ->
@@ -766,19 +913,47 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
   end
 
   defp validate(params, socket) do
-    changeset =
-      Billing.make_changeset(
-        PurInvoice,
-        socket.assigns.form.data,
-        params,
-        socket.assigns.current_company,
-        socket.assigns.current_user
-      )
-      |> Map.put(:action, socket.assigns.live_action)
+    if socket.assigns.live_action == :edit and
+         FullCircle.Trading.contact_change_blocked_for_pur_invoice?(
+           socket.assigns.form.data,
+           params
+         ) do
+      params =
+        params
+        |> Map.put("contact_id", socket.assigns.form.data.contact_id)
+        |> Map.put(
+          "contact_name",
+          socket.assigns.form.data.contact_name || socket.assigns.form[:contact_name].value
+        )
 
-    socket = assign(socket, form: to_form(changeset))
+      changeset =
+        Billing.make_changeset(
+          PurInvoice,
+          socket.assigns.form.data,
+          params,
+          socket.assigns.current_company,
+          socket.assigns.current_user
+        )
+        |> Map.put(:action, socket.assigns.live_action)
+        |> Ecto.Changeset.add_error(
+          :contact_name,
+          gettext("locked while linked to trading — unlink first")
+        )
 
-    {:noreply, socket}
+      {:noreply, assign(socket, form: to_form(changeset))}
+    else
+      changeset =
+        Billing.make_changeset(
+          PurInvoice,
+          socket.assigns.form.data,
+          params,
+          socket.assigns.current_company,
+          socket.assigns.current_user
+        )
+        |> Map.put(:action, socket.assigns.live_action)
+
+      {:noreply, assign(socket, form: to_form(changeset))}
+    end
   end
 
   @impl true
@@ -787,6 +962,36 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
     <div class="w-11/12 mx-auto border rounded-lg border-pink-500 bg-pink-100 p-4">
       <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <.error_box changeset={@form.source} />
+      <div
+        :if={@live_action == :edit and @trading_settlement.linked?}
+        class="mb-3 rounded border border-amber-600 bg-amber-50 px-3 py-2 text-sm"
+        id="trading-settlement-banner"
+      >
+        <p class="font-medium text-amber-900">
+          {gettext("Linked to trading settlement")}
+        </p>
+        <p class="text-amber-800 mt-1">
+          {gettext(
+            "%{n} line(s) · %{mt} MT · trips: %{trips}. Party is locked. Unlink if the match was wrong; commercial qty/price edits are allowed.",
+            n: @trading_settlement.line_count,
+            mt: @trading_settlement.actual_mt_sum,
+            trips: Enum.join(@trading_settlement.trip_refs, ", ")
+          )}
+        </p>
+        <button
+          type="button"
+          id="unlink-trading-settlement"
+          phx-click="unlink_trading_settlement"
+          data-confirm={
+            gettext(
+              "Unlink this purchase invoice from trading loads/hauls? Lines will reappear on the settlement queue."
+            )
+          }
+          class="mt-2 orange button text-sm"
+        >
+          {gettext("Unlink trading settlement")}
+        </button>
+      </div>
       <.form
         for={@form}
         id="object-form"
@@ -803,7 +1008,10 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
             <.input
               field={@form[:contact_name]}
               label={gettext("Supplier")}
-              phx-hook="tributeAutoComplete"
+              phx-hook={
+                if(@trading_settlement.linked?, do: nil, else: "tributeAutoComplete")
+              }
+              readonly={@trading_settlement.linked?}
               url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
             />
           </div>

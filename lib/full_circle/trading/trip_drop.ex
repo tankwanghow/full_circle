@@ -24,6 +24,8 @@ defmodule FullCircle.Trading.TripDrop do
     belongs_to :supply_position, FullCircle.Trading.SupplyPosition
     belongs_to :location, FullCircle.Trading.Location
     belongs_to :invoice, FullCircle.Billing.Invoice
+    # Phase C: transport agent PurInvoice matched to this haul line (drop + origin)
+    belongs_to :transport_pur_invoice, FullCircle.Billing.PurInvoice
 
     has_many :trip_drop_employees, FullCircle.Trading.TripDropEmployee,
       on_replace: :delete,
@@ -42,6 +44,7 @@ defmodule FullCircle.Trading.TripDrop do
         "supply_position_id",
         "location_id",
         "invoice_id",
+        "transport_pur_invoice_id",
         "good_id",
         "party_contact_id"
       ]),
@@ -57,6 +60,7 @@ defmodule FullCircle.Trading.TripDrop do
         :supply_position_id,
         :location_id,
         :invoice_id,
+        :transport_pur_invoice_id,
         :location_name,
         :sales_title,
         :supply_title,
@@ -75,6 +79,7 @@ defmodule FullCircle.Trading.TripDrop do
     |> foreign_key_constraint(:supply_position_id)
     |> foreign_key_constraint(:location_id)
     |> foreign_key_constraint(:invoice_id)
+    |> foreign_key_constraint(:transport_pur_invoice_id)
     |> maybe_mark_for_deletion()
   end
 

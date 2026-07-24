@@ -23,7 +23,9 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
        |> assign(modal: nil)
        |> assign(transit_list: nil)
        |> assign(warehouse_history: nil)
-       |> assign(trips_expanded: true)
+       |> assign(trips_panel: :shown)
+       |> assign(trip_detail_ids: MapSet.new())
+       |> assign(trip_settle_filters: MapSet.new(["any"]))
        |> assign(can_manage: Authorization.can?(user, :manage_trading, company))
        |> assign(filters: empty_filters())
        |> assign_empty_selection()
@@ -65,8 +67,47 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
     {:noreply, close_modal_and_normalize_url(socket)}
   end
 
-  def handle_event("toggle_trips_panel", _, socket) do
-    {:noreply, assign(socket, trips_expanded: !socket.assigns.trips_expanded)}
+  def handle_event("set_trips_panel", %{"mode" => mode}, socket) do
+    panel =
+      case mode do
+        "hidden" -> :hidden
+        "shown" -> :shown
+        "maximized" -> :maximized
+        _ -> socket.assigns.trips_panel
+      end
+
+    {:noreply, assign(socket, trips_panel: panel)}
+  end
+
+  def handle_event("toggle_trip_settle_filter", %{"key" => key}, socket)
+      when key in ["any", "customer", "supplier", "transport"] do
+    set = socket.assigns.trip_settle_filters
+
+    set =
+      if MapSet.member?(set, key) do
+        MapSet.delete(set, key)
+      else
+        MapSet.put(set, key)
+      end
+
+    {:noreply, socket |> assign(trip_settle_filters: set) |> apply_filters()}
+  end
+
+  def handle_event("clear_trip_settle_filters", _, socket) do
+    {:noreply, socket |> assign(trip_settle_filters: MapSet.new()) |> apply_filters()}
+  end
+
+  def handle_event("toggle_trip_detail", %{"id" => id}, socket) do
+    ids = socket.assigns.trip_detail_ids
+
+    ids =
+      if MapSet.member?(ids, id) do
+        MapSet.delete(ids, id)
+      else
+        MapSet.put(ids, id)
+      end
+
+    {:noreply, assign(socket, trip_detail_ids: ids)}
   end
 
   def handle_event("close_transit_list", _, socket) do
@@ -594,6 +635,7 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
     trips =
       socket.assigns.trips_all
       |> filter_rows(f.trips, &trip_field/2)
+      |> filter_trips_by_settlement(socket.assigns.trip_settle_filters)
 
     socket
     |> assign(:supply_rows, supply_rows)
@@ -604,6 +646,37 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
     |> assign(:selection_summary, selection_summary(socket))
     |> assign(:selection_active, selection_active?(socket))
   end
+
+  # Settlement chips: multi-select OR. Empty = no settle filter.
+  # "any" = any stream open/partial; stream keys match that stream only.
+  defp filter_trips_by_settlement(trips, filters) do
+    if MapSet.size(filters) == 0 do
+      trips
+    else
+      Enum.filter(trips, fn t ->
+        badges = Trading.trip_settlement_badges(t)
+        Enum.any?(filters, &settlement_filter_match?(&1, badges))
+      end)
+    end
+  end
+
+  defp settlement_filter_match?("any", badges) do
+    badges.show? and
+      (badges.customer in [:open, :partial] or
+         badges.supplier in [:open, :partial] or
+         badges.transport in [:open, :partial])
+  end
+
+  defp settlement_filter_match?("customer", badges),
+    do: badges.show? and badges.customer in [:open, :partial]
+
+  defp settlement_filter_match?("supplier", badges),
+    do: badges.show? and badges.supplier in [:open, :partial]
+
+  defp settlement_filter_match?("transport", badges),
+    do: badges.show? and badges.transport in [:open, :partial]
+
+  defp settlement_filter_match?(_, _), do: false
 
   defp supply_selectable?(status),
     do: status in FullCircle.Trading.SupplyPosition.active_statuses()
@@ -751,6 +824,12 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
   defp trip_field(t, :status), do: t.status
   defp trip_field(_, _), do: ""
 
+  defp trips_text_filters_active?(trips_filters) do
+    trips_filters
+    |> Map.values()
+    |> Enum.any?(fn v -> String.trim(to_string(v || "")) != "" end)
+  end
+
   defp trip_goods_label(t) do
     t
     |> FullCircle.Trading.Trip.goods()
@@ -770,6 +849,30 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
       %{name: name} -> name
       _ -> ""
     end
+  end
+
+  attr :key, :string, required: true
+  attr :label, :string, required: true
+  attr :title, :string, default: nil
+  attr :active?, :boolean, required: true
+
+  defp trip_settle_chip(assigns) do
+    ~H"""
+    <button
+      type="button"
+      id={"desk-trip-settle-#{@key}"}
+      phx-click="toggle_trip_settle_filter"
+      phx-value-key={@key}
+      title={@title}
+      class={[
+        "rounded-full px-2 py-0.5 border font-medium transition-colors",
+        @active? && "bg-amber-200 border-amber-500 text-amber-950 ring-1 ring-amber-400",
+        !@active? && "bg-white/80 border-violet-300 text-violet-900 hover:bg-violet-200/80"
+      ]}
+    >
+      {@label}
+    </button>
+    """
   end
 
   attr :table, :string, required: true
@@ -844,8 +947,11 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
           {gettext("Customer invoicing")}
         </.link>
       </div>
-      <%!-- Top: supply + warehouse | open sales --%>
-      <div class="flex-1 min-h-0 flex flex-col lg:flex-row gap-2">
+      <%!-- Top: supply + warehouse | open sales (hidden when trips maximized) --%>
+      <div
+        :if={@trips_panel != :maximized}
+        class="flex-1 min-h-0 flex flex-col lg:flex-row gap-2"
+      >
         <div class="lg:w-1/2 min-h-0 flex flex-col gap-2">
           <%!-- SUPPLY: header sticky inside scroll so cols share scrollbar width --%>
           <div
@@ -1337,12 +1443,15 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
         </button>
       </div>
 
-      <%!-- TRIPS (collapsible; transit drill-down is primary) --%>
+      <%!-- TRIPS: shown (~28%), maximized (fills desk), or hidden (header only) --%>
       <div
         id="desk_trips"
+        data-trips-panel={@trips_panel}
         class={[
-          "shrink-0 flex flex-col border-2 border-violet-500 rounded overflow-hidden bg-white dark:bg-zinc-900",
-          @trips_expanded && "h-[28%] min-h-[8rem]"
+          "flex flex-col border-2 border-violet-500 rounded overflow-hidden bg-white dark:bg-zinc-900",
+          @trips_panel == :hidden && "shrink-0",
+          @trips_panel == :shown && "shrink-0 h-[28%] min-h-[8rem]",
+          @trips_panel == :maximized && "flex-1 min-h-0"
         ]}
       >
         <div class="bg-violet-200 border-b border-violet-500 font-bold px-2 py-1 flex items-center gap-1 text-xs md:text-sm text-violet-950">
@@ -1359,130 +1468,182 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
           >
             <.icon name="hero-plus-circle" class="w-5 h-5" />
           </button>
-          <button
-            type="button"
-            id="desk-trips-toggle"
-            phx-click="toggle_trips_panel"
-            class="flex-1 min-w-0 flex items-center justify-between hover:bg-violet-300 rounded px-1 py-0.5"
-          >
+
+          <div class="flex-1 min-w-0 flex items-center justify-between gap-2 px-1 py-0.5">
             <span>
               {gettext("Trips")}
-              <span class="font-normal text-violet-800">({length(@trips)})</span>
+              <span class="font-normal text-violet-800">
+                ({length(@trips)}{if MapSet.size(@trip_settle_filters) > 0 or
+                                       trips_text_filters_active?(@filters.trips),
+                                     do: "/#{length(@trips_all)}",
+                                     else: ""})
+              </span>
             </span>
-            <span class="font-normal">
-              {if(@trips_expanded, do: gettext("Hide"), else: gettext("Show"))}
+            <div
+              id="desk-trip-settle-filters"
+              class="px-2 py-1 flex flex-wrap items-center gap-1 text-[11px]"
+            >
+              <span class="font-semibold text-violet-900 mr-0.5">{gettext("Bill")}:</span>
+              <.trip_settle_chip
+                key="any"
+                label={gettext("Needs bill")}
+                title={gettext("Completed trips with any customer, supplier, or transport still unbilled")}
+                active?={MapSet.member?(@trip_settle_filters, "any")}
+              />
+              <.trip_settle_chip
+                key="customer"
+                label={gettext("Cust unbilled")}
+                title={gettext("Customer invoice open or partial")}
+                active?={MapSet.member?(@trip_settle_filters, "customer")}
+              />
+              <.trip_settle_chip
+                key="supplier"
+                label={gettext("Supp unbilled")}
+                title={gettext("Supplier bill open or partial")}
+                active?={MapSet.member?(@trip_settle_filters, "supplier")}
+              />
+              <.trip_settle_chip
+                key="transport"
+                label={gettext("Haul unbilled")}
+                title={gettext("Transport agent bill open or partial")}
+                active?={MapSet.member?(@trip_settle_filters, "transport")}
+              />
+              <button
+                :if={MapSet.size(@trip_settle_filters) > 0}
+                type="button"
+                id="desk-trip-settle-clear"
+                phx-click="clear_trip_settle_filters"
+                class="ml-1 text-violet-800 underline hover:text-violet-950"
+              >
+                {gettext("Clear")}
+              </button>
+            </div>
+            <span class="shrink-0 flex items-center gap-1 font-normal">
+              <button
+                :if={@trips_panel == :hidden}
+                type="button"
+                id="desk-trips-show"
+                phx-click="set_trips_panel"
+                phx-value-mode="shown"
+                class="px-1.5 py-0.5 rounded hover:bg-violet-300 focus:outline-none focus:ring-1 focus:ring-violet-600"
+              >
+                {gettext("Show")}
+              </button>
+              <button
+                :if={@trips_panel != :hidden}
+                type="button"
+                id="desk-trips-hide"
+                phx-click="set_trips_panel"
+                phx-value-mode="hidden"
+                class="px-1.5 py-0.5 rounded hover:bg-violet-300 focus:outline-none focus:ring-1 focus:ring-violet-600"
+              >
+                {gettext("Hide")}
+              </button>
+              <button
+                :if={@trips_panel != :maximized}
+                type="button"
+                id="desk-trips-maximize"
+                phx-click="set_trips_panel"
+                phx-value-mode="maximized"
+                class="px-1.5 py-0.5 rounded hover:bg-violet-300 focus:outline-none focus:ring-1 focus:ring-violet-600"
+              >
+                {gettext("Maximize")}
+              </button>
+              <button
+                :if={@trips_panel == :maximized}
+                type="button"
+                id="desk-trips-restore"
+                phx-click="set_trips_panel"
+                phx-value-mode="shown"
+                class="px-1.5 py-0.5 rounded hover:bg-violet-300 focus:outline-none focus:ring-1 focus:ring-violet-600"
+              >
+                {gettext("Restore")}
+              </button>
             </span>
-          </button>
+          </div>
         </div>
         <div
-          :if={@trips_expanded}
+          :if={@trips_panel != :hidden}
           class="flex-1 min-h-0 overflow-y-scroll [scrollbar-gutter:stable]"
         >
-          <div class="sticky top-0 z-10 bg-violet-100 border-b border-violet-400 font-bold px-2 py-1 flex gap-1 items-center text-xs md:text-sm text-violet-950">
-            <div class="flex flex-1 min-w-0 gap-1 items-center">
-              <.filter_col
-                class="w-2/24"
-                table="trips"
-                field="date"
-                label={gettext("Date")}
-                value={@filters.trips.date}
-              />
-              <.filter_col
-                class="w-2/24"
-                table="trips"
-                field="ref"
-                label={gettext("Trip No")}
-                value={@filters.trips.ref}
-              />
-              <.filter_col
-                class="w-2/24"
-                table="trips"
-                field="vehicle"
-                label={gettext("Vehicle")}
-                value={@filters.trips.vehicle}
-              />
-              <.filter_col
-                class="w-5/24"
-                table="trips"
-                field="from"
-                label={gettext("From")}
-                value={@filters.trips.from}
-                title={gettext("Suppliers / load locations")}
-              />
-              <.filter_col
-                class="w-5/24"
-                table="trips"
-                field="to"
-                label={gettext("To")}
-                value={@filters.trips.to}
-                title={gettext("Customers / drop locations")}
-              />
-              <.filter_col
-                class="w-3/24"
-                table="trips"
-                field="good"
-                label={gettext("Good")}
-                value={@filters.trips.good}
-              />
-              <.filter_col
-                class="w-3/24"
-                table="trips"
-                field="agent"
-                label={gettext("Agent")}
-                value={@filters.trips.agent}
-              />
-              <.filter_col
-                class="w-2/24"
-                table="trips"
-                field="status"
-                label={gettext("Status")}
-                value={@filters.trips.status}
-              />
+          <div class="sticky top-0 z-10 bg-violet-100 border-b border-violet-400">
+            <div class="font-bold px-2 py-1 flex gap-1 items-center text-xs md:text-sm text-violet-950">
+              <div class="flex flex-1 min-w-0 gap-1 items-center">
+                <.filter_col
+                  class="w-2/24"
+                  table="trips"
+                  field="date"
+                  label={gettext("Date")}
+                  value={@filters.trips.date}
+                />
+                <.filter_col
+                  class="w-2/24"
+                  table="trips"
+                  field="ref"
+                  label={gettext("Trip No")}
+                  value={@filters.trips.ref}
+                />
+                <.filter_col
+                  class="w-2/24"
+                  table="trips"
+                  field="vehicle"
+                  label={gettext("Vehicle")}
+                  value={@filters.trips.vehicle}
+                />
+                <.filter_col  
+                  class="w-5/24"
+                  table="trips"
+                  field="from"
+                  label={gettext("From")}
+                  value={@filters.trips.from}
+                  title={gettext("Suppliers / load locations")}
+                />
+                <.filter_col
+                  class="w-5/24"
+                  table="trips"
+                  field="to"
+                  label={gettext("To")}
+                  value={@filters.trips.to}
+                  title={gettext("Customers / drop locations")}
+                />
+                <.filter_col
+                  class="w-3/24"
+                  table="trips"
+                  field="good"
+                  label={gettext("Good")}
+                  value={@filters.trips.good}
+                />
+                <.filter_col
+                  class="w-3/24"
+                  table="trips"
+                  field="agent"
+                  label={gettext("Agent")}
+                  value={@filters.trips.agent}
+                />
+                <.filter_col
+                  class="w-2/24"
+                  table="trips"
+                  field="status"
+                  label={gettext("Status")}
+                  value={@filters.trips.status}
+                />
+              </div>
             </div>
           </div>
-          <div
+          <.desk_trip_row
             :for={t <- @trips}
-            id={"desk-trip-#{t.id}"}
-            class="flex gap-1 border-b px-2 py-1 text-xs md:text-sm items-center hover:bg-gray-100 dark:hover:bg-zinc-800"
-          >
-            <div class="flex flex-1 min-w-0 gap-1 items-center">
-              <div class="w-2/24 min-w-0 truncate">{t.date}</div>
-              <div
-                class={[
-                  "w-2/24 min-w-0 truncate font-medium",
-                  @can_manage && "text-blue-600 cursor-pointer hover:underline"
-                ]}
-                phx-click={if @can_manage, do: "open_modal"}
-                phx-value-kind="trip"
-                phx-value-action="edit"
-                phx-value-id={t.id}
-                title={t.reference_no}
-              >
-                {t.reference_no || "—"}
-              </div>
-              <div class="w-2/24 min-w-0 truncate" title={t.vehicle_number}>
-                {t.vehicle_number || "—"}
-              </div>
-              <div class="w-5/24 min-w-0 truncate" title={trip_from_title(t)}>
-                {trip_from_label(t) |> then(fn s -> if s == "", do: "—", else: s end)}
-              </div>
-              <div class="w-5/24 min-w-0 truncate" title={trip_to_title(t)}>
-                {trip_to_label(t) |> then(fn s -> if s == "", do: "—", else: s end)}
-              </div>
-              <div class="w-3/24 min-w-0 truncate" title={trip_goods_label(t)}>
-                {trip_goods_label(t) |> then(fn s -> if s == "", do: "—", else: s end)}
-              </div>
-              <div
-                class="w-3/24 min-w-0 truncate"
-                title={t.transport_agent && t.transport_agent.name}
-              >
-                {(t.transport_agent && t.transport_agent.name) || "—"}
-              </div>
-              <div class="w-2/24 min-w-0 truncate">{t.status}</div>
-            </div>
-          </div>
+            trip={t}
+            settle={Trading.trip_settlement_badges(t)}
+            detail_open?={MapSet.member?(@trip_detail_ids, t.id)}
+            can_manage={@can_manage}
+            company={@current_company}
+          />
           <p :if={@trips == []} class="text-center p-2 text-gray-500 text-sm">
-            {gettext("No trips yet.")}
+            {if MapSet.size(@trip_settle_filters) > 0 or trips_text_filters_active?(@filters.trips) do
+              gettext("No trips match the current filters.")
+            else
+              gettext("No trips yet.")
+            end}
           </p>
         </div>
       </div>
@@ -1729,4 +1890,251 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
     <span :if={!@clickable?} class={transit_class(@qty)}>{@qty}</span>
     """
   end
+
+  # --- Trip row: one trip + Option C badges + optional expand ---
+
+  attr :trip, :any, required: true
+  attr :settle, :map, required: true
+  attr :detail_open?, :boolean, required: true
+  attr :can_manage, :boolean, required: true
+  attr :company, :any, required: true
+
+  defp desk_trip_row(assigns) do
+    ~H"""
+    <div
+      id={"desk-trip-#{@trip.id}"}
+      class="border-b px-2 py-1 text-xs md:text-sm hover:bg-gray-100 dark:hover:bg-zinc-800"
+    >
+      <div class="flex gap-1 items-center">
+        <button
+          type="button"
+          id={"desk-trip-expand-#{@trip.id}"}
+          phx-click="toggle_trip_detail"
+          phx-value-id={@trip.id}
+          class="w-5 shrink-0 text-zinc-500 hover:text-zinc-800"
+          title={if(@detail_open?, do: gettext("Hide lines"), else: gettext("Show loads/drops"))}
+        >
+          <span :if={@detail_open?} class="hero-chevron-down w-4 h-4 inline-block"></span>
+          <span :if={!@detail_open?} class="hero-chevron-right w-4 h-4 inline-block"></span>
+        </button>
+        <div class="flex flex-1 min-w-0 gap-1 items-center">
+          <div class="w-2/24 min-w-0 truncate">{@trip.date}</div>
+          <div
+            class={[
+              "w-2/24 min-w-0 truncate font-medium",
+              @can_manage && "text-blue-600 cursor-pointer hover:underline"
+            ]}
+            phx-click={if @can_manage, do: "open_modal"}
+            phx-value-kind="trip"
+            phx-value-action="edit"
+            phx-value-id={@trip.id}
+            title={@trip.reference_no}
+          >
+            {@trip.reference_no || "—"}
+          </div>
+          <div class="w-2/24 min-w-0 truncate" title={@trip.vehicle_number}>
+            {@trip.vehicle_number || "—"}
+          </div>
+          <div class="w-5/24 min-w-0 truncate" title={trip_from_title(@trip)}>
+            {trip_from_label(@trip) |> then(fn s -> if s == "", do: "—", else: s end)}
+          </div>
+          <div class="w-5/24 min-w-0 truncate" title={trip_to_title(@trip)}>
+            {trip_to_label(@trip) |> then(fn s -> if s == "", do: "—", else: s end)}
+          </div>
+          <div class="w-3/24 min-w-0 truncate" title={trip_goods_label(@trip)}>
+            {trip_goods_label(@trip) |> then(fn s -> if s == "", do: "—", else: s end)}
+          </div>
+          <div
+            class="w-3/24 min-w-0 truncate"
+            title={@trip.transport_agent && @trip.transport_agent.name}
+          >
+            {(@trip.transport_agent && @trip.transport_agent.name) || "—"}
+          </div>
+          <div class="w-2/24 min-w-0 truncate">{@trip.status}</div>
+        </div>
+      </div>
+      <div
+        :if={@settle.show?}
+        id={"desk-trip-settle-#{@trip.id}"}
+        class="pl-5 mt-0.5 flex flex-wrap gap-1 items-center"
+      >
+        <.settlement_chip
+          stream={:customer}
+          state={@settle.customer}
+          done={@settle.customer_done}
+          total={@settle.customer_total}
+        />
+        <.settlement_chip
+          stream={:supplier}
+          state={@settle.supplier}
+          done={@settle.supplier_done}
+          total={@settle.supplier_total}
+        />
+        <.settlement_chip
+          stream={:transport}
+          state={@settle.transport}
+          done={@settle.transport_done}
+          total={@settle.transport_total}
+        />
+        <.link
+          id={"desk-trip-settlement-#{@trip.id}"}
+          navigate={
+            ~p"/companies/#{@company.id}/trading/settlement?#{%{trip_id: @trip.id}}"
+          }
+          class="text-[10px] text-blue-600 hover:underline ml-1"
+        >
+          {gettext("Settlement")}
+        </.link>
+      </div>
+      <div
+        :if={@detail_open?}
+        id={"desk-trip-lines-#{@trip.id}"}
+        class="pl-5 mt-1 mb-0.5 text-[11px] space-y-0.5 border-l-2 border-violet-200 ml-1"
+      >
+        <div class="font-semibold text-zinc-600">{gettext("Loads")}</div>
+        <div
+          :for={l <- List.wrap(@trip.loads)}
+          class="flex flex-wrap gap-x-2 text-zinc-700 dark:text-zinc-300"
+        >
+          <span class="text-zinc-400">L{l.seq || "·"}</span>
+          <span>{(l.location && l.location.name) || "—"}</span>
+          <span class="text-zinc-500">{(l.good && l.good.name) || ""}</span>
+          <span class="tabular-nums">{l.actual_mt || l.planned_mt || "—"} Mt</span>
+          <span :if={l.supply_position} class="font-mono text-zinc-500">
+            {l.supply_position.title}
+          </span>
+          <span :if={l.supply_position_id} class={["rounded px-1", load_bill_class(l)]}>
+            {load_bill_label(l)}
+          </span>
+        </div>
+        <div :if={List.wrap(@trip.loads) == []} class="text-zinc-400">—</div>
+        <div class="font-semibold text-zinc-600 pt-0.5">{gettext("Drops")}</div>
+        <div
+          :for={d <- List.wrap(@trip.drops)}
+          class="flex flex-wrap gap-x-2 text-zinc-700 dark:text-zinc-300"
+        >
+          <span class="text-zinc-400">D{d.seq || "·"}</span>
+          <span>{(d.location && d.location.name) || "—"}</span>
+          <span class="text-zinc-500">{(d.good && d.good.name) || ""}</span>
+          <span class="tabular-nums">{d.actual_mt || d.planned_mt || "—"} Mt</span>
+          <span :if={d.sales_position} class="font-mono text-zinc-500">
+            {d.sales_position.title}
+          </span>
+          <span :if={d.sales_position_id} class={["rounded px-1", drop_invoice_class(d)]}>
+            {drop_invoice_label(d)}
+          </span>
+          <span
+            :if={@trip.transport_mode == "agent"}
+            class={["rounded px-1", drop_haul_class(d)]}
+          >
+            {drop_haul_label(d)}
+          </span>
+        </div>
+        <div :if={List.wrap(@trip.drops) == []} class="text-zinc-400">—</div>
+      </div>
+    </div>
+    """
+  end
+
+  # --- Settlement badges (Option C) ---
+
+  attr :stream, :atom, required: true
+  attr :state, :atom, required: true
+  attr :done, :integer, default: 0
+  attr :total, :integer, default: 0
+
+  defp settlement_chip(assigns) do
+    label = settlement_chip_label(assigns.stream, assigns.state)
+    title = settlement_chip_title(assigns.stream, assigns.state, assigns.done, assigns.total)
+    assigns = assign(assigns, label: label, title: title)
+
+    ~H"""
+    <span
+      class={[
+        "inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] font-semibold leading-none",
+        settlement_chip_class(@state)
+      ]}
+      title={@title}
+    >
+      {@label}
+    </span>
+    """
+  end
+
+  defp settlement_chip_label(:customer, :open), do: gettext("Customer uninvoiced")
+  defp settlement_chip_label(:customer, :partial), do: gettext("Customer partial")
+  defp settlement_chip_label(:customer, :done), do: gettext("Customer invoiced")
+  defp settlement_chip_label(:customer, :n_a), do: gettext("Customer n/a")
+
+  defp settlement_chip_label(:supplier, :open), do: gettext("Supplier unbilled")
+  defp settlement_chip_label(:supplier, :partial), do: gettext("Supplier partial")
+  defp settlement_chip_label(:supplier, :done), do: gettext("Supplier billed")
+  defp settlement_chip_label(:supplier, :n_a), do: gettext("Supplier n/a")
+
+  defp settlement_chip_label(:transport, :open), do: gettext("Transport unbilled")
+  defp settlement_chip_label(:transport, :partial), do: gettext("Transport partial")
+  defp settlement_chip_label(:transport, :done), do: gettext("Transport billed")
+  defp settlement_chip_label(:transport, :n_a), do: gettext("Transport n/a")
+
+  defp settlement_chip_label(_, _), do: "—"
+
+  defp settlement_chip_title(:customer, :n_a, _, _),
+    do: gettext("No sales drops on this trip")
+
+  defp settlement_chip_title(:customer, _, done, total),
+    do: gettext("Customer: %{done} of %{total} sales drops invoiced", done: done, total: total)
+
+  defp settlement_chip_title(:supplier, :n_a, _, _),
+    do: gettext("No commercial supply loads on this trip")
+
+  defp settlement_chip_title(:supplier, _, done, total),
+    do: gettext("Supplier: %{done} of %{total} commercial loads billed", done: done, total: total)
+
+  defp settlement_chip_title(:transport, :n_a, _, _),
+    do: gettext("Not an agent trip")
+
+  defp settlement_chip_title(:transport, _, done, total),
+    do: gettext("Transport: %{done} of %{total} haul lines billed", done: done, total: total)
+
+  defp settlement_chip_title(_, _, _, _), do: ""
+
+  defp settlement_chip_class(:open), do: "bg-amber-100 text-amber-900 border-amber-300"
+  defp settlement_chip_class(:partial), do: "bg-sky-100 text-sky-900 border-sky-300"
+  defp settlement_chip_class(:done), do: "bg-emerald-100 text-emerald-900 border-emerald-300"
+  defp settlement_chip_class(:n_a), do: "bg-zinc-100 text-zinc-500 border-zinc-300"
+  defp settlement_chip_class(_), do: "bg-zinc-100 text-zinc-500 border-zinc-300"
+
+  defp load_bill_label(%{pur_invoice_id: id}) when not is_nil(id), do: gettext("billed")
+  defp load_bill_label(%{supply_position_id: id}) when not is_nil(id), do: gettext("unbilled")
+  defp load_bill_label(_), do: ""
+
+  defp load_bill_class(%{pur_invoice_id: id}) when not is_nil(id),
+    do: "bg-emerald-50 text-emerald-800"
+
+  defp load_bill_class(%{supply_position_id: id}) when not is_nil(id),
+    do: "bg-amber-50 text-amber-800"
+
+  defp load_bill_class(_), do: ""
+
+  defp drop_invoice_label(%{invoice_id: id}) when not is_nil(id), do: gettext("invoiced")
+  defp drop_invoice_label(%{sales_position_id: id}) when not is_nil(id), do: gettext("uninvoiced")
+  defp drop_invoice_label(_), do: ""
+
+  defp drop_invoice_class(%{invoice_id: id}) when not is_nil(id),
+    do: "bg-emerald-50 text-emerald-800"
+
+  defp drop_invoice_class(%{sales_position_id: id}) when not is_nil(id),
+    do: "bg-amber-50 text-amber-800"
+
+  defp drop_invoice_class(_), do: ""
+
+  defp drop_haul_label(%{transport_pur_invoice_id: id}) when not is_nil(id),
+    do: gettext("haul billed")
+
+  defp drop_haul_label(_), do: gettext("haul open")
+
+  defp drop_haul_class(%{transport_pur_invoice_id: id}) when not is_nil(id),
+    do: "bg-emerald-50 text-emerald-800"
+
+  defp drop_haul_class(_), do: "bg-amber-50 text-amber-800"
 end

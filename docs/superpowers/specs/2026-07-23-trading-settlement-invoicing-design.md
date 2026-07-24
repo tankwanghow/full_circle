@@ -1,7 +1,9 @@
 # Trading Desk Settlement — Customer Invoice, Supplier Bill, Transport Bill
 
 **Date:** 2026-07-23  
-**Status:** Phase A–B implemented (customer Invoice + supplier PurInvoice); C–D pending  
+**Status:** Phase A–C implemented; Phase D desk badges (Option C + expand lines) and
+trips panel Show/Hide/Maximize implemented; void/delete not in product (unlink + party
+lock instead); rate matrix still later  
 **Parent:** `docs/superpowers/specs/2026-07-15-grain-trading-trip-design.md` (§3.5 Settlement)  
 **Skill:** `.claude/skills/grain-trading-desk.md` (update when implemented)  
 **App:** FullCircle (`full_circle`)  
