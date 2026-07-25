@@ -133,13 +133,13 @@ One load line per selected **supply**:
 
 - `supply_position_id` = supply id  
 - `location_id` = empty if unknown (user picks port/supplier site)  
-- `planned_mt` = `actual_mt` = **supply remaining** (via `Balances.supply_remaining/1`)
+- `planned` = `actual` = **supply remaining** (via `Balances.supply_remaining/1`)
 
 One load line per selected **warehouse** key:
 
 - `location_id` = warehouse location id  
 - `supply_position_id` = nil  
-- `planned_mt` = `actual_mt` = **on hand** for that location × good  
+- `planned` = `actual` = **on hand** for that location × good  
 
 ### 5.2 Drops
 
@@ -148,7 +148,7 @@ One drop line per selected **sales**:
 - `sales_position_id` = sales id  
 - `supply_position_id` = that sales’ `preferred_supply_id` if set and still selected / same good; else if exactly one supply is selected, that supply; else nil  
 - `location_id` = best-effort: active `customer_site` location linked to customer if one exists; else empty  
-- `planned_mt` = `actual_mt` = **sales undelivered** (`Balances.sales_undelivered/1`)
+- `planned` = `actual` = **sales undelivered** (`Balances.sales_undelivered/1`)
 
 ### 5.3 Qty imbalance
 

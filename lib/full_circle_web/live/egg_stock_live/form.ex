@@ -521,11 +521,14 @@ defmodule FullCircleWeb.EggStockLive.Form do
       when is_binary(date_str) and date_str != "" do
     case Date.from_iso8601(date_str) do
       {:ok, date} ->
-        if Date.compare(date, socket.assigns.date) == :eq do
-          {:noreply, socket}
-        else
-          socket = flush_autosave(socket)
+        socket = flush_autosave(socket)
 
+        if Date.compare(date, socket.assigns.date) == :eq do
+          {:noreply,
+           socket
+           |> assign(active_tab: "now")
+           |> load_tab_data("now")}
+        else
           {:noreply,
            socket
            |> assign(active_tab: "now")
@@ -540,6 +543,32 @@ defmodule FullCircleWeb.EggStockLive.Form do
   end
 
   def handle_event("goto_date", _params, socket), do: {:noreply, socket}
+
+  # From Est. Daily Sales/Purchases: open weekly book for that weekday.
+  # Exception: today's row still opens the Stock tab for that day.
+  def handle_event("goto_weekly", %{"kind" => kind, "date" => date_str}, socket)
+      when kind in ["sales", "purchase"] and is_binary(date_str) and date_str != "" do
+    case Date.from_iso8601(date_str) do
+      {:ok, date} ->
+        if Date.compare(date, Date.utc_today()) == :eq do
+          handle_event("goto_date", %{"date" => date_str}, socket)
+        else
+          socket = flush_autosave(socket)
+          tab = if kind == "sales", do: "weekly_sales", else: "weekly_purchases"
+          dow = Date.day_of_week(date)
+
+          {:noreply,
+           socket
+           |> assign(active_tab: tab, dow: dow)
+           |> load_weekly_tab(kind)}
+        end
+
+      {:error, _} ->
+        {:noreply, socket}
+    end
+  end
+
+  def handle_event("goto_weekly", _params, socket), do: {:noreply, socket}
 
   def handle_event("select_dow", %{"dow" => dow_str}, socket) do
     socket = flush_autosave(socket)
@@ -2410,6 +2439,10 @@ defmodule FullCircleWeb.EggStockLive.Form do
   # --- Estimated Tab ---
 
   defp estimated_tab(assigns) do
+    # Sales/purchases rows highlight the day after the board date (e.g. board 25th → 26th).
+    highlight_date = Date.add(assigns.date, 1)
+    assigns = assign(assigns, :highlight_date, highlight_date)
+
     ~H"""
     <div class="flex flex-col items-center">
       <div class="w-fit max-w-full">
@@ -2426,6 +2459,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
           grade_labels={@grade_labels}
           value_key={:closing}
           row_hover="hover:bg-blue-100"
+          row_click="goto_date"
         />
 
         <.forecast_table
@@ -2435,6 +2469,10 @@ defmodule FullCircleWeb.EggStockLive.Form do
           grade_labels={@grade_labels}
           value_key={:sales}
           row_hover="hover:bg-blue-100"
+          highlight_date={@highlight_date}
+          highlight_class="bg-blue-100"
+          row_click="goto_weekly"
+          row_kind="sales"
           class="mt-5"
         />
 
@@ -2445,6 +2483,10 @@ defmodule FullCircleWeb.EggStockLive.Form do
           grade_labels={@grade_labels}
           value_key={:purchases}
           row_hover="hover:bg-emerald-100"
+          highlight_date={@highlight_date}
+          highlight_class="bg-emerald-100"
+          row_click="goto_weekly"
+          row_kind="purchase"
           class="mt-5"
         />
       </div>
@@ -2453,7 +2495,13 @@ defmodule FullCircleWeb.EggStockLive.Form do
   end
 
   defp forecast_table(assigns) do
-    assigns = assign_new(assigns, :class, fn -> "" end)
+    assigns =
+      assigns
+      |> assign_new(:class, fn -> "" end)
+      |> assign_new(:highlight_date, fn -> nil end)
+      |> assign_new(:highlight_class, fn -> "bg-blue-100" end)
+      |> assign_new(:row_click, fn -> "goto_date" end)
+      |> assign_new(:row_kind, fn -> nil end)
 
     ~H"""
     <div class={@class}>
@@ -2482,9 +2530,14 @@ defmodule FullCircleWeb.EggStockLive.Form do
           <tbody>
             <tr
               :for={row <- @forecast}
-              class={"border-b last:border-0 cursor-pointer #{@row_hover}"}
-              phx-click="goto_date"
+              class={[
+                "border-b last:border-0 cursor-pointer",
+                @row_hover,
+                @highlight_date && Date.compare(row.date, @highlight_date) == :eq && @highlight_class
+              ]}
+              phx-click={@row_click}
               phx-value-date={Date.to_iso8601(row.date)}
+              phx-value-kind={@row_kind}
             >
               <td class="py-1 px-2 font-medium whitespace-nowrap">
                 {FullCircleWeb.Helpers.format_date(row.date)}

@@ -3,8 +3,8 @@ defmodule FullCircle.Trading.TripDrop do
   import Ecto.Changeset
 
   schema "trading_trip_drops" do
-    field :planned_mt, :decimal
-    field :actual_mt, :decimal
+    field :planned, :decimal
+    field :actual, :decimal
     field :location_note, :string
     field :variance_note, :string
     # Delivery / unload order: 1 = first unload (often reverse of load order)
@@ -14,6 +14,12 @@ defmodule FullCircle.Trading.TripDrop do
     field :sales_title, :string, virtual: true
     field :supply_title, :string, virtual: true
     field :good_name, :string, virtual: true
+    # Display only — qty fields use Good.unit
+    field :good_unit, :string, virtual: true
+    # Typeahead to add a worker to trip_drop_employees (cleared after add)
+    field :crew_add_name, :string, virtual: true
+    # true once user edits this line's crew — blocks fill-down from earlier lines
+    field :crew_locked, :boolean, virtual: true, default: false
     # Customer contact for location typeahead filter (from sales)
     field :party_contact_id, :binary_id, virtual: true
     field :delete, :boolean, virtual: true, default: false
@@ -49,8 +55,8 @@ defmodule FullCircle.Trading.TripDrop do
         "party_contact_id"
       ]),
       [
-        :planned_mt,
-        :actual_mt,
+        :planned,
+        :actual,
         :location_note,
         :variance_note,
         :seq,
@@ -65,14 +71,17 @@ defmodule FullCircle.Trading.TripDrop do
         :sales_title,
         :supply_title,
         :good_name,
+        :good_unit,
+        :crew_add_name,
+        :crew_locked,
         :party_contact_id,
         :delete
       ]
     )
     |> cast_assoc(:trip_drop_employees, with: &FullCircle.Trading.TripDropEmployee.changeset/2)
     |> validate_required([:location_id, :good_id])
-    |> validate_number(:planned_mt, greater_than_or_equal_to: 0)
-    |> validate_number(:actual_mt, greater_than_or_equal_to: 0)
+    |> validate_number(:planned, greater_than_or_equal_to: 0)
+    |> validate_number(:actual, greater_than_or_equal_to: 0)
     |> foreign_key_constraint(:trip_id)
     |> foreign_key_constraint(:good_id)
     |> foreign_key_constraint(:sales_position_id)

@@ -20,7 +20,7 @@ defmodule FullCircle.Trading.SettlementTest do
     good = Keyword.get_lazy(opts, :good, fn -> good_fixture(company, user) end)
     customer = Keyword.get_lazy(opts, :customer, fn -> contact_fixture(company, user) end)
     supplier = Keyword.get_lazy(opts, :supplier, fn -> contact_fixture(company, user) end)
-    actual = Keyword.get(opts, :actual_mt, "29.6")
+    actual = Keyword.get(opts, :actual, "29.6")
     unit_price = Keyword.get(opts, :unit_price, "1050")
 
     supply =
@@ -51,8 +51,8 @@ defmodule FullCircle.Trading.SettlementTest do
           "vehicle_number" => "ABC1234",
           "loads" => [
             %{
-              "planned_mt" => actual,
-              "actual_mt" => actual,
+              "planned" => actual,
+              "actual" => actual,
               "good_id" => good.id,
               "location_id" => port.id,
               "supply_position_id" => supply.id
@@ -60,8 +60,8 @@ defmodule FullCircle.Trading.SettlementTest do
           ],
           "drops" => [
             %{
-              "planned_mt" => actual,
-              "actual_mt" => actual,
+              "planned" => actual,
+              "actual" => actual,
               "good_id" => good.id,
               "location_id" => site.id,
               "sales_position_id" => sales.id,
@@ -109,8 +109,8 @@ defmodule FullCircle.Trading.SettlementTest do
           "vehicle_number" => "XYZ9999",
           "loads" => [
             %{
-              "planned_mt" => "10",
-              "actual_mt" => "10",
+              "planned" => "10",
+              "actual" => "10",
               "good_id" => good.id,
               "location_id" => port.id,
               "supply_position_id" => supply.id
@@ -118,8 +118,8 @@ defmodule FullCircle.Trading.SettlementTest do
           ],
           "drops" => [
             %{
-              "planned_mt" => "10",
-              "actual_mt" => "10",
+              "planned" => "10",
+              "actual" => "10",
               "good_id" => good.id,
               "location_id" => wh.id,
               "supply_position_id" => supply.id
@@ -151,8 +151,8 @@ defmodule FullCircle.Trading.SettlementTest do
           "status" => "draft",
           "loads" => [
             %{
-              "planned_mt" => "5",
-              "actual_mt" => "5",
+              "planned" => "5",
+              "actual" => "5",
               "good_id" => good.id,
               "location_id" => port.id,
               "supply_position_id" => supply.id
@@ -160,8 +160,8 @@ defmodule FullCircle.Trading.SettlementTest do
           ],
           "drops" => [
             %{
-              "planned_mt" => "5",
-              "actual_mt" => "5",
+              "planned" => "5",
+              "actual" => "5",
               "good_id" => good.id,
               "location_id" => site.id,
               "sales_position_id" => sales2.id
@@ -193,7 +193,7 @@ defmodule FullCircle.Trading.SettlementTest do
     company: company
   } do
     %{drop: drop, customer: customer, good: good} =
-      completed_sales_drop(company, user, actual_mt: "29.6", unit_price: "1050")
+      completed_sales_drop(company, user, actual: "29.6", unit_price: "1050")
 
     assert {:ok, attrs} =
              Trading.build_invoice_attrs_from_drop_ids([drop.id], company, user)
@@ -220,7 +220,7 @@ defmodule FullCircle.Trading.SettlementTest do
     company: company
   } do
     %{drop: drop, customer: customer} =
-      completed_sales_drop(company, user, actual_mt: "12.5", unit_price: "900")
+      completed_sales_drop(company, user, actual: "12.5", unit_price: "900")
 
     assert {:ok, attrs} =
              Trading.build_invoice_attrs_from_drop_ids([drop.id], company, user)
@@ -350,7 +350,7 @@ defmodule FullCircle.Trading.SettlementTest do
     company: company
   } do
     %{trip: trip, good: good} =
-      completed_sales_drop(company, user, actual_mt: "18.0", unit_price: "900")
+      completed_sales_drop(company, user, actual: "18.0", unit_price: "900")
 
     load = hd(trip.loads)
     supply = FullCircle.Repo.get!(FullCircle.Trading.SupplyPosition, load.supply_position_id)
@@ -408,7 +408,7 @@ defmodule FullCircle.Trading.SettlementTest do
         contact_fixture(company, user, %{"name" => "Haul Co"})
       end)
 
-    actual = Keyword.get(opts, :actual_mt, "20")
+    actual = Keyword.get(opts, :actual, "20")
 
     supply =
       supply_position_fixture(company, user, %{
@@ -439,8 +439,8 @@ defmodule FullCircle.Trading.SettlementTest do
           "vehicle_number" => "AGT 9001",
           "loads" => [
             %{
-              "planned_mt" => actual,
-              "actual_mt" => actual,
+              "planned" => actual,
+              "actual" => actual,
               "good_id" => good.id,
               "location_id" => port.id,
               "supply_position_id" => supply.id
@@ -448,8 +448,8 @@ defmodule FullCircle.Trading.SettlementTest do
           ],
           "drops" => [
             %{
-              "planned_mt" => actual,
-              "actual_mt" => actual,
+              "planned" => actual,
+              "actual" => actual,
               "good_id" => good.id,
               "location_id" => site.id,
               "sales_position_id" => sales.id,
@@ -490,7 +490,7 @@ defmodule FullCircle.Trading.SettlementTest do
     user: user,
     company: company
   } do
-    %{drop: drop, agent: agent} = completed_agent_drop(company, user, actual_mt: "22")
+    %{drop: drop, agent: agent} = completed_agent_drop(company, user, actual: "22")
 
     assert {:ok, attrs} =
              Trading.build_pur_invoice_attrs_from_transport_drop_ids([drop.id], company, user)

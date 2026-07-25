@@ -6,7 +6,7 @@ defmodule FullCircle.Trading.Balances do
   Soft holds sum undelivered qty on active sales (draft/open/hold) with a preferred
   supply — they do **not** lock remaining.
 
-  **In transit** (draft + planned trips) uses `coalesce(actual_mt, planned_mt)` so
+  **In transit** (draft + planned trips) uses `coalesce(actual, planned)` so
   desks can show goods already committed on open trips without moving physical stock.
   """
 
@@ -28,7 +28,7 @@ defmodule FullCircle.Trading.Balances do
       join: t in Trip,
       on: t.id == l.trip_id,
       where: t.status == "completed" and l.supply_position_id == ^supply_id,
-      select: coalesce(sum(l.actual_mt), 0)
+      select: coalesce(sum(l.actual), 0)
     )
     |> Repo.one()
     |> to_decimal()
@@ -48,7 +48,7 @@ defmodule FullCircle.Trading.Balances do
       join: t in Trip,
       on: t.id == d.trip_id,
       where: t.status == "completed" and d.sales_position_id == ^sales_id,
-      select: coalesce(sum(d.actual_mt), 0)
+      select: coalesce(sum(d.actual), 0)
     )
     |> Repo.one()
     |> to_decimal()
@@ -81,7 +81,7 @@ defmodule FullCircle.Trading.Balances do
       join: t in Trip,
       on: t.id == l.trip_id,
       where: t.status in ^@open_trip_statuses and l.supply_position_id == ^supply_id,
-      select: coalesce(sum(fragment("coalesce(?, ?)", l.actual_mt, l.planned_mt)), 0)
+      select: coalesce(sum(fragment("coalesce(?, ?)", l.actual, l.planned)), 0)
     )
     |> Repo.one()
     |> to_decimal()
@@ -99,7 +99,7 @@ defmodule FullCircle.Trading.Balances do
       join: t in Trip,
       on: t.id == d.trip_id,
       where: t.status in ^@open_trip_statuses and d.sales_position_id == ^sales_id,
-      select: coalesce(sum(fragment("coalesce(?, ?)", d.actual_mt, d.planned_mt)), 0)
+      select: coalesce(sum(fragment("coalesce(?, ?)", d.actual, d.planned)), 0)
     )
     |> Repo.one()
     |> to_decimal()
@@ -144,7 +144,7 @@ defmodule FullCircle.Trading.Balances do
       join: t in Trip,
       on: t.id == d.trip_id,
       where: t.status == "completed" and d.location_id == ^location_id,
-      select: coalesce(sum(d.actual_mt), 0)
+      select: coalesce(sum(d.actual), 0)
     )
     |> Repo.one()
     |> to_decimal()
@@ -157,7 +157,7 @@ defmodule FullCircle.Trading.Balances do
       join: t in Trip,
       on: t.id == l.trip_id,
       where: t.status == "completed" and l.location_id == ^location_id,
-      select: coalesce(sum(l.actual_mt), 0)
+      select: coalesce(sum(l.actual), 0)
     )
     |> Repo.one()
     |> to_decimal()
@@ -175,7 +175,7 @@ defmodule FullCircle.Trading.Balances do
       on: t.id == d.trip_id,
       where: t.status == "completed" and d.location_id == ^location_id,
       group_by: d.good_id,
-      select: {d.good_id, coalesce(sum(d.actual_mt), 0)}
+      select: {d.good_id, coalesce(sum(d.actual), 0)}
     )
     |> Repo.all()
     |> Map.new(fn {id, qty} -> {id, to_decimal(qty)} end)
@@ -193,7 +193,7 @@ defmodule FullCircle.Trading.Balances do
       on: t.id == l.trip_id,
       where: t.status == "completed" and l.location_id == ^location_id,
       group_by: l.good_id,
-      select: {l.good_id, coalesce(sum(l.actual_mt), 0)}
+      select: {l.good_id, coalesce(sum(l.actual), 0)}
     )
     |> Repo.all()
     |> Map.new(fn {id, qty} -> {id, to_decimal(qty)} end)
@@ -211,7 +211,7 @@ defmodule FullCircle.Trading.Balances do
       on: t.id == d.trip_id,
       where: t.status in ^@open_trip_statuses and d.location_id == ^location_id,
       group_by: d.good_id,
-      select: {d.good_id, coalesce(sum(fragment("coalesce(?, ?)", d.actual_mt, d.planned_mt)), 0)}
+      select: {d.good_id, coalesce(sum(fragment("coalesce(?, ?)", d.actual, d.planned)), 0)}
     )
     |> Repo.all()
     |> Map.new(fn {id, qty} -> {id, to_decimal(qty)} end)
@@ -229,7 +229,7 @@ defmodule FullCircle.Trading.Balances do
       on: t.id == l.trip_id,
       where: t.status in ^@open_trip_statuses and l.location_id == ^location_id,
       group_by: l.good_id,
-      select: {l.good_id, coalesce(sum(fragment("coalesce(?, ?)", l.actual_mt, l.planned_mt)), 0)}
+      select: {l.good_id, coalesce(sum(fragment("coalesce(?, ?)", l.actual, l.planned)), 0)}
     )
     |> Repo.all()
     |> Map.new(fn {id, qty} -> {id, to_decimal(qty)} end)

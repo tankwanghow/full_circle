@@ -46,7 +46,7 @@ defmodule FullCircle.Trading.Settlement do
 
   Includes:
   - **draft / planned** trips (visible, not selectable)
-  - **completed** trips not yet linked to an invoice (selectable when `actual_mt` present)
+  - **completed** trips not yet linked to an invoice (selectable when `actual` present)
 
   Cancelled trips are excluded. Already-invoiced drops are excluded **unless**
   `:trip_id` is set (trip deep-link shows billed + unbilled for that trip).
@@ -86,8 +86,8 @@ defmodule FullCircle.Trading.Settlement do
         order_by: [desc: t.date, asc: t.reference_no, asc: d.seq],
         select: %{
           id: d.id,
-          planned_mt: d.planned_mt,
-          actual_mt: d.actual_mt,
+          planned: d.planned,
+          actual: d.actual,
           seq: d.seq,
           trip_id: t.id,
           trip_date: t.date,
@@ -107,7 +107,7 @@ defmodule FullCircle.Trading.Settlement do
           doc_no: inv.invoice_no,
           doc_kind: "invoice",
           invoiceable:
-            t.status == "completed" and not is_nil(d.actual_mt) and is_nil(d.invoice_id)
+            t.status == "completed" and not is_nil(d.actual) and is_nil(d.invoice_id)
         }
       )
       |> maybe_filter_customer(customer_id)
@@ -233,7 +233,7 @@ defmodule FullCircle.Trading.Settlement do
   Commercial loads for the supplier-billing board.
 
   Includes draft/planned (visible, not selectable) and completed unbilled
-  loads with `supply_position_id` (selectable when `actual_mt` present).
+  loads with `supply_position_id` (selectable when `actual` present).
 
   Already-billed loads are excluded **unless** `:trip_id` is set (includes
   settled lines with `doc_id` / `doc_no` / `doc_kind` for the PurInvoice).
@@ -267,8 +267,8 @@ defmodule FullCircle.Trading.Settlement do
         order_by: [desc: t.date, asc: t.reference_no, asc: l.seq],
         select: %{
           id: l.id,
-          planned_mt: l.planned_mt,
-          actual_mt: l.actual_mt,
+          planned: l.planned,
+          actual: l.actual,
           seq: l.seq,
           trip_id: t.id,
           trip_date: t.date,
@@ -289,7 +289,7 @@ defmodule FullCircle.Trading.Settlement do
           doc_no: pinv.pur_invoice_no,
           doc_kind: "pur_invoice",
           billable:
-            t.status == "completed" and not is_nil(l.actual_mt) and is_nil(l.pur_invoice_id)
+            t.status == "completed" and not is_nil(l.actual) and is_nil(l.pur_invoice_id)
         }
       )
       |> maybe_filter_supplier(supplier_id)
@@ -366,7 +366,7 @@ defmodule FullCircle.Trading.Settlement do
   Haul lines for transport-agent billing (agent trips only).
 
   Matching unit is one drop with resolved origin load location.
-  Draft/planned shown (not selectable); completed + actual_mt billable.
+  Draft/planned shown (not selectable); completed + actual billable.
   Already-billed haul lines excluded **unless** `:trip_id` is set.
 
   Options: `:agent_id`, `:from_date`, `:to_date`, `:trip_id`
@@ -398,8 +398,8 @@ defmodule FullCircle.Trading.Settlement do
           order_by: [desc: t.date, asc: t.reference_no, asc: d.seq],
           select: %{
             id: d.id,
-            planned_mt: d.planned_mt,
-            actual_mt: d.actual_mt,
+            planned: d.planned,
+            actual: d.actual,
             seq: d.seq,
             supply_position_id: d.supply_position_id,
             trip_id: t.id,
@@ -456,7 +456,7 @@ defmodule FullCircle.Trading.Settlement do
         Map.merge(d, %{
           from_location_id: origin && origin.location_id,
           from_location_name: origin && origin.location_name,
-          billable: d.trip_status == "completed" and not is_nil(d.actual_mt) and is_nil(d.doc_id),
+          billable: d.trip_status == "completed" and not is_nil(d.actual) and is_nil(d.doc_id),
           # alias for shared settlement UI (party = agent)
           supplier_id: d.agent_id,
           supplier_name: d.agent_name,
@@ -545,7 +545,7 @@ defmodule FullCircle.Trading.Settlement do
         order_by: [asc: t.reference_no, asc: d.seq],
         select: %{
           drop_id: d.id,
-          actual_mt: d.actual_mt,
+          actual: d.actual,
           trip_id: t.id,
           trip_reference_no: t.reference_no
         }
@@ -570,7 +570,7 @@ defmodule FullCircle.Trading.Settlement do
         order_by: [asc: t.reference_no, asc: l.seq],
         select: %{
           load_id: l.id,
-          actual_mt: l.actual_mt,
+          actual: l.actual,
           trip_id: t.id,
           trip_reference_no: t.reference_no,
           kind: "supplier"
@@ -587,7 +587,7 @@ defmodule FullCircle.Trading.Settlement do
         order_by: [asc: t.reference_no, asc: d.seq],
         select: %{
           drop_id: d.id,
-          actual_mt: d.actual_mt,
+          actual: d.actual,
           trip_id: t.id,
           trip_reference_no: t.reference_no,
           kind: "transport"
@@ -826,7 +826,7 @@ defmodule FullCircle.Trading.Settlement do
     %{
       linked?: false,
       line_count: 0,
-      actual_mt_sum: Decimal.new(0),
+      actual_sum: Decimal.new(0),
       trip_refs: [],
       supplier_load_count: 0,
       transport_drop_count: 0
@@ -836,7 +836,7 @@ defmodule FullCircle.Trading.Settlement do
   defp build_settlement_info(rows, _kind) do
     mt =
       Enum.reduce(rows, Decimal.new(0), fn r, acc ->
-        Decimal.add(acc, r.actual_mt || Decimal.new(0))
+        Decimal.add(acc, r.actual || Decimal.new(0))
       end)
 
     refs =
@@ -848,7 +848,7 @@ defmodule FullCircle.Trading.Settlement do
     %{
       linked?: rows != [],
       line_count: length(rows),
-      actual_mt_sum: mt,
+      actual_sum: mt,
       trip_refs: refs,
       supplier_load_count: 0,
       transport_drop_count: 0
@@ -998,7 +998,7 @@ defmodule FullCircle.Trading.Settlement do
           where: not is_nil(t.transport_agent_id),
           where: t.status == "completed",
           where: is_nil(d.transport_pur_invoice_id),
-          where: not is_nil(d.actual_mt),
+          where: not is_nil(d.actual),
           order_by: [asc: t.date, asc: d.seq]
         )
         |> Repo.all()
@@ -1065,7 +1065,7 @@ defmodule FullCircle.Trading.Settlement do
     # Line is haulage service — not the grain product that was moved
     good = ensure_haulage_good(company, user)
     hauled = drop.good && drop.good.name
-    qty = drop.actual_mt
+    qty = drop.actual
     origin = resolve_origin_struct(drop)
     from_name = origin && origin.location && origin.location.name
     to_name = drop.location && drop.location.name
@@ -1231,7 +1231,7 @@ defmodule FullCircle.Trading.Settlement do
           where: t.status == "completed",
           where: is_nil(d.invoice_id),
           where: not is_nil(d.sales_position_id),
-          where: not is_nil(d.actual_mt),
+          where: not is_nil(d.actual),
           order_by: [asc: t.date, asc: d.seq]
         )
         |> Repo.all()
@@ -1301,7 +1301,7 @@ defmodule FullCircle.Trading.Settlement do
   defp detail_attrs_for_drop(drop, idx, company, user) do
     sales = drop.sales_position
     good = load_good_for_invoice(drop.good_id, company, user)
-    qty = drop.actual_mt
+    qty = drop.actual
     price = sales.unit_price || Decimal.new(0)
 
     # DetailHelpers: if unit_multiplier > 0, quantity := package_qty * unit_multiplier.
@@ -1375,7 +1375,7 @@ defmodule FullCircle.Trading.Settlement do
           where: t.status == "completed",
           where: is_nil(l.pur_invoice_id),
           where: not is_nil(l.supply_position_id),
-          where: not is_nil(l.actual_mt),
+          where: not is_nil(l.actual),
           order_by: [asc: t.date, asc: l.seq]
         )
         |> Repo.all()
@@ -1436,7 +1436,7 @@ defmodule FullCircle.Trading.Settlement do
   defp detail_attrs_for_load(load, idx, company, user) do
     supply = load.supply_position
     good = load_good_for_invoice(load.good_id, company, user)
-    qty = load.actual_mt
+    qty = load.actual
     price = supply.unit_price || Decimal.new(0)
 
     base = %{

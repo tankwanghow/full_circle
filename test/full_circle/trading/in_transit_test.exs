@@ -56,8 +56,8 @@ defmodule FullCircle.Trading.InTransitTest do
               "good_id" => good.id,
               "location_id" => port.id,
               "supply_position_id" => supply.id,
-              "planned_mt" => "50",
-              "actual_mt" => "50"
+              "planned" => "50",
+              "actual" => "50"
             }
           ],
           "drops" => [
@@ -65,15 +65,15 @@ defmodule FullCircle.Trading.InTransitTest do
               "good_id" => good.id,
               "location_id" => farm.id,
               "sales_position_id" => sales.id,
-              "planned_mt" => "30",
-              "actual_mt" => "30"
+              "planned" => "30",
+              "actual" => "30"
             },
             %{
               "good_id" => good.id,
               "location_id" => wh.id,
               "supply_position_id" => supply.id,
-              "planned_mt" => "20",
-              "actual_mt" => "20"
+              "planned" => "20",
+              "actual" => "20"
             }
           ]
         },
@@ -130,16 +130,16 @@ defmodule FullCircle.Trading.InTransitTest do
               "good_id" => good.id,
               "location_id" => port.id,
               "supply_position_id" => supply.id,
-              "planned_mt" => "40",
-              "actual_mt" => "40"
+              "planned" => "40",
+              "actual" => "40"
             }
           ],
           "drops" => [
             %{
               "good_id" => good.id,
               "location_id" => wh.id,
-              "planned_mt" => "40",
-              "actual_mt" => "40"
+              "planned" => "40",
+              "actual" => "40"
             }
           ]
         },
@@ -161,8 +161,8 @@ defmodule FullCircle.Trading.InTransitTest do
             %{
               "good_id" => good.id,
               "location_id" => wh.id,
-              "planned_mt" => "15",
-              "actual_mt" => "15"
+              "planned" => "15",
+              "actual" => "15"
             }
           ],
           "drops" => [
@@ -170,8 +170,8 @@ defmodule FullCircle.Trading.InTransitTest do
               "good_id" => good.id,
               "location_id" => farm.id,
               "sales_position_id" => sales.id,
-              "planned_mt" => "15",
-              "actual_mt" => "15"
+              "planned" => "15",
+              "actual" => "15"
             }
           ]
         },

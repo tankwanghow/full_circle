@@ -394,8 +394,8 @@ test "desk new trip modal saves and lists trip", %{conn: conn, company: company,
       status: "draft",
       good_name: good.name,
       reference_no: "DESK-T1",
-      loads: %{"0" => %{location_id: load_loc.id, supply_position_id: supply.id, planned_mt: "10", actual_mt: "10"}},
-      drops: %{"0" => %{location_id: drop_loc.id, planned_mt: "10", actual_mt: "10"}}
+      loads: %{"0" => %{location_id: load_loc.id, supply_position_id: supply.id, planned: "10", actual: "10"}},
+      drops: %{"0" => %{location_id: drop_loc.id, planned: "10", actual: "10"}}
     }
   )
   |> render_submit()

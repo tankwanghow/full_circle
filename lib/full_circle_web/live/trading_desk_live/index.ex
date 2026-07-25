@@ -260,7 +260,19 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
   end
 
   def handle_event("clear_selection", _, socket) do
-    {:noreply, socket |> assign_empty_selection() |> apply_filters()}
+    had_sales = MapSet.size(socket.assigns.selected_sales_ids) > 0
+
+    socket = assign_empty_selection(socket)
+
+    socket =
+      if had_sales do
+        # Drop auto good filters that came from the selected sales
+        sync_good_filters_from_selected_sales(socket)
+      else
+        apply_filters(socket)
+      end
+
+    {:noreply, socket}
   end
 
   def handle_event("create_trip_from_selection", _, socket) do
@@ -337,7 +349,14 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
       socket
       |> put_flash(:info, msg)
       |> then(fn s ->
-        if kind == :trip, do: assign_empty_selection(s), else: s
+        if kind == :trip do
+          s
+          |> assign_empty_selection()
+          # Clear auto good filters that came from the selected sales
+          |> sync_good_filters_from_selected_sales()
+        else
+          s
+        end
       end)
       |> load_panels()
       |> close_modal_and_normalize_url()
@@ -481,6 +500,8 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
     |> then(fn s ->
       if selecting?, do: maybe_auto_select_preferred_supply(s, id), else: s
     end)
+    # Narrow supply + warehouse boards to the selected sale goods
+    |> sync_good_filters_from_selected_sales()
   end
 
   # Out and In are mutually exclusive per warehouse row (same location×good key).
@@ -527,6 +548,28 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
     else
       socket
     end
+  end
+
+  # Set supply + warehouse "good" column filters from currently selected sales.
+  # Multiple sales → comma-OR of unique good names. No selection → clear those
+  # filters (caller only invokes this after a sales selection change).
+  defp sync_good_filters_from_selected_sales(socket) do
+    goods =
+      socket.assigns.sales_all
+      |> Enum.filter(&MapSet.member?(socket.assigns.selected_sales_ids, &1.sales.id))
+      |> Enum.map(&nested_name(&1.sales, :good))
+      |> Enum.reject(&(&1 == ""))
+      |> Enum.uniq()
+      |> Enum.join(", ")
+
+    filters =
+      socket.assigns.filters
+      |> put_in([Access.key!(:supply), Access.key!(:good)], goods)
+      |> put_in([Access.key!(:warehouse), Access.key!(:good)], goods)
+
+    socket
+    |> assign(:filters, filters)
+    |> apply_filters()
   end
 
   defp toggle_id_set(socket, set_key, id) do
@@ -2084,7 +2127,13 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
           <span class="text-zinc-400">L{l.seq || "·"}</span>
           <span>{(l.location && l.location.name) || "—"}</span>
           <span class="text-zinc-500">{(l.good && l.good.name) || ""}</span>
-          <span class="tabular-nums">{l.actual_mt || l.planned_mt || "—"} Mt</span>
+          <span class="tabular-nums">
+            {l.actual || l.planned || "—"}
+            <span :if={l.good && l.good.unit} class="text-zinc-500 font-normal">
+              {l.good.unit}
+            </span>
+          </span>
+
           <span :if={l.supply_position} class="font-mono text-zinc-500">
             {l.supply_position.title}
           </span>
@@ -2101,7 +2150,13 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
           <span class="text-zinc-400">D{d.seq || "·"}</span>
           <span>{(d.location && d.location.name) || "—"}</span>
           <span class="text-zinc-500">{(d.good && d.good.name) || ""}</span>
-          <span class="tabular-nums">{d.actual_mt || d.planned_mt || "—"} Mt</span>
+          <span class="tabular-nums">
+            {d.actual || d.planned || "—"}
+            <span :if={d.good && d.good.unit} class="text-zinc-500 font-normal">
+              {d.good.unit}
+            </span>
+          </span>
+
           <span :if={d.sales_position} class="font-mono text-zinc-500">
             {d.sales_position.title}
           </span>

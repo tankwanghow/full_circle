@@ -45,6 +45,7 @@ defmodule FullCircleWeb.TradingTripLive.DetailLines do
   attr :user_id, :string, required: true
   attr :phx_target, :any, default: nil
   attr :show_errors, :boolean, default: false
+  attr :show_crew, :boolean, default: false
 
   def drops_section(assigns) do
     ~H"""
@@ -64,8 +65,8 @@ defmodule FullCircleWeb.TradingTripLive.DetailLines do
         <div class="detail-header w-[13%]">{gettext("Good")}</div>
         <div class="detail-header w-[19%]">{gettext("Location")}</div>
         <div class="detail-header w-[14%]">{gettext("Supply")}</div>
-        <div class="detail-header w-[8%]">{gettext("Plan MT")}</div>
-        <div class="detail-header w-[8%]">{gettext("Actual MT")}</div>
+        <div class="detail-header w-[8%]">{gettext("Plan")}</div>
+        <div class="detail-header w-[8%]">{gettext("Actual")}</div>
         <div class="detail-header w-[9%]">{gettext("Variance")}</div>
         <div class="detail-header w-[3%]"></div>
         <div class="detail-header w-[3%]"></div>
@@ -73,107 +74,128 @@ defmodule FullCircleWeb.TradingTripLive.DetailLines do
 
       <.inputs_for :let={drop} field={@form[:drops]}>
         <div class={[
-          "flex flex-row",
           if(drop[:delete].value in [true, "true"], do: "hidden"),
           if(!drop.source.valid?, do: "bg-rose-50 border-l-2 border-l-rose-500")
         ]}>
-          <.input type="hidden" field={drop[:delete]} value={"#{drop[:delete].value}"} />
-          <.input type="hidden" field={drop[:seq]} />
-          <.input type="hidden" field={drop[:good_id]} />
-          <.input type="hidden" field={drop[:location_id]} />
-          <.input type="hidden" field={drop[:sales_position_id]} />
-          <.input type="hidden" field={drop[:supply_position_id]} />
-          <.input type="hidden" field={drop[:party_contact_id]} />
-          <div class="w-[3%] font-semibold text-violet-900 shrink-0 pt-4">
-            {drop[:seq].value || drop.index + 1}
+          <div class="flex flex-row">
+            <.input type="hidden" field={drop[:delete]} value={"#{drop[:delete].value}"} />
+            <.input type="hidden" field={drop[:seq]} />
+            <.input type="hidden" field={drop[:good_id]} />
+            <.input type="hidden" field={drop[:good_unit]} />
+            <.input type="hidden" field={drop[:location_id]} />
+            <.input type="hidden" field={drop[:sales_position_id]} />
+            <.input type="hidden" field={drop[:supply_position_id]} />
+            <.input type="hidden" field={drop[:party_contact_id]} />
+            <div class="w-[3%] font-semibold text-violet-900 shrink-0 pt-4">
+              {drop[:seq].value || drop.index + 1}
+            </div>
+            <div class="w-[20%]">
+              <.line_typeahead
+                field={drop[:sales_title]}
+                error_fields={[drop[:sales_title], drop[:sales_position_id]]}
+                show_errors={@show_errors}
+                url={ac_url(@company_id, @user_id, "opensales")}
+                title={drop[:sales_title].value}
+              />
+            </div>
+            <div class="w-[13%]">
+              <.line_typeahead
+                field={drop[:good_name]}
+                error_fields={[drop[:good_name], drop[:good_id]]}
+                show_errors={@show_errors}
+                url={ac_url(@company_id, @user_id, "good")}
+                title={drop[:good_name].value}
+                readonly={sales_set?(drop)}
+              />
+            </div>
+            <div class="w-[19%]">
+              <.line_typeahead
+                field={drop[:location_name]}
+                error_fields={[drop[:location_name], drop[:location_id]]}
+                show_errors={@show_errors}
+                url={
+                  ac_url(
+                    @company_id,
+                    @user_id,
+                    "tradinglocation",
+                    contact_id: drop[:party_contact_id].value
+                  )
+                }
+                title={drop[:location_name].value}
+              />
+            </div>
+            <div class="w-[14%]">
+              <.line_typeahead
+                field={drop[:supply_title]}
+                error_fields={[drop[:supply_title], drop[:supply_position_id]]}
+                show_errors={@show_errors}
+                url={ac_url(@company_id, @user_id, "opensupply", good_id: drop[:good_id].value)}
+                title={drop[:supply_title].value}
+              />
+            </div>
+            <div class="w-[8%]">
+              <.line_number
+                field={drop[:planned]}
+                show_errors={@show_errors}
+                unit={drop[:good_unit].value}
+              />
+            </div>
+            <div class="w-[8%]">
+              <.line_number
+                field={drop[:actual]}
+                show_errors={@show_errors}
+                unit={drop[:good_unit].value}
+              />
+            </div>
+            <div class="w-[9%]">
+              <.line_text field={drop[:variance_note]} />
+            </div>
+            <div class="w-[3%] flex flex-col items-center justify-center gap-0 text-violet-800 shrink-0">
+              <.link
+                phx-click="move_drop"
+                phx-value-index={drop.index}
+                phx-value-dir="up"
+                phx-target={@phx_target}
+                tabindex="-1"
+                title={gettext("Move up (deliver earlier)")}
+                class="hover:text-violet-950"
+              >
+                <.icon name="hero-chevron-up" class="h-4 w-4" />
+              </.link>
+              <.link
+                phx-click="move_drop"
+                phx-value-index={drop.index}
+                phx-value-dir="down"
+                phx-target={@phx_target}
+                tabindex="-1"
+                title={gettext("Move down (deliver later)")}
+                class="hover:text-violet-950"
+              >
+                <.icon name="hero-chevron-down" class="h-4 w-4" />
+              </.link>
+            </div>
+            <div class="w-[3%] text-rose-500 shrink-0">
+              <.link
+                phx-click="delete_drop"
+                phx-value-index={drop.index}
+                phx-target={@phx_target}
+                tabindex="-1"
+              >
+                <.icon name="hero-trash-solid" class="h-5 w-5 mt-5" />
+              </.link>
+            </div>
           </div>
-          <div class="w-[20%]">
-            <.line_typeahead
-              field={drop[:sales_title]}
-              error_fields={[drop[:sales_title], drop[:sales_position_id]]}
-              show_errors={@show_errors}
-              url={ac_url(@company_id, @user_id, "opensales")}
-              title={drop[:sales_title].value}
-            />
-          </div>
-          <div class="w-[13%]">
-            <.line_typeahead
-              field={drop[:good_name]}
-              error_fields={[drop[:good_name], drop[:good_id]]}
-              show_errors={@show_errors}
-              url={ac_url(@company_id, @user_id, "good")}
-              title={drop[:good_name].value}
-              readonly={sales_set?(drop)}
-            />
-          </div>
-          <div class="w-[19%]">
-            <.line_typeahead
-              field={drop[:location_name]}
-              error_fields={[drop[:location_name], drop[:location_id]]}
-              show_errors={@show_errors}
-              url={
-                ac_url(
-                  @company_id,
-                  @user_id,
-                  "tradinglocation",
-                  contact_id: drop[:party_contact_id].value
-                )
-              }
-              title={drop[:location_name].value}
-            />
-          </div>
-          <div class="w-[14%]">
-            <.line_typeahead
-              field={drop[:supply_title]}
-              error_fields={[drop[:supply_title], drop[:supply_position_id]]}
-              show_errors={@show_errors}
-              url={ac_url(@company_id, @user_id, "opensupply", good_id: drop[:good_id].value)}
-              title={drop[:supply_title].value}
-            />
-          </div>
-          <div class="w-[8%]">
-            <.line_number field={drop[:planned_mt]} show_errors={@show_errors} />
-          </div>
-          <div class="w-[8%]">
-            <.line_number field={drop[:actual_mt]} show_errors={@show_errors} />
-          </div>
-          <div class="w-[9%]">
-            <.line_text field={drop[:variance_note]} />
-          </div>
-          <div class="w-[3%] flex flex-col items-center justify-center gap-0 text-violet-800 shrink-0">
-            <.link
-              phx-click="move_drop"
-              phx-value-index={drop.index}
-              phx-value-dir="up"
-              phx-target={@phx_target}
-              tabindex="-1"
-              title={gettext("Move up (deliver earlier)")}
-              class="hover:text-violet-950"
-            >
-              <.icon name="hero-chevron-up" class="h-4 w-4" />
-            </.link>
-            <.link
-              phx-click="move_drop"
-              phx-value-index={drop.index}
-              phx-value-dir="down"
-              phx-target={@phx_target}
-              tabindex="-1"
-              title={gettext("Move down (deliver later)")}
-              class="hover:text-violet-950"
-            >
-              <.icon name="hero-chevron-down" class="h-4 w-4" />
-            </.link>
-          </div>
-          <div class="w-[3%] text-rose-500 shrink-0">
-            <.link
-              phx-click="delete_drop"
-              phx-value-index={drop.index}
-              phx-target={@phx_target}
-              tabindex="-1"
-            >
-              <.icon name="hero-trash-solid" class="h-5 w-5 mt-5" />
-            </.link>
-          </div>
+          <.crew_row
+            :if={@show_crew}
+            line={drop}
+            crew_field={:trip_drop_employees}
+            label={gettext("Drop crew")}
+            remove_event="remove_drop_crew"
+            tone={:drop}
+            company_id={@company_id}
+            user_id={@user_id}
+            phx_target={@phx_target}
+          />
         </div>
       </.inputs_for>
 
@@ -194,6 +216,7 @@ defmodule FullCircleWeb.TradingTripLive.DetailLines do
   attr :phx_target, :any, default: nil
   attr :drop_good_ids, :list, default: []
   attr :show_errors, :boolean, default: false
+  attr :show_crew, :boolean, default: false
 
   def loads_section(assigns) do
     ~H"""
@@ -222,8 +245,8 @@ defmodule FullCircleWeb.TradingTripLive.DetailLines do
         <div class="detail-header w-[23%]">{gettext("Supply")}</div>
         <div class="detail-header w-[14%]">{gettext("Good")}</div>
         <div class="detail-header w-[24%]">{gettext("Location")}</div>
-        <div class="detail-header w-[9%]">{gettext("Plan MT")}</div>
-        <div class="detail-header w-[9%]">{gettext("Actual MT")}</div>
+        <div class="detail-header w-[9%]">{gettext("Plan")}</div>
+        <div class="detail-header w-[9%]">{gettext("Actual")}</div>
         <div class="detail-header w-[12%]">{gettext("Note")}</div>
         <div class="detail-header w-[3%]"></div>
         <div class="detail-header w-[3%]"></div>
@@ -231,104 +254,125 @@ defmodule FullCircleWeb.TradingTripLive.DetailLines do
 
       <.inputs_for :let={load} field={@form[:loads]}>
         <div class={[
-          "flex flex-row",
           if(load[:delete].value in [true, "true"], do: "hidden"),
           if(!load.source.valid?, do: "bg-rose-50 border-l-2 border-l-rose-500")
         ]}>
-          <.input type="hidden" field={load[:delete]} value={"#{load[:delete].value}"} />
-          <.input type="hidden" field={load[:seq]} />
-          <.input type="hidden" field={load[:good_id]} />
-          <.input type="hidden" field={load[:location_id]} />
-          <.input type="hidden" field={load[:supply_position_id]} />
-          <.input type="hidden" field={load[:party_contact_id]} />
-          <div class="w-[3%] font-semibold text-sky-900 shrink-0 pt-4">
-            {load[:seq].value || load.index + 1}
+          <div class="flex flex-row">
+            <.input type="hidden" field={load[:delete]} value={"#{load[:delete].value}"} />
+            <.input type="hidden" field={load[:seq]} />
+            <.input type="hidden" field={load[:good_id]} />
+            <.input type="hidden" field={load[:good_unit]} />
+            <.input type="hidden" field={load[:location_id]} />
+            <.input type="hidden" field={load[:supply_position_id]} />
+            <.input type="hidden" field={load[:party_contact_id]} />
+            <div class="w-[3%] font-semibold text-sky-900 shrink-0 pt-4">
+              {load[:seq].value || load.index + 1}
+            </div>
+            <div class="w-[23%]">
+              <.line_typeahead
+                field={load[:supply_title]}
+                error_fields={[load[:supply_title], load[:supply_position_id]]}
+                show_errors={@show_errors}
+                url={
+                  ac_url(
+                    @company_id,
+                    @user_id,
+                    "opensupply",
+                    supply_filter_opts(load[:good_id].value, @drop_good_ids)
+                  )
+                }
+                title={load[:supply_title].value}
+              />
+            </div>
+            <div class="w-[14%]">
+              <.line_typeahead
+                field={load[:good_name]}
+                error_fields={[load[:good_name], load[:good_id]]}
+                show_errors={@show_errors}
+                url={ac_url(@company_id, @user_id, "good")}
+                title={load[:good_name].value}
+                readonly={supply_set?(load)}
+              />
+            </div>
+            <div class="w-[24%]">
+              <.line_typeahead
+                field={load[:location_name]}
+                error_fields={[load[:location_name], load[:location_id]]}
+                show_errors={@show_errors}
+                url={
+                  ac_url(
+                    @company_id,
+                    @user_id,
+                    "tradinglocation",
+                    contact_id: load[:party_contact_id].value
+                  )
+                }
+                title={load[:location_name].value}
+              />
+            </div>
+            <div class="w-[9%]">
+              <.line_number
+                field={load[:planned]}
+                show_errors={@show_errors}
+                unit={load[:good_unit].value}
+              />
+            </div>
+            <div class="w-[9%]">
+              <.line_number
+                field={load[:actual]}
+                show_errors={@show_errors}
+                unit={load[:good_unit].value}
+              />
+            </div>
+            <div class="w-[12%]">
+              <.line_text field={load[:location_note]} />
+            </div>
+            <div class="w-[3%] flex flex-col items-center justify-center gap-0 text-sky-800 shrink-0">
+              <.link
+                phx-click="move_load"
+                phx-value-index={load.index}
+                phx-value-dir="up"
+                phx-target={@phx_target}
+                tabindex="-1"
+                title={gettext("Move up (load earlier)")}
+                class="hover:text-sky-950"
+              >
+                <.icon name="hero-chevron-up" class="h-4 w-4" />
+              </.link>
+              <.link
+                phx-click="move_load"
+                phx-value-index={load.index}
+                phx-value-dir="down"
+                phx-target={@phx_target}
+                tabindex="-1"
+                title={gettext("Move down (load later)")}
+                class="hover:text-sky-950"
+              >
+                <.icon name="hero-chevron-down" class="h-4 w-4" />
+              </.link>
+            </div>
+            <div class="w-[3%] text-rose-500 shrink-0">
+              <.link
+                phx-click="delete_load"
+                phx-value-index={load.index}
+                phx-target={@phx_target}
+                tabindex="-1"
+              >
+                <.icon name="hero-trash-solid" class="h-5 w-5 mt-5" />
+              </.link>
+            </div>
           </div>
-          <div class="w-[23%]">
-            <.line_typeahead
-              field={load[:supply_title]}
-              error_fields={[load[:supply_title], load[:supply_position_id]]}
-              show_errors={@show_errors}
-              url={
-                ac_url(
-                  @company_id,
-                  @user_id,
-                  "opensupply",
-                  supply_filter_opts(load[:good_id].value, @drop_good_ids)
-                )
-              }
-              title={load[:supply_title].value}
-            />
-          </div>
-          <div class="w-[14%]">
-            <.line_typeahead
-              field={load[:good_name]}
-              error_fields={[load[:good_name], load[:good_id]]}
-              show_errors={@show_errors}
-              url={ac_url(@company_id, @user_id, "good")}
-              title={load[:good_name].value}
-              readonly={supply_set?(load)}
-            />
-          </div>
-          <div class="w-[24%]">
-            <.line_typeahead
-              field={load[:location_name]}
-              error_fields={[load[:location_name], load[:location_id]]}
-              show_errors={@show_errors}
-              url={
-                ac_url(
-                  @company_id,
-                  @user_id,
-                  "tradinglocation",
-                  contact_id: load[:party_contact_id].value
-                )
-              }
-              title={load[:location_name].value}
-            />
-          </div>
-          <div class="w-[9%]">
-            <.line_number field={load[:planned_mt]} show_errors={@show_errors} />
-          </div>
-          <div class="w-[9%]">
-            <.line_number field={load[:actual_mt]} show_errors={@show_errors} />
-          </div>
-          <div class="w-[12%]">
-            <.line_text field={load[:location_note]} />
-          </div>
-          <div class="w-[3%] flex flex-col items-center justify-center gap-0 text-sky-800 shrink-0">
-            <.link
-              phx-click="move_load"
-              phx-value-index={load.index}
-              phx-value-dir="up"
-              phx-target={@phx_target}
-              tabindex="-1"
-              title={gettext("Move up (load earlier)")}
-              class="hover:text-sky-950"
-            >
-              <.icon name="hero-chevron-up" class="h-4 w-4" />
-            </.link>
-            <.link
-              phx-click="move_load"
-              phx-value-index={load.index}
-              phx-value-dir="down"
-              phx-target={@phx_target}
-              tabindex="-1"
-              title={gettext("Move down (load later)")}
-              class="hover:text-sky-950"
-            >
-              <.icon name="hero-chevron-down" class="h-4 w-4" />
-            </.link>
-          </div>
-          <div class="w-[3%] text-rose-500 shrink-0">
-            <.link
-              phx-click="delete_load"
-              phx-value-index={load.index}
-              phx-target={@phx_target}
-              tabindex="-1"
-            >
-              <.icon name="hero-trash-solid" class="h-5 w-5 mt-5" />
-            </.link>
-          </div>
+          <.crew_row
+            :if={@show_crew}
+            line={load}
+            crew_field={:trip_load_employees}
+            label={gettext("Load crew")}
+            remove_event="remove_load_crew"
+            tone={:load}
+            company_id={@company_id}
+            user_id={@user_id}
+            phx_target={@phx_target}
+          />
         </div>
       </.inputs_for>
 
@@ -339,6 +383,76 @@ defmodule FullCircleWeb.TradingTripLive.DetailLines do
           </.link>
         </div>
       </div>
+    </div>
+    """
+  end
+
+  attr :line, :any, required: true
+  attr :crew_field, :atom, required: true
+  attr :label, :string, required: true
+  attr :remove_event, :string, required: true
+  attr :tone, :atom, default: :load
+  attr :company_id, :string, required: true
+  attr :user_id, :string, required: true
+  attr :phx_target, :any, default: nil
+
+  defp crew_row(assigns) do
+    tone_cls =
+      case assigns.tone do
+        :drop -> "bg-violet-50/80 border-violet-200 text-violet-900"
+        _ -> "bg-sky-50/80 border-sky-200 text-sky-900"
+      end
+
+    assigns = assign(assigns, :tone_cls, tone_cls)
+
+    ~H"""
+    <div class={["mx-1 mb-1.5 mt-0.5 rounded border px-2 py-1.5 text-left", @tone_cls]}>
+      <.input type="hidden" field={@line[:crew_locked]} value={"#{@line[:crew_locked].value}"} />
+      <div class="flex flex-wrap items-center gap-1.5">
+        <span class="inline-flex items-center gap-1 text-[11px] font-semibold shrink-0">
+          <.icon name="hero-user-group" class="w-3.5 h-3.5" />
+          {@label}
+        </span>
+        <.inputs_for :let={crew} field={@line[@crew_field]}>
+          <div class={crew[:delete].value in [true, "true"] && "hidden"}>
+            <.input type="hidden" field={crew[:delete]} value={"#{crew[:delete].value}"} />
+            <.input type="hidden" field={crew[:employee_id]} />
+            <.input type="hidden" field={crew[:employee_name]} />
+            <span class="inline-flex items-center gap-0.5 rounded-full border border-zinc-300 bg-white px-2 py-0.5 text-xs text-zinc-800 shadow-sm">
+              {crew[:employee_name].value || gettext("Worker")}
+              <.link
+                phx-click={@remove_event}
+                phx-value-line={@line.index}
+                phx-value-crew={crew.index}
+                phx-target={@phx_target}
+                tabindex="-1"
+                class="ml-0.5 text-zinc-400 hover:text-rose-600"
+                title={gettext("Remove")}
+              >
+                <.icon name="hero-x-mark" class="w-3.5 h-3.5" />
+              </.link>
+            </span>
+          </div>
+        </.inputs_for>
+        <div class="min-w-[10rem] flex-1 max-w-xs">
+          <input
+            type="text"
+            id={"#{@line.id}_crew_add_name"}
+            name={@line[:crew_add_name].name}
+            value={Phoenix.HTML.Form.normalize_value("text", @line[:crew_add_name].value)}
+            phx-hook="tributeAutoComplete"
+            url={ac_url(@company_id, @user_id, "employee")}
+            placeholder={gettext("Add worker…")}
+            autocomplete="off"
+            class="block w-full h-7 rounded border border-zinc-300 bg-white px-2 text-xs text-zinc-900 focus:ring-0 focus:border-zinc-400"
+          />
+        </div>
+      </div>
+      <p class="text-[10px] text-zinc-500 mt-0.5 leading-tight">
+        {gettext(
+          "Each person gets the full line actual for payroll. Crew fills down to following lines until you change them."
+        )}
+      </p>
     </div>
     """
   end
@@ -386,15 +500,18 @@ defmodule FullCircleWeb.TradingTripLive.DetailLines do
 
   attr :field, Phoenix.HTML.FormField, required: true
   attr :show_errors, :boolean, default: false
+  attr :unit, :any, default: nil
 
   defp line_number(assigns) do
     errors = collect_line_errors([assigns.field], assigns.field, assigns.show_errors)
+    unit = unit_label(assigns.unit)
 
     assigns =
       assigns
       |> assign(:num_class, @num_class)
       |> assign(:errors, errors)
       |> assign(:has_error, errors != [])
+      |> assign(:unit_label, unit)
 
     ~H"""
     <div class="w-full min-w-0 flex flex-col">
@@ -409,10 +526,21 @@ defmodule FullCircleWeb.TradingTripLive.DetailLines do
           @has_error && "border-rose-400 focus:border-rose-400"
         ]}
       />
+      <span
+        :if={@unit_label}
+        class="text-[10px] leading-none text-zinc-500 text-right mt-0.5 tabular-nums"
+      >
+        {@unit_label}
+      </span>
       <.error :for={msg <- @errors}>{msg}</.error>
     </div>
     """
   end
+
+  defp unit_label(nil), do: nil
+  defp unit_label(""), do: nil
+  defp unit_label(u) when is_binary(u), do: String.trim(u) |> then(fn s -> if s == "", do: nil, else: s end)
+  defp unit_label(_), do: nil
 
   attr :field, Phoenix.HTML.FormField, required: true
 

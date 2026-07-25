@@ -523,9 +523,9 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
     end
   end
 
-  defp display_mt(%{actual_mt: %Decimal{} = a}), do: a
-  defp display_mt(%{actual_mt: a}) when not is_nil(a), do: a
-  defp display_mt(%{planned_mt: p}), do: p
+  defp display_mt(%{actual: %Decimal{} = a}), do: a
+  defp display_mt(%{actual: a}) when not is_nil(a), do: a
+  defp display_mt(%{planned: p}), do: p
   defp display_mt(_), do: Decimal.new(0)
 
   defp selected_total_mt(rows, selected) do
@@ -1132,7 +1132,7 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
       <div class="w-1/12 text-right tabular-nums">
         {display_mt(row)}
         <span
-          :if={is_nil(row.actual_mt) and not is_nil(row.planned_mt)}
+          :if={is_nil(row.actual) and not is_nil(row.planned)}
           class="text-xs text-gray-400"
           title={gettext("Planned (no actual yet)")}
         >

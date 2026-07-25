@@ -95,8 +95,8 @@ defmodule FullCircle.TradingFixtures do
       attrs
       |> Map.put_new("loads", [
         %{
-          "planned_mt" => "1",
-          "actual_mt" => "1",
+          "planned" => "1",
+          "actual" => "1",
           "good_id" => good_id,
           "location_id" =>
             attrs["load_location_id"] || location_fixture(company, user, %{"kind" => "port"}).id
@@ -104,8 +104,8 @@ defmodule FullCircle.TradingFixtures do
       ])
       |> Map.put_new("drops", [
         %{
-          "planned_mt" => "1",
-          "actual_mt" => "1",
+          "planned" => "1",
+          "actual" => "1",
           "good_id" => good_id,
           "location_id" =>
             attrs["drop_location_id"] ||

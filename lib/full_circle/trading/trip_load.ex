@@ -3,8 +3,8 @@ defmodule FullCircle.Trading.TripLoad do
   import Ecto.Changeset
 
   schema "trading_trip_loads" do
-    field :planned_mt, :decimal
-    field :actual_mt, :decimal
+    field :planned, :decimal
+    field :actual, :decimal
     field :location_note, :string
     # Load order: 1 = first onto truck (deepest / FILO)
     field :seq, :integer, default: 0
@@ -13,6 +13,12 @@ defmodule FullCircle.Trading.TripLoad do
     field :location_name, :string, virtual: true
     field :supply_title, :string, virtual: true
     field :good_name, :string, virtual: true
+    # Display only — qty fields use Good.unit
+    field :good_unit, :string, virtual: true
+    # Typeahead to add a worker to trip_load_employees (cleared after add)
+    field :crew_add_name, :string, virtual: true
+    # true once user edits this line's crew — blocks fill-down from earlier lines
+    field :crew_locked, :boolean, virtual: true, default: false
     # Supplier contact for location typeahead filter (from supply)
     field :party_contact_id, :binary_id, virtual: true
     field :delete, :boolean, virtual: true, default: false
@@ -43,8 +49,8 @@ defmodule FullCircle.Trading.TripLoad do
         "pur_invoice_id"
       ]),
       [
-        :planned_mt,
-        :actual_mt,
+        :planned,
+        :actual,
         :location_note,
         :seq,
         :trip_id,
@@ -55,14 +61,17 @@ defmodule FullCircle.Trading.TripLoad do
         :location_name,
         :supply_title,
         :good_name,
+        :good_unit,
+        :crew_add_name,
+        :crew_locked,
         :party_contact_id,
         :delete
       ]
     )
     |> cast_assoc(:trip_load_employees, with: &FullCircle.Trading.TripLoadEmployee.changeset/2)
     |> validate_required([:location_id, :good_id])
-    |> validate_number(:planned_mt, greater_than_or_equal_to: 0)
-    |> validate_number(:actual_mt, greater_than_or_equal_to: 0)
+    |> validate_number(:planned, greater_than_or_equal_to: 0)
+    |> validate_number(:actual, greater_than_or_equal_to: 0)
     |> foreign_key_constraint(:trip_id)
     |> foreign_key_constraint(:good_id)
     |> foreign_key_constraint(:supply_position_id)

@@ -45,7 +45,6 @@ defmodule FullCircleWeb.TradingTripLive.Print do
         </div>
         <div class="doctype is-size-4 has-text-weight-semibold">{gettext("TRIP — LOADS")}</div>
         {trip_header(assigns)}
-        <div class="section-title is-size-5 has-text-weight-semibold">{gettext("Loads")}</div>
         <table class="line-table is-size-6">
           <thead>
             <tr>
@@ -54,25 +53,52 @@ defmodule FullCircleWeb.TradingTripLive.Print do
               <th>{gettext("Supplier")}</th>
               <th>{gettext("Good")}</th>
               <th>{gettext("Location")}</th>
-              <th class="num">{gettext("Plan MT")}</th>
-              <th class="num">{gettext("Actual MT")}</th>
-              <th>{gettext("Note")}</th>
+              <th class="num">{gettext("Plan")}</th>
+              <th class="num">{gettext("Actual")}</th>
             </tr>
           </thead>
           <tbody>
-            <tr :for={{load, i} <- Enum.with_index(@loads, 1)}>
-              <td class="c">{load.seq || i}</td>
-              <td>{load.supply_position && load.supply_position.title}</td>
-              <td>{supplier_name(load)}</td>
-              <td>{load.good && load.good.name}</td>
-              <td>{load.location && load.location.name}</td>
-              <td class="num">{format_qty(load.planned_mt)}</td>
-              <td class="num">{format_qty(load.actual_mt)}</td>
-              <td>{load.location_note}</td>
-            </tr>
-            <tr :if={@loads == []}>
-              <td colspan="8" class="c muted">{gettext("No loads")}</td>
-            </tr>
+            <%= for {load, i} <- Enum.with_index(@loads, 1) do %>
+              <% note? = present_text?(load.location_note)
+                 crew = crew_names(load.trip_load_employees)
+                 crew? = crew != ""
+                 rowspan = 1 + if(note?, do: 1, else: 0) + if(crew?, do: 1, else: 0) %>
+              <tr>
+                <td class="c" rowspan={rowspan}>{load.seq || i}</td>
+                <td>{load.supply_position && load.supply_position.title}</td>
+                <td>{supplier_name(load)}</td>
+                <td>
+                  {load.good && load.good.name}
+                  <%= if load.good && load.good.unit do %>
+                    <span class="muted"> ({load.good.unit})</span>
+                  <% end %>
+                </td>
+                <td>{load.location && load.location.name}</td>
+                <td class="num">{format_qty(load.planned)}</td>
+                <td class="num">{format_qty(load.actual)}</td>
+              </tr>
+              <%= if note? do %>
+                <tr class="sub-row">
+                  <td colspan="6">
+                    <span class="sub-label">{gettext("Note")}:</span>
+                    {load.location_note}
+                  </td>
+                </tr>
+              <% end %>
+              <%= if crew? do %>
+                <tr class="sub-row">
+                  <td colspan="6">
+                    <span class="sub-label">{gettext("Crew")}:</span>
+                    {crew}
+                  </td>
+                </tr>
+              <% end %>
+            <% end %>
+            <%= if @loads == [] do %>
+              <tr>
+                <td colspan="7" class="c muted">{gettext("No loads")}</td>
+              </tr>
+            <% end %>
           </tbody>
         </table>
         {if(@pre_print == "true", do: "", else: loads_foot(assigns))}
@@ -85,7 +111,6 @@ defmodule FullCircleWeb.TradingTripLive.Print do
         </div>
         <div class="doctype is-size-4 has-text-weight-semibold">{gettext("TRIP - Deliver")}</div>
         {trip_header(assigns)}
-        <div class="section-title is-size-5 has-text-weight-semibold">{gettext("Drops")}</div>
         <table class="line-table is-size-6">
           <thead>
             <tr>
@@ -95,26 +120,54 @@ defmodule FullCircleWeb.TradingTripLive.Print do
               <th>{gettext("Good")}</th>
               <th>{gettext("Location")}</th>
               <th>{gettext("Supply")}</th>
-              <th class="num">{gettext("Plan MT")}</th>
-              <th class="num">{gettext("Actual MT")}</th>
-              <th>{gettext("Variance")}</th>
+              <th class="num">{gettext("Plan")}</th>
+              <th class="num">{gettext("Actual")}</th>
             </tr>
           </thead>
           <tbody>
-            <tr :for={{drop, i} <- Enum.with_index(@drops, 1)}>
-              <td class="c">{drop.seq || i}</td>
-              <td>{drop.sales_position && drop.sales_position.title}</td>
-              <td>{customer_name(drop)}</td>
-              <td>{drop.good && drop.good.name}</td>
-              <td>{drop.location && drop.location.name}</td>
-              <td>{drop.supply_position && drop.supply_position.title}</td>
-              <td class="num">{format_qty(drop.planned_mt)}</td>
-              <td class="num">{format_qty(drop.actual_mt)}</td>
-              <td>{drop.variance_note}</td>
-            </tr>
-            <tr :if={@drops == []}>
-              <td colspan="9" class="c muted">{gettext("No drops")}</td>
-            </tr>
+            <%= for {drop, i} <- Enum.with_index(@drops, 1) do %>
+              <% note? = present_text?(drop.variance_note) or present_text?(drop.location_note)
+                 note_text = drop_note_text(drop)
+                 crew = crew_names(drop.trip_drop_employees)
+                 crew? = crew != ""
+                 rowspan = 1 + if(note?, do: 1, else: 0) + if(crew?, do: 1, else: 0) %>
+              <tr>
+                <td class="c" rowspan={rowspan}>{drop.seq || i}</td>
+                <td>{drop.sales_position && drop.sales_position.title}</td>
+                <td>{customer_name(drop)}</td>
+                <td>
+                  {drop.good && drop.good.name}
+                  <%= if drop.good && drop.good.unit do %>
+                    <span class="muted"> ({drop.good.unit})</span>
+                  <% end %>
+                </td>
+                <td>{drop.location && drop.location.name}</td>
+                <td>{drop.supply_position && drop.supply_position.title}</td>
+                <td class="num">{format_qty(drop.planned)}</td>
+                <td class="num">{format_qty(drop.actual)}</td>
+              </tr>
+              <%= if note? do %>
+                <tr class="sub-row">
+                  <td colspan="7">
+                    <span class="sub-label">{gettext("Note")}:</span>
+                    {note_text}
+                  </td>
+                </tr>
+              <% end %>
+              <%= if crew? do %>
+                <tr class="sub-row">
+                  <td colspan="7">
+                    <span class="sub-label">{gettext("Crew")}:</span>
+                    {crew}
+                  </td>
+                </tr>
+              <% end %>
+            <% end %>
+            <%= if @drops == [] do %>
+              <tr>
+                <td colspan="8" class="c muted">{gettext("No drops")}</td>
+              </tr>
+            <% end %>
           </tbody>
         </table>
         {if(@pre_print == "true", do: "", else: drops_foot(assigns))}
@@ -167,6 +220,32 @@ defmodule FullCircleWeb.TradingTripLive.Print do
   defp format_qty(nil), do: "—"
   defp format_qty(v), do: to_string(v)
 
+  defp present_text?(nil), do: false
+  defp present_text?(""), do: false
+  defp present_text?(s) when is_binary(s), do: String.trim(s) != ""
+  defp present_text?(_), do: false
+
+  defp crew_names(nil), do: ""
+
+  defp crew_names(rows) do
+    rows
+    |> List.wrap()
+    |> Enum.map(fn
+      %{employee: %{name: name}} when is_binary(name) -> String.trim(name)
+      %{employee_name: name} when is_binary(name) -> String.trim(name)
+      _ -> ""
+    end)
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.join(", ")
+  end
+
+  defp drop_note_text(drop) do
+    [drop.variance_note, drop.location_note]
+    |> Enum.filter(&present_text?/1)
+    |> Enum.map(&String.trim/1)
+    |> Enum.join(" · ")
+  end
+
   def letter_head_data(assigns) do
     ~H"""
     <div class="is-size-3 has-text-weight-bold">{@company.name}</div>
@@ -210,7 +289,7 @@ defmodule FullCircleWeb.TradingTripLive.Print do
     ~H"""
     <style>
       .letter-head { border-bottom: 0.5mm solid black; }
-      .letter-foot { border-top: 0.5mm solid black; margin-top: 10mm; overflow: auto; }
+      .letter-foot {  margin-top: 10mm; overflow: auto; }
       .sign { padding: 3mm; border-top: 2px dotted black; width: 28%; text-align: center; float: right; margin-left: 3mm; margin-top: 16mm; }
     </style>
     """
@@ -231,14 +310,15 @@ defmodule FullCircleWeb.TradingTripLive.Print do
       .doc-header .left { float: left; width: 58%; }
       .doc-header .right { float: right; text-align: right; }
       .doc-header .left div, .doc-header .right div { margin-bottom: 1.2mm; }
-      .notes { margin: 2mm 0 3mm; white-space: pre-wrap; }
-      .section-title { margin: 4mm 0 1.5mm; clear: both; }
+      .notes { margin: 1mm 0 2mm; }
       .line-table { width: 100%; border-collapse: collapse; margin-bottom: 3mm; }
-      .line-table th, .line-table td { border: 0.3mm solid #333; padding: 1.5mm 2mm; vertical-align: top; }
+      .line-table th, .line-table td { border: 0.3mm solid #333; padding: 1.5mm 2mm; vertical-align: top; font-size: 0.85em; }
       .line-table th { background: #eee; font-weight: 600; text-align: left; }
       .line-table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
       .line-table .c { text-align: center; width: 8mm; }
       .line-table .muted { color: #666; font-style: italic; }
+      .line-table tr.sub-row td { border-top: none; background: #fafafa; font-size: 0.75em; min-height: 6mm; }
+      .line-table .sub-label { font-weight: 600; margin-right: 1.5mm; }
     </style>
     """
   end

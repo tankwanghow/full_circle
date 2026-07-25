@@ -294,8 +294,9 @@ defmodule FullCircle.Trading do
   end
 
   @doc """
-  Autocomplete: active supplies (open/hold/collect) by title or supplier name.
-  Value is unique supply title (system no); list shows \"title · supplier\".
+  Autocomplete: active supplies (open/hold/collect) by title, good, or supplier.
+  Value is unique supply title (system no); list shows
+  \"title · good · supplier\". Optional `good_id` / `good_ids` filter.
   """
   def open_supply_position_names(terms, company, user, opts \\ []) do
     if Authorization.can?(user, :view_trading, company) do
@@ -305,13 +306,17 @@ defmodule FullCircle.Trading do
       q =
         from(s in SupplyPosition,
           join: c in assoc(s, :supplier),
+          join: g in assoc(s, :good),
           where: s.company_id == ^company.id,
           where: s.status in ^active,
           where: not is_nil(s.title) and s.title != "",
-          where: ilike(s.title, ^"%#{terms}%") or ilike(c.name, ^"%#{terms}%"),
+          where:
+            ilike(s.title, ^"%#{terms}%") or ilike(c.name, ^"%#{terms}%") or
+              ilike(g.name, ^"%#{terms}%"),
           select: %{
             id: s.id,
-            value: fragment("? || ' · ' || ?", s.title, c.name)
+            value:
+              fragment("? || ' · ' || ? || ' · ' || ?", s.title, g.name, c.name)
           },
           order_by: [asc: s.title]
         )
@@ -330,7 +335,7 @@ defmodule FullCircle.Trading do
 
   @doc """
   Resolve loadable/active supply by typeahead label or exact title.
-  Accepts \"SUP-000001 · Supplier\" or \"SUP-000001\".
+  Accepts \"SUP-000001 · Good · Supplier\", \"SUP-000001 · Supplier\", or \"SUP-000001\".
   """
   def get_open_supply_position_by_title(label, company, user) do
     title = typeahead_key(label)
@@ -685,7 +690,7 @@ defmodule FullCircle.Trading do
 
     from(s in SalesPosition,
       where: s.id == ^id and s.company_id == ^company.id,
-      preload: [:customer, :good, :preferred_supply]
+      preload: [:customer, :good, preferred_supply: [:supplier, :good]]
     )
     |> Repo.one!()
   end
@@ -988,7 +993,7 @@ defmodule FullCircle.Trading do
                 status: t.status,
                 vehicle_number: t.vehicle_number,
                 agent_name: a.name,
-                qty: coalesce(sum(fragment("coalesce(?, ?)", l.actual_mt, l.planned_mt)), 0)
+                qty: coalesce(sum(fragment("coalesce(?, ?)", l.actual, l.planned)), 0)
               }
             )
             |> Repo.all()
@@ -1021,7 +1026,7 @@ defmodule FullCircle.Trading do
                 status: t.status,
                 vehicle_number: t.vehicle_number,
                 agent_name: a.name,
-                qty: coalesce(sum(fragment("coalesce(?, ?)", d.actual_mt, d.planned_mt)), 0)
+                qty: coalesce(sum(fragment("coalesce(?, ?)", d.actual, d.planned)), 0)
               }
             )
             |> Repo.all()
@@ -1055,7 +1060,7 @@ defmodule FullCircle.Trading do
                 status: t.status,
                 vehicle_number: t.vehicle_number,
                 agent_name: a.name,
-                qty: coalesce(sum(fragment("coalesce(?, ?)", d.actual_mt, d.planned_mt)), 0)
+                qty: coalesce(sum(fragment("coalesce(?, ?)", d.actual, d.planned)), 0)
               }
             )
             |> Repo.all()
@@ -1089,7 +1094,7 @@ defmodule FullCircle.Trading do
                 status: t.status,
                 vehicle_number: t.vehicle_number,
                 agent_name: a.name,
-                qty: coalesce(sum(fragment("coalesce(?, ?)", l.actual_mt, l.planned_mt)), 0)
+                qty: coalesce(sum(fragment("coalesce(?, ?)", l.actual, l.planned)), 0)
               }
             )
             |> Repo.all()
@@ -1141,8 +1146,8 @@ defmodule FullCircle.Trading do
             inserted_at: t.inserted_at,
             location_name: loc.name,
             unit: g.unit,
-            planned_mt: l.planned_mt,
-            actual_mt: l.actual_mt,
+            planned: l.planned,
+            actual: l.actual,
             notes: l.location_note
           }
         )
@@ -1172,8 +1177,8 @@ defmodule FullCircle.Trading do
             location_name: loc.name,
             unit: g.unit,
             party_name: fragment("coalesce(?, ?)", c.name, s.title),
-            planned_mt: d.planned_mt,
-            actual_mt: d.actual_mt,
+            planned: d.planned,
+            actual: d.actual,
             notes: fragment("coalesce(?, ?)", d.variance_note, d.location_note)
           }
         )
@@ -1218,8 +1223,8 @@ defmodule FullCircle.Trading do
             location_name: loc.name,
             unit: g.unit,
             party_name: sp.title,
-            planned_mt: d.planned_mt,
-            actual_mt: d.actual_mt,
+            planned: d.planned,
+            actual: d.actual,
             notes: fragment("coalesce(?, ?)", d.variance_note, d.location_note)
           }
         )
@@ -1249,8 +1254,8 @@ defmodule FullCircle.Trading do
               inserted_at: t.inserted_at,
               location_name: loc.name,
               unit: g.unit,
-              planned_mt: l.planned_mt,
-              actual_mt: l.actual_mt,
+              planned: l.planned,
+              actual: l.actual,
               notes: l.location_note
             }
           )
@@ -1336,7 +1341,7 @@ defmodule FullCircle.Trading do
           status: t.status,
           vehicle_number: t.vehicle_number,
           inserted_at: t.inserted_at,
-          qty: fragment("coalesce(?, ?)", l.actual_mt, l.planned_mt),
+          qty: fragment("coalesce(?, ?)", l.actual, l.planned),
           unit: g.unit,
           good_name: g.name,
           notes: l.location_note
@@ -1374,7 +1379,7 @@ defmodule FullCircle.Trading do
           status: t.status,
           vehicle_number: t.vehicle_number,
           inserted_at: t.inserted_at,
-          qty: fragment("coalesce(?, ?)", d.actual_mt, d.planned_mt),
+          qty: fragment("coalesce(?, ?)", d.actual, d.planned),
           unit: g.unit,
           good_name: g.name,
           notes: fragment("coalesce(?, ?)", d.variance_note, d.location_note)
@@ -1447,10 +1452,10 @@ defmodule FullCircle.Trading do
     end)
   end
 
-  defp effective_mt(%{actual_mt: %Decimal{} = a}), do: Decimal.to_string(a)
-  defp effective_mt(%{planned_mt: %Decimal{} = p}), do: Decimal.to_string(p)
-  defp effective_mt(%{actual_mt: a}) when not is_nil(a), do: to_string(a)
-  defp effective_mt(%{planned_mt: p}) when not is_nil(p), do: to_string(p)
+  defp effective_mt(%{actual: %Decimal{} = a}), do: Decimal.to_string(a)
+  defp effective_mt(%{planned: %Decimal{} = p}), do: Decimal.to_string(p)
+  defp effective_mt(%{actual: a}) when not is_nil(a), do: to_string(a)
+  defp effective_mt(%{planned: p}) when not is_nil(p), do: to_string(p)
   defp effective_mt(_), do: nil
 
   defp combine_notes(lines) do
@@ -1599,10 +1604,11 @@ defmodule FullCircle.Trading do
 
             [
               %{
-                "planned_mt" => mt,
-                "actual_mt" => mt,
+                "planned" => mt,
+                "actual" => mt,
                 "good_id" => g_id,
                 "good_name" => good.name,
+                "good_unit" => good.unit,
                 "location_id" => loc_id,
                 "location_name" => location_name_by_id(loc_id),
                 "supply_position_id" => nil
@@ -1636,10 +1642,11 @@ defmodule FullCircle.Trading do
       loc = customer_site_location(company, user, s.customer_id)
 
       %{
-        "planned_mt" => mt,
-        "actual_mt" => mt,
+        "planned" => mt,
+        "actual" => mt,
         "good_id" => s.good_id,
         "good_name" => good && good.name,
+        "good_unit" => good && good.unit,
         "sales_position_id" => s.id,
         "sales_title" => sales_typeahead_label(s),
         "supply_position_id" => supply && supply.id,
@@ -1671,10 +1678,11 @@ defmodule FullCircle.Trading do
         if good do
           [
             %{
-              "planned_mt" => "0",
-              "actual_mt" => "0",
+              "planned" => "0",
+              "actual" => "0",
               "good_id" => g_id,
               "good_name" => good.name,
+              "good_unit" => good.unit,
               "location_id" => loc_id,
               "location_name" => location_name_by_id(loc_id),
               "sales_position_id" => nil,
@@ -1698,10 +1706,11 @@ defmodule FullCircle.Trading do
     mt = Balances.supply_remaining(s) |> decimal_str()
 
     %{
-      "planned_mt" => mt,
-      "actual_mt" => mt,
+      "planned" => mt,
+      "actual" => mt,
       "good_id" => s.good_id,
       "good_name" => good && good.name,
+      "good_unit" => good && good.unit,
       "location_id" => loc_id,
       "location_name" => location_name_by_id(loc_id),
       "sales_position_id" => nil,
@@ -1717,10 +1726,11 @@ defmodule FullCircle.Trading do
     loc = supplier_site_location(company, user, supplier_id)
 
     %{
-      "planned_mt" => mt,
-      "actual_mt" => mt,
+      "planned" => mt,
+      "actual" => mt,
       "good_id" => s.good_id,
       "good_name" => good && good.name,
+      "good_unit" => good && good.unit,
       "supply_position_id" => s.id,
       "supply_title" => supply_typeahead_label(s),
       "party_contact_id" => supplier_id,
@@ -1739,6 +1749,10 @@ defmodule FullCircle.Trading do
     do: if(kind && kind != "", do: "#{name} (#{kind})", else: name)
 
   defp location_typeahead_label(_), do: nil
+
+  defp supply_typeahead_label(%{title: title, good: %{name: gn}, supplier: %{name: sn}})
+       when is_binary(title),
+       do: "#{title} · #{gn} · #{sn}"
 
   defp supply_typeahead_label(%{title: title, supplier: %{name: sn}}) when is_binary(title),
     do: "#{title} · #{sn}"
@@ -2033,7 +2047,7 @@ defmodule FullCircle.Trading do
   def trip_has_settlement_docs?(_), do: false
 
   @doc """
-  Mark trip completed. Requires actual_mt on every load and drop.
+  Mark trip completed. Requires actual on every load and drop.
   Returns `{:ok, trip, warnings}` — warnings never block completion.
   """
   def complete_trip(%Trip{} = trip, company, user) do
@@ -2260,8 +2274,8 @@ defmodule FullCircle.Trading do
   defp take_line_log_fields(line) when is_map(line) do
     Map.take(line, [
       "seq",
-      "planned_mt",
-      "actual_mt",
+      "planned",
+      "actual",
       "location_note",
       "variance_note",
       "good_name",
@@ -2279,8 +2293,8 @@ defmodule FullCircle.Trading do
     |> Map.new(fn {line, i} ->
       base = %{
         "seq" => line.seq && to_string(line.seq),
-        "planned_mt" => decimal_str(line.planned_mt),
-        "actual_mt" => decimal_str(line.actual_mt),
+        "planned" => decimal_str(line.planned),
+        "actual" => decimal_str(line.actual),
         "location_note" => line.location_note,
         "good_name" => assoc_name(line, :good),
         "location_name" => assoc_name(line, :location),
@@ -2423,7 +2437,7 @@ defmodule FullCircle.Trading do
     loads = trip.loads || []
     drops = trip.drops || []
 
-    Enum.any?(loads, &is_nil(&1.actual_mt)) or Enum.any?(drops, &is_nil(&1.actual_mt)) or
+    Enum.any?(loads, &is_nil(&1.actual)) or Enum.any?(drops, &is_nil(&1.actual)) or
       loads == [] or drops == []
   end
 
@@ -2495,32 +2509,38 @@ defmodule FullCircle.Trading do
     if trip.transport_mode == "company_own" do
       empty_load =
         Enum.any?(trip.loads || [], fn l ->
-          employees = Map.get(l, :trip_load_employees) || []
-          employees == []
+          active_crew?(Map.get(l, :trip_load_employees)) == false
         end)
 
       empty_drop =
         Enum.any?(trip.drops || [], fn d ->
-          employees = Map.get(d, :trip_drop_employees) || []
-          employees == []
+          active_crew?(Map.get(d, :trip_drop_employees)) == false
         end)
 
-      cond do
-        empty_load or empty_drop ->
-          ["Company-own trip has load/drop lines without employees" | warnings]
-
-        true ->
-          warnings
+      if empty_load or empty_drop do
+        ["Company-own trip has load/drop lines without employees" | warnings]
+      else
+        warnings
       end
     else
       warnings
     end
   end
 
+  defp active_crew?(nil), do: false
+
+  defp active_crew?(rows) do
+    Enum.any?(List.wrap(rows), fn
+      %{delete: d} when d in [true, "true"] -> false
+      %Ecto.Changeset{} = cs -> Ecto.Changeset.get_field(cs, :delete) not in [true, "true"]
+      _ -> true
+    end)
+  end
+
   defp sum_actuals(lines) do
     (lines || [])
     |> Enum.reduce(Decimal.new(0), fn line, acc ->
-      Decimal.add(acc, line.actual_mt || Decimal.new(0))
+      Decimal.add(acc, line.actual || Decimal.new(0))
     end)
   end
 end

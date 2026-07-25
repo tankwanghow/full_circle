@@ -53,16 +53,16 @@ defmodule FullCircleWeb.TradingTripLiveTest do
               "good_id" => good.id,
               "location_id" => load_loc.id,
               "supply_position_id" => supply.id,
-              "planned_mt" => "40",
-              "actual_mt" => "40"
+              "planned" => "40",
+              "actual" => "40"
             }
           ],
           "drops" => [
             %{
               "good_id" => good.id,
               "location_id" => drop_loc.id,
-              "planned_mt" => "40",
-              "actual_mt" => "40"
+              "planned" => "40",
+              "actual" => "40"
             }
           ]
         },

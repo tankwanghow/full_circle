@@ -200,8 +200,8 @@ Trip
     supply_position_id?       # commercial stock (omit or N/A only if pure warehouse re-handle — prefer always set when leaving a supply deal)
     location_id               # physical load place (Location) — required
     location_note?            # optional one-off detail ("Gate 3")
-    planned_mt
-    actual_mt?
+    planned
+    actual?
     employee_ids[]            # 0..n HR.Employee — people who handled this load (cargo can need several)
 
   drops[]   # 1..n
@@ -209,8 +209,8 @@ Trip
     location_id               # physical drop place (Location) — required
     location_note?            # optional one-off detail
     supply_position_id?       # which supply this drop draws from (when applicable)
-    planned_mt
-    actual_mt?
+    planned
+    actual?
     employee_ids[]            # 0..n HR.Employee — people who handled this drop
     variance_note?
     invoice_id?               # settlement link when created
@@ -243,12 +243,12 @@ Trip
 
 | Layer | Responsibility |
 |-------|----------------|
-| **Trading** | Who worked which load/drop, and **full participation qty** (`actual_mt` of that line for each assigned employee). Employee load/drop registers export this trail. |
+| **Trading** | Who worked which load/drop, and **full participation qty** (`actual` of that line for each assigned employee). Employee load/drop registers export this trail. |
 | **Payroll** | **Load salary** and **drop salary** amounts — rates, and **how pay is split** among people, live in Payroll (not in Trading). |
 
 - **Multiple employees** may be assigned to one load or one drop (cargo handling often needs several people).  
 - Load crew and drop crew are independent lists (can overlap or differ).  
-- **Trading qty rule (full participation):** each employee on a load line is recorded with that line’s **full `actual_mt`** on the load register; same for drops. Trading does **not** split MT or compute RM.  
+- **Trading qty rule (full participation):** each employee on a load line is recorded with that line’s **full `actual`** on the load register; same for drops. Trading does **not** split MT or compute RM.  
 - Payroll later consumes these registers (or equivalent) and applies load/drop salary rules and splitting.
 
 **Transport agent**
@@ -326,10 +326,10 @@ Contact mailing address continues to feed finance docs as today — separate fro
 ### Balance formulas
 
 ```
-supply_remaining = supply_qty − Σ load.actual_mt
+supply_remaining = supply_qty − Σ load.actual
                    (completed trips only, that source)
 
-sales_delivered  = Σ drop.actual_mt (completed, that SalesPosition)
+sales_delivered  = Σ drop.actual (completed, that SalesPosition)
 sales_undelivered = sales_qty − sales_delivered
                    (may remain > 0 even when status = fulfilled)
 
@@ -341,8 +341,8 @@ soft_held        = Σ sales_undelivered where preferred_supply = this SupplyPosi
                    (display only; does not lock)
 
 # Full participation qty for payroll (trading does not split money)
-employee_load_mt(E) = Σ load.actual_mt for completed loads where E ∈ load.employees
-employee_drop_mt(E) = Σ drop.actual_mt for completed drops where E ∈ drop.employees
+employee_load_mt(E) = Σ load.actual for completed loads where E ∈ load.employees
+employee_drop_mt(E) = Σ drop.actual for completed drops where E ∈ drop.employees
 # Payroll turns these qty trails into load/drop salary and applies split rules there.
 
 agent_delivery_lines =
@@ -351,9 +351,9 @@ agent_delivery_lines =
       from_location_id,     # load Location (origin)
       to_location_id,       # drop Location (destination)
       supply_position?, sales_position?,
-      actual_mt }
+      actual }
 
-agent_mt_total   = Σ actual_mt on those lines
+agent_mt_total   = Σ actual on those lines
                    (filterable/groupable by from_location → to_location)
 ```
 

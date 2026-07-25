@@ -105,7 +105,7 @@ defmodule FullCircleWeb.InvoiceLive.Form do
       |> assign(matched_trans: [])
       |> assign(trading_drop_ids: trading_drop_ids)
       |> assign(
-        trading_settlement: %{linked?: false, line_count: 0, actual_mt_sum: 0, trip_refs: []}
+        trading_settlement: %{linked?: false, line_count: 0, actual_sum: 0, trip_refs: []}
       )
       |> assign_egg_link(params, :sales)
       |> assign(:form, to_form(cs))
@@ -741,7 +741,7 @@ defmodule FullCircleWeb.InvoiceLive.Form do
           {gettext(
             "%{n} drop(s) · %{mt} MT · trips: %{trips}. Customer is locked. Unlink if the match was wrong; commercial qty/price edits are allowed.",
             n: @trading_settlement.line_count,
-            mt: @trading_settlement.actual_mt_sum,
+            mt: @trading_settlement.actual_sum,
             trips: Enum.join(@trading_settlement.trip_refs, ", ")
           )}
         </p>

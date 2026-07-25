@@ -21,7 +21,7 @@ After logistics are finished, the office must:
 2. **Match supplier bills** to commercial loads (what was actually lifted).  
 3. **Match transport-agent bills** to haul work (origin → destination + MT).
 
-Today, trips record loads/drops and complete with `actual_mt`, and `trip_drops.invoice_id` exists but is unused. There is no supplier or transport settlement link, and no desk queues for matching.
+Today, trips record loads/drops and complete with `actual`, and `trip_drops.invoice_id` exists but is unused. There is no supplier or transport settlement link, and no desk queues for matching.
 
 ### Success criteria
 
@@ -33,7 +33,7 @@ Today, trips record loads/drops and complete with `actual_mt`, and `trip_drops.i
 ### Confirmed design choice
 
 **“Verified” = trip `status == "completed"`.**  
-There is no per-drop verify flag. Completing the trip (which already requires `actual_mt` on every load and drop) is the single gate.
+There is no per-drop verify flag. Completing the trip (which already requires `actual` on every load and drop) is the single gate.
 
 ---
 
@@ -41,8 +41,8 @@ There is no per-drop verify flag. Completing the trip (which already requires `a
 
 | Document | Party | Matched against | Qty / money basis |
 |----------|--------|-----------------|-------------------|
-| **Customer Invoice** | Customer (SalesPosition) | Drop line(s) | Drop `actual_mt` × sales `unit_price` (editable on invoice) |
-| **Supplier PurInvoice** | Supplier (SupplyPosition) | Load line(s) | Load `actual_mt` × supply `unit_price` (editable) |
+| **Customer Invoice** | Customer (SalesPosition) | Drop line(s) | Drop `actual` × sales `unit_price` (editable on invoice) |
+| **Supplier PurInvoice** | Supplier (SupplyPosition) | Load line(s) | Load `actual` × supply `unit_price` (editable) |
 | **Transport PurInvoice** | Transport agent (`contacts`) | Haul line ≈ drop + origin | From→to locations + MT; RM entered from agent bill |
 
 The three streams are **independent**. Completing a trip unlocks all three; none must wait on the others (commercial SOP may order them in practice; the system does not force order).
@@ -61,8 +61,8 @@ The three streams are **independent**. Completing a trip unlocks all three; none
 
 | Stream | Line eligible when |
 |--------|--------------------|
-| Customer invoice | Drop has `sales_position_id`, `actual_mt` present, `invoice_id` nil |
-| Supplier bill | Load has `supply_position_id`, `actual_mt` present, `pur_invoice_id` nil |
+| Customer invoice | Drop has `sales_position_id`, `actual` present, `invoice_id` nil |
+| Supplier bill | Load has `supply_position_id`, `actual` present, `pur_invoice_id` nil |
 | Transport bill | Trip `transport_mode == "agent"`, agent set, haul line not yet linked to a transport pur-invoice |
 
 ### Explicitly excluded
@@ -72,7 +72,7 @@ The three streams are **independent**. Completing a trip unlocks all three; none
 | Warehouse **in** drop (no sales) | Stock movement only — not customer AR |
 | Warehouse **out** load (no supply) | Not a supplier purchase |
 | `company_own` / `customer_arranged` trips | No transport agent bill |
-| Lines with nil `actual_mt` | Cannot complete trip without them; defensive filter only |
+| Lines with nil `actual` | Cannot complete trip without them; defensive filter only |
 
 ---
 
@@ -128,7 +128,7 @@ User selects one or more drops (same customer for one invoice)
 Prefill Invoice:
   party  = sales.customer
   lines  = one per drop (or merge by good/price if clerk chooses)
-  qty    = drop.actual_mt
+  qty    = drop.actual
   price  = sales.unit_price (editable)
   refs   = TRP-…, SAL-…, drop location, trip date
 User saves Invoice (existing Billing.create_invoice path)
@@ -141,7 +141,7 @@ Write invoice_id on each selected drop
 |------|----------|
 | Multi-drop → one invoice | Allowed (same customer) |
 | Multi-customer one trip | Separate invoices per customer |
-| Short delivery | Bill `actual_mt` (not planned) |
+| Short delivery | Bill `actual` (not planned) |
 | Already linked | Not selectable; one drop → at most one invoice |
 | Void invoice | Unlink drops (or clear `invoice_id` + warn); trading trip stays completed |
 | Warehouse drops | Never in queue |
@@ -158,7 +158,7 @@ User selects loads to match the bill
 Prefill PurInvoice:
   party  = supply.supplier
   lines  = one per load (or merge by good/price)
-  qty    = load.actual_mt
+  qty    = load.actual
   price  = supply.unit_price (editable)
   refs   = TRP-…, SUP-…, load location, trip date
 User saves PurInvoice
@@ -189,7 +189,7 @@ Write pur_invoice_id on each selected load
   from_location,   # origin — see origin rules
   to_location,     # drop location
   supply_position?, sales_position?,
-  actual_mt        # drop.actual_mt
+  actual        # drop.actual
 }
 ```
 

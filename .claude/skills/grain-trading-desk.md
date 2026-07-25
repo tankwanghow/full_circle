@@ -83,7 +83,7 @@ Loading a supply that is still `open` **auto-promotes to `collect`** on trip cre
 **Trip** (`draft | planned | completed | cancelled`):
 
 - Completed/cancelled trips are **locked** (`{:error, :trip_locked}` on update)
-- Complete requires `actual_mt` on every load and drop; returns `{:ok, trip, warnings}` — warnings never block
+- Complete requires `actual` on every load and drop; returns `{:ok, trip, warnings}` — warnings never block
 
 ## System document numbers
 
@@ -101,7 +101,7 @@ Unit always comes from **Good** — never stored on positions.
 
 - **Physical stock movement** only counts trips with `status == "completed"`.
 - **Soft hold** = sum of undelivered qty on active sales that prefer a supply — **display only**, does not lock remaining.
-- **In transit** (draft + planned) uses `coalesce(actual_mt, planned_mt)` so desks show commitment without moving stock.
+- **In transit** (draft + planned) uses `coalesce(actual, planned)` so desks show commitment without moving stock.
 - Warehouse on-hand groups by **own_warehouse** location × **line** `good_id`.
 
 ## Multi-good trips

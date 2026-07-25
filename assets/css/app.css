@@ -265,8 +265,23 @@ body.dark {
 .dark .bg-gray-800 { background-color: var(--color-gray-800); }
 
 /* Tribute autocomplete */
-.tribute-container { z-index: 100; background: white; border: 1px solid #d1d5db; border-radius: 0.375rem; overflow: hidden; }
+.tribute-container {
+  z-index: 100;
+  background: white;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  overflow: hidden;
+  /* Wide enough for "SUP · Good · Supplier" labels */
+  min-width: min(40rem, 92vw);
+  max-width: min(48rem, 95vw);
+}
 .tribute-container ul { background: white; }
+.tribute-container li {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0.35rem 0.75rem;
+}
 .tribute-container li.highlight { background: #e5e7eb; }
 .dark .tribute-container { background: #374151; border-color: #4b5563; }
 .dark .tribute-container ul { background: #374151; }

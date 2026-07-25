@@ -156,8 +156,8 @@ defmodule FullCircle.Repo.Migrations.CreateTradingModule do
 
     create table(:trading_trip_loads, primary_key: false) do
       add :id, :binary_id, primary_key: true
-      add :planned_mt, :decimal
-      add :actual_mt, :decimal
+      add :planned, :decimal
+      add :actual, :decimal
       add :location_note, :string
       # FILO order on the truck (1 = first on)
       add :seq, :integer, null: false, default: 0
@@ -184,8 +184,8 @@ defmodule FullCircle.Repo.Migrations.CreateTradingModule do
 
     create table(:trading_trip_drops, primary_key: false) do
       add :id, :binary_id, primary_key: true
-      add :planned_mt, :decimal
-      add :actual_mt, :decimal
+      add :planned, :decimal
+      add :actual, :decimal
       add :location_note, :string
       add :variance_note, :string
       # Unload order (1 = first off)

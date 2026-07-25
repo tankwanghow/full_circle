@@ -44,7 +44,7 @@ defmodule FullCircleWeb.TradingDeskLive.SalesFormComponent do
             SalesPosition.changeset(s, %{
               "customer_name" => s.customer && s.customer.name,
               "good_name" => s.good && s.good.name,
-              "preferred_supply_title" => s.preferred_supply && s.preferred_supply.title
+              "preferred_supply_title" => preferred_supply_display(s.preferred_supply)
             })
 
           socket
@@ -92,6 +92,8 @@ defmodule FullCircleWeb.TradingDeskLive.SalesFormComponent do
       )
 
     socket = assign(socket, good_unit: good && Map.get(good, :unit))
+    # Preferred supply must match the sales good — clear if good changed away
+    params = clear_preferred_supply_if_good_mismatch(params, socket.assigns.current_company, socket.assigns.current_user)
     validate(params, socket)
   end
 
@@ -100,7 +102,7 @@ defmodule FullCircleWeb.TradingDeskLive.SalesFormComponent do
         %{"_target" => ["sales_position", "preferred_supply_title"], "sales_position" => params},
         socket
       ) do
-    {params, socket, _} =
+    {params, socket, supply} =
       FullCircleWeb.Helpers.assign_autocomplete_id(
         socket,
         params,
@@ -108,6 +110,16 @@ defmodule FullCircleWeb.TradingDeskLive.SalesFormComponent do
         "preferred_supply_id",
         &Trading.get_open_supply_position_by_title/3
       )
+
+    # Reject preferred supply for a different good than the sales line
+    params =
+      if supply_good_mismatch?(supply, params["good_id"]) do
+        params
+        |> Map.put("preferred_supply_id", nil)
+        |> Map.put("preferred_supply_title", "")
+      else
+        params
+      end
 
     validate(params, socket)
   end
@@ -259,10 +271,70 @@ defmodule FullCircleWeb.TradingDeskLive.SalesFormComponent do
            company,
            user
          ) do
-      %{id: id} -> Map.put(params, "preferred_supply_id", id)
-      _ -> Map.put(params, "preferred_supply_id", nil)
+      %{id: id} = supply ->
+        if supply_good_mismatch?(supply, params["good_id"]) do
+          params
+          |> Map.put("preferred_supply_id", nil)
+          |> Map.put("preferred_supply_title", "")
+        else
+          Map.put(params, "preferred_supply_id", id)
+        end
+
+      _ ->
+        Map.put(params, "preferred_supply_id", nil)
     end
   end
+
+  defp clear_preferred_supply_if_good_mismatch(params, company, user) do
+    good_id = params["good_id"]
+    title = params["preferred_supply_title"] || ""
+
+    if good_id in [nil, ""] or String.trim(title) == "" do
+      params
+    else
+      case Trading.get_open_supply_position_by_title(title, company, user) do
+        %{} = supply ->
+          if supply_good_mismatch?(supply, good_id) do
+            params
+            |> Map.put("preferred_supply_id", nil)
+            |> Map.put("preferred_supply_title", "")
+          else
+            params
+          end
+
+        _ ->
+          params
+      end
+    end
+  end
+
+  defp supply_good_mismatch?(%{good_id: sg}, good_id)
+       when is_binary(good_id) and good_id != "" do
+    to_string(sg) != to_string(good_id)
+  end
+
+  defp supply_good_mismatch?(_, _), do: false
+
+  defp preferred_supply_autocomplete_url(company_id, user_id, good_id)
+       when is_binary(good_id) and good_id != "" do
+    "/list/companies/#{company_id}/#{user_id}/autocomplete?schema=opensupply&good_id=#{good_id}&name="
+  end
+
+  defp preferred_supply_autocomplete_url(company_id, user_id, _) do
+    # No good selected yet — open_supply filter with empty good_ids returns unfiltered;
+    # pass a dummy good_id that matches nothing so the list stays empty until good is set.
+    "/list/companies/#{company_id}/#{user_id}/autocomplete?schema=opensupply&good_id=__none__&name="
+  end
+
+  defp preferred_supply_display(%{title: title, good: %{name: gn}, supplier: %{name: sn}})
+       when is_binary(title),
+       do: "#{title} · #{gn} · #{sn}"
+
+  defp preferred_supply_display(%{title: title, supplier: %{name: sn}}) when is_binary(title),
+    do: "#{title} · #{sn}"
+
+  defp preferred_supply_display(%{title: title}) when is_binary(title), do: title
+  defp preferred_supply_display(_), do: nil
 
   @impl true
   def render(assigns) do
@@ -336,14 +408,23 @@ defmodule FullCircleWeb.TradingDeskLive.SalesFormComponent do
             label={gettext("Unit price")}
           />
         </div>
-        <.input
-          field={@form[:preferred_supply_title]}
-          label={gettext("Preferred supply (soft hold)")}
-          placeholder={gettext("Supply no — does not reduce remaining")}
-          phx-hook="tributeAutoComplete"
-          url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=opensupply&name="}
-        />
-        <.input type="hidden" field={@form[:preferred_supply_id]} />
+        <div class="w-full min-w-0">
+          <.input
+            field={@form[:preferred_supply_title]}
+            label={gettext("Preferred supply (soft hold)")}
+            placeholder={gettext("Supply no · good · supplier — same good only")}
+            phx-hook="tributeAutoComplete"
+            class="w-full"
+            url={
+              preferred_supply_autocomplete_url(
+                @current_company.id,
+                @current_user.id,
+                @form[:good_id].value
+              )
+            }
+          />
+          <.input type="hidden" field={@form[:preferred_supply_id]} />
+        </div>
         <.input field={@form[:notes]} type="textarea" label={gettext("Notes")} />
         <.input
           :if={@live_action == :edit}

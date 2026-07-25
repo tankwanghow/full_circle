@@ -363,16 +363,16 @@ defmodule FullCircle.Trading.SampleData do
       agent = Enum.at(agents, rem(i - 1, length(agents)))
 
       load_line = %{
-        "planned_mt" => mt,
-        "actual_mt" => mt,
+        "planned" => mt,
+        "actual" => mt,
         "good_id" => good.id,
         "location_id" => load_loc.id,
         "supply_position_id" => supply.id
       }
 
       drop_line = %{
-        "planned_mt" => mt,
-        "actual_mt" => mt,
+        "planned" => mt,
+        "actual" => mt,
         "good_id" => good.id,
         "location_id" => drop_loc.id,
         "supply_position_id" => drop_supply_id
@@ -484,8 +484,8 @@ defmodule FullCircle.Trading.SampleData do
           "notes" => "#{@batch_prefix} settlement-ready delivery ##{i} #{batch}",
           "loads" => [
             %{
-              "planned_mt" => mt,
-              "actual_mt" => mt,
+              "planned" => mt,
+              "actual" => mt,
               "good_id" => good.id,
               "location_id" => locs.port.id,
               "supply_position_id" => supply.id
@@ -493,8 +493,8 @@ defmodule FullCircle.Trading.SampleData do
           ],
           "drops" => [
             %{
-              "planned_mt" => mt,
-              "actual_mt" => mt,
+              "planned" => mt,
+              "actual" => mt,
               "good_id" => good.id,
               "location_id" => farm.id,
               "sales_position_id" => sales_row.id,
@@ -699,8 +699,8 @@ defmodule FullCircle.Trading.SampleData do
             ],
             "drops" => [
               %{
-                "planned_mt" => "20",
-                "actual_mt" => "20",
+                "planned" => "20",
+                "actual" => "20",
                 "good_id" => good.id,
                 "location_id" => locs.silo.id,
                 "supply_position_id" => supply.id
@@ -747,8 +747,8 @@ defmodule FullCircle.Trading.SampleData do
 
   defp load_line(good, location, supply, planned, actual) do
     %{
-      "planned_mt" => planned,
-      "actual_mt" => actual,
+      "planned" => planned,
+      "actual" => actual,
       "good_id" => good.id,
       "location_id" => location.id,
       "supply_position_id" => supply.id
@@ -757,8 +757,8 @@ defmodule FullCircle.Trading.SampleData do
 
   defp drop_line(good, location, sales, supply, planned, actual) do
     %{
-      "planned_mt" => planned,
-      "actual_mt" => actual,
+      "planned" => planned,
+      "actual" => actual,
       "good_id" => good.id,
       "location_id" => location.id,
       "sales_position_id" => sales.id,

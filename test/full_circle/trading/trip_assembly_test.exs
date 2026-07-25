@@ -53,8 +53,8 @@ defmodule FullCircle.Trading.TripAssemblyTest do
           "good_id" => good.id,
           "loads" => [
             %{
-              "planned_mt" => "40",
-              "actual_mt" => "40",
+              "planned" => "40",
+              "actual" => "40",
               "good_id" => good.id,
               "location_id" => port.id,
               "supply_position_id" => supply.id
@@ -62,8 +62,8 @@ defmodule FullCircle.Trading.TripAssemblyTest do
           ],
           "drops" => [
             %{
-              "planned_mt" => "40",
-              "actual_mt" => "40",
+              "planned" => "40",
+              "actual" => "40",
               "good_id" => good.id,
               "location_id" => wh.id,
               "supply_position_id" => supply.id
@@ -94,15 +94,15 @@ defmodule FullCircle.Trading.TripAssemblyTest do
     assert Enum.all?(attrs["drops"], &(&1["good_id"] == good.id))
 
     supply_load = Enum.find(attrs["loads"], &(&1["supply_position_id"] == supply.id))
-    assert supply_load["planned_mt"] == Decimal.to_string(remaining)
+    assert supply_load["planned"] == Decimal.to_string(remaining)
 
     wh_load = Enum.find(attrs["loads"], &(&1["location_id"] == wh.id))
-    assert wh_load["planned_mt"] == "40"
+    assert wh_load["planned"] == "40"
     assert wh_load["supply_position_id"] == nil
 
     [drop] = attrs["drops"]
     assert drop["sales_position_id"] == sales.id
-    assert drop["planned_mt"] == "25"
+    assert drop["planned"] == "25"
   end
 
   test "incomplete selection errors", %{user: user, company: company} do
@@ -183,14 +183,14 @@ defmodule FullCircle.Trading.TripAssemblyTest do
     [load] = attrs["loads"]
     assert load["supply_position_id"] == supply.id
     assert load["good_id"] == good.id
-    assert load["planned_mt"] == "80"
+    assert load["planned"] == "80"
 
     [drop] = attrs["drops"]
     assert drop["location_id"] == wh.id
     assert drop["sales_position_id"] == nil
     assert drop["supply_position_id"] == supply.id
     assert drop["good_id"] == good.id
-    assert drop["planned_mt"] == "80"
+    assert drop["planned"] == "80"
   end
 
   test "supply_title and sales_title on prefill for typeahead", %{user: user, company: company} do

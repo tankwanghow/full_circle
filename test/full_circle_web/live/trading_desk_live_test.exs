@@ -65,14 +65,14 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
           "status" => "draft",
           "loads" => [
             %{
-              "planned_mt" => "10",
+              "planned" => "10",
               "good_id" => good.id,
               "location_id" => load_loc.id
             }
           ],
           "drops" => [
             %{
-              "planned_mt" => "10",
+              "planned" => "10",
               "good_id" => good.id,
               "location_id" => drop_loc.id
             }
@@ -152,8 +152,8 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
               "good_id" => good.id,
               "location_id" => port.id,
               "supply_position_id" => supply.id,
-              "planned_mt" => "25",
-              "actual_mt" => "25"
+              "planned" => "25",
+              "actual" => "25"
             }
           ],
           "drops" => [
@@ -161,8 +161,8 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
               "good_id" => good.id,
               "location_id" => farm.id,
               "sales_position_id" => sales.id,
-              "planned_mt" => "25",
-              "actual_mt" => "25"
+              "planned" => "25",
+              "actual" => "25"
             }
           ]
         },
@@ -320,9 +320,9 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
 
     html = render(lv)
     assert html =~ "AsmMaize"
-    # multi-good: other goods stay visible
-    assert html =~ "AsmPollard"
-    assert has_element?(lv, "#desk-supply-#{other_supply.id}")
+    # Selecting sales auto-filters supply/warehouse good to the sale's good
+    refute html =~ "AsmPollard"
+    refute has_element?(lv, "#desk-supply-#{other_supply.id}")
 
     lv
     |> element("#sel-supply-#{supply.id}")
@@ -355,15 +355,15 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
         loads: %{
           "0" => %{
             location_name: "#{load_loc.name} (#{load_loc.kind})",
-            planned_mt: "20",
-            actual_mt: "20"
+            planned: "20",
+            actual: "20"
           }
         },
         drops: %{
           "0" => %{
             location_name: "#{drop_loc.name} (#{drop_loc.kind})",
-            planned_mt: "20",
-            actual_mt: "20"
+            planned: "20",
+            actual: "20"
           }
         }
       }
@@ -428,6 +428,100 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
     assert has_element?(lv, "#desk-create-trip-selection:not([disabled])")
   end
 
+  test "selecting sales auto-filters supply and warehouse good columns", %{
+    conn: conn,
+    company: company,
+    user: user
+  } do
+    good_a = good_fixture(company, user, %{"name" => "AutoFilterMaize"})
+    good_b = good_fixture(company, user, %{"name" => "AutoFilterPollard"})
+    customer = contact_fixture(company, user, %{"name" => "AutoFilter Customer"})
+    supplier = contact_fixture(company, user, %{"name" => "AutoFilter Supplier"})
+
+    supply_a =
+      supply_position_fixture(company, user, %{
+        "good_id" => good_a.id,
+        "supplier_id" => supplier.id,
+        "quantity" => "50",
+        "status" => "open"
+      })
+
+    supply_b =
+      supply_position_fixture(company, user, %{
+        "good_id" => good_b.id,
+        "supplier_id" => supplier.id,
+        "quantity" => "40",
+        "status" => "open"
+      })
+
+    sales =
+      sales_position_fixture(company, user, %{
+        "good_id" => good_a.id,
+        "customer_id" => customer.id,
+        "quantity" => "20",
+        "status" => "open"
+      })
+
+    wh = location_fixture(company, user, %{"kind" => "own_warehouse", "name" => "AF Silo"})
+    port = location_fixture(company, user, %{"kind" => "port", "name" => "AF Port"})
+
+    # Stock both goods so warehouse rows exist
+    for {good, supply} <- [{good_a, supply_a}, {good_b, supply_b}] do
+      {:ok, trip} =
+        FullCircle.Trading.create_trip(
+          %{
+            "date" => "2026-07-01",
+            "transport_mode" => "company_own",
+            "vehicle_number" => "AF1234",
+            "loads" => [
+              %{
+                "good_id" => good.id,
+                "location_id" => port.id,
+                "supply_position_id" => supply.id,
+                "planned" => "10",
+                "actual" => "10"
+              }
+            ],
+            "drops" => [
+              %{
+                "good_id" => good.id,
+                "location_id" => wh.id,
+                "supply_position_id" => supply.id,
+                "planned" => "10",
+                "actual" => "10"
+              }
+            ]
+          },
+          company,
+          user
+        )
+
+      assert {:ok, _, _} = FullCircle.Trading.complete_trip(trip, company, user)
+    end
+
+    {:ok, lv, _} = live(conn, ~p"/companies/#{company.id}/trading/desk")
+    assert has_element?(lv, "#desk-supply-#{supply_a.id}")
+    assert has_element?(lv, "#desk-supply-#{supply_b.id}")
+
+    lv |> element("#sel-sales-#{sales.id}") |> render_click()
+
+    # Supply/warehouse good filters set to sale's good; other good rows hidden
+    assert has_element?(lv, ~s(#desk-filter-supply-good input[name="value"][value="AutoFilterMaize"]))
+    assert has_element?(
+             lv,
+             ~s(#desk-filter-warehouse-good input[name="value"][value="AutoFilterMaize"])
+           )
+    assert has_element?(lv, "#desk-supply-#{supply_a.id}")
+    refute has_element?(lv, "#desk-supply-#{supply_b.id}")
+    assert has_element?(lv, "#desk-wh-#{wh.id}-#{good_a.id}")
+    refute has_element?(lv, "#desk-wh-#{wh.id}-#{good_b.id}")
+
+    # Deselect sale → clear auto good filters; both supplies show again
+    lv |> element("#sel-sales-#{sales.id}") |> render_click()
+    assert has_element?(lv, "#desk-supply-#{supply_a.id}")
+    assert has_element?(lv, "#desk-supply-#{supply_b.id}")
+  end
+
   test "warehouse out and in are mutually exclusive on same row", %{
     conn: conn,
     company: company,
@@ -459,8 +553,8 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
               "good_id" => good.id,
               "location_id" => port.id,
               "supply_position_id" => supply.id,
-              "planned_mt" => "30",
-              "actual_mt" => "30"
+              "planned" => "30",
+              "actual" => "30"
             }
           ],
           "drops" => [
@@ -468,8 +562,8 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
               "good_id" => good.id,
               "location_id" => wh.id,
               "supply_position_id" => supply.id,
-              "planned_mt" => "30",
-              "actual_mt" => "30"
+              "planned" => "30",
+              "actual" => "30"
             }
           ]
         },
@@ -622,15 +716,15 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
         loads: %{
           "0" => %{
             location_name: "#{load_loc.name} (#{load_loc.kind})",
-            planned_mt: "50",
-            actual_mt: "50"
+            planned: "50",
+            actual: "50"
           }
         },
         drops: %{
           "0" => %{
             location_name: "#{wh.name} (#{wh.kind})",
-            planned_mt: "50",
-            actual_mt: "50"
+            planned: "50",
+            actual: "50"
           }
         }
       }
@@ -722,8 +816,8 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
           "vehicle_number" => "OPEN1",
           "loads" => [
             %{
-              "planned_mt" => "10",
-              "actual_mt" => "10",
+              "planned" => "10",
+              "actual" => "10",
               "good_id" => good.id,
               "location_id" => port.id,
               "supply_position_id" => supply.id
@@ -731,8 +825,8 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
           ],
           "drops" => [
             %{
-              "planned_mt" => "10",
-              "actual_mt" => "10",
+              "planned" => "10",
+              "actual" => "10",
               "good_id" => good.id,
               "location_id" => site.id,
               "sales_position_id" => sales.id,
@@ -754,7 +848,7 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
           "vehicle_number" => "DRAFT1",
           "loads" => [
             %{
-              "planned_mt" => "5",
+              "planned" => "5",
               "good_id" => good.id,
               "location_id" => port.id,
               "supply_position_id" => supply.id
@@ -762,7 +856,7 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
           ],
           "drops" => [
             %{
-              "planned_mt" => "5",
+              "planned" => "5",
               "good_id" => good.id,
               "location_id" => wh.id
             }
@@ -831,8 +925,8 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
           "vehicle_number" => "BADGE1",
           "loads" => [
             %{
-              "planned_mt" => "10",
-              "actual_mt" => "10",
+              "planned" => "10",
+              "actual" => "10",
               "good_id" => good.id,
               "location_id" => port.id,
               "supply_position_id" => supply.id
@@ -840,8 +934,8 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
           ],
           "drops" => [
             %{
-              "planned_mt" => "10",
-              "actual_mt" => "10",
+              "planned" => "10",
+              "actual" => "10",
               "good_id" => good.id,
               "location_id" => site.id,
               "sales_position_id" => sales.id,
@@ -910,8 +1004,8 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
           "vehicle_number" => "NOCAN1",
           "loads" => [
             %{
-              "planned_mt" => "5",
-              "actual_mt" => "5",
+              "planned" => "5",
+              "actual" => "5",
               "good_id" => good.id,
               "location_id" => port.id,
               "supply_position_id" => supply.id
@@ -919,8 +1013,8 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
           ],
           "drops" => [
             %{
-              "planned_mt" => "5",
-              "actual_mt" => "5",
+              "planned" => "5",
+              "actual" => "5",
               "good_id" => good.id,
               "location_id" => site.id,
               "sales_position_id" => sales.id,
@@ -991,16 +1085,16 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
             good_name: good.name,
             location_name: "#{load_loc.name} (#{load_loc.kind})",
             supply_title: "#{supply.title} · ",
-            planned_mt: "10",
-            actual_mt: "10"
+            planned: "10",
+            actual: "10"
           }
         },
         drops: %{
           "0" => %{
             good_name: good.name,
             location_name: "#{drop_loc.name} (#{drop_loc.kind})",
-            planned_mt: "10",
-            actual_mt: "10"
+            planned: "10",
+            actual: "10"
           }
         }
       }

@@ -6,6 +6,7 @@ defmodule FullCircle.Trading.TripTest do
 
   import FullCircle.TradingFixtures
   import FullCircle.BillingFixtures
+  import FullCircle.HRFixtures
 
   setup do
     trading_setup()
@@ -26,8 +27,8 @@ defmodule FullCircle.Trading.TripTest do
           "good_id" => good.id,
           "loads" => [
             %{
-              "planned_mt" => "40",
-              "actual_mt" => "40",
+              "planned" => "40",
+              "actual" => "40",
               "good_id" => good.id,
               "location_id" => loc.id,
               "supply_position_id" => supply.id
@@ -35,8 +36,8 @@ defmodule FullCircle.Trading.TripTest do
           ],
           "drops" => [
             %{
-              "planned_mt" => "40",
-              "actual_mt" => "40",
+              "planned" => "40",
+              "actual" => "40",
               "good_id" => good.id,
               "location_id" => drop_loc.id,
               "supply_position_id" => supply.id
@@ -79,8 +80,8 @@ defmodule FullCircle.Trading.TripTest do
           "good_id" => good.id,
           "loads" => [
             %{
-              "planned_mt" => "33.5",
-              "actual_mt" => "33.5",
+              "planned" => "33.5",
+              "actual" => "33.5",
               "good_id" => good.id,
               "location_id" => load_loc.id,
               "supply_position_id" => supply.id
@@ -88,8 +89,8 @@ defmodule FullCircle.Trading.TripTest do
           ],
           "drops" => [
             %{
-              "planned_mt" => "33.5",
-              "actual_mt" => "33.5",
+              "planned" => "33.5",
+              "actual" => "33.5",
               "good_id" => good.id,
               "location_id" => drop_loc.id,
               "sales_position_id" => sales.id,
@@ -142,15 +143,15 @@ defmodule FullCircle.Trading.TripTest do
           "good_id" => good.id,
           "loads" => [
             %{
-              "planned_mt" => "40",
-              "actual_mt" => "40",
+              "planned" => "40",
+              "actual" => "40",
               "good_id" => good.id,
               "location_id" => l1.id,
               "supply_position_id" => s1.id
             },
             %{
-              "planned_mt" => "50",
-              "actual_mt" => "50",
+              "planned" => "50",
+              "actual" => "50",
               "good_id" => good.id,
               "location_id" => l2.id,
               "supply_position_id" => s2.id
@@ -158,15 +159,15 @@ defmodule FullCircle.Trading.TripTest do
           ],
           "drops" => [
             %{
-              "planned_mt" => "55",
-              "actual_mt" => "55",
+              "planned" => "55",
+              "actual" => "55",
               "good_id" => good.id,
               "location_id" => d1.id,
               "sales_position_id" => sales.id
             },
             %{
-              "planned_mt" => "35",
-              "actual_mt" => "35",
+              "planned" => "35",
+              "actual" => "35",
               "good_id" => good.id,
               "location_id" => d2.id,
               "sales_position_id" => sales.id
@@ -210,8 +211,8 @@ defmodule FullCircle.Trading.TripTest do
           "good_id" => good.id,
           "loads" => [
             %{
-              "planned_mt" => "40",
-              "actual_mt" => "40",
+              "planned" => "40",
+              "actual" => "40",
               "good_id" => good.id,
               "location_id" => supplier_loc.id,
               "supply_position_id" => supply.id
@@ -219,8 +220,8 @@ defmodule FullCircle.Trading.TripTest do
           ],
           "drops" => [
             %{
-              "planned_mt" => "40",
-              "actual_mt" => "40",
+              "planned" => "40",
+              "actual" => "40",
               "good_id" => good.id,
               "location_id" => wh.id,
               "supply_position_id" => supply.id
@@ -249,16 +250,16 @@ defmodule FullCircle.Trading.TripTest do
           "good_id" => good.id,
           "loads" => [
             %{
-              "planned_mt" => "15",
-              "actual_mt" => "15",
+              "planned" => "15",
+              "actual" => "15",
               "good_id" => good.id,
               "location_id" => wh.id
             }
           ],
           "drops" => [
             %{
-              "planned_mt" => "15",
-              "actual_mt" => "15",
+              "planned" => "15",
+              "actual" => "15",
               "good_id" => good.id,
               "location_id" => customer_loc.id,
               "sales_position_id" => sales.id
@@ -301,8 +302,8 @@ defmodule FullCircle.Trading.TripTest do
           "good_id" => good.id,
           "loads" => [
             %{
-              "planned_mt" => "25",
-              "actual_mt" => "25",
+              "planned" => "25",
+              "actual" => "25",
               "good_id" => good.id,
               "location_id" => supplier_loc.id,
               "supply_position_id" => supply.id
@@ -310,8 +311,8 @@ defmodule FullCircle.Trading.TripTest do
           ],
           "drops" => [
             %{
-              "planned_mt" => "25",
-              "actual_mt" => "25",
+              "planned" => "25",
+              "actual" => "25",
               "good_id" => good.id,
               "location_id" => wh.id,
               "supply_position_id" => supply.id
@@ -335,16 +336,16 @@ defmodule FullCircle.Trading.TripTest do
           "good_id" => good.id,
           "loads" => [
             %{
-              "planned_mt" => "20",
-              "actual_mt" => "20",
+              "planned" => "20",
+              "actual" => "20",
               "good_id" => good.id,
               "location_id" => wh.id
             }
           ],
           "drops" => [
             %{
-              "planned_mt" => "20",
-              "actual_mt" => "20",
+              "planned" => "20",
+              "actual" => "20",
               "good_id" => good.id,
               "location_id" => customer_loc.id,
               "sales_position_id" => sales.id
@@ -376,8 +377,8 @@ defmodule FullCircle.Trading.TripTest do
           "status" => "draft",
           "loads" => [
             %{
-              "planned_mt" => "40",
-              "actual_mt" => "40",
+              "planned" => "40",
+              "actual" => "40",
               "good_id" => good.id,
               "location_id" => loc.id,
               "supply_position_id" => supply.id
@@ -385,8 +386,8 @@ defmodule FullCircle.Trading.TripTest do
           ],
           "drops" => [
             %{
-              "planned_mt" => "40",
-              "actual_mt" => "40",
+              "planned" => "40",
+              "actual" => "40",
               "good_id" => good.id,
               "location_id" => drop_loc.id
             }
@@ -430,8 +431,8 @@ defmodule FullCircle.Trading.TripTest do
           "good_id" => good.id,
           "loads" => [
             %{
-              "planned_mt" => "40",
-              "actual_mt" => "40",
+              "planned" => "40",
+              "actual" => "40",
               "good_id" => good.id,
               "location_id" => loc.id,
               "supply_position_id" => supply.id
@@ -439,8 +440,8 @@ defmodule FullCircle.Trading.TripTest do
           ],
           "drops" => [
             %{
-              "planned_mt" => "40",
-              "actual_mt" => "40",
+              "planned" => "40",
+              "actual" => "40",
               "good_id" => good.id,
               "location_id" => drop_loc.id
             }
@@ -469,10 +470,10 @@ defmodule FullCircle.Trading.TripTest do
           "transport_mode" => "company_own",
           "vehicle_number" => "ABC1234",
           "loads" => [
-            %{"planned_mt" => "10", "good_id" => good.id, "location_id" => loc.id}
+            %{"planned" => "10", "good_id" => good.id, "location_id" => loc.id}
           ],
           "drops" => [
-            %{"planned_mt" => "10", "good_id" => good.id, "location_id" => loc.id}
+            %{"planned" => "10", "good_id" => good.id, "location_id" => loc.id}
           ]
         },
         company,
@@ -480,6 +481,92 @@ defmodule FullCircle.Trading.TripTest do
       )
 
     assert Trading.complete_trip(trip, company, admin) == {:error, :missing_actuals}
+  end
+
+  test "company_own trip can save load/drop crew and warns when empty", %{
+    admin: admin,
+    company: company
+  } do
+    good = good_fixture(company, admin)
+    loc = location_fixture(company, admin)
+    emp_a = employee_fixture(%{"name" => "Crew Ali"}, company, admin)
+    emp_b = employee_fixture(%{"name" => "Crew Siti"}, company, admin)
+
+    {:ok, trip} =
+      Trading.create_trip(
+        %{
+          "date" => "2026-07-09",
+          "transport_mode" => "company_own",
+          "vehicle_number" => "CREW01",
+          "loads" => [
+            %{
+              "planned" => "10",
+              "actual" => "10",
+              "good_id" => good.id,
+              "location_id" => loc.id,
+              "trip_load_employees" => [
+                %{"employee_id" => emp_a.id}
+              ]
+            }
+          ],
+          "drops" => [
+            %{
+              "planned" => "10",
+              "actual" => "10",
+              "good_id" => good.id,
+              "location_id" => loc.id,
+              "trip_drop_employees" => [
+                %{"employee_id" => emp_b.id}
+              ]
+            }
+          ]
+        },
+        company,
+        admin
+      )
+
+    trip = Trading.get_trip!(trip.id, company, admin)
+    assert length(hd(trip.loads).trip_load_employees) == 1
+    assert hd(hd(trip.loads).trip_load_employees).employee_id == emp_a.id
+    assert length(hd(trip.drops).trip_drop_employees) == 1
+    assert hd(hd(trip.drops).trip_drop_employees).employee_id == emp_b.id
+    refute Enum.any?(Trading.trip_warnings(trip), &String.contains?(&1, "without employees"))
+
+    {:ok, empty_crew} =
+      Trading.create_trip(
+        %{
+          "date" => "2026-07-09",
+          "transport_mode" => "company_own",
+          "vehicle_number" => "CREW02",
+          "loads" => [
+            %{
+              "planned" => "5",
+              "actual" => "5",
+              "good_id" => good.id,
+              "location_id" => loc.id
+            }
+          ],
+          "drops" => [
+            %{
+              "planned" => "5",
+              "actual" => "5",
+              "good_id" => good.id,
+              "location_id" => loc.id
+            }
+          ]
+        },
+        company,
+        admin
+      )
+
+    empty_crew = Trading.get_trip!(empty_crew.id, company, admin)
+    warnings = Trading.trip_warnings(empty_crew)
+    assert Enum.any?(warnings, &String.contains?(&1, "without employees"))
+
+    assert {:ok, _completed, complete_warnings} =
+             Trading.complete_trip(empty_crew, company, admin)
+
+    assert Enum.any?(complete_warnings, &String.contains?(&1, "without employees"))
   end
 
   test "creating load on open supply auto-promotes status to collect", %{
@@ -508,8 +595,8 @@ defmodule FullCircle.Trading.TripTest do
                  "good_id" => good.id,
                  "loads" => [
                    %{
-                     "planned_mt" => "10",
-                     "actual_mt" => "10",
+                     "planned" => "10",
+                     "actual" => "10",
                      "good_id" => good.id,
                      "location_id" => loc.id,
                      "supply_position_id" => supply.id
@@ -517,8 +604,8 @@ defmodule FullCircle.Trading.TripTest do
                  ],
                  "drops" => [
                    %{
-                     "planned_mt" => "10",
-                     "actual_mt" => "10",
+                     "planned" => "10",
+                     "actual" => "10",
                      "good_id" => good.id,
                      "location_id" => drop_loc.id
                    }
@@ -546,8 +633,8 @@ defmodule FullCircle.Trading.TripTest do
                  "vehicle_number" => "ABC1234",
                  "loads" => [
                    %{
-                     "planned_mt" => "10",
-                     "actual_mt" => "10",
+                     "planned" => "10",
+                     "actual" => "10",
                      "good_id" => good_a.id,
                      "location_id" => loc.id,
                      "supply_position_id" => supply.id
@@ -555,8 +642,8 @@ defmodule FullCircle.Trading.TripTest do
                  ],
                  "drops" => [
                    %{
-                     "planned_mt" => "10",
-                     "actual_mt" => "10",
+                     "planned" => "10",
+                     "actual" => "10",
                      "good_id" => good_a.id,
                      "location_id" => loc.id
                    }
@@ -613,15 +700,15 @@ defmodule FullCircle.Trading.TripTest do
           "vehicle_number" => "ABC1234",
           "loads" => [
             %{
-              "planned_mt" => "20",
-              "actual_mt" => "20",
+              "planned" => "20",
+              "actual" => "20",
               "good_id" => good.id,
               "location_id" => load_loc.id,
               "supply_position_id" => supply_a.id
             },
             %{
-              "planned_mt" => "20",
-              "actual_mt" => "20",
+              "planned" => "20",
+              "actual" => "20",
               "good_id" => good.id,
               "location_id" => load_loc.id,
               "supply_position_id" => supply_b.id
@@ -629,15 +716,15 @@ defmodule FullCircle.Trading.TripTest do
           ],
           "drops" => [
             %{
-              "planned_mt" => "25",
-              "actual_mt" => "25",
+              "planned" => "25",
+              "actual" => "25",
               "good_id" => good.id,
               "location_id" => drop_loc.id,
               "sales_position_id" => sales.id
             },
             %{
-              "planned_mt" => "15",
-              "actual_mt" => "15",
+              "planned" => "15",
+              "actual" => "15",
               "good_id" => good.id,
               "location_id" => silo.id
             }
@@ -684,15 +771,15 @@ defmodule FullCircle.Trading.TripTest do
           "loads" => [
             %{
               "seq" => 1,
-              "planned_mt" => "10",
-              "actual_mt" => "10",
+              "planned" => "10",
+              "actual" => "10",
               "good_id" => good.id,
               "location_id" => loc_a.id
             },
             %{
               "seq" => 2,
-              "planned_mt" => "10",
-              "actual_mt" => "10",
+              "planned" => "10",
+              "actual" => "10",
               "good_id" => good.id,
               "location_id" => loc_b.id
             }
@@ -700,15 +787,15 @@ defmodule FullCircle.Trading.TripTest do
           "drops" => [
             %{
               "seq" => 1,
-              "planned_mt" => "10",
-              "actual_mt" => "10",
+              "planned" => "10",
+              "actual" => "10",
               "good_id" => good.id,
               "location_id" => drop_a.id
             },
             %{
               "seq" => 2,
-              "planned_mt" => "10",
-              "actual_mt" => "10",
+              "planned" => "10",
+              "actual" => "10",
               "good_id" => good.id,
               "location_id" => drop_b.id
             }
@@ -733,16 +820,16 @@ defmodule FullCircle.Trading.TripTest do
             %{
               "id" => Enum.at(trip.drops, 1).id,
               "seq" => 1,
-              "planned_mt" => "10",
-              "actual_mt" => "10",
+              "planned" => "10",
+              "actual" => "10",
               "good_id" => good.id,
               "location_id" => drop_b.id
             },
             %{
               "id" => Enum.at(trip.drops, 0).id,
               "seq" => 2,
-              "planned_mt" => "10",
-              "actual_mt" => "10",
+              "planned" => "10",
+              "actual" => "10",
               "good_id" => good.id,
               "location_id" => drop_a.id
             }
@@ -807,8 +894,8 @@ defmodule FullCircle.Trading.TripTest do
           "vehicle_number" => "ABC1234",
           "loads" => [
             %{
-              "planned_mt" => "10",
-              "actual_mt" => "10",
+              "planned" => "10",
+              "actual" => "10",
               "good_id" => good.id,
               "good_name" => good.name,
               "location_id" => load_loc.id,
@@ -817,8 +904,8 @@ defmodule FullCircle.Trading.TripTest do
           ],
           "drops" => [
             %{
-              "planned_mt" => "10",
-              "actual_mt" => "10",
+              "planned" => "10",
+              "actual" => "10",
               "good_id" => good.id,
               "good_name" => good.name,
               "location_id" => drop_loc.id,
@@ -851,8 +938,8 @@ defmodule FullCircle.Trading.TripTest do
           "loads" => [
             %{
               "id" => load.id,
-              "planned_mt" => "10",
-              "actual_mt" => "10",
+              "planned" => "10",
+              "actual" => "10",
               "good_id" => good.id,
               "good_name" => good.name,
               "location_id" => load_loc.id,
@@ -862,8 +949,8 @@ defmodule FullCircle.Trading.TripTest do
           "drops" => [
             %{
               "id" => drop.id,
-              "planned_mt" => "10",
-              "actual_mt" => "10",
+              "planned" => "10",
+              "actual" => "10",
               "good_id" => good.id,
               "good_name" => good.name,
               "location_id" => alt_loc.id,
@@ -921,8 +1008,8 @@ defmodule FullCircle.Trading.TripTest do
           "vehicle_number" => "XYZ999",
           "loads" => [
             %{
-              "planned_mt" => "40",
-              "actual_mt" => "40",
+              "planned" => "40",
+              "actual" => "40",
               "good_id" => good.id,
               "location_id" => load_loc.id,
               "supply_position_id" => supply.id
@@ -930,8 +1017,8 @@ defmodule FullCircle.Trading.TripTest do
           ],
           "drops" => [
             %{
-              "planned_mt" => "40",
-              "actual_mt" => "40",
+              "planned" => "40",
+              "actual" => "40",
               "good_id" => good.id,
               "location_id" => drop_loc.id,
               "sales_position_id" => sales.id,

@@ -216,7 +216,7 @@ end
 ```elixir
 # FullCircle.Trading.Balances
 def supply_loaded(%SupplyPosition{id: id}) do
-  # query sum trip_loads.actual_mt where trip.status == "completed" and supply_position_id == id
+  # query sum trip_loads.actual where trip.status == "completed" and supply_position_id == id
   # return Decimal; 0 if no trips table yet — implement fully in Task 6, for now return Decimal.new(0)
 end
 
@@ -297,7 +297,7 @@ end
 
 ```elixir
 def sales_delivered(%SalesPosition{id: id}) do
-  # sum completed trip_drops.actual_mt for sales_position_id — 0 until Task 6
+  # sum completed trip_drops.actual for sales_position_id — 0 until Task 6
 end
 
 def sales_undelivered(%SalesPosition{} = s) do
@@ -363,8 +363,8 @@ has_many :loads, TripLoad, on_replace: :delete
 has_many :drops, TripDrop, on_replace: :delete
 
 # TripLoad
-field :planned_mt, :decimal
-field :actual_mt, :decimal
+field :planned, :decimal
+field :actual, :decimal
 field :location_note, :string
 belongs_to :trip, Trip
 belongs_to :supply_position, SupplyPosition
@@ -372,8 +372,8 @@ belongs_to :location, Location  # required
 has_many :employees, through: [:trip_load_employees, :employee]  # many workers per load
 
 # TripDrop
-field :planned_mt, :decimal
-field :actual_mt, :decimal
+field :planned, :decimal
+field :actual, :decimal
 field :location_note, :string
 field :variance_note, :string
 belongs_to :trip, Trip
@@ -388,12 +388,12 @@ has_many :employees, through: [:trip_drop_employees, :employee]  # many workers 
 # trading_trip_drop_employees (trip_drop_id, employee_id) unique pair
 ```
 
-**Pay qty (full participation in Trading):** each employee on a load/drop is recorded with that line’s full `actual_mt` in the employee load/drop register. **Loading/dropping salary and any split among workers are handled in Payroll**, not Trading.
+**Pay qty (full participation in Trading):** each employee on a load/drop is recorded with that line’s full `actual` in the employee load/drop register. **Loading/dropping salary and any split among workers are handled in Payroll**, not Trading.
 
 **Changeset rules:**
 - `location_id` required on load and drop
 - `transport_mode` required; if `agent`, warn (not hard error) if agent blank on complete
-- On `complete_trip/3`: status → completed; require actual_mt on lines (or default actual = planned with warning — prefer require actuals)
+- On `complete_trip/3`: status → completed; require actual on lines (or default actual = planned with warning — prefer require actuals)
 - Cancel completed: error if any drop has `invoice_id`; else status cancelled
 - Validate one good on trip matches sales/supply goods when linked (warn or error — prefer **error** if mismatched good ids)
 - Cast embeds/assocs with `cast_assoc` for loads/drops
@@ -405,7 +405,7 @@ def supply_loaded(supply_id) do
   from(l in TripLoad,
     join: t in Trip, on: t.id == l.trip_id,
     where: t.status == "completed" and l.supply_position_id == ^supply_id,
-    select: coalesce(sum(l.actual_mt), 0)
+    select: coalesce(sum(l.actual), 0)
   ) |> Repo.one()
 end
 ```
@@ -456,14 +456,14 @@ Form: header fields; dynamic load/drop lines (add/remove); location selects filt
 
 ```elixir
 @spec employee_load_register(company, user, %{from: Date.t(), to: Date.t(), employee_id: id | nil}) ::
-  [%{employee, trip, date, location, supply_position, actual_mt}]
-  # one row per (employee, load line); actual_mt = full load.actual_mt (full participation for Payroll)
+  [%{employee, trip, date, location, supply_position, actual}]
+  # one row per (employee, load line); actual = full load.actual (full participation for Payroll)
 
 @spec employee_drop_register(company, user, filters) ::
-  [%{employee, trip, date, location, sales_position, actual_mt}]
+  [%{employee, trip, date, location, sales_position, actual}]
 
 @spec agent_delivery_register(company, user, filters) ::
-  [%{agent, trip, date, from_location, to_location, supply_position, sales_position, actual_mt}]
+  [%{agent, trip, date, from_location, to_location, supply_position, sales_position, actual}]
 ```
 
 Agent rows: one per **drop** on completed trips with `transport_mode == "agent"`.  
@@ -486,7 +486,7 @@ Totals by employee / by agent / by from→to pair.
 **Behavior:**
 - `create_invoice_from_drop(drop_id, company, user)`  
   - Auth: existing `can?(user, :create_invoice, company)` **and** `:manage_trading`  
-  - Build attrs for `FullCircle.Billing.create_invoice/3` from sales position customer, good, unit_price, qty = drop.actual_mt  
+  - Build attrs for `FullCircle.Billing.create_invoice/3` from sales position customer, good, unit_price, qty = drop.actual  
   - Read a real invoice create call in `billing.ex` / invoice LiveView to match required attrs (tax code, accounts, doc dates) — **do not invent GL accounts**; reuse company defaults or require minimal fields the form requires  
   - On success set `trip_drops.invoice_id`  
   - If already linked, return `{:error, :already_invoiced}`

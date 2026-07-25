@@ -5,6 +5,7 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
   alias FullCircle.Trading.{Trip, TripLoad, TripDrop}
   alias FullCircle.Accounting
   alias FullCircle.Product
+  alias FullCircle.HR
   import FullCircleWeb.TradingTripLive.DetailLines
 
   @impl true
@@ -65,9 +66,11 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
         %{
           l
           | good_name: l.good && l.good.name,
+            good_unit: l.good && l.good.unit,
             location_name: location_label(l.location),
             supply_title: supply_label(l.supply_position),
-            party_contact_id: l.supply_position && l.supply_position.supplier_id
+            party_contact_id: l.supply_position && l.supply_position.supplier_id,
+            trip_load_employees: put_crew_names(l.trip_load_employees)
         }
       end)
 
@@ -76,14 +79,24 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
         %{
           d
           | good_name: d.good && d.good.name,
+            good_unit: d.good && d.good.unit,
             location_name: location_label(d.location),
             sales_title: sales_label(d.sales_position),
             supply_title: supply_label(d.supply_position),
-            party_contact_id: d.sales_position && d.sales_position.customer_id
+            party_contact_id: d.sales_position && d.sales_position.customer_id,
+            trip_drop_employees: put_crew_names(d.trip_drop_employees)
         }
       end)
 
     %{trip | loads: loads, drops: drops}
+  end
+
+  defp put_crew_names(nil), do: []
+
+  defp put_crew_names(rows) do
+    Enum.map(List.wrap(rows), fn row ->
+      %{row | employee_name: row.employee && row.employee.name}
+    end)
   end
 
   defp location_label(%{name: name, kind: kind}) when is_binary(name),
@@ -202,6 +215,7 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
     cs =
       socket.assigns.form.source
       |> FullCircleWeb.Helpers.add_line(:loads, %TripLoad{seq: next_seq(socket, :loads)})
+      |> fill_down_crew_changesets(:loads, :trip_load_employees)
       |> Map.put(:action, :validate)
 
     {:noreply, assign(socket, form: to_form(cs))}
@@ -211,6 +225,7 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
     cs =
       socket.assigns.form.source
       |> FullCircleWeb.Helpers.add_line(:drops, %TripDrop{seq: next_seq(socket, :drops)})
+      |> fill_down_crew_changesets(:drops, :trip_drop_employees)
       |> Map.put(:action, :validate)
 
     {:noreply, assign(socket, form: to_form(cs))}
@@ -272,6 +287,24 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
     {:noreply, assign(socket, form: to_form(cs))}
   end
 
+  def handle_event("remove_load_crew", %{"line" => line, "crew" => crew}, socket) do
+    cs =
+      socket
+      |> remove_nested_crew(:loads, :trip_load_employees, line, crew)
+      |> fill_down_crew_changesets(:loads, :trip_load_employees)
+
+    {:noreply, assign(socket, form: to_form(cs))}
+  end
+
+  def handle_event("remove_drop_crew", %{"line" => line, "crew" => crew}, socket) do
+    cs =
+      socket
+      |> remove_nested_crew(:drops, :trip_drop_employees, line, crew)
+      |> fill_down_crew_changesets(:drops, :trip_drop_employees)
+
+    {:noreply, assign(socket, form: to_form(cs))}
+  end
+
   def handle_event("save", %{"trip" => params}, socket) do
     company = socket.assigns.current_company
     user = socket.assigns.current_user
@@ -319,7 +352,7 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
         {:noreply, socket}
 
       {:error, :missing_actuals} ->
-        {:noreply, put_flash(socket, :error, gettext("All loads and drops need actual MT."))}
+        {:noreply, put_flash(socket, :error, gettext("All loads and drops need actual quantity."))}
 
       {:error, :good_mismatch} ->
         {:noreply,
@@ -371,6 +404,125 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
     end)
     |> length()
     |> Kernel.+(1)
+  end
+
+  defp remove_nested_crew(socket, line_assoc, crew_assoc, line_idx, crew_idx) do
+    line_i = if is_binary(line_idx), do: String.to_integer(line_idx), else: line_idx
+    crew_s = to_string(crew_idx)
+    cs = socket.assigns.form.source
+    lines = Ecto.Changeset.get_assoc(cs, line_assoc) || []
+
+    case Enum.at(lines, line_i) do
+      nil ->
+        cs |> Map.put(:action, :validate)
+
+      line_cs ->
+        line_cs =
+          line_cs
+          |> FullCircleWeb.Helpers.delete_line(crew_s, crew_assoc)
+          |> Ecto.Changeset.put_change(:crew_locked, true)
+
+        lines = List.replace_at(lines, line_i, line_cs)
+
+        cs
+        |> Ecto.Changeset.put_assoc(line_assoc, lines)
+        |> Map.put(:action, :validate)
+    end
+  end
+
+  defp crew_visible?(mode) when mode in ["company_own", "agent"], do: true
+  defp crew_visible?(_), do: false
+
+  # Copy crew from each locked line down onto following unlocked lines.
+  defp fill_down_crew_changesets(cs, line_assoc, crew_assoc) do
+    lines = Ecto.Changeset.get_assoc(cs, line_assoc) || []
+    n = length(lines)
+
+    if n == 0 do
+      cs
+    else
+      new_lines =
+        Enum.reduce(0..(n - 1)//1, lines, fn i, ls ->
+        line = Enum.at(ls, i)
+
+        cond do
+          cs_line_deleted?(line) ->
+            ls
+
+          not cs_crew_locked?(line) ->
+            ls
+
+          true ->
+            crew_params = crew_params_from_line_cs(line, crew_assoc)
+
+            if i >= n - 1 do
+              ls
+            else
+              Enum.reduce((i + 1)..(n - 1)//1, ls, fn j, ls2 ->
+                jl = Enum.at(ls2, j)
+
+                cond do
+                  cs_line_deleted?(jl) ->
+                    ls2
+
+                  cs_crew_locked?(jl) ->
+                    ls2
+
+                  true ->
+                    List.replace_at(ls2, j, put_crew_params_on_line_cs(jl, crew_assoc, crew_params))
+                end
+              end)
+            end
+        end
+      end)
+
+      Ecto.Changeset.put_assoc(cs, line_assoc, new_lines)
+    end
+  end
+
+  defp cs_line_deleted?(%Ecto.Changeset{} = cs),
+    do: Ecto.Changeset.get_field(cs, :delete) in [true, "true"]
+
+  defp cs_line_deleted?(_), do: false
+
+  defp cs_crew_locked?(%Ecto.Changeset{} = cs),
+    do: Ecto.Changeset.get_field(cs, :crew_locked) in [true, "true"]
+
+  defp cs_crew_locked?(_), do: false
+
+  defp crew_params_from_line_cs(line_cs, crew_assoc) do
+    (Ecto.Changeset.get_assoc(line_cs, crew_assoc) || [])
+    |> Enum.reject(fn
+      %Ecto.Changeset{} = c -> Ecto.Changeset.get_field(c, :delete) in [true, "true"]
+      _ -> false
+    end)
+    |> Enum.with_index()
+    |> Map.new(fn {crew_cs, i} ->
+      {Integer.to_string(i),
+       %{
+         "employee_id" => Ecto.Changeset.get_field(crew_cs, :employee_id),
+         "employee_name" => Ecto.Changeset.get_field(crew_cs, :employee_name)
+       }}
+    end)
+  end
+
+  defp put_crew_params_on_line_cs(line_cs, crew_assoc, crew_params) do
+    module =
+      case crew_assoc do
+        :trip_load_employees -> FullCircle.Trading.TripLoadEmployee
+        :trip_drop_employees -> FullCircle.Trading.TripDropEmployee
+      end
+
+    crew_cs =
+      crew_params
+      |> Enum.sort_by(fn {k, _} -> String.to_integer(k) end)
+      |> Enum.map(fn {_k, attrs} ->
+        module.changeset(struct(module), attrs)
+      end)
+
+    line_cs
+    |> Ecto.Changeset.put_assoc(crew_assoc, crew_cs)
+    |> Ecto.Changeset.put_change(:crew_locked, false)
   end
 
   defp validate(params, socket) do
@@ -443,12 +595,18 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
             "good_id",
             fn name -> Product.get_good_by_name(name, company, user) end,
             fn
-              %{id: id, value: name} -> %{"good_id" => id, "good_name" => name}
-              _ -> %{}
+              %{id: id, value: name, unit: unit} ->
+                %{"good_id" => id, "good_name" => name, "good_unit" => unit}
+
+              %{id: id, value: name} ->
+                %{"good_id" => id, "good_name" => name}
+
+              _ ->
+                %{}
             end,
             fn id ->
               case FullCircle.Repo.get(FullCircle.Product.Good, id) do
-                %{name: name} -> %{"good_name" => name}
+                %{name: name, unit: unit} -> %{"good_name" => name, "good_unit" => unit}
                 _ -> %{}
               end
             end
@@ -494,6 +652,7 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
                   "supply_title" => supply_label(s),
                   "good_id" => s.good_id,
                   "good_name" => s.good && s.good.name,
+                  "good_unit" => s.good && s.good.unit,
                   "party_contact_id" => s.supplier_id
                 }
 
@@ -508,6 +667,7 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
                   "supply_title" => supply_label(s),
                   "good_id" => s.good_id,
                   "good_name" => s.good && s.good.name,
+                  "good_unit" => s.good && s.good.unit,
                   "party_contact_id" => s.supplier_id
                 }
               rescue
@@ -547,12 +707,18 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
             "good_id",
             fn name -> Product.get_good_by_name(name, company, user) end,
             fn
-              %{id: id, value: name} -> %{"good_id" => id, "good_name" => name}
-              _ -> %{}
+              %{id: id, value: name, unit: unit} ->
+                %{"good_id" => id, "good_name" => name, "good_unit" => unit}
+
+              %{id: id, value: name} ->
+                %{"good_id" => id, "good_name" => name}
+
+              _ ->
+                %{}
             end,
             fn id ->
               case FullCircle.Repo.get(FullCircle.Product.Good, id) do
-                %{name: name} -> %{"good_name" => name}
+                %{name: name, unit: unit} -> %{"good_name" => name, "good_unit" => unit}
                 _ -> %{}
               end
             end
@@ -578,6 +744,7 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
                   "sales_title" => sales_label(s),
                   "good_id" => s.good_id,
                   "good_name" => s.good && s.good.name,
+                  "good_unit" => s.good && s.good.unit,
                   "party_contact_id" => s.customer_id
                 }
 
@@ -592,6 +759,7 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
                   "sales_title" => sales_label(s),
                   "good_id" => s.good_id,
                   "good_name" => s.good && s.good.name,
+                  "good_unit" => s.good && s.good.unit,
                   "party_contact_id" => s.customer_id
                 }
               rescue
@@ -764,9 +932,12 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
           |> resolve_drop_typeahead("good_name", company, user)
           |> resolve_drop_typeahead("location_name", company, user)
           |> resolve_drop_typeahead("supply_title", company, user)
+          |> absorb_crew_add("trip_drop_employees", company, user)
+          |> backfill_crew_names("trip_drop_employees", company, user)
 
         {k, drop}
       end)
+      |> fill_down_crew_params("trip_drop_employees")
 
     loads =
       Map.new(params["loads"] || %{}, fn {k, load} ->
@@ -776,13 +947,180 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
           |> resolve_load_typeahead("supply_title", company, user)
           |> resolve_load_typeahead("good_name", company, user)
           |> resolve_load_typeahead("location_name", company, user)
+          |> absorb_crew_add("trip_load_employees", company, user)
+          |> backfill_crew_names("trip_load_employees", company, user)
 
         {k, load}
       end)
+      |> fill_down_crew_params("trip_load_employees")
 
     params
     |> Map.put("loads", loads)
     |> Map.put("drops", drops)
+  end
+
+  # When crew_add_name resolves to an employee, append to crew assoc, lock this line,
+  # and clear the field (fill-down runs after all lines are processed).
+  defp absorb_crew_add(detail, crew_key, company, user) do
+    name = detail["crew_add_name"] |> to_string() |> String.trim()
+
+    if name == "" do
+      detail
+    else
+      case HR.get_employee_by_name(name, company, user) do
+        %{id: id, name: ename} ->
+          crew = normalize_crew_map(detail[crew_key])
+
+          already? =
+            Enum.any?(crew, fn {_k, row} ->
+              row = stringify_keys_one(row)
+              to_string(row["employee_id"]) == to_string(id) and row["delete"] not in [true, "true"]
+            end)
+
+          crew =
+            if already? do
+              crew
+            else
+              idx = next_crew_index(crew)
+              Map.put(crew, idx, %{"employee_id" => id, "employee_name" => ename})
+            end
+
+          detail
+          |> Map.put(crew_key, crew)
+          |> Map.put("crew_add_name", "")
+          |> Map.put("crew_locked", true)
+
+        nil ->
+          # Keep typed text so user can finish the name; id not added yet
+          detail
+      end
+    end
+  end
+
+  # For each locked line (user-edited crew), copy its active crew onto following
+  # unlocked lines. Later locked lines win for lines below them.
+  defp fill_down_crew_params(lines_map, crew_key) when is_map(lines_map) do
+    keys =
+      lines_map
+      |> Map.keys()
+      |> Enum.sort_by(fn
+        k when is_integer(k) -> k
+        k when is_binary(k) -> String.to_integer(k)
+      end)
+
+    Enum.reduce(keys, lines_map, fn i, map ->
+      line = stringify_keys_one(Map.get(map, i) || %{})
+
+      cond do
+        line_params_deleted?(line) ->
+          map
+
+        not truthy_locked?(line["crew_locked"]) ->
+          map
+
+        true ->
+          crew = active_crew_snapshot(line[crew_key])
+          following = Enum.drop_while(keys, &(&1 != i)) |> Enum.drop(1)
+
+          Enum.reduce(following, map, fn j, m ->
+            jl = stringify_keys_one(Map.get(m, j) || %{})
+
+            cond do
+              line_params_deleted?(jl) ->
+                m
+
+              truthy_locked?(jl["crew_locked"]) ->
+                m
+
+              true ->
+                Map.put(
+                  m,
+                  j,
+                  jl
+                  |> Map.put(crew_key, crew)
+                  |> Map.put("crew_locked", false)
+                )
+            end
+          end)
+      end
+    end)
+  end
+
+  defp fill_down_crew_params(other, _), do: other
+
+  defp line_params_deleted?(line), do: line["delete"] in [true, "true"]
+
+  defp truthy_locked?(v), do: v in [true, "true"]
+
+  defp active_crew_snapshot(crew) do
+    crew
+    |> normalize_crew_map()
+    |> Enum.filter(fn {_k, row} ->
+      row = stringify_keys_one(row)
+      row["delete"] not in [true, "true"] and present_id?(row["employee_id"])
+    end)
+    |> Enum.with_index()
+    |> Map.new(fn {{_k, row}, i} ->
+      row = stringify_keys_one(row)
+
+      {Integer.to_string(i),
+       %{
+         "employee_id" => row["employee_id"],
+         "employee_name" => row["employee_name"]
+       }}
+    end)
+  end
+
+  defp backfill_crew_names(detail, crew_key, _company, _user) do
+    crew =
+      detail
+      |> Map.get(crew_key, %{})
+      |> normalize_crew_map()
+      |> Map.new(fn {k, row} ->
+        row = stringify_keys_one(row)
+        id = row["employee_id"]
+        name = row["employee_name"] |> to_string() |> String.trim()
+
+        row =
+          cond do
+            name != "" ->
+              row
+
+            present_id?(id) ->
+              case FullCircle.Repo.get(FullCircle.HR.Employee, id) do
+                %{name: n} -> Map.put(row, "employee_name", n)
+                _ -> row
+              end
+
+            true ->
+              row
+          end
+
+        {k, row}
+      end)
+
+    Map.put(detail, crew_key, crew)
+  end
+
+  defp normalize_crew_map(map) when is_map(map), do: stringify_map(map)
+  defp normalize_crew_map(list) when is_list(list) do
+    list
+    |> Enum.with_index()
+    |> Map.new(fn {item, i} -> {Integer.to_string(i), stringify_val(item)} end)
+  end
+
+  defp normalize_crew_map(_), do: %{}
+
+  defp next_crew_index(crew) when is_map(crew) do
+    crew
+    |> Map.keys()
+    |> Enum.map(fn
+      k when is_integer(k) -> k
+      k when is_binary(k) -> String.to_integer(k)
+    end)
+    |> Enum.max(fn -> -1 end)
+    |> Kernel.+(1)
+    |> Integer.to_string()
   end
 
   # Ensure typeahead labels are populated from IDs (desk prefill may only have ids).
@@ -879,6 +1217,7 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
           user_id={@current_user.id}
           phx_target={@myself}
           show_errors={!!@form.source.action}
+          show_crew={crew_visible?(@form[:transport_mode].value)}
         />
 
         <.loads_section
@@ -888,6 +1227,7 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
           phx_target={@myself}
           drop_good_ids={drop_good_ids(@form)}
           show_errors={!!@form.source.action}
+          show_crew={crew_visible?(@form[:transport_mode].value)}
         />
 
         <div class="mt-3 flex flex-wrap items-center justify-between gap-3">

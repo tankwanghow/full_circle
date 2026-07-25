@@ -50,8 +50,8 @@ defmodule FullCircleWeb.TradingSettlementLiveTest do
           "vehicle_number" => "SET#{tag}",
           "loads" => [
             %{
-              "planned_mt" => "30",
-              "actual_mt" => "29.5",
+              "planned" => "30",
+              "actual" => "29.5",
               "good_id" => good.id,
               "location_id" => port.id,
               "supply_position_id" => supply.id
@@ -59,8 +59,8 @@ defmodule FullCircleWeb.TradingSettlementLiveTest do
           ],
           "drops" => [
             %{
-              "planned_mt" => "30",
-              "actual_mt" => "29.5",
+              "planned" => "30",
+              "actual" => "29.5",
               "good_id" => good.id,
               "location_id" => site.id,
               "sales_position_id" => sales.id,
@@ -266,8 +266,8 @@ defmodule FullCircleWeb.TradingSettlementLiveTest do
           "vehicle_number" => "LVH 1",
           "loads" => [
             %{
-              "planned_mt" => "15",
-              "actual_mt" => "15",
+              "planned" => "15",
+              "actual" => "15",
               "good_id" => good.id,
               "location_id" => port.id,
               "supply_position_id" => supply.id
@@ -275,8 +275,8 @@ defmodule FullCircleWeb.TradingSettlementLiveTest do
           ],
           "drops" => [
             %{
-              "planned_mt" => "15",
-              "actual_mt" => "15",
+              "planned" => "15",
+              "actual" => "15",
               "good_id" => good.id,
               "location_id" => site.id,
               "sales_position_id" => sales.id,
@@ -353,8 +353,8 @@ defmodule FullCircleWeb.TradingSettlementLiveTest do
           "status" => "draft",
           "loads" => [
             %{
-              "planned_mt" => "12",
-              "actual_mt" => "12",
+              "planned" => "12",
+              "actual" => "12",
               "good_id" => good.id,
               "location_id" => port.id,
               "supply_position_id" => supply.id
@@ -362,8 +362,8 @@ defmodule FullCircleWeb.TradingSettlementLiveTest do
           ],
           "drops" => [
             %{
-              "planned_mt" => "12",
-              "actual_mt" => "12",
+              "planned" => "12",
+              "actual" => "12",
               "good_id" => good.id,
               "location_id" => site.id,
               "sales_position_id" => sales.id

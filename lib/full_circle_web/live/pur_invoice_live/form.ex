@@ -41,7 +41,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
        %{
          linked?: false,
          line_count: 0,
-         actual_mt_sum: 0,
+         actual_sum: 0,
          trip_refs: [],
          supplier_load_count: 0,
          transport_drop_count: 0
@@ -979,7 +979,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
           {gettext(
             "%{n} line(s) · %{mt} MT · trips: %{trips}. Party is locked. Unlink if the match was wrong; commercial qty/price edits are allowed.",
             n: @trading_settlement.line_count,
-            mt: @trading_settlement.actual_mt_sum,
+            mt: @trading_settlement.actual_sum,
             trips: Enum.join(@trading_settlement.trip_refs, ", ")
           )}
         </p>
