@@ -18,6 +18,41 @@ defmodule FullCircleWeb.StatutoryCalcLiveTest do
     assert html =~ "epf_employee"
   end
 
+  test "admin index links to rate tables and file formats", %{conn: conn, com: com} do
+    {:ok, lv, _html} = live(conn, ~p"/companies/#{com.id}/statutory_calcs")
+
+    assert has_element?(
+             lv,
+             ~s(#rate_tables_link[href="/companies/#{com.id}/statutory_rate_tables"])
+           )
+
+    assert has_element?(
+             lv,
+             ~s(#file_formats_link[href="/companies/#{com.id}/statutory_file_formats"])
+           )
+
+    # Links actually reach the pages
+    assert {:error, {:live_redirect, %{to: to}}} =
+             lv |> element("#rate_tables_link") |> render_click()
+
+    assert to == "/companies/#{com.id}/statutory_rate_tables"
+    {:ok, _lv, html} = live(conn, to)
+    assert html =~ "Statutory Rate Table Listing"
+  end
+
+  # The listing itself requires :manage_statutory_config, so a clerk never
+  # reaches the page (and therefore never sees the links on it).
+  test "non-admin cannot reach the statutory calc listing", %{com: com, admin: admin} do
+    clerk = user_fixture()
+    {:ok, _} = FullCircle.Sys.allow_user_to_access(com, clerk, "clerk", admin)
+    conn = log_in_user(build_conn(), clerk)
+
+    assert {:error, {:live_redirect, %{to: to}}} =
+             live(conn, ~p"/companies/#{com.id}/statutory_calcs")
+
+    assert to =~ "/companies/#{com.id}/dashboard"
+  end
+
   test "form saves a new version visible in index", %{conn: conn, com: com} do
     {:ok, lv, _html} = live(conn, ~p"/companies/#{com.id}/statutory_calcs/new")
 
