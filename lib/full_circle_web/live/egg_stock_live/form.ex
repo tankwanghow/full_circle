@@ -413,7 +413,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
       Enum.reduce(details, {Map.new(grades, &{&1, 0}), Map.new(grades, &{&1, 0})}, fn {_k, detail},
                                                                                       {sales,
                                                                                        purchases} ->
-        if detail["is_separator"] in [true, "true"] do
+        if detail["is_separator"] in [true, "true"] or detail["ignore"] in [true, "true"] do
           {sales, purchases}
         else
           quantities = detail["quantities"] || %{}
@@ -1315,7 +1315,8 @@ defmodule FullCircleWeb.EggStockLive.Form do
   defp sum_quantities(details, section, grade) when is_list(details) do
     details
     |> Enum.filter(fn d ->
-      d.section == section and Map.get(d, :is_separator) != true
+      d.section == section and Map.get(d, :is_separator) != true and
+        Map.get(d, :ignore) != true
     end)
     |> Enum.reduce(0, fn d, acc ->
       acc + to_int((d.quantities || %{})[grade])
