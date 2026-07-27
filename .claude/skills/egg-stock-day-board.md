@@ -87,6 +87,21 @@ Weekly books are edited in the app UI (one-time ODS import tooling was removed a
   if a day already has actual closing, that closing wins.
 - Production identity per day: `sold + expired + closing − opening − bought`.
 
+## Estimated tab navigation
+
+Rows in the Estimated tab are clickable (`forecast_table` assigns `row_click`,
+`row_kind`, `highlight_date`, `highlight_class`):
+
+- **Closing** rows → `goto_date` (opens the Stock tab for that day)
+- **Est. Sales / Purchases** rows → `goto_weekly` (opens `weekly_sales` /
+  `weekly_purchases` for that row's DOW) — **except today's row**, which falls
+  back to `goto_date`
+- Highlighted row is the board date **+1** (board 25th → 26th highlighted),
+  blue for sales, emerald for purchases
+
+`goto_date` now calls `flush_autosave/1` even when the date is unchanged, and
+re-loads the "now" tab instead of returning early.
+
 ## UI conventions (form)
 
 - Single planned board surface; delete control sits **after** document actions on planned lines.

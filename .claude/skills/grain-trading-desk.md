@@ -36,6 +36,17 @@ Settlement Invoice / PurInvoice stay in finance — trading does not auto-post t
   (`doc_id` / `doc_no` / `doc_kind` link to Invoice/PurInvoice). Global board
   (`/trading/settlement` without trip_id) still uses tabs/filters and hides settled.
 Gate for billing is trip `completed` only (draft/planned shown, not selectable).
+
+**Prefill dates come from the trip, and settle same-day.** All three builders
+(`invoice_attrs_from_drops`, and the supplier / transport `pur_invoice_attrs_*`)
+date the document `trip.date || Date.utc_today()` and set
+**`due_date` == that same date** — trading settles on the trip date, it does not
+run payment terms. Don't reintroduce a `Date.add(date, 30)` here.
+
+Note the settlement screen **discards** the attrs it builds and deep-links to
+`/Invoice/new?trading_drops=…` (or `?trading_loads=` / `?trading_transport_drops=`);
+the receiving form re-runs the same builder. A prefill change must be made in
+`Settlement`, not in the LiveView, or the two paths diverge.
 **Link hygiene:** link means “settled via” (not live mirror). While linked, **party
 (contact) is locked** on Invoice/PurInvoice; qty/price may still be edited.
 **Unlink trading settlement** clears FKs so lines reappear on settlement queues
@@ -55,12 +66,30 @@ substring). Status boxes show defaults on mount:
 - Sales: `draft, open, hold`
 - Trips: `draft, planned`
 
+**Auto good filter:** selecting sales rows writes the unique good names of the
+selection (comma-OR) into the **supply** and **warehouse** `good` column filters
+(`sync_good_filters_from_selected_sales/1`). Clearing the selection or creating
+the trip clears them again — these filters are derived, not user-owned.
+
 **Trip bill filters:** sticky chips under trips header — **Needs bill** /
 **Cust unbilled** / **Supp unbilled** / **Haul unbilled** (multi-select OR on
 `trip_settlement_badges` open|partial). Mount is **ops-first**: Bill chips off.
 Turning a Bill chip on forces trip status `completed`; last chip off restores
 `draft, planned`. **Clear** clears chips **and** the trip status box. Title shows
 `shown/all` when any filter active.
+
+**The trips panel is loaded two different ways** (`load_trips_for_panel/3`):
+
+| Bill chips | Query | Why |
+|---|---|---|
+| off | newest 50 (`Enum.take(50)`) | ops view only cares about recent work |
+| any on | `list_trips(status: "completed")`, **uncapped** | settlement stays open indefinitely; capping hides old unbilled trips |
+
+Toggling a chip therefore has to **reload** the panel (`reload_trips/1`), not just
+re-filter the existing assign. A trip only carries settlement badges at all when
+it is `completed` **and** has a `supply_position_id` on a load (supplier stream),
+a `sales_position_id` on a drop (customer stream), or `transport_mode == "agent"`
+with an agent (transport stream) — otherwise `show?: false` and no chip matches it.
 See `docs/superpowers/specs/2026-07-23-trading-settlement-invoicing-design.md`.
 
 ## Status machines
@@ -74,16 +103,48 @@ See `docs/superpowers/specs/2026-07-23-trading-settlement-invoicing-design.md`.
 
 Active board / soft-hold targets: `open | hold | collect`.  
 Loading a supply that is still `open` **auto-promotes to `collect`** on trip create/update.
+That promotion is **not recorded anywhere**, so an auto-promoted `collect` cannot
+later be told apart from one a clerk set by hand — see `cancel_trip` below.
 
 **Sales** (`draft | open | hold | fulfilled | cancelled`):
 
 - Active (open board / soft hold / drop targets): `draft | open | hold`
 - Terminal: `fulfilled` (may be short; optional `fulfilled_note`), `cancelled`
 
+**Terminal positions are status-locked.** Supply `closed` and sales
+`fulfilled`/`cancelled` are terminal (`SupplyPosition.terminal?/1`,
+`SalesPosition.terminal?/1`). `update_supply_position` / `update_sales_position`
+return `{:error, :position_locked}` for any attempt to move to a *different*
+status — including via the thin wrappers (`hold_`, `collect_`, `open_`,
+`fulfill_`, `cancel_`). Deliberately surgical:
+
+- Other fields stay editable (e.g. `notes` on a closed supply)
+- Re-asserting the *same* terminal status is a no-op, not an error — so
+  `fulfill_sales_position` can still revise a `fulfilled_note`
+
+Callers must handle `{:error, :position_locked}`; the desk form components flash
+a specific message for it.
+
+**Preferred supply must match the sales good.** Autocomplete is
+`schema=opensupply&good_id=<good_id>`; with no good picked yet it passes
+`good_id=__none__` so the list stays empty rather than showing everything.
+A mismatched supply clears both `preferred_supply_id` and
+`preferred_supply_title` — enforced on the good change, on the title change, and
+again in save. Display label is `SUP-… · Good · Supplier`.
+
 **Trip** (`draft | planned | completed | cancelled`):
 
 - Completed/cancelled trips are **locked** (`{:error, :trip_locked}` on update)
 - Complete requires `actual` on every load and drop; returns `{:ok, trip, warnings}` — warnings never block
+- `cancel_trip` also returns **`{:ok, trip, warnings}`** (same shape as complete).
+  A completed trip with a linked Invoice/PurInvoice cannot be cancelled
+  (`{:error, :has_invoices}`) — unlink settlement first.
+
+**Cancelling never reverts a supply's `collect` status.** Because the
+`open → collect` promotion is not recorded, auto-reverting would wrongly reopen a
+supply a clerk had marked `collect` by hand. Instead `stranded_collect_warnings/2`
+returns an advisory naming each supply that is still `collect` **and** no longer
+referenced by any non-cancelled trip; the clerk decides. Status is left untouched.
 
 ## System document numbers
 
@@ -95,7 +156,10 @@ Gapless per company via `gapless_doc_ids`:
 | Sales | `SAL-` | `title` (unique per company) |
 | Trip | `TRP-` | `reference_no` (immutable after create) |
 
-Unit always comes from **Good** — never stored on positions.
+Unit always comes from **Good** — never stored on positions. Desk rows, trip form
+and print all render `good.unit` via the `good_unit` virtual; never hardcode "Mt".
+Qty columns are `planned` / `actual` (renamed from `planned_mt` / `actual_mt` in
+migration `20260725120000`).
 
 ## Balances (`Trading.Balances`)
 
@@ -103,6 +167,27 @@ Unit always comes from **Good** — never stored on positions.
 - **Soft hold** = sum of undelivered qty on active sales that prefer a supply — **display only**, does not lock remaining.
 - **In transit** (draft + planned) uses `coalesce(actual, planned)` so desks show commitment without moving stock.
 - Warehouse on-hand groups by **own_warehouse** location × **line** `good_id`.
+
+**Boards must use the batch helpers, not the per-position ones.** Each
+`supply_loaded/1`-style function runs its own query, so calling them per row makes
+a board O(rows) round-trips. `position_board` / `sales_board` instead use the
+`*_by_ids/1` variants, which answer for a whole id set in one `GROUP BY` and return
+`%{id => Decimal}` (absent id ⇒ zero):
+
+`supply_loaded_by_ids/1`, `supply_in_transit_by_ids/1`, `sales_delivered_by_ids/1`,
+`sales_in_transit_by_ids/1`, `soft_held_by_ids/1`.
+
+Both boards are now a **flat ~8 queries at any row count** (was 5N+4).
+Two further traps:
+
+- `supply_remaining/1` and `sales_undelivered/1` internally re-run the loaded /
+  delivered query. When you already have that value, pass it: the arity-2
+  `supply_remaining(s, loaded)` / `sales_undelivered(s, delivered)`.
+- `soft_held_by_ids/1` exists because the arity-1 `soft_held_for_supply/1` loops
+  `sales_undelivered/1` per matching sale — an N+1 nested inside the board's N.
+
+`test/full_circle/trading/board_aggregation_test.exs` pins both halves: aggregated
+values equal the per-position functions, and query count does not grow with rows.
 
 ## Multi-good trips
 
@@ -135,7 +220,21 @@ Location for the supplier if none exists. Mirror for customers:
 Drivers are **Employees**; transport agents are **Contacts**. Agent required only when
 `transport_mode == "agent"`. Modes: `company_own | agent | customer_arranged`.
 
-Multi-employee on load/drop via `trip_load_employees` / `trip_drop_employees`.
+## Line crew (`trip_load_employees` / `trip_drop_employees`)
+
+Multi-employee per load/drop line. Crew UI only renders when
+`transport_mode in ["company_own", "agent"]` (`crew_visible?/1`).
+
+Virtuals on TripLoad / TripDrop:
+
+- `crew_add_name` — employee typeahead; cleared once the row is appended
+- `crew_locked` — `true` once the user edits **that line's** crew
+
+**Fill-down:** crew from each *locked* line is copied down onto the following
+*unlocked* lines (on add-line, crew add, and crew remove). Deleted lines are
+skipped. Removing all crew from a line still leaves it locked — that is how a
+line opts out of inheriting. Implemented twice: on changesets
+(`fill_down_crew_changesets/3`) and on raw params during validate.
 
 ## Desk-only UX
 
@@ -154,6 +253,20 @@ on the desk; print under `trading_trip_live`, `trading_sales_live`,
 - `:view_trading` — boards, lists, print
 - `:manage_trading` — create/update/complete/cancel
 
+**Company-scope every position lookup reached through trip line params.** A trip's
+`loads`/`drops` carry client-supplied `supply_position_id` / `sales_position_id`.
+`authorize/3` only checks the *user vs. company* — it says nothing about whether a
+referenced position belongs to that company. Both places that resolve those ids
+must filter on `company_id`:
+
+- `line_goods_mismatch?/3` — an out-of-company position then resolves to "not
+  found", mismatches the line's `good_id`, and the changeset is rejected
+- `maybe_promote_open_supplies_to_collect/2` — the `update_all` must be scoped, or
+  saving a trip could flip another company's supply from `open` to `collect`
+
+Both take `company` as an explicit argument for exactly this reason; don't drop it
+back to an arity that "looks tidier".
+
 ## Gotchas
 
 1. **Warn-only oversell** — remaining can go negative; `trip_warnings/1` is advisory.
@@ -162,6 +275,11 @@ on the desk; print under `trading_trip_live`, `trading_sales_live`,
 4. **Sample data** — `Trading.SampleData` for demo seed; not production.
 5. **Order/Load/Delivery removed** from Product — trading replaced that logistics path for grain.
 6. **Migrations collapsed** for undeployed trading schema; prefer current schemas over intermediate migration history.
+7. **Crew clears itself on transport-mode switch** — switching away from
+   `company_own`/`agent` hides the crew inputs, and the existing `cast_assoc` +
+   `on_replace: :delete` already deletes the rows on save. No extra clearing code
+   is needed; don't "fix" this. (Trip line ids survive edits because Phoenix
+   `inputs_for` emits hidden primary-key inputs.)
 
 ## Key files
 
