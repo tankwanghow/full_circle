@@ -106,8 +106,7 @@ defmodule FullCircle.Trading.Settlement do
           doc_id: d.invoice_id,
           doc_no: inv.invoice_no,
           doc_kind: "invoice",
-          invoiceable:
-            t.status == "completed" and not is_nil(d.actual) and is_nil(d.invoice_id)
+          invoiceable: t.status == "completed" and not is_nil(d.actual) and is_nil(d.invoice_id)
         }
       )
       |> maybe_filter_customer(customer_id)
@@ -288,8 +287,7 @@ defmodule FullCircle.Trading.Settlement do
           doc_id: l.pur_invoice_id,
           doc_no: pinv.pur_invoice_no,
           doc_kind: "pur_invoice",
-          billable:
-            t.status == "completed" and not is_nil(l.actual) and is_nil(l.pur_invoice_id)
+          billable: t.status == "completed" and not is_nil(l.actual) and is_nil(l.pur_invoice_id)
         }
       )
       |> maybe_filter_supplier(supplier_id)
@@ -1051,7 +1049,8 @@ defmodule FullCircle.Trading.Settlement do
 
     %{
       "pur_invoice_date" => Date.to_iso8601(inv_date),
-      "due_date" => Date.to_iso8601(Date.add(inv_date, 30)),
+      # Trading settles on the trip date — due immediately, not on terms
+      "due_date" => Date.to_iso8601(inv_date),
       "load_date" => Date.to_iso8601(inv_date),
       "contact_name" => agent.name,
       "contact_id" => agent.id,
@@ -1288,7 +1287,8 @@ defmodule FullCircle.Trading.Settlement do
 
     %{
       "invoice_date" => Date.to_iso8601(invoice_date),
-      "due_date" => Date.to_iso8601(Date.add(invoice_date, 30)),
+      # Trading settles on the trip date — due immediately, not on terms
+      "due_date" => Date.to_iso8601(invoice_date),
       "load_date" => Date.to_iso8601(invoice_date),
       "contact_name" => customer.name,
       "contact_id" => customer.id,
@@ -1423,7 +1423,8 @@ defmodule FullCircle.Trading.Settlement do
 
     %{
       "pur_invoice_date" => Date.to_iso8601(inv_date),
-      "due_date" => Date.to_iso8601(Date.add(inv_date, 30)),
+      # Trading settles on the trip date — due immediately, not on terms
+      "due_date" => Date.to_iso8601(inv_date),
       "load_date" => Date.to_iso8601(inv_date),
       "contact_name" => supplier.name,
       "contact_id" => supplier.id,

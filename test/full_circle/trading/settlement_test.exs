@@ -16,6 +16,11 @@ defmodule FullCircle.Trading.SettlementTest do
     %{user: user, company: company}
   end
 
+  # PurInvoice create no longer auto-fills e_inv_internal_id (user must supply it).
+  defp with_e_inv_internal_id(attrs, id \\ "SUP-TEST-INV") do
+    Map.put(attrs, "e_inv_internal_id", id)
+  end
+
   defp completed_sales_drop(company, user, opts \\ []) do
     good = Keyword.get_lazy(opts, :good, fn -> good_fixture(company, user) end)
     customer = Keyword.get_lazy(opts, :customer, fn -> contact_fixture(company, user) end)
@@ -300,6 +305,7 @@ defmodule FullCircle.Trading.SettlementTest do
              Trading.create_invoice_from_drops([drop.id], inv_attrs, company, user)
 
     {:ok, load_attrs} = Trading.build_pur_invoice_attrs_from_load_ids([load.id], company, user)
+    load_attrs = with_e_inv_internal_id(load_attrs)
 
     assert {:ok, %{create_pur_invoice: pinv}} =
              Trading.create_pur_invoice_from_loads([load.id], load_attrs, company, user)
@@ -369,11 +375,14 @@ defmodule FullCircle.Trading.SettlementTest do
     assert attrs["descriptions"] in [nil, ""]
     assert detail["descriptions"] =~ "SUP-"
 
+    attrs = with_e_inv_internal_id(attrs)
+
     assert {:ok, %{create_pur_invoice: pinv}} =
              Trading.create_pur_invoice_from_loads([load.id], attrs, company, user)
 
     reloaded = FullCircle.Repo.get!(FullCircle.Trading.TripLoad, load.id)
     assert reloaded.pur_invoice_id == pinv.id
+    assert pinv.e_inv_internal_id == "SUP-TEST-INV"
 
     rows = Trading.list_unbilled_loads(company, user)
     refute Enum.any?(rows, &(&1.id == load.id))
@@ -383,6 +392,7 @@ defmodule FullCircle.Trading.SettlementTest do
     %{trip: trip} = completed_sales_drop(company, user)
     load = hd(trip.loads)
     {:ok, attrs} = Trading.build_pur_invoice_attrs_from_load_ids([load.id], company, user)
+    attrs = with_e_inv_internal_id(attrs)
     assert {:ok, _} = Trading.create_pur_invoice_from_loads([load.id], attrs, company, user)
 
     assert {:error, :ineligible_loads} =
@@ -393,6 +403,7 @@ defmodule FullCircle.Trading.SettlementTest do
     %{trip: trip} = completed_sales_drop(company, user)
     load = hd(trip.loads)
     {:ok, attrs} = Trading.build_pur_invoice_attrs_from_load_ids([load.id], company, user)
+    attrs = with_e_inv_internal_id(attrs)
     assert {:ok, _} = Trading.create_pur_invoice_from_loads([load.id], attrs, company, user)
 
     assert {:error, :has_invoices} = Trading.cancel_trip(trip, company, user)
@@ -515,7 +526,11 @@ defmodule FullCircle.Trading.SettlementTest do
 
     # Clerk sets haulage rate from agent bill
     detail = Map.put(detail, "unit_price", "50")
-    attrs = put_in(attrs, ["pur_invoice_details", "0"], detail)
+
+    attrs =
+      attrs
+      |> put_in(["pur_invoice_details", "0"], detail)
+      |> with_e_inv_internal_id()
 
     assert {:ok, %{create_pur_invoice: pinv}} =
              Trading.create_pur_invoice_from_transport_drops([drop.id], attrs, company, user)
@@ -535,7 +550,11 @@ defmodule FullCircle.Trading.SettlementTest do
       Trading.build_pur_invoice_attrs_from_transport_drop_ids([drop.id], company, user)
 
     detail = Map.put(attrs["pur_invoice_details"]["0"], "unit_price", "10")
-    attrs = put_in(attrs, ["pur_invoice_details", "0"], detail)
+
+    attrs =
+      attrs
+      |> put_in(["pur_invoice_details", "0"], detail)
+      |> with_e_inv_internal_id()
 
     assert {:ok, _} =
              Trading.create_pur_invoice_from_transport_drops([drop.id], attrs, company, user)
@@ -579,6 +598,7 @@ defmodule FullCircle.Trading.SettlementTest do
     %{trip: trip} = completed_sales_drop(company, user)
     load = hd(trip.loads)
     {:ok, attrs} = Trading.build_pur_invoice_attrs_from_load_ids([load.id], company, user)
+    attrs = with_e_inv_internal_id(attrs)
 
     assert {:ok, %{create_pur_invoice: pinv}} =
              Trading.create_pur_invoice_from_loads([load.id], attrs, company, user)
@@ -621,5 +641,42 @@ defmodule FullCircle.Trading.SettlementTest do
     assert badges.show?
     assert badges.transport == :open
     assert badges.transport_total == 1
+  end
+
+  # Trading settles on the trip date rather than on payment terms, so all three
+  # settlement documents are due the day they are dated.
+  test "customer invoice prefills due_date equal to invoice date", %{
+    user: user,
+    company: company
+  } do
+    %{drop: drop} = completed_sales_drop(company, user)
+
+    assert {:ok, attrs} = Trading.build_invoice_attrs_from_drop_ids([drop.id], company, user)
+    assert attrs["due_date"] == attrs["invoice_date"]
+  end
+
+  test "supplier bill prefills due_date equal to pur invoice date", %{
+    user: user,
+    company: company
+  } do
+    %{trip: trip} = completed_sales_drop(company, user)
+    load = hd(trip.loads)
+
+    assert {:ok, attrs} =
+             Trading.build_pur_invoice_attrs_from_load_ids([load.id], company, user)
+
+    assert attrs["due_date"] == attrs["pur_invoice_date"]
+  end
+
+  test "transport bill prefills due_date equal to pur invoice date", %{
+    user: user,
+    company: company
+  } do
+    %{drop: drop} = completed_agent_drop(company, user)
+
+    assert {:ok, attrs} =
+             Trading.build_pur_invoice_attrs_from_transport_drop_ids([drop.id], company, user)
+
+    assert attrs["due_date"] == attrs["pur_invoice_date"]
   end
 end
