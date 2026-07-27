@@ -60,9 +60,9 @@ defmodule FullCircleWeb.TradingTripLive.Print do
           <tbody>
             <%= for {load, i} <- Enum.with_index(@loads, 1) do %>
               <% note? = present_text?(load.location_note)
-                 crew = crew_names(load.trip_load_employees)
-                 crew? = crew != ""
-                 rowspan = 1 + if(note?, do: 1, else: 0) + if(crew?, do: 1, else: 0) %>
+              crew = crew_names(load.trip_load_employees)
+              crew? = crew != ""
+              rowspan = 1 + if(note?, do: 1, else: 0) + if(crew?, do: 1, else: 0) %>
               <tr>
                 <td class="c" rowspan={rowspan}>{load.seq || i}</td>
                 <td>{load.supply_position && load.supply_position.title}</td>
@@ -127,10 +127,10 @@ defmodule FullCircleWeb.TradingTripLive.Print do
           <tbody>
             <%= for {drop, i} <- Enum.with_index(@drops, 1) do %>
               <% note? = present_text?(drop.variance_note) or present_text?(drop.location_note)
-                 note_text = drop_note_text(drop)
-                 crew = crew_names(drop.trip_drop_employees)
-                 crew? = crew != ""
-                 rowspan = 1 + if(note?, do: 1, else: 0) + if(crew?, do: 1, else: 0) %>
+              note_text = drop_note_text(drop)
+              crew = crew_names(drop.trip_drop_employees)
+              crew? = crew != ""
+              rowspan = 1 + if(note?, do: 1, else: 0) + if(crew?, do: 1, else: 0) %>
               <tr>
                 <td class="c" rowspan={rowspan}>{drop.seq || i}</td>
                 <td>{drop.sales_position && drop.sales_position.title}</td>

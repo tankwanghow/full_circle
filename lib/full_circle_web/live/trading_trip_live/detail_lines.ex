@@ -539,7 +539,10 @@ defmodule FullCircleWeb.TradingTripLive.DetailLines do
 
   defp unit_label(nil), do: nil
   defp unit_label(""), do: nil
-  defp unit_label(u) when is_binary(u), do: String.trim(u) |> then(fn s -> if s == "", do: nil, else: s end)
+
+  defp unit_label(u) when is_binary(u),
+    do: String.trim(u) |> then(fn s -> if s == "", do: nil, else: s end)
+
   defp unit_label(_), do: nil
 
   attr :field, Phoenix.HTML.FormField, required: true

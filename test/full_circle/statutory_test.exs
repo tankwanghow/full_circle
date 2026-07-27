@@ -352,7 +352,8 @@ defmodule FullCircle.StatutoryTest do
       assert norm(EpfFormat.rows(ctx.contribs, "EPFCODE")) ==
                norm(
                  FullCircle.LegacyStatutory.epf_submit_file_format_query(
-                   ctx.pay_month, ctx.pay_year,
+                   ctx.pay_month,
+                   ctx.pay_year,
                    "EPFCODE",
                    ctx.com.id
                  )
@@ -363,7 +364,8 @@ defmodule FullCircle.StatutoryTest do
       assert norm(SocsoFormat.rows(ctx.contribs, "SOCSOCODE")) ==
                norm(
                  FullCircle.LegacyStatutory.socso_submit_file_format_query(
-                   ctx.pay_month, ctx.pay_year,
+                   ctx.pay_month,
+                   ctx.pay_year,
                    "SOCSOCODE",
                    ctx.com.id
                  )
@@ -374,7 +376,8 @@ defmodule FullCircle.StatutoryTest do
       assert norm(EisFormat.rows(ctx.contribs, "EISCODE")) ==
                norm(
                  FullCircle.LegacyStatutory.eis_submit_file_format_query(
-                   ctx.pay_month, ctx.pay_year,
+                   ctx.pay_month,
+                   ctx.pay_year,
                    "EISCODE",
                    ctx.com.id
                  )
@@ -391,7 +394,8 @@ defmodule FullCircle.StatutoryTest do
 
       {["textstr"], v1_rows} =
         FullCircle.LegacyStatutory.socso_eis_submit_file_format_query(
-          ctx.pay_month, ctx.pay_year,
+          ctx.pay_month,
+          ctx.pay_year,
           "EMPCODE",
           ctx.com.id
         )
@@ -427,7 +431,14 @@ defmodule FullCircle.StatutoryTest do
           ctx.admin
         )
 
-      slip(e1, ctx.pay_month, ctx.pay_year, %{"Monthly Salary" => "3000", "EPF By Employee" => "330"}, ctx)
+      slip(
+        e1,
+        ctx.pay_month,
+        ctx.pay_year,
+        %{"Monthly Salary" => "3000", "EPF By Employee" => "330"},
+        ctx
+      )
+
       {col, rows} = Statutory.rows("EPF", ctx.pay_month, ctx.pay_year, "EPFCODE", ctx.com.id)
       assert col == ["epf_no", "id_number", "name", "wages", "employer", "employee"]
       assert length(rows) == 1
@@ -462,8 +473,22 @@ defmodule FullCircle.StatutoryTest do
           ctx.admin
         )
 
-      slip(e1, ctx.pay_month, ctx.pay_year, %{"Monthly Salary" => "5000", "Employee PCB" => "79.20"}, ctx)
-      slip(e2, ctx.pay_month, ctx.pay_year, %{"Monthly Salary" => "8000", "Employee PCB" => "318.90"}, ctx)
+      slip(
+        e1,
+        ctx.pay_month,
+        ctx.pay_year,
+        %{"Monthly Salary" => "5000", "Employee PCB" => "79.20"},
+        ctx
+      )
+
+      slip(
+        e2,
+        ctx.pay_month,
+        ctx.pay_year,
+        %{"Monthly Salary" => "8000", "Employee PCB" => "318.90"},
+        ctx
+      )
+
       slip(e3, ctx.pay_month, ctx.pay_year, %{"Monthly Salary" => "1000"}, ctx)
 
       contribs = HR.statutory_contributions(ctx.pay_month, ctx.pay_year, ctx.com.id)

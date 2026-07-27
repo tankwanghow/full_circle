@@ -352,7 +352,8 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
         {:noreply, socket}
 
       {:error, :missing_actuals} ->
-        {:noreply, put_flash(socket, :error, gettext("All loads and drops need actual quantity."))}
+        {:noreply,
+         put_flash(socket, :error, gettext("All loads and drops need actual quantity."))}
 
       {:error, :good_mismatch} ->
         {:noreply,
@@ -372,8 +373,15 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
     user = socket.assigns.current_user
 
     case Trading.cancel_trip(socket.assigns.trip, company, user) do
-      {:ok, _} ->
-        send(self(), {:desk_modal_saved, :trip, gettext("Trip cancelled.")})
+      {:ok, _trip, warnings} ->
+        msg =
+          if warnings == [] do
+            gettext("Trip cancelled.")
+          else
+            gettext("Trip cancelled with warnings: ") <> Enum.join(warnings, "; ")
+          end
+
+        send(self(), {:desk_modal_saved, :trip, msg})
         {:noreply, socket}
 
       {:error, :has_invoices} ->
@@ -443,38 +451,42 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
     else
       new_lines =
         Enum.reduce(0..(n - 1)//1, lines, fn i, ls ->
-        line = Enum.at(ls, i)
+          line = Enum.at(ls, i)
 
-        cond do
-          cs_line_deleted?(line) ->
-            ls
-
-          not cs_crew_locked?(line) ->
-            ls
-
-          true ->
-            crew_params = crew_params_from_line_cs(line, crew_assoc)
-
-            if i >= n - 1 do
+          cond do
+            cs_line_deleted?(line) ->
               ls
-            else
-              Enum.reduce((i + 1)..(n - 1)//1, ls, fn j, ls2 ->
-                jl = Enum.at(ls2, j)
 
-                cond do
-                  cs_line_deleted?(jl) ->
-                    ls2
+            not cs_crew_locked?(line) ->
+              ls
 
-                  cs_crew_locked?(jl) ->
-                    ls2
+            true ->
+              crew_params = crew_params_from_line_cs(line, crew_assoc)
 
-                  true ->
-                    List.replace_at(ls2, j, put_crew_params_on_line_cs(jl, crew_assoc, crew_params))
-                end
-              end)
-            end
-        end
-      end)
+              if i >= n - 1 do
+                ls
+              else
+                Enum.reduce((i + 1)..(n - 1)//1, ls, fn j, ls2 ->
+                  jl = Enum.at(ls2, j)
+
+                  cond do
+                    cs_line_deleted?(jl) ->
+                      ls2
+
+                    cs_crew_locked?(jl) ->
+                      ls2
+
+                    true ->
+                      List.replace_at(
+                        ls2,
+                        j,
+                        put_crew_params_on_line_cs(jl, crew_assoc, crew_params)
+                      )
+                  end
+                end)
+              end
+          end
+        end)
 
       Ecto.Changeset.put_assoc(cs, line_assoc, new_lines)
     end
@@ -974,7 +986,9 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
           already? =
             Enum.any?(crew, fn {_k, row} ->
               row = stringify_keys_one(row)
-              to_string(row["employee_id"]) == to_string(id) and row["delete"] not in [true, "true"]
+
+              to_string(row["employee_id"]) == to_string(id) and
+                row["delete"] not in [true, "true"]
             end)
 
           crew =
@@ -1103,6 +1117,7 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
   end
 
   defp normalize_crew_map(map) when is_map(map), do: stringify_map(map)
+
   defp normalize_crew_map(list) when is_list(list) do
     list
     |> Enum.with_index()

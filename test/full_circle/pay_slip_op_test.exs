@@ -122,8 +122,7 @@ defmodule FullCircle.PaySlipOpTest do
       assert length(advances) >= 1
     end
 
-    test "returns empty when no advances exist", %{com: com, employee: employee
-    } do
+    test "returns empty when no advances exist", %{com: com, employee: employee} do
       advances = PaySlipOp.get_uncount_advances(employee.id, 1, 2099, com)
       assert advances == []
     end
@@ -224,7 +223,6 @@ defmodule FullCircle.PaySlipOpTest do
       assert :not_authorise == PaySlipOp.create_pay_slip(attrs, com, guest)
     end
   end
-
 
   describe "preview/pay" do
     setup :setup_payroll
