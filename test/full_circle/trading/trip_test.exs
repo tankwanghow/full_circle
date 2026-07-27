@@ -454,9 +454,112 @@ defmodule FullCircle.Trading.TripTest do
     assert {:ok, completed, _} = Trading.complete_trip(trip, company, admin)
     assert Decimal.eq?(Balances.supply_remaining(supply), Decimal.new("60"))
 
-    assert {:ok, cancelled} = Trading.cancel_trip(completed, company, admin)
+    assert {:ok, cancelled, _} = Trading.cancel_trip(completed, company, admin)
     assert cancelled.status == "cancelled"
     assert Decimal.eq?(Balances.supply_remaining(supply), Decimal.new("100"))
+  end
+
+  test "cancelling warns about supply left at collect but does not change its status", %{
+    admin: admin,
+    company: company
+  } do
+    good = good_fixture(company, admin)
+    loc = location_fixture(company, admin)
+    drop_loc = location_fixture(company, admin, %{"kind" => "own_warehouse"})
+
+    supply =
+      supply_position_fixture(company, admin, %{
+        "good_id" => good.id,
+        "quantity" => "100",
+        "status" => "open"
+      })
+
+    {:ok, trip} =
+      Trading.create_trip(
+        %{
+          "date" => "2026-07-07",
+          "transport_mode" => "company_own",
+          "vehicle_number" => "CNCL001",
+          "loads" => [
+            %{
+              "planned" => "40",
+              "actual" => "40",
+              "good_id" => good.id,
+              "location_id" => loc.id,
+              "supply_position_id" => supply.id
+            }
+          ],
+          "drops" => [
+            %{
+              "planned" => "40",
+              "actual" => "40",
+              "good_id" => good.id,
+              "location_id" => drop_loc.id
+            }
+          ]
+        },
+        company,
+        admin
+      )
+
+    # Creating the trip auto-promoted the open supply to collect
+    assert Trading.get_supply_position!(supply.id, company, admin).status == "collect"
+
+    assert {:ok, _cancelled, warnings} = Trading.cancel_trip(trip, company, admin)
+
+    # Advisory only — the clerk decides; status is deliberately left alone
+    assert Enum.any?(warnings, &String.contains?(&1, supply.title))
+    assert Enum.any?(warnings, &String.contains?(&1, "still marked collect"))
+    assert Trading.get_supply_position!(supply.id, company, admin).status == "collect"
+  end
+
+  test "no stranded-collect warning when another live trip still needs the supply", %{
+    admin: admin,
+    company: company
+  } do
+    good = good_fixture(company, admin)
+    loc = location_fixture(company, admin)
+    drop_loc = location_fixture(company, admin, %{"kind" => "own_warehouse"})
+
+    supply =
+      supply_position_fixture(company, admin, %{
+        "good_id" => good.id,
+        "quantity" => "100",
+        "status" => "open"
+      })
+
+    line = fn qty ->
+      %{
+        "date" => "2026-07-07",
+        "transport_mode" => "company_own",
+        "vehicle_number" => "CNCL002",
+        "loads" => [
+          %{
+            "planned" => qty,
+            "actual" => qty,
+            "good_id" => good.id,
+            "location_id" => loc.id,
+            "supply_position_id" => supply.id
+          }
+        ],
+        "drops" => [
+          %{
+            "planned" => qty,
+            "actual" => qty,
+            "good_id" => good.id,
+            "location_id" => drop_loc.id
+          }
+        ]
+      }
+    end
+
+    {:ok, trip_a} = Trading.create_trip(line.("10"), company, admin)
+    {:ok, _trip_b} = Trading.create_trip(line.("20"), company, admin)
+
+    assert {:ok, _cancelled, warnings} = Trading.cancel_trip(trip_a, company, admin)
+
+    # trip_b is still live and loading from this supply, so collect is correct
+    refute Enum.any?(warnings, &String.contains?(&1, supply.title))
   end
 
   test "complete requires actuals", %{admin: admin, company: company} do
@@ -977,7 +1080,7 @@ defmodule FullCircle.Trading.TripTest do
     logs = FullCircle.Sys.list_logs("trading_trips", trip.id)
     assert Enum.any?(logs, &(&1.action == "complete_trip"))
 
-    {:ok, trip} = Trading.cancel_trip(trip, company, admin)
+    {:ok, trip, _} = Trading.cancel_trip(trip, company, admin)
     logs = FullCircle.Sys.list_logs("trading_trips", trip.id)
     assert Enum.any?(logs, &(&1.action == "cancel_trip"))
     assert length(logs) == 4

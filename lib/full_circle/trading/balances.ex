@@ -21,6 +21,105 @@ defmodule FullCircle.Trading.Balances do
 
   def open_trip_statuses, do: @open_trip_statuses
 
+  # --- Batch (board) variants -------------------------------------------------
+  #
+  # The per-position functions below each run their own query. Rendering a board
+  # one row at a time therefore costs O(rows) round-trips. These `*_by_ids/1`
+  # helpers answer the same questions for a whole id set in **one** GROUP BY
+  # query and return `%{id => Decimal}` (missing id ⇒ absent, treat as zero).
+
+  @doc "Completed loaded qty per supply id."
+  def supply_loaded_by_ids(supply_ids) when is_list(supply_ids) do
+    sum_by_ids(
+      from(l in TripLoad,
+        join: t in Trip,
+        on: t.id == l.trip_id,
+        where: t.status == "completed" and l.supply_position_id in ^supply_ids,
+        group_by: l.supply_position_id,
+        select: {l.supply_position_id, coalesce(sum(l.actual), 0)}
+      ),
+      supply_ids
+    )
+  end
+
+  @doc "Draft/planned (in-transit) qty per supply id, using coalesce(actual, planned)."
+  def supply_in_transit_by_ids(supply_ids) when is_list(supply_ids) do
+    sum_by_ids(
+      from(l in TripLoad,
+        join: t in Trip,
+        on: t.id == l.trip_id,
+        where: t.status in ^@open_trip_statuses and l.supply_position_id in ^supply_ids,
+        group_by: l.supply_position_id,
+        select:
+          {l.supply_position_id,
+           coalesce(sum(fragment("coalesce(?, ?)", l.actual, l.planned)), 0)}
+      ),
+      supply_ids
+    )
+  end
+
+  @doc "Completed delivered qty per sales id."
+  def sales_delivered_by_ids(sales_ids) when is_list(sales_ids) do
+    sum_by_ids(
+      from(d in TripDrop,
+        join: t in Trip,
+        on: t.id == d.trip_id,
+        where: t.status == "completed" and d.sales_position_id in ^sales_ids,
+        group_by: d.sales_position_id,
+        select: {d.sales_position_id, coalesce(sum(d.actual), 0)}
+      ),
+      sales_ids
+    )
+  end
+
+  @doc "Draft/planned (in-transit) qty per sales id, using coalesce(actual, planned)."
+  def sales_in_transit_by_ids(sales_ids) when is_list(sales_ids) do
+    sum_by_ids(
+      from(d in TripDrop,
+        join: t in Trip,
+        on: t.id == d.trip_id,
+        where: t.status in ^@open_trip_statuses and d.sales_position_id in ^sales_ids,
+        group_by: d.sales_position_id,
+        select:
+          {d.sales_position_id, coalesce(sum(fragment("coalesce(?, ?)", d.actual, d.planned)), 0)}
+      ),
+      sales_ids
+    )
+  end
+
+  @doc """
+  Soft hold per supply id: undelivered qty on active sales naming that supply as
+  preferred. Two queries total (active sales, then their delivered totals) rather
+  than one per sales row.
+  """
+  def soft_held_by_ids([]), do: %{}
+
+  def soft_held_by_ids(supply_ids) when is_list(supply_ids) do
+    active = SalesPosition.active_statuses()
+
+    sales =
+      from(s in SalesPosition,
+        where: s.preferred_supply_id in ^supply_ids and s.status in ^active,
+        select: {s.id, s.preferred_supply_id, s.quantity}
+      )
+      |> Repo.all()
+
+    delivered = sales_delivered_by_ids(Enum.map(sales, fn {id, _sup, _q} -> id end))
+
+    Enum.reduce(sales, %{}, fn {id, supply_id, qty}, acc ->
+      undelivered = Decimal.sub(to_decimal(qty), Map.get(delivered, id, @zero))
+      Map.update(acc, supply_id, undelivered, &Decimal.add(&1, undelivered))
+    end)
+  end
+
+  defp sum_by_ids(_query, []), do: %{}
+
+  defp sum_by_ids(query, _ids) do
+    query
+    |> Repo.all()
+    |> Map.new(fn {id, total} -> {id, to_decimal(total)} end)
+  end
+
   def supply_loaded(%SupplyPosition{id: id}), do: supply_loaded(id)
 
   def supply_loaded(supply_id) when is_binary(supply_id) do
@@ -36,9 +135,15 @@ defmodule FullCircle.Trading.Balances do
 
   def supply_loaded(_), do: @zero
 
-  def supply_remaining(%SupplyPosition{} = s) do
+  def supply_remaining(%SupplyPosition{} = s), do: supply_remaining(s, supply_loaded(s))
+
+  @doc """
+  Remaining against an already-computed `loaded`. Use this when the caller has
+  just called `supply_loaded/1` — the arity-1 form would re-run that query.
+  """
+  def supply_remaining(%SupplyPosition{} = s, loaded) do
     qty = s.quantity || @zero
-    Decimal.sub(qty, supply_loaded(s))
+    Decimal.sub(qty, to_decimal(loaded))
   end
 
   def sales_delivered(%SalesPosition{id: id}), do: sales_delivered(id)
@@ -56,20 +161,24 @@ defmodule FullCircle.Trading.Balances do
 
   def sales_delivered(_), do: @zero
 
-  def sales_undelivered(%SalesPosition{} = s) do
-    qty = s.quantity || @zero
-    Decimal.sub(qty, sales_delivered(s))
-  end
+  def sales_undelivered(%SalesPosition{} = s), do: sales_undelivered(s, sales_delivered(s))
 
-  def sales_undelivered(%{quantity: qty, id: id}) when not is_nil(qty) do
-    Decimal.sub(qty, sales_delivered(id))
-  end
+  def sales_undelivered(%{quantity: qty, id: id} = s) when not is_nil(qty),
+    do: sales_undelivered(s, sales_delivered(id))
 
   def sales_undelivered(%{quantity: qty}) when not is_nil(qty) do
     Decimal.sub(qty, @zero)
   end
 
   def sales_undelivered(_), do: @zero
+
+  @doc """
+  Undelivered against an already-computed `delivered`. Use this when the caller
+  has just called `sales_delivered/1` — the arity-1 form would re-run that query.
+  """
+  def sales_undelivered(%{quantity: qty}, delivered) do
+    Decimal.sub(qty || @zero, to_decimal(delivered))
+  end
 
   @doc """
   MT loaded on draft/planned trips for this supply (not yet completed).

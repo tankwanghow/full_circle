@@ -15,6 +15,9 @@ defmodule FullCircle.Trading.SupplyPosition do
   # open may be auto-promoted to collect when a load is saved
   @loadable_statuses ~w(open hold collect)
 
+  # Terminal — cannot transition to a different status once reached
+  @terminal_statuses ~w(closed)
+
   schema "trading_supply_positions" do
     # System-generated unique number (SUP-000001) via gapless_doc_ids
     field :title, :string
@@ -38,6 +41,8 @@ defmodule FullCircle.Trading.SupplyPosition do
   def statuses, do: @statuses
   def active_statuses, do: @active_statuses
   def loadable_statuses, do: @loadable_statuses
+  def terminal_statuses, do: @terminal_statuses
+  def terminal?(status), do: status in @terminal_statuses
 
   @doc "Deprecated alias — use loadable_statuses/0"
   def collectable_statuses, do: @loadable_statuses

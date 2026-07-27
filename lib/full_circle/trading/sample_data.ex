@@ -410,7 +410,7 @@ defmodule FullCircle.Trading.SampleData do
           {:ok, t} = Trading.create_trip(attrs, company, user)
 
           case cancel_trip_if_possible(t, company, user) do
-            {:ok, t2} -> t2
+            {:ok, t2, _warnings} -> t2
             _ -> t
           end
 

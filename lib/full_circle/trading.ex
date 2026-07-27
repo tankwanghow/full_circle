@@ -263,13 +263,26 @@ defmodule FullCircle.Trading do
         |> Map.drop(["title"])
         |> Map.put("title", position.title)
 
-      position
-      |> SupplyPosition.changeset(attrs)
-      |> Repo.update()
+      if terminal_status_change?(position, attrs, &SupplyPosition.terminal?/1) do
+        {:error, :position_locked}
+      else
+        position
+        |> SupplyPosition.changeset(attrs)
+        |> Repo.update()
+      end
     else
       false -> :not_authorise
       other -> other
     end
+  end
+
+  # A position that reached a terminal status (supply "closed"; sales
+  # "fulfilled"/"cancelled") may still have other fields edited — e.g. notes —
+  # but must not be moved to a different status.
+  defp terminal_status_change?(position, attrs, terminal?) do
+    new_status = attrs["status"]
+
+    terminal?.(position.status) and is_binary(new_status) and new_status != position.status
   end
 
   @doc """
@@ -315,8 +328,7 @@ defmodule FullCircle.Trading do
               ilike(g.name, ^"%#{terms}%"),
           select: %{
             id: s.id,
-            value:
-              fragment("? || ' · ' || ? || ' · ' || ?", s.title, g.name, c.name)
+            value: fragment("? || ' · ' || ? || ' · ' || ?", s.title, g.name, c.name)
           },
           order_by: [asc: s.title]
         )
@@ -531,15 +543,24 @@ defmodule FullCircle.Trading do
   def position_board(company, user, opts \\ []) do
     statuses = Keyword.get(opts, :statuses) || SupplyPosition.active_statuses()
 
-    company
-    |> list_supply_positions(user, statuses: statuses)
-    |> Enum.map(fn s ->
+    rows = list_supply_positions(company, user, statuses: statuses)
+    ids = Enum.map(rows, & &1.id)
+
+    # Aggregate queries for the whole board rather than ~4 per row
+    loaded_map = Balances.supply_loaded_by_ids(ids)
+    transit_map = Balances.supply_in_transit_by_ids(ids)
+    soft_held_map = Balances.soft_held_by_ids(ids)
+    zero = Decimal.new(0)
+
+    Enum.map(rows, fn s ->
+      loaded = Map.get(loaded_map, s.id, zero)
+
       %{
         supply: s,
-        loaded: Balances.supply_loaded(s),
-        remaining: Balances.supply_remaining(s),
-        soft_held: Balances.soft_held_for_supply(s.id),
-        in_transit: Balances.supply_in_transit(s)
+        loaded: loaded,
+        remaining: Balances.supply_remaining(s, loaded),
+        soft_held: Map.get(soft_held_map, s.id, zero),
+        in_transit: Map.get(transit_map, s.id, zero)
       }
     end)
   end
@@ -672,15 +693,23 @@ defmodule FullCircle.Trading do
   Desk sales rows with undelivered / in-transit balances.
   """
   def sales_board(company, user, opts \\ []) do
-    company
-    |> list_open_sales(user, opts)
-    |> Enum.map(fn s ->
+    rows = list_open_sales(company, user, opts)
+    ids = Enum.map(rows, & &1.id)
+
+    # Aggregate queries for the whole board rather than ~2 per row
+    delivered_map = Balances.sales_delivered_by_ids(ids)
+    transit_map = Balances.sales_in_transit_by_ids(ids)
+    zero = Decimal.new(0)
+
+    Enum.map(rows, fn s ->
+      delivered = Map.get(delivered_map, s.id, zero)
+
       %{
         sales: s,
         ordered: s.quantity,
-        delivered: Balances.sales_delivered(s),
-        undelivered: Balances.sales_undelivered(s),
-        in_transit: Balances.sales_in_transit(s)
+        delivered: delivered,
+        undelivered: Balances.sales_undelivered(s, delivered),
+        in_transit: Map.get(transit_map, s.id, zero)
       }
     end)
   end
@@ -788,9 +817,13 @@ defmodule FullCircle.Trading do
         |> Map.drop(["title"])
         |> Map.put("title", position.title)
 
-      position
-      |> SalesPosition.changeset(attrs)
-      |> Repo.update()
+      if terminal_status_change?(position, attrs, &SalesPosition.terminal?/1) do
+        {:error, :position_locked}
+      else
+        position
+        |> SalesPosition.changeset(attrs)
+        |> Repo.update()
+      end
     else
       false -> :not_authorise
       other -> other
@@ -1904,7 +1937,7 @@ defmodule FullCircle.Trading do
         |> put_company(company)
         |> Map.put("reference_no", doc)
         |> then(&Trip.changeset(%Trip{}, &1))
-        |> validate_trip_goods()
+        |> validate_trip_goods(company)
       end)
       |> Multi.insert(:create_trip_log, fn %{create_trip: entity} ->
         Sys.log_changeset(
@@ -1921,7 +1954,7 @@ defmodule FullCircle.Trading do
       end)
       |> Repo.transaction()
       |> unwrap_multi(:create_trip)
-      |> maybe_promote_open_supplies_to_collect()
+      |> maybe_promote_open_supplies_to_collect(company)
       |> preload_trip_result()
     end
   end
@@ -1943,7 +1976,7 @@ defmodule FullCircle.Trading do
           trip
           |> Repo.preload([:loads, :drops])
           |> Trip.changeset(attrs)
-          |> validate_trip_goods()
+          |> validate_trip_goods(company)
 
         Multi.new()
         |> Multi.update(:update_trip, cs)
@@ -1952,7 +1985,7 @@ defmodule FullCircle.Trading do
         end)
         |> Repo.transaction()
         |> unwrap_multi(:update_trip)
-        |> maybe_promote_open_supplies_to_collect()
+        |> maybe_promote_open_supplies_to_collect(company)
         |> preload_trip_result()
       end
     else
@@ -2102,6 +2135,11 @@ defmodule FullCircle.Trading do
   @doc """
   Cancel a trip. Completed trips with linked Invoice / PurInvoice (customer,
   supplier, or transport) cannot be cancelled — unlink settlement first.
+
+  Returns `{:ok, trip, warnings}`. Cancelling does not revert supply positions
+  this trip promoted from `open` to `collect` (that promotion is not recorded,
+  so an auto-promoted `collect` is indistinguishable from one a clerk set by
+  hand). Affected supplies are named in `warnings` for a clerk to review.
   """
   def cancel_trip(%Trip{} = trip, company, user) do
     with :ok <- authorize(user, :manage_trading, company),
@@ -2130,7 +2168,8 @@ defmodule FullCircle.Trading do
           |> Repo.transaction()
           |> case do
             {:ok, _} ->
-              {:ok, get_trip!(trip.id, company, user)}
+              cancelled = get_trip!(trip.id, company, user)
+              {:ok, cancelled, stranded_collect_warnings(cancelled, company)}
 
             {:error, :cancel_trip, %Ecto.Changeset{} = cs, _} ->
               {:error, cs}
@@ -2142,6 +2181,46 @@ defmodule FullCircle.Trading do
     else
       false -> :not_authorise
       other -> other
+    end
+  end
+
+  # Supplies this trip loaded from that are still "collect" and are no longer
+  # referenced by any live (non-cancelled) trip — likely left over from this
+  # trip's open→collect promotion. Advisory only; status is not changed.
+  defp stranded_collect_warnings(%Trip{} = trip, company) do
+    supply_ids =
+      (trip.loads || [])
+      |> Enum.map(& &1.supply_position_id)
+      |> Enum.reject(&is_nil/1)
+      |> Enum.uniq()
+
+    if supply_ids == [] do
+      []
+    else
+      still_referenced =
+        from(l in TripLoad,
+          join: t in assoc(l, :trip),
+          where:
+            l.supply_position_id in ^supply_ids and t.company_id == ^company.id and
+              t.status != "cancelled" and t.id != ^trip.id,
+          select: l.supply_position_id,
+          distinct: true
+        )
+        |> Repo.all()
+        |> MapSet.new()
+
+      from(s in SupplyPosition,
+        where:
+          s.id in ^supply_ids and s.company_id == ^company.id and
+            s.status == "collect",
+        select: {s.id, s.title},
+        order_by: [asc: s.title]
+      )
+      |> Repo.all()
+      |> Enum.reject(fn {id, _title} -> MapSet.member?(still_referenced, id) end)
+      |> Enum.map(fn {_id, title} ->
+        "#{title} is still marked collect — review whether it should return to open"
+      end)
     end
   end
 
@@ -2347,7 +2426,7 @@ defmodule FullCircle.Trading do
 
   # When a load is saved against an open supply, mark that supply as collect
   # (supplier is effectively allowing collection via the trip plan).
-  defp maybe_promote_open_supplies_to_collect({:ok, trip}) do
+  defp maybe_promote_open_supplies_to_collect({:ok, trip}, company) do
     trip = Repo.preload(trip, :loads)
 
     supply_ids =
@@ -2360,7 +2439,7 @@ defmodule FullCircle.Trading do
       now = DateTime.utc_now() |> DateTime.truncate(:second)
 
       from(s in SupplyPosition,
-        where: s.id in ^supply_ids and s.status == "open"
+        where: s.id in ^supply_ids and s.status == "open" and s.company_id == ^company.id
       )
       |> Repo.update_all(set: [status: "collect", updated_at: now])
     end
@@ -2368,11 +2447,11 @@ defmodule FullCircle.Trading do
     {:ok, trip}
   end
 
-  defp maybe_promote_open_supplies_to_collect(other), do: other
+  defp maybe_promote_open_supplies_to_collect(other, _company), do: other
 
-  defp validate_trip_goods(%Ecto.Changeset{valid?: false} = cs), do: cs
+  defp validate_trip_goods(%Ecto.Changeset{valid?: false} = cs, _company), do: cs
 
-  defp validate_trip_goods(%Ecto.Changeset{} = cs) do
+  defp validate_trip_goods(%Ecto.Changeset{} = cs, company) do
     loads = Ecto.Changeset.get_field(cs, :loads) || []
     drops = Ecto.Changeset.get_field(cs, :drops) || []
 
@@ -2383,15 +2462,19 @@ defmodule FullCircle.Trading do
       Enum.any?(drops, &is_nil(&1.good_id)) ->
         Ecto.Changeset.add_error(cs, :drops, "each drop requires a good")
 
-      line_goods_mismatch?(loads, drops) ->
-        Ecto.Changeset.add_error(cs, :loads, "good does not match linked supply/sales position")
+      line_goods_mismatch?(loads, drops, company) ->
+        Ecto.Changeset.add_error(
+          cs,
+          :loads,
+          "good does not match linked supply/sales position, or it belongs to another company"
+        )
 
       true ->
         cs
     end
   end
 
-  defp line_goods_mismatch?(loads, drops) do
+  defp line_goods_mismatch?(loads, drops, company) do
     supply_ids =
       (Enum.map(loads, & &1.supply_position_id) ++ Enum.map(drops, & &1.supply_position_id))
       |> Enum.reject(&is_nil/1)
@@ -2407,7 +2490,10 @@ defmodule FullCircle.Trading do
       if supply_ids == [] do
         %{}
       else
-        from(s in SupplyPosition, where: s.id in ^supply_ids, select: {s.id, s.good_id})
+        from(s in SupplyPosition,
+          where: s.id in ^supply_ids and s.company_id == ^company.id,
+          select: {s.id, s.good_id}
+        )
         |> Repo.all()
         |> Map.new()
       end
@@ -2416,7 +2502,10 @@ defmodule FullCircle.Trading do
       if sales_ids == [] do
         %{}
       else
-        from(s in SalesPosition, where: s.id in ^sales_ids, select: {s.id, s.good_id})
+        from(s in SalesPosition,
+          where: s.id in ^sales_ids and s.company_id == ^company.id,
+          select: {s.id, s.good_id}
+        )
         |> Repo.all()
         |> Map.new()
       end

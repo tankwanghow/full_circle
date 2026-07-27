@@ -93,7 +93,13 @@ defmodule FullCircleWeb.TradingDeskLive.SalesFormComponent do
 
     socket = assign(socket, good_unit: good && Map.get(good, :unit))
     # Preferred supply must match the sales good — clear if good changed away
-    params = clear_preferred_supply_if_good_mismatch(params, socket.assigns.current_company, socket.assigns.current_user)
+    params =
+      clear_preferred_supply_if_good_mismatch(
+        params,
+        socket.assigns.current_company,
+        socket.assigns.current_user
+      )
+
     validate(params, socket)
   end
 
@@ -146,6 +152,14 @@ defmodule FullCircleWeb.TradingDeskLive.SalesFormComponent do
 
       {:error, %Ecto.Changeset{} = cs} ->
         {:noreply, assign(socket, form: to_form(cs))}
+
+      {:error, :position_locked} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           gettext("Fulfilled or cancelled sales positions cannot change status.")
+         )}
 
       :not_authorise ->
         {:noreply,

@@ -5,6 +5,7 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
   import FullCircle.UserAccountsFixtures
   import FullCircle.TradingFixtures
   import FullCircle.BillingFixtures
+  import FullCircle.HRFixtures
 
   setup %{conn: conn} do
     user = user_fixture()
@@ -506,11 +507,16 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
     lv |> element("#sel-sales-#{sales.id}") |> render_click()
 
     # Supply/warehouse good filters set to sale's good; other good rows hidden
-    assert has_element?(lv, ~s(#desk-filter-supply-good input[name="value"][value="AutoFilterMaize"]))
+    assert has_element?(
+             lv,
+             ~s(#desk-filter-supply-good input[name="value"][value="AutoFilterMaize"])
+           )
+
     assert has_element?(
              lv,
              ~s(#desk-filter-warehouse-good input[name="value"][value="AutoFilterMaize"])
            )
+
     assert has_element?(lv, "#desk-supply-#{supply_a.id}")
     refute has_element?(lv, "#desk-supply-#{supply_b.id}")
     assert has_element?(lv, "#desk-wh-#{wh.id}-#{good_a.id}")
@@ -1118,6 +1124,189 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
 
     assert render(lv) =~ "Trip saved successfully"
     assert render(lv) =~ "TRP-"
+  end
+
+  test "switching transport_mode away from company_own/agent clears saved crew", %{
+    conn: conn,
+    company: company,
+    user: user
+  } do
+    good = good_fixture(company, user, %{"name" => "CrewClearGood"})
+    loc = location_fixture(company, user, %{"kind" => "own_warehouse", "name" => "CrewClearWh"})
+    emp = employee_fixture(%{"name" => "Crew Clear Ali"}, company, user)
+
+    {:ok, trip} =
+      FullCircle.Trading.create_trip(
+        %{
+          "date" => Date.utc_today() |> Date.to_iso8601(),
+          "transport_mode" => "company_own",
+          "vehicle_number" => "CREWCLR1",
+          "loads" => [
+            %{
+              "planned" => "10",
+              "actual" => "10",
+              "good_id" => good.id,
+              "location_id" => loc.id,
+              "trip_load_employees" => [%{"employee_id" => emp.id}]
+            }
+          ],
+          "drops" => [
+            %{
+              "planned" => "10",
+              "actual" => "10",
+              "good_id" => good.id,
+              "location_id" => loc.id,
+              "trip_drop_employees" => [%{"employee_id" => emp.id}]
+            }
+          ]
+        },
+        company,
+        user
+      )
+
+    trip = FullCircle.Trading.get_trip!(trip.id, company, user)
+    assert length(hd(trip.loads).trip_load_employees) == 1
+    assert length(hd(trip.drops).trip_drop_employees) == 1
+
+    {:ok, lv, _} = live(conn, ~p"/companies/#{company.id}/trading/trips/#{trip.id}/edit")
+    assert has_element?(lv, "#desk-trip-form")
+
+    # Crew inputs are only rendered for company_own / agent
+    assert render(lv) =~ "trip[loads][0][trip_load_employees]"
+
+    lv
+    |> form("#desk-trip-form", trip: %{transport_mode: "customer_arranged"})
+    |> render_change()
+
+    # Crew UI is gone, so the submitted params carry no crew key at all
+    refute render(lv) =~ "trip[loads][0][trip_load_employees]"
+
+    lv |> form("#desk-trip-form") |> render_submit()
+    assert render(lv) =~ "Trip saved successfully"
+
+    reloaded = FullCircle.Trading.get_trip!(trip.id, company, user)
+    assert reloaded.transport_mode == "customer_arranged"
+    assert hd(reloaded.loads).trip_load_employees == []
+    assert hd(reloaded.drops).trip_drop_employees == []
+  end
+
+  test "Bill chips surface an unbilled trip older than the desk's 50-trip cap", %{
+    conn: conn,
+    company: company,
+    user: user
+  } do
+    good = good_fixture(company, user, %{"name" => "CapGood"})
+    loc = location_fixture(company, user, %{"kind" => "port", "name" => "CapPort"})
+    drop_loc = location_fixture(company, user, %{"kind" => "own_warehouse", "name" => "CapWh"})
+
+    make_trip = fn date, vehicle, supply_id ->
+      {:ok, t} =
+        FullCircle.Trading.create_trip(
+          %{
+            "date" => date,
+            "transport_mode" => "company_own",
+            "vehicle_number" => vehicle,
+            "loads" => [
+              %{
+                "planned" => "5",
+                "actual" => "5",
+                "good_id" => good.id,
+                "location_id" => loc.id,
+                "supply_position_id" => supply_id
+              }
+            ],
+            "drops" => [
+              %{
+                "planned" => "5",
+                "actual" => "5",
+                "good_id" => good.id,
+                "location_id" => drop_loc.id
+              }
+            ]
+          },
+          company,
+          user
+        )
+
+      {:ok, t, _} = FullCircle.Trading.complete_trip(t, company, user)
+      t
+    end
+
+    # Oldest completed trip, with a supplier load that was never billed
+    supply =
+      supply_position_fixture(company, user, %{"good_id" => good.id, "quantity" => "1000"})
+
+    old = make_trip.("2020-01-01", "OLDCAP1", supply.id)
+
+    # Bury it under more than the 50-trip desk cap
+    for i <- 1..55 do
+      make_trip.(
+        "2026-07-#{String.pad_leading(to_string(rem(i, 28) + 1), 2, "0")}",
+        "NEW#{i}",
+        nil
+      )
+    end
+
+    {:ok, lv, _} = live(conn, ~p"/companies/#{company.id}/trading/desk")
+
+    # Ops view is capped and most-recent-first, so the old trip is not shown
+    refute has_element?(lv, "#desk-trip-#{old.id}")
+
+    # Turning on a Bill chip must find it regardless of age
+    lv |> element("#desk-trip-settle-any") |> render_click()
+    assert has_element?(lv, "#desk-trip-#{old.id}")
+
+    # Clearing chips returns to the capped ops view
+    lv |> element("#desk-trip-settle-clear") |> render_click()
+    refute has_element?(lv, "#desk-trip-#{old.id}")
+  end
+
+  test "selecting a sale does not auto-tick a closed preferred supply", %{
+    conn: conn,
+    company: company,
+    user: user
+  } do
+    good = good_fixture(company, user, %{"name" => "ClosedPrefGood"})
+    customer = contact_fixture(company, user, %{"name" => "ClosedPrefCust"})
+
+    closed_supply =
+      supply_position_fixture(company, user, %{
+        "good_id" => good.id,
+        "quantity" => "100",
+        "status" => "closed"
+      })
+
+    sales =
+      sales_position_fixture(company, user, %{
+        "good_id" => good.id,
+        "customer_id" => customer.id,
+        "quantity" => "10",
+        "status" => "open",
+        "preferred_supply_id" => closed_supply.id
+      })
+
+    {:ok, lv, _} = live(conn, ~p"/companies/#{company.id}/trading/desk")
+
+    # Pull closed rows onto the supply board via the status filter
+    lv
+    |> form("#desk-filter-supply-status", %{
+      "table" => "supply",
+      "field" => "status",
+      "value" => "open, hold, collect, closed"
+    })
+    |> render_change()
+
+    assert has_element?(lv, "#desk-supply-#{closed_supply.id}")
+    # A closed row renders no checkbox, so it must never be auto-selected
+    refute has_element?(lv, "#sel-supply-#{closed_supply.id}")
+
+    lv |> element("#sel-sales-#{sales.id}") |> render_click()
+
+    # The sale is selected, but the unselectable closed supply is not dragged in
+    assert has_element?(lv, "#desk-selection-tray")
+    tray = lv |> element("#desk-selection-tray") |> render()
+    assert tray =~ "1 sales"
+    assert tray =~ "0 supply"
   end
 
   test "desk column filters support comma-OR tokens", %{

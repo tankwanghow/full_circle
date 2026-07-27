@@ -15,6 +15,9 @@ defmodule FullCircle.Trading.SalesPosition do
   # Still open commitments (open sales board, soft hold, trip drop targets)
   @active_statuses ~w(draft open hold)
 
+  # Terminal — cannot transition to a different status once reached
+  @terminal_statuses ~w(fulfilled cancelled)
+
   schema "trading_sales_positions" do
     # System-generated unique number (SAL-000001) via gapless_doc_ids
     field :title, :string
@@ -40,6 +43,8 @@ defmodule FullCircle.Trading.SalesPosition do
 
   def statuses, do: @statuses
   def active_statuses, do: @active_statuses
+  def terminal_statuses, do: @terminal_statuses
+  def terminal?(status), do: status in @terminal_statuses
 
   def status_label("draft"), do: "draft — not committed"
   def status_label("open"), do: "open — committed"

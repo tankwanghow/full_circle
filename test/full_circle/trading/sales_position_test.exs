@@ -270,4 +270,48 @@ defmodule FullCircle.Trading.SalesPositionTest do
              guest
            ) == :not_authorise
   end
+
+  test "fulfilled and cancelled sales positions cannot change status", %{
+    admin: admin,
+    company: company
+  } do
+    fulfilled_src = sales_position_fixture(company, admin)
+
+    {:ok, fulfilled} =
+      Trading.fulfill_sales_position(
+        fulfilled_src,
+        %{"fulfilled_note" => "short"},
+        company,
+        admin
+      )
+
+    assert fulfilled.status == "fulfilled"
+
+    assert {:error, :position_locked} = Trading.open_sales_position(fulfilled, company, admin)
+    assert {:error, :position_locked} = Trading.hold_sales_position(fulfilled, company, admin)
+    assert {:error, :position_locked} = Trading.cancel_sales_position(fulfilled, company, admin)
+    assert Trading.get_sales_position!(fulfilled.id, company, admin).status == "fulfilled"
+
+    # fulfilled_note stays editable while status is unchanged
+    assert {:ok, renoted} =
+             Trading.fulfill_sales_position(
+               fulfilled,
+               %{"fulfilled_note" => "revised"},
+               company,
+               admin
+             )
+
+    assert renoted.fulfilled_note == "revised"
+
+    cancelled_src = sales_position_fixture(company, admin)
+    {:ok, cancelled} = Trading.cancel_sales_position(cancelled_src, company, admin)
+    assert cancelled.status == "cancelled"
+
+    assert {:error, :position_locked} = Trading.open_sales_position(cancelled, company, admin)
+
+    assert {:error, :position_locked} =
+             Trading.fulfill_sales_position(cancelled, %{}, company, admin)
+
+    assert Trading.get_sales_position!(cancelled.id, company, admin).status == "cancelled"
+  end
 end

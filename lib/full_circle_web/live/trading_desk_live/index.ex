@@ -112,6 +112,7 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
     {:noreply,
      socket
      |> assign(trip_settle_filters: set, filters: filters)
+     |> reload_trips()
      |> apply_filters()}
   end
 
@@ -122,6 +123,7 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
     {:noreply,
      socket
      |> assign(trip_settle_filters: MapSet.new(), filters: filters)
+     |> reload_trips()
      |> apply_filters()}
   end
 
@@ -534,9 +536,15 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
         if row.sales.id == sales_id, do: row.sales.preferred_supply_id
       end)
 
+    # Being on the board is not enough — a status filter can pull closed rows in,
+    # and those render no checkbox, so auto-ticking one would strand a selection
+    # the user cannot see or clear from the supply panel.
     on_board? =
       is_binary(preferred_id) and
-        Enum.any?(socket.assigns.supply_all, &(&1.supply.id == preferred_id))
+        Enum.any?(
+          socket.assigns.supply_all,
+          &(&1.supply.id == preferred_id and supply_selectable?(&1.supply.status))
+        )
 
     if on_board? do
       socket
@@ -637,11 +645,7 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
     user = socket.assigns.current_user
     f = socket.assigns.filters
 
-    trips =
-      company
-      |> Trading.list_trips(user)
-      # list_trips is already most-recent-first; take newest 50 for the desk
-      |> Enum.take(50)
+    trips = load_trips_for_panel(company, user, socket.assigns.trip_settle_filters)
 
     socket
     |> assign(
@@ -747,6 +751,31 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
     |> assign(:selection_ready, selection_ready?(socket))
     |> assign(:selection_summary, selection_summary(socket))
     |> assign(:selection_active, selection_active?(socket))
+  end
+
+  # Ops view shows the newest trips only. Bill chips are about settlement, which
+  # only exists on completed trips and stays open indefinitely — capping there
+  # would hide older unbilled trips, so query that set from the DB instead.
+  defp load_trips_for_panel(company, user, settle_filters) do
+    if MapSet.size(settle_filters) > 0 do
+      Trading.list_trips(company, user, status: "completed")
+    else
+      company
+      |> Trading.list_trips(user)
+      # list_trips is already most-recent-first; take newest 50 for the desk
+      |> Enum.take(50)
+    end
+  end
+
+  defp reload_trips(socket) do
+    trips =
+      load_trips_for_panel(
+        socket.assigns.current_company,
+        socket.assigns.current_user,
+        socket.assigns.trip_settle_filters
+      )
+
+    assign(socket, :trips_all, trips)
   end
 
   # Settlement chips: multi-select OR. Empty = no settle filter.
