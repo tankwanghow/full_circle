@@ -803,7 +803,7 @@ defmodule FullCircle.Billing do
       make_changeset(
         PurInvoice,
         %PurInvoice{},
-        Map.merge(attrs, %{"pur_invoice_no" => doc, "e_inv_internal_id" => doc}),
+        merge_pur_invoice_create_attrs(attrs, doc),
         com,
         user
       )
@@ -812,12 +812,23 @@ defmodule FullCircle.Billing do
       FullCircle.Sys.log_changeset(
         pur_invoice_name,
         entity,
-        Map.merge(attrs, %{"pur_invoice_no" => entity.pur_invoice_no}),
+        Map.merge(attrs, %{
+          "pur_invoice_no" => entity.pur_invoice_no,
+          "e_inv_internal_id" => entity.e_inv_internal_id
+        }),
         com,
         user
       )
     end)
     |> create_doc_transactions(pur_invoice_name, com, user, @pur_invoice_txn_opts)
+  end
+
+  # pur_invoice_no is always the gapless PINV. e_inv_internal_id is never
+  # system-generated — user/e-invoice value only (schema requires it).
+  defp merge_pur_invoice_create_attrs(attrs, doc) do
+    attrs
+    |> key_to_string()
+    |> Map.put("pur_invoice_no", doc)
   end
 
   def match_pur_invoice(%PurInvoice{} = pur_invoice, attrs, com, user) do

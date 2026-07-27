@@ -321,6 +321,56 @@ defmodule FullCircle.BillingTest do
       assert pur_invoice.company_id == company.id
     end
 
+    test "preserves user-entered e_inv_internal_id on create", %{
+      admin: admin,
+      company: company
+    } do
+      contact = contact_fixture(company, admin)
+      good = good_fixture(company, admin)
+      pur_acct = Accounting.get_account_by_name("General Purchases", company, admin)
+
+      no_ptax =
+        Repo.one!(
+          from tc in TaxCode,
+            where: tc.company_id == ^company.id and tc.code == "NoPTax"
+        )
+
+      attrs =
+        pur_invoice_attrs(contact, good, pur_acct, no_ptax)
+        |> Map.put("e_inv_internal_id", "SUPPLIER-INV-999")
+
+      assert {:ok, %{create_pur_invoice: pur_invoice}} =
+               Billing.create_pur_invoice(attrs, company, admin)
+
+      assert pur_invoice.pur_invoice_no =~ ~r/^PINV-\d{6}$/
+      assert pur_invoice.e_inv_internal_id == "SUPPLIER-INV-999"
+      assert pur_invoice.e_inv_internal_id != pur_invoice.pur_invoice_no
+    end
+
+    test "rejects blank e_inv_internal_id on create", %{
+      admin: admin,
+      company: company
+    } do
+      contact = contact_fixture(company, admin)
+      good = good_fixture(company, admin)
+      pur_acct = Accounting.get_account_by_name("General Purchases", company, admin)
+
+      no_ptax =
+        Repo.one!(
+          from tc in TaxCode,
+            where: tc.company_id == ^company.id and tc.code == "NoPTax"
+        )
+
+      attrs =
+        pur_invoice_attrs(contact, good, pur_acct, no_ptax)
+        |> Map.put("e_inv_internal_id", "")
+
+      assert {:error, :create_pur_invoice, changeset, _} =
+               Billing.create_pur_invoice(attrs, company, admin)
+
+      assert %{e_inv_internal_id: [_ | _]} = errors_on(changeset)
+    end
+
     test "creates GL transactions with positive line and negated header", %{
       admin: admin,
       company: company
