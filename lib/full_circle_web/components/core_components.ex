@@ -739,18 +739,15 @@ defmodule FullCircleWeb.CoreComponents do
       id="error-summary"
       class="bg-rose-50 border border-rose-400 rounded-lg p-3 mb-3"
     >
-      <p class="text-rose-700 font-semibold text-sm mb-1">
-        <.icon name="hero-exclamation-triangle-mini" class="h-5 w-5" />
+      <p class="flex items-center gap-1 text-rose-700 font-semibold text-sm mb-1">
+        <.icon name="hero-exclamation-triangle-mini" class="h-5 w-5 flex-none" />
         {gettext("Please fix the following errors:")}
-
-        <span class="text-sm text-rose-600 space-y-1.5 pl-1">
-          <span :for={{label, msg} <- @errors} class="min-w-0">
-            <span class="font-medium text-rose-700">
-              [{label}<span class="text-rose-400"> - {msg}</span>]
-            </span>
-          </span>
-        </span>
       </p>
+      <div class="flex flex-wrap gap-x-2 gap-y-1 text-sm text-rose-600">
+        <span :for={{label, msg} <- @errors} class="min-w-0 font-medium text-rose-700">
+          [{label}<span class="text-rose-400"> - {msg}</span>]
+        </span>
+      </div>
     </div>
     """
   end

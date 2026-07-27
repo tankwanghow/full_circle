@@ -37,6 +37,19 @@ defmodule FullCircleWeb.InvoiceLive.Print do
   @detail_height_plain 8
   @detail_height_with_desc 12
 
+  # `.detail-desc` is `white-space: normal` at full width, so a long description
+  # wraps and the row grows past @detail_height_with_desc. Estimate the wrapped
+  # line count instead of assuming one, or the page silently overflows
+  # `.details-body` (a hard 150mm) into the footer.
+  #
+  # Each rendered description line costs this much; 8 + 4 = 12mm keeps the old
+  # single-line estimate unchanged. Deliberately >= the true 3.2mm
+  # (4mm font x 0.8 line-height) so we break a page early rather than overflow.
+  @desc_line_height 4
+  # `.detail-desc` spans the details width (~190mm printable) at a 4mm font;
+  # proportional glyphs average ~2mm, so ~95 characters fit per line.
+  @desc_chars_per_line 95
+
   defp set_page_defaults(socket) do
     socket
     |> assign(:detail_body_height, 150)
@@ -50,7 +63,6 @@ defmodule FullCircleWeb.InvoiceLive.Print do
   defp fill_invoices(socket, ids) do
     body = socket.assigns.detail_body_height
     plain = socket.assigns.detail_height_plain
-    with_desc = socket.assigns.detail_height_with_desc
 
     invoices =
       Billing.get_print_invoices!(
@@ -60,9 +72,7 @@ defmodule FullCircleWeb.InvoiceLive.Print do
       )
       |> Enum.map(fn invoice ->
         detail_chunks =
-          chunk_by_height(invoice.invoice_details, body, fn d ->
-            if has_line_desc?(d), do: with_desc, else: plain
-          end)
+          chunk_by_height(invoice.invoice_details, body, &detail_height(&1, plain))
 
         invoice
         |> Map.merge(%{
@@ -75,8 +85,25 @@ defmodule FullCircleWeb.InvoiceLive.Print do
     |> assign(:invoices, invoices)
   end
 
-  defp has_line_desc?(%{descriptions: d}) when d not in [nil, ""], do: true
-  defp has_line_desc?(_), do: false
+  defp detail_height(%{descriptions: desc}, plain) when desc not in [nil, ""],
+    do: plain + desc_line_count(desc) * @desc_line_height
+
+  defp detail_height(_detail, plain), do: plain
+
+  @doc false
+  # Wrapped line count: explicit newlines split, then each segment wraps at
+  # @desc_chars_per_line. Always at least one line.
+  def desc_line_count(desc) do
+    desc
+    |> to_string()
+    |> String.split(~r/\r?\n/)
+    |> Enum.map(fn segment ->
+      len = segment |> String.trim() |> String.length()
+      max(1, ceil(len / @desc_chars_per_line))
+    end)
+    |> Enum.sum()
+    |> max(1)
+  end
 
   defp chunk_by_height(items, max_height, height_fn) do
     {chunks, current, _h} =

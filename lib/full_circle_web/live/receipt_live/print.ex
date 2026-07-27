@@ -36,6 +36,14 @@ defmodule FullCircleWeb.ReceiptLive.Print do
   @detail_height_plain 8
   @detail_height_with_desc 12
 
+  # A description wraps at full width, so a long one grows the row past
+  # @detail_height_with_desc and overflows `.details-body` (a hard max-height).
+  # Estimate wrapped lines rather than assuming one. 8 + 4 = 12mm keeps the old
+  # single-line estimate; 4mm is deliberately >= the true line box so we break a
+  # page early rather than overflow. Mirrors invoice_live/print.ex.
+  @desc_line_height 4
+  @desc_chars_per_line 95
+
   defp set_page_defaults(socket) do
     socket
     |> assign(:detail_body_height, 160)
@@ -48,7 +56,6 @@ defmodule FullCircleWeb.ReceiptLive.Print do
   defp fill_receipts(socket, ids) do
     body = socket.assigns.detail_body_height
     plain = socket.assigns.detail_height_plain
-    with_desc = socket.assigns.detail_height_with_desc
 
     receipts =
       ReceiveFund.get_print_receipts!(
@@ -72,10 +79,7 @@ defmodule FullCircleWeb.ReceiptLive.Print do
             receipt.received_cheques ++
             [%{__struct__: "funds_head"}, receipt, %{__struct__: "funds_foot"}]
 
-        all_chunks =
-          chunk_by_height(items, body, fn item ->
-            receipt_item_height(item, plain, with_desc)
-          end)
+        all_chunks = chunk_by_height(items, body, &receipt_item_height(&1, plain))
 
         receipt
         |> Map.merge(%{
@@ -88,11 +92,24 @@ defmodule FullCircleWeb.ReceiptLive.Print do
     |> assign(:receipts, receipts)
   end
 
-  defp receipt_item_height(%ReceiveFund.ReceiptDetail{} = d, plain, with_desc) do
-    if d.descriptions not in [nil, ""], do: with_desc, else: plain
-  end
+  defp receipt_item_height(%ReceiveFund.ReceiptDetail{descriptions: desc}, plain)
+       when desc not in [nil, ""],
+       do: plain + desc_line_count(desc) * @desc_line_height
 
-  defp receipt_item_height(_item, plain, _with_desc), do: plain
+  defp receipt_item_height(_item, plain), do: plain
+
+  # Explicit newlines split; each segment then wraps at @desc_chars_per_line.
+  defp desc_line_count(desc) do
+    desc
+    |> to_string()
+    |> String.split(~r/\r?\n/)
+    |> Enum.map(fn segment ->
+      len = segment |> String.trim() |> String.length()
+      max(1, ceil(len / @desc_chars_per_line))
+    end)
+    |> Enum.sum()
+    |> max(1)
+  end
 
   defp chunk_by_height(items, max_height, height_fn) do
     {chunks, current, _h} =
