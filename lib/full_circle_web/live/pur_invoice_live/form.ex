@@ -37,6 +37,11 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
      socket
      |> assign_new(:trading_load_ids, fn -> [] end)
      |> assign_new(:trading_transport_drop_ids, fn -> [] end)
+     # Attach direction — lines the clerk ticked on the trading panel, linked
+     # inside the save Multi. Distinct from the push-direction ids above, which
+     # arrive prefilled from the settlement board.
+     |> assign_new(:trading_link_load_ids, fn -> [] end)
+     |> assign_new(:trading_link_transport_drop_ids, fn -> [] end)
      |> assign_new(:e_inv_payable, fn -> nil end)
      |> assign_new(:trading_settlement, fn ->
        %{
@@ -667,6 +672,15 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
     end
   end
 
+  @impl true
+  def handle_info({:trading_attach_selection, contact_id, load_ids, transport_drop_ids}, socket) do
+    {:noreply,
+     socket
+     |> assign(trading_link_contact_id: contact_id)
+     |> assign(trading_link_load_ids: load_ids)
+     |> assign(trading_link_transport_drop_ids: transport_drop_ids)}
+  end
+
   defp save(socket, :new, params) do
     params = params |> Map.merge(%{"pur_invoice_no" => "...new..."})
     company = socket.assigns.current_company
@@ -688,7 +702,12 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
           )
 
         true ->
-          Billing.create_pur_invoice(params, company, user)
+          Billing.create_pur_invoice(
+            params,
+            company,
+            user,
+            attach_links_fun(socket, params, company, user)
+          )
       end
 
     case result do
@@ -706,6 +725,9 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
             transport_ids != [] ->
               gettext("Purchase invoice created and transport haul lines linked successfully.")
 
+            attached?(socket, params) ->
+              gettext("Purchase Invoice created and trading lines linked successfully.")
+
             true ->
               gettext("Purchase Invoice created successfully.")
           end
@@ -713,7 +735,8 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
         {:noreply,
          socket
          |> push_navigate(to: ~p"/companies/#{company.id}/PurInvoice/#{obj.id}/edit")
-         |> put_flash(:info, flash)}
+         |> put_flash(:info, flash)
+         |> maybe_warn_unbilled_trading(obj, params, company, user)}
 
       {:error, :loads_already_billed} ->
         {:noreply,
@@ -753,6 +776,9 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
            :error,
            gettext("Selected haul lines must belong to the same transport agent")
          )}
+
+      {:error, step, reason, _} when step in [:link_trading_loads, :link_trading_transport] ->
+        {:noreply, put_flash(socket, :error, trading_link_error(reason))}
 
       {:error, failed_operation, changeset, _} ->
         {:noreply,
@@ -867,12 +893,28 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
   end
 
   defp do_update_pur_invoice(socket, pinv, params, company, user) do
-    case Billing.update_pur_invoice(pinv, params, company, user) do
+    case Billing.update_pur_invoice(
+           pinv,
+           params,
+           company,
+           user,
+           attach_links_fun(socket, params, company, user, :update_pur_invoice)
+         ) do
       {:ok, %{update_pur_invoice: obj}} ->
+        flash =
+          if attached?(socket, params) do
+            gettext("Purchase Invoice updated and trading lines linked successfully.")
+          else
+            gettext("Purchase Invoice updated successfully.")
+          end
+
         {:noreply,
          socket
          |> push_navigate(to: ~p"/companies/#{company.id}/PurInvoice/#{obj.id}/edit")
-         |> put_flash(:info, "#{gettext("Purchase Invoice updated successfully.")}")}
+         |> put_flash(:info, flash)}
+
+      {:error, step, reason, _} when step in [:link_trading_loads, :link_trading_transport] ->
+        {:noreply, put_flash(socket, :error, trading_link_error(reason))}
 
       {:error, failed_operation, changeset, _} ->
         {:noreply,
@@ -911,6 +953,94 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
          socket
          |> put_flash(:error, gettext("You are not authorised to perform this action"))}
     end
+  end
+
+  # --- Trading attach (linking an existing/e-invoice bill to trading lines) ---
+
+  defp attach_links_fun(socket, params, company, user, pinv_key \\ :create_pur_invoice) do
+    {load_ids, drop_ids} = attach_ids(socket, params)
+
+    &FullCircle.Trading.attach_links_multi(&1, pinv_key, load_ids, drop_ids, company, user)
+  end
+
+  # A selection is only valid for the contact it was made against. Switching
+  # supplier unmounts the panel, so the parent has to drop the ids itself —
+  # otherwise the save would fail with :supplier_mismatch instead of quietly
+  # forgetting lines the clerk can no longer see.
+  defp attach_ids(socket, params) do
+    if blank_id(params["contact_id"]) == socket.assigns[:trading_link_contact_id] do
+      {socket.assigns[:trading_link_load_ids] || [],
+       socket.assigns[:trading_link_transport_drop_ids] || []}
+    else
+      {[], []}
+    end
+  end
+
+  defp attached?(socket, params) do
+    attach_ids(socket, params) != {[], []}
+  end
+
+  defp trading_link_error(:loads_already_billed),
+    do: gettext("Some loads were already billed by someone else. Nothing was saved.")
+
+  defp trading_link_error(:transport_already_billed),
+    do: gettext("Some haul lines were already billed by someone else. Nothing was saved.")
+
+  defp trading_link_error(:ineligible_loads),
+    do: gettext("Some loads are no longer eligible for billing")
+
+  defp trading_link_error(:ineligible_transport),
+    do: gettext("Some haul lines are no longer eligible for billing")
+
+  defp trading_link_error(:mixed_suppliers),
+    do: gettext("Selected loads must belong to the same supplier")
+
+  defp trading_link_error(:mixed_agents),
+    do: gettext("Selected haul lines must belong to the same transport agent")
+
+  defp trading_link_error(:supplier_mismatch),
+    do: gettext("Selected loads belong to a different supplier than this bill")
+
+  defp trading_link_error(:agent_mismatch),
+    do: gettext("Selected haul lines belong to a different transport agent than this bill")
+
+  defp trading_link_error(:not_authorise),
+    do: gettext("You are not authorised to perform this action")
+
+  defp trading_link_error(_), do: gettext("Failed to link trading lines")
+
+  # Nudge when a bill is saved leaving this contact's trading lines unbilled.
+  # Only on create, and only when something is actually billable — plenty of
+  # purchases from a grain supplier (bags, fuel, repairs) are not trading.
+  defp maybe_warn_unbilled_trading(socket, obj, params, company, user) do
+    if attached?(socket, params) or is_nil(obj.contact_id) do
+      socket
+    else
+      case FullCircle.Trading.billable_line_counts(obj.contact_id, company, user) do
+        %{total: 0} ->
+          socket
+
+        %{total: n} ->
+          put_flash(
+            socket,
+            :warn,
+            gettext(
+              "%{n} trading line(s) for this supplier are still unbilled. Open this bill and attach them if it settles any of them.",
+              n: n
+            )
+          )
+      end
+    end
+  end
+
+  # Quantity across the keyed lines, for the panel's advisory variance strip.
+  defp bill_quantity(form) do
+    form.source
+    |> Ecto.Changeset.fetch_field!(:pur_invoice_details)
+    |> Enum.reject(&(Map.get(&1, :delete) == true))
+    |> Enum.reduce(Decimal.new(0), fn d, acc ->
+      Decimal.add(acc, d.quantity || Decimal.new(0))
+    end)
   end
 
   defp validate(params, socket) do
@@ -1113,6 +1243,21 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
             </.link>
           </div>
         </div>
+
+        <.live_component
+          :if={
+            @live_action in [:new, :edit] and @trading_load_ids == [] and
+              @trading_transport_drop_ids == [] and
+              not is_nil(blank_id(@form[:contact_id].value))
+          }
+          module={FullCircleWeb.PurInvoiceLive.TradingAttachComponent}
+          id="trading-attach"
+          current_company={@current_company}
+          current_user={@current_user}
+          contact_id={blank_id(@form[:contact_id].value)}
+          bill_date={@form[:pur_invoice_date].value}
+          bill_qty={bill_quantity(@form)}
+        />
 
         <.live_component
           module={FullCircleWeb.InvoiceLive.DetailComponent}

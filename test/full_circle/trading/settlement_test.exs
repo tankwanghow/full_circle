@@ -8,7 +8,7 @@ defmodule FullCircle.Trading.SettlementTest do
 
   alias FullCircle.Trading
   alias FullCircle.Repo
-  alias FullCircle.Trading.TripDrop
+  alias FullCircle.Trading.{TripDrop, TripLoad}
 
   setup do
     user = user_fixture()
@@ -678,5 +678,240 @@ defmodule FullCircle.Trading.SettlementTest do
              Trading.build_pur_invoice_attrs_from_transport_drop_ids([drop.id], company, user)
 
     assert attrs["due_date"] == attrs["pur_invoice_date"]
+  end
+
+  # --- Attach direction: linking trading lines to a PurInvoice that already
+  # exists. This is the path a received e-invoice takes, since EInvMetas.Prefill
+  # creates the bill without ever touching trading. ---
+
+  defp pur_invoice_for(contact, company, user) do
+    good = good_fixture(company, user)
+    pur_acct = FullCircle.Accounting.get_account_by_name("General Purchases", company, user)
+
+    pur_tc =
+      Repo.one!(
+        from tc in FullCircle.Accounting.TaxCode,
+          where: tc.company_id == ^company.id and tc.code == "NoPTax"
+      )
+
+    attrs = pur_invoice_attrs(contact, good, pur_acct, pur_tc, tax_rate: "0")
+
+    {:ok, %{create_pur_invoice: pinv}} =
+      FullCircle.Billing.create_pur_invoice(attrs, company, user)
+
+    pinv
+  end
+
+  test "link_loads_to_pur_invoice links a completed load to an existing bill", %{
+    user: user,
+    company: company
+  } do
+    supplier = contact_fixture(company, user)
+    %{trip: trip} = completed_sales_drop(company, user, supplier: supplier)
+    load = hd(trip.loads)
+    pinv = pur_invoice_for(supplier, company, user)
+
+    assert {:ok, 1} = Trading.link_loads_to_pur_invoice([load.id], pinv, company, user)
+    assert Repo.get!(TripLoad, load.id).pur_invoice_id == pinv.id
+
+    # and it drops off the settlement queue
+    refute Enum.any?(Trading.list_unbilled_loads(company, user), &(&1.id == load.id))
+  end
+
+  test "link_loads_to_pur_invoice refuses a load already billed elsewhere", %{
+    user: user,
+    company: company
+  } do
+    supplier = contact_fixture(company, user)
+    %{trip: trip} = completed_sales_drop(company, user, supplier: supplier)
+    load = hd(trip.loads)
+
+    first = pur_invoice_for(supplier, company, user)
+    second = pur_invoice_for(supplier, company, user)
+
+    assert {:ok, 1} = Trading.link_loads_to_pur_invoice([load.id], first, company, user)
+
+    assert {:error, :ineligible_loads} =
+             Trading.link_loads_to_pur_invoice([load.id], second, company, user)
+
+    # the first link is untouched
+    assert Repo.get!(TripLoad, load.id).pur_invoice_id == first.id
+  end
+
+  test "link_loads_to_pur_invoice refuses a bill for a different supplier", %{
+    user: user,
+    company: company
+  } do
+    supplier = contact_fixture(company, user)
+    other = contact_fixture(company, user)
+    %{trip: trip} = completed_sales_drop(company, user, supplier: supplier)
+    load = hd(trip.loads)
+    pinv = pur_invoice_for(other, company, user)
+
+    assert {:error, :supplier_mismatch} =
+             Trading.link_loads_to_pur_invoice([load.id], pinv, company, user)
+
+    assert is_nil(Repo.get!(TripLoad, load.id).pur_invoice_id)
+  end
+
+  test "link_loads_to_pur_invoice refuses loads from mixed suppliers", %{
+    user: user,
+    company: company
+  } do
+    supplier = contact_fixture(company, user)
+    other = contact_fixture(company, user)
+    %{trip: trip_a} = completed_sales_drop(company, user, supplier: supplier)
+    %{trip: trip_b} = completed_sales_drop(company, user, supplier: other)
+    pinv = pur_invoice_for(supplier, company, user)
+
+    ids = [hd(trip_a.loads).id, hd(trip_b.loads).id]
+
+    assert {:error, :mixed_suppliers} =
+             Trading.link_loads_to_pur_invoice(ids, pinv, company, user)
+  end
+
+  test "link_loads_to_pur_invoice cannot reach another company's load", %{
+    user: user,
+    company: company
+  } do
+    other_company = company_fixture(user, %{})
+    supplier = contact_fixture(company, user)
+
+    %{trip: foreign_trip} = completed_sales_drop(other_company, user)
+    foreign_load = hd(foreign_trip.loads)
+
+    pinv = pur_invoice_for(supplier, company, user)
+
+    assert {:error, :ineligible_loads} =
+             Trading.link_loads_to_pur_invoice([foreign_load.id], pinv, company, user)
+
+    assert is_nil(Repo.get!(TripLoad, foreign_load.id).pur_invoice_id)
+  end
+
+  test "link_transport_drops_to_pur_invoice links a haul to an agent bill", %{
+    user: user,
+    company: company
+  } do
+    %{drop: drop, agent: agent} = completed_agent_drop(company, user)
+    pinv = pur_invoice_for(agent, company, user)
+
+    assert {:ok, 1} =
+             Trading.link_transport_drops_to_pur_invoice([drop.id], pinv, company, user)
+
+    assert Repo.get!(TripDrop, drop.id).transport_pur_invoice_id == pinv.id
+
+    info = Trading.pur_invoice_settlement_info(pinv.id, company)
+    assert info.linked?
+    assert info.transport_drop_count == 1
+  end
+
+  test "link_transport_drops_to_pur_invoice refuses a bill from another agent", %{
+    user: user,
+    company: company
+  } do
+    %{drop: drop} = completed_agent_drop(company, user)
+    other = contact_fixture(company, user, %{"name" => "Some Other Haulier"})
+    pinv = pur_invoice_for(other, company, user)
+
+    assert {:error, :agent_mismatch} =
+             Trading.link_transport_drops_to_pur_invoice([drop.id], pinv, company, user)
+
+    assert is_nil(Repo.get!(TripDrop, drop.id).transport_pur_invoice_id)
+  end
+
+  test "attach_links_multi links loads while the bill is being created", %{
+    user: user,
+    company: company
+  } do
+    supplier = contact_fixture(company, user)
+    %{trip: trip} = completed_sales_drop(company, user, supplier: supplier)
+    load = hd(trip.loads)
+
+    good = good_fixture(company, user)
+    pur_acct = FullCircle.Accounting.get_account_by_name("General Purchases", company, user)
+
+    pur_tc =
+      Repo.one!(
+        from tc in FullCircle.Accounting.TaxCode,
+          where: tc.company_id == ^company.id and tc.code == "NoPTax"
+      )
+
+    attrs = pur_invoice_attrs(supplier, good, pur_acct, pur_tc, tax_rate: "0")
+
+    assert {:ok, %{create_pur_invoice: pinv}} =
+             FullCircle.Billing.create_pur_invoice(
+               attrs,
+               company,
+               user,
+               &Trading.attach_links_multi(
+                 &1,
+                 :create_pur_invoice,
+                 [load.id],
+                 [],
+                 company,
+                 user
+               )
+             )
+
+    assert Repo.get!(TripLoad, load.id).pur_invoice_id == pinv.id
+  end
+
+  test "a failed link rolls the whole bill back", %{user: user, company: company} do
+    supplier = contact_fixture(company, user)
+    other = contact_fixture(company, user)
+    %{trip: trip} = completed_sales_drop(company, user, supplier: other)
+    load = hd(trip.loads)
+
+    good = good_fixture(company, user)
+    pur_acct = FullCircle.Accounting.get_account_by_name("General Purchases", company, user)
+
+    pur_tc =
+      Repo.one!(
+        from tc in FullCircle.Accounting.TaxCode,
+          where: tc.company_id == ^company.id and tc.code == "NoPTax"
+      )
+
+    before_count = Repo.aggregate(FullCircle.Billing.PurInvoice, :count)
+    attrs = pur_invoice_attrs(supplier, good, pur_acct, pur_tc, tax_rate: "0")
+
+    assert {:error, :link_trading_loads, :supplier_mismatch, _} =
+             FullCircle.Billing.create_pur_invoice(
+               attrs,
+               company,
+               user,
+               &Trading.attach_links_multi(
+                 &1,
+                 :create_pur_invoice,
+                 [load.id],
+                 [],
+                 company,
+                 user
+               )
+             )
+
+    assert Repo.aggregate(FullCircle.Billing.PurInvoice, :count) == before_count
+  end
+
+  test "billable_line_counts drives the unbilled nudge", %{user: user, company: company} do
+    supplier = contact_fixture(company, user)
+    %{trip: trip} = completed_sales_drop(company, user, supplier: supplier)
+    load = hd(trip.loads)
+
+    assert %{loads: 1, transport: 0, total: 1} =
+             Trading.billable_line_counts(supplier.id, company, user)
+
+    pinv = pur_invoice_for(supplier, company, user)
+    assert {:ok, 1} = Trading.link_loads_to_pur_invoice([load.id], pinv, company, user)
+
+    assert %{total: 0} = Trading.billable_line_counts(supplier.id, company, user)
+  end
+
+  test "billable_line_counts is zero for a contact with no trading lines", %{
+    user: user,
+    company: company
+  } do
+    contact = contact_fixture(company, user)
+    assert %{loads: 0, transport: 0, total: 0} =
+             Trading.billable_line_counts(contact.id, company, user)
   end
 end

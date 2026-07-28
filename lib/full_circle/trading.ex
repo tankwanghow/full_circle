@@ -2036,6 +2036,22 @@ defmodule FullCircle.Trading do
     Settlement.create_pur_invoice_from_transport_drops(drop_ids, attrs, company, user)
   end
 
+  def link_loads_to_pur_invoice(load_ids, pur_invoice, company, user) do
+    Settlement.link_loads_to_pur_invoice(load_ids, pur_invoice, company, user)
+  end
+
+  def link_transport_drops_to_pur_invoice(drop_ids, pur_invoice, company, user) do
+    Settlement.link_transport_drops_to_pur_invoice(drop_ids, pur_invoice, company, user)
+  end
+
+  def attach_links_multi(multi, pinv_key, load_ids, transport_drop_ids, company, user) do
+    Settlement.attach_links_multi(multi, pinv_key, load_ids, transport_drop_ids, company, user)
+  end
+
+  def billable_line_counts(contact_id, company, user, opts \\ []) do
+    Settlement.billable_line_counts(contact_id, company, user, opts)
+  end
+
   def invoice_settlement_info(invoice_id, company) do
     Settlement.invoice_settlement_info(invoice_id, company)
   end

@@ -820,11 +820,17 @@ defmodule FullCircle.Billing do
     |> Repo.all()
   end
 
-  def create_pur_invoice(attrs, com, user) do
+  @doc """
+  `extend_multi` lets a caller append steps that need the created PurInvoice —
+  e.g. `Trading.attach_links_multi/6` linking trip loads or haul lines to it —
+  without Billing having to know about that caller's domain.
+  """
+  def create_pur_invoice(attrs, com, user, extend_multi \\ &Function.identity/1) do
     case can?(user, :create_pur_invoice, com) do
       true ->
         Multi.new()
         |> create_pur_invoice_multi(attrs, com, user)
+        |> extend_multi.()
         |> Repo.transaction()
 
       false ->
@@ -892,12 +898,22 @@ defmodule FullCircle.Billing do
       {:sql_error, e.postgres.message}
   end
 
-  def update_pur_invoice(%PurInvoice{} = pur_invoice, attrs, com, user) do
+  @doc """
+  See `create_pur_invoice/4` for `extend_multi`.
+  """
+  def update_pur_invoice(
+        %PurInvoice{} = pur_invoice,
+        attrs,
+        com,
+        user,
+        extend_multi \\ &Function.identity/1
+      ) do
     attrs = remove_field_if_new_flag(attrs, "pur_invoice_no")
 
     if can?(user, :update_pur_invoice, com) do
       Multi.new()
       |> update_pur_invoice_multi(pur_invoice, attrs, com, user)
+      |> extend_multi.()
       |> Repo.transaction()
     else
       :not_authorise

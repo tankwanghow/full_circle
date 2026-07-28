@@ -526,6 +526,160 @@ defmodule FullCircle.Trading.Settlement do
 
   def create_pur_invoice_from_transport_drops(_, _, _, _), do: {:error, :invalid_transport}
 
+  # --- Attach: link trading lines to a PurInvoice that already exists ---
+  #
+  # The three `create_*_from_*` functions above are the *push* direction: the
+  # settlement board builds the document. Most supplier and haulier bills instead
+  # arrive as received LHDN e-invoices and are keyed through `EInvMetas.Prefill`,
+  # which knows nothing about trading. These are the *attach* direction, so such a
+  # bill can still be matched to its trading lines.
+  #
+  # Mirrors `link_drops_to_invoice/4` on the customer side.
+
+  @doc """
+  Link eligible commercial loads to an existing PurInvoice
+  (sets `trip_loads.pur_invoice_id`).
+
+  Only updates rows that still have `pur_invoice_id` nil. Returns
+  `{:error, :loads_already_billed}` if fewer rows updated than expected.
+  """
+  def link_loads_to_pur_invoice(load_ids, pur_invoice, company, user)
+      when is_list(load_ids) and load_ids != [] do
+    with :ok <- authorize_pur_invoice(user, company),
+         true <- pur_invoice.company_id == company.id,
+         {:ok, loads} <- load_eligible_loads(load_ids, company),
+         :ok <- same_supplier?(loads),
+         :ok <- supplier_matches_pur_invoice?(loads, pur_invoice) do
+      ids = Enum.map(loads, & &1.id)
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      {n, _} =
+        from(l in TripLoad,
+          where: l.id in ^ids,
+          where: is_nil(l.pur_invoice_id)
+        )
+        |> Repo.update_all(set: [pur_invoice_id: pur_invoice.id, updated_at: now])
+
+      if n == length(ids) do
+        {:ok, n}
+      else
+        {:error, :loads_already_billed}
+      end
+    else
+      false -> :not_authorise
+      other -> other
+    end
+  end
+
+  def link_loads_to_pur_invoice([], _pur_invoice, _company, _user), do: {:error, :invalid_loads}
+  def link_loads_to_pur_invoice(_, _, _, _), do: {:error, :invalid_loads}
+
+  @doc """
+  Link eligible agent haul lines to an existing PurInvoice
+  (sets `trip_drops.transport_pur_invoice_id`).
+  """
+  def link_transport_drops_to_pur_invoice(drop_ids, pur_invoice, company, user)
+      when is_list(drop_ids) and drop_ids != [] do
+    with :ok <- authorize_pur_invoice(user, company),
+         true <- pur_invoice.company_id == company.id,
+         {:ok, drops} <- load_eligible_transport_drops(drop_ids, company),
+         :ok <- same_agent?(drops),
+         :ok <- agent_matches_pur_invoice?(drops, pur_invoice) do
+      ids = Enum.map(drops, & &1.id)
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      {n, _} =
+        from(d in TripDrop,
+          where: d.id in ^ids,
+          where: is_nil(d.transport_pur_invoice_id)
+        )
+        |> Repo.update_all(set: [transport_pur_invoice_id: pur_invoice.id, updated_at: now])
+
+      if n == length(ids) do
+        {:ok, n}
+      else
+        {:error, :transport_already_billed}
+      end
+    else
+      false -> :not_authorise
+      other -> other
+    end
+  end
+
+  def link_transport_drops_to_pur_invoice([], _pur_invoice, _company, _user),
+    do: {:error, :invalid_transport}
+
+  def link_transport_drops_to_pur_invoice(_, _, _, _), do: {:error, :invalid_transport}
+
+  @doc """
+  Append the attach steps to a caller's `Multi`.
+
+  `pinv_key` is the step name holding the PurInvoice — `:create_pur_invoice` or
+  `:update_pur_invoice`. Empty id lists append nothing, so this is safe to pipe
+  unconditionally. Passed to `Billing.create_pur_invoice/5` and
+  `update_pur_invoice/5` as `extend_multi`, which keeps Billing free of any
+  Trading dependency.
+
+  Failure of a link step rolls back the whole transaction: the document is not
+  written if its lines were billed by someone else meanwhile. LiveView retains
+  the submitted form params on a failed save, so the clerk unticks and re-saves
+  rather than re-keying the bill.
+  """
+  def attach_links_multi(multi, pinv_key, load_ids, transport_drop_ids, company, user) do
+    multi
+    |> maybe_link_loads_step(pinv_key, load_ids, company, user)
+    |> maybe_link_transport_step(pinv_key, transport_drop_ids, company, user)
+  end
+
+  defp maybe_link_loads_step(multi, _pinv_key, [], _company, _user), do: multi
+
+  defp maybe_link_loads_step(multi, pinv_key, load_ids, company, user) do
+    Multi.run(multi, :link_trading_loads, fn _repo, changes ->
+      load_ids
+      |> link_loads_to_pur_invoice(Map.fetch!(changes, pinv_key), company, user)
+      |> normalize_link_result()
+    end)
+  end
+
+  defp maybe_link_transport_step(multi, _pinv_key, [], _company, _user), do: multi
+
+  defp maybe_link_transport_step(multi, pinv_key, drop_ids, company, user) do
+    Multi.run(multi, :link_trading_transport, fn _repo, changes ->
+      drop_ids
+      |> link_transport_drops_to_pur_invoice(Map.fetch!(changes, pinv_key), company, user)
+      |> normalize_link_result()
+    end)
+  end
+
+  # Multi.run only accepts {:ok, _} | {:error, _}; the link functions may also
+  # return the bare :not_authorise used everywhere else in this module.
+  defp normalize_link_result(:not_authorise), do: {:error, :not_authorise}
+  defp normalize_link_result(other), do: other
+
+  @doc """
+  Count of still-billable trading lines for a contact, for the "you left trading
+  lines unbilled" nudge after a bill is saved with nothing attached.
+
+  Same options as `list_unbilled_loads/3` — `:from_date`, `:to_date`.
+  """
+  def billable_line_counts(contact_id, company, user, opts \\ [])
+
+  def billable_line_counts(contact_id, company, user, opts) when is_binary(contact_id) do
+    loads =
+      company
+      |> list_unbilled_loads(user, Keyword.put(opts, :supplier_id, contact_id))
+      |> Enum.count(& &1.billable)
+
+    transport =
+      company
+      |> list_unbilled_transport_lines(user, Keyword.put(opts, :agent_id, contact_id))
+      |> Enum.count(& &1.billable)
+
+    %{loads: loads, transport: transport, total: loads + transport}
+  end
+
+  def billable_line_counts(_, _, _, _), do: %{loads: 0, transport: 0, total: 0}
+
   # --- Link hygiene: info, contact lock, unlink (no void/delete on finance docs) ---
 
   @doc """
@@ -1032,6 +1186,14 @@ defmodule FullCircle.Trading.Settlement do
 
   defp same_agent?([]), do: {:error, :invalid_transport}
 
+  defp agent_matches_pur_invoice?([first | _], pur_invoice) do
+    if first.trip.transport_agent_id == pur_invoice.contact_id do
+      :ok
+    else
+      {:error, :agent_mismatch}
+    end
+  end
+
   defp pur_invoice_attrs_from_transport_drops(drops, company, user) do
     [first | _] = drops
     agent = first.trip.transport_agent
@@ -1405,6 +1567,14 @@ defmodule FullCircle.Trading.Settlement do
   end
 
   defp same_supplier?([]), do: {:error, :invalid_loads}
+
+  defp supplier_matches_pur_invoice?([first | _], pur_invoice) do
+    if first.supply_position.supplier_id == pur_invoice.contact_id do
+      :ok
+    else
+      {:error, :supplier_mismatch}
+    end
+  end
 
   defp pur_invoice_attrs_from_loads(loads, company, user) do
     [first | _] = loads
