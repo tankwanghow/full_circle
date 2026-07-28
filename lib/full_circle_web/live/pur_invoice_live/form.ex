@@ -37,6 +37,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
      socket
      |> assign_new(:trading_load_ids, fn -> [] end)
      |> assign_new(:trading_transport_drop_ids, fn -> [] end)
+     |> assign_new(:e_inv_payable, fn -> nil end)
      |> assign_new(:trading_settlement, fn ->
        %{
          linked?: false,
@@ -47,7 +48,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
          transport_drop_count: 0
        }
      end)
-     |> assign(e_inv_preview: nil)
+     |> assign_new(:e_inv_preview, fn -> nil end)
      |> assign(
        settings:
          FullCircle.Sys.load_settings(
@@ -305,10 +306,15 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
     com = socket.assigns.current_company
     user = socket.assigns.current_user
 
-    {attrs, flash} =
+    summary_tin = obj["supplierTIN"] || obj["issuerTIN"]
+    summary_brn = if obj["issuerIDType"] == "BRN", do: obj["issuerID"]
+
+    {attrs, meta} =
       case FullCircle.EInvMetas.get_full_e_invoice(obj["uuid"], com, user) do
         {:ok, body} ->
           parsed = FullCircle.EInvMetas.parse_e_invoice_document(body)
+          tin = parsed.supplier_tin || summary_tin
+          brn = parsed.supplier_brn || summary_brn
 
           details =
             parsed.invoice_lines
@@ -320,7 +326,9 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
                 "quantity" => line.quantity,
                 "unit_price" => line.unit_price,
                 "discount" => line.discount,
-                "tax_rate" => line.tax_rate,
+                # LHDN reports the tax as a percentage ("5.0"); tax_rate here is
+                # a fraction, the same scale as tax_codes.rate (0.06 for 6%).
+                "tax_rate" => (line.tax_rate || 0) / 100,
                 "good_name" => "",
                 "account_name" => "",
                 "tax_code_name" => "",
@@ -331,31 +339,52 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
               }
             end)
 
-          {%{
-             pur_invoice_no: "...new...",
-             e_inv_internal_id: parsed.internal_id,
-             e_inv_uuid: obj["uuid"],
-             pur_invoice_date: parsed.issue_date,
-             due_date: parsed.issue_date,
-             contact_name:
-               (parsed.supplier_name || "")
-               |> String.replace(~r/[^a-zA-Z0-9]/, "")
-               |> String.downcase(),
-             pur_invoice_details: details
-           }, nil}
+          {attrs, warning} =
+            %{
+              pur_invoice_no: "...new...",
+              e_inv_internal_id: parsed.internal_id,
+              e_inv_uuid: obj["uuid"],
+              pur_invoice_date: parsed.issue_date,
+              due_date: parsed.issue_date,
+              pur_invoice_details: details
+            }
+            |> put_supplier(tin, brn, parsed.supplier_name, com)
+
+          attrs = put_goods(attrs, com, user)
+
+          {attrs,
+           %{
+             supplier_ids: {tin, brn},
+             payable: e_inv_payable(parsed.total_payable_amount, obj["totalPayableAmount"]),
+             # Show the document straight away for keying against. It is the one
+             # we just fetched, so this costs no extra LHDN call — the
+             # "Show E-Invoice" button re-fetches it.
+             preview: {:ok, parsed},
+             warnings: List.wrap(warning)
+           }}
 
         {:error, _reason} ->
-          {%{
-             pur_invoice_no: "...new...",
-             e_inv_internal_id: obj["internalId"],
-             e_inv_uuid: obj["uuid"],
-             pur_invoice_date: obj["dateTimeIssued"],
-             due_date: obj["dateTimeIssued"],
-             contact_name:
-               obj["supplierName"]
-               |> String.replace(~r/[^a-zA-Z0-9]/, "")
-               |> String.downcase()
-           }, gettext("Could not fetch e-invoice details. Using summary data only.")}
+          {attrs, warning} =
+            %{
+              pur_invoice_no: "...new...",
+              e_inv_internal_id: obj["internalId"],
+              e_inv_uuid: obj["uuid"],
+              pur_invoice_date: obj["dateTimeIssued"],
+              due_date: obj["dateTimeIssued"]
+            }
+            |> put_supplier(summary_tin, summary_brn, obj["supplierName"], com)
+
+          {attrs,
+           %{
+             supplier_ids: {summary_tin, summary_brn},
+             payable: e_inv_payable(nil, obj["totalPayableAmount"]),
+             # Nothing to show: the fetch that would have supplied it failed.
+             preview: nil,
+             warnings: [
+               gettext("Could not fetch e-invoice details. Using summary data only.")
+               | List.wrap(warning)
+             ]
+           }}
       end
 
     socket
@@ -363,7 +392,15 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
     |> assign(id: "new")
     |> assign(page_title: gettext("New Purchase Invoice"))
     |> assign(matched_trans: [])
-    |> then(fn s -> if flash, do: put_flash(s, :warning, flash), else: s end)
+    |> assign(e_inv_supplier_ids: meta.supplier_ids)
+    |> assign(e_inv_payable: meta.payable)
+    |> assign(e_inv_preview: meta.preview)
+    |> then(fn s ->
+      case Enum.reject(meta.warnings, &is_nil/1) do
+        [] -> s
+        msgs -> put_flash(s, :warn, Enum.join(msgs, " "))
+      end
+    end)
     |> assign(
       :form,
       to_form(
@@ -376,6 +413,187 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
         )
       )
     )
+  end
+
+  # Seed the supplier from the e-invoice. When it cannot be resolved we still
+  # show the LHDN name so the user knows who to look for; contact_id stays nil
+  # and the changeset flags it.
+  # When a supplier has only ever sold us one good, fill it in on every seeded
+  # line. Choosing the good is the pivot: it carries the purchase account, tax
+  # code, packaging, unit and multiplier with it, so this is what turns a
+  # single-good supplier's bill into a no-typing bill.
+  defp put_goods(%{contact_id: contact_id, pur_invoice_details: details} = attrs, com, user)
+       when not is_nil(contact_id) and is_list(details) do
+    case Billing.purchased_good_names(contact_id, com) do
+      [] ->
+        attrs
+
+      names ->
+        sole? = match?([_], names)
+
+        %{
+          attrs
+          | pur_invoice_details: Enum.map(details, &seed_good(&1, names, sole?, com, user))
+        }
+    end
+  end
+
+  defp put_goods(attrs, _com, _user), do: attrs
+
+  # Two ways to know the good, in order of confidence:
+  #
+  #   * the supplier has only ever sold one good (98% right) — take it, and take
+  #     its packaging too, which is right 93% of the time;
+  #   * otherwise the line's own description names one of the goods we have
+  #     bought from them before (96% right) — take the good but NOT the
+  #     packaging. The description tells us the product, never the pack size,
+  #     and a good's first packaging is often not the one this supplier uses
+  #     (Wheat Pollard defaults to "Unweighted Bag" while every real bill used
+  #     "55kg/Bag"), so leave it blank for the user to choose.
+  defp seed_good(detail, names, true = _sole?, com, user) do
+    apply_good(detail, hd(names), com, user, packaging: true)
+  end
+
+  defp seed_good(detail, names, false = _sole?, com, user) do
+    case good_named_in(detail["descriptions"], names) do
+      nil -> detail
+      name -> apply_good(detail, name, com, user, packaging: false)
+    end
+  end
+
+  # Longest match wins, so "Wheat Brans" never shadows "Wheat Pollard".
+  defp good_named_in(descriptions, names) when is_binary(descriptions) and descriptions != "" do
+    descr = String.downcase(descriptions)
+
+    names
+    |> Enum.filter(&String.contains?(descr, String.downcase(&1)))
+    |> Enum.max_by(&String.length/1, fn -> nil end)
+  end
+
+  defp good_named_in(_descriptions, _names), do: nil
+
+  defp apply_good(detail, name, com, user, opts) do
+    case FullCircle.Product.get_good_by_name(name, com, user) do
+      nil -> detail
+      good -> merge_good(detail, good, opts[:packaging])
+    end
+  end
+
+  # unit_multiplier stays 0 on purpose. compute_detail_fields/1 uses
+  # package_qty * unit_multiplier whenever the multiplier is positive, which
+  # would throw away the quantity LHDN gave us and leave the line at zero.
+  defp merge_good(detail, good, packaging?) do
+    packaging =
+      if packaging?,
+        do: %{"package_name" => good.package_name, "package_id" => good.package_id},
+        else: %{"package_name" => "", "package_id" => nil}
+
+    detail
+    |> Map.merge(%{
+      "good_name" => good.value,
+      "good_id" => good.id,
+      "account_name" => good.purchase_account_name,
+      "account_id" => good.purchase_account_id,
+      "tax_code_name" => good.purchase_tax_code_name,
+      "tax_code_id" => good.purchase_tax_code_id,
+      "tax_rate" => good.purchase_tax_rate,
+      "unit" => good.unit,
+      "unit_multiplier" => 0,
+      # The quantity LHDN sends is in the supplier's own units, which for a
+      # bagged good is bags, not the good's stock unit ("WHEAT POLLARD 55KG",
+      # qty 550 = 550 bags = 30.25 Mt). Seed it into both fields: quantity is
+      # used while no packaging is set, and the moment the user picks a
+      # packaging with a multiplier, compute_detail_fields/1 switches to
+      # package_qty * multiplier and the line completes without retyping.
+      "package_qty" => detail["quantity"]
+    })
+    |> Map.merge(packaging)
+  end
+
+  # The amount LHDN says is payable, used as the target the keyed lines must add
+  # up to. Some suppliers publish a summary total of 0 even on a real invoice, so
+  # treat zero as "no figure to compare against" rather than as a discrepancy.
+  defp e_inv_payable(from_document, from_summary) do
+    [from_document, from_summary]
+    |> Enum.map(&to_decimal/1)
+    |> Enum.find(fn d -> d && Decimal.gt?(d, 0) end)
+  end
+
+  defp to_decimal(nil), do: nil
+  defp to_decimal(%Decimal{} = d), do: d
+  defp to_decimal(n) when is_integer(n), do: Decimal.new(n)
+  defp to_decimal(n) when is_float(n), do: Decimal.from_float(n)
+
+  defp to_decimal(s) when is_binary(s) do
+    case Decimal.parse(s) do
+      {d, _} -> d
+      :error -> nil
+    end
+  end
+
+  defp to_decimal(_), do: nil
+
+  # Difference between what has been keyed and what the supplier declared to
+  # LHDN. nil when they agree, so the template can stay quiet.
+  defp e_inv_variance(form, payable) do
+    diff =
+      form.source
+      |> Ecto.Changeset.fetch_field!(:pur_invoice_amount)
+      |> Decimal.sub(payable)
+
+    if Decimal.compare(Decimal.abs(diff), Decimal.new("0.01")) == :lt, do: nil, else: diff
+  end
+
+  # Returns {attrs, warning}. tax_id and reg_no are display-only virtuals
+  # mirroring the contact, the same ones assign_autocomplete_ids/5 fills when a
+  # contact is picked by hand.
+  defp put_supplier(attrs, tin, brn, name, com) do
+    case FullCircle.Accounting.resolve_e_invoice_contact(tin, brn, name, com) do
+      nil ->
+        {Map.merge(attrs, %{contact_name: name || "", contact_id: nil, tax_id: nil, reg_no: nil}),
+         gettext("Supplier \"%{name}\" not found. Please select the contact.", name: name || "")}
+
+      {contact, source} ->
+        {Map.merge(attrs, %{
+           contact_name: contact.name,
+           contact_id: contact.id,
+           tax_id: contact.tax_id,
+           reg_no: contact.reg_no
+         }), supplier_warning(source, contact, name)}
+    end
+  end
+
+  # A TIN or Reg No match identifies the supplier outright. A name match does
+  # not, so say so — the user should confirm it before saving.
+  defp supplier_warning(:name, contact, e_inv_name) do
+    gettext(
+      "Supplier matched by name only: e-Invoice \"%{e_inv_name}\" to \"%{contact}\". No TIN or Reg No match, please verify.",
+      e_inv_name: e_inv_name || "",
+      contact: contact.name
+    )
+  end
+
+  defp supplier_warning(_identifier_match, _contact, _e_inv_name), do: nil
+
+  # After a bill is created from an e-invoice, stamp the supplier's TIN and BRN
+  # onto the contact if it has none, so the next e-invoice from them resolves on
+  # identifier instead of on a name spelling that may never match.
+  defp maybe_learn_supplier_ids(socket, obj) do
+    case socket.assigns[:e_inv_supplier_ids] do
+      {tin, brn} ->
+        FullCircle.Accounting.learn_contact_identifiers(
+          obj.contact_id,
+          tin,
+          brn,
+          socket.assigns.current_company,
+          socket.assigns.current_user
+        )
+
+      _ ->
+        nil
+    end
+
+    socket
   end
 
   defp mount_edit(socket, id) do
@@ -700,7 +918,10 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
 
     case result do
       {:ok, %{create_pur_invoice: obj}} ->
-        socket = maybe_attach_egg_planned(socket, obj, params)
+        socket =
+          socket
+          |> maybe_attach_egg_planned(obj, params)
+          |> maybe_learn_supplier_ids(obj)
 
         flash =
           cond do
@@ -1134,6 +1355,27 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
           current_user={@current_user}
           matched_trans={@matched_trans}
         />
+
+        <div :if={@e_inv_payable} class="flex flex-row">
+          <% variance = e_inv_variance(@form, @e_inv_payable) %>
+          <div class="grow"></div>
+          <div class={[
+            "w-[10%] text-right px-1",
+            if(variance, do: "text-red-600 font-semibold", else: "text-green-600")
+          ]}>
+            {gettext("E-Invoice")}
+          </div>
+          <div class={[
+            "detail-amt-col text-right px-1",
+            if(variance, do: "text-red-600 font-semibold", else: "text-green-600")
+          ]}>
+            {@e_inv_payable |> Number.Delimit.number_to_delimited()}
+            <div :if={variance} class="text-xs">
+              {gettext("out by")} {variance |> Number.Delimit.number_to_delimited()}
+            </div>
+          </div>
+          <div class="detail-setting-col" />
+        </div>
 
         <div class="flex flex-row justify-center gap-x-1 mt-1">
           <.form_action_button

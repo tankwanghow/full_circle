@@ -587,4 +587,85 @@ defmodule FullCircle.BillingTest do
       assert Billing.get_matcher_by("Invoice", invoice.id) == []
     end
   end
+
+  describe "sole_purchased_good_name/2" do
+    setup %{admin: admin, company: company} do
+      pur_acct = Accounting.get_account_by_name("General Purchases", company, admin)
+
+      no_ptax =
+        Repo.one!(from tc in TaxCode, where: tc.company_id == ^company.id and tc.code == "NoPTax")
+
+      bill = fn contact, good ->
+        {:ok, _} =
+          Billing.create_pur_invoice(
+            pur_invoice_attrs(contact, good, pur_acct, no_ptax, tax_rate: "0"),
+            company,
+            admin
+          )
+      end
+
+      %{bill: bill}
+    end
+
+    test "returns the good when the supplier has only ever sold one", %{
+      admin: admin,
+      company: company,
+      bill: bill
+    } do
+      contact = contact_fixture(company, admin)
+      good = good_fixture(company, admin)
+      bill.(contact, good)
+      bill.(contact, good)
+
+      assert Billing.sole_purchased_good_name(contact.id, company) == good.name
+    end
+
+    test "returns nil once the supplier has sold more than one", %{
+      admin: admin,
+      company: company,
+      bill: bill
+    } do
+      contact = contact_fixture(company, admin)
+      bill.(contact, good_fixture(company, admin))
+      bill.(contact, good_fixture(company, admin))
+
+      refute Billing.sole_purchased_good_name(contact.id, company)
+    end
+
+    test "returns nil for a supplier with no purchase history", %{
+      admin: admin,
+      company: company
+    } do
+      refute Billing.sole_purchased_good_name(contact_fixture(company, admin).id, company)
+    end
+
+    test "seeding a good with unit_multiplier 0 keeps the e-invoice quantity", %{
+      admin: admin,
+      company: company
+    } do
+      contact = contact_fixture(company, admin)
+      good = good_fixture(company, admin)
+      pur_acct = Accounting.get_account_by_name("General Purchases", company, admin)
+
+      no_ptax =
+        Repo.one!(from tc in TaxCode, where: tc.company_id == ^company.id and tc.code == "NoPTax")
+
+      # compute_detail_fields/1 derives quantity from package_qty * unit_multiplier
+      # whenever the multiplier is positive. A seeded line carries the quantity
+      # from LHDN and no package_qty, so the multiplier must stay 0 or the
+      # quantity is thrown away.
+      attrs =
+        pur_invoice_attrs(contact, good, pur_acct, no_ptax,
+          tax_rate: "0",
+          quantity: "1000",
+          unit_price: "1.15"
+        )
+
+      {:ok, %{create_pur_invoice: pinv}} = Billing.create_pur_invoice(attrs, company, admin)
+      loaded = Billing.get_pur_invoice!(pinv.id, company, admin)
+
+      assert Decimal.eq?(loaded.pur_invoice_amount, Decimal.new("1150.00"))
+      assert Decimal.eq?(hd(loaded.pur_invoice_details).quantity, Decimal.new("1000"))
+    end
+  end
 end

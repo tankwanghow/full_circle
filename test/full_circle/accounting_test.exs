@@ -300,4 +300,117 @@ defmodule FullCircle.AccountingTest do
       assert hd(names_name1) == "name1"
     end
   end
+
+  describe "resolve_e_invoice_contact/4" do
+    setup do
+      admin = user_fixture()
+      com = company_fixture(admin, %{})
+      %{admin: admin, com: com}
+    end
+
+    test "matches on tax_id even when the names share nothing", %{admin: admin, com: com} do
+      contact =
+        FullCircle.BillingFixtures.contact_fixture(com, admin, %{
+          "name" => "Ct Square Marketing",
+          "tax_id" => "IG3543553041"
+        })
+
+      assert {%{id: id}, :tax_id} =
+               Accounting.resolve_e_invoice_contact("IG3543553041", nil, "KHOR CHAI THING", com)
+      assert id == contact.id
+    end
+
+    test "falls back to name ignoring case and punctuation", %{admin: admin, com: com} do
+      contact =
+        FullCircle.BillingFixtures.contact_fixture(com, admin, %{
+          "name" => "Syarikat Kamparly Auto & Hardwares Sdn. Bhd.",
+          "tax_id" => ""
+        })
+
+      assert {%{id: id}, :name} =
+               Accounting.resolve_e_invoice_contact(
+                 "C2853053050",
+                 nil,
+                 "SYARIKAT KAMPARLY AUTO & HARDWARES SDN BHD",
+                 com
+               )
+
+      assert id == contact.id
+    end
+
+    test "matches on reg_no ignoring formatting, before falling back to name", %{
+      admin: admin,
+      com: com
+    } do
+      contact =
+        FullCircle.BillingFixtures.contact_fixture(com, admin, %{
+          "name" => "Renamed Entity Sdn Bhd",
+          "tax_id" => "",
+          "reg_no" => "1996-01020394"
+        })
+
+      assert {%{id: id}, :reg_no} =
+               Accounting.resolve_e_invoice_contact(
+                 "C5895805030",
+                 "199601020394",
+                 "GRAIN & PROTEIN TECHNOLOGIES ASIA SDN BHD",
+                 com
+               )
+
+      assert id == contact.id
+    end
+
+    test "returns nil when neither tax_id nor name matches", %{com: com} do
+      refute Accounting.resolve_e_invoice_contact("C999", "999999999999", "Nobody Sdn Bhd", com)
+    end
+
+    test "a blank tax_id does not match contacts with a blank tax_id", %{admin: admin, com: com} do
+      FullCircle.BillingFixtures.contact_fixture(com, admin, %{
+        "name" => "Some Other Supplier",
+        "tax_id" => ""
+      })
+
+      refute Accounting.resolve_e_invoice_contact("", "", "Unrelated Name Sdn Bhd", com)
+    end
+  end
+
+  describe "learn_contact_identifiers/5" do
+    setup do
+      admin = user_fixture()
+      com = company_fixture(admin, %{})
+      %{admin: admin, com: com}
+    end
+
+    test "fills a blank tax_id so the supplier resolves next time", %{admin: admin, com: com} do
+      contact =
+        FullCircle.BillingFixtures.contact_fixture(com, admin, %{
+          "name" => "Learnt Supplier Sdn Bhd",
+          "tax_id" => ""
+        })
+
+      assert {:ok, _} =
+               Accounting.learn_contact_identifiers(contact.id, "C123456789", "", com, admin)
+
+      assert {%{id: id}, :tax_id} =
+               Accounting.resolve_e_invoice_contact("C123456789", nil, "Totally Different", com)
+      assert id == contact.id
+    end
+
+    test "never overwrites an existing tax_id", %{admin: admin, com: com} do
+      contact =
+        FullCircle.BillingFixtures.contact_fixture(com, admin, %{
+          "name" => "Already Has Tin Sdn Bhd",
+          "tax_id" => "C111"
+        })
+
+      assert {:ok, _} = Accounting.learn_contact_identifiers(contact.id, "C999", "", com, admin)
+
+      assert FullCircle.Repo.get!(FullCircle.Accounting.Contact, contact.id).tax_id == "C111"
+    end
+
+    test "is a no-op without a contact or a tin", %{admin: admin, com: com} do
+      assert :noop == Accounting.learn_contact_identifiers(nil, "C123", "", com, admin)
+      assert :noop == Accounting.learn_contact_identifiers(Ecto.UUID.generate(), "", "", com, admin)
+    end
+  end
 end

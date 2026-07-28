@@ -601,6 +601,149 @@ defmodule FullCircle.Accounting do
     )
   end
 
+  @doc """
+  Resolve the local `Contact` for an e-invoice supplier.
+
+  Identifiers are tried before the name, because a matching TIN or registration
+  number identifies the party regardless of how the name is spelt. Only if both
+  are absent do we compare names with punctuation, spacing and case stripped —
+  that catches "SDN BHD" vs "Sdn. Bhd." but not abbreviations like "Bhd" vs
+  "Berhad", so a name miss is expected and resolved by the user picking the
+  contact once (see `learn_contact_identifiers/5`).
+
+  Returns `{contact, :tax_id | :reg_no | :name}` so the caller can tell a
+  certain match from a probable one — `:tax_id` and `:reg_no` identify the party
+  outright, `:name` does not — or `nil` when nothing matches.
+  """
+  def resolve_e_invoice_contact(tax_id, reg_no, name, com) do
+    with nil <- with_source(contact_by_tax_id(tax_id, com), :tax_id),
+         nil <- with_source(contact_by_reg_no(reg_no, com), :reg_no) do
+      with_source(contact_by_normalized_name(name, com), :name)
+    end
+  end
+
+  defp with_source(nil, _source), do: nil
+  defp with_source(contact, source), do: {contact, source}
+
+  defp contact_by_tax_id(tax_id, com) do
+    case String.trim(tax_id || "") do
+      "" ->
+        nil
+
+      tin ->
+        Repo.one(
+          from ct in Contact,
+            where: ct.company_id == ^com.id,
+            where: ct.tax_id == ^tin,
+            order_by: ct.name,
+            limit: 1
+        )
+    end
+  end
+
+  defp contact_by_reg_no(reg_no, com) do
+    case normalize_reg_no(reg_no) do
+      "" ->
+        nil
+
+      brn ->
+        Repo.one(
+          from ct in Contact,
+            where: ct.company_id == ^com.id,
+            where:
+              fragment("upper(regexp_replace(?, '[^a-zA-Z0-9]', '', 'g'))", ct.reg_no) == ^brn,
+            order_by: ct.name,
+            limit: 1
+        )
+    end
+  end
+
+  defp contact_by_normalized_name(name, com) do
+    case normalize_contact_name(name) do
+      "" ->
+        nil
+
+      norm ->
+        Repo.one(
+          from ct in Contact,
+            where: ct.company_id == ^com.id,
+            where:
+              fragment("lower(regexp_replace(?, '[^a-zA-Z0-9]', '', 'g'))", ct.name) == ^norm,
+            order_by: ct.name,
+            limit: 1
+        )
+    end
+  end
+
+  def normalize_contact_name(name) do
+    (name || "") |> String.replace(~r/[^a-zA-Z0-9]/, "") |> String.downcase()
+  end
+
+  def normalize_reg_no(reg_no) do
+    (reg_no || "") |> String.replace(~r/[^a-zA-Z0-9]/, "") |> String.upcase()
+  end
+
+  @doc """
+  Record an e-invoice supplier's TIN and registration number on a contact that
+  is missing them.
+
+  A supplier the user had to pick by hand then resolves on identifier for every
+  later e-invoice, so the manual step happens once per supplier and never again.
+
+  Neither field is ever overwritten. That matters for `reg_no` especially:
+  contacts commonly hold the old ROC number ("178854-K") while LHDN sends the
+  new 12-digit SSM number ("198901001548"), and the local one is the record the
+  business relies on elsewhere.
+  """
+  def learn_contact_identifiers(contact_id, tax_id, reg_no, com, user) do
+    tin = String.trim(tax_id || "")
+    brn = String.trim(reg_no || "")
+
+    if contact_id in [nil, ""] or (tin == "" and brn == "") do
+      :noop
+    else
+      Multi.new()
+      |> learn_identifier(:tax_id, contact_id, tin, com)
+      |> learn_identifier(:reg_no, contact_id, brn, com)
+      |> Multi.run(:logging, fn repo, changes ->
+        learnt =
+          [tax_id: tin, reg_no: brn]
+          |> Enum.filter(fn {field, _} -> match?({n, _} when n > 0, changes[field]) end)
+          |> Enum.map_join(", ", fn {field, value} -> "#{field} #{value}" end)
+
+        if learnt == "" do
+          {:ok, nil}
+        else
+          repo.insert(%FullCircle.Sys.Log{
+            entity: "contacts",
+            entity_id: contact_id,
+            action: "update",
+            delta: "Note: #{learnt} learnt from e-Invoice",
+            user_id: user.id,
+            company_id: com.id
+          })
+        end
+      end)
+      |> Repo.transaction()
+    end
+  end
+
+  defp learn_identifier(multi, _field, _contact_id, "", _com), do: multi
+
+  defp learn_identifier(multi, field, contact_id, value, com) do
+    Multi.update_all(
+      multi,
+      field,
+      from(ct in Contact,
+        where: ct.id == ^contact_id,
+        where: ct.company_id == ^com.id,
+        where: is_nil(field(ct, ^field)) or field(ct, ^field) == "",
+        update: [set: ^[{field, value}]]
+      ),
+      []
+    )
+  end
+
   def delete_account(ac, company, user) do
     if is_default_account?(ac) do
       if Sys.get_company_user(company.id, user.id).role == "admin" do
