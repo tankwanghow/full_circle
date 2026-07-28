@@ -9,6 +9,10 @@ Domain knowledge for `lib/full_circle/e_inv_metas.ex` and the
 `lib/full_circle_web/live/e_inv_list_live/` LiveViews. These are non-obvious
 contracts that have already caused production crashes.
 
+For turning a *received* e-invoice into a purchase invoice — supplier
+resolution, good pre-fill, the seeded-line quantity/packaging/tax traps — see
+`e-invoice-bill-prefill.md`.
+
 ## `fc_doc` maps are STRING-keyed
 
 `EInvMetas.unmatch/3` and the `match/...` path read `fc_doc` with **string

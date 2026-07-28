@@ -1,6 +1,6 @@
 ---
 name: liveview-computed-field-gotchas
-description: Use when a readonly/computed field (e.g. Amount) in a LiveView form fails to update after editing an input, or when working with the calculatorInput JS hook — covers LiveView's focused-input patch skip and programmatic value-set event dispatch.
+description: Use when a LiveView form field misbehaves — a readonly/computed field (e.g. Amount) not updating after an edit, a virtual/display-only field rendering blank, a flash message never appearing, or work on the calculatorInput JS hook. Covers the focused-input patch skip, programmatic value-set events, _unused_* params, changeset.params fallback rendering, and the :warn flash kind.
 ---
 
 # LiveView Computed-Field Gotchas
@@ -48,6 +48,35 @@ iterates raw form maps and assumes numeric keys crashes:
 drop non-matches) and strip the `_unused_*` keys before persisting a raw
 `:map` cast. Example: `FullCircle.Tax.paid_by_month/1` + `sanitize_overrides/1`
 (see [[cp204-instalment-planner]]).
+
+## 4. A virtual field renders even when it is not in the cast list
+
+`PurInvoice` declares `:tax_id` and `:reg_no` as virtual and does **not** cast
+them, yet seeding them through the attrs map makes them display. That is not an
+accident: `Phoenix.HTML.FormData` for `Ecto.Changeset` falls back to
+`changeset.params`, and `cast/3` keeps every key it was given there regardless
+of the permitted list — only `changes` is filtered.
+
+So a display-only mirror field is populated by **passing it in the attrs map**.
+Setting it on the struct instead has no effect once params are present, and
+adding it to the cast list is unnecessary. If such a field renders blank, check
+whether the code that builds the attrs omitted it (this is exactly how the
+e-invoice prefill first shipped with an empty Tax Id / Reg No).
+
+## 5. Warning flashes must use `:warn`, never `:warning`
+
+`CoreComponents.flash/1` declares `attr :kind, values: [:info, :warn, :error]`
+and `flash_group/1` renders exactly those three via
+`Phoenix.Flash.get(@flash, @kind)`.
+
+Phoenix does not validate flash keys, so `put_flash(socket, :warning, msg)`
+stores the message where nothing reads it — **no error, no warning, just an
+invisible message**. This hid a real warning in `pur_invoice_live/form.ex`
+("Could not fetch e-invoice details…") for as long as it had existed.
+
+The flashes have no auto-hide timer — they persist until clicked — so "it
+appeared and I missed it" is never the explanation. If a flash you added never
+shows, check the kind before debugging anything else.
 
 ## Where this pattern lives
 
