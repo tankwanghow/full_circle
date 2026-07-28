@@ -1,6 +1,6 @@
 ---
 name: grain-trading-desk
-description: Use when working on FullCircle grain trading — SupplyPosition, SalesPosition, Trip (loads/drops), Location GPS, warehouse board, desk assembly, balances, system doc nos (SUP/SAL/TRP), or trading LiveViews under trading_desk_live / trading_*.
+description: Use when working on FullCircle grain trading — SupplyPosition, SalesPosition, Trip (loads/drops), Location GPS, warehouse board, desk assembly, balances, system doc nos (SUP/SAL/TRP), trading LiveViews under trading_desk_live / trading_*, or linking a PurInvoice (including one keyed from a received e-invoice) to trading settlement.
 ---
 
 # Grain Trading Desk
@@ -47,6 +47,44 @@ Note the settlement screen **discards** the attrs it builds and deep-links to
 `/Invoice/new?trading_drops=…` (or `?trading_loads=` / `?trading_transport_drops=`);
 the receiving form re-runs the same builder. A prefill change must be made in
 `Settlement`, not in the LiveView, or the two paths diverge.
+
+## Attach direction (the e-invoice path)
+
+Everything above is **push**: the board builds the document. Most purchase bills
+do not arrive that way — supplier and haulier bills come in as received LHDN
+e-invoices and are keyed from `/PurInvoice/new?obj=…` through
+`EInvMetas.Prefill`, which knows nothing about trading. Without an attach path
+those bills leave `trip_loads.pur_invoice_id` / `trip_drops.transport_pur_invoice_id`
+nil forever and the trip never goes green. See `e-invoice-bill-prefill.md`.
+
+`PurInvoiceLive.TradingAttachComponent` renders on **any** PurInvoice form (new,
+e-invoice-seeded, or edit) once a contact resolves, listing that contact's
+unbilled loads and hauls from the existing `list_unbilled_loads/3` /
+`list_unbilled_transport_lines/3`. Ticked lines link on save.
+
+- **Primitives:** `Settlement.link_loads_to_pur_invoice/4` and
+  `link_transport_drops_to_pur_invoice/4`, mirroring the customer-side
+  `link_drops_to_invoice/4`. All reuse the company-scoped eligibility loaders,
+  so a client-supplied id cannot reach another company's line.
+- **Composition:** `Settlement.attach_links_multi/6` is appended via the
+  `extend_multi` argument on `Billing.create_pur_invoice/5` /
+  `update_pur_invoice/5`. **That argument exists so Billing carries no Trading
+  dependency — don't inline the link steps into Billing.**
+- **Hidden on the push flow** (`trading_loads=` / `trading_transport_drops=`
+  params present), which already links; otherwise the panel would offer the very
+  lines being billed.
+- **Selection is keyed to the contact** and dropped if the supplier changes —
+  the panel unmounts on that change and cannot retract the ids itself.
+- **Variance strip is advisory** and sums quantity across all detail lines, so
+  it is only meaningful on a single-good bill. It never blocks.
+- Saving with nothing ticked while billable lines exist flashes `:warn`
+  (`billable_line_counts/4`). Kind must be `:warn` — `:warning` renders nothing.
+
+**`:loads_already_billed` is nearly unreachable.** The eligibility loaders filter
+`is_nil(pur_invoice_id)` first, so a line billed earlier returns
+`:ineligible_loads`. The already-billed error only fires in a true race between
+the eligibility read and the `update_all`.
+
 **Link hygiene:** link means “settled via” (not live mirror). While linked, **party
 (contact) is locked** on Invoice/PurInvoice; qty/price may still be edited.
 **Unlink trading settlement** clears FKs so lines reappear on settlement queues
@@ -292,9 +330,11 @@ back to an arity that "looks tidier".
 ```
 lib/full_circle/trading.ex
 lib/full_circle/trading/{supply_position,sales_position,trip,trip_load,trip_drop,
-  trip_load_employee,trip_drop_employee,location,balances,sample_data}.ex
+  trip_load_employee,trip_drop_employee,location,balances,settlement,sample_data}.ex
 lib/full_circle_web/live/trading_desk_live/
+lib/full_circle_web/live/trading_settlement_live/
 lib/full_circle_web/live/trading_components.ex
 lib/full_circle_web/live/trading_{location,trip,sales,history}_live/
+lib/full_circle_web/live/pur_invoice_live/trading_attach_component.ex   # attach direction
 test/full_circle/trading/
 ```

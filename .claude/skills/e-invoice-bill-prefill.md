@@ -22,6 +22,12 @@ copy would not fail loudly.
 For the sync/match/reconcile side of e-invoices see `e-invoice-sync.md`. This
 skill is only about the data-entry path.
 
+A bill seeded here carries **no trading link** — `Prefill` knows nothing about
+grain trading, so `trip_loads.pur_invoice_id` and
+`trip_drops.transport_pur_invoice_id` stay nil. If the supplier or haulier is a
+trading counterparty, the clerk attaches the lines from the panel on the
+PurInvoice form; see the attach direction in `grain-trading-desk.md`.
+
 ## Payment only makes sense for *received* Invoices
 
 Roughly 60% of payments carry an `e_inv_uuid`, but **1,733 of 1,826 are
