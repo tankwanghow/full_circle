@@ -56,12 +56,6 @@ defmodule Mix.Tasks.FullCircle.SeedTrading do
     end
   end
 
-  defp format_pairs(list) do
-    list
-    |> Enum.map(fn {title, status} -> "  - [#{status}] #{title}" end)
-    |> Enum.join("\n")
-  end
-
   defp format_multi(list) do
     list
     |> Enum.map(fn {ref, status, n_loads, n_drops} ->
