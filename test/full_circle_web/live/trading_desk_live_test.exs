@@ -219,6 +219,7 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
     |> render_submit()
 
     html = render(lv)
+    assert html =~ "Modal supply X"
     assert html =~ "Modal supplier"
     assert html =~ "Modal good S"
     refute has_element?(lv, "#desk-modal")

@@ -195,13 +195,44 @@ defmodule FullCircleWeb.CompanyLiveTest do
       %{conn: conn, lv: lv, html: html, comp: comp, comp1: comp1, comp2: comp2}
     end
 
+    # The closing_day select is populated from the *saved* month on mount, so
+    # moving from a short month to a long one has to widen the option list
+    # before the new day can be submitted. Deterministic stand-in for a flake
+    # that only appeared when the random fixture happened to roll February.
+    test "save valid company after widening closing_month", %{
+      conn: conn,
+      user: user,
+      comp1: comp1
+    } do
+      feb_co = company_fixture(user, %{name: "febco", closing_month: 2, closing_day: 28})
+      # Keep the edited company inactive — editing the *active* company submits
+      # through trigger_action instead of a LiveView redirect.
+      conn = conn |> put_session(:current_company, comp1)
+      {:ok, lv, _html} = live(conn, ~p"/edit_company/#{feb_co.id}")
+
+      attrs =
+        valid_company_attributes(%{name: "janco", closing_month: 1, closing_day: 30})
+
+      {:ok, _, html} =
+        lv
+        |> announce_closing_month(attrs)
+        |> form("#company", company: attrs)
+        |> render_submit()
+        |> follow_redirect(conn)
+
+      assert html =~ "janco"
+    end
+
     test "save valid company", %{conn: conn, comp: comp, comp1: comp1} do
       conn = conn |> put_session(:current_company, comp1)
       {:ok, lv, _html} = live(conn, ~p"/edit_company/#{comp.id}")
 
+      attrs = valid_company_attributes(%{name: "kakak"})
+
       {:ok, _, html} =
         lv
-        |> form("#company", company: valid_company_attributes(%{name: "kakak"}))
+        |> announce_closing_month(attrs)
+        |> form("#company", company: attrs)
         |> render_submit()
         |> follow_redirect(conn)
 
@@ -216,9 +247,12 @@ defmodule FullCircleWeb.CompanyLiveTest do
       assert LazyHTML.from_fragment(html) |> LazyHTML.query("#active-company") |> LazyHTML.text() =~
                comp.name
 
+      attrs = valid_company_attributes(%{name: "kakak"})
+
       form =
         lv
-        |> form("#company", company: valid_company_attributes(%{name: "kakak"}))
+        |> announce_closing_month(attrs)
+        |> form("#company", company: attrs)
 
       render_submit(form)
       conn = follow_trigger_action(form, conn)
@@ -264,16 +298,9 @@ defmodule FullCircleWeb.CompanyLiveTest do
     test "save valid company", %{conn: conn, lv: lv} do
       attrs = valid_company_attributes(%{name: "kakak"})
 
-      # First trigger closing_month change to populate closing_days options
-      lv
-      |> element("#company")
-      |> render_change(%{
-        "_target" => ["company", "closing_month"],
-        "company" => %{"closing_month" => "#{attrs.closing_month}"}
-      })
-
       {:ok, _, html} =
         lv
+        |> announce_closing_month(attrs)
         |> form("#company", company: attrs)
         |> render_submit()
         |> follow_redirect(conn)
@@ -309,5 +336,50 @@ defmodule FullCircleWeb.CompanyLiveTest do
       assert html =~ "Closing Month\n</label>"
       assert html =~ "Descriptions\n</label>"
     end
+  end
+
+  # Fix A (announcing the month) is only sufficient because the fixture never
+  # hands back a day the resulting month cannot offer. Pinned directly rather
+  # than left to seed roulette: the original flake needed February *and* a day
+  # above 28, roughly 1 run in 180, which no practical seed sweep will surface.
+  test "valid_company_attributes never yields a day the closing_day select rejects" do
+    days_offered = %{
+      1 => 31,
+      2 => 28,
+      3 => 31,
+      4 => 30,
+      5 => 31,
+      6 => 30,
+      7 => 31,
+      8 => 31,
+      9 => 30,
+      10 => 31,
+      11 => 30,
+      12 => 31
+    }
+
+    for _ <- 1..2000 do
+      attrs = valid_company_attributes()
+
+      assert attrs.closing_day >= 1
+      assert attrs.closing_day <= days_offered[attrs.closing_month],
+             "month #{attrs.closing_month} offers 1..#{days_offered[attrs.closing_month]}, " <>
+               "fixture produced day #{attrs.closing_day}"
+    end
+  end
+
+  # The closing_day options are rebuilt only by the validate clause whose
+  # _target is closing_month, so a test that moves month and day in one
+  # submission would be checked against the previous month's option list. A
+  # browser never does that — it fires change on the month first. Do the same.
+  defp announce_closing_month(lv, attrs) do
+    lv
+    |> element("#company")
+    |> render_change(%{
+      "_target" => ["company", "closing_month"],
+      "company" => %{"closing_month" => "#{attrs.closing_month}"}
+    })
+
+    lv
   end
 end

@@ -19,7 +19,7 @@ defmodule FullCircle.Trading.SupplyPosition do
   @terminal_statuses ~w(closed)
 
   schema "trading_supply_positions" do
-    # System-generated unique number (SUP-000001) via gapless_doc_ids
+    # Supply no: user-entered, or system gapless SUP-000001 when blank on create
     field :title, :string
     # Estimated date stock is available from
     field :available_from, :date
@@ -69,10 +69,13 @@ defmodule FullCircle.Trading.SupplyPosition do
       :good_name
     ])
     |> update_change(:title, &trim_title/1)
-    |> validate_required([:title, :quantity, :company_id, :supplier_id, :good_id, :status])
+    # title optional on form validate (empty = auto SUP-###### on create);
+    # create/update always set a non-blank title before insert/update
+    |> validate_required([:quantity, :company_id, :supplier_id, :good_id, :status])
+    |> validate_title_if_present()
     |> validate_inclusion(:status, @statuses)
     |> validate_number(:quantity, greater_than: 0)
-    |> unique_constraint([:company_id, :title],
+    |> unique_constraint(:title,
       name: :trading_supply_positions_unique_title_per_company
     )
     |> foreign_key_constraint(:company_id)
@@ -82,4 +85,12 @@ defmodule FullCircle.Trading.SupplyPosition do
 
   defp trim_title(title) when is_binary(title), do: String.trim(title)
   defp trim_title(title), do: title
+
+  # Blank title is allowed on the form (means auto-generate). Non-blank must stay non-blank after trim.
+  defp validate_title_if_present(cs) do
+    case get_change(cs, :title) || get_field(cs, :title) do
+      t when is_binary(t) and t != "" -> validate_length(cs, :title, min: 1, max: 50)
+      _ -> cs
+    end
+  end
 end

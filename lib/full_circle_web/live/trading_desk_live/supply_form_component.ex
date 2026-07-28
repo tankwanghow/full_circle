@@ -25,7 +25,7 @@ defmodule FullCircleWeb.TradingDeskLive.SupplyFormComponent do
             SupplyPosition.changeset(%SupplyPosition{}, %{
               "company_id" => company.id,
               "status" => "open",
-              "title" => "...new..."
+              "title" => ""
             })
 
           socket
@@ -169,7 +169,8 @@ defmodule FullCircleWeb.TradingDeskLive.SupplyFormComponent do
     params =
       params
       |> Map.put("company_id", socket.assigns.current_company.id)
-      |> put_system_title(socket)
+      # Supply no is immutable after create; on new, empty = auto gapless on save
+      |> lock_title_on_edit(socket)
 
     cs =
       case socket.assigns.live_action do
@@ -181,13 +182,10 @@ defmodule FullCircleWeb.TradingDeskLive.SupplyFormComponent do
     {:noreply, assign(socket, form: to_form(cs))}
   end
 
-  defp put_system_title(params, %{assigns: %{live_action: :new}}),
-    do: Map.put(params, "title", "...new...")
-
-  defp put_system_title(params, %{assigns: %{supply: %{title: title}}}),
+  defp lock_title_on_edit(params, %{assigns: %{live_action: :edit, supply: %{title: title}}}),
     do: Map.put(params, "title", title)
 
-  defp put_system_title(params, _), do: params
+  defp lock_title_on_edit(params, _), do: params
 
   defp ensure_ids(params, company, user) do
     params =
@@ -227,8 +225,9 @@ defmodule FullCircleWeb.TradingDeskLive.SupplyFormComponent do
             <.input
               field={@form[:title]}
               label={gettext("Supply no")}
-              readonly
-              tabindex="-1"
+              placeholder={if @live_action == :new, do: gettext("auto"), else: nil}
+              readonly={@live_action == :edit}
+              tabindex={if @live_action == :edit, do: "-1", else: nil}
             />
           </div>
           <div class="w-[35%]">

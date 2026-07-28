@@ -193,22 +193,59 @@ defmodule FullCircle.Trading do
 
   def create_supply_position(attrs, company, user) do
     with :ok <- authorize(user, :manage_trading, company) do
-      gapless_name = String.to_atom("update_gapless_doc" <> gen_temp_id())
-
-      Multi.new()
-      |> get_gapless_doc_id(gapless_name, "TradingSupply", "SUP", company)
-      |> Multi.insert(:create_supply, fn %{^gapless_name => doc} ->
+      attrs =
         attrs
         |> stringify_attr_keys()
         |> put_company(company)
-        |> Map.put("title", doc)
-        |> then(&SupplyPosition.changeset(%SupplyPosition{}, &1))
-      end)
+
+      multi =
+        case manual_supply_title(attrs) do
+          # User-entered Supply no (trimmed); unique per company
+          {:manual, title} ->
+            Multi.new()
+            |> Multi.insert(:create_supply, fn _ ->
+              supply_position_changeset(attrs, title)
+            end)
+
+          # Blank / "...new..." → next gapless SUP-######
+          :auto ->
+            gapless_name = String.to_atom("update_gapless_doc" <> gen_temp_id())
+
+            Multi.new()
+            |> get_gapless_doc_id(gapless_name, "TradingSupply", "SUP", company)
+            |> Multi.insert(:create_supply, fn %{^gapless_name => doc} ->
+              supply_position_changeset(attrs, doc)
+            end)
+        end
+
+      multi
       |> Multi.run(:ensure_supplier_location, fn _, %{create_supply: supply} ->
         ensure_supplier_site_location(supply.supplier_id, company, user)
       end)
       |> Repo.transaction()
       |> unwrap_multi(:create_supply)
+    end
+  end
+
+  defp supply_position_changeset(attrs, title) do
+    attrs
+    |> Map.put("title", title)
+    |> then(&SupplyPosition.changeset(%SupplyPosition{}, &1))
+  end
+
+  # Returns {:manual, trimmed} when the user entered a Supply no; :auto when empty
+  # or the UI placeholder "...new..." so the system assigns a gapless SUP-######.
+  defp manual_supply_title(attrs) do
+    title =
+      attrs
+      |> Map.get("title")
+      |> to_string()
+      |> String.trim()
+
+    cond do
+      title == "" -> :auto
+      title == "...new..." -> :auto
+      true -> {:manual, title}
     end
   end
 

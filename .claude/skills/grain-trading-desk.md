@@ -156,6 +156,12 @@ Gapless per company via `gapless_doc_ids`:
 | Sales | `SAL-` | `title` (unique per company) |
 | Trip | `TRP-` | `reference_no` (immutable after create) |
 
+**Supply no on create:** the desk modal field is editable. If the user leaves it
+blank (or the UI placeholder `...new...`), `create_supply_position` assigns the
+next gapless `SUP-######`. If they type a value, that trimmed string is stored
+as `title` (still unique per company). After create the number is immutable
+(`update_supply_position` always restores the existing title).
+
 Unit always comes from **Good** — never stored on positions. Desk rows, trip form
 and print all render `good.unit` via the `good_unit` virtual; never hardcode "Mt".
 Qty columns are `planned` / `actual` (renamed from `planned_mt` / `actual_mt` in
@@ -270,7 +276,7 @@ back to an arity that "looks tidier".
 ## Gotchas
 
 1. **Warn-only oversell** — remaining can go negative; `trip_warnings/1` is advisory.
-2. **Title uniqueness** — SUP/SAL titles unique per company; do not free-edit after create without care (trip ref never changes).
+2. **Title uniqueness** — SUP/SAL titles unique per company; supply allows manual title on create only (blank → gapless); do not free-edit after create (trip ref never changes).
 3. **Loadable open supplies** — open is intentionally loadable and promotes to collect; do not treat open as non-loadable.
 4. **Sample data** — `Trading.SampleData` for demo seed; not production.
 5. **Order/Load/Delivery removed** from Product — trading replaced that logistics path for grain.

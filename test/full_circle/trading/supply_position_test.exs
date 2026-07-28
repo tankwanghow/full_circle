@@ -11,7 +11,7 @@ defmodule FullCircle.Trading.SupplyPositionTest do
     trading_setup()
   end
 
-  test "create open supply 100 MT; remaining is 100; supply no is system-generated", %{
+  test "create open supply 100 MT; remaining is 100; empty supply no is system-generated", %{
     admin: admin,
     company: company
   } do
@@ -36,6 +36,71 @@ defmodule FullCircle.Trading.SupplyPositionTest do
     assert s.title =~ ~r/^SUP-\d{6}$/
     assert Decimal.eq?(Balances.supply_remaining(s), Decimal.new("100"))
     assert Decimal.eq?(Balances.supply_loaded(s), Decimal.new(0))
+  end
+
+  test "create supply accepts manual supply no; blank/placeholder still auto", %{
+    admin: admin,
+    company: company
+  } do
+    contact = contact_fixture(company, admin)
+    good = good_fixture(company, admin)
+
+    assert {:ok, %SupplyPosition{} = manual} =
+             Trading.create_supply_position(
+               %{
+                 "title" => "  PO-8842  ",
+                 "quantity" => "25",
+                 "supplier_id" => contact.id,
+                 "good_id" => good.id
+               },
+               company,
+               admin
+             )
+
+    assert manual.title == "PO-8842"
+
+    assert {:ok, %SupplyPosition{} = auto} =
+             Trading.create_supply_position(
+               %{
+                 "title" => "",
+                 "quantity" => "10",
+                 "supplier_id" => contact.id,
+                 "good_id" => good.id
+               },
+               company,
+               admin
+             )
+
+    assert auto.title =~ ~r/^SUP-\d{6}$/
+
+    assert {:ok, %SupplyPosition{} = placeholder} =
+             Trading.create_supply_position(
+               %{
+                 "title" => "...new...",
+                 "quantity" => "5",
+                 "supplier_id" => contact.id,
+                 "good_id" => good.id
+               },
+               company,
+               admin
+             )
+
+    assert placeholder.title =~ ~r/^SUP-\d{6}$/
+
+    # Duplicate manual Supply no rejected
+    assert {:error, cs} =
+             Trading.create_supply_position(
+               %{
+                 "title" => "PO-8842",
+                 "quantity" => "1",
+                 "supplier_id" => contact.id,
+                 "good_id" => good.id
+               },
+               company,
+               admin
+             )
+
+    assert %{title: _} = errors_on(cs)
   end
 
   test "create supply auto-creates supplier site location when missing", %{

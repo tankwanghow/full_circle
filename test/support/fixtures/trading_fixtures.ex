@@ -36,8 +36,8 @@ defmodule FullCircle.TradingFixtures do
       "good_id" => good.id
     }
 
-    # title is system-generated (SUP-######); drop if passed so create assigns it
-    attrs = stringify_keys(attrs) |> Map.drop(["title"])
+    # title optional: blank → gapless SUP-######; pass "title" for a manual Supply no
+    attrs = stringify_keys(attrs)
 
     {:ok, supply} =
       Trading.create_supply_position(Map.merge(defaults, attrs), company, user)
