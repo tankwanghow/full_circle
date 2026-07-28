@@ -247,8 +247,14 @@ defmodule FullCircleWeb.CompanyLive.Form do
         %{"_target" => ["company", "closing_month"], "company" => %{"closing_month" => mth}},
         socket
       ) do
-    {:noreply, assign(socket, closing_days: closing_days(String.to_integer(mth)))}
+    month = parse_int(mth)
+
+    {:noreply,
+     socket
+     |> assign(closing_days: closing_days(month))
+     |> clamp_closing_day(month)}
   end
+
 
   @impl true
   def handle_event("validate", %{"company" => params}, socket) do
@@ -338,15 +344,35 @@ defmodule FullCircleWeb.CompanyLive.Form do
     end
   end
 
-  defp closing_days(mth) do
-    th31 = [1, 3, 5, 7, 8, 10, 12]
-    th30 = [4, 6, 9, 11]
+  defp closing_days(mth), do: Company.closing_day_options(mth)
 
-    cond do
-      !is_nil(Enum.find(th31, fn x -> x == mth end)) -> Enum.to_list(1..31)
-      !is_nil(Enum.find(th30, fn x -> x == mth end)) -> Enum.to_list(1..30)
-      mth == 2 -> Enum.to_list(1..28)
-      true -> []
+  # Narrowing the month can strand the chosen day outside the new option list.
+  # Left alone the select renders with nothing selected, the browser quietly
+  # falls back to its first option, and the user ends up with day 1 without
+  # being told. Pull it down to the last day of the month instead — that is what
+  # someone who picked the 30th or 31st meant.
+  defp clamp_closing_day(socket, month) do
+    max = Company.days_in_closing_month(month)
+    form = socket.assigns.form
+    day = parse_int(form[:closing_day].value)
+
+    if is_integer(max) and is_integer(day) and day > max do
+      changeset = Ecto.Changeset.put_change(form.source, :closing_day, max)
+      assign(socket, form: to_form(changeset))
+    else
+      socket
     end
   end
+
+  defp parse_int(value) when is_integer(value), do: value
+
+  defp parse_int(value) when is_binary(value) do
+    case Integer.parse(value) do
+      {int, ""} -> int
+      _ -> nil
+    end
+  end
+
+  defp parse_int(_), do: nil
+
 end

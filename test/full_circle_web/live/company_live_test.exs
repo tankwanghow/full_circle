@@ -223,6 +223,41 @@ defmodule FullCircleWeb.CompanyLiveTest do
       assert html =~ "janco"
     end
 
+    # The other half of the closing-day rule: the select alone cannot hold the
+    # line, because narrowing the month strands the chosen day outside the new
+    # option list. Left alone the browser silently falls back to day 1.
+    test "narrowing the closing month pulls an out-of-range day back into range", %{
+      conn: conn,
+      user: user,
+      comp1: comp1
+    } do
+      jan_co = company_fixture(user, %{name: "janco30", closing_month: 1, closing_day: 30})
+      conn = conn |> put_session(:current_company, comp1)
+      {:ok, lv, _html} = live(conn, ~p"/edit_company/#{jan_co.id}")
+
+      html =
+        lv
+        |> element("#company")
+        |> render_change(%{
+          "_target" => ["company", "closing_month"],
+          "company" => %{"closing_month" => "2"}
+        })
+
+      doc = LazyHTML.from_fragment(html)
+      options = doc |> LazyHTML.query("#company_closing_day option") |> LazyHTML.attribute("value")
+
+      assert "28" in options
+      refute "29" in options
+      refute "30" in options
+
+      selected =
+        doc
+        |> LazyHTML.query("#company_closing_day option[selected]")
+        |> LazyHTML.attribute("value")
+
+      assert selected == ["28"], "expected the day to clamp to 28, got #{inspect(selected)}"
+    end
+
     test "save valid company", %{conn: conn, comp: comp, comp1: comp1} do
       conn = conn |> put_session(:current_company, comp1)
       {:ok, lv, _html} = live(conn, ~p"/edit_company/#{comp.id}")

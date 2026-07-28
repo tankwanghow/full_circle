@@ -32,11 +32,7 @@ defmodule FullCircle.SysFixtures do
     )
   end
 
-  # Mirrors CompanyLive.Form.closing_days/1. February stops at 28 so a closing
-  # day never lands on a date that only exists in leap years.
-  defp days_in_closing_month(month) when month in [1, 3, 5, 7, 8, 10, 12], do: 31
-  defp days_in_closing_month(month) when month in [4, 6, 9, 11], do: 30
-  defp days_in_closing_month(2), do: 28
+  defdelegate days_in_closing_month(month), to: FullCircle.Sys.Company
 
   def company_fixture(attrs \\ %{}),
     do: company_fixture(FullCircle.UserAccountsFixtures.user_fixture(), attrs)

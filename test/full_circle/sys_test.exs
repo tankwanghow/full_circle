@@ -7,6 +7,44 @@ defmodule FullCircle.SysTest do
     import FullCircle.SysFixtures
     import FullCircle.UserAccountsFixtures
 
+    test "closing day must exist in the closing month" do
+      user = user_fixture()
+
+      assert {:error, :create_company, cs, _} =
+               Sys.create_company(
+                 valid_company_attributes(%{closing_month: 2, closing_day: 30}),
+                 user
+               )
+
+      assert "only 1 to 28 in month 2" in errors_on(cs).closing_day
+    end
+
+    test "a closing day valid for the month is accepted" do
+      user = user_fixture()
+
+      assert {:ok, com} =
+               Sys.create_company(
+                 valid_company_attributes(%{closing_month: 2, closing_day: 28}),
+                 user
+               )
+
+      assert com.closing_month == 2
+      assert com.closing_day == 28
+    end
+
+    # The whole point of the rule: the year-end boundary is rebuilt for an
+    # arbitrary year with Date.new!/3, which raises on a date that never was.
+    test "an impossible closing date would break the year-end boundary" do
+      user = user_fixture()
+      com = company_fixture(user, %{closing_month: 2, closing_day: 28})
+
+      assert %Date{} = FullCircle.Reporting.prev_close_date(~D[2026-07-28], com)
+
+      assert_raise ArgumentError, fn ->
+        FullCircle.Reporting.prev_close_date(~D[2026-07-28], %{com | closing_day: 30})
+      end
+    end
+
     test "default accounts should have" do
       defaults = Sys.default_accounts()
       assert Enum.count(defaults) == 9
