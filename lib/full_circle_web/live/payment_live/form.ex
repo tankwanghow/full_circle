@@ -23,6 +23,9 @@ defmodule FullCircleWeb.PaymentLive.Form do
      |> assign(query_match_trans: [])
      |> assign(details_got_error: false)
      |> assign(matchers_got_error: false)
+     |> assign_new(:e_inv_supplier_ids, fn -> nil end)
+     |> assign_new(:e_inv_payable, fn -> nil end)
+     |> assign_new(:e_inv_preview, fn -> nil end)
      |> assign(
        settings:
          FullCircle.Sys.load_settings(
@@ -31,6 +34,42 @@ defmodule FullCircleWeb.PaymentLive.Form do
            socket.assigns.current_user
          )
      )}
+  end
+
+  defp mount_new(socket, %{"obj" => obj}) when is_binary(obj) do
+    com = socket.assigns.current_company
+    user = socket.assigns.current_user
+
+    seed =
+      Jason.decode!(obj)
+      |> FullCircle.EInvMetas.Prefill.build(com, user, :payment_details)
+
+    attrs =
+      seed.attrs
+      |> Map.merge(%{
+        payment_no: "...new...",
+        payment_date: seed.issue_date,
+        # LHDN's payable is what this payment settles — it equalled funds_amount
+        # on every payment already matched to a received invoice.
+        funds_amount: seed.payable
+      })
+      |> put_funds_account(com, user)
+
+    socket
+    |> assign(live_action: :new)
+    |> assign(id: "new")
+    |> assign(page_title: gettext("New Payment"))
+    |> assign_egg_link(%{}, :purchase)
+    |> assign(e_inv_supplier_ids: seed.supplier_ids)
+    |> assign(e_inv_payable: seed.payable)
+    |> assign(e_inv_preview: seed.preview)
+    |> then(fn s ->
+      case Enum.reject(seed.warnings, &is_nil/1) do
+        [] -> s
+        msgs -> put_flash(s, :warn, Enum.join(msgs, " "))
+      end
+    end)
+    |> assign(:form, to_form(BillPay.make_changeset(Payment, %Payment{}, attrs, com, user)))
   end
 
   defp mount_new(socket, params) do
@@ -138,6 +177,56 @@ defmodule FullCircleWeb.PaymentLive.Form do
     |> Enum.reject(&is_nil/1)
   end
 
+  # The e-invoice cannot say which bank or cash account paid it, so fall back to
+  # history — and only when the supplier has only ever been paid from one.
+  defp put_funds_account(%{contact_id: contact_id} = attrs, com, user)
+       when not is_nil(contact_id) do
+    case BillPay.sole_funds_account_name(contact_id, com) do
+      nil ->
+        attrs
+
+      name ->
+        account = Accounting.get_account_by_name(name, com, user)
+
+        Map.merge(attrs, %{
+          funds_account_name: name,
+          funds_account_id: account && account.id
+        })
+    end
+  end
+
+  defp put_funds_account(attrs, _com, _user), do: attrs
+
+  # Compare the keyed detail lines against what the supplier declared to LHDN.
+  # funds_amount is seeded from the same figure, so the lines are the part that
+  # can drift.
+  defp e_inv_variance(form, payable) do
+    form.source
+    |> Ecto.Changeset.fetch_field!(:payment_detail_amount)
+    |> FullCircle.EInvMetas.Prefill.variance(payable)
+  end
+
+  # After a payment is created from an e-invoice, stamp the supplier's TIN and
+  # BRN onto the contact if it has none, so the next e-invoice from them resolves
+  # on identifier instead of on a name spelling that may never match.
+  defp maybe_learn_supplier_ids(socket, obj) do
+    case socket.assigns[:e_inv_supplier_ids] do
+      {tin, brn} ->
+        Accounting.learn_contact_identifiers(
+          obj.contact_id,
+          tin,
+          brn,
+          socket.assigns.current_company,
+          socket.assigns.current_user
+        )
+
+      _ ->
+        nil
+    end
+
+    socket
+  end
+
   defp mount_edit(socket, id) do
     object =
       BillPay.get_payment!(
@@ -160,6 +249,11 @@ defmodule FullCircleWeb.PaymentLive.Form do
     |> assign(id: id)
     |> assign(page_title: gettext("Edit Payment") <> " " <> object.payment_no)
     |> assign(:form, to_form(cs))
+  end
+
+  @impl true
+  def handle_event("close_e_inv_preview", _, socket) do
+    {:noreply, socket |> assign(e_inv_preview: nil)}
   end
 
   @impl true
@@ -458,7 +552,10 @@ defmodule FullCircleWeb.PaymentLive.Form do
            socket.assigns.current_user
          ) do
       {:ok, %{create_payment: obj}} ->
-        socket = maybe_attach_egg_planned(socket, obj, params)
+        socket =
+          socket
+          |> maybe_attach_egg_planned(obj, params)
+          |> maybe_learn_supplier_ids(obj)
 
         {:noreply,
          socket
@@ -740,6 +837,20 @@ defmodule FullCircleWeb.PaymentLive.Form do
           current_user={@current_user}
         />
 
+        <div :if={@e_inv_payable} class="flex flex-row mt-1">
+          <% variance = e_inv_variance(@form, @e_inv_payable) %>
+          <div class="grow"></div>
+          <div class={[
+            "text-right px-1",
+            if(variance, do: "text-red-600 font-semibold", else: "text-green-600")
+          ]}>
+            {gettext("E-Invoice")} {@e_inv_payable |> Number.Delimit.number_to_delimited()}
+            <span :if={variance} class="text-xs">
+              ({gettext("details out by")} {variance |> Number.Delimit.number_to_delimited()})
+            </span>
+          </div>
+        </div>
+
         <div class="flex justify-center gap-x-1 mt-1">
           <.form_action_button
             form={@form}
@@ -781,6 +892,115 @@ defmodule FullCircleWeb.PaymentLive.Form do
           />
         </div>
       </.form>
+
+      <div
+        :if={@live_action == :new and @e_inv_preview}
+        class="mt-4 border rounded-lg border-blue-500 bg-blue-50 p-4"
+      >
+        <div class="flex justify-between items-center mb-3">
+          <p class="text-xl font-medium">{gettext("E-Invoice Document")}</p>
+          <.link phx-click="close_e_inv_preview" class="orange button text-sm">
+            {gettext("Close")}
+          </.link>
+        </div>
+        <%= case @e_inv_preview do %>
+          <% {:ok, parsed} -> %>
+            <div class="grid grid-cols-2 gap-4 text-sm">
+              <div class="border rounded p-3 bg-white">
+                <p class="font-bold mb-2">{gettext("Supplier")}</p>
+                <p class="font-medium">{parsed.supplier_name}</p>
+                <p>TIN: {parsed.supplier_tin}</p>
+                <p>BRN: {parsed.supplier_brn}</p>
+              </div>
+              <div class="border rounded p-3 bg-white">
+                <p class="font-bold mb-2">{gettext("Document Info")}</p>
+                <p><span class="font-bold">{gettext("Internal ID")}:</span> {parsed.internal_id}</p>
+                <p><span class="font-bold">{gettext("Issue Date")}:</span> {parsed.issue_date}</p>
+                <p><span class="font-bold">{gettext("Currency")}:</span> {parsed.currency}</p>
+                <p><span class="font-bold">{gettext("Type")}:</span> {parsed.type_code}</p>
+              </div>
+            </div>
+            <div class="mt-3 border rounded p-3 bg-white text-sm">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="border-b font-bold">
+                    <th class="text-left p-1">#</th>
+                    <th class="text-left p-1">{gettext("Description")}</th>
+                    <th class="text-right p-1">{gettext("Qty")}</th>
+                    <th class="text-left p-1">{gettext("Unit")}</th>
+                    <th class="text-right p-1">{gettext("Unit Price")}</th>
+                    <th class="text-right p-1">{gettext("Discount")}</th>
+                    <th class="text-right p-1">{gettext("Amount")}</th>
+                    <th class="text-right p-1">{gettext("Tax%")}</th>
+                    <th class="text-right p-1">{gettext("Tax")}</th>
+                    <th class="text-left p-1">{gettext("Tax Type")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <%= for {line, idx} <- Enum.with_index(parsed.invoice_lines, 1) do %>
+                    <tr class="border-b">
+                      <td class="p-1">{idx}</td>
+                      <td class="p-1">{line.descriptions}</td>
+                      <td class="text-right p-1">
+                        {:erlang.float_to_binary(line.quantity / 1, decimals: 2)}
+                      </td>
+                      <td class="p-1">{line.unit}</td>
+                      <td class="text-right p-1">
+                        {:erlang.float_to_binary(line.unit_price / 1, decimals: 2)}
+                      </td>
+                      <td class="text-right p-1">
+                        {:erlang.float_to_binary(line.discount / 1, decimals: 2)}
+                      </td>
+                      <td class="text-right p-1">
+                        {:erlang.float_to_binary(
+                          (line.quantity * line.unit_price - line.discount) / 1,
+                          decimals: 2
+                        )}
+                      </td>
+                      <td class="text-right p-1">
+                        {:erlang.float_to_binary(line.tax_rate / 1, decimals: 2)}
+                      </td>
+                      <td class="text-right p-1">
+                        {:erlang.float_to_binary(
+                          Float.round(
+                            (line.quantity * line.unit_price - line.discount) * line.tax_rate / 100,
+                            2
+                          ) / 1,
+                          decimals: 2
+                        )}
+                      </td>
+                      <td class="p-1">{line.tax_code_id_lhdn} ({line.tax_scheme})</td>
+                    </tr>
+                  <% end %>
+                </tbody>
+              </table>
+              <% subtotal =
+                Enum.reduce(parsed.invoice_lines, 0.0, fn line, acc ->
+                  acc + (line.quantity * line.unit_price - line.discount)
+                end)
+
+              tax =
+                Enum.reduce(parsed.invoice_lines, 0.0, fn line, acc ->
+                  acc +
+                    Float.round(
+                      (line.quantity * line.unit_price - line.discount) * line.tax_rate / 100,
+                      2
+                    )
+                end) %>
+              <div class="flex justify-end gap-6 mt-2 font-bold">
+                <span>
+                  {gettext("Subtotal")}: {:erlang.float_to_binary(subtotal / 1, decimals: 2)}
+                </span>
+                <span>{gettext("Tax")}: {:erlang.float_to_binary(tax / 1, decimals: 2)}</span>
+                <span>
+                  {gettext("Total")}: {:erlang.float_to_binary((subtotal + tax) / 1, decimals: 2)}
+                </span>
+              </div>
+            </div>
+          <% {:error, reason} -> %>
+            <div class="text-red-600 font-bold">{reason}</div>
+        <% end %>
+      </div>
     </div>
     <.live_component
       module={FullCircleWeb.ReceiptLive.QryMatcherComponent}

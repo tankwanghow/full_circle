@@ -1,17 +1,50 @@
 ---
 name: e-invoice-bill-prefill
-description: Use when working on creating a PurInvoice from a received LHDN e-invoice — PurInvoiceLive.Form.mount_new/2 seeding, supplier resolution by TIN/BRN, good pre-fill from supplier history or line description, the total variance guard, and the quantity/packaging/tax traps in seeded lines.
+description: Use when working on creating a PurInvoice or a Payment from a received LHDN e-invoice — the shared FullCircle.EInvMetas.Prefill module, supplier resolution by TIN/BRN, good pre-fill from supplier history or line description, funds-account pre-fill, the total variance guard, and the quantity/packaging/tax traps in seeded lines.
 ---
 
-# Seeding a Purchase Invoice from a Received E-Invoice
+# Seeding a Purchase Document from a Received E-Invoice
 
-"New Pur Invoice" on a received e-invoice row
-(`e_inv_list_live/index_received_component.ex`) navigates to
-`/PurInvoice/new?obj=<einvoice json>`. `PurInvoiceLive.Form.mount_new/2` then
-fetches the full document from LHDN, parses it, and seeds the form.
+"New Pur Invoice" and "New Payment" on a received e-invoice row
+(`e_inv_list_live/index_received_component.ex`) navigate to
+`/PurInvoice/new?obj=<einvoice json>` or `/Payment/new?obj=…`. Both forms call
+**`FullCircle.EInvMetas.Prefill.build/4`**, which fetches the full document from
+LHDN, parses it, and returns seeded attrs plus the payable, the preview and any
+warnings. The caller supplies only its own field names — `pur_invoice_no` /
+`pur_invoice_date` / `due_date`, or `payment_no` / `payment_date` /
+`funds_amount`.
+
+One implementation is deliberate: `PaymentDetail` is field-identical to
+`PurInvoiceDetail`, down to the same `validate_required` list, so every rule and
+every trap below applies to both — and the traps are **silent**, so a divergent
+copy would not fail loudly.
 
 For the sync/match/reconcile side of e-invoices see `e-invoice-sync.md`. This
 skill is only about the data-entry path.
+
+## Payment only makes sense for *received* Invoices
+
+Roughly 60% of payments carry an `e_inv_uuid`, but **1,733 of 1,826 are
+self-billed invoices the company issued**, not supplier invoices. For those the
+flow runs the other way: `get_internal_document("Self-billed Invoice", "Sent", …)`
+finds a Payment by `payment_no`, because the self-bill is submitted to LHDN
+using the payment's own number. **The Payment exists first — never prefill one
+from a self-billed e-invoice.**
+
+Only ~92 payments (about 15/month, a practice that started 2026-01) come from a
+received supplier Invoice: a direct expense paid immediately with no PurInvoice,
+91 of 92 carrying detail lines rather than matchers. The scoping is structural —
+"New Payment" appears only on the *received* listing; the sent listing offers
+New Invoice / New Receipt.
+
+Payment-specific seeding:
+
+- `funds_amount` ← the LHDN payable. It equalled `funds_amount` on every
+  received-matched payment checked.
+- `funds_account` ← `BillPay.sole_funds_account_name/2`, only when the supplier
+  has only ever been paid from one account: **98.7% right, covering 56%** of
+  payments. Taking the most recently used account instead is 92% right, which is
+  not good enough for choosing a bank. (88 of the 92 are `Cash In Hand`.)
 
 ## Supplier: identifiers first, name last
 
@@ -40,7 +73,7 @@ enough to attach a bill to the wrong supplier silently.
 
 ## Goods: seed only when it is safe
 
-`put_goods/3` fills the good, which is the pivot field — choosing it carries the
+`Prefill` fills the good, which is the pivot field — choosing it carries the
 purchase account, tax code, unit and multiplier with it. Two rules, in order:
 
 1. **Supplier has only ever sold one good** (`Billing.sole_purchased_good_name/2`)
@@ -102,8 +135,11 @@ deliberate choice. (On the sole-good path the packaging is seeded; it is right
 
 ## The total variance guard
 
-The parsed `total_payable_amount` is displayed under the invoice total, green
-when the keyed lines agree and red with the difference when they do not. It is
+The parsed `total_payable_amount` is displayed under the document total, green
+when the keyed lines agree and red with the difference when they do not
+(`Prefill.variance/2`). On a Payment it is compared against
+`payment_detail_amount`, not `funds_amount` — the latter is seeded from the same
+LHDN figure, so only the lines can drift. It is
 the right anchor: 96.8% of historical bills match it exactly, versus 91.4% for
 `totalNetAmount` and 89.2% for `totalExcludingTax`.
 
@@ -125,6 +161,8 @@ until that line is added.
 - `mount_new/2` runs on both the disconnected and the connected mount, so each
   click costs **two** LHDN Get Document calls (60 RPM limit). Guard with
   `connected?(socket)` if this ever matters.
+- A map literal cannot put `key: value` shorthand before a dynamic `key => value`
+  entry, which `Prefill` needs for `detail_key`. The dynamic entry comes first.
 - The e-invoice preview panel below the form is fed from the document already
   fetched in `mount_new/2`. The "Show E-Invoice" button re-fetches; it renders
   only `when is_nil(@e_inv_preview)`, so it hides itself.

@@ -243,4 +243,60 @@ defmodule FullCircle.BillPayTest do
       assert length(results) >= 1
     end
   end
+
+  describe "sole_funds_account_name/2" do
+    setup %{admin: admin, company: company} do
+      pur_acct = Accounting.get_account_by_name("General Purchases", company, admin)
+
+      no_ptax =
+        Repo.one!(from tc in TaxCode, where: tc.company_id == ^company.id and tc.code == "NoPTax")
+
+      pay = fn contact, funds_acct ->
+        {:ok, _} =
+          BillPay.create_payment(
+            payment_attrs(
+              contact,
+              good_fixture(company, admin),
+              pur_acct,
+              no_ptax,
+              funds_acct,
+              tax_rate: "0"
+            ),
+            company,
+            admin
+          )
+      end
+
+      %{pay: pay}
+    end
+
+    test "returns the account when the supplier has only ever been paid from one", %{
+      admin: admin,
+      company: company,
+      pay: pay
+    } do
+      contact = contact_fixture(company, admin)
+      funds = pay_funds_account_fixture(company, admin)
+      pay.(contact, funds)
+      pay.(contact, funds)
+
+      assert BillPay.sole_funds_account_name(contact.id, company) == funds.name
+    end
+
+    test "returns nil once two different accounts have been used", %{
+      admin: admin,
+      company: company,
+      pay: pay
+    } do
+      contact = contact_fixture(company, admin)
+      pay.(contact, pay_funds_account_fixture(company, admin))
+      pay.(contact, pay_funds_account_fixture(company, admin))
+
+      refute BillPay.sole_funds_account_name(contact.id, company)
+    end
+
+    test "returns nil for a contact never paid", %{admin: admin, company: company} do
+      refute BillPay.sole_funds_account_name(contact_fixture(company, admin).id, company)
+    end
+  end
 end
