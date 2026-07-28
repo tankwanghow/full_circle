@@ -74,7 +74,12 @@
       "Bash(sed -n '8,60p' lib/full_circle_web/live/time_attend_live/punch_card.ex)",
       "Bash(git stash *)",
       "WebFetch(domain:www.hasil.gov.my)",
-      "WebFetch(domain:www.perkeso.gov.my)"
+      "WebFetch(domain:www.perkeso.gov.my)",
+      "Skill(code-review)",
+      "Skill(code-review:*)",
+      "Bash(git status *)",
+      "Bash(perl -0pi -e 's/\\\\n    params\\\\n    \\\\|> resolve_all_line_typeaheads\\\\\\(company, user\\\\\\)\\\\n    \\\\|> clear_crew_if_not_crew_mode\\\\\\(\\\\\\)\\\\n/\\\\n    resolve_all_line_typeaheads\\(params, company, user\\)\\\\n/' lib/full_circle_web/live/trading_desk_live/trip_form_component.ex)",
+      "Bash(perl -0pi -e 's/      \\\\|> resolve_all_line_typeaheads\\\\\\(company, user\\\\\\)\\\\n      \\\\|> clear_crew_if_not_crew_mode\\\\\\(\\\\\\)\\\\n/      |> resolve_all_line_typeaheads\\(company, user\\)\\\\n/' lib/full_circle_web/live/trading_desk_live/trip_form_component.ex)"
     ]
   },
   "hooks": {
