@@ -27,7 +27,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
      |> assign(autosave_delay: autosave_delay)
      |> assign(save_status: nil)
      |> assign(dow_kind: "sales")
-     |> assign(dow: Date.day_of_week(Date.utc_today()))
+     |> assign(dow: Date.day_of_week(today()))
      |> assign(page_title: gettext("Egg Stock"))}
   end
 
@@ -39,9 +39,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
     grades = EggStock.list_grades(company.id)
     grade_names = Enum.map(grades, & &1.name)
     grade_labels = Map.new(grades, fn g -> {g.name, g.nickname || g.name} end)
-    today = Date.utc_today()
-    editable = Date.compare(date, today) != :lt
-    is_future = Date.compare(date, today) == :gt
+    editable = Date.compare(date, today()) != :lt
 
     {:noreply,
      socket
@@ -50,34 +48,34 @@ defmodule FullCircleWeb.EggStockLive.Form do
        grades: grades,
        grade_names: grade_names,
        grade_labels: grade_labels,
-       editable: editable,
-       is_future: is_future
+       editable: editable
      )
      |> load_tab_data(socket.assigns.active_tab)}
   end
 
-  defp parse_date(nil), do: Date.utc_today()
+  # Single source of "today" for this page. Change this one line to simulate
+  # another day in development.
+  defp today, do: Date.utc_today()
+
+  # The board never goes past today: nav_date, the date picker and a hand-typed
+  # URL all reach handle_params through here, so this is the only clamp needed.
+  defp parse_date(nil), do: today()
 
   defp parse_date(date_str) do
     case Date.from_iso8601(date_str) do
-      {:ok, date} -> date
-      _ -> Date.utc_today()
+      {:ok, date} -> Enum.min([date, today()], Date)
+      _ -> today()
     end
   end
 
   defp load_tab_data(socket, "now") do
     company = socket.assigns.current_company
     date = socket.assigns.date
-    is_future = socket.assigns.is_future
     lookback_days = socket.assigns.lookback_days
 
     case EggStock.get_or_create_day(company.id, date) do
       {:ok, day} ->
-        if is_future do
-          load_future_day(socket, day, company, date, lookback_days)
-        else
-          load_today_or_past_day(socket, day, company, date, lookback_days)
-        end
+        load_today_or_past_day(socket, day, company, date, lookback_days)
 
       {:error, _cs} ->
         socket |> put_flash(:error, gettext("Failed to load day data"))
@@ -89,7 +87,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
     date = socket.assigns.date
     lookback_days = socket.assigns.lookback_days
 
-    forecast = EggStock.compute_7day_forecast(company.id, date, lookback_days)
+    forecast = EggStock.compute_7day_forecast(company.id, date, lookback_days, today())
     assign(socket, forecast: forecast)
   end
 
@@ -118,41 +116,6 @@ defmodule FullCircleWeb.EggStockLive.Form do
     |> assign(dow_kind: kind)
     |> assign(dow_lines: lines)
     |> assign(dow_params: dow_lines_to_params(lines))
-  end
-
-  defp load_future_day(socket, day, company, date, lookback_days) do
-    est_opening = EggStock.compute_estimated_opening(company.id, date, lookback_days)
-    est_production = EggStock.compute_avg_production(company.id, lookback_days)
-    est_harvest = EggStock.compute_avg_harvest(company.id, lookback_days)
-
-    day = %{day | opening_bal: est_opening}
-    day = seed_planned_details_from_book(day, company.id, date)
-
-    planned_sales = planned_rows_from_day(day, :sales)
-    planned_purchases = planned_rows_from_day(day, :purchase)
-
-    est_closing =
-      compute_est_closing(
-        est_opening,
-        est_production,
-        planned_sales,
-        planned_purchases,
-        socket.assigns.grade_names
-      )
-
-    socket
-    |> assign(
-      day: day,
-      est_opening: est_opening,
-      est_production: est_production,
-      est_harvest: est_harvest,
-      est_closing: est_closing,
-      actual_sales: [],
-      actual_purchases: [],
-      harvested: 0,
-      yesterday_ug: 0
-    )
-    |> assign_day_form(day)
   end
 
   defp load_today_or_past_day(socket, day, company, date, lookback_days) do
@@ -246,7 +209,6 @@ defmodule FullCircleWeb.EggStockLive.Form do
       actual_purchases: actual_purchases,
       harvested: harvested,
       yesterday_ug: yesterday_ug,
-      est_opening: nil,
       est_production: est_production,
       est_harvest: est_harvest,
       est_closing: est_closing
@@ -550,7 +512,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
       when kind in ["sales", "purchase"] and is_binary(date_str) and date_str != "" do
     case Date.from_iso8601(date_str) do
       {:ok, date} ->
-        if Date.compare(date, Date.utc_today()) == :eq do
+        if Date.compare(date, today()) == :eq do
           handle_event("goto_date", %{"date" => date_str}, socket)
         else
           socket = flush_autosave(socket)
@@ -729,14 +691,9 @@ defmodule FullCircleWeb.EggStockLive.Form do
 
         socket =
           if socket.assigns[:est_production] do
-            opening =
-              if socket.assigns.is_future,
-                do: socket.assigns.est_opening,
-                else: socket.assigns.day.opening_bal
-
             est_closing =
               compute_est_closing_from_params(
-                opening,
+                socket.assigns.day.opening_bal,
                 socket.assigns.est_production,
                 params,
                 socket.assigns.grade_names
@@ -1226,14 +1183,9 @@ defmodule FullCircleWeb.EggStockLive.Form do
 
     socket =
       if socket.assigns[:est_production] do
-        opening =
-          if socket.assigns.is_future,
-            do: socket.assigns.est_opening,
-            else: socket.assigns.day.opening_bal
-
         est_closing =
           compute_est_closing_from_params(
-            opening,
+            socket.assigns.day.opening_bal,
             socket.assigns.est_production,
             params,
             socket.assigns.grade_names
@@ -1377,6 +1329,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
             name="date"
             id="egg-stock-date"
             value={Date.to_iso8601(@date)}
+            max={Date.to_iso8601(today())}
             class="text-lg font-semibold border border-gray-300 rounded px-2 py-1 cursor-pointer hover:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
             title={gettext("Pick a date")}
           />
@@ -1385,7 +1338,8 @@ defmodule FullCircleWeb.EggStockLive.Form do
           type="button"
           phx-click="nav_date"
           phx-value-dir="next"
-          class="px-2 py-1 text-lg font-bold text-gray-600 hover:text-blue-600"
+          disabled={Date.compare(@date, today()) != :lt}
+          class="px-2 py-1 text-lg font-bold text-gray-600 hover:text-blue-600 disabled:text-gray-300 disabled:hover:text-gray-300"
         >
           <.icon name="hero-chevron-right" class="h-5 w-5" />
         </button>
@@ -1415,12 +1369,10 @@ defmodule FullCircleWeb.EggStockLive.Form do
           grades={@grade_names}
           grade_labels={@grade_labels}
           editable={@editable}
-          is_future={@is_future}
           actual_sales={@actual_sales}
           actual_purchases={@actual_purchases}
           harvested={@harvested}
           yesterday_ug={@yesterday_ug}
-          est_opening={@est_opening}
           est_production={@est_production}
           est_harvest={@est_harvest}
           est_closing={@est_closing}
@@ -1767,20 +1719,12 @@ defmodule FullCircleWeb.EggStockLive.Form do
           </div>
         </div>
 
-        <%!-- Today / Future --%>
+        <%!-- Today --%>
         <div :if={@editable}>
           <.summary_row
-            :if={!@is_future}
             label={gettext("Opening")}
             grades={@grades}
             values={@day.opening_bal || %{}}
-            bg="bg-gray-100"
-          />
-          <.summary_row
-            :if={@is_future}
-            label={gettext("Est Opening")}
-            grades={@grades}
-            values={@est_opening || %{}}
             bg="bg-gray-100"
           />
 
@@ -1828,12 +1772,6 @@ defmodule FullCircleWeb.EggStockLive.Form do
               bg="bg-green-50"
             />
 
-            <div :if={@is_future} class="flex gap-1 mb-1">
-              <div class="w-12 shrink-0"></div>
-              <div class="w-56 font-bold text-sm py-1">{gettext("Est Harvest")}</div>
-              <div class="w-20 text-center border rounded px-2 py-1 bg-amber-50">{@est_harvest}</div>
-            </div>
-
             <.summary_row
               :if={@est_closing}
               label={gettext("Est Closing")}
@@ -1842,7 +1780,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
               bg="bg-purple-50"
             />
 
-            <div :if={!@is_future}>
+            <div>
               <.expired_closing_block form={@form} grades={@grades} />
               <.production_block
                 day={@day}
@@ -1866,7 +1804,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
             <.note_block form={@form} />
           </.form>
 
-          <div :if={!@is_future} class="flex justify-end mt-2">
+          <div class="flex justify-end mt-2">
             <a
               href={~p"/companies/#{@current_company.id}/EggStock/#{Date.to_iso8601(@date)}/print"}
               target="_blank"
@@ -2460,7 +2398,8 @@ defmodule FullCircleWeb.EggStockLive.Form do
           grade_labels={@grade_labels}
           value_key={:closing}
           row_hover="hover:bg-blue-100"
-          row_click="goto_date"
+          row_click="goto_weekly"
+          row_kind="sales"
         />
 
         <.forecast_table

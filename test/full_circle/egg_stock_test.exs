@@ -252,7 +252,59 @@ defmodule FullCircle.EggStockTest do
         )
 
       assert EggStock.day_has_planned_sales?(day)
-      assert EggStock.planned_sales_totals(company.id, monday)["AA"] == 3
+      assert EggStock.planned_sales_totals(company.id, monday, nil, monday)["AA"] == 3
+    end
+
+    test "book wins over day lines for dates after today", %{
+      company: company,
+      admin: admin,
+      contact: contact
+    } do
+      today = ~D[2026-07-20]
+      future = ~D[2026-07-27]
+      assert Date.day_of_week(future) == 1
+
+      {:ok, _} =
+        EggStock.save_dow_lines(
+          company.id,
+          :sales,
+          1,
+          [
+            %{
+              "id" => "",
+              "contact_id" => contact.id,
+              "contact_name" => contact.name,
+              "quantities" => %{"AA" => "100"},
+              "delete" => "false"
+            }
+          ],
+          company,
+          admin
+        )
+
+      {:ok, day} = EggStock.get_or_create_day(company.id, future)
+
+      {:ok, _} =
+        EggStock.save_day(
+          day,
+          %{
+            "egg_stock_day_details" => %{
+              "0" => %{
+                "section" => "planned_order",
+                "contact_id" => contact.id,
+                "contact_name" => contact.name,
+                "quantities" => %{"AA" => "3"},
+                "ignore" => "false"
+              }
+            }
+          },
+          company,
+          admin
+        )
+
+      rows = EggStock.planned_sales_for_date(company.id, future, today)
+      assert Enum.map(rows, & &1.source) == [:book]
+      assert EggStock.planned_sales_totals(company.id, future, nil, today)["AA"] == 100
     end
 
     test "copy_dow_book_to_day and clear_day_planned_section", %{
@@ -348,6 +400,69 @@ defmodule FullCircle.EggStockTest do
       # Est closing = 100 + 100 + 0 - 10 = 190
       assert first.closing["AA"] == 190
       assert first.purchases["AA"] == 0
+    end
+
+    test "future rows follow the book even when the day has saved planned lines", %{
+      company: company,
+      admin: admin,
+      contact: contact
+    } do
+      today = ~D[2026-07-20]
+      wednesday = ~D[2026-07-22]
+      assert Date.day_of_week(wednesday) == 3
+
+      {:ok, prev} = EggStock.get_or_create_day(company.id, Date.add(today, -1))
+
+      {:ok, _} =
+        EggStock.save_day(
+          prev,
+          %{"closing_bal" => %{"AA" => "100"}, "expired" => %{}, "ungraded_bal" => "0"},
+          company,
+          admin
+        )
+
+      {:ok, _} =
+        EggStock.save_dow_lines(
+          company.id,
+          :sales,
+          3,
+          [
+            %{
+              "id" => "",
+              "contact_id" => contact.id,
+              "contact_name" => contact.name,
+              "quantities" => %{"AA" => "50"},
+              "delete" => "false"
+            }
+          ],
+          company,
+          admin
+        )
+
+      {:ok, day} = EggStock.get_or_create_day(company.id, wednesday)
+
+      {:ok, _} =
+        EggStock.save_day(
+          day,
+          %{
+            "egg_stock_day_details" => %{
+              "0" => %{
+                "section" => "planned_order",
+                "contact_id" => contact.id,
+                "contact_name" => contact.name,
+                "quantities" => %{"AA" => "5"},
+                "ignore" => "false"
+              }
+            }
+          },
+          company,
+          admin
+        )
+
+      forecast = EggStock.compute_7day_forecast(company.id, today, 2, today)
+      row = Enum.find(forecast, &(&1.date == wednesday))
+
+      assert row.sales["AA"] == 50
     end
   end
 

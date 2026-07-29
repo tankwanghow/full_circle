@@ -391,16 +391,19 @@ defmodule FullCircle.EggStock do
   def day_has_planned_sales?(day), do: day_has_planned_section?(day, @planned_sales)
   def day_has_planned_purchases?(day), do: day_has_planned_section?(day, @planned_purchase)
 
-  def planned_sales_for_date(company_id, date) do
-    planned_lines_for_date(company_id, date, :sales, planned_sales_sections())
+  def planned_sales_for_date(company_id, date, today \\ Date.utc_today()) do
+    planned_lines_for_date(company_id, date, :sales, planned_sales_sections(), today)
   end
 
-  def planned_purchases_for_date(company_id, date) do
-    planned_lines_for_date(company_id, date, :purchase, planned_purchase_sections())
+  def planned_purchases_for_date(company_id, date, today \\ Date.utc_today()) do
+    planned_lines_for_date(company_id, date, :purchase, planned_purchase_sections(), today)
   end
 
-  defp planned_lines_for_date(company_id, date, kind, sections) do
-    day = get_day(company_id, date)
+  # Day lines win for today and past dates. After today the weekly book is
+  # authoritative, so editing a book moves the forecast even for a day that was
+  # seeded with its own lines earlier.
+  defp planned_lines_for_date(company_id, date, kind, sections, today) do
+    day = if Date.compare(date, today) == :gt, do: nil, else: get_day(company_id, date)
 
     rows =
       if day && Enum.any?(day.egg_stock_day_details || [], &(&1.section in sections)) do
@@ -426,14 +429,14 @@ defmodule FullCircle.EggStock do
     overlay_actual_quantities(rows, actuals)
   end
 
-  def planned_sales_totals(company_id, date, grades \\ nil) do
+  def planned_sales_totals(company_id, date, grades \\ nil, today \\ Date.utc_today()) do
     grades = grades || grade_names(company_id)
-    planned_sales_for_date(company_id, date) |> sum_planned_rows(grades)
+    planned_sales_for_date(company_id, date, today) |> sum_planned_rows(grades)
   end
 
-  def planned_purchases_totals(company_id, date, grades \\ nil) do
+  def planned_purchases_totals(company_id, date, grades \\ nil, today \\ Date.utc_today()) do
     grades = grades || grade_names(company_id)
-    planned_purchases_for_date(company_id, date) |> sum_planned_rows(grades)
+    planned_purchases_for_date(company_id, date, today) |> sum_planned_rows(grades)
   end
 
   @doc """
@@ -1101,7 +1104,7 @@ defmodule FullCircle.EggStock do
 
   # --- Estimation / forecast (hybrid) ---
 
-  def compute_estimated_opening(company_id, target_date, lookback_days) do
+  def compute_estimated_opening(company_id, target_date, lookback_days, today \\ Date.utc_today()) do
     grades = grade_names(company_id)
 
     case get_latest_actual_closing(company_id, target_date) do
@@ -1121,8 +1124,8 @@ defmodule FullCircle.EggStock do
             if day && has_actual_closing?(day.closing_bal) do
               day.closing_bal
             else
-              day_sales = planned_sales_totals(company_id, date, grades)
-              day_purchases = planned_purchases_totals(company_id, date, grades)
+              day_sales = planned_sales_totals(company_id, date, grades, today)
+              day_purchases = planned_purchases_totals(company_id, date, grades, today)
 
               Map.new(grades, fn g ->
                 o = to_int(prev_closing[g])
@@ -1218,19 +1221,19 @@ defmodule FullCircle.EggStock do
     end)
   end
 
-  def compute_7day_forecast(company_id, start_date, lookback_days) do
+  def compute_7day_forecast(company_id, start_date, lookback_days, today \\ Date.utc_today()) do
     grades = grade_names(company_id)
     avg_prod = compute_avg_production(company_id, lookback_days)
 
-    opening = compute_estimated_opening(company_id, start_date, lookback_days)
+    opening = compute_estimated_opening(company_id, start_date, lookback_days, today)
 
     0..6
     |> Enum.map_reduce(opening, fn offset, prev_closing ->
       date = Date.add(start_date, offset)
       day = get_day(company_id, date)
 
-      day_sales = planned_sales_totals(company_id, date, grades)
-      day_purchases = planned_purchases_totals(company_id, date, grades)
+      day_sales = planned_sales_totals(company_id, date, grades, today)
+      day_purchases = planned_purchases_totals(company_id, date, grades, today)
 
       closing =
         if day && has_actual_closing?(day.closing_bal) do
