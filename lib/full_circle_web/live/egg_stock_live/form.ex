@@ -1092,7 +1092,19 @@ defmodule FullCircleWeb.EggStockLive.Form do
     end
   end
 
+  # The book for today's weekday cannot affect today's board — today reads its own
+  # planned lines — so it is served read-only. Guard the write, not just the UI.
+  defp dow_readonly?(dow), do: dow == Date.day_of_week(today())
+
   defp do_save_dow(params, socket) do
+    if dow_readonly?(socket.assigns.dow) do
+      {:noreply, socket}
+    else
+      save_dow(params, socket)
+    end
+  end
+
+  defp save_dow(params, socket) do
     case EggStock.save_dow_lines(
            socket.assigns.current_company.id,
            socket.assigns.dow_kind,
@@ -1283,6 +1295,10 @@ defmodule FullCircleWeb.EggStockLive.Form do
   defp dow_label(6), do: gettext("Sat")
   defp dow_label(7), do: gettext("Sun")
 
+  # The weekday's date inside the 7-day window starting at the board date, so the
+  # book buttons line up with the rows on the Estimated tab.
+  defp dow_date(date, dow), do: Date.add(date, Integer.mod(dow - Date.day_of_week(date), 7))
+
   # --- Render ---
 
   defp save_status(%{status: nil} = assigns), do: ~H""
@@ -1334,6 +1350,9 @@ defmodule FullCircleWeb.EggStockLive.Form do
             title={gettext("Pick a date")}
           />
         </form>
+        <span class="text-lg font-semibold text-gray-500 w-10 text-center">
+          {Calendar.strftime(@date, "%a")}
+        </span>
         <button
           type="button"
           phx-click="nav_date"
@@ -1385,6 +1404,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
         <.weekly_tab
           kind={@dow_kind}
           dow={@dow}
+          date={@date}
           dow_params={@dow_params}
           grades={@grade_names}
           grade_labels={@grade_labels}
@@ -1431,9 +1451,20 @@ defmodule FullCircleWeb.EggStockLive.Form do
   # --- Weekly Tab ---
 
   defp weekly_tab(assigns) do
+    assigns = assign(assigns, :readonly, dow_readonly?(assigns.dow))
+
     ~H"""
     <div class="flex flex-col items-center">
       <div class="w-fit max-w-full">
+        <p
+          :if={@readonly}
+          class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 mb-3 max-w-xl"
+        >
+          {gettext(
+            "Today's book is read-only. Today's board uses the planned lines on the Stock tab, so edits here would have no effect."
+          )}
+        </p>
+
         <div class="mb-3 flex flex-wrap items-center gap-2">
           <span class="text-sm font-semibold text-gray-600">
             {if @kind == "sales", do: gettext("Sales book"), else: gettext("Purchase book")}
@@ -1443,9 +1474,10 @@ defmodule FullCircleWeb.EggStockLive.Form do
             type="button"
             phx-click="select_dow"
             phx-value-dow={d}
-            class={"px-3 py-1 text-sm rounded border #{if d == @dow, do: "bg-blue-600 text-white border-blue-600", else: "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"}"}
+            class={"px-2.5 py-1 text-sm rounded border leading-tight #{if d == @dow, do: "bg-blue-600 text-white border-blue-600", else: "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"}"}
           >
-            {dow_label(d)}
+            <div class="font-bold">{dow_label(d)} <span class="font-normal">{Calendar.strftime(dow_date(@date, d), "%-d/%-m")}</span></div>
+
           </button>
         </div>
 
@@ -1493,6 +1525,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
             >
               <div class="flex items-center w-12 shrink-0">
                 <button
+                  :if={!@readonly}
                   type="button"
                   phx-click="move_dow_line"
                   phx-value-index={idx}
@@ -1503,6 +1536,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
                   <.icon name="hero-chevron-up" class="h-3 w-3" />
                 </button>
                 <button
+                  :if={!@readonly}
                   type="button"
                   phx-click="move_dow_line"
                   phx-value-index={idx}
@@ -1520,10 +1554,12 @@ defmodule FullCircleWeb.EggStockLive.Form do
                 name={"dow_lines[#{idx}][group_name]"}
                 value={line["group_name"] || ""}
                 placeholder={gettext("Label (optional)")}
-                class="w-56 text-xs border rounded px-2 py-0.5 text-gray-600"
+                readonly={@readonly}
+                class={"w-56 text-xs border rounded px-2 py-0.5 text-gray-600 #{if @readonly, do: "bg-gray-100"}"}
               />
               <div class="flex-1 border-t-2 border-dashed border-gray-400"></div>
               <button
+                :if={!@readonly}
                 type="button"
                 phx-click="delete_dow_line"
                 phx-value-index={idx}
@@ -1540,6 +1576,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
             >
               <div class="flex items-center w-12 shrink-0">
                 <button
+                  :if={!@readonly}
                   type="button"
                   phx-click="move_dow_line"
                   phx-value-index={idx}
@@ -1550,6 +1587,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
                   <.icon name="hero-chevron-up" class="h-3 w-3" />
                 </button>
                 <button
+                  :if={!@readonly}
                   type="button"
                   phx-click="move_dow_line"
                   phx-value-index={idx}
@@ -1565,7 +1603,8 @@ defmodule FullCircleWeb.EggStockLive.Form do
                 id={"dow-contact-#{@kind}-#{idx}"}
                 name={"dow_lines[#{idx}][contact_name]"}
                 value={line["contact_name"]}
-                class="w-56 border rounded px-2 py-1"
+                readonly={@readonly}
+                class={"w-56 border rounded px-2 py-1 #{if @readonly, do: "bg-gray-100"}"}
                 placeholder={gettext("Contact or free name")}
                 phx-hook="tributeAutoComplete"
                 url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
@@ -1575,12 +1614,14 @@ defmodule FullCircleWeb.EggStockLive.Form do
                 type="number"
                 name={"dow_lines[#{idx}][quantities][#{grade}]"}
                 value={(line["quantities"] || %{})[grade] || ""}
-                class="w-20 text-center border rounded px-1 py-1"
+                readonly={@readonly}
+                class={"w-20 text-center border rounded px-1 py-1 #{if @readonly, do: "bg-gray-100"}"}
               />
               <div class="w-20 text-center font-semibold py-1">
                 {Enum.reduce(@grades, 0, fn g, acc -> acc + to_int((line["quantities"] || %{})[g]) end)}
               </div>
               <button
+                :if={!@readonly}
                 type="button"
                 phx-click="delete_dow_line"
                 phx-value-index={idx}
@@ -1615,7 +1656,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
           </div>
         </.form>
 
-        <div class="mt-2 flex gap-3">
+        <div :if={!@readonly} class="mt-2 flex gap-3">
           <button
             type="button"
             phx-click="add_dow_line"
