@@ -436,11 +436,17 @@ defmodule FullCircle.Billing do
     |> Enum.reject(&is_nil/1)
   end
 
-  def create_invoice(attrs, com, user) do
+  @doc """
+  `extend_multi` lets a caller append steps that need the created Invoice —
+  e.g. `Trading.attach_invoice_drops_multi/5` linking trip drops to it —
+  without Billing having to know about that caller's domain.
+  """
+  def create_invoice(attrs, com, user, extend_multi \\ &Function.identity/1) do
     case can?(user, :create_invoice, com) do
       true ->
         Multi.new()
         |> create_invoice_multi(attrs, com, user)
+        |> extend_multi.()
         |> Repo.transaction()
 
       false ->
@@ -599,7 +605,10 @@ defmodule FullCircle.Billing do
     end
   end
 
-  def update_invoice(%Invoice{} = invoice, attrs, com, user) do
+  @doc """
+  See `create_invoice/4` for `extend_multi`.
+  """
+  def update_invoice(%Invoice{} = invoice, attrs, com, user, extend_multi \\ &Function.identity/1) do
     attrs =
       remove_field_if_new_flag(attrs, "e_inv_internal_id")
       |> remove_field_if_new_flag("invoice_no")
@@ -607,6 +616,7 @@ defmodule FullCircle.Billing do
     if can?(user, :update_invoice, com) do
       Multi.new()
       |> update_invoice_multi(invoice, attrs, com, user)
+      |> extend_multi.()
       |> Repo.transaction()
     else
       :not_authorise

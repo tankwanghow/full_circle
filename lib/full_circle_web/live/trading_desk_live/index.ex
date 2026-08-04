@@ -366,6 +366,12 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
     {:noreply, socket}
   end
 
+  # LiveComponents cannot put_flash on the parent layout; they send this instead.
+  def handle_info({:desk_flash, kind, msg}, socket)
+      when kind in [:info, :error, :warn] and is_binary(msg) do
+    {:noreply, put_flash(socket, kind, msg)}
+  end
+
   # Deep links: /supply_positions/:id/edit, /trips/new, etc. → desk + modal
   defp apply_modal_from_live_action(socket, params) do
     if socket.assigns.can_manage do

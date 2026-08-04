@@ -104,6 +104,8 @@ defmodule FullCircleWeb.InvoiceLive.Form do
       |> assign(page_title: gettext("New Invoice"))
       |> assign(matched_trans: [])
       |> assign(trading_drop_ids: trading_drop_ids)
+      |> assign(trading_link_contact_id: nil)
+      |> assign(trading_link_drop_ids: [])
       |> assign(
         trading_settlement: %{linked?: false, line_count: 0, actual_sum: 0, trip_refs: []}
       )
@@ -207,6 +209,8 @@ defmodule FullCircleWeb.InvoiceLive.Form do
     |> assign(live_action: :edit)
     |> assign(id: id)
     |> assign(trading_drop_ids: [])
+    |> assign(trading_link_contact_id: nil)
+    |> assign(trading_link_drop_ids: [])
     |> assign(trading_settlement: settlement)
     |> assign(page_title: gettext("Edit Invoice") <> " " <> object.invoice_no)
     |> assign(matched_trans: Billing.get_matcher_by("Invoice", id))
@@ -538,17 +542,33 @@ defmodule FullCircleWeb.InvoiceLive.Form do
     {:noreply, socket |> assign(cancel_url: uri)}
   end
 
+  @impl true
+  def handle_info({:trading_invoice_attach_selection, contact_id, drop_ids}, socket) do
+    {:noreply,
+     socket
+     |> assign(trading_link_contact_id: contact_id)
+     |> assign(trading_link_drop_ids: drop_ids)}
+  end
+
   defp save(socket, :new, params) do
     params = params |> Map.merge(%{"invoice_no" => "...new..."})
     company = socket.assigns.current_company
     user = socket.assigns.current_user
+    # Push path from settlement board (pre-selected drops)
     drop_ids = socket.assigns[:trading_drop_ids] || []
 
     result =
-      if drop_ids != [] do
-        FullCircle.Trading.create_invoice_from_drops(drop_ids, params, company, user)
-      else
-        Billing.create_invoice(params, company, user)
+      cond do
+        drop_ids != [] ->
+          FullCircle.Trading.create_invoice_from_drops(drop_ids, params, company, user)
+
+        true ->
+          Billing.create_invoice(
+            params,
+            company,
+            user,
+            attach_invoice_drops_fun(socket, params, company, user)
+          )
       end
 
     case result do
@@ -556,16 +576,22 @@ defmodule FullCircleWeb.InvoiceLive.Form do
         socket = maybe_attach_egg_planned(socket, obj, params)
 
         flash =
-          if drop_ids != [] do
-            gettext("Invoice created and trading drops linked successfully.")
-          else
-            gettext("Invoice created successfully.")
+          cond do
+            drop_ids != [] ->
+              gettext("Invoice created and trading drops linked successfully.")
+
+            attached_drops?(socket, params) ->
+              gettext("Invoice created and trading drops linked successfully.")
+
+            true ->
+              gettext("Invoice created successfully.")
           end
 
         {:noreply,
          socket
          |> push_navigate(to: ~p"/companies/#{company.id}/Invoice/#{obj.id}/edit")
-         |> put_flash(:info, flash)}
+         |> put_flash(:info, flash)
+         |> maybe_warn_uninvoiced_trading(obj, params, company, user)}
 
       {:error, :drops_already_invoiced} ->
         {:noreply,
@@ -584,6 +610,9 @@ defmodule FullCircleWeb.InvoiceLive.Form do
         {:noreply,
          socket
          |> put_flash(:error, gettext("Selected drops must belong to the same customer"))}
+
+      {:error, :link_trading_drops, reason, _} ->
+        {:noreply, put_flash(socket, :error, trading_invoice_link_error(reason))}
 
       {:error, failed_operation, changeset, _} ->
         {:noreply,
@@ -626,12 +655,28 @@ defmodule FullCircleWeb.InvoiceLive.Form do
   end
 
   defp do_update_invoice(socket, invoice, params, company, user) do
-    case Billing.update_invoice(invoice, params, company, user) do
+    case Billing.update_invoice(
+           invoice,
+           params,
+           company,
+           user,
+           attach_invoice_drops_fun(socket, params, company, user, :update_invoice)
+         ) do
       {:ok, %{update_invoice: obj}} ->
+        flash =
+          if attached_drops?(socket, params) do
+            gettext("Invoice updated and trading drops linked successfully.")
+          else
+            gettext("Invoice updated successfully.")
+          end
+
         {:noreply,
          socket
          |> push_navigate(to: ~p"/companies/#{company.id}/Invoice/#{obj.id}/edit")
-         |> put_flash(:info, "#{gettext("Invoice updated successfully.")}")}
+         |> put_flash(:info, flash)}
+
+      {:error, :link_trading_drops, reason, _} ->
+        {:noreply, put_flash(socket, :error, trading_invoice_link_error(reason))}
 
       {:error, failed_operation, changeset, _} ->
         {:noreply,
@@ -670,6 +715,72 @@ defmodule FullCircleWeb.InvoiceLive.Form do
          socket
          |> put_flash(:error, gettext("You are not authorised to perform this action"))}
     end
+  end
+
+  # --- Trading attach (pull: manual invoice → customer drops) ---
+
+  defp attach_invoice_drops_fun(socket, params, company, user, invoice_key \\ :create_invoice) do
+    drop_ids = attach_drop_ids(socket, params)
+
+    &FullCircle.Trading.attach_invoice_drops_multi(&1, invoice_key, drop_ids, company, user)
+  end
+
+  # Selection is only valid for the contact it was made against. Switching
+  # customer unmounts the panel; parent drops the ids so we do not link wrong
+  # customer's drops (including other customers on a multi-customer trip).
+  defp attach_drop_ids(socket, params) do
+    if blank_id(params["contact_id"]) == socket.assigns[:trading_link_contact_id] do
+      socket.assigns[:trading_link_drop_ids] || []
+    else
+      []
+    end
+  end
+
+  defp attached_drops?(socket, params), do: attach_drop_ids(socket, params) != []
+
+  defp trading_invoice_link_error(:drops_already_invoiced),
+    do: gettext("Some drops were already invoiced by someone else. Nothing was saved.")
+
+  defp trading_invoice_link_error(:ineligible_drops),
+    do: gettext("Some drops are no longer eligible for invoicing")
+
+  defp trading_invoice_link_error(:mixed_customers),
+    do: gettext("Selected drops must belong to the same customer")
+
+  defp trading_invoice_link_error(:customer_mismatch),
+    do: gettext("Selected drops do not belong to this invoice customer")
+
+  defp trading_invoice_link_error(_), do: gettext("Failed to link trading drops")
+
+  defp maybe_warn_uninvoiced_trading(socket, obj, params, company, user) do
+    if attached_drops?(socket, params) or is_nil(obj.contact_id) or
+         (socket.assigns[:trading_drop_ids] || []) != [] do
+      socket
+    else
+      case FullCircle.Trading.billable_drop_count(obj.contact_id, company, user) do
+        0 ->
+          socket
+
+        n ->
+          put_flash(
+            socket,
+            :warn,
+            gettext(
+              "%{n} trading drop(s) for this customer are still uninvoiced. Open this invoice and attach them if it settles any of them.",
+              n: n
+            )
+          )
+      end
+    end
+  end
+
+  defp bill_quantity(form) do
+    form.source
+    |> Ecto.Changeset.fetch_field!(:invoice_details)
+    |> Enum.reject(&(Map.get(&1, :delete) == true))
+    |> Enum.reduce(Decimal.new(0), fn d, acc ->
+      Decimal.add(acc, d.quantity || Decimal.new(0))
+    end)
   end
 
   defp validate(params, socket) do
@@ -868,6 +979,21 @@ defmodule FullCircleWeb.InvoiceLive.Form do
             </.link>
           </div>
         </div>
+
+        <.live_component
+          :if={
+            @live_action in [:new, :edit] and @trading_drop_ids == [] and
+              not (@trading_settlement.linked? || false) and
+              not is_nil(blank_id(@form[:contact_id].value))
+          }
+          module={FullCircleWeb.InvoiceLive.TradingAttachComponent}
+          id="trading-invoice-attach"
+          current_company={@current_company}
+          current_user={@current_user}
+          contact_id={blank_id(@form[:contact_id].value)}
+          bill_date={@form[:invoice_date].value}
+          bill_qty={bill_quantity(@form)}
+        />
 
         <.live_component
           module={FullCircleWeb.InvoiceLive.DetailComponent}

@@ -93,6 +93,7 @@ defmodule FullCircle.Trading.Settlement do
           trip_date: t.date,
           trip_reference_no: t.reference_no,
           trip_status: t.status,
+          vehicle_number: t.vehicle_number,
           sales_position_id: s.id,
           sales_title: s.title,
           unit_price: s.unit_price,
@@ -106,7 +107,9 @@ defmodule FullCircle.Trading.Settlement do
           doc_id: d.invoice_id,
           doc_no: inv.invoice_no,
           doc_kind: "invoice",
-          invoiceable: t.status == "completed" and not is_nil(d.actual) and is_nil(d.invoice_id)
+          # alias used by shared attach UI (billable / invoiceable)
+          invoiceable: t.status == "completed" and not is_nil(d.actual) and is_nil(d.invoice_id),
+          billable: t.status == "completed" and not is_nil(d.actual) and is_nil(d.invoice_id)
         }
       )
       |> maybe_filter_customer(customer_id)
@@ -651,6 +654,26 @@ defmodule FullCircle.Trading.Settlement do
     end)
   end
 
+  @doc """
+  Append customer-drop attach steps to an Invoice create/update `Multi`.
+
+  `invoice_key` is `:create_invoice` or `:update_invoice`. Empty id list is a no-op.
+  Passed to `Billing.create_invoice/4` / `update_invoice/5` as `extend_multi`.
+  """
+  def attach_invoice_drops_multi(multi, invoice_key, drop_ids, company, user) do
+    maybe_link_invoice_drops_step(multi, invoice_key, drop_ids, company, user)
+  end
+
+  defp maybe_link_invoice_drops_step(multi, _invoice_key, [], _company, _user), do: multi
+
+  defp maybe_link_invoice_drops_step(multi, invoice_key, drop_ids, company, user) do
+    Multi.run(multi, :link_trading_drops, fn _repo, changes ->
+      drop_ids
+      |> link_drops_to_invoice(Map.fetch!(changes, invoice_key), company, user)
+      |> normalize_link_result()
+    end)
+  end
+
   # Multi.run only accepts {:ok, _} | {:error, _}; the link functions may also
   # return the bare :not_authorise used everywhere else in this module.
   defp normalize_link_result(:not_authorise), do: {:error, :not_authorise}
@@ -679,6 +702,19 @@ defmodule FullCircle.Trading.Settlement do
   end
 
   def billable_line_counts(_, _, _, _), do: %{loads: 0, transport: 0, total: 0}
+
+  @doc """
+  Count of still-invoiceable sales drops for a customer contact.
+  """
+  def billable_drop_count(contact_id, company, user, opts \\ [])
+
+  def billable_drop_count(contact_id, company, user, opts) when is_binary(contact_id) do
+    company
+    |> list_uninvoiced_drops(user, Keyword.put(opts, :customer_id, contact_id))
+    |> Enum.count(& &1.billable)
+  end
+
+  def billable_drop_count(_, _, _, _), do: 0
 
   # --- Link hygiene: info, contact lock, unlink (no void/delete on finance docs) ---
 

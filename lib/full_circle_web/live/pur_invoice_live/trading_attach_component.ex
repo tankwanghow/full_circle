@@ -96,7 +96,7 @@ defmodule FullCircleWeb.PurInvoiceLive.TradingAttachComponent do
   end
 
   defp billable_ids(rows) do
-    rows |> Enum.filter(& &1.billable) |> Enum.map(& &1.id) |> MapSet.new()
+    rows |> Enum.filter(& &1.billable) |> Enum.map(&to_string(&1.id)) |> MapSet.new()
   end
 
   @impl true
@@ -121,9 +121,14 @@ defmodule FullCircleWeb.PurInvoiceLive.TradingAttachComponent do
      |> maybe_load_candidates()}
   end
 
+  # Always store string ids — phx-value-id is a string; row.id may differ in type.
   defp toggle(set, id) do
+    id = to_string(id)
+
     if MapSet.member?(set, id), do: MapSet.delete(set, id), else: MapSet.put(set, id)
   end
+
+  defp selected?(set, id), do: MapSet.member?(set, to_string(id))
 
   # The contact travels with the selection so the parent can discard it if the
   # clerk ticks lines and then switches supplier — the panel is unmounted at that
@@ -157,7 +162,7 @@ defmodule FullCircleWeb.PurInvoiceLive.TradingAttachComponent do
 
   defp selected_sum(rows, selected) do
     rows
-    |> Enum.filter(&MapSet.member?(selected, &1.id))
+    |> Enum.filter(&selected?(selected, &1.id))
     |> Enum.reduce(Decimal.new(0), fn r, acc -> Decimal.add(acc, r.actual || Decimal.new(0)) end)
   end
 
@@ -228,8 +233,16 @@ defmodule FullCircleWeb.PurInvoiceLive.TradingAttachComponent do
   attr :bill_qty, :any, required: true
 
   defp attach_table(assigns) do
+    # Include selected? in checkbox id so morphdom remounts after phx-click
+    # (browser also toggles the box; rows 2+ otherwise stay visually wrong).
+    rows =
+      Enum.map(assigns.rows, fn row ->
+        Map.put(row, :selected?, selected?(assigns.selected, row.id))
+      end)
+
     assigns =
       assign(assigns,
+        rows: rows,
         linked_qty: selected_sum(assigns.rows, assigns.selected),
         n_selected: MapSet.size(assigns.selected)
       )
@@ -263,10 +276,10 @@ defmodule FullCircleWeb.PurInvoiceLive.TradingAttachComponent do
           :if={row.billable}
           type="checkbox"
           phx-click={@event}
-          phx-value-id={row.id}
+          phx-value-id={to_string(row.id)}
           phx-target={@myself}
-          checked={MapSet.member?(@selected, row.id)}
-          id={"#{@id_prefix}-cb-#{row.id}"}
+          checked={row.selected?}
+          id={"#{@id_prefix}-cb-#{row.id}-#{row.selected?}"}
         />
       </div>
       <div class="w-2/12">{row.trip_date}</div>

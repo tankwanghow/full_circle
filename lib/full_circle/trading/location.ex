@@ -37,6 +37,7 @@ defmodule FullCircle.Trading.Location do
       :contact_id,
       :contact_name
     ])
+    |> update_change(:name, &trim_optional/1)
     |> validate_required([:name, :kind, :company_id])
     |> validate_inclusion(:kind, @kinds)
     |> validate_number(:latitude, greater_than_or_equal_to: -90, less_than_or_equal_to: 90)
@@ -45,6 +46,10 @@ defmodule FullCircle.Trading.Location do
     |> foreign_key_constraint(:company_id)
     |> foreign_key_constraint(:contact_id)
   end
+
+  defp trim_optional(nil), do: nil
+  defp trim_optional(v) when is_binary(v), do: String.trim(v)
+  defp trim_optional(v), do: v
 
   @doc """
   Google Maps URL for this GPS point, or nil if coordinates are incomplete.

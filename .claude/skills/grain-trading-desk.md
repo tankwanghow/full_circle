@@ -28,6 +28,19 @@ Settlement Invoice / PurInvoice stay in finance — trading does not auto-post t
   `trip_drops.transport_pur_invoice_id`; line good priority:
   Transport Services Purchase → Transport Charges → Note
   (else create Haulage); unit price clerk-entered (no rate matrix)
+- **Multi-customer trips:** settlement unit is the **drop** (via
+  `sales_position.customer_id`), not the trip. One TRP can have drops for
+  customers A and B; each invoice only lists/links **that** customer’s drops.
+  `list_uninvoiced_drops(..., customer_id:)` and
+  `link_drops_to_invoice` (`same_customer?` / `customer_matches_invoice?`) enforce this.
+- **Attach (pull) direction — Invoice:**
+  `InvoiceLive.TradingAttachComponent` on Invoice new/edit (when not already
+  push-linked via `trading_drops=`). Tick uninvoiced drops for the invoice
+  contact; save uses `Billing.create_invoice/4` or `update_invoice/5`
+  `extend_multi` → `Trading.attach_invoice_drops_multi/5`. Hidden when
+  settlement already linked or when opened from the board push flow.
+- **Attach (pull) — PurInvoice:** `PurInvoiceLive.TradingAttachComponent` +
+  `attach_links_multi/6` (loads + transport).
 - **Desk deep-link:** trip row **Settlement** →
   `/trading/settlement?trip_id=<id>` opens a **single-trip page** (not the
   tabbed board): Customer Invoice + Supplier Bill + Transport Bill sections on
@@ -173,7 +186,24 @@ again in save. Display label is `SUP-… · Good · Supplier`.
 **Trip** (`draft | planned | completed | cancelled`):
 
 - Completed/cancelled trips are **locked** (`{:error, :trip_locked}` on update)
-- Complete requires `actual` on every load and drop; returns `{:ok, trip, warnings}` — warnings never block
+- **Save never sets `completed`/`cancelled`.** Form status options are only
+  `draft`/`planned`; lifecycle is **Complete trip** / **Cancel trip** only.
+  `create_trip` / `update_trip` clamp any other status to a writable value.
+- **Non-warehouse drops require sales on Save.** Drop location kind
+  `own_warehouse` may omit `sales_position_id` (stock-in). Any other kind
+  (`customer_site`, `port`, `supplier_site`, `other`) must have a sales
+  position or create/update is rejected
+  (`sales_position_id: required for non-warehouse drop`). Complete applies
+  the same rule as defense in depth.
+- Complete requires `actual` on every load and drop **and** ≥1 load + ≥1 drop;
+  returns `{:ok, trip, warnings}` — warnings never block.
+- Complete rejects customer-site drops without `sales_position_id`
+  (`{:error, :customer_drops_need_sales}`) — settlement has no customer path
+  otherwise.
+- Typeahead re-resolve on save: never wipe `sales_position_id` /
+  `supply_position_id` when open-only lookup misses; fall back to any-status
+  title lookup (`get_sales_position_by_title` / `get_supply_position_by_title`)
+  so fulfill/close then re-save does not unlink lines.
 - `cancel_trip` also returns **`{:ok, trip, warnings}`** (same shape as complete).
   A completed trip with a linked Invoice/PurInvoice cannot be cancelled
   (`{:error, :has_invoices}`) — unlink settlement first.

@@ -73,9 +73,36 @@ defmodule FullCircleWeb.TradingTripLiveTest do
     {:ok, lv, html} = live(conn, ~p"/companies/#{company.id}/trading/trips/#{trip.id}/edit")
     assert html =~ "desk-modal" or html =~ trip.reference_no or html =~ "trip-form"
 
+    # Complete is a form submit so current line actuals are persisted first
     lv
-    |> element("button", "Complete trip")
-    |> render_click()
+    |> form("#desk-trip-form", %{
+      "trip" => %{
+        "date" => Date.to_iso8601(trip.date),
+        "transport_mode" => "company_own",
+        "vehicle_number" => "ABC1234",
+        "status" => "planned",
+        "loads" => %{
+          "0" => %{
+            "id" => hd(trip.loads).id,
+            "planned" => "40",
+            "actual" => "40",
+            "good_id" => good.id,
+            "location_id" => load_loc.id,
+            "supply_position_id" => supply.id
+          }
+        },
+        "drops" => %{
+          "0" => %{
+            "id" => hd(trip.drops).id,
+            "planned" => "40",
+            "actual" => "40",
+            "good_id" => good.id,
+            "location_id" => drop_loc.id
+          }
+        }
+      }
+    })
+    |> render_submit(%{"submit_action" => "complete"})
 
     remaining = Balances.supply_remaining(Trading.get_supply_position!(supply.id, company, user))
     assert Decimal.eq?(remaining, Decimal.new("60"))

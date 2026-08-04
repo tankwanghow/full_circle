@@ -914,4 +914,157 @@ defmodule FullCircle.Trading.SettlementTest do
     assert %{loads: 0, transport: 0, total: 0} =
              Trading.billable_line_counts(contact.id, company, user)
   end
+
+  test "attach_invoice_drops_multi links drops while invoice is created", %{
+    user: user,
+    company: company
+  } do
+    %{drop: drop, customer: customer, good: good} =
+      completed_sales_drop(company, user, actual: "15", unit_price: "1000")
+
+    sales_acct = FullCircle.Accounting.get_account_by_name("General Sales", company, user)
+
+    sales_tc =
+      Repo.one!(
+        from tc in FullCircle.Accounting.TaxCode,
+          where: tc.company_id == ^company.id and tc.code == "NoSTax"
+      )
+
+    attrs = invoice_attrs(customer, good, sales_acct, sales_tc, quantity: "15", tax_rate: "0")
+
+    assert {:ok, %{create_invoice: inv}} =
+             FullCircle.Billing.create_invoice(
+               attrs,
+               company,
+               user,
+               &Trading.attach_invoice_drops_multi(
+                 &1,
+                 :create_invoice,
+                 [drop.id],
+                 company,
+                 user
+               )
+             )
+
+    assert Repo.get!(TripDrop, drop.id).invoice_id == inv.id
+    assert Trading.invoice_settlement_info(inv.id, company).linked?
+  end
+
+  test "multi-customer trip: list and attach are customer-scoped", %{
+    user: user,
+    company: company
+  } do
+    good = good_fixture(company, user)
+    c1 = contact_fixture(company, user, %{"name" => "Cust A"})
+    c2 = contact_fixture(company, user, %{"name" => "Cust B"})
+    supplier = contact_fixture(company, user)
+
+    supply =
+      supply_position_fixture(company, user, %{
+        "good_id" => good.id,
+        "supplier_id" => supplier.id,
+        "quantity" => "100",
+        "status" => "collect"
+      })
+
+    s1 =
+      sales_position_fixture(company, user, %{
+        "good_id" => good.id,
+        "customer_id" => c1.id,
+        "quantity" => "20",
+        "status" => "open"
+      })
+
+    s2 =
+      sales_position_fixture(company, user, %{
+        "good_id" => good.id,
+        "customer_id" => c2.id,
+        "quantity" => "30",
+        "status" => "open"
+      })
+
+    port = location_fixture(company, user, %{"kind" => "port"})
+    site1 = location_fixture(company, user, %{"kind" => "customer_site", "name" => "Farm A"})
+    site2 = location_fixture(company, user, %{"kind" => "customer_site", "name" => "Farm B"})
+
+    {:ok, trip} =
+      Trading.create_trip(
+        %{
+          "date" => "2026-08-04",
+          "transport_mode" => "company_own",
+          "vehicle_number" => "MULTI1",
+          "loads" => [
+            %{
+              "planned" => "50",
+              "actual" => "50",
+              "good_id" => good.id,
+              "location_id" => port.id,
+              "supply_position_id" => supply.id
+            }
+          ],
+          "drops" => [
+            %{
+              "planned" => "20",
+              "actual" => "20",
+              "good_id" => good.id,
+              "location_id" => site1.id,
+              "sales_position_id" => s1.id
+            },
+            %{
+              "planned" => "30",
+              "actual" => "30",
+              "good_id" => good.id,
+              "location_id" => site2.id,
+              "sales_position_id" => s2.id
+            }
+          ]
+        },
+        company,
+        user
+      )
+
+    assert {:ok, trip, _} = Trading.complete_trip(trip, company, user)
+    [d1, d2] = Enum.sort_by(trip.drops, & &1.seq)
+
+    # Customer filter: only that customer's drop (same trip appears for both)
+    for_c1 = Trading.list_uninvoiced_drops(company, user, customer_id: c1.id)
+    for_c2 = Trading.list_uninvoiced_drops(company, user, customer_id: c2.id)
+    assert Enum.map(for_c1, & &1.id) == [d1.id]
+    assert Enum.map(for_c2, & &1.id) == [d2.id]
+    assert Enum.all?(for_c1, & &1.billable)
+    assert Enum.all?(for_c2, & &1.billable)
+
+    # Attach invoice for c1 cannot take c2's drop
+    inv_c1 = invoice_fixture(company, user)
+    inv_c1 = %{inv_c1 | contact_id: c1.id}
+
+    assert {:error, :customer_mismatch} =
+             Trading.link_drops_to_invoice([d2.id], inv_c1, company, user)
+
+    assert is_nil(Repo.get!(TripDrop, d2.id).invoice_id)
+
+    # Attach c1's drop only
+    sales_acct = FullCircle.Accounting.get_account_by_name("General Sales", company, user)
+
+    sales_tc =
+      Repo.one!(
+        from tc in FullCircle.Accounting.TaxCode,
+          where: tc.company_id == ^company.id and tc.code == "NoSTax"
+      )
+
+    attrs = invoice_attrs(c1, good, sales_acct, sales_tc, quantity: "20", tax_rate: "0")
+
+    assert {:ok, %{create_invoice: inv}} =
+             FullCircle.Billing.create_invoice(
+               attrs,
+               company,
+               user,
+               &Trading.attach_invoice_drops_multi(&1, :create_invoice, [d1.id], company, user)
+             )
+
+    assert Repo.get!(TripDrop, d1.id).invoice_id == inv.id
+    assert is_nil(Repo.get!(TripDrop, d2.id).invoice_id)
+    assert Trading.billable_drop_count(c1.id, company, user) == 0
+    assert Trading.billable_drop_count(c2.id, company, user) == 1
+  end
 end

@@ -37,6 +37,26 @@ defmodule FullCircle.Trading.SalesPositionTest do
     assert Decimal.eq?(Balances.sales_undelivered(s), Decimal.new("35"))
   end
 
+  test "title lookup finds fulfilled sales that open lookup misses", %{
+    admin: admin,
+    company: company
+  } do
+    sales =
+      sales_position_fixture(company, admin, %{"quantity" => "10", "status" => "open"})
+
+    label = "#{sales.title} · Acme Farm"
+
+    assert %{id: id} = Trading.get_open_sales_position_by_title(label, company, admin)
+    assert id == sales.id
+
+    assert {:ok, fulfilled} =
+             Trading.fulfill_sales_position(sales, %{}, company, admin)
+
+    assert fulfilled.status == "fulfilled"
+    assert Trading.get_open_sales_position_by_title(label, company, admin) == nil
+    assert %{id: ^id} = Trading.get_sales_position_by_title(label, company, admin)
+  end
+
   test "create sales auto-creates customer delivery location when missing", %{
     admin: admin,
     company: company
@@ -106,6 +126,8 @@ defmodule FullCircle.Trading.SalesPositionTest do
 
     assert id == open.id
     assert Trading.get_open_supply_position_by_title(closed.title, company, admin) == nil
+    assert %{id: closed_id} = Trading.get_supply_position_by_title(closed.title, company, admin)
+    assert closed_id == closed.id
   end
 
   test "soft hold does not change supply remaining", %{admin: admin, company: company} do

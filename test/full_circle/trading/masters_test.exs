@@ -200,5 +200,66 @@ defmodule FullCircle.Trading.MastersTest do
 
       assert Trading.sole_location_for_contact(supplier.id, company, admin) == nil
     end
+
+    test "get_location_by_name matches despite trailing spaces in stored name", %{
+      admin: admin,
+      company: company
+    } do
+      customer = contact_fixture(company, admin, %{"name" => "Ngei Sing Farm Sdn. Bhd."})
+
+      # Simulate legacy auto-site name: slice(0, 20) left a trailing space
+      {:ok, site} =
+        Trading.create_location(
+          %{
+            "name" => "Ngei Sing Farm Sdn. ",
+            "kind" => "customer_site",
+            "contact_id" => customer.id
+          },
+          company,
+          admin
+        )
+
+      # create_location trims on cast — re-dirty the name to match production rows
+      {1, _} =
+        FullCircle.Repo.update_all(
+          from(l in Location, where: l.id == ^site.id),
+          set: [name: "Ngei Sing Farm Sdn. "]
+        )
+
+      label = "Ngei Sing Farm Sdn. (customer_site)"
+
+      found =
+        Trading.get_location_by_name(label, company, admin, contact_id: customer.id)
+
+      assert found
+      assert found.id == site.id
+
+      # Double-space label (how location_label looked before trim) also resolves
+      found2 =
+        Trading.get_location_by_name(
+          "Ngei Sing Farm Sdn.  (customer_site)",
+          company,
+          admin,
+          contact_id: customer.id
+        )
+
+      assert found2.id == site.id
+    end
+
+    test "ensure_customer_delivery_location does not store trailing spaces", %{
+      admin: admin,
+      company: company
+    } do
+      customer =
+        contact_fixture(company, admin, %{"name" => "Ngei Sing Farm Sdn. Bhd. Extra"})
+
+      assert {:ok, loc} =
+               Trading.ensure_customer_delivery_location(customer.id, company, admin)
+
+      assert is_struct(loc, Location)
+      assert loc.name == String.trim(loc.name)
+      refute String.ends_with?(loc.name, " ")
+      assert String.length(loc.name) <= 20
+    end
   end
 end

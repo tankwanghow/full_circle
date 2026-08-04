@@ -161,6 +161,7 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
     |> assign(trip: trip)
     |> assign(form: to_form(cs))
     |> assign(warnings: if(trip, do: Trading.trip_warnings(trip), else: []))
+    |> assign(action_error: nil)
   end
 
   @impl true
@@ -305,66 +306,37 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
     {:noreply, assign(socket, form: to_form(cs))}
   end
 
-  def handle_event("save", %{"trip" => params}, socket) do
+  def handle_event("save", params, socket) do
     company = socket.assigns.current_company
     user = socket.assigns.current_user
-    params = ensure_ids(params, company, user)
+    # Complete is a form submit so current actuals/lines are saved first (not DB-stale).
+    submit_action = params["submit_action"] || "save"
+    trip_params = ensure_ids(params["trip"] || %{}, company, user)
 
     result =
       case socket.assigns.live_action do
-        :new -> Trading.create_trip(params, company, user)
-        :edit -> Trading.update_trip(socket.assigns.trip, params, company, user)
+        :new -> Trading.create_trip(trip_params, company, user)
+        :edit -> Trading.update_trip(socket.assigns.trip, trip_params, company, user)
       end
 
     case result do
+      {:ok, trip} when submit_action == "complete" ->
+        finish_complete(socket, trip, company, user)
+
       {:ok, _} ->
         send(self(), {:desk_modal_saved, :trip})
         {:noreply, socket}
 
       {:error, %Ecto.Changeset{} = cs} ->
-        {:noreply, assign(socket, form: to_form(cs))}
+        {:noreply, assign(socket, form: to_form(cs), action_error: nil)}
 
       {:error, :trip_locked} ->
         {:noreply,
-         put_flash(socket, :error, gettext("Completed or cancelled trips cannot be edited."))}
+         put_action_error(socket, gettext("Completed or cancelled trips cannot be edited."))}
 
       :not_authorise ->
         {:noreply,
-         put_flash(socket, :error, gettext("You are not authorised to perform this action"))}
-    end
-  end
-
-  def handle_event("complete", _, socket) do
-    company = socket.assigns.current_company
-    user = socket.assigns.current_user
-    trip = socket.assigns.trip
-
-    case Trading.complete_trip(trip, company, user) do
-      {:ok, _trip, warnings} ->
-        msg =
-          if warnings == [] do
-            gettext("Trip completed.")
-          else
-            gettext("Trip completed with warnings: ") <> Enum.join(warnings, "; ")
-          end
-
-        send(self(), {:desk_modal_saved, :trip, msg})
-        {:noreply, socket}
-
-      {:error, :missing_actuals} ->
-        {:noreply,
-         put_flash(socket, :error, gettext("All loads and drops need actual quantity."))}
-
-      {:error, :good_mismatch} ->
-        {:noreply,
-         put_flash(socket, :error, gettext("Load/drop product does not match the line good."))}
-
-      {:error, reason} when is_atom(reason) ->
-        {:noreply,
-         put_flash(socket, :error, gettext("Could not complete trip (%{reason})", reason: reason))}
-
-      _ ->
-        {:noreply, put_flash(socket, :error, gettext("Could not complete trip."))}
+         put_action_error(socket, gettext("You are not authorised to perform this action"))}
     end
   end
 
@@ -386,18 +358,88 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
 
       {:error, :has_invoices} ->
         {:noreply,
-         put_flash(
+         put_action_error(
            socket,
-           :error,
            gettext(
              "Cannot cancel: trip has a linked Invoice or PurInvoice. Unlink settlement first."
            )
          )}
 
+      {:error, reason} when is_atom(reason) ->
+        {:noreply,
+         put_action_error(
+           socket,
+           gettext("Could not cancel trip (%{reason})", reason: reason)
+         )}
+
       _ ->
-        {:noreply, put_flash(socket, :error, gettext("Could not cancel trip."))}
+        {:noreply, put_action_error(socket, gettext("Could not cancel trip."))}
     end
   end
+
+  defp finish_complete(socket, trip, company, user) do
+    case Trading.complete_trip(trip, company, user) do
+      {:ok, _trip, warnings} ->
+        msg =
+          if warnings == [] do
+            gettext("Trip completed.")
+          else
+            gettext("Trip completed with warnings: ") <> Enum.join(warnings, "; ")
+          end
+
+        send(self(), {:desk_modal_saved, :trip, msg})
+        {:noreply, socket}
+
+      {:error, reason} ->
+        # Form was saved; re-bind so the modal matches DB and show why complete failed.
+        trip = Trading.get_trip!(trip.id, company, user)
+        trip = put_line_display_names(trip)
+
+        cs =
+          Trip.changeset(trip, %{
+            "transport_agent_name" => trip.transport_agent && trip.transport_agent.name
+          })
+
+        {:noreply,
+         socket
+         |> assign_form(cs, :edit, trip)
+         |> put_action_error(complete_error_message(reason))}
+    end
+  end
+
+  # LiveComponent put_flash is not rendered by the parent layout flash_group.
+  # Show inline in the modal and bubble to the parent LiveView.
+  defp put_action_error(socket, msg) do
+    send(self(), {:desk_flash, :error, msg})
+    assign(socket, action_error: msg)
+  end
+
+  defp complete_error_message(:missing_lines),
+    do: gettext("Cannot complete: trip needs at least one load and one drop.")
+
+  defp complete_error_message(:missing_actuals),
+    do: gettext("Cannot complete: every load and drop needs an actual quantity.")
+
+  defp complete_error_message(:good_mismatch),
+    do: gettext("Cannot complete: load/drop product does not match the linked supply/sales.")
+
+  defp complete_error_message(:customer_drops_need_sales),
+    do:
+      gettext(
+        "Cannot complete: drops at non-warehouse locations must be linked to a sales position."
+      )
+
+  defp complete_error_message(:already_completed),
+    do: gettext("Trip is already completed.")
+
+  defp complete_error_message(:cancelled),
+    do: gettext("Cannot complete a cancelled trip.")
+
+  defp complete_error_message(reason) when is_atom(reason),
+    do: gettext("Could not complete trip (%{reason})", reason: reason)
+
+  defp complete_error_message(_),
+    do: gettext("Could not complete trip.")
 
   defp next_seq(socket, assoc) do
     lines = Ecto.Changeset.get_assoc(socket.assigns.form.source, assoc) || []
@@ -555,7 +597,7 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
       end
       |> Map.put(:action, :validate)
 
-    {:noreply, assign(socket, form: to_form(cs))}
+    {:noreply, assign(socket, form: to_form(cs), action_error: nil)}
   end
 
   defp put_system_reference_no(params, %{assigns: %{live_action: :new}}),
@@ -650,13 +692,17 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
         )
 
       "supply_title" ->
-        # Supply first: set good + supplier party; auto location if sole site
+        # Supply first: set good + supplier party; auto location if sole site.
+        # Fallback to any-status so re-save after close does not wipe FK.
         detail =
           resolve_named(
             detail,
             "supply_title",
             "supply_position_id",
-            fn name -> Trading.get_open_supply_position_by_title(name, company, user) end,
+            fn name ->
+              Trading.get_open_supply_position_by_title(name, company, user) ||
+                Trading.get_supply_position_by_title(name, company, user)
+            end,
             fn
               %{} = s ->
                 %{
@@ -742,13 +788,17 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
         resolve_load_typeahead(detail, "location_name", company, user)
 
       "sales_title" ->
-        # Sales first: set good + customer party; auto location if sole site
+        # Sales first: set good + customer party; auto location if sole site.
+        # Fallback to any-status title so re-saving after fulfill does not wipe FK.
         detail =
           resolve_named(
             detail,
             "sales_title",
             "sales_position_id",
-            fn name -> Trading.get_open_sales_position_by_title(name, company, user) end,
+            fn name ->
+              Trading.get_open_sales_position_by_title(name, company, user) ||
+                Trading.get_sales_position_by_title(name, company, user)
+            end,
             fn
               %{} = s ->
                 %{
@@ -797,9 +847,13 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
           "supply_title",
           "supply_position_id",
           fn name ->
-            case Trading.get_open_supply_position_by_title(name, company, user) do
-              %{} = s ->
-                if matching_good?(line_good, s.good_id), do: s, else: nil
+            s =
+              Trading.get_open_supply_position_by_title(name, company, user) ||
+                Trading.get_supply_position_by_title(name, company, user)
+
+            case s do
+              %{} = pos ->
+                if matching_good?(line_good, pos.good_id), do: pos, else: nil
 
               _ ->
                 nil
@@ -907,7 +961,9 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
   end
 
   # Resolve typeahead text → id. If text blank but id present, keep id and fill label.
-  # Only clear id when text is non-empty but does not match a record.
+  # Never wipe an existing id when name lookup fails — re-fill labels from the id
+  # (fulfilled/closed positions disappear from open typeahead but stay linked).
+  # Only clear id when name is non-empty, lookup fails, and no id is present.
   defp resolve_named(detail, name_key, id_key, lookup_by_name, from_record, from_id) do
     name = detail[name_key] |> to_string() |> String.trim()
     id = detail[id_key]
@@ -915,11 +971,16 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
     cond do
       name != "" ->
         case lookup_by_name.(name) do
-          nil ->
-            detail |> Map.put(id_key, nil)
-
-          rec ->
+          rec when not is_nil(rec) ->
             Map.merge(detail, from_record.(rec))
+
+          nil ->
+            if present_id?(id) do
+              # Keep FK; refresh display fields from the linked record
+              Map.merge(detail, from_id.(id))
+            else
+              detail |> Map.put(id_key, nil)
+            end
         end
 
       present_id?(id) ->
@@ -1143,6 +1204,14 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
     resolve_all_line_typeaheads(params, company, user)
   end
 
+  # Save may only set draft/planned. completed/cancelled via Complete / Cancel buttons.
+  defp trip_form_status_options(:edit, %{status: status})
+       when status in ["completed", "cancelled"] do
+    [{status, status}]
+  end
+
+  defp trip_form_status_options(_, _), do: [{"draft", "draft"}, {"planned", "planned"}]
+
   defp stringify_keys_one(map) when is_map(map) do
     Map.new(map, fn
       {k, v} when is_atom(k) -> {Atom.to_string(k), v}
@@ -1158,6 +1227,19 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
     <div>
       <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <.error_box changeset={@form.source} />
+
+      <div
+        :if={@action_error}
+        id="trip-action-error"
+        class="mb-3 p-3 bg-rose-50 border border-rose-400 rounded-lg text-sm text-rose-800"
+        role="alert"
+      >
+        <p class="flex items-center gap-1 font-semibold">
+          <.icon name="hero-exclamation-triangle-mini" class="h-5 w-5 flex-none" />
+          {gettext("Error")}
+        </p>
+        <p class="mt-1">{@action_error}</p>
+      </div>
 
       <div
         :if={@warnings != []}
@@ -1220,7 +1302,7 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
               field={@form[:status]}
               type="select"
               label={gettext("Status")}
-              options={Enum.map(Trip.statuses(), &{&1, &1})}
+              options={trip_form_status_options(@live_action, @trip)}
               disabled={@live_action == :edit && @trip && @trip.status in ["completed", "cancelled"]}
             />
           </div>
@@ -1284,9 +1366,10 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
             </span>
             <button
               :if={@trip.status in ["draft", "planned"]}
-              type="button"
-              phx-click="complete"
-              phx-target={@myself}
+              type="submit"
+              name="submit_action"
+              value="complete"
+              id="desk-trip-complete"
               class="orange button"
               data-confirm={gettext("Complete this trip? Actuals will update balances.")}
             >

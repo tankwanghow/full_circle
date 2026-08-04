@@ -455,6 +455,47 @@ defmodule FullCircle.Trading do
   end
 
   @doc """
+  Resolve any sales position by typeahead label or exact title (any status).
+
+  Used when re-saving a trip whose drops already show a sales title after the
+  sales was fulfilled/cancelled — open-only lookup would miss and wipe the FK.
+  """
+  def get_sales_position_by_title(label, company, user) do
+    title = typeahead_key(label)
+
+    if title == "" or not Authorization.can?(user, :view_trading, company) do
+      nil
+    else
+      from(s in SalesPosition,
+        where: s.company_id == ^company.id,
+        where: s.title == ^title,
+        preload: [:customer, :good]
+      )
+      |> Repo.one()
+    end
+  end
+
+  @doc """
+  Resolve any supply by typeahead label or exact title (any status, including closed).
+
+  Same re-save safety as `get_sales_position_by_title/3`.
+  """
+  def get_supply_position_by_title(label, company, user) do
+    title = typeahead_key(label)
+
+    if title == "" or not Authorization.can?(user, :view_trading, company) do
+      nil
+    else
+      from(s in SupplyPosition,
+        where: s.company_id == ^company.id,
+        where: s.title == ^title,
+        preload: [:supplier, :good]
+      )
+      |> Repo.one()
+    end
+  end
+
+  @doc """
   Autocomplete: active trading locations by name or kind.
 
   Optional `contact_id:` filters to sites linked to that supplier/customer.
@@ -527,13 +568,17 @@ defmodule FullCircle.Trading do
       nil
     else
       {name, kind} = parse_location_label(label)
+      # btrim: auto site names used String.slice(0, 20) which left trailing spaces
+      # for some contacts (e.g. "Ngei Sing Farm Sdn. "); parse trims the label so
+      # strict equality missed the row and the trip form cleared location_id.
+      name = String.trim(name)
       contact_id = Keyword.get(opts, :contact_id) |> blank_to_nil()
 
       q =
         from(l in Location,
           where: l.company_id == ^company.id,
           where: l.active == true,
-          where: l.name == ^name
+          where: fragment("btrim(?) = ?", l.name, ^name)
         )
 
       q =
@@ -823,11 +868,14 @@ defmodule FullCircle.Trading do
 
   def ensure_customer_delivery_location(_, _, _), do: {:ok, :skipped}
 
+  # First 20 chars of contact name; trim again after slice so mid-word cuts
+  # (e.g. "…Sdn. Bhd." → "…Sdn. ") never leave a trailing space in the location name.
   defp contact_site_location_name(%{name: name}) do
     name
     |> to_string()
     |> String.trim()
     |> String.slice(0, 20)
+    |> String.trim()
   end
 
   defp contact_mailing_address(%Contact{} = c) do
@@ -1967,6 +2015,10 @@ defmodule FullCircle.Trading do
       gapless_name = String.to_atom("update_gapless_doc" <> gen_temp_id())
       attrs = stringify_attr_keys(attrs)
 
+      # completed/cancelled only via complete_trip / cancel_trip — never via Save.
+      attrs =
+        Map.put(attrs, "status", writable_trip_status(Map.get(attrs, "status"), "draft"))
+
       Multi.new()
       |> get_gapless_doc_id(gapless_name, "TradingTrip", "TRP", company)
       |> Multi.insert(:create_trip, fn %{^gapless_name => doc} ->
@@ -2008,6 +2060,10 @@ defmodule FullCircle.Trading do
           # System-generated trip no — never change after create
           |> Map.drop(["reference_no"])
           |> Map.put("reference_no", trip.reference_no)
+          # completed/cancelled only via complete_trip / cancel_trip — never via Save.
+          |> then(fn a ->
+            Map.put(a, "status", writable_trip_status(Map.get(a, "status"), trip.status))
+          end)
 
         cs =
           trip
@@ -2085,8 +2141,16 @@ defmodule FullCircle.Trading do
     Settlement.attach_links_multi(multi, pinv_key, load_ids, transport_drop_ids, company, user)
   end
 
+  def attach_invoice_drops_multi(multi, invoice_key, drop_ids, company, user) do
+    Settlement.attach_invoice_drops_multi(multi, invoice_key, drop_ids, company, user)
+  end
+
   def billable_line_counts(contact_id, company, user, opts \\ []) do
     Settlement.billable_line_counts(contact_id, company, user, opts)
+  end
+
+  def billable_drop_count(contact_id, company, user, opts \\ []) do
+    Settlement.billable_drop_count(contact_id, company, user, opts)
   end
 
   def invoice_settlement_info(invoice_id, company) do
@@ -2134,6 +2198,7 @@ defmodule FullCircle.Trading do
 
   @doc """
   Mark trip completed. Requires actual on every load and drop.
+  Customer-site drops must link a sales position (settlement path).
   Returns `{:ok, trip, warnings}` — warnings never block completion.
   """
   def complete_trip(%Trip{} = trip, company, user) do
@@ -2148,11 +2213,17 @@ defmodule FullCircle.Trading do
         trip.status == "cancelled" ->
           {:error, :cancelled}
 
+        missing_trip_lines?(trip) ->
+          {:error, :missing_lines}
+
         missing_actuals?(trip) ->
           {:error, :missing_actuals}
 
         goods_mismatch?(trip) ->
           {:error, :good_mismatch}
+
+        non_warehouse_drops_without_sales?(trip) ->
+          {:error, :customer_drops_need_sales}
 
         true ->
           Multi.new()
@@ -2505,8 +2576,8 @@ defmodule FullCircle.Trading do
   defp validate_trip_goods(%Ecto.Changeset{valid?: false} = cs, _company), do: cs
 
   defp validate_trip_goods(%Ecto.Changeset{} = cs, company) do
-    loads = Ecto.Changeset.get_field(cs, :loads) || []
-    drops = Ecto.Changeset.get_field(cs, :drops) || []
+    loads = active_trip_lines(Ecto.Changeset.get_field(cs, :loads) || [])
+    drops = active_trip_lines(Ecto.Changeset.get_field(cs, :drops) || [])
 
     cond do
       Enum.any?(loads, &is_nil(&1.good_id)) ->
@@ -2523,8 +2594,94 @@ defmodule FullCircle.Trading do
         )
 
       true ->
-        cs
+        validate_non_warehouse_drops_need_sales(cs, company)
     end
+  end
+
+  # Own-warehouse drops may be stock-in without a sale. Any other location kind
+  # (customer_site, port, supplier_site, other) is a commercial destination and
+  # requires sales_position_id — reject on create/update Save, not only complete.
+  defp validate_non_warehouse_drops_need_sales(cs, company) do
+    drops = active_trip_lines(Ecto.Changeset.get_field(cs, :drops) || [])
+    kinds = location_kinds_map(drops, company)
+
+    case Ecto.Changeset.get_change(cs, :drops) do
+      drop_css when is_list(drop_css) ->
+        drop_css =
+          Enum.map(drop_css, fn drop_cs ->
+            if trip_line_cs_deleted?(drop_cs) do
+              drop_cs
+            else
+              d = Ecto.Changeset.apply_changes(drop_cs)
+              kind = Map.get(kinds, d.location_id)
+
+              if drop_needs_sales?(kind, d.sales_position_id) do
+                drop_cs
+                |> Ecto.Changeset.add_error(
+                  :sales_position_id,
+                  "required for non-warehouse drop"
+                )
+                |> Map.put(:action, drop_cs.action || :validate)
+              else
+                drop_cs
+              end
+            end
+          end)
+
+        cs = Ecto.Changeset.put_change(cs, :drops, drop_css)
+
+        if Enum.any?(drop_css, &(not &1.valid?)) do
+          %{cs | valid?: false}
+        else
+          cs
+        end
+
+      _ ->
+        if Enum.any?(drops, fn d ->
+             drop_needs_sales?(Map.get(kinds, d.location_id), d.sales_position_id)
+           end) do
+          Ecto.Changeset.add_error(
+            cs,
+            :drops,
+            "non-warehouse drops require a sales position"
+          )
+        else
+          cs
+        end
+    end
+  end
+
+  defp drop_needs_sales?("own_warehouse", _), do: false
+  defp drop_needs_sales?(_kind, sales_id) when not is_nil(sales_id), do: false
+  defp drop_needs_sales?(_kind, _), do: true
+
+  defp location_kinds_map(drops, company) do
+    loc_ids =
+      drops
+      |> Enum.map(& &1.location_id)
+      |> Enum.reject(&is_nil/1)
+      |> Enum.uniq()
+
+    if loc_ids == [] do
+      %{}
+    else
+      from(l in Location,
+        where: l.id in ^loc_ids and l.company_id == ^company.id,
+        select: {l.id, l.kind}
+      )
+      |> Repo.all()
+      |> Map.new()
+    end
+  end
+
+  defp active_trip_lines(lines) do
+    Enum.reject(lines, fn line ->
+      Map.get(line, :delete) in [true, "true"]
+    end)
+  end
+
+  defp trip_line_cs_deleted?(%Ecto.Changeset{} = cs) do
+    Ecto.Changeset.get_field(cs, :delete) in [true, "true"] or cs.action == :delete
   end
 
   defp line_goods_mismatch?(loads, drops, company) do
@@ -2575,12 +2732,28 @@ defmodule FullCircle.Trading do
       end)
   end
 
-  defp missing_actuals?(%Trip{} = trip) do
-    loads = trip.loads || []
-    drops = trip.drops || []
+  # Save/create may only set draft or planned. Terminal statuses use lifecycle actions.
+  defp writable_trip_status(status, _fallback) when status in ["draft", "planned"], do: status
+  defp writable_trip_status(_status, fallback) when fallback in ["draft", "planned"], do: fallback
+  defp writable_trip_status(_, _), do: "draft"
 
-    Enum.any?(loads, &is_nil(&1.actual)) or Enum.any?(drops, &is_nil(&1.actual)) or
-      loads == [] or drops == []
+  defp missing_trip_lines?(%Trip{} = trip) do
+    List.wrap(trip.loads) == [] or List.wrap(trip.drops) == []
+  end
+
+  defp missing_actuals?(%Trip{} = trip) do
+    loads = List.wrap(trip.loads)
+    drops = List.wrap(trip.drops)
+
+    Enum.any?(loads, &is_nil(&1.actual)) or Enum.any?(drops, &is_nil(&1.actual))
+  end
+
+  # Same rule as save validation (defense in depth if data was created before the rule).
+  defp non_warehouse_drops_without_sales?(%Trip{} = trip) do
+    Enum.any?(List.wrap(trip.drops), fn d ->
+      is_nil(d.sales_position_id) and
+        not match?(%{kind: "own_warehouse"}, d.location)
+    end)
   end
 
   defp goods_mismatch?(%Trip{} = trip) do

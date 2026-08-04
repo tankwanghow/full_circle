@@ -586,6 +586,66 @@ defmodule FullCircle.Trading.TripTest do
     assert Trading.complete_trip(trip, company, admin) == {:error, :missing_actuals}
   end
 
+  test "complete requires at least one load and one drop", %{admin: admin, company: company} do
+    good = good_fixture(company, admin)
+    loc = location_fixture(company, admin, %{"kind" => "own_warehouse"})
+
+    {:ok, trip} =
+      Trading.create_trip(
+        %{
+          "date" => "2026-07-08",
+          "transport_mode" => "company_own",
+          "vehicle_number" => "NOLD1",
+          "loads" => [
+            %{"planned" => "10", "actual" => "10", "good_id" => good.id, "location_id" => loc.id}
+          ],
+          "drops" => [
+            %{"planned" => "10", "actual" => "10", "good_id" => good.id, "location_id" => loc.id}
+          ]
+        },
+        company,
+        admin
+      )
+
+    # Soft-delete all loads via update (empty commercial loads path)
+    drop = hd(trip.drops)
+
+    {:ok, trip} =
+      Trading.update_trip(
+        trip,
+        %{
+          "date" => "2026-07-08",
+          "transport_mode" => "company_own",
+          "vehicle_number" => "NOLD1",
+          "status" => "planned",
+          "loads" => [
+            %{
+              "id" => hd(trip.loads).id,
+              "delete" => "true",
+              "planned" => "10",
+              "actual" => "10",
+              "good_id" => good.id,
+              "location_id" => loc.id
+            }
+          ],
+          "drops" => [
+            %{
+              "id" => drop.id,
+              "planned" => "10",
+              "actual" => "10",
+              "good_id" => good.id,
+              "location_id" => loc.id
+            }
+          ]
+        },
+        company,
+        admin
+      )
+
+    assert trip.loads == [] or trip.loads == nil or length(List.wrap(trip.loads)) == 0
+    assert Trading.complete_trip(trip, company, admin) == {:error, :missing_lines}
+  end
+
   test "company_own trip can save load/drop crew and warns when empty", %{
     admin: admin,
     company: company
@@ -862,8 +922,9 @@ defmodule FullCircle.Trading.TripTest do
     good = good_fixture(company, admin)
     loc_a = location_fixture(company, admin, %{"kind" => "port", "name" => "Port A"})
     loc_b = location_fixture(company, admin, %{"kind" => "port", "name" => "Port B"})
-    drop_a = location_fixture(company, admin, %{"kind" => "customer_site", "name" => "Farm A"})
-    drop_b = location_fixture(company, admin, %{"kind" => "customer_site", "name" => "Farm B"})
+    # own_warehouse drops: no sales required (seq test is not about commercial delivery)
+    drop_a = location_fixture(company, admin, %{"kind" => "own_warehouse", "name" => "Farm A"})
+    drop_b = location_fixture(company, admin, %{"kind" => "own_warehouse", "name" => "Farm B"})
 
     {:ok, trip} =
       Trading.create_trip(
@@ -986,7 +1047,7 @@ defmodule FullCircle.Trading.TripTest do
   } do
     good = good_fixture(company, admin)
     load_loc = location_fixture(company, admin, %{"kind" => "supplier_site", "name" => "Port A"})
-    drop_loc = location_fixture(company, admin, %{"kind" => "customer_site", "name" => "Farm A"})
+    drop_loc = location_fixture(company, admin, %{"kind" => "own_warehouse", "name" => "Farm A"})
     alt_loc = location_fixture(company, admin, %{"kind" => "own_warehouse", "name" => "Own WH"})
 
     {:ok, trip} =
@@ -1152,5 +1213,287 @@ defmodule FullCircle.Trading.TripTest do
     assert hd(srow.drops).place == "Farm"
     assert hd(srow.drops).qty == "40"
     assert is_binary(srow.unit) and srow.unit != ""
+  end
+
+  test "create/update cannot set status completed or cancelled via Save", %{
+    admin: admin,
+    company: company
+  } do
+    good = good_fixture(company, admin)
+    loc = location_fixture(company, admin, %{"kind" => "own_warehouse"})
+
+    {:ok, trip} =
+      Trading.create_trip(
+        %{
+          "date" => "2026-08-01",
+          "transport_mode" => "company_own",
+          "vehicle_number" => "SAVE01",
+          "status" => "completed",
+          "loads" => [
+            %{
+              "planned" => "5",
+              "actual" => "5",
+              "good_id" => good.id,
+              "location_id" => loc.id
+            }
+          ],
+          "drops" => [
+            %{
+              "planned" => "5",
+              "actual" => "5",
+              "good_id" => good.id,
+              "location_id" => loc.id
+            }
+          ]
+        },
+        company,
+        admin
+      )
+
+    assert trip.status == "draft"
+
+    {:ok, trip} =
+      Trading.update_trip(
+        trip,
+        %{
+          "status" => "completed",
+          "date" => "2026-08-01",
+          "transport_mode" => "company_own",
+          "vehicle_number" => "SAVE01",
+          "loads" => [
+            %{
+              "id" => hd(trip.loads).id,
+              "planned" => "5",
+              "actual" => "5",
+              "good_id" => good.id,
+              "location_id" => loc.id
+            }
+          ],
+          "drops" => [
+            %{
+              "id" => hd(trip.drops).id,
+              "planned" => "5",
+              "actual" => "5",
+              "good_id" => good.id,
+              "location_id" => loc.id
+            }
+          ]
+        },
+        company,
+        admin
+      )
+
+    assert trip.status == "draft"
+
+    {:ok, completed, _} = Trading.complete_trip(trip, company, admin)
+    assert completed.status == "completed"
+  end
+
+  test "save rejects non-warehouse drops without sales_position_id", %{
+    admin: admin,
+    company: company
+  } do
+    good = good_fixture(company, admin)
+    load_loc = location_fixture(company, admin, %{"kind" => "own_warehouse"})
+    drop_loc = location_fixture(company, admin, %{"kind" => "customer_site"})
+
+    assert {:error, %Ecto.Changeset{} = cs} =
+             Trading.create_trip(
+               %{
+                 "date" => "2026-08-02",
+                 "transport_mode" => "company_own",
+                 "vehicle_number" => "CUST01",
+                 "loads" => [
+                   %{
+                     "planned" => "1.5",
+                     "actual" => "1.5",
+                     "good_id" => good.id,
+                     "location_id" => load_loc.id
+                   }
+                 ],
+                 "drops" => [
+                   %{
+                     "planned" => "1.5",
+                     "actual" => "1.5",
+                     "good_id" => good.id,
+                     "location_id" => drop_loc.id
+                   }
+                 ]
+               },
+               company,
+               admin
+             )
+
+    assert cs.errors != [] or
+             Enum.any?(Ecto.Changeset.get_change(cs, :drops) || [], &(not &1.valid?))
+
+    sales =
+      sales_position_fixture(company, admin, %{
+        "quantity" => "1.5",
+        "good_id" => good.id,
+        "status" => "open"
+      })
+
+    assert {:ok, trip} =
+             Trading.create_trip(
+               %{
+                 "date" => "2026-08-02",
+                 "transport_mode" => "company_own",
+                 "vehicle_number" => "CUST01",
+                 "loads" => [
+                   %{
+                     "planned" => "1.5",
+                     "actual" => "1.5",
+                     "good_id" => good.id,
+                     "location_id" => load_loc.id
+                   }
+                 ],
+                 "drops" => [
+                   %{
+                     "planned" => "1.5",
+                     "actual" => "1.5",
+                     "good_id" => good.id,
+                     "location_id" => drop_loc.id,
+                     "sales_position_id" => sales.id
+                   }
+                 ]
+               },
+               company,
+               admin
+             )
+
+    assert {:ok, completed, _} = Trading.complete_trip(trip, company, admin)
+    assert completed.status == "completed"
+  end
+
+  test "own_warehouse drops can save without sales", %{admin: admin, company: company} do
+    good = good_fixture(company, admin)
+    wh_a = location_fixture(company, admin, %{"kind" => "own_warehouse", "name" => "Silo A"})
+    wh_b = location_fixture(company, admin, %{"kind" => "own_warehouse", "name" => "Silo B"})
+
+    assert {:ok, trip} =
+             Trading.create_trip(
+               %{
+                 "date" => "2026-08-02",
+                 "transport_mode" => "company_own",
+                 "vehicle_number" => "WHONLY",
+                 "loads" => [
+                   %{
+                     "planned" => "10",
+                     "actual" => "10",
+                     "good_id" => good.id,
+                     "location_id" => wh_a.id
+                   }
+                 ],
+                 "drops" => [
+                   %{
+                     "planned" => "10",
+                     "actual" => "10",
+                     "good_id" => good.id,
+                     "location_id" => wh_b.id
+                   }
+                 ]
+               },
+               company,
+               admin
+             )
+
+    assert is_nil(hd(trip.drops).sales_position_id)
+    assert {:ok, _, _} = Trading.complete_trip(trip, company, admin)
+  end
+
+  test "re-save keeps sales_position_id after sales is fulfilled", %{
+    admin: admin,
+    company: company
+  } do
+    good = good_fixture(company, admin)
+    load_loc = location_fixture(company, admin, %{"kind" => "own_warehouse"})
+    drop_loc = location_fixture(company, admin, %{"kind" => "customer_site"})
+
+    sales =
+      sales_position_fixture(company, admin, %{
+        "quantity" => "2",
+        "good_id" => good.id,
+        "status" => "open"
+      })
+
+    {:ok, trip} =
+      Trading.create_trip(
+        %{
+          "date" => "2026-08-03",
+          "transport_mode" => "company_own",
+          "vehicle_number" => "KEEP01",
+          "status" => "planned",
+          "loads" => [
+            %{
+              "planned" => "2",
+              "actual" => "2",
+              "good_id" => good.id,
+              "location_id" => load_loc.id
+            }
+          ],
+          "drops" => [
+            %{
+              "planned" => "2",
+              "actual" => "2",
+              "good_id" => good.id,
+              "location_id" => drop_loc.id,
+              "sales_position_id" => sales.id
+            }
+          ]
+        },
+        company,
+        admin
+      )
+
+    sales_id = sales.id
+    assert hd(trip.drops).sales_position_id == sales_id
+
+    assert {:ok, _} =
+             Trading.fulfill_sales_position(sales, %{"fulfilled_note" => "done"}, company, admin)
+
+    # Simulate form re-save with sales title still present (open lookup would miss)
+    drop = hd(trip.drops)
+    label = "#{sales.title} · customer"
+
+    assert %{id: ^sales_id} =
+             Trading.get_sales_position_by_title(label, company, admin)
+
+    assert Trading.get_open_sales_position_by_title(label, company, admin) == nil
+
+    {:ok, trip} =
+      Trading.update_trip(
+        trip,
+        %{
+          "date" => "2026-08-03",
+          "transport_mode" => "company_own",
+          "vehicle_number" => "KEEP01",
+          "status" => "planned",
+          "loads" => [
+            %{
+              "id" => hd(trip.loads).id,
+              "planned" => "2",
+              "actual" => "2",
+              "good_id" => good.id,
+              "location_id" => load_loc.id
+            }
+          ],
+          "drops" => [
+            %{
+              "id" => drop.id,
+              "planned" => "2",
+              "actual" => "2",
+              "good_id" => good.id,
+              "location_id" => drop_loc.id,
+              "sales_position_id" => sales_id,
+              "sales_title" => label
+            }
+          ]
+        },
+        company,
+        admin
+      )
+
+    assert hd(trip.drops).sales_position_id == sales_id
   end
 end
