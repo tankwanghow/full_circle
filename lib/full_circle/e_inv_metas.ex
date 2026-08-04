@@ -759,8 +759,6 @@ defmodule FullCircle.EInvMetas do
     unit_map = Map.merge(@default_unit_codes, meta.unit_code_map || %{})
     ubl_json = build_invoice_ubl(invoice, com, preview, unit_map)
     encoded = Jason.encode!(ubl_json)
-    require Logger
-    Logger.info("E-Invoice UBL JSON: #{encoded}")
     doc_base64 = Base.encode64(encoded)
     doc_hash = :crypto.hash(:sha256, encoded) |> Base.encode16(case: :lower)
 

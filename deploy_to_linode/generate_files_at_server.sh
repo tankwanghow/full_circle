@@ -39,6 +39,11 @@ services:
       - MAIL_FROM=${MAIL_FROM}
       - UPLOADS_DIR=/app/uploads
     network_mode: host
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 EOF
 
 echo "Creating Nginx conf file for ${DOMAIN_NAME}..."
