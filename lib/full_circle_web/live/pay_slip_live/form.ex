@@ -27,11 +27,12 @@ defmodule FullCircleWeb.PaySlipLive.Form do
         socket.assigns.current_user
       )
 
-    cs = PaySlip.changeset(obj, %{})
+    cs = PaySlip.changeset_for_form(obj, %{})
 
     socket
     |> assign(live_action: :view)
     |> assign(id: id)
+    |> assign(obj: obj)
     |> assign(employee: emp)
     |> assign(page_title: gettext("View Pay Slip") <> " " <> obj.slip_no)
     |> assign(
@@ -39,6 +40,68 @@ defmodule FullCircleWeb.PaySlipLive.Form do
         ~p"/companies/#{socket.assigns.current_company.id}/PunchCard?#{%{"search[employee_name]" => emp.name, "search[month]" => obj.pay_month, "search[year]" => obj.pay_year}}"
     )
     |> assign(form: to_form(cs))
+  end
+
+  @impl true
+  def handle_event(
+        "validate",
+        %{"_target" => ["pay_slip", "funds_account_name"], "pay_slip" => params},
+        socket
+      ) do
+    {params, socket, _} =
+      FullCircleWeb.Helpers.assign_autocomplete_id(
+        socket,
+        params,
+        "funds_account_name",
+        "funds_account_id",
+        &FullCircle.Accounting.get_account_by_name/3
+      )
+
+    {:noreply, assign_form(socket, params)}
+  end
+
+  def handle_event("validate", %{"pay_slip" => params}, socket) do
+    {:noreply, assign_form(socket, params)}
+  end
+
+  @impl true
+  def handle_event("save", %{"pay_slip" => params}, socket) do
+    case PaySlipOp.update_payment_meta(
+           socket.assigns.id,
+           params,
+           socket.assigns.current_company,
+           socket.assigns.current_user
+         ) do
+      {:ok, %{update_payment_meta: _ps}} ->
+        {:noreply,
+         socket
+         |> put_flash(:info, gettext("Pay date and payment account updated."))
+         |> mount_view(socket.assigns.id)}
+
+      {:error, %Ecto.Changeset{} = cs} ->
+        # Keep line items on the form; surface meta-field errors
+        form_cs =
+          PaySlip.changeset_for_form(socket.assigns.obj, params)
+          |> Map.put(:action, :validate)
+          |> merge_meta_errors(cs)
+
+        {:noreply, assign(socket, form: to_form(form_cs))}
+
+      :not_authorise ->
+        {:noreply,
+         put_flash(socket, :error, gettext("You are not authorised to perform this action"))}
+
+      {:period_closed, deadline} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           gettext("Editing for this pay period closed on %{date}", date: deadline)
+         )}
+
+      {:sql_error, msg} ->
+        {:noreply, put_flash(socket, :error, "#{gettext("Failed")} #{msg}")}
+    end
   end
 
   @impl true
@@ -68,12 +131,33 @@ defmodule FullCircleWeb.PaySlipLive.Form do
     end
   end
 
+  defp assign_form(socket, params) do
+    cs =
+      PaySlip.changeset_for_form(socket.assigns.obj, params)
+      |> Map.put(:action, :validate)
+
+    assign(socket, form: to_form(cs))
+  end
+
+  defp merge_meta_errors(form_cs, meta_cs) do
+    Enum.reduce(meta_cs.errors, form_cs, fn {field, {msg, opts}}, acc ->
+      Ecto.Changeset.add_error(acc, field, msg, opts)
+    end)
+  end
+
   @impl true
   def render(assigns) do
     ~H"""
     <div class="w-8/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
       <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
-      <.form for={@form} id="object-form" autocomplete="off" class="mx-auto">
+      <.form
+        for={@form}
+        id="object-form"
+        autocomplete="off"
+        phx-change="validate"
+        phx-submit="save"
+        class="mx-auto"
+      >
         <.input type="hidden" field={@form[:slip_no]} />
         <div class="flex flex-nowrap gap-1 mb-2">
           <div class="w-[25%]">
@@ -81,13 +165,7 @@ defmodule FullCircleWeb.PaySlipLive.Form do
             <.input field={@form[:employee_name]} label={gettext("Employee")} readonly tabindex="-1" />
           </div>
           <div class="w-[15%]">
-            <.input
-              field={@form[:slip_date]}
-              label={gettext("Date")}
-              type="date"
-              readonly
-              tabindex="-1"
-            />
+            <.input field={@form[:slip_date]} label={gettext("Pay Date")} type="date" />
           </div>
           <div class="w-[7%]">
             <.input
@@ -107,14 +185,17 @@ defmodule FullCircleWeb.PaySlipLive.Form do
               tabindex="-1"
             />
           </div>
-          <div class="w-[20%]">
+          <div class="w-[26%]">
             <.input type="hidden" field={@form[:funds_account_id]} />
             <.input
               field={@form[:funds_account_name]}
-              label={gettext("Funds From")}
-              readonly
-              tabindex="-1"
+              label={gettext("Payment Account")}
+              phx-hook="tributeAutoComplete"
+              url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=fundsaccount&name="}
             />
+          </div>
+          <div class="w-[10%] flex items-end">
+            <.save_button form={@form} label={gettext("Save")} />
           </div>
         </div>
 

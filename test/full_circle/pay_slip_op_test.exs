@@ -738,6 +738,161 @@ defmodule FullCircle.PaySlipOpTest do
     end
   end
 
+  describe "update_payment_meta" do
+    setup :setup_payroll
+
+    test "updates pay date and funds account and re-posts GL", %{
+      com: com,
+      admin: admin,
+      employee: emp,
+      salary_type: st,
+      funds_ac: funds,
+      pay_month: mth,
+      pay_year: yr,
+      today: today
+    } do
+      other_funds =
+        account_fixture(
+          %{name: "Bank BCA", account_type: "Cash or Equivalent"},
+          com,
+          admin
+        )
+
+      {:ok, _} =
+        FullCircle.HR.create_salary_note(
+          %{
+            "note_date" => Date.to_iso8601(today),
+            "quantity" => "1",
+            "unit_price" => "3000",
+            "employee_name" => emp.name,
+            "employee_id" => emp.id,
+            "salary_type_name" => st.name,
+            "salary_type_id" => st.id,
+            "descriptions" => "salary"
+          },
+          com,
+          admin
+        )
+
+      {:ok, %{create_pay_slip: ps}} = PaySlipOp.pay(emp, mth, yr, funds.id, com, admin)
+
+      new_date = Date.add(today, 3)
+
+      assert {:ok, %{update_payment_meta: updated}} =
+               PaySlipOp.update_payment_meta(
+                 ps.id,
+                 %{
+                   "slip_date" => Date.to_iso8601(new_date),
+                   "funds_account_name" => other_funds.name,
+                   "funds_account_id" => other_funds.id
+                 },
+                 com,
+                 admin
+               )
+
+      assert updated.slip_date == new_date
+      assert updated.funds_account_id == other_funds.id
+
+      loaded = PaySlipOp.get_pay_slip!(ps.id, com)
+      assert loaded.slip_date == new_date
+      assert loaded.funds_account_id == other_funds.id
+      assert loaded.funds_account_name == other_funds.name
+
+      gl =
+        FullCircle.Repo.all(
+          from(t in FullCircle.Accounting.Transaction,
+            where:
+              t.doc_type == "PaySlip" and t.doc_no == ^ps.slip_no and t.company_id == ^com.id
+          )
+        )
+
+      assert length(gl) == 2
+      assert Enum.all?(gl, &(&1.doc_date == new_date))
+      assert Enum.any?(gl, &(&1.account_id == other_funds.id))
+      refute Enum.any?(gl, &(&1.account_id == funds.id and Decimal.lt?(&1.amount, 0)))
+    end
+
+    test "rejects invalid payment account", %{
+      com: com,
+      admin: admin,
+      employee: emp,
+      salary_type: st,
+      funds_ac: funds,
+      pay_month: mth,
+      pay_year: yr,
+      today: today
+    } do
+      {:ok, _} =
+        FullCircle.HR.create_salary_note(
+          %{
+            "note_date" => Date.to_iso8601(today),
+            "quantity" => "1",
+            "unit_price" => "3000",
+            "employee_name" => emp.name,
+            "employee_id" => emp.id,
+            "salary_type_name" => st.name,
+            "salary_type_id" => st.id,
+            "descriptions" => "salary"
+          },
+          com,
+          admin
+        )
+
+      {:ok, %{create_pay_slip: ps}} = PaySlipOp.pay(emp, mth, yr, funds.id, com, admin)
+
+      assert {:error, %Ecto.Changeset{} = cs} =
+               PaySlipOp.update_payment_meta(
+                 ps.id,
+                 %{
+                   "slip_date" => Date.to_iso8601(today),
+                   "funds_account_name" => "Not A Real Account",
+                   "funds_account_id" => nil
+                 },
+                 com,
+                 admin
+               )
+
+      assert cs.errors[:funds_account_name]
+    end
+
+    test "blocked after period closed", %{
+      com: com,
+      admin: admin
+    } do
+      closed = Timex.shift(Timex.today(), months: -2)
+
+      emp = employee_fixture(%{}, com, admin)
+
+      funds =
+        account_fixture(%{name: "Meta Cash", account_type: "Cash or Equivalent"}, com, admin)
+
+      ps =
+        FullCircle.Repo.insert!(%FullCircle.HR.PaySlip{
+          slip_no: "PS-META-CLOSED",
+          slip_date: Date.new!(closed.year, closed.month, 28),
+          pay_month: closed.month,
+          pay_year: closed.year,
+          employee_id: emp.id,
+          funds_account_id: funds.id,
+          company_id: com.id
+        })
+
+      deadline = PaySlipOp.void_deadline(closed.month, closed.year)
+
+      assert {:period_closed, ^deadline} =
+               PaySlipOp.update_payment_meta(
+                 ps.id,
+                 %{
+                   "slip_date" => Date.to_iso8601(ps.slip_date),
+                   "funds_account_name" => funds.name,
+                   "funds_account_id" => funds.id
+                 },
+                 com,
+                 admin
+               )
+    end
+  end
+
   describe "void deadline" do
     test "void_deadline/2 is the 15th of the following month" do
       assert PaySlipOp.void_deadline(5, 2026) == ~D[2026-06-15]

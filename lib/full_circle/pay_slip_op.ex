@@ -625,6 +625,64 @@ defmodule FullCircle.PaySlipOp do
       {:sql_error, e.postgres.message}
   end
 
+  @doc """
+  Amend pay date (`slip_date`) and/or payment account (`funds_account`) on an
+  existing slip. Re-posts the PaySlip GL with the new date and account.
+  Blocked after the same `void_deadline/2` window as voiding.
+  """
+  def update_payment_meta(pay_slip_id, attrs, com, user) do
+    case can?(user, :update_pay_slip, com) do
+      true ->
+        ps = get_pay_slip!(pay_slip_id, com)
+        deadline = void_deadline(ps.pay_month, ps.pay_year)
+
+        if Date.compare(Timex.today(), deadline) == :gt do
+          {:period_closed, deadline}
+        else
+          do_update_payment_meta(ps, attrs, com, user)
+        end
+
+      false ->
+        :not_authorise
+    end
+  rescue
+    e in Postgrex.Error ->
+      {:sql_error, e.postgres.message}
+  end
+
+  defp do_update_payment_meta(ps, attrs, com, user) do
+    meta = %{
+      "slip_date" => Map.get(attrs, "slip_date") || Map.get(attrs, :slip_date),
+      "funds_account_name" =>
+        Map.get(attrs, "funds_account_name") || Map.get(attrs, :funds_account_name),
+      "funds_account_id" =>
+        Map.get(attrs, "funds_account_id") || Map.get(attrs, :funds_account_id)
+    }
+
+    cs = PaySlip.changeset_payment_meta(ps, meta)
+
+    if cs.valid? do
+      amount = PaySlip.compute_struct_fields(ps).pay_slip_amount
+      name = :update_payment_meta
+
+      Multi.new()
+      |> Multi.update(name, cs)
+      |> Multi.delete_all(
+        :delete_transaction,
+        from(txn in Transaction,
+          where: txn.doc_type == "PaySlip",
+          where: txn.doc_no == ^ps.slip_no,
+          where: txn.company_id == ^com.id
+        )
+      )
+      |> Sys.insert_log_for(name, meta, com, user)
+      |> create_pay_slip_transactions(name, to_string(amount), com, user)
+      |> Repo.transaction()
+    else
+      {:error, cs}
+    end
+  end
+
   defp do_void_pay_slip(ps, com, user) do
     stat =
       from(sn in SalaryNote,

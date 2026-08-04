@@ -1,6 +1,6 @@
 ---
 name: punch-card-payroll
-description: Use when working on FullCircle payroll prep in the Punch Card screen (time_attend_live/punch_card.ex), PaySlipOp (preview/pay/void/recal), pay_preps/PayPrep, salary-note/advance editing or linking, statutory (EPF/SOCSO/EIS/PCB) recompute, or "statutory didn't update / recurring not shown / can't edit linked note" bugs.
+description: Use when working on FullCircle payroll prep in the Punch Card screen (time_attend_live/punch_card.ex), PaySlipOp (preview/pay/void/recal/update_payment_meta), pay_preps/PayPrep, salary-note/advance editing or linking, statutory (EPF/SOCSO/EIS/PCB) recompute, pay date/payment account amendment on an existing slip, or "statutory didn't update / recurring not shown / can't edit linked note" bugs.
 ---
 
 # Punch Card Payroll Prep
@@ -11,13 +11,15 @@ behind it (most caused real bugs).
 
 ## Where create / edit / void live (Punch Card vs PaySlip Form)
 
-The Punch Card is the **only** create/edit path; the PaySlip Form (`pay_slip_live/form.ex`) is a
-**view/print-only document** screen. There are no `:new`/`:recal` form routes — only
-`/PaySlip/:id/view`. Don't re-add form-based create/edit (it would be a second editing path → the
-`cal_func`/duplicate-statutory bugs below).
+The Punch Card is the **only** path for creating a slip and editing its **lines** (notes/advances/
+statutory). The PaySlip Form (`pay_slip_live/form.ex`) is `/PaySlip/:id/view` only — no `:new`/
+`:recal` routes. Don't re-add form-based line create/edit (second editing path → the `cal_func`/
+duplicate-statutory bugs below).
 
 - **Save PaySlip** (Punch Card `pay` event) `push_navigate`s to the saved slip's `/PaySlip/:id/view`
   (extracts the slip from the multi result's `:create_pay_slip`/`:update_pay_slip` key).
+- **Pay date + payment account** *are* editable on the PaySlip Form after create (see next section).
+  Line items, month/year, and totals stay read-only there.
 - **Void** lives on the PaySlip Form, not the Punch Card (the Punch Card has no void button/handler).
   It calls `PaySlipOp.void_pay_slip/3`, then returns to wherever the user came from via
   `push_event(socket, "history_back", %{})` → `window.history.back()` (listener in `app.js`).
@@ -26,6 +28,25 @@ The Punch Card is the **only** create/edit path; the PaySlip Form (`pay_slip_liv
 - Pay Run's "New Pay"/"Card" links and the Form's "Edit in Punch Card" button all route to the Punch
   Card for that employee/month/year (note: if a slip already exists, its notes are linked & locked —
   void to unlock for re-edit).
+
+## Amend pay date / payment account after create
+
+Prepare-now / pay-later is supported: period (`pay_month`/`pay_year`) stays fixed; **pay date**
+(`slip_date`) and **payment account** (`funds_account`) can change on the view form.
+
+- **UI:** PaySlip Form — editable Pay Date + Payment Account (funds autocomplete) + **Save**.
+  Uses `PaySlip.changeset_for_form/2` (no ±15-day-from-today window so older open-period slips
+  still load/edit) and `PaySlipOp.update_payment_meta/4` on submit.
+- **Backend:** `update_payment_meta/4` updates those two fields only, then **deletes and re-posts**
+  the slip's `doc_type: "PaySlip"` GL with the new `doc_date` and funds `account_id`. Amount is
+  recomputed from existing lines (`PaySlip.compute_struct_fields/1`), not re-run from Punch Card.
+- **Validation:** `PaySlip.changeset_payment_meta/2` — required pay date + funds name, `validate_id`
+  for the account, `validate_pay_month_year` (slip_date within ~31 days of period end). No
+  create-time ±15-day window.
+- **Same deadline as void:** blocked with `{:period_closed, deadline}` after `void_deadline/2`
+  (15th of the following month). Auth: `:update_pay_slip`.
+- **Do not** fold this into full `update_pay_slip` / Punch Card re-pay — that re-links notes and
+  recalculates statutory; payment-meta is intentionally a narrow amend.
 
 ## Auto-derived statutory preview (no manual "Calculate")
 

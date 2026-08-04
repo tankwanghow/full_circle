@@ -33,32 +33,46 @@ defmodule FullCircle.HR.PaySlip do
   end
 
   @doc false
-  defp std_changeset(slip, attrs) do
-    slip
-    |> cast(attrs, [
-      :slip_no,
-      :slip_date,
-      :pay_month,
-      :pay_year,
-      :employee_name,
-      :employee_id,
-      :funds_account_name,
-      :funds_account_id,
-      :company_id
-    ])
-    |> validate_required([
-      :slip_no,
-      :slip_date,
-      :pay_month,
-      :pay_year,
-      :employee_name,
-      :funds_account_name,
-      :company_id
-    ])
-    |> validate_id(:employee_name, :employee_id)
-    |> validate_id(:funds_account_name, :funds_account_id)
-    |> validate_date(:slip_date, days_before: 15)
-    |> validate_date(:slip_date, days_after: 15)
+  defp std_changeset(slip, attrs, opts \\ []) do
+    # New payslips enforce ±15 days from today; post-create payment edits only
+    # require the date to stay near the pay period (validate_pay_month_year).
+    date_window? = Keyword.get(opts, :date_window, true)
+
+    cs =
+      slip
+      |> cast(attrs, [
+        :slip_no,
+        :slip_date,
+        :pay_month,
+        :pay_year,
+        :employee_name,
+        :employee_id,
+        :funds_account_name,
+        :funds_account_id,
+        :company_id
+      ])
+      |> validate_required([
+        :slip_no,
+        :slip_date,
+        :pay_month,
+        :pay_year,
+        :employee_name,
+        :funds_account_name,
+        :company_id
+      ])
+      |> validate_id(:employee_name, :employee_id)
+      |> validate_id(:funds_account_name, :funds_account_id)
+
+    cs =
+      if date_window? do
+        cs
+        |> validate_date(:slip_date, days_before: 15)
+        |> validate_date(:slip_date, days_after: 15)
+      else
+        cs
+      end
+
+    cs
     |> validate_pay_month_year()
     |> unsafe_validate_unique([:slip_no, :company_id], FullCircle.Repo,
       message: gettext("has already been taken")
@@ -88,6 +102,25 @@ defmodule FullCircle.HR.PaySlip do
 
   def changeset(slip, attrs) do
     slip |> std_changeset(attrs) |> compute_fields()
+  end
+
+  @doc """
+  Form changeset for an existing pay slip (view + edit pay date / funds account).
+  Skips the ±15-day-from-today window so older slips in an open period remain editable.
+  """
+  def changeset_for_form(slip, attrs) do
+    slip |> std_changeset(attrs, date_window: false) |> compute_fields()
+  end
+
+  @doc """
+  Validates only pay date and payment account for post-create amendments.
+  """
+  def changeset_payment_meta(slip, attrs) do
+    slip
+    |> cast(attrs, [:slip_date, :funds_account_name, :funds_account_id])
+    |> validate_required([:slip_date, :funds_account_name])
+    |> validate_id(:funds_account_name, :funds_account_id)
+    |> validate_pay_month_year()
   end
 
   def compute_struct_fields(sn) do
