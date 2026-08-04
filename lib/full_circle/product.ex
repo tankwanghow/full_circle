@@ -7,6 +7,7 @@ defmodule FullCircle.Product do
 
   alias FullCircle.Product.{
     Good,
+    GoodPriceHistory,
     Packaging
   }
 
@@ -14,6 +15,216 @@ defmodule FullCircle.Product do
 
   def categories() do
     ~w{Egg Chicken Pig Dung Feed FFB Vaccine Additive Others}
+  end
+
+  # PRICE HISTORY (archive + imported lines)
+
+  @doc """
+  Price history lines for a good, newest first.
+
+  `side` is `"sale"`, `"purchase"`, or `nil` for both.
+  """
+  def list_price_history(good_id, company_id, opts \\ []) do
+    side = Keyword.get(opts, :side)
+    limit = Keyword.get(opts, :limit, 200)
+
+    GoodPriceHistory
+    |> where([h], h.good_id == ^good_id and h.company_id == ^company_id)
+    |> then(fn q ->
+      if side in ["sale", "purchase"], do: where(q, [h], h.side == ^side), else: q
+    end)
+    |> order_by([h], desc: h.doc_date, desc: h.inserted_at)
+    |> limit(^limit)
+    |> Repo.all()
+  end
+
+  @doc """
+  Monthly avg/min/max/last unit price for charts and summaries.
+  """
+  def price_history_monthly(good_id, company_id, side \\ nil) do
+    q =
+      from(h in GoodPriceHistory,
+        where: h.good_id == ^good_id and h.company_id == ^company_id and h.unit_price > 0
+      )
+
+    q =
+      if side in ["sale", "purchase"] do
+        from(h in q, where: h.side == ^side)
+      else
+        q
+      end
+
+    from(h in q,
+      group_by: [fragment("date_trunc('month', ?)", h.doc_date), h.side],
+      order_by: [asc: fragment("date_trunc('month', ?)", h.doc_date), asc: h.side],
+      select: %{
+        month: fragment("date_trunc('month', ?)::date", h.doc_date),
+        side: h.side,
+        lines: count(h.id),
+        avg_price: avg(h.unit_price),
+        min_price: min(h.unit_price),
+        max_price: max(h.unit_price),
+        last_price:
+          fragment("(array_agg(? ORDER BY ? DESC))[1]", h.unit_price, h.doc_date)
+      }
+    )
+    |> Repo.all()
+  end
+
+  @doc "Most recent unit price for a good on a given side."
+  def last_price(good_id, company_id, side) when side in ["sale", "purchase"] do
+    GoodPriceHistory
+    |> where(
+      [h],
+      h.good_id == ^good_id and h.company_id == ^company_id and h.side == ^side and
+        h.unit_price > 0
+    )
+    |> order_by([h], desc: h.doc_date, desc: h.inserted_at)
+    |> limit(1)
+    |> select([h], h.unit_price)
+    |> Repo.one()
+  end
+
+  def last_price(_, _, _), do: nil
+
+  @doc """
+  Default commercial egg grade good names used by the egg price chart.
+  """
+  def default_egg_grade_names do
+    [
+      "Egg Grade AA",
+      "Egg Grade A",
+      "Egg Grade B",
+      "Egg Grade C",
+      "Egg Grade D",
+      "Egg Grade E",
+      "Egg Grade F",
+      "Egg Grade White",
+      "Egg Grade Crack"
+    ]
+  end
+
+  @doc """
+  Monthly average unit prices for egg goods, combining imported archive
+  (`good_price_histories`) with live invoice/pur-invoice lines after the
+  archive ends so the series is continuous through today.
+
+  Options:
+    * `:side` - `"sale"` (default) or `"purchase"`
+    * `:from` / `:to` - `Date` range (inclusive)
+    * `:names` - list of good names; defaults to `default_egg_grade_names/0`
+  """
+  def egg_price_history_monthly(company_id, opts \\ []) do
+    side = Keyword.get(opts, :side, "sale")
+    names = Keyword.get(opts, :names) || default_egg_grade_names()
+    to = Keyword.get(opts, :to) || Date.utc_today()
+    from = Keyword.get(opts, :from) || Date.new!(to.year - 10, 1, 1)
+
+    if side not in ["sale", "purchase"] or names == [] do
+      []
+    else
+      archive_end =
+        from(h in GoodPriceHistory,
+          where: h.company_id == ^company_id and h.side == ^side,
+          select: max(h.doc_date)
+        )
+        |> Repo.one()
+
+      live_from =
+        case archive_end do
+          %Date{} = d -> Date.add(d, 1)
+          _ -> from
+        end
+
+      archive_rows = egg_archive_monthly(company_id, side, from, to, names)
+
+      live_rows =
+        if Date.compare(live_from, to) != :gt do
+          egg_live_monthly(company_id, side, max_date(live_from, from), to, names)
+        else
+          []
+        end
+
+      (archive_rows ++ live_rows)
+      |> Enum.sort_by(fn r -> {r.month, r.good_name} end)
+    end
+  end
+
+  defp max_date(a, b) do
+    if Date.compare(a, b) == :lt, do: b, else: a
+  end
+
+  defp egg_archive_monthly(company_id, side, from, to, names) do
+    from(h in GoodPriceHistory,
+      join: g in Good,
+      on: g.id == h.good_id,
+      where:
+        h.company_id == ^company_id and h.side == ^side and h.unit_price > 0 and
+          h.doc_date >= ^from and h.doc_date <= ^to and g.name in ^names,
+      group_by: [fragment("date_trunc('month', ?)::date", h.doc_date), g.name],
+      order_by: [asc: fragment("date_trunc('month', ?)::date", h.doc_date), asc: g.name],
+      select: %{
+        month: fragment("date_trunc('month', ?)::date", h.doc_date),
+        good_name: g.name,
+        avg_price: avg(h.unit_price),
+        min_price: min(h.unit_price),
+        max_price: max(h.unit_price),
+        lines: count(h.id),
+        source: "archive"
+      }
+    )
+    |> Repo.all()
+  end
+
+  defp egg_live_monthly(company_id, "sale", from, to, names) do
+    from(d in FullCircle.Billing.InvoiceDetail,
+      join: i in FullCircle.Billing.Invoice,
+      on: i.id == d.invoice_id,
+      join: g in Good,
+      on: g.id == d.good_id,
+      where:
+        i.company_id == ^company_id and d.unit_price > 0 and d.quantity != 0 and
+          i.invoice_date >= ^from and i.invoice_date <= ^to and g.name in ^names,
+      group_by: [fragment("date_trunc('month', ?)::date", i.invoice_date), g.name],
+      order_by: [asc: fragment("date_trunc('month', ?)::date", i.invoice_date), asc: g.name],
+      select: %{
+        month: fragment("date_trunc('month', ?)::date", i.invoice_date),
+        good_name: g.name,
+        avg_price: avg(d.unit_price),
+        min_price: min(d.unit_price),
+        max_price: max(d.unit_price),
+        lines: count(d.id),
+        source: "live"
+      }
+    )
+    |> Repo.all()
+  end
+
+  defp egg_live_monthly(company_id, "purchase", from, to, names) do
+    from(d in FullCircle.Billing.PurInvoiceDetail,
+      join: i in FullCircle.Billing.PurInvoice,
+      on: i.id == d.pur_invoice_id,
+      join: g in Good,
+      on: g.id == d.good_id,
+      where:
+        i.company_id == ^company_id and d.unit_price > 0 and d.quantity != 0 and
+          i.pur_invoice_date >= ^from and i.pur_invoice_date <= ^to and g.name in ^names,
+      group_by: [fragment("date_trunc('month', ?)::date", i.pur_invoice_date), g.name],
+      order_by: [
+        asc: fragment("date_trunc('month', ?)::date", i.pur_invoice_date),
+        asc: g.name
+      ],
+      select: %{
+        month: fragment("date_trunc('month', ?)::date", i.pur_invoice_date),
+        good_name: g.name,
+        avg_price: avg(d.unit_price),
+        min_price: min(d.unit_price),
+        max_price: max(d.unit_price),
+        lines: count(d.id),
+        source: "live"
+      }
+    )
+    |> Repo.all()
   end
 
   # GOODS

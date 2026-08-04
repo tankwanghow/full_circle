@@ -185,6 +185,13 @@ defmodule FullCircleWeb.DashboardLive do
         <.link navigate={~p"/companies/#{@current_company.id}/feed_egg_report"} class="button gray">
           {gettext("Feed vs Egg Report")}
         </.link>
+        <.link
+          :if={@current_role == "admin"}
+          navigate={~p"/companies/#{@current_company.id}/egg_price_history"}
+          class="button gray"
+        >
+          {gettext("Egg Price History")}
+        </.link>
         <.link navigate={~p"/companies/#{@current_company.id}/egg_stock"} class="button gray">
           {gettext("Egg Stock")}
         </.link>
