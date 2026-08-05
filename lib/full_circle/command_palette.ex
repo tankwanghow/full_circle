@@ -2,8 +2,9 @@ defmodule FullCircle.CommandPalette do
   @moduledoc """
   App-wide command palette facade.
 
-  v1: document-number jump. Future: assistant proposals and rich queries share
-  the same UI shell via `CommandPalette.Router`.
+  Search: document number and contact name → document edit jump.
+  Future: assistant proposals and rich queries share the same UI shell via
+  `CommandPalette.Router`.
   """
 
   alias FullCircle.CommandPalette.Router

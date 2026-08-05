@@ -1,7 +1,7 @@
 # Command Palette — Global Document Search
 
 **Date:** 2026-08-05  
-**Status:** Approved for implementation  
+**Status:** Implemented (v1 doc no + v1.1 contact name)  
 **App:** FullCircle (`full_circle`)  
 **Related:** `docs/superpowers/specs/2026-07-28-assistant-command-bar-design.md` (future mode)
 
@@ -12,20 +12,21 @@
 Users often know a document number (from a phone call, WhatsApp, or printout) but must
 navigate menus and index filters to open it. Global document jump removes that friction.
 
-**Goals (v1)**
+**Goals**
 
 - App-wide **command palette** opened with **Ctrl/Cmd+K**.
-- Search by **document number only** (full or partial, case-insensitive).
+- Search by **document number** (full or partial, case-insensitive).
+- **v1.1:** Search by **contact name** → recent finance documents for matching contacts.
 - Select a hit → open the document **edit form**.
 - Company-scoped, role-aware, fast enough while typing.
 - Architecture leaves room for **assistant** and **rich query** modes later.
 
-**Non-goals (v1)**
+**Non-goals (current)**
 
-- Contact / name / particulars search  
 - Natural language filters (e.g. “swee heng invoice 1/2/2026… egg grade e”)  
 - LLM / assistant actions  
-- Master data (accounts, goods, employees)  
+- Jump to contact master (only documents for that contact)  
+- Master data (accounts, goods, employees) as results  
 - Trading trips, payroll docs, weighings  
 - Print view as primary destination  
 
@@ -39,9 +40,10 @@ navigate menus and index filters to open it. Global document jump removes that f
 | UI | Command palette (modal), not a permanent header search box |
 | Open | `Ctrl+K` / `Cmd+K`; optional header icon that opens the same modal |
 | Close | `Esc`, backdrop click, or navigate away |
-| Match field | `doc_no` only |
+| Match fields | `doc_no` **or** contact `name` (documents for matching contacts) |
 | Min query length | 2 characters |
-| Match style | Case-insensitive substring (`ILIKE %terms%`), ranked by `word_similarity` then date |
+| Match style | Case-insensitive substring (`ILIKE %terms%`); doc no ranked by `word_similarity`; contact docs by date |
+| Merge | Doc-number hits first, then contact-name docs; de-dupe `{doc_type, doc_id}`; cap 20 |
 | Max hits | 20 |
 | Select | Arrow keys + Enter, or click → edit form |
 | Auth | Only types the user can `:update_*` |
@@ -86,7 +88,9 @@ Ctrl/Cmd+K
 |--------|----------------|
 | `FullCircle.CommandPalette` | Facade: `dispatch/3` |
 | `FullCircle.CommandPalette.Router` | Mode selection; extension point for assistant / rich query |
-| `FullCircle.CommandPalette.DocNoSearch` | Query, de-dupe, auth type filter, map to hits |
+| `FullCircle.CommandPalette.Types` | Shared type specs, auth filter, hit mapping |
+| `FullCircle.CommandPalette.DocNoSearch` | Match `doc_no` on transactions |
+| `FullCircle.CommandPalette.ContactDocSearch` | Match contacts by name → recent docs |
 | `FullCircle.CommandPalette.Hit` | Struct: type, ids, no, date, contact, label, path |
 | `FullCircleWeb.CommandPaletteComponent` | Modal UI + keyboard |
 | JS hook `CommandPalette` | Global Ctrl/Cmd+K; optional custom event from header |

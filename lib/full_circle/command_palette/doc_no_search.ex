@@ -4,36 +4,22 @@ defmodule FullCircle.CommandPalette.DocNoSearch do
   """
 
   import Ecto.Query, warn: false
-  import FullCircle.Authorization
 
   alias FullCircle.Repo
   alias FullCircle.Sys
   alias FullCircle.Accounting.{Contact, Transaction}
-  alias FullCircle.CommandPalette.Hit
-
-  @type_specs [
-    {"Invoice", :update_invoice, "Invoice", "Invoice"},
-    {"PurInvoice", :update_pur_invoice, "Purchase Invoice", "PurInvoice"},
-    {"Receipt", :update_receipt, "Receipt", "Receipt"},
-    {"Payment", :update_payment, "Payment", "Payment"},
-    {"CreditNote", :update_credit_note, "Credit Note", "CreditNote"},
-    {"DebitNote", :update_debit_note, "Debit Note", "DebitNote"},
-    {"Journal", :update_journal, "Journal", "Journal"}
-  ]
-
-  @min_length 2
-  @limit 20
+  alias FullCircle.CommandPalette.Types
 
   @doc """
-  Search company documents by partial `doc_no`. Returns at most #{@limit} hits.
+  Search company documents by partial `doc_no`.
   """
   def search(company, user, terms) when is_binary(terms) do
     terms = String.trim(terms)
 
-    if String.length(terms) < @min_length do
+    if String.length(terms) < Types.min_length() do
       []
     else
-      allowed = allowed_types(company, user)
+      allowed = Types.allowed_types(company, user)
 
       if allowed == [] do
         []
@@ -43,15 +29,9 @@ defmodule FullCircle.CommandPalette.DocNoSearch do
     end
   end
 
-  defp allowed_types(company, user) do
-    for {doc_type, action, _label, _route} <- @type_specs,
-        can?(user, action, company),
-        do: doc_type
-  end
-
   defp do_search(company, user, terms, allowed_types) do
-    pattern = "%#{escape_like(terms)}%"
-    meta = Map.new(@type_specs, fn {t, _a, label, route} -> {t, {label, route}} end)
+    pattern = "%#{Types.escape_like(terms)}%"
+    meta = Types.type_meta()
 
     from(t in Transaction,
       join: com in subquery(Sys.user_company(company, user)),
@@ -67,7 +47,7 @@ defmodule FullCircle.CommandPalette.DocNoSearch do
         desc: t.doc_date,
         asc: t.doc_no
       ],
-      limit: ^@limit,
+      limit: ^Types.limit(),
       select: %{
         doc_type: t.doc_type,
         doc_id: t.doc_id,
@@ -77,33 +57,7 @@ defmodule FullCircle.CommandPalette.DocNoSearch do
       }
     )
     |> Repo.all()
-    |> Enum.map(&to_hit(&1, company.id, meta))
+    |> Enum.map(&Types.to_hit(&1, company.id, meta))
     |> Enum.reject(&is_nil/1)
-  end
-
-  defp to_hit(row, company_id, meta) do
-    case Map.get(meta, row.doc_type) do
-      {label, route_seg} ->
-        %Hit{
-          doc_type: row.doc_type,
-          doc_id: row.doc_id,
-          doc_no: row.doc_no,
-          doc_date: row.doc_date,
-          contact_name: row.contact_name,
-          label: label,
-          path: "/companies/#{company_id}/#{route_seg}/#{row.doc_id}/edit"
-        }
-
-      nil ->
-        nil
-    end
-  end
-
-  # Escape LIKE metacharacters so user input is literal.
-  defp escape_like(terms) do
-    terms
-    |> String.replace("\\", "\\\\")
-    |> String.replace("%", "\\%")
-    |> String.replace("_", "\\_")
   end
 end

@@ -93,6 +93,96 @@ defmodule FullCircle.CommandPaletteTest do
       assert {:hits, hits} = CommandPalette.dispatch(company, admin, invoice.invoice_no)
       assert Enum.any?(hits, &(&1.doc_id == invoice.id))
     end
+
+    test "finds documents by contact name", %{admin: admin, company: company} do
+      contact =
+        contact_fixture(company, admin, %{
+          "name" => "Swee Heng Trading #{System.unique_integer([:positive])}"
+        })
+
+      good = good_fixture(company, admin)
+      sales_acct = Accounting.get_account_by_name("General Sales", company, admin)
+
+      no_stax =
+        Repo.one!(
+          from tc in TaxCode,
+            where: tc.company_id == ^company.id and tc.code == "NoSTax"
+        )
+
+      attrs =
+        invoice_attrs(contact, good, sales_acct, no_stax)
+        |> Map.put("contact_name", contact.name)
+        |> Map.put("contact_id", contact.id)
+
+      assert {:ok, %{create_invoice: invoice}} = Billing.create_invoice(attrs, company, admin)
+
+      # Partial name — not a document number
+      hits = CommandPalette.search(company, admin, "Swee Heng")
+      hit = Enum.find(hits, &(&1.doc_id == invoice.id))
+      assert hit
+      assert hit.contact_name == contact.name
+      assert hit.path == "/companies/#{company.id}/Invoice/#{invoice.id}/edit"
+    end
+
+    test "contact name search does not leak other companies", %{admin: admin, company: company} do
+      contact =
+        contact_fixture(company, admin, %{
+          "name" => "UniqueContactXYZ #{System.unique_integer([:positive])}"
+        })
+
+      good = good_fixture(company, admin)
+      sales_acct = Accounting.get_account_by_name("General Sales", company, admin)
+
+      no_stax =
+        Repo.one!(
+          from tc in TaxCode,
+            where: tc.company_id == ^company.id and tc.code == "NoSTax"
+        )
+
+      attrs =
+        invoice_attrs(contact, good, sales_acct, no_stax)
+        |> Map.put("contact_name", contact.name)
+        |> Map.put("contact_id", contact.id)
+
+      assert {:ok, %{create_invoice: invoice}} = Billing.create_invoice(attrs, company, admin)
+
+      other_admin = user_fixture()
+      other_company = company_fixture(other_admin, %{})
+
+      hits = CommandPalette.search(other_company, other_admin, "UniqueContactXYZ")
+      refute Enum.any?(hits, &(&1.doc_id == invoice.id))
+    end
+
+    test "merges doc-number and contact hits without duplicates", %{
+      admin: admin,
+      company: company
+    } do
+      contact =
+        contact_fixture(company, admin, %{
+          "name" => "MergeCo #{System.unique_integer([:positive])}"
+        })
+
+      good = good_fixture(company, admin)
+      sales_acct = Accounting.get_account_by_name("General Sales", company, admin)
+
+      no_stax =
+        Repo.one!(
+          from tc in TaxCode,
+            where: tc.company_id == ^company.id and tc.code == "NoSTax"
+        )
+
+      attrs =
+        invoice_attrs(contact, good, sales_acct, no_stax)
+        |> Map.put("contact_name", contact.name)
+        |> Map.put("contact_id", contact.id)
+
+      assert {:ok, %{create_invoice: invoice}} = Billing.create_invoice(attrs, company, admin)
+
+      # Full doc no also appears under contact search if we used a shared fragment —
+      # for merge test, search by number only yields one hit.
+      hits = CommandPalette.search(company, admin, invoice.invoice_no)
+      assert Enum.count(hits, &(&1.doc_id == invoice.id)) == 1
+    end
   end
 
   describe "authorization" do

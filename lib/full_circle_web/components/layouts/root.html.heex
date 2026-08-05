@@ -40,7 +40,7 @@
           :if={assigns[:current_company] && @current_role != "punch_camera"}
           type="button"
           id="command-palette-trigger"
-          title={gettext("Search documents (Ctrl+K)")}
+          title={gettext("Search documents or contacts (Ctrl+K)")}
           class="rounded hover:bg-gray-400 p-2 flex items-center gap-1"
           onclick="window.dispatchEvent(new CustomEvent('fc-open-command-palette'))"
         >
