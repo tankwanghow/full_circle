@@ -1,7 +1,7 @@
 # Command Palette — Global Document Search
 
 **Date:** 2026-08-05  
-**Status:** Implemented (v1 doc no + v1.1 contact name)  
+**Status:** Implemented (search + create actions)  
 **App:** FullCircle (`full_circle`)  
 **Related:** `docs/superpowers/specs/2026-07-28-assistant-command-bar-design.md` (future mode)
 
@@ -17,8 +17,10 @@ navigate menus and index filters to open it. Global document jump removes that f
 - App-wide **command palette** opened with **Ctrl/Cmd+K**.
 - Search by **document number** (full or partial, case-insensitive).
 - **v1.1:** Search by **contact name** → recent finance documents for matching contacts.
-- Select a hit → open the document **edit form**.
+- **v1.2:** Create actions via **compound tokens** (`newinv`, `newpur`, `newcn`, …) → `/new` form.
+- Select a hit → open edit form (search) or create form (action).
 - Company-scoped, role-aware, fast enough while typing.
+- Single shortcut **Ctrl/Cmd+K** (not two chords).
 - Architecture leaves room for **assistant** and **rich query** modes later.
 
 **Non-goals (current)**
@@ -42,6 +44,8 @@ navigate menus and index filters to open it. Global document jump removes that f
 | Close | `Esc`, backdrop click, or navigate away |
 | Match fields | `doc_no` **or** contact `name` (documents for matching contacts) |
 | Type keywords | Optional whole tokens: `inv`, `invoice`, `pinv`, `receipt`/`rc`, `payment`/`pv`, `cn`, `dn`, `journal`/`js` — filter doc types (`swee heng inv`) |
+| Create actions | Single token only: `newinv`, `newinvoice`, `newpur`, `newpinv`, `newrc`, `newpv`, `newcn`, `newcreditnote`, `newdn`, `newdebitnote`, `newjs`, `newjournal` (prefix `new` lists all). Auth uses `:create_*`. |
+| Action vs contact | Multi-word input never runs actions — contact “New Asia” stays search-only |
 | Min query length | 2 characters |
 | Match style | Case-insensitive substring (`ILIKE %terms%`); doc no ranked by `word_similarity`; contact docs by date |
 | Merge | Doc-number hits first, then contact-name docs; de-dupe `{doc_type, doc_id}`; cap 20 |

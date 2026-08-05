@@ -1,12 +1,18 @@
 defmodule FullCircle.CommandPalette.Router do
   @moduledoc """
-  Chooses how to interpret palette input.
+  Command palette routing.
 
-  Search: document number + contact name + optional type keywords
-  (`swee heng inv`). Later: structured date/good query / assistant.
+  - **Actions** (single token): `newinv`, `newpur`, `newcn`, …
+  - **Search**: document number, contact name, optional type keywords (`swee heng inv`)
   """
 
-  alias FullCircle.CommandPalette.{ContactDocSearch, DocNoSearch, Query, Types}
+  alias FullCircle.CommandPalette.{
+    ActionSearch,
+    ContactDocSearch,
+    DocNoSearch,
+    Query,
+    Types
+  }
 
   @type outcome ::
           {:hits, [FullCircle.CommandPalette.Hit.t()]}
@@ -23,17 +29,18 @@ defmodule FullCircle.CommandPalette.Router do
     if String.length(terms) < Types.min_length() do
       {:hits, []}
     else
-      q = Query.parse(terms)
-      {:hits, merge_hits(company, user, q)}
+      {:hits, merge_hits(company, user, terms)}
     end
   end
 
-  # Doc-number matches first, then contact-name docs. De-dupe; cap at limit.
-  defp merge_hits(company, user, %Query{} = q) do
+  # Actions first, then document hits. De-dupe documents only.
+  defp merge_hits(company, user, terms) do
+    actions = ActionSearch.search(company, user, terms)
+    q = Query.parse(terms)
     by_no = DocNoSearch.search(company, user, q)
     by_contact = ContactDocSearch.search(company, user, q)
 
-    {merged, _seen} =
+    {docs, _seen} =
       Enum.reduce(by_no ++ by_contact, {[], MapSet.new()}, fn hit, {acc, seen} ->
         key = {hit.doc_type, hit.doc_id}
 
@@ -44,6 +51,21 @@ defmodule FullCircle.CommandPalette.Router do
         end
       end)
 
-    Enum.take(merged, Types.limit())
+    # Prefer pure action match: if user typed an action token, don't flood with unrelated docs
+    hits =
+      if actions != [] and single_token?(terms) and action_like?(terms) do
+        actions
+      else
+        actions ++ docs
+      end
+
+    Enum.take(hits, Types.limit())
+  end
+
+  defp single_token?(terms), do: not String.match?(terms, ~r/\s/)
+
+  defp action_like?(terms) do
+    n = Types.normalize_token(terms)
+    String.starts_with?(n, "new")
   end
 end

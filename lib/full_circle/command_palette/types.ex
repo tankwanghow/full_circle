@@ -4,7 +4,7 @@ defmodule FullCircle.CommandPalette.Types do
   import FullCircle.Authorization
   alias FullCircle.CommandPalette.Hit
 
-  # {doc_type, auth_action, display_label, route_segment}
+  # {doc_type, update_action, display_label, route_segment}
   @type_specs [
     {"Invoice", :update_invoice, "Invoice", "Invoice"},
     {"PurInvoice", :update_pur_invoice, "Purchase Invoice", "PurInvoice"},
@@ -15,9 +15,25 @@ defmodule FullCircle.CommandPalette.Types do
     {"Journal", :update_journal, "Journal", "Journal"}
   ]
 
+  # Create actions: compound tokens (no spaces) so they never clash with contact names.
+  # {keys, doc_type, create_action, label, route_segment}
+  @create_specs [
+    {~w(newinv newinvoice), "Invoice", :create_invoice, "New Invoice", "Invoice"},
+    {~w(newpur newpinv newpurchase newpurinvoice), "PurInvoice", :create_pur_invoice,
+     "New Purchase Invoice", "PurInvoice"},
+    {~w(newrc newrec newreceipt), "Receipt", :create_receipt, "New Receipt", "Receipt"},
+    {~w(newpv newpay newpayment), "Payment", :create_payment, "New Payment", "Payment"},
+    {~w(newcn newcredit newcreditnote), "CreditNote", :create_credit_note, "New Credit Note",
+     "CreditNote"},
+    {~w(newdn newdebit newdebitnote), "DebitNote", :create_debit_note, "New Debit Note",
+     "DebitNote"},
+    {~w(newjs newjv newjournal), "Journal", :create_journal, "New Journal", "Journal"}
+  ]
+
   def min_length, do: 2
   def limit, do: 20
   def type_specs, do: @type_specs
+  def create_specs, do: @create_specs
 
   def allowed_types(company, user) do
     for {doc_type, action, _label, _route} <- @type_specs,
@@ -33,6 +49,7 @@ defmodule FullCircle.CommandPalette.Types do
     case Map.get(meta, row.doc_type) do
       {label, route_seg} ->
         %Hit{
+          kind: :document,
           doc_type: row.doc_type,
           doc_id: row.doc_id,
           doc_no: row.doc_no,
@@ -52,5 +69,11 @@ defmodule FullCircle.CommandPalette.Types do
     |> String.replace("\\", "\\\\")
     |> String.replace("%", "\\%")
     |> String.replace("_", "\\_")
+  end
+
+  def normalize_token(token) when is_binary(token) do
+    token
+    |> String.downcase()
+    |> String.replace(~r/[^a-z]/, "")
   end
 end

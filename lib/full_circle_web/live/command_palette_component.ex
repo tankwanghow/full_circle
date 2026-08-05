@@ -1,6 +1,8 @@
 defmodule FullCircleWeb.CommandPaletteComponent do
   @moduledoc """
-  App-wide command palette (Ctrl/Cmd+K). v1: document number → edit form.
+  App-wide command palette (Ctrl/Cmd+K).
+
+  Search documents/contacts, or run create actions (`newinv`, `newpur`, …).
   """
   use FullCircleWeb, :live_component
 
@@ -101,6 +103,10 @@ defmodule FullCircleWeb.CommandPaletteComponent do
     |> assign(:selected, 0)
   end
 
+  defp subtitle(%{kind: :action, contact_name: key}) when is_binary(key) do
+    gettext("Create · type %{key}", key: key)
+  end
+
   defp subtitle(hit) do
     date =
       case hit.doc_date do
@@ -112,6 +118,12 @@ defmodule FullCircleWeb.CommandPaletteComponent do
     |> Enum.reject(&(is_nil(&1) or &1 == ""))
     |> Enum.join(" · ")
   end
+
+  defp primary_text(%{kind: :action, doc_no: title}), do: title
+  defp primary_text(%{doc_no: no}), do: no
+
+  defp badge_class(:action), do: "bg-sky-800 text-sky-200"
+  defp badge_class(_), do: "bg-gray-700 text-amber-300"
 
   @impl true
   def render(assigns) do
@@ -143,7 +155,7 @@ defmodule FullCircleWeb.CommandPaletteComponent do
                 name="terms"
                 value={@terms}
                 phx-debounce="250"
-                placeholder={gettext("Doc no, contact, or “name inv”…")}
+                placeholder={gettext("Search docs, or newinv / newpur / newcn…")}
                 class="w-full bg-transparent border-0 text-white placeholder:text-gray-500 focus:ring-0 focus:outline-none py-2"
                 autocomplete="off"
                 autofocus
@@ -164,7 +176,7 @@ defmodule FullCircleWeb.CommandPaletteComponent do
               :if={@hits == []}
               class="px-4 py-6 text-center text-gray-400 text-sm"
             >
-              {gettext("No documents found")}
+              {gettext("No matches")}
             </li>
             <li
               :for={{hit, index} <- Enum.with_index(@hits)}
@@ -181,11 +193,14 @@ defmodule FullCircleWeb.CommandPaletteComponent do
               phx-target={@myself}
               phx-mouseover="hover"
             >
-              <span class="shrink-0 rounded bg-gray-700 px-2 py-0.5 text-xs font-medium text-amber-300 w-28 text-center truncate">
+              <span class={[
+                "shrink-0 rounded px-2 py-0.5 text-xs font-medium w-28 text-center truncate",
+                badge_class(hit.kind)
+              ]}>
                 {hit.label}
               </span>
               <div class="min-w-0 flex-1">
-                <div class="font-semibold truncate">{hit.doc_no}</div>
+                <div class="font-semibold truncate">{primary_text(hit)}</div>
                 <div :if={subtitle(hit) != ""} class="text-xs text-gray-400 truncate">
                   {subtitle(hit)}
                 </div>
@@ -198,10 +213,11 @@ defmodule FullCircleWeb.CommandPaletteComponent do
             </li>
           </ul>
 
-          <div class="border-t border-gray-700 px-3 py-2 text-xs text-gray-500 flex flex-wrap gap-3">
+          <div class="border-t border-gray-700 px-3 py-2 text-xs text-gray-500 flex flex-wrap gap-x-3 gap-y-1">
             <span><kbd class="border border-gray-600 rounded px-1">↑↓</kbd> {gettext("navigate")}</span>
             <span><kbd class="border border-gray-600 rounded px-1">↵</kbd> {gettext("open")}</span>
             <span><kbd class="border border-gray-600 rounded px-1">esc</kbd> {gettext("close")}</span>
+            <span class="text-gray-600">{gettext("actions: newinv newpur newrc newpv newcn newdn newjs")}</span>
           </div>
         </div>
       </div>

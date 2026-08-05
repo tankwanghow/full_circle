@@ -242,6 +242,59 @@ defmodule FullCircle.CommandPaletteTest do
     end
   end
 
+  describe "create actions" do
+    test "newinv opens invoice create path", %{admin: admin, company: company} do
+      hits = CommandPalette.search(company, admin, "newinv")
+      assert [%{kind: :action, doc_type: "Invoice", path: path}] = hits
+      assert path == "/companies/#{company.id}/Invoice/new"
+    end
+
+    test "newpur and aliases", %{admin: admin, company: company} do
+      for term <- ~w(newpur newpinv newpurchase) do
+        hits = CommandPalette.search(company, admin, term)
+        assert Enum.any?(hits, &(&1.kind == :action and &1.doc_type == "PurInvoice"))
+        assert Enum.any?(hits, &(&1.path == "/companies/#{company.id}/PurInvoice/new"))
+      end
+    end
+
+    test "all finance create tokens", %{admin: admin, company: company} do
+      expected = %{
+        "newrc" => {"Receipt", "Receipt"},
+        "newpv" => {"Payment", "Payment"},
+        "newcn" => {"CreditNote", "CreditNote"},
+        "newdn" => {"DebitNote", "DebitNote"},
+        "newjs" => {"Journal", "Journal"},
+        "newdebitnote" => {"DebitNote", "DebitNote"},
+        "newcreditnote" => {"CreditNote", "CreditNote"}
+      }
+
+      for {term, {doc_type, route}} <- expected do
+        hits = CommandPalette.search(company, admin, term)
+        hit = Enum.find(hits, &(&1.kind == :action and &1.doc_type == doc_type))
+        assert hit, "expected action for #{term}"
+        assert hit.path == "/companies/#{company.id}/#{route}/new"
+      end
+    end
+
+    test "prefix new lists create actions", %{admin: admin, company: company} do
+      hits = CommandPalette.search(company, admin, "new")
+      assert Enum.all?(hits, &(&1.kind == :action))
+      assert length(hits) >= 7
+    end
+
+    test "spaced input is never an action (contact-safe)", %{admin: admin, company: company} do
+      hits = CommandPalette.search(company, admin, "new inv")
+      refute Enum.any?(hits, &(&1.kind == :action))
+    end
+
+    test "guest cannot create invoice action", %{admin: admin, company: company} do
+      guest = user_fixture()
+      assert {:ok, _} = Sys.add_user_to_company(company, guest.email, "guest", admin)
+      hits = CommandPalette.search(company, guest, "newinv")
+      refute Enum.any?(hits, &(&1.kind == :action and &1.doc_type == "Invoice"))
+    end
+  end
+
   describe "authorization" do
     test "guest role gets no invoice hits", %{admin: admin, company: company} do
       guest = user_fixture()

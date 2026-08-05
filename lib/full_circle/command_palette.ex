@@ -1,10 +1,9 @@
 defmodule FullCircle.CommandPalette do
   @moduledoc """
-  App-wide command palette facade.
+  App-wide command palette (Ctrl/Cmd+K).
 
-  Search: document number and contact name → document edit jump.
-  Future: assistant proposals and rich queries share the same UI shell via
-  `CommandPalette.Router`.
+  - **Search:** document number, contact name, type keywords (`swee heng inv`)
+  - **Actions:** compound tokens (`newinv`, `newpur`, `newcn`, …) → create form
   """
 
   alias FullCircle.CommandPalette.Router
@@ -17,7 +16,7 @@ defmodule FullCircle.CommandPalette do
   end
 
   @doc """
-  Convenience for v1 callers that only need hit lists.
+  Convenience for callers that only need hit lists.
   """
   def search(company, user, text) do
     case dispatch(company, user, text) do

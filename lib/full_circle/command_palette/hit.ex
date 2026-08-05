@@ -1,10 +1,11 @@
 defmodule FullCircle.CommandPalette.Hit do
   @moduledoc """
-  One command-palette search result (document jump, v1).
+  One command-palette result: an existing document or a create action.
   """
 
-  @enforce_keys [:doc_type, :doc_id, :doc_no, :label, :path]
+  @enforce_keys [:kind, :label, :path]
   defstruct [
+    :kind,
     :doc_type,
     :doc_id,
     :doc_no,
@@ -14,10 +15,13 @@ defmodule FullCircle.CommandPalette.Hit do
     :path
   ]
 
+  @type kind :: :document | :action
+
   @type t :: %__MODULE__{
-          doc_type: String.t(),
-          doc_id: Ecto.UUID.t(),
-          doc_no: String.t(),
+          kind: kind(),
+          doc_type: String.t() | nil,
+          doc_id: Ecto.UUID.t() | nil,
+          doc_no: String.t() | nil,
           doc_date: Date.t() | nil,
           contact_name: String.t() | nil,
           label: String.t(),
