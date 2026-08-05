@@ -41,6 +41,7 @@ navigate menus and index filters to open it. Global document jump removes that f
 | Open | `Ctrl+K` / `Cmd+K`; optional header icon that opens the same modal |
 | Close | `Esc`, backdrop click, or navigate away |
 | Match fields | `doc_no` **or** contact `name` (documents for matching contacts) |
+| Type keywords | Optional whole tokens: `inv`, `invoice`, `pinv`, `receipt`/`rc`, `payment`/`pv`, `cn`, `dn`, `journal`/`js` — filter doc types (`swee heng inv`) |
 | Min query length | 2 characters |
 | Match style | Case-insensitive substring (`ILIKE %terms%`); doc no ranked by `word_similarity`; contact docs by date |
 | Merge | Doc-number hits first, then contact-name docs; de-dupe `{doc_type, doc_id}`; cap 20 |

@@ -2,11 +2,11 @@ defmodule FullCircle.CommandPalette.Router do
   @moduledoc """
   Chooses how to interpret palette input.
 
-  v1–v1.1: document number + contact name → document hits.
-  Later: structured query / assistant proposals.
+  Search: document number + contact name + optional type keywords
+  (`swee heng inv`). Later: structured date/good query / assistant.
   """
 
-  alias FullCircle.CommandPalette.{ContactDocSearch, DocNoSearch, Types}
+  alias FullCircle.CommandPalette.{ContactDocSearch, DocNoSearch, Query, Types}
 
   @type outcome ::
           {:hits, [FullCircle.CommandPalette.Hit.t()]}
@@ -23,15 +23,15 @@ defmodule FullCircle.CommandPalette.Router do
     if String.length(terms) < Types.min_length() do
       {:hits, []}
     else
-      {:hits, merge_hits(company, user, terms)}
+      q = Query.parse(terms)
+      {:hits, merge_hits(company, user, q)}
     end
   end
 
-  # Doc-number matches first (user often has a number), then contact-name docs.
-  # De-dupe by {doc_type, doc_id}. Cap at Types.limit().
-  defp merge_hits(company, user, terms) do
-    by_no = DocNoSearch.search(company, user, terms)
-    by_contact = ContactDocSearch.search(company, user, terms)
+  # Doc-number matches first, then contact-name docs. De-dupe; cap at limit.
+  defp merge_hits(company, user, %Query{} = q) do
+    by_no = DocNoSearch.search(company, user, q)
+    by_contact = ContactDocSearch.search(company, user, q)
 
     {merged, _seen} =
       Enum.reduce(by_no ++ by_contact, {[], MapSet.new()}, fn hit, {acc, seen} ->

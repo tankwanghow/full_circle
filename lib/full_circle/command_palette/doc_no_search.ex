@@ -8,18 +8,22 @@ defmodule FullCircle.CommandPalette.DocNoSearch do
   alias FullCircle.Repo
   alias FullCircle.Sys
   alias FullCircle.Accounting.{Contact, Transaction}
-  alias FullCircle.CommandPalette.Types
+  alias FullCircle.CommandPalette.{Query, Types}
 
   @doc """
-  Search company documents by partial `doc_no`.
+  Search by partial `doc_no`. Accepts a raw string or a parsed `Query`.
+
+  When the query has type filters, only those doc types are returned.
+  Doc-number text is the full raw input, or the non-type tokens when types
+  were stripped (so `"inv 001"` searches doc_no for `001` among invoices).
   """
-  def search(company, user, terms) when is_binary(terms) do
-    terms = String.trim(terms)
+  def search(company, user, %Query{} = q) do
+    terms = doc_no_terms(q)
 
     if String.length(terms) < Types.min_length() do
       []
     else
-      allowed = Types.allowed_types(company, user)
+      allowed = narrow_types(company, user, q.doc_types)
 
       if allowed == [] do
         []
@@ -27,6 +31,21 @@ defmodule FullCircle.CommandPalette.DocNoSearch do
         do_search(company, user, terms, allowed)
       end
     end
+  end
+
+  def search(company, user, terms) when is_binary(terms) do
+    search(company, user, Query.parse(terms))
+  end
+
+  # Prefer non-type tokens when present ("inv 001" → "001"); else full raw ("INV-12" or "inv").
+  defp doc_no_terms(%Query{contact_terms: ct}) when ct != "", do: ct
+  defp doc_no_terms(%Query{raw: raw}), do: raw
+
+  defp narrow_types(company, user, nil), do: Types.allowed_types(company, user)
+
+  defp narrow_types(company, user, wanted) do
+    allowed = MapSet.new(Types.allowed_types(company, user))
+    Enum.filter(wanted, &MapSet.member?(allowed, &1))
   end
 
   defp do_search(company, user, terms, allowed_types) do

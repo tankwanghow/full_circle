@@ -1,6 +1,7 @@
 defmodule FullCircle.CommandPalette.ContactDocSearch do
   @moduledoc """
-  Find finance documents whose contact name matches the search terms.
+  Find finance documents whose contact name matches the search terms,
+  optionally filtered by document type keywords (`inv`, `receipt`, …).
   """
 
   import Ecto.Query, warn: false
@@ -8,25 +9,25 @@ defmodule FullCircle.CommandPalette.ContactDocSearch do
   alias FullCircle.Repo
   alias FullCircle.Sys
   alias FullCircle.Accounting.{Contact, Transaction}
-  alias FullCircle.CommandPalette.Types
+  alias FullCircle.CommandPalette.{Query, Types}
 
   @max_contacts 5
 
   @doc """
-  Match contacts by name, then return their recent documents (same v1 types).
+  Match contacts by name, then return their recent documents.
   """
-  def search(company, user, terms) when is_binary(terms) do
-    terms = String.trim(terms)
+  def search(company, user, %Query{} = q) do
+    name_terms = q.contact_terms
 
-    if String.length(terms) < Types.min_length() do
+    if String.length(name_terms) < Types.min_length() do
       []
     else
-      allowed = Types.allowed_types(company, user)
+      allowed = narrow_types(company, user, q.doc_types)
 
       if allowed == [] do
         []
       else
-        contact_ids = match_contact_ids(company, user, terms)
+        contact_ids = match_contact_ids(company, user, name_terms)
 
         if contact_ids == [] do
           []
@@ -35,6 +36,17 @@ defmodule FullCircle.CommandPalette.ContactDocSearch do
         end
       end
     end
+  end
+
+  def search(company, user, terms) when is_binary(terms) do
+    search(company, user, Query.parse(terms))
+  end
+
+  defp narrow_types(company, user, nil), do: Types.allowed_types(company, user)
+
+  defp narrow_types(company, user, wanted) do
+    allowed = MapSet.new(Types.allowed_types(company, user))
+    Enum.filter(wanted, &MapSet.member?(allowed, &1))
   end
 
   defp match_contact_ids(company, user, terms) do
