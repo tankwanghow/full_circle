@@ -265,7 +265,9 @@ defmodule FullCircle.CommandPaletteTest do
         "newdn" => {"DebitNote", "DebitNote"},
         "newjs" => {"Journal", "Journal"},
         "newdebitnote" => {"DebitNote", "DebitNote"},
-        "newcreditnote" => {"CreditNote", "CreditNote"}
+        "newcreditnote" => {"CreditNote", "CreditNote"},
+        "newdep" => {"Deposit", "Deposit"},
+        "newdeposit" => {"Deposit", "Deposit"}
       }
 
       for {term, {doc_type, route}} <- expected do
@@ -279,7 +281,7 @@ defmodule FullCircle.CommandPaletteTest do
     test "prefix new lists create actions", %{admin: admin, company: company} do
       hits = CommandPalette.search(company, admin, "new")
       assert Enum.all?(hits, &(&1.kind == :action))
-      assert length(hits) >= 7
+      assert length(hits) >= 8
     end
 
     test "spaced input is never an action (contact-safe)", %{admin: admin, company: company} do

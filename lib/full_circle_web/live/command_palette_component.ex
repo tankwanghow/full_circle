@@ -217,7 +217,7 @@ defmodule FullCircleWeb.CommandPaletteComponent do
             <span><kbd class="border border-gray-600 rounded px-1">↑↓</kbd> {gettext("navigate")}</span>
             <span><kbd class="border border-gray-600 rounded px-1">↵</kbd> {gettext("open")}</span>
             <span><kbd class="border border-gray-600 rounded px-1">esc</kbd> {gettext("close")}</span>
-            <span class="text-gray-600">{gettext("actions: newinv newpur newrc newpv newcn newdn newjs")}</span>
+            <span class="text-gray-600">{gettext("actions: newinv newpur newrc newpv newcn newdn newjs newdep")}</span>
           </div>
         </div>
       </div>

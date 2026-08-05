@@ -27,7 +27,8 @@ defmodule FullCircle.CommandPalette.Types do
      "CreditNote"},
     {~w(newdn newdebit newdebitnote), "DebitNote", :create_debit_note, "New Debit Note",
      "DebitNote"},
-    {~w(newjs newjv newjournal), "Journal", :create_journal, "New Journal", "Journal"}
+    {~w(newjs newjv newjournal), "Journal", :create_journal, "New Journal", "Journal"},
+    {~w(newdep newdeposit newdeposits), "Deposit", :create_deposit, "New Deposit", "Deposit"}
   ]
 
   def min_length, do: 2
