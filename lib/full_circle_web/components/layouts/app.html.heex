@@ -1,4 +1,13 @@
 <%= if @current_user do %>
+  <%= if assigns[:current_company] && assigns[:current_role] != "punch_camera" do %>
+    <.live_component
+      module={FullCircleWeb.CommandPaletteComponent}
+      id="command-palette"
+      current_company={@current_company}
+      current_user={@current_user}
+      current_role={@current_role}
+    />
+  <% end %>
   <%= if assigns[:full_screen_app?] do %>
     <main class="mt-1">
       {@inner_content}

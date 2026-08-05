@@ -132,6 +132,38 @@ Hooks.localStorageInput = {
   }
 }
 
+// App-wide command palette (Ctrl/Cmd+K) — document number jump
+Hooks.CommandPalette = {
+  mounted() {
+    this.open = () => {
+      this.pushEventTo(this.el, "open", {})
+    }
+    this.onKey = (e) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K")) {
+        // Don't steal from editable fields that need Ctrl+K (rare); allow always for palette
+        e.preventDefault()
+        this.open()
+      }
+    }
+    this.onCustom = () => this.open()
+    window.addEventListener("keydown", this.onKey)
+    window.addEventListener("fc-open-command-palette", this.onCustom)
+  },
+  updated() {
+    if (this.el.dataset.open === "true") {
+      const input = this.el.querySelector("input[type=search]")
+      if (input && document.activeElement !== input) {
+        // Defer so the modal is in the DOM
+        requestAnimationFrame(() => input.focus())
+      }
+    }
+  },
+  destroyed() {
+    window.removeEventListener("keydown", this.onKey)
+    window.removeEventListener("fc-open-command-palette", this.onCustom)
+  }
+}
+
 
 Hooks.ctrlEnterAddDetail = {
   mounted() {
