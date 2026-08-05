@@ -44,6 +44,7 @@ navigate menus and index filters to open it. Global document jump removes that f
 | Close | `Esc`, backdrop click, or navigate away |
 | Match fields | `doc_no` **or** contact `name` (documents for matching contacts) |
 | Type keywords | Optional whole tokens: `inv`, `invoice`, `pinv`, `receipt`/`rc`, `payment`/`pv`, `cn`, `dn`, `journal`/`js` — filter doc types (`swee heng inv`) |
+| Dates | DMY (`5/2/2026`) or ISO. **None** → no date filter. **One** → on or before (`doc_date <= d`). **Two** → inclusive range (auto-swap if inverted). Separator `-` / `to` optional. |
 | Create actions | Single token only: `newinv`, `newpur`, `newrc`, `newpv`, `newcn`, `newdn`, `newjs`, `newdep`/`newdeposit`, plus longer aliases (prefix `new` lists all). Auth uses `:create_*`. |
 | Action vs contact | Multi-word input never runs actions — contact “New Asia” stays search-only |
 | Min query length | 2 characters |

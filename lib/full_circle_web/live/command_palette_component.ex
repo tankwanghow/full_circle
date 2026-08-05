@@ -155,7 +155,7 @@ defmodule FullCircleWeb.CommandPaletteComponent do
                 name="terms"
                 value={@terms}
                 phx-debounce="250"
-                placeholder={gettext("Search docs, or newinv / newpur / newcn…")}
+                placeholder={gettext("Docs, contact, dates, or newinv…")}
                 class="w-full bg-transparent border-0 text-white placeholder:text-gray-500 focus:ring-0 focus:outline-none py-2"
                 autocomplete="off"
                 autofocus
@@ -217,7 +217,9 @@ defmodule FullCircleWeb.CommandPaletteComponent do
             <span><kbd class="border border-gray-600 rounded px-1">↑↓</kbd> {gettext("navigate")}</span>
             <span><kbd class="border border-gray-600 rounded px-1">↵</kbd> {gettext("open")}</span>
             <span><kbd class="border border-gray-600 rounded px-1">esc</kbd> {gettext("close")}</span>
-            <span class="text-gray-600">{gettext("actions: newinv newpur newrc newpv newcn newdn newjs newdep")}</span>
+            <span class="text-gray-600">
+              {gettext("e.g. swee inv 5/2/2026 · newinv · INV-…")}
+            </span>
           </div>
         </div>
       </div>

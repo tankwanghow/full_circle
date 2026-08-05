@@ -1,7 +1,8 @@
-defmodule FullCircle.CommandPalette.ContactDocSearch do
+defmodule FullCircle.CommandPalette.DateDocSearch do
   @moduledoc """
-  Find finance documents whose contact name matches the search terms,
-  optionally filtered by document type and dates.
+  Document search by type and/or date when there is no contact name fragment.
+
+  Examples: `inv 5/2/2026`, `1/2/2026 - 14/2/2026`, `receipt 5/2/2026`.
   """
 
   import Ecto.Query, warn: false
@@ -11,28 +12,22 @@ defmodule FullCircle.CommandPalette.ContactDocSearch do
   alias FullCircle.Accounting.{Contact, Transaction}
   alias FullCircle.CommandPalette.{DateFilter, Query, Types}
 
-  @max_contacts 5
-
   @doc """
-  Match contacts by name, then return their documents.
+  Run only when contact_terms is empty and there is a type and/or date filter.
   """
   def search(company, user, %Query{} = q) do
-    name_terms = q.contact_terms
-
-    if String.length(name_terms) < Types.min_length() do
+    if q.contact_terms != "" do
       []
     else
-      allowed = narrow_types(company, user, q.doc_types)
-
-      if allowed == [] do
+      if q.doc_types == nil and q.date_mode == :none do
         []
       else
-        contact_ids = match_contact_ids(company, user, name_terms)
+        allowed = narrow_types(company, user, q.doc_types)
 
-        if contact_ids == [] do
+        if allowed == [] do
           []
         else
-          docs_for_contacts(company, user, contact_ids, allowed, q)
+          do_search(company, user, allowed, q)
         end
       end
     end
@@ -49,39 +44,21 @@ defmodule FullCircle.CommandPalette.ContactDocSearch do
     Enum.filter(wanted, &MapSet.member?(allowed, &1))
   end
 
-  defp match_contact_ids(company, user, terms) do
-    pattern = "%#{Types.escape_like(terms)}%"
-
-    from(c in Contact,
-      join: com in subquery(Sys.user_company(company, user)),
-      on: com.id == c.company_id,
-      where: ilike(c.name, ^pattern),
-      order_by: [
-        desc: fragment("COALESCE(word_similarity(?, ?), 0)", ^terms, c.name),
-        asc: c.name
-      ],
-      limit: ^@max_contacts,
-      select: c.id
-    )
-    |> Repo.all()
-  end
-
-  defp docs_for_contacts(company, user, contact_ids, allowed_types, %Query{} = q) do
+  defp do_search(company, user, allowed_types, %Query{} = q) do
     meta = Types.type_meta()
 
     from(t in Transaction,
       join: com in subquery(Sys.user_company(company, user)),
       on: com.id == t.company_id,
-      join: c in Contact,
+      left_join: c in Contact,
       on: c.id == t.contact_id,
-      where: t.contact_id in ^contact_ids,
       where: t.doc_type in ^allowed_types,
       where: not is_nil(t.doc_id)
     )
     |> DateFilter.apply(q)
     |> then(fn query ->
       from([t, _com, c] in query,
-        group_by: [t.doc_type, t.doc_id, t.doc_no, t.doc_date, c.name],
+        group_by: [t.doc_type, t.doc_id, t.doc_no, t.doc_date],
         order_by: [desc: t.doc_date, desc: t.doc_no],
         limit: ^Types.limit(),
         select: %{
@@ -89,7 +66,7 @@ defmodule FullCircle.CommandPalette.ContactDocSearch do
           doc_id: t.doc_id,
           doc_no: t.doc_no,
           doc_date: t.doc_date,
-          contact_name: c.name
+          contact_name: max(c.name)
         }
       )
     end)

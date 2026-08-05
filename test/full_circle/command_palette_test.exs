@@ -239,6 +239,94 @@ defmodule FullCircle.CommandPaletteTest do
       q = Query.parse("INV-000012")
       assert q.contact_terms == "INV-000012"
       assert q.doc_types == nil
+      assert q.date_mode == :none
+    end
+
+    test "parses single date as on_or_before" do
+      q = Query.parse("swee heng inv 5/2/2026")
+      assert q.contact_terms == "swee heng"
+      assert q.doc_types == ["Invoice"]
+      assert q.date_mode == :on_or_before
+      assert q.date_to == ~D[2026-02-05]
+      assert q.date_from == nil
+    end
+
+    test "parses date range inclusive" do
+      q = Query.parse("swee 1/2/2026 - 14/2/2026")
+      assert q.contact_terms == "swee"
+      assert q.date_mode == :range
+      assert q.date_from == ~D[2026-02-01]
+      assert q.date_to == ~D[2026-02-14]
+    end
+
+    test "swaps inverted range" do
+      q = Query.parse("14/2/2026 1/2/2026")
+      assert q.date_mode == :range
+      assert q.date_from == ~D[2026-02-01]
+      assert q.date_to == ~D[2026-02-14]
+    end
+  end
+
+  describe "date filters" do
+    defp invoice_on!(company, user, contact, date) do
+      good = good_fixture(company, user)
+      sales_acct = Accounting.get_account_by_name("General Sales", company, user)
+
+      no_stax =
+        Repo.one!(
+          from tc in TaxCode,
+            where: tc.company_id == ^company.id and tc.code == "NoSTax"
+        )
+
+      attrs =
+        invoice_attrs(contact, good, sales_acct, no_stax)
+        |> Map.put("contact_name", contact.name)
+        |> Map.put("contact_id", contact.id)
+        |> Map.put("invoice_date", Date.to_string(date))
+        |> Map.put("due_date", Date.to_string(Date.add(date, 30)))
+
+      assert {:ok, %{create_invoice: invoice}} = Billing.create_invoice(attrs, company, user)
+      invoice
+    end
+
+    test "single date keeps on or before only", %{admin: admin, company: company} do
+      contact =
+        contact_fixture(company, admin, %{
+          "name" => "DateFilter Co #{System.unique_integer([:positive])}"
+        })
+
+      older = invoice_on!(company, admin, contact, ~D[2026-01-10])
+      on_day = invoice_on!(company, admin, contact, ~D[2026-02-05])
+      newer = invoice_on!(company, admin, contact, ~D[2026-02-20])
+
+      hits = CommandPalette.search(company, admin, "#{contact.name} inv 5/2/2026")
+      ids = Enum.map(hits, & &1.doc_id)
+
+      assert older.id in ids
+      assert on_day.id in ids
+      refute newer.id in ids
+    end
+
+    test "date range is inclusive", %{admin: admin, company: company} do
+      contact =
+        contact_fixture(company, admin, %{
+          "name" => "RangeFilter Co #{System.unique_integer([:positive])}"
+        })
+
+      before = invoice_on!(company, admin, contact, ~D[2026-01-31])
+      start_d = invoice_on!(company, admin, contact, ~D[2026-02-01])
+      mid = invoice_on!(company, admin, contact, ~D[2026-02-10])
+      end_d = invoice_on!(company, admin, contact, ~D[2026-02-14])
+      after_d = invoice_on!(company, admin, contact, ~D[2026-02-15])
+
+      hits = CommandPalette.search(company, admin, "#{contact.name} 1/2/2026 - 14/2/2026")
+      ids = Enum.map(hits, & &1.doc_id)
+
+      refute before.id in ids
+      assert start_d.id in ids
+      assert mid.id in ids
+      assert end_d.id in ids
+      refute after_d.id in ids
     end
   end
 

@@ -3,12 +3,13 @@ defmodule FullCircle.CommandPalette.Router do
   Command palette routing.
 
   - **Actions** (single token): `newinv`, `newpur`, `newcn`, …
-  - **Search**: document number, contact name, optional type keywords (`swee heng inv`)
+  - **Search**: doc number, contact, type keywords, dates
   """
 
   alias FullCircle.CommandPalette.{
     ActionSearch,
     ContactDocSearch,
+    DateDocSearch,
     DocNoSearch,
     Query,
     Types
@@ -33,15 +34,16 @@ defmodule FullCircle.CommandPalette.Router do
     end
   end
 
-  # Actions first, then document hits. De-dupe documents only.
   defp merge_hits(company, user, terms) do
     actions = ActionSearch.search(company, user, terms)
     q = Query.parse(terms)
+
     by_no = DocNoSearch.search(company, user, q)
     by_contact = ContactDocSearch.search(company, user, q)
+    by_date = DateDocSearch.search(company, user, q)
 
     {docs, _seen} =
-      Enum.reduce(by_no ++ by_contact, {[], MapSet.new()}, fn hit, {acc, seen} ->
+      Enum.reduce(by_no ++ by_contact ++ by_date, {[], MapSet.new()}, fn hit, {acc, seen} ->
         key = {hit.doc_type, hit.doc_id}
 
         if MapSet.member?(seen, key) do
@@ -51,7 +53,6 @@ defmodule FullCircle.CommandPalette.Router do
         end
       end)
 
-    # Prefer pure action match: if user typed an action token, don't flood with unrelated docs
     hits =
       if actions != [] and single_token?(terms) and action_like?(terms) do
         actions
