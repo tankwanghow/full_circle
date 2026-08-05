@@ -74,6 +74,20 @@ See also `deploy_skills.md` for the full deploy flow.
 ./scripts/restore_backup.sh backup_at_YYYYMMDDHHMMSS.tar
 ```
 
+### Tutorial screencasts
+
+`screencasts/` generates the staff tutorial videos in `docs/screencasts/` by
+driving the dev server with Playwright. See `screencasts/README.md`.
+
+```bash
+cd screencasts && node record.mjs --doctor   # verify deps, creds, server
+cd screencasts && node record.mjs --all --dry # selector smoke check after UI changes
+```
+
+Run the dry check after changing Billing LiveViews — it fails on any selector a
+lesson can no longer find. MP4s are gitignored; recordings contain
+production-derived data and must stay internal.
+
 ## Architecture
 
 ### Multi-Tenancy

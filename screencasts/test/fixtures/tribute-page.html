@@ -1,0 +1,50 @@
+<!doctype html>
+<html>
+  <body>
+    <input id="ac" autocomplete="off" />
+    <button id="go">Go</button>
+    <div id="out"></div>
+    <script>
+      const ITEMS = ["Ah Seng Trading", "Ah Seng Holdings", "Bee Huat Sdn Bhd"];
+      const ac = document.getElementById("ac");
+
+      // Mimics Tribute autocompleteMode + Full Circle's char-fuzzy filter
+      // (tri_autocomplete.js): menu opens on keyup only; spaces in typed text
+      // are ignored for matching (typed "AhSeng" matches "Ah Seng Trading").
+      ac.addEventListener("keyup", () => {
+        document.querySelector(".tribute-container")?.remove();
+        const text = ac.value.trim().toLowerCase().replace(/\s+/g, "");
+        if (!text) return;
+        const pattern = text
+          .split("")
+          .map((c) => c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+          .join(".*");
+        const re = new RegExp(pattern);
+        const hits = ITEMS.filter((i) => re.test(i.toLowerCase()));
+        if (!hits.length) return;
+        const box = document.createElement("div");
+        box.className = "tribute-container";
+        const ul = document.createElement("ul");
+        for (const h of hits) {
+          const li = document.createElement("li");
+          li.textContent = h;
+          li.addEventListener("click", () => {
+            ac.value = h;
+            box.remove();
+          });
+          ul.appendChild(li);
+        }
+        box.appendChild(ul);
+        document.body.appendChild(box);
+      });
+
+      document.getElementById("go").addEventListener("click", (e) => {
+        e.target.classList.add("phx-click-loading");
+        setTimeout(() => {
+          e.target.classList.remove("phx-click-loading");
+          document.getElementById("out").textContent = "done";
+        }, 300);
+      });
+    </script>
+  </body>
+</html>

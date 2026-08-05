@@ -58,3 +58,10 @@ deploy.conf
 /.elixir_ls
 # Fingerprint machine monthly exports (binary, employee PII) — kept local only
 docs/*.xls
+
+# Screencast pipeline — videos and scratch are reproducible, never commit
+screencasts/node_modules/
+screencasts/.work/
+screencasts/.created.log
+docs/screencasts/*.mp4
+docs/screencasts/*.webm

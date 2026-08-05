@@ -1,0 +1,11 @@
+{
+  "series": "Full Circle — Daily Tasks",
+  "lessons": [
+    {
+      "id": "01",
+      "slug": "key-a-sales-invoice",
+      "title": "Key a Sales Invoice",
+      "description": "Sign in, open a new sales invoice, choose the customer, add two goods lines, and save it."
+    }
+  ]
+}

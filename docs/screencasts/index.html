@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Full Circle — Daily Tasks</title>
+<style>
+  :root { --bg:#f8fafc; --fg:#0f172a; --muted:#475569; --card:#fff; --line:#e2e8f0; --accent:#b45309; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#0f172a; --fg:#e2e8f0; --muted:#94a3b8; --card:#1e293b; --line:#334155; --accent:#fbbf24; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:2.5rem 1.25rem; background:var(--bg); color:var(--fg);
+         font:16px/1.6 ui-sans-serif, system-ui, sans-serif; }
+  main { max-width: 60rem; margin: 0 auto; }
+  h1 { font-size: 2rem; margin: 0 0 .35rem; }
+  .sub { color: var(--muted); margin: 0 0 2.5rem; }
+  .lesson { background:var(--card); border:1px solid var(--line); border-radius:12px;
+            padding:1.25rem; margin-bottom:1.5rem; }
+  .lesson h2 { font-size:1.2rem; margin:0 0 .35rem; display:flex; gap:.6rem; align-items:baseline; }
+  .num { color:var(--accent); font-variant-numeric:tabular-nums; }
+  .lesson p { color:var(--muted); margin:0 0 1rem; }
+  video { width:100%; max-width:100%; border-radius:8px; background:#000; display:block; }
+  footer { color:var(--muted); font-size:.85rem; margin-top:2.5rem; text-align:center; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Full Circle — Daily Tasks</h1>
+  <p class="sub">Short lessons for everyday data entry. Internal use only.</p>
+
+      <article class="lesson">
+        <h2><span class="num">01</span> Key a Sales Invoice</h2>
+        <p>Sign in, open a new sales invoice, choose the customer, add two goods lines, and save it.</p>
+        <video controls preload="metadata" src="01-key-a-sales-invoice.mp4"></video>
+      </article>
+  <footer>Generated from manifest.json — do not edit by hand.</footer>
+</main>
+</body>
+</html>

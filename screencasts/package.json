@@ -1,0 +1,13 @@
+{
+  "name": "full-circle-screencasts",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "record": "node record.mjs",
+    "index": "node build-index.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.50.0"
+  }
+}
