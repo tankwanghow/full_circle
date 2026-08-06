@@ -32,8 +32,12 @@
           id="full_circle_dashboard"
           patch={~p"/companies/#{@current_company.id}/dashboard"}
           class="rounded hover:bg-gray-400 p-2"
+          title={gettext("Dashboard (Ctrl+Shift+D)")}
         >
           {gettext("Dashboard")}
+          <kbd class="hidden md:inline text-xs text-gray-300 border border-gray-500 rounded px-1 ml-1">
+            ⇧D
+          </kbd>
         </.link>
 
         <button

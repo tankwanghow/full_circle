@@ -72,7 +72,7 @@ defmodule FullCircle.CommandPalette do
       "Search: INV-… · swee inv · dep maybank · rc funds cash",
       "Dates: 5/2/2026 (on/before) · 1/2/2026 - 14/2/2026",
       "Create: newinv newpur newrc newpv newcn newdn newjs newdep newrtn",
-      "Open: ↵ edit · Alt+↵ print (when available)"
+      "Keys: Ctrl+K palette · Ctrl+Shift+D dashboard · ↵ edit · Alt+↵ print"
     ]
   end
 end

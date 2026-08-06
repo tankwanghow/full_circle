@@ -50,6 +50,15 @@ defmodule FullCircleWeb.CommandPaletteComponent do
     {:noreply, close(socket)}
   end
 
+  def handle_event("go_dashboard", _params, socket) do
+    path = ~p"/companies/#{socket.assigns.current_company.id}/dashboard"
+
+    {:noreply,
+     socket
+     |> close()
+     |> push_navigate(to: path)}
+  end
+
   def handle_event("recents", %{"items" => items}, socket) do
     recents = CommandPalette.recents_from_payload(items)
     actions = CommandPalette.empty_hits(socket.assigns.current_company, socket.assigns.current_user)

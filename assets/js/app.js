@@ -139,11 +139,23 @@ Hooks.CommandPalette = {
       this.pushEventTo(this.el, "open", {})
     }
     this.onKey = (e) => {
-      if ((e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K")) {
+      const mod = e.ctrlKey || e.metaKey
+
+      // Ctrl/Cmd+K → command palette
+      if (mod && !e.altKey && !e.shiftKey && (e.key === "k" || e.key === "K")) {
         e.preventDefault()
         this.open()
         return
       }
+
+      // Ctrl/Cmd+Shift+D → company dashboard (Shift avoids browser bookmark Ctrl+D)
+      if (mod && e.shiftKey && !e.altKey && (e.key === "d" || e.key === "D")) {
+        e.preventDefault()
+        e.stopPropagation()
+        this.pushEventTo(this.el, "go_dashboard", {})
+        return
+      }
+
       if (this.el.dataset.open !== "true") return
 
       if (e.key === "ArrowDown" || e.key === "ArrowUp") {
