@@ -1,7 +1,7 @@
 defmodule FullCircle.CommandPalette.ContactDocSearch do
   @moduledoc """
   Find finance documents whose contact name matches the search terms,
-  optionally filtered by document type and dates.
+  optionally filtered by document type, dates, and good on lines.
   """
 
   import Ecto.Query, warn: false
@@ -9,20 +9,23 @@ defmodule FullCircle.CommandPalette.ContactDocSearch do
   alias FullCircle.Repo
   alias FullCircle.Sys
   alias FullCircle.Accounting.{Contact, Transaction}
-  alias FullCircle.CommandPalette.{DateFilter, Query, Types}
+  alias FullCircle.CommandPalette.{DateFilter, GoodFilter, Query, Types}
 
   @max_contacts 5
 
-  @doc """
-  Match contacts by name, then return their documents.
-  """
   def search(company, user, %Query{} = q) do
     name_terms = q.contact_terms
 
     if String.length(name_terms) < Types.min_length() do
       []
     else
-      allowed = narrow_types(company, user, q.doc_types)
+      allowed =
+        company
+        |> Types.allowed_types(user)
+        |> then(fn a ->
+          if q.doc_types, do: Enum.filter(a, &(&1 in q.doc_types)), else: a
+        end)
+        |> GoodFilter.restrict_types(q)
 
       if allowed == [] do
         []
@@ -39,14 +42,7 @@ defmodule FullCircle.CommandPalette.ContactDocSearch do
   end
 
   def search(company, user, terms) when is_binary(terms) do
-    search(company, user, Query.parse(terms))
-  end
-
-  defp narrow_types(company, user, nil), do: Types.allowed_types(company, user)
-
-  defp narrow_types(company, user, wanted) do
-    allowed = MapSet.new(Types.allowed_types(company, user))
-    Enum.filter(wanted, &MapSet.member?(allowed, &1))
+    search(company, user, Query.parse(terms) |> Query.resolve_good(company, user))
   end
 
   defp match_contact_ids(company, user, terms) do
@@ -79,6 +75,7 @@ defmodule FullCircle.CommandPalette.ContactDocSearch do
       where: not is_nil(t.doc_id)
     )
     |> DateFilter.apply(q)
+    |> GoodFilter.apply(q)
     |> then(fn query ->
       from([t, _com, c] in query,
         group_by: [t.doc_type, t.doc_id, t.doc_no, t.doc_date, c.name],

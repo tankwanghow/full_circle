@@ -1,8 +1,6 @@
 defmodule FullCircle.CommandPalette.DateDocSearch do
   @moduledoc """
-  Document search by type and/or date when there is no contact name fragment.
-
-  Examples: `inv 5/2/2026`, `1/2/2026 - 14/2/2026`, `receipt 5/2/2026`.
+  Document search by type and/or date (and optional good) when there is no contact name.
   """
 
   import Ecto.Query, warn: false
@@ -10,19 +8,22 @@ defmodule FullCircle.CommandPalette.DateDocSearch do
   alias FullCircle.Repo
   alias FullCircle.Sys
   alias FullCircle.Accounting.{Contact, Transaction}
-  alias FullCircle.CommandPalette.{DateFilter, Query, Types}
+  alias FullCircle.CommandPalette.{DateFilter, GoodFilter, Query, Types}
 
-  @doc """
-  Run only when contact_terms is empty and there is a type and/or date filter.
-  """
   def search(company, user, %Query{} = q) do
     if q.contact_terms != "" do
       []
     else
-      if q.doc_types == nil and q.date_mode == :none do
+      if q.doc_types == nil and q.date_mode == :none and q.good_terms in [nil, ""] do
         []
       else
-        allowed = narrow_types(company, user, q.doc_types)
+        allowed =
+          company
+          |> Types.allowed_types(user)
+          |> then(fn a ->
+            if q.doc_types, do: Enum.filter(a, &(&1 in q.doc_types)), else: a
+          end)
+          |> GoodFilter.restrict_types(q)
 
         if allowed == [] do
           []
@@ -34,14 +35,7 @@ defmodule FullCircle.CommandPalette.DateDocSearch do
   end
 
   def search(company, user, terms) when is_binary(terms) do
-    search(company, user, Query.parse(terms))
-  end
-
-  defp narrow_types(company, user, nil), do: Types.allowed_types(company, user)
-
-  defp narrow_types(company, user, wanted) do
-    allowed = MapSet.new(Types.allowed_types(company, user))
-    Enum.filter(wanted, &MapSet.member?(allowed, &1))
+    search(company, user, Query.parse(terms) |> Query.resolve_good(company, user))
   end
 
   defp do_search(company, user, allowed_types, %Query{} = q) do
@@ -56,6 +50,7 @@ defmodule FullCircle.CommandPalette.DateDocSearch do
       where: not is_nil(t.doc_id)
     )
     |> DateFilter.apply(q)
+    |> GoodFilter.apply(q)
     |> then(fn query ->
       from([t, _com, c] in query,
         group_by: [t.doc_type, t.doc_id, t.doc_no, t.doc_date],

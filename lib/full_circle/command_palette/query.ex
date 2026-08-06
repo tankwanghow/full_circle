@@ -1,39 +1,42 @@
 defmodule FullCircle.CommandPalette.Query do
   @moduledoc """
-  Parse palette input into contact text, doc-type filters, and optional dates.
+  Parse palette input into contact text, doc-type filters, dates, and optional good name.
 
   Date rules:
   - **None** — no date filter
-  - **One date** — documents on or before that date (`doc_date <= date`)
-  - **Two dates** — inclusive range (order-independent)
+  - **One date** — on or before (`doc_date <= date`)
+  - **Two dates** — inclusive range
 
-  Examples:
-    "INV-000012"
-    "swee heng inv"
-    "swee heng inv 5/2/2026"           → on or before 5/2/2026
-    "swee heng inv 1/2/2026 - 14/2/2026" → range
-    "inv 5/2/2026"                       → type + date only
+  Good name (line filter on Invoice / PurInvoice):
+  - Explicit: `swee heng good grade e` (token `good` separates contact from good)
+  - Or suffix that matches a company good: `swee heng grade e`
   """
+
+  import Ecto.Query, warn: false
+
+  alias FullCircle.Repo
+  alias FullCircle.Sys
+  alias FullCircle.Product.Good
+  alias FullCircle.CommandPalette.Types
 
   defstruct raw: "",
             contact_terms: "",
+            good_terms: nil,
             doc_types: nil,
             date_from: nil,
             date_to: nil,
-            # :none | :on_or_before | :range
             date_mode: :none
 
   @type t :: %__MODULE__{
           raw: String.t(),
           contact_terms: String.t(),
+          good_terms: String.t() | nil,
           doc_types: [String.t()] | nil,
           date_from: Date.t() | nil,
           date_to: Date.t() | nil,
           date_mode: :none | :on_or_before | :range
         }
 
-  # Whole-token type aliases (case-insensitive). Tokens with digits are never types
-  # unless they fail date parse and look like pure type words (they won't with digits).
   @aliases %{
     "inv" => "Invoice",
     "invoice" => "Invoice",
@@ -64,14 +67,13 @@ defmodule FullCircle.CommandPalette.Query do
   }
 
   @doc """
-  Parse free text into a query struct.
+  Parse free text (company-agnostic). Call `resolve_good/3` after for line filters.
   """
   def parse(text) when is_binary(text) do
     raw = String.trim(text)
     tokens = String.split(raw, ~r/\s+/, trim: true)
 
     {dates, non_date_tokens} = extract_dates(tokens)
-
     {type_tokens, other_tokens} = Enum.split_with(non_date_tokens, &type_token?/1)
 
     doc_types =
@@ -81,9 +83,13 @@ defmodule FullCircle.CommandPalette.Query do
 
     {date_mode, date_from, date_to} = date_fields(dates)
 
+    # Explicit "good" separator (not a type keyword)
+    {contact_terms, good_terms} = split_explicit_good(other_tokens)
+
     %__MODULE__{
       raw: raw,
-      contact_terms: Enum.join(other_tokens, " "),
+      contact_terms: contact_terms,
+      good_terms: good_terms,
       doc_types: if(doc_types == [], do: nil, else: doc_types),
       date_from: date_from,
       date_to: date_to,
@@ -93,12 +99,80 @@ defmodule FullCircle.CommandPalette.Query do
 
   def parse(_), do: parse("")
 
+  @doc """
+  If no explicit good was set, try matching a suffix of contact_terms to a company good.
+  """
+  def resolve_good(%__MODULE__{good_terms: g} = q, _company, _user)
+      when is_binary(g) and g != "" do
+    q
+  end
+
+  def resolve_good(%__MODULE__{} = q, company, user) do
+    tokens = String.split(q.contact_terms, ~r/\s+/, trim: true)
+
+    case best_good_suffix(company, user, tokens) do
+      {contact, good} ->
+        %{q | contact_terms: contact, good_terms: good}
+
+      :none ->
+        q
+    end
+  end
+
+  # --- good split ------------------------------------------------------------
+
+  defp split_explicit_good(tokens) do
+    case Enum.split_while(tokens, &(normalize(&1) != "good")) do
+      {before, ["good" | after_good]} when after_good != [] ->
+        {Enum.join(before, " "), Enum.join(after_good, " ")}
+
+      _ ->
+        {Enum.join(tokens, " "), nil}
+    end
+  end
+
+  defp best_good_suffix(_company, _user, []), do: :none
+  defp best_good_suffix(_company, _user, [_single]), do: :none
+
+  defp best_good_suffix(company, user, tokens) do
+    n = length(tokens)
+    # Prefer longer good suffixes (up to 4 words), require remaining contact >= 2 chars if any
+    1..min(n - 1, 4)
+    |> Enum.reverse()
+    |> Enum.find_value(:none, fn good_len ->
+      contact_toks = Enum.take(tokens, n - good_len)
+      good_toks = Enum.take(tokens, -good_len)
+      good_terms = Enum.join(good_toks, " ")
+      contact_terms = Enum.join(contact_toks, " ")
+
+      if goods_match?(company, user, good_terms) and
+           (contact_terms == "" or String.length(contact_terms) >= Types.min_length()) do
+        {contact_terms, good_terms}
+      else
+        nil
+      end
+    end)
+  end
+
+  defp goods_match?(company, user, terms) do
+    pattern = "%#{Types.escape_like(terms)}%"
+
+    from(g in Good,
+      join: com in subquery(Sys.user_company(company, user)),
+      on: com.id == g.company_id,
+      where: ilike(g.name, ^pattern),
+      limit: 1,
+      select: g.id
+    )
+    |> Repo.one()
+    |> is_binary()
+  end
+
   # --- dates -----------------------------------------------------------------
 
-  # Pull date-like tokens and "d1 - d2" pairs. Separator "-" alone is skipped.
   defp extract_dates(tokens) do
     {dates, rest, _pending_sep} =
-      Enum.reduce(tokens, {[], [], false}, fn token, {dates, rest, after_sep} ->
+      Enum.reduce(tokens, {[], [], false}, fn token, {dates, rest, _after_sep} ->
         cond do
           date_separator?(token) ->
             {dates, rest, true}
@@ -108,8 +182,6 @@ defmodule FullCircle.CommandPalette.Query do
             {dates ++ [d], rest, false}
 
           true ->
-            # If we had a dangling "-", keep it out of contact terms
-            _ = after_sep
             {dates, rest ++ [token], false}
         end
       end)
@@ -122,11 +194,7 @@ defmodule FullCircle.CommandPalette.Query do
   end
 
   defp date_fields([]), do: {:none, nil, nil}
-
-  defp date_fields([d]) do
-    # Single date → on or before (doc_date <= d)
-    {:on_or_before, nil, d}
-  end
+  defp date_fields([d]), do: {:on_or_before, nil, d}
 
   defp date_fields([d1, d2 | _]) do
     if Date.compare(d1, d2) == :gt do
@@ -141,13 +209,12 @@ defmodule FullCircle.CommandPalette.Query do
     token = String.trim(token)
 
     cond do
-      # d/m/yyyy or d-m-yyyy or d.m.yyyy
       Regex.match?(~r/^\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{4}$/, token) ->
-        [a, b, y] = Regex.run(~r/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})$/, token, capture: :all_but_first)
-        # Prefer DMY (Malaysia): day/month/year
-        try_date(y, b, a) || try_date(y, a, b)
+        [a, b, y] =
+          Regex.run(~r/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})$/, token, capture: :all_but_first)
 
-      # yyyy-mm-dd (ISO)
+        try_date(y, b, a) || try_date(y, a, b) || :error
+
       Regex.match?(~r/^\d{4}-\d{2}-\d{2}$/, token) ->
         case Date.from_iso8601(token) do
           {:ok, d} -> {:ok, d}
@@ -160,11 +227,7 @@ defmodule FullCircle.CommandPalette.Query do
   end
 
   defp try_date(y, m, d) do
-    y = String.to_integer(y)
-    m = String.to_integer(m)
-    d = String.to_integer(d)
-
-    case Date.new(y, m, d) do
+    case Date.new(String.to_integer(y), String.to_integer(m), String.to_integer(d)) do
       {:ok, date} -> {:ok, date}
       _ -> nil
     end

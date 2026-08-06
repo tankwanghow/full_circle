@@ -8,23 +8,21 @@ defmodule FullCircle.CommandPalette.DocNoSearch do
   alias FullCircle.Repo
   alias FullCircle.Sys
   alias FullCircle.Accounting.{Contact, Transaction}
-  alias FullCircle.CommandPalette.{DateFilter, Query, Types}
+  alias FullCircle.CommandPalette.{DateFilter, GoodFilter, Query, Types}
 
-  @doc """
-  Search by partial `doc_no`. Accepts a raw string or a parsed `Query`.
-
-  When dates are present on the query they constrain results.
-  Doc-number text is non-type/non-date tokens, or raw when empty of those.
-  """
   def search(company, user, %Query{} = q) do
     terms = doc_no_terms(q)
 
-    # Pure type+date search (no doc no fragment): skip doc-no path
-    # ContactDocSearch / DateOnlySearch handles contact or type+date.
     if String.length(terms) < Types.min_length() do
       []
     else
-      allowed = narrow_types(company, user, q.doc_types)
+      allowed =
+        company
+        |> Types.allowed_types(user)
+        |> then(fn a ->
+          if q.doc_types, do: Enum.filter(a, &(&1 in q.doc_types)), else: a
+        end)
+        |> GoodFilter.restrict_types(q)
 
       if allowed == [] do
         []
@@ -35,25 +33,23 @@ defmodule FullCircle.CommandPalette.DocNoSearch do
   end
 
   def search(company, user, terms) when is_binary(terms) do
-    search(company, user, Query.parse(terms))
+    search(company, user, Query.parse(terms) |> Query.resolve_good(company, user))
   end
 
-  # Non-type tokens after parse (contact_terms may still hold a doc number fragment).
-  defp doc_no_terms(%Query{contact_terms: ct}) when ct != "", do: ct
-  defp doc_no_terms(%Query{raw: raw, doc_types: types, date_mode: mode}) do
-    # Type-only or date-only queries should not ILIKE the whole raw string
-    if types != nil or mode != :none do
+  defp doc_no_terms(%Query{contact_terms: ct, good_terms: g})
+       when ct != "" and g in [nil, ""],
+       do: ct
+
+  defp doc_no_terms(%Query{good_terms: g})
+       when is_binary(g) and g != "",
+       do: ""
+
+  defp doc_no_terms(%Query{raw: raw, doc_types: types, date_mode: mode, good_terms: g}) do
+    if types != nil or mode != :none or (is_binary(g) and g != "") do
       ""
     else
       raw
     end
-  end
-
-  defp narrow_types(company, user, nil), do: Types.allowed_types(company, user)
-
-  defp narrow_types(company, user, wanted) do
-    allowed = MapSet.new(Types.allowed_types(company, user))
-    Enum.filter(wanted, &MapSet.member?(allowed, &1))
   end
 
   defp do_search(company, user, terms, allowed_types, %Query{} = q) do
@@ -70,6 +66,7 @@ defmodule FullCircle.CommandPalette.DocNoSearch do
       where: ilike(t.doc_no, ^pattern)
     )
     |> DateFilter.apply(q)
+    |> GoodFilter.apply(q)
     |> then(fn query ->
       from([t, _com, c] in query,
         group_by: [t.doc_type, t.doc_id, t.doc_no, t.doc_date],

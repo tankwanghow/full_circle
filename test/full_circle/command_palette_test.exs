@@ -208,17 +208,19 @@ defmodule FullCircle.CommandPaletteTest do
 
       # Type keyword at end
       hits = CommandPalette.search(company, admin, "Swee Heng Filter inv")
-      assert Enum.any?(hits, &(&1.doc_id == invoice.id))
-      assert Enum.all?(hits, &(&1.doc_type == "Invoice"))
+      docs = Enum.filter(hits, &(&1.kind == :document))
+      assert Enum.any?(docs, &(&1.doc_id == invoice.id))
+      assert Enum.all?(docs, &(&1.doc_type == "Invoice"))
 
       # Type keyword at start
       hits2 = CommandPalette.search(company, admin, "invoice Swee Heng Filter")
-      assert Enum.any?(hits2, &(&1.doc_id == invoice.id))
-      assert Enum.all?(hits2, &(&1.doc_type == "Invoice"))
+      docs2 = Enum.filter(hits2, &(&1.kind == :document))
+      assert Enum.any?(docs2, &(&1.doc_id == invoice.id))
+      assert Enum.all?(docs2, &(&1.doc_type == "Invoice"))
 
       # Wrong type keyword → no invoice hits for this contact path
       hits3 = CommandPalette.search(company, admin, "Swee Heng Filter receipt")
-      refute Enum.any?(hits3, &(&1.doc_id == invoice.id))
+      refute Enum.any?(hits3, &(&1.kind == :document and &1.doc_id == invoice.id))
     end
   end
 
@@ -327,6 +329,74 @@ defmodule FullCircle.CommandPaletteTest do
       assert mid.id in ids
       assert end_d.id in ids
       refute after_d.id in ids
+    end
+  end
+
+  describe "contact master" do
+    test "name search includes contact edit hit", %{admin: admin, company: company} do
+      contact =
+        contact_fixture(company, admin, %{
+          "name" => "MasterJump #{System.unique_integer([:positive])}"
+        })
+
+      hits = CommandPalette.search(company, admin, "MasterJump")
+      hit = Enum.find(hits, &(&1.kind == :contact and &1.doc_id == contact.id))
+      assert hit
+      assert hit.path == "/companies/#{company.id}/contacts/#{contact.id}/edit"
+    end
+  end
+
+  describe "good line filter" do
+    test "explicit good separator filters invoices by good name", %{
+      admin: admin,
+      company: company
+    } do
+      contact =
+        contact_fixture(company, admin, %{
+          "name" => "GoodFilter Co #{System.unique_integer([:positive])}"
+        })
+
+      good_a =
+        good_fixture(company, admin, %{"name" => "Egg Grade A #{System.unique_integer([:positive])}"})
+
+      good_e =
+        good_fixture(company, admin, %{"name" => "Egg Grade E #{System.unique_integer([:positive])}"})
+
+      sales_acct = Accounting.get_account_by_name("General Sales", company, admin)
+
+      no_stax =
+        Repo.one!(
+          from tc in TaxCode,
+            where: tc.company_id == ^company.id and tc.code == "NoSTax"
+        )
+
+      attrs_a =
+        invoice_attrs(contact, good_a, sales_acct, no_stax)
+        |> Map.put("contact_name", contact.name)
+        |> Map.put("contact_id", contact.id)
+
+      attrs_e =
+        invoice_attrs(contact, good_e, sales_acct, no_stax)
+        |> Map.put("contact_name", contact.name)
+        |> Map.put("contact_id", contact.id)
+
+      assert {:ok, %{create_invoice: inv_a}} = Billing.create_invoice(attrs_a, company, admin)
+      assert {:ok, %{create_invoice: inv_e}} = Billing.create_invoice(attrs_e, company, admin)
+
+      hits =
+        CommandPalette.search(
+          company,
+          admin,
+          "#{contact.name} inv good #{good_e.name}"
+        )
+
+      doc_ids =
+        hits
+        |> Enum.filter(&(&1.kind == :document))
+        |> Enum.map(& &1.doc_id)
+
+      assert inv_e.id in doc_ids
+      refute inv_a.id in doc_ids
     end
   end
 

@@ -107,6 +107,10 @@ defmodule FullCircleWeb.CommandPaletteComponent do
     gettext("Create · type %{key}", key: key)
   end
 
+  defp subtitle(%{kind: :contact}) do
+    gettext("Open contact master")
+  end
+
   defp subtitle(hit) do
     date =
       case hit.doc_date do
@@ -120,9 +124,11 @@ defmodule FullCircleWeb.CommandPaletteComponent do
   end
 
   defp primary_text(%{kind: :action, doc_no: title}), do: title
+  defp primary_text(%{kind: :contact, doc_no: name}), do: name
   defp primary_text(%{doc_no: no}), do: no
 
   defp badge_class(:action), do: "bg-sky-800 text-sky-200"
+  defp badge_class(:contact), do: "bg-violet-800 text-violet-200"
   defp badge_class(_), do: "bg-gray-700 text-amber-300"
 
   @impl true
@@ -155,7 +161,7 @@ defmodule FullCircleWeb.CommandPaletteComponent do
                 name="terms"
                 value={@terms}
                 phx-debounce="250"
-                placeholder={gettext("Docs, contact, dates, or newinv…")}
+                placeholder={gettext("Docs, contact, good, dates, or newinv…")}
                 class="w-full bg-transparent border-0 text-white placeholder:text-gray-500 focus:ring-0 focus:outline-none py-2"
                 autocomplete="off"
                 autofocus
@@ -218,7 +224,7 @@ defmodule FullCircleWeb.CommandPaletteComponent do
             <span><kbd class="border border-gray-600 rounded px-1">↵</kbd> {gettext("open")}</span>
             <span><kbd class="border border-gray-600 rounded px-1">esc</kbd> {gettext("close")}</span>
             <span class="text-gray-600">
-              {gettext("e.g. swee inv 5/2/2026 · newinv · INV-…")}
+              {gettext("e.g. swee inv good grade e · newinv · INV-…")}
             </span>
           </div>
         </div>
