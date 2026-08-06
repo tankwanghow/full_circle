@@ -145,6 +145,7 @@ defmodule FullCircleWeb.CommandPaletteComponent do
       phx-hook="CommandPalette"
       phx-target={@myself}
       data-open={to_string(@open?)}
+      data-selected={@selected}
     >
       <div
         :if={@open?}

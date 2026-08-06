@@ -132,7 +132,7 @@ Hooks.localStorageInput = {
   }
 }
 
-// App-wide command palette (Ctrl/Cmd+K) — document number jump
+// App-wide command palette (Ctrl/Cmd+K) — search + actions
 Hooks.CommandPalette = {
   mounted() {
     this.open = () => {
@@ -156,7 +156,14 @@ Hooks.CommandPalette = {
         // Defer so the modal is in the DOM
         requestAnimationFrame(() => input.focus())
       }
+      // Keep keyboard-selected row visible inside the scrollable list
+      requestAnimationFrame(() => this.scrollSelectedIntoView())
     }
+  },
+  scrollSelectedIntoView() {
+    const selected = this.el.querySelector('[role="option"][aria-selected="true"]')
+    if (!selected) return
+    selected.scrollIntoView({ block: "nearest", inline: "nearest" })
   },
   destroyed() {
     window.removeEventListener("keydown", this.onKey)
