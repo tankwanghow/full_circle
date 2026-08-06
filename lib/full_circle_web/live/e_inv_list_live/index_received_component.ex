@@ -178,89 +178,81 @@ defmodule FullCircleWeb.EInvListLive.IndexReceivedComponent do
   def render(assigns) do
     ~H"""
     <div id={@id} class="flex flex-row bg-gray-200 hover:bg-gray-300">
-      <div class="w-[49.8%] text-nowrap flex flex-row border-b border-amber-400 p-1">
-        <div class="w-[22%] text-wrap p-1">
+      <div class="w-[49.8%] min-w-0 flex flex-row border-b border-amber-400 p-1">
+        <div class="w-[20%] shrink-0 p-1 text-xs leading-snug">
           <div>
-            <div class="">
-              {@obj.dateTimeReceived
-              |> FullCircleWeb.Helpers.format_datetime(@company)}
-            </div>
-            <div>
-              {@obj.dateTimeIssued
-              |> FullCircleWeb.Helpers.format_datetime(@company)}
-            </div>
-            <div>
-              {if !is_nil(@obj.rejectRequestDateTime) do
-                @obj.rejectRequestDateTime
-                |> FullCircleWeb.Helpers.format_datetime(@company)
-              end}
-            </div>
+            {@obj.dateTimeReceived
+            |> FullCircleWeb.Helpers.format_datetime(@company)}
+          </div>
+          <div>
+            {@obj.dateTimeIssued
+            |> FullCircleWeb.Helpers.format_datetime(@company)}
+          </div>
+          <div :if={!is_nil(@obj.rejectRequestDateTime)}>
+            {@obj.rejectRequestDateTime
+            |> FullCircleWeb.Helpers.format_datetime(@company)}
           </div>
         </div>
-        <div class="w-[36%]">
+        <div class="w-[42%] min-w-0 px-1">
           <a
-            class="text-blue-600 hover:font-medium"
+            class="block truncate text-blue-600 hover:font-medium text-xs"
             target="_blank"
             href={"#{@einv_portal}/documents/#{@obj.uuid}"}
+            title={@obj.uuid}
           >
             {@obj.uuid}
           </a>
-          <div class="text-xs">
-            {"#{@obj.internalId}"}
+          <div class="text-xs truncate" title={@obj.internalId}>
+            {@obj.internalId}
+          </div>
+          <div class="text-xs flex flex-wrap gap-x-1 gap-y-0.5 items-baseline">
             <span class="font-bold text-orange-600">Received</span>
             <span class="text-purple-600">{@obj.typeName} {@obj.typeVersionName}</span>
             <span :if={@obj.status == "Valid"} class="text-green-600">{@obj.status}</span>
             <span :if={@obj.status != "Valid"} class="text-rose-600">{@obj.status}</span>
           </div>
         </div>
-        <div class="w-[42%]">
-          <div class="overflow-hidden">{@obj.supplierName}</div>
-          <div class="text-sm">
-            <span class="font-bold">
-              {@obj.documentCurrency}
-              {@obj.totalNetAmount
-              |> Number.Delimit.number_to_delimited()}
-            </span>
+        <div class="w-[38%] min-w-0 px-1 text-right">
+          <div class="truncate text-left font-medium" title={@obj.supplierName}>
+            {@obj.supplierName}
+          </div>
+          <div class="text-xs text-gray-600 truncate text-left" title={@obj.supplierTIN}>
             {@obj.supplierTIN}
-            <span class="font-bold text-gray-500">
-              {@obj.documentCurrency}
-              {@obj.totalPayableAmount
-              |> Number.Delimit.number_to_delimited()}
-            </span>
+          </div>
+          <div class="text-sm font-bold tabular-nums whitespace-nowrap">
+            <span class="text-gray-500 text-xs font-normal">{@obj.documentCurrency}</span>
+            {@obj.totalNetAmount |> Number.Delimit.number_to_delimited()}
+          </div>
+          <div class="text-sm font-bold text-gray-600 tabular-nums whitespace-nowrap">
+            <span class="text-gray-500 text-xs font-normal">{@obj.documentCurrency}</span>
+            {@obj.totalPayableAmount |> Number.Delimit.number_to_delimited()}
+            <span class="text-[10px] font-normal text-gray-400 ml-0.5">pay</span>
           </div>
         </div>
       </div>
-      <div class="w-[0.4%] bg-white"></div>
-      <div class="w-[49.8%] p-1 border-b border-amber-400">
+      <div class="w-[0.4%] bg-white shrink-0"></div>
+      <div class="w-[49.8%] min-w-0 p-1 border-b border-amber-400">
         {if Enum.count(@obj.fc_docs) == 0 and @obj.status == "Valid", do: new_fc(assigns)}
         <%= for doc <- @obj.fc_docs do %>
-          <div class="flex border-b border-amber-400 last:border-0">
-            <div class="w-[22%]">
-              <div>
-                <div>
-                  {doc.doc_date |> Helpers.format_date()}
-                </div>
-              </div>
+          <div class="flex min-w-0 border-b border-amber-400 last:border-0">
+            <div class="w-[20%] shrink-0 text-xs">
+              {doc.doc_date |> Helpers.format_date()}
             </div>
-            <div class="w-[36%]">
-              {doc.e_inv_uuid}
-              <div class="text-xs">
+            <div class="w-[42%] min-w-0 px-1">
+              <div class="truncate text-xs" title={doc.e_inv_uuid}>{doc.e_inv_uuid}</div>
+              <div class="text-xs flex flex-wrap gap-x-1">
                 <.doc_link current_company={@company} doc_obj={doc} />
-                {doc.e_inv_internal_id}
+                <span class="truncate">{doc.e_inv_internal_id}</span>
                 <span class="text-purple-600">{doc.doc_type}</span>
               </div>
             </div>
-
-            <div class="w-[42%]">
-              <div class="text-nowrap overflow-hidden">{doc.contact_name}</div>
-              <div class="text-sm">
-                {doc.contact_tin}
-                <span class="font-bold">
-                  {doc.amount
-                  |> Number.Delimit.number_to_delimited()}
-                </span>
-                {matched_or_try_match(doc, assigns)}
+            <div class="w-[38%] min-w-0 px-1 text-right">
+              <div class="truncate text-left" title={doc.contact_name}>{doc.contact_name}</div>
+              <div class="text-xs text-gray-600 truncate text-left">{doc.contact_tin}</div>
+              <div class="text-sm font-bold tabular-nums whitespace-nowrap">
+                {doc.amount |> Number.Delimit.number_to_delimited()}
               </div>
+              <div class="text-xs">{matched_or_try_match(doc, assigns)}</div>
             </div>
           </div>
         <% end %>

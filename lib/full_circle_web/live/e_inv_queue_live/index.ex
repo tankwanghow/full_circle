@@ -262,9 +262,11 @@ defmodule FullCircleWeb.EInvQueueLive.Index do
                 </div>
               </td>
               <td class="p-2 font-mono text-xs">{row.internal_id || "—"}</td>
-              <td class="p-2 text-right whitespace-nowrap">
-                {format_money(row.amount)}
-                <span class="text-xs text-gray-500">{row.currency}</span>
+              <td class="p-2 text-right tabular-nums">
+                <div class="whitespace-nowrap font-medium">
+                  <span class="text-xs text-gray-500 font-normal">{row.currency}</span>
+                  {format_money(row.amount)}
+                </div>
               </td>
               <td class="p-2 text-xs">
                 <div :if={row.pur_invoice_no}>
