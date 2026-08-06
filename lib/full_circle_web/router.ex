@@ -195,6 +195,7 @@ defmodule FullCircleWeb.Router do
 
       live("/e_inv_meta", EInvMetaLive.Form)
       live("/e_invoices", EInvListLive.Index)
+      live("/e_invoice_queue", EInvQueueLive.Index)
 
       live("/holidays", HolidayLive.Index, :index)
       live("/holidays/new", HolidayLive.Form, :new)

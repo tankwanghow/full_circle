@@ -210,6 +210,14 @@ defmodule FullCircleWeb.EInvListLive.Index do
     ~H"""
     <div class="mx-auto w-10/12">
       <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
+      <div class="mt-2 flex justify-center">
+        <.link
+          navigate={~p"/companies/#{@current_company.id}/e_invoice_queue"}
+          class="button teal"
+        >
+          {gettext("Received work queue")}
+        </.link>
+      </div>
       <div class="mt-4 mb-5 flex justify-center">
         <div class="">
           <%= if @syncing do %>
