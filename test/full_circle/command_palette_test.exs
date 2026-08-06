@@ -404,11 +404,43 @@ defmodule FullCircle.CommandPaletteTest do
     end
   end
 
+  describe "groups" do
+    test "groups contacts and documents separately", %{admin: admin, company: company} do
+      contact =
+        contact_fixture(company, admin, %{
+          "name" => "GroupCo #{System.unique_integer([:positive])}"
+        })
+
+      good = good_fixture(company, admin)
+      sales_acct = Accounting.get_account_by_name("General Sales", company, admin)
+
+      no_stax =
+        Repo.one!(
+          from tc in TaxCode,
+            where: tc.company_id == ^company.id and tc.code == "NoSTax"
+        )
+
+      attrs =
+        invoice_attrs(contact, good, sales_acct, no_stax)
+        |> Map.put("contact_name", contact.name)
+        |> Map.put("contact_id", contact.id)
+
+      assert {:ok, %{create_invoice: _}} = Billing.create_invoice(attrs, company, admin)
+
+      hits = CommandPalette.search(company, admin, contact.name)
+      groups = CommandPalette.group_hits(hits)
+      sections = Enum.map(groups, &elem(&1, 0))
+      assert :contacts in sections
+      assert :documents in sections
+    end
+  end
+
   describe "create actions" do
     test "newinv opens invoice create path", %{admin: admin, company: company} do
       hits = CommandPalette.search(company, admin, "newinv")
-      assert [%{kind: :action, doc_type: "Invoice", path: path}] = hits
-      assert path == "/companies/#{company.id}/Invoice/new"
+      assert Enum.any?(hits, &(&1.kind == :action and &1.doc_type == "Invoice"))
+      hit = Enum.find(hits, &(&1.kind == :action and &1.doc_type == "Invoice"))
+      assert hit.path == "/companies/#{company.id}/Invoice/new"
     end
 
     test "newpur and aliases", %{admin: admin, company: company} do
@@ -444,6 +476,12 @@ defmodule FullCircle.CommandPaletteTest do
       hits = CommandPalette.search(company, admin, "new")
       assert Enum.all?(hits, &(&1.kind == :action))
       assert length(hits) >= 8
+    end
+
+    test "empty_hits returns create actions", %{admin: admin, company: company} do
+      hits = CommandPalette.empty_hits(company, admin)
+      assert Enum.all?(hits, &(&1.kind == :action))
+      assert Enum.any?(hits, &(&1.doc_type == "Deposit"))
     end
 
     test "spaced input is never an action (contact-safe)", %{admin: admin, company: company} do

@@ -132,7 +132,7 @@ Hooks.localStorageInput = {
   }
 }
 
-// App-wide command palette (Ctrl/Cmd+K) — search + actions
+// App-wide command palette (Ctrl/Cmd+K) — search + actions + recents
 Hooks.CommandPalette = {
   mounted() {
     this.open = () => {
@@ -144,7 +144,6 @@ Hooks.CommandPalette = {
         this.open()
         return
       }
-      // While open, keep ↑/↓ from moving the search caret / page; LiveView still gets phx-window-keydown
       if (this.el.dataset.open === "true" && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
         e.preventDefault()
       }
@@ -152,6 +151,40 @@ Hooks.CommandPalette = {
     this.onCustom = () => this.open()
     window.addEventListener("keydown", this.onKey)
     window.addEventListener("fc-open-command-palette", this.onCustom)
+
+    this.handleEvent("palette_load_recents", ({ company_id }) => {
+      const key = `fc-palette-recents-${company_id || this.el.dataset.companyId}`
+      let items = []
+      try {
+        items = JSON.parse(localStorage.getItem(key) || "[]")
+      } catch (_) {
+        items = []
+      }
+      if (!Array.isArray(items)) items = []
+      this.pushEventTo(this.el, "recents", { items })
+    })
+
+    this.handleEvent("palette_remember", (item) => {
+      const companyId = item.company_id || this.el.dataset.companyId
+      if (!companyId || !item.path) return
+      const key = `fc-palette-recents-${companyId}`
+      let items = []
+      try {
+        items = JSON.parse(localStorage.getItem(key) || "[]")
+      } catch (_) {
+        items = []
+      }
+      if (!Array.isArray(items)) items = []
+      items = items.filter((x) => x && x.path !== item.path)
+      items.unshift({
+        path: item.path,
+        title: item.title,
+        label: item.label,
+        doc_type: item.doc_type,
+        doc_id: item.doc_id
+      })
+      localStorage.setItem(key, JSON.stringify(items.slice(0, 8)))
+    })
   },
   updated() {
     if (this.el.dataset.open !== "true") return
@@ -161,7 +194,6 @@ Hooks.CommandPalette = {
       requestAnimationFrame(() => input.focus())
     }
 
-    // After patch paints the new aria-selected row, scroll only the listbox
     requestAnimationFrame(() => {
       requestAnimationFrame(() => this.scrollSelectedIntoView())
     })
@@ -170,7 +202,6 @@ Hooks.CommandPalette = {
     const selected = this.el.querySelector('[role="option"][aria-selected="true"]')
     if (!selected) return
 
-    // Prefer the scrollable results list — never scroll the page behind the modal
     const list =
       selected.closest('[role="listbox"]') ||
       this.el.querySelector('[role="listbox"]')

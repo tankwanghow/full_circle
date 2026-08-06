@@ -63,7 +63,10 @@ defmodule FullCircle.CommandPalette.Query do
     "js" => "Journal",
     "jv" => "Journal",
     "journal" => "Journal",
-    "journals" => "Journal"
+    "journals" => "Journal",
+    "dep" => "Deposit",
+    "deposit" => "Deposit",
+    "deposits" => "Deposit"
   }
 
   @doc """

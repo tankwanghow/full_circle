@@ -1,7 +1,7 @@
 # Command Palette — Global Document Search
 
 **Date:** 2026-08-05  
-**Status:** Implemented (search + create actions)  
+**Status:** Implemented (search + create + groups + recents + deposit search)  
 **App:** FullCircle (`full_circle`)  
 **Related:** `docs/superpowers/specs/2026-07-28-assistant-command-bar-design.md` (future mode)
 

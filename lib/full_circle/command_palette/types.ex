@@ -12,7 +12,8 @@ defmodule FullCircle.CommandPalette.Types do
     {"Payment", :update_payment, "Payment", "Payment"},
     {"CreditNote", :update_credit_note, "Credit Note", "CreditNote"},
     {"DebitNote", :update_debit_note, "Debit Note", "DebitNote"},
-    {"Journal", :update_journal, "Journal", "Journal"}
+    {"Journal", :update_journal, "Journal", "Journal"},
+    {"Deposit", :update_deposit, "Deposit", "Deposit"}
   ]
 
   # Create actions: compound tokens (no spaces) so they never clash with contact names.

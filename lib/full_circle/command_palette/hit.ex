@@ -16,7 +16,7 @@ defmodule FullCircle.CommandPalette.Hit do
     :path
   ]
 
-  @type kind :: :document | :action | :contact
+  @type kind :: :document | :action | :contact | :recent
 
   @type t :: %__MODULE__{
           kind: kind(),

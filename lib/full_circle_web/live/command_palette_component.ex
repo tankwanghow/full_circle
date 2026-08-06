@@ -1,12 +1,11 @@
 defmodule FullCircleWeb.CommandPaletteComponent do
   @moduledoc """
   App-wide command palette (Ctrl/Cmd+K).
-
-  Search documents/contacts, or run create actions (`newinv`, `newpur`, …).
   """
   use FullCircleWeb, :live_component
 
   alias FullCircle.CommandPalette
+  alias FullCircle.CommandPalette.Groups
 
   @impl true
   def mount(socket) do
@@ -15,6 +14,7 @@ defmodule FullCircleWeb.CommandPaletteComponent do
      |> assign(:open?, false)
      |> assign(:terms, "")
      |> assign(:hits, [])
+     |> assign(:groups, [])
      |> assign(:selected, 0)}
   end
 
@@ -26,6 +26,7 @@ defmodule FullCircleWeb.CommandPaletteComponent do
      |> assign_new(:open?, fn -> false end)
      |> assign_new(:terms, fn -> "" end)
      |> assign_new(:hits, fn -> [] end)
+     |> assign_new(:groups, fn -> [] end)
      |> assign_new(:selected, fn -> 0 end)}
   end
 
@@ -36,26 +37,49 @@ defmodule FullCircleWeb.CommandPaletteComponent do
      |> assign(:open?, true)
      |> assign(:terms, "")
      |> assign(:hits, [])
-     |> assign(:selected, 0)}
+     |> assign(:groups, [])
+     |> assign(:selected, 0)
+     |> push_event("palette_load_recents", %{
+       company_id: socket.assigns.current_company.id
+     })}
   end
 
   def handle_event("close", _params, socket) do
     {:noreply, close(socket)}
   end
 
-  def handle_event("search", %{"terms" => terms}, socket) do
-    hits =
-      CommandPalette.search(
-        socket.assigns.current_company,
-        socket.assigns.current_user,
-        terms
-      )
+  def handle_event("recents", %{"items" => items}, socket) do
+    recents = CommandPalette.recents_from_payload(items)
+    actions = CommandPalette.empty_hits(socket.assigns.current_company, socket.assigns.current_user)
+    hits = recents ++ actions
+    set_hits(socket, hits, "")
+  end
 
-    {:noreply,
-     socket
-     |> assign(:terms, terms)
-     |> assign(:hits, hits)
-     |> assign(:selected, 0)}
+  def handle_event("search", %{"terms" => terms}, socket) do
+    terms = terms || ""
+
+    hits =
+      if String.trim(terms) == "" do
+        # Keep showing empty-state until recents event; request again
+        []
+      else
+        CommandPalette.search(
+          socket.assigns.current_company,
+          socket.assigns.current_user,
+          terms
+        )
+      end
+
+    socket =
+      if String.trim(terms) == "" do
+        push_event(socket, "palette_load_recents", %{
+          company_id: socket.assigns.current_company.id
+        })
+      else
+        socket
+      end
+
+    set_hits(socket, hits, terms)
   end
 
   def handle_event("keydown", %{"key" => "Escape"}, socket) do
@@ -76,7 +100,7 @@ defmodule FullCircleWeb.CommandPaletteComponent do
   def handle_event("keydown", %{"key" => "Enter"}, socket) do
     case Enum.at(socket.assigns.hits, socket.assigns.selected) do
       nil -> {:noreply, socket}
-      hit -> {:noreply, socket |> close() |> push_navigate(to: hit.path)}
+      hit -> navigate_hit(socket, hit)
     end
   end
 
@@ -87,7 +111,7 @@ defmodule FullCircleWeb.CommandPaletteComponent do
 
     case Enum.at(socket.assigns.hits, index) do
       nil -> {:noreply, socket}
-      hit -> {:noreply, socket |> close() |> push_navigate(to: hit.path)}
+      hit -> navigate_hit(socket, hit)
     end
   end
 
@@ -95,11 +119,41 @@ defmodule FullCircleWeb.CommandPaletteComponent do
     {:noreply, assign(socket, :selected, String.to_integer(index))}
   end
 
+  defp set_hits(socket, hits, terms) do
+    groups = CommandPalette.group_hits(hits)
+    flat = Groups.flatten(groups)
+
+    {:noreply,
+     socket
+     |> assign(:terms, terms)
+     |> assign(:hits, flat)
+     |> assign(:groups, groups)
+     |> assign(:selected, 0)}
+  end
+
+  defp navigate_hit(socket, hit) do
+    remember = %{
+      path: hit.path,
+      title: primary_text(hit),
+      label: hit.label,
+      doc_type: hit.doc_type,
+      doc_id: hit.doc_id,
+      company_id: socket.assigns.current_company.id
+    }
+
+    {:noreply,
+     socket
+     |> push_event("palette_remember", remember)
+     |> close()
+     |> push_navigate(to: hit.path)}
+  end
+
   defp close(socket) do
     socket
     |> assign(:open?, false)
     |> assign(:terms, "")
     |> assign(:hits, [])
+    |> assign(:groups, [])
     |> assign(:selected, 0)
   end
 
@@ -109,6 +163,10 @@ defmodule FullCircleWeb.CommandPaletteComponent do
 
   defp subtitle(%{kind: :contact}) do
     gettext("Open contact master")
+  end
+
+  defp subtitle(%{kind: :recent}) do
+    gettext("Recent")
   end
 
   defp subtitle(hit) do
@@ -131,11 +189,15 @@ defmodule FullCircleWeb.CommandPaletteComponent do
 
   defp primary_text(%{kind: :action, doc_no: title}), do: title
   defp primary_text(%{kind: :contact, doc_no: name}), do: name
+  defp primary_text(%{kind: :recent, doc_no: title}), do: title
   defp primary_text(%{doc_no: no}), do: no
 
   defp badge_class(:action), do: "bg-sky-800 text-sky-200"
   defp badge_class(:contact), do: "bg-violet-800 text-violet-200"
+  defp badge_class(:recent), do: "bg-amber-900 text-amber-200"
   defp badge_class(_), do: "bg-gray-700 text-amber-300"
+
+  defp empty_terms?(terms), do: String.trim(terms || "") == ""
 
   @impl true
   def render(assigns) do
@@ -146,6 +208,7 @@ defmodule FullCircleWeb.CommandPaletteComponent do
       phx-target={@myself}
       data-open={to_string(@open?)}
       data-selected={@selected}
+      data-company-id={@current_company.id}
     >
       <div
         :if={@open?}
@@ -168,7 +231,7 @@ defmodule FullCircleWeb.CommandPaletteComponent do
                 name="terms"
                 value={@terms}
                 phx-debounce="250"
-                placeholder={gettext("Docs, contact, good, dates, or newinv…")}
+                placeholder={gettext("Search or newinv / newdep…")}
                 class="w-full bg-transparent border-0 text-white placeholder:text-gray-500 focus:ring-0 focus:outline-none py-2"
                 autocomplete="off"
                 autofocus
@@ -179,65 +242,86 @@ defmodule FullCircleWeb.CommandPaletteComponent do
             </div>
           </form>
 
-          <ul
-            :if={@terms != "" and String.length(String.trim(@terms)) >= 2}
+          <div
+            :if={empty_terms?(@terms) and @groups == []}
+            class="px-4 py-6 text-center text-gray-400 text-sm"
+          >
+            {gettext("Loading…")}
+          </div>
+
+          <div
+            :if={@groups != [] or (not empty_terms?(@terms) and String.length(String.trim(@terms)) >= 2)}
             id={"#{@id}-results"}
             class="max-h-80 overflow-y-auto py-1"
             role="listbox"
           >
-            <li
-              :if={@hits == []}
+            <div
+              :if={not empty_terms?(@terms) and String.length(String.trim(@terms)) >= 2 and @hits == []}
               class="px-4 py-6 text-center text-gray-400 text-sm"
             >
               {gettext("No matches")}
-            </li>
-            <li
-              :for={{hit, index} <- Enum.with_index(@hits)}
-              id={"#{@id}-hit-#{index}"}
-              role="option"
-              aria-selected={to_string(@selected == index)}
-              data-selected={to_string(@selected == index)}
-              class={[
-                "flex cursor-pointer items-center gap-3 px-3 py-2 text-sm",
-                @selected == index && "bg-emerald-700/80",
-                @selected != index && "hover:bg-gray-800"
-              ]}
-              phx-click="select"
-              phx-value-index={index}
-              phx-target={@myself}
-              phx-mouseover="hover"
-            >
-              <span class={[
-                "shrink-0 rounded px-2 py-0.5 text-xs font-medium w-28 text-center truncate",
-                badge_class(hit.kind)
-              ]}>
-                {hit.label}
-              </span>
-              <div class="min-w-0 flex-1">
-                <div class="font-semibold truncate">{primary_text(hit)}</div>
-                <div :if={subtitle(hit) != ""} class="text-xs text-gray-400 truncate">
-                  {subtitle(hit)}
-                </div>
+            </div>
+
+            <%= for {section, section_hits} <- @groups do %>
+              <% base = flat_offset(@groups, section) %>
+              <div class="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+                {Groups.section_label(section)}
               </div>
-              <.icon
-                :if={@selected == index}
-                name="hero-arrow-right"
-                class="w-4 h-4 text-gray-300 shrink-0"
-              />
-            </li>
-          </ul>
+              <div
+                :for={{hit, i} <- Enum.with_index(section_hits)}
+                id={"#{@id}-hit-#{base + i}"}
+                role="option"
+                aria-selected={to_string(@selected == base + i)}
+                data-selected={to_string(@selected == base + i)}
+                class={[
+                  "flex cursor-pointer items-center gap-3 px-3 py-2 text-sm",
+                  @selected == base + i && "bg-emerald-700/80",
+                  @selected != base + i && "hover:bg-gray-800"
+                ]}
+                phx-click="select"
+                phx-value-index={base + i}
+                phx-target={@myself}
+                phx-mouseover="hover"
+              >
+                <span class={[
+                  "shrink-0 rounded px-2 py-0.5 text-xs font-medium w-28 text-center truncate",
+                  badge_class(hit.kind)
+                ]}>
+                  {hit.label}
+                </span>
+                <div class="min-w-0 flex-1">
+                  <div class="font-semibold truncate">{primary_text(hit)}</div>
+                  <div :if={subtitle(hit) != ""} class="text-xs text-gray-400 truncate">
+                    {subtitle(hit)}
+                  </div>
+                </div>
+                <.icon
+                  :if={@selected == base + i}
+                  name="hero-arrow-right"
+                  class="w-4 h-4 text-gray-300 shrink-0"
+                />
+              </div>
+            <% end %>
+          </div>
 
           <div class="border-t border-gray-700 px-3 py-2 text-xs text-gray-500 flex flex-wrap gap-x-3 gap-y-1">
             <span><kbd class="border border-gray-600 rounded px-1">↑↓</kbd> {gettext("navigate")}</span>
             <span><kbd class="border border-gray-600 rounded px-1">↵</kbd> {gettext("open")}</span>
             <span><kbd class="border border-gray-600 rounded px-1">esc</kbd> {gettext("close")}</span>
             <span class="text-gray-600">
-              {gettext("e.g. swee inv good grade e · newinv · INV-…")}
+              {gettext("sections · newinv · DEP-…")}
             </span>
           </div>
         </div>
       </div>
     </div>
     """
+  end
+
+  # Flat index where this section's items start
+  defp flat_offset(groups, section) do
+    groups
+    |> Enum.take_while(fn {sec, _} -> sec != section end)
+    |> Enum.reduce(0, fn {_s, hits}, acc -> acc + length(hits) end)
   end
 end
