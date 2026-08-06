@@ -174,7 +174,8 @@ defmodule FullCircle.CommandPalette.FundsDocSearch do
       good_name: nil,
       bank_name: row.bank_name,
       label: label,
-      path: "/companies/#{company_id}/#{route}/#{row.doc_id}/edit"
+      path: "/companies/#{company_id}/#{route}/#{row.doc_id}/edit",
+      print_path: "/companies/#{company_id}/#{route}/#{row.doc_id}/print?pre_print=false"
     }
   end
 end

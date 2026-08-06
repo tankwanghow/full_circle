@@ -113,7 +113,8 @@ defmodule FullCircle.CommandPalette.DepositSearch do
       good_name: nil,
       bank_name: row.bank_name,
       label: "Deposit",
-      path: "/companies/#{company_id}/Deposit/#{row.doc_id}/edit"
+      path: "/companies/#{company_id}/Deposit/#{row.doc_id}/edit",
+      print_path: nil
     }
   end
 end

@@ -52,7 +52,8 @@ defmodule FullCircle.CommandPalette do
             contact_name: nil,
             good_name: nil,
             label: label,
-            path: path
+            path: path,
+            print_path: item["print_path"] || item[:print_path]
           }
         ]
       else
@@ -62,4 +63,16 @@ defmodule FullCircle.CommandPalette do
   end
 
   def recents_from_payload(_), do: []
+
+  @doc """
+  Short token cheatsheet for empty palette footer / help strip.
+  """
+  def cheatsheet_lines do
+    [
+      "Search: INV-… · swee inv · dep maybank · rc funds cash",
+      "Dates: 5/2/2026 (on/before) · 1/2/2026 - 14/2/2026",
+      "Create: newinv newpur newrc newpv newcn newdn newjs newdep newrtn",
+      "Open: ↵ edit · Alt+↵ print (when available)"
+    ]
+  end
 end

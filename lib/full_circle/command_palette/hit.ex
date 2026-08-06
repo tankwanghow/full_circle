@@ -14,7 +14,8 @@ defmodule FullCircle.CommandPalette.Hit do
     :good_name,
     :bank_name,
     :label,
-    :path
+    :path,
+    :print_path
   ]
 
   @type kind :: :document | :action | :contact | :recent
@@ -29,6 +30,7 @@ defmodule FullCircle.CommandPalette.Hit do
           good_name: String.t() | nil,
           bank_name: String.t() | nil,
           label: String.t(),
-          path: String.t()
+          path: String.t(),
+          print_path: String.t() | nil
         }
 end

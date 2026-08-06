@@ -438,6 +438,51 @@ defmodule FullCircle.CommandPaletteTest do
     end
   end
 
+  describe "polish" do
+    test "doc_number_like? detects doc nos" do
+      alias FullCircle.CommandPalette.Types
+      assert Types.doc_number_like?("INV-010798")
+      assert Types.doc_number_like?("RC00012")
+      assert Types.doc_number_like?("12345")
+      refute Types.doc_number_like?("Swee Heng")
+      refute Types.doc_number_like?("swee")
+    end
+
+    test "doc number search does not return contact master hits", %{
+      admin: admin,
+      company: company
+    } do
+      contact =
+        contact_fixture(company, admin, %{
+          "name" => "INV-LOOKALIKE #{System.unique_integer([:positive])}"
+        })
+
+      # Query that looks like a doc number should not list contacts
+      hits = CommandPalette.search(company, admin, "INV-999999")
+      refute Enum.any?(hits, &(&1.kind == :contact))
+
+      # Real name still finds contact
+      hits2 = CommandPalette.search(company, admin, contact.name)
+      assert Enum.any?(hits2, &(&1.kind == :contact and &1.doc_id == contact.id))
+    end
+
+    test "newrtn is a create action", %{admin: admin, company: company} do
+      hits = CommandPalette.search(company, admin, "newrtn")
+      hit = Enum.find(hits, &(&1.kind == :action and &1.doc_type == "ReturnCheque"))
+      assert hit
+      assert hit.path == "/companies/#{company.id}/ReturnCheque/new"
+    end
+
+    test "printable docs expose print_path", %{admin: admin, company: company} do
+      {invoice, _} = create_invoice!(company, admin)
+      hits = CommandPalette.search(company, admin, invoice.invoice_no)
+      hit = Enum.find(hits, &(&1.doc_id == invoice.id))
+      assert hit
+      assert hit.print_path =~ "/Invoice/#{invoice.id}/print"
+      assert hit.print_path =~ "pre_print=false"
+    end
+  end
+
   describe "groups" do
     test "groups contacts and documents separately", %{admin: admin, company: company} do
       contact =

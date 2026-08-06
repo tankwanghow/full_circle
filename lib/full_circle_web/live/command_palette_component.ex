@@ -15,7 +15,8 @@ defmodule FullCircleWeb.CommandPaletteComponent do
      |> assign(:terms, "")
      |> assign(:hits, [])
      |> assign(:groups, [])
-     |> assign(:selected, 0)}
+     |> assign(:selected, 0)
+     |> assign(:cheatsheet, CommandPalette.cheatsheet_lines())}
   end
 
   @impl true
@@ -27,7 +28,8 @@ defmodule FullCircleWeb.CommandPaletteComponent do
      |> assign_new(:terms, fn -> "" end)
      |> assign_new(:hits, fn -> [] end)
      |> assign_new(:groups, fn -> [] end)
-     |> assign_new(:selected, fn -> 0 end)}
+     |> assign_new(:selected, fn -> 0 end)
+     |> assign_new(:cheatsheet, fn -> CommandPalette.cheatsheet_lines() end)}
   end
 
   @impl true
@@ -60,7 +62,6 @@ defmodule FullCircleWeb.CommandPaletteComponent do
 
     hits =
       if String.trim(terms) == "" do
-        # Keep showing empty-state until recents event; request again
         []
       else
         CommandPalette.search(
@@ -97,10 +98,24 @@ defmodule FullCircleWeb.CommandPaletteComponent do
     {:noreply, assign(socket, :selected, sel)}
   end
 
+  # Alt+Enter → print when available
+  def handle_event("keydown", %{"key" => "Enter", "altKey" => true}, socket) do
+    case Enum.at(socket.assigns.hits, socket.assigns.selected) do
+      %{print_path: path} = hit when is_binary(path) and path != "" ->
+        navigate_hit(socket, hit, path)
+
+      hit when not is_nil(hit) ->
+        navigate_hit(socket, hit, hit.path)
+
+      nil ->
+        {:noreply, socket}
+    end
+  end
+
   def handle_event("keydown", %{"key" => "Enter"}, socket) do
     case Enum.at(socket.assigns.hits, socket.assigns.selected) do
       nil -> {:noreply, socket}
-      hit -> navigate_hit(socket, hit)
+      hit -> navigate_hit(socket, hit, hit.path)
     end
   end
 
@@ -111,7 +126,19 @@ defmodule FullCircleWeb.CommandPaletteComponent do
 
     case Enum.at(socket.assigns.hits, index) do
       nil -> {:noreply, socket}
-      hit -> navigate_hit(socket, hit)
+      hit -> navigate_hit(socket, hit, hit.path)
+    end
+  end
+
+  def handle_event("print", %{"index" => index}, socket) do
+    index = String.to_integer(index)
+
+    case Enum.at(socket.assigns.hits, index) do
+      %{print_path: path} = hit when is_binary(path) and path != "" ->
+        navigate_hit(socket, hit, path)
+
+      _ ->
+        {:noreply, socket}
     end
   end
 
@@ -131,9 +158,10 @@ defmodule FullCircleWeb.CommandPaletteComponent do
      |> assign(:selected, 0)}
   end
 
-  defp navigate_hit(socket, hit) do
+  defp navigate_hit(socket, hit, path) do
     remember = %{
       path: hit.path,
+      print_path: hit.print_path,
       title: primary_text(hit),
       label: hit.label,
       doc_type: hit.doc_type,
@@ -145,7 +173,7 @@ defmodule FullCircleWeb.CommandPaletteComponent do
      socket
      |> push_event("palette_remember", remember)
      |> close()
-     |> push_navigate(to: hit.path)}
+     |> push_navigate(to: path)}
   end
 
   defp close(socket) do
@@ -188,7 +216,14 @@ defmodule FullCircleWeb.CommandPaletteComponent do
         _ -> nil
       end
 
-    [date, hit.contact_name, account, good]
+    print_hint =
+      if is_binary(hit.print_path) and hit.print_path != "" do
+        gettext("Alt+↵ print")
+      else
+        nil
+      end
+
+    [date, hit.contact_name, account, good, print_hint]
     |> Enum.reject(&(is_nil(&1) or &1 == ""))
     |> Enum.join(" · ")
   end
@@ -204,6 +239,8 @@ defmodule FullCircleWeb.CommandPaletteComponent do
   defp badge_class(_), do: "bg-gray-700 text-amber-300"
 
   defp empty_terms?(terms), do: String.trim(terms || "") == ""
+  defp has_print?(%{print_path: p}) when is_binary(p) and p != "", do: true
+  defp has_print?(_), do: false
 
   @impl true
   def render(assigns) do
@@ -237,7 +274,7 @@ defmodule FullCircleWeb.CommandPaletteComponent do
                 name="terms"
                 value={@terms}
                 phx-debounce="250"
-                placeholder={gettext("Search or newinv / newdep…")}
+                placeholder={gettext("Search or newinv / newdep / newrtn…")}
                 class="w-full bg-transparent border-0 text-white placeholder:text-gray-500 focus:ring-0 focus:outline-none py-2"
                 autocomplete="off"
                 autofocus
@@ -253,6 +290,14 @@ defmodule FullCircleWeb.CommandPaletteComponent do
             class="px-4 py-6 text-center text-gray-400 text-sm"
           >
             {gettext("Loading…")}
+          </div>
+
+          <%!-- Empty palette: recents/actions already in groups; always show cheatsheet strip --%>
+          <div
+            :if={empty_terms?(@terms) and @groups != []}
+            class="border-b border-gray-800 px-3 py-2 text-[11px] text-gray-500 space-y-0.5"
+          >
+            <p :for={line <- @cheatsheet} class="truncate">{line}</p>
           </div>
 
           <div
@@ -301,8 +346,19 @@ defmodule FullCircleWeb.CommandPaletteComponent do
                     {subtitle(hit)}
                   </div>
                 </div>
+                <button
+                  :if={has_print?(hit)}
+                  type="button"
+                  class="shrink-0 rounded px-1.5 py-0.5 text-[10px] text-gray-300 hover:bg-gray-700 border border-gray-600"
+                  phx-click="print"
+                  phx-value-index={base + i}
+                  phx-target={@myself}
+                  title={gettext("Print (Alt+Enter)")}
+                >
+                  {gettext("Print")}
+                </button>
                 <.icon
-                  :if={@selected == base + i}
+                  :if={@selected == base + i and not has_print?(hit)}
                   name="hero-arrow-right"
                   class="w-4 h-4 text-gray-300 shrink-0"
                 />
@@ -312,11 +368,11 @@ defmodule FullCircleWeb.CommandPaletteComponent do
 
           <div class="border-t border-gray-700 px-3 py-2 text-xs text-gray-500 flex flex-wrap gap-x-3 gap-y-1">
             <span><kbd class="border border-gray-600 rounded px-1">↑↓</kbd> {gettext("navigate")}</span>
-            <span><kbd class="border border-gray-600 rounded px-1">↵</kbd> {gettext("open")}</span>
-            <span><kbd class="border border-gray-600 rounded px-1">esc</kbd> {gettext("close")}</span>
-            <span class="text-gray-600">
-              {gettext("sections · newinv · DEP-…")}
+            <span><kbd class="border border-gray-600 rounded px-1">↵</kbd> {gettext("edit")}</span>
+            <span>
+              <kbd class="border border-gray-600 rounded px-1">Alt+↵</kbd> {gettext("print")}
             </span>
+            <span><kbd class="border border-gray-600 rounded px-1">esc</kbd> {gettext("close")}</span>
           </div>
         </div>
       </div>
@@ -324,7 +380,6 @@ defmodule FullCircleWeb.CommandPaletteComponent do
     """
   end
 
-  # Flat index where this section's items start
   defp flat_offset(groups, section) do
     groups
     |> Enum.take_while(fn {sec, _} -> sec != section end)

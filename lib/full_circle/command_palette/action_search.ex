@@ -51,7 +51,8 @@ defmodule FullCircle.CommandPalette.ActionSearch do
         doc_date: nil,
         contact_name: primary,
         label: "New",
-        path: "/companies/#{company.id}/#{route}/new"
+        path: "/companies/#{company.id}/#{route}/new",
+        print_path: nil
       }
     end)
   end

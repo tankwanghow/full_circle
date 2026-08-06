@@ -46,7 +46,14 @@ defmodule FullCircle.CommandPalette.Router do
         |> Query.parse()
         |> Query.resolve_good(company, user)
 
-      contacts = ContactMasterSearch.search(company, user, q)
+      # Skip contact-master noise when the query is clearly a document number
+      contacts =
+        if Types.doc_number_like?(terms) or Types.doc_number_like?(q.contact_terms) do
+          []
+        else
+          ContactMasterSearch.search(company, user, q)
+        end
+
       by_no = DocNoSearch.search(company, user, q)
       by_contact = ContactDocSearch.search(company, user, q)
       by_date = DateDocSearch.search(company, user, q)
@@ -58,16 +65,17 @@ defmodule FullCircle.CommandPalette.Router do
           by_no ++ by_contact ++ by_date ++ by_deposit ++ by_funds,
           {[], MapSet.new()},
           fn hit, {acc, seen} ->
-          key = {hit.doc_type, hit.doc_id}
+            key = {hit.doc_type, hit.doc_id}
 
-          if MapSet.member?(seen, key) do
-            {acc, seen}
-          else
-            {acc ++ [hit], MapSet.put(seen, key)}
+            if MapSet.member?(seen, key) do
+              {acc, seen}
+            else
+              {acc ++ [hit], MapSet.put(seen, key)}
+            end
           end
-        end)
+        )
 
-      # Contacts first (quick jump to master), then documents
+      # Contacts first (when shown), then documents
       Enum.take(contacts ++ docs, Types.limit())
     end
   end
