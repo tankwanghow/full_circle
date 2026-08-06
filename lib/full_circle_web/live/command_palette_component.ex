@@ -107,57 +107,23 @@ defmodule FullCircleWeb.CommandPaletteComponent do
     {:noreply, assign(socket, :selected, sel)}
   end
 
-  # Enter → edit (Alt+Enter is handled via JS → print_selected; see hook)
-  def handle_event("keydown", %{"key" => "Enter"} = params, socket) do
-    if alt_pressed?(params) do
-      print_selected(socket)
-    else
-      case Enum.at(socket.assigns.hits, socket.assigns.selected) do
-        nil -> {:noreply, socket}
-        hit -> navigate_hit(socket, hit, hit.path)
-      end
+  def handle_event("keydown", %{"key" => "Enter"}, socket) do
+    case Enum.at(socket.assigns.hits, socket.assigns.selected) do
+      nil -> {:noreply, socket}
+      hit -> navigate_hit(socket, hit)
     end
   end
 
   def handle_event("keydown", _params, socket), do: {:noreply, socket}
-
-  def handle_event("print_selected", _params, socket) do
-    print_selected(socket)
-  end
 
   def handle_event("select", %{"index" => index}, socket) do
     index = String.to_integer(index)
 
     case Enum.at(socket.assigns.hits, index) do
       nil -> {:noreply, socket}
-      hit -> navigate_hit(socket, hit, hit.path)
+      hit -> navigate_hit(socket, hit)
     end
   end
-
-  def handle_event("print", %{"index" => index}, socket) do
-    index = String.to_integer(index)
-
-    case Enum.at(socket.assigns.hits, index) do
-      %{print_path: path} = hit when is_binary(path) and path != "" ->
-        navigate_hit(socket, hit, path)
-
-      _ ->
-        {:noreply, socket}
-    end
-  end
-
-  defp print_selected(socket) do
-    case Enum.at(socket.assigns.hits, socket.assigns.selected) do
-      %{print_path: path} = hit when is_binary(path) and path != "" ->
-        navigate_hit(socket, hit, path)
-
-      _ ->
-        {:noreply, socket}
-    end
-  end
-
-  defp alt_pressed?(%{"altKey" => v}) when v in [true, "true"], do: true
-  defp alt_pressed?(_), do: false
 
   def handle_event("hover", %{"index" => index}, socket) do
     {:noreply, assign(socket, :selected, String.to_integer(index))}
@@ -175,10 +141,9 @@ defmodule FullCircleWeb.CommandPaletteComponent do
      |> assign(:selected, 0)}
   end
 
-  defp navigate_hit(socket, hit, path) do
+  defp navigate_hit(socket, hit) do
     remember = %{
       path: hit.path,
-      print_path: hit.print_path,
       title: primary_text(hit),
       label: hit.label,
       doc_type: hit.doc_type,
@@ -186,21 +151,12 @@ defmodule FullCircleWeb.CommandPaletteComponent do
       company_id: socket.assigns.current_company.id
     }
 
-    socket =
-      socket
-      |> push_event("palette_remember", remember)
-      |> close()
-
-    # Print lives in a different live_session (print_root) — full redirect required
-    if print_url?(path) do
-      {:noreply, redirect(socket, to: path)}
-    else
-      {:noreply, push_navigate(socket, to: path)}
-    end
+    {:noreply,
+     socket
+     |> push_event("palette_remember", remember)
+     |> close()
+     |> push_navigate(to: hit.path)}
   end
-
-  defp print_url?(path) when is_binary(path), do: String.contains?(path, "/print")
-  defp print_url?(_), do: false
 
   defp close(socket) do
     socket
@@ -242,14 +198,7 @@ defmodule FullCircleWeb.CommandPaletteComponent do
         _ -> nil
       end
 
-    print_hint =
-      if is_binary(hit.print_path) and hit.print_path != "" do
-        gettext("Alt+↵ print")
-      else
-        nil
-      end
-
-    [date, hit.contact_name, account, good, print_hint]
+    [date, hit.contact_name, account, good]
     |> Enum.reject(&(is_nil(&1) or &1 == ""))
     |> Enum.join(" · ")
   end
@@ -265,8 +214,6 @@ defmodule FullCircleWeb.CommandPaletteComponent do
   defp badge_class(_), do: "bg-gray-700 text-amber-300"
 
   defp empty_terms?(terms), do: String.trim(terms || "") == ""
-  defp has_print?(%{print_path: p}) when is_binary(p) and p != "", do: true
-  defp has_print?(_), do: false
 
   @impl true
   def render(assigns) do
@@ -372,19 +319,8 @@ defmodule FullCircleWeb.CommandPaletteComponent do
                     {subtitle(hit)}
                   </div>
                 </div>
-                <button
-                  :if={has_print?(hit)}
-                  type="button"
-                  class="shrink-0 rounded px-1.5 py-0.5 text-[10px] text-gray-300 hover:bg-gray-700 border border-gray-600"
-                  phx-click="print"
-                  phx-value-index={base + i}
-                  phx-target={@myself}
-                  title={gettext("Print (Alt+Enter)")}
-                >
-                  {gettext("Print")}
-                </button>
                 <.icon
-                  :if={@selected == base + i and not has_print?(hit)}
+                  :if={@selected == base + i}
                   name="hero-arrow-right"
                   class="w-4 h-4 text-gray-300 shrink-0"
                 />
@@ -394,10 +330,7 @@ defmodule FullCircleWeb.CommandPaletteComponent do
 
           <div class="border-t border-gray-700 px-3 py-2 text-xs text-gray-500 flex flex-wrap gap-x-3 gap-y-1">
             <span><kbd class="border border-gray-600 rounded px-1">↑↓</kbd> {gettext("navigate")}</span>
-            <span><kbd class="border border-gray-600 rounded px-1">↵</kbd> {gettext("edit")}</span>
-            <span>
-              <kbd class="border border-gray-600 rounded px-1">Alt+↵</kbd> {gettext("print")}
-            </span>
+            <span><kbd class="border border-gray-600 rounded px-1">↵</kbd> {gettext("open")}</span>
             <span><kbd class="border border-gray-600 rounded px-1">esc</kbd> {gettext("close")}</span>
           </div>
         </div>

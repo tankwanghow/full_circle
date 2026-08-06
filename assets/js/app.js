@@ -160,18 +160,9 @@ Hooks.CommandPalette = {
 
       if (e.key === "ArrowDown" || e.key === "ArrowUp") {
         e.preventDefault()
-        return
-      }
-
-      // Alt+Enter → print selected (handle here so form submit / LV key quirks don't drop it)
-      if (e.key === "Enter" && e.altKey) {
-        e.preventDefault()
-        e.stopPropagation()
-        this.pushEventTo(this.el, "print_selected", {})
       }
     }
     this.onCustom = () => this.open()
-    // Capture phase so Alt+Enter beats form submit / other handlers
     window.addEventListener("keydown", this.onKey, true)
     window.addEventListener("fc-open-command-palette", this.onCustom)
 
@@ -206,6 +197,7 @@ Hooks.CommandPalette = {
         doc_type: item.doc_type,
         doc_id: item.doc_id
       })
+      // strip legacy print_path if present in older stored items
       localStorage.setItem(key, JSON.stringify(items.slice(0, 8)))
     })
   },

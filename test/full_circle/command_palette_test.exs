@@ -473,14 +473,6 @@ defmodule FullCircle.CommandPaletteTest do
       assert hit.path == "/companies/#{company.id}/ReturnCheque/new"
     end
 
-    test "printable docs expose print_path", %{admin: admin, company: company} do
-      {invoice, _} = create_invoice!(company, admin)
-      hits = CommandPalette.search(company, admin, invoice.invoice_no)
-      hit = Enum.find(hits, &(&1.doc_id == invoice.id))
-      assert hit
-      assert hit.print_path =~ "/Invoice/#{invoice.id}/print"
-      assert hit.print_path =~ "pre_print=false"
-    end
   end
 
   describe "groups" do

@@ -52,8 +52,7 @@ defmodule FullCircle.CommandPalette do
             contact_name: nil,
             good_name: nil,
             label: label,
-            path: path,
-            print_path: item["print_path"] || item[:print_path]
+            path: path
           }
         ]
       else
@@ -72,7 +71,7 @@ defmodule FullCircle.CommandPalette do
       "Search: INV-… · swee inv · dep maybank · rc funds cash",
       "Dates: 5/2/2026 (on/before) · 1/2/2026 - 14/2/2026",
       "Create: newinv newpur newrc newpv newcn newdn newjs newdep newrtn",
-      "Keys: Ctrl+K palette · Ctrl+Shift+D dashboard · ↵ edit · Alt+↵ print"
+      "Keys: Ctrl+K palette · Ctrl+Shift+D dashboard · ↵ open"
     ]
   end
 end

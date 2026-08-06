@@ -56,8 +56,7 @@ defmodule FullCircle.CommandPalette.ContactMasterSearch do
         doc_date: nil,
         contact_name: nil,
         label: "Contact",
-        path: "/companies/#{company.id}/contacts/#{row.id}/edit",
-        print_path: nil
+        path: "/companies/#{company.id}/contacts/#{row.id}/edit"
       }
     end)
   end
