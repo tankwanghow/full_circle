@@ -1,117 +1,10 @@
 defmodule FullCircleWeb.DashboardLive do
   use FullCircleWeb, :live_view
 
-  alias FullCircle.Dashboard
-
   @impl true
   def render(assigns) do
     ~H"""
     <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
-
-    <div
-      :if={@current_role != "punch_camera" and @today}
-      class="mx-auto w-11/12 max-w-4xl mb-8"
-    >
-      <div class="rounded-lg border border-gray-300 bg-white dark:bg-gray-800 dark:border-gray-600 shadow-sm p-4">
-        <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
-          <h2 class="text-xl font-semibold">
-            {gettext("Today")}
-            <span class="text-base font-normal text-gray-500 ml-2">
-              {Calendar.strftime(@today.date, "%d/%m/%Y")}
-            </span>
-          </h2>
-          <p class="text-sm text-gray-500">
-            {gettext("Ctrl+K to search · newinv / newdep to create")}
-          </p>
-        </div>
-
-        <div class="flex flex-wrap gap-2 mb-4">
-          <div class="rounded-md bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800 px-3 py-2 min-w-[5rem] text-center">
-            <div class="text-2xl font-bold text-emerald-700 dark:text-emerald-300">{@today.total}</div>
-            <div class="text-xs text-gray-600 dark:text-gray-400">{gettext("docs today")}</div>
-          </div>
-          <div
-            :for={{type, count} <- Enum.sort(@today.counts)}
-            class="rounded-md bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 px-3 py-2 min-w-[5rem] text-center"
-          >
-            <div class="text-xl font-semibold">{count}</div>
-            <div class="text-xs text-gray-600 dark:text-gray-400">{Dashboard.type_label(type)}</div>
-          </div>
-          <div
-            :if={@today.total == 0}
-            class="text-sm text-gray-500 self-center px-2"
-          >
-            {gettext("No finance documents dated today yet.")}
-          </div>
-        </div>
-
-        <div class="font-medium text-sm text-gray-600 dark:text-gray-300 mb-2">{gettext("Quick open")}</div>
-        <div class="flex flex-wrap gap-1 justify-start">
-          <.link
-            :if={FullCircle.Authorization.can?(@current_user, :create_invoice, @current_company)}
-            navigate={~p"/companies/#{@current_company.id}/Invoice/new"}
-            class="button teal"
-          >
-            {gettext("New Invoice")}
-          </.link>
-          <.link
-            :if={FullCircle.Authorization.can?(@current_user, :create_receipt, @current_company)}
-            navigate={~p"/companies/#{@current_company.id}/Receipt/new"}
-            class="button blue"
-          >
-            {gettext("New Receipt")}
-          </.link>
-          <.link
-            :if={FullCircle.Authorization.can?(@current_user, :create_payment, @current_company)}
-            navigate={~p"/companies/#{@current_company.id}/Payment/new"}
-            class="button blue"
-          >
-            {gettext("New Payment")}
-          </.link>
-          <.link
-            :if={FullCircle.Authorization.can?(@current_user, :create_deposit, @current_company)}
-            navigate={~p"/companies/#{@current_company.id}/Deposit/new"}
-            class="button blue"
-          >
-            {gettext("New Deposit")}
-          </.link>
-          <.link navigate={~p"/companies/#{@current_company.id}/aging"} class="button red">
-            {gettext("Aging")}
-          </.link>
-          <.link
-            :if={@current_role == "admin"}
-            navigate={~p"/companies/#{@current_company.id}/cash_forecast"}
-            class="button red"
-          >
-            {gettext("Cash Forecast")}
-          </.link>
-          <.link
-            :if={FullCircle.Authorization.can?(@current_user, :view_trading, @current_company)}
-            navigate={~p"/companies/#{@current_company.id}/trading/desk"}
-            class="button teal"
-          >
-            {gettext("Trading Desk")}
-          </.link>
-          <.link navigate={~p"/companies/#{@current_company.id}/egg_stock"} class="button gray">
-            {gettext("Egg Stock")}
-          </.link>
-          <.link
-            :if={
-              FullCircle.Authorization.can?(
-                @current_user,
-                :view_bank_reconciliation,
-                @current_company
-              )
-            }
-            navigate={~p"/companies/#{@current_company.id}/bank_reconciliation"}
-            class="button blue"
-          >
-            {gettext("Bank Recon")}
-          </.link>
-        </div>
-      </div>
-    </div>
-
     <div :if={@current_role != "punch_camera"} class="mx-auto w-6/12 text-center">
       <div :if={@current_role == "admin"} class="font-medium text-xl">
         Administrator Functions
@@ -406,19 +299,7 @@ defmodule FullCircleWeb.DashboardLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    today =
-      if socket.assigns[:current_company] && socket.assigns[:current_user] &&
-           socket.assigns[:current_role] != "punch_camera" do
-        Dashboard.today_snapshot(socket.assigns.current_company, socket.assigns.current_user)
-      else
-        nil
-      end
-
-    {:ok,
-     socket
-     |> assign(:back_to_route, "#")
-     |> assign(page_title: gettext("Dashboard"))
-     |> assign(:today, today)}
+    {:ok, socket |> assign(:back_to_route, "#") |> assign(page_title: gettext("Dashboard"))}
   end
 
   @impl true
