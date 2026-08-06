@@ -404,6 +404,23 @@ defmodule FullCircle.CommandPaletteTest do
     end
   end
 
+  describe "deposit bank search" do
+    test "parses bank separator", %{admin: _admin, company: _company} do
+      alias FullCircle.CommandPalette.Query
+      q = Query.parse("dep bank maybank")
+      assert q.doc_types == ["Deposit"]
+      assert q.bank_terms == "maybank"
+      assert q.contact_terms == ""
+    end
+
+    test "dep + free text is available as bank/no match terms" do
+      alias FullCircle.CommandPalette.Query
+      q = Query.parse("dep public bank")
+      assert q.doc_types == ["Deposit"]
+      assert q.contact_terms == "public bank"
+    end
+  end
+
   describe "groups" do
     test "groups contacts and documents separately", %{admin: admin, company: company} do
       contact =

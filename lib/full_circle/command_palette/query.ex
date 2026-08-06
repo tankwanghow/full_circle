@@ -22,6 +22,7 @@ defmodule FullCircle.CommandPalette.Query do
   defstruct raw: "",
             contact_terms: "",
             good_terms: nil,
+            bank_terms: nil,
             doc_types: nil,
             date_from: nil,
             date_to: nil,
@@ -31,6 +32,7 @@ defmodule FullCircle.CommandPalette.Query do
           raw: String.t(),
           contact_terms: String.t(),
           good_terms: String.t() | nil,
+          bank_terms: String.t() | nil,
           doc_types: [String.t()] | nil,
           date_from: Date.t() | nil,
           date_to: Date.t() | nil,
@@ -86,13 +88,15 @@ defmodule FullCircle.CommandPalette.Query do
 
     {date_mode, date_from, date_to} = date_fields(dates)
 
-    # Explicit "good" separator (not a type keyword)
-    {contact_terms, good_terms} = split_explicit_good(other_tokens)
+    # Explicit "good" / "bank" separators (not type keywords)
+    {contact_terms, good_terms} = split_explicit_keyword(other_tokens, "good")
+    {contact_terms, bank_terms} = split_explicit_keyword(String.split(contact_terms, ~r/\s+/, trim: true), "bank")
 
     %__MODULE__{
       raw: raw,
       contact_terms: contact_terms,
       good_terms: good_terms,
+      bank_terms: bank_terms,
       doc_types: if(doc_types == [], do: nil, else: doc_types),
       date_from: date_from,
       date_to: date_to,
@@ -124,10 +128,12 @@ defmodule FullCircle.CommandPalette.Query do
 
   # --- good split ------------------------------------------------------------
 
-  defp split_explicit_good(tokens) do
-    case Enum.split_while(tokens, &(normalize(&1) != "good")) do
-      {before, ["good" | after_good]} when after_good != [] ->
-        {Enum.join(before, " "), Enum.join(after_good, " ")}
+  # tokens may be a list or we re-split contact string above for bank
+  defp split_explicit_keyword(tokens, keyword) when is_list(tokens) do
+    case Enum.split_while(tokens, &(normalize(&1) != keyword)) do
+      {before, [kw | after_kw]} when after_kw != [] ->
+        _ = kw
+        {Enum.join(before, " "), Enum.join(after_kw, " ")}
 
       _ ->
         {Enum.join(tokens, " "), nil}

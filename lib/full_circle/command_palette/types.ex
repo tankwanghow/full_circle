@@ -58,6 +58,7 @@ defmodule FullCircle.CommandPalette.Types do
           doc_date: row.doc_date,
           contact_name: row.contact_name,
           good_name: Map.get(row, :good_name),
+          bank_name: Map.get(row, :bank_name),
           label: label,
           path: "/companies/#{company_id}/#{route_seg}/#{row.doc_id}/edit"
         }
