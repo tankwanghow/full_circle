@@ -11,6 +11,7 @@ defmodule FullCircle.CommandPalette.Hit do
     :doc_no,
     :doc_date,
     :contact_name,
+    :good_name,
     :label,
     :path
   ]
@@ -24,6 +25,7 @@ defmodule FullCircle.CommandPalette.Hit do
           doc_no: String.t() | nil,
           doc_date: Date.t() | nil,
           contact_name: String.t() | nil,
+          good_name: String.t() | nil,
           label: String.t(),
           path: String.t()
         }

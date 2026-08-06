@@ -118,7 +118,13 @@ defmodule FullCircleWeb.CommandPaletteComponent do
         _ -> nil
       end
 
-    [date, hit.contact_name]
+    good =
+      case hit.good_name do
+        name when is_binary(name) and name != "" -> name
+        _ -> nil
+      end
+
+    [date, hit.contact_name, good]
     |> Enum.reject(&(is_nil(&1) or &1 == ""))
     |> Enum.join(" · ")
   end

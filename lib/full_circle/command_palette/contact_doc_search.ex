@@ -93,5 +93,6 @@ defmodule FullCircle.CommandPalette.ContactDocSearch do
     |> Repo.all()
     |> Enum.map(&Types.to_hit(&1, company.id, meta))
     |> Enum.reject(&is_nil/1)
+    |> GoodFilter.attach_good_names(q)
   end
 end

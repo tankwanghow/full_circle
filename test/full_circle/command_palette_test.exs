@@ -397,6 +397,10 @@ defmodule FullCircle.CommandPaletteTest do
 
       assert inv_e.id in doc_ids
       refute inv_a.id in doc_ids
+
+      hit_e = Enum.find(hits, &(&1.kind == :document and &1.doc_id == inv_e.id))
+      assert hit_e.good_name
+      assert hit_e.good_name =~ good_e.name
     end
   end
 
