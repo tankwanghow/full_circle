@@ -421,6 +421,23 @@ defmodule FullCircle.CommandPaletteTest do
     end
   end
 
+  describe "receipt/payment funds search" do
+    test "parses funds separator" do
+      alias FullCircle.CommandPalette.Query
+      q = Query.parse("rc funds cash")
+      assert q.doc_types == ["Receipt"]
+      assert q.funds_terms == "cash"
+      assert q.contact_terms == ""
+    end
+
+    test "payment type keeps free text for funds/contact match" do
+      alias FullCircle.CommandPalette.Query
+      q = Query.parse("pv maybank")
+      assert q.doc_types == ["Payment"]
+      assert q.contact_terms == "maybank"
+    end
+  end
+
   describe "groups" do
     test "groups contacts and documents separately", %{admin: admin, company: company} do
       contact =

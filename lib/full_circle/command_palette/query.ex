@@ -23,6 +23,7 @@ defmodule FullCircle.CommandPalette.Query do
             contact_terms: "",
             good_terms: nil,
             bank_terms: nil,
+            funds_terms: nil,
             doc_types: nil,
             date_from: nil,
             date_to: nil,
@@ -33,6 +34,7 @@ defmodule FullCircle.CommandPalette.Query do
           contact_terms: String.t(),
           good_terms: String.t() | nil,
           bank_terms: String.t() | nil,
+          funds_terms: String.t() | nil,
           doc_types: [String.t()] | nil,
           date_from: Date.t() | nil,
           date_to: Date.t() | nil,
@@ -88,15 +90,21 @@ defmodule FullCircle.CommandPalette.Query do
 
     {date_mode, date_from, date_to} = date_fields(dates)
 
-    # Explicit "good" / "bank" separators (not type keywords)
+    # Explicit separators (not type keywords)
     {contact_terms, good_terms} = split_explicit_keyword(other_tokens, "good")
-    {contact_terms, bank_terms} = split_explicit_keyword(String.split(contact_terms, ~r/\s+/, trim: true), "bank")
+
+    {contact_terms, bank_terms} =
+      split_explicit_keyword(String.split(contact_terms, ~r/\s+/, trim: true), "bank")
+
+    {contact_terms, funds_terms} =
+      split_explicit_keyword(String.split(contact_terms, ~r/\s+/, trim: true), "funds")
 
     %__MODULE__{
       raw: raw,
       contact_terms: contact_terms,
       good_terms: good_terms,
       bank_terms: bank_terms,
+      funds_terms: funds_terms,
       doc_types: if(doc_types == [], do: nil, else: doc_types),
       date_from: date_from,
       date_to: date_to,

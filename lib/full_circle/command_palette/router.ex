@@ -14,6 +14,7 @@ defmodule FullCircle.CommandPalette.Router do
     DateDocSearch,
     DepositSearch,
     DocNoSearch,
+    FundsDocSearch,
     Query,
     Types
   }
@@ -50,11 +51,13 @@ defmodule FullCircle.CommandPalette.Router do
       by_contact = ContactDocSearch.search(company, user, q)
       by_date = DateDocSearch.search(company, user, q)
       by_deposit = DepositSearch.search(company, user, q)
+      by_funds = FundsDocSearch.search(company, user, q)
 
       {docs, _seen} =
-        Enum.reduce(by_no ++ by_contact ++ by_date ++ by_deposit, {[], MapSet.new()}, fn hit,
-                                                                                        {acc,
-                                                                                         seen} ->
+        Enum.reduce(
+          by_no ++ by_contact ++ by_date ++ by_deposit ++ by_funds,
+          {[], MapSet.new()},
+          fn hit, {acc, seen} ->
           key = {hit.doc_type, hit.doc_id}
 
           if MapSet.member?(seen, key) do

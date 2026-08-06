@@ -182,13 +182,13 @@ defmodule FullCircleWeb.CommandPaletteComponent do
         _ -> nil
       end
 
-    bank =
+    account =
       case Map.get(hit, :bank_name) do
         name when is_binary(name) and name != "" -> name
         _ -> nil
       end
 
-    [date, hit.contact_name, bank, good]
+    [date, hit.contact_name, account, good]
     |> Enum.reject(&(is_nil(&1) or &1 == ""))
     |> Enum.join(" · ")
   end
