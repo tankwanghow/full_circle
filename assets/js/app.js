@@ -159,7 +159,8 @@ Hooks.CommandPalette = {
       }
     }
     this.onCustom = () => this.open()
-    window.addEventListener("keydown", this.onKey)
+    // Capture phase so Alt+Enter beats form submit / other handlers
+    window.addEventListener("keydown", this.onKey, true)
     window.addEventListener("fc-open-command-palette", this.onCustom)
 
     this.handleEvent("palette_load_recents", ({ company_id }) => {
@@ -228,7 +229,7 @@ Hooks.CommandPalette = {
     }
   },
   destroyed() {
-    window.removeEventListener("keydown", this.onKey)
+    window.removeEventListener("keydown", this.onKey, true)
     window.removeEventListener("fc-open-command-palette", this.onCustom)
   }
 }
