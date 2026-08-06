@@ -197,7 +197,6 @@ Hooks.CommandPalette = {
         doc_type: item.doc_type,
         doc_id: item.doc_id
       })
-      // strip legacy print_path if present in older stored items
       localStorage.setItem(key, JSON.stringify(items.slice(0, 8)))
     })
   },
