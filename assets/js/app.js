@@ -140,9 +140,13 @@ Hooks.CommandPalette = {
     }
     this.onKey = (e) => {
       if ((e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K")) {
-        // Don't steal from editable fields that need Ctrl+K (rare); allow always for palette
         e.preventDefault()
         this.open()
+        return
+      }
+      // While open, keep ↑/↓ from moving the search caret / page; LiveView still gets phx-window-keydown
+      if (this.el.dataset.open === "true" && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+        e.preventDefault()
       }
     }
     this.onCustom = () => this.open()
@@ -150,20 +154,37 @@ Hooks.CommandPalette = {
     window.addEventListener("fc-open-command-palette", this.onCustom)
   },
   updated() {
-    if (this.el.dataset.open === "true") {
-      const input = this.el.querySelector("input[type=search]")
-      if (input && document.activeElement !== input) {
-        // Defer so the modal is in the DOM
-        requestAnimationFrame(() => input.focus())
-      }
-      // Keep keyboard-selected row visible inside the scrollable list
-      requestAnimationFrame(() => this.scrollSelectedIntoView())
+    if (this.el.dataset.open !== "true") return
+
+    const input = this.el.querySelector("input[type=search]")
+    if (input && document.activeElement !== input) {
+      requestAnimationFrame(() => input.focus())
     }
+
+    // After patch paints the new aria-selected row, scroll only the listbox
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => this.scrollSelectedIntoView())
+    })
   },
   scrollSelectedIntoView() {
     const selected = this.el.querySelector('[role="option"][aria-selected="true"]')
     if (!selected) return
-    selected.scrollIntoView({ block: "nearest", inline: "nearest" })
+
+    // Prefer the scrollable results list — never scroll the page behind the modal
+    const list =
+      selected.closest('[role="listbox"]') ||
+      this.el.querySelector('[role="listbox"]')
+    if (!list) return
+
+    const listRect = list.getBoundingClientRect()
+    const itemRect = selected.getBoundingClientRect()
+    const pad = 4
+
+    if (itemRect.bottom > listRect.bottom - pad) {
+      list.scrollTop += itemRect.bottom - listRect.bottom + pad
+    } else if (itemRect.top < listRect.top + pad) {
+      list.scrollTop -= listRect.top - itemRect.top + pad
+    }
   },
   destroyed() {
     window.removeEventListener("keydown", this.onKey)

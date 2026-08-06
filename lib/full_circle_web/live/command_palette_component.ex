@@ -195,7 +195,8 @@ defmodule FullCircleWeb.CommandPaletteComponent do
               :for={{hit, index} <- Enum.with_index(@hits)}
               id={"#{@id}-hit-#{index}"}
               role="option"
-              aria-selected={@selected == index}
+              aria-selected={to_string(@selected == index)}
+              data-selected={to_string(@selected == index)}
               class={[
                 "flex cursor-pointer items-center gap-3 px-3 py-2 text-sm",
                 @selected == index && "bg-emerald-700/80",
