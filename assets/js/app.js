@@ -144,8 +144,18 @@ Hooks.CommandPalette = {
         this.open()
         return
       }
-      if (this.el.dataset.open === "true" && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+      if (this.el.dataset.open !== "true") return
+
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
         e.preventDefault()
+        return
+      }
+
+      // Alt+Enter → print selected (handle here so form submit / LV key quirks don't drop it)
+      if (e.key === "Enter" && e.altKey) {
+        e.preventDefault()
+        e.stopPropagation()
+        this.pushEventTo(this.el, "print_selected", {})
       }
     }
     this.onCustom = () => this.open()

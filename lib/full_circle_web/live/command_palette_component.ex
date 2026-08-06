@@ -98,28 +98,23 @@ defmodule FullCircleWeb.CommandPaletteComponent do
     {:noreply, assign(socket, :selected, sel)}
   end
 
-  # Alt+Enter → print when available
-  def handle_event("keydown", %{"key" => "Enter", "altKey" => true}, socket) do
-    case Enum.at(socket.assigns.hits, socket.assigns.selected) do
-      %{print_path: path} = hit when is_binary(path) and path != "" ->
-        navigate_hit(socket, hit, path)
-
-      hit when not is_nil(hit) ->
-        navigate_hit(socket, hit, hit.path)
-
-      nil ->
-        {:noreply, socket}
-    end
-  end
-
-  def handle_event("keydown", %{"key" => "Enter"}, socket) do
-    case Enum.at(socket.assigns.hits, socket.assigns.selected) do
-      nil -> {:noreply, socket}
-      hit -> navigate_hit(socket, hit, hit.path)
+  # Enter → edit (Alt+Enter is handled via JS → print_selected; see hook)
+  def handle_event("keydown", %{"key" => "Enter"} = params, socket) do
+    if alt_pressed?(params) do
+      print_selected(socket)
+    else
+      case Enum.at(socket.assigns.hits, socket.assigns.selected) do
+        nil -> {:noreply, socket}
+        hit -> navigate_hit(socket, hit, hit.path)
+      end
     end
   end
 
   def handle_event("keydown", _params, socket), do: {:noreply, socket}
+
+  def handle_event("print_selected", _params, socket) do
+    print_selected(socket)
+  end
 
   def handle_event("select", %{"index" => index}, socket) do
     index = String.to_integer(index)
@@ -141,6 +136,19 @@ defmodule FullCircleWeb.CommandPaletteComponent do
         {:noreply, socket}
     end
   end
+
+  defp print_selected(socket) do
+    case Enum.at(socket.assigns.hits, socket.assigns.selected) do
+      %{print_path: path} = hit when is_binary(path) and path != "" ->
+        navigate_hit(socket, hit, path)
+
+      _ ->
+        {:noreply, socket}
+    end
+  end
+
+  defp alt_pressed?(%{"altKey" => v}) when v in [true, "true"], do: true
+  defp alt_pressed?(_), do: false
 
   def handle_event("hover", %{"index" => index}, socket) do
     {:noreply, assign(socket, :selected, String.to_integer(index))}
@@ -169,12 +177,21 @@ defmodule FullCircleWeb.CommandPaletteComponent do
       company_id: socket.assigns.current_company.id
     }
 
-    {:noreply,
-     socket
-     |> push_event("palette_remember", remember)
-     |> close()
-     |> push_navigate(to: path)}
+    socket =
+      socket
+      |> push_event("palette_remember", remember)
+      |> close()
+
+    # Print lives in a different live_session (print_root) — full redirect required
+    if print_url?(path) do
+      {:noreply, redirect(socket, to: path)}
+    else
+      {:noreply, push_navigate(socket, to: path)}
+    end
   end
+
+  defp print_url?(path) when is_binary(path), do: String.contains?(path, "/print")
+  defp print_url?(_), do: false
 
   defp close(socket) do
     socket
