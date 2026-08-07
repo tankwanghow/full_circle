@@ -270,13 +270,13 @@ defmodule FullCircleWeb.EInvListLive.IndexSentComponent do
             </div>
             <div class="w-[48%] min-w-0 p-1">
               <div class="truncate" title={doc.contact_name}>{doc.contact_name}</div>
-              <div class="text-xs text-gray-600 flex items-baseline gap-x-2 min-w-0">
-                <span class="truncate min-w-0">{doc.contact_tin}</span>
-                <span class="font-bold text-sm tabular-nums whitespace-nowrap ml-auto shrink-0">
+              <div class="text-xs text-gray-600 flex items-center gap-x-2 min-w-0">
+                <span class="truncate min-w-0" title={doc.contact_tin}>{doc.contact_tin}</span>
+                <span class="shrink-0">{matched_or_try_match(doc, assigns)}</span>
+                <span class="font-bold text-sm text-gray-900 tabular-nums whitespace-nowrap ml-auto shrink-0">
                   {doc.amount |> Number.Delimit.number_to_delimited()}
                 </span>
               </div>
-              <div class="text-xs">{matched_or_try_match(doc, assigns)}</div>
             </div>
           </div>
         <% end %>
