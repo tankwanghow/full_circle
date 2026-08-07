@@ -50,7 +50,9 @@ defmodule FullCircleWeb.ReceiptLive.Form do
       Map.merge(seed.attrs, %{
         receipt_no: "...new...",
         receipt_date: seed.issue_date,
-        load_date: seed.issue_date
+        load_date: seed.issue_date,
+        # LHDN payable is what this receipt settles — same anchor as Payment.
+        funds_amount: seed.payable
       })
 
     socket
@@ -152,6 +154,14 @@ defmodule FullCircleWeb.ReceiptLive.Form do
     end
 
     socket
+  end
+
+  # Compare keyed detail lines against LHDN total_payable (received self-billed).
+  # funds_amount is seeded from the same figure, so only the lines can drift.
+  defp e_inv_variance(form, payable) do
+    form.source
+    |> Ecto.Changeset.fetch_field!(:receipt_detail_amount)
+    |> FullCircle.EInvMetas.Prefill.variance(payable)
   end
 
   defp maybe_attach_egg_planned(socket, obj, params) do
@@ -947,6 +957,21 @@ defmodule FullCircleWeb.ReceiptLive.Form do
           current_company={@current_company}
           current_user={@current_user}
         />
+
+        <div :if={@e_inv_payable} class="flex flex-row mt-1">
+          <% variance = e_inv_variance(@form, @e_inv_payable) %>
+          <div class="grow"></div>
+          <div class={[
+            "text-right px-1",
+            if(variance, do: "text-red-600 font-semibold", else: "text-green-600")
+          ]}>
+            {gettext("E-Invoice")} {@e_inv_payable |> Number.Delimit.number_to_delimited()}
+            <span :if={variance} class="text-xs">
+              ({gettext("details out by")} {variance |> Number.Delimit.number_to_delimited()})
+            </span>
+          </div>
+        </div>
+
         <div class="flex justify-center gap-x-1 mt-1">
           <.form_action_button
             form={@form}

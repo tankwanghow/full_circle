@@ -215,6 +215,13 @@ defmodule FullCircleWeb.InvoiceLive.Form do
     socket
   end
 
+  # Compare keyed invoice lines against LHDN total_payable (received self-billed).
+  defp e_inv_variance(form, payable) do
+    form.source
+    |> Ecto.Changeset.fetch_field!(:invoice_amount)
+    |> FullCircle.EInvMetas.Prefill.variance(payable)
+  end
+
   defp maybe_attach_egg_planned(socket, obj, params) do
     if socket.assigns[:egg_detail_id] || socket.assigns[:egg_load_date] do
       load_date =
@@ -1080,6 +1087,27 @@ defmodule FullCircleWeb.InvoiceLive.Form do
           current_company={@current_company}
           current_user={@current_user}
         />
+
+        <div :if={@e_inv_payable} class="flex flex-row">
+          <% variance = e_inv_variance(@form, @e_inv_payable) %>
+          <div class="grow"></div>
+          <div class={[
+            "w-[10%] text-right px-1",
+            if(variance, do: "text-red-600 font-semibold", else: "text-green-600")
+          ]}>
+            {gettext("E-Invoice")}
+          </div>
+          <div class={[
+            "detail-amt-col text-right px-1",
+            if(variance, do: "text-red-600 font-semibold", else: "text-green-600")
+          ]}>
+            {@e_inv_payable |> Number.Delimit.number_to_delimited()}
+            <div :if={variance} class="text-xs">
+              {gettext("out by")} {variance |> Number.Delimit.number_to_delimited()}
+            </div>
+          </div>
+          <div class="detail-setting-col" />
+        </div>
 
         <div class="flex flex-row justify-center gap-x-1 mt-1">
           <.form_action_button
