@@ -93,6 +93,14 @@ defmodule FullCircleWeb.EInvListLive.IndexReceivedComponent do
     end
   end
 
+  defp same_amount?(a, b) do
+    case {a, b} do
+      {%Decimal{} = x, %Decimal{} = y} -> Decimal.equal?(x, y)
+      {x, y} when is_nil(x) or is_nil(y) -> x == y
+      {x, y} -> to_string(x) == to_string(y)
+    end
+  end
+
   defp matched_or_try_match(doc, assigns) do
     cond do
       assigns.obj.status != "Valid" -> "Cannot match"
@@ -212,21 +220,26 @@ defmodule FullCircleWeb.EInvListLive.IndexReceivedComponent do
             <span :if={@obj.status != "Valid"} class="text-rose-600">{@obj.status}</span>
           </div>
         </div>
-        <div class="w-[38%] min-w-0 px-1 text-right">
-          <div class="truncate text-left font-medium" title={@obj.supplierName}>
+        <div class="w-[38%] min-w-0 px-1">
+          <div class="truncate font-medium" title={@obj.supplierName}>
             {@obj.supplierName}
           </div>
-          <div class="text-xs text-gray-600 truncate text-left" title={@obj.supplierTIN}>
-            {@obj.supplierTIN}
+          <div class="text-xs text-gray-600 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+            <span class="truncate" title={@obj.supplierTIN}>{@obj.supplierTIN}</span>
+            <span class="font-bold text-sm text-gray-900 tabular-nums whitespace-nowrap ml-auto">
+              <span class="text-gray-500 text-xs font-normal">{@obj.documentCurrency}</span>
+              {@obj.totalNetAmount |> Number.Delimit.number_to_delimited()}
+            </span>
           </div>
-          <div class="text-sm font-bold tabular-nums whitespace-nowrap">
-            <span class="text-gray-500 text-xs font-normal">{@obj.documentCurrency}</span>
-            {@obj.totalNetAmount |> Number.Delimit.number_to_delimited()}
-          </div>
-          <div class="text-sm font-bold text-gray-600 tabular-nums whitespace-nowrap">
-            <span class="text-gray-500 text-xs font-normal">{@obj.documentCurrency}</span>
-            {@obj.totalPayableAmount |> Number.Delimit.number_to_delimited()}
-            <span class="text-[10px] font-normal text-gray-400 ml-0.5">pay</span>
+          <div
+            :if={!same_amount?(@obj.totalNetAmount, @obj.totalPayableAmount)}
+            class="text-xs text-gray-500 flex justify-end tabular-nums whitespace-nowrap"
+          >
+            <span class="text-gray-400 mr-1">pay</span>
+            <span class="font-semibold text-gray-700">
+              {@obj.documentCurrency}
+              {@obj.totalPayableAmount |> Number.Delimit.number_to_delimited()}
+            </span>
           </div>
         </div>
       </div>
