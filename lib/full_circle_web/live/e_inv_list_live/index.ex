@@ -282,28 +282,28 @@ defmodule FullCircleWeb.EInvListLive.Index do
           </div>
         </.form>
       </div>
-      <div class="flex flex-row">
-        <div class="font-medium flex flex-row bg-amber-200 w-[49.8%]">
-          <div class="w-[22%] border-b border-t border-amber-400 p-1">
-            <div>{gettext("Received/ Issued/ Reject")}</div>
+      <div class="flex flex-row text-xs font-medium">
+        <div class="flex flex-row bg-amber-200 w-[49.8%] min-w-0">
+          <div class="w-[20%] shrink-0 border-b border-t border-amber-400 p-1">
+            {gettext("Received / Issued / Reject")}
           </div>
-          <div class="w-[36%] border-b border-t border-amber-400 p-1">
-            <div>{gettext("UUD/ InternalId/ Direction/ Type")}</div>
+          <div class="w-[32%] min-w-0 border-b border-t border-amber-400 p-1">
+            {gettext("UUID / InternalId / Direction / Type")}
           </div>
-          <div class="w-[42%] border-b border-t border-amber-400 p-1">
-            <div>{gettext("ContactName/ TIN/ NetAmount/ PayaAmount")}</div>
+          <div class="w-[48%] min-w-0 border-b border-t border-amber-400 p-1">
+            {gettext("Contact / TIN / Amount")}
           </div>
         </div>
-        <div class="w-[0.4%] bg-white"></div>
-        <div class="font-medium flex flex-row bg-cyan-200 w-[49.8%]">
-          <div class="w-[22%] border-b border-t border-amber-400 p-1">
-            <div>{gettext("Doc Date")}</div>
+        <div class="w-[0.4%] bg-white shrink-0"></div>
+        <div class="flex flex-row bg-cyan-200 w-[49.8%] min-w-0">
+          <div class="w-[20%] shrink-0 border-b border-t border-amber-400 p-1">
+            {gettext("Doc Date")}
           </div>
-          <div class="w-[36%] border-b border-t border-amber-400 p-1">
-            <div>{gettext("InternalId/ Type")}</div>
+          <div class="w-[32%] min-w-0 border-b border-t border-amber-400 p-1">
+            {gettext("InternalId / Type")}
           </div>
-          <div class="w-[42%] border-b border-t border-amber-400 p-1">
-            <div>{gettext("ContactName/ TIN/ Amount")}</div>
+          <div class="w-[48%] min-w-0 border-b border-t border-amber-400 p-1">
+            {gettext("Contact / TIN / Amount")}
           </div>
         </div>
       </div>

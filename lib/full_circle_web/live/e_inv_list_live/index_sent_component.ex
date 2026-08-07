@@ -197,7 +197,7 @@ defmodule FullCircleWeb.EInvListLive.IndexSentComponent do
   def render(assigns) do
     ~H"""
     <div id={@id} class="flex flex-row bg-gray-200 hover:bg-gray-300">
-      <div class="w-[49.8%] min-w-0 flex flex-row p-1 border-b border-amber-400">
+      <div class="w-[49.8%] min-w-0 flex flex-row border-b border-amber-400">
         <div class="w-[20%] shrink-0 p-1 text-xs leading-snug">
           <div>
             {@obj.dateTimeReceived |> Helpers.format_datetime(@company)}
@@ -209,7 +209,7 @@ defmodule FullCircleWeb.EInvListLive.IndexSentComponent do
             {@obj.rejectRequestDateTime |> Helpers.format_datetime(@company)}
           </div>
         </div>
-        <div class="w-[42%] min-w-0 px-1">
+        <div class="w-[32%] min-w-0 p-1 overflow-hidden">
           <a
             class="block truncate text-blue-600 hover:font-medium text-xs"
             target="_blank"
@@ -218,23 +218,23 @@ defmodule FullCircleWeb.EInvListLive.IndexSentComponent do
           >
             {@obj.uuid}
           </a>
-          <div class="text-xs truncate" title={@obj.internalId}>
+          <div class="text-xs truncate max-w-full" title={@obj.internalId}>
             {@obj.internalId}
           </div>
           <div class="text-xs flex flex-wrap gap-x-1 gap-y-0.5 items-baseline">
             <span class="font-bold text-green-600">Sent</span>
-            <span class="text-purple-600">{@obj.typeName} {@obj.typeVersionName}</span>
+            <span class="text-purple-600 truncate">{@obj.typeName} {@obj.typeVersionName}</span>
             <span :if={@obj.status == "Valid"} class="text-green-600">{@obj.status}</span>
             <span :if={@obj.status != "Valid"} class="text-rose-600">{@obj.status}</span>
           </div>
         </div>
 
-        <div class="w-[38%] min-w-0 px-1">
+        <div class="w-[48%] min-w-0 p-1">
           <div class="truncate font-medium" title={@obj.buyerName}>
             {@obj.buyerName}
           </div>
           <div class="text-xs text-gray-600 flex items-baseline gap-x-2 min-w-0">
-            <span class="truncate shrink min-w-0" title={@obj.buyerTIN}>{@obj.buyerTIN}</span>
+            <span class="truncate min-w-0" title={@obj.buyerTIN}>{@obj.buyerTIN}</span>
             <span class="font-bold text-sm text-gray-900 tabular-nums whitespace-nowrap ml-auto shrink-0">
               <span class="text-gray-500 text-xs font-normal">{@obj.documentCurrency}</span>
               {@obj.totalNetAmount |> Number.Delimit.number_to_delimited()}
@@ -251,26 +251,30 @@ defmodule FullCircleWeb.EInvListLive.IndexSentComponent do
         </div>
       </div>
       <div class="w-[0.4%] bg-white shrink-0"></div>
-      <div class="w-[49.8%] min-w-0 p-1 border-b border-amber-400">
+      <div class="w-[49.8%] min-w-0 border-b border-amber-400">
         {if Enum.count(@obj.fc_docs) == 0 and @obj.status == "Valid", do: new_fc(assigns)}
         <%= for doc <- @obj.fc_docs do %>
           <div class="flex min-w-0 border-b border-amber-400 last:border-0">
-            <div class="w-[20%] shrink-0 text-xs">
+            <div class="w-[20%] shrink-0 p-1 text-xs">
               {doc.doc_date |> Helpers.format_date()}
             </div>
-            <div class="w-[42%] min-w-0 px-1">
+            <div class="w-[32%] min-w-0 p-1 overflow-hidden">
               <div class="truncate text-xs" title={doc.e_inv_uuid}>{doc.e_inv_uuid}</div>
-              <div class="text-xs flex flex-wrap gap-x-1">
+              <div class="text-xs flex flex-wrap gap-x-1 min-w-0">
                 <.doc_link current_company={@company} doc_obj={doc} />
-                <span class="truncate">{doc.e_inv_internal_id}</span>
-                <span class="text-purple-600">{doc.doc_type}</span>
+                <span class="truncate min-w-0" title={doc.e_inv_internal_id}>
+                  {doc.e_inv_internal_id}
+                </span>
+                <span class="text-purple-600 shrink-0">{doc.doc_type}</span>
               </div>
             </div>
-            <div class="w-[38%] min-w-0 px-1 text-right">
-              <div class="truncate text-left" title={doc.contact_name}>{doc.contact_name}</div>
-              <div class="text-xs text-gray-600 truncate text-left">{doc.contact_tin}</div>
-              <div class="text-sm font-bold tabular-nums whitespace-nowrap">
-                {doc.amount |> Number.Delimit.number_to_delimited()}
+            <div class="w-[48%] min-w-0 p-1">
+              <div class="truncate" title={doc.contact_name}>{doc.contact_name}</div>
+              <div class="text-xs text-gray-600 flex items-baseline gap-x-2 min-w-0">
+                <span class="truncate min-w-0">{doc.contact_tin}</span>
+                <span class="font-bold text-sm tabular-nums whitespace-nowrap ml-auto shrink-0">
+                  {doc.amount |> Number.Delimit.number_to_delimited()}
+                </span>
               </div>
               <div class="text-xs">{matched_or_try_match(doc, assigns)}</div>
             </div>
