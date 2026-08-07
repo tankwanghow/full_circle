@@ -224,21 +224,19 @@ defmodule FullCircleWeb.EInvListLive.IndexReceivedComponent do
           <div class="truncate font-medium" title={@obj.supplierName}>
             {@obj.supplierName}
           </div>
-          <div class="text-xs text-gray-600 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-            <span class="truncate" title={@obj.supplierTIN}>{@obj.supplierTIN}</span>
-            <span class="font-bold text-sm text-gray-900 tabular-nums whitespace-nowrap ml-auto">
+          <div class="text-xs text-gray-600 flex items-baseline gap-x-2 min-w-0">
+            <span class="truncate shrink min-w-0" title={@obj.supplierTIN}>{@obj.supplierTIN}</span>
+            <span class="font-bold text-sm text-gray-900 tabular-nums whitespace-nowrap ml-auto shrink-0">
               <span class="text-gray-500 text-xs font-normal">{@obj.documentCurrency}</span>
               {@obj.totalNetAmount |> Number.Delimit.number_to_delimited()}
-            </span>
-          </div>
-          <div
-            :if={!same_amount?(@obj.totalNetAmount, @obj.totalPayableAmount)}
-            class="text-xs text-gray-500 flex justify-end tabular-nums whitespace-nowrap"
-          >
-            <span class="text-gray-400 mr-1">pay</span>
-            <span class="font-semibold text-gray-700">
-              {@obj.documentCurrency}
-              {@obj.totalPayableAmount |> Number.Delimit.number_to_delimited()}
+              <span
+                :if={!same_amount?(@obj.totalNetAmount, @obj.totalPayableAmount)}
+                class="ml-2 font-semibold text-gray-600"
+              >
+                <span class="text-gray-400 text-[10px] font-normal">pay</span>
+                {@obj.documentCurrency}
+                {@obj.totalPayableAmount |> Number.Delimit.number_to_delimited()}
+              </span>
             </span>
           </div>
         </div>
