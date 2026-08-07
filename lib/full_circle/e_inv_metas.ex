@@ -425,6 +425,18 @@ defmodule FullCircle.EInvMetas do
     supplier_tin = find_party_id(supplier_ids, "TIN")
     supplier_brn = find_party_id(supplier_ids, "BRN")
 
+    customer =
+      invoice["AccountingCustomerParty"]
+      |> List.first()
+      |> get_in(["Party", Access.at(0)])
+
+    customer_name =
+      get_in(customer, ["PartyLegalEntity", Access.at(0), "RegistrationName", Access.at(0), "_"])
+
+    customer_ids = get_in(customer, ["PartyIdentification"]) || []
+    customer_tin = find_party_id(customer_ids, "TIN")
+    customer_brn = find_party_id(customer_ids, "BRN")
+
     internal_id = get_in(invoice, ["ID", Access.at(0), "_"])
     issue_date = get_in(invoice, ["IssueDate", Access.at(0), "_"])
     currency = get_in(invoice, ["DocumentCurrencyCode", Access.at(0), "_"]) || "MYR"
@@ -498,6 +510,9 @@ defmodule FullCircle.EInvMetas do
       supplier_name: supplier_name,
       supplier_tin: supplier_tin,
       supplier_brn: supplier_brn,
+      customer_name: customer_name,
+      customer_tin: customer_tin,
+      customer_brn: customer_brn,
       invoice_lines: invoice_lines
     }
   end
@@ -537,6 +552,11 @@ defmodule FullCircle.EInvMetas do
     supplier_tin = xml_id_by_scheme(supplier_block, "TIN")
     supplier_brn = xml_id_by_scheme(supplier_block, "BRN")
 
+    customer_block = xml_block(clean, "AccountingCustomerParty")
+    customer_name = xml_tag_text(customer_block, ~r/<RegistrationName>(.+?)<\/RegistrationName>/s)
+    customer_tin = xml_id_by_scheme(customer_block, "TIN")
+    customer_brn = xml_id_by_scheme(customer_block, "BRN")
+
     line_blocks = Regex.scan(~r/<InvoiceLine>(.+?)<\/InvoiceLine>/s, clean)
 
     invoice_lines =
@@ -567,6 +587,9 @@ defmodule FullCircle.EInvMetas do
       supplier_name: supplier_name,
       supplier_tin: supplier_tin,
       supplier_brn: supplier_brn,
+      customer_name: customer_name,
+      customer_tin: customer_tin,
+      customer_brn: customer_brn,
       invoice_lines: invoice_lines
     }
   end

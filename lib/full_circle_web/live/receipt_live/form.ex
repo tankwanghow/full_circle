@@ -25,6 +25,9 @@ defmodule FullCircleWeb.ReceiptLive.Form do
      |> assign(details_got_error: false)
      |> assign(matchers_got_error: false)
      |> assign(contact_advances: [])
+     |> assign_new(:e_inv_preview, fn -> nil end)
+     |> assign_new(:e_inv_payable, fn -> nil end)
+     |> assign_new(:e_inv_supplier_ids, fn -> nil end)
      |> assign(
        settings:
          FullCircle.Sys.load_settings(
@@ -33,6 +36,41 @@ defmodule FullCircleWeb.ReceiptLive.Form do
            socket.assigns.current_user
          )
      )}
+  end
+
+  defp mount_new(socket, %{"obj" => obj}) when is_binary(obj) do
+    com = socket.assigns.current_company
+    user = socket.assigns.current_user
+
+    seed =
+      Jason.decode!(obj)
+      |> FullCircle.EInvMetas.Prefill.build(com, user, :receipt_details, side: :sales)
+
+    attrs =
+      Map.merge(seed.attrs, %{
+        receipt_no: "...new...",
+        receipt_date: seed.issue_date,
+        load_date: seed.issue_date
+      })
+
+    socket
+    |> assign(live_action: :new)
+    |> assign(id: "new")
+    |> assign(page_title: gettext("New Receipt"))
+    |> assign_egg_link(%{}, :sales)
+    |> assign(e_inv_supplier_ids: seed.contact_ids)
+    |> assign(e_inv_payable: seed.payable)
+    |> assign(e_inv_preview: seed.preview)
+    |> then(fn s ->
+      case Enum.reject(seed.warnings, &is_nil/1) do
+        [] -> s
+        msgs -> put_flash(s, :warn, Enum.join(msgs, " "))
+      end
+    end)
+    |> assign(
+      :form,
+      to_form(ReceiveFund.make_changeset(Receipt, %Receipt{}, attrs, com, user))
+    )
   end
 
   defp mount_new(socket, params) do
@@ -96,6 +134,24 @@ defmodule FullCircleWeb.ReceiptLive.Form do
       |> assign(:egg_load_date, nil)
       |> assign(:egg_side, nil)
     end
+  end
+
+  defp maybe_learn_e_inv_contact_ids(socket, obj) do
+    case socket.assigns[:e_inv_supplier_ids] do
+      {tin, brn} ->
+        FullCircle.Accounting.learn_contact_identifiers(
+          obj.contact_id,
+          tin,
+          brn,
+          socket.assigns.current_company,
+          socket.assigns.current_user
+        )
+
+      _ ->
+        nil
+    end
+
+    socket
   end
 
   defp maybe_attach_egg_planned(socket, obj, params) do
@@ -484,7 +540,10 @@ defmodule FullCircleWeb.ReceiptLive.Form do
            socket.assigns.current_user
          ) do
       {:ok, %{create_receipt: obj}} ->
-        socket = maybe_attach_egg_planned(socket, obj, params)
+        socket =
+          socket
+          |> maybe_attach_egg_planned(obj, params)
+          |> maybe_learn_e_inv_contact_ids(obj)
 
         {:noreply,
          socket

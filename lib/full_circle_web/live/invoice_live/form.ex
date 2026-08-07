@@ -16,7 +16,9 @@ defmodule FullCircleWeb.InvoiceLive.Form do
 
     {:ok,
      socket
-     |> assign(e_inv_preview: nil)
+     |> assign_new(:e_inv_preview, fn -> nil end)
+     |> assign_new(:e_inv_payable, fn -> nil end)
+     |> assign_new(:e_inv_supplier_ids, fn -> nil end)
      |> assign(
        settings:
          FullCircle.Sys.load_settings(
@@ -25,6 +27,52 @@ defmodule FullCircleWeb.InvoiceLive.Form do
            socket.assigns.current_user
          )
      )}
+  end
+
+  defp mount_new(socket, %{"obj" => obj}) when is_binary(obj) do
+    com = socket.assigns.current_company
+    user = socket.assigns.current_user
+
+    seed =
+      Jason.decode!(obj)
+      |> FullCircle.EInvMetas.Prefill.build(com, user, :invoice_details, side: :sales)
+
+    attrs =
+      Map.merge(seed.attrs, %{
+        invoice_no: "...new...",
+        invoice_date: seed.issue_date,
+        due_date: seed.issue_date
+      })
+
+    cs = Billing.make_changeset(Invoice, %Invoice{}, attrs, com, user)
+
+    cs =
+      if Ecto.Changeset.get_assoc(cs, :invoice_details) == [] do
+        FullCircleWeb.Helpers.add_line(cs, :invoice_details)
+      else
+        cs
+      end
+
+    socket
+    |> assign(live_action: :new)
+    |> assign(id: "new")
+    |> assign(page_title: gettext("New Invoice"))
+    |> assign(matched_trans: [])
+    |> assign(trading_drop_ids: [])
+    |> assign(trading_link_contact_id: nil)
+    |> assign(trading_link_drop_ids: [])
+    |> assign(trading_settlement: %{linked?: false, line_count: 0, actual_sum: 0, trip_refs: []})
+    |> assign_egg_link(%{}, :sales)
+    |> assign(e_inv_supplier_ids: seed.contact_ids)
+    |> assign(e_inv_payable: seed.payable)
+    |> assign(e_inv_preview: seed.preview)
+    |> then(fn s ->
+      case Enum.reject(seed.warnings, &is_nil/1) do
+        [] -> s
+        msgs -> put_flash(s, :warn, Enum.join(msgs, " "))
+      end
+    end)
+    |> assign(:form, to_form(cs))
   end
 
   defp mount_new(socket, params) do
@@ -147,6 +195,24 @@ defmodule FullCircleWeb.InvoiceLive.Form do
       |> assign(:egg_load_date, nil)
       |> assign(:egg_side, nil)
     end
+  end
+
+  defp maybe_learn_e_inv_contact_ids(socket, obj) do
+    case socket.assigns[:e_inv_supplier_ids] do
+      {tin, brn} ->
+        FullCircle.Accounting.learn_contact_identifiers(
+          obj.contact_id,
+          tin,
+          brn,
+          socket.assigns.current_company,
+          socket.assigns.current_user
+        )
+
+      _ ->
+        nil
+    end
+
+    socket
   end
 
   defp maybe_attach_egg_planned(socket, obj, params) do
@@ -573,7 +639,10 @@ defmodule FullCircleWeb.InvoiceLive.Form do
 
     case result do
       {:ok, %{create_invoice: obj}} ->
-        socket = maybe_attach_egg_planned(socket, obj, params)
+        socket =
+          socket
+          |> maybe_attach_egg_planned(obj, params)
+          |> maybe_learn_e_inv_contact_ids(obj)
 
         flash =
           cond do

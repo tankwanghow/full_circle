@@ -170,14 +170,14 @@ defmodule FullCircleWeb.EInvListLive.IndexReceivedComponent do
         <% "Self-billed Invoice" -> %>
           <.link
             target="_blank"
-            navigate={~p"/companies/#{@company.id}/Invoice/new"}
+            navigate={~p"/companies/#{@company.id}/Invoice/new?obj=#{Jason.encode!(@obj)}"}
             class="blue button"
           >
             {gettext("New Invoice")}
           </.link>
           <.link
             target="_blank"
-            navigate={~p"/companies/#{@company.id}/Receipt/new"}
+            navigate={~p"/companies/#{@company.id}/Receipt/new?obj=#{Jason.encode!(@obj)}"}
             class="green button"
           >
             {gettext("New Receipt")}

@@ -831,6 +831,25 @@ defmodule FullCircle.Billing do
   end
 
   @doc """
+  Every good ever sold to a contact (sales invoices), most frequent first.
+  Used when seeding sales documents from a received self-billed e-invoice.
+  """
+  def sold_good_names(contact_id, com) do
+    from(inv in Invoice,
+      join: d in InvoiceDetail,
+      on: d.invoice_id == inv.id,
+      join: g in Good,
+      on: g.id == d.good_id,
+      where: inv.company_id == ^com.id,
+      where: inv.contact_id == ^contact_id,
+      group_by: g.name,
+      order_by: [desc: count(d.id)],
+      select: g.name
+    )
+    |> Repo.all()
+  end
+
+  @doc """
   `extend_multi` lets a caller append steps that need the created PurInvoice —
   e.g. `Trading.attach_links_multi/6` linking trip loads or haul lines to it —
   without Billing having to know about that caller's domain.
