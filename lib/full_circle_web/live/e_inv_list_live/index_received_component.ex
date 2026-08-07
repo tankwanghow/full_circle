@@ -141,11 +141,18 @@ defmodule FullCircleWeb.EInvListLive.IndexReceivedComponent do
     """
   end
 
+  # Buttons must mirror get_internal_document/4 for direction "Received":
+  # - Invoice              → purchase (PurInvoice / Payment)
+  # - Self-billed Invoice  → sales (Invoice / Receipt) — customer self-billed us
+  # - Credit Note          → DebitNote
+  # - Self-billed Debit Note → CreditNote
+  # - Debit Note           → CreditNote
+  # - Self-billed Credit Note → DebitNote
   defp new_fc(assigns) do
     ~H"""
-    <div class="w-[99%] flex">
+    <div class="w-[99%] flex flex-wrap gap-1">
       <%= case @obj.typeName do %>
-        <% type when type in ["Invoice", "Self-billed Invoice"] -> %>
+        <% "Invoice" -> %>
           <.link
             target="_blank"
             navigate={~p"/companies/#{@company.id}/PurInvoice/new?obj=#{Jason.encode!(@obj)}"}
@@ -160,7 +167,22 @@ defmodule FullCircleWeb.EInvListLive.IndexReceivedComponent do
           >
             {gettext("New Payment")}
           </.link>
-        <% type when type in ["Credit Note", "Self-billed Debit Note"] -> %>
+        <% "Self-billed Invoice" -> %>
+          <.link
+            target="_blank"
+            navigate={~p"/companies/#{@company.id}/Invoice/new"}
+            class="blue button"
+          >
+            {gettext("New Invoice")}
+          </.link>
+          <.link
+            target="_blank"
+            navigate={~p"/companies/#{@company.id}/Receipt/new"}
+            class="green button"
+          >
+            {gettext("New Receipt")}
+          </.link>
+        <% "Credit Note" -> %>
           <.link
             target="_blank"
             navigate={~p"/companies/#{@company.id}/DebitNote/new"}
@@ -168,13 +190,29 @@ defmodule FullCircleWeb.EInvListLive.IndexReceivedComponent do
           >
             {gettext("New Debit Note")}
           </.link>
-        <% type when type in ["Debit Note", "Self-billed Credit Note"] -> %>
+        <% "Self-billed Debit Note" -> %>
           <.link
             target="_blank"
             navigate={~p"/companies/#{@company.id}/CreditNote/new"}
             class="orange button"
           >
             {gettext("New Credit Note")}
+          </.link>
+        <% "Debit Note" -> %>
+          <.link
+            target="_blank"
+            navigate={~p"/companies/#{@company.id}/CreditNote/new"}
+            class="orange button"
+          >
+            {gettext("New Credit Note")}
+          </.link>
+        <% "Self-billed Credit Note" -> %>
+          <.link
+            target="_blank"
+            navigate={~p"/companies/#{@company.id}/DebitNote/new"}
+            class="orange button"
+          >
+            {gettext("New Debit Note")}
           </.link>
         <% _ -> %>
       <% end %>

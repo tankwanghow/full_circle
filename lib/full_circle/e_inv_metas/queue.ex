@@ -3,7 +3,8 @@ defmodule FullCircle.EInvMetas.Queue do
   Received supplier e-invoice work queue: needs bill → billed → paid.
 
   Scope: LHDN **Received** rows with `typeName == "Invoice"` and `status == "Valid"`.
-  Self-billed invoices are excluded (they drive the outbound Payment/Invoice flow).
+  Self-billed invoices are excluded: Received self-billed is a *sales* match
+  (Invoice/Receipt); this queue is only supplier bills (Received Invoice).
 
   Staging uses local documents linked by `e_inv_uuid`:
   - **needs_bill** — no PurInvoice and no Payment
