@@ -2,8 +2,8 @@ defmodule FullCircleWeb.EInvQueueLive.Index do
   @moduledoc """
   Received e-invoice work queue:
 
-  * **Supplier bills** — Needs bill → Billed → Paid  
-  * **Self-billed (sales)** — Needs invoice → Invoiced → Receipted  
+  * **Supplier bills** — Needs bill → Billed → Paid
+  * **Self-billed (sales)** — Needs invoice → Invoiced → Receipted
   """
   use FullCircleWeb, :live_view
 
@@ -277,7 +277,7 @@ defmodule FullCircleWeb.EInvQueueLive.Index do
         </div>
         <div>
           <label class="block text-xs text-gray-500">{gettext("Last days")}</label>
-          <select name="days" class="border rounded px-2 py-1">
+          <select name="days" class="border rounded px-2 py-1 w-15">
             <option value="14" selected={@days == 14}>14</option>
             <option value="30" selected={@days == 30}>30</option>
             <option value="45" selected={@days == 45}>45</option>
