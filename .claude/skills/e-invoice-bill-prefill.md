@@ -115,22 +115,13 @@ Sales path uses **sales** account / tax code fields on the good (`merge_good/4` 
 
 `Prefill.variance/2` returns `nil` when `|keyed − payable| < 0.01`, else the signed diff.
 
-Forms assign `e_inv_payable` from `seed.payable` and show a strip under the lines:
+`seed.payable` still comes from LHDN `totalPayableAmount` (via `payable/2`, skipping non-positive). Forms use it for seeding (`funds_amount` on Payment/Receipt); **there is no green/red variance strip** on PurInvoice, Payment, Invoice, or Receipt — the full LHDN total and lines live in the document panel (`e_inv_preview` purchase / `e_inv_document` sales).
 
-| Form | Compare field | UI placement |
-|---|---|---|
-| PurInvoice | `pur_invoice_amount` | Under detail component (column-aligned) |
-| Invoice | `invoice_amount` | Same pattern as PurInvoice |
-| Payment | `payment_detail_amount` (not `funds_amount`) | Near action buttons |
-| Receipt | `receipt_detail_amount` (not `funds_amount`) | Same pattern as Payment |
+`Prefill.variance/2` remains available if a form wants a programmatic check later.
 
-Green when in agreement; red with “out by” / “details out by” when not. **`funds_amount` is seeded from the same LHDN figure**, so only detail lines can drift — never compare variance to funds.
+Anchor for amounts is `totalPayableAmount`: 96.8% exact match historically vs 91.4% net / 89.2% excl. tax.
 
-Anchor is `totalPayableAmount`: 96.8% exact match historically vs 91.4% net / 89.2% excl. tax.
-
-**Zero LHDN total ⇒ no payable to show** (`payable/2` skips non-positive). Cargill-style `totalPayableAmount = 0.0` on valid invoices must not scream red.
-
-This company often books sales tax as a **separate line** (good `Note`) with `tax_rate` 0 on purchase details — LHDN 5% tax will show red until that line is added.
+This company often books sales tax as a **separate line** (good `Note`) with `tax_rate` 0 on purchase details — clerks compare against the document panel when LHDN includes tax.
 
 ---
 
@@ -139,7 +130,11 @@ This company often books sales tax as a **separate line** (good `Note`) with `ta
 - `totalPayableAmount` in listing JSON is often a **string** (Jason quotes Decimals). `Prefill` parses via `to_decimal/1`.
 - `mount_new/2` runs on disconnected and connected mount → **two** LHDN Get Document calls (60 RPM). Guard with `connected?(socket)` if it bites.
 - Map literal: dynamic `detail_key =>` must come before shorthand keys when needed.
-- E-invoice preview on Invoice/PurInvoice is fed from the fetch in `mount_new/2`. "Show E-Invoice" re-fetches; render only when `is_nil(@e_inv_preview)`.
+- **Invoice has two different preview assigns — do not mix them.**  
+  - `e_inv_document` ← Prefill `seed.preview` (flat `customer_name` / `invoice_lines` parse). Read-only “E-Invoice Document” panel when creating from received self-billed.  
+  - `e_inv_preview` ← `preview_e_invoice/3` only (nested `preview.supplier` / `.customer` / `.warnings`). Outgoing LHDN submit UI.  
+  Putting Prefill parse into `e_inv_preview` crashes the submit template (`preview.supplier.name`). Receipt uses only `e_inv_document` (no submit path).
+- PurInvoice/Payment still store the received parse in `e_inv_preview` (they have no submit-shaped preview). "Show E-Invoice" re-fetches; hide when already assigned.
 - Assigns from `mount_new/2` must use `assign_new/3` later in `mount/3`, not bare `assign/2`, or seeds are wiped.
 - After save, `maybe_learn_e_inv_contact_ids` uses `e_inv_supplier_ids` / `contact_ids` — name is historical; works for customer TIN/BRN too.
 

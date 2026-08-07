@@ -42,7 +42,6 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
      # arrive prefilled from the settlement board.
      |> assign_new(:trading_link_load_ids, fn -> [] end)
      |> assign_new(:trading_link_transport_drop_ids, fn -> [] end)
-     |> assign_new(:e_inv_payable, fn -> nil end)
      |> assign_new(:trading_settlement, fn ->
        %{
          linked?: false,
@@ -327,7 +326,6 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
     |> assign(page_title: gettext("New Purchase Invoice"))
     |> assign(matched_trans: [])
     |> assign(e_inv_supplier_ids: seed.supplier_ids)
-    |> assign(e_inv_payable: seed.payable)
     |> assign(e_inv_preview: seed.preview)
     |> then(fn s ->
       case Enum.reject(seed.warnings, &is_nil/1) do
@@ -347,12 +345,6 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
         )
       )
     )
-  end
-
-  defp e_inv_variance(form, payable) do
-    form.source
-    |> Ecto.Changeset.fetch_field!(:pur_invoice_amount)
-    |> FullCircle.EInvMetas.Prefill.variance(payable)
   end
 
   # After a bill is created from an e-invoice, stamp the supplier's TIN and BRN
@@ -1275,27 +1267,6 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
           current_user={@current_user}
           matched_trans={@matched_trans}
         />
-
-        <div :if={@e_inv_payable} class="flex flex-row">
-          <% variance = e_inv_variance(@form, @e_inv_payable) %>
-          <div class="grow"></div>
-          <div class={[
-            "w-[10%] text-right px-1",
-            if(variance, do: "text-red-600 font-semibold", else: "text-green-600")
-          ]}>
-            {gettext("E-Invoice")}
-          </div>
-          <div class={[
-            "detail-amt-col text-right px-1",
-            if(variance, do: "text-red-600 font-semibold", else: "text-green-600")
-          ]}>
-            {@e_inv_payable |> Number.Delimit.number_to_delimited()}
-            <div :if={variance} class="text-xs">
-              {gettext("out by")} {variance |> Number.Delimit.number_to_delimited()}
-            </div>
-          </div>
-          <div class="detail-setting-col" />
-        </div>
 
         <div class="flex flex-row justify-center gap-x-1 mt-1">
           <.form_action_button

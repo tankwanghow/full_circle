@@ -24,7 +24,6 @@ defmodule FullCircleWeb.PaymentLive.Form do
      |> assign(details_got_error: false)
      |> assign(matchers_got_error: false)
      |> assign_new(:e_inv_supplier_ids, fn -> nil end)
-     |> assign_new(:e_inv_payable, fn -> nil end)
      |> assign_new(:e_inv_preview, fn -> nil end)
      |> assign(
        settings:
@@ -61,7 +60,6 @@ defmodule FullCircleWeb.PaymentLive.Form do
     |> assign(page_title: gettext("New Payment"))
     |> assign_egg_link(%{}, :purchase)
     |> assign(e_inv_supplier_ids: seed.supplier_ids)
-    |> assign(e_inv_payable: seed.payable)
     |> assign(e_inv_preview: seed.preview)
     |> then(fn s ->
       case Enum.reject(seed.warnings, &is_nil/1) do
@@ -196,15 +194,6 @@ defmodule FullCircleWeb.PaymentLive.Form do
   end
 
   defp put_funds_account(attrs, _com, _user), do: attrs
-
-  # Compare the keyed detail lines against what the supplier declared to LHDN.
-  # funds_amount is seeded from the same figure, so the lines are the part that
-  # can drift.
-  defp e_inv_variance(form, payable) do
-    form.source
-    |> Ecto.Changeset.fetch_field!(:payment_detail_amount)
-    |> FullCircle.EInvMetas.Prefill.variance(payable)
-  end
 
   # After a payment is created from an e-invoice, stamp the supplier's TIN and
   # BRN onto the contact if it has none, so the next e-invoice from them resolves
@@ -836,20 +825,6 @@ defmodule FullCircleWeb.PaymentLive.Form do
           current_company={@current_company}
           current_user={@current_user}
         />
-
-        <div :if={@e_inv_payable} class="flex flex-row mt-1">
-          <% variance = e_inv_variance(@form, @e_inv_payable) %>
-          <div class="grow"></div>
-          <div class={[
-            "text-right px-1",
-            if(variance, do: "text-red-600 font-semibold", else: "text-green-600")
-          ]}>
-            {gettext("E-Invoice")} {@e_inv_payable |> Number.Delimit.number_to_delimited()}
-            <span :if={variance} class="text-xs">
-              ({gettext("details out by")} {variance |> Number.Delimit.number_to_delimited()})
-            </span>
-          </div>
-        </div>
 
         <div class="flex justify-center gap-x-1 mt-1">
           <.form_action_button

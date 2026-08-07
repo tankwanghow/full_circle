@@ -16,8 +16,10 @@ defmodule FullCircleWeb.InvoiceLive.Form do
 
     {:ok,
      socket
+     # e_inv_preview = outgoing LHDN submit shape (preview.supplier / .customer).
+     # e_inv_document = received self-billed parse from Prefill (flat supplier_name…).
      |> assign_new(:e_inv_preview, fn -> nil end)
-     |> assign_new(:e_inv_payable, fn -> nil end)
+     |> assign_new(:e_inv_document, fn -> nil end)
      |> assign_new(:e_inv_supplier_ids, fn -> nil end)
      |> assign(
        settings:
@@ -64,8 +66,8 @@ defmodule FullCircleWeb.InvoiceLive.Form do
     |> assign(trading_settlement: %{linked?: false, line_count: 0, actual_sum: 0, trip_refs: []})
     |> assign_egg_link(%{}, :sales)
     |> assign(e_inv_supplier_ids: seed.contact_ids)
-    |> assign(e_inv_payable: seed.payable)
-    |> assign(e_inv_preview: seed.preview)
+    # Never put Prefill parse into e_inv_preview — that assign is submit-only.
+    |> assign(e_inv_document: seed.preview)
     |> then(fn s ->
       case Enum.reject(seed.warnings, &is_nil/1) do
         [] -> s
@@ -213,13 +215,6 @@ defmodule FullCircleWeb.InvoiceLive.Form do
     end
 
     socket
-  end
-
-  # Compare keyed invoice lines against LHDN total_payable (received self-billed).
-  defp e_inv_variance(form, payable) do
-    form.source
-    |> Ecto.Changeset.fetch_field!(:invoice_amount)
-    |> FullCircle.EInvMetas.Prefill.variance(payable)
   end
 
   defp maybe_attach_egg_planned(socket, obj, params) do
@@ -551,6 +546,11 @@ defmodule FullCircleWeb.InvoiceLive.Form do
   @impl true
   def handle_event("close_preview", _, socket) do
     {:noreply, socket |> assign(e_inv_preview: nil)}
+  end
+
+  @impl true
+  def handle_event("close_e_inv_document", _, socket) do
+    {:noreply, socket |> assign(e_inv_document: nil)}
   end
 
   @impl true
@@ -1088,27 +1088,6 @@ defmodule FullCircleWeb.InvoiceLive.Form do
           current_user={@current_user}
         />
 
-        <div :if={@e_inv_payable} class="flex flex-row">
-          <% variance = e_inv_variance(@form, @e_inv_payable) %>
-          <div class="grow"></div>
-          <div class={[
-            "w-[10%] text-right px-1",
-            if(variance, do: "text-red-600 font-semibold", else: "text-green-600")
-          ]}>
-            {gettext("E-Invoice")}
-          </div>
-          <div class={[
-            "detail-amt-col text-right px-1",
-            if(variance, do: "text-red-600 font-semibold", else: "text-green-600")
-          ]}>
-            {@e_inv_payable |> Number.Delimit.number_to_delimited()}
-            <div :if={variance} class="text-xs">
-              {gettext("out by")} {variance |> Number.Delimit.number_to_delimited()}
-            </div>
-          </div>
-          <div class="detail-setting-col" />
-        </div>
-
         <div class="flex flex-row justify-center gap-x-1 mt-1">
           <.form_action_button
             form={@form}
@@ -1150,6 +1129,115 @@ defmodule FullCircleWeb.InvoiceLive.Form do
           />
         </div>
       </.form>
+
+      <div
+        :if={@live_action == :new and @e_inv_document}
+        class="mt-4 border rounded-lg border-blue-500 bg-blue-50 p-4"
+      >
+        <div class="flex justify-between items-center mb-3">
+          <p class="text-xl font-medium">{gettext("E-Invoice Document")}</p>
+          <.link phx-click="close_e_inv_document" class="orange button text-sm">
+            {gettext("Close")}
+          </.link>
+        </div>
+        <%= case @e_inv_document do %>
+          <% {:ok, parsed} -> %>
+            <div class="grid grid-cols-2 gap-4 text-sm">
+              <div class="border rounded p-3 bg-white">
+                <p class="font-bold mb-2">{gettext("Customer")}</p>
+                <p class="font-medium">{parsed.customer_name}</p>
+                <p>TIN: {parsed.customer_tin}</p>
+                <p>BRN: {parsed.customer_brn}</p>
+              </div>
+              <div class="border rounded p-3 bg-white">
+                <p class="font-bold mb-2">{gettext("Document Info")}</p>
+                <p><span class="font-bold">{gettext("Internal ID")}:</span> {parsed.internal_id}</p>
+                <p><span class="font-bold">{gettext("Issue Date")}:</span> {parsed.issue_date}</p>
+                <p><span class="font-bold">{gettext("Currency")}:</span> {parsed.currency}</p>
+                <p><span class="font-bold">{gettext("Type")}:</span> {parsed.type_code}</p>
+              </div>
+            </div>
+            <div class="mt-3 border rounded p-3 bg-white text-sm">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="border-b font-bold">
+                    <th class="text-left p-1">#</th>
+                    <th class="text-left p-1">{gettext("Description")}</th>
+                    <th class="text-right p-1">{gettext("Qty")}</th>
+                    <th class="text-left p-1">{gettext("Unit")}</th>
+                    <th class="text-right p-1">{gettext("Unit Price")}</th>
+                    <th class="text-right p-1">{gettext("Discount")}</th>
+                    <th class="text-right p-1">{gettext("Amount")}</th>
+                    <th class="text-right p-1">{gettext("Tax%")}</th>
+                    <th class="text-right p-1">{gettext("Tax")}</th>
+                    <th class="text-left p-1">{gettext("Tax Type")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <%= for {line, idx} <- Enum.with_index(parsed.invoice_lines, 1) do %>
+                    <tr class="border-b">
+                      <td class="p-1">{idx}</td>
+                      <td class="p-1">{line.descriptions}</td>
+                      <td class="text-right p-1">
+                        {:erlang.float_to_binary(line.quantity / 1, decimals: 2)}
+                      </td>
+                      <td class="p-1">{line.unit}</td>
+                      <td class="text-right p-1">
+                        {:erlang.float_to_binary(line.unit_price / 1, decimals: 2)}
+                      </td>
+                      <td class="text-right p-1">
+                        {:erlang.float_to_binary(line.discount / 1, decimals: 2)}
+                      </td>
+                      <td class="text-right p-1">
+                        {:erlang.float_to_binary(
+                          (line.quantity * line.unit_price - line.discount) / 1,
+                          decimals: 2
+                        )}
+                      </td>
+                      <td class="text-right p-1">
+                        {:erlang.float_to_binary(line.tax_rate / 1, decimals: 2)}
+                      </td>
+                      <td class="text-right p-1">
+                        {:erlang.float_to_binary(
+                          Float.round(
+                            (line.quantity * line.unit_price - line.discount) * line.tax_rate / 100,
+                            2
+                          ) / 1,
+                          decimals: 2
+                        )}
+                      </td>
+                      <td class="p-1">{line.tax_code_id_lhdn} ({line.tax_scheme})</td>
+                    </tr>
+                  <% end %>
+                </tbody>
+              </table>
+              <% subtotal =
+                Enum.reduce(parsed.invoice_lines, 0.0, fn line, acc ->
+                  acc + (line.quantity * line.unit_price - line.discount)
+                end)
+
+              tax =
+                Enum.reduce(parsed.invoice_lines, 0.0, fn line, acc ->
+                  acc +
+                    Float.round(
+                      (line.quantity * line.unit_price - line.discount) * line.tax_rate / 100,
+                      2
+                    )
+                end) %>
+              <div class="flex justify-end gap-6 mt-2 font-bold">
+                <span>
+                  {gettext("Subtotal")}: {:erlang.float_to_binary(subtotal / 1, decimals: 2)}
+                </span>
+                <span>{gettext("Tax")}: {:erlang.float_to_binary(tax / 1, decimals: 2)}</span>
+                <span>
+                  {gettext("Total")}: {:erlang.float_to_binary((subtotal + tax) / 1, decimals: 2)}
+                </span>
+              </div>
+            </div>
+          <% {:error, reason} -> %>
+            <div class="text-red-600 font-bold">{reason}</div>
+        <% end %>
+      </div>
 
       <div :if={@e_inv_preview} class="mt-4 border rounded-lg border-blue-500 bg-blue-50 p-4">
         <div class="flex justify-between items-center mb-3">
