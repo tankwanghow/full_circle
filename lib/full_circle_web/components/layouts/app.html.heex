@@ -1,5 +1,6 @@
 <%= if @current_user do %>
-  <%= if assigns[:current_company] && assigns[:current_role] != "punch_camera" do %>
+  <%= if assigns[:current_company] && assigns[:current_role] &&
+           assigns[:current_role] != "punch_camera" do %>
     <.live_component
       module={FullCircleWeb.CommandPaletteComponent}
       id="command-palette"
