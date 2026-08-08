@@ -379,6 +379,38 @@ defmodule FullCircle.PaySlipOpTest do
       assert Decimal.eq?(hd(loaded.advances).amount, Decimal.new("500"))
     end
 
+    # PaySlipOp dates the statutory lines it generates at end_of_month
+    # (pay_slip_op.ex:212), which sits outside SalaryNote's +14 day edit window
+    # for most of the month. Deleting one must not run the edit-time validations
+    # — otherwise re-running pay/6 early in the month fails outright. The
+    # re-pay test below only catches this in the first half of a month, so this
+    # one pins it down date-independently.
+    test "a salary note dated outside the edit window can still be deleted", %{
+      com: com,
+      admin: admin,
+      employee: emp,
+      salary_type: st
+    } do
+      note =
+        FullCircle.Repo.insert!(%FullCircle.HR.SalaryNote{
+          note_no: "SN-OUTSIDE-WINDOW",
+          note_date: Date.add(Date.utc_today(), 60),
+          quantity: Decimal.new("1"),
+          unit_price: Decimal.new("100"),
+          employee_id: emp.id,
+          salary_type_id: st.id,
+          company_id: com.id,
+          descriptions: "dated well past the edit window"
+        })
+
+      assert {:ok, _} =
+               Ecto.Multi.new()
+               |> FullCircle.HR.delete_salary_note_multi(note, com, admin)
+               |> FullCircle.Repo.transaction()
+
+      refute FullCircle.Repo.get(FullCircle.HR.SalaryNote, note.id)
+    end
+
     test "a statutory line that recomputes to 0 is deleted from the slip on re-pay", %{
       com: com,
       admin: admin,
