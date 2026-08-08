@@ -93,7 +93,13 @@ contributions/leaves, so the merged preview has no internal repeats.
 - `HR.update_salary_note` / `delete_salary_note` / `update_advance` take `from_punchcard? \\ false` and return `{:error, :on_payslip}` when the item has a `pay_slip_id` and the flag is false.
 - The Punch Card modal components pass `from_punchcard?: true`; standalone Salary Note / Advance pages show a linked item **read-only** (a `@readonly` assign hides Save/Delete and sets inputs readonly) — edit it via the Punch Card.
 - **Never** add this guard (or the `clear_pay_prep` auto-clear) to the `*_multi` builders — `PaySlipOp` uses those to link notes during Pay, so guarding them would break/clear on Pay.
-- `SalaryNote` changeset also has `validate_has_pay_slip_no_cannot_change_after_days(7)` — a linked note locks 7 days after, everywhere (incl. Punch Card).
+- `SalaryNote` changeset also has `validate_has_pay_slip_no_cannot_change_after_days(7)` — a linked note locks 7 days after, on every **insert/update** path (incl. Punch Card).
+- That lock does **not** apply to deletes. `delete_salary_note_multi/5` builds its changeset with
+  `Ecto.Changeset.change/1`, not `StdInterface.changeset/4`, so no edit-time rule runs on a
+  delete — same reasoning as the bullet above. Validating there made the `end_of_month`-dated
+  statutory lines `PaySlipOp` generates undeletable for most of the month, which failed the
+  whole `pay/6` run (fixed in `4244c1a`). Deleting stays guarded where it belongs: by the
+  `{:error, :on_payslip}` cond in `delete_salary_note/4`.
 
 ## Void (un-pay) a slip
 
