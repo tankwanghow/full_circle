@@ -175,6 +175,16 @@ defmodule FullCircleWeb.FixedAssetLive.Disposals do
          |> assign(live_action: :new)
          |> to_form_fap()}
 
+      {:error, :stale} ->
+        {:noreply,
+         socket
+         |> put_flash(
+           :error,
+           gettext(
+             "This record was changed or deleted by someone else. Please reload and try again."
+           )
+         )}
+
       {:error, failed_operation, changeset, _} ->
         assign(socket, form: to_form(changeset))
         |> put_flash(

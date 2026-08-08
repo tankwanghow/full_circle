@@ -567,6 +567,9 @@ defmodule FullCircle.ReceiveFund do
       |> Repo.transaction()
     end
   rescue
+    Ecto.StaleEntryError ->
+      {:error, :stale}
+
     e in Postgrex.Error ->
       {:sql_error, e.postgres.message}
   end

@@ -567,6 +567,7 @@ defmodule FullCircle.Product do
         sales_tax_rate: stc.rate,
         purchase_tax_rate: ptc.rate,
         descriptions: good.descriptions,
+        lock_version: good.lock_version,
         inserted_at: good.inserted_at,
         updated_at: good.updated_at
       }

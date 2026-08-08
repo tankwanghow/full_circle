@@ -622,6 +622,9 @@ defmodule FullCircle.Billing do
       :not_authorise
     end
   rescue
+    Ecto.StaleEntryError ->
+      {:error, :stale}
+
     e in Postgrex.Error ->
       classify_postgrex_error(e)
   end
@@ -948,6 +951,9 @@ defmodule FullCircle.Billing do
       :not_authorise
     end
   rescue
+    Ecto.StaleEntryError ->
+      {:error, :stale}
+
     e in Postgrex.Error ->
       classify_postgrex_error(e)
   end

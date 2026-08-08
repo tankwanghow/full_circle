@@ -21,6 +21,9 @@ defmodule FullCircle.Cheque.ReturnCheque do
     field :cheque_due_date, :date, virtual: true
     field :cheque_amount, :decimal, virtual: true
 
+    # Concurrency guard, see FullCircle.StdInterface.changeset/5
+    field :lock_version, :integer, default: 0
+
     timestamps(type: :utc_datetime)
   end
 

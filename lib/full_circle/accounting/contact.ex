@@ -26,6 +26,9 @@ defmodule FullCircle.Accounting.Contact do
 
     has_many :invoices, FullCircle.Billing.Invoice
 
+    # Concurrency guard, see FullCircle.StdInterface.changeset/5
+    field :lock_version, :integer, default: 0
+
     timestamps(type: :utc_datetime)
   end
 

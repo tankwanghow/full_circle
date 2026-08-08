@@ -828,7 +828,10 @@ defmodule FullCircle.EInvMetas do
           :update_invoice,
           from(inv in Invoice,
             where: inv.id == ^invoice.id,
-            update: [set: [e_inv_uuid: ^uuid, e_inv_internal_id: ^internal_id]]
+            update: [
+              set: [e_inv_uuid: ^uuid, e_inv_internal_id: ^internal_id],
+              inc: [lock_version: 1]
+            ]
           ),
           []
         )
@@ -2096,7 +2099,10 @@ defmodule FullCircle.EInvMetas do
       :matching,
       from(doc in klass,
         where: doc.id == ^fc_doc["doc_id"],
-        update: [set: [e_inv_uuid: ^einv["uuid"], e_inv_internal_id: ^einv["internalId"]]]
+        update: [
+          set: [e_inv_uuid: ^einv["uuid"], e_inv_internal_id: ^einv["internalId"]],
+          inc: [lock_version: 1]
+        ]
       ),
       []
     )
@@ -2145,7 +2151,7 @@ defmodule FullCircle.EInvMetas do
       :unmatching,
       from(doc in klass,
         where: doc.id == ^fc_doc["doc_id"],
-        update: [set: [e_inv_uuid: nil, e_inv_internal_id: nil]]
+        update: [set: [e_inv_uuid: nil, e_inv_internal_id: nil], inc: [lock_version: 1]]
       ),
       []
     )

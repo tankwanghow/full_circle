@@ -738,7 +738,7 @@ defmodule FullCircle.Accounting do
         where: ct.id == ^contact_id,
         where: ct.company_id == ^com.id,
         where: is_nil(field(ct, ^field)) or field(ct, ^field) == "",
-        update: [set: ^[{field, value}]]
+        update: [set: ^[{field, value}], inc: [lock_version: 1]]
       ),
       []
     )

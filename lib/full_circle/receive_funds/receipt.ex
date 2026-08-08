@@ -40,6 +40,9 @@ defmodule FullCircle.ReceiveFund.Receipt do
     field :receipt_balance, :decimal, virtual: true, default: Decimal.new("0.00")
     field :receipt_amount, :decimal, virtual: true, default: Decimal.new("0.00")
 
+    # Concurrency guard, see FullCircle.StdInterface.changeset/5
+    field :lock_version, :integer, default: 0
+
     timestamps(type: :utc_datetime)
   end
 

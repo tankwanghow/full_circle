@@ -140,6 +140,16 @@ defmodule FullCircleWeb.AccountLive.Form do
          )
          |> put_flash(:info, "#{gettext("Account updated successfully.")}")}
 
+      {:error, :stale} ->
+        {:noreply,
+         socket
+         |> put_flash(
+           :error,
+           gettext(
+             "This record was changed or deleted by someone else. Please reload and try again."
+           )
+         )}
+
       {:error, failed_operation, changeset, _} ->
         {:noreply,
          socket

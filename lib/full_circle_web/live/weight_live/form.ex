@@ -135,6 +135,16 @@ defmodule FullCircleWeb.WeighingLive.Form do
          |> push_navigate(to: ~p"/companies/#{socket.assigns.current_company.id}/Weighing")
          |> put_flash(:info, "#{gettext("Weighing updated successfully.")}")}
 
+      {:error, :stale} ->
+        {:noreply,
+         socket
+         |> put_flash(
+           :error,
+           gettext(
+             "This record was changed or deleted by someone else. Please reload and try again."
+           )
+         )}
+
       {:error, failed_operation, changeset, _} ->
         {:noreply,
          socket

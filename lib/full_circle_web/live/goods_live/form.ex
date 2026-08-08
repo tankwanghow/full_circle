@@ -265,6 +265,16 @@ defmodule FullCircleWeb.GoodLive.Form do
          |> push_event("invalidate_autocomplete_cache", %{})
          |> put_flash(:info, info)}
 
+      {:error, :stale} ->
+        {:noreply,
+         socket
+         |> put_flash(
+           :error,
+           gettext(
+             "This record was changed or deleted by someone else. Please reload and try again."
+           )
+         )}
+
       {:error, failed_operation, changeset, _} ->
         {:noreply,
          socket

@@ -36,6 +36,9 @@ defmodule FullCircle.BillPay.Payment do
 
     field :payment_balance, :decimal, virtual: true, default: Decimal.new("0")
 
+    # Concurrency guard, see FullCircle.StdInterface.changeset/5
+    field :lock_version, :integer, default: 0
+
     timestamps(type: :utc_datetime)
   end
 

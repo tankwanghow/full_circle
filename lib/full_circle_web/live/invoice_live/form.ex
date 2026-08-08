@@ -751,6 +751,16 @@ defmodule FullCircleWeb.InvoiceLive.Form do
          |> push_navigate(to: ~p"/companies/#{company.id}/Invoice/#{obj.id}/edit")
          |> put_flash(:info, flash)}
 
+      {:error, :stale} ->
+        {:noreply,
+         socket
+         |> put_flash(
+           :error,
+           gettext(
+             "This record was changed or deleted by someone else. Please reload and try again."
+           )
+         )}
+
       {:error, :link_trading_drops, reason, _} ->
         {:noreply, put_flash(socket, :error, trading_invoice_link_error(reason))}
 

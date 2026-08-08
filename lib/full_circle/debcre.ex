@@ -247,6 +247,9 @@ defmodule FullCircle.DebCre do
       :not_authorise
     end
   rescue
+    Ecto.StaleEntryError ->
+      {:error, :stale}
+
     e in Postgrex.Error ->
       classify_postgrex_error(e)
   end
@@ -468,6 +471,9 @@ defmodule FullCircle.DebCre do
       :not_authorise
     end
   rescue
+    Ecto.StaleEntryError ->
+      {:error, :stale}
+
     e in Postgrex.Error ->
       classify_postgrex_error(e)
   end

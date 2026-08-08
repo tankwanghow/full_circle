@@ -34,6 +34,9 @@ defmodule FullCircle.Product.Good do
     field(:sales_tax_rate, :decimal, virtual: true)
     field(:packaging_count, :decimal, virtual: true, default: 0)
 
+    # Concurrency guard, see FullCircle.StdInterface.changeset/5
+    field(:lock_version, :integer, default: 0)
+
     timestamps(type: :utc_datetime)
   end
 

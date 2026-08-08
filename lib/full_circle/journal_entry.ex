@@ -185,6 +185,9 @@ defmodule FullCircle.JournalEntry do
         :not_authorise
     end
   rescue
+    Ecto.StaleEntryError ->
+      {:error, :stale}
+
     e in Postgrex.Error ->
       {:sql_error, e.postgres.message}
   end

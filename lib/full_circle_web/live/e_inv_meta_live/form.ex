@@ -149,6 +149,16 @@ defmodule FullCircleWeb.EInvMetaLive.Form do
          |> push_navigate(to: ~p"/companies/#{socket.assigns.current_company.id}/e_inv_meta")
          |> put_flash(:info, "#{gettext("E-Invoice Meta Data updated successfully.")}")}
 
+      {:error, :stale} ->
+        {:noreply,
+         socket
+         |> put_flash(
+           :error,
+           gettext(
+             "This record was changed or deleted by someone else. Please reload and try again."
+           )
+         )}
+
       {:error, failed_operation, changeset, _} ->
         {:noreply,
          socket

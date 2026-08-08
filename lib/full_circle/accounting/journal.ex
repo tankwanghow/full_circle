@@ -19,6 +19,9 @@ defmodule FullCircle.Accounting.Journal do
     field :journal_balance, :decimal, virtual: true, default: Decimal.new("0")
     field :transaction_count, :decimal, virtual: true, default: 0
 
+    # Concurrency guard, see FullCircle.StdInterface.changeset/5
+    field(:lock_version, :integer, default: 0)
+
     timestamps(type: :utc_datetime)
   end
 

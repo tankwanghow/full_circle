@@ -905,6 +905,16 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
          |> push_navigate(to: ~p"/companies/#{company.id}/PurInvoice/#{obj.id}/edit")
          |> put_flash(:info, flash)}
 
+      {:error, :stale} ->
+        {:noreply,
+         socket
+         |> put_flash(
+           :error,
+           gettext(
+             "This record was changed or deleted by someone else. Please reload and try again."
+           )
+         )}
+
       {:error, step, reason, _} when step in [:link_trading_loads, :link_trading_transport] ->
         {:noreply, put_flash(socket, :error, trading_link_error(reason))}
 

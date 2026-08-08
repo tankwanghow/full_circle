@@ -39,6 +39,9 @@ defmodule FullCircle.Billing.PurInvoice do
     field :matched_amount, :decimal, virtual: true, default: Decimal.new("0")
     field :sum_qty, :decimal, virtual: true, default: 0
 
+    # Concurrency guard, see FullCircle.StdInterface.changeset/5
+    field :lock_version, :integer, default: 0
+
     timestamps(type: :utc_datetime)
   end
 

@@ -18,6 +18,9 @@ defmodule FullCircle.Cheque.Deposit do
     field :funds_from_name, :string, virtual: true
     field :cheques_amount, :decimal, virtual: true, default: 0
 
+    # Concurrency guard, see FullCircle.StdInterface.changeset/5
+    field :lock_version, :integer, default: 0
+
     timestamps(type: :utc_datetime)
   end
 

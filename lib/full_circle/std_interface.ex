@@ -120,11 +120,13 @@ defmodule FullCircle.StdInterface do
       false ->
         :not_authorise
     end
+  rescue
+    Ecto.StaleEntryError -> {:error, :stale}
   end
 
   def delete(klass, klass_name, obj, company, user, multi \\ Multi.new()) do
     action = String.to_atom("delete_" <> klass_name)
-    changeset = changeset(klass, obj, %{}, company)
+    changeset = unlocked_changeset(klass, obj, %{}, company, :changeset)
 
     case can?(user, action, company) do
       true ->
@@ -150,7 +152,25 @@ defmodule FullCircle.StdInterface do
   end
 
   def changeset(klass, obj, attrs \\ %{}, company, changeset_func \\ :changeset) do
+    unlocked_changeset(klass, obj, attrs, company, changeset_func)
+    |> maybe_optimistic_lock(klass)
+  end
+
+  defp unlocked_changeset(klass, obj, attrs, company, changeset_func) do
     attrs = Map.merge(attrs, %{company_id: company.id}) |> key_to_string()
     apply(klass, changeset_func, [obj, attrs])
+  end
+
+  # Schemas carrying a :lock_version column are ones two users can have open in
+  # a form at the same time, so the second save must be refused rather than
+  # silently overwriting the first. Applied on insert and update only —
+  # `delete/6` builds an unlocked changeset so deleting a record is not blocked
+  # by someone else's concurrent edit.
+  defp maybe_optimistic_lock(changeset, klass) do
+    if :lock_version in klass.__schema__(:fields) do
+      Ecto.Changeset.optimistic_lock(changeset, :lock_version)
+    else
+      changeset
+    end
   end
 end
