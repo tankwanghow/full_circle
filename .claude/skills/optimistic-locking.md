@@ -93,13 +93,34 @@ submit path (`Multi.update_all(:update_invoice, ...)`), `EInvMetas.match/4` and
 `bank_statement_lines` — neither is locked, so it needs nothing. Re-check that if it ever
 starts writing document headers.
 
-## Trap 2: a partial `select:` silently nils the column
+## Trap 2: a partial `select:` silently substitutes the schema default
 
-A loader that builds an explicit struct drops any field it doesn't list. `lock_version`
-then loads as `nil`, `optimistic_lock/2` matches no row, and **every save from that form
-fails as stale** — a total breakage, not an edge case.
+A loader that builds an explicit struct drops any field it doesn't list — and the struct
+comes back carrying the schema **default** for that field, not `nil`. For `lock_version`
+that default is `0`.
 
-This bit `Product.good_query/2`, the only such loader in the codebase:
+Meanwhile `StdInterface.create/6` also applies the lock, so `incrementer.(0)` runs on
+insert and a **freshly created row is already at `lock_version: 1`**.
+
+So the filter becomes `WHERE lock_version = 0` against a row holding `1`: zero rows
+matched, `StaleEntryError`, and **every save from that loader fails as stale** from the
+very first edit. Total breakage, not an intermittent edge case.
+
+The default is what makes this nasty. Ecto only warns you about the *nil* case —
+`optimistic_lock/2` logs "the current value of `lock_version` is `nil` and will not be
+used as a filter" and skips filtering entirely. A defaulted `0` produces **no warning at
+all**, just a wrong filter value. Don't go looking for that log line; it never appears.
+
+Measured on `goods` with the select line removed: struct `lock_version` `0`, DB row `1`,
+changeset filters `%{lock_version: 0}`, save → `{:error, :stale}`.
+
+On a database that already has rows this is even harder to read: rows predating the
+migration sit at `0`, so their **first** edit succeeds (filter `0` matches row `0`) and
+bumps them to `1` — after which they jam forever. Rows created after the deploy jam
+immediately. Old records editable exactly once, new records never, which looks like a data
+problem rather than a query problem.
+
+This bit `Product.good_query/2`:
 
 ```elixir
 select: %Good{
@@ -114,7 +135,22 @@ select: %Good{
 Loaders using `select: doc` plus `select_merge:` for virtuals are fine — the full struct
 carries the column.
 
-**When adding a locked schema, check its getter.** `grep -rE "select: %(Schema)\{" lib`.
+**`Good` is not the only schema built this way — it is only the locked one.** There are
+four explicit-struct loaders in `lib`, three of them attached to schemas that are *not*
+locked yet and will break the moment someone locks them:
+
+| Loader | Schema | Locked today? |
+|---|---|---|
+| `product.ex:554` `good_query/2` | `Good` | yes — carries `lock_version` |
+| `accounting.ex:512` `fixed_asset_query/2` | `FixedAsset` | no |
+| `accounting.ex:259` | `TaxCode` | no |
+| `hr.ex:911` | `Advance` | no |
+
+**Before locking any new schema, run this and check whether its loader is on the list:**
+
+```bash
+grep -rnE "select: %[A-Z][A-Za-z]*\{" lib
+```
 
 ## Verifying
 
@@ -134,5 +170,5 @@ column.
 | Calling `optimistic_lock/2` in the schema's `changeset/2` | Double increment; `StdInterface` already applies it |
 | Adding the column but not the `field` | No locking at all, silently |
 | `update_all` without `inc: [lock_version: 1]` | Machine writes silently overwritten |
-| Explicit `select: %Schema{}` omitting `lock_version` | Every save from that loader fails as stale |
+| Explicit `select: %Schema{}` omitting `lock_version` | Struct gets the schema default `0`, DB row is `1` — every save from that loader fails as stale, with no Ecto warning |
 | New form `case` without `{:error, :stale}` | `CaseClauseError` crash on conflict |
