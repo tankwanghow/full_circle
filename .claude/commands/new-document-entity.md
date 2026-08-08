@@ -16,6 +16,10 @@ Follow the Invoice pattern:
 - `changeset/2` with `cast_assoc` for details
 - `admin_changeset/2` allowing doc number editing
 - `compute_fields/1` (changeset-based) and `compute_struct_fields/1` (struct-based)
+- `field :lock_version, :integer, default: 0` — document headers are co-edited, so they
+  take the optimistic lock. Add the matching column in the migration (step 5). Do NOT
+  call `optimistic_lock/2` here; `StdInterface.changeset/5` applies it to any schema
+  carrying the field. See `.claude/skills/optimistic-locking.md`.
 - `timestamps(type: :utc_datetime)`
 
 ### 2. Create the Detail Schema
@@ -42,8 +46,16 @@ Include:
 - `update_<entity>/4` with:
   1. `remove_field_if_new_flag` for protected fields
   2. `update_doc_multi` (update + delete old GL + create new GL)
+  3. A `rescue` turning `Ecto.StaleEntryError` into `{:error, :stale}`, ahead of the
+     existing `Postgrex.Error` clause. The error is *raised*, not returned, and escapes
+     `Repo.transaction` — without this a concurrent edit (or a row someone else deleted)
+     crashes the LiveView.
 - `<entity>_index_query` with `apply_index_filters`
 - `make_changeset/5` for admin changeset selection
+
+If the getter uses an explicit `select: %<Entity>{...}` rather than `select: doc` plus
+`select_merge:`, it MUST list `lock_version` — omitting it loads the column as `nil` and
+every save from the form fails as stale.
 
 ### 4. Add Authorization
 In `lib/full_circle/authorization.ex`:
@@ -57,12 +69,29 @@ def can?(user, :update_<entity>, company),
 ### 5. Add GaplessDocId Migration
 Create migration to add document type to gapless_doc_ids table.
 
+Also add the lock column to the header table:
+```elixir
+add :lock_version, :integer, default: 0, null: false
+```
+
 ### 6. Create LiveView Files
 - `lib/full_circle_web/live/<entity>_live/index.ex`
 - `lib/full_circle_web/live/<entity>_live/form.ex`
 - `lib/full_circle_web/live/<entity>_live/index_component.ex`
 - `lib/full_circle_web/live/<entity>_live/detail_component.ex`
 - `lib/full_circle_web/live/<entity>_live/print.ex`
+
+The form's save `case` needs an `{:error, :stale}` clause alongside `{:sql_error, msg}`
+and `:not_authorise`, or a real conflict raises `CaseClauseError`:
+```elixir
+{:error, :stale} ->
+  {:noreply,
+   socket
+   |> put_flash(
+     :error,
+     gettext("This record was changed or deleted by someone else. Please reload and try again.")
+   )}
+```
 
 ### 7. Add Routes
 In `router.ex` under `:require_authenticated_user_n_active_company`:
@@ -91,6 +120,8 @@ mise exec -- mix test test/full_circle/<context>_test.exs
 ```
 
 ## Reference Files
+- Optimistic locking contract: `.claude/skills/optimistic-locking.md`
+- Stale-save tests: `test/full_circle/stale_entry_test.exs`
 - Invoice pattern: `lib/full_circle/billing.ex`, `lib/full_circle/billing/invoice.ex`
 - Receipt pattern: `lib/full_circle/receive_fund.ex`, `lib/full_circle/receive_funds/receipt.ex`
 - Test pattern: `test/full_circle/billing_test.exs`

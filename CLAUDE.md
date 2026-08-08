@@ -116,7 +116,7 @@ Project skills (non-obvious domain contracts) live in `.claude/skills/`:
 `grain-trading-desk.md`, `egg-stock-day-board.md`, `e-invoice-sync.md`,
 `e-invoice-bill-prefill.md`, `bank-recon-llm-parser.md`, `cash-forecast-model.md`,
 `cp204-instalment-planner.md`, `punch-card-payroll.md`, `finger-print-import.md`,
-`statutory-bundle.md`, `liveview-computed-field-gotchas.md`.
+`statutory-bundle.md`, `liveview-computed-field-gotchas.md`, `optimistic-locking.md`.
 
 ### StdInterface Pattern (`lib/full_circle/std_interface.ex`)
 
@@ -165,5 +165,7 @@ Supports English (`en`) and Chinese (`zh`) via Gettext. Locale stored in session
 - Print views support `pre_print` parameter (true = data only for pre-printed forms, false = full letterhead)
 - Company deletion cascades via database triggers (see `create_triggers_when_delete_company` migration)
 - PostgreSQL `pg_trgm` extension used for fuzzy search (see `create_fuzzy_search` migration)
+- Co-edited records (document headers, contacts, goods) carry `lock_version`; a concurrent
+  save returns `{:error, :stale}`. See `.claude/skills/optimistic-locking.md`
 - Design docs / plans: `docs/superpowers/specs/` and `docs/superpowers/plans/`
 - Commit on `master` directly (solo workflow — no feature branches unless asked)

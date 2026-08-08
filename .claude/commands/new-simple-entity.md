@@ -14,6 +14,10 @@ Migration should:
 - Add `company_id` as `references(:companies, type: :binary_id)`
 - Add `timestamps(type: :utc_datetime)`
 - Create unique index on `[:name, :company_id]` (or appropriate uniqueness constraint)
+- If two users can realistically have this record open at once (master data like Contact
+  or Good), add `add :lock_version, :integer, default: 0, null: false` — see step 2 and
+  `.claude/skills/optimistic-locking.md`. Skip it for config-ish tables only one person
+  ever touches.
 
 ### 2. Create Schema
 Location: `lib/full_circle/<context>/<entity>.ex`
@@ -28,6 +32,11 @@ defmodule FullCircle.<Context>.<Entity> do
     field :name, :string
     # ... other fields ...
     belongs_to :company, FullCircle.Sys.Company
+
+    # Only if the migration added the column. StdInterface.changeset/5 applies
+    # optimistic_lock/2 to any schema carrying this field — do NOT call it here.
+    field :lock_version, :integer, default: 0
+
     timestamps(type: :utc_datetime)
   end
 
@@ -74,6 +83,18 @@ def can?(user, :delete_<entity>, company),
 - Mount new vs edit
 - Validate on change
 - Save via `StdInterface.create/5` or `StdInterface.update/6`
+- The save `case` needs an `{:error, :stale}` clause. `StdInterface.update/7` returns it
+  when the record was deleted or (for locked schemas) changed by someone else; without
+  the clause that's a `CaseClauseError` crash:
+  ```elixir
+  {:error, :stale} ->
+    {:noreply,
+     socket
+     |> put_flash(
+       :error,
+       gettext("This record was changed or deleted by someone else. Please reload and try again.")
+     )}
+  ```
 
 **IndexComponent** (`lib/full_circle_web/live/<entity>_live/index_component.ex`):
 - Table row component with key display fields
@@ -110,6 +131,8 @@ mise exec -- mix test test/full_circle/<context>_test.exs
 ```
 
 ## Reference Files
+- Optimistic locking contract: `.claude/skills/optimistic-locking.md`
+- Locked master-data examples: `lib/full_circle/accounting/contact.ex`, `lib/full_circle/product/good.ex`
 - Account pattern: `lib/full_circle/accounting/account.ex`
 - Account LiveView: `lib/full_circle_web/live/account_live/`
 - Account test: `test/full_circle_web/live/account_live_test.exs`
