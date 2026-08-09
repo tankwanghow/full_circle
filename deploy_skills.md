@@ -19,9 +19,9 @@ built on the dev machine and streamed to the server over SSH (no Docker Hub push
 
 | Script | Purpose |
 |---|---|
-| `deploy.sh` | Build image, stream to server, recreate container, migrate |
+| `deploy.sh` | Build image, stream to server, migrate, recreate container |
 | `launch.sh` | First-time provision + deploy |
-| `deploy_at_server.sh` | Pull/tag image, `docker compose` restart, migrate |
+| `deploy_at_server.sh` | Pull/tag image, `compose down`, migrate in a one-off container, `compose up`. Migrating before start avoids serving a release whose schemas name columns the DB lacks; a failed migration aborts the deploy and leaves the app down with a rollback command rather than starting it. |
 | `setup_barebone_debian_at_server.sh` | Docker, Nginx, PostgreSQL 17 |
 | `setup_db_at_server.sh` | Database user/database |
 | `setup_certbot_at_server.sh` | SSL via certbot |
