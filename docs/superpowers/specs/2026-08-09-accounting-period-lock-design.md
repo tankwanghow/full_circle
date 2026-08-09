@@ -168,8 +168,23 @@ DebitNote), `:journal_date`.
 
 ### Deletes
 
-Deleting a document deletes its transactions, so the delete paths are covered by the
-same guard placed before `Multi.delete_all`. No separate delete handling is needed.
+Only **Receipt** and **Payment** can be deleted as documents. Invoice, PurInvoice,
+CreditNote, DebitNote and Journal have no document-level delete — their forms expose
+only line deletion (`delete_detail` / `delete_trans`), and emptying a document's lines is
+an ordinary GL-affecting save that the guard above already blocks.
+
+Receipt and Payment delete through `StdInterface.delete/6` directly from their forms
+(`receipt_live/form.ex:513`, `payment_live/form.ex:509`), which does **not** pass through
+either context's multi and is therefore not covered by the guard above.
+
+Two thin context wrappers close this, keeping the rule in the context layer where
+`assert_doc_editable/4` already lives:
+
+- `ReceiveFund.delete_receipt(receipt, com, user)`
+- `BillPay.delete_payment(payment, com, user)`
+
+Each calls `assert_period_open/2` on the document's posting date, then delegates to
+`StdInterface.delete/6`. The two forms call these instead of `StdInterface.delete/6`.
 
 ### Error surfacing
 
@@ -245,7 +260,9 @@ Context tests (`test/full_circle/`):
 - Per document type (all nine): creating into a closed period is rejected; creating
   after the cutoff succeeds; editing a GL field on a closed-period document is rejected;
   moving a document's date from an open period into a closed one is rejected, and the
-  reverse likewise; deleting a closed-period document is rejected.
+  reverse likewise.
+- Receipt and Payment only: deleting a closed-period document is rejected, and deleting
+  one dated after the cutoff still succeeds.
 - Invoice and CreditNote specifically: a description-only edit on a closed-period
   document still succeeds, confirming the fast path is preserved.
 - Receipt and Payment specifically: a description-only edit is rejected, documenting the
