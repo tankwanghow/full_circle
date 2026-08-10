@@ -177,7 +177,14 @@ Tick rows on the Stock tab (planned **sales** only) or on either weekly book
   for `@day.egg_stock_day_details` instead reintroduces the stale-row bug above.
 - `selectable_sales_ids/1` — saved, non-separator planned-sales rows only
   (id not nil/empty; section in `EggStock.planned_sales_sections()`), taken
-  from `live_day_details/1`.
+  from `live_day_details/1`. The plural section list is **defence-in-depth here,
+  not the live guard**: `assign_day_form/2` normalises legacy `"actual_order"`
+  to `"planned_order"` before rows reach this changeset, so no test can tell the
+  plural from the singular at this call site. The legacy path is pinned one
+  level up — the markup test catches `assign_day_form/2` losing the
+  normalisation, and `loading_list_source_rows/2`'s day query keeps its own
+  plural filter (pinned by "day source includes rows in the legacy actual_order
+  section").
 - `selectable_dow_ids/1` — saved, non-separator, non-deleted weekly rows.
 - `all_selected?/2` — the single "every selectable row is ticked" predicate
   (false when nothing is selectable). Both `all_sales_selected?/2` and

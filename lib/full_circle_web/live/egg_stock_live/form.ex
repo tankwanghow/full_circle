@@ -1085,6 +1085,13 @@ defmodule FullCircleWeb.EggStockLive.Form do
     do: Ecto.Changeset.get_field(cs, :egg_stock_day_details) || []
 
   # Only saved, non-separator planned sales rows can be selected.
+  #
+  # The plural planned_sales_sections/0 is defence-in-depth here, not the live
+  # guard: assign_day_form/2 already normalises legacy "actual_order" rows to
+  # "planned_order" before they reach this changeset, so no test can distinguish
+  # the plural from the singular at this call site. The legacy path is pinned one
+  # level up instead — the markup test catches assign_day_form/2 dropping the
+  # normalisation, and the loading-list day query keeps its own plural filter.
   defp selectable_sales_ids(form) do
     form
     |> live_day_details()
