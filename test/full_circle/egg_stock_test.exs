@@ -754,4 +754,156 @@ defmodule FullCircle.EggStockTest do
       assert detail.quantities["A"] == 1
     end
   end
+
+  describe "loading_list_groups/3 for the day board" do
+    setup %{company: company, admin: admin, contact: contact} do
+      date = ~D[2026-08-10]
+      {:ok, day} = EggStock.get_or_create_day(company.id, date)
+
+      {:ok, day} =
+        EggStock.save_day(
+          day,
+          %{
+            "egg_stock_day_details" => %{
+              "0" => %{
+                "section" => "planned_order",
+                "contact_id" => contact.id,
+                "contact_name" => contact.name,
+                "quantities" => %{"AA" => "10"},
+                "position" => "0",
+                "is_separator" => "false"
+              },
+              "1" => %{
+                "section" => "planned_order",
+                "contact_name" => "",
+                "group_name" => "Lorry 2",
+                "position" => "1",
+                "is_separator" => "true"
+              },
+              "2" => %{
+                "section" => "planned_order",
+                "contact_name" => "Ah Seng",
+                "quantities" => %{"AA" => "5", "A" => "3"},
+                "position" => "2",
+                "is_separator" => "false"
+              },
+              "3" => %{
+                "section" => "planned_order",
+                "contact_name" => "Kedai Muar",
+                "quantities" => %{"B" => "7"},
+                "position" => "3",
+                "is_separator" => "false"
+              },
+              "4" => %{
+                "section" => "planned_purchase",
+                "contact_name" => "Supplier X",
+                "quantities" => %{"AA" => "99"},
+                "position" => "4",
+                "is_separator" => "false"
+              }
+            }
+          },
+          company,
+          admin
+        )
+
+      day =
+        FullCircle.Repo.preload(day, [egg_stock_day_details: EggStock.__day_details_query__()],
+          force: true
+        )
+
+      by_name = Map.new(day.egg_stock_day_details, &{&1.contact_name, &1})
+      %{date: date, day: day, by_name: by_name}
+    end
+
+    test "groups selected rows under the separator above them", %{
+      company: company,
+      date: date,
+      by_name: by_name
+    } do
+      ids = [by_name["Ah Seng"].id, by_name["Kedai Muar"].id]
+
+      assert [%{group_name: "Lorry 2", rows: rows}] =
+               EggStock.loading_list_groups(company.id, {:day, date}, ids)
+
+      assert Enum.map(rows, & &1.contact_name) == ["Ah Seng", "Kedai Muar"]
+      assert Enum.at(rows, 0).quantities == %{"AA" => 5, "A" => 3}
+    end
+
+    test "rows before any separator land in an unnamed group", %{
+      company: company,
+      contact: contact,
+      date: date,
+      by_name: by_name
+    } do
+      ids = [by_name[contact.name].id, by_name["Kedai Muar"].id]
+
+      assert [
+               %{group_name: "", rows: [%{contact_name: first}]},
+               %{group_name: "Lorry 2", rows: [%{contact_name: "Kedai Muar"}]}
+             ] = EggStock.loading_list_groups(company.id, {:day, date}, ids)
+
+      assert first == contact.name
+    end
+
+    test "groups with no selected row are dropped", %{
+      company: company,
+      contact: contact,
+      date: date,
+      by_name: by_name
+    } do
+      ids = [by_name[contact.name].id]
+
+      assert [%{group_name: "", rows: [_]}] =
+               EggStock.loading_list_groups(company.id, {:day, date}, ids)
+    end
+
+    test "rows print in board position order regardless of id order", %{
+      company: company,
+      date: date,
+      by_name: by_name
+    } do
+      ids = [by_name["Kedai Muar"].id, by_name["Ah Seng"].id]
+
+      assert [%{rows: rows}] = EggStock.loading_list_groups(company.id, {:day, date}, ids)
+      assert Enum.map(rows, & &1.contact_name) == ["Ah Seng", "Kedai Muar"]
+    end
+
+    test "ignores ids from the planned purchase section", %{
+      company: company,
+      date: date,
+      by_name: by_name
+    } do
+      ids = [by_name["Supplier X"].id]
+
+      assert [] == EggStock.loading_list_groups(company.id, {:day, date}, ids)
+    end
+
+    test "ignores ids that belong to another date", %{
+      company: company,
+      date: date,
+      by_name: by_name
+    } do
+      ids = [by_name["Ah Seng"].id]
+
+      assert [] == EggStock.loading_list_groups(company.id, {:day, ~D[2026-08-11]}, ids)
+    end
+
+    test "ignores ids that belong to another company", %{
+      company: company,
+      date: date,
+      by_name: by_name
+    } do
+      other_admin = user_fixture()
+      other_company = company_fixture(other_admin, %{})
+      ids = [by_name["Ah Seng"].id]
+
+      assert [] == EggStock.loading_list_groups(other_company.id, {:day, date}, ids)
+      assert [_] = EggStock.loading_list_groups(company.id, {:day, date}, ids)
+    end
+
+    test "returns no groups for an empty selection", %{company: company, date: date} do
+      assert [] == EggStock.loading_list_groups(company.id, {:day, date}, [])
+    end
+  end
 end

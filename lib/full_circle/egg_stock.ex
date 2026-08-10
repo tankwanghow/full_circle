@@ -233,6 +233,65 @@ defmodule FullCircle.EggStock do
     |> sum_line_quantities(grades)
   end
 
+  # --- Loading list (selected planned sales rows) ---
+
+  @doc """
+  Selected planned-sales rows for a loading list, in board order, grouped by the
+  separator label above them.
+
+  `source` is `{:day, %Date{}}` for the day board or `{:dow, kind, dow}` for the
+  weekly book. Ids that do not resolve inside that scope are dropped, which is
+  also the multi-tenant guard. Groups containing no selected row are omitted.
+  """
+  def loading_list_groups(company_id, source, selected_ids) do
+    selected = MapSet.new(selected_ids, &to_string/1)
+
+    company_id
+    |> loading_list_source_rows(source)
+    |> Enum.reduce({[], ""}, fn row, {groups, current} ->
+      cond do
+        row.is_separator ->
+          {groups, row.group_name || ""}
+
+        MapSet.member?(selected, to_string(row.id)) ->
+          entry = %{
+            id: to_string(row.id),
+            contact_name: row.contact_name || "",
+            quantities: normalize_qty_map(row.quantities)
+          }
+
+          case groups do
+            [%{group_name: ^current, rows: rows} = g | rest] ->
+              {[%{g | rows: rows ++ [entry]} | rest], current}
+
+            _ ->
+              {[%{group_name: current, rows: [entry]} | groups], current}
+          end
+
+        true ->
+          {groups, current}
+      end
+    end)
+    |> elem(0)
+    |> Enum.reverse()
+  end
+
+  defp loading_list_source_rows(company_id, {:day, date}) do
+    from(d in EggStockDayDetail,
+      join: day in EggStockDay,
+      on: day.id == d.egg_stock_day_id,
+      left_join: c in Contact,
+      on: c.id == d.contact_id,
+      where:
+        day.company_id == ^company_id and day.stock_date == ^date and
+          d.section in ^planned_sales_sections(),
+      order_by: [asc: d.position, asc: d.id],
+      select: d,
+      select_merge: %{contact_name: fragment("coalesce(?, ?)", c.name, d.contact_name)}
+    )
+    |> Repo.all()
+  end
+
   def save_dow_lines(company_id, kind, dow, lines_params, company, user)
       when kind in [:sales, :purchase, "sales", "purchase"] do
     kind = to_string(kind)
