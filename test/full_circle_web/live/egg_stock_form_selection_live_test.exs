@@ -106,7 +106,8 @@ defmodule FullCircleWeb.EggStockFormSelectionLiveTest do
 
     assert html =~ "src=day"
     assert html =~ "date=#{Date.to_iso8601(date)}"
-    assert html =~ by_name["Ah Seng"].id
+    # pin the href itself: the bare id also renders in a hidden input on every render
+    assert html =~ "ids=#{by_name["Ah Seng"].id}"
   end
 
   test "select all takes the sales section only, not planned purchases", %{
@@ -144,7 +145,30 @@ defmodule FullCircleWeb.EggStockFormSelectionLiveTest do
     refute html =~ "Print selected"
   end
 
-  test "selecting a row does not change the stored quantities", %{
+  # The selection checkbox sits inside the phx-change="validate" form. A `name`
+  # attribute would put it in the submitted params and reach the changeset.
+  test "the selection checkbox carries no name attribute", %{
+    conn: conn,
+    company: company,
+    user: user
+  } do
+    {_date, _by_name} = seed_today(company, user)
+    {:ok, _lv, html} = live(conn, ~p"/companies/#{company.id}/egg_stock")
+
+    boxes =
+      html
+      |> LazyHTML.from_fragment()
+      |> LazyHTML.query(~s{input[type=checkbox][phx-click=toggle_print_row]})
+
+    # guards against a vacuous pass if the markup ever stops rendering checkboxes;
+    # 2 == the planned sales rows only, the planned purchase row gets no checkbox
+    assert Enum.count(boxes) == 2
+
+    # LazyHTML.attribute/2 omits elements lacking the attribute, so [] proves none carry it
+    assert LazyHTML.attribute(boxes, "name") == []
+  end
+
+  test "a real form change with a row selected does not corrupt stored quantities", %{
     conn: conn,
     company: company,
     user: user
@@ -153,6 +177,12 @@ defmodule FullCircleWeb.EggStockFormSelectionLiveTest do
     {:ok, lv, _html} = live(conn, ~p"/companies/#{company.id}/egg_stock")
 
     render_click(lv, "toggle_print_row", %{"id" => by_name["Ah Seng"].id})
+
+    # serializes the real rendered form — the path a named checkbox would leak through
+    lv |> form("#day-form") |> render_change()
+
+    # switch_tab flushes the pending autosave, writing the serialized params to the DB
+    render_click(lv, "switch_tab", %{"tab" => "estimated"})
 
     reloaded =
       EggStock.get_day(company.id, date)
