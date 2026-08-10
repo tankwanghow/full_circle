@@ -135,7 +135,20 @@ defmodule FullCircleWeb.EggStockLoadingListLiveTest do
     assert html =~ "Wed"
   end
 
-  test "an empty selection renders the sheet with no rows", %{conn: conn, company: company} do
+  test "an empty selection renders the sheet with no rows", %{
+    conn: conn,
+    company: company,
+    user: user
+  } do
+    date = ~D[2026-08-10]
+    day = seed_day(company, user, date)
+    names = Enum.map(day.egg_stock_day_details, & &1.contact_name)
+
+    # Both rows are on the day board, so their absence below is the empty
+    # selection filtering them out, not an empty database.
+    assert "Ah Seng" in names
+    assert "Kedai Muar" in names
+
     {:ok, _lv, html} =
       live(
         conn,
@@ -144,5 +157,6 @@ defmodule FullCircleWeb.EggStockLoadingListLiveTest do
 
     assert html =~ "Planned sales"
     refute html =~ "Ah Seng"
+    refute html =~ "Kedai Muar"
   end
 end
