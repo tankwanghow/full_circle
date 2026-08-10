@@ -520,6 +520,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
           handle_event("goto_date", %{"date" => date_str}, socket)
         else
           socket = flush_autosave(socket)
+          socket = clear_print_selection(socket)
           tab = if kind == "sales", do: "weekly_sales", else: "weekly_purchases"
           dow = Date.day_of_week(date)
 
@@ -538,6 +539,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
 
   def handle_event("select_dow", %{"dow" => dow_str}, socket) do
     socket = flush_autosave(socket)
+    socket = clear_print_selection(socket)
     dow = String.to_integer(dow_str)
     kind = socket.assigns.dow_kind
 
@@ -566,6 +568,25 @@ defmodule FullCircleWeb.EggStockLive.Form do
 
   def handle_event("clear_print_rows", _params, socket) do
     {:noreply, assign(socket, sel_sales_ids: MapSet.new())}
+  end
+
+  def handle_event("toggle_dow_print_row", %{"id" => id}, socket) do
+    {:noreply, assign(socket, sel_dow_ids: toggle_id(socket.assigns.sel_dow_ids, id))}
+  end
+
+  def handle_event("toggle_all_dow_print_rows", _params, socket) do
+    all = MapSet.new(selectable_dow_ids(socket.assigns.dow_params))
+
+    selected =
+      if MapSet.size(all) > 0 and MapSet.subset?(all, socket.assigns.sel_dow_ids),
+        do: MapSet.new(),
+        else: all
+
+    {:noreply, assign(socket, sel_dow_ids: selected)}
+  end
+
+  def handle_event("clear_dow_print_rows", _params, socket) do
+    {:noreply, assign(socket, sel_dow_ids: MapSet.new())}
   end
 
   # --- Now tab: validate/save ---
@@ -1066,6 +1087,29 @@ defmodule FullCircleWeb.EggStockLive.Form do
     ~p"/companies/#{company_id}/EggStock/loading_list?#{query}"
   end
 
+  # Only saved, non-separator, non-deleted weekly rows can be selected.
+  defp selectable_dow_ids(dow_params) do
+    (dow_params || [])
+    |> Enum.filter(fn line ->
+      line["delete"] != "true" and line["is_separator"] not in [true, "true"] and
+        line["id"] not in [nil, ""]
+    end)
+    |> Enum.map(&to_string(&1["id"]))
+  end
+
+  defp all_dow_selected?(dow_params, selected) do
+    ids = selectable_dow_ids(dow_params)
+    ids != [] and MapSet.subset?(MapSet.new(ids), selected)
+  end
+
+  defp selected_dow_total(dow_params, grades, selected) do
+    (dow_params || [])
+    |> Enum.filter(&MapSet.member?(selected, to_string(&1["id"] || "")))
+    |> Enum.reduce(0, fn line, acc ->
+      acc + Enum.reduce(grades, 0, fn g, a -> a + to_int((line["quantities"] || %{})[g]) end)
+    end)
+  end
+
   defp flush_autosave(socket) do
     if timer = socket.assigns[:autosave_timer] do
       Process.cancel_timer(timer)
@@ -1472,6 +1516,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
           grade_labels={@grade_labels}
           current_company={@current_company}
           current_user={@current_user}
+          sel_dow_ids={@sel_dow_ids}
         />
       </div>
 
@@ -1553,7 +1598,15 @@ defmodule FullCircleWeb.EggStockLive.Form do
           class="w-fit max-w-full"
         >
           <div class="flex gap-1 mb-1">
-            <div class="w-12 shrink-0"></div>
+            <div class="w-12 shrink-0 flex items-center gap-1">
+              <input
+                type="checkbox"
+                class="h-4 w-4 accent-blue-600"
+                checked={all_dow_selected?(@dow_params, @sel_dow_ids)}
+                phx-click="toggle_all_dow_print_rows"
+              />
+              <span class="text-xs">{gettext("all")}</span>
+            </div>
             <div class="w-56 text-sm font-semibold text-gray-600">{gettext("Contact")}</div>
             <div :for={grade <- @grades} class="w-20 text-center text-sm font-semibold text-gray-600">
               {@grade_labels[grade]}
@@ -1639,6 +1692,18 @@ defmodule FullCircleWeb.EggStockLive.Form do
               class="flex items-center gap-1 mb-1"
             >
               <div class="flex items-center w-12 shrink-0">
+                <input
+                  type="checkbox"
+                  class="mr-1 h-4 w-4 accent-blue-600 disabled:opacity-40"
+                  disabled={line["id"] in [nil, ""]}
+                  title={
+                    if line["id"] in [nil, ""],
+                      do: gettext("Save first before selecting this row")
+                  }
+                  checked={MapSet.member?(@sel_dow_ids, to_string(line["id"] || ""))}
+                  phx-click="toggle_dow_print_row"
+                  phx-value-id={line["id"]}
+                />
                 <button
                   :if={!@readonly}
                   type="button"
@@ -1719,6 +1784,19 @@ defmodule FullCircleWeb.EggStockLive.Form do
             </div>
           </div>
         </.form>
+
+        <.print_action_bar
+          count={MapSet.size(@sel_dow_ids)}
+          total={selected_dow_total(@dow_params, @grades, @sel_dow_ids)}
+          href={
+            loading_list_href(
+              @current_company.id,
+              [src: "dow", kind: if(@kind == "sales", do: "sales", else: "purchase"), dow: @dow],
+              @sel_dow_ids
+            )
+          }
+          clear_event="clear_dow_print_rows"
+        />
 
         <div :if={!@readonly} class="mt-2 flex gap-3">
           <button

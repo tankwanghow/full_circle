@@ -194,4 +194,122 @@ defmodule FullCircleWeb.EggStockFormSelectionLiveTest do
     assert EggStock.to_int(row.quantities["AA"]) == 5
     assert EggStock.to_int(row.quantities["A"]) == 3
   end
+
+  # --- Weekly Sales tab selection ---
+
+  defp seed_weekly(company, user, dow) do
+    {:ok, _} =
+      EggStock.save_dow_lines(
+        company.id,
+        :sales,
+        dow,
+        [
+          %{
+            "id" => "",
+            "contact_name" => "Weekly Ah Seng",
+            "quantities" => %{"AA" => "4", "A" => "1"},
+            "is_separator" => "false",
+            "delete" => "false"
+          },
+          %{
+            "id" => "",
+            "contact_name" => "Weekly Kedai",
+            "quantities" => %{"AA" => "2"},
+            "is_separator" => "false",
+            "delete" => "false"
+          }
+        ],
+        company,
+        user
+      )
+
+    Map.new(EggStock.list_dow_lines(company.id, :sales, dow), &{&1.contact_name, &1})
+  end
+
+  # Any weekday other than today, so the book is not read-only.
+  defp other_dow, do: rem(Date.day_of_week(Date.utc_today()), 7) + 1
+
+  test "the weekly action bar appears after selecting a row", %{
+    conn: conn,
+    company: company,
+    user: user
+  } do
+    dow = other_dow()
+    by_name = seed_weekly(company, user, dow)
+
+    {:ok, lv, _html} = live(conn, ~p"/companies/#{company.id}/egg_stock")
+    render_click(lv, "switch_tab", %{"tab" => "weekly_sales"})
+    render_click(lv, "select_dow", %{"dow" => to_string(dow)})
+
+    html = render_click(lv, "toggle_dow_print_row", %{"id" => by_name["Weekly Ah Seng"].id})
+
+    assert html =~ "Print selected"
+    assert html =~ "1 selected"
+    assert html =~ "5 eggs"
+    assert html =~ "src=dow"
+    assert html =~ "kind=sales"
+  end
+
+  test "the weekly selection clears when the weekday changes", %{
+    conn: conn,
+    company: company,
+    user: user
+  } do
+    dow = other_dow()
+    by_name = seed_weekly(company, user, dow)
+    next_dow = rem(dow, 7) + 1
+
+    {:ok, lv, _html} = live(conn, ~p"/companies/#{company.id}/egg_stock")
+    render_click(lv, "switch_tab", %{"tab" => "weekly_sales"})
+    render_click(lv, "select_dow", %{"dow" => to_string(dow)})
+    render_click(lv, "toggle_dow_print_row", %{"id" => by_name["Weekly Ah Seng"].id})
+
+    html = render_click(lv, "select_dow", %{"dow" => to_string(next_dow)})
+
+    refute html =~ "Print selected"
+  end
+
+  test "weekly select all takes every saved row on that weekday", %{
+    conn: conn,
+    company: company,
+    user: user
+  } do
+    dow = other_dow()
+    seed_weekly(company, user, dow)
+
+    {:ok, lv, _html} = live(conn, ~p"/companies/#{company.id}/egg_stock")
+    render_click(lv, "switch_tab", %{"tab" => "weekly_sales"})
+    render_click(lv, "select_dow", %{"dow" => to_string(dow)})
+
+    html = render_click(lv, "toggle_all_dow_print_rows", %{})
+
+    assert html =~ "2 selected"
+    assert html =~ "7 eggs"
+  end
+
+  # The selection checkbox sits inside the phx-change="validate_dow" form. A `name`
+  # attribute would put it in the submitted params and reach the changeset.
+  test "the weekly selection checkbox carries no name attribute", %{
+    conn: conn,
+    company: company,
+    user: user
+  } do
+    dow = other_dow()
+    seed_weekly(company, user, dow)
+
+    {:ok, lv, _html} = live(conn, ~p"/companies/#{company.id}/egg_stock")
+    render_click(lv, "switch_tab", %{"tab" => "weekly_sales"})
+    html = render_click(lv, "select_dow", %{"dow" => to_string(dow)})
+
+    boxes =
+      html
+      |> LazyHTML.from_fragment()
+      |> LazyHTML.query(~s{input[type=checkbox][phx-click=toggle_dow_print_row]})
+
+    # anti-vacuity guard: 2 seeded rows means 2 checkboxes must be present
+    assert Enum.count(boxes) == 2
+
+    # LazyHTML.attribute/2 omits elements lacking the attribute, so [] proves none carry it
+    assert LazyHTML.attribute(boxes, "name") == []
+  end
 end
