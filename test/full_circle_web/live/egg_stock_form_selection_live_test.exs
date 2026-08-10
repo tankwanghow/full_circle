@@ -48,6 +48,14 @@ defmodule FullCircleWeb.EggStockFormSelectionLiveTest do
               "quantities" => %{"AA" => "99"},
               "position" => "2",
               "is_separator" => "false"
+            },
+            # legacy planned-sales section name, still read via planned_sales_sections()
+            "3" => %{
+              "section" => "actual_order",
+              "contact_name" => "Legacy Ah Meng",
+              "quantities" => %{"AA" => "7"},
+              "position" => "0",
+              "is_separator" => "false"
             }
           }
         },
@@ -120,8 +128,10 @@ defmodule FullCircleWeb.EggStockFormSelectionLiveTest do
 
     html = render_click(lv, "toggle_all_print_rows", %{})
 
-    assert html =~ "2 selected"
-    assert html =~ "10 eggs"
+    # 3 == 2 planned_order rows + the legacy actual_order row; the planned
+    # purchase row (99 eggs) stays out
+    assert html =~ "3 selected"
+    assert html =~ "17 eggs"
   end
 
   test "selection clears when the date changes", %{conn: conn, company: company, user: user} do
@@ -152,20 +162,32 @@ defmodule FullCircleWeb.EggStockFormSelectionLiveTest do
     company: company,
     user: user
   } do
-    {_date, _by_name} = seed_today(company, user)
+    {_date, by_name} = seed_today(company, user)
     {:ok, _lv, html} = live(conn, ~p"/companies/#{company.id}/egg_stock")
 
-    boxes =
-      html
-      |> LazyHTML.from_fragment()
-      |> LazyHTML.query(~s{input[type=checkbox][phx-click=toggle_print_row]})
+    doc = LazyHTML.from_fragment(html)
+    boxes = LazyHTML.query(doc, ~s{input[type=checkbox][phx-click=toggle_print_row]})
 
     # guards against a vacuous pass if the markup ever stops rendering checkboxes;
-    # 2 == the planned sales rows only, the planned purchase row gets no checkbox
-    assert Enum.count(boxes) == 2
+    # 3 == the planned sales rows only (2 planned_order + 1 legacy actual_order),
+    # the planned purchase row gets no checkbox
+    assert Enum.count(boxes) == 3
 
     # LazyHTML.attribute/2 omits elements lacking the attribute, so [] proves none carry it
     assert LazyHTML.attribute(boxes, "name") == []
+
+    # the handler matches on %{"id" => id}; without phx-value-id it would crash in
+    # the browser while every server-side render_click test stayed green
+    expected_ids =
+      ["Ah Seng", "Kedai Muar", "Legacy Ah Meng"] |> Enum.map(&by_name[&1].id) |> Enum.sort()
+
+    assert boxes |> LazyHTML.attribute("phx-value-id") |> Enum.sort() == expected_ids
+
+    # the select-all checkbox is asserted nowhere else; deleting its phx-click
+    # would silently kill the control
+    assert doc
+           |> LazyHTML.query(~s{input[type=checkbox][phx-click=toggle_all_print_rows]})
+           |> Enum.count() == 1
   end
 
   test "a real form change with a row selected does not corrupt stored quantities", %{
@@ -250,6 +272,33 @@ defmodule FullCircleWeb.EggStockFormSelectionLiveTest do
     assert html =~ "kind=sales"
   end
 
+  # The DOW buttons label themselves with dow_date(@date, d). The print href must
+  # use the same anchor, or the sheet prints a different date than the button.
+  test "the weekly print href carries the board-anchored date", %{
+    conn: conn,
+    company: company,
+    user: user
+  } do
+    dow = other_dow()
+    by_name = seed_weekly(company, user, dow)
+
+    board_date = Date.add(Date.utc_today(), -7)
+    expected = EggStock.dow_date(board_date, dow)
+
+    # the bug this pins: anchoring on today would print a different week
+    refute expected == EggStock.dow_date(Date.utc_today(), dow)
+
+    {:ok, lv, _html} =
+      live(conn, ~p"/companies/#{company.id}/egg_stock/#{Date.to_iso8601(board_date)}")
+
+    render_click(lv, "switch_tab", %{"tab" => "weekly_sales"})
+    render_click(lv, "select_dow", %{"dow" => to_string(dow)})
+    html = render_click(lv, "toggle_dow_print_row", %{"id" => by_name["Weekly Ah Seng"].id})
+
+    assert html =~ "date=#{Date.to_iso8601(expected)}"
+    refute html =~ "date=#{Date.to_iso8601(EggStock.dow_date(Date.utc_today(), dow))}"
+  end
+
   test "the weekly selection clears when the weekday changes", %{
     conn: conn,
     company: company,
@@ -295,21 +344,63 @@ defmodule FullCircleWeb.EggStockFormSelectionLiveTest do
     user: user
   } do
     dow = other_dow()
-    seed_weekly(company, user, dow)
+    by_name = seed_weekly(company, user, dow)
 
     {:ok, lv, _html} = live(conn, ~p"/companies/#{company.id}/egg_stock")
     render_click(lv, "switch_tab", %{"tab" => "weekly_sales"})
     html = render_click(lv, "select_dow", %{"dow" => to_string(dow)})
 
-    boxes =
-      html
-      |> LazyHTML.from_fragment()
-      |> LazyHTML.query(~s{input[type=checkbox][phx-click=toggle_dow_print_row]})
+    doc = LazyHTML.from_fragment(html)
+    boxes = LazyHTML.query(doc, ~s{input[type=checkbox][phx-click=toggle_dow_print_row]})
 
     # anti-vacuity guard: 2 seeded rows means 2 checkboxes must be present
     assert Enum.count(boxes) == 2
 
     # LazyHTML.attribute/2 omits elements lacking the attribute, so [] proves none carry it
     assert LazyHTML.attribute(boxes, "name") == []
+
+    # the handler matches on %{"id" => id}; without phx-value-id it would crash in
+    # the browser while every server-side render_click test stayed green
+    expected_ids =
+      ["Weekly Ah Seng", "Weekly Kedai"] |> Enum.map(&by_name[&1].id) |> Enum.sort()
+
+    assert boxes |> LazyHTML.attribute("phx-value-id") |> Enum.sort() == expected_ids
+
+    # the select-all checkbox is asserted nowhere else; deleting its phx-click
+    # would silently kill the control
+    assert doc
+           |> LazyHTML.query(~s{input[type=checkbox][phx-click=toggle_all_dow_print_rows]})
+           |> Enum.count() == 1
+  end
+
+  test "deleting a selected weekly row drops it from the print selection", %{
+    conn: conn,
+    company: company,
+    user: user
+  } do
+    dow = other_dow()
+    by_name = seed_weekly(company, user, dow)
+
+    {:ok, lv, _html} = live(conn, ~p"/companies/#{company.id}/egg_stock")
+    render_click(lv, "switch_tab", %{"tab" => "weekly_sales"})
+    html = render_click(lv, "select_dow", %{"dow" => to_string(dow)})
+
+    idx =
+      html
+      |> LazyHTML.from_fragment()
+      |> LazyHTML.query(~s{input[type=checkbox][phx-click=toggle_dow_print_row]})
+      |> LazyHTML.attribute("phx-value-id")
+      |> Enum.find_index(&(&1 == by_name["Weekly Ah Seng"].id))
+
+    html = render_click(lv, "toggle_all_dow_print_rows", %{})
+    assert html =~ "2 selected"
+    assert html =~ "7 eggs"
+
+    # the row is only marked deleted in dow_params; it stays in the DB until the
+    # autosave fires, so the selection must shed it immediately
+    html = render_click(lv, "delete_dow_line", %{"index" => to_string(idx)})
+
+    assert html =~ "1 selected"
+    assert html =~ "2 eggs"
   end
 end

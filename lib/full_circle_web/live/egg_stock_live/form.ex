@@ -556,12 +556,12 @@ defmodule FullCircleWeb.EggStockLive.Form do
   end
 
   def handle_event("toggle_all_print_rows", _params, socket) do
-    all = MapSet.new(selectable_sales_ids(socket.assigns.day))
+    ids = selectable_sales_ids(socket.assigns.day)
 
     selected =
-      if MapSet.size(all) > 0 and MapSet.subset?(all, socket.assigns.sel_sales_ids),
+      if all_selected?(ids, socket.assigns.sel_sales_ids),
         do: MapSet.new(),
-        else: all
+        else: MapSet.new(ids)
 
     {:noreply, assign(socket, sel_sales_ids: selected)}
   end
@@ -575,12 +575,12 @@ defmodule FullCircleWeb.EggStockLive.Form do
   end
 
   def handle_event("toggle_all_dow_print_rows", _params, socket) do
-    all = MapSet.new(selectable_dow_ids(socket.assigns.dow_params))
+    ids = selectable_dow_ids(socket.assigns.dow_params)
 
     selected =
-      if MapSet.size(all) > 0 and MapSet.subset?(all, socket.assigns.sel_dow_ids),
+      if all_selected?(ids, socket.assigns.sel_dow_ids),
         do: MapSet.new(),
-        else: all
+        else: MapSet.new(ids)
 
     {:noreply, assign(socket, sel_dow_ids: selected)}
   end
@@ -733,7 +733,16 @@ defmodule FullCircleWeb.EggStockLive.Form do
           |> Map.put(:action, :validate)
 
         params = changeset_to_params(cs)
-        socket = assign(socket, form: to_form(cs))
+
+        # The row lives on in the DB until the autosave fires; drop it from the
+        # selection now so a print in that window cannot sheet a cancelled order.
+        deleted_id = to_string(Ecto.Changeset.get_field(detail_cs, :id) || "")
+
+        socket =
+          assign(socket,
+            form: to_form(cs),
+            sel_sales_ids: MapSet.delete(socket.assigns.sel_sales_ids, deleted_id)
+          )
 
         socket =
           if socket.assigns[:est_production] do
@@ -820,7 +829,17 @@ defmodule FullCircleWeb.EggStockLive.Form do
       end
 
     params = renumber_dow_positions(params)
-    socket = assign(socket, dow_params: params)
+
+    # Same reasoning as delete_detail: the row survives in the DB until the
+    # autosave fires, so it must leave the print selection immediately.
+    deleted_id = to_string(line["id"] || "")
+
+    socket =
+      assign(socket,
+        dow_params: params,
+        sel_dow_ids: MapSet.delete(socket.assigns.sel_dow_ids, deleted_id)
+      )
+
     socket = schedule_autosave(socket, {:dow, params})
     {:noreply, socket}
   end
@@ -1069,10 +1088,13 @@ defmodule FullCircleWeb.EggStockLive.Form do
     |> Enum.map(&to_string(&1.id))
   end
 
-  defp all_sales_selected?(day, selected) do
-    ids = selectable_sales_ids(day)
-    ids != [] and MapSet.subset?(MapSet.new(ids), selected)
-  end
+  defp all_sales_selected?(day, selected),
+    do: all_selected?(selectable_sales_ids(day), selected)
+
+  # Shared by both boards and by both select-all handlers: "every selectable row
+  # is ticked", false when there is nothing selectable at all.
+  defp all_selected?(ids, selected),
+    do: ids != [] and MapSet.subset?(MapSet.new(ids), selected)
 
   defp selected_rows_total(rows, grades, selected) do
     rows
@@ -1097,10 +1119,8 @@ defmodule FullCircleWeb.EggStockLive.Form do
     |> Enum.map(&to_string(&1["id"]))
   end
 
-  defp all_dow_selected?(dow_params, selected) do
-    ids = selectable_dow_ids(dow_params)
-    ids != [] and MapSet.subset?(MapSet.new(ids), selected)
-  end
+  defp all_dow_selected?(dow_params, selected),
+    do: all_selected?(selectable_dow_ids(dow_params), selected)
 
   defp selected_dow_total(dow_params, grades, selected) do
     (dow_params || [])
@@ -1641,6 +1661,8 @@ defmodule FullCircleWeb.EggStockLive.Form do
               class="flex items-center gap-1 my-2"
             >
               <div class="flex items-center w-12 shrink-0">
+                <%!-- keeps the chevrons aligned with the contact rows' checkbox gutter --%>
+                <span class="mr-1 w-4 shrink-0"></span>
                 <button
                   :if={!@readonly}
                   type="button"
@@ -1791,7 +1813,13 @@ defmodule FullCircleWeb.EggStockLive.Form do
           href={
             loading_list_href(
               @current_company.id,
-              [src: "dow", kind: if(@kind == "sales", do: "sales", else: "purchase"), dow: @dow],
+              [
+                src: "dow",
+                kind: @kind,
+                dow: @dow,
+                # board-anchored, so the sheet prints the same date as the DOW button
+                date: Date.to_iso8601(dow_date(@date, @dow))
+              ],
               @sel_dow_ids
             )
           }
