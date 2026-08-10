@@ -28,6 +28,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
      |> assign(save_status: nil)
      |> assign(dow_kind: "sales")
      |> assign(dow: Date.day_of_week(today()))
+     |> assign(sel_sales_ids: MapSet.new(), sel_dow_ids: MapSet.new())
      |> assign(page_title: gettext("Egg Stock"))}
   end
 
@@ -451,6 +452,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
   @impl true
   def handle_event("switch_tab", %{"tab" => tab}, socket) do
     socket = flush_autosave(socket)
+    socket = clear_print_selection(socket)
 
     socket =
       socket
@@ -469,6 +471,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
 
   def handle_event("nav_date", %{"dir" => dir}, socket) do
     socket = flush_autosave(socket)
+    socket = clear_print_selection(socket)
     date = socket.assigns.date
     new_date = if dir == "prev", do: Date.add(date, -1), else: Date.add(date, 1)
 
@@ -484,6 +487,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
     case Date.from_iso8601(date_str) do
       {:ok, date} ->
         socket = flush_autosave(socket)
+        socket = clear_print_selection(socket)
 
         if Date.compare(date, socket.assigns.date) == :eq do
           {:noreply,
@@ -541,6 +545,60 @@ defmodule FullCircleWeb.EggStockLive.Form do
      socket
      |> assign(dow: dow)
      |> load_weekly_tab(kind)}
+  end
+
+  # --- Print selection ---
+
+  def handle_event("toggle_print_row", %{"id" => id}, socket) do
+    {:noreply, assign(socket, sel_sales_ids: toggle_id(socket.assigns.sel_sales_ids, id))}
+  end
+
+  def handle_event("toggle_all_print_rows", _params, socket) do
+    all = MapSet.new(selectable_sales_ids(socket.assigns.day))
+
+    selected =
+      if MapSet.size(all) > 0 and MapSet.subset?(all, socket.assigns.sel_sales_ids),
+        do: MapSet.new(),
+        else: all
+
+    {:noreply, assign(socket, sel_sales_ids: selected)}
+  end
+
+  def handle_event("clear_print_rows", _params, socket) do
+    {:noreply, assign(socket, sel_sales_ids: MapSet.new())}
+  end
+
+  defp toggle_id(set, id) do
+    id = to_string(id)
+    if MapSet.member?(set, id), do: MapSet.delete(set, id), else: MapSet.put(set, id)
+  end
+
+  # Only saved, non-separator planned sales rows can be selected.
+  defp selectable_sales_ids(day) do
+    (day.egg_stock_day_details || [])
+    |> Enum.filter(fn d ->
+      d.section in EggStock.planned_sales_sections() and !d.is_separator and
+        d.id not in [nil, ""]
+    end)
+    |> Enum.map(&to_string(&1.id))
+  end
+
+  defp all_sales_selected?(day, selected) do
+    ids = selectable_sales_ids(day)
+    ids != [] and MapSet.subset?(MapSet.new(ids), selected)
+  end
+
+  defp selected_rows_total(rows, grades, selected) do
+    rows
+    |> Enum.filter(&MapSet.member?(selected, to_string(&1.id || "")))
+    |> Enum.reduce(0, fn row, acc ->
+      acc + Enum.reduce(grades, 0, fn g, a -> a + to_int((row.quantities || %{})[g]) end)
+    end)
+  end
+
+  defp loading_list_href(company_id, params, selected) do
+    query = params ++ [ids: selected |> MapSet.to_list() |> Enum.join(",")]
+    ~p"/companies/#{company_id}/EggStock/loading_list?#{query}"
   end
 
   # --- Now tab: validate/save ---
@@ -1005,6 +1063,9 @@ defmodule FullCircleWeb.EggStockLive.Form do
     assign(socket, autosave_timer: timer, autosave_params: payload)
   end
 
+  defp clear_print_selection(socket),
+    do: assign(socket, sel_sales_ids: MapSet.new(), sel_dow_ids: MapSet.new())
+
   defp flush_autosave(socket) do
     if timer = socket.assigns[:autosave_timer] do
       Process.cancel_timer(timer)
@@ -1397,6 +1458,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
           est_closing={@est_closing}
           current_company={@current_company}
           current_user={@current_user}
+          sel_sales_ids={@sel_sales_ids}
         />
       </div>
 
@@ -1791,6 +1853,11 @@ defmodule FullCircleWeb.EggStockLive.Form do
               day_details={@day.egg_stock_day_details}
               locked_contact_ids={locked_contact_ids(@actual_purchases)}
               docs_by_contact={docs_by_contact(@actual_purchases)}
+              selectable={false}
+              selected={MapSet.new()}
+              all_selected={false}
+              selected_total={0}
+              print_href=""
             />
 
             <.planned_section
@@ -1805,6 +1872,19 @@ defmodule FullCircleWeb.EggStockLive.Form do
               day_details={@day.egg_stock_day_details}
               locked_contact_ids={locked_contact_ids(@actual_sales)}
               docs_by_contact={docs_by_contact(@actual_sales)}
+              selectable={true}
+              selected={@sel_sales_ids}
+              all_selected={all_sales_selected?(@day, @sel_sales_ids)}
+              selected_total={
+                selected_rows_total(@day.egg_stock_day_details || [], @grades, @sel_sales_ids)
+              }
+              print_href={
+                loading_list_href(
+                  @current_company.id,
+                  [src: "day", date: Date.to_iso8601(@date)],
+                  @sel_sales_ids
+                )
+              }
             />
 
             <.summary_row
@@ -1891,6 +1971,18 @@ defmodule FullCircleWeb.EggStockLive.Form do
         </button>
       </div>
 
+      <div :if={@selectable} class="flex gap-1 items-center mb-1 text-xs text-gray-600">
+        <div class="w-[68px] shrink-0 flex items-center gap-1">
+          <input
+            type="checkbox"
+            class="h-4 w-4 accent-blue-600"
+            checked={@all_selected}
+            phx-click="toggle_all_print_rows"
+          />
+          <span>{gettext("all")}</span>
+        </div>
+      </div>
+
       <.detail_lines
         form={@form}
         section={@section}
@@ -1902,8 +1994,49 @@ defmodule FullCircleWeb.EggStockLive.Form do
         date={@date}
         locked_contact_ids={@locked_contact_ids}
         docs_by_contact={@docs_by_contact}
+        selectable={@selectable}
+        selected={@selected}
       />
       <.section_totals details={@day_details} section={@section} grades={@grades} />
+      <.print_action_bar
+        :if={@selectable}
+        count={MapSet.size(@selected)}
+        total={@selected_total}
+        href={@print_href}
+        clear_event="clear_print_rows"
+      />
+    </div>
+    """
+  end
+
+  attr :count, :integer, required: true
+  attr :total, :integer, required: true
+  attr :href, :string, required: true
+  attr :clear_event, :string, required: true
+
+  defp print_action_bar(assigns) do
+    ~H"""
+    <div
+      :if={@count > 0}
+      class="mt-2 flex items-center gap-3 rounded border border-blue-400 bg-white px-3 py-1.5 text-sm"
+    >
+      <span class="font-semibold text-blue-700">{@count} {gettext("selected")}</span>
+      <span class="text-gray-600">{@total} {gettext("eggs")}</span>
+      <span class="flex-1"></span>
+      <a
+        href={@href}
+        target="_blank"
+        class="flex items-center gap-1 text-blue-600 hover:text-blue-800"
+      >
+        <.icon name="hero-printer" class="h-4 w-4" /> {gettext("Print selected")}
+      </a>
+      <button
+        type="button"
+        phx-click={@clear_event}
+        class="text-gray-500 hover:text-gray-700"
+      >
+        {gettext("Clear")}
+      </button>
     </div>
     """
   end
@@ -2180,7 +2313,8 @@ defmodule FullCircleWeb.EggStockLive.Form do
 
           <%!-- Separator row (label stored in group_name) --%>
           <div :if={separator?} class="flex items-center gap-1 my-2">
-            <div :if={@editable} class="flex items-center w-12 shrink-0">
+            <div :if={@editable} class="flex items-center w-[68px] shrink-0">
+              <span class="mr-1 w-4 shrink-0"></span>
               <button
                 type="button"
                 phx-click="move_detail"
@@ -2202,7 +2336,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
                 <.icon name="hero-chevron-down" class="h-3 w-3" />
               </button>
             </div>
-            <div :if={!@editable} class="w-12 shrink-0"></div>
+            <div :if={!@editable} class="w-[68px] shrink-0"></div>
             <div class="flex-1 border-t-2 border-dashed border-gray-400"></div>
             <input type="hidden" name={dtl[:contact_name].name} value="" />
             <input
@@ -2235,7 +2369,21 @@ defmodule FullCircleWeb.EggStockLive.Form do
                 do: gettext("Linked to a document — edit quantities on the document")
             }
           >
-            <div :if={@editable} class="flex items-center w-12 shrink-0">
+            <div :if={@editable} class="flex items-center w-[68px] shrink-0">
+              <input
+                :if={@selectable}
+                type="checkbox"
+                class="mr-1 h-4 w-4 accent-blue-600 disabled:opacity-40"
+                disabled={dtl[:id].value in [nil, ""]}
+                title={
+                  if dtl[:id].value in [nil, ""],
+                    do: gettext("Save first before selecting this row")
+                }
+                checked={MapSet.member?(@selected, to_string(dtl[:id].value || ""))}
+                phx-click="toggle_print_row"
+                phx-value-id={dtl[:id].value}
+              />
+              <span :if={!@selectable} class="mr-1 w-4 shrink-0"></span>
               <button
                 type="button"
                 phx-click="move_detail"
@@ -2257,7 +2405,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
                 <.icon name="hero-chevron-down" class="h-3 w-3" />
               </button>
             </div>
-            <div :if={!@editable} class="w-12 shrink-0"></div>
+            <div :if={!@editable} class="w-[68px] shrink-0"></div>
 
             <%!-- readonly (not disabled) so values still submit on autosave of other fields --%>
             <input
