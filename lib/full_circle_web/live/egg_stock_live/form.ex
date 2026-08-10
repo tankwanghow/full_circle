@@ -1297,7 +1297,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
 
   # The weekday's date inside the 7-day window starting at the board date, so the
   # book buttons line up with the rows on the Estimated tab.
-  defp dow_date(date, dow), do: Date.add(date, Integer.mod(dow - Date.day_of_week(date), 7))
+  defp dow_date(date, dow), do: EggStock.dow_date(date, dow)
 
   # --- Render ---
 
@@ -1476,8 +1476,10 @@ defmodule FullCircleWeb.EggStockLive.Form do
             phx-value-dow={d}
             class={"px-2.5 py-1 text-sm rounded border leading-tight #{if d == @dow, do: "bg-blue-600 text-white border-blue-600", else: "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"}"}
           >
-            <div class="font-bold">{dow_label(d)} <span class="font-normal">{Calendar.strftime(dow_date(@date, d), "%-d/%-m")}</span></div>
-
+            <div class="font-bold">
+              {dow_label(d)}
+              <span class="font-normal">{Calendar.strftime(dow_date(@date, d), "%-d/%-m")}</span>
+            </div>
           </button>
         </div>
 

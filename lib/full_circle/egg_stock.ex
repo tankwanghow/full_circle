@@ -225,6 +225,11 @@ defmodule FullCircle.EggStock do
     |> Repo.all()
   end
 
+  @doc """
+  The next occurrence of weekday `dow` (Monday = 1) on or after `date`.
+  """
+  def dow_date(date, dow), do: Date.add(date, Integer.mod(dow - Date.day_of_week(date), 7))
+
   def dow_totals(company_id, kind, dow, grades \\ nil) do
     grades = grades || grade_names(company_id)
 
@@ -291,6 +296,10 @@ defmodule FullCircle.EggStock do
       select_merge: %{contact_name: fragment("coalesce(?, ?)", c.name, d.contact_name)}
     )
     |> Repo.all()
+  end
+
+  defp loading_list_source_rows(company_id, {:dow, kind, dow}) do
+    list_dow_lines(company_id, kind, dow)
   end
 
   def save_dow_lines(company_id, kind, dow, lines_params, company, user)

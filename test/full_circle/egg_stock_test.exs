@@ -885,7 +885,7 @@ defmodule FullCircle.EggStockTest do
 
     test "ignores ids that belong to another date", %{
       company: company,
-      date: date,
+      date: _date,
       by_name: by_name
     } do
       ids = [by_name["Ah Seng"].id]
@@ -908,6 +908,115 @@ defmodule FullCircle.EggStockTest do
 
     test "returns no groups for an empty selection", %{company: company, date: date} do
       assert [] == EggStock.loading_list_groups(company.id, {:day, date}, [])
+    end
+  end
+
+  describe "loading_list_groups/3 for the weekly book" do
+    setup %{company: company, admin: admin, contact: contact} do
+      {:ok, _} =
+        EggStock.save_dow_lines(
+          company.id,
+          :sales,
+          3,
+          [
+            %{
+              "id" => "",
+              "contact_id" => contact.id,
+              "contact_name" => contact.name,
+              "quantities" => %{"AA" => "10"},
+              "is_separator" => "false",
+              "delete" => "false"
+            },
+            %{
+              "id" => "",
+              "contact_name" => "",
+              "group_name" => "Lorry 2",
+              "is_separator" => "true",
+              "delete" => "false"
+            },
+            %{
+              "id" => "",
+              "contact_name" => "Ah Seng",
+              "quantities" => %{"AA" => "5", "A" => "3"},
+              "is_separator" => "false",
+              "delete" => "false"
+            }
+          ],
+          company,
+          admin
+        )
+
+      {:ok, _} =
+        EggStock.save_dow_lines(
+          company.id,
+          :purchase,
+          3,
+          [
+            %{
+              "id" => "",
+              "contact_name" => "Supplier X",
+              "quantities" => %{"AA" => "99"},
+              "is_separator" => "false",
+              "delete" => "false"
+            }
+          ],
+          company,
+          admin
+        )
+
+      sales = EggStock.list_dow_lines(company.id, :sales, 3)
+      purchases = EggStock.list_dow_lines(company.id, :purchase, 3)
+      by_name = Map.new(sales ++ purchases, &{&1.contact_name, &1})
+      %{by_name: by_name}
+    end
+
+    test "groups selected weekly rows under their separator", %{
+      company: company,
+      by_name: by_name
+    } do
+      ids = [by_name["Ah Seng"].id]
+
+      assert [%{group_name: "Lorry 2", rows: [row]}] =
+               EggStock.loading_list_groups(company.id, {:dow, "sales", 3}, ids)
+
+      assert row.contact_name == "Ah Seng"
+      assert row.quantities == %{"AA" => 5, "A" => 3}
+    end
+
+    test "ignores ids from the purchase book", %{company: company, by_name: by_name} do
+      ids = [by_name["Supplier X"].id]
+
+      assert [] == EggStock.loading_list_groups(company.id, {:dow, "sales", 3}, ids)
+    end
+
+    test "ignores ids from another weekday", %{company: company, by_name: by_name} do
+      ids = [by_name["Ah Seng"].id]
+
+      assert [] == EggStock.loading_list_groups(company.id, {:dow, "sales", 4}, ids)
+    end
+
+    test "ignores ids from another company", %{company: _company, by_name: by_name} do
+      other_admin = user_fixture()
+      other_company = company_fixture(other_admin, %{})
+      ids = [by_name["Ah Seng"].id]
+
+      assert [] == EggStock.loading_list_groups(other_company.id, {:dow, "sales", 3}, ids)
+    end
+  end
+
+  describe "dow_date/2" do
+    test "returns the same date when the weekday already matches" do
+      monday = ~D[2026-08-10]
+      assert Date.day_of_week(monday) == 1
+      assert EggStock.dow_date(monday, 1) == monday
+    end
+
+    test "returns the next occurrence of a later weekday" do
+      assert EggStock.dow_date(~D[2026-08-10], 3) == ~D[2026-08-12]
+    end
+
+    test "wraps to next week for an earlier weekday" do
+      assert EggStock.dow_date(~D[2026-08-12], 1) == ~D[2026-08-17]
     end
   end
 end
