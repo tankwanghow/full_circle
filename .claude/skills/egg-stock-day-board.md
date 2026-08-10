@@ -108,10 +108,10 @@ re-loads the "now" tab instead of returning early.
 - Separators + drag/reorder via `position` / group fields.
 - Today print layout under `egg_stock_live/print.ex`.
 
-## Loading list (selected planned sales rows)
+## Loading list (selected planned rows)
 
-Tick planned sales rows on the Stock tab or the Weekly Sales book and print just
-those rows as a lorry loading list.
+Tick rows on the Stock tab (planned **sales** only) or on either weekly book
+(**sales or purchase**) and print just those rows as a lorry loading list.
 
 - `EggStock.loading_list_groups(company_id, source, selected_ids)` —
   `source` is `{:day, %Date{}}` for the day board or `{:dow, kind, dow}` for
@@ -122,14 +122,32 @@ those rows as a lorry loading list.
   dropped — that is also the multi-tenant guard.
 - Print view: `EggStockLive.LoadingList` at
   `/companies/:company_id/EggStock/loading_list?src=day&date=YYYY-MM-DD&ids=id1,id2`
-  or `?src=dow&kind=sales&dow=N&ids=id1,id2`.
-  `EggStock.dow_date(Date.utc_today(), dow)` converts the DOW integer to the
-  next occurrence of that weekday — that date drives the printed date line.
+  or `/companies/:company_id/EggStock/loading_list?src=dow&kind=sales&dow=N&date=YYYY-MM-DD&ids=id1,id2`.
+- **The dow URL's `date` is board-anchored, and it is authoritative.** The weekly
+  DOW buttons label themselves `dow_date(@date, d)` where `@date` is the *board*
+  date, which can be in the past. The href therefore carries
+  `date: Date.to_iso8601(dow_date(@date, @dow))` so the sheet prints the same
+  date as the button that was clicked. `parse_source/1` prefers that param and
+  only falls back to `EggStock.dow_date(Date.utc_today(), dow)` when it is
+  absent, which keeps URLs copied before the param existed working.
+- **The sheet title follows the source kind**: `{:dow, "purchase", _}` prints
+  `"Planned purchases — loading list"`, everything else prints
+  `"Planned sales — loading list"`. `src=day` is always sales — the Stock tab
+  renders planned purchases with `selectable={false}`.
 - Selection state lives in the `:sel_sales_ids` / `:sel_dow_ids` socket assigns
   as `MapSet`s of **row ids** (strings). Never list index, which shifts on
   move/delete. Both assigns are initialised to `MapSet.new()` in `mount/3` and
   are both cleared by `clear_print_selection/1`, which runs on tab switch, date
   navigation, and weekday change.
+- **Deleting a row must prune its id from the selection.** `delete_detail` and
+  `delete_dow_line` only stage the removal and schedule an autosave — the row
+  survives in the DB for up to `autosave_delay` seconds, so without a
+  `MapSet.delete/2` a cancelled order would still print on the warehouse sheet.
+- **Semantic split worth knowing:** `selected_rows_total/3` reads
+  `@day.egg_stock_day_details` (DB-loaded, refreshed only by `do_save_day`)
+  while `selected_dow_total/3` reads `@dow_params` (live form params). So the
+  Stock tab's "N eggs" figure lags an in-flight quantity edit by the autosave
+  delay; the weekly one updates immediately.
 
 ### Events (Stock tab — day board)
 
@@ -139,7 +157,7 @@ those rows as a lorry loading list.
 | `"toggle_all_print_rows"` | Select all selectable; if already all selected, clear |
 | `"clear_print_rows"` | Clear `:sel_sales_ids` |
 
-### Events (Weekly Sales tab)
+### Events (Weekly tab — both sales and purchase books)
 
 | Event | What it does |
 |-------|--------------|
@@ -152,8 +170,17 @@ those rows as a lorry loading list.
 - `selectable_sales_ids/1` — saved, non-separator planned-sales rows only
   (id not nil/empty; section in `EggStock.planned_sales_sections()`).
 - `selectable_dow_ids/1` — saved, non-separator, non-deleted weekly rows.
-- `loading_list_href/3` — builds the `/EggStock/loading_list?…` URL with
-  `src`, `date`/`dow`, `kind`, and comma-joined `ids` query params.
+- `all_selected?/2` — the single "every selectable row is ticked" predicate
+  (false when nothing is selectable). Both `all_sales_selected?/2` and
+  `all_dow_selected?/2` and both select-all handlers go through it; do not
+  re-inline the `MapSet.subset?` check.
+  `selectable_sales_ids`/`selectable_dow_ids` and
+  `selected_rows_total`/`selected_dow_total` stay separate on purpose — the two
+  boards hold genuinely different shapes (changeset-backed `inputs_for` rows vs
+  plain string-keyed `@dow_params` maps).
+- `loading_list_href/3` — builds the
+  `/companies/:company_id/EggStock/loading_list?…` URL with `src`, `date`,
+  `dow`, `kind`, and comma-joined `ids` query params.
 - `print_action_bar` component — renders a bar below the section when count > 0,
   showing selected count, egg total, a "Print selected" link (target="_blank"),
   and a "Clear" button. Uses `clear_event="clear_print_rows"` for Stock tab and
@@ -192,9 +219,15 @@ Rows with no id yet (freshly added, and the in-memory orphan rows from
      |> LazyHTML.query(~s{input[type=checkbox][phx-click=toggle_print_row]})
 
    # anti-vacuity: assert the expected count before checking attributes
-   assert Enum.count(boxes) == 2
+   assert Enum.count(boxes) == 3
    assert LazyHTML.attribute(boxes, "name") == []
    ```
+
+   Absence assertions alone under-pin the markup. Also assert what must be
+   **present**: the sorted `phx-value-id` values equal the seeded row ids (the
+   handler matches `%{"id" => id}`, so a missing `phx-value-id` crashes in the
+   browser while every `render_click` test stays green), and query the select-all
+   checkbox by its `phx-click` and assert exactly one match.
 
 ## Key files
 
