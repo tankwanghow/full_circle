@@ -384,6 +384,7 @@ defmodule FullCircleWeb.Router do
       live("/eaform/print", ReportLive.EAFormPrint, :print)
 
       live("/EggStock/:date/print", EggStockLive.Print, :print)
+      live("/EggStock/loading_list", EggStockLive.LoadingList, :print)
 
       live("/bank_reconciliation/print", BankReconciliationLive.Print, :print)
     end
