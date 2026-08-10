@@ -262,7 +262,7 @@ defmodule FullCircle.EggStock do
 
           case groups do
             [%{group_name: ^current, rows: rows} = g | rest] ->
-              {[%{g | rows: rows ++ [entry]} | rest], current}
+              {[%{g | rows: [entry | rows]} | rest], current}
 
             _ ->
               {[%{group_name: current, rows: [entry]} | groups], current}
@@ -273,6 +273,7 @@ defmodule FullCircle.EggStock do
       end
     end)
     |> elem(0)
+    |> Enum.map(fn g -> %{g | rows: Enum.reverse(g.rows)} end)
     |> Enum.reverse()
   end
 

@@ -812,7 +812,11 @@ defmodule FullCircle.EggStockTest do
           force: true
         )
 
-      by_name = Map.new(day.egg_stock_day_details, &{&1.contact_name, &1})
+      by_name =
+        day.egg_stock_day_details
+        |> Enum.reject(& &1.is_separator)
+        |> Map.new(&{&1.contact_name, &1})
+
       %{date: date, day: day, by_name: by_name}
     end
 
