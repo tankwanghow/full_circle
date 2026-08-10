@@ -108,6 +108,66 @@ re-loads the "now" tab instead of returning early.
 - Separators + drag/reorder via `position` / group fields.
 - Today print layout under `egg_stock_live/print.ex`.
 
+## Loading list (selected planned sales rows)
+
+Tick planned sales rows on the Stock tab or the Weekly Sales book and print just
+those rows as a lorry loading list.
+
+- `EggStock.loading_list_groups(company_id, source, selected_ids)` —
+  `source` is `{:day, %Date{}}` for the day board or `{:dow, kind, dow}` for
+  the weekly book (e.g. `{:dow, "sales", 2}`). Returns
+  `[%{group_name: String.t(), rows: [%{id, contact_name, quantities}]}]`, ordered
+  by board `position`, grouped by the separator label above each run of rows.
+  Groups with no selected row are dropped. Ids that fall outside the scope are
+  dropped — that is also the multi-tenant guard.
+- Print view: `EggStockLive.LoadingList` at
+  `/companies/:company_id/EggStock/loading_list?src=day&date=YYYY-MM-DD&ids=id1,id2`
+  or `?src=dow&kind=sales&dow=N&ids=id1,id2`.
+  `EggStock.dow_date(Date.utc_today(), dow)` converts the DOW integer to the
+  next occurrence of that weekday — that date drives the printed date line.
+- Selection state lives in the `:sel_sales_ids` / `:sel_dow_ids` socket assigns
+  as `MapSet`s of **row ids** (strings). Never list index, which shifts on
+  move/delete. Both assigns are initialised to `MapSet.new()` in `mount/3` and
+  are both cleared by `clear_print_selection/1`, which runs on tab switch, date
+  navigation, and weekday change.
+
+### Events (Stock tab — day board)
+
+| Event | What it does |
+|-------|--------------|
+| `"toggle_print_row"` | Toggle one id in `:sel_sales_ids` |
+| `"toggle_all_print_rows"` | Select all selectable; if already all selected, clear |
+| `"clear_print_rows"` | Clear `:sel_sales_ids` |
+
+### Events (Weekly Sales tab)
+
+| Event | What it does |
+|-------|--------------|
+| `"toggle_dow_print_row"` | Toggle one id in `:sel_dow_ids` |
+| `"toggle_all_dow_print_rows"` | Select all selectable; if already all selected, clear |
+| `"clear_dow_print_rows"` | Clear `:sel_dow_ids` |
+
+### Helper functions (`form.ex`)
+
+- `selectable_sales_ids/1` — saved, non-separator planned-sales rows only
+  (id not nil/empty; section in `EggStock.planned_sales_sections()`).
+- `selectable_dow_ids/1` — saved, non-separator, non-deleted weekly rows.
+- `loading_list_href/3` — builds the `/EggStock/loading_list?…` URL with
+  `src`, `date`/`dow`, `kind`, and comma-joined `ids` query params.
+- `print_action_bar` component — renders a bar below the section when count > 0,
+  showing selected count, egg total, a "Print selected" link (target="_blank"),
+  and a "Clear" button. Uses `clear_event="clear_print_rows"` for Stock tab and
+  `clear_event="clear_dow_print_rows"` for the weekly tab.
+
+### Gotcha: the selection checkbox must not have a `name`
+
+Both boards are inside a `phx-change` form. A named checkbox would be submitted
+with the rest of the row and reach the changeset. Drive it from the server only:
+`phx-click`, `phx-value-id`, and `checked={MapSet.member?(...)}`. No `name` attr.
+
+Rows with no id yet (freshly added, and the in-memory orphan rows from
+`ensure_planned_lines_for_actuals/3`) render a disabled checkbox.
+
 ## Gotchas
 
 1. **Ad-hoc lines need `contact_name`** when `contact_id` is nil — empty labels confuse attach/sync.
@@ -116,13 +176,34 @@ re-loads the "now" tab instead of returning early.
 4. **cast_assoc can miss map-only qty updates** — use `persist_synced_detail_quantities/3` after sync.
 5. **Legacy section names** — never hardcode only `planned_order`; include legacy in filters.
 6. **Local restore vs trading schema** — use `scripts/restore_backup.sh` (drop/recreate DB) rather than `pg_restore -c` when local has tables newer than the dump.
+7. **Selection checkboxes need no `name`** — see the loading list section above.
+8. **No Floki — use LazyHTML for HTML-attribute assertions in tests.** LiveView 1.2
+   ships `lazy_html 0.1.12` (in `mix.lock`). HTML-attribute assertions use
+   `LazyHTML.from_fragment/1`, `LazyHTML.query/2`, and `LazyHTML.attribute/2`.
+   Critical anti-vacuity rule: `LazyHTML.attribute(matches, "name") == []` passes
+   trivially when the query matches **zero** elements — always assert the expected
+   element count first. The canonical idiom, from
+   `test/full_circle_web/live/egg_stock_form_selection_live_test.exs`:
+
+   ```elixir
+   boxes =
+     html
+     |> LazyHTML.from_fragment()
+     |> LazyHTML.query(~s{input[type=checkbox][phx-click=toggle_print_row]})
+
+   # anti-vacuity: assert the expected count before checking attributes
+   assert Enum.count(boxes) == 2
+   assert LazyHTML.attribute(boxes, "name") == []
+   ```
 
 ## Key files
 
 ```
 lib/full_circle/egg_stock.ex
 lib/full_circle/egg_stock/{egg_grade,egg_stock_day,egg_stock_day_detail,dow_template_line}.ex
-lib/full_circle_web/live/egg_stock_live/{form,print,production_report}.ex
+lib/full_circle_web/live/egg_stock_live/{form,print,loading_list,production_report}.ex
 scripts/restore_backup.sh
 test/full_circle/egg_stock_test.exs
+test/full_circle_web/live/egg_stock_form_selection_live_test.exs
+test/full_circle_web/live/egg_stock_loading_list_live_test.exs
 ```
