@@ -127,6 +127,82 @@ defmodule FullCircleWeb.EggStockLoadingListLiveTest do
     assert html =~ "Legacy Ah Meng"
   end
 
+  # Each separator is one lorry load, so it needs its own subtotal even when the
+  # label was left blank. A lone group would only repeat the grand total.
+  test "each blank separator prints its own subtotal, and a lone group prints none", %{
+    conn: conn,
+    company: company,
+    user: user
+  } do
+    date = ~D[2026-08-13]
+    {:ok, day} = EggStock.get_or_create_day(company.id, date)
+
+    row = fn pos, name ->
+      %{
+        "section" => "planned_order",
+        "contact_name" => name,
+        "quantities" => %{"AA" => "4"},
+        "position" => to_string(pos),
+        "is_separator" => "false"
+      }
+    end
+
+    sep = fn pos ->
+      %{
+        "section" => "planned_order",
+        "contact_name" => "",
+        "group_name" => "",
+        "position" => to_string(pos),
+        "is_separator" => "true"
+      }
+    end
+
+    {:ok, day} =
+      EggStock.save_day(
+        day,
+        %{
+          "egg_stock_day_details" => %{
+            "0" => row.(0, "Lorry A Cust"),
+            "1" => sep.(1),
+            "2" => row.(2, "Lorry B Cust"),
+            "3" => sep.(3),
+            "4" => row.(4, "Lorry C Cust")
+          }
+        },
+        company,
+        user
+      )
+
+    by_name =
+      FullCircle.Repo.preload(day, [egg_stock_day_details: EggStock.__day_details_query__()],
+        force: true
+      ).egg_stock_day_details
+      |> Enum.reject(& &1.is_separator)
+      |> Map.new(&{&1.contact_name, &1})
+
+    sheet = fn names ->
+      ids = Enum.map_join(names, ",", &by_name[&1].id)
+
+      {:ok, _lv, html} =
+        live(
+          conn,
+          ~p"/companies/#{company.id}/EggStock/loading_list?#{[src: "day", date: Date.to_iso8601(date), ids: ids]}"
+        )
+
+      html
+    end
+
+    three = sheet.(["Lorry A Cust", "Lorry B Cust", "Lorry C Cust"])
+    assert subtotal_rows(three) == 3
+    assert three =~ "Subtotal"
+
+    assert subtotal_rows(sheet.(["Lorry B Cust"])) == 0
+  end
+
+  # Matches the rendered attribute, not the `.subtotal-row` rule in the <style> block.
+  defp subtotal_rows(html),
+    do: html |> String.split(~s(class="subtotal-row")) |> length() |> Kernel.-(1)
+
   defp seed_dow(company, user, kind, dow, name) do
     {:ok, _} =
       EggStock.save_dow_lines(

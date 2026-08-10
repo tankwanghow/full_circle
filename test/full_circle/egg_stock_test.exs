@@ -909,6 +909,63 @@ defmodule FullCircle.EggStockTest do
     test "returns no groups for an empty selection", %{company: company, date: date} do
       assert [] == EggStock.loading_list_groups(company.id, {:day, date}, [])
     end
+
+    test "every separator opens its own group even when the labels are blank", %{
+      company: company,
+      admin: admin
+    } do
+      date = ~D[2026-08-12]
+      {:ok, day} = EggStock.get_or_create_day(company.id, date)
+
+      row = fn pos, name, qty ->
+        %{
+          "section" => "planned_order",
+          "contact_name" => name,
+          "quantities" => %{"AA" => qty},
+          "position" => to_string(pos),
+          "is_separator" => "false"
+        }
+      end
+
+      sep = fn pos ->
+        %{
+          "section" => "planned_order",
+          "contact_name" => "",
+          "group_name" => "",
+          "position" => to_string(pos),
+          "is_separator" => "true"
+        }
+      end
+
+      {:ok, day} =
+        EggStock.save_day(
+          day,
+          %{
+            "egg_stock_day_details" => %{
+              "0" => row.(0, "Lorry A", "10"),
+              "1" => sep.(1),
+              "2" => row.(2, "Lorry B", "20"),
+              "3" => sep.(3),
+              "4" => row.(4, "Lorry C", "30")
+            }
+          },
+          company,
+          admin
+        )
+
+      ids =
+        FullCircle.Repo.preload(day, [egg_stock_day_details: EggStock.__day_details_query__()],
+          force: true
+        ).egg_stock_day_details
+        |> Enum.reject(& &1.is_separator)
+        |> Enum.map(& &1.id)
+
+      assert [
+               %{group_name: "", rows: [%{contact_name: "Lorry A"}]},
+               %{group_name: "", rows: [%{contact_name: "Lorry B"}]},
+               %{group_name: "", rows: [%{contact_name: "Lorry C"}]}
+             ] = EggStock.loading_list_groups(company.id, {:day, date}, ids)
+    end
   end
 
   describe "loading_list_groups/3 for the weekly book" do

@@ -104,7 +104,7 @@ defmodule FullCircleWeb.EggStockLive.LoadingList do
       <td>{row_total(row, @grade_names)}</td>
       <td class="tick-col"></td>
     </tr>
-    <tr class="subtotal-row">
+    <tr :if={@show_subtotal} class="subtotal-row">
       <td class="no-col"></td>
       <td class="contact-name">{gettext("Subtotal")}</td>
       <td :for={g <- @grade_names}>{group_subtotal(@group.rows, g)}</td>
@@ -168,7 +168,13 @@ defmodule FullCircleWeb.EggStockLive.LoadingList do
             </tr>
           </thead>
           <tbody>
-            <.render_group :for={group <- @groups} group={group} grade_names={@grade_names} />
+            <%!-- A lone group's subtotal just repeats the grand total, so skip it. --%>
+            <.render_group
+              :for={group <- @groups}
+              group={group}
+              grade_names={@grade_names}
+              show_subtotal={length(@groups) > 1}
+            />
             <tr class="total-row">
               <td class="no-col"></td>
               <td class="contact-name">{gettext("Total")}</td>

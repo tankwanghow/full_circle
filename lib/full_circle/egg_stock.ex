@@ -253,10 +253,12 @@ defmodule FullCircle.EggStock do
 
     company_id
     |> loading_list_source_rows(source)
-    |> Enum.reduce({[], ""}, fn row, {groups, current} ->
+    |> Enum.reduce({[], {:pending, ""}}, fn row, {groups, state} ->
       cond do
+        # A separator always opens a new group, so two unlabelled separators
+        # still print two subtotals instead of merging into one block.
         row.is_separator ->
-          {groups, row.group_name || ""}
+          {groups, {:pending, row.group_name || ""}}
 
         MapSet.member?(selected, to_string(row.id)) ->
           entry = %{
@@ -265,16 +267,16 @@ defmodule FullCircle.EggStock do
             quantities: normalize_qty_map(row.quantities)
           }
 
-          case groups do
-            [%{group_name: ^current, rows: rows} = g | rest] ->
-              {[%{g | rows: [entry | rows]} | rest], current}
+          case {state, groups} do
+            {{:pending, name}, _} ->
+              {[%{group_name: name, rows: [entry]} | groups], :open}
 
-            _ ->
-              {[%{group_name: current, rows: [entry]} | groups], current}
+            {:open, [%{rows: rows} = g | rest]} ->
+              {[%{g | rows: [entry | rows]} | rest], :open}
           end
 
         true ->
-          {groups, current}
+          {groups, state}
       end
     end)
     |> elem(0)

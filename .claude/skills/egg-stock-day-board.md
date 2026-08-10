@@ -117,9 +117,16 @@ Tick rows on the Stock tab (planned **sales** only) or on either weekly book
   `source` is `{:day, %Date{}}` for the day board or `{:dow, kind, dow}` for
   the weekly book (e.g. `{:dow, "sales", 2}`). Returns
   `[%{group_name: String.t(), rows: [%{id, contact_name, quantities}]}]`, ordered
-  by board `position`, grouped by the separator label above each run of rows.
+  by board `position`, carrying the separator label above each run of rows.
   Groups with no selected row are dropped. Ids that fall outside the scope are
   dropped — that is also the multi-tenant guard.
+- **Every separator opens a new group, keyed on the break and not on the label.**
+  The label is optional on the board, so grouping by `group_name` merged every
+  unlabelled section into one block with a single subtotal. The reduce carries a
+  `{:pending, name}` / `:open` state instead, so N separators always print N
+  subtotals — one per lorry load — whether or not they were named.
+- The print sheet drops the per-group subtotal row when there is only one group,
+  since it would just repeat the grand total.
 - Print view: `EggStockLive.LoadingList` at
   `/companies/:company_id/EggStock/loading_list?src=day&date=YYYY-MM-DD&ids=id1,id2`
   or `/companies/:company_id/EggStock/loading_list?src=dow&kind=sales&dow=N&date=YYYY-MM-DD&ids=id1,id2`.
