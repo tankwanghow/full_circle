@@ -19,18 +19,29 @@ defmodule FullCircleWeb.EggStockLive.LoadingList do
      |> assign(
        page_title: gettext("Loading List"),
        date_label: date_label,
+       sheet_title: sheet_title(source),
        groups: groups,
        grade_names: grade_names,
        grade_labels: grade_labels,
+       # numbered/1 only adds a :no key per row, so totalling before it is safe
        grand_total: total_of(groups, grade_names),
        company: FullCircle.Sys.get_company!(company.id)
      )}
   end
 
-  defp parse_source(%{"src" => "dow", "kind" => kind, "dow" => dow_str})
+  # The weekly href carries an explicit board-anchored `date`, so the sheet shows
+  # the same date as the DOW button that was clicked. URLs copied before that
+  # param existed still work: fall back to anchoring the weekday on today.
+  defp parse_source(%{"src" => "dow", "kind" => kind, "dow" => dow_str} = params)
        when kind in ["sales", "purchase"] do
     dow = String.to_integer(dow_str)
-    date = EggStock.dow_date(Date.utc_today(), dow)
+
+    date =
+      case params["date"] do
+        d when is_binary(d) and d != "" -> Date.from_iso8601!(d)
+        _ -> EggStock.dow_date(Date.utc_today(), dow)
+      end
+
     {{:dow, kind, dow}, "#{dow_label(dow)} #{FullCircleWeb.Helpers.format_date(date)}"}
   end
 
@@ -38,6 +49,11 @@ defmodule FullCircleWeb.EggStockLive.LoadingList do
     date = Date.from_iso8601!(date_str)
     {{:day, date}, FullCircleWeb.Helpers.format_date(date)}
   end
+
+  # Only the weekly purchase book prints purchases; `src=day` is always sales
+  # (the Stock tab renders planned purchases with `selectable={false}`).
+  defp sheet_title({:dow, "purchase", _dow}), do: gettext("Planned purchases — loading list")
+  defp sheet_title(_source), do: gettext("Planned sales — loading list")
 
   defp dow_label(1), do: gettext("Mon")
   defp dow_label(2), do: gettext("Tue")
@@ -138,7 +154,7 @@ defmodule FullCircleWeb.EggStockLive.LoadingList do
 
       <div class="page">
         <div class="company-name">{@company.name}</div>
-        <h1>{gettext("Planned sales — loading list")}</h1>
+        <h1>{@sheet_title}</h1>
         <h2>{@date_label}</h2>
 
         <table>

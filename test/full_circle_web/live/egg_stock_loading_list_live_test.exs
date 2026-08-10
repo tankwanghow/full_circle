@@ -47,6 +47,14 @@ defmodule FullCircleWeb.EggStockLoadingListLiveTest do
               "quantities" => %{"AA" => "2"},
               "position" => "2",
               "is_separator" => "false"
+            },
+            # legacy planned-sales section name, still read via planned_sales_sections()
+            "3" => %{
+              "section" => "actual_order",
+              "contact_name" => "Legacy Ah Meng",
+              "quantities" => %{"AA" => "7"},
+              "position" => "0",
+              "is_separator" => "false"
             }
           }
         },
@@ -100,20 +108,35 @@ defmodule FullCircleWeb.EggStockLoadingListLiveTest do
     refute html =~ "Kedai Muar"
   end
 
-  test "dow source renders the weekday and its upcoming date", %{
+  # pins the plural planned_sales_sections() in the day query (egg_stock.ex)
+  test "day source includes rows in the legacy actual_order section", %{
     conn: conn,
     company: company,
     user: user
   } do
+    date = ~D[2026-08-10]
+    day = seed_day(company, user, date)
+    by_name = Map.new(day.egg_stock_day_details, &{&1.contact_name, &1})
+
+    {:ok, _lv, html} =
+      live(
+        conn,
+        ~p"/companies/#{company.id}/EggStock/loading_list?#{[src: "day", date: "2026-08-10", ids: by_name["Legacy Ah Meng"].id]}"
+      )
+
+    assert html =~ "Legacy Ah Meng"
+  end
+
+  defp seed_dow(company, user, kind, dow, name) do
     {:ok, _} =
       EggStock.save_dow_lines(
         company.id,
-        :sales,
-        3,
+        kind,
+        dow,
         [
           %{
             "id" => "",
-            "contact_name" => "Weekly Ah Seng",
+            "contact_name" => name,
             "quantities" => %{"AA" => "4"},
             "is_separator" => "false",
             "delete" => "false"
@@ -123,7 +146,17 @@ defmodule FullCircleWeb.EggStockLoadingListLiveTest do
         user
       )
 
-    [line] = EggStock.list_dow_lines(company.id, :sales, 3)
+    [line] = EggStock.list_dow_lines(company.id, kind, dow)
+    line
+  end
+
+  test "dow source with no date param falls back to the upcoming occurrence", %{
+    conn: conn,
+    company: company,
+    user: user
+  } do
+    line = seed_dow(company, user, :sales, 3, "Weekly Ah Seng")
+    upcoming = EggStock.dow_date(Date.utc_today(), 3)
 
     {:ok, _lv, html} =
       live(
@@ -133,6 +166,65 @@ defmodule FullCircleWeb.EggStockLoadingListLiveTest do
 
     assert html =~ "Weekly Ah Seng"
     assert html =~ "Wed"
+    assert html =~ FullCircleWeb.Helpers.format_date(upcoming)
+  end
+
+  # The DOW buttons on the weekly book are anchored on the board date, which can
+  # be in the past. The sheet must print the date the user saw on the button.
+  test "dow source prints the board-anchored date from the date param", %{
+    conn: conn,
+    company: company,
+    user: user
+  } do
+    line = seed_dow(company, user, :sales, 3, "Weekly Ah Seng")
+
+    upcoming = EggStock.dow_date(Date.utc_today(), 3)
+    board_date = Date.add(upcoming, -7)
+
+    {:ok, _lv, html} =
+      live(
+        conn,
+        ~p"/companies/#{company.id}/EggStock/loading_list?#{[src: "dow", kind: "sales", dow: "3", date: Date.to_iso8601(board_date), ids: line.id]}"
+      )
+
+    assert html =~ "Wed"
+    assert html =~ FullCircleWeb.Helpers.format_date(board_date)
+    refute html =~ FullCircleWeb.Helpers.format_date(upcoming)
+  end
+
+  test "the weekly purchase book prints under the purchases title", %{
+    conn: conn,
+    company: company,
+    user: user
+  } do
+    line = seed_dow(company, user, :purchase, 3, "Weekly Supplier")
+
+    {:ok, _lv, html} =
+      live(
+        conn,
+        ~p"/companies/#{company.id}/EggStock/loading_list?#{[src: "dow", kind: "purchase", dow: "3", ids: line.id]}"
+      )
+
+    assert html =~ "Weekly Supplier"
+    assert html =~ "Planned purchases"
+    refute html =~ "Planned sales"
+  end
+
+  test "the weekly sales book prints under the sales title", %{
+    conn: conn,
+    company: company,
+    user: user
+  } do
+    line = seed_dow(company, user, :sales, 3, "Weekly Ah Seng")
+
+    {:ok, _lv, html} =
+      live(
+        conn,
+        ~p"/companies/#{company.id}/EggStock/loading_list?#{[src: "dow", kind: "sales", dow: "3", ids: line.id]}"
+      )
+
+    assert html =~ "Planned sales"
+    refute html =~ "Planned purchases"
   end
 
   test "an empty selection renders the sheet with no rows", %{
