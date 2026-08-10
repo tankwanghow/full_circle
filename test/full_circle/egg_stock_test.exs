@@ -708,6 +708,180 @@ defmodule FullCircle.EggStockTest do
       assert untouched.quantities["AA"] == 99
     end
 
+    test "an overridden row keeps the plan it replaced and the documents that did it", %{
+      contact: contact
+    } do
+      doc = {"Invoice", Ecto.UUID.generate()}
+
+      planned = [%{contact_id: contact.id, contact_name: contact.name, quantities: %{"D" => 700}}]
+
+      actuals = [
+        %{
+          contact_id: contact.id,
+          contact_name: contact.name,
+          quantities: %{"D" => 1},
+          doc_links: [doc]
+        }
+      ]
+
+      [row] = EggStock.overlay_actual_quantities(planned, actuals)
+
+      assert row.quantities == %{"D" => 1}
+      assert row.overridden_from == %{"D" => 700}
+      assert row.override_doc_links == [doc]
+    end
+
+    test "a row with no actual document is not stamped", %{contact: contact} do
+      planned = [%{contact_id: contact.id, contact_name: contact.name, quantities: %{"D" => 700}}]
+
+      [row] = EggStock.overlay_actual_quantities(planned, [])
+
+      refute Map.has_key?(row, :overridden_from)
+    end
+  end
+
+  describe "override_warnings/2" do
+    setup do
+      %{grades: ["AA", "D", "F"]}
+    end
+
+    test "reports a row whose document total differs from the plan it replaced", %{grades: grades} do
+      doc = {"Invoice", Ecto.UUID.generate()}
+
+      rows = [
+        %{
+          contact_name: "H.H.Hock Hen Trading Sdn Bhd",
+          quantities: %{"D" => 1},
+          overridden_from: %{"D" => 700, "F" => 200},
+          override_doc_links: [doc]
+        }
+      ]
+
+      assert [warning] = EggStock.override_warnings(rows, grades)
+      assert warning.contact_name == "H.H.Hock Hen Trading Sdn Bhd"
+      assert warning.planned_total == 900
+      assert warning.actual_total == 1
+      assert warning.doc_links == [doc]
+    end
+
+    # The common case: the clerk keyed the invoice exactly as planned. Warning on
+    # every override would be noise, and noise gets ignored.
+    test "stays quiet when the document matches the plan", %{grades: grades} do
+      rows = [
+        %{
+          contact_name: "Joo How Trading",
+          quantities: %{"D" => 600, "F" => 100},
+          overridden_from: %{"F" => 100, "D" => 600},
+          override_doc_links: [{"Invoice", Ecto.UUID.generate()}]
+        }
+      ]
+
+      assert EggStock.override_warnings(rows, grades) == []
+    end
+
+    test "ignores rows that were never overridden", %{grades: grades} do
+      rows = [%{contact_name: "Heng Huat Farm", quantities: %{"D" => 600}}]
+
+      assert EggStock.override_warnings(rows, grades) == []
+    end
+
+    # End to end over the real query path: a book row of 700 AA against an invoice
+    # the clerk keyed as a single tray. This is the production case that prompted
+    # the warning — the estimate still reports the document's 1, but says so.
+    test "the 7-day forecast reports a document that disagrees with the book", %{
+      company: company,
+      admin: admin,
+      contact: contact
+    } do
+      today = ~D[2026-08-10]
+      sale_date = ~D[2026-08-11]
+      dow = Date.day_of_week(sale_date)
+
+      {:ok, _} =
+        EggStock.save_dow_lines(
+          company.id,
+          :sales,
+          dow,
+          [
+            %{
+              "id" => "",
+              "contact_id" => contact.id,
+              "contact_name" => contact.name,
+              "quantities" => %{"AA" => "700"},
+              "is_separator" => "false",
+              "delete" => "false"
+            }
+          ],
+          company,
+          admin
+        )
+
+      invoice = one_tray_invoice(company, admin, contact, "AA", sale_date)
+
+      [day] =
+        EggStock.compute_7day_forecast(company.id, sale_date, 30, today)
+        |> Enum.filter(&(&1.date == sale_date))
+
+      # The document still wins the number — this change warns, it does not re-rank.
+      assert day.sales["AA"] == 1
+
+      assert [warning] = day.sales_overrides
+      assert warning.contact_name == contact.name
+      assert warning.planned_total == 700
+      assert warning.actual_total == 1
+      assert warning.doc_links == [{"Invoice", invoice.id}]
+    end
+
+    test "the 7-day forecast stays quiet when the document matches the book", %{
+      company: company,
+      admin: admin,
+      contact: contact
+    } do
+      today = ~D[2026-08-10]
+      sale_date = ~D[2026-08-11]
+
+      {:ok, _} =
+        EggStock.save_dow_lines(
+          company.id,
+          :sales,
+          Date.day_of_week(sale_date),
+          [
+            %{
+              "id" => "",
+              "contact_id" => contact.id,
+              "contact_name" => contact.name,
+              "quantities" => %{"AA" => "1"},
+              "is_separator" => "false",
+              "delete" => "false"
+            }
+          ],
+          company,
+          admin
+        )
+
+      _invoice = one_tray_invoice(company, admin, contact, "AA", sale_date)
+
+      [day] =
+        EggStock.compute_7day_forecast(company.id, sale_date, 30, today)
+        |> Enum.filter(&(&1.date == sale_date))
+
+      assert day.sales["AA"] == 1
+      assert day.sales_overrides == []
+    end
+
+    test "only counts grades the company actually has", %{grades: grades} do
+      rows = [
+        %{
+          contact_name: "Stale Grade",
+          quantities: %{"D" => 10},
+          overridden_from: %{"D" => 10, "RETIRED" => 5000},
+          override_doc_links: []
+        }
+      ]
+
+      assert EggStock.override_warnings(rows, grades) == []
+    end
+
     test "sync_day_details_from_actuals updates matching detail quantities", %{
       company: company,
       admin: admin,
@@ -1075,5 +1249,28 @@ defmodule FullCircle.EggStockTest do
     test "wraps to next week for an earlier weekday" do
       assert EggStock.dow_date(~D[2026-08-12], 1) == ~D[2026-08-17]
     end
+  end
+
+  # A sales invoice for one tray of `grade_name` on `date`. The good is named
+  # after the grade because actual_sales_for_date/2 matches goods to grades by
+  # name, and the default packaging multiplies by 1, so quantity 1 is one tray.
+  defp one_tray_invoice(company, user, contact, grade_name, date) do
+    good = good_fixture(company, user, %{"name" => grade_name})
+    sales_acct = FullCircle.Accounting.get_account_by_name("General Sales", company, user)
+
+    sales_tc =
+      FullCircle.Repo.one!(
+        from tc in FullCircle.Accounting.TaxCode,
+          where: tc.company_id == ^company.id and tc.code == "NoSTax"
+      )
+
+    attrs =
+      contact
+      |> invoice_attrs(good, sales_acct, sales_tc, quantity: "1", tax_rate: "0")
+      |> Map.put("invoice_date", Date.to_string(date))
+      |> Map.put("due_date", Date.to_string(Date.add(date, 30)))
+
+    {:ok, %{create_invoice: invoice}} = FullCircle.Billing.create_invoice(attrs, company, user)
+    invoice
   end
 end

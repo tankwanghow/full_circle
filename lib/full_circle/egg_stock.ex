@@ -513,22 +513,62 @@ defmodule FullCircle.EggStock do
   @doc """
   For planned lines that have matching actual document rows (same contact),
   replace quantities with the document totals so planned reflects issued docs.
+
+  An overridden row is stamped with `:overridden_from` (the plan it replaced) and
+  `:override_doc_links` (the documents that replaced it). The replacement is
+  wholesale, so a document that omits a grade zeroes it — `override_warnings/2`
+  turns that into something the user can see instead of a silent change.
   """
   def overlay_actual_quantities(planned_rows, actual_rows) do
     by_contact =
       (actual_rows || [])
       |> Enum.filter(fn r -> r.contact_id not in [nil, ""] end)
-      |> Map.new(fn r -> {to_string(r.contact_id), r.quantities || %{}} end)
+      |> Map.new(fn r -> {to_string(r.contact_id), r} end)
 
     Enum.map(planned_rows || [], fn row ->
       cid = row[:contact_id] || row["contact_id"]
 
-      if cid not in [nil, ""] and Map.has_key?(by_contact, to_string(cid)) do
-        Map.put(row, :quantities, normalize_qty_map(by_contact[to_string(cid)]))
-      else
-        row
+      case cid not in [nil, ""] && Map.get(by_contact, to_string(cid)) do
+        nil ->
+          row
+
+        false ->
+          row
+
+        actual ->
+          row
+          |> Map.put(:quantities, normalize_qty_map(actual.quantities || %{}))
+          |> Map.put(:overridden_from, row[:quantities] || %{})
+          |> Map.put(:override_doc_links, Map.get(actual, :doc_links) || [])
       end
     end)
+  end
+
+  @doc """
+  Planned rows whose replacement document disagrees with the plan it replaced.
+
+  Only a difference in total is reported. A document keyed exactly as planned is
+  the normal case, and warning on it would train the user to ignore the warning.
+  """
+  def override_warnings(planned_rows, grades) do
+    (planned_rows || [])
+    # mirror sum_planned_rows/2: a row the totals skip must not warn either
+    |> Enum.reject(&(&1[:ignore] || &1[:is_separator]))
+    |> Enum.filter(&Map.has_key?(&1, :overridden_from))
+    |> Enum.map(fn row ->
+      %{
+        contact_name: row[:contact_name] || "",
+        planned_total: sum_quantities(row[:overridden_from], grades),
+        actual_total: sum_quantities(row[:quantities], grades),
+        doc_links: row[:override_doc_links] || []
+      }
+    end)
+    |> Enum.reject(&(&1.planned_total == &1.actual_total))
+  end
+
+  defp sum_quantities(quantities, grades) do
+    qty = quantities || %{}
+    Enum.reduce(grades, 0, fn g, acc -> acc + to_int(qty[g]) end)
   end
 
   @doc """
@@ -1303,8 +1343,13 @@ defmodule FullCircle.EggStock do
       date = Date.add(start_date, offset)
       day = get_day(company_id, date)
 
-      day_sales = planned_sales_totals(company_id, date, grades, today)
-      day_purchases = planned_purchases_totals(company_id, date, grades, today)
+      # Rows are fetched once so the totals and the override warnings describe
+      # exactly the same set of lines.
+      sales_rows = planned_sales_for_date(company_id, date, today)
+      purchase_rows = planned_purchases_for_date(company_id, date, today)
+
+      day_sales = sum_planned_rows(sales_rows, grades)
+      day_purchases = sum_planned_rows(purchase_rows, grades)
 
       closing =
         if day && has_actual_closing?(day.closing_bal) do
@@ -1324,7 +1369,9 @@ defmodule FullCircle.EggStock do
          closing: closing,
          sales: day_sales,
          purchases: day_purchases,
-         production: avg_prod
+         production: avg_prod,
+         sales_overrides: override_warnings(sales_rows, grades),
+         purchases_overrides: override_warnings(purchase_rows, grades)
        }, closing}
     end)
     |> elem(0)

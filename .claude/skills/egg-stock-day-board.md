@@ -60,6 +60,41 @@ contact) appear together. Orphans are created in-memory via
 4. `persist_synced_detail_quantities/3` writes map qty changes with **direct updates**
    (not only cast_assoc — map diffs are easy to miss).
 
+**The overlay is wholesale, and that is the sharp edge.** `aggregate_daily_results/2`
+builds the replacement map from only the grades present on the document, so any grade
+the document omits becomes 0 — the planned figure is not preserved. A clerk who keys
+one tray of Grade D against a planned `D 700 / F 200` silently drops 899 from the
+forecast. `qty_trays` is `quantity / COALESCE(unit_multiplier, 30)`, so a stray `1` in
+an estimate column is the signature of a one-tray document.
+
+Diagnosing "my planned row vanished from the estimate": it did not vanish, it was
+overwritten. Check for a document whose `COALESCE(load_date, invoice_date)` equals that
+date for the row's `contact_id`. Renaming the contact "fixes" it only because the row
+then points at a different `contact_id` with no document.
+
+### Override warnings
+
+Overriding is intentional and was kept — documents stay the source of truth. What was
+silent is now visible:
+
+- `overlay_actual_quantities/2` stamps each overridden row with `:overridden_from`
+  (the plan it replaced) and `:override_doc_links`.
+- `override_warnings/2` reports only rows whose **totals differ**. A document keyed
+  exactly as planned is the normal case; warning on it would train the user to ignore
+  the warning. It mirrors `sum_planned_rows/2` in skipping ignored/separator rows so
+  a row the totals skip cannot warn.
+- `compute_7day_forecast/4` fetches rows **once** per day and returns
+  `sales_overrides` / `purchases_overrides` alongside the totals, so warnings always
+  describe the same lines the totals summed.
+- `forecast_table` renders an amber triangle plus a link per source document on the
+  affected date (`override_key` + `company_id` attrs). The anchor needs
+  `onclick="event.stopPropagation()"` or the row's `phx-click` swallows the click.
+
+This fires only where the plan still exists to compare against — future dates, read
+fresh from the weekly book. For today and past dates
+`persist_synced_detail_quantities/3` has already written the document's numbers into
+the day row, so plan and document read as identical and nothing can be detected.
+
 ### Ad-hoc → real contact after invoicing
 
 When a document is created from a planned ad-hoc line, call
@@ -83,8 +118,9 @@ Weekly books are edited in the app UI (one-time ODS import tooling was removed a
   (`compute_estimated_opening/3`).
 - **Avg production** from days that have non-empty closing_bal
   (`compute_avg_production/2`).
-- **7-day forecast** `compute_7day_forecast/3` uses planned totals + avg prod;
-  if a day already has actual closing, that closing wins.
+- **7-day forecast** `compute_7day_forecast/4` uses planned totals + avg prod;
+  if a day already has actual closing, that closing wins. Each day also carries
+  `sales_overrides` / `purchases_overrides` — see [Override warnings](#override-warnings).
 - Production identity per day: `sold + expired + closing − opening − bought`.
 
 ## Estimated tab navigation

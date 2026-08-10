@@ -1560,6 +1560,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
           grades={@grade_names}
           grade_labels={@grade_labels}
           date={@date}
+          company_id={@current_company.id}
         />
       </div>
 
@@ -2717,6 +2718,8 @@ defmodule FullCircleWeb.EggStockLive.Form do
           grades={@grades}
           grade_labels={@grade_labels}
           value_key={:sales}
+          override_key={:sales_overrides}
+          company_id={@company_id}
           row_hover="hover:bg-blue-100"
           highlight_date={@highlight_date}
           highlight_class="bg-blue-100"
@@ -2731,6 +2734,8 @@ defmodule FullCircleWeb.EggStockLive.Form do
           grades={@grades}
           grade_labels={@grade_labels}
           value_key={:purchases}
+          override_key={:purchases_overrides}
+          company_id={@company_id}
           row_hover="hover:bg-emerald-100"
           highlight_date={@highlight_date}
           highlight_class="bg-emerald-100"
@@ -2751,6 +2756,8 @@ defmodule FullCircleWeb.EggStockLive.Form do
       |> assign_new(:highlight_class, fn -> "bg-blue-100" end)
       |> assign_new(:row_click, fn -> "goto_date" end)
       |> assign_new(:row_kind, fn -> nil end)
+      |> assign_new(:override_key, fn -> nil end)
+      |> assign_new(:company_id, fn -> nil end)
 
     ~H"""
     <div class={@class}>
@@ -2788,8 +2795,29 @@ defmodule FullCircleWeb.EggStockLive.Form do
               phx-value-date={Date.to_iso8601(row.date)}
               phx-value-kind={@row_kind}
             >
+              <% overrides = (@override_key && Map.get(row, @override_key)) || [] %>
               <td class="py-1 px-2 font-medium whitespace-nowrap">
                 {FullCircleWeb.Helpers.format_date(row.date)}
+                <%!-- A document replaced a planned row wholesale and disagrees with it.
+                      The figure in this row is the document's, not the plan's. --%>
+                <span
+                  :if={overrides != []}
+                  class="inline-flex items-center gap-0.5 align-middle"
+                  title={override_tooltip(overrides)}
+                >
+                  <%!-- amber-600 and blue-600/800 carry dark remaps in app.css --%>
+                  <.icon name="hero-exclamation-triangle-solid" class="h-4 w-4 text-amber-600" />
+                  <a
+                    :for={{doc_type, doc_id} <- override_doc_links(overrides)}
+                    href={doc_link_path(@company_id, doc_type, doc_id)}
+                    target="_blank"
+                    onclick="event.stopPropagation()"
+                    class="text-blue-600 hover:text-blue-800"
+                    title={gettext("Open %{type}", type: doc_type)}
+                  >
+                    <.icon name={doc_icon(doc_type)} class="h-4 w-4" />
+                  </a>
+                </span>
               </td>
               <td class="py-1 px-1.5 text-gray-500">
                 {Calendar.strftime(row.date, "%a")}
@@ -2811,6 +2839,28 @@ defmodule FullCircleWeb.EggStockLive.Form do
       </div>
     </div>
     """
+  end
+
+  # This row's figure came from a document that replaced the plan wholesale, so a
+  # grade the document omits reads as zero. Name the gap rather than the mechanism.
+  defp override_tooltip(overrides) do
+    header =
+      gettext("Replaced by an issued document — this row shows the document, not the plan:")
+
+    lines =
+      Enum.map(overrides, fn o ->
+        gettext("%{contact}: planned %{planned}, document %{actual}",
+          contact: o.contact_name,
+          planned: o.planned_total,
+          actual: o.actual_total
+        )
+      end)
+
+    Enum.join([header | lines], "\n")
+  end
+
+  defp override_doc_links(overrides) do
+    overrides |> Enum.flat_map(& &1.doc_links) |> Enum.uniq()
   end
 
   # --- Settings Tab ---
