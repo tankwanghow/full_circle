@@ -556,7 +556,7 @@ defmodule FullCircleWeb.EggStockLive.Form do
   end
 
   def handle_event("toggle_all_print_rows", _params, socket) do
-    ids = selectable_sales_ids(socket.assigns.day)
+    ids = selectable_sales_ids(socket.assigns.form)
 
     selected =
       if all_selected?(ids, socket.assigns.sel_sales_ids),
@@ -1078,9 +1078,16 @@ defmodule FullCircleWeb.EggStockLive.Form do
     if MapSet.member?(set, id), do: MapSet.delete(set, id), else: MapSet.put(set, id)
   end
 
+  # The live rows from the form changeset, never the DB-loaded @day: a row
+  # deleted in this session is already gone from the changeset but lingers in
+  # @day until the autosave fires, and select-all must not resurrect it.
+  defp live_day_details(%Phoenix.HTML.Form{source: cs}),
+    do: Ecto.Changeset.get_field(cs, :egg_stock_day_details) || []
+
   # Only saved, non-separator planned sales rows can be selected.
-  defp selectable_sales_ids(day) do
-    (day.egg_stock_day_details || [])
+  defp selectable_sales_ids(form) do
+    form
+    |> live_day_details()
     |> Enum.filter(fn d ->
       d.section in EggStock.planned_sales_sections() and !d.is_separator and
         d.id not in [nil, ""]
@@ -1088,8 +1095,8 @@ defmodule FullCircleWeb.EggStockLive.Form do
     |> Enum.map(&to_string(&1.id))
   end
 
-  defp all_sales_selected?(day, selected),
-    do: all_selected?(selectable_sales_ids(day), selected)
+  defp all_sales_selected?(form, selected),
+    do: all_selected?(selectable_sales_ids(form), selected)
 
   # Shared by both boards and by both select-all handlers: "every selectable row
   # is ticked", false when there is nothing selectable at all.
@@ -1980,10 +1987,8 @@ defmodule FullCircleWeb.EggStockLive.Form do
               docs_by_contact={docs_by_contact(@actual_sales)}
               selectable={true}
               selected={@sel_sales_ids}
-              all_selected={all_sales_selected?(@day, @sel_sales_ids)}
-              selected_total={
-                selected_rows_total(@day.egg_stock_day_details || [], @grades, @sel_sales_ids)
-              }
+              all_selected={all_sales_selected?(@form, @sel_sales_ids)}
+              selected_total={selected_rows_total(live_day_details(@form), @grades, @sel_sales_ids)}
               print_href={
                 loading_list_href(
                   @current_company.id,

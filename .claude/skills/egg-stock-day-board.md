@@ -143,11 +143,16 @@ Tick rows on the Stock tab (planned **sales** only) or on either weekly book
   `delete_dow_line` only stage the removal and schedule an autosave — the row
   survives in the DB for up to `autosave_delay` seconds, so without a
   `MapSet.delete/2` a cancelled order would still print on the warehouse sheet.
-- **Semantic split worth knowing:** `selected_rows_total/3` reads
-  `@day.egg_stock_day_details` (DB-loaded, refreshed only by `do_save_day`)
-  while `selected_dow_total/3` reads `@dow_params` (live form params). So the
-  Stock tab's "N eggs" figure lags an in-flight quantity edit by the autosave
-  delay; the weekly one updates immediately.
+- **Both boards read live form state, never the DB-loaded copy.** On the Stock
+  tab, `selectable_sales_ids/1` and `selected_rows_total/3` go through
+  `live_day_details/1`, which pulls the rows out of the `@form` changeset —
+  **not** `@day.egg_stock_day_details`, which is only refreshed by
+  `do_save_day`. Reading `@day` was a real bug: select-all re-selected a row
+  deleted earlier in the session (still present in `@day` until the autosave
+  fired) even though it was no longer rendered, and that cancelled order would
+  then print. The weekly board is equivalent by construction — `@dow_params`
+  is already live. Pinned by "select all does not resurrect a row deleted in
+  this session".
 
 ### Events (Stock tab — day board)
 
@@ -167,8 +172,12 @@ Tick rows on the Stock tab (planned **sales** only) or on either weekly book
 
 ### Helper functions (`form.ex`)
 
+- `live_day_details/1` — the day board's rows straight from the `@form`
+  changeset. Every selection helper on the Stock tab goes through it; reaching
+  for `@day.egg_stock_day_details` instead reintroduces the stale-row bug above.
 - `selectable_sales_ids/1` — saved, non-separator planned-sales rows only
-  (id not nil/empty; section in `EggStock.planned_sales_sections()`).
+  (id not nil/empty; section in `EggStock.planned_sales_sections()`), taken
+  from `live_day_details/1`.
 - `selectable_dow_ids/1` — saved, non-separator, non-deleted weekly rows.
 - `all_selected?/2` — the single "every selectable row is ticked" predicate
   (false when nothing is selectable). Both `all_sales_selected?/2` and

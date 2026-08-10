@@ -134,6 +134,53 @@ defmodule FullCircleWeb.EggStockFormSelectionLiveTest do
     assert html =~ "17 eggs"
   end
 
+  test "select all does not resurrect a row deleted in this session", %{
+    conn: conn,
+    company: company,
+    user: user
+  } do
+    {_date, by_name} = seed_today(company, user)
+    {:ok, lv, html} = live(conn, ~p"/companies/#{company.id}/egg_stock")
+
+    # delete_detail indexes into the changeset's assoc, so read the index off the
+    # hidden [id] input carrying this row's id rather than its document position
+    # (planned purchases render before planned sales, so the two orders differ)
+    idx =
+      html
+      |> LazyHTML.from_fragment()
+      |> LazyHTML.query(~s{input[type=hidden][value="#{by_name["Ah Seng"].id}"]})
+      |> LazyHTML.attribute("name")
+      |> Enum.find_value(fn name ->
+        case Regex.run(~r/\[egg_stock_day_details\]\[(\d+)\]\[id\]/, name) do
+          [_, i] -> i
+          _ -> nil
+        end
+      end)
+
+    assert idx, "could not locate the changeset index for Ah Seng"
+
+    html = render_click(lv, "toggle_all_print_rows", %{})
+    assert html =~ "3 selected"
+    assert html =~ "17 eggs"
+
+    html = render_click(lv, "delete_detail", %{"index" => idx})
+    assert html =~ "2 selected"
+    assert html =~ "9 eggs"
+
+    # clear first: with every remaining row still ticked, select-all would simply
+    # toggle them off and tell us nothing about which rows it considers selectable
+    html = render_click(lv, "clear_print_rows", %{})
+    refute html =~ "Print selected"
+
+    # the deleted row lives on in @day until the autosave fires, so select-all
+    # must read the live changeset or it re-selects a row that is no longer
+    # even rendered — and that cancelled order would then print
+    html = render_click(lv, "toggle_all_print_rows", %{})
+    assert html =~ "2 selected"
+    assert html =~ "9 eggs"
+    refute html =~ "3 selected"
+  end
+
   test "selection clears when the date changes", %{conn: conn, company: company, user: user} do
     {_date, by_name} = seed_today(company, user)
     {:ok, lv, _html} = live(conn, ~p"/companies/#{company.id}/egg_stock")
