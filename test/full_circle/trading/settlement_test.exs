@@ -242,6 +242,18 @@ defmodule FullCircle.Trading.SettlementTest do
     refute Enum.any?(rows, &(&1.id == drop.id))
   end
 
+  test "create_invoice_from_drops into a closed period is rejected as :period_closed", %{
+    user: user,
+    company: company
+  } do
+    %{drop: drop} = completed_sales_drop(company, user)
+    {:ok, attrs} = Trading.build_invoice_attrs_from_drop_ids([drop.id], company, user)
+    {:ok, _} = FullCircle.Sys.close_period_through(company, Date.utc_today(), user)
+
+    assert {:error, :period_closed} =
+             Trading.create_invoice_from_drops([drop.id], attrs, company, user)
+  end
+
   test "cannot double-invoice same drop", %{user: user, company: company} do
     %{drop: drop} = completed_sales_drop(company, user)
     {:ok, attrs} = Trading.build_invoice_attrs_from_drop_ids([drop.id], company, user)
@@ -911,6 +923,7 @@ defmodule FullCircle.Trading.SettlementTest do
     company: company
   } do
     contact = contact_fixture(company, user)
+
     assert %{loads: 0, transport: 0, total: 0} =
              Trading.billable_line_counts(contact.id, company, user)
   end

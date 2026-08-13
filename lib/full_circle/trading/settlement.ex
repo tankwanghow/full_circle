@@ -211,6 +211,7 @@ defmodule FullCircle.Trading.Settlement do
         end
       end)
       |> Repo.transaction()
+      |> Accounting.map_period_closed()
       |> case do
         {:ok, %{create_invoice: inv} = result} ->
           {:ok, Map.put(result, :create_invoice, inv)}
@@ -220,6 +221,9 @@ defmodule FullCircle.Trading.Settlement do
 
         {:error, :link_trading_drops, reason, _} ->
           {:error, reason}
+
+        {:error, :period_closed} ->
+          {:error, :period_closed}
 
         {:error, step, reason, _} ->
           {:error, step, reason, %{}}
@@ -343,6 +347,7 @@ defmodule FullCircle.Trading.Settlement do
         end
       end)
       |> Repo.transaction()
+      |> Accounting.map_period_closed()
       |> case do
         {:ok, %{create_pur_invoice: pinv} = result} ->
           {:ok, Map.put(result, :create_pur_invoice, pinv)}
@@ -352,6 +357,9 @@ defmodule FullCircle.Trading.Settlement do
 
         {:error, :link_trading_loads, reason, _} ->
           {:error, reason}
+
+        {:error, :period_closed} ->
+          {:error, :period_closed}
 
         {:error, step, reason, _} ->
           {:error, step, reason, %{}}
@@ -511,6 +519,7 @@ defmodule FullCircle.Trading.Settlement do
         end
       end)
       |> Repo.transaction()
+      |> Accounting.map_period_closed()
       |> case do
         {:ok, %{create_pur_invoice: pinv} = result} ->
           {:ok, Map.put(result, :create_pur_invoice, pinv)}
@@ -520,6 +529,9 @@ defmodule FullCircle.Trading.Settlement do
 
         {:error, :link_transport_drops, reason, _} ->
           {:error, reason}
+
+        {:error, :period_closed} ->
+          {:error, :period_closed}
 
         {:error, step, reason, _} ->
           {:error, step, reason, %{}}
