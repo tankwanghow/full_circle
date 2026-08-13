@@ -90,6 +90,10 @@ defmodule FullCircleWeb.StatutoryBundleLive.Import do
   end
 
   @impl true
+  def handle_event("validate", _params, socket) do
+    {:noreply, socket}
+  end
+
   def handle_event("apply", _params, socket) do
     case StatutoryConfig.import_bundle(
            socket.assigns.bundle,
@@ -136,7 +140,9 @@ defmodule FullCircleWeb.StatutoryBundleLive.Import do
       <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
 
       <div :if={@step == :upload} class="text-center my-4">
-        <form id="bundle-upload-form">
+        <%!-- the browser only starts the auto-upload for inputs whose form
+              binds phx-change --%>
+        <form id="bundle-upload-form" phx-change="validate">
           <.live_file_input upload={@uploads.bundle} />
         </form>
         <p :if={@decode_error} class="text-rose-600 font-semibold mt-2">{@decode_error}</p>

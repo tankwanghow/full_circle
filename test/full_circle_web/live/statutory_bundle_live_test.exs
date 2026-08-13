@@ -12,6 +12,19 @@ defmodule FullCircleWeb.StatutoryBundleLiveTest do
     %{conn: log_in_user(conn, admin), admin: admin, com: com}
   end
 
+  # render_upload/2 drives the upload machinery directly and skips the browser's
+  # requirement that the file input's form carries phx-change — without that
+  # binding a real browser never starts the auto-upload (no network traffic at
+  # all). Assert the DOM contract explicitly.
+  test "upload form binds phx-change so the browser can start the auto-upload", %{
+    conn: conn,
+    com: com
+  } do
+    {:ok, lv, _html} = live(conn, ~p"/companies/#{com.id}/statutory_bundle/import")
+
+    assert lv |> element("#bundle-upload-form") |> render() =~ "phx-change"
+  end
+
   test "valid bundle upload shows diff rows and Apply persists", %{conn: conn, com: com} do
     bundle = FullCircle.StatutoryConfig.template_bundle()
 
