@@ -422,4 +422,51 @@ defmodule FullCircle.PeriodLockTest do
     FullCircle.DebCreFixtures.debit_note_attrs(contact, acct, tc, tax_rate: "0")
     |> Map.put("note_date", Date.to_string(date))
   end
+
+  describe "Payment under a closed period" do
+    setup do
+      %{admin: admin, company: company} = FullCircle.BillingFixtures.billing_setup()
+      %{admin: admin, company: company}
+    end
+
+    test "creating into a closed period is rejected", %{company: company, admin: admin} do
+      {:ok, _} = Sys.close_period_through(company, Date.utc_today(), admin)
+
+      assert {:error, :period_closed} =
+               FullCircle.BillPay.create_payment(
+                 payment_attrs_dated(company, admin, Date.utc_today()),
+                 company,
+                 admin
+               )
+    end
+
+    test "creating after the cutoff succeeds", %{company: company, admin: admin} do
+      {:ok, _} = Sys.close_period_through(company, Date.add(Date.utc_today(), -30), admin)
+
+      assert {:ok, %{create_payment: _}} =
+               FullCircle.BillPay.create_payment(
+                 payment_attrs_dated(company, admin, Date.utc_today()),
+                 company,
+                 admin
+               )
+    end
+  end
+
+  defp payment_attrs_dated(company, user, date) do
+    contact = FullCircle.BillingFixtures.contact_fixture(company, user)
+    good = FullCircle.BillingFixtures.good_fixture(company, user)
+    pur_acct = FullCircle.Accounting.get_account_by_name("General Purchases", company, user)
+    funds_acct = FullCircle.BillPayFixtures.pay_funds_account_fixture(company, user)
+
+    tc =
+      Repo.one!(
+        from t in FullCircle.Accounting.TaxCode,
+          where: t.company_id == ^company.id and t.code == "NoPTax"
+      )
+
+    FullCircle.BillPayFixtures.payment_attrs(contact, good, pur_acct, tc, funds_acct,
+      tax_rate: "0"
+    )
+    |> Map.put("payment_date", Date.to_string(date))
+  end
 end

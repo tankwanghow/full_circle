@@ -322,6 +322,7 @@ defmodule FullCircle.BillPay do
         Multi.new()
         |> create_payment_multi(attrs, com, user)
         |> Repo.transaction()
+        |> Accounting.map_period_closed()
 
       false ->
         :not_authorise
@@ -346,6 +347,10 @@ defmodule FullCircle.BillPay do
         user
       )
     end)
+    |> Accounting.multi_assert_period_open(
+      fn %{^payment_name => doc} -> [doc.payment_date] end,
+      com
+    )
     |> create_payment_transactions(payment_name, com, user)
   end
 
@@ -358,6 +363,7 @@ defmodule FullCircle.BillPay do
       Multi.new()
       |> update_payment_multi(payment, attrs, com, user)
       |> Repo.transaction()
+      |> Accounting.map_period_closed()
     end
   rescue
     Ecto.StaleEntryError ->
@@ -374,6 +380,12 @@ defmodule FullCircle.BillPay do
     |> Multi.update(payment_name, fn _ ->
       make_changeset(Payment, payment, attrs, com, user)
     end)
+    |> Accounting.multi_assert_period_open(
+      fn changes ->
+        [payment.payment_date, Map.get(changes, payment_name, payment).payment_date]
+      end,
+      com
+    )
     |> Multi.delete_all(
       :delete_transaction,
       from(txn in Transaction,
