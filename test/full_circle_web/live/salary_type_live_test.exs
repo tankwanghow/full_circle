@@ -55,6 +55,51 @@ defmodule FullCircleWeb.SalaryTypeLiveTest do
     end
   end
 
+  describe "cal_func options" do
+    test "select offers legacy funcs and imported calc codes", %{
+      conn: conn,
+      com: com,
+      admin: admin
+    } do
+      {_st, lv, _html} = edit_form(conn, com, admin, "Monthly Salary")
+
+      html =
+        lv
+        |> element("#object-form select[name='salary_type[cal_func]']")
+        |> render()
+
+      assert html =~ ~s(value="epf_employer")
+      assert html =~ ~s(value="hrd_corp")
+    end
+  end
+
+  describe "index" do
+    test "rows show the type as a badge", %{conn: conn, com: com} do
+      {:ok, _lv, html} = live(conn, ~p"/companies/#{com.id}/salary_types")
+
+      assert html =~ "type-badge"
+      assert html =~ "FixedWages"
+    end
+
+    test "rows show the statutory code when set", %{conn: conn, com: com, admin: admin} do
+      st = HR.get_salary_type_by_name("Monthly Salary", com, admin)
+
+      {:ok, _} =
+        FullCircle.StdInterface.update(
+          FullCircle.HR.SalaryType,
+          "salary_type",
+          st,
+          %{"statutory_code" => "hrd_corp"},
+          com,
+          admin
+        )
+
+      {:ok, _lv, html} = live(conn, ~p"/companies/#{com.id}/salary_types")
+
+      assert html =~ "hrd_corp"
+    end
+  end
+
   describe "statutory code options" do
     test "imported calc codes are selectable", %{conn: conn, com: com, admin: admin} do
       # seed_company! imports the template, which ships hrd_corp

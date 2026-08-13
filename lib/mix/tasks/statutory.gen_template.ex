@@ -54,6 +54,8 @@ defmodule Mix.Tasks.Statutory.GenTemplate do
   # HRD Corp (PSMB) levy: employer-only, 1% of levy-able wages = basic salary +
   # fixed allowances (FixedWages salary types). Variable pay (OT, rest-day /
   # holiday premiums, commission) and bonus are excluded by the PSMB Act 2001.
+  # The levy covers Malaysian employees only — enforced by attaching the
+  # salary type to Malaysian employees, not in the script.
   @hrd_corp_script """
   result = round(fixed_wages * 0.01, 2)
   """

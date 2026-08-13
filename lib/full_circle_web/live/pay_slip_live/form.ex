@@ -221,6 +221,16 @@ defmodule FullCircleWeb.PaySlipLive.Form do
           current_user={@current_user}
         />
 
+        <%!-- FixedWages subset of the additions — the HRD Corp levy base --%>
+        <div class="flex flex-row text-sm">
+          <div class="w-[89%] text-right mr-3 mt-1 italic">
+            {gettext("Fixed Wages (HRD levy base)")}
+          </div>
+          <div class="w-[11%]">
+            <.input readonly tabindex="-1" field={@form[:fixed_wage_amount]} type="number" />
+          </div>
+        </div>
+
         <.live_component
           module={SalaryNoteComponent}
           id="bonuses"

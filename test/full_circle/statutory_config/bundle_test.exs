@@ -52,7 +52,8 @@ defmodule FullCircle.StatutoryConfig.BundleTest do
         bonus_amount: Decimal.new("0")
       })
 
-    # 1% of fixed wages only (excludes OT/commission in the Addition remainder)
+    # 1% of fixed wages only (excludes OT/commission in the Addition remainder).
+    # Malaysian-only scoping is handled by salary type attachment, not the script.
     assert {:ok, dec} = StatutoryConfig.calculate("hrd_corp", emp, cs)
     assert Decimal.equal?(dec, Decimal.new("23.46"))
   end

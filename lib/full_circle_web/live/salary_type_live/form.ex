@@ -60,6 +60,14 @@ defmodule FullCircleWeb.SalaryTypeLive.Form do
     end
   end
 
+  # everything validate_cal_func accepts: legacy funcs + imported calc codes
+  defp cal_func_options(company_id) do
+    (FullCircle.PaySlipOp.legacy_cal_funcs() ++
+       FullCircle.StatutoryConfig.calc_codes(company_id))
+    |> Enum.uniq()
+    |> Enum.sort()
+  end
+
   def handle_event(
         "validate",
         %{"_target" => ["salary_type", "db_ac_name"], "salary_type" => params},
@@ -255,7 +263,13 @@ defmodule FullCircleWeb.SalaryTypeLive.Form do
             />
           </div>
           <div class="col-span-4">
-            <.input field={@form[:cal_func]} label={gettext("Calculation Function")} />
+            <.input
+              field={@form[:cal_func]}
+              label={gettext("Calculation Function")}
+              type="select"
+              prompt={gettext("— none —")}
+              options={cal_func_options(@current_company.id)}
+            />
           </div>
         </div>
         <div class="grid grid-cols-12 gap-1">
