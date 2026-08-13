@@ -186,6 +186,36 @@ defmodule FullCircleWeb.CompanyLive.Form do
         </.link>
       </div>
     </.form>
+    <div
+      :if={@live_action == :edit and @current_role == "admin"}
+      class="max-w-2xl mx-auto mt-6 rounded border border-amber-400 p-4"
+    >
+      <div class="font-medium text-lg">{gettext("Close Accounting Period")}</div>
+      <p class="text-sm mb-2">
+        {gettext(
+          "Blocks creating or amending any document dated on or before this date. This is separate from the financial-year closing month and day above. Clear the field to reopen."
+        )}
+      </p>
+      <p :if={@closed_through} class="text-sm mb-2 font-medium">
+        {gettext("Currently closed through %{date}", date: to_string(@closed_through))}
+      </p>
+      <.form id="period-lock-form" for={%{}} as={:period} phx-submit="save_period_lock">
+        <input
+          type="date"
+          name="period[closed_through]"
+          value={to_string(@closed_through || "")}
+          class="rounded border p-2"
+        />
+        <button
+          class="button orange"
+          data-confirm={
+            gettext("Closing a period blocks all edits to documents dated on or before it. Continue?")
+          }
+        >
+          {gettext("Save")}
+        </button>
+      </.form>
+    </div>
     """
   end
 
@@ -238,7 +268,8 @@ defmodule FullCircleWeb.CompanyLive.Form do
      |> assign(:trigger_method, "post")
      |> assign(:company, company)
      |> assign(:llm_settings, llm_settings)
-     |> assign(closing_days: closing_days(company.closing_month))}
+     |> assign(closing_days: closing_days(company.closing_month))
+     |> assign(:closed_through, Sys.period_closed_through(company))}
   end
 
   @impl true
@@ -254,7 +285,6 @@ defmodule FullCircleWeb.CompanyLive.Form do
      |> assign(closing_days: closing_days(month))
      |> clamp_closing_day(month)}
   end
-
 
   @impl true
   def handle_event("validate", %{"company" => params}, socket) do
@@ -275,6 +305,30 @@ defmodule FullCircleWeb.CompanyLive.Form do
     end
 
     save_company(socket, socket.assigns.live_action, company_params)
+  end
+
+  @impl true
+  def handle_event("save_period_lock", %{"period" => %{"closed_through" => str}}, socket) do
+    date =
+      case Date.from_iso8601(str) do
+        {:ok, d} -> d
+        {:error, _} -> nil
+      end
+
+    case Sys.close_period_through(socket.assigns.company, date, socket.assigns.current_user) do
+      {:ok, company} ->
+        {:noreply,
+         socket
+         |> assign(:company, company)
+         |> assign(:closed_through, Sys.period_closed_through(company))
+         |> put_flash(:info, gettext("Accounting period updated."))}
+
+      {:error, :future_date} ->
+        {:noreply, put_flash(socket, :warn, gettext("Cannot close a period that has not ended."))}
+
+      :not_authorise ->
+        {:noreply, put_flash(socket, :warn, gettext("Not authorised."))}
+    end
   end
 
   @impl true
@@ -374,5 +428,4 @@ defmodule FullCircleWeb.CompanyLive.Form do
   end
 
   defp parse_int(_), do: nil
-
 end
