@@ -2,13 +2,13 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Give administrators a cutoff date per company that blocks writing or deleting general-ledger rows dated on or before it, across the eight core accounting documents plus Journal.
+**Goal:** Give administrators a cutoff date per company that blocks writing or rebuilding general-ledger rows dated on or before it, across the eight core accounting documents plus Journal.
 
-**Architecture:** The cutoff lives in `company.settings["period"]["closed_through"]`, set only through an admin-gated, logged function on `FullCircle.Sys`. Enforcement is a single `Ecto.Multi.run` step inserted immediately before the two operations that touch the GL in every document context — the transaction build and the transaction `delete_all` — so a save that changes nothing GL-affecting is never blocked. Two thin delete wrappers cover Receipt and Payment, the only documents with a document-level delete.
+**Architecture:** The cutoff lives in `company.settings["period"]["closed_through"]`, set only through an admin-gated, logged function on `FullCircle.Sys`. `period_closed_through/1` always re-reads that map from the database — the session `current_company` is stale. Enforcement is a single `Ecto.Multi.run` step inserted immediately before the operations that touch the GL. Public `create_*` / `update_*` map the Multi failure to `{:error, :period_closed}`. There is no document-level delete to guard.
 
 **Tech Stack:** Elixir 1.19.5, Phoenix 1.8.3, Phoenix LiveView 1.1.x, Ecto/Postgres, ExUnit.
 
-Spec: `docs/superpowers/specs/2026-08-09-accounting-period-lock-design.md`
+Spec: `docs/superpowers/specs/2026-08-09-accounting-period-lock-design.md` (revised 2026-08-13)
 
 ## Global Constraints
 
@@ -18,39 +18,43 @@ Spec: `docs/superpowers/specs/2026-08-09-accounting-period-lock-design.md`
 - All new user-facing strings go through `gettext/1`.
 - Schemas use `use FullCircle.Schema` (binary_id primary keys), not `use Ecto.Schema`.
 - The existing `transactions.closed` flag means "seeded opening balance". Do not repurpose it, and do not write to it.
-- Run tests with `mix test`. The suite was green at 1105 tests as of 2026-08-08.
+- Bind insertion points by **function name**, not the line numbers in older drafts — they have drifted.
+- Public APIs return `{:error, :period_closed}`, never `{:error, :assert_period_open, :period_closed, _}`.
+- Do not add `delete_receipt` / `delete_payment`. Receipt and Payment are not deletable documents.
+- Run tests with `mix test`.
 
 ---
 
 ## File Structure
 
 **Created:**
-- `priv/repo/migrations/<timestamp>_add_update_closed_transaction_trigger.exs` — the missing `BEFORE UPDATE` trigger.
-- `test/full_circle/period_lock_test.exs` — cutoff storage, the guard function, and per-document enforcement.
+- `priv/repo/migrations/<timestamp>_add_update_closed_transaction_trigger.exs` — replace the trigger function (`RETURN NEW` on UPDATE) and add the missing `BEFORE UPDATE` trigger.
+- `test/full_circle/period_lock_test.exs` — cutoff storage, the guard, per-document create/update.
 - `test/full_circle_web/live/period_lock_live_test.exs` — company-form control and a blocked save's flash.
 
 **Modified:**
 - `lib/full_circle/sys.ex` — `period_closed_through/1`, `close_period_through/3`.
-- `lib/full_circle/accounting.ex` — `assert_period_open/2`, `multi_assert_period_open/3`.
-- `lib/full_circle/billing.ex` — guard in the Invoice and PurInvoice create paths and in `update_doc_multi/9`'s rebuild branch.
-- `lib/full_circle/debcre.ex` — guard in the CreditNote and DebitNote create paths and in `update_note_multi/8`'s rebuild branch.
-- `lib/full_circle/bill_pay.ex` — guard in `create_payment_multi/4` and `update_payment_multi/5`; new `delete_payment/3`.
-- `lib/full_circle/receive_fund.ex` — guard in the Receipt create path and `update_doc_multi/8`; new `delete_receipt/3`.
-- `lib/full_circle/cheque.ex` — guard in the Deposit and ReturnCheque create and update multis.
-- `lib/full_circle/journal_entry.ex` — guard in `create_journal_multi/4` and `update_journal_multi/5`.
-- `lib/full_circle_web/live/{invoice,pur_invoice,receipt,payment,credit_note,debit_note,journal}_live/form.ex` — a `{:error, :period_closed}` clause each; Receipt and Payment forms also switch their delete to the new context wrapper.
-- `lib/full_circle_web/live/company_live/form.ex` — the admin-only cutoff control.
+- `lib/full_circle/accounting.ex` — `assert_period_open/2`, `multi_assert_period_open/3`, `map_period_closed/1`.
+- `lib/full_circle/billing.ex` — guard + map on Invoice and PurInvoice create/update.
+- `lib/full_circle/debcre.ex` — guard + map on CreditNote and DebitNote create/update.
+- `lib/full_circle/bill_pay.ex` — guard + map on Payment create/update. No delete wrapper.
+- `lib/full_circle/receive_fund.ex` — guard + map on Receipt create/update. No delete wrapper.
+- `lib/full_circle/cheque.ex` — guard + map on Deposit and ReturnCheque create/update.
+- `lib/full_circle/journal_entry.ex` — guard + map on Journal create/update.
+- `lib/full_circle_web/live/{invoice,pur_invoice,receipt,payment,credit_note,debit_note,journal}_live/form.ex`
+- `lib/full_circle_web/live/cheque_live/{deposit_form,return_cheque_form}.ex`
+- `lib/full_circle_web/live/company_live/form.ex` — sibling admin cutoff form after `#company` closes.
 
 ---
 
 ## Task 1: Cutoff storage and the administrator action
 
 **Files:**
-- Modify: `lib/full_circle/sys.ex` (near `get_company_settings/2` at line 262)
+- Modify: `lib/full_circle/sys.ex` (after `update_company_settings/3`)
 - Test: `test/full_circle/period_lock_test.exs` (create)
 
 **Interfaces:**
-- Consumes: `Sys.get_company_settings/2`, `Sys.update_company_settings/3`, `Sys.log_changeset/5`, `Sys.user_role_in_company/2` — all already exist in `sys.ex`.
+- Consumes: `Sys.get_company_settings/2`, `Sys.log_changeset/5`, `Sys.user_role_in_company/2`, `FullCircle.Repo`, `FullCircle.Sys.Company`.
 - Produces:
   - `Sys.period_closed_through(company) :: Date.t() | nil`
   - `Sys.close_period_through(company, Date.t() | nil, user) :: {:ok, Company.t()} | {:error, :future_date} | :not_authorise`
@@ -64,9 +68,17 @@ defmodule FullCircle.PeriodLockTest do
   use FullCircle.DataCase
 
   alias FullCircle.Sys
+  alias FullCircle.Sys.Company
 
   import FullCircle.SysFixtures
   import FullCircle.UserAccountsFixtures
+
+  defp company_today(company) do
+    case DateTime.now(company.timezone || "Etc/UTC") do
+      {:ok, dt} -> DateTime.to_date(dt)
+      _ -> Date.utc_today()
+    end
+  end
 
   describe "period cutoff storage" do
     setup do
@@ -93,7 +105,7 @@ defmodule FullCircle.PeriodLockTest do
     end
 
     test "a future date is rejected", %{company: company, admin: admin} do
-      future = Date.add(Date.utc_today(), 1)
+      future = Date.add(company_today(company), 1)
       assert {:error, :future_date} = Sys.close_period_through(company, future, admin)
       assert Sys.period_closed_through(company) == nil
     end
@@ -120,14 +132,23 @@ defmodule FullCircle.PeriodLockTest do
     end
 
     test "a malformed stored value reads as no cutoff", %{company: company} do
-      {:ok, company} = Sys.update_company_settings(company, "period", %{"closed_through" => "rubbish"})
+      {:ok, _} = Sys.update_company_settings(company, "period", %{"closed_through" => "rubbish"})
       assert Sys.period_closed_through(company) == nil
+    end
+
+    test "reads the cutoff from the database, not the in-memory struct", %{
+      company: company,
+      admin: admin
+    } do
+      {:ok, _} = Sys.close_period_through(company, ~D[2025-12-31], admin)
+      stale = %{company | settings: %{}}
+      assert Sys.period_closed_through(stale) == ~D[2025-12-31]
     end
   end
 end
 ```
 
-`Sys.allow_user_to_access(company, user, role, granting_admin)` is the existing role-granting helper — arity 4, with the granting admin last. `test/full_circle/sys_test.exs:117` shows it in use.
+`Sys.allow_user_to_access/4` — granting admin last. `company_fixture` sets `timezone: "Asia/Kuala_Lumpur"`; never use `Date.utc_today() + 1` for the future-date test.
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
@@ -136,103 +157,99 @@ Expected: FAIL with `function FullCircle.Sys.period_closed_through/1 is undefine
 
 - [ ] **Step 3: Implement**
 
-Add to `lib/full_circle/sys.ex`, directly after `update_company_settings/3` (line 273):
+Add to `lib/full_circle/sys.ex`, directly after `update_company_settings/3`:
 
 ```elixir
-@period_settings_key "period"
-@closed_through_key "closed_through"
+  @period_settings_key "period"
+  @closed_through_key "closed_through"
 
-@doc """
-The date through which this company's accounting period is closed, or `nil`.
+  @doc """
+  The date through which this company's accounting period is closed, or `nil`.
 
-Returns `nil` for an unset or unparseable value — an unreadable setting must not
-lock a company out of its own books.
-"""
-def period_closed_through(company) do
-  company
-  |> get_company_settings(@period_settings_key)
-  |> Map.get(@closed_through_key)
-  |> case do
-    nil ->
-      nil
+  Always re-reads `companies.settings` from the database. The session
+  `current_company` is a snapshot and must not be trusted for the cutoff.
+  Returns `nil` for an unset or unparseable value.
+  """
+  def period_closed_through(company) do
+    company
+    |> then(&Repo.get!(Company, &1.id))
+    |> get_company_settings(@period_settings_key)
+    |> Map.get(@closed_through_key)
+    |> case do
+      nil ->
+        nil
 
-    str when is_binary(str) ->
-      case Date.from_iso8601(str) do
-        {:ok, date} -> date
-        {:error, _} -> nil
-      end
+      str when is_binary(str) ->
+        case Date.from_iso8601(str) do
+          {:ok, date} -> date
+          {:error, _} -> nil
+        end
 
-    _ ->
-      nil
+      _ ->
+        nil
+    end
   end
-end
 
-@doc """
-Close (or reopen) this company's accounting period through `date`.
+  @doc """
+  Close (or reopen) this company's accounting period through `date`.
 
-Admin only. `nil` clears the cutoff. A date in the future is rejected — a period
-that has not finished cannot be closed; "future" is judged in the company's own
-timezone, not the server's.
+  Admin only. `nil` clears the cutoff. A date in the future is rejected — a period
+  that has not finished cannot be closed; "future" is judged in the company's own
+  timezone, not the server's.
+  """
+  def close_period_through(company, date, user) do
+    cond do
+      user_role_in_company(user.id, company.id) != "admin" ->
+        :not_authorise
 
-Writes the setting and a `close_period` log entry in one transaction, so a reopen
-is as visible in the log as a close.
-"""
-def close_period_through(company, date, user) do
-  cond do
-    user_role_in_company(user.id, company.id) != "admin" ->
-      :not_authorise
+      not is_nil(date) and Date.compare(date, company_today(company)) == :gt ->
+        {:error, :future_date}
 
-    not is_nil(date) and Date.compare(date, company_today(company)) == :gt ->
-      {:error, :future_date}
+      true ->
+        previous = period_closed_through(company)
+        values = if is_nil(date), do: %{}, else: %{@closed_through_key => Date.to_iso8601(date)}
+        fresh = Repo.get!(Company, company.id)
+        new_settings = Map.put(fresh.settings || %{}, @period_settings_key, values)
 
-    true ->
-      previous = period_closed_through(company)
-      values = if is_nil(date), do: %{}, else: %{@closed_through_key => Date.to_iso8601(date)}
-
-      Ecto.Multi.new()
-      |> Ecto.Multi.run(:company, fn _repo, _ ->
-        update_company_settings(company, @period_settings_key, values)
-      end)
-      |> Ecto.Multi.insert(:close_period_log, fn %{company: com} ->
-        log_changeset(
-          :close_period,
-          com,
-          %{"from" => to_string(previous), "to" => to_string(date)},
-          com,
-          user
-        )
-      end)
-      |> Repo.transaction()
-      |> case do
-        {:ok, %{company: com}} -> {:ok, com}
-        {:error, _, reason, _} -> {:error, reason}
-      end
+        Ecto.Multi.new()
+        |> Ecto.Multi.update(:company, Ecto.Changeset.change(fresh, %{settings: new_settings}))
+        |> Ecto.Multi.insert(:close_period_log, fn %{company: com} ->
+          log_changeset(
+            :close_period,
+            com,
+            %{"from" => to_string(previous), "to" => to_string(date)},
+            com,
+            user
+          )
+        end)
+        |> Repo.transaction()
+        |> case do
+          {:ok, %{company: com}} -> {:ok, com}
+          {:error, _, reason, _} -> {:error, reason}
+        end
+    end
   end
-end
 
-# Today in the company's own timezone. A server in UTC and a company in
-# Asia/Kuala_Lumpur disagree for eight hours a day, and "is this date in the
-# future" must follow the company.
-defp company_today(company) do
-  case company.timezone do
-    tz when is_binary(tz) and tz != "" ->
-      case DateTime.now(tz) do
-        {:ok, dt} -> DateTime.to_date(dt)
-        _ -> Date.utc_today()
-      end
+  defp company_today(company) do
+    case company.timezone do
+      tz when is_binary(tz) and tz != "" ->
+        case DateTime.now(tz) do
+          {:ok, dt} -> DateTime.to_date(dt)
+          _ -> Date.utc_today()
+        end
 
-    _ ->
-      Date.utc_today()
+      _ ->
+        Date.utc_today()
+    end
   end
-end
 ```
 
-`log_changeset/5` builds its `entity`/`entity_id` from the struct passed in, so passing the company gives a log row anchored to the company — which is what we want here.
+`Company` is already aliased in `sys.ex`. `log_changeset/5` builds `entity` from the struct, so the log row is anchored to the company.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `mix test test/full_circle/period_lock_test.exs`
-Expected: PASS, 7 tests.
+Expected: PASS.
 
 - [ ] **Step 5: Format and commit**
 
@@ -247,18 +264,19 @@ git commit -m "feat(period-lock): admin-set accounting period cutoff on the comp
 ## Task 2: The guard function
 
 **Files:**
-- Modify: `lib/full_circle/accounting.ex` (near `assert_doc_editable/4` at line 30)
+- Modify: `lib/full_circle/accounting.ex` (immediately after `assert_doc_editable/4`)
 - Test: `test/full_circle/period_lock_test.exs`
 
 **Interfaces:**
 - Consumes: `Sys.period_closed_through/1` from Task 1.
 - Produces:
   - `Accounting.assert_period_open([Date.t() | nil], company) :: :ok | {:error, :period_closed}`
-  - `Accounting.multi_assert_period_open(Ecto.Multi.t(), (map() -> [Date.t() | nil]), company) :: Ecto.Multi.t()` — adds a `:assert_period_open` step.
+  - `Accounting.multi_assert_period_open(Ecto.Multi.t(), (map() -> [Date.t() | nil]), company) :: Ecto.Multi.t()`
+  - `Accounting.map_period_closed(term()) :: term()`
 
 - [ ] **Step 1: Write the failing tests**
 
-Append to `test/full_circle/period_lock_test.exs`, inside the module:
+Append inside the test module:
 
 ```elixir
   describe "assert_period_open/2" do
@@ -298,6 +316,20 @@ Append to `test/full_circle/period_lock_test.exs`, inside the module:
       assert :ok = FullCircle.Accounting.assert_period_open([~D[2019-01-01]], open_company)
     end
   end
+
+  describe "map_period_closed/1" do
+    test "collapses the Multi 4-tuple" do
+      assert {:error, :period_closed} =
+               FullCircle.Accounting.map_period_closed(
+                 {:error, :assert_period_open, :period_closed, %{}}
+               )
+    end
+
+    test "passes other results through" do
+      assert {:ok, :x} = FullCircle.Accounting.map_period_closed({:ok, :x})
+      assert :not_authorise = FullCircle.Accounting.map_period_closed(:not_authorise)
+    end
+  end
 ```
 
 - [ ] **Step 2: Run the tests to verify they fail**
@@ -307,57 +339,40 @@ Expected: FAIL with `function FullCircle.Accounting.assert_period_open/2 is unde
 
 - [ ] **Step 3: Implement**
 
-Add to `lib/full_circle/accounting.ex`, immediately after `assert_doc_editable/4` (which ends around line 50):
+Add to `lib/full_circle/accounting.ex` immediately after `assert_doc_editable/4`:
 
 ```elixir
-@doc """
-Returns `:ok` if every date in `dates` sits after the company's closed-period
-cutoff, or `{:error, :period_closed}` otherwise.
-
-`dates` are the posting dates involved in a GL write: the new document date on
-create, and both the old and new dates on update, so that neither moving a
-document into a closed period nor out of one is possible. `nil` entries are
-ignored, as is an empty list. `:ok` when the company has no cutoff set.
-"""
-def assert_period_open(dates, company) do
-  case FullCircle.Sys.period_closed_through(company) do
-    nil ->
-      :ok
-
-    cutoff ->
-      if Enum.any?(dates, fn d -> not is_nil(d) and Date.compare(d, cutoff) != :gt end) do
-        {:error, :period_closed}
-      else
+  def assert_period_open(dates, company) do
+    case FullCircle.Sys.period_closed_through(company) do
+      nil ->
         :ok
-      end
-  end
-end
 
-@doc """
-Adds an `:assert_period_open` step to `multi` that aborts the transaction when the
-write would touch a closed period.
-
-`dates_fun` receives the multi's changes so far and returns the posting dates to
-check — this is how the step reads a document that an earlier step just inserted
-or updated.
-
-Place this immediately before the transaction build and the transaction
-`delete_all`, so that a save which changes nothing GL-affecting is never blocked.
-"""
-def multi_assert_period_open(multi, dates_fun, company) do
-  Ecto.Multi.run(multi, :assert_period_open, fn _repo, changes ->
-    case assert_period_open(dates_fun.(changes), company) do
-      :ok -> {:ok, :period_open}
-      {:error, reason} -> {:error, reason}
+      cutoff ->
+        if Enum.any?(dates, fn d -> not is_nil(d) and Date.compare(d, cutoff) != :gt end) do
+          {:error, :period_closed}
+        else
+          :ok
+        end
     end
-  end)
-end
+  end
+
+  def multi_assert_period_open(multi, dates_fun, company) do
+    Ecto.Multi.run(multi, :assert_period_open, fn _repo, changes ->
+      case assert_period_open(dates_fun.(changes), company) do
+        :ok -> {:ok, :period_open}
+        {:error, reason} -> {:error, reason}
+      end
+    end)
+  end
+
+  def map_period_closed({:error, :assert_period_open, :period_closed, _}), do: {:error, :period_closed}
+  def map_period_closed(other), do: other
 ```
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `mix test test/full_circle/period_lock_test.exs`
-Expected: PASS, 13 tests.
+Expected: PASS.
 
 - [ ] **Step 5: Format and commit**
 
@@ -372,18 +387,12 @@ git commit -m "feat(period-lock): assert_period_open guard and its Multi wrapper
 ## Task 3: Wire Invoice and PurInvoice
 
 **Files:**
-- Modify: `lib/full_circle/billing.ex:274-302` (`update_doc_multi/9`), `:444-485` (`create_invoice_multi/4`), and the PurInvoice create multi near `:900`
+- Modify: `lib/full_circle/billing.ex` — `update_doc_multi/9` rebuild branch, `create_invoice_multi/4`, `create_pur_invoice_multi/4`, and each public `create_*` / `update_*` (`|> Repo.transaction() |> Accounting.map_period_closed()`).
 - Test: `test/full_circle/period_lock_test.exs`
 
-**Interfaces:**
-- Consumes: `Accounting.multi_assert_period_open/3` from Task 2.
-- Produces: `Billing.create_invoice/4`, `update_invoice/5` and their PurInvoice counterparts return `{:error, :assert_period_open, :period_closed, _changes}` when the write touches a closed period.
-
-`billing.ex` has the `doc_transactions_unchanged?` fast path, so a description-only edit must still succeed. The guard goes inside the `else` branch only.
+`billing.ex` already aliases `FullCircle.Accounting`. Guard the `else` branch of `doc_transactions_unchanged?` only.
 
 - [ ] **Step 1: Write the failing tests**
-
-Append to `test/full_circle/period_lock_test.exs`:
 
 ```elixir
   describe "Invoice under a closed period" do
@@ -392,20 +401,15 @@ Append to `test/full_circle/period_lock_test.exs`:
       %{admin: admin, company: company}
     end
 
-    defp close_through(company, admin, date) do
-      {:ok, company} = Sys.close_period_through(company, date, admin)
-      company
-    end
-
     test "creating into a closed period is rejected", %{company: company, admin: admin} do
-      company = close_through(company, admin, Date.utc_today())
+      {:ok, _} = Sys.close_period_through(company, Date.utc_today(), admin)
 
-      assert {:error, :assert_period_open, :period_closed, _} =
+      assert {:error, :period_closed} =
                create_invoice_dated(company, admin, Date.utc_today())
     end
 
     test "creating after the cutoff succeeds", %{company: company, admin: admin} do
-      company = close_through(company, admin, Date.add(Date.utc_today(), -30))
+      {:ok, _} = Sys.close_period_through(company, Date.add(Date.utc_today(), -30), admin)
 
       assert {:ok, %{create_invoice: _}} =
                create_invoice_dated(company, admin, Date.utc_today())
@@ -414,25 +418,28 @@ Append to `test/full_circle/period_lock_test.exs`:
     test "editing a GL field on a closed-period invoice is rejected",
          %{company: company, admin: admin} do
       invoice = FullCircle.BillingFixtures.invoice_fixture(company, admin)
-      company = close_through(company, admin, Date.utc_today())
+      {:ok, _} = Sys.close_period_through(company, Date.utc_today(), admin)
 
       invoice = FullCircle.Billing.get_invoice!(invoice.id, company, admin)
-      attrs = gl_changing_attrs(invoice)
 
-      assert {:error, :assert_period_open, :period_closed, _} =
-               FullCircle.Billing.update_invoice(invoice, attrs, company, admin)
+      assert {:error, :period_closed} =
+               FullCircle.Billing.update_invoice(invoice, gl_changing_attrs(invoice), company, admin)
     end
 
     test "a description-only edit on a closed-period invoice still succeeds",
          %{company: company, admin: admin} do
       invoice = FullCircle.BillingFixtures.invoice_fixture(company, admin)
-      company = close_through(company, admin, Date.utc_today())
+      {:ok, _} = Sys.close_period_through(company, Date.utc_today(), admin)
 
       invoice = FullCircle.Billing.get_invoice!(invoice.id, company, admin)
-      attrs = description_only_attrs(invoice, "edited after closing")
 
       assert {:ok, %{update_invoice: updated}} =
-               FullCircle.Billing.update_invoice(invoice, attrs, company, admin)
+               FullCircle.Billing.update_invoice(
+                 invoice,
+                 description_only_attrs(invoice, "edited after closing"),
+                 company,
+                 admin
+               )
 
       assert updated.descriptions == "edited after closing"
     end
@@ -440,22 +447,38 @@ Append to `test/full_circle/period_lock_test.exs`:
     test "moving an open invoice into a closed period is rejected",
          %{company: company, admin: admin} do
       invoice = FullCircle.BillingFixtures.invoice_fixture(company, admin)
-      company = close_through(company, admin, Date.add(Date.utc_today(), -30))
+      {:ok, _} = Sys.close_period_through(company, Date.add(Date.utc_today(), -30), admin)
 
       invoice = FullCircle.Billing.get_invoice!(invoice.id, company, admin)
-      attrs = date_change_attrs(invoice, Date.add(Date.utc_today(), -60))
 
-      assert {:error, :assert_period_open, :period_closed, _} =
-               FullCircle.Billing.update_invoice(invoice, attrs, company, admin)
+      assert {:error, :period_closed} =
+               FullCircle.Billing.update_invoice(
+                 invoice,
+                 date_change_attrs(invoice, Date.add(Date.utc_today(), -60)),
+                 company,
+                 admin
+               )
+    end
+  end
+
+  describe "PurInvoice under a closed period" do
+    setup do
+      %{admin: admin, company: company} = FullCircle.BillingFixtures.billing_setup()
+      %{admin: admin, company: company}
+    end
+
+    test "creating into a closed period is rejected", %{company: company, admin: admin} do
+      {:ok, _} = Sys.close_period_through(company, Date.utc_today(), admin)
+
+      assert {:error, :period_closed} =
+               create_pur_invoice_dated(company, admin, Date.utc_today())
     end
   end
 ```
 
-The three helpers build attrs from a loaded invoice. Add them as private functions at the bottom of the test module. `invoice_attrs/5` in `test/support/fixtures/billing_fixtures.ex:109` shows the exact attrs shape a save expects — build these by loading the invoice, converting it to that shape, and changing the one field each helper names:
+Private helpers at the bottom of the module. `lock_version` is required:
 
 ```elixir
-  # Rebuild the attrs map a save expects from a loaded invoice. The detail rows
-  # must carry their `id` so cast_assoc updates rather than replaces them.
   defp invoice_to_attrs(invoice) do
     details =
       invoice.invoice_details
@@ -487,6 +510,7 @@ The three helpers build attrs from a loaded invoice. Add them as private functio
       "contact_name" => invoice.contact_name,
       "contact_id" => invoice.contact_id,
       "descriptions" => invoice.descriptions,
+      "lock_version" => invoice.lock_version,
       "invoice_details" => details
     }
   end
@@ -497,8 +521,7 @@ The three helpers build attrs from a loaded invoice. Add them as private functio
 
   defp gl_changing_attrs(invoice) do
     attrs = invoice_to_attrs(invoice)
-    details =
-      Map.update!(attrs["invoice_details"], "0", &Map.put(&1, "unit_price", "99.00"))
+    details = Map.update!(attrs["invoice_details"], "0", &Map.put(&1, "unit_price", "99.00"))
     Map.put(attrs, "invoice_details", details)
   end
 
@@ -523,18 +546,34 @@ The three helpers build attrs from a loaded invoice. Add them as private functio
 
     FullCircle.Billing.create_invoice(attrs, company, user)
   end
-```
 
-If `invoice.lock_version` is required by the changeset (see `.claude/skills/optimistic-locking.md`), add `"lock_version" => to_string(invoice.lock_version)` to `invoice_to_attrs/1`.
+  defp create_pur_invoice_dated(company, user, date) do
+    contact = FullCircle.BillingFixtures.contact_fixture(company, user)
+    good = FullCircle.BillingFixtures.good_fixture(company, user)
+    acct = FullCircle.Accounting.get_account_by_name("General Purchases", company, user)
+
+    tc =
+      Repo.one!(
+        from t in FullCircle.Accounting.TaxCode,
+          where: t.company_id == ^company.id and t.code == "NoPTax"
+      )
+
+    attrs =
+      FullCircle.BillingFixtures.pur_invoice_attrs(contact, good, acct, tc, tax_rate: "0")
+      |> Map.put("pur_invoice_date", Date.to_string(date))
+
+    FullCircle.Billing.create_pur_invoice(attrs, company, user)
+  end
+```
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
 Run: `mix test test/full_circle/period_lock_test.exs`
-Expected: FAIL — the create and edit tests return `{:ok, _}` where `{:error, :assert_period_open, ...}` is asserted. The description-only test should already pass; that is the behaviour being protected.
+Expected: FAIL — create/edit return `{:ok, _}` where `{:error, :period_closed}` is asserted. The description-only test should already pass.
 
 - [ ] **Step 3: Implement**
 
-In `lib/full_circle/billing.ex`, in `update_doc_multi/9`, replace the `else` branch (starting line 291):
+In `update_doc_multi/9`, replace the `else` branch so the guard sits before `Multi.delete_all`:
 
 ```elixir
     else
@@ -559,24 +598,23 @@ In `lib/full_circle/billing.ex`, in `update_doc_multi/9`, replace the `else` bra
     end
 ```
 
-In `create_invoice_multi/4`, insert the guard before the final `create_doc_transactions` call (line 484):
+In `create_invoice_multi/4`, before `create_doc_transactions`:
 
 ```elixir
     |> Accounting.multi_assert_period_open(
       fn %{^invoice_name => doc} -> [doc.invoice_date] end,
       com
     )
-    |> create_doc_transactions(invoice_name, com, user, @invoice_txn_opts)
 ```
 
-Do the same in the PurInvoice create multi near line 900, using `doc.pur_invoice_date` and its own step-name variable.
+Same in `create_pur_invoice_multi/4` with `doc.pur_invoice_date`.
 
-Confirm `alias FullCircle.Accounting` is already present at the top of `billing.ex` — it is, since `assert_doc_editable` is referenced elsewhere in the file. If it is aliased differently, match the existing usage.
+On every public `create_invoice`, `update_invoice`, `create_pur_invoice`, `update_pur_invoice`, change `|> Repo.transaction()` to `|> Repo.transaction() |> Accounting.map_period_closed()`.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `mix test test/full_circle/period_lock_test.exs test/full_circle/billing_test.exs`
-Expected: PASS. `billing_test.exs` must stay green — no company in it sets a cutoff, so the guard is a no-op there.
+Expected: PASS.
 
 - [ ] **Step 5: Format and commit**
 
@@ -591,20 +629,12 @@ git commit -m "feat(period-lock): enforce the cutoff on Invoice and PurInvoice"
 ## Task 4: Wire CreditNote and DebitNote
 
 **Files:**
-- Modify: `lib/full_circle/debcre.ex:212-237` (`create_credit_note_multi/4`), `:436` (`create_debit_note_multi/4`), `:600-623` (`update_note_multi/8`)
+- Modify: `lib/full_circle/debcre.ex` — `update_note_multi/8` rebuild branch, both create multis, all four public functions via `map_period_closed/1`. Add `alias FullCircle.Accounting` if missing.
 - Test: `test/full_circle/period_lock_test.exs`
 
-**Interfaces:**
-- Consumes: `Accounting.multi_assert_period_open/3` from Task 2.
-- Produces: the four `create_/update_` note functions return `{:error, :assert_period_open, :period_closed, _changes}` on a closed-period write.
-
-`debcre.ex` also has a fingerprint fast path (`note_transactions_unchanged?/6`), so the same rule applies: guard the rebuild branch only.
-
-Note `@credit_note_txn_opts` has **no** `doc_date_key` — unlike `billing.ex`'s opts. Both notes use `:note_date`, so reference the field directly rather than inventing an opts key.
+Notes use `:note_date` directly; `@credit_note_txn_opts` has no `doc_date_key`.
 
 - [ ] **Step 1: Write the failing tests**
-
-Append to `test/full_circle/period_lock_test.exs`. `FullCircle.DebCreFixtures.credit_note_attrs(contact, account, tax_code, opts)` builds the attrs map with `"note_date"` defaulted to today; the helper below overrides that date.
 
 ```elixir
   describe "CreditNote under a closed period" do
@@ -614,26 +644,57 @@ Append to `test/full_circle/period_lock_test.exs`. `FullCircle.DebCreFixtures.cr
     end
 
     test "creating into a closed period is rejected", %{company: company, admin: admin} do
-      {:ok, company} = Sys.close_period_through(company, Date.utc_today(), admin)
+      {:ok, _} = Sys.close_period_through(company, Date.utc_today(), admin)
 
-      attrs = credit_note_attrs_dated(company, admin, Date.utc_today())
-
-      assert {:error, :assert_period_open, :period_closed, _} =
-               FullCircle.DebCre.create_credit_note(attrs, company, admin)
+      assert {:error, :period_closed} =
+               FullCircle.DebCre.create_credit_note(
+                 credit_note_attrs_dated(company, admin, Date.utc_today()),
+                 company,
+                 admin
+               )
     end
 
-    test "creating after the cutoff succeeds", %{company: company, admin: admin} do
-      {:ok, company} = Sys.close_period_through(company, Date.add(Date.utc_today(), -30), admin)
+    test "a description-only edit on a closed-period credit note still succeeds",
+         %{company: company, admin: admin} do
+      {:ok, %{create_credit_note: cn}} =
+        FullCircle.DebCre.create_credit_note(
+          credit_note_attrs_dated(company, admin, Date.utc_today()),
+          company,
+          admin
+        )
 
-      attrs = credit_note_attrs_dated(company, admin, Date.utc_today())
+      {:ok, _} = Sys.close_period_through(company, Date.utc_today(), admin)
+      cn = FullCircle.DebCre.get_credit_note!(cn.id, company, admin)
 
-      assert {:ok, %{create_credit_note: _}} =
-               FullCircle.DebCre.create_credit_note(attrs, company, admin)
+      attrs = credit_note_to_attrs(cn) |> Map.put("descriptions", "edited after closing")
+
+      assert {:ok, %{update_credit_note: updated}} =
+               FullCircle.DebCre.update_credit_note(cn, attrs, company, admin)
+
+      assert updated.descriptions == "edited after closing"
+    end
+  end
+
+  describe "DebitNote under a closed period" do
+    setup do
+      %{admin: admin, company: company} = FullCircle.BillingFixtures.billing_setup()
+      %{admin: admin, company: company}
+    end
+
+    test "creating into a closed period is rejected", %{company: company, admin: admin} do
+      {:ok, _} = Sys.close_period_through(company, Date.utc_today(), admin)
+
+      assert {:error, :period_closed} =
+               FullCircle.DebCre.create_debit_note(
+                 debit_note_attrs_dated(company, admin, Date.utc_today()),
+                 company,
+                 admin
+               )
     end
   end
 ```
 
-Add this private helper at the bottom of the test module:
+Helpers — read `get_credit_note!/3` and the CreditNote schema for the descriptions field and detail assoc names before filling `credit_note_to_attrs/1`. Include `lock_version` and each detail `id`. If CreditNote has no `descriptions` header field, change the description-only test to a non-GL field that exists (or skip that assertion and only assert `{:ok, _}`).
 
 ```elixir
   defp credit_note_attrs_dated(company, user, date) do
@@ -649,51 +710,34 @@ Add this private helper at the bottom of the test module:
     FullCircle.DebCreFixtures.credit_note_attrs(contact, acct, tc, tax_rate: "0")
     |> Map.put("note_date", Date.to_string(date))
   end
+
+  defp debit_note_attrs_dated(company, user, date) do
+    contact = FullCircle.BillingFixtures.contact_fixture(company, user)
+    acct = FullCircle.Accounting.get_account_by_name("General Purchases", company, user)
+
+    tc =
+      Repo.one!(
+        from t in FullCircle.Accounting.TaxCode,
+          where: t.company_id == ^company.id and t.code == "NoPTax"
+      )
+
+    FullCircle.DebCreFixtures.debit_note_attrs(contact, acct, tc, tax_rate: "0")
+    |> Map.put("note_date", Date.to_string(date))
+  end
 ```
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
 Run: `mix test test/full_circle/period_lock_test.exs`
-Expected: FAIL — the create test returns `{:ok, _}`.
+Expected: FAIL — the create tests return `{:ok, _}`.
 
 - [ ] **Step 3: Implement**
 
-In `update_note_multi/8`, replace the `else` branch:
+In `update_note_multi/8` `else` branch, insert the guard before `Multi.delete_all`, dates `[note.note_date, Map.get(changes, step_name, note).note_date]`.
 
-```elixir
-    else
-      multi
-      |> Accounting.multi_assert_period_open(
-        fn changes ->
-          [note.note_date, Map.get(changes, step_name, note).note_date]
-        end,
-        com
-      )
-      |> Multi.delete_all(
-        :delete_transaction,
-        from(txn in Transaction,
-          where: txn.doc_type == ^doc_type,
-          where: txn.doc_no == ^note.note_no,
-          where: txn.company_id == ^com.id
-        )
-      )
-      |> create_note_transactions(step_name, com, user, txn_opts)
-    end
-```
+In both create multis, insert the guard before `create_note_transactions` with `[doc.note_date]`.
 
-In `create_credit_note_multi/4`, before the final `create_note_transactions` call:
-
-```elixir
-    |> Accounting.multi_assert_period_open(
-      fn %{^note_name => doc} -> [doc.note_date] end,
-      com
-    )
-    |> create_note_transactions(note_name, com, user, @credit_note_txn_opts)
-```
-
-Repeat verbatim in `create_debit_note_multi/4` with `@debit_note_txn_opts`.
-
-Add `alias FullCircle.Accounting` at the top of `debcre.ex` if it is not already there.
+Pipe all four public functions through `Accounting.map_period_closed/1`.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
@@ -710,22 +754,17 @@ git commit -m "feat(period-lock): enforce the cutoff on CreditNote and DebitNote
 
 ---
 
-## Task 5: Wire Payment, and guard its delete
+## Task 5: Wire Payment (create and update only)
 
 **Files:**
-- Modify: `lib/full_circle/bill_pay.ex:331-350` (`create_payment_multi/4`), `:370-386` (`update_payment_multi/5`), and add `delete_payment/3`
-- Modify: `lib/full_circle_web/live/payment_live/form.ex:509-520`
+- Modify: `lib/full_circle/bill_pay.ex` — `create_payment_multi/4`, `update_payment_multi/5`, public `create_payment/3` and `update_payment/4`.
 - Test: `test/full_circle/period_lock_test.exs`
 
-**Interfaces:**
-- Consumes: `Accounting.multi_assert_period_open/3`, `Accounting.assert_period_open/2` from Task 2.
-- Produces: `BillPay.delete_payment(payment, com, user) :: {:ok, Payment.t()} | {:error, :period_closed} | :not_authorise | {:error, atom(), any(), map()}`
+Do **not** add `delete_payment/3`. Do **not** touch `payment_live/form.ex` delete handler.
 
-Payment has **no** fingerprint fast path — every save rewrites its transactions, so every save into a closed period is blocked. That asymmetry is intended and documented in the spec.
+Payment has no fingerprint fast path.
 
 - [ ] **Step 1: Write the failing tests**
-
-Append to `test/full_circle/period_lock_test.exs`. `FullCircle.BillPayFixtures` exposes `payment_fixture(company, user, opts)`, `payment_attrs(contact, good, purchase_account, purchase_tax_code, funds_account, opts)` and `pay_funds_account_fixture(company, user)`; `payment_attrs/6` defaults `"payment_date"` to today.
 
 ```elixir
   describe "Payment under a closed period" do
@@ -735,31 +774,28 @@ Append to `test/full_circle/period_lock_test.exs`. `FullCircle.BillPayFixtures` 
     end
 
     test "creating into a closed period is rejected", %{company: company, admin: admin} do
-      {:ok, company} = Sys.close_period_through(company, Date.utc_today(), admin)
-      attrs = payment_attrs_dated(company, admin, Date.utc_today())
-
-      assert {:error, :assert_period_open, :period_closed, _} =
-               FullCircle.BillPay.create_payment(attrs, company, admin)
-    end
-
-    test "deleting a closed-period payment is rejected", %{company: company, admin: admin} do
-      payment = FullCircle.BillPayFixtures.payment_fixture(company, admin)
-      {:ok, company} = Sys.close_period_through(company, Date.utc_today(), admin)
+      {:ok, _} = Sys.close_period_through(company, Date.utc_today(), admin)
 
       assert {:error, :period_closed} =
-               FullCircle.BillPay.delete_payment(payment, company, admin)
+               FullCircle.BillPay.create_payment(
+                 payment_attrs_dated(company, admin, Date.utc_today()),
+                 company,
+                 admin
+               )
     end
 
-    test "deleting a payment after the cutoff still succeeds", %{company: company, admin: admin} do
-      payment = FullCircle.BillPayFixtures.payment_fixture(company, admin)
-      {:ok, company} = Sys.close_period_through(company, Date.add(Date.utc_today(), -30), admin)
+    test "creating after the cutoff succeeds", %{company: company, admin: admin} do
+      {:ok, _} = Sys.close_period_through(company, Date.add(Date.utc_today(), -30), admin)
 
-      assert {:ok, _} = FullCircle.BillPay.delete_payment(payment, company, admin)
+      assert {:ok, %{create_payment: _}} =
+               FullCircle.BillPay.create_payment(
+                 payment_attrs_dated(company, admin, Date.utc_today()),
+                 company,
+                 admin
+               )
     end
   end
 ```
-
-Add this private helper at the bottom of the test module:
 
 ```elixir
   defp payment_attrs_dated(company, user, date) do
@@ -784,50 +820,22 @@ Add this private helper at the bottom of the test module:
 - [ ] **Step 2: Run the tests to verify they fail**
 
 Run: `mix test test/full_circle/period_lock_test.exs`
-Expected: FAIL with `function FullCircle.BillPay.delete_payment/3 is undefined`.
+Expected: FAIL — create returns `{:ok, _}`.
 
 - [ ] **Step 3: Implement**
 
-In `create_payment_multi/4`, before the final `create_payment_transactions` call:
+In `create_payment_multi/4`, before `create_payment_transactions`:
 
 ```elixir
     |> Accounting.multi_assert_period_open(
       fn %{^payment_name => doc} -> [doc.payment_date] end,
       com
     )
-    |> create_payment_transactions(payment_name, com, user)
 ```
 
-In `update_payment_multi/5`, insert the guard between the `Multi.update` and the `Multi.delete_all`:
+In `update_payment_multi/5`, between `Multi.update` and `Multi.delete_all`, dates `[payment.payment_date, Map.get(changes, payment_name, payment).payment_date]`.
 
-```elixir
-    |> Accounting.multi_assert_period_open(
-      fn changes ->
-        [payment.payment_date, Map.get(changes, payment_name, payment).payment_date]
-      end,
-      com
-    )
-    |> Multi.delete_all(
-```
-
-Add `delete_payment/3` next to `update_payment/4`:
-
-```elixir
-@doc """
-Delete a payment, refusing when its posting date sits inside a closed period.
-
-`StdInterface.delete/6` does not pass through this context's multi, so the period
-guard has to live here rather than in `update_payment_multi/5`.
-"""
-def delete_payment(%Payment{} = payment, com, user) do
-  case Accounting.assert_period_open([payment.payment_date], com) do
-    :ok -> StdInterface.delete(Payment, "payment", payment, com, user)
-    {:error, reason} -> {:error, reason}
-  end
-end
-```
-
-In `lib/full_circle_web/live/payment_live/form.ex`, change the `handle_event("delete", ...)` clause at line 509 to call `FullCircle.BillPay.delete_payment(socket.assigns.form.data, socket.assigns.current_company, socket.assigns.current_user)` in place of `StdInterface.delete(...)`, keeping the existing result-matching clauses and adding one for `{:error, :period_closed}` (Task 9 covers the message).
+Pipe `create_payment/3` and `update_payment/4` through `Accounting.map_period_closed/1`. Add `alias FullCircle.Accounting` if missing.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
@@ -837,29 +845,22 @@ Expected: PASS.
 - [ ] **Step 5: Format and commit**
 
 ```bash
-mix format lib/full_circle/bill_pay.ex lib/full_circle_web/live/payment_live/form.ex test/full_circle/period_lock_test.exs
-git add lib/full_circle/bill_pay.ex lib/full_circle_web/live/payment_live/form.ex test/full_circle/period_lock_test.exs
-git commit -m "feat(period-lock): enforce the cutoff on Payment, including delete"
+mix format lib/full_circle/bill_pay.ex test/full_circle/period_lock_test.exs
+git add lib/full_circle/bill_pay.ex test/full_circle/period_lock_test.exs
+git commit -m "feat(period-lock): enforce the cutoff on Payment"
 ```
 
 ---
 
-## Task 6: Wire Receipt, and guard its delete
+## Task 6: Wire Receipt (create and update only)
 
 **Files:**
-- Modify: `lib/full_circle/receive_fund.ex:590-605` (`update_doc_multi/8`), the Receipt create multi above it, and add `delete_receipt/3`
-- Modify: `lib/full_circle_web/live/receipt_live/form.ex:513-524`
+- Modify: `lib/full_circle/receive_fund.ex` — create multi, `update_doc_multi/8`, public `create_receipt/3` and `update_receipt/4`.
 - Test: `test/full_circle/period_lock_test.exs`
 
-**Interfaces:**
-- Consumes: `Accounting.multi_assert_period_open/3`, `Accounting.assert_period_open/2` from Task 2.
-- Produces: `ReceiveFund.delete_receipt(receipt, com, user) :: {:ok, Receipt.t()} | {:error, :period_closed} | :not_authorise | {:error, atom(), any(), map()}`
-
-Structurally identical to Task 5 — Receipt has no fingerprint fast path either. Repeated in full rather than cross-referenced, since tasks may be read out of order.
+Do **not** add `delete_receipt/3`. Do **not** touch `receipt_live/form.ex` delete handler.
 
 - [ ] **Step 1: Write the failing tests**
-
-Append to `test/full_circle/period_lock_test.exs`. `FullCircle.ReceiveFundFixtures` exposes `receipt_fixture(company, user, opts)` and `receipt_attrs(contact, good, sales_account, sales_tax_code, opts)`, which defaults `"receipt_date"` to today.
 
 ```elixir
   describe "Receipt under a closed period" do
@@ -869,65 +870,53 @@ Append to `test/full_circle/period_lock_test.exs`. `FullCircle.ReceiveFundFixtur
     end
 
     test "creating into a closed period is rejected", %{company: company, admin: admin} do
-      {:ok, company} = Sys.close_period_through(company, Date.utc_today(), admin)
-      attrs = receipt_attrs_dated(company, admin, Date.utc_today())
-
-      assert {:error, :assert_period_open, :period_closed, _} =
-               FullCircle.ReceiveFund.create_receipt(attrs, company, admin)
-    end
-
-    test "deleting a closed-period receipt is rejected", %{company: company, admin: admin} do
-      receipt = FullCircle.ReceiveFundFixtures.receipt_fixture(company, admin)
-      {:ok, company} = Sys.close_period_through(company, Date.utc_today(), admin)
+      {:ok, _} = Sys.close_period_through(company, Date.utc_today(), admin)
 
       assert {:error, :period_closed} =
-               FullCircle.ReceiveFund.delete_receipt(receipt, company, admin)
+               FullCircle.ReceiveFund.create_receipt(
+                 receipt_attrs_dated(company, admin, Date.utc_today()),
+                 company,
+                 admin
+               )
     end
 
-    test "a description-only edit on a closed-period receipt is rejected", %{company: company, admin: admin} do
-      # Documents the known asymmetry: Receipt has no fingerprint fast path, so
-      # even a non-GL edit is blocked. If this test starts failing, the fast path
-      # was extended here and the spec's asymmetry section needs updating.
+    test "a description-only edit on a closed-period receipt is rejected",
+         %{company: company, admin: admin} do
       receipt = FullCircle.ReceiveFundFixtures.receipt_fixture(company, admin)
-      {:ok, company} = Sys.close_period_through(company, Date.utc_today(), admin)
+      {:ok, _} = Sys.close_period_through(company, Date.utc_today(), admin)
 
       receipt = FullCircle.ReceiveFund.get_receipt!(receipt.id, company, admin)
-      attrs = receipt_description_attrs(receipt, "edited after closing")
+      attrs = receipt_to_attrs(receipt) |> Map.put("descriptions", "edited after closing")
 
-      assert {:error, :assert_period_open, :period_closed, _} =
+      assert {:error, :period_closed} =
                FullCircle.ReceiveFund.update_receipt(receipt, attrs, company, admin)
     end
-  end
-```
 
-Add one more test to the same `describe`, covering the spec's requirement that settling an old invoice stays possible:
-
-```elixir
     test "a new receipt can still match a closed-period invoice",
          %{company: company, admin: admin} do
       invoice = FullCircle.BillingFixtures.invoice_fixture(company, admin)
-      {:ok, company} = Sys.close_period_through(company, Date.utc_today(), admin)
+      invoice = FullCircle.Billing.get_invoice!(invoice.id, company, admin)
+      {:ok, _} = Sys.close_period_through(company, Date.utc_today(), admin)
 
-      # Dated after the cutoff, so the receipt itself is in an open period, but
-      # it matches a transaction that is not. Matching writes new
-      # transaction_matchers rows without altering the closed transactions, so
-      # this must succeed — otherwise prior-year receivables become uncollectable.
-      attrs = receipt_attrs_matching(company, admin, invoice, Date.add(Date.utc_today(), 1))
+      attrs =
+        receipt_attrs_matching(company, admin, invoice, Date.add(Date.utc_today(), 1))
 
       assert {:ok, %{create_receipt: _}} =
                FullCircle.ReceiveFund.create_receipt(attrs, company, admin)
     end
+  end
 ```
 
-Build `receipt_attrs_matching/4` from `receipt_attrs/5` plus a `"transaction_matchers"` entry pointing at the invoice's receivable transaction. `test/full_circle/receive_fund_test.exs` already contains a matching test — copy its matcher-map shape rather than inventing one.
+Helpers — `receipt_to_attrs/1` must rebuild details, funds, cheques and matchers from the loaded receipt (mirror `test/full_circle/receive_fund_test.exs` update attrs, plus `lock_version`). A descriptions-only map fails the changeset first.
 
-Add these private helpers at the bottom of the test module:
+`receipt_attrs_matching/4` finds the invoice's contact-bearing transaction and attaches a matcher. `receive_fund_test.exs` does **not** contain this shape — write it:
 
 ```elixir
   defp receipt_attrs_dated(company, user, date) do
     contact = FullCircle.BillingFixtures.contact_fixture(company, user)
     good = FullCircle.BillingFixtures.good_fixture(company, user)
     sales_acct = FullCircle.Accounting.get_account_by_name("General Sales", company, user)
+    funds_acct = FullCircle.ReceiveFundFixtures.funds_account_fixture(company, user)
 
     tc =
       Repo.one!(
@@ -935,71 +924,79 @@ Add these private helpers at the bottom of the test module:
           where: t.company_id == ^company.id and t.code == "NoSTax"
       )
 
-    FullCircle.ReceiveFundFixtures.receipt_attrs(contact, good, sales_acct, tc, tax_rate: "0")
+    FullCircle.ReceiveFundFixtures.receipt_attrs_with_funds(
+      contact,
+      good,
+      sales_acct,
+      tc,
+      funds_acct,
+      tax_rate: "0"
+    )
     |> Map.put("receipt_date", Date.to_string(date))
   end
 
-  defp receipt_description_attrs(receipt, text) do
-    %{
-      "receipt_date" => Date.to_string(receipt.receipt_date),
-      "contact_name" => receipt.contact_name,
-      "contact_id" => receipt.contact_id,
-      "descriptions" => text
-    }
+  defp receipt_attrs_matching(company, user, invoice, date) do
+    good = FullCircle.BillingFixtures.good_fixture(company, user)
+    sales_acct = FullCircle.Accounting.get_account_by_name("General Sales", company, user)
+    funds_acct = FullCircle.ReceiveFundFixtures.funds_account_fixture(company, user)
+
+    tc =
+      Repo.one!(
+        from t in FullCircle.Accounting.TaxCode,
+          where: t.company_id == ^company.id and t.code == "NoSTax"
+      )
+
+    ar_txn =
+      Repo.one!(
+        from t in FullCircle.Accounting.Transaction,
+          where: t.doc_type == "Invoice",
+          where: t.doc_id == ^invoice.id,
+          where: not is_nil(t.contact_id),
+          limit: 1
+      )
+
+    FullCircle.ReceiveFundFixtures.receipt_attrs_with_funds(
+      %{name: invoice.contact_name, id: invoice.contact_id},
+      good,
+      sales_acct,
+      tc,
+      funds_acct,
+      tax_rate: "0",
+      quantity: "0",
+      unit_price: "0",
+      funds_amount: "50.00"
+    )
+    |> Map.put("receipt_date", Date.to_string(date))
+    |> Map.put("contact_id", invoice.contact_id)
+    |> Map.put("contact_name", invoice.contact_name)
+    |> Map.put("transaction_matchers", %{
+      "0" => %{
+        "transaction_id" => ar_txn.id,
+        "match_amount" => "50.00",
+        "doc_date" => Date.to_string(date),
+        "doc_type" => "Receipt",
+        "t_doc_no" => invoice.invoice_no,
+        "t_doc_type" => "Invoice",
+        "t_doc_date" => Date.to_string(invoice.invoice_date),
+        "t_doc_id" => invoice.id,
+        "amount" => to_string(ar_txn.amount),
+        "all_matched_amount" => "0",
+        "_persistent_id" => "0"
+      }
+    })
   end
 ```
 
-If the Receipt changeset rejects `receipt_description_attrs/2` for missing detail lines, rebuild the detail and cheque maps from the loaded receipt the way Task 3's `invoice_to_attrs/1` does for Invoice.
+If `receipt_attrs_with_funds` rejects a map-as-contact, build the contact from `invoice.contact_id` via `Repo.get!`. If create fails validation, read `ReceiveFund.Receipt` changeset and the matcher `validate_required` list and adjust — do not drop the test.
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
 Run: `mix test test/full_circle/period_lock_test.exs`
-Expected: FAIL with `function FullCircle.ReceiveFund.delete_receipt/3 is undefined`.
+Expected: FAIL — create returns `{:ok, _}`.
 
 - [ ] **Step 3: Implement**
 
-In `update_doc_multi/8`, insert the guard between the `Multi.update` and the `Multi.delete_all`:
-
-```elixir
-    |> Accounting.multi_assert_period_open(
-      fn changes ->
-        [doc.receipt_date, Map.get(changes, step_name, doc).receipt_date]
-      end,
-      com
-    )
-    |> Multi.delete_all(
-```
-
-In the Receipt create multi, insert the guard before its `create_receipt_transactions` call:
-
-```elixir
-    |> Accounting.multi_assert_period_open(
-      fn %{^receipt_name => doc} -> [doc.receipt_date] end,
-      com
-    )
-    |> create_receipt_transactions(receipt_name, com, user)
-```
-
-Match the actual step-name variable used in that function.
-
-Add `delete_receipt/3` next to `update_receipt/4`:
-
-```elixir
-@doc """
-Delete a receipt, refusing when its posting date sits inside a closed period.
-
-`StdInterface.delete/6` does not pass through this context's multi, so the period
-guard has to live here rather than in `update_doc_multi/8`.
-"""
-def delete_receipt(%Receipt{} = receipt, com, user) do
-  case Accounting.assert_period_open([receipt.receipt_date], com) do
-    :ok -> StdInterface.delete(Receipt, "receipt", receipt, com, user)
-    {:error, reason} -> {:error, reason}
-  end
-end
-```
-
-In `lib/full_circle_web/live/receipt_live/form.ex`, change the `handle_event("delete", ...)` clause at line 513 to call `FullCircle.ReceiveFund.delete_receipt(...)` in place of `StdInterface.delete(...)`, keeping the existing result-matching clauses.
+Guard `update_doc_multi/8` between `Multi.update` and `Multi.delete_all` (`[doc.receipt_date, new.receipt_date]`). Guard the create multi before `create_receipt_transactions`. Pipe public create/update through `map_period_closed/1`.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
@@ -1009,9 +1006,9 @@ Expected: PASS.
 - [ ] **Step 5: Format and commit**
 
 ```bash
-mix format lib/full_circle/receive_fund.ex lib/full_circle_web/live/receipt_live/form.ex test/full_circle/period_lock_test.exs
-git add lib/full_circle/receive_fund.ex lib/full_circle_web/live/receipt_live/form.ex test/full_circle/period_lock_test.exs
-git commit -m "feat(period-lock): enforce the cutoff on Receipt, including delete"
+mix format lib/full_circle/receive_fund.ex test/full_circle/period_lock_test.exs
+git add lib/full_circle/receive_fund.ex test/full_circle/period_lock_test.exs
+git commit -m "feat(period-lock): enforce the cutoff on Receipt"
 ```
 
 ---
@@ -1019,18 +1016,10 @@ git commit -m "feat(period-lock): enforce the cutoff on Receipt, including delet
 ## Task 7: Wire Deposit and ReturnCheque
 
 **Files:**
-- Modify: `lib/full_circle/cheque.ex:168-187` (`create_deposit_multi/4`), `:209-228` (`update_deposit_multi/5`), `:243-266` (`create_return_cheque_multi/4`), `:290-310` (`update_return_cheque_multi/5`)
+- Modify: `lib/full_circle/cheque.ex` — all four create/update multis and public functions.
 - Test: `test/full_circle/period_lock_test.exs`
 
-**Interfaces:**
-- Consumes: `Accounting.multi_assert_period_open/3` from Task 2.
-- Produces: the four functions return `{:error, :assert_period_open, :period_closed, _changes}` on a closed-period write.
-
-Neither document has a fingerprint fast path, and neither has any non-GL persisted field, so a full block is the correct behaviour here.
-
 - [ ] **Step 1: Write the failing tests**
-
-Append to `test/full_circle/period_lock_test.exs`. `FullCircle.ChequeFixtures` has `deposit_fixture(company, user, opts)` but **no** `deposit_attrs` builder — `deposit_fixture/3` inlines its attrs and hardcodes today's date. The helper below reproduces that attrs map with the date parameterised.
 
 ```elixir
   describe "Deposit under a closed period" do
@@ -1040,97 +1029,57 @@ Append to `test/full_circle/period_lock_test.exs`. `FullCircle.ChequeFixtures` h
     end
 
     test "creating into a closed period is rejected", %{company: company, admin: admin} do
-      {:ok, company} = Sys.close_period_through(company, Date.utc_today(), admin)
-      attrs = deposit_attrs_dated(company, admin, Date.utc_today())
+      {:ok, _} = Sys.close_period_through(company, Date.utc_today(), admin)
 
-      assert {:error, :assert_period_open, :period_closed, _} =
-               FullCircle.Cheque.create_deposit(attrs, company, admin)
+      assert {:error, :period_closed} =
+               FullCircle.Cheque.create_deposit(
+                 deposit_attrs_dated(company, admin, Date.utc_today()),
+                 company,
+                 admin
+               )
     end
 
     test "creating after the cutoff succeeds", %{company: company, admin: admin} do
-      {:ok, company} = Sys.close_period_through(company, Date.add(Date.utc_today(), -30), admin)
-      attrs = deposit_attrs_dated(company, admin, Date.utc_today())
+      {:ok, _} = Sys.close_period_through(company, Date.add(Date.utc_today(), -30), admin)
 
       assert {:ok, %{create_deposit: _}} =
-               FullCircle.Cheque.create_deposit(attrs, company, admin)
+               FullCircle.Cheque.create_deposit(
+                 deposit_attrs_dated(company, admin, Date.utc_today()),
+                 company,
+                 admin
+               )
+    end
+  end
+
+  describe "ReturnCheque under a closed period" do
+    setup do
+      %{admin: admin, company: company} = FullCircle.BillingFixtures.billing_setup()
+      %{admin: admin, company: company}
+    end
+
+    test "creating into a closed period is rejected", %{company: company, admin: admin} do
+      {:ok, _} = Sys.close_period_through(company, Date.utc_today(), admin)
+
+      assert {:error, :period_closed} =
+               FullCircle.Cheque.create_return_cheque(
+                 return_cheque_attrs_dated(company, admin, Date.utc_today()),
+                 company,
+                 admin
+               )
     end
   end
 ```
 
-Add this private helper at the bottom of the test module:
-
-```elixir
-  defp deposit_attrs_dated(company, user, date) do
-    bank_acct = FullCircle.ChequeFixtures.bank_account_fixture(company, user)
-    funds_from_acct = FullCircle.ReceiveFundFixtures.funds_account_fixture(company, user)
-
-    %{
-      "deposit_date" => Date.to_string(date),
-      "bank_name" => bank_acct.name,
-      "bank_id" => bank_acct.id,
-      "funds_from_name" => funds_from_acct.name,
-      "funds_from_id" => funds_from_acct.id,
-      "funds_amount" => "100.00",
-      "descriptions" => "Test deposit"
-    }
-  end
-```
+`deposit_attrs_dated/3` is the map inside `ChequeFixtures.deposit_fixture/3` with the date parameterised. `return_cheque_attrs_dated/3` copies `ChequeFixtures.return_cheque_fixture/2`: create a receipt-with-cheque **before** closing the period (or dated after the cutoff if you close first — the receipt itself must not be blocked), then build the return attrs with the given `return_date`.
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
 Run: `mix test test/full_circle/period_lock_test.exs`
-Expected: FAIL — the create test returns `{:ok, _}`.
+Expected: FAIL — create returns `{:ok, _}`.
 
 - [ ] **Step 3: Implement**
 
-In `create_deposit_multi/4`, before the final `create_deposit_transactions` call:
-
-```elixir
-    |> Accounting.multi_assert_period_open(
-      fn %{^deposit_name => doc} -> [doc.deposit_date] end,
-      com
-    )
-    |> create_deposit_transactions(deposit_name, com, user)
-```
-
-In `update_deposit_multi/5`, between `Sys.insert_log_for` and `Multi.delete_all`:
-
-```elixir
-    |> Accounting.multi_assert_period_open(
-      fn changes ->
-        [deposit.deposit_date, Map.get(changes, deposit_name, deposit).deposit_date]
-      end,
-      com
-    )
-    |> Multi.delete_all(
-```
-
-In `create_return_cheque_multi/4`, before the final `create_return_cheque_transactions` call:
-
-```elixir
-    |> Accounting.multi_assert_period_open(
-      fn %{^return_name => doc} -> [doc.return_date] end,
-      com
-    )
-    |> create_return_cheque_transactions(return_name, com, user)
-```
-
-In `update_return_cheque_multi/5`, between `Sys.insert_log_for` and `Multi.delete_all`:
-
-```elixir
-    |> Accounting.multi_assert_period_open(
-      fn changes ->
-        [
-          return_cheque.return_date,
-          Map.get(changes, return_cheque_name, return_cheque).return_date
-        ]
-      end,
-      com
-    )
-    |> Multi.delete_all(
-```
-
-Add `alias FullCircle.Accounting` at the top of `cheque.ex` if not already present.
+Guard each create multi before its `create_*_transactions` (`deposit_date` / `return_date`). Guard each update multi between log insert and `Multi.delete_all`. Pipe the four public functions through `map_period_closed/1`. Add `alias FullCircle.Accounting` if missing.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
@@ -1150,18 +1099,12 @@ git commit -m "feat(period-lock): enforce the cutoff on Deposit and ReturnCheque
 ## Task 8: Wire Journal
 
 **Files:**
-- Modify: `lib/full_circle/journal_entry.ex:140-172` (`create_journal_multi/4`), `:195-225` (`update_journal_multi/5`)
+- Modify: `lib/full_circle/journal_entry.ex` — `create_journal_multi/4`, `update_journal_multi/5`, public create/update.
 - Test: `test/full_circle/period_lock_test.exs`
 
-**Interfaces:**
-- Consumes: `Accounting.multi_assert_period_open/3` from Task 2.
-- Produces: `JournalEntry.create_journal/3` and `update_journal/4` return `{:error, :assert_period_open, :period_closed, _changes}` on a closed-period write.
-
-Journal is shaped differently from every other document: its transactions are a `has_many` with `on_replace: :delete`, written by `cast_assoc` inside the Journal changeset. There is no separate transaction build step and no `Multi.delete_all`. The guard therefore goes immediately **after** the `Multi.insert` / `Multi.update`, reading the resulting struct; a failing step aborts and rolls the whole transaction back.
+Journal transactions are a `has_many` with `on_replace: :delete`, written by `cast_assoc`. There is no separate `delete_all`. Place the guard **after** `Multi.insert` / `Multi.update` so a failing step rolls the header back.
 
 - [ ] **Step 1: Write the failing tests**
-
-Append to `test/full_circle/period_lock_test.exs`. Build journal attrs the way `journal_live` tests or `accounting_fixtures.ex` do — a Journal needs a balanced `"transactions"` map:
 
 ```elixir
   describe "Journal under a closed period" do
@@ -1171,24 +1114,28 @@ Append to `test/full_circle/period_lock_test.exs`. Build journal attrs the way `
     end
 
     test "creating into a closed period is rejected", %{company: company, admin: admin} do
-      {:ok, company} = Sys.close_period_through(company, Date.utc_today(), admin)
-      attrs = journal_attrs_dated(company, admin, Date.utc_today())
+      {:ok, _} = Sys.close_period_through(company, Date.utc_today(), admin)
 
-      assert {:error, :assert_period_open, :period_closed, _} =
-               FullCircle.JournalEntry.create_journal(attrs, company, admin)
+      assert {:error, :period_closed} =
+               FullCircle.JournalEntry.create_journal(
+                 journal_attrs_dated(company, admin, Date.utc_today()),
+                 company,
+                 admin
+               )
     end
 
     test "creating after the cutoff succeeds", %{company: company, admin: admin} do
-      {:ok, company} = Sys.close_period_through(company, Date.add(Date.utc_today(), -30), admin)
-      attrs = journal_attrs_dated(company, admin, Date.utc_today())
+      {:ok, _} = Sys.close_period_through(company, Date.add(Date.utc_today(), -30), admin)
 
       assert {:ok, %{create_journal: _}} =
-               FullCircle.JournalEntry.create_journal(attrs, company, admin)
+               FullCircle.JournalEntry.create_journal(
+                 journal_attrs_dated(company, admin, Date.utc_today()),
+                 company,
+                 admin
+               )
     end
   end
 ```
-
-The context module is `FullCircle.JournalEntry` (verified). `create_journal_multi/4` merges `"doc_no"`, `"doc_type"`, `"doc_date"`, `"contact_particulars"` and `"company_id"` into each transaction row itself, so the attrs only need the per-row fields the Journal changeset casts. Add this private helper, adjusting the row keys to whatever `FullCircle.Accounting.Transaction`'s changeset actually casts — read `lib/full_circle/accounting/transaction.ex:88` for the cast list:
 
 ```elixir
   defp journal_attrs_dated(company, user, date) do
@@ -1217,39 +1164,16 @@ The context module is `FullCircle.JournalEntry` (verified). `create_journal_mult
   end
 ```
 
-If no existing test creates a Journal, drive `lib/full_circle_web/live/journal_live/form.ex` in the browser once and copy the params it submits — that is the authoritative shape.
+Read `Transaction.journal_entry_changeset/2` if this map is rejected and adjust keys.
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
 Run: `mix test test/full_circle/period_lock_test.exs`
-Expected: FAIL — the create test returns `{:ok, _}`.
+Expected: FAIL — create returns `{:ok, _}`.
 
 - [ ] **Step 3: Implement**
 
-In `create_journal_multi/4`, append the guard after the log insert at the end of the pipeline:
-
-```elixir
-    |> Accounting.multi_assert_period_open(
-      fn %{^journal_name => doc} -> [doc.journal_date] end,
-      com
-    )
-```
-
-In `update_journal_multi/5`, insert the guard between the `Multi.update` and `Sys.insert_log_for`:
-
-```elixir
-    multi
-    |> Multi.update(journal_name, StdInterface.changeset(Journal, journal, attrs, com))
-    |> Accounting.multi_assert_period_open(
-      fn changes ->
-        [journal.journal_date, Map.get(changes, journal_name, journal).journal_date]
-      end,
-      com
-    )
-    |> Sys.insert_log_for(journal_name, attrs, com, user)
-```
-
-Add `alias FullCircle.Accounting` at the top of `journal_entry.ex` if not already present.
+Append the guard after the log insert on create (`[doc.journal_date]`). On update, insert it between `Multi.update` and `Sys.insert_log_for`, dates `[journal.journal_date, new.journal_date]`. Pipe public create/update through `map_period_closed/1`.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
@@ -1269,18 +1193,25 @@ git commit -m "feat(period-lock): enforce the cutoff on Journal"
 ## Task 9: Surface the rejection in the document forms
 
 **Files:**
-- Modify: `lib/full_circle_web/live/invoice_live/form.ex:786` and the equivalent result-matching clause in `pur_invoice_live/form.ex:940`, `receipt_live/form.ex:617`, `payment_live/form.ex:613`, `credit_note_live/form.ex:314`, `debit_note_live/form.ex:364`, and `journal_live/form.ex`
+- Modify the save `case` in:
+  - `lib/full_circle_web/live/invoice_live/form.ex`
+  - `lib/full_circle_web/live/pur_invoice_live/form.ex`
+  - `lib/full_circle_web/live/receipt_live/form.ex`
+  - `lib/full_circle_web/live/payment_live/form.ex`
+  - `lib/full_circle_web/live/credit_note_live/form.ex`
+  - `lib/full_circle_web/live/debit_note_live/form.ex`
+  - `lib/full_circle_web/live/journal_live/form.ex`
+  - `lib/full_circle_web/live/cheque_live/deposit_form.ex`
+  - `lib/full_circle_web/live/cheque_live/return_cheque_form.ex`
 - Test: `test/full_circle_web/live/period_lock_live_test.exs` (create)
 
-**Interfaces:**
-- Consumes: the `{:error, :assert_period_open, :period_closed, _changes}` and `{:error, :period_closed}` returns from Tasks 3–8.
-- Produces: no new module interface; user-visible flash only.
+Contexts now return `{:error, :period_closed}`. A 2-tuple does not collide with `{:error, failed_operation, changeset, _}`. Add the clause on **new and edit** save paths of each form. Journal / Deposit / ReturnCheque have no `{:error, :closed}` today — add this clause anyway.
 
-Each of these forms already has an `{:error, :closed} ->` clause. Add a sibling clause beside it.
+Do **not** change any `handle_event("delete")`.
 
 - [ ] **Step 1: Write the failing test**
 
-Create `test/full_circle_web/live/period_lock_live_test.exs`. Model the setup on `test/full_circle_web/live/stale_save_live_test.exs`, which already drives a document form to a save failure — read it and follow its login and navigation helpers:
+Create `test/full_circle_web/live/period_lock_live_test.exs`. Follow login/navigation in `test/full_circle_web/live/stale_save_live_test.exs`. Invoice form id is `object-form`.
 
 ```elixir
 defmodule FullCircleWeb.PeriodLockLiveTest do
@@ -1301,9 +1232,6 @@ defmodule FullCircleWeb.PeriodLockLiveTest do
     {:ok, view, _html} =
       live(conn, ~p"/companies/#{company.id}/Invoice/#{invoice.id}/edit")
 
-    # Must change a GL-affecting field. Invoice has the fingerprint fast path, so
-    # a descriptions-only edit still succeeds by design (see Task 3) and would
-    # not exercise this clause.
     html =
       view
       |> form("#object-form",
@@ -1316,8 +1244,6 @@ defmodule FullCircleWeb.PeriodLockLiveTest do
 end
 ```
 
-The form id, param key and route must match what the invoice form actually uses — read `lib/full_circle_web/live/invoice_live/form.ex` and the router before finalising them.
-
 - [ ] **Step 2: Run the test to verify it fails**
 
 Run: `mix test test/full_circle_web/live/period_lock_live_test.exs`
@@ -1325,24 +1251,7 @@ Expected: FAIL — no flash matching "Accounting period is closed".
 
 - [ ] **Step 3: Implement**
 
-In each of the seven forms, beside the existing `{:error, :closed} ->` clause in the save result `case`, add:
-
-```elixir
-      {:error, :assert_period_open, :period_closed, _} ->
-        {:noreply,
-         socket
-         |> put_flash(
-           :warn,
-           gettext("Accounting period is closed on or before %{date}.",
-             date:
-               to_string(
-                 FullCircle.Sys.period_closed_through(socket.assigns.current_company)
-               )
-           )
-         )}
-```
-
-In the Receipt and Payment forms, add the same message for the delete path's `{:error, :period_closed}` return from Task 5 and Task 6:
+In every save `case` listed above (both `:new` and `:edit` where they are separate functions):
 
 ```elixir
       {:error, :period_closed} ->
@@ -1359,7 +1268,7 @@ In the Receipt and Payment forms, add the same message for the delete path's `{:
          )}
 ```
 
-The flash kind must be `:warn`. `:warning` renders nothing.
+Flash kind must be `:warn`.
 
 - [ ] **Step 4: Run the test to verify it passes**
 
@@ -1369,7 +1278,7 @@ Expected: PASS.
 - [ ] **Step 5: Format and commit**
 
 ```bash
-mix format lib/full_circle_web/live/invoice_live/form.ex lib/full_circle_web/live/pur_invoice_live/form.ex lib/full_circle_web/live/receipt_live/form.ex lib/full_circle_web/live/payment_live/form.ex lib/full_circle_web/live/credit_note_live/form.ex lib/full_circle_web/live/debit_note_live/form.ex lib/full_circle_web/live/journal_live/form.ex test/full_circle_web/live/period_lock_live_test.exs
+mix format lib/full_circle_web/live/invoice_live/form.ex lib/full_circle_web/live/pur_invoice_live/form.ex lib/full_circle_web/live/receipt_live/form.ex lib/full_circle_web/live/payment_live/form.ex lib/full_circle_web/live/credit_note_live/form.ex lib/full_circle_web/live/debit_note_live/form.ex lib/full_circle_web/live/journal_live/form.ex lib/full_circle_web/live/cheque_live/deposit_form.ex lib/full_circle_web/live/cheque_live/return_cheque_form.ex test/full_circle_web/live/period_lock_live_test.exs
 git add lib/full_circle_web/live/ test/full_circle_web/live/period_lock_live_test.exs
 git commit -m "feat(period-lock): flash the cutoff date when a save is blocked"
 ```
@@ -1379,25 +1288,21 @@ git commit -m "feat(period-lock): flash the cutoff date when a save is blocked"
 ## Task 10: The administrator control on the company form
 
 **Files:**
-- Modify: `lib/full_circle_web/live/company_live/form.ex` (near the LLM settings block at lines 118-170 and its `handle_event` at line 274)
+- Modify: `lib/full_circle_web/live/company_live/form.ex`
 - Test: `test/full_circle_web/live/period_lock_live_test.exs`
 
-**Interfaces:**
-- Consumes: `Sys.period_closed_through/1`, `Sys.close_period_through/3` from Task 1.
-- Produces: no new module interface.
+The edit route is `/edit_company/:id`. `mount_edit` already assigns `:company` from `Sys.get_company!/1` and `:current_role`. LLM settings use `@current_role == "admin"` — reuse that, do not invent `@is_admin`.
 
-The LLM settings block in this file is the pattern to follow — it reads a namespaced settings map in `mount`, renders its own form, and saves through a dedicated `handle_event`.
+The period form is a **sibling after** `</.form>` of `#company`. Do not nest it.
 
 - [ ] **Step 1: Write the failing tests**
-
-Append to `test/full_circle_web/live/period_lock_live_test.exs`:
 
 ```elixir
   test "an admin sees the period cutoff control", %{conn: conn} do
     %{admin: admin, company: company} = billing_setup()
     conn = log_in_user(conn, admin)
 
-    {:ok, _view, html} = live(conn, ~p"/companies/#{company.id}/edit")
+    {:ok, _view, html} = live(conn, ~p"/edit_company/#{company.id}")
 
     assert html =~ "Close Accounting Period"
   end
@@ -1405,11 +1310,11 @@ Append to `test/full_circle_web/live/period_lock_live_test.exs`:
   test "a clerk does not see the period cutoff control", %{conn: conn} do
     %{admin: admin, company: company} = billing_setup()
     clerk = FullCircle.UserAccountsFixtures.user_fixture()
-    {:ok, _} = Sys.allow_user_to_access(company, clerk, "clerk")
+    {:ok, _} = Sys.allow_user_to_access(company, clerk, "clerk", admin)
 
     conn = log_in_user(conn, clerk)
 
-    {:ok, _view, html} = live(conn, ~p"/companies/#{company.id}/edit")
+    {:ok, _view, html} = live(conn, ~p"/edit_company/#{company.id}")
 
     refute html =~ "Close Accounting Period"
   end
@@ -1418,7 +1323,7 @@ Append to `test/full_circle_web/live/period_lock_live_test.exs`:
     %{admin: admin, company: company} = billing_setup()
     conn = log_in_user(conn, admin)
 
-    {:ok, view, _html} = live(conn, ~p"/companies/#{company.id}/edit")
+    {:ok, view, _html} = live(conn, ~p"/edit_company/#{company.id}")
 
     view
     |> form("#period-lock-form", period: %{closed_through: "2025-12-31"})
@@ -1429,90 +1334,80 @@ Append to `test/full_circle_web/live/period_lock_live_test.exs`:
   end
 ```
 
-Confirm the company edit route from the router before finalising the `~p` paths, and match `allow_user_to_access/3` to whatever `sys.ex` actually exposes.
+`allow_user_to_access/4` — granting admin last.
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
 Run: `mix test test/full_circle_web/live/period_lock_live_test.exs`
-Expected: FAIL — no "Close Accounting Period" text in the rendered form.
+Expected: FAIL — no "Close Accounting Period" text.
 
 - [ ] **Step 3: Implement**
 
-Add to `mount/3` in `company_live/form.ex`, beside the existing `:llm_settings` assign:
+In `mount_edit/2`, after the existing assigns:
 
 ```elixir
 |> assign(:closed_through, Sys.period_closed_through(company))
-|> assign(:is_admin, Sys.user_role_in_company(current_user.id, company.id) == "admin")
 ```
 
-Use whichever variable names the surrounding `mount/3` already binds for the company and the current user.
-
-Add the block to `render/1`, near the existing closing_month/closing_day fields:
+After the company `</.form>` (the one that ends just before `end` of `render/1`), add:
 
 ```heex
-<div :if={@is_admin} class="mt-6 rounded border border-amber-400 p-4">
-  <div class="font-medium text-lg">{gettext("Close Accounting Period")}</div>
-  <p class="text-sm mb-2">
-    {gettext(
-      "Blocks creating, amending or deleting any document dated on or before this date. This is separate from the financial-year closing month and day above. Clear the field to reopen."
-    )}
-  </p>
-  <p :if={@closed_through} class="text-sm mb-2 font-medium">
-    {gettext("Currently closed through %{date}", date: to_string(@closed_through))}
-  </p>
-  <.form id="period-lock-form" for={%{}} as={:period} phx-submit="save_period_lock">
-    <input
-      type="date"
-      name="period[closed_through]"
-      value={to_string(@closed_through)}
-      class="rounded border p-2"
-    />
-    <button
-      class="button orange"
-      data-confirm={
-        gettext("Closing a period blocks all edits to documents dated on or before it. Continue?")
-      }
+    <div
+      :if={@live_action == :edit and @current_role == "admin"}
+      class="max-w-2xl mx-auto mt-6 rounded border border-amber-400 p-4"
     >
-      {gettext("Save")}
-    </button>
-  </.form>
-</div>
+      <div class="font-medium text-lg">{gettext("Close Accounting Period")}</div>
+      <p class="text-sm mb-2">
+        {gettext(
+          "Blocks creating or amending any document dated on or before this date. This is separate from the financial-year closing month and day above. Clear the field to reopen."
+        )}
+      </p>
+      <p :if={@closed_through} class="text-sm mb-2 font-medium">
+        {gettext("Currently closed through %{date}", date: to_string(@closed_through))}
+      </p>
+      <.form id="period-lock-form" for={%{}} as={:period} phx-submit="save_period_lock">
+        <input
+          type="date"
+          name="period[closed_through]"
+          value={to_string(@closed_through)}
+          class="rounded border p-2"
+        />
+        <button
+          class="button orange"
+          data-confirm={
+            gettext("Closing a period blocks all edits to documents dated on or before it. Continue?")
+          }
+        >
+          {gettext("Save")}
+        </button>
+      </.form>
+    </div>
 ```
-
-Match the surrounding file's Tailwind conventions, and check both light and dark themes render acceptably.
-
-Add the `handle_event`:
 
 ```elixir
-def handle_event("save_period_lock", %{"period" => %{"closed_through" => str}}, socket) do
-  date =
-    case Date.from_iso8601(str) do
-      {:ok, d} -> d
-      {:error, _} -> nil
+  def handle_event("save_period_lock", %{"period" => %{"closed_through" => str}}, socket) do
+    date =
+      case Date.from_iso8601(str) do
+        {:ok, d} -> d
+        {:error, _} -> nil
+      end
+
+    case Sys.close_period_through(socket.assigns.company, date, socket.assigns.current_user) do
+      {:ok, company} ->
+        {:noreply,
+         socket
+         |> assign(:company, company)
+         |> assign(:closed_through, Sys.period_closed_through(company))
+         |> put_flash(:info, gettext("Accounting period updated."))}
+
+      {:error, :future_date} ->
+        {:noreply, put_flash(socket, :warn, gettext("Cannot close a period that has not ended."))}
+
+      :not_authorise ->
+        {:noreply, put_flash(socket, :warn, gettext("Not authorised."))}
     end
-
-  case Sys.close_period_through(
-         socket.assigns.company,
-         date,
-         socket.assigns.current_user
-       ) do
-    {:ok, company} ->
-      {:noreply,
-       socket
-       |> assign(:company, company)
-       |> assign(:closed_through, Sys.period_closed_through(company))
-       |> put_flash(:info, gettext("Accounting period updated."))}
-
-    {:error, :future_date} ->
-      {:noreply, put_flash(socket, :warn, gettext("Cannot close a period that has not ended."))}
-
-    :not_authorise ->
-      {:noreply, put_flash(socket, :warn, gettext("Not authorised."))}
   end
-end
 ```
-
-Match the socket assign names the file already uses for the company and current user.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
@@ -1535,15 +1430,9 @@ git commit -m "feat(period-lock): admin control for the cutoff on the company fo
 - Create: `priv/repo/migrations/<timestamp>_add_update_closed_transaction_trigger.exs`
 - Test: `test/full_circle/period_lock_test.exs`
 
-**Interfaces:**
-- Consumes: nothing. Independent of Tasks 1–10 and safe to do in any order.
-- Produces: no module interface. A direct `UPDATE` of a transaction with `closed = true` now raises.
-
-Migration `20230421072511_create_transaction_trigger.exs` defines a function named `cannot_update_or_delete_closed_transaction` whose message reads "Cannot update or delete a CLOSED transaction!", but only ever creates `BEFORE DELETE`. The function itself already handles the `OLD.closed = true` case and needs no change.
+The 2023 function `RETURN OLD` on success. That is correct for DELETE and **wrong for UPDATE** (PostgreSQL writes the old row; bank-rec `match_group_id` / Journal `cast_assoc` would silently no-op). Replace the function and add the trigger.
 
 - [ ] **Step 1: Write the failing test**
-
-Append to `test/full_circle/period_lock_test.exs`:
 
 ```elixir
   describe "closed transaction trigger" do
@@ -1576,7 +1465,10 @@ Append to `test/full_circle/period_lock_test.exs`:
       end
     end
 
-    test "an open transaction updates normally", %{company: company, admin: admin} do
+    test "an open transaction updates and the new value is stored", %{
+      company: company,
+      admin: admin
+    } do
       invoice = FullCircle.BillingFixtures.invoice_fixture(company, admin)
 
       txn =
@@ -1591,37 +1483,48 @@ Append to `test/full_circle/period_lock_test.exs`:
                  from(t in FullCircle.Accounting.Transaction, where: t.id == ^txn.id),
                  set: [particulars: "fine"]
                )
+
+      assert Repo.get!(FullCircle.Accounting.Transaction, txn.id).particulars == "fine"
     end
   end
 ```
 
-The first `update_all` that sets `closed: true` must run **before** the trigger exists to bite — it sets `closed` on a row whose `OLD.closed` is still `false`, so it passes the trigger check either way.
+The first `update_all` that sets `closed: true` must run **before** the trigger bites — `OLD.closed` is still false, so it passes either way. The open-transaction test **must** reload the column. `{1, _}` alone would pass under the old `RETURN OLD` function.
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
 Run: `mix test test/full_circle/period_lock_test.exs`
-Expected: FAIL — the update succeeds where `Postgrex.Error` is asserted.
+Expected: FAIL — the closed update succeeds where `Postgrex.Error` is asserted.
 
 - [ ] **Step 3: Implement**
-
-Generate the migration:
 
 ```bash
 mix ecto.gen.migration add_update_closed_transaction_trigger
 ```
 
-Fill it in:
-
 ```elixir
 defmodule FullCircle.Repo.Migrations.AddUpdateClosedTransactionTrigger do
   use Ecto.Migration
 
-  # 20230421072511 created cannot_update_or_delete_closed_transaction/0 and a
-  # BEFORE DELETE trigger, but never the BEFORE UPDATE half its name and error
-  # message promise. A direct UPDATE of a closed transaction has succeeded
-  # silently since then. The function is unchanged; only the trigger is added.
-
   def up do
+    execute """
+    CREATE OR REPLACE FUNCTION cannot_update_or_delete_closed_transaction()
+      RETURNS trigger AS $trigger$
+      BEGIN
+        IF (OLD.closed = true) AND EXISTS(SELECT 1 FROM companies WHERE id=OLD.company_id) THEN
+          RAISE EXCEPTION 'Cannot update or delete a CLOSED transaction!'
+            USING ERRCODE = 'integrity_constraint_violation';
+        END IF;
+
+        IF TG_OP = 'UPDATE' THEN
+          RETURN NEW;
+        ELSE
+          RETURN OLD;
+        END IF;
+      END;
+      $trigger$ LANGUAGE plpgsql;
+    """
+
     execute """
     CREATE TRIGGER update_closed_transaction_trigger
       BEFORE UPDATE ON transactions FOR EACH ROW
@@ -1631,6 +1534,20 @@ defmodule FullCircle.Repo.Migrations.AddUpdateClosedTransactionTrigger do
 
   def down do
     execute "DROP TRIGGER update_closed_transaction_trigger ON transactions;"
+
+    execute """
+    CREATE OR REPLACE FUNCTION cannot_update_or_delete_closed_transaction()
+      RETURNS trigger AS $trigger$
+      BEGIN
+        IF (OLD.closed = true) AND EXISTS(SELECT 1 FROM companies WHERE id=OLD.company_id) THEN
+          RAISE EXCEPTION 'Cannot update or delete a CLOSED transaction!'
+            USING ERRCODE = 'integrity_constraint_violation';
+        ELSE
+          RETURN OLD;
+        END IF;
+      END;
+      $trigger$ LANGUAGE plpgsql;
+    """
   end
 end
 ```
@@ -1640,17 +1557,17 @@ end
 Run: `mix ecto.migrate && mix test test/full_circle/period_lock_test.exs`
 Expected: PASS.
 
-Then run the whole suite — this trigger is global and could catch an existing test that updates a seeded closed transaction:
+Then the whole suite — this trigger is global:
 
 Run: `mix test`
-Expected: PASS, no regressions against the 1105-test baseline. If a seeding or reporting test now fails, the trigger has found a real write to a closed transaction; report it rather than weakening the trigger.
+Expected: PASS. If a seeding or bank-rec test now fails because it updates a `closed = true` row, report it rather than weakening the trigger.
 
 - [ ] **Step 5: Format and commit**
 
 ```bash
 mix format test/full_circle/period_lock_test.exs
 git add priv/repo/migrations/ test/full_circle/period_lock_test.exs
-git commit -m "fix(accounting): add the BEFORE UPDATE trigger for closed transactions"
+git commit -m "fix(accounting): BEFORE UPDATE trigger for closed transactions returns NEW"
 ```
 
 ---
@@ -1661,26 +1578,27 @@ git commit -m "fix(accounting): add the BEFORE UPDATE trigger for closed transac
 - Create: `.claude/skills/accounting-period-lock.md`
 - Modify: `CLAUDE.md` (the project-skills list under "Domain Contexts")
 
-**Interfaces:**
-- Consumes: the finished behaviour from Tasks 1–11.
-- Produces: no code interface.
-
-Per the project's Skill Authoring Convention, a non-obvious contract like this belongs in a skill. **Ask the user to confirm before finalising** — do not create it silently.
+Per the project's Skill Authoring Convention, **ask the user to confirm before finalising**.
 
 - [ ] **Step 1: Draft the skill**
 
-Create `.claude/skills/accounting-period-lock.md` with frontmatter whose `description` names the trigger conditions — editing a document context's save path, adding a new GL-posting document type, or debugging a `:period_closed` error. Contents:
+Frontmatter `description` must name the triggers: editing a document context's save path, adding a new GL-posting document type, or debugging a `:period_closed` error.
 
-- Where the cutoff lives and the two `Sys` functions that read and write it.
-- The rule, stated once: a save is blocked when it would write or delete GL rows dated on or before the cutoff.
-- Why the guard sits in the multi and not in `make_changeset/5`.
-- The `doc_transactions_unchanged?` asymmetry: Invoice, PurInvoice, CreditNote and DebitNote keep non-GL editability; Payment, Receipt, Deposit, ReturnCheque and Journal do not.
-- **Any new GL-posting document type must add the guard** before its transaction build and its transaction `delete_all`, or it silently bypasses the lock.
-- That `transactions.closed` is unrelated and means "seeded opening balance".
+Contents:
+
+- Cutoff lives in `companies.settings["period"]["closed_through"]`. `Sys.period_closed_through/1` **always re-reads the DB**. Do not read `company.settings` off the session struct.
+- `Sys.close_period_through/3` is the only writer. Admin only. Logged as `close_period`.
+- Rule: a save is blocked when it would write or rebuild GL rows dated on or before the cutoff.
+- Guard sits in the multi, not in `make_changeset/5`. Public APIs return `{:error, :period_closed}` via `Accounting.map_period_closed/1`.
+- Fast-path asymmetry: Invoice, PurInvoice, CreditNote, DebitNote keep non-GL editability; Payment, Receipt, Deposit, ReturnCheque, Journal do not.
+- There is no document-level delete. Receipt/Payment `handle_event("delete")` is dead leftover — do not wrap it, do not build on it.
+- Any new GL-posting document type must add the guard before its transaction build / `delete_all`, or it silently bypasses the lock.
+- `transactions.closed` means "seeded opening balance". The UPDATE trigger must `RETURN NEW` for open rows.
+- Payroll, trading, and fixed-asset depreciation are not covered yet.
 
 - [ ] **Step 2: Add the pointer to CLAUDE.md**
 
-Append `accounting-period-lock.md` to the project-skills list in the "Domain Contexts" section.
+Append `accounting-period-lock.md` to the project-skills list.
 
 - [ ] **Step 3: Ask the user to confirm, then commit**
 
@@ -1693,7 +1611,7 @@ git commit -m "docs: accounting period lock skill"
 
 ## Final verification
 
-- [ ] Run the full suite: `mix test`. Expected: PASS, no regressions against the 1105-test baseline.
-- [ ] Confirm `git status` is clean and no unrelated file was reformatted (`git diff --stat HEAD~12..HEAD` should list only the files named in this plan).
-- [ ] Manually exercise the flow in `mix phx.server`: set a cutoff on a test company, confirm an invoice dated before it is refused with the flash, confirm a description-only edit on that same invoice still saves, then clear the cutoff and confirm both save.
-- [ ] Check the company-form control in both light and dark themes.
+- [ ] Run the full suite: `mix test`. Expected: PASS.
+- [ ] Confirm `git status` is clean and no unrelated file was reformatted.
+- [ ] Manually exercise in `mix phx.server`: set a cutoff on a test company (`/edit_company/:id`), confirm an invoice dated on or before it is refused with the flash naming the date, confirm a description-only edit on that invoice still saves, confirm a new receipt dated after the cutoff can still match that invoice, then clear the cutoff and confirm both save.
+- [ ] Confirm there is still no Delete control on Receipt or Payment.

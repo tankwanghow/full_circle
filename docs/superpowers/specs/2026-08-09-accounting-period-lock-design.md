@@ -1,6 +1,7 @@
 # Accounting Period Lock — Design
 
 **Date:** 2026-08-09
+**Revised:** 2026-08-13 (review: session-stale cutoff, UPDATE trigger `RETURN NEW`, map `:period_closed` at the public API, drop Receipt/Payment delete, drop false e-invoice write-back risk)
 **Status:** Approved
 
 ## Problem
@@ -23,8 +24,9 @@ A substantial part of the enforcement chain is built but idle:
 - `transactions.closed` — a boolean column.
 - `Accounting.assert_doc_editable/4` (`accounting.ex:30`) returns `{:error, :closed}`
   when any of a document's transactions is closed.
-- All six document forms already render that error (invoice, pur_invoice, receipt,
-  payment, credit_note, debit_note).
+- Invoice, PurInvoice, Receipt, Payment, CreditNote and DebitNote forms already render
+  that error. Journal, Deposit and ReturnCheque do not — they have no `{:error, :closed}`
+  clause.
 - `billing.ex:369` and `debcre.ex:684` classify the Postgres exception raised by the
   DB trigger into `{:error, :closed}`.
 - A `BEFORE DELETE` trigger on `transactions` raises when a closed transaction is
@@ -44,25 +46,52 @@ Two gaps in that existing machinery:
    migration or any other. A direct UPDATE of a closed transaction succeeds silently.
    This is a latent bug independent of period locking, and is fixed as part of this work.
 
+   The function cannot be reused unchanged. It `RETURN OLD` on the success path, which
+   is correct for `BEFORE DELETE` and **wrong for `BEFORE UPDATE`**: PostgreSQL writes
+   the old row and reports success, so bank-rec `update_all` of `match_group_id` /
+   `reconciled` and Journal `cast_assoc` updates would silently no-op. The function
+   must `RETURN NEW` on UPDATE and keep `RETURN OLD` on DELETE.
+
 ## Design decisions
 
 | Decision | Choice |
 |---|---|
 | Mechanism | A cutoff date on the company, not a per-row flag sweep |
 | Who sets it | An administrator, explicitly. Never derived, never advanced by a job |
-| Scope | Core accounting documents + Journal. Payroll and trading deferred |
+| Scope | Core accounting documents + Journal. Payroll, trading, FA depreciation deferred |
 | Admin bypass | None. The cutoff is a hard block for every role |
 | Non-GL edits | Still allowed where the code already allows them |
+| Document delete | None. Receipt/Payment must not be deletable, same as Invoice/Journal/notes |
 
 ### Why a cutoff date rather than a flag sweep
 
 A flag sweep (`UPDATE transactions SET closed = true WHERE doc_date <= ...`) would
 engage the trigger and `assert_doc_editable` that already exist, but it cannot stop a
 *new* backdated document from being created — the rows it would flag don't exist yet.
-A cutoff date governs creation, amendment and deletion from one value, and reopening a
+A cutoff date governs creation and amendment from one value, and reopening a
 period is a single edit rather than an un-flagging pass.
 
 The existing `closed` flag is left alone. It continues to mean "seeded opening balance".
+
+### Receipt and Payment are not deletable documents
+
+Invoice, PurInvoice, CreditNote, DebitNote, Journal, Deposit and ReturnCheque have no
+document-level delete. Receipt and Payment have leftover `handle_event("delete")`
+clauses that call `StdInterface.delete/6`, but they are not a feature:
+
+- Neither form renders a delete control.
+- There is no `:delete_receipt` / `:delete_payment` clause in `authorization.ex`, so
+  the handler would `FunctionClauseError` if invoked.
+- Neither LiveView handles `{:deleted, _}`.
+- There are no delete tests.
+- `transactions.doc_id` is not an FK to the header, so a successful header delete
+  would orphan GL rows or hit `transaction_matchers` `ON DELETE RESTRICT`.
+
+The right correction for a wrong receipt is another document (or an edit while the
+period is still open), not a hole in the gapless number sequence.
+
+This work does **not** add delete wrappers. It does **not** rip the dead handlers out
+either — that cleanup is a follow-up. Period lock only guards create and update.
 
 ## Part 1 — Storage and the administrator action
 
@@ -78,8 +107,14 @@ through `Sys.get_company_settings/2` and `Sys.update_company_settings/3`
 
 **`period_closed_through(company) :: Date.t() | nil`**
 
-Reads `settings["period"]["closed_through"]` and parses it. Returns `nil` when unset or
-unparseable — an unreadable setting must not lock the company out of its own books.
+Re-reads `companies.settings` from the database by `company.id`, then parses
+`settings["period"]["closed_through"]`. Returns `nil` when unset or unparseable —
+an unreadable setting must not lock the company out of its own books.
+
+It must **not** trust `company.settings` on the struct it was passed. `current_company`
+is the Company stuffed into the session (`FullCircleWeb.ActiveCompany`) and is only
+reloaded when the user switches company or posts `update_active_company`. Reading the
+in-memory map would leave every open session unlocked after an admin sets the cutoff.
 
 **`close_period_through(company, date, user)`**
 
@@ -90,8 +125,10 @@ nor logs, so this is a wrapper rather than a direct call:
   `:not_authorise` to match the convention in the document contexts.
 - Rejects a date in the future — a period that has not finished cannot be closed.
   "Future" is evaluated against today in the **company's** `timezone`, not the server's.
+  Today in that timezone is allowed (the day can be closed once it has begun).
 - Accepts `nil` to clear the cutoff entirely.
-- Writes the setting and a `Sys.Log` row in one `Ecto.Multi`, action `"close_period"`,
+- Writes the setting and a `Sys.Log` row in one `Ecto.Multi` (use `Multi.update` on
+  a settings changeset, not `Repo.update` inside `Multi.run`), action `"close_period"`,
   with a delta carrying the previous and new values so that reopening a period is as
   visible in the log as closing one.
 
@@ -100,11 +137,19 @@ authorization and producing the same log entry.
 
 ### UI
 
-A block on the company form (`live/company_live/form.ex`), rendered only when the
-current user is an admin, positioned near the existing `closing_month` / `closing_day`
-fields. It must carry a short explanatory note distinguishing it from those fields —
-"closing day" already means something different in this form, and conflating the two
+A **sibling** block on the company edit page (`live/company_live/form.ex`), rendered
+only when `@current_role == "admin"` (same gate as the LLM settings). Do **not** nest
+a second `<.form>` inside `#company` — that is invalid HTML. The LLM settings are
+fields *inside* the company form; the period lock is its own form **after** `#company`
+closes, because it saves through a dedicated event and must not ride the company
+POST.
+
+Place it visually near `closing_month` / `closing_day` (immediately below the company
+form is fine). It must carry a short explanatory note distinguishing it from those
+fields — "closing day" already means something different, and conflating the two
 would be easy.
+
+The company edit route is `/edit_company/:id`, not `/companies/:id/edit`.
 
 The block shows the current cutoff, a date input, and a confirmation step, since moving
 the date forward locks work and moving it back unlocks it.
@@ -114,7 +159,7 @@ the date forward locks work and moving it back unlocks it.
 ### The rule
 
 > A save is blocked when it would **write** GL rows dated on or before the cutoff, or
-> **delete** GL rows dated on or before the cutoff.
+> **delete-and-rebuild** GL rows dated on or before the cutoff.
 
 Nothing else is blocked. In particular:
 
@@ -130,8 +175,9 @@ Nothing else is blocked. In particular:
 
 Every document context has the same shape: `create_X_multi` builds transactions, and
 `update_X_multi` issues a `Multi.delete_all` over the document's transactions and then
-rebuilds them. The guard is a `Multi.run` step placed immediately before those two
-operations — the precise points at which GL rows are written or removed:
+rebuilds them (Journal is the exception: `cast_assoc` with `on_replace: :delete`). The
+guard is a `Multi.run` step placed immediately before those two operations — the
+precise points at which GL rows are written or removed:
 
 | Context | Functions |
 |---|---|
@@ -150,7 +196,7 @@ On update the guard checks **both** dates — the date of the rows being deleted
 date of the rows being written — so that neither moving a document out of a closed
 period nor moving one into it is possible.
 
-### New function
+### New functions
 
 **`Accounting.assert_period_open(dates, company) :: :ok | {:error, :period_closed}`**
 
@@ -158,52 +204,68 @@ period nor moving one into it is possible.
 create that is the single new document date; on update it is the old and new dates.
 `nil` entries are ignored.
 
-Reads the cutoff via `Sys.period_closed_through/1` and returns `{:error, :period_closed}`
-if any date falls on or before it. Returns `:ok` when no cutoff is set, and `:ok` for an
-empty or all-`nil` list.
+Reads the cutoff via `Sys.period_closed_through/1` (which re-reads the DB) and returns
+`{:error, :period_closed}` if any date falls on or before it. Returns `:ok` when no
+cutoff is set, and `:ok` for an empty or all-`nil` list.
 
 Posting date field per schema: `:invoice_date`, `:pur_invoice_date`, `:receipt_date`,
 `:payment_date`, `:deposit_date`, `:return_date`, `:note_date` (CreditNote and
 DebitNote), `:journal_date`.
 
-### Deletes
+**`Accounting.multi_assert_period_open(multi, dates_fun, company)`**
 
-Only **Receipt** and **Payment** can be deleted as documents. Invoice, PurInvoice,
-CreditNote, DebitNote and Journal have no document-level delete — their forms expose
-only line deletion (`delete_detail` / `delete_trans`), and emptying a document's lines is
-an ordinary GL-affecting save that the guard above already blocks.
+Adds an `:assert_period_open` step. `dates_fun` receives the multi's changes so far.
 
-Receipt and Payment delete through `StdInterface.delete/6` directly from their forms
-(`receipt_live/form.ex:513`, `payment_live/form.ex:509`), which does **not** pass through
-either context's multi and is therefore not covered by the guard above.
+**`Accounting.map_period_closed(result)`**
 
-Two thin context wrappers close this, keeping the rule in the context layer where
-`assert_doc_editable/4` already lives:
+Each public `create_*` / `update_*` pipes `Repo.transaction()` through this:
 
-- `ReceiveFund.delete_receipt(receipt, com, user)`
-- `BillPay.delete_payment(payment, com, user)`
+```elixir
+{:error, :assert_period_open, :period_closed, _} -> {:error, :period_closed}
+other -> other
+```
 
-Each calls `assert_period_open/2` on the document's posting date, then delegates to
-`StdInterface.delete/6`. The two forms call these instead of `StdInterface.delete/6`.
+Do **not** leak the Multi 4-tuple to LiveViews. Every document form already matches
+`{:error, failed_operation, changeset, _}` first and calls `to_form(changeset)` /
+`changeset.errors`. A 4-tuple with `:period_closed` as the "changeset" crashes the
+LiveView. Mapping to the same 2-tuple shape as `:closed` and `:stale` avoids that.
 
 ### Error surfacing
 
-A `Multi.run` returning `{:error, :period_closed}` aborts the transaction and yields
-`{:error, :assert_period_open, :period_closed, _changes}`. Each document context maps
-that to `{:error, :period_closed}` at its public entry point, alongside the existing
-`{:error, :closed}` and `{:error, :stale}` returns. The six forms gain a clause beside
-their existing `{:error, :closed}` clause, flashing a message naming the cutoff date,
-e.g. "Accounting period is closed on or before 2025-12-31."
+The nine document forms (Invoice, PurInvoice, Receipt, Payment, CreditNote, DebitNote,
+Journal, Deposit, ReturnCheque) each gain:
+
+```elixir
+{:error, :period_closed} ->
+  put_flash(:warn, gettext("Accounting period is closed on or before %{date}.",
+    date: to_string(FullCircle.Sys.period_closed_through(socket.assigns.current_company))))
+```
+
+The existing `{:error, :closed}` flash talks about the seed flag ("this document is in
+a closed accounting period"). The new flash **must name the cutoff date** so the two
+mechanisms are distinguishable.
+
+Journal, Deposit and ReturnCheque have no `{:error, :closed}` clause today — add the
+new clause anyway. Placement relative to the generic 4-tuple does not matter once the
+context maps to a 2-tuple.
 
 Flash kind must be `:warn` — `:warning` renders nothing.
 
 ### Trigger fix
 
-A migration adds the `BEFORE UPDATE` trigger on `transactions` that
-`20230421072511`'s function name and error message already promise. The function itself
-is unchanged and already handles the `OLD.closed = true` case; only the trigger is
-missing. This protects the seeded opening balances that `closed` currently guards, and
-is independent of the cutoff date.
+A migration replaces `cannot_update_or_delete_closed_transaction` so that:
+
+- `TG_OP = 'UPDATE'` and `OLD.closed = true` → `RAISE` the existing message
+- `TG_OP = 'UPDATE'` and `OLD.closed = false` → `RETURN NEW`
+- `TG_OP = 'DELETE'` keeps today's behaviour (`RAISE` if closed, else `RETURN OLD`)
+
+and adds the missing `BEFORE UPDATE` trigger. Tests must assert that an open
+transaction's updated column actually changed — `{1, _}` from `update_all` is not
+enough, because the old `RETURN OLD` path would still report one row.
+
+Matching or reconciling a `closed = true` opening-balance line in bank rec will start
+raising. That is the trigger doing its job. Check after migrate whether any live recon
+depends on touching those rows; do not weaken the trigger if one does — report it.
 
 ## Known asymmetry
 
@@ -235,45 +297,61 @@ and recorded as a follow-up.
 
 ## Risks
 
-**E-invoice write-back onto a closed-period Receipt.** Receipt carries `e_inv_uuid` and
-`e_inv_internal_id`, written back by the LHDN flow, and has no fingerprint fast path. A
-write-back onto a receipt dated inside a closed period would be blocked. Unlikely in
-practice — submission happens long before a period is closed — but if it occurs the
-symptom is an e-invoice status that will not update, and the remedy is to reopen the
-period briefly. Worth watching after rollout.
+**Session-stale cutoff.** Mitigated by `period_closed_through/1` always re-reading
+`companies.settings` from the DB. Do not regress this to a struct-field read.
+
+**Bank rec vs `closed = true` opening balances.** After the UPDATE trigger, reconciling
+a seeded opening-balance transaction raises. Opening balances are rarely bank-rec
+lines; if one is, the remedy is to leave it unmatched or clear `closed` on that seed
+row, not to `RETURN OLD`.
 
 **Existing data.** Setting a cutoff on a live company immediately locks historical
 documents. The confirmation step in the UI is the mitigation; there is no migration or
 backfill, and clearing the cutoff fully restores the previous behaviour.
+
+E-invoice write-back (`e_inv_metas.ex`) uses `update_all` on `e_inv_uuid` /
+`e_inv_internal_id` of the document header. It does **not** go through
+`update_receipt` / `update_invoice` and is not blocked by this lock.
 
 ## Testing
 
 Context tests (`test/full_circle/`):
 
 - `Sys.close_period_through/3` — admin succeeds; non-admin returns `:not_authorise`;
-  a future date is rejected; `nil` clears the cutoff; a `Log` row is written on both
-  close and reopen.
+  a future date (company timezone today + 1, not `Date.utc_today() + 1`) is rejected;
+  `nil` clears the cutoff; a `Log` row is written on both close and reopen.
 - `Sys.period_closed_through/1` — unset returns `nil`; a malformed stored value returns
-  `nil` rather than raising.
+  `nil` rather than raising; a company struct whose in-memory `settings` lack the
+  cutoff still reads it after another process wrote it (proves the DB reload).
 - `Accounting.assert_period_open/2` — boundary behaviour: a document dated exactly on
   the cutoff is blocked; the day after is allowed; `:ok` when no cutoff is set.
-- Per document type (all nine): creating into a closed period is rejected; creating
-  after the cutoff succeeds; editing a GL field on a closed-period document is rejected;
-  moving a document's date from an open period into a closed one is rejected, and the
-  reverse likewise.
-- Receipt and Payment only: deleting a closed-period document is rejected, and deleting
-  one dated after the cutoff still succeeds.
-- Invoice and CreditNote specifically: a description-only edit on a closed-period
-  document still succeeds, confirming the fast path is preserved.
-- Receipt and Payment specifically: a description-only edit is rejected, documenting the
-  known asymmetry so a future change to it is a deliberate one.
-- Matching a new receipt against a closed-period invoice succeeds.
+- Per document type (all nine): creating into a closed period is rejected as
+  `{:error, :period_closed}` (not the Multi 4-tuple); creating after the cutoff
+  succeeds.
+- Invoice (fast-path representative): editing a GL field on a closed-period document
+  is rejected; a description-only edit still succeeds; moving a date from open into
+  closed is rejected.
+- CreditNote (fast-path representative): a description-only edit still succeeds.
+- Receipt (no-fast-path representative): a description-only edit is rejected,
+  documenting the known asymmetry. Rebuild the full attrs map (details, funds,
+  cheques, matchers) — a descriptions-only map fails the changeset first.
+- Matching a new receipt (dated after the cutoff) against a closed-period invoice
+  succeeds. Build the matcher from the invoice's contact-bearing `Transaction` row;
+  `receive_fund_test.exs` only has empty `"transaction_matchers" => %{}`.
+
+No document-delete tests. There is no delete to guard.
 
 Migration test: updating a transaction with `closed = true` raises after the new
-trigger, and a transaction with `closed = false` updates normally.
+trigger; a transaction with `closed = false` updates and the changed column is
+visible on reload.
 
-LiveView test (`test/full_circle_web/live/`): the company form shows the cutoff control
-to an admin and not to a clerk; a blocked save surfaces the flash naming the cutoff.
+LiveView test (`test/full_circle_web/live/`):
+
+- Company edit at `~p"/edit_company/#{company.id}"` shows the cutoff control to an
+  admin and not to a clerk. `Sys.allow_user_to_access/4` (admin last).
+- A blocked Invoice save surfaces the flash naming the cutoff.
+
+`invoice_to_attrs/1` must include `"lock_version"`.
 
 ## Follow-ups (not in this work)
 
@@ -282,4 +360,8 @@ to an admin and not to a clerk; a blocked save surfaces the flash naming the cut
 2. Extend the cutoff to payroll (`PaySlip`, `SalaryNote`, `Advance`) and trading
    (`TradingSales`, `TradingSupply`, `TradingTrip`). Payroll needs a decision on how the
    cutoff interacts with the existing `void_deadline` (`pay_slip_op.ex:600`) when the
-   two disagree.
+   two disagree. `hr.ex` (SalaryNote, Advance) and `accounting.ex` (fixed-asset
+   depreciation) already write `transactions` and will remain writable into a "closed"
+   year until this lands.
+3. Remove the dead Receipt/Payment `handle_event("delete")` clauses. They are not
+   reachable from the UI and are not authorized.
