@@ -3,7 +3,6 @@ defmodule FullCircleWeb.PaymentLive.Form do
 
   alias FullCircle.{Accounting, BillPay}
   alias FullCircle.BillPay.{Payment}
-  alias FullCircle.StdInterface
 
   @impl true
   def mount(params, _session, socket) do
@@ -503,33 +502,6 @@ defmodule FullCircleWeb.PaymentLive.Form do
   @impl true
   def handle_event("save", %{"payment" => params}, socket) do
     save(socket, socket.assigns.live_action, params)
-  end
-
-  @impl true
-  def handle_event("delete", _params, socket) do
-    case StdInterface.delete(
-           Payment,
-           "payment",
-           socket.assigns.form.data,
-           socket.assigns.current_company,
-           socket.assigns.current_user
-         ) do
-      {:ok, obj} ->
-        send(self(), {:deleted, obj})
-        {:noreply, socket}
-
-      {:error, failed_operation, changeset, _} ->
-        {:noreply,
-         socket
-         |> put_flash(
-           :error,
-           "#{gettext("Failed")} #{failed_operation}. #{list_errors_to_string(changeset.errors)}"
-         )}
-
-      :not_authorise ->
-        send(self(), :not_authorise)
-        {:noreply, socket}
-    end
   end
 
   defp save(socket, :new, params) do

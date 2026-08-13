@@ -58,9 +58,9 @@ intentional for matcher-owning and full-rebuild docs.
 
 ## No document-level delete
 
-There is no supported document delete for these GL docs. Receipt/Payment
-`handle_event("delete")` (if still present) is **dead leftover** — do not wrap it with
-the period guard and do not build UI or tests on it.
+There is no supported document delete for these GL docs. Do not add a delete
+handler, UI, or tests. The right correction for a wrong receipt or payment is
+another document (or an edit while the period is still open).
 
 ## New GL-posting document types
 

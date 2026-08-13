@@ -369,5 +369,4 @@ LiveView test (`test/full_circle_web/live/`):
    two disagree. `hr.ex` (SalaryNote, Advance) and `accounting.ex` (fixed-asset
    depreciation) already write `transactions` and will remain writable into a "closed"
    year until this lands.
-3. Remove the dead Receipt/Payment `handle_event("delete")` clauses. They are not
-   reachable from the UI and are not authorized.
+3. ~~Remove the dead Receipt/Payment `handle_event("delete")` clauses.~~ Done.
