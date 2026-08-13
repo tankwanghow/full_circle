@@ -45,6 +45,21 @@ defmodule FullCircleWeb.SalaryTypeLive.Form do
     )
   end
 
+  # Default salary types keep their seeded type, except the wage defaults
+  # (Monthly/Daily/Hourly Salary etc.), which may flip between Addition and
+  # FixedWages — the FixedWages subset is the HRD Corp levy base.
+  defp type_locked?(st) do
+    HR.is_default_salary_type?(st) and st.type not in HR.wage_types()
+  end
+
+  defp type_options(st) do
+    if HR.is_default_salary_type?(st) and st.type in HR.wage_types() do
+      HR.wage_types()
+    else
+      HR.salary_type_types()
+    end
+  end
+
   def handle_event(
         "validate",
         %{"_target" => ["salary_type", "db_ac_name"], "salary_type" => params},
@@ -232,11 +247,11 @@ defmodule FullCircleWeb.SalaryTypeLive.Form do
           </div>
           <div class="col-span-3">
             <.input
-              disabled={FullCircle.HR.is_default_salary_type?(@form.data)}
+              disabled={type_locked?(@form.data)}
               field={@form[:type]}
               label={gettext("Type")}
               type="select"
-              options={FullCircle.HR.salary_type_types()}
+              options={type_options(@form.data)}
             />
           </div>
           <div class="col-span-4">
@@ -250,7 +265,7 @@ defmodule FullCircleWeb.SalaryTypeLive.Form do
               type="select"
               label={gettext("Statutory Code")}
               prompt={gettext("— none —")}
-              options={FullCircle.HR.SalaryType.statutory_codes()}
+              options={FullCircle.HR.statutory_categories(@current_company.id)}
             />
           </div>
           <div class="col-span-4">
