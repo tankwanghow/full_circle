@@ -272,6 +272,91 @@ defmodule FullCircle.Sys do
     Repo.update(cs)
   end
 
+  @period_settings_key "period"
+  @closed_through_key "closed_through"
+
+  @doc """
+  The date through which this company's accounting period is closed, or `nil`.
+
+  Always re-reads `companies.settings` from the database. The session
+  `current_company` is a snapshot and must not be trusted for the cutoff.
+  Returns `nil` for an unset or unparseable value.
+  """
+  def period_closed_through(company) do
+    company
+    |> then(&Repo.get!(Company, &1.id))
+    |> get_company_settings(@period_settings_key)
+    |> Map.get(@closed_through_key)
+    |> case do
+      nil ->
+        nil
+
+      str when is_binary(str) ->
+        case Date.from_iso8601(str) do
+          {:ok, date} -> date
+          {:error, _} -> nil
+        end
+
+      _ ->
+        nil
+    end
+  end
+
+  @doc """
+  Close (or reopen) this company's accounting period through `date`.
+
+  Admin only. `nil` clears the cutoff. A date in the future is rejected — a period
+  that has not finished cannot be closed; "future" is judged in the company's own
+  timezone, not the server's.
+  """
+  def close_period_through(company, date, user) do
+    cond do
+      user_role_in_company(user.id, company.id) != "admin" ->
+        :not_authorise
+
+      not is_nil(date) and Date.compare(date, company_today(company)) == :gt ->
+        {:error, :future_date}
+
+      true ->
+        previous = period_closed_through(company)
+        values = if is_nil(date), do: %{}, else: %{@closed_through_key => Date.to_iso8601(date)}
+        fresh = Repo.get!(Company, company.id)
+        new_settings = Map.put(fresh.settings || %{}, @period_settings_key, values)
+
+        # Multi.update is the clearer shape. Repo.update inside Multi.run would
+        # also join this transaction — style, not a correctness fix.
+        Ecto.Multi.new()
+        |> Ecto.Multi.update(:company, Ecto.Changeset.change(fresh, %{settings: new_settings}))
+        |> Ecto.Multi.insert(:close_period_log, fn %{company: com} ->
+          log_changeset(
+            :close_period,
+            com,
+            %{"from" => to_string(previous), "to" => to_string(date)},
+            com,
+            user
+          )
+        end)
+        |> Repo.transaction()
+        |> case do
+          {:ok, %{company: com}} -> {:ok, com}
+          {:error, _, reason, _} -> {:error, reason}
+        end
+    end
+  end
+
+  defp company_today(company) do
+    case company.timezone do
+      tz when is_binary(tz) and tz != "" ->
+        case DateTime.now(tz) do
+          {:ok, dt} -> DateTime.to_date(dt)
+          _ -> Date.utc_today()
+        end
+
+      _ ->
+        Date.utc_today()
+    end
+  end
+
   def get_company!(id) do
     Repo.get!(Company, id)
   end
