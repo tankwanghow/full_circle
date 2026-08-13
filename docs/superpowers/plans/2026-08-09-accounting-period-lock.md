@@ -211,6 +211,8 @@ Add to `lib/full_circle/sys.ex`, directly after `update_company_settings/3`:
         fresh = Repo.get!(Company, company.id)
         new_settings = Map.put(fresh.settings || %{}, @period_settings_key, values)
 
+        # Multi.update is the clearer shape. Repo.update inside Multi.run would
+        # also join this transaction — style, not a correctness fix.
         Ecto.Multi.new()
         |> Ecto.Multi.update(:company, Ecto.Changeset.change(fresh, %{settings: new_settings}))
         |> Ecto.Multi.insert(:close_period_log, fn %{company: com} ->
@@ -1207,6 +1209,8 @@ git commit -m "feat(period-lock): enforce the cutoff on Journal"
 
 Contexts now return `{:error, :period_closed}`. A 2-tuple does not collide with `{:error, failed_operation, changeset, _}`. Add the clause on **new and edit** save paths of each form. Journal / Deposit / ReturnCheque have no `{:error, :closed}` today — add this clause anyway.
 
+Place `{:error, :period_closed}` **above any looser `{:error, _}` (or `{:error, _, _, _}`) clause in the same `case`**. A generic match listed first would swallow it. On the invoice save path today the looser `{:error, _}` clauses live in other handlers, not that `case`, so this is unlikely to bite — still put the new clause first.
+
 Do **not** change any `handle_event("delete")`.
 
 - [ ] **Step 1: Write the failing test**
@@ -1251,7 +1255,7 @@ Expected: FAIL — no flash matching "Accounting period is closed".
 
 - [ ] **Step 3: Implement**
 
-In every save `case` listed above (both `:new` and `:edit` where they are separate functions):
+In every save `case` listed above (both `:new` and `:edit` where they are separate functions). Insert this clause **before** any `{:error, _}` or `{:error, _, _, _}` catch-all in that same `case`:
 
 ```elixir
       {:error, :period_closed} ->

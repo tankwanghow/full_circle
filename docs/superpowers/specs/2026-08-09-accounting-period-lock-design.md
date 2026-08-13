@@ -1,7 +1,7 @@
 # Accounting Period Lock — Design
 
 **Date:** 2026-08-09
-**Revised:** 2026-08-13 (review: session-stale cutoff, UPDATE trigger `RETURN NEW`, map `:period_closed` at the public API, drop Receipt/Payment delete, drop false e-invoice write-back risk)
+**Revised:** 2026-08-13 (review: session-stale cutoff, UPDATE trigger `RETURN NEW`, map `:period_closed` at the public API, drop Receipt/Payment delete, drop false e-invoice write-back risk; later the same day: `Multi.update` is style not a txn fix; place the form clause above any generic `{:error, _}`)
 **Status:** Approved
 
 ## Problem
@@ -127,10 +127,12 @@ nor logs, so this is a wrapper rather than a direct call:
   "Future" is evaluated against today in the **company's** `timezone`, not the server's.
   Today in that timezone is allowed (the day can be closed once it has begun).
 - Accepts `nil` to clear the cutoff entirely.
-- Writes the setting and a `Sys.Log` row in one `Ecto.Multi` (use `Multi.update` on
-  a settings changeset, not `Repo.update` inside `Multi.run`), action `"close_period"`,
+- Writes the setting and a `Sys.Log` row in one `Ecto.Multi`, action `"close_period"`,
   with a delta carrying the previous and new values so that reopening a period is as
-  visible in the log as closing one.
+  visible in the log as closing one. Prefer `Multi.update` on a settings changeset —
+  it is the clearer Multi shape. `Repo.update` inside `Multi.run` is transactionally
+  sound too (Ecto joins the same process's transaction); this is style, not a
+  correctness fix.
 
 Moving the date backwards to reopen a period is the same call, subject to the same
 authorization and producing the same log entry.
@@ -246,8 +248,12 @@ a closed accounting period"). The new flash **must name the cutoff date** so the
 mechanisms are distinguishable.
 
 Journal, Deposit and ReturnCheque have no `{:error, :closed}` clause today — add the
-new clause anyway. Placement relative to the generic 4-tuple does not matter once the
-context maps to a 2-tuple.
+new clause anyway. Place `{:error, :period_closed}` **above** any looser
+`{:error, _}` (or `{:error, _, _, _}`) match in the same `case`. Mapping to a 2-tuple
+already avoids the 4-tuple `to_form` crash; a generic `{:error, _}` would still
+swallow it if it came first. On the invoice save path today the looser clauses live
+in other handlers, not that `case` — still place the new clause first so an
+implementer does not invent the footgun.
 
 Flash kind must be `:warn` — `:warning` renders nothing.
 
