@@ -159,6 +159,7 @@ defmodule FullCircle.Cheque do
         Multi.new()
         |> create_deposit_multi(attrs, com, user)
         |> Repo.transaction()
+        |> Accounting.map_period_closed()
 
       false ->
         :not_authorise
@@ -183,6 +184,10 @@ defmodule FullCircle.Cheque do
         user
       )
     end)
+    |> Accounting.multi_assert_period_open(
+      fn %{^deposit_name => doc} -> [doc.deposit_date] end,
+      com
+    )
     |> create_deposit_transactions(deposit_name, com, user)
   end
 
@@ -194,6 +199,7 @@ defmodule FullCircle.Cheque do
         Multi.new()
         |> update_deposit_multi(deposit, attrs, com, user)
         |> Repo.transaction()
+        |> Accounting.map_period_closed()
 
       false ->
         :not_authorise
@@ -214,6 +220,12 @@ defmodule FullCircle.Cheque do
     multi
     |> Multi.update(deposit_name, cs)
     |> Sys.insert_log_for(deposit_name, attrs, com, user)
+    |> Accounting.multi_assert_period_open(
+      fn changes ->
+        [deposit.deposit_date, Map.get(changes, deposit_name, deposit).deposit_date]
+      end,
+      com
+    )
     |> Multi.delete_all(
       :delete_transaction,
       from(txn in Transaction,
@@ -234,6 +246,7 @@ defmodule FullCircle.Cheque do
         Multi.new()
         |> create_return_cheque_multi(attrs, com, user)
         |> Repo.transaction()
+        |> Accounting.map_period_closed()
 
       false ->
         :not_authorise
@@ -264,6 +277,10 @@ defmodule FullCircle.Cheque do
         user
       )
     end)
+    |> Accounting.multi_assert_period_open(
+      fn %{^return_name => doc} -> [doc.return_date] end,
+      com
+    )
     |> create_return_cheque_transactions(return_name, com, user)
   end
 
@@ -275,6 +292,7 @@ defmodule FullCircle.Cheque do
         Multi.new()
         |> update_return_cheque_multi(return_cheque, attrs, com, user)
         |> Repo.transaction()
+        |> Accounting.map_period_closed()
 
       false ->
         :not_authorise
@@ -295,6 +313,15 @@ defmodule FullCircle.Cheque do
     multi
     |> Multi.update(return_cheque_name, cs)
     |> Sys.insert_log_for(return_cheque_name, attrs, com, user)
+    |> Accounting.multi_assert_period_open(
+      fn changes ->
+        [
+          return_cheque.return_date,
+          Map.get(changes, return_cheque_name, return_cheque).return_date
+        ]
+      end,
+      com
+    )
     |> Multi.delete_all(
       :delete_transaction,
       from(txn in Transaction,

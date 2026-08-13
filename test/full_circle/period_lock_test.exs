@@ -665,4 +665,108 @@ defmodule FullCircle.PeriodLockTest do
       }
     })
   end
+
+  describe "Deposit under a closed period" do
+    setup do
+      %{admin: admin, company: company} = FullCircle.BillingFixtures.billing_setup()
+      %{admin: admin, company: company}
+    end
+
+    test "creating into a closed period is rejected", %{company: company, admin: admin} do
+      {:ok, _} = Sys.close_period_through(company, Date.utc_today(), admin)
+
+      assert {:error, :period_closed} =
+               FullCircle.Cheque.create_deposit(
+                 deposit_attrs_dated(company, admin, Date.utc_today()),
+                 company,
+                 admin
+               )
+    end
+
+    test "creating after the cutoff succeeds", %{company: company, admin: admin} do
+      {:ok, _} = Sys.close_period_through(company, Date.add(Date.utc_today(), -30), admin)
+
+      assert {:ok, %{create_deposit: _}} =
+               FullCircle.Cheque.create_deposit(
+                 deposit_attrs_dated(company, admin, Date.utc_today()),
+                 company,
+                 admin
+               )
+    end
+  end
+
+  describe "ReturnCheque under a closed period" do
+    setup do
+      %{admin: admin, company: company} = FullCircle.BillingFixtures.billing_setup()
+      %{admin: admin, company: company}
+    end
+
+    test "creating into a closed period is rejected", %{company: company, admin: admin} do
+      {:ok, _} = Sys.close_period_through(company, Date.utc_today(), admin)
+
+      assert {:error, :period_closed} =
+               FullCircle.Cheque.create_return_cheque(
+                 return_cheque_attrs_dated(company, admin, Date.utc_today()),
+                 company,
+                 admin
+               )
+    end
+  end
+
+  defp deposit_attrs_dated(company, user, date) do
+    bank_acct = FullCircle.ChequeFixtures.bank_account_fixture(company, user)
+    funds_from_acct = FullCircle.ReceiveFundFixtures.funds_account_fixture(company, user)
+
+    %{
+      "deposit_date" => Date.to_string(date),
+      "bank_name" => bank_acct.name,
+      "bank_id" => bank_acct.id,
+      "funds_from_name" => funds_from_acct.name,
+      "funds_from_id" => funds_from_acct.id,
+      "funds_amount" => "100.00",
+      "descriptions" => "Test deposit"
+    }
+  end
+
+  defp return_cheque_attrs_dated(company, user, date) do
+    contact = FullCircle.BillingFixtures.contact_fixture(company, user)
+    good = FullCircle.BillingFixtures.good_fixture(company, user)
+    sales_acct = FullCircle.Accounting.get_account_by_name("General Sales", company, user)
+
+    no_stax =
+      Repo.one!(
+        from tc in FullCircle.Accounting.TaxCode,
+          where: tc.company_id == ^company.id and tc.code == "NoSTax"
+      )
+
+    # Receipt must stay open: tests close through today, so date it after the cutoff.
+    attrs =
+      FullCircle.ReceiveFundFixtures.receipt_attrs_with_cheque(
+        contact,
+        good,
+        sales_acct,
+        no_stax,
+        quantity: "10",
+        unit_price: "5.00",
+        cheque_amount: "50.00"
+      )
+      |> Map.put("receipt_date", Date.to_string(Date.add(Date.utc_today(), 1)))
+
+    {:ok, %{create_receipt: receipt}} =
+      FullCircle.ReceiveFund.create_receipt(attrs, company, user)
+
+    receipt = Repo.preload(receipt, :received_cheques)
+    cheque = List.first(receipt.received_cheques)
+
+    %{
+      "return_date" => Date.to_string(date),
+      "return_reason" => "Bounced",
+      "cheque_owner_name" => contact.name,
+      "cheque_owner_id" => contact.id,
+      "cheque_no" => cheque.cheque_no,
+      "cheque_due_date" => Date.to_string(cheque.due_date),
+      "cheque_amount" => Decimal.to_string(cheque.amount),
+      "cheque" => %{"id" => cheque.id}
+    }
+  end
 end
