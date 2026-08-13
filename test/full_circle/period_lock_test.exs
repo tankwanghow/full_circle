@@ -823,4 +823,57 @@ defmodule FullCircle.PeriodLockTest do
       }
     }
   end
+
+  describe "closed transaction trigger" do
+    setup do
+      %{admin: admin, company: company} = FullCircle.BillingFixtures.billing_setup()
+      %{admin: admin, company: company}
+    end
+
+    test "a closed transaction cannot be updated", %{company: company, admin: admin} do
+      invoice = FullCircle.BillingFixtures.invoice_fixture(company, admin)
+
+      txn =
+        Repo.one!(
+          from t in FullCircle.Accounting.Transaction,
+            where: t.doc_type == "Invoice" and t.doc_id == ^invoice.id,
+            limit: 1
+        )
+
+      {1, _} =
+        Repo.update_all(
+          from(t in FullCircle.Accounting.Transaction, where: t.id == ^txn.id),
+          set: [closed: true]
+        )
+
+      assert_raise Postgrex.Error, ~r/CLOSED transaction/, fn ->
+        Repo.update_all(
+          from(t in FullCircle.Accounting.Transaction, where: t.id == ^txn.id),
+          set: [particulars: "tampered"]
+        )
+      end
+    end
+
+    test "an open transaction updates and the new value is stored", %{
+      company: company,
+      admin: admin
+    } do
+      invoice = FullCircle.BillingFixtures.invoice_fixture(company, admin)
+
+      txn =
+        Repo.one!(
+          from t in FullCircle.Accounting.Transaction,
+            where: t.doc_type == "Invoice" and t.doc_id == ^invoice.id,
+            limit: 1
+        )
+
+      assert {1, _} =
+               Repo.update_all(
+                 from(t in FullCircle.Accounting.Transaction, where: t.id == ^txn.id),
+                 set: [particulars: "fine"]
+               )
+
+      assert Repo.get!(FullCircle.Accounting.Transaction, txn.id).particulars == "fine"
+    end
+  end
 end
