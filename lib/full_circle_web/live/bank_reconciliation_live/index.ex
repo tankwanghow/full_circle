@@ -285,6 +285,9 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
 
               {:ok, journal}
 
+            {:error, :period_closed} ->
+              {:error, :period_closed}
+
             {:error, _step, changeset, _} ->
               {:error, changeset}
 
@@ -310,6 +313,17 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
                socket,
                :info,
                "#{gettext("Journal entry created and matched")} (#{length(lines)} #{gettext("lines")})"
+             )}
+
+          {:error, :period_closed} ->
+            {:noreply,
+             socket
+             |> put_flash(
+               :warn,
+               gettext("Accounting period is closed on or before %{date}.",
+                 date:
+                   to_string(FullCircle.Sys.period_closed_through(socket.assigns.current_company))
+               )
              )}
 
           {:error, _} ->

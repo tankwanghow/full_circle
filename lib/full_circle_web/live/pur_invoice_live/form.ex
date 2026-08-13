@@ -730,6 +730,16 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
          |> put_flash(:info, flash)
          |> maybe_warn_unbilled_trading(obj, params, company, user)}
 
+      {:error, :period_closed} ->
+        {:noreply,
+         socket
+         |> put_flash(
+           :warn,
+           gettext("Accounting period is closed on or before %{date}.",
+             date: to_string(FullCircle.Sys.period_closed_through(socket.assigns.current_company))
+           )
+         )}
+
       {:error, :loads_already_billed} ->
         {:noreply,
          socket
@@ -904,6 +914,16 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
          socket
          |> push_navigate(to: ~p"/companies/#{company.id}/PurInvoice/#{obj.id}/edit")
          |> put_flash(:info, flash)}
+
+      {:error, :period_closed} ->
+        {:noreply,
+         socket
+         |> put_flash(
+           :warn,
+           gettext("Accounting period is closed on or before %{date}.",
+             date: to_string(FullCircle.Sys.period_closed_through(socket.assigns.current_company))
+           )
+         )}
 
       {:error, :stale} ->
         {:noreply,

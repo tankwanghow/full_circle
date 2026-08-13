@@ -553,6 +553,16 @@ defmodule FullCircleWeb.PaymentLive.Form do
          )
          |> put_flash(:info, gettext("Payment created successfully."))}
 
+      {:error, :period_closed} ->
+        {:noreply,
+         socket
+         |> put_flash(
+           :warn,
+           gettext("Accounting period is closed on or before %{date}.",
+             date: to_string(FullCircle.Sys.period_closed_through(socket.assigns.current_company))
+           )
+         )}
+
       {:error, failed_operation, changeset, _} ->
         {:noreply,
          socket
@@ -590,6 +600,16 @@ defmodule FullCircleWeb.PaymentLive.Form do
            to: ~p"/companies/#{socket.assigns.current_company.id}/Payment/#{obj.id}/edit"
          )
          |> put_flash(:info, gettext("Payment updated successfully."))}
+
+      {:error, :period_closed} ->
+        {:noreply,
+         socket
+         |> put_flash(
+           :warn,
+           gettext("Accounting period is closed on or before %{date}.",
+             date: to_string(FullCircle.Sys.period_closed_through(socket.assigns.current_company))
+           )
+         )}
 
       {:error, :stale} ->
         {:noreply,

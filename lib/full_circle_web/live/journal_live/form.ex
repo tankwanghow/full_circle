@@ -156,6 +156,16 @@ defmodule FullCircleWeb.JournalLive.Form do
          )
          |> put_flash(:info, "#{gettext("Journal created successfully.")}")}
 
+      {:error, :period_closed} ->
+        {:noreply,
+         socket
+         |> put_flash(
+           :warn,
+           gettext("Accounting period is closed on or before %{date}.",
+             date: to_string(FullCircle.Sys.period_closed_through(socket.assigns.current_company))
+           )
+         )}
+
       {:error, failed_operation, changeset, _} ->
         {:noreply,
          socket
@@ -191,6 +201,16 @@ defmodule FullCircleWeb.JournalLive.Form do
            to: ~p"/companies/#{socket.assigns.current_company.id}/Journal/#{obj.id}/edit"
          )
          |> put_flash(:info, "#{gettext("Journal updated successfully.")}")}
+
+      {:error, :period_closed} ->
+        {:noreply,
+         socket
+         |> put_flash(
+           :warn,
+           gettext("Accounting period is closed on or before %{date}.",
+             date: to_string(FullCircle.Sys.period_closed_through(socket.assigns.current_company))
+           )
+         )}
 
       {:error, :stale} ->
         {:noreply,
