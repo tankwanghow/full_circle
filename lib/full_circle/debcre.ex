@@ -203,6 +203,7 @@ defmodule FullCircle.DebCre do
         Multi.new()
         |> create_credit_note_multi(attrs, com, user)
         |> Repo.transaction()
+        |> Accounting.map_period_closed()
 
       false ->
         :not_authorise
@@ -233,6 +234,10 @@ defmodule FullCircle.DebCre do
         user
       )
     end)
+    |> Accounting.multi_assert_period_open(
+      fn %{^note_name => doc} -> [doc.note_date] end,
+      com
+    )
     |> create_note_transactions(note_name, com, user, @credit_note_txn_opts)
   end
 
@@ -243,6 +248,7 @@ defmodule FullCircle.DebCre do
       Multi.new()
       |> update_credit_note_multi(credit_note, attrs, com, user)
       |> Repo.transaction()
+      |> Accounting.map_period_closed()
     else
       :not_authorise
     end
@@ -427,6 +433,7 @@ defmodule FullCircle.DebCre do
         Multi.new()
         |> create_debit_note_multi(attrs, com, user)
         |> Repo.transaction()
+        |> Accounting.map_period_closed()
 
       false ->
         :not_authorise
@@ -457,6 +464,10 @@ defmodule FullCircle.DebCre do
         user
       )
     end)
+    |> Accounting.multi_assert_period_open(
+      fn %{^note_name => doc} -> [doc.note_date] end,
+      com
+    )
     |> create_note_transactions(note_name, com, user, @debit_note_txn_opts)
   end
 
@@ -467,6 +478,7 @@ defmodule FullCircle.DebCre do
       Multi.new()
       |> update_debit_note_multi(debit_note, attrs, com, user)
       |> Repo.transaction()
+      |> Accounting.map_period_closed()
     else
       :not_authorise
     end
@@ -610,6 +622,12 @@ defmodule FullCircle.DebCre do
       multi
     else
       multi
+      |> Accounting.multi_assert_period_open(
+        fn changes ->
+          [note.note_date, Map.get(changes, step_name, note).note_date]
+        end,
+        com
+      )
       |> Multi.delete_all(
         :delete_transaction,
         from(txn in Transaction,
