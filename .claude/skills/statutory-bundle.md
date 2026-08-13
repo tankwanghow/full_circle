@@ -72,6 +72,9 @@ Scripts are line-oriented `name = expression` statements; the last binding must 
 - `fixed_wages` sums only `FixedWages`-typed notes (basic salary + fixed allowances). It is the
   HRD Corp levy base (`hrd_corp` calc: `result = round(fixed_wages * 0.01, 2)`); the PSMB Act
   excludes OT, rest-day/holiday premiums, commission, and bonus, which stay type `Addition`/`Bonus`.
+  The levy's Malaysian-only scope is **deliberately enforced by attaching the salary type to
+  Malaysian employees only, not by a `malaysian` guard in the script** (owner's decision,
+  2026-08-13) — do not "fix" the script by adding one.
 - Scripts summing YTD income must cover both wage types: `ytd_sum(type: ["Addition", "FixedWages"])`.
 
 Save-time validation rejects parse errors, unknown identifiers/tables, missing `result`, and `calc()` cycles. Runtime errors (e.g. division by zero) surface on the Punch Card preview — never silent zero.
