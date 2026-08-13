@@ -383,6 +383,7 @@ defmodule FullCircle.ReceiveFund do
         Multi.new()
         |> create_receipt_multi(attrs, com, user)
         |> Repo.transaction()
+        |> Accounting.map_period_closed()
 
       false ->
         :not_authorise
@@ -407,6 +408,10 @@ defmodule FullCircle.ReceiveFund do
         user
       )
     end)
+    |> Accounting.multi_assert_period_open(
+      fn %{^receipt_name => doc} -> [doc.receipt_date] end,
+      com
+    )
     |> create_receipt_transactions(receipt_name, com, user)
   end
 
@@ -565,6 +570,7 @@ defmodule FullCircle.ReceiveFund do
       Multi.new()
       |> update_receipt_multi(receipt, attrs, com, user)
       |> Repo.transaction()
+      |> Accounting.map_period_closed()
     end
   rescue
     Ecto.StaleEntryError ->
@@ -592,6 +598,12 @@ defmodule FullCircle.ReceiveFund do
     |> Multi.update(step_name, fn _ ->
       make_changeset(schema, doc, attrs, com, user)
     end)
+    |> Accounting.multi_assert_period_open(
+      fn changes ->
+        [doc.receipt_date, Map.get(changes, step_name, doc).receipt_date]
+      end,
+      com
+    )
     |> Multi.delete_all(
       :delete_transaction,
       from(txn in Transaction,

@@ -469,4 +469,200 @@ defmodule FullCircle.PeriodLockTest do
     )
     |> Map.put("payment_date", Date.to_string(date))
   end
+
+  describe "Receipt under a closed period" do
+    setup do
+      %{admin: admin, company: company} = FullCircle.BillingFixtures.billing_setup()
+      %{admin: admin, company: company}
+    end
+
+    test "creating into a closed period is rejected", %{company: company, admin: admin} do
+      {:ok, _} = Sys.close_period_through(company, Date.utc_today(), admin)
+
+      assert {:error, :period_closed} =
+               FullCircle.ReceiveFund.create_receipt(
+                 receipt_attrs_dated(company, admin, Date.utc_today()),
+                 company,
+                 admin
+               )
+    end
+
+    test "a description-only edit on a closed-period receipt is rejected",
+         %{company: company, admin: admin} do
+      receipt = FullCircle.ReceiveFundFixtures.receipt_fixture(company, admin)
+      {:ok, _} = Sys.close_period_through(company, Date.utc_today(), admin)
+
+      receipt = FullCircle.ReceiveFund.get_receipt!(receipt.id, company, admin)
+      attrs = receipt_to_attrs(receipt) |> Map.put("descriptions", "edited after closing")
+
+      assert {:error, :period_closed} =
+               FullCircle.ReceiveFund.update_receipt(receipt, attrs, company, admin)
+    end
+
+    test "a new receipt can still match a closed-period invoice",
+         %{company: company, admin: admin} do
+      invoice = FullCircle.BillingFixtures.invoice_fixture(company, admin)
+      invoice = FullCircle.Billing.get_invoice!(invoice.id, company, admin)
+      {:ok, _} = Sys.close_period_through(company, Date.utc_today(), admin)
+
+      attrs =
+        receipt_attrs_matching(company, admin, invoice, Date.add(Date.utc_today(), 1))
+
+      assert {:ok, %{create_receipt: _}} =
+               FullCircle.ReceiveFund.create_receipt(attrs, company, admin)
+    end
+  end
+
+  defp receipt_to_attrs(receipt) do
+    details =
+      receipt.receipt_details
+      |> Enum.with_index()
+      |> Enum.into(%{}, fn {d, i} ->
+        {to_string(i),
+         %{
+           "id" => d.id,
+           "good_id" => d.good_id,
+           "good_name" => d.good_name,
+           "account_id" => d.account_id,
+           "account_name" => d.account_name,
+           "tax_code_id" => d.tax_code_id,
+           "tax_code_name" => d.tax_code_name,
+           "package_id" => d.package_id,
+           "package_name" => d.package_name,
+           "quantity" => to_string(d.quantity),
+           "unit_price" => to_string(d.unit_price),
+           "discount" => to_string(d.discount),
+           "tax_rate" => to_string(d.tax_rate),
+           "unit_multiplier" => "0",
+           "_persistent_id" => to_string(i)
+         }}
+      end)
+
+    cheques =
+      receipt.received_cheques
+      |> Enum.with_index()
+      |> Enum.into(%{}, fn {c, i} ->
+        {to_string(i),
+         %{
+           "id" => c.id,
+           "bank" => c.bank,
+           "due_date" => Date.to_string(c.due_date),
+           "state" => c.state,
+           "city" => c.city,
+           "cheque_no" => c.cheque_no,
+           "amount" => to_string(c.amount),
+           "_persistent_id" => to_string(i)
+         }}
+      end)
+
+    matchers =
+      receipt.transaction_matchers
+      |> Enum.with_index()
+      |> Enum.into(%{}, fn {m, i} ->
+        {to_string(i),
+         %{
+           "id" => m.id,
+           "transaction_id" => m.transaction_id,
+           "match_amount" => to_string(m.match_amount),
+           "doc_date" => Date.to_string(m.doc_date),
+           "doc_type" => m.doc_type,
+           "t_doc_no" => m.t_doc_no,
+           "t_doc_type" => m.t_doc_type,
+           "t_doc_date" => Date.to_string(m.t_doc_date),
+           "t_doc_id" => m.t_doc_id,
+           "amount" => to_string(m.amount),
+           "all_matched_amount" => to_string(m.all_matched_amount),
+           "_persistent_id" => to_string(i)
+         }}
+      end)
+
+    %{
+      "receipt_no" => receipt.receipt_no,
+      "receipt_date" => Date.to_string(receipt.receipt_date),
+      "contact_name" => receipt.contact_name,
+      "contact_id" => receipt.contact_id,
+      "descriptions" => receipt.descriptions,
+      "funds_account_name" => receipt.funds_account_name,
+      "funds_account_id" => receipt.funds_account_id,
+      "funds_amount" => to_string(receipt.funds_amount),
+      "lock_version" => receipt.lock_version,
+      "receipt_details" => details,
+      "received_cheques" => cheques,
+      "transaction_matchers" => matchers
+    }
+  end
+
+  defp receipt_attrs_dated(company, user, date) do
+    contact = FullCircle.BillingFixtures.contact_fixture(company, user)
+    good = FullCircle.BillingFixtures.good_fixture(company, user)
+    sales_acct = FullCircle.Accounting.get_account_by_name("General Sales", company, user)
+    funds_acct = FullCircle.ReceiveFundFixtures.funds_account_fixture(company, user)
+
+    tc =
+      Repo.one!(
+        from t in FullCircle.Accounting.TaxCode,
+          where: t.company_id == ^company.id and t.code == "NoSTax"
+      )
+
+    FullCircle.ReceiveFundFixtures.receipt_attrs_with_funds(
+      contact,
+      good,
+      sales_acct,
+      tc,
+      funds_acct,
+      tax_rate: "0"
+    )
+    |> Map.put("receipt_date", Date.to_string(date))
+  end
+
+  defp receipt_attrs_matching(company, user, invoice, date) do
+    good = FullCircle.BillingFixtures.good_fixture(company, user)
+    sales_acct = FullCircle.Accounting.get_account_by_name("General Sales", company, user)
+    funds_acct = FullCircle.ReceiveFundFixtures.funds_account_fixture(company, user)
+
+    tc =
+      Repo.one!(
+        from t in FullCircle.Accounting.TaxCode,
+          where: t.company_id == ^company.id and t.code == "NoSTax"
+      )
+
+    ar_txn =
+      Repo.one!(
+        from t in FullCircle.Accounting.Transaction,
+          where: t.doc_type == "Invoice",
+          where: t.doc_id == ^invoice.id,
+          where: not is_nil(t.contact_id),
+          limit: 1
+      )
+
+    FullCircle.ReceiveFundFixtures.receipt_attrs_with_funds(
+      %{name: invoice.contact_name, id: invoice.contact_id},
+      good,
+      sales_acct,
+      tc,
+      funds_acct,
+      tax_rate: "0",
+      quantity: "1",
+      unit_price: "0",
+      funds_amount: "50.00"
+    )
+    |> Map.put("receipt_date", Date.to_string(date))
+    |> Map.put("contact_id", invoice.contact_id)
+    |> Map.put("contact_name", invoice.contact_name)
+    |> Map.put("transaction_matchers", %{
+      "0" => %{
+        "transaction_id" => ar_txn.id,
+        "match_amount" => "50.00",
+        "doc_date" => Date.to_string(date),
+        "doc_type" => "Receipt",
+        "t_doc_no" => invoice.invoice_no,
+        "t_doc_type" => "Invoice",
+        "t_doc_date" => Date.to_string(invoice.invoice_date),
+        "t_doc_id" => invoice.id,
+        "amount" => to_string(ar_txn.amount),
+        "all_matched_amount" => "0",
+        "_persistent_id" => "0"
+      }
+    })
+  end
 end
