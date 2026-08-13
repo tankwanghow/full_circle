@@ -79,4 +79,56 @@ defmodule FullCircle.PeriodLockTest do
       assert Sys.period_closed_through(stale) == ~D[2025-12-31]
     end
   end
+
+  describe "assert_period_open/2" do
+    setup do
+      admin = user_fixture()
+      company = company_fixture(admin, %{})
+      {:ok, company} = Sys.close_period_through(company, ~D[2025-12-31], admin)
+      %{admin: admin, company: company}
+    end
+
+    test "a date on the cutoff is closed", %{company: company} do
+      assert {:error, :period_closed} =
+               FullCircle.Accounting.assert_period_open([~D[2025-12-31]], company)
+    end
+
+    test "a date before the cutoff is closed", %{company: company} do
+      assert {:error, :period_closed} =
+               FullCircle.Accounting.assert_period_open([~D[2025-11-04]], company)
+    end
+
+    test "the day after the cutoff is open", %{company: company} do
+      assert :ok = FullCircle.Accounting.assert_period_open([~D[2026-01-01]], company)
+    end
+
+    test "any closed date in the list closes the write", %{company: company} do
+      assert {:error, :period_closed} =
+               FullCircle.Accounting.assert_period_open([~D[2026-01-01], ~D[2025-11-04]], company)
+    end
+
+    test "nils are ignored", %{company: company} do
+      assert :ok = FullCircle.Accounting.assert_period_open([nil], company)
+      assert :ok = FullCircle.Accounting.assert_period_open([], company)
+    end
+
+    test "no cutoff means everything is open", %{admin: admin} do
+      open_company = company_fixture(admin, %{})
+      assert :ok = FullCircle.Accounting.assert_period_open([~D[2019-01-01]], open_company)
+    end
+  end
+
+  describe "map_period_closed/1" do
+    test "collapses the Multi 4-tuple" do
+      assert {:error, :period_closed} =
+               FullCircle.Accounting.map_period_closed(
+                 {:error, :assert_period_open, :period_closed, %{}}
+               )
+    end
+
+    test "passes other results through" do
+      assert {:ok, :x} = FullCircle.Accounting.map_period_closed({:ok, :x})
+      assert :not_authorise = FullCircle.Accounting.map_period_closed(:not_authorise)
+    end
+  end
 end

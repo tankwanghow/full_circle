@@ -49,6 +49,34 @@ defmodule FullCircle.Accounting do
     end
   end
 
+  def assert_period_open(dates, company) do
+    case FullCircle.Sys.period_closed_through(company) do
+      nil ->
+        :ok
+
+      cutoff ->
+        if Enum.any?(dates, fn d -> not is_nil(d) and Date.compare(d, cutoff) != :gt end) do
+          {:error, :period_closed}
+        else
+          :ok
+        end
+    end
+  end
+
+  def multi_assert_period_open(multi, dates_fun, company) do
+    Ecto.Multi.run(multi, :assert_period_open, fn _repo, changes ->
+      case assert_period_open(dates_fun.(changes), company) do
+        :ok -> {:ok, :period_open}
+        {:error, reason} -> {:error, reason}
+      end
+    end)
+  end
+
+  def map_period_closed({:error, :assert_period_open, :period_closed, _}),
+    do: {:error, :period_closed}
+
+  def map_period_closed(other), do: other
+
   defp matchers_exist_for_doc?(doc_id, doc_type, com_id) do
     Repo.exists?(
       from t in Transaction,
