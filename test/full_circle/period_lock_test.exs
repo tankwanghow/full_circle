@@ -131,4 +131,177 @@ defmodule FullCircle.PeriodLockTest do
       assert :not_authorise = FullCircle.Accounting.map_period_closed(:not_authorise)
     end
   end
+
+  describe "Invoice under a closed period" do
+    setup do
+      %{admin: admin, company: company} = FullCircle.BillingFixtures.billing_setup()
+      %{admin: admin, company: company}
+    end
+
+    test "creating into a closed period is rejected", %{company: company, admin: admin} do
+      {:ok, _} = Sys.close_period_through(company, Date.utc_today(), admin)
+
+      assert {:error, :period_closed} =
+               create_invoice_dated(company, admin, Date.utc_today())
+    end
+
+    test "creating after the cutoff succeeds", %{company: company, admin: admin} do
+      {:ok, _} = Sys.close_period_through(company, Date.add(Date.utc_today(), -30), admin)
+
+      assert {:ok, %{create_invoice: _}} =
+               create_invoice_dated(company, admin, Date.utc_today())
+    end
+
+    test "editing a GL field on a closed-period invoice is rejected",
+         %{company: company, admin: admin} do
+      invoice = FullCircle.BillingFixtures.invoice_fixture(company, admin)
+      {:ok, _} = Sys.close_period_through(company, Date.utc_today(), admin)
+
+      invoice = FullCircle.Billing.get_invoice!(invoice.id, company, admin)
+
+      assert {:error, :period_closed} =
+               FullCircle.Billing.update_invoice(
+                 invoice,
+                 gl_changing_attrs(invoice),
+                 company,
+                 admin
+               )
+    end
+
+    test "a description-only edit on a closed-period invoice still succeeds",
+         %{company: company, admin: admin} do
+      invoice = FullCircle.BillingFixtures.invoice_fixture(company, admin)
+      {:ok, _} = Sys.close_period_through(company, Date.utc_today(), admin)
+
+      invoice = FullCircle.Billing.get_invoice!(invoice.id, company, admin)
+
+      assert {:ok, %{update_invoice: updated}} =
+               FullCircle.Billing.update_invoice(
+                 invoice,
+                 description_only_attrs(invoice, "edited after closing"),
+                 company,
+                 admin
+               )
+
+      assert updated.descriptions == "edited after closing"
+    end
+
+    test "moving an open invoice into a closed period is rejected",
+         %{company: company, admin: admin} do
+      invoice = FullCircle.BillingFixtures.invoice_fixture(company, admin)
+      {:ok, _} = Sys.close_period_through(company, Date.add(Date.utc_today(), -30), admin)
+
+      invoice = FullCircle.Billing.get_invoice!(invoice.id, company, admin)
+
+      assert {:error, :period_closed} =
+               FullCircle.Billing.update_invoice(
+                 invoice,
+                 date_change_attrs(invoice, Date.add(Date.utc_today(), -60)),
+                 company,
+                 admin
+               )
+    end
+  end
+
+  describe "PurInvoice under a closed period" do
+    setup do
+      %{admin: admin, company: company} = FullCircle.BillingFixtures.billing_setup()
+      %{admin: admin, company: company}
+    end
+
+    test "creating into a closed period is rejected", %{company: company, admin: admin} do
+      {:ok, _} = Sys.close_period_through(company, Date.utc_today(), admin)
+
+      assert {:error, :period_closed} =
+               create_pur_invoice_dated(company, admin, Date.utc_today())
+    end
+  end
+
+  defp invoice_to_attrs(invoice) do
+    details =
+      invoice.invoice_details
+      |> Enum.with_index()
+      |> Enum.into(%{}, fn {d, i} ->
+        {to_string(i),
+         %{
+           "id" => d.id,
+           "good_id" => d.good_id,
+           "good_name" => d.good_name,
+           "account_id" => d.account_id,
+           "account_name" => d.account_name,
+           "tax_code_id" => d.tax_code_id,
+           "tax_code_name" => d.tax_code_name,
+           "package_id" => d.package_id,
+           "package_name" => d.package_name,
+           "quantity" => to_string(d.quantity),
+           "unit_price" => to_string(d.unit_price),
+           "discount" => to_string(d.discount),
+           "tax_rate" => to_string(d.tax_rate),
+           "unit_multiplier" => "0",
+           "_persistent_id" => to_string(i)
+         }}
+      end)
+
+    %{
+      "invoice_no" => invoice.invoice_no,
+      "e_inv_internal_id" => invoice.e_inv_internal_id,
+      "invoice_date" => Date.to_string(invoice.invoice_date),
+      "due_date" => Date.to_string(invoice.due_date),
+      "contact_name" => invoice.contact_name,
+      "contact_id" => invoice.contact_id,
+      "descriptions" => invoice.descriptions,
+      "lock_version" => invoice.lock_version,
+      "invoice_details" => details
+    }
+  end
+
+  defp description_only_attrs(invoice, text) do
+    invoice |> invoice_to_attrs() |> Map.put("descriptions", text)
+  end
+
+  defp gl_changing_attrs(invoice) do
+    attrs = invoice_to_attrs(invoice)
+    details = Map.update!(attrs["invoice_details"], "0", &Map.put(&1, "unit_price", "99.00"))
+    Map.put(attrs, "invoice_details", details)
+  end
+
+  defp date_change_attrs(invoice, date) do
+    invoice |> invoice_to_attrs() |> Map.put("invoice_date", Date.to_string(date))
+  end
+
+  defp create_invoice_dated(company, user, date) do
+    contact = FullCircle.BillingFixtures.contact_fixture(company, user)
+    good = FullCircle.BillingFixtures.good_fixture(company, user)
+    acct = FullCircle.Accounting.get_account_by_name("General Sales", company, user)
+
+    tc =
+      Repo.one!(
+        from t in FullCircle.Accounting.TaxCode,
+          where: t.company_id == ^company.id and t.code == "NoSTax"
+      )
+
+    attrs =
+      FullCircle.BillingFixtures.invoice_attrs(contact, good, acct, tc, tax_rate: "0")
+      |> Map.put("invoice_date", Date.to_string(date))
+
+    FullCircle.Billing.create_invoice(attrs, company, user)
+  end
+
+  defp create_pur_invoice_dated(company, user, date) do
+    contact = FullCircle.BillingFixtures.contact_fixture(company, user)
+    good = FullCircle.BillingFixtures.good_fixture(company, user)
+    acct = FullCircle.Accounting.get_account_by_name("General Purchases", company, user)
+
+    tc =
+      Repo.one!(
+        from t in FullCircle.Accounting.TaxCode,
+          where: t.company_id == ^company.id and t.code == "NoPTax"
+      )
+
+    attrs =
+      FullCircle.BillingFixtures.pur_invoice_attrs(contact, good, acct, tc, tax_rate: "0")
+      |> Map.put("pur_invoice_date", Date.to_string(date))
+
+    FullCircle.Billing.create_pur_invoice(attrs, company, user)
+  end
 end

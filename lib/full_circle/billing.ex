@@ -288,7 +288,15 @@ defmodule FullCircle.Billing do
       # hitting the BEFORE DELETE trigger.
       multi
     else
+      doc_date_key = Keyword.fetch!(txn_opts, :doc_date_key)
+
       multi
+      |> Accounting.multi_assert_period_open(
+        fn changes ->
+          [Map.get(doc, doc_date_key), Map.get(Map.get(changes, step_name, doc), doc_date_key)]
+        end,
+        com
+      )
       |> Multi.delete_all(
         :delete_transaction,
         from(txn in Transaction,
@@ -448,6 +456,7 @@ defmodule FullCircle.Billing do
         |> create_invoice_multi(attrs, com, user)
         |> extend_multi.()
         |> Repo.transaction()
+        |> Accounting.map_period_closed()
 
       false ->
         :not_authorise
@@ -481,6 +490,10 @@ defmodule FullCircle.Billing do
         user
       )
     end)
+    |> Accounting.multi_assert_period_open(
+      fn %{^invoice_name => doc} -> [doc.invoice_date] end,
+      com
+    )
     |> create_doc_transactions(invoice_name, com, user, @invoice_txn_opts)
   end
 
@@ -618,6 +631,7 @@ defmodule FullCircle.Billing do
       |> update_invoice_multi(invoice, attrs, com, user)
       |> extend_multi.()
       |> Repo.transaction()
+      |> Accounting.map_period_closed()
     else
       :not_authorise
     end
@@ -864,6 +878,7 @@ defmodule FullCircle.Billing do
         |> create_pur_invoice_multi(attrs, com, user)
         |> extend_multi.()
         |> Repo.transaction()
+        |> Accounting.map_period_closed()
 
       false ->
         :not_authorise
@@ -897,6 +912,10 @@ defmodule FullCircle.Billing do
         user
       )
     end)
+    |> Accounting.multi_assert_period_open(
+      fn %{^pur_invoice_name => doc} -> [doc.pur_invoice_date] end,
+      com
+    )
     |> create_doc_transactions(pur_invoice_name, com, user, @pur_invoice_txn_opts)
   end
 
@@ -947,6 +966,7 @@ defmodule FullCircle.Billing do
       |> update_pur_invoice_multi(pur_invoice, attrs, com, user)
       |> extend_multi.()
       |> Repo.transaction()
+      |> Accounting.map_period_closed()
     else
       :not_authorise
     end
