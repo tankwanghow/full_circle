@@ -769,4 +769,58 @@ defmodule FullCircle.PeriodLockTest do
       "cheque" => %{"id" => cheque.id}
     }
   end
+
+  describe "Journal under a closed period" do
+    setup do
+      %{admin: admin, company: company} = FullCircle.BillingFixtures.billing_setup()
+      %{admin: admin, company: company}
+    end
+
+    test "creating into a closed period is rejected", %{company: company, admin: admin} do
+      {:ok, _} = Sys.close_period_through(company, Date.utc_today(), admin)
+
+      assert {:error, :period_closed} =
+               FullCircle.JournalEntry.create_journal(
+                 journal_attrs_dated(company, admin, Date.utc_today()),
+                 company,
+                 admin
+               )
+    end
+
+    test "creating after the cutoff succeeds", %{company: company, admin: admin} do
+      {:ok, _} = Sys.close_period_through(company, Date.add(Date.utc_today(), -30), admin)
+
+      assert {:ok, %{create_journal: _}} =
+               FullCircle.JournalEntry.create_journal(
+                 journal_attrs_dated(company, admin, Date.utc_today()),
+                 company,
+                 admin
+               )
+    end
+  end
+
+  defp journal_attrs_dated(company, user, date) do
+    debit = FullCircle.Accounting.get_account_by_name("General Purchases", company, user)
+    credit = FullCircle.Accounting.get_account_by_name("General Sales", company, user)
+
+    %{
+      "journal_date" => Date.to_string(date),
+      "transactions" => %{
+        "0" => %{
+          "account_id" => debit.id,
+          "account_name" => debit.name,
+          "particulars" => "Test journal debit",
+          "amount" => "100.00",
+          "_persistent_id" => "0"
+        },
+        "1" => %{
+          "account_id" => credit.id,
+          "account_name" => credit.name,
+          "particulars" => "Test journal credit",
+          "amount" => "-100.00",
+          "_persistent_id" => "1"
+        }
+      }
+    }
+  end
 end

@@ -11,7 +11,7 @@ defmodule FullCircle.JournalEntry do
     Transaction
   }
 
-  alias FullCircle.{Sys}
+  alias FullCircle.{Sys, Accounting}
   alias FullCircle.Accounting.Account
   alias FullCircle.StdInterface
   alias Ecto.Multi
@@ -131,6 +131,7 @@ defmodule FullCircle.JournalEntry do
         Multi.new()
         |> create_journal_multi(attrs, com, user)
         |> Repo.transaction()
+        |> Accounting.map_period_closed()
 
       false ->
         :not_authorise
@@ -170,6 +171,10 @@ defmodule FullCircle.JournalEntry do
         user
       )
     end)
+    |> Accounting.multi_assert_period_open(
+      fn %{^journal_name => doc} -> [doc.journal_date] end,
+      com
+    )
   end
 
   def update_journal(%Journal{} = journal, attrs, com, user) do
@@ -180,6 +185,7 @@ defmodule FullCircle.JournalEntry do
         Multi.new()
         |> update_journal_multi(journal, attrs, com, user)
         |> Repo.transaction()
+        |> Accounting.map_period_closed()
 
       false ->
         :not_authorise
@@ -212,6 +218,12 @@ defmodule FullCircle.JournalEntry do
 
     multi
     |> Multi.update(journal_name, StdInterface.changeset(Journal, journal, attrs, com))
+    |> Accounting.multi_assert_period_open(
+      fn changes ->
+        [journal.journal_date, Map.get(changes, journal_name, journal).journal_date]
+      end,
+      com
+    )
     |> Sys.insert_log_for(journal_name, attrs, com, user)
   end
 end
