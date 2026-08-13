@@ -23,6 +23,7 @@ defmodule FullCircleWeb.TimeAttendLive.SalaryNoteComponent do
           @obj.salary_type_type == "Deduction" -> "text-red-600"
           @obj.salary_type_type == "Contribution" -> "text-amber-600"
           @obj.salary_type_type == "Addition" -> "text-green-600"
+          @obj.salary_type_type == "FixedWages" -> "text-green-600"
           true -> ""
         end
       ]}

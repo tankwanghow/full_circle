@@ -51,6 +51,13 @@ defmodule Mix.Tasks.Statutory.GenTemplate do
   result = lookup("eis", wages, "employer")
   """
 
+  # HRD Corp (PSMB) levy: employer-only, 1% of levy-able wages = basic salary +
+  # fixed allowances (FixedWages salary types). Variable pay (OT, rest-day /
+  # holiday premiums, commission) and bonus are excluded by the PSMB Act 2001.
+  @hrd_corp_script """
+  result = round(fixed_wages * 0.01, 2)
+  """
+
   @id_number_expr ~s|replace(if(socso_no == "" or socso_no == "-", id_no, socso_no), "-", "")|
 
   @socso_txt_spec %{
@@ -341,7 +348,7 @@ defmodule Mix.Tasks.Statutory.GenTemplate do
 
   @pcb_script """
   cap = calc("epf_relief_cap")
-  y   = ytd_sum(type: "Addition") + ytd_sum(name: "Employee Current Year Income")
+  y   = ytd_sum(type: ["Addition", "FixedWages"]) + ytd_sum(name: "Employee Current Year Income")
   k   = min(ytd_sum(name: ["EPF By Employee", "EPF By Employee Current Year"]), cap)
   y1  = wages
   k1  = if(k >= cap, 0, min(calc("epf_employee"), cap - k))
@@ -423,7 +430,8 @@ defmodule Mix.Tasks.Statutory.GenTemplate do
           ~D[1957-01-01],
           @eis_employer_only_script
         ),
-        calc_entry("pcb_employee", "PCB Employee", ~D[1957-01-01], @pcb_script)
+        calc_entry("pcb_employee", "PCB Employee", ~D[1957-01-01], @pcb_script),
+        calc_entry("hrd_corp", "HRD Corp Levy", ~D[1957-01-01], @hrd_corp_script)
       ],
       "file_formats" => [
         file_format_entry("socso_txt", "SOCSO text file", ~D[1957-01-01], @socso_txt_spec),

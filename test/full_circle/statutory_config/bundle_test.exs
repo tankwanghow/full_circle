@@ -12,7 +12,7 @@ defmodule FullCircle.StatutoryConfig.BundleTest do
   @template_codes ~w(
     epf_relief_cap pcb_individual_deduction pcb_spouse_deduction pcb_child_deduction
     epf_employer epf_employee socso_employer socso_employee socso_employer_only socso_24hour
-    eis_employer eis_employee eis_employer_only pcb_employee
+    eis_employer eis_employee eis_employer_only pcb_employee hrd_corp
   )
 
   setup do
@@ -23,6 +23,46 @@ defmodule FullCircle.StatutoryConfig.BundleTest do
 
   test "template bundle validates offline" do
     assert :ok = StatutoryConfig.validate_bundle(StatutoryConfig.template_bundle())
+  end
+
+  test "template ships hrd_corp levied on fixed wages", %{com: com, user: user} do
+    bundle = StatutoryConfig.template_bundle()
+
+    assert Enum.any?(bundle["calcs"], &(&1["code"] == "hrd_corp"))
+
+    assert {:ok, _} = StatutoryConfig.import_bundle(bundle, com, user)
+
+    emp = %{
+      id: Ecto.UUID.generate(),
+      company_id: com.id,
+      dob: ~D[1990-01-15],
+      nationality: "Malaysian",
+      marital_status: "Single",
+      partner_working: "No",
+      children: 0,
+      service_since: nil
+    }
+
+    cs =
+      Ecto.Changeset.change(%FullCircle.HR.PaySlip{}, %{
+        pay_month: 6,
+        pay_year: 2026,
+        addition_amount: Decimal.new("2845.65"),
+        fixed_wage_amount: Decimal.new("2345.65"),
+        bonus_amount: Decimal.new("0")
+      })
+
+    # 1% of fixed wages only (excludes OT/commission in the Addition remainder)
+    assert {:ok, dec} = StatutoryConfig.calculate("hrd_corp", emp, cs)
+    assert Decimal.equal?(dec, Decimal.new("23.46"))
+  end
+
+  test "template PCB year-to-date income covers FixedWages notes" do
+    pcb =
+      StatutoryConfig.template_bundle()["calcs"]
+      |> Enum.find(&(&1["code"] == "pcb_employee"))
+
+    assert pcb["script"] =~ ~s|ytd_sum(type: ["Addition", "FixedWages"])|
   end
 
   test "import then export round-trips every code", %{com: com, user: user} do

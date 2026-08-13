@@ -24,6 +24,7 @@ defmodule FullCircle.HR.PaySlip do
     field(:employee_name, :string, virtual: true)
     field(:funds_account_name, :string, virtual: true)
     field(:addition_amount, :decimal, virtual: true, default: 0)
+    field(:fixed_wage_amount, :decimal, virtual: true, default: 0)
     field(:deduction_amount, :decimal, virtual: true, default: 0)
     field(:advance_amount, :decimal, virtual: true, default: 0)
     field(:bonus_amount, :decimal, virtual: true, default: 0)
@@ -130,6 +131,7 @@ defmodule FullCircle.HR.PaySlip do
       |> sum_struct_field_to(:deductions, :amount, :deduction_amount)
       |> sum_struct_field_to(:advances, :amount, :advance_amount)
       |> sum_struct_field_to(:bonuses, :amount, :bonus_amount)
+      |> compute_struct_fixed_wage_amount()
 
     Map.replace!(
       sn,
@@ -148,6 +150,7 @@ defmodule FullCircle.HR.PaySlip do
       |> sum_field_to(:deductions, :amount, :deduction_amount)
       |> sum_field_to(:advances, :amount, :advance_amount)
       |> sum_field_to(:bonuses, :amount, :bonus_amount)
+      |> compute_fixed_wage_amount()
 
     changeset =
       force_change(
@@ -164,6 +167,43 @@ defmodule FullCircle.HR.PaySlip do
     else
       changeset |> clear_error(:pay_slip_amount)
     end
+  end
+
+  # fixed_wage_amount is the FixedWages subset of :additions — the HRD Corp
+  # levy base — while addition_amount stays the full wage sum.
+  defp compute_struct_fixed_wage_amount(sn) do
+    sum =
+      if is_struct(sn.additions, Ecto.Association.NotLoaded) do
+        Decimal.new("0")
+      else
+        sn.additions
+        |> Enum.filter(fn n -> n.salary_type_type == "FixedWages" end)
+        |> Enum.reduce(Decimal.new("0"), fn n, acc -> Decimal.add(acc, n.amount) end)
+      end
+
+    Map.replace!(sn, :fixed_wage_amount, Decimal.round(sum, 2))
+  end
+
+  defp compute_fixed_wage_amount(changeset) do
+    sum =
+      changeset
+      |> get_change_or_data(:additions)
+      |> Enum.reduce(Decimal.new("0"), fn x, acc ->
+        func =
+          if is_struct(x, Ecto.Changeset) do
+            &fetch_field!/2
+          else
+            &Map.fetch!/2
+          end
+
+        if func.(x, :salary_type_type) == "FixedWages" and !func.(x, :delete) do
+          Decimal.add(acc, func.(x, :amount))
+        else
+          acc
+        end
+      end)
+
+    put_change(changeset, :fixed_wage_amount, Decimal.round(sum, 2))
   end
 
   defp validate_pay_month_year(cs) do

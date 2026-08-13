@@ -66,7 +66,13 @@ Scripts are line-oriented `name = expression` statements; the last binding must 
 | `calc` | `calc("code")` — evaluate another statutory calc (no cycles) |
 | Math | `min(a,b)`, `max(a,b)`, `ceil(x)`, `floor(x)`, `abs(x)`, `round(x, n)` |
 
-**Context variables:** `wages`, `bonus`, `age`, `malaysian`, `nationality`, `marital_status`, `partner_working`, `children`, `pay_month`, `pay_year`, `service_years`.
+**Context variables:** `wages`, `bonus`, `fixed_wages`, `age`, `malaysian`, `nationality`, `marital_status`, `partner_working`, `children`, `pay_month`, `pay_year`, `service_years`.
+
+- `wages` sums salary notes of both wage types (`Addition` + `FixedWages` — see `HR.wage_types/0`).
+- `fixed_wages` sums only `FixedWages`-typed notes (basic salary + fixed allowances). It is the
+  HRD Corp levy base (`hrd_corp` calc: `result = round(fixed_wages * 0.01, 2)`); the PSMB Act
+  excludes OT, rest-day/holiday premiums, commission, and bonus, which stay type `Addition`/`Bonus`.
+- Scripts summing YTD income must cover both wage types: `ytd_sum(type: ["Addition", "FixedWages"])`.
 
 Save-time validation rejects parse errors, unknown identifiers/tables, missing `result`, and `calc()` cycles. Runtime errors (e.g. division by zero) surface on the Punch Card preview — never silent zero.
 

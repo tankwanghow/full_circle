@@ -38,7 +38,18 @@ defmodule FullCircle.PayScriptTest do
 
   test "standard_variables lists the spec's context variables" do
     assert PayScript.standard_variables() ==
-             ~w(wages bonus age malaysian nationality marital_status partner_working children pay_month pay_year service_years)
+             ~w(wages bonus fixed_wages age malaysian nationality marital_status partner_working children pay_month pay_year service_years)
+  end
+
+  test "fixed_wages is evaluatable as a context variable" do
+    assert {:ok, dec} =
+             PayScript.eval(
+               "result = round(fixed_wages * 0.01, 2)",
+               %{"fixed_wages" => 2345.65},
+               env()
+             )
+
+    assert Decimal.equal?(dec, Decimal.new("23.46"))
   end
 
   test "eval returns a Decimal" do

@@ -221,6 +221,7 @@ defmodule FullCircle.StatutoryConfig do
     %{
       "wages" => cs |> fetch_field!(:addition_amount) |> Decimal.to_float(),
       "bonus" => cs |> fetch_field!(:bonus_amount) |> Decimal.to_float(),
+      "fixed_wages" => cs |> fetch_field!(:fixed_wage_amount) |> Decimal.new() |> Decimal.to_float(),
       "age" => Timex.diff(end_of_month, emp.dob, :years),
       "malaysian" =>
         emp.nationality |> String.trim() |> String.downcase() |> String.starts_with?("malays"),
@@ -760,10 +761,19 @@ defmodule FullCircle.StatutoryConfig do
   end
 
   defp preview_changeset(emp, month, year) do
-    addition_sum =
+    wage_sts =
       emp.id
       |> FullCircle.HR.get_employee_salary_types()
-      |> Enum.filter(&(&1.type == "Addition"))
+      |> Enum.filter(&(&1.type in FullCircle.HR.wage_types()))
+
+    addition_sum =
+      wage_sts
+      |> Enum.map(& &1.amount)
+      |> Enum.reduce(Decimal.new(0), &Decimal.add/2)
+
+    fixed_wage_sum =
+      wage_sts
+      |> Enum.filter(&(&1.type == "FixedWages"))
       |> Enum.map(& &1.amount)
       |> Enum.reduce(Decimal.new(0), &Decimal.add/2)
 
@@ -772,6 +782,7 @@ defmodule FullCircle.StatutoryConfig do
       pay_month: month,
       pay_year: year,
       addition_amount: addition_sum,
+      fixed_wage_amount: fixed_wage_sum,
       bonus_amount: Decimal.new(0)
     })
   end

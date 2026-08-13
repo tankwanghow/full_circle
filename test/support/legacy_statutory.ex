@@ -11,7 +11,7 @@ defmodule FullCircle.LegacyStatutory do
       select epf_no, id_no as ID_NUMBER, emp.name AS NAME, '#{epf_code}' as epf_code,
              (select sum(quantity * unit_price) from salary_notes sn
                inner join salary_types st on sn.salary_type_id = st.id
-               where st.type = 'Addition' and sn.company_id = '#{com_id}' and sn.pay_slip_id = ps.id) as WAGES,
+               where st.type in ('Addition', 'FixedWages') and sn.company_id = '#{com_id}' and sn.pay_slip_id = ps.id) as WAGES,
              (select quantity * unit_price from salary_notes sn
                inner join salary_types st on sn.salary_type_id = st.id
                where st.name = 'EPF By Employer' and sn.company_id = '#{com_id}' and sn.pay_slip_id = ps.id) as EMPLOYER,
@@ -35,7 +35,7 @@ defmodule FullCircle.LegacyStatutory do
       select case when socso_no = '' then id_no when socso_no = '-' then id_no when socso_no is null then id_no else socso_no end as ID_NUMBER,
              emp.name AS NAME, service_since, ps.pay_month, ps.pay_year,
              COALESCE((select sum(quantity * unit_price) from salary_notes sn inner join salary_types st on sn.salary_type_id = st.id
-                        where st.type = 'Addition' and sn.pay_slip_id = ps.id), 0) as WAGES,
+                        where st.type in ('Addition', 'FixedWages') and sn.pay_slip_id = ps.id), 0) as WAGES,
              COALESCE((select quantity * unit_price from salary_notes sn inner join salary_types st on sn.salary_type_id = st.id
                         where st.name = 'SOCSO By Employer' and sn.pay_slip_id = ps.id), 0) as EMPLOYER,
              COALESCE((select quantity * unit_price from salary_notes sn inner join salary_types st on sn.salary_type_id = st.id
@@ -62,7 +62,7 @@ defmodule FullCircle.LegacyStatutory do
       select case when socso_no = '' then id_no when socso_no = '-' then id_no when socso_no is null then id_no else socso_no end as ID_NUMBER,
              emp.name AS NAME, service_since, ps.pay_month, ps.pay_year,
              COALESCE((select sum(quantity * unit_price) from salary_notes sn inner join salary_types st on sn.salary_type_id = st.id
-                        where st.type = 'Addition' and sn.pay_slip_id = ps.id), 0) as WAGES,
+                        where st.type in ('Addition', 'FixedWages') and sn.pay_slip_id = ps.id), 0) as WAGES,
              COALESCE((select quantity * unit_price from salary_notes sn inner join salary_types st on sn.salary_type_id = st.id
                         where st.name = 'EIS By Employer' and sn.pay_slip_id = ps.id), 0) as EMPLOYER,
              COALESCE((select quantity * unit_price from salary_notes sn inner join salary_types st on sn.salary_type_id = st.id
@@ -87,7 +87,7 @@ defmodule FullCircle.LegacyStatutory do
       select case when socso_no = '' then id_no when socso_no = '-' then id_no when socso_no is null then id_no else socso_no end as ID_NUMBER,
              emp.name AS NAME, service_since, ps.pay_month, ps.pay_year,
              COALESCE((select sum(quantity * unit_price) from salary_notes sn inner join salary_types st on sn.salary_type_id = st.id
-                        where st.type = 'Addition' and sn.pay_slip_id = ps.id), 0) as WAGES,
+                        where st.type in ('Addition', 'FixedWages') and sn.pay_slip_id = ps.id), 0) as WAGES,
              COALESCE((select quantity * unit_price from salary_notes sn inner join salary_types st on sn.salary_type_id = st.id
                         where st.name = 'SOCSO By Employer' and sn.pay_slip_id = ps.id), 0) as SOCSO_EMPLOYER,
              COALESCE((select quantity * unit_price from salary_notes sn inner join salary_types st on sn.salary_type_id = st.id

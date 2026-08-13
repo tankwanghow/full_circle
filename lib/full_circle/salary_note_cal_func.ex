@@ -257,7 +257,7 @@ defmodule FullCircle.SalaryNoteCalFunc do
       # where: not is_nil(sn.pay_slip_id),
       where: fragment("extract(year from ?) = ?", sn.note_date, ^yr),
       where: fragment("extract(month from ?) < ?", sn.note_date, ^mth),
-      where: st.type == "Addition" or st.name == ^@income_cy,
+      where: st.type in ^FullCircle.HR.wage_types() or st.name == ^@income_cy,
       select: coalesce(sum(sn.quantity * sn.unit_price), 0)
     )
     |> Repo.one()

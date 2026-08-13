@@ -13,6 +13,7 @@ defmodule FullCircle.HRTest do
     test "returns expected list" do
       assert HR.salary_type_types() == [
                "Addition",
+               "FixedWages",
                "Deduction",
                "Contribution",
                "Bonus",
@@ -22,10 +23,27 @@ defmodule FullCircle.HRTest do
     end
   end
 
+  describe "wage_types" do
+    test "wages are Addition plus FixedWages" do
+      assert HR.wage_types() == ["Addition", "FixedWages"]
+    end
+  end
+
   describe "default_salary_types" do
     test "returns 14 default salary types for a company_id" do
       defaults = HR.default_salary_types("some-id")
       assert length(defaults) == 14
+    end
+
+    test "basic salaries default to FixedWages, variable pay stays Addition" do
+      by_name = HR.default_salary_types("x") |> Map.new(&{&1.name, &1.type})
+
+      assert by_name["Monthly Salary"] == "FixedWages"
+      assert by_name["Daily Salary"] == "FixedWages"
+      assert by_name["Hourly Salary"] == "FixedWages"
+      assert by_name["Overtime Salary"] == "Addition"
+      assert by_name["Sunday Salary"] == "Addition"
+      assert by_name["Holiday Salary"] == "Addition"
     end
 
     test "includes expected names" do

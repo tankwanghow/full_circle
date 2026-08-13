@@ -83,7 +83,13 @@
       "code": "pcb_employee",
       "effective_from": "1957-01-01",
       "name": "PCB Employee",
-      "script": "cap = calc(\"epf_relief_cap\")\ny   = ytd_sum(type: \"Addition\") + ytd_sum(name: \"Employee Current Year Income\")\nk   = min(ytd_sum(name: [\"EPF By Employee\", \"EPF By Employee Current Year\"]), cap)\ny1  = wages\nk1  = if(k >= cap, 0, min(calc(\"epf_employee\"), cap - k))\ny2  = y1\nn   = 12 - pay_month\nk2  = if(k + k1 == 0, 0, if(k + k1 * n >= cap, 0, cap - (k + k1 * n)))\nyt  = bonus\nkt  = if(k + k1 + k2 == 0, 0,\n      if(k + k1 + k2 >= cap, 0, min(calc(\"epf_employee\"), cap - (k + k1 + k2))))\nd   = calc(\"pcb_individual_deduction\")\ns   = if(marital_status == \"Married\" and not partner_working,\n         calc(\"pcb_spouse_deduction\"), 0)\nq   = calc(\"pcb_child_deduction\")\np   = y - k + (y1 - k1) + (y2 - k2) * n + (yt - kt) - (d + s + q * children)\nm   = lookup(\"pcb_normal\", p, \"m\")\nr   = lookup(\"pcb_normal\", p, \"r\")\nb   = if(marital_status == \"Married\" and not partner_working,\n         lookup(\"pcb_normal\", p, \"b2\"),\n         lookup(\"pcb_normal\", p, \"b13\"))\nx   = ytd_sum(name: [\"Employee PCB\", \"PCB Current Year\"])\nz   = ytd_sum(name: [\"Employee Zakat\", \"Zakat Current Year\"])\npcb = ((p - m) * r + b - (z + x)) / (n + 1)\nresult = if(pcb > 0, round(pcb, 1), 0)"
+      "script": "cap = calc(\"epf_relief_cap\")\ny   = ytd_sum(type: [\"Addition\", \"FixedWages\"]) + ytd_sum(name: \"Employee Current Year Income\")\nk   = min(ytd_sum(name: [\"EPF By Employee\", \"EPF By Employee Current Year\"]), cap)\ny1  = wages\nk1  = if(k >= cap, 0, min(calc(\"epf_employee\"), cap - k))\ny2  = y1\nn   = 12 - pay_month\nk2  = if(k + k1 == 0, 0, if(k + k1 * n >= cap, 0, cap - (k + k1 * n)))\nyt  = bonus\nkt  = if(k + k1 + k2 == 0, 0,\n      if(k + k1 + k2 >= cap, 0, min(calc(\"epf_employee\"), cap - (k + k1 + k2))))\nd   = calc(\"pcb_individual_deduction\")\ns   = if(marital_status == \"Married\" and not partner_working,\n         calc(\"pcb_spouse_deduction\"), 0)\nq   = calc(\"pcb_child_deduction\")\np   = y - k + (y1 - k1) + (y2 - k2) * n + (yt - kt) - (d + s + q * children)\nm   = lookup(\"pcb_normal\", p, \"m\")\nr   = lookup(\"pcb_normal\", p, \"r\")\nb   = if(marital_status == \"Married\" and not partner_working,\n         lookup(\"pcb_normal\", p, \"b2\"),\n         lookup(\"pcb_normal\", p, \"b13\"))\nx   = ytd_sum(name: [\"Employee PCB\", \"PCB Current Year\"])\nz   = ytd_sum(name: [\"Employee Zakat\", \"Zakat Current Year\"])\npcb = ((p - m) * r + b - (z + x)) / (n + 1)\nresult = if(pcb > 0, round(pcb, 1), 0)"
+    },
+    {
+      "code": "hrd_corp",
+      "effective_from": "1957-01-01",
+      "name": "HRD Corp Levy",
+      "script": "result = round(fixed_wages * 0.01, 2)"
     }
   ],
   "file_formats": [

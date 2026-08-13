@@ -22,6 +22,31 @@ defmodule FullCircle.StatutoryConfigTest do
     )
   end
 
+  test "script_context exposes fixed_wages from the pay slip changeset" do
+    cs =
+      Ecto.Changeset.change(%FullCircle.HR.PaySlip{}, %{
+        pay_month: 1,
+        pay_year: 2026,
+        addition_amount: Decimal.new("3000"),
+        fixed_wage_amount: Decimal.new("2500"),
+        bonus_amount: Decimal.new("0")
+      })
+
+    emp = %{
+      dob: ~D[1990-01-15],
+      nationality: "Malaysian",
+      marital_status: "Single",
+      partner_working: "No",
+      children: 0,
+      service_since: nil
+    }
+
+    ctx = StatutoryConfig.script_context(emp, cs)
+
+    assert ctx["wages"] == 3000.0
+    assert ctx["fixed_wages"] == 2500.0
+  end
+
   test "valid rate table changeset" do
     assert %{valid?: true} = StatutoryRateTable.changeset(%StatutoryRateTable{}, table_attrs())
   end

@@ -13,7 +13,7 @@ defmodule FullCircle.PayScript do
 
   alias FullCircle.PayScript.{Error, Evaluator, Lexer, Parser, Validator}
 
-  @standard_variables ~w(wages bonus age malaysian nationality marital_status
+  @standard_variables ~w(wages bonus fixed_wages age malaysian nationality marital_status
                          partner_working children pay_month pay_year service_years)
 
   @doc "Context variables every statutory calc may reference."

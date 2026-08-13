@@ -126,6 +126,7 @@ defmodule FullCircle.PayRun do
       select sn.pay_slip_id,
              sum(case st.type
                    when 'Addition' then sn.quantity * sn.unit_price
+                   when 'FixedWages' then sn.quantity * sn.unit_price
                    when 'Bonus' then sn.quantity * sn.unit_price
                    when 'Deduction' then -(sn.quantity * sn.unit_price)
                    else 0 end) as amt

@@ -161,7 +161,7 @@ defmodule FullCircle.PaySlipOp do
         end
       end)
 
-    add = sns |> Enum.filter(fn x -> fetch_field!(x, :salary_type_type) == "Addition" end)
+    add = sns |> Enum.filter(fn x -> fetch_field!(x, :salary_type_type) in HR.wage_types() end)
     ded = sns |> Enum.filter(fn x -> fetch_field!(x, :salary_type_type) == "Deduction" end)
     con = sns |> Enum.filter(fn x -> fetch_field!(x, :salary_type_type) == "Contribution" end)
     lea = sns |> Enum.filter(fn x -> fetch_field!(x, :salary_type_type) == "LeaveTaken" end)
@@ -196,7 +196,7 @@ defmodule FullCircle.PaySlipOp do
          ])
       |> Enum.uniq_by(fn %{id: id} -> id end)
       |> Enum.reject(fn x ->
-        x.type == "Addition" and
+        x.type in HR.wage_types() and
           Enum.any?(sns, fn y ->
             y.salary_type_id == x.id
           end)
@@ -224,7 +224,7 @@ defmodule FullCircle.PaySlipOp do
           }
         end)
 
-    add = sns |> Enum.filter(fn x -> x.salary_type_type == "Addition" end)
+    add = sns |> Enum.filter(fn x -> x.salary_type_type in HR.wage_types() end)
     ded = sns |> Enum.filter(fn x -> x.salary_type_type == "Deduction" end)
     con = sns |> Enum.filter(fn x -> x.salary_type_type == "Contribution" end)
     lea = sns |> Enum.filter(fn x -> x.salary_type_type == "LeaveTaken" end)
@@ -403,8 +403,10 @@ defmodule FullCircle.PaySlipOp do
   end
 
   defp pay_slip_notes(type) do
+    types = List.wrap(type)
+
     from(note in subquery(salary_note_query()),
-      where: note.salary_type_type == ^type
+      where: note.salary_type_type in ^types
     )
   end
 
@@ -508,7 +510,7 @@ defmodule FullCircle.PaySlipOp do
       on: emp.id == ps.employee_id,
       join: ac in Account,
       on: ac.id == ps.funds_account_id,
-      preload: [additions: ^pay_slip_notes("Addition")],
+      preload: [additions: ^pay_slip_notes(HR.wage_types())],
       preload: [bonuses: ^pay_slip_notes("Bonus")],
       preload: [deductions: ^pay_slip_notes("Deduction")],
       preload: [contributions: ^pay_slip_notes("Contribution")],
@@ -527,7 +529,7 @@ defmodule FullCircle.PaySlipOp do
 
   def get_print_pay_slips(ids, com) do
     from(ps in PaySlip,
-      preload: [additions: ^pay_slip_notes("Addition")],
+      preload: [additions: ^pay_slip_notes(HR.wage_types())],
       preload: [bonuses: ^pay_slip_notes("Bonus")],
       preload: [deductions: ^pay_slip_notes("Deduction")],
       preload: [contributions: ^pay_slip_notes("Contribution")],

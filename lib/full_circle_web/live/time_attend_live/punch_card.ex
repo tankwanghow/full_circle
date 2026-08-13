@@ -195,7 +195,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
 
         <%!-- new earning lines (recurrings / new salary types) --%>
         <.preview_row
-          :for={n <- preview_lines(@statutory_preview, ["Addition", "Bonus"])}
+          :for={n <- preview_lines(@statutory_preview, ["Addition", "FixedWages", "Bonus"])}
           n={n}
           klass="bg-green-100"
         />

@@ -22,28 +22,37 @@ defmodule FullCircle.HR do
   alias FullCircle.{Repo, Sys, StdInterface}
 
   def salary_type_types() do
-    ["Addition", "Deduction", "Contribution", "Bonus", "Recording", "LeaveTaken"]
+    ["Addition", "FixedWages", "Deduction", "Contribution", "Bonus", "Recording", "LeaveTaken"]
+  end
+
+  @doc """
+  Salary type types that count as wages (the pay slip's addition/wage base).
+  FixedWages is the levy-able subset (basic salary + fixed allowances, e.g.
+  for the HRD Corp levy); Addition covers variable pay like overtime.
+  """
+  def wage_types() do
+    ["Addition", "FixedWages"]
   end
 
   def default_salary_types(company_id) do
     [
       %{
         name: "Monthly Salary",
-        type: "Addition",
+        type: "FixedWages",
         company_id: company_id,
         db_ac_name: "Salaries and Wages",
         cr_ac_name: "Salaries and Wages Payable"
       },
       %{
         name: "Daily Salary",
-        type: "Addition",
+        type: "FixedWages",
         company_id: company_id,
         db_ac_name: "Salaries and Wages",
         cr_ac_name: "Salaries and Wages Payable"
       },
       %{
         name: "Hourly Salary",
-        type: "Addition",
+        type: "FixedWages",
         company_id: company_id,
         db_ac_name: "Salaries and Wages",
         cr_ac_name: "Salaries and Wages Payable"
@@ -171,7 +180,8 @@ defmodule FullCircle.HR do
            ps.pay_month, ps.pay_year,
            coalesce((select sum(sn.quantity * sn.unit_price)
                        from salary_notes sn join salary_types st on st.id = sn.salary_type_id
-                      where sn.pay_slip_id = ps.id and st.type = 'Addition'), 0) as wages,
+                      where sn.pay_slip_id = ps.id
+                        and st.type in (#{Enum.map_join(wage_types(), ", ", &"'#{&1}'")})), 0) as wages,
            #{sums}
       from pay_slips ps join employees emp on emp.id = ps.employee_id
      where ps.pay_month = #{month} and ps.pay_year = #{year} and ps.company_id = '#{com_id}'
