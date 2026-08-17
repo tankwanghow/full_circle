@@ -162,6 +162,57 @@ defmodule FullCircle.BankReconciliation do
   def dismiss_statement_lines(_), do: {:error, :empty_selection}
 
   @doc """
+  Correct an unmatched imported statement line (date/amount/description/cheque).
+  Matched lines must be unmatched first. Scoped by company.
+  """
+  def update_statement_line(line_id, company_id, attrs) do
+    case Repo.get_by(BankStatementLine, id: line_id, company_id: company_id) do
+      nil ->
+        {:error, :not_found}
+
+      %BankStatementLine{match_group_id: gid} when not is_nil(gid) ->
+        {:error, :matched}
+
+      %BankStatementLine{} = line ->
+        line
+        |> BankStatementLine.update_changeset(attrs)
+        |> Repo.update()
+    end
+  end
+
+  @doc """
+  Delete unmatched selected statement lines. Refuses the whole batch if any
+  selected line is already matched.
+  """
+  def delete_selected_statement_lines(stmt_ids, company_id)
+      when is_list(stmt_ids) and stmt_ids != [] do
+    matched =
+      from(sl in BankStatementLine,
+        where: sl.id in ^stmt_ids,
+        where: sl.company_id == ^company_id,
+        where: not is_nil(sl.match_group_id),
+        select: count(sl.id)
+      )
+      |> Repo.one()
+
+    if matched > 0 do
+      {:error, :matched}
+    else
+      {count, _} =
+        from(sl in BankStatementLine,
+          where: sl.id in ^stmt_ids,
+          where: sl.company_id == ^company_id,
+          where: is_nil(sl.match_group_id)
+        )
+        |> Repo.delete_all()
+
+      {:ok, count}
+    end
+  end
+
+  def delete_selected_statement_lines(_, _), do: {:error, :empty_selection}
+
+  @doc """
   Unmatch old groups first, then create a new match group.
   Used when re-matching already-reconciled items.
   """

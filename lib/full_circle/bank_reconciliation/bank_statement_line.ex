@@ -32,4 +32,13 @@ defmodule FullCircle.BankReconciliation.BankStatementLine do
     ])
     |> validate_required([:statement_date, :amount, :source_format, :account_id, :company_id])
   end
+
+  def update_changeset(line, attrs) do
+    line
+    |> cast(attrs, [:statement_date, :description, :cheque_no, :amount])
+    |> validate_required([:statement_date, :amount])
+    |> validate_change(:amount, fn :amount, amount ->
+      if Decimal.eq?(amount, 0), do: [amount: "must not be zero"], else: []
+    end)
+  end
 end

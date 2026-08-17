@@ -39,6 +39,7 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
         |> assign(processing_ai_match: false, ai_match_task: nil)
         |> assign(book_entry_mode: false, book_entry_lines: [], book_entry_contra: "")
         |> assign(manual_stmt_mode: false, manual_stmt: new_manual_stmt())
+        |> assign(editing_stmt_id: nil)
         |> assign(hide_matched: false)
         |> assign(llm_settings: llm_settings)
         |> allow_upload(:csv_file,
@@ -173,6 +174,78 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
        |> put_flash(:info, gettext("Statement lines dismissed."))}
     else
       {:noreply, put_flash(socket, :error, gettext("Select statement lines to dismiss."))}
+    end
+  end
+
+  @impl true
+  def handle_event("delete_selected", _, socket) do
+    stmt_ids = MapSet.to_list(socket.assigns.selected_stmt_ids)
+
+    case BankReconciliation.delete_selected_statement_lines(
+           stmt_ids,
+           socket.assigns.current_company.id
+         ) do
+      {:ok, count} ->
+        {:noreply,
+         socket
+         |> assign(selected_stmt_ids: MapSet.new(), selected_txn_ids: MapSet.new())
+         |> reload_data()
+         |> put_flash(:info, "#{count} #{gettext("statement lines deleted.")}")}
+
+      {:error, :matched} ->
+        {:noreply, put_flash(socket, :error, gettext("Unmatch selected lines before deleting."))}
+
+      {:error, :empty_selection} ->
+        {:noreply, put_flash(socket, :error, gettext("Select statement lines to delete."))}
+    end
+  end
+
+  @impl true
+  def handle_event("start_edit_stmt", %{"id" => id}, socket) do
+    {:noreply, assign(socket, editing_stmt_id: id)}
+  end
+
+  @impl true
+  def handle_event("cancel_edit_stmt", _, socket) do
+    {:noreply, assign(socket, editing_stmt_id: nil)}
+  end
+
+  @impl true
+  def handle_event("save_edit_stmt", %{"edit" => params}, socket) do
+    amount_str = String.trim(params["amount"] || "")
+    date_str = String.trim(params["statement_date"] || "")
+
+    with {:ok, amount} <- parse_decimal(amount_str),
+         {:ok, date} <- Date.from_iso8601(date_str) do
+      case BankReconciliation.update_statement_line(
+             params["id"],
+             socket.assigns.current_company.id,
+             %{
+               statement_date: date,
+               description: String.trim(params["description"] || ""),
+               cheque_no: String.trim(params["cheque_no"] || ""),
+               amount: amount
+             }
+           ) do
+        {:ok, _} ->
+          {:noreply,
+           socket
+           |> assign(editing_stmt_id: nil)
+           |> reload_data()
+           |> put_flash(:info, gettext("Statement line updated."))}
+
+        {:error, :matched} ->
+          {:noreply, put_flash(socket, :error, gettext("Unmatch the line before editing."))}
+
+        {:error, :not_found} ->
+          {:noreply, put_flash(socket, :error, gettext("Statement line not found."))}
+
+        {:error, _changeset} ->
+          {:noreply, put_flash(socket, :error, gettext("Invalid date or amount."))}
+      end
+    else
+      _ ->
+        {:noreply, put_flash(socket, :error, gettext("Invalid date or amount."))}
     end
   end
 
@@ -741,7 +814,8 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
         finalized?: finalized?,
         selected_stmt_ids: MapSet.new(),
         selected_txn_ids: MapSet.new(),
-        suggested_matches: []
+        suggested_matches: [],
+        editing_stmt_id: nil
       )
     else
       socket
@@ -775,14 +849,26 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
 
   defp suggested_stmt_ids(suggested_matches) do
     Enum.reduce(suggested_matches, MapSet.new(), fn {stmt_ids, _txn_ids, _score}, acc ->
-      Enum.reduce(stmt_ids, acc, &MapSet.put(&2, &1))
+      Enum.reduce(stmt_ids, acc, &MapSet.put(&2, to_string(&1)))
     end)
   end
 
   defp suggested_txn_ids(suggested_matches) do
     Enum.reduce(suggested_matches, MapSet.new(), fn {_stmt_ids, txn_ids, _score}, acc ->
-      Enum.reduce(txn_ids, acc, &MapSet.put(&2, &1))
+      Enum.reduce(txn_ids, acc, &MapSet.put(&2, to_string(&1)))
     end)
+  end
+
+  defp member_id?(set, id), do: MapSet.member?(set, to_string(id))
+
+  defp annotate_recon_rows(rows, suggested_ids, selected_ids) do
+    rows
+    |> Enum.map(fn row ->
+      row
+      |> Map.put(:suggested?, member_id?(suggested_ids, row.id))
+      |> Map.put(:selected?, member_id?(selected_ids, row.id))
+    end)
+    |> Enum.sort_by(&if(&1.suggested? or &1.selected?, do: 0, else: 1))
   end
 
   defp format_amount(amount) do
@@ -795,12 +881,21 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
 
   defp selection_total(ids, items, id_field) do
     items
-    |> Enum.filter(&(Map.get(&1, id_field) in ids))
+    |> Enum.filter(&member_id?(ids, Map.get(&1, id_field)))
     |> Enum.reduce(Decimal.new(0), &Decimal.add(&1.amount, &2))
   end
 
   defp new_manual_stmt do
     %{statement_date: "", description: "", cheque_no: "", amount: ""}
+  end
+
+  defp parse_decimal(str) do
+    cleaned = str |> String.replace(",", "") |> String.trim()
+
+    case Decimal.parse(cleaned) do
+      {dec, ""} -> {:ok, dec}
+      _ -> :error
+    end
   end
 
   defp visible_lines(lines, true, :match_group_id),
@@ -837,15 +932,17 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
         Decimal.eq?(stmt_sel_total, 0)
 
     visible_statement_lines =
-      visible_lines(assigns.statement_lines, assigns.hide_matched, :match_group_id)
+      assigns.statement_lines
+      |> visible_lines(assigns.hide_matched, :match_group_id)
+      |> annotate_recon_rows(suggested_stmt, assigns.selected_stmt_ids)
 
     visible_book_transactions =
-      visible_lines(assigns.book_transactions, assigns.hide_matched, :reconciled)
+      assigns.book_transactions
+      |> visible_lines(assigns.hide_matched, :reconciled)
+      |> annotate_recon_rows(suggested_txn, assigns.selected_txn_ids)
 
     assigns =
       assign(assigns,
-        suggested_stmt: suggested_stmt,
-        suggested_txn: suggested_txn,
         stmt_sel_total: stmt_sel_total,
         txn_sel_total: txn_sel_total,
         bank_to_bank?: bank_to_bank?,
@@ -1245,6 +1342,14 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
         </button>
         <button
           :if={MapSet.size(@selected_stmt_ids) > 0 and MapSet.size(@selected_txn_ids) == 0}
+          phx-click="delete_selected"
+          data-confirm={gettext("Delete selected statement lines? This cannot be undone.")}
+          class="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700"
+        >
+          {gettext("Delete")} ({MapSet.size(@selected_stmt_ids)})
+        </button>
+        <button
+          :if={MapSet.size(@selected_stmt_ids) > 0 and MapSet.size(@selected_txn_ids) == 0}
           phx-click="start_book_entry"
           class="bg-indigo-500 text-white px-3 py-1 rounded text-sm hover:bg-indigo-600"
         >
@@ -1436,62 +1541,148 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
           <div id="stmt-scroll" class="overflow-y-auto flex-1 min-h-0 border-b-4 border-amber-400">
             <%= for line <- @visible_statement_lines do %>
               <% matched? = not is_nil(line.match_group_id) %>
-              <% suggested? = MapSet.member?(@suggested_stmt, line.id) %>
-              <% selected? = MapSet.member?(@selected_stmt_ids, line.id) %>
-              <div
-                phx-click={unless matched?, do: "toggle_stmt"}
-                phx-value-id={line.id}
-                class={[
-                  "flex flex-row text-center tracking-tighter text-xs",
-                  not matched? && "cursor-pointer",
-                  matched? && !selected? && "bg-green-100",
-                  suggested? && !matched? && !selected? && "bg-yellow-100",
-                  selected? && "ring-2 ring-blue-500 bg-blue-50",
-                  not matched? && not suggested? && not selected? && "bg-red-50 hover:bg-red-100"
-                ]}
-              >
-                <div class="w-[3%] py-0.5">
-                  <input
-                    :if={not matched?}
-                    type="checkbox"
-                    checked={selected?}
-                    class="rounded border-gray-400"
-                    phx-click="toggle_stmt"
-                    phx-value-id={line.id}
-                  />
-                </div>
-                <div class="w-[13%] border rounded border-gray-300 px-1 py-0.5">
-                  {format_date(line.statement_date)}
-                </div>
-                <div class="w-[10%] border rounded border-gray-300 px-1 py-0.5 truncate">
-                  {line.cheque_no}
-                </div>
-                <div
-                  class="w-[39%] border rounded border-gray-300 px-1 py-0.5 text-left truncate"
-                  title={line.description <> if(line.reference, do: " | " <> line.reference, else: "")}
+              <% suggested? = line.suggested? %>
+              <% selected? = line.selected? %>
+              <% editing? = @editing_stmt_id == to_string(line.id) or @editing_stmt_id == line.id %>
+              <%= if editing? do %>
+                <.form
+                  for={%{}}
+                  id="edit-stmt-form"
+                  phx-submit="save_edit_stmt"
+                  autocomplete="off"
+                  class="flex flex-row text-center tracking-tighter text-xs bg-amber-50 ring-2 ring-amber-400"
                 >
-                  {line.description}
-                </div>
-                <div class="w-[17%] border rounded border-gray-300 px-1 py-0.5">
-                  {format_amount(line.amount)}
-                </div>
-                <div class="w-[18%] border rounded border-gray-300 px-1 py-0.5">
-                  <%= if matched? do %>
-                    <span class="text-green-700 text-xs font-semibold">{gettext("Matched")}</span>
+                  <input type="hidden" name="edit[id]" value={line.id} />
+                  <div class="w-[3%] py-0.5"></div>
+                  <div class="w-[13%] px-0.5 py-0.5">
+                    <input
+                      type="date"
+                      name="edit[statement_date]"
+                      value={Date.to_iso8601(line.statement_date)}
+                      class="w-full border border-gray-300 rounded px-0.5 py-0.5 text-xs"
+                    />
+                  </div>
+                  <div class="w-[10%] px-0.5 py-0.5">
+                    <input
+                      type="text"
+                      name="edit[cheque_no]"
+                      value={line.cheque_no}
+                      class="w-full border border-gray-300 rounded px-0.5 py-0.5 text-xs"
+                    />
+                  </div>
+                  <div class="w-[39%] px-0.5 py-0.5">
+                    <input
+                      type="text"
+                      name="edit[description]"
+                      value={line.description}
+                      class="w-full border border-gray-300 rounded px-0.5 py-0.5 text-xs"
+                    />
+                  </div>
+                  <div class="w-[17%] px-0.5 py-0.5">
+                    <input
+                      type="text"
+                      name="edit[amount]"
+                      value={Decimal.to_string(line.amount)}
+                      class="w-full border border-gray-300 rounded px-0.5 py-0.5 text-xs text-right"
+                    />
+                  </div>
+                  <div class="w-[18%] px-0.5 py-0.5 flex items-center justify-center gap-0.5">
                     <button
-                      phx-click="unmatch_group"
-                      phx-value-group-id={line.match_group_id}
-                      class="text-red-500 hover:text-red-700 ml-0.5"
-                      title={gettext("Unmatch group")}
-                      tabindex="-1"
+                      type="submit"
+                      class="bg-amber-600 text-white px-1.5 py-0.5 rounded text-xs hover:bg-amber-700"
+                    >
+                      {gettext("Save")}
+                    </button>
+                    <button
+                      type="button"
+                      phx-click="cancel_edit_stmt"
+                      class="text-gray-500 hover:text-gray-700 px-1"
+                      title={gettext("Cancel")}
                     >
                       x
                     </button>
-                  <% else %>
-                    <span class="text-red-400 font-semibold">{gettext("Unmatched")}</span>
-                  <% end %>
+                  </div>
+                </.form>
+              <% else %>
+                <div
+                  id={"stmt-#{line.id}"}
+                  phx-click={unless matched?, do: "toggle_stmt"}
+                  phx-value-id={line.id}
+                  class={[
+                    "flex flex-row text-center tracking-tighter text-xs",
+                    not matched? && "cursor-pointer",
+                    matched? && !selected? && "bg-green-100",
+                    suggested? && !matched? && !selected? && "bg-yellow-200 ring-2 ring-yellow-400",
+                    selected? && "ring-2 ring-blue-500 bg-blue-100",
+                    not matched? && not suggested? && not selected? && "bg-red-50 hover:bg-red-100"
+                  ]}
+                >
+                  <div class="w-[3%] py-0.5">
+                    <input
+                      :if={not matched?}
+                      type="checkbox"
+                      id={"stmt-cb-#{line.id}-#{selected?}-#{suggested?}"}
+                      checked={selected?}
+                      class="rounded border-gray-400"
+                      phx-click="toggle_stmt"
+                      phx-value-id={line.id}
+                    />
+                  </div>
+                  <div class="w-[13%] border rounded border-gray-300 px-1 py-0.5">
+                    {format_date(line.statement_date)}
+                  </div>
+                  <div class="w-[10%] border rounded border-gray-300 px-1 py-0.5 truncate">
+                    {line.cheque_no}
+                  </div>
+                  <div
+                    class="w-[39%] border rounded border-gray-300 px-1 py-0.5 text-left truncate"
+                    title={
+                      line.description <> if(line.reference, do: " | " <> line.reference, else: "")
+                    }
+                  >
+                    <%= if matched? do %>
+                      {line.description}
+                    <% else %>
+                      <a
+                        href="#"
+                        phx-click="start_edit_stmt"
+                        phx-value-id={line.id}
+                        class="text-blue-600 hover:underline"
+                        title={gettext("Edit")}
+                      >
+                        {line.description}
+                      </a>
+                    <% end %>
+                  </div>
+                  <div class="w-[17%] border rounded border-gray-300 px-1 py-0.5">
+                    {format_amount(line.amount)}
+                  </div>
+                  <div class="w-[18%] border rounded border-gray-300 px-1 py-0.5">
+                    <%= if matched? do %>
+                      <span class="text-green-700 text-xs font-semibold">{gettext("Matched")}</span>
+                      <button
+                        phx-click="unmatch_group"
+                        phx-value-group-id={line.match_group_id}
+                        class="text-red-500 hover:text-red-700 ml-0.5"
+                        title={gettext("Unmatch group")}
+                        tabindex="-1"
+                      >
+                        x
+                      </button>
+                    <% else %>
+                      <span
+                        :if={suggested?}
+                        class="text-yellow-800 font-semibold"
+                      >
+                        {gettext("Suggested")}
+                      </span>
+                      <span :if={not suggested?} class="text-red-400 font-semibold">
+                        {gettext("Unmatched")}
+                      </span>
+                    <% end %>
+                  </div>
                 </div>
-              </div>
+              <% end %>
             <% end %>
             <div :if={@visible_statement_lines == []} class="text-center text-gray-500 p-4 text-sm">
               <%= if @statement_lines == [] do %>
@@ -1535,17 +1726,18 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
           <div id="txn-scroll" class="overflow-y-auto flex-1 min-h-0 border-b-4 border-blue-400">
             <%= for txn <- @visible_book_transactions do %>
               <% matched? = txn.reconciled %>
-              <% suggested? = MapSet.member?(@suggested_txn, txn.id) %>
-              <% selected? = MapSet.member?(@selected_txn_ids, txn.id) %>
+              <% suggested? = txn.suggested? %>
+              <% selected? = txn.selected? %>
               <div
+                id={"txn-#{txn.id}"}
                 phx-click={unless matched?, do: "toggle_txn"}
                 phx-value-id={txn.id}
                 class={[
                   "flex flex-row text-center tracking-tighter text-xs",
                   not matched? && "cursor-pointer",
                   matched? && !selected? && "bg-green-100",
-                  suggested? && !matched? && !selected? && "bg-yellow-100",
-                  selected? && "ring-2 ring-blue-500 bg-blue-50",
+                  suggested? && !matched? && !selected? && "bg-yellow-200 ring-2 ring-yellow-400",
+                  selected? && "ring-2 ring-blue-500 bg-blue-100",
                   not matched? && not suggested? && not selected? && "bg-red-50 hover:bg-red-100"
                 ]}
               >
@@ -1553,6 +1745,7 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
                   <input
                     :if={not matched?}
                     type="checkbox"
+                    id={"txn-cb-#{txn.id}-#{selected?}-#{suggested?}"}
                     checked={selected?}
                     class="rounded border-gray-400"
                     phx-click="toggle_txn"
@@ -1591,7 +1784,15 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
                       x
                     </button>
                   <% else %>
-                    <span class="text-red-400 font-semibold">{gettext("Unmatched")}</span>
+                    <span
+                      :if={suggested?}
+                      class="text-yellow-800 font-semibold"
+                    >
+                      {gettext("Suggested")}
+                    </span>
+                    <span :if={not suggested?} class="text-red-400 font-semibold">
+                      {gettext("Unmatched")}
+                    </span>
                   <% end %>
                 </div>
               </div>
