@@ -18,4 +18,8 @@ defmodule FullCircle.UserQueries do
       " #{st}#{nd}('#{com_id}') "
     end)
   end
+
+  def generate_sql(prompt, llm_settings, opts \\ []) do
+    FullCircle.UserQueries.SqlGenerator.generate(prompt, llm_settings, opts)
+  end
 end

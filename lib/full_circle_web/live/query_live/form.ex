@@ -15,7 +15,11 @@ defmodule FullCircleWeb.QueryLive.Form do
         :edit -> mount_edit(socket, id)
       end
 
-    {:ok, socket |> assign(result: waiting_for_async_action_map())}
+    {:ok,
+     socket
+     |> assign(result: waiting_for_async_action_map())
+     |> assign(ai_prompt: "", generating?: false, generate_task: nil)
+     |> assign(llm_settings: load_llm_settings(socket))}
   end
 
   defp mount_new(socket) do
@@ -43,7 +47,37 @@ defmodule FullCircleWeb.QueryLive.Form do
   end
 
   @impl true
-  def handle_event("validate", %{"query" => params}, socket) do
+  def handle_event("update_ai_prompt", params, socket) do
+    prompt = params["value"] || params["prompt"] || ""
+    {:noreply, assign(socket, ai_prompt: prompt)}
+  end
+
+  @impl true
+  def handle_event("generate_sql", _params, socket) do
+    prompt = String.trim(socket.assigns.ai_prompt || "")
+
+    cond do
+      prompt == "" ->
+        {:noreply, put_flash(socket, :error, gettext("Describe the query first."))}
+
+      not llm_configured?(socket.assigns.llm_settings) ->
+        {:noreply, put_flash(socket, :error, gettext("LLM is not configured for this company."))}
+
+      true ->
+        settings = socket.assigns.llm_settings
+        company_id = socket.assigns.current_company.id
+
+        task =
+          Task.async(fn ->
+            UserQueries.generate_sql(prompt, settings, company_id: company_id)
+          end)
+
+        {:noreply, assign(socket, ai_prompt: prompt, generating?: true, generate_task: task)}
+    end
+  end
+
+  @impl true
+  def handle_event("validate", %{"query" => params} = all, socket) do
     changeset =
       StdInterface.changeset(
         Query,
@@ -53,9 +87,10 @@ defmodule FullCircleWeb.QueryLive.Form do
       )
       |> Map.put(:action, :insert)
 
-    socket = assign(socket, form: to_form(changeset))
-
-    {:noreply, socket}
+    {:noreply,
+     socket
+     |> assign(form: to_form(changeset))
+     |> assign(ai_prompt: all["prompt"] || socket.assigns.ai_prompt)}
   end
 
   @impl true
@@ -189,6 +224,70 @@ defmodule FullCircleWeb.QueryLive.Form do
   end
 
   @impl true
+  def handle_info({ref, result}, socket) when is_reference(ref) do
+    Process.demonitor(ref, [:flush])
+
+    if socket.assigns.generate_task && ref == socket.assigns.generate_task.ref do
+      case result do
+        {:ok, sql} ->
+          {:noreply,
+           socket
+           |> assign(generating?: false, generate_task: nil)
+           |> put_sql(sql)
+           |> put_flash(:info, gettext("SQL drafted. Review it, then Execute Query."))}
+
+        {:error, reason} ->
+          {:noreply,
+           socket
+           |> assign(generating?: false, generate_task: nil)
+           |> put_flash(:error, to_string(reason))}
+      end
+    else
+      {:noreply, socket}
+    end
+  end
+
+  def handle_info({:DOWN, _ref, :process, _pid, :normal}, socket), do: {:noreply, socket}
+
+  def handle_info({:DOWN, _ref, :process, _pid, reason}, socket) do
+    {:noreply,
+     socket
+     |> assign(generating?: false, generate_task: nil)
+     |> put_flash(:error, "SQL generation failed: #{inspect(reason)}")}
+  end
+
+  defp put_sql(socket, sql) do
+    name = Ecto.Changeset.fetch_field!(socket.assigns.form.source, :qry_name) || ""
+
+    changeset =
+      StdInterface.changeset(
+        Query,
+        socket.assigns.form.data,
+        %{"qry_name" => name, "sql_string" => sql},
+        socket.assigns.current_company
+      )
+      |> Map.put(:action, :insert)
+
+    assign(socket, form: to_form(changeset))
+  end
+
+  defp load_llm_settings(socket) do
+    defaults = %{
+      "llm-provider" => "none",
+      "llm-endpoint" => "",
+      "llm-model" => "",
+      "llm-api-key" => ""
+    }
+
+    saved = FullCircle.Sys.get_company_settings(socket.assigns.current_company, "llm")
+    Map.merge(defaults, saved)
+  end
+
+  defp llm_configured?(settings) do
+    settings["llm-provider"] not in [nil, "", "none"]
+  end
+
+  @impl true
   def render(assigns) do
     ~H"""
     <div class="w-8/12 mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4">
@@ -229,9 +328,38 @@ defmodule FullCircleWeb.QueryLive.Form do
           </div>
         </div>
 
+        <div
+          :if={llm_configured?(@llm_settings)}
+          class="mt-2 mb-2 border border-purple-400 rounded bg-purple-50 p-2"
+        >
+          <label class="block text-sm font-semibold mb-1">{gettext("Ask AI to draft SQL")}</label>
+          <textarea
+            name="prompt"
+            id="ai-query-prompt"
+            rows="3"
+            phx-blur="update_ai_prompt"
+            class="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+            placeholder={gettext("e.g. debtors ageing at 31 Dec 2025, exclude related companies")}
+          >{@ai_prompt}</textarea>
+          <div class="flex items-center gap-2 mt-1">
+            <button
+              type="button"
+              id="generate-sql"
+              phx-click="generate_sql"
+              disabled={@generating?}
+              class="bg-purple-600 text-white px-3 py-1 rounded text-sm hover:bg-purple-700 disabled:opacity-50"
+            >
+              {if @generating?, do: gettext("Generating..."), else: gettext("Generate SQL")}
+            </button>
+            <span class="text-xs text-gray-600">
+              {gettext("Fills the SQL box only. Review, then Execute Query.")}
+            </span>
+          </div>
+        </div>
+
         <.input
           field={@form[:sql_string]}
-          label={gettext("Descriptions")}
+          label={gettext("SQL")}
           type="textarea"
           rows="30"
           spellcheck="false"
