@@ -26,7 +26,9 @@ fixed-asset register that can keep depreciating after go-live.
 | Document numbers | Keep Xero numbers; bump gapless counters after apply |
 | Fixed assets | Register + past charges; abort if any diminishing-value |
 | Dates | Import runs as a Full Circle **admin**; `admin_changeset` already skips the ±60-day window. Period stays unlocked until reconcile passes |
-| Out of scope | Attachments, tracking categories, payroll, **bank reconciliation** (statement lines, Xero ticks, and setting `transactions.reconciled` on imported bank lines), repeating-invoice templates, multi-currency, a reusable in-app wizard |
+| Out of scope | Attachments, tracking categories, **payroll HR documents** (employees, PaySlips, advances, EA / EPF / SOCSO files), **bank reconciliation** (statement lines, Xero ticks, and setting `transactions.reconciled` on imported bank lines), repeating-invoice templates, multi-currency, a reusable in-app wizard |
+
+**Salary in the books:** Golden Husbandry records pay in Xero as **manual journals and/or bank spend**, not Xero Payroll pay runs. Those documents import as live `Journal` / `Payment` (or unmatched bank spend). Wages expense, statutory payables, and bank stay on the trial balance. We do **not** create Full Circle `PaySlip` or `Employee` rows from that history. After go-live, do not generate Full Circle payslips for a month whose wages are already in an imported journal (that would double the expense). Xero staff who exist only as contacts become Full Circle **Contacts**, not HR employees.
 
 Bank rec starts in Full Circle **after go-live**. The import brings the cash book (receipts, payments, spend/receive, transfers) and checks bank **balances** in reconcile. It does not import Xero statement lines or mark historical bank `transactions` as reconciled. The first Full Circle recon should use a period starting at the snapshot date so old book lines are not treated as the current statement.
 
