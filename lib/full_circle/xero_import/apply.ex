@@ -1,11 +1,23 @@
 defmodule FullCircle.XeroImport.Apply do
   import Ecto.Query, warn: false
 
-  alias FullCircle.{Accounting, Product, Repo, Seeding, Sys}
+  alias FullCircle.{
+    Accounting,
+    Billing,
+    BillPay,
+    DebCre,
+    JournalEntry,
+    Product,
+    ReceiveFund,
+    Repo,
+    Seeding,
+    Sys
+  }
+
   alias FullCircle.Accounting.{Contact, Transaction}
   alias FullCircle.Billing.Invoice
   alias FullCircle.Sys.{Company, CompanyUser}
-  alias FullCircle.XeroImport.Mapper
+  alias FullCircle.XeroImport.{Gapless, Mapper}
 
   @default_company_name "Golden Husbandry Sdn. Bhd."
 
@@ -29,15 +41,48 @@ defmodule FullCircle.XeroImport.Apply do
            id_map: %{},
            accounts_by_code: %{},
            account_names: %{},
-           tax_by_type: %{}
+           tax_by_type: %{},
+           goods_by_code: %{},
+           invoice_info: %{},
+           imported_numbers: %{
+             Invoice: [],
+             PurInvoice: [],
+             Receipt: [],
+             Payment: [],
+             CreditNote: [],
+             DebitNote: [],
+             Journal: []
+           }
          },
          {:ok, ctx} <- import_accounts(ctx),
          {:ok, ctx} <- import_tax_codes(ctx),
          {:ok, ctx} <- import_contacts(ctx),
          {:ok, ctx} <- import_goods(ctx),
          {:ok, ctx} <- import_fixed_assets(ctx) do
-      {:ok, %{company: ctx.company, id_map: ctx.id_map}}
+      if Keyword.get(opts, :stop_after) == :masters do
+        {:ok, result(ctx)}
+      else
+        with {:ok, ctx} <- seed_conversion_balances(ctx),
+             {:ok, ctx} <- import_invoices_and_bills(ctx),
+             {:ok, ctx} <- import_notes(ctx),
+             {:ok, ctx} <- import_receipts_and_payments(ctx),
+             {:ok, ctx} <- import_journals(ctx),
+             {:ok, ctx} <- import_bank(ctx),
+             :ok <- Gapless.bump(ctx.company, ctx.imported_numbers) do
+          {:ok, result(ctx)}
+        end
+      end
     end
+  end
+
+  defp result(ctx), do: %{company: ctx.company, id_map: ctx.id_map}
+
+  # Conversion invoices: InvoiceNumber starts with "CONV-" or Date == conversion Date.
+  def conversion_invoice?(inv, conversion_date) when is_map(inv) do
+    num = to_string(inv["InvoiceNumber"] || "")
+
+    String.starts_with?(num, "CONV-") or
+      dates_equal?(parse_date(inv["Date"]), parse_date(conversion_date))
   end
 
   defp ensure_company(snapshot, user, name, reset?) do
@@ -253,14 +298,56 @@ defmodule FullCircle.XeroImport.Apply do
       |> Map.put_new("purchase_tax_code_name", "NoPTax")
 
     xero_id = xero["ItemID"] || xero["ItemId"]
+    code = xero["Code"]
 
     case Product.get_good_by_name(attrs["name"], ctx.company, ctx.user) do
       %{id: id} ->
-        {:ok, put_id(ctx, "good:" <> to_string(xero_id), id)}
+        ctx
+        |> put_id("good:" <> to_string(xero_id), id)
+        |> put_good_code(code, attrs["name"])
+        |> then(&ensure_packaging(attrs["name"], &1))
 
       nil ->
         case seed_one("Goods", attrs, ctx) do
-          {:ok, good} -> {:ok, put_id(ctx, "good:" <> to_string(xero_id), good.id)}
+          {:ok, good} ->
+            ctx
+            |> put_id("good:" <> to_string(xero_id), good.id)
+            |> put_good_code(code, attrs["name"])
+            |> then(&ensure_packaging(attrs["name"], &1))
+
+          {:error, _} = err ->
+            err
+        end
+    end
+  end
+
+  defp put_good_code(ctx, code, name) when is_binary(code) and code != "" do
+    put_in(ctx, [:goods_by_code, code], name)
+  end
+
+  defp put_good_code(ctx, _code, _name), do: ctx
+
+  defp ensure_packaging(good_name, ctx) do
+    good = Product.get_good_by_name(good_name, ctx.company, ctx.user)
+
+    cond do
+      is_nil(good) ->
+        {:ok, ctx}
+
+      not is_nil(good.package_id) ->
+        {:ok, ctx}
+
+      true ->
+        attrs = %{
+          "good_name" => good_name,
+          "name" => good.unit || "unit",
+          "unit_multiplier" => 1,
+          "cost_per_package" => 0,
+          "default" => true
+        }
+
+        case seed_one("GoodPackagings", attrs, ctx) do
+          {:ok, _} -> {:ok, ctx}
           {:error, _} = err -> err
         end
     end
@@ -364,6 +451,8 @@ defmodule FullCircle.XeroImport.Apply do
     do: Accounting.get_fixed_asset_by_name(filled["name"], ctx.company, ctx.user)
 
   defp lookup_seeded("FixedAssetDepreciations", _filled, _ctx), do: :ok
+  defp lookup_seeded("GoodPackagings", _filled, _ctx), do: :ok
+  defp lookup_seeded("Balances", _filled, _ctx), do: :ok
 
   defp uniquify_name(%{"name" => name} = attrs, _ctx, lookup) do
     %{attrs | "name" => unique_name(name, lookup, 2)}
@@ -408,4 +497,701 @@ defmodule FullCircle.XeroImport.Apply do
       {k, v} -> {k, v}
     end)
   end
+
+  defp seed_conversion_balances(ctx) do
+    cb = ctx.snapshot.conversion_balances || %{}
+    date = parse_date(cb["Date"]) || ~D[1970-01-01]
+    {ar_strip, ap_strip} = conversion_control_strips(ctx)
+    lines = cb["Lines"] || []
+
+    Enum.reduce_while(lines, {:ok, ctx}, fn line, {:ok, ctx} ->
+      case seed_conversion_line(line, date, ar_strip, ap_strip, ctx) do
+        {:ok, ctx} -> {:cont, {:ok, ctx}}
+        {:error, _} = err -> {:halt, err}
+      end
+    end)
+  end
+
+  defp conversion_control_strips(ctx) do
+    date = conversion_date(ctx)
+
+    rows(ctx.snapshot.invoices)
+    |> Enum.filter(&Mapper.importable_invoice?/1)
+    |> Enum.filter(&conversion_invoice?(&1, date))
+    |> Enum.reduce({Decimal.new(0), Decimal.new(0)}, fn inv, {ar, ap} ->
+      total = decimalize(inv["Total"] || 0)
+
+      case inv["Type"] do
+        "ACCPAY" -> {ar, Decimal.add(ap, total)}
+        _ -> {Decimal.add(ar, total), ap}
+      end
+    end)
+  end
+
+  defp seed_conversion_line(line, date, ar_strip, ap_strip, ctx) do
+    xero_id = to_string(line["AccountID"] || "")
+
+    case name_for_xero_account(xero_id, ctx) do
+      nil ->
+        {:error, {:unmapped_account, xero_id}}
+
+      name ->
+        amount = decimalize(line["Balance"] || 0)
+
+        amount =
+          cond do
+            ar_account?(name) -> Decimal.sub(amount, ar_strip)
+            ap_account?(name) -> Decimal.sub(amount, ap_strip)
+            true -> amount
+          end
+
+        if Decimal.eq?(amount, 0) do
+          {:ok, ctx}
+        else
+          attrs = %{
+            "account_name" => name,
+            "amount" => amount,
+            "doc_date" => date
+          }
+
+          case seed_one("Balances", attrs, ctx) do
+            {:ok, _} -> {:ok, ctx}
+            {:error, _} = err -> err
+          end
+        end
+    end
+  end
+
+  defp ar_account?(name), do: name in ["Account Receivables", "Accounts Receivable"]
+  defp ap_account?(name), do: name in ["Account Payables", "Accounts Payable"]
+
+  defp conversion_date(ctx) do
+    parse_date(get_in(ctx.snapshot.conversion_balances || %{}, ["Date"]))
+  end
+
+  defp import_invoices_and_bills(ctx) do
+    base = base_currency(ctx)
+
+    rows(ctx.snapshot.invoices)
+    |> Enum.sort_by(&sort_date/1, Date)
+    |> then(&reduce_rows(&1, ctx, fn inv, ctx -> import_one_invoice(inv, ctx, base) end))
+  end
+
+  defp import_one_invoice(inv, ctx, base) do
+    cond do
+      not Mapper.importable_invoice?(inv) ->
+        {:ok, ctx}
+
+      not Mapper.base_currency_ok?(inv, base) ->
+        {:error, {:foreign_currency, inv["InvoiceNumber"]}}
+
+      true ->
+        persist_invoice(inv, ctx)
+    end
+  end
+
+  defp persist_invoice(inv, ctx) do
+    with {:ok, attrs, type} <- invoice_attrs(inv, ctx) do
+      xero_id = to_string(inv["InvoiceID"] || inv["InvoiceId"])
+      number = inv["InvoiceNumber"]
+
+      result =
+        case type do
+          :pur_invoice -> Billing.import_pur_invoice(attrs, ctx.company, ctx.user)
+          :invoice -> Billing.import_invoice(attrs, ctx.company, ctx.user)
+        end
+
+      case wrap_import(result) do
+        {:ok, map} ->
+          entity = Map.fetch!(map, if(type == :pur_invoice, do: :create_pur_invoice, else: :create_invoice))
+          doc_type = if(type == :pur_invoice, do: "PurInvoice", else: "Invoice")
+          gap_type = if(type == :pur_invoice, do: :PurInvoice, else: :Invoice)
+
+          ctx =
+            ctx
+            |> put_id("invoice:" <> xero_id, entity.id)
+            |> put_invoice_info(xero_id, inv, entity, doc_type)
+            |> track_number(gap_type, number)
+
+          {:ok, ctx}
+
+        {:error, _} = err ->
+          err
+      end
+    end
+  end
+
+  defp invoice_attrs(inv, ctx) do
+    type = if inv["Type"] == "ACCPAY", do: :pur_invoice, else: :invoice
+    side = if type == :pur_invoice, do: "Purchase", else: "Sales"
+
+    with {:ok, contact} <- mapped_contact(inv, ctx),
+         {:ok, details} <- invoice_details(inv, ctx, side, type) do
+      date = parse_date(inv["Date"]) || Date.utc_today()
+      due = parse_date(inv["DueDate"]) || date
+      number = inv["InvoiceNumber"]
+
+      attrs =
+        if type == :pur_invoice do
+          %{
+            "pur_invoice_no" => number,
+            "pur_invoice_date" => date,
+            "due_date" => due,
+            "contact_id" => contact.id,
+            "contact_name" => contact.name,
+            "descriptions" => inv["Reference"] || number,
+            "e_inv_internal_id" => number,
+            "pur_invoice_details" => details
+          }
+        else
+          %{
+            "invoice_no" => number,
+            "invoice_date" => date,
+            "due_date" => due,
+            "contact_id" => contact.id,
+            "contact_name" => contact.name,
+            "descriptions" => inv["Reference"] || number,
+            "invoice_details" => details
+          }
+        end
+
+      {:ok, attrs, type}
+    end
+  end
+
+  defp invoice_details(inv, ctx, side, type) do
+    (inv["LineItems"] || [])
+    |> Enum.with_index()
+    |> Enum.reduce_while({:ok, %{}}, fn {line, idx}, {:ok, acc} ->
+      case invoice_detail(line, ctx, side, type, idx) do
+        {:ok, detail} -> {:cont, {:ok, Map.put(acc, Integer.to_string(idx), detail)}}
+        {:error, _} = err -> {:halt, err}
+      end
+    end)
+  end
+
+  defp invoice_detail(line, ctx, side, type, idx) do
+    with {:ok, good} <- resolve_line_good(line, ctx),
+         {:ok, account} <- resolve_line_account(line, good, ctx, type),
+         {:ok, tax} <- resolve_line_tax(line, ctx, side) do
+      qty = decimalize(line["Quantity"] || 1)
+
+      qty =
+        if Decimal.compare(qty, 0) != :gt do
+          Decimal.new(1)
+        else
+          qty
+        end
+
+      unit_price = decimalize(line["UnitAmount"] || line["LineAmount"] || 0)
+      pkg_name = good.package_name || good.unit || "unit"
+
+      {:ok,
+       %{
+         "good_id" => good.id,
+         "good_name" => good_display_name(good),
+         "account_id" => account.id,
+         "account_name" => account.name,
+         "tax_code_id" => tax.id,
+         "tax_code_name" => tax.code,
+         "package_id" => good.package_id,
+         "package_name" => pkg_name,
+         "quantity" => qty,
+         "unit_price" => unit_price,
+         "discount" => "0",
+         "tax_rate" => tax.rate || Decimal.new(0),
+         "unit_multiplier" => "0",
+         "descriptions" => line["Description"],
+         "_persistent_id" => Integer.to_string(idx + 1)
+       }}
+    end
+  end
+
+  defp resolve_line_good(line, ctx) do
+    item_id = line["ItemID"] || get_in(line, ["Item", "ItemID"])
+    item_code = line["ItemCode"] || line["ItemCode"]
+
+    name =
+      cond do
+        is_binary(item_code) and Map.has_key?(ctx.goods_by_code, item_code) ->
+          ctx.goods_by_code[item_code]
+
+        is_binary(item_id) and Map.has_key?(ctx.id_map, "good:" <> to_string(item_id)) ->
+          ctx.goods_by_code
+          |> Enum.find_value(fn {_c, n} -> n end)
+
+        is_binary(item_code) and item_code != "" ->
+          item_code
+
+        is_binary(line["Description"]) and line["Description"] != "" ->
+          line["Description"]
+
+        true ->
+          "Xero Line"
+      end
+
+    case ensure_named_good(name, ctx) do
+      {:ok, good} -> {:ok, good}
+      {:error, _} = err -> err
+    end
+  end
+
+  defp ensure_named_good(name, ctx) do
+    case Product.get_good_by_name(name, ctx.company, ctx.user) do
+      %{id: _} = good ->
+        case ensure_packaging(name, ctx) do
+          {:ok, _} -> {:ok, Product.get_good_by_name(name, ctx.company, ctx.user) || good}
+          {:error, _} = err -> err
+        end
+
+      nil ->
+        sales = fallback_account_name(ctx)
+
+        attrs = %{
+          "name" => name,
+          "unit" => "unit",
+          "sales_account_name" => sales,
+          "purchase_account_name" => sales,
+          "sales_tax_code_name" => "NoSTax",
+          "purchase_tax_code_name" => "NoPTax"
+        }
+
+        case seed_one("Goods", attrs, ctx) do
+          {:ok, _} ->
+            case ensure_packaging(name, ctx) do
+              {:ok, _} ->
+                {:ok, Product.get_good_by_name(name, ctx.company, ctx.user)}
+
+              {:error, _} = err ->
+                err
+            end
+
+          {:error, _} = err ->
+            err
+        end
+    end
+  end
+
+  defp fallback_account_name(ctx) do
+    Map.get(ctx.accounts_by_code, "200") ||
+      ctx.account_names |> Map.values() |> List.first() ||
+      "Sales"
+  end
+
+  defp resolve_line_account(line, good, ctx, type) do
+    name =
+      cond do
+        is_binary(line["AccountCode"]) and Map.has_key?(ctx.accounts_by_code, line["AccountCode"]) ->
+          ctx.accounts_by_code[line["AccountCode"]]
+
+        type == :pur_invoice ->
+          good.purchase_account_name
+
+        true ->
+          good.sales_account_name
+      end
+
+    case Accounting.get_account_by_name(name, ctx.company, ctx.user) do
+      %{id: _} = acc -> {:ok, acc}
+      nil -> {:error, {:unmapped_account, line["AccountCode"] || name}}
+    end
+  end
+
+  defp resolve_line_tax(line, ctx, side) do
+    name = tax_code_name(ctx, line["TaxType"], side)
+
+    case Accounting.get_tax_code_by_code(name, ctx.company, ctx.user) do
+      %{id: _} = tc -> {:ok, tc}
+      nil -> {:error, {:unmapped_tax, line["TaxType"] || name}}
+    end
+  end
+
+  defp tax_code_name(ctx, xero_type, side) do
+    fallback = if(side == "Purchase", do: "NoPTax", else: "NoSTax")
+
+    ctx.tax_by_type
+    |> Map.get(xero_type, [])
+    |> Enum.find(fn
+      %{tax_type: ^side} -> true
+      %{"tax_type" => ^side} -> true
+      _ -> false
+    end)
+    |> case do
+      %{code: c} -> c
+      %{"code" => c} -> c
+      _ -> fallback
+    end
+  end
+
+  defp mapped_contact(doc, ctx) do
+    xero_id = get_in(doc, ["Contact", "ContactID"]) || get_in(doc, ["Contact", "ContactId"])
+    fc_id = xero_id && ctx.id_map["contact:" <> to_string(xero_id)]
+
+    cond do
+      is_nil(fc_id) ->
+        {:error, {:unmapped_contact, xero_id}}
+
+      true ->
+        case Repo.get(Contact, fc_id) do
+          %Contact{} = c -> {:ok, c}
+          nil -> {:error, {:unmapped_contact, xero_id}}
+        end
+    end
+  end
+
+  defp put_invoice_info(ctx, xero_id, inv, entity, doc_type) do
+    contact_id = Map.get(entity, :contact_id)
+    number = inv["InvoiceNumber"]
+
+    info = %{
+      type: inv["Type"],
+      number: number,
+      contact_id: contact_id,
+      contact_name: contact_name(contact_id),
+      doc_type: doc_type
+    }
+
+    put_in(ctx, [:invoice_info, xero_id], info)
+  end
+
+  defp contact_name(nil), do: nil
+
+  defp contact_name(id) do
+    case Repo.get(Contact, id) do
+      %Contact{name: name} -> name
+      _ -> nil
+    end
+  end
+
+  defp import_notes(ctx) do
+    base = base_currency(ctx)
+
+    reduce_rows(rows(ctx.snapshot.credit_notes), ctx, fn note, ctx ->
+      import_one_note(note, ctx, base)
+    end)
+  end
+
+  defp import_one_note(note, ctx, base) do
+    cond do
+      not Mapper.importable_invoice?(note) ->
+        {:ok, ctx}
+
+      not Mapper.base_currency_ok?(note, base) ->
+        {:error, {:foreign_currency, note["CreditNoteNumber"] || note["CreditNoteID"]}}
+
+      true ->
+        persist_note(note, ctx)
+    end
+  end
+
+  defp persist_note(note, ctx) do
+    with :ok <- assert_note_allocations(note, ctx),
+         {:ok, attrs, kind} <- note_attrs(note, ctx) do
+      number = note["CreditNoteNumber"] || note["CreditNoteID"]
+
+      result =
+        case kind do
+          :debit_note -> DebCre.import_debit_note(attrs, ctx.company, ctx.user)
+          :credit_note -> DebCre.import_credit_note(attrs, ctx.company, ctx.user)
+        end
+
+      case wrap_import(result) do
+        {:ok, _} ->
+          gap = if(kind == :debit_note, do: :DebitNote, else: :CreditNote)
+          {:ok, track_number(ctx, gap, number)}
+
+        {:error, _} = err ->
+          err
+      end
+    end
+  end
+
+  defp assert_note_allocations(note, ctx) do
+    Enum.reduce_while(note["Allocations"] || [], :ok, fn alloc, :ok ->
+      invoice_id = get_in(alloc, ["Invoice", "InvoiceID"]) || alloc["InvoiceID"]
+
+      if invoice_id && Map.has_key?(ctx.id_map, "invoice:" <> to_string(invoice_id)) do
+        {:cont, :ok}
+      else
+        {:halt,
+         {:error, {:missing_allocation_target, note["CreditNoteID"], invoice_id}}}
+      end
+    end)
+  end
+
+  defp note_attrs(note, ctx) do
+    kind = if note["Type"] == "ACCPAYCREDIT", do: :debit_note, else: :credit_note
+    side = if kind == :debit_note, do: "Purchase", else: "Sales"
+    details_key = if kind == :debit_note, do: "debit_note_details", else: "credit_note_details"
+
+    with {:ok, contact} <- mapped_contact(note, ctx) do
+      details =
+        (note["LineItems"] || [])
+        |> Enum.with_index()
+        |> Map.new(fn {line, idx} ->
+          tax_name = tax_code_name(ctx, line["TaxType"], side)
+          tax = Accounting.get_tax_code_by_code(tax_name, ctx.company, ctx.user)
+          acc_name = ctx.accounts_by_code[line["AccountCode"]] || fallback_account_name(ctx)
+          acc = Accounting.get_account_by_name(acc_name, ctx.company, ctx.user)
+          qty = decimalize(line["Quantity"] || 1)
+          qty = if Decimal.compare(qty, 0) != :gt, do: Decimal.new(1), else: qty
+
+          {Integer.to_string(idx),
+           %{
+             "descriptions" => line["Description"] || note["CreditNoteNumber"] || "Note",
+             "account_id" => acc && acc.id,
+             "account_name" => acc && acc.name,
+             "tax_code_id" => tax && tax.id,
+             "tax_code_name" => tax && tax.code,
+             "quantity" => qty,
+             "unit_price" => decimalize(line["UnitAmount"] || line["LineAmount"] || 0),
+             "tax_rate" => (tax && tax.rate) || Decimal.new(0),
+             "_persistent_id" => Integer.to_string(idx + 1)
+           }}
+        end)
+
+      date = parse_date(note["Date"]) || Date.utc_today()
+
+      attrs = %{
+        "note_no" => note["CreditNoteNumber"] || note["CreditNoteID"],
+        "note_date" => date,
+        "contact_id" => contact.id,
+        "contact_name" => contact.name,
+        details_key => details,
+        "transaction_matchers" => %{}
+      }
+
+      {:ok, attrs, kind}
+    end
+  end
+
+  defp import_receipts_and_payments(ctx) do
+    reduce_rows(rows(ctx.snapshot.payments), ctx, &import_one_payment/2)
+  end
+
+  defp import_one_payment(pay, ctx) do
+    cond do
+      not Mapper.importable_invoice?(pay) ->
+        {:ok, ctx}
+
+      true ->
+        persist_payment(pay, ctx)
+    end
+  end
+
+  defp persist_payment(pay, ctx) do
+    payment_id = to_string(pay["PaymentID"] || pay["PaymentId"])
+    invoice_id = get_in(pay, ["Invoice", "InvoiceID"]) || get_in(pay, ["Invoice", "InvoiceId"])
+    invoice_id = invoice_id && to_string(invoice_id)
+
+    info = invoice_id && Map.get(ctx.invoice_info, invoice_id)
+
+    cond do
+      is_nil(invoice_id) or is_nil(info) or not Map.has_key?(ctx.id_map, "invoice:" <> invoice_id) ->
+        {:error, {:missing_allocation_target, payment_id, invoice_id || "unknown"}}
+
+      true ->
+        apply_allocation(pay, payment_id, info, ctx)
+    end
+  end
+
+  defp apply_allocation(pay, payment_id, info, ctx) do
+    with {:ok, txn} <- control_transaction(info, ctx),
+         {:ok, funds} <- payment_funds_account(pay, ctx) do
+      date = parse_date(pay["Date"]) || Date.utc_today()
+      amount = decimalize(pay["Amount"] || 0)
+      match_amount = Decimal.negate(txn.amount)
+      number = pay["PaymentNumber"] || pay["Reference"] || payment_id
+
+      matcher = %{
+        "0" => %{
+          "transaction_id" => txn.id,
+          "match_amount" => match_amount,
+          "doc_type" => if(info.type == "ACCPAY", do: "Payment", else: "Receipt"),
+          "doc_date" => date,
+          "t_doc_no" => info.number,
+          "_persistent_id" => "1"
+        }
+      }
+
+      if info.type == "ACCPAY" do
+        attrs = %{
+          "payment_no" => number,
+          "payment_date" => date,
+          "contact_id" => info.contact_id,
+          "contact_name" => info.contact_name,
+          "funds_account_id" => funds.id,
+          "funds_account_name" => funds.name,
+          "funds_amount" => amount,
+          "payment_details" => %{},
+          "transaction_matchers" => matcher
+        }
+
+        case wrap_import(BillPay.import_payment(attrs, ctx.company, ctx.user)) do
+          {:ok, _} -> {:ok, track_number(ctx, :Payment, number)}
+          {:error, _} = err -> err
+        end
+      else
+        attrs = %{
+          "receipt_no" => number,
+          "receipt_date" => date,
+          "contact_id" => info.contact_id,
+          "contact_name" => info.contact_name,
+          "funds_account_id" => funds.id,
+          "funds_account_name" => funds.name,
+          "funds_amount" => amount,
+          "receipt_details" => %{},
+          "transaction_matchers" => matcher
+        }
+
+        case wrap_import(ReceiveFund.import_receipt(attrs, ctx.company, ctx.user)) do
+          {:ok, _} -> {:ok, track_number(ctx, :Receipt, number)}
+          {:error, _} = err -> err
+        end
+      end
+    end
+  end
+
+  defp control_transaction(info, ctx) do
+    account_name =
+      if info.type == "ACCPAY", do: "Account Payables", else: "Account Receivables"
+
+    txn =
+      Repo.one(
+        from t in Transaction,
+          join: a in FullCircle.Accounting.Account,
+          on: a.id == t.account_id,
+          where:
+            t.company_id == ^ctx.company.id and t.doc_no == ^info.number and
+              t.doc_type == ^info.doc_type and a.name == ^account_name
+      )
+
+    if txn, do: {:ok, txn}, else: {:error, {:missing_allocation_target, info.number, info.number}}
+  end
+
+  defp payment_funds_account(pay, ctx) do
+    xero_id =
+      get_in(pay, ["Account", "AccountID"]) ||
+        get_in(pay, ["Account", "AccountId"]) ||
+        pay["AccountID"]
+
+    name = name_for_xero_account(xero_id, ctx)
+
+    case name && Accounting.get_account_by_name(name, ctx.company, ctx.user) do
+      %{id: _} = acc -> {:ok, acc}
+      _ -> {:error, {:unmapped_account, xero_id}}
+    end
+  end
+
+  defp import_journals(ctx) do
+    reduce_rows(rows(ctx.snapshot.manual_journals), ctx, &import_one_journal/2)
+  end
+
+  defp import_one_journal(journal, ctx) do
+    status = journal["Status"]
+
+    if status in [nil, "POSTED", "AUTHORISED"] do
+      persist_journal(journal, ctx)
+    else
+      {:ok, ctx}
+    end
+  end
+
+  defp persist_journal(journal, ctx) do
+    number = journal["JournalNumber"] || journal["ManualJournalID"] || journal["Narration"]
+    date = parse_date(journal["Date"]) || Date.utc_today()
+    lines = journal["JournalLines"] || journal["Lines"] || []
+
+    transactions =
+      lines
+      |> Enum.with_index()
+      |> Map.new(fn {line, idx} ->
+        acc_name =
+          ctx.accounts_by_code[line["AccountCode"]] ||
+            name_for_xero_account(line["AccountID"], ctx)
+
+        acc = acc_name && Accounting.get_account_by_name(acc_name, ctx.company, ctx.user)
+
+        {Integer.to_string(idx),
+         %{
+           "account_id" => acc && acc.id,
+           "account_name" => acc && acc.name,
+           "particulars" => line["Description"] || journal["Narration"] || number,
+           "amount" => decimalize(line["LineAmount"] || 0),
+           "_persistent_id" => Integer.to_string(idx)
+         }}
+      end)
+
+    attrs = %{
+      "journal_no" => number,
+      "journal_date" => date,
+      "transactions" => transactions
+    }
+
+    case wrap_import(JournalEntry.import_journal(attrs, ctx.company, ctx.user)) do
+      {:ok, _} -> {:ok, track_number(ctx, :Journal, number)}
+      {:error, _} = err -> err
+    end
+  end
+
+  defp import_bank(ctx) do
+    with {:ok, ctx} <- reduce_rows(rows(ctx.snapshot.bank_transactions), ctx, &skip_row/2) do
+      reduce_rows(rows(ctx.snapshot.bank_transfers), ctx, &skip_row/2)
+    end
+  end
+
+  defp skip_row(_row, ctx), do: {:ok, ctx}
+
+  defp wrap_import({:ok, result}), do: {:ok, result}
+  defp wrap_import(:not_authorise), do: {:error, :not_authorise}
+  defp wrap_import({:error, _op, val, _so_far}), do: {:error, val}
+  defp wrap_import({:error, _} = err), do: err
+  defp wrap_import(other), do: {:error, other}
+
+  defp track_number(ctx, type, number) when is_binary(number) do
+    update_in(ctx, [:imported_numbers, type], fn list -> (list || []) ++ [number] end)
+  end
+
+  defp track_number(ctx, _type, _number), do: ctx
+
+  defp good_display_name(%{value: name}) when is_binary(name), do: name
+  defp good_display_name(%{name: name}) when is_binary(name), do: name
+  defp good_display_name(_), do: "Xero Line"
+
+  defp base_currency(ctx) do
+    organisation(ctx.snapshot)["BaseCurrency"] || "MYR"
+  end
+
+  defp sort_date(row) do
+    parse_date(row["Date"]) || ~D[0001-01-01]
+  end
+
+  defp dates_equal?(%Date{} = a, %Date{} = b), do: Date.compare(a, b) == :eq
+  defp dates_equal?(_, _), do: false
+
+  defp parse_date(nil), do: nil
+  defp parse_date(%Date{} = d), do: d
+
+  defp parse_date(<<y::binary-size(4), "-", m::binary-size(2), "-", d::binary-size(2), _::binary>>) do
+    case Date.from_iso8601("#{y}-#{m}-#{d}") do
+      {:ok, date} -> date
+      _ -> nil
+    end
+  end
+
+  defp parse_date(other) when is_binary(other) do
+    case Date.from_iso8601(other) do
+      {:ok, d} -> d
+      _ -> nil
+    end
+  end
+
+  defp parse_date(_), do: nil
+
+  defp decimalize(nil), do: Decimal.new(0)
+  defp decimalize(%Decimal{} = d), do: d
+  defp decimalize(n) when is_integer(n), do: Decimal.new(n)
+  defp decimalize(n) when is_float(n), do: n |> to_string() |> Decimal.new()
+  defp decimalize(bin) when is_binary(bin), do: Decimal.new(bin)
+  defp decimalize(_), do: Decimal.new(0)
 end

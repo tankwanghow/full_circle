@@ -97,4 +97,95 @@ defmodule FullCircle.XeroImport.ApplyTest do
     assert {:error, {:diminishing_value, _}} =
              Apply.run(snap, user, company_name: name, stop_after: :masters)
   end
+
+  test "imports INV-000123 and does not mint INV-000001", %{user: user, snap: snap, name: name} do
+    assert {:ok, %{company: com}} = Apply.run(snap, user, company_name: name)
+
+    inv =
+      Repo.one!(
+        from i in FullCircle.Billing.Invoice,
+          where: i.company_id == ^com.id and i.invoice_no == "INV-000123"
+      )
+
+    assert inv.invoice_no == "INV-000123"
+
+    refute Repo.exists?(
+             from i in FullCircle.Billing.Invoice,
+               where: i.company_id == ^com.id and i.invoice_no == "INV-DRAFT"
+           )
+  end
+
+  test "receipt matchers settle INV-000123", %{user: user, snap: snap, name: name} do
+    {:ok, %{company: com}} = Apply.run(snap, user, company_name: name)
+
+    ar =
+      Repo.one!(
+        from t in Transaction,
+          join: a in FullCircle.Accounting.Account,
+          on: a.id == t.account_id,
+          where:
+            t.company_id == ^com.id and t.doc_no == "INV-000123" and
+              a.name == "Account Receivables"
+      )
+
+    matched =
+      Repo.aggregate(
+        from(m in FullCircle.Accounting.TransactionMatcher, where: m.transaction_id == ^ar.id),
+        :sum,
+        :match_amount
+      )
+
+    assert Decimal.eq?(Decimal.add(ar.amount, matched || 0), 0)
+  end
+
+  test "payment whose invoice is missing aborts", %{user: user, snap: snap, name: name} do
+    snap =
+      put_in(snap.payments, [
+        %{
+          "PaymentID" => "pay-bad",
+          "Invoice" => %{"InvoiceID" => "nope"},
+          "Amount" => 1.0,
+          "Date" => "2024-02-01",
+          "Account" => %{"AccountID" => "ac-bank"},
+          "Status" => "AUTHORISED"
+        }
+      ])
+
+    assert {:error, {:missing_allocation_target, "pay-bad", "nope"}} =
+             Apply.run(snap, user, company_name: name)
+  end
+
+  test "gapless sits at 123 after INV-000123; SI-88 does not move it", %{
+    user: user,
+    snap: snap,
+    name: name
+  } do
+    {:ok, %{company: com}} = Apply.run(snap, user, company_name: name)
+
+    current =
+      Repo.one!(
+        from g in FullCircle.Sys.GaplessDocId,
+          where: g.company_id == ^com.id and g.doc_type == "Invoice",
+          select: g.current
+      )
+
+    assert current == 123
+  end
+
+  test "conversion AR is reduced by imported conversion invoice", %{
+    user: user,
+    snap: snap,
+    name: name
+  } do
+    {:ok, %{company: com, id_map: map}} = Apply.run(snap, user, company_name: name)
+    ar_id = map["account:ac-ar"]
+
+    seed =
+      Repo.all(
+        from t in Transaction,
+          where: t.company_id == ^com.id and t.account_id == ^ar_id and t.old_data == true
+      )
+
+    assert Enum.reduce(seed, Decimal.new(0), &Decimal.add(&2, &1.amount)) |> Decimal.eq?(0)
+  end
 end
