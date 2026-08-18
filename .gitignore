@@ -56,5 +56,7 @@ secret.txt
 
 deploy.conf
 /.elixir_ls
+# Isolated git worktrees (see using-git-worktrees)
+/.worktrees/
 # Fingerprint machine monthly exports (binary, employee PII) — kept local only
 docs/*.xls
