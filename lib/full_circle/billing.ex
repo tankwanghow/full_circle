@@ -497,6 +497,55 @@ defmodule FullCircle.Billing do
     |> create_doc_transactions(invoice_name, com, user, @invoice_txn_opts)
   end
 
+  def import_invoice(attrs, com, user) do
+    case can?(user, :create_invoice, com) do
+      true ->
+        Multi.new()
+        |> import_invoice_multi(attrs, com, user)
+        |> Repo.transaction()
+        |> Accounting.map_period_closed()
+
+      false ->
+        :not_authorise
+    end
+  end
+
+  def import_invoice_multi(multi, attrs, com, user) do
+    invoice_name = :create_invoice
+    doc = Map.fetch!(attrs, "invoice_no")
+
+    multi
+    |> Multi.insert(invoice_name, fn _ ->
+      make_changeset(
+        Invoice,
+        %Invoice{},
+        Map.merge(attrs, %{
+          "invoice_no" => doc,
+          "e_inv_internal_id" => attrs["e_inv_internal_id"] || doc
+        }),
+        com,
+        user
+      )
+    end)
+    |> Multi.insert("#{invoice_name}_log", fn %{^invoice_name => entity} ->
+      FullCircle.Sys.log_changeset(
+        invoice_name,
+        entity,
+        Map.merge(attrs, %{
+          "invoice_no" => entity.invoice_no,
+          "e_inv_internal_id" => entity.e_inv_internal_id
+        }),
+        com,
+        user
+      )
+    end)
+    |> Accounting.multi_assert_period_open(
+      fn %{^invoice_name => doc} -> [doc.invoice_date] end,
+      com
+    )
+    |> create_doc_transactions(invoice_name, com, user, @invoice_txn_opts)
+  end
+
   defp create_doc_transactions(multi, name, com, user, opts) do
     multi
     |> Multi.insert_all(:create_transactions, Transaction, fn %{^name => doc} ->
@@ -896,6 +945,55 @@ defmodule FullCircle.Billing do
         PurInvoice,
         %PurInvoice{},
         merge_pur_invoice_create_attrs(attrs, doc),
+        com,
+        user
+      )
+    end)
+    |> Multi.insert("#{pur_invoice_name}_log", fn %{^pur_invoice_name => entity} ->
+      FullCircle.Sys.log_changeset(
+        pur_invoice_name,
+        entity,
+        Map.merge(attrs, %{
+          "pur_invoice_no" => entity.pur_invoice_no,
+          "e_inv_internal_id" => entity.e_inv_internal_id
+        }),
+        com,
+        user
+      )
+    end)
+    |> Accounting.multi_assert_period_open(
+      fn %{^pur_invoice_name => doc} -> [doc.pur_invoice_date] end,
+      com
+    )
+    |> create_doc_transactions(pur_invoice_name, com, user, @pur_invoice_txn_opts)
+  end
+
+  def import_pur_invoice(attrs, com, user) do
+    case can?(user, :create_pur_invoice, com) do
+      true ->
+        Multi.new()
+        |> import_pur_invoice_multi(attrs, com, user)
+        |> Repo.transaction()
+        |> Accounting.map_period_closed()
+
+      false ->
+        :not_authorise
+    end
+  end
+
+  def import_pur_invoice_multi(multi, attrs, com, user) do
+    pur_invoice_name = :create_pur_invoice
+    doc = Map.fetch!(attrs, "pur_invoice_no")
+
+    multi
+    |> Multi.insert(pur_invoice_name, fn _ ->
+      make_changeset(
+        PurInvoice,
+        %PurInvoice{},
+        Map.merge(attrs, %{
+          "pur_invoice_no" => doc,
+          "e_inv_internal_id" => attrs["e_inv_internal_id"] || doc
+        }),
         com,
         user
       )
