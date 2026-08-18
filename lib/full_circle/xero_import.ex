@@ -3,4 +3,6 @@ defmodule FullCircle.XeroImport do
 
   def fixture_dir, do: @fixture
   def read_snapshot(dir), do: FullCircle.XeroImport.Snapshot.read(dir)
+
+  def apply(snapshot, user), do: FullCircle.XeroImport.Apply.run(snapshot, user, [])
 end

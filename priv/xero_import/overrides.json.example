@@ -1,0 +1,11 @@
+{
+  "account_types": {
+    "WEIRD": "Expenses"
+  },
+  "control_accounts": {
+    "Accounts Receivable": "Account Receivables",
+    "Accounts Payable": "Account Payables",
+    "GST": "Sales Tax Payable"
+  },
+  "disposal_account": "Gain on Disposal"
+}
