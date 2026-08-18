@@ -1,0 +1,18 @@
+[
+  {
+    "Name": "SST 6%",
+    "TaxType": "OUTPUT",
+    "EffectiveRate": 6.0,
+    "CanApplyToRevenue": true,
+    "CanApplyToExpenses": true,
+    "Status": "ACTIVE"
+  },
+  {
+    "Name": "Tax Exempt",
+    "TaxType": "NONE",
+    "EffectiveRate": 0.0,
+    "CanApplyToRevenue": true,
+    "CanApplyToExpenses": true,
+    "Status": "ACTIVE"
+  }
+]

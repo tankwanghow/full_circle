@@ -1,0 +1,17 @@
+[
+  {
+    "ItemID": "it-egg",
+    "Code": "EGG",
+    "Name": "Egg",
+    "SalesDetails": {
+      "UnitPrice": 1.0,
+      "AccountCode": "200",
+      "TaxType": "OUTPUT"
+    },
+    "PurchaseDetails": {
+      "UnitPrice": 0.8,
+      "AccountCode": "200",
+      "TaxType": "NONE"
+    }
+  }
+]

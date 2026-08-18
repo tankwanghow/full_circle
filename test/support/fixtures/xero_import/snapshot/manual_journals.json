@@ -1,0 +1,22 @@
+[
+  {
+    "ManualJournalID": "mj-1",
+    "Narration": "Opening adj",
+    "Date": "2024-01-15",
+    "Status": "POSTED",
+    "JournalLines": [
+      {
+        "AccountID": "ac-bank",
+        "AccountCode": "090",
+        "Description": "Cheque Account",
+        "LineAmount": 50.0
+      },
+      {
+        "AccountID": "ac-sales",
+        "AccountCode": "200",
+        "Description": "Sales",
+        "LineAmount": -50.0
+      }
+    ]
+  }
+]

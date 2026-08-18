@@ -1,0 +1,30 @@
+[
+  {
+    "AssetId": "fa-van",
+    "AssetName": "Van 1",
+    "AssetNumber": "FA-001",
+    "PurchaseDate": "2023-01-01",
+    "PurchasePrice": 100000.0,
+    "ResidualValue": 10000.0,
+    "DepreciationStartDate": "2023-01-01",
+    "BookValue": 80000.0,
+    "AccountingBookValue": 80000.0,
+    "DepreciationMethod": "StraightLine",
+    "AveragingMethod": "ActualDays",
+    "DepreciationRate": 20.0,
+    "AssetTypeId": "fat-vehicle",
+    "AssetType": {
+      "AssetTypeName": "Vehicles",
+      "FixedAssetAccountId": "ac-fa",
+      "AccumulatedDepreciationAccountId": "ac-accum",
+      "DepreciationExpenseAccountId": "ac-depre"
+    },
+    "DepreciationHistory": [
+      {
+        "DepreciationDate": "2023-12-31",
+        "DepreciationAmount": 20000.0,
+        "CostLimit": 100000.0
+      }
+    ]
+  }
+]

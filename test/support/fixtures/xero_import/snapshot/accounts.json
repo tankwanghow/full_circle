@@ -1,0 +1,56 @@
+[
+  {
+    "AccountID": "ac-sales",
+    "Code": "200",
+    "Name": "Sales",
+    "Type": "REVENUE"
+  },
+  {
+    "AccountID": "ac-bank",
+    "Code": "090",
+    "Name": "Cheque Account",
+    "Type": "BANK"
+  },
+  {
+    "AccountID": "ac-ar",
+    "Code": "610",
+    "Name": "Accounts Receivable",
+    "Type": "CURRENT"
+  },
+  {
+    "AccountID": "ac-ap",
+    "Code": "800",
+    "Name": "Accounts Payable",
+    "Type": "CURRLIAB"
+  },
+  {
+    "AccountID": "ac-gst",
+    "Code": "820",
+    "Name": "GST",
+    "Type": "CURRLIAB"
+  },
+  {
+    "AccountID": "ac-fa",
+    "Code": "710",
+    "Name": "Motor Vehicles",
+    "Type": "FIXED"
+  },
+  {
+    "AccountID": "ac-accum",
+    "Code": "711",
+    "Name": "Less Accumulated Depreciation on Motor Vehicles",
+    "Type": "FIXED"
+  },
+  {
+    "AccountID": "ac-depre",
+    "Code": "477",
+    "Name": "Depreciation",
+    "Type": "DEPRECIATN"
+  },
+  {
+    "AccountID": "ac-disp",
+    "Code": "270",
+    "Name": "Gain on Disposal",
+    "Type": "OTHERINCOME"
+  }
+]

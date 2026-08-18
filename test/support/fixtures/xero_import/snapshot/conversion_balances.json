@@ -1,0 +1,10 @@
+{
+  "Date": "2024-01-01",
+  "Lines": [
+    { "AccountID": "ac-bank", "Balance": 1000.0 },
+    { "AccountID": "ac-ar", "Balance": 100.0 },
+    { "AccountID": "ac-fa", "Balance": 100000.0 },
+    { "AccountID": "ac-accum", "Balance": -20000.0 },
+    { "AccountID": "ac-sales", "Balance": 0.0 }
+  ]
+}

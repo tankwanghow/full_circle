@@ -1,0 +1,14 @@
+[
+  {
+    "PaymentID": "pay-1",
+    "Invoice": {
+      "InvoiceID": "inv-123"
+    },
+    "Amount": 50.0,
+    "Date": "2024-02-15",
+    "Account": {
+      "AccountID": "ac-bank"
+    },
+    "Status": "AUTHORISED"
+  }
+]

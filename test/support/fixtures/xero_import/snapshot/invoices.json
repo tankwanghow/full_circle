@@ -1,0 +1,130 @@
+[
+  {
+    "InvoiceID": "inv-123",
+    "Type": "ACCREC",
+    "InvoiceNumber": "INV-000123",
+    "Status": "AUTHORISED",
+    "Contact": {
+      "ContactID": "ct-alice",
+      "Name": "Alice Customer"
+    },
+    "Date": "2024-02-01",
+    "DueDate": "2024-03-01",
+    "LineAmountTypes": "Exclusive",
+    "CurrencyCode": "MYR",
+    "Total": 50.0,
+    "LineItems": [
+      {
+        "Description": "Egg",
+        "Quantity": 10.0,
+        "UnitAmount": 5.0,
+        "AccountCode": "200",
+        "ItemCode": "EGG",
+        "TaxType": "NONE",
+        "LineAmount": 50.0
+      }
+    ]
+  },
+  {
+    "InvoiceID": "inv-si88",
+    "Type": "ACCREC",
+    "InvoiceNumber": "SI-88",
+    "Status": "AUTHORISED",
+    "Contact": {
+      "ContactID": "ct-alice",
+      "Name": "Alice Customer"
+    },
+    "Date": "2024-02-01",
+    "DueDate": "2024-03-01",
+    "LineAmountTypes": "Exclusive",
+    "CurrencyCode": "MYR",
+    "Total": 20.0,
+    "LineItems": [
+      {
+        "Description": "Egg",
+        "Quantity": 4.0,
+        "UnitAmount": 5.0,
+        "AccountCode": "200",
+        "ItemCode": "EGG",
+        "TaxType": "NONE",
+        "LineAmount": 20.0
+      }
+    ]
+  },
+  {
+    "InvoiceID": "bill-10",
+    "Type": "ACCPAY",
+    "InvoiceNumber": "BILL-10",
+    "Status": "AUTHORISED",
+    "Contact": {
+      "ContactID": "ct-bob",
+      "Name": "Bob Supplier"
+    },
+    "Date": "2024-02-01",
+    "DueDate": "2024-03-01",
+    "LineAmountTypes": "Exclusive",
+    "CurrencyCode": "MYR",
+    "Total": 30.0,
+    "LineItems": [
+      {
+        "Description": "Supplies",
+        "Quantity": 1.0,
+        "UnitAmount": 30.0,
+        "AccountCode": "200",
+        "TaxType": "NONE",
+        "LineAmount": 30.0
+      }
+    ]
+  },
+  {
+    "InvoiceID": "inv-draft",
+    "Type": "ACCREC",
+    "InvoiceNumber": "INV-DRAFT",
+    "Status": "DRAFT",
+    "Contact": {
+      "ContactID": "ct-alice",
+      "Name": "Alice Customer"
+    },
+    "Date": "2024-02-01",
+    "DueDate": "2024-03-01",
+    "LineAmountTypes": "Exclusive",
+    "CurrencyCode": "MYR",
+    "Total": 10.0,
+    "LineItems": [
+      {
+        "Description": "Draft egg",
+        "Quantity": 2.0,
+        "UnitAmount": 5.0,
+        "AccountCode": "200",
+        "ItemCode": "EGG",
+        "TaxType": "NONE",
+        "LineAmount": 10.0
+      }
+    ]
+  },
+  {
+    "InvoiceID": "inv-conv",
+    "Type": "ACCREC",
+    "InvoiceNumber": "CONV-AR-1",
+    "Status": "AUTHORISED",
+    "Contact": {
+      "ContactID": "ct-alice",
+      "Name": "Alice Customer"
+    },
+    "Date": "2024-01-01",
+    "DueDate": "2024-01-31",
+    "LineAmountTypes": "Exclusive",
+    "CurrencyCode": "MYR",
+    "Total": 100.0,
+    "LineItems": [
+      {
+        "Description": "Conversion AR",
+        "Quantity": 1.0,
+        "UnitAmount": 100.0,
+        "AccountCode": "200",
+        "TaxType": "NONE",
+        "LineAmount": 100.0
+      }
+    ]
+  }
+]

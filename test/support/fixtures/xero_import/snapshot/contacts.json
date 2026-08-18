@@ -1,0 +1,16 @@
+[
+  {
+    "ContactID": "ct-alice",
+    "Name": "Alice Customer",
+    "IsCustomer": true,
+    "IsSupplier": false,
+    "Addresses": []
+  },
+  {
+    "ContactID": "ct-bob",
+    "Name": "Bob Supplier",
+    "IsCustomer": false,
+    "IsSupplier": true,
+    "Addresses": []
+  }
+]

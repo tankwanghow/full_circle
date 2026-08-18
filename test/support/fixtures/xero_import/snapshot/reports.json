@@ -1,0 +1,14 @@
+{
+  "trial_balance": [
+    { "account_name": "Cheque Account", "balance": 1050.0 },
+    { "account_name": "Account Receivables", "balance": 120.0 },
+    { "account_name": "Motor Vehicles", "balance": 100000.0 },
+    { "account_name": "Less Accumulated Depreciation on Motor Vehicles", "balance": -20000.0 }
+  ],
+  "aged_receivables": [{ "contact_name": "Alice Customer", "balance": 20.0 }],
+  "aged_payables": [{ "contact_name": "Bob Supplier", "balance": 30.0 }],
+  "invoice_totals": { "count": 3, "amount": 170.0 },
+  "bill_totals": { "count": 1, "amount": 30.0 },
+  "fa_nbv": [{ "name": "Van 1", "nbv": 80000.0 }],
+  "bank": [{ "account_name": "Cheque Account", "balance": 1050.0 }]
+}
