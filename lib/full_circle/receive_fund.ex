@@ -415,6 +415,43 @@ defmodule FullCircle.ReceiveFund do
     |> create_receipt_transactions(receipt_name, com, user)
   end
 
+  def import_receipt(attrs, com, user) do
+    case can?(user, :create_receipt, com) do
+      true ->
+        Multi.new()
+        |> import_receipt_multi(attrs, com, user)
+        |> Repo.transaction()
+        |> Accounting.map_period_closed()
+
+      false ->
+        :not_authorise
+    end
+  end
+
+  def import_receipt_multi(multi, attrs, com, user) do
+    receipt_name = :create_receipt
+    doc = Map.fetch!(attrs, "receipt_no")
+
+    multi
+    |> Multi.insert(receipt_name, fn _ ->
+      make_changeset(Receipt, %Receipt{}, Map.merge(attrs, %{"receipt_no" => doc}), com, user)
+    end)
+    |> Multi.insert("#{receipt_name}_log", fn %{^receipt_name => entity} ->
+      FullCircle.Sys.log_changeset(
+        receipt_name,
+        entity,
+        Map.merge(attrs, %{"receipt_no" => entity.receipt_no}),
+        com,
+        user
+      )
+    end)
+    |> Accounting.multi_assert_period_open(
+      fn %{^receipt_name => doc} -> [doc.receipt_date] end,
+      com
+    )
+    |> create_receipt_transactions(receipt_name, com, user)
+  end
+
   defp create_receipt_transactions(multi, name, com, user) do
     pdc_id = Accounting.get_account_by_name("Post Dated Cheques", com, user).id
     ap_id = Accounting.get_account_by_name("Account Payables", com, user).id

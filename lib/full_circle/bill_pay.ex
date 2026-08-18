@@ -354,6 +354,43 @@ defmodule FullCircle.BillPay do
     |> create_payment_transactions(payment_name, com, user)
   end
 
+  def import_payment(attrs, com, user) do
+    case can?(user, :create_payment, com) do
+      true ->
+        Multi.new()
+        |> import_payment_multi(attrs, com, user)
+        |> Repo.transaction()
+        |> Accounting.map_period_closed()
+
+      false ->
+        :not_authorise
+    end
+  end
+
+  def import_payment_multi(multi, attrs, com, user) do
+    payment_name = :create_payment
+    doc = Map.fetch!(attrs, "payment_no")
+
+    multi
+    |> Multi.insert(payment_name, fn _ ->
+      make_changeset(Payment, %Payment{}, Map.merge(attrs, %{"payment_no" => doc}), com, user)
+    end)
+    |> Multi.insert("#{payment_name}_log", fn %{^payment_name => entity} ->
+      FullCircle.Sys.log_changeset(
+        payment_name,
+        entity,
+        Map.merge(attrs, %{"payment_no" => entity.payment_no}),
+        com,
+        user
+      )
+    end)
+    |> Accounting.multi_assert_period_open(
+      fn %{^payment_name => doc} -> [doc.payment_date] end,
+      com
+    )
+    |> create_payment_transactions(payment_name, com, user)
+  end
+
   def update_payment(%Payment{} = payment, attrs, com, user) do
     attrs = remove_field_if_new_flag(attrs, "payment_no")
 
