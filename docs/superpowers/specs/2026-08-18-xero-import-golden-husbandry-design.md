@@ -26,7 +26,9 @@ fixed-asset register that can keep depreciating after go-live.
 | Document numbers | Keep Xero numbers; bump gapless counters after apply |
 | Fixed assets | Register + past charges; abort if any diminishing-value |
 | Dates | Import runs as a Full Circle **admin**; `admin_changeset` already skips the ±60-day window. Period stays unlocked until reconcile passes |
-| Out of scope | Attachments, tracking categories, payroll, bank-rec history, repeating-invoice templates, multi-currency, a reusable in-app wizard |
+| Out of scope | Attachments, tracking categories, payroll, **bank reconciliation** (statement lines, Xero ticks, and setting `transactions.reconciled` on imported bank lines), repeating-invoice templates, multi-currency, a reusable in-app wizard |
+
+Bank rec starts in Full Circle **after go-live**. The import brings the cash book (receipts, payments, spend/receive, transfers) and checks bank **balances** in reconcile. It does not import Xero statement lines or mark historical bank `transactions` as reconciled. The first Full Circle recon should use a period starting at the snapshot date so old book lines are not treated as the current statement.
 
 Do **not** also seed current-year (or any post-conversion) GL as `old_data` transactions.
 Live documents post the GL. Double-posting is a hard fail in reconcile.
