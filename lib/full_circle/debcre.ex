@@ -241,6 +241,49 @@ defmodule FullCircle.DebCre do
     |> create_note_transactions(note_name, com, user, @credit_note_txn_opts)
   end
 
+  def import_credit_note(attrs, com, user) do
+    case can?(user, :create_credit_note, com) do
+      true ->
+        Multi.new()
+        |> import_credit_note_multi(attrs, com, user)
+        |> Repo.transaction()
+        |> Accounting.map_period_closed()
+
+      false ->
+        :not_authorise
+    end
+  end
+
+  def import_credit_note_multi(multi, attrs, com, user) do
+    note_name = :create_credit_note
+    doc = Map.fetch!(attrs, "note_no")
+
+    multi
+    |> Multi.insert(note_name, fn _ ->
+      make_changeset(
+        CreditNote,
+        %CreditNote{},
+        Map.merge(attrs, %{"note_no" => doc}),
+        com,
+        user
+      )
+    end)
+    |> Multi.insert("#{note_name}_log", fn %{^note_name => entity} ->
+      FullCircle.Sys.log_changeset(
+        note_name,
+        entity,
+        Map.merge(attrs, %{"note_no" => entity.note_no}),
+        com,
+        user
+      )
+    end)
+    |> Accounting.multi_assert_period_open(
+      fn %{^note_name => doc} -> [doc.note_date] end,
+      com
+    )
+    |> create_note_transactions(note_name, com, user, @credit_note_txn_opts)
+  end
+
   def update_credit_note(%CreditNote{} = credit_note, attrs, com, user) do
     attrs = remove_field_if_new_flag(attrs, "note_no")
 
@@ -447,6 +490,49 @@ defmodule FullCircle.DebCre do
     multi
     |> get_gapless_doc_id(gapless_name, "DebitNote", "DN", com)
     |> Multi.insert(note_name, fn %{^gapless_name => doc} ->
+      make_changeset(
+        DebitNote,
+        %DebitNote{},
+        Map.merge(attrs, %{"note_no" => doc}),
+        com,
+        user
+      )
+    end)
+    |> Multi.insert("#{note_name}_log", fn %{^note_name => entity} ->
+      FullCircle.Sys.log_changeset(
+        note_name,
+        entity,
+        Map.merge(attrs, %{"note_no" => entity.note_no}),
+        com,
+        user
+      )
+    end)
+    |> Accounting.multi_assert_period_open(
+      fn %{^note_name => doc} -> [doc.note_date] end,
+      com
+    )
+    |> create_note_transactions(note_name, com, user, @debit_note_txn_opts)
+  end
+
+  def import_debit_note(attrs, com, user) do
+    case can?(user, :create_debit_note, com) do
+      true ->
+        Multi.new()
+        |> import_debit_note_multi(attrs, com, user)
+        |> Repo.transaction()
+        |> Accounting.map_period_closed()
+
+      false ->
+        :not_authorise
+    end
+  end
+
+  def import_debit_note_multi(multi, attrs, com, user) do
+    note_name = :create_debit_note
+    doc = Map.fetch!(attrs, "note_no")
+
+    multi
+    |> Multi.insert(note_name, fn _ ->
       make_changeset(
         DebitNote,
         %DebitNote{},

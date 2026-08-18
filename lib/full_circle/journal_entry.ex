@@ -177,6 +177,57 @@ defmodule FullCircle.JournalEntry do
     )
   end
 
+  def import_journal(attrs, com, user) do
+    case can?(user, :create_journal, com) do
+      true ->
+        Multi.new()
+        |> import_journal_multi(attrs, com, user)
+        |> Repo.transaction()
+        |> Accounting.map_period_closed()
+
+      false ->
+        :not_authorise
+    end
+  end
+
+  def import_journal_multi(multi, attrs, com, user) do
+    journal_name = :create_journal
+    doc = Map.fetch!(attrs, "journal_no")
+
+    multi
+    |> Multi.insert(journal_name, fn _ ->
+      attrs =
+        Map.merge(attrs, %{
+          "transactions" =>
+            Enum.into(attrs["transactions"], %{}, fn {k, v} ->
+              {k,
+               Map.merge(v, %{
+                 "doc_no" => doc,
+                 "doc_type" => "Journal",
+                 "doc_date" => attrs["journal_date"],
+                 "contact_particulars" => v["particulars"],
+                 "company_id" => com.id
+               })}
+            end)
+        })
+
+      StdInterface.changeset(Journal, %Journal{}, Map.merge(attrs, %{"journal_no" => doc}), com)
+    end)
+    |> Multi.insert("#{journal_name}_log", fn %{^journal_name => entity} ->
+      FullCircle.Sys.log_changeset(
+        journal_name,
+        entity,
+        Map.merge(attrs, %{"journal_no" => entity.journal_no}),
+        com,
+        user
+      )
+    end)
+    |> Accounting.multi_assert_period_open(
+      fn %{^journal_name => doc} -> [doc.journal_date] end,
+      com
+    )
+  end
+
   def update_journal(%Journal{} = journal, attrs, com, user) do
     attrs = remove_field_if_new_flag(attrs, "journal_no")
 
