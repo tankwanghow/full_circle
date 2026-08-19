@@ -80,6 +80,235 @@ defmodule FullCircle.XeroImport.Apply do
 
   defp result(ctx), do: %{company: ctx.company, id_map: ctx.id_map}
 
+  def plan(snapshot, opts \\ %{})
+
+  def plan(snapshot, opts) when is_map(snapshot) do
+    overrides = plan_opt(opts, :overrides, %{}) || %{}
+    base = organisation(snapshot)["BaseCurrency"] || "MYR"
+
+    %{
+      snapshot: snapshot,
+      overrides: overrides,
+      base: base,
+      ops: [],
+      errors: [],
+      invoice_ids: MapSet.new(),
+      invoice_types: %{},
+      account_codes: %{},
+      tax_by_type: %{}
+    }
+    |> plan_accounts()
+    |> plan_tax_codes()
+    |> plan_contacts()
+    |> plan_goods()
+    |> plan_fixed_assets()
+    |> plan_invoices()
+    |> plan_notes()
+    |> plan_payments()
+    |> plan_journals()
+    |> plan_bank()
+    |> then(fn state -> {Enum.reverse(state.ops), Enum.reverse(state.errors)} end)
+  end
+
+  def plan(_snapshot, _opts), do: {[], [:invalid_snapshot]}
+
+  defp plan_opt(opts, key, default) when is_list(opts), do: Keyword.get(opts, key, default)
+
+  defp plan_opt(opts, key, default) when is_map(opts) do
+    Map.get(opts, key) || Map.get(opts, Atom.to_string(key)) || default
+  end
+
+  defp plan_opt(_opts, _key, default), do: default
+
+  defp plan_accounts(state) do
+    Enum.reduce(rows(state.snapshot.accounts), state, fn xero, state ->
+      case Mapper.account_type(xero["Type"], state.overrides) do
+        {:ok, account_type} ->
+          xero_id = to_string(xero["AccountID"] || xero["AccountId"] || "")
+          name = xero["Name"]
+          code = xero["Code"]
+
+          state =
+            if is_binary(code) and code != "" do
+              put_in(state, [:account_codes, code], name)
+            else
+              state
+            end
+
+          add_op(state, {:accounts, %{id: xero_id, name: name, account_type: account_type}})
+
+        {:error, err} ->
+          add_error(state, err)
+      end
+    end)
+  end
+
+  defp plan_tax_codes(state) do
+    Enum.reduce(rows(state.snapshot.tax_rates), state, fn rate, state ->
+      codes = Mapper.tax_codes(rate)
+      xero_type = rate["TaxType"]
+      entries = Enum.map(codes, &%{tax_type: &1.tax_type, code: &1.code})
+      put_in(state, [:tax_by_type, xero_type], entries)
+    end)
+  end
+
+  defp plan_contacts(state) do
+    Enum.reduce(rows(state.snapshot.contacts), state, fn xero, state ->
+      add_op(state, {:contacts, Mapper.contact(xero)})
+    end)
+  end
+
+  defp plan_goods(state) do
+    Enum.reduce(rows(state.snapshot.items), state, fn xero, state ->
+      attrs = Mapper.good(xero, state.account_codes, state.tax_by_type)
+      add_op(state, {:good, attrs})
+    end)
+  end
+
+  defp plan_fixed_assets(state) do
+    Enum.reduce(rows(state.snapshot.fixed_assets), state, fn xero, state ->
+      case Mapper.fixed_asset(xero) do
+        {:ok, attrs} -> add_op(state, {:assets, attrs})
+        {:error, err} -> add_error(state, err)
+      end
+    end)
+  end
+
+  defp plan_invoices(state) do
+    Enum.reduce(rows(state.snapshot.invoices), state, fn inv, state ->
+      cond do
+        not Mapper.importable_invoice?(inv) ->
+          add_op(state, {:skip, :not_importable, inv})
+
+        not Mapper.base_currency_ok?(inv, state.base) ->
+          add_error(state, {:foreign_currency, inv["InvoiceNumber"]})
+
+        true ->
+          xero_id = to_string(inv["InvoiceID"] || inv["InvoiceId"] || "")
+          type = inv["Type"]
+
+          state =
+            state
+            |> Map.update!(:invoice_ids, &MapSet.put(&1, xero_id))
+            |> put_in([:invoice_types, xero_id], type)
+
+          kind = if type == "ACCPAY", do: :bills, else: :invoices
+          add_op(state, {kind, inv})
+      end
+    end)
+  end
+
+  defp plan_notes(state) do
+    Enum.reduce(rows(state.snapshot.credit_notes), state, fn note, state ->
+      cond do
+        not Mapper.importable_invoice?(note) ->
+          add_op(state, {:skip, :not_importable, note})
+
+        not Mapper.base_currency_ok?(note, state.base) ->
+          add_error(state, {:foreign_currency, note["CreditNoteNumber"] || note["CreditNoteID"]})
+
+        true ->
+          state
+          |> plan_allocations(note["Allocations"] || [], note["CreditNoteID"])
+          |> add_op({:note, note})
+      end
+    end)
+  end
+
+  defp plan_allocations(state, allocations, source_id) do
+    Enum.reduce(allocations, state, fn alloc, state ->
+      invoice_id = get_in(alloc, ["Invoice", "InvoiceID"]) || alloc["InvoiceID"]
+      invoice_id = invoice_id && to_string(invoice_id)
+
+      if invoice_id && MapSet.member?(state.invoice_ids, invoice_id) do
+        state
+      else
+        add_error(state, {:missing_allocation_target, source_id, invoice_id || "unknown"})
+      end
+    end)
+  end
+
+  defp plan_payments(state) do
+    Enum.reduce(rows(state.snapshot.payments), state, fn pay, state ->
+      cond do
+        not Mapper.importable_invoice?(pay) ->
+          add_op(state, {:skip, :not_importable, pay})
+
+        true ->
+          payment_id = to_string(pay["PaymentID"] || pay["PaymentId"] || "")
+
+          invoice_id =
+            get_in(pay, ["Invoice", "InvoiceID"]) || get_in(pay, ["Invoice", "InvoiceId"])
+
+          invoice_id = invoice_id && to_string(invoice_id)
+
+          cond do
+            is_nil(invoice_id) or not MapSet.member?(state.invoice_ids, invoice_id) ->
+              add_error(state, {:missing_allocation_target, payment_id, invoice_id || "unknown"})
+
+            state.invoice_types[invoice_id] == "ACCPAY" ->
+              add_op(state, {:payments, pay})
+
+            true ->
+              add_op(state, {:receipts, pay})
+          end
+      end
+    end)
+  end
+
+  defp plan_journals(state) do
+    Enum.reduce(rows(state.snapshot.manual_journals), state, fn journal, state ->
+      if journal["Status"] in [nil, "POSTED", "AUTHORISED"] do
+        add_op(state, {:journals, journal})
+      else
+        add_op(state, {:skip, :journal_status, journal})
+      end
+    end)
+  end
+
+  defp plan_bank(state) do
+    state
+    |> then(fn state ->
+      Enum.reduce(rows(state.snapshot.bank_transactions), state, &plan_bank_txn(&2, &1))
+    end)
+    |> then(fn state ->
+      Enum.reduce(rows(state.snapshot.bank_transfers), state, &plan_bank_transfer(&2, &1))
+    end)
+  end
+
+  defp plan_bank_txn(state, txn) do
+    cond do
+      not bank_txn_importable?(txn) ->
+        add_op(state, {:skip, :not_importable, txn})
+
+      Map.has_key?(txn, "CurrencyCode") and not Mapper.base_currency_ok?(txn, state.base) ->
+        add_error(
+          state,
+          {:foreign_currency, txn["BankTransactionNumber"] || txn["BankTransactionID"]}
+        )
+
+      txn["Type"] == "SPEND" ->
+        add_op(state, {:payments, txn})
+
+      txn["Type"] == "RECEIVE" ->
+        add_op(state, {:receipts, txn})
+
+      true ->
+        add_op(state, {:skip, :bank_type, txn})
+    end
+  end
+
+  defp plan_bank_transfer(state, xfer) do
+    if Map.get(xfer, "Status") in [nil, "AUTHORISED", "PAID"] do
+      add_op(state, {:journals, xfer})
+    else
+      add_op(state, {:skip, :not_importable, xfer})
+    end
+  end
+
+  defp add_op(state, op), do: %{state | ops: [op | state.ops]}
+  defp add_error(state, err), do: %{state | errors: [err | state.errors]}
+
   # Conversion invoices: InvoiceNumber starts with "CONV-" or Date == conversion Date.
   def conversion_invoice?(inv, conversion_date) when is_map(inv) do
     num = to_string(inv["InvoiceNumber"] || "")
@@ -611,7 +840,12 @@ defmodule FullCircle.XeroImport.Apply do
 
       case wrap_import(result) do
         {:ok, map} ->
-          entity = Map.fetch!(map, if(type == :pur_invoice, do: :create_pur_invoice, else: :create_invoice))
+          entity =
+            Map.fetch!(
+              map,
+              if(type == :pur_invoice, do: :create_pur_invoice, else: :create_invoice)
+            )
+
           doc_type = if(type == :pur_invoice, do: "PurInvoice", else: "Invoice")
           gap_type = if(type == :pur_invoice, do: :PurInvoice, else: :Invoice)
 
@@ -716,7 +950,9 @@ defmodule FullCircle.XeroImport.Apply do
   end
 
   defp resolve_line_good(line, ctx) do
-    item_id = line["ItemID"] || get_in(line, ["Item", "ItemID"]) || get_in(line, ["Item", "ItemId"])
+    item_id =
+      line["ItemID"] || get_in(line, ["Item", "ItemID"]) || get_in(line, ["Item", "ItemId"])
+
     item_code = line["ItemCode"]
 
     cond do
@@ -924,8 +1160,7 @@ defmodule FullCircle.XeroImport.Apply do
       if invoice_id && Map.has_key?(ctx.id_map, "invoice:" <> to_string(invoice_id)) do
         {:cont, :ok}
       else
-        {:halt,
-         {:error, {:missing_allocation_target, note["CreditNoteID"], invoice_id}}}
+        {:halt, {:error, {:missing_allocation_target, note["CreditNoteID"], invoice_id}}}
       end
     end)
   end
@@ -1191,7 +1426,8 @@ defmodule FullCircle.XeroImport.Apply do
   end
 
   defp import_bank(ctx) do
-    with {:ok, ctx} <- reduce_rows(rows(ctx.snapshot.bank_transactions), ctx, &import_one_bank_txn/2) do
+    with {:ok, ctx} <-
+           reduce_rows(rows(ctx.snapshot.bank_transactions), ctx, &import_one_bank_txn/2) do
       reduce_rows(rows(ctx.snapshot.bank_transfers), ctx, &import_one_bank_transfer/2)
     end
   end
@@ -1398,7 +1634,9 @@ defmodule FullCircle.XeroImport.Apply do
   defp parse_date(nil), do: nil
   defp parse_date(%Date{} = d), do: d
 
-  defp parse_date(<<y::binary-size(4), "-", m::binary-size(2), "-", d::binary-size(2), _::binary>>) do
+  defp parse_date(
+         <<y::binary-size(4), "-", m::binary-size(2), "-", d::binary-size(2), _::binary>>
+       ) do
     case Date.from_iso8601("#{y}-#{m}-#{d}") do
       {:ok, date} -> date
       _ -> nil
