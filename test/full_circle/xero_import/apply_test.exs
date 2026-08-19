@@ -85,6 +85,22 @@ defmodule FullCircle.XeroImport.ApplyTest do
     assert com1.id != com2.id
   end
 
+  test "reset deletes and recreates a fully imported company", %{
+    user: user,
+    snap: snap,
+    name: name
+  } do
+    {:ok, %{company: com1}} = Apply.run(snap, user, company_name: name)
+
+    assert {:ok, %{company: com2}} =
+             Apply.run(snap, user, company_name: name, reset: true)
+
+    assert com1.id != com2.id
+
+    refute Repo.exists?(from c in FullCircle.Sys.Company, where: c.id == ^com1.id)
+    refute Repo.exists?(from t in Transaction, where: t.company_id == ^com1.id)
+  end
+
   test "straight-line asset is seeded and depre rows do not post GL", %{
     user: user,
     snap: snap,

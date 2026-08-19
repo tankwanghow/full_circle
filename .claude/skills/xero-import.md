@@ -61,8 +61,9 @@ errors `{:missing_allocation_target, ...}` — unsupported by design; dry-run fl
 
 **Guards.** Non-reset apply refuses a company that has transactions, invoices, **contacts,
 or goods** (`:company_not_empty`). `--reset` prompts `Mix.shell().yes?` unless `--yes`.
-Caveat: `Sys.delete_company` currently FK-crashes on `transaction_matchers_transaction_id_fkey`
-for a company with matched documents, so `--reset` of a completed import needs that fixed first.
+Company deletion pre-cleans matcher rows via the `delete_non_cascadeable_records()` trigger
+(migration `20260819150000`) — the matcher FKs stay `ON DELETE RESTRICT` so matched documents
+remain protected from manual deletes everywhere else.
 
 **Reconcile is independent of import arithmetic** — expected sides come from Xero itself:
 TB report (parsed header-aware, **YTD Debit/YTD Credit** columns, cells positional — never
