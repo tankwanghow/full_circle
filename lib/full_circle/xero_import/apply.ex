@@ -27,6 +27,8 @@ defmodule FullCircle.XeroImport.Apply do
     "GST" => "Sales Tax Payable"
   }
 
+  @xero_line_good "__xero_line__"
+
   def run(snapshot, user, opts \\ []) do
     overrides = Keyword.get(opts, :overrides) || %{}
     name = Keyword.get(opts, :company_name, @default_company_name)
@@ -43,6 +45,7 @@ defmodule FullCircle.XeroImport.Apply do
            account_names: %{},
            tax_by_type: %{},
            goods_by_code: %{},
+           goods_names: %{},
            invoice_info: %{},
            imported_numbers: %{
              Invoice: [],
@@ -303,22 +306,27 @@ defmodule FullCircle.XeroImport.Apply do
     case Product.get_good_by_name(attrs["name"], ctx.company, ctx.user) do
       %{id: id} ->
         ctx
-        |> put_id("good:" <> to_string(xero_id), id)
-        |> put_good_code(code, attrs["name"])
+        |> remember_good(xero_id, id, code, attrs["name"])
         |> then(&ensure_packaging(attrs["name"], &1))
 
       nil ->
         case seed_one("Goods", attrs, ctx) do
           {:ok, good} ->
             ctx
-            |> put_id("good:" <> to_string(xero_id), good.id)
-            |> put_good_code(code, attrs["name"])
+            |> remember_good(xero_id, good.id, code, attrs["name"])
             |> then(&ensure_packaging(attrs["name"], &1))
 
           {:error, _} = err ->
             err
         end
     end
+  end
+
+  defp remember_good(ctx, xero_id, fc_id, code, name) do
+    ctx
+    |> put_id("good:" <> to_string(xero_id), fc_id)
+    |> put_good_code(code, name)
+    |> put_in([:goods_names, to_string(xero_id)], name)
   end
 
   defp put_good_code(ctx, code, name) when is_binary(code) and code != "" do
@@ -708,31 +716,34 @@ defmodule FullCircle.XeroImport.Apply do
   end
 
   defp resolve_line_good(line, ctx) do
-    item_id = line["ItemID"] || get_in(line, ["Item", "ItemID"])
-    item_code = line["ItemCode"] || line["ItemCode"]
+    item_id = line["ItemID"] || get_in(line, ["Item", "ItemID"]) || get_in(line, ["Item", "ItemId"])
+    item_code = line["ItemCode"]
 
-    name =
-      cond do
-        is_binary(item_code) and Map.has_key?(ctx.goods_by_code, item_code) ->
-          ctx.goods_by_code[item_code]
+    cond do
+      is_binary(item_id) and Map.has_key?(ctx.id_map, "good:" <> to_string(item_id)) ->
+        ensure_named_good(good_name_for_item_id(item_id, ctx), ctx)
 
-        is_binary(item_id) and Map.has_key?(ctx.id_map, "good:" <> to_string(item_id)) ->
-          ctx.goods_by_code
-          |> Enum.find_value(fn {_c, n} -> n end)
+      is_binary(item_code) and Map.has_key?(ctx.goods_by_code, item_code) ->
+        ensure_named_good(ctx.goods_by_code[item_code], ctx)
 
-        is_binary(item_code) and item_code != "" ->
-          item_code
+      is_binary(item_code) and item_code != "" ->
+        ensure_named_good(item_code, ctx)
 
-        is_binary(line["Description"]) and line["Description"] != "" ->
-          line["Description"]
+      true ->
+        ensure_named_good(@xero_line_good, ctx)
+    end
+  end
 
-        true ->
-          "Xero Line"
-      end
+  defp good_name_for_item_id(item_id, ctx) do
+    xero_id = to_string(item_id)
 
-    case ensure_named_good(name, ctx) do
-      {:ok, good} -> {:ok, good}
-      {:error, _} = err -> err
+    case Map.get(ctx.goods_names, xero_id) do
+      name when is_binary(name) ->
+        name
+
+      _ ->
+        fc_id = ctx.id_map["good:" <> xero_id]
+        Product.get_good!(fc_id, ctx.company, ctx.user).name
     end
   end
 
@@ -952,17 +963,52 @@ defmodule FullCircle.XeroImport.Apply do
 
       date = parse_date(note["Date"]) || Date.utc_today()
 
-      attrs = %{
-        "note_no" => note["CreditNoteNumber"] || note["CreditNoteID"],
-        "note_date" => date,
-        "contact_id" => contact.id,
-        "contact_name" => contact.name,
-        details_key => details,
-        "transaction_matchers" => %{}
-      }
+      with {:ok, matchers} <- note_matchers(note, ctx, kind, date) do
+        attrs = %{
+          "note_no" => note["CreditNoteNumber"] || note["CreditNoteID"],
+          "note_date" => date,
+          "contact_id" => contact.id,
+          "contact_name" => contact.name,
+          details_key => details,
+          "transaction_matchers" => matchers
+        }
 
-      {:ok, attrs, kind}
+        {:ok, attrs, kind}
+      end
     end
+  end
+
+  defp note_matchers(note, ctx, kind, date) do
+    doc_type = if(kind == :debit_note, do: "DebitNote", else: "CreditNote")
+
+    (note["Allocations"] || [])
+    |> Enum.with_index()
+    |> Enum.reduce_while({:ok, %{}}, fn {alloc, idx}, {:ok, acc} ->
+      invoice_id =
+        get_in(alloc, ["Invoice", "InvoiceID"]) || get_in(alloc, ["Invoice", "InvoiceId"]) ||
+          alloc["InvoiceID"]
+
+      invoice_id = invoice_id && to_string(invoice_id)
+      info = invoice_id && Map.get(ctx.invoice_info, invoice_id)
+      amount = decimalize(alloc["Amount"] || 0)
+
+      case info && control_transaction(info, ctx) do
+        {:ok, txn} ->
+          matcher = %{
+            "transaction_id" => txn.id,
+            "match_amount" => signed_match_amount(txn.amount, amount),
+            "doc_type" => doc_type,
+            "doc_date" => date,
+            "t_doc_no" => info.number,
+            "_persistent_id" => Integer.to_string(idx + 1)
+          }
+
+          {:cont, {:ok, Map.put(acc, Integer.to_string(idx), matcher)}}
+
+        _ ->
+          {:halt, {:error, {:missing_allocation_target, note["CreditNoteID"], invoice_id}}}
+      end
+    end)
   end
 
   defp import_receipts_and_payments(ctx) do
@@ -1000,7 +1046,7 @@ defmodule FullCircle.XeroImport.Apply do
          {:ok, funds} <- payment_funds_account(pay, ctx) do
       date = parse_date(pay["Date"]) || Date.utc_today()
       amount = decimalize(pay["Amount"] || 0)
-      match_amount = Decimal.negate(txn.amount)
+      match_amount = signed_match_amount(txn.amount, amount)
       number = pay["PaymentNumber"] || pay["Reference"] || payment_id
 
       matcher = %{
@@ -1134,13 +1180,193 @@ defmodule FullCircle.XeroImport.Apply do
     end
   end
 
-  defp import_bank(ctx) do
-    with {:ok, ctx} <- reduce_rows(rows(ctx.snapshot.bank_transactions), ctx, &skip_row/2) do
-      reduce_rows(rows(ctx.snapshot.bank_transfers), ctx, &skip_row/2)
+  defp signed_match_amount(header_amount, alloc_amount) do
+    abs_alloc = Decimal.abs(decimalize(alloc_amount))
+
+    if Decimal.lt?(header_amount, Decimal.new(0)) do
+      abs_alloc
+    else
+      Decimal.negate(abs_alloc)
     end
   end
 
-  defp skip_row(_row, ctx), do: {:ok, ctx}
+  defp import_bank(ctx) do
+    with {:ok, ctx} <- reduce_rows(rows(ctx.snapshot.bank_transactions), ctx, &import_one_bank_txn/2) do
+      reduce_rows(rows(ctx.snapshot.bank_transfers), ctx, &import_one_bank_transfer/2)
+    end
+  end
+
+  defp import_one_bank_txn(txn, ctx) do
+    cond do
+      not bank_txn_importable?(txn) ->
+        {:ok, ctx}
+
+      Map.has_key?(txn, "CurrencyCode") and not Mapper.base_currency_ok?(txn, base_currency(ctx)) ->
+        {:error, {:foreign_currency, txn["BankTransactionNumber"] || txn["BankTransactionID"]}}
+
+      txn["Type"] == "SPEND" ->
+        persist_bank_spend(txn, ctx)
+
+      txn["Type"] == "RECEIVE" ->
+        persist_bank_receive(txn, ctx)
+
+      true ->
+        {:ok, ctx}
+    end
+  end
+
+  defp bank_txn_importable?(txn) do
+    Map.get(txn, "Status") in [nil, "AUTHORISED", "PAID"]
+  end
+
+  defp persist_bank_spend(txn, ctx) do
+    with {:ok, contact} <- mapped_contact(txn, ctx),
+         {:ok, funds} <- bank_txn_funds_account(txn, ctx),
+         {:ok, details} <- invoice_details(txn, ctx, "Purchase", :pur_invoice) do
+      date = parse_date(txn["Date"]) || Date.utc_today()
+      number = txn["BankTransactionNumber"] || txn["BankTransactionID"]
+      amount = bank_txn_amount(txn)
+
+      attrs = %{
+        "payment_no" => number,
+        "payment_date" => date,
+        "contact_id" => contact.id,
+        "contact_name" => contact.name,
+        "funds_account_id" => funds.id,
+        "funds_account_name" => funds.name,
+        "funds_amount" => amount,
+        "descriptions" => txn["Reference"] || txn["Narration"],
+        "payment_details" => details,
+        "transaction_matchers" => %{}
+      }
+
+      case wrap_import(BillPay.import_payment(attrs, ctx.company, ctx.user)) do
+        {:ok, _} -> {:ok, track_number(ctx, :Payment, number)}
+        {:error, _} = err -> err
+      end
+    end
+  end
+
+  defp persist_bank_receive(txn, ctx) do
+    with {:ok, contact} <- mapped_contact(txn, ctx),
+         {:ok, funds} <- bank_txn_funds_account(txn, ctx),
+         {:ok, details} <- invoice_details(txn, ctx, "Sales", :invoice) do
+      date = parse_date(txn["Date"]) || Date.utc_today()
+      number = txn["BankTransactionNumber"] || txn["BankTransactionID"]
+      amount = bank_txn_amount(txn)
+
+      attrs = %{
+        "receipt_no" => number,
+        "receipt_date" => date,
+        "contact_id" => contact.id,
+        "contact_name" => contact.name,
+        "funds_account_id" => funds.id,
+        "funds_account_name" => funds.name,
+        "funds_amount" => amount,
+        "descriptions" => txn["Reference"] || txn["Narration"],
+        "receipt_details" => details,
+        "transaction_matchers" => %{}
+      }
+
+      case wrap_import(ReceiveFund.import_receipt(attrs, ctx.company, ctx.user)) do
+        {:ok, _} -> {:ok, track_number(ctx, :Receipt, number)}
+        {:error, _} = err -> err
+      end
+    end
+  end
+
+  defp bank_txn_funds_account(txn, ctx) do
+    xero_id =
+      get_in(txn, ["BankAccount", "AccountID"]) ||
+        get_in(txn, ["BankAccount", "AccountId"]) ||
+        txn["AccountID"]
+
+    name = name_for_xero_account(xero_id, ctx)
+
+    case name && Accounting.get_account_by_name(name, ctx.company, ctx.user) do
+      %{id: _} = acc -> {:ok, acc}
+      _ -> {:error, {:unmapped_account, xero_id}}
+    end
+  end
+
+  defp bank_txn_amount(txn) do
+    case decimalize(txn["Total"] || txn["TotalAmount"]) do
+      %Decimal{} = d ->
+        if Decimal.eq?(d, 0) do
+          (txn["LineItems"] || [])
+          |> Enum.reduce(Decimal.new(0), fn line, acc ->
+            Decimal.add(acc, decimalize(line["LineAmount"] || line["UnitAmount"] || 0))
+          end)
+        else
+          d
+        end
+    end
+  end
+
+  defp import_one_bank_transfer(xfer, ctx) do
+    status = Map.get(xfer, "Status")
+
+    if status in [nil, "AUTHORISED", "PAID"] do
+      persist_bank_transfer(xfer, ctx)
+    else
+      {:ok, ctx}
+    end
+  end
+
+  defp persist_bank_transfer(xfer, ctx) do
+    from_id =
+      get_in(xfer, ["FromBankAccount", "AccountID"]) ||
+        get_in(xfer, ["FromBankAccount", "AccountId"])
+
+    to_id =
+      get_in(xfer, ["ToBankAccount", "AccountID"]) ||
+        get_in(xfer, ["ToBankAccount", "AccountId"])
+
+    from_name = name_for_xero_account(from_id, ctx)
+    to_name = name_for_xero_account(to_id, ctx)
+    from_acc = from_name && Accounting.get_account_by_name(from_name, ctx.company, ctx.user)
+    to_acc = to_name && Accounting.get_account_by_name(to_name, ctx.company, ctx.user)
+
+    cond do
+      is_nil(from_acc) ->
+        {:error, {:unmapped_account, from_id}}
+
+      is_nil(to_acc) ->
+        {:error, {:unmapped_account, to_id}}
+
+      true ->
+        number = xfer["BankTransferID"] || xfer["Reference"]
+        date = parse_date(xfer["Date"]) || Date.utc_today()
+        amount = decimalize(xfer["Amount"] || 0)
+        particulars = xfer["Reference"] || "Bank transfer"
+
+        attrs = %{
+          "journal_no" => number,
+          "journal_date" => date,
+          "transactions" => %{
+            "0" => %{
+              "account_id" => to_acc.id,
+              "account_name" => to_acc.name,
+              "particulars" => particulars,
+              "amount" => amount,
+              "_persistent_id" => "0"
+            },
+            "1" => %{
+              "account_id" => from_acc.id,
+              "account_name" => from_acc.name,
+              "particulars" => particulars,
+              "amount" => Decimal.negate(amount),
+              "_persistent_id" => "1"
+            }
+          }
+        }
+
+        case wrap_import(JournalEntry.import_journal(attrs, ctx.company, ctx.user)) do
+          {:ok, _} -> {:ok, track_number(ctx, :Journal, number)}
+          {:error, _} = err -> err
+        end
+    end
+  end
 
   defp wrap_import({:ok, result}), do: {:ok, result}
   defp wrap_import(:not_authorise), do: {:error, :not_authorise}

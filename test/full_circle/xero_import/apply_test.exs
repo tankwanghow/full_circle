@@ -179,6 +179,27 @@ defmodule FullCircle.XeroImport.ApplyTest do
   } do
     {:ok, %{company: com, id_map: map}} = Apply.run(snap, user, company_name: name)
     ar_id = map["account:ac-ar"]
+    bank_id = map["account:ac-bank"]
+
+    assert Repo.exists?(
+             from i in FullCircle.Billing.Invoice,
+               where: i.company_id == ^com.id and i.invoice_no == "CONV-AR-1"
+           )
+
+    assert Repo.exists?(
+             from t in Transaction,
+               where: t.company_id == ^com.id and t.account_id == ^bank_id and t.old_data == true
+           )
+
+    refute Repo.exists?(
+             from g in FullCircle.Product.Good,
+               where: g.company_id == ^com.id and g.name == "Conversion AR"
+           )
+
+    assert Repo.exists?(
+             from g in FullCircle.Product.Good,
+               where: g.company_id == ^com.id and g.name == "__xero_line__"
+           )
 
     seed =
       Repo.all(
@@ -187,5 +208,78 @@ defmodule FullCircle.XeroImport.ApplyTest do
       )
 
     assert Enum.reduce(seed, Decimal.new(0), &Decimal.add(&2, &1.amount)) |> Decimal.eq?(0)
+  end
+
+  test "payment match_amount uses Xero amount not the full invoice", %{
+    user: user,
+    snap: snap,
+    name: name
+  } do
+    pay = snap.payments |> List.first() |> Map.put("Amount", 20.0)
+    snap = %{snap | payments: [pay]}
+    {:ok, %{company: com}} = Apply.run(snap, user, company_name: name)
+
+    ar =
+      Repo.one!(
+        from t in Transaction,
+          join: a in FullCircle.Accounting.Account,
+          on: a.id == t.account_id,
+          where:
+            t.company_id == ^com.id and t.doc_no == "INV-000123" and
+              a.name == "Account Receivables"
+      )
+
+    matched =
+      Repo.aggregate(
+        from(m in FullCircle.Accounting.TransactionMatcher, where: m.transaction_id == ^ar.id),
+        :sum,
+        :match_amount
+      )
+
+    assert Decimal.eq?(matched, Decimal.new("-20.00"))
+    assert Decimal.eq?(Decimal.add(ar.amount, matched), Decimal.new("30.00"))
+  end
+
+  test "imports a SPEND bank transaction as a payment", %{user: user, snap: snap, name: name} do
+    snap = %{
+      snap
+      | bank_transactions: [
+          %{
+            "BankTransactionID" => "bt-spend-1",
+            "Type" => "SPEND",
+            "Status" => "AUTHORISED",
+            "BankAccount" => %{"AccountID" => "ac-bank"},
+            "Contact" => %{"ContactID" => "ct-bob"},
+            "Date" => "2024-02-20",
+            "CurrencyCode" => "MYR",
+            "Total" => 15.0,
+            "LineItems" => [
+              %{
+                "Description" => "Office supplies",
+                "Quantity" => 1.0,
+                "UnitAmount" => 15.0,
+                "AccountCode" => "200",
+                "TaxType" => "NONE",
+                "LineAmount" => 15.0
+              }
+            ]
+          }
+        ]
+    }
+
+    {:ok, %{company: com}} = Apply.run(snap, user, company_name: name)
+
+    pay =
+      Repo.one!(
+        from p in FullCircle.BillPay.Payment,
+          where: p.company_id == ^com.id and p.payment_no == "bt-spend-1"
+      )
+
+    assert Decimal.eq?(pay.funds_amount, Decimal.new("15.00"))
+
+    refute Repo.exists?(
+             from m in FullCircle.Accounting.TransactionMatcher,
+               where: m.doc_type == "Payment" and m.doc_id == ^pay.id
+           )
   end
 end
