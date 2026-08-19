@@ -4,15 +4,16 @@ defmodule Mix.Tasks.FullCircle.ImportXero do
   @moduledoc """
   Offline Xero → Full Circle import.
 
+      mix full_circle.import_xero --auth [--credentials PATH]
+      mix full_circle.import_xero --snapshot [--snapshot-dir PATH] [--credentials PATH]
       mix full_circle.import_xero --dry-run --snapshot-dir PATH --user EMAIL
       mix full_circle.import_xero --apply --snapshot-dir PATH --user EMAIL [--reset]
       mix full_circle.import_xero --reconcile --snapshot-dir PATH --user EMAIL [--company NAME]
 
   Default `--snapshot-dir` is `priv/xero_import/golden_husbandry`.
+  Default `--credentials` is `priv/xero_import/.credentials`.
   `--user` falls back to env `FC_IMPORT_USER`.
   `--reconcile` needs an existing company (`--company`, default Golden Husbandry Sdn. Bhd.).
-
-  `--auth` and `--snapshot` are not implemented in this task (see Task 10).
   """
 
   use Mix.Task
@@ -20,12 +21,13 @@ defmodule Mix.Tasks.FullCircle.ImportXero do
   import Ecto.Query, warn: false
 
   alias FullCircle.XeroImport
-  alias FullCircle.XeroImport.{Apply, Reconcile}
+  alias FullCircle.XeroImport.{Apply, Credentials, HttpClient, Reconcile, Snapshot}
   alias FullCircle.Repo
   alias FullCircle.Sys.{Company, CompanyUser}
 
   @default_snapshot_dir "priv/xero_import/golden_husbandry"
   @default_company_name "Golden Husbandry Sdn. Bhd."
+  @default_credentials "priv/xero_import/.credentials"
 
   @impl Mix.Task
   def run(args) do
@@ -41,16 +43,19 @@ defmodule Mix.Tasks.FullCircle.ImportXero do
           user: :string,
           company: :string,
           snapshot_dir: :string,
+          credentials: :string,
           log: :string
         ]
       )
 
     cond do
       opts[:auth] ->
-        stub!("not implemented")
+        Mix.Task.run("app.start")
+        auth!(opts)
 
       opts[:snapshot] ->
-        stub!("not implemented")
+        Mix.Task.run("app.start")
+        snapshot!(opts)
 
       opts[:dry_run] ->
         Mix.Task.run("app.start")
@@ -66,7 +71,7 @@ defmodule Mix.Tasks.FullCircle.ImportXero do
 
       true ->
         stub!(
-          "usage: mix full_circle.import_xero --dry-run|--apply|--reconcile [--reset] [--user EMAIL] [--company NAME] [--snapshot-dir PATH]"
+          "usage: mix full_circle.import_xero --auth|--snapshot|--dry-run|--apply|--reconcile [--reset] [--user EMAIL] [--company NAME] [--snapshot-dir PATH] [--credentials PATH]"
         )
     end
   end
@@ -144,7 +149,89 @@ defmodule Mix.Tasks.FullCircle.ImportXero do
     if company, do: {:ok, company}, else: {:error, {:company_not_found, name}}
   end
 
+  defp auth!(opts) do
+    path = credentials_path(opts)
+
+    with {:ok, creds} <- Credentials.load(path) do
+      url = Credentials.authorize_url(creds)
+      Mix.shell().info("Open this URL to authorise Xero:\n#{url}")
+      open_browser(url)
+
+      case Credentials.await_code() do
+        {:ok, code} ->
+          case Credentials.exchange_code(creds, code) do
+            {:ok, tokens} ->
+              :ok = Credentials.append_tokens(path, tokens)
+              Mix.shell().info("wrote tokens to #{path}")
+              :ok
+
+            {:error, reason} ->
+              halt!(inspect(reason))
+          end
+
+        {:error, reason} ->
+          halt!(inspect(reason))
+      end
+    else
+      {:error, reason} -> halt!(inspect(reason))
+    end
+  end
+
+  defp snapshot!(opts) do
+    path = credentials_path(opts)
+    dest = snapshot_dir(opts)
+
+    with {:ok, creds} <- Credentials.load(path),
+         {:ok, tokens} <- Credentials.token(creds),
+         {:ok, tenant_id} <- resolve_tenant(tokens.access_token, creds),
+         client <-
+           HttpClient.new(
+             access_token: tokens.access_token,
+             tenant_id: tenant_id,
+             credentials: creds
+           ),
+         {:ok, dest} <- Snapshot.pull(client, dest) do
+      if present?(tokens[:refresh_token]) do
+        _ = Credentials.append_tokens(path, tokens)
+      end
+
+      Mix.shell().info("snapshot written to #{dest}")
+      :ok
+    else
+      {:error, reason} -> halt!(inspect(reason))
+    end
+  end
+
+  defp resolve_tenant(_token, %{tenant_id: id}) when is_binary(id) and id != "" do
+    {:ok, id}
+  end
+
+  defp resolve_tenant(token, _creds) do
+    with {:ok, tenants} <- HttpClient.fetch_tenants(token) do
+      HttpClient.pick_tenant(tenants, @default_company_name)
+    end
+  end
+
+  defp open_browser(url) do
+    cond do
+      exe = System.find_executable("xdg-open") ->
+        System.cmd(exe, [url], stderr_to_stdout: true)
+
+      exe = System.find_executable("open") ->
+        System.cmd(exe, [url], stderr_to_stdout: true)
+
+      true ->
+        :ok
+    end
+  rescue
+    _ -> :ok
+  end
+
+  defp present?(val), do: is_binary(val) and val != ""
+
   defp snapshot_dir(opts), do: opts[:snapshot_dir] || @default_snapshot_dir
+
+  defp credentials_path(opts), do: opts[:credentials] || @default_credentials
 
   defp resolve_user(opts) do
     email = opts[:user] || System.get_env("FC_IMPORT_USER")

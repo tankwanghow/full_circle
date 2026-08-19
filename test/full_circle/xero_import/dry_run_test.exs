@@ -37,12 +37,20 @@ defmodule FullCircle.XeroImport.DryRunTest do
     assert Repo.aggregate(from(c in FullCircle.Sys.Company), :count) == companies_before
   end
 
-  test "mix --auth is a stub and exits 1" do
-    assert catch_exit(Mix.Task.rerun("full_circle.import_xero", ["--auth"])) == {:shutdown, 1}
+  test "mix --auth without credentials exits 1" do
+    missing = "/tmp/xero-no-creds-#{System.unique_integer([:positive])}"
+
+    assert catch_exit(
+             Mix.Task.rerun("full_circle.import_xero", ["--auth", "--credentials", missing])
+           ) == {:shutdown, 1}
   end
 
-  test "mix --snapshot is a stub and exits 1" do
-    assert catch_exit(Mix.Task.rerun("full_circle.import_xero", ["--snapshot"])) == {:shutdown, 1}
+  test "mix --snapshot without credentials exits 1" do
+    missing = "/tmp/xero-no-creds-#{System.unique_integer([:positive])}"
+
+    assert catch_exit(
+             Mix.Task.rerun("full_circle.import_xero", ["--snapshot", "--credentials", missing])
+           ) == {:shutdown, 1}
   end
 
   test "mix --dry-run against fixture with --log false" do
