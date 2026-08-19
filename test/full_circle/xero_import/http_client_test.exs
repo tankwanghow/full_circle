@@ -58,6 +58,20 @@ defmodule FullCircle.XeroImport.HttpClientTest do
       })
     end
 
+    @impl true
+    def get_trial_balance(client, date) do
+      case client do
+        %{fail: :get_trial_balance} ->
+          {:error, :forced}
+
+        %{payloads: %{get_trial_balance: fun}} when is_function(fun, 1) ->
+          {:ok, fun.(date)}
+
+        _ ->
+          {:ok, []}
+      end
+    end
+
     defp reply(%{fail: fail}, name, _default) when fail == name, do: {:error, :forced}
     defp reply(%{payloads: payloads}, name, default), do: {:ok, Map.get(payloads, name, default)}
     defp reply(_client, _name, default), do: {:ok, default}
@@ -137,11 +151,17 @@ defmodule FullCircle.XeroImport.HttpClientTest do
       body = form_body(conn)
       assert body["grant_type"] == "client_credentials"
       scopes = String.split(body["scope"] || "", " ", trim: true)
-      assert "accounting.transactions.read" in scopes
-      assert "accounting.contacts.read" in scopes
       assert "accounting.settings.read" in scopes
-      assert "accounting.reports.read" in scopes
+      assert "accounting.contacts.read" in scopes
+      assert "accounting.invoices.read" in scopes
+      assert "accounting.payments.read" in scopes
+      assert "accounting.banktransactions.read" in scopes
+      assert "accounting.manualjournals.read" in scopes
+      assert "accounting.reports.trialbalance.read" in scopes
       assert "assets.read" in scopes
+      # Broad scopes were retired for apps created on/after 2026-03-02.
+      refute "accounting.transactions.read" in scopes
+      refute "accounting.reports.read" in scopes
       refute "accounting.journals.read" in scopes
       refute "offline_access" in scopes
       assert Plug.Conn.get_req_header(conn, "authorization") != []
@@ -202,7 +222,7 @@ defmodule FullCircle.XeroImport.HttpClientTest do
       body = form_body(conn)
       assert body["grant_type"] == "authorization_code"
       assert body["code"] == "abc-code"
-      assert body["redirect_uri"] == "http://127.0.0.1:4099/callback"
+      assert body["redirect_uri"] == "http://localhost:4099/callback"
 
       Req.Test.json(conn, %{
         "access_token" => "at-1",
@@ -225,11 +245,13 @@ defmodule FullCircle.XeroImport.HttpClientTest do
     assert uri.path == "/identity/connect/authorize"
     params = URI.decode_query(uri.query)
     assert params["client_id"] == "id1"
-    assert params["redirect_uri"] == "http://127.0.0.1:4099/callback"
+    assert params["redirect_uri"] == "http://localhost:4099/callback"
     assert params["response_type"] == "code"
     scopes = String.split(params["scope"] || "", " ", trim: true)
     assert "offline_access" in scopes
-    assert "accounting.transactions.read" in scopes
+    assert "accounting.invoices.read" in scopes
+    assert "accounting.reports.trialbalance.read" in scopes
+    refute "accounting.transactions.read" in scopes
     refute "accounting.journals.read" in scopes
   end
 
@@ -499,6 +521,18 @@ defmodule FullCircle.XeroImport.HttpClientTest do
            ] = reports["trial_balance"]
   end
 
+  test "GET /Setup 404 yields empty conversion balances", %{stub: stub} do
+    Req.Test.expect(stub, fn conn ->
+      assert conn.request_path == "/api.xro/2.0/Setup"
+      Plug.Conn.send_resp(conn, 404, "")
+    end)
+
+    assert {:ok, %{"Date" => nil, "Lines" => []}} =
+             HttpClient.get_conversion_balances(http_client(stub))
+
+    Req.Test.verify!(stub)
+  end
+
   test "conversion date uses Day when present", %{stub: stub} do
     Req.Test.expect(stub, fn conn ->
       assert conn.request_path == "/api.xro/2.0/Setup"
@@ -576,6 +610,64 @@ defmodule FullCircle.XeroImport.HttpClientTest do
     assert asset["DepreciationMethod"] == "StraightLine"
     assert asset["AssetType"]["FixedAssetAccountId"] == "ac-fa"
     assert [%{"DepreciationAmount" => 200.0}] = asset["DepreciationHistory"]
+  end
+
+  test "pull collects a trial balance per financial year end", %{dir: dir} do
+    dest = Path.join(dir, "snap-yearly")
+    today = Date.utc_today()
+
+    client = %FakeClient{
+      payloads: %{
+        get_organisation: %{
+          "Name" => "Pulled Org",
+          "FinancialYearEndMonth" => 12,
+          "FinancialYearEndDay" => 31
+        },
+        list_invoices: [
+          %{
+            "InvoiceID" => "a",
+            "Type" => "ACCREC",
+            "Status" => "PAID",
+            "Total" => 5.0,
+            "DateString" => "#{today.year - 2}-06-01T00:00:00"
+          }
+        ],
+        get_trial_balance: fn date ->
+          [%{"account_name" => "Sales", "balance" => date.year * 1.0}]
+        end
+      }
+    }
+
+    assert {:ok, ^dest} = Snapshot.pull(client, dest)
+    assert {:ok, snap} = Snapshot.read(dest)
+
+    periods = snap.reports["trial_balance_by_year"]
+    dates = Enum.map(periods, & &1["date"])
+
+    assert "#{today.year - 2}-12-31" in dates
+    assert "#{today.year - 1}-12-31" in dates
+    assert List.last(dates) == Date.to_iso8601(today)
+
+    fye = Enum.find(periods, &(&1["date"] == "#{today.year - 1}-12-31"))
+    assert [%{"account_name" => "Sales", "balance" => bal}] = fye["lines"]
+    assert bal == (today.year - 1) * 1.0
+  end
+
+  test "pull excludes zero-total docs from invoice totals", %{dir: dir} do
+    dest = Path.join(dir, "snap-zero")
+
+    client = %FakeClient{
+      payloads: %{
+        list_invoices: [
+          %{"InvoiceID" => "a", "Type" => "ACCREC", "Status" => "PAID", "Total" => 50.0},
+          %{"InvoiceID" => "z", "Type" => "ACCREC", "Status" => "PAID", "Total" => 0.0}
+        ]
+      }
+    }
+
+    assert {:ok, ^dest} = Snapshot.pull(client, dest)
+    assert {:ok, snap} = Snapshot.read(dest)
+    assert snap.reports["invoice_totals"] == %{"count" => 1, "amount" => 50.0}
   end
 
   test "pull fills aged from contact outstanding when aged reports are empty", %{dir: dir} do

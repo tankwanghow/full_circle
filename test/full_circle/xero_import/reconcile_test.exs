@@ -50,6 +50,64 @@ defmodule FullCircle.XeroImport.ReconcileTest do
     assert tb_check.ok?
   end
 
+  test "TB names carrying Xero code suffixes match FC accounts", %{
+    snap: snap,
+    company: company,
+    user: user
+  } do
+    tb =
+      Enum.map(snap.reports["trial_balance"], fn row ->
+        Map.update!(row, "account_name", &(&1 <> " (090)"))
+      end)
+
+    snap = put_in(snap.reports["trial_balance"], tb)
+
+    assert {:ok, %{checks: checks}} = Reconcile.run(snap, company, user)
+    tb_check = Enum.find(checks, &(&1.name == :trial_balance))
+    assert tb_check.ok?
+  end
+
+  test "P&L accounts reconcile in aggregate with Retained Earnings", %{
+    snap: snap,
+    company: company,
+    user: user
+  } do
+    # Simulate a multi-year org: Xero TB shows zero YTD Sales, with prior
+    # years folded into the computed Retained Earnings line.
+    tb =
+      Enum.map(snap.reports["trial_balance"], fn
+        %{"account_name" => "Sales"} = row -> Map.put(row, "balance", 0.0)
+        row -> row
+      end) ++ [%{"account_name" => "Retained Earnings", "balance" => -190.0}]
+
+    snap = put_in(snap.reports["trial_balance"], tb)
+
+    assert {:ok, %{checks: checks}} = Reconcile.run(snap, company, user)
+    tb_check = Enum.find(checks, &(&1.name == :trial_balance))
+    assert tb_check.ok?
+  end
+
+  test "fa_nbv groups suffixed duplicate asset names under the Xero name", %{
+    user: user,
+    snap: snap
+  } do
+    dup =
+      snap.fixed_assets
+      |> List.first()
+      |> Map.merge(%{"AssetId" => "fa-van-dup", "BookValue" => 80000.0})
+
+    snap =
+      %{snap | fixed_assets: snap.fixed_assets ++ [dup]}
+      |> put_in([Access.key(:reports), "fa_nbv"], [%{"name" => "Van 1", "nbv" => 160_000.0}])
+
+    name = "Xero Recon FA #{System.unique_integer([:positive])}"
+    {:ok, %{company: com}} = Apply.run(snap, user, company_name: name)
+
+    assert {:ok, %{checks: checks}} = Reconcile.run(snap, com, user)
+    fa = Enum.find(checks, &(&1.name == :fa_nbv))
+    assert fa.ok?
+  end
+
   test "honors control-account overrides when remapping TB names", %{
     snap: snap,
     company: company,

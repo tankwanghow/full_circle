@@ -23,12 +23,7 @@ defmodule FullCircle.XeroImport.Reconcile do
     overrides = Keyword.get(opts, :overrides) || %{}
 
     checks = [
-      check_named(
-        :trial_balance,
-        report_lines(reports, "trial_balance"),
-        live_trial_balance(company),
-        overrides
-      ),
+      check_trial_balance(reports, company, overrides),
       check_named(
         :aged_receivables,
         report_lines(reports, "aged_receivables"),
@@ -62,16 +57,69 @@ defmodule FullCircle.XeroImport.Reconcile do
     end
   end
 
-  defp live_trial_balance(company) do
-    from(t in Transaction,
-      join: a in Account,
-      on: a.id == t.account_id,
-      where: t.company_id == ^company.id,
-      group_by: a.name,
-      select: {a.name, sum(t.amount)}
-    )
-    |> Repo.all()
-    |> Map.new(fn {name, amt} -> {name, decimalize(amt)} end)
+  @fc_pl_types ["Revenue", "Other Income", "Direct Costs", "Expenses", "Overhead", "Depreciation"]
+
+  # Xero's TB report shows P&L accounts as current-FY YTD plus a computed
+  # Retained Earnings line, while FC holds the full history — so P&L (with
+  # Retained Earnings) can only be reconciled in aggregate. Balance-sheet
+  # accounts compare per-account.
+  defp check_trial_balance(reports, company, overrides) do
+    rows = report_lines(reports, "trial_balance")
+
+    live =
+      from(t in Transaction,
+        join: a in Account,
+        on: a.id == t.account_id,
+        where: t.company_id == ^company.id,
+        group_by: [a.name, a.account_type],
+        select: {a.name, a.account_type, sum(t.amount)}
+      )
+      |> Repo.all()
+
+    {live_bs, live_pl} =
+      Enum.reduce(live, {%{}, Decimal.new(0)}, fn {name, type, amt}, {bs, pl} ->
+        amt = decimalize(amt)
+
+        if type in @fc_pl_types or name == "Retained Earnings" do
+          {bs, Decimal.add(pl, amt)}
+        else
+          {Map.put(bs, name, amt), pl}
+        end
+      end)
+
+    pl_names =
+      for {name, type, _} <- live, type in @fc_pl_types, into: MapSet.new(["Retained Earnings"]) do
+        name
+      end
+
+    {bs_rows, expected_pl} =
+      Enum.reduce(rows, {[], Decimal.new(0)}, fn row, {acc, pl} ->
+        key = remap_expected_name(line_key(row), :trial_balance, overrides)
+        amt = decimalize(line_amount(row))
+
+        if MapSet.member?(pl_names, key) do
+          {acc, Decimal.add(pl, amt)}
+        else
+          {[%{"account_name" => key, "balance" => amt} | acc], pl}
+        end
+      end)
+
+    check = check_named(:trial_balance, Enum.reverse(bs_rows), live_bs, overrides)
+    pl_delta = Decimal.sub(live_pl, expected_pl)
+
+    if within_tolerance?(pl_delta) do
+      check
+    else
+      diff = %{
+        key: "P&L + Retained Earnings",
+        account_name: "P&L + Retained Earnings",
+        xero: expected_pl,
+        full_circle: live_pl,
+        delta: pl_delta
+      }
+
+      %{check | ok?: false, diffs: check.diffs ++ [diff]}
+    end
   end
 
   defp live_bank(company) do
@@ -195,14 +243,17 @@ defmodule FullCircle.XeroImport.Reconcile do
         |> Map.new(fn {id, amt} -> {id, decimalize(amt)} end)
       end
 
-    Map.new(assets, fn {id, name, pur_price} ->
+    # Same-named Xero assets import with " (2)" suffixes; the expected side
+    # keys by the original name, so group live NBV by the base name.
+    Enum.reduce(assets, %{}, fn {id, name, pur_price}, acc ->
       nbv =
         pur_price
         |> decimalize()
         |> Decimal.sub(Map.get(depre, id, Decimal.new(0)))
         |> Decimal.sub(Map.get(disposals, id, Decimal.new(0)))
 
-      {name, nbv}
+      base = String.replace(name, ~r/ \(\d+\)$/, "")
+      Map.update(acc, base, nbv, &Decimal.add(&1, nbv))
     end)
   end
 
@@ -340,7 +391,9 @@ defmodule FullCircle.XeroImport.Reconcile do
 
   defp remap_expected_name(key, name, overrides)
        when name in [:trial_balance, :bank] and is_binary(key) do
-    Mapper.control_account_name(key, overrides)
+    key
+    |> Mapper.strip_code_suffix()
+    |> Mapper.control_account_name(overrides)
   end
 
   defp remap_expected_name(key, _name, _overrides), do: key

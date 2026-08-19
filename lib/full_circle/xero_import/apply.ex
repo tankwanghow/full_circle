@@ -84,6 +84,8 @@ defmodule FullCircle.XeroImport.Apply do
              {:ok, ctx} <- import_receipts_and_payments(ctx),
              {:ok, ctx} <- import_journals(ctx),
              {:ok, ctx} <- import_bank(ctx),
+             {:ok, ctx} <- post_catchup_journals(ctx),
+             {:ok, ctx} <- post_aged_attribution(ctx),
              :ok <- Gapless.bump(ctx.company, ctx.imported_numbers) do
           {:ok, result(ctx)}
         end
@@ -196,6 +198,9 @@ defmodule FullCircle.XeroImport.Apply do
         not Mapper.importable_invoice?(inv) ->
           add_op(state, {:skip, :not_importable, inv})
 
+        zero_total?(inv) ->
+          add_op(state, {:skip, :zero_total, inv})
+
         not Mapper.base_currency_ok?(inv, state.base) ->
           add_error(state, {:foreign_currency, inv["InvoiceNumber"]})
 
@@ -249,6 +254,14 @@ defmodule FullCircle.XeroImport.Apply do
       cond do
         not Mapper.importable_invoice?(pay) ->
           add_op(state, {:skip, :not_importable, pay})
+
+        Mapper.overpayment_or_prepayment?(pay["Invoice"] || %{}) ->
+          kind =
+            if String.starts_with?(to_string(get_in(pay, ["Invoice", "Type"])), "AR"),
+              do: :payments,
+              else: :receipts
+
+          add_op(state, {kind, pay})
 
         true ->
           payment_id = to_string(pay["PaymentID"] || pay["PaymentId"] || "")
@@ -632,6 +645,7 @@ defmodule FullCircle.XeroImport.Apply do
   defp import_one_asset(xero, ctx) do
     with {:ok, attrs} <- Mapper.fixed_asset(xero),
          attrs = Map.merge(attrs, asset_account_names(xero, ctx)),
+         :ok <- ensure_disposal_account(attrs, ctx),
          :ok <- assert_asset_accounts(attrs) do
       xero_id = xero["AssetId"] || xero["AssetID"]
 
@@ -641,7 +655,7 @@ defmodule FullCircle.XeroImport.Apply do
       case seed_one("FixedAssets", attrs, ctx) do
         {:ok, fa} ->
           ctx = put_id(ctx, "asset:" <> to_string(xero_id), fa.id)
-          seed_depreciations(xero, fa, ctx)
+          seed_depreciations(xero, fa, attrs, ctx)
 
         {:error, _} = err ->
           err
@@ -673,16 +687,36 @@ defmodule FullCircle.XeroImport.Apply do
     }
   end
 
+  # Xero charts often have no disposal/gain account (fixed assets live in a
+  # separate register); FC's FixedAsset requires one, so seed the fallback.
+  defp ensure_disposal_account(%{"disp_fund_ac_name" => name}, ctx) when is_binary(name) do
+    case Accounting.get_account_by_name(name, ctx.company, ctx.user) do
+      %{id: _} ->
+        :ok
+
+      nil ->
+        case seed_one("Accounts", %{"name" => name, "account_type" => "Other Income"}, ctx) do
+          {:ok, _} -> :ok
+          {:error, _} = err -> err
+        end
+    end
+  end
+
+  defp ensure_disposal_account(_attrs, _ctx), do: :ok
+
   defp name_for_xero_account(nil, _ctx), do: nil
 
   defp name_for_xero_account(xero_id, ctx) do
     Map.get(ctx.account_names, to_string(xero_id))
   end
 
-  defp seed_depreciations(xero, fa, ctx) do
+  defp seed_depreciations(xero, fa, asset_attrs, ctx) do
     history = xero["DepreciationHistory"] || []
+    conv_date = conversion_date(ctx)
 
-    Enum.reduce_while(history, {:ok, ctx}, fn row, {:ok, ctx} ->
+    history
+    |> Enum.with_index()
+    |> Enum.reduce_while({:ok, ctx}, fn {row, idx}, {:ok, ctx} ->
       attrs = %{
         "fixed_asset_name" => fa.name,
         "cost_basis" => row["CostLimit"] || xero["PurchasePrice"] || fa.pur_price,
@@ -690,11 +724,63 @@ defmodule FullCircle.XeroImport.Apply do
         "amount" => row["DepreciationAmount"]
       }
 
-      case seed_one("FixedAssetDepreciations", attrs, ctx) do
-        {:ok, _} -> {:cont, {:ok, ctx}}
+      with {:ok, _} <- seed_one("FixedAssetDepreciations", attrs, ctx),
+           {:ok, ctx} <- post_depreciation_journal(row, idx, xero, asset_attrs, conv_date, ctx) do
+        {:cont, {:ok, ctx}}
+      else
         {:error, _} = err -> {:halt, err}
       end
     end)
+  end
+
+  # Xero posts depreciation to the GL via system journals (Journals API,
+  # not pulled). Reconstruct them from DepreciationHistory — but only for
+  # rows after the conversion date: earlier depreciation already sits in the
+  # conversion balances.
+  defp post_depreciation_journal(row, idx, xero, asset_attrs, conv_date, ctx) do
+    date = parse_date(row["DepreciationDate"])
+    amount = decimalize(row["DepreciationAmount"] || 0)
+
+    pre_conversion? = conv_date != nil and date != nil and Date.compare(date, conv_date) != :gt
+
+    if pre_conversion? or Decimal.eq?(amount, 0) or is_nil(date) do
+      {:ok, ctx}
+    else
+      depre = Accounting.get_account_by_name(asset_attrs["depre_ac_name"], ctx.company, ctx.user)
+
+      accum =
+        Accounting.get_account_by_name(asset_attrs["cume_depre_ac_name"], ctx.company, ctx.user)
+
+      xero_id = xero["AssetId"] || xero["AssetID"]
+      number = "XDEP-#{xero_id}-#{idx + 1}"
+      particulars = "Depreciation #{asset_attrs["name"]}"
+
+      attrs = %{
+        "journal_no" => number,
+        "journal_date" => date,
+        "transactions" => %{
+          "0" => %{
+            "account_id" => depre && depre.id,
+            "account_name" => depre && depre.name,
+            "particulars" => particulars,
+            "amount" => amount,
+            "_persistent_id" => "0"
+          },
+          "1" => %{
+            "account_id" => accum && accum.id,
+            "account_name" => accum && accum.name,
+            "particulars" => particulars,
+            "amount" => Decimal.negate(amount),
+            "_persistent_id" => "1"
+          }
+        }
+      }
+
+      case wrap_import(JournalEntry.import_journal(attrs, ctx.company, ctx.user)) do
+        {:ok, _} -> {:ok, ctx}
+        {:error, _} = err -> err
+      end
+    end
   end
 
   defp seed_one(kind, attrs, ctx) do
@@ -867,6 +953,14 @@ defmodule FullCircle.XeroImport.Apply do
       not Mapper.importable_invoice?(inv) ->
         {:ok, ctx}
 
+      # FC validates invoice_amount > 0, so zero-total invoices can't import
+      # as invoices. All-zero lines carry no ledger effect and are dropped;
+      # self-cancelling lines across different accounts (e.g. POS float
+      # movements) still move per-account balances, so they become a journal.
+      # Snapshot.doc_totals excludes zero-total docs, keeping counts aligned.
+      zero_total?(inv) ->
+        persist_zero_invoice_journal(inv, ctx)
+
       not Mapper.base_currency_ok?(inv, base) ->
         {:error, {:foreign_currency, inv["InvoiceNumber"]}}
 
@@ -875,10 +969,57 @@ defmodule FullCircle.XeroImport.Apply do
     end
   end
 
+  defp zero_total?(doc) do
+    Decimal.eq?(decimalize(doc["Total"] || 0), 0)
+  end
+
+  defp persist_zero_invoice_journal(inv, ctx) do
+    lines =
+      (inv["LineItems"] || [])
+      |> Enum.reject(fn line -> Decimal.eq?(decimalize(line["LineAmount"] || 0), 0) end)
+
+    if lines == [] do
+      {:ok, ctx}
+    else
+      number = invoice_number(inv)
+      date = parse_date(inv["Date"]) || Date.utc_today()
+
+      transactions =
+        lines
+        |> Enum.with_index()
+        |> Map.new(fn {line, idx} ->
+          acc_name = ctx.accounts_by_code[line["AccountCode"]] || fallback_account_name(ctx)
+          acc = Accounting.get_account_by_name(acc_name, ctx.company, ctx.user)
+
+          {Integer.to_string(idx),
+           %{
+             "account_id" => acc && acc.id,
+             "account_name" => acc && acc.name,
+             "particulars" => presence(line["Description"]) || number,
+             "amount" => decimalize(line["LineAmount"]),
+             "_persistent_id" => Integer.to_string(idx)
+           }}
+        end)
+
+      attrs = %{
+        "journal_no" => number,
+        "journal_date" => date,
+        "transactions" => transactions
+      }
+
+      case wrap_import(JournalEntry.import_journal(attrs, ctx.company, ctx.user)) do
+        {:ok, _} -> {:ok, track_number(ctx, :Journal, number)}
+        {:error, _} = err -> err
+      end
+    end
+  end
+
   defp persist_invoice(inv, ctx) do
-    with {:ok, attrs, type} <- invoice_attrs(inv, ctx) do
+    type = if inv["Type"] == "ACCPAY", do: :pur_invoice, else: :invoice
+    number = inv |> invoice_number() |> dedupe_doc_number(type, ctx)
+
+    with {:ok, attrs, ^type} <- invoice_attrs(inv, ctx, number) do
       xero_id = to_string(inv["InvoiceID"] || inv["InvoiceId"])
-      number = inv["InvoiceNumber"]
 
       result =
         case type do
@@ -900,7 +1041,7 @@ defmodule FullCircle.XeroImport.Apply do
           ctx =
             ctx
             |> put_id("invoice:" <> xero_id, entity.id)
-            |> put_invoice_info(xero_id, inv, entity, doc_type)
+            |> put_invoice_info(xero_id, inv, entity, doc_type, number)
             |> track_number(gap_type, number)
 
           {:ok, ctx}
@@ -911,15 +1052,15 @@ defmodule FullCircle.XeroImport.Apply do
     end
   end
 
-  defp invoice_attrs(inv, ctx) do
+  defp invoice_attrs(inv, ctx, number) do
     type = if inv["Type"] == "ACCPAY", do: :pur_invoice, else: :invoice
     side = if type == :pur_invoice, do: "Purchase", else: "Sales"
 
     with {:ok, contact} <- mapped_contact(inv, ctx),
-         {:ok, details} <- invoice_details(inv, ctx, side, type) do
+         {:ok, details} <- invoice_details(inv, ctx, side, type),
+         {:ok, details} <- align_doc_total(details, inv, number, side, ctx) do
       date = parse_date(inv["Date"]) || Date.utc_today()
       due = parse_date(inv["DueDate"]) || date
-      number = inv["InvoiceNumber"]
 
       attrs =
         if type == :pur_invoice do
@@ -946,6 +1087,66 @@ defmodule FullCircle.XeroImport.Apply do
         end
 
       {:ok, attrs, type}
+    end
+  end
+
+  # Xero's Total is the authoritative AR/AP posting and includes its own
+  # rounding; FC recomputes from lines, so per-document cent gaps accumulate
+  # into aged/total drift. Close each gap with an explicit rounding line.
+  # A gap beyond 1.00 is a mapping bug, not rounding — fail loudly.
+  @max_doc_rounding Decimal.new("1.00")
+
+  defp align_doc_total(details, inv, number, side, ctx) do
+    xero_total = decimalize(inv["Total"] || 0)
+
+    computed =
+      Enum.reduce(details, Decimal.new(0), fn {_k, d}, acc ->
+        line =
+          d["quantity"]
+          |> decimalize()
+          |> Decimal.mult(decimalize(d["unit_price"]))
+          |> Decimal.add(decimalize(d["discount"]))
+          |> then(&Decimal.mult(&1, Decimal.add(Decimal.new(1), decimalize(d["tax_rate"]))))
+
+        Decimal.add(acc, line)
+      end)
+
+    delta = xero_total |> Decimal.sub(computed) |> Decimal.round(2)
+
+    cond do
+      Decimal.eq?(delta, 0) ->
+        {:ok, details}
+
+      Decimal.compare(Decimal.abs(delta), @max_doc_rounding) == :gt ->
+        {:error, {:doc_total_mismatch, number, delta}}
+
+      true ->
+        with {:ok, good} <- ensure_named_good(@xero_line_good, ctx) do
+          {_k, first} = Enum.min_by(details, fn {k, _} -> String.to_integer(k) end)
+          idx = map_size(details)
+          tax_code = if side == "Purchase", do: "NoPTax", else: "NoSTax"
+          tax = Accounting.get_tax_code_by_code(tax_code, ctx.company, ctx.user)
+
+          line = %{
+            "good_id" => good.id,
+            "good_name" => good_display_name(good),
+            "account_id" => first["account_id"],
+            "account_name" => first["account_name"],
+            "tax_code_id" => tax && tax.id,
+            "tax_code_name" => tax && tax.code,
+            "package_id" => good.package_id,
+            "package_name" => good.package_name || good.unit || "unit",
+            "quantity" => Decimal.new(1),
+            "unit_price" => delta,
+            "discount" => Decimal.new(0),
+            "tax_rate" => Decimal.new(0),
+            "unit_multiplier" => "0",
+            "descriptions" => "Xero rounding",
+            "_persistent_id" => Integer.to_string(idx + 1)
+          }
+
+          {:ok, Map.put(details, Integer.to_string(idx), line)}
+        end
     end
   end
 
@@ -1184,9 +1385,48 @@ defmodule FullCircle.XeroImport.Apply do
     end
   end
 
-  defp put_invoice_info(ctx, xero_id, inv, entity, doc_type) do
+  # Xero allows blank numbers on bills; fall back to Reference then the
+  # unique InvoiceID (traceable via id_map.json). Gapless ignores both.
+  defp invoice_number(inv) do
+    presence(inv["InvoiceNumber"]) || presence(inv["Reference"]) ||
+      to_string(inv["InvoiceID"] || inv["InvoiceId"])
+  end
+
+  defp presence(val) when is_binary(val) do
+    case String.trim(val) do
+      "" -> nil
+      trimmed -> trimmed
+    end
+  end
+
+  defp presence(_), do: nil
+
+  # Xero supplier bill numbers are not unique; FC enforces uniqueness per
+  # company, so collisions get " (2)" suffixes. Payments still land on the
+  # right document because invoice_info stores each InvoiceID's final number.
+  defp dedupe_doc_number(number, type, ctx, n \\ 1) do
+    candidate = if n == 1, do: number, else: "#{number} (#{n})"
+
+    exists? =
+      case type do
+        :pur_invoice ->
+          Repo.exists?(
+            from p in FullCircle.Billing.PurInvoice,
+              where: p.company_id == ^ctx.company.id and p.pur_invoice_no == ^candidate
+          )
+
+        :invoice ->
+          Repo.exists?(
+            from i in Invoice,
+              where: i.company_id == ^ctx.company.id and i.invoice_no == ^candidate
+          )
+      end
+
+    if exists?, do: dedupe_doc_number(number, type, ctx, n + 1), else: candidate
+  end
+
+  defp put_invoice_info(ctx, xero_id, inv, entity, doc_type, number) do
     contact_id = Map.get(entity, :contact_id)
-    number = inv["InvoiceNumber"]
 
     info = %{
       type: inv["Type"],
@@ -1375,11 +1615,98 @@ defmodule FullCircle.XeroImport.Apply do
     info = invoice_id && Map.get(ctx.invoice_info, invoice_id)
 
     cond do
+      Mapper.overpayment_or_prepayment?(pay["Invoice"] || %{}) ->
+        persist_overpayment_refund(pay, payment_id, ctx)
+
       is_nil(invoice_id) or is_nil(info) or not Map.has_key?(ctx.id_map, "invoice:" <> invoice_id) ->
         {:error, {:missing_allocation_target, payment_id, invoice_id || "unknown"}}
 
       true ->
         apply_allocation(pay, payment_id, info, ctx)
+    end
+  end
+
+  # A payment against an over/prepayment is a cash refund: the AP side means
+  # the supplier returns money (Receipt crediting Account Payables, reversing
+  # the SPEND-OVERPAYMENT that debited it); the AR side refunds a customer
+  # (Payment debiting Account Receivables).
+  defp persist_overpayment_refund(pay, payment_id, ctx) do
+    inv = pay["Invoice"] || %{}
+    ar? = String.starts_with?(to_string(inv["Type"]), "AR")
+    control = if ar?, do: "Account Receivables", else: "Account Payables"
+
+    with {:ok, contact} <- mapped_contact(inv, ctx),
+         {:ok, funds} <- payment_funds_account(pay, ctx),
+         {:ok, good} <- ensure_named_good(@xero_line_good, ctx),
+         {:ok, acc} <- control_account(control, ctx) do
+      tax_code = if ar?, do: "NoPTax", else: "NoSTax"
+      tax = Accounting.get_tax_code_by_code(tax_code, ctx.company, ctx.user)
+      date = parse_date(pay["Date"]) || Date.utc_today()
+      amount = decimalize(pay["Amount"] || 0)
+      number = payment_id
+
+      detail = %{
+        "0" => %{
+          "good_id" => good.id,
+          "good_name" => good_display_name(good),
+          "account_id" => acc.id,
+          "account_name" => acc.name,
+          "tax_code_id" => tax && tax.id,
+          "tax_code_name" => tax && tax.code,
+          "package_id" => good.package_id,
+          "package_name" => good.package_name || good.unit || "unit",
+          "quantity" => Decimal.new(1),
+          "unit_price" => amount,
+          "discount" => Decimal.new(0),
+          "tax_rate" => Decimal.new(0),
+          "unit_multiplier" => "0",
+          "descriptions" => "Xero #{inv["Type"]} refund",
+          "_persistent_id" => "1"
+        }
+      }
+
+      if ar? do
+        attrs = %{
+          "payment_no" => number,
+          "payment_date" => date,
+          "contact_id" => contact.id,
+          "contact_name" => contact.name,
+          "funds_account_id" => funds.id,
+          "funds_account_name" => funds.name,
+          "funds_amount" => amount,
+          "payment_details" => detail,
+          "transaction_matchers" => %{}
+        }
+
+        case wrap_import(BillPay.import_payment(attrs, ctx.company, ctx.user)) do
+          {:ok, _} -> {:ok, track_number(ctx, :Payment, number)}
+          {:error, _} = err -> err
+        end
+      else
+        attrs = %{
+          "receipt_no" => number,
+          "receipt_date" => date,
+          "contact_id" => contact.id,
+          "contact_name" => contact.name,
+          "funds_account_id" => funds.id,
+          "funds_account_name" => funds.name,
+          "funds_amount" => amount,
+          "receipt_details" => detail,
+          "transaction_matchers" => %{}
+        }
+
+        case wrap_import(ReceiveFund.import_receipt(attrs, ctx.company, ctx.user)) do
+          {:ok, _} -> {:ok, track_number(ctx, :Receipt, number)}
+          {:error, _} = err -> err
+        end
+      end
+    end
+  end
+
+  defp control_account(name, ctx) do
+    case Accounting.get_account_by_name(name, ctx.company, ctx.user) do
+      %{id: _} = acc -> {:ok, acc}
+      nil -> {:error, {:unmapped_account, name}}
     end
   end
 
@@ -1389,7 +1716,10 @@ defmodule FullCircle.XeroImport.Apply do
       date = parse_date(pay["Date"]) || Date.utc_today()
       amount = decimalize(pay["Amount"] || 0)
       match_amount = signed_match_amount(txn.amount, amount)
-      number = pay["PaymentNumber"] || pay["Reference"] || payment_id
+      # Xero payments have no document number and References collide en masse
+      # (e.g. "Cash" on every POS payment) — the PaymentID is the only safe
+      # unique number.
+      number = payment_id
 
       matcher = %{
         "0" => %{
@@ -1504,7 +1834,9 @@ defmodule FullCircle.XeroImport.Apply do
          %{
            "account_id" => acc && acc.id,
            "account_name" => acc && acc.name,
-           "particulars" => line["Description"] || journal["Narration"] || number,
+           "particulars" =>
+             presence(line["Description"]) || presence(journal["Narration"]) ||
+               to_string(number),
            "amount" => decimalize(line["LineAmount"] || 0),
            "_persistent_id" => Integer.to_string(idx)
          }}
@@ -1520,6 +1852,298 @@ defmodule FullCircle.XeroImport.Apply do
       {:ok, _} -> {:ok, track_number(ctx, :Journal, number)}
       {:error, _} = err -> err
     end
+  end
+
+  @fc_pl_types ["Revenue", "Other Income", "Direct Costs", "Expenses", "Overhead", "Depreciation"]
+
+  # Xero posts payroll and other system journals via the Journals API, which
+  # new apps cannot read. Close the gap with one balanced journal per
+  # financial year, derived from the yearly TB snapshots: balance-sheet
+  # accounts as cumulative diffs, P&L accounts as that-year activity diffs.
+  # A period whose documents fully explain its TB posts nothing.
+  defp post_catchup_journals(ctx) do
+    periods =
+      (ctx.snapshot.reports || %{})
+      |> report_value("trial_balance_by_year")
+      |> List.wrap()
+      |> Enum.sort_by(& &1["date"])
+
+    periods
+    |> Enum.reduce_while({:ok, {ctx, nil}}, fn period, {:ok, {ctx, prev_date}} ->
+      case post_one_catchup(period, prev_date, ctx) do
+        {:ok, ctx} -> {:cont, {:ok, {ctx, parse_date(period["date"])}}}
+        {:error, _} = err -> {:halt, err}
+      end
+    end)
+    |> case do
+      {:ok, {ctx, _}} -> {:ok, ctx}
+      err -> err
+    end
+  end
+
+  defp report_value(reports, key) when is_map(reports),
+    do: Map.get(reports, key) || Map.get(reports, String.to_atom(key))
+
+  defp report_value(_reports, _key), do: nil
+
+  defp post_one_catchup(period, prev_date, ctx) do
+    date = parse_date(period["date"])
+    xero = catchup_expected(period["lines"] || [], ctx)
+    fc_now = fc_balances_at(date, ctx)
+    fc_prev = if prev_date, do: fc_balances_at(prev_date, ctx), else: %{}
+
+    names =
+      xero |> Map.keys() |> MapSet.new() |> MapSet.union(MapSet.new(Map.keys(fc_now)))
+
+    lines =
+      Enum.reduce(names, [], fn name, acc ->
+        {type, fc_amt} = Map.get(fc_now, name, {nil, Decimal.new(0)})
+        {_, prev_amt} = Map.get(fc_prev, name, {nil, Decimal.new(0)})
+        xero_amt = Map.get(xero, name, Decimal.new(0))
+
+        delta =
+          if type in @fc_pl_types do
+            # Xero TB shows P&L as YTD for that financial year.
+            Decimal.sub(xero_amt, Decimal.sub(fc_amt, prev_amt))
+          else
+            Decimal.sub(xero_amt, fc_amt)
+          end
+
+        delta = Decimal.round(delta, 2)
+        if Decimal.eq?(delta, 0), do: acc, else: [{name, delta} | acc]
+      end)
+
+    with {:ok, lines} <- balance_catchup_lines(lines, date) do
+      if lines == [] do
+        {:ok, ctx}
+      else
+        persist_catchup_journal(lines, date, ctx)
+      end
+    end
+  end
+
+  defp catchup_expected(rows, ctx) do
+    Enum.reduce(rows, %{}, fn row, acc ->
+      name =
+        (row["account_name"] || row[:account_name])
+        |> Mapper.strip_code_suffix()
+        |> Mapper.control_account_name(ctx.overrides)
+
+      cond do
+        name in [nil, "", "Total", "Opening Balances", "Retained Earnings"] ->
+          acc
+
+        true ->
+          amt = decimalize(row["balance"] || row[:balance] || 0)
+          Map.update(acc, name, amt, &Decimal.add(&1, amt))
+      end
+    end)
+  end
+
+  defp fc_balances_at(date, ctx) do
+    from(t in Transaction,
+      join: a in FullCircle.Accounting.Account,
+      on: a.id == t.account_id,
+      where: t.company_id == ^ctx.company.id and t.doc_date <= ^date,
+      where: a.name != "Retained Earnings",
+      group_by: [a.name, a.account_type],
+      select: {a.name, a.account_type, sum(t.amount)}
+    )
+    |> Repo.all()
+    |> Map.new(fn {name, type, amt} -> {name, {type, decimalize(amt)}} end)
+  end
+
+  # Every ledger and every Xero TB balances, so the deltas must net to zero;
+  # tolerate only float-rounding cents by folding them into the largest line.
+  defp balance_catchup_lines(lines, date) do
+    residual = Enum.reduce(lines, Decimal.new(0), fn {_n, amt}, acc -> Decimal.add(acc, amt) end)
+
+    cond do
+      Decimal.eq?(residual, 0) ->
+        {:ok, lines}
+
+      Decimal.compare(Decimal.abs(residual), Decimal.new("0.02")) == :gt ->
+        {:error, {:catchup_unbalanced, Date.to_iso8601(date), residual}}
+
+      true ->
+        [{name, amt} | rest] =
+          Enum.sort_by(lines, fn {_n, amt} -> Decimal.abs(amt) end, {:desc, Decimal})
+
+        {:ok, [{name, Decimal.sub(amt, residual)} | rest]}
+    end
+  end
+
+  defp persist_catchup_journal(lines, date, ctx) do
+    number = "XCATCHUP-#{Date.to_iso8601(date)}"
+
+    transactions =
+      lines
+      |> Enum.sort_by(fn {name, _} -> name end)
+      |> Enum.with_index()
+      |> Enum.reduce_while({:ok, %{}}, fn {{name, amt}, idx}, {:ok, acc} ->
+        case Accounting.get_account_by_name(name, ctx.company, ctx.user) do
+          %{id: _} = account ->
+            entry = %{
+              "account_id" => account.id,
+              "account_name" => account.name,
+              "particulars" => "Xero catch-up #{Date.to_iso8601(date)}",
+              "amount" => amt,
+              "_persistent_id" => Integer.to_string(idx)
+            }
+
+            {:cont, {:ok, Map.put(acc, Integer.to_string(idx), entry)}}
+
+          nil ->
+            {:halt, {:error, {:unmapped_account, name}}}
+        end
+      end)
+
+    with {:ok, transactions} <- transactions do
+      attrs = %{
+        "journal_no" => number,
+        "journal_date" => date,
+        "transactions" => transactions
+      }
+
+      case wrap_import(JournalEntry.import_journal(attrs, ctx.company, ctx.user)) do
+        {:ok, _} -> {:ok, track_number(ctx, :Journal, number)}
+        {:error, _} = err -> err
+      end
+    end
+  end
+
+  # Xero payroll (and other unreadable system journals) post AR/AP per
+  # contact; the yearly catch-up journals close the account totals but carry
+  # no contact. Post one zero-sum journal that moves the contact-less
+  # catch-up onto the contacts Xero's aged balances name.
+  defp post_aged_attribution(ctx) do
+    lines =
+      [{"Account Receivables", "aged_receivables"}, {"Account Payables", "aged_payables"}]
+      |> Enum.flat_map(fn {account, report_key} ->
+        aged_attribution_lines(account, report_key, ctx)
+      end)
+
+    if lines == [] do
+      {:ok, ctx}
+    else
+      date = last_catchup_date(ctx) || Date.utc_today()
+      number = "XCATCHUP-AGED"
+
+      transactions =
+        lines
+        |> Enum.with_index()
+        |> Map.new(fn {line, idx} ->
+          {Integer.to_string(idx), Map.put(line, "_persistent_id", Integer.to_string(idx))}
+        end)
+
+      attrs = %{
+        "journal_no" => number,
+        "journal_date" => date,
+        "transactions" => transactions
+      }
+
+      case wrap_import(JournalEntry.import_journal(attrs, ctx.company, ctx.user)) do
+        {:ok, _} -> {:ok, track_number(ctx, :Journal, number)}
+        {:error, _} = err -> err
+      end
+    end
+  end
+
+  defp aged_attribution_lines(account_name, report_key, ctx) do
+    account = Accounting.get_account_by_name(account_name, ctx.company, ctx.user)
+
+    expected =
+      (ctx.snapshot.reports || %{})
+      |> report_value(report_key)
+      |> List.wrap()
+      |> Enum.reduce(%{}, fn row, acc ->
+        name = row["contact_name"] || row[:contact_name]
+        amt = decimalize(row["balance"] || row[:balance] || 0)
+        if name, do: Map.update(acc, name, amt, &Decimal.add(&1, amt)), else: acc
+      end)
+
+    live =
+      if account do
+        from(t in Transaction,
+          join: c in Contact,
+          on: c.id == t.contact_id,
+          where: t.company_id == ^ctx.company.id and t.account_id == ^account.id,
+          group_by: c.name,
+          select: {c.name, sum(t.amount)}
+        )
+        |> Repo.all()
+        |> Map.new(fn {name, amt} -> {name, decimalize(amt)} end)
+      else
+        %{}
+      end
+
+    gaps =
+      expected
+      |> Map.keys()
+      |> MapSet.new()
+      |> MapSet.union(MapSet.new(Map.keys(live)))
+      |> Enum.reduce([], fn name, acc ->
+        gap =
+          Map.get(expected, name, Decimal.new(0))
+          |> Decimal.sub(Map.get(live, name, Decimal.new(0)))
+          |> Decimal.round(2)
+
+        if Decimal.eq?(gap, 0), do: acc, else: [{name, gap} | acc]
+      end)
+
+    if gaps == [] or is_nil(account) do
+      []
+    else
+      contact_lines =
+        gaps
+        |> Enum.sort_by(fn {name, _} -> name end)
+        |> Enum.flat_map(fn {name, gap} ->
+          case Accounting.get_contact_by_name(name, ctx.company, ctx.user) do
+            %{id: id} ->
+              [
+                %{
+                  "account_id" => account.id,
+                  "account_name" => account.name,
+                  "contact_id" => id,
+                  "contact_name" => name,
+                  "particulars" => "Xero aged attribution",
+                  "amount" => gap
+                }
+              ]
+
+            nil ->
+              []
+          end
+        end)
+
+      offset =
+        contact_lines
+        |> Enum.reduce(Decimal.new(0), fn line, acc -> Decimal.add(acc, line["amount"]) end)
+        |> Decimal.negate()
+
+      if contact_lines == [] or Decimal.eq?(offset, 0) do
+        contact_lines
+      else
+        contact_lines ++
+          [
+            %{
+              "account_id" => account.id,
+              "account_name" => account.name,
+              "particulars" => "Xero aged attribution offset",
+              "amount" => offset
+            }
+          ]
+      end
+    end
+  end
+
+  defp last_catchup_date(ctx) do
+    (ctx.snapshot.reports || %{})
+    |> report_value("trial_balance_by_year")
+    |> List.wrap()
+    |> Enum.map(&parse_date(&1["date"]))
+    |> Enum.reject(&is_nil/1)
+    |> Enum.max(Date, fn -> nil end)
   end
 
   defp signed_match_amount(header_amount, alloc_amount) do
@@ -1540,6 +2164,10 @@ defmodule FullCircle.XeroImport.Apply do
   end
 
   defp import_one_bank_txn(txn, ctx) do
+    {txn, flipped?} = maybe_flip_negative_bank_txn(txn)
+    spend? = txn["Type"] in @spend_bank_types != flipped?
+    receive? = txn["Type"] in @receive_bank_types != flipped?
+
     cond do
       not bank_txn_importable?(txn) ->
         {:ok, ctx}
@@ -1547,14 +2175,48 @@ defmodule FullCircle.XeroImport.Apply do
       Map.has_key?(txn, "CurrencyCode") and not Mapper.base_currency_ok?(txn, base_currency(ctx)) ->
         {:error, {:foreign_currency, txn["BankTransactionNumber"] || txn["BankTransactionID"]}}
 
-      txn["Type"] in @spend_bank_types ->
+      txn["Type"] not in @spend_bank_types and txn["Type"] not in @receive_bank_types ->
+        {:ok, ctx}
+
+      spend? ->
         persist_bank_spend(txn, ctx)
 
-      txn["Type"] in @receive_bank_types ->
+      receive? ->
         persist_bank_receive(txn, ctx)
 
       true ->
         {:ok, ctx}
+    end
+  end
+
+  # A negative-total SPEND is money in (a correction entry) and vice versa;
+  # FC requires funds_amount > 0, so flip the direction and negate the lines.
+  defp maybe_flip_negative_bank_txn(txn) do
+    if Decimal.lt?(bank_txn_amount(txn), 0) do
+      lines =
+        Enum.map(txn["LineItems"] || [], fn line ->
+          line
+          |> negate_key("UnitAmount")
+          |> negate_key("LineAmount")
+          |> negate_key("DiscountAmount")
+        end)
+
+      txn =
+        txn
+        |> Map.put("LineItems", lines)
+        |> negate_key("Total")
+        |> negate_key("TotalAmount")
+
+      {txn, true}
+    else
+      {txn, false}
+    end
+  end
+
+  defp negate_key(map, key) do
+    case map[key] do
+      nil -> map
+      val -> Map.put(map, key, Decimal.negate(decimalize(val)))
     end
   end
 
@@ -1681,7 +2343,7 @@ defmodule FullCircle.XeroImport.Apply do
         number = xfer["BankTransferID"] || xfer["Reference"]
         date = parse_date(xfer["Date"]) || Date.utc_today()
         amount = decimalize(xfer["Amount"] || 0)
-        particulars = xfer["Reference"] || "Bank transfer"
+        particulars = presence(xfer["Reference"]) || "Bank transfer"
 
         attrs = %{
           "journal_no" => number,
@@ -1740,6 +2402,16 @@ defmodule FullCircle.XeroImport.Apply do
 
   defp parse_date(nil), do: nil
   defp parse_date(%Date{} = d), do: d
+
+  # Xero's .NET JSON date: "/Date(1607299200000+0000)/" (ms since epoch, UTC
+  # midnight for date-only fields). Payments and manual journals carry ONLY
+  # this format — no ISO DateString.
+  defp parse_date("/Date(" <> rest) do
+    case Integer.parse(rest) do
+      {ms, _} -> ms |> DateTime.from_unix!(:millisecond) |> DateTime.to_date()
+      :error -> nil
+    end
+  end
 
   defp parse_date(
          <<y::binary-size(4), "-", m::binary-size(2), "-", d::binary-size(2), _::binary>>

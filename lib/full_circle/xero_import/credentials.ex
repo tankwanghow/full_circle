@@ -4,15 +4,26 @@ defmodule FullCircle.XeroImport.Credentials do
   @default_path "priv/xero_import/.credentials"
   @token_url "https://identity.xero.com/connect/token"
   @authorize_url "https://login.xero.com/identity/connect/authorize"
-  @redirect_uri "http://127.0.0.1:4099/callback"
+  # Xero's WAF rejects authorize URLs whose redirect_uri contains a literal
+  # 127.0.0.1 (bare 403); "localhost" passes. The callback listener still
+  # binds 127.0.0.1, which localhost resolves to.
+  @redirect_uri "http://localhost:4099/callback"
   @auth_ip {127, 0, 0, 1}
   @auth_port 4099
 
+  # Granular scopes only: apps created on/after 2026-03-02 cannot request the
+  # broad accounting.transactions[.read] / accounting.reports.read scopes
+  # (authorize returns invalid_scope). Items/Setup/Organisation fall under
+  # accounting.settings.read; CreditNotes under accounting.invoices.read;
+  # BankTransfers under accounting.banktransactions.read.
   @scopes [
-    "accounting.transactions.read",
-    "accounting.contacts.read",
     "accounting.settings.read",
-    "accounting.reports.read",
+    "accounting.contacts.read",
+    "accounting.invoices.read",
+    "accounting.payments.read",
+    "accounting.banktransactions.read",
+    "accounting.manualjournals.read",
+    "accounting.reports.trialbalance.read",
     "assets.read"
   ]
 

@@ -29,6 +29,12 @@ defmodule FullCircle.XeroImport.Mapper do
 
   @importable_statuses ~w(AUTHORISED PAID)
 
+  # Xero's TB report renders account names as "Name (Code)".
+  def strip_code_suffix(name) when is_binary(name),
+    do: String.replace(name, ~r/ \([^()]*\)$/, "")
+
+  def strip_code_suffix(name), do: name
+
   def control_account_name(name, overrides \\ %{})
 
   def control_account_name(name, overrides) when is_binary(name) do

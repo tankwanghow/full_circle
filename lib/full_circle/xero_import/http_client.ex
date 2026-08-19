@@ -108,8 +108,15 @@ defmodule FullCircle.XeroImport.HttpClient do
 
   @impl true
   def get_conversion_balances(client) do
-    with {:ok, body} <- request(client, :get, "#{@accounting}/Setup") do
-      {:ok, normalize_setup(body)}
+    # Xero's Setup endpoint is write-only: GET /Setup 404s, so conversion
+    # balances cannot be read via the API. Emit an empty file — the reconcile
+    # trial-balance check catches truly-missing balances, and the snapshot
+    # JSON can be hand-filled from Xero UI (Accounting > Advanced >
+    # Conversion balances) when the org has them.
+    case request(client, :get, "#{@accounting}/Setup") do
+      {:ok, body} -> {:ok, normalize_setup(body)}
+      {:error, {:http_error, 404, _}} -> {:ok, %{"Date" => nil, "Lines" => []}}
+      {:error, _} = err -> err
     end
   end
 
@@ -124,6 +131,16 @@ defmodule FullCircle.XeroImport.HttpClient do
          "aged_receivables" => [],
          "aged_payables" => []
        }}
+    end
+  end
+
+  @impl true
+  def get_trial_balance(client, %Date{} = date) do
+    with {:ok, tb} <-
+           request(client, :get, "#{@accounting}/Reports/TrialBalance",
+             params: [date: Date.to_iso8601(date)]
+           ) do
+      {:ok, parse_trial_balance(tb)}
     end
   end
 

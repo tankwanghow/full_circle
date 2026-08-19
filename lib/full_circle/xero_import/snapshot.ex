@@ -54,6 +54,12 @@ defmodule FullCircle.XeroImport.Snapshot do
         end
       end)
 
+    result =
+      with {:ok, data} <- result,
+           {:ok, data} <- pull_yearly_trial_balances(client, data) do
+        {:ok, data}
+      end
+
     case result do
       {:ok, data} ->
         data = finalize(data)
@@ -75,6 +81,86 @@ defmodule FullCircle.XeroImport.Snapshot do
   end
 
   def pull(mod, dest_dir) when is_atom(mod), do: pull(struct(mod), dest_dir)
+
+  # Xero's TB report is YTD-based, so multi-year catch-up (payroll and other
+  # system journals that no readable API exposes) needs a TB per financial
+  # year end. The current-date TB is appended as the final period.
+  defp pull_yearly_trial_balances(%mod{} = client, data) do
+    today = Date.utc_today()
+
+    yearly =
+      data
+      |> fye_dates(today)
+      |> Enum.reduce_while({:ok, []}, fn date, {:ok, acc} ->
+        case apply(mod, :get_trial_balance, [client, date]) do
+          {:ok, lines} ->
+            {:cont, {:ok, acc ++ [%{"date" => Date.to_iso8601(date), "lines" => lines}]}}
+
+          {:error, _} = err ->
+            {:halt, err}
+        end
+      end)
+
+    with {:ok, periods} <- yearly do
+      current = %{
+        "date" => Date.to_iso8601(today),
+        "lines" => (is_map(data.reports) && data.reports["trial_balance"]) || []
+      }
+
+      reports =
+        (is_map(data.reports) && data.reports)
+        |> Kernel.||(%{})
+        |> Map.put("trial_balance_by_year", periods ++ [current])
+
+      {:ok, Map.put(data, :reports, reports)}
+    end
+  end
+
+  defp fye_dates(data, today) do
+    org = data[:organisation] || %{}
+    month = org["FinancialYearEndMonth"] || 12
+    day = org["FinancialYearEndDay"] || 31
+
+    case earliest_doc_year(data) do
+      nil ->
+        []
+
+      first_year ->
+        for year <- first_year..today.year,
+            {:ok, date} <- [fye_for(year, month, day)],
+            Date.compare(date, today) == :lt do
+          date
+        end
+    end
+  end
+
+  defp fye_for(year, month, day) do
+    Date.new(year, month, min(day, Date.days_in_month(Date.new!(year, month, 1))))
+  end
+
+  defp earliest_doc_year(data) do
+    [:invoices, :bank_transactions, :manual_journals, :payments]
+    |> Enum.flat_map(fn key -> data |> Map.get(key) |> List.wrap() end)
+    |> Enum.map(&doc_year(&1["DateString"] || &1["Date"]))
+    |> Enum.reject(&is_nil/1)
+    |> Enum.min(fn -> nil end)
+  end
+
+  defp doc_year("/Date(" <> rest) do
+    case Integer.parse(rest) do
+      {ms, _} -> ms |> DateTime.from_unix!(:millisecond) |> Map.fetch!(:year)
+      :error -> nil
+    end
+  end
+
+  defp doc_year(<<y::binary-size(4), "-", _::binary>>) do
+    case Integer.parse(y) do
+      {year, ""} -> year
+      _ -> nil
+    end
+  end
+
+  defp doc_year(_), do: nil
 
   defp write_files!(dir, data) do
     Enum.each(@files, fn key ->
@@ -152,11 +238,14 @@ defmodule FullCircle.XeroImport.Snapshot do
   defp fill_reports(data), do: data
 
   defp doc_totals(rows, type) do
+    # Zero-total docs are skipped by the import (FC requires amount > 0),
+    # so exclude them here to keep the reconcile counts consistent.
     docs =
       rows
       |> List.wrap()
       |> Enum.filter(fn row ->
-        row["Type"] == type and row["Status"] in ["AUTHORISED", "PAID"]
+        row["Type"] == type and row["Status"] in ["AUTHORISED", "PAID"] and
+          to_float(row["Total"]) != 0.0
       end)
 
     amount =
@@ -233,8 +322,10 @@ defmodule FullCircle.XeroImport.Snapshot do
     if MapSet.size(bank_names) == 0 do
       []
     else
+      # TB report names carry " (Code)" suffixes; strip before matching.
       Enum.filter(reports["trial_balance"] || [], fn line ->
-        MapSet.member?(bank_names, line["account_name"])
+        name = String.replace(line["account_name"] || "", ~r/ \([^()]*\)$/, "")
+        MapSet.member?(bank_names, name)
       end)
     end
   end

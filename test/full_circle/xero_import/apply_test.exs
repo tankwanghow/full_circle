@@ -90,6 +90,34 @@ defmodule FullCircle.XeroImport.ApplyTest do
     snap: snap,
     name: name
   } do
+    # Include a bank SPEND so the company holds payment_details rows —
+    # their RESTRICT FKs onto accounts/goods must not block deletion.
+    snap = %{
+      snap
+      | bank_transactions: [
+          %{
+            "BankTransactionID" => "bt-reset-1",
+            "Type" => "SPEND",
+            "Status" => "AUTHORISED",
+            "BankAccount" => %{"AccountID" => "ac-bank"},
+            "Contact" => %{"ContactID" => "ct-bob"},
+            "Date" => "2024-02-20",
+            "CurrencyCode" => "MYR",
+            "Total" => 15.0,
+            "LineItems" => [
+              %{
+                "Description" => "Supplies",
+                "Quantity" => 1.0,
+                "UnitAmount" => 15.0,
+                "AccountCode" => "200",
+                "TaxType" => "NONE",
+                "LineAmount" => 15.0
+              }
+            ]
+          }
+        ]
+    }
+
     {:ok, %{company: com1}} = Apply.run(snap, user, company_name: name)
 
     assert {:ok, %{company: com2}} =
@@ -123,6 +151,81 @@ defmodule FullCircle.XeroImport.ApplyTest do
              from t in Transaction,
                where: t.company_id == ^com.id and t.doc_type == "fixed_asset_depreciations"
            )
+  end
+
+  test "missing disposal account is seeded instead of failing the asset", %{
+    user: user,
+    snap: snap,
+    name: name
+  } do
+    snap =
+      %{snap | accounts: Enum.reject(snap.accounts, &(&1["Name"] == "Gain on Disposal"))}
+      |> update_in([Access.key(:fixed_assets), Access.at(0), "AssetType"], fn type ->
+        Map.delete(type, "DisposalAccountId")
+      end)
+
+    assert {:ok, %{company: com}} =
+             Apply.run(snap, user, company_name: name, stop_after: :masters)
+
+    assert Repo.exists?(
+             from a in FullCircle.Accounting.Account,
+               where: a.company_id == ^com.id and a.name == "Gain on Disposal"
+           )
+
+    assert Repo.exists?(
+             from f in FullCircle.Accounting.FixedAsset, where: f.company_id == ^com.id
+           )
+  end
+
+  test "post-conversion depreciation history posts GL journals", %{
+    user: user,
+    snap: snap,
+    name: name
+  } do
+    snap =
+      snap
+      |> update_in([Access.key(:conversion_balances), "Lines"], fn lines ->
+        Enum.reject(lines, &(&1["AccountID"] == "ac-accum"))
+      end)
+      |> put_in(
+        [Access.key(:fixed_assets), Access.at(0), "DepreciationHistory"],
+        [
+          %{
+            "DepreciationDate" => "2024-06-30",
+            "DepreciationAmount" => 20000.0,
+            "CostLimit" => 100_000.0
+          }
+        ]
+      )
+
+    {:ok, %{company: com, id_map: map}} = Apply.run(snap, user, company_name: name)
+    accum_id = map["account:ac-accum"]
+
+    total =
+      Repo.one(
+        from t in Transaction,
+          where: t.company_id == ^com.id and t.account_id == ^accum_id,
+          select: coalesce(sum(t.amount), 0)
+      )
+
+    assert Decimal.eq?(total, Decimal.new("-20000"))
+  end
+
+  test "pre-conversion depreciation history does not post GL (covered by conversion balances)",
+       %{user: user, snap: snap, name: name} do
+    {:ok, %{company: com, id_map: map}} = Apply.run(snap, user, company_name: name)
+    accum_id = map["account:ac-accum"]
+
+    # Fixture history row is dated 2023-12-31, before the 2024-01-01
+    # conversion; the -20000 must come only from the conversion balance line.
+    total =
+      Repo.one(
+        from t in Transaction,
+          where: t.company_id == ^com.id and t.account_id == ^accum_id,
+          select: coalesce(sum(t.amount), 0)
+      )
+
+    assert Decimal.eq?(total, Decimal.new("-20000"))
   end
 
   test "asset with unmapped depreciation account errors instead of crashing", %{
@@ -189,6 +292,393 @@ defmodule FullCircle.XeroImport.ApplyTest do
       )
 
     assert Decimal.eq?(Decimal.add(ar.amount, matched || 0), 0)
+  end
+
+  test "bill without an InvoiceNumber falls back to the Xero InvoiceID", %{
+    user: user,
+    snap: snap,
+    name: name
+  } do
+    bill = %{
+      "InvoiceID" => "bill-nonum",
+      "Type" => "ACCPAY",
+      "Status" => "AUTHORISED",
+      "Contact" => %{"ContactID" => "ct-bob"},
+      "Date" => "2024-02-05",
+      "DueDate" => "2024-03-05",
+      "LineAmountTypes" => "Exclusive",
+      "CurrencyCode" => "MYR",
+      "Total" => 25.0,
+      "LineItems" => [
+        %{
+          "Description" => "Unnumbered bill",
+          "Quantity" => 1.0,
+          "UnitAmount" => 25.0,
+          "AccountCode" => "200",
+          "TaxType" => "NONE",
+          "LineAmount" => 25.0
+        }
+      ]
+    }
+
+    snap = %{snap | invoices: snap.invoices ++ [bill]}
+    {:ok, %{company: com}} = Apply.run(snap, user, company_name: name)
+
+    assert Repo.exists?(
+             from p in FullCircle.Billing.PurInvoice,
+               where: p.company_id == ^com.id and p.pur_invoice_no == "bill-nonum"
+           )
+  end
+
+  test "payments sharing a Reference get unique receipt numbers from PaymentID", %{
+    user: user,
+    snap: snap,
+    name: name
+  } do
+    inv = fn id, no ->
+      %{
+        "InvoiceID" => id,
+        "Type" => "ACCREC",
+        "InvoiceNumber" => no,
+        "Status" => "AUTHORISED",
+        "Contact" => %{"ContactID" => "ct-alice"},
+        "Date" => "2024-02-01",
+        "DueDate" => "2024-03-01",
+        "LineAmountTypes" => "Exclusive",
+        "CurrencyCode" => "MYR",
+        "Total" => 10.0,
+        "LineItems" => [
+          %{
+            "Description" => "Eggs",
+            "Quantity" => 1.0,
+            "UnitAmount" => 10.0,
+            "AccountCode" => "200",
+            "TaxType" => "NONE",
+            "LineAmount" => 10.0
+          }
+        ]
+      }
+    end
+
+    pay = fn pid, inv_id ->
+      %{
+        "PaymentID" => pid,
+        "Status" => "AUTHORISED",
+        "Reference" => "Cash",
+        "Amount" => 10.0,
+        "Date" => "2024-02-06",
+        "Account" => %{"AccountID" => "ac-bank"},
+        "Invoice" => %{"InvoiceID" => inv_id, "Type" => "ACCREC"}
+      }
+    end
+
+    snap = %{
+      snap
+      | invoices: snap.invoices ++ [inv.("inv-c1", "INV-C1"), inv.("inv-c2", "INV-C2")],
+        payments: snap.payments ++ [pay.("pay-c1", "inv-c1"), pay.("pay-c2", "inv-c2")]
+    }
+
+    {:ok, %{company: com}} = Apply.run(snap, user, company_name: name)
+
+    nos =
+      Repo.all(
+        from r in FullCircle.ReceiveFund.Receipt,
+          where: r.company_id == ^com.id and r.receipt_no in ["pay-c1", "pay-c2"],
+          select: r.receipt_no
+      )
+
+    assert Enum.sort(nos) == ["pay-c1", "pay-c2"]
+  end
+
+  test "zero-total invoice with cross-account lines imports as a journal", %{
+    user: user,
+    snap: snap,
+    name: name
+  } do
+    float_inv = %{
+      "InvoiceID" => "inv-float",
+      "Type" => "ACCREC",
+      "InvoiceNumber" => "INV-FLOAT",
+      "Status" => "AUTHORISED",
+      "Contact" => %{"ContactID" => "ct-alice"},
+      "Date" => "2024-02-04",
+      "DueDate" => "2024-02-04",
+      "LineAmountTypes" => "Exclusive",
+      "CurrencyCode" => "MYR",
+      "Total" => 0.0,
+      "LineItems" => [
+        %{
+          "Description" => "Opening float",
+          "Quantity" => 1.0,
+          "UnitAmount" => 250.0,
+          "AccountCode" => "090",
+          "TaxType" => "NONE",
+          "LineAmount" => 250.0
+        },
+        %{
+          "Description" => "Closing float",
+          "Quantity" => 1.0,
+          "UnitAmount" => -250.0,
+          "AccountCode" => "200",
+          "TaxType" => "NONE",
+          "LineAmount" => -250.0
+        }
+      ]
+    }
+
+    snap = %{snap | invoices: snap.invoices ++ [float_inv]}
+    {:ok, %{company: com}} = Apply.run(snap, user, company_name: name)
+
+    refute Repo.exists?(
+             from i in Invoice, where: i.company_id == ^com.id and i.invoice_no == "INV-FLOAT"
+           )
+
+    txn =
+      Repo.one!(
+        from t in Transaction,
+          join: a in FullCircle.Accounting.Account,
+          on: a.id == t.account_id,
+          where:
+            t.company_id == ^com.id and t.doc_no == "INV-FLOAT" and
+              a.name == "Cheque Account"
+      )
+
+    assert Decimal.eq?(txn.amount, Decimal.new("250"))
+  end
+
+  test "document rounding gap is closed so AR posts exactly the Xero Total", %{
+    user: user,
+    snap: snap,
+    name: name
+  } do
+    inv = %{
+      "InvoiceID" => "inv-round",
+      "Type" => "ACCREC",
+      "InvoiceNumber" => "INV-ROUND",
+      "Status" => "AUTHORISED",
+      "Contact" => %{"ContactID" => "ct-alice"},
+      "Date" => "2024-02-08",
+      "DueDate" => "2024-03-08",
+      "LineAmountTypes" => "Exclusive",
+      "CurrencyCode" => "MYR",
+      "Total" => 10.0,
+      "LineItems" => [
+        %{
+          "Description" => "Rounded line",
+          "Quantity" => 1.0,
+          "UnitAmount" => 9.99,
+          "AccountCode" => "200",
+          "TaxType" => "NONE",
+          "LineAmount" => 9.99
+        }
+      ]
+    }
+
+    snap = %{snap | invoices: snap.invoices ++ [inv]}
+    {:ok, %{company: com}} = Apply.run(snap, user, company_name: name)
+
+    ar =
+      Repo.one!(
+        from t in Transaction,
+          join: a in FullCircle.Accounting.Account,
+          on: a.id == t.account_id,
+          where:
+            t.company_id == ^com.id and t.doc_no == "INV-ROUND" and
+              a.name == "Account Receivables"
+      )
+
+    assert Decimal.eq?(ar.amount, Decimal.new("10.00"))
+  end
+
+  test "aged gaps are attributed to contacts by a final journal", %{
+    user: user,
+    snap: snap,
+    name: name
+  } do
+    # Xero payroll posts per-contact payables via unreadable system journals:
+    # expected aged shows Bob at -50 while documents only explain -30.
+    snap =
+      put_in(snap, [Access.key(:reports), "aged_payables"], [
+        %{"contact_name" => "Bob Supplier", "balance" => -50.0}
+      ])
+
+    {:ok, %{company: com}} = Apply.run(snap, user, company_name: name)
+
+    bob_ap =
+      Repo.one(
+        from t in Transaction,
+          join: a in FullCircle.Accounting.Account,
+          on: a.id == t.account_id,
+          join: c in Contact,
+          on: c.id == t.contact_id,
+          where:
+            t.company_id == ^com.id and a.name == "Account Payables" and
+              c.name == "Bob Supplier",
+          select: sum(t.amount)
+      )
+
+    assert Decimal.eq?(bob_ap, Decimal.new("-50.00"))
+
+    # The attribution journal must not move the account total.
+    attribution =
+      Repo.one(
+        from t in Transaction,
+          where: t.company_id == ^com.id and t.doc_no == "XCATCHUP-AGED",
+          select: coalesce(sum(t.amount), 0)
+      )
+
+    assert Decimal.eq?(attribution, Decimal.new("0"))
+  end
+
+  test "zero-total invoices are skipped", %{user: user, snap: snap, name: name} do
+    zero = %{
+      "InvoiceID" => "inv-zero",
+      "Type" => "ACCREC",
+      "InvoiceNumber" => "INV-ZERO",
+      "Status" => "AUTHORISED",
+      "Contact" => %{"ContactID" => "ct-alice"},
+      "Date" => "2024-02-04",
+      "DueDate" => "2024-02-04",
+      "LineAmountTypes" => "Exclusive",
+      "CurrencyCode" => "MYR",
+      "Total" => 0.0,
+      "LineItems" => [
+        %{
+          "Description" => "No sale",
+          "Quantity" => 1.0,
+          "UnitAmount" => 0.0,
+          "AccountCode" => "200",
+          "TaxType" => "NONE",
+          "LineAmount" => 0.0
+        }
+      ]
+    }
+
+    snap = %{snap | invoices: snap.invoices ++ [zero]}
+    assert {:ok, %{company: com}} = Apply.run(snap, user, company_name: name)
+
+    refute Repo.exists?(
+             from i in Invoice, where: i.company_id == ^com.id and i.invoice_no == "INV-ZERO"
+           )
+  end
+
+  test "duplicate bill numbers get a suffix and keep their own payments", %{
+    user: user,
+    snap: snap,
+    name: name
+  } do
+    bill = fn id, amt ->
+      %{
+        "InvoiceID" => id,
+        "Type" => "ACCPAY",
+        "InvoiceNumber" => "TNB-1",
+        "Status" => "AUTHORISED",
+        "Contact" => %{"ContactID" => "ct-bob"},
+        "Date" => "2024-02-05",
+        "DueDate" => "2024-03-05",
+        "LineAmountTypes" => "Exclusive",
+        "CurrencyCode" => "MYR",
+        "Total" => amt,
+        "LineItems" => [
+          %{
+            "Description" => "Electricity",
+            "Quantity" => 1.0,
+            "UnitAmount" => amt,
+            "AccountCode" => "200",
+            "TaxType" => "NONE",
+            "LineAmount" => amt
+          }
+        ]
+      }
+    end
+
+    pay = %{
+      "PaymentID" => "pay-dup2",
+      "Status" => "AUTHORISED",
+      "Amount" => 7.0,
+      "Date" => "2024-02-10",
+      "Account" => %{"AccountID" => "ac-bank"},
+      "Invoice" => %{"InvoiceID" => "bill-dup2", "Type" => "ACCPAY"}
+    }
+
+    snap = %{
+      snap
+      | invoices: snap.invoices ++ [bill.("bill-dup1", 5.0), bill.("bill-dup2", 7.0)],
+        payments: snap.payments ++ [pay]
+    }
+
+    {:ok, %{company: com}} = Apply.run(snap, user, company_name: name)
+
+    nos =
+      Repo.all(
+        from p in FullCircle.Billing.PurInvoice,
+          where: p.company_id == ^com.id and like(p.pur_invoice_no, "TNB-1%"),
+          select: p.pur_invoice_no
+      )
+
+    assert Enum.sort(nos) == ["TNB-1", "TNB-1 (2)"]
+
+    ap =
+      Repo.one!(
+        from t in Transaction,
+          join: a in FullCircle.Accounting.Account,
+          on: a.id == t.account_id,
+          where:
+            t.company_id == ^com.id and t.doc_no == "TNB-1 (2)" and
+              a.name == "Account Payables"
+      )
+
+    matched =
+      Repo.aggregate(
+        from(m in FullCircle.Accounting.TransactionMatcher, where: m.transaction_id == ^ap.id),
+        :sum,
+        :match_amount
+      )
+
+    assert Decimal.eq?(matched, Decimal.new("7.00"))
+  end
+
+  test "AP overpayment refund imports as a receipt against Account Payables", %{
+    user: user,
+    snap: snap,
+    name: name
+  } do
+    refund = %{
+      "PaymentID" => "pay-opref",
+      "PaymentType" => "APOVERPAYMENTPAYMENT",
+      "Status" => "AUTHORISED",
+      "Amount" => 0.01,
+      "Date" => "2024-02-25",
+      "Account" => %{"AccountID" => "ac-bank"},
+      "Invoice" => %{
+        "InvoiceID" => "op-1",
+        "Type" => "APOVERPAYMENT",
+        "Contact" => %{"ContactID" => "ct-bob"}
+      }
+    }
+
+    snap = %{snap | payments: snap.payments ++ [refund]}
+    {:ok, %{company: com}} = Apply.run(snap, user, company_name: name)
+
+    rec =
+      Repo.one!(
+        from r in FullCircle.ReceiveFund.Receipt,
+          where: r.company_id == ^com.id and r.receipt_no == "pay-opref"
+      )
+
+    assert Decimal.eq?(rec.funds_amount, Decimal.new("0.01"))
+
+    ap =
+      Repo.one!(
+        from t in Transaction,
+          join: a in FullCircle.Accounting.Account,
+          on: a.id == t.account_id,
+          where:
+            t.company_id == ^com.id and t.doc_no == "pay-opref" and
+              a.name == "Account Payables"
+      )
+
+    assert Decimal.eq?(ap.amount, Decimal.new("-0.01"))
   end
 
   test "payment whose invoice is missing aborts", %{user: user, snap: snap, name: name} do
@@ -296,6 +786,68 @@ defmodule FullCircle.XeroImport.ApplyTest do
     assert Enum.reduce(seed, Decimal.new(0), &Decimal.add(&2, &1.amount)) |> Decimal.eq?(0)
   end
 
+  test "yearly TBs generate balanced catch-up journals for unpulled postings", %{
+    user: user,
+    snap: snap,
+    name: name
+  } do
+    # Simulate Xero system journals we cannot pull (e.g. payroll): the FYE
+    # TB shows 50 more Depreciation expense and 50 more AP than the documents
+    # explain. A catch-up journal must close exactly that gap.
+    lines =
+      snap.reports["trial_balance"] ++
+        [
+          %{"account_name" => "Depreciation (477)", "balance" => 50.0},
+          %{"account_name" => "Accounts Payable", "balance" => -50.0}
+        ]
+
+    snap =
+      put_in(snap, [Access.key(:reports), "trial_balance_by_year"], [
+        %{"date" => "2024-12-31", "lines" => lines}
+      ])
+
+    {:ok, %{company: com}} = Apply.run(snap, user, company_name: name)
+
+    depre =
+      Repo.one!(
+        from t in Transaction,
+          join: a in FullCircle.Accounting.Account,
+          on: a.id == t.account_id,
+          where:
+            t.company_id == ^com.id and t.doc_no == "XCATCHUP-2024-12-31" and
+              a.name == "Depreciation"
+      )
+
+    assert Decimal.eq?(depre.amount, Decimal.new("50"))
+    assert depre.doc_date == ~D[2024-12-31]
+
+    ap =
+      Repo.one!(
+        from t in Transaction,
+          join: a in FullCircle.Accounting.Account,
+          on: a.id == t.account_id,
+          where:
+            t.company_id == ^com.id and t.doc_no == "XCATCHUP-2024-12-31" and
+              a.name == "Account Payables"
+      )
+
+    assert Decimal.eq?(ap.amount, Decimal.new("-50"))
+  end
+
+  test "matching yearly TBs post no catch-up journals", %{user: user, snap: snap, name: name} do
+    snap =
+      put_in(snap, [Access.key(:reports), "trial_balance_by_year"], [
+        %{"date" => "2024-12-31", "lines" => snap.reports["trial_balance"]}
+      ])
+
+    {:ok, %{company: com}} = Apply.run(snap, user, company_name: name)
+
+    refute Repo.exists?(
+             from t in Transaction,
+               where: t.company_id == ^com.id and like(t.doc_no, "XCATCHUP%")
+           )
+  end
+
   test "conversion AP is reduced by imported conversion bill", %{
     user: user,
     snap: snap,
@@ -349,6 +901,25 @@ defmodule FullCircle.XeroImport.ApplyTest do
       )
 
     assert Enum.reduce(seed, Decimal.new(0), &Decimal.add(&2, &1.amount)) |> Decimal.eq?(0)
+  end
+
+  test "parses Xero .NET /Date(ms)/ format", %{} do
+    # 1607299200000 ms = 2020-12-07T00:00:00Z; payments and manual journals
+    # carry only this format (no ISO DateString).
+    assert Apply.conversion_invoice?(
+             %{"InvoiceNumber" => "X", "Date" => "/Date(1607299200000+0000)/"},
+             "2020-12-07"
+           )
+
+    refute Apply.conversion_invoice?(
+             %{"InvoiceNumber" => "X", "Date" => "/Date(1607299200000+0000)/"},
+             "2020-12-06"
+           )
+
+    assert Apply.conversion_invoice?(
+             %{"InvoiceNumber" => "X", "Date" => "/Date(1607299200000)/"},
+             "2020-12-07"
+           )
   end
 
   test "invoices dated before the conversion date strip conversion AR too", %{
@@ -850,6 +1421,90 @@ defmodule FullCircle.XeroImport.ApplyTest do
     )
 
     assert Repo.exists?(from c in FullCircle.Sys.Company, where: c.id == ^com.id)
+  end
+
+  test "bank transfer with blank Reference gets default particulars", %{
+    user: user,
+    snap: snap,
+    name: name
+  } do
+    snap = %{
+      snap
+      | bank_transfers: [
+          %{
+            "BankTransferID" => "xfer-blank",
+            "Status" => "AUTHORISED",
+            "Reference" => "",
+            "Date" => "2024-02-22",
+            "Amount" => 40.0,
+            "FromBankAccount" => %{"AccountID" => "ac-bank"},
+            "ToBankAccount" => %{"AccountID" => "ac-bank2"}
+          }
+        ],
+        accounts:
+          snap.accounts ++
+            [%{"AccountID" => "ac-bank2", "Code" => "091", "Name" => "Petty Bank", "Type" => "BANK"}]
+    }
+
+    {:ok, %{company: com}} = Apply.run(snap, user, company_name: name)
+
+    txn =
+      Repo.one!(
+        from t in Transaction,
+          join: a in FullCircle.Accounting.Account,
+          on: a.id == t.account_id,
+          where:
+            t.company_id == ^com.id and t.doc_no == "xfer-blank" and a.name == "Petty Bank"
+      )
+
+    assert txn.particulars == "Bank transfer"
+  end
+
+  test "negative-total SPEND imports as a receipt with positive amounts", %{
+    user: user,
+    snap: snap,
+    name: name
+  } do
+    snap = %{
+      snap
+      | bank_transactions: [
+          %{
+            "BankTransactionID" => "bt-neg-1",
+            "Type" => "SPEND",
+            "Status" => "AUTHORISED",
+            "BankAccount" => %{"AccountID" => "ac-bank"},
+            "Contact" => %{"ContactID" => "ct-bob"},
+            "Date" => "2024-02-21",
+            "CurrencyCode" => "MYR",
+            "Total" => -1.3,
+            "LineItems" => [
+              %{
+                "Description" => "Wrongly entered amount",
+                "Quantity" => 1.0,
+                "UnitAmount" => -1.3,
+                "AccountCode" => "200",
+                "TaxType" => "NONE",
+                "LineAmount" => -1.3
+              }
+            ]
+          }
+        ]
+    }
+
+    {:ok, %{company: com}} = Apply.run(snap, user, company_name: name)
+
+    rec =
+      Repo.one!(
+        from r in FullCircle.ReceiveFund.Receipt,
+          where: r.company_id == ^com.id and r.receipt_no == "bt-neg-1"
+      )
+
+    assert Decimal.eq?(rec.funds_amount, Decimal.new("1.30"))
+
+    refute Repo.exists?(
+             from p in FullCircle.BillPay.Payment,
+               where: p.company_id == ^com.id and p.payment_no == "bt-neg-1"
+           )
   end
 
   test "imports a SPEND bank transaction as a payment", %{user: user, snap: snap, name: name} do

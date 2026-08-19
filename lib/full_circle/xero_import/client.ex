@@ -18,4 +18,5 @@ defmodule FullCircle.XeroImport.Client do
   @callback list_fixed_assets(client()) :: result()
   @callback get_conversion_balances(client()) :: result()
   @callback get_reports(client()) :: result()
+  @callback get_trial_balance(client(), Date.t()) :: result()
 end

@@ -5,6 +5,14 @@ description: Use when working on the Xero → Full Circle import — anything un
 
 # Xero Import
 
+**OAuth gotchas (2026):** Xero's WAF 403s any redirect_uri containing a literal
+`127.0.0.1` — use `http://localhost:4099/callback` (registered in the Xero app too).
+Apps created on/after 2026-03-02 accept **granular scopes only** (broad
+`accounting.transactions[.read]` / `accounting.reports.read` → `invalid_scope`);
+`Credentials.scopes/0` holds the granular set (settings/contacts/invoices/payments/
+banktransactions/manualjournals/reports.trialbalance `.read` + `assets.read`,
+`offline_access` added for the web flow).
+
 One-time replay of a Xero organisation into a fresh FC company as live documents.
 Code: `lib/full_circle/xero_import/*`, task `lib/mix/tasks/full_circle.import_xero.ex`.
 Plan doc `docs/superpowers/plans/2026-08-18-xero-import-golden-husbandry.md` predates the
@@ -56,22 +64,56 @@ FC's `qty * unit_price + discount` formula:
 transaction found by doc_no + doc_type + hardcoded FC control names
 ("Account Receivables"/"Account Payables" — FC posting uses these regardless of overrides).
 `signed_match_amount/2`: matcher sign is the negation of the header txn's sign.
-A Xero Payment without an `"Invoice"` key (credit-note refund, over/prepayment payment)
-errors `{:missing_allocation_target, ...}` — unsupported by design; dry-run flags it first.
+A payment against an over/prepayment invoice is a cash refund (AP side → Receipt crediting
+AP; AR side → Payment debiting AR); a payment with no `"Invoice"` key at all still errors.
+
+**Real-data quirks (all from the live GH run, each locked by a test):**
+- Dates: payments/manual journals carry ONLY .NET `/Date(ms)/` — `parse_date` handles it.
+- Bills may have blank or **duplicate** numbers → fallback Reference → InvoiceID, then
+  ` (2)` dedupe suffixes; payments always number by PaymentID (References collide en masse).
+- Zero-total invoices: all-zero lines are skipped; self-cancelling cross-account lines
+  (POS float moves) become a Journal.
+- Negative-total SPEND/RECEIVE bank txns flip direction with negated lines (funds > 0).
+- Blank `Reference` strings must go through `presence/1` — `"" || fallback` keeps `""`.
+- Chart may lack a disposal account → `ensure_disposal_account` seeds "Gain on Disposal".
+- GET `/Setup` 404s (write-only endpoint) → empty conversion balances, not an error.
+
+**Rounding.** Xero's document `Total` is authoritative; FC recomputes from lines, so
+`align_doc_total` appends an explicit "Xero rounding" line when they differ (≤ 1.00,
+else `{:error, {:doc_total_mismatch, ...}}`). This keeps AR/AP per document exact.
+
+**Multi-year catch-up.** Xero posts payroll/depreciation via system journals the API
+can't expose (accounting.journals.read is not grantable to new apps). Coverage:
+- `Snapshot.pull` fetches a TrialBalance per financial year end into
+  `reports["trial_balance_by_year"]` (+ current date as final period).
+- `Apply.post_catchup_journals` posts one `XCATCHUP-<date>` journal per period:
+  balance-sheet accounts as cumulative diffs, P&L accounts as per-year YTD diffs
+  (Retained Earnings excluded both sides); residual > 0.02 → `{:error, {:catchup_unbalanced, ...}}`.
+- `Apply.post_aged_attribution` then posts zero-sum `XCATCHUP-AGED` moving contact-less
+  AR/AP catch-up onto the contacts named by Xero aged balances (journal lines carry contact_id).
+- Fixed-asset `DepreciationHistory` rows dated after the conversion date post
+  `XDEP-<assetid>-<n>` journals (depre expense / accum. depre); rows on/before it are
+  already inside the conversion balances — seed rows only, no GL.
 
 **Guards.** Non-reset apply refuses a company that has transactions, invoices, **contacts,
 or goods** (`:company_not_empty`). `--reset` prompts `Mix.shell().yes?` unless `--yes`.
-Company deletion pre-cleans matcher rows via the `delete_non_cascadeable_records()` trigger
-(migration `20260819150000`) — the matcher FKs stay `ON DELETE RESTRICT` so matched documents
-remain protected from manual deletes everywhere else.
+Company deletion: cascade order = FK creation order, which is parent-before-child for all
+company_id tables, and the closed-transaction trigger's escape hatch (companies row already
+gone) admits the cascade. Only **grandchild** tables (no company_id: matchers, the six
+document detail tables, employee_salary_types, trading trip junctions) get pre-deleted in
+`delete_non_cascadeable_records()` (migration `20260820090000`). Never pre-delete
+company_id-scoped tables there — direct deletes run while the company row still exists and
+trip the closed-transaction guard.
 
 **Reconcile is independent of import arithmetic** — expected sides come from Xero itself:
 TB report (parsed header-aware, **YTD Debit/YTD Credit** columns, cells positional — never
-filter blank cells), contact `Balances.*.Outstanding` for aged, invoice `Total` for doc totals,
-asset `BookValue` for NBV. Live aged = contact-grouped sum of control-account transactions
-(matchers are aging metadata, NOT balance — do not add them when comparing to Xero contact
-Outstanding; unallocated credit notes net in). Tolerance is strictly `< 0.01` — an exact
-1-cent drift FAILS, locked by test.
+filter blank cells; names carry " (Code)" suffixes, stripped via `Mapper.strip_code_suffix`),
+contact `Balances.*.Outstanding` for aged, invoice `Total` for doc totals (zero-total docs
+excluded on both sides), asset `BookValue` for NBV (live groups ` (n)` dupes under the base
+name). TB check: balance-sheet accounts per-account; P&L + Retained Earnings only in
+aggregate (Xero TB is current-FY YTD, FC holds full history). Live aged = contact-grouped
+sum of control-account transactions (matchers are aging metadata, NOT balance; unallocated
+credit notes net in). Tolerance is strictly `< 0.01` — an exact 1-cent drift FAILS.
 
 **HTTP.** Xero refresh tokens are single-use: a mid-pull 401 refresh persists the rotated
 token to the creds file immediately and keeps it in the client agent (state
@@ -94,4 +136,11 @@ Fixture snapshot: `test/support/fixtures/xero_import/snapshot/*.json`
 `Apply.run(snap, user, company_name: unique_name)`. HTTP tests stub with
 `Req.Test` (`plug: {Req.Test, stub}`); `Snapshot.pull` tests use a `FakeClient` behaviour.
 Mix-task tests use `Mix.Task.rerun` (+ `Mix.Shell.Process` for the `--reset` prompt).
-88 tests in `test/full_circle/xero_import/` as of 2026-08-19.
+111 tests in `test/full_circle/xero_import/` as of 2026-08-20.
+
+## Status
+
+2026-08-20: full live rehearsal on the real Golden Husbandry organisation (3,414
+invoices / 6,999 payments / 3,554 bank txns / 1,154 transfers / 43 assets, 2019–2026)
+applies in ~44s and **reconciles clean on all seven checks**. Live data and credentials
+live in `priv/xero_import/` (nested .gitignore keeps them out of git).
