@@ -14,12 +14,13 @@ defmodule FullCircle.XeroImport.HttpClient do
 
   def new(opts) do
     token = Keyword.fetch!(opts, :access_token)
-    {:ok, pid} = Agent.start_link(fn -> token end)
+    credentials = Keyword.get(opts, :credentials)
+    {:ok, pid} = Agent.start_link(fn -> %{token: token, credentials: credentials} end)
 
     %__MODULE__{
       token_agent: pid,
       tenant_id: Keyword.fetch!(opts, :tenant_id),
-      credentials: Keyword.get(opts, :credentials),
+      credentials: credentials,
       req_options: Keyword.get(opts, :req_options, []),
       sleeper: Keyword.get(opts, :sleeper, &Process.sleep/1)
     }
@@ -39,7 +40,11 @@ defmodule FullCircle.XeroImport.HttpClient do
   def list_tax_rates(client), do: get_all(client, "#{@accounting}/TaxRates", "TaxRates")
 
   @impl true
-  def list_contacts(client), do: get_pages(client, "#{@accounting}/Contacts", "Contacts")
+  def list_contacts(client) do
+    # Archived contacts still own historical invoices; without them the
+    # replay aborts on an unmapped contact.
+    get_pages(client, "#{@accounting}/Contacts", "Contacts", 1, [], includeArchived: true)
+  end
 
   @impl true
   def list_items(client), do: get_pages(client, "#{@accounting}/Items", "Items")
@@ -48,7 +53,8 @@ defmodule FullCircle.XeroImport.HttpClient do
   def list_invoices(client), do: get_pages(client, "#{@accounting}/Invoices", "Invoices")
 
   @impl true
-  def list_credit_notes(client), do: get_pages(client, "#{@accounting}/CreditNotes", "CreditNotes")
+  def list_credit_notes(client),
+    do: get_pages(client, "#{@accounting}/CreditNotes", "CreditNotes")
 
   @impl true
   def list_payments(client), do: get_pages(client, "#{@accounting}/Payments", "Payments")
@@ -155,8 +161,8 @@ defmodule FullCircle.XeroImport.HttpClient do
     end
   end
 
-  defp get_pages(client, url, key, page \\ 1, acc \\ []) do
-    with {:ok, body} <- request(client, :get, url, params: [page: page]) do
+  defp get_pages(client, url, key, page \\ 1, acc \\ [], extra_params \\ []) do
+    with {:ok, body} <- request(client, :get, url, params: extra_params ++ [page: page]) do
       items = extract_list(body, key)
 
       cond do
@@ -170,7 +176,7 @@ defmodule FullCircle.XeroImport.HttpClient do
           {:ok, acc ++ items}
 
         true ->
-          get_pages(client, url, key, page + 1, acc ++ items)
+          get_pages(client, url, key, page + 1, acc ++ items, extra_params)
       end
     end
   end
@@ -183,7 +189,7 @@ defmodule FullCircle.XeroImport.HttpClient do
   end
 
   defp request_loop(client, method, url, opts, attempt, refreshed) do
-    token = Agent.get(client.token_agent, & &1)
+    token = Agent.get(client.token_agent, & &1.token)
 
     headers = [
       {"authorization", "Bearer #{token}"},
@@ -225,16 +231,40 @@ defmodule FullCircle.XeroImport.HttpClient do
     end
   end
 
-  defp refresh_token(%{credentials: nil}), do: {:error, :unauthorized}
-
   defp refresh_token(client) do
-    case Credentials.token(client.credentials, req_options: client.req_options) do
-      {:ok, %{access_token: token}} ->
-        Agent.update(client.token_agent, fn _ -> token end)
-        {:ok, client}
+    creds = Agent.get(client.token_agent, & &1.credentials)
 
-      {:error, _} = err ->
-        err
+    if is_nil(creds) do
+      {:error, :unauthorized}
+    else
+      case Credentials.token(creds, req_options: client.req_options) do
+        {:ok, %{access_token: token} = tokens} ->
+          # Xero refresh tokens are single-use: keep the rotated one in memory
+          # for the next refresh and persist it right away, or a later failure
+          # leaves a consumed token on disk and bricks subsequent runs.
+          creds = rotate_credentials(creds, tokens)
+          Agent.update(client.token_agent, fn _ -> %{token: token, credentials: creds} end)
+          {:ok, client}
+
+        {:error, _} = err ->
+          err
+      end
+    end
+  end
+
+  defp rotate_credentials(creds, tokens) do
+    refresh = tokens[:refresh_token]
+
+    if is_binary(refresh) and refresh != "" do
+      path = creds[:path]
+
+      if is_binary(path) do
+        _ = Credentials.append_tokens(path, tokens)
+      end
+
+      Map.put(creds, :refresh_token, refresh)
+    else
+      creds
     end
   end
 
@@ -318,10 +348,39 @@ defmodule FullCircle.XeroImport.HttpClient do
   defp pad_int(n, width), do: n |> to_string() |> String.pad_leading(width, "0")
 
   defp parse_trial_balance(body) do
-    body
-    |> report_rows()
+    rows = report_rows(body)
+    cols = tb_amount_columns(rows)
+
+    rows
     |> walk_detail_rows()
-    |> Enum.flat_map(&tb_line/1)
+    |> Enum.flat_map(&tb_line(&1, cols))
+  end
+
+  # Xero's TrialBalance report carries [Account, Debit, Credit, YTD Debit,
+  # YTD Credit]; the YTD columns are the balances. Cells must be read by
+  # position — blanks are real cells, not gaps to be filtered out.
+  defp tb_amount_columns(rows) do
+    header =
+      Enum.find(List.wrap(rows), fn
+        %{"RowType" => "Header"} -> true
+        _ -> false
+      end)
+
+    titles =
+      ((header && header["Cells"]) || [])
+      |> Enum.map(fn cell -> cell |> cell_value() |> to_string() |> String.downcase() end)
+
+    cond do
+      "ytd debit" in titles ->
+        {Enum.find_index(titles, &(&1 == "ytd debit")),
+         Enum.find_index(titles, &(&1 == "ytd credit"))}
+
+      "debit" in titles ->
+        {Enum.find_index(titles, &(&1 == "debit")), Enum.find_index(titles, &(&1 == "credit"))}
+
+      true ->
+        nil
+    end
   end
 
   defp report_rows(%{"Reports" => [report | _]}), do: report["Rows"] || []
@@ -343,42 +402,37 @@ defmodule FullCircle.XeroImport.HttpClient do
 
   defp walk_detail_rows(_), do: []
 
-  defp tb_line(%{"Cells" => cells}) do
+  defp tb_line(%{"Cells" => cells}, cols) do
     values = Enum.map(cells || [], &cell_value/1)
-    name = Enum.find(values, &(is_binary(&1) and &1 != "" and not numeric?(&1)))
-    nums = values |> Enum.filter(&numeric?/1) |> Enum.map(&to_number/1)
+    name = List.first(values)
+
+    {di, ci} =
+      case cols do
+        {di, ci} when is_integer(di) and is_integer(ci) -> {di, ci}
+        _ -> {length(values) - 2, length(values) - 1}
+      end
 
     cond do
-      is_nil(name) or name in ["Total", "Opening Balances"] ->
+      not is_binary(name) or name == "" or name in ["Total", "Opening Balances"] ->
         []
 
       true ->
-        {debit, credit} =
-          case nums do
-            [d, c | _] -> {d, c}
-            [d] -> {d, 0.0}
-            [] -> {0.0, 0.0}
-          end
-
+        debit = number_at(values, di)
+        credit = number_at(values, ci)
         [%{"account_name" => name, "balance" => debit - credit}]
     end
   end
 
-  defp tb_line(_), do: []
+  defp tb_line(_, _cols), do: []
+
+  defp number_at(values, idx) when is_integer(idx) and idx >= 0 do
+    values |> Enum.at(idx) |> to_number()
+  end
+
+  defp number_at(_values, _idx), do: 0.0
 
   defp cell_value(%{"Value" => v}), do: v
   defp cell_value(_), do: nil
-
-  defp numeric?(v) when is_number(v), do: true
-
-  defp numeric?(v) when is_binary(v) do
-    case Float.parse(String.replace(v, ",", "")) do
-      {_, ""} -> true
-      _ -> false
-    end
-  end
-
-  defp numeric?(_), do: false
 
   defp to_number(v) when is_integer(v), do: v * 1.0
   defp to_number(v) when is_float(v), do: v
@@ -507,7 +561,9 @@ defmodule FullCircle.XeroImport.HttpClient do
           asset["BookValue"] || pur
       )
 
-    prior = to_number(book["priorAccumDepreciationAmount"] || book["PriorAccumDepreciationAmount"])
+    prior =
+      to_number(book["priorAccumDepreciationAmount"] || book["PriorAccumDepreciationAmount"])
+
     current =
       to_number(book["currentAccumDepreciationAmount"] || book["CurrentAccumDepreciationAmount"])
 

@@ -26,6 +26,23 @@ defmodule FullCircle.XeroImport.Apply do
   @spend_bank_types ~w(SPEND SPEND-OVERPAYMENT SPEND-PREPAYMENT)
 
   def run(snapshot, user, opts \\ []) do
+    # One transaction for the whole replay: a mid-import failure must not
+    # strand a half-imported company with gapless counters still at zero.
+    case Repo.transaction(fn -> run_inside(snapshot, user, opts) end, timeout: :infinity) do
+      {:ok, {:ok, result}} -> {:ok, result}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp run_inside(snapshot, user, opts) do
+    case do_run(snapshot, user, opts) do
+      {:ok, result} -> {:ok, result}
+      {:error, reason} -> Repo.rollback(reason)
+      other -> Repo.rollback(other)
+    end
+  end
+
+  defp do_run(snapshot, user, opts) do
     overrides = Keyword.get(opts, :overrides) || %{}
     name = Keyword.get(opts, :company_name, @default_company_name)
     reset? = Keyword.get(opts, :reset, false) == true
@@ -308,12 +325,14 @@ defmodule FullCircle.XeroImport.Apply do
   defp add_op(state, op), do: %{state | ops: [op | state.ops]}
   defp add_error(state, err), do: %{state | errors: [err | state.errors]}
 
-  # Conversion invoices: InvoiceNumber starts with "CONV-" or Date == conversion Date.
+  # Conversion invoices: InvoiceNumber starts with "CONV-" or Date is on or
+  # before the conversion Date (Xero setup enters open invoices with their
+  # original pre-conversion dates; they are part of the conversion AR/AP).
   def conversion_invoice?(inv, conversion_date) when is_map(inv) do
     num = to_string(inv["InvoiceNumber"] || "")
 
     String.starts_with?(num, "CONV-") or
-      dates_equal?(parse_date(inv["Date"]), parse_date(conversion_date))
+      on_or_before?(parse_date(inv["Date"]), parse_date(conversion_date))
   end
 
   defp ensure_company(snapshot, user, name, reset?) do
@@ -351,7 +370,9 @@ defmodule FullCircle.XeroImport.Apply do
 
   defp company_not_empty?(company) do
     Repo.exists?(from t in Transaction, where: t.company_id == ^company.id) or
-      Repo.exists?(from i in Invoice, where: i.company_id == ^company.id)
+      Repo.exists?(from i in Invoice, where: i.company_id == ^company.id) or
+      Repo.exists?(from c in Contact, where: c.company_id == ^company.id) or
+      Repo.exists?(from g in FullCircle.Product.Good, where: g.company_id == ^company.id)
   end
 
   defp create_company(snapshot, user, name) do
@@ -529,6 +550,7 @@ defmodule FullCircle.XeroImport.Apply do
       |> Mapper.good(ctx.accounts_by_code, ctx.tax_by_type)
       |> Map.put_new("sales_tax_code_name", "NoSTax")
       |> Map.put_new("purchase_tax_code_name", "NoPTax")
+      |> default_good_accounts(ctx)
 
     xero_id = xero["ItemID"] || xero["ItemId"]
     code = xero["Code"]
@@ -550,6 +572,18 @@ defmodule FullCircle.XeroImport.Apply do
             err
         end
     end
+  end
+
+  # Xero items may carry only one of SalesDetails/PurchaseDetails; Seeding
+  # requires both account names, so default the missing side.
+  defp default_good_accounts(attrs, ctx) do
+    sales = attrs["sales_account_name"] || attrs["purchase_account_name"]
+    purchase = attrs["purchase_account_name"] || attrs["sales_account_name"]
+    fallback = fallback_account_name(ctx)
+
+    attrs
+    |> Map.put("sales_account_name", sales || fallback)
+    |> Map.put("purchase_account_name", purchase || fallback)
   end
 
   defp remember_good(ctx, xero_id, fc_id, code, name) do
@@ -596,8 +630,9 @@ defmodule FullCircle.XeroImport.Apply do
   end
 
   defp import_one_asset(xero, ctx) do
-    with {:ok, attrs} <- Mapper.fixed_asset(xero) do
-      attrs = Map.merge(attrs, asset_account_names(xero, ctx))
+    with {:ok, attrs} <- Mapper.fixed_asset(xero),
+         attrs = Map.merge(attrs, asset_account_names(xero, ctx)),
+         :ok <- assert_asset_accounts(attrs) do
       xero_id = xero["AssetId"] || xero["AssetID"]
 
       attrs =
@@ -611,6 +646,15 @@ defmodule FullCircle.XeroImport.Apply do
         {:error, _} = err ->
           err
       end
+    end
+  end
+
+  defp assert_asset_accounts(attrs) do
+    ["asset_ac_name", "cume_depre_ac_name", "depre_ac_name", "disp_fund_ac_name"]
+    |> Enum.find(&is_nil(attrs[&1]))
+    |> case do
+      nil -> :ok
+      missing -> {:error, {:unmapped_asset_account, attrs["name"], missing}}
     end
   end
 
@@ -773,10 +817,13 @@ defmodule FullCircle.XeroImport.Apply do
       name ->
         amount = decimalize(line["Balance"] || 0)
 
+        # Conversion balances are debit-positive: AR arrives positive, AP negative.
+        # Impending conversion documents re-post AR positive / AP negative, so the
+        # strip must move each balance toward zero from its own side.
         amount =
           cond do
             ar_account?(name) -> Decimal.sub(amount, ar_strip)
-            ap_account?(name) -> Decimal.sub(amount, ap_strip)
+            ap_account?(name) -> Decimal.add(amount, ap_strip)
             true -> amount
           end
 
@@ -919,21 +966,7 @@ defmodule FullCircle.XeroImport.Apply do
     with {:ok, good} <- resolve_line_good(line, ctx),
          {:ok, account} <- resolve_line_account(line, good, ctx, type),
          {:ok, tax} <- resolve_line_tax(line, ctx, side) do
-      qty = decimalize(line["Quantity"] || 1)
-
-      qty =
-        if Decimal.compare(qty, 0) != :gt do
-          Decimal.new(1)
-        else
-          qty
-        end
-
-      unit_price =
-        exclusive_unit_price(
-          decimalize(line["UnitAmount"] || line["LineAmount"] || 0),
-          tax.rate,
-          line_types
-        )
+      {qty, unit_price, discount} = line_pricing(line, tax.rate, line_types)
 
       pkg_name = good.package_name || good.unit || "unit"
 
@@ -949,13 +982,69 @@ defmodule FullCircle.XeroImport.Apply do
          "package_name" => pkg_name,
          "quantity" => qty,
          "unit_price" => unit_price,
-         "discount" => "0",
+         "discount" => discount,
          "tax_rate" => tax.rate || Decimal.new(0),
          "unit_multiplier" => "0",
          "descriptions" => line["Description"],
          "_persistent_id" => Integer.to_string(idx + 1)
        }}
     end
+  end
+
+  # FC computes a line as quantity * unit_price + discount (discount <= 0).
+  # Reproduce Xero's tax-exclusive LineAmount exactly: discounts land in
+  # `discount`, and non-positive quantities fold into a qty-1 signed price.
+  defp line_pricing(line, tax_rate, line_types) do
+    qty = decimalize(line["Quantity"] || 1)
+
+    unit =
+      case line["UnitAmount"] do
+        nil -> nil
+        v -> exclusive_unit_price(decimalize(v), tax_rate, line_types)
+      end
+
+    la =
+      case line["LineAmount"] do
+        nil -> implied_line_amount(line, qty, unit)
+        v -> exclusive_unit_price(decimalize(v), tax_rate, line_types)
+      end
+
+    cond do
+      Decimal.compare(qty, 0) != :gt ->
+        {Decimal.new(1), la, Decimal.new(0)}
+
+      is_nil(unit) ->
+        {qty, safe_div(la, qty), Decimal.new(0)}
+
+      true ->
+        discount = Decimal.sub(la, Decimal.mult(qty, unit))
+
+        if Decimal.compare(discount, 0) == :gt do
+          {qty, safe_div(la, qty), Decimal.new(0)}
+        else
+          {qty, unit, discount}
+        end
+    end
+  end
+
+  defp implied_line_amount(line, qty, unit) do
+    gross = Decimal.mult(qty, unit || Decimal.new(0))
+
+    cond do
+      line["DiscountAmount"] ->
+        Decimal.sub(gross, decimalize(line["DiscountAmount"]))
+
+      line["DiscountRate"] ->
+        rate = Decimal.div(decimalize(line["DiscountRate"]), Decimal.new(100))
+        Decimal.mult(gross, Decimal.sub(Decimal.new(1), rate))
+
+      true ->
+        gross
+    end
+  end
+
+  defp safe_div(num, den) do
+    if Decimal.eq?(den, 0), do: num, else: Decimal.div(num, den)
   end
 
   defp resolve_line_good(line, ctx) do
@@ -1188,15 +1277,17 @@ defmodule FullCircle.XeroImport.Apply do
           tax = Accounting.get_tax_code_by_code(tax_name, ctx.company, ctx.user)
           acc_name = ctx.accounts_by_code[line["AccountCode"]] || fallback_account_name(ctx)
           acc = Accounting.get_account_by_name(acc_name, ctx.company, ctx.user)
-          qty = decimalize(line["Quantity"] || 1)
-          qty = if Decimal.compare(qty, 0) != :gt, do: Decimal.new(1), else: qty
+
+          # Note details have no discount field, so fold it into unit_price.
+          {qty, unit_price, discount} =
+            line_pricing(line, tax && tax.rate, note["LineAmountTypes"])
 
           unit_price =
-            exclusive_unit_price(
-              decimalize(line["UnitAmount"] || line["LineAmount"] || 0),
-              tax && tax.rate,
-              note["LineAmountTypes"]
-            )
+            if Decimal.eq?(discount, 0) do
+              unit_price
+            else
+              Decimal.add(unit_price, safe_div(discount, qty))
+            end
 
           {Integer.to_string(idx),
            %{
@@ -1644,8 +1735,8 @@ defmodule FullCircle.XeroImport.Apply do
     parse_date(row["Date"]) || ~D[0001-01-01]
   end
 
-  defp dates_equal?(%Date{} = a, %Date{} = b), do: Date.compare(a, b) == :eq
-  defp dates_equal?(_, _), do: false
+  defp on_or_before?(%Date{} = a, %Date{} = b), do: Date.compare(a, b) != :gt
+  defp on_or_before?(_, _), do: false
 
   defp parse_date(nil), do: nil
   defp parse_date(%Date{} = d), do: d

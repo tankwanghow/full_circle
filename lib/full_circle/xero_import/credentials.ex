@@ -97,7 +97,9 @@ defmodule FullCircle.XeroImport.Credentials do
       |> maybe_put("XERO_ACCESS_TOKEN", token_field(tokens, :access_token))
       |> maybe_put("XERO_REFRESH_TOKEN", token_field(tokens, :refresh_token))
 
-    File.write(path, upsert_pairs(existing, updates))
+    with :ok <- File.write(path, upsert_pairs(existing, updates)) do
+      File.chmod(path, 0o600)
+    end
   end
 
   def await_code(opts \\ []) do
@@ -307,6 +309,7 @@ defmodule FullCircle.XeroImport.Credentials do
   defp present?(val), do: is_binary(val) and val != ""
 
   defp blank_to_nil(nil), do: nil
+
   defp blank_to_nil(val) when is_binary(val) do
     case String.trim(val) do
       "" -> nil

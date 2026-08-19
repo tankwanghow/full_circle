@@ -54,6 +54,28 @@ defmodule FullCircle.XeroImport.ApplyTest do
              Apply.run(snap, user, company_name: name, stop_after: :masters)
   end
 
+  test "aborts without reset if company already has contacts or goods", %{
+    user: user,
+    snap: snap,
+    name: name
+  } do
+    {:ok, com} =
+      FullCircle.Sys.create_company(
+        %{
+          name: name,
+          country: "Malaysia",
+          timezone: "Asia/Kuala_Lumpur",
+          closing_month: 12,
+          closing_day: 31
+        },
+        user
+      )
+
+    Repo.insert!(%Contact{company_id: com.id, name: "Pre-existing Customer"})
+
+    assert {:error, :company_not_empty} = Apply.run(snap, user, company_name: name)
+  end
+
   test "reset deletes and recreates", %{user: user, snap: snap, name: name} do
     {:ok, %{company: com1}} = Apply.run(snap, user, company_name: name, stop_after: :masters)
 
@@ -85,6 +107,20 @@ defmodule FullCircle.XeroImport.ApplyTest do
              from t in Transaction,
                where: t.company_id == ^com.id and t.doc_type == "fixed_asset_depreciations"
            )
+  end
+
+  test "asset with unmapped depreciation account errors instead of crashing", %{
+    user: user,
+    snap: snap,
+    name: name
+  } do
+    snap =
+      update_in(snap, [Access.key(:fixed_assets), Access.at(0), "AssetType"], fn type ->
+        Map.delete(type, "AccumulatedDepreciationAccountId")
+      end)
+
+    assert {:error, {:unmapped_asset_account, "Van 1", _}} =
+             Apply.run(snap, user, company_name: name, stop_after: :masters)
   end
 
   test "diminishing-value asset aborts", %{user: user, snap: snap, name: name} do
@@ -156,6 +192,39 @@ defmodule FullCircle.XeroImport.ApplyTest do
              Apply.run(snap, user, company_name: name)
   end
 
+  test "failed import rolls back completely and can be rerun", %{
+    user: user,
+    snap: snap,
+    name: name
+  } do
+    bad_snap =
+      put_in(snap.payments, [
+        %{
+          "PaymentID" => "pay-bad",
+          "Invoice" => %{"InvoiceID" => "nope"},
+          "Amount" => 1.0,
+          "Date" => "2024-02-01",
+          "Account" => %{"AccountID" => "ac-bank"},
+          "Status" => "AUTHORISED"
+        }
+      ])
+
+    assert {:error, _} = Apply.run(bad_snap, user, company_name: name)
+
+    refute Repo.exists?(
+             from i in Invoice,
+               join: c in FullCircle.Sys.Company,
+               on: c.id == i.company_id,
+               where: c.name == ^name
+           )
+
+    assert {:ok, %{company: com}} = Apply.run(snap, user, company_name: name)
+
+    assert Repo.exists?(
+             from i in Invoice, where: i.company_id == ^com.id and i.invoice_no == "INV-000123"
+           )
+  end
+
   test "gapless sits at 123 after INV-000123; SI-88 does not move it", %{
     user: user,
     snap: snap,
@@ -201,6 +270,125 @@ defmodule FullCircle.XeroImport.ApplyTest do
              from g in FullCircle.Product.Good,
                where: g.company_id == ^com.id and g.name == "__xero_line__"
            )
+
+    seed =
+      Repo.all(
+        from t in Transaction,
+          where: t.company_id == ^com.id and t.account_id == ^ar_id and t.old_data == true
+      )
+
+    assert Enum.reduce(seed, Decimal.new(0), &Decimal.add(&2, &1.amount)) |> Decimal.eq?(0)
+  end
+
+  test "conversion AP is reduced by imported conversion bill", %{
+    user: user,
+    snap: snap,
+    name: name
+  } do
+    snap =
+      snap
+      |> Map.update!(:conversion_balances, fn cb ->
+        Map.update!(cb, "Lines", &(&1 ++ [%{"AccountID" => "ac-ap", "Balance" => -30.0}]))
+      end)
+      |> Map.update!(:invoices, fn invs ->
+        invs ++
+          [
+            %{
+              "InvoiceID" => "bill-conv",
+              "Type" => "ACCPAY",
+              "InvoiceNumber" => "CONV-AP-1",
+              "Status" => "AUTHORISED",
+              "Contact" => %{"ContactID" => "ct-bob"},
+              "Date" => "2024-01-01",
+              "DueDate" => "2024-01-31",
+              "LineAmountTypes" => "Exclusive",
+              "CurrencyCode" => "MYR",
+              "Total" => 30.0,
+              "LineItems" => [
+                %{
+                  "Description" => "Conversion AP",
+                  "Quantity" => 1.0,
+                  "UnitAmount" => 30.0,
+                  "AccountCode" => "200",
+                  "TaxType" => "NONE",
+                  "LineAmount" => 30.0
+                }
+              ]
+            }
+          ]
+      end)
+
+    {:ok, %{company: com, id_map: map}} = Apply.run(snap, user, company_name: name)
+    ap_id = map["account:ac-ap"]
+
+    assert Repo.exists?(
+             from i in FullCircle.Billing.PurInvoice,
+               where: i.company_id == ^com.id and i.pur_invoice_no == "CONV-AP-1"
+           )
+
+    seed =
+      Repo.all(
+        from t in Transaction,
+          where: t.company_id == ^com.id and t.account_id == ^ap_id and t.old_data == true
+      )
+
+    assert Enum.reduce(seed, Decimal.new(0), &Decimal.add(&2, &1.amount)) |> Decimal.eq?(0)
+  end
+
+  test "invoices dated before the conversion date strip conversion AR too", %{
+    user: user,
+    snap: snap,
+    name: name
+  } do
+    # Xero's normal conversion flow enters open invoices with their original
+    # (pre-conversion) dates; they are part of the conversion AR balance.
+    assert Apply.conversion_invoice?(
+             %{"InvoiceNumber" => "SI-1", "Date" => "2023-12-15"},
+             "2024-01-01"
+           )
+
+    refute Apply.conversion_invoice?(
+             %{"InvoiceNumber" => "SI-1", "Date" => "2024-01-02"},
+             "2024-01-01"
+           )
+
+    pre = %{
+      "InvoiceID" => "inv-pre",
+      "Type" => "ACCREC",
+      "InvoiceNumber" => "SI-PRE-1",
+      "Status" => "AUTHORISED",
+      "Contact" => %{"ContactID" => "ct-alice"},
+      "Date" => "2023-12-15",
+      "DueDate" => "2024-01-15",
+      "LineAmountTypes" => "Exclusive",
+      "CurrencyCode" => "MYR",
+      "Total" => 40.0,
+      "LineItems" => [
+        %{
+          "Description" => "Pre-conversion sale",
+          "Quantity" => 1.0,
+          "UnitAmount" => 40.0,
+          "AccountCode" => "200",
+          "TaxType" => "NONE",
+          "LineAmount" => 40.0
+        }
+      ]
+    }
+
+    snap =
+      snap
+      |> Map.update!(:invoices, &(&1 ++ [pre]))
+      |> Map.update!(:conversion_balances, fn cb ->
+        Map.update!(cb, "Lines", fn lines ->
+          Enum.map(lines, fn
+            %{"AccountID" => "ac-ar"} = line -> Map.put(line, "Balance", 140.0)
+            line -> line
+          end)
+        end)
+      end)
+
+    {:ok, %{company: com, id_map: map}} = Apply.run(snap, user, company_name: name)
+    ar_id = map["account:ac-ar"]
 
     seed =
       Repo.all(
@@ -283,6 +471,33 @@ defmodule FullCircle.XeroImport.ApplyTest do
     assert "Van 1" in names
     assert "Van 1 (2)" in names
     assert map["asset:fa-van"] != map["asset:fa-van-2"]
+  end
+
+  test "sales-only item defaults its purchase side instead of crashing", %{
+    user: user,
+    snap: snap,
+    name: name
+  } do
+    item = %{
+      "ItemID" => "it-tray",
+      "Code" => "TRAY",
+      "Name" => "Egg Tray",
+      "SalesDetails" => %{"UnitPrice" => 2.0, "AccountCode" => "200", "TaxType" => "OUTPUT"},
+      "PurchaseDetails" => %{}
+    }
+
+    snap = %{snap | items: snap.items ++ [item]}
+
+    assert {:ok, %{company: com}} =
+             Apply.run(snap, user, company_name: name, stop_after: :masters)
+
+    good =
+      Repo.one!(
+        from g in FullCircle.Product.Good,
+          where: g.company_id == ^com.id and g.name == "Egg Tray"
+      )
+
+    assert good.purchase_account_id != nil
   end
 
   test "zero-rate Xero taxes reuse NoSTax/NoPTax", %{user: user, snap: snap, name: name} do
@@ -405,6 +620,149 @@ defmodule FullCircle.XeroImport.ApplyTest do
     assert Decimal.eq?(Decimal.round(detail.unit_price, 2), Decimal.new("5.00"))
   end
 
+  test "discounted line keeps Xero LineAmount via negative discount", %{
+    user: user,
+    snap: snap,
+    name: name
+  } do
+    inv = %{
+      "InvoiceID" => "inv-disc",
+      "Type" => "ACCREC",
+      "InvoiceNumber" => "INV-DISC",
+      "Status" => "AUTHORISED",
+      "Contact" => %{"ContactID" => "ct-alice", "Name" => "Alice Customer"},
+      "Date" => "2024-02-01",
+      "DueDate" => "2024-03-01",
+      "LineAmountTypes" => "Exclusive",
+      "CurrencyCode" => "MYR",
+      "Total" => 180.0,
+      "LineItems" => [
+        %{
+          "Description" => "Discounted egg trays",
+          "Quantity" => 2.0,
+          "UnitAmount" => 100.0,
+          "DiscountRate" => 10.0,
+          "AccountCode" => "200",
+          "TaxType" => "NONE",
+          "LineAmount" => 180.0
+        }
+      ]
+    }
+
+    snap = %{snap | invoices: snap.invoices ++ [inv]}
+    {:ok, %{company: com}} = Apply.run(snap, user, company_name: name)
+
+    detail =
+      Repo.one!(
+        from d in InvoiceDetail,
+          join: i in Invoice,
+          on: d.invoice_id == i.id,
+          where: i.company_id == ^com.id and i.invoice_no == "INV-DISC"
+      )
+
+    assert Decimal.eq?(detail.discount, Decimal.new("-20"))
+
+    net = Decimal.add(Decimal.mult(detail.quantity, detail.unit_price), detail.discount)
+    assert Decimal.eq?(net, Decimal.new("180"))
+  end
+
+  test "negative-quantity correction line keeps its Xero LineAmount", %{
+    user: user,
+    snap: snap,
+    name: name
+  } do
+    inv = %{
+      "InvoiceID" => "inv-negqty",
+      "Type" => "ACCREC",
+      "InvoiceNumber" => "INV-NEGQTY",
+      "Status" => "AUTHORISED",
+      "Contact" => %{"ContactID" => "ct-alice", "Name" => "Alice Customer"},
+      "Date" => "2024-02-01",
+      "DueDate" => "2024-03-01",
+      "LineAmountTypes" => "Exclusive",
+      "CurrencyCode" => "MYR",
+      "Total" => 150.0,
+      "LineItems" => [
+        %{
+          "Description" => "Eggs",
+          "Quantity" => 4.0,
+          "UnitAmount" => 50.0,
+          "AccountCode" => "200",
+          "TaxType" => "NONE",
+          "LineAmount" => 200.0
+        },
+        %{
+          "Description" => "Returned tray",
+          "Quantity" => -1.0,
+          "UnitAmount" => 50.0,
+          "AccountCode" => "200",
+          "TaxType" => "NONE",
+          "LineAmount" => -50.0
+        }
+      ]
+    }
+
+    snap = %{snap | invoices: snap.invoices ++ [inv]}
+    {:ok, %{company: com}} = Apply.run(snap, user, company_name: name)
+
+    details =
+      Repo.all(
+        from d in InvoiceDetail,
+          join: i in Invoice,
+          on: d.invoice_id == i.id,
+          where: i.company_id == ^com.id and i.invoice_no == "INV-NEGQTY"
+      )
+
+    total =
+      Enum.reduce(details, Decimal.new(0), fn d, acc ->
+        d.quantity |> Decimal.mult(d.unit_price) |> Decimal.add(d.discount) |> Decimal.add(acc)
+      end)
+
+    assert Decimal.eq?(total, Decimal.new("150"))
+  end
+
+  test "discounted credit note line folds the discount into unit_price", %{
+    user: user,
+    snap: snap,
+    name: name
+  } do
+    note = %{
+      "CreditNoteID" => "cn-disc",
+      "CreditNoteNumber" => "CN-DISC",
+      "Type" => "ACCRECCREDIT",
+      "Status" => "AUTHORISED",
+      "Contact" => %{"ContactID" => "ct-alice"},
+      "Date" => "2024-02-10",
+      "LineAmountTypes" => "Exclusive",
+      "CurrencyCode" => "MYR",
+      "Total" => 180.0,
+      "LineItems" => [
+        %{
+          "Description" => "Discounted return",
+          "Quantity" => 2.0,
+          "UnitAmount" => 100.0,
+          "DiscountRate" => 10.0,
+          "AccountCode" => "200",
+          "TaxType" => "NONE",
+          "LineAmount" => 180.0
+        }
+      ]
+    }
+
+    snap = %{snap | credit_notes: [note]}
+    {:ok, %{company: com}} = Apply.run(snap, user, company_name: name)
+
+    detail =
+      Repo.one!(
+        from d in FullCircle.DebCre.CreditNoteDetail,
+          join: n in FullCircle.DebCre.CreditNote,
+          on: d.credit_note_id == n.id,
+          where: n.company_id == ^com.id and n.note_no == "CN-DISC"
+      )
+
+    assert Decimal.eq?(Decimal.mult(detail.quantity, detail.unit_price), Decimal.new("180"))
+  end
+
   test "mix --apply writes id_map.json next to the snapshot", %{user: user, name: name} do
     src = XeroImport.fixture_dir()
     dir = Path.join(System.tmp_dir!(), "xero-idmap-#{System.unique_integer([:positive])}")
@@ -433,6 +791,49 @@ defmodule FullCircle.XeroImport.ApplyTest do
     {:ok, map} = Jason.decode(File.read!(path))
     assert is_binary(map["account:ac-ar"])
     assert is_binary(map["contact:ct-alice"])
+  end
+
+  test "mix --apply --reset refuses to delete an existing company without confirmation", %{
+    user: user,
+    snap: snap,
+    name: name
+  } do
+    {:ok, %{company: com}} = Apply.run(snap, user, company_name: name)
+
+    src = XeroImport.fixture_dir()
+    dir = Path.join(System.tmp_dir!(), "xero-reset-#{System.unique_integer([:positive])}")
+    File.mkdir_p!(dir)
+
+    for file <- File.ls!(src), String.ends_with?(file, ".json") do
+      File.cp!(Path.join(src, file), Path.join(dir, file))
+    end
+
+    old_shell = Mix.shell()
+    Mix.shell(Mix.Shell.Process)
+
+    on_exit(fn ->
+      Mix.shell(old_shell)
+      File.rm_rf(dir)
+    end)
+
+    send(self(), {:mix_shell_input, :yes?, false})
+
+    catch_exit(
+      Mix.Task.rerun("full_circle.import_xero", [
+        "--apply",
+        "--reset",
+        "--snapshot-dir",
+        dir,
+        "--user",
+        user.email,
+        "--company",
+        name,
+        "--log",
+        "false"
+      ])
+    )
+
+    assert Repo.exists?(from c in FullCircle.Sys.Company, where: c.id == ^com.id)
   end
 
   test "imports a SPEND bank transaction as a payment", %{user: user, snap: snap, name: name} do

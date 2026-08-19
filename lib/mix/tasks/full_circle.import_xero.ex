@@ -7,7 +7,7 @@ defmodule Mix.Tasks.FullCircle.ImportXero do
       mix full_circle.import_xero --auth [--credentials PATH]
       mix full_circle.import_xero --snapshot [--snapshot-dir PATH] [--credentials PATH]
       mix full_circle.import_xero --dry-run --snapshot-dir PATH --user EMAIL
-      mix full_circle.import_xero --apply --snapshot-dir PATH --user EMAIL [--reset]
+      mix full_circle.import_xero --apply --snapshot-dir PATH --user EMAIL [--reset [--yes]]
       mix full_circle.import_xero --reconcile --snapshot-dir PATH --user EMAIL [--company NAME]
 
   Default `--snapshot-dir` is `priv/xero_import/golden_husbandry`.
@@ -39,6 +39,7 @@ defmodule Mix.Tasks.FullCircle.ImportXero do
           dry_run: :boolean,
           apply: :boolean,
           reset: :boolean,
+          yes: :boolean,
           reconcile: :boolean,
           user: :string,
           company: :string,
@@ -99,6 +100,7 @@ defmodule Mix.Tasks.FullCircle.ImportXero do
     dir = snapshot_dir(opts)
 
     with {:ok, user} <- resolve_user(opts),
+         :ok <- confirm_reset!(opts, user),
          {:ok, snap} <- XeroImport.read_snapshot(dir),
          {:ok, result} <-
            Apply.run(snap, user,
@@ -127,7 +129,7 @@ defmodule Mix.Tasks.FullCircle.ImportXero do
     with {:ok, user} <- resolve_user(opts),
          {:ok, snap} <- XeroImport.read_snapshot(dir),
          {:ok, company} <- find_company(name, user),
-         result <- Reconcile.run(snap, company, user) do
+         result <- Reconcile.run(snap, company, user, overrides: load_overrides(dir)) do
       text = format_reconcile(result, company)
       Mix.shell().info(text)
       maybe_log(dir, opts, text)
@@ -138,6 +140,26 @@ defmodule Mix.Tasks.FullCircle.ImportXero do
       end
     else
       {:error, reason} -> halt!(inspect(reason))
+    end
+  end
+
+  # --reset destroys the matched company outright (cascade triggers, uploads),
+  # so an existing company needs an explicit confirmation or --yes.
+  defp confirm_reset!(opts, user) do
+    name = opts[:company] || @default_company_name
+
+    cond do
+      opts[:reset] != true or opts[:yes] == true ->
+        :ok
+
+      match?({:error, _}, find_company(name, user)) ->
+        :ok
+
+      Mix.shell().yes?("--reset will DELETE company \"#{name}\" and all its data. Continue?") ->
+        :ok
+
+      true ->
+        halt!("reset aborted")
     end
   end
 

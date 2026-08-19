@@ -9,6 +9,20 @@ defmodule FullCircle.XeroImport.MapperTest do
     assert Mapper.control_account_name("Sales") == "Sales"
   end
 
+  test "contact prefers the STREET address over other address types" do
+    contact = %{
+      "Name" => "Alice",
+      "Addresses" => [
+        %{"AddressType" => "DELIVERY", "City" => "Delivery Town", "AddressLine1" => "Dock 9"},
+        %{"AddressType" => "STREET", "City" => "Street Town", "AddressLine1" => "1 Main St"}
+      ]
+    }
+
+    attrs = Mapper.contact(contact)
+    assert attrs["city"] == "Street Town"
+    assert attrs["address1"] == "1 Main St"
+  end
+
   test "overpayment invoice types are detected" do
     assert Mapper.overpayment_or_prepayment?(%{"Type" => "AROVERPAYMENT"})
     assert Mapper.overpayment_or_prepayment?(%{"Type" => "ARPREPAYMENT"})
@@ -54,7 +68,10 @@ defmodule FullCircle.XeroImport.MapperTest do
 
   test "diminishing-value asset fails" do
     assert {:error, {:diminishing_value, _}} =
-             Mapper.fixed_asset(%{"AssetName" => "Van", "DepreciationMethod" => "DiminishingValue"})
+             Mapper.fixed_asset(%{
+               "AssetName" => "Van",
+               "DepreciationMethod" => "DiminishingValue"
+             })
   end
 
   test "straight-line asset rate is a fraction" do
@@ -62,7 +79,7 @@ defmodule FullCircle.XeroImport.MapperTest do
       Mapper.fixed_asset(%{
         "AssetName" => "Van 1",
         "PurchaseDate" => "2023-01-01",
-        "PurchasePrice" => 100000.0,
+        "PurchasePrice" => 100_000.0,
         "ResidualValue" => 10000.0,
         "DepreciationStartDate" => "2023-01-01",
         "DepreciationMethod" => "StraightLine",

@@ -78,7 +78,8 @@ defmodule FullCircle.XeroImport.Mapper do
     %{
       "name" => Map.get(xero_contact, "Name"),
       "category" => contact_category(xero_contact),
-      "country" => blank_to_malaysia(Map.get(addr, "Country") || Map.get(xero_contact, "Country")),
+      "country" =>
+        blank_to_malaysia(Map.get(addr, "Country") || Map.get(xero_contact, "Country")),
       "address1" => Map.get(addr, "AddressLine1"),
       "address2" => Map.get(addr, "AddressLine2"),
       "city" => Map.get(addr, "City"),
@@ -214,7 +215,9 @@ defmodule FullCircle.XeroImport.Mapper do
   defp parse_date(nil), do: nil
   defp parse_date(%Date{} = d), do: d
 
-  defp parse_date(<<y::binary-size(4), "-", m::binary-size(2), "-", d::binary-size(2), _::binary>>) do
+  defp parse_date(
+         <<y::binary-size(4), "-", m::binary-size(2), "-", d::binary-size(2), _::binary>>
+       ) do
     Date.from_iso8601!("#{y}-#{m}-#{d}")
   end
 
@@ -247,13 +250,12 @@ defmodule FullCircle.XeroImport.Mapper do
   defp blank_to_malaysia(_), do: "Malaysia"
 
   defp primary_address(addresses) when is_list(addresses) do
-    Enum.find(addresses, %{}, fn a ->
-      Map.get(a, "AddressType") in ["STREET", "POBOX", nil] or map_size(a) > 0
-    end)
-    |> case do
-      nil -> %{}
-      addr -> addr
-    end
+    non_empty = Enum.filter(addresses, &(is_map(&1) and map_size(&1) > 0))
+
+    Enum.find(non_empty, &(Map.get(&1, "AddressType") == "STREET")) ||
+      Enum.find(non_empty, &(Map.get(&1, "AddressType") == "POBOX")) ||
+      List.first(non_empty) ||
+      %{}
   end
 
   defp primary_address(_), do: %{}

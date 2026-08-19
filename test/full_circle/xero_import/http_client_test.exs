@@ -112,7 +112,8 @@ defmodule FullCircle.XeroImport.HttpClientTest do
   end
 
   test "load/1 errors when the file is missing" do
-    assert {:error, _} = Credentials.load("/tmp/xero-missing-#{System.unique_integer([:positive])}")
+    assert {:error, _} =
+             Credentials.load("/tmp/xero-missing-#{System.unique_integer([:positive])}")
   end
 
   test "load/1 errors when client id or secret is missing", %{dir: dir} do
@@ -245,6 +246,16 @@ defmodule FullCircle.XeroImport.HttpClientTest do
     assert creds.refresh_token == "rt-x"
   end
 
+  test "append_tokens/2 leaves the credentials file readable only by the owner", %{dir: dir} do
+    path = Path.join(dir, ".credentials")
+    File.write!(path, "XERO_CLIENT_ID=id1\nXERO_CLIENT_SECRET=sec1\n")
+
+    assert :ok = Credentials.append_tokens(path, %{access_token: "at-x", refresh_token: "rt-x"})
+
+    %File.Stat{mode: mode} = File.stat!(path)
+    assert Bitwise.band(mode, 0o777) == 0o600
+  end
+
   test "list_invoices/1 assembles pages until empty", %{stub: stub} do
     Req.Test.expect(stub, fn conn ->
       assert conn.method == "GET"
@@ -269,6 +280,66 @@ defmodule FullCircle.XeroImport.HttpClientTest do
     assert {:ok, invoices} = HttpClient.list_invoices(client)
     assert Enum.map(invoices, & &1["InvoiceID"]) == ["a", "b"]
     Req.Test.verify!(stub)
+  end
+
+  test "list_contacts includes archived contacts", %{stub: stub} do
+    Req.Test.expect(stub, fn conn ->
+      assert conn.request_path == "/api.xro/2.0/Contacts"
+      assert conn.query_params["includeArchived"] == "true"
+      Req.Test.json(conn, %{"Contacts" => []})
+    end)
+
+    assert {:ok, []} = HttpClient.list_contacts(http_client(stub))
+    Req.Test.verify!(stub)
+  end
+
+  test "401 refresh persists the rotated refresh token and uses the new access token", %{
+    dir: dir,
+    stub: stub
+  } do
+    path = Path.join(dir, ".credentials")
+
+    File.write!(path, """
+    XERO_CLIENT_ID=id1
+    XERO_CLIENT_SECRET=sec1
+    XERO_REFRESH_TOKEN=rt-old
+    """)
+
+    {:ok, creds} = Credentials.load(path)
+    {:ok, hits} = Agent.start_link(fn -> 0 end)
+
+    Req.Test.stub(stub, fn conn ->
+      cond do
+        conn.host == "identity.xero.com" ->
+          body = form_body(conn)
+          assert body["grant_type"] == "refresh_token"
+          assert body["refresh_token"] == "rt-old"
+          Req.Test.json(conn, %{"access_token" => "tok-2", "refresh_token" => "rt-new"})
+
+        true ->
+          n = Agent.get_and_update(hits, fn i -> {i, i + 1} end)
+
+          if n == 0 do
+            Plug.Conn.send_resp(conn, 401, "expired")
+          else
+            assert "Bearer tok-2" in Plug.Conn.get_req_header(conn, "authorization")
+            Req.Test.json(conn, %{"Invoices" => []})
+          end
+      end
+    end)
+
+    client =
+      HttpClient.new(
+        access_token: "tok-1",
+        tenant_id: "tenant-1",
+        credentials: creds,
+        req_options: [plug: {Req.Test, stub}]
+      )
+
+    assert {:ok, []} = HttpClient.list_invoices(client)
+
+    {:ok, creds2} = Credentials.load(path)
+    assert creds2.refresh_token == "rt-new"
   end
 
   test "retries 429 using Retry-After then succeeds", %{stub: stub} do
@@ -371,9 +442,67 @@ defmodule FullCircle.XeroImport.HttpClientTest do
     assert reports["aged_payables"] == []
   end
 
+  test "trial balance uses YTD columns and keeps blank cells positional", %{stub: stub} do
+    Req.Test.stub(stub, fn conn ->
+      assert String.ends_with?(conn.request_path, "/Reports/TrialBalance")
+
+      Req.Test.json(conn, %{
+        "Reports" => [
+          %{
+            "Rows" => [
+              %{
+                "RowType" => "Header",
+                "Cells" => [
+                  %{"Value" => "Account"},
+                  %{"Value" => "Debit"},
+                  %{"Value" => "Credit"},
+                  %{"Value" => "YTD Debit"},
+                  %{"Value" => "YTD Credit"}
+                ]
+              },
+              %{
+                "RowType" => "Section",
+                "Rows" => [
+                  %{
+                    "RowType" => "Row",
+                    "Cells" => [
+                      %{"Value" => "Bank"},
+                      %{"Value" => "100.00"},
+                      %{"Value" => ""},
+                      %{"Value" => "150.00"},
+                      %{"Value" => ""}
+                    ]
+                  },
+                  %{
+                    "RowType" => "Row",
+                    "Cells" => [
+                      %{"Value" => "Sales"},
+                      %{"Value" => ""},
+                      %{"Value" => "40.00"},
+                      %{"Value" => ""},
+                      %{"Value" => "240.00"}
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      })
+    end)
+
+    assert {:ok, reports} = HttpClient.get_reports(http_client(stub))
+
+    assert [
+             %{"account_name" => "Bank", "balance" => 150.0},
+             %{"account_name" => "Sales", "balance" => -240.0}
+           ] = reports["trial_balance"]
+  end
+
   test "conversion date uses Day when present", %{stub: stub} do
     Req.Test.expect(stub, fn conn ->
       assert conn.request_path == "/api.xro/2.0/Setup"
+
       Req.Test.json(conn, %{
         "ConversionDate" => %{"Year" => 2024, "Month" => 1, "Day" => 15},
         "ConversionBalances" => [%{"AccountCode" => "090", "Balance" => 1.0}]
@@ -471,8 +600,12 @@ defmodule FullCircle.XeroImport.HttpClientTest do
 
     assert {:ok, ^dest} = Snapshot.pull(client, dest)
     assert {:ok, snap} = Snapshot.read(dest)
-    assert [%{"contact_name" => "Alice Customer", "balance" => 120.0}] = snap.reports["aged_receivables"]
-    assert [%{"contact_name" => "Bob Supplier", "balance" => -30.0}] = snap.reports["aged_payables"]
+
+    assert [%{"contact_name" => "Alice Customer", "balance" => 120.0}] =
+             snap.reports["aged_receivables"]
+
+    assert [%{"contact_name" => "Bob Supplier", "balance" => -30.0}] =
+             snap.reports["aged_payables"]
   end
 
   test "failed pull leaves dest and does not keep tmp", %{dir: dir} do

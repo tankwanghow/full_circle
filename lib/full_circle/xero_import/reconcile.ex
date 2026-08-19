@@ -7,9 +7,7 @@ defmodule FullCircle.XeroImport.Reconcile do
     FixedAsset,
     FixedAssetDepreciation,
     FixedAssetDisposal,
-    SeedTransactionMatcher,
-    Transaction,
-    TransactionMatcher
+    Transaction
   }
 
   alias FullCircle.Billing.{Invoice, InvoiceDetail, PurInvoice, PurInvoiceDetail}
@@ -18,24 +16,28 @@ defmodule FullCircle.XeroImport.Reconcile do
 
   @tolerance Decimal.new("0.01")
 
-  def run(snapshot, company, _user) do
+  def run(snapshot, company, user, opts \\ [])
+
+  def run(snapshot, company, _user, opts) do
     reports = snapshot.reports || %{}
+    overrides = Keyword.get(opts, :overrides) || %{}
 
     checks = [
       check_named(
         :trial_balance,
         report_lines(reports, "trial_balance"),
-        live_trial_balance(company)
+        live_trial_balance(company),
+        overrides
       ),
       check_named(
         :aged_receivables,
         report_lines(reports, "aged_receivables"),
-        live_aged(company, "Invoice")
+        live_aged(company, "Account Receivables")
       ),
       check_named(
         :aged_payables,
         report_lines(reports, "aged_payables"),
-        live_aged(company, "PurInvoice")
+        live_aged(company, "Account Payables")
       ),
       check_totals(
         :invoice_totals,
@@ -48,7 +50,7 @@ defmodule FullCircle.XeroImport.Reconcile do
         live_bill_totals(company)
       ),
       check_named(:fa_nbv, report_lines(reports, "fa_nbv"), live_fa_nbv(company)),
-      check_named(:bank, report_lines(reports, "bank"), live_bank(company))
+      check_named(:bank, report_lines(reports, "bank"), live_bank(company), overrides)
     ]
 
     result = %{checks: checks}
@@ -85,52 +87,23 @@ defmodule FullCircle.XeroImport.Reconcile do
     |> Map.new(fn {name, amt} -> {name, decimalize(amt)} end)
   end
 
-  defp live_aged(company, doc_type) do
-    headers =
-      from(t in Transaction,
-        join: c in Contact,
-        on: c.id == t.contact_id,
-        where: t.company_id == ^company.id,
-        where: t.doc_type == ^doc_type,
-        select: %{id: t.id, contact_name: c.name, amount: t.amount}
-      )
-      |> Repo.all()
-
-    ids = Enum.map(headers, & &1.id)
-
-    matched =
-      if ids == [] do
-        %{}
-      else
-        live =
-          from(m in TransactionMatcher,
-            where: m.transaction_id in ^ids,
-            group_by: m.transaction_id,
-            select: {m.transaction_id, sum(m.match_amount)}
-          )
-          |> Repo.all()
-          |> Map.new()
-
-        seed =
-          from(m in SeedTransactionMatcher,
-            where: m.transaction_id in ^ids,
-            group_by: m.transaction_id,
-            select: {m.transaction_id, sum(m.match_amount)}
-          )
-          |> Repo.all()
-          |> Map.new()
-
-        Map.merge(live, seed, fn _k, a, b -> Decimal.add(decimalize(a), decimalize(b)) end)
-      end
-
-    Enum.reduce(headers, %{}, fn header, acc ->
-      outstanding =
-        header.amount
-        |> decimalize()
-        |> Decimal.add(decimalize(Map.get(matched, header.id, 0)))
-
-      Map.update(acc, header.contact_name, outstanding, &Decimal.add(&1, outstanding))
-    end)
+  # Xero's per-contact Outstanding nets everything hitting the control account
+  # (invoices, credit notes, unallocated receipts), so mirror it as a plain
+  # contact-grouped sum of control-account transactions — matchers are aging
+  # metadata, not balance.
+  defp live_aged(company, control_account_name) do
+    from(t in Transaction,
+      join: a in Account,
+      on: a.id == t.account_id,
+      join: c in Contact,
+      on: c.id == t.contact_id,
+      where: t.company_id == ^company.id,
+      where: a.name == ^control_account_name,
+      group_by: c.name,
+      select: {c.name, sum(t.amount)}
+    )
+    |> Repo.all()
+    |> Map.new(fn {name, amt} -> {name, decimalize(amt)} end)
   end
 
   defp live_invoice_totals(company) do
@@ -233,10 +206,10 @@ defmodule FullCircle.XeroImport.Reconcile do
     end)
   end
 
-  defp check_named(name, expected_rows, live_map) do
+  defp check_named(name, expected_rows, live_map, overrides \\ %{}) do
     expected_map =
       Enum.reduce(expected_rows, %{}, fn row, acc ->
-        key = remap_expected_name(line_key(row), name)
+        key = remap_expected_name(line_key(row), name, overrides)
         amt = decimalize(line_amount(row))
         Map.update(acc, key, amt, &Decimal.add(&1, amt))
       end)
@@ -365,11 +338,12 @@ defmodule FullCircle.XeroImport.Reconcile do
     end
   end
 
-  defp remap_expected_name(key, name) when name in [:trial_balance, :bank] and is_binary(key) do
-    Mapper.control_account_name(key)
+  defp remap_expected_name(key, name, overrides)
+       when name in [:trial_balance, :bank] and is_binary(key) do
+    Mapper.control_account_name(key, overrides)
   end
 
-  defp remap_expected_name(key, _name), do: key
+  defp remap_expected_name(key, _name, _overrides), do: key
 
   defp line_key(row) when is_map(row) do
     row["account_name"] || row[:account_name] ||
