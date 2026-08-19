@@ -117,7 +117,8 @@ Project skills (non-obvious domain contracts) live in `.claude/skills/`:
 `e-invoice-bill-prefill.md`, `bank-recon-llm-parser.md`, `cash-forecast-model.md`,
 `cp204-instalment-planner.md`, `punch-card-payroll.md`, `finger-print-import.md`,
 `statutory-bundle.md`, `liveview-computed-field-gotchas.md`, `liveview-upload-gotchas.md`,
-`optimistic-locking.md`, `accounting-period-lock.md`, `user-query-sql.md`.
+`optimistic-locking.md`, `accounting-period-lock.md`, `user-query-sql.md`,
+`xero-import.md`.
 
 ### StdInterface Pattern (`lib/full_circle/std_interface.ex`)
 
