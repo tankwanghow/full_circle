@@ -6,6 +6,9 @@ defmodule FullCircle.XeroImport do
 
   def apply(snapshot, user), do: FullCircle.XeroImport.Apply.run(snapshot, user, [])
 
+  def reconcile(snapshot, company, user),
+    do: FullCircle.XeroImport.Reconcile.run(snapshot, company, user)
+
   def dry_run(snapshot, opts \\ %{})
 
   def dry_run(snapshot, opts) when is_map(snapshot) do

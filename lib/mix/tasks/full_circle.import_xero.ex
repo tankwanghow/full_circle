@@ -6,19 +6,26 @@ defmodule Mix.Tasks.FullCircle.ImportXero do
 
       mix full_circle.import_xero --dry-run --snapshot-dir PATH --user EMAIL
       mix full_circle.import_xero --apply --snapshot-dir PATH --user EMAIL [--reset]
+      mix full_circle.import_xero --reconcile --snapshot-dir PATH --user EMAIL [--company NAME]
 
   Default `--snapshot-dir` is `priv/xero_import/golden_husbandry`.
   `--user` falls back to env `FC_IMPORT_USER`.
+  `--reconcile` needs an existing company (`--company`, default Golden Husbandry Sdn. Bhd.).
 
   `--auth` and `--snapshot` are not implemented in this task (see Task 10).
   """
 
   use Mix.Task
 
+  import Ecto.Query, warn: false
+
   alias FullCircle.XeroImport
-  alias FullCircle.XeroImport.Apply
+  alias FullCircle.XeroImport.{Apply, Reconcile}
+  alias FullCircle.Repo
+  alias FullCircle.Sys.{Company, CompanyUser}
 
   @default_snapshot_dir "priv/xero_import/golden_husbandry"
+  @default_company_name "Golden Husbandry Sdn. Bhd."
 
   @impl Mix.Task
   def run(args) do
@@ -32,6 +39,7 @@ defmodule Mix.Tasks.FullCircle.ImportXero do
           reset: :boolean,
           reconcile: :boolean,
           user: :string,
+          company: :string,
           snapshot_dir: :string,
           log: :string
         ]
@@ -53,11 +61,12 @@ defmodule Mix.Tasks.FullCircle.ImportXero do
         apply!(opts)
 
       opts[:reconcile] ->
-        stub!("not implemented")
+        Mix.Task.run("app.start")
+        reconcile!(opts)
 
       true ->
         stub!(
-          "usage: mix full_circle.import_xero --dry-run|--apply [--reset] [--user EMAIL] [--snapshot-dir PATH]"
+          "usage: mix full_circle.import_xero --dry-run|--apply|--reconcile [--reset] [--user EMAIL] [--company NAME] [--snapshot-dir PATH]"
         )
     end
   end
@@ -99,6 +108,40 @@ defmodule Mix.Tasks.FullCircle.ImportXero do
       {:error, reason} ->
         halt!(inspect(reason))
     end
+  end
+
+  defp reconcile!(opts) do
+    dir = snapshot_dir(opts)
+    name = opts[:company] || @default_company_name
+
+    with {:ok, user} <- resolve_user(opts),
+         {:ok, snap} <- XeroImport.read_snapshot(dir),
+         {:ok, company} <- find_company(name, user),
+         result <- Reconcile.run(snap, company, user) do
+      text = format_reconcile(result, company)
+      Mix.shell().info(text)
+      maybe_log(dir, opts, text)
+
+      case result do
+        {:ok, _} -> :ok
+        {:error, _} -> halt!("reconcile failed")
+      end
+    else
+      {:error, reason} -> halt!(inspect(reason))
+    end
+  end
+
+  defp find_company(name, user) do
+    company =
+      Repo.one(
+        from c in Company,
+          join: cu in CompanyUser,
+          on: cu.company_id == c.id,
+          where: c.name == ^name and cu.user_id == ^user.id,
+          limit: 1
+      )
+
+    if company, do: {:ok, company}, else: {:error, {:company_not_found, name}}
   end
 
   defp snapshot_dir(opts), do: opts[:snapshot_dir] || @default_snapshot_dir
@@ -162,6 +205,38 @@ defmodule Mix.Tasks.FullCircle.ImportXero do
     errors:
     #{err_lines}
     """
+  end
+
+  defp format_reconcile({status, %{checks: checks}}, company) do
+    tag = if status == :ok, do: "ok", else: "FAIL"
+
+    check_lines =
+      checks
+      |> Enum.map(&format_check/1)
+      |> Enum.join("\n")
+
+    """
+    reconcile #{tag} company=#{company.name} id=#{company.id}
+    #{check_lines}
+    """
+  end
+
+  defp format_check(%{name: name, ok?: true, diffs: _}) do
+    "  #{name}: ok"
+  end
+
+  defp format_check(%{name: name, ok?: false, diffs: diffs}) do
+    diff_lines =
+      diffs
+      |> Enum.map(&format_diff/1)
+      |> Enum.join("\n")
+
+    "  #{name}: FAIL\n#{diff_lines}"
+  end
+
+  defp format_diff(diff) do
+    key = diff[:account_name] || diff[:contact_name] || diff[:name] || diff[:key]
+    "    #{key} xero=#{diff[:xero]} full_circle=#{diff[:full_circle]} delta=#{diff[:delta]}"
   end
 
   defp format_errors([]), do: "  (none)"
