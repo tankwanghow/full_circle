@@ -35,8 +35,10 @@ defmodule FullCircle.XeroImport do
     %{
       accounts: 0,
       contacts: 0,
+      goods: 0,
       invoices: 0,
       bills: 0,
+      notes: 0,
       receipts: 0,
       payments: 0,
       journals: 0,

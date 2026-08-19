@@ -101,7 +101,12 @@ defmodule Mix.Tasks.FullCircle.ImportXero do
     with {:ok, user} <- resolve_user(opts),
          {:ok, snap} <- XeroImport.read_snapshot(dir),
          {:ok, result} <-
-           Apply.run(snap, user, reset: opts[:reset] == true, overrides: load_overrides(dir)) do
+           Apply.run(snap, user,
+             reset: opts[:reset] == true,
+             overrides: load_overrides(dir),
+             company_name: opts[:company] || @default_company_name
+           ) do
+      write_id_map!(dir, result.id_map)
       text = "applied company=#{result.company.name} id=#{result.company.id}"
       Mix.shell().info(text)
       maybe_log(dir, opts, text)
@@ -272,8 +277,10 @@ defmodule Mix.Tasks.FullCircle.ImportXero do
       [
         :accounts,
         :contacts,
+        :goods,
         :invoices,
         :bills,
+        :notes,
         :receipts,
         :payments,
         :journals,
@@ -348,6 +355,15 @@ defmodule Mix.Tasks.FullCircle.ImportXero do
       "off" -> false
       _ -> true
     end
+  end
+
+  defp write_id_map!(dir, id_map) when is_map(id_map) do
+    json =
+      id_map
+      |> Map.new(fn {k, v} -> {to_string(k), to_string(v)} end)
+      |> Jason.encode!(pretty: true)
+
+    File.write!(Path.join(dir, "id_map.json"), json)
   end
 
   defp stub!(message) do

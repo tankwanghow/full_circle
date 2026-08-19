@@ -26,6 +26,30 @@ defmodule FullCircle.XeroImport.ReconcileTest do
     assert Enum.all?(checks, & &1.ok?)
   end
 
+  test "maps Xero TB names onto FC control accounts", %{
+    snap: snap,
+    company: company,
+    user: user
+  } do
+    tb =
+      Enum.map(snap.reports["trial_balance"], fn
+        %{"account_name" => "Account Receivables"} = row ->
+          Map.put(row, "account_name", "Accounts Receivable")
+
+        %{"account_name" => "Account Payables"} = row ->
+          Map.put(row, "account_name", "Accounts Payable")
+
+        row ->
+          row
+      end)
+
+    snap = put_in(snap.reports["trial_balance"], tb)
+
+    assert {:ok, %{checks: checks}} = Reconcile.run(snap, company, user)
+    tb_check = Enum.find(checks, &(&1.name == :trial_balance))
+    assert tb_check.ok?
+  end
+
   test "off-by-0.01 fails with TB diff printing both sides", %{
     snap: snap,
     company: company,

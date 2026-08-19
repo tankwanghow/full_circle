@@ -1,4 +1,12 @@
 defmodule FullCircle.XeroImport.Mapper do
+  @control_accounts %{
+    "Accounts Receivable" => "Account Receivables",
+    "Accounts Payable" => "Account Payables",
+    "GST" => "Sales Tax Payable"
+  }
+
+  @overpayment_types ~w(AROVERPAYMENT APOVERPAYMENT ARPREPAYMENT APPREPAYMENT)
+
   @account_types %{
     "BANK" => "Bank",
     "CURRENT" => "Current Asset",
@@ -20,6 +28,19 @@ defmodule FullCircle.XeroImport.Mapper do
   }
 
   @importable_statuses ~w(AUTHORISED PAID)
+
+  def control_account_name(name, overrides \\ %{})
+
+  def control_account_name(name, overrides) when is_binary(name) do
+    custom = get_in(overrides || %{}, ["control_accounts", name])
+    custom || Map.get(@control_accounts, name) || name
+  end
+
+  def control_account_name(name, _overrides), do: name
+
+  def overpayment_or_prepayment?(doc) when is_map(doc) do
+    Map.get(doc, "Type") in @overpayment_types
+  end
 
   def account_type(xero_type, overrides) when is_binary(xero_type) and is_map(overrides) do
     override =

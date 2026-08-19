@@ -2,6 +2,19 @@ defmodule FullCircle.XeroImport.MapperTest do
   use ExUnit.Case, async: true
   alias FullCircle.XeroImport.Mapper
 
+  test "control account names map onto Full Circle defaults" do
+    assert Mapper.control_account_name("Accounts Receivable") == "Account Receivables"
+    assert Mapper.control_account_name("Accounts Payable") == "Account Payables"
+    assert Mapper.control_account_name("GST") == "Sales Tax Payable"
+    assert Mapper.control_account_name("Sales") == "Sales"
+  end
+
+  test "overpayment invoice types are detected" do
+    assert Mapper.overpayment_or_prepayment?(%{"Type" => "AROVERPAYMENT"})
+    assert Mapper.overpayment_or_prepayment?(%{"Type" => "ARPREPAYMENT"})
+    refute Mapper.overpayment_or_prepayment?(%{"Type" => "ACCREC"})
+  end
+
   test "maps every specified Xero account type" do
     assert Mapper.account_type("BANK", %{}) == {:ok, "Bank"}
     assert Mapper.account_type("REVENUE", %{}) == {:ok, "Revenue"}

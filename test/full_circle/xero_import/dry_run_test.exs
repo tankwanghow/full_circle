@@ -14,6 +14,10 @@ defmodule FullCircle.XeroImport.DryRunTest do
     assert {:ok, %{counts: c, errors: []}} = XeroImport.dry_run(snap, %{})
     assert c.invoices == 3
     assert c.skipped >= 1
+    assert c.goods == 1
+    assert c.notes == 0
+    assert Map.has_key?(c, :notes)
+    assert Map.has_key?(c, :goods)
   end
 
   test "dry-run captures missing allocation without writing", %{snap: snap} = ctx do

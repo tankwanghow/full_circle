@@ -14,6 +14,7 @@ defmodule FullCircle.XeroImport.Reconcile do
 
   alias FullCircle.Billing.{Invoice, InvoiceDetail, PurInvoice, PurInvoiceDetail}
   alias FullCircle.Repo
+  alias FullCircle.XeroImport.Mapper
 
   @tolerance Decimal.new("0.01")
 
@@ -234,8 +235,10 @@ defmodule FullCircle.XeroImport.Reconcile do
 
   defp check_named(name, expected_rows, live_map) do
     expected_map =
-      Map.new(expected_rows, fn row ->
-        {line_key(row), decimalize(line_amount(row))}
+      Enum.reduce(expected_rows, %{}, fn row, acc ->
+        key = remap_expected_name(line_key(row), name)
+        amt = decimalize(line_amount(row))
+        Map.update(acc, key, amt, &Decimal.add(&1, amt))
       end)
 
     keys =
@@ -361,6 +364,12 @@ defmodule FullCircle.XeroImport.Reconcile do
         %{count: 0, amount: Decimal.new(0)}
     end
   end
+
+  defp remap_expected_name(key, name) when name in [:trial_balance, :bank] and is_binary(key) do
+    Mapper.control_account_name(key)
+  end
+
+  defp remap_expected_name(key, _name), do: key
 
   defp line_key(row) when is_map(row) do
     row["account_name"] || row[:account_name] ||

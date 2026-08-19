@@ -1,8 +1,9 @@
 defmodule FullCircle.XeroImport.ApplyTest do
   use FullCircle.DataCase
 
-  alias FullCircle.{Accounting, Repo}
-  alias FullCircle.Accounting.Transaction
+  alias FullCircle.{Accounting, Repo, XeroImport}
+  alias FullCircle.Accounting.{Contact, TaxCode, Transaction}
+  alias FullCircle.Billing.{Invoice, InvoiceDetail}
   alias FullCircle.XeroImport.Apply
 
   setup do
@@ -238,6 +239,200 @@ defmodule FullCircle.XeroImport.ApplyTest do
 
     assert Decimal.eq?(matched, Decimal.new("-20.00"))
     assert Decimal.eq?(Decimal.add(ar.amount, matched), Decimal.new("30.00"))
+  end
+
+  test "contact name collision suffixes (2)", %{user: user, snap: snap, name: name} do
+    extra = %{
+      "ContactID" => "ct-alice-2",
+      "Name" => "Alice Customer",
+      "IsCustomer" => true,
+      "Addresses" => []
+    }
+
+    snap = %{snap | contacts: snap.contacts ++ [extra]}
+
+    {:ok, %{company: com, id_map: map}} =
+      Apply.run(snap, user, company_name: name, stop_after: :masters)
+
+    names =
+      Repo.all(from c in Contact, where: c.company_id == ^com.id, select: c.name)
+
+    assert "Alice Customer" in names
+    assert "Alice Customer (2)" in names
+    assert map["contact:ct-alice"] != map["contact:ct-alice-2"]
+  end
+
+  test "fixed asset name collision suffixes (2)", %{user: user, snap: snap, name: name} do
+    extra =
+      snap.fixed_assets
+      |> List.first()
+      |> Map.merge(%{"AssetId" => "fa-van-2", "AssetName" => "Van 1"})
+
+    snap = %{snap | fixed_assets: snap.fixed_assets ++ [extra]}
+
+    {:ok, %{company: com, id_map: map}} =
+      Apply.run(snap, user, company_name: name, stop_after: :masters)
+
+    names =
+      Repo.all(
+        from f in FullCircle.Accounting.FixedAsset,
+          where: f.company_id == ^com.id,
+          select: f.name
+      )
+
+    assert "Van 1" in names
+    assert "Van 1 (2)" in names
+    assert map["asset:fa-van"] != map["asset:fa-van-2"]
+  end
+
+  test "zero-rate Xero taxes reuse NoSTax/NoPTax", %{user: user, snap: snap, name: name} do
+    {:ok, %{company: com}} = Apply.run(snap, user, company_name: name, stop_after: :masters)
+
+    codes =
+      Repo.all(from t in TaxCode, where: t.company_id == ^com.id, select: t.code)
+
+    assert "NoSTax" in codes
+    assert "NoPTax" in codes
+    refute Enum.any?(codes, &String.contains?(&1, "TaxExempt"))
+  end
+
+  test "does not persist AROVERPAYMENT as an invoice", %{user: user, snap: snap, name: name} do
+    over = %{
+      "InvoiceID" => "inv-over",
+      "Type" => "AROVERPAYMENT",
+      "InvoiceNumber" => "OVER-1",
+      "Status" => "AUTHORISED",
+      "Contact" => %{"ContactID" => "ct-alice", "Name" => "Alice Customer"},
+      "Date" => "2024-02-01",
+      "DueDate" => "2024-03-01",
+      "LineAmountTypes" => "Exclusive",
+      "CurrencyCode" => "MYR",
+      "Total" => 10.0,
+      "LineItems" => [
+        %{
+          "Description" => "Overpayment",
+          "Quantity" => 1.0,
+          "UnitAmount" => 10.0,
+          "AccountCode" => "200",
+          "TaxType" => "NONE",
+          "LineAmount" => 10.0
+        }
+      ]
+    }
+
+    snap = %{snap | invoices: snap.invoices ++ [over]}
+    {:ok, %{company: com}} = Apply.run(snap, user, company_name: name)
+
+    refute Repo.exists?(
+             from i in Invoice, where: i.company_id == ^com.id and i.invoice_no == "OVER-1"
+           )
+  end
+
+  test "RECEIVE-OVERPAYMENT is imported as a receipt", %{user: user, snap: snap, name: name} do
+    snap = %{
+      snap
+      | bank_transactions: [
+          %{
+            "BankTransactionID" => "bt-over-1",
+            "Type" => "RECEIVE-OVERPAYMENT",
+            "Status" => "AUTHORISED",
+            "BankAccount" => %{"AccountID" => "ac-bank"},
+            "Contact" => %{"ContactID" => "ct-alice"},
+            "Date" => "2024-02-20",
+            "CurrencyCode" => "MYR",
+            "Total" => 12.0,
+            "LineItems" => [
+              %{
+                "Description" => "Customer overpay",
+                "Quantity" => 1.0,
+                "UnitAmount" => 12.0,
+                "AccountCode" => "200",
+                "TaxType" => "NONE",
+                "LineAmount" => 12.0
+              }
+            ]
+          }
+        ]
+    }
+
+    {:ok, %{company: com}} = Apply.run(snap, user, company_name: name)
+
+    rec =
+      Repo.one!(
+        from r in FullCircle.ReceiveFund.Receipt,
+          where: r.company_id == ^com.id and r.receipt_no == "bt-over-1"
+      )
+
+    assert Decimal.eq?(rec.funds_amount, Decimal.new("12.00"))
+  end
+
+  test "inclusive line amounts are netted before FC tax", %{user: user, snap: snap, name: name} do
+    inv = %{
+      "InvoiceID" => "inv-incl",
+      "Type" => "ACCREC",
+      "InvoiceNumber" => "INV-INCL",
+      "Status" => "AUTHORISED",
+      "Contact" => %{"ContactID" => "ct-alice", "Name" => "Alice Customer"},
+      "Date" => "2024-02-01",
+      "DueDate" => "2024-03-01",
+      "LineAmountTypes" => "Inclusive",
+      "CurrencyCode" => "MYR",
+      "Total" => 53.0,
+      "LineItems" => [
+        %{
+          "Description" => "Egg",
+          "Quantity" => 10.0,
+          "UnitAmount" => 5.3,
+          "AccountCode" => "200",
+          "ItemCode" => "EGG",
+          "TaxType" => "OUTPUT",
+          "LineAmount" => 53.0
+        }
+      ]
+    }
+
+    snap = %{snap | invoices: snap.invoices ++ [inv]}
+    {:ok, %{company: com}} = Apply.run(snap, user, company_name: name)
+
+    detail =
+      Repo.one!(
+        from d in InvoiceDetail,
+          join: i in Invoice,
+          on: d.invoice_id == i.id,
+          where: i.company_id == ^com.id and i.invoice_no == "INV-INCL"
+      )
+
+    assert Decimal.eq?(Decimal.round(detail.unit_price, 2), Decimal.new("5.00"))
+  end
+
+  test "mix --apply writes id_map.json next to the snapshot", %{user: user, name: name} do
+    src = XeroImport.fixture_dir()
+    dir = Path.join(System.tmp_dir!(), "xero-idmap-#{System.unique_integer([:positive])}")
+    File.mkdir_p!(dir)
+
+    for file <- File.ls!(src), String.ends_with?(file, ".json") do
+      File.cp!(Path.join(src, file), Path.join(dir, file))
+    end
+
+    on_exit(fn -> File.rm_rf(dir) end)
+
+    Mix.Task.rerun("full_circle.import_xero", [
+      "--apply",
+      "--snapshot-dir",
+      dir,
+      "--user",
+      user.email,
+      "--company",
+      name,
+      "--log",
+      "false"
+    ])
+
+    path = Path.join(dir, "id_map.json")
+    assert File.exists?(path)
+    {:ok, map} = Jason.decode(File.read!(path))
+    assert is_binary(map["account:ac-ar"])
+    assert is_binary(map["contact:ct-alice"])
   end
 
   test "imports a SPEND bank transaction as a payment", %{user: user, snap: snap, name: name} do

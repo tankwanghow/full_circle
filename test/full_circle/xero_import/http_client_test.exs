@@ -334,6 +334,147 @@ defmodule FullCircle.XeroImport.HttpClientTest do
     assert is_map(snap.reports)
   end
 
+  test "get_reports fetches TrialBalance and does not call aged reports", %{stub: stub} do
+    Req.Test.stub(stub, fn conn ->
+      cond do
+        String.ends_with?(conn.request_path, "/Reports/TrialBalance") ->
+          Req.Test.json(conn, %{
+            "Reports" => [
+              %{
+                "Rows" => [
+                  %{
+                    "RowType" => "Row",
+                    "Cells" => [
+                      %{"Value" => "Sales"},
+                      %{"Value" => "10.00"},
+                      %{"Value" => "0.00"}
+                    ]
+                  }
+                ]
+              }
+            ]
+          })
+
+        String.contains?(conn.request_path, "Aged") ->
+          conn
+          |> Plug.Conn.put_resp_content_type("application/json")
+          |> Plug.Conn.send_resp(400, ~s({"ErrorNumber":400,"Message":"contactID required"}))
+
+        true ->
+          Plug.Conn.send_resp(conn, 404, conn.request_path)
+      end
+    end)
+
+    assert {:ok, reports} = HttpClient.get_reports(http_client(stub))
+    assert [%{"account_name" => "Sales", "balance" => 10.0}] = reports["trial_balance"]
+    assert reports["aged_receivables"] == []
+    assert reports["aged_payables"] == []
+  end
+
+  test "conversion date uses Day when present", %{stub: stub} do
+    Req.Test.expect(stub, fn conn ->
+      assert conn.request_path == "/api.xro/2.0/Setup"
+      Req.Test.json(conn, %{
+        "ConversionDate" => %{"Year" => 2024, "Month" => 1, "Day" => 15},
+        "ConversionBalances" => [%{"AccountCode" => "090", "Balance" => 1.0}]
+      })
+    end)
+
+    assert {:ok, cb} = HttpClient.get_conversion_balances(http_client(stub))
+    assert cb["Date"] == "2024-01-15"
+    Req.Test.verify!(stub)
+  end
+
+  test "list_fixed_assets requests status, pageSize, AssetTypes and asset details", %{stub: stub} do
+    Req.Test.stub(stub, fn conn ->
+      cond do
+        conn.request_path == "/assets.xro/1.0/AssetTypes" ->
+          Req.Test.json(conn, [
+            %{
+              "assetTypeId" => "fat-1",
+              "assetTypeName" => "Vehicles",
+              "fixedAssetAccountId" => "ac-fa",
+              "accumulatedDepreciationAccountId" => "ac-accum",
+              "depreciationExpenseAccountId" => "ac-depre"
+            }
+          ])
+
+        conn.request_path == "/assets.xro/1.0/Assets" ->
+          assert conn.query_params["pageSize"] == "200"
+          assert conn.query_params["status"] in ["REGISTERED", "DISPOSED"]
+
+          items =
+            if conn.query_params["status"] == "REGISTERED" do
+              [%{"assetId" => "fa-1", "assetName" => "Van", "assetTypeId" => "fat-1"}]
+            else
+              []
+            end
+
+          Req.Test.json(conn, %{
+            "pagination" => %{"page" => 1, "pageCount" => 1, "pageSize" => 200},
+            "items" => items
+          })
+
+        conn.request_path == "/assets.xro/1.0/Assets/fa-1" ->
+          Req.Test.json(conn, %{
+            "assetId" => "fa-1",
+            "assetName" => "Van",
+            "purchaseDate" => "2023-01-01",
+            "purchasePrice" => 1000.0,
+            "assetTypeId" => "fat-1",
+            "accountingBookValue" => 800.0,
+            "bookDepreciationSetting" => %{
+              "depreciationMethod" => "StraightLine",
+              "depreciationRate" => 20.0,
+              "averagingMethod" => "Monthly"
+            },
+            "bookDepreciationDetail" => %{
+              "residualValue" => 0,
+              "depreciationStartDate" => "2023-01-01",
+              "priorAccumDepreciationAmount" => 200.0,
+              "currentAccumDepreciationAmount" => 0.0
+            }
+          })
+
+        true ->
+          Plug.Conn.send_resp(conn, 404, conn.request_path)
+      end
+    end)
+
+    assert {:ok, [asset]} = HttpClient.list_fixed_assets(http_client(stub))
+    assert asset["AssetId"] == "fa-1"
+    assert asset["AssetName"] == "Van"
+    assert asset["DepreciationMethod"] == "StraightLine"
+    assert asset["AssetType"]["FixedAssetAccountId"] == "ac-fa"
+    assert [%{"DepreciationAmount" => 200.0}] = asset["DepreciationHistory"]
+  end
+
+  test "pull fills aged from contact outstanding when aged reports are empty", %{dir: dir} do
+    dest = Path.join(dir, "snap-aged")
+
+    client = %FakeClient{
+      payloads: %{
+        list_contacts: [
+          %{
+            "ContactID" => "c1",
+            "Name" => "Alice Customer",
+            "Balances" => %{"AccountsReceivable" => %{"Outstanding" => 120.0}}
+          },
+          %{
+            "ContactID" => "c2",
+            "Name" => "Bob Supplier",
+            "Balances" => %{"AccountsPayable" => %{"Outstanding" => 30.0}}
+          }
+        ]
+      }
+    }
+
+    assert {:ok, ^dest} = Snapshot.pull(client, dest)
+    assert {:ok, snap} = Snapshot.read(dest)
+    assert [%{"contact_name" => "Alice Customer", "balance" => 120.0}] = snap.reports["aged_receivables"]
+    assert [%{"contact_name" => "Bob Supplier", "balance" => -30.0}] = snap.reports["aged_payables"]
+  end
+
   test "failed pull leaves dest and does not keep tmp", %{dir: dir} do
     dest = Path.join(dir, "snap")
     File.mkdir_p!(dest)

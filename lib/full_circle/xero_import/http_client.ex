@@ -65,8 +65,40 @@ defmodule FullCircle.XeroImport.HttpClient do
   def list_manual_journals(client),
     do: get_pages(client, "#{@accounting}/ManualJournals", "ManualJournals")
 
+  @asset_statuses ~w(REGISTERED DISPOSED)
+  @asset_page_size 200
+
   @impl true
-  def list_fixed_assets(client), do: get_pages(client, "#{@assets}/Assets", "items")
+  def list_fixed_assets(client) do
+    types_by_id =
+      case request(client, :get, "#{@assets}/AssetTypes") do
+        {:ok, body} ->
+          body
+          |> extract_list("items")
+          |> then(fn
+            [] -> extract_list(body, "AssetTypes")
+            list -> list
+          end)
+          |> Map.new(fn type ->
+            id = type["assetTypeId"] || type["AssetTypeId"]
+            {to_string(id), type}
+          end)
+
+        {:error, _} ->
+          %{}
+      end
+
+    Enum.reduce_while(@asset_statuses, {:ok, []}, fn status, {:ok, acc} ->
+      case list_assets_by_status(client, status) do
+        {:ok, items} -> {:cont, {:ok, acc ++ items}}
+        {:error, _} = err -> {:halt, err}
+      end
+    end)
+    |> case do
+      {:ok, items} -> hydrate_assets(client, items, types_by_id)
+      {:error, _} = err -> err
+    end
+  end
 
   @impl true
   def get_conversion_balances(client) do
@@ -77,14 +109,14 @@ defmodule FullCircle.XeroImport.HttpClient do
 
   @impl true
   def get_reports(client) do
-    with {:ok, tb} <- request(client, :get, "#{@accounting}/Reports/TrialBalance"),
-         {:ok, ar} <- request(client, :get, "#{@accounting}/Reports/AgedReceivablesByContact"),
-         {:ok, ap} <- request(client, :get, "#{@accounting}/Reports/AgedPayablesByContact") do
+    # AgedReceivablesByContact / AgedPayablesByContact require contactID and 400
+    # without it. Snapshot.pull fills aged from Contacts Outstanding instead.
+    with {:ok, tb} <- request(client, :get, "#{@accounting}/Reports/TrialBalance") do
       {:ok,
        %{
          "trial_balance" => parse_trial_balance(tb),
-         "aged_receivables" => parse_aged(ar, :ar),
-         "aged_payables" => parse_aged(ap, :ap)
+         "aged_receivables" => [],
+         "aged_payables" => []
        }}
     end
   end
@@ -274,35 +306,22 @@ defmodule FullCircle.XeroImport.HttpClient do
     %{"Date" => date, "Lines" => lines}
   end
 
-  defp conversion_date(%{"Year" => year, "Month" => month}) do
-    "#{year}-#{String.pad_leading(to_string(month), 2, "0")}-01"
+  defp conversion_date(%{"Year" => year, "Month" => month} = map) do
+    day = Map.get(map, "Day") || 1
+
+    "#{pad_int(year, 4)}-#{pad_int(month, 2)}-#{pad_int(day, 2)}"
   end
 
   defp conversion_date(other) when is_binary(other), do: other
   defp conversion_date(_), do: nil
+
+  defp pad_int(n, width), do: n |> to_string() |> String.pad_leading(width, "0")
 
   defp parse_trial_balance(body) do
     body
     |> report_rows()
     |> walk_detail_rows()
     |> Enum.flat_map(&tb_line/1)
-  end
-
-  defp parse_aged(body, kind) do
-    sign = if kind == :ap, do: -1, else: 1
-
-    Enum.flat_map(report_rows(body), fn
-      %{"RowType" => "Section", "Title" => title, "Rows" => inner}
-      when is_binary(title) and title != "" ->
-        if title in ["Total"] do
-          []
-        else
-          [%{"contact_name" => title, "balance" => sign * section_total(inner)}]
-        end
-
-      _ ->
-        []
-    end)
   end
 
   defp report_rows(%{"Reports" => [report | _]}), do: report["Rows"] || []
@@ -347,17 +366,6 @@ defmodule FullCircle.XeroImport.HttpClient do
 
   defp tb_line(_), do: []
 
-  defp section_total(rows) do
-    summary = Enum.find(rows || [], &match?(%{"RowType" => "SummaryRow"}, &1))
-    cells = (summary || List.last(rows || []) || %{})["Cells"] || []
-
-    cells
-    |> Enum.map(&cell_value/1)
-    |> Enum.filter(&numeric?/1)
-    |> List.last()
-    |> to_number()
-  end
-
   defp cell_value(%{"Value" => v}), do: v
   defp cell_value(_), do: nil
 
@@ -383,4 +391,145 @@ defmodule FullCircle.XeroImport.HttpClient do
   end
 
   defp to_number(_), do: 0.0
+
+  defp list_assets_by_status(client, status, page \\ 1, acc \\ []) do
+    params = [status: status, page: page, pageSize: @asset_page_size]
+
+    with {:ok, body} <- request(client, :get, "#{@assets}/Assets", params: params) do
+      items = extract_list(body, "items")
+      pagination = if is_map(body), do: body["pagination"] || %{}, else: %{}
+      page_count = pagination["pageCount"] || pagination["page_count"] || 1
+      acc = acc ++ items
+
+      if items == [] or page >= page_count do
+        {:ok, acc}
+      else
+        list_assets_by_status(client, status, page + 1, acc)
+      end
+    end
+  end
+
+  defp hydrate_assets(client, items, types_by_id) do
+    Enum.reduce_while(items, {:ok, []}, fn item, {:ok, acc} ->
+      id = item["assetId"] || item["AssetId"] || item["AssetID"]
+
+      detail =
+        if is_binary(id) and id != "" do
+          case request(client, :get, "#{@assets}/Assets/#{id}") do
+            {:ok, body} when is_map(body) -> body
+            _ -> item
+          end
+        else
+          item
+        end
+
+      {:cont, {:ok, acc ++ [normalize_asset(detail, item, types_by_id)]}}
+    end)
+  end
+
+  defp normalize_asset(detail, list_item, types_by_id) do
+    asset = Map.merge(list_item || %{}, detail || %{})
+    type_id = asset["assetTypeId"] || asset["AssetTypeId"]
+    type = asset["assetType"] || asset["AssetType"] || types_by_id[to_string(type_id)] || %{}
+    setting = asset["bookDepreciationSetting"] || asset["BookDepreciationSetting"] || %{}
+    book = asset["bookDepreciationDetail"] || asset["BookDepreciationDetail"] || %{}
+    history = depreciation_history(asset, book)
+
+    %{
+      "AssetId" => asset["assetId"] || asset["AssetId"] || asset["AssetID"],
+      "AssetName" => asset["assetName"] || asset["AssetName"],
+      "AssetNumber" => asset["assetNumber"] || asset["AssetNumber"],
+      "PurchaseDate" => asset["purchaseDate"] || asset["PurchaseDate"],
+      "PurchasePrice" => asset["purchasePrice"] || asset["PurchasePrice"],
+      "ResidualValue" =>
+        book["residualValue"] || book["ResidualValue"] || asset["residualValue"] ||
+          asset["ResidualValue"] || 0,
+      "DepreciationStartDate" =>
+        book["depreciationStartDate"] || book["DepreciationStartDate"] ||
+          asset["depreciationStartDate"] || asset["DepreciationStartDate"],
+      "BookValue" =>
+        asset["accountingBookValue"] || asset["AccountingBookValue"] || asset["bookValue"] ||
+          asset["BookValue"],
+      "AccountingBookValue" => asset["accountingBookValue"] || asset["AccountingBookValue"],
+      "DepreciationMethod" =>
+        setting["depreciationMethod"] || setting["DepreciationMethod"] ||
+          asset["DepreciationMethod"],
+      "AveragingMethod" =>
+        setting["averagingMethod"] || setting["AveragingMethod"] || asset["AveragingMethod"],
+      "DepreciationRate" =>
+        setting["depreciationRate"] || setting["DepreciationRate"] || asset["DepreciationRate"],
+      "AssetTypeId" => type_id,
+      "AssetType" => normalize_asset_type(type),
+      "DepreciationHistory" => history
+    }
+  end
+
+  defp normalize_asset_type(type) when is_map(type) do
+    %{
+      "AssetTypeName" => type["assetTypeName"] || type["AssetTypeName"],
+      "FixedAssetAccountId" => type["fixedAssetAccountId"] || type["FixedAssetAccountId"],
+      "AccumulatedDepreciationAccountId" =>
+        type["accumulatedDepreciationAccountId"] || type["AccumulatedDepreciationAccountId"],
+      "DepreciationExpenseAccountId" =>
+        type["depreciationExpenseAccountId"] || type["DepreciationExpenseAccountId"],
+      "DisposalAccountId" => type["disposalAccountId"] || type["DisposalAccountId"]
+    }
+  end
+
+  defp normalize_asset_type(_), do: %{}
+
+  defp depreciation_history(asset, book) do
+    existing = asset["DepreciationHistory"] || asset["depreciationHistory"]
+
+    if is_list(existing) and existing != [] do
+      Enum.map(existing, &normalize_history_row/1)
+    else
+      synthesize_history(asset, book)
+    end
+  end
+
+  defp normalize_history_row(row) when is_map(row) do
+    %{
+      "DepreciationDate" => row["DepreciationDate"] || row["depreciationDate"],
+      "DepreciationAmount" => row["DepreciationAmount"] || row["depreciationAmount"],
+      "CostLimit" => row["CostLimit"] || row["costLimit"]
+    }
+  end
+
+  defp normalize_history_row(_), do: %{}
+
+  defp synthesize_history(asset, book) do
+    pur = to_number(asset["purchasePrice"] || asset["PurchasePrice"] || 0)
+
+    book_value =
+      to_number(
+        asset["accountingBookValue"] || asset["AccountingBookValue"] || asset["bookValue"] ||
+          asset["BookValue"] || pur
+      )
+
+    prior = to_number(book["priorAccumDepreciationAmount"] || book["PriorAccumDepreciationAmount"])
+    current =
+      to_number(book["currentAccumDepreciationAmount"] || book["CurrentAccumDepreciationAmount"])
+
+    amount =
+      cond do
+        prior + current > 0 -> prior + current
+        pur - book_value > 0 -> pur - book_value
+        true -> 0.0
+      end
+
+    if amount == 0.0 do
+      []
+    else
+      [
+        %{
+          "DepreciationDate" =>
+            book["depreciationStartDate"] || book["DepreciationStartDate"] ||
+              asset["purchaseDate"] || asset["PurchaseDate"],
+          "DepreciationAmount" => amount,
+          "CostLimit" => book["costLimit"] || book["CostLimit"] || pur
+        }
+      ]
+    end
+  end
 end

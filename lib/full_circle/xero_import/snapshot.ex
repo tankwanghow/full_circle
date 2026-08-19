@@ -143,6 +143,8 @@ defmodule FullCircle.XeroImport.Snapshot do
       |> Map.put_new("bill_totals", doc_totals(Map.get(data, :invoices), "ACCPAY"))
       |> Map.put_new("fa_nbv", fa_nbv(Map.get(data, :fixed_assets)))
       |> Map.put_new("bank", bank_lines(reports, Map.get(data, :accounts)))
+      |> fill_aged("aged_receivables", Map.get(data, :contacts), :ar)
+      |> fill_aged("aged_payables", Map.get(data, :contacts), :ap)
 
     Map.put(data, :reports, reports)
   end
@@ -173,6 +175,51 @@ defmodule FullCircle.XeroImport.Snapshot do
         "name" => asset["AssetName"] || asset["AssetNumber"],
         "nbv" => asset["BookValue"] || asset["AccountingBookValue"] || 0
       }
+    end)
+  end
+
+  defp fill_aged(reports, key, contacts, kind) do
+    case reports[key] do
+      list when is_list(list) and list != [] ->
+        reports
+
+      _ ->
+        Map.put(reports, key, aged_from_contacts(contacts, kind))
+    end
+  end
+
+  defp aged_from_contacts(contacts, kind) do
+    sign = if kind == :ap, do: -1, else: 1
+    path =
+      if kind == :ap do
+        ["Balances", "AccountsPayable", "Outstanding"]
+      else
+        ["Balances", "AccountsReceivable", "Outstanding"]
+      end
+
+    alt_path =
+      if kind == :ap do
+        ["balances", "accountsPayable", "outstanding"]
+      else
+        ["balances", "accountsReceivable", "outstanding"]
+      end
+
+    contacts
+    |> List.wrap()
+    |> Enum.flat_map(fn contact ->
+      bal = get_in(contact, path) || get_in(contact, alt_path) || 0
+      amount = to_float(bal)
+
+      if amount == 0.0 do
+        []
+      else
+        [
+          %{
+            "contact_name" => contact["Name"] || contact["name"],
+            "balance" => sign * amount
+          }
+        ]
+      end
     end)
   end
 

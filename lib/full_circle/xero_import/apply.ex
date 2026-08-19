@@ -21,13 +21,9 @@ defmodule FullCircle.XeroImport.Apply do
 
   @default_company_name "Golden Husbandry Sdn. Bhd."
 
-  @default_control_accounts %{
-    "Accounts Receivable" => "Account Receivables",
-    "Accounts Payable" => "Account Payables",
-    "GST" => "Sales Tax Payable"
-  }
-
   @xero_line_good "__xero_line__"
+  @receive_bank_types ~w(RECEIVE RECEIVE-OVERPAYMENT RECEIVE-PREPAYMENT)
+  @spend_bank_types ~w(SPEND SPEND-OVERPAYMENT SPEND-PREPAYMENT)
 
   def run(snapshot, user, opts \\ []) do
     overrides = Keyword.get(opts, :overrides) || %{}
@@ -161,7 +157,7 @@ defmodule FullCircle.XeroImport.Apply do
   defp plan_goods(state) do
     Enum.reduce(rows(state.snapshot.items), state, fn xero, state ->
       attrs = Mapper.good(xero, state.account_codes, state.tax_by_type)
-      add_op(state, {:good, attrs})
+      add_op(state, {:goods, attrs})
     end)
   end
 
@@ -177,6 +173,9 @@ defmodule FullCircle.XeroImport.Apply do
   defp plan_invoices(state) do
     Enum.reduce(rows(state.snapshot.invoices), state, fn inv, state ->
       cond do
+        Mapper.overpayment_or_prepayment?(inv) ->
+          add_op(state, {:skip, :overpayment, inv})
+
         not Mapper.importable_invoice?(inv) ->
           add_op(state, {:skip, :not_importable, inv})
 
@@ -210,7 +209,7 @@ defmodule FullCircle.XeroImport.Apply do
         true ->
           state
           |> plan_allocations(note["Allocations"] || [], note["CreditNoteID"])
-          |> add_op({:note, note})
+          |> add_op({:notes, note})
       end
     end)
   end
@@ -287,10 +286,10 @@ defmodule FullCircle.XeroImport.Apply do
           {:foreign_currency, txn["BankTransactionNumber"] || txn["BankTransactionID"]}
         )
 
-      txn["Type"] == "SPEND" ->
+      txn["Type"] in @spend_bank_types ->
         add_op(state, {:payments, txn})
 
-      txn["Type"] == "RECEIVE" ->
+      txn["Type"] in @receive_bank_types ->
         add_op(state, {:receipts, txn})
 
       true ->
@@ -405,7 +404,7 @@ defmodule FullCircle.XeroImport.Apply do
     xero_code = xero["Code"]
 
     with {:ok, account_type} <- Mapper.account_type(xero["Type"], ctx.overrides) do
-      fc_name = control_target(xero_name, ctx.overrides)
+      fc_name = Mapper.control_account_name(xero_name, ctx.overrides)
 
       acc =
         Accounting.get_account_by_name(fc_name, ctx.company, ctx.user) ||
@@ -426,11 +425,6 @@ defmodule FullCircle.XeroImport.Apply do
           end
       end
     end
-  end
-
-  defp control_target(xero_name, overrides) do
-    custom = get_in(overrides, ["control_accounts", xero_name])
-    custom || Map.get(@default_control_accounts, xero_name) || xero_name
   end
 
   defp put_account(ctx, xero_id, xero_code, acc) do
@@ -466,24 +460,37 @@ defmodule FullCircle.XeroImport.Apply do
   end
 
   defp upsert_tax_code(code, xero_type, ctx) do
-    attrs = %{
-      "code" => code.code,
-      "tax_type" => code.tax_type,
-      "rate" => code.rate,
-      "descriptions" => code.descriptions,
-      "account_name" => tax_account_name(code.tax_type)
-    }
+    if zero_rate?(code.rate) do
+      default_code = if(code.tax_type == "Purchase", do: "NoPTax", else: "NoSTax")
 
-    case Accounting.get_tax_code_by_code(code.code, ctx.company, ctx.user) do
-      %{code: _} = tc ->
-        {:ok, put_tax(ctx, xero_type, tc)}
+      case Accounting.get_tax_code_by_code(default_code, ctx.company, ctx.user) do
+        %{code: _} = tc -> {:ok, put_tax(ctx, xero_type, tc)}
+        nil -> {:error, {:unmapped_tax, default_code}}
+      end
+    else
+      attrs = %{
+        "code" => code.code,
+        "tax_type" => code.tax_type,
+        "rate" => code.rate,
+        "descriptions" => code.descriptions,
+        "account_name" => tax_account_name(code.tax_type)
+      }
 
-      nil ->
-        case seed_one("TaxCodes", attrs, ctx) do
-          {:ok, tc} -> {:ok, put_tax(ctx, xero_type, tc)}
-          {:error, _} = err -> err
-        end
+      case Accounting.get_tax_code_by_code(code.code, ctx.company, ctx.user) do
+        %{code: _} = tc ->
+          {:ok, put_tax(ctx, xero_type, tc)}
+
+        nil ->
+          case seed_one("TaxCodes", attrs, ctx) do
+            {:ok, tc} -> {:ok, put_tax(ctx, xero_type, tc)}
+            {:error, _} = err -> err
+          end
+      end
     end
+  end
+
+  defp zero_rate?(rate) do
+    Decimal.compare(decimalize(rate), Decimal.new(0)) == :eq
   end
 
   defp tax_account_name("Sales"), do: "Sales Tax Payable"
@@ -503,18 +510,12 @@ defmodule FullCircle.XeroImport.Apply do
     attrs = Mapper.contact(xero)
     xero_id = xero["ContactID"] || xero["ContactId"]
 
-    case Accounting.get_contact_by_name(attrs["name"], ctx.company, ctx.user) do
-      %Contact{} = contact ->
-        {:ok, put_id(ctx, "contact:" <> to_string(xero_id), contact.id)}
+    attrs =
+      uniquify_name(attrs, ctx, &Accounting.get_contact_by_name(&1, ctx.company, ctx.user))
 
-      nil ->
-        attrs =
-          uniquify_name(attrs, ctx, &Accounting.get_contact_by_name(&1, ctx.company, ctx.user))
-
-        case seed_one("Contacts", attrs, ctx) do
-          {:ok, contact} -> {:ok, put_id(ctx, "contact:" <> to_string(xero_id), contact.id)}
-          {:error, _} = err -> err
-        end
+    case seed_one("Contacts", attrs, ctx) do
+      {:ok, contact} -> {:ok, put_id(ctx, "contact:" <> to_string(xero_id), contact.id)}
+      {:error, _} = err -> err
     end
   end
 
@@ -599,19 +600,16 @@ defmodule FullCircle.XeroImport.Apply do
       attrs = Map.merge(attrs, asset_account_names(xero, ctx))
       xero_id = xero["AssetId"] || xero["AssetID"]
 
-      case Accounting.get_fixed_asset_by_name(attrs["name"], ctx.company, ctx.user) do
-        %{id: id} ->
-          {:ok, put_id(ctx, "asset:" <> to_string(xero_id), id)}
+      attrs =
+        uniquify_name(attrs, ctx, &Accounting.get_fixed_asset_by_name(&1, ctx.company, ctx.user))
 
-        nil ->
-          case seed_one("FixedAssets", attrs, ctx) do
-            {:ok, fa} ->
-              ctx = put_id(ctx, "asset:" <> to_string(xero_id), fa.id)
-              seed_depreciations(xero, fa, ctx)
+      case seed_one("FixedAssets", attrs, ctx) do
+        {:ok, fa} ->
+          ctx = put_id(ctx, "asset:" <> to_string(xero_id), fa.id)
+          seed_depreciations(xero, fa, ctx)
 
-            {:error, _} = err ->
-              err
-          end
+        {:error, _} = err ->
+          err
       end
     end
   end
@@ -816,6 +814,9 @@ defmodule FullCircle.XeroImport.Apply do
 
   defp import_one_invoice(inv, ctx, base) do
     cond do
+      Mapper.overpayment_or_prepayment?(inv) ->
+        {:ok, ctx}
+
       not Mapper.importable_invoice?(inv) ->
         {:ok, ctx}
 
@@ -902,17 +903,19 @@ defmodule FullCircle.XeroImport.Apply do
   end
 
   defp invoice_details(inv, ctx, side, type) do
+    line_types = inv["LineAmountTypes"]
+
     (inv["LineItems"] || [])
     |> Enum.with_index()
     |> Enum.reduce_while({:ok, %{}}, fn {line, idx}, {:ok, acc} ->
-      case invoice_detail(line, ctx, side, type, idx) do
+      case invoice_detail(line, ctx, side, type, idx, line_types) do
         {:ok, detail} -> {:cont, {:ok, Map.put(acc, Integer.to_string(idx), detail)}}
         {:error, _} = err -> {:halt, err}
       end
     end)
   end
 
-  defp invoice_detail(line, ctx, side, type, idx) do
+  defp invoice_detail(line, ctx, side, type, idx, line_types) do
     with {:ok, good} <- resolve_line_good(line, ctx),
          {:ok, account} <- resolve_line_account(line, good, ctx, type),
          {:ok, tax} <- resolve_line_tax(line, ctx, side) do
@@ -925,7 +928,13 @@ defmodule FullCircle.XeroImport.Apply do
           qty
         end
 
-      unit_price = decimalize(line["UnitAmount"] || line["LineAmount"] || 0)
+      unit_price =
+        exclusive_unit_price(
+          decimalize(line["UnitAmount"] || line["LineAmount"] || 0),
+          tax.rate,
+          line_types
+        )
+
       pkg_name = good.package_name || good.unit || "unit"
 
       {:ok,
@@ -1182,6 +1191,13 @@ defmodule FullCircle.XeroImport.Apply do
           qty = decimalize(line["Quantity"] || 1)
           qty = if Decimal.compare(qty, 0) != :gt, do: Decimal.new(1), else: qty
 
+          unit_price =
+            exclusive_unit_price(
+              decimalize(line["UnitAmount"] || line["LineAmount"] || 0),
+              tax && tax.rate,
+              note["LineAmountTypes"]
+            )
+
           {Integer.to_string(idx),
            %{
              "descriptions" => line["Description"] || note["CreditNoteNumber"] || "Note",
@@ -1190,7 +1206,7 @@ defmodule FullCircle.XeroImport.Apply do
              "tax_code_id" => tax && tax.id,
              "tax_code_name" => tax && tax.code,
              "quantity" => qty,
-             "unit_price" => decimalize(line["UnitAmount"] || line["LineAmount"] || 0),
+             "unit_price" => unit_price,
              "tax_rate" => (tax && tax.rate) || Decimal.new(0),
              "_persistent_id" => Integer.to_string(idx + 1)
            }}
@@ -1440,10 +1456,10 @@ defmodule FullCircle.XeroImport.Apply do
       Map.has_key?(txn, "CurrencyCode") and not Mapper.base_currency_ok?(txn, base_currency(ctx)) ->
         {:error, {:foreign_currency, txn["BankTransactionNumber"] || txn["BankTransactionID"]}}
 
-      txn["Type"] == "SPEND" ->
+      txn["Type"] in @spend_bank_types ->
         persist_bank_spend(txn, ctx)
 
-      txn["Type"] == "RECEIVE" ->
+      txn["Type"] in @receive_bank_types ->
         persist_bank_receive(txn, ctx)
 
       true ->
@@ -1651,6 +1667,18 @@ defmodule FullCircle.XeroImport.Apply do
   end
 
   defp parse_date(_), do: nil
+
+  defp exclusive_unit_price(unit_price, tax_rate, "Inclusive") do
+    rate = decimalize(tax_rate)
+
+    if Decimal.compare(rate, Decimal.new(0)) == :gt do
+      Decimal.div(unit_price, Decimal.add(Decimal.new(1), rate))
+    else
+      unit_price
+    end
+  end
+
+  defp exclusive_unit_price(unit_price, _tax_rate, _line_types), do: unit_price
 
   defp decimalize(nil), do: Decimal.new(0)
   defp decimalize(%Decimal{} = d), do: d
