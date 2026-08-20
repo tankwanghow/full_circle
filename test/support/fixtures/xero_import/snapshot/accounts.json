@@ -52,5 +52,11 @@
     "Code": "270",
     "Name": "Gain on Disposal",
     "Type": "OTHERINCOME"
+  },
+  {
+    "AccountID": "ac-re",
+    "Code": "960",
+    "Name": "Retained Earnings",
+    "Type": "EQUITY"
   }
 ]

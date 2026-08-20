@@ -86,6 +86,7 @@ defmodule FullCircle.XeroImport.Apply do
              {:ok, ctx} <- import_bank(ctx),
              {:ok, ctx} <- post_catchup_journals(ctx),
              {:ok, ctx} <- post_aged_attribution(ctx),
+             {:ok, ctx} <- post_closing_journals(ctx),
              :ok <- Gapless.bump(ctx.company, ctx.imported_numbers) do
           {:ok, result(ctx)}
         end
@@ -869,12 +870,51 @@ defmodule FullCircle.XeroImport.Apply do
     {ar_strip, ap_strip} = conversion_control_strips(ctx)
     lines = cb["Lines"] || []
 
-    Enum.reduce_while(lines, {:ok, ctx}, fn line, {:ok, ctx} ->
+    lines
+    |> Enum.reduce_while({:ok, ctx}, fn line, {:ok, ctx} ->
       case seed_conversion_line(line, date, ar_strip, ap_strip, ctx) do
         {:ok, ctx} -> {:cont, {:ok, ctx}}
         {:error, _} = err -> {:halt, err}
       end
     end)
+    |> case do
+      {:ok, ctx} when lines != [] ->
+        balance_conversion_seed(date, ctx)
+
+      other ->
+        other
+    end
+  end
+
+  # Xero's conversion set balances to zero, but the AR/AP strips displace the
+  # part now re-posted by the imported conversion documents (whose P&L side
+  # Xero folds into Retained Earnings). Re-balance the seed set with an RE
+  # line so the ledger stays at zero.
+  defp balance_conversion_seed(date, ctx) do
+    seeded =
+      Repo.one(
+        from t in Transaction,
+          where: t.company_id == ^ctx.company.id and t.old_data == true,
+          select: coalesce(sum(t.amount), 0)
+      )
+      |> decimalize()
+
+    if Decimal.eq?(seeded, 0) do
+      {:ok, ctx}
+    else
+      with {:ok, re} <- retained_earnings_account(ctx) do
+        attrs = %{
+          "account_name" => re.name,
+          "amount" => Decimal.negate(seeded),
+          "doc_date" => date
+        }
+
+        case seed_one("Balances", attrs, ctx) do
+          {:ok, _} -> {:ok, ctx}
+          {:error, _} = err -> err
+        end
+      end
+    end
   end
 
   defp conversion_control_strips(ctx) do
@@ -1913,7 +1953,7 @@ defmodule FullCircle.XeroImport.Apply do
         if Decimal.eq?(delta, 0), do: acc, else: [{name, delta} | acc]
       end)
 
-    with {:ok, lines} <- balance_catchup_lines(lines, date) do
+    with {:ok, lines} <- balance_catchup_lines(lines, ctx) do
       if lines == [] do
         {:ok, ctx}
       else
@@ -1953,23 +1993,18 @@ defmodule FullCircle.XeroImport.Apply do
     |> Map.new(fn {name, type, amt} -> {name, {type, decimalize(amt)}} end)
   end
 
-  # Every ledger and every Xero TB balances, so the deltas must net to zero;
-  # tolerate only float-rounding cents by folding them into the largest line.
-  defp balance_catchup_lines(lines, date) do
+  # Retained Earnings is excluded from the per-account deltas (Xero's TB RE
+  # row is computed, FC's is posted), so any residual IS the RE difference —
+  # rounding cents included. Balance the journal against Retained Earnings.
+  defp balance_catchup_lines(lines, ctx) do
     residual = Enum.reduce(lines, Decimal.new(0), fn {_n, amt}, acc -> Decimal.add(acc, amt) end)
 
-    cond do
-      Decimal.eq?(residual, 0) ->
-        {:ok, lines}
-
-      Decimal.compare(Decimal.abs(residual), Decimal.new("0.02")) == :gt ->
-        {:error, {:catchup_unbalanced, Date.to_iso8601(date), residual}}
-
-      true ->
-        [{name, amt} | rest] =
-          Enum.sort_by(lines, fn {_n, amt} -> Decimal.abs(amt) end, {:desc, Decimal})
-
-        {:ok, [{name, Decimal.sub(amt, residual)} | rest]}
+    if Decimal.eq?(residual, 0) do
+      {:ok, lines}
+    else
+      with {:ok, re} <- retained_earnings_account(ctx) do
+        {:ok, [{re.name, Decimal.negate(residual)} | lines]}
+      end
     end
   end
 
@@ -2144,6 +2179,114 @@ defmodule FullCircle.XeroImport.Apply do
     |> Enum.map(&parse_date(&1["date"]))
     |> Enum.reject(&is_nil/1)
     |> Enum.max(Date, fn -> nil end)
+  end
+
+  # FC's TB/balance-sheet reports show P&L for the current financial year
+  # only and expect prior years closed into Retained Earnings (Xero computes
+  # retained earnings on the fly, so the history arrives unclosed). Post one
+  # XCLOSE-<fye> journal per completed FY moving each P&L account's year
+  # result into Retained Earnings. Must run AFTER catch-up journals (their
+  # FYE-dated P&L lines belong to the year being closed).
+  defp post_closing_journals(ctx) do
+    first =
+      Repo.one(
+        from t in Transaction,
+          where: t.company_id == ^ctx.company.id,
+          select: min(t.doc_date)
+      )
+
+    if is_nil(first) do
+      {:ok, ctx}
+    else
+      today = Date.utc_today()
+
+      first.year..today.year
+      |> Enum.map(&fye_date(&1, ctx.company))
+      |> Enum.filter(&(Date.compare(&1, today) == :lt))
+      |> Enum.reduce_while({:ok, ctx}, fn fye, {:ok, ctx} ->
+        case post_one_closing(fye, ctx) do
+          {:ok, ctx} -> {:cont, {:ok, ctx}}
+          {:error, _} = err -> {:halt, err}
+        end
+      end)
+    end
+  end
+
+  defp fye_date(year, com) do
+    month = com.closing_month || 12
+    day = min(com.closing_day || 31, Date.days_in_month(Date.new!(year, month, 1)))
+    Date.new!(year, month, day)
+  end
+
+  defp post_one_closing(fye, ctx) do
+    prev = fye_date(fye.year - 1, ctx.company)
+
+    lines =
+      from(t in Transaction,
+        join: a in FullCircle.Accounting.Account,
+        on: a.id == t.account_id,
+        where: t.company_id == ^ctx.company.id,
+        where: a.account_type in ^FullCircle.Accounting.profit_loss_account_types(),
+        where: t.doc_date > ^prev and t.doc_date <= ^fye,
+        group_by: [a.id, a.name],
+        having: sum(t.amount) != 0,
+        select: {a.id, a.name, sum(t.amount)}
+      )
+      |> Repo.all()
+
+    if lines == [] do
+      {:ok, ctx}
+    else
+      with {:ok, re} <- retained_earnings_account(ctx) do
+        total =
+          Enum.reduce(lines, Decimal.new(0), fn {_, _, amt}, acc ->
+            Decimal.add(acc, decimalize(amt))
+          end)
+
+        transactions =
+          lines
+          |> Enum.sort_by(fn {_, name, _} -> name end)
+          |> Enum.with_index()
+          |> Map.new(fn {{id, name, amt}, idx} ->
+            {Integer.to_string(idx),
+             %{
+               "account_id" => id,
+               "account_name" => name,
+               "particulars" => "Year-end closing #{fye.year}",
+               "amount" => Decimal.negate(decimalize(amt)),
+               "_persistent_id" => Integer.to_string(idx)
+             }}
+          end)
+          |> Map.put(Integer.to_string(length(lines)), %{
+            "account_id" => re.id,
+            "account_name" => re.name,
+            "particulars" => "Year-end closing #{fye.year}",
+            "amount" => total,
+            "_persistent_id" => Integer.to_string(length(lines))
+          })
+
+        attrs = %{
+          "journal_no" => "XCLOSE-#{Date.to_iso8601(fye)}",
+          "journal_date" => fye,
+          "transactions" => transactions
+        }
+
+        case wrap_import(JournalEntry.import_journal(attrs, ctx.company, ctx.user)) do
+          {:ok, _} -> {:ok, track_number(ctx, :Journal, attrs["journal_no"])}
+          {:error, _} = err -> err
+        end
+      end
+    end
+  end
+
+  defp retained_earnings_account(ctx) do
+    case Accounting.get_account_by_name("Retained Earnings", ctx.company, ctx.user) do
+      %{id: _} = acc ->
+        {:ok, acc}
+
+      nil ->
+        seed_one("Accounts", %{"name" => "Retained Earnings", "account_type" => "Equity"}, ctx)
+    end
   end
 
   defp signed_match_amount(header_amount, alloc_amount) do

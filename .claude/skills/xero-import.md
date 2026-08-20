@@ -91,6 +91,14 @@ can't expose (accounting.journals.read is not grantable to new apps). Coverage:
   (Retained Earnings excluded both sides); residual > 0.02 → `{:error, {:catchup_unbalanced, ...}}`.
 - `Apply.post_aged_attribution` then posts zero-sum `XCATCHUP-AGED` moving contact-less
   AR/AP catch-up onto the contacts named by Xero aged balances (journal lines carry contact_id).
+- `Apply.post_closing_journals` finally posts `XCLOSE-<fye>` per **completed** FY moving
+  each P&L account's year result into Retained Earnings — FC's TB/balance-sheet reports
+  window P&L to the current FY and expect prior years closed to RE (Xero computes RE on
+  the fly, so history arrives unclosed and the report won't sum to zero without these).
+- Retained Earnings is excluded from catch-up deltas (Xero's TB RE row is computed, FC's
+  is posted); any residual in a catch-up journal IS the RE difference and balances to RE.
+- Conversion seeding re-balances the stripped AR/AP against RE (`balance_conversion_seed`)
+  because the imported conversion documents re-post P&L that Xero kept inside RE.
 - Fixed-asset `DepreciationHistory` rows dated after the conversion date post
   `XDEP-<assetid>-<n>` journals (depre expense / accum. depre); rows on/before it are
   already inside the conversion balances — seed rows only, no GL.

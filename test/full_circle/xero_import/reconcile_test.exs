@@ -77,8 +77,9 @@ defmodule FullCircle.XeroImport.ReconcileTest do
     tb =
       Enum.map(snap.reports["trial_balance"], fn
         %{"account_name" => "Sales"} = row -> Map.put(row, "balance", 0.0)
+        %{"account_name" => "Retained Earnings"} = row -> Map.put(row, "balance", -81190.0)
         row -> row
-      end) ++ [%{"account_name" => "Retained Earnings", "balance" => -190.0}]
+      end)
 
     snap = put_in(snap.reports["trial_balance"], tb)
 
@@ -163,7 +164,7 @@ defmodule FullCircle.XeroImport.ReconcileTest do
       |> update_in([Access.key(:reports), "trial_balance"], fn tb ->
         Enum.map(tb, fn
           %{"account_name" => "Account Receivables"} = row -> Map.put(row, "balance", 90.0)
-          %{"account_name" => "Sales"} = row -> Map.put(row, "balance", -160.0)
+          %{"account_name" => "Sales"} = row -> Map.put(row, "balance", -60.0)
           row -> row
         end)
       end)

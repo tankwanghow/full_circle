@@ -786,6 +786,44 @@ defmodule FullCircle.XeroImport.ApplyTest do
     assert Enum.reduce(seed, Decimal.new(0), &Decimal.add(&2, &1.amount)) |> Decimal.eq?(0)
   end
 
+  test "FC trial balance report sums to zero after year-end closings", %{
+    user: user,
+    snap: snap,
+    name: name
+  } do
+    # Fixture documents are dated 2024; FC's TB report shows P&L only for
+    # the current FY and expects prior years closed into Retained Earnings.
+    {:ok, %{company: com}} = Apply.run(snap, user, company_name: name)
+
+    total =
+      Date.utc_today()
+      |> FullCircle.Reporting.trail_balance(com)
+      |> Enum.reduce(Decimal.new(0), &Decimal.add(&2, &1.balance))
+
+    assert Decimal.eq?(total, 0)
+
+    re =
+      Repo.one(
+        from t in Transaction,
+          join: a in FullCircle.Accounting.Account,
+          on: a.id == t.account_id,
+          where:
+            t.company_id == ^com.id and a.name == "Retained Earnings" and
+              like(t.doc_no, "XCLOSE%"),
+          select: coalesce(sum(t.amount), 0)
+      )
+
+    refute Decimal.eq?(re, 0)
+
+    # No closing journal for the current, incomplete financial year.
+    current_close = "XCLOSE-#{Date.utc_today().year}-12-31"
+
+    refute Repo.exists?(
+             from t in Transaction,
+               where: t.company_id == ^com.id and t.doc_no == ^current_close
+           )
+  end
+
   test "yearly TBs generate balanced catch-up journals for unpulled postings", %{
     user: user,
     snap: snap,
@@ -835,9 +873,17 @@ defmodule FullCircle.XeroImport.ApplyTest do
   end
 
   test "matching yearly TBs post no catch-up journals", %{user: user, snap: snap, name: name} do
+    # Use FC's internal split (conversion revenue in Sales, not in RE) so
+    # every per-account delta is zero.
+    lines =
+      Enum.map(snap.reports["trial_balance"], fn
+        %{"account_name" => "Sales"} = row -> Map.put(row, "balance", -190.0)
+        row -> row
+      end)
+
     snap =
       put_in(snap, [Access.key(:reports), "trial_balance_by_year"], [
-        %{"date" => "2024-12-31", "lines" => snap.reports["trial_balance"]}
+        %{"date" => "2024-12-31", "lines" => lines}
       ])
 
     {:ok, %{company: com}} = Apply.run(snap, user, company_name: name)
