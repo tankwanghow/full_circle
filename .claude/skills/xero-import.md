@@ -91,10 +91,13 @@ can't expose (accounting.journals.read is not grantable to new apps). Coverage:
   (Retained Earnings excluded both sides); residual > 0.02 → `{:error, {:catchup_unbalanced, ...}}`.
 - `Apply.post_aged_attribution` then posts zero-sum `XCATCHUP-AGED` moving contact-less
   AR/AP catch-up onto the contacts named by Xero aged balances (journal lines carry contact_id).
-- `Apply.post_closing_journals` finally posts `XCLOSE-<fye>` per **completed** FY moving
-  each P&L account's year result into Retained Earnings — FC's TB/balance-sheet reports
-  window P&L to the current FY and expect prior years closed to RE (Xero computes RE on
-  the fly, so history arrives unclosed and the report won't sum to zero without these).
+- `Apply.post_closing_journals` finally posts `XCLOSE-<fye>` per **completed** FY in the
+  **KPST convention**: exactly two lines — the year's net through a P&L-typed contra
+  "Net Profit for The Year" (Revenue) against "Retained Earnings" (Equity). NEVER reverse
+  individual P&L accounts: the contra being P&L-typed makes prior years self-cancel in
+  aggregate (TB balances at any date) while every account keeps its history, so the P&L
+  report for a closed year shows full detail plus the Net Profit line netting to zero
+  (identical to KPST's manual JS closings, e.g. JS-000275).
 - Retained Earnings is excluded from catch-up deltas (Xero's TB RE row is computed, FC's
   is posted); any residual in a catch-up journal IS the RE difference and balances to RE.
 - Conversion seeding re-balances the stripped AR/AP against RE (`balance_conversion_seed`)

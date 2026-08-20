@@ -2218,57 +2218,52 @@ defmodule FullCircle.XeroImport.Apply do
     Date.new!(year, month, day)
   end
 
+  # KPST convention: DO NOT reverse individual P&L accounts (that blanks the
+  # closed year's P&L report). Post the year's net result through a
+  # P&L-typed contra ("Net Profit for The Year", Revenue) against Retained
+  # Earnings — prior years then self-cancel in aggregate (TB balances) while
+  # every account keeps its history visible.
   defp post_one_closing(fye, ctx) do
     prev = fye_date(fye.year - 1, ctx.company)
 
-    lines =
-      from(t in Transaction,
-        join: a in FullCircle.Accounting.Account,
-        on: a.id == t.account_id,
-        where: t.company_id == ^ctx.company.id,
-        where: a.account_type in ^FullCircle.Accounting.profit_loss_account_types(),
-        where: t.doc_date > ^prev and t.doc_date <= ^fye,
-        group_by: [a.id, a.name],
-        having: sum(t.amount) != 0,
-        select: {a.id, a.name, sum(t.amount)}
+    net =
+      Repo.one(
+        from t in Transaction,
+          join: a in FullCircle.Accounting.Account,
+          on: a.id == t.account_id,
+          where: t.company_id == ^ctx.company.id,
+          where: a.account_type in ^FullCircle.Accounting.profit_loss_account_types(),
+          where: t.doc_date > ^prev and t.doc_date <= ^fye,
+          select: coalesce(sum(t.amount), 0)
       )
-      |> Repo.all()
+      |> decimalize()
 
-    if lines == [] do
+    if Decimal.eq?(net, 0) do
       {:ok, ctx}
     else
-      with {:ok, re} <- retained_earnings_account(ctx) do
-        total =
-          Enum.reduce(lines, Decimal.new(0), fn {_, _, amt}, acc ->
-            Decimal.add(acc, decimalize(amt))
-          end)
-
-        transactions =
-          lines
-          |> Enum.sort_by(fn {_, name, _} -> name end)
-          |> Enum.with_index()
-          |> Map.new(fn {{id, name, amt}, idx} ->
-            {Integer.to_string(idx),
-             %{
-               "account_id" => id,
-               "account_name" => name,
-               "particulars" => "Year-end closing #{fye.year}",
-               "amount" => Decimal.negate(decimalize(amt)),
-               "_persistent_id" => Integer.to_string(idx)
-             }}
-          end)
-          |> Map.put(Integer.to_string(length(lines)), %{
-            "account_id" => re.id,
-            "account_name" => re.name,
-            "particulars" => "Year-end closing #{fye.year}",
-            "amount" => total,
-            "_persistent_id" => Integer.to_string(length(lines))
-          })
+      with {:ok, re} <- retained_earnings_account(ctx),
+           {:ok, npy} <- net_profit_account(ctx) do
+        particulars = "Year-end closing #{fye.year}"
 
         attrs = %{
           "journal_no" => "XCLOSE-#{Date.to_iso8601(fye)}",
           "journal_date" => fye,
-          "transactions" => transactions
+          "transactions" => %{
+            "0" => %{
+              "account_id" => npy.id,
+              "account_name" => npy.name,
+              "particulars" => particulars,
+              "amount" => Decimal.negate(net),
+              "_persistent_id" => "0"
+            },
+            "1" => %{
+              "account_id" => re.id,
+              "account_name" => re.name,
+              "particulars" => particulars,
+              "amount" => net,
+              "_persistent_id" => "1"
+            }
+          }
         }
 
         case wrap_import(JournalEntry.import_journal(attrs, ctx.company, ctx.user)) do
@@ -2276,6 +2271,20 @@ defmodule FullCircle.XeroImport.Apply do
           {:error, _} = err -> err
         end
       end
+    end
+  end
+
+  defp net_profit_account(ctx) do
+    case Accounting.get_account_by_name("Net Profit for The Year", ctx.company, ctx.user) do
+      %{id: _} = acc ->
+        {:ok, acc}
+
+      nil ->
+        seed_one(
+          "Accounts",
+          %{"name" => "Net Profit for The Year", "account_type" => "Revenue"},
+          ctx
+        )
     end
   end
 

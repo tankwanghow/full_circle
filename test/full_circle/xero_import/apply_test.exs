@@ -802,6 +802,24 @@ defmodule FullCircle.XeroImport.ApplyTest do
 
     assert Decimal.eq?(total, 0)
 
+    # KPST convention: closing hits ONLY "Net Profit for The Year" + RE, so
+    # the P&L report for a closed year keeps every account's history visible.
+    pl_2024 = FullCircle.Reporting.profit_loss(~D[2024-12-31], com)
+    sales = Enum.find(pl_2024, &(&1.name == "Sales"))
+    assert sales, "Sales must stay visible in a closed year's P&L"
+    refute Decimal.eq?(sales.balance, 0)
+
+    assert Enum.any?(pl_2024, &(&1.name == "Net Profit for The Year"))
+
+    refute Repo.exists?(
+             from t in Transaction,
+               join: a in FullCircle.Accounting.Account,
+               on: a.id == t.account_id,
+               where:
+                 t.company_id == ^com.id and like(t.doc_no, "XCLOSE%") and
+                   a.name not in ["Net Profit for The Year", "Retained Earnings"]
+           )
+
     re =
       Repo.one(
         from t in Transaction,
