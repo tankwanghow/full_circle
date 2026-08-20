@@ -842,6 +842,36 @@ defmodule FullCircle.XeroImport.ApplyTest do
            )
   end
 
+  test "retained earnings override renames the account everywhere", %{
+    user: user,
+    snap: snap,
+    name: name
+  } do
+    overrides = %{"control_accounts" => %{"Retained Earnings" => "Retained Profits"}}
+
+    {:ok, %{company: com}} =
+      Apply.run(snap, user, company_name: name, overrides: overrides)
+
+    assert Accounting.get_account_by_name("Retained Profits", com, user)
+    refute Accounting.get_account_by_name("Retained Earnings", com, user)
+
+    # Closings must post to the overridden name, not seed a second account.
+    close =
+      Repo.one(
+        from t in Transaction,
+          join: a in FullCircle.Accounting.Account,
+          on: a.id == t.account_id,
+          where:
+            t.company_id == ^com.id and like(t.doc_no, "XCLOSE%") and
+              a.name == "Retained Profits",
+          select: coalesce(sum(t.amount), 0)
+      )
+
+    refute Decimal.eq?(close, 0)
+
+    assert {:ok, _} = FullCircle.XeroImport.Reconcile.run(snap, com, user, overrides: overrides)
+  end
+
   test "yearly TBs generate balanced catch-up journals for unpulled postings", %{
     user: user,
     snap: snap,

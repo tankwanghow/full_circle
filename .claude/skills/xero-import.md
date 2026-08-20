@@ -25,9 +25,13 @@ Plan doc `docs/superpowers/plans/2026-08-18-xero-import-golden-husbandry.md` pre
 ```
 
 Default snapshot dir `priv/xero_import/golden_husbandry`; creds `priv/xero_import/.credentials`
-(dotenv, chmod 0600); user via `--user` or `FC_IMPORT_USER`. Optional `overrides.json` in the
-snapshot dir: `{"control_accounts": {xero_name: fc_name}, "account_types": {...}, "disposal_account": ...}` —
-honored by **both** apply and reconcile.
+(dotenv, chmod 0600); user via `--user` or `FC_IMPORT_USER`. Optional `overrides.json`:
+`{"control_accounts": {xero_name: fc_name}, "account_types": {...}, "disposal_account": ...}` —
+honored by **both** apply and reconcile. Put it at `priv/xero_import/overrides.json` (the
+fallback path, committed): a copy inside the snapshot dir is DELETED by every `--snapshot`
+pull (atomic dir swap). GH ships `"Retained Earnings" -> "Retained Profits"` to match KPST
+naming; the retained-earnings name is resolved through this override everywhere (account
+seed, closings, catch-up exclusion, conversion rebalance, reconcile bucketing).
 
 | Module | Role |
 |--------|------|

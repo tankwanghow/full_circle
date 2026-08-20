@@ -65,6 +65,7 @@ defmodule FullCircle.XeroImport.Reconcile do
   # accounts compare per-account.
   defp check_trial_balance(reports, company, overrides) do
     rows = report_lines(reports, "trial_balance")
+    re_name = Mapper.control_account_name("Retained Earnings", overrides)
 
     live =
       from(t in Transaction,
@@ -80,7 +81,7 @@ defmodule FullCircle.XeroImport.Reconcile do
       Enum.reduce(live, {%{}, Decimal.new(0)}, fn {name, type, amt}, {bs, pl} ->
         amt = decimalize(amt)
 
-        if type in @fc_pl_types or name == "Retained Earnings" do
+        if type in @fc_pl_types or name == re_name do
           {bs, Decimal.add(pl, amt)}
         else
           {Map.put(bs, name, amt), pl}
@@ -88,7 +89,7 @@ defmodule FullCircle.XeroImport.Reconcile do
       end)
 
     pl_names =
-      for {name, type, _} <- live, type in @fc_pl_types, into: MapSet.new(["Retained Earnings"]) do
+      for {name, type, _} <- live, type in @fc_pl_types, into: MapSet.new([re_name]) do
         name
       end
 

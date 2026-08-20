@@ -452,7 +452,7 @@ defmodule FullCircle.XeroImport.Apply do
           {:ok, put_account(ctx, xero_id, xero_code, acc)}
 
         true ->
-          attrs = %{"name" => xero_name, "account_type" => account_type}
+          attrs = %{"name" => fc_name, "account_type" => account_type}
 
           case seed_one("Accounts", attrs, ctx) do
             {:ok, acc} -> {:ok, put_account(ctx, xero_id, xero_code, acc)}
@@ -1963,6 +1963,8 @@ defmodule FullCircle.XeroImport.Apply do
   end
 
   defp catchup_expected(rows, ctx) do
+    re_name = retained_earnings_name(ctx)
+
     Enum.reduce(rows, %{}, fn row, acc ->
       name =
         (row["account_name"] || row[:account_name])
@@ -1970,7 +1972,7 @@ defmodule FullCircle.XeroImport.Apply do
         |> Mapper.control_account_name(ctx.overrides)
 
       cond do
-        name in [nil, "", "Total", "Opening Balances", "Retained Earnings"] ->
+        name in [nil, "", "Total", "Opening Balances", re_name] ->
           acc
 
         true ->
@@ -1981,11 +1983,13 @@ defmodule FullCircle.XeroImport.Apply do
   end
 
   defp fc_balances_at(date, ctx) do
+    re_name = retained_earnings_name(ctx)
+
     from(t in Transaction,
       join: a in FullCircle.Accounting.Account,
       on: a.id == t.account_id,
       where: t.company_id == ^ctx.company.id and t.doc_date <= ^date,
-      where: a.name != "Retained Earnings",
+      where: a.name != ^re_name,
       group_by: [a.name, a.account_type],
       select: {a.name, a.account_type, sum(t.amount)}
     )
@@ -2288,13 +2292,21 @@ defmodule FullCircle.XeroImport.Apply do
     end
   end
 
+  # The FC-side retained earnings name honors control_accounts overrides
+  # (e.g. "Retained Earnings" -> "Retained Profits" to match KPST naming).
+  defp retained_earnings_name(ctx) do
+    Mapper.control_account_name("Retained Earnings", ctx.overrides)
+  end
+
   defp retained_earnings_account(ctx) do
-    case Accounting.get_account_by_name("Retained Earnings", ctx.company, ctx.user) do
+    name = retained_earnings_name(ctx)
+
+    case Accounting.get_account_by_name(name, ctx.company, ctx.user) do
       %{id: _} = acc ->
         {:ok, acc}
 
       nil ->
-        seed_one("Accounts", %{"name" => "Retained Earnings", "account_type" => "Equity"}, ctx)
+        seed_one("Accounts", %{"name" => name, "account_type" => "Equity"}, ctx)
     end
   end
 
