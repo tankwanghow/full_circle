@@ -109,6 +109,9 @@ can't expose (accounting.journals.read is not grantable to new apps). Coverage:
 - Fixed-asset `DepreciationHistory` rows dated after the conversion date post
   `XDEP-<assetid>-<n>` journals (depre expense / accum. depre); rows on/before it are
   already inside the conversion balances — seed rows only, no GL.
+- Straight-line assets entered by life in Xero have a nil `DepreciationRate`; the mapper
+  derives rate = 1/`EffectiveLifeYears` (`Mapper.straight_line_rate`). Assets that still
+  end up with rate 0 are guarded in `Accounting.depreciation_dates` (no schedule, no loop).
 
 **Guards.** Non-reset apply refuses a company that has transactions, invoices, **contacts,
 or goods** (`:company_not_empty`). `--reset` prompts `Mix.shell().yes?` unless `--yes`.
@@ -133,7 +136,10 @@ credit notes net in). Tolerance is strictly `< 0.01` — an exact 1-cent drift F
 **HTTP.** Xero refresh tokens are single-use: a mid-pull 401 refresh persists the rotated
 token to the creds file immediately and keeps it in the client agent (state
 `%{token, credentials}`). Contacts are pulled with `includeArchived=true` — archived contacts
-still own historical invoices. 429 honors Retry-After, else 2/4/8s backoff, 5 attempts.
+still own historical invoices. 429 honors Retry-After, else 2/4/8s backoff, 5 attempts —
+but a Retry-After above 120s is Xero's DAILY tenant limit: the client returns
+`{:error, {:rate_limited, seconds}}` instead of sleeping for hours, and the mix task
+prints the wait time (`describe_error`).
 Aged reports are NOT pulled (`AgedReceivablesByContact` 400s without contactID);
 `Snapshot.fill_reports` builds them from contact Outstanding instead.
 
