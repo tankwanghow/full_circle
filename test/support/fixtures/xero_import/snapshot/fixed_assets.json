@@ -21,7 +21,7 @@
     },
     "DepreciationHistory": [
       {
-        "DepreciationDate": "2023-12-31",
+        "DepreciationDate": "2023-01-01",
         "DepreciationAmount": 20000.0,
         "CostLimit": 100000.0
       }

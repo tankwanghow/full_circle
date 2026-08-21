@@ -712,7 +712,10 @@ defmodule FullCircle.XeroImport.Apply do
   end
 
   defp seed_depreciations(xero, fa, asset_attrs, ctx) do
-    history = xero["DepreciationHistory"] || []
+    history =
+      (xero["DepreciationHistory"] || [])
+      |> Mapper.expand_depreciation_history(fa, ctx.company)
+
     conv_date = conversion_date(ctx)
 
     history

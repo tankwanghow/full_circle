@@ -1,4 +1,6 @@
 defmodule FullCircle.XeroImport.Mapper do
+  require Logger
+
   @control_accounts %{
     "Accounts Receivable" => "Account Receivables",
     "Accounts Payable" => "Account Payables",
@@ -128,6 +130,106 @@ defmodule FullCircle.XeroImport.Mapper do
       _ ->
         {:error, {:diminishing_value, name}}
     end
+  end
+
+  @doc """
+  Expands a synthesized cumulative DepreciationHistory lump (the single row
+  HttpClient.synthesize_history/2 builds, dated at the depreciation start or
+  purchase date) into one row per depreciation period, so the imported asset
+  carries month-by-month (or year-by-year) depreciation instead of one lump.
+
+  Dates land on the company closing day (capped to each month's length),
+  matching where Accounting.depreciation_dates/2 will resume the schedule.
+  The last row absorbs the rounding remainder so the Decimal sum equals the
+  Xero lump exactly — Reconcile's NBV check sums seed rows at < 0.01
+  tolerance. Anything that is not a synthesized lump (multi-row histories,
+  hand-dated rows, zero rates, lumps within one period) passes through
+  unchanged.
+  """
+  def expand_depreciation_history([row] = history, fa, com) do
+    date = parse_date(row["DepreciationDate"])
+    lump = decimalize(row["DepreciationAmount"] || 0)
+    cost = decimalize(row["CostLimit"] || fa.pur_price || 0)
+    per = period_amount(cost, fa.depre_rate, fa.depre_interval)
+
+    synthesized? = date != nil and (date == fa.depre_start_date or date == fa.pur_date)
+
+    if synthesized? and Decimal.compare(per, 0) == :gt and Decimal.compare(lump, per) == :gt do
+      periods = Decimal.div(lump, per)
+      n = periods |> Decimal.round(0, :half_up) |> Decimal.to_integer()
+
+      drift = periods |> Decimal.sub(n) |> Decimal.abs()
+
+      if Decimal.compare(drift, Decimal.new("0.05")) == :gt do
+        Logger.warning(
+          "depreciation lump for #{Map.get(fa, :name)} is not a whole number of periods " <>
+            "(#{lump} / #{per} = #{periods}); expanding to #{n} rows"
+        )
+      end
+
+      if n > 1 do
+        last = Decimal.sub(lump, Decimal.mult(per, n - 1))
+        amounts = List.duplicate(per, n - 1) ++ [last]
+        dates = period_dates(fa.depre_start_date, fa.depre_interval, n, com)
+
+        Enum.zip_with(dates, amounts, fn d, amount ->
+          %{
+            "DepreciationDate" => Date.to_iso8601(d),
+            "DepreciationAmount" => amount,
+            "CostLimit" => row["CostLimit"]
+          }
+        end)
+      else
+        history
+      end
+    else
+      history
+    end
+  end
+
+  def expand_depreciation_history(history, _fa, _com), do: history
+
+  defp period_amount(cost, rate, interval)
+       when not is_nil(cost) and not is_nil(rate) and interval in ["Monthly", "Yearly"] do
+    annual = Decimal.mult(cost, rate)
+
+    case interval do
+      "Monthly" -> annual |> Decimal.div(12) |> Decimal.round(2)
+      "Yearly" -> Decimal.round(annual, 2)
+    end
+  end
+
+  defp period_amount(_cost, _rate, _interval), do: Decimal.new("0")
+
+  # Closing-day anchoring per period, capped to each month's length (Feb 31
+  # -> Feb 28/29). Accounting.depreciation_dates/2 re-anchors on the last
+  # row's month the same way, so generation resumes at the next real period.
+  defp period_dates(start, "Monthly", n, com) do
+    first_month = Date.new!(start.year, start.month, 1)
+
+    0..(n - 1)
+    |> Enum.map(fn i ->
+      m = Timex.shift(first_month, months: i)
+      Date.new!(m.year, m.month, min(com.closing_day, Date.days_in_month(m)))
+    end)
+    |> clamp_first(start)
+  end
+
+  defp period_dates(start, "Yearly", n, com) do
+    0..(n - 1)
+    |> Enum.map(fn i ->
+      m = Date.new!(start.year + i, com.closing_month, 1)
+      Date.new!(m.year, m.month, min(com.closing_day, Date.days_in_month(m)))
+    end)
+    |> clamp_first(start)
+  end
+
+  # FixedAssetDepreciation validation rejects depre_date < depre_start_date;
+  # an asset starting after the closing day would otherwise get a first row
+  # before its own start. Later rows are in later periods, so ordering and
+  # uniqueness hold.
+  defp clamp_first([first | rest], start) do
+    [if(Date.compare(first, start) == :lt, do: start, else: first) | rest]
   end
 
   def importable_invoice?(doc) when is_map(doc) do

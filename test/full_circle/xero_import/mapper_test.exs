@@ -133,4 +133,102 @@ defmodule FullCircle.XeroImport.MapperTest do
     refute Mapper.base_currency_ok?(%{"CurrencyCode" => "USD"}, "MYR")
     assert Mapper.base_currency_ok?(%{"CurrencyCode" => "MYR"}, "MYR")
   end
+
+  describe "expand_depreciation_history/3" do
+    @com %{closing_month: 12, closing_day: 31}
+
+    defp fa_map(over \\ %{}) do
+      Map.merge(
+        %{
+          depre_rate: Decimal.new("0.1"),
+          depre_interval: "Monthly",
+          depre_start_date: ~D[2021-01-18],
+          pur_date: ~D[2021-01-18],
+          pur_price: Decimal.new("7350")
+        },
+        over
+      )
+    end
+
+    defp lump(amount, date \\ "2021-01-18", cost \\ 7350.0) do
+      [%{"DepreciationDate" => date, "DepreciationAmount" => amount, "CostLimit" => cost}]
+    end
+
+    defp sum_amounts(rows) do
+      Enum.reduce(rows, Decimal.new("0"), &Decimal.add(&2, &1["DepreciationAmount"]))
+    end
+
+    test "expands the GH lump into monthly closing-day rows summing exactly" do
+      rows = Mapper.expand_depreciation_history(lump(2940.0), fa_map(), @com)
+
+      assert length(rows) == 48
+      assert List.first(rows)["DepreciationDate"] == "2021-01-31"
+      assert List.last(rows)["DepreciationDate"] == "2024-12-31"
+      assert Enum.all?(rows, &Decimal.eq?(&1["DepreciationAmount"], Decimal.new("61.25")))
+      assert Decimal.eq?(sum_amounts(rows), Decimal.new("2940.00"))
+    end
+
+    test "last row absorbs the remainder so the sum stays exact" do
+      rows = Mapper.expand_depreciation_history(lump(2906.41), fa_map(), @com)
+
+      assert length(rows) == 47
+      assert Enum.take(rows, 46) |> Enum.all?(&Decimal.eq?(&1["DepreciationAmount"], "61.25"))
+      assert Decimal.eq?(List.last(rows)["DepreciationAmount"], Decimal.new("88.91"))
+      assert Decimal.eq?(sum_amounts(rows), Decimal.new("2906.41"))
+    end
+
+    test "yearly interval expands on closing month/day" do
+      fa =
+        fa_map(%{
+          depre_rate: Decimal.new("0.2"),
+          depre_interval: "Yearly",
+          depre_start_date: ~D[2023-01-01],
+          pur_date: ~D[2023-01-01],
+          pur_price: Decimal.new("100000")
+        })
+
+      rows =
+        Mapper.expand_depreciation_history(lump(40_000.0, "2023-01-01", 100_000.0), fa, @com)
+
+      assert Enum.map(rows, & &1["DepreciationDate"]) == ["2023-12-31", "2024-12-31"]
+      assert Enum.all?(rows, &Decimal.eq?(&1["DepreciationAmount"], Decimal.new("20000")))
+    end
+
+    test "first date is clamped up to the depreciation start date" do
+      fa = fa_map(%{depre_start_date: ~D[2021-01-28], pur_date: ~D[2021-01-28]})
+      com = %{closing_month: 12, closing_day: 25}
+
+      rows = Mapper.expand_depreciation_history(lump(122.5, "2021-01-28"), fa, com)
+
+      assert Enum.map(rows, & &1["DepreciationDate"]) == ["2021-01-28", "2021-02-25"]
+    end
+
+    test "February anchor falls back to end of month" do
+      fa = fa_map(%{depre_start_date: ~D[2021-02-10], pur_date: ~D[2021-02-10]})
+
+      rows = Mapper.expand_depreciation_history(lump(122.5, "2021-02-10"), fa, @com)
+
+      assert Enum.map(rows, & &1["DepreciationDate"]) == ["2021-02-28", "2021-03-31"]
+    end
+
+    test "passes through histories that are not a synthesized lump" do
+      # multi-row history
+      two = lump(61.25) ++ [%{"DepreciationDate" => "2021-02-28", "DepreciationAmount" => 61.25}]
+      assert Mapper.expand_depreciation_history(two, fa_map(), @com) == two
+
+      # single row dated neither at start nor purchase date
+      hand = lump(2940.0, "2024-06-30")
+      assert Mapper.expand_depreciation_history(hand, fa_map(), @com) == hand
+
+      # zero rate
+      zero_rate = fa_map(%{depre_rate: Decimal.new("0")})
+      assert Mapper.expand_depreciation_history(lump(2940.0), zero_rate, @com) == lump(2940.0)
+
+      # lump within a single period
+      assert Mapper.expand_depreciation_history(lump(61.25), fa_map(), @com) == lump(61.25)
+
+      # empty history
+      assert Mapper.expand_depreciation_history([], fa_map(), @com) == []
+    end
+  end
 end

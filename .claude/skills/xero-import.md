@@ -109,6 +109,14 @@ can't expose (accounting.journals.read is not grantable to new apps). Coverage:
 - Fixed-asset `DepreciationHistory` rows dated after the conversion date post
   `XDEP-<assetid>-<n>` journals (depre expense / accum. depre); rows on/before it are
   already inside the conversion balances — seed rows only, no GL.
+- Xero's Assets API exposes no per-period history: `HttpClient.synthesize_history` emits
+  ONE cumulative lump dated at the depreciation start date. At apply time
+  `Mapper.expand_depreciation_history/3` expands that lump into per-period rows
+  (asset's `depre_interval`, closing-day-anchored dates, Decimal-exact — last row absorbs
+  the remainder so seed sums match Xero BookValue for reconcile). Only the synthesized
+  shape (single row dated at start/purchase date) expands; hand-dated or multi-row
+  histories pass through. Without expansion, `Accounting.depreciation_dates` would resume
+  the schedule right after the lump's start date and double-depreciate.
 - Straight-line assets entered by life in Xero have a nil `DepreciationRate`; the mapper
   derives rate = 1/`EffectiveLifeYears` (`Mapper.straight_line_rate`). Assets that still
   end up with rate 0 are guarded in `Accounting.depreciation_dates` (no schedule, no loop).
@@ -157,7 +165,7 @@ Fixture snapshot: `test/support/fixtures/xero_import/snapshot/*.json`
 `Apply.run(snap, user, company_name: unique_name)`. HTTP tests stub with
 `Req.Test` (`plug: {Req.Test, stub}`); `Snapshot.pull` tests use a `FakeClient` behaviour.
 Mix-task tests use `Mix.Task.rerun` (+ `Mix.Shell.Process` for the `--reset` prompt).
-111 tests in `test/full_circle/xero_import/` as of 2026-08-20.
+123 tests in `test/full_circle/xero_import/` as of 2026-08-21.
 
 ## Status
 

@@ -141,10 +141,21 @@ defmodule FullCircle.XeroImport.ApplyTest do
 
     depre =
       Repo.all(
-        from d in FullCircle.Accounting.FixedAssetDepreciation, where: d.fixed_asset_id == ^fa.id
+        from d in FullCircle.Accounting.FixedAssetDepreciation,
+          where: d.fixed_asset_id == ^fa.id,
+          order_by: d.depre_date
       )
 
-    assert depre != []
+    # The synthesized 20000 lump (100000 @ 20% Monthly from 2023-01-01)
+    # expands into 12 closing-day rows: 11 x 1666.67 + 1666.63.
+    assert length(depre) == 12
+    assert List.first(depre).depre_date == ~D[2023-01-31]
+    assert List.last(depre).depre_date == ~D[2023-12-31]
+    assert Enum.all?(Enum.take(depre, 11), &Decimal.eq?(&1.amount, Decimal.new("1666.67")))
+    assert Decimal.eq?(List.last(depre).amount, Decimal.new("1666.63"))
+
+    total = Enum.reduce(depre, Decimal.new("0"), &Decimal.add(&2, &1.amount))
+    assert Decimal.eq?(total, Decimal.new("20000"))
     assert Enum.all?(depre, & &1.is_seed)
 
     refute Repo.exists?(
@@ -216,8 +227,9 @@ defmodule FullCircle.XeroImport.ApplyTest do
     {:ok, %{company: com, id_map: map}} = Apply.run(snap, user, company_name: name)
     accum_id = map["account:ac-accum"]
 
-    # Fixture history row is dated 2023-12-31, before the 2024-01-01
-    # conversion; the -20000 must come only from the conversion balance line.
+    # The fixture lump expands to rows 2023-01-31..2023-12-31, all before the
+    # 2024-01-01 conversion; the -20000 must come only from the conversion
+    # balance line.
     total =
       Repo.one(
         from t in Transaction,
@@ -226,6 +238,59 @@ defmodule FullCircle.XeroImport.ApplyTest do
       )
 
     assert Decimal.eq?(total, Decimal.new("-20000"))
+  end
+
+  test "expanded lump straddling the conversion date posts per-period XDEP journals", %{
+    user: user,
+    snap: snap,
+    name: name
+  } do
+    # Conversion mid-2023: the 12 expanded rows split into 6 seed-only rows
+    # (Jan-Jun, inside the conversion accum balance of -10000.02) and 6
+    # post-conversion rows that must each post their own XDEP journal
+    # (5 x 1666.67 + 1666.63 = 9999.98).
+    snap =
+      snap
+      |> put_in([Access.key(:conversion_balances), "Date"], "2023-06-30")
+      |> update_in([Access.key(:conversion_balances), "Lines"], fn lines ->
+        Enum.map(lines, fn
+          %{"AccountID" => "ac-accum"} = l -> %{l | "Balance" => -10_000.02}
+          l -> l
+        end)
+      end)
+
+    {:ok, %{company: com, id_map: map}} = Apply.run(snap, user, company_name: name)
+    accum_id = map["account:ac-accum"]
+
+    fa = Repo.one!(from f in FullCircle.Accounting.FixedAsset, where: f.company_id == ^com.id)
+
+    seed_count =
+      Repo.one(
+        from d in FullCircle.Accounting.FixedAssetDepreciation,
+          where: d.fixed_asset_id == ^fa.id and d.is_seed == true,
+          select: count()
+      )
+
+    assert seed_count == 12
+
+    xdep_nos =
+      Repo.all(
+        from j in FullCircle.Accounting.Journal,
+          where: j.company_id == ^com.id and like(j.journal_no, "XDEP-fa-van-%"),
+          select: j.journal_no
+      )
+
+    assert length(xdep_nos) == 6
+    assert length(Enum.uniq(xdep_nos)) == 6
+
+    total =
+      Repo.one(
+        from t in Transaction,
+          where: t.company_id == ^com.id and t.account_id == ^accum_id,
+          select: coalesce(sum(t.amount), 0)
+      )
+
+    assert Decimal.eq?(total, Decimal.new("-20000.00"))
   end
 
   test "asset with unmapped depreciation account errors instead of crashing", %{
