@@ -13,13 +13,14 @@
 -- (they are two halves of the same convention change).
 --
 -- The 2026-01-01 opening-stock journal is NOT posted here — post it through
--- the FullCircle journal form (it is an open period):
---   Dr Opening Stock - Pigs      3,045,730.00
+-- the FullCircle journal form (it is an open period). Amounts reflect the
+-- auditor's 2025-12-31 adjustments (JS-000319/320/322: layers fair value
+-- reversed out, pigs restated to cost):
+--   Dr Opening Stock - Pigs      3,920,056.38
 --   Dr Opening Stock - Feeds     1,285,489.10
---   Dr Opening Stock - Chicken     642,527.73
 --   Dr Opening Stock - Medicine    133,177.00
 --   Dr Opening Stock - Eggs        103,975.50
---   Cr Purchases - Closing Stock 5,210,899.33
+--   Cr Purchases - Closing Stock 5,442,697.98
 --
 -- Usage (idempotent — safe to re-run; aborts and rolls back on any
 -- failed verification):
@@ -193,8 +194,8 @@ BEGIN
   FROM transactions t
   JOIN accounts a ON a.id = t.account_id
   WHERE t.company_id = com_id AND a.account_type = 'Inventory';
-  IF inv_balance <> 5210899.33 THEN
-    RAISE EXCEPTION 'verification failed: inventory balance % <> 5210899.33', inv_balance;
+  IF inv_balance <> 5442697.98 THEN
+    RAISE EXCEPTION 'verification failed: inventory balance % <> 5442697.98', inv_balance;
   END IF;
 
   -- closed years 2015-2024 must have zero P&L residue
