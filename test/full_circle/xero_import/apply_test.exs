@@ -293,6 +293,152 @@ defmodule FullCircle.XeroImport.ApplyTest do
     assert Decimal.eq?(total, Decimal.new("-20000.00"))
   end
 
+  test "reconstructed wage docs import as bill, allocated payment, and liability-funded payments",
+       %{user: user, snap: snap, name: name} do
+    # Shapes produced by scripts/xero_wage_reconstruct.py (extra_docs.json):
+    # a statutory wage bill, its allocated payment, a payslip as a Payment
+    # funded FROM the Wages Payable liability, and the payout as a Payment
+    # funded from bank hitting Wages Payable.
+    snap =
+      snap
+      |> Map.update!(:accounts, fn accounts ->
+        accounts ++
+          [
+            %{"AccountID" => "ac-wages", "Code" => "478", "Name" => "Wages and Salaries",
+              "Type" => "EXPENSE"},
+            %{"AccountID" => "ac-wagespay", "Code" => "803", "Name" => "Wages Payable",
+              "Type" => "CURRLIAB"}
+          ]
+      end)
+      |> Map.update!(:contacts, &(&1 ++ [%{"ContactID" => "c-emp1", "Name" => "MOK CHUA KWAN"}]))
+      |> Map.update!(:invoices, fn invoices ->
+        invoices ++
+          [
+            %{
+              "Type" => "ACCPAY",
+              "Status" => "AUTHORISED",
+              "CurrencyCode" => "MYR",
+              "InvoiceID" => "xwpi-1",
+              "InvoiceNumber" => "PR-0001-KWSP",
+              "Date" => "2024-06-30",
+              "Total" => 660.0,
+              "LineAmountTypes" => "NoTax",
+              "Contact" => %{"ContactID" => "c-emp1"},
+              "LineItems" => [
+                %{"AccountCode" => "478", "Description" => "EPF Contributions",
+                  "Quantity" => 1, "UnitAmount" => 660.0, "LineAmount" => 660.0,
+                  "TaxType" => "NONE"}
+              ]
+            }
+          ]
+      end)
+      |> Map.update!(:payments, fn payments ->
+        payments ++
+          [
+            %{
+              "PaymentID" => "XWPAY-1",
+              "Status" => "AUTHORISED",
+              "Date" => "2024-07-10",
+              "Amount" => 660.0,
+              "Account" => %{"AccountID" => "ac-bank"},
+              "Invoice" => %{"InvoiceID" => "xwpi-1"}
+            }
+          ]
+      end)
+      |> Map.update!(:bank_transactions, fn txns ->
+        txns ++
+          [
+            %{
+              "Type" => "SPEND",
+              "Status" => "AUTHORISED",
+              "BankTransactionID" => "xslip-1",
+              "BankTransactionNumber" => "XWSLIP-1",
+              "Date" => "2024-06-30",
+              "Total" => 500.0,
+              "Reference" => "Payslip PR-0001 MOK CHUA KWAN",
+              "BankAccount" => %{"AccountID" => "ac-wagespay"},
+              "Contact" => %{"ContactID" => "c-emp1"},
+              "LineAmountTypes" => "NoTax",
+              "LineItems" => [
+                %{"AccountCode" => "478", "Quantity" => 1, "UnitAmount" => 500.0,
+                  "LineAmount" => 500.0, "TaxType" => "NONE"}
+              ]
+            },
+            %{
+              "Type" => "SPEND",
+              "Status" => "AUTHORISED",
+              "BankTransactionID" => "xout-1",
+              "BankTransactionNumber" => "XWOUT-1",
+              "Date" => "2024-07-02",
+              "Total" => 500.0,
+              "Reference" => "Wages 1 Jun - 30 Jun",
+              "BankAccount" => %{"AccountID" => "ac-bank"},
+              "Contact" => %{"ContactID" => "c-emp1"},
+              "LineAmountTypes" => "NoTax",
+              "LineItems" => [
+                %{"AccountCode" => "803", "Quantity" => 1, "UnitAmount" => 500.0,
+                  "LineAmount" => 500.0, "TaxType" => "NONE"}
+              ]
+            }
+          ]
+      end)
+
+    {:ok, %{company: com}} = Apply.run(snap, user, company_name: name)
+
+    assert Repo.exists?(
+             from i in FullCircle.Billing.PurInvoice,
+               where: i.company_id == ^com.id and i.pur_invoice_no == "PR-0001-KWSP"
+           )
+
+    ap_credit =
+      Repo.one!(
+        from t in Transaction,
+          join: a in FullCircle.Accounting.Account,
+          on: a.id == t.account_id,
+          where:
+            t.company_id == ^com.id and t.doc_no == "PR-0001-KWSP" and
+              a.name == "Account Payables",
+          select: t.amount
+      )
+
+    assert Decimal.eq?(ap_credit, Decimal.new("-660"))
+
+    pay =
+      Repo.one!(
+        from p in FullCircle.BillPay.Payment,
+          where: p.company_id == ^com.id and p.payment_no == "XWPAY-1",
+          preload: [:transaction_matchers, :funds_account]
+      )
+
+    assert pay.funds_account.name == "Cheque Account"
+    assert [matcher] = pay.transaction_matchers
+    matched_txn = Repo.one!(from t in Transaction, where: t.id == ^matcher.transaction_id)
+    assert matched_txn.doc_no == "PR-0001-KWSP"
+
+    slip =
+      Repo.one!(
+        from p in FullCircle.BillPay.Payment,
+          where: p.company_id == ^com.id and p.payment_no == "XWSLIP-1",
+          preload: [:funds_account]
+      )
+
+    assert slip.funds_account.name == "Wages Payable"
+
+    balances =
+      Repo.all(
+        from t in Transaction,
+          join: a in FullCircle.Accounting.Account,
+          on: a.id == t.account_id,
+          where: t.company_id == ^com.id and a.name in ["Wages and Salaries", "Wages Payable"],
+          group_by: a.name,
+          select: {a.name, sum(t.amount)}
+      )
+      |> Map.new()
+
+    assert Decimal.eq?(balances["Wages and Salaries"], Decimal.new("1160"))
+    assert Decimal.eq?(balances["Wages Payable"], Decimal.new("0"))
+  end
+
   test "asset with unmapped depreciation account errors instead of crashing", %{
     user: user,
     snap: snap,
@@ -491,13 +637,38 @@ defmodule FullCircle.XeroImport.ApplyTest do
       ]
     }
 
-    snap = %{snap | invoices: snap.invoices ++ [float_inv]}
+    # A zero-total ACCPAY bill posts the raw line sign (bills debit their
+    # line accounts), unlike ACCREC.
+    zero_bill = %{
+      "InvoiceID" => "bill-zero-x",
+      "Type" => "ACCPAY",
+      "InvoiceNumber" => "BILL-ZERO-X",
+      "Status" => "AUTHORISED",
+      "Contact" => %{"ContactID" => "ct-alice"},
+      "Date" => "2024-02-05",
+      "DueDate" => "2024-02-05",
+      "LineAmountTypes" => "Exclusive",
+      "CurrencyCode" => "MYR",
+      "Total" => 0.0,
+      "LineItems" => [
+        %{"Description" => "Move in", "Quantity" => 1.0, "UnitAmount" => 40.0,
+          "AccountCode" => "090", "TaxType" => "NONE", "LineAmount" => 40.0},
+        %{"Description" => "Move out", "Quantity" => 1.0, "UnitAmount" => -40.0,
+          "AccountCode" => "200", "TaxType" => "NONE", "LineAmount" => -40.0}
+      ]
+    }
+
+    snap = %{snap | invoices: snap.invoices ++ [float_inv, zero_bill]}
     {:ok, %{company: com}} = Apply.run(snap, user, company_name: name)
 
     refute Repo.exists?(
              from i in Invoice, where: i.company_id == ^com.id and i.invoice_no == "INV-FLOAT"
            )
 
+    # Xero GL semantics (verified against a real Account Transactions report):
+    # an ACCREC line of +L CREDITS its account (-L), so the journal must
+    # negate ACCREC line amounts. The GH Vend invoices with asymmetric
+    # zero-total lines (till shortfalls) exposed this.
     txn =
       Repo.one!(
         from t in Transaction,
@@ -508,7 +679,19 @@ defmodule FullCircle.XeroImport.ApplyTest do
               a.name == "Cheque Account"
       )
 
-    assert Decimal.eq?(txn.amount, Decimal.new("250"))
+    assert Decimal.eq?(txn.amount, Decimal.new("-250"))
+
+    bill_txn =
+      Repo.one!(
+        from t in Transaction,
+          join: a in FullCircle.Accounting.Account,
+          on: a.id == t.account_id,
+          where:
+            t.company_id == ^com.id and t.doc_no == "BILL-ZERO-X" and
+              a.name == "Cheque Account"
+      )
+
+    assert Decimal.eq?(bill_txn.amount, Decimal.new("40"))
   end
 
   test "document rounding gap is closed so AR posts exactly the Xero Total", %{

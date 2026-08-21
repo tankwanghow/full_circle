@@ -1027,6 +1027,11 @@ defmodule FullCircle.XeroImport.Apply do
       number = invoice_number(inv)
       date = parse_date(inv["Date"]) || Date.utc_today()
 
+      # Xero GL semantics: an ACCREC line of +L CREDITS its account (sales
+      # side), an ACCPAY line of +L DEBITS its account. Zero-total docs post
+      # no AR/AP, but each line still needs its ledger sign.
+      sign = if inv["Type"] == "ACCREC", do: Decimal.new("-1"), else: Decimal.new("1")
+
       transactions =
         lines
         |> Enum.with_index()
@@ -1039,7 +1044,7 @@ defmodule FullCircle.XeroImport.Apply do
              "account_id" => acc && acc.id,
              "account_name" => acc && acc.name,
              "particulars" => presence(line["Description"]) || number,
-             "amount" => decimalize(line["LineAmount"]),
+             "amount" => Decimal.mult(decimalize(line["LineAmount"]), sign),
              "_persistent_id" => Integer.to_string(idx)
            }}
         end)

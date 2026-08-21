@@ -22,7 +22,18 @@ defmodule FullCircle.XeroImport.Snapshot do
     {:reports, :get_reports}
   ]
 
+  # Sidecar keys mergeable from extra_docs.json — document/contact lists only.
+  # Reconstructed documents (e.g. Xero pay runs invisible to the API, rebuilt
+  # from a UI report export) are appended to these lists at read time.
+  @extra_doc_keys ~w(contacts invoices credit_notes payments bank_transactions manual_journals)
+
   def read(dir) do
+    with {:ok, snap} <- read_files(dir) do
+      merge_extra_docs(snap, dir)
+    end
+  end
+
+  defp read_files(dir) do
     Enum.reduce_while(@files, {:ok, %{}}, fn key, {:ok, acc} ->
       path = Path.join(dir, "#{key}.json")
 
@@ -40,6 +51,55 @@ defmodule FullCircle.XeroImport.Snapshot do
       end
     end)
   end
+
+  # extra_docs.json lives in the snapshot dir or (surviving `--snapshot`
+  # re-pulls, which atomically replace the snapshot dir) one level up —
+  # same convention as overrides.json. Totals derived from invoices are
+  # recomputed so reconcile compares against the merged document set.
+  defp merge_extra_docs(snap, dir) do
+    path =
+      [Path.join(dir, "extra_docs.json"), Path.join(Path.dirname(dir), "extra_docs.json")]
+      |> Enum.find(&File.exists?/1)
+
+    if path do
+      with {:ok, bin} <- File.read(path),
+           {:ok, extra} <- Jason.decode(bin),
+           :ok <- validate_extra_keys(extra) do
+        snap =
+          Enum.reduce(extra, snap, fn {key, rows}, acc ->
+            key = String.to_existing_atom(key)
+            Map.update(acc, key, List.wrap(rows), &(List.wrap(&1) ++ List.wrap(rows)))
+          end)
+
+        {:ok, recompute_doc_totals(snap)}
+      else
+        {:error, _} = err -> err
+        err -> {:error, err}
+      end
+    else
+      {:ok, snap}
+    end
+  end
+
+  defp validate_extra_keys(extra) when is_map(extra) do
+    case Enum.find(Map.keys(extra), &(&1 not in @extra_doc_keys)) do
+      nil -> :ok
+      key -> {:error, {:invalid_extra_docs_key, key}}
+    end
+  end
+
+  defp validate_extra_keys(_), do: {:error, :invalid_extra_docs}
+
+  defp recompute_doc_totals(%{reports: reports} = snap) when is_map(reports) do
+    reports =
+      reports
+      |> Map.put("invoice_totals", doc_totals(Map.get(snap, :invoices), "ACCREC"))
+      |> Map.put("bill_totals", doc_totals(Map.get(snap, :invoices), "ACCPAY"))
+
+    Map.put(snap, :reports, reports)
+  end
+
+  defp recompute_doc_totals(snap), do: snap
 
   def pull(%mod{} = client, dest_dir) do
     tmp = dest_dir <> ".tmp"

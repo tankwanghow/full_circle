@@ -94,8 +94,31 @@ GH's XCATCHUP content is exactly these pay-run journals (Wages/KWSP/SOCSO vs Ban
 plus 2025 Vend-POS oddments; the 3,148 dry-run skips are all voided/deleted/transfer
 duplicates and contribute nothing to catch-up. The empty 2025-26 bank_transactions is
 real data (verified with a `where Date >= DateTime(2025,01,01)` probe → 0 rows), not a
-pagination bug. Per-transaction backfill of the catch-up therefore requires a non-API
-source (e.g. Xero UI Journal-report export appended as manual journals). Coverage:
+pagination bug.
+
+**Pay-run backfill (extra_docs.json).** The API-invisible pay runs are reconstructed from
+a Xero UI "Account Transactions" report export (all accounts, whole history) by
+`scripts/xero_wage_reconstruct.py <xlsx> <snapshot_dir> priv/xero_import/extra_docs.json`.
+`Snapshot.read` merges `extra_docs.json` (snapshot dir, else one level up — the durable
+spot, like overrides.json; gitignored, it holds real company data) into
+contacts/invoices/credit_notes/payments/bank_transactions/manual_journals, then RECOMPUTES
+`invoice_totals`/`bill_totals` so reconcile compares the merged set. Mapping: Wage Payable
+Invoice rows → pseudo ACCPAY bills (PurInvoice per PR+contact); their AP payments → pseudo
+payments (FC Payment + matcher, partial allocations fine); Payslips → pseudo SPEND bank
+txns funded FROM "Wages Payable" (FC Payment: debit Wages, credit WP — the import path has
+NO funds-account type restriction, only the LiveView autocomplete does); wage payouts →
+SPEND funded from bank/cash hitting Wages Payable; cent-level bank-rec Adjustments →
+manual journals. Depreciation/End-of-Period report rows are excluded (XDEP/XCLOSE post
+those). After backfill the XCATCHUP journals collapse to rounding cents — they remain as
+the safety net proving completeness.
+
+**Zero-total invoice sign rule** (found via a real asymmetric Vend till-shortfall
+invoice): an ACCREC line of +L CREDITS its account, ACCPAY +L DEBITS —
+`persist_zero_invoice_journal` negates ACCREC line amounts. Symmetric float pairs hid
+this for years; the catch-up absorbed the error invisibly (reconcile cannot catch a bad
+plug — TB includes the catch-up itself).
+
+Coverage:
 - `Snapshot.pull` fetches a TrialBalance per financial year end into
   `reports["trial_balance_by_year"]` (+ current date as final period).
 - `Apply.post_catchup_journals` posts one `XCATCHUP-<date>` journal per period:
@@ -173,7 +196,7 @@ Fixture snapshot: `test/support/fixtures/xero_import/snapshot/*.json`
 `Apply.run(snap, user, company_name: unique_name)`. HTTP tests stub with
 `Req.Test` (`plug: {Req.Test, stub}`); `Snapshot.pull` tests use a `FakeClient` behaviour.
 Mix-task tests use `Mix.Task.rerun` (+ `Mix.Shell.Process` for the `--reset` prompt).
-123 tests in `test/full_circle/xero_import/` as of 2026-08-21.
+133 tests in `test/full_circle/xero_import/` as of 2026-08-21 (mapper, snapshot-merge, apply incl. wage-doc contract).
 
 ## Status
 
