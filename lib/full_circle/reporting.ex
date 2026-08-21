@@ -139,9 +139,7 @@ defmodule FullCircle.Reporting do
   end
 
   defp balance_sheet_query(at_date, com) do
-    bs_acc =
-      FullCircle.Accounting.balance_sheet_account_types()
-      |> Enum.reject(fn x -> x == "Inventory" end)
+    bs_acc = FullCircle.Accounting.balance_sheet_account_types()
 
     a =
       from(ac in Account,
@@ -150,25 +148,6 @@ defmodule FullCircle.Reporting do
         where: ac.company_id == ^com.id,
         where: ac.account_type in ^bs_acc,
         where: txn.doc_date <= ^at_date,
-        where: is_nil(txn.contact_id),
-        select: %{
-          id: ac.id,
-          type: ac.account_type,
-          name: ac.name,
-          balance: sum(txn.amount)
-        },
-        group_by: [ac.account_type, ac.id],
-        having: sum(txn.amount) != 0
-      )
-
-    b =
-      from(ac in Account,
-        join: txn in Transaction,
-        on: ac.id == txn.account_id,
-        where: ac.company_id == ^com.id,
-        where: ac.account_type == "Inventory",
-        where: txn.doc_date <= ^at_date,
-        where: txn.doc_date > ^prev_close_date(at_date, com),
         where: is_nil(txn.contact_id),
         select: %{
           id: ac.id,
@@ -199,7 +178,7 @@ defmodule FullCircle.Reporting do
         having: sum(txn.amount) != 0
       )
 
-    union_all(a, ^b) |> union_all(^c)
+    union_all(a, ^c)
   end
 
   defp profit_loss_query(at_date, com) do
@@ -238,6 +217,63 @@ defmodule FullCircle.Reporting do
     |> order_by([2, 3])
     |> Repo.all()
   end
+
+  @cash_account_types ["Cash or Equivalent", "Bank"]
+  @investing_account_types ["Fixed Asset", "Non-current Asset", "Intangible Asset"]
+  @financing_account_types ["Equity", "Non-current Liability", "Liability"]
+  @cash_flow_sections ["Operating", "Investing", "Financing"]
+
+  def cash_flow(f_date, t_date, com) do
+    from(ac in Account,
+      join: txn in Transaction,
+      on: ac.id == txn.account_id,
+      where: ac.company_id == ^com.id,
+      where: ac.account_type not in ^@cash_account_types,
+      where: txn.doc_date >= ^f_date,
+      where: txn.doc_date <= ^t_date,
+      select: %{
+        id: ac.id,
+        account_type: ac.account_type,
+        name: ac.name,
+        balance: sum(txn.amount)
+      },
+      group_by: [ac.account_type, ac.id],
+      having: sum(txn.amount) != 0
+    )
+    |> Repo.all()
+    |> Enum.map(fn r ->
+      %{
+        id: r.id,
+        type: r.account_type,
+        name: r.name,
+        balance: Decimal.negate(r.balance)
+      }
+    end)
+    |> Enum.sort_by(fn r ->
+      {Enum.find_index(@cash_flow_sections, &(&1 == cash_flow_section(r.type))), r.type, r.name}
+    end)
+  end
+
+  def cash_balance(at_date, com) do
+    from(ac in Account,
+      join: txn in Transaction,
+      on: ac.id == txn.account_id,
+      where: ac.company_id == ^com.id,
+      where: ac.account_type in ^@cash_account_types,
+      where: txn.doc_date <= ^at_date,
+      select: coalesce(sum(txn.amount), 0)
+    )
+    |> Repo.one()
+    |> Decimal.new()
+  end
+
+  defp cash_flow_section(account_type) when account_type in @investing_account_types,
+    do: "Investing"
+
+  defp cash_flow_section(account_type) when account_type in @financing_account_types,
+    do: "Financing"
+
+  defp cash_flow_section(_account_type), do: "Operating"
 
   def statements(ids, edate, com, cutoffs \\ [30, 60, 90, 120]) do
     cutoffs = to_cutoffs!(cutoffs)
