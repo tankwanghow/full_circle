@@ -87,7 +87,15 @@ AP; AR side → Payment debiting AR); a payment with no `"Invoice"` key at all s
 else `{:error, {:doc_total_mismatch, ...}}`). This keeps AR/AP per document exact.
 
 **Multi-year catch-up.** Xero posts payroll/depreciation via system journals the API
-can't expose (accounting.journals.read is not grantable to new apps). Coverage:
+can't expose (accounting.journals.read is not grantable to new apps — VERIFIED
+2026-08-21: adding the scope makes the authorize endpoint 302 straight to
+`Error: invalid_scope` before login; the same URL without it reaches the login page).
+GH's XCATCHUP content is exactly these pay-run journals (Wages/KWSP/SOCSO vs Bank/Cash)
+plus 2025 Vend-POS oddments; the 3,148 dry-run skips are all voided/deleted/transfer
+duplicates and contribute nothing to catch-up. The empty 2025-26 bank_transactions is
+real data (verified with a `where Date >= DateTime(2025,01,01)` probe → 0 rows), not a
+pagination bug. Per-transaction backfill of the catch-up therefore requires a non-API
+source (e.g. Xero UI Journal-report export appended as manual journals). Coverage:
 - `Snapshot.pull` fetches a TrialBalance per financial year end into
   `reports["trial_balance_by_year"]` (+ current date as final period).
 - `Apply.post_catchup_journals` posts one `XCATCHUP-<date>` journal per period:
