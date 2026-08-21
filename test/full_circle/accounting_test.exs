@@ -34,6 +34,34 @@ defmodule FullCircle.AccountingTest do
     end
   end
 
+  describe "depreciation_dates/2 with zero rate" do
+    test "monthly asset with depre_rate 0 has no scheduled dates" do
+      fa = %FullCircle.Accounting.FixedAsset{
+        id: Ecto.UUID.generate(),
+        depre_rate: Decimal.new("0"),
+        depre_interval: "Monthly",
+        depre_start_date: ~D[2021-01-01]
+      }
+
+      com = %FullCircle.Sys.Company{closing_month: 12, closing_day: 31}
+
+      assert {[], nil} = Accounting.depreciation_dates(fa, com)
+    end
+
+    test "yearly asset with depre_rate 0 has no scheduled dates" do
+      fa = %FullCircle.Accounting.FixedAsset{
+        id: Ecto.UUID.generate(),
+        depre_rate: Decimal.new("0"),
+        depre_interval: "Yearly",
+        depre_start_date: ~D[2021-01-01]
+      }
+
+      com = %FullCircle.Sys.Company{closing_month: 12, closing_day: 31}
+
+      assert {[], nil} = Accounting.depreciation_dates(fa, com)
+    end
+  end
+
   describe "accounts" do
     setup do
       admin = user_fixture()

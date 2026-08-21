@@ -142,7 +142,7 @@ defmodule FullCircle.XeroImport.Mapper do
     {depre_method, depre_rate} =
       case method do
         "StraightLine" ->
-          {"Straight-Line", rate_fraction(Map.get(asset, "DepreciationRate", 0))}
+          {"Straight-Line", straight_line_rate(asset)}
 
         _ ->
           {"No Depreciation", Decimal.new("0")}
@@ -194,6 +194,24 @@ defmodule FullCircle.XeroImport.Mapper do
       %{code: code, tax_type: tax_type, rate: rate, descriptions: name}
       | acc
     ]
+  end
+
+  # Xero straight-line assets carry either DepreciationRate (a percentage) or
+  # EffectiveLifeYears (rate = 1/life); "Life"-entered assets have a nil rate.
+  defp straight_line_rate(asset) do
+    rate = rate_fraction(Map.get(asset, "DepreciationRate"))
+
+    if Decimal.compare(rate, 0) == :gt do
+      rate
+    else
+      case Map.get(asset, "EffectiveLifeYears") do
+        life when is_number(life) and life > 0 ->
+          Decimal.div(Decimal.new("1"), decimalize(life))
+
+        _ ->
+          Decimal.new("0")
+      end
+    end
   end
 
   defp rate_fraction(nil), do: Decimal.new("0")

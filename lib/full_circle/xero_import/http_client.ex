@@ -9,6 +9,8 @@ defmodule FullCircle.XeroImport.HttpClient do
   @assets "https://api.xero.com/assets.xro/1.0"
   @connections "https://api.xero.com/connections"
   @max_attempts 5
+  # Longest Retry-After we will honor by sleeping (minute-limit 429s are <= 60s).
+  @max_retry_after_ms 120_000
 
   defstruct [:token_agent, :tenant_id, :credentials, :req_options, :sleeper]
 
@@ -225,8 +227,16 @@ defmodule FullCircle.XeroImport.HttpClient do
         {:ok, decode(body)}
 
       {:ok, %{status: 429} = resp} when attempt < @max_attempts ->
-        client.sleeper.(retry_delay_ms(resp, attempt))
-        request_loop(client, method, url, opts, attempt + 1, refreshed)
+        delay_ms = retry_delay_ms(resp, attempt)
+
+        # A Retry-After of minutes-to-hours is Xero's daily tenant limit —
+        # fail loudly with the wait instead of sleeping silently for hours.
+        if delay_ms > @max_retry_after_ms do
+          {:error, {:rate_limited, div(delay_ms, 1000)}}
+        else
+          client.sleeper.(delay_ms)
+          request_loop(client, method, url, opts, attempt + 1, refreshed)
+        end
 
       {:ok, %{status: 429}} ->
         {:error, :too_many_requests}
@@ -529,6 +539,9 @@ defmodule FullCircle.XeroImport.HttpClient do
         setting["averagingMethod"] || setting["AveragingMethod"] || asset["AveragingMethod"],
       "DepreciationRate" =>
         setting["depreciationRate"] || setting["DepreciationRate"] || asset["DepreciationRate"],
+      "EffectiveLifeYears" =>
+        setting["effectiveLifeYears"] || setting["EffectiveLifeYears"] ||
+          asset["EffectiveLifeYears"],
       "AssetTypeId" => type_id,
       "AssetType" => normalize_asset_type(type),
       "DepreciationHistory" => history

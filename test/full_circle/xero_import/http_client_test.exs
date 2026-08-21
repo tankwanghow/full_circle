@@ -403,6 +403,22 @@ defmodule FullCircle.XeroImport.HttpClientTest do
     assert Agent.get(delays, & &1) == [2_000, 4_000, 8_000]
   end
 
+  test "429 with a Retry-After beyond the cap fails fast instead of sleeping", %{stub: stub} do
+    Req.Test.stub(stub, fn conn ->
+      conn
+      |> Plug.Conn.put_resp_header("retry-after", "70000")
+      |> Plug.Conn.send_resp(429, "daily limit exceeded")
+    end)
+
+    {:ok, delays} = Agent.start_link(fn -> [] end)
+    sleeper = fn ms -> Agent.update(delays, &(&1 ++ [ms])) end
+
+    assert {:error, {:rate_limited, 70_000}} =
+             HttpClient.list_invoices(http_client(stub, sleeper: sleeper))
+
+    assert Agent.get(delays, & &1) == []
+  end
+
   test "429 still failing after max retries is an error", %{stub: stub} do
     Req.Test.stub(stub, fn conn ->
       conn
@@ -588,7 +604,8 @@ defmodule FullCircle.XeroImport.HttpClientTest do
             "accountingBookValue" => 800.0,
             "bookDepreciationSetting" => %{
               "depreciationMethod" => "StraightLine",
-              "depreciationRate" => 20.0,
+              "depreciationRate" => nil,
+              "effectiveLifeYears" => 5,
               "averagingMethod" => "Monthly"
             },
             "bookDepreciationDetail" => %{
@@ -608,6 +625,7 @@ defmodule FullCircle.XeroImport.HttpClientTest do
     assert asset["AssetId"] == "fa-1"
     assert asset["AssetName"] == "Van"
     assert asset["DepreciationMethod"] == "StraightLine"
+    assert asset["EffectiveLifeYears"] == 5
     assert asset["AssetType"]["FixedAssetAccountId"] == "ac-fa"
     assert [%{"DepreciationAmount" => 200.0}] = asset["DepreciationHistory"]
   end

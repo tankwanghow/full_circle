@@ -92,7 +92,7 @@ defmodule Mix.Tasks.FullCircle.ImportXero do
         halt!(format_errors(result.errors))
       end
     else
-      {:error, reason} -> halt!(inspect(reason))
+      {:error, reason} -> halt!(describe_error(reason))
     end
   end
 
@@ -118,7 +118,7 @@ defmodule Mix.Tasks.FullCircle.ImportXero do
         halt!(":company_not_empty")
 
       {:error, reason} ->
-        halt!(inspect(reason))
+        halt!(describe_error(reason))
     end
   end
 
@@ -139,7 +139,7 @@ defmodule Mix.Tasks.FullCircle.ImportXero do
         {:error, _} -> halt!("reconcile failed")
       end
     else
-      {:error, reason} -> halt!(inspect(reason))
+      {:error, reason} -> halt!(describe_error(reason))
     end
   end
 
@@ -193,14 +193,14 @@ defmodule Mix.Tasks.FullCircle.ImportXero do
               :ok
 
             {:error, reason} ->
-              halt!(inspect(reason))
+              halt!(describe_error(reason))
           end
 
         {:error, reason} ->
-          halt!(inspect(reason))
+          halt!(describe_error(reason))
       end
     else
-      {:error, reason} -> halt!(inspect(reason))
+      {:error, reason} -> halt!(describe_error(reason))
     end
   end
 
@@ -210,22 +210,21 @@ defmodule Mix.Tasks.FullCircle.ImportXero do
 
     with {:ok, creds} <- Credentials.load(path),
          {:ok, tokens} <- Credentials.token(creds),
+         # Refresh tokens are single-use: persist the rotated one BEFORE the
+         # long pull — a crash mid-pull must not leave a consumed token on disk.
+         _ <- if(present?(tokens[:refresh_token]), do: Credentials.append_tokens(path, tokens)),
          {:ok, tenant_id} <- resolve_tenant(tokens.access_token, creds),
          client <-
            HttpClient.new(
              access_token: tokens.access_token,
              tenant_id: tenant_id,
-             credentials: creds
+             credentials: Map.put(creds, :refresh_token, tokens[:refresh_token] || creds.refresh_token)
            ),
          {:ok, dest} <- Snapshot.pull(client, dest) do
-      if present?(tokens[:refresh_token]) do
-        _ = Credentials.append_tokens(path, tokens)
-      end
-
       Mix.shell().info("snapshot written to #{dest}")
       :ok
     else
-      {:error, reason} -> halt!(inspect(reason))
+      {:error, reason} -> halt!(describe_error(reason))
     end
   end
 
@@ -397,4 +396,13 @@ defmodule Mix.Tasks.FullCircle.ImportXero do
     Mix.shell().error(to_string(message))
     exit({:shutdown, 1})
   end
+
+  defp describe_error({:rate_limited, seconds}) do
+    resumes_at = DateTime.utc_now() |> DateTime.add(seconds) |> DateTime.truncate(:second)
+
+    "Xero daily API limit hit — retry in ~#{Float.round(seconds / 3600, 1)}h " <>
+      "(#{seconds}s, around #{resumes_at} UTC)"
+  end
+
+  defp describe_error(reason), do: inspect(reason)
 end

@@ -372,6 +372,22 @@ defmodule FullCircle.Accounting do
   end
 
   def depreciation_dates(fa, com) when fa.depre_interval == "Yearly" do
+    if Decimal.compare(fa.depre_rate, 0) != :gt do
+      {[], depreciations_query(fa.id) |> List.last()}
+    else
+      depreciation_dates_yearly(fa, com)
+    end
+  end
+
+  def depreciation_dates(fa, com) when fa.depre_interval == "Monthly" do
+    if Decimal.compare(fa.depre_rate, 0) != :gt do
+      {[], depreciations_query(fa.id) |> List.last()}
+    else
+      depreciation_dates_monthly(fa, com)
+    end
+  end
+
+  defp depreciation_dates_yearly(fa, com) do
     depreciations = depreciations_query(fa.id)
     last_depre = depreciations |> List.last()
 
@@ -391,7 +407,7 @@ defmodule FullCircle.Accounting do
      |> Enum.map(fn x -> Timex.shift(last_dep_date, years: x) end), last_depre}
   end
 
-  def depreciation_dates(fa, com) when fa.depre_interval == "Monthly" do
+  defp depreciation_dates_monthly(fa, com) do
     depreciations = depreciations_query(fa.id)
     last_depre = depreciations |> List.last()
 

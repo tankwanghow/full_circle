@@ -92,6 +92,36 @@ defmodule FullCircle.XeroImport.MapperTest do
     assert fa["depre_interval"] == "Monthly"
   end
 
+  test "straight-line asset without rate derives it from effective life years" do
+    {:ok, fa} =
+      Mapper.fixed_asset(%{
+        "AssetName" => "Freezer",
+        "PurchaseDate" => "2021-01-01",
+        "PurchasePrice" => 1690.0,
+        "ResidualValue" => 0,
+        "DepreciationStartDate" => "2021-01-01",
+        "DepreciationMethod" => "StraightLine",
+        "DepreciationRate" => nil,
+        "EffectiveLifeYears" => 10,
+        "AveragingMethod" => "FullMonth"
+      })
+
+    assert Decimal.eq?(fa["depre_rate"], Decimal.new("0.1"))
+  end
+
+  test "straight-line asset with neither rate nor life keeps rate 0" do
+    {:ok, fa} =
+      Mapper.fixed_asset(%{
+        "AssetName" => "Mystery",
+        "PurchaseDate" => "2021-01-01",
+        "PurchasePrice" => 100.0,
+        "DepreciationStartDate" => "2021-01-01",
+        "DepreciationMethod" => "StraightLine"
+      })
+
+    assert Decimal.eq?(fa["depre_rate"], Decimal.new("0"))
+  end
+
   test "skips draft and void invoices" do
     refute Mapper.importable_invoice?(%{"Status" => "DRAFT", "Type" => "ACCREC"})
     refute Mapper.importable_invoice?(%{"Status" => "VOIDED", "Type" => "ACCREC"})
