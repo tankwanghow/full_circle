@@ -271,7 +271,7 @@ defmodule FullCircleWeb.CsvController do
 
   def show(conn, %{
         "company_id" => com_id,
-        "report" => "tbplbs",
+        "report" => "financial_statements",
         "rep" => rep,
         "tdate" => tdate
       }) do
@@ -288,6 +288,24 @@ defmodule FullCircleWeb.CsvController do
 
         rep == "Balance Sheet" ->
           FullCircle.Reporting.balance_sheet(tdate, com)
+
+        rep == "Cash Flow" ->
+          fdate =
+            conn.params["fdate"] |> Timex.parse!("{YYYY}-{0M}-{0D}") |> NaiveDateTime.to_date()
+
+          FullCircle.Reporting.cash_flow(fdate, tdate, com) ++
+            [
+              %{
+                type: "Cash",
+                name: "Cash at Beginning of Period",
+                balance: FullCircle.Reporting.cash_balance(Date.add(fdate, -1), com)
+              },
+              %{
+                type: "Cash",
+                name: "Cash at End of Period",
+                balance: FullCircle.Reporting.cash_balance(tdate, com)
+              }
+            ]
 
         true ->
           []

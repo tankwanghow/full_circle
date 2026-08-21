@@ -245,7 +245,7 @@ defmodule FullCircleWeb.Router do
       live("/house_feed", ReportLive.HouseFeed, :index)
       live("/eaform", ReportLive.EAForm, :index)
 
-      live("/tbplbs", ReportLive.TbPlBs, :index)
+      live("/financial_statements", ReportLive.FinancialStatements, :index)
       live("/aging", ReportLive.Aging, :index)
       live("/fixed_assets_report", ReportLive.FixedAssets, :index)
       live("/post_dated_cheque_listing", ReportLive.PostDatedCheques, :index)
@@ -377,7 +377,7 @@ defmodule FullCircleWeb.Router do
       live("/csvformprint", CsvFormPrintLive.Print, :print)
       live("/print/harvrepo", LayerLive.HarvestReportPrint, :print)
       live("/print/harvwagrepo", LayerLive.HarvestWageReportPrint, :print)
-      live("/print/tbplbs", ReportLive.TbPlBs, :print)
+      live("/print/financial_statements", ReportLive.FinancialStatements, :print)
       live("/print/house_feed", ReportLive.HouseFeedPrint, :print)
       live("/cash_forecast/print", ReportLive.CashForecastPrint, :print)
       live("/profit_loss_forecast/print", ReportLive.ProfitLossForecastPrint, :print)
