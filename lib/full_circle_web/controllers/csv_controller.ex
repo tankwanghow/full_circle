@@ -248,6 +248,44 @@ defmodule FullCircleWeb.CsvController do
 
   def show(conn, %{
         "company_id" => com_id,
+        "report" => "goodpurchases",
+        "contact" => contact,
+        "goods" => goods,
+        "fdate" => fdate,
+        "tdate" => tdate
+      }) do
+    tdate = tdate |> Timex.parse!("{YYYY}-{0M}-{0D}") |> NaiveDateTime.to_date()
+    fdate = fdate |> Timex.parse!("{YYYY}-{0M}-{0D}") |> NaiveDateTime.to_date()
+
+    data =
+      FullCircle.TaggedBill.goods_purchases_report(
+        contact,
+        goods,
+        fdate,
+        tdate,
+        com_id
+      )
+
+    fields = [
+      :doc_date,
+      :doc_type,
+      :doc_no,
+      :contact,
+      :good,
+      :pack_name,
+      :pack_qty,
+      :qty,
+      :unit,
+      :price,
+      :amount
+    ]
+
+    filename = "good_purchases_#{fdate}_#{tdate}"
+    send_csv_map(conn, data, fields, filename)
+  end
+
+  def show(conn, %{
+        "company_id" => com_id,
         "report" => "weigoodrepo",
         "glist" => glist,
         "fdate" => fdate,

@@ -89,8 +89,8 @@ defmodule FullCircleWeb.DashboardLive do
         <.link navigate={~p"/companies/#{@current_company.id}/PurInvoice"} class="button teal">
           {gettext("Purchase Invoices")}
         </.link>
-        <.link navigate={~p"/companies/#{@current_company.id}/good_sales"} class="button teal">
-          {gettext("Good Sales")}
+        <.link navigate={~p"/companies/#{@current_company.id}/good_snp"} class="button teal">
+          {gettext("Goods Sales & Purchases")}
         </.link>
         <.link navigate={~p"/companies/#{@current_company.id}/trading/desk"} class="button teal">
           {gettext("Trading Desk")}

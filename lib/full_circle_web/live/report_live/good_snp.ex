@@ -1,19 +1,23 @@
-defmodule FullCircleWeb.ReportLive.GoodSales do
+defmodule FullCircleWeb.ReportLive.GoodSnP do
   use FullCircleWeb, :live_view
+
+  # Combined goods sales & purchases listing.
+  # type "sales":      Invoice + cash-sale Receipt lines (contact = Customer)
+  # type "purchases":  PurInvoice + cash-purchase Payment lines (contact = Vendor)
+  # Replaces the old ReportLive.GoodSales; /good_sales still routes here.
+
+  @types ~w(sales purchases)
 
   @impl true
   def mount(_params, _session, socket) do
-    socket =
-      socket
-      |> assign(page_title: "Good Sales Listing")
-
-    {:ok, socket}
+    {:ok, assign(socket, page_title: gettext("Goods Sales & Purchases"))}
   end
 
   @impl true
   def handle_params(params, _uri, socket) do
     params = params["search"]
 
+    type = if params["type"] in @types, do: params["type"], else: "sales"
     contact = params["contact"] || ""
     goods = params["goods"] || ""
     category = params["category"] || ""
@@ -24,6 +28,7 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
      socket
      |> assign(
        search: %{
+         type: type,
          contact: contact,
          goods: goods,
          f_date: f_date,
@@ -31,7 +36,7 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
          category: category
        }
      )
-     |> filter_transactions(contact, goods, f_date, t_date)}
+     |> filter_transactions(type, contact, goods, f_date, t_date)}
   end
 
   @impl true
@@ -39,6 +44,7 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
         "query",
         %{
           "search" => %{
+            "type" => type,
             "contact" => contact,
             "goods" => goods,
             "category" => category,
@@ -49,6 +55,7 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
         socket
       ) do
     qry = %{
+      "search[type]" => type,
       "search[contact]" => contact,
       "search[goods]" => goods,
       "search[category]" => category,
@@ -57,11 +64,9 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
     }
 
     url =
-      "/companies/#{socket.assigns.current_company.id}/good_sales?#{URI.encode_query(qry)}"
+      "/companies/#{socket.assigns.current_company.id}/good_snp?#{URI.encode_query(qry)}"
 
-    {:noreply,
-     socket
-     |> push_navigate(to: url)}
+    {:noreply, push_navigate(socket, to: url)}
   end
 
   @impl true
@@ -70,6 +75,7 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
         %{
           "_target" => ["search", "category"],
           "search" => %{
+            "type" => type,
             "category" => cat,
             "contact" => cont,
             "f_date" => f_date,
@@ -88,8 +94,7 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
 
     goods =
       if Enum.count(goods) > 0 do
-        goods
-        |> Enum.map_join(", ", fn x -> x.name end)
+        goods |> Enum.map_join(", ", fn x -> x.name end)
       else
         ["Not Goods in this category"]
       end
@@ -98,6 +103,7 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
      socket
      |> assign(
        search: %{
+         type: type,
          contact: cont,
          goods: goods,
          f_date: f_date,
@@ -112,7 +118,7 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
     {:noreply, socket}
   end
 
-  defp filter_transactions(socket, contact, goods, f_date, t_date) do
+  defp filter_transactions(socket, type, contact, goods, f_date, t_date) do
     current_company = socket.assigns.current_company
 
     socket
@@ -125,25 +131,50 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
              if f_date == "" or t_date == "" do
                {[], []}
              else
-               {FullCircle.TaggedBill.goods_sales_report(
-                  contact,
-                  goods,
-                  f_date,
-                  t_date,
-                  current_company.id
-                ),
-                FullCircle.TaggedBill.goods_sales_summary_report(
-                  contact,
-                  goods,
-                  f_date,
-                  t_date,
-                  current_company.id
-                )}
+               case type do
+                 "purchases" ->
+                   {FullCircle.TaggedBill.goods_purchases_report(
+                      contact,
+                      goods,
+                      f_date,
+                      t_date,
+                      current_company.id
+                    ),
+                    FullCircle.TaggedBill.goods_purchases_summary_report(
+                      contact,
+                      goods,
+                      f_date,
+                      t_date,
+                      current_company.id
+                    )}
+
+                 _ ->
+                   {FullCircle.TaggedBill.goods_sales_report(
+                      contact,
+                      goods,
+                      f_date,
+                      t_date,
+                      current_company.id
+                    ),
+                    FullCircle.TaggedBill.goods_sales_summary_report(
+                      contact,
+                      goods,
+                      f_date,
+                      t_date,
+                      current_company.id
+                    )}
+               end
              end
          }}
       end
     )
   end
+
+  defp contact_label("purchases"), do: gettext("Vendor")
+  defp contact_label(_), do: gettext("Customer")
+
+  defp csv_report("purchases"), do: "goodpurchases"
+  defp csv_report(_), do: "goodsales"
 
   @impl true
   def render(assigns) do
@@ -155,6 +186,16 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
           <div class="flex tracking-tighter">
             <div class="w-[10%]">
               <.input
+                id="search_type"
+                name="search[type]"
+                value={@search.type}
+                label={gettext("Type")}
+                type="select"
+                options={[{gettext("Sales"), "sales"}, {gettext("Purchases"), "purchases"}]}
+              />
+            </div>
+            <div class="w-[10%]">
+              <.input
                 id="search_category"
                 name="search[category]"
                 value={@search.category}
@@ -163,7 +204,7 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
                 options={FullCircle.Product.categories()}
               />
             </div>
-            <div class="w-[40%]">
+            <div class="w-[30%]">
               <.input
                 label={gettext("Contact")}
                 id="search_contact"
@@ -198,7 +239,7 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
               <.link
                 :if={@result.result != {[], []}}
                 navigate={
-                  ~p"/companies/#{@current_company.id}/csv?report=goodsales&&contact=#{@search.goods}&goods=#{@search.goods}&fdate=#{@search.f_date}&tdate=#{@search.t_date}"
+                  ~p"/companies/#{@current_company.id}/csv?report=#{csv_report(@search.type)}&contact=#{@search.contact}&goods=#{@search.goods}&fdate=#{@search.f_date}&tdate=#{@search.t_date}"
                 }
                 class="blue button"
                 target="_blank"
@@ -232,7 +273,7 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
               {gettext("Doc No")}
             </div>
             <div class="w-[25%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
-              {gettext("Customer")}
+              {contact_label(@search.type)}
             </div>
             <div class="w-[15%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
               {gettext("Goods")}
@@ -257,7 +298,7 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
             </div>
           </div>
 
-          <div id="objexts">
+          <div id="report-lines">
             <%= for obj <- objects do %>
               <div class="flex flex-row text-center tracking-tighter">
                 <div class="w-[8%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
@@ -295,11 +336,11 @@ defmodule FullCircleWeb.ReportLive.GoodSales do
             <% end %>
           </div>
 
-          <div id="objexts">
+          <div id="report-summaries">
             <%= for obj <- summaries do %>
               <div class="flex flex-row text-center tracking-tighter font-bold">
                 <div class="w-[41%] border rounded bg-green-200 border-green-400 px-2 py-1 text-right">
-                  Summary
+                  {gettext("Summary")}
                 </div>
                 <div class="w-[15%] border rounded bg-green-200 border-green-400 px-2 py-1">
                   {obj.good}

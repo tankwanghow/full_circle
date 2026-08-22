@@ -240,7 +240,9 @@ defmodule FullCircleWeb.Router do
       live("/feed_egg_report", LayerLive.FeedEggReport, :index)
       live("/transport_commission", ReportLive.TransportCommission, :index)
       live("/epfsocsoeis", ReportLive.EpfSocsoEis, :index)
-      live("/good_sales", ReportLive.GoodSales, :index)
+      live("/good_snp", ReportLive.GoodSnP, :index)
+      # Legacy bookmarks: old sales-only report path renders the combined page
+      live("/good_sales", ReportLive.GoodSnP, :index)
       live("/egg_price_history", ReportLive.EggPriceHistory, :index)
       live("/house_feed", ReportLive.HouseFeed, :index)
       live("/eaform", ReportLive.EAForm, :index)
