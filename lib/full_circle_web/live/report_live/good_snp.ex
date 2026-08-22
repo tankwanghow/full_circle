@@ -15,52 +15,43 @@ defmodule FullCircleWeb.ReportLive.GoodSnP do
 
   @impl true
   def handle_params(params, _uri, socket) do
-    params = params["search"]
-
-    type = if params["type"] in @types, do: params["type"], else: "sales"
-    contact = params["contact"] || ""
-    goods = params["goods"] || ""
-    category = params["category"] || ""
-    f_date = params["f_date"] || "#{Timex.today()}"
-    t_date = params["t_date"] || "#{Timex.today()}"
+    search = parse_search(params["search"] || %{})
 
     {:noreply,
      socket
-     |> assign(
-       search: %{
-         type: type,
-         contact: contact,
-         goods: goods,
-         f_date: f_date,
-         t_date: t_date,
-         category: category
-       }
-     )
-     |> filter_transactions(type, contact, goods, f_date, t_date)}
+     |> assign(search: search)
+     |> filter_transactions(search)}
+  end
+
+  # "custom" category: goods list is replaced by two ilike pattern lists —
+  # name_ilike matches good.name, desc_ilike matches the detail line
+  # descriptions; a line qualifies when either group matches.
+  defp parse_search(params) do
+    %{
+      type: if(params["type"] in @types, do: params["type"], else: "sales"),
+      contact: params["contact"] || "",
+      goods: params["goods"] || "",
+      category: params["category"] || "",
+      name_ilike: params["name_ilike"] || "",
+      desc_ilike: params["desc_ilike"] || "",
+      f_date: params["f_date"] || "#{Timex.today()}",
+      t_date: params["t_date"] || "#{Timex.today()}"
+    }
   end
 
   @impl true
-  def handle_event(
-        "query",
-        %{
-          "search" => %{
-            "type" => type,
-            "contact" => contact,
-            "goods" => goods,
-            "category" => category,
-            "f_date" => f_date,
-            "t_date" => t_date
-          }
-        },
-        socket
-      ) do
+  def handle_event("query", %{"search" => search_params}, socket) do
+    s = parse_search(search_params)
+
     qry = %{
-      "search[type]" => type,
-      "search[contact]" => contact,
-      "search[goods]" => goods,
-      "search[category]" => category,
-      "search[f_date]" => f_date,
-      "search[t_date]" => t_date
+      "search[type]" => s.type,
+      "search[contact]" => s.contact,
+      "search[goods]" => s.goods,
+      "search[category]" => s.category,
+      "search[name_ilike]" => s.name_ilike,
+      "search[desc_ilike]" => s.desc_ilike,
+      "search[f_date]" => s.f_date,
+      "search[t_date]" => s.t_date
     }
 
     url =
@@ -72,45 +63,34 @@ defmodule FullCircleWeb.ReportLive.GoodSnP do
   @impl true
   def handle_event(
         "change",
-        %{
-          "_target" => ["search", "category"],
-          "search" => %{
-            "type" => type,
-            "category" => cat,
-            "contact" => cont,
-            "f_date" => f_date,
-            "goods" => _goods,
-            "t_date" => t_date
-          }
-        },
+        %{"_target" => ["search", "category"], "search" => search_params},
         socket
       ) do
-    goods =
-      FullCircle.Product.get_goods_by_category(
-        cat,
-        socket.assigns.current_company,
-        socket.assigns.current_user
-      )
+    s = parse_search(search_params)
 
-    goods =
-      if Enum.count(goods) > 0 do
-        goods |> Enum.map_join(", ", fn x -> x.name end)
+    s =
+      if s.category == "custom" do
+        # user enters ilike patterns; keep whatever is typed
+        s
       else
-        ["Not Goods in this category"]
+        goods =
+          FullCircle.Product.get_goods_by_category(
+            s.category,
+            socket.assigns.current_company,
+            socket.assigns.current_user
+          )
+
+        goods =
+          if Enum.count(goods) > 0 do
+            goods |> Enum.map_join(", ", fn x -> x.name end)
+          else
+            ["Not Goods in this category"]
+          end
+
+        %{s | goods: goods}
       end
 
-    {:noreply,
-     socket
-     |> assign(
-       search: %{
-         type: type,
-         contact: cont,
-         goods: goods,
-         f_date: f_date,
-         t_date: t_date,
-         category: cat
-       }
-     )}
+    {:noreply, assign(socket, search: s)}
   end
 
   @impl true
@@ -118,8 +98,16 @@ defmodule FullCircleWeb.ReportLive.GoodSnP do
     {:noreply, socket}
   end
 
-  defp filter_transactions(socket, type, contact, goods, f_date, t_date) do
+  defp query_opts(%{category: "custom"} = search) do
+    [match: :ilike, name_ilike: search.name_ilike, desc_ilike: search.desc_ilike]
+  end
+
+  defp query_opts(_search), do: []
+
+  defp filter_transactions(socket, search) do
     current_company = socket.assigns.current_company
+    %{type: type, contact: contact, goods: goods, f_date: f_date, t_date: t_date} = search
+    opts = query_opts(search)
 
     socket
     |> assign_async(
@@ -138,14 +126,16 @@ defmodule FullCircleWeb.ReportLive.GoodSnP do
                       goods,
                       f_date,
                       t_date,
-                      current_company.id
+                      current_company.id,
+                      opts
                     ),
                     FullCircle.TaggedBill.goods_purchases_summary_report(
                       contact,
                       goods,
                       f_date,
                       t_date,
-                      current_company.id
+                      current_company.id,
+                      opts
                     )}
 
                  _ ->
@@ -154,14 +144,16 @@ defmodule FullCircleWeb.ReportLive.GoodSnP do
                       goods,
                       f_date,
                       t_date,
-                      current_company.id
+                      current_company.id,
+                      opts
                     ),
                     FullCircle.TaggedBill.goods_sales_summary_report(
                       contact,
                       goods,
                       f_date,
                       t_date,
-                      current_company.id
+                      current_company.id,
+                      opts
                     )}
                end
              end
@@ -201,7 +193,7 @@ defmodule FullCircleWeb.ReportLive.GoodSnP do
                 value={@search.category}
                 label={gettext("Category")}
                 type="select"
-                options={FullCircle.Product.categories()}
+                options={FullCircle.Product.categories() ++ ["custom"]}
               />
             </div>
             <div class="w-[30%]">
@@ -239,7 +231,7 @@ defmodule FullCircleWeb.ReportLive.GoodSnP do
               <.link
                 :if={@result.result != {[], []}}
                 navigate={
-                  ~p"/companies/#{@current_company.id}/csv?report=#{csv_report(@search.type)}&contact=#{@search.contact}&goods=#{@search.goods}&fdate=#{@search.f_date}&tdate=#{@search.t_date}"
+                  ~p"/companies/#{@current_company.id}/csv?report=#{csv_report(@search.type)}&contact=#{@search.contact}&goods=#{@search.goods}&category=#{@search.category}&name_ilike=#{@search.name_ilike}&desc_ilike=#{@search.desc_ilike}&fdate=#{@search.f_date}&tdate=#{@search.t_date}"
                 }
                 class="blue button"
                 target="_blank"
@@ -248,7 +240,7 @@ defmodule FullCircleWeb.ReportLive.GoodSnP do
               </.link>
             </div>
           </div>
-          <div class="w-[100%]">
+          <div :if={@search.category != "custom"} class="w-[100%]">
             <.input
               label={gettext("Good List")}
               type="textarea"
@@ -259,6 +251,26 @@ defmodule FullCircleWeb.ReportLive.GoodSnP do
               url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=good&name="}
             />
           </div>
+          <div :if={@search.category == "custom"} class="flex gap-2">
+            <div class="w-[50%]">
+              <.input
+                label={gettext("Good name ilike list (e.g. %egg%, %maize%)")}
+                type="textarea"
+                id="search_name_ilike"
+                name="search[name_ilike]"
+                value={@search.name_ilike}
+              />
+            </div>
+            <div class="w-[50%]">
+              <.input
+                label={gettext("Line description ilike list (e.g. %egg%, %transport%)")}
+                type="textarea"
+                id="search_desc_ilike"
+                name="search[desc_ilike]"
+                value={@search.desc_ilike}
+              />
+            </div>
+          </div>
         </.form>
       </div>
 
@@ -266,34 +278,37 @@ defmodule FullCircleWeb.ReportLive.GoodSnP do
         <:result_html>
           <% {objects, summaries} = @result.result %>
           <div class="font-medium flex flex-row text-center tracking-tighter mb-1">
-            <div class="w-[8%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
+            <div class="w-[7%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
               {gettext("Date")}
             </div>
-            <div class="w-[8%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
+            <div class="w-[7%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
               {gettext("Doc No")}
             </div>
-            <div class="w-[25%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
+            <div class="w-[15%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
               {contact_label(@search.type)}
             </div>
-            <div class="w-[15%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
+            <div class="w-[11%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
               {gettext("Goods")}
             </div>
-            <div class="w-[6%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
+            <div class="w-[14%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
+              {gettext("Descriptions")}
+            </div>
+            <div class="w-[5%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
               {gettext("Pack")}
             </div>
-            <div class="w-[8%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
+            <div class="w-[7%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
               {gettext("PackQty")}
             </div>
             <div class="w-[10%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
               {gettext("Qty (Avg Qty)")}
             </div>
-            <div class="w-[6%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
+            <div class="w-[5%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
               {gettext("Unit")}
             </div>
-            <div class="w-[6%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
+            <div class="w-[9%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
               {gettext("Avg Price")}
             </div>
-            <div class="w-[8%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
+            <div class="w-[10%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
               {gettext("Amount")}
             </div>
           </div>
@@ -301,35 +316,41 @@ defmodule FullCircleWeb.ReportLive.GoodSnP do
           <div id="report-lines">
             <%= for obj <- objects do %>
               <div class="flex flex-row text-center tracking-tighter">
-                <div class="w-[8%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
+                <div class="w-[7%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
                   {obj.doc_date |> FullCircleWeb.Helpers.format_date()}
                 </div>
-                <div class="w-[8%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
+                <div class="w-[7%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
                   <.doc_link current_company={@current_company} doc_obj={obj} />
                 </div>
-                <div class="w-[25%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
+                <div class="w-[15%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
                   {obj.contact}
                 </div>
-                <div class="w-[15%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
+                <div class="w-[11%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
                   {obj.good}
                 </div>
-                <div class="w-[6%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
+                <div
+                  class="w-[14%] border rounded bg-blue-200 border-blue-400 px-2 py-1 truncate"
+                  title={obj.descriptions}
+                >
+                  {obj.descriptions}
+                </div>
+                <div class="w-[5%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
                   {obj.pack_name}
                 </div>
-                <div class="w-[8%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
+                <div class="w-[7%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
                   {obj.pack_qty |> Number.Delimit.number_to_delimited()}
                 </div>
                 <div class="w-[10%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
                   {obj.qty |> Number.Delimit.number_to_delimited()} ({obj.avg_qty
                   |> Number.Delimit.number_to_delimited()})
                 </div>
-                <div class="w-[6%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
+                <div class="w-[5%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
                   {obj.unit}
                 </div>
-                <div class="w-[6%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
+                <div class="w-[9%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
                   {obj.price |> Number.Delimit.number_to_delimited()}
                 </div>
-                <div class="w-[8%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
+                <div class="w-[10%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
                   {obj.amount |> Number.Delimit.number_to_delimited()}
                 </div>
               </div>
@@ -339,29 +360,30 @@ defmodule FullCircleWeb.ReportLive.GoodSnP do
           <div id="report-summaries">
             <%= for obj <- summaries do %>
               <div class="flex flex-row text-center tracking-tighter font-bold">
-                <div class="w-[41%] border rounded bg-green-200 border-green-400 px-2 py-1 text-right">
+                <div class="w-[29%] border rounded bg-green-200 border-green-400 px-2 py-1 text-right">
                   {gettext("Summary")}
                 </div>
-                <div class="w-[15%] border rounded bg-green-200 border-green-400 px-2 py-1">
+                <div class="w-[11%] border rounded bg-green-200 border-green-400 px-2 py-1">
                   {obj.good}
                 </div>
-                <div class="w-[6%] border rounded bg-green-200 border-green-400 px-2 py-1">
+                <div class="w-[14%] border rounded bg-green-200 border-green-400 px-2 py-1"></div>
+                <div class="w-[5%] border rounded bg-green-200 border-green-400 px-2 py-1">
                   {obj.pack_name}
                 </div>
-                <div class="w-[8%] border rounded bg-green-200 border-green-400 px-2 py-1">
+                <div class="w-[7%] border rounded bg-green-200 border-green-400 px-2 py-1">
                   {obj.pack_qty |> Number.Delimit.number_to_delimited()}
                 </div>
                 <div class="w-[10%] border rounded bg-green-200 border-green-400 px-2 py-1">
                   {obj.qty |> Number.Delimit.number_to_delimited()} ({obj.avg_qty
                   |> Number.Delimit.number_to_delimited()})
                 </div>
-                <div class="w-[6%] border rounded bg-green-200 border-green-400 px-2 py-1">
+                <div class="w-[5%] border rounded bg-green-200 border-green-400 px-2 py-1">
                   {obj.unit}
                 </div>
-                <div class="w-[6%] border rounded bg-green-200 border-green-400 px-2 py-1">
+                <div class="w-[9%] border rounded bg-green-200 border-green-400 px-2 py-1">
                   {obj.price |> Number.Delimit.number_to_delimited()}
                 </div>
-                <div class="w-[8%] border rounded bg-green-200 border-green-400 px-2 py-1">
+                <div class="w-[10%] border rounded bg-green-200 border-green-400 px-2 py-1">
                   {obj.amount |> Number.Delimit.number_to_delimited()}
                 </div>
               </div>

@@ -117,6 +117,123 @@ defmodule FullCircle.TaggedBillTest do
     end
   end
 
+  describe "custom ilike matching (match: :ilike)" do
+    defp create_invoice_with_desc(company, user, contact, good, desc, opts) do
+      sales_acct = FullCircle.Accounting.get_account_by_name("General Sales", company, user)
+
+      sales_tc =
+        Repo.one!(from tc in TaxCode, where: tc.company_id == ^company.id and tc.code == "NoSTax")
+
+      attrs =
+        invoice_attrs(contact, good, sales_acct, sales_tc, Keyword.put(opts, :tax_rate, "0"))
+        |> put_in(["invoice_details", "0", "descriptions"], desc)
+
+      {:ok, %{create_invoice: inv}} = FullCircle.Billing.create_invoice(attrs, company, user)
+      inv
+    end
+
+    test "sales: name patterns OR description patterns, blank field ignored", %{
+      user: user,
+      company: company
+    } do
+      contact = contact_fixture(company, user, %{"name" => "Ilike Customer"})
+      egg_good = good_fixture(company, user, %{"name" => "Grade A Egg"})
+      misc_good = good_fixture(company, user, %{"name" => "Misc Item"})
+      wheat_good = good_fixture(company, user, %{"name" => "Wheat Bran"})
+
+      create_invoice_with_desc(company, user, contact, egg_good, nil, quantity: "1")
+
+      create_invoice_with_desc(company, user, contact, misc_good, "used egg trays", quantity: "2")
+
+      create_invoice_with_desc(company, user, contact, wheat_good, "plain wheat", quantity: "3")
+
+      # egg good matches via name list, misc good via description list; wheat neither
+      rows =
+        TaggedBill.goods_sales_report("", "", today(), today(), company.id,
+          match: :ilike,
+          name_ilike: "%egg%, %maize%",
+          desc_ilike: "%tray%"
+        )
+
+      goods = Enum.map(rows, & &1.good) |> Enum.sort()
+      assert goods == ["Grade A Egg", "Misc Item"]
+      assert Enum.any?(rows, &(&1.descriptions == "used egg trays"))
+
+      # blank name list: only the description patterns apply
+      rows =
+        TaggedBill.goods_sales_report("", "", today(), today(), company.id,
+          match: :ilike,
+          name_ilike: "",
+          desc_ilike: "%tray%"
+        )
+
+      assert Enum.map(rows, & &1.good) == ["Misc Item"]
+
+      # summary honours the same patterns
+      summaries =
+        TaggedBill.goods_sales_summary_report("", "", today(), today(), company.id,
+          match: :ilike,
+          name_ilike: "%egg%",
+          desc_ilike: ""
+        )
+
+      assert Enum.map(summaries, & &1.good) == ["Grade A Egg"]
+    end
+
+    test "purchases: name patterns OR description patterns", %{
+      user: user,
+      company: company
+    } do
+      contact = contact_fixture(company, user, %{"name" => "Ilike Vendor"})
+      maize_good = good_fixture(company, user, %{"name" => "Maize Corn"})
+      other_good = good_fixture(company, user, %{"name" => "Other Stuff"})
+
+      pur_acct = FullCircle.Accounting.get_account_by_name("General Purchases", company, user)
+
+      pur_tc =
+        Repo.one!(from tc in TaxCode, where: tc.company_id == ^company.id and tc.code == "NoPTax")
+
+      attrs =
+        pur_invoice_attrs(contact, maize_good, pur_acct, pur_tc, quantity: "5", tax_rate: "0")
+
+      {:ok, _} = FullCircle.Billing.create_pur_invoice(attrs, company, user)
+
+      attrs2 =
+        pur_invoice_attrs(contact, other_good, pur_acct, pur_tc, quantity: "7", tax_rate: "0")
+        |> put_in(["pur_invoice_details", "0", "descriptions"], "maize transport charge")
+
+      {:ok, _} = FullCircle.Billing.create_pur_invoice(attrs2, company, user)
+
+      rows =
+        TaggedBill.goods_purchases_report("", "", today(), today(), company.id,
+          match: :ilike,
+          name_ilike: "%maize%",
+          desc_ilike: "%maize%"
+        )
+
+      goods = Enum.map(rows, & &1.good) |> Enum.sort()
+      assert goods == ["Maize Corn", "Other Stuff"]
+      assert Enum.any?(rows, &(&1.descriptions == "maize transport charge"))
+    end
+
+    test "exact mode is unchanged and rows still include descriptions", %{
+      user: user,
+      company: company
+    } do
+      contact = contact_fixture(company, user, %{"name" => "Exact Customer"})
+      good = good_fixture(company, user, %{"name" => "ExactGood"})
+
+      create_invoice_with_desc(company, user, contact, good, "line note", quantity: "1")
+
+      [row] = TaggedBill.goods_sales_report("", "ExactGood", today(), today(), company.id)
+      assert row.descriptions == "line note"
+
+      # a partial name does not match in exact mode
+      assert [] ==
+               TaggedBill.goods_sales_report("", "Exact", today(), today(), company.id)
+    end
+  end
+
   describe "goods_sales_report/5 tenant isolation" do
     test "does not leak other companies' sales", %{company: company} do
       other_user = user_fixture()

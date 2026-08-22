@@ -4,24 +4,59 @@ defmodule FullCircle.TaggedBill do
   alias FullCircle.Repo
   alias FullCircle.Accounting.Contact
 
-  def goods_sales_report(contact, goods, fdate, tdate, com_id) do
-    good_lst = goods |> String.split(",") |> Enum.map(fn x -> String.trim(x) end)
-    cont = FullCircle.Accounting.get_contact_by_name(contact, %{id: com_id}, nil)
+  # Goods filter for every report query below. Bindings: the detail line is
+  # always binding 1 and Good binding 2 ([doc, detail, good | _]).
+  #
+  # - exact (default): comma list of full good names (empty = all)
+  # - match: :ilike — "custom" category: `name_ilike` patterns OR-match
+  #   good.name, `desc_ilike` patterns OR-match the detail line descriptions;
+  #   a row qualifies when either group matches; a blank list contributes
+  #   nothing; both blank = no filter.
+  defp goods_condition(goods, opts) do
+    case Keyword.get(opts, :match, :exact) do
+      :ilike ->
+        names = split_list(Keyword.get(opts, :name_ilike, ""))
+        descs = split_list(Keyword.get(opts, :desc_ilike, ""))
 
-    goods_qry =
-      if good_lst != [""] do
-        from(gd in FullCircle.Product.Good,
-          where: gd.name in ^good_lst
-        )
-      else
-        from(gd in FullCircle.Product.Good)
-      end
+        if names == [] and descs == [] do
+          dynamic(true)
+        else
+          cond0 =
+            Enum.reduce(names, dynamic(false), fn p, acc ->
+              dynamic([_, _, g], ^acc or ilike(g.name, ^p))
+            end)
+
+          Enum.reduce(descs, cond0, fn p, acc ->
+            dynamic([_, d, _], ^acc or ilike(d.descriptions, ^p))
+          end)
+        end
+
+      _ ->
+        case split_list(goods) do
+          [] -> dynamic(true)
+          lst -> dynamic([_, _, g], g.name in ^lst)
+        end
+    end
+  end
+
+  defp split_list(nil), do: []
+
+  defp split_list(s) when is_binary(s) do
+    s
+    |> String.split(",")
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
+  end
+
+  def goods_sales_report(contact, goods, fdate, tdate, com_id, opts \\ []) do
+    cont = FullCircle.Accounting.get_contact_by_name(contact, %{id: com_id}, nil)
+    goods_cond = goods_condition(goods, opts)
 
     inv =
       from(inv in FullCircle.Billing.Invoice,
         join: invd in FullCircle.Billing.InvoiceDetail,
         on: invd.invoice_id == inv.id,
-        join: gd in ^goods_qry,
+        join: gd in FullCircle.Product.Good,
         on: gd.id == invd.good_id,
         join: cont in Contact,
         on: cont.id == inv.contact_id,
@@ -49,9 +84,11 @@ defmodule FullCircle.TaggedBill do
             ),
           unit: gd.unit,
           price: (invd.unit_price * invd.quantity - invd.discount) / invd.quantity,
-          amount: invd.unit_price * invd.quantity - invd.discount
+          amount: invd.unit_price * invd.quantity - invd.discount,
+          descriptions: invd.descriptions
         }
       )
+      |> where(^goods_cond)
 
     inv = if(cont, do: from(i in inv, where: i.contact_id == ^cont.id), else: inv)
 
@@ -59,7 +96,7 @@ defmodule FullCircle.TaggedBill do
       from(inv in FullCircle.ReceiveFund.Receipt,
         join: invd in FullCircle.ReceiveFund.ReceiptDetail,
         on: invd.receipt_id == inv.id,
-        join: gd in ^goods_qry,
+        join: gd in FullCircle.Product.Good,
         on: gd.id == invd.good_id,
         join: cont in Contact,
         on: cont.id == inv.contact_id,
@@ -87,9 +124,11 @@ defmodule FullCircle.TaggedBill do
             ),
           unit: gd.unit,
           price: (invd.unit_price * invd.quantity - invd.discount) / invd.quantity,
-          amount: invd.unit_price * invd.quantity - invd.discount
+          amount: invd.unit_price * invd.quantity - invd.discount,
+          descriptions: invd.descriptions
         }
       )
+      |> where(^goods_cond)
 
     rec = if(cont, do: from(i in rec, where: i.contact_id == ^cont.id), else: rec)
 
@@ -98,24 +137,15 @@ defmodule FullCircle.TaggedBill do
 
   # Purchases mirror of goods_sales_report: PurInvoice lines union cash
   # Payment lines (PaymentDetail carries the same good/package fields).
-  def goods_purchases_report(contact, goods, fdate, tdate, com_id) do
-    good_lst = goods |> String.split(",") |> Enum.map(fn x -> String.trim(x) end)
+  def goods_purchases_report(contact, goods, fdate, tdate, com_id, opts \\ []) do
     cont = FullCircle.Accounting.get_contact_by_name(contact, %{id: com_id}, nil)
-
-    goods_qry =
-      if good_lst != [""] do
-        from(gd in FullCircle.Product.Good,
-          where: gd.name in ^good_lst
-        )
-      else
-        from(gd in FullCircle.Product.Good)
-      end
+    goods_cond = goods_condition(goods, opts)
 
     pinv =
       from(pinv in FullCircle.Billing.PurInvoice,
         join: pinvd in FullCircle.Billing.PurInvoiceDetail,
         on: pinvd.pur_invoice_id == pinv.id,
-        join: gd in ^goods_qry,
+        join: gd in FullCircle.Product.Good,
         on: gd.id == pinvd.good_id,
         join: cont in Contact,
         on: cont.id == pinv.contact_id,
@@ -143,9 +173,11 @@ defmodule FullCircle.TaggedBill do
             ),
           unit: gd.unit,
           price: (pinvd.unit_price * pinvd.quantity - pinvd.discount) / pinvd.quantity,
-          amount: pinvd.unit_price * pinvd.quantity - pinvd.discount
+          amount: pinvd.unit_price * pinvd.quantity - pinvd.discount,
+          descriptions: pinvd.descriptions
         }
       )
+      |> where(^goods_cond)
 
     pinv = if(cont, do: from(i in pinv, where: i.contact_id == ^cont.id), else: pinv)
 
@@ -153,7 +185,7 @@ defmodule FullCircle.TaggedBill do
       from(pay in FullCircle.BillPay.Payment,
         join: payd in FullCircle.BillPay.PaymentDetail,
         on: payd.payment_id == pay.id,
-        join: gd in ^goods_qry,
+        join: gd in FullCircle.Product.Good,
         on: gd.id == payd.good_id,
         join: cont in Contact,
         on: cont.id == pay.contact_id,
@@ -181,33 +213,26 @@ defmodule FullCircle.TaggedBill do
             ),
           unit: gd.unit,
           price: (payd.unit_price * payd.quantity - payd.discount) / payd.quantity,
-          amount: payd.unit_price * payd.quantity - payd.discount
+          amount: payd.unit_price * payd.quantity - payd.discount,
+          descriptions: payd.descriptions
         }
       )
+      |> where(^goods_cond)
 
     pay = if(cont, do: from(i in pay, where: i.contact_id == ^cont.id), else: pay)
 
     union_all(pay, ^pinv) |> order_by([4, 2, 3]) |> Repo.all()
   end
 
-  def goods_purchases_summary_report(contact, goods, fdate, tdate, com_id) do
-    good_lst = goods |> String.split(",") |> Enum.map(fn x -> String.trim(x) end)
+  def goods_purchases_summary_report(contact, goods, fdate, tdate, com_id, opts \\ []) do
     cont = FullCircle.Accounting.get_contact_by_name(contact, %{id: com_id}, nil)
-
-    goods_qry =
-      if good_lst != [""] do
-        from(gd in FullCircle.Product.Good,
-          where: gd.name in ^good_lst
-        )
-      else
-        from(gd in FullCircle.Product.Good)
-      end
+    goods_cond = goods_condition(goods, opts)
 
     pinv =
       from(pinv in FullCircle.Billing.PurInvoice,
         join: pinvd in FullCircle.Billing.PurInvoiceDetail,
         on: pinvd.pur_invoice_id == pinv.id,
-        join: gd in ^goods_qry,
+        join: gd in FullCircle.Product.Good,
         on: gd.id == pinvd.good_id,
         join: pkg in FullCircle.Product.Packaging,
         on: pkg.id == pinvd.package_id,
@@ -225,6 +250,7 @@ defmodule FullCircle.TaggedBill do
         },
         group_by: [gd.name, pkg.name, gd.unit]
       )
+      |> where(^goods_cond)
 
     pinv = if(cont, do: from(i in pinv, where: i.contact_id == ^cont.id), else: pinv)
 
@@ -232,7 +258,7 @@ defmodule FullCircle.TaggedBill do
       from(pay in FullCircle.BillPay.Payment,
         join: payd in FullCircle.BillPay.PaymentDetail,
         on: payd.payment_id == pay.id,
-        join: gd in ^goods_qry,
+        join: gd in FullCircle.Product.Good,
         on: gd.id == payd.good_id,
         join: pkg in FullCircle.Product.Packaging,
         on: pkg.id == payd.package_id,
@@ -250,6 +276,7 @@ defmodule FullCircle.TaggedBill do
         },
         group_by: [gd.name, pkg.name, gd.unit]
       )
+      |> where(^goods_cond)
 
     pay = if(cont, do: from(i in pay, where: i.contact_id == ^cont.id), else: pay)
 
@@ -278,24 +305,15 @@ defmodule FullCircle.TaggedBill do
     |> Repo.all()
   end
 
-  def goods_sales_summary_report(contact, goods, fdate, tdate, com_id) do
-    good_lst = goods |> String.split(",") |> Enum.map(fn x -> String.trim(x) end)
+  def goods_sales_summary_report(contact, goods, fdate, tdate, com_id, opts \\ []) do
     cont = FullCircle.Accounting.get_contact_by_name(contact, %{id: com_id}, nil)
-
-    goods_qry =
-      if good_lst != [""] do
-        from(gd in FullCircle.Product.Good,
-          where: gd.name in ^good_lst
-        )
-      else
-        from(gd in FullCircle.Product.Good)
-      end
+    goods_cond = goods_condition(goods, opts)
 
     inv =
       from(inv in FullCircle.Billing.Invoice,
         join: invd in FullCircle.Billing.InvoiceDetail,
         on: invd.invoice_id == inv.id,
-        join: gd in ^goods_qry,
+        join: gd in FullCircle.Product.Good,
         on: gd.id == invd.good_id,
         join: pkg in FullCircle.Product.Packaging,
         on: pkg.id == invd.package_id,
@@ -313,6 +331,7 @@ defmodule FullCircle.TaggedBill do
         },
         group_by: [gd.name, pkg.name, gd.unit]
       )
+      |> where(^goods_cond)
 
     inv = if(cont, do: from(i in inv, where: i.contact_id == ^cont.id), else: inv)
 
@@ -320,7 +339,7 @@ defmodule FullCircle.TaggedBill do
       from(inv in FullCircle.ReceiveFund.Receipt,
         join: invd in FullCircle.ReceiveFund.ReceiptDetail,
         on: invd.receipt_id == inv.id,
-        join: gd in ^goods_qry,
+        join: gd in FullCircle.Product.Good,
         on: gd.id == invd.good_id,
         join: pkg in FullCircle.Product.Packaging,
         on: pkg.id == invd.package_id,
@@ -338,6 +357,7 @@ defmodule FullCircle.TaggedBill do
         },
         group_by: [gd.name, pkg.name, gd.unit]
       )
+      |> where(^goods_cond)
 
     rec = if(cont, do: from(i in rec, where: i.contact_id == ^cont.id), else: rec)
 

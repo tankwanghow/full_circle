@@ -208,14 +208,17 @@ defmodule FullCircleWeb.CsvController do
     send_csv_map(conn, data, fields, filename)
   end
 
-  def show(conn, %{
-        "company_id" => com_id,
-        "report" => "goodsales",
-        "contact" => contact,
-        "goods" => goods,
-        "fdate" => fdate,
-        "tdate" => tdate
-      }) do
+  def show(
+        conn,
+        %{
+          "company_id" => com_id,
+          "report" => "goodsales",
+          "contact" => contact,
+          "goods" => goods,
+          "fdate" => fdate,
+          "tdate" => tdate
+        } = params
+      ) do
     tdate = tdate |> Timex.parse!("{YYYY}-{0M}-{0D}") |> NaiveDateTime.to_date()
     fdate = fdate |> Timex.parse!("{YYYY}-{0M}-{0D}") |> NaiveDateTime.to_date()
 
@@ -225,35 +228,25 @@ defmodule FullCircleWeb.CsvController do
         goods,
         fdate,
         tdate,
-        com_id
+        com_id,
+        good_snp_opts(params)
       )
 
-    fields = [
-      :doc_date,
-      :doc_type,
-      :doc_no,
-      :contact,
-      :good,
-      :pack_name,
-      :pack_qty,
-      :qty,
-      :unit,
-      :price,
-      :amount
-    ]
-
     filename = "good_sales_#{fdate}_#{tdate}"
-    send_csv_map(conn, data, fields, filename)
+    send_csv_map(conn, data, good_snp_fields(), filename)
   end
 
-  def show(conn, %{
-        "company_id" => com_id,
-        "report" => "goodpurchases",
-        "contact" => contact,
-        "goods" => goods,
-        "fdate" => fdate,
-        "tdate" => tdate
-      }) do
+  def show(
+        conn,
+        %{
+          "company_id" => com_id,
+          "report" => "goodpurchases",
+          "contact" => contact,
+          "goods" => goods,
+          "fdate" => fdate,
+          "tdate" => tdate
+        } = params
+      ) do
     tdate = tdate |> Timex.parse!("{YYYY}-{0M}-{0D}") |> NaiveDateTime.to_date()
     fdate = fdate |> Timex.parse!("{YYYY}-{0M}-{0D}") |> NaiveDateTime.to_date()
 
@@ -263,25 +256,12 @@ defmodule FullCircleWeb.CsvController do
         goods,
         fdate,
         tdate,
-        com_id
+        com_id,
+        good_snp_opts(params)
       )
 
-    fields = [
-      :doc_date,
-      :doc_type,
-      :doc_no,
-      :contact,
-      :good,
-      :pack_name,
-      :pack_qty,
-      :qty,
-      :unit,
-      :price,
-      :amount
-    ]
-
     filename = "good_purchases_#{fdate}_#{tdate}"
-    send_csv_map(conn, data, fields, filename)
+    send_csv_map(conn, data, good_snp_fields(), filename)
   end
 
   def show(conn, %{
@@ -448,5 +428,32 @@ defmodule FullCircleWeb.CsvController do
     body = data |> Enum.map(fn d -> Enum.map(fields, fn f -> Map.fetch!(d, f) end) end)
 
     [fields | body] |> NimbleCSV.RFC4180.dump_to_iodata()
+  end
+
+  defp good_snp_opts(%{"category" => "custom"} = params) do
+    [
+      match: :ilike,
+      name_ilike: params["name_ilike"] || "",
+      desc_ilike: params["desc_ilike"] || ""
+    ]
+  end
+
+  defp good_snp_opts(_), do: []
+
+  defp good_snp_fields do
+    [
+      :doc_date,
+      :doc_type,
+      :doc_no,
+      :contact,
+      :good,
+      :descriptions,
+      :pack_name,
+      :pack_qty,
+      :qty,
+      :unit,
+      :price,
+      :amount
+    ]
   end
 end
