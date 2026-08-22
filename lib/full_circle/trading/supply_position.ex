@@ -23,6 +23,10 @@ defmodule FullCircle.Trading.SupplyPosition do
     field :title, :string
     # Estimated date stock is available from
     field :available_from, :date
+    # Supplier storage terms: last free-storage day (per-ton-per-day charges
+    # start the day after). Manually entered any time — even after collection,
+    # to verify a late storage bill. nil = no storage tracking.
+    field :grace_period_end_date, :date
     field :quantity, :decimal
     field :unit_price, :decimal
     field :status, :string, default: "open"
@@ -58,6 +62,7 @@ defmodule FullCircle.Trading.SupplyPosition do
     |> cast(attrs, [
       :title,
       :available_from,
+      :grace_period_end_date,
       :quantity,
       :unit_price,
       :status,

@@ -239,7 +239,7 @@ defmodule FullCircleWeb.TradingDeskLive.SupplyFormComponent do
             />
             <.input type="hidden" field={@form[:supplier_id]} />
           </div>
-          <div class="w-[35%]">
+          <div class="w-[20%]">
             <.input
               field={@form[:status]}
               type="select"
@@ -252,6 +252,13 @@ defmodule FullCircleWeb.TradingDeskLive.SupplyFormComponent do
               field={@form[:available_from]}
               type="date"
               label={gettext("Est. available from")}
+            />
+          </div>
+          <div class="w-[15%]">
+            <.input
+              field={@form[:grace_period_end_date]}
+              type="date"
+              label={gettext("Free storage until")}
             />
           </div>
         </div>

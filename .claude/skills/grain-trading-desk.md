@@ -204,6 +204,22 @@ status — including via the thin wrappers (`hold_`, `collect_`, `open_`,
 Callers must handle `{:error, :position_locked}`; the desk form components flash
 a specific message for it.
 
+**Supplier storage tracking (`Trading.Storage`).** `grace_period_end_date` on
+SupplyPosition = last free-storage day, **manually entered** (supply form
+"Free storage until"), settable retroactively even on a closed supply to
+verify a late bill. **No rate is stored** — the deliverable is duration ×
+tonnage evidence (ton·days); the rate is negotiated when the bill arrives.
+Conventions (pinned in `storage_test.exs`): charges start the **day after**
+the grace end; a day is charged on its **start-of-day** balance (a load on
+day *e* stops charging from *e+1*); the accrual window ends at the earliest
+of the zero-crossing day (over-collection residue ignored), the **last load
+date when the supply is closed** (closing absorbs a tiny short residue —
+deliberately no tolerance constant), or today. Desk chip in the supply
+status cell: `grace: Nd` (sky) → `storage: Nd` (rose, `chip_state/3`, pure,
+uses board `remaining` — no extra query) → grey `storage` when ended; click
+opens `#desk-storage-breakdown` (periods from/to/days/remaining/ton·days +
+totals via `Storage.breakdown/4`).
+
 **Preferred supply must match the sales good.** Autocomplete is
 `schema=opensupply&good_id=<good_id>`; with no good picked yet it passes
 `good_id=__none__` so the list stays empty rather than showing everything.

@@ -1717,6 +1717,144 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
     refute html =~ "Supplier unbilled"
   end
 
+  test "supply storage chips: grace countdown, accruing days, breakdown modal", %{
+    conn: conn,
+    company: company,
+    user: user
+  } do
+    today = Date.utc_today()
+    good = good_fixture(company, user)
+    supplier = contact_fixture(company, user, %{"name" => "Storage Supplier Co"})
+
+    # Accruing: grace ended 6 days ago, 10 of 30 collected before charging began
+    accruing =
+      supply_position_fixture(company, user, %{
+        "good_id" => good.id,
+        "supplier_id" => supplier.id,
+        "quantity" => "30",
+        "status" => "collect",
+        "grace_period_end_date" => Date.to_iso8601(Date.add(today, -6))
+      })
+
+    # In grace: 5 days left
+    in_grace =
+      supply_position_fixture(company, user, %{
+        "good_id" => good.id,
+        "quantity" => "20",
+        "status" => "collect",
+        "grace_period_end_date" => Date.to_iso8601(Date.add(today, 5))
+      })
+
+    # No terms: no chip
+    untracked =
+      supply_position_fixture(company, user, %{
+        "good_id" => good.id,
+        "quantity" => "20",
+        "status" => "collect"
+      })
+
+    port = location_fixture(company, user, %{"kind" => "port"})
+    wh = location_fixture(company, user, %{"kind" => "own_warehouse"})
+
+    {:ok, trip} =
+      FullCircle.Trading.create_trip(
+        %{
+          "date" => Date.to_iso8601(Date.add(today, -8)),
+          "transport_mode" => "company_own",
+          "vehicle_number" => "STOR1",
+          "loads" => [
+            %{
+              "planned" => "10",
+              "actual" => "10",
+              "good_id" => good.id,
+              "location_id" => port.id,
+              "supply_position_id" => accruing.id
+            }
+          ],
+          "drops" => [
+            %{
+              "planned" => "10",
+              "actual" => "10",
+              "good_id" => good.id,
+              "location_id" => wh.id
+            }
+          ]
+        },
+        company,
+        user
+      )
+
+    {:ok, _trip, _} = FullCircle.Trading.complete_trip(trip, company, user)
+
+    {:ok, lv, _html} = live(conn, ~p"/companies/#{company.id}/trading/desk")
+
+    assert lv |> element("#desk-supply-storage-#{accruing.id}") |> render() =~ "6d"
+    assert lv |> element("#desk-supply-storage-#{in_grace.id}") |> render() =~ "5d"
+    refute has_element?(lv, "#desk-supply-storage-#{untracked.id}")
+
+    # Breakdown modal: one period, 6 days on 20 remaining = 120 ton-days
+    lv |> element("#desk-supply-storage-#{accruing.id}") |> render_click()
+    assert has_element?(lv, "#desk-storage-breakdown")
+    html = lv |> element("#desk-storage-breakdown") |> render()
+    assert html =~ accruing.title
+    assert html =~ "120"
+    assert html =~ "20"
+
+    lv |> element("#desk-storage-breakdown-close") |> render_click()
+    refute has_element?(lv, "#desk-storage-breakdown")
+  end
+
+  test "closed supply with grace date shows ended chip for retro verification", %{
+    conn: conn,
+    company: company,
+    user: user
+  } do
+    today = Date.utc_today()
+    good = good_fixture(company, user)
+
+    closed =
+      supply_position_fixture(company, user, %{
+        "good_id" => good.id,
+        "quantity" => "30",
+        "status" => "closed",
+        "grace_period_end_date" => Date.to_iso8601(Date.add(today, -10))
+      })
+
+    {:ok, lv, _html} = live(conn, ~p"/companies/#{company.id}/trading/desk")
+
+    # Closed rows only load when the closed status chip is on
+    refute has_element?(lv, "#desk-supply-#{closed.id}")
+    lv |> element("#desk-supply-status-chip-closed") |> render_click()
+    assert has_element?(lv, "#desk-supply-#{closed.id}")
+    assert has_element?(lv, "#desk-supply-storage-#{closed.id}")
+
+    lv |> element("#desk-supply-storage-#{closed.id}") |> render_click()
+    assert has_element?(lv, "#desk-storage-breakdown")
+  end
+
+  test "supply form has grace period end date field", %{
+    conn: conn,
+    company: company,
+    user: user
+  } do
+    good = good_fixture(company, user)
+
+    supply =
+      supply_position_fixture(company, user, %{
+        "good_id" => good.id,
+        "quantity" => "30",
+        "status" => "collect"
+      })
+
+    {:ok, lv, _html} = live(conn, ~p"/companies/#{company.id}/trading/desk")
+    lv |> element("#desk-supply-#{supply.id} [phx-value-action=edit]") |> render_click()
+
+    assert has_element?(
+             lv,
+             ~s(#desk-supply-form input[name="supply_position[grace_period_end_date]"])
+           )
+  end
+
   test "panel counts show shown/all when filters narrow", %{
     conn: conn,
     company: company,

@@ -30,6 +30,7 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
        |> assign(modal: nil)
        |> assign(transit_list: nil)
        |> assign(warehouse_history: nil)
+       |> assign(storage_breakdown: nil)
        |> assign(trips_panel: :shown)
        |> assign(trip_detail_ids: MapSet.new())
        # Ops-first: no Bill chips on mount (billing only applies to completed trips)
@@ -146,6 +147,21 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
 
   def handle_event("close_warehouse_history", _, socket) do
     {:noreply, assign(socket, warehouse_history: nil)}
+  end
+
+  def handle_event("show_storage_breakdown", %{"id" => id}, socket) do
+    company = socket.assigns.current_company
+    user = socket.assigns.current_user
+    supply = Trading.get_supply_position!(id, company, user)
+
+    case FullCircle.Trading.Storage.breakdown(supply, company, user) do
+      :none -> {:noreply, socket}
+      data -> {:noreply, assign(socket, storage_breakdown: %{supply: supply, data: data})}
+    end
+  end
+
+  def handle_event("close_storage_breakdown", _, socket) do
+    {:noreply, assign(socket, storage_breakdown: nil)}
   end
 
   def handle_event(
@@ -1053,6 +1069,10 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
     |> Enum.join(", ")
   end
 
+  defp storage_end_reason(%{end_reason: :exhausted}), do: gettext("fully collected")
+  defp storage_end_reason(%{end_reason: :closed}), do: gettext("closed at last load")
+  defp storage_end_reason(%{end_reason: :running}), do: gettext("still accruing")
+
   defp trip_from_label(t), do: Trading.trip_parties_label(Trading.trip_from_names(t))
   defp trip_to_label(t), do: Trading.trip_parties_label(Trading.trip_to_names(t))
   defp trip_from_title(t), do: Enum.join(Trading.trip_from_names(t), ", ")
@@ -1135,6 +1155,50 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
 
   defp chip_color_class("violet", false),
     do: "bg-violet-100/60 border-violet-400 text-violet-800/70 hover:bg-violet-50"
+
+  # Supplier storage chip on the supply row: grace countdown, accruing days
+  # past grace, or a grey "ended" entry point to the breakdown for closed /
+  # fully collected supplies (retro bill verification).
+  attr :supply, :any, required: true
+  attr :remaining, :any, required: true
+
+  defp storage_chip(assigns) do
+    state =
+      FullCircle.Trading.Storage.chip_state(assigns.supply, assigns.remaining, Date.utc_today())
+
+    assigns = assign(assigns, state: state)
+
+    ~H"""
+    <span
+      :if={match?({:grace, _}, @state)}
+      id={"desk-supply-storage-#{@supply.id}"}
+      class="rounded-full border border-sky-400 bg-sky-100 text-sky-900 px-1 text-[10px] font-semibold whitespace-nowrap"
+      title={gettext("Free storage until %{date}", date: @supply.grace_period_end_date)}
+    >
+      {gettext("grace")}: {elem(@state, 1)}d
+    </span>
+    <button
+      :if={match?({:accruing, _}, @state) or @state == :ended}
+      type="button"
+      id={"desk-supply-storage-#{@supply.id}"}
+      phx-click="show_storage_breakdown"
+      phx-value-id={@supply.id}
+      class={[
+        "rounded-full border px-1 text-[10px] font-semibold whitespace-nowrap cursor-pointer",
+        match?({:accruing, _}, @state) &&
+          "border-rose-400 bg-rose-100 text-rose-900 hover:bg-rose-200",
+        @state == :ended &&
+          "border-zinc-400 bg-zinc-200 text-zinc-600 hover:bg-zinc-300"
+      ]}
+      title={gettext("Storage past free period — click for the days × tonnage breakdown")}
+    >
+      {case @state do
+        {:accruing, d} -> "#{gettext("storage")}: #{d}d"
+        :ended -> gettext("storage")
+      end}
+    </button>
+    """
+  end
 
   attr :table, :string, required: true
   attr :field, :string, required: true
@@ -1352,7 +1416,10 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
                   >
                     {row.supply.good && row.supply.good.name}
                   </div>
-                  <div class="w-3/24 min-w-0 truncate text-center">{row.supply.status}</div>
+                  <div class="w-3/24 min-w-0 flex flex-col items-center leading-tight">
+                    <span class="truncate max-w-full">{row.supply.status}</span>
+                    <.storage_chip supply={row.supply} remaining={row.remaining} />
+                  </div>
                   <div class={[
                     "w-3/24 min-w-0 text-right font-semibold",
                     remaining_class(row.remaining)
@@ -2084,6 +2151,89 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
           </p>
           <div class="text-center mt-3">
             <button type="button" phx-click="close_warehouse_history" class="teal button">
+              {gettext("Close")}
+            </button>
+          </div>
+        </div>
+      </.modal>
+
+      <%!-- Supplier storage breakdown (days × tonnage for bill verification) --%>
+      <.modal
+        :if={@storage_breakdown}
+        id="desk-storage-breakdown-modal"
+        show
+        max_w="max-w-3xl"
+        on_cancel={JS.push("close_storage_breakdown")}
+      >
+        <div id="desk-storage-breakdown">
+          <p class="text-xl font-medium text-center mb-1">
+            {gettext("Supplier storage")} · {@storage_breakdown.supply.title}
+          </p>
+          <p class="text-center text-sm mb-3 text-zinc-600 dark:text-zinc-400">
+            {gettext("Free storage until")}
+            <span class="font-semibold">{@storage_breakdown.supply.grace_period_end_date}</span>
+            · {gettext("charged from")}
+            <span class="font-semibold">{@storage_breakdown.data.first_charge_date}</span>
+            · {gettext("to")}
+            <span class="font-semibold">{@storage_breakdown.data.end_date}</span>
+            <span class="text-zinc-500">({storage_end_reason(@storage_breakdown.data)})</span>
+          </p>
+
+          <div class="bg-rose-100 border-y-2 border-rose-400 font-bold p-2 flex gap-1 text-sm text-rose-950">
+            <div class="w-5/24">{gettext("From")}</div>
+            <div class="w-5/24">{gettext("To")}</div>
+            <div class="w-4/24 text-right">{gettext("Days")}</div>
+            <div class="w-5/24 text-right">{gettext("Remaining")}</div>
+            <div class="w-5/24 text-right">{gettext("Ton·days")}</div>
+          </div>
+          <div
+            :for={p <- @storage_breakdown.data.periods}
+            class="flex gap-1 border-b p-2 text-sm tabular-nums"
+          >
+            <div class="w-5/24">{p.from}</div>
+            <div class="w-5/24">{p.to}</div>
+            <div class="w-4/24 text-right">{p.days}</div>
+            <div class="w-5/24 text-right">{p.remaining}</div>
+            <div class="w-5/24 text-right font-semibold">{p.ton_days}</div>
+          </div>
+          <p
+            :if={@storage_breakdown.data.periods == []}
+            class="text-center p-4 text-gray-500 text-sm"
+          >
+            {gettext("No chargeable storage days — collected within the free period.")}
+          </p>
+          <div
+            :if={@storage_breakdown.data.periods != []}
+            class="flex gap-1 p-2 text-sm font-bold tabular-nums border-t-2 border-rose-400"
+          >
+            <div class="w-10/24">{gettext("Total")}</div>
+            <div class="w-4/24 text-right">{@storage_breakdown.data.total_days}</div>
+            <div class="w-5/24"></div>
+            <div class="w-5/24 text-right">{@storage_breakdown.data.total_ton_days}</div>
+          </div>
+          <p
+            :if={
+              @storage_breakdown.data.end_reason != :exhausted and
+                Decimal.compare(@storage_breakdown.data.leftover_remaining, 0) == :gt
+            }
+            class="text-center text-xs text-amber-700 mt-2"
+          >
+            {gettext("Uncollected residue: %{qty}",
+              qty: @storage_breakdown.data.leftover_remaining
+            )}
+          </p>
+          <p class="text-center text-xs text-zinc-400 mt-2">
+            {gettext(
+              "Computed from completed trip loads. Expected charge = ton·days × the negotiated rate."
+            )}
+          </p>
+          <div class="text-center mt-3">
+            <button
+              type="button"
+              id="desk-storage-breakdown-close"
+              phx-click="close_storage_breakdown"
+              class="teal button"
+            >
               {gettext("Close")}
             </button>
           </div>
