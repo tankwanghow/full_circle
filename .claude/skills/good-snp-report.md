@@ -1,0 +1,69 @@
+---
+name: good-snp-report
+description: Use when working on the GoodSnP report (goods sales & purchases listing), FullCircle.TaggedBill report queries, the custom ilike category, or the goodsales/goodpurchases CSV exports — especially before adding or reordering columns/filters in these union queries.
+---
+
+# GoodSnP Report (Goods Sales & Purchases)
+
+Files: `lib/full_circle/tagged_bill.ex` (queries),
+`lib/full_circle_web/live/report_live/good_snp.ex` (UI),
+`csv_controller.ex` (`goodsales` / `goodpurchases` branches).
+Routes: `/good_snp`; legacy `/good_sales` renders the same LiveView
+defaulting to Sales — keep it.
+
+## The positional-select trap (read before touching any select map)
+
+The four report queries are `union_all` pairs ordered with **positional**
+`order_by([4, 2, 3])`. Both rely on the **written order** of the
+`select: %{...}` map (Ecto preserves AST literal order — atom-sort
+intuition is wrong here). Consequences:
+
+- **New select fields go at the END of the map, in every branch of the
+  union.** Inserting mid-map silently changes what `order_by([4,2,3])`
+  sorts by and misaligns union columns (they pair by position, not key).
+- Both branches of a union must keep identical written field order. The
+  sales Invoice branch's `invoice_date:` key aligns positionally with the
+  Receipt branch's `doc_date:` — result rows take keys from the **first**
+  query in `union_all` (`rec` / `pay`), which is why rows expose
+  `doc_date` despite the Invoice branch's key name.
+- Test pin: `test/full_circle/tagged_bill_test.exs`.
+
+## Query contract
+
+All four functions take `(contact, goods, fdate, tdate, com_id, opts \\ [])`:
+`goods_sales_report`, `goods_sales_summary_report`,
+`goods_purchases_report`, `goods_purchases_summary_report`.
+
+- Sales = `Invoice`+`InvoiceDetail` ∪ cash-sale `Receipt`+`ReceiptDetail`;
+  Purchases = `PurInvoice`+`PurInvoiceDetail` ∪ cash-purchase
+  `Payment`+`PaymentDetail`. All four detail schemas carry
+  `descriptions`, `good_id`, `package_id`, `quantity`, `package_qty`,
+  `unit_price`, `discount`.
+- Goods filtering is one shared `goods_condition/2` dynamic. **Binding
+  convention: detail line is binding 1, Good is binding 2**
+  (`[doc, detail, good | _]`) in every query — new queries must join in
+  that order or the dynamic silently targets the wrong tables.
+- Default (exact) mode: `goods` is a comma list of full good names;
+  empty = all.
+- Custom mode: `opts = [match: :ilike, name_ilike: "...", desc_ilike: "..."]`.
+  Comma-separated ilike patterns; a row qualifies when good name matches
+  any name pattern **OR** line descriptions match any desc pattern; a
+  blank list contributes nothing; both blank = no filter. `goods` is
+  ignored in this mode.
+
+## UI / CSV notes
+
+- Category select = `Product.categories() ++ ["custom"]`. Picking
+  "custom" swaps the Good List textarea for two pattern textareas
+  (`search[name_ilike]`, `search[desc_ilike]`); other categories
+  overwrite the goods list from `get_goods_by_category`.
+- Adding a column: append to select maps (see trap above), then the
+  LiveView header + detail row + summary row (percent widths must total
+  100 and stay aligned across the three), then `good_snp_fields()` in
+  the CSV controller.
+- CSV branch heads bind `= params` and read `category`/`name_ilike`/
+  `desc_ilike` optionally — old bookmarked CSV URLs lack those params.
+- Doc numbers render via `<.doc_link>`, which builds
+  `/companies/:id/{doc_type}/{doc_id}/edit` — `doc_type` values in
+  selects must be exact router path segments: `Invoice`, `PurInvoice`,
+  `Receipt`, `Payment`.
