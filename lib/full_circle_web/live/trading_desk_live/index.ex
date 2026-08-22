@@ -2316,18 +2316,21 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
           stream={:customer}
           state={@settle.customer}
           done={@settle.customer_done}
+          exempt={@settle.customer_exempt}
           total={@settle.customer_total}
         />
         <.settlement_chip
           stream={:supplier}
           state={@settle.supplier}
           done={@settle.supplier_done}
+          exempt={@settle.supplier_exempt}
           total={@settle.supplier_total}
         />
         <.settlement_chip
           stream={:transport}
           state={@settle.transport}
           done={@settle.transport_done}
+          exempt={@settle.transport_exempt}
           total={@settle.transport_total}
         />
         <.link
@@ -2405,11 +2408,20 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
   attr :stream, :atom, required: true
   attr :state, :atom, required: true
   attr :done, :integer, default: 0
+  attr :exempt, :integer, default: 0
   attr :total, :integer, default: 0
 
   defp settlement_chip(assigns) do
     label = settlement_chip_label(assigns.stream, assigns.state)
     title = settlement_chip_title(assigns.stream, assigns.state, assigns.done, assigns.total)
+
+    title =
+      if assigns.exempt > 0 do
+        title <> " · " <> gettext("%{count} waived", count: assigns.exempt)
+      else
+        title
+      end
+
     assigns = assign(assigns, label: label, title: title)
 
     ~H"""
@@ -2428,16 +2440,19 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
   defp settlement_chip_label(:customer, :open), do: gettext("Customer uninvoiced")
   defp settlement_chip_label(:customer, :partial), do: gettext("Customer partial")
   defp settlement_chip_label(:customer, :done), do: gettext("Customer invoiced")
+  defp settlement_chip_label(:customer, :waived), do: gettext("Customer waived")
   defp settlement_chip_label(:customer, :n_a), do: gettext("Customer n/a")
 
   defp settlement_chip_label(:supplier, :open), do: gettext("Supplier unbilled")
   defp settlement_chip_label(:supplier, :partial), do: gettext("Supplier partial")
   defp settlement_chip_label(:supplier, :done), do: gettext("Supplier billed")
+  defp settlement_chip_label(:supplier, :waived), do: gettext("Supplier waived")
   defp settlement_chip_label(:supplier, :n_a), do: gettext("Supplier n/a")
 
   defp settlement_chip_label(:transport, :open), do: gettext("Transport unbilled")
   defp settlement_chip_label(:transport, :partial), do: gettext("Transport partial")
   defp settlement_chip_label(:transport, :done), do: gettext("Transport billed")
+  defp settlement_chip_label(:transport, :waived), do: gettext("Transport waived")
   defp settlement_chip_label(:transport, :n_a), do: gettext("Transport n/a")
 
   defp settlement_chip_label(_, _), do: "—"
@@ -2465,15 +2480,20 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
   defp settlement_chip_class(:open), do: "bg-amber-100 text-amber-900 border-amber-300"
   defp settlement_chip_class(:partial), do: "bg-sky-100 text-sky-900 border-sky-300"
   defp settlement_chip_class(:done), do: "bg-emerald-100 text-emerald-900 border-emerald-300"
+  defp settlement_chip_class(:waived), do: "bg-zinc-200 text-zinc-600 border-zinc-400"
   defp settlement_chip_class(:n_a), do: "bg-zinc-100 text-zinc-500 border-zinc-300"
   defp settlement_chip_class(_), do: "bg-zinc-100 text-zinc-500 border-zinc-300"
 
   defp load_bill_label(%{pur_invoice_id: id}) when not is_nil(id), do: gettext("billed")
+  defp load_bill_label(%{pur_invoice_exempt_at: at}) when not is_nil(at), do: gettext("waived")
   defp load_bill_label(%{supply_position_id: id}) when not is_nil(id), do: gettext("unbilled")
   defp load_bill_label(_), do: ""
 
   defp load_bill_class(%{pur_invoice_id: id}) when not is_nil(id),
     do: "bg-emerald-50 text-emerald-800"
+
+  defp load_bill_class(%{pur_invoice_exempt_at: at}) when not is_nil(at),
+    do: "bg-zinc-100 text-zinc-600"
 
   defp load_bill_class(%{supply_position_id: id}) when not is_nil(id),
     do: "bg-amber-50 text-amber-800"
@@ -2481,11 +2501,15 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
   defp load_bill_class(_), do: ""
 
   defp drop_invoice_label(%{invoice_id: id}) when not is_nil(id), do: gettext("invoiced")
+  defp drop_invoice_label(%{invoice_exempt_at: at}) when not is_nil(at), do: gettext("waived")
   defp drop_invoice_label(%{sales_position_id: id}) when not is_nil(id), do: gettext("uninvoiced")
   defp drop_invoice_label(_), do: ""
 
   defp drop_invoice_class(%{invoice_id: id}) when not is_nil(id),
     do: "bg-emerald-50 text-emerald-800"
+
+  defp drop_invoice_class(%{invoice_exempt_at: at}) when not is_nil(at),
+    do: "bg-zinc-100 text-zinc-600"
 
   defp drop_invoice_class(%{sales_position_id: id}) when not is_nil(id),
     do: "bg-amber-50 text-amber-800"
@@ -2495,10 +2519,16 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
   defp drop_haul_label(%{transport_pur_invoice_id: id}) when not is_nil(id),
     do: gettext("haul billed")
 
+  defp drop_haul_label(%{transport_exempt_at: at}) when not is_nil(at),
+    do: gettext("haul waived")
+
   defp drop_haul_label(_), do: gettext("haul open")
 
   defp drop_haul_class(%{transport_pur_invoice_id: id}) when not is_nil(id),
     do: "bg-emerald-50 text-emerald-800"
+
+  defp drop_haul_class(%{transport_exempt_at: at}) when not is_nil(at),
+    do: "bg-zinc-100 text-zinc-600"
 
   defp drop_haul_class(_), do: "bg-amber-50 text-amber-800"
 end

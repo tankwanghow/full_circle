@@ -2153,6 +2153,14 @@ defmodule FullCircle.Trading do
     Settlement.billable_drop_count(contact_id, company, user, opts)
   end
 
+  def exempt_settlement_lines(stream, line_ids, reason, company, user) do
+    Settlement.exempt_settlement_lines(stream, line_ids, reason, company, user)
+  end
+
+  def unexempt_settlement_lines(stream, line_ids, company, user) do
+    Settlement.unexempt_settlement_lines(stream, line_ids, company, user)
+  end
+
   def invoice_settlement_info(invoice_id, company) do
     Settlement.invoice_settlement_info(invoice_id, company)
   end

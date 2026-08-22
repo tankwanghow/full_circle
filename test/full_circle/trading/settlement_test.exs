@@ -1080,4 +1080,279 @@ defmodule FullCircle.Trading.SettlementTest do
     assert Trading.billable_drop_count(c1.id, company, user) == 0
     assert Trading.billable_drop_count(c2.id, company, user) == 1
   end
+
+  describe "settlement exemptions (admin-only waivers)" do
+    defp manager_user(company, admin) do
+      other = user_fixture()
+      {:ok, _} = FullCircle.Sys.allow_user_to_access(company, other, "manager", admin)
+      other
+    end
+
+    test "non-admin cannot exempt or unexempt", %{user: admin, company: company} do
+      %{drop: drop} = completed_sales_drop(company, admin)
+      manager = manager_user(company, admin)
+
+      assert {:error, :not_authorise} =
+               Trading.exempt_settlement_lines(
+                 :customer,
+                 [drop.id],
+                 "free delivery",
+                 company,
+                 manager
+               )
+
+      assert {:ok, 1} =
+               Trading.exempt_settlement_lines(
+                 :customer,
+                 [drop.id],
+                 "free delivery",
+                 company,
+                 admin
+               )
+
+      assert {:error, :not_authorise} =
+               Trading.unexempt_settlement_lines(:customer, [drop.id], company, manager)
+    end
+
+    test "exempt requires a reason", %{user: admin, company: company} do
+      %{drop: drop} = completed_sales_drop(company, admin)
+
+      assert {:error, :reason_required} =
+               Trading.exempt_settlement_lines(:customer, [drop.id], "  ", company, admin)
+    end
+
+    test "customer waiver: audit fields, queue exclusion, badge, unexempt round-trip", %{
+      user: admin,
+      company: company
+    } do
+      %{trip: trip, drop: drop, customer: customer} = completed_sales_drop(company, admin)
+
+      assert {:ok, 1} =
+               Trading.exempt_settlement_lines(:customer, [drop.id], "goodwill", company, admin)
+
+      saved = Repo.get!(TripDrop, drop.id)
+      assert saved.invoice_exempt_reason == "goodwill"
+      assert saved.invoice_exempt_by_id == admin.id
+      assert %DateTime{} = saved.invoice_exempt_at
+
+      # Global board excludes the waived drop; trip deep-link still shows it
+      assert [] == Trading.list_uninvoiced_drops(company, admin)
+      [row] = Trading.list_uninvoiced_drops(company, admin, trip_id: trip.id)
+      assert row.id == drop.id
+      assert row.exempt_reason == "goodwill"
+      refute row.billable
+      assert Trading.billable_drop_count(customer.id, company, admin) == 0
+
+      # Badge reports waived, not open
+      trip = Trading.get_trip!(trip.id, company, admin)
+      badges = Trading.trip_settlement_badges(trip)
+      assert badges.customer == :waived
+      assert badges.customer_exempt == 1
+
+      # Un-waive restores the queue and badge
+      assert {:ok, 1} = Trading.unexempt_settlement_lines(:customer, [drop.id], company, admin)
+      assert [%{id: _}] = Trading.list_uninvoiced_drops(company, admin)
+      trip = Trading.get_trip!(trip.id, company, admin)
+      assert Trading.trip_settlement_badges(trip).customer == :open
+    end
+
+    test "supplier waiver excludes load from queue and flips badge", %{
+      user: admin,
+      company: company
+    } do
+      %{trip: trip} = completed_sales_drop(company, admin)
+      load = hd(trip.loads)
+
+      assert {:ok, 1} =
+               Trading.exempt_settlement_lines(
+                 :supplier,
+                 [load.id],
+                 "settled outside",
+                 company,
+                 admin
+               )
+
+      assert [] == Trading.list_unbilled_loads(company, admin)
+      [row] = Trading.list_unbilled_loads(company, admin, trip_id: trip.id)
+      assert row.exempt_reason == "settled outside"
+      refute row.billable
+
+      trip = Trading.get_trip!(trip.id, company, admin)
+      assert Trading.trip_settlement_badges(trip).supplier == :waived
+    end
+
+    test "transport waiver excludes haul line and flips badge", %{user: admin, company: company} do
+      %{trip: trip, drop: drop, agent: agent} = completed_agent_drop(company, admin)
+
+      assert {:ok, 1} =
+               Trading.exempt_settlement_lines(
+                 :transport,
+                 [drop.id],
+                 "haul waived",
+                 company,
+                 admin
+               )
+
+      assert [] == Trading.list_unbilled_transport_lines(company, admin)
+      [row] = Trading.list_unbilled_transport_lines(company, admin, trip_id: trip.id)
+      assert row.exempt_reason == "haul waived"
+      refute row.billable
+      assert Trading.billable_line_counts(agent.id, company, admin).transport == 0
+
+      trip = Trading.get_trip!(trip.id, company, admin)
+      badges = Trading.trip_settlement_badges(trip)
+      assert badges.transport == :waived
+      # Customer stream untouched
+      assert badges.customer == :open
+    end
+
+    test "billed or already-waived lines cannot be exempted", %{user: admin, company: company} do
+      %{trip: trip, drop: drop, customer: customer, good: good} =
+        completed_sales_drop(company, admin)
+
+      assert {:ok, 1} =
+               Trading.exempt_settlement_lines(:customer, [drop.id], "once", company, admin)
+
+      assert {:error, :ineligible_lines} =
+               Trading.exempt_settlement_lines(:customer, [drop.id], "twice", company, admin)
+
+      assert {:ok, 1} = Trading.unexempt_settlement_lines(:customer, [drop.id], company, admin)
+
+      # Bill it, then exemption must refuse
+      sales_acct = FullCircle.Accounting.get_account_by_name("General Sales", company, admin)
+
+      sales_tc =
+        Repo.one!(
+          from tc in FullCircle.Accounting.TaxCode,
+            where: tc.company_id == ^company.id and tc.code == "NoSTax"
+        )
+
+      attrs = invoice_attrs(customer, good, sales_acct, sales_tc, quantity: "20", tax_rate: "0")
+
+      assert {:ok, %{create_invoice: _}} =
+               FullCircle.Billing.create_invoice(
+                 attrs,
+                 company,
+                 admin,
+                 &Trading.attach_invoice_drops_multi(
+                   &1,
+                   :create_invoice,
+                   [drop.id],
+                   company,
+                   admin
+                 )
+               )
+
+      assert {:error, :ineligible_lines} =
+               Trading.exempt_settlement_lines(:customer, [drop.id], "nope", company, admin)
+
+      _ = trip
+    end
+
+    test "mixed stream: one drop billed, one waived reports waived badge", %{
+      user: admin,
+      company: company
+    } do
+      good = good_fixture(company, admin)
+      c1 = contact_fixture(company, admin, %{"name" => "Waive Cust 1"})
+      c2 = contact_fixture(company, admin, %{"name" => "Waive Cust 2"})
+      supplier = contact_fixture(company, admin)
+
+      supply =
+        supply_position_fixture(company, admin, %{
+          "good_id" => good.id,
+          "supplier_id" => supplier.id,
+          "quantity" => "100",
+          "status" => "collect"
+        })
+
+      s1 =
+        sales_position_fixture(company, admin, %{
+          "good_id" => good.id,
+          "customer_id" => c1.id,
+          "quantity" => "30",
+          "status" => "open"
+        })
+
+      s2 =
+        sales_position_fixture(company, admin, %{
+          "good_id" => good.id,
+          "customer_id" => c2.id,
+          "quantity" => "30",
+          "status" => "open"
+        })
+
+      port = location_fixture(company, admin, %{"kind" => "port"})
+      site = location_fixture(company, admin, %{"kind" => "customer_site"})
+
+      {:ok, trip} =
+        Trading.create_trip(
+          %{
+            "date" => "2026-07-22",
+            "transport_mode" => "company_own",
+            "vehicle_number" => "MIX1",
+            "loads" => [
+              %{
+                "planned" => "20",
+                "actual" => "20",
+                "good_id" => good.id,
+                "location_id" => port.id,
+                "supply_position_id" => supply.id
+              }
+            ],
+            "drops" => [
+              %{
+                "planned" => "10",
+                "actual" => "10",
+                "good_id" => good.id,
+                "location_id" => site.id,
+                "sales_position_id" => s1.id,
+                "supply_position_id" => supply.id
+              },
+              %{
+                "planned" => "10",
+                "actual" => "10",
+                "good_id" => good.id,
+                "location_id" => site.id,
+                "sales_position_id" => s2.id,
+                "supply_position_id" => supply.id
+              }
+            ]
+          },
+          company,
+          admin
+        )
+
+      assert {:ok, trip, _} = Trading.complete_trip(trip, company, admin)
+      [d1, d2] = Enum.sort_by(trip.drops, & &1.seq)
+
+      sales_acct = FullCircle.Accounting.get_account_by_name("General Sales", company, admin)
+
+      sales_tc =
+        Repo.one!(
+          from tc in FullCircle.Accounting.TaxCode,
+            where: tc.company_id == ^company.id and tc.code == "NoSTax"
+        )
+
+      attrs = invoice_attrs(c1, good, sales_acct, sales_tc, quantity: "10", tax_rate: "0")
+
+      assert {:ok, _} =
+               FullCircle.Billing.create_invoice(
+                 attrs,
+                 company,
+                 admin,
+                 &Trading.attach_invoice_drops_multi(&1, :create_invoice, [d1.id], company, admin)
+               )
+
+      assert {:ok, 1} =
+               Trading.exempt_settlement_lines(:customer, [d2.id], "sample", company, admin)
+
+      trip = Trading.get_trip!(trip.id, company, admin)
+      badges = Trading.trip_settlement_badges(trip)
+      assert badges.customer == :waived
+      assert badges.customer_done == 1
+      assert badges.customer_exempt == 1
+      assert badges.customer_total == 2
+    end
+  end
 end

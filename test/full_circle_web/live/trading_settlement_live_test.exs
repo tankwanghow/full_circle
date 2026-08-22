@@ -125,6 +125,74 @@ defmodule FullCircleWeb.TradingSettlementLiveTest do
     refute html =~ trip_b.reference_no
   end
 
+  test "admin waives and un-waives settlement lines on the trip page", %{
+    conn: conn,
+    company: company,
+    user: user
+  } do
+    {trip, drop, load, _customer, _supplier} = completed_drop(company, user)
+
+    {:ok, lv, _html} =
+      live(conn, ~p"/companies/#{company.id}/trading/settlement?trip_id=#{trip.id}")
+
+    # Unbilled billable rows offer Waive to an admin (both streams)
+    assert has_element?(lv, "#waive-row-#{drop.id}")
+    assert has_element?(lv, "#waive-row-#{load.id}")
+
+    # Waive the customer drop with a reason
+    lv |> element("#waive-row-#{drop.id}") |> render_click()
+    assert has_element?(lv, "#settlement-waive-form")
+
+    lv
+    |> form("#settlement-waive-form", %{"reason" => "free delivery"})
+    |> render_submit()
+
+    refute has_element?(lv, "#settlement-waive-form")
+    assert has_element?(lv, "#settlement-waived-#{drop.id}")
+    # No longer selectable for billing; waive button gone, un-waive offered
+    refute has_element?(lv, "#select-row-#{drop.id}")
+    refute has_element?(lv, "#waive-row-#{drop.id}")
+    assert has_element?(lv, "#unwaive-row-#{drop.id}")
+    assert render(lv) =~ "free delivery"
+
+    # Un-waive restores billability
+    lv |> element("#unwaive-row-#{drop.id}") |> render_click()
+    refute has_element?(lv, "#settlement-waived-#{drop.id}")
+    assert has_element?(lv, "#select-row-#{drop.id}")
+    assert has_element?(lv, "#waive-row-#{drop.id}")
+  end
+
+  test "waive with blank reason is rejected", %{conn: conn, company: company, user: user} do
+    {trip, drop, _load, _customer, _supplier} = completed_drop(company, user)
+
+    {:ok, lv, _html} =
+      live(conn, ~p"/companies/#{company.id}/trading/settlement?trip_id=#{trip.id}")
+
+    lv |> element("#waive-row-#{drop.id}") |> render_click()
+
+    lv
+    |> form("#settlement-waive-form", %{"reason" => "   "})
+    |> render_submit()
+
+    refute has_element?(lv, "#settlement-waived-#{drop.id}")
+    assert has_element?(lv, "#waive-row-#{drop.id}")
+  end
+
+  test "non-admin sees no waive controls", %{company: company, user: admin} do
+    {trip, drop, load, _customer, _supplier} = completed_drop(company, admin)
+
+    manager = user_fixture()
+    {:ok, _} = FullCircle.Sys.allow_user_to_access(company, manager, "manager", admin)
+    conn = log_in_user(Phoenix.ConnTest.build_conn(), manager)
+
+    {:ok, lv, _html} =
+      live(conn, ~p"/companies/#{company.id}/trading/settlement?trip_id=#{trip.id}")
+
+    assert has_element?(lv, "#settlement-row-#{drop.id}")
+    refute has_element?(lv, "#waive-row-#{drop.id}")
+    refute has_element?(lv, "#waive-row-#{load.id}")
+  end
+
   test "trip filter shows billed drop with invoice link", %{
     conn: conn,
     company: company,

@@ -80,6 +80,8 @@ defmodule FullCircle.Trading.Settlement do
         on: l.id == d.location_id,
         left_join: inv in Invoice,
         on: inv.id == d.invoice_id,
+        left_join: exu in FullCircle.UserAccounts.User,
+        on: exu.id == d.invoice_exempt_by_id,
         where: t.company_id == ^company.id,
         where: t.status in ["draft", "planned", "completed"],
         where: not is_nil(d.sales_position_id),
@@ -107,9 +109,16 @@ defmodule FullCircle.Trading.Settlement do
           doc_id: d.invoice_id,
           doc_no: inv.invoice_no,
           doc_kind: "invoice",
+          exempt_at: d.invoice_exempt_at,
+          exempt_reason: d.invoice_exempt_reason,
+          exempt_by_email: exu.email,
           # alias used by shared attach UI (billable / invoiceable)
-          invoiceable: t.status == "completed" and not is_nil(d.actual) and is_nil(d.invoice_id),
-          billable: t.status == "completed" and not is_nil(d.actual) and is_nil(d.invoice_id)
+          invoiceable:
+            t.status == "completed" and not is_nil(d.actual) and is_nil(d.invoice_id) and
+              is_nil(d.invoice_exempt_at),
+          billable:
+            t.status == "completed" and not is_nil(d.actual) and is_nil(d.invoice_id) and
+              is_nil(d.invoice_exempt_at)
         }
       )
       |> maybe_filter_customer(customer_id)
@@ -267,6 +276,8 @@ defmodule FullCircle.Trading.Settlement do
         on: loc.id == l.location_id,
         left_join: pinv in PurInvoice,
         on: pinv.id == l.pur_invoice_id,
+        left_join: exu in FullCircle.UserAccounts.User,
+        on: exu.id == l.pur_invoice_exempt_by_id,
         where: t.company_id == ^company.id,
         where: t.status in ["draft", "planned", "completed"],
         where: not is_nil(l.supply_position_id),
@@ -294,7 +305,12 @@ defmodule FullCircle.Trading.Settlement do
           doc_id: l.pur_invoice_id,
           doc_no: pinv.pur_invoice_no,
           doc_kind: "pur_invoice",
-          billable: t.status == "completed" and not is_nil(l.actual) and is_nil(l.pur_invoice_id)
+          exempt_at: l.pur_invoice_exempt_at,
+          exempt_reason: l.pur_invoice_exempt_reason,
+          exempt_by_email: exu.email,
+          billable:
+            t.status == "completed" and not is_nil(l.actual) and is_nil(l.pur_invoice_id) and
+              is_nil(l.pur_invoice_exempt_at)
         }
       )
       |> maybe_filter_supplier(supplier_id)
@@ -400,6 +416,8 @@ defmodule FullCircle.Trading.Settlement do
           on: to_loc.id == d.location_id,
           left_join: pinv in PurInvoice,
           on: pinv.id == d.transport_pur_invoice_id,
+          left_join: exu in FullCircle.UserAccounts.User,
+          on: exu.id == d.transport_exempt_by_id,
           where: t.company_id == ^company.id,
           where: t.transport_mode == "agent",
           where: not is_nil(t.transport_agent_id),
@@ -425,7 +443,10 @@ defmodule FullCircle.Trading.Settlement do
             to_location_name: to_loc.name,
             doc_id: d.transport_pur_invoice_id,
             doc_no: pinv.pur_invoice_no,
-            doc_kind: "pur_invoice"
+            doc_kind: "pur_invoice",
+            exempt_at: d.transport_exempt_at,
+            exempt_reason: d.transport_exempt_reason,
+            exempt_by_email: exu.email
           }
         )
         |> maybe_filter_agent(agent_id)
@@ -465,7 +486,9 @@ defmodule FullCircle.Trading.Settlement do
         Map.merge(d, %{
           from_location_id: origin && origin.location_id,
           from_location_name: origin && origin.location_name,
-          billable: d.trip_status == "completed" and not is_nil(d.actual) and is_nil(d.doc_id),
+          billable:
+            d.trip_status == "completed" and not is_nil(d.actual) and is_nil(d.doc_id) and
+              is_nil(d.exempt_at),
           # alias for shared settlement UI (party = agent)
           supplier_id: d.agent_id,
           supplier_name: d.agent_name,
@@ -728,6 +751,98 @@ defmodule FullCircle.Trading.Settlement do
 
   def billable_drop_count(_, _, _, _), do: 0
 
+  # --- Settlement waivers (admin-only): "this bill will never exist" ---
+
+  # stream => {schema, billing FK, exempt_at, exempt_by_id, exempt_reason}
+  @exempt_streams %{
+    customer:
+      {TripDrop, :invoice_id, :invoice_exempt_at, :invoice_exempt_by_id, :invoice_exempt_reason},
+    supplier:
+      {TripLoad, :pur_invoice_id, :pur_invoice_exempt_at, :pur_invoice_exempt_by_id,
+       :pur_invoice_exempt_reason},
+    transport:
+      {TripDrop, :transport_pur_invoice_id, :transport_exempt_at, :transport_exempt_by_id,
+       :transport_exempt_reason}
+  }
+
+  @doc """
+  Waive billing for settlement lines (admin only, reason required).
+
+  Marks lines so they leave the unbilled queues and the stream badge reports
+  `:waived` instead of staying open forever. Eligible lines: completed trip,
+  no billing document linked, not already waived — anything else rolls back
+  with `{:error, :ineligible_lines}`. Link and waiver are mutually exclusive;
+  to bill a waived line, un-waive it first.
+  """
+  def exempt_settlement_lines(stream, line_ids, reason, company, user)
+      when is_map_key(@exempt_streams, stream) and is_list(line_ids) and line_ids != [] do
+    reason = String.trim(to_string(reason || ""))
+    {schema, fk, at_f, by_f, reason_f} = Map.fetch!(@exempt_streams, stream)
+
+    cond do
+      not Authorization.can?(user, :exempt_trading_settlement, company) ->
+        {:error, :not_authorise}
+
+      reason == "" ->
+        {:error, :reason_required}
+
+      true ->
+        ids = Enum.uniq(line_ids)
+        now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+        Repo.transaction(fn ->
+          {n, _} =
+            from(x in schema,
+              join: t in Trip,
+              on: t.id == x.trip_id,
+              where: x.id in ^ids,
+              where: t.company_id == ^company.id,
+              where: t.status == "completed",
+              where: is_nil(field(x, ^fk)),
+              where: is_nil(field(x, ^at_f))
+            )
+            |> Repo.update_all(
+              set: [{at_f, now}, {by_f, user.id}, {reason_f, reason}, {:updated_at, now}]
+            )
+
+          if n == length(ids), do: n, else: Repo.rollback(:ineligible_lines)
+        end)
+    end
+  end
+
+  def exempt_settlement_lines(_, _, _, _, _), do: {:error, :invalid_lines}
+
+  @doc """
+  Reverse a settlement waiver (admin only). Lines reappear in the unbilled queues.
+  """
+  def unexempt_settlement_lines(stream, line_ids, company, user)
+      when is_map_key(@exempt_streams, stream) and is_list(line_ids) and line_ids != [] do
+    {schema, _fk, at_f, by_f, reason_f} = Map.fetch!(@exempt_streams, stream)
+
+    if Authorization.can?(user, :exempt_trading_settlement, company) do
+      ids = Enum.uniq(line_ids)
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      Repo.transaction(fn ->
+        {n, _} =
+          from(x in schema,
+            join: t in Trip,
+            on: t.id == x.trip_id,
+            where: x.id in ^ids,
+            where: t.company_id == ^company.id,
+            where: not is_nil(field(x, ^at_f))
+          )
+          |> Repo.update_all(set: [{at_f, nil}, {by_f, nil}, {reason_f, nil}, {:updated_at, now}])
+
+        if n == length(ids), do: n, else: Repo.rollback(:ineligible_lines)
+      end)
+    else
+      {:error, :not_authorise}
+    end
+  end
+
+  def unexempt_settlement_lines(_, _, _, _), do: {:error, :invalid_lines}
+
   # --- Link hygiene: info, contact lock, unlink (no void/delete on finance docs) ---
 
   @doc """
@@ -936,18 +1051,7 @@ defmodule FullCircle.Trading.Settlement do
   """
   def trip_settlement_badges(%Trip{} = trip) do
     if trip.status != "completed" do
-      %{
-        show?: false,
-        customer: :n_a,
-        supplier: :n_a,
-        transport: :n_a,
-        customer_done: 0,
-        customer_total: 0,
-        supplier_done: 0,
-        supplier_total: 0,
-        transport_done: 0,
-        transport_total: 0
-      }
+      hidden_badges()
     else
       loads = List.wrap(trip.loads)
       drops = List.wrap(trip.drops)
@@ -956,49 +1060,63 @@ defmodule FullCircle.Trading.Settlement do
       commercial_loads = Enum.filter(loads, & &1.supply_position_id)
 
       cust_done = Enum.count(sales_drops, & &1.invoice_id)
+      cust_exempt = Enum.count(sales_drops, & &1.invoice_exempt_at)
       cust_total = length(sales_drops)
 
       sup_done = Enum.count(commercial_loads, & &1.pur_invoice_id)
+      sup_exempt = Enum.count(commercial_loads, & &1.pur_invoice_exempt_at)
       sup_total = length(commercial_loads)
 
       agent? = trip.transport_mode == "agent" and not is_nil(trip.transport_agent_id)
       haul_done = if agent?, do: Enum.count(drops, & &1.transport_pur_invoice_id), else: 0
+      haul_exempt = if agent?, do: Enum.count(drops, & &1.transport_exempt_at), else: 0
       haul_total = if agent?, do: length(drops), else: 0
 
       %{
         show?: true,
-        customer: stream_state(cust_done, cust_total),
-        supplier: stream_state(sup_done, sup_total),
-        transport: if(agent?, do: stream_state(haul_done, haul_total), else: :n_a),
+        customer: stream_state(cust_done, cust_exempt, cust_total),
+        supplier: stream_state(sup_done, sup_exempt, sup_total),
+        transport: if(agent?, do: stream_state(haul_done, haul_exempt, haul_total), else: :n_a),
         customer_done: cust_done,
+        customer_exempt: cust_exempt,
         customer_total: cust_total,
         supplier_done: sup_done,
+        supplier_exempt: sup_exempt,
         supplier_total: sup_total,
         transport_done: haul_done,
+        transport_exempt: haul_exempt,
         transport_total: haul_total
       }
     end
   end
 
-  def trip_settlement_badges(_) do
+  def trip_settlement_badges(_), do: hidden_badges()
+
+  defp hidden_badges do
     %{
       show?: false,
       customer: :n_a,
       supplier: :n_a,
       transport: :n_a,
       customer_done: 0,
+      customer_exempt: 0,
       customer_total: 0,
       supplier_done: 0,
+      supplier_exempt: 0,
       supplier_total: 0,
       transport_done: 0,
+      transport_exempt: 0,
       transport_total: 0
     }
   end
 
-  defp stream_state(_done, 0), do: :n_a
-  defp stream_state(0, _total), do: :open
-  defp stream_state(done, total) when done >= total, do: :done
-  defp stream_state(_done, _total), do: :partial
+  # :waived = nothing left unbilled but at least one line was waived — the
+  # stream is closed without every bill existing. Never conflate with :done.
+  defp stream_state(_done, _exempt, 0), do: :n_a
+  defp stream_state(done, exempt, total) when done + exempt >= total and exempt > 0, do: :waived
+  defp stream_state(done, _exempt, total) when done >= total, do: :done
+  defp stream_state(0, 0, _total), do: :open
+  defp stream_state(_done, _exempt, _total), do: :partial
 
   # --- private ---
 
@@ -1092,17 +1210,22 @@ defmodule FullCircle.Trading.Settlement do
 
   defp maybe_filter_trip_id(q, _), do: q
 
-  # When include_settled? is true (trip deep-link), keep billed rows; otherwise hide them.
+  # When include_settled? is true (trip deep-link), keep billed and waived rows;
+  # otherwise (global board) hide both.
   defp maybe_require_unset_invoice(q, true), do: q
-  defp maybe_require_unset_invoice(q, _), do: where(q, [d], is_nil(d.invoice_id))
+
+  defp maybe_require_unset_invoice(q, _),
+    do: where(q, [d], is_nil(d.invoice_id) and is_nil(d.invoice_exempt_at))
 
   defp maybe_require_unset_pur_invoice_load(q, true), do: q
-  defp maybe_require_unset_pur_invoice_load(q, _), do: where(q, [l], is_nil(l.pur_invoice_id))
+
+  defp maybe_require_unset_pur_invoice_load(q, _),
+    do: where(q, [l], is_nil(l.pur_invoice_id) and is_nil(l.pur_invoice_exempt_at))
 
   defp maybe_require_unset_transport_pur_invoice(q, true), do: q
 
   defp maybe_require_unset_transport_pur_invoice(q, _) do
-    where(q, [d], is_nil(d.transport_pur_invoice_id))
+    where(q, [d], is_nil(d.transport_pur_invoice_id) and is_nil(d.transport_exempt_at))
   end
 
   defp maybe_filter_customer(q, nil), do: q

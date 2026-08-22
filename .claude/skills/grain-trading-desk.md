@@ -98,6 +98,24 @@ unbilled loads and hauls from the existing `list_unbilled_loads/3` /
 `:ineligible_loads`. The already-billed error only fires in a true race between
 the eligibility read and the `update_all`.
 
+**Settlement waivers (admin-only):** `Settlement.exempt_settlement_lines(stream,
+ids, reason, company, user)` / `unexempt_settlement_lines/4` with stream
+`:customer | :supplier | :transport`, gated by `:exempt_trading_settlement`
+(admin role only). Per **line** per **stream**: `trip_drops.invoice_exempt_*`
+(customer), `trip_drops.transport_exempt_*` (haul), `trip_loads.pur_invoice_exempt_*`
+(supplier) — each set is `_at` / `_by_id` / `_reason` (reason mandatory; that IS
+the audit trail). Eligibility: completed trip + no billing FK + not already
+waived, else `{:error, :ineligible_lines}` (transaction rolls back). Link and
+waiver are mutually exclusive — un-waive first to bill. Waived lines leave the
+three unbilled loaders (global board, attach panels, `billable_line_counts`)
+but still show on the trip deep-link page (`exempt_at/reason/by_email` in row
+maps) with greyed style + Un-waive. Badges: `stream_state(done, exempt, total)`
+returns **`:waived`** (never fake `:done`) when nothing is left unbilled and
+exempt > 0; `:waived` is not in `open|partial` so those trips leave **Needs
+bill** automatically. UI: Waive…/Un-waive on settlement rows (reason modal
+`#settlement-waive-form`), grey "waived" chips on desk trip rows and expanded
+lines.
+
 **Link hygiene:** link means “settled via” (not live mirror). While linked, **party
 (contact) is locked** on Invoice/PurInvoice; qty/price may still be edited.
 **Unlink trading settlement** clears FKs so lines reappear on settlement queues

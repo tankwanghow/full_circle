@@ -29,6 +29,12 @@ defmodule FullCircle.Trading.TripLoad do
     belongs_to :location, FullCircle.Trading.Location
     belongs_to :pur_invoice, FullCircle.Billing.PurInvoice
 
+    # Admin settlement waiver (set via Settlement.exempt_settlement_lines only,
+    # never cast from forms). nil exempt_at = not waived.
+    field :pur_invoice_exempt_at, :utc_datetime
+    field :pur_invoice_exempt_reason, :string
+    belongs_to :pur_invoice_exempt_by, FullCircle.UserAccounts.User
+
     has_many :trip_load_employees, FullCircle.Trading.TripLoadEmployee,
       on_replace: :delete,
       on_delete: :delete_all

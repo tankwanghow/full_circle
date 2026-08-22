@@ -1621,6 +1621,102 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
     refute has_element?(lv, "#desk-supply-clear-filters")
   end
 
+  test "waived settlement streams show waived chips and leave Needs bill", %{
+    conn: conn,
+    company: company,
+    user: user
+  } do
+    good = good_fixture(company, user)
+    customer = contact_fixture(company, user)
+    supplier = contact_fixture(company, user)
+
+    supply =
+      supply_position_fixture(company, user, %{
+        "good_id" => good.id,
+        "supplier_id" => supplier.id,
+        "status" => "collect",
+        "quantity" => "100"
+      })
+
+    sales =
+      sales_position_fixture(company, user, %{
+        "good_id" => good.id,
+        "customer_id" => customer.id,
+        "status" => "open"
+      })
+
+    port = location_fixture(company, user, %{"kind" => "port"})
+    site = location_fixture(company, user, %{"kind" => "customer_site"})
+
+    {:ok, trip} =
+      FullCircle.Trading.create_trip(
+        %{
+          "date" => "2026-07-20",
+          "transport_mode" => "company_own",
+          "vehicle_number" => "WAIV1",
+          "loads" => [
+            %{
+              "planned" => "10",
+              "actual" => "10",
+              "good_id" => good.id,
+              "location_id" => port.id,
+              "supply_position_id" => supply.id
+            }
+          ],
+          "drops" => [
+            %{
+              "planned" => "10",
+              "actual" => "10",
+              "good_id" => good.id,
+              "location_id" => site.id,
+              "sales_position_id" => sales.id,
+              "supply_position_id" => supply.id
+            }
+          ]
+        },
+        company,
+        user
+      )
+
+    {:ok, trip, _} = FullCircle.Trading.complete_trip(trip, company, user)
+    drop = hd(trip.drops)
+    load = hd(trip.loads)
+
+    assert {:ok, 1} =
+             FullCircle.Trading.exempt_settlement_lines(
+               :customer,
+               [drop.id],
+               "free delivery",
+               company,
+               user
+             )
+
+    assert {:ok, 1} =
+             FullCircle.Trading.exempt_settlement_lines(
+               :supplier,
+               [load.id],
+               "settled outside",
+               company,
+               user
+             )
+
+    {:ok, lv, _html} = live(conn, ~p"/companies/#{company.id}/trading/desk")
+
+    # Fully waived trip does not match any Bill chip
+    lv |> element("#desk-trip-settle-any") |> render_click()
+    refute has_element?(lv, "#desk-trip-#{trip.id}")
+    lv |> element("#desk-trip-settle-clear") |> render_click()
+
+    # Visible via status chips, the row shows waived chips instead of unbilled
+    lv |> element("#desk-trips-status-chip-completed") |> render_click()
+    assert has_element?(lv, "#desk-trip-#{trip.id}")
+    html = lv |> element("#desk-trip-#{trip.id}") |> render()
+    assert html =~ "Customer waived"
+    assert html =~ "Supplier waived"
+    refute html =~ "Customer uninvoiced"
+    refute html =~ "Supplier unbilled"
+  end
+
   test "panel counts show shown/all when filters narrow", %{
     conn: conn,
     company: company,

@@ -33,6 +33,17 @@ defmodule FullCircle.Trading.TripDrop do
     # Phase C: transport agent PurInvoice matched to this haul line (drop + origin)
     belongs_to :transport_pur_invoice, FullCircle.Billing.PurInvoice
 
+    # Admin settlement waivers (set via Settlement.exempt_settlement_lines only,
+    # never cast from forms). nil exempt_at = not waived. Two sets because a
+    # drop carries two billable streams: customer invoice and transport bill.
+    field :invoice_exempt_at, :utc_datetime
+    field :invoice_exempt_reason, :string
+    belongs_to :invoice_exempt_by, FullCircle.UserAccounts.User
+
+    field :transport_exempt_at, :utc_datetime
+    field :transport_exempt_reason, :string
+    belongs_to :transport_exempt_by, FullCircle.UserAccounts.User
+
     has_many :trip_drop_employees, FullCircle.Trading.TripDropEmployee,
       on_replace: :delete,
       on_delete: :delete_all

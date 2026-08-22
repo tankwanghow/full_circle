@@ -23,6 +23,8 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
        |> assign(can_manage: Authorization.can?(user, :manage_trading, company))
        |> assign(can_invoice: Authorization.can?(user, :create_invoice, company))
        |> assign(can_pur_invoice: Authorization.can?(user, :create_pur_invoice, company))
+       |> assign(can_exempt: Authorization.can?(user, :exempt_trading_settlement, company))
+       |> assign(waive: nil)
        |> assign(filters: %{"party_id" => "", "from_date" => "", "to_date" => ""})
        |> assign(rows: [])
        |> assign(groups: %{})
@@ -192,6 +194,79 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
       "customer" -> create_customer_invoice(socket, ids, nil)
       "supplier" -> create_supplier_pur_invoice(socket, ids, nil)
       "transport" -> create_transport_pur_invoice(socket, ids, nil)
+    end
+  end
+
+  # --- Admin-only settlement waivers ---
+
+  def handle_event("open_waive", %{"id" => id, "stream" => stream}, socket)
+      when stream in @streams do
+    if socket.assigns.can_exempt do
+      {:noreply, assign(socket, waive: %{id: id, stream: stream})}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  def handle_event("close_waive", _params, socket) do
+    {:noreply, assign(socket, waive: nil)}
+  end
+
+  def handle_event("confirm_waive", %{"reason" => reason}, socket) do
+    company = socket.assigns.current_company
+    user = socket.assigns.current_user
+
+    case socket.assigns.waive do
+      %{id: id, stream: stream} ->
+        case Trading.exempt_settlement_lines(stream_atom(stream), [id], reason, company, user) do
+          {:ok, _} ->
+            {:noreply,
+             socket
+             |> assign(waive: nil)
+             |> put_flash(:info, gettext("Billing waived for this line."))
+             |> load_rows()}
+
+          {:error, :reason_required} ->
+            {:noreply, put_flash(socket, :error, gettext("A reason is required to waive."))}
+
+          {:error, :not_authorise} ->
+            {:noreply,
+             socket
+             |> assign(waive: nil)
+             |> put_flash(:error, gettext("You are not authorised to perform this action"))}
+
+          {:error, _} ->
+            {:noreply,
+             socket
+             |> assign(waive: nil)
+             |> put_flash(:error, gettext("Line can no longer be waived (billed or changed)."))
+             |> load_rows()}
+        end
+
+      nil ->
+        {:noreply, socket}
+    end
+  end
+
+  def handle_event("unwaive", %{"id" => id, "stream" => stream}, socket)
+      when stream in @streams do
+    company = socket.assigns.current_company
+    user = socket.assigns.current_user
+
+    case Trading.unexempt_settlement_lines(stream_atom(stream), [id], company, user) do
+      {:ok, _} ->
+        {:noreply,
+         socket
+         |> put_flash(:info, gettext("Waiver removed; line is billable again."))
+         |> load_rows()}
+
+      {:error, :not_authorise} ->
+        {:noreply,
+         put_flash(socket, :error, gettext("You are not authorised to perform this action"))}
+
+      {:error, _} ->
+        {:noreply,
+         socket |> put_flash(:error, gettext("Could not remove waiver.")) |> load_rows()}
     end
   end
 
@@ -487,6 +562,12 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
   defp party_id_of(row, "supplier"), do: row.supplier_id
   defp party_id_of(row, "transport"), do: row.agent_id
 
+  defp stream_atom("customer"), do: :customer
+  defp stream_atom("supplier"), do: :supplier
+  defp stream_atom("transport"), do: :transport
+
+  defp waived?(row), do: not is_nil(Map.get(row, :exempt_at))
+
   defp selectable?(row, "customer"), do: row.invoiceable
   defp selectable?(row, "supplier"), do: row.billable
   defp selectable?(row, "transport"), do: row.billable
@@ -645,6 +726,7 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
           selected_by_stream={@selected_by_stream}
           modal={@modal}
           current_user={@current_user}
+          can_exempt={@can_exempt}
         />
       <% else %>
         <.board_settlement_page
@@ -660,9 +742,49 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
           can_pur_invoice={@can_pur_invoice}
           modal={@modal}
           current_user={@current_user}
+          can_exempt={@can_exempt}
         />
       <% end %>
+      <.waive_modal waive={@waive} />
     </div>
+    """
+  end
+
+  attr :waive, :any, required: true
+
+  defp waive_modal(assigns) do
+    ~H"""
+    <.modal
+      :if={@waive}
+      id="settlement-waive-modal"
+      show
+      max_w="max-w-md"
+      on_cancel={JS.push("close_waive")}
+    >
+      <p class="text-lg font-medium mb-1">{gettext("Waive billing for this line")}</p>
+      <p class="text-sm text-zinc-500 mb-3">
+        {gettext(
+          "The line leaves the billing queues and the trip settles without this bill. Only an admin can undo it (Un-waive)."
+        )}
+      </p>
+      <form id="settlement-waive-form" phx-submit="confirm_waive" class="m-0">
+        <input
+          type="text"
+          name="reason"
+          autocomplete="off"
+          placeholder={gettext("Reason (required)")}
+          class="w-full rounded border border-zinc-300 px-2 py-1 text-sm"
+        />
+        <div class="flex gap-2 mt-3 justify-end">
+          <button type="button" phx-click="close_waive" class="gray button text-sm py-0.5">
+            {gettext("Cancel")}
+          </button>
+          <button type="submit" class="blue button text-sm py-0.5">
+            {gettext("Waive billing")}
+          </button>
+        </div>
+      </form>
+    </.modal>
     """
   end
 
@@ -679,6 +801,7 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
   attr :transport_rows, :list, required: true
   attr :selected_by_stream, :map, required: true
   attr :modal, :any, required: true
+  attr :can_exempt, :boolean, default: false
 
   defp trip_settlement_page(assigns) do
     ~H"""
@@ -712,6 +835,7 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
         can_manage={@can_manage}
         can_create={@can_invoice}
         create_id="create-trading-doc-customer"
+        can_exempt={@can_exempt}
       />
       <.stream_panel
         stream="supplier"
@@ -723,6 +847,7 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
         can_manage={@can_manage}
         can_create={@can_pur_invoice}
         create_id="create-trading-doc-supplier"
+        can_exempt={@can_exempt}
       />
       <.stream_panel
         stream="transport"
@@ -734,6 +859,7 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
         can_manage={@can_manage}
         can_create={@can_pur_invoice}
         create_id="create-trading-doc-transport"
+        can_exempt={@can_exempt}
       />
 
       <.settlement_trip_modal
@@ -754,6 +880,7 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
   attr :can_manage, :boolean, required: true
   attr :can_create, :boolean, required: true
   attr :create_id, :string, required: true
+  attr :can_exempt, :boolean, default: false
 
   defp stream_panel(assigns) do
     groups = Enum.group_by(assigns.rows, &party_key(&1, assigns.stream))
@@ -837,6 +964,7 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
           current_company={@current_company}
           can_manage={@can_manage}
           compact_trip={true}
+          can_exempt={@can_exempt}
         />
       </div>
     </section>
@@ -857,6 +985,7 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
   attr :can_invoice, :boolean, required: true
   attr :can_pur_invoice, :boolean, required: true
   attr :modal, :any, required: true
+  attr :can_exempt, :boolean, default: false
 
   defp board_settlement_page(assigns) do
     assigns =
@@ -1019,6 +1148,7 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
           current_company={@current_company}
           can_manage={@can_manage}
           compact_trip={false}
+          can_exempt={@can_exempt}
         />
       </div>
 
@@ -1037,6 +1167,7 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
   attr :current_company, :any, required: true
   attr :can_manage, :boolean, required: true
   attr :compact_trip, :boolean, default: false
+  attr :can_exempt, :boolean, default: false
 
   defp settlement_table(assigns) do
     ~H"""
@@ -1063,7 +1194,9 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
         "flex gap-1 border-b p-2 text-sm items-center",
         selectable?(row, @stream) && "hover:bg-gray-50",
         settled?(row) && "bg-emerald-50/50",
-        (!selectable?(row, @stream) and not settled?(row)) && "opacity-60 bg-gray-50/80"
+        waived?(row) && "opacity-70 bg-zinc-100/80 dark:bg-zinc-800/60",
+        (!selectable?(row, @stream) and not settled?(row) and not waived?(row)) &&
+          "opacity-60 bg-gray-50/80"
       ]}
     >
       <div class="w-8">
@@ -1092,7 +1225,14 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
           ✓
         </span>
         <span
-          :if={!selectable?(row, @stream) and not settled?(row)}
+          :if={waived?(row)}
+          class="inline-block w-4 text-center text-zinc-500"
+          title={gettext("Billing waived")}
+        >
+          ⊘
+        </span>
+        <span
+          :if={!selectable?(row, @stream) and not settled?(row) and not waived?(row)}
           class="inline-block w-4 text-center text-gray-400"
           title={gettext("Complete the trip before billing")}
         >
@@ -1140,7 +1280,7 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
         </span>
       </div>
       <div class="w-1/12 text-right tabular-nums">{row.unit_price || "—"}</div>
-      <div class="w-2/12 min-w-0">
+      <div class="w-2/12 min-w-0 flex items-center gap-1">
         <.link
           :if={settled?(row)}
           id={"settlement-doc-#{row.id}"}
@@ -1150,10 +1290,53 @@ defmodule FullCircleWeb.TradingSettlementLive.Index do
         >
           {row.doc_no || gettext("Open bill")}
         </.link>
-        <span :if={not settled?(row)} class="text-xs text-gray-400">—</span>
+        <span
+          :if={waived?(row)}
+          id={"settlement-waived-#{row.id}"}
+          class="text-xs font-medium text-zinc-600 dark:text-zinc-400 truncate"
+          title={waived_title(row)}
+        >
+          {gettext("Waived")} · {row.exempt_reason}
+        </span>
+        <button
+          :if={waived?(row) and @can_exempt}
+          type="button"
+          id={"unwaive-row-#{row.id}"}
+          phx-click="unwaive"
+          phx-value-id={row.id}
+          phx-value-stream={@stream}
+          class="text-xs text-blue-700 underline hover:text-blue-900 shrink-0"
+          title={gettext("Remove waiver; line becomes billable again")}
+        >
+          {gettext("Un-waive")}
+        </button>
+        <span :if={not settled?(row) and not waived?(row)} class="text-xs text-gray-400">
+          —
+        </span>
+        <button
+          :if={selectable?(row, @stream) and @can_exempt}
+          type="button"
+          id={"waive-row-#{row.id}"}
+          phx-click="open_waive"
+          phx-value-id={row.id}
+          phx-value-stream={@stream}
+          class="text-xs text-zinc-500 underline hover:text-zinc-800 shrink-0"
+          title={gettext("Admin: waive billing for this line (no bill will exist)")}
+        >
+          {gettext("Waive…")}
+        </button>
       </div>
     </div>
     """
+  end
+
+  defp waived_title(row) do
+    who = Map.get(row, :exempt_by_email)
+    at = Map.get(row, :exempt_at)
+
+    [row.exempt_reason, who, at && Calendar.strftime(at, "%Y-%m-%d")]
+    |> Enum.reject(&(&1 in [nil, ""]))
+    |> Enum.join(" · ")
   end
 
   attr :modal, :any, required: true

@@ -134,6 +134,10 @@ defmodule FullCircle.Authorization do
   def can?(user, :manage_trading, company),
     do: allow_roles(~w(admin manager supervisor clerk cashier), company, user)
 
+  # Settlement waivers hide lines from billing queues forever — admin only.
+  def can?(user, :exempt_trading_settlement, company),
+    do: allow_roles(~w(admin), company, user)
+
   def can?(user, :create_fixed_asset, company),
     do: allow_roles(~w(admin manager supervisor), company, user)
 
