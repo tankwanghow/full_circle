@@ -104,11 +104,12 @@ spot, like overrides.json; gitignored, it holds real company data) into
 contacts/invoices/credit_notes/payments/bank_transactions/manual_journals, then RECOMPUTES
 `invoice_totals`/`bill_totals` so reconcile compares the merged set. Mapping: Wage Payable
 Invoice rows → pseudo ACCPAY bills (PurInvoice per PR+contact); their AP payments → pseudo
-payments (FC Payment + matcher, partial allocations fine); Payslips → pseudo SPEND bank
-txns funded FROM "Wages Payable" (FC Payment: debit Wages, credit WP — the import path has
-NO funds-account type restriction, only the LiveView autocomplete does); wage payouts →
-SPEND funded from bank/cash hitting Wages Payable; cent-level bank-rec Adjustments →
-manual journals. Depreciation/End-of-Period report rows are excluded (XDEP/XCLOSE post
+payments (FC Payment + matcher, partial allocations fine); Payslips → one pseudo manual
+journal per pay run, `XWSLIP-<PR>` (debit Wages / credit Wages Payable per employee —
+user chose journal+payment over Payment-funded-from-liability, though the import path
+would allow the latter: it has NO funds-account type restriction, only the LiveView
+autocomplete does); wage payouts → SPEND funded from bank/cash hitting Wages Payable
+(FC Payment); cent-level bank-rec Adjustments → manual journals. Depreciation/End-of-Period report rows are excluded (XDEP/XCLOSE post
 those). After backfill the XCATCHUP journals collapse to rounding cents — they remain as
 the safety net proving completeness.
 

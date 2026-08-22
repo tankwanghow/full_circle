@@ -10,8 +10,9 @@ which Snapshot.read merges into the snapshot:
 
   Wage Payable Invoice rows  -> pseudo ACCPAY bills   (FC PurInvoice)
   Payable Payment on AP      -> pseudo payments        (FC Payment + matcher)
-  Payslip rows               -> pseudo SPEND bank txns funded FROM Wages
-                                Payable (FC Payment: debit Wages, credit WP)
+  Payslip rows               -> pseudo manual journals per pay run
+                                (FC Journal: debit Wages / credit Wages
+                                Payable per employee)
   Wages Payable payouts      -> pseudo SPEND bank txns funded from bank/cash
                                 hitting Wages Payable (FC Payment)
   Adjustment rows            -> pseudo manual journals (FC Journal)
@@ -219,35 +220,34 @@ def main():
             }
         )
 
-    # ---- 3. Payslips -> SPEND funded from Wages Payable, line Wages and Salaries
-    slips = [l for l in lines if l["source"] == "Payslip" and l["debit"] > 0]
-    slip_credits = [l for l in lines if l["source"] == "Payslip" and l["credit"] > 0]
-    if round(sum(l["debit"] for l in slips), 2) != round(sum(l["credit"] for l in slip_credits), 2):
-        die("payslip debit/credit totals differ")
+    # ---- 3. Payslips -> one manual journal per pay run
+    # (Wages debit / Wages Payable credit per employee)
+    slip_lines = [l for l in lines if l["source"] == "Payslip"]
+    slip_runs = collections.defaultdict(list)
+    for l in slip_lines:
+        if not (l["inv"] and str(l["inv"]).startswith("PR-")):
+            die(f"payslip line without PR number: {l}")
+        slip_runs[(l["inv"], l["date"])].append(l)
+
     slip_n = 0
-    for l in sorted(slips, key=lambda x: (x["date"], str(x["inv"]), str(x["contact"]))):
-        slip_n += 1
-        bank_txns.append(
+    for (pr, date), rows in sorted(slip_runs.items()):
+        net = round(sum(r["debit"] - r["credit"] for r in rows), 2)
+        if abs(net) >= 0.005:
+            die(f"payslip run {pr} {date} does not balance: {net}")
+        slip_n += len([r for r in rows if r["debit"] > 0])
+        journals.append(
             {
-                "Type": "SPEND",
-                "Status": "AUTHORISED",
-                "BankTransactionID": f"xslip-{slip_n:04d}",
-                "BankTransactionNumber": f"XWSLIP-{slip_n:04d}",
-                "Date": iso(l["date"]),
-                "Total": l["debit"],
-                "Reference": f"Payslip {l['inv']} {l['contact']}"[:200],
-                "BankAccount": {"AccountID": account_id("Wages Payable")},
-                "Contact": {"ContactID": contact_id(l["contact"])},
-                "LineAmountTypes": "NoTax",
-                "LineItems": [
+                "JournalNumber": f"XWSLIP-{pr}",
+                "Narration": f"Payslips {pr}",
+                "Status": "POSTED",
+                "Date": iso(date),
+                "JournalLines": [
                     {
-                        "AccountCode": account_code(l["account"]),
-                        "Description": f"Payslip {l['inv']}"[:200],
-                        "Quantity": 1,
-                        "UnitAmount": l["debit"],
-                        "LineAmount": l["debit"],
-                        "TaxType": "NONE",
+                        "AccountCode": account_code(r["account"]),
+                        "LineAmount": round(r["debit"] - r["credit"], 2),
+                        "Description": f"Payslip {pr} {r['contact']}"[:200],
                     }
+                    for r in rows
                 ],
             }
         )
@@ -333,9 +333,9 @@ def main():
     print(f"  new contacts:      {len(new_contacts)}")
     print(f"  wage bills:        {len(invoices)}")
     print(f"  bill payments:     {len(payments)}")
-    print(f"  payslip payments:  {slip_n}")
+    print(f"  payslips (in {len(slip_runs)} run journals): {slip_n}")
     print(f"  wage payouts:      {out_n}")
-    print(f"  adjustment jrnls:  {len(journals)}")
+    print(f"  adjustment jrnls:  {len(journals) - len(slip_runs)}")
     print("  wages by year:", {y: round(v, 2) for y, v in sorted(wages_by_year.items())})
 
 

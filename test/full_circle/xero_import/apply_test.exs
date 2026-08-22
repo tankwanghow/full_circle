@@ -296,9 +296,9 @@ defmodule FullCircle.XeroImport.ApplyTest do
   test "reconstructed wage docs import as bill, allocated payment, and liability-funded payments",
        %{user: user, snap: snap, name: name} do
     # Shapes produced by scripts/xero_wage_reconstruct.py (extra_docs.json):
-    # a statutory wage bill, its allocated payment, a payslip as a Payment
-    # funded FROM the Wages Payable liability, and the payout as a Payment
-    # funded from bank hitting Wages Payable.
+    # a statutory wage bill, its allocated payment, a payslip accrual as a
+    # manual journal (Wages debit / Wages Payable credit), and the payout as
+    # a Payment funded from bank hitting Wages Payable.
     snap =
       snap
       |> Map.update!(:accounts, fn accounts ->
@@ -345,25 +345,26 @@ defmodule FullCircle.XeroImport.ApplyTest do
             }
           ]
       end)
+      |> Map.update!(:manual_journals, fn journals ->
+        journals ++
+          [
+            %{
+              "JournalNumber" => "XWSLIP-PR-0001",
+              "Narration" => "Payslips PR-0001",
+              "Status" => "POSTED",
+              "Date" => "2024-06-30",
+              "JournalLines" => [
+                %{"AccountCode" => "478", "LineAmount" => 500.0,
+                  "Description" => "Payslip PR-0001 MOK CHUA KWAN"},
+                %{"AccountCode" => "803", "LineAmount" => -500.0,
+                  "Description" => "Payslip PR-0001 MOK CHUA KWAN"}
+              ]
+            }
+          ]
+      end)
       |> Map.update!(:bank_transactions, fn txns ->
         txns ++
           [
-            %{
-              "Type" => "SPEND",
-              "Status" => "AUTHORISED",
-              "BankTransactionID" => "xslip-1",
-              "BankTransactionNumber" => "XWSLIP-1",
-              "Date" => "2024-06-30",
-              "Total" => 500.0,
-              "Reference" => "Payslip PR-0001 MOK CHUA KWAN",
-              "BankAccount" => %{"AccountID" => "ac-wagespay"},
-              "Contact" => %{"ContactID" => "c-emp1"},
-              "LineAmountTypes" => "NoTax",
-              "LineItems" => [
-                %{"AccountCode" => "478", "Quantity" => 1, "UnitAmount" => 500.0,
-                  "LineAmount" => 500.0, "TaxType" => "NONE"}
-              ]
-            },
             %{
               "Type" => "SPEND",
               "Status" => "AUTHORISED",
@@ -415,14 +416,10 @@ defmodule FullCircle.XeroImport.ApplyTest do
     matched_txn = Repo.one!(from t in Transaction, where: t.id == ^matcher.transaction_id)
     assert matched_txn.doc_no == "PR-0001-KWSP"
 
-    slip =
-      Repo.one!(
-        from p in FullCircle.BillPay.Payment,
-          where: p.company_id == ^com.id and p.payment_no == "XWSLIP-1",
-          preload: [:funds_account]
-      )
-
-    assert slip.funds_account.name == "Wages Payable"
+    assert Repo.exists?(
+             from j in FullCircle.Accounting.Journal,
+               where: j.company_id == ^com.id and j.journal_no == "XWSLIP-PR-0001"
+           )
 
     balances =
       Repo.all(
