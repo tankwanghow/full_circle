@@ -1184,7 +1184,11 @@ defmodule FullCircle.XeroImport.Apply do
             "tax_code_name" => tax && tax.code,
             "package_id" => good.package_id,
             "package_name" => good.package_name || good.unit || "unit",
+            # package_qty mirrors quantity: seeded packagings have
+            # unit_multiplier 1 and the edit form recomputes
+            # quantity = package_qty * multiplier.
             "quantity" => Decimal.new(1),
+            "package_qty" => Decimal.new(1),
             "unit_price" => delta,
             "discount" => Decimal.new(0),
             "tax_rate" => Decimal.new(0),
@@ -1229,7 +1233,9 @@ defmodule FullCircle.XeroImport.Apply do
          "tax_code_name" => tax.code,
          "package_id" => good.package_id,
          "package_name" => pkg_name,
+         # package_qty mirrors quantity — see align_doc_total comment.
          "quantity" => qty,
+         "package_qty" => qty,
          "unit_price" => unit_price,
          "discount" => discount,
          "tax_rate" => tax.rate || Decimal.new(0),
@@ -1703,7 +1709,9 @@ defmodule FullCircle.XeroImport.Apply do
           "tax_code_name" => tax && tax.code,
           "package_id" => good.package_id,
           "package_name" => good.package_name || good.unit || "unit",
+          # package_qty mirrors quantity — see align_doc_total comment.
           "quantity" => Decimal.new(1),
+          "package_qty" => Decimal.new(1),
           "unit_price" => amount,
           "discount" => Decimal.new(0),
           "tax_rate" => Decimal.new(0),

@@ -404,6 +404,32 @@ defmodule FullCircle.XeroImport.ApplyTest do
 
     assert Decimal.eq?(ap_credit, Decimal.new("-660"))
 
+    # The edit form recomputes quantity as package_qty * unit_multiplier
+    # (packagings are seeded with multiplier 1), so package_qty must equal
+    # quantity or every imported line collapses to qty 0 on edit.
+    for {qty, pkg_qty} <-
+          Repo.all(
+            from d in FullCircle.Billing.PurInvoiceDetail,
+              join: i in FullCircle.Billing.PurInvoice,
+              on: i.id == d.pur_invoice_id,
+              where: i.company_id == ^com.id and i.pur_invoice_no == "PR-0001-KWSP",
+              select: {d.quantity, d.package_qty}
+          ) do
+      assert Decimal.eq?(pkg_qty, qty)
+    end
+
+    payout_details =
+      Repo.all(
+        from d in FullCircle.BillPay.PaymentDetail,
+          join: p in FullCircle.BillPay.Payment,
+          on: p.id == d.payment_id,
+          where: p.company_id == ^com.id and p.payment_no == "XWOUT-1",
+          select: {d.quantity, d.package_qty}
+      )
+
+    assert payout_details != []
+    for {qty, pkg_qty} <- payout_details, do: assert(Decimal.eq?(pkg_qty, qty))
+
     pay =
       Repo.one!(
         from p in FullCircle.BillPay.Payment,
