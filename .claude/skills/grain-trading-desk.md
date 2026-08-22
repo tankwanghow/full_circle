@@ -112,10 +112,19 @@ inline (still one trip, not split into multi rows).
 (header only) | `:maximized` (hides supply/warehouse/sales, trips fill remaining height).
 Controls: Show / Hide / Maximize / Restore on the trips header.
 **Column filters:** comma-separated tokens are **OR** (trimmed, case-insensitive
-substring). Status boxes show defaults on mount:
-- Supplies: `open, hold, collect`
-- Sales: `draft, open, hold`
-- Trips: `draft, planned`
+substring). **Status is chips, not a text box** (`toggle_status_chip`): each panel
+strip shows its full vocabulary as toggle chips writing the same comma-OR string
+into `filters.<panel>.status`, so the reload/expand pipeline is unchanged. Chip
+defaults on mount:
+- Supplies: `open, hold, collect` (closed off)
+- Sales: `draft, open, hold` (fulfilled/cancelled off)
+- Trips: `draft, planned` (completed/cancelled off)
+
+All chips off = no status restriction over the loaded rows (same as the old
+emptied box). Text filter boxes tint amber and grow a ✕ (`clear_filter`) when
+non-empty; each panel strip has **Clear** (`clear_panel_filters`) restoring that
+panel's defaults (trips Clear also clears Bill chips) and a `shown/all` count
+when the panel's filters deviate from defaults (`filters_deviate?/2`).
 
 **Auto good filter:** selecting sales rows writes the unique good names of the
 selection (comma-OR) into the **supply** and **warehouse** `good` column filters
@@ -125,9 +134,10 @@ the trip clears them again — these filters are derived, not user-owned.
 **Trip bill filters:** sticky chips under trips header — **Needs bill** /
 **Cust unbilled** / **Supp unbilled** / **Haul unbilled** (multi-select OR on
 `trip_settlement_badges` open|partial). Mount is **ops-first**: Bill chips off.
-Turning a Bill chip on forces trip status `completed`; last chip off restores
-`draft, planned`. **Clear** clears chips **and** the trip status box. Title shows
-`shown/all` when any filter active.
+Turning a Bill chip on forces trip status `completed` (the trips status chips
+reflect it); last chip off restores `draft, planned`. Bill **Clear** clears Bill
+chips **and** empties the trip status filter (all status chips off = everything
+loaded shows). Title shows `shown/all` when any filter active.
 
 **The trips panel is loaded two different ways** (`load_trips_for_panel/3`):
 

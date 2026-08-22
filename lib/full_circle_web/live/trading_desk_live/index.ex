@@ -253,6 +253,55 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
     end
   end
 
+  # Status chips write the same comma-OR string the status filter uses, so the
+  # reload/expand/filter pipeline stays unchanged. All chips off = no status
+  # restriction over the loaded (active) rows, same as an emptied status box.
+  def handle_event("toggle_status_chip", %{"table" => table, "status" => status}, socket)
+      when table in ["supply", "sales", "trips"] do
+    t = String.to_existing_atom(table)
+    vocab = panel_statuses(t)
+
+    if status in vocab do
+      tokens = filter_tokens(socket.assigns.filters[t].status)
+
+      tokens =
+        if status in tokens, do: List.delete(tokens, status), else: [status | tokens]
+
+      value = vocab |> Enum.filter(&(&1 in tokens)) |> Enum.join(", ")
+
+      filters = put_in(socket.assigns.filters, [Access.key!(t), Access.key!(:status)], value)
+
+      {:noreply,
+       socket
+       |> assign(:filters, filters)
+       |> maybe_reload_for_status_filter(t, :status)
+       |> apply_filters()}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  def handle_event("clear_filter", %{"table" => table, "field" => field}, socket) do
+    handle_event("filter", %{"table" => table, "field" => field, "value" => ""}, socket)
+  end
+
+  def handle_event("clear_panel_filters", %{"table" => table}, socket)
+      when table in ["supply", "warehouse", "sales", "trips"] do
+    t = String.to_existing_atom(table)
+    filters = Map.put(socket.assigns.filters, t, empty_filters()[t])
+    socket = assign(socket, :filters, filters)
+
+    socket =
+      case t do
+        :supply -> maybe_reload_for_status_filter(socket, :supply, :status)
+        :sales -> maybe_reload_for_status_filter(socket, :sales, :status)
+        :trips -> socket |> assign(trip_settle_filters: MapSet.new()) |> reload_trips()
+        :warehouse -> socket
+      end
+
+    {:noreply, apply_filters(socket)}
+  end
+
   def handle_event("toggle_select", %{"kind" => kind, "id" => id} = params, socket) do
     if socket.assigns.can_manage do
       {:noreply, toggle_selection(socket, kind, id, params["good_id"])}
@@ -987,11 +1036,15 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
   defp trip_field(t, :status), do: t.status
   defp trip_field(_, _), do: ""
 
-  defp trips_text_filters_active?(trips_filters) do
-    trips_filters
-    |> Map.values()
-    |> Enum.any?(fn v -> String.trim(to_string(v || "")) != "" end)
-  end
+  defp panel_statuses(:supply), do: FullCircle.Trading.SupplyPosition.statuses()
+  defp panel_statuses(:sales), do: FullCircle.Trading.SalesPosition.statuses()
+  defp panel_statuses(:trips), do: FullCircle.Trading.Trip.statuses()
+
+  defp status_active?(status_q, status), do: status in filter_tokens(status_q)
+
+  # A panel deviates when any of its filters differ from the mount defaults
+  # (text typed, or status chips off the active set).
+  defp filters_deviate?(filters, table), do: Map.get(filters, table) != empty_filters()[table]
 
   defp trip_goods_label(t) do
     t
@@ -1039,6 +1092,50 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
     """
   end
 
+  # Status chip: toggles one status token in the panel's comma-OR status filter.
+  attr :table, :string, required: true
+  attr :status, :string, required: true
+  attr :active?, :boolean, required: true
+  attr :color, :string, required: true
+
+  defp status_chip(assigns) do
+    ~H"""
+    <button
+      type="button"
+      id={"desk-#{@table}-status-chip-#{@status}"}
+      phx-click="toggle_status_chip"
+      phx-value-table={@table}
+      phx-value-status={@status}
+      data-active={to_string(@active?)}
+      title={gettext("Show %{status} rows", status: @status)}
+      class={[
+        "rounded-full px-2 py-0 border font-medium transition-colors",
+        chip_color_class(@color, @active?)
+      ]}
+    >
+      {@status}
+    </button>
+    """
+  end
+
+  defp chip_color_class("amber", true),
+    do: "bg-white border-amber-600 text-amber-950 ring-1 ring-amber-500 font-semibold"
+
+  defp chip_color_class("amber", false),
+    do: "bg-amber-100/60 border-amber-400 text-amber-800/70 hover:bg-amber-50"
+
+  defp chip_color_class("emerald", true),
+    do: "bg-white border-emerald-600 text-emerald-950 ring-1 ring-emerald-500 font-semibold"
+
+  defp chip_color_class("emerald", false),
+    do: "bg-emerald-100/60 border-emerald-400 text-emerald-800/70 hover:bg-emerald-50"
+
+  defp chip_color_class("violet", true),
+    do: "bg-white border-violet-600 text-violet-950 ring-1 ring-violet-500 font-semibold"
+
+  defp chip_color_class("violet", false),
+    do: "bg-violet-100/60 border-violet-400 text-violet-800/70 hover:bg-violet-50"
+
   attr :table, :string, required: true
   attr :field, :string, required: true
   attr :label, :string, required: true
@@ -1048,7 +1145,8 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
   attr :title, :string, default: nil
 
   defp filter_col(assigns) do
-    assigns = assign(assigns, :tip, assigns.title || assigns.label)
+    tip = assigns.title || assigns.label
+    assigns = assign(assigns, :tip, tip <> " · " <> gettext("comma = any of"))
 
     ~H"""
     <div class={[@class, "min-w-0 flex items-center"]}>
@@ -1056,7 +1154,7 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
         id={"desk-filter-#{@table}-#{@field}"}
         phx-change="filter"
         phx-submit="filter"
-        class="w-full m-0"
+        class="w-full m-0 relative"
       >
         <input type="hidden" name="table" value={@table} />
         <input type="hidden" name="field" value={@field} />
@@ -1066,7 +1164,11 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
           value={@value}
           phx-debounce="200"
           class={[
-            "w-full font-bold text-xs md:text-sm px-1 py-0.5 rounded border border-black/20 bg-white/80 text-gray-900 placeholder:text-inherit placeholder:opacity-90 focus:outline-none focus:ring-1 focus:ring-black/30 focus:bg-white",
+            "w-full font-bold text-xs md:text-sm px-1 py-0.5 rounded border text-gray-900 placeholder:text-inherit placeholder:opacity-90 focus:outline-none focus:ring-1 focus:ring-black/30 focus:bg-white",
+            if(@value != "",
+              do: "bg-yellow-100 border-amber-500 ring-1 ring-amber-400 pr-5",
+              else: "bg-white/80 border-black/20"
+            ),
             @align == "right" && "text-right",
             @align == "center" && "text-center"
           ]}
@@ -1075,6 +1177,19 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
           aria-label={@label}
           autocomplete="off"
         />
+        <button
+          :if={@value != ""}
+          type="button"
+          id={"desk-clear-#{@table}-#{@field}"}
+          phx-click="clear_filter"
+          phx-value-table={@table}
+          phx-value-field={@field}
+          class="absolute right-0.5 top-1/2 -translate-y-1/2 p-0 text-gray-500 hover:text-gray-900"
+          title={gettext("Clear filter")}
+          aria-label={gettext("Clear filter")}
+        >
+          <.icon name="hero-x-mark" class="w-3.5 h-3.5" />
+        </button>
       </form>
     </div>
     """
@@ -1114,57 +1229,78 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
             class="flex-1 min-h-0 flex flex-col border-2 border-amber-500 rounded overflow-hidden bg-white dark:bg-zinc-900"
           >
             <div class="flex-1 min-h-0 overflow-y-scroll [scrollbar-gutter:stable]">
-              <div class="sticky top-0 z-10 bg-amber-200 border-b-2 border-amber-500 font-bold px-2 py-1 flex gap-1 items-center text-xs md:text-sm text-amber-950">
-                <div class="w-6 shrink-0 flex items-center justify-center">
+              <div class="sticky top-0 z-10 bg-amber-200 border-b-2 border-amber-500 text-amber-950">
+                <div class="px-2 pt-0.5 flex flex-wrap items-center gap-1 text-[11px]">
+                  <span class="font-bold">{gettext("Supply")}</span>
+                  <span id="desk-supply-count" class="font-normal text-amber-800">
+                    ({length(@supply_rows)}{if filters_deviate?(@filters, :supply),
+                      do: "/#{length(@supply_all)}",
+                      else: ""})
+                  </span>
+                  <span class="ml-1 font-semibold">{gettext("Status")}:</span>
+                  <.status_chip
+                    :for={s <- panel_statuses(:supply)}
+                    table="supply"
+                    status={s}
+                    color="amber"
+                    active?={status_active?(@filters.supply.status, s)}
+                  />
                   <button
-                    :if={@can_manage}
+                    :if={filters_deviate?(@filters, :supply)}
                     type="button"
-                    id="desk-new-supply"
-                    phx-click="open_modal"
-                    phx-value-kind="supply"
-                    phx-value-action="new"
-                    class="p-0 rounded text-amber-900 hover:bg-amber-300/80 focus:outline-none focus:ring-1 focus:ring-amber-600"
-                    title={gettext("New Supply")}
-                    aria-label={gettext("New Supply")}
+                    id="desk-supply-clear-filters"
+                    phx-click="clear_panel_filters"
+                    phx-value-table="supply"
+                    class="ml-1 font-medium text-amber-800 underline hover:text-amber-950"
                   >
-                    <.icon name="hero-plus-circle" class="w-5 h-5" />
+                    {gettext("Clear")}
                   </button>
                 </div>
+                <div class="font-bold px-2 py-1 flex gap-1 items-center text-xs md:text-sm">
+                  <div class="w-6 shrink-0 flex items-center justify-center">
+                    <button
+                      :if={@can_manage}
+                      type="button"
+                      id="desk-new-supply"
+                      phx-click="open_modal"
+                      phx-value-kind="supply"
+                      phx-value-action="new"
+                      class="p-0 rounded text-amber-900 hover:bg-amber-300/80 focus:outline-none focus:ring-1 focus:ring-amber-600"
+                      title={gettext("New Supply")}
+                      aria-label={gettext("New Supply")}
+                    >
+                      <.icon name="hero-plus-circle" class="w-5 h-5" />
+                    </button>
+                  </div>
 
-                <div class="flex flex-1 min-w-0 gap-1 items-center">
-                  <.filter_col
-                    class="w-3/24"
-                    table="supply"
-                    field="no"
-                    label={gettext("Supply no")}
-                    value={@filters.supply.no}
-                  />
-                  <.filter_col
-                    class="w-5/24"
-                    table="supply"
-                    field="supplier"
-                    label={gettext("Supplier")}
-                    value={@filters.supply.supplier}
-                  />
-                  <.filter_col
-                    class="w-4/24"
-                    table="supply"
-                    field="good"
-                    label={gettext("Good")}
-                    value={@filters.supply.good}
-                  />
-                  <.filter_col
-                    class="w-3/24"
-                    table="supply"
-                    field="status"
-                    label={gettext("Status")}
-                    value={@filters.supply.status}
-                    title={gettext("Type closed to include closed supplies")}
-                  />
-                  <.plain_col class="w-3/24" label={gettext("Remain")} align="right" />
-                  <.plain_col class="w-2/24" label={gettext("Transit")} align="right" />
-                  <.plain_col class="w-2/24" label={gettext("Soft")} align="right" />
-                  <.plain_col class="w-2/24" label={gettext("Price")} align="right" />
+                  <div class="flex flex-1 min-w-0 gap-1 items-center">
+                    <.filter_col
+                      class="w-3/24"
+                      table="supply"
+                      field="no"
+                      label={gettext("Supply no")}
+                      value={@filters.supply.no}
+                    />
+                    <.filter_col
+                      class="w-5/24"
+                      table="supply"
+                      field="supplier"
+                      label={gettext("Supplier")}
+                      value={@filters.supply.supplier}
+                    />
+                    <.filter_col
+                      class="w-4/24"
+                      table="supply"
+                      field="good"
+                      label={gettext("Good")}
+                      value={@filters.supply.good}
+                    />
+                    <.plain_col class="w-3/24" label={gettext("Status")} />
+                    <.plain_col class="w-3/24" label={gettext("Remain")} align="right" />
+                    <.plain_col class="w-2/24" label={gettext("Transit")} align="right" />
+                    <.plain_col class="w-2/24" label={gettext("Soft")} align="right" />
+                    <.plain_col class="w-2/24" label={gettext("Price")} align="right" />
+                  </div>
                 </div>
               </div>
               <div
@@ -1252,27 +1388,47 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
             class="flex-1 min-h-0 flex flex-col border-2 border-sky-500 rounded overflow-hidden bg-white dark:bg-zinc-900"
           >
             <div class="flex-1 min-h-0 overflow-y-scroll [scrollbar-gutter:stable]">
-              <div class="sticky top-0 z-10 bg-sky-200 border-b-2 border-sky-500 font-bold px-2 py-1 flex gap-1 items-center text-xs md:text-sm text-sky-950">
-                <.plain_col class="w-8 shrink-0 text-center" label={gettext("Out")} />
-                <.plain_col class="w-8 shrink-0 text-center" label={gettext("In")} />
-                <div class="flex flex-1 min-w-0 gap-1 items-center">
-                  <.filter_col
-                    class="w-6/24"
-                    table="warehouse"
-                    field="location"
-                    label={gettext("Warehouse")}
-                    value={@filters.warehouse.location}
-                  />
-                  <.filter_col
-                    class="w-6/24"
-                    table="warehouse"
-                    field="good"
-                    label={gettext("Good")}
-                    value={@filters.warehouse.good}
-                  />
-                  <.plain_col class="w-4/24" label={gettext("On hand")} align="right" />
-                  <.plain_col class="w-2/24" label={gettext("Inc")} align="right" />
-                  <.plain_col class="w-2/24" label={gettext("Outg")} align="right" />
+              <div class="sticky top-0 z-10 bg-sky-200 border-b-2 border-sky-500 text-sky-950">
+                <div class="px-2 pt-0.5 flex flex-wrap items-center gap-1 text-[11px]">
+                  <span class="font-bold">{gettext("Warehouse")}</span>
+                  <span id="desk-warehouse-count" class="font-normal text-sky-800">
+                    ({length(@warehouse_rows)}{if filters_deviate?(@filters, :warehouse),
+                      do: "/#{length(@warehouse_all)}",
+                      else: ""})
+                  </span>
+                  <button
+                    :if={filters_deviate?(@filters, :warehouse)}
+                    type="button"
+                    id="desk-warehouse-clear-filters"
+                    phx-click="clear_panel_filters"
+                    phx-value-table="warehouse"
+                    class="ml-1 font-medium text-sky-800 underline hover:text-sky-950"
+                  >
+                    {gettext("Clear")}
+                  </button>
+                </div>
+                <div class="font-bold px-2 py-1 flex gap-1 items-center text-xs md:text-sm">
+                  <.plain_col class="w-8 shrink-0 text-center" label={gettext("Out")} />
+                  <.plain_col class="w-8 shrink-0 text-center" label={gettext("In")} />
+                  <div class="flex flex-1 min-w-0 gap-1 items-center">
+                    <.filter_col
+                      class="w-6/24"
+                      table="warehouse"
+                      field="location"
+                      label={gettext("Warehouse")}
+                      value={@filters.warehouse.location}
+                    />
+                    <.filter_col
+                      class="w-6/24"
+                      table="warehouse"
+                      field="good"
+                      label={gettext("Good")}
+                      value={@filters.warehouse.good}
+                    />
+                    <.plain_col class="w-4/24" label={gettext("On hand")} align="right" />
+                    <.plain_col class="w-2/24" label={gettext("Inc")} align="right" />
+                    <.plain_col class="w-2/24" label={gettext("Outg")} align="right" />
+                  </div>
                 </div>
               </div>
               <div
@@ -1404,61 +1560,82 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
           class="lg:w-1/2 min-h-0 flex flex-col border-2 border-emerald-500 rounded overflow-hidden bg-white dark:bg-zinc-900"
         >
           <div class="flex-1 min-h-0 overflow-y-scroll [scrollbar-gutter:stable]">
-            <div class="sticky top-0 z-10 bg-emerald-200 border-b-2 border-emerald-500 font-bold px-2 py-1 flex gap-1 items-center text-xs md:text-sm text-emerald-950">
-              <div class="w-6 shrink-0 flex items-center justify-center">
+            <div class="sticky top-0 z-10 bg-emerald-200 border-b-2 border-emerald-500 text-emerald-950">
+              <div class="px-2 pt-0.5 flex flex-wrap items-center gap-1 text-[11px]">
+                <span class="font-bold">{gettext("Sales")}</span>
+                <span id="desk-sales-count" class="font-normal text-emerald-800">
+                  ({length(@sales_rows)}{if filters_deviate?(@filters, :sales),
+                    do: "/#{length(@sales_all)}",
+                    else: ""})
+                </span>
+                <span class="ml-1 font-semibold">{gettext("Status")}:</span>
+                <.status_chip
+                  :for={s <- panel_statuses(:sales)}
+                  table="sales"
+                  status={s}
+                  color="emerald"
+                  active?={status_active?(@filters.sales.status, s)}
+                />
                 <button
-                  :if={@can_manage}
+                  :if={filters_deviate?(@filters, :sales)}
                   type="button"
-                  id="desk-new-sales"
-                  phx-click="open_modal"
-                  phx-value-kind="sales"
-                  phx-value-action="new"
-                  class="p-0 rounded text-emerald-900 hover:bg-emerald-300/80 focus:outline-none focus:ring-1 focus:ring-emerald-600"
-                  title={gettext("New Sales")}
-                  aria-label={gettext("New Sales")}
+                  id="desk-sales-clear-filters"
+                  phx-click="clear_panel_filters"
+                  phx-value-table="sales"
+                  class="ml-1 font-medium text-emerald-800 underline hover:text-emerald-950"
                 >
-                  <.icon name="hero-plus-circle" class="w-5 h-5" />
+                  {gettext("Clear")}
                 </button>
               </div>
-              <div class="flex flex-1 min-w-0 gap-1 items-center">
-                <.filter_col
-                  class="w-3/24"
-                  table="sales"
-                  field="no"
-                  label={gettext("Sales no")}
-                  value={@filters.sales.no}
-                />
-                <.filter_col
-                  class="w-6/24"
-                  table="sales"
-                  field="customer"
-                  label={gettext("Customer")}
-                  value={@filters.sales.customer}
-                />
-                <.filter_col
-                  class="w-5/24"
-                  table="sales"
-                  field="good"
-                  label={gettext("Good")}
-                  value={@filters.sales.good}
-                />
-                <.plain_col class="w-2/24" label={gettext("Undeliv")} align="right" />
-                <.plain_col class="w-2/24" label={gettext("Transit")} align="right" />
-                <.filter_col
-                  class="w-3/24"
-                  table="sales"
-                  field="status"
-                  label={gettext("Status")}
-                  value={@filters.sales.status}
-                  title={gettext("Type fulfilled or cancelled to include those sales")}
-                />
-                <.filter_col
-                  class="w-3/24"
-                  table="sales"
-                  field="need_by"
-                  label={gettext("Need by")}
-                  value={@filters.sales.need_by}
-                />
+              <div class="font-bold px-2 py-1 flex gap-1 items-center text-xs md:text-sm">
+                <div class="w-6 shrink-0 flex items-center justify-center">
+                  <button
+                    :if={@can_manage}
+                    type="button"
+                    id="desk-new-sales"
+                    phx-click="open_modal"
+                    phx-value-kind="sales"
+                    phx-value-action="new"
+                    class="p-0 rounded text-emerald-900 hover:bg-emerald-300/80 focus:outline-none focus:ring-1 focus:ring-emerald-600"
+                    title={gettext("New Sales")}
+                    aria-label={gettext("New Sales")}
+                  >
+                    <.icon name="hero-plus-circle" class="w-5 h-5" />
+                  </button>
+                </div>
+                <div class="flex flex-1 min-w-0 gap-1 items-center">
+                  <.filter_col
+                    class="w-3/24"
+                    table="sales"
+                    field="no"
+                    label={gettext("Sales no")}
+                    value={@filters.sales.no}
+                  />
+                  <.filter_col
+                    class="w-6/24"
+                    table="sales"
+                    field="customer"
+                    label={gettext("Customer")}
+                    value={@filters.sales.customer}
+                  />
+                  <.filter_col
+                    class="w-5/24"
+                    table="sales"
+                    field="good"
+                    label={gettext("Good")}
+                    value={@filters.sales.good}
+                  />
+                  <.plain_col class="w-2/24" label={gettext("Undeliv")} align="right" />
+                  <.plain_col class="w-2/24" label={gettext("Transit")} align="right" />
+                  <.plain_col class="w-3/24" label={gettext("Status")} />
+                  <.filter_col
+                    class="w-3/24"
+                    table="sales"
+                    field="need_by"
+                    label={gettext("Need by")}
+                    value={@filters.sales.need_by}
+                  />
+                </div>
               </div>
             </div>
             <div
@@ -1628,9 +1805,9 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
           <div class="flex-1 min-w-0 flex items-center justify-between gap-2 px-1 py-0.5">
             <span>
               {gettext("Trips")}
-              <span class="font-normal text-violet-800">
+              <span id="desk-trips-count" class="font-normal text-violet-800">
                 ({length(@trips)}{if MapSet.size(@trip_settle_filters) > 0 or
-                                       trips_text_filters_active?(@filters.trips),
+                                       filters_deviate?(@filters, :trips),
                                      do: "/#{length(@trips_all)}",
                                      else: ""})
               </span>
@@ -1639,7 +1816,25 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
               id="desk-trip-settle-filters"
               class="px-2 py-1 flex flex-wrap items-center gap-1 text-[11px]"
             >
-              <span class="font-semibold text-violet-900 mr-0.5">{gettext("Bill")}:</span>
+              <span class="font-semibold text-violet-900 mr-0.5">{gettext("Status")}:</span>
+              <.status_chip
+                :for={s <- panel_statuses(:trips)}
+                table="trips"
+                status={s}
+                color="violet"
+                active?={status_active?(@filters.trips.status, s)}
+              />
+              <button
+                :if={filters_deviate?(@filters, :trips) or MapSet.size(@trip_settle_filters) > 0}
+                type="button"
+                id="desk-trips-clear-filters"
+                phx-click="clear_panel_filters"
+                phx-value-table="trips"
+                class="mr-1 font-medium text-violet-800 underline hover:text-violet-950"
+              >
+                {gettext("Clear")}
+              </button>
+              <span class="font-semibold text-violet-900 mr-0.5 ml-2">{gettext("Bill")}:</span>
               <.trip_settle_chip
                 key="any"
                 label={gettext("Needs bill")}
@@ -1785,13 +1980,7 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
                   label={gettext("Agent")}
                   value={@filters.trips.agent}
                 />
-                <.filter_col
-                  class="w-2/24"
-                  table="trips"
-                  field="status"
-                  label={gettext("Status")}
-                  value={@filters.trips.status}
-                />
+                <.plain_col class="w-2/24" label={gettext("Status")} />
               </div>
             </div>
           </div>
@@ -1804,7 +1993,7 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
             company={@current_company}
           />
           <p :if={@trips == []} class="text-center p-2 text-gray-500 text-sm">
-            {if MapSet.size(@trip_settle_filters) > 0 or trips_text_filters_active?(@filters.trips) do
+            {if MapSet.size(@trip_settle_filters) > 0 or filters_deviate?(@filters, :trips) do
               gettext("No trips match the current filters.")
             else
               gettext("No trips yet.")

@@ -637,37 +637,33 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
       })
 
     {:ok, lv, html} = live(conn, ~p"/companies/#{company.id}/trading/desk")
-    # default: active statuses prefilled in status boxes
-    assert html =~ ~s(value="open, hold, collect")
-    assert html =~ ~s(value="draft, open, hold")
+    # default: active status chips on, terminal chips off
+    assert has_element?(lv, ~s(#desk-supply-status-chip-open[data-active="true"]))
+    assert has_element?(lv, ~s(#desk-supply-status-chip-closed[data-active="false"]))
+    assert has_element?(lv, ~s(#desk-sales-status-chip-open[data-active="true"]))
+    assert has_element?(lv, ~s(#desk-sales-status-chip-fulfilled[data-active="false"]))
     refute html =~ closed.title
     refute html =~ fulfilled.title
     assert html =~ open_supply.title
     assert html =~ open_sales.title
 
-    lv
-    |> form("#desk-filter-supply-status", %{
-      "table" => "supply",
-      "field" => "status",
-      "value" => "closed"
-    })
-    |> render_change()
+    # Narrow supply to closed only: closed chip on, active chips off
+    lv |> element("#desk-supply-status-chip-closed") |> render_click()
+    lv |> element("#desk-supply-status-chip-open") |> render_click()
+    lv |> element("#desk-supply-status-chip-hold") |> render_click()
+    lv |> element("#desk-supply-status-chip-collect") |> render_click()
 
     html = render(lv)
     assert html =~ closed.title
-    assert html =~ "closed"
-    # open still in dataset until status filter narrows; "closed" does not match "open"
     refute html =~ open_supply.title
     # closed rows are not selectable for trips
     refute has_element?(lv, "#sel-supply-#{closed.id}")
 
-    lv
-    |> form("#desk-filter-sales-status", %{
-      "table" => "sales",
-      "field" => "status",
-      "value" => "fulfilled"
-    })
-    |> render_change()
+    # Narrow sales to fulfilled only
+    lv |> element("#desk-sales-status-chip-fulfilled") |> render_click()
+    lv |> element("#desk-sales-status-chip-draft") |> render_click()
+    lv |> element("#desk-sales-status-chip-open") |> render_click()
+    lv |> element("#desk-sales-status-chip-hold") |> render_click()
 
     html = render(lv)
     assert html =~ fulfilled.title
@@ -877,7 +873,9 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
     assert has_element?(lv, "#desk-trip-settle-filters")
     # Ops default: draft + planned; Bill chips off; completed trips hidden by status
     assert html =~ ~s(id="desk-trip-settle-any")
-    assert html =~ ~s(value="draft, planned") or html =~ "draft, planned"
+    assert has_element?(lv, ~s(#desk-trips-status-chip-draft[data-active="true"]))
+    assert has_element?(lv, ~s(#desk-trips-status-chip-planned[data-active="true"]))
+    assert has_element?(lv, ~s(#desk-trips-status-chip-completed[data-active="false"]))
     assert has_element?(lv, "#desk-trip-#{draft.id}")
     refute has_element?(lv, "#desk-trip-#{open_trip.id}")
 
@@ -885,7 +883,7 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
     lv |> element("#desk-trip-settle-any") |> render_click()
     assert has_element?(lv, "#desk-trip-#{open_trip.id}")
     refute has_element?(lv, "#desk-trip-#{draft.id}")
-    assert render(lv) =~ ~s(value="completed") or render(lv) =~ ">completed<"
+    assert has_element?(lv, ~s(#desk-trips-status-chip-completed[data-active="true"]))
 
     lv |> element("#desk-trip-settle-clear") |> render_click()
     # Clear removes Bill chips and status filter — both draft and completed show
@@ -1042,14 +1040,8 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
 
     {:ok, lv, _} = live(conn, ~p"/companies/#{company.id}/trading/desk")
 
-    # Clear status filter so completed trips appear (ops default is draft, planned)
-    lv
-    |> form("#desk-filter-trips-status", %{
-      "table" => "trips",
-      "field" => "status",
-      "value" => "completed"
-    })
-    |> render_change()
+    # Widen status chips so completed trips appear (ops default is draft, planned)
+    lv |> element("#desk-trips-status-chip-completed") |> render_click()
 
     lv
     |> element("#desk-trip-#{trip.id} [phx-value-action=edit]")
@@ -1288,14 +1280,8 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
 
     {:ok, lv, _} = live(conn, ~p"/companies/#{company.id}/trading/desk")
 
-    # Pull closed rows onto the supply board via the status filter
-    lv
-    |> form("#desk-filter-supply-status", %{
-      "table" => "supply",
-      "field" => "status",
-      "value" => "open, hold, collect, closed"
-    })
-    |> render_change()
+    # Pull closed rows onto the supply board via the closed status chip
+    lv |> element("#desk-supply-status-chip-closed") |> render_click()
 
     assert has_element?(lv, "#desk-supply-#{closed_supply.id}")
     # A closed row renders no checkbox, so it must never be auto-selected
@@ -1337,20 +1323,332 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
         "status" => "collect"
       })
 
-    {:ok, lv, html} = live(conn, ~p"/companies/#{company.id}/trading/desk")
-    # Trip status default is comma-OR for ops statuses
-    assert html =~ "draft, planned"
+    {:ok, lv, _html} = live(conn, ~p"/companies/#{company.id}/trading/desk")
+    # Trip status default is the ops chip set
+    assert has_element?(lv, ~s(#desk-trips-status-chip-draft[data-active="true"]))
+    assert has_element?(lv, ~s(#desk-trips-status-chip-planned[data-active="true"]))
 
-    lv
-    |> form("#desk-filter-supply-status", %{
-      "table" => "supply",
-      "field" => "status",
-      "value" => "open, hold"
-    })
-    |> render_change()
+    # Chips build the comma-OR token list: open, hold (collect off)
+    lv |> element("#desk-supply-status-chip-collect") |> render_click()
 
     assert has_element?(lv, "#desk-supply-#{s_open.id}")
     assert has_element?(lv, "#desk-supply-#{s_hold.id}")
     refute has_element?(lv, "#desk-supply-#{s_collect.id}")
+  end
+
+  test "supply and sales status chips toggle statuses", %{
+    conn: conn,
+    company: company,
+    user: user
+  } do
+    good = good_fixture(company, user)
+    supplier = contact_fixture(company, user, %{"name" => "Chip Closed Supplier"})
+    customer = contact_fixture(company, user, %{"name" => "Chip Fulfilled Customer"})
+
+    closed =
+      supply_position_fixture(company, user, %{
+        "good_id" => good.id,
+        "supplier_id" => supplier.id,
+        "quantity" => "10",
+        "status" => "closed"
+      })
+
+    open_supply =
+      supply_position_fixture(company, user, %{
+        "good_id" => good.id,
+        "quantity" => "20",
+        "status" => "open"
+      })
+
+    fulfilled =
+      sales_position_fixture(company, user, %{
+        "good_id" => good.id,
+        "customer_id" => customer.id,
+        "quantity" => "5",
+        "status" => "fulfilled"
+      })
+
+    open_sales =
+      sales_position_fixture(company, user, %{
+        "good_id" => good.id,
+        "quantity" => "8",
+        "status" => "open"
+      })
+
+    {:ok, lv, _html} = live(conn, ~p"/companies/#{company.id}/trading/desk")
+
+    # Status text boxes are gone; chips carry the vocabulary with defaults on
+    refute has_element?(lv, "#desk-filter-supply-status")
+    refute has_element?(lv, "#desk-filter-sales-status")
+    assert has_element?(lv, ~s(#desk-supply-status-chip-open[data-active="true"]))
+    assert has_element?(lv, ~s(#desk-supply-status-chip-hold[data-active="true"]))
+    assert has_element?(lv, ~s(#desk-supply-status-chip-collect[data-active="true"]))
+    assert has_element?(lv, ~s(#desk-supply-status-chip-closed[data-active="false"]))
+    assert has_element?(lv, ~s(#desk-sales-status-chip-draft[data-active="true"]))
+    assert has_element?(lv, ~s(#desk-sales-status-chip-fulfilled[data-active="false"]))
+    assert has_element?(lv, ~s(#desk-sales-status-chip-cancelled[data-active="false"]))
+    refute has_element?(lv, "#desk-supply-#{closed.id}")
+    refute has_element?(lv, "#desk-sales-#{fulfilled.id}")
+
+    # Turning the closed chip on reloads the board with closed rows included
+    lv |> element("#desk-supply-status-chip-closed") |> render_click()
+    assert has_element?(lv, ~s(#desk-supply-status-chip-closed[data-active="true"]))
+    assert has_element?(lv, "#desk-supply-#{closed.id}")
+    assert has_element?(lv, "#desk-supply-#{open_supply.id}")
+    # closed rows are not selectable for trips
+    refute has_element?(lv, "#sel-supply-#{closed.id}")
+
+    # Narrow to closed only
+    lv |> element("#desk-supply-status-chip-open") |> render_click()
+    lv |> element("#desk-supply-status-chip-hold") |> render_click()
+    lv |> element("#desk-supply-status-chip-collect") |> render_click()
+    assert has_element?(lv, "#desk-supply-#{closed.id}")
+    refute has_element?(lv, "#desk-supply-#{open_supply.id}")
+
+    # Sales: fulfilled chip pulls fulfilled rows in; dropping actives narrows
+    lv |> element("#desk-sales-status-chip-fulfilled") |> render_click()
+    assert has_element?(lv, "#desk-sales-#{fulfilled.id}")
+    refute has_element?(lv, "#sel-sales-#{fulfilled.id}")
+
+    lv |> element("#desk-sales-status-chip-draft") |> render_click()
+    lv |> element("#desk-sales-status-chip-open") |> render_click()
+    lv |> element("#desk-sales-status-chip-hold") |> render_click()
+    assert has_element?(lv, "#desk-sales-#{fulfilled.id}")
+    refute has_element?(lv, "#desk-sales-#{open_sales.id}")
+  end
+
+  test "trips status chips and bill chip interplay", %{
+    conn: conn,
+    company: company,
+    user: user
+  } do
+    good = good_fixture(company, user)
+    customer = contact_fixture(company, user)
+    supplier = contact_fixture(company, user)
+
+    supply =
+      supply_position_fixture(company, user, %{
+        "good_id" => good.id,
+        "supplier_id" => supplier.id,
+        "status" => "collect",
+        "quantity" => "100"
+      })
+
+    sales =
+      sales_position_fixture(company, user, %{
+        "good_id" => good.id,
+        "customer_id" => customer.id,
+        "status" => "open"
+      })
+
+    port = location_fixture(company, user, %{"kind" => "port"})
+    site = location_fixture(company, user, %{"kind" => "customer_site"})
+    wh = location_fixture(company, user, %{"kind" => "own_warehouse"})
+
+    {:ok, done_trip} =
+      FullCircle.Trading.create_trip(
+        %{
+          "date" => "2026-07-20",
+          "transport_mode" => "company_own",
+          "vehicle_number" => "DONE1",
+          "loads" => [
+            %{
+              "planned" => "10",
+              "actual" => "10",
+              "good_id" => good.id,
+              "location_id" => port.id,
+              "supply_position_id" => supply.id
+            }
+          ],
+          "drops" => [
+            %{
+              "planned" => "10",
+              "actual" => "10",
+              "good_id" => good.id,
+              "location_id" => site.id,
+              "sales_position_id" => sales.id,
+              "supply_position_id" => supply.id
+            }
+          ]
+        },
+        company,
+        user
+      )
+
+    {:ok, done_trip, _} = FullCircle.Trading.complete_trip(done_trip, company, user)
+
+    {:ok, draft} =
+      FullCircle.Trading.create_trip(
+        %{
+          "date" => "2026-07-21",
+          "transport_mode" => "company_own",
+          "vehicle_number" => "DRAFT1",
+          "loads" => [
+            %{
+              "planned" => "5",
+              "good_id" => good.id,
+              "location_id" => port.id,
+              "supply_position_id" => supply.id
+            }
+          ],
+          "drops" => [
+            %{
+              "planned" => "5",
+              "good_id" => good.id,
+              "location_id" => wh.id
+            }
+          ]
+        },
+        company,
+        user
+      )
+
+    {:ok, lv, _html} = live(conn, ~p"/companies/#{company.id}/trading/desk")
+
+    refute has_element?(lv, "#desk-filter-trips-status")
+    assert has_element?(lv, ~s(#desk-trips-status-chip-draft[data-active="true"]))
+    assert has_element?(lv, ~s(#desk-trips-status-chip-planned[data-active="true"]))
+    assert has_element?(lv, ~s(#desk-trips-status-chip-completed[data-active="false"]))
+    assert has_element?(lv, "#desk-trip-#{draft.id}")
+    refute has_element?(lv, "#desk-trip-#{done_trip.id}")
+
+    # Completed chip widens: draft + completed both visible
+    lv |> element("#desk-trips-status-chip-completed") |> render_click()
+    assert has_element?(lv, "#desk-trip-#{draft.id}")
+    assert has_element?(lv, "#desk-trip-#{done_trip.id}")
+
+    # Drop draft + planned: only completed remains
+    lv |> element("#desk-trips-status-chip-draft") |> render_click()
+    lv |> element("#desk-trips-status-chip-planned") |> render_click()
+    refute has_element?(lv, "#desk-trip-#{draft.id}")
+    assert has_element?(lv, "#desk-trip-#{done_trip.id}")
+
+    # Bill chip forces completed; status chips reflect it
+    lv |> element("#desk-trip-settle-any") |> render_click()
+    assert has_element?(lv, ~s(#desk-trips-status-chip-completed[data-active="true"]))
+    assert has_element?(lv, ~s(#desk-trips-status-chip-draft[data-active="false"]))
+    assert has_element?(lv, ~s(#desk-trips-status-chip-planned[data-active="false"]))
+
+    # Last bill chip off restores the ops default
+    lv |> element("#desk-trip-settle-any") |> render_click()
+    assert has_element?(lv, ~s(#desk-trips-status-chip-draft[data-active="true"]))
+    assert has_element?(lv, ~s(#desk-trips-status-chip-planned[data-active="true"]))
+    assert has_element?(lv, ~s(#desk-trips-status-chip-completed[data-active="false"]))
+  end
+
+  test "per-box clear button clears a text filter", %{
+    conn: conn,
+    company: company,
+    user: user
+  } do
+    good = good_fixture(company, user)
+    sup_a = contact_fixture(company, user, %{"name" => "Alpha Clear Co"})
+    sup_b = contact_fixture(company, user, %{"name" => "Beta Clear Co"})
+
+    supply_position_fixture(company, user, %{
+      "title" => "CLR-A",
+      "good_id" => good.id,
+      "supplier_id" => sup_a.id
+    })
+
+    supply_position_fixture(company, user, %{
+      "title" => "CLR-B",
+      "good_id" => good.id,
+      "supplier_id" => sup_b.id
+    })
+
+    {:ok, lv, _html} = live(conn, ~p"/companies/#{company.id}/trading/desk")
+    refute has_element?(lv, "#desk-clear-supply-supplier")
+
+    html =
+      lv
+      |> form("#desk-filter-supply-supplier", %{value: "Alpha"})
+      |> render_change()
+
+    assert html =~ "Alpha Clear Co"
+    refute html =~ "Beta Clear Co"
+    assert has_element?(lv, "#desk-clear-supply-supplier")
+
+    html = lv |> element("#desk-clear-supply-supplier") |> render_click()
+    assert html =~ "Alpha Clear Co"
+    assert html =~ "Beta Clear Co"
+    refute has_element?(lv, "#desk-clear-supply-supplier")
+  end
+
+  test "per-panel clear resets filters to defaults", %{
+    conn: conn,
+    company: company,
+    user: user
+  } do
+    good = good_fixture(company, user)
+    supplier = contact_fixture(company, user, %{"name" => "PanelClear Supplier"})
+
+    closed =
+      supply_position_fixture(company, user, %{
+        "good_id" => good.id,
+        "supplier_id" => supplier.id,
+        "quantity" => "10",
+        "status" => "closed"
+      })
+
+    open_supply =
+      supply_position_fixture(company, user, %{
+        "good_id" => good.id,
+        "quantity" => "20",
+        "status" => "open"
+      })
+
+    {:ok, lv, _html} = live(conn, ~p"/companies/#{company.id}/trading/desk")
+    # At defaults the panel Clear is not offered
+    refute has_element?(lv, "#desk-supply-clear-filters")
+
+    lv
+    |> form("#desk-filter-supply-supplier", %{value: "PanelClear"})
+    |> render_change()
+
+    lv |> element("#desk-supply-status-chip-closed") |> render_click()
+    lv |> element("#desk-supply-status-chip-open") |> render_click()
+    assert has_element?(lv, "#desk-supply-#{closed.id}")
+    refute has_element?(lv, "#desk-supply-#{open_supply.id}")
+
+    assert has_element?(lv, "#desk-supply-clear-filters")
+    lv |> element("#desk-supply-clear-filters") |> render_click()
+
+    assert has_element?(lv, ~s(#desk-supply-status-chip-open[data-active="true"]))
+    assert has_element?(lv, ~s(#desk-supply-status-chip-closed[data-active="false"]))
+    assert has_element?(lv, "#desk-supply-#{open_supply.id}")
+    refute has_element?(lv, "#desk-supply-#{closed.id}")
+    refute has_element?(lv, "#desk-supply-clear-filters")
+  end
+
+  test "panel counts show shown/all when filters narrow", %{
+    conn: conn,
+    company: company,
+    user: user
+  } do
+    good = good_fixture(company, user)
+    sup_a = contact_fixture(company, user, %{"name" => "Count Alpha Co"})
+    sup_b = contact_fixture(company, user, %{"name" => "Count Beta Co"})
+
+    supply_position_fixture(company, user, %{
+      "title" => "CNT-A",
+      "good_id" => good.id,
+      "supplier_id" => sup_a.id
+    })
+
+    supply_position_fixture(company, user, %{
+      "title" => "CNT-B",
+      "good_id" => good.id,
+      "supplier_id" => sup_b.id
+    })
+
+    {:ok, lv, _html} = live(conn, ~p"/companies/#{company.id}/trading/desk")
+    assert lv |> element("#desk-supply-count") |> render() =~ "(2)"
+
+    lv
+    |> form("#desk-filter-supply-supplier", %{value: "Count Alpha"})
+    |> render_change()
+
+    assert lv |> element("#desk-supply-count") |> render() =~ "(1/2)"
   end
 end
