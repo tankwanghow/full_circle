@@ -81,6 +81,10 @@ AP; AR side → Payment debiting AR); a payment with no `"Invoice"` key at all s
 - Blank `Reference` strings must go through `presence/1` — `"" || fallback` keeps `""`.
 - Chart may lack a disposal account → `ensure_disposal_account` seeds "Gain on Disposal".
 - GET `/Setup` 404s (write-only endpoint) → empty conversion balances, not an error.
+- Imported detail lines must set `package_qty` = quantity: the edit form recomputes
+  quantity as package_qty × the packaging's unit_multiplier (seeded as 1), so a 0
+  package_qty collapses every line to qty 0 on edit even though the stored books are
+  right. Applies to invoice/bill/payment/receipt details; note details have no package.
 
 **Rounding.** Xero's document `Total` is authoritative; FC recomputes from lines, so
 `align_doc_total` appends an explicit "Xero rounding" line when they differ (≤ 1.00,
