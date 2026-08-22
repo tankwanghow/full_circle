@@ -276,7 +276,7 @@ defmodule FullCircle.XeroImport.ApplyTest do
     xdep_nos =
       Repo.all(
         from j in FullCircle.Accounting.Journal,
-          where: j.company_id == ^com.id and like(j.journal_no, "XDEP-fa-van-%"),
+          where: j.company_id == ^com.id and like(j.journal_no, "XDEP-FA-001-%"),
           select: j.journal_no
       )
 
@@ -460,6 +460,118 @@ defmodule FullCircle.XeroImport.ApplyTest do
 
     assert Decimal.eq?(balances["Wages and Salaries"], Decimal.new("1160"))
     assert Decimal.eq?(balances["Wages Payable"], Decimal.new("0"))
+  end
+
+  test "UUID document numbers are replaced with readable FC-style sequences", %{
+    user: user,
+    snap: snap,
+    name: name
+  } do
+    u1 = "0ea7f470-59f0-4d83-9422-2dd37bb2141d"
+    u2 = "fca5eb9a-6991-4d80-a404-4b78af92153d"
+    u3 = "851e9780-8750-481b-95f0-772fc5883957"
+    u4 = "e9686406-53f8-41d4-8c3a-2d71615e65fa"
+    u5 = "80c152f1-b6c1-49e9-8edf-279fc327caa8"
+
+    snap =
+      snap
+      |> Map.update!(:invoices, fn invoices ->
+        invoices ++
+          [
+            %{
+              "Type" => "ACCREC",
+              "Status" => "AUTHORISED",
+              "CurrencyCode" => "MYR",
+              "InvoiceID" => u5,
+              "Date" => "2024-03-01",
+              "DueDate" => "2024-03-01",
+              "LineAmountTypes" => "Exclusive",
+              "Total" => 30.0,
+              "Contact" => %{"ContactID" => "ct-alice"},
+              "LineItems" => [
+                %{"AccountCode" => "200", "Quantity" => 1, "UnitAmount" => 30.0,
+                  "LineAmount" => 30.0, "TaxType" => "NONE"}
+              ]
+            }
+          ]
+      end)
+      |> Map.update!(:payments, fn payments ->
+        payments ++
+          [
+            %{"PaymentID" => u1, "Invoice" => %{"InvoiceID" => "bill-10"}, "Amount" => 10.0,
+              "Date" => "2024-03-02", "Account" => %{"AccountID" => "ac-bank"},
+              "Status" => "AUTHORISED"},
+            %{"PaymentID" => u2, "Invoice" => %{"InvoiceID" => "inv-si88"}, "Amount" => 5.0,
+              "Date" => "2024-03-03", "Account" => %{"AccountID" => "ac-bank"},
+              "Status" => "AUTHORISED"}
+          ]
+      end)
+      |> Map.update!(:bank_transactions, fn txns ->
+        txns ++
+          [
+            %{
+              "Type" => "SPEND",
+              "Status" => "AUTHORISED",
+              "BankTransactionID" => u3,
+              "Date" => "2024-03-05",
+              "Total" => 20.0,
+              "BankAccount" => %{"AccountID" => "ac-bank"},
+              "Contact" => %{"ContactID" => "ct-alice"},
+              "LineAmountTypes" => "NoTax",
+              "LineItems" => [
+                %{"AccountCode" => "200", "Quantity" => 1, "UnitAmount" => 20.0,
+                  "LineAmount" => 20.0, "TaxType" => "NONE"}
+              ]
+            }
+          ]
+      end)
+      |> Map.update!(:bank_transfers, fn xfers ->
+        xfers ++
+          [
+            %{"BankTransferID" => u4, "Date" => "2024-03-06", "Amount" => 15.0,
+              "FromBankAccount" => %{"AccountID" => "ac-bank"},
+              "ToBankAccount" => %{"AccountID" => "ac-bank"}}
+          ]
+      end)
+
+    {:ok, %{company: com}} = Apply.run(snap, user, company_name: name)
+
+    # Readable Xero identifiers are kept as-is...
+    assert Repo.exists?(
+             from r in FullCircle.ReceiveFund.Receipt,
+               where: r.company_id == ^com.id and r.receipt_no == "pay-1"
+           )
+
+    # ...but UUID numbers are minted into FC-style sequences.
+    pv =
+      Repo.all(
+        from p in FullCircle.BillPay.Payment,
+          where: p.company_id == ^com.id and like(p.payment_no, "PV-%"),
+          select: p.payment_no
+      )
+
+    assert length(pv) == 2
+    assert Enum.all?(pv, &(&1 =~ ~r/^PV-\d{5}$/))
+
+    assert Repo.exists?(
+             from r in FullCircle.ReceiveFund.Receipt,
+               where: r.company_id == ^com.id and fragment("? ~ ?", r.receipt_no, "^RC-\\d{5}$")
+           )
+
+    assert Repo.exists?(
+             from j in FullCircle.Accounting.Journal,
+               where: j.company_id == ^com.id and fragment("? ~ ?", j.journal_no, "^JS-\\d{5}$")
+           )
+
+    assert Repo.exists?(
+             from i in Invoice,
+               where: i.company_id == ^com.id and fragment("? ~ ?", i.invoice_no, "^INV-\\d{5}$")
+           )
+
+    refute Repo.exists?(
+             from p in FullCircle.BillPay.Payment,
+               where: p.company_id == ^com.id and p.payment_no == ^u1
+           )
   end
 
   test "asset with unmapped depreciation account errors instead of crashing", %{

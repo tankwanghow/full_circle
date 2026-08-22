@@ -14,6 +14,8 @@ defmodule FullCircle.XeroImport.Gapless do
     Journal: "JS"
   }
 
+  def prefix(type), do: Map.fetch!(@prefixes, type)
+
   @doc """
   Set `gapless_doc_ids.current` to the max integer seen for each prefix.
 

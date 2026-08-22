@@ -74,7 +74,11 @@ AP; AR side → Payment debiting AR); a payment with no `"Invoice"` key at all s
 **Real-data quirks (all from the live GH run, each locked by a test):**
 - Dates: payments/manual journals carry ONLY .NET `/Date(ms)/` — `parse_date` handles it.
 - Bills may have blank or **duplicate** numbers → fallback Reference → InvoiceID, then
-  ` (2)` dedupe suffixes; payments always number by PaymentID (References collide en masse).
+  ` (2)` dedupe suffixes. UUID/blank doc numbers (payments have none, bank txns/transfers
+  fall back to their IDs) are minted into FC-style sequences by `Apply.readable_number/3`
+  (RC-/PV-/JS-/INV-/PINV-/CN-/DN-, 5-digit, per-type counters in processing order);
+  readable Xero numbers pass through, and `Gapless.bump` advances counters past the
+  minted ranges. XDEP journals number by `AssetNumber` (FA-0021) instead of AssetId.
 - Zero-total invoices: all-zero lines are skipped; self-cancelling cross-account lines
   (POS float moves) become a Journal.
 - Negative-total SPEND/RECEIVE bank txns flip direction with negated lines (funds > 0).

@@ -60,6 +60,7 @@ defmodule FullCircle.XeroImport.Apply do
            goods_by_code: %{},
            goods_names: %{},
            invoice_info: %{},
+           number_seq: %{},
            imported_numbers: %{
              Invoice: [],
              PurInvoice: [],
@@ -755,8 +756,8 @@ defmodule FullCircle.XeroImport.Apply do
       accum =
         Accounting.get_account_by_name(asset_attrs["cume_depre_ac_name"], ctx.company, ctx.user)
 
-      xero_id = xero["AssetId"] || xero["AssetID"]
-      number = "XDEP-#{xero_id}-#{idx + 1}"
+      asset_ref = presence(xero["AssetNumber"]) || xero["AssetId"] || xero["AssetID"]
+      number = "XDEP-#{asset_ref}-#{idx + 1}"
       particulars = "Depreciation #{asset_attrs["name"]}"
 
       attrs = %{
@@ -1024,7 +1025,7 @@ defmodule FullCircle.XeroImport.Apply do
     if lines == [] do
       {:ok, ctx}
     else
-      number = invoice_number(inv)
+      {number, ctx} = readable_number(invoice_number(inv), :Journal, ctx)
       date = parse_date(inv["Date"]) || Date.utc_today()
 
       # Xero GL semantics: an ACCREC line of +L CREDITS its account (sales
@@ -1064,7 +1065,9 @@ defmodule FullCircle.XeroImport.Apply do
 
   defp persist_invoice(inv, ctx) do
     type = if inv["Type"] == "ACCPAY", do: :pur_invoice, else: :invoice
-    number = inv |> invoice_number() |> dedupe_doc_number(type, ctx)
+    gap = if type == :pur_invoice, do: :PurInvoice, else: :Invoice
+    {number, ctx} = readable_number(invoice_number(inv), gap, ctx)
+    number = dedupe_doc_number(number, type, ctx)
 
     with {:ok, attrs, ^type} <- invoice_attrs(inv, ctx, number) do
       xero_id = to_string(inv["InvoiceID"] || inv["InvoiceId"])
@@ -1446,6 +1449,29 @@ defmodule FullCircle.XeroImport.Apply do
       to_string(inv["InvoiceID"] || inv["InvoiceId"])
   end
 
+  @uuid_regex ~r/^[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$/
+
+  defp uuid_like?(val) when is_binary(val), do: Regex.match?(@uuid_regex, val)
+  defp uuid_like?(_), do: false
+
+  # Xero UUIDs make unreadable document numbers (payments have no number at
+  # all, bank txns/transfers often fall back to their ID). Mint an FC-style
+  # sequence instead; Gapless.bump advances the company counters past these
+  # after the import, so live numbering continues seamlessly. Readable Xero
+  # numbers pass through untouched.
+  defp readable_number(candidate, type, ctx) do
+    candidate = candidate && to_string(candidate)
+
+    if presence(candidate) && not uuid_like?(candidate) do
+      {candidate, ctx}
+    else
+      seq = Map.get(ctx.number_seq, type, 0) + 1
+      ctx = %{ctx | number_seq: Map.put(ctx.number_seq, type, seq)}
+
+      {"#{Gapless.prefix(type)}-#{String.pad_leading(Integer.to_string(seq), 5, "0")}", ctx}
+    end
+  end
+
   defp presence(val) when is_binary(val) do
     case String.trim(val) do
       "" -> nil
@@ -1526,7 +1552,12 @@ defmodule FullCircle.XeroImport.Apply do
   defp persist_note(note, ctx) do
     with :ok <- assert_note_allocations(note, ctx),
          {:ok, attrs, kind} <- note_attrs(note, ctx) do
-      number = note["CreditNoteNumber"] || note["CreditNoteID"]
+      gap = if(kind == :debit_note, do: :DebitNote, else: :CreditNote)
+
+      {number, ctx} =
+        readable_number(note["CreditNoteNumber"] || note["CreditNoteID"], gap, ctx)
+
+      attrs = Map.put(attrs, "note_no", number)
 
       result =
         case kind do
@@ -1536,7 +1567,6 @@ defmodule FullCircle.XeroImport.Apply do
 
       case wrap_import(result) do
         {:ok, _} ->
-          gap = if(kind == :debit_note, do: :DebitNote, else: :CreditNote)
           {:ok, track_number(ctx, gap, number)}
 
         {:error, _} = err ->
@@ -1697,7 +1727,8 @@ defmodule FullCircle.XeroImport.Apply do
       tax = Accounting.get_tax_code_by_code(tax_code, ctx.company, ctx.user)
       date = parse_date(pay["Date"]) || Date.utc_today()
       amount = decimalize(pay["Amount"] || 0)
-      number = payment_id
+      # AR refund pays money out (Payment); AP refund receives it (Receipt).
+      {number, ctx} = readable_number(payment_id, if(ar?, do: :Payment, else: :Receipt), ctx)
 
       detail = %{
         "0" => %{
@@ -1773,9 +1804,10 @@ defmodule FullCircle.XeroImport.Apply do
       amount = decimalize(pay["Amount"] || 0)
       match_amount = signed_match_amount(txn.amount, amount)
       # Xero payments have no document number and References collide en masse
-      # (e.g. "Cash" on every POS payment) — the PaymentID is the only safe
-      # unique number.
-      number = payment_id
+      # (e.g. "Cash" on every POS payment); PaymentIDs are unique but
+      # unreadable UUIDs, so mint FC-style numbers (readable ids pass through).
+      {number, ctx} =
+        readable_number(payment_id, if(info.type == "ACCPAY", do: :Payment, else: :Receipt), ctx)
 
       matcher = %{
         "0" => %{
@@ -1872,7 +1904,13 @@ defmodule FullCircle.XeroImport.Apply do
   end
 
   defp persist_journal(journal, ctx) do
-    number = journal["JournalNumber"] || journal["ManualJournalID"] || journal["Narration"]
+    {number, ctx} =
+      readable_number(
+        journal["JournalNumber"] || journal["ManualJournalID"] || journal["Narration"],
+        :Journal,
+        ctx
+      )
+
     date = parse_date(journal["Date"]) || Date.utc_today()
     lines = journal["JournalLines"] || journal["Lines"] || []
 
@@ -2409,7 +2447,10 @@ defmodule FullCircle.XeroImport.Apply do
          {:ok, funds} <- bank_txn_funds_account(txn, ctx),
          {:ok, details} <- invoice_details(txn, ctx, "Purchase", :pur_invoice) do
       date = parse_date(txn["Date"]) || Date.utc_today()
-      number = txn["BankTransactionNumber"] || txn["BankTransactionID"]
+
+      {number, ctx} =
+        readable_number(txn["BankTransactionNumber"] || txn["BankTransactionID"], :Payment, ctx)
+
       amount = bank_txn_amount(txn)
 
       attrs = %{
@@ -2437,7 +2478,10 @@ defmodule FullCircle.XeroImport.Apply do
          {:ok, funds} <- bank_txn_funds_account(txn, ctx),
          {:ok, details} <- invoice_details(txn, ctx, "Sales", :invoice) do
       date = parse_date(txn["Date"]) || Date.utc_today()
-      number = txn["BankTransactionNumber"] || txn["BankTransactionID"]
+
+      {number, ctx} =
+        readable_number(txn["BankTransactionNumber"] || txn["BankTransactionID"], :Receipt, ctx)
+
       amount = bank_txn_amount(txn)
 
       attrs = %{
@@ -2520,7 +2564,7 @@ defmodule FullCircle.XeroImport.Apply do
         {:error, {:unmapped_account, to_id}}
 
       true ->
-        number = xfer["BankTransferID"] || xfer["Reference"]
+        {number, ctx} = readable_number(xfer["BankTransferID"] || xfer["Reference"], :Journal, ctx)
         date = parse_date(xfer["Date"]) || Date.utc_today()
         amount = decimalize(xfer["Amount"] || 0)
         particulars = presence(xfer["Reference"]) || "Bank transfer"
