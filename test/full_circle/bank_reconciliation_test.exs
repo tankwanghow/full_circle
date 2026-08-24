@@ -145,4 +145,58 @@ defmodule FullCircle.BankReconciliationTest do
                BankReconciliation.delete_selected_statement_lines([], company.id)
     end
   end
+
+  describe "find_doc_transaction/3" do
+    test "finds the bank-account transaction for a Payment", %{
+      admin: admin,
+      company: company,
+      account: account
+    } do
+      payment = payment_paid_from(account, company, admin)
+
+      txn = BankReconciliation.find_doc_transaction(payment.id, account.id, "Payment")
+
+      assert txn
+      assert txn.doc_type == "Payment"
+      assert txn.account_id == account.id
+      assert Decimal.eq?(txn.amount, Decimal.new("-50.00"))
+    end
+
+    test "returns nil for another account", %{
+      admin: admin,
+      company: company,
+      account: account
+    } do
+      other = account_fixture(%{name: "RHB Current", account_type: "Bank"}, company, admin)
+      payment = payment_paid_from(account, company, admin)
+
+      assert BankReconciliation.find_doc_transaction(payment.id, other.id, "Payment") == nil
+    end
+  end
+
+  defp payment_paid_from(funds_account, company, user) do
+    contact = FullCircle.BillingFixtures.contact_fixture(company, user)
+    good = FullCircle.BillingFixtures.good_fixture(company, user)
+    pur_acct = FullCircle.Accounting.get_account_by_name("General Purchases", company, user)
+
+    pur_tc =
+      Repo.one!(
+        from(tc in FullCircle.Accounting.TaxCode,
+          where: tc.company_id == ^company.id and tc.code == "NoPTax"
+        )
+      )
+
+    attrs =
+      FullCircle.BillPayFixtures.payment_attrs(
+        contact,
+        good,
+        pur_acct,
+        pur_tc,
+        funds_account,
+        tax_rate: "0"
+      )
+
+    {:ok, %{create_payment: payment}} = FullCircle.BillPay.create_payment(attrs, company, user)
+    payment
+  end
 end

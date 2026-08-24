@@ -72,6 +72,29 @@ defmodule FullCircleWeb.ReceiptLive.Form do
     )
   end
 
+  defp mount_new(socket, %{"recon" => recon}) when is_binary(recon) do
+    com = socket.assigns.current_company
+    user = socket.assigns.current_user
+    recon = Jason.decode!(recon)
+
+    attrs = %{
+      receipt_no: "...new...",
+      receipt_date: recon["date"],
+      descriptions: recon["descriptions"],
+      funds_amount: recon["amount"],
+      funds_account_name: recon["bank_account_name"],
+      funds_account_id: recon["bank_account_id"]
+    }
+
+    socket
+    |> assign(live_action: :new)
+    |> assign(id: "new")
+    |> assign(page_title: gettext("New Receipt"))
+    |> assign_egg_link(%{}, :sales)
+    |> assign(recon_link: FullCircleWeb.Helpers.recon_link_from_params(recon, com))
+    |> assign(:form, to_form(ReceiveFund.make_changeset(Receipt, %Receipt{}, attrs, com, user)))
+  end
+
   defp mount_new(socket, params) do
     attrs =
       if params["egg"] do
@@ -522,12 +545,37 @@ defmodule FullCircleWeb.ReceiptLive.Form do
           |> maybe_attach_egg_planned(obj, params)
           |> maybe_learn_e_inv_contact_ids(obj)
 
-        {:noreply,
-         socket
-         |> push_navigate(
-           to: ~p"/companies/#{socket.assigns.current_company.id}/Receipt/#{obj.id}/edit"
-         )
-         |> put_flash(:info, gettext("Receipt created successfully."))}
+        case FullCircleWeb.Helpers.match_recon_after_save(
+               socket.assigns[:recon_link],
+               obj.id,
+               "Receipt"
+             ) do
+          {:matched, return_to} ->
+            {:noreply,
+             socket
+             |> push_navigate(to: return_to)
+             |> put_flash(
+               :info,
+               "#{obj.receipt_no} #{gettext("created and matched to statement.")}"
+             )}
+
+          {:unmatched, return_to} ->
+            {:noreply,
+             socket
+             |> push_navigate(to: return_to)
+             |> put_flash(
+               :warn,
+               "#{obj.receipt_no} #{gettext("created, but could not be auto-matched to the statement. Match it manually.")}"
+             )}
+
+          :no_recon ->
+            {:noreply,
+             socket
+             |> push_navigate(
+               to: ~p"/companies/#{socket.assigns.current_company.id}/Receipt/#{obj.id}/edit"
+             )
+             |> put_flash(:info, gettext("Receipt created successfully."))}
+        end
 
       {:error, :period_closed} ->
         {:noreply,

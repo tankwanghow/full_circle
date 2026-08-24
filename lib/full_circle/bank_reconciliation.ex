@@ -678,10 +678,14 @@ defmodule FullCircle.BankReconciliation do
   defp decimal_to_string(other), do: to_string(other)
 
   def find_journal_transaction(journal_id, account_id) do
+    find_doc_transaction(journal_id, account_id, "Journal")
+  end
+
+  def find_doc_transaction(doc_id, account_id, doc_type) do
     from(t in Transaction,
-      where: t.doc_id == ^journal_id,
+      where: t.doc_id == ^doc_id,
       where: t.account_id == ^account_id,
-      where: t.doc_type == "Journal",
+      where: t.doc_type == ^doc_type,
       limit: 1
     )
     |> Repo.one()

@@ -224,4 +224,86 @@ defmodule FullCircleWeb.BankReconciliationLiveTest do
     })
     |> Repo.insert!()
   end
+
+  describe "create document from statement lines" do
+    test "Create Payment navigates to the seeded Payment form for negative lines", %{
+      conn: conn,
+      company: company,
+      account: account
+    } do
+      line =
+        import_line(account, company, %{
+          description: "IBG PAYMENT NO DOC",
+          amount: Decimal.new("-250.50")
+        })
+
+      {:ok, lv, _html} = live(conn, recon_path(company, account))
+
+      html = render_click(lv, "toggle_stmt", %{"id" => line.id})
+      assert html =~ "Create Payment"
+      refute html =~ "Create Receipt"
+
+      render_click(lv, "create_doc_from_stmt", %{"doc" => "Payment"})
+      {path, _flash} = assert_redirect(lv)
+      assert path =~ "/companies/#{company.id}/Payment/new?recon="
+
+      recon =
+        path
+        |> URI.parse()
+        |> Map.fetch!(:query)
+        |> URI.decode_query()
+        |> Map.fetch!("recon")
+        |> Jason.decode!()
+
+      assert recon["stmt_ids"] == [line.id]
+      assert recon["amount"] == "250.50"
+      assert recon["stmt_total"] == "-250.50"
+      assert recon["date"] == "2026-04-15"
+      assert recon["bank_account_id"] == account.id
+      assert recon["bank_account_name"] == account.name
+      assert recon["descriptions"] == "IBG PAYMENT NO DOC"
+      assert recon["return"]["name"] == account.name
+      assert recon["return"]["f_date"] == "2026-04-01"
+      assert recon["return"]["t_date"] == "2026-04-30"
+    end
+
+    test "Create Receipt navigates to the seeded Receipt form for positive lines", %{
+      conn: conn,
+      company: company,
+      account: account
+    } do
+      line =
+        import_line(account, company, %{
+          description: "IBG CREDIT CUSTOMER PAID",
+          amount: Decimal.new("880.00")
+        })
+
+      {:ok, lv, _html} = live(conn, recon_path(company, account))
+
+      html = render_click(lv, "toggle_stmt", %{"id" => line.id})
+      assert html =~ "Create Receipt"
+      refute html =~ "Create Payment"
+
+      render_click(lv, "create_doc_from_stmt", %{"doc" => "Receipt"})
+      {path, _flash} = assert_redirect(lv)
+      assert path =~ "/companies/#{company.id}/Receipt/new?recon="
+    end
+
+    test "offers neither button for a mixed-sign selection", %{
+      conn: conn,
+      company: company,
+      account: account
+    } do
+      neg = import_line(account, company, %{description: "NEG", amount: Decimal.new("-10.00")})
+      pos = import_line(account, company, %{description: "POS", amount: Decimal.new("10.00")})
+
+      {:ok, lv, _html} = live(conn, recon_path(company, account))
+
+      render_click(lv, "toggle_stmt", %{"id" => neg.id})
+      html = render_click(lv, "toggle_stmt", %{"id" => pos.id})
+
+      refute html =~ "Create Payment"
+      refute html =~ "Create Receipt"
+    end
+  end
 end

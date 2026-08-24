@@ -237,6 +237,47 @@ defmodule FullCircleWeb.Helpers do
     )
   end
 
+  @doc """
+  Parse the `recon` query param (JSON from the bank recon screen) into the
+  link map a Payment/Receipt form keeps in assigns until save.
+  """
+  def recon_link_from_params(recon, company) when is_map(recon) do
+    ret = recon["return"] || %{}
+
+    qry = %{
+      "search[name]" => ret["name"] || "",
+      "search[f_date]" => ret["f_date"] || "",
+      "search[t_date]" => ret["t_date"] || ""
+    }
+
+    %{
+      stmt_ids: recon["stmt_ids"] || [],
+      stmt_total: Decimal.new(recon["stmt_total"]),
+      account_id: recon["bank_account_id"],
+      return_to: "/companies/#{company.id}/bank_reconciliation?#{URI.encode_query(qry)}"
+    }
+  end
+
+  @doc """
+  After a recon-seeded Payment/Receipt saves, match its bank transaction to
+  the originating statement lines — only when the transaction exists on the
+  recon bank account with exactly the statement total, so a clerk-edited
+  amount never creates a false reconcile.
+  """
+  def match_recon_after_save(nil, _doc_id, _doc_type), do: :no_recon
+
+  def match_recon_after_save(link, doc_id, doc_type) do
+    txn = FullCircle.BankReconciliation.find_doc_transaction(doc_id, link.account_id, doc_type)
+
+    with %{} <- txn,
+         true <- Decimal.eq?(txn.amount, link.stmt_total),
+         {:ok, _} <- FullCircle.BankReconciliation.confirm_group_match(link.stmt_ids, [txn.id]) do
+      {:matched, link.return_to}
+    else
+      _ -> {:unmatched, link.return_to}
+    end
+  end
+
   def put_into_matchers(params, field, doc_date) do
     if params["transaction_matchers"] do
       mt =
