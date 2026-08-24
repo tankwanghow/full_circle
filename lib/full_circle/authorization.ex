@@ -138,6 +138,10 @@ defmodule FullCircle.Authorization do
   def can?(user, :exempt_trading_settlement, company),
     do: allow_roles(~w(admin), company, user)
 
+  # Completed trips are locked; corrections move stock balances — admin only.
+  def can?(user, :update_completed_trip, company),
+    do: allow_roles(~w(admin), company, user)
+
   def can?(user, :create_fixed_asset, company),
     do: allow_roles(~w(admin manager supervisor), company, user)
 

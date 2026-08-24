@@ -18,6 +18,10 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
       socket
       |> assign(assigns)
       |> assign(current_company: company, current_user: user)
+      |> assign(
+        can_edit_completed:
+          FullCircle.Authorization.can?(user, :update_completed_trip, company)
+      )
 
     socket =
       case action do
@@ -333,6 +337,18 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
       {:error, :trip_locked} ->
         {:noreply,
          put_action_error(socket, gettext("Completed or cancelled trips cannot be edited."))}
+
+      {:error, :settled_lines_locked} ->
+        {:noreply,
+         put_action_error(
+           socket,
+           gettext(
+             "Settled (billed or waived) lines are locked — unlink or un-waive them first."
+           )
+         )}
+
+      {:error, reason} when reason in [:missing_actuals, :missing_lines] ->
+        {:noreply, put_action_error(socket, complete_error_message(reason))}
 
       :not_authorise ->
         {:noreply,
@@ -1330,7 +1346,13 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
         <div class="mt-3 flex flex-wrap items-center justify-between gap-3">
           <%!-- Form actions (left) --%>
           <div class="flex flex-wrap gap-1">
-            <.button :if={is_nil(@trip) or @trip.status not in ["completed", "cancelled"]}>
+            <.button
+              :if={
+                is_nil(@trip) or @trip.status not in ["completed", "cancelled"] or
+                  (@trip.status == "completed" and @can_edit_completed)
+              }
+              id="desk-trip-save"
+            >
               {gettext("Save")}
             </.button>
             <.print_button

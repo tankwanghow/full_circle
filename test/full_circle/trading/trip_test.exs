@@ -7,6 +7,7 @@ defmodule FullCircle.Trading.TripTest do
   import FullCircle.TradingFixtures
   import FullCircle.BillingFixtures
   import FullCircle.HRFixtures
+  import FullCircle.UserAccountsFixtures
 
   setup do
     trading_setup()
@@ -1495,5 +1496,223 @@ defmodule FullCircle.Trading.TripTest do
       )
 
     assert hd(trip.drops).sales_position_id == sales_id
+  end
+
+  describe "admin update of completed trip" do
+    defp completed_supply_trip(company, admin) do
+      good = good_fixture(company, admin)
+
+      supply =
+        supply_position_fixture(company, admin, %{"quantity" => "100", "good_id" => good.id})
+
+      load_loc = location_fixture(company, admin, %{"kind" => "supplier_site"})
+      drop_loc = location_fixture(company, admin, %{"kind" => "own_warehouse"})
+
+      {:ok, trip} =
+        Trading.create_trip(
+          %{
+            "date" => "2026-07-01",
+            "transport_mode" => "company_own",
+            "vehicle_number" => "ADM001",
+            "loads" => [
+              %{
+                "planned" => "40",
+                "actual" => "40",
+                "good_id" => good.id,
+                "location_id" => load_loc.id,
+                "supply_position_id" => supply.id
+              }
+            ],
+            "drops" => [
+              %{
+                "planned" => "40",
+                "actual" => "40",
+                "good_id" => good.id,
+                "location_id" => drop_loc.id
+              }
+            ]
+          },
+          company,
+          admin
+        )
+
+      {:ok, trip, _} = Trading.complete_trip(trip, company, admin)
+
+      %{
+        trip: trip,
+        supply: supply,
+        good: good,
+        load_loc: load_loc,
+        drop_loc: drop_loc
+      }
+    end
+
+    defp line_attrs(line, overrides) do
+      Map.merge(
+        %{
+          "id" => line.id,
+          "planned" => Decimal.to_string(line.planned),
+          "actual" => line.actual && Decimal.to_string(line.actual),
+          "good_id" => line.good_id,
+          "location_id" => line.location_id,
+          "supply_position_id" => line.supply_position_id
+        },
+        overrides
+      )
+    end
+
+    defp non_admin(company, admin, role) do
+      other = user_fixture()
+      {:ok, _} = FullCircle.Sys.allow_user_to_access(company, other, role, admin)
+      other
+    end
+
+    test "admin can correct actuals; balances follow", %{admin: admin, company: company} do
+      %{trip: trip, supply: supply} = completed_supply_trip(company, admin)
+
+      assert {:ok, updated} =
+               Trading.update_trip(
+                 trip,
+                 %{
+                   "loads" => [line_attrs(hd(trip.loads), %{"actual" => "42"})],
+                   "drops" => [line_attrs(hd(trip.drops), %{"actual" => "42"})]
+                 },
+                 company,
+                 admin
+               )
+
+      assert updated.status == "completed"
+      assert Decimal.eq?(Balances.supply_loaded(supply), Decimal.new("42"))
+    end
+
+    test "save cannot change a completed trip's status", %{admin: admin, company: company} do
+      %{trip: trip} = completed_supply_trip(company, admin)
+
+      assert {:ok, updated} =
+               Trading.update_trip(trip, %{"status" => "draft"}, company, admin)
+
+      assert updated.status == "completed"
+    end
+
+    test "manager still gets trip_locked on a completed trip", %{
+      admin: admin,
+      company: company
+    } do
+      %{trip: trip} = completed_supply_trip(company, admin)
+      manager = non_admin(company, admin, "manager")
+
+      assert {:error, :trip_locked} =
+               Trading.update_trip(
+                 trip,
+                 %{"loads" => [line_attrs(hd(trip.loads), %{"actual" => "42"})]},
+                 company,
+                 manager
+               )
+    end
+
+    test "cancelled trips stay locked even for admin", %{admin: admin, company: company} do
+      %{trip: trip} = completed_supply_trip(company, admin)
+      {:ok, cancelled, _} = Trading.cancel_trip(trip, company, admin)
+
+      assert {:error, :trip_locked} =
+               Trading.update_trip(cancelled, %{"vehicle_number" => "X"}, company, admin)
+    end
+
+    test "a waived line cannot be changed", %{admin: admin, company: company} do
+      %{trip: trip} = completed_supply_trip(company, admin)
+      load = hd(trip.loads)
+
+      assert {:ok, 1} =
+               Trading.exempt_settlement_lines(:supplier, [load.id], "goodwill", company, admin)
+
+      trip = Trading.get_trip!(trip.id, company, admin)
+
+      assert {:error, :settled_lines_locked} =
+               Trading.update_trip(
+                 trip,
+                 %{"loads" => [line_attrs(load, %{"actual" => "42"})]},
+                 company,
+                 admin
+               )
+    end
+
+    test "a waived line cannot be deleted", %{admin: admin, company: company} do
+      %{trip: trip} = completed_supply_trip(company, admin)
+      load = hd(trip.loads)
+
+      assert {:ok, 1} =
+               Trading.exempt_settlement_lines(:supplier, [load.id], "goodwill", company, admin)
+
+      trip = Trading.get_trip!(trip.id, company, admin)
+
+      assert {:error, :settled_lines_locked} =
+               Trading.update_trip(
+                 trip,
+                 %{"loads" => [line_attrs(load, %{"delete" => "true"})]},
+                 company,
+                 admin
+               )
+    end
+
+    test "a billed line cannot be changed", %{admin: admin, company: company} do
+      %{trip: trip, supply: supply} = completed_supply_trip(company, admin)
+      load = hd(trip.loads)
+
+      supplier = Repo.get!(FullCircle.Accounting.Contact, supply.supplier_id)
+      pinv = pur_invoice_for_supplier(supplier, company, admin)
+      assert {:ok, 1} = Trading.link_loads_to_pur_invoice([load.id], pinv, company, admin)
+
+      trip = Trading.get_trip!(trip.id, company, admin)
+
+      assert {:error, :settled_lines_locked} =
+               Trading.update_trip(
+                 trip,
+                 %{"loads" => [line_attrs(hd(trip.loads), %{"actual" => "42"})]},
+                 company,
+                 admin
+               )
+    end
+
+    test "blanking an actual is rejected", %{admin: admin, company: company} do
+      %{trip: trip} = completed_supply_trip(company, admin)
+
+      assert {:error, :missing_actuals} =
+               Trading.update_trip(
+                 trip,
+                 %{"drops" => [line_attrs(hd(trip.drops), %{"actual" => ""})]},
+                 company,
+                 admin
+               )
+    end
+
+    test "removing the last drop is rejected", %{admin: admin, company: company} do
+      %{trip: trip} = completed_supply_trip(company, admin)
+
+      assert {:error, :missing_lines} =
+               Trading.update_trip(
+                 trip,
+                 %{"drops" => [line_attrs(hd(trip.drops), %{"delete" => "true"})]},
+                 company,
+                 admin
+               )
+    end
+  end
+
+  defp pur_invoice_for_supplier(contact, company, user) do
+    good = good_fixture(company, user)
+    pur_acct = FullCircle.Accounting.get_account_by_name("General Purchases", company, user)
+
+    pur_tc =
+      Repo.one!(
+        from tc in FullCircle.Accounting.TaxCode,
+          where: tc.company_id == ^company.id and tc.code == "NoPTax"
+      )
+
+    attrs = pur_invoice_attrs(contact, good, pur_acct, pur_tc, tax_rate: "0")
+
+    {:ok, %{create_pur_invoice: pinv}} =
+      FullCircle.Billing.create_pur_invoice(attrs, company, user)
+
+    pinv
   end
 end

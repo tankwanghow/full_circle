@@ -229,7 +229,17 @@ again in save. Display label is `SUP-… · Good · Supplier`.
 
 **Trip** (`draft | planned | completed | cancelled`):
 
-- Completed/cancelled trips are **locked** (`{:error, :trip_locked}` on update)
+- Cancelled trips are **locked** for everyone; completed trips are locked
+  (`{:error, :trip_locked}`) except for **admins** (`:update_completed_trip`,
+  admin-only). An admin edit of a completed trip must leave it a valid
+  completed trip: status stays `completed` (Save cannot revert it), every
+  line keeps an `actual` (`{:error, :missing_actuals}`), ≥1 load + ≥1 drop
+  remain (`{:error, :missing_lines}`), and **settled lines (billed FK or
+  waiver) cannot be changed or deleted** — any touch returns
+  `{:error, :settled_lines_locked}`; unlink / un-waive first
+  (`validate_completed_trip_update/2`). Balances recompute automatically
+  since they read completed trips. Desk Save button shows for admins on
+  completed trips (`can_edit_completed` assign).
 - **Save never sets `completed`/`cancelled`.** Form status options are only
   `draft`/`planned`; lifecycle is **Complete trip** / **Cancel trip** only.
   `create_trip` / `update_trip` clamp any other status to a writable value.

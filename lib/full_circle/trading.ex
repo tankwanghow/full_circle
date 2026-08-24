@@ -2051,41 +2051,103 @@ defmodule FullCircle.Trading do
   def update_trip(%Trip{} = trip, attrs, company, user) do
     with :ok <- authorize(user, :manage_trading, company),
          true <- trip.company_id == company.id do
-      if trip.status in ["completed", "cancelled"] do
-        {:error, :trip_locked}
-      else
-        attrs =
-          attrs
-          |> stringify_attr_keys()
-          # System-generated trip no — never change after create
-          |> Map.drop(["reference_no"])
-          |> Map.put("reference_no", trip.reference_no)
-          # completed/cancelled only via complete_trip / cancel_trip — never via Save.
-          |> then(fn a ->
-            Map.put(a, "status", writable_trip_status(Map.get(a, "status"), trip.status))
-          end)
+      cond do
+        trip.status == "cancelled" ->
+          {:error, :trip_locked}
 
-        cs =
-          trip
-          |> Repo.preload([:loads, :drops])
-          |> Trip.changeset(attrs)
-          |> validate_trip_goods(company)
+        trip.status == "completed" and
+            not Authorization.can?(user, :update_completed_trip, company) ->
+          {:error, :trip_locked}
 
-        Multi.new()
-        |> Multi.update(:update_trip, cs)
-        |> Multi.insert(:update_trip_log, fn %{update_trip: entity} ->
-          Sys.log_changeset(:update_trip, entity, trip_log_attrs(attrs), company, user)
-        end)
-        |> Repo.transaction()
-        |> unwrap_multi(:update_trip)
-        |> maybe_promote_open_supplies_to_collect(company)
-        |> preload_trip_result()
+        true ->
+          attrs =
+            attrs
+            |> stringify_attr_keys()
+            # System-generated trip no — never change after create
+            |> Map.drop(["reference_no"])
+            |> Map.put("reference_no", trip.reference_no)
+            # completed/cancelled only via complete_trip / cancel_trip — never via
+            # Save. An admin correction of a completed trip stays completed.
+            |> then(fn a ->
+              status =
+                if trip.status == "completed",
+                  do: "completed",
+                  else: writable_trip_status(Map.get(a, "status"), trip.status)
+
+              Map.put(a, "status", status)
+            end)
+
+          cs =
+            trip
+            |> Repo.preload([:loads, :drops])
+            |> Trip.changeset(attrs)
+            |> validate_trip_goods(company)
+
+          with :ok <- validate_completed_trip_update(cs, trip) do
+            Multi.new()
+            |> Multi.update(:update_trip, cs)
+            |> Multi.insert(:update_trip_log, fn %{update_trip: entity} ->
+              Sys.log_changeset(:update_trip, entity, trip_log_attrs(attrs), company, user)
+            end)
+            |> Repo.transaction()
+            |> unwrap_multi(:update_trip)
+            |> maybe_promote_open_supplies_to_collect(company)
+            |> preload_trip_result()
+          end
       end
     else
       false -> :not_authorise
       other -> other
     end
   end
+
+  # An admin edit of a completed trip must leave it a valid completed trip:
+  # settled (billed or waived) lines untouched, every line with an actual,
+  # and at least one load + one drop remaining.
+  defp validate_completed_trip_update(_cs, %Trip{status: status}) when status != "completed",
+    do: :ok
+
+  defp validate_completed_trip_update(cs, %Trip{status: "completed"}) do
+    applied = Ecto.Changeset.apply_changes(cs)
+
+    cond do
+      settled_lines_changed?(cs) -> {:error, :settled_lines_locked}
+      missing_trip_lines?(applied) -> {:error, :missing_lines}
+      missing_actuals?(applied) -> {:error, :missing_actuals}
+      true -> :ok
+    end
+  end
+
+  # Form-only virtuals never count as a change to a settled line.
+  @line_virtual_fields ~w(location_name supply_title sales_title good_name good_unit
+                          crew_add_name crew_locked party_contact_id delete)a
+
+  defp settled_lines_changed?(cs) do
+    line_changes_on_settled?(Ecto.Changeset.get_change(cs, :loads), &settled_load?/1) or
+      line_changes_on_settled?(Ecto.Changeset.get_change(cs, :drops), &settled_drop?/1)
+  end
+
+  defp line_changes_on_settled?(nil, _settled?), do: false
+
+  defp line_changes_on_settled?(children, settled?) do
+    Enum.any?(children, fn child ->
+      settled?.(child.data) and
+        (child.action in [:delete, :replace] or
+           child.changes |> Map.drop(@line_virtual_fields) |> map_size() > 0)
+    end)
+  end
+
+  defp settled_load?(%TripLoad{} = l),
+    do: not is_nil(l.pur_invoice_id) or not is_nil(l.pur_invoice_exempt_at)
+
+  defp settled_load?(_), do: false
+
+  defp settled_drop?(%TripDrop{} = d),
+    do:
+      not is_nil(d.invoice_id) or not is_nil(d.transport_pur_invoice_id) or
+        not is_nil(d.invoice_exempt_at) or not is_nil(d.transport_exempt_at)
+
+  defp settled_drop?(_), do: false
 
   # --- Settlement (customer invoice from completed drops) ---
 

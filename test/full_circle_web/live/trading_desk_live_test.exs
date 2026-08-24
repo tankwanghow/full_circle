@@ -1885,4 +1885,125 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
 
     assert lv |> element("#desk-supply-count") |> render() =~ "(1/2)"
   end
+
+  describe "admin edit of completed trip" do
+    defp completed_warehouse_trip(company, user) do
+      good = good_fixture(company, user)
+
+      supply =
+        supply_position_fixture(company, user, %{"good_id" => good.id, "quantity" => "100"})
+
+      load_loc = location_fixture(company, user, %{"kind" => "supplier_site"})
+      drop_loc = location_fixture(company, user, %{"kind" => "own_warehouse"})
+
+      {:ok, trip} =
+        FullCircle.Trading.create_trip(
+          %{
+            "date" => "2026-07-21",
+            "transport_mode" => "company_own",
+            "vehicle_number" => "ADMEDIT1",
+            "loads" => [
+              %{
+                "planned" => "5",
+                "actual" => "5",
+                "good_id" => good.id,
+                "location_id" => load_loc.id,
+                "supply_position_id" => supply.id
+              }
+            ],
+            "drops" => [
+              %{
+                "planned" => "5",
+                "actual" => "5",
+                "good_id" => good.id,
+                "location_id" => drop_loc.id
+              }
+            ]
+          },
+          company,
+          user
+        )
+
+      {:ok, trip, _} = FullCircle.Trading.complete_trip(trip, company, user)
+      trip
+    end
+
+    defp open_completed_trip_modal(lv, trip) do
+      lv |> element("#desk-trips-status-chip-completed") |> render_click()
+
+      lv
+      |> element("#desk-trip-#{trip.id} [phx-value-action=edit]")
+      |> render_click()
+
+      assert has_element?(lv, "#desk-trip-form")
+    end
+
+    test "admin sees Save and can correct actuals on a completed trip", %{
+      conn: conn,
+      company: company,
+      user: user
+    } do
+      trip = completed_warehouse_trip(company, user)
+
+      {:ok, lv, _} = live(conn, ~p"/companies/#{company.id}/trading/desk")
+      open_completed_trip_modal(lv, trip)
+
+      assert has_element?(lv, "#desk-trip-save")
+
+      lv
+      |> form("#desk-trip-form",
+        trip: %{
+          loads: %{"0" => %{actual: "7"}},
+          drops: %{"0" => %{actual: "7"}}
+        }
+      )
+      |> render_submit()
+
+      assert render(lv) =~ "Trip saved successfully"
+
+      reloaded = FullCircle.Trading.get_trip!(trip.id, company, user)
+      assert reloaded.status == "completed"
+      assert Decimal.eq?(hd(reloaded.loads).actual, Decimal.new("7"))
+    end
+
+    test "manager gets no Save on a completed trip", %{company: company, user: admin} do
+      trip = completed_warehouse_trip(company, admin)
+
+      manager = user_fixture()
+      {:ok, _} = FullCircle.Sys.allow_user_to_access(company, manager, "manager", admin)
+      conn = log_in_user(Phoenix.ConnTest.build_conn(), manager)
+
+      {:ok, lv, _} = live(conn, ~p"/companies/#{company.id}/trading/desk")
+      open_completed_trip_modal(lv, trip)
+
+      refute has_element?(lv, "#desk-trip-save")
+    end
+
+    test "settled lines show a specific error when edited", %{
+      conn: conn,
+      company: company,
+      user: user
+    } do
+      trip = completed_warehouse_trip(company, user)
+      load = hd(trip.loads)
+
+      assert {:ok, 1} =
+               FullCircle.Trading.exempt_settlement_lines(
+                 :supplier,
+                 [load.id],
+                 "goodwill",
+                 company,
+                 user
+               )
+
+      {:ok, lv, _} = live(conn, ~p"/companies/#{company.id}/trading/desk")
+      open_completed_trip_modal(lv, trip)
+
+      lv
+      |> form("#desk-trip-form", trip: %{loads: %{"0" => %{actual: "9"}}})
+      |> render_submit()
+
+      assert render(lv) =~ "Settled (billed or waived) lines are locked"
+    end
+  end
 end
