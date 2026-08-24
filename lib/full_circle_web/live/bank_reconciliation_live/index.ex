@@ -38,6 +38,8 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
         |> assign(processing_csv: false, csv_task: nil)
         |> assign(processing_ai_match: false, ai_match_task: nil)
         |> assign(book_entry_mode: false, book_entry_lines: [], book_entry_contra: "")
+        |> assign(reset_settle_assigns())
+        |> assign(diff_account: "")
         |> assign(manual_stmt_mode: false, manual_stmt: new_manual_stmt())
         |> assign(editing_stmt_id: nil)
         |> assign(hide_matched: false)
@@ -312,6 +314,264 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
     else
       {:noreply,
        put_flash(socket, :error, gettext("Select unmatched statement lines of one sign first."))}
+    end
+  end
+
+  @impl true
+  def handle_event("diff_form_change", %{"diff_account" => name}, socket) do
+    {:noreply, assign(socket, diff_account: name)}
+  end
+
+  @impl true
+  def handle_event("match_with_difference", _, socket) do
+    name = String.trim(socket.assigns.diff_account)
+    company = socket.assigns.current_company
+    user = socket.assigns.current_user
+
+    account = if name != "", do: FullCircle.Accounting.get_account_by_name(name, company, user)
+
+    if is_nil(account) do
+      {:noreply, put_flash(socket, :error, "#{gettext("Account not found")}: #{name}")}
+    else
+      case BankReconciliation.match_with_difference(
+             MapSet.to_list(socket.assigns.selected_stmt_ids),
+             MapSet.to_list(socket.assigns.selected_txn_ids),
+             account,
+             company,
+             user
+           ) do
+        {:ok, journal} ->
+          {:noreply,
+           socket
+           |> assign(
+             selected_stmt_ids: MapSet.new(),
+             selected_txn_ids: MapSet.new(),
+             diff_account: ""
+           )
+           |> reload_data()
+           |> put_flash(
+             :info,
+             "#{journal.journal_no} #{gettext("posted, selection matched with difference.")}"
+           )}
+
+        {:error, :no_difference} ->
+          {:noreply,
+           put_flash(socket, :error, gettext("Selection totals are equal — use Match Selected."))}
+
+        {:error, :invalid_selection} ->
+          {:noreply,
+           put_flash(socket, :error, gettext("Select unmatched items on one bank account."))}
+
+        {:error, :period_closed} ->
+          {:noreply,
+           put_flash(
+             socket,
+             :warn,
+             gettext("Accounting period is closed on or before %{date}.",
+               date: to_string(FullCircle.Sys.period_closed_through(company))
+             )
+           )}
+
+        {:error, %Ecto.Changeset{} = cs} ->
+          {:noreply,
+           put_flash(socket, :error, "#{gettext("Failed")}: #{list_errors_to_string(cs.errors)}")}
+
+        {:error, reason} ->
+          {:noreply, put_flash(socket, :error, "#{gettext("Failed")}: #{reason}")}
+
+        :not_authorise ->
+          {:noreply,
+           put_flash(socket, :error, gettext("You are not authorised to perform this action"))}
+      end
+    end
+  end
+
+  @impl true
+  def handle_event("start_settle_doc", %{"doc" => doc}, socket)
+      when doc in ["Payment", "Receipt"] do
+    stmt_ids = MapSet.to_list(socket.assigns.selected_stmt_ids)
+
+    lines =
+      socket.assigns.statement_lines
+      |> Enum.filter(&(&1.id in stmt_ids and is_nil(&1.match_group_id)))
+
+    expected_sign = if doc == "Payment", do: :lt, else: :gt
+
+    valid? =
+      lines != [] and length(lines) == length(stmt_ids) and
+        Enum.all?(lines, &(Decimal.compare(&1.amount, 0) == expected_sign))
+
+    if valid? do
+      dates = Enum.map(lines, & &1.statement_date)
+
+      {:noreply,
+       assign(socket,
+         settle_mode: true,
+         settle_kind: doc,
+         settle_lines: lines,
+         settle_contact: "",
+         settle_contact_id: nil,
+         settle_rows: [],
+         settle_ticked: MapSet.new(),
+         settle_error: nil,
+         settle_query: %{
+           from: dates |> Enum.min(Date) |> Date.add(-366) |> Date.to_iso8601(),
+           to: Date.utc_today() |> Date.to_iso8601()
+         }
+       )}
+    else
+      {:noreply,
+       put_flash(socket, :error, gettext("Select unmatched statement lines of one sign first."))}
+    end
+  end
+
+  @impl true
+  def handle_event("cancel_settle_doc", _, socket) do
+    {:noreply, assign(socket, reset_settle_assigns())}
+  end
+
+  @impl true
+  def handle_event("settle_form_change", params, socket) do
+    query = %{
+      from: params["from"] || socket.assigns.settle_query.from,
+      to: params["to"] || socket.assigns.settle_query.to
+    }
+
+    {:noreply,
+     assign(socket,
+       settle_contact: params["contact"] || socket.assigns.settle_contact,
+       settle_query: query
+     )}
+  end
+
+  @impl true
+  def handle_event("settle_load_docs", _, socket) do
+    name = String.trim(socket.assigns.settle_contact)
+    company = socket.assigns.current_company
+    user = socket.assigns.current_user
+
+    contact =
+      if name != "", do: FullCircle.Accounting.get_contact_by_name(name, company, user)
+
+    if is_nil(contact) do
+      {:noreply, assign(socket, settle_error: "#{gettext("Contact not found")}: #{name}")}
+    else
+      wanted_sign = if socket.assigns.settle_kind == "Payment", do: :lt, else: :gt
+
+      rows =
+        FullCircle.Accounting.query_transactions_for_matching(
+          contact.id,
+          socket.assigns.settle_query.from,
+          socket.assigns.settle_query.to,
+          company,
+          user
+        )
+        |> Enum.filter(&(Decimal.compare(&1.balance, 0) == wanted_sign))
+
+      {:noreply,
+       assign(socket,
+         settle_contact_id: contact.id,
+         settle_rows: rows,
+         settle_ticked: MapSet.new(),
+         settle_error: nil
+       )}
+    end
+  end
+
+  @impl true
+  def handle_event("settle_toggle_doc", %{"id" => id}, socket) do
+    {:noreply, assign(socket, settle_ticked: toggle_set(socket.assigns.settle_ticked, id))}
+  end
+
+  @impl true
+  def handle_event("confirm_settle_doc", _, socket) do
+    %{
+      settle_kind: kind_s,
+      settle_lines: lines,
+      settle_rows: rows,
+      settle_ticked: ticked
+    } = socket.assigns
+
+    funds =
+      lines
+      |> Enum.reduce(Decimal.new(0), &Decimal.add(&1.amount, &2))
+      |> Decimal.abs()
+
+    allocs = settle_allocations(rows, ticked, funds)
+    allocated = Enum.reduce(allocs, Decimal.new(0), fn {_row, a}, acc -> Decimal.add(acc, a) end)
+
+    cond do
+      is_nil(socket.assigns.settle_contact_id) ->
+        {:noreply, assign(socket, settle_error: gettext("Pick a contact and load documents."))}
+
+      not Decimal.eq?(allocated, funds) ->
+        {:noreply,
+         assign(socket,
+           settle_error: gettext("Allocated amount must equal the statement total.")
+         )}
+
+      true ->
+        matchers =
+          Enum.map(allocs, fn {row, alloc} ->
+            %{
+              "transaction_id" => row.transaction_id,
+              "account_id" => row.account_id,
+              "match_amount" => Decimal.to_string(alloc)
+            }
+          end)
+
+        contact_attrs = %{
+          "contact_id" => socket.assigns.settle_contact_id,
+          "contact_name" => socket.assigns.settle_contact
+        }
+
+        kind = if kind_s == "Receipt", do: :receipt, else: :payment
+
+        case BankReconciliation.create_settling_doc(
+               kind,
+               Enum.map(lines, & &1.id),
+               contact_attrs,
+               matchers,
+               socket.assigns.current_company,
+               socket.assigns.current_user
+             ) do
+          {:ok, doc} ->
+            doc_no = if kind == :receipt, do: doc.receipt_no, else: doc.payment_no
+
+            {:noreply,
+             socket
+             |> assign(reset_settle_assigns())
+             |> assign(selected_stmt_ids: MapSet.new(), selected_txn_ids: MapSet.new())
+             |> reload_data()
+             |> put_flash(
+               :info,
+               "#{doc_no} #{gettext("created and matched to statement.")}"
+             )}
+
+          {:error, :period_closed} ->
+            {:noreply,
+             put_flash(
+               socket,
+               :warn,
+               gettext("Accounting period is closed on or before %{date}.",
+                 date:
+                   to_string(FullCircle.Sys.period_closed_through(socket.assigns.current_company))
+               )
+             )}
+
+          {:error, %Ecto.Changeset{} = cs} ->
+            {:noreply,
+             assign(socket,
+               settle_error: "#{gettext("Failed")}: #{list_errors_to_string(cs.errors)}"
+             )}
+
+          {:error, reason} ->
+            {:noreply, assign(socket, settle_error: "#{gettext("Failed")}: #{reason}")}
+
+          :not_authorise ->
+            {:noreply,
+             put_flash(socket, :error, gettext("You are not authorised to perform this action"))}
+        end
     end
   end
 
@@ -947,6 +1207,39 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
 
   defp visible_lines(lines, false, _), do: lines
 
+  defp reset_settle_assigns do
+    [
+      settle_mode: false,
+      settle_kind: nil,
+      settle_lines: [],
+      settle_contact: "",
+      settle_contact_id: nil,
+      settle_rows: [],
+      settle_ticked: MapSet.new(),
+      settle_error: nil,
+      settle_query: %{from: "", to: ""}
+    ]
+  end
+
+  # FIFO allocation over the listed rows: each ticked row takes its full
+  # outstanding balance, capped so the total never exceeds the statement total.
+  defp settle_allocations(rows, ticked, funds) do
+    {allocs, _remaining} =
+      Enum.reduce(rows, {[], funds}, fn row, {acc, remaining} ->
+        if MapSet.member?(ticked, row.transaction_id) do
+          alloc = Decimal.min(Decimal.abs(row.balance), remaining)
+
+          if Decimal.gt?(alloc, 0),
+            do: {[{row, alloc} | acc], Decimal.sub(remaining, alloc)},
+            else: {acc, remaining}
+        else
+          {acc, remaining}
+        end
+      end)
+
+    Enum.reverse(allocs)
+  end
+
   defp load_llm_settings(socket) do
     defaults = %{
       "llm-provider" => "none",
@@ -1001,12 +1294,31 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
       |> visible_lines(assigns.hide_matched, :reconciled)
       |> annotate_recon_rows(suggested_txn, assigns.selected_txn_ids)
 
+    {settle_alloc_map, settle_allocated, settle_funds} =
+      if assigns.settle_mode do
+        funds =
+          assigns.settle_lines
+          |> Enum.reduce(Decimal.new(0), &Decimal.add(&1.amount, &2))
+          |> Decimal.abs()
+
+        allocs = settle_allocations(assigns.settle_rows, assigns.settle_ticked, funds)
+
+        {Map.new(allocs, fn {row, alloc} -> {row.transaction_id, alloc} end),
+         Enum.reduce(allocs, Decimal.new(0), fn {_row, alloc}, acc -> Decimal.add(acc, alloc) end),
+         funds}
+      else
+        {%{}, Decimal.new(0), Decimal.new(0)}
+      end
+
     assigns =
       assign(assigns,
         stmt_sel_total: stmt_sel_total,
         txn_sel_total: txn_sel_total,
         bank_to_bank?: bank_to_bank?,
         create_doc_type: create_doc_type,
+        settle_alloc_map: settle_alloc_map,
+        settle_allocated: settle_allocated,
+        settle_funds: settle_funds,
         visible_statement_lines: visible_statement_lines,
         visible_book_transactions: visible_book_transactions
       )
@@ -1333,13 +1645,17 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
           {gettext("Hide matched")}
         </label>
         <button
+          :if={MapSet.size(@selected_txn_ids) == 0}
           phx-click="auto_match"
           class="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600"
         >
           {gettext("Auto-Match")}
         </button>
         <button
-          :if={@llm_settings["llm-provider"] not in [nil, "", "none"] and !@processing_ai_match}
+          :if={
+            MapSet.size(@selected_txn_ids) == 0 and
+              @llm_settings["llm-provider"] not in [nil, "", "none"] and !@processing_ai_match
+          }
           phx-click="ai_match"
           class="bg-purple-500 text-white px-3 py-1 rounded text-sm hover:bg-purple-600"
         >
@@ -1369,7 +1685,10 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
           )}
         </div>
         <button
-          :if={MapSet.size(@selected_stmt_ids) > 0 and MapSet.size(@selected_txn_ids) > 0}
+          :if={
+            MapSet.size(@selected_stmt_ids) > 0 and MapSet.size(@selected_txn_ids) > 0 and
+              Decimal.eq?(@stmt_sel_total, @txn_sel_total)
+          }
           phx-click="match_selected"
           class="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600"
         >
@@ -1377,6 +1696,39 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
             @selected_txn_ids
           )} txn)
         </button>
+        <.form
+          :if={
+            MapSet.size(@selected_stmt_ids) > 0 and MapSet.size(@selected_txn_ids) > 0 and
+              not Decimal.eq?(@stmt_sel_total, @txn_sel_total)
+          }
+          for={%{}}
+          id="recon-diff-form"
+          phx-change="diff_form_change"
+          autocomplete="off"
+          class="flex items-center gap-1"
+        >
+          <input
+            type="text"
+            name="diff_account"
+            id="recon-diff-account"
+            value={@diff_account}
+            placeholder={gettext("Diff account, e.g. Card Commission")}
+            phx-hook="tributeAutoComplete"
+            phx-debounce="500"
+            url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=account&name="}
+            class="border border-gray-300 rounded px-2 py-1 text-sm w-56"
+          />
+          <button
+            type="button"
+            phx-click="match_with_difference"
+            phx-disable-with={gettext("Posting...")}
+            class="bg-amber-600 text-white px-3 py-1 rounded text-sm hover:bg-amber-700 whitespace-nowrap"
+          >
+            {gettext("Post Diff & Match")} ({format_amount(
+              Decimal.sub(@stmt_sel_total, @txn_sel_total)
+            )})
+          </button>
+        </.form>
         <button
           :if={@bank_to_bank?}
           phx-click="match_selected"
@@ -1431,6 +1783,22 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
           class="bg-teal-500 text-white px-3 py-1 rounded text-sm hover:bg-teal-600"
         >
           {gettext("Create Receipt")} ({MapSet.size(@selected_stmt_ids)})
+        </button>
+        <button
+          :if={@create_doc_type == "Payment"}
+          phx-click="start_settle_doc"
+          phx-value-doc="Payment"
+          class="bg-fuchsia-600 text-white px-3 py-1 rounded text-sm hover:bg-fuchsia-700"
+        >
+          {gettext("Settle Bills")} ({MapSet.size(@selected_stmt_ids)})
+        </button>
+        <button
+          :if={@create_doc_type == "Receipt"}
+          phx-click="start_settle_doc"
+          phx-value-doc="Receipt"
+          class="bg-cyan-600 text-white px-3 py-1 rounded text-sm hover:bg-cyan-700"
+        >
+          {gettext("Settle Invoices")} ({MapSet.size(@selected_stmt_ids)})
         </button>
         <span
           :if={MapSet.size(@selected_stmt_ids) > 0 or MapSet.size(@selected_txn_ids) > 0}
@@ -1506,6 +1874,143 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
         >
           {gettext("Delete Statement")}
         </button>
+      </div>
+
+      <%!-- Settle Invoices / Bills panel --%>
+      <div
+        :if={@settle_mode}
+        id="recon-settle-panel"
+        class="border-2 border-cyan-500 rounded bg-cyan-50 dark:bg-cyan-950 p-3 mb-2"
+      >
+        <div class="flex items-center justify-between mb-2">
+          <span class="font-semibold text-sm">
+            <%= if @settle_kind == "Receipt" do %>
+              {gettext("Settle Invoices — create Receipt")}
+            <% else %>
+              {gettext("Settle Bills — create Payment")}
+            <% end %>
+            ({length(@settle_lines)} {gettext("lines")}, {format_amount(@settle_funds)})
+          </span>
+          <button phx-click="cancel_settle_doc" class="text-gray-500 hover:text-gray-700 text-sm">
+            {gettext("Cancel")}
+          </button>
+        </div>
+
+        <.form for={%{}} id="recon-settle-form" phx-change="settle_form_change" autocomplete="off">
+          <div class="flex items-end gap-2 mb-2">
+            <div class="flex-1">
+              <label class="block text-xs font-medium mb-0.5">{gettext("Contact")}</label>
+              <input
+                type="text"
+                name="contact"
+                id="recon-settle-contact"
+                value={@settle_contact}
+                phx-hook="tributeAutoComplete"
+                phx-debounce="500"
+                url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
+                class="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+              />
+            </div>
+            <div>
+              <label class="block text-xs font-medium mb-0.5">{gettext("From")}</label>
+              <input
+                type="date"
+                name="from"
+                value={@settle_query.from}
+                class="border border-gray-300 rounded px-2 py-1 text-sm"
+              />
+            </div>
+            <div>
+              <label class="block text-xs font-medium mb-0.5">{gettext("To")}</label>
+              <input
+                type="date"
+                name="to"
+                value={@settle_query.to}
+                class="border border-gray-300 rounded px-2 py-1 text-sm"
+              />
+            </div>
+            <button
+              type="button"
+              phx-click="settle_load_docs"
+              class="bg-cyan-600 text-white px-4 py-1 rounded text-sm hover:bg-cyan-700"
+            >
+              {gettext("Load Documents")}
+            </button>
+          </div>
+        </.form>
+
+        <table :if={@settle_rows != []} class="w-full text-xs">
+          <thead>
+            <tr class="bg-cyan-100 dark:bg-cyan-900">
+              <th class="px-2 py-1"></th>
+              <th class="px-2 py-1 text-left">{gettext("Date")}</th>
+              <th class="px-2 py-1 text-left">{gettext("Type")}</th>
+              <th class="px-2 py-1 text-left">{gettext("Doc No")}</th>
+              <th class="px-2 py-1 text-right">{gettext("Outstanding")}</th>
+              <th class="px-2 py-1 text-right">{gettext("Allocated")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              :for={row <- @settle_rows}
+              class="border-b border-cyan-200 cursor-pointer hover:bg-cyan-100"
+              phx-click="settle_toggle_doc"
+              phx-value-id={row.transaction_id}
+            >
+              <td class="px-2 py-1 text-center">
+                <input
+                  type="checkbox"
+                  checked={MapSet.member?(@settle_ticked, row.transaction_id)}
+                  class="pointer-events-none"
+                />
+              </td>
+              <td class="px-2 py-1">{format_date(row.t_doc_date)}</td>
+              <td class="px-2 py-1">{row.t_doc_type}</td>
+              <td class="px-2 py-1">{row.t_doc_no}</td>
+              <td class="px-2 py-1 text-right">{format_amount(Decimal.abs(row.balance))}</td>
+              <td class="px-2 py-1 text-right font-semibold">
+                {format_amount(Map.get(@settle_alloc_map, row.transaction_id, Decimal.new(0)))}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div :if={@settle_rows == [] and @settle_contact_id} class="text-xs text-gray-500 py-2">
+          {gettext("No outstanding documents found for this contact in the date range.")}
+        </div>
+
+        <div class="flex items-center justify-between mt-2">
+          <span class="text-xs">
+            {gettext("Statement")}: <span class="font-semibold">{format_amount(@settle_funds)}</span>
+            | {gettext("Allocated")}:
+            <span class="font-semibold">{format_amount(@settle_allocated)}</span>
+            | {gettext("Diff")}:
+            <span class={[
+              "font-semibold",
+              if(Decimal.eq?(@settle_allocated, @settle_funds),
+                do: "text-green-700",
+                else: "text-red-600"
+              )
+            ]}>
+              {format_amount(Decimal.sub(@settle_funds, @settle_allocated))}
+            </span>
+          </span>
+          <button
+            phx-click="confirm_settle_doc"
+            phx-disable-with={gettext("Creating...")}
+            class={[
+              "px-4 py-1 rounded text-sm text-white",
+              if(Decimal.eq?(@settle_allocated, @settle_funds) and @settle_ticked != %MapSet{},
+                do: "bg-cyan-600 hover:bg-cyan-700",
+                else: "bg-gray-400 cursor-not-allowed"
+              )
+            ]}
+          >
+            {gettext("Create & Match")}
+          </button>
+        </div>
+
+        <div :if={@settle_error} class="text-sm text-rose-600 mt-1">{@settle_error}</div>
       </div>
 
       <%!-- Book Entry Form --%>

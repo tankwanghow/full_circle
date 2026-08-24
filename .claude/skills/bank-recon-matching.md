@@ -1,6 +1,6 @@
 ---
 name: bank-recon-matching
-description: Use when working on Bank Reconciliation matching — statement lines vs book transactions, match groups, carry-forward of unmatched items, and the "Create Payment / Create Receipt from statement line" flow (online-banking payments/receipts the clerk never documented). Covers the recon prefill payload contract, the auto-match-on-save amount guard, and why Book Entry / Dismiss are wrong for supplier and customer payments.
+description: Use when working on Bank Reconciliation matching — statement lines vs book transactions, match groups, carry-forward of unmatched items, the "Create Payment / Create Receipt from statement line" flow, and the "Settle Invoices / Settle Bills" panel that creates a matcher-only RC/PV settling outstanding Invoices/PurInvoices in one shot. Covers the recon prefill payload contract, matcher sign conventions, the auto-match amount guards, and why Book Entry / Dismiss are wrong for supplier and customer payments.
 ---
 
 # Bank Recon Matching & Doc Creation from Statement Lines
@@ -64,10 +64,66 @@ account must never silently create a false reconcile. On mismatch the doc is
 kept, the user returns to recon with a `:warn` flash (never `:warning` — it
 renders nothing) and matches manually.
 
+## Settle Invoices / Settle Bills (matcher-only RC/PV in one shot)
+
+When the money movement *settles known invoices*, the recon screen can skip the
+form entirely: **Settle Invoices** (positive lines → Receipt) / **Settle
+Bills** (negative lines → Payment) opens an inline panel (`settle_mode`,
+`#recon-settle-panel`): pick contact → `Accounting.query_transactions_for_matching/5`
+(rows filtered `balance > 0` for RC, `< 0` for PV; default range = min stmt
+date − 366 → today) → tick docs. Allocation is FIFO in listed order
+(`settle_allocations/3`): each ticked row takes its outstanding, the last is
+capped; **Create is refused unless allocated == statement total** — custom
+splits belong in the form flow.
+
+`BankReconciliation.create_settling_doc(kind, stmt_ids, contact_attrs,
+matchers, com, user)` (kind `:receipt | :payment`) does everything in **one
+transaction** via `create_receipt_multi` / `create_payment_multi` + a
+`:recon_match` step: builds a matcher-only doc (no detail lines; funds account
+= the lines' bank account; `funds_amount` = |Σ lines|; date = max stmt date),
+then finds the bank transaction and `confirm_group_match`es — any failure
+rolls the whole thing back. Errors: `:invalid_lines` (unmatched/one-sign/one
+account checks), `:allocation_mismatch`, `:bank_txn_mismatch`, changeset,
+`:period_closed`, `:not_authorise`.
+
+**Matcher sign convention** (matches the form flows): `match_amount` =
+`−balance` of the matched transaction → **negative** on a Receipt (settling
+AR), **positive** on a Payment (settling AP). Matcher-only docs are valid:
+receipt balance = funds + matched = 0; payment balance = funds − matched = 0.
+
+**Gotcha:** after settling, the new RC/PV's *own* AR/AP transaction appears in
+`query_transactions_for_matching` with its natural balance — "settled" means
+the *invoice* rows read zero, not that the contact's whole list is empty.
+
+## Post Diff & Match (statement net of a fee)
+
+Card settlements arrive net of merchant commission: RC-100 was issued on the
+sale day, the statement later shows 98.00. Never force-match 98↔100 — the
+2.00 is a real expense. **Sign-agnostic, so it covers the payment direction
+too**: PV-100.00 vs statement −100.50 (cheque clearing / transfer fee) posts
+bank −0.50 ↔ fee account +0.50 the same way — do not add sign gating. When both sides are selected and totals **differ**,
+the selection strip grows `#recon-diff-form` (account autocomplete) +
+**Post Diff & Match**: `BankReconciliation.match_with_difference(stmt_ids,
+txn_ids, diff_account, com, user)` posts a Journal **dated the latest
+statement date** (bank `stmt_total − txn_total` ↔ diff account the negation —
+journals have no 60-day date window, so month-later recon backdates fine,
+period lock permitting) and group-matches lines + transactions + the journal's
+bank transaction in **one database transaction** via
+`JournalEntry.create_journal_multi` + a `:recon_match` step. Errors:
+`:no_difference` (equal totals → use Match Selected), `:invalid_selection`
+(matched/foreign/multi-account items), `:period_closed`, changeset,
+`:not_authorise` (needs `:create_journal`). Footer visibility is mutually
+exclusive: zero-diff selections show **Match Selected** only, unequal totals
+show **Post Diff & Match** only, and **Auto-Match / AI Match hide while any
+book transaction is selected** (selection = manual-match mode).
+
 ## Tests
 
 `test/full_circle_web/live/recon_doc_prefill_live_test.exs` (form seeding,
 match, mismatch guard), `bank_reconciliation_live_test.exs` (buttons, payload),
-`bank_reconciliation_test.exs` (`find_doc_transaction/3`). Driving a full doc
+`bank_reconciliation_test.exs` (`find_doc_transaction/3`),
+`bank_reconciliation_settle_test.exs` (`create_settling_doc/6`),
+`recon_settle_live_test.exs` (settle panel). Settle tests must use **recent
+dates** — receipt/payment date validation allows only ~60 days back. Driving a full doc
 save in tests: `element("#object-form") |> render_submit(%{"payment" => attrs})`
 with fixture attrs — the `form()` helper can't fill autocomplete/nested inputs.

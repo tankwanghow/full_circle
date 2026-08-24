@@ -677,6 +677,223 @@ defmodule FullCircle.BankReconciliation do
   defp decimal_to_string(%Decimal{} = d), do: Decimal.to_string(d)
   defp decimal_to_string(other), do: to_string(other)
 
+  @doc """
+  Create a matcher-only Receipt (`:receipt`, positive statement lines) or
+  Payment (`:payment`, negative lines) that settles the given outstanding
+  invoice transactions, and match it to the originating statement lines —
+  all in one database transaction.
+
+  `matchers` are `%{"transaction_id" => id, "account_id" => id,
+  "match_amount" => abs amount}` rows (from
+  `Accounting.query_transactions_for_matching/5`); their total must equal
+  the statement total exactly or `{:error, :allocation_mismatch}` is
+  returned. Statement lines must be unmatched, on one account, and all of
+  the sign matching the doc kind, else `{:error, :invalid_lines}`.
+  """
+  def create_settling_doc(kind, stmt_ids, contact_attrs, matchers, company, user)
+      when kind in [:receipt, :payment] and is_list(stmt_ids) do
+    lines =
+      from(sl in BankStatementLine,
+        where: sl.id in ^stmt_ids,
+        where: sl.company_id == ^company.id,
+        where: is_nil(sl.match_group_id)
+      )
+      |> Repo.all()
+
+    expected_sign = if kind == :receipt, do: :gt, else: :lt
+    total = Enum.reduce(lines, Decimal.new(0), &Decimal.add(&1.amount, &2))
+    funds = Decimal.abs(total)
+
+    allocated =
+      Enum.reduce(matchers, Decimal.new(0), fn m, acc ->
+        Decimal.add(acc, Decimal.abs(Decimal.new(m["match_amount"])))
+      end)
+
+    cond do
+      lines == [] or length(lines) != length(stmt_ids) or
+        length(Enum.uniq_by(lines, & &1.account_id)) != 1 or
+          not Enum.all?(lines, &(Decimal.compare(&1.amount, 0) == expected_sign)) ->
+        {:error, :invalid_lines}
+
+      not Decimal.eq?(allocated, funds) ->
+        {:error, :allocation_mismatch}
+
+      not FullCircle.Authorization.can?(user, doc_create_action(kind), company) ->
+        :not_authorise
+
+      true ->
+        do_create_settling_doc(kind, lines, total, contact_attrs, matchers, company, user)
+    end
+  end
+
+  defp doc_create_action(:receipt), do: :create_receipt
+  defp doc_create_action(:payment), do: :create_payment
+
+  defp do_create_settling_doc(kind, lines, total, contact_attrs, matchers, company, user) do
+    account = Repo.get!(FullCircle.Accounting.Account, hd(lines).account_id)
+    date = lines |> Enum.map(& &1.statement_date) |> Enum.max(Date)
+    stmt_ids = Enum.map(lines, & &1.id)
+    doc_type = if kind == :receipt, do: "Receipt", else: "Payment"
+    doc_key = if kind == :receipt, do: :create_receipt, else: :create_payment
+
+    matcher_params =
+      matchers
+      |> Enum.with_index()
+      |> Map.new(fn {m, i} ->
+        amt = m["match_amount"] |> Decimal.new() |> Decimal.abs()
+        # Receipt settles AR (positive balances) → negative match_amount;
+        # Payment settles AP (negative balances) → positive match_amount.
+        signed = if kind == :receipt, do: Decimal.negate(amt), else: amt
+
+        {"#{i}",
+         %{
+           "transaction_id" => m["transaction_id"],
+           "account_id" => m["account_id"],
+           "doc_type" => doc_type,
+           "doc_date" => Date.to_iso8601(date),
+           "match_amount" => Decimal.to_string(signed),
+           "_persistent_id" => "#{i + 1}"
+         }}
+      end)
+
+    descriptions =
+      lines |> Enum.map(& &1.description) |> Enum.uniq() |> Enum.join("; ") |> String.slice(0, 230)
+
+    base = %{
+      "contact_id" => contact_attrs["contact_id"],
+      "contact_name" => contact_attrs["contact_name"],
+      "descriptions" => descriptions,
+      "funds_account_name" => account.name,
+      "funds_account_id" => account.id,
+      "funds_amount" => Decimal.to_string(Decimal.abs(total)),
+      "transaction_matchers" => matcher_params
+    }
+
+    multi =
+      case kind do
+        :receipt ->
+          Map.merge(base, %{"receipt_no" => "...new...", "receipt_date" => Date.to_iso8601(date)})
+          |> then(&FullCircle.ReceiveFund.create_receipt_multi(Ecto.Multi.new(), &1, company, user))
+
+        :payment ->
+          Map.merge(base, %{"payment_no" => "...new...", "payment_date" => Date.to_iso8601(date)})
+          |> then(&FullCircle.BillPay.create_payment_multi(Ecto.Multi.new(), &1, company, user))
+      end
+
+    multi
+    |> Ecto.Multi.run(:recon_match, fn _repo, changes ->
+      doc = Map.fetch!(changes, doc_key)
+      txn = find_doc_transaction(doc.id, account.id, doc_type)
+
+      if txn && Decimal.eq?(txn.amount, total) do
+        confirm_group_match(stmt_ids, [txn.id])
+      else
+        {:error, :bank_txn_mismatch}
+      end
+    end)
+    |> Repo.transaction()
+    |> case do
+      {:ok, changes} -> {:ok, Map.fetch!(changes, doc_key)}
+      {:error, _step, %Ecto.Changeset{} = cs, _} -> {:error, cs}
+      {:error, _step, reason, _} -> {:error, reason}
+    end
+    |> Accounting.map_period_closed()
+  end
+
+  @doc """
+  Match statement lines against book transactions whose totals differ — a
+  statement net of a fee (card commission, bank charges) — by posting the
+  difference to `diff_account` as a Journal dated the latest statement date,
+  then matching lines + transactions + the new journal's bank transaction as
+  one group. All in one database transaction.
+
+  stmt_total − txn_total = the journal's bank-side amount (e.g. 98 − 100 =
+  −2.00 fee), so the matched group always sums exactly.
+  """
+  def match_with_difference(stmt_ids, txn_ids, diff_account, company, user)
+      when is_list(stmt_ids) and stmt_ids != [] and is_list(txn_ids) and txn_ids != [] do
+    lines =
+      from(sl in BankStatementLine,
+        where: sl.id in ^stmt_ids,
+        where: sl.company_id == ^company.id,
+        where: is_nil(sl.match_group_id)
+      )
+      |> Repo.all()
+
+    txns =
+      from(t in Transaction,
+        where: t.id in ^txn_ids,
+        where: t.company_id == ^company.id,
+        where: t.reconciled == false
+      )
+      |> Repo.all()
+
+    stmt_total = Enum.reduce(lines, Decimal.new(0), &Decimal.add(&1.amount, &2))
+    txn_total = Enum.reduce(txns, Decimal.new(0), &Decimal.add(&1.amount, &2))
+    diff = Decimal.sub(stmt_total, txn_total)
+
+    cond do
+      length(lines) != length(stmt_ids) or length(txns) != length(txn_ids) or
+          length(Enum.uniq_by(lines, & &1.account_id)) != 1 ->
+        {:error, :invalid_selection}
+
+      Decimal.eq?(diff, 0) ->
+        {:error, :no_difference}
+
+      not FullCircle.Authorization.can?(user, :create_journal, company) ->
+        :not_authorise
+
+      true ->
+        do_match_with_difference(lines, txns, diff, diff_account, company, user)
+    end
+  end
+
+  defp do_match_with_difference(lines, txns, diff, diff_account, company, user) do
+    bank_account = Repo.get!(FullCircle.Accounting.Account, hd(lines).account_id)
+    date = lines |> Enum.map(& &1.statement_date) |> Enum.max(Date)
+
+    particulars =
+      lines |> Enum.map(& &1.description) |> Enum.uniq() |> Enum.join("; ") |> String.slice(0, 230)
+
+    attrs = %{
+      "journal_date" => Date.to_iso8601(date),
+      "company_id" => company.id,
+      "transactions" => %{
+        "0" => %{
+          "account_name" => bank_account.name,
+          "account_id" => bank_account.id,
+          "amount" => Decimal.to_string(diff),
+          "particulars" => particulars
+        },
+        "1" => %{
+          "account_name" => diff_account.name,
+          "account_id" => diff_account.id,
+          "amount" => Decimal.to_string(Decimal.negate(diff)),
+          "particulars" => particulars
+        }
+      }
+    }
+
+    stmt_ids = Enum.map(lines, & &1.id)
+    txn_ids = Enum.map(txns, & &1.id)
+
+    Ecto.Multi.new()
+    |> FullCircle.JournalEntry.create_journal_multi(attrs, company, user)
+    |> Ecto.Multi.run(:recon_match, fn _repo, %{create_journal: journal} ->
+      case find_journal_transaction(journal.id, bank_account.id) do
+        %Transaction{} = jtxn -> confirm_group_match(stmt_ids, txn_ids ++ [jtxn.id])
+        nil -> {:error, :journal_txn_missing}
+      end
+    end)
+    |> Repo.transaction()
+    |> case do
+      {:ok, %{create_journal: journal}} -> {:ok, journal}
+      {:error, _step, %Ecto.Changeset{} = cs, _} -> {:error, cs}
+      {:error, _step, reason, _} -> {:error, reason}
+    end
+    |> Accounting.map_period_closed()
+  end
+
   def find_journal_transaction(journal_id, account_id) do
     find_doc_transaction(journal_id, account_id, "Journal")
   end
