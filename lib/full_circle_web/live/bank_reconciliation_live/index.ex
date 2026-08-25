@@ -1172,6 +1172,26 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
     |> Enum.sort_by(&if(&1.suggested? or &1.selected?, do: 0, else: 1))
   end
 
+  # The movement difference alone can be non-zero on a fully reconciled period:
+  # a book transaction dated in an earlier month may only clear the bank inside
+  # this window (timing). The recon is healthy when nothing is left unmatched
+  # and the closing balances agree; without an uploaded statement closing
+  # balance we can only fall back to the movement difference itself.
+  defp recon_complete?(summary) do
+    summary.statement_unmatched == 0 and summary.book_unreconciled == 0 and
+      closing_agrees?(summary)
+  end
+
+  defp closing_agrees?(%{stmt_closing: nil} = summary),
+    do: Decimal.eq?(summary.difference, 0)
+
+  defp closing_agrees?(summary),
+    do: Decimal.eq?(summary.stmt_closing, summary.book_closing)
+
+  defp timing_difference?(summary) do
+    recon_complete?(summary) and not Decimal.eq?(summary.difference, 0)
+  end
+
   defp format_amount(amount) do
     if amount, do: Number.Delimit.number_to_delimited(amount), else: ""
   end
@@ -1533,12 +1553,15 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
             <span>
               {gettext("Diff")}:
               <span class={
-                if(Decimal.eq?(@summary.difference, 0),
+                if(recon_complete?(@summary),
                   do: "text-green-700 font-bold",
                   else: "text-red-600 font-bold"
                 )
               }>
                 {format_amount(@summary.difference)}
+                <span :if={timing_difference?(@summary)}>
+                  ({gettext("timing")})
+                </span>
               </span>
             </span>
             <span>
@@ -1605,13 +1628,26 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
             <div class="font-semibold text-right pr-2">{gettext("Difference")}</div>
             <div></div>
             <div></div>
-            <div class={
-              if(Decimal.eq?(@summary.difference, 0),
-                do: "text-green-700 font-bold",
-                else: "text-red-600 font-bold"
-              )
-            }>
+            <div
+              id="recon-difference"
+              class={
+                if(recon_complete?(@summary),
+                  do: "text-green-700 font-bold",
+                  else: "text-red-600 font-bold"
+                )
+              }
+              title={
+                if timing_difference?(@summary),
+                  do:
+                    gettext(
+                      "Movements differ only by items clearing the bank in another period — closing balances agree and everything is matched."
+                    )
+              }
+            >
               {format_amount(@summary.difference)}
+              <span :if={timing_difference?(@summary)}>
+                ({gettext("timing")})
+              </span>
             </div>
           </div>
           <div class="grid grid-cols-3 text-center mt-1 border-t border-cyan-300 pt-1">

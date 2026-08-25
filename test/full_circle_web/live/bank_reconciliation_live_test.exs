@@ -306,4 +306,79 @@ defmodule FullCircleWeb.BankReconciliationLiveTest do
       refute html =~ "Create Receipt"
     end
   end
+
+  describe "summary difference health" do
+    defp match!(line, txn) do
+      group_id = Ecto.UUID.generate()
+
+      Repo.get!(BankStatementLine, line.id)
+      |> Ecto.Changeset.change(match_group_id: group_id)
+      |> Repo.update!()
+
+      Repo.get!(Transaction, txn.id)
+      |> Ecto.Changeset.change(match_group_id: group_id, reconciled: true)
+      |> Repo.update!()
+    end
+
+    test "cross-period match with agreeing closing balances shows green timing difference", %{
+      conn: conn,
+      company: company,
+      account: account
+    } do
+      # Recorded in March, cleared the bank in April: movement diff is non-zero
+      # but the recon is complete.
+      txn = insert_book_txn!(company, account, Decimal.new("-250.50"), ~D[2026-03-28], "CHQ 111")
+      line = import_line(account, company, %{description: "CHQ 111 CLEARED"})
+      match!(line, txn)
+
+      BankReconciliation.save_statement_balances(
+        company.id,
+        account.id,
+        ~D[2026-04-01],
+        ~D[2026-04-30],
+        %{opening_balance: Decimal.new("0.00"), closing_balance: Decimal.new("-250.50")}
+      )
+
+      {:ok, lv, html} = live(conn, recon_path(company, account))
+
+      assert has_element?(lv, "#recon-difference.text-green-700")
+      assert html =~ "timing"
+    end
+
+    test "unmatched line shows red difference without timing label", %{
+      conn: conn,
+      company: company,
+      account: account
+    } do
+      import_line(account, company, %{description: "UNMATCHED LINE"})
+
+      {:ok, lv, html} = live(conn, recon_path(company, account))
+
+      assert has_element?(lv, "#recon-difference.text-red-600")
+      refute html =~ "timing"
+    end
+
+    test "all matched but closing balances disagree shows red", %{
+      conn: conn,
+      company: company,
+      account: account
+    } do
+      txn = insert_book_txn!(company, account, Decimal.new("-250.50"), ~D[2026-03-28], "CHQ 222")
+      line = import_line(account, company, %{description: "CHQ 222 CLEARED"})
+      match!(line, txn)
+
+      BankReconciliation.save_statement_balances(
+        company.id,
+        account.id,
+        ~D[2026-04-01],
+        ~D[2026-04-30],
+        %{opening_balance: Decimal.new("0.00"), closing_balance: Decimal.new("100.00")}
+      )
+
+      {:ok, lv, html} = live(conn, recon_path(company, account))
+
+      assert has_element?(lv, "#recon-difference.text-red-600")
+      refute html =~ "timing"
+    end
+  end
 end

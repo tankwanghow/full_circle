@@ -21,6 +21,20 @@ matching side: `lib/full_circle/bank_reconciliation.ex` +
   cheques already reconciled elsewhere). `delete_statement_lines` unreconciles
   the transactions in affected groups.
 
+## Summary "Difference" semantics (timing, not error)
+
+`reconciliation_summary/4` sums only movements *dated inside the queried
+window* on each side, so the Difference row = (stmt − book) movements — a
+movement comparison, **not** a balance check. A book txn dated in an earlier
+month that clears the bank inside the window makes it non-zero on a *perfect*
+recon (opening diff and movement diff cancel; closing diff = 0). The health
+signal is `recon_complete?/1` in `index.ex`: unmatched counts zero AND
+stmt/book closing balances equal (fallback: difference = 0 when no statement
+balances were uploaded). Explained diffs render green with a "(timing)" label;
+`#recon-difference` is the testable cell. A dismissed line is stored exactly
+like a stranded one (stmt-only match group) — data alone can't tell them
+apart.
+
 ## The missing-document scenario
 
 A PurInvoice/Invoice never touches the bank account — only a Payment (BillPay)
