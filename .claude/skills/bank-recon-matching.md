@@ -109,6 +109,24 @@ receipt balance = funds + matched = 0; payment balance = funds − matched = 0.
 `query_transactions_for_matching` with its natural balance — "settled" means
 the *invoice* rows read zero, not that the contact's whole list is empty.
 
+## Doc edits must preserve reconciliation (capture/restore contract)
+
+Document updates rebuild transactions (`Multi.delete_all(:delete_transaction)`
++ re-insert), which used to silently wipe `reconciled`/`match_group_id` on the
+book side while the statement line kept its group — stranded one-sided
+"Matched" (found via a payment edited weeks after matching). Every such update
+multi MUST be wrapped with `BankReconciliation.preserve_recon_capture/4`
+(before the delete) and `preserve_recon_restore/4` (after the re-insert),
+passing the same doc_type/doc_no/company_id as the delete query. Wired in:
+Payment, Receipt, Journal, Deposit, ReturnCheque, Credit/Debit notes,
+Invoice/PurInvoice. **Add the pair to any new document entity's update multi.**
+
+Restore semantics: a captured match survives if a txn with the same
+account+amount still exists in the group (journal cast_assoc keeps row ids —
+don't "restore" those); else an identical fresh txn is re-stamped; else the
+**whole group is unmatched on both sides** so nothing is ever stranded.
+Tests: `test/full_circle/recon_preserve_on_update_test.exs`.
+
 ## Post Diff & Match (statement net of a fee)
 
 Card settlements arrive net of merchant commission: RC-100 was issued on the

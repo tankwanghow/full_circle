@@ -268,6 +268,11 @@ defmodule FullCircle.JournalEntry do
       })
 
     multi
+    |> FullCircle.BankReconciliation.preserve_recon_capture(
+      "Journal",
+      journal.journal_no,
+      com.id
+    )
     |> Multi.update(journal_name, StdInterface.changeset(Journal, journal, attrs, com))
     |> Accounting.multi_assert_period_open(
       fn changes ->
@@ -276,5 +281,10 @@ defmodule FullCircle.JournalEntry do
       com
     )
     |> Sys.insert_log_for(journal_name, attrs, com, user)
+    |> FullCircle.BankReconciliation.preserve_recon_restore(
+      "Journal",
+      journal.journal_no,
+      com.id
+    )
   end
 end

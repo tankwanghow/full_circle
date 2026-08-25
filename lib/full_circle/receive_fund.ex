@@ -641,6 +641,7 @@ defmodule FullCircle.ReceiveFund do
       end,
       com
     )
+    |> FullCircle.BankReconciliation.preserve_recon_capture("Receipt", doc_no, com.id)
     |> Multi.delete_all(
       :delete_transaction,
       from(txn in Transaction,
@@ -652,5 +653,6 @@ defmodule FullCircle.ReceiveFund do
     )
     |> Sys.insert_log_for(step_name, attrs, com, user)
     |> create_receipt_transactions(step_name, com, user)
+    |> FullCircle.BankReconciliation.preserve_recon_restore("Receipt", doc_no, com.id)
   end
 end

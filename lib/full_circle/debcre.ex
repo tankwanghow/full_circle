@@ -714,6 +714,7 @@ defmodule FullCircle.DebCre do
         end,
         com
       )
+      |> FullCircle.BankReconciliation.preserve_recon_capture(doc_type, note.note_no, com.id)
       |> Multi.delete_all(
         :delete_transaction,
         from(txn in Transaction,
@@ -723,6 +724,7 @@ defmodule FullCircle.DebCre do
         )
       )
       |> create_note_transactions(step_name, com, user, txn_opts)
+      |> FullCircle.BankReconciliation.preserve_recon_restore(doc_type, note.note_no, com.id)
     end
   end
 

@@ -226,6 +226,11 @@ defmodule FullCircle.Cheque do
       end,
       com
     )
+    |> FullCircle.BankReconciliation.preserve_recon_capture(
+      "Deposit",
+      deposit.deposit_no,
+      com.id
+    )
     |> Multi.delete_all(
       :delete_transaction,
       from(txn in Transaction,
@@ -236,6 +241,11 @@ defmodule FullCircle.Cheque do
       )
     )
     |> create_deposit_transactions(deposit_name, com, user)
+    |> FullCircle.BankReconciliation.preserve_recon_restore(
+      "Deposit",
+      deposit.deposit_no,
+      com.id
+    )
   end
 
   # ── Return Cheque ───────────────────────────────────
@@ -322,6 +332,11 @@ defmodule FullCircle.Cheque do
       end,
       com
     )
+    |> FullCircle.BankReconciliation.preserve_recon_capture(
+      "ReturnCheque",
+      return_cheque.return_no,
+      com.id
+    )
     |> Multi.delete_all(
       :delete_transaction,
       from(txn in Transaction,
@@ -332,6 +347,11 @@ defmodule FullCircle.Cheque do
       )
     )
     |> create_return_cheque_transactions(return_cheque_name, com, user)
+    |> FullCircle.BankReconciliation.preserve_recon_restore(
+      "ReturnCheque",
+      return_cheque.return_no,
+      com.id
+    )
   end
 
   # ── Private Helpers ─────────────────────────────────

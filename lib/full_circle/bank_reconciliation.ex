@@ -271,6 +271,118 @@ defmodule FullCircle.BankReconciliation do
   def unmatch_group(nil), do: {:ok, :no_group}
 
   @doc """
+  Capture the reconciliation state of a document's transactions before a
+  document update deletes and re-inserts them. Pair with
+  `preserve_recon_restore/4` after the insert step in the same Multi.
+
+  Document updates rebuild transactions from scratch, so a reconciled bank
+  transaction would silently lose its `match_group_id`/`reconciled` flags,
+  leaving the matched statement lines stranded as one-sided "Matched".
+  """
+  def preserve_recon_capture(multi, doc_type, doc_no, company_id) do
+    Ecto.Multi.run(multi, :recon_capture, fn repo, _changes ->
+      rows =
+        from(txn in Transaction,
+          where: txn.doc_type == ^doc_type,
+          where: txn.doc_no == ^doc_no,
+          where: txn.company_id == ^company_id,
+          where: txn.reconciled == true or not is_nil(txn.match_group_id),
+          select: %{
+            account_id: txn.account_id,
+            amount: txn.amount,
+            match_group_id: txn.match_group_id
+          }
+        )
+        |> repo.all()
+
+      {:ok, rows}
+    end)
+  end
+
+  @doc """
+  Restore reconciliation state captured by `preserve_recon_capture/4` onto the
+  document's re-inserted transactions. A captured match survives when the new
+  document still posts a transaction with the same account and amount;
+  otherwise the whole match group is unmatched (both sides), so a changed
+  document never leaves statement lines stranded.
+  """
+  def preserve_recon_restore(multi, doc_type, doc_no, company_id) do
+    Ecto.Multi.run(multi, :recon_restore, fn repo, %{recon_capture: captured} ->
+      broken_groups =
+        Enum.reduce(captured, MapSet.new(), fn cap, broken ->
+          restore_one(repo, doc_type, doc_no, company_id, cap, broken)
+        end)
+
+      # A group that lost a transaction no longer balances — unmatch it wholly
+      # (including any members restored above) instead of leaving the
+      # statement side matched against nothing.
+      Enum.each(broken_groups, fn gid ->
+        repo.update_all(
+          from(sl in BankStatementLine, where: sl.match_group_id == ^gid),
+          set: [match_group_id: nil]
+        )
+
+        repo.update_all(
+          from(txn in Transaction, where: txn.match_group_id == ^gid),
+          set: [match_group_id: nil, reconciled: false]
+        )
+      end)
+
+      {:ok, %{unmatched_groups: MapSet.to_list(broken_groups)}}
+    end)
+  end
+
+  defp restore_one(repo, doc_type, doc_no, company_id, cap, broken) do
+    base =
+      from(txn in Transaction,
+        where: txn.doc_type == ^doc_type,
+        where: txn.doc_no == ^doc_no,
+        where: txn.company_id == ^company_id,
+        where: txn.account_id == ^cap.account_id,
+        where: txn.amount == ^cap.amount
+      )
+
+    # In-place edits (cast_assoc keeping row ids) leave the match intact —
+    # nothing to restore for this capture.
+    survivor? =
+      if cap.match_group_id do
+        repo.exists?(from(txn in base, where: txn.match_group_id == ^cap.match_group_id))
+      else
+        repo.exists?(from(txn in base, where: txn.reconciled == true))
+      end
+
+    candidate_id =
+      unless survivor? do
+        from(txn in base,
+          where: is_nil(txn.match_group_id),
+          where: txn.reconciled == false,
+          limit: 1,
+          select: txn.id
+        )
+        |> repo.one()
+      end
+
+    cond do
+      survivor? ->
+        broken
+
+      candidate_id ->
+        repo.update_all(
+          from(txn in Transaction, where: txn.id == ^candidate_id),
+          set: [match_group_id: cap.match_group_id, reconciled: true]
+        )
+
+        broken
+
+      cap.match_group_id ->
+        MapSet.put(broken, cap.match_group_id)
+
+      true ->
+        broken
+    end
+  end
+
+  @doc """
   Auto-match: finds 1:1 matches by amount + date proximity.
   Returns list of {[stmt_id], [txn_id], score} tuples.
   For many-to-many, users match manually.

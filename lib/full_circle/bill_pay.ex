@@ -423,6 +423,11 @@ defmodule FullCircle.BillPay do
       end,
       com
     )
+    |> FullCircle.BankReconciliation.preserve_recon_capture(
+      "Payment",
+      payment.payment_no,
+      com.id
+    )
     |> Multi.delete_all(
       :delete_transaction,
       from(txn in Transaction,
@@ -433,6 +438,11 @@ defmodule FullCircle.BillPay do
     )
     |> Sys.insert_log_for(payment_name, attrs, com, user)
     |> create_payment_transactions(payment_name, com, user)
+    |> FullCircle.BankReconciliation.preserve_recon_restore(
+      "Payment",
+      payment.payment_no,
+      com.id
+    )
   end
 
   # ── Private Helpers ─────────────────────────────────
