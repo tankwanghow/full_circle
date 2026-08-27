@@ -51,8 +51,10 @@ Receipt** (all positive). Multi-select sums into one document.
 
 ## The `recon` prefill payload contract
 
-Button navigates to `/companies/:id/Payment/new?recon=<json>` (or Receipt).
-JSON fields (built in `create_doc_from_stmt` handler; parsed by
+Button is a `target="_blank"` link to `/companies/:id/Payment/new?recon=<json>`
+(or Receipt) — it opens in a NEW TAB so the recon page keeps its state. JSON
+fields (built in `create_doc_url/5`, computed in `render/1` whenever
+`@create_doc_type` is set; parsed by
 `FullCircleWeb.Helpers.recon_link_from_params/2`):
 
 | Field | Meaning |

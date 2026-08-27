@@ -276,45 +276,25 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
     end
   end
 
-  @impl true
-  def handle_event("create_doc_from_stmt", %{"doc" => doc}, socket)
-      when doc in ["Payment", "Receipt"] do
-    stmt_ids = MapSet.to_list(socket.assigns.selected_stmt_ids)
+  # Builds the /Payment/new or /Receipt/new URL seeded from the selected
+  # unmatched statement lines. Rendered as a target="_blank" link so the recon
+  # page (selections, matches in progress) stays open in its own tab.
+  defp create_doc_url(doc, lines, account, company, search) do
+    total = Enum.reduce(lines, Decimal.new(0), &Decimal.add(&1.amount, &2))
 
-    lines =
-      socket.assigns.statement_lines
-      |> Enum.filter(&(&1.id in stmt_ids and is_nil(&1.match_group_id)))
+    payload = %{
+      "stmt_ids" => Enum.map(lines, & &1.id),
+      "date" => lines |> Enum.map(& &1.statement_date) |> Enum.max(Date) |> Date.to_iso8601(),
+      "amount" => total |> Decimal.abs() |> Decimal.to_string(),
+      "stmt_total" => Decimal.to_string(total),
+      "bank_account_id" => account.id,
+      "bank_account_name" => account.name,
+      "descriptions" => lines |> Enum.map(& &1.description) |> Enum.uniq() |> Enum.join("; "),
+      "return" => %{"name" => search.name, "f_date" => search.f_date, "t_date" => search.t_date}
+    }
 
-    expected_sign = if doc == "Payment", do: :lt, else: :gt
-
-    valid? =
-      lines != [] and length(lines) == length(stmt_ids) and
-        Enum.all?(lines, &(Decimal.compare(&1.amount, 0) == expected_sign))
-
-    if valid? do
-      total = Enum.reduce(lines, Decimal.new(0), &Decimal.add(&1.amount, &2))
-      search = socket.assigns.search
-
-      payload = %{
-        "stmt_ids" => Enum.map(lines, & &1.id),
-        "date" => lines |> Enum.map(& &1.statement_date) |> Enum.max(Date) |> Date.to_iso8601(),
-        "amount" => total |> Decimal.abs() |> Decimal.to_string(),
-        "stmt_total" => Decimal.to_string(total),
-        "bank_account_id" => socket.assigns.account.id,
-        "bank_account_name" => socket.assigns.account.name,
-        "descriptions" => lines |> Enum.map(& &1.description) |> Enum.uniq() |> Enum.join("; "),
-        "return" => %{"name" => search.name, "f_date" => search.f_date, "t_date" => search.t_date}
-      }
-
-      url =
-        "/companies/#{socket.assigns.current_company.id}/#{doc}/new?" <>
-          URI.encode_query(%{"recon" => Jason.encode!(payload)})
-
-      {:noreply, push_navigate(socket, to: url)}
-    else
-      {:noreply,
-       put_flash(socket, :error, gettext("Select unmatched statement lines of one sign first."))}
-    end
+    "/companies/#{company.id}/#{doc}/new?" <>
+      URI.encode_query(%{"recon" => Jason.encode!(payload)})
   end
 
   @impl true
@@ -1304,6 +1284,17 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
         true -> nil
       end
 
+    create_doc_url =
+      if create_doc_type do
+        create_doc_url(
+          create_doc_type,
+          selected_unmatched_stmts,
+          assigns.account,
+          assigns.current_company,
+          assigns.search
+        )
+      end
+
     visible_statement_lines =
       assigns.statement_lines
       |> visible_lines(assigns.hide_matched, :match_group_id)
@@ -1336,6 +1327,7 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
         txn_sel_total: txn_sel_total,
         bank_to_bank?: bank_to_bank?,
         create_doc_type: create_doc_type,
+        create_doc_url: create_doc_url,
         settle_alloc_map: settle_alloc_map,
         settle_allocated: settle_allocated,
         settle_funds: settle_funds,
@@ -1804,22 +1796,22 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
         >
           {gettext("Book Entry")} ({MapSet.size(@selected_stmt_ids)})
         </button>
-        <button
+        <.link
           :if={@create_doc_type == "Payment"}
-          phx-click="create_doc_from_stmt"
-          phx-value-doc="Payment"
+          href={@create_doc_url}
+          target="_blank"
           class="bg-rose-500 text-white px-3 py-1 rounded text-sm hover:bg-rose-600"
         >
           {gettext("Create Payment")} ({MapSet.size(@selected_stmt_ids)})
-        </button>
-        <button
+        </.link>
+        <.link
           :if={@create_doc_type == "Receipt"}
-          phx-click="create_doc_from_stmt"
-          phx-value-doc="Receipt"
+          href={@create_doc_url}
+          target="_blank"
           class="bg-teal-500 text-white px-3 py-1 rounded text-sm hover:bg-teal-600"
         >
           {gettext("Create Receipt")} ({MapSet.size(@selected_stmt_ids)})
-        </button>
+        </.link>
         <button
           :if={@create_doc_type == "Payment"}
           phx-click="start_settle_doc"

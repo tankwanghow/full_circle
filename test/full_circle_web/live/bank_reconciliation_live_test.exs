@@ -226,7 +226,7 @@ defmodule FullCircleWeb.BankReconciliationLiveTest do
   end
 
   describe "create document from statement lines" do
-    test "Create Payment navigates to the seeded Payment form for negative lines", %{
+    test "Create Payment is a new-tab link to the seeded Payment form for negative lines", %{
       conn: conn,
       company: company,
       account: account
@@ -243,12 +243,14 @@ defmodule FullCircleWeb.BankReconciliationLiveTest do
       assert html =~ "Create Payment"
       refute html =~ "Create Receipt"
 
-      render_click(lv, "create_doc_from_stmt", %{"doc" => "Payment"})
-      {path, _flash} = assert_redirect(lv)
-      assert path =~ "/companies/#{company.id}/Payment/new?recon="
+      assert [tag] = Regex.run(~r/<a [^>]*href="[^"]*Payment\/new[^"]*"[^>]*>/, html)
+      assert tag =~ ~s(target="_blank")
+      [_, href] = Regex.run(~r/href="([^"]*)"/, tag)
+      href = String.replace(href, "&amp;", "&")
+      assert href =~ "/companies/#{company.id}/Payment/new?recon="
 
       recon =
-        path
+        href
         |> URI.parse()
         |> Map.fetch!(:query)
         |> URI.decode_query()
@@ -267,7 +269,7 @@ defmodule FullCircleWeb.BankReconciliationLiveTest do
       assert recon["return"]["t_date"] == "2026-04-30"
     end
 
-    test "Create Receipt navigates to the seeded Receipt form for positive lines", %{
+    test "Create Receipt is a new-tab link to the seeded Receipt form for positive lines", %{
       conn: conn,
       company: company,
       account: account
@@ -284,9 +286,11 @@ defmodule FullCircleWeb.BankReconciliationLiveTest do
       assert html =~ "Create Receipt"
       refute html =~ "Create Payment"
 
-      render_click(lv, "create_doc_from_stmt", %{"doc" => "Receipt"})
-      {path, _flash} = assert_redirect(lv)
-      assert path =~ "/companies/#{company.id}/Receipt/new?recon="
+      assert [tag] = Regex.run(~r/<a [^>]*href="[^"]*Receipt\/new[^"]*"[^>]*>/, html)
+      assert tag =~ ~s(target="_blank")
+      [_, href] = Regex.run(~r/href="([^"]*)"/, tag)
+      href = String.replace(href, "&amp;", "&")
+      assert href =~ "/companies/#{company.id}/Receipt/new?recon="
     end
 
     test "offers neither button for a mixed-sign selection", %{
