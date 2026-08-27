@@ -148,7 +148,7 @@ defmodule FullCircle.BankReconciliation.LlmParser do
   end
 
   defp parse_pdf_pages(pages, settings) do
-    [first | rest] = pages
+    [first | rest] = stitch_cross_page_details(pages)
 
     case call_first_batch(first, settings) do
       {:ok, "llm", first_lines, first_usage, page1_balances} ->
@@ -162,6 +162,71 @@ defmodule FullCircle.BankReconciliation.LlmParser do
 
       error ->
         error
+    end
+  end
+
+  # A transaction that starts at the bottom of a page can have its detail lines
+  # spill onto the next page, printed after that page's "Balance B/F" row. Each
+  # page is parsed in its own LLM batch, so those orphan lines (no date, no
+  # amount) would be dropped by the batch that sees them and are invisible to the
+  # batch that saw the transaction. Move them back to the previous page, just
+  # above its "Balance C/F" row — where they would have printed had they fit —
+  # so one batch sees the whole transaction. Pages without a spill are untouched.
+
+  @bf_line ~r/balance\s+b\/f|b\/f\s+balance|brought\s+forward/i
+  @cf_line ~r/balance\s+c\/f|c\/f\s+balance|carried\s+forward/i
+  @amount_pattern ~r/\b\d{1,3}(?:,\d{3})*\.\d{2}\b/
+  @tx_start_pattern ~r/^\d{1,2}[\/\-]\d{1,2}/
+
+  @doc false
+  def stitch_cross_page_details(pages) do
+    pages
+    |> Enum.reduce([], fn
+      page, [] ->
+        [page]
+
+      page, [prev | done] ->
+        {prev, page} = move_orphan_details(prev, page)
+        [page, prev | done]
+    end)
+    |> Enum.reverse()
+  end
+
+  defp move_orphan_details(prev, page) do
+    lines = String.split(page, "\n")
+
+    with bf_idx when not is_nil(bf_idx) <- Enum.find_index(lines, &Regex.match?(@bf_line, &1)),
+         {kept, after_bf} = Enum.split(lines, bf_idx + 1),
+         {orphans, remainder} = Enum.split_while(after_bf, &orphan_detail_line?/1),
+         false <- orphans == [] do
+      {insert_before_cf(prev, orphans), Enum.join(kept ++ remainder, "\n")}
+    else
+      _ -> {prev, page}
+    end
+  end
+
+  # Detail continuation lines carry no date, no monetary amount, and no balance
+  # keyword. Anything else ends the orphan run (conservative: a partial move is
+  # safe, a wrong move is not).
+  defp orphan_detail_line?(line) do
+    trimmed = String.trim(line)
+
+    trimmed != "" and
+      not Regex.match?(@amount_pattern, line) and
+      not Regex.match?(@tx_start_pattern, trimmed) and
+      not Regex.match?(~r/balance|baki/i, line)
+  end
+
+  defp insert_before_cf(prev, orphans) do
+    lines = String.split(prev, "\n")
+
+    case Enum.find_index(Enum.reverse(lines), &Regex.match?(@cf_line, &1)) do
+      nil ->
+        Enum.join(lines ++ orphans, "\n")
+
+      rev_idx ->
+        {before_cf, from_cf} = Enum.split(lines, length(lines) - 1 - rev_idx)
+        Enum.join(before_cf ++ orphans ++ from_cf, "\n")
     end
   end
 

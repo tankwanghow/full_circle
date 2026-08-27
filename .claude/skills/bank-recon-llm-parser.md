@@ -23,7 +23,10 @@ against the book balances.
 
 - **PDF** → `parse_pdf/2`:
   - `PdfText.pages/1` succeeds with **1 page** → `parse_content/2` (single request).
-  - succeeds with **N pages** → `parse_pdf_pages/2`: page 1 = first batch (transactions + fallback balances), pages 2..N = continuation batches (transactions only), then a **dedicated whole-statement balance pass** (`extract_balances/4`).
+  - succeeds with **N pages** → `parse_pdf_pages/2`: first `stitch_cross_page_details/1`
+    (see below), then page 1 = first batch (transactions + fallback balances), pages 2..N =
+    continuation batches (transactions only), then a **dedicated whole-statement balance
+    pass** (`extract_balances/4`).
   - `pdftotext` unavailable / no text (scanned PDF) → `parse_pdf_vision/2` sends the raw PDF to the model (`@pdf_prompt`).
 - **CSV / text** → `parse/2` → `parse_content/2` (header + batched data lines).
 
@@ -56,6 +59,26 @@ closing — wrong. (Real bug: 2026-June Public Bank statement returned
 3. Opening = balance BEFORE the first transaction (`Opening Balance`, `Balance From Last Statement`, `Baki Pembukaan`, `BAKI AWAL`).
 4. Closing = balance AFTER the last transaction of the whole period.
 5. Balances are always positive.
+
+## Gotcha #2: transactions that cross a page break
+
+A transaction starting at the bottom of a page can have only its header line
+(date + type + amount + balance) fit; its detail lines (references, payer names)
+print at the **top of the next page, after that page's `Balance B/F` row**. Since
+each page is its own LLM batch, the batch that saw the transaction never sees the
+detail, and the next batch sees orphan lines with no date/amount and drops them.
+(Real bug: 2025-January Public Bank statement, `13/01 DEP-ECP 247269` and
+`24/01 DEP-ECP 214901` both lost their IMEPS/UTMB/XREF detail lines.)
+
+Fixed **deterministically in code, not prompts**: `stitch_cross_page_details/1`
+(public-for-test in `llm_parser.ex`) runs before batching. For each page 2..N it
+takes the lines directly after the `B/F` row that have **no monetary amount
+(`\d.\d\d`), no leading date, and no balance keyword**, and moves them to the
+previous page just above its `C/F` row — exactly where they'd have printed had
+they fit. Pages without a spill are untouched (a normal transaction line after
+`B/F` has amounts, so the orphan run is empty → no-op). Conservative by design:
+a partial move is safe, a wrong move is not. Unit tests cover it with fixtures
+shaped like the real statement.
 
 ## The whole-statement balance pass
 
