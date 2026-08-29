@@ -166,7 +166,9 @@ whitelist additions.
 - Duty show page: "Link document" picker — choose doc_type (whitelist) then
   search by doc_no. Writes `duty_documents` + `linked` event.
 - Document form page (whitelisted types): "Link to duty" picker — search
-  duties by title. Same write path.
+  duties by title. Same write path. On success the flash includes a direct
+  link to the duty ("Linked to *Pay monthly taxes* — open duty to record
+  progress or complete it") so the user can jump straight to completing it.
 - Unlink (supervisory roles only, §6) removes the row and writes an
   `unlinked` event. Links are never edited, only added/removed.
 
