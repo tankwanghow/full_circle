@@ -755,6 +755,7 @@ defmodule FullCircle.Tugas do
   """
   import Ecto.Query, warn: false
   import FullCircle.Authorization
+  import FullCircle.Helpers, only: [similarity_order: 2]
 
   alias Ecto.Multi
   alias FullCircle.{Repo, StdInterface, Sys}
@@ -777,21 +778,33 @@ defmodule FullCircle.Tugas do
 
     from(d in duty_query(com, user), where: d.id == ^id)
     |> Repo.one!()
-    |> Repo.preload([
-      [duty_events: {events_query, [:user, :duty_event_documents]}],
-      :duty_documents
-    ])
+    |> Repo.preload(
+      duty_events: {events_query, [:user, :duty_event_documents]},
+      duty_documents: []
+    )
   end
 
+  # NOT via StdInterface.filter/4: that helper wraps the query in a subquery and
+  # puts offset/limit on the outer query with no outer ORDER BY when terms == "",
+  # so Postgres is free to discard the inner ordering. Order on the outer query here.
   def filter_duties(terms, status, com, user, page: page, per_page: per_page) do
-    duty_query(com, user)
-    |> filter_status(status)
-    |> order_by([d],
-      asc: fragment("CASE WHEN ? = 'active' THEN 0 ELSE 1 END", d.status),
-      asc: d.due_date,
-      desc: d.updated_at
-    )
-    |> StdInterface.filter([:title, :descriptions], terms, page: page, per_page: per_page)
+    base = duty_query(com, user) |> filter_status(status)
+
+    q =
+      if terms != "" do
+        from(d in subquery(base), order_by: ^similarity_order([:title, :descriptions], terms))
+      else
+        from(d in subquery(base),
+          order_by: [
+            asc: fragment("CASE WHEN ? = 'active' THEN 0 ELSE 1 END", d.status),
+            asc: d.due_date,
+            desc: d.updated_at
+          ]
+        )
+      end
+
+    from(d in q, offset: ^((page - 1) * per_page), limit: ^per_page)
+    |> Repo.all()
   end
 
   defp duty_query(com, user) do
@@ -810,12 +823,12 @@ end
 
 Note on `StdInterface.create` returns: it returns `{:ok, obj}` on success (see std_interface.ex:91-92), so the test asserts `{:ok, %Duty{}}` directly.
 
-Note on ordering: `StdInterface.filter/4` wraps the query in a subquery and puts offset/limit outside — Postgres usually honors the inner `order_by`, and the Task-4 ordering test pins it. If that test fails on ordering, drop the `order_by` from the context query and apply it in a thin local copy of the filter (outer query) instead.
+Note on ordering: `filter_duties/5` deliberately does NOT use `StdInterface.filter/4` — that helper applies offset/limit on an outer query with no outer `ORDER BY` when terms are empty, so the inner ordering is not guaranteed. The implementation above orders on the outer query itself; `similarity_order/2` comes from `FullCircle.Helpers` (helpers.ex:92), the same function StdInterface uses.
 
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `mix test test/full_circle/tugas_test.exs`
-Expected: PASS. If the preload syntax `{events_query, [...]}` misbehaves, use the equivalent `Repo.preload(duty, duty_events: {events_query, [:user, :duty_event_documents]}, duty_documents: [])`.
+Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
@@ -972,7 +985,7 @@ Expected: FAIL — functions undefined.
       |> Multi.update(:duty, Duty.changeset(duty, %{"status" => new_status}))
       |> insert_event_multi(:event, duty, action, note, com, user)
       |> attach_files_multi(:event, files, com)
-      |> spawn_next_multi(duty, com)
+      |> spawn_next_multi(duty, com, user)
       |> Repo.transaction()
       |> normalize_result()
     end
@@ -1028,14 +1041,15 @@ Expected: FAIL — functions undefined.
   # Task 6 implements file storage; [] is a no-op so Task 5 ships without it.
   defp attach_files_multi(multi, _event_name, [], _com), do: multi
 
-  defp spawn_next_multi(multi, %Duty{recur_unit: nil}, _com), do: Multi.put(multi, :next_cycle, nil)
-
-  defp spawn_next_multi(multi, %Duty{series_ended_at: %DateTime{}}, _com),
+  defp spawn_next_multi(multi, %Duty{recur_unit: nil}, _com, _user),
     do: Multi.put(multi, :next_cycle, nil)
 
-  defp spawn_next_multi(multi, %Duty{} = duty, com) do
-    Multi.insert(
-      multi,
+  defp spawn_next_multi(multi, %Duty{series_ended_at: %DateTime{}}, _com, _user),
+    do: Multi.put(multi, :next_cycle, nil)
+
+  defp spawn_next_multi(multi, %Duty{} = duty, com, user) do
+    multi
+    |> Multi.insert(
       :next_cycle,
       Duty.changeset(%Duty{}, %{
         "company_id" => com.id,
@@ -1048,6 +1062,11 @@ Expected: FAIL — functions undefined.
         "recur_every" => duty.recur_every
       })
     )
+    # the spawned row gets its own audit log — every duties row must be
+    # traceable in logs, and this one is not covered by the close event's log
+    |> Multi.insert("next_cycle_log", fn %{next_cycle: next} ->
+      Sys.log_changeset(:create_duty, next, %{"spawned_from" => duty.id}, com, user)
+    end)
   end
 
   defp normalize_result({:ok, changes}), do: {:ok, changes}
@@ -1605,7 +1624,9 @@ defmodule FullCircleWeb.TugasLive.Index do
   def handle_params(params, _uri, socket) do
     search = params["search"] || %{}
     terms = search["terms"] || ""
-    status = search["status"] || "active"
+    # spec §7 default listing: live cycles first by due date, then closed —
+    # "all" + filter_duties' active-first ordering gives exactly that
+    status = search["status"] || "all"
 
     {:noreply,
      socket
@@ -1664,10 +1685,10 @@ defmodule FullCircleWeb.TugasLive.Index do
           class="rounded border px-2 py-1 w-5/12"
         />
         <select name="search[status]" class="rounded border px-2 py-1">
+          <option value="all" selected={@search.status == "all"}>{gettext("All")}</option>
           <option value="active" selected={@search.status == "active"}>{gettext("Active")}</option>
           <option value="done" selected={@search.status == "done"}>{gettext("Done")}</option>
           <option value="skipped" selected={@search.status == "skipped"}>{gettext("Skipped")}</option>
-          <option value="all" selected={@search.status == "all"}>{gettext("All")}</option>
         </select>
       </.form>
       <div class="text-center mb-2">
@@ -1978,7 +1999,7 @@ git commit -m "feat(tugas): duty form"
       assert render(lv) =~ "cheque signed by boss"
     end
 
-    test "complete spawns next cycle and shows it", %{conn: conn, comp: comp, user: user} do
+    test "complete closes the duty and spawns the next cycle", %{conn: conn, comp: comp, user: user} do
       duty = create_duty(comp, user)
       {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/tugas/duties/#{duty.id}")
 
@@ -2031,6 +2052,30 @@ git commit -m "feat(tugas): duty form"
                  where: d.series_id == ^duty.series_id and d.status == "active"
                )
              )
+    end
+
+    test "auditor sees the duty read-only: no edit, payment, or event form", %{
+      conn: _conn,
+      comp: comp,
+      user: user
+    } do
+      duty = create_duty(comp, user)
+      {:ok, _, _} = Tugas.add_progress_event(duty, "printed slip", [], comp, user)
+
+      auditor = FullCircle.UserAccountsFixtures.user_fixture()
+      FullCircle.Sys.allow_user_to_access(comp, auditor, "auditor", user)
+      conn = log_in_user(build_conn(), auditor)
+
+      {:ok, _lv, html} = live(conn, ~p"/companies/#{comp.id}/tugas/duties/#{duty.id}")
+
+      # spec §6: auditor is read-only — can see the duty and its trail,
+      # but gets none of the mutating affordances
+      assert html =~ "Pay monthly taxes"
+      assert html =~ "printed slip"
+      refute html =~ ~s(id="event-form")
+      refute html =~ ~s(id="create-payment")
+      refute html =~ ~s(id="btn-end-series")
+      refute html =~ "tugas/duties/#{duty.id}/edit"
     end
   end
 ```
@@ -2182,6 +2227,10 @@ defmodule FullCircleWeb.TugasLive.Show do
 
       <div class="text-center my-2">
         <.link
+          :if={
+            @duty.status == "active" &&
+              FullCircle.Authorization.can?(@current_user, :create_payment, @current_company)
+          }
           id="create-payment"
           navigate={~p"/companies/#{@current_company.id}/Payment/new?duty_id=#{@duty.id}"}
           class="blue button"
@@ -2189,7 +2238,10 @@ defmodule FullCircleWeb.TugasLive.Show do
           {gettext("Make Payment")}
         </.link>
         <.link
-          :if={@duty.status == "active"}
+          :if={
+            @duty.status == "active" &&
+              FullCircle.Authorization.can?(@current_user, :update_duty, @current_company)
+          }
           navigate={~p"/companies/#{@current_company.id}/tugas/duties/#{@duty.id}/edit"}
           class="gray button"
         >
@@ -2321,16 +2373,15 @@ git commit -m "feat(tugas): duty show with timeline, workflow actions and eviden
 The payment fixture setup mirrors `test/full_circle/bill_pay_test.exs` — but a full payment needs the billing fixtures. Keep it light: linking only reads `id`/`payment_no`/`company_id`, so insert a minimal Payment row directly.
 
 ```elixir
+  # bypasses changeset — linking only reads id/payment_no/company_id.
+  # Plain insert!, NOT on_conflict: :nothing (that can return a struct with no id).
+  # Unique payment_no per call so two bare payments can coexist in one test.
   defp bare_payment(com) do
-    Repo.insert!(
-      %FullCircle.BillPay.Payment{
-        payment_no: "PV-TEST01",
-        payment_date: ~D[2026-09-10],
-        company_id: com.id
-      },
-      # bypass changeset — linking only needs id/payment_no/company_id
-      on_conflict: :nothing
-    )
+    Repo.insert!(%FullCircle.BillPay.Payment{
+      payment_no: "PV-TEST#{System.unique_integer([:positive])}",
+      payment_date: ~D[2026-09-10],
+      company_id: com.id
+    })
   end
 
   describe "document linking" do
@@ -2339,10 +2390,14 @@ The payment fixture setup mirrors `test/full_circle/bill_pay_test.exs` — but a
       payment = bare_payment(com)
 
       assert {:ok, link} = Tugas.link_document(duty, "Payment", payment.id, com, admin)
-      assert link.doc_no == "PV-TEST01"
+      assert link.doc_no == payment.payment_no
 
       duty = Tugas.get_duty!(duty.id, com, admin)
-      assert Enum.any?(duty.duty_events, &(&1.action == "linked" and &1.note =~ "PV-TEST01"))
+
+      assert Enum.any?(
+               duty.duty_events,
+               &(&1.action == "linked" and &1.note =~ payment.payment_no)
+             )
       assert [log] = FullCircle.Sys.log_entry_for("duty_documents", link.id, com.id)
       assert log.action == "link_duty_document"
     end
@@ -2399,7 +2454,8 @@ The payment fixture setup mirrors `test/full_circle/bill_pay_test.exs` — but a
       {:ok, _duty} = Tugas.create_duty(duty_attrs(%{"title" => "Renew fire cert"}), com, admin)
       payment = bare_payment(com)
 
-      assert [%{doc_no: "PV-TEST01"}] = Tugas.search_linkable_docs("Payment", "TEST", com, admin)
+      assert [%{doc_no: doc_no}] = Tugas.search_linkable_docs("Payment", "TEST", com, admin)
+      assert doc_no == payment.payment_no
       assert [_] = Tugas.search_duties_for_link("fire", com, admin)
       assert [] = Tugas.search_duties_for_link("zzz-no-match", com, admin)
       assert payment.id
@@ -2472,9 +2528,9 @@ Expected: FAIL — functions undefined.
   def link_document(%Duty{} = duty, doc_type, doc_id, com, user)
       when doc_type in @linkable_doc_types do
     with true <- can?(user, :link_duty_document, com) || :not_authorise,
-         {:ok, _doc} <- fetch_linkable(doc_type, doc_id, com) do
+         {:ok, doc} <- fetch_linkable(doc_type, doc_id, com) do
       Multi.new()
-      |> Multi.put(:doc, elem(fetch_linkable(doc_type, doc_id, com), 1))
+      |> Multi.put(:doc, doc)
       |> link_document_multi(:doc, doc_type, duty.id, com, user)
       |> Repo.transaction()
       |> case do
@@ -2579,8 +2635,6 @@ Expected: FAIL — functions undefined.
     end
   end
 ```
-
-Cleanup during implementation: `link_document/5` calls `fetch_linkable` twice in the sketch above — restructure to call once (`with {:ok, doc} <- fetch_linkable(...)` then `Multi.put(:doc, doc)`).
 
 - [ ] **Step 4: Run tests to verify they pass**
 
@@ -2748,10 +2802,60 @@ Expected: PASS (new tests and all pre-existing ones — the default args keep ol
 
       assert html =~ "Pay monthly taxes"
     end
+
+    test "saving a duty-scoped payment links it and redirects to the duty", %{
+      conn: conn,
+      comp: comp,
+      user: user
+    } do
+      duty = create_duty(comp, user)
+
+      contact = contact_fixture(comp, user)
+      good = good_fixture(comp, user)
+      pur_acct = FullCircle.Accounting.get_account_by_name("General Purchases", comp, user)
+      funds_acct = pay_funds_account_fixture(comp, user)
+
+      no_ptax =
+        FullCircle.Repo.one!(
+          from(tc in FullCircle.Accounting.TaxCode,
+            where: tc.company_id == ^comp.id and tc.code == "NoPTax"
+          )
+        )
+
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/Payment/new?duty_id=#{duty.id}")
+
+      # Drive the save event directly — the payment form's nested detail inputs
+      # are rendered by components, so form/2 + render_submit on the DOM form
+      # would reject fields it can't see. handle_event("save", %{"payment" => ...})
+      # is the real entry point (form.ex:526).
+      render_submit(lv, "save", %{
+        "payment" => payment_attrs(contact, good, pur_acct, no_ptax, funds_acct)
+      })
+
+      flash = assert_redirect(lv, ~p"/companies/#{comp.id}/tugas/duties/#{duty.id}")
+      assert flash["info"] =~ "linked to duty"
+
+      assert [dd] =
+               FullCircle.Repo.all(
+                 from(dd in FullCircle.Tugas.DutyDocument, where: dd.duty_id == ^duty.id)
+               )
+
+      assert dd.doc_type == "Payment"
+      duty = Tugas.get_duty!(duty.id, comp, user)
+      assert Enum.any?(duty.duty_events, &(&1.action == "linked"))
+    end
   end
 ```
 
-(Full submit-to-redirect coverage needs the whole payment fixture stack; the Multi is already covered by Step 1's context test. These two LiveView tests pin the mount clause and the entry link.)
+This needs these imports at the top of the test module (Task 13 reuses them for its `real_payment/2` helper; `ConnCase` does not import `Ecto.Query`):
+
+```elixir
+  import Ecto.Query, only: [from: 2]
+  import FullCircle.BillingFixtures
+  import FullCircle.BillPayFixtures
+```
+
+(The Multi internals are already covered by Step 1's context test; this LV test pins the save → link → redirect wiring the spec demands, plus the mount clause and the entry link from the two tests above.)
 
 - [ ] **Step 6: Run to verify failure, then extend the Payment form**
 
@@ -2821,7 +2925,16 @@ And inside the success branch's `:no_recon` arm (form.ex:567), redirect back to 
             end
 ```
 
-Also handle the new error tuple from a broken link step in the same `case` (alongside the existing `{:error, failed_operation, changeset, _}` clause it may already match — verify the shape `{:error, :duty_for_link, :duty_not_found, _}` doesn't crash that clause; if it does, add an explicit clause flashing `gettext("Duty not found.")`).
+**Required:** an explicit clause for the link-step failure, placed BEFORE the existing generic error clause at form.ex:586. The generic clause `{:error, failed_operation, changeset, _}` WILL match `{:error, :duty_for_link, :duty_not_found, _}` (it binds `changeset = :duty_not_found`) and then crash on `to_form(:duty_not_found)`. Add:
+
+```elixir
+      {:error, :duty_for_link, :duty_not_found, _} ->
+        {:noreply,
+         socket
+         |> put_flash(:error, gettext("Duty not found — payment was not created."))}
+```
+
+(The whole Multi rolls back, so no payment exists; the form keeps its state and the user can retry without the duty link. A test in this task's Step 5 exercises a bad `duty_id` and asserts no crash and no payment row.)
 
 - [ ] **Step 7: Run all touched tests**
 
@@ -2874,12 +2987,10 @@ git commit -m "feat(tugas): create-and-link payment from a duty (?duty_id= flow)
           user
         )
 
-      payment =
-        FullCircle.Repo.insert!(%FullCircle.BillPay.Payment{
-          payment_no: "PV-DEMO01",
-          payment_date: ~D[2026-09-10],
-          company_id: comp.id
-        })
+      # MUST be a real payment: BillPay.get_payment!/3 inner-joins contacts
+      # (bill_pay.ex:59-60), so a bare row with contact_id nil returns nil and
+      # mount_edit crashes on object.payment_no.
+      payment = real_payment(comp, user)
 
       {:ok, _} = Tugas.link_document(duty, "Payment", payment.id, comp, user)
 
@@ -2938,7 +3049,34 @@ git commit -m "feat(tugas): create-and-link payment from a duty (?duty_id= flow)
   end
 ```
 
-(If the bare `%Payment{}` insert hits NOT NULL constraints, reuse whatever minimal fixture Task 11 settled on. Separately, the first test renders the Payment **edit page**, whose mount/render may require a real payment with details, contact and funds account — if it crashes on a bare row, build the payment with the full fixture stack exactly as `test/full_circle/bill_pay_test.exs` does: `billing_setup()` + `contact_fixture` + `good_fixture` + `pay_funds_account_fixture` + `payment_attrs` + `BillPay.create_payment/3`.)
+The `real_payment/2` helper builds a full payment the same way `test/full_circle/bill_pay_test.exs` does — add to the test module (the `BillingFixtures`/`BillPayFixtures` imports were already added in Task 12):
+
+```elixir
+  defp real_payment(comp, user) do
+    contact = contact_fixture(comp, user)
+    good = good_fixture(comp, user)
+    pur_acct = FullCircle.Accounting.get_account_by_name("General Purchases", comp, user)
+    funds_acct = pay_funds_account_fixture(comp, user)
+
+    no_ptax =
+      FullCircle.Repo.one!(
+        from(tc in FullCircle.Accounting.TaxCode,
+          where: tc.company_id == ^comp.id and tc.code == "NoPTax"
+        )
+      )
+
+    {:ok, %{create_payment: payment}} =
+      FullCircle.BillPay.create_payment(
+        payment_attrs(contact, good, pur_acct, no_ptax, funds_acct),
+        comp,
+        user
+      )
+
+    payment
+  end
+```
+
+The second and third tests only render the duty show page (which never calls `get_payment!`), so their bare `%Payment{}` inserts are fine — if they hit NOT NULL constraints, reuse Task 11's `bare_payment` shape.
 
 - [ ] **Step 2: Run tests to verify they fail**
 
@@ -3030,8 +3168,19 @@ defmodule FullCircleWeb.TugasLive.Components.DocPanel do
   @impl true
   def render(assigns) do
     ~H"""
-    <div id={@id} class="border rounded p-3 my-4">
-      <div class="font-medium text-xl">{gettext("Tugas")}</div>
+    <%!-- Stateful LiveComponents need a single STATIC root tag, so the
+          bare outer div always renders; the visible panel inside is
+          conditional — spec §5: show nothing when there are no links and
+          the viewer cannot create one (no empty "Tugas" box on every payment) --%>
+    <div id={@id}>
+      <div
+        :if={
+          @links != [] ||
+            Authorization.can?(@current_user, :link_duty_document, @current_company)
+        }
+        class="border rounded p-3 my-4"
+      >
+        <div class="font-medium text-xl">{gettext("Tugas")}</div>
 
       <div :for={link <- @links} id={"linked-duty-#{link.duty_id}"} class="mt-2">
         <div class="flex gap-2 items-center">
@@ -3107,6 +3256,7 @@ defmodule FullCircleWeb.TugasLive.Components.DocPanel do
           {duty.title} ({gettext("due")} {duty.due_date})
         </button>
       </div>
+      </div>
     </div>
     """
   end
@@ -3146,12 +3296,20 @@ Append to the Show render (below the timeline):
       <div class="font-medium text-xl mt-4">{gettext("Linked Documents")}</div>
       <div :for={link <- @links} class="text-sm py-1" id={"duty-link-#{link.id}"}>
         {link.doc_type}
+        <%!-- spec §5: click-through is role-gated — the edit page needs
+              :update_payment, which e.g. auditor doesn't have --%>
         <.link
+          :if={FullCircle.Authorization.can?(@current_user, :update_payment, @current_company)}
           navigate={~p"/companies/#{@current_company.id}/Payment/#{link.doc_id}/edit"}
           class="text-blue-600 underline"
         >
           {link.doc_no}
         </.link>
+        <span :if={
+          !FullCircle.Authorization.can?(@current_user, :update_payment, @current_company)
+        }>
+          {link.doc_no}
+        </span>
         <button
           :if={FullCircle.Authorization.can?(@current_user, :unlink_duty_document, @current_company)}
           id={"unlink-#{link.id}"}
