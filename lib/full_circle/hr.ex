@@ -12,8 +12,7 @@ defmodule FullCircle.HR do
     PaySlip,
     SalaryNote,
     Recurring,
-    TimeAttend,
-    EmployeePhoto
+    TimeAttend
   }
 
   alias FullCircle.Accounting.{Account, Transaction}
@@ -508,71 +507,6 @@ defmodule FullCircle.HR do
       )
       |> Repo.all()
     end
-  end
-
-  def get_face_id_descriptors(com_id) do
-    from(pht in EmployeePhoto,
-      join: emp in Employee,
-      on: emp.id == pht.employee_id,
-      where: pht.company_id == ^com_id,
-      select: %{
-        id: pht.id,
-        employee_id: pht.employee_id,
-        employee_name: emp.name,
-        photo_descriptor: pht.photo_descriptor
-      }
-    )
-    |> Repo.all()
-  end
-
-  def get_face_id_photo(photo_id) do
-    from(pht in EmployeePhoto,
-      where: pht.id == ^photo_id,
-      select: %{id: pht.id, photo_data: pht.photo_data}
-    )
-    |> Repo.one()
-  end
-
-  def get_employee_photos(emp_id, com_id) do
-    from(pht in EmployeePhoto,
-      where: pht.employee_id == ^emp_id,
-      where: pht.company_id == ^com_id,
-      order_by: [desc: pht.inserted_at],
-      select: %{
-        id: pht.id,
-        photo_data: pht.photo_data,
-        inserted_at: pht.inserted_at
-      }
-    )
-    |> Repo.all()
-  end
-
-  def delete_employee_photo(photo_id) do
-    from(pht in EmployeePhoto,
-      where: pht.id == ^photo_id
-    )
-    |> Repo.delete_all()
-  end
-
-  @doc """
-  Keep only the `max` most-recent photos for an employee. Returns the IDs of
-  the photos that were removed (so the caller can broadcast deletions).
-  """
-  def prune_employee_photos(emp_id, com_id, max) do
-    stale_ids =
-      from(p in EmployeePhoto,
-        where: p.employee_id == ^emp_id and p.company_id == ^com_id,
-        order_by: [desc: p.inserted_at],
-        offset: ^max,
-        select: p.id
-      )
-      |> Repo.all()
-
-    if stale_ids != [] do
-      from(p in EmployeePhoto, where: p.id in ^stale_ids) |> Repo.delete_all()
-    end
-
-    stale_ids
   end
 
   def salary_note_query(company, user) do

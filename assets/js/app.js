@@ -45,30 +45,6 @@ Hooks.clipCopy = {
   }
 }
 
-Hooks.FaceID = {
-  mounted() {
-    import("./face_id").then(
-      (h) => {
-        h.initFaceID(this)
-      }
-    );
-  }
-}
-
-Hooks.takePhoto = {
-  mounted() {
-    import("./take_photo_human").then(
-      (h) => {
-        this._takePhoto = h
-        h.initTakePhoto(this)
-      }
-    );
-  },
-  destroyed() {
-    if (this._takePhoto?.teardownTakePhoto) this._takePhoto.teardownTakePhoto()
-  }
-}
-
 Hooks.punchCamera = {
   mounted() {
     import("./qr_attend").then(

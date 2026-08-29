@@ -501,8 +501,6 @@ end
 | `calculatorInput` | Math expressions in inputs | `phx-hook="calculatorInput"` |
 | `clipCopy` | Copy to clipboard | `phx-hook="clipCopy"` |
 | `copyAndOpen` | Copy + open URL | For e-invoice links |
-| `FaceID` | Face recognition | Biometric attendance |
-| `takePhoto` | Photo capture | Employee photos |
 | `punchCamera` | QR scanning | QR attendance |
 
 ### Autocomplete URL Pattern

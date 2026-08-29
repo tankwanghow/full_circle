@@ -400,19 +400,6 @@ defmodule FullCircleWeb.Router do
       root_layout: {FullCircleWeb.Layouts, :punch} do
       live("/PunchCamera", TimeAttendLive.PunchCamera)
     end
-
-    live_session :require_authenticated_user_n_active_company_recon,
-      on_mount: [
-        {FullCircleWeb.UserAuth, :ensure_authenticated},
-        {FullCircleWeb.Locale, :set_locale},
-        {FullCircleWeb.ActiveCompany, :assign_active_company}
-      ],
-      root_layout: {FullCircleWeb.Layouts, :recon} do
-      live("/face_id", FaceIdLive)
-      live("/take_photo", SelectEmployeeLive)
-      live("/take_photo/:emp_id", TakePhotoLive)
-      live("/take_photo/:emp_id/photos", EmployeePhotosLive)
-    end
   end
 
   # Public, no-login document links emailed to customers.

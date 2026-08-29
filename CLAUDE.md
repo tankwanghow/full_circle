@@ -139,20 +139,18 @@ Each feature follows a consistent folder pattern:
 
 ### Layouts
 
-Five layouts in `lib/full_circle_web/components/layouts/`:
+Four layouts in `lib/full_circle_web/components/layouts/`:
 - `root.html.heex` — Main app shell
 - `app.html.heex` — Authenticated app content
 - `print_root.html.heex` — Print-optimized (no nav, print CSS)
 - `punch.html.heex` — Time punch kiosk mode
-- `recon.html.heex` — Face recognition attendance
 
 ### Frontend Assets
 
 - **CSS**: Tailwind CSS 3.4, configured in `assets/tailwind.config.js`
 - **JS**: esbuild with ESM format and code splitting. Entry points in `assets/js/`:
-  - `app.js` — Main app (LiveView hooks, IndexedDB caching via `indexdb.js`)
+  - `app.js` — Main app (LiveView hooks)
   - `tri_autocomplete.js` — Custom autocomplete component
-  - `take_photo_human.js` / `face_id.js` — Face recognition (uses Human.js library in `assets/vendor/human-main/`)
   - `qr_attend.js` — QR code attendance scanning
 
 ### I18n
