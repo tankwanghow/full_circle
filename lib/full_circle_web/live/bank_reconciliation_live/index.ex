@@ -276,27 +276,6 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
     end
   end
 
-  # Builds the /Payment/new or /Receipt/new URL seeded from the selected
-  # unmatched statement lines. Rendered as a target="_blank" link so the recon
-  # page (selections, matches in progress) stays open in its own tab.
-  defp create_doc_url(doc, lines, account, company, search) do
-    total = Enum.reduce(lines, Decimal.new(0), &Decimal.add(&1.amount, &2))
-
-    payload = %{
-      "stmt_ids" => Enum.map(lines, & &1.id),
-      "date" => lines |> Enum.map(& &1.statement_date) |> Enum.max(Date) |> Date.to_iso8601(),
-      "amount" => total |> Decimal.abs() |> Decimal.to_string(),
-      "stmt_total" => Decimal.to_string(total),
-      "bank_account_id" => account.id,
-      "bank_account_name" => account.name,
-      "descriptions" => lines |> Enum.map(& &1.description) |> Enum.uniq() |> Enum.join("; "),
-      "return" => %{"name" => search.name, "f_date" => search.f_date, "t_date" => search.t_date}
-    }
-
-    "/companies/#{company.id}/#{doc}/new?" <>
-      URI.encode_query(%{"recon" => Jason.encode!(payload)})
-  end
-
   @impl true
   def handle_event("diff_form_change", %{"diff_account" => name}, socket) do
     {:noreply, assign(socket, diff_account: name)}
@@ -1122,6 +1101,27 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
     else
       socket
     end
+  end
+
+  # Builds the /Payment/new or /Receipt/new URL seeded from the selected
+  # unmatched statement lines. Rendered as a target="_blank" link so the recon
+  # page (selections, matches in progress) stays open in its own tab.
+  defp create_doc_url(doc, lines, account, company, search) do
+    total = Enum.reduce(lines, Decimal.new(0), &Decimal.add(&1.amount, &2))
+
+    payload = %{
+      "stmt_ids" => Enum.map(lines, & &1.id),
+      "date" => lines |> Enum.map(& &1.statement_date) |> Enum.max(Date) |> Date.to_iso8601(),
+      "amount" => total |> Decimal.abs() |> Decimal.to_string(),
+      "stmt_total" => Decimal.to_string(total),
+      "bank_account_id" => account.id,
+      "bank_account_name" => account.name,
+      "descriptions" => lines |> Enum.map(& &1.description) |> Enum.uniq() |> Enum.join("; "),
+      "return" => %{"name" => search.name, "f_date" => search.f_date, "t_date" => search.t_date}
+    }
+
+    "/companies/#{company.id}/#{doc}/new?" <>
+      URI.encode_query(%{"recon" => Jason.encode!(payload)})
   end
 
   defp toggle_set(set, id) do
