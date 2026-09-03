@@ -73,29 +73,20 @@ defmodule FullCircle.TaggedBill do
           contact: cont.name,
           good: gd.name,
           pack_name: pkg.name,
-          pack_qty: sum(invd.package_qty),
-          qty: sum(invd.quantity),
+          pack_qty: invd.package_qty,
+          qty: invd.quantity,
           avg_qty:
             fragment(
-              "sum(?) / sum(case when ? = 0 then 1 else ? end)",
+              "? / case when ? = 0 then 1 else ? end",
               invd.quantity,
               invd.package_qty,
               invd.package_qty
             ),
           unit: gd.unit,
-          price: sum(invd.unit_price * invd.quantity + invd.discount) / sum(invd.quantity),
-          amount: sum(invd.unit_price * invd.quantity + invd.discount),
-          descriptions: fragment("string_agg(distinct ?, ' | ')", invd.descriptions)
-        },
-        group_by: [
-          inv.id,
-          inv.invoice_no,
-          inv.invoice_date,
-          cont.name,
-          gd.name,
-          pkg.name,
-          gd.unit
-        ]
+          price: (invd.unit_price * invd.quantity + invd.discount) / invd.quantity,
+          amount: invd.unit_price * invd.quantity + invd.discount,
+          descriptions: invd.descriptions
+        }
       )
       |> where(^goods_cond)
 
@@ -122,29 +113,20 @@ defmodule FullCircle.TaggedBill do
           contact: cont.name,
           good: gd.name,
           pack_name: pkg.name,
-          pack_qty: sum(invd.package_qty),
-          qty: sum(invd.quantity),
+          pack_qty: invd.package_qty,
+          qty: invd.quantity,
           avg_qty:
             fragment(
-              "sum(?) / sum(case when ? = 0 then 1 else ? end)",
+              "? / case when ? = 0 then 1 else ? end",
               invd.quantity,
               invd.package_qty,
               invd.package_qty
             ),
           unit: gd.unit,
-          price: sum(invd.unit_price * invd.quantity + invd.discount) / sum(invd.quantity),
-          amount: sum(invd.unit_price * invd.quantity + invd.discount),
-          descriptions: fragment("string_agg(distinct ?, ' | ')", invd.descriptions)
-        },
-        group_by: [
-          inv.id,
-          inv.receipt_no,
-          inv.receipt_date,
-          cont.name,
-          gd.name,
-          pkg.name,
-          gd.unit
-        ]
+          price: (invd.unit_price * invd.quantity + invd.discount) / invd.quantity,
+          amount: invd.unit_price * invd.quantity + invd.discount,
+          descriptions: invd.descriptions
+        }
       )
       |> where(^goods_cond)
 
@@ -180,29 +162,20 @@ defmodule FullCircle.TaggedBill do
           contact: cont.name,
           good: gd.name,
           pack_name: pkg.name,
-          pack_qty: sum(pinvd.package_qty),
-          qty: sum(pinvd.quantity),
+          pack_qty: pinvd.package_qty,
+          qty: pinvd.quantity,
           avg_qty:
             fragment(
-              "sum(?) / sum(case when ? = 0 then 1 else ? end)",
+              "? / case when ? = 0 then 1 else ? end",
               pinvd.quantity,
               pinvd.package_qty,
               pinvd.package_qty
             ),
           unit: gd.unit,
-          price: sum(pinvd.unit_price * pinvd.quantity + pinvd.discount) / sum(pinvd.quantity),
-          amount: sum(pinvd.unit_price * pinvd.quantity + pinvd.discount),
-          descriptions: fragment("string_agg(distinct ?, ' | ')", pinvd.descriptions)
-        },
-        group_by: [
-          pinv.id,
-          pinv.pur_invoice_no,
-          pinv.pur_invoice_date,
-          cont.name,
-          gd.name,
-          pkg.name,
-          gd.unit
-        ]
+          price: (pinvd.unit_price * pinvd.quantity + pinvd.discount) / pinvd.quantity,
+          amount: pinvd.unit_price * pinvd.quantity + pinvd.discount,
+          descriptions: pinvd.descriptions
+        }
       )
       |> where(^goods_cond)
 
@@ -229,29 +202,20 @@ defmodule FullCircle.TaggedBill do
           contact: cont.name,
           good: gd.name,
           pack_name: pkg.name,
-          pack_qty: sum(payd.package_qty),
-          qty: sum(payd.quantity),
+          pack_qty: payd.package_qty,
+          qty: payd.quantity,
           avg_qty:
             fragment(
-              "sum(?) / sum(case when ? = 0 then 1 else ? end)",
+              "? / case when ? = 0 then 1 else ? end",
               payd.quantity,
               payd.package_qty,
               payd.package_qty
             ),
           unit: gd.unit,
-          price: sum(payd.unit_price * payd.quantity + payd.discount) / sum(payd.quantity),
-          amount: sum(payd.unit_price * payd.quantity + payd.discount),
-          descriptions: fragment("string_agg(distinct ?, ' | ')", payd.descriptions)
-        },
-        group_by: [
-          pay.id,
-          pay.payment_no,
-          pay.payment_date,
-          cont.name,
-          gd.name,
-          pkg.name,
-          gd.unit
-        ]
+          price: (payd.unit_price * payd.quantity + payd.discount) / payd.quantity,
+          amount: payd.unit_price * payd.quantity + payd.discount,
+          descriptions: payd.descriptions
+        }
       )
       |> where(^goods_cond)
 

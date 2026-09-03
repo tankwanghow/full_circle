@@ -297,10 +297,10 @@ defmodule FullCircleWeb.ReportLive.GoodSnP do
               {gettext("Pack")}
             </div>
             <div class="w-[7%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
-              {gettext("PackQty (Sum)")}
+              {gettext("PackQty")}
             </div>
             <div class="w-[10%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
-              {gettext("Qty (Sum)")}
+              {gettext("Qty")}
             </div>
             <div class="w-[5%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
               {gettext("Unit")}

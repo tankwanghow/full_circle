@@ -37,13 +37,6 @@ must add it, never subtract:
 - Line `amount = unit_price * quantity + discount`.
 - Detail-row `price = amount / quantity` (net of discount — the "Avg Price"
   column is the effective unit price, not the raw `unit_price` field).
-- Detail rows are **grouped per document + good + packaging + unit**
-  (`group_by: [doc.id, doc_no, doc_date, cont.name, gd.name, pkg.name, gd.unit]`),
-  summing `quantity`, `package_qty`, `amount`, and `string_agg(distinct
-  descriptions, ' | ')`. This folds an FOC line (qty > 0, price 0) into the
-  paid line for the same good so the row price is the true blended price.
-  Consequence: a desc ilike filter that matches only the FOC line returns a
-  row priced at 0 — the filter runs before aggregation.
 - Summary `price = sum(amount) / sum(quantity)`, both in the per-branch
   `group_by` selects and in the outer union re-aggregation. Never `avg()` of
   line prices — that is unweighted and the outer union would then average
@@ -78,7 +71,11 @@ All four functions take `(contact, goods, fdate, tdate, com_id, opts \\ [])`:
   `Qty × Avg Price` visibly drifts from `Amount` on large quantities (a
   115k-unit row was off by ~RM500). The query result itself reconciles to
   ~1e-11. `avg_qty` is still selected (positional-union safety) but no longer
-  displayed; the Qty/PackQty columns are labelled "(Sum)".
+  displayed.
+- Detail rows are **one per detail line** — do not group by document/good.
+  Grouping was tried (to fold FOC lines into the paid line) and reverted:
+  the user wants every matching line listed. The summary rows already give
+  the blended `sum(amount) / sum(qty)` price across FOC and paid lines.
 
 - Category select = `Product.categories() ++ ["custom"]`. Picking
   "custom" swaps the Good List textarea for two pattern textareas
