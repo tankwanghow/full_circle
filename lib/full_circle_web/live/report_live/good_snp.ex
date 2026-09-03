@@ -297,10 +297,10 @@ defmodule FullCircleWeb.ReportLive.GoodSnP do
               {gettext("Pack")}
             </div>
             <div class="w-[7%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
-              {gettext("PackQty")}
+              {gettext("PackQty (Sum)")}
             </div>
             <div class="w-[10%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
-              {gettext("Qty (Avg Qty)")}
+              {gettext("Qty (Sum)")}
             </div>
             <div class="w-[5%] border rounded bg-gray-200 border-gray-400 px-2 py-1">
               {gettext("Unit")}
@@ -341,14 +341,13 @@ defmodule FullCircleWeb.ReportLive.GoodSnP do
                   {obj.pack_qty |> Number.Delimit.number_to_delimited()}
                 </div>
                 <div class="w-[10%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
-                  {obj.qty |> Number.Delimit.number_to_delimited()} ({obj.avg_qty
-                  |> Number.Delimit.number_to_delimited()})
+                  {obj.qty |> Number.Delimit.number_to_delimited()}
                 </div>
                 <div class="w-[5%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
                   {obj.unit}
                 </div>
                 <div class="w-[9%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
-                  {obj.price |> Number.Delimit.number_to_delimited()}
+                  {obj.price |> Number.Delimit.number_to_delimited(precision: 4)}
                 </div>
                 <div class="w-[10%] border rounded bg-blue-200 border-blue-400 px-2 py-1">
                   {obj.amount |> Number.Delimit.number_to_delimited()}
@@ -374,14 +373,13 @@ defmodule FullCircleWeb.ReportLive.GoodSnP do
                   {obj.pack_qty |> Number.Delimit.number_to_delimited()}
                 </div>
                 <div class="w-[10%] border rounded bg-green-200 border-green-400 px-2 py-1">
-                  {obj.qty |> Number.Delimit.number_to_delimited()} ({obj.avg_qty
-                  |> Number.Delimit.number_to_delimited()})
+                  {obj.qty |> Number.Delimit.number_to_delimited()}
                 </div>
                 <div class="w-[5%] border rounded bg-green-200 border-green-400 px-2 py-1">
                   {obj.unit}
                 </div>
                 <div class="w-[9%] border rounded bg-green-200 border-green-400 px-2 py-1">
-                  {obj.price |> Number.Delimit.number_to_delimited()}
+                  {obj.price |> Number.Delimit.number_to_delimited(precision: 4)}
                 </div>
                 <div class="w-[10%] border rounded bg-green-200 border-green-400 px-2 py-1">
                   {obj.amount |> Number.Delimit.number_to_delimited()}

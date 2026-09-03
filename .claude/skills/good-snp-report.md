@@ -74,6 +74,12 @@ All four functions take `(contact, goods, fdate, tdate, com_id, opts \\ [])`:
 
 ## UI / CSV notes
 
+- The LiveView renders `price` at **4 decimals** (`precision: 4`). At 2dp,
+  `Qty × Avg Price` visibly drifts from `Amount` on large quantities (a
+  115k-unit row was off by ~RM500). The query result itself reconciles to
+  ~1e-11. `avg_qty` is still selected (positional-union safety) but no longer
+  displayed; the Qty/PackQty columns are labelled "(Sum)".
+
 - Category select = `Product.categories() ++ ["custom"]`. Picking
   "custom" swaps the Good List textarea for two pattern textareas
   (`search[name_ilike]`, `search[desc_ilike]`); other categories
