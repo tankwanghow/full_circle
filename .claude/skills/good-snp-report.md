@@ -28,6 +28,20 @@ intuition is wrong here). Consequences:
   `doc_date` despite the Invoice branch's key name.
 - Test pin: `test/full_circle/tagged_bill_test.exs`.
 
+## Price / amount contract
+
+`discount` on every detail line is **signed and negative** for a reduction
+(the schemas compute `good_amount = qty * unit_price + discount`). The report
+must add it, never subtract:
+
+- Line `amount = unit_price * quantity + discount`.
+- Detail-row `price = amount / quantity` (net of discount — the "Avg Price"
+  column is the effective unit price, not the raw `unit_price` field).
+- Summary `price = sum(amount) / sum(quantity)`, both in the per-branch
+  `group_by` selects and in the outer union re-aggregation. Never `avg()` of
+  line prices — that is unweighted and the outer union would then average
+  the two branch averages again.
+
 ## Query contract
 
 All four functions take `(contact, goods, fdate, tdate, com_id, opts \\ [])`:

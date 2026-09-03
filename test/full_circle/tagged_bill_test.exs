@@ -62,6 +62,25 @@ defmodule FullCircle.TaggedBillTest do
       assert Decimal.equal?(pay_row.amount, Decimal.new("10.00"))
     end
 
+    test "price is line amount / quantity with signed discount applied", %{
+      user: user,
+      company: company
+    } do
+      contact = contact_fixture(company, user, %{"name" => "Disc Vendor"})
+      good = good_fixture(company, user, %{"name" => "DiscGood"})
+
+      create_pur_invoice(company, user, contact, good,
+        quantity: "10",
+        unit_price: "5.00",
+        discount: "-10.00"
+      )
+
+      [row] = TaggedBill.goods_purchases_report("", "DiscGood", today(), today(), company.id)
+
+      assert Decimal.equal?(row.amount, Decimal.new("40.00"))
+      assert Decimal.equal?(row.price, Decimal.new("4.00"))
+    end
+
     test "filters by contact and goods list", %{user: user, company: company} do
       vendor_a = contact_fixture(company, user, %{"name" => "Filter Vendor A"})
       vendor_b = contact_fixture(company, user, %{"name" => "Filter Vendor B"})
@@ -114,6 +133,31 @@ defmodule FullCircle.TaggedBillTest do
       assert row.good == "SumGood"
       assert Decimal.equal?(row.qty, Decimal.new(16))
       assert Decimal.equal?(row.amount, Decimal.new("80.00"))
+    end
+
+    test "price is quantity-weighted: sum(amount) / sum(qty)", %{
+      user: user,
+      company: company
+    } do
+      contact = contact_fixture(company, user, %{"name" => "Wgt Vendor"})
+      good = good_fixture(company, user, %{"name" => "WgtGood"})
+
+      # (90 * 1.00 - 5.00) + (10 * 10.00) = 185.00 over 100 units -> 1.85
+      # an unweighted avg of line prices would give ~5.47
+      create_pur_invoice(company, user, contact, good,
+        quantity: "90",
+        unit_price: "1.00",
+        discount: "-5.00"
+      )
+
+      create_pur_invoice(company, user, contact, good, quantity: "10", unit_price: "10.00")
+
+      [row] =
+        TaggedBill.goods_purchases_summary_report("", "WgtGood", today(), today(), company.id)
+
+      assert Decimal.equal?(row.qty, Decimal.new(100))
+      assert Decimal.equal?(row.amount, Decimal.new("185.00"))
+      assert Decimal.equal?(row.price, Decimal.new("1.85"))
     end
   end
 
