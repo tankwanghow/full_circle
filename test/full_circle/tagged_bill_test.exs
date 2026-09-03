@@ -81,6 +81,46 @@ defmodule FullCircle.TaggedBillTest do
       assert Decimal.equal?(row.price, Decimal.new("4.00"))
     end
 
+    test "FOC line for the same good on one document is merged into the paid line", %{
+      user: user,
+      company: company
+    } do
+      contact = contact_fixture(company, user, %{"name" => "FOC Vendor"})
+      good = good_fixture(company, user, %{"name" => "FocGood"})
+      pur_acct = FullCircle.Accounting.get_account_by_name("General Purchases", company, user)
+
+      pur_tc =
+        Repo.one!(from tc in TaxCode, where: tc.company_id == ^company.id and tc.code == "NoPTax")
+
+      attrs =
+        pur_invoice_attrs(contact, good, pur_acct, pur_tc,
+          quantity: "100",
+          unit_price: "5.00",
+          tax_rate: "0"
+        )
+
+      paid_line = attrs["pur_invoice_details"]["0"]
+
+      foc_line =
+        paid_line
+        |> Map.merge(%{
+          "quantity" => "10",
+          "unit_price" => "0",
+          "descriptions" => "FOC",
+          "_persistent_id" => "2"
+        })
+
+      attrs = put_in(attrs, ["pur_invoice_details", "1"], foc_line)
+      {:ok, _} = FullCircle.Billing.create_pur_invoice(attrs, company, user)
+
+      [row] = TaggedBill.goods_purchases_report("", "FocGood", today(), today(), company.id)
+
+      assert Decimal.equal?(row.qty, Decimal.new(110))
+      assert Decimal.equal?(row.amount, Decimal.new("500.00"))
+      assert Decimal.equal?(Decimal.round(row.price, 4), Decimal.new("4.5455"))
+      assert row.descriptions =~ "FOC"
+    end
+
     test "filters by contact and goods list", %{user: user, company: company} do
       vendor_a = contact_fixture(company, user, %{"name" => "Filter Vendor A"})
       vendor_b = contact_fixture(company, user, %{"name" => "Filter Vendor B"})

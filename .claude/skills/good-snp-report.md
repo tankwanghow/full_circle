@@ -37,6 +37,13 @@ must add it, never subtract:
 - Line `amount = unit_price * quantity + discount`.
 - Detail-row `price = amount / quantity` (net of discount — the "Avg Price"
   column is the effective unit price, not the raw `unit_price` field).
+- Detail rows are **grouped per document + good + packaging + unit**
+  (`group_by: [doc.id, doc_no, doc_date, cont.name, gd.name, pkg.name, gd.unit]`),
+  summing `quantity`, `package_qty`, `amount`, and `string_agg(distinct
+  descriptions, ' | ')`. This folds an FOC line (qty > 0, price 0) into the
+  paid line for the same good so the row price is the true blended price.
+  Consequence: a desc ilike filter that matches only the FOC line returns a
+  row priced at 0 — the filter runs before aggregation.
 - Summary `price = sum(amount) / sum(quantity)`, both in the per-branch
   `group_by` selects and in the outer union re-aggregation. Never `avg()` of
   line prices — that is unweighted and the outer union would then average
