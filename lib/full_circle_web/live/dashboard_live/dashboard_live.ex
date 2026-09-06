@@ -5,7 +5,7 @@ defmodule FullCircleWeb.DashboardLive do
   def render(assigns) do
     ~H"""
     <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
-    <div :if={@current_role != "punch_camera"} class="mx-auto w-6/12 text-center">
+    <div class="mx-auto w-6/12 text-center">
       <div :if={@current_role == "admin"} class="font-medium text-xl">
         Administrator Functions
       </div>

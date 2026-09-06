@@ -71,8 +71,8 @@ layer exists only to make the **first** match fast.
 
 - Vendor **SheetJS** (`xlsx.full.min.js`, MIT) into `assets/vendor/`. SheetJS reads legacy `.xls`
   (BIFF8/OLE2) and `.xlsx`.
-- Isolate SheetJS + the conversion hook as its **own esbuild entry** (mirroring `take_photo_human.js`
-  / `qr_attend.js`) so the main `app.js` bundle isn't bloated; loaded only on the import page.
+- Isolate SheetJS + the conversion hook as its **own esbuild entry** (mirroring `take_photo_human.js`)
+  so the main `app.js` bundle isn't bloated; loaded only on the import page.
 - A LiveView hook on the import page's file input:
   - native `<input type="file">` accepts `.xls,.xlsx` (multiple);
   - on selection, for each file: read its bytes, `XLSX.read(buf, {type:'array'})`, re-emit as an

@@ -687,8 +687,7 @@ defmodule FullCircle.Sys do
             company_user_changeset(%CompanyUser{}, %{
               company_id: com.id,
               user_id: u.id,
-              role: role,
-              default_company: if(role == "punch_camera", do: true, else: false)
+              role: role
             })
           end)
           |> FullCircle.Repo.transaction()

@@ -45,16 +45,6 @@ Hooks.clipCopy = {
   }
 }
 
-Hooks.punchCamera = {
-  mounted() {
-    import("./qr_attend").then(
-      (q) => {
-        q.initPunchCamera(this)
-      }
-    );
-  }
-}
-
 Hooks.tributeAutoComplete = {
   mounted() {
     import("./tri_autocomplete").then(

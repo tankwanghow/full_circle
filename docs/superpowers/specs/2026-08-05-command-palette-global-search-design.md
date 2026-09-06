@@ -55,7 +55,7 @@ navigate menus and index filters to open it. Global document jump removes that f
 | Max hits | 20 |
 | Select | Arrow keys + Enter, or click → edit form |
 | Auth | Only types the user can `:update_*` |
-| Roles without company / `punch_camera` | Palette not shown |
+| Roles without company | Palette not shown |
 
 ### v1 document types
 
@@ -131,7 +131,7 @@ No new permission atom in v1.
 ### UI mounting
 
 Mount `CommandPaletteComponent` from **`app.html.heex`** when
-`current_company` is set and `current_role != "punch_camera"`.
+`current_company` is set.
 
 App layout is part of the LiveView tree (unlike static root chrome), so
 `live_component` and events work. Print / punch / recon layouts do not mount it.

@@ -126,7 +126,7 @@ Reusable CRUD operations used across most contexts: `get!`, `filter`, `create`, 
 
 ### Authorization Roles
 
-Defined in `lib/full_circle/authorization.ex`. Roles: `admin`, `manager`, `supervisor`, `cashier`, `clerk`, `auditor`, `punch_camera`, `guest`, `disable`. Authorization uses pattern-matched `can?/3` functions.
+Defined in `lib/full_circle/authorization.ex`. Roles: `admin`, `manager`, `supervisor`, `cashier`, `clerk`, `auditor`, `guest`, `disable`. Authorization uses pattern-matched `can?/3` functions.
 
 ### LiveView Structure (`lib/full_circle_web/live/`)
 
@@ -139,11 +139,10 @@ Each feature follows a consistent folder pattern:
 
 ### Layouts
 
-Four layouts in `lib/full_circle_web/components/layouts/`:
+Three layouts in `lib/full_circle_web/components/layouts/`:
 - `root.html.heex` — Main app shell
 - `app.html.heex` — Authenticated app content
 - `print_root.html.heex` — Print-optimized (no nav, print CSS)
-- `punch.html.heex` — Time punch kiosk mode
 
 ### Frontend Assets
 
@@ -151,7 +150,6 @@ Four layouts in `lib/full_circle_web/components/layouts/`:
 - **JS**: esbuild with ESM format and code splitting. Entry points in `assets/js/`:
   - `app.js` — Main app (LiveView hooks)
   - `tri_autocomplete.js` — Custom autocomplete component
-  - `qr_attend.js` — QR code attendance scanning
 
 ### I18n
 

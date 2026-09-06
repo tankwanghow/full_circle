@@ -19,22 +19,22 @@ defmodule FullCircle.DebCreTest do
   describe "debcre authorization" do
     test_authorise_to(
       :create_credit_note,
-      ["admin", "manager", "supervisor", "clerk", "disable", "punch_camera"]
+      ["admin", "manager", "supervisor", "clerk", "disable"]
     )
 
     test_authorise_to(
       :update_credit_note,
-      ["admin", "manager", "supervisor", "clerk", "disable", "punch_camera"]
+      ["admin", "manager", "supervisor", "clerk", "disable"]
     )
 
     test_authorise_to(
       :create_debit_note,
-      ["admin", "manager", "supervisor", "clerk", "disable", "punch_camera"]
+      ["admin", "manager", "supervisor", "clerk", "disable"]
     )
 
     test_authorise_to(
       :update_debit_note,
-      ["admin", "manager", "supervisor", "clerk", "disable", "punch_camera"]
+      ["admin", "manager", "supervisor", "clerk", "disable"]
     )
   end
 

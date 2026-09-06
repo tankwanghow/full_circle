@@ -390,16 +390,6 @@ defmodule FullCircleWeb.Router do
 
       live("/bank_reconciliation/print", BankReconciliationLive.Print, :print)
     end
-
-    live_session :require_authenticated_user_n_active_company_punch,
-      on_mount: [
-        {FullCircleWeb.UserAuth, :ensure_authenticated},
-        {FullCircleWeb.Locale, :set_locale},
-        {FullCircleWeb.ActiveCompany, :assign_active_company}
-      ],
-      root_layout: {FullCircleWeb.Layouts, :punch} do
-      live("/PunchCamera", TimeAttendLive.PunchCamera)
-    end
   end
 
   # Public, no-login document links emailed to customers.

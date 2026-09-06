@@ -20,22 +20,22 @@ defmodule FullCircle.ChequeTest do
   describe "cheque authorization" do
     test_authorise_to(
       :create_deposit,
-      ["admin", "manager", "supervisor", "clerk", "cashier", "disable", "punch_camera"]
+      ["admin", "manager", "supervisor", "clerk", "cashier", "disable"]
     )
 
     test_authorise_to(
       :update_deposit,
-      ["admin", "manager", "supervisor", "clerk", "cashier", "disable", "punch_camera"]
+      ["admin", "manager", "supervisor", "clerk", "cashier", "disable"]
     )
 
     test_authorise_to(
       :create_return_cheque,
-      ["admin", "manager", "supervisor", "clerk", "disable", "punch_camera"]
+      ["admin", "manager", "supervisor", "clerk", "disable"]
     )
 
     test_authorise_to(
       :update_return_cheque,
-      ["admin", "manager", "supervisor", "clerk", "disable", "punch_camera"]
+      ["admin", "manager", "supervisor", "clerk", "disable"]
     )
   end
 

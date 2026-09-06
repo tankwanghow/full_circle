@@ -160,10 +160,10 @@ test_authorise_to(:create_invoice,
 
 # For forbid_roles - list ALL roles NOT in forbid list
 test_authorise_to(:create_contact,
-  ["admin", "manager", "supervisor", "cashier", "clerk", "disable", "punch_camera"])
+  ["admin", "manager", "supervisor", "cashier", "clerk", "disable"])
 ```
 
-**Critical**: For forbid_roles, include `disable` and `punch_camera` if not forbidden.
+**Critical**: For forbid_roles, include `disable` if not forbidden.
 
 ## Common Test Pitfalls
 

@@ -501,7 +501,6 @@ end
 | `calculatorInput` | Math expressions in inputs | `phx-hook="calculatorInput"` |
 | `clipCopy` | Copy to clipboard | `phx-hook="clipCopy"` |
 | `copyAndOpen` | Copy + open URL | For e-invoice links |
-| `punchCamera` | QR scanning | QR attendance |
 
 ### Autocomplete URL Pattern
 
@@ -671,7 +670,7 @@ user_fixture()           -> User
 
 ### Role Hierarchy
 
-Roles (from `authorization.ex`): `admin`, `manager`, `supervisor`, `cashier`, `clerk`, `auditor`, `punch_camera`, `guest`, `disable`
+Roles (from `authorization.ex`): `admin`, `manager`, `supervisor`, `cashier`, `clerk`, `auditor`, `guest`, `disable`
 
 ### Two Authorization Styles
 
@@ -696,12 +695,12 @@ test_authorise_to(:create_invoice,
 
 # For forbid_roles - list ALL roles NOT in the forbid list
 # forbid_roles(~w(auditor guest)) means everyone EXCEPT auditor and guest is allowed
-# So the allowed list includes disable and punch_camera too!
+# So the allowed list includes disable too!
 test_authorise_to(:create_contact,
-  ["admin", "manager", "supervisor", "cashier", "clerk", "disable", "punch_camera"])
+  ["admin", "manager", "supervisor", "cashier", "clerk", "disable"])
 ```
 
-**CRITICAL**: When authorization uses `forbid_roles`, the `disable` and `punch_camera` roles are allowed unless explicitly forbidden. Include them in the test's allowed list.
+**CRITICAL**: When authorization uses `forbid_roles`, the `disable` role is allowed unless explicitly forbidden. Include it in the test's allowed list.
 
 ---
 

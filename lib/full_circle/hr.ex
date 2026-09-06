@@ -257,16 +257,6 @@ defmodule FullCircle.HR do
     )
   end
 
-  def create_time_attendence_by_punch(attrs, com, user) do
-    case can?(user, :create_time_attendence, com) do
-      true ->
-        Repo.insert(TimeAttend.changeset(%TimeAttend{}, attrs))
-
-      false ->
-        :not_authorise
-    end
-  end
-
   def insert_time_attendence_from_log(entry, com) do
     ptu = entry.punch_time |> Timex.shift(minutes: -5)
     ptd = entry.punch_time |> Timex.shift(minutes: 5)

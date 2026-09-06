@@ -129,8 +129,6 @@ The per-day time inputs (`PunchTimeComponent`, rendered via `PunchCardComponent`
   **PunchIndex** computes it **per row** in `PunchIndexComponent.update/2` (rows span employees/dates) via
   `HR.pay_slip_exists_for_period?/3`. A surface that forgets to pass the flag still can't write (backend
   guard) but degrades to a silent red field.
-- The kiosk path (`create_time_attendence_by_punch`) is NOT guarded — live punches are for the current
-  month, which has no payslip yet.
 
 ## Holiday pay days (`punch_card.ex` `holiday_pay_days/2` → `HR.punch_by_date/3`)
 

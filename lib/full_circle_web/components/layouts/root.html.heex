@@ -16,10 +16,7 @@
   </head>
   <body class="bg-green-50">
     <%= if @current_user do %>
-      <div
-        :if={@current_role != "punch_camera"}
-        class="flex fixed top-0 z-50 w-full items-center justify-center text-white gap-4 bg-gray-800 py-2 px-5 shadow"
-      >
+      <div class="flex fixed top-0 z-50 w-full items-center justify-center text-white gap-4 bg-gray-800 py-2 px-5 shadow">
         <div class="text-3xl font-bold cursor-default w-[70%]">
           {gettext("FullCircle")}
           <span :if={assigns[:current_company]} id="active-company" class="font-normal text-2xl">
@@ -41,7 +38,7 @@
         </.link>
 
         <button
-          :if={assigns[:current_company] && @current_role != "punch_camera"}
+          :if={assigns[:current_company]}
           type="button"
           id="command-palette-trigger"
           title={gettext("Search or actions (Ctrl+K) — newinv, newpur, newcn…")}
@@ -76,7 +73,7 @@
                   </.link>
                 </li>
 
-                <li :if={@current_role != "punch_camera"} class="my-5">
+                <li class="my-5">
                   <.link navigate={~p"/companies"} class="mb-2 p-3 hover:bg-emerald-400 flex">
                     {gettext("Companies")}
                   </.link>

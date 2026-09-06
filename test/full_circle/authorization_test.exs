@@ -23,8 +23,7 @@ defmodule FullCircle.AuthorizationTest do
     "guest",
     "auditor",
     "cashier",
-    "clerk",
-    "punch_camera"
+    "clerk"
   ])
 
   test_not_authorise_to(:update_account, [
@@ -32,8 +31,7 @@ defmodule FullCircle.AuthorizationTest do
     "guest",
     "auditor",
     "cashier",
-    "clerk",
-    "punch_camera"
+    "clerk"
   ])
 
   test_not_authorise_to(:delete_account, [
@@ -41,13 +39,12 @@ defmodule FullCircle.AuthorizationTest do
     "guest",
     "auditor",
     "cashier",
-    "clerk",
-    "punch_camera"
+    "clerk"
   ])
 
   describe "authorization" do
     test "should have roles" do
-      assert Enum.count(Authorization.roles()) == 9
+      assert Enum.count(Authorization.roles()) == 8
       assert Enum.any?(Authorization.roles(), fn x -> x == "guest" end)
       assert Enum.any?(Authorization.roles(), fn x -> x == "admin" end)
       assert Enum.any?(Authorization.roles(), fn x -> x == "clerk" end)
