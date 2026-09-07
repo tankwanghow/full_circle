@@ -206,4 +206,16 @@ defmodule FullCircle.PunchGateTest do
                ingest_attrs(emp, %{"punched_at" => "not-a-datetime"})
              )
   end
+
+  test "badge_payload prefixes employee id with fcqa:" do
+    id = Ecto.UUID.generate()
+    assert PunchGate.badge_payload(%{id: id}) == "fcqa:#{id}"
+  end
+
+  test "parse_badge_payload accepts fcqa: prefix and bare UUID" do
+    id = Ecto.UUID.generate()
+    assert PunchGate.parse_badge_payload("fcqa:#{id}") == {:ok, id}
+    assert PunchGate.parse_badge_payload(id) == {:ok, id}
+    assert PunchGate.parse_badge_payload("not-a-badge") == :error
+  end
 end

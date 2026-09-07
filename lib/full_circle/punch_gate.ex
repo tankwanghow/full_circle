@@ -14,6 +14,17 @@ defmodule FullCircle.PunchGate do
     :crypto.hash(:sha256, plain) |> Base.encode16(case: :lower)
   end
 
+  def badge_payload(%{id: id}), do: "fcqa:#{id}"
+
+  def parse_badge_payload("fcqa:" <> id), do: {:ok, id}
+
+  def parse_badge_payload(id) do
+    case Ecto.UUID.cast(id) do
+      {:ok, uuid} -> {:ok, uuid}
+      :error -> :error
+    end
+  end
+
   def create_device(name, company, user) do
     case Authorization.can?(user, :manage_punch_device, company) do
       true ->
