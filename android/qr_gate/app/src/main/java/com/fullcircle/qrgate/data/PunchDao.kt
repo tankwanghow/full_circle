@@ -16,6 +16,9 @@ interface PunchDao {
     @Query("DELETE FROM punches WHERE clientId = :clientId")
     suspend fun delete(clientId: String)
 
+    @Query("DELETE FROM punches")
+    suspend fun deleteAll()
+
     @Query("UPDATE punches SET tries = :tries, lastError = :lastError WHERE clientId = :clientId")
     suspend fun markAttempt(clientId: String, tries: Int, lastError: String?)
 }

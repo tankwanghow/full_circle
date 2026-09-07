@@ -11,7 +11,6 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.fullcircle.qrgate.Prefs
-import com.fullcircle.qrgate.data.PunchDao
 import com.fullcircle.qrgate.data.PunchEntity
 import com.fullcircle.qrgate.data.QueueDb
 import okhttp3.MediaType.Companion.toMediaType
@@ -48,9 +47,8 @@ class UploadWorker(
                     File(row.photoPath).delete()
                 }
                 is Outcome.Revoked -> {
-                    dropAll(dao, rows)
-                    prefs.clear()
-                    Log.w(TAG, "device token rejected (401); pairing cleared")
+                    QueueDb.wipeBecauseRevoked(applicationContext)
+                    Log.w(TAG, "device token rejected (401); queue wiped, pairing cleared")
                     return Result.success()
                 }
                 is Outcome.Retry -> {
@@ -60,16 +58,6 @@ class UploadWorker(
             }
         }
         return if (networkFail) Result.retry() else Result.success()
-    }
-
-    private suspend fun dropAll(
-        dao: PunchDao,
-        rows: List<PunchEntity>,
-    ) {
-        for (row in rows) {
-            dao.delete(row.clientId)
-            File(row.photoPath).delete()
-        }
     }
 
     private fun upload(baseUrl: String, token: String, row: PunchEntity): Outcome {
