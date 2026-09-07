@@ -116,6 +116,7 @@ defmodule FullCircleWeb.Router do
     pipe_through([:browser, :require_authenticated_user])
 
     get "/csv", CsvController, :show
+    get "/TimeAttend/:id/photo", PunchPhotoController, :show
     get "/statutory_bundle/export", BundleController, :export
     get "/download/:filename", FileDownloadController, :show
 
