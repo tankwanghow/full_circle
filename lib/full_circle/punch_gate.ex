@@ -180,9 +180,34 @@ defmodule FullCircle.PunchGate do
     end)
     |> Repo.transaction()
     |> case do
-      {:ok, %{flags: ta}} -> {:ok, Repo.preload(ta, :employee)}
-      {:error, _, reason, _} when is_atom(reason) -> {:error, reason}
-      {:error, _, _reason, _} -> {:error, :invalid}
+      {:ok, %{flags: ta}} ->
+        {:ok, Repo.preload(ta, :employee)}
+
+      {:error, :ta, %Ecto.Changeset{} = cs, _} ->
+        resolve_client_conflict(cs, device.id, client_id)
+
+      {:error, _, reason, _} when is_atom(reason) ->
+        {:error, reason}
+
+      {:error, _, _reason, _} ->
+        {:error, :invalid}
+    end
+  end
+
+  defp resolve_client_conflict(%Ecto.Changeset{} = cs, device_id, client_id) do
+    unique? =
+      case Keyword.get(cs.errors, :client_id) do
+        {_msg, opts} -> opts[:constraint] == :unique
+        _ -> false
+      end
+
+    if unique? do
+      case existing_client(device_id, client_id) do
+        %TimeAttend{} = ta -> {:ok, Repo.preload(ta, :employee)}
+        nil -> {:error, :invalid}
+      end
+    else
+      {:error, :invalid}
     end
   end
 

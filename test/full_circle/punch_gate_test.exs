@@ -83,6 +83,9 @@ defmodule FullCircle.PunchGateTest do
     assert ta.punch_device_id == device.id
     assert is_nil(ta.user_id)
     assert File.exists?(PunchGate.photo_abs_path(company.id, ta))
+    assert is_binary(ta.photo_path)
+    refute String.starts_with?(ta.photo_path, "/")
+    assert String.starts_with?(ta.photo_path, "#{company.id}/punch_photos/")
   end
 
   test "second punch same day is 1_OUT_1; third is 2_IN_2", %{admin: admin, company: company} do
@@ -163,5 +166,44 @@ defmodule FullCircle.PunchGateTest do
     {:ok, {device, _}} = PunchGate.create_device("Gate 1", company, admin)
     attrs = ingest_attrs(%{id: Ecto.UUID.generate()})
     assert {:error, :not_found} = PunchGate.ingest_punch(device, attrs)
+  end
+
+  test "nil photo is :missing_photo", %{admin: admin, company: company} do
+    {:ok, {device, _}} = PunchGate.create_device("Gate 1", company, admin)
+    emp = employee_fixture(%{}, company, admin)
+
+    assert {:error, :missing_photo} =
+             PunchGate.ingest_punch(device, ingest_attrs(emp, %{"photo" => nil}))
+  end
+
+  test "photo over 300KB is :too_large", %{admin: admin, company: company} do
+    {:ok, {device, _}} = PunchGate.create_device("Gate 1", company, admin)
+    emp = employee_fixture(%{}, company, admin)
+    path = Path.join(System.tmp_dir!(), "big-#{System.unique_integer()}.jpg")
+    File.write!(path, :binary.copy(<<0>>, 300_001))
+    photo = %Plug.Upload{path: path, filename: "face.jpg", content_type: "image/jpeg"}
+
+    assert {:error, :too_large} =
+             PunchGate.ingest_punch(device, ingest_attrs(emp, %{"photo" => photo}))
+  end
+
+  test "punched_at more than 120s ahead is :future", %{admin: admin, company: company} do
+    {:ok, {device, _}} = PunchGate.create_device("Gate 1", company, admin)
+    emp = employee_fixture(%{}, company, admin)
+    future = DateTime.utc_now() |> DateTime.add(180, :second) |> DateTime.truncate(:second)
+
+    assert {:error, :future} =
+             PunchGate.ingest_punch(device, ingest_attrs(emp, %{"punched_at" => future}))
+  end
+
+  test "garbage punched_at is :invalid", %{admin: admin, company: company} do
+    {:ok, {device, _}} = PunchGate.create_device("Gate 1", company, admin)
+    emp = employee_fixture(%{}, company, admin)
+
+    assert {:error, :invalid} =
+             PunchGate.ingest_punch(
+               device,
+               ingest_attrs(emp, %{"punched_at" => "not-a-datetime"})
+             )
   end
 end

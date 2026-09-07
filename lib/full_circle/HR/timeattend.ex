@@ -71,6 +71,7 @@ defmodule FullCircle.HR.TimeAttend do
       :punch_device_id,
       :client_id
     ])
+    |> unique_constraint(:client_id, name: :time_attendences_punch_device_id_client_id_index)
   end
 
   @doc false
