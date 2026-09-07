@@ -10,6 +10,9 @@ defmodule FullCircle.HR.TimeAttend do
     field(:gps_long, :float)
     field(:gps_lat, :float)
     field(:status, :string, default: "Draft")
+    field(:photo_path, :string)
+    field(:client_id, :string)
+    belongs_to(:punch_device, FullCircle.PunchGate.PunchDevice)
 
     field(:employee_name, :string, virtual: true)
     field(:email, :string, virtual: true)
