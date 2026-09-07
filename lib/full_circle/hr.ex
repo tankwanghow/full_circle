@@ -1205,8 +1205,18 @@ defmodule FullCircle.HR do
                     eids.work_days_per_month),
           emp_time_list as (
             select ta.employee_id, ds.dd as dd_utc, ds.dd at time zone '#{com.timezone}' as dd_tz,
-                   array_agg((ta.punch_time at time zone '#{com.timezone}')::varchar || '|' || ta.id::varchar || '|' || ta.status || '|' || ta.flag order by ta.punch_time, ta.flag) time_list
-              from time_attendences ta cross join date_series ds
+                   array_agg(
+                     (ta.punch_time at time zone '#{com.timezone}')::varchar
+                     || '|' || ta.id::varchar
+                     || '|' || ta.status
+                     || '|' || ta.flag
+                     || '|' || coalesce(ta.photo_path, '')
+                     || '|' || coalesce(pd.name, '')
+                     order by ta.punch_time, ta.flag
+                   ) time_list
+              from time_attendences ta
+              left join punch_devices pd on pd.id = ta.punch_device_id
+              cross join date_series ds
              where ta.punch_time between ds.dd and (ds.dd + interval '23 hours 59 minutes 59 seconds')
              group by ta.employee_id, ds.dd)
 
@@ -1246,7 +1256,7 @@ defmodule FullCircle.HR do
     dd = Timex.to_date(dd)
 
     (punch_query_by_company_id(dd, dd, com) <>
-       " and eidsh.id::varchar || eidsh.dd::varchar = '#{empid}#{dd}'")
+       " and eidsh.id::varchar || eidsh.dd::date::varchar = '#{empid}#{dd}'")
     |> exec_query_map()
     |> unzip_all_time_list()
     |> Enum.at(0)
@@ -1278,7 +1288,7 @@ defmodule FullCircle.HR do
     |> Enum.chunk_every(2)
     |> Enum.map(fn t ->
       try do
-        [[ti, _, _, _], [to, _, _, _]] = t
+        [[ti | _], [to | _]] = t
 
         if is_nil(ti) || is_nil(to) do
           0.0
@@ -1343,7 +1353,13 @@ defmodule FullCircle.HR do
     else
       tl
       |> Enum.map(fn x -> String.split(x, "|") end)
-      |> Enum.map(fn [t, i, s, f] -> [Timex.parse!(t, "{RFC3339}"), i, s, f] end)
+      |> Enum.map(fn
+        [t, i, s, f, photo, gate] ->
+          [Timex.parse!(t, "{RFC3339}"), i, s, f, photo, gate]
+
+        [t, i, s, f] ->
+          [Timex.parse!(t, "{RFC3339}"), i, s, f, "", ""]
+      end)
     end
   end
 

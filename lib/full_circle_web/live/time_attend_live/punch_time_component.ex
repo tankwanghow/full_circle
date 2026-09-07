@@ -70,7 +70,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchTimeComponent do
       tis:
         List.replace_at(
           socket.assigns.tis,
-          Enum.find_index(socket.assigns.tis, fn {_, id, _, _, _} -> id == taid end),
+          Enum.find_index(socket.assigns.tis, fn t -> elem(t, 1) == taid end),
           {nil, "_new_#{FullCircle.Helpers.gen_temp_id(31)}", status, flag, nil}
         )
     )
@@ -112,7 +112,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchTimeComponent do
           tis:
             List.replace_at(
               socket.assigns.tis,
-              Enum.find_index(socket.assigns.tis, fn {_, id, _, _, _} -> id == taid end),
+              Enum.find_index(socket.assigns.tis, fn t -> elem(t, 1) == taid end),
               {punch_time, obj.id, obj.status, obj.flag, punch_time_local}
             )
         )
@@ -165,7 +165,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchTimeComponent do
           tis:
             List.replace_at(
               socket.assigns.tis,
-              Enum.find_index(socket.assigns.tis, fn {_, id, _, _, _} -> id == taid end),
+              Enum.find_index(socket.assigns.tis, fn t -> elem(t, 1) == taid end),
               {punch_time, obj.id, obj.status, obj.flag, punch_time_local}
             )
         )
@@ -181,13 +181,13 @@ defmodule FullCircleWeb.TimeAttendLive.PunchTimeComponent do
 
   defp update_working_hours(socket) do
     [
-      {_ti1, id1, st1, fl1, dt1},
-      {_ti2, id2, st2, fl2, dt2},
-      {_ti3, id3, st3, fl3, dt3},
-      {_ti4, id4, st4, fl4, dt4},
-      {_ti5, id5, st5, fl5, dt5},
-      {_ti6, id6, st6, fl6, dt6}
-    ] = socket.assigns.tis
+      {_ti1, id1, st1, fl1, dt1, _p1},
+      {_ti2, id2, st2, fl2, dt2, _p2},
+      {_ti3, id3, st3, fl3, dt3, _p3},
+      {_ti4, id4, st4, fl4, dt4, _p4},
+      {_ti5, id5, st5, fl5, dt5, _p5},
+      {_ti6, id6, st6, fl6, dt6, _p6}
+    ] = Enum.map(socket.assigns.tis, &pad_tis/1)
 
     tl = [
       [dt1, id1, st1, fl1],
@@ -258,13 +258,16 @@ defmodule FullCircleWeb.TimeAttendLive.PunchTimeComponent do
     |> Timex.to_datetime(socket.assigns.company.timezone)
   end
 
+  defp pad_tis({t, i, s, f, d}), do: {t, i, s, f, d, ""}
+  defp pad_tis({t, i, s, f, d, p}), do: {t, i, s, f, d, p}
+
   @impl true
   def render(assigns) do
     ~H"""
     <div class="flex flex-nowrap gap-1">
       <%= if !is_nil(@tis) do %>
         <%= for o <- @tis do %>
-          <% {time, id, status, flag, datetime} = o %>
+          <% {time, id, status, flag, datetime, photo} = pad_tis(o) %>
           <.form
             for={}
             autocomplete="off"
@@ -290,6 +293,14 @@ defmodule FullCircleWeb.TimeAttendLive.PunchTimeComponent do
               phx-debounce="blur"
               id={id}
             />
+            <.link
+              :if={photo != "" and !String.starts_with?(id, "_new_")}
+              href={~p"/companies/#{@company.id}/TimeAttend/#{id}/photo"}
+              target="_blank"
+              class="block text-center text-xs"
+            >
+              📷
+            </.link>
           </.form>
         <% end %>
       <% end %>
