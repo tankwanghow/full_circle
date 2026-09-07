@@ -22,6 +22,11 @@ defmodule FullCircleWeb.Router do
     plug(:fetch_api_user)
   end
 
+  pipeline :punch_api do
+    plug :accepts, ["json", "multipart"]
+    plug FullCircleWeb.PunchDeviceAuth
+  end
+
   pipeline :list do
     plug(:accepts, ["json"])
     plug(:fetch_session)
@@ -42,7 +47,11 @@ defmodule FullCircleWeb.Router do
 
   scope "/api", FullCircleWeb do
     pipe_through(:api)
-    # all api routes place here
+  end
+
+  scope "/api/punch", FullCircleWeb do
+    pipe_through(:punch_api)
+    post "/attendances", PunchAttendanceController, :create
   end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development
