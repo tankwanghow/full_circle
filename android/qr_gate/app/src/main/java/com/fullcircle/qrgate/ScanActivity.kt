@@ -16,6 +16,7 @@ import android.view.View
 import android.view.WindowManager
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.ColorRes
 import androidx.annotation.StringRes
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.CameraSelector
@@ -372,6 +373,7 @@ class ScanActivity : AppCompatActivity() {
         if (shouldBeep) lastRejectBeepAt = now
         runOnUiThread {
             if (isDestroyed || isFinishing) return@runOnUiThread
+            flash(R.color.flash_fail)
             if (shouldBeep) beep(ToneGenerator.TONE_PROP_NACK, 300)
             showWaitUi()
             showHint(reasonRes, force = true)
@@ -416,6 +418,7 @@ class ScanActivity : AppCompatActivity() {
         pendingEmployeeId = null
         pendingPunchedAtIso = null
         step.set(Step.OK)
+        flash(R.color.flash_ok)
         beep(ToneGenerator.TONE_PROP_BEEP, 200)
         binding.guideFrame.visibility = View.GONE
         binding.prompt.setText(R.string.ok)
@@ -434,6 +437,21 @@ class ScanActivity : AppCompatActivity() {
         readyAt = SystemClock.elapsedRealtime() + QR_COOLDOWN_MS
         showWaitUi()
         step.set(Step.WAIT)
+    }
+
+    /** Full-screen colour cue: green accepted, red rejected. Read from across the gate. */
+    private fun flash(@ColorRes colorRes: Int) {
+        if (!::binding.isInitialized || isDestroyed || isFinishing) return
+        val v = binding.flashOverlay
+        v.animate().cancel()
+        v.setBackgroundColor(ContextCompat.getColor(this, colorRes))
+        v.alpha = FLASH_ALPHA
+        v.visibility = View.VISIBLE
+        v.animate()
+            .alpha(0f)
+            .setStartDelay(FLASH_HOLD_MS)
+            .setDuration(FLASH_FADE_MS)
+            .withEndAction { v.visibility = View.GONE }
     }
 
     /** Briefly explain a rejection, then fall back to the standing prompt. */
@@ -472,7 +490,10 @@ class ScanActivity : AppCompatActivity() {
         val now = SystemClock.elapsedRealtime()
         if (now - lastRejectBeepAt < 1_500L) return
         lastRejectBeepAt = now
-        runOnUiThread { beep(ToneGenerator.TONE_SUP_ERROR, 400) }
+        runOnUiThread {
+            flash(R.color.flash_fail)
+            beep(ToneGenerator.TONE_SUP_ERROR, 400)
+        }
     }
 
     private fun goPairing() {
@@ -507,6 +528,9 @@ class ScanActivity : AppCompatActivity() {
         private const val QR_COOLDOWN_MS = 2_000L
         private const val REJECT_COOLDOWN_MS = 750L
         private const val HINT_MS = 1_500L
+        private const val FLASH_ALPHA = 0.75f
+        private const val FLASH_HOLD_MS = 250L
+        private const val FLASH_FADE_MS = 400L
         private const val DUP_WINDOW_MS = 180_000L
         private const val MAX_PHOTO_BYTES = 300_000L
         private const val LONG_SIDE_PX = 480
