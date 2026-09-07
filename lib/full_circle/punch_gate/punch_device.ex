@@ -25,7 +25,7 @@ defmodule FullCircle.PunchGate.PunchDevice do
       :paired_by_user_id
     ])
     |> validate_required([:name, :token_hash, :company_id])
-    |> unique_constraint([:company_id, :name],
+    |> unique_constraint(:name,
       name: :punch_devices_company_id_name_index,
       message: gettext("has already been taken")
     )

@@ -17,6 +17,7 @@ defmodule FullCircle.AuthorizationTest do
   test_authorise_to(:delete_company, ["admin"])
   test_authorise_to(:update_company, ["admin"])
   test_authorise_to(:reset_user_password, ["admin"])
+  test_authorise_to(:manage_punch_device, ["admin", "manager", "supervisor"])
 
   test_not_authorise_to(:create_account, [
     "disable",
