@@ -75,7 +75,7 @@ then restart Phoenix and create the device again.
 ## Scan a badge
 
 1. Square overlay: hold the printed employee badge in the box (`fcqa:` payload, or a bare UUID from older cards).
-2. Oval overlay + “Look at the camera”: face JPEG (long side 480px, quality 70, abort/recapture if `> 300_000` bytes). **No photo → no punch.**
+2. Oval overlay + “Look at the camera”: ML Kit **face detection** on live frames, then a still. **Zero faces → reject beep, no JPEG, no queue row; stay on the oval until a face is in frame.** At least one face → JPEG (long side 480px, quality 70, recapture if `> 300_000` bytes). Detection only (no matching / enrolment). **No photo → no punch.**
 3. “OK” 1.5s, beep, back to the QR step. Punch time is scan time (UTC ISO-8601), not upload time.
 
 There is no flip-camera control and no employee list.

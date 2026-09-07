@@ -9,6 +9,7 @@ import android.graphics.Matrix
 import android.media.AudioManager
 import android.media.ToneGenerator
 import android.os.Bundle
+import android.os.SystemClock
 import android.util.Log
 import android.view.View
 import android.view.WindowManager
@@ -32,11 +33,15 @@ import com.fullcircle.qrgate.data.PunchEntity
 import com.fullcircle.qrgate.data.QueueDb
 import com.fullcircle.qrgate.databinding.ActivityScanBinding
 import com.fullcircle.qrgate.net.UploadWorker
+import com.google.android.gms.tasks.Tasks
 import com.google.mlkit.vision.barcode.BarcodeScanner
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.face.FaceDetection
+import com.google.mlkit.vision.face.FaceDetector
+import com.google.mlkit.vision.face.FaceDetectorOptions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -46,20 +51,24 @@ import java.time.temporal.ChronoUnit
 import java.util.UUID
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
-import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.max
 
 class ScanActivity : AppCompatActivity() {
+    private enum class Step { QR, FACE, CAPTURING, OK }
+
     private lateinit var binding: ActivityScanBinding
     private lateinit var prefs: Prefs
     private lateinit var cameraExecutor: ExecutorService
     private lateinit var scanner: BarcodeScanner
+    private lateinit var faceDetector: FaceDetector
     private lateinit var photosDir: File
 
     private var imageCapture: ImageCapture? = null
     private var pendingEmployeeId: String? = null
-    private var faceAttempts = 0
-    private val acceptingQr = AtomicBoolean(true)
+    private var lastRejectBeepAt = 0L
+    private val step = AtomicReference(Step.QR)
 
     private val prefListener =
         SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
@@ -96,6 +105,14 @@ class ScanActivity : AppCompatActivity() {
         scanner = BarcodeScanning.getClient(
             BarcodeScannerOptions.Builder()
                 .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
+                .build(),
+        )
+        faceDetector = FaceDetection.getClient(
+            FaceDetectorOptions.Builder()
+                .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
+                .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_NONE)
+                .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_NONE)
+                .setMinFaceSize(0.10f)
                 .build(),
         )
 
@@ -168,7 +185,7 @@ class ScanActivity : AppCompatActivity() {
             val analysis = ImageAnalysis.Builder()
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .build()
-                .also { it.setAnalyzer(cameraExecutor, ::analyzeQr) }
+                .also { it.setAnalyzer(cameraExecutor, ::analyzeFrame) }
 
             provider.unbindAll()
             try {
@@ -187,39 +204,53 @@ class ScanActivity : AppCompatActivity() {
     }
 
     @OptIn(ExperimentalGetImage::class)
-    private fun analyzeQr(imageProxy: ImageProxy) {
+    private fun analyzeFrame(imageProxy: ImageProxy) {
         val media = imageProxy.image
-        if (media == null || !acceptingQr.get()) {
+        if (media == null) {
             imageProxy.close()
             return
         }
         val image = InputImage.fromMediaImage(media, imageProxy.imageInfo.rotationDegrees)
-        scanner.process(image)
-            .addOnSuccessListener { barcodes ->
-                if (!acceptingQr.get()) return@addOnSuccessListener
-                val raw = barcodes.firstNotNullOfOrNull { it.rawValue } ?: return@addOnSuccessListener
-                val empId = parseBadge(raw) ?: return@addOnSuccessListener
-                if (acceptingQr.compareAndSet(true, false)) {
-                    runOnUiThread { onBadgeScanned(empId) }
-                }
+        when (step.get()) {
+            Step.QR -> {
+                scanner.process(image)
+                    .addOnSuccessListener { barcodes ->
+                        if (step.get() != Step.QR) return@addOnSuccessListener
+                        val raw = barcodes.firstNotNullOfOrNull { it.rawValue }
+                            ?: return@addOnSuccessListener
+                        val empId = parseBadge(raw) ?: return@addOnSuccessListener
+                        if (step.compareAndSet(Step.QR, Step.FACE)) {
+                            runOnUiThread { onBadgeScanned(empId) }
+                        }
+                    }
+                    .addOnCompleteListener { imageProxy.close() }
             }
-            .addOnCompleteListener { imageProxy.close() }
+            Step.FACE -> {
+                faceDetector.process(image)
+                    .addOnSuccessListener { faces ->
+                        if (step.get() != Step.FACE) return@addOnSuccessListener
+                        if (faces.isNotEmpty() && step.compareAndSet(Step.FACE, Step.CAPTURING)) {
+                            runOnUiThread { captureFace() }
+                        }
+                    }
+                    .addOnCompleteListener { imageProxy.close() }
+            }
+            else -> imageProxy.close()
+        }
     }
 
     private fun onBadgeScanned(employeeId: String) {
         pendingEmployeeId = employeeId
-        faceAttempts = 0
         binding.guideSquare.visibility = View.GONE
         binding.guideOval.visibility = View.VISIBLE
         binding.prompt.setText(R.string.look_at_camera)
-        binding.root.postDelayed({ captureFace() }, FACE_DELAY_MS)
     }
 
     private fun captureFace() {
         if (isDestroyed || isFinishing) return
         val capture = imageCapture
         if (capture == null) {
-            failFace()
+            stayOnFace(beepReject = true)
             return
         }
         capture.takePicture(
@@ -231,11 +262,17 @@ class ScanActivity : AppCompatActivity() {
                     } catch (e: Exception) {
                         Log.w(TAG, "toBitmap failed", e)
                         image.close()
-                        runOnUiThread { recaptureOrFail() }
+                        stayOnFace(beepReject = true)
                         return
                     }
                     val rotated = rotateIfNeeded(bitmap, image.imageInfo.rotationDegrees)
                     image.close()
+
+                    if (!hasFace(rotated)) {
+                        Log.i(TAG, "capture has zero faces; not queueing")
+                        stayOnFace(beepReject = true)
+                        return
+                    }
 
                     val emp = pendingEmployeeId
                     if (emp == null) {
@@ -246,7 +283,7 @@ class ScanActivity : AppCompatActivity() {
                     val dest = File(photosDir, "$clientId.jpg")
                     if (!writeFaceJpeg(rotated, dest)) {
                         dest.delete()
-                        runOnUiThread { recaptureOrFail() }
+                        stayOnFace(beepReject = true)
                         return
                     }
                     queuePunch(clientId, emp, dest)
@@ -254,25 +291,36 @@ class ScanActivity : AppCompatActivity() {
 
                 override fun onError(exception: ImageCaptureException) {
                     Log.w(TAG, "capture failed", exception)
-                    runOnUiThread { recaptureOrFail() }
+                    stayOnFace(beepReject = true)
                 }
             },
         )
     }
 
-    private fun recaptureOrFail() {
-        faceAttempts += 1
-        if (faceAttempts >= MAX_FACE_ATTEMPTS) {
-            failFace()
-        } else {
-            binding.root.postDelayed({ captureFace() }, 400)
+    /** Detection only — no matching / enrolment. Empty or error → do not save. */
+    private fun hasFace(bitmap: Bitmap): Boolean {
+        return try {
+            val image = InputImage.fromBitmap(bitmap, 0)
+            val faces = Tasks.await(faceDetector.process(image), 2, TimeUnit.SECONDS)
+            faces.isNotEmpty()
+        } catch (e: Exception) {
+            Log.w(TAG, "face detect failed", e)
+            false
         }
     }
 
-    private fun failFace() {
-        beep(ToneGenerator.TONE_PROP_NACK, 300)
-        binding.prompt.setText(R.string.capture_failed)
-        binding.root.postDelayed({ backToQr() }, 1_200)
+    private fun stayOnFace(beepReject: Boolean) {
+        step.set(Step.FACE)
+        val now = SystemClock.elapsedRealtime()
+        val shouldBeep = beepReject && now - lastRejectBeepAt > 1_500L
+        if (shouldBeep) lastRejectBeepAt = now
+        runOnUiThread {
+            if (isDestroyed || isFinishing) return@runOnUiThread
+            if (shouldBeep) beep(ToneGenerator.TONE_PROP_NACK, 300)
+            binding.guideSquare.visibility = View.GONE
+            binding.guideOval.visibility = View.VISIBLE
+            binding.prompt.setText(R.string.look_at_camera)
+        }
     }
 
     private fun queuePunch(clientId: String, employeeId: String, photo: File) {
@@ -291,6 +339,7 @@ class ScanActivity : AppCompatActivity() {
     }
 
     private fun showOk() {
+        step.set(Step.OK)
         beep(ToneGenerator.TONE_PROP_BEEP, 200)
         binding.guideSquare.visibility = View.GONE
         binding.guideOval.visibility = View.GONE
@@ -305,11 +354,10 @@ class ScanActivity : AppCompatActivity() {
             return
         }
         pendingEmployeeId = null
-        faceAttempts = 0
         binding.guideOval.visibility = View.GONE
         binding.guideSquare.visibility = View.VISIBLE
         binding.prompt.setText(R.string.scan_badge)
-        acceptingQr.set(true)
+        step.set(Step.QR)
     }
 
     private fun goPairing() {
@@ -321,7 +369,11 @@ class ScanActivity : AppCompatActivity() {
         try {
             val tg = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 80)
             tg.startTone(tone, durationMs)
-            binding.root.postDelayed({ tg.release() }, durationMs + 80L)
+            if (::binding.isInitialized) {
+                binding.root.postDelayed({ tg.release() }, durationMs + 80L)
+            } else {
+                tg.release()
+            }
         } catch (_: Exception) {
         }
     }
@@ -330,13 +382,12 @@ class ScanActivity : AppCompatActivity() {
         super.onDestroy()
         if (::cameraExecutor.isInitialized) cameraExecutor.shutdown()
         if (::scanner.isInitialized) scanner.close()
+        if (::faceDetector.isInitialized) faceDetector.close()
     }
 
     companion object {
         private const val TAG = "QrGateScan"
-        private const val FACE_DELAY_MS = 1_000L
         private const val OK_MS = 1_500L
-        private const val MAX_FACE_ATTEMPTS = 3
         private const val MAX_PHOTO_BYTES = 300_000L
         private const val LONG_SIDE_PX = 480
         private const val JPEG_QUALITY = 70
