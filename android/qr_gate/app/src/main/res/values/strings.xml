@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">QR Gate</string>
+    <string name="scan_pairing">Scan pairing QR from Full Circle Punch Devices</string>
+    <string name="scan_badge">Hold badge in the square</string>
+    <string name="look_at_camera">Look at the camera</string>
+    <string name="ok">OK</string>
+    <string name="camera_required">Camera permission is required</string>
+    <string name="capture_failed">Photo failed — scan again</string>
+</resources>
