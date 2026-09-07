@@ -17,10 +17,10 @@ defmodule FullCircleWeb.EmployeeLive.Print do
 
   defp fill_employee(socket, ids) do
     detail_body_height = 285
-    detail_height = 52
+    detail_height = 80
     chunk = (detail_body_height / detail_height) |> floor
 
-    svg_settings = %QRCode.Render.SvgSettings{scale: 4}
+    svg_settings = %QRCode.Render.SvgSettings{scale: 6, structure: :readable}
 
     emps =
       HR.get_print_employees!(
@@ -34,7 +34,7 @@ defmodule FullCircleWeb.EmployeeLive.Print do
           svg: QRCode.create(emp.id, :high) |> QRCode.render(:svg, svg_settings) |> elem(1)
         })
       end)
-      |> Enum.chunk_every(3)
+      |> Enum.chunk_every(2)
 
     socket
     |> assign(page_title: gettext("Print"))
@@ -52,13 +52,13 @@ defmodule FullCircleWeb.EmployeeLive.Print do
       {style(assigns)}
       <%= Enum.map 1..@chunk_number, fn n -> %>
         <div class="page">
-          <div class="details-body is-size-6">
+          <div class="details-body is-size-8">
             <%= for emp <- Enum.at(@detail_chunks, n - 1) do %>
               <div class="detail">
                 <%= for e <- emp do %>
                   <div class="emp-card">
                     <div class="emp-svg">{e.svg |> raw}</div>
-                    <div class="emp-info">{e.name}</div>
+                    <div class="emp-name">{e.name}</div>
                     <div class="emp-info">{e.id_no}</div>
                   </div>
                 <% end %>
@@ -75,8 +75,8 @@ defmodule FullCircleWeb.EmployeeLive.Print do
     ~H"""
     <style>
       .details-body { height: <%= @detail_body_height %>mm; }
-      .detail { display: flex; height: <%= @detail_height %>mm; margin-bottom: 3mm; }
-      .page { width: 210mm; min-height: 290mm; padding: 5mm; }
+      .detail { display: flex; height: <%= @detail_height %>mm; margin-bottom: 12mm; }
+      .page { width: 210mm; min-height: 290mm; padding: 20mm; }
 
       @media print {
         @page { size: A4; margin: 0mm; }
@@ -84,9 +84,10 @@ defmodule FullCircleWeb.EmployeeLive.Print do
         html { margin: 0mm; }
         .page { padding: 5mm; page-break-after: always;} }
 
-      .emp-card { width: 55mm; border: 1px solid black; margin-left: 10mm; }
-      .emp-card .emp-svg { margin-left: 7.5mm; }
-      .emp-card .emp-info { text-align: center; width: 55mm; max-height: 5mm; overflow: hidden; }
+      .emp-card { width: 73mm; border: 2px solid black; margin-right: 16mm;}
+      .emp-card .emp-svg { }
+      .emp-card .emp-name { text-align: center; margin-top: -6mm; width: 73mm; max-height: 5mm; overflow: hidden; }
+      .emp-card .emp-info { text-align: center; margin-top: 0mm; width: 73mm; max-height: 5mm; overflow: hidden; }
     </style>
     """
   end
