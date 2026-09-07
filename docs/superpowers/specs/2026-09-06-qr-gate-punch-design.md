@@ -28,7 +28,7 @@ Goal: company-owned **wall-mounted Android phones** at the gate, under a roof in
 | Device auth | Admin **pairs** each phone once. Device token on the phone; **no ERP user login** on the device. |
 | Badge QR | `fcqa:<employee_id>` (UUID). No extra token column. Lost badge → face photos + disable employee if needed. Reprint is the same QR. |
 | Face photo | **Audit only.** JPEG stored with the punch. No enrolment, no matching, do not restore `employee_photos`. |
-| Camera | **Front camera** + live preview (QR box, then face oval). Decode from raw frames, not the mirrored preview. No flip-camera on a fixed mount. |
+| Camera | **Front camera** + live preview. Capture only when **one frame** has a valid badge QR **and** a face. Decode from raw frames, not the mirrored preview. No flip-camera on a fixed mount. |
 | Hardware | Consumer/commercial Android phone or tablet, wall cradle, always charging, under a roof, daylight. Not a closed ZKTeco-style terminal. |
 | Fingerprint | Import path **unchanged** until QR is successful. Then phase out separately. |
 | GPS | Not in v1 (gate is a named device). |
@@ -110,12 +110,10 @@ Served only to logged-in company users (`GET /companies/:company_id/TimeAttend/:
 ## Scan flow (mounted phone)
 
 1. App is the only foreground activity (lock-task / kiosk). Screen stays on. Front camera preview fills the screen.
-2. **QR step:** overlay a square guide. Employee holds the printed badge in the box. On decode of `fcqa:<uuid>` (or a bare UUID that is an employee in this company — so cards printed **before** the `fcqa:` prefix still work), beep.
-3. **Face step:** overlay an oval, copy “Look at the camera”. Capture a JPEG (~480 px on the long side, quality ~70). If capture fails, **do not** queue a punch (photo is required).
-4. Write `{employee_id, punched_at, photo, local_id}` to SQLite immediately. Show a short OK (name if last successful sync cached it; otherwise “OK”).
+2. One overlay + “Hold your badge and look at the camera”. Live frames run **barcode and face detection together**. Capture a still only when that **same frame** has a valid badge (`fcqa:<uuid>`, or a bare UUID so older cards still work) **and** at least one face. Prefer `fcqa:` if two codes are in view.
+3. Re-check the JPEG: still must contain a face **and** the same employee QR. If either is missing, reject beep, no queue row. JPEG ~480 px on the long side, quality ~70. Detection only (no matching). **No photo → no punch.**
+4. Write `{employee_id, punched_at, photo, local_id}` to SQLite immediately. Show a short OK. `punched_at` is that capture instant (UTC ISO-8601), not upload time.
 5. Upload when the network is up. Success → delete local row. Failure → retry with backoff. `punched_at` never changes.
-
-Two shots are required: the badge covers the face if they hold it up, so QR and portrait cannot share one frame.
 
 ## IN/OUT flag assignment
 
@@ -217,7 +215,7 @@ Manual test on a wall-mounted phone is the gate for the APK; Mix tests cover the
 2. **Paired devices**, not a logged-in user on the phone — no ERP session on a shared gate device; `user_id` nil, `punch_device_id` set.
 3. **Infer IN/OUT on the server by calendar day** — no extra tap on a shared screen; late sync still sorts correctly.
 4. **QR = `fcqa:` + employee UUID** — print already exists; no rotatable token until stolen badges hurt.
-5. **Front camera + two-step capture** — screen faces the person; badge and face cannot share one frame.
+5. **Front camera + same-frame capture** — screen faces the person; punch only when the badge QR and a face are in the same picture (stronger buddy-punch audit than QR-then-oval).
 6. **Audit JPEG on disk** — deterrence and review, not Face ID.
 7. **No personal-phone QR** — standing rule.
 8. **Fingerprint import stays** until this path is proven.

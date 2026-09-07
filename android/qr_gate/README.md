@@ -1,6 +1,6 @@
 # QR Gate scanner (Android)
 
-Wall-mounted kiosk: scan a printed employee badge (`fcqa:<uuid>` or a bare UUID), take an audit face JPEG, queue offline, POST to Full Circle.
+Wall-mounted kiosk: one still with a printed employee badge (`fcqa:<uuid>` or a bare UUID) **and** a face, queue offline, POST to Full Circle.
 
 No ERP login. Config is only the pairing QR: token + API base URL in `SharedPreferences`.
 
@@ -76,10 +76,9 @@ then restart Phoenix and create the device again.
 
 ## Scan a badge
 
-1. Square overlay: hold the printed employee badge in the box (`fcqa:` payload, or a bare UUID from older cards).
-2. Oval overlay + “Look at the camera”: ML Kit **face detection** on live frames, then a still. **Zero faces → reject beep, no JPEG, no queue row; keep the oval.** At least one face → JPEG (long side 480px, quality 70, recapture if `> 300_000` bytes). Detection only (no matching / enrolment). **No photo → no punch.**
-3. If **no face within 8 seconds**, reject beep, clear the pending employee, back to the QR square (no punch).
-4. “OK” 1.5s, beep, back to the QR step. After returning to QR, ignore all badges for **2s**. The **same employee** is ignored for **3 minutes** (duplicate window) with a distinct reject beep — no second punch queued. **`punched_at` is badge-scan time** (UTC ISO-8601), not face-capture or upload time.
+1. Frame overlay: hold the printed badge and look at the camera so **both** are in view (`fcqa:` payload, or a bare UUID from older cards). If two QR codes are visible, `fcqa:` wins.
+2. Live frames run barcode **and** face detection together. A still is taken only when that same frame has a valid badge **and** an unobstructed face. **The badge must not cover the face:** the QR bounding box is measured against the *largest* face box (so a bystander behind you cannot stand in for yours), and more than **5%** coverage is rejected — holding the card over your nose or mouth will not punch. Hold it below your chin or beside your head. A degenerate face box fails closed. On screen you get “Don't cover your face — hold the badge lower” and no capture. The JPEG is re-checked for badge, face, **and** the same coverage rule; **missing face or badge, or a covered face → reject beep, no queue row.** JPEG long side 480px, quality 70; a result outside `1..300_000` bytes is discarded and the punch rejected (no recapture). Detection only (no matching / enrolment). **No photo → no punch.**
+3. “OK” 1.5s, beep, back to waiting. After OK, ignore all badges for **2s**. The **same employee** is ignored for **3 minutes** (duplicate window) with a distinct reject beep — no second punch queued. **`punched_at` is that capture time** (UTC ISO-8601), not upload time.
 
 There is no flip-camera control and no employee list.
 
@@ -113,6 +112,6 @@ Release builds do not allow cleartext and trust only system CAs.
 
 - Pair phone → scanner mode.
 - Print an employee badge (payload `fcqa:<id>`).
-- Scan + face → Punch IO shows a 📷 for that slot.
+- Hold badge + face in one frame → Punch IO shows a 📷 for that slot.
 - Airplane mode: scan twice (wait 3+ minutes), restore network → both rows appear in time order with rebuilt flags.
 - Revoke device → next upload 401, **entire** local queue + photos wiped, phone returns to pairing (nothing left to upload under the next device).

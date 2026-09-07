@@ -2,9 +2,10 @@
 <resources>
     <string name="app_name">QR Gate</string>
     <string name="scan_pairing">Scan pairing QR from Full Circle Punch Devices</string>
-    <string name="scan_badge">Hold badge in the square</string>
-    <string name="look_at_camera">Look at the camera</string>
+    <string name="scan_badge">Hold your badge and look at the camera</string>
     <string name="ok">OK</string>
     <string name="camera_required">Camera permission is required</string>
-    <string name="capture_failed">Photo failed — scan again</string>
+    <string name="front_camera_required">Front camera required</string>
+    <string name="badge_covers_face">Don\'t cover your face — hold the badge lower</string>
+    <string name="capture_rejected">Show your full face and the badge — try again</string>
 </resources>
