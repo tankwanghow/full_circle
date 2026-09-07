@@ -50,6 +50,29 @@ defmodule FullCircle.HR.TimeAttend do
     ])
   end
 
+  def changeset_gate(st, attrs) do
+    st
+    |> cast(attrs, [
+      :flag,
+      :input_medium,
+      :punch_time,
+      :company_id,
+      :employee_id,
+      :punch_device_id,
+      :client_id,
+      :status
+    ])
+    |> validate_required([
+      :flag,
+      :input_medium,
+      :punch_time,
+      :company_id,
+      :employee_id,
+      :punch_device_id,
+      :client_id
+    ])
+  end
+
   @doc false
   def data_entry_changeset(st, attrs) do
     st

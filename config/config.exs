@@ -81,6 +81,7 @@ config :logger, :console,
   metadata: [:request_id]
 
 config :tzdata, :autoupdate, :disabled
+config :elixir, :time_zone_database, Tzdata.TimeZoneDatabase
 
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
