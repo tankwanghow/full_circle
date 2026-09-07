@@ -16,6 +16,7 @@ defmodule FullCircleWeb.PunchDeviceLive.Index do
        |> assign(page_title: gettext("Punch Devices"))
        |> assign(pairing: nil)
        |> assign(form: to_form(%{"name" => ""}, as: :device))
+       |> assign_pairing_origin()
        |> load_devices()}
     end
   end
@@ -23,6 +24,37 @@ defmodule FullCircleWeb.PunchDeviceLive.Index do
   defp load_devices(socket) do
     devices = PunchGate.list_devices(socket.assigns.current_company, socket.assigns.current_user)
     assign(socket, devices: devices)
+  end
+
+  defp assign_pairing_origin(socket) do
+    base =
+      case Phoenix.LiveView.get_connect_info(socket, :uri) do
+        %URI{scheme: scheme, host: host, port: port}
+        when is_binary(scheme) and is_binary(host) ->
+          origin(scheme, host, port)
+
+        _ ->
+          FullCircleWeb.Endpoint.url() |> String.trim_trailing("/")
+      end
+
+    socket
+    |> assign(:pairing_base, base)
+    |> assign(:pairing_unreachable?, pairing_unreachable?(base))
+  end
+
+  defp origin(scheme, host, port) do
+    if port in [nil, URI.default_port(scheme)] do
+      "#{scheme}://#{host}"
+    else
+      "#{scheme}://#{host}:#{port}"
+    end
+  end
+
+  defp pairing_unreachable?(base) do
+    case URI.parse(base) do
+      %URI{host: host} when host in ["localhost", "127.0.0.1", "::1"] -> true
+      _ -> false
+    end
   end
 
   @impl true
@@ -33,7 +65,7 @@ defmodule FullCircleWeb.PunchDeviceLive.Index do
            socket.assigns.current_user
          ) do
       {:ok, {device, plain}} ->
-        base = FullCircleWeb.Endpoint.url()
+        base = socket.assigns.pairing_base
         payload = "fcpair:#{device.id}:#{plain}:#{base}"
         svg = QRCode.create(payload, :high) |> QRCode.render(:svg) |> elem(1)
 
@@ -72,6 +104,11 @@ defmodule FullCircleWeb.PunchDeviceLive.Index do
     ~H"""
     <div class="mx-auto w-8/12">
       <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
+      <p :if={@pairing_unreachable?} class="text-center text-rose-600 mb-4">
+        {gettext(
+          "This page is localhost. The gate phone cannot reach localhost — open Punch Devices as http://<this-computer-LAN-IP>:4000 (the same address phone Chrome used), then pair."
+        )}
+      </p>
       <.form for={@form} id="device-form" phx-submit="create" class="flex gap-2 justify-center mb-4">
         <.input field={@form[:name]} label={gettext("Gate name")} />
         <.button class="mt-5">{gettext("Pair new phone")}</.button>

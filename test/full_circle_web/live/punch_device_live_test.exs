@@ -24,6 +24,29 @@ defmodule FullCircleWeb.PunchDeviceLiveTest do
     assert html =~ "fcpair:"
   end
 
+  test "pairing QR uses the browser origin, not Endpoint.url", %{conn: conn, comp: comp} do
+    conn = %{conn | host: "192.168.1.112", port: 4000, scheme: :http}
+
+    {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/punch_devices")
+
+    html =
+      lv
+      |> form("#device-form", device: %{name: "Gate LAN"})
+      |> render_submit()
+
+    assert html =~ "fcpair:"
+    assert html =~ "http://192.168.1.112:4000"
+    refute html =~ FullCircleWeb.Endpoint.url()
+  end
+
+  test "warns when Punch Devices is opened on localhost", %{conn: conn, comp: comp} do
+    conn = %{conn | host: "localhost", port: 4000, scheme: :http}
+
+    {:ok, _lv, html} = live(conn, ~p"/companies/#{comp.id}/punch_devices")
+
+    assert html =~ "gate phone cannot reach localhost"
+  end
+
   test "revoked gate name can be reused", %{conn: conn, comp: comp} do
     {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/punch_devices")
 
