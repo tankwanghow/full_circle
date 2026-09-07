@@ -643,7 +643,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
       {_ti4, id4, st4, fl4, dt4},
       {_ti5, id5, st5, fl5, dt5},
       {_ti6, id6, st6, fl6, dt6}
-    ] = tis
+    ] = Enum.map(tis, &tis_core/1)
 
     tl = [
       [dt1, id1, st1, fl1],
@@ -661,6 +661,9 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
 
     {:noreply, socket |> assign(punches: punches) |> update_punch_card(punches)}
   end
+
+  defp tis_core({t, i, s, f, d}), do: {t, i, s, f, d}
+  defp tis_core({t, i, s, f, d, _p}), do: {t, i, s, f, d}
 
   # Coerce a search input (string/integer/nil/blank/out-of-range) to a valid
   # integer-string in [min, max], falling back to `default` so downstream

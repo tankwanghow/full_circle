@@ -100,6 +100,7 @@ Every entity belongs to a `Company`. Routes are scoped as `/companies/:company_i
 | `Cheque` | Deposits, returns, post-dated cheques |
 | `DebCre` | Debit/credit notes |
 | `HR` | Employees, salary types, pay slips, time attendance, holidays |
+| `PunchGate` | Wall-mounted QR gate punch devices, badge ingest, audit face photos |
 | `Product` | Goods and packaging (Order/Load/Delivery removed — grain uses Trading) |
 | `Layer` | Agricultural: houses, flocks, harvests, weighing, movements |
 | `EggStock` | Daily egg stock board, weekly DOW books, hybrid forecast |
@@ -116,10 +117,10 @@ Project skills (non-obvious domain contracts) live in `.claude/skills/`:
 `grain-trading-desk.md`, `egg-stock-day-board.md`, `e-invoice-sync.md`,
 `e-invoice-bill-prefill.md`, `bank-recon-llm-parser.md`, `bank-recon-matching.md`, `cash-forecast-model.md`,
 `cp204-instalment-planner.md`, `punch-card-payroll.md`, `finger-print-import.md`,
-`statutory-bundle.md`, `liveview-computed-field-gotchas.md`, `liveview-upload-gotchas.md`,
-`optimistic-locking.md`, `accounting-period-lock.md`, `user-query-sql.md`,
-`xero-import.md`, `periodic-inventory-double-entry.md`, `good-snp-report.md`,
-`layer-alive-birds-and-yield.md`.
+`qr-gate-punch.md`, `statutory-bundle.md`, `liveview-computed-field-gotchas.md`,
+`liveview-upload-gotchas.md`, `optimistic-locking.md`, `accounting-period-lock.md`,
+`user-query-sql.md`, `xero-import.md`, `periodic-inventory-double-entry.md`,
+`good-snp-report.md`, `layer-alive-birds-and-yield.md`.
 
 ### StdInterface Pattern (`lib/full_circle/std_interface.ex`)
 

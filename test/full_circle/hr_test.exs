@@ -543,4 +543,19 @@ defmodule FullCircle.HRTest do
       assert Enum.map(found, & &1.id) == [emp.id]
     end
   end
+
+  describe "unzip_time_list/1" do
+    test "parses 4- and 6-field rows and skips malformed extra-pipe rows" do
+      t = "2026-09-06T08:00:00+08:00"
+      four = "#{t}|ida|Draft|1_IN_1"
+      six = "#{t}|idb|Draft|1_OUT_1|p.jpg|Gate 1"
+      bad = "#{t}|idc|Draft|1_IN_1|p.jpg|Gate|1"
+
+      parsed = HR.unzip_time_list([four, six, bad])
+      assert length(parsed) == 2
+      assert Enum.at(hd(parsed), 3) == "1_IN_1"
+      assert Enum.at(Enum.at(parsed, 1), 4) == "p.jpg"
+      assert Enum.at(Enum.at(parsed, 1), 5) == "Gate 1"
+    end
+  end
 end

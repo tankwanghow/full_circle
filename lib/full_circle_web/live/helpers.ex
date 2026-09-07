@@ -304,22 +304,23 @@ defmodule FullCircleWeb.Helpers do
   end
 
   defp make_timeattend(time_list, flag, com) do
-    ti = Enum.find(time_list, fn [_, _, _, inout] -> inout == flag end)
+    ti = Enum.find(time_list, fn row -> Enum.at(row, 3) == flag end)
 
     if !is_nil(ti) do
-      [time, id, status, inout] = ti
+      [time, id, status, inout | rest] = ti
+      photo = Enum.at(rest, 0) || ""
 
       if !is_nil(time) do
         {Timex.format!(
            Timex.to_datetime(time, com.timezone),
            "%H:%M",
            :strftime
-         ), id, status, inout, Timex.to_datetime(time, com.timezone)}
+         ), id, status, inout, Timex.to_datetime(time, com.timezone), photo}
       else
-        {nil, "_new_#{FullCircle.Helpers.gen_temp_id(31)}", "normal", flag, nil}
+        {nil, "_new_#{FullCircle.Helpers.gen_temp_id(31)}", "normal", flag, nil, ""}
       end
     else
-      {nil, "_new_#{FullCircle.Helpers.gen_temp_id(31)}", "normal", flag, nil}
+      {nil, "_new_#{FullCircle.Helpers.gen_temp_id(31)}", "normal", flag, nil, ""}
     end
   end
 end

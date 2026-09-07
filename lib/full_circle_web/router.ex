@@ -22,6 +22,11 @@ defmodule FullCircleWeb.Router do
     plug(:fetch_api_user)
   end
 
+  pipeline :punch_api do
+    plug :accepts, ["json", "multipart"]
+    plug FullCircleWeb.PunchDeviceAuth
+  end
+
   pipeline :list do
     plug(:accepts, ["json"])
     plug(:fetch_session)
@@ -42,7 +47,11 @@ defmodule FullCircleWeb.Router do
 
   scope "/api", FullCircleWeb do
     pipe_through(:api)
-    # all api routes place here
+  end
+
+  scope "/api/punch", FullCircleWeb do
+    pipe_through(:punch_api)
+    post "/attendances", PunchAttendanceController, :create
   end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development
@@ -107,6 +116,7 @@ defmodule FullCircleWeb.Router do
     pipe_through([:browser, :require_authenticated_user])
 
     get "/csv", CsvController, :show
+    get "/TimeAttend/:id/photo", PunchPhotoController, :show
     get "/statutory_bundle/export", BundleController, :export
     get "/download/:filename", FileDownloadController, :show
 
@@ -184,6 +194,8 @@ defmodule FullCircleWeb.Router do
       live("/employees/new", EmployeeLive.Form, :new)
       live("/employees/:employee_id/copy", EmployeeLive.Form, :copy)
       live("/employees/:employee_id/edit", EmployeeLive.Form, :edit)
+
+      live("/punch_devices", PunchDeviceLive.Index, :index)
 
       live("/houses", LayerLive.HouseIndex, :index)
       live("/houses/new", LayerLive.HouseForm, :new)

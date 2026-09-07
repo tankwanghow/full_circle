@@ -10,6 +10,9 @@ defmodule FullCircle.HR.TimeAttend do
     field(:gps_long, :float)
     field(:gps_lat, :float)
     field(:status, :string, default: "Draft")
+    field(:photo_path, :string)
+    field(:client_id, :string)
+    belongs_to(:punch_device, FullCircle.PunchGate.PunchDevice)
 
     field(:employee_name, :string, virtual: true)
     field(:email, :string, virtual: true)
@@ -45,6 +48,30 @@ defmodule FullCircle.HR.TimeAttend do
       :status,
       :user_id
     ])
+  end
+
+  def changeset_gate(st, attrs) do
+    st
+    |> cast(attrs, [
+      :flag,
+      :input_medium,
+      :punch_time,
+      :company_id,
+      :employee_id,
+      :punch_device_id,
+      :client_id,
+      :status
+    ])
+    |> validate_required([
+      :flag,
+      :input_medium,
+      :punch_time,
+      :company_id,
+      :employee_id,
+      :punch_device_id,
+      :client_id
+    ])
+    |> unique_constraint(:client_id, name: :time_attendences_punch_device_id_client_id_index)
   end
 
   @doc false

@@ -31,7 +31,10 @@ defmodule FullCircleWeb.EmployeeLive.Print do
       |> Enum.map(fn emp ->
         emp
         |> Map.merge(%{
-          svg: QRCode.create(emp.id, :high) |> QRCode.render(:svg, svg_settings) |> elem(1)
+          svg:
+            QRCode.create(FullCircle.PunchGate.badge_payload(emp), :high)
+            |> QRCode.render(:svg, svg_settings)
+            |> elem(1)
         })
       end)
       |> Enum.chunk_every(2)
