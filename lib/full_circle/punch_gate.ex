@@ -255,7 +255,13 @@ defmodule FullCircle.PunchGate do
   end
 
   defp get_company_employee(id, company_id) do
-    Repo.get_by(Employee, id: id, company_id: company_id) || {:error, :not_found}
+    case Ecto.UUID.cast(id) do
+      {:ok, uuid} ->
+        Repo.get_by(Employee, id: uuid, company_id: company_id) || {:error, :not_found}
+
+      :error ->
+        {:error, :not_found}
+    end
   end
 
   defp validate_active(%Employee{status: "Active"}), do: :ok

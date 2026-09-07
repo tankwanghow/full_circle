@@ -24,6 +24,26 @@ defmodule FullCircleWeb.PunchDeviceLiveTest do
     assert html =~ "fcpair:"
   end
 
+  test "revoked gate name can be reused", %{conn: conn, comp: comp} do
+    {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/punch_devices")
+
+    lv
+    |> form("#device-form", device: %{name: "Gate 1"})
+    |> render_submit()
+
+    lv
+    |> element("button", "Revoke")
+    |> render_click()
+
+    html =
+      lv
+      |> form("#device-form", device: %{name: "Gate 1"})
+      |> render_submit()
+
+    assert html =~ "fcpair:"
+    refute html =~ "has already been taken"
+  end
+
   test "clerk is redirected", %{comp: comp, user: admin} do
     clerk = user_fixture()
     {:ok, _} = FullCircle.Sys.allow_user_to_access(comp, clerk, "clerk", admin)

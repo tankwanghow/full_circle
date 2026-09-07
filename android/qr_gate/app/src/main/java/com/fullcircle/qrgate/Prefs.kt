@@ -30,7 +30,11 @@ class Prefs(context: Context) {
     }
 
     fun clear() {
-        sp.edit().clear().apply()
+        // Editor.clear() does not notify listeners of KEY_TOKEN.
+        sp.edit()
+            .remove(KEY_TOKEN)
+            .remove(KEY_BASE_URL)
+            .apply()
     }
 
     fun register(listener: SharedPreferences.OnSharedPreferenceChangeListener) {

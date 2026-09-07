@@ -79,7 +79,7 @@ then restart Phoenix and create the device again.
 1. Square overlay: hold the printed employee badge in the box (`fcqa:` payload, or a bare UUID from older cards).
 2. Oval overlay + “Look at the camera”: ML Kit **face detection** on live frames, then a still. **Zero faces → reject beep, no JPEG, no queue row; keep the oval.** At least one face → JPEG (long side 480px, quality 70, recapture if `> 300_000` bytes). Detection only (no matching / enrolment). **No photo → no punch.**
 3. If **no face within 8 seconds**, reject beep, clear the pending employee, back to the QR square (no punch).
-4. “OK” 1.5s, beep, back to the QR step. **`punched_at` is badge-scan time** (UTC ISO-8601), not face-capture or upload time.
+4. “OK” 1.5s, beep, back to the QR step. After returning to QR, ignore all badges for **2s**. The **same employee** is ignored for **3 minutes** (duplicate window) with a distinct reject beep — no second punch queued. **`punched_at` is badge-scan time** (UTC ISO-8601), not face-capture or upload time.
 
 There is no flip-camera control and no employee list.
 
@@ -90,7 +90,7 @@ Room + WorkManager. Airplane mode: scan as usual; when the network returns, rows
 | Server | Phone |
 |---|---|
 | 201 | delete queue row |
-| 401 | **DELETE the whole queue table** and punch JPEG files, clear pairing, stop inserting until re-paired |
+| 401 | **DELETE the whole queue table** and punch JPEG files, `Prefs.remove(token)` (listener fires) so the scanner returns to pairing immediately |
 | 404 / 422 / 409 (and other 4xx, including 413) | delete that queue row; **do not retry forever** |
 | network / 5xx | increment `tries`, WorkManager exponential backoff |
 

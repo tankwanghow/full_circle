@@ -49,6 +49,7 @@ import java.io.File
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -72,6 +73,8 @@ class ScanActivity : AppCompatActivity() {
     private val faceEpoch = AtomicInteger(0)
     private var faceDeadlineElapsed = 0L
     private var lastRejectBeepAt = 0L
+    private var qrReadyAt = 0L
+    private val lastOkAtByEmployee = ConcurrentHashMap<String, Long>()
     private val step = AtomicReference(Step.QR)
     private val faceTimeout = Runnable { onFaceTimeout() }
 
@@ -227,9 +230,15 @@ class ScanActivity : AppCompatActivity() {
                 scanner.process(image)
                     .addOnSuccessListener { barcodes ->
                         if (step.get() != Step.QR) return@addOnSuccessListener
+                        val now = SystemClock.elapsedRealtime()
+                        if (now < qrReadyAt) return@addOnSuccessListener
                         val raw = barcodes.firstNotNullOfOrNull { it.rawValue }
                             ?: return@addOnSuccessListener
                         val empId = parseBadge(raw) ?: return@addOnSuccessListener
+                        if (recentlyAccepted(empId)) {
+                            dupRejectBeep()
+                            return@addOnSuccessListener
+                        }
                         if (step.compareAndSet(Step.QR, Step.FACE)) {
                             runOnUiThread { onBadgeScanned(empId) }
                         }
@@ -402,12 +411,21 @@ class ScanActivity : AppCompatActivity() {
             photoPath = photo.absolutePath,
         )
         lifecycleScope.launch(Dispatchers.IO) {
+            if (recentlyAccepted(employeeId)) {
+                photo.delete()
+                withContext(Dispatchers.Main) {
+                    dupRejectBeep()
+                    backToQr()
+                }
+                return@launch
+            }
             val accepted = QueueDb.insertIfPaired(this@ScanActivity, row)
             if (!accepted) {
                 photo.delete()
                 withContext(Dispatchers.Main) { goPairing() }
                 return@launch
             }
+            rememberOk(employeeId)
             UploadWorker.enqueue(this@ScanActivity)
             withContext(Dispatchers.Main) { showOk() }
         }
@@ -436,10 +454,29 @@ class ScanActivity : AppCompatActivity() {
             goPairing()
             return
         }
+        qrReadyAt = SystemClock.elapsedRealtime() + QR_COOLDOWN_MS
         binding.guideOval.visibility = View.GONE
         binding.guideSquare.visibility = View.VISIBLE
         binding.prompt.setText(R.string.scan_badge)
         step.set(Step.QR)
+    }
+
+    private fun recentlyAccepted(employeeId: String): Boolean {
+        val now = SystemClock.elapsedRealtime()
+        lastOkAtByEmployee.entries.removeIf { now - it.value >= DUP_WINDOW_MS }
+        val last = lastOkAtByEmployee[employeeId] ?: return false
+        return now - last < DUP_WINDOW_MS
+    }
+
+    private fun rememberOk(employeeId: String) {
+        lastOkAtByEmployee[employeeId] = SystemClock.elapsedRealtime()
+    }
+
+    private fun dupRejectBeep() {
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastRejectBeepAt < 1_500L) return
+        lastRejectBeepAt = now
+        runOnUiThread { beep(ToneGenerator.TONE_SUP_ERROR, 400) }
     }
 
     private fun goPairing() {
@@ -472,6 +509,8 @@ class ScanActivity : AppCompatActivity() {
         private const val TAG = "QrGateScan"
         private const val FACE_TIMEOUT_MS = 8_000L
         private const val OK_MS = 1_500L
+        private const val QR_COOLDOWN_MS = 2_000L
+        private const val DUP_WINDOW_MS = 180_000L
         private const val MAX_PHOTO_BYTES = 300_000L
         private const val LONG_SIDE_PX = 480
         private const val JPEG_QUALITY = 70

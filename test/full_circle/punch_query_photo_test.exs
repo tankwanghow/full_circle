@@ -37,4 +37,41 @@ defmodule FullCircle.PunchQueryPhotoTest do
     assert length(first) >= 5
     assert Enum.at(first, 4) not in [nil, ""]
   end
+
+  test "punch_query does not crash when a gate name contains a pipe" do
+    admin = user_fixture()
+    company = company_fixture(admin, %{})
+    emp = employee_fixture(%{}, company, admin)
+    {:ok, {device, _}} = PunchGate.create_device("Gate 1", company, admin)
+
+    device
+    |> Ecto.Changeset.change(%{name: "Gate|1"})
+    |> FullCircle.Repo.update!()
+
+    path = Path.join(System.tmp_dir!(), "face-#{System.unique_integer()}.jpg")
+
+    File.write!(
+      path,
+      Base.decode64!(
+        "/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA="
+      )
+    )
+
+    {:ok, ta} =
+      PunchGate.ingest_punch(device, %{
+        "employee_id" => emp.id,
+        "punched_at" => DateTime.utc_now() |> DateTime.truncate(:second),
+        "client_id" => Ecto.UUID.generate(),
+        "photo" => %Plug.Upload{path: path, filename: "f.jpg", content_type: "image/jpeg"}
+      })
+
+    day =
+      ta.punch_time
+      |> DateTime.shift_zone!(company.timezone)
+      |> DateTime.to_date()
+
+    row = HR.punch_query_by_id(emp.id, day, company)
+    assert is_map(row)
+    assert is_list(row.time_list)
+  end
 end

@@ -159,14 +159,17 @@ defmodule FullCircleWeb.TimeAttendLive.PunchTimeComponent do
       )
     ) do
       {:ok, obj} ->
+        idx = Enum.find_index(socket.assigns.tis, fn t -> elem(t, 1) == taid end)
+        old = Enum.at(socket.assigns.tis, idx)
+
         socket
         |> assign(bg_color: "bg-transparent")
         |> assign(
           tis:
             List.replace_at(
               socket.assigns.tis,
-              Enum.find_index(socket.assigns.tis, fn t -> elem(t, 1) == taid end),
-              {punch_time, obj.id, obj.status, obj.flag, punch_time_local}
+              idx,
+              {punch_time, obj.id, obj.status, obj.flag, punch_time_local, photo_from(old)}
             )
         )
         |> update_working_hours
@@ -260,6 +263,9 @@ defmodule FullCircleWeb.TimeAttendLive.PunchTimeComponent do
 
   defp pad_tis({t, i, s, f, d}), do: {t, i, s, f, d, ""}
   defp pad_tis({t, i, s, f, d, p}), do: {t, i, s, f, d, p}
+
+  defp photo_from(t) when is_tuple(t) and tuple_size(t) >= 6, do: elem(t, 5)
+  defp photo_from(_), do: ""
 
   @impl true
   def render(assigns) do

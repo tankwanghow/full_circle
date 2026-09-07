@@ -2,6 +2,7 @@ defmodule FullCircle.HR do
   import Ecto.Query, warn: false
   import FullCircle.Helpers
   import FullCircle.Authorization
+  require Logger
   alias Ecto.Multi
 
   alias FullCircle.HR.{
@@ -1353,12 +1354,16 @@ defmodule FullCircle.HR do
     else
       tl
       |> Enum.map(fn x -> String.split(x, "|") end)
-      |> Enum.map(fn
+      |> Enum.flat_map(fn
         [t, i, s, f, photo, gate] ->
-          [Timex.parse!(t, "{RFC3339}"), i, s, f, photo, gate]
+          [[Timex.parse!(t, "{RFC3339}"), i, s, f, photo, gate]]
 
         [t, i, s, f] ->
-          [Timex.parse!(t, "{RFC3339}"), i, s, f, "", ""]
+          [[Timex.parse!(t, "{RFC3339}"), i, s, f, "", ""]]
+
+        other ->
+          Logger.warning("skipping malformed punch time_list row: #{inspect(other)}")
+          []
       end)
     end
   end

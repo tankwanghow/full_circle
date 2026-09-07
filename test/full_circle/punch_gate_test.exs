@@ -41,6 +41,19 @@ defmodule FullCircle.PunchGateTest do
     assert %{name: _} = errors_on(cs)
   end
 
+  test "revoked gate name can be reused", %{admin: admin, company: company} do
+    assert {:ok, {device, _}} = PunchGate.create_device("Gate 1", company, admin)
+    assert {:ok, _} = PunchGate.revoke_device(device, company, admin)
+    assert {:ok, {again, _}} = PunchGate.create_device("Gate 1", company, admin)
+    assert again.name == "Gate 1"
+    refute again.id == device.id
+  end
+
+  test "device name containing a pipe is rejected", %{admin: admin, company: company} do
+    assert {:error, cs} = PunchGate.create_device("Gate|1", company, admin)
+    assert %{name: _} = errors_on(cs)
+  end
+
   test "revoke then lookup by token returns nil", %{admin: admin, company: company} do
     {:ok, {device, plain}} = PunchGate.create_device("Gate 1", company, admin)
     assert %PunchDevice{} = PunchGate.get_active_device_by_token(plain)
@@ -165,6 +178,12 @@ defmodule FullCircle.PunchGateTest do
   test "unknown employee is :not_found", %{admin: admin, company: company} do
     {:ok, {device, _}} = PunchGate.create_device("Gate 1", company, admin)
     attrs = ingest_attrs(%{id: Ecto.UUID.generate()})
+    assert {:error, :not_found} = PunchGate.ingest_punch(device, attrs)
+  end
+
+  test "malformed employee_id is :not_found", %{admin: admin, company: company} do
+    {:ok, {device, _}} = PunchGate.create_device("Gate 1", company, admin)
+    attrs = ingest_attrs(%{id: "not-a-uuid"})
     assert {:error, :not_found} = PunchGate.ingest_punch(device, attrs)
   end
 
