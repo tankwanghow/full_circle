@@ -36,7 +36,7 @@ Creditors: same query, `HAVING SUM(t.amount) < 0` (or list all non-zero).
 
 ## Dates
 
-Prefer business dates: `invoice_date`, `due_date`, `receipt_date`, `payment_date`, `journal_date`, `doc_date`, `note_date`, `slip_date`, `statement_date`. Do not filter on `inserted_at` unless asked.
+Prefer business dates: `invoice_date`, `due_date`, `receipt_date`, `payment_date`, `journal_date`, `doc_date`, `note_date`, `slip_date`, `statement_date`, `har_date` (harvests), `move_date` (movements). Do not filter on `inserted_at` unless asked.
 
 ## Joins
 
