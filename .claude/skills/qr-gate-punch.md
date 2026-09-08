@@ -15,6 +15,8 @@ Fingerprint import is unchanged until the gate is proven.
 
 Pairing: `PunchGate.create_device/3` returns `{device, plain_token}` once. QR `fcpair:<id>:<token>:<url>`. Clerks cannot pair (`:manage_punch_device` = admin/manager/supervisor).
 
+Revoke is a **soft delete** and stays that way: `revoked_at` is stamped, the row is kept, and `list_devices/2` filters it out so the UI hides it. Do not delete the row — `time_attendences.punch_device_id` is `on_delete: :nilify_all`, so deleting a device would silently strip gate attribution from every punch it ever recorded (the punch query joins `coalesce(pd.name, '')`). Revoking also clears the on-screen pairing QR for that device, since that QR no longer works.
+
 Badge must not occlude the face: the phone compares the QR bounding box against the **largest** face box and rejects at **>5%** coverage (`ScanActivity.badgeOccludesFace`), in both the live gate and the still re-check. Do **not** switch to `LANDMARK_MODE_ALL` and test for a missing nose/mouth landmark instead — ML Kit *estimates* landmarks for covered features and reports no per-landmark occlusion confidence. This is a client-side guard only; the server runs no detection, so the stored audit JPEG stays the real backstop.
 
 Photos: `{uploads_dir}/{company_id}/punch_photos/{yyyy}/{mm}/{id}.jpg`. Serve via `GET /companies/:id/TimeAttend/:id/photo`.

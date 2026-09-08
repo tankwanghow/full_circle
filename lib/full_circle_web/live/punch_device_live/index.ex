@@ -21,6 +21,14 @@ defmodule FullCircleWeb.PunchDeviceLive.Index do
     end
   end
 
+  # The QR on screen belongs to a device that no longer accepts uploads.
+  defp clear_pairing_for(socket, device_id) do
+    case socket.assigns.pairing do
+      %{device_id: ^device_id} -> assign(socket, pairing: nil)
+      _ -> socket
+    end
+  end
+
   defp load_devices(socket) do
     devices = PunchGate.list_devices(socket.assigns.current_company, socket.assigns.current_user)
     assign(socket, devices: devices)
@@ -71,7 +79,12 @@ defmodule FullCircleWeb.PunchDeviceLive.Index do
 
         {:noreply,
          socket
-         |> assign(pairing: %{payload: payload, svg: svg, name: device.name})
+         |> assign(pairing: %{
+           payload: payload,
+           svg: svg,
+           name: device.name,
+           device_id: device.id
+         })
          |> load_devices()
          |> put_flash(:success, gettext("Device created. Scan the QR with the gate phone now."))}
 
@@ -92,7 +105,11 @@ defmodule FullCircleWeb.PunchDeviceLive.Index do
            socket.assigns.current_user
          ) do
       {:ok, _} ->
-        {:noreply, socket |> load_devices() |> put_flash(:success, gettext("Revoked"))}
+        {:noreply,
+         socket
+         |> clear_pairing_for(id)
+         |> load_devices()
+         |> put_flash(:success, gettext("Revoked"))}
 
       _ ->
         {:noreply, put_flash(socket, :error, gettext("Not Authorized!"))}
@@ -121,14 +138,13 @@ defmodule FullCircleWeb.PunchDeviceLive.Index do
           {gettext("This code is shown once. Scan it on the gate phone now.")}
         </p>
       </div>
-      <div :for={d <- @devices} class="flex justify-between border-b py-2">
-        <div>
-          {d.name}
-          <span :if={d.revoked_at} class="text-rose-600">({gettext("revoked")})</span>
+      <div id="devices-list">
+        <div :for={d <- @devices} id={"device-#{d.id}"} class="flex justify-between border-b py-2">
+          <div>{d.name}</div>
+          <button phx-click="revoke" phx-value-id={d.id} class="red button">
+            {gettext("Revoke")}
+          </button>
         </div>
-        <button :if={is_nil(d.revoked_at)} phx-click="revoke" phx-value-id={d.id} class="red button">
-          {gettext("Revoke")}
-        </button>
       </div>
     </div>
     """

@@ -77,4 +77,39 @@ defmodule FullCircleWeb.PunchDeviceLiveTest do
 
     assert to =~ "/companies/#{comp.id}/dashboard"
   end
+
+  test "a revoked device is hidden from the list", %{conn: conn, comp: comp} do
+    {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/punch_devices")
+
+    lv
+    |> form("#device-form", device: %{name: "Gate 9"})
+    |> render_submit()
+
+    assert has_element?(lv, "#devices-list", "Gate 9")
+
+    lv
+    |> element("button", "Revoke")
+    |> render_click()
+
+    refute has_element?(lv, "#devices-list", "Gate 9")
+    refute has_element?(lv, "button", "Revoke")
+  end
+
+  test "revoking clears the pairing QR, which is now dead", %{conn: conn, comp: comp} do
+    {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/punch_devices")
+
+    html =
+      lv
+      |> form("#device-form", device: %{name: "Gate 10"})
+      |> render_submit()
+
+    assert html =~ "fcpair:"
+
+    after_revoke =
+      lv
+      |> element("button", "Revoke")
+      |> render_click()
+
+    refute after_revoke =~ "fcpair:"
+  end
 end

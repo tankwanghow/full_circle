@@ -77,6 +77,7 @@ defmodule FullCircle.PunchGate do
       true ->
         from(d in PunchDevice,
           where: d.company_id == ^company.id,
+          where: is_nil(d.revoked_at),
           order_by: [asc: d.name]
         )
         |> Repo.all()
