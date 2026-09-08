@@ -14,7 +14,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchIndex do
       <div class="flex justify-center mb-2">
         <.form for={%{}} id="search-form" phx-submit="search" autocomplete="off" class="w-full">
           <div class=" flex flex-row flex-wrap tracking-tighter text-sm">
-            <div class="w-[40%]">
+            <div class="w-[30%]">
               <.input
                 id="search_emp_name"
                 name="search[emp_name]"
@@ -50,6 +50,20 @@ defmodule FullCircleWeb.TimeAttendLive.PunchIndex do
                 label={gettext("Active only")}
               />
             </div>
+            <div class="w-[10%] flex items-center justify-center mt-5">
+              <.input
+                id="search_show_photos"
+                name="search[show_photos]"
+                type="checkbox"
+                value={@search.show_photos}
+                phx-debounce={nil}
+                phx-click={
+                  JS.toggle_class("show-punch-photos", to: "#punch_photos_wrapper")
+                  |> JS.push("toggle_photos")
+                }
+                label={gettext("Show photos")}
+              />
+            </div>
             <.button class="mt-5 h-10 w-10 grow-0 shrink-0">🔍</.button>
           </div>
         </.form>
@@ -79,23 +93,25 @@ defmodule FullCircleWeb.TimeAttendLive.PunchIndex do
           </div>
         </div>
       </div>
-      <div
-        :if={Enum.count(@streams.objects) > 0 or @page > 1}
-        id="objects_list"
-        phx-update="stream"
-        phx-viewport-bottom={!@end_of_timeline? && "next-page"}
-        phx-page-loading
-      >
-        <%= for {obj_id, obj} <- @streams.objects do %>
-          <.live_component
-            module={PunchIndexComponent}
-            id={obj_id}
-            obj={obj}
-            company={@current_company}
-            user={@current_user}
-            ex_class=""
-          />
-        <% end %>
+      <div id="punch_photos_wrapper" class={@search.show_photos && "show-punch-photos"}>
+        <div
+          :if={Enum.count(@streams.objects) > 0 or @page > 1}
+          id="objects_list"
+          phx-update="stream"
+          phx-viewport-bottom={!@end_of_timeline? && "next-page"}
+          phx-page-loading
+        >
+          <%= for {obj_id, obj} <- @streams.objects do %>
+            <.live_component
+              module={PunchIndexComponent}
+              id={obj_id}
+              obj={obj}
+              company={@current_company}
+              user={@current_user}
+              ex_class=""
+            />
+          <% end %>
+        </div>
       </div>
       <.infinite_scroll_footer ended={@end_of_timeline?} />
     </div>
@@ -109,6 +125,8 @@ defmodule FullCircleWeb.TimeAttendLive.PunchIndex do
     edate = params["search"]["edate"] || Timex.today() |> Timex.shift(days: 1)
     # default to active-only; a present param of "false" turns it off
     active_only = (params["search"]["active_only"] || "true") == "true"
+    # photos are off by default: the default view is every employee for today
+    show_photos = (params["search"]["show_photos"] || "false") == "true"
 
     socket =
       socket
@@ -118,12 +136,22 @@ defmodule FullCircleWeb.TimeAttendLive.PunchIndex do
           emp_name: emp_name,
           sdate: sdate,
           edate: edate,
-          active_only: active_only
+          active_only: active_only,
+          show_photos: show_photos
         }
       )
       |> filter_objects(emp_name, true, sdate, edate, 1)
 
     {:ok, socket}
+  end
+
+  @impl true
+  def handle_event("toggle_photos", _, socket) do
+    s = socket.assigns.search
+
+    # Visibility is CSS on the wrapper, so nothing below needs re-rendering:
+    # the stream keeps its rows and its scroll position.
+    {:noreply, assign(socket, search: %{s | show_photos: !s.show_photos})}
   end
 
   @impl true
@@ -172,17 +200,27 @@ defmodule FullCircleWeb.TimeAttendLive.PunchIndex do
         socket
       ) do
     active_only = (search["active_only"] || "false") == "true"
+    show_photos = (search["show_photos"] || "false") == "true"
 
     qry = %{
       "search[emp_name]" => emp_name,
       "search[sdate]" => sd,
       "search[edate]" => ed,
-      "search[active_only]" => to_string(active_only)
+      "search[active_only]" => to_string(active_only),
+      "search[show_photos]" => to_string(show_photos)
     }
 
     {:noreply,
      socket
-     |> assign(search: %{emp_name: emp_name, sdate: sd, edate: ed, active_only: active_only})
+     |> assign(
+       search: %{
+         emp_name: emp_name,
+         sdate: sd,
+         edate: ed,
+         active_only: active_only,
+         show_photos: show_photos
+       }
+     )
      |> push_navigate(
        to: "/companies/#{socket.assigns.current_company.id}/PunchIndex?#{URI.encode_query(qry)}"
      )}

@@ -55,7 +55,20 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
               phx-debounce="blur"
             />
           </div>
-          <a onclick="history.back();" class="w-[7%] h-10 mt-5 blue button">{gettext("Back")}</a>
+          <div class="flex items-center justify-center mt-5">
+            <.input
+              id="search_show_photos"
+              name="search[show_photos]"
+              type="checkbox"
+              value={@search.show_photos}
+              phx-debounce={nil}
+              phx-click={
+                JS.toggle_class("show-punch-photos", to: "#punches_list")
+                |> JS.push("toggle_photos")
+              }
+              label={gettext("Show photos")}
+            />
+          </div>
         </div>
       </.form>
       <div class="text-center my-4">
@@ -83,6 +96,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
         >
           {gettext("+ Advance")}
         </.link>
+        <a onclick="history.back();" class="w-[7%] h-10 mt-5 ml-2 orange button">{gettext("Back")}</a>
       </div>
 
       <div :if={@employee} class="flex flex-row gap-2 items-end justify-center my-2">
@@ -315,7 +329,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
           </div>
         </div>
       </div>
-      <div id="punches_list" class="mb-5">
+      <div id="punches_list" class={["mb-5", @search.show_photos && "show-punch-photos"]}>
         <%= for obj <- @punches do %>
           <.live_component
             module={PunchCardComponent}
@@ -323,6 +337,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
             obj={obj}
             user={@current_user}
             company={@current_company}
+            show_photos={@search.show_photos}
             payslip_locked?={@payslip_locked?}
           />
         <% end %>
@@ -374,6 +389,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
 
     month = clamp_int(params["search"]["month"], d.month, 1, 12)
     year = clamp_int(params["search"]["year"], d.year, 2000, 2099)
+    show_photos = (params["search"]["show_photos"] || "false") == "true"
 
     socket =
       socket
@@ -382,10 +398,30 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
       |> assign(live_action_sn: :index)
       |> assign(live_action_adv: :index)
       |> assign(shake_obj: %{id: ""})
-      |> assign(search: %{employee_name: emp_name, month: month, year: year})
+      |> assign(
+        search: %{
+          employee_name: emp_name,
+          month: month,
+          year: year,
+          show_photos: show_photos
+        }
+      )
       |> filter_punches(month, year, emp_name)
 
     {:ok, socket}
+  end
+
+  @impl true
+  def handle_event("search", %{"_target" => ["search", "show_photos"]}, socket) do
+    # The filter form is phx-change="search". Ticking Show photos must not
+    # push_navigate and remount the page — "toggle_photos" already handled it.
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("toggle_photos", _, socket) do
+    s = socket.assigns.search
+    {:noreply, assign(socket, search: %{s | show_photos: !s.show_photos})}
   end
 
   @impl true
@@ -396,19 +432,24 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
             "employee_name" => name,
             "month" => month,
             "year" => year
-          }
+          } = search
         },
         socket
       ) do
+    show_photos = (search["show_photos"] || "false") == "true"
+
     qry = %{
       "search[employee_name]" => name,
       "search[month]" => month,
-      "search[year]" => year
+      "search[year]" => year,
+      "search[show_photos]" => to_string(show_photos)
     }
 
     {:noreply,
      socket
-     |> assign(search: %{employee_name: name, month: month, year: year})
+     |> assign(
+       search: %{employee_name: name, month: month, year: year, show_photos: show_photos}
+     )
      |> assign(shake_obj: %{id: ""})
      |> push_navigate(
        to: "/companies/#{socket.assigns.current_company.id}/PunchCard?#{URI.encode_query(qry)}"
@@ -703,7 +744,15 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
       |> assign(pay_prep: nil)
       |> assign(statutory_preview: nil)
       |> assign(net_pay: nil)
-      |> assign(search: %{employee_name: emp_name, month: month, year: year})
+      |> assign(
+        search: %{
+          employee_name: emp_name,
+          month: month,
+          year: year,
+          # keep the toggle: this branch runs whenever no employee is selected
+          show_photos: socket.assigns.search.show_photos
+        }
+      )
     else
       punches =
         HR.punch_card_query(

@@ -303,9 +303,14 @@ defmodule FullCircleWeb.TimeAttendLive.PunchTimeComponent do
               :if={photo != "" and !String.starts_with?(id, "_new_")}
               href={~p"/companies/#{@company.id}/TimeAttend/#{id}/photo"}
               target="_blank"
-              class="block text-center text-xs"
+              class="punch-photo text-center text-xs"
             >
-              📷
+              <img
+                src={~p"/companies/#{@company.id}/TimeAttend/#{id}/photo"}
+                loading="lazy"
+                alt={gettext("Punch photo")}
+                class="mt-0.5 w-full h-12 object-cover rounded border border-gray-400 dark:border-gray-600"
+              />
             </.link>
           </.form>
         <% end %>

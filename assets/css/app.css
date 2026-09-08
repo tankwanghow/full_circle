@@ -16,6 +16,21 @@
   --color-brand: #FD4F00;
 }
 
+/* ── Punch photo thumbnails ───────────────────────────────────────── */
+/* Hidden by default and shown by a wrapper class, so the "Show photos"
+   toggle is instant: no re-render of the punch rows (Punch IO streams
+   them, and a stream comprehension emits nothing on re-render) and no
+   re-query. display:none also keeps loading="lazy" images unfetched
+   until they are actually shown. */
+
+.punch-photo {
+  display: none;
+}
+
+.show-punch-photos .punch-photo {
+  display: block;
+}
+
 /* ── Dark mode: global overrides ──────────────────────────────────── */
 /* Remap common light backgrounds/text so templates work without per-element dark: classes */
 
