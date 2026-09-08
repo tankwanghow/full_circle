@@ -14,7 +14,10 @@ config :full_circle, FullCircle.Repo,
   hostname: "localhost",
   database: "full_circle_test#{System.get_env("MIX_TEST_PARTITION")}",
   pool: Ecto.Adapters.SQL.Sandbox,
-  pool_size: 10
+  # ExUnit runs up to schedulers_online() * 2 cases at once; a smaller pool than
+  # that makes sandbox checkout time out under load, failing unrelated tests at
+  # setup with DBConnection :queue_timeout.
+  pool_size: System.schedulers_online() * 2
 
 # We don't run a server during test. If one is required,
 # you can enable the server option below.
