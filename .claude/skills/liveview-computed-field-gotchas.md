@@ -1,6 +1,6 @@
 ---
 name: liveview-computed-field-gotchas
-description: Use when a LiveView form field misbehaves — a readonly/computed field (e.g. Amount) not updating after an edit, a virtual/display-only field rendering blank, a flash message never appearing, or work on the calculatorInput JS hook. Covers the focused-input patch skip, programmatic value-set events, _unused_* params, changeset.params fallback rendering, and the :warn flash kind.
+description: Use when a LiveView form field or input event misbehaves — a readonly/computed field (e.g. Amount) not updating after an edit, a virtual/display-only field rendering blank, a flash message never appearing, a phx-click/phx-change on an input that only fires after clicking away, or work on the calculatorInput JS hook. Covers the focused-input patch skip, programmatic value-set events, _unused_* params, changeset.params fallback rendering, the :warn flash kind, and the .input phx-debounce="blur" default.
 ---
 
 # LiveView Computed-Field Gotchas
@@ -77,6 +77,43 @@ invisible message**. This hid a real warning in `pur_invoice_live/form.ex`
 The flashes have no auto-hide timer — they persist until clicked — so "it
 appeared and I missed it" is never the explanation. If a flash you added never
 shows, check the kind before debugging anything else.
+
+## 6. Every `.input` debounces to blur unless it opts out
+
+`CoreComponents` declares the debounce **with a default**:
+
+```elixir
+attr(:"phx-debounce", :string, default: "blur")   # core_components.ex:287
+```
+
+so every `.input` renders `phx-debounce="blur"`. On a text field that is what you
+want. On anything expected to react **immediately** — a checkbox, a toggle, a
+filter switch — it means the event is held until focus leaves the element. The
+symptom is "I click it and nothing happens until I click somewhere else".
+
+Fix by passing the declared attribute explicitly:
+
+```heex
+<.input type="checkbox" phx-debounce={nil} phx-click="toggle" ... />
+```
+
+`phx-debounce={nil}` omits the attribute. Note it must be a **declared
+attribute** — passing it through a spread (`{%{"phx-debounce" => nil}}`) lands
+in `@rest`/globals, is never read by `Map.get(assigns, :"phx-debounce")`, and
+silently does nothing.
+
+**Why tests do not catch this.** `render_click/1` and `render_change/1` invoke
+the server handler directly; debounce is a client-side concern in
+`phoenix_live_view.js`. The suite stays green while the browser is broken. Guard
+it with a markup assertion instead:
+
+```elixir
+refute has_element?(lv, "#my_checkbox[phx-debounce]")
+```
+
+When an input event misfires, **dump the rendered markup** rather than reading
+the template — component defaults do not appear at the call site. A throwaway
+test that prints the element settles it in one run.
 
 ## Where this pattern lives
 

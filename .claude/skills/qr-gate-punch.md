@@ -19,6 +19,21 @@ Badge must not occlude the face: the phone compares the QR bounding box against 
 
 Photos: `{uploads_dir}/{company_id}/punch_photos/{yyyy}/{mm}/{id}.jpg`. Serve via `GET /companies/:id/TimeAttend/:id/photo`.
 
+The stored JPEG is **cropped to the face** (`ScanActivity.faceCropBox`, face box padded 30%, clamped to the frame) so it is legible as a thumbnail. The badge is verified in the same frame and then **deliberately cropped out** — the stored image proves *who*, not *which badge*. Chosen 2026-09-08 with that trade-off understood; do not "restore" the full frame as if it were a regression.
+
+Punch IO **and Punch Card** have a live **Show photos** toggle (`search[show_photos]` for URL persistence, default off). There is no photo icon: a slot shows a thumbnail or nothing. The binding is `JS.toggle_class("show-punch-photos", to: ...) |> JS.push("toggle_photos")` — the class flip is client-side so it is instant, and the push keeps the server assign in step for later re-renders.
+
+Visibility is **CSS, not markup**: `PunchTimeComponent` always renders the thumbnail with class `punch-photo` (hidden by `app.css`), and the toggle adds `show-punch-photos` to a wrapper around the list. This is deliberate — Punch IO renders rows through a `phx-update="stream"` comprehension, which emits nothing on re-render, so a markup-based toggle would leave already-rendered rows stale unless you re-stream (losing scroll position and re-querying). CSS cascades to rows already in the DOM, so the toggle is instant on both pages and the components need no `show_photos` assign at all.
+
+Two traps when touching this:
+
+- The `show-punch-photos` wrapper must be **outside** `#objects_list`, whose `:if={Enum.count(@streams.objects) > 0 or @page > 1}` is **false on every re-render after the first** — a `LiveStream`'s count is 0 once its inserts are consumed. Put the class on that div and the toggle silently does nothing.
+- Both checkboxes pass `phx-debounce={nil}`; without it `.input`'s default makes the toggle wait for blur. See `.claude/skills/liveview-computed-field-gotchas.md` §6.
+- `PunchCard`'s filter form is **`phx-change="search"`**, and that handler `push_navigate`s. Without the `handle_event("search", %{"_target" => ["search", "show_photos"]}, ...)` no-op clause, ticking the box remounts the whole page instead of toggling live. `render_click` in tests only exercises `phx-click`, so this is invisible unless you test `render_change` with that `_target`.
+- `PunchCard.filter_punches/4` **rebuilds the whole `search` map** on its `is_nil(emp)` branch, so a key added to `search` must be carried through there or the default page (no employee selected) raises `KeyError`.
+
+Face **matching** was considered on 2026-09-08 and deliberately not built: it needs an embedding (a biometric template) whether or not you persist it, there is no Oban or Nx in this project, and a cold-start baseline can be poisoned by an impostor in an employee's first few punches. Thumbnails plus a human eye first; revisit only if mismatches actually turn up.
+
 ## Building & installing the APK
 
 `./gradlew` needs **JDK 17**; the default `java` on this box is a JDK 8 mise shim, so a bare invocation fails. `ANDROID_HOME` is unset but `local.properties` carries `sdk.dir`, so JAVA_HOME is the only missing piece (re-derive the path with `mise where java <version>` if mise is upgraded):
