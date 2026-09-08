@@ -284,7 +284,8 @@ defmodule FullCircleWeb.CoreComponents do
   attr(:label, :string, default: nil)
   attr(:value, :any)
   attr(:url, :string, default: nil)
-  attr(:"phx-debounce", :string, default: "blur")
+  # :any, not :string — passing nil is how a caller opts out of the blur default
+  attr(:"phx-debounce", :any, default: "blur")
   attr(:klass, :string, default: "")
   attr(:feedback, :boolean, default: false)
 

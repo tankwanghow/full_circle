@@ -9,6 +9,7 @@ defmodule FullCircle.PunchGate do
   @dup_seconds 180
   @future_leeway_seconds 120
   @max_photo_bytes 300_000
+  @prune_batch 500
 
   def hash_token(plain) when is_binary(plain) do
     :crypto.hash(:sha256, plain) |> Base.encode16(case: :lower)
@@ -127,6 +128,68 @@ defmodule FullCircle.PunchGate do
       date.month |> Integer.to_string() |> String.pad_leading(2, "0"),
       "#{id}.jpg"
     ])
+  end
+
+  @doc """
+  Deletes punch photos captured before `cutoff`, keeping the attendance rows.
+
+  The file is removed **before** `photo_path` is cleared. If that is interrupted
+  the row points at a missing file, which `PunchPhotoController` already answers
+  with a 404, and the next run finishes the job — a missing file counts as
+  success. The reverse order would orphan the file permanently and never reclaim
+  the disk this exists to reclaim.
+
+  Options: `:dry_run` (report what would go, change nothing) and `:batch`.
+  """
+  def prune_photos_before(%DateTime{} = cutoff, opts \\ []) do
+    dry_run? = Keyword.get(opts, :dry_run, false)
+    batch = Keyword.get(opts, :batch, @prune_batch)
+    uploads = Application.get_env(:full_circle, :uploads_dir)
+
+    {:ok, prune_batches(cutoff, batch, dry_run?, uploads, 0)}
+  end
+
+  defp prune_batches(cutoff, batch, dry_run?, uploads, done) do
+    rows =
+      from(ta in TimeAttend,
+        where: not is_nil(ta.photo_path),
+        where: ta.punch_time < ^cutoff,
+        order_by: [asc: ta.punch_time],
+        limit: ^batch,
+        select: %{id: ta.id, photo_path: ta.photo_path}
+      )
+      |> Repo.all()
+
+    cond do
+      rows == [] ->
+        done
+
+      dry_run? ->
+        # Nothing is written, so paging would loop forever on the same rows.
+        done + length(rows) + count_remaining(cutoff, length(rows))
+
+      true ->
+        Enum.each(rows, fn row ->
+          uploads |> Path.join(row.photo_path) |> File.rm()
+
+          from(ta in TimeAttend, where: ta.id == ^row.id)
+          |> Repo.update_all(set: [photo_path: nil])
+        end)
+
+        prune_batches(cutoff, batch, dry_run?, uploads, done + length(rows))
+    end
+  end
+
+  defp count_remaining(cutoff, seen) do
+    total =
+      from(ta in TimeAttend,
+        where: not is_nil(ta.photo_path),
+        where: ta.punch_time < ^cutoff,
+        select: count(ta.id)
+      )
+      |> Repo.one()
+
+    max(total - seen, 0)
   end
 
   def rebuild_day_flags(employee_id, company, %DateTime{} = punched_at) do

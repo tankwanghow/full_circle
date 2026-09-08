@@ -35,6 +35,9 @@ config :swoosh, :api_client, false
 # Upload directory for company creation
 config :full_circle, uploads_dir: System.tmp_dir!()
 
+# The pruner deletes files; never let it run alongside the suite.
+config :full_circle, punch_photo_prune_enabled: false
+
 # Print only warnings and errors during test
 config :logger, level: :warning
 

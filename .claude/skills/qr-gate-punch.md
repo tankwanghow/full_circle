@@ -21,6 +21,14 @@ Badge must not occlude the face: the phone compares the QR bounding box against 
 
 Photos: `{uploads_dir}/{company_id}/punch_photos/{yyyy}/{mm}/{id}.jpg`. Serve via `GET /companies/:id/TimeAttend/:id/photo`.
 
+**Retention: 24 months** (`:punch_photo_retention_months`). `PunchGate.PhotoPruner` is a supervised GenServer that wakes daily and calls `prune_photos_before/2`; the punch rows are kept forever, only the JPEGs go. There is no Oban here, which is why it is a plain process rather than a job — it ships with the release so there is nothing to configure per server. Disabled in `test` (`:punch_photo_prune_enabled`), since it deletes files.
+
+The prune removes the **file first, then clears `photo_path`**. Interrupted, that leaves a row pointing at a missing file, which the photo controller already answers with 404, and the next run finishes it — a missing file counts as success. The reverse order would orphan the file permanently and never reclaim the disk. Do not "fix" the order.
+
+It is a **no-op until late 2028** (the gate went live 2026-09), so it cannot be observed working in production before then; the tests in `FullCircle.PunchGateTest` are the evidence. To see what it would remove, use a nearer cutoff with `dry_run: true`.
+
+Sizing, measured from real punches at 360x480 / ~24 KB: 100 employees at 4 punches/day on a 6-day week is ~125k photos and ~3 GB a year. The 300 KB cap is ~12x the real mean and only catches pathological frames.
+
 The stored JPEG is **cropped to the face** (`ScanActivity.faceCropBox`, face box padded 30%, clamped to the frame) so it is legible as a thumbnail. The badge is verified in the same frame and then **deliberately cropped out** — the stored image proves *who*, not *which badge*. Chosen 2026-09-08 with that trade-off understood; do not "restore" the full frame as if it were a regression.
 
 Punch IO **and Punch Card** have a live **Show photos** toggle (`search[show_photos]` for URL persistence, default off). There is no photo icon: a slot shows a thumbnail or nothing. The binding is `JS.toggle_class("show-punch-photos", to: ...) |> JS.push("toggle_photos")` — the class flip is client-side so it is instant, and the push keeps the server assign in step for later re-renders.

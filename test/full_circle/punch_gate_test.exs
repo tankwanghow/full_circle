@@ -237,4 +237,133 @@ defmodule FullCircle.PunchGateTest do
     assert PunchGate.parse_badge_payload(id) == {:ok, id}
     assert PunchGate.parse_badge_payload("not-a-badge") == :error
   end
+
+  describe "prune_photos_before/2" do
+    # The gate went live in 2026-09, so nothing is older than 24 months until
+    # late 2028. These tests are the only evidence this job behaves before it
+    # first deletes ~125k files unattended.
+
+    setup %{admin: admin, company: company} do
+      emp = employee_fixture(%{}, company, admin)
+      %{emp: emp}
+    end
+
+    defp punch_with_photo(company, emp, admin, punch_time, write_file? \\ true) do
+      ta =
+        FullCircle.Repo.insert!(%FullCircle.HR.TimeAttend{
+          company_id: company.id,
+          employee_id: emp.id,
+          user_id: admin.id,
+          punch_time: punch_time,
+          flag: "1_IN_1",
+          status: "Draft",
+          input_medium: "QRGate"
+        })
+
+      abs = PunchGate.photo_abs_path(company.id, ta)
+      rel = Path.relative_to(abs, Application.get_env(:full_circle, :uploads_dir))
+
+      if write_file? do
+        File.mkdir_p!(Path.dirname(abs))
+        File.write!(abs, "jpegbytes")
+      end
+
+      ta = ta |> Ecto.Changeset.change(%{photo_path: rel}) |> FullCircle.Repo.update!()
+      {ta, abs}
+    end
+
+    defp reload(ta), do: FullCircle.Repo.get!(FullCircle.HR.TimeAttend, ta.id)
+
+    test "deletes the file and clears photo_path past the cutoff", ctx do
+      old = DateTime.utc_now() |> DateTime.add(-800, :day) |> DateTime.truncate(:second)
+      {ta, abs} = punch_with_photo(ctx.company, ctx.emp, ctx.admin, old)
+      assert File.exists?(abs)
+
+      assert {:ok, 1} = PunchGate.prune_photos_before(DateTime.utc_now())
+
+      refute File.exists?(abs)
+      assert is_nil(reload(ta).photo_path)
+    end
+
+    test "keeps photos newer than the cutoff", ctx do
+      recent = DateTime.utc_now() |> DateTime.add(-10, :day) |> DateTime.truncate(:second)
+      {ta, abs} = punch_with_photo(ctx.company, ctx.emp, ctx.admin, recent)
+
+      cutoff = DateTime.utc_now() |> DateTime.add(-100, :day)
+      assert {:ok, 0} = PunchGate.prune_photos_before(cutoff)
+
+      assert File.exists?(abs)
+      assert reload(ta).photo_path
+    end
+
+    test "the punch row itself survives", ctx do
+      old = DateTime.utc_now() |> DateTime.add(-800, :day) |> DateTime.truncate(:second)
+      {ta, _abs} = punch_with_photo(ctx.company, ctx.emp, ctx.admin, old)
+
+      PunchGate.prune_photos_before(DateTime.utc_now())
+
+      kept = reload(ta)
+      assert kept.punch_time == ta.punch_time
+      assert kept.flag == ta.flag
+      assert kept.employee_id == ta.employee_id
+    end
+
+    test "an already-missing file still clears photo_path", ctx do
+      old = DateTime.utc_now() |> DateTime.add(-800, :day) |> DateTime.truncate(:second)
+      {ta, abs} = punch_with_photo(ctx.company, ctx.emp, ctx.admin, old, false)
+      refute File.exists?(abs)
+
+      assert {:ok, 1} = PunchGate.prune_photos_before(DateTime.utc_now())
+      assert is_nil(reload(ta).photo_path)
+    end
+
+    test "dry_run reports the count but changes nothing", ctx do
+      old = DateTime.utc_now() |> DateTime.add(-800, :day) |> DateTime.truncate(:second)
+      {ta, abs} = punch_with_photo(ctx.company, ctx.emp, ctx.admin, old)
+
+      assert {:ok, 1} = PunchGate.prune_photos_before(DateTime.utc_now(), dry_run: true)
+
+      assert File.exists?(abs)
+      assert reload(ta).photo_path
+    end
+
+    test "the scheduled pruner honours the configured retention window", ctx do
+      prev = Application.get_env(:full_circle, :punch_photo_retention_months)
+      Application.put_env(:full_circle, :punch_photo_retention_months, 1)
+      on_exit(fn -> Application.put_env(:full_circle, :punch_photo_retention_months, prev) end)
+
+      old_t = Timex.shift(DateTime.utc_now(), months: -3) |> DateTime.truncate(:second)
+      recent_t = Timex.shift(DateTime.utc_now(), days: -3) |> DateTime.truncate(:second)
+      {old_ta, old_abs} = punch_with_photo(ctx.company, ctx.emp, ctx.admin, old_t)
+      {new_ta, new_abs} = punch_with_photo(ctx.company, ctx.emp, ctx.admin, recent_t)
+
+      assert :ok = FullCircle.PunchGate.PhotoPruner.prune()
+
+      refute File.exists?(old_abs)
+      assert is_nil(reload(old_ta).photo_path)
+      assert File.exists?(new_abs)
+      assert reload(new_ta).photo_path
+    end
+
+    test "works across more rows than one batch", ctx do
+      old = DateTime.utc_now() |> DateTime.add(-800, :day) |> DateTime.truncate(:second)
+
+      pairs =
+        for i <- 1..5 do
+          punch_with_photo(
+            ctx.company,
+            ctx.emp,
+            ctx.admin,
+            DateTime.add(old, i, :second)
+          )
+        end
+
+      assert {:ok, 5} = PunchGate.prune_photos_before(DateTime.utc_now(), batch: 2)
+
+      for {ta, abs} <- pairs do
+        refute File.exists?(abs)
+        assert is_nil(reload(ta).photo_path)
+      end
+    end
+  end
 end

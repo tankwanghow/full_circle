@@ -14,6 +14,7 @@ defmodule FullCircle.Application do
       FullCircle.Repo,
       FullCircle.QueryRepo,
       FullCircle.StatutoryConfig.Cache,
+      FullCircle.PunchGate.PhotoPruner,
       # Start the PubSub system
       {Phoenix.PubSub, name: FullCircle.PubSub},
       # Start Finch
