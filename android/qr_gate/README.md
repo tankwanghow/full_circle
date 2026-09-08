@@ -47,7 +47,30 @@ APK: `app/build/outputs/apk/debug/app-debug.apk`
 
 `./gradlew assembleDebug` **cannot run in the SDD worktree environment**: there is `/usr/bin/java` (OpenJDK 8 JRE, no `javac`) and `/usr/bin/adb`, but **no `ANDROID_HOME` / `sdkmanager`**. Source is complete; build on a machine that meets the requirements above.
 
+## Release APK
+
+```bash
+# once, outside the repo (keytool will not create the directory):
+mkdir -p ~/keystores && chmod 700 ~/keystores
+keytool -genkeypair -v -keystore ~/keystores/qr_gate.jks -alias qr_gate \
+  -keyalg RSA -keysize 4096 -validity 10000 -storetype PKCS12
+
+# then in ~/.gradle/gradle.properties (never in this repo):
+#   QR_GATE_STORE_FILE, QR_GATE_STORE_PASSWORD, QR_GATE_KEY_ALIAS, QR_GATE_KEY_PASSWORD
+
+JAVA_HOME=... ./gradlew assembleRelease
+```
+
+**Back up the keystore.** Losing it means no installed app can ever be updated.
+
+Without those properties `assembleRelease` refuses in ~2s naming what is missing, rather than producing an unsigned APK.
+
+The first release install per phone **wipes that app's data** (a release signature cannot upgrade a debug-signed install): drain the queue, revoke the device, `adb uninstall`, install, pair fresh. Later upgrades are a plain `adb install -r`.
+
+Release builds refuse a non-https pairing QR, since they cannot upload over cleartext. Point them at the production domain.
+
 ## Install
+
 
 ```bash
 adb install -r app/build/outputs/apk/debug/app-debug.apk

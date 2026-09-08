@@ -48,6 +48,37 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 Gate phone is OPPO/ColorOS: USB debugging is off by default and the toggle is gated behind SIM + network + HeyTap account. `lsusb -d 22d9:2764 -v` tells you which state it is in — an Imaging/MTP interface alone means debugging is off; the ADB interface is class 255 / subclass 66 / protocol 1. There are no Android udev rules on this box, so expect `no permissions` once ADB does appear. Wireless debugging (`adb pair` / `adb connect`) sidesteps both and suits a phone screwed to a wall.
 
+### Release (production) APK
+
+Signing comes from `~/.gradle/gradle.properties`, never the repo:
+
+```properties
+QR_GATE_STORE_FILE=/home/<you>/keystores/qr_gate.jks
+QR_GATE_STORE_PASSWORD=…
+QR_GATE_KEY_ALIAS=qr_gate
+QR_GATE_KEY_PASSWORD=…
+```
+
+Created once with `mkdir -p ~/keystores && chmod 700 ~/keystores` then `keytool -genkeypair -v -keystore ~/keystores/qr_gate.jks -alias qr_gate -keyalg RSA -keysize 4096 -validity 10000 -storetype PKCS12` (keytool does not create the directory). **Back the keystore up.** Lose it and no installed app can ever be updated again — the only recovery is uninstall + re-pair on every phone.
+
+`assembleRelease` fails in ~2s with the missing property names if they are absent, rather than emitting an unsigned APK that only fails at `adb install`.
+
+**The first release install wipes each phone's app data**, because a release signature cannot upgrade a debug-signed install (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`). Per phone, once: drain the queue (confirm recent punches in Punch IO — anything still queued is lost), revoke the device in Punch Devices, `adb uninstall com.fullcircle.qrgate`, install the release APK, then pair fresh. `adb uninstall -k` is not a shortcut: with a changed signature the retained data is orphaned. Later release upgrades are a plain `adb install -r` and keep pairing.
+
+Release builds forbid cleartext, so **pairing refuses a non-https URL** (`PairingActivity.pairingUrlUsable`) instead of storing it and failing later as an endlessly retrying upload. Point release phones at the production domain, which has a real Let's Encrypt cert — no cert bundling needed. Debug builds still pair over `http://<lan-ip>:4000`.
+
+`versionName` is rendered faintly in the scanner's top-right corner so a wall-mounted phone's build can be read without unmounting it. Bump `versionCode`/`versionName` deliberately per release.
+
+Verify a release artifact before shipping it (all three fail on a debug APK):
+
+```bash
+aapt2 dump badging app-release.apk | grep application-debuggable   # must print nothing
+apksigner verify --print-certs app-release.apk                     # must NOT be CN=Android Debug
+aapt2 dump xmltree --file AndroidManifest.xml app-release.apk | grep usesCleartextTraffic
+```
+
+Note the app is **multidex** (6 dex files): grepping only `classes.dex` for a symbol gives a false negative.
+
 Two gotchas that each cost a build:
 
 - A bare apostrophe in `strings.xml` fails AAPT2 with a misleading *"Invalid unicode escape sequence"*. Use `\'`, not `&#39;`.

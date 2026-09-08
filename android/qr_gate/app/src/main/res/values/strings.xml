@@ -5,6 +5,7 @@
     <string name="scan_badge">Hold your badge and look at the camera</string>
     <string name="ok">OK</string>
     <string name="camera_required">Camera permission is required</string>
+    <string name="pairing_url_unusable">That gate address cannot be used by this app. It must be https, or an http address on a debug build.</string>
     <string name="front_camera_required">Front camera required</string>
     <string name="badge_covers_face">Don\'t cover your face — hold the badge lower</string>
     <string name="capture_rejected">Show your full face and the badge — try again</string>

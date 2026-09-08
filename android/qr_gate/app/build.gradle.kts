@@ -1,3 +1,12 @@
+// Release signing comes from ~/.gradle/gradle.properties, never from this repo.
+val signingProps = listOf(
+    "QR_GATE_STORE_FILE",
+    "QR_GATE_STORE_PASSWORD",
+    "QR_GATE_KEY_ALIAS",
+    "QR_GATE_KEY_PASSWORD",
+)
+val missingSigningProps = signingProps.filterNot { project.hasProperty(it) }
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -12,9 +21,20 @@ android {
         applicationId = "com.fullcircle.qrgate"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "1.0.0"
         manifestPlaceholders["usesCleartextTraffic"] = "false"
+    }
+
+    signingConfigs {
+        create("release") {
+            if (missingSigningProps.isEmpty()) {
+                storeFile = file(project.property("QR_GATE_STORE_FILE") as String)
+                storePassword = project.property("QR_GATE_STORE_PASSWORD") as String
+                keyAlias = project.property("QR_GATE_KEY_ALIAS") as String
+                keyPassword = project.property("QR_GATE_KEY_PASSWORD") as String
+            }
+        }
     }
 
     buildTypes {
@@ -22,6 +42,7 @@ android {
             manifestPlaceholders["usesCleartextTraffic"] = "true"
         }
         release {
+            signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -42,7 +63,27 @@ android {
     }
 
     buildFeatures {
+        buildConfig = true
         viewBinding = true
+    }
+}
+
+// Fail before anything builds, rather than emitting an unsigned APK that only
+// fails at install time, or dying deep in packageRelease after a long build.
+gradle.taskGraph.whenReady {
+    val wantsRelease = allTasks.any { t ->
+        t.name.contains("Release") &&
+            (t.name.startsWith("package") || t.name.startsWith("assemble") ||
+                t.name.startsWith("bundle"))
+    }
+    if (wantsRelease && missingSigningProps.isNotEmpty()) {
+        throw GradleException(
+            "Cannot build a release APK: missing signing propert" +
+                (if (missingSigningProps.size == 1) "y " else "ies ") +
+                missingSigningProps.joinToString(", ") +
+                ". Set them in ~/.gradle/gradle.properties " +
+                "(see .claude/skills/qr-gate-punch.md).",
+        )
     }
 }
 

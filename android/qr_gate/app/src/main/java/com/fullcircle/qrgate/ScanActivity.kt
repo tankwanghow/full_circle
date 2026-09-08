@@ -114,6 +114,8 @@ class ScanActivity : AppCompatActivity() {
         setContentView(binding.root)
         hideSystemBars()
 
+        binding.version.text = BuildConfig.VERSION_NAME
+
         photosDir = QueueDb.photosDir(this).also { it.mkdirs() }
         cameraExecutor = Executors.newSingleThreadExecutor()
         scanner = BarcodeScanning.getClient(

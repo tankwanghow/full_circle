@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.security.NetworkSecurityPolicy
 import android.util.Log
 import android.view.WindowManager
 import androidx.activity.result.contract.ActivityResultContracts
@@ -24,6 +25,8 @@ import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
+import java.net.URI
+import java.net.URISyntaxException
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
@@ -115,6 +118,11 @@ class PairingActivity : AppCompatActivity() {
                 if (!accepting.get()) return@addOnSuccessListener
                 val raw = barcodes.firstNotNullOfOrNull { it.rawValue } ?: return@addOnSuccessListener
                 val parsed = parsePairing(raw) ?: return@addOnSuccessListener
+                if (!pairingUrlUsable(parsed.third, ::cleartextPermitted)) {
+                    Log.w(TAG, "refusing pairing URL this build cannot upload to: ${parsed.third}")
+                    runOnUiThread { binding.prompt.setText(R.string.pairing_url_unusable) }
+                    return@addOnSuccessListener
+                }
                 if (accepting.compareAndSet(true, false)) {
                     val (_, token, url) = parsed
                     Log.i(TAG, "paired; baseUrl=$url")
@@ -124,6 +132,9 @@ class PairingActivity : AppCompatActivity() {
             }
             .addOnCompleteListener { imageProxy.close() }
     }
+
+    private fun cleartextPermitted(host: String): Boolean =
+        NetworkSecurityPolicy.getInstance().isCleartextTrafficPermitted(host)
 
     private fun startScanner() {
         startActivity(Intent(this, ScanActivity::class.java))
@@ -138,6 +149,25 @@ class PairingActivity : AppCompatActivity() {
 
     companion object {
         private const val TAG = "QrGatePair"
+
+        /**
+         * Release builds forbid cleartext, and pairing only *stores* the URL — the
+         * failure would otherwise surface much later as a retrying upload error,
+         * with the gate showing OK on every scan while delivering nothing.
+         */
+        fun pairingUrlUsable(url: String, cleartextPermitted: (String) -> Boolean): Boolean {
+            val uri = try {
+                URI(url)
+            } catch (_: URISyntaxException) {
+                return false
+            }
+            val host = uri.host?.takeIf { it.isNotBlank() } ?: return false
+            return when (uri.scheme?.lowercase()) {
+                "https" -> true
+                "http" -> cleartextPermitted(host)
+                else -> false
+            }
+        }
 
         fun parsePairing(raw: String): Triple<String, String, String>? {
             if (!raw.startsWith("fcpair:")) return null
