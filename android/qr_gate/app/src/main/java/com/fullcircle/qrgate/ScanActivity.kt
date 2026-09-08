@@ -304,14 +304,16 @@ class ScanActivity : AppCompatActivity() {
                         rejectStill()
                         return
                     }
-                    if (!stillHasFaceAndBadge(rotated, emp)) {
+                    val faceBox = verifyStill(rotated, emp)
+                    if (faceBox == null) {
                         Log.i(TAG, "still missing face or badge QR; not queueing")
                         rejectStill()
                         return
                     }
+                    val cropped = cropToFace(rotated, faceBox)
                     val clientId = UUID.randomUUID().toString()
                     val dest = File(photosDir, "$clientId.jpg")
-                    if (!writeFaceJpeg(rotated, dest)) {
+                    if (!writeFaceJpeg(cropped, dest)) {
                         dest.delete()
                         rejectStill()
                         return
@@ -334,32 +336,32 @@ class ScanActivity : AppCompatActivity() {
 
     /**
      * Detection only — no matching / enrolment. The badge must be in this JPEG, must be the
-     * one seen live, and must not cover the face.
+     * one seen live, and must not cover the face. Returns the face box to crop to, or null.
      */
-    private fun stillHasFaceAndBadge(bitmap: Bitmap, expectedEmp: String): Boolean {
+    private fun verifyStill(bitmap: Bitmap, expectedEmp: String): Box? {
         val image = InputImage.fromBitmap(bitmap, 0)
         val faces = try {
             Tasks.await(faceDetector.process(image), 2, TimeUnit.SECONDS)
         } catch (e: Exception) {
             Log.w(TAG, "face detect failed", e)
-            return false
+            return null
         }
         val barcodes = try {
             Tasks.await(scanner.process(image), 2, TimeUnit.SECONDS)
         } catch (e: Exception) {
             Log.w(TAG, "badge decode on still failed", e)
-            return false
+            return null
         }
 
-        val (id, badge) = pickBadgeBarcode(barcodes) ?: return false
-        if (!id.equals(expectedEmp, ignoreCase = true)) return false
-        val badgeBox = badge.boundingBox?.toBox() ?: return false
-        val faceBox = largestFace(faces.map { it.boundingBox.toBox() }) ?: return false
+        val (id, badge) = pickBadgeBarcode(barcodes) ?: return null
+        if (!id.equals(expectedEmp, ignoreCase = true)) return null
+        val badgeBox = badge.boundingBox?.toBox() ?: return null
+        val faceBox = largestFace(faces.map { it.boundingBox.toBox() }) ?: return null
         if (badgeOccludesFace(faceBox, badgeBox)) {
             Log.i(TAG, "badge covers face; not queueing")
-            return false
+            return null
         }
-        return true
+        return faceBox
     }
 
     private fun rejectStill(@StringRes reasonRes: Int = R.string.capture_rejected) {
@@ -535,6 +537,7 @@ class ScanActivity : AppCompatActivity() {
         private const val MAX_PHOTO_BYTES = 300_000L
         private const val LONG_SIDE_PX = 480
         private const val JPEG_QUALITY = 70
+        private const val FACE_CROP_PAD = 0.3f
         private const val MAX_FACE_COVERED = 0.05f
 
         private val UUID_RE =
@@ -557,6 +560,18 @@ class ScanActivity : AppCompatActivity() {
         ): Boolean {
             if (area(face) <= 0L) return true
             return faceCoveredFraction(face, badge) > maxFraction
+        }
+
+        /** Face box padded outward and clamped to the image — ML Kit's box is tight. */
+        fun faceCropBox(face: Box, padFraction: Float, imgW: Int, imgH: Int): Box {
+            val padX = ((face.right - face.left) * padFraction).toInt()
+            val padY = ((face.bottom - face.top) * padFraction).toInt()
+            return Box(
+                left = (face.left - padX).coerceIn(0, imgW),
+                top = (face.top - padY).coerceIn(0, imgH),
+                right = (face.right + padX).coerceIn(0, imgW),
+                bottom = (face.bottom + padY).coerceIn(0, imgH),
+            )
         }
 
         /** The person at the gate, not a bystander in the background. */
@@ -593,6 +608,15 @@ class ScanActivity : AppCompatActivity() {
         }
 
         fun Rect.toBox(): Box = Box(left, top, right, bottom)
+
+        /** Falls back to the whole frame if the padded box is degenerate. */
+        fun cropToFace(src: Bitmap, face: Box): Bitmap {
+            val box = faceCropBox(face, FACE_CROP_PAD, src.width, src.height)
+            val w = box.right - box.left
+            val h = box.bottom - box.top
+            if (w <= 0 || h <= 0) return src
+            return Bitmap.createBitmap(src, box.left, box.top, w, h)
+        }
 
         fun rotateIfNeeded(bitmap: Bitmap, degrees: Int): Bitmap {
             if (degrees % 360 == 0) return bitmap

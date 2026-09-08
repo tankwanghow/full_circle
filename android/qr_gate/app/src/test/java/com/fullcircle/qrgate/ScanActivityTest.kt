@@ -92,4 +92,41 @@ class ScanActivityTest {
         assertEquals(big, ScanActivity.largestFace(listOf(small, big)))
         assertNull(ScanActivity.largestFace(emptyList()))
     }
+
+    // --- face crop geometry ---
+
+    @Test
+    fun cropPadsTheFaceBoxOnEverySide() {
+        // 100x100 face, 30% pad => 30px each side.
+        val crop = ScanActivity.faceCropBox(face, 0.3f, 1000, 1000)
+        assertEquals(ScanActivity.Box(70, 70, 230, 230), crop)
+    }
+
+    @Test
+    fun cropClampsAtTheTopLeftCorner() {
+        val corner = ScanActivity.Box(10, 10, 110, 110)
+        val crop = ScanActivity.faceCropBox(corner, 0.3f, 1000, 1000)
+        assertEquals(ScanActivity.Box(0, 0, 140, 140), crop)
+    }
+
+    @Test
+    fun cropClampsAtTheBottomRightEdge() {
+        val edge = ScanActivity.Box(900, 900, 1000, 1000)
+        val crop = ScanActivity.faceCropBox(edge, 0.3f, 1000, 1000)
+        assertEquals(ScanActivity.Box(870, 870, 1000, 1000), crop)
+    }
+
+    @Test
+    fun cropOfADegenerateFaceHasNoArea() {
+        val empty = ScanActivity.Box(50, 50, 50, 50)
+        val crop = ScanActivity.faceCropBox(empty, 0.3f, 1000, 1000)
+        assertEquals(crop.left, crop.right)
+        assertEquals(crop.top, crop.bottom)
+    }
+
+    @Test
+    fun cropNeverEscapesASmallImage() {
+        val crop = ScanActivity.faceCropBox(face, 0.3f, 150, 150)
+        assertEquals(ScanActivity.Box(70, 70, 150, 150), crop)
+    }
 }
