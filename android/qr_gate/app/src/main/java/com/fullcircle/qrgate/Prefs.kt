@@ -22,6 +22,15 @@ class Prefs(context: Context) {
     val isPaired: Boolean
         get() = token.isNotEmpty() && baseUrl.isNotEmpty()
 
+    /** Camera-off idle, seconds. Survives re-pair; not cleared with the token. */
+    var idleSeconds: Int
+        get() = BurstIdle.clampIdleSeconds(
+            sp.getInt(KEY_IDLE_SEC, BurstIdle.DEFAULT_IDLE_SEC),
+        )
+        set(value) {
+            sp.edit().putInt(KEY_IDLE_SEC, BurstIdle.clampIdleSeconds(value)).apply()
+        }
+
     fun savePairing(token: String, baseUrl: String) {
         sp.edit()
             .putString(KEY_TOKEN, token)
@@ -49,5 +58,6 @@ class Prefs(context: Context) {
         const val PREFS_NAME = "qr_gate"
         const val KEY_TOKEN = "token"
         const val KEY_BASE_URL = "baseUrl"
+        const val KEY_IDLE_SEC = "idleSeconds"
     }
 }

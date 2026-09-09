@@ -6,14 +6,21 @@ import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Matrix
+import android.graphics.PorterDuff
 import android.graphics.Rect
+import android.widget.ImageView
+import android.widget.TextView
 import android.media.AudioManager
 import android.media.ToneGenerator
 import android.os.Bundle
 import android.os.SystemClock
+import android.text.InputType
 import android.util.Log
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
+import android.widget.EditText
+import android.widget.FrameLayout
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.ColorRes
@@ -26,6 +33,7 @@ import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
+import androidx.camera.core.UseCaseGroup
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
@@ -35,21 +43,28 @@ import androidx.lifecycle.lifecycleScope
 import com.fullcircle.qrgate.data.PunchEntity
 import com.fullcircle.qrgate.data.QueueDb
 import com.fullcircle.qrgate.databinding.ActivityScanBinding
+import com.fullcircle.qrgate.net.PunchUploader
 import com.fullcircle.qrgate.net.UploadWorker
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import com.google.android.gms.tasks.Tasks
 import com.google.mlkit.vision.barcode.BarcodeScanner
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.face.Face
 import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetector
 import com.google.mlkit.vision.face.FaceDetectorOptions
+import com.google.mlkit.vision.face.FaceLandmark
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.IOException
 import java.time.Instant
+import java.time.ZonedDateTime
 import java.time.temporal.ChronoUnit
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -58,11 +73,18 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
+import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 
 class ScanActivity : AppCompatActivity() {
     private enum class Step { WAIT, CAPTURING, OK }
+
+    sealed class BadgePick {
+        data object None : BadgePick()
+        data class One(val employeeId: String) : BadgePick()
+        data object Ambiguous : BadgePick()
+    }
 
     /** Rect-free so the geometry stays unit-testable off-device. */
     data class Box(val left: Int, val top: Int, val right: Int, val bottom: Int)
@@ -75,14 +97,42 @@ class ScanActivity : AppCompatActivity() {
     private lateinit var photosDir: File
 
     private var imageCapture: ImageCapture? = null
+    private var cameraProvider: ProcessCameraProvider? = null
     private var pendingEmployeeId: String? = null
     private var pendingPunchedAtIso: String? = null
     private val captureGeneration = AtomicInteger(0)
     private var lastRejectBeepAt = 0L
-    private var lastHintAt = 0L
     private var readyAt = 0L
     private val lastOkAtByEmployee = ConcurrentHashMap<String, Long>()
     private val step = AtomicReference(Step.WAIT)
+    private val burstIdle = BurstIdle()
+    private val sleepTick = Runnable {
+        if (step.get() != Step.WAIT) return@Runnable
+        applyIdle(burstIdle.idleElapsed())
+    }
+    private var lastLegend: GateUi.Legend? = null
+    private val clockTick = object : Runnable {
+        override fun run() {
+            if (!::binding.isInitialized || isDestroyed || isFinishing) return
+            val at = ZonedDateTime.now()
+            binding.gateDate.text = GateUi.formatDate(at)
+            binding.gateTime.text = GateUi.formatTime(at)
+            binding.root.postDelayed(this, 1_000L)
+        }
+    }
+    private val healthExecutor = Executors.newSingleThreadExecutor()
+    private val healthClient: OkHttpClient = OkHttpClient.Builder()
+        .connectTimeout(3, TimeUnit.SECONDS)
+        .readTimeout(3, TimeUnit.SECONDS)
+        .writeTimeout(3, TimeUnit.SECONDS)
+        .build()
+    private val healthTick = object : Runnable {
+        override fun run() {
+            if (!::binding.isInitialized || isDestroyed || isFinishing) return
+            healthExecutor.execute { pingHealth() }
+            binding.root.postDelayed(this, HEALTH_MS)
+        }
+    }
 
     private val prefListener =
         SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
@@ -93,7 +143,12 @@ class ScanActivity : AppCompatActivity() {
 
     private val requestCamera =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-            if (granted) startCamera() else binding.prompt.setText(R.string.camera_required)
+            if (granted) {
+                startCamera()
+            } else {
+                binding.prompt.visibility = View.VISIBLE
+                binding.prompt.setText(R.string.camera_required)
+            }
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -115,6 +170,16 @@ class ScanActivity : AppCompatActivity() {
         hideSystemBars()
 
         binding.version.text = BuildConfig.VERSION_NAME
+        binding.version.setOnLongClickListener {
+            showIdleDialog()
+            true
+        }
+        binding.sleepOverlay.setOnClickListener { applyIdle(burstIdle.tapped()) }
+        binding.legend.setOnClickListener { applyIdle(burstIdle.tapped()) }
+        binding.clock.setOnClickListener { applyIdle(burstIdle.tapped()) }
+        clockTick.run()
+        applyLink(LinkStatus.DISCONNECTED)
+        healthTick.run()
 
         photosDir = QueueDb.photosDir(this).also { it.mkdirs() }
         cameraExecutor = Executors.newSingleThreadExecutor()
@@ -126,7 +191,7 @@ class ScanActivity : AppCompatActivity() {
         faceDetector = FaceDetection.getClient(
             FaceDetectorOptions.Builder()
                 .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
-                .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_NONE)
+                .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL)
                 .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_NONE)
                 .setMinFaceSize(0.10f)
                 .build(),
@@ -148,6 +213,7 @@ class ScanActivity : AppCompatActivity() {
         } else {
             requestCamera.launch(Manifest.permission.CAMERA)
         }
+        applyIdle(burstIdle.started())
 
         UploadWorker.enqueue(this)
     }
@@ -193,9 +259,27 @@ class ScanActivity : AppCompatActivity() {
     }
 
     private fun startCamera() {
+        if (!::binding.isInitialized) return
+        binding.previewView.post { bindCameraUseCases() }
+    }
+
+    /**
+     * Crop analysis + still to the same pixels as the full-screen preview.
+     * Without a ViewPort, FILL_CENTER preview can show a cut-off head while
+     * the analyzer still sees the whole sensor and punches.
+     */
+    private fun bindCameraUseCases() {
+        if (isDestroyed || isFinishing) return
+        if (burstIdle.mode != BurstIdle.Mode.ACTIVE) return
+        if (binding.previewView.width == 0 || binding.previewView.height == 0) {
+            binding.previewView.post { bindCameraUseCases() }
+            return
+        }
         val future = ProcessCameraProvider.getInstance(this)
         future.addListener({
             val provider = future.get()
+            cameraProvider = provider
+            if (burstIdle.mode != BurstIdle.Mode.ACTIVE) return@addListener
             val preview = Preview.Builder().build().also {
                 it.setSurfaceProvider(binding.previewView.surfaceProvider)
             }
@@ -211,15 +295,31 @@ class ScanActivity : AppCompatActivity() {
 
             provider.unbindAll()
             try {
-                provider.bindToLifecycle(
-                    this,
-                    CameraSelector.DEFAULT_FRONT_CAMERA,
-                    preview,
-                    capture,
-                    analysis,
-                )
+                val viewPort = binding.previewView.viewPort
+                if (viewPort != null) {
+                    val group = UseCaseGroup.Builder()
+                        .setViewPort(viewPort)
+                        .addUseCase(preview)
+                        .addUseCase(capture)
+                        .addUseCase(analysis)
+                        .build()
+                    provider.bindToLifecycle(
+                        this,
+                        CameraSelector.DEFAULT_FRONT_CAMERA,
+                        group,
+                    )
+                } else {
+                    provider.bindToLifecycle(
+                        this,
+                        CameraSelector.DEFAULT_FRONT_CAMERA,
+                        preview,
+                        capture,
+                        analysis,
+                    )
+                }
             } catch (e: IllegalArgumentException) {
                 Log.e(TAG, "front camera required", e)
+                binding.prompt.visibility = View.VISIBLE
                 binding.prompt.setText(R.string.front_camera_required)
             }
         }, ContextCompat.getMainExecutor(this))
@@ -228,32 +328,59 @@ class ScanActivity : AppCompatActivity() {
     @OptIn(ExperimentalGetImage::class)
     private fun analyzeFrame(imageProxy: ImageProxy) {
         val media = imageProxy.image
-        if (media == null || step.get() != Step.WAIT ||
-            SystemClock.elapsedRealtime() < readyAt
+        if (media == null ||
+            step.get() != Step.WAIT ||
+            burstIdle.mode == BurstIdle.Mode.SLEEP
         ) {
             imageProxy.close()
             return
         }
-        val image = InputImage.fromMediaImage(media, imageProxy.imageInfo.rotationDegrees)
+        val rotation = imageProxy.imageInfo.rotationDegrees
+        val (imgW, imgH) = uprightImageSize(imageProxy.width, imageProxy.height, rotation)
+        val image = InputImage.fromMediaImage(media, rotation)
         val barcodesTask = scanner.process(image)
         val facesTask = faceDetector.process(image)
         Tasks.whenAllComplete(barcodesTask, facesTask)
             .addOnCompleteListener {
                 try {
                     if (step.get() != Step.WAIT) return@addOnCompleteListener
-                    if (!barcodesTask.isSuccessful || !facesTask.isSuccessful) {
-                        return@addOnCompleteListener
+                    if (facesTask.isSuccessful &&
+                        facesTask.result.orEmpty().isNotEmpty()
+                    ) {
+                        runOnUiThread { applyIdle(burstIdle.faceSeen()) }
                     }
-                    val (empId, badge) = pickBadgeBarcode(barcodesTask.result.orEmpty())
-                        ?: return@addOnCompleteListener
-                    val badgeBox = badge.boundingBox?.toBox() ?: return@addOnCompleteListener
-                    val faceBox = largestFace(
-                        facesTask.result.orEmpty().map { it.boundingBox.toBox() },
-                    ) ?: return@addOnCompleteListener
-                    if (badgeOccludesFace(faceBox, badgeBox)) {
-                        showHint(R.string.badge_covers_face)
-                        return@addOnCompleteListener
+                    val pick = if (barcodesTask.isSuccessful) {
+                        pickBadgeBarcode(barcodesTask.result.orEmpty())
+                    } else {
+                        BadgePick.None to null
                     }
+                    val mlFace = if (facesTask.isSuccessful) {
+                        facesTask.result.orEmpty().maxByOrNull { area(it.boundingBox.toBox()) }
+                    } else {
+                        null
+                    }
+                    val faceBox = mlFace?.boundingBox?.toBox()
+                    val fullFace = mlFace != null && isCompleteFace(mlFace, imgW, imgH)
+                    val badgeBox = pick.second?.boundingBox?.toBox()
+                    val occludes = fullFace &&
+                        pick.first is BadgePick.One &&
+                        faceBox != null &&
+                        badgeBox != null &&
+                        badgeOccludesFace(faceBox, badgeBox)
+                    val ready = fullFace && pick.first is BadgePick.One && !occludes
+                    runOnUiThread {
+                        applyLegend(
+                            GateUi.legend(
+                                asleep = burstIdle.mode == BurstIdle.Mode.SLEEP,
+                                fullFace = fullFace,
+                                pick = pick.first,
+                                occludes = occludes,
+                            ),
+                        )
+                    }
+                    if (SystemClock.elapsedRealtime() < readyAt) return@addOnCompleteListener
+                    if (!ready) return@addOnCompleteListener
+                    val empId = (pick.first as BadgePick.One).employeeId
                     if (recentlyAccepted(empId)) {
                         dupRejectBeep()
                         return@addOnCompleteListener
@@ -262,7 +389,10 @@ class ScanActivity : AppCompatActivity() {
                         pendingEmployeeId = empId
                         pendingPunchedAtIso =
                             Instant.now().truncatedTo(ChronoUnit.SECONDS).toString()
-                        runOnUiThread { captureStill() }
+                        runOnUiThread {
+                            applyIdle(burstIdle.captureStarted())
+                            captureStill()
+                        }
                     }
                 } finally {
                     imageProxy.close()
@@ -355,10 +485,16 @@ class ScanActivity : AppCompatActivity() {
             return null
         }
 
-        val (id, badge) = pickBadgeBarcode(barcodes) ?: return null
+        val (pick, badge) = pickBadgeBarcode(barcodes)
+        val id = (pick as? BadgePick.One)?.employeeId ?: return null
         if (!id.equals(expectedEmp, ignoreCase = true)) return null
-        val badgeBox = badge.boundingBox?.toBox() ?: return null
-        val faceBox = largestFace(faces.map { it.boundingBox.toBox() }) ?: return null
+        val badgeBox = badge?.boundingBox?.toBox() ?: return null
+        val mlFace = faces.maxByOrNull { area(it.boundingBox.toBox()) } ?: return null
+        val faceBox = mlFace.boundingBox.toBox()
+        if (!isCompleteFace(mlFace, bitmap.width, bitmap.height)) {
+            Log.i(TAG, "face not complete; not queueing")
+            return null
+        }
         if (badgeOccludesFace(faceBox, badgeBox)) {
             Log.i(TAG, "badge covers face; not queueing")
             return null
@@ -366,7 +502,7 @@ class ScanActivity : AppCompatActivity() {
         return faceBox
     }
 
-    private fun rejectStill(@StringRes reasonRes: Int = R.string.capture_rejected) {
+    private fun rejectStill() {
         captureGeneration.incrementAndGet()
         pendingEmployeeId = null
         pendingPunchedAtIso = null
@@ -380,7 +516,7 @@ class ScanActivity : AppCompatActivity() {
             flash(R.color.flash_fail)
             if (shouldBeep) beep(ToneGenerator.TONE_PROP_NACK, 300)
             showWaitUi()
-            showHint(reasonRes, force = true)
+            applyIdle(burstIdle.backToWait())
         }
     }
 
@@ -424,8 +560,7 @@ class ScanActivity : AppCompatActivity() {
         step.set(Step.OK)
         flash(R.color.flash_ok)
         beep(ToneGenerator.TONE_PROP_BEEP, 200)
-        binding.guideFrame.visibility = View.GONE
-        binding.prompt.setText(R.string.ok)
+        applyLegend(GateUi.Legend(faceOk = true, qrOk = true, asleep = false))
         binding.root.postDelayed({ backToWait() }, OK_MS)
     }
 
@@ -441,6 +576,7 @@ class ScanActivity : AppCompatActivity() {
         readyAt = SystemClock.elapsedRealtime() + QR_COOLDOWN_MS
         showWaitUi()
         step.set(Step.WAIT)
+        applyIdle(burstIdle.backToWait())
     }
 
     /** Full-screen colour cue: green accepted, red rejected. Read from across the gate. */
@@ -458,25 +594,31 @@ class ScanActivity : AppCompatActivity() {
             .withEndAction { v.visibility = View.GONE }
     }
 
-    /** Briefly explain a rejection, then fall back to the standing prompt. */
-    private fun showHint(@StringRes res: Int, force: Boolean = false) {
-        val now = SystemClock.elapsedRealtime()
-        if (!force && now - lastHintAt < HINT_MS) return
-        lastHintAt = now
-        runOnUiThread {
-            if (isDestroyed || isFinishing) return@runOnUiThread
-            binding.prompt.setText(res)
-            binding.root.postDelayed({
-                if (!isDestroyed && !isFinishing && step.get() == Step.WAIT) {
-                    binding.prompt.setText(R.string.scan_badge)
-                }
-            }, HINT_MS)
+    private fun applyLegend(legend: GateUi.Legend) {
+        if (!::binding.isInitialized || isDestroyed || isFinishing) return
+        if (legend == lastLegend) return
+        lastLegend = legend
+        tintLegend(binding.faceIcon, binding.faceLabel, legend.faceOk)
+        tintLegend(binding.qrIcon, binding.qrLabel, legend.qrOk)
+        if (legend.asleep) {
+            binding.prompt.visibility = View.VISIBLE
+            binding.prompt.setText(R.string.tap_to_scan)
+        } else {
+            binding.prompt.visibility = View.GONE
         }
     }
 
+    private fun tintLegend(icon: ImageView, label: TextView, ok: Boolean) {
+        val color = ContextCompat.getColor(
+            this,
+            if (ok) R.color.flash_ok else R.color.flash_fail,
+        )
+        icon.setColorFilter(color, PorterDuff.Mode.SRC_IN)
+        label.setTextColor(color)
+    }
+
     private fun showWaitUi() {
-        binding.guideFrame.visibility = View.VISIBLE
-        binding.prompt.setText(R.string.scan_badge)
+        applyLegend(GateUi.Legend(faceOk = false, qrOk = false, asleep = false))
     }
 
     private fun recentlyAccepted(employeeId: String): Boolean {
@@ -501,6 +643,7 @@ class ScanActivity : AppCompatActivity() {
     }
 
     private fun goPairing() {
+        disarmIdleTimer()
         startActivity(Intent(this, PairingActivity::class.java))
         finish()
     }
@@ -518,9 +661,159 @@ class ScanActivity : AppCompatActivity() {
         }
     }
 
+    private fun applyIdle(effect: BurstIdle.Effect) {
+        when (effect) {
+            BurstIdle.Effect.None -> {}
+            BurstIdle.Effect.ArmIdle -> armIdleTimer()
+            BurstIdle.Effect.DisarmIdle -> disarmIdleTimer()
+            BurstIdle.Effect.Sleep -> enterSleep()
+            BurstIdle.Effect.Wake -> enterWake()
+        }
+    }
+
+    private fun armIdleTimer() {
+        if (!::binding.isInitialized) return
+        binding.root.removeCallbacks(sleepTick)
+        binding.root.postDelayed(sleepTick, prefs.idleSeconds * 1000L)
+    }
+
+    private fun disarmIdleTimer() {
+        if (!::binding.isInitialized) return
+        binding.root.removeCallbacks(sleepTick)
+    }
+
+    /**
+     * Unbind the camera and dim the panel. Keep the window "on" so a tap
+     * still wakes us — the mount covers the power button.
+     */
+    private fun enterSleep() {
+        if (isDestroyed || isFinishing) return
+        if (step.get() != Step.WAIT) {
+            burstIdle.abortSleep()
+            return
+        }
+        disarmIdleTimer()
+        cameraProvider?.unbindAll()
+        imageCapture = null
+        setBrightness(SLEEP_BRIGHTNESS)
+        binding.sleepOverlay.visibility = View.VISIBLE
+        applyLegend(GateUi.Legend(faceOk = false, qrOk = false, asleep = true))
+    }
+
+    private fun enterWake() {
+        if (isDestroyed || isFinishing) return
+        setBrightness(WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE)
+        binding.sleepOverlay.visibility = View.GONE
+        showWaitUi()
+        startCamera()
+        armIdleTimer()
+    }
+
+    private fun setBrightness(value: Float) {
+        val lp = window.attributes
+        lp.screenBrightness = value
+        window.attributes = lp
+    }
+
+    private fun showIdleDialog() {
+        disarmIdleTimer()
+        lifecycleScope.launch {
+            val queued = QueueDb.get(this@ScanActivity).punchDao().count()
+            withContext(Dispatchers.Main) {
+                if (isDestroyed || isFinishing) return@withContext
+                val pad = (20 * resources.displayMetrics.density).toInt()
+                val input = EditText(this@ScanActivity).apply {
+                    inputType = InputType.TYPE_CLASS_NUMBER
+                    hint = getString(R.string.idle_range)
+                    setText(prefs.idleSeconds.toString())
+                    setSelection(text.length)
+                }
+                val box = FrameLayout(this@ScanActivity).apply {
+                    setPadding(pad, pad / 2, pad, 0)
+                    addView(
+                        input,
+                        FrameLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.WRAP_CONTENT,
+                        ),
+                    )
+                }
+                androidx.appcompat.app.AlertDialog.Builder(this@ScanActivity)
+                    .setTitle(R.string.idle_title)
+                    .setMessage(GateUi.queuedLabel(queued))
+                    .setView(box)
+                    .setPositiveButton(R.string.idle_save) { _, _ ->
+                        prefs.idleSeconds = BurstIdle.parseIdleSeconds(input.text.toString())
+                    }
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .setOnDismissListener {
+                        if (burstIdle.mode == BurstIdle.Mode.ACTIVE && step.get() == Step.WAIT) {
+                            armIdleTimer()
+                        }
+                    }
+                    .show()
+            }
+        }
+    }
+
+    private fun pingHealth() {
+        if (isDestroyed || isFinishing) return
+        val token = prefs.token
+        val base = prefs.baseUrl.trimEnd('/')
+        if (token.isEmpty() || base.isEmpty()) return
+        val request = Request.Builder()
+            .url("$base/api/punch/health")
+            .header("Authorization", "Bearer $token")
+            .get()
+            .build()
+        val status = try {
+            healthClient.newCall(request).execute().use { LinkStatus.fromHttp(it.code) }
+        } catch (_: IOException) {
+            LinkStatus.fromNetworkError()
+        }
+        val afterDrain =
+            if (status == LinkStatus.CONNECTED) {
+                when (PunchUploader.drainBlocking(applicationContext)) {
+                    PunchUploader.Result.REVOKED -> LinkStatus.REVOKED
+                    else -> status
+                }
+            } else {
+                status
+            }
+        runOnUiThread { applyLink(afterDrain) }
+    }
+
+    private fun applyLink(status: LinkStatus) {
+        if (!::binding.isInitialized || isDestroyed || isFinishing) return
+        when (status) {
+            LinkStatus.CONNECTED -> {
+                val color = ContextCompat.getColor(this, R.color.flash_ok)
+                binding.linkIcon.setColorFilter(color, PorterDuff.Mode.SRC_IN)
+                binding.linkIcon.contentDescription = getString(R.string.server_connected)
+            }
+            LinkStatus.DISCONNECTED -> {
+                val color = ContextCompat.getColor(this, R.color.flash_fail)
+                binding.linkIcon.setColorFilter(color, PorterDuff.Mode.SRC_IN)
+                binding.linkIcon.contentDescription = getString(R.string.server_disconnected)
+            }
+            LinkStatus.REVOKED -> {
+                lifecycleScope.launch {
+                    QueueDb.wipeBecauseRevoked(this@ScanActivity)
+                    withContext(Dispatchers.Main) { goPairing() }
+                }
+            }
+        }
+    }
+
     override fun onDestroy() {
         captureGeneration.incrementAndGet()
+        if (::binding.isInitialized) {
+            binding.root.removeCallbacks(sleepTick)
+            binding.root.removeCallbacks(clockTick)
+            binding.root.removeCallbacks(healthTick)
+        }
         super.onDestroy()
+        healthExecutor.shutdown()
         if (::cameraExecutor.isInitialized) cameraExecutor.shutdown()
         if (::scanner.isInitialized) scanner.close()
         if (::faceDetector.isInitialized) faceDetector.close()
@@ -528,10 +821,10 @@ class ScanActivity : AppCompatActivity() {
 
     companion object {
         private const val TAG = "QrGateScan"
+        private const val HEALTH_MS = 20_000L
         private const val OK_MS = 1_500L
         private const val QR_COOLDOWN_MS = 2_000L
         private const val REJECT_COOLDOWN_MS = 750L
-        private const val HINT_MS = 1_500L
         private const val FLASH_ALPHA = 0.75f
         private const val FLASH_HOLD_MS = 250L
         private const val FLASH_FADE_MS = 400L
@@ -541,6 +834,9 @@ class ScanActivity : AppCompatActivity() {
         private const val JPEG_QUALITY = 70
         private const val FACE_CROP_PAD = 0.3f
         private const val MAX_FACE_COVERED = 0.05f
+        private const val FACE_EDGE_MARGIN = 0.04f
+        private const val MAX_FACE_YAW_DEG = 25f
+        private const val SLEEP_BRIGHTNESS = 0.01f
 
         private val UUID_RE =
             Regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
@@ -553,6 +849,32 @@ class ScanActivity : AppCompatActivity() {
             val h = (min(face.bottom, badge.bottom) - max(face.top, badge.top)).coerceAtLeast(0)
             return (w.toLong() * h.toLong()).toFloat() / faceArea.toFloat()
         }
+
+        /**
+         * Whole head in shot. A 4% inset catches boxes of a visible half that
+         * sit a few pixels in, not at 0. Size does not matter — a 30%
+         * arm's-length face that is complete must punch.
+         */
+        fun faceFullyInFrame(face: Box, imageWidth: Int, imageHeight: Int): Boolean {
+            if (imageWidth <= 0 || imageHeight <= 0) return false
+            if (area(face) <= 0L) return false
+            val mx = max(1, (imageWidth * FACE_EDGE_MARGIN).toInt())
+            val my = max(1, (imageHeight * FACE_EDGE_MARGIN).toInt())
+            return face.left >= mx &&
+                face.top >= my &&
+                face.right <= imageWidth - mx &&
+                face.bottom <= imageHeight - my
+        }
+
+        fun fullFaceFeatures(hasLeftEye: Boolean, hasRightEye: Boolean, hasNose: Boolean): Boolean =
+            hasLeftEye && hasRightEye && hasNose
+
+        fun faceIsFrontal(eulerY: Float, maxAbsDeg: Float = MAX_FACE_YAW_DEG): Boolean =
+            abs(eulerY) <= maxAbsDeg
+
+        /** ML Kit boxes are in the rotated (upright) image; the buffer may be landscape. */
+        fun uprightImageSize(width: Int, height: Int, rotationDegrees: Int): Pair<Int, Int> =
+            if (rotationDegrees % 180 == 0) width to height else height to width
 
         /** Fails closed: a degenerate face box counts as occluded. */
         fun badgeOccludesFace(
@@ -593,23 +915,44 @@ class ScanActivity : AppCompatActivity() {
             return id.takeIf { UUID_RE.matches(it) }
         }
 
-        fun pickBadge(raws: Iterable<String>): String? {
-            val trimmed = raws.map { it.trim() }.filter { it.isNotEmpty() }
-            trimmed.firstOrNull { it.startsWith("fcqa:") }?.let { parseBadge(it) }?.let { return it }
-            return trimmed.firstNotNullOfOrNull { parseBadge(it) }
+        fun pickBadge(raws: Iterable<String>): BadgePick {
+            val ids = raws.mapNotNull { parseBadge(it.trim()) }.toSet()
+            return when (ids.size) {
+                0 -> BadgePick.None
+                1 -> BadgePick.One(ids.single())
+                else -> BadgePick.Ambiguous
+            }
         }
 
-        /** Same preference as [pickBadge], but keeps the Barcode so its box can be measured. */
-        fun pickBadgeBarcode(barcodes: List<Barcode>): Pair<String, Barcode>? {
-            val raws = barcodes.mapNotNull { b ->
-                b.rawValue?.trim()?.takeIf { it.isNotEmpty() }?.let { it to b }
+        /** Same IDs as [pickBadge]; if that is One, the barcode used for the box prefers fcqa:. */
+        fun pickBadgeBarcode(barcodes: List<Barcode>): Pair<BadgePick, Barcode?> {
+            val parsed = barcodes.mapNotNull { b ->
+                val raw = b.rawValue?.trim()?.takeIf { it.isNotEmpty() } ?: return@mapNotNull null
+                parseBadge(raw)?.let { id -> Triple(id, raw, b) }
             }
-            raws.firstOrNull { it.first.startsWith("fcqa:") }
-                ?.let { (raw, b) -> parseBadge(raw)?.let { return it to b } }
-            return raws.firstNotNullOfOrNull { (raw, b) -> parseBadge(raw)?.let { it to b } }
+            val pick = pickBadge(parsed.map { it.second })
+            val badge = when (pick) {
+                is BadgePick.One ->
+                    parsed.firstOrNull { it.second.startsWith("fcqa:") }?.third
+                        ?: parsed.firstOrNull()?.third
+                else -> null
+            }
+            return pick to badge
         }
 
         fun Rect.toBox(): Box = Box(left, top, right, bottom)
+
+        /** Landmarks mean the feature is in this cropped frame, not badge occlusion. */
+        fun isCompleteFace(face: Face, imageWidth: Int, imageHeight: Int): Boolean {
+            val box = face.boundingBox.toBox()
+            return faceFullyInFrame(box, imageWidth, imageHeight) &&
+                fullFaceFeatures(
+                    face.getLandmark(FaceLandmark.LEFT_EYE) != null,
+                    face.getLandmark(FaceLandmark.RIGHT_EYE) != null,
+                    face.getLandmark(FaceLandmark.NOSE_BASE) != null,
+                ) &&
+                faceIsFrontal(face.headEulerAngleY)
+        }
 
         /** Falls back to the whole frame if the padded box is degenerate. */
         fun cropToFace(src: Bitmap, face: Box): Bitmap {

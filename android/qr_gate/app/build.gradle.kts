@@ -21,8 +21,8 @@ android {
         applicationId = "com.fullcircle.qrgate"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "1.0.0"
+        versionCode = 13
+        versionName = "1.2.0"
         manifestPlaceholders["usesCleartextTraffic"] = "false"
     }
 

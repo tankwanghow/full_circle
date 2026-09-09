@@ -2,6 +2,10 @@ defmodule FullCircleWeb.PunchAttendanceController do
   use FullCircleWeb, :controller
   alias FullCircle.PunchGate
 
+  def health(conn, _params) do
+    send_resp(conn, :no_content, "")
+  end
+
   def create(conn, params) do
     case PunchGate.ingest_punch(conn.assigns.punch_device, params) do
       {:ok, ta} ->

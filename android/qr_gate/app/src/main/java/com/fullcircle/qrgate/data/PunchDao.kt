@@ -10,6 +10,9 @@ interface PunchDao {
     @Query("SELECT * FROM punches ORDER BY punchedAtIso ASC")
     suspend fun all(): List<PunchEntity>
 
+    @Query("SELECT COUNT(*) FROM punches")
+    suspend fun count(): Int
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insert(row: PunchEntity)
 

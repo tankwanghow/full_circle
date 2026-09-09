@@ -78,4 +78,29 @@ defmodule FullCircleWeb.PunchAttendanceControllerTest do
 
     assert conn.status == 401
   end
+
+  test "GET /api/punch/health is 204 when the device token is valid", %{
+    conn: conn,
+    token: token
+  } do
+    conn = conn |> auth(token) |> get(~p"/api/punch/health")
+    assert conn.status == 204
+  end
+
+  test "GET /api/punch/health is 401 without a token", %{conn: conn} do
+    conn = get(conn, ~p"/api/punch/health")
+    assert conn.status == 401
+  end
+
+  test "GET /api/punch/health is 401 when revoked", %{
+    conn: conn,
+    token: token,
+    device: device,
+    company: company,
+    admin: admin
+  } do
+    {:ok, _} = PunchGate.revoke_device(device, company, admin)
+    conn = conn |> auth(token) |> get(~p"/api/punch/health")
+    assert conn.status == 401
+  end
 end

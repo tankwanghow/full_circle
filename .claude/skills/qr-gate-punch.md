@@ -9,6 +9,10 @@ Company wall-mounted Android phones capture **one still** that contains a printe
 
 Pairing QR must use the **browser origin** (open Punch Devices as `http://<lan-ip>:4000`, not localhost). `Endpoint.url()` is `https://localhost:4001` in dev and the phone cannot upload to that.
 
+The scanner **unbinds the camera after N seconds with no face** (`BurstIdle`, default 20, range 5–120) so a wall phone can run a shift on battery. Set N by **long-pressing the version label** (top-right; sits above the sleep overlay so it works while asleep). Stored in `Prefs.idleSeconds`, not cleared on re-pair. Any face while waiting restarts the timer (a queue stays awake). Capture/OK disarms it. Sleep is a dim black overlay — not a real screen-off — because the mount covers the power button and a blank LCD ignores taps. Wake is a tap on that overlay; do not add proximity/PIR, and do not call `PowerManager.goToSleep`. `startCamera`'s bind listener must no-op when `BurstIdle` is already `SLEEP`, or a late bind turns the camera back on under the overlay.
+
+Scanner chrome (always above the sleep overlay): **link icon top-left** (`GET /api/punch/health` every 20s; green = 200/204, red = down, 401 wipes pairing). A successful ping **must** `PunchUploader.drainBlocking` in-process — ColorOS often never runs WorkManager, so a green icon with a growing queue means WM was the only drain path. WorkManager enqueue stays as backup. **Version top-right**; long-press opens sleep-delay seconds plus **how many punches are still queued**. Bottom: face/QR drawings (green = ok, red = missing), Tap to Scan only while asleep, then the clock.
+
 Do **not** revive `/PunchCamera`, `punch_camera` role, Face ID, or employee self-service QR.
 
 Fingerprint import is unchanged until the gate is proven.
@@ -16,6 +20,15 @@ Fingerprint import is unchanged until the gate is proven.
 Pairing: `PunchGate.create_device/3` returns `{device, plain_token}` once. QR `fcpair:<id>:<token>:<url>`. Clerks cannot pair (`:manage_punch_device` = admin/manager/supervisor).
 
 Revoke is a **soft delete** and stays that way: `revoked_at` is stamped, the row is kept, and `list_devices/2` filters it out so the UI hides it. Do not delete the row — `time_attendences.punch_device_id` is `on_delete: :nilify_all`, so deleting a device would silently strip gate attribution from every punch it ever recorded (the punch query joins `coalesce(pd.name, '')`). Revoking also clears the on-screen pairing QR for that device, since that QR no longer works.
+
+A punch needs a **readable badge QR and a full face in the same frame**. Full face (`isCompleteFace`):
+
+- Bind preview + analysis + still with `PreviewView`'s **ViewPort**. Default `FILL_CENTER` preview otherwise crops the screen so a cut-off head on the glass is still a complete face in the analyzer.
+- Box inset ≥4% from every edge (`faceFullyInFrame`). A visible-half box often sits a few pixels in, not at 0.
+- **Both eyes and the nose** present, and |yaw| ≤ 25°. This is "is the whole head in this cropped frame". Do **not** use missing landmarks as a proxy for a badge covering the face — ML Kit estimates those; keep the QR-box overlap rule for occlusion.
+- Size is not a gate: a ~30% arm's-length complete face must punch. Do not bring back a 95%-of-width fill rule.
+
+Several faces: use the **largest** (`ScanActivity.largestFace`). Several QRs: parse employee IDs only (`fcqa:` or bare UUID; ignore pairing/junk). **One distinct employee → punch. Two different employees → refuse** with “One badge only” (`BadgePick.Ambiguous`). Two codes for the same person (fcqa + bare UUID, or two copies) count as one. Do not pick “first fcqa” or nearest-to-face when IDs disagree — that punches the wrong person onto the largest face.
 
 Badge must not occlude the face: the phone compares the QR bounding box against the **largest** face box and rejects at **>5%** coverage (`ScanActivity.badgeOccludesFace`), in both the live gate and the still re-check. Do **not** switch to `LANDMARK_MODE_ALL` and test for a missing nose/mouth landmark instead — ML Kit *estimates* landmarks for covered features and reports no per-landmark occlusion confidence. This is a client-side guard only; the server runs no detection, so the stored audit JPEG stays the real backstop.
 

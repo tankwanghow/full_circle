@@ -12,18 +12,150 @@
         android:layout_height="match_parent" />
 
     <View
-        android:id="@+id/guideFrame"
-        android:layout_width="280dp"
-        android:layout_height="420dp"
-        android:layout_gravity="center"
-        android:background="@drawable/guide_square" />
-
-    <View
         android:id="@+id/flashOverlay"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:alpha="0"
         android:visibility="gone" />
+
+    <FrameLayout
+        android:id="@+id/sleepOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@android:color/black"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:id="@+id/legend"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:layout_marginBottom="16dp"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        android:paddingHorizontal="16dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:id="@+id/exampleFace"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:orientation="vertical">
+
+                <ImageView
+                    android:id="@+id/faceIcon"
+                    android:layout_width="72dp"
+                    android:layout_height="72dp"
+                    android:contentDescription="@string/need_face"
+                    android:src="@drawable/example_face" />
+
+                <TextView
+                    android:id="@+id/faceLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:shadowColor="#80000000"
+                    android:shadowRadius="6"
+                    android:text="@string/need_face"
+                    android:textColor="@color/flash_fail"
+                    android:textSize="14sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/exampleQr"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:orientation="vertical">
+
+                <ImageView
+                    android:id="@+id/qrIcon"
+                    android:layout_width="72dp"
+                    android:layout_height="72dp"
+                    android:contentDescription="@string/need_qr"
+                    android:src="@drawable/example_qr" />
+
+                <TextView
+                    android:id="@+id/qrLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:shadowColor="#80000000"
+                    android:shadowRadius="6"
+                    android:text="@string/need_qr"
+                    android:textColor="@color/flash_fail"
+                    android:textSize="14sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/prompt"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:gravity="center"
+            android:shadowColor="#80000000"
+            android:shadowDx="0"
+            android:shadowDy="1"
+            android:shadowRadius="8"
+            android:text="@string/tap_to_scan"
+            android:textColor="@android:color/white"
+            android:textSize="32sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+        <LinearLayout
+            android:id="@+id/clock"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:gravity="center_horizontal"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/gateDate"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:shadowColor="#80000000"
+                android:shadowDx="0"
+                android:shadowDy="1"
+                android:shadowRadius="8"
+                android:textColor="@android:color/white"
+                android:textSize="18sp" />
+
+            <TextView
+                android:id="@+id/gateTime"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:shadowColor="#80000000"
+                android:shadowDx="0"
+                android:shadowDy="1"
+                android:shadowRadius="8"
+                android:textColor="@android:color/white"
+                android:textSize="42sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <ImageView
+        android:id="@+id/linkIcon"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_gravity="top|start"
+        android:layout_marginTop="10dp"
+        android:layout_marginStart="12dp"
+        android:contentDescription="@string/server_disconnected"
+        android:src="@drawable/example_link" />
 
     <TextView
         android:id="@+id/version"
@@ -33,23 +165,10 @@
         android:layout_marginTop="8dp"
         android:layout_marginEnd="10dp"
         android:alpha="0.45"
+        android:clickable="true"
+        android:focusable="true"
+        android:longClickable="true"
+        android:padding="8dp"
         android:textColor="@android:color/white"
         android:textSize="11sp" />
-
-    <TextView
-        android:id="@+id/prompt"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_gravity="bottom"
-        android:layout_marginHorizontal="24dp"
-        android:layout_marginBottom="48dp"
-        android:gravity="center"
-        android:shadowColor="#80000000"
-        android:shadowDx="0"
-        android:shadowDy="1"
-        android:shadowRadius="8"
-        android:text="@string/scan_badge"
-        android:textColor="@android:color/white"
-        android:textSize="28sp"
-        android:textStyle="bold" />
 </FrameLayout>

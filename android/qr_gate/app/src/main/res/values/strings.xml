@@ -2,11 +2,21 @@
 <resources>
     <string name="app_name">QR Gate</string>
     <string name="scan_pairing">Scan pairing QR from Full Circle Punch Devices</string>
-    <string name="scan_badge">Hold your badge and look at the camera</string>
+    <string name="scan_badge">Need Face</string>
+    <string name="need_face">Need Face</string>
+    <string name="need_qr">Need QR</string>
+    <string name="tap_to_scan">Tap to Scan</string>
+    <string name="server_connected">Connected to Full Circle</string>
+    <string name="server_disconnected">Not connected to Full Circle</string>
     <string name="ok">OK</string>
     <string name="camera_required">Camera permission is required</string>
     <string name="pairing_url_unusable">That gate address cannot be used by this app. It must be https, or an http address on a debug build.</string>
     <string name="front_camera_required">Front camera required</string>
     <string name="badge_covers_face">Don\'t cover your face — hold the badge lower</string>
+    <string name="face_not_full">Show your whole face in the camera</string>
+    <string name="one_badge_only">One badge only</string>
     <string name="capture_rejected">Show your full face and the badge — try again</string>
+    <string name="idle_title">Sleep after (seconds)</string>
+    <string name="idle_save">Save</string>
+    <string name="idle_range">5–120</string>
 </resources>

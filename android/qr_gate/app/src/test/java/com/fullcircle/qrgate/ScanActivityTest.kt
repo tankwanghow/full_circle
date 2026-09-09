@@ -8,24 +8,52 @@ import org.junit.Test
 
 class ScanActivityTest {
     @Test
-    fun pickBadgePrefersFcqaWhenTwoCodesPresent() {
-        val bare = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
-        val fcqa = "fcqa:11111111-2222-3333-4444-555555555555"
+    fun pickBadgeTreatsFcqaAndBareOfTheSamePersonAsOne() {
+        val id = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
         assertEquals(
-            "11111111-2222-3333-4444-555555555555",
-            ScanActivity.pickBadge(listOf(bare, fcqa)),
+            ScanActivity.BadgePick.One(id),
+            ScanActivity.pickBadge(listOf(id, "fcqa:$id")),
         )
     }
 
     @Test
-    fun pickBadgeAcceptsBareUuid() {
+    fun pickBadgeAcceptsBareUuidAmongJunk() {
         val id = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
-        assertEquals(id, ScanActivity.pickBadge(listOf("fcpair:x:y:http://lan", id)))
+        assertEquals(
+            ScanActivity.BadgePick.One(id),
+            ScanActivity.pickBadge(listOf("fcpair:x:y:http://lan", id)),
+        )
     }
 
     @Test
     fun pickBadgeIgnoresPairingAndJunk() {
-        assertNull(ScanActivity.pickBadge(listOf("fcpair:id:token:http://x", "hello")))
+        assertEquals(
+            ScanActivity.BadgePick.None,
+            ScanActivity.pickBadge(listOf("fcpair:id:token:http://x", "hello")),
+        )
+    }
+
+    @Test
+    fun pickBadgeRefusesTwoDifferentEmployees() {
+        val a = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+        val b = "11111111-2222-3333-4444-555555555555"
+        assertEquals(
+            ScanActivity.BadgePick.Ambiguous,
+            ScanActivity.pickBadge(listOf("fcqa:$a", "fcqa:$b")),
+        )
+        assertEquals(
+            ScanActivity.BadgePick.Ambiguous,
+            ScanActivity.pickBadge(listOf(a, "fcqa:$b")),
+        )
+    }
+
+    @Test
+    fun pickBadgeTwoCopiesOfTheSameFcqaAreOnePerson() {
+        val id = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+        assertEquals(
+            ScanActivity.BadgePick.One(id),
+            ScanActivity.pickBadge(listOf("fcqa:$id", "fcqa:$id")),
+        )
     }
 
     // --- badge-vs-face occlusion geometry ---
@@ -91,6 +119,71 @@ class ScanActivityTest {
         val big = ScanActivity.Box(100, 100, 200, 200)
         assertEquals(big, ScanActivity.largestFace(listOf(small, big)))
         assertNull(ScanActivity.largestFace(emptyList()))
+    }
+
+    // --- full face in frame: a 30% arm's-length face must punch; clipped must not ---
+
+    @Test
+    fun aThirtyPercentFaceFullyInsideTheFrameIsAccepted() {
+        // 300px of 1000 wide, inset on every side — the reported "30% still punches" case.
+        val armLength = ScanActivity.Box(350, 400, 650, 800)
+        assertTrue(ScanActivity.faceFullyInFrame(armLength, 1000, 1800))
+    }
+
+    @Test
+    fun aFaceTouchingTheLeftEdgeIsNotFullyInFrame() {
+        val clipped = ScanActivity.Box(0, 400, 300, 800)
+        assertFalse(ScanActivity.faceFullyInFrame(clipped, 1000, 1800))
+    }
+
+    @Test
+    fun aFaceTouchingTheTopEdgeIsNotFullyInFrame() {
+        val clipped = ScanActivity.Box(350, 0, 650, 400)
+        assertFalse(ScanActivity.faceFullyInFrame(clipped, 1000, 1800))
+    }
+
+    @Test
+    fun aFaceTouchingTheRightOrBottomEdgeIsNotFullyInFrame() {
+        assertFalse(ScanActivity.faceFullyInFrame(ScanActivity.Box(700, 400, 1000, 800), 1000, 1800))
+        assertFalse(ScanActivity.faceFullyInFrame(ScanActivity.Box(350, 1400, 650, 1800), 1000, 1800))
+    }
+
+    @Test
+    fun aDegenerateFaceOrImageIsNotFullyInFrame() {
+        assertFalse(ScanActivity.faceFullyInFrame(face, 0, 1800))
+        assertFalse(ScanActivity.faceFullyInFrame(ScanActivity.Box(100, 100, 100, 200), 1000, 1800))
+    }
+
+    @Test
+    fun aFaceSittingOnTheEdgeInsetIsNotFullyInFrame() {
+        // Visible-half boxes often sit a few pixels in, not at 0.
+        val nearLeft = ScanActivity.Box(10, 400, 310, 800)
+        assertFalse(ScanActivity.faceFullyInFrame(nearLeft, 1000, 1800))
+    }
+
+    @Test
+    fun bothEyesAndNoseAreRequiredForAFullFace() {
+        assertTrue(ScanActivity.fullFaceFeatures(true, true, true))
+        assertFalse(ScanActivity.fullFaceFeatures(true, false, true))
+        assertFalse(ScanActivity.fullFaceFeatures(false, true, true))
+        assertFalse(ScanActivity.fullFaceFeatures(true, true, false))
+    }
+
+    @Test
+    fun aTurnedHeadIsNotAFullFace() {
+        assertTrue(ScanActivity.faceIsFrontal(0f))
+        assertTrue(ScanActivity.faceIsFrontal(20f))
+        assertTrue(ScanActivity.faceIsFrontal(-20f))
+        assertFalse(ScanActivity.faceIsFrontal(40f))
+        assertFalse(ScanActivity.faceIsFrontal(-40f))
+    }
+
+    @Test
+    fun uprightSizeSwapsWhenTheBufferIsRotated() {
+        assertEquals(Pair(1080, 1920), ScanActivity.uprightImageSize(1920, 1080, 90))
+        assertEquals(Pair(1080, 1920), ScanActivity.uprightImageSize(1920, 1080, 270))
+        assertEquals(Pair(1080, 1920), ScanActivity.uprightImageSize(1080, 1920, 0))
+        assertEquals(Pair(1080, 1920), ScanActivity.uprightImageSize(1080, 1920, 180))
     }
 
     // --- face crop geometry ---

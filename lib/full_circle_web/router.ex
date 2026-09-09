@@ -52,6 +52,7 @@ defmodule FullCircleWeb.Router do
   scope "/api/punch", FullCircleWeb do
     pipe_through(:punch_api)
     post "/attendances", PunchAttendanceController, :create
+    get "/health", PunchAttendanceController, :health
   end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development
