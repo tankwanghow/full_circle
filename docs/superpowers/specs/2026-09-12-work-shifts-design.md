@@ -179,7 +179,30 @@ The day renders in the existing `bg-red-300` anomaly style (`punch_time_componen
 
 ## UI
 
-- **The six-slot grid goes.** `make_timeattend_list/2` and `PunchTimeComponent`'s 6-element destructure are replaced by "render every punch in the instance, in time order". This removes the ceiling for everyone, shift-assigned or not.
+### The punch row
+
+`make_timeattend_list/2` and `PunchTimeComponent`'s 6-element destructure go, but "render every punch" is not sufficient on its own — it would break two things.
+
+**The blank slots are the add-a-punch affordance, not padding.** `make_timeattend_list/2` emits `_new_` placeholders, and typing into one fires `new_time_attendence/2` (`punch_time_component.ex:34-35, 80-92`). Rendering only real punches would leave a clerk nothing to type into — removing the single action the anomaly flow requires of them.
+
+**The row grid budgets to exactly 100%.** It is one `flex flex-nowrap` row: six punch slots at `w-[11.666%]` = 70%, then HW / NH / OT at `w-[10%]` each (`punch_time_component.ex:273-324`). Eight punches is 93.3% inside a 70% budget, so `flex-nowrap` would shove the hours columns off the row.
+
+The rule is therefore:
+
+```
+slots = max(6, punch_count + 1)     # never fewer slots than today
+```
+
+with the punch forms nested in their **own** `w-[70%] flex flex-wrap` wrapper, and HW / NH / OT left outside it at `w-[10%]` so wrapping can never displace them.
+
+| Day | Today | After |
+|---|---|---|
+| 4 punches (the typical day) | 4 filled + 2 blank | **identical** |
+| 6 punches | 6 filled | **identical** |
+| 8 punches | 6 shown, 2 silently dropped | 8 filled + 1 blank, wraps to a second line |
+
+**No day in the existing 20 months renders differently** — zero of 6,336 employee-days exceed 6 punches. The layout grows a second line only on days that are already red-flagged and already blocking the pay slip, where a taller row is a feature. Keeping a 6-slot minimum preserves the blank-slot add affordance for free, and a night shift is an ordinary 4-punch day that never wraps.
+
 - Punch Card rows are keyed by **pay date**, so a night shift appears once, on the day it ended, with all its punches together.
 - Punch IO keeps listing punches; the photo toggle, `.punch-photo` CSS and infinite scroll are untouched.
 - **Work Shifts** maintenance page (admin/manager/supervisor): list, create, edit. Name, start time, normal hour, max hour, and a read-only derived line showing the nominal end and the cutover, so the arithmetic is never a mystery.
@@ -207,6 +230,9 @@ The day renders in the existing `bg-red-300` anomaly style (`punch_time_componen
 
 **Pairs**
 - 4 pairs (8 punches) in one instance: all 8 stored, all 8 rendered, hours = sum of 4 intervals, no wraparound, flags run `1_IN_1` … `4_OUT_4`.
+- A 4-punch day renders 6 slots (4 filled, 2 blank) — byte-identical markup to today.
+- An 8-punch day renders 9 slots and wraps, and the HW / NH / OT columns stay on the first line at their existing widths.
+- Typing into a blank slot still creates a punch, and clearing a filled slot still deletes one, at every slot count.
 - Fingerprint import of 8 punches stores all 8 (today it silently discards 7 and 8).
 - Re-importing the same fingerprint file creates no duplicates.
 
