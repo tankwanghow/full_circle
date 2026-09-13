@@ -449,6 +449,47 @@ defmodule FullCircle.WorkShiftTest do
       assert ["1_IN_1", "1_OUT_1"] =
                instance_punches(ctx, ~D[2026-05-05]) |> Enum.map(& &1.flag)
     end
+
+    test "a punch-card time edit rebuilds the instance left", ctx do
+      assert {:ok, _} = gate_punch(ctx, "2026-05-05T08:00:00+08:00")
+      assert {:ok, b} = gate_punch(ctx, "2026-05-05T17:00:00+08:00")
+
+      sparse = %FullCircle.HR.TimeAttend{
+        id: b.id,
+        employee_id: ctx.emp.id,
+        company_id: ctx.company.id,
+        punch_time_local: ~N[2026-05-07 09:00:00],
+        flag: b.flag,
+        status: "Draft",
+        user_id: ctx.admin.id,
+        employee_name: ctx.emp.name,
+        input_medium: "UserEntry"
+      }
+
+      assert {:ok, _} =
+               FullCircle.HR.update_time_attendence(
+                 sparse,
+                 %{
+                   input_medium: "UserEntry",
+                   punch_time_local: ~N[2026-05-07 09:00:00]
+                 },
+                 ctx.company,
+                 ctx.admin
+               )
+
+      assert [left] = instance_punches(ctx, ~D[2026-05-05])
+      assert left.flag == "1_IN_1"
+      assert [moved] = instance_punches(ctx, ~D[2026-05-07])
+      assert moved.flag == "1_IN_1"
+    end
+
+    test "ingest returns the rebuilt flag not the insert placeholder", ctx do
+      assert {:ok, _} = gate_punch(ctx, "2026-05-05T08:00:00+08:00")
+      assert {:ok, second} = gate_punch(ctx, "2026-05-05T17:00:00+08:00")
+
+      assert second.flag == "1_OUT_1"
+      assert second.punch_kind == "OUT"
+    end
   end
 
   describe "fingerprint import" do

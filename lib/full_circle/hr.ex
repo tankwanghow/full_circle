@@ -360,7 +360,7 @@ defmodule FullCircle.HR do
       rebuild_instance(company, ta.employee_id, old_id, old_date)
     end
 
-    {:ok, ta}
+    {:ok, Repo.get!(TimeAttend, ta.id)}
   end
 
   def insert_time_attendence_from_log(entry, com) do
@@ -426,7 +426,18 @@ defmodule FullCircle.HR do
   def update_time_attendence(ta, attrs, com, user) do
     case can?(user, :update_time_attendence, com) do
       true ->
-        cs = TimeAttend.data_entry_changeset(ta, attrs)
+        # Punch-card edits pass a :built struct without grouping fields. Load
+        # the persisted row so reassign_punch/2 can rebuild the instance left.
+        persisted = Repo.get_by!(TimeAttend, id: ta.id, company_id: com.id)
+
+        base = %{
+          persisted
+          | employee_name: ta.employee_name,
+            punch_time_local: ta.punch_time_local,
+            user_id: ta.user_id || persisted.user_id
+        }
+
+        cs = TimeAttend.data_entry_changeset(base, attrs)
         emp_id = Ecto.Changeset.get_field(cs, :employee_id)
         ptl = Ecto.Changeset.get_field(cs, :punch_time_local)
 
