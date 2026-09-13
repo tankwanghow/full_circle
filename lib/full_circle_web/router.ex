@@ -118,6 +118,7 @@ defmodule FullCircleWeb.Router do
 
     get "/csv", CsvController, :show
     get "/TimeAttend/:id/photo", PunchPhotoController, :show
+    get "/punch_ingest_logs/:id/photo", PunchIngestLogPhotoController, :show
     get "/statutory_bundle/export", BundleController, :export
     get "/download/:filename", FileDownloadController, :show
 
