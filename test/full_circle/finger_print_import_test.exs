@@ -42,22 +42,23 @@ defmodule FullCircle.HR.FingerPrintImportTest do
     ]
   end
 
-  test "parse_file_rows/1 splits concatenated times, dedups <10min, flags IN/OUT positionally" do
+  test "parse_file_rows/1 splits concatenated times, dedups <10min, placeholder flags" do
     [d1, d2] =
       FingerPrintImport.parse_file_rows(sample_rows())
       |> Enum.group_by(&(&1.punch_time_local |> NaiveDateTime.to_date()))
       |> Enum.sort_by(fn {d, _} -> d end)
       |> Enum.map(fn {_d, list} -> list end)
 
-    # Day 1: 4 punches -> 1_IN_1,1_OUT_1,2_IN_2,2_OUT_2
-    assert Enum.map(d1, & &1.flag) == ["1_IN_1", "1_OUT_1", "2_IN_2", "2_OUT_2"]
+    # Position is derived after insert by HR.rebuild_instance/4; the parser
+    # only needs a value that passes validation.
+    assert Enum.map(d1, & &1.flag) == ["1_IN_1", "1_IN_1", "1_IN_1", "1_IN_1"]
 
     assert Enum.map(d1, & &1.stamp) ==
              [~T[07:55:00], ~T[12:01:00], ~T[12:54:00], ~T[17:01:00]]
 
     # Day 2: 07:51 then 07:55 (<10min, dropped) then 12:01 -> two punches
     assert Enum.map(d2, & &1.stamp) == [~T[07:51:00], ~T[12:01:00]]
-    assert Enum.map(d2, & &1.flag) == ["1_IN_1", "1_OUT_1"]
+    assert Enum.map(d2, & &1.flag) == ["1_IN_1", "1_IN_1"]
 
     # punch_card_id is the canonical "<id>.<name>" key (department excluded)
     assert hd(d1).punch_card_id == "7.Gurung Bir Bahadur"
