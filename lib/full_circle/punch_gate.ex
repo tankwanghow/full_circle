@@ -25,6 +25,19 @@ defmodule FullCircle.PunchGate do
     end
   end
 
+  @doc """
+  The HTTP status the gate API answers for an ingest result.
+
+  Single source of truth: `PunchAttendanceController` sends it and
+  `punch_ingest_logs.http_status` stores it, so the two cannot drift.
+  """
+  def http_status_for(:accepted), do: 201
+  def http_status_for(:revoked), do: 401
+  def http_status_for(:not_found), do: 404
+  def http_status_for(:duplicate), do: 409
+  def http_status_for(:too_large), do: 413
+  def http_status_for(_), do: 422
+
   def create_device(name, company, user) do
     case Authorization.can?(user, :manage_punch_device, company) do
       true ->

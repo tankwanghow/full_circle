@@ -12,7 +12,7 @@ defmodule FullCircleWeb.PunchAttendanceController do
         ta = FullCircle.Repo.preload(ta, :employee)
 
         conn
-        |> put_status(:created)
+        |> put_status(PunchGate.http_status_for(:accepted))
         |> json(%{
           id: ta.id,
           employee_name: ta.employee.name,
@@ -20,26 +20,16 @@ defmodule FullCircleWeb.PunchAttendanceController do
           punch_time: DateTime.to_iso8601(ta.punch_time)
         })
 
-      {:error, :not_found} ->
-        send_resp(conn, 404, "not found")
-
-      {:error, :inactive} ->
-        send_resp(conn, 422, "inactive")
-
-      {:error, :duplicate} ->
-        send_resp(conn, 409, "duplicate")
-
-      {:error, :too_large} ->
-        send_resp(conn, 413, "too large")
-
-      {:error, :missing_photo} ->
-        send_resp(conn, 422, "missing photo")
-
-      {:error, :future} ->
-        send_resp(conn, 422, "future")
-
-      {:error, _} ->
-        send_resp(conn, 422, "invalid")
+      {:error, reason} ->
+        send_resp(conn, PunchGate.http_status_for(reason), body_for(reason))
     end
   end
+
+  defp body_for(:not_found), do: "not found"
+  defp body_for(:inactive), do: "inactive"
+  defp body_for(:duplicate), do: "duplicate"
+  defp body_for(:too_large), do: "too large"
+  defp body_for(:missing_photo), do: "missing photo"
+  defp body_for(:future), do: "future"
+  defp body_for(_), do: "invalid"
 end
