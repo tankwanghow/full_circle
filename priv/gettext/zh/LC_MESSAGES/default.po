@@ -1831,3 +1831,123 @@ msgstr ""
 #, elixir-autogen, elixir-format
 msgid "Welcome back!"
 msgstr "欢迎回来！"
+
+#: lib/full_circle_web/live/punch_ingest_log_live/index.ex
+#, elixir-autogen, elixir-format
+msgid "Punch Ingest Log"
+msgstr "打卡上传记录"
+
+#: lib/full_circle_web/live/punch_ingest_log_live/index.ex
+#, elixir-autogen, elixir-format
+msgid "Employee or Badge"
+msgstr "员工或工牌"
+
+#: lib/full_circle_web/live/punch_ingest_log_live/index.ex
+#, elixir-autogen, elixir-format
+msgid "Device"
+msgstr "设备"
+
+#: lib/full_circle_web/live/punch_ingest_log_live/index.ex
+#, elixir-autogen, elixir-format
+msgid "Received From"
+msgstr "接收日期从"
+
+#: lib/full_circle_web/live/punch_ingest_log_live/index.ex
+#, elixir-autogen, elixir-format
+msgid "Received To"
+msgstr "接收日期到"
+
+#: lib/full_circle_web/live/punch_ingest_log_live/index.ex
+#, elixir-autogen, elixir-format
+msgid "Received At"
+msgstr "接收时间"
+
+#: lib/full_circle_web/live/punch_ingest_log_live/index.ex
+#, elixir-autogen, elixir-format
+msgid "Punch Time"
+msgstr "打卡时间"
+
+#: lib/full_circle_web/live/punch_ingest_log_live/index.ex
+#, elixir-autogen, elixir-format
+msgid "Outcome"
+msgstr "结果"
+
+#: lib/full_circle_web/live/punch_ingest_log_live/index.ex
+#, elixir-autogen, elixir-format
+msgid "Status"
+msgstr "状态"
+
+#: lib/full_circle_web/live/punch_ingest_log_live/index.ex
+#, elixir-autogen, elixir-format
+msgid "All"
+msgstr "全部"
+
+#: lib/full_circle_web/live/punch_ingest_log_live/index.ex
+#, elixir-autogen, elixir-format
+msgid "Accepted"
+msgstr "已接受"
+
+#: lib/full_circle_web/live/punch_ingest_log_live/index.ex
+#, elixir-autogen, elixir-format
+msgid "Replayed"
+msgstr "重复提交"
+
+#: lib/full_circle_web/live/punch_ingest_log_live/index.ex
+#, elixir-autogen, elixir-format
+msgid "Duplicate"
+msgstr "重复打卡"
+
+#: lib/full_circle_web/live/punch_ingest_log_live/index.ex
+#, elixir-autogen, elixir-format
+msgid "Rejected"
+msgstr "已拒绝"
+
+#: lib/full_circle_web/live/punch_ingest_log_live/index.ex
+#, elixir-autogen, elixir-format
+msgid "Unknown Badge"
+msgstr "工牌不明"
+
+#: lib/full_circle_web/live/punch_ingest_log_live/index.ex
+#, elixir-autogen, elixir-format
+msgid "Not Active"
+msgstr "员工非在职"
+
+#: lib/full_circle_web/live/punch_ingest_log_live/index.ex
+#, elixir-autogen, elixir-format
+msgid "Photo Too Large"
+msgstr "照片过大"
+
+#: lib/full_circle_web/live/punch_ingest_log_live/index.ex
+#, elixir-autogen, elixir-format
+msgid "No Photo"
+msgstr "没有照片"
+
+#: lib/full_circle_web/live/punch_ingest_log_live/index.ex
+#, elixir-autogen, elixir-format
+msgid "Future Time"
+msgstr "时间在未来"
+
+#: lib/full_circle_web/live/punch_ingest_log_live/index.ex
+#, elixir-autogen, elixir-format
+msgid "Invalid"
+msgstr "无效"
+
+#: lib/full_circle_web/live/punch_ingest_log_live/index.ex
+#, elixir-autogen, elixir-format
+msgid "Device Revoked"
+msgstr "设备已注销"
+
+#: lib/full_circle_web/live/punch_ingest_log_live/index.ex
+#, elixir-autogen, elixir-format
+msgid "Employee"
+msgstr "员工"
+
+#: lib/full_circle_web/live/punch_ingest_log_live/index.ex
+#, elixir-autogen, elixir-format
+msgid "Punch photo"
+msgstr "打卡照片"
+
+#: lib/full_circle_web/live/punch_ingest_log_live/index.ex
+#, elixir-autogen, elixir-format
+msgid "Show photos"
+msgstr "显示照片"

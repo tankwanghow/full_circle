@@ -198,6 +198,7 @@ defmodule FullCircleWeb.Router do
       live("/employees/:employee_id/edit", EmployeeLive.Form, :edit)
 
       live("/punch_devices", PunchDeviceLive.Index, :index)
+      live("/punch_ingest_logs", PunchIngestLogLive.Index, :index)
 
       live("/houses", LayerLive.HouseIndex, :index)
       live("/houses/new", LayerLive.HouseForm, :new)

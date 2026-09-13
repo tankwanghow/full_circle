@@ -118,6 +118,19 @@ defmodule FullCircleWeb.DashboardLive do
         >
           {gettext("Punch Devices")}
         </.link>
+        <.link
+          :if={
+            FullCircle.Authorization.can?(
+              @current_user,
+              :view_punch_ingest_log,
+              @current_company
+            )
+          }
+          navigate={~p"/companies/#{@current_company.id}/punch_ingest_logs"}
+          class="button orange"
+        >
+          {gettext("Punch Ingest Log")}
+        </.link>
         <.link navigate={~p"/companies/#{@current_company.id}/import_attend"} class="blue button">
           {gettext("Import Attendence File")}
         </.link>
