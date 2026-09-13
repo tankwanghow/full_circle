@@ -40,7 +40,7 @@ defmodule FullCircle.HR.ShiftInstance do
     first = hd(punches)
     last = List.last(punches)
     span = DateTime.diff(last.punch_time, first.punch_time) / 3600
-    anomaly = anomaly_for(length(punches), span, shift)
+    anomaly = anomaly(length(punches), span, shift.max_hour)
 
     %__MODULE__{
       employee_id: first.employee_id,
@@ -54,12 +54,16 @@ defmodule FullCircle.HR.ShiftInstance do
     }
   end
 
-  # Exactly two anomalies. A punch is never anomalous merely for falling
-  # outside the shift's nominal window: 34.5% of real punches do.
-  defp anomaly_for(count, span, %WorkShift{max_hour: max_hour}) do
+  @doc """
+  The single anomaly rule, shared by the struct builder and the SQL-fed read
+  path. Exactly two anomalies: an odd punch count, and a span beyond the
+  shift's tolerance. A punch is never anomalous for falling outside the
+  nominal window — 34.5% of real punches do.
+  """
+  def anomaly(count, span_hours, max_hour) do
     cond do
       rem(count, 2) == 1 -> :missing_punch
-      span > Decimal.to_float(max_hour) -> :too_long
+      span_hours > Decimal.to_float(max_hour) -> :too_long
       true -> nil
     end
   end

@@ -11,7 +11,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchIndexComponent do
   @impl true
   def update(assigns, socket) do
     yw = FullCircleWeb.Helpers.work_week(assigns.obj.dd)
-    tis = FullCircleWeb.Helpers.make_timeattend_list(assigns.obj.time_list, assigns.company)
+    tis = FullCircleWeb.Helpers.punch_slots(assigns.obj.time_list, assigns.company)
 
     # Per row: lock editing if a payslip exists for this row's employee + month
     # (rows span employees/dates, so this is computed per row, not once).

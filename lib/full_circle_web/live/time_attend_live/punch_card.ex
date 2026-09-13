@@ -428,11 +428,12 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
   def handle_event(
         "search",
         %{
-          "search" => %{
-            "employee_name" => name,
-            "month" => month,
-            "year" => year
-          } = search
+          "search" =>
+            %{
+              "employee_name" => name,
+              "month" => month,
+              "year" => year
+            } = search
         },
         socket
       ) do
@@ -447,9 +448,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
 
     {:noreply,
      socket
-     |> assign(
-       search: %{employee_name: name, month: month, year: year, show_photos: show_photos}
-     )
+     |> assign(search: %{employee_name: name, month: month, year: year, show_photos: show_photos})
      |> assign(shake_obj: %{id: ""})
      |> push_navigate(
        to: "/companies/#{socket.assigns.current_company.id}/PunchCard?#{URI.encode_query(qry)}"
@@ -677,23 +676,10 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
         {:updated_punch, idg, tis, wh, nh, ot},
         socket
       ) do
-    [
-      {_ti1, id1, st1, fl1, dt1},
-      {_ti2, id2, st2, fl2, dt2},
-      {_ti3, id3, st3, fl3, dt3},
-      {_ti4, id4, st4, fl4, dt4},
-      {_ti5, id5, st5, fl5, dt5},
-      {_ti6, id6, st6, fl6, dt6}
-    ] = Enum.map(tis, &tis_core/1)
-
-    tl = [
-      [dt1, id1, st1, fl1],
-      [dt2, id2, st2, fl2],
-      [dt3, id3, st3, fl3],
-      [dt4, id4, st4, fl4],
-      [dt5, id5, st5, fl5],
-      [dt6, id6, st6, fl6]
-    ]
+    tl =
+      tis
+      |> Enum.map(&tis_core/1)
+      |> Enum.map(fn {_ti, id, st, fl, dt} -> [dt, id, st, fl] end)
 
     i = socket.assigns.punches |> Enum.find_index(fn x -> x.idg == idg end)
     old = socket.assigns.punches |> Enum.at(i)

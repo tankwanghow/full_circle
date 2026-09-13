@@ -2,6 +2,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchTimeComponent do
   use FullCircleWeb, :live_component
 
   alias FullCircle.HR
+  alias FullCircle.HR.ShiftInstance
 
   @impl true
   def mount(socket) do
@@ -183,64 +184,36 @@ defmodule FullCircleWeb.TimeAttendLive.PunchTimeComponent do
   end
 
   defp update_working_hours(socket) do
-    [
-      {_ti1, id1, st1, fl1, dt1, _p1},
-      {_ti2, id2, st2, fl2, dt2, _p2},
-      {_ti3, id3, st3, fl3, dt3, _p3},
-      {_ti4, id4, st4, fl4, dt4, _p4},
-      {_ti5, id5, st5, fl5, dt5, _p5},
-      {_ti6, id6, st6, fl6, dt6, _p6}
-    ] = Enum.map(socket.assigns.tis, &pad_tis/1)
+    tis = Enum.map(socket.assigns.tis, &pad_tis/1)
 
-    tl = [
-      [dt1, id1, st1, fl1],
-      [dt2, id2, st2, fl2],
-      [dt3, id3, st3, fl3],
-      [dt4, id4, st4, fl4],
-      [dt5, id5, st5, fl5],
-      [dt6, id6, st6, fl6]
-    ]
+    tl =
+      Enum.map(tis, fn {_ti, id, st, fl, dt, _p} -> [dt, id, st, fl] end)
 
-    wh = HR.wh(tl)
+    filled = tl |> Enum.reject(fn [dt | _] -> is_nil(dt) end) |> Enum.map(fn [dt | _] -> dt end)
 
-    tl_ok? =
-      case [!is_nil(dt1), !is_nil(dt2), !is_nil(dt3), !is_nil(dt4), !is_nil(dt5), !is_nil(dt6)] do
-        [true, true, true, true, true, true] ->
-          [
-            DateTime.compare(dt1, dt2),
-            DateTime.compare(dt2, dt3),
-            DateTime.compare(dt3, dt4),
-            DateTime.compare(dt4, dt5),
-            DateTime.compare(dt5, dt6)
-          ] == [:lt, :lt, :lt, :lt, :lt]
+    ordered? =
+      filled
+      |> Enum.chunk_every(2, 1, :discard)
+      |> Enum.all?(fn [a, b] -> DateTime.compare(a, b) == :lt end)
 
-        [true, true, false, false, false, false] ->
-          DateTime.compare(dt1, dt2) == :lt
-
-        [true, true, true, true, false, false] ->
-          [
-            DateTime.compare(dt1, dt2),
-            DateTime.compare(dt2, dt3),
-            DateTime.compare(dt3, dt4)
-          ] ==
-            [:lt, :lt, :lt]
-
-        [false, false, true, true, false, false] ->
-          DateTime.compare(dt3, dt4) == :lt
-
-        [false, false, true, true, true, true] ->
-          [
-            DateTime.compare(dt3, dt4),
-            DateTime.compare(dt4, dt5),
-            DateTime.compare(dt5, dt6)
-          ] == [:lt, :lt, :lt]
-
-        [false, false, false, false, false, false] ->
-          true
-
-        _ ->
-          false
+    span =
+      case filled do
+        [] -> 0.0
+        [_] -> 0.0
+        list -> DateTime.diff(List.last(list), hd(list)) / 3600
       end
+
+    # The same rule the query uses, so the component cannot disagree with the
+    # row it is rendering. Out-of-order punches stay a red-row signal of their
+    # own - they are not an anomaly the query knows about.
+    anomaly = ShiftInstance.anomaly(length(filled), span, max_hour(socket))
+
+    # Blank, not a partial sum. HR.wh/1 chunks in twos and rescues the leftover
+    # to 0.0, so an odd day would otherwise show the hours of its complete pairs
+    # as if that were the day's total.
+    wh = if is_nil(anomaly), do: HR.wh(tl), else: nil
+
+    tl_ok? = is_nil(anomaly) and ordered?
 
     socket =
       if !tl_ok? do
@@ -251,14 +224,46 @@ defmodule FullCircleWeb.TimeAttendLive.PunchTimeComponent do
 
     socket
     |> assign(wh: wh)
-    |> assign(nh: HR.nh(wh, socket.assigns.obj.work_hours_per_day))
-    |> assign(ot: HR.ot(wh, socket.assigns.obj.work_hours_per_day))
+    |> assign(nh: wh && HR.nh(wh, socket.assigns.obj.work_hours_per_day))
+    |> assign(ot: wh && HR.ot(wh, socket.assigns.obj.work_hours_per_day))
+  end
+
+  # The row's shift, when Task 7 has put it there; the seeded General tolerance
+  # otherwise, which is what every existing row resolves to anyway.
+  defp max_hour(socket) do
+    case socket.assigns.obj do
+      %{work_shift: %FullCircle.HR.WorkShift{max_hour: m}} -> m
+      _ -> Decimal.new("12")
+    end
+  end
+
+  # A time-only input has to be placed on one of two candidate dates: the
+  # instance's anchor day, or the day after it. Exactly one of them puts the
+  # time inside the instance's half-open window.
+  def slot_date(pt, anchor, %FullCircle.HR.WorkShift{} = ws) do
+    {:ok, time} = Time.from_iso8601(pt <> ":00")
+
+    if Time.compare(time, FullCircle.HR.WorkShift.cutover_time(ws)) in [:gt, :eq],
+      do: anchor,
+      else: Date.add(anchor, 1)
   end
 
   defp add_date_to(pt, socket) do
-    "#{Timex.format!(socket.assigns.obj.dd, "%Y-%m-%d", :strftime)}T#{pt}"
-    |> Timex.parse!("{RFC3339}")
-    |> Timex.to_datetime(socket.assigns.company.timezone)
+    %{company: com, obj: obj} = socket.assigns
+    {:ok, time} = Time.from_iso8601(pt <> ":00")
+
+    date =
+      case Map.get(obj, :work_shift) do
+        %FullCircle.HR.WorkShift{} = ws ->
+          slot_date(pt, Map.get(obj, :work_shift_date) || Timex.to_date(obj.dd), ws)
+
+        # Before Task 7 lands the shift on the row, a row is still a calendar
+        # day and the old behaviour is the correct one.
+        _ ->
+          Timex.to_date(obj.dd)
+      end
+
+    DateTime.new!(date, time, com.timezone)
   end
 
   defp pad_tis({t, i, s, f, d}), do: {t, i, s, f, d, ""}
@@ -271,50 +276,52 @@ defmodule FullCircleWeb.TimeAttendLive.PunchTimeComponent do
   def render(assigns) do
     ~H"""
     <div class="flex flex-nowrap gap-1">
-      <%= if !is_nil(@tis) do %>
-        <%= for o <- @tis do %>
-          <% {time, id, status, flag, datetime, photo} = pad_tis(o) %>
-          <.form
-            for={}
-            autocomplete="off"
-            phx-change="punch_time_changed"
-            phx-target={@myself}
-            class="w-[11.666%]"
-          >
-            <input name="flag" type="hidden" value={flag} />
-            <input name="status" type="hidden" value={status} />
-            <input name="employee_id" type="hidden" value={@obj.employee_id} />
-            <input name="datetime" type="hidden" value={datetime} />
-            <input name="taid" type="hidden" value={id} />
-            <input
-              name="punch_time"
-              type="time"
-              value={time}
-              readonly={@payslip_locked?}
-              title={@payslip_locked? && gettext("Locked: a pay slip exists for this month")}
-              class={[
-                "rounded h-6 w-full text-center text-black",
-                (@payslip_locked? && "bg-gray-300 cursor-not-allowed") || @bg_color
-              ]}
-              phx-debounce="blur"
-              id={id}
-            />
-            <.link
-              :if={photo != "" and !String.starts_with?(id, "_new_")}
-              href={~p"/companies/#{@company.id}/TimeAttend/#{id}/photo"}
-              target="_blank"
-              class="punch-photo text-center text-xs"
+      <div class="w-[70%] flex flex-wrap gap-1">
+        <%= if !is_nil(@tis) do %>
+          <%= for o <- @tis do %>
+            <% {time, id, status, flag, datetime, photo} = pad_tis(o) %>
+            <.form
+              for={}
+              autocomplete="off"
+              phx-change="punch_time_changed"
+              phx-target={@myself}
+              class="w-[16.666%]"
             >
-              <img
-                src={~p"/companies/#{@company.id}/TimeAttend/#{id}/photo"}
-                loading="lazy"
-                alt={gettext("Punch photo")}
-                class="mt-0.5 w-full h-12 object-cover rounded border border-gray-400 dark:border-gray-600"
+              <input name="flag" type="hidden" value={flag} />
+              <input name="status" type="hidden" value={status} />
+              <input name="employee_id" type="hidden" value={@obj.employee_id} />
+              <input name="datetime" type="hidden" value={datetime} />
+              <input name="taid" type="hidden" value={id} />
+              <input
+                name="punch_time"
+                type="time"
+                value={time}
+                readonly={@payslip_locked?}
+                title={@payslip_locked? && gettext("Locked: a pay slip exists for this month")}
+                class={[
+                  "rounded h-6 w-full text-center text-black",
+                  (@payslip_locked? && "bg-gray-300 cursor-not-allowed") || @bg_color
+                ]}
+                phx-debounce="blur"
+                id={id}
               />
-            </.link>
-          </.form>
+              <.link
+                :if={photo != "" and !String.starts_with?(id, "_new_")}
+                href={~p"/companies/#{@company.id}/TimeAttend/#{id}/photo"}
+                target="_blank"
+                class="punch-photo text-center text-xs"
+              >
+                <img
+                  src={~p"/companies/#{@company.id}/TimeAttend/#{id}/photo"}
+                  loading="lazy"
+                  alt={gettext("Punch photo")}
+                  class="mt-0.5 w-full h-12 object-cover rounded border border-gray-400 dark:border-gray-600"
+                />
+              </.link>
+            </.form>
+          <% end %>
         <% end %>
-      <% end %>
+      </div>
       <div class="worked-hours w-[10%] text-center">
         {Number.Delimit.number_to_delimited(@wh)}
       </div>

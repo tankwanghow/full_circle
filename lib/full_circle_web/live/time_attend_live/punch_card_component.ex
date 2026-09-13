@@ -11,7 +11,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCardComponent do
   @impl true
   def update(assigns, socket) do
     yw = FullCircleWeb.Helpers.work_week(assigns.obj.dd)
-    tis = FullCircleWeb.Helpers.make_timeattend_list(assigns.obj.time_list, assigns.company)
+    tis = FullCircleWeb.Helpers.punch_slots(assigns.obj.time_list, assigns.company)
     {:ok, socket |> assign(assigns) |> assign(yw: yw) |> assign(tis: tis)}
   end
 

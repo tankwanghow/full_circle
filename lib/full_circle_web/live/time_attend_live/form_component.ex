@@ -189,15 +189,6 @@ defmodule FullCircleWeb.TimeAttendLive.FormComponent do
           <div class="col-span-2">
             <.input
               feedback={true}
-              field={@form[:flag]}
-              label={gettext("Flag")}
-              type="select"
-              options={["1_IN_1", "1_OUT_1", "2_IN_2", "2_OUT_2", "3_IN_3", "3_OUT_3"]}
-            />
-          </div>
-          <div class="col-span-2">
-            <.input
-              feedback={true}
               field={@form[:status]}
               label={gettext("Status")}
               type="select"
