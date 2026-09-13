@@ -276,7 +276,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchTimeComponent do
   def render(assigns) do
     ~H"""
     <div class="flex flex-nowrap gap-1">
-      <div class="w-[70%] flex flex-wrap gap-1">
+      <div class="w-[70%] grid grid-cols-6 gap-1">
         <%= if !is_nil(@tis) do %>
           <%= for o <- @tis do %>
             <% {time, id, status, flag, datetime, photo} = pad_tis(o) %>
@@ -285,7 +285,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchTimeComponent do
               autocomplete="off"
               phx-change="punch_time_changed"
               phx-target={@myself}
-              class="w-[16.666%]"
+              class="min-w-0"
             >
               <input name="flag" type="hidden" value={flag} />
               <input name="status" type="hidden" value={status} />

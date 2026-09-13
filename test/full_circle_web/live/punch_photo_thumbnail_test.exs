@@ -116,6 +116,23 @@ defmodule FullCircleWeb.PunchPhotoThumbnailTest do
     end
   end
 
+  describe "punch slot layout" do
+    # Six 16.666% flex items plus gap-1 overflow a 70% wrapper, so a normal
+    # four-punch day wrapped. grid-cols-6 keeps six on line 1; extras wrap.
+    test "Punch IO puts slots in a six-column grid and hours outside it", %{
+      conn: conn,
+      comp: comp
+    } do
+      {:ok, _lv, html} = live(conn, ~p"/companies/#{comp.id}/PunchIndex")
+
+      assert html =~ ~s(class="w-[70%] grid grid-cols-6 gap-1")
+      refute html =~ "w-[16.666%]"
+      assert html =~ ~s(class="worked-hours w-[10%] text-center")
+      assert html =~ ~s(class="normal-hours w-[10%] text-center")
+      assert html =~ ~s(class="ot-hours w-[10%] text-center")
+    end
+  end
+
   describe "Punch Card form" do
     test "ticking Show photos does not remount the page", %{conn: conn, comp: comp, emp: emp} do
       # The filter form is phx-change="search", which push_navigates. Without a
