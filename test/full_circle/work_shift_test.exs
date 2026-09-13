@@ -539,4 +539,157 @@ defmodule FullCircle.WorkShiftTest do
       assert count == 8
     end
   end
+
+  describe "anomalous instances read as blank, and pay anyway" do
+    setup ctx do
+      emp = employee_fixture(%{}, ctx.company, ctx.admin)
+      %{emp: emp}
+    end
+
+    defp manual_punch!(ctx, iso) do
+      ta =
+        Repo.insert!(%FullCircle.HR.TimeAttend{
+          company_id: ctx.company.id,
+          employee_id: ctx.emp.id,
+          user_id: ctx.admin.id,
+          punch_time:
+            Timex.parse!(iso, "{RFC3339}")
+            |> DateTime.shift_zone!("Etc/UTC")
+            |> DateTime.truncate(:second),
+          status: "Draft",
+          input_medium: "Manual"
+        })
+
+      {:ok, ta} = FullCircle.HR.reassign_punch(ta, ctx.company)
+      ta
+    end
+
+    defp day(ctx, date) do
+      FullCircle.HR.punch_card_query(5, 2026, ctx.emp.id, ctx.company)
+      |> Enum.find(fn r -> Timex.to_date(r.dd) == date end)
+    end
+
+    test "a complete day carries hours and no anomaly", ctx do
+      manual_punch!(ctx, "2026-05-05T08:00:00+08:00")
+      manual_punch!(ctx, "2026-05-05T17:00:00+08:00")
+
+      row = day(ctx, ~D[2026-05-05])
+      assert is_nil(row.anomaly)
+      assert_in_delta row.wh, 9.0, 0.001
+    end
+
+    test "a missing punch out blanks the hours instead of paying 0.0", ctx do
+      manual_punch!(ctx, "2026-05-05T08:00:00+08:00")
+
+      row = day(ctx, ~D[2026-05-05])
+      assert row.anomaly == :missing_punch
+      assert is_nil(row.wh)
+      assert is_nil(row.nh)
+      assert is_nil(row.ot)
+    end
+
+    test "adding the missing punch restores the hours", ctx do
+      manual_punch!(ctx, "2026-05-05T08:00:00+08:00")
+      assert day(ctx, ~D[2026-05-05]).anomaly == :missing_punch
+
+      manual_punch!(ctx, "2026-05-05T17:00:00+08:00")
+      row = day(ctx, ~D[2026-05-05])
+      assert is_nil(row.anomaly)
+      assert_in_delta row.wh, 9.0, 0.001
+    end
+
+    # The cutover splits these two punches into separate instances: General cuts
+    # over at 02:00, so 08:00 on the 5th and 17:00 on the 6th are two days, each
+    # holding one punch. This is NOT one 33-hour :too_long instance - an earlier
+    # draft said it was, and a test asserting that would fail.
+    test "punches a day apart are two instances, each missing a punch", ctx do
+      manual_punch!(ctx, "2026-05-05T08:00:00+08:00")
+      manual_punch!(ctx, "2026-05-06T17:00:00+08:00")
+
+      assert day(ctx, ~D[2026-05-05]).anomaly == :missing_punch
+      assert day(ctx, ~D[2026-05-06]).anomaly == :missing_punch
+    end
+
+    # :too_long needs both punches inside one window.
+    test "a fourteen hour span inside one instance is too long", ctx do
+      manual_punch!(ctx, "2026-05-05T07:00:00+08:00")
+      manual_punch!(ctx, "2026-05-05T21:00:00+08:00")
+
+      row = day(ctx, ~D[2026-05-05])
+      assert row.anomaly == :too_long
+      assert is_nil(row.wh)
+    end
+
+    test "a genuine zero hour day stays 0.0, not nil", ctx do
+      manual_punch!(ctx, "2026-05-05T08:00:00+08:00")
+      manual_punch!(ctx, "2026-05-05T08:00:00+08:00")
+
+      row = day(ctx, ~D[2026-05-05])
+      assert is_nil(row.anomaly)
+      assert row.wh == 0.0
+    end
+
+    # The off-site case: one punch every working day, for a whole month, and the
+    # pay slip must still generate. Nothing in this feature gates payroll.
+    test "a month of single punch days still pays", ctx do
+      for d <- 4..8 do
+        manual_punch!(ctx, "2026-05-0#{d}T08:00:00+08:00")
+      end
+
+      rows = FullCircle.HR.punch_card_query(5, 2026, ctx.emp.id, ctx.company)
+      assert Enum.count(rows, fn r -> r.anomaly == :missing_punch end) == 5
+
+      # PaySlipOp.pay/6 always looks up "Employee PCB"; it is not company-seeded.
+      cr =
+        FullCircle.Accounting.get_account_by_name(
+          "Salaries and Wages Payable",
+          ctx.company,
+          ctx.admin
+        )
+
+      salary_type_fixture(
+        %{
+          name: "Employee PCB",
+          type: "Deduction",
+          cal_func: "pcb_employee",
+          db_ac_name: cr.name,
+          db_ac_id: cr.id,
+          cr_ac_name: cr.name,
+          cr_ac_id: cr.id
+        },
+        ctx.company,
+        ctx.admin
+      )
+
+      acc = FullCircle.ReceiveFundFixtures.funds_account_fixture(ctx.company, ctx.admin)
+
+      # PaySlipOp.pay/6 hardcodes slip_date to Timex.today(), and PaySlip
+      # validate_pay_month_year rejects a period more than 31 days from that
+      # date. May 2026 cannot insert in September; paying the current period
+      # still proves there is no anomaly gate (PaySlipOp does not read punches).
+      today = Date.utc_today()
+
+      assert {:ok, _} =
+               FullCircle.PaySlipOp.pay(
+                 Repo.reload!(ctx.emp),
+                 today.month,
+                 today.year,
+                 acc.id,
+                 ctx.company,
+                 ctx.admin
+               )
+    end
+  end
+
+  describe "anomaly/3 is the single rule" do
+    test "odd count, then span, then clean" do
+      alias FullCircle.HR.ShiftInstance
+      max = Decimal.new("12")
+
+      assert ShiftInstance.anomaly(3, 4.0, max) == :missing_punch
+      assert ShiftInstance.anomaly(2, 33.0, max) == :too_long
+      assert ShiftInstance.anomaly(2, 12.0, max) == nil
+      assert ShiftInstance.anomaly(4, 9.0, max) == nil
+    end
+  end
 end

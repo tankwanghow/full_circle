@@ -398,8 +398,57 @@ defmodule FullCircle.HR do
     |> Repo.exists?()
   end
 
-  defp punch_locked_by_payslip?(emp_id, %NaiveDateTime{} = ptl, com),
-    do: pay_slip_exists_for_period?(emp_id, NaiveDateTime.to_date(ptl), com)
+  @doc """
+  The date whose pay slip governs this punch: the local date its instance ended
+  on, not the local date of the punch itself. They differ for any shift that
+  crosses midnight.
+  """
+  def punch_pay_date(%TimeAttend{work_shift_id: nil} = ta, com),
+    do: ta.punch_time |> Timex.to_datetime(com.timezone) |> Timex.to_date()
+
+  def punch_pay_date(%TimeAttend{} = ta, com) do
+    from(t in TimeAttend,
+      where: t.company_id == ^com.id,
+      where: t.employee_id == ^ta.employee_id,
+      where: t.work_shift_id == ^ta.work_shift_id,
+      where: t.work_shift_date == ^ta.work_shift_date,
+      order_by: [desc: t.punch_time],
+      limit: 1,
+      select: t.punch_time
+    )
+    |> Repo.one()
+    |> case do
+      nil -> ta.punch_time
+      last -> last
+    end
+    |> Timex.to_datetime(com.timezone)
+    |> Timex.to_date()
+  end
+
+  defp punch_locked_by_payslip?(emp_id, %NaiveDateTime{} = ptl, com) do
+    local = DateTime.from_naive!(ptl, com.timezone)
+    shift = shift_for(emp_id, com, NaiveDateTime.to_date(ptl))
+    anchor = instance_anchor(shift, local)
+
+    # Last punch already in that instance, if any - a new punch joining an
+    # existing night shift is governed by the same pay slip as the rest of it.
+    pay_date =
+      from(t in TimeAttend,
+        where: t.company_id == ^com.id and t.employee_id == ^emp_id,
+        where: t.work_shift_id == ^shift.id and t.work_shift_date == ^anchor,
+        order_by: [desc: t.punch_time],
+        limit: 1,
+        select: t.punch_time
+      )
+      |> Repo.one()
+      |> case do
+        nil -> local
+        last -> Timex.to_datetime(last, com.timezone)
+      end
+      |> Timex.to_date()
+
+    pay_slip_exists_for_period?(emp_id, pay_date, com)
+  end
 
   defp punch_locked_by_payslip?(_emp_id, _ptl, _com), do: false
 
@@ -476,11 +525,7 @@ defmodule FullCircle.HR do
           is_nil(ta) ->
             {:ok, :not_found}
 
-          pay_slip_exists_for_period?(
-            ta.employee_id,
-            ta.punch_time |> Timex.to_datetime(com.timezone) |> Timex.to_date(),
-            com
-          ) ->
+          pay_slip_exists_for_period?(ta.employee_id, punch_pay_date(ta, com), com) ->
             {:error, :on_payslip}
 
           true ->
@@ -1335,27 +1380,40 @@ defmodule FullCircle.HR do
            group by eids.dd, eids.name, eids.id, eids.status, eids.id_no,
                     eids.work_hours_per_day, eids.work_days_per_week,
                     eids.work_days_per_month),
-          emp_time_list as (
-            select ta.employee_id, ds.dd as dd_utc, ds.dd at time zone '#{com.timezone}' as dd_tz,
+          emp_instance as (
+            select ta.employee_id,
+                   ta.work_shift_id,
+                   ta.work_shift_date,
+                   count(*) as punch_count,
+                   extract(epoch from (max(ta.punch_time) - min(ta.punch_time))) / 3600.0 as span_hours,
+                   (max(ta.punch_time) at time zone '#{com.timezone}')::date as pay_date,
                    array_agg(
                      (ta.punch_time at time zone '#{com.timezone}')::varchar
                      || '|' || ta.id::varchar
                      || '|' || ta.status
-                     || '|' || ta.flag
+                     || '|' || coalesce(ta.flag, '')
                      || '|' || coalesce(ta.photo_path, '')
                      || '|' || coalesce(pd.name, '')
-                     order by ta.punch_time, ta.flag
+                     order by ta.punch_time
                    ) time_list
               from time_attendences ta
               left join punch_devices pd on pd.id = ta.punch_device_id
+             where ta.company_id = '#{com.id}'
+               and ta.work_shift_id is not null
+             group by ta.employee_id, ta.work_shift_id, ta.work_shift_date),
+          emp_time_list as (
+            select ei.employee_id, ds.dd as dd_utc, ei.time_list,
+                   ei.punch_count, ei.span_hours, ws.max_hour
+              from emp_instance ei
+              join work_shifts ws on ws.id = ei.work_shift_id
               cross join date_series ds
-             where ta.punch_time between ds.dd and (ds.dd + interval '23 hours 59 minutes 59 seconds')
-             group by ta.employee_id, ds.dd)
+             where (ds.dd at time zone '#{com.timezone}')::date = ei.pay_date)
 
         select eidsh.id::varchar || eidsh.dd::date::varchar as idg,
               eidsh.dd at time zone 'Asia/Kuala_Lumpur' as dd,
               eidsh.name, eidsh.work_hours_per_day, eidsh.work_days_per_week,
               eidsh.work_days_per_month, eidsh.id as employee_id, etl.time_list,
+              etl.punch_count, etl.span_hours, etl.max_hour,
               eidsh.holi_list, eidsh.sholi_list
           from emp_info_date_series_holiday eidsh left outer join emp_time_list etl
             on eidsh.id = etl.employee_id and eidsh.dd = etl.dd_utc
@@ -1466,18 +1524,42 @@ defmodule FullCircle.HR do
     ps
     |> Enum.map(fn t ->
       ut = Map.get(t, :time_list) |> unzip_time_list()
-      # change key to id
       idg = Map.get(t, :idg)
       nwh = Decimal.to_float(Map.get(t, :work_hours_per_day) || Decimal.new("0.00001"))
-      wh = wh(ut)
 
-      nh = nh(wh, nwh)
+      anomaly =
+        case {Map.get(t, :punch_count), Map.get(t, :span_hours), Map.get(t, :max_hour)} do
+          {nil, _, _} -> nil
+          {_, _, nil} -> nil
+          {count, span, max} -> ShiftInstance.anomaly(count, to_float(span), max)
+        end
 
-      ot = ot(wh, nwh)
+      # nil, never 0.0: a real zero-hour day must stay distinguishable from
+      # "we cannot say", because holiday_pay_days reads 0.0 as a genuine absence.
+      {wh, nh, ot} =
+        if is_nil(anomaly) do
+          w = wh(ut)
+          {w, nh(w, nwh), ot(w, nwh)}
+        else
+          {nil, nil, nil}
+        end
 
-      Map.merge(t, %{time_list: ut, wh: wh, nh: nh, ot: ot, id: idg, work_hours_per_day: nwh})
+      Map.merge(t, %{
+        time_list: ut,
+        wh: wh,
+        nh: nh,
+        ot: ot,
+        anomaly: anomaly,
+        id: idg,
+        work_hours_per_day: nwh
+      })
     end)
   end
+
+  defp to_float(%Decimal{} = d), do: Decimal.to_float(d)
+  defp to_float(f) when is_float(f), do: f
+  defp to_float(i) when is_integer(i), do: i * 1.0
+  defp to_float(nil), do: 0.0
 
   def unzip_time_list(tl) do
     if is_nil(tl) do

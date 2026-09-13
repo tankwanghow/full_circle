@@ -856,38 +856,54 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
     )
   end
 
+  # An anomalous day contributes nothing: its hours are unknown. It does not
+  # block anything - the red row is the signal, exactly as it is today.
   defp holiday_pay_days(objs, com) do
-    Enum.map(objs, fn x ->
-      if !is_nil(x.sholi_list) and x.nh > x.work_hours_per_day / 2 do
-        px = HR.punch_by_date(x.employee_id, Timex.shift(x.dd, days: -1), com)
-        nx = HR.punch_by_date(x.employee_id, Timex.shift(x.dd, days: 1), com)
+    by_date = Map.new(objs, fn x -> {Timex.to_date(x.dd), x} end)
 
-        if px.wh == 0.0 or nx.wh == 0.0 do
-          0.0
-        else
-          x.nh / x.work_hours_per_day
-        end
-      else
-        0.0
+    objs
+    |> Enum.map(fn x ->
+      d = Timex.to_date(x.dd)
+      prev = neighbour(by_date, d, -1, x.employee_id, com)
+      next = neighbour(by_date, d, 1, x.employee_id, com)
+
+      cond do
+        is_nil(x.sholi_list) -> 0.0
+        is_nil(x.nh) -> 0.0
+        x.nh <= x.work_hours_per_day / 2 -> 0.0
+        is_nil(prev) or is_nil(next) -> 0.0
+        # nil means unknown, not absent - do not pay a holiday we cannot verify.
+        is_nil(prev.wh) or is_nil(next.wh) -> 0.0
+        prev.wh == 0.0 or next.wh == 0.0 -> 0.0
+        true -> x.nh / x.work_hours_per_day
       end
     end)
     |> Enum.sum()
   end
 
+  # The day before the 1st and the day after the last are in another month, so
+  # they are not in `objs` and must still be fetched. Indexing the list instead
+  # (`Enum.at(objs, i - 1)`) silently returns the *last* day of the month for
+  # i == 0, which would pay or withhold a holiday on the strength of a day three
+  # or four weeks later.
+  defp neighbour(by_date, date, offset, emp_id, com) do
+    d = Date.add(date, offset)
+
+    case Map.get(by_date, d) do
+      nil -> HR.punch_by_date(emp_id, d, com)
+      row -> row
+    end
+  end
+
   defp sunday_pay_days(tdw, ot, sc, dim, ewdpw) do
     rest_day_per_week = 7 - ewdpw
     expected_work_days = dim - sc * rest_day_per_week
-
     dw = tdw - ot
     sw = dw - expected_work_days
-
     if(sw > 0.0, do: sw, else: 0.0)
   end
 
-  defp normal_pay_days(objs) do
-    Enum.map(objs, fn x -> x.nh / x.work_hours_per_day end)
-    |> Enum.sum()
-  end
+  defp normal_pay_days(objs), do: sum_days(objs, :nh)
 
   defp sunday_count(objs) do
     Enum.count(objs, fn x -> x.dd |> Timex.weekday() |> Timex.day_shortname() == "Sun" end)
@@ -897,13 +913,18 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
     if objs != [], do: Timex.days_in_month(Enum.at(objs, 1).dd), else: 0
   end
 
-  defp total_day_worked(objs) do
-    Enum.map(objs, fn x -> x.wh / x.work_hours_per_day end)
-    |> Enum.sum()
-  end
+  defp total_day_worked(objs), do: sum_days(objs, :wh)
 
-  defp ot_day_worked(objs) do
-    Enum.map(objs, fn x -> x.ot / x.work_hours_per_day end)
+  defp ot_day_worked(objs), do: sum_days(objs, :ot)
+
+  defp sum_days(objs, key) do
+    objs
+    |> Enum.map(fn x ->
+      case Map.get(x, key) do
+        nil -> 0.0
+        hours -> hours / x.work_hours_per_day
+      end
+    end)
     |> Enum.sum()
   end
 

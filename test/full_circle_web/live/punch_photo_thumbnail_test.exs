@@ -31,6 +31,8 @@ defmodule FullCircleWeb.PunchPhotoThumbnailTest do
         photo_path: "#{comp.id}/punch_photos/2026/09/#{Ecto.UUID.generate()}.jpg"
       })
 
+    {:ok, ta} = FullCircle.HR.reassign_punch(ta, comp)
+
     # Punch Card previews a pay slip on mount, which needs the PCB salary type.
     ensure_salary_type(comp, user, "Employee PCB", "Deduction")
 
