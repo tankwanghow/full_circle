@@ -692,4 +692,58 @@ defmodule FullCircle.WorkShiftTest do
       assert ShiftInstance.anomaly(4, 9.0, max) == nil
     end
   end
+
+  describe "punch-card row carries the instance shift for slot_date" do
+    setup ctx do
+      emp = employee_fixture(%{}, ctx.company, ctx.admin)
+      {:ok, night} = shift(ctx.company, %{})
+
+      Repo.insert!(%EmployeeWorkShift{
+        employee_id: emp.id,
+        work_shift_id: night.id,
+        effective_from: ~D[2026-05-01]
+      })
+
+      %{emp: emp, night: night}
+    end
+
+    defp night_punch!(ctx, iso) do
+      ta =
+        Repo.insert!(%FullCircle.HR.TimeAttend{
+          company_id: ctx.company.id,
+          employee_id: ctx.emp.id,
+          user_id: ctx.admin.id,
+          punch_time:
+            Timex.parse!(iso, "{RFC3339}")
+            |> DateTime.shift_zone!("Etc/UTC")
+            |> DateTime.truncate(:second),
+          status: "Draft",
+          input_medium: "Manual"
+        })
+
+      {:ok, ta} = FullCircle.HR.reassign_punch(ta, ctx.company)
+      ta
+    end
+
+    test "the pay-date row keeps the instance anchor, not the pay date", ctx do
+      night_punch!(ctx, "2026-05-05T17:00:00+08:00")
+      night_punch!(ctx, "2026-05-06T02:00:00+08:00")
+
+      row =
+        FullCircle.HR.punch_card_query(5, 2026, ctx.emp.id, ctx.company)
+        |> Enum.find(fn r -> Timex.to_date(r.dd) == ~D[2026-05-06] end)
+
+      assert row.work_shift_date == ~D[2026-05-05]
+      assert row.work_shift.start_time == ~T[17:00:00]
+      assert is_nil(row.anomaly)
+
+      alias FullCircleWeb.TimeAttendLive.PunchTimeComponent
+
+      assert PunchTimeComponent.slot_date("17:00", row.work_shift_date, row.work_shift) ==
+               ~D[2026-05-05]
+
+      assert PunchTimeComponent.slot_date("02:00", row.work_shift_date, row.work_shift) ==
+               ~D[2026-05-06]
+    end
+  end
 end

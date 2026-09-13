@@ -1403,7 +1403,9 @@ defmodule FullCircle.HR do
              group by ta.employee_id, ta.work_shift_id, ta.work_shift_date),
           emp_time_list as (
             select ei.employee_id, ds.dd as dd_utc, ei.time_list,
-                   ei.punch_count, ei.span_hours, ws.max_hour
+                   ei.punch_count, ei.span_hours, ei.work_shift_date,
+                   ws.id as work_shift_id, ws.name as work_shift_name,
+                   ws.start_time, ws.normal_hour, ws.max_hour, ws.is_default
               from emp_instance ei
               join work_shifts ws on ws.id = ei.work_shift_id
               cross join date_series ds
@@ -1414,6 +1416,8 @@ defmodule FullCircle.HR do
               eidsh.name, eidsh.work_hours_per_day, eidsh.work_days_per_week,
               eidsh.work_days_per_month, eidsh.id as employee_id, etl.time_list,
               etl.punch_count, etl.span_hours, etl.max_hour,
+              etl.work_shift_id, etl.work_shift_name, etl.start_time,
+              etl.normal_hour, etl.is_default, etl.work_shift_date,
               eidsh.holi_list, eidsh.sholi_list
           from emp_info_date_series_holiday eidsh left outer join emp_time_list etl
             on eidsh.id = etl.employee_id and eidsh.dd = etl.dd_utc
@@ -1553,8 +1557,27 @@ defmodule FullCircle.HR do
         id: idg,
         work_hours_per_day: nwh
       })
+      |> merge_work_shift()
     end)
   end
+
+  defp merge_work_shift(%{work_shift_id: nil} = t), do: t
+
+  defp merge_work_shift(%{work_shift_id: id} = t) when not is_nil(id) do
+    Map.merge(t, %{
+      work_shift_date: Map.get(t, :work_shift_date),
+      work_shift: %WorkShift{
+        id: id,
+        name: Map.get(t, :work_shift_name),
+        start_time: Map.get(t, :start_time),
+        normal_hour: Map.get(t, :normal_hour),
+        max_hour: Map.get(t, :max_hour),
+        is_default: Map.get(t, :is_default)
+      }
+    })
+  end
+
+  defp merge_work_shift(t), do: t
 
   defp to_float(%Decimal{} = d), do: Decimal.to_float(d)
   defp to_float(f) when is_float(f), do: f
