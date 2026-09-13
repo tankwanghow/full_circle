@@ -15,7 +15,8 @@ defmodule FullCircle.HR do
     Recurring,
     TimeAttend,
     WorkShift,
-    EmployeeWorkShift
+    EmployeeWorkShift,
+    ShiftInstance
   }
 
   alias FullCircle.Accounting.{Account, Transaction}
@@ -299,6 +300,69 @@ defmodule FullCircle.HR do
     )
   end
 
+  @doc """
+  Which instance a punch belongs to, as changeset attrs.
+
+  Resolution uses the punch's own local date to pick the shift, then that
+  shift's cutover to pick the instance.
+  """
+  def punch_shift_attrs(employee_id, company, %DateTime{} = punch_time) do
+    local = DateTime.shift_zone!(punch_time, company.timezone)
+    shift = shift_for(employee_id, company, DateTime.to_date(local))
+
+    %{work_shift_id: shift.id, work_shift_date: instance_anchor(shift, local)}
+  end
+
+  @doc """
+  Renumbers `punch_kind` and the display `flag` across one instance, in time
+  order. Replaces the old per-calendar-day flag rebuild, which wrapped at six.
+  """
+  def rebuild_instance(company, employee_id, work_shift_id, work_shift_date) do
+    from(t in TimeAttend,
+      where: t.company_id == ^company.id,
+      where: t.employee_id == ^employee_id,
+      where: t.work_shift_id == ^work_shift_id,
+      where: t.work_shift_date == ^work_shift_date,
+      order_by: [asc: t.punch_time, asc: t.id]
+    )
+    |> Repo.all()
+    |> Enum.with_index(1)
+    |> Enum.each(fn {ta, i} ->
+      kind = ShiftInstance.punch_kind(i)
+      flag = ShiftInstance.flag(i)
+
+      if ta.punch_kind != kind or ta.flag != flag do
+        ta |> Ecto.Changeset.change(%{punch_kind: kind, flag: flag}) |> Repo.update!()
+      end
+    end)
+
+    :ok
+  end
+
+  @doc """
+  Resolves a punch to its instance and renumbers it — plus the instance it just
+  left, when a time edit moved it.
+  """
+  def reassign_punch(%TimeAttend{} = ta, company) do
+    old_id = ta.work_shift_id
+    old_date = ta.work_shift_date
+    attrs = punch_shift_attrs(ta.employee_id, company, ta.punch_time)
+
+    {:ok, ta} = ta |> Ecto.Changeset.change(attrs) |> Repo.update()
+
+    rebuild_instance(company, ta.employee_id, ta.work_shift_id, ta.work_shift_date)
+
+    # A time edit can move a punch between instances; the one it left has to be
+    # renumbered too, or it keeps a gap in its sequence.
+    moved? = old_id != ta.work_shift_id or old_date != ta.work_shift_date
+
+    if not is_nil(old_id) and moved? do
+      rebuild_instance(company, ta.employee_id, old_id, old_date)
+    end
+
+    {:ok, ta}
+  end
+
   def insert_time_attendence_from_log(entry, com) do
     ptu = entry.punch_time |> Timex.shift(minutes: -5)
     ptd = entry.punch_time |> Timex.shift(minutes: 5)
@@ -307,15 +371,16 @@ defmodule FullCircle.HR do
       from(ta in TimeAttend,
         where: ta.employee_id == ^entry.employee_id,
         where: ta.company_id == ^com.id,
-        where: ta.flag == ^entry.flag,
         where: ta.punch_time >= ^ptu,
         where: ta.punch_time <= ^ptd
       )
       |> Repo.exists?()
 
     if !got? do
-      cs = TimeAttend.finger_print_log_changeset(%TimeAttend{}, entry)
-      Repo.insert(cs)
+      with {:ok, ta} <-
+             %TimeAttend{} |> TimeAttend.finger_print_log_changeset(entry) |> Repo.insert() do
+        reassign_punch(ta, com)
+      end
     end
   end
 
@@ -345,9 +410,13 @@ defmodule FullCircle.HR do
         emp_id = Ecto.Changeset.get_field(cs, :employee_id)
         ptl = Ecto.Changeset.get_field(cs, :punch_time_local)
 
-        if punch_locked_by_payslip?(emp_id, ptl, com),
-          do: {:error, :on_payslip},
-          else: Repo.insert(cs)
+        if punch_locked_by_payslip?(emp_id, ptl, com) do
+          {:error, :on_payslip}
+        else
+          with {:ok, ta} <- Repo.insert(cs) do
+            reassign_punch(ta, com)
+          end
+        end
 
       false ->
         :not_authorise
@@ -361,9 +430,13 @@ defmodule FullCircle.HR do
         emp_id = Ecto.Changeset.get_field(cs, :employee_id)
         ptl = Ecto.Changeset.get_field(cs, :punch_time_local)
 
-        if punch_locked_by_payslip?(emp_id, ptl, com),
-          do: {:error, :on_payslip},
-          else: Repo.update(cs)
+        if punch_locked_by_payslip?(emp_id, ptl, com) do
+          {:error, :on_payslip}
+        else
+          with {:ok, ta} <- Repo.update(cs) do
+            reassign_punch(ta, com)
+          end
+        end
 
       false ->
         :not_authorise
@@ -373,7 +446,10 @@ defmodule FullCircle.HR do
   def delete_time_attendence(ta, com, user) do
     case can?(user, :delete_time_attendence, com) do
       true ->
-        Repo.delete(ta)
+        with {:ok, ta} <- Repo.delete(ta) do
+          rebuild_instance(com, ta.employee_id, ta.work_shift_id, ta.work_shift_date)
+          {:ok, ta}
+        end
 
       false ->
         :not_authorise
@@ -397,7 +473,10 @@ defmodule FullCircle.HR do
             {:error, :on_payslip}
 
           true ->
-            Repo.delete(ta)
+            with {:ok, ta} <- Repo.delete(ta) do
+              rebuild_instance(com, ta.employee_id, ta.work_shift_id, ta.work_shift_date)
+              {:ok, ta}
+            end
         end
 
       false ->

@@ -98,16 +98,10 @@ defmodule FullCircle.HR.FingerPrintImport do
   end
 
   defp fill_flags_to_map(tl) do
-    Enum.map(Enum.with_index(tl, 1), fn {t, index} ->
-      cond do
-        index == 1 -> %{stamp: t, flag: "1_IN_1"}
-        index == 2 -> %{stamp: t, flag: "1_OUT_1"}
-        index == 3 -> %{stamp: t, flag: "2_IN_2"}
-        index == 4 -> %{stamp: t, flag: "2_OUT_2"}
-        index == 5 -> %{stamp: t, flag: "3_IN_3"}
-        index == 6 -> %{stamp: t, flag: "3_OUT_3"}
-        true -> %{stamp: t, flag: nil}
-      end
-    end)
+    # Position within the shift is derived after insert by HR.rebuild_instance/4,
+    # so this only has to be a value that passes validation. It used to emit nil
+    # past the sixth punch, which failed validate_required and silently dropped
+    # the punch.
+    Enum.map(tl, fn t -> %{stamp: t, flag: "1_IN_1"} end)
   end
 end

@@ -5,7 +5,6 @@ defmodule FullCircle.PunchGate do
   alias FullCircle.Authorization
   alias FullCircle.HR.{TimeAttend, Employee}
 
-  @flags ~w(1_IN_1 1_OUT_1 2_IN_2 2_OUT_2 3_IN_3 3_OUT_3)
   @dup_seconds 180
   @future_leeway_seconds 120
   @max_photo_bytes 300_000
@@ -192,36 +191,6 @@ defmodule FullCircle.PunchGate do
     max(total - seen, 0)
   end
 
-  def rebuild_day_flags(employee_id, company, %DateTime{} = punched_at) do
-    tz = company.timezone
-    {:ok, local} = DateTime.shift_zone(punched_at, tz)
-    d = DateTime.to_date(local)
-    {:ok, start_local} = DateTime.new(d, ~T[00:00:00], tz)
-    start_utc = DateTime.shift_zone!(start_local, "Etc/UTC")
-    end_utc = DateTime.add(start_utc, 86400, :second)
-
-    rows =
-      from(ta in TimeAttend,
-        where: ta.employee_id == ^employee_id,
-        where: ta.company_id == ^company.id,
-        where: ta.punch_time >= ^start_utc and ta.punch_time < ^end_utc,
-        order_by: [asc: ta.punch_time, asc: ta.flag]
-      )
-      |> Repo.all()
-
-    rows
-    |> Enum.with_index()
-    |> Enum.each(fn {ta, i} ->
-      flag = Enum.at(@flags, rem(i, length(@flags)))
-
-      if ta.flag != flag do
-        ta |> Ecto.Changeset.change(%{flag: flag}) |> Repo.update!()
-      end
-    end)
-
-    :ok
-  end
-
   defp insert_punch(device, emp, company, punched_at, client_id, photo) do
     Ecto.Multi.new()
     |> Ecto.Multi.insert(
@@ -245,8 +214,8 @@ defmodule FullCircle.PunchGate do
       ta |> Ecto.Changeset.change(%{photo_path: rel}) |> Repo.update()
     end)
     |> Ecto.Multi.run(:flags, fn _repo, %{photo: ta} ->
-      rebuild_day_flags(emp.id, company, punched_at)
-      {:ok, Repo.get!(TimeAttend, ta.id)}
+      {:ok, ta} = FullCircle.HR.reassign_punch(ta, company)
+      {:ok, ta}
     end)
     |> Ecto.Multi.update(:seen, fn _ ->
       PunchDevice.changeset(device, %{

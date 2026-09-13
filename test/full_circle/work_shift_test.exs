@@ -316,4 +316,186 @@ defmodule FullCircle.WorkShiftTest do
       refute FullCircle.HR.instance_anchor(gen, local) == DateTime.to_date(local)
     end
   end
+
+  describe "assignment on write" do
+    setup ctx do
+      emp = employee_fixture(%{}, ctx.company, ctx.admin)
+      {:ok, {device, _}} = FullCircle.PunchGate.create_device("Gate 1", ctx.company, ctx.admin)
+      {:ok, night} = shift(ctx.company, %{})
+      %{emp: emp, device: device, night: night}
+    end
+
+    defp jpeg_upload do
+      path = Path.join(System.tmp_dir!(), "face-#{System.unique_integer([:positive])}.jpg")
+
+      File.write!(
+        path,
+        Base.decode64!(
+          "/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA="
+        )
+      )
+
+      %Plug.Upload{path: path, filename: "face.jpg", content_type: "image/jpeg"}
+    end
+
+    defp gate_punch(ctx, iso) do
+      FullCircle.PunchGate.ingest_punch(ctx.device, %{
+        "employee_id" => ctx.emp.id,
+        "punched_at" =>
+          Timex.parse!(iso, "{RFC3339}")
+          |> DateTime.shift_zone!("Etc/UTC")
+          |> DateTime.truncate(:second),
+        "client_id" => Ecto.UUID.generate(),
+        "photo" => jpeg_upload()
+      })
+    end
+
+    defp instance_punches(ctx, date) do
+      import Ecto.Query
+
+      Repo.all(
+        from t in FullCircle.HR.TimeAttend,
+          where: t.employee_id == ^ctx.emp.id and t.work_shift_date == ^date,
+          order_by: [asc: t.punch_time]
+      )
+    end
+
+    test "a gate punch is assigned to General and numbered", ctx do
+      assert {:ok, ta} = gate_punch(ctx, "2026-05-05T08:00:00+08:00")
+      ta = Repo.reload!(ta)
+
+      assert ta.work_shift_id == FullCircle.HR.default_work_shift(ctx.company).id
+      assert ta.work_shift_date == ~D[2026-05-05]
+      assert ta.punch_kind == "IN"
+      assert ta.flag == "1_IN_1"
+    end
+
+    test "a fourth pair keeps numbering instead of wrapping to 1_IN_1", ctx do
+      for iso <- [
+            "2026-05-05T08:00:00+08:00",
+            "2026-05-05T10:00:00+08:00",
+            "2026-05-05T10:30:00+08:00",
+            "2026-05-05T12:30:00+08:00",
+            "2026-05-05T13:30:00+08:00",
+            "2026-05-05T15:30:00+08:00",
+            "2026-05-05T16:00:00+08:00",
+            "2026-05-05T18:00:00+08:00"
+          ] do
+        assert {:ok, _} = gate_punch(ctx, iso)
+      end
+
+      flags = instance_punches(ctx, ~D[2026-05-05]) |> Enum.map(& &1.flag)
+
+      assert flags == [
+               "1_IN_1",
+               "1_OUT_1",
+               "2_IN_2",
+               "2_OUT_2",
+               "3_IN_3",
+               "3_OUT_3",
+               "4_IN_4",
+               "4_OUT_4"
+             ]
+    end
+
+    test "an assigned night worker's 02:00 punch joins the previous evening", ctx do
+      Repo.insert!(%EmployeeWorkShift{
+        employee_id: ctx.emp.id,
+        work_shift_id: ctx.night.id,
+        effective_from: ~D[2026-05-01]
+      })
+
+      assert {:ok, _} = gate_punch(ctx, "2026-05-05T17:00:00+08:00")
+      assert {:ok, _} = gate_punch(ctx, "2026-05-06T02:00:00+08:00")
+
+      punches = instance_punches(ctx, ~D[2026-05-05])
+      assert length(punches) == 2
+      assert Enum.map(punches, & &1.punch_kind) == ["IN", "OUT"]
+      assert instance_punches(ctx, ~D[2026-05-06]) == []
+    end
+
+    test "editing a punch time out of an instance renumbers both", ctx do
+      assert {:ok, _} = gate_punch(ctx, "2026-05-05T08:00:00+08:00")
+      assert {:ok, b} = gate_punch(ctx, "2026-05-05T17:00:00+08:00")
+
+      b
+      |> Ecto.Changeset.change(%{
+        punch_time:
+          Timex.parse!("2026-05-07T09:00:00+08:00", "{RFC3339}")
+          |> DateTime.shift_zone!("Etc/UTC")
+          |> DateTime.truncate(:second)
+      })
+      |> Repo.update!()
+      |> FullCircle.HR.reassign_punch(ctx.company)
+
+      assert [left] = instance_punches(ctx, ~D[2026-05-05])
+      assert left.flag == "1_IN_1"
+      assert [moved] = instance_punches(ctx, ~D[2026-05-07])
+      assert moved.flag == "1_IN_1"
+      assert moved.punch_kind == "IN"
+    end
+
+    test "rebuild_day_flags is gone", _ctx do
+      refute function_exported?(FullCircle.PunchGate, :rebuild_day_flags, 3)
+    end
+
+    test "clearing a punch from the row renumbers what is left", ctx do
+      assert {:ok, a} = gate_punch(ctx, "2026-05-05T08:00:00+08:00")
+      assert {:ok, _} = gate_punch(ctx, "2026-05-05T12:00:00+08:00")
+      assert {:ok, _} = gate_punch(ctx, "2026-05-05T17:00:00+08:00")
+
+      FullCircle.HR.delete_time_attendence_by_id(a.id, ctx.company, ctx.admin)
+
+      assert ["1_IN_1", "1_OUT_1"] =
+               instance_punches(ctx, ~D[2026-05-05]) |> Enum.map(& &1.flag)
+    end
+  end
+
+  describe "fingerprint import" do
+    setup ctx do
+      %{emp: employee_fixture(%{}, ctx.company, ctx.admin)}
+    end
+
+    test "a seventh and eighth punch are stored, not silently discarded", ctx do
+      times = [
+        ~T[08:00:00],
+        ~T[10:00:00],
+        ~T[10:30:00],
+        ~T[12:30:00],
+        ~T[13:30:00],
+        ~T[15:30:00],
+        ~T[16:00:00],
+        ~T[18:00:00]
+      ]
+
+      for t <- times do
+        entry = %{
+          employee_id: ctx.emp.id,
+          employee_name: ctx.emp.name,
+          company_id: ctx.company.id,
+          user_id: ctx.admin.id,
+          status: "Draft",
+          input_medium: "FingerPrint",
+          punch_time_local: NaiveDateTime.new!(~D[2026-05-05], t),
+          punch_time:
+            DateTime.new!(~D[2026-05-05], t, ctx.company.timezone)
+            |> DateTime.shift_zone!("Etc/UTC")
+            |> DateTime.truncate(:second)
+        }
+
+        FullCircle.HR.insert_time_attendence_from_log(entry, ctx.company)
+      end
+
+      import Ecto.Query
+
+      count =
+        Repo.one(
+          from t in FullCircle.HR.TimeAttend,
+            where: t.employee_id == ^ctx.emp.id,
+            select: count(t.id)
+        )
+
+      assert count == 8
+    end
+  end
 end

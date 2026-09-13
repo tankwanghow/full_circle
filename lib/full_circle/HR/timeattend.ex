@@ -44,7 +44,6 @@ defmodule FullCircle.HR.TimeAttend do
       :punch_kind
     ])
     |> validate_required([
-      :flag,
       :input_medium,
       :punch_time_local,
       :punch_time,
@@ -72,7 +71,6 @@ defmodule FullCircle.HR.TimeAttend do
       :punch_kind
     ])
     |> validate_required([
-      :flag,
       :input_medium,
       :punch_time,
       :company_id,
@@ -100,7 +98,6 @@ defmodule FullCircle.HR.TimeAttend do
       :punch_kind
     ])
     |> validate_required([
-      :flag,
       :input_medium,
       :punch_time_local,
       :company_id,
