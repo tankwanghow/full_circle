@@ -77,13 +77,32 @@ defmodule FullCircle.PunchGate do
     end
   end
 
-  def get_active_device_by_token(plain) when is_binary(plain) do
+  @doc """
+  Resolves a device Bearer token.
+
+  Returns `{:revoked, device}` rather than `nil` for a token whose device was
+  revoked: that POST is still attributable to a company, and it is a *silent*
+  punch loss (the APK drops 4xx), so it is worth a `punch_ingest_logs` row.
+  A token matching no row stays anonymous and is never logged.
+  """
+  def authenticate_device(plain) when is_binary(plain) do
     from(d in PunchDevice,
       where: d.token_hash == ^hash_token(plain),
-      where: is_nil(d.revoked_at),
       preload: [:company]
     )
     |> Repo.one()
+    |> case do
+      nil -> :error
+      %PunchDevice{revoked_at: nil} = device -> {:ok, device}
+      %PunchDevice{} = device -> {:revoked, device}
+    end
+  end
+
+  def get_active_device_by_token(plain) when is_binary(plain) do
+    case authenticate_device(plain) do
+      {:ok, device} -> device
+      _ -> nil
+    end
   end
 
   def list_devices(company, user) do
@@ -537,4 +556,46 @@ defmodule FullCircle.PunchGate do
   defp truncate_field(nil), do: nil
   defp truncate_field(s) when is_binary(s), do: String.slice(s, 0, @raw_field_limit)
   defp truncate_field(other), do: other |> to_string() |> String.slice(0, @raw_field_limit)
+
+  @doc """
+  Records a POST refused with 401 because the device is revoked.
+
+  Always returns `:ok`; the caller is an auth plug and must send its 401
+  regardless. No photo is copied — the useful fact is "this phone is unpaired",
+  not the face.
+  """
+  def log_revoked_attempt(%PunchDevice{} = device, params) do
+    raw = to_string(params["employee_id"] || "")
+
+    insert_ingest_log(%{
+      id: Ecto.UUID.generate(),
+      inserted_at: DateTime.utc_now(),
+      company_id: device.company_id,
+      punch_device_id: device.id,
+      employee_id: revoked_employee_id(raw, device.company_id),
+      employee_id_raw: truncate_field(raw),
+      client_id: truncate_field(params["client_id"]),
+      punched_at: parsed_or_nil(params["punched_at"]),
+      outcome: "rejected",
+      reason: "revoked",
+      http_status: http_status_for(:revoked)
+    })
+
+    :ok
+  rescue
+    e ->
+      # Same contract as log_ingest/3, for the same reason and one layer earlier:
+      # these are raw multipart params, so a repeated or nested field can make
+      # `params["employee_id"]` a list or a map and `to_string/1` raise. Without
+      # this the plug would 500 and the APK would retry a punch it should drop.
+      Logger.error("punch revoked log raised: #{Exception.message(e)}")
+      :ok
+  end
+
+  defp revoked_employee_id(raw, company_id) do
+    case get_company_employee(raw, company_id) do
+      %Employee{id: id} -> id
+      _ -> nil
+    end
+  end
 end

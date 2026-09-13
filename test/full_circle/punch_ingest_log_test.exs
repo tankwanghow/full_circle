@@ -512,4 +512,76 @@ defmodule FullCircle.PunchIngestLogTest do
       assert logs(ctx.company) == []
     end
   end
+
+  describe "authenticate_device/1" do
+    test "active, revoked, and unknown tokens", ctx do
+      assert {:ok, %FullCircle.PunchGate.PunchDevice{}} = PunchGate.authenticate_device(ctx.token)
+      assert :error = PunchGate.authenticate_device("garbage")
+
+      {:ok, _} = PunchGate.revoke_device(ctx.device, ctx.company, ctx.admin)
+      assert {:revoked, device} = PunchGate.authenticate_device(ctx.token)
+      assert device.id == ctx.device.id
+      assert device.company.id == ctx.company.id
+    end
+
+    test "get_active_device_by_token/1 is unchanged", ctx do
+      assert %FullCircle.PunchGate.PunchDevice{} = PunchGate.get_active_device_by_token(ctx.token)
+      {:ok, _} = PunchGate.revoke_device(ctx.device, ctx.company, ctx.admin)
+      assert is_nil(PunchGate.get_active_device_by_token(ctx.token))
+    end
+  end
+
+  describe "log_revoked_attempt/2" do
+    setup ctx do
+      %{emp: employee_fixture(%{}, ctx.company, ctx.admin)}
+    end
+
+    test "logs a 401 row with the employee resolved and no photo", ctx do
+      {:ok, _} = PunchGate.revoke_device(ctx.device, ctx.company, ctx.admin)
+      {:revoked, device} = PunchGate.authenticate_device(ctx.token)
+      punched = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      assert :ok =
+               PunchGate.log_revoked_attempt(device, %{
+                 "employee_id" => ctx.emp.id,
+                 "client_id" => "abc123",
+                 "punched_at" => DateTime.to_iso8601(punched)
+               })
+
+      log = one_log(ctx.company)
+      assert log.outcome == "rejected"
+      assert log.reason == "revoked"
+      assert log.http_status == 401
+      assert log.punch_device_id == ctx.device.id
+      assert log.employee_id == ctx.emp.id
+      assert log.employee_id_raw == ctx.emp.id
+      assert log.client_id == "abc123"
+      assert log.punched_at == punched
+      assert is_nil(log.photo_path)
+      assert is_nil(log.time_attendence_id)
+    end
+
+    test "an unresolvable badge still logs, with employee_id nil", ctx do
+      {:ok, _} = PunchGate.revoke_device(ctx.device, ctx.company, ctx.admin)
+      {:revoked, device} = PunchGate.authenticate_device(ctx.token)
+
+      assert :ok = PunchGate.log_revoked_attempt(device, %{"employee_id" => "junk"})
+
+      log = one_log(ctx.company)
+      assert log.reason == "revoked"
+      assert is_nil(log.employee_id)
+      assert log.employee_id_raw == "junk"
+      assert is_nil(log.punched_at)
+    end
+
+    test "a param shape that raises still answers :ok and writes nothing", ctx do
+      # Raw multipart: a repeated or nested field makes this a map, and
+      # to_string/1 raises on it. The plug must still send its plain 401.
+      {:ok, _} = PunchGate.revoke_device(ctx.device, ctx.company, ctx.admin)
+      {:revoked, device} = PunchGate.authenticate_device(ctx.token)
+
+      assert :ok = PunchGate.log_revoked_attempt(device, %{"employee_id" => %{"nested" => "1"}})
+      assert logs(ctx.company) == []
+    end
+  end
 end
