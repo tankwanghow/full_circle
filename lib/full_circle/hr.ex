@@ -14,7 +14,8 @@ defmodule FullCircle.HR do
     SalaryNote,
     Recurring,
     TimeAttend,
-    WorkShift
+    WorkShift,
+    EmployeeWorkShift
   }
 
   alias FullCircle.Accounting.{Account, Transaction}
@@ -28,6 +29,41 @@ defmodule FullCircle.HR do
 
   def default_work_shift(company) do
     Repo.get_by!(WorkShift, company_id: company.id, is_default: true)
+  end
+
+  @doc """
+  The shift an employee works on `date`: their effective assignment, else the
+  company default. Most staff have no assignment row at all.
+  """
+  def shift_for(employee_id, company, %Date{} = date) do
+    from(ews in EmployeeWorkShift,
+      join: ws in WorkShift,
+      on: ws.id == ews.work_shift_id,
+      where: ews.employee_id == ^employee_id,
+      where: ws.company_id == ^company.id,
+      where: ews.effective_from <= ^date,
+      where: is_nil(ews.effective_to) or ews.effective_to >= ^date,
+      order_by: [desc: ews.effective_from],
+      limit: 1,
+      select: ws
+    )
+    |> Repo.one() || default_work_shift(company)
+  end
+
+  @doc """
+  The local date identifying the shift instance a punch belongs to.
+
+  Instances run `[cutover(D), cutover(D+1))`, and the anchor is D. A punch at or
+  after the cutover opens that day's instance; one before it still belongs to
+  the previous day's.
+  """
+  def instance_anchor(%WorkShift{} = shift, %DateTime{} = local) do
+    cutover = WorkShift.cutover_time(shift)
+    date = DateTime.to_date(local)
+
+    if Time.compare(DateTime.to_time(local), cutover) in [:gt, :eq],
+      do: date,
+      else: Date.add(date, -1)
   end
 
   @doc """

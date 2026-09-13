@@ -169,4 +169,85 @@ defmodule FullCircle.WorkShiftTest do
       assert {:ok, _} = assign(ctx.emp, ctx.ws, ~D[2026-06-01], ~D[2026-06-30])
     end
   end
+
+  describe "shift_for/3 and instance_anchor/2" do
+    setup ctx do
+      emp = employee_fixture(%{}, ctx.company, ctx.admin)
+      {:ok, night} = shift(ctx.company, %{})
+      gen = FullCircle.HR.default_work_shift(ctx.company)
+      %{emp: emp, night: night, gen: gen}
+    end
+
+    defp local(ctx, s),
+      do: Timex.parse!(s, "{RFC3339}") |> DateTime.shift_zone!(ctx.company.timezone)
+
+    test "an unassigned employee resolves to General", ctx do
+      ws = FullCircle.HR.shift_for(ctx.emp.id, ctx.company, ~D[2026-05-05])
+      assert ws.id == ctx.gen.id
+      assert ws.is_default
+    end
+
+    test "an assignment wins inside its range and not outside it", ctx do
+      Repo.insert!(%EmployeeWorkShift{
+        employee_id: ctx.emp.id,
+        work_shift_id: ctx.night.id,
+        effective_from: ~D[2026-05-01],
+        effective_to: ~D[2026-05-31]
+      })
+
+      assert FullCircle.HR.shift_for(ctx.emp.id, ctx.company, ~D[2026-05-15]).id == ctx.night.id
+      assert FullCircle.HR.shift_for(ctx.emp.id, ctx.company, ~D[2026-04-30]).id == ctx.gen.id
+      assert FullCircle.HR.shift_for(ctx.emp.id, ctx.company, ~D[2026-06-01]).id == ctx.gen.id
+    end
+
+    test "an open ended assignment applies from its start onward", ctx do
+      Repo.insert!(%EmployeeWorkShift{
+        employee_id: ctx.emp.id,
+        work_shift_id: ctx.night.id,
+        effective_from: ~D[2026-05-01]
+      })
+
+      assert FullCircle.HR.shift_for(ctx.emp.id, ctx.company, ~D[2027-01-01]).id == ctx.night.id
+    end
+
+    test "General anchors every punch to its own calendar day", ctx do
+      # 07:00 and 21:00 both sit after the 02:00 cutover, so both anchor to 5/5.
+      assert FullCircle.HR.instance_anchor(ctx.gen, local(ctx, "2026-05-05T07:00:00+08:00")) ==
+               ~D[2026-05-05]
+
+      assert FullCircle.HR.instance_anchor(ctx.gen, local(ctx, "2026-05-05T21:00:00+08:00")) ==
+               ~D[2026-05-05]
+    end
+
+    test "General still groups a punch just past midnight with the day before", ctx do
+      assert FullCircle.HR.instance_anchor(ctx.gen, local(ctx, "2026-05-06T00:30:00+08:00")) ==
+               ~D[2026-05-05]
+    end
+
+    test "Night groups 17:00 and the following 02:00 into one instance", ctx do
+      a = FullCircle.HR.instance_anchor(ctx.night, local(ctx, "2026-05-05T17:00:00+08:00"))
+      b = FullCircle.HR.instance_anchor(ctx.night, local(ctx, "2026-05-06T02:00:00+08:00"))
+      assert a == ~D[2026-05-05]
+      assert b == ~D[2026-05-05]
+    end
+
+    test "a punch exactly on the cutover opens the later instance", ctx do
+      # Night cutover is 11:00.
+      assert FullCircle.HR.instance_anchor(ctx.night, local(ctx, "2026-05-06T11:00:00+08:00")) ==
+               ~D[2026-05-06]
+
+      assert FullCircle.HR.instance_anchor(ctx.night, local(ctx, "2026-05-06T10:59:59+08:00")) ==
+               ~D[2026-05-05]
+    end
+
+    test "drift of several hours does not change the instance", ctx do
+      for t <- [
+            "2026-05-06T01:00:00+08:00",
+            "2026-05-06T02:00:00+08:00",
+            "2026-05-06T04:00:00+08:00"
+          ] do
+        assert FullCircle.HR.instance_anchor(ctx.night, local(ctx, t)) == ~D[2026-05-05]
+      end
+    end
+  end
 end
