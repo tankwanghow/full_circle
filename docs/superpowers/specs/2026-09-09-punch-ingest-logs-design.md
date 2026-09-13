@@ -33,7 +33,7 @@ Gate POSTs that the server rejects (unknown badge, inactive employee, ±3 min du
 - Changing when the phone drops 4xx vs retries 5xx.
 - Writing into `logs`.
 - Oban (this app has none; pruner is a supervised GenServer, same as `PhotoPruner`).
-- Fixing the 6-punch ceiling. A local day with more than 3 IN/OUT pairs is **accepted** and logged as `accepted` — correctly, since the server did accept it. But `rebuild_day_flags/3` wraps (`rem(i, 6)` at `punch_gate.ex:213`), so punch 7 is labelled `1_IN_1` again; `make_timeattend_list/2` (`helpers.ex:295`) keeps only the **first** row per flag; and `PunchTimeComponent` destructures a fixed 6-element list and recomputes `wh` from it (`punch_time_component.ex:185-204`). Punches 7+ are therefore invisible on Punch IO and Punch Card, and a clerk editing any punch on such a day replaces that day's hours with the truncated six (`punch_card.ex:677-700`) — the query-level `wh` over the full list (`hr.ex:1287`) is correct until then. That is a pre-existing payroll-UI ceiling, not an ingest gap. This log is what makes it **diagnosable** (8 `accepted` rows, 6 shown); fixing it has its own spec.
+- Fixing the 6-punch ceiling. A local day with more than 3 IN/OUT pairs is **accepted** and logged as `accepted` — correctly, since the server did accept it. But `rebuild_day_flags/3` wraps (`rem(i, length(@flags))` at `punch_gate.ex:215`), so punch 7 is labelled `1_IN_1` again; `make_timeattend_list/2` (`live/helpers.ex:295`) keeps only the **first** row per flag; and `PunchTimeComponent` destructures a fixed 6-element list and recomputes `wh` from it (`punch_time_component.ex:185-204`). Punches 7+ are therefore invisible on Punch IO and Punch Card, and a clerk editing any punch on such a day replaces that day's hours with the truncated six (`punch_card.ex:677-700`) — the query-level `wh` over the full list (`hr.ex:1309`, applied at `hr.ex:1341`) is correct until then. That is a pre-existing payroll-UI ceiling, not an ingest gap. This log is what makes it **diagnosable** (8 `accepted` rows, 6 shown); fixing it has its own spec.
 
 ## Outcome map
 
@@ -65,6 +65,17 @@ Gate POSTs that the server rejects (unknown badge, inactive employee, ±3 min du
 | `:too_large` | 413 |
 | `:inactive`, `:missing_photo`, `:future`, `:invalid`, anything else | 422 |
 
+### `reason` is an allow-list, never `to_string(atom)`
+
+`reason` is check-constrained to `not_found`, `inactive`, `too_large`,
+`missing_photo`, `future`, `invalid`, `revoked`. The logger maps the ingest atom
+through that list and stores **`invalid`** for anything else. A blind
+`to_string(reason)` on some later `{:error, :photo}` would violate the check
+constraint, raise, be swallowed by the best-effort rescue, and lose the row the
+log exists to keep — the one failure this feature cannot have. The same
+allow-list is what makes `String.to_existing_atom/1` safe when the logger
+derives `http_status` back from the stored string.
+
 ### The JPEG rule is unconditional
 
 `validate_photo/1` runs **first** in today's `with`, so by the time any of `not_found`, `inactive`, `future`, `duplicate`, or an insert-failure `:invalid` is reachable, the upload has already passed (non-empty JPEG ≤ 300 KB). The rule is therefore:
@@ -76,11 +87,15 @@ Gate POSTs that the server rejects (unknown badge, inactive employee, ±3 min du
 `replayed` is produced in **two** places and both must be tagged:
 
 1. `ingest_punch/2` short-circuits on `existing_client/2` (`punch_gate.ex:104`).
-2. `resolve_client_conflict/3` (`punch_gate.ex:271`) returns `{:ok, ta}` after losing the `(punch_device_id, client_id)` unique-index race.
+2. `resolve_client_conflict/4` (`punch_gate.ex:272`, gaining the resolved employee id — see the field ordering note) returns `{:ok, ta}` after losing the `(punch_device_id, client_id)` unique-index race.
+
+Path 2 cannot be reached through `ingest_punch/2` in a test: whenever the conflicting row is already visible, the short-circuit at `:104` wins, and forcing the real race needs two connections and a controlled interleave. Make the helper public with `@doc false` and test it directly against a genuine unique-constraint changeset (insert the same `(punch_device_id, client_id)` twice with `changeset_gate/2` and feed the returned changeset in). A test of the short-circuit does **not** cover this branch.
 
 ### Field ordering note
 
 Today's `with` order is photo → parse time → future → employee → active → duplicate/insert. So `missing_photo`, `too_large`, `future`, and a bad timestamp all happen **before** employee lookup: `employee_id` is nil, `employee_id_raw` is still stored. `:invalid` after a resolved employee is possible only from insert/changeset failures.
+
+That makes `:invalid` two different rows wearing one atom, and they must be told apart at the source rather than guessed at afterwards. Re-looking-up the badge for every `:invalid` is wrong — a POST with a valid badge and a junk `punched_at` never ran the employee lookup, and the row must say so. **The insert-failure half is reachable, not theoretical:** `changeset_gate/2` requires `client_id`, so a POST that omits it resolves the employee, fails the changeset, and lands here; "Ali — rejected/invalid" is exactly the row a clerk needs. Tag it where it happens: `insert_punch/6` and `resolve_client_conflict/4` return `{:error, :invalid, employee_id}`, the logger reads the id off that third element, and `ingest_punch/2` strips it before returning — the public contract stays `{:ok, ta} | {:error, atom}`.
 
 `last_seen_at` still updates only on a real `time_attendences` insert — not on replay, duplicate, reject, or a revoked-device 401.
 
@@ -88,7 +103,9 @@ Today's `with` order is photo → parse time → future → employee → active 
 
 ### `punch_ingest_logs`
 
-`use FullCircle.Schema`. Append-only: `timestamps(updated_at: false, type: :utc_datetime)` in the schema, `timestamps(updated_at: false, type: :timestamptz)` in the migration (matching `20260906120000_create_punch_devices`).
+`use FullCircle.Schema`. Append-only: `timestamps(updated_at: false, type: :utc_datetime_usec)` in the schema, `timestamps(updated_at: false)` in the migration (`migration_timestamps: [type: :timestamptz]` is already the project default, matching `20260906120000_create_punch_devices`).
+
+`inserted_at` is **microsecond** precision on purpose. A queue drain writes many rows inside the same second; at second precision `order_by: [desc: inserted_at]` has no defined order among them, so "newest first" is wrong on screen, offset pagination can skip and repeat rows, and any test asserting an order is flaky. `id` is a random UUID and cannot stand in for insertion order — it only makes ties *deterministic*. Use both: microseconds for the true order, `id` as the tiebreaker. (`FullCircle.UserAccounts.User` already uses `:utc_datetime_usec`, so this is not a new pattern here.)
 
 | Column | Type | Notes |
 |---|---|---|
@@ -104,7 +121,7 @@ Today's `with` order is photo → parse time → future → employee → active 
 | `reason` | `:string` | only when `outcome = rejected`: `not_found`, `inactive`, `too_large`, `missing_photo`, `future`, `invalid`, `revoked` |
 | `http_status` | `:integer` | 201 / 401 / 404 / 409 / 413 / 422 |
 | `photo_path` | `:string` | relative under `uploads_dir`; nil unless a log JPEG was stored |
-| `inserted_at` | `:utc_datetime` | server received time |
+| `inserted_at` | `:utc_datetime_usec` | server received time; microseconds so newest-first has a defined order |
 
 **Truncate `employee_id_raw` and `client_id` before building the changeset.** Both are unvalidated client strings — `ingest_punch` does `to_string(attrs["employee_id"] || ...)` with no bound. A 300-character `employee_id` overflows `varchar(255)`, raises `Postgrex.Error`, gets swallowed by the best-effort rescue, and loses the log row for exactly the malformed POST the log exists to surface.
 
@@ -171,7 +188,7 @@ The status is decided by `PunchAttendanceController.create/2`; a column filled i
 
 Generate the id first, then insert once:
 
-1. `id = Ecto.UUID.generate()`, `now = DateTime.utc_now() |> DateTime.truncate(:second)`.
+1. `id = Ecto.UUID.generate()`, `now = DateTime.utc_now()` — **not** truncated, `inserted_at` is microsecond.
 2. Derive the path from `id` + `now`; `File.mkdir_p!` + `File.cp` from the upload.
 3. Insert one row carrying `id`, `inserted_at: now`, and `photo_path`.
 4. If the insert fails, `File.rm` the file.
@@ -190,12 +207,14 @@ One write, no update to a table declared append-only, and no window where the ro
   - received-at date range, **company timezone**. Default: **today**.
   - outcome: `all` (default) / `accepted` / `replayed` / `duplicate` / `rejected`
 - Columns: received at (local), punch time (local), device name, employee (name, else raw id), outcome + reason, HTTP status.
-- Infinite scroll, `@per_page 100` (same as Punch IO), newest `inserted_at` first.
-- Date range is company-local **received** time. The window is `[local 00:00 of sdate, local 00:00 of edate + 1 day)` converted to UTC, filtering `inserted_at`. Be explicit about that upper bound: Punch IO papers over it by defaulting `edate` to tomorrow (`punch_index.ex:124`); do not inherit that. Do not use `inserted_at::date` in UTC (Malaysia UTC+8 would split "today").
+- Infinite scroll, `@per_page 100` (same as Punch IO), newest `inserted_at` first with `id` as the tiebreaker, so paging cannot skip or repeat a row.
+- Date range is company-local **received** time. The window is `[local 00:00 of sdate, local 00:00 of edate + 1 day)` converted to UTC, filtering `inserted_at`. Be explicit about that upper bound: Punch IO papers over it by defaulting `edate` to tomorrow (`punch_index.ex:125`); do not inherit that. Do not use `inserted_at::date` in UTC (Malaysia UTC+8 would split "today").
 - **Show photos** toggle: same CSS as Punch IO (`.punch-photo` / `.show-punch-photos` on a wrapper **outside** `#objects_list`, `phx-debounce={nil}`).
   - `duplicate` / `rejected` with `photo_path`: `GET /companies/:company_id/punch_ingest_logs/:id/photo`
   - `accepted` / `replayed` with `time_attendence_id`: existing `GET /companies/:company_id/TimeAttend/:id/photo`
-- Log JPEG controller: `PunchIngestLogPhotoController.show/2` (do not overload `PunchPhotoController.show/2`). Logged-out users hit the existing `:require_authenticated_user` redirect to login. Logged-in without `:view_punch_ingest_log` → **403** (an `<img>` must not follow a dashboard redirect and render HTML). Wrong `company_id` or missing row/file/`photo_path` → **404**.
+- Log JPEG controller: `PunchIngestLogPhotoController.show/2` (do not overload `PunchPhotoController.show/2`). Logged-out users hit the existing `:require_authenticated_user` redirect to login. Logged-in without `:view_punch_ingest_log` → **403** (an `<img>` must not follow a dashboard redirect and render HTML). Not a member of the company in the URL, or missing row/file/`photo_path` → **404**.
+
+  **Resolve the company from the URL segment and `current_user`, never from `conn.assigns.current_company`.** `ActiveCompany.set_active_company/2` only assigns when the session company differs from the `:company_id` in the URL; on the normal path — dashboard → ingest log → `<img src=...>` — they are equal and the plug returns `conn` untouched, so `conn.assigns.current_company` is not merely nil, it is **absent** and the dot access raises. `PunchPhotoController` already keys on the URL `company_id` plus the row for exactly this reason. Use `Sys.get_company_user(company_id, user.id)` (404 when there is no membership row), then `can?(:view_punch_ingest_log, company)` (403). A test that does not `put_session(:current_company, company)` passes either way — it must set it to the **same** company as the URL, which is the production path.
 
 Query lives on `PunchGate.list_ingest_logs/3`. The function itself must `can?(:view_punch_ingest_log)` and return `:not_authorise` if the caller is not allowed (same as `list_devices/2`). Mount also checks `can?` directly so it does not run the list query twice. Scope `where: company_id == ^company.id`. Join employee and device for display names. `Repo`, not `QueryRepo`.
 
@@ -248,19 +267,22 @@ TimeAttend photos and `PhotoPruner` are untouched.
 
 ## Testing
 
-### Context (`test/full_circle/punch_gate_test.exs`)
+### Context (`test/full_circle/punch_ingest_log_test.exs`)
+
+A new file rather than an append to `punch_gate_test.exs`: the log tests carry their own fixtures and helpers, and the existing file's job is to prove the *punch* contract did not move.
 
 - Accepted ingest → one log row, `outcome=accepted`, `time_attendence_id` set, `photo_path` nil, punch JPEG still on TimeAttend.
 - Same `client_id` again → second log row `replayed`, still one `time_attendences` row.
-- The `resolve_client_conflict` replay path also logs `replayed` (not `invalid`).
+- The `resolve_client_conflict` replay path returns the `replayed` tag (not `:invalid`). Test the helper directly with a real unique-constraint changeset; the "same `client_id` twice" test hits the short-circuit and does **not** cover it.
 - ±3 min → `duplicate`, log JPEG exists, no new TimeAttend.
 - Unknown employee → `rejected`/`not_found`, `employee_id` nil, `employee_id_raw` set, log JPEG exists.
 - Inactive → `rejected`/`inactive`, `employee_id` set.
 - Missing photo / too large → `rejected` with that reason, `photo_path` nil.
 - Future / invalid timestamp → `rejected` with that reason, log JPEG exists.
-- An over-long `employee_id` (say 400 chars) still produces a log row, with `employee_id_raw` truncated.
+- An over-long `employee_id` (say 400 chars) still produces a log row, with `employee_id_raw` truncated. It is rejected as `:not_found` before any insert, so it never reaches the punch transaction.
+- An over-long `client_id` still produces a log row with `client_id` truncated to 64 — but test it with **~200** chars, not 400: `time_attendences.client_id` is `varchar(255)` and `changeset_gate/2` has no length check, so 400 raises `Postgrex.Error` inside the punch transaction itself, which is a different (pre-existing) bug and not what this test is about.
 - `GET` health and unknown-token 401 create **zero** log rows.
-- Log failure does not change the punch result: `Repo.insert` returning `{:error, changeset}` is matched (no raise) and logged; a raised `Postgrex.Error` (or any exception while building/copying) is rescued the same way. A broken `uploads_dir` that makes the JPEG copy fail still leaves the log row and still returns the original ingest result.
+- Log failure does not change the punch result, tested three ways, not one: (a) `Repo.insert` returning `{:error, changeset}` is matched, logged, and swallowed; (b) a **raised** exception anywhere in the log path — building the attrs, not only the insert — is rescued and swallowed; (c) a broken `uploads_dir` that makes the JPEG copy fail still leaves the log row and still returns the original ingest result. (c) alone only proves the copy is safe.
 - Prune: row older than cutoff is deleted and its JPEG removed; a newer row remains; TimeAttend photo remains.
 
 ### Revoked device 401
@@ -279,13 +301,13 @@ TimeAttend photos and `PhotoPruner` are untouched.
 
 ### HTTP contract
 
-Existing `PunchAttendanceControllerTest` statuses and JSON stay green — including the 401 body, which must not change. Add only that a 201 also left an `accepted` log row if that is cheap; do not change assertions on the response body.
+Existing `PunchAttendanceControllerTest` statuses and JSON stay green — including the 401 body, which must not change. Add one assertion that a 201 also left an `accepted` log row; do not change any assertion on the response body.
 
 ## Files (expected)
 
 - `priv/repo/migrations/*_create_punch_ingest_logs.exs`
 - `lib/full_circle/punch_gate/punch_ingest_log.ex`
-- `lib/full_circle/punch_gate.ex` — `authenticate_device/1`, `http_status_for/1`, log after ingest, `log_revoked_attempt/2`, list, prune
+- `lib/full_circle/punch_gate.ex` — `authenticate_device/1`, `http_status_for/1`, log after ingest, `log_revoked_attempt/2`, `resolve_client_conflict/4`, list, prune
 - `lib/full_circle_web/plugs/punch_device_auth.ex` — revoked branch
 - `lib/full_circle/punch_gate/ingest_log_pruner.ex`
 - `lib/full_circle/application.ex` — start pruner
@@ -297,8 +319,11 @@ Existing `PunchAttendanceControllerTest` statuses and JSON stay green — includ
 - `lib/full_circle_web/live/dashboard_live/dashboard_live.ex` — Payroll link
 - `config/config.exs` — retention + enabled defaults
 - `config/test.exs` — prune disabled
-- tests as above
-- `.claude/skills/qr-gate-punch.md` — short section so the next session does not treat Punch IO as the only place a gate POST is visible
+- `test/full_circle/punch_ingest_log_test.exs` (new — context: logging, revoked, prune, list)
+- `test/full_circle_web/controllers/punch_ingest_log_photo_controller_test.exs` (new)
+- `test/full_circle_web/live/punch_ingest_log_live_test.exs` (new)
+- `test/full_circle_web/controllers/punch_attendance_controller_test.exs` — revoked-device cases plus the one added 201 assertion
+- `.claude/skills/qr-gate-punch.md` — short section so the next session does not treat Punch IO as the only place a gate POST is visible; extend the skill's `description:` so "missing punch" / "ingest log" actually trigger it
 
 ## Key decisions
 

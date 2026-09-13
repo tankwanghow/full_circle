@@ -6,7 +6,7 @@
 
 **Architecture:** A new `punch_ingest_logs` table written best-effort *after* `PunchGate.ingest_punch/2` has already decided the punch, so a logging failure can never change payroll or the HTTP response. `PunchDeviceAuth` gains one extra branch: a token that resolves to a *revoked* device is still attributable to a company, so its 401 gets a row too (POSTs only — the 20s health ping shares the plug). Retention is a `PhotoPruner`-shaped supervised GenServer; there is no job runner in this app.
 
-**Tech Stack:** Elixir 1.19.5 / OTP 28.3.1, Phoenix 1.8.3, LiveView 1.1.x, Ecto + PostgreSQL, Timex, Gettext (en + zh), Tailwind 3.4.
+**Tech Stack:** Elixir 1.19.5 / OTP 28.3.1, Phoenix 1.8.3, LiveView 1.1.x, Ecto + PostgreSQL, Timex, Gettext (en + zh), Tailwind **4.3.1** — CSS-first config in `assets/css/app.css`, there is no `tailwind.config.js`, and `dark:` is class-based via `@custom-variant dark (&:where(.dark, .dark *))`.
 
 **Spec:** `docs/superpowers/specs/2026-09-09-punch-ingest-logs-design.md`
 
@@ -17,6 +17,7 @@
 - **Do not use `StdInterface`** for this table — it writes CRUD `logs` and requires a `user_id`; a gate POST has no ERP user.
 - **Never run bare `mix format`** — it rewrites ~14 already-unformatted files on master. Format only the files you touched: `mix format <path> <path>`.
 - **Commit directly to `master`.** Solo workflow, no feature branches.
+- **Never `git add -A`.** The working tree already carries unrelated modifications (`priv/cert/selfsigned*.pem` regenerate themselves in dev). Every commit below lists its own paths; add exactly those.
 - Schemas use `use FullCircle.Schema` (binary_id PK + binary_id FKs). Migrations inherit `migration_primary_key: [name: :id, type: :binary_id]` and `migration_timestamps: [type: :timestamptz]` from `config/config.exs:39-40`, so plain `create table/2` and plain `timestamps/1` are already correct.
 - Retention is **3 calendar months** via `Timex.shift(months: -3)`, never 90 days.
 - Roles for viewing: `admin`, `manager`, `supervisor`, `clerk`. Not cashier, auditor, guest, disable.
@@ -68,7 +69,7 @@
 - Modify: `lib/full_circle_web/controllers/punch_attendance_controller.ex:8-46`
 
 **Interfaces:**
-- Produces: `FullCircle.PunchGate.PunchIngestLog` with fields `id, company_id, punch_device_id, employee_id, employee_id_raw, time_attendence_id, client_id, punched_at, outcome, reason, http_status, photo_path, inserted_at`; `PunchIngestLog.changeset(struct, attrs)` casting **all** of those (including `:id` and `:inserted_at`, which later tasks set explicitly).
+- Produces: `FullCircle.PunchGate.PunchIngestLog` with fields `id, company_id, punch_device_id, employee_id, employee_id_raw, time_attendence_id, client_id, punched_at, outcome, reason, http_status, photo_path, inserted_at` (`inserted_at` is `:utc_datetime_usec`; `punched_at` stays `:utc_datetime`, matching `time_attendences.punch_time`); `PunchIngestLog.changeset(struct, attrs)` casting **all** of those (including `:id` and `:inserted_at`, which later tasks set explicitly).
 - Produces: `PunchGate.http_status_for(atom) :: integer` — `:accepted → 201`, `:revoked → 401`, `:not_found → 404`, `:duplicate → 409`, `:too_large → 413`, anything else → `422`.
 
 - [ ] **Step 1: Write the failing test**
@@ -158,7 +159,9 @@ defmodule FullCircle.PunchIngestLogTest do
 
     test "accepts an explicit id and inserted_at", ctx do
       id = Ecto.UUID.generate()
-      at = ~U[2026-01-02 03:04:05Z]
+      # Microsecond literal: inserted_at is :utc_datetime_usec, and DateTime
+      # equality compares the precision tuple, so ~U[...05Z] != ~U[...05.000000Z].
+      at = ~U[2026-01-02 03:04:05.000000Z]
 
       assert {:ok, log} =
                %PunchIngestLog{}
@@ -219,6 +222,9 @@ defmodule FullCircle.Repo.Migrations.CreatePunchIngestLogs do
 
     # Newest-first listing. PostgreSQL scans a btree backwards, so a plain
     # ascending index serves `order_by: [desc: inserted_at]` without a DESC index.
+    # The list query adds `desc: id` as a tiebreaker; it is not in the index
+    # because inserted_at is microsecond precision, so ties are vanishingly rare
+    # and only need to be *deterministic*, not index-ordered.
     create index(:punch_ingest_logs, [:company_id, :inserted_at])
     create index(:punch_ingest_logs, [:company_id, :outcome, :inserted_at])
 
@@ -257,6 +263,12 @@ defmodule FullCircle.PunchGate.PunchIngestLog do
   decided, so a bad row here can never cost a punch. `id` and `inserted_at` are
   cast on purpose: the writer generates both up front so the JPEG filename and
   its `yyyy/mm` folder are known before the row exists.
+
+  `inserted_at` is microsecond precision (like `UserAccounts.User`), not the
+  second precision the rest of this app defaults to. A queue drain writes many
+  rows inside one second, and at second precision `order_by: [desc: inserted_at]`
+  has no defined order among them: "newest first" renders wrong, offset paging
+  can skip and repeat rows, and order assertions go flaky.
   """
   use FullCircle.Schema
   import Ecto.Changeset
@@ -278,7 +290,7 @@ defmodule FullCircle.PunchGate.PunchIngestLog do
     belongs_to :employee, FullCircle.HR.Employee
     belongs_to :time_attendence, FullCircle.HR.TimeAttend
 
-    timestamps(updated_at: false, type: :utc_datetime)
+    timestamps(updated_at: false, type: :utc_datetime_usec)
   end
 
   def outcomes, do: @outcomes
@@ -372,7 +384,11 @@ mix format priv/repo/migrations/20260909120000_create_punch_ingest_logs.exs \
   lib/full_circle/punch_gate.ex \
   lib/full_circle_web/controllers/punch_attendance_controller.ex \
   test/full_circle/punch_ingest_log_test.exs
-git add -A
+git add priv/repo/migrations/20260909120000_create_punch_ingest_logs.exs \
+  lib/full_circle/punch_gate/punch_ingest_log.ex \
+  lib/full_circle/punch_gate.ex \
+  lib/full_circle_web/controllers/punch_attendance_controller.ex \
+  test/full_circle/punch_ingest_log_test.exs
 git commit -m "feat(punch-gate): punch_ingest_logs table and one HTTP status map
 
 "
@@ -385,13 +401,14 @@ git commit -m "feat(punch-gate): punch_ingest_logs table and one HTTP status map
 Rows only — the JPEG comes in Task 3.
 
 **Files:**
-- Modify: `lib/full_circle/punch_gate.ex:89-115` (`ingest_punch/2`), `:271` (`resolve_client_conflict/3`)
+- Modify: `lib/full_circle/punch_gate.ex:91-118` (`ingest_punch/2`), `:225-270` (`insert_punch/6`), `:272-287` (`resolve_client_conflict/3` → `/4`, made public)
 - Modify: `test/full_circle/punch_ingest_log_test.exs`
 
 **Interfaces:**
 - Consumes: `PunchIngestLog.changeset/2`, `PunchGate.http_status_for/1` (Task 1).
-- Produces: `PunchGate.ingest_punch/2` public return is **unchanged** (`{:ok, ta} | {:error, atom}`). Internally `insert_punch/6` and `resolve_client_conflict/3` may now return `{:replayed, ta}`, stripped before returning.
-- Produces: private `log_ingest/3`, `truncate_field/1`, `outcome_and_reason/1`.
+- Produces: `PunchGate.ingest_punch/2` public return is **unchanged** (`{:ok, ta} | {:error, atom}`). Internally `insert_punch/6` and `resolve_client_conflict/4` may now return `{:replayed, ta}` or `{:error, reason, employee_id}`; both extras are stripped before returning.
+- Produces: private `log_ingest/3`, `truncate_field/1`, `outcome_and_reason/1`, `reason_string/1`.
+- Produces: `PunchGate.resolve_client_conflict/4` — public with `@doc false`, only so the unique-index race can be tested.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -455,13 +472,46 @@ Append to `test/full_circle/punch_ingest_log_test.exs` (inside the module, after
       assert {:ok, b} = PunchGate.ingest_punch(ctx.device, attrs)
       assert a.id == b.id
 
+      # Sort with the DateTime module, never bare Enum.sort_by/2: plain term
+      # order compares struct keys alphabetically, so :microsecond is weighed
+      # before :second and two rows either side of a second boundary come back
+      # reversed.
       assert ["accepted", "replayed"] ==
-               logs(ctx.company) |> Enum.sort_by(& &1.inserted_at) |> Enum.map(& &1.outcome)
+               logs(ctx.company)
+               |> Enum.sort_by(& &1.inserted_at, DateTime)
+               |> Enum.map(& &1.outcome)
 
       replay = Enum.find(logs(ctx.company), &(&1.outcome == "replayed"))
       assert replay.time_attendence_id == a.id
       assert replay.http_status == 201
       assert is_nil(replay.reason)
+    end
+
+    test "the unique-index race replays too, not rejects", ctx do
+      # The test above hits the existing_client short-circuit (punch_gate.ex:104),
+      # which always wins once the row is visible — it does NOT cover the race.
+      # Drive resolve_client_conflict/4 with a real unique-constraint changeset.
+      attrs = ingest_attrs(ctx.emp)
+      assert {:ok, ta} = PunchGate.ingest_punch(ctx.device, attrs)
+
+      {:error, cs} =
+        %TimeAttend{}
+        |> TimeAttend.changeset_gate(%{
+          employee_id: ctx.emp.id,
+          company_id: ctx.company.id,
+          punch_device_id: ctx.device.id,
+          punch_time: DateTime.utc_now() |> DateTime.truncate(:second),
+          input_medium: "QRGate",
+          flag: "1_IN_1",
+          status: "Draft",
+          client_id: attrs["client_id"]
+        })
+        |> Repo.insert()
+
+      assert {:replayed, replayed} =
+               PunchGate.resolve_client_conflict(cs, ctx.device.id, attrs["client_id"], ctx.emp.id)
+
+      assert replayed.id == ta.id
     end
 
     test "duplicate inside the 3 minute window", ctx do
@@ -549,13 +599,35 @@ Append to `test/full_circle/punch_ingest_log_test.exs` (inside the module, after
       assert log.punched_at == future
     end
 
-    test "unparseable punch time logs invalid with a nil punched_at", ctx do
+    # The two halves of :invalid. Same atom on the wire, different rows: one was
+    # decided before the employee lookup ever ran, the other after it succeeded.
+    test "unparseable punch time logs invalid with a nil punched_at and no employee", ctx do
       assert {:error, :invalid} =
                PunchGate.ingest_punch(ctx.device, ingest_attrs(ctx.emp, %{"punched_at" => "not-a-time"}))
 
       log = one_log(ctx.company)
       assert log.reason == "invalid"
       assert is_nil(log.punched_at)
+      # The badge was valid, but the `with` never reached the lookup. Do not
+      # "improve" this by re-resolving employee_id_raw for every :invalid.
+      assert is_nil(log.employee_id)
+      assert log.employee_id_raw == ctx.emp.id
+    end
+
+    test "an insert failure logs invalid and still names the employee", ctx do
+      # changeset_gate/2 requires client_id, so omitting it resolves and
+      # activates the employee and then fails the changeset — the only way to
+      # reach :invalid with an employee in hand, and the row a clerk needs.
+      assert {:error, :invalid} =
+               PunchGate.ingest_punch(ctx.device, ingest_attrs(ctx.emp, %{"client_id" => nil}))
+
+      log = one_log(ctx.company)
+      assert log.outcome == "rejected"
+      assert log.reason == "invalid"
+      assert log.http_status == 422
+      assert log.employee_id == ctx.emp.id
+      assert is_nil(log.time_attendence_id)
+      assert Repo.aggregate(TimeAttend, :count) == 0
     end
 
     test "an over-long employee_id still produces a row, truncated", ctx do
@@ -568,7 +640,10 @@ Append to `test/full_circle/punch_ingest_log_test.exs` (inside the module, after
     end
 
     test "an over-long client_id still produces a row, truncated", ctx do
-      long = String.duplicate("c", 400)
+      # 200, not 400: time_attendences.client_id is varchar(255) and
+      # changeset_gate/2 has no length check, so 400 raises Postgrex.Error
+      # inside the punch transaction itself — a different, pre-existing bug.
+      long = String.duplicate("c", 200)
       assert {:ok, _} = PunchGate.ingest_punch(ctx.device, ingest_attrs(ctx.emp, %{"client_id" => long}))
 
       log = one_log(ctx.company)
@@ -578,26 +653,60 @@ Append to `test/full_circle/punch_ingest_log_test.exs` (inside the module, after
   end
 ```
 
-Add `import Ecto.Query` and `import FullCircle.HRFixtures` to the top of the test module.
+Add `import Ecto.Query`, `import FullCircle.HRFixtures`, and `alias FullCircle.HR.TimeAttend` to the top of the test module.
 
 - [ ] **Step 2: Run and watch them fail**
 
 Run: `mix test test/full_circle/punch_ingest_log_test.exs`
 Expected: FAIL — every log assertion fails because no rows are written.
 
-- [ ] **Step 3: Tag the two replay paths**
+- [ ] **Step 3: Tag the replay paths and the post-lookup `:invalid`**
 
-In `lib/full_circle/punch_gate.ex`, `insert_punch/6`'s `case` (around line 256) — change only the conflict branch's helper. Then in `resolve_client_conflict/3` (line 271) change the success return:
+Two tags, both purely for the logger:
+
+- **replay** — so a POST that matched an existing row logs `replayed`, not `accepted`.
+- **the employee behind a post-lookup `:invalid`** — `insert_punch/6` runs only after the badge resolved *and* the employee is active, so every `:invalid` it produces knows who punched; a bad `punched_at` earlier in the `with` does not, and must stay nil. The tuple is the only way to tell those apart without re-looking-up a badge the server never looked up. This is a reachable path, not a theoretical one: `changeset_gate/2` requires `client_id`, so a POST that omits it resolves the employee and then fails the changeset.
+
+In `lib/full_circle/punch_gate.ex`, `insert_punch/6`'s `case` (lines 257-269):
 
 ```elixir
+    |> case do
+      {:ok, %{flags: ta}} ->
+        {:ok, Repo.preload(ta, :employee)}
+
+      {:error, :ta, %Ecto.Changeset{} = cs, _} ->
+        resolve_client_conflict(cs, device.id, client_id, emp.id)
+
+      {:error, _, reason, _} when is_atom(reason) ->
+        {:error, reason, emp.id}
+
+      {:error, _, _reason, _} ->
+        {:error, :invalid, emp.id}
+    end
+```
+
+Then `resolve_client_conflict/3` (line 272) becomes `/4` and **public with `@doc false`** — Step 1's race test calls it directly, because no test can reach that branch through `ingest_punch/2`:
+
+```elixir
+  @doc false
+  # Public only so the unique-index race can be tested without two connections
+  # and a controlled interleave.
+  def resolve_client_conflict(%Ecto.Changeset{} = cs, device_id, client_id, employee_id) do
+    unique? =
+      case Keyword.get(cs.errors, :client_id) do
+        {_msg, opts} -> opts[:constraint] == :unique
+        _ -> false
+      end
+
     if unique? do
       case existing_client(device_id, client_id) do
         %TimeAttend{} = ta -> {:replayed, Repo.preload(ta, :employee)}
-        nil -> {:error, :invalid}
+        nil -> {:error, :invalid, employee_id}
       end
     else
-      {:error, :invalid}
+      {:error, :invalid, employee_id}
     end
+  end
 ```
 
 - [ ] **Step 4: Rewrite `ingest_punch/2` to log, then strip the tag**
@@ -641,14 +750,17 @@ Replace `ingest_punch/2` (`lib/full_circle/punch_gate.ex:89-115`) with:
       photo: photo
     }, result)
 
-    strip_replay_tag(result)
+    strip_log_tag(result)
   end
 
-  defp strip_replay_tag({:replayed, ta}), do: {:ok, ta}
-  defp strip_replay_tag(other), do: other
+  # The logger wants more than the caller does. Strip the extra back off so the
+  # public contract stays {:ok, ta} | {:error, atom}.
+  defp strip_log_tag({:replayed, ta}), do: {:ok, ta}
+  defp strip_log_tag({:error, reason, _employee_id}), do: {:error, reason}
+  defp strip_log_tag(other), do: other
 ```
 
-Note `{:replayed, ta}` from the `existing_client` short-circuit is **not** preloaded, while the one from `resolve_client_conflict/3` is. `PunchAttendanceController.create/2` preloads `:employee` itself, so both are safe — that is pre-existing behavior, do not "fix" it here.
+Note `{:replayed, ta}` from the `existing_client` short-circuit is **not** preloaded, while the one from `resolve_client_conflict/4` is. `PunchAttendanceController.create/2` preloads `:employee` itself, so both are safe — that is pre-existing behavior, do not "fix" it here.
 
 - [ ] **Step 5: Write the logging helpers**
 
@@ -708,7 +820,20 @@ Add near the bottom of `lib/full_circle/punch_gate.ex`, and add `require Logger`
   defp outcome_and_reason({:ok, _}), do: {"accepted", nil}
   defp outcome_and_reason({:replayed, _}), do: {"replayed", nil}
   defp outcome_and_reason({:error, :duplicate}), do: {"duplicate", nil}
-  defp outcome_and_reason({:error, reason}), do: {"rejected", to_string(reason)}
+  defp outcome_and_reason({:error, :duplicate, _employee_id}), do: {"duplicate", nil}
+  defp outcome_and_reason({:error, reason}), do: {"rejected", reason_string(reason)}
+  defp outcome_and_reason({:error, reason, _employee_id}), do: {"rejected", reason_string(reason)}
+
+  # `reason` is check-constrained to this list. Anything else is stored as
+  # "invalid" rather than violating the constraint, raising, being swallowed by
+  # the rescue, and losing the row — the one failure this table cannot have.
+  # It is also what makes String.to_existing_atom/1 below safe.
+  @log_reasons ~w(not_found inactive too_large missing_photo future invalid revoked)
+
+  defp reason_string(reason) do
+    s = to_string(reason)
+    if s in @log_reasons, do: s, else: "invalid"
+  end
 
   defp log_status_atom("accepted", _), do: :accepted
   defp log_status_atom("replayed", _), do: :accepted
@@ -719,11 +844,16 @@ Add near the bottom of `lib/full_circle/punch_gate.ex`, and add `require Logger`
   defp log_time_attendence_id({:replayed, %TimeAttend{id: id}}), do: id
   defp log_time_attendence_id(_), do: nil
 
-  # Only the two outcomes that resolved an employee but produced no row pay for
-  # an extra lookup; the happy path reads it off the attendance row.
+  # The happy path reads the employee off the attendance row.
   defp log_employee_id({:ok, %TimeAttend{employee_id: id}}, _raw, _company_id), do: id
   defp log_employee_id({:replayed, %TimeAttend{employee_id: id}}, _raw, _company_id), do: id
 
+  # insert_punch/6 already resolved and activated the employee, so take the id
+  # off the tag instead of resolving the badge a second time.
+  defp log_employee_id({:error, _reason, employee_id}, _raw, _company_id), do: employee_id
+
+  # :duplicate and :inactive resolved an employee but produced no row and carry
+  # no tag, so they are the only two outcomes that pay for an extra lookup.
   defp log_employee_id({:error, reason}, raw, company_id) when reason in [:duplicate, :inactive] do
     case get_company_employee(raw, company_id) do
       %Employee{id: id} -> id
@@ -731,6 +861,9 @@ Add near the bottom of `lib/full_circle/punch_gate.ex`, and add `require Logger`
     end
   end
 
+  # Everything decided before the employee lookup — missing_photo, too_large,
+  # future, an unparseable punched_at, not_found — has no employee to name.
+  # employee_id_raw still holds whatever the phone sent.
   defp log_employee_id(_result, _raw, _company_id), do: nil
 
   defp parsed_or_nil(raw) do
@@ -750,7 +883,7 @@ Add near the bottom of `lib/full_circle/punch_gate.ex`, and add `require Logger`
 
 Add the alias at the top of the module: `alias FullCircle.PunchGate.{PunchDevice, PunchIngestLog}` (replacing the existing single-module alias).
 
-`log_status_atom/2` uses `String.to_existing_atom/1`, which is safe here: every reason string it can see was produced by `to_string/1` on an atom that already exists in this module.
+`log_status_atom/2` uses `String.to_existing_atom/1`, which is safe because `reason_string/1` already narrowed the string to `@log_reasons` — every one of those atoms is referenced in this module.
 
 - [ ] **Step 6: Run the tests**
 
@@ -765,7 +898,7 @@ test that asserts nothing.
 
 ```bash
 mix format lib/full_circle/punch_gate.ex test/full_circle/punch_ingest_log_test.exs
-git add -A
+git add lib/full_circle/punch_gate.ex test/full_circle/punch_ingest_log_test.exs
 git commit -m "feat(punch-gate): log every ingest outcome to punch_ingest_logs
 
 "
@@ -856,6 +989,16 @@ Append a new describe block to `test/full_circle/punch_ingest_log_test.exs`:
                PunchGate.ingest_punch(ctx.device, ingest_attrs(ctx.emp, %{"photo" => nil}))
 
       assert is_nil(one_log(ctx.company).photo_path)
+
+      big = Path.join(System.tmp_dir!(), "big-#{System.unique_integer([:positive])}.jpg")
+      File.write!(big, :binary.copy("x", 400_000))
+      too_big = %Plug.Upload{path: big, filename: "big.jpg", content_type: "image/jpeg"}
+
+      assert {:error, :too_large} =
+               PunchGate.ingest_punch(ctx.device, ingest_attrs(ctx.emp, %{"photo" => too_big}))
+
+      assert length(logs(ctx.company)) == 2
+      assert Enum.all?(logs(ctx.company), &is_nil(&1.photo_path))
     end
 
     test "a failing photo copy still leaves the row and the original result", ctx do
@@ -878,8 +1021,37 @@ Append a new describe block to `test/full_circle/punch_ingest_log_test.exs`:
       assert log.reason == "not_found"
       assert is_nil(log.photo_path)
     end
+
+    test "an invalid log changeset comes back as a tuple, not a raise", ctx do
+      # Why insert_ingest_log/1 must `case` on the result instead of leaning on
+      # the rescue: Repo.insert answers a failed changeset with {:error, cs}.
+      assert {:error, %Ecto.Changeset{}} =
+               %PunchIngestLog{}
+               |> PunchIngestLog.changeset(%{outcome: "accepted", http_status: 201})
+               |> Repo.insert()
+
+      assert logs(ctx.company) == []
+    end
+
+    test "a raised log insert still leaves the punch result untouched", ctx do
+      # Delete the device row but keep the struct in hand: punch_ingest_logs
+      # .punch_device_id then violates its FK, which Repo.insert *raises*
+      # (no constraint is declared on the changeset). A rejected outcome is used
+      # so the punch itself never touches time_attendences.
+      Repo.delete!(ctx.device)
+
+      assert {:error, :not_found} =
+               PunchGate.ingest_punch(
+                 ctx.device,
+                 ingest_attrs(ctx.emp, %{"employee_id" => Ecto.UUID.generate()})
+               )
+
+      assert logs(ctx.company) == []
+    end
   end
 ```
+
+Between them these three cover the spec's "a log failure never changes the punch": the tuple shape that must be matched, a real raise that must be rescued, and a JPEG copy that fails. The blocked-`uploads_dir` test alone only proves the last one.
 
 - [ ] **Step 2: Run and watch them fail**
 
@@ -912,10 +1084,16 @@ In `lib/full_circle/punch_gate.ex`, next to `photo_abs_path/2`:
 Replace `log_ingest/3` and `insert_ingest_log/1` from Task 2 with:
 
 ```elixir
+  # The rescue stays on this whole function, exactly as in Task 2 — it does not
+  # move down onto the insert. Building the attrs runs outcome_and_reason/1 (a
+  # pattern match on a result shape), log_status_atom/2 (String.to_existing_atom),
+  # log_employee_id/3 (a query) and truncate_field/1 (to_string on unvalidated
+  # client values). A raise in any of them must not turn a decided punch into a
+  # 500 that the phone will retry.
   defp log_ingest(%PunchDevice{} = device, info, result) do
     {outcome, reason} = outcome_and_reason(result)
     id = Ecto.UUID.generate()
-    now = DateTime.utc_now() |> DateTime.truncate(:second)
+    now = DateTime.utc_now()
 
     photo_path =
       if log_photo?(outcome, reason),
@@ -947,6 +1125,13 @@ Replace `log_ingest/3` and `insert_ingest_log/1` from Task 2 with:
         if photo_path, do: File.rm(Path.join(uploads_dir(), photo_path))
         :error
     end
+  rescue
+    e ->
+      # A raise after the JPEG was copied leaves that file behind. It is the
+      # same class of orphan as a deleted company's folder, and not worth a
+      # second cleanup path; losing the HTTP contract would be.
+      Logger.error("punch ingest log raised: #{Exception.message(e)}")
+      :error
   end
 
   defp uploads_dir, do: Application.get_env(:full_circle, :uploads_dir)
@@ -974,7 +1159,7 @@ Replace `log_ingest/3` and `insert_ingest_log/1` from Task 2 with:
   end
 ```
 
-And simplify `insert_ingest_log/1` to take the attrs it is given (it no longer builds them):
+And simplify `insert_ingest_log/1` to take the attrs it is given (it no longer builds them). Its own rescue goes away — the caller's covers it, and `log_revoked_attempt/2` gets one of its own in Task 4 — but the `case` stays, because `Repo.insert` returns `{:error, changeset}` **without** raising and a rescue alone would miss it:
 
 ```elixir
   defp insert_ingest_log(attrs) do
@@ -989,10 +1174,6 @@ And simplify `insert_ingest_log/1` to take the attrs it is given (it no longer b
         Logger.error("punch ingest log insert failed: #{inspect(reason)}")
         :error
     end
-  rescue
-    e ->
-      Logger.error("punch ingest log raised: #{Exception.message(e)}")
-      :error
   end
 ```
 
@@ -1005,7 +1186,7 @@ Expected: PASS.
 
 ```bash
 mix format lib/full_circle/punch_gate.ex test/full_circle/punch_ingest_log_test.exs
-git add -A
+git add lib/full_circle/punch_gate.ex test/full_circle/punch_ingest_log_test.exs
 git commit -m "feat(punch-gate): store the reject and duplicate face on the ingest log
 
 "
@@ -1092,6 +1273,16 @@ Append to `test/full_circle/punch_ingest_log_test.exs`:
       assert is_nil(log.employee_id)
       assert log.employee_id_raw == "junk"
       assert is_nil(log.punched_at)
+    end
+
+    test "a param shape that raises still answers :ok and writes nothing", ctx do
+      # Raw multipart: a repeated or nested field makes this a map, and
+      # to_string/1 raises on it. The plug must still send its plain 401.
+      {:ok, _} = PunchGate.revoke_device(ctx.device, ctx.company, ctx.admin)
+      {:revoked, device} = PunchGate.authenticate_device(ctx.token)
+
+      assert :ok = PunchGate.log_revoked_attempt(device, %{"employee_id" => %{"nested" => "1"}})
+      assert logs(ctx.company) == []
     end
   end
 ```
@@ -1205,7 +1396,7 @@ In `lib/full_circle/punch_gate.ex`, with the other logging helpers:
 
     insert_ingest_log(%{
       id: Ecto.UUID.generate(),
-      inserted_at: DateTime.utc_now() |> DateTime.truncate(:second),
+      inserted_at: DateTime.utc_now(),
       company_id: device.company_id,
       punch_device_id: device.id,
       employee_id: revoked_employee_id(raw, device.company_id),
@@ -1218,6 +1409,14 @@ In `lib/full_circle/punch_gate.ex`, with the other logging helpers:
     })
 
     :ok
+  rescue
+    e ->
+      # Same contract as log_ingest/3, for the same reason and one layer earlier:
+      # these are raw multipart params, so a repeated or nested field can make
+      # `params["employee_id"]` a list or a map and `to_string/1` raise. Without
+      # this the plug would 500 and the APK would retry a punch it should drop.
+      Logger.error("punch revoked log raised: #{Exception.message(e)}")
+      :ok
   end
 
   defp revoked_employee_id(raw, company_id) do
@@ -1277,7 +1476,9 @@ Expected: PASS, with the pre-existing 401 assertions untouched.
 mix format lib/full_circle/punch_gate.ex lib/full_circle_web/plugs/punch_device_auth.ex \
   test/full_circle/punch_ingest_log_test.exs \
   test/full_circle_web/controllers/punch_attendance_controller_test.exs
-git add -A
+git add lib/full_circle/punch_gate.ex lib/full_circle_web/plugs/punch_device_auth.ex \
+  test/full_circle/punch_ingest_log_test.exs \
+  test/full_circle_web/controllers/punch_attendance_controller_test.exs
 git commit -m "feat(punch-gate): log POSTs refused because the device is revoked
 
 "
@@ -1576,7 +1777,9 @@ Expected: PASS.
 mix format lib/full_circle/punch_gate.ex lib/full_circle/punch_gate/ingest_log_pruner.ex \
   lib/full_circle/application.ex config/config.exs config/test.exs \
   test/full_circle/punch_ingest_log_test.exs
-git add -A
+git add lib/full_circle/punch_gate.ex lib/full_circle/punch_gate/ingest_log_pruner.ex \
+  lib/full_circle/application.ex config/config.exs config/test.exs \
+  test/full_circle/punch_ingest_log_test.exs
 git commit -m "feat(punch-gate): prune ingest logs after 3 calendar months
 
 "
@@ -1741,7 +1944,7 @@ In `lib/full_circle/punch_gate.ex`:
         on: d.id == l.punch_device_id,
         where: l.company_id == ^company.id,
         where: l.inserted_at >= ^from_utc and l.inserted_at < ^to_utc,
-        order_by: [desc: l.inserted_at],
+        order_by: [desc: l.inserted_at, desc: l.id],
         offset: ^((page - 1) * per_page),
         limit: ^per_page,
         select: %{
@@ -1797,6 +2000,20 @@ In `lib/full_circle/punch_gate.ex`:
   end
 ```
 
+Two things about this query that look wrong at a glance and are not — do not "fix" either:
+
+- **`order_by: [desc: l.inserted_at, desc: l.id]`.** `inserted_at` is microsecond precision (Task 1), so it carries the real order; `id` only makes ties deterministic so offset paging cannot skip or repeat a row. A random UUID is *not* a substitute for the timestamp — the tiebreaker alone would not order same-instant rows correctly.
+- **The three `filter_log_*` clauses compose onto a query that already has `select`, `order_by`, `offset` and `limit`.** That is fine: `from([l, e, _d] in query, ...)` re-binds the existing joins and appends to the `WHERE` clause — it does not wrap the query in a subquery, and `LIMIT` is still applied last. Verified against this schema:
+
+  ```sql
+  SELECT ... FROM "punch_ingest_logs" AS p0
+    LEFT OUTER JOIN "employees" AS e1 ON ... LEFT OUTER JOIN "punch_devices" AS p2 ON ...
+    WHERE (p0."company_id" = $1) AND (...) AND ((e1."name" ILIKE $3) OR (p0."employee_id_raw" ILIKE $4))
+    ORDER BY p0."inserted_at" DESC, p0."id" DESC LIMIT 100 OFFSET 0
+  ```
+
+  (Only `select` itself cannot be composed twice.) The `or ilike(l.employee_id_raw, ...)` half is what makes an unresolved badge searchable: `e.name` is `NULL` on those rows, `NULL ILIKE` is `NULL`, and the `OR` still matches.
+
 - [ ] **Step 5: Run the tests**
 
 Run: `mix test test/full_circle/punch_ingest_log_test.exs`
@@ -1807,7 +2024,8 @@ Expected: PASS. There is no `authorization_test.exs`; the cashier/clerk cases ab
 ```bash
 mix format lib/full_circle/punch_gate.ex lib/full_circle/authorization.ex \
   test/full_circle/punch_ingest_log_test.exs
-git add -A
+git add lib/full_circle/punch_gate.ex lib/full_circle/authorization.ex \
+  test/full_circle/punch_ingest_log_test.exs
 git commit -m "feat(punch-gate): view_punch_ingest_log permission and list query
 
 "
@@ -1889,19 +2107,50 @@ defmodule FullCircleWeb.PunchIngestLogPhotoControllerTest do
     user
   end
 
-  test "200 JPEG for an admin", ctx do
+  # ctx.conn carries put_session(:current_company, company) for the SAME company
+  # as the URL — the production path, and the one where set_active_company/2
+  # assigns nothing. Do not drop that line to make a test pass.
+  test "200 JPEG for an admin whose session already holds this company", ctx do
     conn = get(ctx.conn, ~p"/companies/#{ctx.company.id}/punch_ingest_logs/#{ctx.log.id}/photo")
     assert conn.status == 200
     assert get_resp_header(conn, "content-type") |> hd() =~ "image/jpeg"
   end
 
-  test "200 for a clerk", %{company: company, admin: admin, log: log} do
+  test "200 for a clerk with no company in the session", %{company: company, admin: admin, log: log} do
     conn =
       build_conn()
       |> log_in_user(member(company, "clerk", admin))
       |> get(~p"/companies/#{company.id}/punch_ingest_logs/#{log.id}/photo")
 
     assert conn.status == 200
+  end
+
+  test "200 for a clerk whose session already holds this company", %{
+    company: company,
+    admin: admin,
+    log: log
+  } do
+    conn =
+      build_conn()
+      |> log_in_user(member(company, "clerk", admin))
+      |> put_session(:current_company, company)
+      |> get(~p"/companies/#{company.id}/punch_ingest_logs/#{log.id}/photo")
+
+    assert conn.status == 200
+  end
+
+  # A stale session is the only way past the plug: it skips its membership check
+  # whenever the session company matches the URL, so access revoked after login
+  # reaches the controller. That is the gap this 404 closes. (A non-member with
+  # no such session is redirected by the plug with a 302 and never gets here.)
+  test "404 for a stale session whose user is no longer a member", %{company: company, log: log} do
+    conn =
+      build_conn()
+      |> log_in_user(user_fixture())
+      |> put_session(:current_company, company)
+      |> get(~p"/companies/#{company.id}/punch_ingest_logs/#{log.id}/photo")
+
+    assert conn.status == 404
   end
 
   test "403 for a logged-in cashier, never an HTML redirect", %{
@@ -1970,14 +2219,16 @@ defmodule FullCircleWeb.PunchIngestLogPhotoController do
 
   alias FullCircle.Authorization
   alias FullCircle.PunchGate.PunchIngestLog
-  alias FullCircle.Repo
+  alias FullCircle.{Repo, Sys}
 
   def show(conn, %{"id" => id, "company_id" => company_id}) do
     user = conn.assigns.current_user
-    company = conn.assigns.current_company
 
+    # The URL segment is the authority, not conn.assigns.current_company:
+    # set_active_company/2 assigns nothing when the session company already
+    # matches the URL, which is the normal path to this image.
     cond do
-      is_nil(company) or to_string(company.id) != to_string(company_id) ->
+      is_nil(company = member_company(company_id, user)) ->
         send_resp(conn, 404, "not found")
 
       !Authorization.can?(user, :view_punch_ingest_log, company) ->
@@ -1985,6 +2236,13 @@ defmodule FullCircleWeb.PunchIngestLogPhotoController do
 
       true ->
         send_log_photo(conn, company_id, id)
+    end
+  end
+
+  defp member_company(company_id, user) do
+    case Sys.get_company_user(company_id, user.id) do
+      nil -> nil
+      cu -> Sys.get_company!(cu.company_id)
     end
   end
 
@@ -2012,7 +2270,9 @@ defmodule FullCircleWeb.PunchIngestLogPhotoController do
 end
 ```
 
-`conn.assigns.current_company` is set by the `set_active_company` plug in the `:browser` pipeline (`lib/full_circle_web/active_company.ex:31`), which resolves it from the `:company_id` URL segment and redirects a non-member away before this controller runs.
+**Do not reach for `conn.assigns.current_company` here.** `ActiveCompany.set_active_company/2` (`lib/full_circle_web/active_company.ex:25-53`) compares the session company to the `:company_id` in the URL and, when they are equal, returns `conn` **untouched** — it only assigns on the mismatch branch. On the normal path (dashboard → ingest log → `<img src=...>`) they are equal, so the assign is not merely `nil`, it is **absent**, and `conn.assigns.current_company` raises `KeyError`. Every thumbnail on the page would fail for the one user who already has the company selected, while a test that omits `put_session(:current_company, company)` passes.
+
+`PunchPhotoController.show/2` already keys on the URL `company_id` plus the row for exactly this reason. Resolve membership the same way `set_active_company` itself does — `Sys.get_company_user(company_id, user.id)` — which also gives the right 404-vs-403 split: no membership row is a 404 (never confirm that a log id exists to someone outside the company), a member without the role is a 403.
 
 - [ ] **Step 4: Add the route**
 
@@ -2033,7 +2293,9 @@ Expected: PASS.
 mix format lib/full_circle_web/controllers/punch_ingest_log_photo_controller.ex \
   lib/full_circle_web/router.ex \
   test/full_circle_web/controllers/punch_ingest_log_photo_controller_test.exs
-git add -A
+git add lib/full_circle_web/controllers/punch_ingest_log_photo_controller.ex \
+  lib/full_circle_web/router.ex \
+  test/full_circle_web/controllers/punch_ingest_log_photo_controller_test.exs
 git commit -m "feat(punch-gate): serve ingest log photos behind view_punch_ingest_log
 
 "
@@ -2059,7 +2321,10 @@ Create `test/full_circle_web/live/punch_ingest_log_live_test.exs`:
 
 ```elixir
 defmodule FullCircleWeb.PunchIngestLogLiveTest do
-  use FullCircleWeb.ConnCase
+  # async: false — this file drives real ingests, which write log JPEGs into the
+  # shared `uploads_dir` (System.tmp_dir!() in test). ConnCase already defaults
+  # to sync; stated explicitly so nobody makes it async later.
+  use FullCircleWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest
   import FullCircle.UserAccountsFixtures
@@ -2280,7 +2545,10 @@ defmodule FullCircleWeb.PunchIngestLogLive.Index do
         </.form>
       </div>
 
-      <div class="font-medium flex flex-row text-center tracking-tighter bg-amber-200 dark:bg-amber-800">
+      <%!-- bg-amber-200 alone, exactly like Punch IO. app.css already remaps it
+            (`.dark .bg-amber-200 { --color-amber-900 }`), and that unlayered rule
+            beats a `dark:` utility, so adding one here would be dead CSS. --%>
+      <div class="font-medium flex flex-row text-center tracking-tighter bg-amber-200">
         <div class="w-[17%] border-b border-t border-amber-400 py-1">{gettext("Received At")}</div>
         <div class="w-[17%] border-b border-t border-amber-400 py-1">{gettext("Punch Time")}</div>
         <div class="w-[14%] border-b border-t border-amber-400 py-1">{gettext("Device")}</div>
@@ -2533,7 +2801,7 @@ Some of these msgids (`Device`, `Status`, `All`, `Employee`, `Punch photo`) may 
 mix phx.server
 ```
 
-Open `/companies/<id>/punch_ingest_logs`. Confirm: today's rows load, the outcome dropdown filters, **Show photos** reveals reject faces with no re-query, and the page reads correctly in both light and dark theme (toggle the `.dark` class on `<html>` in devtools).
+Open `/companies/<id>/punch_ingest_logs`. Confirm: today's rows load, the outcome dropdown filters, **Show photos** reveals reject faces with no re-query, and the page reads correctly in both light and dark theme (toggle the `.dark` class on `<html>` in devtools). Dark styling comes from the `.dark .bg-*` remaps already in `assets/css/app.css`; reuse the same colour classes Punch IO uses rather than adding `dark:` variants.
 
 - [ ] **Step 9: Format and commit**
 
@@ -2542,7 +2810,11 @@ mix format lib/full_circle_web/live/punch_ingest_log_live/index.ex \
   lib/full_circle_web/router.ex \
   lib/full_circle_web/live/dashboard_live/dashboard_live.ex \
   test/full_circle_web/live/punch_ingest_log_live_test.exs
-git add -A
+git add lib/full_circle_web/live/punch_ingest_log_live/index.ex \
+  lib/full_circle_web/router.ex \
+  lib/full_circle_web/live/dashboard_live/dashboard_live.ex \
+  test/full_circle_web/live/punch_ingest_log_live_test.exs \
+  priv/gettext/en/LC_MESSAGES/default.po priv/gettext/zh/LC_MESSAGES/default.po
 git commit -m "feat(punch-gate): read-only Punch Ingest Log page
 
 "
@@ -2557,7 +2829,7 @@ git commit -m "feat(punch-gate): read-only Punch Ingest Log page
 
 - [ ] **Step 1: Add the section to the skill**
 
-Insert into `.claude/skills/qr-gate-punch.md`, after the pairing paragraph and before `## Building & installing the APK`:
+Insert into `.claude/skills/qr-gate-punch.md` **immediately above `## Building & installing the APK`** (line 60 today):
 
 ```markdown
 ## Where a missing punch went
@@ -2570,7 +2842,8 @@ best-effort *after* the punch is decided so it can never cost a punch.
   (admin/manager/supervisor/**clerk** — clerks still cannot pair or edit punches).
 - **Outcomes:** `accepted`, `replayed` (same device + `client_id` — two code paths,
   the `existing_client` short-circuit *and* the unique-index race in
-  `resolve_client_conflict/3`), `duplicate` (±3 min), `rejected` + a reason.
+  `resolve_client_conflict/4`, which is public only so that race can be tested),
+  `duplicate` (±3 min), `rejected` + a reason.
 - **Reasons:** `not_found`, `inactive`, `too_large`, `missing_photo`, `future`,
   `invalid`, `revoked`.
 - **`revoked` is the one 401 that gets logged.** A revoked token still resolves to a
@@ -2594,7 +2867,15 @@ Statuses come from `PunchGate.http_status_for/1`, which the controller also uses
 not hardcode a status in either place.
 ```
 
-- [ ] **Step 2: Run the whole suite**
+- [ ] **Step 2: Extend the skill's trigger**
+
+The current `description:` never mentions a missing punch or the ingest log, so the skill will not fire for the question it now answers. Append to it (one line, keep the existing text):
+
+```yaml
+description: Use when working on QR gate attendance — paired Android scanners, building or installing the android/qr_gate APK, POST /api/punch/attendances, punch_devices, fcqa: badge QR, audit face photos on time_attendences, Punch IO photo link, IN/OUT flag rebuild for a calendar day, or a punch that is missing from Punch IO — punch_ingest_logs, ingest outcomes and reasons, revoked-device 401s.
+```
+
+- [ ] **Step 3: Run the whole suite**
 
 ```bash
 mix test
@@ -2603,10 +2884,10 @@ Expected: PASS, with no failures anywhere — in particular `punch_gate_test.exs
 
 If anything fails, fix it before committing — do not commit a red suite.
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
-git add -A
+git add .claude/skills/qr-gate-punch.md
 git commit -m "docs(skills): record where a missing gate punch shows up
 
 "
@@ -2619,3 +2900,18 @@ git commit -m "docs(skills): record where a missing gate punch shows up
 - **Spec coverage:** table + constraints + indexes (T1), `punched_at` as `:timestamptz` (T1), outcome map incl. both replay paths and the flat JPEG rule (T2, T3), truncation (T2), `http_status_for/1` including `:revoked` (T1), controller wired to that function (T1), best-effort `{:error, changeset}` + rescue (T2/T3), id-before-row photo write (T3), revoked 401 with `client_id`/`punched_at` + POST-only guard (T4), 3-month calendar pruner + `config.exs` knobs (T5), `:view_punch_ingest_log` + `list_ingest_logs` itself returns `:not_authorise` + local day range (T6), 403-not-redirect photo route (T7), list page with filters/infinite scroll/photo toggle + dashboard link + en/zh (T8), skill paragraph (T9).
 - **Known gap carried from the spec, deliberately not closed:** `PunchPhotoController` has no role check, so a cashier can still fetch an accepted face at `/TimeAttend/:id/photo` by URL. Gating that shipped route is a separate decision and is out of scope here.
 - **Not built:** `docs` for a UI prune button, any edit/delete path, and any change to `PhotoPruner` or the 24-month TimeAttend window — all explicit non-goals.
+
+### Traps this plan is deliberately shaped around
+
+Each of these is a place where the obvious implementation is wrong, with the test that catches it:
+
+| Trap | Where | Caught by |
+|---|---|---|
+| `conn.assigns.current_company` is **absent**, not nil, when the session company already matches the URL — `set_active_company/2` only assigns on the mismatch branch | T7 | "200 … whose session already holds this company" (drop the `put_session` and the test passes while the page is dead) |
+| Moving the `rescue` down onto the insert: a raise while *building* the attrs then turns a decided punch into a 500 the phone retries | T3 | "a raised log insert still leaves the punch result untouched" |
+| `to_string(reason)` for an atom outside the check constraint raises, is swallowed, and loses the row | T2 `reason_string/1` | the schema's `punch_ingest_logs_reason_check` test (T1) |
+| Second-precision `inserted_at` leaves same-second rows unordered — wrong "newest first", skipped/repeated pages, flaky assertions | T1 `:utc_datetime_usec` + T6 `desc: id` | "accepted then replayed" order, "admin sees today's rows newest first" |
+| Re-resolving the badge for every `:invalid`, which names an employee the server never looked up | T2 `{:error, reason, employee_id}` | the paired "unparseable punch time …" / "an insert failure …" tests |
+| Treating "same `client_id` twice" as covering the unique-index race — the short-circuit always wins once the row is visible | T2 `resolve_client_conflict/4` made public | "the unique-index race replays too, not rejects" |
+| A 400-char `client_id` raising inside the *punch* transaction (varchar(255), no length check) and masking what the truncation test meant to prove | T2 | the same test, at 200 chars |
+| No rescue around `log_revoked_attempt/2`: raw multipart params can make `params["employee_id"]` a map, and a 401 becomes a 500 | T4 | "a param shape that raises still answers :ok and writes nothing" |
