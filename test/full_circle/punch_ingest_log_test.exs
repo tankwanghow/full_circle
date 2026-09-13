@@ -584,4 +584,97 @@ defmodule FullCircle.PunchIngestLogTest do
       assert logs(ctx.company) == []
     end
   end
+
+  describe "prune_ingest_logs_before/2" do
+    setup ctx do
+      %{emp: employee_fixture(%{}, ctx.company, ctx.admin)}
+    end
+
+    defp log_with_photo(ctx, inserted_at, write_file? \\ true) do
+      id = Ecto.UUID.generate()
+      abs = PunchGate.ingest_log_photo_abs_path(ctx.company.id, id, inserted_at)
+      rel = Path.relative_to(abs, Application.get_env(:full_circle, :uploads_dir))
+
+      if write_file? do
+        File.mkdir_p!(Path.dirname(abs))
+        File.write!(abs, "jpegbytes")
+      end
+
+      {:ok, log} =
+        %PunchIngestLog{}
+        |> PunchIngestLog.changeset(%{
+          id: id,
+          inserted_at: inserted_at,
+          company_id: ctx.company.id,
+          punch_device_id: ctx.device.id,
+          employee_id: ctx.emp.id,
+          employee_id_raw: ctx.emp.id,
+          outcome: "duplicate",
+          http_status: 409,
+          photo_path: rel
+        })
+        |> Repo.insert()
+
+      {log, abs}
+    end
+
+    test "deletes the row and its file past the cutoff", ctx do
+      old = DateTime.utc_now() |> DateTime.add(-120, :day) |> DateTime.truncate(:second)
+      {log, abs} = log_with_photo(ctx, old)
+      assert File.exists?(abs)
+
+      assert {:ok, 1} = PunchGate.prune_ingest_logs_before(DateTime.utc_now())
+
+      refute File.exists?(abs)
+      refute Repo.get(PunchIngestLog, log.id)
+    end
+
+    test "keeps rows newer than the cutoff", ctx do
+      recent = DateTime.utc_now() |> DateTime.add(-10, :day) |> DateTime.truncate(:second)
+      {log, abs} = log_with_photo(ctx, recent)
+
+      cutoff = DateTime.utc_now() |> DateTime.add(-100, :day)
+      assert {:ok, 0} = PunchGate.prune_ingest_logs_before(cutoff)
+
+      assert File.exists?(abs)
+      assert Repo.get(PunchIngestLog, log.id)
+    end
+
+    test "a missing file counts as success", ctx do
+      old = DateTime.utc_now() |> DateTime.add(-120, :day) |> DateTime.truncate(:second)
+      {log, _abs} = log_with_photo(ctx, old, false)
+
+      assert {:ok, 1} = PunchGate.prune_ingest_logs_before(DateTime.utc_now())
+      refute Repo.get(PunchIngestLog, log.id)
+    end
+
+    test "dry_run counts without deleting and does not loop", ctx do
+      old = DateTime.utc_now() |> DateTime.add(-120, :day) |> DateTime.truncate(:second)
+      for _ <- 1..3, do: log_with_photo(ctx, old)
+
+      assert {:ok, 3} =
+               PunchGate.prune_ingest_logs_before(DateTime.utc_now(), dry_run: true, batch: 2)
+
+      assert Repo.aggregate(PunchIngestLog, :count) == 3
+    end
+
+    test "pages through more rows than one batch", ctx do
+      old = DateTime.utc_now() |> DateTime.add(-120, :day) |> DateTime.truncate(:second)
+      for _ <- 1..5, do: log_with_photo(ctx, old)
+
+      assert {:ok, 5} = PunchGate.prune_ingest_logs_before(DateTime.utc_now(), batch: 2)
+      assert Repo.aggregate(PunchIngestLog, :count) == 0
+    end
+
+    test "TimeAttend photos are untouched", ctx do
+      assert {:ok, ta} = PunchGate.ingest_punch(ctx.device, ingest_attrs(ctx.emp))
+      old = DateTime.utc_now() |> DateTime.add(-120, :day) |> DateTime.truncate(:second)
+      log_with_photo(ctx, old)
+
+      assert {:ok, 1} =
+               PunchGate.prune_ingest_logs_before(DateTime.utc_now() |> DateTime.add(-1, :day))
+
+      assert File.exists?(PunchGate.photo_abs_path(ctx.company.id, ta))
+    end
+  end
 end

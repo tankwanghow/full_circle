@@ -259,6 +259,62 @@ defmodule FullCircle.PunchGate do
     max(total - seen, 0)
   end
 
+  @doc """
+  Deletes `punch_ingest_logs` received before `cutoff`, file then row.
+
+  The file is removed first: if that is interrupted the row points at a missing
+  file, which the photo controller already answers with a 404, and the next run
+  finishes the job. The reverse order would orphan the file forever.
+
+  Options: `:dry_run` (report what would go, change nothing) and `:batch`.
+  """
+  def prune_ingest_logs_before(%DateTime{} = cutoff, opts \\ []) do
+    dry_run? = Keyword.get(opts, :dry_run, false)
+    batch = Keyword.get(opts, :batch, @prune_batch)
+    uploads = Application.get_env(:full_circle, :uploads_dir)
+
+    {:ok, prune_log_batches(cutoff, batch, dry_run?, uploads, 0)}
+  end
+
+  defp prune_log_batches(cutoff, batch, dry_run?, uploads, done) do
+    rows =
+      from(l in PunchIngestLog,
+        where: l.inserted_at < ^cutoff,
+        order_by: [asc: l.inserted_at],
+        limit: ^batch,
+        select: %{id: l.id, photo_path: l.photo_path}
+      )
+      |> Repo.all()
+
+    cond do
+      rows == [] ->
+        done
+
+      dry_run? ->
+        # Nothing is written, so paging would loop forever on the same rows.
+        done + length(rows) + count_remaining_logs(cutoff, length(rows))
+
+      true ->
+        Enum.each(rows, fn row ->
+          if row.photo_path, do: uploads |> Path.join(row.photo_path) |> File.rm()
+          from(l in PunchIngestLog, where: l.id == ^row.id) |> Repo.delete_all()
+        end)
+
+        prune_log_batches(cutoff, batch, dry_run?, uploads, done + length(rows))
+    end
+  end
+
+  defp count_remaining_logs(cutoff, seen) do
+    total =
+      from(l in PunchIngestLog,
+        where: l.inserted_at < ^cutoff,
+        select: count(l.id)
+      )
+      |> Repo.one()
+
+    max(total - seen, 0)
+  end
+
   defp insert_punch(device, emp, company, punched_at, client_id, photo) do
     Ecto.Multi.new()
     |> Ecto.Multi.insert(
