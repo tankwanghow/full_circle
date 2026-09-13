@@ -1,7 +1,8 @@
 defmodule FullCircle.PunchGate do
   import Ecto.Query, warn: false
+  require Logger
   alias FullCircle.Repo
-  alias FullCircle.PunchGate.PunchDevice
+  alias FullCircle.PunchGate.{PunchDevice, PunchIngestLog}
   alias FullCircle.Authorization
   alias FullCircle.HR.{TimeAttend, Employee}
 
@@ -105,29 +106,49 @@ defmodule FullCircle.PunchGate do
     company = device.company
     employee_id = to_string(attrs["employee_id"] || attrs[:employee_id] || "")
     client_id = attrs["client_id"] || attrs[:client_id]
-    punched_at = attrs["punched_at"] || attrs[:punched_at]
+    raw_punched_at = attrs["punched_at"] || attrs[:punched_at]
     photo = attrs["photo"] || attrs[:photo]
 
-    with :ok <- validate_photo(photo),
-         {:ok, punched_at} <- parse_punched_at(punched_at),
-         :ok <- validate_not_future(punched_at),
-         %Employee{} = emp <- get_company_employee(employee_id, company.id),
-         :ok <- validate_active(emp) do
-      case existing_client(device.id, client_id) do
-        %TimeAttend{} = ta ->
-          {:ok, ta}
+    result =
+      with :ok <- validate_photo(photo),
+           {:ok, punched_at} <- parse_punched_at(raw_punched_at),
+           :ok <- validate_not_future(punched_at),
+           %Employee{} = emp <- get_company_employee(employee_id, company.id),
+           :ok <- validate_active(emp) do
+        case existing_client(device.id, client_id) do
+          %TimeAttend{} = ta ->
+            {:replayed, ta}
 
-        nil ->
-          with :ok <- reject_duplicate(emp.id, company.id, punched_at) do
-            insert_punch(device, emp, company, punched_at, client_id, photo)
-          else
-            {:error, reason} -> {:error, reason}
-          end
+          nil ->
+            with :ok <- reject_duplicate(emp.id, company.id, punched_at) do
+              insert_punch(device, emp, company, punched_at, client_id, photo)
+            else
+              {:error, reason} -> {:error, reason}
+            end
+        end
+      else
+        {:error, reason} -> {:error, reason}
       end
-    else
-      {:error, reason} -> {:error, reason}
-    end
+
+    log_ingest(
+      device,
+      %{
+        employee_id_raw: employee_id,
+        client_id: client_id,
+        punched_at: raw_punched_at,
+        photo: photo
+      },
+      result
+    )
+
+    strip_log_tag(result)
   end
+
+  # The logger wants more than the caller does. Strip the extra back off so the
+  # public contract stays {:ok, ta} | {:error, atom}.
+  defp strip_log_tag({:replayed, ta}), do: {:ok, ta}
+  defp strip_log_tag({:error, reason, _employee_id}), do: {:error, reason}
+  defp strip_log_tag(other), do: other
 
   def photo_abs_path(company_id, %TimeAttend{id: id, punch_time: pt}) do
     date = DateTime.to_date(pt)
@@ -241,17 +262,20 @@ defmodule FullCircle.PunchGate do
         {:ok, Repo.preload(ta, :employee)}
 
       {:error, :ta, %Ecto.Changeset{} = cs, _} ->
-        resolve_client_conflict(cs, device.id, client_id)
+        resolve_client_conflict(cs, device.id, client_id, emp.id)
 
       {:error, _, reason, _} when is_atom(reason) ->
-        {:error, reason}
+        {:error, reason, emp.id}
 
       {:error, _, _reason, _} ->
-        {:error, :invalid}
+        {:error, :invalid, emp.id}
     end
   end
 
-  defp resolve_client_conflict(%Ecto.Changeset{} = cs, device_id, client_id) do
+  @doc false
+  # Public only so the unique-index race can be tested without two connections
+  # and a controlled interleave.
+  def resolve_client_conflict(%Ecto.Changeset{} = cs, device_id, client_id, employee_id) do
     unique? =
       case Keyword.get(cs.errors, :client_id) do
         {_msg, opts} -> opts[:constraint] == :unique
@@ -260,11 +284,11 @@ defmodule FullCircle.PunchGate do
 
     if unique? do
       case existing_client(device_id, client_id) do
-        %TimeAttend{} = ta -> {:ok, Repo.preload(ta, :employee)}
-        nil -> {:error, :invalid}
+        %TimeAttend{} = ta -> {:replayed, Repo.preload(ta, :employee)}
+        nil -> {:error, :invalid, employee_id}
       end
     else
-      {:error, :invalid}
+      {:error, :invalid, employee_id}
     end
   end
 
@@ -333,4 +357,118 @@ defmodule FullCircle.PunchGate do
   defp existing_client(device_id, client_id) do
     Repo.get_by(TimeAttend, punch_device_id: device_id, client_id: client_id)
   end
+
+  # ── Ingest logging ─────────────────────────────────────────────────
+  # Best effort, always after the punch is decided. Nothing in here may
+  # change what ingest_punch/2 returns or what the controller sends.
+
+  @raw_field_limit 64
+
+  # The rescue sits on this function, not on the insert alone: building the
+  # attrs touches unvalidated client values (to_string/1 on whatever the phone
+  # sent), so a raise there must be swallowed too.
+  defp log_ingest(%PunchDevice{} = device, info, result) do
+    {outcome, reason} = outcome_and_reason(result)
+
+    attrs = %{
+      company_id: device.company_id,
+      punch_device_id: device.id,
+      employee_id: log_employee_id(result, info.employee_id_raw, device.company_id),
+      employee_id_raw: truncate_field(info.employee_id_raw),
+      time_attendence_id: log_time_attendence_id(result),
+      client_id: truncate_field(info.client_id),
+      punched_at: parsed_or_nil(info.punched_at),
+      outcome: outcome,
+      reason: reason,
+      http_status: http_status_for(log_status_atom(outcome, reason))
+    }
+
+    insert_ingest_log(attrs)
+  rescue
+    e ->
+      Logger.error("punch ingest log raised: #{Exception.message(e)}")
+      :error
+  end
+
+  # Repo.insert returns {:error, changeset} without raising, so the tuple needs
+  # handling here; the raising cases (a check-constraint violation with no
+  # check_constraint/3 on the changeset raises Postgrex.Error / ConstraintError)
+  # are caught by the rescue on log_ingest/3 above.
+  defp insert_ingest_log(attrs) do
+    %PunchIngestLog{}
+    |> PunchIngestLog.changeset(attrs)
+    |> Repo.insert()
+    |> case do
+      {:ok, log} ->
+        {:ok, log}
+
+      {:error, reason} ->
+        Logger.error("punch ingest log insert failed: #{inspect(reason)}")
+        :error
+    end
+  end
+
+  defp outcome_and_reason({:ok, _}), do: {"accepted", nil}
+  defp outcome_and_reason({:replayed, _}), do: {"replayed", nil}
+  defp outcome_and_reason({:error, :duplicate}), do: {"duplicate", nil}
+  defp outcome_and_reason({:error, :duplicate, _employee_id}), do: {"duplicate", nil}
+  defp outcome_and_reason({:error, reason}), do: {"rejected", reason_string(reason)}
+  defp outcome_and_reason({:error, reason, _employee_id}), do: {"rejected", reason_string(reason)}
+
+  # `reason` is check-constrained to this list. Anything else is stored as
+  # "invalid" rather than violating the constraint, raising, being swallowed by
+  # the rescue, and losing the row — the one failure this table cannot have.
+  # It is also what makes String.to_existing_atom/1 below safe.
+  @log_reasons ~w(not_found inactive too_large missing_photo future invalid revoked)
+
+  defp reason_string(reason) do
+    s = to_string(reason)
+    if s in @log_reasons, do: s, else: "invalid"
+  end
+
+  defp log_status_atom("accepted", _), do: :accepted
+  defp log_status_atom("replayed", _), do: :accepted
+  defp log_status_atom("duplicate", _), do: :duplicate
+  defp log_status_atom("rejected", reason), do: String.to_existing_atom(reason)
+
+  defp log_time_attendence_id({:ok, %TimeAttend{id: id}}), do: id
+  defp log_time_attendence_id({:replayed, %TimeAttend{id: id}}), do: id
+  defp log_time_attendence_id(_), do: nil
+
+  # The happy path reads the employee off the attendance row.
+  defp log_employee_id({:ok, %TimeAttend{employee_id: id}}, _raw, _company_id), do: id
+  defp log_employee_id({:replayed, %TimeAttend{employee_id: id}}, _raw, _company_id), do: id
+
+  # insert_punch/6 already resolved and activated the employee, so take the id
+  # off the tag instead of resolving the badge a second time.
+  defp log_employee_id({:error, _reason, employee_id}, _raw, _company_id), do: employee_id
+
+  # :duplicate and :inactive resolved an employee but produced no row and carry
+  # no tag, so they are the only two outcomes that pay for an extra lookup.
+  defp log_employee_id({:error, reason}, raw, company_id)
+       when reason in [:duplicate, :inactive] do
+    case get_company_employee(raw, company_id) do
+      %Employee{id: id} -> id
+      _ -> nil
+    end
+  end
+
+  # Everything decided before the employee lookup — missing_photo, too_large,
+  # future, an unparseable punched_at, not_found — has no employee to name.
+  # employee_id_raw still holds whatever the phone sent.
+  defp log_employee_id(_result, _raw, _company_id), do: nil
+
+  defp parsed_or_nil(raw) do
+    case parse_punched_at(raw) do
+      {:ok, dt} -> dt
+      _ -> nil
+    end
+  end
+
+  # employee_id and client_id are unvalidated client strings. varchar(255)
+  # would raise on a long one, the rescue above would swallow it, and the log
+  # row would be lost for exactly the malformed POST worth seeing.
+  defp truncate_field(nil), do: nil
+  defp truncate_field(s) when is_binary(s), do: String.slice(s, 0, @raw_field_limit)
+  defp truncate_field(other), do: other |> to_string() |> String.slice(0, @raw_field_limit)
 end
