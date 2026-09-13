@@ -164,6 +164,21 @@ defmodule FullCircle.PunchGate do
   end
 
   @doc """
+  Where a log JPEG lives. The folder is `inserted_at`'s UTC year/month — a
+  folder, not a business date, so no timezone conversion is wanted here.
+  """
+  def ingest_log_photo_abs_path(company_id, log_id, %DateTime{} = at) do
+    Path.join([
+      Application.get_env(:full_circle, :uploads_dir),
+      "#{company_id}",
+      "punch_ingest_logs",
+      "#{at.year}",
+      at.month |> Integer.to_string() |> String.pad_leading(2, "0"),
+      "#{log_id}.jpg"
+    ])
+  end
+
+  @doc """
   Deletes punch photos captured before `cutoff`, keeping the attendance rows.
 
   The file is removed **before** `photo_path` is cleared. If that is interrupted
@@ -364,13 +379,25 @@ defmodule FullCircle.PunchGate do
 
   @raw_field_limit 64
 
-  # The rescue sits on this function, not on the insert alone: building the
-  # attrs touches unvalidated client values (to_string/1 on whatever the phone
-  # sent), so a raise there must be swallowed too.
+  # The rescue stays on this whole function, exactly as in Task 2 — it does not
+  # move down onto the insert. Building the attrs runs outcome_and_reason/1 (a
+  # pattern match on a result shape), log_status_atom/2 (String.to_existing_atom),
+  # log_employee_id/3 (a query) and truncate_field/1 (to_string on unvalidated
+  # client values). A raise in any of them must not turn a decided punch into a
+  # 500 that the phone will retry.
   defp log_ingest(%PunchDevice{} = device, info, result) do
     {outcome, reason} = outcome_and_reason(result)
+    id = Ecto.UUID.generate()
+    now = DateTime.utc_now()
+
+    photo_path =
+      if log_photo?(outcome, reason),
+        do: copy_log_photo(device.company_id, id, now, info.photo),
+        else: nil
 
     attrs = %{
+      id: id,
+      inserted_at: now,
       company_id: device.company_id,
       punch_device_id: device.id,
       employee_id: log_employee_id(result, info.employee_id_raw, device.company_id),
@@ -380,14 +407,53 @@ defmodule FullCircle.PunchGate do
       punched_at: parsed_or_nil(info.punched_at),
       outcome: outcome,
       reason: reason,
-      http_status: http_status_for(log_status_atom(outcome, reason))
+      http_status: http_status_for(log_status_atom(outcome, reason)),
+      photo_path: photo_path
     }
 
-    insert_ingest_log(attrs)
+    case insert_ingest_log(attrs) do
+      {:ok, log} ->
+        {:ok, log}
+
+      :error ->
+        # The row is what makes the file findable; without one it is garbage.
+        if photo_path, do: File.rm(Path.join(uploads_dir(), photo_path))
+        :error
+    end
   rescue
     e ->
+      # A raise after the JPEG was copied leaves that file behind. It is the
+      # same class of orphan as a deleted company's folder, and not worth a
+      # second cleanup path; losing the HTTP contract would be.
       Logger.error("punch ingest log raised: #{Exception.message(e)}")
       :error
+  end
+
+  defp uploads_dir, do: Application.get_env(:full_circle, :uploads_dir)
+
+  # validate_photo/1 is the first clause of the ingest `with`, so anything that
+  # gets past it has a usable JPEG. Accepted and replayed faces already live on
+  # time_attendences for 24 months and are never copied here; revoked is logged
+  # from the auth plug, before any photo handling.
+  defp log_photo?(outcome, _reason) when outcome in ["accepted", "replayed"], do: false
+
+  defp log_photo?(_outcome, reason) when reason in ["missing_photo", "too_large", "revoked"],
+    do: false
+
+  defp log_photo?(_outcome, _reason), do: true
+
+  defp copy_log_photo(_company_id, _id, _now, nil), do: nil
+
+  defp copy_log_photo(company_id, id, now, photo) do
+    abs = ingest_log_photo_abs_path(company_id, id, now)
+    File.mkdir_p!(Path.dirname(abs))
+    File.cp!(photo_src(photo), abs)
+    Path.relative_to(abs, uploads_dir())
+  rescue
+    e ->
+      # A missing picture is worth far less than a missing row. Keep the row.
+      Logger.error("punch ingest log photo copy failed: #{Exception.message(e)}")
+      nil
   end
 
   # Repo.insert returns {:error, changeset} without raising, so the tuple needs

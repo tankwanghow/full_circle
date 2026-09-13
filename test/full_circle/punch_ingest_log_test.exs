@@ -368,4 +368,148 @@ defmodule FullCircle.PunchIngestLogTest do
       assert String.length(log.client_id) == 64
     end
   end
+
+  describe "log JPEG" do
+    setup ctx do
+      %{emp: employee_fixture(%{}, ctx.company, ctx.admin)}
+    end
+
+    defp log_abs(log),
+      do: Path.join(Application.get_env(:full_circle, :uploads_dir), log.photo_path)
+
+    test "duplicate stores a file", ctx do
+      t0 = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      assert {:ok, _} =
+               PunchGate.ingest_punch(ctx.device, ingest_attrs(ctx.emp, %{"punched_at" => t0}))
+
+      assert {:error, :duplicate} =
+               PunchGate.ingest_punch(
+                 ctx.device,
+                 ingest_attrs(ctx.emp, %{"punched_at" => DateTime.add(t0, 30, :second)})
+               )
+
+      dup = Enum.find(logs(ctx.company), &(&1.outcome == "duplicate"))
+      assert is_binary(dup.photo_path)
+      refute String.starts_with?(dup.photo_path, "/")
+      assert dup.photo_path =~ "punch_ingest_logs"
+      assert dup.photo_path =~ "#{dup.id}.jpg"
+      assert File.exists?(log_abs(dup))
+
+      assert File.exists?(
+               PunchGate.ingest_log_photo_abs_path(ctx.company.id, dup.id, dup.inserted_at)
+             )
+    end
+
+    test "not_found stores a file", ctx do
+      assert {:error, :not_found} =
+               PunchGate.ingest_punch(
+                 ctx.device,
+                 ingest_attrs(ctx.emp, %{"employee_id" => Ecto.UUID.generate()})
+               )
+
+      log = one_log(ctx.company)
+      assert File.exists?(log_abs(log))
+    end
+
+    test "inactive stores a file", ctx do
+      emp = employee_fixture(%{status: "Resigned"}, ctx.company, ctx.admin)
+      assert {:error, :inactive} = PunchGate.ingest_punch(ctx.device, ingest_attrs(emp))
+      assert File.exists?(log_abs(one_log(ctx.company)))
+    end
+
+    test "future stores a file", ctx do
+      future = DateTime.utc_now() |> DateTime.add(600, :second) |> DateTime.truncate(:second)
+
+      assert {:error, :future} =
+               PunchGate.ingest_punch(
+                 ctx.device,
+                 ingest_attrs(ctx.emp, %{"punched_at" => future})
+               )
+
+      assert File.exists?(log_abs(one_log(ctx.company)))
+    end
+
+    test "invalid timestamp stores a file", ctx do
+      assert {:error, :invalid} =
+               PunchGate.ingest_punch(
+                 ctx.device,
+                 ingest_attrs(ctx.emp, %{"punched_at" => "nope"})
+               )
+
+      assert File.exists?(log_abs(one_log(ctx.company)))
+    end
+
+    test "accepted stores no log file and leaves the TimeAttend photo alone", ctx do
+      assert {:ok, ta} = PunchGate.ingest_punch(ctx.device, ingest_attrs(ctx.emp))
+      log = one_log(ctx.company)
+      assert is_nil(log.photo_path)
+      assert File.exists?(PunchGate.photo_abs_path(ctx.company.id, ta))
+    end
+
+    test "missing_photo and too_large store no file", ctx do
+      assert {:error, :missing_photo} =
+               PunchGate.ingest_punch(ctx.device, ingest_attrs(ctx.emp, %{"photo" => nil}))
+
+      assert is_nil(one_log(ctx.company).photo_path)
+
+      big = Path.join(System.tmp_dir!(), "big-#{System.unique_integer([:positive])}.jpg")
+      File.write!(big, :binary.copy("x", 400_000))
+      too_big = %Plug.Upload{path: big, filename: "big.jpg", content_type: "image/jpeg"}
+
+      assert {:error, :too_large} =
+               PunchGate.ingest_punch(ctx.device, ingest_attrs(ctx.emp, %{"photo" => too_big}))
+
+      assert length(logs(ctx.company)) == 2
+      assert Enum.all?(logs(ctx.company), &is_nil(&1.photo_path))
+    end
+
+    test "a failing photo copy still leaves the row and the original result", ctx do
+      original = Application.get_env(:full_circle, :uploads_dir)
+      # A regular file where a directory has to be, so File.mkdir_p! raises.
+      blocker = Path.join(System.tmp_dir!(), "blocker-#{System.unique_integer([:positive])}")
+      File.write!(blocker, "not a directory")
+      Application.put_env(:full_circle, :uploads_dir, blocker)
+      on_exit(fn -> Application.put_env(:full_circle, :uploads_dir, original) end)
+
+      # A rejected outcome, so the punch itself never writes a TimeAttend photo
+      # and the only file operation in play is the log's.
+      assert {:error, :not_found} =
+               PunchGate.ingest_punch(
+                 ctx.device,
+                 ingest_attrs(ctx.emp, %{"employee_id" => Ecto.UUID.generate()})
+               )
+
+      log = one_log(ctx.company)
+      assert log.reason == "not_found"
+      assert is_nil(log.photo_path)
+    end
+
+    test "an invalid log changeset comes back as a tuple, not a raise", ctx do
+      # Why insert_ingest_log/1 must `case` on the result instead of leaning on
+      # the rescue: Repo.insert answers a failed changeset with {:error, cs}.
+      assert {:error, %Ecto.Changeset{}} =
+               %PunchIngestLog{}
+               |> PunchIngestLog.changeset(%{outcome: "accepted", http_status: 201})
+               |> Repo.insert()
+
+      assert logs(ctx.company) == []
+    end
+
+    test "a raised log insert still leaves the punch result untouched", ctx do
+      # Delete the device row but keep the struct in hand: punch_ingest_logs
+      # .punch_device_id then violates its FK, which Repo.insert *raises*
+      # (no constraint is declared on the changeset). A rejected outcome is used
+      # so the punch itself never touches time_attendences.
+      Repo.delete!(ctx.device)
+
+      assert {:error, :not_found} =
+               PunchGate.ingest_punch(
+                 ctx.device,
+                 ingest_attrs(ctx.emp, %{"employee_id" => Ecto.UUID.generate()})
+               )
+
+      assert logs(ctx.company) == []
+    end
+  end
 end
