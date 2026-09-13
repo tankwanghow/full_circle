@@ -250,4 +250,70 @@ defmodule FullCircle.WorkShiftTest do
       end
     end
   end
+
+  describe "time_attendences shift columns" do
+    setup ctx do
+      %{emp: employee_fixture(%{}, ctx.company, ctx.admin)}
+    end
+
+    defp punch!(ctx, iso) do
+      Repo.insert!(%FullCircle.HR.TimeAttend{
+        company_id: ctx.company.id,
+        employee_id: ctx.emp.id,
+        user_id: ctx.admin.id,
+        punch_time:
+          Timex.parse!(iso, "{RFC3339}")
+          |> DateTime.shift_zone!("Etc/UTC")
+          |> DateTime.truncate(:second),
+        flag: "1_IN_1",
+        status: "Draft",
+        input_medium: "Manual"
+      })
+    end
+
+    test "the schema carries the new fields", _ctx do
+      fields = FullCircle.HR.TimeAttend.__schema__(:fields)
+      assert :work_shift_id in fields
+      assert :work_shift_date in fields
+      assert :punch_kind in fields
+      refute :shift_id in fields
+    end
+
+    test "the dead shift_id column is gone from the table", _ctx do
+      {:ok, r} =
+        Repo.query("select count(*) from information_schema.columns
+            where table_name = 'time_attendences' and column_name = 'shift_id'")
+
+      assert [[0]] = r.rows
+    end
+
+    test "General anchors match the calendar date for the whole working day", ctx do
+      gen = FullCircle.HR.default_work_shift(ctx.company)
+
+      for iso <- [
+            "2026-05-05T07:00:00+08:00",
+            "2026-05-05T12:00:00+08:00",
+            "2026-05-05T17:00:00+08:00",
+            "2026-05-05T21:00:00+08:00"
+          ] do
+        ta = punch!(ctx, iso)
+        local = DateTime.shift_zone!(ta.punch_time, ctx.company.timezone)
+
+        assert FullCircle.HR.instance_anchor(gen, local) == DateTime.to_date(local),
+               "#{iso} must anchor to its own calendar date or the backfill gate is unsafe"
+      end
+    end
+
+    test "a punch inside the dead band is exactly what the gate exists to catch", ctx do
+      # 01:00 is before General's 02:00 cutover, so it anchors to the previous
+      # day. No such punch exists in 23,902 rows of history, which is why the
+      # backfill is safe - and why the migration asserts it rather than assuming.
+      gen = FullCircle.HR.default_work_shift(ctx.company)
+      ta = punch!(ctx, "2026-05-06T01:00:00+08:00")
+      local = DateTime.shift_zone!(ta.punch_time, ctx.company.timezone)
+
+      assert FullCircle.HR.instance_anchor(gen, local) == ~D[2026-05-05]
+      refute FullCircle.HR.instance_anchor(gen, local) == DateTime.to_date(local)
+    end
+  end
 end

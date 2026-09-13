@@ -12,6 +12,9 @@ defmodule FullCircle.HR.TimeAttend do
     field(:status, :string, default: "Draft")
     field(:photo_path, :string)
     field(:client_id, :string)
+    field(:work_shift_date, :date)
+    field(:punch_kind, :string)
+    belongs_to(:work_shift, FullCircle.HR.WorkShift)
     belongs_to(:punch_device, FullCircle.PunchGate.PunchDevice)
 
     field(:employee_name, :string, virtual: true)
@@ -35,7 +38,10 @@ defmodule FullCircle.HR.TimeAttend do
       :punch_time_local,
       :punch_time,
       :status,
-      :user_id
+      :user_id,
+      :work_shift_id,
+      :work_shift_date,
+      :punch_kind
     ])
     |> validate_required([
       :flag,
@@ -60,7 +66,10 @@ defmodule FullCircle.HR.TimeAttend do
       :employee_id,
       :punch_device_id,
       :client_id,
-      :status
+      :status,
+      :work_shift_id,
+      :work_shift_date,
+      :punch_kind
     ])
     |> validate_required([
       :flag,
@@ -85,7 +94,10 @@ defmodule FullCircle.HR.TimeAttend do
       :employee_name,
       :punch_time_local,
       :status,
-      :user_id
+      :user_id,
+      :work_shift_id,
+      :work_shift_date,
+      :punch_kind
     ])
     |> validate_required([
       :flag,
