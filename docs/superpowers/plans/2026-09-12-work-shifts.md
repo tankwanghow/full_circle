@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make attendance shift-aware instead of calendar-day-aware, so a shift crossing midnight is one shift paid in full, a day can hold any number of IN/OUT pairs, and anything the system cannot pair is blanked and blocks the pay slip rather than being silently truncated.
+**Goal:** Make attendance shift-aware instead of calendar-day-aware, so a shift crossing midnight is one shift paid in full, a day can hold any number of IN/OUT pairs, and anything the system cannot pair reads as blank-and-red rather than being silently truncated into a plausible-looking number.
 
 **Architecture:** Declarative `work_shifts` (seeded with General 08:00 / 9 / 12) plus dated `employee_work_shifts`; an employee with no effective row resolves to General. Each punch stores *which instance it belongs to* (`work_shift_id` + `work_shift_date`), while hours, pay date and anomalies are **derived on read** from that grouping — so a clerk's edit can never leave a stale total, which is the trap `rebuild_day_flags/3` falls into today. The instance boundary is a derived cutover, never configured.
 
@@ -13,7 +13,8 @@
 ## Global Constraints
 
 - **OT must not change.** It stays `worked − Employee.work_hours_per_day` (7.5 default). `normal_hour` is display-only and must never become an OT threshold — 94% of employee-days (5,955 of 6,336) exceed 7.5 h worked, so moving that threshold would be a large silent pay cut.
-- **The backfill must be behaviour-preserving.** General's derived cutover is 02:00 and there are **zero punches between 22:00 and 06:59** in all 23,902 rows, so grouping must come out identical. Task 3 carries a hard equality gate; if it fails, the backfill is wrong and does not ship.
+- **The backfill must be behaviour-preserving.** General's derived cutover is 02:00 and there are **zero punches between 22:00 and 06:59** in all 23,902 rows, so grouping must come out identical. Task 3 carries a hard gate; if it fails, the backfill is wrong and does not ship. The gate must test the punch's local time against **the cutover** — asserting that `work_shift_date` equals the expression it was just assigned from is a tautology that passes on any data.
+- **Blank the hours, never block the pay slip.** Measured on the restored production database, **328 of 6,619 employee-days already have an odd punch count** (283 of them a single punch), across **68 employee-months**, 61 already paid. Most are not errors: three off-site employees punch once on every day they work (Rajeswari 115/115, Hazriq 75/75, Isrol 28/65), and no missing punch exists to recover. An anomalous instance therefore shows blank hours and a red row — which is exactly what those days do today — and payroll is untouched. There is no pay-slip gate, no `unresolved_shift_dates`, and `PaySlipOp` is not modified by this plan.
 - **Blank is not zero.** An anomalous instance has `worked = nil`. A real zero-hour day (punch in, straight out) stays `0.0`. The two must never be conflated — `holiday_pay_days/2` tests `wh == 0.0` and would misread nil as absence.
 - **The window never judges a punch.** `start_time` / `normal_hour` exist to group and to display. A punch is never anomalous for falling outside them — 34.5% of real punches fall outside 08:00–17:00.
 - **Never run bare `mix format`** — it rewrites ~14 already-unformatted files on master. Format only files you touched: `mix format <path> <path>`.
@@ -21,9 +22,11 @@
 - Schemas use `use FullCircle.Schema` (binary_id PK and FKs). Migrations inherit `migration_primary_key: [name: :id, type: :binary_id]` and `migration_timestamps: [type: :timestamptz]` from `config/config.exs:39-40`, so plain `create table/2` and plain `timestamps/1` are already correct.
 - Anomalies are exactly two: an odd punch count in an instance, and a span greater than `max_hour`. Nothing else.
 
-### One addition made during planning
+### Additions made during planning
 
-The spec lists `work_shifts` as `name`, `start_time`, `normal_hour`, `max_hour`. This plan adds **`is_default`** (boolean, one true row per company, enforced by a partial unique index). Resolving General by the literal string `"General"` would break the moment someone renames it, and the fallback path runs on every punch. Flagged here rather than smuggled in.
+1. **`is_default`** on `work_shifts` (boolean, one true row per company, enforced by a partial unique index). Resolving General by the literal string `"General"` would break the moment someone renames it, and the fallback path runs on every punch. The spec has been updated to match.
+2. **The default shift is seeded by `Sys.create_company/2`, not only by the migration.** A migration seeds the companies that exist when it runs; every company created afterwards — including every test fixture, since migrations run against an empty `companies` table — would have no `is_default` row, and `HR.default_work_shift/1` is `Repo.get_by!`, so the first punch in a new tenant would raise. It joins the default accounts, tax codes, gapless doc ids and salary types already seeded there (`sys.ex:484-530`).
+3. **The spec's pay-slip block is dropped**, on the evidence in the constraint above — it would have demanded impossible repairs from off-site staff and made 61 already-paid employee-months unre-runnable. The red row, which those days already have today, is the whole signal.
 
 ---
 
@@ -46,7 +49,8 @@ The spec lists `work_shifts` as `name`, `start_time`, `normal_hour`, `max_hour`.
 
 | File | Change |
 |---|---|
-| `lib/full_circle/hr.ex` | `shift_for/3`, `resolve_punch_shift/2`, `rebuild_instance/4`, instance queries, monthly totals, `holiday_pay_days/2`, fingerprint import + dedupe, the `emp_time_list` CTE |
+| `lib/full_circle/hr.ex` | `shift_for/3`, `resolve_punch_shift/2`, `rebuild_instance/4`, instance queries, monthly totals, `holiday_pay_days/2`, fingerprint import + dedupe, the `emp_time_list` CTE, the pay-slip edit lock keyed to the instance pay date |
+| `lib/full_circle/sys.ex` | Seed the default shift in `create_company/2` |
 | `lib/full_circle/HR/timeattend.ex` | New fields; `flag` no longer required |
 | `lib/full_circle/punch_gate.ex` | Replace `rebuild_day_flags/3` with instance re-resolution |
 | `lib/full_circle/hr/finger_print_import.ex` | Stop emitting `flag: nil` past index 6 |
@@ -68,6 +72,7 @@ The spec lists `work_shifts` as `name`, `start_time`, `normal_hour`, `max_hour`.
 - Create: `priv/repo/migrations/20260912090000_create_work_shifts.exs`
 - Create: `lib/full_circle/hr/work_shift.ex`, `lib/full_circle/hr/employee_work_shift.ex`
 - Create: `test/full_circle/work_shift_test.exs`
+- Modify: `lib/full_circle/sys.ex` (seed the default shift in `create_company/2`)
 
 **Interfaces:**
 - Produces: `FullCircle.HR.WorkShift` with `name, start_time, normal_hour, max_hour, is_default, company_id`; `changeset/2`.
@@ -167,8 +172,10 @@ defmodule FullCircle.WorkShiftTest do
       assert %{name: _} = errors_on(cs)
     end
 
+    # The fixture company already owns the seeded General default (see the
+    # "General is seeded" describe below), so this asserts against that one
+    # rather than creating a first default of its own.
     test "only one default per company", ctx do
-      assert {:ok, _} = shift(ctx.company, %{name: "A", is_default: true})
       assert {:error, cs} = shift(ctx.company, %{name: "B", is_default: true})
       assert %{is_default: _} = errors_on(cs)
     end
@@ -176,6 +183,9 @@ defmodule FullCircle.WorkShiftTest do
 
   describe "General is seeded" do
     test "every company gets exactly one default General shift", ctx do
+      # company_fixture/2 calls Sys.create_company/2, which seeds this the same
+      # way it seeds default accounts, tax codes and salary types. The migration
+      # only covers companies that existed when it ran.
       gen = Repo.get_by!(WorkShift, company_id: ctx.company.id, is_default: true)
       assert gen.name == "General"
       assert gen.start_time == ~T[08:00:00]
@@ -183,6 +193,13 @@ defmodule FullCircle.WorkShiftTest do
       assert Decimal.equal?(gen.max_hour, Decimal.new("12"))
       assert WorkShift.cutover_time(gen) == ~T[02:00:00]
       assert WorkShift.nominal_end(gen) == ~T[17:00:00]
+    end
+
+    test "a company created after the migration still has one", ctx do
+      other = company_fixture(ctx.admin, %{name: "Second Co #{System.unique_integer([:positive])}"})
+
+      assert %WorkShift{name: "General"} =
+               FullCircle.HR.default_work_shift(other)
     end
   end
 
@@ -475,20 +492,51 @@ defmodule FullCircle.HR.EmployeeWorkShift do
 end
 ```
 
-- [ ] **Step 6: Migrate and run the tests**
+- [ ] **Step 6: Seed the default shift for every *new* company**
+
+The migration seeds the companies that exist when it runs. Everything created afterwards — every new tenant, and **every test fixture**, since migrations run against an empty `companies` table — would have no `is_default` row, and `HR.default_work_shift/1` is `Repo.get_by!`. The first punch in such a company would raise.
+
+In `lib/full_circle/sys.ex`, add a step to the `create_company/2` Multi, immediately after `:create_default_salary_types` (around `sys.ex:515-530`), following the same `insert_all` shape it already uses:
+
+```elixir
+    |> Multi.insert_all(
+      :create_default_work_shift,
+      FullCircle.HR.WorkShift,
+      fn %{create_company: c} ->
+        time = DateTime.truncate(Timex.now(), :second)
+
+        [
+          %{
+            company_id: c.id,
+            name: "General",
+            start_time: ~T[08:00:00],
+            normal_hour: Decimal.new("9"),
+            max_hour: Decimal.new("12"),
+            is_default: true,
+            inserted_at: time,
+            updated_at: time
+          }
+        ]
+      end
+    )
+```
+
+`insert_all` autogenerates the `binary_id` primary key exactly as it does for the salary types above it, so no explicit `id` is needed.
+
+- [ ] **Step 7: Migrate and run the tests**
 
 ```bash
 mix ecto.migrate
 mix test test/full_circle/work_shift_test.exs
 ```
-Expected: PASS.
+Expected: PASS — including `"a company created after the migration still has one"`, which fails without Step 6.
 
-- [ ] **Step 7: Format and commit**
+- [ ] **Step 8: Format and commit**
 
 ```bash
 mix format priv/repo/migrations/20260912090000_create_work_shifts.exs \
   lib/full_circle/hr/work_shift.ex lib/full_circle/hr/employee_work_shift.ex \
-  test/full_circle/work_shift_test.exs
+  lib/full_circle/sys.ex test/full_circle/work_shift_test.exs
 git add -A
 git commit -m "feat(hr): work_shifts and employee_work_shifts with derived cutover
 
@@ -801,10 +849,17 @@ defmodule FullCircle.Repo.Migrations.AddWorkShiftToTimeAttendences do
      where ta.id = n.id
     """)
 
-    # EQUALITY GATE. General's derived cutover is 02:00 and no punch has ever
-    # been recorded between 22:00 and 07:00, so instance grouping must equal
-    # calendar-day grouping for every existing row. If it does not, the
-    # behaviour-preserving claim is false and this migration must not complete.
+    # CUTOVER GATE. The backfill above writes the punch's local *date* as the
+    # anchor. That is only correct where the punch's local *time* is at or after
+    # its shift's cutover; a punch before the cutover belongs to the previous
+    # day's instance, which is exactly the regrouping this migration claims does
+    # not happen. So test the punch against the cutover, not against the
+    # expression it was just assigned from - comparing work_shift_date with
+    # (punch_time at time zone tz)::date is a tautology that passes on any data.
+    #
+    # cutover = (start_time + (24 + max_hour)/2) mod 24, the same arithmetic as
+    # WorkShift.cutover_time/1. For the seeded General (08:00 / 12) that is
+    # 02:00, and there are zero punches between 22:00 and 06:59 in 23,902 rows.
     execute("""
     do $$
     declare bad integer;
@@ -812,11 +867,13 @@ defmodule FullCircle.Repo.Migrations.AddWorkShiftToTimeAttendences do
       select count(*) into bad
         from time_attendences ta
         join companies c on c.id = ta.company_id
-       where ta.work_shift_date is distinct from (ta.punch_time at time zone c.timezone)::date;
+        join work_shifts ws on ws.id = ta.work_shift_id
+       where (ta.punch_time at time zone c.timezone)::time
+             < ((ws.start_time + make_interval(mins => ((24 + ws.max_hour) * 30)::int))::time);
 
       if bad > 0 then
         raise exception
-          'work shift backfill changed grouping for % punches - backfill is not behaviour preserving', bad;
+          'work shift backfill regroups % punches across a cutover - backfill is not behaviour preserving', bad;
       end if;
     end $$;
     """)
@@ -860,7 +917,38 @@ Expected: PASS, and the migration completes without raising — which is itself 
 ```bash
 mix ecto.rollback -n 1 && mix ecto.migrate
 ```
-Expected: completes silently. On a database with a punch between 22:00 and 07:00 it would instead abort with `work shift backfill changed grouping for N punches`. That is the intended behaviour — investigate rather than weaken the gate.
+Expected: completes silently. On a database with a punch before its shift's cutover it would instead abort with `work shift backfill regroups N punches across a cutover`. That is the intended behaviour — investigate rather than weaken the gate.
+
+Then check hours parity directly. The cutover gate proves the *grouping* is unchanged; this proves the *hours* are, reproducing `count_hours_work/1` in SQL (pairs 1-2, 3-4, …, an unpaired last punch contributing 0.0) for both groupings and diffing them:
+
+```bash
+PGPASSWORD=... psql -h localhost -U full_circle -d full_circle_dev -c "
+with numbered as (
+  select ta.employee_id, ta.punch_time, ta.work_shift_id, ta.work_shift_date,
+         (ta.punch_time at time zone c.timezone)::date as cal_date
+    from time_attendences ta join companies c on c.id = ta.company_id),
+cal as (
+  select employee_id, cal_date,
+         sum(case when rn % 2 = 1 and nxt is not null
+                  then extract(epoch from (nxt - punch_time))/3600.0 else 0 end) wh
+    from (select *, row_number() over w rn, lead(punch_time) over w nxt from numbered
+          window w as (partition by employee_id, cal_date order by punch_time)) x
+   group by 1,2),
+ins as (
+  select employee_id, work_shift_id, work_shift_date,
+         sum(case when rn % 2 = 1 and nxt is not null
+                  then extract(epoch from (nxt - punch_time))/3600.0 else 0 end) wh
+    from (select *, row_number() over w rn, lead(punch_time) over w nxt from numbered
+          window w as (partition by employee_id, work_shift_id, work_shift_date order by punch_time)) x
+   group by 1,2,3)
+select count(*) as mismatched_days
+  from cal join ins
+    on ins.employee_id = cal.employee_id and ins.work_shift_date = cal.cal_date
+ where round(cal.wh::numeric, 4) is distinct from round(ins.wh::numeric, 4);"
+```
+Expected: `0`. Measured on the current restore, both sides total **51,608.84 h over 6,619 employee-days**.
+
+Note what this comparison deliberately does *not* do: it does not compare against the new `nil`. An odd day is rescued to `0.0` today and becomes `nil` after Task 7, and 328 employee-days are odd — comparing those two directly would fail a gate they are not evidence against. The parity that matters is the pairing arithmetic, which is what this measures.
 
 - [ ] **Step 7: Format and commit**
 
@@ -1023,16 +1111,21 @@ defmodule FullCircle.ShiftInstanceTest do
       assert is_nil(inst.worked)
     end
 
+    # Both punches are inside one General window (cutover 02:00), which is what
+    # :too_long requires. Note that 08:00 on the 5th with 17:00 on the *6th* is
+    # NOT this case - those are two instances of one punch each, two
+    # :missing_punch days. Task 7 covers that; feeding both to build/3 here
+    # would test an input the resolver cannot produce.
     test "a span beyond max_hour is too_long, and hours are blank" do
       punches = [
-        p("2026-05-05T08:00:00+08:00"),
-        p("2026-05-06T17:00:00+08:00")
+        p("2026-05-05T07:00:00+08:00"),
+        p("2026-05-05T21:00:00+08:00")
       ]
 
       inst = ShiftInstance.build(punches, general(), @tz)
       assert inst.anomaly == :too_long
       assert is_nil(inst.worked)
-      assert_in_delta inst.span_hours, 33.0, 0.001
+      assert_in_delta inst.span_hours, 14.0, 0.001
     end
 
     test "a span exactly at max_hour is not an anomaly" do
@@ -1173,7 +1266,7 @@ end
 - [ ] **Step 4: Run the tests**
 
 Run: `mix test test/full_circle/shift_instance_test.exs`
-Expected: PASS, including `worked == 9.083` for the drifted night shift and `:too_long` for the 33-hour span.
+Expected: PASS, including `worked == 9.083` for the drifted night shift and `:too_long` for the 14-hour span.
 
 - [ ] **Step 5: Format and commit**
 
@@ -1191,7 +1284,7 @@ Claude-Session: https://claude.ai/code/session_01EVknXqbVEgvFNnMbxUqdXG"
 ## Task 5: Assign on write, renumber the instance, and fix the fingerprint importer
 
 **Files:**
-- Modify: `lib/full_circle/hr.ex:261-277` (`insert_time_attendence_from_log/2`), `:300-350` (manual CRUD)
+- Modify: `lib/full_circle/hr.ex:261-277` (`insert_time_attendence_from_log/2`), `:300-356` (manual CRUD — **including `delete_time_attendence_by_id/3`**, the path the punch row uses)
 - Modify: `lib/full_circle/hr/finger_print_import.ex:99-110`
 - Modify: `lib/full_circle/punch_gate.ex:194-223` (`rebuild_day_flags/3`), `:225-268` (`insert_punch/6`)
 - Modify: `lib/full_circle/HR/timeattend.ex`
@@ -1485,6 +1578,31 @@ The initial insert's `flag: "1_IN_1"` in `TimeAttend.changeset_gate/2` stays as 
         end
 ```
 
+**`delete_time_attendence_by_id/3` (`hr.ex:342-356`) needs the same treatment, and it is the one that matters** — it is what the punch row calls (`punch_time_component.ex:65`); `delete_time_attendence/3` above is reached from the TimeAttend index only. Miss it and every punch a clerk clears from the punch card leaves a hole in the numbering (`1_IN_1`, `1_OUT_1`, `3_IN_3`, …):
+
+```elixir
+          true ->
+            with {:ok, ta} <- Repo.delete(ta) do
+              rebuild_instance(com, ta.employee_id, ta.work_shift_id, ta.work_shift_date)
+              {:ok, ta}
+            end
+```
+
+Add a test for that path specifically, since it is the one the UI exercises:
+
+```elixir
+    test "clearing a punch from the row renumbers what is left", ctx do
+      assert {:ok, a} = gate_punch(ctx, "2026-05-05T08:00:00+08:00")
+      assert {:ok, _} = gate_punch(ctx, "2026-05-05T12:00:00+08:00")
+      assert {:ok, _} = gate_punch(ctx, "2026-05-05T17:00:00+08:00")
+
+      FullCircle.HR.delete_time_attendence_by_id(a.id, ctx.company, ctx.admin)
+
+      assert ["1_IN_1", "1_OUT_1"] =
+               instance_punches(ctx, ~D[2026-05-05]) |> Enum.map(& &1.flag)
+    end
+```
+
 `insert_time_attendence_from_log/2` — the dedupe must stop comparing `flag`, which is `NULL` for the very rows it needs to catch (`flag = NULL` is never true in SQL, so those rows re-insert on every import). Position is no longer known at import time, so match on employee and time alone:
 
 ```elixir
@@ -1556,6 +1674,7 @@ Claude-Session: https://claude.ai/code/session_01EVknXqbVEgvFNnMbxUqdXG"
 **Files:**
 - Modify: `lib/full_circle_web/live/helpers.ex:295-320` (delete `make_timeattend_list/2` and `make_timeattend/3`)
 - Modify: `lib/full_circle_web/live/time_attend_live/punch_time_component.ex:185-324`
+- Modify: `lib/full_circle_web/live/time_attend_live/punch_card.ex:675-700` (the `{:updated_punch, ...}` handler)
 - Modify: `lib/full_circle_web/live/time_attend_live/punch_index_component.ex:14`, `punch_card_component.ex:14`
 - Modify: `lib/full_circle_web/live/time_attend_live/form_component.ex:189-196`
 - Create: `test/full_circle_web/live/punch_row_test.exs`
@@ -1564,10 +1683,11 @@ Claude-Session: https://claude.ai/code/session_01EVknXqbVEgvFNnMbxUqdXG"
 - Consumes: `ShiftInstance.punch_kind/1` (Task 4).
 - Produces: `FullCircleWeb.Helpers.punch_slots(time_list, company) :: [tuple]` — the punches in time order plus trailing blanks, length `max(6, count + 1)`.
 
-Two things make this more than a loop change, and both are load-bearing:
+Three things make this more than a loop change, and all are load-bearing:
 
 - **The blank slots are the add-a-punch affordance.** Typing into one fires `new_time_attendence/2` (`punch_time_component.ex:34-35, 80-92`). Render only real punches and a clerk can no longer add the missing punch — the single action the anomaly flow asks of them.
 - **The row budgets to exactly 100%** — six slots at `w-[11.666%]` plus HW/NH/OT at `w-[10%]`. Eight punches is 93.3% inside a 70% budget, so under `flex-nowrap` the hours columns get pushed off the row.
+- **The parent destructures six tuples too.** `punch_card.ex:675-700` matches `[{_,_,_,_,_}, × 6] = Enum.map(tis, &tis_core/1)` on every `{:updated_punch, ...}` message. Removing the ceiling in the component alone means the first edit on a seven-punch day raises `MatchError` in the LiveView, not in the component — Step 6 below fixes it in the same commit.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1703,7 +1823,7 @@ with
 
 - [ ] **Step 5: Make the component handle N slots**
 
-In `lib/full_circle_web/live/time_attend_live/punch_time_component.ex`, replace the fixed six-element destructure and its `tl` construction (lines 185-204) with:
+In `lib/full_circle_web/live/time_attend_live/punch_time_component.ex` (adding `alias FullCircle.HR.ShiftInstance`), replace the fixed six-element destructure and its `tl` construction (lines 185-204) with:
 
 ```elixir
     tis = Enum.map(socket.assigns.tis, &pad_tis/1)
@@ -1711,21 +1831,58 @@ In `lib/full_circle_web/live/time_attend_live/punch_time_component.ex`, replace 
     tl =
       Enum.map(tis, fn {_ti, id, st, fl, dt, _p} -> [dt, id, st, fl] end)
 
-    wh = HR.wh(tl)
+    filled = tl |> Enum.reject(fn [dt | _] -> is_nil(dt) end) |> Enum.map(fn [dt | _] -> dt end)
 
-    filled = Enum.reject(tl, fn [dt | _] -> is_nil(dt) end)
+    ordered? =
+      filled
+      |> Enum.chunk_every(2, 1, :discard)
+      |> Enum.all?(fn [a, b] -> DateTime.compare(a, b) == :lt end)
 
-    # Out-of-order punches are the existing red-row signal; an odd count is the
-    # new one. Both mean "a human needs to look at this".
-    tl_ok? =
-      rem(length(filled), 2) == 0 and
-        filled
-        |> Enum.map(fn [dt | _] -> dt end)
-        |> Enum.chunk_every(2, 1, :discard)
-        |> Enum.all?(fn [a, b] -> DateTime.compare(a, b) == :lt end)
+    span =
+      case filled do
+        [] -> 0.0
+        [_] -> 0.0
+        list -> DateTime.diff(List.last(list), hd(list)) / 3600
+      end
+
+    # The same rule the query uses, so the component cannot disagree with the
+    # row it is rendering. Out-of-order punches stay a red-row signal of their
+    # own - they are not an anomaly the query knows about.
+    anomaly = ShiftInstance.anomaly(length(filled), span, max_hour(socket))
+
+    # Blank, not a partial sum. HR.wh/1 chunks in twos and rescues the leftover
+    # to 0.0, so an odd day would otherwise show the hours of its complete pairs
+    # as if that were the day's total.
+    wh = if is_nil(anomaly), do: HR.wh(tl), else: nil
+
+    tl_ok? = is_nil(anomaly) and ordered?
 ```
 
-Then delete the old `case [!is_nil(dt1), ...]` block entirely — it is replaced by the two lines above and no longer compiles once `dt1`..`dt6` are gone.
+with
+
+```elixir
+  # The row's shift, when Task 7 has put it there; the seeded General tolerance
+  # otherwise, which is what every existing row resolves to anyway.
+  defp max_hour(socket) do
+    case socket.assigns.obj do
+      %{work_shift: %FullCircle.HR.WorkShift{max_hour: m}} -> m
+      _ -> Decimal.new("12")
+    end
+  end
+```
+
+and `nh` / `ot` guarded the same way:
+
+```elixir
+    socket
+    |> assign(wh: wh)
+    |> assign(nh: wh && HR.nh(wh, socket.assigns.obj.work_hours_per_day))
+    |> assign(ot: wh && HR.ot(wh, socket.assigns.obj.work_hours_per_day))
+```
+
+Then delete the old `case [!is_nil(dt1), ...]` block entirely — it is replaced by the above and no longer compiles once `dt1`..`dt6` are gone.
+
+Two notes on why this matters beyond tidiness. `update/2` runs `update_working_hours/1` on **every** render (`punch_time_component.ex:18-20`), so whatever the component computes overwrites the `nil` Task 7 puts on the row — without this change the blanking works everywhere except the screen it was built for. And `Number.Delimit.number_to_delimited/1` returns `nil` for `nil` (`deps/number/lib/number/delimit.ex:83`), so a blank cell renders empty rather than raising; no template guard is needed.
 
 In `render/1`, wrap the punch forms so wrapping cannot displace the hours columns. Replace `<div class="flex flex-nowrap gap-1">` (line 273) and its closing with:
 
@@ -1746,16 +1903,94 @@ In `render/1`, wrap the punch forms so wrapping cannot displace the hours column
 
 (`w-[16.666%]` is one sixth **of the 70% wrapper**, so a slot keeps the same on-screen width it has today.) Close the new wrapper `</div>` immediately before the `worked-hours` div at line 318, leaving HW/NH/OT outside it at their existing `w-[10%]`.
 
-- [ ] **Step 6: Drop the hard-coded flag dropdown**
+- [ ] **Step 6: Make the parent accept N slots**
+
+`lib/full_circle_web/live/time_attend_live/punch_card.ex:675-700` rebuilds `time_list` from the message the component sends, and destructures exactly six tuples to do it. Replace the whole `[{_ti1, ...}, ...] = Enum.map(tis, &tis_core/1)` block and its `tl = [...]` literal with:
+
+```elixir
+    tl =
+      tis
+      |> Enum.map(&tis_core/1)
+      |> Enum.map(fn {_ti, id, st, fl, dt} -> [dt, id, st, fl] end)
+```
+
+`tis_core/1` stays as it is. Without this, the component happily renders seven slots and the first edit on that row crashes the LiveView with a `MatchError` here.
+
+- [ ] **Step 7: Resolve a typed time inside its instance, not against the row date**
+
+`add_date_to/2` (`punch_time_component.ex:258-262`) stitches the typed `HH:MM` onto `socket.assigns.obj.dd`. That is correct only while a row is a calendar day. After Task 7 a row is a **pay date**, so on a Night instance that ended at 02:00 on 6 May, the 17:00 slot displays on the 6 May row — and re-typing it would store *6 May 17:00*, which is past Night's 11:00 cutover and therefore the **next** instance. The clerk's only repair action would tear the shift in half.
+
+Resolve the typed time into the instance's own window instead. The instance anchor is on the row (`work_shift_date`, carried through Task 7's CTE); the window is `[cutover(anchor), cutover(anchor + 1))`:
+
+```elixir
+  # A time-only input has to be placed on one of two candidate dates: the
+  # instance's anchor day, or the day after it. Exactly one of them puts the
+  # time inside the instance's half-open window.
+  defp add_date_to(pt, socket) do
+    %{company: com, obj: obj} = socket.assigns
+    {:ok, time} = Time.from_iso8601(pt <> ":00")
+
+    anchor = Map.get(obj, :work_shift_date) || Timex.to_date(obj.dd)
+
+    date =
+      case Map.get(obj, :work_shift) do
+        %FullCircle.HR.WorkShift{} = ws ->
+          if Time.compare(time, FullCircle.HR.WorkShift.cutover_time(ws)) in [:gt, :eq],
+            do: anchor,
+            else: Date.add(anchor, 1)
+
+        # Before Task 7 lands the shift on the row, a row is still a calendar
+        # day and the old behaviour is the correct one.
+        _ ->
+          Timex.to_date(obj.dd)
+      end
+
+    DateTime.new!(date, time, com.timezone)
+  end
+```
+
+**Ordering note:** the fields this reads (`work_shift_date`, `work_shift`) arrive with Task 7's CTE, and rows are not keyed by pay date until then either. The fallback clause above keeps this step correct if it is committed first; if you prefer, fold it into Task 7 instead — it is the same edit either way.
+
+For General (cutover 02:00, anchor = pay date) every plausible punch time is `>= 02:00`, so this returns the row's own date and nothing about today's behaviour changes. For Night (cutover 11:00) a typed `17:00` lands on the anchor and a typed `02:00` lands on the day after — which is exactly how the instance is shaped.
+
+`obj.work_shift` must therefore be preloaded onto the row; Task 7's CTE already joins `work_shifts` for `max_hour`, so add `start_time` to the same select rather than issuing another query.
+
+Add to `test/full_circle_web/live/punch_row_test.exs`:
+
+```elixir
+  test "a typed time on a night row lands in that instance, not the next one" do
+    night = %FullCircle.HR.WorkShift{
+      start_time: ~T[17:00:00],
+      normal_hour: Decimal.new("9"),
+      max_hour: Decimal.new("12")
+    }
+
+    # Instance anchored 5 May, paid on 6 May. 17:00 belongs to the 5th.
+    assert ~D[2026-05-05] =
+             FullCircleWeb.TimeAttendLive.PunchTimeComponent.slot_date(
+               "17:00", ~D[2026-05-05], night
+             )
+
+    # 02:00 is before the 11:00 cutover, so it is the morning after.
+    assert ~D[2026-05-06] =
+             FullCircleWeb.TimeAttendLive.PunchTimeComponent.slot_date(
+               "02:00", ~D[2026-05-05], night
+             )
+  end
+```
+
+Expose the date arithmetic as a public `slot_date/3` so it is testable without a socket; `add_date_to/2` becomes a thin wrapper around it.
+
+- [ ] **Step 8: Drop the hard-coded flag dropdown**
 
 `lib/full_circle_web/live/time_attend_live/form_component.ex:189-196` — delete the whole `<div class="col-span-2">` holding the `field={@form[:flag]}` select. Flag is derived by `HR.rebuild_instance/4` from position; letting a clerk pick one would immediately be overwritten.
 
-- [ ] **Step 7: Run the tests**
+- [ ] **Step 9: Run the tests**
 
 Run: `mix test test/full_circle_web/live/punch_row_test.exs test/full_circle_web/live/ test/full_circle/`
 Expected: PASS.
 
-- [ ] **Step 8: Look at it**
+- [ ] **Step 10: Look at it**
 
 ```bash
 mix phx.server
@@ -1763,11 +1998,12 @@ mix phx.server
 
 Open `/companies/<id>/PunchIndex`. A normal four-punch day must look **identical** to before. Then add four more punches to one employee on one day via the blank slots and confirm the row wraps to a second line with HW/NH/OT still on the first. Check both light and dark theme.
 
-- [ ] **Step 9: Format and commit**
+- [ ] **Step 11: Format and commit**
 
 ```bash
 mix format lib/full_circle_web/live/helpers.ex \
   lib/full_circle_web/live/time_attend_live/punch_time_component.ex \
+  lib/full_circle_web/live/time_attend_live/punch_card.ex \
   lib/full_circle_web/live/time_attend_live/punch_index_component.ex \
   lib/full_circle_web/live/time_attend_live/punch_card_component.ex \
   lib/full_circle_web/live/time_attend_live/form_component.ex \
@@ -1781,26 +2017,26 @@ Claude-Session: https://claude.ai/code/session_01EVknXqbVEgvFNnMbxUqdXG"
 
 ---
 
-## Task 7: Group the punch query by instance, blank anomalies, gate the pay slip
+## Task 7: Group the punch query by instance and blank anomalous hours
 
 **Files:**
 - Modify: `lib/full_circle/hr/shift_instance.ex` (expose the anomaly rule)
 - Modify: `lib/full_circle/hr.ex:1207-1222` (the `emp_time_list` CTE), `:1334-1350` (`unzip_all_time_list/1`)
 - Modify: `lib/full_circle_web/live/time_attend_live/punch_card.ex:873-923` (monthly totals)
-- Modify: `lib/full_circle/pay_slip_op.ex:564-574` (`create_pay_slip/3`)
 - Modify: `test/full_circle/work_shift_test.exs`
 
 **Interfaces:**
 - Produces: `ShiftInstance.anomaly(count, span_hours, max_hour) :: :missing_punch | :too_long | nil` — the single source of truth for the rule, called by both `ShiftInstance.build/3` and the SQL-fed read path.
-- Produces: `HR.unresolved_shift_dates(employee_id, month, year, company) :: [Date.t()]` — anomalous pay dates in that month.
-- `create_pay_slip/3` gains a `{:error, :unresolved_shifts, [Date.t()]}` return.
+- Produces: an `anomaly` key on every punch-card row, and `wh` / `nh` / `ot` as `nil` when it is set.
+
+**`PaySlipOp` is deliberately not in that list.** An earlier draft blocked the pay slip for a month containing an anomalous instance. It does not, for the reason in the Global Constraints: 328 employee-days are already odd, most of them off-site staff with no missing punch to recover, and 61 of the 68 affected employee-months are already paid. The red row is the signal, and it is the same signal those days carry today.
 
 - [ ] **Step 1: Write the failing test**
 
 Append to `test/full_circle/work_shift_test.exs`:
 
 ```elixir
-  describe "anomalies reach payroll" do
+  describe "anomalous instances read as blank, and pay anyway" do
     setup ctx do
       emp = employee_fixture(%{}, ctx.company, ctx.admin)
       %{emp: emp}
@@ -1821,54 +2057,89 @@ Append to `test/full_circle/work_shift_test.exs`:
       ta
     end
 
-    test "a complete day is payable", ctx do
+    defp day(ctx, date) do
+      FullCircle.HR.punch_card_query(5, 2026, ctx.emp.id, ctx.company)
+      |> Enum.find(fn r -> Timex.to_date(r.dd) == date end)
+    end
+
+    test "a complete day carries hours and no anomaly", ctx do
       manual_punch!(ctx, "2026-05-05T08:00:00+08:00")
       manual_punch!(ctx, "2026-05-05T17:00:00+08:00")
 
-      assert FullCircle.HR.unresolved_shift_dates(ctx.emp.id, 5, 2026, ctx.company) == []
+      row = day(ctx, ~D[2026-05-05])
+      assert is_nil(row.anomaly)
+      assert_in_delta row.wh, 9.0, 0.001
     end
 
-    test "a missing punch out blocks the month and names the date", ctx do
+    test "a missing punch out blanks the hours instead of paying 0.0", ctx do
       manual_punch!(ctx, "2026-05-05T08:00:00+08:00")
 
-      assert FullCircle.HR.unresolved_shift_dates(ctx.emp.id, 5, 2026, ctx.company) ==
-               [~D[2026-05-05]]
+      row = day(ctx, ~D[2026-05-05])
+      assert row.anomaly == :missing_punch
+      assert is_nil(row.wh)
+      assert is_nil(row.nh)
+      assert is_nil(row.ot)
     end
 
-    test "adding the missing punch clears it", ctx do
+    test "adding the missing punch restores the hours", ctx do
       manual_punch!(ctx, "2026-05-05T08:00:00+08:00")
-      assert FullCircle.HR.unresolved_shift_dates(ctx.emp.id, 5, 2026, ctx.company) != []
+      assert day(ctx, ~D[2026-05-05]).anomaly == :missing_punch
 
       manual_punch!(ctx, "2026-05-05T17:00:00+08:00")
-      assert FullCircle.HR.unresolved_shift_dates(ctx.emp.id, 5, 2026, ctx.company) == []
+      row = day(ctx, ~D[2026-05-05])
+      assert is_nil(row.anomaly)
+      assert_in_delta row.wh, 9.0, 0.001
     end
 
-    test "a span past max_hour blocks the month", ctx do
+    # The cutover splits these two punches into separate instances: General cuts
+    # over at 02:00, so 08:00 on the 5th and 17:00 on the 6th are two days, each
+    # holding one punch. This is NOT one 33-hour :too_long instance - an earlier
+    # draft said it was, and a test asserting that would fail.
+    test "punches a day apart are two instances, each missing a punch", ctx do
       manual_punch!(ctx, "2026-05-05T08:00:00+08:00")
       manual_punch!(ctx, "2026-05-06T17:00:00+08:00")
 
-      # Attributed to the day the shift ended.
-      assert FullCircle.HR.unresolved_shift_dates(ctx.emp.id, 5, 2026, ctx.company) ==
-               [~D[2026-05-06]]
+      assert day(ctx, ~D[2026-05-05]).anomaly == :missing_punch
+      assert day(ctx, ~D[2026-05-06]).anomaly == :missing_punch
     end
 
-    test "a genuine zero hour day does not block", ctx do
-      manual_punch!(ctx, "2026-05-05T08:00:00+08:00")
-      manual_punch!(ctx, "2026-05-05T08:00:00+08:00")
+    # :too_long needs both punches inside one window.
+    test "a fourteen hour span inside one instance is too long", ctx do
+      manual_punch!(ctx, "2026-05-05T07:00:00+08:00")
+      manual_punch!(ctx, "2026-05-05T21:00:00+08:00")
 
-      assert FullCircle.HR.unresolved_shift_dates(ctx.emp.id, 5, 2026, ctx.company) == []
+      row = day(ctx, ~D[2026-05-05])
+      assert row.anomaly == :too_long
+      assert is_nil(row.wh)
     end
 
-    test "create_pay_slip refuses while a month is unresolved", ctx do
+    test "a genuine zero hour day stays 0.0, not nil", ctx do
+      manual_punch!(ctx, "2026-05-05T08:00:00+08:00")
       manual_punch!(ctx, "2026-05-05T08:00:00+08:00")
 
-      assert {:error, :unresolved_shifts, [~D[2026-05-05]]} =
-               FullCircle.PaySlipOp.create_pay_slip(
-                 %{
-                   "employee_id" => ctx.emp.id,
-                   "pay_month" => 5,
-                   "pay_year" => 2026
-                 },
+      row = day(ctx, ~D[2026-05-05])
+      assert is_nil(row.anomaly)
+      assert row.wh == 0.0
+    end
+
+    # The off-site case: one punch every working day, for a whole month, and the
+    # pay slip must still generate. Nothing in this feature gates payroll.
+    test "a month of single punch days still pays", ctx do
+      for d <- 4..8 do
+        manual_punch!(ctx, "2026-05-0#{d}T08:00:00+08:00")
+      end
+
+      rows = FullCircle.HR.punch_card_query(5, 2026, ctx.emp.id, ctx.company)
+      assert Enum.count(rows, fn r -> r.anomaly == :missing_punch end) == 5
+
+      acc = FullCircle.ReceiveFundFixtures.funds_account_fixture(ctx.company, ctx.admin)
+
+      assert {:ok, _} =
+               FullCircle.PaySlipOp.pay(
+                 Repo.reload!(ctx.emp),
+                 5,
+                 2026,
+                 acc.id,
                  ctx.company,
                  ctx.admin
                )
@@ -1891,7 +2162,7 @@ Append to `test/full_circle/work_shift_test.exs`:
 - [ ] **Step 2: Run and watch it fail**
 
 Run: `mix test test/full_circle/work_shift_test.exs`
-Expected: FAIL — `HR.unresolved_shift_dates/4` and `ShiftInstance.anomaly/3` are undefined.
+Expected: FAIL — `ShiftInstance.anomaly/3` is undefined and the punch-card rows carry no `anomaly` key.
 
 - [ ] **Step 3: Make the anomaly rule public**
 
@@ -2008,14 +2279,16 @@ Add `alias FullCircle.HR.ShiftInstance` to `hr.ex` if Task 5 has not already.
 In `lib/full_circle_web/live/time_attend_live/punch_card.ex`, all five totals divide by `work_hours_per_day` and would crash on nil. Replace lines 873-923:
 
 ```elixir
-  # An anomalous day contributes nothing: its hours are unknown, and the pay
-  # slip is blocked until a clerk resolves it.
-  defp holiday_pay_days(objs, _com) do
+  # An anomalous day contributes nothing: its hours are unknown. It does not
+  # block anything - the red row is the signal, exactly as it is today.
+  defp holiday_pay_days(objs, com) do
+    by_date = Map.new(objs, fn x -> {Timex.to_date(x.dd), x} end)
+
     objs
-    |> Enum.with_index()
-    |> Enum.map(fn {x, i} ->
-      prev = Enum.at(objs, i - 1)
-      next = Enum.at(objs, i + 1)
+    |> Enum.map(fn x ->
+      d = Timex.to_date(x.dd)
+      prev = neighbour(by_date, d, -1, x.employee_id, com)
+      next = neighbour(by_date, d, 1, x.employee_id, com)
 
       cond do
         is_nil(x.sholi_list) -> 0.0
@@ -2029,6 +2302,20 @@ In `lib/full_circle_web/live/time_attend_live/punch_card.ex`, all five totals di
       end
     end)
     |> Enum.sum()
+  end
+
+  # The day before the 1st and the day after the last are in another month, so
+  # they are not in `objs` and must still be fetched. Indexing the list instead
+  # (`Enum.at(objs, i - 1)`) silently returns the *last* day of the month for
+  # i == 0, which would pay or withhold a holiday on the strength of a day three
+  # or four weeks later.
+  defp neighbour(by_date, date, offset, emp_id, com) do
+    d = Date.add(date, offset)
+
+    case Map.get(by_date, d) do
+      nil -> HR.punch_by_date(emp_id, d, com)
+      row -> row
+    end
   end
 
   defp sunday_pay_days(tdw, ot, sc, dim, ewdpw) do
@@ -2065,88 +2352,75 @@ In `lib/full_circle_web/live/time_attend_live/punch_card.ex`, all five totals di
   end
 ```
 
-The `holiday_pay_days/2` rewrite is the substantive one: it previously re-queried the **previous and next calendar date** with `HR.punch_by_date/3`. Under pay-date grouping that is the wrong neighbour, and a nil would have read as a zero-hour absence — silently withholding holiday pay. It now walks the month's own ordered days and treats nil as unknown.
+The `holiday_pay_days/2` rewrite is the substantive one, and it has two independent bugs to avoid. It previously re-queried the **previous and next calendar date** with `HR.punch_by_date/3`; under pay-date grouping that is the wrong neighbour, and a `nil` there would read as a zero-hour absence and silently withhold holiday pay. But replacing the query with a plain index into the month's own list breaks the month edges: `Enum.at(objs, i - 1)` at `i == 0` is `Enum.at(objs, -1)`, the **last day of the month**, and the last day of the month has no `i + 1` at all. The version above reads the month's rows when it can and falls back to the existing query for the two days that sit outside it.
 
-- [ ] **Step 7: Gate the pay slip**
+- [ ] **Step 7: Key the pay-slip edit lock to the pay date**
 
-Add to `lib/full_circle/hr.ex`:
+Not a gate — the opposite direction. `pay_slip_exists_for_period?/3` freezes attendance editing once a month is paid, and both callers hand it the punch's **own calendar date**: `punch_locked_by_payslip?/3` from the punch's `punch_time_local` (`hr.ex:295`), and `delete_time_attendence_by_id/3` from `ta.punch_time` shifted to the company timezone (`hr.ex:349-353`).
+
+For General those are the same day. For a night shift they are not: an OUT at 02:00 on 1 June belongs to May's instance and May's pay slip, but is keyed to June — so it stays editable after May is paid, and freezes as soon as June is. Both directions are wrong.
+
+In `lib/full_circle/hr.ex`, resolve the punch's instance and use **the pay date of that instance** — the local date of its last punch:
 
 ```elixir
   @doc """
-  Pay dates in the month whose shift instance cannot be paired or exceeds its
-  shift's tolerance. A non-empty list blocks the pay slip.
+  The date whose pay slip governs this punch: the local date its instance ended
+  on, not the local date of the punch itself. They differ for any shift that
+  crosses midnight.
   """
-  def unresolved_shift_dates(employee_id, month, year, company) do
+  def punch_pay_date(%TimeAttend{work_shift_id: nil} = ta, com),
+    do: ta.punch_time |> Timex.to_datetime(com.timezone) |> Timex.to_date()
+
+  def punch_pay_date(%TimeAttend{} = ta, com) do
     from(t in TimeAttend,
-      join: ws in WorkShift,
-      on: ws.id == t.work_shift_id,
-      where: t.company_id == ^company.id,
-      where: t.employee_id == ^employee_id,
-      where: not is_nil(t.work_shift_id),
-      group_by: [t.work_shift_id, t.work_shift_date, ws.max_hour],
-      select: %{
-        count: count(t.id),
-        span:
-          fragment(
-            "extract(epoch from (max(?) - min(?))) / 3600.0",
-            t.punch_time,
-            t.punch_time
-          ),
-        max_hour: ws.max_hour,
-        pay_date:
-          fragment("(max(?) at time zone ?)::date", t.punch_time, ^company.timezone)
-      }
+      where: t.company_id == ^com.id,
+      where: t.employee_id == ^ta.employee_id,
+      where: t.work_shift_id == ^ta.work_shift_id,
+      where: t.work_shift_date == ^ta.work_shift_date,
+      order_by: [desc: t.punch_time],
+      limit: 1,
+      select: t.punch_time
     )
-    |> Repo.all()
-    |> Enum.filter(fn r ->
-      r.pay_date.month == month and r.pay_date.year == year and
-        not is_nil(ShiftInstance.anomaly(r.count, to_float(r.span), r.max_hour))
-    end)
-    |> Enum.map(& &1.pay_date)
-    |> Enum.uniq()
-    |> Enum.sort(Date)
-  end
-```
-
-In `lib/full_circle/pay_slip_op.ex`, `create_pay_slip/3`:
-
-```elixir
-  def create_pay_slip(attrs, com, user) do
-    case can?(user, :create_pay_slip, com) do
-      true ->
-        emp_id = attrs["employee_id"] || attrs[:employee_id]
-        mth = attrs["pay_month"] || attrs[:pay_month]
-        yr = attrs["pay_year"] || attrs[:pay_year]
-
-        case FullCircle.HR.unresolved_shift_dates(emp_id, mth, yr, com) do
-          [] ->
-            Multi.new()
-            |> create_pay_slip_multi(prepare_pay_slip(attrs), attrs, com, user)
-            |> Repo.transaction()
-
-          dates ->
-            {:error, :unresolved_shifts, dates}
-        end
-
-      false ->
-        :not_authorise
+    |> Repo.one()
+    |> case do
+      nil -> ta.punch_time
+      last -> last
     end
+    |> Timex.to_datetime(com.timezone)
+    |> Timex.to_date()
   end
 ```
 
-Surface it wherever `create_pay_slip/3` is called, with a flash naming the dates:
+`delete_time_attendence_by_id/3` calls `punch_pay_date(ta, com)` in place of its inline date arithmetic. The create/update path goes through `punch_locked_by_payslip?/3`, which only has a `NaiveDateTime` and no saved row yet — there, resolve the shift for the employee and use the instance the punch *would* join:
 
 ```elixir
-      {:error, :unresolved_shifts, dates} ->
-        {:noreply,
-         socket
-         |> put_flash(
-           :error,
-           gettext("Unresolved punches on: %{dates}",
-             dates: Enum.map_join(dates, ", ", &Date.to_string/1)
-           )
-         )}
+  defp punch_locked_by_payslip?(emp_id, %NaiveDateTime{} = ptl, com) do
+    local = DateTime.from_naive!(ptl, com.timezone)
+    shift = shift_for(emp_id, com, NaiveDateTime.to_date(ptl))
+    anchor = instance_anchor(shift, local)
+
+    # Last punch already in that instance, if any - a new punch joining an
+    # existing night shift is governed by the same pay slip as the rest of it.
+    pay_date =
+      from(t in TimeAttend,
+        where: t.company_id == ^com.id and t.employee_id == ^emp_id,
+        where: t.work_shift_id == ^shift.id and t.work_shift_date == ^anchor,
+        order_by: [desc: t.punch_time],
+        limit: 1,
+        select: t.punch_time
+      )
+      |> Repo.one()
+      |> case do
+        nil -> local
+        last -> Timex.to_datetime(last, com.timezone)
+      end
+      |> Timex.to_date()
+
+    pay_slip_exists_for_period?(emp_id, pay_date, com)
+  end
 ```
+
+For every General punch this returns the punch's own date, so nothing about today's behaviour changes.
 
 - [ ] **Step 8: Verify the SQL did not move existing numbers**
 
@@ -2160,24 +2434,39 @@ Then check the rewritten CTE against real data — this is the read-path counter
 ```bash
 mix run -e '
 com = FullCircle.Repo.all(FullCircle.Sys.Company) |> hd()
-emp = FullCircle.Repo.all(FullCircle.HR.Employee) |> hd()
-rows = FullCircle.HR.punch_card_query(5, 2026, emp.id, com)
-bad = Enum.filter(rows, fn r -> r.anomaly != nil end)
-IO.puts("days: #{length(rows)} | anomalous: #{length(bad)}")
-IO.inspect(Enum.map(bad, & &1.dd))
+rows =
+  FullCircle.Repo.all(FullCircle.HR.Employee)
+  |> Enum.flat_map(fn e -> FullCircle.HR.punch_card_query(5, 2026, e.id, com) end)
+
+worked = Enum.reject(rows, fn r -> is_nil(r.time_list) end)
+bad = Enum.filter(worked, fn r -> r.anomaly != nil end)
+IO.puts("days with punches: #{length(worked)} | anomalous: #{length(bad)}")
+IO.inspect(Enum.map(bad, fn r -> {r.name, r.dd} end), limit: :infinity)
 '
 ```
-Expected: `anomalous: 0` for a historical month. Any anomaly on real history means the grouping or the rule is wrong — investigate before continuing.
+
+Expected for May 2026: **68 anomalous days**, all `:missing_punch`, and **zero** `:too_long`. That number is not a failure — it is the odd-punch population the Global Constraints describe, and those same days render red today. What would be a failure is a `:too_long`, or an anomaly count that does not match this SQL, which measures the same thing without the new code:
+
+```bash
+PGPASSWORD=... psql -h localhost -U full_circle -d full_circle_dev -t -A -c "
+select count(*) from (
+  select ta.employee_id, (ta.punch_time at time zone c.timezone)::date dd, count(*) n
+    from time_attendences ta join companies c on c.id = ta.company_id
+   group by 1,2) d
+ where d.n % 2 = 1
+   and date_trunc('month', d.dd) = date '2026-05-01';"
+```
+
+Both sides must print the same number. A mismatch means the instance grouping moved a punch, and Task 3's cutover gate missed it.
 
 - [ ] **Step 9: Format and commit**
 
 ```bash
 mix format lib/full_circle/hr.ex lib/full_circle/hr/shift_instance.ex \
-  lib/full_circle/pay_slip_op.ex \
   lib/full_circle_web/live/time_attend_live/punch_card.ex \
   test/full_circle/work_shift_test.exs
 git add -A
-git commit -m "feat(hr): blank unresolved shifts and block their pay slip
+git commit -m "feat(hr): blank the hours on an unpairable shift instance
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01EVknXqbVEgvFNnMbxUqdXG"
@@ -2190,11 +2479,79 @@ Claude-Session: https://claude.ai/code/session_01EVknXqbVEgvFNnMbxUqdXG"
 **Files:**
 - Create: `lib/full_circle_web/live/work_shift_live/{index,index_component,form}.ex`
 - Create: `test/full_circle_web/live/work_shift_live_test.exs`
+- Modify: `lib/full_circle/hr.ex` (`save_work_shift/4`, `delete_work_shift/3`)
 - Modify: `lib/full_circle/authorization.ex`, `lib/full_circle_web/router.ex`, `lib/full_circle_web/live/dashboard_live/dashboard_live.ex`
 
 **Interfaces:**
-- Consumes: `WorkShift` + `WorkShift.cutover_time/1` + `WorkShift.nominal_end/1` (Task 1).
+- Consumes: `WorkShift` + `WorkShift.cutover_time/1` + `WorkShift.nominal_end/1` (Task 1); `HR.reassign_punch/2` (Task 5).
 - Produces: `Authorization.can?(user, :create_work_shift | :update_work_shift | :delete_work_shift, company)` — admin, manager, supervisor. Required by `StdInterface`, which derives the action atom from the klass name.
+- Produces: `HR.save_work_shift(shift, attrs, company, user)` — re-resolves the shift's punches when the cutover moves.
+- Produces: `HR.delete_work_shift(shift, company, user)` — refuses the default row and any shift still in use.
+
+**Two rules the maintenance page has to enforce, or the stored grouping goes stale:**
+
+1. **Editing `start_time` or `max_hour` moves the cutover.** Every punch on that shift was anchored with the *old* cutover, and nothing re-resolves them, so the stored `work_shift_date` silently stops agreeing with the arithmetic that produced it. A save that changes either field must re-resolve that shift's punches:
+
+```elixir
+  def save_work_shift(%WorkShift{} = ws, attrs, com, user) do
+    moved? =
+      Map.has_key?(attrs, "start_time") or Map.has_key?(attrs, "max_hour") or
+        Map.has_key?(attrs, :start_time) or Map.has_key?(attrs, :max_hour)
+
+    with {:ok, updated} <- StdInterface.save(ws, WorkShift, "work_shift", attrs, com, user) do
+      if moved? and cutover_changed?(ws, updated) do
+        from(t in TimeAttend,
+          where: t.company_id == ^com.id and t.work_shift_id == ^updated.id
+        )
+        |> Repo.all()
+        |> Enum.each(&reassign_punch(&1, com))
+      end
+
+      {:ok, updated}
+    end
+  end
+
+  defp cutover_changed?(before, aft),
+    do: WorkShift.cutover_time(before) != WorkShift.cutover_time(aft)
+```
+
+Re-resolving is idempotent, so a save that does not move the cutover costs one comparison and nothing else.
+
+2. **The default row must not be deletable.** `time_attendences.work_shift_id` is `on_delete: :nilify_all` and `HR.default_work_shift/1` is `Repo.get_by!` — deleting the default orphans every punch in the company *and* makes the next punch raise. Refuse it, and refuse deleting any shift still referenced:
+
+```elixir
+  def delete_work_shift(%WorkShift{is_default: true}, _com, _user),
+    do: {:error, :default_shift}
+
+  def delete_work_shift(%WorkShift{} = ws, com, user) do
+    cond do
+      Repo.exists?(from t in TimeAttend, where: t.work_shift_id == ^ws.id) ->
+        {:error, :shift_in_use}
+
+      Repo.exists?(from a in EmployeeWorkShift, where: a.work_shift_id == ^ws.id) ->
+        {:error, :shift_assigned}
+
+      true ->
+        StdInterface.delete(ws, "work_shift", com, user)
+    end
+  end
+```
+
+with tests:
+
+```elixir
+  test "the default shift cannot be deleted", ctx do
+    gen = FullCircle.HR.default_work_shift(ctx.comp)
+    assert {:error, :default_shift} = FullCircle.HR.delete_work_shift(gen, ctx.comp, ctx.user)
+  end
+
+  test "moving the cutover re-resolves that shift's punches", ctx do
+    # Night 17:00/12 -> cutover 11:00, so a 02:00 punch anchors to the day before.
+    {:ok, night} = ...
+    # assign, punch 02:00, then widen max_hour so the cutover moves to 08:00
+    # and the same punch now anchors to its own calendar date.
+  end
+```
 
 - [ ] **Step 1: Write the failing test**
 
@@ -2765,7 +3122,18 @@ Add to `lib/full_circle/hr.ex`:
 
 - [ ] **Step 4: Add the form section**
 
-In `lib/full_circle_web/live/employee_live/form.ex`, add a section rendering `@work_shift_assignments` — each row showing the shift name and effective range with a remove button, plus a small add form (shift select, effective from, effective to). Assign it in `mount/3` with `HR.list_employee_work_shifts(employee_id)` and the company's shifts, and state the fallback in the UI:
+In `lib/full_circle_web/live/employee_live/form.ex`, add a section rendering `@work_shift_assignments` — each row showing the shift name and effective range with a remove button, plus a small add form (shift select, effective from, effective to). Assign it in `mount/3` with `HR.list_employee_work_shifts(employee_id)` and the company's shifts, and state the fallback in the UI.
+
+Two guards this section needs, both of which the rest of the employee form does not:
+
+- **`:create_employee` / `:update_employee` include `clerk`** (`authorization.ex:265-272`) while `:update_work_shift` does not (admin / manager / supervisor). A clerk opening an employee must see the assignments read-only — no add form, no Remove button — or they get a section whose every action fails authorization. Compute `@can_assign_shift = can?(@current_user, :update_work_shift, @current_company)` in `mount/3` and gate the controls on it.
+- **A new employee has no id.** On `live_action == :new` the employee is an unsaved changeset, and an `employee_work_shifts` row cannot reference it. Render the section only when there is a saved id, with a one-line note that shifts can be assigned after saving. (An employee with no assignment works the default shift anyway, so nothing is lost by the order.)
+
+```heex
+<div :if={@employee_id && @can_assign_shift} class="mt-4 border-t pt-3">
+```
+
+for the editable form, and a `:if={@employee_id && !@can_assign_shift}` read-only variant listing the same rows without controls:
 
 ```heex
 <div class="mt-4 border-t pt-3">
@@ -2867,8 +3235,15 @@ leave a stale total.
 - Two anomalies only: an odd punch count, and a span over `max_hour`. A punch is
   never anomalous for falling outside the nominal window — 34.5% of real punches
   are. An anomalous instance has `worked = nil` (**never `0.0`** — a real
-  zero-hour day must stay distinguishable) and blocks `create_pay_slip/3`, which
-  returns `{:error, :unresolved_shifts, dates}`.
+  zero-hour day must stay distinguishable) and renders red.
+- **Nothing gates payroll.** An anomaly is a display state, not a lock: 5% of
+  employee-days are odd, and the heaviest cases are off-site staff (lorry
+  drivers) who punch once a day by design and have no missing punch to recover.
+  `PaySlipOp` does not know this feature exists. Do not add a block here without
+  first re-measuring that population.
+- A time-only input on a punch row resolves **inside the instance window**, not
+  against the row's date — rows are keyed by pay date, so on a night shift those
+  are different days (`PunchTimeComponent.slot_date/3`).
 - No ceiling on pairs. `PunchGate.rebuild_day_flags/3` is gone; `flag` is a
   derived label written by `HR.rebuild_instance/4` and numbers past `3_OUT_3`.
 ```
@@ -2923,10 +3298,23 @@ Claude-Session: https://claude.ai/code/session_01EVknXqbVEgvFNnMbxUqdXG"
 
 ## Self-review notes
 
-**Spec coverage.** `work_shifts` shape and the `normal_hour`/`max_hour` split (T1); dated assignment with overlap rejection and the General fallback (T1, T2); derived cutover (T1); instance anchoring and attribution to the ending day (T2, T4); `time_attendences` columns, dead `shift_id` dropped, seed and backfill with the equality gate (T3); pairing with no ceiling, hours, anomalies, nil-not-zero (T4); write-path assignment replacing `rebuild_day_flags/3`, fingerprint silent-discard and dedupe fixes, `flag` no longer required (T5); the punch row with `slots = max(6, count + 1)` and the flex-wrap wrapper (T6); the instance-grouped CTE, blanked totals, the `holiday_pay_days/2` rewrite, the pay-slip gate (T7); maintenance page and permissions (T8); assignment UI and re-resolution (T9); gettext and skills (T10).
+**Spec coverage.** `work_shifts` shape and the `normal_hour`/`max_hour` split (T1); dated assignment with overlap rejection and the default-shift fallback (T1, T2); seeding in both the migration and `Sys.create_company/2` (T1); derived cutover (T1); instance anchoring and attribution to the ending day (T2, T4); `time_attendences` columns, dead `shift_id` dropped, backfill under the cutover gate and the hours-parity check (T3); pairing with no ceiling, hours, anomalies, nil-not-zero (T4); write-path assignment replacing `rebuild_day_flags/3` on every path including `delete_time_attendence_by_id/3`, fingerprint silent-discard and dedupe fixes, `flag` no longer required (T5); the punch row with `slots = max(6, count + 1)`, the flex-wrap wrapper, the parent's N-slot handler and instance-aware time entry (T6); the instance-grouped CTE, blanked hours and totals, the `holiday_pay_days/2` rewrite, the pay-slip edit lock keyed to the pay date (T7); maintenance page, permissions, cutover-move re-resolution and delete protection (T8); assignment UI, authorization and re-resolution (T9); gettext and skills (T10).
 
-**Shippable milestone.** Tasks 1–5 change no visible behaviour: they add the model, backfill it under the equality gate, and swap the flag engine. That is a sensible place to stop, verify against production data, and continue later. Tasks 6–9 are what make night shifts usable.
+**Corrections made after review.** Six things in the first draft were wrong and are fixed above, each with the measurement that settled it:
 
-**Riskiest tasks, in order.** T3 (the backfill — gated in SQL, and the gate is the point), T7 (the SQL rewrite — verify against a historical month before trusting it), T5 (every write path must call the re-resolver or punches silently keep stale positions).
+| Was | Is |
+|---|---|
+| Backfill gate compared `work_shift_date` with the expression it was assigned from — a tautology | Compares the punch's local time against the shift's cutover (T3); measured 0 violations in 23,902 rows |
+| General seeded only by the migration | Also seeded by `Sys.create_company/2` (T1) — otherwise every new tenant and every test fixture raises in `default_work_shift/1` |
+| `IN 5/5 08:00` + `OUT 6/5 17:00` treated as one 33-hour `:too_long` | Two instances, two `:missing_punch` (T4, T7) — General's 02:00 cutover splits them, which is the whole point of the cutover |
+| Pay slip blocked on an anomalous month | Nothing blocks (T7) — 328 employee-days are already odd, most of them off-site staff with no missing punch to recover, and 61 of 68 affected employee-months are already paid |
+| `holiday_pay_days/2` indexed `Enum.at(objs, i - 1)` | Falls back to `punch_by_date/3` at the month edges (T7) — index `-1` is the last day of the month, not yesterday |
+| Component recomputed `wh` over the query's `nil`, and the parent matched 6 tuples | Component applies the same `anomaly/3` rule and blanks; parent maps N slots (T6) |
 
-**Not built:** rotating rosters, shift swaps, lateness reporting, night-shift allowances, clock-time OT, and removal of the `flag` column — all explicit non-goals in the spec.
+**Shippable milestone.** Tasks 1–5 change no visible behaviour: they add the model, backfill it under the cutover gate, and swap the flag engine. That is a sensible place to stop, verify against production data, and continue later. Tasks 6–9 are what make night shifts usable.
+
+**Riskiest tasks, in order.** T3 (the backfill — gated in SQL, and the gate is the point), T7 (the SQL rewrite — the May 2026 anomaly count must match the pre-change SQL exactly), T5 (every write path must call the re-resolver, including the delete path the punch row uses, or punches silently keep stale positions), T6 (the typed-time rule is the difference between a night shift being repairable and being corrupted by its own repair).
+
+**Deliberately not built:** rotating rosters, shift swaps, lateness reporting, night-shift allowances, clock-time OT, removal of the `flag` column — all explicit non-goals in the spec. Also not built: any representation of "this employee's attendance is not measured". With nothing gating payroll it earns nothing, and the off-site staff it would describe already read correctly without it.
+
+**Known, accepted limitation.** `EmployeeWorkShift.validate_no_overlap/1` is a `Repo.exists?` check in a changeset, not an exclusion constraint, so two simultaneous assignment saves for one employee could still overlap. Adding a real constraint needs `btree_gist` and a `daterange` column; on a floor with a handful of shift workers and one clerk assigning them, the changeset check is the proportionate answer.
