@@ -677,4 +677,104 @@ defmodule FullCircle.PunchIngestLogTest do
       assert File.exists?(PunchGate.photo_abs_path(ctx.company.id, ta))
     end
   end
+
+  describe "list_ingest_logs/3" do
+    setup ctx do
+      emp = employee_fixture(%{name: "Ali Bin Abu"}, ctx.company, ctx.admin)
+      {:ok, _} = PunchGate.ingest_punch(ctx.device, ingest_attrs(emp))
+
+      {:error, :not_found} =
+        PunchGate.ingest_punch(ctx.device, ingest_attrs(emp, %{"employee_id" => "junk-badge"}))
+
+      today =
+        DateTime.now!(ctx.company.timezone) |> DateTime.to_date() |> Date.to_iso8601()
+
+      %{emp: emp, today: today}
+    end
+
+    defp list(ctx, opts \\ []) do
+      PunchGate.list_ingest_logs(
+        ctx.company,
+        ctx.admin,
+        Keyword.merge([sdate: ctx.today, edate: ctx.today], opts)
+      )
+    end
+
+    test "admin sees today's rows newest first", ctx do
+      rows = list(ctx)
+      assert length(rows) == 2
+      assert hd(rows).outcome == "rejected"
+      assert Enum.map(rows, & &1.device_name) == ["Gate 1", "Gate 1"]
+    end
+
+    test "a cashier gets :not_authorise", ctx do
+      cashier = user_fixture()
+      {:ok, _} = FullCircle.Sys.allow_user_to_access(ctx.company, cashier, "cashier", ctx.admin)
+
+      assert :not_authorise =
+               PunchGate.list_ingest_logs(ctx.company, cashier,
+                 sdate: ctx.today,
+                 edate: ctx.today
+               )
+    end
+
+    test "a clerk is allowed", ctx do
+      clerk = user_fixture()
+      {:ok, _} = FullCircle.Sys.allow_user_to_access(ctx.company, clerk, "clerk", ctx.admin)
+
+      assert is_list(
+               PunchGate.list_ingest_logs(ctx.company, clerk, sdate: ctx.today, edate: ctx.today)
+             )
+    end
+
+    test "outcome filter", ctx do
+      assert [row] = list(ctx, outcome: "accepted")
+      assert row.outcome == "accepted"
+      assert row.employee_name == "Ali Bin Abu"
+    end
+
+    test "employee name search", ctx do
+      assert [row] = list(ctx, emp_name: "ali")
+      assert row.employee_name == "Ali Bin Abu"
+    end
+
+    test "raw badge search finds the unresolved row", ctx do
+      assert [row] = list(ctx, emp_name: "junk-badge")
+      assert is_nil(row.employee_name)
+      assert row.employee_id_raw == "junk-badge"
+    end
+
+    test "device name search", ctx do
+      assert length(list(ctx, device_name: "Gate")) == 2
+      assert list(ctx, device_name: "Nowhere") == []
+    end
+
+    test "a day before today is empty", ctx do
+      yesterday =
+        DateTime.now!(ctx.company.timezone)
+        |> DateTime.to_date()
+        |> Date.add(-1)
+        |> Date.to_iso8601()
+
+      assert list(ctx, sdate: yesterday, edate: yesterday) == []
+    end
+
+    test "the range is inclusive of edate", ctx do
+      yesterday =
+        DateTime.now!(ctx.company.timezone)
+        |> DateTime.to_date()
+        |> Date.add(-1)
+        |> Date.to_iso8601()
+
+      assert length(list(ctx, sdate: yesterday, edate: ctx.today)) == 2
+    end
+
+    test "other companies are never visible", ctx do
+      other_admin = user_fixture()
+      other = company_fixture(other_admin, %{})
+
+      assert PunchGate.list_ingest_logs(other, other_admin, sdate: ctx.today, edate: ctx.today) ==
+               []
+    end
+  end
 end

@@ -120,6 +120,87 @@ defmodule FullCircle.PunchGate do
     end
   end
 
+  @doc """
+  Rows for the ingest log list page, newest first.
+
+  `sdate`/`edate` are company-local ISO dates. The window is
+  `[local 00:00 of sdate, local 00:00 of edate + 1 day)` converted to UTC —
+  never `inserted_at::date` in UTC, which would split "today" in Malaysia
+  (UTC+8).
+  """
+  def list_ingest_logs(company, user, opts \\ []) do
+    if Authorization.can?(user, :view_punch_ingest_log, company) do
+      page = Keyword.get(opts, :page, 1)
+      per_page = Keyword.get(opts, :per_page, 100)
+      outcome = Keyword.get(opts, :outcome, "all")
+      emp_name = Keyword.get(opts, :emp_name, "") |> to_string() |> String.trim()
+      device_name = Keyword.get(opts, :device_name, "") |> to_string() |> String.trim()
+
+      {from_utc, to_utc} =
+        local_day_range(company, Keyword.fetch!(opts, :sdate), Keyword.fetch!(opts, :edate))
+
+      from(l in PunchIngestLog,
+        left_join: e in Employee,
+        on: e.id == l.employee_id,
+        left_join: d in PunchDevice,
+        on: d.id == l.punch_device_id,
+        where: l.company_id == ^company.id,
+        where: l.inserted_at >= ^from_utc and l.inserted_at < ^to_utc,
+        order_by: [desc: l.inserted_at, desc: l.id],
+        offset: ^((page - 1) * per_page),
+        limit: ^per_page,
+        select: %{
+          id: l.id,
+          inserted_at: l.inserted_at,
+          punched_at: l.punched_at,
+          outcome: l.outcome,
+          reason: l.reason,
+          http_status: l.http_status,
+          photo_path: l.photo_path,
+          time_attendence_id: l.time_attendence_id,
+          employee_id_raw: l.employee_id_raw,
+          employee_name: e.name,
+          device_name: d.name
+        }
+      )
+      |> filter_log_outcome(outcome)
+      |> filter_log_employee(emp_name)
+      |> filter_log_device(device_name)
+      |> Repo.all()
+    else
+      :not_authorise
+    end
+  end
+
+  defp filter_log_outcome(query, outcome) when outcome in [nil, "", "all"], do: query
+  defp filter_log_outcome(query, outcome), do: from(l in query, where: l.outcome == ^outcome)
+
+  defp filter_log_employee(query, ""), do: query
+
+  defp filter_log_employee(query, name) do
+    like = "%#{name}%"
+
+    from([l, e, _d] in query,
+      where: ilike(e.name, ^like) or ilike(l.employee_id_raw, ^like)
+    )
+  end
+
+  defp filter_log_device(query, ""), do: query
+
+  defp filter_log_device(query, name) do
+    from([_l, _e, d] in query, where: ilike(d.name, ^"%#{name}%"))
+  end
+
+  defp local_day_range(company, sdate, edate) do
+    tz = company.timezone
+    {:ok, s} = sdate |> to_string() |> Date.from_iso8601()
+    {:ok, e} = edate |> to_string() |> Date.from_iso8601()
+    {:ok, start_local} = DateTime.new(s, ~T[00:00:00], tz)
+    {:ok, end_local} = DateTime.new(Date.add(e, 1), ~T[00:00:00], tz)
+
+    {DateTime.shift_zone!(start_local, "Etc/UTC"), DateTime.shift_zone!(end_local, "Etc/UTC")}
+  end
+
   def ingest_punch(%PunchDevice{} = device, attrs) do
     device = Repo.preload(device, :company)
     company = device.company
