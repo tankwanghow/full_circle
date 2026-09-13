@@ -13,7 +13,8 @@ defmodule FullCircle.HR do
     PaySlip,
     SalaryNote,
     Recurring,
-    TimeAttend
+    TimeAttend,
+    WorkShift
   }
 
   alias FullCircle.Accounting.{Account, Transaction}
@@ -23,6 +24,10 @@ defmodule FullCircle.HR do
 
   def salary_type_types() do
     ["Addition", "FixedWages", "Deduction", "Contribution", "Bonus", "Recording", "LeaveTaken"]
+  end
+
+  def default_work_shift(company) do
+    Repo.get_by!(WorkShift, company_id: company.id, is_default: true)
   end
 
   @doc """

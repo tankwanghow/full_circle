@@ -533,6 +533,26 @@ defmodule FullCircle.Sys do
         end)
       end
     )
+    |> Multi.insert_all(
+      :create_default_work_shift,
+      FullCircle.HR.WorkShift,
+      fn %{create_company: c} ->
+        time = DateTime.truncate(Timex.now(), :second)
+
+        [
+          %{
+            company_id: c.id,
+            name: "General",
+            start_time: ~T[08:00:00],
+            normal_hour: Decimal.new("9"),
+            max_hour: Decimal.new("12"),
+            is_default: true,
+            inserted_at: time,
+            updated_at: time
+          }
+        ]
+      end
+    )
     |> Multi.run(:create_default_statutory_config, fn _repo, %{create_company: c} ->
       FullCircle.StatutoryConfig.seed_company!(c.id)
       {:ok, nil}
