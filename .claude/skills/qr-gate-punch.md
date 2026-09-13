@@ -1,6 +1,6 @@
 ---
 name: qr-gate-punch
-description: Use when working on QR gate attendance — paired Android scanners, building or installing the android/qr_gate APK, POST /api/punch/attendances, punch_devices, fcqa: badge QR, audit face photos on time_attendences, Punch IO photo link, or IN/OUT flag rebuild for a calendar day.
+description: Use when working on QR gate attendance — paired Android scanners, building or installing the android/qr_gate APK, POST /api/punch/attendances, punch_devices, fcqa: badge QR, audit face photos on time_attendences, Punch IO photo link, IN/OUT flag rebuild for a calendar day, or a punch that is missing from Punch IO — punch_ingest_logs, ingest outcomes and reasons, revoked-device 401s.
 ---
 
 # QR Gate Punch
@@ -56,6 +56,40 @@ Two traps when touching this:
 - `PunchCard.filter_punches/4` **rebuilds the whole `search` map** on its `is_nil(emp)` branch, so a key added to `search` must be carried through there or the default page (no employee selected) raises `KeyError`.
 
 Face **matching** was considered on 2026-09-08 and deliberately not built: it needs an embedding (a biometric template) whether or not you persist it, there is no Oban or Nx in this project, and a cold-start baseline can be poisoned by an impostor in an employee's first few punches. Thumbnails plus a human eye first; revisit only if mismatches actually turn up.
+
+## Where a missing punch went
+
+Punch IO shows what was **recorded**. `punch_ingest_logs` shows what **arrived** —
+one append-only row per gate POST the server can attribute to a company, written
+best-effort *after* the punch is decided so it can never cost a punch.
+
+- **Page:** `/companies/:id/punch_ingest_logs`, `:view_punch_ingest_log`
+  (admin/manager/supervisor/**clerk** — clerks still cannot pair or edit punches).
+- **Outcomes:** `accepted`, `replayed` (same device + `client_id` — two code paths,
+  the `existing_client` short-circuit *and* the unique-index race in
+  `resolve_client_conflict/4`, which is public only so that race can be tested),
+  `duplicate` (±3 min), `rejected` + a reason.
+- **Reasons:** `not_found`, `inactive`, `too_large`, `missing_photo`, `future`,
+  `invalid`, `revoked`.
+- **`revoked` is the one 401 that gets logged.** A revoked token still resolves to a
+  company, and the APK drops 4xx, so re-pairing a gate on a new phone makes the old
+  phone discard punches silently. `PunchDeviceAuth` logs those — **POSTs only**, since
+  the same plug fronts the 20-second `/health` ping. An unknown token is never logged:
+  there is no company to scope it to.
+- **Reject/duplicate faces** live at
+  `{uploads_dir}/{company_id}/punch_ingest_logs/{yyyy}/{mm}/{log_id}.jpg` and are served
+  by `PunchIngestLogPhotoController` (403, never a redirect, for a member without the
+  role). Accepted faces are **not** copied — they stay on `time_attendences` for 24
+  months. There is a JPEG for every outcome except `accepted`, `replayed`,
+  `missing_photo`, `too_large`, and `revoked`.
+- **Retention:** 3 calendar months, `IngestLogPruner` (a supervised GenServer, same
+  shape as `PhotoPruner`; there is no Oban here). It deletes **rows**, not just files.
+- **Nothing at all in the table** means the POST never reached `ingest_punch` and the
+  token matched no device: network, DNS, TLS, or an unpaired phone.
+
+`punch_ingest_logs` is not `logs` — no `user_id`, never goes through `StdInterface`.
+Statuses come from `PunchGate.http_status_for/1`, which the controller also uses; do
+not hardcode a status in either place.
 
 ## Building & installing the APK
 
