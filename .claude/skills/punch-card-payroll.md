@@ -130,7 +130,11 @@ leave a stale total.
   Night 11:00. An instance is `[cutover(D), cutover(D+1))` and `work_shift_date`
   is D. Pay date is the local date of the **last** punch: the day it ended.
 - `employee_work_shifts` is dated. **No effective row means the company's
-  default (General) shift**, so most staff need no row.
+  default (General) shift**, so most staff need no row. A punch whose local
+  time is not after *today's* cutover can still use **yesterday's** assignment
+  (`HR.shift_for_punch/3`): a Night `effective_to` of 31 May keeps the 02:00
+  OUT on 1 June, but an 08:00 IN that morning is General. A Night OUT after
+  today's cutover (e.g. 02:05 vs General 02:00) follows today.
 - Two anomalies only: an odd punch count, and a span over `max_hour`. A punch is
   never anomalous for falling outside the nominal window — 34.5% of real punches
   are. An anomalous instance has `worked = nil` (**never `0.0`** — a real
