@@ -218,6 +218,16 @@ defmodule FullCircle.WorkShiftTest do
       assert out.work_shift_id == ctx.night.id
       assert out.work_shift_date == ~D[2026-05-31]
 
+      morning =
+        FullCircle.HR.punch_shift_attrs(
+          ctx.emp.id,
+          ctx.company,
+          local(ctx, "2026-06-01T08:00:00+08:00")
+        )
+
+      assert morning.work_shift_id == ctx.gen.id
+      assert morning.work_shift_date == ~D[2026-06-01]
+
       later =
         FullCircle.HR.punch_shift_attrs(
           ctx.emp.id,
@@ -467,6 +477,29 @@ defmodule FullCircle.WorkShiftTest do
       assert is_nil(row.anomaly)
       refute is_nil(row.wh)
       assert_in_delta row.wh, 9.0, 0.001
+    end
+
+    test "a General morning IN after a dated Night does not join the last Night", ctx do
+      Repo.insert!(%EmployeeWorkShift{
+        employee_id: ctx.emp.id,
+        work_shift_id: ctx.night.id,
+        effective_from: ~D[2026-05-01],
+        effective_to: ~D[2026-05-31]
+      })
+
+      assert {:ok, _} = gate_punch(ctx, "2026-05-31T17:00:00+08:00")
+      assert {:ok, _} = gate_punch(ctx, "2026-06-01T02:00:00+08:00")
+      assert {:ok, inn} = gate_punch(ctx, "2026-06-01T08:00:00+08:00")
+
+      inn = Repo.reload!(inn)
+      gen = FullCircle.HR.default_work_shift(ctx.company)
+      assert inn.work_shift_id == gen.id
+      assert inn.work_shift_date == ~D[2026-06-01]
+
+      night_punches = instance_punches(ctx, ~D[2026-05-31])
+      assert length(night_punches) == 2
+      assert Enum.all?(night_punches, &(&1.work_shift_id == ctx.night.id))
+      refute Enum.any?(night_punches, &(&1.id == inn.id))
     end
 
     test "editing a punch time out of an instance renumbers both", ctx do

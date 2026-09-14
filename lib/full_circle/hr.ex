@@ -504,10 +504,10 @@ defmodule FullCircle.HR do
   Which instance a punch belongs to, as changeset attrs.
 
   Picks the employee's shift for the punch's local date, then that shift's
-  cutover to pick the instance. A punch still inside yesterday's window
-  (the instance anchored on yesterday) uses yesterday's assignment — so a
-  Night OUT at 02:00 on 1 June stays with a May 1–31 Night assignment
-  rather than flipping to General.
+  cutover to pick the instance. A punch still inside yesterday's instance
+  uses yesterday's assignment *until today's cutover* — so a Night OUT at
+  02:00 on 1 June stays with a May 1–31 Night assignment, but an 08:00
+  General IN the same morning does not.
   """
   def punch_shift_attrs(employee_id, company, %DateTime{} = punch_time) do
     local = DateTime.shift_zone!(punch_time, company.timezone)
@@ -517,14 +517,21 @@ defmodule FullCircle.HR do
   end
 
   # Yesterday's assignment still owns a punch that belongs to yesterday's
-  # instance under that shift's cutover. `shift_for/3` alone keys on the
-  # punch's local date, which splits the last night of a closed range.
+  # instance, but only until today's cutover. Night's window runs to 11:00,
+  # so yesterday-cutover-only would steal an 08:00 General IN. 02:00 vs
+  # General's 02:00 is `:eq` (not `:gt`) and stays on Night.
   defp shift_for_punch(employee_id, company, %DateTime{} = local) do
     d = DateTime.to_date(local)
     today = shift_for(employee_id, company, d)
     yesterday = shift_for(employee_id, company, Date.add(d, -1))
+    t = DateTime.to_time(local)
 
-    if yesterday.id != today.id and instance_anchor(yesterday, local) == Date.add(d, -1) do
+    yesterday_owns? =
+      yesterday.id != today.id and instance_anchor(yesterday, local) == Date.add(d, -1)
+
+    still_before_today? = Time.compare(t, WorkShift.cutover_time(today)) != :gt
+
+    if yesterday_owns? and still_before_today? do
       yesterday
     else
       today
