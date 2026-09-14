@@ -589,7 +589,7 @@ defmodule FullCircleWeb.EmployeeLive.Form do
         <div :for={a <- @work_shift_assignments} class="flex flex-row gap-2 items-center py-1">
           <div class="w-[30%]">{a.work_shift.name}</div>
           <div class="w-[25%]">{a.effective_from}</div>
-          <div class="w-[25%]">{a.effective_to || gettext("open")}</div>
+          <div class="w-[25%]">{a.effective_to || gettext("indefinite")}</div>
           <.button type="button" phx-click="unassign_shift" phx-value-id={a.id} class="red button">
             {gettext("Remove")}
           </.button>
@@ -640,7 +640,7 @@ defmodule FullCircleWeb.EmployeeLive.Form do
         <div :for={a <- @work_shift_assignments} class="flex flex-row gap-2 items-center py-1">
           <div class="w-[30%]">{a.work_shift.name}</div>
           <div class="w-[25%]">{a.effective_from}</div>
-          <div class="w-[25%]">{a.effective_to || gettext("open")}</div>
+          <div class="w-[25%]">{a.effective_to || gettext("indefinite")}</div>
         </div>
       </div>
     </div>

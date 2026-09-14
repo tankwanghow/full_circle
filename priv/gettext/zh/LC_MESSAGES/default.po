@@ -1894,11 +1894,10 @@ msgstr "分界时间"
 msgid "(default)"
 msgstr "（预设）"
 
-#: lib/full_circle_web/live/command_palette_component.ex:333
 #: lib/full_circle_web/live/employee_live/form.ex:592
 #: lib/full_circle_web/live/employee_live/form.ex:643
 #, elixir-autogen, elixir-format
-msgid "open"
+msgid "indefinite"
 msgstr "无限期"
 
 #: lib/full_circle/hr/work_shift.ex:79

@@ -366,7 +366,7 @@ defmodule FullCircleWeb.WorkShiftLiveTest do
       html = render(lv)
       assert html =~ "Night"
       assert html =~ "2026-05-01"
-      assert html =~ "open"
+      assert html =~ "indefinite"
 
       [a] = HR.list_employee_work_shifts(ctx.emp.id)
 
