@@ -118,6 +118,7 @@ defmodule FullCircleWeb.Router do
 
     get "/csv", CsvController, :show
     get "/TimeAttend/:id/photo", PunchPhotoController, :show
+    get "/punch_ingest_logs/:id/photo", PunchIngestLogPhotoController, :show
     get "/statutory_bundle/export", BundleController, :export
     get "/download/:filename", FileDownloadController, :show
 
@@ -200,6 +201,7 @@ defmodule FullCircleWeb.Router do
       live("/work_shifts", WorkShiftLive.Index, :index)
       live("/work_shifts/new", WorkShiftLive.Form, :new)
       live("/work_shifts/:work_shift_id/edit", WorkShiftLive.Form, :edit)
+      live("/punch_ingest_logs", PunchIngestLogLive.Index, :index)
 
       live("/houses", LayerLive.HouseIndex, :index)
       live("/houses/new", LayerLive.HouseForm, :new)

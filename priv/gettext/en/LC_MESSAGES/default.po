@@ -1926,3 +1926,123 @@ msgstr ""
 #, elixir-autogen, elixir-format
 msgid "No assignment means this employee works the default shift (General)."
 msgstr ""
+
+#: lib/full_circle_web/live/punch_ingest_log_live/index.ex
+#, elixir-autogen, elixir-format
+msgid "Punch Ingest Log"
+msgstr ""
+
+#: lib/full_circle_web/live/punch_ingest_log_live/index.ex
+#, elixir-autogen, elixir-format
+msgid "Employee or Badge"
+msgstr ""
+
+#: lib/full_circle_web/live/punch_ingest_log_live/index.ex
+#, elixir-autogen, elixir-format
+msgid "Device"
+msgstr ""
+
+#: lib/full_circle_web/live/punch_ingest_log_live/index.ex
+#, elixir-autogen, elixir-format
+msgid "Received From"
+msgstr ""
+
+#: lib/full_circle_web/live/punch_ingest_log_live/index.ex
+#, elixir-autogen, elixir-format
+msgid "Received To"
+msgstr ""
+
+#: lib/full_circle_web/live/punch_ingest_log_live/index.ex
+#, elixir-autogen, elixir-format
+msgid "Received At"
+msgstr ""
+
+#: lib/full_circle_web/live/punch_ingest_log_live/index.ex
+#, elixir-autogen, elixir-format
+msgid "Punch Time"
+msgstr ""
+
+#: lib/full_circle_web/live/punch_ingest_log_live/index.ex
+#, elixir-autogen, elixir-format
+msgid "Outcome"
+msgstr ""
+
+#: lib/full_circle_web/live/punch_ingest_log_live/index.ex
+#, elixir-autogen, elixir-format
+msgid "Status"
+msgstr ""
+
+#: lib/full_circle_web/live/punch_ingest_log_live/index.ex
+#, elixir-autogen, elixir-format
+msgid "All"
+msgstr ""
+
+#: lib/full_circle_web/live/punch_ingest_log_live/index.ex
+#, elixir-autogen, elixir-format
+msgid "Accepted"
+msgstr ""
+
+#: lib/full_circle_web/live/punch_ingest_log_live/index.ex
+#, elixir-autogen, elixir-format
+msgid "Replayed"
+msgstr ""
+
+#: lib/full_circle_web/live/punch_ingest_log_live/index.ex
+#, elixir-autogen, elixir-format
+msgid "Duplicate"
+msgstr ""
+
+#: lib/full_circle_web/live/punch_ingest_log_live/index.ex
+#, elixir-autogen, elixir-format
+msgid "Rejected"
+msgstr ""
+
+#: lib/full_circle_web/live/punch_ingest_log_live/index.ex
+#, elixir-autogen, elixir-format
+msgid "Unknown Badge"
+msgstr ""
+
+#: lib/full_circle_web/live/punch_ingest_log_live/index.ex
+#, elixir-autogen, elixir-format
+msgid "Not Active"
+msgstr ""
+
+#: lib/full_circle_web/live/punch_ingest_log_live/index.ex
+#, elixir-autogen, elixir-format
+msgid "Photo Too Large"
+msgstr ""
+
+#: lib/full_circle_web/live/punch_ingest_log_live/index.ex
+#, elixir-autogen, elixir-format
+msgid "No Photo"
+msgstr ""
+
+#: lib/full_circle_web/live/punch_ingest_log_live/index.ex
+#, elixir-autogen, elixir-format
+msgid "Future Time"
+msgstr ""
+
+#: lib/full_circle_web/live/punch_ingest_log_live/index.ex
+#, elixir-autogen, elixir-format
+msgid "Invalid"
+msgstr ""
+
+#: lib/full_circle_web/live/punch_ingest_log_live/index.ex
+#, elixir-autogen, elixir-format
+msgid "Device Revoked"
+msgstr ""
+
+#: lib/full_circle_web/live/punch_ingest_log_live/index.ex
+#, elixir-autogen, elixir-format
+msgid "Employee"
+msgstr ""
+
+#: lib/full_circle_web/live/punch_ingest_log_live/index.ex
+#, elixir-autogen, elixir-format
+msgid "Punch photo"
+msgstr ""
+
+#: lib/full_circle_web/live/punch_ingest_log_live/index.ex
+#, elixir-autogen, elixir-format
+msgid "Show photos"
+msgstr ""
