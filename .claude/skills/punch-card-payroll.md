@@ -113,6 +113,42 @@ contributions/leaves, so the merged preview has no internal repeats.
 Delete/unlink BEFORE the slip delete — do **not** rely on the schema `has_many on_delete: :delete_all`
 cascade (it would delete the earning notes).
 
+## Shifts, not calendar days
+
+Attendance groups by **shift instance**, not by calendar day. Each punch stores
+`work_shift_id` + `work_shift_date`; hours, pay date and anomalies are derived
+on read (`FullCircle.HR.ShiftInstance`), never stored, so a clerk's edit cannot
+leave a stale total.
+
+- `work_shifts`: `name`, `start_time`, `normal_hour`, `max_hour`. There is no
+  `end_time` — it is `start_time + normal_hour`, display only. **`normal_hour`
+  is never an OT threshold**; OT is still `worked − Employee.work_hours_per_day`.
+- `max_hour` is a tolerance (~12), not the shift length (~9). 57% of real
+  employee-days span more than nine hours, so conflating them would flag half of
+  history.
+- **Cutover** = `(start_time + (24 + max_hour) / 2) mod 24` — General 02:00,
+  Night 11:00. An instance is `[cutover(D), cutover(D+1))` and `work_shift_date`
+  is D. Pay date is the local date of the **last** punch: the day it ended.
+- `employee_work_shifts` is dated. **No effective row means the company's
+  default (General) shift**, so most staff need no row.
+- Two anomalies only: an odd punch count, and a span over `max_hour`. A punch is
+  never anomalous for falling outside the nominal window — 34.5% of real punches
+  are. An anomalous instance has `worked = nil` (**never `0.0`** — a real
+  zero-hour day must stay distinguishable) and renders red.
+- **Nothing gates payroll.** An anomaly is a display state, not a lock: 5% of
+  employee-days are odd, and the heaviest cases are off-site staff (lorry
+  drivers) who punch once a day by design and have no missing punch to recover.
+  `PaySlipOp` does not know this feature exists. Do not add a block here without
+  first re-measuring that population.
+- There is **no exemption flag** on employees or shifts. Off-site staff already
+  read as a red row with blank hours; with nothing gating payroll, "attendance
+  is not measured" needs no schema.
+- A time-only input on a punch row resolves **inside the instance window**, not
+  against the row's date — rows are keyed by pay date, so on a night shift those
+  are different days (`PunchTimeComponent.slot_date/3`).
+- No ceiling on pairs. `PunchGate.rebuild_day_flags/3` is gone; `flag` is a
+  derived label written by `HR.rebuild_instance/4` and numbers past `3_OUT_3`.
+
 ## Punch (attendance) editing — frozen once a payslip exists
 
 The per-day time inputs (`PunchTimeComponent`, rendered via `PunchCardComponent`) create/update/delete
@@ -121,8 +157,11 @@ The per-day time inputs (`PunchTimeComponent`, rendered via `PunchCardComponent`
   `days_after: 0`, no future-dating) — historical/imported months are editable. (There used to be a
   `days_before: 40` cap that silently blocked editing imported attendance; removed.)
 - **Frozen by payslip, not by age.** `HR.create_time_attendence_by_entry` / `update_time_attendence` /
-  `delete_time_attendence_by_id` return `{:error, :on_payslip}` when `HR.pay_slip_exists_for_period?(emp_id, date, com)`
-  is true (a PaySlip exists for that punch's employee + month/year). **Void the payslip to re-open editing.**
+  `delete_time_attendence_by_id` return `{:error, :on_payslip}` when a PaySlip already exists for that
+  punch's **instance pay date** (`HR.punch_pay_date/2` → `HR.pay_slip_exists_for_period?/3`). A night
+  shift's 02:00 OUT is locked by the evening it ended, not by the calendar date of the punch.
+  **Void the payslip to re-open editing.** This freeze is only about editing paid punches; it is not
+  a pay-slip gate on anomalies.
 - Both editing surfaces pass `payslip_locked?` to `PunchTimeComponent` so the inputs render **read-only +
   greyed with a tooltip** when locked (belt to the backend guard's braces): the **Punch Card** computes one
   flag per card in `filter_punches` (via `PaySlipOp.get_pay_slip_by_period/4`, since it's one employee/month);
@@ -136,8 +175,11 @@ Only runs for a day with a holiday (`sholi_list`) where hours worked exceed half
 dormant until an employee actually has **punches on a holiday** (which fingerprint import can produce).
 Because it was dormant it shipped broken; when touching it: `holiday_pay_days` must be passed the **company
 struct** (not `current_company.id`), and `punch_by_date(emp_id, date, com)` needs a **`Date`** (it coerces
-via `Timex.to_date/1`) and filters on **`eidsh.id`** (the CTE has no `employee_id` column). It returns a
-per-day map with `:wh`/`:nh`; the rule pays the holiday only if both adjacent days were worked (`wh > 0`).
+via `Timex.to_date/1`) and filters on **`eidsh.id`** (the CTE has no `employee_id` column). Adjacent days
+come from `neighbour/5`: in-month from the `by_date` map, **month edges via `punch_by_date/3`**. Do **not**
+index `Enum.at(objs, i - 1)` — at `i == 0` that is the last day of the month, not yesterday. Neighbour
+`wh` of `nil` is unknown, not absent (`holiday_pay_days` withholds). A genuine `wh == 0.0` is absence.
+OT and day-count totals still divide by `Employee.work_hours_per_day`, never `normal_hour`.
 
 ## pay_preps / PayPrep (currently dormant gating)
 

@@ -47,8 +47,9 @@ Each punch map: `%{stamp: Time, flag:, ID:, Name:, Department:, punch_card_id:, 
 - row 0 title, row 1 blank, **row 2 idx 2** = `"2026-01-01 ~ 2026-01-31"`, row 3 day-number header,
   **rows 4+ = `[info_row, attendance_row]` pairs** per employee.
 - Attendance cell = a day's punches concatenated, e.g. `"07:5512:0112:5417:01"`; the parser regex-scans
-  `\d{2}:\d{2}`, **dedups punches within 10 min**, assigns positional flags
-  `1_IN_1,1_OUT_1,2_IN_2,2_OUT_2,3_IN_3,3_OUT_3` then `nil` for a 7th+ punch.
+  `\d{2}:\d{2}`, **dedups punches within 10 min**, then writes a **placeholder** `flag: "1_IN_1"`
+  for every stamp. Position is derived after insert by `HR.rebuild_instance/4` — there is no 6-flag
+  ring and a 7th+ punch is stored, not dropped.
 
 ### Info-row index gotcha
 `filter_times_n_split_to_map` does `Enum.reject(info, & &1 == "")` FIRST, then reads `Enum.at(info, 1)`
@@ -104,9 +105,25 @@ whole `Multi`. Including `"name"` (unchanged) gives a non-blank delta.
 
 ## Idempotent insert
 
-`HR.insert_time_attendence_from_log/2` skips inserting when a same-`flag` punch already exists within
-±5 min for that employee/company, so re-imports and overlapping data are safe. The plural wrapper also
-skips unmatched people and `nil`-flag (7th+) punches.
+`HR.insert_time_attendence_from_log/2` skips inserting when a punch already exists within ±5 min for
+that employee/company. Dedupe matches on **employee + time only** — do not reintroduce a `flag`
+comparison there. After insert it calls `HR.reassign_punch/2`. Unmatched people are skipped; placeholder
+flags mean 7th+ punches are no longer dropped.
+
+## Punches past the sixth
+
+`fill_flags_to_map/1` used to emit `flag: nil` past index 6. Since
+`finger_print_log_changeset` requires `:flag` and
+`insert_time_attendence_from_log/2` never checked the insert result, **those
+punches were silently discarded and never stored**. Its dedupe also compared
+`ta.flag == ^entry.flag`, which is `flag = NULL` for exactly those rows and
+never true.
+
+Position is now derived after insert by `HR.rebuild_instance/4`, the import
+writes a placeholder flag, and the dedupe matches on employee + a ±5 minute
+window only. Do not reintroduce a flag comparison there. `:flag` is no longer
+in `validate_required` on the TimeAttend changesets.
+
 
 ## Verifying against real files
 Convert `.xls`→`.xlsx` with the vendored SheetJS in Node, then feed through `read_excel_files/1` +

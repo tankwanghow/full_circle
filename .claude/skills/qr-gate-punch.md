@@ -1,11 +1,15 @@
 ---
 name: qr-gate-punch
-description: Use when working on QR gate attendance — paired Android scanners, building or installing the android/qr_gate APK, POST /api/punch/attendances, punch_devices, fcqa: badge QR, audit face photos on time_attendences, Punch IO photo link, or IN/OUT flag rebuild for a calendar day.
+description: Use when working on QR gate attendance — paired Android scanners, building or installing the android/qr_gate APK, POST /api/punch/attendances, punch_devices, fcqa: badge QR, audit face photos on time_attendences, Punch IO photo link, or shift-instance punch_kind/flag rebuild after a gate punch.
 ---
 
 # QR Gate Punch
 
-Company wall-mounted Android phones capture **one still** that contains a printed badge (`fcqa:<employee_id>`) **and** an unobstructed face (detection only, no matching), then POST to `/api/punch/attendances` with a **device** Bearer token. Full Circle inserts `time_attendences` (`input_medium: QRGate`, `user_id` nil) and rebuilds that employee's IN/OUT flags for the local calendar day.
+Company wall-mounted Android phones capture **one still** that contains a printed badge (`fcqa:<employee_id>`) **and** an unobstructed face (detection only, no matching), then POST to `/api/punch/attendances` with a **device** Bearer token. Full Circle inserts `time_attendences` (`input_medium: QRGate`, `user_id` nil). The gate no longer rebuilds flags per calendar day. `insert_punch/6` calls
+`HR.reassign_punch/2`, which resolves the punch to its shift instance
+(`work_shift_id` + `work_shift_date`) and renumbers `punch_kind` and `flag`
+across that instance. A night shift's 02:00 punch joins the previous evening's
+instance rather than opening a new day. `PunchGate.rebuild_day_flags/3` is gone.
 
 Pairing QR must use the **browser origin** (open Punch Devices as `http://<lan-ip>:4000`, not localhost). `Endpoint.url()` is `https://localhost:4001` in dev and the phone cannot upload to that.
 
@@ -15,7 +19,7 @@ Scanner chrome (always above the sleep overlay): **link icon top-left** (`GET /a
 
 Do **not** revive `/PunchCamera`, `punch_camera` role, Face ID, or employee self-service QR.
 
-Fingerprint import is unchanged until the gate is proven.
+Fingerprint import is a separate write path; after insert it also calls `HR.reassign_punch/2` (see [[finger-print-import]]). Do not revive `PunchGate.rebuild_day_flags/3`.
 
 Pairing: `PunchGate.create_device/3` returns `{device, plain_token}` once. QR `fcpair:<id>:<token>:<url>`. Clerks cannot pair (`:manage_punch_device` = admin/manager/supervisor).
 

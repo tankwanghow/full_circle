@@ -1831,3 +1831,98 @@ msgstr ""
 #, elixir-autogen, elixir-format
 msgid "Welcome back!"
 msgstr "欢迎回来！"
+
+#: lib/full_circle_web/live/dashboard_live/dashboard_live.ex:126
+#: lib/full_circle_web/live/work_shift_live/index.ex:52
+#, elixir-autogen, elixir-format
+msgid "Work Shifts"
+msgstr "班次"
+
+#: lib/full_circle_web/live/employee_live/form.ex:585
+#: lib/full_circle_web/live/employee_live/form.ex:636
+#, elixir-autogen, elixir-format
+msgid "Work Shift"
+msgstr "班次"
+
+#: lib/full_circle_web/live/work_shift_live/form.ex:74
+#: lib/full_circle_web/live/work_shift_live/index.ex:21
+#, elixir-autogen, elixir-format
+msgid "New Work Shift"
+msgstr "新增班次"
+
+#: lib/full_circle_web/live/work_shift_live/form.ex:74
+#, elixir-autogen, elixir-format
+msgid "Edit Work Shift"
+msgstr "修改班次"
+
+#: lib/full_circle_web/live/work_shift_live/form.ex:22
+#: lib/full_circle_web/live/work_shift_live/index.ex:26
+#, elixir-autogen, elixir-format
+msgid "Starts"
+msgstr "开始时间"
+
+#: lib/full_circle_web/live/work_shift_live/index.ex:27
+#, elixir-autogen, elixir-format
+msgid "Nominal End"
+msgstr "名义结束"
+
+#: lib/full_circle_web/live/work_shift_live/form.ex:31
+#, elixir-autogen, elixir-format
+msgid "Nominal end"
+msgstr "名义结束"
+
+#: lib/full_circle_web/live/work_shift_live/form.ex:23
+#: lib/full_circle_web/live/work_shift_live/index.ex:28
+#, elixir-autogen, elixir-format
+msgid "Normal Hour"
+msgstr "正常时数"
+
+#: lib/full_circle_web/live/work_shift_live/form.ex:24
+#: lib/full_circle_web/live/work_shift_live/index.ex:29
+#, elixir-autogen, elixir-format
+msgid "Max Hour"
+msgstr "最长时数"
+
+#: lib/full_circle_web/live/work_shift_live/form.ex:31
+#: lib/full_circle_web/live/work_shift_live/index.ex:30
+#, elixir-autogen, elixir-format
+msgid "Cutover"
+msgstr "分界时间"
+
+#: lib/full_circle_web/live/work_shift_live/index_component.ex:21
+#, elixir-autogen, elixir-format
+msgid "(default)"
+msgstr "（预设）"
+
+#: lib/full_circle_web/live/command_palette_component.ex:333
+#: lib/full_circle_web/live/employee_live/form.ex:592
+#: lib/full_circle_web/live/employee_live/form.ex:643
+#, elixir-autogen, elixir-format
+msgid "open"
+msgstr "无限期"
+
+#: lib/full_circle/hr/work_shift.ex:79
+#, elixir-autogen, elixir-format
+msgid "must not be less than normal hour"
+msgstr "不可少于正常时数"
+
+#: lib/full_circle/hr/employee_work_shift.ex:64
+#, elixir-autogen, elixir-format
+msgid "overlaps an existing assignment"
+msgstr "与现有指派重叠"
+
+#: lib/full_circle/hr/work_shift.ex:70
+#, elixir-autogen, elixir-format
+msgid "there is already a default shift"
+msgstr "已经有预设班次"
+
+#: lib/full_circle_web/live/work_shift_live/index.ex:17
+#, elixir-autogen, elixir-format
+msgid "An employee with no assignment works the default shift."
+msgstr "没有指派的员工使用预设班次。"
+
+#: lib/full_circle_web/live/employee_live/form.ex:587
+#: lib/full_circle_web/live/employee_live/form.ex:638
+#, elixir-autogen, elixir-format
+msgid "No assignment means this employee works the default shift (General)."
+msgstr "没有指派表示此员工使用预设班次（General）。"
