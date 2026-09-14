@@ -180,6 +180,9 @@ defmodule FullCircleWeb.EmployeeLive.Form do
       {:error, %Ecto.Changeset{} = cs} ->
         {:noreply, put_flash(socket, :error, list_errors_to_string(cs.errors))}
 
+      {:error, :not_found} ->
+        {:noreply, put_flash(socket, :error, gettext("Work shift not found."))}
+
       :not_authorise ->
         {:noreply,
          put_flash(socket, :error, gettext("You are not authorised to perform this action"))}
@@ -201,6 +204,9 @@ defmodule FullCircleWeb.EmployeeLive.Form do
 
       {:error, %Ecto.Changeset{} = cs} ->
         {:noreply, put_flash(socket, :error, list_errors_to_string(cs.errors))}
+
+      {:error, :not_found} ->
+        {:noreply, put_flash(socket, :error, gettext("Work shift not found."))}
 
       :not_authorise ->
         {:noreply,

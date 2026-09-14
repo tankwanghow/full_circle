@@ -135,9 +135,17 @@ defmodule FullCircle.HR do
   """
   def assign_work_shift(attrs, company, user) do
     if can?(user, :update_work_shift, company) do
-      with {:ok, a} <- %EmployeeWorkShift{} |> EmployeeWorkShift.changeset(attrs) |> Repo.insert() do
+      work_shift_id = Map.get(attrs, "work_shift_id") || Map.get(attrs, :work_shift_id)
+      employee_id = Map.get(attrs, "employee_id") || Map.get(attrs, :employee_id)
+
+      with %WorkShift{} <- Repo.get_by(WorkShift, id: work_shift_id, company_id: company.id),
+           %Employee{} <- Repo.get_by(Employee, id: employee_id, company_id: company.id),
+           {:ok, a} <- %EmployeeWorkShift{} |> EmployeeWorkShift.changeset(attrs) |> Repo.insert() do
         reresolve_range(a.employee_id, company, a.effective_from, a.effective_to)
         {:ok, a}
+      else
+        nil -> {:error, :not_found}
+        {:error, %Ecto.Changeset{}} = err -> err
       end
     else
       :not_authorise
@@ -146,11 +154,24 @@ defmodule FullCircle.HR do
 
   def unassign_work_shift(id, company, user) do
     if can?(user, :update_work_shift, company) do
-      a = Repo.get!(EmployeeWorkShift, id)
+      a =
+        from(e in EmployeeWorkShift,
+          join: w in WorkShift,
+          on: w.id == e.work_shift_id,
+          where: e.id == ^id,
+          where: w.company_id == ^company.id
+        )
+        |> Repo.one()
 
-      with {:ok, a} <- Repo.delete(a) do
-        reresolve_range(a.employee_id, company, a.effective_from, a.effective_to)
-        {:ok, a}
+      case a do
+        nil ->
+          {:error, :not_found}
+
+        a ->
+          with {:ok, a} <- Repo.delete(a) do
+            reresolve_range(a.employee_id, company, a.effective_from, a.effective_to)
+            {:ok, a}
+          end
       end
     else
       :not_authorise

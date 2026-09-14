@@ -403,5 +403,50 @@ defmodule FullCircleWeb.WorkShiftLiveTest do
 
       assert html =~ "overlaps an existing assignment"
     end
+
+    test "assign and unassign cannot cross companies", ctx do
+      user_b = user_fixture()
+      comp_b = company_fixture(user_b, %{})
+      emp_b = employee_fixture(%{}, comp_b, user_b)
+
+      {:ok, night_b} =
+        %WorkShift{}
+        |> WorkShift.changeset(%{
+          company_id: comp_b.id,
+          name: "Night",
+          start_time: ~T[17:00:00],
+          normal_hour: "9",
+          max_hour: "12"
+        })
+        |> Repo.insert()
+
+      assert {:error, :not_found} =
+               HR.assign_work_shift(
+                 %{
+                   "employee_id" => ctx.emp.id,
+                   "work_shift_id" => night_b.id,
+                   "effective_from" => "2026-05-01"
+                 },
+                 ctx.comp,
+                 ctx.user
+               )
+
+      refute Repo.get_by(EmployeeWorkShift, work_shift_id: night_b.id)
+      refute Repo.get_by(EmployeeWorkShift, employee_id: ctx.emp.id)
+
+      {:ok, asg_b} =
+        HR.assign_work_shift(
+          %{
+            "employee_id" => emp_b.id,
+            "work_shift_id" => night_b.id,
+            "effective_from" => "2026-05-01"
+          },
+          comp_b,
+          user_b
+        )
+
+      assert {:error, :not_found} = HR.unassign_work_shift(asg_b.id, ctx.comp, ctx.user)
+      assert Repo.get(EmployeeWorkShift, asg_b.id)
+    end
   end
 end
