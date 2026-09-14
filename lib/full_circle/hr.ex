@@ -118,6 +118,95 @@ defmodule FullCircle.HR do
     end
   end
 
+  def list_employee_work_shifts(employee_id) do
+    from(e in EmployeeWorkShift,
+      join: w in WorkShift,
+      on: w.id == e.work_shift_id,
+      where: e.employee_id == ^employee_id,
+      order_by: [desc: e.effective_from],
+      preload: [work_shift: w]
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  Assigns a shift, then re-resolves every punch the assignment now covers —
+  an assignment changes which instance existing punches belong to.
+  """
+  def assign_work_shift(attrs, company, user) do
+    if can?(user, :update_work_shift, company) do
+      with {:ok, a} <- %EmployeeWorkShift{} |> EmployeeWorkShift.changeset(attrs) |> Repo.insert() do
+        reresolve_range(a.employee_id, company, a.effective_from, a.effective_to)
+        {:ok, a}
+      end
+    else
+      :not_authorise
+    end
+  end
+
+  def unassign_work_shift(id, company, user) do
+    if can?(user, :update_work_shift, company) do
+      a = Repo.get!(EmployeeWorkShift, id)
+
+      with {:ok, a} <- Repo.delete(a) do
+        reresolve_range(a.employee_id, company, a.effective_from, a.effective_to)
+        {:ok, a}
+      end
+    else
+      :not_authorise
+    end
+  end
+
+  # An assignment changes which instance existing punches belong to, so every
+  # punch in range is re-resolved and both the instances they left and the ones
+  # they joined are renumbered.
+  #
+  # The window is padded a day either side because a cutover can pull a punch
+  # into the neighbouring day's instance. Bounds are built in company-local time
+  # and then shifted to UTC, because punch_time is UTC.
+  defp reresolve_range(employee_id, company, from_date, to_date) do
+    tz = company.timezone
+
+    from_utc =
+      DateTime.new!(Date.add(from_date, -1), ~T[00:00:00], tz)
+      |> DateTime.shift_zone!("Etc/UTC")
+
+    to_utc =
+      case to_date do
+        nil ->
+          DateTime.new!(~D[9999-12-31], ~T[00:00:00], "Etc/UTC")
+
+        d ->
+          DateTime.new!(Date.add(d, 2), ~T[00:00:00], tz)
+          |> DateTime.shift_zone!("Etc/UTC")
+      end
+
+    punches =
+      from(t in TimeAttend,
+        where: t.company_id == ^company.id,
+        where: t.employee_id == ^employee_id,
+        where: t.punch_time >= ^from_utc and t.punch_time < ^to_utc,
+        order_by: [asc: t.punch_time]
+      )
+      |> Repo.all()
+
+    before = Enum.map(punches, &{&1.work_shift_id, &1.work_shift_date})
+
+    after_ =
+      Enum.map(punches, fn ta ->
+        attrs = punch_shift_attrs(ta.employee_id, company, ta.punch_time)
+        ta |> Ecto.Changeset.change(attrs) |> Repo.update!()
+        {attrs.work_shift_id, attrs.work_shift_date}
+      end)
+
+    (before ++ after_)
+    |> Enum.uniq()
+    |> Enum.reject(fn {ws_id, date} -> is_nil(ws_id) or is_nil(date) end)
+    |> Enum.each(fn {ws_id, date} -> rebuild_instance(company, employee_id, ws_id, date) end)
+
+    :ok
+  end
+
   @doc """
   Salary type types that count as wages (the pay slip's addition/wage base).
   FixedWages is the levy-able subset (basic salary + fixed allowances, e.g.

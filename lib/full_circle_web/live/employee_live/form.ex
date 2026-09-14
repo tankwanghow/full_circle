@@ -1,8 +1,12 @@
 defmodule FullCircleWeb.EmployeeLive.Form do
   use FullCircleWeb, :live_view
 
-  alias FullCircle.HR.{Employee}
+  import Ecto.Query, warn: false
+
+  alias FullCircle.Authorization
+  alias FullCircle.HR.{Employee, WorkShift}
   alias FullCircle.HR
+  alias FullCircle.Repo
   alias FullCircle.StdInterface
 
   @impl true
@@ -16,7 +20,9 @@ defmodule FullCircleWeb.EmployeeLive.Form do
         :copy -> mount_copy(socket, id)
       end
 
-    {:ok, socket}
+    employee_id = if socket.assigns.live_action == :edit, do: socket.assigns.id, else: nil
+
+    {:ok, assign_shift_section(socket, employee_id)}
   end
 
   defp mount_new(socket) do
@@ -155,6 +161,53 @@ defmodule FullCircleWeb.EmployeeLive.Form do
     end
   end
 
+  @impl true
+  def handle_event("assign_shift", params, socket) do
+    attrs = %{
+      "employee_id" => socket.assigns.employee_id,
+      "work_shift_id" => params["work_shift_id"],
+      "effective_from" => params["effective_from"],
+      "effective_to" => blank_to_nil(params["effective_to"])
+    }
+
+    case HR.assign_work_shift(attrs, socket.assigns.current_company, socket.assigns.current_user) do
+      {:ok, _} ->
+        {:noreply,
+         socket
+         |> reload_assignments()
+         |> put_flash(:info, gettext("Work shift assigned."))}
+
+      {:error, %Ecto.Changeset{} = cs} ->
+        {:noreply, put_flash(socket, :error, list_errors_to_string(cs.errors))}
+
+      :not_authorise ->
+        {:noreply,
+         put_flash(socket, :error, gettext("You are not authorised to perform this action"))}
+    end
+  end
+
+  @impl true
+  def handle_event("unassign_shift", %{"id" => id}, socket) do
+    case HR.unassign_work_shift(
+           id,
+           socket.assigns.current_company,
+           socket.assigns.current_user
+         ) do
+      {:ok, _} ->
+        {:noreply,
+         socket
+         |> reload_assignments()
+         |> put_flash(:info, gettext("Work shift unassigned."))}
+
+      {:error, %Ecto.Changeset{} = cs} ->
+        {:noreply, put_flash(socket, :error, list_errors_to_string(cs.errors))}
+
+      :not_authorise ->
+        {:noreply,
+         put_flash(socket, :error, gettext("You are not authorised to perform this action"))}
+    end
+  end
+
   defp save(socket, :new, params) do
     case StdInterface.create(
            Employee,
@@ -274,6 +327,42 @@ defmodule FullCircleWeb.EmployeeLive.Form do
       }
     end)
   end
+
+  defp assign_shift_section(socket, employee_id) do
+    company = socket.assigns.current_company
+
+    socket
+    |> assign(:employee_id, employee_id)
+    |> assign(
+      :can_assign_shift,
+      Authorization.can?(socket.assigns.current_user, :update_work_shift, company)
+    )
+    |> assign(
+      :work_shift_assignments,
+      if(employee_id, do: HR.list_employee_work_shifts(employee_id), else: [])
+    )
+    |> assign(:work_shifts, company_work_shifts(company))
+    |> assign(:default_work_shift_id, HR.default_work_shift(company).id)
+  end
+
+  defp reload_assignments(socket) do
+    assign(
+      socket,
+      :work_shift_assignments,
+      HR.list_employee_work_shifts(socket.assigns.employee_id)
+    )
+  end
+
+  defp company_work_shifts(company) do
+    from(w in WorkShift,
+      where: w.company_id == ^company.id,
+      order_by: [desc: w.is_default, asc: w.name]
+    )
+    |> Repo.all()
+  end
+
+  defp blank_to_nil(v) when v in [nil, ""], do: nil
+  defp blank_to_nil(v), do: v
 
   @impl true
   def render(assigns) do
@@ -481,6 +570,73 @@ defmodule FullCircleWeb.EmployeeLive.Form do
           />
         </div>
       </.form>
+
+      <p :if={!@employee_id} class="mt-4 border-t pt-3 text-sm text-gray-600 dark:text-gray-400">
+        {gettext("Work shifts can be assigned after the employee is saved.")}
+      </p>
+
+      <div :if={@employee_id && @can_assign_shift} class="mt-4 border-t pt-3">
+        <p class="font-medium">{gettext("Work Shift")}</p>
+        <p class="text-sm text-gray-600 dark:text-gray-400">
+          {gettext("No assignment means this employee works the default shift (General).")}
+        </p>
+        <div :for={a <- @work_shift_assignments} class="flex flex-row gap-2 items-center py-1">
+          <div class="w-[30%]">{a.work_shift.name}</div>
+          <div class="w-[25%]">{a.effective_from}</div>
+          <div class="w-[25%]">{a.effective_to || gettext("open")}</div>
+          <.button type="button" phx-click="unassign_shift" phx-value-id={a.id} class="red button">
+            {gettext("Remove")}
+          </.button>
+        </div>
+        <form
+          id="assign-shift-form"
+          phx-submit="assign_shift"
+          autocomplete="off"
+          class="flex flex-row gap-2 items-end mt-2"
+        >
+          <div class="w-[30%]">
+            <.input
+              type="select"
+              id="assign_work_shift_id"
+              name="work_shift_id"
+              label={gettext("Shift")}
+              options={Enum.map(@work_shifts, &{&1.name, &1.id})}
+              value={@default_work_shift_id}
+            />
+          </div>
+          <div class="w-[25%]">
+            <.input
+              type="date"
+              id="assign_effective_from"
+              name="effective_from"
+              label={gettext("From")}
+              value=""
+            />
+          </div>
+          <div class="w-[25%]">
+            <.input
+              type="date"
+              id="assign_effective_to"
+              name="effective_to"
+              label={gettext("To")}
+              value=""
+            />
+          </div>
+          <.button>{gettext("Assign")}</.button>
+        </form>
+      </div>
+
+      <div :if={@employee_id && !@can_assign_shift} class="mt-4 border-t pt-3">
+        <p class="font-medium">{gettext("Work Shift")}</p>
+        <p class="text-sm text-gray-600 dark:text-gray-400">
+          {gettext("No assignment means this employee works the default shift (General).")}
+        </p>
+        <div :for={a <- @work_shift_assignments} class="flex flex-row gap-2 items-center py-1">
+          <div class="w-[30%]">{a.work_shift.name}</div>
+          <div class="w-[25%]">{a.effective_from}</div>
+          <div class="w-[25%]">{a.effective_to || gettext("open")}</div>
+        </div>
+      </div>
     </div>
     """
   end

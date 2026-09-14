@@ -196,4 +196,212 @@ defmodule FullCircleWeb.WorkShiftLiveTest do
     assert WorkShift.cutover_time(updated) == ~T[02:00:00]
     assert Repo.reload!(ta).work_shift_date == ~D[2026-05-06]
   end
+
+  describe "assignment" do
+    setup %{comp: comp, user: user} do
+      emp = FullCircle.HRFixtures.employee_fixture(%{}, comp, user)
+
+      {:ok, night} =
+        %FullCircle.HR.WorkShift{}
+        |> FullCircle.HR.WorkShift.changeset(%{
+          company_id: comp.id,
+          name: "Night",
+          start_time: ~T[17:00:00],
+          normal_hour: "9",
+          max_hour: "12"
+        })
+        |> Repo.insert()
+
+      %{emp: emp, night: night}
+    end
+
+    test "assigning re-resolves existing punches into the new instance", ctx do
+      a =
+        Repo.insert!(%FullCircle.HR.TimeAttend{
+          company_id: ctx.comp.id,
+          employee_id: ctx.emp.id,
+          user_id: ctx.user.id,
+          punch_time:
+            Timex.parse!("2026-05-05T17:00:00+08:00", "{RFC3339}")
+            |> DateTime.shift_zone!("Etc/UTC")
+            |> DateTime.truncate(:second),
+          status: "Draft",
+          input_medium: "Manual"
+        })
+
+      b =
+        Repo.insert!(%FullCircle.HR.TimeAttend{
+          company_id: ctx.comp.id,
+          employee_id: ctx.emp.id,
+          user_id: ctx.user.id,
+          punch_time:
+            Timex.parse!("2026-05-06T02:00:00+08:00", "{RFC3339}")
+            |> DateTime.shift_zone!("Etc/UTC")
+            |> DateTime.truncate(:second),
+          status: "Draft",
+          input_medium: "Manual"
+        })
+
+      {:ok, _} = FullCircle.HR.reassign_punch(a, ctx.comp)
+      {:ok, _} = FullCircle.HR.reassign_punch(b, ctx.comp)
+
+      # Under General these are two separate days, each with one punch.
+      assert Repo.reload!(a).work_shift_date == ~D[2026-05-05]
+      assert Repo.reload!(b).work_shift_date == ~D[2026-05-06]
+
+      {:ok, _} =
+        FullCircle.HR.assign_work_shift(
+          %{
+            "employee_id" => ctx.emp.id,
+            "work_shift_id" => ctx.night.id,
+            "effective_from" => "2026-05-01"
+          },
+          ctx.comp,
+          ctx.user
+        )
+
+      # Under Night they are one instance anchored to 5 May.
+      assert Repo.reload!(a).work_shift_date == ~D[2026-05-05]
+      assert Repo.reload!(b).work_shift_date == ~D[2026-05-05]
+      assert Repo.reload!(a).punch_kind == "IN"
+      assert Repo.reload!(b).punch_kind == "OUT"
+    end
+
+    test "unassigning re-resolves punches back onto General", ctx do
+      {:ok, asg} =
+        HR.assign_work_shift(
+          %{
+            "employee_id" => ctx.emp.id,
+            "work_shift_id" => ctx.night.id,
+            "effective_from" => "2026-05-01"
+          },
+          ctx.comp,
+          ctx.user
+        )
+
+      a =
+        Repo.insert!(%TimeAttend{
+          company_id: ctx.comp.id,
+          employee_id: ctx.emp.id,
+          user_id: ctx.user.id,
+          punch_time:
+            Timex.parse!("2026-05-05T17:00:00+08:00", "{RFC3339}")
+            |> DateTime.shift_zone!("Etc/UTC")
+            |> DateTime.truncate(:second),
+          status: "Draft",
+          input_medium: "Manual"
+        })
+
+      b =
+        Repo.insert!(%TimeAttend{
+          company_id: ctx.comp.id,
+          employee_id: ctx.emp.id,
+          user_id: ctx.user.id,
+          punch_time:
+            Timex.parse!("2026-05-06T02:00:00+08:00", "{RFC3339}")
+            |> DateTime.shift_zone!("Etc/UTC")
+            |> DateTime.truncate(:second),
+          status: "Draft",
+          input_medium: "Manual"
+        })
+
+      {:ok, _} = HR.reassign_punch(a, ctx.comp)
+      {:ok, _} = HR.reassign_punch(b, ctx.comp)
+
+      assert Repo.reload!(a).work_shift_date == ~D[2026-05-05]
+      assert Repo.reload!(b).work_shift_date == ~D[2026-05-05]
+
+      {:ok, _} = HR.unassign_work_shift(asg.id, ctx.comp, ctx.user)
+
+      assert Repo.reload!(a).work_shift_date == ~D[2026-05-05]
+      assert Repo.reload!(b).work_shift_date == ~D[2026-05-06]
+    end
+
+    test "the employee form lists assignments and offers General as the default", ctx do
+      {:ok, _lv, html} =
+        live(ctx.conn, ~p"/companies/#{ctx.comp.id}/employees/#{ctx.emp.id}/edit")
+
+      assert html =~ "Work Shift"
+      assert html =~ "General"
+    end
+
+    test "a clerk sees assignments read-only", ctx do
+      Repo.insert!(%EmployeeWorkShift{
+        employee_id: ctx.emp.id,
+        work_shift_id: ctx.night.id,
+        effective_from: ~D[2026-05-01]
+      })
+
+      {:ok, _lv, html} =
+        live(
+          member_conn(ctx.comp, "clerk"),
+          ~p"/companies/#{ctx.comp.id}/employees/#{ctx.emp.id}/edit"
+        )
+
+      assert html =~ "Work Shift"
+      assert html =~ "Night"
+      refute html =~ "Remove"
+      refute html =~ ~s(id="assign-shift-form")
+    end
+
+    test "a new employee has no assignment form until saved", ctx do
+      {:ok, _lv, html} = live(ctx.conn, ~p"/companies/#{ctx.comp.id}/employees/new")
+
+      assert html =~ "Work shifts can be assigned after the employee is saved."
+      refute html =~ ~s(id="assign-shift-form")
+      refute html =~ "Remove"
+    end
+
+    test "the employee form assigns and removes a shift", ctx do
+      {:ok, lv, _} =
+        live(ctx.conn, ~p"/companies/#{ctx.comp.id}/employees/#{ctx.emp.id}/edit")
+
+      lv
+      |> form("#assign-shift-form", %{
+        "work_shift_id" => ctx.night.id,
+        "effective_from" => "2026-05-01"
+      })
+      |> render_submit()
+
+      html = render(lv)
+      assert html =~ "Night"
+      assert html =~ "2026-05-01"
+      assert html =~ "open"
+
+      [a] = HR.list_employee_work_shifts(ctx.emp.id)
+
+      lv
+      |> element("button[phx-click=unassign_shift][phx-value-id='#{a.id}']")
+      |> render_click()
+
+      refute render(lv) =~ "2026-05-01"
+      assert HR.list_employee_work_shifts(ctx.emp.id) == []
+    end
+
+    test "overlapping assignment flashes the overlap error", ctx do
+      {:ok, _} =
+        HR.assign_work_shift(
+          %{
+            "employee_id" => ctx.emp.id,
+            "work_shift_id" => ctx.night.id,
+            "effective_from" => "2026-05-01"
+          },
+          ctx.comp,
+          ctx.user
+        )
+
+      {:ok, lv, _} =
+        live(ctx.conn, ~p"/companies/#{ctx.comp.id}/employees/#{ctx.emp.id}/edit")
+
+      html =
+        lv
+        |> form("#assign-shift-form", %{
+          "work_shift_id" => ctx.night.id,
+          "effective_from" => "2026-05-01"
+        })
+        |> render_submit()
+
+      assert html =~ "overlaps an existing assignment"
+    end
+  end
 end
