@@ -200,6 +200,35 @@ defmodule FullCircle.WorkShiftTest do
       assert FullCircle.HR.shift_for(ctx.emp.id, ctx.company, ~D[2026-06-01]).id == ctx.gen.id
     end
 
+    test "a Night OUT after effective_to still uses yesterday's Night", ctx do
+      Repo.insert!(%EmployeeWorkShift{
+        employee_id: ctx.emp.id,
+        work_shift_id: ctx.night.id,
+        effective_from: ~D[2026-05-01],
+        effective_to: ~D[2026-05-31]
+      })
+
+      out =
+        FullCircle.HR.punch_shift_attrs(
+          ctx.emp.id,
+          ctx.company,
+          local(ctx, "2026-06-01T02:00:00+08:00")
+        )
+
+      assert out.work_shift_id == ctx.night.id
+      assert out.work_shift_date == ~D[2026-05-31]
+
+      later =
+        FullCircle.HR.punch_shift_attrs(
+          ctx.emp.id,
+          ctx.company,
+          local(ctx, "2026-06-01T12:00:00+08:00")
+        )
+
+      assert later.work_shift_id == ctx.gen.id
+      assert later.work_shift_date == ~D[2026-06-01]
+    end
+
     test "an open ended assignment applies from its start onward", ctx do
       Repo.insert!(%EmployeeWorkShift{
         employee_id: ctx.emp.id,
@@ -412,6 +441,32 @@ defmodule FullCircle.WorkShiftTest do
       assert length(punches) == 2
       assert Enum.map(punches, & &1.punch_kind) == ["IN", "OUT"]
       assert instance_punches(ctx, ~D[2026-05-06]) == []
+    end
+
+    test "a dated Night assignment keeps the last morning OUT in the same instance", ctx do
+      Repo.insert!(%EmployeeWorkShift{
+        employee_id: ctx.emp.id,
+        work_shift_id: ctx.night.id,
+        effective_from: ~D[2026-05-01],
+        effective_to: ~D[2026-05-31]
+      })
+
+      assert {:ok, _} = gate_punch(ctx, "2026-05-31T17:00:00+08:00")
+      assert {:ok, _} = gate_punch(ctx, "2026-06-01T02:00:00+08:00")
+
+      punches = instance_punches(ctx, ~D[2026-05-31])
+      assert length(punches) == 2
+      assert Enum.all?(punches, &(&1.work_shift_id == ctx.night.id))
+      assert Enum.map(punches, & &1.punch_kind) == ["IN", "OUT"]
+      assert instance_punches(ctx, ~D[2026-06-01]) == []
+
+      row =
+        FullCircle.HR.punch_card_query(6, 2026, ctx.emp.id, ctx.company)
+        |> Enum.find(fn r -> Timex.to_date(r.dd) == ~D[2026-06-01] end)
+
+      assert is_nil(row.anomaly)
+      refute is_nil(row.wh)
+      assert_in_delta row.wh, 9.0, 0.001
     end
 
     test "editing a punch time out of an instance renumbers both", ctx do
@@ -801,6 +856,141 @@ defmodule FullCircle.WorkShiftTest do
                  ctx.company,
                  ctx.admin
                )
+    end
+  end
+
+  describe "punch-card rows stay unique when two instances share a pay date" do
+    setup ctx do
+      emp = employee_fixture(%{}, ctx.company, ctx.admin)
+      %{emp: emp}
+    end
+
+    defp share_punch!(ctx, iso) do
+      ta =
+        Repo.insert!(%FullCircle.HR.TimeAttend{
+          company_id: ctx.company.id,
+          employee_id: ctx.emp.id,
+          user_id: ctx.admin.id,
+          punch_time:
+            Timex.parse!(iso, "{RFC3339}")
+            |> DateTime.shift_zone!("Etc/UTC")
+            |> DateTime.truncate(:second),
+          status: "Draft",
+          input_medium: "Manual"
+        })
+
+      {:ok, ta} = FullCircle.HR.reassign_punch(ta, ctx.company)
+      ta
+    end
+
+    test "General 17:00-00:30 and next-day 08:00-17:00 do not duplicate idg", ctx do
+      share_punch!(ctx, "2026-05-05T17:00:00+08:00")
+      share_punch!(ctx, "2026-05-06T00:30:00+08:00")
+      share_punch!(ctx, "2026-05-06T08:00:00+08:00")
+      share_punch!(ctx, "2026-05-06T17:00:00+08:00")
+
+      rows = FullCircle.HR.punch_card_query(5, 2026, ctx.emp.id, ctx.company)
+      on_d = Enum.filter(rows, fn r -> Timex.to_date(r.dd) == ~D[2026-05-06] end)
+      idgs = Enum.map(on_d, & &1.idg)
+
+      assert idgs == Enum.uniq(idgs)
+      assert length(on_d) == 2
+
+      overnight = Enum.find(on_d, &(&1.work_shift_date == ~D[2026-05-05]))
+      dayshift = Enum.find(on_d, &(&1.work_shift_date == ~D[2026-05-06]))
+
+      refute is_nil(overnight)
+      refute is_nil(dayshift)
+      assert overnight.idg != dayshift.idg
+      assert_in_delta overnight.wh, 7.5, 0.01
+      assert_in_delta dayshift.wh, 9.0, 0.01
+
+      # 00:30 belongs to yesterday's instance; 08:00 to today's. Pairing
+      # across instances would either blank hours or fuse them into one span.
+      hm = fn row -> Enum.map(row.time_list, fn [t | _] -> {t.hour, t.minute} end) end
+
+      assert {0, 30} in hm.(overnight)
+      refute {8, 0} in hm.(overnight)
+      assert {8, 0} in hm.(dayshift)
+      refute {0, 30} in hm.(dayshift)
+    end
+  end
+
+  describe "save_work_shift/4 is transactional" do
+    setup ctx do
+      emp = employee_fixture(%{}, ctx.company, ctx.admin)
+      {:ok, night} = shift(ctx.company, %{})
+      %{emp: emp, night: night}
+    end
+
+    test "a cutover edit re-resolves punches with the shift row", ctx do
+      Repo.insert!(%EmployeeWorkShift{
+        employee_id: ctx.emp.id,
+        work_shift_id: ctx.night.id,
+        effective_from: ~D[2026-05-01]
+      })
+
+      ta =
+        Repo.insert!(%FullCircle.HR.TimeAttend{
+          company_id: ctx.company.id,
+          employee_id: ctx.emp.id,
+          user_id: ctx.admin.id,
+          punch_time:
+            Timex.parse!("2026-05-06T02:00:00+08:00", "{RFC3339}")
+            |> DateTime.shift_zone!("Etc/UTC")
+            |> DateTime.truncate(:second),
+          status: "Draft",
+          input_medium: "Manual"
+        })
+
+      {:ok, ta} = FullCircle.HR.reassign_punch(ta, ctx.company)
+      assert Repo.reload!(ta).work_shift_date == ~D[2026-05-05]
+
+      assert {:ok, updated} =
+               FullCircle.HR.save_work_shift(
+                 ctx.night,
+                 %{"start_time" => "08:00"},
+                 ctx.company,
+                 ctx.admin
+               )
+
+      assert FullCircle.HR.WorkShift.cutover_time(updated) == ~T[02:00:00]
+      assert Repo.reload!(ta).work_shift_date == ~D[2026-05-06]
+    end
+
+    test "a rejected shift save does not re-resolve punches", ctx do
+      Repo.insert!(%EmployeeWorkShift{
+        employee_id: ctx.emp.id,
+        work_shift_id: ctx.night.id,
+        effective_from: ~D[2026-05-01]
+      })
+
+      ta =
+        Repo.insert!(%FullCircle.HR.TimeAttend{
+          company_id: ctx.company.id,
+          employee_id: ctx.emp.id,
+          user_id: ctx.admin.id,
+          punch_time:
+            Timex.parse!("2026-05-06T02:00:00+08:00", "{RFC3339}")
+            |> DateTime.shift_zone!("Etc/UTC")
+            |> DateTime.truncate(:second),
+          status: "Draft",
+          input_medium: "Manual"
+        })
+
+      {:ok, ta} = FullCircle.HR.reassign_punch(ta, ctx.company)
+      assert Repo.reload!(ta).work_shift_date == ~D[2026-05-05]
+
+      assert {:error, :update_work_shift, %Ecto.Changeset{}, _} =
+               FullCircle.HR.save_work_shift(
+                 ctx.night,
+                 %{"max_hour" => "1", "normal_hour" => "9"},
+                 ctx.company,
+                 ctx.admin
+               )
+
+      assert Repo.reload!(ctx.night).start_time == ~T[17:00:00]
+      assert Repo.reload!(ta).work_shift_date == ~D[2026-05-05]
     end
   end
 

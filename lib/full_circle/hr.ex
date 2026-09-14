@@ -71,6 +71,10 @@ defmodule FullCircle.HR do
   Persists a work shift. A save that actually moves the cutover re-resolves
   that shift's punches so stored `work_shift_date` stays in agreement with
   the new arithmetic.
+
+  The shift row and every reassign commit in one `Ecto.Multi`. StdInterface.update/7
+  already commits, so this path builds the Multi itself — a failed reassign
+  rolls the shift change back too.
   """
   def save_work_shift(%WorkShift{id: nil}, attrs, com, user) do
     StdInterface.create(WorkShift, "work_shift", attrs, com, user)
@@ -81,17 +85,52 @@ defmodule FullCircle.HR do
       Map.has_key?(attrs, "start_time") or Map.has_key?(attrs, "max_hour") or
         Map.has_key?(attrs, :start_time) or Map.has_key?(attrs, :max_hour)
 
-    with {:ok, updated} <- StdInterface.update(WorkShift, "work_shift", ws, attrs, com, user) do
-      if moved? and cutover_changed?(ws, updated) do
-        from(t in TimeAttend,
-          where: t.company_id == ^com.id and t.work_shift_id == ^updated.id
-        )
-        |> Repo.all()
-        |> Enum.each(&reassign_punch(&1, com))
-      end
+    action = :update_work_shift
 
-      {:ok, updated}
+    case can?(user, action, com) do
+      false ->
+        :not_authorise
+
+      true ->
+        Multi.new()
+        |> Multi.update(action, StdInterface.changeset(WorkShift, ws, attrs, com))
+        |> Sys.insert_log_for(action, attrs, com, user)
+        |> Multi.run(:reresolve_cutover, fn _repo, %{^action => updated} ->
+          if moved? and cutover_changed?(ws, updated) do
+            reresolve_shift_punches(updated, com)
+          else
+            {:ok, :unchanged}
+          end
+        end)
+        |> Repo.transaction()
+        |> case do
+          {:ok, %{^action => updated}} ->
+            {:ok, updated}
+
+          {:error, failed_operation, failed_value, changes} ->
+            {:error, failed_operation, failed_value, changes}
+        end
     end
+  rescue
+    Ecto.StaleEntryError -> {:error, :stale}
+  end
+
+  # One load, then reassign each punch. Any `{:error, _}` aborts the Multi so
+  # the shift update does not commit with mixed anchors.
+  defp reresolve_shift_punches(%WorkShift{} = shift, com) do
+    punches =
+      from(t in TimeAttend,
+        where: t.company_id == ^com.id and t.work_shift_id == ^shift.id,
+        order_by: [asc: t.punch_time]
+      )
+      |> Repo.all()
+
+    Enum.reduce_while(punches, {:ok, :reresolved}, fn ta, acc ->
+      case reassign_punch(ta, com) do
+        {:ok, _} -> {:cont, acc}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
   end
 
   defp cutover_changed?(before, aft),
@@ -464,14 +503,32 @@ defmodule FullCircle.HR do
   @doc """
   Which instance a punch belongs to, as changeset attrs.
 
-  Resolution uses the punch's own local date to pick the shift, then that
-  shift's cutover to pick the instance.
+  Picks the employee's shift for the punch's local date, then that shift's
+  cutover to pick the instance. A punch still inside yesterday's window
+  (the instance anchored on yesterday) uses yesterday's assignment — so a
+  Night OUT at 02:00 on 1 June stays with a May 1–31 Night assignment
+  rather than flipping to General.
   """
   def punch_shift_attrs(employee_id, company, %DateTime{} = punch_time) do
     local = DateTime.shift_zone!(punch_time, company.timezone)
-    shift = shift_for(employee_id, company, DateTime.to_date(local))
+    shift = shift_for_punch(employee_id, company, local)
 
     %{work_shift_id: shift.id, work_shift_date: instance_anchor(shift, local)}
+  end
+
+  # Yesterday's assignment still owns a punch that belongs to yesterday's
+  # instance under that shift's cutover. `shift_for/3` alone keys on the
+  # punch's local date, which splits the last night of a closed range.
+  defp shift_for_punch(employee_id, company, %DateTime{} = local) do
+    d = DateTime.to_date(local)
+    today = shift_for(employee_id, company, d)
+    yesterday = shift_for(employee_id, company, Date.add(d, -1))
+
+    if yesterday.id != today.id and instance_anchor(yesterday, local) == Date.add(d, -1) do
+      yesterday
+    else
+      today
+    end
   end
 
   @doc """
@@ -509,19 +566,19 @@ defmodule FullCircle.HR do
     old_date = ta.work_shift_date
     attrs = punch_shift_attrs(ta.employee_id, company, ta.punch_time)
 
-    {:ok, ta} = ta |> Ecto.Changeset.change(attrs) |> Repo.update()
+    with {:ok, ta} <- ta |> Ecto.Changeset.change(attrs) |> Repo.update() do
+      rebuild_instance(company, ta.employee_id, ta.work_shift_id, ta.work_shift_date)
 
-    rebuild_instance(company, ta.employee_id, ta.work_shift_id, ta.work_shift_date)
+      # A time edit can move a punch between instances; the one it left has to be
+      # renumbered too, or it keeps a gap in its sequence.
+      moved? = old_id != ta.work_shift_id or old_date != ta.work_shift_date
 
-    # A time edit can move a punch between instances; the one it left has to be
-    # renumbered too, or it keeps a gap in its sequence.
-    moved? = old_id != ta.work_shift_id or old_date != ta.work_shift_date
+      if not is_nil(old_id) and moved? do
+        rebuild_instance(company, ta.employee_id, old_id, old_date)
+      end
 
-    if not is_nil(old_id) and moved? do
-      rebuild_instance(company, ta.employee_id, old_id, old_date)
+      {:ok, Repo.get!(TimeAttend, ta.id)}
     end
-
-    {:ok, Repo.get!(TimeAttend, ta.id)}
   end
 
   def insert_time_attendence_from_log(entry, com) do
@@ -588,7 +645,7 @@ defmodule FullCircle.HR do
 
   defp punch_locked_by_payslip?(emp_id, %NaiveDateTime{} = ptl, com) do
     local = DateTime.from_naive!(ptl, com.timezone)
-    shift = shift_for(emp_id, com, NaiveDateTime.to_date(ptl))
+    shift = shift_for_punch(emp_id, com, local)
     anchor = instance_anchor(shift, local)
 
     this_date = DateTime.to_date(local)
@@ -1582,7 +1639,15 @@ defmodule FullCircle.HR do
               cross join date_series ds
              where (ds.dd at time zone '#{com.timezone}')::date = ei.pay_date)
 
-        select eidsh.id::varchar || eidsh.dd::date::varchar as idg,
+        select case
+                 when etl.work_shift_id is null then
+                   eidsh.id::varchar || eidsh.dd::date::varchar
+                 else
+                   eidsh.id::varchar
+                   || etl.work_shift_id::varchar
+                   || coalesce(etl.work_shift_date::varchar, '')
+                   || eidsh.dd::date::varchar
+               end as idg,
               eidsh.dd at time zone 'Asia/Kuala_Lumpur' as dd,
               eidsh.name, eidsh.work_hours_per_day, eidsh.work_days_per_week,
               eidsh.work_days_per_month, eidsh.id as employee_id, etl.time_list,
@@ -1600,7 +1665,7 @@ defmodule FullCircle.HR do
 
     (punch_query_by_company_id(pdate, pdate, com) <>
        " and eidsh.id = '#{emp_id}'" <>
-       " order by eidsh.dd")
+       " order by eidsh.dd, etl.work_shift_date nulls first")
     |> exec_query_map()
     |> unzip_all_time_list()
     |> Enum.at(0)
@@ -1612,7 +1677,7 @@ defmodule FullCircle.HR do
 
     (punch_query_by_company_id(sdate, edate, com) <>
        " and eidsh.id = '#{emp_id}'" <>
-       " order by eidsh.dd")
+       " order by eidsh.dd, etl.work_shift_date nulls first")
     |> exec_query_map()
     |> unzip_all_time_list()
   end
@@ -1638,7 +1703,7 @@ defmodule FullCircle.HR do
          else: ""
        ) <>
        if(active_only, do: " and eidsh.status = 'Active'", else: "") <>
-       " order by eidsh.name, eidsh.dd" <>
+       " order by eidsh.name, eidsh.dd, etl.work_shift_date nulls first" <>
        " limit #{per_page} offset (#{page} - 1) * #{per_page} ")
     |> exec_query_map()
     |> unzip_all_time_list()
