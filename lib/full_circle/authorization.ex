@@ -274,6 +274,15 @@ defmodule FullCircle.Authorization do
   def can?(user, :manage_punch_device, company),
     do: allow_roles(~w(admin manager supervisor), company, user)
 
+  def can?(user, :create_work_shift, company),
+    do: allow_roles(~w(admin manager supervisor), company, user)
+
+  def can?(user, :update_work_shift, company),
+    do: allow_roles(~w(admin manager supervisor), company, user)
+
+  def can?(user, :delete_work_shift, company),
+    do: allow_roles(~w(admin manager supervisor), company, user)
+
   def can?(user, :create_recurring, company),
     do: allow_roles(~w(admin manager supervisor clerk), company, user)
 

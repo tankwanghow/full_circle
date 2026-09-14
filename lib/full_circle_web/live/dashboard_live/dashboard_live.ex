@@ -118,6 +118,13 @@ defmodule FullCircleWeb.DashboardLive do
         >
           {gettext("Punch Devices")}
         </.link>
+        <.link
+          :if={FullCircle.Authorization.can?(@current_user, :update_work_shift, @current_company)}
+          navigate={~p"/companies/#{@current_company.id}/work_shifts"}
+          class="button orange"
+        >
+          {gettext("Work Shifts")}
+        </.link>
         <.link navigate={~p"/companies/#{@current_company.id}/import_attend"} class="blue button">
           {gettext("Import Attendence File")}
         </.link>

@@ -68,6 +68,57 @@ defmodule FullCircle.HR do
   end
 
   @doc """
+  Persists a work shift. A save that actually moves the cutover re-resolves
+  that shift's punches so stored `work_shift_date` stays in agreement with
+  the new arithmetic.
+  """
+  def save_work_shift(%WorkShift{id: nil}, attrs, com, user) do
+    StdInterface.create(WorkShift, "work_shift", attrs, com, user)
+  end
+
+  def save_work_shift(%WorkShift{} = ws, attrs, com, user) do
+    moved? =
+      Map.has_key?(attrs, "start_time") or Map.has_key?(attrs, "max_hour") or
+        Map.has_key?(attrs, :start_time) or Map.has_key?(attrs, :max_hour)
+
+    with {:ok, updated} <- StdInterface.update(WorkShift, "work_shift", ws, attrs, com, user) do
+      if moved? and cutover_changed?(ws, updated) do
+        from(t in TimeAttend,
+          where: t.company_id == ^com.id and t.work_shift_id == ^updated.id
+        )
+        |> Repo.all()
+        |> Enum.each(&reassign_punch(&1, com))
+      end
+
+      {:ok, updated}
+    end
+  end
+
+  defp cutover_changed?(before, aft),
+    do: WorkShift.cutover_time(before) != WorkShift.cutover_time(aft)
+
+  @doc """
+  Deletes a work shift. The default row is undeletable (`default_work_shift/1`
+  is `get_by!` and punches nilify), and a shift still referenced by punches or
+  assignments is refused.
+  """
+  def delete_work_shift(%WorkShift{is_default: true}, _com, _user),
+    do: {:error, :default_shift}
+
+  def delete_work_shift(%WorkShift{} = ws, com, user) do
+    cond do
+      Repo.exists?(from t in TimeAttend, where: t.work_shift_id == ^ws.id) ->
+        {:error, :shift_in_use}
+
+      Repo.exists?(from a in EmployeeWorkShift, where: a.work_shift_id == ^ws.id) ->
+        {:error, :shift_assigned}
+
+      true ->
+        StdInterface.delete(WorkShift, "work_shift", ws, com, user)
+    end
+  end
+
+  @doc """
   Salary type types that count as wages (the pay slip's addition/wage base).
   FixedWages is the levy-able subset (basic salary + fixed allowances, e.g.
   for the HRD Corp levy); Addition covers variable pay like overtime.
