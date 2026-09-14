@@ -430,8 +430,12 @@ defmodule FullCircle.HR do
     shift = shift_for(emp_id, com, NaiveDateTime.to_date(ptl))
     anchor = instance_anchor(shift, local)
 
-    # Last punch already in that instance, if any - a new punch joining an
-    # existing night shift is governed by the same pay slip as the rest of it.
+    this_date = DateTime.to_date(local)
+
+    # Prospective pay date is the day the instance *will* end after this punch:
+    # max(existing last local date, this punch local date). Using only the
+    # punches already stored would let a new OUT that crosses midnight land on
+    # a paid month's punch-card row.
     pay_date =
       from(t in TimeAttend,
         where: t.company_id == ^com.id and t.employee_id == ^emp_id,
@@ -442,10 +446,16 @@ defmodule FullCircle.HR do
       )
       |> Repo.one()
       |> case do
-        nil -> local
-        last -> Timex.to_datetime(last, com.timezone)
+        nil ->
+          this_date
+
+        last ->
+          last_date = last |> Timex.to_datetime(com.timezone) |> Timex.to_date()
+
+          if Date.compare(this_date, last_date) == :gt,
+            do: this_date,
+            else: last_date
       end
-      |> Timex.to_date()
 
     pay_slip_exists_for_period?(emp_id, pay_date, com)
   end

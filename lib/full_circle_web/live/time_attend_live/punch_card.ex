@@ -858,7 +858,7 @@ defmodule FullCircleWeb.TimeAttendLive.PunchCard do
 
   # An anomalous day contributes nothing: its hours are unknown. It does not
   # block anything - the red row is the signal, exactly as it is today.
-  defp holiday_pay_days(objs, com) do
+  def holiday_pay_days(objs, com) do
     by_date = Map.new(objs, fn x -> {Timex.to_date(x.dd), x} end)
 
     objs

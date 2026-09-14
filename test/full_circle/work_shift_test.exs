@@ -629,45 +629,22 @@ defmodule FullCircle.WorkShiftTest do
       assert row.wh == 0.0
     end
 
-    # The off-site case: one punch every working day, for a whole month, and the
-    # pay slip must still generate. Nothing in this feature gates payroll.
+    # The off-site case: one punch every working day, and the pay slip for
+    # *that* month must still generate. PaySlipOp.pay/6 hardcodes slip_date to
+    # Timex.today() and rejects a period more than 31 days away, so the
+    # punches live in the current month — the month that can actually insert.
     test "a month of single punch days still pays", ctx do
+      today = Timex.today()
+      month = today.month |> Integer.to_string() |> String.pad_leading(2, "0")
+
       for d <- 4..8 do
-        manual_punch!(ctx, "2026-05-0#{d}T08:00:00+08:00")
+        manual_punch!(ctx, "#{today.year}-#{month}-0#{d}T08:00:00+08:00")
       end
 
-      rows = FullCircle.HR.punch_card_query(5, 2026, ctx.emp.id, ctx.company)
+      rows = FullCircle.HR.punch_card_query(today.month, today.year, ctx.emp.id, ctx.company)
       assert Enum.count(rows, fn r -> r.anomaly == :missing_punch end) == 5
 
-      # PaySlipOp.pay/6 always looks up "Employee PCB"; it is not company-seeded.
-      cr =
-        FullCircle.Accounting.get_account_by_name(
-          "Salaries and Wages Payable",
-          ctx.company,
-          ctx.admin
-        )
-
-      salary_type_fixture(
-        %{
-          name: "Employee PCB",
-          type: "Deduction",
-          cal_func: "pcb_employee",
-          db_ac_name: cr.name,
-          db_ac_id: cr.id,
-          cr_ac_name: cr.name,
-          cr_ac_id: cr.id
-        },
-        ctx.company,
-        ctx.admin
-      )
-
-      acc = FullCircle.ReceiveFundFixtures.funds_account_fixture(ctx.company, ctx.admin)
-
-      # PaySlipOp.pay/6 hardcodes slip_date to Timex.today(), and PaySlip
-      # validate_pay_month_year rejects a period more than 31 days from that
-      # date. May 2026 cannot insert in September; paying the current period
-      # still proves there is no anomaly gate (PaySlipOp does not read punches).
-      today = Date.utc_today()
+      acc = pcb_and_funds!(ctx)
 
       assert {:ok, _} =
                FullCircle.PaySlipOp.pay(
@@ -745,5 +722,160 @@ defmodule FullCircle.WorkShiftTest do
       assert PunchTimeComponent.slot_date("02:00", row.work_shift_date, row.work_shift) ==
                ~D[2026-05-06]
     end
+  end
+
+  describe "punch_locked_by_payslip uses the prospective pay date" do
+    setup ctx do
+      emp = employee_fixture(%{}, ctx.company, ctx.admin)
+      {:ok, night} = shift(ctx.company, %{})
+      %{emp: emp, night: night}
+    end
+
+    test "a night OUT into a paid month is locked", ctx do
+      today = Timex.today()
+      d1 = %{today | day: 1}
+      d0 = Date.add(d1, -1)
+
+      Repo.insert!(%EmployeeWorkShift{
+        employee_id: ctx.emp.id,
+        work_shift_id: ctx.night.id,
+        effective_from: d0
+      })
+
+      Repo.insert!(%FullCircle.HR.TimeAttend{
+        company_id: ctx.company.id,
+        employee_id: ctx.emp.id,
+        user_id: ctx.admin.id,
+        punch_time:
+          DateTime.new!(d0, ~T[17:00:00], ctx.company.timezone)
+          |> DateTime.shift_zone!("Etc/UTC")
+          |> DateTime.truncate(:second),
+        status: "Draft",
+        input_medium: "Manual"
+      })
+      |> FullCircle.HR.reassign_punch(ctx.company)
+
+      acc = pcb_and_funds!(ctx)
+
+      assert {:ok, _} =
+               FullCircle.PaySlipOp.pay(
+                 Repo.reload!(ctx.emp),
+                 d1.month,
+                 d1.year,
+                 acc.id,
+                 ctx.company,
+                 ctx.admin
+               )
+
+      assert {:error, :on_payslip} =
+               FullCircle.HR.create_time_attendence_by_entry(
+                 %{
+                   input_medium: "UserEntry",
+                   employee_id: ctx.emp.id,
+                   employee_name: ctx.emp.name,
+                   punch_time_local: NaiveDateTime.new!(d1, ~T[02:00:00]),
+                   status: "Draft",
+                   company_id: ctx.company.id,
+                   user_id: ctx.admin.id
+                 },
+                 ctx.company,
+                 ctx.admin
+               )
+    end
+
+    test "a General punch on an unpaid day is not locked", ctx do
+      today = Timex.today()
+      d = Date.add(today, -1)
+
+      assert {:ok, _} =
+               FullCircle.HR.create_time_attendence_by_entry(
+                 %{
+                   input_medium: "UserEntry",
+                   employee_id: ctx.emp.id,
+                   employee_name: ctx.emp.name,
+                   punch_time_local: NaiveDateTime.new!(d, ~T[08:00:00]),
+                   status: "Draft",
+                   company_id: ctx.company.id,
+                   user_id: ctx.admin.id
+                 },
+                 ctx.company,
+                 ctx.admin
+               )
+    end
+  end
+
+  describe "holiday_pay_days withholds on a nil neighbour" do
+    setup ctx do
+      emp = employee_fixture(%{}, ctx.company, ctx.admin)
+      %{emp: emp}
+    end
+
+    defp hrow(emp_id, date, attrs) do
+      Map.merge(
+        %{
+          dd: NaiveDateTime.new!(date, ~T[00:00:00]),
+          employee_id: emp_id,
+          work_hours_per_day: 7.5,
+          sholi_list: nil,
+          nh: 8.0,
+          wh: 9.0
+        },
+        attrs
+      )
+    end
+
+    test "worked neighbours pay; a nil neighbour withholds", ctx do
+      emp_id = ctx.emp.id
+      h = ~D[2026-05-05]
+      holiday = hrow(emp_id, h, %{sholi_list: "H", nh: 8.0, wh: 9.0})
+
+      worked =
+        FullCircleWeb.TimeAttendLive.PunchCard.holiday_pay_days(
+          [
+            hrow(emp_id, Date.add(h, -1), %{wh: 9.0, nh: 8.0}),
+            holiday,
+            hrow(emp_id, Date.add(h, 1), %{wh: 9.0, nh: 8.0})
+          ],
+          ctx.company
+        )
+
+      withheld =
+        FullCircleWeb.TimeAttendLive.PunchCard.holiday_pay_days(
+          [
+            hrow(emp_id, Date.add(h, -1), %{wh: nil, nh: nil}),
+            holiday,
+            hrow(emp_id, Date.add(h, 1), %{wh: 9.0, nh: 8.0})
+          ],
+          ctx.company
+        )
+
+      assert_in_delta worked, 8.0 / 7.5, 0.001
+      assert withheld == 0.0
+    end
+  end
+
+  defp pcb_and_funds!(ctx) do
+    cr =
+      FullCircle.Accounting.get_account_by_name(
+        "Salaries and Wages Payable",
+        ctx.company,
+        ctx.admin
+      )
+
+    salary_type_fixture(
+      %{
+        name: "Employee PCB",
+        type: "Deduction",
+        cal_func: "pcb_employee",
+        db_ac_name: cr.name,
+        db_ac_id: cr.id,
+        cr_ac_name: cr.name,
+        cr_ac_id: cr.id
+      },
+      ctx.company,
+      ctx.admin
+    )
+
+    FullCircle.ReceiveFundFixtures.funds_account_fixture(ctx.company, ctx.admin)
   end
 end
