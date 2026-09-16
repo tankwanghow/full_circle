@@ -109,13 +109,9 @@ defmodule FullCircle.HR.TimeAttend do
     |> punch_time_to_utc()
     # No days_before cap: historical attendance (e.g. imported fingerprint months)
     # must be editable. Editing is instead frozen once a PaySlip exists for the
-    # employee/month — enforced in HR.create/update/delete_time_attendence.
+    # employee/month — enforced in HR.create/update/delete_time_attendence_by_id.
     |> validate_date(:punch_time_local, days_after: 0)
     |> validate_id(:employee_name, :employee_id)
-  end
-
-  def punch_time_to_local_tz(ta, com) do
-    ta |> Map.merge(%{punch_time_local: ta.punch_time |> Timex.to_datetime(com.timezone)})
   end
 
   defp punch_time_to_utc(cs) do

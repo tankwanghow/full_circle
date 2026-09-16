@@ -309,10 +309,6 @@ defmodule FullCircleWeb.Router do
       live("/Payment/:payment_id/edit", PaymentLive.Form, :edit)
       live("/Payment/:payment_id/match_e_inv", PaymentLive.Form, :match)
 
-      live("/TimeAttend", TimeAttendLive.Index, :index)
-      # live("/TimeAttend/new", TimeAttendLive.Form, :new)
-      # live("/TimeAttend/:attend_id/edit", TimeAttendLive.Form, :edit)
-
       live("/PunchIndex", TimeAttendLive.PunchIndex, :index)
       live("/PunchCard", TimeAttendLive.PunchCard, :index)
 

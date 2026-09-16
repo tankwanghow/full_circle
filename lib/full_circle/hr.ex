@@ -436,48 +436,6 @@ defmodule FullCircle.HR do
     Enum.any?(FullCircle.HR.default_salary_types(st.company_id), fn a -> a.name == st.name end)
   end
 
-  def timeattend_index_query(terms, date_from, com, user,
-        page: page,
-        per_page: per_page
-      ) do
-    qry =
-      from(inv in subquery(timeattend_raw_query(com, user)))
-
-    qry =
-      if terms != "" do
-        from inv in subquery(qry),
-          order_by:
-            ^similarity_order(
-              [:employee_name, :flag, :input_medium],
-              terms
-            ),
-          order_by: [inv.punch_time]
-      else
-        qry
-      end
-
-    qry =
-      if date_from != "" do
-        date_from = "#{date_from}"
-
-        from inv in qry,
-          where: inv.punch_time >= ^date_from,
-          order_by: [inv.punch_time]
-      else
-        qry
-      end
-
-    qry |> offset((^page - 1) * ^per_page) |> limit(^per_page) |> Repo.all()
-  end
-
-  def get_time_attendence!(id, company, user) do
-    from(ta in timeattend_raw_query(company, user),
-      where: ta.id == ^id
-    )
-    |> Repo.one!()
-    |> FullCircle.HR.TimeAttend.punch_time_to_local_tz(company)
-  end
-
   def find_employee_last_punch_data(emp_id, com_id) do
     from(ta in TimeAttend,
       where: ta.employee_id == ^emp_id,
@@ -486,18 +444,6 @@ defmodule FullCircle.HR do
       limit: 1
     )
     |> Repo.one!()
-  end
-
-  defp timeattend_raw_query(company, _user) do
-    from(ta in TimeAttend,
-      join: emp in Employee,
-      on: emp.id == ta.employee_id,
-      join: user in FullCircle.UserAccounts.User,
-      on: user.id == ta.user_id,
-      where: ta.company_id == ^company.id,
-      select: ta,
-      select_merge: %{employee_name: emp.name, email: user.email}
-    )
   end
 
   @doc """
@@ -731,19 +677,6 @@ defmodule FullCircle.HR do
           with {:ok, ta} <- Repo.update(cs) do
             reassign_punch(ta, com)
           end
-        end
-
-      false ->
-        :not_authorise
-    end
-  end
-
-  def delete_time_attendence(ta, com, user) do
-    case can?(user, :delete_time_attendence, com) do
-      true ->
-        with {:ok, ta} <- Repo.delete(ta) do
-          rebuild_instance(com, ta.employee_id, ta.work_shift_id, ta.work_shift_date)
-          {:ok, ta}
         end
 
       false ->
