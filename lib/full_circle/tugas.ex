@@ -562,4 +562,115 @@ defmodule FullCircle.Tugas do
   defp extension_for("application/pdf"), do: ".pdf"
 
   defp uploads_dir, do: Application.get_env(:full_circle, :uploads_dir)
+
+  # --- CORRECTIONS ----------------------------------------------------------
+
+  @correction_window_hours 48
+
+  def correction_window_hours, do: @correction_window_hours
+
+  @doc """
+  Fixes the note on a `progress` event.
+
+  Only the note changes; `action` is dropped from the attrs, because an event's
+  kind is decided by the state machine that wrote it and rewriting it would put
+  the trail out of step with the duty row.
+
+  The author may correct their own event for #{@correction_window_hours} hours.
+  After that — or on somebody else's event at any age — it takes
+  `:correct_others_duty_event`, which is the supervisory override.
+  """
+  def correct_duty_event(%DutyEvent{} = event, attrs, com, user) do
+    note = note_of(FullCircle.Helpers.key_to_string(attrs))
+
+    with {:ok, event} <- correctable(event, com, user),
+         {:ok, updated} <-
+           Repo.update(DutyEvent.changeset(event, %{"note" => note})),
+         {:ok, _} <-
+           Repo.insert(
+             Sys.log_changeset(
+               :correct_duty_event,
+               updated,
+               %{"note" => note, "was" => event.note},
+               com,
+               user
+             )
+           ) do
+      {:ok, updated}
+    end
+  end
+
+  @doc """
+  Retracts a `progress` event, and takes its evidence off the volume with it.
+
+  Same window and same override as `correct_duty_event/4`. The evidence rows
+  cascade from the foreign key; the files would not, so they are removed here.
+  """
+  def delete_duty_event(%DutyEvent{} = event, com, user) do
+    with {:ok, event} <- correctable(event, com, user) do
+      paths = Enum.map(list_event_documents(event.id, com, user), & &1.path)
+
+      Multi.new()
+      |> Multi.delete(:duty_event, event)
+      |> Multi.insert("delete_duty_event_log", fn _ ->
+        Sys.log_changeset(
+          :delete_duty_event,
+          event,
+          %{"action" => event.action, "note" => event.note, "duty_id" => event.duty_id},
+          com,
+          user
+        )
+      end)
+      |> Repo.transaction()
+      |> case do
+        {:ok, %{duty_event: event}} ->
+          # Only once the rows are certainly gone. A file removed ahead of a
+          # rolled-back delete would leave a row pointing at nothing, which is
+          # worse than the orphan it was trying to avoid.
+          Enum.each(paths, &File.rm(Path.join(uploads_dir(), &1)))
+          {:ok, event}
+
+        {:error, _, failed_value, _} ->
+          {:error, failed_value}
+      end
+    end
+  end
+
+  # Structural events (done, skip, linked, unlinked, end_series) are written by
+  # the state machine and are what the duty row is derived from. Retracting a
+  # "done" would not reopen the duty, it would only make the trail lie.
+  defp correctable(%DutyEvent{action: action}, _com, _user) when action != "progress",
+    do: {:error, :not_correctable}
+
+  defp correctable(%DutyEvent{} = event, com, user) do
+    case get_duty_event(event.id, com, user) do
+      nil ->
+        {:error, :not_found}
+
+      %DutyEvent{} = event ->
+        cond do
+          own?(event, user) and within_window?(event) ->
+            if can?(user, :create_duty_event, com), do: {:ok, event}, else: :not_authorise
+
+          can?(user, :correct_others_duty_event, com) ->
+            {:ok, event}
+
+          own?(event, user) ->
+            {:error, :window_closed}
+
+          true ->
+            {:error, :not_author}
+        end
+    end
+  end
+
+  defp own?(%DutyEvent{user_id: uid}, %{id: uid}), do: true
+  defp own?(_, _), do: false
+
+  defp within_window?(%DutyEvent{inserted_at: at}) do
+    DateTime.diff(DateTime.utc_now(), at, :second) <= @correction_window_hours * 3600
+  end
+
+  def get_duty_event(id, com, user),
+    do: Repo.one(from(e in query(DutyEvent, com, user), where: e.id == ^id))
 end

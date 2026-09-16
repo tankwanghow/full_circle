@@ -574,4 +574,166 @@ defmodule FullCircle.TugasTest do
       assert length(Tugas.list_event_documents(event.id, company, admin)) == 2
     end
   end
+
+  # --- CORRECTIONS ----------------------------------------------------------
+
+  defp user_with_role(company, admin, role) do
+    user = FullCircle.UserAccountsFixtures.user_fixture()
+    FullCircle.Sys.allow_user_to_access(company, user, role, admin)
+    user
+  end
+
+  defp backdate_event(event, hours) do
+    at = DateTime.utc_now() |> DateTime.add(-hours * 3600, :second)
+
+    {1, _} =
+      Repo.update_all(
+        from(e in FullCircle.Tugas.DutyEvent, where: e.id == ^event.id),
+        set: [inserted_at: at]
+      )
+
+    Repo.get!(FullCircle.Tugas.DutyEvent, event.id)
+  end
+
+  describe "correct_duty_event/4" do
+    test "the author may fix their own note inside 48 hours", %{admin: admin, company: company} do
+      clerk = user_with_role(company, admin, "clerk")
+      {:ok, duty} = Tugas.create_duty(%{"title" => "Typo duty"}, company, clerk)
+      {:ok, event} = Tugas.add_progress(duty, %{"note" => "calle"}, company, clerk)
+      event = backdate_event(event, 47)
+
+      assert {:ok, fixed} =
+               Tugas.correct_duty_event(event, %{"note" => "called"}, company, clerk)
+
+      assert fixed.note == "called"
+      assert fixed.action == "progress"
+    end
+
+    test "the author loses the right after 48 hours", %{admin: admin, company: company} do
+      clerk = user_with_role(company, admin, "clerk")
+      {:ok, duty} = Tugas.create_duty(%{"title" => "Old typo"}, company, clerk)
+      {:ok, event} = Tugas.add_progress(duty, %{"note" => "calle"}, company, clerk)
+      event = backdate_event(event, 49)
+
+      assert {:error, :window_closed} =
+               Tugas.correct_duty_event(event, %{"note" => "called"}, company, clerk)
+    end
+
+    test "a supervisor may correct an old event by another author", %{
+      admin: admin,
+      company: company
+    } do
+      clerk = user_with_role(company, admin, "clerk")
+      supervisor = user_with_role(company, admin, "supervisor")
+
+      {:ok, duty} = Tugas.create_duty(%{"title" => "Old typo"}, company, clerk)
+      {:ok, event} = Tugas.add_progress(duty, %{"note" => "calle"}, company, clerk)
+      event = backdate_event(event, 500)
+
+      assert {:ok, fixed} =
+               Tugas.correct_duty_event(event, %{"note" => "called"}, company, supervisor)
+
+      assert fixed.note == "called"
+    end
+
+    test "a clerk may not correct another author's event", %{admin: admin, company: company} do
+      author = user_with_role(company, admin, "clerk")
+      other = user_with_role(company, admin, "cashier")
+
+      {:ok, duty} = Tugas.create_duty(%{"title" => "Not yours"}, company, author)
+      {:ok, event} = Tugas.add_progress(duty, %{"note" => "mine"}, company, author)
+
+      assert {:error, :not_author} =
+               Tugas.correct_duty_event(event, %{"note" => "theirs"}, company, other)
+    end
+
+    test "a correction cannot change what kind of event it was", %{
+      admin: admin,
+      company: company
+    } do
+      {:ok, duty} = Tugas.create_duty(%{"title" => "Sneaky"}, company, admin)
+      {:ok, event} = Tugas.add_progress(duty, %{"note" => "note"}, company, admin)
+
+      assert {:ok, fixed} =
+               Tugas.correct_duty_event(
+                 event,
+                 %{"note" => "n", "action" => "done"},
+                 company,
+                 admin
+               )
+
+      assert fixed.action == "progress"
+      assert Tugas.get_duty!(duty.id, company, admin).status == "active"
+    end
+
+    test "structural events are not correctable", %{admin: admin, company: company} do
+      {:ok, duty} = Tugas.create_duty(%{"title" => "Closed"}, company, admin)
+      {:ok, _} = Tugas.complete_duty(duty.id, %{"note" => "paid"}, company, admin)
+      [done_event] = Tugas.list_duty_events(duty.id, company, admin)
+
+      assert {:error, :not_correctable} =
+               Tugas.correct_duty_event(done_event, %{"note" => "nope"}, company, admin)
+    end
+  end
+
+  describe "delete_duty_event/3" do
+    test "the author may retract their own note inside 48 hours", %{
+      admin: admin,
+      company: company
+    } do
+      clerk = user_with_role(company, admin, "clerk")
+      {:ok, duty} = Tugas.create_duty(%{"title" => "Retract"}, company, clerk)
+      {:ok, event} = Tugas.add_progress(duty, %{"note" => "wrong duty"}, company, clerk)
+
+      assert {:ok, _} = Tugas.delete_duty_event(event, company, clerk)
+      assert Tugas.list_duty_events(duty.id, company, clerk) == []
+    end
+
+    test "the author loses the right after 48 hours", %{admin: admin, company: company} do
+      clerk = user_with_role(company, admin, "clerk")
+      {:ok, duty} = Tugas.create_duty(%{"title" => "Retract"}, company, clerk)
+      {:ok, event} = Tugas.add_progress(duty, %{"note" => "wrong"}, company, clerk)
+      event = backdate_event(event, 49)
+
+      assert {:error, :window_closed} = Tugas.delete_duty_event(event, company, clerk)
+    end
+
+    test "a supervisor may retract an old event by another author", %{
+      admin: admin,
+      company: company
+    } do
+      clerk = user_with_role(company, admin, "clerk")
+      supervisor = user_with_role(company, admin, "supervisor")
+
+      {:ok, duty} = Tugas.create_duty(%{"title" => "Retract"}, company, clerk)
+      {:ok, event} = Tugas.add_progress(duty, %{"note" => "wrong"}, company, clerk)
+      event = backdate_event(event, 500)
+
+      assert {:ok, _} = Tugas.delete_duty_event(event, company, supervisor)
+    end
+
+    test "structural events are not deletable", %{admin: admin, company: company} do
+      {:ok, duty} = Tugas.create_duty(%{"title" => "Closed"}, company, admin)
+      {:ok, _} = Tugas.complete_duty(duty.id, %{"note" => "paid"}, company, admin)
+      [done_event] = Tugas.list_duty_events(duty.id, company, admin)
+
+      assert {:error, :not_correctable} = Tugas.delete_duty_event(done_event, company, admin)
+    end
+
+    test "retracting an event takes its evidence off the volume too", %{
+      admin: admin,
+      company: company
+    } do
+      event = live_event(company, admin)
+      {:ok, doc} = Tugas.attach_evidence(event, tmp_upload(@png_magic, "a.png"), company, admin)
+
+      abs = Path.join(System.tmp_dir!(), doc.path)
+      assert File.exists?(abs)
+
+      assert {:ok, _} = Tugas.delete_duty_event(event, company, admin)
+
+      refute File.exists?(abs)
+      assert Tugas.list_event_documents(event.id, company, admin) == []
+    end
+  end
 end
