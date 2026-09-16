@@ -79,12 +79,14 @@ defmodule FullCircleWeb.PunchDeviceLive.Index do
 
         {:noreply,
          socket
-         |> assign(pairing: %{
-           payload: payload,
-           svg: svg,
-           name: device.name,
-           device_id: device.id
-         })
+         |> assign(
+           pairing: %{
+             payload: payload,
+             svg: svg,
+             name: device.name,
+             device_id: device.id
+           }
+         )
          |> load_devices()
          |> put_flash(:success, gettext("Device created. Scan the QR with the gate phone now."))}
 
@@ -119,7 +121,7 @@ defmodule FullCircleWeb.PunchDeviceLive.Index do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="mx-auto w-8/12">
+    <div class="mx-auto w-6/12">
       <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <p :if={@pairing_unreachable?} class="text-center text-rose-600 mb-4">
         {gettext(
@@ -127,8 +129,11 @@ defmodule FullCircleWeb.PunchDeviceLive.Index do
         )}
       </p>
       <.form for={@form} id="device-form" phx-submit="create" class="flex gap-2 justify-center mb-4">
+
         <.input field={@form[:name]} label={gettext("Gate name")} />
-        <.button class="mt-5">{gettext("Pair new phone")}</.button>
+
+        <.button class="mt-5 w-1/4">{gettext("Pair new phone")}</.button>
+
       </.form>
       <div :if={@pairing} class="text-center mb-4 border p-4">
         <p class="font-bold">{@pairing.name}</p>
