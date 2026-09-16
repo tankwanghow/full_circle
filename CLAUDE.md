@@ -121,7 +121,8 @@ Project skills (non-obvious domain contracts) live in `.claude/skills/`:
 `qr-gate-punch.md`, `statutory-bundle.md`, `liveview-computed-field-gotchas.md`,
 `liveview-upload-gotchas.md`, `optimistic-locking.md`, `accounting-period-lock.md`,
 `user-query-sql.md`, `xero-import.md`, `periodic-inventory-double-entry.md`,
-`good-snp-report.md`, `layer-alive-birds-and-yield.md`, `tugas-duties.md`.
+`good-snp-report.md`, `layer-alive-birds-and-yield.md`, `tugas-duties.md`,
+`pl-forecast-model.md`.
 
 ### StdInterface Pattern (`lib/full_circle/std_interface.ex`)
 
