@@ -310,4 +310,149 @@ defmodule FullCircle.TugasTest do
       assert "series already has a live cycle" in errors_on(cs).series_id
     end
   end
+
+  describe "document_types/0" do
+    test "only Payment is linkable for now" do
+      assert Tugas.document_types() == ["Payment"]
+    end
+  end
+
+  describe "link_document/4" do
+    test "links a payment and records a linked event", %{admin: admin, company: company} do
+      {:ok, duty} = Tugas.create_duty(%{"title" => "Pay the rent"}, company, admin)
+      doc_id = Ecto.UUID.generate()
+
+      assert {:ok, link} =
+               Tugas.link_document(
+                 duty,
+                 %{"doc_type" => "Payment", "doc_id" => doc_id, "doc_no" => "PV-000001"},
+                 company,
+                 admin
+               )
+
+      assert link.doc_type == "Payment"
+      assert link.doc_id == doc_id
+      assert link.doc_no == "PV-000001"
+      assert link.user_id == admin.id
+      assert link.company_id == company.id
+
+      assert [%{action: "linked", note: "Payment PV-000001"}] =
+               Tugas.list_duty_events(duty.id, company, admin)
+    end
+
+    test "one duty can carry many documents", %{admin: admin, company: company} do
+      {:ok, duty} = Tugas.create_duty(%{"title" => "Settle the month"}, company, admin)
+
+      for no <- ~w(PV-000001 PV-000002 PV-000003) do
+        assert {:ok, _} =
+                 Tugas.link_document(
+                   duty,
+                   %{"doc_type" => "Payment", "doc_id" => Ecto.UUID.generate(), "doc_no" => no},
+                   company,
+                   admin
+                 )
+      end
+
+      assert length(Tugas.list_duty_documents(duty.id, company, admin)) == 3
+    end
+
+    test "rejects a doc_type that is not whitelisted", %{admin: admin, company: company} do
+      {:ok, duty} = Tugas.create_duty(%{"title" => "Nope"}, company, admin)
+
+      assert {:error, cs} =
+               Tugas.link_document(
+                 duty,
+                 %{"doc_type" => "Invoice", "doc_id" => Ecto.UUID.generate()},
+                 company,
+                 admin
+               )
+
+      assert "is invalid" in errors_on(cs).doc_type
+    end
+
+    test "the same document cannot be linked to the same duty twice", %{
+      admin: admin,
+      company: company
+    } do
+      {:ok, duty} = Tugas.create_duty(%{"title" => "Dup"}, company, admin)
+      attrs = %{"doc_type" => "Payment", "doc_id" => Ecto.UUID.generate(), "doc_no" => "PV-1"}
+
+      assert {:ok, _} = Tugas.link_document(duty, attrs, company, admin)
+      assert {:error, cs} = Tugas.link_document(duty, attrs, company, admin)
+      assert "already linked to this duty" in errors_on(cs).doc_id
+    end
+  end
+
+  describe "unlink_document/3" do
+    test "removes the link and records an unlinked event", %{admin: admin, company: company} do
+      {:ok, duty} = Tugas.create_duty(%{"title" => "Undo me"}, company, admin)
+
+      {:ok, link} =
+        Tugas.link_document(
+          duty,
+          %{"doc_type" => "Payment", "doc_id" => Ecto.UUID.generate(), "doc_no" => "PV-9"},
+          company,
+          admin
+        )
+
+      assert {:ok, _} = Tugas.unlink_document(link, company, admin)
+      assert Tugas.list_duty_documents(duty.id, company, admin) == []
+
+      assert [%{action: "linked"}, %{action: "unlinked", note: "Payment PV-9"}] =
+               Tugas.list_duty_events(duty.id, company, admin)
+    end
+
+    test "a clerk may link but not unlink", %{admin: admin, company: company} do
+      clerk = FullCircle.UserAccountsFixtures.user_fixture()
+      FullCircle.Sys.allow_user_to_access(company, clerk, "clerk", admin)
+
+      {:ok, duty} = Tugas.create_duty(%{"title" => "Clerk duty"}, company, clerk)
+
+      {:ok, link} =
+        Tugas.link_document(
+          duty,
+          %{"doc_type" => "Payment", "doc_id" => Ecto.UUID.generate(), "doc_no" => "PV-7"},
+          company,
+          clerk
+        )
+
+      assert :not_authorise = Tugas.unlink_document(link, company, clerk)
+    end
+  end
+
+  describe "search_duties/4" do
+    test "finds duties by title", %{admin: admin, company: company} do
+      {:ok, _} = Tugas.create_duty(%{"title" => "Renew the road tax"}, company, admin)
+      {:ok, _} = Tugas.create_duty(%{"title" => "File the SST return"}, company, admin)
+
+      assert [%{title: "Renew the road tax"}] = Tugas.search_duties("road", company, admin)
+    end
+
+    test "treats % in the search terms as a literal, not a wildcard", %{
+      admin: admin,
+      company: company
+    } do
+      {:ok, _} = Tugas.create_duty(%{"title" => "100% collected"}, company, admin)
+      {:ok, _} = Tugas.create_duty(%{"title" => "100 boxes collected"}, company, admin)
+
+      assert [%{title: "100% collected"}] = Tugas.search_duties("100%", company, admin)
+    end
+
+    test "treats _ in the search terms as a literal, not a wildcard", %{
+      admin: admin,
+      company: company
+    } do
+      {:ok, _} = Tugas.create_duty(%{"title" => "job_1 handover"}, company, admin)
+      {:ok, _} = Tugas.create_duty(%{"title" => "jobX1 handover"}, company, admin)
+
+      assert [%{title: "job_1 handover"}] = Tugas.search_duties("job_1", company, admin)
+    end
+
+    test "does not leak duties from another company", %{admin: admin, company: company} do
+      %{admin: other_admin, company: other_company} = billing_setup()
+      {:ok, _} = Tugas.create_duty(%{"title" => "Secret road tax"}, other_company, other_admin)
+
+      assert Tugas.search_duties("road", company, admin) == []
+    end
+  end
 end

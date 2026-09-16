@@ -22,6 +22,7 @@ defmodule FullCircle.Tugas do
   alias FullCircle.StdInterface
   alias FullCircle.Sys
   alias FullCircle.Tugas.Duty
+  alias FullCircle.Tugas.DutyDocument
   alias FullCircle.Tugas.DutyEvent
 
   @doc """
@@ -45,6 +46,14 @@ defmodule FullCircle.Tugas do
       join: com in subquery(Sys.user_company(company, user)),
       on: com.id == e.company_id,
       select: e
+    )
+  end
+
+  def query(DutyDocument, company, user) do
+    from(l in DutyDocument,
+      join: com in subquery(Sys.user_company(company, user)),
+      on: com.id == l.company_id,
+      select: l
     )
   end
 
@@ -277,5 +286,137 @@ defmodule FullCircle.Tugas do
       :not_authorise -> :not_authorise
       nil -> {:error, :not_found}
     end
+  end
+
+  # --- DOCUMENT LINKS -------------------------------------------------------
+
+  def list_duty_documents(duty_id, com, user) do
+    Repo.all(
+      from(l in query(DutyDocument, com, user),
+        where: l.duty_id == ^duty_id,
+        order_by: [asc: l.inserted_at, asc: l.id]
+      )
+    )
+  end
+
+  @doc """
+  Points a duty at a document.
+
+  Deliberately allowed on a closed duty: the document that proves a duty was
+  done is often posted after someone ticked it off, and refusing the link
+  would push that evidence out of the trail entirely.
+  """
+  def link_document(%Duty{} = duty, attrs, com, user) do
+    attrs = FullCircle.Helpers.key_to_string(attrs)
+
+    changeset =
+      DutyDocument.changeset(%DutyDocument{}, %{
+        "doc_type" => attrs["doc_type"],
+        "doc_id" => attrs["doc_id"],
+        "doc_no" => attrs["doc_no"],
+        "duty_id" => duty.id,
+        "company_id" => com.id,
+        "user_id" => user.id
+      })
+
+    with true <- can?(user, :link_duty_document, com) || :not_authorise do
+      Multi.new()
+      |> Multi.insert(:duty_document, changeset)
+      |> Multi.merge(fn %{duty_document: link} ->
+        Multi.new()
+        |> insert_event_multi(
+          :duty_event,
+          duty.id,
+          "linked",
+          DutyDocument.label(link),
+          com,
+          user
+        )
+      end)
+      |> Multi.insert("link_duty_document_log", fn %{duty_document: link} ->
+        Sys.log_changeset(
+          :link_duty_document,
+          link,
+          %{"doc_type" => link.doc_type, "doc_no" => link.doc_no, "duty_id" => duty.id},
+          com,
+          user
+        )
+      end)
+      |> Repo.transaction()
+      |> case do
+        {:ok, %{duty_document: link}} -> {:ok, link}
+        {:error, _, failed_value, _} -> {:error, failed_value}
+      end
+    end
+  end
+
+  @doc """
+  Removes a document link, leaving an `unlinked` event behind.
+
+  The link row is deleted rather than flagged; the event is what preserves the
+  fact that it once existed, which is why unlinking is supervisory.
+  """
+  def unlink_document(%DutyDocument{} = link, com, user) do
+    with true <- can?(user, :unlink_duty_document, com) || :not_authorise,
+         %DutyDocument{} = link <- get_duty_document(link.id, com, user) do
+      Multi.new()
+      |> insert_event_multi(
+        :duty_event,
+        link.duty_id,
+        "unlinked",
+        DutyDocument.label(link),
+        com,
+        user
+      )
+      |> Multi.delete(:duty_document, link)
+      |> Multi.insert("unlink_duty_document_log", fn _ ->
+        Sys.log_changeset(
+          :unlink_duty_document,
+          link,
+          %{"doc_type" => link.doc_type, "doc_no" => link.doc_no, "duty_id" => link.duty_id},
+          com,
+          user
+        )
+      end)
+      |> Repo.transaction()
+      |> case do
+        {:ok, %{duty_document: link}} -> {:ok, link}
+        {:error, _, failed_value, _} -> {:error, failed_value}
+      end
+    else
+      :not_authorise -> :not_authorise
+      nil -> {:error, :not_found}
+    end
+  end
+
+  def get_duty_document(id, com, user),
+    do: Repo.one(from(l in query(DutyDocument, com, user), where: l.id == ^id))
+
+  @doc """
+  Finds duties whose title or descriptions contain `terms`.
+
+  `terms` is escaped before it reaches the LIKE pattern, so a user typing "100%"
+  searches for a literal percent sign rather than matching every duty starting
+  with "100".
+  """
+  def search_duties(terms, com, user, opts \\ [])
+
+  def search_duties(terms, _com, _user, _opts) when terms in [nil, ""], do: []
+
+  def search_duties(terms, com, user, opts) do
+    pattern = "%#{FullCircle.CommandPalette.Types.escape_like(terms)}%"
+    status = Keyword.get(opts, :status)
+    limit = Keyword.get(opts, :limit, 50)
+
+    q =
+      from(d in query(Duty, com, user),
+        where: ilike(d.title, ^pattern) or ilike(d.descriptions, ^pattern),
+        order_by: [asc_nulls_last: d.due_date, asc: d.inserted_at],
+        limit: ^limit
+      )
+
+    q = if status, do: from(d in q, where: d.status == ^status), else: q
+
+    Repo.all(q)
   end
 end
