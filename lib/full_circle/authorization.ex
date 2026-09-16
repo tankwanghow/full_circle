@@ -142,6 +142,53 @@ defmodule FullCircle.Authorization do
   def can?(user, :update_completed_trip, company),
     do: allow_roles(~w(admin), company, user)
 
+  # --- Tugas (duties) ---------------------------------------------------
+  #
+  # Allow-lists throughout: an action nobody was explicitly granted is denied,
+  # which is why a new role added later starts with no duty rights at all.
+  # `auditor` reads the board and nothing else.
+
+  def can?(user, :view_tugas, company),
+    do: allow_roles(~w(admin manager supervisor clerk cashier auditor), company, user)
+
+  def can?(user, :create_duty, company),
+    do: allow_roles(~w(admin manager supervisor clerk cashier), company, user)
+
+  def can?(user, :update_duty, company),
+    do: allow_roles(~w(admin manager supervisor clerk cashier), company, user)
+
+  def can?(user, :create_duty_event, company),
+    do: allow_roles(~w(admin manager supervisor clerk cashier), company, user)
+
+  def can?(user, :create_duty_event_document, company),
+    do: allow_roles(~w(admin manager supervisor clerk cashier), company, user)
+
+  def can?(user, :complete_duty, company),
+    do: allow_roles(~w(admin manager supervisor clerk cashier), company, user)
+
+  def can?(user, :skip_duty, company),
+    do: allow_roles(~w(admin manager supervisor clerk cashier), company, user)
+
+  def can?(user, :link_duty_document, company),
+    do: allow_roles(~w(admin manager supervisor clerk cashier), company, user)
+
+  # Ending a series stops every future cycle from ever being spawned, and
+  # unlinking erases the evidence trail tying a duty to a posted document.
+  # Both are supervisory.
+  def can?(user, :end_duty_series, company),
+    do: allow_roles(~w(admin manager supervisor), company, user)
+
+  def can?(user, :unlink_duty_document, company),
+    do: allow_roles(~w(admin manager supervisor), company, user)
+
+  # Anyone may correct or retract their own event inside the 48h window; doing
+  # it to somebody else's event is a supervisory override.
+  def can?(user, :correct_others_duty_event, company),
+    do: allow_roles(~w(admin manager supervisor), company, user)
+
+  def can?(user, :delete_others_duty_event, company),
+    do: allow_roles(~w(admin manager supervisor), company, user)
+
   def can?(user, :create_fixed_asset, company),
     do: allow_roles(~w(admin manager supervisor), company, user)
 
