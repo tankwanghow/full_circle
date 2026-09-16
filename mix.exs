@@ -37,8 +37,12 @@ defmodule FullCircle.MixProject do
       {:bcrypt_elixir, "~> 3.0"},
       {:phoenix, "~> 1.8"},
       {:phoenix_ecto, "~> 4.5"},
-      {:ecto_sql, "~> 3.13"},
+      {:ecto_sql, "~> 3.14"},
       {:postgrex, ">= 0.0.0"},
+      # ecto_sql 3.14 needs decimal ~> 3.0; number 1.0.5 still declares
+      # decimal ~> 1.5 or ~> 2.0, so pin it ourselves. number only touches
+      # new/from_float/compare/div/round/abs/to_string, all unchanged in 3.x.
+      {:decimal, "~> 3.1", override: true},
       {:phoenix_html, "~> 4.1"},
       {:phoenix_live_reload, "~> 1.2", only: :dev},
       {:phoenix_live_view, "~> 1.2"},
@@ -51,7 +55,9 @@ defmodule FullCircle.MixProject do
       {:finch, "~> 0.13"},
       {:telemetry_metrics, "~> 1.0"},
       {:telemetry_poller, "~> 1.0"},
-      {:gettext, "~> 0.26"},
+      # timex 3.7.13 (latest) declares gettext ~> 0.26; gettext 1.0 is that
+      # release with no breaking changes, so override the stale requirement.
+      {:gettext, "~> 1.0", override: true},
       {:jason, "~> 1.2"},
       {:dns_cluster, "~> 0.3.0"},
       {:bandit, "~> 1.5"},
