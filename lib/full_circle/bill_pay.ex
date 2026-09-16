@@ -316,11 +316,17 @@ defmodule FullCircle.BillPay do
     end
   end
 
-  def create_payment(attrs, com, user) do
+  @doc """
+  Creates a payment.
+
+  `opts[:duty_id]` links the new payment to a Tugas duty in the same
+  transaction; see `maybe_link_duty/5`.
+  """
+  def create_payment(attrs, com, user, opts \\ []) do
     case can?(user, :create_payment, com) do
       true ->
         Multi.new()
-        |> create_payment_multi(attrs, com, user)
+        |> create_payment_multi(attrs, com, user, opts)
         |> Repo.transaction()
         |> Accounting.map_period_closed()
 
@@ -329,7 +335,7 @@ defmodule FullCircle.BillPay do
     end
   end
 
-  def create_payment_multi(multi, attrs, com, user) do
+  def create_payment_multi(multi, attrs, com, user, opts \\ []) do
     gapless_name = String.to_atom("update_gapless_doc" <> gen_temp_id())
     payment_name = :create_payment
 
@@ -352,6 +358,19 @@ defmodule FullCircle.BillPay do
       com
     )
     |> create_payment_transactions(payment_name, com, user)
+    |> maybe_link_duty(Keyword.get(opts, :duty_id), payment_name, com, user)
+  end
+
+  # A payment raised "for" a duty that does not resolve in this company is
+  # almost always the wrong payment, so the failed link takes the payment down
+  # with it rather than posting it silently unlinked.
+  defp maybe_link_duty(multi, nil, _payment_name, _com, _user), do: multi
+
+  defp maybe_link_duty(multi, duty_id, payment_name, com, user) do
+    FullCircle.Tugas.link_document_multi(multi, duty_id, "Payment", com, user, fn changes ->
+      payment = Map.fetch!(changes, payment_name)
+      %{doc_id: payment.id, doc_no: payment.payment_no}
+    end)
   end
 
   def import_payment(attrs, com, user) do

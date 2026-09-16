@@ -362,6 +362,59 @@ defmodule FullCircle.Tugas do
   end
 
   @doc """
+  Links a document that is being created inside `multi` to a duty, in the same
+  transaction.
+
+  `doc_fun` receives the multi's changes so far and returns
+  `%{doc_id: ..., doc_no: ...}` — the document usually does not exist yet when
+  the steps are added, so its id and number can only be read once the earlier
+  steps have run.
+
+  A duty_id that does not resolve inside this company fails the step, which
+  rolls the document back with it. That is deliberate: a payment raised "for"
+  a duty that turns out not to exist is almost always the wrong payment, and
+  posting it unlinked would hide the mistake.
+
+  Adds the steps `:tugas_duty`, `:tugas_duty_document`, `:tugas_duty_event`
+  (plus logs), so it can only be used once per multi.
+  """
+  def link_document_multi(multi, duty_id, doc_type, com, user, doc_fun) do
+    multi
+    |> Multi.run(:tugas_duty, fn _repo, _changes ->
+      with true <- can?(user, :link_duty_document, com) || {:error, :not_authorise},
+           %Duty{} = duty <- get_duty(duty_id, com, user) do
+        {:ok, duty}
+      else
+        {:error, reason} -> {:error, reason}
+        _ -> {:error, :duty_not_found}
+      end
+    end)
+    |> Multi.insert(:tugas_duty_document, fn changes ->
+      %{doc_id: doc_id, doc_no: doc_no} = doc_fun.(changes)
+
+      DutyDocument.changeset(%DutyDocument{}, %{
+        "doc_type" => doc_type,
+        "doc_id" => doc_id,
+        "doc_no" => doc_no,
+        "duty_id" => duty_id,
+        "company_id" => com.id,
+        "user_id" => user.id
+      })
+    end)
+    |> Multi.merge(fn %{tugas_duty_document: link} ->
+      Multi.new()
+      |> insert_event_multi(
+        :tugas_duty_event,
+        duty_id,
+        "linked",
+        DutyDocument.label(link),
+        com,
+        user
+      )
+    end)
+  end
+
+  @doc """
   Removes a document link, leaving an `unlinked` event behind.
 
   The link row is deleted rather than flagged; the event is what preserves the

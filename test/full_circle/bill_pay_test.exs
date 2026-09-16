@@ -299,4 +299,82 @@ defmodule FullCircle.BillPayTest do
       refute BillPay.sole_funds_account_name(contact_fixture(company, admin).id, company)
     end
   end
+
+  # --- TUGAS DUTY LINK ---
+
+  describe "create_payment/4 with opts[:duty_id]" do
+    setup %{admin: admin, company: company} do
+      contact = contact_fixture(company, admin)
+      good = good_fixture(company, admin)
+      pur_acct = Accounting.get_account_by_name("General Purchases", company, admin)
+      funds_acct = pay_funds_account_fixture(company, admin)
+
+      no_ptax =
+        Repo.one!(
+          from tc in TaxCode,
+            where: tc.company_id == ^company.id and tc.code == "NoPTax"
+        )
+
+      %{attrs: payment_attrs(contact, good, pur_acct, no_ptax, funds_acct)}
+    end
+
+    test "links the new payment to the duty in the same transaction", %{
+      admin: admin,
+      company: company,
+      attrs: attrs
+    } do
+      {:ok, duty} =
+        FullCircle.Tugas.create_duty(%{"title" => "Pay the supplier"}, company, admin)
+
+      assert {:ok, %{create_payment: payment}} =
+               BillPay.create_payment(attrs, company, admin, duty_id: duty.id)
+
+      assert [link] = FullCircle.Tugas.list_duty_documents(duty.id, company, admin)
+      assert link.doc_type == "Payment"
+      assert link.doc_id == payment.id
+      assert link.doc_no == payment.payment_no
+
+      assert [%{action: "linked"}] = FullCircle.Tugas.list_duty_events(duty.id, company, admin)
+    end
+
+    test "an unknown duty_id rolls the payment back entirely", %{
+      admin: admin,
+      company: company,
+      attrs: attrs
+    } do
+      before = Repo.aggregate(FullCircle.BillPay.Payment, :count)
+
+      assert {:error, :tugas_duty, :duty_not_found, _} =
+               BillPay.create_payment(attrs, company, admin, duty_id: Ecto.UUID.generate())
+
+      assert Repo.aggregate(FullCircle.BillPay.Payment, :count) == before
+    end
+
+    test "a duty from another company rolls the payment back", %{
+      admin: admin,
+      company: company,
+      attrs: attrs
+    } do
+      %{admin: other_admin, company: other_company} = billing_setup()
+
+      {:ok, duty} =
+        FullCircle.Tugas.create_duty(%{"title" => "Theirs"}, other_company, other_admin)
+
+      before = Repo.aggregate(FullCircle.BillPay.Payment, :count)
+
+      assert {:error, :tugas_duty, :duty_not_found, _} =
+               BillPay.create_payment(attrs, company, admin, duty_id: duty.id)
+
+      assert Repo.aggregate(FullCircle.BillPay.Payment, :count) == before
+    end
+
+    test "create_payment/3 still creates an unlinked payment", %{
+      admin: admin,
+      company: company,
+      attrs: attrs
+    } do
+      assert {:ok, %{create_payment: payment}} = BillPay.create_payment(attrs, company, admin)
+      assert payment.payment_no =~ ~r/^PV-\d{6}$/
+    end
+  end
 end
