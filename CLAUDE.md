@@ -105,6 +105,7 @@ Every entity belongs to a `Company`. Routes are scoped as `/companies/:company_i
 | `Layer` | Agricultural: houses, flocks, harvests, weighing, movements |
 | `EggStock` | Daily egg stock board, weekly DOW books, hybrid forecast |
 | `Trading` | Grain trading desk: supply/sales positions, locations, multi-good trips |
+| `Tugas` | Duties: progress events, evidence files, multi-document links |
 | `BankReconciliation` | Bank statement import/match (LLM parser skill) |
 | `EInvMetas` | E-invoice metadata (Malaysia LHDN integration) |
 | `Reporting` | Report queries (cash forecast, CP204, etc.) |
@@ -120,7 +121,7 @@ Project skills (non-obvious domain contracts) live in `.claude/skills/`:
 `qr-gate-punch.md`, `statutory-bundle.md`, `liveview-computed-field-gotchas.md`,
 `liveview-upload-gotchas.md`, `optimistic-locking.md`, `accounting-period-lock.md`,
 `user-query-sql.md`, `xero-import.md`, `periodic-inventory-double-entry.md`,
-`good-snp-report.md`, `layer-alive-birds-and-yield.md`.
+`good-snp-report.md`, `layer-alive-birds-and-yield.md`, `tugas-duties.md`.
 
 ### StdInterface Pattern (`lib/full_circle/std_interface.ex`)
 
