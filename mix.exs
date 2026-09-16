@@ -53,7 +53,7 @@ defmodule FullCircle.MixProject do
       {:telemetry_poller, "~> 1.0"},
       {:gettext, "~> 0.26"},
       {:jason, "~> 1.2"},
-      {:dns_cluster, "~> 0.2.0"},
+      {:dns_cluster, "~> 0.3.0"},
       {:bandit, "~> 1.5"},
       {:tzdata, "~> 1.1"},
       {:timex, "~> 3.0"},
