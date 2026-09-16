@@ -13,7 +13,7 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecastPrint do
     %{label: "Operating Profit", key: :operating_profit, kind: :subtotal},
     %{label: "Other Income", key: :other_income, type: "Other Income", kind: :line},
     %{label: "Depreciation", key: :depreciation, type: "Depreciation", kind: :line},
-    %{label: "Net Profit", key: :net_profit, kind: :subtotal},
+    %{label: "Profit Before Tax", key: :net_profit, kind: :subtotal},
     %{label: "Net Margin %", key: :net_margin, kind: :margin},
     %{label: "Estimated Tax", key: :estimated_tax, kind: :tax},
     %{label: "Net Profit After Tax", key: :net_profit_after_tax, kind: :tax}
@@ -38,9 +38,20 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecastPrint do
         do: @rows,
         else: Enum.reject(@rows, &(&1.kind == :tax))
 
+    excluded =
+      case PLF.excluded_account_ids(com) do
+        [] -> []
+        ids -> PLF.list_pl_accounts(com) |> Enum.filter(&(&1.id in ids))
+      end
+
     {:ok,
      socket
-     |> assign(page_title: gettext("Profit & Loss Forecast"), rows: rows, forecast: forecast)}
+     |> assign(
+       page_title: gettext("Profit & Loss Forecast"),
+       rows: rows,
+       forecast: forecast,
+       excluded_accounts: excluded
+     )}
   end
 
   defp safe_int(s, default) do
@@ -68,6 +79,14 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecastPrint do
             else: gettext("Monthly")}
         </p>
 
+        <p :if={@excluded_accounts != []} class="text-center">
+          {ngettext(
+            "%{count} account excluded",
+            "%{count} accounts excluded",
+            length(@excluded_accounts),
+            count: length(@excluded_accounts)
+          )}: {Enum.map_join(@excluded_accounts, ", ", & &1.name)}
+        </p>
         <table class="pl">
           <thead>
             <tr>

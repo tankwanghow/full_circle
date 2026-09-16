@@ -354,3 +354,205 @@ defmodule FullCircle.Reporting.ProfitLossForecastDBTest do
     end
   end
 end
+
+defmodule FullCircle.Reporting.ProfitLossForecastExcludeTest do
+  use FullCircle.DataCase, async: true
+
+  import FullCircle.SysFixtures
+  import FullCircle.UserAccountsFixtures
+  import FullCircle.AccountingFixtures
+
+  alias FullCircle.Reporting.ProfitLossForecast, as: PLF
+  alias FullCircle.Accounting.Transaction
+  alias FullCircle.Repo
+
+  defp d(n), do: Decimal.new("#{n}")
+
+  defp txn!(com, account_id, date, amount) do
+    %Transaction{}
+    |> Transaction.changeset(%{
+      doc_type: "Journal",
+      doc_no: "J#{System.unique_integer([:positive])}",
+      doc_date: date,
+      particulars: "t",
+      amount: amount,
+      company_id: com.id,
+      account_id: account_id
+    })
+    |> Repo.insert!()
+  end
+
+  defp acct(com, admin, type, prefix) do
+    account_fixture(
+      %{account_type: type, name: "#{prefix} #{System.unique_integer([:positive])}"},
+      com,
+      admin
+    )
+  end
+
+  setup do
+    admin = user_fixture()
+    com = company_fixture(admin, %{closing_month: 12, closing_day: 31})
+
+    rev = acct(com, admin, "Revenue", "Sales")
+    rent = acct(com, admin, "Expenses", "Rent")
+    tax = acct(com, admin, "Expenses", "Taxation")
+
+    %{admin: admin, com: com, rev: rev, rent: rent, tax: tax}
+  end
+
+  describe "excluded_account_ids/1 and save_excluded_account_ids/2" do
+    test "defaults to an empty list", %{com: com} do
+      assert PLF.excluded_account_ids(com) == []
+      assert PLF.excluded_account_ids(%{settings: nil}) == []
+      assert PLF.excluded_account_ids(%{settings: %{}}) == []
+    end
+
+    test "round-trips through company settings", %{com: com, tax: tax} do
+      {:ok, com} = PLF.save_excluded_account_ids(com, [tax.id])
+      assert PLF.excluded_account_ids(com) == [tax.id]
+      assert PLF.excluded_account_ids(PLF.company_with_settings(com)) == [tax.id]
+
+      {:ok, com} = PLF.save_excluded_account_ids(com, [])
+      assert PLF.excluded_account_ids(PLF.company_with_settings(com)) == []
+    end
+
+    test "does not disturb the trailing-days or tax-rate settings", %{com: com, tax: tax} do
+      {:ok, com} = PLF.save_category_trailing(com, %{"Revenue" => 90})
+      {:ok, com} = PLF.save_tax_rate(com, "24")
+      {:ok, com} = PLF.save_excluded_account_ids(com, [tax.id])
+
+      com = PLF.company_with_settings(com)
+      assert PLF.category_trailing(com)["Revenue"] == 90
+      assert Decimal.equal?(PLF.tax_rate(com), d(24))
+      assert PLF.excluded_account_ids(com) == [tax.id]
+    end
+  end
+
+  describe "list_pl_accounts/1" do
+    test "lists only profit & loss accounts", %{com: com, admin: admin, rev: rev, tax: tax} do
+      bank = acct(com, admin, "Bank", "Maybank")
+
+      names = PLF.list_pl_accounts(com) |> Enum.map(& &1.name)
+
+      assert rev.name in names
+      assert tax.name in names
+      refute bank.name in names
+    end
+
+    test "returns id, name and account_type", %{com: com, tax: tax} do
+      row = PLF.list_pl_accounts(com) |> Enum.find(&(&1.id == tax.id))
+      assert row.name == tax.name
+      assert row.account_type == "Expenses"
+    end
+  end
+
+  describe "excluded accounts drop out of actual periods" do
+    test "an excluded account's posted amount leaves the category line", %{
+      com: com,
+      rev: rev,
+      rent: rent,
+      tax: tax
+    } do
+      txn!(com, rev.id, ~D[2026-01-10], d(-10_000))
+      txn!(com, rent.id, ~D[2026-01-12], d(300))
+      txn!(com, tax.id, ~D[2026-01-15], d(2_400))
+
+      opts = %{fy_year: 2026, granularity: :monthly, as_of: ~D[2026-06-15]}
+
+      jan = PLF.pl_forecast(opts, com) |> Map.fetch!(:periods) |> hd()
+      assert jan.source == :actual
+      assert Decimal.equal?(jan.expenses, d(2_700))
+
+      {:ok, com} = PLF.save_excluded_account_ids(com, [tax.id])
+      jan = PLF.pl_forecast(opts, com) |> Map.fetch!(:periods) |> hd()
+
+      assert jan.source == :actual
+      assert Decimal.equal?(jan.expenses, d(300))
+      assert Decimal.equal?(jan.net_profit, d(9_700))
+    end
+  end
+
+  describe "excluded accounts drop out of the run-rate" do
+    test "a forecast period projects only the accounts left in the category", %{
+      com: com,
+      rent: rent,
+      tax: tax
+    } do
+      today = Date.utc_today()
+      txn!(com, rent.id, Date.add(today, -10), d(300))
+      txn!(com, tax.id, Date.add(today, -10), d(900))
+
+      {:ok, com} = PLF.save_category_trailing(com, %{"Expenses" => 30})
+      {:ok, com} = PLF.save_excluded_account_ids(com, [tax.id])
+
+      res = PLF.pl_forecast(%{fy_year: today.year, granularity: :monthly}, com)
+      fc = Enum.find(res.periods, &(&1.source == :forecast))
+
+      days = Date.diff(fc.period_end, fc.period_start) + 1
+      expected = Decimal.mult(Decimal.div(d(300), d(30)), d(days))
+      assert Decimal.equal?(fc.expenses, expected)
+    end
+  end
+
+  describe "excluded accounts drop out of the previous-FY fallback" do
+    test "a category whose only prior-year activity is excluded is not estimated", %{
+      com: com,
+      tax: tax
+    } do
+      # A lump in the previous FY, outside the 365-day trailing window.
+      txn!(com, tax.id, ~D[2025-01-15], d(12_000))
+      opts = %{fy_year: 2026, granularity: :monthly, as_of: ~D[2026-06-15]}
+
+      res = PLF.pl_forecast(opts, com)
+      assert "Expenses" in res.estimated_types
+
+      {:ok, com} = PLF.save_excluded_account_ids(com, [tax.id])
+      res = PLF.pl_forecast(opts, com)
+
+      refute "Expenses" in res.estimated_types
+      assert Enum.all?(res.periods, &Decimal.equal?(&1.expenses, d(0)))
+    end
+  end
+
+  describe "excluded accounts drop out of the drill-down" do
+    test "drill-down reconciles to the category line it opens from", %{
+      com: com,
+      rent: rent,
+      tax: tax
+    } do
+      txn!(com, rent.id, ~D[2026-01-12], d(300))
+      txn!(com, tax.id, ~D[2026-01-15], d(2_400))
+
+      {:ok, com} = PLF.save_excluded_account_ids(com, [tax.id])
+      rows = PLF.period_category_transactions("Expenses", ~D[2026-01-01], ~D[2026-01-31], com)
+
+      assert length(rows) == 1
+      assert Decimal.equal?(hd(rows).amount, d(300))
+    end
+  end
+
+  describe "excluding the Taxation account removes the tax double-count" do
+    test "profit before tax rises by the tax paid, and the estimate follows it", %{
+      com: com,
+      rev: rev,
+      tax: tax
+    } do
+      txn!(com, rev.id, ~D[2026-01-10], d(-10_000))
+      txn!(com, tax.id, ~D[2026-01-15], d(2_400))
+
+      {:ok, com} = PLF.save_tax_rate(com, "24")
+      opts = %{fy_year: 2026, granularity: :monthly, as_of: ~D[2026-06-15]}
+
+      before = PLF.pl_forecast(opts, com) |> Map.fetch!(:periods) |> hd()
+      # tax paid is sitting inside Expenses, dragging profit before tax down
+      assert Decimal.equal?(before.net_profit, d(7_600))
+
+      {:ok, com} = PLF.save_excluded_account_ids(com, [tax.id])
+      after_ = PLF.pl_forecast(opts, com) |> Map.fetch!(:periods) |> hd()
+
+      assert Decimal.equal?(after_.net_profit, d(10_000))
+      assert Decimal.equal?(Decimal.sub(after_.net_profit, before.net_profit), d(2_400))
+    end
+  end
+end

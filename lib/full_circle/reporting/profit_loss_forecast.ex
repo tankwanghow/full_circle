@@ -8,7 +8,8 @@ defmodule FullCircle.Reporting.ProfitLossForecast do
   run-rate (anchored at today). Income categories (Revenue, Other Income) are
   credit-normal in the ledger, so amounts are sign-flipped to positive income;
   expense categories stay positive. Accounts listed in the company's settings are
-  excluded from the run-rate (one-off / discretionary items).
+  excluded from the WHOLE report — actuals, run-rate and prior-year fallback alike
+  — so the figures show the underlying business (see `excluded_account_ids/1`).
   """
 
   alias FullCircle.Repo
@@ -34,6 +35,11 @@ defmodule FullCircle.Reporting.ProfitLossForecast do
   ]
 
   @trailing_key "pl_forecast_trailing"
+  # Account ids the user has taken out of the forecast entirely (the Taxation
+  # expense account, one-off gains, …). Kept separate from the cash forecast's
+  # own exclusion list: that one drops whole DOCUMENTS touching an account,
+  # this one drops the account's own P&L lines.
+  @exclude_key "pl_forecast_exclude_accounts"
   @default_trailing 365
   @tax_rate_key "pl_forecast_tax_rate"
 
@@ -79,6 +85,36 @@ defmodule FullCircle.Reporting.ProfitLossForecast do
 
     settings = Map.put(com.settings || %{}, @trailing_key, cleaned)
     com |> Ecto.Changeset.change(settings: settings) |> Repo.update()
+  end
+
+  @doc """
+  Account ids excluded from the forecast, read from the company settings.
+
+  Unlike the cash forecast, exclusion here applies to the WHOLE report — actual
+  periods as well as forecast ones — so the P&L shown is the underlying business.
+  The motivating case is the Taxation expense account: tax paid during the year
+  sits in `Expenses`, which both understates profit before tax and makes the
+  estimated-tax row charge tax on an already-taxed figure.
+  """
+  def excluded_account_ids(com), do: Map.get(com.settings || %{}, @exclude_key, [])
+
+  @doc "Persist the excluded account-id list to the company settings."
+  def save_excluded_account_ids(com, ids) when is_list(ids) do
+    settings = Map.put(com.settings || %{}, @exclude_key, ids)
+    com |> Ecto.Changeset.change(settings: settings) |> Repo.update()
+  end
+
+  @doc """
+  Profit & loss accounts for the company, for the exclusion picker. Only P&L
+  types are listed — excluding a balance-sheet account would do nothing here.
+  """
+  def list_pl_accounts(com) do
+    from(a in Account,
+      where: a.company_id == ^com.id and a.account_type in ^@pl_types,
+      order_by: [a.account_type, a.name],
+      select: %{id: a.id, name: a.name, account_type: a.account_type}
+    )
+    |> Repo.all()
   end
 
   @doc "Flat income-tax rate (percent) for the forecast, from company settings. 0 when unset/invalid."
@@ -143,6 +179,7 @@ defmodule FullCircle.Reporting.ProfitLossForecast do
     fy_year = Map.fetch!(opts, :fy_year)
     granularity = Map.get(opts, :granularity, :monthly)
     trailing = category_trailing(com)
+    excluded = excluded_account_ids(com)
     # "today" / as-of date: anchors the trailing window and the actual/forecast split.
     today = Map.get(opts, :as_of) || Date.utc_today()
 
@@ -156,12 +193,12 @@ defmodule FullCircle.Reporting.ProfitLossForecast do
     fy_end = add_months(pc, period_months * periods_count)
     bounds = period_bounds(pc, period_months, periods_count)
 
-    trailing_daily = run_rate_daily_by_type(trailing, today, com)
+    trailing_daily = run_rate_daily_by_type(trailing, today, com, excluded)
 
     # Previous financial year totals — the fallback source for a category with no data
     # in its trailing window.
     prev_start = Date.add(prev_close(com, fy_year - 1), 1)
-    prev_totals = prev_fy_by_type(prev_start, pc, com)
+    prev_totals = prev_fy_by_type(prev_start, pc, com, excluded)
     prev_days = Decimal.new("#{Date.diff(pc, prev_start) + 1}")
 
     # Per-category daily rate: the trailing run-rate, or last year's total if the window
@@ -178,7 +215,7 @@ defmodule FullCircle.Reporting.ProfitLossForecast do
         end
       end)
 
-    actuals = actuals_by_type(pc, period_months, today, fy_end, com)
+    actuals = actuals_by_type(pc, period_months, today, fy_end, com, excluded)
     n_elapsed = Enum.count(bounds, fn {_ps, pe} -> Date.compare(pe, today) != :gt end)
 
     elapsed_sum =
@@ -299,6 +336,7 @@ defmodule FullCircle.Reporting.ProfitLossForecast do
       },
       order_by: [t.doc_date, t.doc_no]
     )
+    |> exclude_accounts(excluded_account_ids(com))
     |> Repo.all()
     |> Enum.map(fn r ->
       amt = to_decimal(r.amount)
@@ -307,6 +345,11 @@ defmodule FullCircle.Reporting.ProfitLossForecast do
   end
 
   # ---- internals ----
+
+  # Drop the user-excluded accounts. Every caller's query joins Account as the
+  # second binding. An empty list is left alone rather than pushed into SQL.
+  defp exclude_accounts(query, []), do: query
+  defp exclude_accounts(query, ids), do: from([_t, a] in query, where: a.id not in ^ids)
 
   defp lines(bt) do
     g = fn t -> Map.get(bt, t, @zero) end
@@ -401,7 +444,7 @@ defmodule FullCircle.Reporting.ProfitLossForecast do
   # %{period_index(0-based) => %{account_type => normalized value}} for elapsed periods.
   # Periods are closing-day anchored: a transaction's period is determined by how many
   # closing anchors after `pc` it falls (a day after the closing day rolls to next period).
-  defp actuals_by_type(pc, period_months, today, fy_end, com) do
+  defp actuals_by_type(pc, period_months, today, fy_end, com, excluded) do
     upper = if Date.compare(today, fy_end) == :lt, do: today, else: fy_end
     fy_start = Date.add(pc, 1)
 
@@ -434,6 +477,7 @@ defmodule FullCircle.Reporting.ProfitLossForecast do
         },
         group_by: [selected_as(:idx), a.account_type]
       )
+      |> exclude_accounts(excluded)
       |> Repo.all()
       |> Enum.reduce(%{}, fn r, acc ->
         Map.update(acc, r.idx, %{r.type => normalize(r.type, r.sum)}, fn m ->
@@ -446,7 +490,7 @@ defmodule FullCircle.Reporting.ProfitLossForecast do
   # %{account_type => normalized per-DAY run-rate value}. Each category uses its own
   # trailing window (`trailing` is `%{account_type => days}`). The caller multiplies
   # by each period's day-count.
-  defp run_rate_daily_by_type(trailing, today, com) do
+  defp run_rate_daily_by_type(trailing, today, com, excluded) do
     Map.new(@categories, fn type ->
       days = Map.get(trailing, type, @default_trailing)
       window_start = Date.add(today, -days)
@@ -460,6 +504,7 @@ defmodule FullCircle.Reporting.ProfitLossForecast do
               t.doc_date >= ^window_start and t.doc_date < ^today,
           select: coalesce(sum(t.amount), 0)
         )
+        |> exclude_accounts(excluded)
         |> Repo.one()
 
       {type, normalize(type, Decimal.div(to_decimal(sum), Decimal.new("#{days}")))}
@@ -467,7 +512,7 @@ defmodule FullCircle.Reporting.ProfitLossForecast do
   end
 
   # %{account_type => normalized total} over the previous financial year [from..to].
-  defp prev_fy_by_type(from_date, to_date, com) do
+  defp prev_fy_by_type(from_date, to_date, com, excluded) do
     from(t in Transaction,
       join: a in Account,
       on: a.id == t.account_id,
@@ -477,6 +522,7 @@ defmodule FullCircle.Reporting.ProfitLossForecast do
       select: %{type: a.account_type, sum: sum(t.amount)},
       group_by: a.account_type
     )
+    |> exclude_accounts(excluded)
     |> Repo.all()
     |> Map.new(fn r -> {r.type, normalize(r.type, r.sum)} end)
   end

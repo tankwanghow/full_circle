@@ -37,7 +37,7 @@ defmodule FullCircleWeb.ProfitLossForecastLiveTest do
       assert html =~ "Profit &amp; Loss Forecast" or html =~ "Profit & Loss Forecast"
     end
 
-    test "with query params renders the category table (Net Profit row)", %{
+    test "with query params renders the category table (Profit Before Tax row)", %{
       conn: conn,
       company: company
     } do
@@ -48,7 +48,7 @@ defmodule FullCircleWeb.ProfitLossForecastLiveTest do
         )
 
       html = render_async(lv)
-      assert html =~ "Net Profit"
+      assert html =~ "Profit Before Tax"
       assert html =~ "Gross Margin"
     end
 
@@ -86,7 +86,7 @@ defmodule FullCircleWeb.ProfitLossForecastLiveTest do
       {:ok, lv, html} = live(conn, ~p"/companies/#{company.id}/profit_loss_forecast")
       refute html =~ "Net Profit After Tax"
 
-      lv |> element("button", "Trailing") |> render_click()
+      lv |> element("button", "Settings") |> render_click()
 
       lv
       |> form("form[phx-submit=save_settings]")
@@ -95,6 +95,170 @@ defmodule FullCircleWeb.ProfitLossForecastLiveTest do
       html2 = render_async(lv)
       assert html2 =~ "Net Profit After Tax"
       assert html2 =~ "Estimated Tax"
+    end
+
+    test "the profit subtotal is labelled Profit Before Tax, not Net Profit", %{
+      conn: conn,
+      company: company
+    } do
+      {:ok, lv, _html} = live(conn, ~p"/companies/#{company.id}/profit_loss_forecast")
+      html = render_async(lv)
+
+      assert html =~ "Profit Before Tax"
+      # at rate 0 the tax rows are hidden, so the old label must be gone entirely
+      refute html =~ "Net Profit"
+    end
+
+    test "settings modal lists P&L accounts but not balance-sheet accounts", %{
+      conn: conn,
+      company: company,
+      user: user
+    } do
+      tax =
+        account_fixture(
+          %{account_type: "Expenses", name: "Taxation #{System.unique_integer([:positive])}"},
+          company,
+          user
+        )
+
+      bank =
+        account_fixture(
+          %{account_type: "Bank", name: "Maybank #{System.unique_integer([:positive])}"},
+          company,
+          user
+        )
+
+      {:ok, lv, _html} = live(conn, ~p"/companies/#{company.id}/profit_loss_forecast")
+      html = lv |> element("button", "Settings") |> render_click()
+
+      assert html =~ tax.name
+      refute html =~ bank.name
+    end
+
+    test "ticking an account and saving excludes it from the forecast", %{
+      conn: conn,
+      user: user
+    } do
+      company = company_fixture(user, %{closing_month: 12, closing_day: 31})
+
+      rev =
+        account_fixture(
+          %{account_type: "Revenue", name: "Sales #{System.unique_integer([:positive])}"},
+          company,
+          user
+        )
+
+      tax =
+        account_fixture(
+          %{account_type: "Expenses", name: "Taxation #{System.unique_integer([:positive])}"},
+          company,
+          user
+        )
+
+      txn!(company, rev.id, ~D[2026-01-10], -10_000)
+      txn!(company, tax.id, ~D[2026-01-15], 2_400)
+
+      {:ok, lv, _html} =
+        live(
+          conn,
+          ~p"/companies/#{company.id}/profit_loss_forecast?search[fy_year]=2026&search[granularity]=monthly&search[as_of]=2026-06-15"
+        )
+
+      lv |> element("button", "Settings") |> render_click()
+      lv |> element("input[phx-value-id=\"#{tax.id}\"]") |> render_click()
+
+      lv
+      |> form("form[phx-submit=save_settings]")
+      |> render_submit(%{"tax_rate" => "0", "trailing" => %{}})
+
+      render_async(lv)
+
+      assert PLF.excluded_account_ids(PLF.company_with_settings(company)) == [tax.id]
+    end
+
+    test "the report notes how many accounts are excluded", %{
+      conn: conn,
+      company: company,
+      user: user
+    } do
+      tax =
+        account_fixture(
+          %{account_type: "Expenses", name: "Taxation #{System.unique_integer([:positive])}"},
+          company,
+          user
+        )
+
+      {:ok, lv, _html} = live(conn, ~p"/companies/#{company.id}/profit_loss_forecast")
+      html = render_async(lv)
+      refute html =~ "account excluded"
+
+      lv |> element("button", "Settings") |> render_click()
+      lv |> element("input[phx-value-id=\"#{tax.id}\"]") |> render_click()
+
+      lv
+      |> form("form[phx-submit=save_settings]")
+      |> render_submit(%{"tax_rate" => "0", "trailing" => %{}})
+
+      html = render_async(lv)
+      assert html =~ "1 account excluded"
+      assert html =~ tax.name
+    end
+
+    test "saving settings persists trailing, tax rate and exclusions together", %{
+      conn: conn,
+      company: company,
+      user: user
+    } do
+      tax =
+        account_fixture(
+          %{account_type: "Expenses", name: "Taxation #{System.unique_integer([:positive])}"},
+          company,
+          user
+        )
+
+      {:ok, lv, _html} = live(conn, ~p"/companies/#{company.id}/profit_loss_forecast")
+
+      lv |> element("button", "Settings") |> render_click()
+      lv |> element("input[phx-value-id=\"#{tax.id}\"]") |> render_click()
+
+      lv
+      |> form("form[phx-submit=save_settings]")
+      |> render_submit(%{"tax_rate" => "24", "trailing" => %{"Revenue" => "90"}})
+
+      render_async(lv)
+
+      com = PLF.company_with_settings(company)
+      assert PLF.category_trailing(com)["Revenue"] == 90
+      assert Decimal.equal?(PLF.tax_rate(com), Decimal.new(24))
+      assert PLF.excluded_account_ids(com) == [tax.id]
+    end
+
+    test "print view uses the Profit Before Tax label and notes exclusions", %{
+      conn: conn,
+      user: user
+    } do
+      company = company_fixture(user, %{closing_month: 12, closing_day: 31})
+
+      tax =
+        account_fixture(
+          %{account_type: "Expenses", name: "Taxation #{System.unique_integer([:positive])}"},
+          company,
+          user
+        )
+
+      {:ok, _lv, html} =
+        live(conn, ~p"/companies/#{company.id}/profit_loss_forecast/print?fy_year=2026")
+
+      assert html =~ "Profit Before Tax"
+      refute html =~ "account excluded"
+
+      {:ok, _} = PLF.save_excluded_account_ids(company, [tax.id])
+
+      {:ok, _lv, html} =
+        live(conn, ~p"/companies/#{company.id}/profit_loss_forecast/print?fy_year=2026")
+
+      assert html =~ "1 account excluded"
+      assert html =~ tax.name
     end
 
     # Security: non-admin users must be redirected from the forecast page since it now WRITES.

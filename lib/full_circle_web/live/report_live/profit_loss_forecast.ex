@@ -15,7 +15,7 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
     %{label: "Operating Profit", key: :operating_profit, kind: :subtotal},
     %{label: "Other Income", key: :other_income, type: "Other Income", kind: :line},
     %{label: "Depreciation", key: :depreciation, type: "Depreciation", kind: :line},
-    %{label: "Net Profit", key: :net_profit, kind: :subtotal},
+    %{label: "Profit Before Tax", key: :net_profit, kind: :subtotal},
     %{label: "Net Margin %", key: :net_margin, kind: :margin},
     %{label: "Estimated Tax", key: :estimated_tax, kind: :tax},
     %{label: "Net Profit After Tax", key: :net_profit_after_tax, kind: :tax}
@@ -39,6 +39,10 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
          drill: nil,
          settings_open: false,
          trailing: %{},
+         accounts: [],
+         exclude_set: MapSet.new(),
+         excluded_accounts: [],
+         acct_filter: "",
          tax_rate: Decimal.new(0),
          full_amounts: false,
          plan: nil,
@@ -133,8 +137,22 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
      assign(socket,
        settings_open: true,
        trailing: PLF.category_trailing(socket.assigns.current_company),
-       tax_rate: PLF.tax_rate(socket.assigns.current_company)
+       tax_rate: PLF.tax_rate(socket.assigns.current_company),
+       accounts: PLF.list_pl_accounts(socket.assigns.current_company),
+       exclude_set: MapSet.new(PLF.excluded_account_ids(socket.assigns.current_company)),
+       acct_filter: ""
      )}
+  end
+
+  @impl true
+  def handle_event("filter_accounts", %{"value" => f}, socket),
+    do: {:noreply, assign(socket, acct_filter: f)}
+
+  @impl true
+  def handle_event("toggle_exclude", %{"id" => id}, socket) do
+    set = socket.assigns.exclude_set
+    set = if MapSet.member?(set, id), do: MapSet.delete(set, id), else: MapSet.put(set, id)
+    {:noreply, assign(socket, exclude_set: set)}
   end
 
   @impl true
@@ -144,8 +162,12 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
   @impl true
   def handle_event("save_settings", %{"trailing" => trailing} = params, socket) do
     com = socket.assigns.current_company
-    {:ok, _} = PLF.save_category_trailing(com, trailing)
-    {:ok, _} = PLF.save_tax_rate(com, params["tax_rate"])
+    # Each save_* rewrites the whole settings map, so the updated company has to be
+    # threaded through — passing the original `com` to all three makes the last write
+    # clobber the other two.
+    {:ok, com} = PLF.save_category_trailing(com, trailing)
+    {:ok, com} = PLF.save_tax_rate(com, params["tax_rate"])
+    {:ok, com} = PLF.save_excluded_account_ids(com, MapSet.to_list(socket.assigns.exclude_set))
     com = PLF.company_with_settings(com)
 
     {:noreply,
@@ -226,6 +248,7 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
 
   defp run_forecast(socket, search) do
     com = socket.assigns.current_company
+    socket = assign(socket, excluded_accounts: excluded_accounts(com))
     year = safe_int(search.fy_year, Date.utc_today().year)
     gran = if search.granularity == "quarterly", do: :quarterly, else: :monthly
 
@@ -238,6 +261,15 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
     assign_async(socket, :result, fn ->
       {:ok, %{result: PLF.pl_forecast(%{fy_year: year, granularity: gran, as_of: as_of}, com)}}
     end)
+  end
+
+  # The excluded accounts, resolved to names for the on-report note. Excluding an
+  # account changes the Actual columns too, so the report has to say so on its face.
+  defp excluded_accounts(com) do
+    case PLF.excluded_account_ids(com) do
+      [] -> []
+      ids -> PLF.list_pl_accounts(com) |> Enum.filter(&(&1.id in ids))
+    end
   end
 
   defp default_fy_year(com) do
@@ -293,7 +325,7 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
             <div class="col-span-3 mt-6 flex items-center gap-2 flex-wrap">
               <.button>{gettext("Query")}</.button>
               <button type="button" phx-click="open_settings" class="gray button">
-                {gettext("Trailing")}
+                {gettext("Settings")}
               </button>
               <.link
                 :if={@result.ok? && is_map(@result.result)}
@@ -331,6 +363,7 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
             <p class="text-center font-medium mb-1">
               {gettext("Financial year")} {Date.to_iso8601(f.start_date)} → {Date.to_iso8601(f.fy_end)}
             </p>
+            <.excluded_note accounts={@excluded_accounts} />
             <.pl_table
               rows={@rows}
               periods={f.periods}
@@ -353,7 +386,14 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
       </.async_html>
 
       <.drill_modal :if={@drill} drill={@drill} />
-      <.settings_modal :if={@settings_open} trailing={@trailing} tax_rate={@tax_rate} />
+      <.settings_modal
+        :if={@settings_open}
+        trailing={@trailing}
+        tax_rate={@tax_rate}
+        accounts={@accounts}
+        exclude_set={@exclude_set}
+        filter={@acct_filter}
+      />
     </div>
     """
   end
@@ -845,15 +885,44 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
   defp plan_money(nil), do: "0.00"
   defp plan_money(other), do: to_string(other)
 
+  attr :accounts, :list, default: []
+
+  defp excluded_note(assigns) do
+    ~H"""
+    <p
+      :if={@accounts != []}
+      class="text-center text-sm text-amber-700 dark:text-amber-400 mb-1"
+      title={Enum.map_join(@accounts, ", ", & &1.name)}
+    >
+      {ngettext("%{count} account excluded", "%{count} accounts excluded", length(@accounts),
+        count: length(@accounts)
+      )}: {Enum.map_join(@accounts, ", ", & &1.name)}
+    </p>
+    """
+  end
+
   attr :trailing, :map, required: true
   attr :tax_rate, :any, required: true
+  attr :accounts, :list, required: true
+  attr :exclude_set, :any, required: true
+  attr :filter, :string, required: true
 
   defp settings_modal(assigns) do
+    flt = String.downcase(assigns.filter)
+
+    filtered =
+      if flt == "",
+        do: assigns.accounts,
+        else: Enum.filter(assigns.accounts, &String.contains?(String.downcase(&1.name), flt))
+
+    assigns = assign(assigns, :filtered, filtered)
+
     ~H"""
     <div class="fixed inset-0 z-50 flex items-center justify-center">
       <div class="absolute inset-0 bg-black/40" phx-click="close_settings"></div>
-      <div class="relative z-10 w-11/12 max-w-md rounded shadow-lg bg-white dark:bg-gray-800 dark:text-gray-100 p-4">
-        <p class="font-bold">{gettext("Run-rate Trailing Days per Category")}</p>
+      <div class="relative z-10 w-11/12 max-w-2xl max-h-[85vh] overflow-auto rounded shadow-lg bg-white dark:bg-gray-800 dark:text-gray-100 p-4">
+        <p class="font-bold text-lg mb-3">{gettext("Profit & Loss Forecast Settings")}</p>
+        <p class="font-medium">{gettext("Run-rate trailing days per category")}</p>
         <p class="text-sm text-gray-500 dark:text-gray-400 mb-3">
           {gettext(
             "How many days of recent history each category's forecast is averaged from. Saved per company."
@@ -875,8 +944,8 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
               />
             <% end %>
           </div>
-          <div class="mt-4">
-            <label class="text-sm font-medium" for="tax_rate">{gettext("Estimated tax rate %")}</label>
+          <div class="mt-5 pt-4 border-t dark:border-gray-700">
+            <label class="font-medium" for="tax_rate">{gettext("Estimated tax rate %")}</label>
             <input
               type="number"
               min="0"
@@ -890,6 +959,41 @@ defmodule FullCircleWeb.ReportLive.ProfitLossForecast do
               {gettext(
                 "Flat percentage of forecast net profit — a planning estimate, not a tax computation. 0 hides the tax rows."
               )}
+            </p>
+          </div>
+          <div class="mt-5 pt-4 border-t dark:border-gray-700">
+            <p class="font-medium">{gettext("Exclude accounts from the forecast")}</p>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">
+              {gettext(
+                "Tick accounts to leave out of the report entirely — the Taxation expense account (so the profit line is genuinely before tax), one-off gains, and the like. Unlike the cash forecast this affects Actual columns too, so the figures show the underlying business. Saved per company."
+              )}
+            </p>
+            <input
+              type="text"
+              value={@filter}
+              phx-keyup="filter_accounts"
+              phx-debounce="200"
+              autocomplete="off"
+              placeholder={gettext("Filter accounts…")}
+              class="w-full border rounded px-2 py-1 mb-2 dark:bg-gray-700 dark:border-gray-600"
+            />
+            <div class="max-h-56 overflow-auto border rounded dark:border-gray-700">
+              <label
+                :for={a <- @filtered}
+                class="flex items-center gap-2 px-2 py-1 border-b dark:border-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                <input
+                  type="checkbox"
+                  checked={MapSet.member?(@exclude_set, a.id)}
+                  phx-click="toggle_exclude"
+                  phx-value-id={a.id}
+                />
+                <span class="flex-1 text-sm">{a.name}</span>
+                <span class="text-xs text-gray-500 dark:text-gray-400">{a.account_type}</span>
+              </label>
+            </div>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              {MapSet.size(@exclude_set)} {gettext("excluded")}
             </p>
           </div>
           <div class="flex justify-end gap-2 mt-4">
