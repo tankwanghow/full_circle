@@ -5,6 +5,7 @@ least_cost_feed/
 orgmind/
 peggy/
 pou_con/
+tugas/
 usbboot/
 
 full_circle/_build/
@@ -18,6 +19,9 @@ full_circle/.git/
 full_circle/assets/node_modules/
 full_circle/priv/static/assets/
 full_circle/priv/static/cache_manifest.json
+# One-off Xero migration snapshots: read only by `mix full_circle.import_xero`,
+# which cannot run in a release. ~24MB of JSON that never needs to ship.
+full_circle/priv/xero_import/
 full_circle/uploads/
 full_circle/seed_csv/
 full_circle/seed_csv_old/
