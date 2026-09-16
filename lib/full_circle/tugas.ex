@@ -17,6 +17,8 @@ defmodule FullCircle.Tugas do
   import Ecto.Query, warn: false
   import FullCircle.Authorization
 
+  require Logger
+
   alias Ecto.Multi
   alias FullCircle.Repo
   alias FullCircle.StdInterface
@@ -24,6 +26,7 @@ defmodule FullCircle.Tugas do
   alias FullCircle.Tugas.Duty
   alias FullCircle.Tugas.DutyDocument
   alias FullCircle.Tugas.DutyEvent
+  alias FullCircle.Tugas.DutyEventDocument
 
   @doc """
   Document types a duty may be linked to.
@@ -54,6 +57,14 @@ defmodule FullCircle.Tugas do
       join: com in subquery(Sys.user_company(company, user)),
       on: com.id == l.company_id,
       select: l
+    )
+  end
+
+  def query(DutyEventDocument, company, user) do
+    from(d in DutyEventDocument,
+      join: com in subquery(Sys.user_company(company, user)),
+      on: com.id == d.company_id,
+      select: d
     )
   end
 
@@ -154,7 +165,7 @@ defmodule FullCircle.Tugas do
     Repo.all(
       from(e in query(DutyEvent, com, user),
         where: e.duty_id == ^duty_id,
-        order_by: [asc: e.inserted_at, asc: e.id]
+        order_by: [asc: e.inserted_at]
       )
     )
   end
@@ -419,4 +430,136 @@ defmodule FullCircle.Tugas do
 
     Repo.all(q)
   end
+
+  # --- EVIDENCE -------------------------------------------------------------
+
+  @evidence_max_bytes 10_000_000
+
+  @doc "MIME types a piece of evidence is allowed to be, after sniffing."
+  def evidence_content_types, do: ~w(image/jpeg image/png image/webp application/pdf)
+
+  @doc "Largest evidence file accepted, in bytes."
+  def evidence_max_bytes, do: @evidence_max_bytes
+
+  def list_event_documents(event_id, com, user) do
+    Repo.all(
+      from(d in query(DutyEventDocument, com, user),
+        where: d.duty_event_id == ^event_id,
+        order_by: [asc: d.inserted_at]
+      )
+    )
+  end
+
+  @doc """
+  Attaches a file to a duty event.
+
+  `upload` is `%{path: <file on disk>, file_name: <name to show>}`, which is
+  what `consume_uploaded_entry/3` hands over.
+
+  The content type is sniffed from the first bytes of the file and the claimed
+  type is ignored entirely. Size is checked with `File.stat/1` before anything
+  is read or copied, so an oversized upload costs one stat.
+
+  Returns `{:error, :too_large}`, `{:error, :unsupported_type}`,
+  `{:error, :not_found}` or `{:error, changeset}`. On any failure after the
+  copy the destination file is removed, so a rejected row never leaves an
+  unreferenced file on the volume.
+  """
+  def attach_evidence(%DutyEvent{} = event, upload, com, user) do
+    src = upload[:path] || upload["path"]
+    file_name = upload[:file_name] || upload["file_name"]
+
+    with true <- can?(user, :create_duty_event_document, com) || :not_authorise,
+         :ok <- assert_event_in_company(event, com),
+         {:ok, size} <- assert_size(src),
+         {:ok, content_type} <- sniff(src) do
+      write_evidence(event, src, file_name, size, content_type, com, user)
+    end
+  end
+
+  defp assert_event_in_company(%DutyEvent{company_id: cid}, %{id: cid}), do: :ok
+  defp assert_event_in_company(_, _), do: {:error, :not_found}
+
+  defp assert_size(src) do
+    case File.stat(src) do
+      {:ok, %{size: size}} when size <= @evidence_max_bytes -> {:ok, size}
+      {:ok, _} -> {:error, :too_large}
+      {:error, _} -> {:error, :not_found}
+    end
+  end
+
+  # Magic bytes only. A claimed content type is trivially wrong (a phone that
+  # sends every picture as application/octet-stream) and trivially forged, and
+  # this column decides what the file is later served back as.
+  defp sniff(src) do
+    case File.open(src, [:read, :binary], &IO.binread(&1, 16)) do
+      {:ok, <<0xFF, 0xD8, 0xFF, _::binary>>} -> {:ok, "image/jpeg"}
+      {:ok, <<0x89, "PNG\r\n", 0x1A, 0x0A, _::binary>>} -> {:ok, "image/png"}
+      {:ok, <<"RIFF", _::binary-size(4), "WEBP", _::binary>>} -> {:ok, "image/webp"}
+      {:ok, <<"%PDF-", _::binary>>} -> {:ok, "application/pdf"}
+      {:ok, _} -> {:error, :unsupported_type}
+      {:error, _} -> {:error, :not_found}
+    end
+  end
+
+  defp write_evidence(event, src, file_name, size, content_type, com, user) do
+    rel = evidence_rel_path(event, com, content_type)
+    abs = Path.join(uploads_dir(), rel)
+
+    File.mkdir_p!(Path.dirname(abs))
+    File.cp!(src, abs)
+
+    Multi.new()
+    |> Multi.insert(
+      :duty_event_document,
+      DutyEventDocument.changeset(%DutyEventDocument{}, %{
+        "file_name" => file_name,
+        "content_type" => content_type,
+        "file_size" => size,
+        "path" => rel,
+        "duty_event_id" => event.id,
+        "company_id" => com.id
+      })
+    )
+    |> Multi.insert("create_duty_event_document_log", fn %{duty_event_document: doc} ->
+      Sys.log_changeset(
+        :create_duty_event_document,
+        doc,
+        %{"file_name" => file_name, "content_type" => content_type, "file_size" => size},
+        com,
+        user
+      )
+    end)
+    |> Repo.transaction()
+    |> case do
+      {:ok, %{duty_event_document: doc}} ->
+        {:ok, doc}
+
+      {:error, _, failed_value, _} ->
+        # The row is what makes the file findable. Without one it is garbage on
+        # the volume that nothing will ever clean up, so drop it here.
+        File.rm(abs)
+        {:error, failed_value}
+    end
+  rescue
+    e in [File.Error, File.CopyError] ->
+      Logger.error("tugas evidence copy failed: #{Exception.message(e)}")
+      {:error, :copy_failed}
+  end
+
+  defp evidence_rel_path(event, com, content_type) do
+    Path.join([
+      com.id,
+      "tugas",
+      event.id,
+      Ecto.UUID.generate() <> extension_for(content_type)
+    ])
+  end
+
+  defp extension_for("image/jpeg"), do: ".jpg"
+  defp extension_for("image/png"), do: ".png"
+  defp extension_for("image/webp"), do: ".webp"
+  defp extension_for("application/pdf"), do: ".pdf"
+
+  defp uploads_dir, do: Application.get_env(:full_circle, :uploads_dir)
 end

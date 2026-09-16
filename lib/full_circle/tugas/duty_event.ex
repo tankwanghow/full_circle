@@ -22,7 +22,11 @@ defmodule FullCircle.Tugas.DutyEvent do
     belongs_to(:company, FullCircle.Sys.Company)
     belongs_to(:user, FullCircle.UserAccounts.User)
 
-    timestamps(type: :utc_datetime)
+    # Microsecond precision, unlike the rest of the app: several events can be
+    # written inside one transaction (close + spawn, link + event), and at
+    # second precision the trail comes back in an arbitrary order because the
+    # only tiebreaker left is a random UUID.
+    timestamps(type: :utc_datetime_usec)
   end
 
   def changeset(event, attrs) do

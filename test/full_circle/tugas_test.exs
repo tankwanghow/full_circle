@@ -455,4 +455,123 @@ defmodule FullCircle.TugasTest do
       assert Tugas.search_duties("road", company, admin) == []
     end
   end
+
+  # --- EVIDENCE -------------------------------------------------------------
+
+  @png_magic <<0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A>>
+  @jpeg_magic <<0xFF, 0xD8, 0xFF, 0xE0>>
+  @webp_magic "RIFF" <> <<0, 0, 0, 0>> <> "WEBP"
+  @pdf_magic "%PDF-1.7\n"
+
+  defp tmp_upload(bytes, name) do
+    path =
+      Path.join(
+        System.tmp_dir!(),
+        "tugas_src_#{System.unique_integer([:positive])}_#{name}"
+      )
+
+    File.write!(path, bytes)
+    ExUnit.Callbacks.on_exit(fn -> File.rm(path) end)
+    %{path: path, file_name: name}
+  end
+
+  defp live_event(company, admin) do
+    {:ok, duty} = Tugas.create_duty(%{"title" => "Evidence duty"}, company, admin)
+    {:ok, event} = Tugas.add_progress(duty, %{"note" => "see attached"}, company, admin)
+    ExUnit.Callbacks.on_exit(fn -> File.rm_rf(Path.join(System.tmp_dir!(), company.id)) end)
+    event
+  end
+
+  describe "attach_evidence/4" do
+    test "derives the content type from the bytes, not from the client", %{
+      admin: admin,
+      company: company
+    } do
+      event = live_event(company, admin)
+
+      # The name and anything a client might claim say PDF; the bytes say PNG.
+      upload = tmp_upload(@png_magic <> "rest of the image", "receipt.pdf")
+
+      assert {:ok, doc} = Tugas.attach_evidence(event, upload, company, admin)
+      assert doc.content_type == "image/png"
+      assert doc.file_name == "receipt.pdf"
+      assert doc.duty_event_id == event.id
+      assert doc.company_id == company.id
+    end
+
+    test "accepts jpeg, webp and pdf", %{admin: admin, company: company} do
+      event = live_event(company, admin)
+
+      for {bytes, name, type} <- [
+            {@jpeg_magic <> "x", "a.jpg", "image/jpeg"},
+            {@webp_magic <> "x", "b.webp", "image/webp"},
+            {@pdf_magic <> "x", "c.pdf", "application/pdf"}
+          ] do
+        assert {:ok, doc} = Tugas.attach_evidence(event, tmp_upload(bytes, name), company, admin)
+        assert doc.content_type == type
+      end
+    end
+
+    test "stores the file under <company_id>/tugas and leaves it on disk", %{
+      admin: admin,
+      company: company
+    } do
+      event = live_event(company, admin)
+      upload = tmp_upload(@pdf_magic <> "body", "statement.pdf")
+
+      assert {:ok, doc} = Tugas.attach_evidence(event, upload, company, admin)
+
+      assert doc.path =~ ~r{^#{company.id}/tugas/}
+      assert doc.file_size == byte_size(@pdf_magic <> "body")
+      assert File.exists?(Path.join(System.tmp_dir!(), doc.path))
+    end
+
+    test "rejects a type that is not on the allowlist", %{admin: admin, company: company} do
+      event = live_event(company, admin)
+      # A GIF: a real image, deliberately not on the allowlist.
+      upload = tmp_upload("GIF89a" <> "x", "anim.gif")
+
+      assert {:error, :unsupported_type} = Tugas.attach_evidence(event, upload, company, admin)
+      refute File.exists?(Path.join([System.tmp_dir!(), company.id, "tugas"]))
+    end
+
+    test "rejects a file over 10MB", %{admin: admin, company: company} do
+      event = live_event(company, admin)
+      upload = tmp_upload(@png_magic <> :binary.copy(<<0>>, 10 * 1_000_000), "huge.png")
+
+      assert {:error, :too_large} = Tugas.attach_evidence(event, upload, company, admin)
+    end
+
+    test "leaves no orphan file behind when the row cannot be written", %{
+      admin: admin,
+      company: company
+    } do
+      event = live_event(company, admin)
+      # The event vanishes between the caller reading it and the attach landing.
+      Repo.delete!(event)
+
+      upload = tmp_upload(@png_magic <> "x", "late.png")
+
+      assert {:error, %Ecto.Changeset{}} = Tugas.attach_evidence(event, upload, company, admin)
+
+      tugas_dir = Path.join([System.tmp_dir!(), company.id, "tugas"])
+      assert Path.wildcard(Path.join(tugas_dir, "**/*")) |> Enum.filter(&File.regular?/1) == []
+    end
+
+    test "refuses an event belonging to another company", %{admin: admin, company: company} do
+      %{admin: other_admin, company: other_company} = billing_setup()
+      event = live_event(other_company, other_admin)
+
+      assert {:error, :not_found} =
+               Tugas.attach_evidence(event, tmp_upload(@png_magic, "x.png"), company, admin)
+    end
+
+    test "lists evidence for an event", %{admin: admin, company: company} do
+      event = live_event(company, admin)
+      {:ok, _} = Tugas.attach_evidence(event, tmp_upload(@png_magic, "a.png"), company, admin)
+      {:ok, _} = Tugas.attach_evidence(event, tmp_upload(@pdf_magic, "b.pdf"), company, admin)
+
+      assert length(Tugas.list_event_documents(event.id, company, admin)) == 2
+    end
+  end
 end
