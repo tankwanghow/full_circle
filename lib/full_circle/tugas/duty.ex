@@ -44,7 +44,10 @@ defmodule FullCircle.Tugas.Duty do
     |> validate_inclusion(:status, @statuses)
     |> validate_inclusion(:recur_unit, @recur_units)
     |> validate_recurrence()
-    |> unique_constraint(:series_id, name: :duties_one_live_cycle_per_series)
+    |> unique_constraint(:series_id,
+      name: :duties_one_live_cycle_per_series,
+      message: "series already has a live cycle"
+    )
     |> foreign_key_constraint(:company_id)
   end
 
@@ -61,8 +64,13 @@ defmodule FullCircle.Tugas.Duty do
       not is_nil(unit) and is_nil(every) ->
         add_error(changeset, :recur_every, "can't be blank")
 
-      not is_nil(every) ->
-        validate_number(changeset, :recur_every, greater_than_or_equal_to: 1)
+      not is_nil(unit) ->
+        # Recurrence is "advance the due date by one interval". With no date to
+        # advance from, every spawned cycle would be undated and the series
+        # would never come due again.
+        changeset
+        |> validate_required([:due_date])
+        |> validate_number(:recur_every, greater_than_or_equal_to: 1)
 
       true ->
         changeset

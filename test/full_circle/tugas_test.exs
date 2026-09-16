@@ -79,4 +79,235 @@ defmodule FullCircle.TugasTest do
       assert "can't be blank" in errors_on(cs).title
     end
   end
+
+  describe "update_duty/4" do
+    test "updates title and due date", %{admin: admin, company: company} do
+      {:ok, duty} = Tugas.create_duty(%{"title" => "Old"}, company, admin)
+
+      assert {:ok, duty} =
+               Tugas.update_duty(
+                 duty,
+                 %{"title" => "New", "due_date" => "2026-10-05"},
+                 company,
+                 admin
+               )
+
+      assert duty.title == "New"
+      assert duty.due_date == ~D[2026-10-05]
+    end
+
+    test "cannot be used to move the duty out of active", %{admin: admin, company: company} do
+      {:ok, duty} = Tugas.create_duty(%{"title" => "Old"}, company, admin)
+
+      assert {:ok, duty} = Tugas.update_duty(duty, %{"status" => "done"}, company, admin)
+      assert duty.status == "active"
+    end
+  end
+
+  describe "add_progress/4" do
+    test "appends a progress event carrying the author and note", %{
+      admin: admin,
+      company: company
+    } do
+      {:ok, duty} = Tugas.create_duty(%{"title" => "Chase the supplier"}, company, admin)
+
+      assert {:ok, event} =
+               Tugas.add_progress(duty, %{"note" => "called, no answer"}, company, admin)
+
+      assert event.action == "progress"
+      assert event.note == "called, no answer"
+      assert event.user_id == admin.id
+      assert event.company_id == company.id
+      assert event.duty_id == duty.id
+    end
+
+    test "leaves the duty active", %{admin: admin, company: company} do
+      {:ok, duty} = Tugas.create_duty(%{"title" => "Chase"}, company, admin)
+      {:ok, _} = Tugas.add_progress(duty, %{"note" => "ping"}, company, admin)
+
+      assert Tugas.get_duty!(duty.id, company, admin).status == "active"
+    end
+
+    test "refuses a duty that is already closed", %{admin: admin, company: company} do
+      {:ok, duty} = Tugas.create_duty(%{"title" => "Chase"}, company, admin)
+
+      {:ok, duty} =
+        duty |> Ecto.Changeset.change(status: "done") |> Repo.update()
+
+      assert {:error, :not_live} = Tugas.add_progress(duty, %{"note" => "late"}, company, admin)
+    end
+  end
+
+  defp recurring_duty(company, admin, attrs \\ %{}) do
+    {:ok, duty} =
+      Tugas.create_duty(
+        Map.merge(
+          %{
+            "title" => "Pay rent",
+            "due_date" => "2026-09-30",
+            "recur_unit" => "month",
+            "recur_every" => 1
+          },
+          attrs
+        ),
+        company,
+        admin
+      )
+
+    duty
+  end
+
+  describe "recurrence validation" do
+    test "a recurring duty needs a due date to advance from", %{admin: admin, company: company} do
+      assert {:error, :create_duty, cs, _} =
+               Tugas.create_duty(
+                 %{"title" => "Pay rent", "recur_unit" => "month", "recur_every" => 1},
+                 company,
+                 admin
+               )
+
+      assert "can't be blank" in errors_on(cs).due_date
+    end
+
+    test "recur_every without a unit is rejected", %{admin: admin, company: company} do
+      assert {:error, :create_duty, cs, _} =
+               Tugas.create_duty(%{"title" => "x", "recur_every" => 2}, company, admin)
+
+      assert "needs a recur unit" in errors_on(cs).recur_every
+    end
+  end
+
+  describe "complete_duty/4" do
+    test "closes the duty and records a done event", %{admin: admin, company: company} do
+      {:ok, duty} = Tugas.create_duty(%{"title" => "One off"}, company, admin)
+
+      assert {:ok, %{duty: closed, next_duty: nil}} =
+               Tugas.complete_duty(duty.id, %{"note" => "paid"}, company, admin)
+
+      assert closed.status == "done"
+
+      assert [%{action: "done", note: "paid", user_id: author}] =
+               Tugas.list_duty_events(duty.id, company, admin)
+
+      assert author == admin.id
+    end
+
+    test "spawns the next cycle of a recurring duty in the same series", %{
+      admin: admin,
+      company: company
+    } do
+      duty = recurring_duty(company, admin)
+
+      assert {:ok, %{duty: closed, next_duty: next}} =
+               Tugas.complete_duty(duty.id, %{}, company, admin)
+
+      assert closed.status == "done"
+      assert next.status == "active"
+      assert next.series_id == duty.series_id
+      assert next.title == duty.title
+      assert next.recur_unit == "month"
+      assert next.recur_every == 1
+      # 30 Sep + 1 month
+      assert next.due_date == ~D[2026-10-30]
+    end
+
+    test "month recurrence clamps instead of rolling into the next month", %{
+      admin: admin,
+      company: company
+    } do
+      duty = recurring_duty(company, admin, %{"due_date" => "2026-01-31"})
+
+      assert {:ok, %{next_duty: next}} = Tugas.complete_duty(duty.id, %{}, company, admin)
+      assert next.due_date == ~D[2026-02-28]
+    end
+
+    test "a closed duty cannot be closed again", %{admin: admin, company: company} do
+      {:ok, duty} = Tugas.create_duty(%{"title" => "One off"}, company, admin)
+      assert {:ok, _} = Tugas.complete_duty(duty.id, %{}, company, admin)
+      assert {:error, :not_live} = Tugas.complete_duty(duty.id, %{}, company, admin)
+    end
+
+    test "a duty from another company is not closeable", %{admin: admin, company: company} do
+      %{admin: other_admin, company: other_company} = billing_setup()
+      {:ok, duty} = Tugas.create_duty(%{"title" => "Theirs"}, other_company, other_admin)
+
+      assert {:error, :not_live} = Tugas.complete_duty(duty.id, %{}, company, admin)
+    end
+  end
+
+  describe "skip_duty/4" do
+    test "marks the cycle skipped and still spawns the next one", %{
+      admin: admin,
+      company: company
+    } do
+      duty = recurring_duty(company, admin)
+
+      assert {:ok, %{duty: closed, next_duty: next}} =
+               Tugas.skip_duty(duty.id, %{"note" => "office shut"}, company, admin)
+
+      assert closed.status == "skipped"
+      assert next.status == "active"
+      assert next.due_date == ~D[2026-10-30]
+
+      assert [%{action: "skip", note: "office shut"}] =
+               Tugas.list_duty_events(duty.id, company, admin)
+    end
+  end
+
+  describe "end_series/3" do
+    test "stamps the series and records an end_series event", %{admin: admin, company: company} do
+      duty = recurring_duty(company, admin)
+
+      assert {:ok, %{duty: ended}} = Tugas.end_series(duty, company, admin)
+      assert ended.series_ended_at
+      assert ended.status == "active"
+
+      assert [%{action: "end_series"}] = Tugas.list_duty_events(duty.id, company, admin)
+    end
+
+    test "an ended series spawns no further cycle when the live one is closed", %{
+      admin: admin,
+      company: company
+    } do
+      duty = recurring_duty(company, admin)
+      {:ok, _} = Tugas.end_series(duty, company, admin)
+
+      assert {:ok, %{duty: closed, next_duty: nil}} =
+               Tugas.complete_duty(duty.id, %{}, company, admin)
+
+      assert closed.status == "done"
+    end
+
+    test "stamps every cycle of the series, not just the live one", %{
+      admin: admin,
+      company: company
+    } do
+      duty = recurring_duty(company, admin)
+      {:ok, %{next_duty: next}} = Tugas.complete_duty(duty.id, %{}, company, admin)
+      {:ok, _} = Tugas.end_series(next, company, admin)
+
+      assert Tugas.get_duty!(duty.id, company, admin).series_ended_at
+    end
+  end
+
+  describe "one live cycle per series" do
+    test "the database refuses a second active duty in the same series", %{
+      admin: admin,
+      company: company
+    } do
+      duty = recurring_duty(company, admin)
+
+      assert {:error, cs} =
+               %FullCircle.Tugas.Duty{}
+               |> FullCircle.Tugas.Duty.changeset(%{
+                 "title" => "Sneaky second live cycle",
+                 "series_id" => duty.series_id,
+                 "status" => "active",
+                 "company_id" => company.id
+               })
+               |> Repo.insert()
+
+      assert "series already has a live cycle" in errors_on(cs).series_id
+    end
+  end
 end
