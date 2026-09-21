@@ -121,7 +121,109 @@ Weekly books are edited in the app UI (one-time ODS import tooling was removed a
 - **7-day forecast** `compute_7day_forecast/4` uses planned totals + avg prod;
   if a day already has actual closing, that closing wins. Each day also carries
   `sales_overrides` / `purchases_overrides` — see [Override warnings](#override-warnings).
-- Production identity per day: `sold + expired + closing − opening − bought`.
+- Production identity per day: see [The two day identities](#the-two-day-identities).
+
+## The two day identities
+
+Both are computed in the LiveView, per grade for production and as a single
+total for loss (`egg_stock_live/form.ex`, `production_block/1` and
+`harvest_ug_loss_block/1`; mirrored in `egg_stock_live/print.ex`):
+
+```
+production = sold + expired + closing − opening − bought
+loss       = harvest + opening + bought + ytd_ug − ug − sold − closing − expired
+```
+
+`closing`, `expired` and `ungraded_bal` are **keyed inputs** — the board trusts
+the physical count and derives everything else from it. `harvest` comes from the
+house collection figures (`harvest_total_for_date/2`), independently.
+
+So `Loss` means "eggs I cannot account for", and a **negative Loss in red means
+eggs appeared from nowhere** — almost always stock that came back in with no
+document behind it.
+
+**`sold` and `bought` come from documents only.** `actual_sales_for_date/2` reads
+Invoice + Receipt lines; `actual_purchases_for_date/2` reads PurInvoice + Payment
+lines. Both match goods to grades by name and date on `COALESCE(load_date,
+<doc>_date)`. **A planned board line does not move either figure** — only
+`Est Closing` reads the live planned rows. Credit notes are invisible to the
+board entirely: `CreditNoteDetail` has no `good_id`, it is descriptions +
+account + amount.
+
+## Rejected delivery / goods returned
+
+The board has no returns concept. This is the procedure that substitutes for
+one, worked out for a real case: a full load was invoiced and sent, an accident
+destroyed half of it in transit, the customer refused the whole delivery and
+asked for it to be re-sent the next day.
+
+**Do not reopen the day that has already closed.** The eggs left the warehouse
+that day and the sales invoice covers them, so that day's count and Loss are
+already correct. Moving the invoice's `load_date` forward is the tempting move
+and it is wrong — it strips the sale off a day whose stock is genuinely gone,
+and Loss blows up by the whole load.
+
+Three documents, all dated the day the goods physically move back:
+
+1. **Purchase invoice from the customer**, same quantity and amount as the
+   undelivered sales invoice. Brings the goods back on the `bought` side and
+   nets their account to zero. Contacts are not split into customer/supplier,
+   so this is structurally fine.
+2. **New sales invoice** for the replacement load.
+3. **`Expired`** carries whatever was destroyed.
+
+The original sales invoice is left standing — nothing to cancel.
+
+Why it reconciles, with opening `O`, harvest `H`, a 1000-tray load, 500
+destroyed and 500 returned. The physical count that evening is `O + H − 500`,
+and the board is told sold 1000, bought 1000, expired 500:
+
+```
+production = 1000 + 500 + (O + H − 500) − O − 1000  =  H
+loss       = H + O + 1000 − 1000 − (O + H − 500) − 500  =  0
+```
+
+Production lands exactly on the day's harvest and Loss is zero.
+
+### Traps
+
+- **Packaging must match the sales invoice.** Tray counts are
+  `quantity / COALESCE(NULLIF(unit_multiplier, 0), 30)`, so the same `quantity`
+  under different packaging is a different number of trays on the board.
+- **`load_date`, not the document date**, decides which day a document lands on.
+- **The purchase invoice says 1000 while only 500 physically arrive.** That gap
+  is the `Expired` figure and it is deliberate. Put it in the day's `note` —
+  the purchase section will read "customer X: 1000 in" and it looks like an
+  error months later.
+- **The same contact sits on both sides of the board that day.**
+  `ensure_planned_lines_for_actuals/3` will add the purchase row by itself, and
+  the overlays are applied per side, so this is harmless.
+- **The account on the purchase line is free.** `actual_purchases_for_date/2`
+  only joins through `Good` and never looks at the account, so pointing the line
+  at the sales account as a contra keeps turnover clean and the board counts the
+  eggs identically.
+- **`Expired` is the only per-grade write-off bucket**, so it absorbs spoilage
+  and accidents alike and the production report cannot tell them apart.
+
+### E-invoice: the purchase leg carries none
+
+**No self-billed e-invoice is required for the goods-back purchase invoice** —
+confirmed with the tax agent 2026-09-21. It is a local stock and ledger record.
+The original sales invoice stays as issued at LHDN; nothing is cancelled and no
+credit note is raised.
+
+That is fortunate, because the codebase could not have produced one.
+`EInvMetas.submit_e_invoice/4` submits **sales invoices only** — it loads
+`InvoiceDetail` and is called from `invoice_live/form.ex`. There is **no submit
+path for `PurInvoice` or `CreditNote`, and no cancel path at all**; submitting a
+document that already has an `e_inv_uuid` is refused outright. Purchase
+e-invoices only arrive inbound through sync (see `e-invoice-bill-prefill.md`).
+
+If a future case does need a self-billed document, the fallback is to issue it by
+hand on MyInvois and match it back — `get_internal_document/4` already has the
+`"Self-billed Invoice"` / `"Self-billed Credit Note"` clauses — rather than
+building a submit path for `PurInvoice`. That matching path has not been
+exercised; trial it on a small return before relying on it.
 
 ## Estimated tab navigation
 
