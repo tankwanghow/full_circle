@@ -9,7 +9,7 @@ defmodule FullCircle.PunchGate.PhotoPruner do
   the work is idempotent).
 
   Note this is a no-op until the oldest punches cross the window: the gate went
-  live in 2026-09, so nothing is prunable until late 2028. The tests in
+  live in 2026-09, so nothing is prunable until 2027-03. The tests in
   `FullCircle.PunchGateTest` are the real evidence it behaves. To see what it
   would do before then, call it directly with a nearer cutoff:
 
@@ -24,7 +24,9 @@ defmodule FullCircle.PunchGate.PhotoPruner do
   alias FullCircle.PunchGate
 
   @day_ms 24 * 60 * 60 * 1000
-  @default_retention_months 24
+  # Compliance figure, not a tuning knob — see .claude/skills/punch-photo-pdpa.md
+  # before lengthening it.
+  @default_retention_months 6
   # Late enough after boot that a deploy is not competing with startup work.
   @first_run_ms 5 * 60 * 1000
 
@@ -52,7 +54,7 @@ defmodule FullCircle.PunchGate.PhotoPruner do
         @default_retention_months
       )
 
-    # Calendar months, not 30-day approximations: 24 * 30 days is 23.7 months.
+    # Calendar months, not 30-day approximations, which drift a few days a year.
     cutoff = Timex.shift(DateTime.utc_now(), months: -months)
 
     case PunchGate.prune_photos_before(cutoff) do

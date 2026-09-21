@@ -239,9 +239,9 @@ defmodule FullCircle.PunchGateTest do
   end
 
   describe "prune_photos_before/2" do
-    # The gate went live in 2026-09, so nothing is older than 24 months until
-    # late 2028. These tests are the only evidence this job behaves before it
-    # first deletes ~125k files unattended.
+    # The gate went live in 2026-09, so nothing crosses the 6-month window until
+    # 2027-03. These tests are the only evidence this job behaves before it
+    # starts deleting files unattended.
 
     setup %{admin: admin, company: company} do
       emp = employee_fixture(%{}, company, admin)

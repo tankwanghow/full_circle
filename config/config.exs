@@ -90,10 +90,11 @@ config :phoenix, :json_library, Jason
 # of this file so it overrides the configuration defined above.
 
 # Punch photos are deleted after this many months; the punch rows are kept.
-config :full_circle, punch_photo_retention_months: 24
+# Kept short deliberately — see .claude/skills/punch-photo-pdpa.md.
+config :full_circle, punch_photo_retention_months: 6
 
 # Punch ingest log rows and their reject photos are deleted after this many
-# calendar months. Shorter than the 24-month punch photo window: this is an
+# calendar months. Shorter than the 6-month punch photo window: this is an
 # operational breadcrumb trail, not a register.
 config :full_circle, punch_ingest_log_retention_months: 3
 config :full_circle, punch_ingest_log_prune_enabled: true

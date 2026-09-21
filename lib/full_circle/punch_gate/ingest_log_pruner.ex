@@ -10,7 +10,7 @@ defmodule FullCircle.PunchGate.IngestLogPruner do
 
   Unlike `PhotoPruner` this one deletes **rows**, not just files: the ingest log
   is an operational breadcrumb trail, not a register. `time_attendences` and
-  its 24-month photos are untouched.
+  its longer-lived photos are untouched.
 
   To see what it would do without deleting anything:
 

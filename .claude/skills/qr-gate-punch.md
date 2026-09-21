@@ -17,7 +17,7 @@ The scanner **unbinds the camera after N seconds with no face** (`BurstIdle`, de
 
 Scanner chrome (always above the sleep overlay): **link icon top-left** (`GET /api/punch/health` every 20s; green = 200/204, red = down, 401 wipes pairing). A successful ping **must** `PunchUploader.drainBlocking` in-process — ColorOS often never runs WorkManager, so a green icon with a growing queue means WM was the only drain path. WorkManager enqueue stays as backup. **Version top-right**; long-press opens sleep-delay seconds plus **how many punches are still queued**. Bottom: face/QR drawings (green = ok, red = missing), Tap to Scan only while asleep, then the clock.
 
-Do **not** revive `/PunchCamera`, `punch_camera` role, Face ID, or employee self-service QR.
+Do **not** revive `/PunchCamera`, `punch_camera` role, Face ID, or employee self-service QR. Face ID in particular is now barred on compliance grounds — see [[punch-photo-pdpa]].
 
 Fingerprint import is a separate write path; after insert it also calls `HR.reassign_punch/2` (see [[finger-print-import]]). Do not revive `PunchGate.rebuild_day_flags/3`.
 
@@ -38,13 +38,15 @@ Badge must not occlude the face: the phone compares the QR bounding box against 
 
 Photos: `{uploads_dir}/{company_id}/punch_photos/{yyyy}/{mm}/{id}.jpg`. Serve via `GET /companies/:id/TimeAttend/:id/photo`.
 
-**Retention: 24 months** (`:punch_photo_retention_months`). `PunchGate.PhotoPruner` is a supervised GenServer that wakes daily and calls `prune_photos_before/2`; the punch rows are kept forever, only the JPEGs go. There is no Oban here, which is why it is a plain process rather than a job — it ships with the release so there is nothing to configure per server. Disabled in `test` (`:punch_photo_prune_enabled`), since it deletes files.
+**Retention: 6 months** (`:punch_photo_retention_months`). `PunchGate.PhotoPruner` is a supervised GenServer that wakes daily and calls `prune_photos_before/2`; the punch rows are kept forever, only the JPEGs go. There is no Oban here, which is why it is a plain process rather than a job — it ships with the release so there is nothing to configure per server. Disabled in `test` (`:punch_photo_prune_enabled`), since it deletes files.
+
+This number is a **PDPA proportionality figure**, not a disk-space tuning knob — it was cut from 24 to 6 months on 2026-09-20. Do not lengthen it without reading [[punch-photo-pdpa]].
 
 The prune removes the **file first, then clears `photo_path`**. Interrupted, that leaves a row pointing at a missing file, which the photo controller already answers with 404, and the next run finishes it — a missing file counts as success. The reverse order would orphan the file permanently and never reclaim the disk. Do not "fix" the order.
 
-It is a **no-op until late 2028** (the gate went live 2026-09), so it cannot be observed working in production before then; the tests in `FullCircle.PunchGateTest` are the evidence. To see what it would remove, use a nearer cutoff with `dry_run: true`.
+It is a **no-op until 2027-03** (the gate went live 2026-09), so it cannot be observed working in production before then; the tests in `FullCircle.PunchGateTest` are the evidence. To see what it would remove, use a nearer cutoff with `dry_run: true`.
 
-Sizing, measured from real punches at 360x480 / ~24 KB: 100 employees at 4 punches/day on a 6-day week is ~125k photos and ~3 GB a year. The 300 KB cap is ~12x the real mean and only catches pathological frames.
+Sizing, measured from real punches at 360x480 / ~24 KB: 100 employees at 4 punches/day on a 6-day week is ~125k photos and ~3 GB a year, so the 6-month window settles at ~1.5 GB steady state. The 300 KB cap is ~12x the real mean and only catches pathological frames.
 
 The stored JPEG is **cropped to the face** (`ScanActivity.faceCropBox`, face box padded 30%, clamped to the frame) so it is legible as a thumbnail. The badge is verified in the same frame and then **deliberately cropped out** — the stored image proves *who*, not *which badge*. Chosen 2026-09-08 with that trade-off understood; do not "restore" the full frame as if it were a regression.
 
@@ -59,7 +61,9 @@ Two traps when touching this:
 - `PunchCard`'s filter form is **`phx-change="search"`**, and that handler `push_navigate`s. Without the `handle_event("search", %{"_target" => ["search", "show_photos"]}, ...)` no-op clause, ticking the box remounts the whole page instead of toggling live. `render_click` in tests only exercises `phx-click`, so this is invisible unless you test `render_change` with that `_target`.
 - `PunchCard.filter_punches/4` **rebuilds the whole `search` map** on its `is_nil(emp)` branch, so a key added to `search` must be carried through there or the default page (no employee selected) raises `KeyError`.
 
-Face **matching** was considered on 2026-09-08 and deliberately not built: it needs an embedding (a biometric template) whether or not you persist it, there is no Oban or Nx in this project, and a cold-start baseline can be poisoned by an impostor in an employee's first few punches. Thumbnails plus a human eye first; revisit only if mismatches actually turn up.
+Face **matching** was considered on 2026-09-08 and deliberately not built: it needs an embedding (a biometric template) whether or not you persist it, there is no Oban or Nx in this project, and a cold-start baseline can be poisoned by an impostor in an employee's first few punches. Thumbnails plus a human eye first.
+
+Since 2026-09-20 this is also a **legal constraint, not just a scope call**: computing an embedding reclassifies every stored photo as sensitive personal data under the PDPA. Read [[punch-photo-pdpa]] before touching it.
 
 ## Where a missing punch went
 

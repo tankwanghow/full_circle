@@ -589,8 +589,8 @@ defmodule FullCircle.PunchGate do
 
   # validate_photo/1 is the first clause of the ingest `with`, so anything that
   # gets past it has a usable JPEG. Accepted and replayed faces already live on
-  # time_attendences for 24 months and are never copied here; revoked is logged
-  # from the auth plug, before any photo handling.
+  # time_attendences for their own retention window and are never copied here;
+  # revoked is logged from the auth plug, before any photo handling.
   defp log_photo?(outcome, _reason) when outcome in ["accepted", "replayed"], do: false
 
   defp log_photo?(_outcome, reason) when reason in ["missing_photo", "too_large", "revoked"],
