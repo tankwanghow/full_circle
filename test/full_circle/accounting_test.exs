@@ -81,9 +81,17 @@ defmodule FullCircle.AccountingTest do
           per_page: 50
         )
 
-      ac = FullCircle.StdInterface.get!(FullCircle.Accounting.Account, Enum.at(all, 0).id)
+      # filter/7 has no order_by, so Enum.at(all, 0) is an arbitrary row. Pick a
+      # default account by name instead: a fresh company references "Sales Tax
+      # Payable" / "Purchase Tax Receivable" from tax_codes and "Salaries and
+      # Wages" / "Salaries and Wages Payable" from salary_types, all with
+      # on_delete: :restrict, so deleting those raises.
+      default_ac = Enum.find(all, fn a -> a.name == "General Sales" end)
+      assert default_ac, "expected a default \"General Sales\" account"
 
-      FullCircle.Accounting.delete_account(ac, com, admin)
+      ac = FullCircle.StdInterface.get!(FullCircle.Accounting.Account, default_ac.id)
+
+      assert {:ok, _} = FullCircle.Accounting.delete_account(ac, com, admin)
 
       assert Enum.count(all) - 1 ==
                Enum.count(
