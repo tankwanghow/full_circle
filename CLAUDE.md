@@ -152,7 +152,9 @@ Three layouts in `lib/full_circle_web/components/layouts/`:
 
 ### Frontend Assets
 
-- **CSS**: Tailwind CSS 3.4, configured in `assets/tailwind.config.js`
+- **CSS**: Tailwind CSS 4.x, configured CSS-first in `assets/css/app.css`
+  (`@import`, `@source`, `@plugin`, `@theme`). There is no `tailwind.config.js`.
+  Dynamic utilities mean arbitrary values such as `grid-cols-14` work without config.
 - **JS**: esbuild with ESM format and code splitting. Entry points in `assets/js/`:
   - `app.js` — Main app (LiveView hooks)
   - `tri_autocomplete.js` — Custom autocomplete component
