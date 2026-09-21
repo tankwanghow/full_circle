@@ -26,6 +26,7 @@ defmodule FullCircleWeb.ReportLive.Statement do
     # encoder rejects a struct without an :id. Ticking a row before pressing
     # Query used to crash the LiveView here.
     t_date = params["t_date"] || Date.to_iso8601(Timex.today())
+    days = params["days"] || ""
 
     cutoffs = AgingBuckets.parse_cutoffs(params)
     preset = AgingBuckets.preset_for(cutoffs)
@@ -33,6 +34,7 @@ defmodule FullCircleWeb.ReportLive.Statement do
     search = %{
       gt: gt,
       t_date: t_date,
+      days: days,
       preset: preset,
       c1: Enum.at(cutoffs, 0),
       c2: Enum.at(cutoffs, 1),
@@ -137,6 +139,7 @@ defmodule FullCircleWeb.ReportLive.Statement do
     qry = %{
       "search[gt]" => params["gt"],
       "search[t_date]" => params["t_date"],
+      "search[days]" => params["days"],
       "search[c1]" => Enum.at(cutoffs, 0),
       "search[c2]" => Enum.at(cutoffs, 1),
       "search[c3]" => Enum.at(cutoffs, 2),
@@ -173,7 +176,7 @@ defmodule FullCircleWeb.ReportLive.Statement do
       <p class="text-2xl text-center font-medium">{"#{@page_title}"}</p>
       <div class="border rounded bg-amber-200 text-center p-2">
         <.form for={%{}} id="search-form" phx-submit="query" phx-change="changed" autocomplete="off">
-          <div class="grid grid-cols-13 gap-1 tracking-tighter">
+          <div class="grid grid-cols-14 gap-1 tracking-tighter">
             <div class="col-span-1">
               <.input
                 label={gettext("Bal >")}
@@ -191,6 +194,18 @@ defmodule FullCircleWeb.ReportLive.Statement do
                 type="date"
                 id="search_t_date"
                 value={@search.t_date}
+              />
+            </div>
+            <div class="col-span-2">
+              <.input
+                label={gettext("Detail Days")}
+                name="search[days]"
+                type="number"
+                id="search_days"
+                step="1"
+                min="0"
+                max="365"
+                value={@search.days}
               />
             </div>
             <div class="col-span-2">
@@ -243,7 +258,7 @@ defmodule FullCircleWeb.ReportLive.Statement do
                 value={@search.c4}
               />
             </div>
-            <div class="col-span-4 mt-4">
+            <div class="col-span-3 mt-4">
               <.button>
                 {gettext("Query")}
               </.button>
@@ -251,7 +266,7 @@ defmodule FullCircleWeb.ReportLive.Statement do
                 :if={@can_print}
                 class="blue button mr-1"
                 navigate={
-                  ~p"/companies/#{@current_company.id}//Statement/print_multi?&tdate=#{@search.t_date}&ids=#{@ids}&c1=#{@search.c1}&c2=#{@search.c2}&c3=#{@search.c3}&c4=#{@search.c4}"
+                  ~p"/companies/#{@current_company.id}//Statement/print_multi?&tdate=#{@search.t_date}&days=#{@search.days}&ids=#{@ids}&c1=#{@search.c1}&c2=#{@search.c2}&c3=#{@search.c3}&c4=#{@search.c4}"
                 }
                 target="_blank"
               >

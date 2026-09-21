@@ -1,6 +1,8 @@
 defmodule FullCircleWeb.StatementIndexLiveTest do
   @moduledoc """
-  The Contacts Balance search form.
+  The Detail Days box on the Contacts Balance search form. Guards the round
+  trip through handle_params — a missing `days` key raises in the template and
+  500s the page.
   """
   use FullCircleWeb.ConnCase
 
@@ -30,6 +32,48 @@ defmodule FullCircleWeb.StatementIndexLiveTest do
     })
 
     contact
+  end
+
+  defp days_input(html) do
+    html
+    |> LazyHTML.from_fragment()
+    |> LazyHTML.query(~s{input[name="search[days]"]})
+  end
+
+  test "the form renders a Detail Days box, empty by default", %{conn: conn, company: company} do
+    {:ok, _lv, html} = live(conn, ~p"/companies/#{company.id}/debtor_statement")
+
+    inputs = days_input(html)
+
+    assert Enum.count(inputs) == 1
+    assert LazyHTML.attribute(inputs, "type") == ["number"]
+    assert LazyHTML.attribute(inputs, "value") in [[], [""]]
+    assert LazyHTML.attribute(inputs, "max") == ["365"]
+    assert html =~ "Detail Days"
+  end
+
+  test "a days value in the URL comes back into the box", %{conn: conn, company: company} do
+    {:ok, _lv, html} =
+      live(conn, ~p"/companies/#{company.id}/debtor_statement?search[days]=90")
+
+    inputs = days_input(html)
+
+    assert Enum.count(inputs) == 1
+    assert LazyHTML.attribute(inputs, "value") == ["90"]
+  end
+
+  test "submitting the form carries days into the query string", %{
+    conn: conn,
+    company: company
+  } do
+    {:ok, lv, _html} = live(conn, ~p"/companies/#{company.id}/debtor_statement")
+
+    assert {:error, {:live_redirect, %{to: to}}} =
+             lv
+             |> form("#search-form", search: %{"gt" => "0.00", "days" => "60"})
+             |> render_submit()
+
+    assert to =~ "search%5Bdays%5D=60"
   end
 
   test "ticking a row on a freshly loaded page renders the print link", %{

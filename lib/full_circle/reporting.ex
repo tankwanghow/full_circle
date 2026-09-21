@@ -275,7 +275,7 @@ defmodule FullCircle.Reporting do
 
   defp cash_flow_section(_account_type), do: "Operating"
 
-  def statements(ids, edate, com, cutoffs \\ [30, 60, 90, 120]) do
+  def statements(ids, edate, com, cutoffs \\ [30, 60, 90, 120], days \\ nil) do
     cutoffs = to_cutoffs!(cutoffs)
 
     conts =
@@ -298,9 +298,10 @@ defmodule FullCircle.Reporting do
 
     conts
     |> Enum.map(fn c ->
-      sdate = Map.get(last_months, c.id) || Date.beginning_of_month(edate)
+      sdate = statement_start_date(Map.get(last_months, c.id), edate, days)
 
       c
+      |> Map.merge(%{sdate: sdate})
       |> Map.merge(%{aging: Enum.find(agings, fn a -> a.contact_id == c.id end)})
       |> Map.merge(%{pd_chqs: Enum.find(pdcs, fn a -> a.contact_id == c.id end)})
       |> Map.merge(%{
@@ -312,6 +313,19 @@ defmodule FullCircle.Reporting do
           end)
       })
     end)
+  end
+
+  # Without `days` a contact's detail starts at the month it last traded in.
+  # `days` reaches further back from the To date, and can only widen the window:
+  # the floor keeps a dormant contact's last month on the page instead of
+  # printing a brought-forward line and nothing else.
+  defp statement_start_date(last_month, edate, days) do
+    floor_date = last_month || Date.beginning_of_month(edate)
+
+    case days do
+      nil -> floor_date
+      n -> Enum.min([Date.add(edate, -n), floor_date], Date)
+    end
   end
 
   defp contact_last_txn_month(ids, edate, com) do

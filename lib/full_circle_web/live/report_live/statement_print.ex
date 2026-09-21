@@ -11,7 +11,8 @@ defmodule FullCircleWeb.ReportLive.Statement.Print do
     chunk = (detail_body_height / detail_height) |> floor
 
     cutoffs = AgingBuckets.parse_cutoffs(params)
-    contacts = fill_data(socket, params["ids"], params["tdate"], cutoffs)
+    days = parse_days(params["days"])
+    contacts = fill_data(socket, params["ids"], params["tdate"], cutoffs, days)
 
     contacts =
       contacts
@@ -33,17 +34,34 @@ defmodule FullCircleWeb.ReportLive.Statement.Print do
      |> assign(:cutoffs, cutoffs)
      |> assign(:bucket_labels, AgingBuckets.bucket_labels(cutoffs))
      |> assign(page_title: gettext("Print"))
+     |> assign(:days, days)
      |> assign(:tdate, Date.from_iso8601!(params["tdate"]))}
   end
 
-  defp fill_data(socket, ids, tdate, cutoffs) do
+  @max_days 365
+
+  # The search form always submits `days`, empty when the box is blank, so the
+  # empty string is the common path rather than the edge case. The cap is
+  # enforced here and not only by the input's max attribute, because this print
+  # route is reachable by URL.
+  defp parse_days(days) when is_binary(days) do
+    case Integer.parse(days) do
+      {n, ""} when n > 0 -> min(n, @max_days)
+      _ -> nil
+    end
+  end
+
+  defp parse_days(_), do: nil
+
+  defp fill_data(socket, ids, tdate, cutoffs, days) do
     ids = String.split(ids, ",")
 
     FullCircle.Reporting.statements(
       ids,
       Date.from_iso8601!(tdate),
       socket.assigns.current_company,
-      cutoffs
+      cutoffs,
+      days
     )
   end
 
@@ -92,10 +110,8 @@ defmodule FullCircleWeb.ReportLive.Statement.Print do
     ~H"""
     <div class="txn">
       <div class="doc_date">{@txn.doc_date}</div>
-      <div class="doc_info">
-        <span class="txn_doctype">{@txn.doc_type}</span> {@txn.doc_no}
-      </div>
-      <div class="parti">{@txn.particulars |> String.slice(0..40)}</div>
+      <div class="doc_info">{@txn.doc_no}</div>
+      <div class="parti">{@txn.particulars |> String.slice(0..43)}</div>
       <div class="amount">{@txn.amount |> Number.Delimit.number_to_delimited()}</div>
       <div class="running_sum">{@txn.running |> Number.Delimit.number_to_delimited()}</div>
     </div>
@@ -154,9 +170,15 @@ defmodule FullCircleWeb.ReportLive.Statement.Print do
       <div class="is-size-6">TO</div>
       <div class="customer">
         <div class="is-size-5 has-text-weight-bold">{@contact.name}</div>
-        <div class="statement-info">
+        <div class={"statement-info #{if @days, do: "with-period"}"}>
           <div>
             Statement Date: <span class="has-text-weight-bold">{Helpers.format_date(@tdate)}</span>
+          </div>
+          <div :if={@days}>
+            Period:
+            <span class="has-text-weight-bold">
+              {Helpers.format_date(@contact.sdate)} - {Helpers.format_date(@tdate)}
+            </span>
           </div>
           <div class="page-info">{"page #{@page} of #{@pages}"}</div>
         </div>
@@ -215,21 +237,25 @@ defmodule FullCircleWeb.ReportLive.Statement.Print do
 
       .doctype { float: right; font-weight: bold; font-size: 1.5rem; }
 
-      .txn_doctype { font-size: 0.7rem; }
-
       .statement-header { height: 40mm; margin-top: 3mm; border-top: 1px solid black; }
       .statement-header .customer { padding-left: 3mm; padding-top: 2mm; }
-      .statement-header .statement-info { float: right; text-align: right; }
+      /* The info block floats inside a fixed 40mm header, so its height is load
+         bearing: overhang intrudes on the transaction header's line box and
+         squashes the column labels. line-height is stated so the Period line is
+         known to be exactly 5mm, and the page-info spacer gives back the same
+         5mm when it is present, leaving the float's bottom edge where it was. */
+      .statement-header .statement-info { float: right; text-align: right; line-height: 5mm; }
       .statement-header .page-info { margin-top: 8mm; }
+      .statement-header .statement-info.with-period .page-info { margin-top: 3mm; }
 
       .txn.header { font-weight: bold; border-top: 2px solid black; border-bottom: 2px solid black; height: 8mm; padding-top: 1mm; margin-bottom: 2mm; }
 
       .txn { display: flex; height: <%= @detail_height %>mm;  }
       .txn .doc_date { width: 12%; text-align: left; }
-      .txn .doc_info { width: 21%; text-align: center; }
-      .txn .parti { width: 40%; text-align: center; overflow: clip;}
-      .txn .amount { width: 12%; text-align: right; }
-      .txn .running_sum { width: 15%; text-align: right; }
+      .txn .doc_info { width: 15%; text-align: center; }
+      .txn .parti { width: 44%; text-align: center; overflow: clip;}
+      .txn .amount { width: 13%; text-align: right; }
+      .txn .running_sum { width: 16%; text-align: right; }
 
       .aging_group { bottom: 10px;}
       .aging { display: flex; gap: 2px; margin-bottom: 1px;}
