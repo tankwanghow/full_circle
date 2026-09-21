@@ -22,7 +22,10 @@ defmodule FullCircleWeb.ReportLive.Statement do
 
     gt = params["gt"] || "0.00"
 
-    t_date = params["t_date"] || Timex.today()
+    # ISO string, not a Date: the print link builds its query with ~p, whose
+    # encoder rejects a struct without an :id. Ticking a row before pressing
+    # Query used to crash the LiveView here.
+    t_date = params["t_date"] || Date.to_iso8601(Timex.today())
 
     cutoffs = AgingBuckets.parse_cutoffs(params)
     preset = AgingBuckets.preset_for(cutoffs)
