@@ -111,7 +111,7 @@ defmodule FullCircleWeb.ReportLive.Statement.Print do
     <div class="txn">
       <div class="doc_date">{@txn.doc_date}</div>
       <div class="doc_info">{@txn.doc_no}</div>
-      <div class="parti">{@txn.particulars |> String.slice(0..43)}</div>
+      <div class="parti">{@txn.particulars}</div>
       <div class="amount">{@txn.amount |> Number.Delimit.number_to_delimited()}</div>
       <div class="running_sum">{@txn.running |> Number.Delimit.number_to_delimited()}</div>
     </div>
@@ -251,11 +251,27 @@ defmodule FullCircleWeb.ReportLive.Statement.Print do
       .txn.header { font-weight: bold; border-top: 2px solid black; border-bottom: 2px solid black; height: 8mm; padding-top: 1mm; margin-bottom: 2mm; }
 
       .txn { display: flex; height: <%= @detail_height %>mm;  }
-      .txn .doc_date { width: 12%; text-align: left; }
-      .txn .doc_info { width: 15%; text-align: center; }
-      .txn .parti { width: 44%; text-align: center; overflow: clip;}
+      .txn .doc_date { width: 11%; text-align: left; }
+      .txn .doc_info { width: 13%; text-align: center; }
+      .txn .parti { width: 49%; text-align: center; overflow: clip; white-space: nowrap; }
       .txn .amount { width: 13%; text-align: right; }
-      .txn .running_sum { width: 16%; text-align: right; }
+      .txn .running_sum { width: 14%; text-align: right; }
+
+      /* Weight separates the columns; the two that recede are Date and the
+         Particulars prose, which lets the document number, the amount and the
+         balance carry the row. Tracking is negative throughout so each column
+         holds more before it runs out of width - particulars is not truncated
+         in the markup, it is clipped at the real column edge, which is why it
+         also needs white-space: nowrap above. Without that a long description
+         wraps and the second line's top edge shows under the clipped row. */
+      .txn .doc_date { font-weight: 300; letter-spacing: -0.08em; }
+      .txn .doc_info { font-weight: 400; letter-spacing: -0.05em;}
+      .txn .parti { font-weight: 300; letter-spacing: -0.08em; }
+      .txn .amount { font-weight: 400; letter-spacing: -0.05em;}
+      .txn .running_sum { font-weight: 600; letter-spacing: -0.03em;}
+
+      /* The header row labels must read as labels, not imitate their column. */
+      .txn.header div { font-weight: inherit; letter-spacing: normal; }
 
       .aging_group { bottom: 10px;}
       .aging { display: flex; gap: 2px; margin-bottom: 1px;}
