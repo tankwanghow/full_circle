@@ -224,7 +224,7 @@ defmodule FullCircleWeb.CompanyLive.Form do
     socket =
       socket
       |> assign(:full_screen_app?, false)
-      |> assign(:current_company, session["current_company"])
+      |> assign(:current_company, FullCircleWeb.ActiveCompany.company_from_session(session))
       |> assign(:current_role, session["current_role"])
 
     case socket.assigns.live_action do

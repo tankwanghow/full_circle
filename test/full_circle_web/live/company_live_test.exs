@@ -59,7 +59,7 @@ defmodule FullCircleWeb.CompanyLiveTest do
     end
 
     test "mark active company", %{conn: conn, comp: comp, comp1: comp1, comp2: comp2} do
-      conn = conn |> put_session(:current_company, comp)
+      conn = conn |> put_session(:current_company_id, comp.id)
       {:ok, _lv, html} = live(conn, ~p"/companies")
       parsed = LazyHTML.from_fragment(html)
 
@@ -72,7 +72,7 @@ defmodule FullCircleWeb.CompanyLiveTest do
       assert LazyHTML.query(parsed, ~s|div#company-#{comp2.id} a.set-active|)
              |> LazyHTML.to_tree() != []
 
-      conn = conn |> put_session(:current_company, comp1)
+      conn = conn |> put_session(:current_company_id, comp1.id)
       {:ok, _lv, html} = live(conn, ~p"/companies")
       parsed = LazyHTML.from_fragment(html)
 
@@ -207,7 +207,7 @@ defmodule FullCircleWeb.CompanyLiveTest do
       feb_co = company_fixture(user, %{name: "febco", closing_month: 2, closing_day: 28})
       # Keep the edited company inactive — editing the *active* company submits
       # through trigger_action instead of a LiveView redirect.
-      conn = conn |> put_session(:current_company, comp1)
+      conn = conn |> put_session(:current_company_id, comp1.id)
       {:ok, lv, _html} = live(conn, ~p"/edit_company/#{feb_co.id}")
 
       attrs =
@@ -232,7 +232,7 @@ defmodule FullCircleWeb.CompanyLiveTest do
       comp1: comp1
     } do
       jan_co = company_fixture(user, %{name: "janco30", closing_month: 1, closing_day: 30})
-      conn = conn |> put_session(:current_company, comp1)
+      conn = conn |> put_session(:current_company_id, comp1.id)
       {:ok, lv, _html} = live(conn, ~p"/edit_company/#{jan_co.id}")
 
       html =
@@ -259,7 +259,7 @@ defmodule FullCircleWeb.CompanyLiveTest do
     end
 
     test "save valid company", %{conn: conn, comp: comp, comp1: comp1} do
-      conn = conn |> put_session(:current_company, comp1)
+      conn = conn |> put_session(:current_company_id, comp1.id)
       {:ok, lv, _html} = live(conn, ~p"/edit_company/#{comp.id}")
 
       attrs = valid_company_attributes(%{name: "kakak"})
@@ -276,7 +276,7 @@ defmodule FullCircleWeb.CompanyLiveTest do
     end
 
     test "save active valid company", %{conn: conn, comp: comp} do
-      conn = conn |> put_session(:current_company, comp)
+      conn = conn |> put_session(:current_company_id, comp.id)
       {:ok, lv, html} = live(conn, ~p"/edit_company/#{comp.id}")
 
       assert LazyHTML.from_fragment(html) |> LazyHTML.query("#active-company") |> LazyHTML.text() =~
@@ -292,7 +292,8 @@ defmodule FullCircleWeb.CompanyLiveTest do
       render_submit(form)
       conn = follow_trigger_action(form, conn)
       assert redirected_to(conn) == ~p"/companies"
-      assert get_session(conn, :current_company).name == "kakak"
+      assert get_session(conn, :current_company_id) == comp.id
+      assert FullCircleWeb.ActiveCompany.active_company(conn).name == "kakak"
     end
 
     test "save invalid company", %{lv: lv} do

@@ -94,7 +94,7 @@ defmodule FullCircleWeb.CompanyLiveIndex do
     socket =
       socket
       |> assign(:page_title, gettext("Company Listing"))
-      |> assign(:current_company, session["current_company"])
+      |> assign(:current_company, FullCircleWeb.ActiveCompany.company_from_session(session))
       |> assign(:current_role, session["current_role"])
       |> assign(:full_screen_app?, false)
 

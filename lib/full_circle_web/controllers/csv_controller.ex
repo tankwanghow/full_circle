@@ -98,7 +98,7 @@ defmodule FullCircleWeb.CsvController do
         "report" => "fixed_assets_report",
         "tdate" => tdate
       }) do
-    com = get_session(conn, "current_company")
+    com = FullCircleWeb.ActiveCompany.active_company(conn)
     tdate = tdate |> Timex.parse!("{YYYY}-{0M}-{0D}") |> NaiveDateTime.to_date()
 
     {col, row} = FullCircle.Reporting.fixed_assets(tdate, com)
@@ -109,7 +109,7 @@ defmodule FullCircleWeb.CsvController do
   end
 
   def show(conn, %{"report" => "queries", "id" => id}) do
-    com = get_session(conn, "current_company")
+    com = FullCircleWeb.ActiveCompany.active_company(conn)
     user = conn.assigns.current_user
 
     q = FullCircle.StdInterface.get!(FullCircle.UserQueries.Query, id)
@@ -125,7 +125,7 @@ defmodule FullCircleWeb.CsvController do
         "report" => "post_dated_cheque_listing",
         "tdate" => tdate
       }) do
-    com = get_session(conn, "current_company")
+    com = FullCircleWeb.ActiveCompany.active_company(conn)
     tdate = tdate |> Timex.parse!("{YYYY}-{0M}-{0D}") |> NaiveDateTime.to_date()
 
     data = FullCircle.Reporting.contact_undeposit_cheques(tdate, com)

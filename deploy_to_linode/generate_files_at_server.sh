@@ -75,6 +75,16 @@ server {
 
     location / {
         proxy_pass http://localhost:$PORT; # ${IMAGE_NAME} container uses host network
+
+        # The whole response header block must fit in ONE proxy buffer, and the
+        # default is a single 4k page. Phoenix signs its session into a cookie
+        # that Plug allows up to 4096 bytes on its own, so a large session put
+        # the header over the line and nginx answered 502 while the app was
+        # returning 200. Give the header room rather than relying on the
+        # session staying small.
+        proxy_buffer_size 16k;
+        proxy_buffers 8 16k;
+        proxy_busy_buffers_size 32k;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
