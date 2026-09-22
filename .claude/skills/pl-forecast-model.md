@@ -1,6 +1,6 @@
 ---
 name: pl-forecast-model
-description: Use when working on FullCircle.Reporting.ProfitLossForecast, the Profit & Loss Forecast LiveView/print, its account-exclusion list, the per-category trailing windows, the estimated-tax rows — or when writing ANY function that persists a key into a Company's `settings` map.
+description: Use when working on FullCircle.Reporting.ProfitLossForecast, the Profit & Loss Forecast LiveView/print, its account-exclusion list, the per-category trailing windows, the estimated-tax rows — when writing ANY function that persists a key into a Company's `settings` map — or when putting anything into the Phoenix session / debugging a 502 on a company-scoped page.
 ---
 
 # P&L Forecast Model
@@ -101,8 +101,37 @@ This applies to **any** company-settings writer, not just this report. If you ad
 a new settings key, either thread the company or fold the write into an existing
 save that already owns the map.
 
-`company_with_settings/1` re-reads settings from the DB — needed because the
-session's company struct goes stale as soon as settings are written.
+`company_with_settings/1` re-reads settings from the DB. Always read settings
+from the row, never from a struct you have been holding across a write.
+
+## GOTCHA: `settings` has a size budget, and it is a cookie
+
+`companies.settings` is not free-form storage. The active company used to be put
+into the session whole, and the session is a **signed cookie**:
+
+- Plug hard-caps a cookie at **4096 bytes** and raises `CookieOverflowError` (500)
+  above it;
+- nginx must fit the **entire response header block** into one
+  `proxy_buffer_size`, which defaults to a single 4k page, and answers **502 Bad
+  Gateway** when it does not fit — while the app logs a healthy `Sent 200`.
+
+The exclusion lists store a 36-char account UUID each, so they grow settings fast.
+At 1210 chars of settings the signed cookie reached ~3.8KB and production 502'd on
+every company-scoped page. Fixed in `6063a512`: the session now holds only
+`current_company_id` and `FullCircleWeb.ActiveCompany` reads the row per request
+(3209 → 421 bytes on the regression test in `active_company_test.exs`).
+
+Rules that follow:
+
+- **Never put a `%Company{}`, or anything else unbounded, into the session.** Put
+  an id and read the row. `FullCircleWeb.ActiveCompany.company_from_session/1`
+  (LiveView `session` map) and `active_company/1` (`conn`) are the loaders.
+- A new settings key is a **per-company, per-request read**, not free. Keep
+  payloads to ids and scalars; large text belongs in its own column or table.
+- The generated nginx conf sets `proxy_buffer_size 16k`
+  (`deploy_to_linode/generate_files_at_server.sh`). A box provisioned before that
+  is still on the 4k default — check there first when a healthy 200 arrives as a
+  502.
 
 ## Testing
 
