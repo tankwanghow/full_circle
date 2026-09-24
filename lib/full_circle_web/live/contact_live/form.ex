@@ -28,7 +28,13 @@ defmodule FullCircleWeb.ContactLive.Form do
   end
 
   defp mount_edit(socket, id) do
-    account = StdInterface.get!(Contact, id)
+    account =
+      StdInterface.get_by_id!(
+        Contact,
+        id,
+        socket.assigns.current_company,
+        socket.assigns.current_user
+      )
 
     socket
     |> assign(live_action: :edit)

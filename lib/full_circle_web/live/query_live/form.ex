@@ -39,12 +39,12 @@ defmodule FullCircleWeb.QueryLive.Form do
     # get_one_by/5 joins through Sys.user_company/2, so it also re-checks that
     # this user is still a member of the company the session names.
     query =
-      StdInterface.get_by_id(
+      StdInterface.get_by_id!(
         Query,
         id,
         socket.assigns.current_company,
         socket.assigns.current_user
-      ) || raise(Ecto.NoResultsError, queryable: Query)
+      )
 
     socket
     |> assign(live_action: :edit)

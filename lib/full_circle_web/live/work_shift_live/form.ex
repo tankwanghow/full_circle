@@ -65,7 +65,12 @@ defmodule FullCircleWeb.WorkShiftLive.Form do
             }
 
           id ->
-            StdInterface.get!(WorkShift, id)
+            StdInterface.get_by_id!(
+              WorkShift,
+              id,
+              company,
+              socket.assigns.current_user
+            )
         end
 
       {:ok,

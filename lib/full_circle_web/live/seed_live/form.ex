@@ -30,7 +30,13 @@ defmodule FullCircleWeb.SeedLive.Form do
 
   @impl true
   def handle_event("save", %{"_target" => ["transaction", _], "transaction" => params}, socket) do
-    obj = StdInterface.get!(Transaction, params["id"])
+    obj =
+      StdInterface.get_by_id!(
+        Transaction,
+        params["id"],
+        socket.assigns.current_company,
+        socket.assigns.current_user
+      )
 
     case StdInterface.update(
            Transaction,

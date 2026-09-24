@@ -30,7 +30,13 @@ defmodule FullCircleWeb.HolidayLive.Form do
   end
 
   defp mount_edit(socket, id) do
-    holiday = StdInterface.get!(Holiday, id)
+    holiday =
+      StdInterface.get_by_id!(
+        Holiday,
+        id,
+        socket.assigns.current_company,
+        socket.assigns.current_user
+      )
 
     socket
     |> assign(live_action: :edit)
@@ -44,7 +50,12 @@ defmodule FullCircleWeb.HolidayLive.Form do
 
   defp mount_copy(socket, id) do
     obj =
-      StdInterface.get!(Holiday, id)
+      StdInterface.get_by_id!(
+        Holiday,
+        id,
+        socket.assigns.current_company,
+        socket.assigns.current_user
+      )
 
     socket
     |> assign(live_action: :new)

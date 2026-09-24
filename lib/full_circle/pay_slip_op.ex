@@ -51,7 +51,7 @@ defmodule FullCircle.PaySlipOp do
 
   @doc "Create or update the payslip for an employee/month from the calculated preview."
   def pay(emp, mth, yr, funds_account_id, com, user) do
-    acc = StdInterface.get!(Account, funds_account_id)
+    acc = StdInterface.get_by_id!(Account, funds_account_id, com, user)
     attrs = changeset_to_pay_attrs(preview(emp, mth, yr, com, user), acc)
 
     case get_pay_slip_by_period(emp, mth, yr, com) do

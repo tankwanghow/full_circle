@@ -37,7 +37,13 @@ defmodule FullCircleWeb.WeighingLive.Form do
   end
 
   defp mount_edit(socket, id) do
-    obj = StdInterface.get!(Weighing, id)
+    obj =
+      StdInterface.get_by_id!(
+        Weighing,
+        id,
+        socket.assigns.current_company,
+        socket.assigns.current_user
+      )
 
     socket
     |> assign(live_action: :edit)

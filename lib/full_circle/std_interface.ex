@@ -35,6 +35,15 @@ defmodule FullCircle.StdInterface do
     end
   end
 
+  @doc """
+  Like `get_by_id/4`, but raises `Ecto.NoResultsError` when there is no match.
+
+  The failure mode `get!/2` had, with the scoping it lacked.
+  """
+  def get_by_id!(klass, id, company, user) do
+    get_by_id(klass, id, company, user) || raise(Ecto.NoResultsError, queryable: klass)
+  end
+
   def get_one_by(klass, field, value, com, user) do
     Repo.one(
       from obj in subquery(query(klass, com, user)),

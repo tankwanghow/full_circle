@@ -558,6 +558,34 @@ defmodule FullCircle.PaySlipOpTest do
     end
   end
 
+  describe "pay/6 funds account scoping" do
+    setup :setup_payroll
+
+    # pay/6 loaded the funds account with an unscoped get!, so an id from
+    # another company was accepted and written onto the pay slip.
+    test "refuses a funds account from another company", %{
+      com: com,
+      admin: admin,
+      employee: emp
+    } do
+      stranger = FullCircle.UserAccountsFixtures.user_fixture()
+
+      other =
+        FullCircle.SysFixtures.company_fixture(stranger, %{name: "Elsewhere Sdn Bhd"})
+
+      theirs =
+        FullCircle.AccountingFixtures.account_fixture(
+          %{name: "Their Cash", account_type: "Cash or Equivalent"},
+          other,
+          stranger
+        )
+
+      assert_raise Ecto.NoResultsError, fn ->
+        PaySlipOp.pay(emp, 3, 2023, theirs.id, com, admin)
+      end
+    end
+  end
+
   describe "linked-note edit guard" do
     setup :setup_payroll
 
