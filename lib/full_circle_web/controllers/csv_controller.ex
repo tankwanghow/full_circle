@@ -1,7 +1,7 @@
 defmodule FullCircleWeb.CsvController do
   use FullCircleWeb, :controller
 
-  alias FullCircle.{HR, Repo, StatutoryConfig}
+  alias FullCircle.{HR, StatutoryConfig, StdInterface}
   alias FullCircle.UserQueries.Query
 
   def show(conn, %{
@@ -109,11 +109,12 @@ defmodule FullCircleWeb.CsvController do
     send_csv_row_col(conn, row, col, filename)
   end
 
-  def show(conn, %{"company_id" => com_id, "report" => "queries", "id" => id}) do
+  def show(conn, %{"report" => "queries", "id" => id}) do
     com = FullCircleWeb.ActiveCompany.active_company(conn)
     user = conn.assigns.current_user
 
-    case saved_query(com_id, id) do
+    # Scoped: an unscoped get! would run another company's saved SQL.
+    case StdInterface.get_by_id(Query, id, com, user) do
       nil ->
         send_resp(conn, 404, "not found")
 
@@ -415,16 +416,6 @@ defmodule FullCircleWeb.CsvController do
 
   defp send_csv_row_col(conn, data, fields, filename) do
     send_csv(conn, fields, data, filename)
-  end
-
-  # StdInterface.get!/2 is an unscoped Repo.get!, so an id belonging to another
-  # company would be loaded and its SQL run. Scope it, and treat a malformed id
-  # as absent rather than letting it raise Ecto.Query.CastError as a 500.
-  defp saved_query(com_id, id) do
-    case Ecto.UUID.cast(id) do
-      {:ok, uuid} -> Repo.get_by(Query, id: uuid, company_id: com_id)
-      :error -> nil
-    end
   end
 
   # A report that matched nothing has no first row to read column names from.

@@ -7,7 +7,33 @@ defmodule FullCircle.StdInterface do
   alias Ecto.Multi
   alias FullCircle.Sys
 
+  @doc """
+  Unscoped fetch by primary key — the id alone decides what comes back.
+
+  Prefer `get_by_id/4`. Reach for this only where the company has already been
+  established by other means, never with an id taken from a URL or a form.
+  """
   def get!(klass, id), do: Repo.get!(klass, id)
+
+  @doc """
+  Fetches `id` only if it belongs to `company` and `user` is still a member.
+
+  Joins through `Sys.user_company/2`, so a record from another company — or any
+  record at all once the user's access is revoked or set to `disable` — comes
+  back as `nil` rather than being handed to the caller. A malformed id is `nil`
+  too, not an `Ecto.Query.CastError`.
+
+  Unlike `get_one_by/5` this casts the id, so it works on `binary_id` keys.
+  """
+  def get_by_id(klass, id, company, user) do
+    case Ecto.UUID.cast(id) do
+      {:ok, uuid} ->
+        Repo.one(from(obj in subquery(query(klass, company, user)), where: obj.id == ^uuid))
+
+      :error ->
+        nil
+    end
+  end
 
   def get_one_by(klass, field, value, com, user) do
     Repo.one(
