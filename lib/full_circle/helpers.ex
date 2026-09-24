@@ -293,8 +293,16 @@ defmodule FullCircle.Helpers do
     end)
   end
 
-  def exec_query_row_col(qry, repo \\ FullCircle.Repo) do
-    k = repo.query!(qry)
+  @doc """
+  Runs `qry` and returns `{columns, rows}`.
+
+  `timeout` is passed explicitly rather than left to the repo default: the repo
+  default is 60s, which is exactly nginx's default `proxy_read_timeout`, so a
+  query that runs to the wire loses its response to a 504 while still holding a
+  pool connection.
+  """
+  def exec_query_row_col(qry, repo \\ FullCircle.Repo, opts \\ []) do
+    k = repo.query!(qry, [], timeout: Keyword.get(opts, :timeout, 45_000))
 
     rows =
       Enum.map(k.rows, fn r ->

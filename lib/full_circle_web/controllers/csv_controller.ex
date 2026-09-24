@@ -399,35 +399,36 @@ defmodule FullCircleWeb.CsvController do
   end
 
   defp send_csv_map(conn, data, fields, filename) do
-    conn
-    |> put_resp_content_type("text/csv")
-    |> put_resp_header("content-disposition", "attachment; filename=\"#{filename}.csv\"")
-    |> put_root_layout(false)
-    |> send_resp(
-      200,
-      csv_map(data, fields)
-    )
+    rows = Stream.map(data, fn d -> Enum.map(fields, fn f -> Map.fetch!(d, f) end) end)
+    send_csv(conn, fields, rows, filename)
   end
 
   defp send_csv_row_col(conn, data, fields, filename) do
-    conn
-    |> put_resp_content_type("text/csv")
-    |> put_resp_header("content-disposition", "attachment; filename=\"#{filename}.csv\"")
-    |> put_root_layout(false)
-    |> send_resp(
-      200,
-      csv_row_col(data, fields)
-    )
+    send_csv(conn, fields, data, filename)
   end
 
-  defp csv_row_col(data, fields) do
-    [fields | data] |> NimbleCSV.RFC4180.dump_to_iodata()
-  end
+  # Chunked rather than one send_resp/3: encoding the whole export into a single
+  # binary first meant the rows AND their encoded copy were resident at once, on
+  # a box where an OOM takes the container down for good (no restart policy).
+  # The rows themselves still come from a fully-materialised query, so this
+  # halves peak memory rather than making it constant — bounding the query is a
+  # separate job.
+  defp send_csv(conn, fields, rows, filename) do
+    conn =
+      conn
+      |> put_resp_content_type("text/csv")
+      |> put_resp_header("content-disposition", "attachment; filename=\"#{filename}.csv\"")
+      |> put_root_layout(false)
+      |> send_chunked(200)
 
-  defp csv_map(data, fields) do
-    body = data |> Enum.map(fn d -> Enum.map(fields, fn f -> Map.fetch!(d, f) end) end)
-
-    [fields | body] |> NimbleCSV.RFC4180.dump_to_iodata()
+    [fields]
+    |> Stream.concat(rows)
+    |> Enum.reduce_while(conn, fn row, conn ->
+      case chunk(conn, NimbleCSV.RFC4180.dump_to_iodata([row])) do
+        {:ok, conn} -> {:cont, conn}
+        {:error, :closed} -> {:halt, conn}
+      end
+    end)
   end
 
   defp good_snp_opts(%{"category" => "custom"} = params) do

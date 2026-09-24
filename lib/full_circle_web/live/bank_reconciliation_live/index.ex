@@ -1027,7 +1027,17 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
     {:noreply,
      socket
      |> assign(processing_csv: false, csv_task: nil)
-     |> put_flash(:error, "CSV processing failed: #{inspect(reason)}")}
+     |> put_flash(:error, "CSV processing failed: #{describe_exit(reason)}")}
+  end
+
+  # An exit reason carries the stacktrace and often the arguments too. Flash
+  # rides in the session cookie across a redirect, and that cookie is capped at
+  # 4096 bytes, so an untruncated reason here is a 500 waiting to happen.
+  @exit_reason_limit 300
+  defp describe_exit(reason) do
+    reason
+    |> inspect(limit: 5, printable_limit: @exit_reason_limit)
+    |> String.slice(0, @exit_reason_limit)
   end
 
   defp load_data(socket, name, f_date, t_date) do

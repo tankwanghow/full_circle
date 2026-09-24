@@ -108,7 +108,9 @@ sshpass -p $LINODE_PWD ssh root@$LINODE_IP "bash /home/${IMAGE_NAME}/$SETUP_DB $
 
 sshpass -p $LINODE_PWD ssh root@$LINODE_IP "bash /home/${IMAGE_NAME}/$SETUP_CERTBOT $DOMAIN_NAME"
 
-sshpass -p $LINODE_PWD ssh root@$LINODE_IP "bash /home/${IMAGE_NAME}/$GEN_FILE $DB_NAME $DB_USER $DB_PWD $PORT $DOMAIN_NAME $IMAGE_NAME $DOCKER_HUB_USERNAME $DOCKER_CONTAINER_NAME"
+# The generator reads MAIL_* from $9..$13; omitting them produced a compose
+# file with empty mail settings, which runtime.exs rejects at boot.
+sshpass -p $LINODE_PWD ssh root@$LINODE_IP "bash /home/${IMAGE_NAME}/$GEN_FILE $DB_NAME $DB_USER $DB_PWD $PORT $DOMAIN_NAME $IMAGE_NAME $DOCKER_HUB_USERNAME $DOCKER_CONTAINER_NAME $MAIL_HOST $MAIL_PORT $MAIL_USERNAME $MAIL_PASSWORD $MAIL_FROM"
 
 # shellcheck source=../../shared_config/docker_deploy.sh
 source "$umbrella_root/shared_config/docker_deploy.sh"

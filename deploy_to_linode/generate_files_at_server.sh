@@ -9,11 +9,11 @@ DOMAIN_NAME=$5
 IMAGE_NAME=$6
 DOCKER_HUB_USERNAME=$7
 DOCKER_CONTAINER_NAME=$8
-MAIL_HOST=${10}
-MAIL_PORT=${11}
-MAIL_USERNAME=${12}
-MAIL_PASSWORD=${13}
-MAIL_FROM=${14}
+MAIL_HOST=$9
+MAIL_PORT=${10}
+MAIL_USERNAME=${11}
+MAIL_PASSWORD=${12}
+MAIL_FROM=${13}
 APP_COMPOSE="/home/$IMAGE_NAME/docker-compose-$IMAGE_NAME.yml"
 NGINX_CONF="${IMAGE_NAME}-nginx.conf"
 
@@ -39,6 +39,7 @@ services:
       - MAIL_FROM=${MAIL_FROM}
       - UPLOADS_DIR=/app/uploads
     network_mode: host
+    restart: unless-stopped
     logging:
       driver: json-file
       options:
@@ -49,6 +50,11 @@ EOF
 echo "Creating Nginx conf file for ${DOMAIN_NAME}..."
 cat << EOF > /etc/nginx/sites-available/${NGINX_CONF}
 # /etc/nginx/sites-available/${NGINX_CONF}
+
+map \$http_upgrade \$${IMAGE_NAME}_connection_upgrade {
+    default upgrade;
+    ''      close;
+}
 
 server {
     listen 80;
@@ -91,7 +97,12 @@ server {
         proxy_set_header X-Forwarded-Proto \$scheme;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection "upgrade";
+        proxy_set_header Connection \$${IMAGE_NAME}_connection_upgrade;
+
+        # Must exceed the app's own query timeout, or nginx abandons a slow
+        # report as a 504 while the query keeps holding a pool connection.
+        proxy_read_timeout 120s;
+        proxy_send_timeout 120s;
     }
 }
 EOF

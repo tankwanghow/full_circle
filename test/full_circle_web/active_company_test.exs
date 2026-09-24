@@ -54,6 +54,63 @@ defmodule FullCircleWeb.ActiveCompanyTest do
     end
   end
 
+  describe "authorisation" do
+    # The session is SIGNED, not encrypted, and the signing key was public for
+    # a long time. So a session naming a company must never be taken as proof
+    # that the user may open it — re-check CompanyUser on every request.
+    test "a session naming a company the user cannot access is refused", %{conn: conn} do
+      other = company_fixture(user_fixture(), %{name: "Someone Elses Sdn Bhd"})
+
+      conn =
+        conn
+        |> Plug.Test.init_test_session(%{})
+        |> put_session(:current_company_id, other.id)
+        |> put_session(:current_role, "admin")
+        |> get(~p"/companies/#{other.id}/dashboard")
+
+      assert redirected_to(conn) == "/"
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "Not Authorise."
+    end
+
+    test "a disabled user is refused, matching user_company/2", %{
+      conn: conn,
+      comp: comp,
+      not_admin: not_admin,
+      user: user
+    } do
+      # change_user_role_in/4 also revokes the user's tokens, so disable first
+      # and sign in afterwards.
+      Sys.change_user_role_in(comp, not_admin.id, "disable", user)
+
+      conn =
+        conn
+        |> log_in_user(not_admin)
+        |> Plug.Test.init_test_session(%{})
+        |> put_session(:current_company_id, comp.id)
+        |> get(~p"/companies/#{comp.id}/dashboard")
+
+      assert redirected_to(conn) == "/"
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "Not Authorise."
+    end
+
+    test "the role in the session cannot outrank the role in the database", %{
+      conn: conn,
+      comp: comp,
+      not_admin: not_admin
+    } do
+      conn =
+        conn
+        |> log_in_user(not_admin)
+        |> Plug.Test.init_test_session(%{})
+        |> put_session(:current_company_id, comp.id)
+        |> put_session(:current_role, "admin")
+        |> get(~p"/companies/#{comp.id}/dashboard")
+
+      assert get_session(conn, "current_role") == "clerk"
+      refute html_response(conn, 200) =~ "Administrator Functions"
+    end
+  end
+
   describe "session payload" do
     # The session is a signed cookie: Plug hard-caps it at 4096 bytes and nginx
     # refuses a response header block over its 4k proxy_buffer_size with a 502.

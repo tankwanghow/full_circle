@@ -89,18 +89,24 @@ defmodule FullCircleWeb.PunchIngestLogPhotoControllerTest do
     assert conn.status == 200
   end
 
-  # A stale session is the only way past the plug: it skips its membership check
-  # whenever the session company matches the URL, so access revoked after login
-  # reaches the controller. That is the gap this 404 closes. (A non-member with
-  # no such session is redirected by the plug with a 302 and never gets here.)
-  test "404 for a stale session whose user is no longer a member", %{company: company, log: log} do
+  # This used to reach the controller and get a 404: the plug skipped its
+  # membership check whenever the session company matched the URL, so a session
+  # held across a revocation walked straight in. set_active_company/2 now
+  # re-checks CompanyUser on every request, so the plug turns it away first.
+  # member_company/2 below is still the controller's own guard — defence in
+  # depth, no longer the only depth.
+  test "a stale session whose user is no longer a member is refused", %{
+    company: company,
+    log: log
+  } do
     conn =
       build_conn()
       |> log_in_user(user_fixture())
-      |> put_session(:current_company, company)
+      |> put_session(:current_company_id, company.id)
       |> get(~p"/companies/#{company.id}/punch_ingest_logs/#{log.id}/photo")
 
-    assert conn.status == 404
+    assert redirected_to(conn) == "/"
+    assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "Not Authorise."
   end
 
   test "403 for a logged-in cashier, never an HTML redirect", %{

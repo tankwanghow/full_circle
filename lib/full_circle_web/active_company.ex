@@ -65,41 +65,24 @@ defmodule FullCircleWeb.ActiveCompany do
     end
   end
 
-  def set_active_company(%{params: %{"company_id" => url_company_id}} = conn, _opts) do
-    session_company_id = active_company_id(get_session(conn)) || -1
+  @doc """
+  Resolves the company named in the URL, for every company-scoped request.
 
-    if session_company_id == url_company_id do
-      # Already active. Rewrite only a session left over from the release that
-      # stored the struct — otherwise this company-scoped request, and every one
-      # after it, would keep carrying the oversized cookie that caused the 502.
-      if get_session(conn, "current_company") do
-        put_active_company(conn, url_company_id)
-      else
-        conn
+  The membership check is NOT skipped when the session already names this
+  company. The session is signed, not encrypted, so a session that names a
+  company is not evidence that its holder may open it — nor that the role it
+  carries is the role the database gives them. `CompanyUser` is the authority,
+  and `Sys.user_company/2` excludes `disable`, so this must too or the plug and
+  the query scoping disagree about who is allowed in.
+  """
+  def set_active_company(%{params: %{"company_id" => url_company_id}} = conn, _opts) do
+    if conn.assigns[:current_user] do
+      case company_membership(url_company_id, conn.assigns.current_user.id) do
+        {:ok, company, role} -> sync_active_company(conn, company, role)
+        :error -> refuse(conn)
       end
     else
-      if conn.assigns.current_user do
-        cu = FullCircle.Sys.get_company_user(url_company_id, conn.assigns.current_user.id)
-
-        if cu != nil do
-          c = FullCircle.Sys.get_company!(cu.company_id)
-
-          conn
-          |> put_session(:current_role, cu.role)
-          |> put_active_company(c)
-          |> put_session(:full_screen_app?, false)
-          |> assign(:current_role, cu.role)
-          |> assign(:current_company, c)
-          |> assign(:full_screen_app?, false)
-        else
-          conn
-          |> put_flash(:error, gettext("Not Authorise."))
-          |> redirect(to: "/")
-          |> halt()
-        end
-      else
-        conn
-      end
+      conn
     end
   end
 
@@ -108,6 +91,45 @@ defmodule FullCircleWeb.ActiveCompany do
     |> assign(:current_role, get_session(conn, "current_role"))
     |> assign(:current_company, active_company(conn))
     |> assign(:full_screen_app?, get_session(conn, "full_screen_app?"))
+  end
+
+  defp company_membership(company_id, user_id) do
+    # A path segment is whatever the caller typed; casting it keeps a malformed
+    # id from raising Ecto.Query.CastError and turning into a 500.
+    with {:ok, _} <- Ecto.UUID.cast(company_id),
+         %{role: role} when role != "disable" <-
+           FullCircle.Sys.get_company_user(company_id, user_id) do
+      {:ok, FullCircle.Sys.get_company!(company_id), role}
+    else
+      _ -> :error
+    end
+  end
+
+  defp sync_active_company(conn, company, role) do
+    conn =
+      conn
+      |> assign(:current_role, role)
+      |> assign(:current_company, company)
+
+    if get_session(conn, "current_company_id") == company.id and
+         get_session(conn, "current_role") == role and
+         is_nil(get_session(conn, "current_company")) do
+      # Nothing to correct — don't spend a Set-Cookie on every request.
+      assign(conn, :full_screen_app?, get_session(conn, "full_screen_app?") || false)
+    else
+      conn
+      |> put_active_company(company)
+      |> put_session(:current_role, role)
+      |> put_session(:full_screen_app?, false)
+      |> assign(:full_screen_app?, false)
+    end
+  end
+
+  defp refuse(conn) do
+    conn
+    |> put_flash(:error, gettext("Not Authorise."))
+    |> redirect(to: "/")
+    |> halt()
   end
 
   @doc """
