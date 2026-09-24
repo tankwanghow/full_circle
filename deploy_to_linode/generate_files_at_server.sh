@@ -16,6 +16,13 @@ MAIL_PASSWORD=${12}
 MAIL_FROM=${13}
 APP_COMPOSE="/home/$IMAGE_NAME/docker-compose-$IMAGE_NAME.yml"
 NGINX_CONF="${IMAGE_NAME}-nginx.conf"
+SECRET_KEY_BASE=${14}
+
+if [ -z "$SECRET_KEY_BASE" ]; then
+    echo "Error: SECRET_KEY_BASE not supplied." >&2
+    echo "Add it to deploy.conf; the live value is in $APP_COMPOSE on the server." >&2
+    exit 1
+fi
 
 echo "Creating ${APP_COMPOSE} file..."
 cat << EOF > $APP_COMPOSE
@@ -28,7 +35,7 @@ services:
     environment:
       - DATABASE_URL=postgres://${DB_USER}:${DB_PWD}@localhost:5432/${DB_NAME}
       - DATABASE_QUERY_URL=postgres://${DB_USER}_query:${DB_PWD}@localhost:5432/${DB_NAME}
-      - SECRET_KEY_BASE=DZv2YzLPLvdS28scvTWDWe+7LQLK27EVkM6p4Yf7EXKIBSVBW1XA55PnpeIUFX/Z
+      - SECRET_KEY_BASE=${SECRET_KEY_BASE}
       - PHX_HOST=${DOMAIN_NAME}
       - MIX_ENV=prod
       - PORT=$PORT
