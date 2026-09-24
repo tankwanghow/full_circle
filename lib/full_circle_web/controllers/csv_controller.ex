@@ -1,7 +1,8 @@
 defmodule FullCircleWeb.CsvController do
   use FullCircleWeb, :controller
 
-  alias FullCircle.{HR, StatutoryConfig}
+  alias FullCircle.{HR, Repo, StatutoryConfig}
+  alias FullCircle.UserQueries.Query
 
   def show(conn, %{
         "company_id" => com_id,
@@ -37,7 +38,7 @@ defmodule FullCircleWeb.CsvController do
     tdate = tdate |> Timex.parse!("{YYYY}-{0M}-{0D}") |> NaiveDateTime.to_date()
     fdate = fdate |> Timex.parse!("{YYYY}-{0M}-{0D}") |> NaiveDateTime.to_date()
     data = FullCircle.TaggedBill.transport_commission(tags, fdate, tdate, com_id)
-    fields = data |> Enum.at(0) |> Map.keys()
+    fields = fields_from(data)
     filename = "driver_commission_#{fdate}_#{tdate}"
     send_csv_map(conn, data, fields, filename)
   end
@@ -108,17 +109,26 @@ defmodule FullCircleWeb.CsvController do
     send_csv_row_col(conn, row, col, filename)
   end
 
-  def show(conn, %{"report" => "queries", "id" => id}) do
+  def show(conn, %{"company_id" => com_id, "report" => "queries", "id" => id}) do
     com = FullCircleWeb.ActiveCompany.active_company(conn)
     user = conn.assigns.current_user
 
-    q = FullCircle.StdInterface.get!(FullCircle.UserQueries.Query, id)
+    case saved_query(com_id, id) do
+      nil ->
+        send_resp(conn, 404, "not found")
 
-    {col, row} = FullCircle.UserQueries.execute(q.sql_string, com, user)
+      q ->
+        # execute/3 also returns {:error, :not_authorise}, which matches
+        # {col, row} and used to reach the encoder as a pair of column names.
+        case FullCircle.UserQueries.execute(q.sql_string, com, user) do
+          {:error, :not_authorise} ->
+            send_resp(conn, 403, "forbidden")
 
-    filename = "#{q.qry_name}_#{Timex.now() |> Timex.format!("%Y%m%d%H%M%S", :strftime)}"
-
-    send_csv_row_col(conn, row, col, filename)
+          {col, row} ->
+            stamp = Timex.now() |> Timex.format!("%Y%m%d%H%M%S", :strftime)
+            send_csv_row_col(conn, row, col, "#{q.qry_name}_#{stamp}")
+        end
+    end
   end
 
   def show(conn, %{
@@ -189,7 +199,7 @@ defmodule FullCircleWeb.CsvController do
       FullCircle.Layer.harvest_report(tdate, com_id)
       |> FullCircle.Layer.sort_harvest_report(params["sort_by"], params["sort_dir"])
 
-    fields = data |> Enum.at(0) |> Map.keys()
+    fields = fields_from(data)
     filename = "harvest_report_#{tdate}"
     send_csv_map(conn, data, fields, filename)
   end
@@ -203,7 +213,7 @@ defmodule FullCircleWeb.CsvController do
     tdate = tdate |> Timex.parse!("{YYYY}-{0M}-{0D}") |> NaiveDateTime.to_date()
     fdate = fdate |> Timex.parse!("{YYYY}-{0M}-{0D}") |> NaiveDateTime.to_date()
     data = FullCircle.Layer.harvest_wage_report(fdate, tdate, com_id)
-    fields = data |> Enum.at(0) |> Map.keys()
+    fields = fields_from(data)
     filename = "harvest_wage_report_#{fdate}_#{tdate}"
     send_csv_map(conn, data, fields, filename)
   end
@@ -282,7 +292,7 @@ defmodule FullCircleWeb.CsvController do
         com_id
       )
 
-    fields = data |> Enum.at(0) |> Map.keys()
+    fields = fields_from(data)
     filename = "weight_good_report_#{fdate}_#{tdate}"
     send_csv_map(conn, data, fields, filename)
   end
@@ -407,6 +417,21 @@ defmodule FullCircleWeb.CsvController do
     send_csv(conn, fields, data, filename)
   end
 
+  # StdInterface.get!/2 is an unscoped Repo.get!, so an id belonging to another
+  # company would be loaded and its SQL run. Scope it, and treat a malformed id
+  # as absent rather than letting it raise Ecto.Query.CastError as a 500.
+  defp saved_query(com_id, id) do
+    case Ecto.UUID.cast(id) do
+      {:ok, uuid} -> Repo.get_by(Query, id: uuid, company_id: com_id)
+      :error -> nil
+    end
+  end
+
+  # A report that matched nothing has no first row to read column names from.
+  # That is a normal outcome, so the export is simply empty.
+  defp fields_from([first | _]), do: Map.keys(first)
+  defp fields_from([]), do: []
+
   # Chunked rather than one send_resp/3: encoding the whole export into a single
   # binary first meant the rows AND their encoded copy were resident at once, on
   # a box where an OOM takes the container down for good (no restart policy).
@@ -421,7 +446,9 @@ defmodule FullCircleWeb.CsvController do
       |> put_root_layout(false)
       |> send_chunked(200)
 
-    [fields]
+    header = if fields == [], do: [], else: [fields]
+
+    header
     |> Stream.concat(rows)
     |> Enum.reduce_while(conn, fn row, conn ->
       case chunk(conn, NimbleCSV.RFC4180.dump_to_iodata([row])) do
