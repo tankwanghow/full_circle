@@ -2044,3 +2044,332 @@ msgstr "打卡照片"
 #, elixir-autogen, elixir-format
 msgid "Show photos"
 msgstr "显示照片"
+
+#: lib/full_circle_web/live/note_live/form.ex
+#, elixir-autogen, elixir-format
+msgid "You cannot edit that note."
+msgstr "您不能编辑该备注。"
+
+#: lib/full_circle_web/live/note_live/form.ex
+#: lib/full_circle_web/live/note_live/index.ex
+#, elixir-autogen, elixir-format
+msgid "New Note"
+msgstr "新备注"
+
+#: lib/full_circle_web/live/note_live/form.ex
+#, elixir-autogen, elixir-format
+msgid "(unavailable)"
+msgstr "（不可用）"
+
+#: lib/full_circle_web/live/note_live/form.ex
+#, elixir-autogen, elixir-format
+msgid "Edit Note"
+msgstr "编辑备注"
+
+#: lib/full_circle_web/live/note_live/form.ex
+#, elixir-autogen, elixir-format
+msgid "Note saved."
+msgstr "备注已保存。"
+
+#: lib/full_circle_web/live/note_live/form.ex
+#, elixir-autogen, elixir-format
+msgid "someone else changed this note — reload to see their version"
+msgstr "有人已修改此备注 — 请重新加载查看他们的版本"
+
+#: lib/full_circle_web/live/note_live/form.ex
+#, elixir-autogen, elixir-format
+msgid "A linked record no longer exists."
+msgstr "某个链接的记录已不存在。"
+
+#: lib/full_circle_web/live/note_live/form.ex
+#, elixir-autogen, elixir-format
+msgid "Title (optional)"
+msgstr "标题（可选）"
+
+#: lib/full_circle_web/live/note_live/form.ex
+#: lib/full_circle_web/live/note_live/notes_panel_component.ex
+#: lib/full_circle_web/components/note_components.ex
+#, elixir-autogen, elixir-format
+msgid "Note"
+msgstr "备注"
+
+#: lib/full_circle_web/live/note_live/form.ex
+#, elixir-autogen, elixir-format
+msgid "Who can read this note"
+msgstr "谁可以查看此备注"
+
+#: lib/full_circle_web/live/note_live/form.ex
+#, elixir-autogen, elixir-format
+msgid "Tick none for everyone. Admin and you can always read it."
+msgstr "不勾选则所有人可见。管理员和您始终可以查看。"
+
+#: lib/full_circle_web/live/note_live/form.ex
+#: lib/full_circle_web/live/note_live/index.ex
+#: lib/full_circle_web/live/note_live/show.ex
+#, elixir-autogen, elixir-format
+msgid "About"
+msgstr "关于"
+
+#: lib/full_circle_web/live/note_live/form.ex
+#, elixir-autogen, elixir-format
+msgid "nothing in particular"
+msgstr "无特定对象"
+
+#: lib/full_circle_web/live/note_live/form.ex
+#: lib/full_circle_web/live/note_live/show.ex
+#, elixir-autogen, elixir-format
+msgid "Links"
+msgstr "链接"
+
+#: lib/full_circle_web/live/note_live/form.ex
+#, elixir-autogen, elixir-format
+msgid "Set what this note is about"
+msgstr "设置此备注关于什么"
+
+#: lib/full_circle_web/live/note_live/form.ex
+#, elixir-autogen, elixir-format
+msgid "Link other records"
+msgstr "链接其他记录"
+
+#: lib/full_circle_web/live/note_live/index.ex
+#: lib/full_circle_web/live/note_live/notes_panel_component.ex
+#: lib/full_circle_web/components/note_components.ex
+#, elixir-autogen, elixir-format
+msgid "Notes"
+msgstr "备注"
+
+#: lib/full_circle_web/live/note_live/index.ex
+#, elixir-autogen, elixir-format
+msgid "Words in the title or body..."
+msgstr "标题或内容中的字词..."
+
+#: lib/full_circle_web/live/note_live/index.ex
+#, elixir-autogen, elixir-format
+msgid "Anything"
+msgstr "任何"
+
+#: lib/full_circle_web/live/note_live/index.ex
+#, elixir-autogen, elixir-format
+msgid "Written by me"
+msgstr "我写的"
+
+#: lib/full_circle_web/live/note_live/notes_panel_component.ex
+#, elixir-autogen, elixir-format
+msgid "Full form"
+msgstr "完整表单"
+
+#: lib/full_circle_web/live/note_live/notes_panel_component.ex
+#, elixir-autogen, elixir-format
+msgid "Write a note..."
+msgstr "写备注..."
+
+#: lib/full_circle_web/live/note_live/notes_panel_component.ex
+#, elixir-autogen, elixir-format
+msgid "Readable by"
+msgstr "可查看者"
+
+#: lib/full_circle_web/live/note_live/notes_panel_component.ex
+#, elixir-autogen, elixir-format
+msgid "tick none for everyone"
+msgstr "不勾选则所有人可见"
+
+#: lib/full_circle_web/live/note_live/notes_panel_component.ex
+#, elixir-autogen, elixir-format
+msgid "Attach files after saving."
+msgstr "保存后再附加文件。"
+
+#: lib/full_circle_web/live/note_live/notes_panel_component.ex
+#, elixir-autogen, elixir-format
+msgid "No notes yet."
+msgstr "暂无备注。"
+
+#: lib/full_circle_web/live/note_live/record_picker_component.ex
+#, elixir-autogen, elixir-format
+msgid "Find a record"
+msgstr "查找记录"
+
+#: lib/full_circle_web/live/note_live/record_picker_component.ex
+#, elixir-autogen, elixir-format
+msgid "Type a name or number..."
+msgstr "输入名称或编号..."
+
+#: lib/full_circle_web/live/note_live/record_picker_component.ex
+#, elixir-autogen, elixir-format
+msgid "No match."
+msgstr "无匹配。"
+
+#: lib/full_circle_web/live/note_live/show.ex
+#: lib/full_circle_web/controllers/note_attachment_controller.ex
+#, elixir-autogen, elixir-format
+msgid "Note not found."
+msgstr "找不到备注。"
+
+#: lib/full_circle_web/live/note_live/show.ex
+#, elixir-autogen, elixir-format
+msgid "Note deleted."
+msgstr "备注已删除。"
+
+#: lib/full_circle_web/live/note_live/show.ex
+#, elixir-autogen, elixir-format
+msgid "Already linked."
+msgstr "已链接。"
+
+#: lib/full_circle_web/live/note_live/show.ex
+#, elixir-autogen, elixir-format
+msgid "Could not link that record."
+msgstr "无法链接该记录。"
+
+#: lib/full_circle_web/live/note_live/show.ex
+#, elixir-autogen, elixir-format
+msgid "edited by"
+msgstr "编辑者"
+
+#: lib/full_circle_web/live/note_live/show.ex
+#, elixir-autogen, elixir-format
+msgid "Edit"
+msgstr "编辑"
+
+#: lib/full_circle_web/live/note_live/show.ex
+#, elixir-autogen, elixir-format
+msgid "Delete this note? Its history is kept."
+msgstr "删除此备注？其历史记录将保留。"
+
+#: lib/full_circle_web/live/note_live/show.ex
+#, elixir-autogen, elixir-format
+msgid "No links."
+msgstr "没有链接。"
+
+#: lib/full_circle_web/live/note_live/show.ex
+#, elixir-autogen, elixir-format
+msgid "Link a record"
+msgstr "链接记录"
+
+#: lib/full_circle_web/live/note_live/show.ex
+#, elixir-autogen, elixir-format
+msgid "Notes linking here"
+msgstr "链接到此的备注"
+
+#: lib/full_circle_web/live/note_live/show.ex
+#, elixir-autogen, elixir-format
+msgid "None."
+msgstr "无。"
+
+#: lib/full_circle_web/live/note_live/show.ex
+#, elixir-autogen, elixir-format
+msgid "History"
+msgstr "历史记录"
+
+#: lib/full_circle_web/live/note_live/show.ex
+#, elixir-autogen, elixir-format
+msgid "replaced by"
+msgstr "被替换者"
+
+#: lib/full_circle_web/live/note_live/show.ex
+#, elixir-autogen, elixir-format
+msgid "Never edited."
+msgstr "从未编辑。"
+
+#: lib/full_circle_web/components/note_components.ex
+#, elixir-autogen, elixir-format
+msgid "Invoice"
+msgstr "发票"
+
+#: lib/full_circle_web/components/note_components.ex
+#, elixir-autogen, elixir-format
+msgid "Purchase Invoice"
+msgstr "采购发票"
+
+#: lib/full_circle_web/components/note_components.ex
+#, elixir-autogen, elixir-format
+msgid "Receipt"
+msgstr "收据"
+
+#: lib/full_circle_web/components/note_components.ex
+#, elixir-autogen, elixir-format
+msgid "Payment"
+msgstr "付款"
+
+#: lib/full_circle_web/components/note_components.ex
+#, elixir-autogen, elixir-format
+msgid "Credit Note"
+msgstr "贷项通知单"
+
+#: lib/full_circle_web/components/note_components.ex
+#, elixir-autogen, elixir-format
+msgid "Debit Note"
+msgstr "借项通知单"
+
+#: lib/full_circle_web/components/note_components.ex
+#, elixir-autogen, elixir-format
+msgid "Deposit"
+msgstr "存款"
+
+#: lib/full_circle_web/components/note_components.ex
+#, elixir-autogen, elixir-format
+msgid "Return Cheque"
+msgstr "退票"
+
+#: lib/full_circle_web/components/note_components.ex
+#, elixir-autogen, elixir-format
+msgid "Everyone"
+msgstr "所有人"
+
+#: lib/full_circle_web/components/note_components.ex
+#, elixir-autogen, elixir-format
+msgid "Restricted record"
+msgstr "受限记录"
+
+#: lib/full_circle_web/components/note_components.ex
+#, elixir-autogen, elixir-format
+msgid "deleted"
+msgstr "已删除"
+
+#: lib/full_circle_web/components/note_components.ex
+#, elixir-autogen, elixir-format
+msgid "linked"
+msgstr "已链接"
+
+#: lib/full_circle_web/components/note_components.ex
+#, elixir-autogen, elixir-format
+msgid "Open"
+msgstr "打开"
+
+#: lib/full_circle_web/components/note_components.ex
+#, elixir-autogen, elixir-format
+msgid "Remove this file from the note?"
+msgstr "从备注中移除此文件？"
+
+#: lib/full_circle_web/components/note_components.ex
+#, elixir-autogen, elixir-format
+msgid "Remove"
+msgstr "移除"
+
+#: lib/full_circle_web/components/note_components.ex
+#, elixir-autogen, elixir-format
+msgid "Attach file"
+msgstr "附加文件"
+
+#: lib/full_circle_web/controllers/note_attachment_controller.ex
+#, elixir-autogen, elixir-format
+msgid "No file received."
+msgstr "未收到文件。"
+
+#: lib/full_circle_web/controllers/note_attachment_controller.ex
+#, elixir-autogen, elixir-format
+msgid "File is larger than 10 MB."
+msgstr "文件大于 10 MB。"
+
+#: lib/full_circle_web/controllers/note_attachment_controller.ex
+#, elixir-autogen, elixir-format
+msgid "Only JPEG, PNG, WebP images and PDF files are allowed."
+msgstr "只允许 JPEG、PNG、WebP 图片和 PDF 文件。"
+
+#: lib/full_circle_web/controllers/note_attachment_controller.ex
+#, elixir-autogen, elixir-format
+msgid "File could not be read."
+msgstr "无法读取文件。"
+
+#: lib/full_circle_web/controllers/note_attachment_controller.ex
+#, elixir-autogen, elixir-format
+msgid "Upload failed."
+msgstr "上传失败。"
