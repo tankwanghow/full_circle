@@ -10,6 +10,7 @@ defmodule FullCircle.Notes do
 
   alias Ecto.Multi
   alias FullCircle.{Linkable, Repo, Sys}
+  alias FullCircle.CommandPalette.Types, as: PaletteTypes
   alias FullCircle.Linkable.RecordLink
   alias FullCircle.Notes.{Note, NoteVersion}
 
@@ -275,9 +276,6 @@ defmodule FullCircle.Notes do
     end)
   end
 
-  # Replaced by the real search in the search task.
-  def search(_company, _user, _terms, _filters, _opts), do: []
-
   def add_link(%Note{} = note, type, id, company, user) do
     with %Note{} = current <- get_note(note.id, company, user) || {:error, :not_found},
          true <- can_edit?(current, company, user) || :not_authorise,
@@ -386,5 +384,93 @@ defmodule FullCircle.Notes do
     (pairs ++ linked)
     |> Enum.uniq()
     |> Enum.frequencies_by(fn {record_id, _} -> record_id end)
+  end
+
+  def search(company, user, terms, filters, page: page, per_page: per_page) do
+    words = terms |> to_string() |> String.split(~r/\s+/, trim: true)
+
+    visible_to(company, user)
+    |> apply_words(words)
+    |> apply_filters(filters || %{}, user)
+    |> order_search(words, terms)
+    |> offset(^((page - 1) * per_page))
+    |> limit(^per_page)
+    |> Repo.all()
+    |> Repo.preload(:author)
+  end
+
+  # ILIKE decides what matches; word_similarity only orders. CJK text scores
+  # near zero on trigrams, so similarity must never be the filter.
+  defp apply_words(query, words) do
+    Enum.reduce(words, query, fn w, q ->
+      pattern = "%#{PaletteTypes.escape_like(w)}%"
+      from(n in q, where: ilike(n.body, ^pattern) or ilike(coalesce(n.title, ""), ^pattern))
+    end)
+  end
+
+  defp apply_filters(query, filters, user) do
+    Enum.reduce(filters, query, fn
+      {"subject_type", t}, q when t not in [nil, ""] -> from(n in q, where: n.subject_type == ^t)
+      {"subject_id", id}, q when id not in [nil, ""] -> subject_id_filter(q, id)
+      {"mine", "true"}, q -> from(n in q, where: n.author_id == ^user.id)
+      {"from", d}, q -> date_filter(q, d, :from)
+      {"to", d}, q -> date_filter(q, d, :to)
+      _, q -> q
+    end)
+  end
+
+  # A hand-edited URL can carry anything; a malformed id matches nothing.
+  defp subject_id_filter(q, id) do
+    case Ecto.UUID.cast(id) do
+      {:ok, id} -> from(n in q, where: n.subject_id == ^id)
+      :error -> from(n in q, where: false)
+    end
+  end
+
+  # A hand-edited URL can carry anything; a bad date drops the filter.
+  defp date_filter(q, d, dir) do
+    case Date.from_iso8601(to_string(d)) do
+      {:ok, date} when dir == :from ->
+        from(n in q, where: fragment("?::date", n.inserted_at) >= ^date)
+
+      {:ok, date} ->
+        from(n in q, where: fragment("?::date", n.inserted_at) <= ^date)
+
+      _ ->
+        q
+    end
+  end
+
+  defp order_search(query, [], _terms),
+    do: from(n in query, order_by: [desc: n.inserted_at, desc: n.id])
+
+  defp order_search(query, _words, terms) do
+    from(n in query,
+      order_by: [
+        desc:
+          fragment(
+            "word_similarity(?, coalesce(?, '') || ' ' || ?)",
+            ^terms,
+            n.title,
+            n.body
+          ),
+        desc: n.inserted_at
+      ]
+    )
+  end
+
+  @versioned ~w(title body subject_type subject_id visibility)a
+
+  def version_changes(versions, %Note{} = note) do
+    newer_states = [note | versions] |> Enum.take(length(versions))
+
+    Enum.zip_with(versions, newer_states, fn v, newer ->
+      changes =
+        for f <- @versioned,
+            Map.get(v, f) != Map.get(newer, f),
+            do: {f, Map.get(v, f), Map.get(newer, f)}
+
+      %{version: v, changes: changes}
+    end)
   end
 end

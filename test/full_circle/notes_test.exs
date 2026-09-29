@@ -352,4 +352,92 @@ defmodule FullCircle.NotesTest do
       assert Notes.count_by_records(company, admin, "Contact", [c.id, c2.id]) == %{c.id => 3}
     end
   end
+
+  describe "search/5" do
+    setup %{admin: admin, company: company} do
+      clerk = user_with_role(company, admin, "clerk")
+      note_fixture(company, admin, %{"title" => "Welding", "body" => "Ali can weld aluminium"})
+      note_fixture(company, admin, %{"body" => "Ah Seng pays 100% late"})
+      note_fixture(company, admin, %{"body" => "焊工 很好"})
+      note_fixture(company, admin, %{"body" => "secret weld", "visibility" => ["manager"]})
+      %{clerk: clerk}
+    end
+
+    defp bodies(list), do: list |> Enum.map(& &1.body) |> Enum.sort()
+
+    test "every word must match title or body, visibility applied", %{
+      company: company,
+      clerk: clerk
+    } do
+      assert bodies(Notes.search(company, clerk, "weld", %{}, page: 1, per_page: 30)) ==
+               ["Ali can weld aluminium"]
+    end
+
+    test "admin sees the restricted match too", %{company: company, admin: admin} do
+      assert length(Notes.search(company, admin, "weld", %{}, page: 1, per_page: 30)) == 2
+    end
+
+    test "LIKE metacharacters are literal", %{company: company, clerk: clerk} do
+      assert bodies(Notes.search(company, clerk, "100%", %{}, page: 1, per_page: 30)) ==
+               ["Ah Seng pays 100% late"]
+    end
+
+    test "Chinese text is found", %{company: company, clerk: clerk} do
+      assert bodies(Notes.search(company, clerk, "焊工", %{}, page: 1, per_page: 30)) == ["焊工 很好"]
+    end
+
+    test "empty terms list newest first and paginate", %{company: company, admin: admin} do
+      assert length(Notes.search(company, admin, "", %{}, page: 1, per_page: 3)) == 3
+      assert length(Notes.search(company, admin, "", %{}, page: 2, per_page: 3)) == 1
+    end
+
+    test "mine and subject filters", %{company: company, admin: admin, clerk: clerk} do
+      c = contact_fixture(company, admin)
+
+      note_fixture(company, clerk, %{
+        "body" => "clerk's",
+        "subject_type" => "Contact",
+        "subject_id" => c.id
+      })
+
+      assert bodies(Notes.search(company, clerk, "", %{"mine" => "true"}, page: 1, per_page: 30)) ==
+               ["clerk's"]
+
+      assert bodies(
+               Notes.search(
+                 company,
+                 admin,
+                 "",
+                 %{"subject_type" => "Contact", "subject_id" => c.id},
+                 page: 1,
+                 per_page: 30
+               )
+             ) == ["clerk's"]
+    end
+  end
+
+  describe "version_changes/2" do
+    test "lists changed fields per version", %{admin: admin, company: company} do
+      note = note_fixture(company, admin, %{"body" => "v1"})
+      {:ok, note} = Notes.update_note(note, %{"body" => "v2"}, company, admin)
+      {:ok, note} = Notes.update_note(note, %{"title" => "T"}, company, admin)
+      versions = Notes.list_versions(note, company, admin)
+
+      assert [
+               %{version: %{version: 2}, changes: [{:title, nil, "T"}]},
+               %{version: %{version: 1}, changes: [{:body, "v1", "v2"}]}
+             ] = Notes.version_changes(versions, note)
+    end
+  end
+
+  test "search with a malformed subject_id filter matches nothing instead of raising",
+       %{admin: admin, company: company} do
+    note_fixture(company, admin, %{"body" => "anything"})
+
+    assert Notes.search(company, admin, "", %{"subject_id" => "not-a-uuid"},
+             page: 1,
+             per_page: 30
+           ) ==
+             []
+  end
 end
