@@ -25,21 +25,46 @@ updates the *struct the editor loaded* with `optimistic_lock` — the loaded
 `lock_version` is what detects a concurrent save (`{:error, :stale}`). No-op
 edits return early and write no version. Delete is soft and also snapshots.
 
+- **`snapshot` locks the note row (`FOR UPDATE`) and compares `lock_version`
+  before numbering.** Without the lock, two simultaneous saves both compute
+  `max(version)+1`; the loser hits the unique index and gets a `NoteVersion`
+  changeset back, which crashes the form. With it, the loser gets `:stale`.
+- **History is filtered per version, by that version's own `visibility`.**
+  `list_versions/3` shows a past version only to users who could have read it
+  *as it was*; admin and the note's author see all. Filtering by the note's
+  current visibility leaks: a manager-only note later made public would show
+  clerks its restricted text. `version_changes/2` must be fed the filtered
+  list, so each diff compares against the next *visible* state.
+- **The subject is validated only when set or changed.** An unchanged subject
+  that has since been deleted must not block fixing a typo in the body.
+
+## Rights
+For notes already known to be readable (anything from `visible_to/3`), take
+`rights/2` once and use `may_edit?/3` / `may_delete?/3`. `can_edit?/3` and
+`can_delete?/3` re-run the visibility query per note — fine for one note, ~5
+queries per row in a list.
+
 ## Linkable
 References are `(type, id)` with no FK. `Linkable` is the whitelist and scopes
-every resolve to the company; foreign ids are `:not_found`, types the user may
-not view are `:restricted`. Documents resolve through `transactions` using the
-command palette's per-type `update_*` permission.
+every resolve to the company; foreign ids are `:not_found`. Records and posted
+documents are visible to **any company member**, as their pages are.
+Documents resolve through `transactions`. **Do not gate on the palette's
+`update_*` actions** — they are about editing; gating on them stopped clerks
+noting journals and cashiers noting credit/debit notes and return cheques.
+`:restricted` happens only for `Note` targets when the user lacks `:view_notes`.
 
 ### Adding a linkable type
 1. Entry in `@records` (table with `company_id` + title column) or add it to
    `CommandPalette.Types.type_specs` if it is a posted document.
 2. `type_label/1` clause in `NoteComponents` (gettext).
 3. Panel snippet after `</.form>` in its edit LiveView (`:edit` guard).
-4. Index: alias + `NotesIndex.init(type[, key])` in mount, `NotesIndex.count/3`
-   before `stream(`, `note_count=` on the row component, `<NotesIndex.modal>`,
-   `open_notes`/`close_notes`/`{:notes_changed, ...}` clauses; row component
-   gets `assign_new(:note_count, ...)` and `<.notes_count_badge>`.
+4. Index: alias + `NotesIndex.init(type, RowComponent, key: …, stream: …)` in
+   mount (`key`/`stream` default to `:id`/`:objects`), `NotesIndex.count/3`
+   before `stream(`, `note_count=` on the row component, `<NotesIndex.modal>`.
+   `init` attaches the `open_notes`/`close_notes` event and
+   `{:notes_changed, ...}` info hooks itself — **no handler clauses in the
+   index**. Row component gets `assign_new(:note_count, ...)` and
+   `<.notes_count_badge>`.
 
 ## Index-page gotchas (LiveView streams)
 - **Drop the list's `:if={Enum.count(@streams.objects) > 0 or @page > 1}`.**
@@ -49,7 +74,7 @@ command palette's per-type `update_*` permission.
   stream comprehension drops the row's `send_update`. It recounts and
   `send_update`s the row only; row components must `assign(assigns)` (merge).
 - Rows that are not the record (Deposit/ReturnCheque rows are transactions):
-  `NotesIndex.init(type, :deposit_id | :return_id)`; `notes_rows` maps each
+  `NotesIndex.init(type, RowComponent, key: :deposit_id | :return_id)`; `notes_rows` maps each
   document id to its row ids for updates; hide the badge when the key is nil.
 - In LiveView tests, a quick-add's count reaches the row via two messages;
   call `:sys.get_state(lv.pid)` twice before `render(lv)`.
@@ -57,7 +82,17 @@ command palette's per-type `update_*` permission.
 ## Attachments
 Plain HTTP (`NoteAttachmentController`), never LiveView uploads — phones lose
 socket uploads when the camera backgrounds the page. Type sniffed from magic
-bytes; removal hides but keeps the file (history may refer to it).
+bytes. **Removal hides the file from the note and from download**
+(`get_readable/3` filters `removed_at`) but keeps it on disk — a removed file is
+usually the wrong upload, so an old link must not keep serving it.
+
+`note_attach.js`:
+- Re-encodes only photo formats to JPEG; PNG/WebP/GIF keep transparency.
+- Announces a finished upload by dispatching `note-attach:done` to the element
+  carrying the button's id *now*, whose hook pushes to its own component.
+  Pushing from the original (possibly re-rendered, detached) element reaches
+  the host LiveView instead, which has no handler and crashes.
+- Never forces a reload when the socket is down (it would lose unsaved input).
 
 ## Counts
 `Notes.count_by_records/4` = notes about ∪ notes linking, each note once,
