@@ -127,7 +127,7 @@ defmodule FullCircleWeb.DebitNoteLive.Index do
     socket =
       socket
       |> assign(page_title: gettext("Debit Note Listing"))
-      |> NotesIndex.init("DebitNote")
+      |> NotesIndex.init("DebitNote", IndexComponent)
 
     {:ok, socket}
   end
@@ -146,12 +146,6 @@ defmodule FullCircleWeb.DebitNoteLive.Index do
      |> assign(can_print: false)
      |> filter_objects(terms, true, note_date, 1)}
   end
-
-  @impl true
-  def handle_event("open_notes", %{"id" => id}, socket),
-    do: {:noreply, NotesIndex.open(socket, id)}
-
-  def handle_event("close_notes", _, socket), do: {:noreply, NotesIndex.close(socket)}
 
   @impl true
   def handle_event("check_click", %{"object-id" => id, "value" => "on"}, socket) do
@@ -231,10 +225,6 @@ defmodule FullCircleWeb.DebitNoteLive.Index do
 
     {:noreply, socket |> push_navigate(to: url)}
   end
-
-  @impl true
-  def handle_info({:notes_changed, _type, id}, socket),
-    do: {:noreply, NotesIndex.changed(socket, id, IndexComponent)}
 
   defp filter_objects(socket, terms, reset, note_date, page) do
     objects =

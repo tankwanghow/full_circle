@@ -64,7 +64,7 @@ defmodule FullCircleWeb.GoodLive.Index do
     socket =
       socket
       |> assign(page_title: gettext("Good Listing"))
-      |> NotesIndex.init("Good")
+      |> NotesIndex.init("Good", IndexComponent)
 
     {:ok, socket}
   end
@@ -80,12 +80,6 @@ defmodule FullCircleWeb.GoodLive.Index do
      |> assign(search: %{terms: terms})
      |> filter_objects(terms, true, 1)}
   end
-
-  @impl true
-  def handle_event("open_notes", %{"id" => id}, socket),
-    do: {:noreply, NotesIndex.open(socket, id)}
-
-  def handle_event("close_notes", _, socket), do: {:noreply, NotesIndex.close(socket)}
 
   @impl true
   def handle_event("next-page", _, socket) do
@@ -104,10 +98,6 @@ defmodule FullCircleWeb.GoodLive.Index do
 
     {:noreply, socket |> push_patch(to: url)}
   end
-
-  @impl true
-  def handle_info({:notes_changed, _type, id}, socket),
-    do: {:noreply, NotesIndex.changed(socket, id, IndexComponent)}
 
   defp filter_objects(socket, terms, reset, page) when page >= 1 do
     objects =

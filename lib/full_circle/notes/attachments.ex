@@ -23,7 +23,7 @@ defmodule FullCircle.Notes.Attachments do
     src = upload[:path] || upload["path"]
     file_name = upload[:file_name] || upload["file_name"] || "file"
 
-    with %Note{} = note <- Notes.get_note(note.id, company, user) || {:error, :not_found},
+    with %Note{} = note <- Notes.get_note(note.id, company, user) || {:error, :note_not_found},
          true <- Notes.may_edit?(note, user, Notes.rights(company, user)) || :not_authorise,
          {:ok, size} <- assert_size(src),
          {:ok, content_type} <- sniff(src) do

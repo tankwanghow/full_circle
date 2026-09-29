@@ -118,8 +118,13 @@ defmodule FullCircleWeb.NoteLive.Show do
       {:ok, _} ->
         {:noreply, reload(socket)}
 
+      # The changeset says which rule refused it ("already linked", "cannot
+      # link to itself"); show that, not a blanket guess.
+      {:error, %Ecto.Changeset{errors: [{_field, error} | _]}} ->
+        {:noreply, put_flash(socket, :warn, FullCircleWeb.CoreComponents.translate_error(error))}
+
       {:error, %Ecto.Changeset{}} ->
-        {:noreply, put_flash(socket, :warn, gettext("Already linked."))}
+        {:noreply, put_flash(socket, :warn, gettext("Could not link that record."))}
 
       _ ->
         {:noreply, put_flash(socket, :warn, gettext("Could not link that record."))}

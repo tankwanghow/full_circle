@@ -9,18 +9,38 @@ defmodule FullCircleWeb.NoteLive.NotesIndex do
   alias FullCircle.Notes
 
   @doc """
-  `key` is the row field holding the record's id. Most index rows are the
-  record itself (`:id`); deposit and return-cheque rows are transactions that
-  carry the document id in another field.
+  Sets up notes counts and the notes modal on an index LiveView. Call from
+  `mount/3`. It attaches its own `handle_event` ("open_notes", "close_notes")
+  and `handle_info` (`{:notes_changed, _, _}`) hooks, so the index only calls
+  `count/3` where it streams rows and renders `modal/1`.
+
+  `row_module` is the index's row live_component (updated in place when a
+  count changes). Options:
+    * `:key` — the row field holding the record's id (default `:id`; deposit
+      and return-cheque rows are transactions carrying it elsewhere)
+    * `:stream` — the stream name (default `:objects`)
   """
-  def init(socket, record_type, key \\ :id) do
-    assign(socket,
+  def init(socket, record_type, row_module, opts \\ []) do
+    key = Keyword.get(opts, :key, :id)
+    stream = Keyword.get(opts, :stream, :objects)
+
+    socket
+    |> assign(
       notes_type: record_type,
       notes_key: key,
       note_counts: %{},
       notes_rows: %{},
       notes_for: nil
     )
+    |> Phoenix.LiveView.attach_hook(:notes_events, :handle_event, fn
+      "open_notes", %{"id" => id}, s -> {:halt, open(s, id)}
+      "close_notes", _params, s -> {:halt, close(s)}
+      _event, _params, s -> {:cont, s}
+    end)
+    |> Phoenix.LiveView.attach_hook(:notes_info, :handle_info, fn
+      {:notes_changed, _type, id}, s -> {:halt, changed(s, id, row_module, stream)}
+      _msg, s -> {:cont, s}
+    end)
   end
 
   def count(socket, objects, reset?) do

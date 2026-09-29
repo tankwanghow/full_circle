@@ -61,7 +61,7 @@ defmodule FullCircleWeb.ContactLive.Index do
     socket =
       socket
       |> assign(page_title: gettext("Contacts Listing"))
-      |> NotesIndex.init("Contact")
+      |> NotesIndex.init("Contact", IndexComponent)
 
     {:ok, socket}
   end
@@ -77,12 +77,6 @@ defmodule FullCircleWeb.ContactLive.Index do
      |> assign(search: %{terms: terms})
      |> filter_objects(terms, true, 1)}
   end
-
-  @impl true
-  def handle_event("open_notes", %{"id" => id}, socket),
-    do: {:noreply, NotesIndex.open(socket, id)}
-
-  def handle_event("close_notes", _, socket), do: {:noreply, NotesIndex.close(socket)}
 
   @impl true
   def handle_event("next-page", _, socket) do
@@ -101,10 +95,6 @@ defmodule FullCircleWeb.ContactLive.Index do
 
     {:noreply, socket |> push_patch(to: url)}
   end
-
-  @impl true
-  def handle_info({:notes_changed, _type, id}, socket),
-    do: {:noreply, NotesIndex.changed(socket, id, IndexComponent)}
 
   defp filter_objects(socket, terms, reset, page) do
     objects =

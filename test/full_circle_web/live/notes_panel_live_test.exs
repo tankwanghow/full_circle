@@ -147,6 +147,24 @@ defmodule FullCircleWeb.NotesPanelLiveTest do
     end
   end
 
+  test "a cashier can quick-add a note on a credit note they cannot edit",
+       %{admin: admin, comp: comp} do
+    cashier = user_with_role(comp, admin, "cashier")
+    cn = FullCircle.DebCreFixtures.credit_note_fixture(comp, admin)
+
+    {:ok, lv, _} =
+      live(log_in_user(build_conn(), cashier), ~p"/companies/#{comp.id}/CreditNote/#{cn.id}/edit")
+
+    lv |> element("#notes-panel-new") |> render_click()
+
+    html =
+      lv
+      |> form("#notes-panel-form", %{"note" => %{"body" => "customer returned 2 bags"}})
+      |> render_submit()
+
+    assert html =~ "customer returned 2 bags"
+  end
+
   describe "rollout" do
     test "invoice edit page shows the panel and the invoice list shows counts", %{
       conn: conn,

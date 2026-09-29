@@ -150,7 +150,7 @@ defmodule FullCircleWeb.InvoiceLive.Index do
     socket =
       socket
       |> assign(page_title: gettext("Invoice Listing"))
-      |> NotesIndex.init("Invoice")
+      |> NotesIndex.init("Invoice", IndexComponent)
 
     {:ok, socket}
   end
@@ -174,12 +174,6 @@ defmodule FullCircleWeb.InvoiceLive.Index do
      |> assign(can_print: false)
      |> filter_objects(terms, true, invoice_date, due_date, bal, 1)}
   end
-
-  @impl true
-  def handle_event("open_notes", %{"id" => id}, socket),
-    do: {:noreply, NotesIndex.open(socket, id)}
-
-  def handle_event("close_notes", _, socket), do: {:noreply, NotesIndex.close(socket)}
 
   @impl true
   def handle_event("check_click", %{"object-id" => id, "value" => "on"}, socket) do
@@ -265,10 +259,6 @@ defmodule FullCircleWeb.InvoiceLive.Index do
 
     {:noreply, socket |> push_navigate(to: url)}
   end
-
-  @impl true
-  def handle_info({:notes_changed, _type, id}, socket),
-    do: {:noreply, NotesIndex.changed(socket, id, IndexComponent)}
 
   defp filter_objects(socket, terms, reset, invoice_date, due_date, bal, page) do
     objects =

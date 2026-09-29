@@ -108,6 +108,25 @@ defmodule FullCircleWeb.NoteLiveTest do
   end
 
   describe "show" do
+    test "linking a note to itself says so, not 'Already linked'", %{
+      conn: conn,
+      admin: admin,
+      comp: comp
+    } do
+      note = note_fixture(comp, admin, %{"body" => "selfish note"})
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/notes/#{note.id}")
+
+      lv
+      |> form("#link-picker form", %{"type" => "Note", "terms" => "selfish"})
+      |> render_change()
+
+      lv |> element("#link-picker-pick-#{note.id}") |> render_click()
+
+      html = render(lv)
+      assert html =~ "cannot link to itself"
+      refute html =~ "Already linked."
+    end
+
     test "shows body, links, backlinks and history", %{conn: conn, admin: admin, comp: comp} do
       c = contact_fixture(comp, admin, %{"name" => "Ah Seng"})
 

@@ -2,7 +2,11 @@
 // the camera/file picker backgrounds the page, the socket can time out, and a
 // remount throws away an in-flight socket upload. A transient <input> in
 // document.body survives a remount; an XHR survives the socket dying.
-const IMAGE_EXT = new Set(["jpg", "jpeg", "png", "webp", "heic", "heif", "bmp", "avif"])
+// Only photo formats are re-encoded to JPEG. PNG/WebP/GIF can carry
+// transparency (logos, screenshots) that JPEG would paint black.
+const PHOTO_EXT = new Set(["jpg", "jpeg", "heic", "heif", "bmp", "avif"])
+const PHOTO_TYPES = new Set(["image/jpeg", "image/heic", "image/heif", "image/bmp", "image/avif"])
+const DONE_EVENT = "note-attach:done"
 
 function ext(name) {
   const i = name.lastIndexOf(".")
@@ -10,8 +14,8 @@ function ext(name) {
 }
 
 async function downscale(file, maxEdge = 1920, quality = 0.85) {
-  const isImage = IMAGE_EXT.has(ext(file.name)) || (file.type || "").startsWith("image/")
-  if (!isImage || file.size < 50000 || file.type === "image/gif") return file
+  const isPhoto = PHOTO_EXT.has(ext(file.name)) || PHOTO_TYPES.has(file.type || "")
+  if (!isPhoto || file.size < 50000) return file
   let bitmap
   try { bitmap = await createImageBitmap(file) } catch (_e) { return file }
   const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height))
@@ -28,6 +32,14 @@ async function downscale(file, maxEdge = 1920, quality = 0.85) {
 
 export const NoteAttach = {
   mounted() {
+    // The upload can outlive this element: the panel may re-render while the
+    // XHR runs. The finished upload is announced to whichever element carries
+    // this id *now*, and that element's hook pushes to its own component.
+    // Pushing from a detached element would reach the host LiveView instead,
+    // which has no handler for it and would crash, losing unsaved input.
+    this.el.addEventListener(DONE_EVENT, e => {
+      this.pushEventTo(this.el, "attachment_uploaded", e.detail || {})
+    })
     this.el.addEventListener("click", e => {
       e.preventDefault()
       const input = document.createElement("input")
@@ -67,11 +79,12 @@ export const NoteAttach = {
       try { body = JSON.parse(xhr.responseText) } catch (_e) {}
       if (xhr.status === 200) {
         this.message("")
-        if (this.liveSocket.isConnected()) {
-          this.pushEventTo(this.el, "attachment_uploaded", { id: body.id })
-        } else {
-          window.location.reload()
+        const current = document.getElementById(this.el.id)
+        if (current && this.liveSocket.isConnected()) {
+          current.dispatchEvent(new CustomEvent(DONE_EVENT, { detail: { id: body.id } }))
         }
+        // Otherwise the file is saved and the page shows it on its next
+        // (re)load. No forced reload: that would throw away unsaved input.
       } else {
         this.message(body.error || `Upload failed (${xhr.status}).`)
       }

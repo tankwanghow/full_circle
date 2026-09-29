@@ -36,11 +36,13 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
   defp load(socket) do
     %{record_type: t, record_id: id, current_company: com, current_user: user} = socket.assigns
     rows = Notes.notes_for_record(t, id, com, user)
+    # Every row is already visible, so edit rights need no per-note query.
+    rights = Notes.rights(com, user)
 
     assign(socket,
       rows: rows,
-      editable: MapSet.new(for r <- rows, Notes.can_edit?(r.note, com, user), do: r.note.id),
-      can_create: FullCircle.Authorization.can?(user, :create_note, com)
+      editable: MapSet.new(for r <- rows, Notes.may_edit?(r.note, user, rights), do: r.note.id),
+      can_create: rights.create
     )
   end
 
@@ -131,6 +133,17 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
           rows="3"
           placeholder={gettext("Write a note...")}
         />
+        <%!-- The subject is fixed to this record and has no input of its own;
+             without this line a subject error would make Save silently do nothing. --%>
+        <.error :for={
+          msg <-
+            Enum.map(
+              @form[:subject_id].errors ++ @form[:subject_type].errors ++ @form[:visibility].errors,
+              &translate_error/1
+            )
+        }>
+          {msg}
+        </.error>
         <div class="text-xs">
           {gettext("Readable by")} ({gettext("tick none for everyone")}):
           <input type="hidden" name="note[visibility][]" value="" />

@@ -6,23 +6,31 @@ defmodule FullCircleWeb.NoteAttachmentController do
   """
   use FullCircleWeb, :controller
 
-  alias FullCircle.Notes
-  alias FullCircle.Notes.Attachments
+  alias FullCircle.Notes.{Attachments, Note}
 
   def create(conn, %{"note_id" => note_id, "file" => %Plug.Upload{} = file}) do
     company = conn.assigns.current_company
     user = conn.assigns.current_user
 
-    case Notes.get_note(note_id, company, user) do
-      nil ->
+    # attach/4 loads the note itself (visibility included); no need to fetch
+    # it here first.
+    case Attachments.attach(
+           %Note{id: note_id},
+           %{path: file.path, file_name: file.filename},
+           company,
+           user
+         ) do
+      {:ok, att} ->
+        json(conn, %{ok: true, id: att.id})
+
+      {:error, :note_not_found} ->
         conn |> put_status(404) |> json(%{error: gettext("Note not found.")})
 
-      note ->
-        case Attachments.attach(note, %{path: file.path, file_name: file.filename}, company, user) do
-          {:ok, att} -> json(conn, %{ok: true, id: att.id})
-          :not_authorise -> conn |> put_status(403) |> json(%{error: gettext("Not Authorise.")})
-          {:error, reason} -> conn |> put_status(422) |> json(%{error: message(reason)})
-        end
+      :not_authorise ->
+        conn |> put_status(403) |> json(%{error: gettext("Not Authorise.")})
+
+      {:error, reason} ->
+        conn |> put_status(422) |> json(%{error: message(reason)})
     end
   end
 

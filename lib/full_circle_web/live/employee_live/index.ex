@@ -76,7 +76,7 @@ defmodule FullCircleWeb.EmployeeLive.Index do
       socket
       |> assign(update_action: "stream")
       |> assign(page_title: gettext("Employee Listing"))
-      |> NotesIndex.init("Employee")
+      |> NotesIndex.init("Employee", IndexComponent)
 
     {:ok, socket}
   end
@@ -96,12 +96,6 @@ defmodule FullCircleWeb.EmployeeLive.Index do
      |> assign(search: %{terms: terms})
      |> filter_objects(terms, true, 1)}
   end
-
-  @impl true
-  def handle_event("open_notes", %{"id" => id}, socket),
-    do: {:noreply, NotesIndex.open(socket, id)}
-
-  def handle_event("close_notes", _, socket), do: {:noreply, NotesIndex.close(socket)}
 
   @impl true
   def handle_event("next-page", _, socket) do
@@ -166,10 +160,6 @@ defmodule FullCircleWeb.EmployeeLive.Index do
 
     {:noreply, socket |> assign(ids: Enum.join(socket.assigns.selected, ","))}
   end
-
-  @impl true
-  def handle_info({:notes_changed, _type, id}, socket),
-    do: {:noreply, NotesIndex.changed(socket, id, IndexComponent)}
 
   defp filter_objects(socket, terms, reset, page) when page >= 1 do
     query =
