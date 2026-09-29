@@ -53,7 +53,13 @@ defmodule FullCircleWeb.NoteLive.RecordPickerComponent do
     ~H"""
     <div id={@id} class="rounded border border-gray-300 p-2 dark:border-gray-600">
       <div class="text-sm font-semibold">{@label}</div>
-      <form phx-change="search" phx-submit="search" phx-target={@myself} class="flex gap-1">
+      <form
+        id={"#{@id}-form"}
+        phx-change="search"
+        phx-submit="search"
+        phx-target={@myself}
+        class="flex gap-1"
+      >
         <select name="type" class="rounded border-gray-300 text-sm">
           <option :for={t <- @types} value={t} selected={t == @type}>{type_label(t)}</option>
         </select>
