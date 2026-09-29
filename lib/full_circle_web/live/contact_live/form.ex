@@ -274,6 +274,16 @@ defmodule FullCircleWeb.ContactLive.Form do
           />
         </div>
       </.form>
+
+      <.live_component
+        :if={@live_action == :edit and @id != "new"}
+        module={FullCircleWeb.NoteLive.NotesPanelComponent}
+        id="notes-panel"
+        record_type="Contact"
+        record_id={@id}
+        current_company={@current_company}
+        current_user={@current_user}
+      />
     </div>
     """
   end
