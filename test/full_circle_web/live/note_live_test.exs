@@ -106,4 +106,66 @@ defmodule FullCircleWeb.NoteLiveTest do
       assert to == "/companies/#{comp.id}/notes"
     end
   end
+
+  describe "show" do
+    test "shows body, links, backlinks and history", %{conn: conn, admin: admin, comp: comp} do
+      c = contact_fixture(comp, admin, %{"name" => "Ah Seng"})
+
+      note =
+        note_fixture(comp, admin, %{
+          "body" => "v1",
+          "links" => [%{"type" => "Contact", "id" => c.id}]
+        })
+
+      {:ok, note} = FullCircle.Notes.update_note(note, %{"body" => "v2"}, comp, admin)
+      other = note_fixture(comp, admin, %{"body" => "points here"})
+      {:ok, _} = FullCircle.Notes.add_link(other, "Note", note.id, comp, admin)
+
+      {:ok, lv, html} = live(conn, ~p"/companies/#{comp.id}/notes/#{note.id}")
+      assert html =~ "v2"
+      assert html =~ "Ah Seng"
+      assert html =~ "points here"
+
+      html = lv |> element("#toggle-history") |> render_click()
+      assert html =~ "v1"
+    end
+
+    test "adds and removes a link", %{conn: conn, admin: admin, comp: comp} do
+      c = contact_fixture(comp, admin, %{"name" => "Kedai Mei"})
+      note = note_fixture(comp, admin)
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/notes/#{note.id}")
+
+      lv
+      |> form("#link-picker form", %{"type" => "Contact", "terms" => "Kedai"})
+      |> render_change()
+
+      lv |> element("#link-picker-pick-#{c.id}") |> render_click()
+      # The pick reaches Show via send/2, so read the page after it lands.
+      assert render(lv) =~ "Kedai Mei"
+
+      [link] = FullCircle.Notes.list_links(note, comp, admin)
+      html = lv |> element("#remove-link-#{link.link_id}") |> render_click()
+      refute html =~ "Kedai Mei"
+    end
+
+    test "delete returns to the index", %{conn: conn, admin: admin, comp: comp} do
+      note = note_fixture(comp, admin)
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/notes/#{note.id}")
+
+      assert {:error, {:live_redirect, %{to: to}}} =
+               lv |> element("#delete-note") |> render_click()
+
+      assert to == "/companies/#{comp.id}/notes"
+    end
+
+    test "a restricted note is not found for an outsider", %{admin: admin, comp: comp} do
+      note = note_fixture(comp, admin, %{"visibility" => ["manager"]})
+      clerk = user_with_role(comp, admin, "clerk")
+
+      assert {:error, {:live_redirect, %{to: to}}} =
+               live(log_in_user(build_conn(), clerk), ~p"/companies/#{comp.id}/notes/#{note.id}")
+
+      assert to == "/companies/#{comp.id}/notes"
+    end
+  end
 end

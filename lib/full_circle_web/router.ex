@@ -172,6 +172,7 @@ defmodule FullCircleWeb.Router do
       live("/notes", NoteLive.Index, :index)
       live("/notes/new", NoteLive.Form, :new)
       live("/notes/:note_id/edit", NoteLive.Form, :edit)
+      live("/notes/:note_id", NoteLive.Show, :show)
 
       live("/tax_codes", TaxCodeLive.Index, :index)
       live("/tax_codes/new", TaxCodeLive.Form, :new)
