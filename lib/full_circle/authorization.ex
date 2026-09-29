@@ -189,6 +189,23 @@ defmodule FullCircle.Authorization do
   def can?(user, :delete_others_duty_event, company),
     do: allow_roles(~w(admin manager supervisor), company, user)
 
+  # --- Notes ------------------------------------------------------------
+  #
+  # Per-note visibility (a role list on the note) decides *which* notes a user
+  # reads; these decide whether they touch notes at all. auditor reads only.
+
+  def can?(user, :view_notes, company),
+    do: allow_roles(~w(admin manager supervisor cashier clerk auditor), company, user)
+
+  def can?(user, :create_note, company),
+    do: allow_roles(~w(admin manager supervisor cashier clerk), company, user)
+
+  def can?(user, :edit_others_note, company),
+    do: allow_roles(~w(admin manager), company, user)
+
+  def can?(user, :delete_others_note, company),
+    do: allow_roles(~w(admin manager), company, user)
+
   def can?(user, :create_fixed_asset, company),
     do: allow_roles(~w(admin manager supervisor), company, user)
 
