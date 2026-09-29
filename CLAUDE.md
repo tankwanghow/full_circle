@@ -105,7 +105,7 @@ Every entity belongs to a `Company`. Routes are scoped as `/companies/:company_i
 | `Layer` | Agricultural: houses, flocks, harvests, weighing, movements |
 | `EggStock` | Daily egg stock board, weekly DOW books, hybrid forecast |
 | `Trading` | Grain trading desk: supply/sales positions, locations, multi-good trips |
-| `Tugas` | Duties: progress events, evidence files, multi-document links |
+| `Notes` / `Linkable` | Company memory: notes about any record, role visibility, versions, attachments, links |
 | `BankReconciliation` | Bank statement import/match (LLM parser skill) |
 | `EInvMetas` | E-invoice metadata (Malaysia LHDN integration) |
 | `Reporting` | Report queries (cash forecast, CP204, etc.) |
@@ -123,7 +123,7 @@ Project skills (non-obvious domain contracts) live in `.claude/skills/`:
 `liveview-upload-gotchas.md`, `optimistic-locking.md`, `accounting-period-lock.md`,
 `user-query-sql.md`, `xero-import.md`, `fukuro-closure-backfill.md`,
 `periodic-inventory-double-entry.md`, `good-snp-report.md`,
-`layer-alive-birds-and-yield.md`, `tugas-duties.md`, `pl-forecast-model.md`,
+`layer-alive-birds-and-yield.md`, `notes.md`, `pl-forecast-model.md`,
 `mix-dependency-overrides.md`, `deploy-image-size.md`.
 
 ### StdInterface Pattern (`lib/full_circle/std_interface.ex`)
@@ -173,5 +173,6 @@ Supports English (`en`) and Chinese (`zh`) via Gettext. Locale stored in session
 - PostgreSQL `pg_trgm` extension used for fuzzy search (see `create_fuzzy_search` migration)
 - Co-edited records (document headers, contacts, goods) carry `lock_version`; a concurrent
   save returns `{:error, :stale}`. See `.claude/skills/optimistic-locking.md`
+- Notes (company memory) are read only through `Notes.visible_to/3`; see `.claude/skills/notes.md`
 - Design docs / plans: `docs/superpowers/specs/` and `docs/superpowers/plans/`
 - Commit on `master` directly (solo workflow — no feature branches unless asked)
