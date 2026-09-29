@@ -258,4 +258,98 @@ defmodule FullCircle.NotesTest do
       assert :not_authorise = Notes.delete_note(note, company, clerk)
     end
   end
+
+  describe "links and record queries" do
+    setup %{admin: admin, company: company} do
+      c = contact_fixture(company, admin)
+      clerk = user_with_role(company, admin, "clerk")
+      %{contact: c, clerk: clerk}
+    end
+
+    test "add/remove link; duplicate and self links rejected", %{
+      admin: admin,
+      company: company,
+      contact: c
+    } do
+      note = note_fixture(company, admin)
+      assert {:ok, link} = Notes.add_link(note, "Contact", c.id, company, admin)
+      assert {:error, cs} = Notes.add_link(note, "Contact", c.id, company, admin)
+      assert %{to_id: ["already linked"]} = errors_on(cs)
+      assert {:error, cs} = Notes.add_link(note, "Note", note.id, company, admin)
+      assert %{to_id: ["cannot link to itself"]} = errors_on(cs)
+
+      assert {:error, :not_found} =
+               Notes.add_link(note, "Contact", Ecto.UUID.generate(), company, admin)
+
+      assert {:ok, _} = Notes.remove_link(note, link.id, company, admin)
+      assert [] = Notes.list_links(note, company, admin)
+    end
+
+    test "a linked record deleted later resolves to not_found, not a crash", %{
+      admin: admin,
+      company: company
+    } do
+      other = note_fixture(company, admin, %{"body" => "target"})
+      note = note_fixture(company, admin)
+      {:ok, _} = Notes.add_link(note, "Note", other.id, company, admin)
+      {:ok, _} = Notes.delete_note(other, company, admin)
+      assert [%{target: {:error, :not_found}}] = Notes.list_links(note, company, admin)
+    end
+
+    test "backlinks show only visible notes", %{admin: admin, company: company, clerk: clerk} do
+      target = note_fixture(company, admin, %{"body" => "target"})
+      open = note_fixture(company, admin, %{"body" => "open"})
+      hidden = note_fixture(company, admin, %{"body" => "hidden", "visibility" => ["manager"]})
+      {:ok, _} = Notes.add_link(open, "Note", target.id, company, admin)
+      {:ok, _} = Notes.add_link(hidden, "Note", target.id, company, admin)
+
+      assert [%{body: "open"}] = Notes.list_backlinks(target, company, clerk)
+      assert length(Notes.list_backlinks(target, company, admin)) == 2
+    end
+
+    test "notes_for_record: about + linked, no duplicates, visibility applied",
+         %{admin: admin, company: company, contact: c, clerk: clerk} do
+      about =
+        note_fixture(company, admin, %{
+          "body" => "about",
+          "subject_type" => "Contact",
+          "subject_id" => c.id
+        })
+
+      {:ok, _} = Notes.add_link(about, "Contact", c.id, company, admin)
+      linked = note_fixture(company, admin, %{"body" => "linked"})
+      {:ok, _} = Notes.add_link(linked, "Contact", c.id, company, admin)
+
+      _hidden =
+        note_fixture(company, admin, %{
+          "body" => "hidden",
+          "subject_type" => "Contact",
+          "subject_id" => c.id,
+          "visibility" => ["manager"]
+        })
+
+      rows = Notes.notes_for_record("Contact", c.id, company, clerk)
+
+      assert Enum.map(rows, &{&1.note.body, &1.relation}) |> Enum.sort() ==
+               [{"about", :about}, {"linked", :linked}]
+    end
+
+    test "count_by_records respects visibility and counts each note once",
+         %{admin: admin, company: company, contact: c, clerk: clerk} do
+      c2 = contact_fixture(company, admin)
+      a = note_fixture(company, admin, %{"subject_type" => "Contact", "subject_id" => c.id})
+      {:ok, _} = Notes.add_link(a, "Contact", c.id, company, admin)
+      b = note_fixture(company, admin)
+      {:ok, _} = Notes.add_link(b, "Contact", c.id, company, admin)
+
+      note_fixture(company, admin, %{
+        "subject_type" => "Contact",
+        "subject_id" => c.id,
+        "visibility" => ["manager"]
+      })
+
+      assert Notes.count_by_records(company, clerk, "Contact", [c.id, c2.id]) == %{c.id => 2}
+      assert Notes.count_by_records(company, admin, "Contact", [c.id, c2.id]) == %{c.id => 3}
+    end
+  end
 end

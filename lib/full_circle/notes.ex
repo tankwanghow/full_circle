@@ -277,4 +277,114 @@ defmodule FullCircle.Notes do
 
   # Replaced by the real search in the search task.
   def search(_company, _user, _terms, _filters, _opts), do: []
+
+  def add_link(%Note{} = note, type, id, company, user) do
+    with %Note{} = current <- get_note(note.id, company, user) || {:error, :not_found},
+         true <- can_edit?(current, company, user) || :not_authorise,
+         {:ok, _} <- resolve_link_target(type, id, current, company, user) do
+      %RecordLink{}
+      |> RecordLink.changeset(%{
+        company_id: company.id,
+        from_type: "Note",
+        from_id: current.id,
+        to_type: type,
+        to_id: id,
+        created_by_id: user.id
+      })
+      |> Repo.insert()
+    end
+  end
+
+  # A self-link is refused by a check constraint; let it reach the database so
+  # the error lands on the changeset instead of masquerading as "not found".
+  defp resolve_link_target("Note", id, %Note{id: id} = note, company, _user),
+    do: {:ok, %{type: "Note", id: id, url: Linkable.url("Note", id, company), title: note.body}}
+
+  defp resolve_link_target(type, id, _note, company, user) do
+    case Linkable.resolve(type, id, company, user) do
+      {:ok, t} -> {:ok, t}
+      {:error, _} -> {:error, :not_found}
+    end
+  end
+
+  def remove_link(%Note{} = note, link_id, company, user) do
+    with %Note{} = current <- get_note(note.id, company, user) || {:error, :not_found},
+         true <- can_edit?(current, company, user) || :not_authorise,
+         %RecordLink{} = link <-
+           Repo.one(
+             from(l in RecordLink,
+               where:
+                 l.id == ^link_id and l.company_id == ^company.id and l.from_type == "Note" and
+                   l.from_id == ^current.id
+             )
+           ) || {:error, :not_found} do
+      Repo.delete(link)
+    end
+  end
+
+  def list_backlinks(%Note{} = note, company, user) do
+    from(n in visible_to(company, user),
+      join: l in RecordLink,
+      on: l.from_type == "Note" and l.from_id == n.id,
+      where: l.company_id == ^company.id and l.to_type == "Note" and l.to_id == ^note.id,
+      order_by: [desc: n.inserted_at]
+    )
+    |> Repo.all()
+  end
+
+  def notes_for_record(type, id, company, user) do
+    about =
+      from(n in visible_to(company, user),
+        where: n.subject_type == ^type and n.subject_id == ^id
+      )
+      |> Repo.all()
+
+    about_ids = MapSet.new(about, & &1.id)
+
+    linked =
+      from(n in visible_to(company, user),
+        join: l in RecordLink,
+        on: l.from_type == "Note" and l.from_id == n.id,
+        where: l.company_id == ^company.id and l.to_type == ^type and l.to_id == ^id
+      )
+      |> Repo.all()
+      |> Enum.reject(&MapSet.member?(about_ids, &1.id))
+
+    (Enum.map(about, &%{note: &1, relation: :about}) ++
+       Enum.map(linked, &%{note: &1, relation: :linked}))
+    |> Enum.sort_by(& &1.note.inserted_at, {:desc, DateTime})
+    |> then(fn rows ->
+      notes = Repo.preload(Enum.map(rows, & &1.note), [:author, :attachments])
+      Enum.zip_with(rows, notes, fn row, n -> %{row | note: n} end)
+    end)
+  end
+
+  @doc """
+  Visible notes per record for an index page: notes about the record plus
+  notes linking to it, each note counted once. Two queries per call, whatever
+  the number of ids.
+  """
+  def count_by_records(_company, _user, _type, []), do: %{}
+
+  def count_by_records(company, user, type, ids) do
+    pairs =
+      from(n in visible_to(company, user),
+        where: n.subject_type == ^type and n.subject_id in ^ids,
+        select: {n.subject_id, n.id}
+      )
+      |> Repo.all()
+
+    linked =
+      from(n in visible_to(company, user),
+        join: l in RecordLink,
+        on: l.from_type == "Note" and l.from_id == n.id,
+        where: l.company_id == ^company.id and l.to_type == ^type and l.to_id in ^ids,
+        select: {l.to_id, n.id}
+      )
+      |> Repo.all()
+
+    (pairs ++ linked)
+    |> Enum.uniq()
+    |> Enum.frequencies_by(fn {record_id, _} -> record_id end)
+  end
 end
