@@ -22,10 +22,11 @@ defmodule FullCircle.Linkable do
     %{type: "Good", schema: FullCircle.Product.Good, title: :name, route: "goods"}
   ]
 
-  # kind :document — posted documents found through `transactions`, with the
-  # palette's per-type update permission as the view gate.
-  @documents Enum.map(PaletteTypes.type_specs(), fn {type, action, _label, route} ->
-               %{type: type, action: action, route: route}
+  # kind :document — posted documents found through `transactions`. Like the
+  # records above, any company member may see them: document pages have no view
+  # permission, and the palette's update_* actions are about editing, not seeing.
+  @documents Enum.map(PaletteTypes.type_specs(), fn {type, _action, _label, route} ->
+               %{type: type, route: route}
              end)
 
   def types do
@@ -46,8 +47,8 @@ defmodule FullCircle.Linkable do
   def can_view_type?(type, company, user) do
     case spec(type) do
       {:record, _} -> true
+      {:document, _} -> true
       :note -> FullCircle.Authorization.can?(user, :view_notes, company)
-      {:document, %{action: action}} -> FullCircle.Authorization.can?(user, action, company)
       nil -> false
     end
   end

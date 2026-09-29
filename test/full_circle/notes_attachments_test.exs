@@ -81,7 +81,7 @@ defmodule FullCircle.NotesAttachmentsTest do
              )
   end
 
-  test "remove hides it from the note but keeps the file and readable row", ctx do
+  test "remove hides it from the note and from download, but keeps the file", ctx do
     {:ok, att} =
       Attachments.attach(
         ctx.note,
@@ -94,7 +94,9 @@ defmodule FullCircle.NotesAttachmentsTest do
     assert removed.removed_at
     assert [] = Notes.get_note(ctx.note.id, ctx.company, ctx.admin).attachments
     assert File.exists?(Attachments.abs_path(att))
-    assert Attachments.get_readable(att.id, ctx.company, ctx.admin)
+    # A removed file is usually the wrong one (someone's IC, a payslip);
+    # an old link must not keep serving it.
+    refute Attachments.get_readable(att.id, ctx.company, ctx.admin)
   end
 
   test "get_readable follows note visibility", ctx do

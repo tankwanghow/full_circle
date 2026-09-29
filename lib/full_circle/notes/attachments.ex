@@ -3,7 +3,7 @@ defmodule FullCircle.Notes.Attachments do
   Files on a note. Type is sniffed from magic bytes — the client's claim never
   reaches the column, because it decides how the file is served back. Size is
   checked with `File.stat/1` before any read. Removing hides a file from the
-  note but keeps it on disk: older versions of the note may refer to it.
+  note and from download, but keeps it on disk: history may still name it.
   """
   import Ecto.Query, warn: false
   require Logger
@@ -24,7 +24,7 @@ defmodule FullCircle.Notes.Attachments do
     file_name = upload[:file_name] || upload["file_name"] || "file"
 
     with %Note{} = note <- Notes.get_note(note.id, company, user) || {:error, :not_found},
-         true <- Notes.can_edit?(note, company, user) || :not_authorise,
+         true <- Notes.may_edit?(note, user, Notes.rights(company, user)) || :not_authorise,
          {:ok, size} <- assert_size(src),
          {:ok, content_type} <- sniff(src) do
       # file_name is display only; cap it under the varchar(255) column.
@@ -35,7 +35,7 @@ defmodule FullCircle.Notes.Attachments do
 
   def remove(%NoteAttachment{} = att, company, user) do
     with %Note{} = note <- Notes.get_note(att.note_id, company, user) || {:error, :not_found},
-         true <- Notes.can_edit?(note, company, user) || :not_authorise do
+         true <- Notes.may_edit?(note, user, Notes.rights(company, user)) || :not_authorise do
       att
       |> Ecto.Changeset.change(removed_at: DateTime.utc_now(:second), removed_by_id: user.id)
       |> Repo.update()
@@ -47,7 +47,9 @@ defmodule FullCircle.Notes.Attachments do
       from(a in NoteAttachment,
         join: n in subquery(Notes.visible_to(company, user)),
         on: n.id == a.note_id,
-        where: a.id == ^id
+        # A removed file stays on disk for history, but is usually the wrong
+        # upload (an IC, a payslip) — an old link must not keep serving it.
+        where: a.id == ^id and is_nil(a.removed_at)
       )
       |> Repo.one()
     else

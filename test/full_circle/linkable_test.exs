@@ -55,11 +55,27 @@ defmodule FullCircle.LinkableTest do
     assert url == "/companies/#{company.id}/Invoice/#{inv.id}/edit"
   end
 
-  test "a document the user may not view is restricted", %{admin: admin, company: company} do
+  # Document pages are open to every company member; the update_* permission
+  # is about editing, so it must not decide whether a note can be about one.
+  test "a role that can open but not edit a document still resolves it",
+       %{admin: admin, company: company} do
     inv = invoice_fixture(company, admin)
+
+    for role <- ~w(cashier auditor) do
+      u = user_with_role(company, admin, role)
+      assert {:ok, %{id: id}} = Linkable.resolve("Invoice", inv.id, company, u)
+      assert id == inv.id
+    end
+
+    clerk = user_with_role(company, admin, "clerk")
+    refute FullCircle.Authorization.can?(clerk, :update_journal, company)
+    assert Linkable.can_view_type?("Journal", company, clerk)
+  end
+
+  test "a note is restricted for a role without view_notes", %{admin: admin, company: company} do
+    {:ok, note} = FullCircle.Notes.create_note(%{"body" => "x"}, company, admin)
     guest = user_with_role(company, admin, "guest")
-    refute FullCircle.Authorization.can?(guest, :update_invoice, company)
-    assert {:error, :restricted} = Linkable.resolve("Invoice", inv.id, company, guest)
+    assert {:error, :restricted} = Linkable.resolve("Note", note.id, company, guest)
   end
 
   test "resolve_many batches per type", %{admin: admin, company: company, contact: c} do

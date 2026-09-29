@@ -43,17 +43,31 @@ defmodule FullCircle.Notes do
     Repo.exists?(from(n in visible_to(company, user), where: n.id == ^id))
   end
 
-  def can_edit?(%Note{} = note, company, user) do
-    can_read?(note, company, user) and
-      ((note.author_id == user.id and can?(user, :create_note, company)) or
-         can?(user, :edit_others_note, company))
+  def can_edit?(%Note{} = note, company, user),
+    do: can_read?(note, company, user) and may_edit?(note, user, rights(company, user))
+
+  def can_delete?(%Note{} = note, company, user),
+    do: can_read?(note, company, user) and may_delete?(note, user, rights(company, user))
+
+  @doc """
+  The user's note permissions in this company, looked up once. Pair with
+  `may_edit?/3` / `may_delete?/3` for notes already known to be readable
+  (anything returned by `visible_to/3`), so a list costs three lookups in
+  total rather than a visibility query per note.
+  """
+  def rights(company, user) do
+    %{
+      create: can?(user, :create_note, company),
+      edit_others: can?(user, :edit_others_note, company),
+      delete_others: can?(user, :delete_others_note, company)
+    }
   end
 
-  def can_delete?(%Note{} = note, company, user) do
-    can_read?(note, company, user) and
-      ((note.author_id == user.id and can?(user, :create_note, company)) or
-         can?(user, :delete_others_note, company))
-  end
+  def may_edit?(%Note{author_id: author_id}, user, rights),
+    do: (author_id == user.id and rights.create) or rights.edit_others
+
+  def may_delete?(%Note{author_id: author_id}, user, rights),
+    do: (author_id == user.id and rights.create) or rights.delete_others
 
   # --- read -----------------------------------------------------------------
 
@@ -85,11 +99,23 @@ defmodule FullCircle.Notes do
     end)
   end
 
+  @doc """
+  Past versions of a note, newest first — each one only if the user could have
+  read it *as it was*. A note once restricted to managers and later made public
+  must not show clerks what it said while restricted. Admin and the note's
+  author see every version.
+  """
   def list_versions(%Note{} = note, company, user) do
     if can_read?(note, company, user) do
-      from(v in NoteVersion, where: v.note_id == ^note.id, order_by: [desc: v.version])
-      |> Repo.all()
-      |> Repo.preload([:edited_by, :written_by])
+      role = user_role_in_company(user.id, company.id)
+      query = from(v in NoteVersion, where: v.note_id == ^note.id, order_by: [desc: v.version])
+
+      query =
+        if role == "admin" or note.author_id == user.id,
+          do: query,
+          else: from(v in query, where: is_nil(v.visibility) or ^role in v.visibility)
+
+      query |> Repo.all() |> Repo.preload([:edited_by, :written_by])
     else
       []
     end
@@ -132,7 +158,7 @@ defmodule FullCircle.Notes do
     attrs = attrs |> normalize() |> Map.delete("links")
 
     with %Note{} = current <- get_note(note.id, company, user) || {:error, :not_found},
-         true <- can_edit?(current, company, user) || :not_authorise do
+         true <- may_edit?(current, user, rights(company, user)) || :not_authorise do
       changeset = note |> Note.changeset(attrs) |> validate_subject(company, user)
 
       if changeset.changes == %{} do
@@ -144,7 +170,7 @@ defmodule FullCircle.Notes do
           |> Ecto.Changeset.optimistic_lock(:lock_version)
 
         Multi.new()
-        |> snapshot(current, user)
+        |> snapshot(current, user, note.lock_version)
         |> Multi.update(:note, changeset)
         |> Repo.transaction()
         |> case do
@@ -165,9 +191,9 @@ defmodule FullCircle.Notes do
 
   def delete_note(%Note{} = note, company, user) do
     with %Note{} = current <- get_note(note.id, company, user) || {:error, :not_found},
-         true <- can_delete?(current, company, user) || :not_authorise do
+         true <- may_delete?(current, user, rights(company, user)) || :not_authorise do
       Multi.new()
-      |> snapshot(current, user)
+      |> snapshot(current, user, nil)
       |> Multi.update(
         :note,
         Ecto.Changeset.change(current,
@@ -185,8 +211,22 @@ defmodule FullCircle.Notes do
 
   # --- helpers --------------------------------------------------------------
 
-  defp snapshot(multi, current, user) do
+  # Two editors saving at once would both compute the same max(version)+1 and
+  # the loser would hit the unique index with a NoteVersion changeset. Locking
+  # the note row first serialises them; the loser then sees a moved
+  # lock_version and reports :stale before writing anything.
+  defp snapshot(multi, current, user, expected_lock) do
     multi
+    |> Multi.run(:lock, fn repo, _ ->
+      locked =
+        repo.one(
+          from(n in Note, where: n.id == ^current.id, lock: "FOR UPDATE", select: n.lock_version)
+        )
+
+      if is_nil(expected_lock) or locked == expected_lock,
+        do: {:ok, locked},
+        else: {:error, :stale}
+    end)
     |> Multi.run(:version_no, fn repo, _ ->
       max =
         repo.one(from(v in NoteVersion, where: v.note_id == ^current.id, select: max(v.version)))
@@ -224,12 +264,19 @@ defmodule FullCircle.Notes do
     end)
   end
 
+  # Only a subject being set or changed is checked. An unchanged subject that
+  # has since been deleted (or that this editor cannot resolve) must not block
+  # fixing a typo in the body.
   defp validate_subject(changeset, company, user) do
     type = Ecto.Changeset.get_field(changeset, :subject_type)
     id = Ecto.Changeset.get_field(changeset, :subject_id)
 
+    changed? =
+      Ecto.Changeset.changed?(changeset, :subject_type) or
+        Ecto.Changeset.changed?(changeset, :subject_id)
+
     cond do
-      is_nil(type) or is_nil(id) ->
+      is_nil(type) or is_nil(id) or not changed? ->
         changeset
 
       not Linkable.type?(type) ->
@@ -278,7 +325,7 @@ defmodule FullCircle.Notes do
 
   def add_link(%Note{} = note, type, id, company, user) do
     with %Note{} = current <- get_note(note.id, company, user) || {:error, :not_found},
-         true <- can_edit?(current, company, user) || :not_authorise,
+         true <- may_edit?(current, user, rights(company, user)) || :not_authorise,
          {:ok, _} <- resolve_link_target(type, id, current, company, user) do
       %RecordLink{}
       |> RecordLink.changeset(%{
@@ -307,7 +354,7 @@ defmodule FullCircle.Notes do
 
   def remove_link(%Note{} = note, link_id, company, user) do
     with %Note{} = current <- get_note(note.id, company, user) || {:error, :not_found},
-         true <- can_edit?(current, company, user) || :not_authorise,
+         true <- may_edit?(current, user, rights(company, user)) || :not_authorise,
          %RecordLink{} = link <-
            Repo.one(
              from(l in RecordLink,
@@ -391,7 +438,7 @@ defmodule FullCircle.Notes do
 
     visible_to(company, user)
     |> apply_words(words)
-    |> apply_filters(filters || %{}, user)
+    |> apply_filters(filters || %{}, company, user)
     |> order_search(words, terms)
     |> offset(^((page - 1) * per_page))
     |> limit(^per_page)
@@ -408,13 +455,13 @@ defmodule FullCircle.Notes do
     end)
   end
 
-  defp apply_filters(query, filters, user) do
+  defp apply_filters(query, filters, company, user) do
     Enum.reduce(filters, query, fn
       {"subject_type", t}, q when t not in [nil, ""] -> from(n in q, where: n.subject_type == ^t)
       {"subject_id", id}, q when id not in [nil, ""] -> subject_id_filter(q, id)
       {"mine", "true"}, q -> from(n in q, where: n.author_id == ^user.id)
-      {"from", d}, q -> date_filter(q, d, :from)
-      {"to", d}, q -> date_filter(q, d, :to)
+      {"from", d}, q -> date_filter(q, d, :from, company.timezone)
+      {"to", d}, q -> date_filter(q, d, :to, company.timezone)
       _, q -> q
     end)
   end
@@ -427,14 +474,21 @@ defmodule FullCircle.Notes do
     end
   end
 
-  # A hand-edited URL can carry anything; a bad date drops the filter.
-  defp date_filter(q, d, dir) do
+  # The user picks a day on the company's calendar; inserted_at is UTC. A
+  # hand-edited URL can carry anything; a bad date drops the filter.
+  defp date_filter(q, d, dir, tz) do
     case Date.from_iso8601(to_string(d)) do
       {:ok, date} when dir == :from ->
-        from(n in q, where: fragment("?::date", n.inserted_at) >= ^date)
+        from(n in q,
+          where:
+            fragment("(? AT TIME ZONE 'UTC' AT TIME ZONE ?)::date", n.inserted_at, ^tz) >= ^date
+        )
 
       {:ok, date} ->
-        from(n in q, where: fragment("?::date", n.inserted_at) <= ^date)
+        from(n in q,
+          where:
+            fragment("(? AT TIME ZONE 'UTC' AT TIME ZONE ?)::date", n.inserted_at, ^tz) <= ^date
+        )
 
       _ ->
         q

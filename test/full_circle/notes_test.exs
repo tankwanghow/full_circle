@@ -1,6 +1,8 @@
 defmodule FullCircle.NotesTest do
   use FullCircle.DataCase
 
+  import Ecto.Query
+
   import FullCircle.BillingFixtures
   import FullCircle.NotesFixtures
 
@@ -439,5 +441,126 @@ defmodule FullCircle.NotesTest do
              per_page: 30
            ) ==
              []
+  end
+
+  describe "review fixes" do
+    setup %{admin: admin, company: company} do
+      %{
+        clerk: user_with_role(company, admin, "clerk"),
+        manager: user_with_role(company, admin, "manager")
+      }
+    end
+
+    test "history shows each version only to those who could read it then",
+         %{admin: admin, company: company, clerk: clerk, manager: manager} do
+      note =
+        note_fixture(company, manager, %{
+          "body" => "salary dispute details",
+          "visibility" => ["manager"]
+        })
+
+      {:ok, note} =
+        Notes.update_note(note, %{"body" => "resolved", "visibility" => []}, company, manager)
+
+      {:ok, note} = Notes.update_note(note, %{"body" => "resolved, closed"}, company, manager)
+
+      clerk_versions = Notes.list_versions(note, company, clerk)
+      refute Enum.any?(clerk_versions, &(&1.body =~ "salary"))
+      assert [%{body: "resolved"}] = clerk_versions
+
+      # The diff a clerk sees never names the hidden text either.
+      for %{changes: changes} <- Notes.version_changes(clerk_versions, note),
+          {_f, old, new} <- changes do
+        refute to_string(old) =~ "salary"
+        refute to_string(new) =~ "salary"
+      end
+
+      assert length(Notes.list_versions(note, company, manager)) == 2
+      assert length(Notes.list_versions(note, company, admin)) == 2
+    end
+
+    test "the author sees every version of their own note",
+         %{company: company, clerk: clerk} do
+      note = note_fixture(company, clerk, %{"body" => "v1", "visibility" => ["manager"]})
+      {:ok, note} = Notes.update_note(note, %{"body" => "v2"}, company, clerk)
+      assert [%{body: "v1"}] = Notes.list_versions(note, company, clerk)
+    end
+
+    test "a note whose subject disappeared can still be edited", %{admin: admin, company: company} do
+      target = note_fixture(company, admin, %{"body" => "target"})
+
+      note =
+        note_fixture(company, admin, %{
+          "body" => "about target",
+          "subject_type" => "Note",
+          "subject_id" => target.id
+        })
+
+      {:ok, _} = Notes.delete_note(target, company, admin)
+
+      assert {:ok, updated} =
+               Notes.update_note(
+                 note,
+                 %{"body" => "typo fixed", "subject_type" => "Note", "subject_id" => target.id},
+                 company,
+                 admin
+               )
+
+      assert updated.body == "typo fixed"
+      assert updated.subject_id == target.id
+
+      # Pointing it at a new missing record is still refused.
+      assert {:error, cs} =
+               Notes.update_note(updated, %{"subject_id" => Ecto.UUID.generate()}, company, admin)
+
+      assert %{subject_id: ["not found"]} = errors_on(cs)
+    end
+
+    test "a cashier can write a note about a credit note they cannot edit",
+         %{company: company, admin: admin} do
+      cashier = user_with_role(company, admin, "cashier")
+      refute FullCircle.Authorization.can?(cashier, :update_credit_note, company)
+      cn = FullCircle.DebCreFixtures.credit_note_fixture(company, admin)
+
+      assert {:ok, note} =
+               Notes.create_note(
+                 %{"body" => "x", "subject_type" => "CreditNote", "subject_id" => cn.id},
+                 company,
+                 cashier
+               )
+
+      assert note.subject_id == cn.id
+    end
+
+    test "date filters use the company's day, not UTC's", %{admin: admin, company: company} do
+      note = note_fixture(company, admin, %{"body" => "early morning"})
+
+      # 07:30 on 29 Sep in Kuala Lumpur is 23:30 on 28 Sep UTC.
+      from(n in FullCircle.Notes.Note, where: n.id == ^note.id)
+      |> Repo.update_all(set: [inserted_at: ~U[2026-09-28 23:30:00Z]])
+
+      on_29th = %{"from" => "2026-09-29", "to" => "2026-09-29"}
+      on_28th = %{"from" => "2026-09-28", "to" => "2026-09-28"}
+
+      assert [%{body: "early morning"}] =
+               Notes.search(company, admin, "", on_29th, page: 1, per_page: 30)
+
+      assert [] = Notes.search(company, admin, "", on_28th, page: 1, per_page: 30)
+    end
+
+    test "edit rights for a list match can_edit? note by note",
+         %{admin: admin, company: company, clerk: clerk, manager: manager} do
+      mine = note_fixture(company, clerk, %{"body" => "mine"})
+      theirs = note_fixture(company, admin, %{"body" => "theirs"})
+      notes = [mine, theirs]
+
+      for u <- [admin, clerk, manager] do
+        rights = Notes.rights(company, u)
+
+        for n <- notes do
+          assert Notes.may_edit?(n, u, rights) == Notes.can_edit?(n, company, u)
+        end
+      end
+    end
   end
 end
