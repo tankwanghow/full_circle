@@ -23,4 +23,11 @@ defmodule FullCircle.NotesFixtures do
     File.write!(path, content)
     path
   end
+
+  def note_fixture(company, user, attrs \\ %{}) do
+    {:ok, note} =
+      FullCircle.Notes.create_note(Map.merge(%{"body" => "a note"}, attrs), company, user)
+
+    note
+  end
 end
