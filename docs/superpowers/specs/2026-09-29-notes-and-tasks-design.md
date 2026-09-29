@@ -36,7 +36,7 @@ the record's own page; and see every past version of it.
 | 1 | **Foundation + Notes** (this spec) | Remove old Tugas backend; Linkable registry + `record_links`; Notes with visibility, versions, attachments, search; desktop UI; notes panel on every linkable record page + counts on index pages |
 | 2 | Tasks | Task model (below), My Tasks, nav badge, task timeline of notes |
 | 3 | Calendar | Tasks by due date + existing HR holidays |
-| 4 | Mobile UI | Dedicated `/m/` LiveViews, bottom nav, device auto-routing for 1–3 |
+| 4 | Mobile app | A native phone app for the Tasks side (and notes on tasks), talking to FullCircle over a token-authenticated API. **No web mobile UI** — the web pages stay desktop-first (decided 2026-09-29) |
 | 5 | Voice-todo API | Token-authenticated JSON API; the voice app creates Tasks |
 
 ### Task model — agreed, built in sub-project 2
@@ -297,7 +297,7 @@ authoritative on type and size. Downloads go through
 `GET /companies/:company_id/note_attachments/:id` which re-checks note
 visibility. Reason: the Tugas app learned that LiveView socket uploads are lost
 when a phone backgrounds the page during a camera pick; building it this way now
-means the mobile UI (sub-project 4) reuses it unchanged. Attachments are added
+means the mobile app (sub-project 4) can post to the same endpoint. Attachments are added
 after the note exists (the form saves first, then offers uploads).
 
 ## 9. Errors
@@ -340,4 +340,4 @@ The removal step must leave the suite green with the Tugas and BillPay
 - Notes: free edit, full version history.
 - Any record can be a subject or link target, via the registry.
 - Managers = admin + manager. In-app reminders only. FullCircle styling.
-  Dedicated mobile UI later. Voice API later.
+  No web mobile UI; a native mobile app for Tasks after the web part. Voice API later.
