@@ -1,0 +1,89 @@
+defmodule FullCircle.Notes.Note do
+  @moduledoc """
+  A note in the company memory.
+
+  `subject_type`/`subject_id` point at the record the note is *about* (a
+  `FullCircle.Linkable` type) or are both nil for a free-standing note.
+  `visibility` is nil for public, else the roles allowed to read it; admin and
+  the author always read. Every edit leaves a `NoteVersion` of what it replaced.
+  """
+  use FullCircle.Schema
+  import Ecto.Changeset
+
+  alias FullCircle.Notes.NoteAttachment
+  alias FullCircle.UserAccounts.User
+
+  schema "notes" do
+    field :title, :string
+    field :body, :string
+    field :subject_type, :string
+    field :subject_id, :binary_id
+    field :visibility, {:array, :string}
+    field :lock_version, :integer, default: 0
+    field :deleted_at, :utc_datetime
+
+    belongs_to :company, FullCircle.Sys.Company
+    belongs_to :author, User
+    belongs_to :updated_by, User
+    belongs_to :deleted_by, User
+
+    has_many :attachments, NoteAttachment,
+      where: [removed_at: nil],
+      preload_order: [asc: :inserted_at]
+
+    timestamps(type: :utc_datetime)
+  end
+
+  @castable ~w(title body subject_type subject_id visibility)a
+
+  def visibility_roles, do: FullCircle.Authorization.roles() -- ["disable"]
+
+  def changeset(note, attrs) do
+    note
+    |> cast(attrs, @castable)
+    |> update_change(:title, &blank_to_nil/1)
+    |> validate_required([:body])
+    |> validate_length(:title, max: 120)
+    |> validate_subject_pair()
+    |> validate_visibility()
+    |> check_constraint(:subject_id, name: :notes_subject_pair)
+    |> check_constraint(:visibility, name: :notes_visibility_not_empty)
+  end
+
+  def display_title(%__MODULE__{title: t}) when is_binary(t) and t != "", do: t
+
+  def display_title(%__MODULE__{body: body}) do
+    (body || "") |> String.split("\n", parts: 2) |> hd() |> String.slice(0, 120)
+  end
+
+  defp blank_to_nil(nil), do: nil
+
+  defp blank_to_nil(s) do
+    case String.trim(s) do
+      "" -> nil
+      t -> t
+    end
+  end
+
+  defp validate_subject_pair(cs) do
+    type = get_field(cs, :subject_type)
+    id = get_field(cs, :subject_id)
+
+    if is_nil(type) == is_nil(id),
+      do: cs,
+      else: add_error(cs, :subject_id, "must be set together with subject type")
+  end
+
+  defp validate_visibility(cs) do
+    case get_field(cs, :visibility) do
+      nil ->
+        cs
+
+      [] ->
+        add_error(cs, :visibility, "use nil for public")
+
+      _roles ->
+        validate_subset(cs, :visibility, visibility_roles(), message: "has an invalid entry")
+    end
+  end
+end
