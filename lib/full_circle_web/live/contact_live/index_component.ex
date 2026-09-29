@@ -1,6 +1,8 @@
 defmodule FullCircleWeb.ContactLive.IndexComponent do
   use FullCircleWeb, :live_component
 
+  import FullCircleWeb.NoteComponents, only: [notes_count_badge: 1]
+
   @impl true
   def mount(socket) do
     {:ok, socket}
@@ -8,7 +10,7 @@ defmodule FullCircleWeb.ContactLive.IndexComponent do
 
   @impl true
   def update(assigns, socket) do
-    {:ok, socket |> assign(assigns)}
+    {:ok, socket |> assign(assigns) |> assign_new(:note_count, fn -> 0 end)}
   end
 
   @impl true
@@ -25,7 +27,7 @@ defmodule FullCircleWeb.ContactLive.IndexComponent do
       >
         {@obj.name}
       </.link>
-      ({@obj.category})
+      <.notes_count_badge count={@note_count} id={@obj.id} /> ({@obj.category})
       <div>
         <p>{@obj.address1}, {@obj.address2}
           {@obj.city} {@obj.zipcode}, {@obj.state} {@obj.country}</p>

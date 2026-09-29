@@ -3,6 +3,7 @@ defmodule FullCircleWeb.EmployeeLive.Index do
 
   alias FullCircle.StdInterface
   alias FullCircleWeb.EmployeeLive.IndexComponent
+  alias FullCircleWeb.NoteLive.NotesIndex
 
   @per_page 30
   @selected_max 15
@@ -42,7 +43,6 @@ defmodule FullCircleWeb.EmployeeLive.Index do
         </div>
       </div>
       <div
-        :if={Enum.count(@streams.objects) > 0 or @page > 1}
         id="objects_list"
         phx-update="stream"
         phx-viewport-bottom={!@end_of_timeline? && "next-page"}
@@ -52,6 +52,7 @@ defmodule FullCircleWeb.EmployeeLive.Index do
           <.live_component
             current_company={@current_company}
             module={IndexComponent}
+            note_count={Map.get(@note_counts, obj.id, 0)}
             id={obj_id}
             obj={obj}
             ex_class=""
@@ -59,6 +60,12 @@ defmodule FullCircleWeb.EmployeeLive.Index do
         <% end %>
       </div>
       <.infinite_scroll_footer ended={@end_of_timeline?} />
+      <NotesIndex.modal
+        notes_for={@notes_for}
+        notes_type={@notes_type}
+        current_company={@current_company}
+        current_user={@current_user}
+      />
     </div>
     """
   end
@@ -69,6 +76,7 @@ defmodule FullCircleWeb.EmployeeLive.Index do
       socket
       |> assign(update_action: "stream")
       |> assign(page_title: gettext("Employee Listing"))
+      |> NotesIndex.init("Employee")
 
     {:ok, socket}
   end
@@ -88,6 +96,12 @@ defmodule FullCircleWeb.EmployeeLive.Index do
      |> assign(search: %{terms: terms})
      |> filter_objects(terms, true, 1)}
   end
+
+  @impl true
+  def handle_event("open_notes", %{"id" => id}, socket),
+    do: {:noreply, NotesIndex.open(socket, id)}
+
+  def handle_event("close_notes", _, socket), do: {:noreply, NotesIndex.close(socket)}
 
   @impl true
   def handle_event("next-page", _, socket) do
@@ -153,6 +167,10 @@ defmodule FullCircleWeb.EmployeeLive.Index do
     {:noreply, socket |> assign(ids: Enum.join(socket.assigns.selected, ","))}
   end
 
+  @impl true
+  def handle_info({:notes_changed, _type, id}, socket),
+    do: {:noreply, NotesIndex.changed(socket, id, IndexComponent)}
+
   defp filter_objects(socket, terms, reset, page) when page >= 1 do
     query =
       FullCircle.HR.employee_checked_query(
@@ -171,6 +189,7 @@ defmodule FullCircleWeb.EmployeeLive.Index do
 
     socket
     |> assign(page: page, per_page: @per_page)
+    |> NotesIndex.count(objects, reset)
     |> stream(:objects, objects, reset: reset)
     |> assign(end_of_timeline?: Enum.count(objects) < @per_page)
   end
