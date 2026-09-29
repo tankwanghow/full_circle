@@ -1,6 +1,8 @@
 defmodule FullCircleWeb.ReceiptLive.IndexComponent do
   use FullCircleWeb, :live_component
 
+  import FullCircleWeb.NoteComponents, only: [notes_count_badge: 1]
+
   alias FullCircle.EInvMetas
   alias FullCircleWeb.Helpers
 
@@ -11,7 +13,7 @@ defmodule FullCircleWeb.ReceiptLive.IndexComponent do
 
   @impl true
   def update(assigns, socket) do
-    {:ok, socket |> assign(assigns) |> get_e_invoices()}
+    {:ok, socket |> assign(assigns) |> assign_new(:note_count, fn -> 0 end) |> get_e_invoices()}
   end
 
   defp get_e_invoices(socket) do
@@ -207,6 +209,7 @@ defmodule FullCircleWeb.ReceiptLive.IndexComponent do
             >
               {@obj.receipt_no}
             </.link>
+            <.notes_count_badge count={@note_count} id={@obj.id} />
             {if @obj.receipt_no != @obj.e_inv_internal_id, do: @obj.e_inv_internal_id}
           </span>
           <span :if={@obj.old_data} class="text-sm">{@obj.receipt_no}</span>

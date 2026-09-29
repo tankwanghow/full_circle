@@ -1160,6 +1160,16 @@ defmodule FullCircleWeb.InvoiceLive.Form do
         </div>
       </.form>
 
+      <.live_component
+        :if={@live_action == :edit and @id != "new"}
+        module={FullCircleWeb.NoteLive.NotesPanelComponent}
+        id="notes-panel"
+        record_type="Invoice"
+        record_id={@id}
+        current_company={@current_company}
+        current_user={@current_user}
+      />
+
       <div
         :if={@live_action == :new and @e_inv_document}
         class="mt-4 border rounded-lg border-blue-500 bg-blue-50 p-4"

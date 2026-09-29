@@ -628,6 +628,16 @@ defmodule FullCircleWeb.DebitNoteLive.Form do
           />
         </div>
       </.form>
+
+      <.live_component
+        :if={@live_action == :edit and @id != "new"}
+        module={FullCircleWeb.NoteLive.NotesPanelComponent}
+        id="notes-panel"
+        record_type="DebitNote"
+        record_id={@id}
+        current_company={@current_company}
+        current_user={@current_user}
+      />
     </div>
     <.live_component
       module={FullCircleWeb.ReceiptLive.QryMatcherComponent}

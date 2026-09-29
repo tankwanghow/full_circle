@@ -1,5 +1,7 @@
 defmodule FullCircleWeb.DebitNoteLive.IndexComponent do
   use FullCircleWeb, :live_component
+
+  import FullCircleWeb.NoteComponents, only: [notes_count_badge: 1]
   alias FullCircle.EInvMetas
   alias FullCircleWeb.Helpers
 
@@ -10,7 +12,7 @@ defmodule FullCircleWeb.DebitNoteLive.IndexComponent do
 
   @impl true
   def update(assigns, socket) do
-    {:ok, socket |> assign(assigns) |> get_e_invoices()}
+    {:ok, socket |> assign(assigns) |> assign_new(:note_count, fn -> 0 end) |> get_e_invoices()}
   end
 
   defp get_e_invoices(socket) do
@@ -204,6 +206,7 @@ defmodule FullCircleWeb.DebitNoteLive.IndexComponent do
               current_company={@company}
               doc_obj={%{doc_type: "DebitNote", doc_id: @obj.id, doc_no: @obj.note_no}}
             />
+            <.notes_count_badge count={@note_count} id={@obj.id} />
             {if @obj.note_no != @obj.e_inv_internal_id, do: @obj.e_inv_internal_id}
           <% end %>
           {@obj.tax_id} <span class="text-green-600">{@obj.reg_no}</span>

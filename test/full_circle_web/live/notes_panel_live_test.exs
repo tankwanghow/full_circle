@@ -146,4 +146,91 @@ defmodule FullCircleWeb.NotesPanelLiveTest do
       assert html =~ "📝 1"
     end
   end
+
+  describe "rollout" do
+    test "invoice edit page shows the panel and the invoice list shows counts", %{
+      conn: conn,
+      admin: admin,
+      comp: comp
+    } do
+      inv = invoice_fixture(comp, admin)
+
+      note_fixture(comp, admin, %{
+        "body" => "customer disputes line 2",
+        "subject_type" => "Invoice",
+        "subject_id" => inv.id
+      })
+
+      {:ok, _lv, html} = live(conn, ~p"/companies/#{comp.id}/Invoice/#{inv.id}/edit")
+      assert html =~ "customer disputes line 2"
+
+      {:ok, _lv, html} = live(conn, ~p"/companies/#{comp.id}/Invoice")
+      assert html =~ "📝 1"
+    end
+
+    test "every covered page renders with the panel or badge", %{conn: conn, comp: comp} do
+      for path <-
+            ~w(goods Invoice PurInvoice Receipt Payment CreditNote DebitNote Journal Deposit ReturnCheque) do
+        {:ok, _lv, html} = live(conn, "/companies/#{comp.id}/#{path}")
+        assert is_binary(html), "#{path} index failed to render"
+      end
+    end
+  end
+
+  describe "rollout per type" do
+    # {type, index path segment, fixture}; Journal has no fixture and is
+    # covered by the index smoke render above.
+    @typed [
+      {"Good", "goods", &FullCircle.BillingFixtures.good_fixture/2},
+      {"Invoice", "Invoice", &FullCircle.BillingFixtures.invoice_fixture/2},
+      {"PurInvoice", "PurInvoice", &FullCircle.BillingFixtures.pur_invoice_fixture/2},
+      {"Receipt", "Receipt", &FullCircle.ReceiveFundFixtures.receipt_fixture/2},
+      {"Payment", "Payment", &FullCircle.BillPayFixtures.payment_fixture/2},
+      {"CreditNote", "CreditNote", &FullCircle.DebCreFixtures.credit_note_fixture/2},
+      {"DebitNote", "DebitNote", &FullCircle.DebCreFixtures.debit_note_fixture/2},
+      {"Deposit", "Deposit", &FullCircle.ChequeFixtures.deposit_fixture/2},
+      {"ReturnCheque", "ReturnCheque", &FullCircle.ChequeFixtures.return_cheque_fixture/2}
+    ]
+
+    for {type, segment, fixture} <- @typed do
+      @type_key type
+      @segment segment
+      @fixture fixture
+
+      test "#{type}: edit page panel and index count", %{conn: conn, admin: admin, comp: comp} do
+        rec = @fixture.(comp, admin)
+        body = "about this #{@type_key}"
+
+        note_fixture(comp, admin, %{
+          "body" => body,
+          "subject_type" => @type_key,
+          "subject_id" => rec.id
+        })
+
+        {:ok, _lv, html} = live(conn, FullCircle.Linkable.url(@type_key, rec.id, comp))
+        assert html =~ body
+
+        {:ok, _lv, html} = live(conn, "/companies/#{comp.id}/#{@segment}")
+        assert html =~ "📝 1"
+      end
+    end
+  end
+
+  test "deposit list rows are transactions; quick-add still bumps the row",
+       %{conn: conn, admin: admin, comp: comp} do
+    dep = FullCircle.ChequeFixtures.deposit_fixture(comp, admin)
+    {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/Deposit")
+    lv |> element("button[phx-click=open_notes][phx-value-id='#{dep.id}']") |> render_click()
+    lv |> element("#notes-modal-panel-new") |> render_click()
+
+    lv
+    |> form("#notes-modal-panel-form", %{"note" => %{"body" => "bank queried it"}})
+    |> render_submit()
+
+    :sys.get_state(lv.pid)
+    :sys.get_state(lv.pid)
+    assert render(lv) =~ "📝 1"
+    [note] = FullCircle.Repo.all(FullCircle.Notes.Note)
+    assert {note.subject_type, note.subject_id} == {"Deposit", dep.id}
+  end
 end

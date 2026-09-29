@@ -1,6 +1,8 @@
 defmodule FullCircleWeb.JournalLive.IndexComponent do
   use FullCircleWeb, :live_component
 
+  import FullCircleWeb.NoteComponents, only: [notes_count_badge: 1]
+
   @impl true
   def mount(socket) do
     {:ok, socket}
@@ -8,7 +10,7 @@ defmodule FullCircleWeb.JournalLive.IndexComponent do
 
   @impl true
   def update(assigns, socket) do
-    {:ok, socket |> assign(assigns)}
+    {:ok, socket |> assign(assigns) |> assign_new(:note_count, fn -> 0 end)}
   end
 
   @impl true
@@ -48,6 +50,7 @@ defmodule FullCircleWeb.JournalLive.IndexComponent do
             current_company={@company}
             doc_obj={%{doc_type: "Journal", doc_id: @obj.id, doc_no: @obj.journal_no}}
           />
+          <.notes_count_badge count={@note_count} id={@obj.id} />
         <% end %>
       </div>
       <div class="w-[40%] border-b border-gray-400 py-1 overflow-clip">

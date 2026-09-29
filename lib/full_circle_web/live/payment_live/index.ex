@@ -3,6 +3,7 @@ defmodule FullCircleWeb.PaymentLive.Index do
 
   alias FullCircle.BillPay
   alias FullCircleWeb.PaymentLive.IndexComponent
+  alias FullCircleWeb.NoteLive.NotesIndex
 
   @per_page 15
   @selected_max 10
@@ -92,7 +93,6 @@ defmodule FullCircleWeb.PaymentLive.Index do
         </div>
       </div>
       <div
-        :if={Enum.count(@streams.objects) > 0 or @page > 1}
         id="objects_list"
         phx-update="stream"
         phx-viewport-bottom={!@end_of_timeline? && "next-page"}
@@ -102,6 +102,7 @@ defmodule FullCircleWeb.PaymentLive.Index do
           <%!-- <div>{obj_id} {obj.payment_no}</div> --%>
           <.live_component
             module={IndexComponent}
+            note_count={Map.get(@note_counts, obj.id, 0)}
             id={obj_id}
             obj={obj}
             company={@current_company}
@@ -112,6 +113,12 @@ defmodule FullCircleWeb.PaymentLive.Index do
         <% end %>
       </div>
       <.infinite_scroll_footer ended={@end_of_timeline?} />
+      <NotesIndex.modal
+        notes_for={@notes_for}
+        notes_type={@notes_type}
+        current_company={@current_company}
+        current_user={@current_user}
+      />
     </div>
     """
   end
@@ -121,6 +128,7 @@ defmodule FullCircleWeb.PaymentLive.Index do
     socket =
       socket
       |> assign(page_title: gettext("Payment Listing"))
+      |> NotesIndex.init("Payment")
 
     {:ok, socket}
   end
@@ -139,6 +147,12 @@ defmodule FullCircleWeb.PaymentLive.Index do
      |> assign(can_print: false)
      |> filter_objects(terms, true, payment_date, 1)}
   end
+
+  @impl true
+  def handle_event("open_notes", %{"id" => id}, socket),
+    do: {:noreply, NotesIndex.open(socket, id)}
+
+  def handle_event("close_notes", _, socket), do: {:noreply, NotesIndex.close(socket)}
 
   @impl true
   def handle_event("check_click", %{"object-id" => id, "value" => "on"}, socket) do
@@ -219,6 +233,10 @@ defmodule FullCircleWeb.PaymentLive.Index do
     {:noreply, socket |> push_navigate(to: url)}
   end
 
+  @impl true
+  def handle_info({:notes_changed, _type, id}, socket),
+    do: {:noreply, NotesIndex.changed(socket, id, IndexComponent)}
+
   defp filter_objects(socket, terms, reset, payment_date, page) do
     objects =
       BillPay.payment_index_query(
@@ -234,6 +252,7 @@ defmodule FullCircleWeb.PaymentLive.Index do
 
     socket
     |> assign(page: page, per_page: @per_page)
+    |> NotesIndex.count(objects, reset)
     |> stream(:objects, objects, reset: reset)
     |> assign(end_of_timeline?: obj_count < @per_page)
   end

@@ -384,6 +384,16 @@ defmodule FullCircleWeb.ChequeLive.DepositForm do
           />
         </div>
       </.form>
+
+      <.live_component
+        :if={@live_action == :edit and @id != "new"}
+        module={FullCircleWeb.NoteLive.NotesPanelComponent}
+        id="notes-panel"
+        record_type="Deposit"
+        record_id={@id}
+        current_company={@current_company}
+        current_user={@current_user}
+      />
     </div>
 
     <div class="text-center w-8/12 mx-auto border rounded-lg border-blue-500 bg-blue-100 p-4">

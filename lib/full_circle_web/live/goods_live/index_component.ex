@@ -1,6 +1,8 @@
 defmodule FullCircleWeb.GoodLive.IndexComponent do
   use FullCircleWeb, :live_component
 
+  import FullCircleWeb.NoteComponents, only: [notes_count_badge: 1]
+
   @impl true
   def mount(socket) do
     {:ok, socket}
@@ -8,7 +10,7 @@ defmodule FullCircleWeb.GoodLive.IndexComponent do
 
   @impl true
   def update(assigns, socket) do
-    {:ok, socket |> assign(assigns)}
+    {:ok, socket |> assign(assigns) |> assign_new(:note_count, fn -> 0 end)}
   end
 
   @impl true
@@ -24,7 +26,7 @@ defmodule FullCircleWeb.GoodLive.IndexComponent do
       >
         {@obj.name} ({@obj.unit})
       </.link>
-      &#11049;
+      <.notes_count_badge count={@note_count} id={@obj.id} /> &#11049;
       <span>
         {@obj.category} &#11049; {@obj.sales_account_name} &#11049; {@obj.sales_tax_code_name} &#8226; {@obj.purchase_account_name} &#11049; {@obj.purchase_tax_code_name}
       </span>

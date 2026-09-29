@@ -2,6 +2,7 @@ defmodule FullCircleWeb.ChequeLive.ReturnChequeIndex do
   use FullCircleWeb, :live_view
 
   alias FullCircle.{Cheque}
+  alias FullCircleWeb.NoteLive.NotesIndex
 
   @per_page 30
 
@@ -10,6 +11,7 @@ defmodule FullCircleWeb.ChequeLive.ReturnChequeIndex do
     socket =
       socket
       |> assign(page_title: "Return Cheques")
+      |> NotesIndex.init("ReturnCheque", :return_id)
 
     {:ok, socket}
   end
@@ -26,6 +28,12 @@ defmodule FullCircleWeb.ChequeLive.ReturnChequeIndex do
      |> assign(search: %{terms: terms, r_date: r_date})
      |> filter_objects(terms, true, r_date, 1)}
   end
+
+  @impl true
+  def handle_event("open_notes", %{"id" => id}, socket),
+    do: {:noreply, NotesIndex.open(socket, id)}
+
+  def handle_event("close_notes", _, socket), do: {:noreply, NotesIndex.close(socket)}
 
   @impl true
   def handle_event("next-page", _, socket) do
@@ -59,6 +67,12 @@ defmodule FullCircleWeb.ChequeLive.ReturnChequeIndex do
      |> push_navigate(to: url_from_search(socket))}
   end
 
+  @impl true
+  def handle_info({:notes_changed, _type, id}, socket),
+    do:
+      {:noreply,
+       NotesIndex.changed(socket, id, FullCircleWeb.ChequeLive.ReturnChequeIndexComponent)}
+
   defp filter_objects(socket, terms, reset, r_date, page) do
     objects =
       Cheque.return_cheque_index_query(
@@ -74,6 +88,7 @@ defmodule FullCircleWeb.ChequeLive.ReturnChequeIndex do
 
     socket
     |> assign(page: page, per_page: @per_page)
+    |> NotesIndex.count(objects, reset)
     |> stream(:objects, objects, reset: reset)
     |> assign(end_of_timeline?: obj_count < @per_page)
   end
@@ -149,7 +164,6 @@ defmodule FullCircleWeb.ChequeLive.ReturnChequeIndex do
       </div>
 
       <div
-        :if={Enum.count(@streams.objects) > 0 or @page > 1}
         id="objects_list"
         phx-update="stream"
         phx-viewport-bottom={!@end_of_timeline? && "next-page"}
@@ -158,6 +172,7 @@ defmodule FullCircleWeb.ChequeLive.ReturnChequeIndex do
         <%= for {obj_id, obj} <- @streams.objects do %>
           <.live_component
             module={FullCircleWeb.ChequeLive.ReturnChequeIndexComponent}
+            note_count={Map.get(@note_counts, obj.return_id, 0)}
             id={obj_id}
             obj={obj}
             company={@current_company}
@@ -166,6 +181,12 @@ defmodule FullCircleWeb.ChequeLive.ReturnChequeIndex do
         <% end %>
       </div>
       <.infinite_scroll_footer ended={@end_of_timeline?} />
+      <NotesIndex.modal
+        notes_for={@notes_for}
+        notes_type={@notes_type}
+        current_company={@current_company}
+        current_user={@current_user}
+      />
     </div>
     """
   end
