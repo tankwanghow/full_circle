@@ -60,3 +60,6 @@ deploy.conf
 /.worktrees/
 # Fingerprint machine monthly exports (binary, employee PII) — kept local only
 docs/*.xls
+
+# Brainstorming companion mockups
+/.superpowers/

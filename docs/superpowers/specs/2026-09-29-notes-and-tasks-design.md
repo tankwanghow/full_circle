@@ -33,7 +33,7 @@ the record's own page; and see every past version of it.
 
 | # | Sub-project | Delivers |
 |---|---|---|
-| 1 | **Foundation + Notes** (this spec) | Remove old Tugas backend; Linkable registry + `record_links`; Notes with visibility, versions, attachments, search; desktop UI; notes panel on Employee & Contact |
+| 1 | **Foundation + Notes** (this spec) | Remove old Tugas backend; Linkable registry + `record_links`; Notes with visibility, versions, attachments, search; desktop UI; notes panel on every linkable record page + counts on index pages |
 | 2 | Tasks | Task model (below), My Tasks, nav badge, task timeline of notes |
 | 3 | Calendar | Tasks by due date + existing HR holidays |
 | 4 | Mobile UI | Dedicated `/m/` LiveViews, bottom nav, device auto-routing for 1–3 |
@@ -73,7 +73,8 @@ In:
 - `FullCircle.Linkable` — registry of linkable record types + `record_links`.
 - `FullCircle.Notes` — notes, versions, attachments, visibility, search.
 - Desktop LiveViews: notes index/search, note form, note show (with history),
-  and a reusable notes panel embedded in Employee and Contact forms.
+  and a reusable notes panel on every linkable record's edit page plus a
+  notes count on its index page (§8).
 - Attachment upload/download over plain HTTP controllers.
 
 Out (later or never): tasks, calendar, mobile, API, Markdown rendering, note
@@ -254,10 +255,35 @@ Routes under `/companies/:company_id`:
 - `/notes/:id` — `NoteLive.Show`: body, attachments, outgoing links, backlinks,
   and a collapsible version history (who, when, and a before/after of changed
   fields).
-- `NotesPanelComponent` — embedded in `EmployeeLive.Form` and
-  `ContactLive.Form` in edit mode: visible notes whose subject is this record,
-  plus notes linking to it; an "Add note" button opening `/notes/new` with the
-  subject pre-filled.
+### Notes on every linkable record (chosen: mockups A + C, 2026-09-29)
+
+One `NotesPanelComponent` (a `live_component`, given `record_type` +
+`record_id`) is rendered in two hosts:
+
+- **(A) Record edit page — panel under the form.** Every linkable type's edit
+  LiveView renders the panel below its form. It lists, newest first, the
+  visible notes **about** this record plus visible notes that **link to** it
+  (marked "↩ linked"); restricted notes the viewer cannot read are simply
+  absent. **+ Note** opens an inline quick-add (body, visibility; subject fixed
+  to this record); after save the new note card offers 📎 attachment upload
+  (attachments need a saved note — §8 below). A "Full form" link goes to
+  `/notes/new?subject_type=&subject_id=` for title and links. Hidden on
+  `:new` / `:copy` actions — an unsaved record has no id to attach to.
+- **(C) Index pages — 📝 count per row.** Each linkable type's index row shows
+  a 📝 count (or "—"). Clicking it opens the **same panel in a modal** over the
+  list, so notes can be read and quick-added without opening the record.
+  Counts are **visibility-aware** (a clerk's count excludes notes they cannot
+  read) and come from **one grouped query per page**
+  (`Notes.count_by_records(company, user, type, ids)`), never one per row.
+
+Adding a new linkable type later = registry entry + one line in its form + one
+column in its index.
+
+First-release coverage: index + edit pages of Employee, Contact, Good,
+Invoice, PurInvoice, Receipt, Payment, CreditNote, DebitNote, Journal,
+Deposit, ReturnCheque. Pages that are not a simple edit form get the panel on
+their equivalent detail page; any page where it does not fit is listed in the
+implementation plan rather than skipped silently.
 - Nav entry "Notes"; command-palette action `newnote`.
 - Light and dark theme both checked.
 - Gettext en + zh for all new strings.
@@ -296,8 +322,10 @@ Context tests (`test/full_circle/notes_test.exs`, `linkable_test.exs`):
 - attachment sniffing, size limit, orphan cleanup, removed-but-kept;
 - search escapes `%` and `_`.
 
-LiveView tests for index search, form create/edit, show history, the panel on
-Employee and Contact, and the upload/download controllers (auth + visibility).
+LiveView tests for index search, form create/edit, show history, the panel
+(inline on an edit page and as a modal from an index count, with counts
+respecting visibility) on Employee, Contact and one document type (Invoice),
+a smoke render of every covered index/edit page, and the upload/download controllers (auth + visibility).
 
 The removal step must leave the suite green with the Tugas and BillPay
 `duty_id` tests deleted.
