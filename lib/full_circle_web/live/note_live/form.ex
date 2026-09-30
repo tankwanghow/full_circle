@@ -118,7 +118,9 @@ defmodule FullCircleWeb.NoteLive.Form do
           )
 
         :edit ->
-          Notes.update_note(socket.assigns.note, params, com, user)
+          with {:ok, note} <- Notes.update_note(socket.assigns.note, params, com, user) do
+            {:ok, note, add_links(note, socket.assigns.links, com, user)}
+          end
       end
 
     case result do
@@ -126,6 +128,18 @@ defmodule FullCircleWeb.NoteLive.Form do
         {:noreply,
          socket
          |> put_flash(:info, gettext("Note saved."))
+         |> push_navigate(to: ~p"/companies/#{com.id}/notes/#{note.id}")}
+
+      {:ok, note, []} ->
+        {:noreply,
+         socket
+         |> put_flash(:info, gettext("Note saved."))
+         |> push_navigate(to: ~p"/companies/#{com.id}/notes/#{note.id}")}
+
+      {:ok, note, _failed} ->
+        {:noreply,
+         socket
+         |> put_flash(:warn, gettext("Note saved, but some links could not be added."))
          |> push_navigate(to: ~p"/companies/#{com.id}/notes/#{note.id}")}
 
       {:error, :stale} ->
@@ -148,15 +162,42 @@ defmodule FullCircleWeb.NoteLive.Form do
     end
   end
 
+  # One picker. With no subject yet, a pick sets the subject; once there is
+  # one, picks become links (the label says which). The subject itself is
+  # never also queued as a link.
   @impl true
-  def handle_info({:record_picked, "subject-picker", picked}, socket) do
-    {:noreply, assign(socket, subject: picked)}
+  def handle_info({:record_picked, "record-picker", picked}, socket) do
+    %{subject: subject, links: links} = socket.assigns
+
+    cond do
+      is_nil(subject) ->
+        {:noreply, assign(socket, subject: picked)}
+
+      same?(picked, subject) ->
+        {:noreply, socket}
+
+      true ->
+        {:noreply, assign(socket, links: Enum.uniq_by(links ++ [picked], &{&1.type, &1.id}))}
+    end
   end
 
-  def handle_info({:record_picked, "links-picker", picked}, socket) do
-    links = Enum.uniq_by(socket.assigns.links ++ [picked], &{&1.type, &1.id})
-    {:noreply, assign(socket, links: links)}
+  defp same?(a, b), do: a.type == b.type and a.id == b.id
+
+  # Edit saves the note first, then adds the queued links. An existing link is
+  # not a failure; anything else is reported once the note is saved.
+  defp add_links(note, links, com, user) do
+    for l <- links,
+        not (l.type == "Note" and l.id == note.id),
+        result = Notes.add_link(note, l.type, l.id, com, user),
+        not match?({:ok, _}, result),
+        not already_linked?(result),
+        do: l
   end
+
+  defp already_linked?({:error, %Ecto.Changeset{errors: errors}}),
+    do: Enum.any?(errors, fn {_f, {msg, _}} -> msg == "already linked" end)
+
+  defp already_linked?(_), do: false
 
   @impl true
   def render(assigns) do
@@ -190,9 +231,20 @@ defmodule FullCircleWeb.NoteLive.Form do
 
         <div class="mt-2 text-sm">
           <span class="font-semibold">{gettext("About")}:</span>
-          <span :if={@subject}>
+          <span
+            :if={@subject}
+            class="rounded border border-amber-400 bg-white px-1 dark:border-amber-600 dark:bg-gray-800"
+          >
             {type_label(@subject.type)} — {@subject.title}
-            <button type="button" phx-click="clear_subject" class="text-rose-600 dark:text-rose-400">✕</button>
+            <button
+              type="button"
+              id="clear-subject"
+              phx-click="clear_subject"
+              class="text-rose-600 dark:text-rose-400"
+              title={gettext("Clear")}
+            >
+              ✕
+            </button>
           </span>
           <span :if={!@subject} class="text-gray-500">{gettext("nothing in particular")}</span>
           <.error :for={
@@ -203,7 +255,7 @@ defmodule FullCircleWeb.NoteLive.Form do
           </.error>
         </div>
 
-        <div :if={@live_action == :new and @links != []} class="mt-1 text-sm">
+        <div :if={@links != []} class="mt-1 text-sm">
           <span class="font-semibold">{gettext("Links")}:</span>
           <span :for={l <- @links} class="mr-2">
             {type_label(l.type)} — {l.title}
@@ -227,16 +279,12 @@ defmodule FullCircleWeb.NoteLive.Form do
       <div class="mt-3 grid gap-2">
         <.live_component
           module={RecordPickerComponent}
-          id="subject-picker"
-          label={gettext("Set what this note is about")}
-          current_company={@current_company}
-          current_user={@current_user}
-        />
-        <.live_component
-          :if={@live_action == :new}
-          module={RecordPickerComponent}
-          id="links-picker"
-          label={gettext("Link other records")}
+          id="record-picker"
+          label={
+            if @subject,
+              do: gettext("Link other records"),
+              else: gettext("Set what this note is about")
+          }
           current_company={@current_company}
           current_user={@current_user}
         />

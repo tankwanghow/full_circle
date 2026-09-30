@@ -2373,3 +2373,9 @@ msgstr "无法读取文件。"
 #, elixir-autogen, elixir-format
 msgid "Upload failed."
 msgstr "上传失败。"
+
+msgid "Clear"
+msgstr "清除"
+
+msgid "Note saved, but some links could not be added."
+msgstr "备注已保存，但部分链接无法添加。"

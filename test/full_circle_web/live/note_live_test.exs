@@ -47,6 +47,66 @@ defmodule FullCircleWeb.NoteLiveTest do
   end
 
   describe "form" do
+    defp pick(lv, type, terms, id) do
+      lv |> form("#record-picker form", %{"type" => type, "terms" => terms}) |> render_change()
+      lv |> element("#record-picker-pick-#{id}") |> render_click()
+      # The pick reaches the form via send/2; read the page after it lands.
+      render(lv)
+    end
+
+    test "one picker: first pick sets the subject, later picks add links",
+         %{conn: conn, admin: admin, comp: comp} do
+      ali = contact_fixture(comp, admin, %{"name" => "Ali Welding"})
+      mei = contact_fixture(comp, admin, %{"name" => "Kedai Mei"})
+      {:ok, lv, html} = live(conn, ~p"/companies/#{comp.id}/notes/new")
+      assert html =~ "Set what this note is about"
+
+      html = pick(lv, "Contact", "Ali", ali.id)
+      assert html =~ "Link other records"
+      refute html =~ "Set what this note is about"
+
+      pick(lv, "Contact", "Mei", mei.id)
+      # Picking the subject again does not also make it a link.
+      pick(lv, "Contact", "Ali", ali.id)
+
+      lv |> form("#note-form", %{"note" => %{"body" => "welded the gate"}}) |> render_submit()
+
+      [note] = FullCircle.Repo.all(FullCircle.Notes.Note)
+      assert note.subject_id == ali.id
+      assert [%{id: id}] = FullCircle.Notes.list_links(note, comp, admin)
+      assert id == mei.id
+    end
+
+    test "clearing the subject turns the picker back into the subject picker",
+         %{conn: conn, admin: admin, comp: comp} do
+      ali = contact_fixture(comp, admin, %{"name" => "Ali Welding"})
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/notes/new")
+      pick(lv, "Contact", "Ali", ali.id)
+      html = lv |> element("#clear-subject") |> render_click()
+      assert html =~ "Set what this note is about"
+    end
+
+    test "editing a note with a subject adds picked records as links on save",
+         %{conn: conn, admin: admin, comp: comp} do
+      ali = contact_fixture(comp, admin, %{"name" => "Ali Welding"})
+      mei = contact_fixture(comp, admin, %{"name" => "Kedai Mei"})
+
+      note =
+        note_fixture(comp, admin, %{
+          "body" => "b",
+          "subject_type" => "Contact",
+          "subject_id" => ali.id
+        })
+
+      {:ok, lv, html} = live(conn, ~p"/companies/#{comp.id}/notes/#{note.id}/edit")
+      assert html =~ "Link other records"
+      pick(lv, "Contact", "Mei", mei.id)
+      lv |> form("#note-form", %{"note" => %{"body" => "b2"}}) |> render_submit()
+
+      assert [%{id: id}] = FullCircle.Notes.list_links(note, comp, admin)
+      assert id == mei.id
+    end
+
     test "creates a note about a contact with restricted visibility", %{
       conn: conn,
       admin: admin,
