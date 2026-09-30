@@ -302,8 +302,11 @@ defmodule FullCircleWeb.NoteLive.Form do
   defp link_title(%{target: {:error, :restricted}}), do: gettext("Restricted record")
   defp link_title(%{type: type}), do: "(#{gettext("deleted")} #{type_label(type)})"
 
-  defp link_url(%{target: {:ok, t}}), do: t.url
-  defp link_url(_), do: nil
+  # Records open in a new tab (FullCircle's doc_link convention): their pages
+  # have no "back to where I came from", so the note stays open behind them.
+  defp link_url(%{target: {:ok, t}}, _company), do: t.url
+  defp link_url(%{target: _}, _company), do: nil
+  defp link_url(%{type: type, id: id}, company), do: Linkable.url(type, id, company)
 
   @impl true
   def render(assigns) do
@@ -380,7 +383,13 @@ defmodule FullCircleWeb.NoteLive.Form do
                 :if={@subject}
                 class="rounded-full border border-amber-400 bg-amber-100 px-2 text-xs text-amber-900 dark:border-amber-600 dark:bg-amber-900 dark:text-amber-100"
               >
-                {type_label(@subject.type)} · {@subject.title}
+                <a
+                  href={Linkable.url(@subject.type, @subject.id, @current_company)}
+                  target="_blank"
+                  class="hover:underline"
+                >
+                  {type_label(@subject.type)} · {@subject.title}
+                </a>
                 <button
                   :if={@can_edit}
                   type="button"
@@ -395,10 +404,17 @@ defmodule FullCircleWeb.NoteLive.Form do
                 :for={l <- @links}
                 class="rounded-full border border-sky-400 bg-sky-100 px-2 text-xs text-sky-900 dark:border-sky-600 dark:bg-sky-900 dark:text-sky-100"
               >
-                <.link :if={link_url(l)} navigate={link_url(l)} class="hover:underline">
+                <a
+                  :if={link_url(l, @current_company)}
+                  href={link_url(l, @current_company)}
+                  target="_blank"
+                  class="hover:underline"
+                >
                   {type_label(l.type)} · {link_title(l)}
-                </.link>
-                <span :if={!link_url(l)}>{type_label(l.type)} · {link_title(l)}</span>
+                </a>
+                <span :if={!link_url(l, @current_company)}>
+                  {type_label(l.type)} · {link_title(l)}
+                </span>
                 <button
                   :if={@can_edit and @live_action == :edit}
                   type="button"

@@ -36,6 +36,30 @@ defmodule FullCircleWeb.NoteLiveTest do
       refute html =~ "manager only"
     end
 
+    test "feed chips open records in a new tab; the post opens in the same tab",
+         %{conn: conn, admin: admin, comp: comp} do
+      c = contact_fixture(comp, admin, %{"name" => "Ah Seng"})
+
+      note =
+        note_fixture(comp, admin, %{
+          "body" => "visit",
+          "subject_type" => "Contact",
+          "subject_id" => c.id
+        })
+
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/notes")
+
+      assert has_element?(
+               lv,
+               ~s(#notes-#{note.id} a[target="_blank"][href="/companies/#{comp.id}/contacts/#{c.id}/edit"])
+             )
+
+      refute has_element?(
+               lv,
+               ~s(#notes-#{note.id} a[target="_blank"][href="/companies/#{comp.id}/notes/#{note.id}/edit"])
+             )
+    end
+
     test "a title shows in bold above the text", %{conn: conn, admin: admin, comp: comp} do
       note = note_fixture(comp, admin, %{"title" => "Year-end stock count", "body" => "Steps..."})
       {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/notes")
@@ -282,6 +306,27 @@ defmodule FullCircleWeb.NoteLiveTest do
       |> render_change()
 
       assert has_element?(lv, "label.role-chip[data-selected]", "clerk")
+    end
+
+    test "the About and link chips open their records in a new tab",
+         %{conn: conn, admin: admin, comp: comp} do
+      ali = contact_fixture(comp, admin, %{"name" => "Ali Welding"})
+      mei = contact_fixture(comp, admin, %{"name" => "Kedai Mei"})
+
+      note =
+        note_fixture(comp, admin, %{
+          "body" => "b",
+          "subject_type" => "Contact",
+          "subject_id" => ali.id,
+          "links" => [%{"type" => "Contact", "id" => mei.id}]
+        })
+
+      {:ok, lv, _} = live(conn, edit_path(comp, note))
+
+      for c <- [ali, mei] do
+        href = "/companies/#{comp.id}/contacts/#{c.id}/edit"
+        assert has_element?(lv, ~s(a[target="_blank"][href="#{href}"]))
+      end
     end
 
     test "the Everyone chip clears the role list", %{conn: conn, admin: admin, comp: comp} do

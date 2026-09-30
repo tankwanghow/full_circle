@@ -81,12 +81,15 @@ defmodule FullCircleWeb.NoteComponents do
         <span :if={@relation == :linked} class="rounded border px-1">↩ {gettext("linked")}</span>
         <span>{@note.author && @note.author.email}</span>
         <span>· {FullCircleWeb.Helpers.format_datetime(@note.inserted_at, @current_company)}</span>
-        <.link
-          navigate={"/companies/#{@current_company.id}/notes/#{@note.id}/edit"}
+        <%!-- Cards live in the notes panel on record pages: open the note in a
+             new tab so the record stays where it was. --%>
+        <a
+          href={"/companies/#{@current_company.id}/notes/#{@note.id}/edit"}
+          target="_blank"
           class="ml-auto text-blue-600 hover:font-bold dark:text-blue-400"
         >
           {gettext("Open")}
-        </.link>
+        </a>
       </div>
       <div :if={@note.title} class="font-semibold">{@note.title}</div>
       <div class="whitespace-pre-wrap">{@note.body}</div>
@@ -378,7 +381,8 @@ defmodule FullCircleWeb.NoteComponents do
         <% {:ok, %{url: nil} = t} -> %>
           {type_label(@type)} · {t.title}
         <% {:ok, t} -> %>
-          <.link navigate={t.url} class="hover:underline">{type_label(@type)} · {t.title}</.link>
+          <%!-- New tab, like doc_link: record pages have no way back to the note. --%>
+          <a href={t.url} target="_blank" class="hover:underline">{type_label(@type)} · {t.title}</a>
         <% {:error, :restricted} -> %>
           {gettext("Restricted record")}
         <% _ -> %>

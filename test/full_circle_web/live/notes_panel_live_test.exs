@@ -52,6 +52,23 @@ defmodule FullCircleWeb.NotesPanelLiveTest do
     assert {note.subject_type, note.subject_id} == {"Contact", c.id}
   end
 
+  test "a note opened from a record's panel opens in a new tab",
+       %{conn: conn, admin: admin, comp: comp, contact: c} do
+    note =
+      note_fixture(comp, admin, %{
+        "body" => "x",
+        "subject_type" => "Contact",
+        "subject_id" => c.id
+      })
+
+    {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/contacts/#{c.id}/edit")
+
+    assert has_element?(
+             lv,
+             ~s(#notes-panel a[target="_blank"][href="/companies/#{comp.id}/notes/#{note.id}/edit"])
+           )
+  end
+
   test "panel hidden on the new-contact page", %{conn: conn, comp: comp} do
     {:ok, _lv, html} = live(conn, ~p"/companies/#{comp.id}/contacts/new")
     refute html =~ "notes-panel"
