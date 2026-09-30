@@ -144,6 +144,44 @@ defmodule FullCircleWeb.NoteComponents do
     """
   end
 
+  attr :role, :string, required: true
+  attr :selected, :boolean, required: true
+  attr :disabled, :boolean, default: false
+
+  @doc """
+  A tappable role chip wrapping a hidden `note[visibility][]` checkbox.
+
+  The selected look is chosen here, from `selected`, not with Tailwind's
+  `has-checked:` variants: the dark theme's global remaps in app.css
+  (`.dark .bg-white`, `.dark .border-gray-300`, …) are unlayered CSS and beat
+  every layered utility, so a `dark:has-checked:` style never shows. The page
+  re-renders on each tick (phx-change), so the server always knows.
+  """
+  def role_chip(assigns) do
+    ~H"""
+    <label
+      class={[
+        "role-chip cursor-pointer rounded-full border px-2 text-xs",
+        if(@selected,
+          do: "border-blue-600 bg-blue-600 font-semibold text-white",
+          else: "border-gray-400 text-gray-700 dark:text-gray-300"
+        )
+      ]}
+      data-selected={@selected}
+    >
+      <input
+        type="checkbox"
+        class="sr-only"
+        name="note[visibility][]"
+        value={@role}
+        checked={@selected}
+        disabled={@disabled}
+      />
+      {@role}
+    </label>
+    """
+  end
+
   attr :att, :map, required: true
   attr :class, :any, default: nil
   attr :show_name, :boolean, default: false

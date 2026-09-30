@@ -225,24 +225,11 @@ defmodule FullCircleWeb.NoteLive.Index do
 
             <div :if={@compose_roles} class="flex flex-wrap gap-1 pb-2">
               <input type="hidden" name="note[visibility][]" value="" />
-              <label
+              <.role_chip
                 :for={role <- Note.visibility_roles()}
-                class={[
-                  "cursor-pointer rounded-full border px-2 text-xs",
-                  "border-gray-300 text-gray-600 dark:border-gray-600 dark:text-gray-300",
-                  "has-checked:border-blue-400 has-checked:bg-blue-100 has-checked:text-blue-800",
-                  "dark:has-checked:border-blue-500 dark:has-checked:bg-blue-900 dark:has-checked:text-blue-100"
-                ]}
-              >
-                <input
-                  type="checkbox"
-                  class="sr-only"
-                  name="note[visibility][]"
-                  value={role}
-                  checked={role in compose_roles(@compose_form)}
-                />
-                {role}
-              </label>
+                role={role}
+                selected={role in compose_roles(@compose_form)}
+              />
             </div>
             <%!-- keep the chosen roles when the chips are folded away --%>
             <div :if={!@compose_roles}>

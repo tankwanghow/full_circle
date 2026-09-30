@@ -267,6 +267,23 @@ defmodule FullCircleWeb.NoteLiveTest do
       assert note.visibility == ["manager"]
     end
 
+    test "ticked roles are marked selected by the server, not only by CSS",
+         %{conn: conn, admin: admin, comp: comp} do
+      # The dark theme's unlayered remaps (.dark .bg-white, .dark .border-gray-300)
+      # beat Tailwind's has-checked: variants, so the selected look must come from
+      # the server-rendered class.
+      note = note_fixture(comp, admin, %{"body" => "b", "visibility" => ["manager"]})
+      {:ok, lv, _} = live(conn, edit_path(comp, note))
+      assert has_element?(lv, "label.role-chip[data-selected]", "manager")
+      refute has_element?(lv, "label.role-chip[data-selected]", "clerk")
+
+      lv
+      |> form("#note-form", %{"note" => %{"visibility" => ["manager", "clerk"]}})
+      |> render_change()
+
+      assert has_element?(lv, "label.role-chip[data-selected]", "clerk")
+    end
+
     test "the Everyone chip clears the role list", %{conn: conn, admin: admin, comp: comp} do
       note = note_fixture(comp, admin, %{"body" => "b", "visibility" => ["manager"]})
       {:ok, lv, _} = live(conn, edit_path(comp, note))

@@ -361,25 +361,12 @@ defmodule FullCircleWeb.NoteLive.Form do
                 {if selected_roles(@form) == [], do: "● ", else: ""}{gettext("Everyone")}
               </button>
               <input type="hidden" name="note[visibility][]" value="" />
-              <label
+              <.role_chip
                 :for={role <- Note.visibility_roles()}
-                class={[
-                  "cursor-pointer rounded-full border px-2 text-xs",
-                  "border-gray-300 bg-white text-gray-600 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300",
-                  "has-checked:border-blue-400 has-checked:bg-blue-100 has-checked:text-blue-800",
-                  "dark:has-checked:border-blue-500 dark:has-checked:bg-blue-900 dark:has-checked:text-blue-100"
-                ]}
-              >
-                <input
-                  type="checkbox"
-                  class="sr-only"
-                  name="note[visibility][]"
-                  value={role}
-                  checked={role in selected_roles(@form)}
-                  disabled={!@can_edit}
-                />
-                {role}
-              </label>
+                role={role}
+                selected={role in selected_roles(@form)}
+                disabled={!@can_edit}
+              />
             </div>
             <.error :for={msg <- Enum.map(@form[:visibility].errors, &translate_error/1)}>
               {msg}
