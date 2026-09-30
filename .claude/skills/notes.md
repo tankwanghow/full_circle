@@ -86,6 +86,14 @@ bytes. **Removal hides the file from the note and from download**
 (`get_readable/3` filters `removed_at`) but keeps it on disk — a removed file is
 usually the wrong upload, so an old link must not keep serving it.
 
+**Templates never build file addresses or read `content_type`.** Get the
+address from `Attachments.url(att, :original | :thumb)` and choose how to show
+a file by `Attachments.kind(att)` (`:image | :pdf | :other`), normally via the
+`file_thumb/1` component. `:thumb` serves the original until real renditions
+exist — that function, `kind/1` and `file_thumb/1` are where generated
+thumbnails, video posters and audio slot in. The feed shows the first 4 files
+of any kind (PDFs as tiles) then "+n more"; the note page shows every file.
+
 `note_attach.js`:
 - Re-encodes only photo formats to JPEG; PNG/WebP/GIF keep transparency.
 - Announces a finished upload by dispatching `note-attach:done` to the element
