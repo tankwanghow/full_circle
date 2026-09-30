@@ -37,25 +37,32 @@ defmodule FullCircleWeb.NoteAttachmentController do
   def create(conn, _params),
     do: conn |> put_status(422) |> json(%{error: gettext("No file received.")})
 
-  def show(conn, %{"id" => id}) do
-    case Attachments.get_readable(id, conn.assigns.current_company, conn.assigns.current_user) do
-      nil ->
-        send_resp(conn, 404, "not found")
+  def show(conn, %{"id" => id} = params) do
+    att = Attachments.get_readable(id, conn.assigns.current_company, conn.assigns.current_user)
 
-      att ->
-        abs = Attachments.abs_path(att)
+    file =
+      cond do
+        is_nil(att) -> nil
+        params["variant"] == "thumb" -> Attachments.thumb_file(att)
+        true -> {:ok, Attachments.abs_path(att), att.content_type}
+      end
 
-        if File.exists?(abs) do
+    case file do
+      {:ok, path, type} ->
+        if File.exists?(path) do
           conn
-          |> put_resp_content_type(att.content_type, nil)
+          |> put_resp_content_type(type, nil)
           |> put_resp_header(
             "content-disposition",
             ~s(inline; filename="#{safe_name(att.file_name)}")
           )
-          |> send_file(200, abs)
+          |> send_file(200, path)
         else
           send_resp(conn, 404, "not found")
         end
+
+      _ ->
+        send_resp(conn, 404, "not found")
     end
   end
 

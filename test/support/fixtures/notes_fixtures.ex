@@ -11,6 +11,20 @@ defmodule FullCircle.NotesFixtures do
   # that moves or deletes one never breaks another.
   def jpeg_file, do: tmp_file(".jpg", <<0xFF, 0xD8, 0xFF, 0xE0>> <> :binary.copy(<<0>>, 64))
   def pdf_file, do: tmp_file(".pdf", "%PDF-1.4\n" <> :binary.copy("x", 64))
+
+  # A one-page PDF poppler can actually render (pdf_file/0 only passes the
+  # magic-byte sniff).
+  def real_pdf_file do
+    tmp_file(".pdf", """
+    %PDF-1.4
+    1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj
+    2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj
+    3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]>>endobj
+    trailer<</Root 1 0 R>>
+    %%EOF
+    """)
+  end
+
   def text_file, do: tmp_file(".jpg", "this is not an image at all")
 
   def big_file(bytes),

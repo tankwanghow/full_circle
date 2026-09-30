@@ -21,14 +21,83 @@ defmodule FullCircle.Notes.Attachments do
 
   @doc """
   Where a page links or points an `<img>` for this file. Templates must go
-  through this rather than building the path, so that generated renditions
-  (small thumbnails now, video posters later) change only here.
+  through this rather than building the path, so that renditions change only
+  here.
 
-  `:thumb` has no generated rendition yet and serves the original; the
-  original is already downscaled on upload for photos.
+  `:thumb` is a PDF's rendered first page (`thumb_file/1`); for images it is
+  the original, which is already downscaled on upload.
   """
-  def url(%NoteAttachment{} = att, variant \\ :original) when variant in [:original, :thumb],
+  def url(att, variant \\ :original)
+
+  def url(%NoteAttachment{} = att, :original),
     do: "/companies/#{att.company_id}/note_attachments/#{att.id}"
+
+  def url(%NoteAttachment{} = att, :thumb) do
+    case kind(att) do
+      :pdf -> url(att, :original) <> "?variant=thumb"
+      _ -> url(att, :original)
+    end
+  end
+
+  @thumb_px 480
+  @render_timeout_s "10"
+
+  @doc """
+  The file to serve for `url(att, :thumb)`: `{:ok, abs_path, content_type}`.
+
+  A PDF's first page is rendered by `pdftoppm` (poppler-utils, in the prod
+  image) the first time it is asked for, and cached next to the file as
+  `<file>.thumb.jpg`. Rendering is killed after #{@render_timeout_s}s, writes
+  to a temp name and renames, so a hostile PDF cannot hang a request and two
+  first views cannot clash. A PDF that will not render (encrypted, corrupt,
+  no pdftoppm) gives `{:error, :no_preview}` and is remembered, so it is not
+  retried on every feed load; the page then shows the plain PDF tile.
+  """
+  def thumb_file(%NoteAttachment{} = att) do
+    case kind(att) do
+      :image -> {:ok, abs_path(att), att.content_type}
+      :pdf -> pdf_thumb(att)
+      :other -> {:error, :no_preview}
+    end
+  end
+
+  defp pdf_thumb(att) do
+    dest = abs_path(att) <> ".thumb.jpg"
+    failed = abs_path(att) <> ".thumb.failed"
+
+    cond do
+      File.exists?(dest) -> {:ok, dest, "image/jpeg"}
+      File.exists?(failed) -> {:error, :no_preview}
+      true -> render_pdf(abs_path(att), dest, failed)
+    end
+  end
+
+  defp render_pdf(src, dest, failed) do
+    tmp_base = "#{dest}.tmp#{System.unique_integer([:positive])}"
+
+    args =
+      [@render_timeout_s, "pdftoppm", "-f", "1", "-l", "1", "-singlefile", "-jpeg"] ++
+        ["-scale-to", "#{@thumb_px}", src, tmp_base]
+
+    result =
+      try do
+        System.cmd("timeout", args, stderr_to_stdout: true)
+      rescue
+        # timeout/pdftoppm not installed
+        e in ErlangError -> {Exception.message(e), :not_run}
+      end
+
+    with {_out, 0} <- result,
+         :ok <- File.rename(tmp_base <> ".jpg", dest) do
+      {:ok, dest, "image/jpeg"}
+    else
+      other ->
+        File.rm(tmp_base <> ".jpg")
+        Logger.warning("note PDF preview failed for #{src}: #{inspect(other)}")
+        File.write(failed, "")
+        {:error, :no_preview}
+    end
+  end
 
   @doc """
   What kind of file this is, from its sniffed content type. Pages choose how

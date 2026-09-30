@@ -91,4 +91,54 @@ defmodule FullCircleWeb.NoteAttachmentControllerTest do
     conn = conn |> log_in_user(clerk) |> get(~p"/companies/#{comp.id}/note_attachments/#{att.id}")
     assert response(conn, 404)
   end
+
+  @tag :pdftoppm
+  test "?variant=thumb serves a PDF's first page as a JPEG", %{
+    conn: conn,
+    admin: admin,
+    comp: comp,
+    note: note
+  } do
+    {:ok, att} =
+      Attachments.attach(note, %{path: real_pdf_file(), file_name: "c.pdf"}, comp, admin)
+
+    conn =
+      conn
+      |> log_in_user(admin)
+      |> get(~p"/companies/#{comp.id}/note_attachments/#{att.id}?variant=thumb")
+
+    assert response(conn, 200)
+    assert get_resp_header(conn, "content-type") |> hd() =~ "image/jpeg"
+  end
+
+  @tag :pdftoppm
+  test "a PDF with no preview gives 404 for the thumb, the file itself still downloads",
+       %{conn: conn, admin: admin, comp: comp, note: note} do
+    {:ok, att} = Attachments.attach(note, %{path: pdf_file(), file_name: "bad.pdf"}, comp, admin)
+    conn = log_in_user(conn, admin)
+
+    assert response(
+             get(conn, ~p"/companies/#{comp.id}/note_attachments/#{att.id}?variant=thumb"),
+             404
+           )
+
+    assert response(get(conn, ~p"/companies/#{comp.id}/note_attachments/#{att.id}"), 200)
+  end
+
+  test "a thumb of a restricted note's file is 404 for an outsider", %{
+    conn: conn,
+    admin: admin,
+    comp: comp
+  } do
+    hidden = note_fixture(comp, admin, %{"visibility" => ["manager"]})
+    {:ok, att} = Attachments.attach(hidden, %{path: pdf_file(), file_name: "c.pdf"}, comp, admin)
+    clerk = user_with_role(comp, admin, "clerk")
+
+    conn =
+      build_conn()
+      |> log_in_user(clerk)
+      |> get(~p"/companies/#{comp.id}/note_attachments/#{att.id}?variant=thumb")
+
+    assert response(conn, 404)
+  end
 end

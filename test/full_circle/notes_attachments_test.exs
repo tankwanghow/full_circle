@@ -127,11 +127,71 @@ defmodule FullCircle.NotesAttachmentsTest do
       assert Attachments.url(att, :thumb) == original
     end
 
+    test "a PDF's thumb points at its rendered preview", ctx do
+      {:ok, att} =
+        Attachments.attach(
+          ctx.note,
+          %{path: pdf_file(), file_name: "c.pdf"},
+          ctx.company,
+          ctx.admin
+        )
+
+      assert Attachments.url(att, :thumb) ==
+               "/companies/#{ctx.company.id}/note_attachments/#{att.id}?variant=thumb"
+    end
+
     test "kind comes from the sniffed content type" do
       assert Attachments.kind(%NoteAttachment{content_type: "image/jpeg"}) == :image
       assert Attachments.kind(%NoteAttachment{content_type: "image/webp"}) == :image
       assert Attachments.kind(%NoteAttachment{content_type: "application/pdf"}) == :pdf
       assert Attachments.kind(%NoteAttachment{content_type: "application/zip"}) == :other
+    end
+  end
+
+  describe "thumb_file/1" do
+    @describetag :pdftoppm
+
+    test "renders a PDF's first page to a JPEG once, then serves the cached copy", ctx do
+      {:ok, att} =
+        Attachments.attach(
+          ctx.note,
+          %{path: real_pdf_file(), file_name: "c.pdf"},
+          ctx.company,
+          ctx.admin
+        )
+
+      assert {:ok, path, "image/jpeg"} = Attachments.thumb_file(att)
+      assert <<0xFF, 0xD8, 0xFF, _::binary>> = File.read!(path)
+      assert path != Attachments.abs_path(att)
+
+      %{mtime: first} = File.stat!(path)
+      assert {:ok, ^path, "image/jpeg"} = Attachments.thumb_file(att)
+      assert File.stat!(path).mtime == first
+    end
+
+    test "a PDF that cannot be rendered is an error, not a crash", ctx do
+      {:ok, att} =
+        Attachments.attach(
+          ctx.note,
+          %{path: pdf_file(), file_name: "bad.pdf"},
+          ctx.company,
+          ctx.admin
+        )
+
+      assert {:error, :no_preview} = Attachments.thumb_file(att)
+    end
+
+    test "an image's thumb is the image itself", ctx do
+      {:ok, att} =
+        Attachments.attach(
+          ctx.note,
+          %{path: jpeg_file(), file_name: "a.jpg"},
+          ctx.company,
+          ctx.admin
+        )
+
+      path = Attachments.abs_path(att)
+      assert {:ok, ^path, "image/jpeg"} = Attachments.thumb_file(att)
     end
   end
 end

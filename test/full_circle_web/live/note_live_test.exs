@@ -376,7 +376,9 @@ defmodule FullCircleWeb.NoteLiveTest do
       {:ok, _lv, html} = live(conn, edit_path(comp, note))
       doc = LazyHTML.from_document(html)
       assert doc |> LazyHTML.query(".att-tile") |> Enum.count() == 5
-      assert doc |> LazyHTML.query(".att-tile img") |> Enum.count() == 3
+      # Images preview themselves; PDFs preview their rendered first page.
+      assert doc |> LazyHTML.query(".att-tile img") |> Enum.count() == 5
+      assert doc |> LazyHTML.query(~s(.att-tile img[src$="?variant=thumb"])) |> Enum.count() == 2
     end
 
     test "delete returns to the index", %{conn: conn, admin: admin, comp: comp} do

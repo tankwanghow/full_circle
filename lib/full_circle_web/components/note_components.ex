@@ -168,12 +168,28 @@ defmodule FullCircleWeb.NoteComponents do
     <span
       :if={@kind != :image}
       class={[
-        "flex flex-col items-center justify-center gap-1 bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-200",
+        "relative flex flex-col items-center justify-center gap-1 overflow-hidden bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-200",
         @class
       ]}
     >
       <span class="text-[10px] font-bold">{if @kind == :pdf, do: "PDF", else: gettext("FILE")}</span>
       <span :if={@show_name} class="max-w-full truncate px-2 text-xs text-gray-700 dark:text-gray-200">
+        {@att.file_name}
+      </span>
+      <%!-- The rendered first page covers the badge; if it cannot be rendered the
+           image removes itself and the badge shows through. --%>
+      <img
+        :if={@kind == :pdf}
+        src={Attachments.url(@att, :thumb)}
+        alt=""
+        loading="lazy"
+        onerror="this.remove()"
+        class="absolute inset-0 h-full w-full bg-white object-cover object-top"
+      />
+      <span
+        :if={@kind == :pdf and @show_name}
+        class="absolute inset-x-0 bottom-0 truncate bg-black/55 px-2 py-0.5 text-xs text-white"
+      >
         {@att.file_name}
       </span>
     </span>
