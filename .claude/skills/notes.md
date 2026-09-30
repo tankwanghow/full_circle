@@ -98,6 +98,32 @@ usually the wrong upload, so an old link must not keep serving it.
 `Notes.count_by_records/4` = notes about ∪ notes linking, each note once,
 visibility applied, two queries per call.
 
+## Feed (`/notes`)
+The index is an x.com-style feed (`NoteLive.Index` + `note_post/1`). Per-post
+extras — subject, links, 💬 reply count — come from
+`Notes.feed_details(notes, company, user)`: four queries for the whole page.
+Never call `list_links/3` or `count_by_records/4` per post. A freshly posted
+note goes in with `stream_insert(..., at: 0)` built from
+`feed_details([note], …)`.
+
+## Two note forms on one page
+The note page hosts its own note form *and* the notes panel; the feed has the
+post box. `to_form/1` defaults every one of them to input ids like
+`note_body`, and duplicate ids make the browser patch/focus the wrong
+textarea (LiveViewTest raises on them). So:
+- `NotesPanelComponent` builds its form with `to_form(cs, id: "#{id}_note")`.
+- The feed's post box uses `to_form(cs, id: "compose_note")`, and its
+  textarea id carries a revision counter bumped after each post so the box
+  actually clears (the browser keeps typed text on a same-id textarea).
+Any new place that renders a note form next to another must do the same.
+
+## Note page
+There is no show page: `/notes/:id` and `/notes/:id/edit` both render
+`NoteLive.Form`, read-only when `can_edit?` is false. Title/body/visibility/
+subject save with Save; files and links on a saved note apply immediately
+(links on a new note are queued until the first save). The notes panel sits
+under the note with `record_type: "Note"` for follow-up notes.
+
 ## Translations
 Do not run `mix gettext.extract --merge` for new strings: the catalogs lag the
 code and a merge marks ~200 existing translations fuzzy (disabling them).
