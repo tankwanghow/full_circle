@@ -39,7 +39,7 @@ defmodule FullCircle.Linkable do
     case spec(type) do
       {:record, %{route: route}} -> "/companies/#{company.id}/#{route}/#{id}/edit"
       {:document, %{route: route}} -> "/companies/#{company.id}/#{route}/#{id}/edit"
-      :note -> "/companies/#{company.id}/notes/#{id}"
+      :note -> "/companies/#{company.id}/notes/#{id}/edit"
       nil -> "#"
     end
   end

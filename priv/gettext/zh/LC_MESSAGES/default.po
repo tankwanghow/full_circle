@@ -2379,3 +2379,33 @@ msgstr "清除"
 
 msgid "Note saved, but some links could not be added."
 msgstr "备注已保存，但部分链接无法添加。"
+
+msgid "You cannot create notes."
+msgstr "您不能创建备注。"
+
+msgid "Admin and the writer can always read it."
+msgstr "管理员和作者始终可以查看。"
+
+msgid "About & links"
+msgstr "关于与链接"
+
+msgid "link a record"
+msgstr "链接记录"
+
+msgid "what is it about?"
+msgstr "关于什么？"
+
+msgid "Files"
+msgstr "文件"
+
+msgid "Save the note first, then attach files."
+msgstr "请先保存备注，再附加文件。"
+
+msgid "None"
+msgstr "无"
+
+msgid "Written by"
+msgstr "作者"
+
+msgid "A note cannot be about itself."
+msgstr "备注不能关于它自己。"

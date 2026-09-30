@@ -82,7 +82,7 @@ defmodule FullCircleWeb.NoteComponents do
         <span>{@note.author && @note.author.email}</span>
         <span>· {FullCircleWeb.Helpers.format_datetime(@note.inserted_at, @current_company)}</span>
         <.link
-          navigate={"/companies/#{@current_company.id}/notes/#{@note.id}"}
+          navigate={"/companies/#{@current_company.id}/notes/#{@note.id}/edit"}
           class="ml-auto text-blue-600 hover:font-bold dark:text-blue-400"
         >
           {gettext("Open")}
