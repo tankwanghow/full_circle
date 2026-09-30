@@ -70,7 +70,11 @@ noting journals and cashiers noting credit/debit notes and return cheques.
 1. Entry in `@records` (table with `company_id` + title column) or add it to
    `CommandPalette.Types.type_specs` if it is a posted document.
 2. `type_label/1` clause in `NoteComponents` (gettext).
-3. Panel snippet after `</.form>` in its edit LiveView (`:edit` guard).
+3. Panel `live_component` placed **after the record's card** (the outer
+   `<div class="w-N/12 mx-auto border rounded-lg …">`), not inside it, with
+   `class="w-N/12"` matching the card and the `:edit and @id != "new"` guard.
+   The panel caps itself at `max-w-2xl`, so a wide card (invoices, w-11/12)
+   doesn't stretch the notes across the screen.
 4. Index: alias + `NotesIndex.init(type, RowComponent, key: …, stream: …)` in
    mount (`key`/`stream` default to `:id`/`:objects`), `NotesIndex.count/3`
    before `stream(`, `note_count=` on the row component, `<NotesIndex.modal>`.
@@ -129,6 +133,19 @@ of any kind (PDFs as tiles) then "+n more"; the note page shows every file.
 ## Counts
 `Notes.count_by_records/4` = notes about ∪ notes linking, each note once,
 visibility applied, two queries per call.
+
+## One post component: `note_post/1`
+The feed and every notes panel render the same `note_post/1`, so a note
+looks the same everywhere. Options:
+- `host: {type, id}` — the record whose page shows the post; chips pointing
+  at it are dropped (they would only link back to the page you are on).
+- `relation: :linked` — adds the "↩ linked" tag (note links here, is about
+  something else).
+- `new_tab` — body and counts open the note in a new tab (panels).
+- `compact` — one row of 16×16 thumbnails, names in the tooltip (panels);
+  without it, the feed's large X-style grid.
+- `can_attach` — shows 📎 Attach beside the counts (use `Notes.may_edit?/3`).
+Items are `%{id, note, d}` with `d` from `Notes.feed_details/3`.
 
 ## Feed (`/notes`)
 The index is an x.com-style feed (`NoteLive.Index` + `note_post/1`). Per-post
