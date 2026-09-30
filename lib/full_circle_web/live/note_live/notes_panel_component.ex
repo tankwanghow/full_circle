@@ -117,10 +117,15 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
     ~H"""
     <section
       id={@id}
-      class={[
-        "mx-auto mt-3 overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900",
-        @class
-      ]}
+      class={
+        [
+          "mx-auto mt-3 overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900",
+          @class,
+          # Posts are short text + a thumbnail row: a readable column, even under
+          # a wide invoice card (w-11/12), keeps the eye from travelling.
+          "max-w-2xl"
+        ]
+      }
     >
       <div class="flex items-center gap-2 border-b border-gray-200 px-4 py-2 dark:border-gray-700">
         <span class="font-semibold">📝 {gettext("Notes")}</span>

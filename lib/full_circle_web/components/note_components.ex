@@ -466,7 +466,7 @@ defmodule FullCircleWeb.NoteComponents do
             <span title={gettext("Files")}>📎
             <span class="note-files">{length(@note.attachments)}</span></span>
           </.post_link>
-          <span :if={@can_attach} class="ml-auto">
+          <span :if={@can_attach}>
             <.attach_button note_id={@note.id} current_company={@current_company} />
           </span>
         </div>
