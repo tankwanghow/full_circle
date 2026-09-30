@@ -19,6 +19,26 @@ defmodule FullCircle.Notes.Attachments do
 
   def abs_path(%NoteAttachment{path: rel}), do: Path.join(uploads_dir(), rel)
 
+  @doc """
+  Where a page links or points an `<img>` for this file. Templates must go
+  through this rather than building the path, so that generated renditions
+  (small thumbnails now, video posters later) change only here.
+
+  `:thumb` has no generated rendition yet and serves the original; the
+  original is already downscaled on upload for photos.
+  """
+  def url(%NoteAttachment{} = att, variant \\ :original) when variant in [:original, :thumb],
+    do: "/companies/#{att.company_id}/note_attachments/#{att.id}"
+
+  @doc """
+  What kind of file this is, from its sniffed content type. Pages choose how
+  to show a file from this, not from content-type strings. `:video` and
+  `:audio` join here when those types are allowed.
+  """
+  def kind(%NoteAttachment{content_type: "image/" <> _}), do: :image
+  def kind(%NoteAttachment{content_type: "application/pdf"}), do: :pdf
+  def kind(%NoteAttachment{}), do: :other
+
   def attach(%Note{} = note, upload, company, user) do
     src = upload[:path] || upload["path"]
     file_name = upload[:file_name] || upload["file_name"] || "file"

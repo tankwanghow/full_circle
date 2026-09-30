@@ -2443,3 +2443,6 @@ msgstr "关于此备注的备注"
 msgid "1 more file"
 msgid_plural "%{count} more files"
 msgstr[0] "另外 %{count} 个文件"
+
+msgid "FILE"
+msgstr "文件"

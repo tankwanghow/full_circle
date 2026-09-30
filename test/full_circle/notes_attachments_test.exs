@@ -109,4 +109,29 @@ defmodule FullCircle.NotesAttachmentsTest do
     refute Attachments.get_readable(att.id, ctx.company, clerk)
     refute Attachments.get_readable("not-a-uuid", ctx.company, ctx.admin)
   end
+
+  describe "url/2 and kind/1" do
+    test "every variant is served by the one download route for now", ctx do
+      {:ok, att} =
+        Attachments.attach(
+          ctx.note,
+          %{path: jpeg_file(), file_name: "a.jpg"},
+          ctx.company,
+          ctx.admin
+        )
+
+      original = "/companies/#{ctx.company.id}/note_attachments/#{att.id}"
+      assert Attachments.url(att) == original
+      assert Attachments.url(att, :original) == original
+      # No generated thumbnails yet: :thumb falls back to the original file.
+      assert Attachments.url(att, :thumb) == original
+    end
+
+    test "kind comes from the sniffed content type" do
+      assert Attachments.kind(%NoteAttachment{content_type: "image/jpeg"}) == :image
+      assert Attachments.kind(%NoteAttachment{content_type: "image/webp"}) == :image
+      assert Attachments.kind(%NoteAttachment{content_type: "application/pdf"}) == :pdf
+      assert Attachments.kind(%NoteAttachment{content_type: "application/zip"}) == :other
+    end
+  end
 end

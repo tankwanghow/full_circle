@@ -109,6 +109,31 @@ defmodule FullCircleWeb.NoteLiveTest do
       assert has_element?(lv, "#notes-#{note.id} .note-files", "1")
     end
 
+    test "a post shows at most 4 file thumbnails, PDFs included, then +n more",
+         %{conn: conn, admin: admin, comp: comp} do
+      note = note_fixture(comp, admin, %{"body" => "five files"})
+
+      for {path, name} <- [
+            {jpeg_file(), "1.jpg"},
+            {pdf_file(), "2.pdf"},
+            {jpeg_file(), "3.jpg"},
+            {pdf_file(), "4.pdf"},
+            {jpeg_file(), "5.jpg"}
+          ] do
+        {:ok, _} =
+          FullCircle.Notes.Attachments.attach(note, %{path: path, file_name: name}, comp, admin)
+      end
+
+      {:ok, lv, html} = live(conn, ~p"/companies/#{comp.id}/notes")
+
+      assert html
+             |> LazyHTML.from_document()
+             |> LazyHTML.query("#notes-#{note.id} .note-thumb")
+             |> Enum.count() == 4
+
+      assert has_element?(lv, "#notes-#{note.id}", "1 more file")
+    end
+
     test "the Written by me tab shows only my notes", %{conn: conn, admin: admin, comp: comp} do
       clerk = user_with_role(comp, admin, "clerk")
       note_fixture(comp, admin, %{"body" => "mine"})
@@ -328,6 +353,30 @@ defmodule FullCircleWeb.NoteLiveTest do
         FullCircle.Repo.get_by!(FullCircle.Notes.Note, body: "confirmed with SSM search")
 
       assert {follow_up.subject_type, follow_up.subject_id} == {"Note", note.id}
+    end
+
+    test "the note page shows a thumbnail tile for every file", %{
+      conn: conn,
+      admin: admin,
+      comp: comp
+    } do
+      note = note_fixture(comp, admin, %{"body" => "five files"})
+
+      for {path, name} <- [
+            {jpeg_file(), "1.jpg"},
+            {pdf_file(), "2.pdf"},
+            {jpeg_file(), "3.jpg"},
+            {pdf_file(), "4.pdf"},
+            {jpeg_file(), "5.jpg"}
+          ] do
+        {:ok, _} =
+          FullCircle.Notes.Attachments.attach(note, %{path: path, file_name: name}, comp, admin)
+      end
+
+      {:ok, _lv, html} = live(conn, edit_path(comp, note))
+      doc = LazyHTML.from_document(html)
+      assert doc |> LazyHTML.query(".att-tile") |> Enum.count() == 5
+      assert doc |> LazyHTML.query(".att-tile img") |> Enum.count() == 3
     end
 
     test "delete returns to the index", %{conn: conn, admin: admin, comp: comp} do

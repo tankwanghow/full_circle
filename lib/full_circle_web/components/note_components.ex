@@ -4,7 +4,7 @@ defmodule FullCircleWeb.NoteComponents do
 
   import FullCircleWeb.CoreComponents, only: [icon: 1]
 
-  alias FullCircle.Notes.Note
+  alias FullCircle.Notes.{Attachments, Note}
 
   def type_label("Employee"), do: gettext("Employee")
   def type_label("Contact"), do: gettext("Contact")
@@ -113,27 +113,15 @@ defmodule FullCircleWeb.NoteComponents do
       <div
         :for={a <- @attachments}
         id={"att-#{a.id}"}
-        class="group flex items-center gap-2 rounded-lg border border-gray-200 bg-white p-2 dark:border-gray-700 dark:bg-gray-800"
+        class="att-tile group flex items-center gap-2 rounded-lg border border-gray-200 bg-white p-2 dark:border-gray-700 dark:bg-gray-800"
       >
         <a
-          href={"/companies/#{@current_company.id}/note_attachments/#{a.id}"}
+          href={Attachments.url(a)}
           target="_blank"
           class="flex min-w-0 flex-1 items-center gap-2"
           title={a.file_name}
         >
-          <img
-            :if={String.starts_with?(a.content_type, "image/")}
-            src={"/companies/#{@current_company.id}/note_attachments/#{a.id}"}
-            alt=""
-            loading="lazy"
-            class="h-10 w-10 flex-none rounded object-cover"
-          />
-          <span
-            :if={!String.starts_with?(a.content_type, "image/")}
-            class="flex h-10 w-10 flex-none items-center justify-center rounded bg-rose-100 text-[10px] font-bold text-rose-700 dark:bg-rose-900 dark:text-rose-200"
-          >
-            PDF
-          </span>
+          <.file_thumb att={a} class="h-12 w-12 flex-none rounded" />
           <span class="min-w-0">
             <span class="block truncate text-sm text-gray-800 dark:text-gray-100">{a.file_name}</span>
             <span class="block text-xs text-gray-500 dark:text-gray-400">{file_size(a.byte_size)}</span>
@@ -156,6 +144,42 @@ defmodule FullCircleWeb.NoteComponents do
     """
   end
 
+  attr :att, :map, required: true
+  attr :class, :any, default: nil
+  attr :show_name, :boolean, default: false
+
+  @doc """
+  A file's preview, sized by `class`: the image itself for images, a type
+  tile otherwise. Chooses by `Attachments.kind/1` and points at
+  `Attachments.url(att, :thumb)`, so generated thumbnails and new kinds
+  (video posters, audio) slot in here.
+  """
+  def file_thumb(assigns) do
+    assigns = assign(assigns, kind: Attachments.kind(assigns.att))
+
+    ~H"""
+    <img
+      :if={@kind == :image}
+      src={Attachments.url(@att, :thumb)}
+      alt={@att.file_name}
+      loading="lazy"
+      class={["object-cover", @class]}
+    />
+    <span
+      :if={@kind != :image}
+      class={[
+        "flex flex-col items-center justify-center gap-1 bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-200",
+        @class
+      ]}
+    >
+      <span class="text-[10px] font-bold">{if @kind == :pdf, do: "PDF", else: gettext("FILE")}</span>
+      <span :if={@show_name} class="max-w-full truncate px-2 text-xs text-gray-700 dark:text-gray-200">
+        {@att.file_name}
+      </span>
+    </span>
+    """
+  end
+
   defp file_size(nil), do: ""
   defp file_size(b) when b < 1_000, do: "#{b} B"
   defp file_size(b) when b < 1_000_000, do: "#{round(b / 1_000)} KB"
@@ -171,7 +195,7 @@ defmodule FullCircleWeb.NoteComponents do
     <div :if={@attachments != []} class="mt-1 flex flex-wrap gap-2 text-sm">
       <span :for={a <- @attachments} id={"att-#{a.id}"} class="flex items-center gap-1">
         <a
-          href={"/companies/#{@current_company.id}/note_attachments/#{a.id}"}
+          href={Attachments.url(a)}
           target="_blank"
           class="text-blue-600 hover:font-bold dark:text-blue-400"
         >
@@ -317,21 +341,15 @@ defmodule FullCircleWeb.NoteComponents do
   @doc "One note as a feed post."
   def note_post(assigns) do
     note = assigns.item.note
-
-    {images, others} =
-      Enum.split_with(note.attachments, &String.starts_with?(&1.content_type, "image/"))
-
-    shown_images = Enum.take(images, 4)
-    first_other = List.first(others)
-    hidden = length(note.attachments) - length(shown_images) - if(first_other, do: 1, else: 0)
+    # The first 4 files of any kind; PDFs are tiles in the same grid.
+    shown = Enum.take(note.attachments, 4)
 
     assigns =
       assign(assigns,
         note: note,
         d: assigns.item.d,
-        images: shown_images,
-        first_other: first_other,
-        hidden_files: hidden,
+        thumbs: shown,
+        hidden_files: length(note.attachments) - length(shown),
         path: "/companies/#{assigns.current_company.id}/notes/#{note.id}/edit"
       )
 
@@ -374,37 +392,26 @@ defmodule FullCircleWeb.NoteComponents do
         </.link>
 
         <div
-          :if={@images != []}
+          :if={@thumbs != []}
           class={[
             "mt-2 grid gap-0.5 overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700",
-            length(@images) > 1 && "grid-cols-2"
+            length(@thumbs) > 1 && "grid-cols-2"
           ]}
         >
           <a
-            :for={a <- @images}
-            href={"/companies/#{@current_company.id}/note_attachments/#{a.id}"}
+            :for={a <- @thumbs}
+            href={Attachments.url(a)}
             target="_blank"
+            title={a.file_name}
+            class="note-thumb block"
           >
-            <img
-              src={"/companies/#{@current_company.id}/note_attachments/#{a.id}"}
-              alt={a.file_name}
-              loading="lazy"
-              class={["w-full object-cover", if(length(@images) > 1, do: "h-32", else: "max-h-72")]}
+            <.file_thumb
+              att={a}
+              class={["w-full", if(length(@thumbs) > 1, do: "h-32", else: "h-56")]}
+              show_name
             />
           </a>
         </div>
-
-        <a
-          :if={@first_other}
-          href={"/companies/#{@current_company.id}/note_attachments/#{@first_other.id}"}
-          target="_blank"
-          class="mt-2 flex items-center gap-2 rounded-xl border border-gray-200 p-2 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
-        >
-          <span class="flex h-9 w-8 flex-none items-center justify-center rounded bg-rose-100 text-[9px] font-bold text-rose-700 dark:bg-rose-900 dark:text-rose-200">
-            PDF
-          </span>
-          <span class="min-w-0 truncate text-sm">{@first_other.file_name}</span>
-        </a>
         <div :if={@hidden_files > 0} class="mt-1 text-xs text-gray-500">
           + {ngettext("1 more file", "%{count} more files", @hidden_files)}
         </div>
