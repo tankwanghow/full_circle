@@ -326,8 +326,13 @@ defmodule FullCircleWeb.NoteLive.Form do
           />
 
           <div class="mt-3">
-            <div class="text-sm font-semibold">{gettext("Readable by")}</div>
-            <div class="mt-1 flex flex-wrap items-center gap-1">
+            <div class="flex flex-wrap items-center gap-1">
+              <span
+                class="mr-1 text-sm font-semibold"
+                title={gettext("Admin and the writer can always read it.")}
+              >
+                {gettext("Readable by")}
+              </span>
               <button
                 type="button"
                 id="visibility-everyone"
@@ -366,17 +371,14 @@ defmodule FullCircleWeb.NoteLive.Form do
                 {role}
               </label>
             </div>
-            <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">
-              {gettext("Admin and the writer can always read it.")}
-            </p>
             <.error :for={msg <- Enum.map(@form[:visibility].errors, &translate_error/1)}>
               {msg}
             </.error>
           </div>
 
-          <div class="mt-3">
-            <div class="text-sm font-semibold">{gettext("About & links")}</div>
-            <div class="mt-1 flex flex-wrap items-center gap-1">
+          <div class="mt-2">
+            <div class="flex flex-wrap items-center gap-1">
+              <span class="mr-1 text-sm font-semibold">{gettext("About & links")}</span>
               <span
                 :if={@subject}
                 class="rounded-full border border-amber-400 bg-amber-100 px-2 text-xs text-amber-900 dark:border-amber-600 dark:bg-amber-900 dark:text-amber-100"
@@ -394,13 +396,9 @@ defmodule FullCircleWeb.NoteLive.Form do
               </span>
               <span
                 :for={l <- @links}
-                class="rounded-full border border-gray-300 bg-white px-2 text-xs dark:border-gray-600 dark:bg-gray-800"
+                class="rounded-full border border-sky-400 bg-sky-100 px-2 text-xs text-sky-900 dark:border-sky-600 dark:bg-sky-900 dark:text-sky-100"
               >
-                <.link
-                  :if={link_url(l)}
-                  navigate={link_url(l)}
-                  class="text-blue-700 hover:underline dark:text-blue-300"
-                >
+                <.link :if={link_url(l)} navigate={link_url(l)} class="hover:underline">
                   {type_label(l.type)} · {link_title(l)}
                 </.link>
                 <span :if={!link_url(l)}>{type_label(l.type)} · {link_title(l)}</span>
