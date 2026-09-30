@@ -433,6 +433,45 @@ defmodule FullCircle.Notes do
     |> Enum.frequencies_by(fn {record_id, _} -> record_id end)
   end
 
+  @doc """
+  What the feed shows around each note in `notes` (already visible): its
+  subject, its links (each resolved for this user) and how many visible notes
+  are about or link to it (`replies`). A fixed four queries per page, however
+  many notes.
+  """
+  def feed_details([], _company, _user), do: %{}
+
+  def feed_details(notes, company, user) do
+    ids = Enum.map(notes, & &1.id)
+
+    links =
+      from(l in RecordLink,
+        where: l.company_id == ^company.id and l.from_type == "Note" and l.from_id in ^ids,
+        order_by: [asc: l.inserted_at]
+      )
+      |> Repo.all()
+
+    subjects = for n <- notes, n.subject_type, do: {n.subject_type, n.subject_id}
+
+    resolved =
+      Linkable.resolve_many(subjects ++ Enum.map(links, &{&1.to_type, &1.to_id}), company, user)
+
+    replies = count_by_records(company, user, "Note", ids)
+    links_by_note = Enum.group_by(links, & &1.from_id)
+
+    Map.new(notes, fn n ->
+      {n.id,
+       %{
+         subject: n.subject_type && resolved[{n.subject_type, n.subject_id}],
+         links:
+           for l <- Map.get(links_by_note, n.id, []) do
+             %{type: l.to_type, id: l.to_id, target: resolved[{l.to_type, l.to_id}]}
+           end,
+         replies: Map.get(replies, n.id, 0)
+       }}
+    end)
+  end
+
   def search(company, user, terms, filters, page: page, per_page: per_page) do
     words = terms |> to_string() |> String.split(~r/\s+/, trim: true)
 

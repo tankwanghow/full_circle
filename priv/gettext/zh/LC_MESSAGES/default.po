@@ -2409,3 +2409,37 @@ msgstr "作者"
 
 msgid "A note cannot be about itself."
 msgstr "备注不能关于它自己。"
+
+msgid "now"
+msgstr "刚刚"
+
+msgid "All notes"
+msgstr "全部备注"
+
+msgid "Write a note…"
+msgstr "写一条备注…"
+
+msgid "about…"
+msgstr "关于…"
+
+msgid "Post"
+msgstr "发布"
+
+msgid "What is this note about?"
+msgstr "这条备注关于什么？"
+
+msgid "Search notes"
+msgstr "搜索备注"
+
+msgid "About: anything"
+msgstr "关于：全部"
+
+msgid "Dates"
+msgstr "日期"
+
+msgid "Notes about this note"
+msgstr "关于此备注的备注"
+
+msgid "1 more file"
+msgid_plural "%{count} more files"
+msgstr[0] "另外 %{count} 个文件"

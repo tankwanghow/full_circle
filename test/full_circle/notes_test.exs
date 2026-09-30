@@ -563,4 +563,44 @@ defmodule FullCircle.NotesTest do
       end
     end
   end
+
+  describe "feed_details/3" do
+    test "subject, links and reply counts for a page of notes, visibility applied",
+         %{admin: admin, company: company} do
+      clerk = user_with_role(company, admin, "clerk")
+      c = contact_fixture(company, admin, %{"name" => "Ah Seng"})
+      inv = invoice_fixture(company, admin)
+
+      note =
+        note_fixture(company, admin, %{
+          "body" => "visit",
+          "subject_type" => "Contact",
+          "subject_id" => c.id,
+          "links" => [%{"type" => "Invoice", "id" => inv.id}]
+        })
+
+      plain = note_fixture(company, admin, %{"body" => "plain"})
+
+      note_fixture(company, admin, %{
+        "body" => "reply",
+        "subject_type" => "Note",
+        "subject_id" => note.id
+      })
+
+      note_fixture(company, admin, %{
+        "body" => "hidden reply",
+        "subject_type" => "Note",
+        "subject_id" => note.id,
+        "visibility" => ["manager"]
+      })
+
+      details = Notes.feed_details([note, plain], company, clerk)
+
+      assert %{subject: {:ok, %{title: "Ah Seng"}}, links: [link], replies: 1} = details[note.id]
+      assert {link.type, link.id} == {"Invoice", inv.id}
+      assert {:ok, _} = link.target
+      assert %{subject: nil, links: [], replies: 0} = details[plain.id]
+      assert Notes.feed_details([], company, clerk) == %{}
+    end
+  end
 end

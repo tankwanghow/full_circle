@@ -235,4 +235,188 @@ defmodule FullCircleWeb.NoteComponents do
     </button>
     """
   end
+
+  # --- feed ----------------------------------------------------------------
+
+  @avatar_colors ~w(bg-indigo-500 bg-teal-600 bg-amber-600 bg-rose-500 bg-sky-600 bg-emerald-600 bg-violet-500 bg-orange-500)
+
+  attr :email, :string, required: true
+
+  def avatar(assigns) do
+    local = assigns.email |> to_string() |> String.split("@") |> hd()
+
+    assigns =
+      assign(assigns,
+        initials:
+          local |> String.replace(~r/[^A-Za-z0-9]/, "") |> String.slice(0, 2) |> String.upcase(),
+        color: Enum.at(@avatar_colors, :erlang.phash2(assigns.email, length(@avatar_colors)))
+      )
+
+    ~H"""
+    <div class={[
+      "flex h-10 w-10 flex-none items-center justify-center rounded-full text-sm font-bold text-white",
+      @color
+    ]}>
+      {@initials}
+    </div>
+    """
+  end
+
+  @doc "X-style relative time: now, 5m, 3h, then a date in the company's timezone."
+  def ago(%DateTime{} = dt, company) do
+    secs = DateTime.diff(DateTime.utc_now(), dt)
+
+    cond do
+      secs < 60 -> gettext("now")
+      secs < 3600 -> "#{div(secs, 60)}m"
+      secs < 86_400 -> "#{div(secs, 3600)}h"
+      true -> local_date(dt, company)
+    end
+  end
+
+  defp local_date(dt, company) do
+    local = Timex.to_datetime(dt, company.timezone)
+
+    if local.year == Timex.to_datetime(DateTime.utc_now(), company.timezone).year,
+      do: Calendar.strftime(local, "%b %-d"),
+      else: Calendar.strftime(local, "%-d %b %Y")
+  end
+
+  attr :target, :any, required: true
+  attr :type, :string, required: true
+  attr :kind, :atom, default: :link, values: [:subject, :link]
+
+  @doc "An amber (subject) or sky-blue (link) chip naming a linked record."
+  def record_chip(assigns) do
+    ~H"""
+    <span class={[
+      "inline-block max-w-full truncate rounded-full border px-2 align-middle text-xs",
+      @kind == :subject &&
+        "border-amber-400 bg-amber-100 text-amber-900 dark:border-amber-600 dark:bg-amber-900 dark:text-amber-100",
+      @kind == :link &&
+        "border-sky-400 bg-sky-100 text-sky-900 dark:border-sky-600 dark:bg-sky-900 dark:text-sky-100"
+    ]}>
+      <%= case @target do %>
+        <% {:ok, %{url: nil} = t} -> %>
+          {type_label(@type)} · {t.title}
+        <% {:ok, t} -> %>
+          <.link navigate={t.url} class="hover:underline">{type_label(@type)} · {t.title}</.link>
+        <% {:error, :restricted} -> %>
+          {gettext("Restricted record")}
+        <% _ -> %>
+          ({gettext("deleted")} {type_label(@type)})
+      <% end %>
+    </span>
+    """
+  end
+
+  attr :id, :string, required: true
+  attr :item, :map, required: true, doc: "%{note: Note, d: Notes.feed_details/3 entry}"
+  attr :current_company, :map, required: true
+
+  @doc "One note as a feed post."
+  def note_post(assigns) do
+    note = assigns.item.note
+
+    {images, others} =
+      Enum.split_with(note.attachments, &String.starts_with?(&1.content_type, "image/"))
+
+    shown_images = Enum.take(images, 4)
+    first_other = List.first(others)
+    hidden = length(note.attachments) - length(shown_images) - if(first_other, do: 1, else: 0)
+
+    assigns =
+      assign(assigns,
+        note: note,
+        d: assigns.item.d,
+        images: shown_images,
+        first_other: first_other,
+        hidden_files: hidden,
+        path: "/companies/#{assigns.current_company.id}/notes/#{note.id}/edit"
+      )
+
+    ~H"""
+    <article
+      id={@id}
+      class="flex gap-3 border-b border-gray-200 px-4 py-3 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800/60"
+    >
+      <.avatar email={@note.author.email} />
+      <div class="min-w-0 flex-1">
+        <div class="flex flex-wrap items-center gap-x-1 text-sm">
+          <span class="font-bold">{@note.author.email |> String.split("@") |> hd()}</span>
+          <span
+            class="text-gray-500 dark:text-gray-400"
+            title={FullCircleWeb.Helpers.format_datetime(@note.inserted_at, @current_company)}
+          >
+            · {ago(@note.inserted_at, @current_company)}
+          </span>
+          <span
+            :if={@note.visibility}
+            class="ml-1 rounded-full border border-rose-300 bg-rose-100 px-2 text-xs text-rose-800 dark:border-rose-700 dark:bg-rose-900 dark:text-rose-100"
+          >
+            🔒 {Enum.join(@note.visibility, ", ")}
+          </span>
+        </div>
+
+        <div :if={@d.subject || @d.links != []} class="mt-0.5 flex flex-wrap gap-1">
+          <.record_chip
+            :if={@d.subject}
+            target={@d.subject}
+            type={@note.subject_type}
+            kind={:subject}
+          />
+          <.record_chip :for={l <- @d.links} target={l.target} type={l.type} />
+        </div>
+
+        <.link navigate={@path} class="mt-1 block">
+          <div :if={@note.title} class="note-title font-bold">{@note.title}</div>
+          <div phx-no-format class="line-clamp-8 whitespace-pre-wrap break-words">{@note.body}</div>
+        </.link>
+
+        <div
+          :if={@images != []}
+          class={[
+            "mt-2 grid gap-0.5 overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700",
+            length(@images) > 1 && "grid-cols-2"
+          ]}
+        >
+          <a
+            :for={a <- @images}
+            href={"/companies/#{@current_company.id}/note_attachments/#{a.id}"}
+            target="_blank"
+          >
+            <img
+              src={"/companies/#{@current_company.id}/note_attachments/#{a.id}"}
+              alt={a.file_name}
+              loading="lazy"
+              class={["w-full object-cover", if(length(@images) > 1, do: "h-32", else: "max-h-72")]}
+            />
+          </a>
+        </div>
+
+        <a
+          :if={@first_other}
+          href={"/companies/#{@current_company.id}/note_attachments/#{@first_other.id}"}
+          target="_blank"
+          class="mt-2 flex items-center gap-2 rounded-xl border border-gray-200 p-2 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
+        >
+          <span class="flex h-9 w-8 flex-none items-center justify-center rounded bg-rose-100 text-[9px] font-bold text-rose-700 dark:bg-rose-900 dark:text-rose-200">
+            PDF
+          </span>
+          <span class="min-w-0 truncate text-sm">{@first_other.file_name}</span>
+        </a>
+        <div :if={@hidden_files > 0} class="mt-1 text-xs text-gray-500">
+          + {ngettext("1 more file", "%{count} more files", @hidden_files)}
+        </div>
+
+        <.link navigate={@path} class="mt-2 flex gap-8 text-sm text-gray-500 dark:text-gray-400">
+          <span title={gettext("Notes about this note")}>💬
+          <span class="note-replies">{@d.replies}</span></span>
+          <span title={gettext("Links")}>🔗 <span class="note-links">{length(@d.links)}</span></span>
+          <span title={gettext("Files")}>📎 <span class="note-files">{length(@note.attachments)}</span></span>
+        </.link>
+      </div>
+    </article>
+    """
+  end
 end

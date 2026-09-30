@@ -36,6 +36,99 @@ defmodule FullCircleWeb.NoteLiveTest do
       refute html =~ "manager only"
     end
 
+    test "a title shows in bold above the text", %{conn: conn, admin: admin, comp: comp} do
+      note = note_fixture(comp, admin, %{"title" => "Year-end stock count", "body" => "Steps..."})
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/notes")
+      assert has_element?(lv, "#notes-#{note.id} .note-title", "Year-end stock count")
+    end
+
+    test "the post box creates a note at the top of the feed", %{conn: conn, comp: comp} do
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/notes")
+
+      lv
+      |> form("#compose-form", %{"note" => %{"body" => "Gate 2 lock is broken"}})
+      |> render_submit()
+
+      [note] = FullCircle.Repo.all(FullCircle.Notes.Note)
+      assert has_element?(lv, "#notes-#{note.id}", "Gate 2 lock is broken")
+      # The box is cleared for the next note.
+      refute has_element?(lv, "#compose-form textarea", "Gate 2 lock is broken")
+    end
+
+    test "the post box can set what the note is about", %{conn: conn, admin: admin, comp: comp} do
+      c = contact_fixture(comp, admin, %{"name" => "Kedai Mei"})
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/notes")
+
+      lv |> element("#compose-about") |> render_click()
+
+      lv
+      |> form("#compose-picker form", %{"type" => "Contact", "terms" => "Mei"})
+      |> render_change()
+
+      lv |> element("#compose-picker-pick-#{c.id}") |> render_click()
+      assert render(lv) =~ "Kedai Mei"
+
+      lv
+      |> form("#compose-form", %{"note" => %{"body" => "orders every Monday"}})
+      |> render_submit()
+
+      [note] = FullCircle.Repo.all(FullCircle.Notes.Note)
+      assert {note.subject_type, note.subject_id} == {"Contact", c.id}
+    end
+
+    test "each post shows replies, links and files counts", %{
+      conn: conn,
+      admin: admin,
+      comp: comp
+    } do
+      c = contact_fixture(comp, admin)
+
+      note =
+        note_fixture(comp, admin, %{
+          "body" => "root",
+          "links" => [%{"type" => "Contact", "id" => c.id}]
+        })
+
+      note_fixture(comp, admin, %{
+        "body" => "follow-up",
+        "subject_type" => "Note",
+        "subject_id" => note.id
+      })
+
+      {:ok, _} =
+        FullCircle.Notes.Attachments.attach(
+          note,
+          %{path: jpeg_file(), file_name: "a.jpg"},
+          comp,
+          admin
+        )
+
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/notes")
+      assert has_element?(lv, "#notes-#{note.id} .note-replies", "1")
+      assert has_element?(lv, "#notes-#{note.id} .note-links", "1")
+      assert has_element?(lv, "#notes-#{note.id} .note-files", "1")
+    end
+
+    test "the Written by me tab shows only my notes", %{conn: conn, admin: admin, comp: comp} do
+      clerk = user_with_role(comp, admin, "clerk")
+      note_fixture(comp, admin, %{"body" => "mine"})
+      note_fixture(comp, clerk, %{"body" => "the clerk's"})
+
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/notes")
+      lv |> element("#tab-mine") |> render_click()
+      html = render(lv)
+      assert html =~ "mine"
+      refute html =~ "the clerk&#39;s"
+    end
+
+    test "an auditor reads the feed but gets no post box", %{admin: admin, comp: comp} do
+      note_fixture(comp, admin, %{"body" => "for everyone"})
+      auditor = user_with_role(comp, admin, "auditor")
+      {:ok, lv, html} = live(log_in_user(build_conn(), auditor), ~p"/companies/#{comp.id}/notes")
+      assert html =~ "for everyone"
+      refute has_element?(lv, "#compose-form")
+    end
+
     test "a guest is sent back to the dashboard", %{admin: admin, comp: comp} do
       guest = user_with_role(comp, admin, "guest")
 
