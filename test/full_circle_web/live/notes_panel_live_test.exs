@@ -69,6 +69,94 @@ defmodule FullCircleWeb.NotesPanelLiveTest do
            )
   end
 
+  describe "panel posts look like the feed" do
+    test "avatar-style posts with counts; the host record's own chip is not repeated",
+         %{conn: conn, admin: admin, comp: comp, contact: c} do
+      inv = invoice_fixture(comp, admin)
+
+      note =
+        note_fixture(comp, admin, %{
+          "body" => "pays late",
+          "subject_type" => "Contact",
+          "subject_id" => c.id,
+          "links" => [%{"type" => "Invoice", "id" => inv.id}]
+        })
+
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/contacts/#{c.id}/edit")
+      post = "#notes-panel article#notes-panel-note-#{note.id}"
+      assert has_element?(lv, post <> " .note-replies")
+      # The invoice chip shows; the chip naming this very contact does not.
+      assert has_element?(lv, post <> ~s( a[href="/companies/#{comp.id}/Invoice/#{inv.id}/edit"]))
+      refute has_element?(lv, post <> ~s( a[href="/companies/#{comp.id}/contacts/#{c.id}/edit"]))
+    end
+
+    test "a note that only links here is tagged linked", %{
+      conn: conn,
+      admin: admin,
+      comp: comp,
+      contact: c
+    } do
+      note =
+        note_fixture(comp, admin, %{
+          "body" => "met at expo",
+          "links" => [%{"type" => "Contact", "id" => c.id}]
+        })
+
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/contacts/#{c.id}/edit")
+      assert has_element?(lv, "#notes-panel-note-#{note.id} .note-linked")
+    end
+
+    test "at most 4 file thumbnails per post", %{conn: conn, admin: admin, comp: comp, contact: c} do
+      note =
+        note_fixture(comp, admin, %{
+          "body" => "files",
+          "subject_type" => "Contact",
+          "subject_id" => c.id
+        })
+
+      for i <- 1..5 do
+        {:ok, _} =
+          FullCircle.Notes.Attachments.attach(
+            note,
+            %{path: jpeg_file(), file_name: "#{i}.jpg"},
+            comp,
+            admin
+          )
+      end
+
+      {:ok, _lv, html} = live(conn, ~p"/companies/#{comp.id}/contacts/#{c.id}/edit")
+
+      assert html
+             |> LazyHTML.from_document()
+             |> LazyHTML.query("#notes-panel-note-#{note.id} .note-thumb")
+             |> Enum.count() == 4
+    end
+
+    test "Attach shows only on notes the viewer can edit", %{admin: admin, comp: comp, contact: c} do
+      clerk = user_with_role(comp, admin, "clerk")
+
+      theirs =
+        note_fixture(comp, admin, %{
+          "body" => "admin's",
+          "subject_type" => "Contact",
+          "subject_id" => c.id
+        })
+
+      mine =
+        note_fixture(comp, clerk, %{
+          "body" => "clerk's",
+          "subject_type" => "Contact",
+          "subject_id" => c.id
+        })
+
+      {:ok, lv, _} =
+        live(log_in_user(build_conn(), clerk), ~p"/companies/#{comp.id}/contacts/#{c.id}/edit")
+
+      assert has_element?(lv, "#notes-panel-note-#{mine.id} [phx-hook=NoteAttach]")
+      refute has_element?(lv, "#notes-panel-note-#{theirs.id} [phx-hook=NoteAttach]")
+    end
+  end
+
   test "panel hidden on the new-contact page", %{conn: conn, comp: comp} do
     {:ok, _lv, html} = live(conn, ~p"/companies/#{comp.id}/contacts/new")
     refute html =~ "notes-panel"

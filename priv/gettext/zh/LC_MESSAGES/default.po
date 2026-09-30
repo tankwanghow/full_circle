@@ -2452,3 +2452,6 @@ msgstr "私密"
 
 msgid "Only admins and the writer can read it."
 msgstr "仅管理员和作者可以查看。"
+
+msgid "This note links here; it is about something else."
+msgstr "此备注链接到这里，但它是关于其他记录的。"

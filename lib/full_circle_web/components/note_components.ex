@@ -21,97 +21,6 @@ defmodule FullCircleWeb.NoteComponents do
   def type_label("ReturnCheque"), do: gettext("Return Cheque")
   def type_label(other), do: other
 
-  attr :visibility, :any, required: true
-
-  def visibility_badge(%{visibility: nil} = assigns) do
-    ~H"""
-    <span class="rounded px-1 text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-      {gettext("Everyone")}
-    </span>
-    """
-  end
-
-  def visibility_badge(%{visibility: ["admin"]} = assigns) do
-    ~H"""
-    <span class="rounded px-1 text-xs bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-200">
-      🔒 {gettext("Private")}
-    </span>
-    """
-  end
-
-  def visibility_badge(assigns) do
-    ~H"""
-    <span class="rounded px-1 text-xs bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-200">
-      🔒 {Enum.join(@visibility, ", ")}
-    </span>
-    """
-  end
-
-  attr :target, :any, required: true
-  attr :type, :string, required: true
-
-  def record_link(%{target: {:ok, t}} = assigns) do
-    assigns = assign(assigns, :t, t)
-
-    ~H"""
-    <.link navigate={@t.url} class="text-blue-600 hover:font-bold dark:text-blue-400">
-      {type_label(@type)}: {@t.title}
-    </.link>
-    """
-  end
-
-  def record_link(%{target: {:error, :restricted}} = assigns) do
-    ~H"""
-    <span class="italic text-gray-500">{gettext("Restricted record")}</span>
-    """
-  end
-
-  def record_link(assigns) do
-    ~H"""
-    <span class="italic text-gray-500">({gettext("deleted")} {type_label(@type)})</span>
-    """
-  end
-
-  attr :note, Note, required: true
-  attr :relation, :atom, default: nil
-  attr :current_company, :map, required: true
-  attr :can_edit, :boolean, default: false
-  attr :target, :any, default: nil
-
-  def note_card(assigns) do
-    ~H"""
-    <div
-      id={"note-card-#{@note.id}"}
-      class="my-1 rounded border border-gray-300 bg-white p-2 text-left dark:border-gray-600 dark:bg-gray-800"
-    >
-      <div class="flex flex-wrap items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-        <.visibility_badge visibility={@note.visibility} />
-        <span :if={@relation == :linked} class="rounded border px-1">↩ {gettext("linked")}</span>
-        <span>{@note.author && @note.author.email}</span>
-        <span>· {FullCircleWeb.Helpers.format_datetime(@note.inserted_at, @current_company)}</span>
-        <%!-- Cards live in the notes panel on record pages: open the note in a
-             new tab so the record stays where it was. --%>
-        <a
-          href={"/companies/#{@current_company.id}/notes/#{@note.id}/edit"}
-          target="_blank"
-          class="ml-auto text-blue-600 hover:font-bold dark:text-blue-400"
-        >
-          {gettext("Open")}
-        </a>
-      </div>
-      <div :if={@note.title} class="font-semibold">{@note.title}</div>
-      <div class="whitespace-pre-wrap">{@note.body}</div>
-      <.attachment_list
-        attachments={@note.attachments}
-        current_company={@current_company}
-        can_edit={@can_edit}
-        target={@target}
-      />
-      <.attach_button :if={@can_edit} note_id={@note.id} current_company={@current_company} />
-    </div>
-    """
-  end
-
   attr :attachments, :list, required: true
   attr :current_company, :map, required: true
   attr :can_edit, :boolean, default: false
@@ -317,39 +226,6 @@ defmodule FullCircleWeb.NoteComponents do
   defp file_size(b) when b < 1_000_000, do: "#{round(b / 1_000)} KB"
   defp file_size(b), do: "#{Float.round(b / 1_000_000, 1)} MB"
 
-  attr :attachments, :list, required: true
-  attr :current_company, :map, required: true
-  attr :can_edit, :boolean, default: false
-  attr :target, :any, default: nil
-
-  def attachment_list(assigns) do
-    ~H"""
-    <div :if={@attachments != []} class="mt-1 flex flex-wrap gap-2 text-sm">
-      <span :for={a <- @attachments} id={"att-#{a.id}"} class="flex items-center gap-1">
-        <a
-          href={Attachments.url(a)}
-          target="_blank"
-          class="text-blue-600 hover:font-bold dark:text-blue-400"
-        >
-          📎 {a.file_name}
-        </a>
-        <button
-          :if={@can_edit}
-          type="button"
-          phx-click="remove_attachment"
-          phx-value-id={a.id}
-          phx-target={@target}
-          data-confirm={gettext("Remove this file from the note?")}
-          class="text-rose-600 dark:text-rose-400"
-          title={gettext("Remove")}
-        >
-          <.icon name="hero-x-mark" class="h-4 w-4" />
-        </button>
-      </span>
-    </div>
-    """
-  end
-
   attr :note_id, :string, required: true
   attr :current_company, :map, required: true
 
@@ -470,17 +346,31 @@ defmodule FullCircleWeb.NoteComponents do
   attr :id, :string, required: true
   attr :item, :map, required: true, doc: "%{note: Note, d: Notes.feed_details/3 entry}"
   attr :current_company, :map, required: true
+  attr :host, :any, default: nil, doc: "{type, id} of the record whose page shows this post"
+  attr :relation, :atom, default: nil, doc: ":linked tags a note that only links to the host"
+  attr :new_tab, :boolean, default: false, doc: "open the note in a new tab (panels)"
+  attr :can_attach, :boolean, default: false
+  attr :target, :any, default: nil
 
-  @doc "One note as a feed post."
+  @doc """
+  One note as a post — the feed and every notes panel use this, so a note
+  looks the same everywhere. On a record's page (`host`), chips naming that
+  record are left out: they would only point back at the page you are on.
+  """
   def note_post(assigns) do
     note = assigns.item.note
+    d = assigns.item.d
+    host = assigns.host
     # The first 4 files of any kind; PDFs are tiles in the same grid.
     shown = Enum.take(note.attachments, 4)
+    is_host? = fn type, id -> host == {type, id} end
 
     assigns =
       assign(assigns,
         note: note,
-        d: assigns.item.d,
+        d: d,
+        subject: if(d.subject && !is_host?.(note.subject_type, note.subject_id), do: d.subject),
+        links: Enum.reject(d.links, &is_host?.(&1.type, &1.id)),
         thumbs: shown,
         hidden_files: length(note.attachments) - length(shown),
         path: "/companies/#{assigns.current_company.id}/notes/#{note.id}/edit"
@@ -502,6 +392,13 @@ defmodule FullCircleWeb.NoteComponents do
             · {ago(@note.inserted_at, @current_company)}
           </span>
           <span
+            :if={@relation == :linked}
+            class="note-linked ml-1 rounded-full border border-sky-400 px-2 text-xs text-sky-800 dark:text-sky-200"
+            title={gettext("This note links here; it is about something else.")}
+          >
+            ↩ {gettext("linked")}
+          </span>
+          <span
             :if={@note.visibility}
             class="ml-1 rounded-full border border-rose-300 bg-rose-100 px-2 text-xs text-rose-800 dark:border-rose-700 dark:bg-rose-900 dark:text-rose-100"
           >
@@ -511,20 +408,15 @@ defmodule FullCircleWeb.NoteComponents do
           </span>
         </div>
 
-        <div :if={@d.subject || @d.links != []} class="mt-0.5 flex flex-wrap gap-1">
-          <.record_chip
-            :if={@d.subject}
-            target={@d.subject}
-            type={@note.subject_type}
-            kind={:subject}
-          />
-          <.record_chip :for={l <- @d.links} target={l.target} type={l.type} />
+        <div :if={@subject || @links != []} class="mt-0.5 flex flex-wrap gap-1">
+          <.record_chip :if={@subject} target={@subject} type={@note.subject_type} kind={:subject} />
+          <.record_chip :for={l <- @links} target={l.target} type={l.type} />
         </div>
 
-        <.link navigate={@path} class="mt-1 block">
+        <.post_link path={@path} new_tab={@new_tab} class="mt-1 block">
           <div :if={@note.title} class="note-title font-bold">{@note.title}</div>
           <div phx-no-format class="line-clamp-8 whitespace-pre-wrap break-words">{@note.body}</div>
-        </.link>
+        </.post_link>
 
         <div
           :if={@thumbs != []}
@@ -551,14 +443,39 @@ defmodule FullCircleWeb.NoteComponents do
           + {ngettext("1 more file", "%{count} more files", @hidden_files)}
         </div>
 
-        <.link navigate={@path} class="mt-2 flex gap-8 text-sm text-gray-500 dark:text-gray-400">
-          <span title={gettext("Notes about this note")}>💬
-          <span class="note-replies">{@d.replies}</span></span>
-          <span title={gettext("Links")}>🔗 <span class="note-links">{length(@d.links)}</span></span>
-          <span title={gettext("Files")}>📎 <span class="note-files">{length(@note.attachments)}</span></span>
-        </.link>
+        <div class="mt-2 flex items-center gap-8 text-sm text-gray-500 dark:text-gray-400">
+          <.post_link path={@path} new_tab={@new_tab} class="flex gap-8">
+            <span title={gettext("Notes about this note")}>💬
+            <span class="note-replies">{@d.replies}</span></span>
+            <span title={gettext("Links")}>🔗 <span class="note-links">{length(@d.links)}</span></span>
+            <span title={gettext("Files")}>📎
+            <span class="note-files">{length(@note.attachments)}</span></span>
+          </.post_link>
+          <span :if={@can_attach} class="ml-auto">
+            <.attach_button note_id={@note.id} current_company={@current_company} />
+          </span>
+        </div>
       </div>
     </article>
+    """
+  end
+
+  attr :path, :string, required: true
+  attr :new_tab, :boolean, default: false
+  attr :class, :any, default: nil
+  slot :inner_block, required: true
+
+  # In the feed a post opens in the same tab; in a record's notes panel it
+  # opens in a new one so the record stays put (see "Navigation" in the skill).
+  defp post_link(%{new_tab: true} = assigns) do
+    ~H"""
+    <a href={@path} target="_blank" class={@class}>{render_slot(@inner_block)}</a>
+    """
+  end
+
+  defp post_link(assigns) do
+    ~H"""
+    <.link navigate={@path} class={@class}>{render_slot(@inner_block)}</.link>
     """
   end
 end

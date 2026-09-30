@@ -8,7 +8,7 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
   import FullCircleWeb.NoteComponents
 
   alias FullCircle.Notes
-  alias FullCircle.Notes.{Attachments, Note}
+  alias FullCircle.Notes.Note
 
   # The host form re-renders on every keystroke (phx-change="validate"), which
   # calls update/2 each time. Only (re)load when the record changes, or the
@@ -51,14 +51,22 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
   defp load(socket) do
     %{record_type: t, record_id: id, current_company: com, current_user: user} = socket.assigns
     rows = Notes.notes_for_record(t, id, com, user)
+    details = Notes.feed_details(Enum.map(rows, & &1.note), com, user)
     # Every row is already visible, so edit rights need no per-note query.
     rights = Notes.rights(com, user)
 
-    assign(socket,
-      rows: rows,
-      editable: MapSet.new(for r <- rows, Notes.may_edit?(r.note, user, rights), do: r.note.id),
-      can_create: rights.create
-    )
+    items =
+      for r <- rows do
+        %{
+          id: r.note.id,
+          note: r.note,
+          d: Map.fetch!(details, r.note.id),
+          relation: r.relation,
+          can_attach: Notes.may_edit?(r.note, user, rights)
+        }
+      end
+
+    assign(socket, items: items, can_create: rights.create)
   end
 
   @impl true
@@ -103,46 +111,36 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
 
   def handle_event("attachment_uploaded", _, socket), do: {:noreply, load(socket)}
 
-  def handle_event("remove_attachment", %{"id" => att_id}, socket) do
-    att =
-      socket.assigns.rows
-      |> Enum.flat_map(& &1.note.attachments)
-      |> Enum.find(&(&1.id == att_id))
-
-    if att,
-      do: Attachments.remove(att, socket.assigns.current_company, socket.assigns.current_user)
-
-    {:noreply, load(socket)}
-  end
-
   @impl true
   def render(assigns) do
     ~H"""
-    <div
+    <section
       id={@id}
-      class="mx-auto mt-3 rounded-lg border border-blue-300 bg-blue-50 p-3 dark:border-blue-700 dark:bg-blue-950"
+      class="mx-auto mt-3 overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900"
     >
-      <div class="flex items-center">
-        <span class="font-semibold">📝 {gettext("Notes")} ({length(@rows)})</span>
-        <span class="ml-auto flex gap-2">
-          <button
-            :if={@can_create and !@adding}
-            id={"#{@id}-new"}
-            type="button"
-            phx-click="new"
-            phx-target={@myself}
-            class="blue button"
-          >
-            + {gettext("Note")}
-          </button>
-          <.link
-            :if={@can_create}
-            navigate={"/companies/#{@current_company.id}/notes/new?subject_type=#{@record_type}&subject_id=#{@record_id}"}
-            class="text-sm text-blue-600 hover:font-bold dark:text-blue-400"
-          >
-            {gettext("Full form")}
-          </.link>
-        </span>
+      <div class="flex items-center gap-2 border-b border-gray-200 px-4 py-2 dark:border-gray-700">
+        <span class="font-semibold">📝 {gettext("Notes")}</span>
+        <span class="text-sm text-gray-500">{length(@items)}</span>
+        <.link
+          :if={@can_create}
+          navigate={"/companies/#{@current_company.id}/notes/new?subject_type=#{@record_type}&subject_id=#{@record_id}"}
+          class="ml-auto text-xs text-gray-500 hover:underline dark:text-gray-400"
+        >
+          {gettext("Full form")}
+        </.link>
+        <button
+          :if={@can_create and !@adding}
+          id={"#{@id}-new"}
+          type="button"
+          phx-click="new"
+          phx-target={@myself}
+          class={[
+            "rounded-full bg-sky-500 px-3 py-0.5 text-sm font-bold text-white hover:bg-sky-600",
+            !@can_create && "ml-auto"
+          ]}
+        >
+          ＋ {gettext("Note")}
+        </button>
       </div>
 
       <.form
@@ -152,13 +150,13 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
         phx-change="validate"
         phx-submit="save"
         phx-target={@myself}
-        class="mt-2"
+        class="border-b border-gray-200 px-4 py-3 dark:border-gray-700"
       >
         <.input
           field={@form[:body]}
           type="textarea"
           rows="3"
-          placeholder={gettext("Write a note...")}
+          placeholder={gettext("Write a note…")}
         />
         <%!-- The subject is fixed to this record and has no input of its own;
              without this line a subject error would make Save silently do nothing. --%>
@@ -171,33 +169,43 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
         }>
           {msg}
         </.error>
-        <div class="flex flex-wrap items-center gap-1 text-xs">
-          <span class="mr-1 font-semibold">{gettext("Readable by")}</span>
+        <div class="mt-2 flex flex-wrap items-center gap-1 text-xs">
           <.visibility_chips
             visibility={Ecto.Changeset.get_field(@form.source, :visibility)}
             id_prefix={"#{@id}-visibility"}
             target={@myself}
           />
+          <span class="ml-auto flex items-center gap-2">
+            <button
+              type="button"
+              phx-click="cancel"
+              phx-target={@myself}
+              class="text-sm text-gray-500 hover:underline"
+            >
+              {gettext("Cancel")}
+            </button>
+            <button
+              type="submit"
+              class="rounded-full bg-sky-500 px-4 py-1 text-sm font-bold text-white hover:bg-sky-600"
+            >
+              {gettext("Post")}
+            </button>
+          </span>
         </div>
-        <div class="mt-1 flex gap-2">
-          <.button>{gettext("Save")}</.button>
-          <button type="button" phx-click="cancel" phx-target={@myself} class="orange button">
-            {gettext("Cancel")}
-          </button>
-        </div>
-        <p class="text-xs text-gray-500">{gettext("Attach files after saving.")}</p>
       </.form>
 
-      <.note_card
-        :for={r <- @rows}
-        note={r.note}
-        relation={r.relation}
+      <.note_post
+        :for={item <- @items}
+        id={"#{@id}-note-#{item.id}"}
+        item={item}
         current_company={@current_company}
-        can_edit={MapSet.member?(@editable, r.note.id)}
-        target={@myself}
+        host={{@record_type, @record_id}}
+        relation={item.relation}
+        can_attach={item.can_attach}
+        new_tab
       />
-      <p :if={@rows == []} class="text-sm text-gray-500">{gettext("No notes yet.")}</p>
-    </div>
+      <p :if={@items == []} class="px-4 py-3 text-sm text-gray-500">{gettext("No notes yet.")}</p>
+    </section>
     """
   end
 end
