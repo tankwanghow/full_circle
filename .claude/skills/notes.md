@@ -89,9 +89,20 @@ usually the wrong upload, so an old link must not keep serving it.
 **Templates never build file addresses or read `content_type`.** Get the
 address from `Attachments.url(att, :original | :thumb)` and choose how to show
 a file by `Attachments.kind(att)` (`:image | :pdf | :other`), normally via the
-`file_thumb/1` component. `:thumb` serves the original until real renditions
-exist — that function, `kind/1` and `file_thumb/1` are where generated
-thumbnails, video posters and audio slot in. The feed shows the first 4 files
+`file_thumb/1` component. `:thumb` is the original for images and a PDF's
+rendered first page for PDFs (`?variant=thumb`) — that function, `kind/1`
+and `file_thumb/1` are where further renditions, video posters and audio
+slot in.
+
+**PDF previews:** `Attachments.thumb_file/1` renders page 1 with `pdftoppm`
+(poppler-utils — already in the prod Docker image) on the first request and
+caches it beside the file as `<file>.thumb.jpg`; a `.thumb.failed` marker
+stops an unrenderable PDF being retried on every feed load. 10s timeout,
+temp-then-rename writes. The controller serves the variant behind the same
+visibility check (no preview → 404, the file still downloads);
+`file_thumb/1` lays the preview over the PDF badge and the `<img>` removes
+itself on error. Tests needing pdftoppm are tagged `:pdftoppm` and excluded
+in `test_helper.exs` when it isn't installed. The feed shows the first 4 files
 of any kind (PDFs as tiles) then "+n more"; the note page shows every file.
 
 `note_attach.js`:
@@ -140,3 +151,12 @@ Append new `msgid`/`msgstr` entries to `priv/gettext/zh/LC_MESSAGES/default.po`.
 ## Pages not covered
 None. All 12 record types: Employee, Contact, Good + 9 posted documents (Journal has
 no test fixture; its index is smoke-rendered only).
+
+## Dark theme: selected states
+`assets/css/app.css` remaps light colours for the dark theme with plain,
+unlayered rules (`.dark .bg-white`, `.dark .border-gray-300`, …). Unlayered
+CSS beats every Tailwind utility, so `dark:has-checked:…` (or any `dark:`
+override of a remapped class) never shows. Choose selected/active looks on
+the server instead — see `role_chip/1`, which renders a ticked role solid
+blue from the form state. Check a class against the remap list before relying
+on a `dark:` variant to override it.
