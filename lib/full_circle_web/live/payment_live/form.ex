@@ -698,13 +698,20 @@ defmodule FullCircleWeb.PaymentLive.Form do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="w-11/12 mx-auto border rounded-lg border-pink-500 bg-pink-100 p-4">
+    <div class="w-fit min-w-[64rem] max-w-[98vw] mx-auto border rounded-lg border-pink-500 bg-pink-100 p-4 [&>*:not(form)]:[contain:inline-size]">
       <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <.error_box changeset={@form.source} />
-      <.form for={@form} id="object-form" autocomplete="off" phx-change="validate" phx-submit="save">
+      <.form
+        for={@form}
+        id="object-form"
+        class="[&>*:not(.detail-fit)]:[contain:inline-size]"
+        autocomplete="off"
+        phx-change="validate"
+        phx-submit="save"
+      >
         <.input type="hidden" field={@form[:payment_no]} />
         <div class="flex flex-row flex-nowrap">
-          <div class="w-5/12 grow shrink">
+          <div class="basis-64 grow shrink">
             <.input type="hidden" field={@form[:contact_id]} />
             <.input
               field={@form[:contact_name]}
@@ -713,13 +720,13 @@ defmodule FullCircleWeb.PaymentLive.Form do
               url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
             />
           </div>
-          <div class="grow shrink">
+          <div class="w-36 shrink-0">
             <.input field={@form[:reg_no]} label={gettext("Reg No")} readonly tabindex="-1" />
           </div>
-          <div class="grow shrink">
+          <div class="w-36 shrink-0">
             <.input field={@form[:tax_id]} label={gettext("Tax Id")} readonly tabindex="-1" />
           </div>
-          <div class="w-5/12 grow shrink">
+          <div class="basis-56 grow shrink">
             <.input type="hidden" field={@form[:funds_account_id]} />
             <.input
               field={@form[:funds_account_name]}
@@ -728,7 +735,9 @@ defmodule FullCircleWeb.PaymentLive.Form do
               url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=fundsaccount&name="}
             />
           </div>
-          <div class="w-2/12 grow shrink">
+        </div>
+        <div class="flex flex-row flex-nowrap">
+          <div class="w-32 shrink-0">
             <.input
               field={@form[:funds_amount]}
               label={gettext("Funds Amount")}
@@ -737,15 +746,13 @@ defmodule FullCircleWeb.PaymentLive.Form do
               step="0.01"
             />
           </div>
-          <div class="grow shrink w-2/12">
+          <div class="w-[9.5rem] shrink-0">
             <.input field={@form[:payment_date]} label={gettext("Payment Date")} type="date" />
           </div>
-        </div>
-        <div class="flex flex-row flex-nowrap">
-          <div class="grow shrink w-10/12">
+          <div class="basis-48 grow shrink">
             <.input field={@form[:descriptions]} label={gettext("Descriptions")} />
           </div>
-          <div class="grow shrink w-2/12">
+          <div class="w-32 shrink-0">
             <.input
               feedback={true}
               type="number"
@@ -761,7 +768,7 @@ defmodule FullCircleWeb.PaymentLive.Form do
           <div class="w-[14%]">
             <.input field={@form[:e_inv_internal_id]} label={gettext("E Invoice Internal Id")} />
           </div>
-          <div class="w-[20%]">
+          <div class="w-[20%] min-w-[17rem]">
             <.input field={@form[:e_inv_uuid]} label={gettext("E Invoice UUID")} />
           </div>
           <div
@@ -802,9 +809,9 @@ defmodule FullCircleWeb.PaymentLive.Form do
           <div
             id="match-trans-tab"
             phx-click={
-              JS.show(to: "#match-trans")
+              JS.remove_class("tab-hidden", to: "#match-trans")
               |> JS.add_class("active")
-              |> JS.hide(to: "#payment-details")
+              |> JS.add_class("tab-hidden", to: "#payment-details")
               |> JS.remove_class("active", to: "#payment-details-tab")
               |> JS.show(to: "#query-match-trans")
             }
@@ -828,10 +835,10 @@ defmodule FullCircleWeb.PaymentLive.Form do
           <div
             id="payment-details-tab"
             phx-click={
-              JS.hide(to: "#match-trans")
+              JS.add_class("tab-hidden", to: "#match-trans")
               |> JS.hide(to: "#query-match-trans")
               |> JS.remove_class("active", to: "#match-trans-tab")
-              |> JS.show(to: "#payment-details")
+              |> JS.remove_class("tab-hidden", to: "#payment-details")
               |> JS.add_class("active")
             }
             class="basis-1/2 tab"
@@ -853,7 +860,7 @@ defmodule FullCircleWeb.PaymentLive.Form do
         <.live_component
           module={FullCircleWeb.InvoiceLive.DetailComponent}
           id="payment-details"
-          klass="hidden text-center border bg-purple-100 mt-2 p-3 rounded-lg border-purple-400"
+          klass="tab-hidden detail-fit text-center border bg-purple-100 mt-2 p-3 rounded-lg border-purple-400"
           settings={@settings}
           doc_name="Payment"
           detail_name={:payment_details}
@@ -1026,6 +1033,20 @@ defmodule FullCircleWeb.PaymentLive.Form do
             <div class="text-red-600 font-bold">{reason}</div>
         <% end %>
       </div>
+      <%!-- The Matchers tab's search panel: inside the card (after the main
+           form, since it has its own form) so it takes the card's width. --%>
+      <.live_component
+        module={FullCircleWeb.ReceiptLive.QryMatcherComponent}
+        id="query-match-trans"
+        klass="text-center border bg-green-100 mt-2 p-3 rounded-lg border-green-400"
+        query={@query}
+        query_match_trans={@query_match_trans}
+        form={@form}
+        cannot_match_doc_type={~w(Payment)}
+        doc_no_field={:payment_no}
+        current_company={@current_company}
+        current_user={@current_user}
+      />
     </div>
     <.live_component
       :if={@live_action == :edit and @id != "new"}
@@ -1036,18 +1057,6 @@ defmodule FullCircleWeb.PaymentLive.Form do
       current_company={@current_company}
       current_user={@current_user}
       class="w-11/12"
-    />
-    <.live_component
-      module={FullCircleWeb.ReceiptLive.QryMatcherComponent}
-      id="query-match-trans"
-      klass="w-11/12 mx-auto text-center border bg-green-100 mt-2 p-3 rounded-lg border-green-400"
-      query={@query}
-      query_match_trans={@query_match_trans}
-      form={@form}
-      cannot_match_doc_type={~w(Payment)}
-      doc_no_field={:payment_no}
-      current_company={@current_company}
-      current_user={@current_user}
     />
     """
   end

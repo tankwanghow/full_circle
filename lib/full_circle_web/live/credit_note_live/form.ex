@@ -383,13 +383,20 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="w-9/12 mx-auto border rounded-lg border-cyan-500 bg-cyan-100 p-4">
+    <div class="w-fit min-w-[64rem] max-w-[98vw] mx-auto border rounded-lg border-cyan-500 bg-cyan-100 p-4 [&>*:not(form)]:[contain:inline-size]">
       <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <.error_box changeset={@form.source} />
-      <.form for={@form} id="object-form" autocomplete="off" phx-change="validate" phx-submit="save">
+      <.form
+        for={@form}
+        id="object-form"
+        class="[&>*:not(.detail-fit)]:[contain:inline-size]"
+        autocomplete="off"
+        phx-change="validate"
+        phx-submit="save"
+      >
         <.input type="hidden" field={@form[:note_no]} />
         <div class="flex flex-row flex-nowrap">
-          <div class="w-[41%]">
+          <div class="basis-64 grow shrink">
             <.input type="hidden" field={@form[:contact_id]} />
             <.input
               field={@form[:contact_name]}
@@ -398,16 +405,16 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
               url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
             />
           </div>
-          <div class="grow shrink">
+          <div class="w-36 shrink-0">
             <.input field={@form[:reg_no]} label={gettext("Reg No")} readonly tabindex="-1" />
           </div>
-          <div class="grow shrink">
+          <div class="w-36 shrink-0">
             <.input field={@form[:tax_id]} label={gettext("Tax Id")} readonly tabindex="-1" />
           </div>
-          <div class="w-[12%]">
+          <div class="w-[9.5rem] shrink-0">
             <.input field={@form[:note_date]} label={gettext("Credit Note Date")} type="date" />
           </div>
-          <div class="w-[12%]">
+          <div class="w-40 shrink-0">
             <.input
               feedback={true}
               type="number"
@@ -423,7 +430,7 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
           <div class="w-[14%]">
             <.input field={@form[:e_inv_internal_id]} label={gettext("E Invoice Internal Id")} />
           </div>
-          <div class="w-[20%]">
+          <div class="w-[20%] min-w-[17rem]">
             <.input field={@form[:e_inv_uuid]} label={gettext("E Invoice UUID")} />
           </div>
           <div
@@ -464,10 +471,10 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
           <div
             id="credit-note-details-tab"
             phx-click={
-              JS.hide(to: "#match-trans")
+              JS.add_class("tab-hidden", to: "#match-trans")
               |> JS.hide(to: "#query-match-trans")
               |> JS.remove_class("active", to: "#match-trans-tab")
-              |> JS.show(to: "#credit-note-details")
+              |> JS.remove_class("tab-hidden", to: "#credit-note-details")
               |> JS.add_class("active")
             }
             class="active basis-1/2 tab"
@@ -488,9 +495,9 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
           <div
             id="match-trans-tab"
             phx-click={
-              JS.show(to: "#match-trans")
+              JS.remove_class("tab-hidden", to: "#match-trans")
               |> JS.add_class("active")
-              |> JS.hide(to: "#credit-note-details")
+              |> JS.add_class("tab-hidden", to: "#credit-note-details")
               |> JS.remove_class("active", to: "#credit-note-details-tab")
               |> JS.show(to: "#query-match-trans")
             }
@@ -515,7 +522,7 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
         <.live_component
           module={FullCircleWeb.CreditNoteLive.DetailComponent}
           id="credit-note-details"
-          klass="text-center border bg-purple-100 mt-2 p-3 rounded-lg border-purple-400"
+          klass="detail-fit text-center border bg-purple-100 mt-2 p-3 rounded-lg border-purple-400"
           doc_name="CreditNote"
           detail_name={:credit_note_details}
           form={@form}
@@ -531,7 +538,7 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
         <.live_component
           module={FullCircleWeb.ReceiptLive.MatcherComponent}
           id="match-trans"
-          klass="hidden text-center border bg-green-100 mt-2 p-3 rounded-lg border-green-400"
+          klass="tab-hidden text-center border bg-green-100 mt-2 p-3 rounded-lg border-green-400"
           form={@form}
           current_company={@current_company}
           current_user={@current_user}
@@ -578,7 +585,20 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
           />
         </div>
       </.form>
-
+      <%!-- The Matchers tab's search panel: inside the card (after the main
+           form, since it has its own form) so it takes the card's width. --%>
+      <.live_component
+        module={FullCircleWeb.ReceiptLive.QryMatcherComponent}
+        id="query-match-trans"
+        klass="hidden text-center border-4 bg-green-200 mt-4 p-3 rounded-lg border-green-800"
+        query={@query}
+        query_match_trans={@query_match_trans}
+        form={@form}
+        cannot_match_doc_type={~w(CreditNote Receipt DebitNote Payment)}
+        doc_no_field={:note_no}
+        current_company={@current_company}
+        current_user={@current_user}
+      />
     </div>
     <.live_component
       :if={@live_action == :edit and @id != "new"}
@@ -589,18 +609,6 @@ defmodule FullCircleWeb.CreditNoteLive.Form do
       current_company={@current_company}
       current_user={@current_user}
       class="w-9/12"
-    />
-    <.live_component
-      module={FullCircleWeb.ReceiptLive.QryMatcherComponent}
-      id="query-match-trans"
-      klass="hidden w-9/12 mx-auto text-center border-4 bg-green-200 mt-4 p-3 rounded-lg border-green-800"
-      query={@query}
-      query_match_trans={@query_match_trans}
-      form={@form}
-      cannot_match_doc_type={~w(CreditNote Receipt DebitNote Payment)}
-      doc_no_field={:note_no}
-      current_company={@current_company}
-      current_user={@current_user}
     />
     """
   end

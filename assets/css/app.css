@@ -637,6 +637,11 @@ input[disabled] {
 .detail-fit .detail-taxamt-col { flex: 0 0 6.5rem; width: auto; }
 .detail-fit .detail-amt-col { flex: 0 0 7rem; width: auto; }
 .detail-fit .detail-setting-col { flex: 0 0 1.5rem; width: auto; }
+/* Tabs inside a fit card (Receipt, Payment, Credit/Debit Note) hide their
+   panels with .tab-hidden instead of display:none: invisible, zero height,
+   unfocusable, but still counted for the card's width, so the card does not
+   jump when the user switches tabs. */
+.tab-hidden { visibility: hidden; height: 0; overflow: hidden; margin: 0 !important; padding-top: 0 !important; padding-bottom: 0 !important; border-width: 0 !important; }
 /* Hidden columns must stay out of the layout (flex-basis would otherwise win). */
 .detail-fit .hidden { display: none; }
 

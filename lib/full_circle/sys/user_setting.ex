@@ -101,7 +101,7 @@ defmodule FullCircle.Sys.UserSetting do
         code: "taxrate-col",
         display_name: "Tax Rate",
         values: %{"show" => "visible", "hide" => "hidden"},
-        value: "show",
+        value: "hide",
         company_user_id: cuid
       },
       %{
@@ -109,12 +109,14 @@ defmodule FullCircle.Sys.UserSetting do
         code: "discount-col",
         display_name: "Discount",
         values: %{"show" => "visible", "hide" => "hidden"},
-        value: "show",
+        value: "hide",
         company_user_id: cuid
       }
     ]
   end
 
+  # Receipts and payments often post a line straight to an account, so Account
+  # stays shown; Tax Rate and Discount start hidden for new users.
   def default_settings("Receipt", cuid) do
     [
       %{
@@ -146,7 +148,7 @@ defmodule FullCircle.Sys.UserSetting do
         code: "taxrate-col",
         display_name: "Tax Rate",
         values: %{"show" => "visible", "hide" => "hidden"},
-        value: "show",
+        value: "hide",
         company_user_id: cuid
       },
       %{
@@ -154,7 +156,7 @@ defmodule FullCircle.Sys.UserSetting do
         code: "discount-col",
         display_name: "Discount",
         values: %{"show" => "visible", "hide" => "hidden"},
-        value: "show",
+        value: "hide",
         company_user_id: cuid
       }
     ]
@@ -183,7 +185,7 @@ defmodule FullCircle.Sys.UserSetting do
         code: "account-col",
         display_name: "Account",
         values: %{"show" => "visible", "hide" => "hidden"},
-        value: "show",
+        value: "hide",
         company_user_id: cuid
       },
       %{
@@ -191,7 +193,7 @@ defmodule FullCircle.Sys.UserSetting do
         code: "taxrate-col",
         display_name: "Tax Rate",
         values: %{"show" => "visible", "hide" => "hidden"},
-        value: "show",
+        value: "hide",
         company_user_id: cuid
       },
       %{
@@ -199,7 +201,7 @@ defmodule FullCircle.Sys.UserSetting do
         code: "discount-col",
         display_name: "Discount",
         values: %{"show" => "visible", "hide" => "hidden"},
-        value: "show",
+        value: "hide",
         company_user_id: cuid
       }
     ]

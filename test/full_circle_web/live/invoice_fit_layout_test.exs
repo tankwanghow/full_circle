@@ -21,12 +21,21 @@ defmodule FullCircleWeb.InvoiceFitLayoutTest do
       assert values["taxamt-col"] == "show"
     end
 
-    test "other documents keep their defaults (pilot is Invoice only)" do
-      for page <- ~w(PurInvoice Receipt Payment) do
-        assert page
-               |> UserSetting.default_settings(Ecto.UUID.generate())
-               |> Enum.all?(&(&1.value == "show")),
-               "#{page} defaults changed"
+    test "Purchase Invoice hides the same three; Receipt and Payment keep Account" do
+      defaults = fn page ->
+        page
+        |> UserSetting.default_settings(Ecto.UUID.generate())
+        |> Map.new(&{&1.code, &1.value})
+      end
+
+      assert %{"account-col" => "hide", "taxrate-col" => "hide", "discount-col" => "hide"} =
+               defaults.("PurInvoice")
+
+      # Receipts and payments often post a line straight to an account, so the
+      # Account column stays; only Tax Rate and Discount start hidden.
+      for page <- ~w(Receipt Payment) do
+        assert %{"account-col" => "show", "taxrate-col" => "hide", "discount-col" => "hide"} =
+                 defaults.(page)
       end
     end
   end
@@ -50,9 +59,41 @@ defmodule FullCircleWeb.InvoiceFitLayoutTest do
       refute has_element?(lv, "#invoice_details .detail-amt-col.hidden")
     end
 
-    test "purchase invoices are untouched by the pilot", %{conn: conn, comp: comp} do
-      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/PurInvoice/new")
-      refute has_element?(lv, ".detail-fit")
+    for {path, details} <- [
+          {"PurInvoice", "pur_invoice_details"},
+          {"Receipt", "receipt-details"},
+          {"Payment", "payment-details"},
+          {"CreditNote", "credit-note-details"},
+          {"DebitNote", "debit-note-details"}
+        ] do
+      test "#{path} card fits its columns", %{conn: conn, comp: comp} do
+        {:ok, lv, _} = live(conn, "/companies/#{comp.id}/#{unquote(path)}/new")
+        assert has_element?(lv, "div.w-fit > p")
+        assert has_element?(lv, "##{unquote(details)}.detail-fit")
+      end
+    end
+
+    # Tab panels inside a fit card are hidden with tab-hidden (invisible, zero
+    # height) rather than display:none, so they still size the card and it does
+    # not jump in width when the user switches tabs.
+    for {path, panels} <- [
+          {"Receipt", ~w(receipt-cheques receipt-details match-trans)},
+          {"Payment", ~w(payment-details match-trans)},
+          {"CreditNote", ~w(credit-note-details match-trans)},
+          {"DebitNote", ~w(debit-note-details match-trans)}
+        ] do
+      test "#{path} tabs hide panels with tab-hidden, not display:none", %{conn: conn, comp: comp} do
+        {:ok, lv, html} = live(conn, "/companies/#{comp.id}/#{unquote(path)}/new")
+        doc = LazyHTML.from_document(html)
+
+        for id <- unquote(panels) do
+          assert has_element?(lv, "##{id}")
+          refute doc |> LazyHTML.query("##{id}.hidden") |> Enum.any?(), "##{id} uses .hidden"
+        end
+
+        # The tab buttons switch panels by toggling tab-hidden.
+        assert has_element?(lv, ~s([phx-click*="tab-hidden"]))
+      end
     end
   end
 end

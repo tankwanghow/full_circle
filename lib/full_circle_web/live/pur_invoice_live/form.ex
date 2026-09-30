@@ -1112,7 +1112,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="w-11/12 mx-auto border rounded-lg border-pink-500 bg-pink-100 p-4">
+    <div class="w-fit min-w-[64rem] max-w-[98vw] mx-auto border rounded-lg border-pink-500 bg-pink-100 p-4 [&>*:not(form)]:[contain:inline-size]">
       <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
       <.error_box changeset={@form.source} />
       <div
@@ -1148,6 +1148,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
       <.form
         for={@form}
         id="object-form"
+        class="[&>*:not(.detail-fit)]:[contain:inline-size]"
         autocomplete="off"
         phx-change="validate"
         phx-submit="save"
@@ -1156,7 +1157,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
         <.input type="hidden" field={@form[:pur_invoice_no]} />
         <input type="hidden" id="live_action" value={@live_action} />
         <div class="flex flex-row flex-nowrap">
-          <div class="w-1/4 grow shrink">
+          <div class="basis-64 grow shrink">
             <.input type="hidden" field={@form[:contact_id]} />
             <.input
               field={@form[:contact_name]}
@@ -1166,23 +1167,20 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
               url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
             />
           </div>
-          <div class="grow shrink">
+          <div class="w-36 shrink-0">
             <.input field={@form[:reg_no]} label={gettext("Reg No")} readonly tabindex="-1" />
           </div>
-          <div class="grow shrink">
+          <div class="w-36 shrink-0">
             <.input field={@form[:tax_id]} label={gettext("Tax Id")} readonly tabindex="-1" />
           </div>
-          <div class="grow shrink">
+          <div class="w-[9.5rem] shrink-0">
             <.input field={@form[:pur_invoice_date]} label={gettext("Invoice Date")} type="date" />
           </div>
-          <div class="grow shrink">
+          <div class="w-[9.5rem] shrink-0">
             <.input field={@form[:load_date]} label={gettext("Load Date")} type="date" />
           </div>
-          <div class="grow shrink">
+          <div class="w-[9.5rem] shrink-0">
             <.input field={@form[:due_date]} label={gettext("Due Date")} type="date" />
-          </div>
-          <div class="w-1/4 grow shrink">
-            <.input field={@form[:descriptions]} label={gettext("Descriptions")} />
           </div>
         </div>
 
@@ -1219,13 +1217,16 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
               url={"/list/companies/#{@current_company.id}/#{@current_user.id}/billingtags?klass=FullCircle.Billing.PurInvoice&tag_field=delivery_wages_tags&tag="}
             />
           </div>
+          <div class="grow shrink">
+            <.input field={@form[:descriptions]} label={gettext("Descriptions")} />
+          </div>
         </div>
 
         <div class="flex flex-row flex-nowrap mt-2 w-[92%]">
           <div class="w-[15%]">
             <.input field={@form[:e_inv_internal_id]} label={gettext("E Invoice Internal Id")} />
           </div>
-          <div class="w-[20%]">
+          <div class="w-[20%] min-w-[17rem]">
             <.input field={@form[:e_inv_uuid]} label={gettext("E Invoice UUID")} />
           </div>
           <div
@@ -1284,7 +1285,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
         <.live_component
           module={FullCircleWeb.InvoiceLive.DetailComponent}
           id="pur_invoice_details"
-          klass=""
+          klass="detail-fit "
           settings={@settings}
           doc_name="PurInvoice"
           detail_name={:pur_invoice_details}

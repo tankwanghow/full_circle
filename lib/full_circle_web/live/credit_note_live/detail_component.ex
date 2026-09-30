@@ -16,25 +16,25 @@ defmodule FullCircleWeb.CreditNoteLive.DetailComponent do
     ~H"""
     <div id={@id} class={@klass}>
       <div class="font-medium flex flex-row text-center mt-2 tracking-tighter">
-        <div class="detail-header w-[30%]">
+        <div class="detail-header detail-desc-col">
           {gettext("Description")}
         </div>
-        <div class="detail-header w-[10%]">{gettext("Quantity")}</div>
-        <div class="detail-header w-[8%]">{gettext("Price")}</div>
-        <div class="detail-header w-[10%]">
+        <div class="detail-header detail-qty-col">{gettext("Quantity")}</div>
+        <div class="detail-header detail-price-col">{gettext("Price")}</div>
+        <div class="detail-header detail-goodamt-col">
           {gettext("Desc Amt")}
         </div>
-        <div class="detail-header w-[20%]">
+        <div class="detail-header detail-account-col">
           {gettext("Account")}
         </div>
-        <div class="detail-header w-[8%]">{gettext("TxCode")}</div>
-        <div class="detail-header w-[8%]">
+        <div class="detail-header detail-taxcode-col">{gettext("TxCode")}</div>
+        <div class="detail-header detail-taxrate-col">
           {gettext("Tax%")}
         </div>
-        <div class="detail-header w-[8%]">
+        <div class="detail-header detail-taxamt-col">
           {gettext("TaxAmt")}
         </div>
-        <div class="detail-header w-[14%]">{gettext("Amount")}</div>
+        <div class="detail-header detail-amt-col">{gettext("Amount")}</div>
         <div class="detail-setting-col  mt-1 text-blue-500 grow-0 shrink-0"></div>
       </div>
 
@@ -44,8 +44,8 @@ defmodule FullCircleWeb.CreditNoteLive.DetailComponent do
           if(dtl[:delete].value == true, do: "hidden"),
           if(!dtl.source.valid?, do: "bg-rose-50 border-l-4 border-l-rose-500")
         ]}>
-          <div class="w-[30%]"><.input field={dtl[:descriptions]} /></div>
-          <div class="w-[10%]">
+          <div class="detail-desc-col"><.input field={dtl[:descriptions]} /></div>
+          <div class="detail-qty-col">
             <.input
               phx-hook="calculatorInput"
               klass="text-right"
@@ -53,7 +53,7 @@ defmodule FullCircleWeb.CreditNoteLive.DetailComponent do
               step="0.0001"
             />
           </div>
-          <div class="w-[8%]">
+          <div class="detail-price-col">
             <.input
               phx-hook="calculatorInput"
               klass="text-right"
@@ -61,10 +61,10 @@ defmodule FullCircleWeb.CreditNoteLive.DetailComponent do
               step="0.0001"
             />
           </div>
-          <div class="w-[10%]">
+          <div class="detail-goodamt-col">
             <.input type="number" field={dtl[:desc_amount]} readonly tabindex="-1" />
           </div>
-          <div class="w-[20%]">
+          <div class="detail-account-col">
             <.input
               field={dtl[:account_name]}
               phx-hook="tributeAutoComplete"
@@ -72,7 +72,7 @@ defmodule FullCircleWeb.CreditNoteLive.DetailComponent do
             />
           </div>
           <.input type="hidden" field={dtl[:account_id]} />
-          <div class="w-[8%]">
+          <div class="detail-taxcode-col">
             <.input
               field={dtl[:tax_code_name]}
               phx-hook="tributeAutoComplete"
@@ -80,13 +80,13 @@ defmodule FullCircleWeb.CreditNoteLive.DetailComponent do
             />
           </div>
           <.input type="hidden" field={dtl[:tax_code_id]} />
-          <div class="w-[8%]">
+          <div class="detail-taxrate-col">
             <.input type="number" field={dtl[:tax_rate]} step="0.0001" readonly tabindex="-1" />
           </div>
-          <div class="w-[8%]">
+          <div class="detail-taxamt-col">
             <.input type="number" field={dtl[:tax_amount]} readonly tabindex="-1" />
           </div>
-          <div class="w-[14%]">
+          <div class="detail-amt-col">
             <.input type="number" field={dtl[:line_amount]} readonly tabindex="-1" />
           </div>
           <div class="detail-setting-col mt-1 text-rose-500">
@@ -115,7 +115,7 @@ defmodule FullCircleWeb.CreditNoteLive.DetailComponent do
       </div>
 
       <div class="flex flex-row">
-        <div class="w-[82%]"></div>
+        <div class="grow"></div>
         <div class="w-[10%] text-right px-1">
           {gettext("Tax Total")}
         </div>
@@ -127,7 +127,7 @@ defmodule FullCircleWeb.CreditNoteLive.DetailComponent do
       </div>
 
       <div class="flex flex-row">
-        <div class="w-[82%]"></div>
+        <div class="grow"></div>
         <div class={"w-[10%] text-right px-1 border-t #{if(@matched_trans == [], do: "font-semibold border-b-4 border-double")} border-black"}>
           {gettext("Note Total")}
         </div>
@@ -145,7 +145,7 @@ defmodule FullCircleWeb.CreditNoteLive.DetailComponent do
 
       <%= for obj <- @matched_trans do %>
         <div class="flex flex-row">
-          <div class="w-[82%]"></div>
+          <div class="grow"></div>
           <div class="w-[10%] text-right px-1">
             <.link
               class="text-red-600 hover:font-bold"
@@ -163,7 +163,7 @@ defmodule FullCircleWeb.CreditNoteLive.DetailComponent do
       <% end %>
 
       <div :if={@matched_trans != []} class="flex flex-row">
-        <div class="w-[82%]"></div>
+        <div class="grow"></div>
         <div class="w-[10%] font-bold text-right px-1 border-t border-b-4 border-double border-black">
           {gettext("Balance")}
         </div>
