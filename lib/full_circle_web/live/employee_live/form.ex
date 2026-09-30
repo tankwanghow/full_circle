@@ -643,17 +643,17 @@ defmodule FullCircleWeb.EmployeeLive.Form do
           <div class="w-[25%]">{a.effective_to || gettext("indefinite")}</div>
         </div>
       </div>
-
-      <.live_component
-        :if={@live_action == :edit and @id != "new"}
-        module={FullCircleWeb.NoteLive.NotesPanelComponent}
-        id="notes-panel"
-        record_type="Employee"
-        record_id={@id}
-        current_company={@current_company}
-        current_user={@current_user}
-      />
     </div>
+    <.live_component
+      :if={@live_action == :edit and @id != "new"}
+      module={FullCircleWeb.NoteLive.NotesPanelComponent}
+      id="notes-panel"
+      record_type="Employee"
+      record_id={@id}
+      current_company={@current_company}
+      current_user={@current_user}
+      class="w-7/12"
+    />
     """
   end
 end

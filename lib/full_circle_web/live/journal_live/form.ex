@@ -365,17 +365,17 @@ defmodule FullCircleWeb.JournalLive.Form do
           />
         </div>
       </.form>
-
-      <.live_component
-        :if={@live_action == :edit and @id != "new"}
-        module={FullCircleWeb.NoteLive.NotesPanelComponent}
-        id="notes-panel"
-        record_type="Journal"
-        record_id={@id}
-        current_company={@current_company}
-        current_user={@current_user}
-      />
     </div>
+    <.live_component
+      :if={@live_action == :edit and @id != "new"}
+      module={FullCircleWeb.NoteLive.NotesPanelComponent}
+      id="notes-panel"
+      record_type="Journal"
+      record_id={@id}
+      current_company={@current_company}
+      current_user={@current_user}
+      class="w-6/12"
+    />
     """
   end
 end

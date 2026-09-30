@@ -918,16 +918,6 @@ defmodule FullCircleWeb.PaymentLive.Form do
         </div>
       </.form>
 
-      <.live_component
-        :if={@live_action == :edit and @id != "new"}
-        module={FullCircleWeb.NoteLive.NotesPanelComponent}
-        id="notes-panel"
-        record_type="Payment"
-        record_id={@id}
-        current_company={@current_company}
-        current_user={@current_user}
-      />
-
       <div
         :if={@live_action == :new and @e_inv_preview}
         class="mt-4 border rounded-lg border-blue-500 bg-blue-50 p-4"
@@ -1037,6 +1027,16 @@ defmodule FullCircleWeb.PaymentLive.Form do
         <% end %>
       </div>
     </div>
+    <.live_component
+      :if={@live_action == :edit and @id != "new"}
+      module={FullCircleWeb.NoteLive.NotesPanelComponent}
+      id="notes-panel"
+      record_type="Payment"
+      record_id={@id}
+      current_company={@current_company}
+      current_user={@current_user}
+      class="w-11/12"
+    />
     <.live_component
       module={FullCircleWeb.ReceiptLive.QryMatcherComponent}
       id="query-match-trans"

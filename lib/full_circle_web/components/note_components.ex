@@ -351,6 +351,7 @@ defmodule FullCircleWeb.NoteComponents do
   attr :new_tab, :boolean, default: false, doc: "open the note in a new tab (panels)"
   attr :can_attach, :boolean, default: false
   attr :target, :any, default: nil
+  attr :compact, :boolean, default: false, doc: "one row of small thumbnails (panels)"
 
   @doc """
   One note as a post — the feed and every notes panel use this, so a note
@@ -418,8 +419,22 @@ defmodule FullCircleWeb.NoteComponents do
           <div phx-no-format class="line-clamp-8 whitespace-pre-wrap break-words">{@note.body}</div>
         </.post_link>
 
+        <%!-- Panels sit under a record's form: a row of small thumbnails, names in
+             the tooltip. The feed gets the large X-style grid. --%>
+        <div :if={@compact and @thumbs != []} class="mt-2 flex items-center gap-1.5">
+          <a
+            :for={a <- @thumbs}
+            href={Attachments.url(a)}
+            target="_blank"
+            title={a.file_name}
+            class="note-thumb block overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700"
+          >
+            <.file_thumb att={a} class="h-16 w-16" />
+          </a>
+          <span :if={@hidden_files > 0} class="text-xs text-gray-500">+{@hidden_files}</span>
+        </div>
         <div
-          :if={@thumbs != []}
+          :if={!@compact and @thumbs != []}
           class={[
             "mt-2 grid gap-0.5 overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700",
             length(@thumbs) > 1 && "grid-cols-2"
@@ -439,7 +454,7 @@ defmodule FullCircleWeb.NoteComponents do
             />
           </a>
         </div>
-        <div :if={@hidden_files > 0} class="mt-1 text-xs text-gray-500">
+        <div :if={!@compact and @hidden_files > 0} class="mt-1 text-xs text-gray-500">
           + {ngettext("1 more file", "%{count} more files", @hidden_files)}
         </div>
 

@@ -19,6 +19,7 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
       socket
       |> assign(assigns)
       |> assign_new(:notify_parent, fn -> false end)
+      |> assign_new(:class, fn -> nil end)
       |> assign_new(:adding, fn -> false end)
       |> assign_new(:params, fn -> %{} end)
 
@@ -116,7 +117,10 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
     ~H"""
     <section
       id={@id}
-      class="mx-auto mt-3 overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900"
+      class={[
+        "mx-auto mt-3 overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900",
+        @class
+      ]}
     >
       <div class="flex items-center gap-2 border-b border-gray-200 px-4 py-2 dark:border-gray-700">
         <span class="font-semibold">📝 {gettext("Notes")}</span>
@@ -203,6 +207,7 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
         relation={item.relation}
         can_attach={item.can_attach}
         new_tab
+        compact
       />
       <p :if={@items == []} class="px-4 py-3 text-sm text-gray-500">{gettext("No notes yet.")}</p>
     </section>
