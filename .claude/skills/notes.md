@@ -15,9 +15,22 @@ index, search, panel, counts, backlinks, versions, attachment download — must
 compose it. A new read path that queries `notes` directly is a leak.
 
 ## Visibility values
-nil = public. A list of roles otherwise; `[]` is invalid (DB check). Forms send
-a hidden `""` so unticked groups still submit — `normalize/1` in `Notes` turns
-`["", ...]` into the list or nil.
+nil = public (Everyone). Otherwise a non-empty list; `[]` is invalid (DB
+check). The chips are one shared `visibility_chips/1` (note page, feed post
+box, notes panel quick-add): **Everyone · 🔒 Private · `Note.choosable_roles()`**
+(manager supervisor cashier clerk auditor).
+
+- **No admin chip:** admins read every note regardless (`visible_to/3` skips the
+  role test). **No guest chip:** guests have no `:view_notes`.
+- **Private is stored as `["admin"]`** (`Note.private_visibility/0`,
+  `Note.private?/1`): only admins and the writer read it. "admin" only means
+  something alone — `normalize/1` in `Notes` drops it next to real roles, so
+  ticking a role while Private is on replaces Private.
+- Forms send a hidden `""` so unticked groups still submit; normalize turns
+  `["", ...]` into the list or nil. While Private is on, the chips render a
+  hidden `admin` input so it survives the next phx-change.
+- The host handles `visibility_everyone` / `visibility_private` clicks by
+  re-running its change with the stored form params.
 
 ## Versions
 `update_note/4` snapshots the *current DB row* into `note_versions`, then
@@ -135,6 +148,14 @@ textarea (LiveViewTest raises on them). So:
   textarea id carries a revision counter bumped after each post so the box
   actually clears (the browser keeps typed text on a same-id textarea).
 Any new place that renders a note form next to another must do the same.
+
+## Navigation between notes and records
+Links from notes to records (About and link chips, in the feed and on the note
+page) and from a record's notes panel to a note ("Open") use
+`target="_blank"`, like FullCircle's `doc_link`: record pages have no "back to
+where I came from" (their orange button goes to their own list), so the page
+you came from stays open in its tab. Moving within Notes (feed → note page →
+Back) stays in the same tab.
 
 ## Note page
 There is no show page: `/notes/:id` and `/notes/:id/edit` both render
