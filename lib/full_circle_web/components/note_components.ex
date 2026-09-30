@@ -106,6 +106,66 @@ defmodule FullCircleWeb.NoteComponents do
   attr :can_edit, :boolean, default: false
   attr :target, :any, default: nil
 
+  @doc "Files as a tidy grid of tiles: a thumbnail for images, a type badge otherwise."
+  def attachment_tiles(assigns) do
+    ~H"""
+    <div :if={@attachments != []} class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+      <div
+        :for={a <- @attachments}
+        id={"att-#{a.id}"}
+        class="group flex items-center gap-2 rounded-lg border border-gray-200 bg-white p-2 dark:border-gray-700 dark:bg-gray-800"
+      >
+        <a
+          href={"/companies/#{@current_company.id}/note_attachments/#{a.id}"}
+          target="_blank"
+          class="flex min-w-0 flex-1 items-center gap-2"
+          title={a.file_name}
+        >
+          <img
+            :if={String.starts_with?(a.content_type, "image/")}
+            src={"/companies/#{@current_company.id}/note_attachments/#{a.id}"}
+            alt=""
+            loading="lazy"
+            class="h-10 w-10 flex-none rounded object-cover"
+          />
+          <span
+            :if={!String.starts_with?(a.content_type, "image/")}
+            class="flex h-10 w-10 flex-none items-center justify-center rounded bg-rose-100 text-[10px] font-bold text-rose-700 dark:bg-rose-900 dark:text-rose-200"
+          >
+            PDF
+          </span>
+          <span class="min-w-0">
+            <span class="block truncate text-sm text-gray-800 dark:text-gray-100">{a.file_name}</span>
+            <span class="block text-xs text-gray-500 dark:text-gray-400">{file_size(a.byte_size)}</span>
+          </span>
+        </a>
+        <button
+          :if={@can_edit}
+          type="button"
+          phx-click="remove_attachment"
+          phx-value-id={a.id}
+          phx-target={@target}
+          data-confirm={gettext("Remove this file from the note?")}
+          class="flex-none rounded p-1 text-gray-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950"
+          title={gettext("Remove")}
+        >
+          <.icon name="hero-x-mark" class="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+    """
+  end
+
+  defp file_size(nil), do: ""
+  defp file_size(b) when b < 1_000, do: "#{b} B"
+  defp file_size(b) when b < 1_000_000, do: "#{round(b / 1_000)} KB"
+  defp file_size(b), do: "#{Float.round(b / 1_000_000, 1)} MB"
+
+  attr :attachments, :list, required: true
+  attr :current_company, :map, required: true
+  attr :can_edit, :boolean, default: false
+  attr :target, :any, default: nil
+
   def attachment_list(assigns) do
     ~H"""
     <div :if={@attachments != []} class="mt-1 flex flex-wrap gap-2 text-sm">

@@ -64,7 +64,6 @@ defmodule FullCircleWeb.NoteLive.Form do
       note: %Note{},
       subject: subject,
       links: [],
-      backlinks: [],
       can_edit: true,
       can_delete: false
     )
@@ -95,8 +94,7 @@ defmodule FullCircleWeb.NoteLive.Form do
       subject: subject_of(note, com, user),
       form: to_form(Notes.change_note(note)),
       params: %{},
-      links: Notes.list_links(note, com, user),
-      backlinks: Notes.list_backlinks(note, com, user)
+      links: Notes.list_links(note, com, user)
     )
     |> assign_history()
   end
@@ -122,8 +120,7 @@ defmodule FullCircleWeb.NoteLive.Form do
       fresh ->
         assign(socket,
           note: %{note | attachments: fresh.attachments},
-          links: Notes.list_links(note, com, user),
-          backlinks: Notes.list_backlinks(note, com, user)
+          links: Notes.list_links(note, com, user)
         )
     end
   end
@@ -314,6 +311,19 @@ defmodule FullCircleWeb.NoteLive.Form do
     <div class="mx-auto w-6/12 max-md:w-11/12">
       <div class="rounded-lg border border-yellow-500 bg-yellow-100 p-4 dark:border-yellow-700 dark:bg-yellow-950">
         <p class="w-full text-center text-3xl font-medium">{@page_title}</p>
+        <p
+          :if={@live_action == :edit}
+          class="mb-2 text-center text-xs text-gray-600 dark:text-gray-400"
+        >
+          {gettext("Written by")} {@note.author.email} · {FullCircleWeb.Helpers.format_datetime(
+            @note.inserted_at,
+            @current_company
+          )}
+          <span :if={@note.updated_at != @note.inserted_at}>
+            · {gettext("edited by")} {@note.updated_by.email}
+            {FullCircleWeb.Helpers.format_datetime(@note.updated_at, @current_company)}
+          </span>
+        </p>
 
         <.form for={@form} id="note-form" phx-change="validate" phx-submit="save" autocomplete="off">
           <.input field={@form[:title]} label={gettext("Title (optional)")} disabled={!@can_edit} />
@@ -482,80 +492,75 @@ defmodule FullCircleWeb.NoteLive.Form do
         </div>
       </div>
 
-      <div class="mt-3 px-1">
-        <h2 class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-          {gettext("Files")}
-        </h2>
+      <%!-- Three boxes under the card: files, notes about this note, history. --%>
+      <section class="mt-3 rounded-lg border border-gray-200 bg-white/70 p-3 dark:border-gray-700 dark:bg-gray-900/40">
+        <div class="mb-2 flex items-center">
+          <h2 class="text-sm font-semibold">
+            📎 {gettext("Files")}
+            <span :if={@live_action == :edit and @note.attachments != []} class="text-gray-500">
+              ({length(@note.attachments)})
+            </span>
+          </h2>
+          <span :if={@live_action == :edit and @can_edit} class="ml-auto">
+            <.attach_button note_id={@note.id} current_company={@current_company} />
+          </span>
+        </div>
         <%= if @live_action == :edit do %>
-          <.attachment_list
+          <.attachment_tiles
             attachments={@note.attachments}
             current_company={@current_company}
             can_edit={@can_edit}
           />
-          <p :if={@note.attachments == [] and !@can_edit} class="text-sm text-gray-500">
-            {gettext("None")}
-          </p>
-          <div :if={@can_edit} class="mt-1">
-            <.attach_button note_id={@note.id} current_company={@current_company} />
-          </div>
+          <p :if={@note.attachments == []} class="text-sm text-gray-500">{gettext("None")}</p>
         <% else %>
           <p class="text-sm text-gray-500">{gettext("Save the note first, then attach files.")}</p>
         <% end %>
+      </section>
 
-        <div :if={@live_action == :edit}>
-          <h2 class="mt-3 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-            {gettext("Notes linking here")}
-          </h2>
-          <div :for={b <- @backlinks} class="text-sm">
-            <.link
-              navigate={~p"/companies/#{@current_company.id}/notes/#{b.id}/edit"}
-              class="text-blue-600 hover:underline dark:text-blue-400"
-            >
-              {Note.display_title(b)}
-            </.link>
-          </div>
-          <p :if={@backlinks == []} class="text-sm text-gray-500">{gettext("None")}</p>
+      <%!-- Notes about this note (and notes linking to it): the same panel as
+           on every record page, so follow-ups can be added right here. --%>
+      <.live_component
+        :if={@live_action == :edit}
+        module={FullCircleWeb.NoteLive.NotesPanelComponent}
+        id="notes-panel"
+        record_type="Note"
+        record_id={@note.id}
+        current_company={@current_company}
+        current_user={@current_user}
+      />
 
-          <button
-            id="toggle-history"
-            type="button"
-            phx-click="toggle_history"
-            class="mt-3 text-xs font-semibold uppercase tracking-wide text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-100"
+      <section
+        :if={@live_action == :edit}
+        class="mt-3 rounded-lg border border-gray-200 bg-white/70 p-3 dark:border-gray-700 dark:bg-gray-900/40"
+      >
+        <button
+          id="toggle-history"
+          type="button"
+          phx-click="toggle_history"
+          class="text-sm font-semibold hover:text-blue-700 dark:hover:text-blue-300"
+        >
+          {if @show_history, do: "▾", else: "▸"} 🕘 {gettext("History")}
+        </button>
+        <div :if={@show_history} class="mt-2">
+          <div
+            :for={h <- @history}
+            class="my-1 rounded border border-gray-300 p-2 text-sm dark:border-gray-600"
           >
-            {if @show_history, do: "▾", else: "▸"} {gettext("History")}
-          </button>
-          <div :if={@show_history}>
-            <div
-              :for={h <- @history}
-              class="my-1 rounded border border-gray-300 p-2 text-sm dark:border-gray-600"
-            >
-              <div class="text-xs text-gray-500">
-                {gettext("Version")} {h.version.version} · {gettext("replaced by")} {h.version.edited_by.email}
-                {FullCircleWeb.Helpers.format_datetime(h.version.inserted_at, @current_company)}
-              </div>
-              <div :for={{field, old, new} <- h.changes}>
-                <span class="font-semibold">{field}</span>: <span
-                  phx-no-format
-                  class="whitespace-pre-wrap bg-rose-100 line-through dark:bg-rose-900"
-                >{show_value(old)}</span> →
-                <span class="whitespace-pre-wrap bg-green-100 dark:bg-green-900">{show_value(new)}</span>
-              </div>
+            <div class="text-xs text-gray-500">
+              {gettext("Version")} {h.version.version} · {gettext("replaced by")} {h.version.edited_by.email}
+              {FullCircleWeb.Helpers.format_datetime(h.version.inserted_at, @current_company)}
             </div>
-            <p :if={@history == []} class="text-sm text-gray-500">{gettext("Never edited.")}</p>
+            <div :for={{field, old, new} <- h.changes}>
+              <span class="font-semibold">{field}</span>: <span
+                phx-no-format
+                class="whitespace-pre-wrap bg-rose-100 line-through dark:bg-rose-900"
+              >{show_value(old)}</span> →
+              <span class="whitespace-pre-wrap bg-green-100 dark:bg-green-900">{show_value(new)}</span>
+            </div>
           </div>
-
-          <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">
-            {gettext("Written by")} {@note.author.email} · {FullCircleWeb.Helpers.format_datetime(
-              @note.inserted_at,
-              @current_company
-            )}
-            <span :if={@note.updated_at != @note.inserted_at}>
-              · {gettext("edited by")} {@note.updated_by.email}
-              {FullCircleWeb.Helpers.format_datetime(@note.updated_at, @current_company)}
-            </span>
-          </p>
+          <p :if={@history == []} class="text-sm text-gray-500">{gettext("Never edited.")}</p>
         </div>
-      </div>
+      </section>
     </div>
     """
   end

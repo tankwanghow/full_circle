@@ -28,10 +28,19 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
     else
       {:ok,
        socket
-       |> assign(loaded_for: key, adding: false, form: to_form(Notes.change_note(%Note{})))
+       |> assign(
+         loaded_for: key,
+         adding: false,
+         form: panel_form(socket, Notes.change_note(%Note{}))
+       )
        |> load()}
     end
   end
+
+  # Input ids are prefixed with the component id: the panel can sit on a page
+  # that has its own note form (the note page itself), and two `note_body`
+  # inputs would make the browser patch and focus the wrong textarea.
+  defp panel_form(socket, cs), do: to_form(cs, id: "#{socket.assigns.id}_note")
 
   defp load(socket) do
     %{record_type: t, record_id: id, current_company: com, current_user: user} = socket.assigns
@@ -52,7 +61,7 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
 
   def handle_event("validate", %{"note" => params}, socket) do
     cs = %Note{} |> Notes.change_note(params) |> Map.put(:action, :validate)
-    {:noreply, assign(socket, form: to_form(cs))}
+    {:noreply, assign(socket, form: panel_form(socket, cs))}
   end
 
   def handle_event("save", %{"note" => params}, socket) do
@@ -64,10 +73,12 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
         if socket.assigns.notify_parent, do: send(self(), {:notes_changed, t, id})
 
         {:noreply,
-         socket |> assign(adding: false, form: to_form(Notes.change_note(%Note{}))) |> load()}
+         socket
+         |> assign(adding: false, form: panel_form(socket, Notes.change_note(%Note{})))
+         |> load()}
 
       {:error, %Ecto.Changeset{} = cs} ->
-        {:noreply, assign(socket, form: to_form(cs))}
+        {:noreply, assign(socket, form: panel_form(socket, cs))}
 
       _ ->
         {:noreply, socket}

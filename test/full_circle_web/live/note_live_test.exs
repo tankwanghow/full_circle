@@ -217,6 +217,26 @@ defmodule FullCircleWeb.NoteLiveTest do
       refute html =~ "cert.jpg"
     end
 
+    test "a note can be written about this note from its page",
+         %{conn: conn, admin: admin, comp: comp} do
+      note = note_fixture(comp, admin, %{"body" => "Company closed down"})
+      {:ok, lv, _} = live(conn, edit_path(comp, note))
+
+      lv |> element("#notes-panel-new") |> render_click()
+
+      html =
+        lv
+        |> form("#notes-panel-form", %{"note" => %{"body" => "confirmed with SSM search"}})
+        |> render_submit()
+
+      assert html =~ "confirmed with SSM search"
+
+      follow_up =
+        FullCircle.Repo.get_by!(FullCircle.Notes.Note, body: "confirmed with SSM search")
+
+      assert {follow_up.subject_type, follow_up.subject_id} == {"Note", note.id}
+    end
+
     test "delete returns to the index", %{conn: conn, admin: admin, comp: comp} do
       note = note_fixture(comp, admin)
       {:ok, lv, _} = live(conn, edit_path(comp, note))
