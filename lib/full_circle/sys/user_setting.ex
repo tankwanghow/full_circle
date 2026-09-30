@@ -22,6 +22,9 @@ defmodule FullCircle.Sys.UserSetting do
     |> validate_required([:page, :code, :values, :value, :company_user_id, :display_name])
   end
 
+  # Account, Tax Rate and Discount come from the Good and are rarely changed on
+  # an invoice line, so new users start with them hidden (the ⚙ brings them
+  # back). Existing users keep their saved choices.
   def default_settings("Invoice", cuid) do
     [
       %{
@@ -45,7 +48,7 @@ defmodule FullCircle.Sys.UserSetting do
         code: "account-col",
         display_name: "Account",
         values: %{"show" => "visible", "hide" => "hidden"},
-        value: "show",
+        value: "hide",
         company_user_id: cuid
       },
       %{
@@ -53,7 +56,7 @@ defmodule FullCircle.Sys.UserSetting do
         code: "taxrate-col",
         display_name: "Tax Rate",
         values: %{"show" => "visible", "hide" => "hidden"},
-        value: "show",
+        value: "hide",
         company_user_id: cuid
       },
       %{
@@ -61,7 +64,7 @@ defmodule FullCircle.Sys.UserSetting do
         code: "discount-col",
         display_name: "Discount",
         values: %{"show" => "visible", "hide" => "hidden"},
-        value: "show",
+        value: "hide",
         company_user_id: cuid
       }
     ]

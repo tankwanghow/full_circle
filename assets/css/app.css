@@ -617,6 +617,29 @@ input[disabled] {
   width: 1%;
 }
 
+/* Fit-to-content detail table (pilot: Invoice, opt-in via .detail-fit).
+   Percentage widths above stretch every column across a w-11/12 card; here each
+   column gets a width that suits its content, text columns may grow, and a
+   column hidden with the ⚙ chooser gives its space back. The card is w-fit, so
+   it ends up exactly as wide as the visible columns. */
+.detail-fit .detail-good-col,
+.detail-fit .detail-desc-col { flex: 1 0 11rem; width: auto; }
+.detail-fit .detail-account-col { flex: 1 0 9rem; width: auto; }
+.detail-fit .detail-pack-col { flex: 0 0 7rem; width: auto; }
+.detail-fit .detail-packqty-col { flex: 0 0 4.5rem; width: auto; }
+.detail-fit .detail-qty-col { flex: 0 0 6.5rem; width: auto; }
+.detail-fit .detail-unit-col { flex: 0 0 3.5rem; width: auto; }
+.detail-fit .detail-price-col { flex: 0 0 5.5rem; width: auto; }
+.detail-fit .detail-discount-col { flex: 0 0 4.5rem; width: auto; }
+.detail-fit .detail-goodamt-col { flex: 0 0 7rem; width: auto; }
+.detail-fit .detail-taxcode-col { flex: 0 0 4.5rem; width: auto; }
+.detail-fit .detail-taxrate-col { flex: 0 0 3.5rem; width: auto; }
+.detail-fit .detail-taxamt-col { flex: 0 0 6.5rem; width: auto; }
+.detail-fit .detail-amt-col { flex: 0 0 7rem; width: auto; }
+.detail-fit .detail-setting-col { flex: 0 0 1.5rem; width: auto; }
+/* Hidden columns must stay out of the layout (flex-basis would otherwise win). */
+.detail-fit .hidden { display: none; }
+
 @keyframes flash-shake {
   0%, 100% {
     transform: translateX(-50%);
