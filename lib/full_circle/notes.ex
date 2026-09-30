@@ -298,6 +298,9 @@ defmodule FullCircle.Notes do
     case Map.fetch(attrs, "visibility") do
       {:ok, list} when is_list(list) ->
         roles = list |> Enum.reject(&(&1 in ["", nil])) |> Enum.uniq()
+        # "admin" only means something alone (Private); next to real roles it
+        # is redundant — admins read everything — so a role replaces Private.
+        roles = if roles != ["admin"], do: roles -- ["admin"], else: roles
         Map.put(attrs, "visibility", if(roles == [], do: nil, else: roles))
 
       {:ok, v} when v in ["", nil] ->

@@ -60,6 +60,13 @@ defmodule FullCircleWeb.NoteLiveTest do
              )
     end
 
+    test "a private note's badge says Private", %{conn: conn, admin: admin, comp: comp} do
+      note = note_fixture(comp, admin, %{"body" => "p", "visibility" => ["admin"]})
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/notes")
+      assert has_element?(lv, "#notes-#{note.id}", "Private")
+      refute has_element?(lv, "#notes-#{note.id}", "🔒 admin")
+    end
+
     test "a title shows in bold above the text", %{conn: conn, admin: admin, comp: comp} do
       note = note_fixture(comp, admin, %{"title" => "Year-end stock count", "body" => "Steps..."})
       {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/notes")
@@ -327,6 +334,35 @@ defmodule FullCircleWeb.NoteLiveTest do
         href = "/companies/#{comp.id}/contacts/#{c.id}/edit"
         assert has_element?(lv, ~s(a[target="_blank"][href="#{href}"]))
       end
+    end
+
+    test "chips offer Everyone, Private and the real roles — no admin, no guest",
+         %{conn: conn, admin: admin, comp: comp} do
+      note = note_fixture(comp, admin, %{"body" => "b"})
+      {:ok, lv, _} = live(conn, edit_path(comp, note))
+      refute has_element?(lv, "label.role-chip", "admin")
+      refute has_element?(lv, "label.role-chip", "guest")
+      assert has_element?(lv, "label.role-chip", "manager")
+      assert has_element?(lv, "#visibility-private")
+    end
+
+    test "Private makes the note admins-and-writer only; a role then replaces it",
+         %{conn: conn, admin: admin, comp: comp} do
+      note = note_fixture(comp, admin, %{"body" => "b"})
+      {:ok, lv, _} = live(conn, edit_path(comp, note))
+
+      lv |> element("#visibility-private") |> render_click()
+      assert has_element?(lv, "#visibility-private[data-selected]")
+      lv |> form("#note-form") |> render_submit()
+      assert FullCircle.Repo.get!(FullCircle.Notes.Note, note.id).visibility == ["admin"]
+
+      # Ticking a role while Private is on switches to that role.
+      lv
+      |> form("#note-form", %{"note" => %{"visibility" => ["admin", "clerk"]}})
+      |> render_change()
+
+      refute has_element?(lv, "#visibility-private[data-selected]")
+      assert has_element?(lv, "label.role-chip[data-selected]", "clerk")
     end
 
     test "the Everyone chip clears the role list", %{conn: conn, admin: admin, comp: comp} do

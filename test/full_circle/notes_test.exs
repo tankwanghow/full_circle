@@ -48,6 +48,18 @@ defmodule FullCircle.NotesTest do
       assert cs.valid?
     end
 
+    test "guest is not a visibility choice (guests cannot open notes); admin alone means private" do
+      cs = Note.changeset(%Note{}, %{"body" => "b", "visibility" => ["guest"]})
+      assert %{visibility: ["has an invalid entry"]} = errors_on(cs)
+
+      assert Note.changeset(%Note{}, %{"body" => "b", "visibility" => ["admin"]}).valid?
+      assert Note.private?(%Note{visibility: ["admin"]})
+      refute Note.private?(%Note{visibility: ["admin", "clerk"]})
+      refute Note.private?(%Note{visibility: nil})
+      refute "admin" in Note.choosable_roles()
+      refute "guest" in Note.choosable_roles()
+    end
+
     test "an empty visibility list is rejected — public is nil" do
       cs = Note.changeset(%Note{}, %{"body" => "b", "visibility" => []})
       assert %{visibility: ["use nil for public"]} = errors_on(cs)
@@ -194,6 +206,35 @@ defmodule FullCircle.NotesTest do
         u = user_with_role(company, admin, role)
         assert :not_authorise = Notes.create_note(%{"body" => "x"}, company, u)
       end
+    end
+  end
+
+  describe "private notes" do
+    test "admin alone is private; admin next to roles is dropped (admins always read)",
+         %{admin: admin, company: company} do
+      {:ok, private} =
+        Notes.create_note(%{"body" => "p", "visibility" => ["", "admin"]}, company, admin)
+
+      assert private.visibility == ["admin"]
+
+      {:ok, shared} =
+        Notes.create_note(
+          %{"body" => "s", "visibility" => ["", "admin", "clerk"]},
+          company,
+          admin
+        )
+
+      assert shared.visibility == ["clerk"]
+    end
+
+    test "a private note is read by admins and the writer only", %{admin: admin, company: company} do
+      clerk = user_with_role(company, admin, "clerk")
+      manager = user_with_role(company, admin, "manager")
+      note = note_fixture(company, clerk, %{"body" => "private", "visibility" => ["admin"]})
+
+      assert Notes.get_note(note.id, company, admin)
+      assert Notes.get_note(note.id, company, clerk)
+      refute Notes.get_note(note.id, company, manager)
     end
   end
 

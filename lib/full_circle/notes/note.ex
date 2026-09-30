@@ -36,7 +36,22 @@ defmodule FullCircle.Notes.Note do
 
   @castable ~w(title body subject_type subject_id visibility)a
 
-  def visibility_roles, do: FullCircle.Authorization.roles() -- ["disable"]
+  # Admins read every note regardless of `visibility`, and guests cannot open
+  # notes at all, so neither is a real choice. `["admin"]` on its own is the
+  # stored form of "Private": only admins and the writer can read it.
+  @choosable_roles ~w(manager supervisor cashier clerk auditor)
+  @private ["admin"]
+
+  @doc "Roles offered as visibility chips."
+  def choosable_roles, do: @choosable_roles
+
+  @doc "The stored `visibility` of a private note."
+  def private_visibility, do: @private
+
+  def private?(%{visibility: @private}), do: true
+  def private?(_), do: false
+
+  defp visibility_values, do: @private ++ @choosable_roles
 
   def changeset(note, attrs) do
     note
@@ -83,7 +98,7 @@ defmodule FullCircle.Notes.Note do
         add_error(cs, :visibility, "use nil for public")
 
       _roles ->
-        validate_subset(cs, :visibility, visibility_roles(), message: "has an invalid entry")
+        validate_subset(cs, :visibility, visibility_values(), message: "has an invalid entry")
     end
   end
 end

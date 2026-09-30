@@ -152,6 +152,11 @@ defmodule FullCircleWeb.NoteLive.Form do
   def handle_event("visibility_everyone", _, socket),
     do: {:noreply, change(socket, Map.put(socket.assigns.params, "visibility", [""]))}
 
+  def handle_event("visibility_private", _, socket),
+    do:
+      {:noreply,
+       change(socket, Map.put(socket.assigns.params, "visibility", Note.private_visibility()))}
+
   def handle_event("clear_subject", _, socket), do: {:noreply, assign(socket, subject: nil)}
 
   def handle_event("toggle_picker", _, socket),
@@ -346,28 +351,9 @@ defmodule FullCircleWeb.NoteLive.Form do
               >
                 {gettext("Readable by")}
               </span>
-              <button
-                type="button"
-                id="visibility-everyone"
-                phx-click="visibility_everyone"
-                disabled={!@can_edit}
-                class={[
-                  "rounded-full border px-2 text-xs",
-                  if(selected_roles(@form) == [],
-                    do:
-                      "border-green-400 bg-green-100 text-green-800 dark:border-green-600 dark:bg-green-900 dark:text-green-100",
-                    else:
-                      "border-gray-300 bg-white text-gray-600 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
-                  )
-                ]}
-              >
-                {if selected_roles(@form) == [], do: "● ", else: ""}{gettext("Everyone")}
-              </button>
-              <input type="hidden" name="note[visibility][]" value="" />
-              <.role_chip
-                :for={role <- Note.visibility_roles()}
-                role={role}
-                selected={role in selected_roles(@form)}
+              <.visibility_chips
+                visibility={selected_roles(@form)}
+                id_prefix="visibility"
                 disabled={!@can_edit}
               />
             </div>

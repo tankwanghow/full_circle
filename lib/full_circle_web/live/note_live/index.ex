@@ -75,9 +75,18 @@ defmodule FullCircleWeb.NoteLive.Index do
 
   # --- post box ----------------------------------------------------------------
 
-  def handle_event("compose_validate", %{"note" => params}, socket) do
-    cs = %Note{} |> Notes.change_note(params) |> Map.put(:action, :validate)
-    {:noreply, assign(socket, compose_form: compose_form(cs))}
+  def handle_event("compose_validate", %{"note" => params}, socket),
+    do: {:noreply, compose_change(socket, params)}
+
+  # The post box's Everyone / Private chips (visibility_chips/1).
+  def handle_event("visibility_everyone", _, socket),
+    do:
+      {:noreply,
+       compose_change(socket, Map.put(socket.assigns.compose_params, "visibility", [""]))}
+
+  def handle_event("visibility_private", _, socket) do
+    params = Map.put(socket.assigns.compose_params, "visibility", Note.private_visibility())
+    {:noreply, compose_change(socket, params)}
   end
 
   def handle_event("compose_toggle_roles", _, socket),
@@ -125,10 +134,20 @@ defmodule FullCircleWeb.NoteLive.Index do
   # clears it even though the browser still holds what was typed.
   defp reset_compose(socket) do
     rev = (socket.assigns[:compose_rev] || 0) + 1
-    assign(socket, compose_rev: rev, compose_form: compose_form(Notes.change_note(%Note{})))
+
+    assign(socket,
+      compose_rev: rev,
+      compose_params: %{},
+      compose_form: compose_form(Notes.change_note(%Note{}))
+    )
   end
 
   defp compose_form(cs), do: to_form(cs, id: "compose_note")
+
+  defp compose_change(socket, params) do
+    cs = %Note{} |> Notes.change_note(params) |> Map.put(:action, :validate)
+    assign(socket, compose_form: compose_form(cs), compose_params: params)
+  end
 
   defp compose_roles(form), do: Ecto.Changeset.get_field(form.source, :visibility) || []
 
@@ -224,11 +243,9 @@ defmodule FullCircleWeb.NoteLive.Index do
             </.error>
 
             <div :if={@compose_roles} class="flex flex-wrap gap-1 pb-2">
-              <input type="hidden" name="note[visibility][]" value="" />
-              <.role_chip
-                :for={role <- Note.visibility_roles()}
-                role={role}
-                selected={role in compose_roles(@compose_form)}
+              <.visibility_chips
+                visibility={compose_roles(@compose_form)}
+                id_prefix="compose-visibility"
               />
             </div>
             <%!-- keep the chosen roles when the chips are folded away --%>
@@ -272,10 +289,13 @@ defmodule FullCircleWeb.NoteLive.Index do
                 phx-click="compose_toggle_roles"
                 class="rounded-full border border-gray-300 px-2 text-xs text-gray-600 dark:border-gray-600 dark:text-gray-300"
               >
-                <%= if compose_roles(@compose_form) == [] do %>
-                  👥 {gettext("Everyone")} ▾
-                <% else %>
-                  🔒 {Enum.join(compose_roles(@compose_form), ", ")} ▾
+                <%= cond do %>
+                  <% compose_roles(@compose_form) == [] -> %>
+                    👥 {gettext("Everyone")} ▾
+                  <% compose_roles(@compose_form) == Note.private_visibility() -> %>
+                    🔒 {gettext("Private")} ▾
+                  <% true -> %>
+                    🔒 {Enum.join(compose_roles(@compose_form), ", ")} ▾
                 <% end %>
               </button>
               <.link

@@ -20,6 +20,7 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
       |> assign(assigns)
       |> assign_new(:notify_parent, fn -> false end)
       |> assign_new(:adding, fn -> false end)
+      |> assign_new(:params, fn -> %{} end)
 
     key = {socket.assigns.record_type, socket.assigns.record_id}
 
@@ -42,6 +43,11 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
   # inputs would make the browser patch and focus the wrong textarea.
   defp panel_form(socket, cs), do: to_form(cs, id: "#{socket.assigns.id}_note")
 
+  defp panel_change(socket, params) do
+    cs = %Note{} |> Notes.change_note(params) |> Map.put(:action, :validate)
+    assign(socket, form: panel_form(socket, cs), params: params)
+  end
+
   defp load(socket) do
     %{record_type: t, record_id: id, current_company: com, current_user: user} = socket.assigns
     rows = Notes.notes_for_record(t, id, com, user)
@@ -59,9 +65,15 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
   def handle_event("new", _, socket), do: {:noreply, assign(socket, adding: true)}
   def handle_event("cancel", _, socket), do: {:noreply, assign(socket, adding: false)}
 
-  def handle_event("validate", %{"note" => params}, socket) do
-    cs = %Note{} |> Notes.change_note(params) |> Map.put(:action, :validate)
-    {:noreply, assign(socket, form: panel_form(socket, cs))}
+  def handle_event("validate", %{"note" => params}, socket),
+    do: {:noreply, panel_change(socket, params)}
+
+  def handle_event("visibility_everyone", _, socket),
+    do: {:noreply, panel_change(socket, Map.put(socket.assigns.params, "visibility", [""]))}
+
+  def handle_event("visibility_private", _, socket) do
+    params = Map.put(socket.assigns.params, "visibility", Note.private_visibility())
+    {:noreply, panel_change(socket, params)}
   end
 
   def handle_event("save", %{"note" => params}, socket) do
@@ -74,7 +86,11 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
 
         {:noreply,
          socket
-         |> assign(adding: false, form: panel_form(socket, Notes.change_note(%Note{})))
+         |> assign(
+           adding: false,
+           params: %{},
+           form: panel_form(socket, Notes.change_note(%Note{}))
+         )
          |> load()}
 
       {:error, %Ecto.Changeset{} = cs} ->
@@ -155,12 +171,13 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
         }>
           {msg}
         </.error>
-        <div class="text-xs">
-          {gettext("Readable by")} ({gettext("tick none for everyone")}):
-          <input type="hidden" name="note[visibility][]" value="" />
-          <label :for={role <- Note.visibility_roles()} class="mr-2 inline-flex items-center gap-1">
-            <input type="checkbox" name="note[visibility][]" value={role} />{role}
-          </label>
+        <div class="flex flex-wrap items-center gap-1 text-xs">
+          <span class="mr-1 font-semibold">{gettext("Readable by")}</span>
+          <.visibility_chips
+            visibility={Ecto.Changeset.get_field(@form.source, :visibility)}
+            id_prefix={"#{@id}-visibility"}
+            target={@myself}
+          />
         </div>
         <div class="mt-1 flex gap-2">
           <.button>{gettext("Save")}</.button>

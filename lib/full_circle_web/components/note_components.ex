@@ -31,6 +31,14 @@ defmodule FullCircleWeb.NoteComponents do
     """
   end
 
+  def visibility_badge(%{visibility: ["admin"]} = assigns) do
+    ~H"""
+    <span class="rounded px-1 text-xs bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-200">
+      🔒 {gettext("Private")}
+    </span>
+    """
+  end
+
   def visibility_badge(assigns) do
     ~H"""
     <span class="rounded px-1 text-xs bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-200">
@@ -144,6 +152,73 @@ defmodule FullCircleWeb.NoteComponents do
         </button>
       </div>
     </div>
+    """
+  end
+
+  attr :visibility, :any, required: true, doc: "the form's current visibility (list or nil)"
+  attr :id_prefix, :string, required: true
+  attr :disabled, :boolean, default: false
+  attr :target, :any, default: nil
+
+  @doc """
+  Everyone · 🔒 Private · manager · supervisor · cashier · clerk · auditor.
+
+  Admin is not a chip (admins read every note) and neither is guest (guests
+  cannot open notes). Private is stored as `["admin"]`: readable by admins
+  and the writer only. The host handles `visibility_everyone` and
+  `visibility_private` clicks; ticking a role while Private is on replaces
+  it (see `Notes` normalize). Selected looks are chosen here, not with
+  `has-checked:` — see `role_chip/1`.
+  """
+  def visibility_chips(assigns) do
+    roles = assigns.visibility || []
+    private = roles == Note.private_visibility()
+    assigns = assign(assigns, roles: roles, private: private, everyone: roles == [])
+
+    ~H"""
+    <button
+      type="button"
+      id={"#{@id_prefix}-everyone"}
+      phx-click="visibility_everyone"
+      phx-target={@target}
+      disabled={@disabled}
+      data-selected={@everyone}
+      class={[
+        "rounded-full border px-2 text-xs",
+        if(@everyone,
+          do: "border-green-600 bg-green-600 font-semibold text-white",
+          else: "border-gray-400 text-gray-700 dark:text-gray-300"
+        )
+      ]}
+    >
+      {gettext("Everyone")}
+    </button>
+    <button
+      type="button"
+      id={"#{@id_prefix}-private"}
+      phx-click="visibility_private"
+      phx-target={@target}
+      disabled={@disabled}
+      data-selected={@private}
+      title={gettext("Only admins and the writer can read it.")}
+      class={[
+        "rounded-full border px-2 text-xs",
+        if(@private,
+          do: "border-rose-600 bg-rose-600 font-semibold text-white",
+          else: "border-gray-400 text-gray-700 dark:text-gray-300"
+        )
+      ]}
+    >
+      🔒 {gettext("Private")}
+    </button>
+    <input type="hidden" name="note[visibility][]" value="" />
+    <input :if={@private} type="hidden" name="note[visibility][]" value="admin" />
+    <.role_chip
+      :for={role <- Note.choosable_roles()}
+      role={role}
+      selected={role in @roles}
+      disabled={@disabled}
+    />
     """
   end
 
@@ -430,7 +505,9 @@ defmodule FullCircleWeb.NoteComponents do
             :if={@note.visibility}
             class="ml-1 rounded-full border border-rose-300 bg-rose-100 px-2 text-xs text-rose-800 dark:border-rose-700 dark:bg-rose-900 dark:text-rose-100"
           >
-            🔒 {Enum.join(@note.visibility, ", ")}
+            🔒 {if Note.private?(@note),
+              do: gettext("Private"),
+              else: Enum.join(@note.visibility, ", ")}
           </span>
         </div>
 

@@ -2446,3 +2446,9 @@ msgstr[0] "另外 %{count} 个文件"
 
 msgid "FILE"
 msgstr "文件"
+
+msgid "Private"
+msgstr "私密"
+
+msgid "Only admins and the writer can read it."
+msgstr "仅管理员和作者可以查看。"
