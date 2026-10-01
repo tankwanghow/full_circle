@@ -124,11 +124,11 @@ defmodule FullCircle.Notes do
   # --- write ----------------------------------------------------------------
 
   def change_note(%Note{} = note, attrs \\ %{}) do
-    Note.changeset(note, normalize(attrs))
+    Note.changeset(note, normalize_visibility(attrs))
   end
 
   def create_note(attrs, company, user) do
-    attrs = normalize(attrs)
+    attrs = normalize_visibility(attrs)
 
     if can?(user, :create_note, company) do
       changeset =
@@ -155,7 +155,7 @@ defmodule FullCircle.Notes do
   `lock_version` is what detects a concurrent save.
   """
   def update_note(%Note{} = note, attrs, company, user) do
-    attrs = attrs |> normalize() |> Map.delete("links")
+    attrs = attrs |> normalize_visibility() |> Map.delete("links")
 
     with %Note{} = current <- get_note(note.id, company, user) || {:error, :not_found},
          true <- may_edit?(current, user, rights(company, user)) || :not_authorise do
@@ -292,7 +292,8 @@ defmodule FullCircle.Notes do
 
   # Form checkboxes send a hidden "" so an all-unticked group still submits;
   # "no roles ticked" means public, which is nil.
-  defp normalize(attrs) do
+  @doc "Form visibility params → nil (Everyone), [\"admin\"] (Private) or roles. Shared with Tasks."
+  def normalize_visibility(attrs) do
     attrs = FullCircle.Helpers.key_to_string(attrs)
 
     case Map.fetch(attrs, "visibility") do
