@@ -44,6 +44,15 @@
         >
           📝{gettext("Notes")}
         </.link>
+        <%= if assigns[:current_company] &&
+                 FullCircle.Authorization.can?(@current_user, :view_tasks, @current_company) do %>
+          {live_render(@conn, FullCircleWeb.TaskLive.NavBadge,
+            id: "task-nav-badge",
+            sticky: true,
+            container: {:span, class: "contents"},
+            session: %{"company_id" => @current_company.id}
+          )}
+        <% end %>
 
         <button
           :if={assigns[:current_company]}

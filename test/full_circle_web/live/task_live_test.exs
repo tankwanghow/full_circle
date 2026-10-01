@@ -244,4 +244,38 @@ defmodule FullCircleWeb.TaskLiveTest do
                live(log_in_user(build_conn(), clerk), ~p"/companies/#{comp.id}/tasks/#{t.id}")
     end
   end
+
+  describe "nav badge" do
+    test "the nav carries the badge link for users who can view tasks", %{
+      conn: conn,
+      admin: admin,
+      comp: comp
+    } do
+      {:ok, _lv, html} = live(conn, ~p"/companies/#{comp.id}/dashboard")
+      assert html =~ ~s{id="full_circle_tasks"}
+
+      guest = user_with_role(comp, admin, "guest")
+
+      {:ok, _lv, html} =
+        live(log_in_user(build_conn(), guest), ~p"/companies/#{comp.id}/dashboard")
+
+      refute html =~ ~s{id="full_circle_tasks"}
+    end
+
+    test "counts my due tasks and updates when one is closed", %{
+      conn: conn,
+      admin: admin,
+      comp: comp
+    } do
+      t = task_fixture(comp, admin, %{"due_date" => past(comp, 1)})
+
+      {:ok, lv, _} =
+        live_isolated(conn, FullCircleWeb.TaskLive.NavBadge, session: %{"company_id" => comp.id})
+
+      assert has_element?(lv, "#task-badge-count", "1")
+
+      {:ok, _} = Tasks.close_task(t, :done, nil, comp, admin)
+      refute has_element?(lv, "#task-badge-count")
+    end
+  end
 end
