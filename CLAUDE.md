@@ -106,6 +106,7 @@ Every entity belongs to a `Company`. Routes are scoped as `/companies/:company_i
 | `EggStock` | Daily egg stock board, weekly DOW books, hybrid forecast |
 | `Trading` | Grain trading desk: supply/sales positions, locations, multi-good trips |
 | `Notes` / `Linkable` | Company memory: notes about any record, role visibility, versions, attachments, links |
+| `Tasks` | Recurring duties, job tracking, todos: one row per cycle, Done/Skip/Reopen, nav badge |
 | `BankReconciliation` | Bank statement import/match (LLM parser skill) |
 | `EInvMetas` | E-invoice metadata (Malaysia LHDN integration) |
 | `Reporting` | Report queries (cash forecast, CP204, etc.) |
@@ -123,7 +124,7 @@ Project skills (non-obvious domain contracts) live in `.claude/skills/`:
 `liveview-upload-gotchas.md`, `optimistic-locking.md`, `accounting-period-lock.md`,
 `user-query-sql.md`, `xero-import.md`, `fukuro-closure-backfill.md`,
 `periodic-inventory-double-entry.md`, `good-snp-report.md`,
-`layer-alive-birds-and-yield.md`, `notes.md`, `pl-forecast-model.md`,
+`layer-alive-birds-and-yield.md`, `notes.md`, `tasks.md`, `pl-forecast-model.md`,
 `mix-dependency-overrides.md`, `deploy-image-size.md`, `fit-width-forms.md`,
 `decluttered-index.md`.
 

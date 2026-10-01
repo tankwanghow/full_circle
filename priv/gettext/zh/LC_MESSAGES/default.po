@@ -2458,3 +2458,216 @@ msgstr "此备注链接到这里，但它是关于其他记录的。"
 
 msgid "Fixed Asset"
 msgstr "固定资产"
+
+msgid "Tasks"
+msgstr "任务"
+
+msgid "Task"
+msgstr "任务"
+
+msgid "New Task"
+msgstr "新任务"
+
+msgid "Overdue"
+msgstr "已逾期"
+
+msgid "Due soon"
+msgstr "即将到期"
+
+msgid "Upcoming"
+msgstr "未来"
+
+msgid "Someday"
+msgstr "无期限"
+
+msgid "Done & skipped"
+msgstr "已完成与已跳过"
+
+msgid "%{n}d late"
+msgstr "逾期%{n}天"
+
+msgid "in %{n}d"
+msgstr "%{n}天后"
+
+msgid "today"
+msgstr "今天"
+
+msgid "daily"
+msgstr "每天"
+
+msgid "weekly"
+msgstr "每周"
+
+msgid "monthly"
+msgstr "每月"
+
+msgid "yearly"
+msgstr "每年"
+
+msgid "every %{n} days"
+msgstr "每%{n}天"
+
+msgid "every %{n} weeks"
+msgstr "每%{n}周"
+
+msgid "every %{n} months"
+msgstr "每%{n}个月"
+
+msgid "every %{n} years"
+msgstr "每%{n}年"
+
+msgid "Mark done"
+msgstr "标记完成"
+
+msgid "Skip this time"
+msgstr "本次跳过"
+
+msgid "This task expects:"
+msgstr "此任务需要："
+
+msgid "Next cycle due"
+msgstr "下一期到期日"
+
+msgid "Closing note (optional) — add files on the task page after"
+msgstr "结束备注（可选）— 之后可在任务页添加文件"
+
+msgid "Done"
+msgstr "完成"
+
+msgid "Skip"
+msgstr "跳过"
+
+msgid "Skipped"
+msgstr "已跳过"
+
+msgid "Reopen"
+msgstr "重新打开"
+
+msgid "Task closed."
+msgstr "任务已结束。"
+
+msgid "Task closed. This is the next cycle."
+msgstr "任务已结束。这是下一期。"
+
+msgid "Task reopened."
+msgstr "任务已重新打开。"
+
+msgid "Task reopened. The next cycle was already worked on, so it stays."
+msgstr "任务已重新打开。下一期已有进展，因此保留。"
+
+msgid "Someone already closed this task."
+msgstr "此任务已被他人结束。"
+
+msgid "Task saved."
+msgstr "任务已保存。"
+
+msgid "Task deleted."
+msgstr "任务已删除。"
+
+msgid "Task not found."
+msgstr "找不到任务。"
+
+msgid "You cannot open tasks."
+msgstr "您无权打开任务。"
+
+msgid "You cannot create tasks."
+msgstr "您无权创建任务。"
+
+msgid "someone else changed this task — reload to see their version"
+msgstr "他人已修改此任务 — 请重新加载查看"
+
+msgid "A closed task cannot be edited — reopen it first."
+msgstr "已结束的任务不能编辑 — 请先重新打开。"
+
+msgid "Delete this task? A repeating task stops repeating."
+msgstr "删除此任务？重复任务将停止重复。"
+
+msgid "Whose"
+msgstr "归属"
+
+msgid "Mine"
+msgstr "我的"
+
+msgid "Due"
+msgstr "到期"
+
+msgid "Repeats"
+msgstr "重复"
+
+msgid "Assignee"
+msgstr "负责人"
+
+msgid "Unassigned"
+msgstr "未指派"
+
+msgid "Latest note"
+msgstr "最新备注"
+
+msgid "Nothing here."
+msgstr "暂无内容。"
+
+msgid "title, description or assignee…"
+msgstr "标题、描述或负责人…"
+
+msgid "Due date"
+msgstr "到期日"
+
+msgid "Repeats every"
+msgstr "重复周期"
+
+msgid "Every"
+msgstr "每"
+
+msgid "Does not repeat"
+msgstr "不重复"
+
+msgid "days"
+msgstr "天"
+
+msgid "weeks"
+msgstr "周"
+
+msgid "months"
+msgstr "个月"
+
+msgid "years"
+msgstr "年"
+
+msgid "Remind days before"
+msgstr "提前提醒天数"
+
+msgid "Documents needed (a reminder on Done)"
+msgstr "所需文件（完成时提醒）"
+
+msgid "Visible to"
+msgstr "可见范围"
+
+msgid "Admin, the creator and the assignee can always see it."
+msgstr "管理员、创建人和负责人始终可见。"
+
+msgid "Only admins, the creator and the assignee can see it."
+msgstr "仅管理员、创建人和负责人可见。"
+
+msgid "Only the people who can see this task (and admins) can read it."
+msgstr "仅能看到此任务的人（及管理员）可阅读。"
+
+msgid "Linked records"
+msgstr "关联记录"
+
+msgid "Created by"
+msgstr "创建人"
+
+msgid "Done by"
+msgstr "完成人"
+
+msgid "Skipped by"
+msgstr "跳过人"
+
+msgid "Other cycles"
+msgstr "其他周期"
+
+msgid "Search"
+msgstr "搜索"
+
+msgid "Title"
+msgstr "标题"

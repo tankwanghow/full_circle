@@ -14,6 +14,11 @@ author = me` (admin skips the role test; no `:view_notes` → empty). Every read
 index, search, panel, counts, backlinks, versions, attachment download — must
 compose it. A new read path that queries `notes` directly is a leak.
 
+Plus one rule for tasks: a note with `subject_type "Task"` is also readable by
+anyone who can see that task (`Tasks.visible_to/3`), and `list_versions/3`
+applies that rule per version, using the version's own subject (not the note's
+current one). See `.claude/skills/tasks.md`.
+
 ## Visibility values
 nil = public (Everyone). Otherwise a non-empty list; `[]` is invalid (DB
 check). The chips are one shared `visibility_chips/1` (note page, feed post
