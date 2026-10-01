@@ -339,6 +339,53 @@ defmodule FullCircleWeb.NotesPanelLiveTest do
     end
   end
 
+  describe "accounts and fixed assets" do
+    test "account: edit page panel and index count", %{conn: conn, admin: admin, comp: comp} do
+      ac = FullCircle.AccountingFixtures.account_fixture(%{name: "RHB OD"}, comp, admin)
+
+      note_fixture(comp, admin, %{
+        "body" => "limit RM500k, secured by Lot 123",
+        "subject_type" => "Account",
+        "subject_id" => ac.id
+      })
+
+      {:ok, _lv, html} = live(conn, ~p"/companies/#{comp.id}/accounts/#{ac.id}/edit")
+      assert html =~ "limit RM500k, secured by Lot 123"
+
+      {:ok, lv, html} = live(conn, ~p"/companies/#{comp.id}/accounts?search[terms]=RHB OD")
+      assert html =~ "📝 1"
+
+      html =
+        lv |> element("button[phx-click=open_notes][phx-value-id='#{ac.id}']") |> render_click()
+
+      assert html =~ "limit RM500k"
+    end
+
+    test "fixed asset: edit page panel and index count", %{conn: conn, admin: admin, comp: comp} do
+      fa =
+        FullCircle.AccountingFixtures.fixed_asset_fixture(comp, admin, %{name: "Lorry WXX 1234"})
+
+      note_fixture(comp, admin, %{
+        "body" => "accident 3/2026, claim pending",
+        "subject_type" => "FixedAsset",
+        "subject_id" => fa.id
+      })
+
+      {:ok, _lv, html} = live(conn, ~p"/companies/#{comp.id}/fixed_assets/#{fa.id}/edit")
+      assert html =~ "accident 3/2026, claim pending"
+
+      {:ok, _lv, html} = live(conn, ~p"/companies/#{comp.id}/fixed_assets")
+      assert html =~ "📝 1"
+    end
+
+    test "no panel on the new account and new fixed asset pages", %{conn: conn, comp: comp} do
+      {:ok, _lv, html} = live(conn, ~p"/companies/#{comp.id}/accounts/new")
+      refute html =~ ~s{id="notes-panel"}
+      {:ok, _lv, html} = live(conn, ~p"/companies/#{comp.id}/fixed_assets/new")
+      refute html =~ ~s{id="notes-panel"}
+    end
+  end
+
   test "deposit list rows are transactions; quick-add still bumps the row",
        %{conn: conn, admin: admin, comp: comp} do
     dep = FullCircle.ChequeFixtures.deposit_fixture(comp, admin)

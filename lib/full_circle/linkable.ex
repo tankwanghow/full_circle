@@ -19,7 +19,14 @@ defmodule FullCircle.Linkable do
   @records [
     %{type: "Employee", schema: FullCircle.HR.Employee, title: :name, route: "employees"},
     %{type: "Contact", schema: FullCircle.Accounting.Contact, title: :name, route: "contacts"},
-    %{type: "Good", schema: FullCircle.Product.Good, title: :name, route: "goods"}
+    %{type: "Good", schema: FullCircle.Product.Good, title: :name, route: "goods"},
+    %{type: "Account", schema: FullCircle.Accounting.Account, title: :name, route: "accounts"},
+    %{
+      type: "FixedAsset",
+      schema: FullCircle.Accounting.FixedAsset,
+      title: :name,
+      route: "fixed_assets"
+    }
   ]
 
   # kind :document — posted documents found through `transactions`. Like the

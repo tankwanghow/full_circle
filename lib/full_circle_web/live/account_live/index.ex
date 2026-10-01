@@ -6,6 +6,7 @@ defmodule FullCircleWeb.AccountLive.Index do
   alias FullCircle.Accounting.Account
   alias FullCircle.StdInterface
   alias FullCircleWeb.AccountLive.IndexComponent
+  alias FullCircleWeb.NoteLive.NotesIndex
 
   @per_page 30
 
@@ -38,7 +39,6 @@ defmodule FullCircleWeb.AccountLive.Index do
           <div class="flex-1 min-w-0">{gettext("Descriptions")}</div>
         </:head>
         <div
-          :if={Enum.count(@streams.objects) > 0 or @page > 1}
           id="objects_list"
           phx-update="stream"
           phx-page-loading
@@ -48,6 +48,7 @@ defmodule FullCircleWeb.AccountLive.Index do
               current_company={@current_company}
               current_role={@current_role}
               module={IndexComponent}
+              note_count={Map.get(@note_counts, obj.id, 0)}
               id={obj_id}
               obj={obj}
               ex_class=""
@@ -56,6 +57,12 @@ defmodule FullCircleWeb.AccountLive.Index do
         </div>
       </.list_table>
       <.infinite_scroll_footer ended={@end_of_timeline?} />
+      <NotesIndex.modal
+        notes_for={@notes_for}
+        notes_type={@notes_type}
+        current_company={@current_company}
+        current_user={@current_user}
+      />
     </div>
     """
   end
@@ -65,6 +72,7 @@ defmodule FullCircleWeb.AccountLive.Index do
     socket =
       socket
       |> assign(page_title: gettext("Accounts Listing"))
+      |> NotesIndex.init("Account", IndexComponent)
 
     {:ok, socket}
   end
@@ -113,6 +121,7 @@ defmodule FullCircleWeb.AccountLive.Index do
 
     socket
     |> assign(page: page, per_page: @per_page)
+    |> NotesIndex.count(objects, reset)
     |> stream(:objects, objects, reset: reset)
     |> assign(end_of_timeline?: Enum.count(objects) < @per_page)
   end

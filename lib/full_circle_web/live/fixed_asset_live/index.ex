@@ -6,6 +6,7 @@ defmodule FullCircleWeb.FixedAssetLive.Index do
   alias FullCircle.Accounting
   alias FullCircle.StdInterface
   alias FullCircleWeb.FixedAssetLive.IndexComponent
+  alias FullCircleWeb.NoteLive.NotesIndex
 
   @per_page 30
 
@@ -44,7 +45,6 @@ defmodule FullCircleWeb.FixedAssetLive.Index do
           <div class="w-32 shrink-0">{gettext("Rate")}</div>
         </:head>
         <div
-          :if={Enum.count(@streams.objects) > 0 or @page > 1}
           id="objects_list"
           phx-update="stream"
           phx-page-loading
@@ -52,6 +52,7 @@ defmodule FullCircleWeb.FixedAssetLive.Index do
           <%= for {obj_id, obj} <- @streams.objects do %>
             <.live_component
               module={IndexComponent}
+              note_count={Map.get(@note_counts, obj.id, 0)}
               id={"#{obj_id}"}
               obj={obj}
               current_company={@current_company}
@@ -62,6 +63,12 @@ defmodule FullCircleWeb.FixedAssetLive.Index do
         </div>
       </.list_table>
       <.infinite_scroll_footer ended={@end_of_timeline?} />
+      <NotesIndex.modal
+        notes_for={@notes_for}
+        notes_type={@notes_type}
+        current_company={@current_company}
+        current_user={@current_user}
+      />
     </div>
     """
   end
@@ -71,6 +78,7 @@ defmodule FullCircleWeb.FixedAssetLive.Index do
     socket =
       socket
       |> assign(page_title: gettext("Fixed Asset Listing"))
+      |> NotesIndex.init("FixedAsset", IndexComponent)
 
     {:ok, socket}
   end
@@ -120,6 +128,7 @@ defmodule FullCircleWeb.FixedAssetLive.Index do
 
     socket
     |> assign(page: page, per_page: @per_page)
+    |> NotesIndex.count(objects, reset)
     |> stream(:objects, objects, reset: reset)
     |> assign(end_of_timeline?: Enum.count(objects) < @per_page)
   end

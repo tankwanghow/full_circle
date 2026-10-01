@@ -9,6 +9,8 @@ defmodule FullCircleWeb.NoteComponents do
   def type_label("Employee"), do: gettext("Employee")
   def type_label("Contact"), do: gettext("Contact")
   def type_label("Good"), do: gettext("Good")
+  def type_label("Account"), do: gettext("Account")
+  def type_label("FixedAsset"), do: gettext("Fixed Asset")
   def type_label("Note"), do: gettext("Note")
   def type_label("Invoice"), do: gettext("Invoice")
   def type_label("PurInvoice"), do: gettext("Purchase Invoice")

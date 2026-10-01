@@ -425,6 +425,16 @@ defmodule FullCircleWeb.FixedAssetLive.Form do
         </div>
       </.form>
     </div>
+    <.live_component
+      :if={@live_action == :edit and @id != "new"}
+      module={FullCircleWeb.NoteLive.NotesPanelComponent}
+      id="notes-panel"
+      record_type="FixedAsset"
+      record_id={@id}
+      current_company={@current_company}
+      current_user={@current_user}
+      class="w-7/12"
+    />
     """
   end
 end

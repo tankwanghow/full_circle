@@ -2455,3 +2455,6 @@ msgstr "仅管理员和作者可以查看。"
 
 msgid "This note links here; it is about something else."
 msgstr "此备注链接到这里，但它是关于其他记录的。"
+
+msgid "Fixed Asset"
+msgstr "固定资产"

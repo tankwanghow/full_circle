@@ -10,7 +10,7 @@ defmodule FullCircleWeb.FixedAssetLive.IndexComponent do
 
   @impl true
   def update(assigns, socket) do
-    {:ok, socket |> assign(assigns)}
+    {:ok, socket |> assign(assigns) |> assign_new(:note_count, fn -> 0 end)}
   end
 
   @impl true
@@ -39,6 +39,7 @@ defmodule FullCircleWeb.FixedAssetLive.IndexComponent do
           {@obj.name}
         </.link>
         <.chip :if={@obj.status != "Active"} kind={:bad}>{@obj.status}</.chip>
+        <.row_notes_badge count={@note_count} id={@obj.id} />
       </div>
       <div class="w-28 shrink-0 text-right tabular-nums">{money(@obj.pur_price)}</div>
       <div class="w-32 shrink-0 text-right tabular-nums">

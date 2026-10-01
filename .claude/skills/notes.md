@@ -198,8 +198,10 @@ code and a merge marks ~200 existing translations fuzzy (disabling them).
 Append new `msgid`/`msgstr` entries to `priv/gettext/zh/LC_MESSAGES/default.po`.
 
 ## Pages not covered
-None. All 12 record types: Employee, Contact, Good + 9 posted documents (Journal has
-no test fixture; its index is smoke-rendered only).
+None. All 14 record types: Employee, Contact, Good, Account, FixedAsset + 9 posted
+documents (Journal has no test fixture; its index is smoke-rendered only).
+Account rows link to the edit page only for non-default accounts (or admins),
+but the 📝 badge opens the notes modal for every row.
 
 ## Dark theme: selected states
 `assets/css/app.css` remaps light colours for the dark theme with plain,

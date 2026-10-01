@@ -14,7 +14,7 @@ defmodule FullCircle.LinkableTest do
 
   test "types covers records, notes and the palette documents" do
     assert Linkable.types() ==
-             ~w(Employee Contact Good Note Invoice PurInvoice Receipt Payment CreditNote DebitNote Journal Deposit ReturnCheque)
+             ~w(Employee Contact Good Account FixedAsset Note Invoice PurInvoice Receipt Payment CreditNote DebitNote Journal Deposit ReturnCheque)
 
     assert Linkable.type?("Invoice")
     refute Linkable.type?("Transaction")
@@ -98,5 +98,25 @@ defmodule FullCircle.LinkableTest do
              Linkable.search("Invoice", inv.invoice_no, company, admin),
              &(&1.id == inv.id)
            )
+  end
+
+  test "resolves an account and a fixed asset in the company", %{admin: admin, company: company} do
+    ac =
+      FullCircle.AccountingFixtures.account_fixture(%{name: "RHB Fixed Deposit"}, company, admin)
+
+    fa =
+      FullCircle.AccountingFixtures.fixed_asset_fixture(company, admin, %{name: "Lorry WXX 1234"})
+
+    assert {:ok, %{type: "Account", title: "RHB Fixed Deposit", url: ac_url}} =
+             Linkable.resolve("Account", ac.id, company, admin)
+
+    assert ac_url == "/companies/#{company.id}/accounts/#{ac.id}/edit"
+
+    assert {:ok, %{type: "FixedAsset", title: "Lorry WXX 1234", url: fa_url}} =
+             Linkable.resolve("FixedAsset", fa.id, company, admin)
+
+    assert fa_url == "/companies/#{company.id}/fixed_assets/#{fa.id}/edit"
+    assert [%{id: id}] = Linkable.search("FixedAsset", "wxx 1234", company, admin)
+    assert id == fa.id
   end
 end
