@@ -438,7 +438,7 @@ msgstr "圆环"
 #: lib/full_circle_web/components/layouts/root.html.heex:110
 #, elixir-autogen, elixir-format
 msgid "Home"
-msgstr ""
+msgstr "主页"
 
 #: lib/full_circle_web/live/company_live/index.ex:59
 #, elixir-autogen, elixir-format

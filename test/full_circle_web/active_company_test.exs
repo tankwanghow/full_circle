@@ -25,13 +25,14 @@ defmodule FullCircleWeb.ActiveCompanyTest do
     test "show company name", %{conn: conn, comp: comp} do
       {:ok, _lv, html} = live(conn, ~p"/companies/#{comp.id}/dashboard")
       assert html =~ comp.name
-      assert html =~ "Dashboard"
+      assert html =~ ~r{id="full_circle_dashboard"[^>]*>\s*Home\s*</a>}
+      refute html =~ "Dashboard"
     end
 
     test "show users list menu", %{conn: conn, comp: comp} do
       {:ok, _lv, html} = live(conn, ~p"/companies/#{comp.id}/dashboard")
       assert html =~ comp.name
-      assert html =~ "Dashboard"
+      assert html =~ "Home"
       assert html =~ "Users"
     end
 
@@ -39,7 +40,7 @@ defmodule FullCircleWeb.ActiveCompanyTest do
       conn = log_in_user(conn, not_admin)
       {:ok, _lv, html} = live(conn, ~p"/companies/#{comp.id}/dashboard")
       assert html =~ comp.name
-      assert html =~ "Dashboard"
+      assert html =~ "Home"
       refute html =~ "Users"
     end
 

@@ -301,7 +301,7 @@ defmodule FullCircleWeb.DashboardLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    {:ok, socket |> assign(:back_to_route, "#") |> assign(page_title: gettext("Dashboard"))}
+    {:ok, socket |> assign(:back_to_route, "#") |> assign(page_title: gettext("Home"))}
   end
 
   @impl true

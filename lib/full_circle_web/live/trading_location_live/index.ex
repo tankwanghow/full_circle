@@ -38,7 +38,7 @@ defmodule FullCircleWeb.TradingLocationLive.Index do
           {gettext("New Location")}
         </.link>
         <.link navigate={~p"/companies/#{@current_company.id}/dashboard"} class="gray button">
-          {gettext("Dashboard")}
+          {gettext("Home")}
         </.link>
       </div>
       <div class="bg-amber-200 border-y-2 border-amber-500 font-bold p-2 flex gap-1 text-sm">
