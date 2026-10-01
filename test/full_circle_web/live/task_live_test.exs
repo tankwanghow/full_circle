@@ -125,4 +125,123 @@ defmodule FullCircleWeb.TaskLiveTest do
                live(log_in_user(build_conn(), guest), ~p"/companies/#{comp.id}/tasks")
     end
   end
+
+  describe "task page" do
+    test "creates a repeating task with a link and Everyone by default", %{
+      conn: conn,
+      admin: admin,
+      comp: comp
+    } do
+      clerk = user_with_role(comp, admin, "clerk")
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/tasks/new")
+
+      {:error, {:live_redirect, %{to: to}}} =
+        lv
+        |> form("#task-form", %{
+          "task" => %{
+            "title" => "Permit – Rahim",
+            "due_date" => "2026-12-01",
+            "recur_unit" => "year",
+            "recur_every" => "1",
+            "reminder_before_days" => "60",
+            "assignee_id" => clerk.id
+          }
+        })
+        |> render_submit()
+
+      [_, id] = Regex.run(~r{/tasks/([0-9a-f-]+)$}, to)
+      task = Tasks.get_task(id, comp, admin)
+      assert task.title == "Permit – Rahim"
+      assert task.visibility == nil
+      assert task.assignee_id == clerk.id
+    end
+
+    test "assignee sees fields read-only with Done and Skip; creator edits", %{
+      admin: admin,
+      comp: comp
+    } do
+      clerk = user_with_role(comp, admin, "clerk")
+      t = task_fixture(comp, admin, %{"title" => "Service genset", "assignee_id" => clerk.id})
+
+      {:ok, lv, _} =
+        live(log_in_user(build_conn(), clerk), ~p"/companies/#{comp.id}/tasks/#{t.id}")
+
+      assert has_element?(lv, "#task-form input[name='task[title]'][disabled]")
+      assert has_element?(lv, "#done-task")
+      refute has_element?(lv, "#delete-task")
+
+      {:ok, lv, _} =
+        live(log_in_user(build_conn(), admin), ~p"/companies/#{comp.id}/tasks/#{t.id}")
+
+      lv
+      |> form("#task-form", %{"task" => %{"title" => "Service genset (3-monthly)"}})
+      |> render_submit()
+
+      assert Tasks.get_task(t.id, comp, admin).title == "Service genset (3-monthly)"
+    end
+
+    test "Done moves to the next cycle; past cycles list the done one; Reopen removes it", %{
+      conn: conn,
+      admin: admin,
+      comp: comp
+    } do
+      t =
+        task_fixture(comp, admin, %{
+          "title" => "SOCSO",
+          "due_date" => "2026-10-15",
+          "recur_unit" => "month",
+          "recur_every" => "1"
+        })
+
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/tasks/#{t.id}")
+      lv |> element("#done-task") |> render_click()
+
+      {:error, {:live_redirect, %{to: to}}} =
+        lv |> form("#close-form", %{"close" => %{"note" => ""}}) |> render_submit()
+
+      {:ok, lv, html} = live(conn, to)
+      # the next cycle's date input carries the ISO date
+      assert html =~ "2026-11-15"
+      assert has_element?(lv, "#past-cycles", "15-10-2026")
+
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/tasks/#{t.id}")
+      lv |> element("#reopen-task") |> render_click()
+      assert Tasks.get_task(t.id, comp, admin).status == "open"
+      assert Tasks.series_cycles(t, comp, admin) == []
+    end
+
+    test "a repeated confirm_close after the dialog closed does not crash", %{
+      conn: conn,
+      admin: admin,
+      comp: comp
+    } do
+      t = task_fixture(comp, admin, %{"title" => "Once only"})
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/tasks/#{t.id}")
+      lv |> element("#done-task") |> render_click()
+      lv |> form("#close-form", %{"close" => %{"note" => ""}}) |> render_submit()
+
+      render_hook(lv, "confirm_close", %{"close" => %{"note" => ""}})
+      assert Process.alive?(lv.pid)
+      refute has_element?(lv, "#close-dialog")
+    end
+
+    test "progress notes panel defaults to Private on a task", %{
+      conn: conn,
+      admin: admin,
+      comp: comp
+    } do
+      t = task_fixture(comp, admin)
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/tasks/#{t.id}")
+      lv |> element("#task-notes-new") |> render_click()
+      assert has_element?(lv, "#task-notes-visibility-private[data-selected]")
+    end
+
+    test "a hidden task is not found", %{admin: admin, comp: comp} do
+      t = task_fixture(comp, admin, %{"visibility" => ["admin"]})
+      clerk = user_with_role(comp, admin, "clerk")
+
+      assert {:error, {:live_redirect, %{flash: %{"warn" => _}}}} =
+               live(log_in_user(build_conn(), clerk), ~p"/companies/#{comp.id}/tasks/#{t.id}")
+    end
+  end
 end
