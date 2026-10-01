@@ -326,8 +326,22 @@ defmodule FullCircle.Tasks do
       creator_id: t.creator_id
     }
 
+    existing =
+      repo.one(
+        from(e in CompanyTask,
+          where:
+            e.company_id == ^t.company_id and e.series_id == ^t.series_id and e.id != ^t.id and
+              e.status == "open" and is_nil(e.deleted_at) and e.due_date == ^next.due_date,
+          limit: 1
+        )
+      )
+
+    if existing, do: {:ok, existing}, else: insert_next(repo, t, next, user)
+  end
+
+  defp insert_next(repo, t, next, user) do
     with {:ok, n} <- repo.insert(next) do
-      now = DateTime.utc_now(:second)
+      now = n.inserted_at
 
       rows =
         from(l in RecordLink,
@@ -353,39 +367,60 @@ defmodule FullCircle.Tasks do
 
   def reopen_task(%CompanyTask{} = task, company, user) do
     with %CompanyTask{} = current <- get_task(task.id, company, user) || {:error, :not_found},
-         true <- may_reopen?(current, user, rights(company, user)) || :not_authorise,
-         true <- current.status != "open" || {:error, :open} do
-      next = spawned_next(current)
-      remove? = next != nil and untouched?(next)
-
+         true <- may_reopen?(current, user, rights(company, user)) || :not_authorise do
       Multi.new()
-      |> Multi.update(
-        :reopened,
-        Ecto.Changeset.change(current, status: "open", closed_at: nil, closed_by_id: nil)
-      )
-      |> Multi.run(:next, fn repo, _ ->
-        if remove? do
-          repo.delete_all(
-            from(l in RecordLink,
-              where:
-                l.company_id == ^company.id and l.from_type == "Task" and l.from_id == ^next.id
+      |> Multi.run(:lock, fn repo, _ ->
+        row =
+          repo.one(
+            from(t in CompanyTask,
+              where: t.id == ^current.id and is_nil(t.deleted_at),
+              lock: "FOR UPDATE"
             )
           )
 
-          repo.delete(next)
-        else
-          {:ok, next}
+        cond do
+          is_nil(row) -> {:error, :not_found}
+          row.status == "open" -> {:error, :open}
+          true -> {:ok, row}
         end
       end)
+      |> Multi.run(:next, fn repo, %{lock: locked} ->
+        case spawned_next(repo, locked) do
+          nil ->
+            {:ok, {nil, false}}
+
+          next ->
+            if untouched?(repo, next) do
+              repo.delete_all(
+                from(l in RecordLink,
+                  where:
+                    l.company_id == ^company.id and l.from_type == "Task" and
+                      l.from_id == ^next.id
+                )
+              )
+
+              repo.delete_all(from(t in CompanyTask, where: t.id == ^next.id))
+              {:ok, {next, false}}
+            else
+              {:ok, {next, true}}
+            end
+        end
+      end)
+      |> Multi.update(
+        :reopened,
+        fn %{lock: locked} ->
+          Ecto.Changeset.change(locked, status: "open", closed_at: nil, closed_by_id: nil)
+        end
+      )
       |> Repo.transaction()
       |> case do
-        {:ok, %{reopened: r}} ->
+        {:ok, %{reopened: r, next: {_, kept}}} ->
           broadcast(company)
 
           {:ok,
            %{
              reopened: Repo.preload(r, [:assignee, :creator, :closed_by], force: true),
-             next_kept: next != nil and not remove?
+             next_kept: kept
            }}
 
         {:error, _step, reason, _} ->
@@ -395,32 +430,34 @@ defmodule FullCircle.Tasks do
   end
 
   # The cycle this task's close inserted: same series, the stepped due date,
-  # created no earlier than the close. Scoped by company through `current`.
-  defp spawned_next(%CompanyTask{recur_unit: nil}), do: nil
+  # created no earlier than the close. Locked so a concurrent edit waits.
+  defp spawned_next(_repo, %CompanyTask{recur_unit: nil}), do: nil
 
-  defp spawned_next(%CompanyTask{} = current) do
+  defp spawned_next(repo, %CompanyTask{} = current) do
     due = next_due_date(current.due_date, current.recur_unit, current.recur_every)
 
-    from(t in CompanyTask,
-      where:
-        t.company_id == ^current.company_id and t.series_id == ^current.series_id and
-          t.id != ^current.id and t.due_date == ^due and is_nil(t.deleted_at) and
-          t.inserted_at >= ^current.closed_at,
-      limit: 1
+    repo.one(
+      from(t in CompanyTask,
+        where:
+          t.company_id == ^current.company_id and t.series_id == ^current.series_id and
+            t.id != ^current.id and t.due_date == ^due and is_nil(t.deleted_at) and
+            t.inserted_at >= ^current.closed_at,
+        limit: 1,
+        lock: "FOR UPDATE"
+      )
     )
-    |> Repo.one()
   end
 
   # add_link does not bump lock_version, so a link added after the cycle was
   # spawned (inserted_at strictly later) also counts as a touch.
-  defp untouched?(%CompanyTask{} = t) do
+  defp untouched?(repo, %CompanyTask{} = t) do
     t.status == "open" and t.lock_version == 0 and
-      not Repo.exists?(
+      not repo.exists?(
         from(n in FullCircle.Notes.Note,
           where: n.subject_type == "Task" and n.subject_id == ^t.id and is_nil(n.deleted_at)
         )
       ) and
-      not Repo.exists?(
+      not repo.exists?(
         from(l in RecordLink,
           where:
             l.company_id == ^t.company_id and l.from_type == "Task" and l.from_id == ^t.id and

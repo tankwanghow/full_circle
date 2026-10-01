@@ -495,4 +495,74 @@ defmodule FullCircle.TasksTest do
       assert Tasks.reopen_task(closed, company, clerk) == :not_authorise
     end
   end
+
+  describe "fix round 1" do
+    test "copied links share the next cycle's inserted_at; untouched linked cycle is removed",
+         %{company: company, admin: admin} do
+      contact = contact_fixture(company, admin)
+
+      task =
+        task_fixture(company, admin, %{
+          "due_date" => "2026-10-15",
+          "recur_unit" => "month",
+          "recur_every" => "1",
+          "links" => [%{"type" => "Contact", "id" => contact.id}]
+        })
+
+      {:ok, %{closed: closed, next: next}} = Tasks.close_task(task, :done, nil, company, admin)
+
+      links =
+        Repo.all(from(l in FullCircle.Linkable.RecordLink, where: l.from_id == ^next.id))
+
+      assert [%{inserted_at: at}] = links
+      assert at == next.inserted_at
+
+      assert {:ok, %{next_kept: false}} = Tasks.reopen_task(closed, company, admin)
+      assert Repo.get(CompanyTask, next.id) == nil
+    end
+
+    test "reopening the same closed struct twice errors, never raises",
+         %{company: company, admin: admin} do
+      task =
+        task_fixture(company, admin, %{
+          "due_date" => "2026-10-15",
+          "recur_unit" => "month",
+          "recur_every" => "1"
+        })
+
+      {:ok, %{closed: closed}} = Tasks.close_task(task, :done, nil, company, admin)
+      assert {:ok, _} = Tasks.reopen_task(closed, company, admin)
+      assert {:error, :open} = Tasks.reopen_task(closed, company, admin)
+    end
+
+    test "close, touch next, reopen, close again reuses the open cycle",
+         %{company: company, admin: admin} do
+      task =
+        task_fixture(company, admin, %{
+          "due_date" => "2026-10-15",
+          "recur_unit" => "month",
+          "recur_every" => "1"
+        })
+
+      {:ok, %{closed: closed, next: next}} = Tasks.close_task(task, :done, nil, company, admin)
+
+      note_fixture(company, admin, %{
+        "body" => "started",
+        "subject_type" => "Task",
+        "subject_id" => next.id
+      })
+
+      assert {:ok, %{reopened: r, next_kept: true}} = Tasks.reopen_task(closed, company, admin)
+      assert {:ok, %{next: again}} = Tasks.close_task(r, :done, nil, company, admin)
+      assert again.id == next.id
+
+      open =
+        Repo.aggregate(
+          from(t in CompanyTask, where: t.series_id == ^task.series_id and t.status == "open"),
+          :count
+        )
+
+      assert open == 1
+    end
+  end
 end
