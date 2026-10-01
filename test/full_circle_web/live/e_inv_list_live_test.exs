@@ -82,6 +82,22 @@ defmodule FullCircleWeb.EInvListLiveTest do
     assert has_element?(lv, "#{row} a[href*='/Payment/new?obj=']", "+ Payment")
   end
 
+  test "net amount left at 0 by the vendor: shows the payable amount", %{
+    conn: conn,
+    company: company
+  } do
+    einv =
+      e_invoice!(company, %{
+        totalNetAmount: Decimal.new("0.00"),
+        totalPayableAmount: Decimal.new("18779.75")
+      })
+
+    {:ok, lv, _html} = live(conn, list_path(company))
+
+    assert has_element?(lv, "##{einv.uuid}", "18,779.75")
+    assert has_element?(lv, "##{einv.uuid} [title*='Net MYR 0.00']")
+  end
+
   test "cancelled e-invoice shows a status chip and no + New links", %{
     conn: conn,
     company: company

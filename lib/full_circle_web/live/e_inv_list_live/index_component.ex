@@ -134,9 +134,24 @@ defmodule FullCircleWeb.EInvListLive.IndexComponent do
 
   defp delimited(amount), do: Number.Delimit.number_to_delimited(amount)
 
-  defp same_amount?(%Decimal{} = x, %Decimal{} = y), do: Decimal.equal?(x, y)
-  defp same_amount?(x, y) when is_nil(x) or is_nil(y), do: x == y
-  defp same_amount?(x, y), do: to_string(x) == to_string(y)
+  # Some vendors leave Total Net Amount at 0 and fill only Total Payable (or
+  # the reverse, when prepaid), so show the larger and put both in the tooltip.
+  defp amount_shown(%{totalNetAmount: net, totalPayableAmount: pay}) do
+    net = net || Decimal.new(0)
+    pay = pay || Decimal.new(0)
+    if Decimal.gt?(net, pay), do: net, else: pay
+  end
+
+  defp amounts_title(obj) do
+    if Decimal.equal?(obj.totalNetAmount || 0, obj.totalPayableAmount || 0) do
+      nil
+    else
+      gettext("Net %{net}\nPayable %{pay}",
+        net: "#{obj.documentCurrency} #{delimited(obj.totalNetAmount)}",
+        pay: "#{obj.documentCurrency} #{delimited(obj.totalPayableAmount)}"
+      )
+    end
+  end
 
   @impl true
   def render(assigns) do
@@ -149,9 +164,7 @@ defmodule FullCircleWeb.EInvListLive.IndexComponent do
       assigns
       |> assign(name: name, tin: tin)
       |> assign(valid?: assigns.obj.status == "Valid")
-      |> assign(
-        pay_differs?: !same_amount?(assigns.obj.totalNetAmount, assigns.obj.totalPayableAmount)
-      )
+      |> assign(amounts_title: amounts_title(assigns.obj))
 
     ~H"""
     <div id={@id} class={row_class()}>
@@ -182,17 +195,12 @@ defmodule FullCircleWeb.EInvListLive.IndexComponent do
             "w-32 shrink-0 text-right tabular-nums whitespace-nowrap",
             !@valid? && "line-through text-slate-400 dark:text-slate-500"
           ]}
-          title={
-            @pay_differs? &&
-              gettext("Payable %{amount}",
-                amount: "#{@obj.documentCurrency} #{delimited(@obj.totalPayableAmount)}"
-              )
-          }
+          title={@amounts_title}
         >
           <span :if={@obj.documentCurrency != "MYR"} class={["text-xs", muted_class()]}>
             {@obj.documentCurrency}
           </span>
-          {delimited(@obj.totalNetAmount)}<sup :if={@pay_differs?} class="text-amber-600">*</sup>
+          {delimited(amount_shown(@obj))}<sup :if={@amounts_title} class="text-amber-600">*</sup>
         </div>
         <div class="w-20 shrink-0">
           <span :if={@valid?} class="text-xs text-emerald-700 dark:text-emerald-400">
