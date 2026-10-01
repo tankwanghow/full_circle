@@ -87,6 +87,22 @@ defmodule FullCircleWeb.TaskLiveTest do
                FullCircle.Notes.notes_for_record("Task", t.id, comp, admin)
     end
 
+    test "a repeated confirm_close after the dialog closed does not crash", %{
+      conn: conn,
+      admin: admin,
+      comp: comp
+    } do
+      t = task_fixture(comp, admin, %{"title" => "Once only"})
+
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/tasks?search[scope]=all")
+      lv |> element("#tasks-#{t.id} button[phx-value-kind=done]") |> render_click()
+      lv |> form("#close-form", %{"close" => %{"note" => ""}}) |> render_submit()
+
+      render_hook(lv, "confirm_close", %{"close" => %{"note" => ""}})
+      assert Process.alive?(lv.pid)
+      refute has_element?(lv, "#close-dialog")
+    end
+
     test "auditor sees no Done/Skip and no New", %{admin: admin, comp: comp} do
       t = task_fixture(comp, admin, %{"title" => "Public task"})
       auditor = user_with_role(comp, admin, "auditor")

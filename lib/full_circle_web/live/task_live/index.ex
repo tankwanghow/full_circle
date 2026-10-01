@@ -94,6 +94,9 @@ defmodule FullCircleWeb.TaskLive.Index do
 
   def handle_event("cancel_close", _, socket), do: {:noreply, assign(socket, closing: nil)}
 
+  def handle_event("confirm_close", _, %{assigns: %{closing: nil}} = socket),
+    do: {:noreply, socket}
+
   def handle_event("confirm_close", %{"close" => %{"note" => note}}, socket) do
     %{closing: %{task: task, kind: kind}, current_company: com, current_user: user} =
       socket.assigns
