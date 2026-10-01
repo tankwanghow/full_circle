@@ -1,6 +1,8 @@
 defmodule FullCircleWeb.FixedAssetLive.IndexComponent do
   use FullCircleWeb, :live_component
 
+  import FullCircleWeb.ListComponents
+
   @impl true
   def mount(socket) do
     {:ok, socket}
@@ -14,79 +16,61 @@ defmodule FullCircleWeb.FixedAssetLive.IndexComponent do
   @impl true
   def render(assigns) do
     ~H"""
-    <div id={@id} class="text-center border-b border-gray-500">
-      <div class="grid grid-cols-12">
-        <div class={[
-          "col-span-7 p-2",
-          if(@obj.status == "Active",
-            do: "bg-gray-200",
-            else: "bg-rose-200"
+    <div id={@id} class={[row_class(), line_class()]}>
+      <div
+        class="flex-1 min-w-0 flex items-center gap-1 overflow-hidden"
+        title={
+          Enum.join(
+            [
+              "#{gettext("Fixed Asset Account:")} #{@obj.asset_ac_name}",
+              "#{gettext("Depreciation Account:")} #{@obj.depre_ac_name}",
+              "#{gettext("Cume Depreciation Account:")} #{@obj.cume_depre_ac_name}",
+              "#{gettext("Disposal Account:")} #{@obj.disp_fund_ac_name}",
+              @obj.descriptions
+            ],
+            "\n"
           )
-        ]}>
-          <.link
-            navigate={~p"/companies/#{@current_company.id}/fixed_assets/#{@obj.id}/edit"}
-            class="text-xl hover:font-bold text-blue-600"
-          >
-            {@obj.name} ({@obj.status})
-          </.link>
-          <p>
-            <span class="font-bold">{gettext("Fixed Asset Account:")}</span> {@obj.asset_ac_name}
-          </p>
-          <p>
-            <span class="font-bold">{gettext("Disposal Account:")}</span> {@obj.disp_fund_ac_name}
-          </p>
-          <p>
-            <span class="font-bold">{gettext("Depreciation Account:")}</span> {@obj.depre_ac_name}
-          </p>
-          <span class="font-bold">{gettext("Cume Depreciation Account:")}</span>
-          {@obj.cume_depre_ac_name}
-          <p>{@obj.descriptions}</p>
-        </div>
-        <div class={[
-          "col-span-5 p-2",
-          if(@obj.status == "Active",
-            do: "bg-gray-200",
-            else: "bg-rose-200"
-          )
-        ]}>
-          <p>
-            {gettext("Purchase Price:")} - {Number.Currency.number_to_currency(@obj.pur_price)}
-          </p>
-          <p>
-            <.link
-              :if={@obj.depre_method != "No Depreciation"}
-              navigate={
-                ~p"/companies/#{@current_company.id}/fixed_assets/#{@obj.id}/depreciations?terms=#{@terms}"
-              }
-              class="hover:font-bold text-blue-700"
-            >
-              {gettext("Depreciations")} - {Number.Currency.number_to_currency(@obj.cume_depre)}
-            </.link>
-          </p>
-
-          <p>
-            <.link
-              navigate={
-                ~p"/companies/#{@current_company.id}/fixed_assets/#{@obj.id}/disposals?terms=#{@terms}"
-              }
-              class="hover:font-bold text-blue-700"
-            >
-              {gettext("Disposal")} - {Number.Currency.number_to_currency(@obj.cume_disp)}
-            </.link>
-          </p>
-
-          <p>
-            {gettext("Net Book Value")} - {@obj.pur_price
-            |> Decimal.sub(@obj.cume_disp || Decimal.new("0"))
-            |> Decimal.sub(@obj.cume_depre || Decimal.new("0"))
-            |> Number.Currency.number_to_currency()}
-          </p>
-          <p>
-            {gettext("Depreciation info")} - {Number.Percentage.number_to_percentage(
-              Decimal.mult(@obj.depre_rate, 100)
-            )} &#9679; {@obj.depre_interval}<br />
-          </p>
-        </div>
+        }
+      >
+        <.link
+          navigate={~p"/companies/#{@current_company.id}/fixed_assets/#{@obj.id}/edit"}
+          class="min-w-0 truncate hover:font-bold text-blue-600"
+        >
+          {@obj.name}
+        </.link>
+        <.chip :if={@obj.status != "Active"} kind={:bad}>{@obj.status}</.chip>
+      </div>
+      <div class="w-28 shrink-0 text-right tabular-nums">{money(@obj.pur_price)}</div>
+      <div class="w-32 shrink-0 text-right tabular-nums">
+        <.link
+          :if={@obj.depre_method != "No Depreciation"}
+          navigate={
+            ~p"/companies/#{@current_company.id}/fixed_assets/#{@obj.id}/depreciations?terms=#{@terms}"
+          }
+          class="hover:underline text-blue-600"
+        >
+          {money(@obj.cume_depre || Decimal.new("0"))}
+        </.link>
+        <span :if={@obj.depre_method == "No Depreciation"} class="text-slate-400">—</span>
+      </div>
+      <div class="w-28 shrink-0 text-right tabular-nums">
+        <.link
+          navigate={
+            ~p"/companies/#{@current_company.id}/fixed_assets/#{@obj.id}/disposals?terms=#{@terms}"
+          }
+          class="hover:underline text-blue-600"
+        >
+          {money(@obj.cume_disp || Decimal.new("0"))}
+        </.link>
+      </div>
+      <div class="w-28 shrink-0 text-right tabular-nums">
+        {@obj.pur_price
+        |> Decimal.sub(@obj.cume_disp || Decimal.new("0"))
+        |> Decimal.sub(@obj.cume_depre || Decimal.new("0"))
+        |> money()}
+      </div>
+      <div class={["w-32 shrink-0 truncate", muted_class()]}>
+        {Number.Percentage.number_to_percentage(Decimal.mult(@obj.depre_rate, 100))} · {@obj.depre_interval}
       </div>
     </div>
     """

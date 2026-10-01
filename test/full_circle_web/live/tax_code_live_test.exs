@@ -166,7 +166,8 @@ defmodule FullCircleWeb.TaxCodeLiveTest do
              |> LazyHTML.query(~s|form input[name="search[terms]"]|)
              |> LazyHTML.to_tree() != []
 
-      assert html =~ "TaxCode Information"
+      # Column header of the shared listing table (was an "Information" banner)
+      assert html =~ ">Code</div>"
     end
 
     test "tax_code list", %{conn: conn, comp: comp} do

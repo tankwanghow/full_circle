@@ -1,6 +1,8 @@
 defmodule FullCircleWeb.GoodLive.Index do
   use FullCircleWeb, :live_view
 
+  import FullCircleWeb.ListComponents
+
   alias FullCircle.Product
   alias FullCircleWeb.GoodLive.IndexComponent
   alias FullCircleWeb.NoteLive.NotesIndex
@@ -10,43 +12,51 @@ defmodule FullCircleWeb.GoodLive.Index do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="w-6/12 mx-auto">
-      <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
-      <.search_form
-        search_val={@search.terms}
-        placeholder={gettext("Name, Unit, Account Name and TaxCode...")}
-        live
-      />
-      <div class="text-center mb-2">
-        <.link
-          navigate={~p"/companies/#{@current_company.id}/goods/new"}
-          class="blue button"
-          id="new_object"
+    <div class="w-11/12 max-w-6xl mx-auto">
+      <.list_bar title={@page_title}>
+        <.search_form
+          compact
+          search_val={@search.terms}
+          placeholder={gettext("Name, Unit, Account Name and TaxCode...")}
+          live
+        />
+        <:actions>
+          <.link
+            navigate={~p"/companies/#{@current_company.id}/goods/new"}
+            class="blue button"
+            id="new_object"
+          >
+            + {gettext("New Good")}
+          </.link>
+        </:actions>
+      </.list_bar>
+
+      <.list_table>
+        <:head>
+          <div class="w-[22%] shrink-0">{gettext("Name")}</div>
+          <div class="w-[11%] shrink-0">{gettext("Category")}</div>
+          <div class="flex-1 min-w-0">{gettext("Sales")}</div>
+          <div class="flex-1 min-w-0">{gettext("Purchase")}</div>
+          <div class="w-[16%] shrink-0">{gettext("Packagings")}</div>
+          <div class="w-14 shrink-0"></div>
+        </:head>
+        <div
+          id="objects_list"
+          phx-update="stream"
+          phx-page-loading
         >
-          {gettext("New Good")}
-        </.link>
-      </div>
-      <div class="text-center">
-        <div class="bg-amber-200 border-y-2 border-amber-500 font-bold p-2">
-          {gettext("Good Information")}
+          <%= for {obj_id, obj} <- @streams.objects do %>
+            <.live_component
+              current_company={@current_company}
+              module={IndexComponent}
+              note_count={Map.get(@note_counts, obj.id, 0)}
+              id={"#{obj_id}"}
+              obj={obj}
+              ex_class=""
+            />
+          <% end %>
         </div>
-      </div>
-      <div
-        id="objects_list"
-        phx-update="stream"
-        phx-page-loading
-      >
-        <%= for {obj_id, obj} <- @streams.objects do %>
-          <.live_component
-            current_company={@current_company}
-            module={IndexComponent}
-            note_count={Map.get(@note_counts, obj.id, 0)}
-            id={"#{obj_id}"}
-            obj={obj}
-            ex_class=""
-          />
-        <% end %>
-      </div>
+      </.list_table>
       <.infinite_scroll_footer ended={@end_of_timeline?} />
       <NotesIndex.modal
         notes_for={@notes_for}

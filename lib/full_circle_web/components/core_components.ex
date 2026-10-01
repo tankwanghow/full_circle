@@ -863,6 +863,31 @@ defmodule FullCircleWeb.CoreComponents do
   attr(:search_val, :any)
   attr(:placeholder, :any)
   attr(:live, :boolean, default: false)
+  attr(:compact, :boolean, default: false, doc: "inline in a list_bar (no outer block)")
+
+  def search_form(%{compact: true} = assigns) do
+    ~H"""
+    <.form
+      for={%{}}
+      id="search-form"
+      phx-submit="search"
+      phx-change={@live && "search"}
+      autocomplete="off"
+      class="flex items-end gap-1 grow min-w-56"
+    >
+      <div class="grow">
+        <.input
+          name="search[terms]"
+          type="search"
+          value={@search_val}
+          placeholder={@placeholder}
+          phx-debounce={@live && "300"}
+        />
+      </div>
+      <.button class="h-9 w-10">🔍</.button>
+    </.form>
+    """
+  end
 
   def search_form(assigns) do
     ~H"""

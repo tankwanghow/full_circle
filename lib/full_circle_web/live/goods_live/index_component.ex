@@ -1,7 +1,7 @@
 defmodule FullCircleWeb.GoodLive.IndexComponent do
   use FullCircleWeb, :live_component
 
-  import FullCircleWeb.NoteComponents, only: [notes_count_badge: 1]
+  import FullCircleWeb.ListComponents
 
   @impl true
   def mount(socket) do
@@ -16,37 +16,41 @@ defmodule FullCircleWeb.GoodLive.IndexComponent do
   @impl true
   def render(assigns) do
     ~H"""
-    <div
-      id={@id}
-      class={"#{@ex_class} text-center bg-gray-200 border-gray-500 border-b p-2 hover:bg-gray-300"}
-    >
-      <.link
-        class="text-blue-600 hover:font-bold"
-        navigate={~p"/companies/#{@current_company}/goods/#{@obj.id}/edit"}
+    <div id={@id} class={[row_class(@ex_class), line_class()]}>
+      <div class="w-[22%] shrink-0 min-w-0 flex items-center gap-1 overflow-hidden">
+        <.link
+          class="min-w-0 truncate text-blue-600 hover:font-bold"
+          navigate={~p"/companies/#{@current_company}/goods/#{@obj.id}/edit"}
+        >
+          {@obj.name}
+        </.link>
+        <span class={["text-xs", muted_class()]}>{@obj.unit}</span>
+        <.row_notes_badge count={@note_count} id={@obj.id} />
+      </div>
+      <div class="w-[11%] shrink-0 truncate">{@obj.category}</div>
+      <div
+        class="flex-1 min-w-0 truncate"
+        title={"#{@obj.sales_account_name} · #{@obj.sales_tax_code_name}"}
       >
-        {@obj.name} ({@obj.unit})
-      </.link>
-      <.notes_count_badge count={@note_count} id={@obj.id} /> &#11049;
-      <span>
-        {@obj.category} &#11049; {@obj.sales_account_name} &#11049; {@obj.sales_tax_code_name} &#8226; {@obj.purchase_account_name} &#11049; {@obj.purchase_tax_code_name}
-      </span>
+        {@obj.sales_account_name}
+        <span class={muted_class()}>· {@obj.sales_tax_code_name}</span>
+      </div>
+      <div
+        class="flex-1 min-w-0 truncate"
+        title={"#{@obj.purchase_account_name} · #{@obj.purchase_tax_code_name}"}
+      >
+        {@obj.purchase_account_name}
+        <span class={muted_class()}>· {@obj.purchase_tax_code_name}</span>
+      </div>
+      <% packs = @obj.packagings |> Enum.reject(&is_nil/1) |> Enum.map_join(", ", & &1.name) %>
+      <div class={["w-[16%] shrink-0 truncate", muted_class()]} title={packs}>{packs}</div>
       <.link
         navigate={~p"/companies/#{@current_company}/goods/#{@obj.id}/copy"}
-        class="text-xs hover:bg-orange-400 bg-orange-200 py-1 px-2 rounded-full border-orange-400 border"
+        class="w-14 shrink-0 text-xs text-center rounded-full border border-orange-400/70 px-2 py-0.5 text-orange-800 dark:text-orange-300 hover:bg-orange-100/60 dark:hover:bg-orange-950"
+        tabindex="-1"
       >
         {gettext("Copy")}
       </.link>
-      <div>
-        <span
-          :if={@obj.packagings |> Enum.filter(fn x -> !is_nil(x) end) |> Enum.count() > 0}
-          class="text-sm font-light"
-        >
-          <span class="font-normal">{gettext("Packagings")}</span>
-          :- {@obj.packagings
-          |> Enum.map(fn x -> x.name end)
-          |> Enum.join(", ")}
-        </span>
-      </div>
     </div>
     """
   end

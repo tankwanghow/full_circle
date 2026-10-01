@@ -1,7 +1,7 @@
 defmodule FullCircleWeb.EmployeeLive.IndexComponent do
   use FullCircleWeb, :live_component
 
-  import FullCircleWeb.NoteComponents, only: [notes_count_badge: 1]
+  import FullCircleWeb.ListComponents
 
   @impl true
   def mount(socket) do
@@ -16,58 +16,48 @@ defmodule FullCircleWeb.EmployeeLive.IndexComponent do
   @impl true
   def render(assigns) do
     ~H"""
-    <div
-      id={@id}
-      class={"#{@ex_class} flex text-center bg-gray-200 border-gray-500 hover:bg-gray-300 border-b p-1"}
-    >
-      <div class="w-[3%]">
+    <div id={@id} class={[row_class(@ex_class), line_class()]}>
+      <div class="w-6 shrink-0 text-center">
         <input
           :if={@obj.checked and @obj.status == "Active"}
           id={"checkbox_#{@obj.id}"}
           type="checkbox"
           phx-click="check_click"
           phx-value-object-id={@obj.id}
-          class="rounded border-gray-400 checked:bg-gray-400"
+          class="rounded border-gray-400"
           checked
         />
         <input
           :if={!@obj.checked and @obj.status == "Active"}
           id={"checkbox_#{@obj.id}"}
           type="checkbox"
-          class="rounded border-gray-400 checked:bg-gray-400"
+          class="rounded border-gray-400"
           phx-click="check_click"
           phx-value-object-id={@obj.id}
         />
       </div>
-
-      <div class="w-[41%]">
+      <div class="flex-1 min-w-0 flex items-center gap-1 overflow-hidden">
         <.link
-          class="text-blue-600 hover:font-bold"
+          class="min-w-0 truncate text-blue-600 hover:font-bold"
           tabindex="-1"
           navigate={~p"/companies/#{@current_company}/employees/#{@obj.id}/edit"}
         >
           {@obj.name}
         </.link>
-        <.notes_count_badge count={@note_count} id={@obj.id} />
+        <.row_notes_badge count={@note_count} id={@obj.id} />
       </div>
-      <div class="w-[20%]">
-        {@obj.id_no}
+      <div class="w-[18%] shrink-0 truncate">{@obj.id_no}</div>
+      <div class="w-[16%] shrink-0 truncate">{@obj.nationality}</div>
+      <div class="w-24 shrink-0">
+        <.chip kind={if @obj.status == "Active", do: :ok, else: :muted}>{@obj.status}</.chip>
       </div>
-      <div class="w-[20%]">
-        {@obj.nationality}
-      </div>
-      <div class="w-[10%]">
-        {@obj.status}
-      </div>
-      <div class="w-[6%]">
-        <.link
-          tabindex="-1"
-          navigate={~p"/companies/#{@current_company}/employees/#{@obj.id}/copy"}
-          class="text-xs hover:bg-orange-400 bg-orange-200 py-1 px-2 rounded-full border-orange-400 border"
-        >
-          {gettext("Copy")}
-        </.link>
-      </div>
+      <.link
+        navigate={~p"/companies/#{@current_company}/employees/#{@obj.id}/copy"}
+        class="w-14 shrink-0 text-xs text-center rounded-full border border-orange-400/70 px-2 py-0.5 text-orange-800 dark:text-orange-300 hover:bg-orange-100/60 dark:hover:bg-orange-950"
+        tabindex="-1"
+      >
+        {gettext("Copy")}
+      </.link>
     </div>
     """
   end

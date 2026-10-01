@@ -10,6 +10,7 @@ defmodule FullCircleWeb.DeclutteredListingsTest do
   import FullCircle.HRFixtures
   import FullCircle.ChequeFixtures
   import FullCircle.ReceiveFundFixtures
+  import FullCircle.BillingFixtures
 
   setup %{conn: conn} do
     admin = user_fixture()
@@ -98,5 +99,58 @@ defmodule FullCircleWeb.DeclutteredListingsTest do
   test "Return Cheque listing renders", %{conn: conn, company: company} do
     {:ok, lv, _} = live(conn, "/companies/#{company.id}/ReturnCheque")
     assert_list_page(lv)
+  end
+
+  describe "master data listings" do
+    for path <- ~w(fixed_assets recurrings queries) do
+      @path path
+      test "#{path} renders on the shared layout", %{conn: conn, company: company} do
+        {:ok, lv, _} = live(conn, "/companies/#{company.id}/#{@path}")
+        assert_list_page(lv)
+      end
+    end
+
+    defp assert_row(conn, company, path, text) do
+      {:ok, lv, _} = live(conn, "/companies/#{company.id}/#{path}")
+      assert_list_page(lv)
+      # Record shows as a row in the shared table, under a column header
+      assert has_element?(lv, "#objects_list > div", text)
+      assert has_element?(lv, "div.uppercase", "Name")
+      lv
+    end
+
+    test "contacts", %{conn: conn, admin: admin, company: company} do
+      c = contact_fixture(company, admin, %{"name" => "Swee Lee Farm"})
+      assert_row(conn, company, "contacts", c.name)
+    end
+
+    test "goods", %{conn: conn, admin: admin, company: company} do
+      g = good_fixture(company, admin)
+      assert_row(conn, company, "goods", g.name)
+    end
+
+    test "accounts", %{conn: conn, company: company} do
+      assert_row(conn, company, "accounts", "General Sales")
+    end
+
+    test "tax codes", %{conn: conn, company: company} do
+      {:ok, lv, _} = live(conn, "/companies/#{company.id}/tax_codes")
+      assert_list_page(lv)
+      assert has_element?(lv, "#objects_list > div", "NoSTax")
+    end
+
+    test "employees", %{conn: conn, admin: admin, company: company} do
+      e = employee_fixture(%{}, company, admin)
+      assert_row(conn, company, "employees", e.name)
+    end
+
+    test "holidays", %{conn: conn, admin: admin, company: company} do
+      h = holiday_fixture(%{}, company, admin)
+      assert_row(conn, company, "holidays", h.name)
+    end
+
+    test "salary types", %{conn: conn, company: company} do
+      assert_row(conn, company, "salary_types", "Monthly Salary")
+    end
   end
 end

@@ -1,6 +1,8 @@
 defmodule FullCircleWeb.FixedAssetLive.Index do
   use FullCircleWeb, :live_view
 
+  import FullCircleWeb.ListComponents
+
   alias FullCircle.Accounting
   alias FullCircle.StdInterface
   alias FullCircleWeb.FixedAssetLive.IndexComponent
@@ -10,47 +12,55 @@ defmodule FullCircleWeb.FixedAssetLive.Index do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="w-6/12 mx-auto">
-      <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
-      <.search_form
-        search_val={@search.terms}
-        placeholder={gettext("Name, Asset Account, Depreciation Account or Descriptions...")}
-        live
-      />
-      <div class="text-center mb-2">
-        <.link navigate={~p"/companies/#{@current_company.id}/fixed_assets/new"} class="blue button">
-          {gettext("New Fixed Asset")}
-        </.link>
-        <.link
-          navigate={~p"/companies/#{@current_company.id}/fixed_assets/calalldepre"}
-          class="blue button"
-          id="calculate_depre"
+    <div class="w-11/12 max-w-6xl mx-auto">
+      <.list_bar title={@page_title}>
+        <.search_form
+          compact
+          search_val={@search.terms}
+          placeholder={gettext("Name, Asset Account, Depreciation Account or Descriptions...")}
+          live
+        />
+        <:actions>
+          <.link
+            navigate={~p"/companies/#{@current_company.id}/fixed_assets/calalldepre"}
+            class="blue button"
+            id="calculate_depre"
+          >
+            {gettext("Calculate Depreciations")}
+          </.link>
+          <.link navigate={~p"/companies/#{@current_company.id}/fixed_assets/new"} class="blue button">
+            + {gettext("New Fixed Asset")}
+          </.link>
+        </:actions>
+      </.list_bar>
+
+      <.list_table>
+        <:head>
+          <div class="flex-1 min-w-0">{gettext("Name")}</div>
+          <div class="w-28 shrink-0 text-right">{gettext("Price")}</div>
+          <div class="w-32 shrink-0 text-right">{gettext("Depreciation")}</div>
+          <div class="w-28 shrink-0 text-right">{gettext("Disposal")}</div>
+          <div class="w-28 shrink-0 text-right">{gettext("Net book value")}</div>
+          <div class="w-32 shrink-0">{gettext("Rate")}</div>
+        </:head>
+        <div
+          :if={Enum.count(@streams.objects) > 0 or @page > 1}
+          id="objects_list"
+          phx-update="stream"
+          phx-page-loading
         >
-          {gettext("Calculate Depreciations")}
-        </.link>
-      </div>
-      <div class="text-center">
-        <div class="bg-amber-200 border-y-2 border-amber-500 font-bold p-2">
-          {gettext("Fixed Asset Information")}
+          <%= for {obj_id, obj} <- @streams.objects do %>
+            <.live_component
+              module={IndexComponent}
+              id={"#{obj_id}"}
+              obj={obj}
+              current_company={@current_company}
+              ex_class=""
+              terms={@search.terms}
+            />
+          <% end %>
         </div>
-      </div>
-      <div
-        :if={Enum.count(@streams.objects) > 0 or @page > 1}
-        id="objects_list"
-        phx-update="stream"
-        phx-page-loading
-      >
-        <%= for {obj_id, obj} <- @streams.objects do %>
-          <.live_component
-            module={IndexComponent}
-            id={"#{obj_id}"}
-            obj={obj}
-            current_company={@current_company}
-            ex_class=""
-            terms={@search.terms}
-          />
-        <% end %>
-      </div>
+      </.list_table>
       <.infinite_scroll_footer ended={@end_of_timeline?} />
     </div>
     """

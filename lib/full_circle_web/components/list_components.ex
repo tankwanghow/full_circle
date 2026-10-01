@@ -131,7 +131,7 @@ defmodule FullCircleWeb.ListComponents do
 
   def row_notes_badge(assigns) do
     ~H"""
-    <span class={@count == 0 && "opacity-0 group-hover:opacity-100"}>
+    <span class={["shrink-0 whitespace-nowrap", @count == 0 && "opacity-0 group-hover:opacity-100"]}>
       <FullCircleWeb.NoteComponents.notes_count_badge count={@count} id={@id} />
     </span>
     """

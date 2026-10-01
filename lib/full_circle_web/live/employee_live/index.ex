@@ -1,6 +1,8 @@
 defmodule FullCircleWeb.EmployeeLive.Index do
   use FullCircleWeb, :live_view
 
+  import FullCircleWeb.ListComponents
+
   alias FullCircle.StdInterface
   alias FullCircleWeb.EmployeeLive.IndexComponent
   alias FullCircleWeb.NoteLive.NotesIndex
@@ -11,53 +13,61 @@ defmodule FullCircleWeb.EmployeeLive.Index do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="w-5/12 mx-auto">
-      <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
-      <.search_form
-        search_val={@search.terms}
-        placeholder={gettext("Name, Id No, Nationality and Status...")}
-        live
-      />
-      <div class="text-center mb-2">
-        <.link
-          navigate={~p"/companies/#{@current_company.id}/employees/new"}
-          class="blue button"
-          id="new_employee"
+    <div class="w-11/12 max-w-6xl mx-auto">
+      <.list_bar title={@page_title}>
+        <.search_form
+          compact
+          search_val={@search.terms}
+          placeholder={gettext("Name, Id No, Nationality and Status...")}
+          live
+        />
+        <:actions>
+          <.link
+            :if={@can_print}
+            navigate={
+              ~p"/companies/#{@current_company.id}/employees/print_multi?pre_print=false&ids=#{@ids}"
+            }
+            target="_blank"
+            class="blue button"
+          >
+            {gettext("Print QRCode")}{"(#{Enum.count(@selected)})"}
+          </.link>
+          <.link
+            navigate={~p"/companies/#{@current_company.id}/employees/new"}
+            class="blue button"
+            id="new_employee"
+          >
+            + {gettext("New Employee")}
+          </.link>
+        </:actions>
+      </.list_bar>
+
+      <.list_table>
+        <:head>
+          <div class="w-6 shrink-0"></div>
+          <div class="flex-1 min-w-0">{gettext("Name")}</div>
+          <div class="w-[18%] shrink-0">{gettext("Id No")}</div>
+          <div class="w-[16%] shrink-0">{gettext("Nationality")}</div>
+          <div class="w-24 shrink-0">{gettext("Status")}</div>
+          <div class="w-14 shrink-0"></div>
+        </:head>
+        <div
+          id="objects_list"
+          phx-update="stream"
+          phx-page-loading
         >
-          {gettext("New Employee")}
-        </.link>
-        <.link
-          :if={@can_print}
-          navigate={
-            ~p"/companies/#{@current_company.id}/employees/print_multi?pre_print=false&ids=#{@ids}"
-          }
-          target="_blank"
-          class="blue button"
-        >
-          {gettext("Print QRCode")}{"(#{Enum.count(@selected)})"}
-        </.link>
-      </div>
-      <div class="text-center">
-        <div class="bg-amber-200 border-y-2 border-amber-500 font-bold p-1">
-          {gettext("Employee Information")}
+          <%= for {obj_id, obj} <- @streams.objects do %>
+            <.live_component
+              current_company={@current_company}
+              module={IndexComponent}
+              note_count={Map.get(@note_counts, obj.id, 0)}
+              id={obj_id}
+              obj={obj}
+              ex_class=""
+            />
+          <% end %>
         </div>
-      </div>
-      <div
-        id="objects_list"
-        phx-update="stream"
-        phx-page-loading
-      >
-        <%= for {obj_id, obj} <- @streams.objects do %>
-          <.live_component
-            current_company={@current_company}
-            module={IndexComponent}
-            note_count={Map.get(@note_counts, obj.id, 0)}
-            id={obj_id}
-            obj={obj}
-            ex_class=""
-          />
-        <% end %>
-      </div>
+      </.list_table>
       <.infinite_scroll_footer ended={@end_of_timeline?} />
       <NotesIndex.modal
         notes_for={@notes_for}

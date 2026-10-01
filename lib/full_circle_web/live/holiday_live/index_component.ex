@@ -1,6 +1,8 @@
 defmodule FullCircleWeb.HolidayLive.IndexComponent do
   use FullCircleWeb, :live_component
 
+  import FullCircleWeb.ListComponents
+
   @impl true
   def mount(socket) do
     {:ok, socket}
@@ -14,20 +16,23 @@ defmodule FullCircleWeb.HolidayLive.IndexComponent do
   @impl true
   def render(assigns) do
     ~H"""
-    <div
-      id={@id}
-      class={"#{@ex_class} text-center bg-gray-200 border-gray-500 hover:bg-gray-300 border-b p-1"}
-    >
-      <.link
-        class="hover:font-bold text-blue-600"
-        navigate={~p"/companies/#{@current_company.id}/holidays/#{@obj.id}/edit"}
-      >
-        {@obj.name}
-      </.link>
-      &#8226; {@obj.short_name} &#8226; {@obj.holidate |> FullCircleWeb.Helpers.format_date()}
+    <div id={@id} class={[row_class(@ex_class), line_class()]}>
+      <div class="flex-1 min-w-0 truncate">
+        <.link
+          class="hover:font-bold text-blue-600"
+          navigate={~p"/companies/#{@current_company.id}/holidays/#{@obj.id}/edit"}
+        >
+          {@obj.name}
+        </.link>
+      </div>
+      <div class="w-[20%] shrink-0 truncate">{@obj.short_name}</div>
+      <div class="w-28 shrink-0 tabular-nums">
+        {@obj.holidate |> FullCircleWeb.Helpers.format_date()}
+      </div>
       <.link
         navigate={~p"/companies/#{@current_company}/holidays/#{@obj.id}/copy"}
-        class="text-xs hover:bg-orange-400 bg-orange-200 py-1 px-2 rounded-full border-orange-400 border"
+        class="w-14 shrink-0 text-xs text-center rounded-full border border-orange-400/70 px-2 py-0.5 text-orange-800 dark:text-orange-300 hover:bg-orange-100/60 dark:hover:bg-orange-950"
+        tabindex="-1"
       >
         {gettext("Copy")}
       </.link>

@@ -1,6 +1,8 @@
 defmodule FullCircleWeb.QueryLive.Index do
   use FullCircleWeb, :live_view
 
+  import FullCircleWeb.ListComponents
+
   alias FullCircle.UserQueries.Query
   alias FullCircle.StdInterface
   alias FullCircleWeb.QueryLive.IndexComponent
@@ -10,40 +12,43 @@ defmodule FullCircleWeb.QueryLive.Index do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="w-8/12 mx-auto">
-      <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
-      <.search_form search_val={@search.terms} placeholder={gettext("Name...")} />
-      <div class="text-center mb-2">
-        <.link
-          navigate={~p"/companies/#{@current_company.id}/queries/new"}
-          class="blue button"
-          id="new_query"
+    <div class="w-11/12 max-w-6xl mx-auto">
+      <.list_bar title={@page_title}>
+        <.search_form compact search_val={@search.terms} placeholder={gettext("Name...")} />
+        <:actions>
+          <.link
+            navigate={~p"/companies/#{@current_company.id}/queries/new"}
+            class="blue button"
+            id="new_query"
+          >
+            + {gettext("New Query")}
+          </.link>
+        </:actions>
+      </.list_bar>
+
+      <.list_table>
+        <:head>
+          <div class="w-[30%] shrink-0">{gettext("Name")}</div>
+          <div class="flex-1 min-w-0">{gettext("SQL")}</div>
+        </:head>
+        <div
+          :if={Enum.count(@streams.objects) > 0 or @page > 1}
+          id="objects_list"
+          phx-update="stream"
+          phx-page-loading
         >
-          {gettext("New Query")}
-        </.link>
-      </div>
-      <div class="text-center">
-        <div class="border-y-2 bg-amber-200 border-amber-500 font-bold p-2">
-          {gettext("Query Information")}
+          <%= for {obj_id, obj} <- @streams.objects do %>
+            <.live_component
+              current_company={@current_company}
+              current_role={@current_role}
+              module={IndexComponent}
+              id={obj_id}
+              obj={obj}
+              ex_class=""
+            />
+          <% end %>
         </div>
-      </div>
-      <div
-        :if={Enum.count(@streams.objects) > 0 or @page > 1}
-        id="objects_list"
-        phx-update="stream"
-        phx-page-loading
-      >
-        <%= for {obj_id, obj} <- @streams.objects do %>
-          <.live_component
-            current_company={@current_company}
-            current_role={@current_role}
-            module={IndexComponent}
-            id={obj_id}
-            obj={obj}
-            ex_class=""
-          />
-        <% end %>
-      </div>
+      </.list_table>
       <.infinite_scroll_footer ended={@end_of_timeline?} />
     </div>
     """

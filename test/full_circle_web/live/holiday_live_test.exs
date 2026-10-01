@@ -137,7 +137,8 @@ defmodule FullCircleWeb.HolidayLiveTest do
              |> LazyHTML.query(~s|form input[name="search[terms]"]|)
              |> LazyHTML.to_tree() != []
 
-      assert html =~ "Holiday Information"
+      # Column header of the shared listing table (was an "Information" banner)
+      assert html =~ ">Name</div>"
     end
 
     test "holiday list", %{conn: conn, comp: comp} do

@@ -1,6 +1,8 @@
 defmodule FullCircleWeb.RecurringLive.IndexComponent do
   use FullCircleWeb, :live_component
 
+  import FullCircleWeb.ListComponents
+
   @impl true
   def mount(socket) do
     {:ok, socket}
@@ -14,18 +16,24 @@ defmodule FullCircleWeb.RecurringLive.IndexComponent do
   @impl true
   def render(assigns) do
     ~H"""
-    <div
-      id={@id}
-      class={"#{@ex_class} text-center bg-gray-200 border-gray-500 hover:bg-gray-300 border-b p-1"}
-    >
-      <.link
-        class="text-blue-600 hover:font-bold"
-        navigate={~p"/companies/#{@current_company}/recurrings/#{@obj.id}/edit"}
-      >
-        {@obj.recur_no}
-      </.link>
-      &#8226; {@obj.recur_date |> FullCircleWeb.Helpers.format_date()} &#8226; {@obj.employee_name} &#8226; {@obj.salary_type_name} &#8226; {@obj.start_date
-      |> FullCircleWeb.Helpers.format_date()} &#8226; {@obj.status}
+    <div id={@id} class={[row_class(@ex_class), line_class()]}>
+      <div class="w-[14%] shrink-0 truncate">
+        <.link
+          class="text-blue-600 hover:font-bold"
+          navigate={~p"/companies/#{@current_company}/recurrings/#{@obj.id}/edit"}
+        >
+          {@obj.recur_no}
+        </.link>
+      </div>
+      <div class="w-28 shrink-0 tabular-nums">
+        {@obj.recur_date |> FullCircleWeb.Helpers.format_date()}
+      </div>
+      <div class="flex-1 min-w-0 truncate">{@obj.employee_name}</div>
+      <div class="w-[22%] shrink-0 truncate">{@obj.salary_type_name}</div>
+      <div class="w-28 shrink-0 tabular-nums">
+        {@obj.start_date |> FullCircleWeb.Helpers.format_date()}
+      </div>
+      <div class="w-24 shrink-0 truncate">{@obj.status}</div>
     </div>
     """
   end

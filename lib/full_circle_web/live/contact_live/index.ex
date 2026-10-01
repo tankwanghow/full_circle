@@ -1,6 +1,8 @@
 defmodule FullCircleWeb.ContactLive.Index do
   use FullCircleWeb, :live_view
 
+  import FullCircleWeb.ListComponents
+
   alias FullCircle.StdInterface
   alias FullCircle.Accounting.Contact
   alias FullCircleWeb.ContactLive.IndexComponent
@@ -11,39 +13,47 @@ defmodule FullCircleWeb.ContactLive.Index do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="w-5/12 mx-auto">
-      <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
-      <.search_form
-        live
-        search_val={@search.terms}
-        placeholder={gettext("Name, City, State, Email, Phone and Descriptions...")}
-      />
-      <div class="text-center mb-2">
-        <.link navigate={~p"/companies/#{@current_company.id}/contacts/new"} class="blue button">
-          {gettext("New Contact")}
-        </.link>
-      </div>
-      <div class="text-center">
-        <div class=" bg-amber-200 border-y-2 border-amber-500 font-bold p-2">
-          {gettext("Contact Information")}
+    <div class="w-11/12 max-w-6xl mx-auto">
+      <.list_bar title={@page_title}>
+        <.search_form
+          compact
+          live
+          search_val={@search.terms}
+          placeholder={gettext("Name, City, State, Email, Phone and Descriptions...")}
+        />
+        <:actions>
+          <.link navigate={~p"/companies/#{@current_company.id}/contacts/new"} class="blue button">
+            + {gettext("New Contact")}
+          </.link>
+        </:actions>
+      </.list_bar>
+
+      <.list_table>
+        <:head>
+          <div class="w-[24%] shrink-0">{gettext("Name")}</div>
+          <div class="w-[11%] shrink-0">{gettext("Category")}</div>
+          <div class="flex-1 min-w-0">{gettext("Address")}</div>
+          <div class="w-[12%] shrink-0">{gettext("Phone")}</div>
+          <div class="w-[16%] shrink-0">{gettext("Email")}</div>
+          <div class="w-[14%] shrink-0">{gettext("Descriptions")}</div>
+        </:head>
+        <div
+          id="objects_list"
+          phx-update="stream"
+          phx-page-loading
+        >
+          <%= for {obj_id, obj} <- @streams.objects do %>
+            <.live_component
+              current_company={@current_company}
+              module={IndexComponent}
+              note_count={Map.get(@note_counts, obj.id, 0)}
+              id={obj_id}
+              obj={obj}
+              ex_class=""
+            />
+          <% end %>
         </div>
-      </div>
-      <div
-        id="objects_list"
-        phx-update="stream"
-        phx-page-loading
-      >
-        <%= for {obj_id, obj} <- @streams.objects do %>
-          <.live_component
-            current_company={@current_company}
-            module={IndexComponent}
-            note_count={Map.get(@note_counts, obj.id, 0)}
-            id={obj_id}
-            obj={obj}
-            ex_class=""
-          />
-        <% end %>
-      </div>
+      </.list_table>
       <.infinite_scroll_footer ended={@end_of_timeline?} />
       <NotesIndex.modal
         notes_for={@notes_for}
