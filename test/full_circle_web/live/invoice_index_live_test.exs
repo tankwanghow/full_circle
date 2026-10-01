@@ -193,4 +193,21 @@ defmodule FullCircleWeb.InvoiceIndexLiveTest do
     assert has_element?(lv, row(late))
     refute has_element?(lv, row(soon))
   end
+
+  test "Print buttons show only while something is selected", %{
+    conn: conn,
+    admin: admin,
+    company: company
+  } do
+    inv = create_invoice!(company, admin)
+    {:ok, lv, _} = live(conn, ~p"/companies/#{company.id}/Invoice")
+
+    refute has_element?(lv, "a", "Print(")
+
+    lv |> element("#checkbox_invoice_#{inv.id}") |> render_click(%{"value" => "on"})
+    assert has_element?(lv, "a", "Print(1)")
+
+    lv |> element("#checkbox_invoice_#{inv.id}") |> render_click()
+    refute has_element?(lv, "a", "Print(")
+  end
 end

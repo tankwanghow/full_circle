@@ -212,17 +212,25 @@ defmodule FullCircleWeb.Helpers do
   end
 
   def can_print?(socket, selected_name, max_selected) do
-    if socket.assigns[selected_name] |> Enum.count() > max_selected do
-      socket
-      |> assign(can_print: false)
-      |> Phoenix.LiveView.put_flash(
-        :error,
-        gettext("Please don't select more than ") <>
-          (max_selected |> Integer.to_string()) <>
-          gettext(" items.")
-      )
-    else
-      socket |> assign(can_print: true)
+    count = socket.assigns[selected_name] |> Enum.count()
+
+    cond do
+      # Unticking the last row must hide the print buttons again
+      count == 0 ->
+        socket |> assign(can_print: false)
+
+      count > max_selected ->
+        socket
+        |> assign(can_print: false)
+        |> Phoenix.LiveView.put_flash(
+          :error,
+          gettext("Please don't select more than ") <>
+            (max_selected |> Integer.to_string()) <>
+            gettext(" items.")
+        )
+
+      true ->
+        socket |> assign(can_print: true)
     end
   end
 
