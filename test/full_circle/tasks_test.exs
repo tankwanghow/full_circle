@@ -565,4 +565,142 @@ defmodule FullCircle.TasksTest do
       assert open == 1
     end
   end
+
+  describe "group_of/2" do
+    test "classifies by due date and reminder window" do
+      today = ~D[2026-10-15]
+      t = %CompanyTask{status: "open"}
+      assert Tasks.group_of(%{t | due_date: ~D[2026-10-14]}, today) == :overdue
+      assert Tasks.group_of(%{t | due_date: today}, today) == :due_soon
+
+      assert Tasks.group_of(%{t | due_date: ~D[2026-11-14], reminder_before_days: 30}, today) ==
+               :due_soon
+
+      assert Tasks.group_of(%{t | due_date: ~D[2026-11-15], reminder_before_days: 30}, today) ==
+               :upcoming
+
+      assert Tasks.group_of(%{t | due_date: ~D[2026-10-16]}, today) == :upcoming
+      assert Tasks.group_of(%{t | due_date: nil}, today) == :someday
+      assert Tasks.group_of(%{t | status: "done", due_date: ~D[2026-10-01]}, today) == :closed
+    end
+  end
+
+  describe "list_tasks/4" do
+    setup %{company: company, admin: admin} do
+      clerk = user_with_role(company, admin, "clerk")
+      today = ~D[2026-10-15]
+
+      mk = fn title, attrs -> task_fixture(company, admin, Map.put(attrs, "title", title)) end
+      someday = mk.("someday", %{})
+      upcoming = mk.("upcoming", %{"due_date" => "2026-12-01"})
+      soon = mk.("soon", %{"due_date" => "2026-10-20", "reminder_before_days" => "7"})
+      overdue = mk.("overdue", %{"due_date" => "2026-10-01"})
+      for_clerk = mk.("for clerk", %{"due_date" => "2026-10-02", "assignee_id" => clerk.id})
+
+      %{
+        clerk: clerk,
+        today: today,
+        someday: someday,
+        upcoming: upcoming,
+        soon: soon,
+        overdue: overdue,
+        for_clerk: for_clerk
+      }
+    end
+
+    defp rows(ctx, user, filters, extra \\ []) do
+      Tasks.list_tasks(
+        ctx.company,
+        user,
+        filters,
+        Keyword.merge([page: 1, per_page: 50, today: ctx.today], extra)
+      )
+    end
+
+    test "open, all: grouped order overdue, due soon, upcoming, someday", ctx do
+      rows = rows(ctx, ctx.admin, %{"scope" => "all"})
+
+      assert Enum.map(rows, & &1.task.title) ==
+               ["overdue", "for clerk", "soon", "upcoming", "someday"]
+
+      assert Enum.map(rows, & &1.group) == [:overdue, :overdue, :due_soon, :upcoming, :someday]
+    end
+
+    test "mine = assigned to me, or unassigned and created by me", ctx do
+      titles = fn user -> rows(ctx, user, %{"scope" => "mine"}) |> Enum.map(& &1.task.title) end
+
+      assert titles.(ctx.clerk) == ["for clerk"]
+      refute "for clerk" in titles.(ctx.admin)
+    end
+
+    test "closed state orders by closed_at desc", ctx do
+      {:ok, _} = Tasks.close_task(ctx.upcoming, :done, nil, ctx.company, ctx.admin)
+      rows = rows(ctx, ctx.admin, %{"scope" => "all", "state" => "closed"})
+      assert [%{task: %{title: "upcoming"}, group: :closed}] = rows
+    end
+
+    test "terms search title, descriptions and assignee email; % is literal", ctx do
+      rows = rows(ctx, ctx.admin, %{"scope" => "all", "terms" => ctx.clerk.email})
+      assert Enum.map(rows, & &1.task.title) == ["for clerk"]
+
+      assert rows(ctx, ctx.admin, %{"scope" => "all", "terms" => "%"}) == []
+    end
+
+    test "rows carry the latest visible note and the note count", ctx do
+      first =
+        note_fixture(ctx.company, ctx.admin, %{
+          "body" => "first",
+          "subject_type" => "Task",
+          "subject_id" => ctx.soon.id
+        })
+
+      FullCircle.Repo.update_all(
+        from(n in FullCircle.Notes.Note, where: n.id == ^first.id),
+        set: [inserted_at: DateTime.add(DateTime.utc_now(:second), -3600)]
+      )
+
+      note_fixture(ctx.company, ctx.admin, %{
+        "body" => "waiting for agent",
+        "subject_type" => "Task",
+        "subject_id" => ctx.soon.id
+      })
+
+      row =
+        rows(ctx, ctx.admin, %{"scope" => "all"})
+        |> Enum.find(&(&1.task.id == ctx.soon.id))
+
+      assert row.latest_note.body == "waiting for agent"
+      assert row.note_count == 2
+    end
+
+    test "pages", ctx do
+      page1 = rows(ctx, ctx.admin, %{"scope" => "all"}, per_page: 2)
+      page3 = rows(ctx, ctx.admin, %{"scope" => "all"}, page: 3, per_page: 2)
+      assert length(page1) == 2 and length(page3) == 1
+    end
+  end
+
+  describe "badge_count/3" do
+    test "mine, open, overdue or due soon; undated never counts", %{
+      company: company,
+      admin: admin
+    } do
+      clerk = user_with_role(company, admin, "clerk")
+      today = ~D[2026-10-15]
+      task_fixture(company, admin, %{"due_date" => "2026-10-10"})
+      task_fixture(company, admin, %{"due_date" => "2026-10-15"})
+      task_fixture(company, admin, %{"due_date" => "2026-10-25", "reminder_before_days" => "10"})
+      task_fixture(company, admin, %{"due_date" => "2026-10-26", "reminder_before_days" => "10"})
+      task_fixture(company, admin, %{})
+      task_fixture(company, admin, %{"due_date" => "2026-10-01", "assignee_id" => clerk.id})
+
+      assert Tasks.badge_count(company, admin, today) == 3
+      assert Tasks.badge_count(company, clerk, today) == 1
+    end
+
+    test "today is the company's local date", %{company: company} do
+      assert Tasks.today(%{company | timezone: "Asia/Kuala_Lumpur"}) ==
+               DateTime.now!("Asia/Kuala_Lumpur") |> DateTime.to_date()
+    end
+  end
 end

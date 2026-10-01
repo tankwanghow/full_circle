@@ -475,6 +475,141 @@ defmodule FullCircle.Tasks do
     |> Repo.preload(:closed_by)
   end
 
+  # --- lists and badge ------------------------------------------------------
+
+  def today(company), do: company.timezone |> DateTime.now!() |> DateTime.to_date()
+
+  def group_of(%CompanyTask{status: s}, _today) when s != "open", do: :closed
+  def group_of(%CompanyTask{due_date: nil}, _today), do: :someday
+
+  def group_of(%CompanyTask{due_date: d, reminder_before_days: r}, today) do
+    cond do
+      Date.compare(d, today) == :lt -> :overdue
+      d == today -> :due_soon
+      r && Date.compare(Date.add(d, -r), today) != :gt -> :due_soon
+      true -> :upcoming
+    end
+  end
+
+  def list_tasks(company, user, filters, opts) do
+    page = Keyword.fetch!(opts, :page)
+    per_page = Keyword.fetch!(opts, :per_page)
+    today = Keyword.get(opts, :today) || today(company)
+    filters = filters || %{}
+
+    tasks =
+      visible_to(company, user)
+      |> scope(filters["scope"] || "mine", user)
+      |> state(filters["state"] || "open", today)
+      |> terms(filters["terms"])
+      |> offset(^((page - 1) * per_page))
+      |> limit(^per_page)
+      |> Repo.all()
+      |> Repo.preload([:assignee, :closed_by])
+
+    ids = Enum.map(tasks, & &1.id)
+    latest = latest_notes(ids, company, user)
+    counts = Notes.count_by_records(company, user, "Task", ids)
+
+    Enum.map(tasks, fn t ->
+      %{
+        id: t.id,
+        task: t,
+        group: group_of(t, today),
+        latest_note: Map.get(latest, t.id),
+        note_count: Map.get(counts, t.id, 0)
+      }
+    end)
+  end
+
+  def badge_count(company, user, today \\ nil) do
+    today = today || today(company)
+
+    from(t in visible_to(company, user),
+      where: t.status == "open" and not is_nil(t.due_date),
+      where:
+        t.due_date <= ^today or
+          (not is_nil(t.reminder_before_days) and
+             fragment("? - ? <= ?", t.due_date, t.reminder_before_days, ^today)),
+      select: count(t.id)
+    )
+    |> scope("mine", user)
+    |> Repo.one()
+  end
+
+  defp scope(q, "all", _user), do: q
+
+  defp scope(q, _mine, user) do
+    from(t in q,
+      where: t.assignee_id == ^user.id or (is_nil(t.assignee_id) and t.creator_id == ^user.id)
+    )
+  end
+
+  defp state(q, "closed", _today) do
+    from(t in q, where: t.status != "open", order_by: [desc: t.closed_at, asc: t.title])
+  end
+
+  # The SQL twin of group_of/2: 0 overdue, 1 due soon, 2 upcoming, 3 someday.
+  defp state(q, _open, today) do
+    from(t in q,
+      where: t.status == "open",
+      order_by: [
+        asc:
+          fragment(
+            "CASE WHEN ? IS NULL THEN 3 WHEN ? < ? THEN 0 WHEN ? = ? OR (? IS NOT NULL AND ? - ? <= ?) THEN 1 ELSE 2 END",
+            t.due_date,
+            t.due_date,
+            ^today,
+            t.due_date,
+            ^today,
+            t.reminder_before_days,
+            t.due_date,
+            t.reminder_before_days,
+            ^today
+          ),
+        asc_nulls_last: t.due_date,
+        asc: t.title,
+        asc: t.id
+      ]
+    )
+  end
+
+  defp terms(q, nil), do: q
+
+  defp terms(q, terms) do
+    words = String.split(terms, ~r/\s+/, trim: true)
+
+    if words == [] do
+      q
+    else
+      q = from(t in q, left_join: a in assoc(t, :assignee), as: :assignee)
+
+      Enum.reduce(words, q, fn w, q ->
+        pattern = "%#{FullCircle.CommandPalette.Types.escape_like(w)}%"
+
+        from([t, assignee: a] in q,
+          where:
+            ilike(t.title, ^pattern) or ilike(coalesce(t.descriptions, ""), ^pattern) or
+              ilike(coalesce(a.email, ""), ^pattern)
+        )
+      end)
+    end
+  end
+
+  # Newest visible progress note per task, one query for the whole page.
+  defp latest_notes([], _company, _user), do: %{}
+
+  defp latest_notes(ids, company, user) do
+    from(n in Notes.visible_to(company, user),
+      where: n.subject_type == "Task" and n.subject_id in ^ids,
+      distinct: n.subject_id,
+      order_by: [desc: n.inserted_at, desc: n.id],
+      select: {n.subject_id, %{body: n.body, inserted_at: n.inserted_at}}
+    )
+    |> Repo.all()
+    |> Map.new()
+  end
+
   # --- links ----------------------------------------------------------------
 
   defp insert_links(multi, links, company, user) do
