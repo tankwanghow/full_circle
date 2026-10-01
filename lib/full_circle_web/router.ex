@@ -122,7 +122,6 @@ defmodule FullCircleWeb.Router do
     get "/note_attachments/:id", NoteAttachmentController, :show
     get "/punch_ingest_logs/:id/photo", PunchIngestLogPhotoController, :show
     get "/statutory_bundle/export", BundleController, :export
-    get "/download/:filename", FileDownloadController, :show
 
     live_session :require_authenticated_user_n_active_company,
       on_mount: [
@@ -340,8 +339,6 @@ defmodule FullCircleWeb.Router do
       live("/PaySlip/:pay_slip_id/view", PaySlipLive.Form, :view)
 
       live("/POS", PosLive)
-
-      live("/upload_files", UploadFileLive.Index, :index)
 
       live("/import_attend", UploadPunchLog.Index, :index)
     end
