@@ -81,6 +81,10 @@ add :lock_version, :integer, default: 0, null: false
 - `lib/full_circle_web/live/<entity>_live/detail_component.ex`
 - `lib/full_circle_web/live/<entity>_live/print.ex`
 
+Listing (`index.ex` + `index_component.ex`): follow `.claude/skills/decluttered-index.md`
+— `list_bar` / `list_table`, one line per document, and for e-invoice documents the
+`EInvComponents` status chip + details expander.
+
 The form's save `case` needs an `{:error, :stale}` clause alongside `{:sql_error, msg}`
 and `:not_authorise`, or a real conflict raises `CaseClauseError`:
 ```elixir

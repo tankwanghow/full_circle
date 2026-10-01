@@ -124,7 +124,8 @@ Project skills (non-obvious domain contracts) live in `.claude/skills/`:
 `user-query-sql.md`, `xero-import.md`, `fukuro-closure-backfill.md`,
 `periodic-inventory-double-entry.md`, `good-snp-report.md`,
 `layer-alive-birds-and-yield.md`, `notes.md`, `pl-forecast-model.md`,
-`mix-dependency-overrides.md`, `deploy-image-size.md`, `fit-width-forms.md`.
+`mix-dependency-overrides.md`, `deploy-image-size.md`, `fit-width-forms.md`,
+`decluttered-index.md`.
 
 ### StdInterface Pattern (`lib/full_circle/std_interface.ex`)
 

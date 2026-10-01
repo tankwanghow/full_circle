@@ -75,6 +75,9 @@ def can?(user, :delete_<entity>, company),
 ### 5. Create LiveView Files
 
 **Index** (`lib/full_circle_web/live/<entity>_live/index.ex`):
+- Layout: follow `.claude/skills/decluttered-index.md` — `list_bar` with
+  `<.search_form compact … />`, `list_table` columns, one line per record,
+  `<.infinite_scroll_footer>` (no `phx-viewport-bottom`)
 - Search with fuzzy matching via `StdInterface.filter/6`
 - Streaming for infinite scroll
 - Fields to search: typically `[:name, :descriptions]`
