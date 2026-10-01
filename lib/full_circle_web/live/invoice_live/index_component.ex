@@ -299,25 +299,23 @@ defmodule FullCircleWeb.InvoiceLive.IndexComponent do
 
         <div class="w-28 shrink-0 text-right tabular-nums">{money(@obj.invoice_amount)}</div>
 
-        <%!-- Overdue = rose balance + tooltip; no per-row pill (it is most rows) --%>
-        <div
-          class={[
-            "w-28 shrink-0 text-right tabular-nums",
-            @overdue && "text-rose-700 dark:text-rose-400"
-          ]}
-          title={
-            @overdue &&
-              gettext("%{days}d overdue · due %{date}",
-                days: @overdue,
-                date: FullCircleWeb.Helpers.format_date(@obj.due_date)
-              )
-          }
-        >
+        <div class="w-28 shrink-0 text-right tabular-nums">
           <%= if Decimal.eq?(@obj.balance, 0) do %>
             <span class="text-slate-400">—</span>
           <% else %>
             {money(@obj.balance)}
           <% end %>
+        </div>
+
+        <div
+          data-col="overdue"
+          class="w-16 shrink-0 text-right tabular-nums text-rose-700 dark:text-rose-400"
+          title={
+            @overdue &&
+              gettext("due %{date}", date: FullCircleWeb.Helpers.format_date(@obj.due_date))
+          }
+        >
+          {if @overdue, do: gettext("%{days}d", days: @overdue)}
         </div>
 
         <div class="w-36 shrink-0">{einv_chip(assigns)}</div>

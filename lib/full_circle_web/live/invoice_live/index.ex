@@ -100,6 +100,7 @@ defmodule FullCircleWeb.InvoiceLive.Index do
           <div class="w-[24%] shrink-0">{gettext("Particulars")}</div>
           <div class="w-28 shrink-0 text-right">{gettext("Amount")}</div>
           <div class="w-28 shrink-0 text-right">{gettext("Balance")}</div>
+          <div class="w-16 shrink-0 text-right">{gettext("Overdue")}</div>
           <div class="w-36 shrink-0">{gettext("e-Invoice")}</div>
           <div class="w-6 shrink-0"></div>
         </div>

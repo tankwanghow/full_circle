@@ -70,6 +70,8 @@ defmodule FullCircleWeb.InvoiceIndexLiveTest do
     {:ok, lv, _} = live(conn, ~p"/companies/#{company.id}/Invoice")
 
     assert has_element?(lv, "#{row(inv)} a", inv.invoice_no)
+    # Not yet due → empty overdue cell
+    refute has_element?(lv, "#{row(inv)} [data-col=overdue]", "d")
     assert has_element?(lv, row(inv), "Swee Lee Farm")
     assert has_element?(lv, row(inv), "50.00")
     # Due date comes from the invoice, not the invoice date again
@@ -86,8 +88,8 @@ defmodule FullCircleWeb.InvoiceIndexLiveTest do
       )
 
     {:ok, lv, _} = live(conn, ~p"/companies/#{company.id}/Invoice")
-    assert render(element(lv, row(inv))) =~ "10d overdue"
-    assert has_element?(lv, "#{row(inv)} [title^='10d overdue'].text-rose-700")
+    assert has_element?(lv, "#{row(inv)} [data-col=overdue]", "10d")
+    assert render(element(lv, "#{row(inv)} [data-col=overdue]")) =~ "due "
   end
 
   test "no e-invoice → 'Not sent' link to the portal", %{
