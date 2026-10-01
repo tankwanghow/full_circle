@@ -212,4 +212,20 @@ defmodule FullCircleWeb.InvoiceIndexLiveTest do
     lv |> element("#checkbox_invoice_#{inv.id}") |> render_click()
     refute has_element?(lv, "a", "Print(")
   end
+
+  test "the footer itself drives infinite scroll (works when page 1 doesn't fill the screen)",
+       %{conn: conn, admin: admin, company: company} do
+    invs = for n <- 1..17, do: create_invoice!(company, admin, contact: "Scroll #{n}")
+
+    {:ok, lv, _} = live(conn, ~p"/companies/#{company.id}/Invoice")
+
+    assert has_element?(lv, "#infinite-scroll-footer[phx-hook=InfiniteScroll][data-ended=false]")
+    refute has_element?(lv, "[phx-viewport-bottom]")
+    assert Enum.count(invs, &has_element?(lv, row(&1))) == 15
+
+    lv |> element("#infinite-scroll-footer") |> render_hook("next-page", %{})
+
+    assert Enum.all?(invs, &has_element?(lv, row(&1)))
+    assert has_element?(lv, "#infinite-scroll-footer[data-ended=true]", "No More.")
+  end
 end

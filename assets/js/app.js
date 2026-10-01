@@ -101,6 +101,41 @@ Hooks.localStorageInput = {
   }
 }
 
+// Infinite scroll: the list footer (<.infinite_scroll_footer>) loads the next
+// page whenever it is on screen — including right after the first render,
+// when a short page doesn't fill the viewport (phx-viewport-bottom only fires
+// on scroll). After each page lands it checks again, so it keeps filling
+// until the screen is full or the list ends.
+Hooks.InfiniteScroll = {
+  mounted() {
+    this.pending = false
+    this.observer = new IntersectionObserver(
+      (entries) => { if (entries.some((e) => e.isIntersecting)) this.load() },
+      { rootMargin: "200px" }
+    )
+    this.observer.observe(this.el)
+  },
+  updated() {
+    this.pending = false
+    this.loadIfVisible()
+  },
+  load() {
+    if (this.pending || this.el.dataset.ended === "true") return
+    this.pending = true
+    this.pushEvent("next-page", {}, () => {
+      this.pending = false
+      requestAnimationFrame(() => this.loadIfVisible())
+    })
+  },
+  loadIfVisible() {
+    const r = this.el.getBoundingClientRect()
+    if (r.top < window.innerHeight + 200 && r.bottom > 0) this.load()
+  },
+  destroyed() {
+    this.observer.disconnect()
+  }
+}
+
 // App-wide command palette (header search button) — search + actions + recents.
 // No global keyboard shortcut: it is opened only via the header button.
 Hooks.CommandPalette = {

@@ -62,7 +62,6 @@ defmodule FullCircleWeb.LayerLive.HouseIndex do
         :if={Enum.count(@streams.objects) > 0 or @page > 1}
         id="objects_list"
         phx-update="stream"
-        phx-viewport-bottom={!@end_of_timeline? && "next-page"}
         phx-page-loading
       >
         <%= for {obj_id, obj} <- @streams.objects do %>

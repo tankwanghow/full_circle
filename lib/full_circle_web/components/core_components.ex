@@ -894,14 +894,26 @@ defmodule FullCircleWeb.CoreComponents do
 
   attr(:ended, :boolean)
 
+  # The footer drives paging: the InfiniteScroll hook sends "next-page" while
+  # it is on screen — also right after the first render, when a short page
+  # doesn't fill the viewport (phx-viewport-bottom only fires on scroll).
+  # The host LiveView must handle "next-page" and set @end_of_timeline?.
   def infinite_scroll_footer(assigns) do
     ~H"""
-    <div :if={@ended} class="mt-2 mb-2 text-center border-y-2 bg-orange-200 border-orange-400 p-2">
-      {gettext("No More.")}
-    </div>
-
-    <div :if={!@ended} class="mt-2 mb-2 text-center border-y-2 bg-blue-200 border-blue-400 p-2">
-      {gettext("Loading...")}<.icon name="hero-arrow-path" class="ml-1 h-3 w-3 animate-spin" />
+    <div
+      id="infinite-scroll-footer"
+      phx-hook="InfiniteScroll"
+      data-ended={to_string(@ended)}
+      class={[
+        "mt-2 mb-2 text-center border-y-2 p-2",
+        if(@ended, do: "bg-orange-200 border-orange-400", else: "bg-blue-200 border-blue-400")
+      ]}
+    >
+      <%= if @ended do %>
+        {gettext("No More.")}
+      <% else %>
+        {gettext("Loading...")}<.icon name="hero-arrow-path" class="ml-1 h-3 w-3 animate-spin" />
+      <% end %>
     </div>
     """
   end

@@ -386,7 +386,7 @@ defmodule FullCircleWeb.NoteLive.Index do
         </form>
       </div>
 
-      <div id="notes" phx-update="stream" phx-viewport-bottom={!@end_of_timeline? && "next-page"}>
+      <div id="notes" phx-update="stream">
         <.note_post
           :for={{dom_id, item} <- @streams.notes}
           id={dom_id}
