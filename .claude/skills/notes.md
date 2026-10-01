@@ -181,6 +181,17 @@ subject save with Save; files and links on a saved note apply immediately
 (links on a new note are queued until the first save). The notes panel sits
 under the note with `record_type: "Note"` for follow-up notes.
 
+## Command palette (`CommandPalette.NoteSearch`)
+- `note <words>` / `notes <words>` (case-insensitive) searches **notes only**
+  via `Notes.search/5` — never query `notes` directly from the palette. Hits are
+  kind `:note` (title or first line; subtitle date · author · subject title from
+  `Linkable.resolve_many/3`), path `/companies/:id/notes/:note_id`.
+- Note text is **not mixed into ordinary palette results**: every non-action
+  search instead ends with a `:note_search` row, "Search notes for “…”", that
+  opens `/notes?search[terms]=…`. It is not saved to Recent. Both are omitted
+  without `:view_notes`.
+- Grouped under a "Notes" section after Documents (`Groups.group/1`).
+
 ## Translations
 Do not run `mix gettext.extract --merge` for new strings: the catalogs lag the
 code and a merge marks ~200 existing translations fuzzy (disabling them).

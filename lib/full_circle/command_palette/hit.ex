@@ -13,11 +13,13 @@ defmodule FullCircle.CommandPalette.Hit do
     :contact_name,
     :good_name,
     :bank_name,
+    # Preformatted second line (notes); nil → built from the fields above
+    :subtitle,
     :label,
     :path
   ]
 
-  @type kind :: :document | :action | :contact | :recent
+  @type kind :: :document | :action | :contact | :recent | :note | :note_search
 
   @type t :: %__MODULE__{
           kind: kind(),
@@ -28,6 +30,7 @@ defmodule FullCircle.CommandPalette.Hit do
           contact_name: String.t() | nil,
           good_name: String.t() | nil,
           bank_name: String.t() | nil,
+          subtitle: String.t() | nil,
           label: String.t(),
           path: String.t()
         }

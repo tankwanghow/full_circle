@@ -5,6 +5,8 @@ defmodule FullCircle.CommandPalette.Router do
   - **Actions** (single token): `newinv`, `newpur`, …
   - **Contacts**: open contact master by name
   - **Search**: doc number, contact docs, type, dates, good on lines
+  - **Notes**: `note <words>` searches notes only; other searches end with a
+    "Search notes for …" row (`NoteSearch`)
   """
 
   alias FullCircle.CommandPalette.{
@@ -15,6 +17,7 @@ defmodule FullCircle.CommandPalette.Router do
     DepositSearch,
     DocNoSearch,
     FundsDocSearch,
+    NoteSearch,
     Query,
     Types
   }
@@ -28,10 +31,19 @@ defmodule FullCircle.CommandPalette.Router do
   def dispatch(company, user, text, _page_context \\ %{}) do
     terms = text |> to_string() |> String.trim()
 
-    if String.length(terms) < Types.min_length() do
-      {:hits, []}
-    else
-      {:hits, merge_hits(company, user, terms)}
+    cond do
+      String.length(terms) < Types.min_length() ->
+        {:hits, []}
+
+      match?({:ok, _}, NoteSearch.prefix(terms)) ->
+        {:ok, words} = NoteSearch.prefix(terms)
+
+        {:hits,
+         NoteSearch.search(company, user, words) ++
+           List.wrap(NoteSearch.fallback_hit(company, user, words))}
+
+      true ->
+        {:hits, merge_hits(company, user, terms)}
     end
   end
 
@@ -75,8 +87,9 @@ defmodule FullCircle.CommandPalette.Router do
           end
         )
 
-      # Contacts first (when shown), then documents
-      Enum.take(contacts ++ docs, Types.limit())
+      # Contacts first (when shown), then documents; note search offered last
+      Enum.take(contacts ++ docs, Types.limit()) ++
+        List.wrap(NoteSearch.fallback_hit(company, user, terms))
     end
   end
 

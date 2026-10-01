@@ -2,7 +2,7 @@ defmodule FullCircle.CommandPalette.Groups do
   @moduledoc false
 
   @doc """
-  Group hits for UI: Actions, Contacts, Documents (stable order).
+  Group hits for UI: Actions, Recent, Contacts, Documents, Notes (stable order).
   Returns `[{section_atom, [Hit.t()]}]` omitting empty sections.
   """
   def group(hits) when is_list(hits) do
@@ -10,12 +10,14 @@ defmodule FullCircle.CommandPalette.Groups do
     contacts = Enum.filter(hits, &(&1.kind == :contact))
     recents = Enum.filter(hits, &(&1.kind == :recent))
     documents = Enum.filter(hits, &(&1.kind == :document))
+    notes = Enum.filter(hits, &(&1.kind in [:note, :note_search]))
 
     [
       {:actions, actions},
       {:recents, recents},
       {:contacts, contacts},
-      {:documents, documents}
+      {:documents, documents},
+      {:notes, notes}
     ]
     |> Enum.reject(fn {_sec, list} -> list == [] end)
   end
@@ -31,5 +33,6 @@ defmodule FullCircle.CommandPalette.Groups do
   def section_label(:recents), do: "Recent"
   def section_label(:contacts), do: "Contacts"
   def section_label(:documents), do: "Documents"
+  def section_label(:notes), do: "Notes"
   def section_label(_), do: ""
 end

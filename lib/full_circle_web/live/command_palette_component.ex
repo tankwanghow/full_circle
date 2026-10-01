@@ -61,7 +61,10 @@ defmodule FullCircleWeb.CommandPaletteComponent do
 
   def handle_event("recents", %{"items" => items}, socket) do
     recents = CommandPalette.recents_from_payload(items)
-    actions = CommandPalette.empty_hits(socket.assigns.current_company, socket.assigns.current_user)
+
+    actions =
+      CommandPalette.empty_hits(socket.assigns.current_company, socket.assigns.current_user)
+
     hits = recents ++ actions
     set_hits(socket, hits, "")
   end
@@ -151,9 +154,14 @@ defmodule FullCircleWeb.CommandPaletteComponent do
       company_id: socket.assigns.current_company.id
     }
 
+    # A "Search notes for …" row is a search, not a record — keep it out of Recent
+    socket =
+      if hit.kind == :note_search,
+        do: socket,
+        else: push_event(socket, "palette_remember", remember)
+
     {:noreply,
      socket
-     |> push_event("palette_remember", remember)
      |> close()
      |> push_navigate(to: hit.path)}
   end
@@ -166,6 +174,8 @@ defmodule FullCircleWeb.CommandPaletteComponent do
     |> assign(:groups, [])
     |> assign(:selected, 0)
   end
+
+  defp subtitle(%{subtitle: text}) when is_binary(text), do: text
 
   defp subtitle(%{kind: :action, contact_name: key}) when is_binary(key) do
     gettext("Create · type %{key}", key: key)
@@ -211,6 +221,7 @@ defmodule FullCircleWeb.CommandPaletteComponent do
   defp badge_class(:action), do: "bg-sky-800 text-sky-200"
   defp badge_class(:contact), do: "bg-violet-800 text-violet-200"
   defp badge_class(:recent), do: "bg-amber-900 text-amber-200"
+  defp badge_class(kind) when kind in [:note, :note_search], do: "bg-teal-800 text-teal-200"
   defp badge_class(_), do: "bg-gray-700 text-amber-300"
 
   defp empty_terms?(terms), do: String.trim(terms || "") == ""
@@ -274,13 +285,17 @@ defmodule FullCircleWeb.CommandPaletteComponent do
           </div>
 
           <div
-            :if={@groups != [] or (not empty_terms?(@terms) and String.length(String.trim(@terms)) >= 2)}
+            :if={
+              @groups != [] or (not empty_terms?(@terms) and String.length(String.trim(@terms)) >= 2)
+            }
             id={"#{@id}-results"}
             class="max-h-80 overflow-y-auto py-1"
             role="listbox"
           >
             <div
-              :if={not empty_terms?(@terms) and String.length(String.trim(@terms)) >= 2 and @hits == []}
+              :if={
+                not empty_terms?(@terms) and String.length(String.trim(@terms)) >= 2 and @hits == []
+              }
               class="px-4 py-6 text-center text-gray-400 text-sm"
             >
               {gettext("No matches")}
