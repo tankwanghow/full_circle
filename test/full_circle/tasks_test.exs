@@ -5,6 +5,7 @@ defmodule FullCircle.TasksTest do
   import FullCircle.NotesFixtures
   import FullCircle.TasksFixtures
 
+  alias FullCircle.Notes
   alias FullCircle.Tasks
   alias FullCircle.Tasks.CompanyTask
 
@@ -267,5 +268,231 @@ defmodule FullCircle.TasksTest do
     _auditor = user_with_role(company, admin, "auditor")
     ids = Tasks.assignable_users(company) |> Enum.map(& &1.id) |> Enum.sort()
     assert ids == Enum.sort([admin.id, clerk.id])
+  end
+
+  describe "next_due_date/3" do
+    test "day and week" do
+      assert Tasks.next_due_date(~D[2026-10-30], "day", 3) == ~D[2026-11-02]
+      assert Tasks.next_due_date(~D[2026-10-30], "week", 2) == ~D[2026-11-13]
+    end
+
+    test "month clamps, and month-end stays month-end" do
+      assert Tasks.next_due_date(~D[2026-01-31], "month", 1) == ~D[2026-02-28]
+      assert Tasks.next_due_date(~D[2028-01-31], "month", 1) == ~D[2028-02-29]
+      assert Tasks.next_due_date(~D[2026-02-28], "month", 1) == ~D[2026-03-31]
+      assert Tasks.next_due_date(~D[2026-03-31], "month", 1) == ~D[2026-04-30]
+      assert Tasks.next_due_date(~D[2026-10-15], "month", 3) == ~D[2027-01-15]
+      assert Tasks.next_due_date(~D[2026-01-30], "month", 1) == ~D[2026-02-28]
+    end
+
+    test "year keeps the day; 29 Feb falls to 28 Feb" do
+      assert Tasks.next_due_date(~D[2026-03-01], "year", 1) == ~D[2027-03-01]
+      assert Tasks.next_due_date(~D[2028-02-29], "year", 1) == ~D[2029-02-28]
+      assert Tasks.next_due_date(~D[2027-02-28], "year", 1) == ~D[2028-02-28]
+    end
+  end
+
+  describe "close_task/5" do
+    setup %{company: company, admin: admin} do
+      cashier = user_with_role(company, admin, "cashier")
+      contact = contact_fixture(company, admin)
+
+      task =
+        task_fixture(company, admin, %{
+          "title" => "Road tax WXX 1234",
+          "due_date" => "2026-10-15",
+          "recur_unit" => "year",
+          "recur_every" => "1",
+          "reminder_before_days" => "30",
+          "documents_needed" => "road tax receipt",
+          "assignee_id" => cashier.id,
+          "visibility" => ["manager"],
+          "links" => [%{"type" => "Contact", "id" => contact.id}]
+        })
+
+      %{cashier: cashier, contact: contact, task: task}
+    end
+
+    test "Done spawns the next cycle with copied fields and links", ctx do
+      %{company: company, cashier: cashier, task: task, contact: contact} = ctx
+
+      assert {:ok, %{closed: closed, next: next}} =
+               Tasks.close_task(task, :done, "paid, receipt attached", company, cashier)
+
+      assert closed.status == "done" and closed.closed_by_id == cashier.id
+      assert next.series_id == task.series_id
+      assert next.due_date == ~D[2027-10-15]
+      assert next.status == "open"
+
+      assert {next.title, next.assignee_id, next.visibility, next.reminder_before_days,
+              next.documents_needed, next.recur_unit, next.recur_every, next.creator_id} ==
+               {task.title, task.assignee_id, task.visibility, task.reminder_before_days,
+                task.documents_needed, task.recur_unit, task.recur_every, task.creator_id}
+
+      assert [%{type: "Contact", id: id}] = Tasks.list_links(next, company, ctx.admin)
+      assert id == contact.id
+
+      assert [%{note: n}] = Notes.notes_for_record("Task", task.id, company, cashier)
+      assert n.body == "paid, receipt attached"
+      assert n.visibility == ["admin"]
+    end
+
+    test "Skip also spawns the next cycle; a blank note adds none", ctx do
+      %{company: company, admin: admin, task: task} = ctx
+
+      assert {:ok, %{closed: %{status: "skipped"}, next: %{}}} =
+               Tasks.close_task(task, :skipped, "  ", company, admin)
+
+      assert Notes.notes_for_record("Task", task.id, company, admin) == []
+    end
+
+    test "a one-off spawns nothing", %{company: company, admin: admin} do
+      t = task_fixture(company, admin, %{"due_date" => "2026-10-15"})
+      assert {:ok, %{next: nil}} = Tasks.close_task(t, :done, nil, company, admin)
+    end
+
+    test "closing twice is refused and spawns no second cycle", ctx do
+      %{company: company, admin: admin, task: task} = ctx
+      {:ok, _} = Tasks.close_task(task, :done, nil, company, admin)
+      assert {:error, :already_closed} = Tasks.close_task(task, :done, nil, company, admin)
+
+      count =
+        Repo.aggregate(from(t in CompanyTask, where: t.series_id == ^task.series_id), :count)
+
+      assert count == 2
+    end
+
+    test "auditor cannot close", ctx do
+      auditor = user_with_role(ctx.company, ctx.admin, "auditor")
+      # ctx.task is restricted to managers, which an auditor cannot even see
+      open = task_fixture(ctx.company, ctx.admin, %{"due_date" => "2026-10-15"})
+      assert Tasks.close_task(open, :done, nil, ctx.company, auditor) == :not_authorise
+    end
+  end
+
+  describe "reopen_task/3" do
+    setup %{company: company, admin: admin} do
+      task =
+        task_fixture(company, admin, %{
+          "due_date" => "2026-10-15",
+          "recur_unit" => "month",
+          "recur_every" => "1"
+        })
+
+      {:ok, %{closed: closed, next: next}} = Tasks.close_task(task, :done, nil, company, admin)
+      %{closed: closed, next: next}
+    end
+
+    test "untouched next cycle is removed", %{
+      company: company,
+      admin: admin,
+      closed: closed,
+      next: next
+    } do
+      assert {:ok, %{reopened: r, next_kept: false}} = Tasks.reopen_task(closed, company, admin)
+      assert r.status == "open" and is_nil(r.closed_at)
+      assert Repo.get(CompanyTask, next.id) == nil
+    end
+
+    test "next cycle with a note is kept", %{
+      company: company,
+      admin: admin,
+      closed: closed,
+      next: next
+    } do
+      note_fixture(company, admin, %{
+        "body" => "started",
+        "subject_type" => "Task",
+        "subject_id" => next.id
+      })
+
+      assert {:ok, %{next_kept: true}} = Tasks.reopen_task(closed, company, admin)
+      assert Repo.get(CompanyTask, next.id)
+    end
+
+    test "next cycle that was edited is kept", %{
+      company: company,
+      admin: admin,
+      closed: closed,
+      next: next
+    } do
+      {:ok, _} = Tasks.update_task(next, %{"title" => "changed"}, company, admin)
+      assert {:ok, %{next_kept: true}} = Tasks.reopen_task(closed, company, admin)
+    end
+
+    test "only creator / admin / manager; an open task cannot be reopened", %{
+      company: company,
+      admin: admin,
+      closed: closed
+    } do
+      clerk = user_with_role(company, admin, "clerk")
+      assert Tasks.reopen_task(closed, company, clerk) == :not_authorise
+      {:ok, %{reopened: r}} = Tasks.reopen_task(closed, company, admin)
+      assert {:error, :open} = Tasks.reopen_task(r, company, admin)
+    end
+  end
+
+  test "series_cycles lists the other cycles", %{company: company, admin: admin} do
+    t =
+      task_fixture(company, admin, %{
+        "due_date" => "2026-10-15",
+        "recur_unit" => "month",
+        "recur_every" => "1"
+      })
+
+    {:ok, %{next: n1}} = Tasks.close_task(t, :done, nil, company, admin)
+    {:ok, %{next: n2}} = Tasks.close_task(n1, :skipped, nil, company, admin)
+
+    assert Enum.map(Tasks.series_cycles(n2, company, admin), & &1.id) == [n1.id, t.id]
+  end
+
+  describe "controller rulings" do
+    setup %{company: company, admin: admin} do
+      task =
+        task_fixture(company, admin, %{
+          "due_date" => "2026-10-15",
+          "recur_unit" => "month",
+          "recur_every" => "1"
+        })
+
+      {:ok, %{closed: closed, next: next}} = Tasks.close_task(task, :done, nil, company, admin)
+      %{closed: closed, next: next}
+    end
+
+    test "next cycle with a hand-added link is kept", ctx do
+      %{company: company, admin: admin, closed: closed, next: next} = ctx
+      contact = contact_fixture(company, admin)
+      Process.sleep(1100)
+      {:ok, _} = Tasks.add_link(next, "Contact", contact.id, company, admin)
+
+      assert {:ok, %{next_kept: true}} = Tasks.reopen_task(closed, company, admin)
+      assert Repo.get(CompanyTask, next.id)
+    end
+
+    test "links of a closed task cannot change", ctx do
+      %{company: company, admin: admin, closed: closed} = ctx
+      contact = contact_fixture(company, admin)
+      assert {:error, :closed} = Tasks.add_link(closed, "Contact", contact.id, company, admin)
+
+      open =
+        task_fixture(company, admin, %{"links" => [%{"type" => "Contact", "id" => contact.id}]})
+
+      [%{link_id: link_id}] = Tasks.list_links(open, company, admin)
+      {:ok, _} = Tasks.close_task(open, :done, nil, company, admin)
+      assert {:error, :closed} = Tasks.remove_link(open, link_id, company, admin)
+    end
+
+    test "a demoted creator cannot reopen", %{company: company, admin: admin} do
+      clerk = user_with_role(company, admin, "clerk")
+      t = task_fixture(company, clerk, %{"due_date" => "2026-10-15"})
+      {:ok, %{closed: closed}} = Tasks.close_task(t, :done, nil, company, clerk)
+
+      from(cu in FullCircle.Sys.CompanyUser,
+        where: cu.company_id == ^company.id and cu.user_id == ^clerk.id
+      )
+      |> Repo.update_all(set: [role: "auditor"])
+
+      assert Tasks.reopen_task(closed, company, clerk) == :not_authorise
+    end
   end
 end

@@ -64,7 +64,9 @@ defmodule FullCircle.Tasks do
     do: (c == user.id and r.create) or r.edit_others
 
   def may_close?(%CompanyTask{}, _user, r), do: r.create
-  def may_reopen?(%CompanyTask{creator_id: c}, user, r), do: c == user.id or r.edit_others
+
+  def may_reopen?(%CompanyTask{creator_id: c}, user, r),
+    do: (c == user.id and r.create) or r.edit_others
 
   # --- read -----------------------------------------------------------------
 
@@ -240,6 +242,202 @@ defmodule FullCircle.Tasks do
     }
   end
 
+  # --- repeat, close, reopen ------------------------------------------------
+
+  @doc """
+  The next cycle's due date, stepped from the old due date (fixed calendar).
+  Months clamp to month end, and a month-end date stays month-end, so a task
+  due 31 Jan goes 28 Feb → 31 Mar → 30 Apr instead of sticking at the 28th.
+  """
+  def next_due_date(%Date{} = d, "day", n), do: Date.add(d, n)
+  def next_due_date(%Date{} = d, "week", n), do: Date.add(d, 7 * n)
+
+  def next_due_date(%Date{} = d, "month", n) do
+    shifted = Date.shift(d, month: n)
+    if d.day == Date.days_in_month(d), do: Date.end_of_month(shifted), else: shifted
+  end
+
+  def next_due_date(%Date{} = d, "year", n), do: Date.shift(d, year: n)
+
+  def close_task(%CompanyTask{} = task, kind, closing_note, company, user)
+      when kind in [:done, :skipped] do
+    with %CompanyTask{} = current <- get_task(task.id, company, user) || {:error, :not_found},
+         true <- may_close?(current, user, rights(company, user)) || :not_authorise do
+      Multi.new()
+      |> Multi.run(:lock, fn repo, _ ->
+        status =
+          repo.one(
+            from(t in CompanyTask,
+              where: t.id == ^current.id,
+              lock: "FOR UPDATE",
+              select: t.status
+            )
+          )
+
+        if status == "open", do: {:ok, status}, else: {:error, :already_closed}
+      end)
+      |> Multi.run(:note, fn _repo, _ -> closing_note(closing_note, current, company, user) end)
+      |> Multi.update(:closed, CompanyTask.close_changeset(current, kind, user))
+      |> Multi.run(:next, fn repo, %{closed: closed} -> spawn_next(repo, closed, user) end)
+      |> Repo.transaction()
+      |> case do
+        {:ok, %{closed: closed, next: next}} ->
+          broadcast(company)
+          {:ok, %{closed: closed, next: next}}
+
+        {:error, _step, reason, _} ->
+          {:error, reason}
+      end
+    end
+  end
+
+  defp closing_note(body, task, company, user) do
+    if is_binary(body) and String.trim(body) != "" do
+      Notes.create_note(
+        %{
+          "body" => String.trim(body),
+          "subject_type" => "Task",
+          "subject_id" => task.id,
+          "visibility" => FullCircle.Notes.Note.private_visibility()
+        },
+        company,
+        user
+      )
+    else
+      {:ok, nil}
+    end
+  end
+
+  defp spawn_next(_repo, %CompanyTask{recur_unit: nil}, _user), do: {:ok, nil}
+
+  defp spawn_next(repo, %CompanyTask{} = t, user) do
+    next = %CompanyTask{
+      company_id: t.company_id,
+      series_id: t.series_id,
+      title: t.title,
+      descriptions: t.descriptions,
+      due_date: next_due_date(t.due_date, t.recur_unit, t.recur_every),
+      recur_unit: t.recur_unit,
+      recur_every: t.recur_every,
+      reminder_before_days: t.reminder_before_days,
+      documents_needed: t.documents_needed,
+      assignee_id: t.assignee_id,
+      visibility: t.visibility,
+      creator_id: t.creator_id
+    }
+
+    with {:ok, n} <- repo.insert(next) do
+      now = DateTime.utc_now(:second)
+
+      rows =
+        from(l in RecordLink,
+          where: l.company_id == ^t.company_id and l.from_type == "Task" and l.from_id == ^t.id,
+          select: %{to_type: l.to_type, to_id: l.to_id}
+        )
+        |> repo.all()
+        |> Enum.map(fn l ->
+          Map.merge(l, %{
+            id: Ecto.UUID.generate(),
+            company_id: t.company_id,
+            from_type: "Task",
+            from_id: n.id,
+            created_by_id: user.id,
+            inserted_at: now
+          })
+        end)
+
+      repo.insert_all(RecordLink, rows)
+      {:ok, n}
+    end
+  end
+
+  def reopen_task(%CompanyTask{} = task, company, user) do
+    with %CompanyTask{} = current <- get_task(task.id, company, user) || {:error, :not_found},
+         true <- may_reopen?(current, user, rights(company, user)) || :not_authorise,
+         true <- current.status != "open" || {:error, :open} do
+      next = spawned_next(current)
+      remove? = next != nil and untouched?(next)
+
+      Multi.new()
+      |> Multi.update(
+        :reopened,
+        Ecto.Changeset.change(current, status: "open", closed_at: nil, closed_by_id: nil)
+      )
+      |> Multi.run(:next, fn repo, _ ->
+        if remove? do
+          repo.delete_all(
+            from(l in RecordLink,
+              where:
+                l.company_id == ^company.id and l.from_type == "Task" and l.from_id == ^next.id
+            )
+          )
+
+          repo.delete(next)
+        else
+          {:ok, next}
+        end
+      end)
+      |> Repo.transaction()
+      |> case do
+        {:ok, %{reopened: r}} ->
+          broadcast(company)
+
+          {:ok,
+           %{
+             reopened: Repo.preload(r, [:assignee, :creator, :closed_by], force: true),
+             next_kept: next != nil and not remove?
+           }}
+
+        {:error, _step, reason, _} ->
+          {:error, reason}
+      end
+    end
+  end
+
+  # The cycle this task's close inserted: same series, the stepped due date,
+  # created no earlier than the close. Scoped by company through `current`.
+  defp spawned_next(%CompanyTask{recur_unit: nil}), do: nil
+
+  defp spawned_next(%CompanyTask{} = current) do
+    due = next_due_date(current.due_date, current.recur_unit, current.recur_every)
+
+    from(t in CompanyTask,
+      where:
+        t.company_id == ^current.company_id and t.series_id == ^current.series_id and
+          t.id != ^current.id and t.due_date == ^due and is_nil(t.deleted_at) and
+          t.inserted_at >= ^current.closed_at,
+      limit: 1
+    )
+    |> Repo.one()
+  end
+
+  # add_link does not bump lock_version, so a link added after the cycle was
+  # spawned (inserted_at strictly later) also counts as a touch.
+  defp untouched?(%CompanyTask{} = t) do
+    t.status == "open" and t.lock_version == 0 and
+      not Repo.exists?(
+        from(n in FullCircle.Notes.Note,
+          where: n.subject_type == "Task" and n.subject_id == ^t.id and is_nil(n.deleted_at)
+        )
+      ) and
+      not Repo.exists?(
+        from(l in RecordLink,
+          where:
+            l.company_id == ^t.company_id and l.from_type == "Task" and l.from_id == ^t.id and
+              l.inserted_at > ^t.inserted_at
+        )
+      )
+  end
+
+  def series_cycles(%CompanyTask{} = task, company, user) do
+    from(t in visible_to(company, user),
+      where: t.series_id == ^task.series_id and t.id != ^task.id,
+      order_by: [desc_nulls_last: t.due_date, desc: t.inserted_at]
+    )
+    |> Repo.all()
+    |> Repo.preload(:closed_by)
+  end
+
   # --- links ----------------------------------------------------------------
 
   defp insert_links(multi, links, company, user) do
@@ -287,6 +485,7 @@ defmodule FullCircle.Tasks do
   def add_link(%CompanyTask{} = task, type, id, company, user) do
     with %CompanyTask{} = current <- get_task(task.id, company, user) || {:error, :not_found},
          true <- may_edit?(current, user, rights(company, user)) || :not_authorise,
+         true <- current.status == "open" || {:error, :closed},
          {:ok, _} <- Linkable.resolve(type, id, company, user) do
       Repo.insert(link_changeset(current, type, id, company, user))
     end
@@ -295,6 +494,7 @@ defmodule FullCircle.Tasks do
   def remove_link(%CompanyTask{} = task, link_id, company, user) do
     with %CompanyTask{} = current <- get_task(task.id, company, user) || {:error, :not_found},
          true <- may_edit?(current, user, rights(company, user)) || :not_authorise,
+         true <- current.status == "open" || {:error, :closed},
          %RecordLink{} = link <-
            Repo.one(
              from(l in RecordLink,
