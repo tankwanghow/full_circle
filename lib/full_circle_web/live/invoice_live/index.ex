@@ -1,6 +1,8 @@
 defmodule FullCircleWeb.InvoiceLive.Index do
   use FullCircleWeb, :live_view
 
+  import FullCircleWeb.ListComponents
+
   alias FullCircle.Billing
   alias FullCircleWeb.InvoiceLive.IndexComponent
   alias FullCircleWeb.NoteLive.NotesIndex
@@ -12,87 +14,81 @@ defmodule FullCircleWeb.InvoiceLive.Index do
   def render(assigns) do
     ~H"""
     <div class="mx-auto w-11/12 max-w-[96rem]">
-      <%!-- One bar: title · filters · actions --%>
-      <.form
-        for={%{}}
-        id="search-form"
-        phx-submit="search"
-        autocomplete="off"
-        class="flex flex-wrap items-end gap-2 mb-3 text-sm"
-      >
-        <h1 class="text-2xl font-medium mr-3 self-center">{@page_title}</h1>
-        <div class="grow min-w-56">
-          <label class="text-xs text-slate-500">{gettext("Search")}</label>
-          <.input
-            id="search_terms"
-            name="search[terms]"
-            type="search"
-            value={@search.terms}
-            placeholder={gettext("invoice no, contact or particulars…")}
-          />
-        </div>
-        <div class="w-28">
-          <label class="text-xs text-slate-500">{gettext("Balance")}</label>
-          <.input
-            name="search[balance]"
-            type="select"
-            options={~w(All Paid Unpaid)}
-            value={@search.balance}
-            id="search_balance"
-          />
-        </div>
-        <div class="w-36">
-          <label class="text-xs text-slate-500">{gettext("Invoice date from")}</label>
-          <.input
-            name="search[invoice_date]"
-            type="date"
-            value={@search.invoice_date}
-            id="search_invoice_date"
-          />
-        </div>
-        <div class="w-36">
-          <label class="text-xs text-slate-500">{gettext("Due date from")}</label>
-          <.input
-            name="search[due_date]"
-            type="date"
-            value={@search.due_date}
-            id="search_due_date"
-          />
-        </div>
-        <.button class="h-9 w-10">🔍</.button>
-        <div class="flex gap-1 ml-auto">
-          <.link
-            :if={@can_print}
-            navigate={
-              ~p"/companies/#{@current_company.id}/Invoice/print_multi?pre_print=false&ids=#{@ids}"
-            }
-            target="_blank"
-            class="blue button"
-          >
-            {gettext("Print")}{"(#{Enum.count(@selected)})"}
-          </.link>
-          <.link
-            :if={@can_print}
-            navigate={
-              ~p"/companies/#{@current_company.id}/Invoice/print_multi?pre_print=true&ids=#{@ids}"
-            }
-            target="_blank"
-            class="blue button"
-          >
-            {gettext("Pre Print")}{"(#{Enum.count(@selected)})"}
-          </.link>
-          <.link
-            navigate={~p"/companies/#{@current_company.id}/Invoice/new"}
-            class="blue button"
-            id="new_invoice"
-          >
-            + {gettext("New Invoice")}
-          </.link>
-        </div>
+      <.form for={%{}} id="search-form" phx-submit="search" autocomplete="off">
+        <.list_bar title={@page_title}>
+          <div class="grow min-w-56">
+            <.filter_label>{gettext("Search")}</.filter_label>
+            <.input
+              id="search_terms"
+              name="search[terms]"
+              type="search"
+              value={@search.terms}
+              placeholder={gettext("invoice no, contact or particulars…")}
+            />
+          </div>
+          <div class="w-28">
+            <.filter_label>{gettext("Balance")}</.filter_label>
+            <.input
+              name="search[balance]"
+              type="select"
+              options={~w(All Paid Unpaid)}
+              value={@search.balance}
+              id="search_balance"
+            />
+          </div>
+          <div class="w-36">
+            <.filter_label>{gettext("Invoice date from")}</.filter_label>
+            <.input
+              name="search[invoice_date]"
+              type="date"
+              value={@search.invoice_date}
+              id="search_invoice_date"
+            />
+          </div>
+          <div class="w-36">
+            <.filter_label>{gettext("Due date from")}</.filter_label>
+            <.input
+              name="search[due_date]"
+              type="date"
+              value={@search.due_date}
+              id="search_due_date"
+            />
+          </div>
+          <.button class="h-9 w-10">🔍</.button>
+          <:actions>
+            <.link
+              :if={@can_print}
+              navigate={
+                ~p"/companies/#{@current_company.id}/Invoice/print_multi?pre_print=false&ids=#{@ids}"
+              }
+              target="_blank"
+              class="blue button"
+            >
+              {gettext("Print")}{"(#{Enum.count(@selected)})"}
+            </.link>
+            <.link
+              :if={@can_print}
+              navigate={
+                ~p"/companies/#{@current_company.id}/Invoice/print_multi?pre_print=true&ids=#{@ids}"
+              }
+              target="_blank"
+              class="blue button"
+            >
+              {gettext("Pre Print")}{"(#{Enum.count(@selected)})"}
+            </.link>
+            <.link
+              navigate={~p"/companies/#{@current_company.id}/Invoice/new"}
+              class="blue button"
+              id="new_invoice"
+            >
+              + {gettext("New Invoice")}
+            </.link>
+          </:actions>
+        </.list_bar>
       </.form>
 
-      <div class="rounded border border-slate-300 dark:border-gray-700 overflow-hidden">
-        <div class="flex items-center gap-2 px-2 py-1.5 bg-slate-200 dark:bg-gray-800 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+      <.list_table>
+        <:head>
           <div class="w-6 shrink-0"></div>
           <div class="w-24 shrink-0">{gettext("Date")}</div>
           <div class="w-40 shrink-0">{gettext("No.")}</div>
@@ -103,12 +99,8 @@ defmodule FullCircleWeb.InvoiceLive.Index do
           <div class="w-16 shrink-0 text-right">{gettext("Overdue")}</div>
           <div class="w-36 shrink-0">{gettext("e-Invoice")}</div>
           <div class="w-6 shrink-0"></div>
-        </div>
-        <div
-          id="objects_list"
-          phx-update="stream"
-          phx-page-loading
-        >
+        </:head>
+        <div id="objects_list" phx-update="stream" phx-page-loading>
           <%= for {obj_id, obj} <- @streams.objects do %>
             <.live_component
               module={IndexComponent}
@@ -122,7 +114,7 @@ defmodule FullCircleWeb.InvoiceLive.Index do
             />
           <% end %>
         </div>
-      </div>
+      </.list_table>
       <.infinite_scroll_footer ended={@end_of_timeline?} />
       <NotesIndex.modal
         notes_for={@notes_for}

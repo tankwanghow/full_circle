@@ -1,10 +1,11 @@
 defmodule FullCircleWeb.PurInvoiceLive.IndexComponent do
   use FullCircleWeb, :live_component
 
-  import FullCircleWeb.NoteComponents, only: [notes_count_badge: 1]
+  import FullCircleWeb.ListComponents
+  import FullCircleWeb.EInvComponents
 
   alias FullCircle.EInvMetas
-  alias FullCircleWeb.Helpers
+  alias FullCircleWeb.EInvComponents
 
   @impl true
   def mount(socket) do
@@ -13,7 +14,12 @@ defmodule FullCircleWeb.PurInvoiceLive.IndexComponent do
 
   @impl true
   def update(assigns, socket) do
-    {:ok, socket |> assign(assigns) |> assign_new(:note_count, fn -> 0 end) |> get_e_invoices()}
+    {:ok,
+     socket
+     |> assign(assigns)
+     |> assign_new(:note_count, fn -> 0 end)
+     |> assign_new(:einv_open, fn -> false end)
+     |> get_e_invoices()}
   end
 
   defp get_e_invoices(socket) do
@@ -43,6 +49,11 @@ defmodule FullCircleWeb.PurInvoiceLive.IndexComponent do
         )
     )
     |> get_e_invoices()
+  end
+
+  @impl true
+  def handle_event("toggle_einv", _, socket) do
+    {:noreply, update(socket, :einv_open, &(!&1))}
   end
 
   @impl true
@@ -109,83 +120,26 @@ defmodule FullCircleWeb.PurInvoiceLive.IndexComponent do
     end
   end
 
-  defp matched_or_try_match(fc, einv, assigns) do
-    assigns = assigns |> assign(fc: fc) |> assign(einv: einv)
-
-    cond do
-      einv.status != "Valid" ->
-        ~H"""
-        <a
-          id={@fc.e_inv_internal_id}
-          href="#"
-          phx-hook="copyAndOpen"
-          copy-text={@fc.e_inv_internal_id}
-          goto-url={"#{@einv_portal}/newdocument"}
-          class="border-blue-600 border hover:font-medium bg-blue-200 p-1 rounded-xl"
-        >
-          {gettext("New E-Invoice")}
-        </a>
-        """
-
-      is_nil(fc.e_inv_uuid) or fc.e_inv_uuid == "" ->
-        match(fc, einv, assigns)
-
-      einv.uuid != fc.e_inv_uuid ->
-        ~H"""
-        <span class="font-semibold text-orange-400">Wrongly matched</span>
-        """
-
-      einv.uuid == fc.e_inv_uuid ->
-        unmatch(fc, assigns)
-    end
-  end
-
-  defp match(fc, einv, assigns) do
-    assigns = assigns |> assign(fc: fc) |> assign(einv: einv)
-
-    ~H"""
-    <.link
-      phx-target={@myself}
-      phx-value-einv={Jason.encode!(@einv)}
-      phx-value-fcdoc={Jason.encode!(@fc)}
-      phx-click="match"
-      class="bg-green-200 p-1 hover:font-medium rounded-xl border border-green-600"
-    >
-      Match
-    </.link>
-    """
-  end
-
-  defp unmatch(fc, assigns) do
-    assigns = assigns |> assign(fc: fc)
-
-    ~H"""
-    <.link
-      phx-target={@myself}
-      phx-value-fcdoc={Jason.encode!(@fc)}
-      phx-click="unmatch"
-      class="bg-orange-200 p-1 hover:font-medium rounded-xl border border-orange-600"
-    >
-      Remove Match
-    </.link>
-    """
-  end
-
   @impl true
   def render(assigns) do
-    ~H"""
-    <div
-      id={@id}
-      class={"#{@ex_class} flex flex-row text-center tracking-tighter bg-gray-200 hover:bg-gray-400"}
-    >
-      <div class="w-[6%] border-b border-gray-400 p-1">
-        <div>{@obj.pur_invoice_date |> FullCircleWeb.Helpers.format_date()}</div>
-        <div>{@obj.due_date |> FullCircleWeb.Helpers.format_date()}</div>
-      </div>
+    assigns =
+      assigns
+      |> assign(:state, EInvComponents.einv_state(assigns.obj.e_inv_uuid, assigns.e_invs))
+      |> assign(:overdue, overdue_days(assigns.obj.due_date, Decimal.abs(assigns.obj.balance)))
 
-      <div class="w-[18%] border-b border-gray-400 overflow-clip p-1">
-        <div>{@obj.contact_name}</div>
-        <div class="text-sm">
+    ~H"""
+    <div id={@id} class={row_class(@ex_class)}>
+      <div class={line_class()}>
+        <div class="w-6 shrink-0"></div>
+
+        <div
+          class="w-24 shrink-0 tabular-nums"
+          title={"#{gettext("Due")} #{FullCircleWeb.Helpers.format_date(@obj.due_date)}"}
+        >
+          {FullCircleWeb.Helpers.format_date(@obj.pur_invoice_date)}
+        </div>
+
+        <div class="w-56 shrink-0 whitespace-nowrap overflow-hidden flex items-center gap-1">
           <%= if @obj.old_data do %>
             {@obj.pur_invoice_no}
           <% else %>
@@ -193,80 +147,57 @@ defmodule FullCircleWeb.PurInvoiceLive.IndexComponent do
               current_company={@company}
               doc_obj={%{doc_type: "PurInvoice", doc_id: @obj.id, doc_no: @obj.pur_invoice_no}}
             />
-            <.notes_count_badge count={@note_count} id={@obj.id} />
+            <.row_notes_badge count={@note_count} id={@obj.id} />
+            <span
+              :if={@obj.e_inv_internal_id && @obj.pur_invoice_no != @obj.e_inv_internal_id}
+              class="min-w-0 truncate text-xs text-slate-500"
+              title={@obj.e_inv_internal_id}
+            >
+              {@obj.e_inv_internal_id}
+            </span>
           <% end %>
-          {if @obj.pur_invoice_no != @obj.e_inv_internal_id, do: @obj.e_inv_internal_id}
-          {@obj.tax_id} <span class="text-green-600">{@obj.reg_no}</span>
         </div>
-      </div>
-      <div class="w-[18%] border-b text-center border-gray-400 overflow-clip p-1">
-        <span class="font-light">{@obj.particulars}</span>
-      </div>
-      <div class="w-[7%] border-b border-gray-400 p-1">
-        <div>{Number.Currency.number_to_currency(@obj.pur_invoice_amount)}</div>
-        <div class="text-orange-600">{Number.Currency.number_to_currency(@obj.balance)}</div>
-      </div>
-      <div class="w-[0.4%] bg-white"></div>
-      <div class="w-[50.6%] p-1 border-b border-gray-400">
-        <div :if={@e_invs == []} class="flex border-b border-amber-400 last:border-0">
-          <.link target="_blank" href={"#{@einv_portal}/newdocument"} class="blue button">
-            {gettext("New E-Invoice")}
-          </.link>
-        </div>
-        <%= for einv <- @e_invs do %>
-          <div class="flex border-b border-amber-400 last:border-0">
-            <div class="w-[22%]">
-              <div>
-                <div>
-                  {einv.dateTimeReceived |> Helpers.format_datetime(@company)}
-                </div>
-                <div>
-                  {einv.dateTimeIssued |> Helpers.format_datetime(@company)}
-                </div>
-                <div>
-                  {if !is_nil(einv.rejectRequestDateTime) do
-                    einv.rejectRequestDateTime |> Helpers.format_datetime(@company)
-                  end}
-                </div>
-              </div>
-            </div>
-            <div class="w-[36%]">
-              <a
-                class="text-blue-600 hover:font-medium"
-                target="_blank"
-                href={"#{@einv_portal}/documents/#{einv.uuid}"}
-              >
-                {einv.uuid}
-              </a>
-              <div class="text-sm">
-                {"#{einv.internalId}"}
-                <span class="font-bold text-green-600">Sent</span>
-                <span class="text-purple-600">{einv.typeName} {einv.typeVersionName}</span>
-              </div>
-            </div>
 
-            <div class="w-[42%]">
-              <div class="overflow-hidden">{einv.supplierName}</div>
-              <div class="text-sm">
-                {einv.buyerTIN}
-                <span class="font-bold">
-                  {einv.documentCurrency}
-                  <%= if Decimal.gt?(einv.totalNetAmount, einv.totalPayableAmount) do %>
-                    {einv.totalNetAmount
-                    |> Number.Delimit.number_to_delimited()}
-                  <% else %>
-                    {einv.totalPayableAmount
-                    |> Number.Delimit.number_to_delimited()}
-                  <% end %>
-                </span>
-                <span :if={einv.status == "Valid"} class="text-green-600">{einv.status}</span>
-                <span :if={einv.status != "Valid"} class="text-rose-600">{einv.status}</span>
-                {matched_or_try_match(@obj, einv, assigns)}
-              </div>
-            </div>
-          </div>
-        <% end %>
+        <div
+          class="flex-1 min-w-0 truncate"
+          title={Enum.join(Enum.reject([@obj.tax_id, @obj.reg_no], &(&1 in [nil, ""])), " · ")}
+        >
+          {@obj.contact_name}
+        </div>
+
+        <div class={["w-[24%] shrink-0 truncate", muted_class()]} title={@obj.particulars}>
+          {@obj.particulars}
+        </div>
+
+        <.amount_cell amount={@obj.pur_invoice_amount} />
+        <.amount_cell amount={@obj.balance} />
+        <.overdue_cell days={@overdue} due_date={@obj.due_date} />
+
+        <div class="w-36 shrink-0">
+          <.einv_chip
+            state={@state}
+            fc={@obj}
+            doc_id={@obj.id}
+            copy_text={@obj.pur_invoice_no}
+            none_label={gettext("Not received")}
+            einv_portal={@einv_portal}
+            myself={@myself}
+          />
+        </div>
+
+        <.einv_toggle open={@einv_open} myself={@myself} />
       </div>
+
+      <.einv_details
+        :if={@einv_open}
+        e_invs={@e_invs}
+        fc={@obj}
+        doc_id={@obj.id}
+        copy_text={@obj.pur_invoice_no}
+        company={@company}
+        einv_portal={@einv_portal}
+        myself={@myself}
+      />
     </div>
     """
   end
