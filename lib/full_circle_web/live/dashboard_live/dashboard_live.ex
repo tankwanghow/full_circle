@@ -20,14 +20,6 @@ defmodule FullCircleWeb.DashboardLive do
           {gettext("Rouge Users")}
         </.link>
       </div>
-      <div
-        :if={FullCircle.Authorization.can?(@current_user, :view_notes, @current_company)}
-        class="mb-4 gap-1 flex flex-wrap justify-center"
-      >
-        <.link navigate={~p"/companies/#{@current_company.id}/notes"} class="button blue">
-          📝 {gettext("Notes")}
-        </.link>
-      </div>
       <div class="font-medium text-xl">Accounting</div>
       <div class="mb-4 gap-1 flex flex-wrap justify-center">
         <.link navigate={~p"/companies/#{@current_company.id}/accounts"} class="button blue">

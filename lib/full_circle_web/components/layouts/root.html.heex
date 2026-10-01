@@ -33,6 +33,18 @@
           {gettext("Dashboard")}
         </.link>
 
+        <.link
+          :if={
+            assigns[:current_company] &&
+              FullCircle.Authorization.can?(@current_user, :view_notes, @current_company)
+          }
+          id="full_circle_notes"
+          navigate={~p"/companies/#{@current_company.id}/notes"}
+          class="rounded hover:bg-gray-400 p-2 whitespace-nowrap"
+        >
+          📝 {gettext("Notes")}
+        </.link>
+
         <button
           :if={assigns[:current_company]}
           type="button"
