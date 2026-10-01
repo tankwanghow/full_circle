@@ -1,6 +1,6 @@
 defmodule FullCircleWeb.CommandPaletteComponent do
   @moduledoc """
-  App-wide command palette (Ctrl/Cmd+K).
+  App-wide command palette (opened from the header search button).
   """
   use FullCircleWeb, :live_component
 
@@ -48,15 +48,6 @@ defmodule FullCircleWeb.CommandPaletteComponent do
 
   def handle_event("close", _params, socket) do
     {:noreply, close(socket)}
-  end
-
-  def handle_event("go_dashboard", _params, socket) do
-    path = ~p"/companies/#{socket.assigns.current_company.id}/dashboard"
-
-    {:noreply,
-     socket
-     |> close()
-     |> push_navigate(to: path)}
   end
 
   def handle_event("recents", %{"items" => items}, socket) do

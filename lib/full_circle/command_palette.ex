@@ -1,6 +1,6 @@
 defmodule FullCircle.CommandPalette do
   @moduledoc """
-  App-wide command palette (Ctrl/Cmd+K).
+  App-wide command palette (opened from the header search button).
 
   - **Search:** document number, contact, type, dates, goods, deposits
   - **Notes:** `note <words>`; other searches end with "Search notes for …"
@@ -72,8 +72,7 @@ defmodule FullCircle.CommandPalette do
       "Search: INV-… · swee inv · dep maybank · rc funds cash",
       "Dates: 5/2/2026 (on/before) · 1/2/2026 - 14/2/2026",
       "Notes: note maize moisture · notes swee",
-      "Create: newinv newpur newrc newpv newcn newdn newjs newdep newrtn newnote",
-      "Keys: Ctrl+K palette · Ctrl+Shift+D dashboard · ↵ open"
+      "Create: newinv newpur newrc newpv newcn newdn newjs newdep newrtn newnote"
     ]
   end
 end

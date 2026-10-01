@@ -29,26 +29,19 @@
           id="full_circle_dashboard"
           patch={~p"/companies/#{@current_company.id}/dashboard"}
           class="rounded hover:bg-gray-400 p-2"
-          title={gettext("Dashboard (Ctrl+Shift+D)")}
         >
           {gettext("Dashboard")}
-          <kbd class="hidden md:inline text-xs text-gray-300 border border-gray-500 rounded px-1 ml-1">
-            ⇧D
-          </kbd>
         </.link>
 
         <button
           :if={assigns[:current_company]}
           type="button"
           id="command-palette-trigger"
-          title={gettext("Search or actions (Ctrl+K) — newinv, newpur, newcn…")}
+          title={gettext("Search or actions — newinv, newpur, newcn…")}
           class="rounded hover:bg-gray-400 p-2 flex items-center gap-1"
           onclick="window.dispatchEvent(new CustomEvent('fc-open-command-palette'))"
         >
           <.icon name="hero-magnifying-glass" class="w-5 h-5" />
-          <kbd class="hidden md:inline text-xs text-gray-300 border border-gray-500 rounded px-1">
-            ⌘K
-          </kbd>
         </button>
 
         <ul>

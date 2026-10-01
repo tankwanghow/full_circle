@@ -101,30 +101,14 @@ Hooks.localStorageInput = {
   }
 }
 
-// App-wide command palette (Ctrl/Cmd+K) — search + actions + recents
+// App-wide command palette (header search button) — search + actions + recents.
+// No global keyboard shortcut: it is opened only via the header button.
 Hooks.CommandPalette = {
   mounted() {
     this.open = () => {
       this.pushEventTo(this.el, "open", {})
     }
     this.onKey = (e) => {
-      const mod = e.ctrlKey || e.metaKey
-
-      // Ctrl/Cmd+K → command palette
-      if (mod && !e.altKey && !e.shiftKey && (e.key === "k" || e.key === "K")) {
-        e.preventDefault()
-        this.open()
-        return
-      }
-
-      // Ctrl/Cmd+Shift+D → company dashboard (Shift avoids browser bookmark Ctrl+D)
-      if (mod && e.shiftKey && !e.altKey && (e.key === "d" || e.key === "D")) {
-        e.preventDefault()
-        e.stopPropagation()
-        this.pushEventTo(this.el, "go_dashboard", {})
-        return
-      }
-
       if (this.el.dataset.open !== "true") return
 
       if (e.key === "ArrowDown" || e.key === "ArrowUp") {
