@@ -5,6 +5,7 @@ defmodule FullCircle.NotesTest do
 
   import FullCircle.BillingFixtures
   import FullCircle.NotesFixtures
+  import FullCircle.TasksFixtures
 
   alias FullCircle.Notes
 
@@ -642,6 +643,78 @@ defmodule FullCircle.NotesTest do
       assert {:ok, _} = link.target
       assert %{subject: nil, links: [], replies: 0} = details[plain.id]
       assert Notes.feed_details([], company, clerk) == %{}
+    end
+  end
+
+  describe "notes about a task" do
+    setup %{company: company, admin: admin} do
+      manager = user_with_role(company, admin, "manager")
+      cashier = user_with_role(company, admin, "cashier")
+      clerk = user_with_role(company, admin, "clerk")
+
+      task =
+        task_fixture(company, manager, %{
+          "title" => "Permit renewal",
+          "visibility" => ["admin"],
+          "assignee_id" => cashier.id
+        })
+
+      note =
+        note_fixture(company, manager, %{
+          "body" => "submitted to JTK",
+          "visibility" => ["admin"],
+          "subject_type" => "Task",
+          "subject_id" => task.id
+        })
+
+      %{manager: manager, cashier: cashier, clerk: clerk, task: task, note: note}
+    end
+
+    test "a Private note on a task is readable by whoever sees the task", ctx do
+      %{company: company, cashier: cashier, clerk: clerk, note: note} = ctx
+      assert Notes.can_read?(note, company, cashier)
+      refute Notes.can_read?(note, company, clerk)
+    end
+
+    test "absent from a non-viewer's feed, search and counts", ctx do
+      %{company: company, clerk: clerk, task: task, note: note} = ctx
+
+      refute note.id in Enum.map(
+               Notes.search(company, clerk, "", %{}, page: 1, per_page: 50),
+               & &1.id
+             )
+
+      refute note.id in Enum.map(
+               Notes.search(company, clerk, "JTK", %{}, page: 1, per_page: 50),
+               & &1.id
+             )
+
+      assert Notes.count_by_records(company, clerk, "Task", [task.id]) == %{}
+      assert Notes.count_by_records(company, ctx.cashier, "Task", [task.id]) == %{task.id => 1}
+    end
+
+    test "versions follow the task rule", ctx do
+      %{company: company, manager: manager, cashier: cashier, note: note} = ctx
+
+      {:ok, edited} =
+        Notes.update_note(note, %{"body" => "submitted to JTK on 3/10"}, company, manager)
+
+      assert [_] = Notes.list_versions(edited, company, cashier)
+    end
+
+    test "attachments on it download for the assignee only", ctx do
+      %{company: company, manager: manager, cashier: cashier, clerk: clerk, note: note} = ctx
+
+      {:ok, att} =
+        FullCircle.Notes.Attachments.attach(
+          note,
+          %{path: jpeg_file(), file_name: "p.jpg"},
+          company,
+          manager
+        )
+
+      assert FullCircle.Notes.Attachments.get_readable(att.id, company, cashier)
+      refute FullCircle.Notes.Attachments.get_readable(att.id, company, clerk)
     end
   end
 end

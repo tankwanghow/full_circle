@@ -1,6 +1,6 @@
 defmodule FullCircle.Linkable do
   @moduledoc """
-  The registry of record types a note can be about or link to.
+  The registry of record types a note or task can be about or link to.
 
   References are `(type, id)` pairs with no foreign key; this module is the
   whitelist that keeps them honest. Every resolve is scoped to the company
@@ -37,7 +37,7 @@ defmodule FullCircle.Linkable do
              end)
 
   def types do
-    Enum.map(@records, & &1.type) ++ ["Note"] ++ Enum.map(@documents, & &1.type)
+    Enum.map(@records, & &1.type) ++ ["Note", "Task"] ++ Enum.map(@documents, & &1.type)
   end
 
   def type?(type), do: type in types()
@@ -47,6 +47,7 @@ defmodule FullCircle.Linkable do
       {:record, %{route: route}} -> "/companies/#{company.id}/#{route}/#{id}/edit"
       {:document, %{route: route}} -> "/companies/#{company.id}/#{route}/#{id}/edit"
       :note -> "/companies/#{company.id}/notes/#{id}/edit"
+      :task -> "/companies/#{company.id}/tasks/#{id}"
       nil -> "#"
     end
   end
@@ -56,6 +57,7 @@ defmodule FullCircle.Linkable do
       {:record, _} -> true
       {:document, _} -> true
       :note -> FullCircle.Authorization.can?(user, :view_notes, company)
+      :task -> FullCircle.Authorization.can?(user, :view_tasks, company)
       nil -> false
     end
   end
@@ -91,6 +93,7 @@ defmodule FullCircle.Linkable do
   # --- internals ------------------------------------------------------------
 
   defp spec("Note"), do: :note
+  defp spec("Task"), do: :task
 
   defp spec(type) do
     case Enum.find(@records, &(&1.type == type)) do
@@ -136,6 +139,10 @@ defmodule FullCircle.Linkable do
     FullCircle.Notes.resolve_notes(ids, company, user)
   end
 
+  defp fetch(:task, _type, ids, company, user) do
+    FullCircle.Tasks.resolve_tasks(ids, company, user)
+  end
+
   defp do_search({:record, %{schema: schema, title: title}}, type, terms, company, user) do
     pattern = "%#{PaletteTypes.escape_like(terms)}%"
 
@@ -167,6 +174,10 @@ defmodule FullCircle.Linkable do
     |> Enum.map(fn n ->
       target("Note", n.id, FullCircle.Notes.Note.display_title(n), nil, company)
     end)
+  end
+
+  defp do_search(:task, _type, terms, company, user) do
+    FullCircle.Tasks.search_titles(terms, company, user)
   end
 
   defp doc_query(type, company, user) do

@@ -30,8 +30,14 @@ defmodule FullCircle.Notes do
       if role == "admin" do
         base
       else
+        # A note about a task is also readable by whoever can see that task,
+        # so "Private" on a task means "the people on this task".
+        task_ids = from(t in FullCircle.Tasks.visible_to(company, user), select: t.id)
+
         from(n in base,
-          where: is_nil(n.visibility) or ^role in n.visibility or n.author_id == ^user.id
+          where:
+            is_nil(n.visibility) or ^role in n.visibility or n.author_id == ^user.id or
+              (n.subject_type == "Task" and n.subject_id in subquery(task_ids))
         )
       end
     else
@@ -111,7 +117,7 @@ defmodule FullCircle.Notes do
       query = from(v in NoteVersion, where: v.note_id == ^note.id, order_by: [desc: v.version])
 
       query =
-        if role == "admin" or note.author_id == user.id,
+        if role == "admin" or note.author_id == user.id or task_note_viewer?(note, company, user),
           do: query,
           else: from(v in query, where: is_nil(v.visibility) or ^role in v.visibility)
 
@@ -120,6 +126,11 @@ defmodule FullCircle.Notes do
       []
     end
   end
+
+  defp task_note_viewer?(%Note{subject_type: "Task", subject_id: id}, company, user),
+    do: FullCircle.Tasks.get_task(id, company, user) != nil
+
+  defp task_note_viewer?(_note, _company, _user), do: false
 
   # --- write ----------------------------------------------------------------
 

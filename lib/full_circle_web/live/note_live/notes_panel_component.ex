@@ -33,7 +33,7 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
        |> assign(
          loaded_for: key,
          adding: false,
-         form: panel_form(socket, Notes.change_note(%Note{}))
+         form: panel_form(socket, Notes.change_note(blank_note(socket)))
        )
        |> load()}
     end
@@ -42,10 +42,17 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
   # Input ids are prefixed with the component id: the panel can sit on a page
   # that has its own note form (the note page itself), and two `note_body`
   # inputs would make the browser patch and focus the wrong textarea.
+  # On a task, Private means "the people who can see this task" (Notes'
+  # task rule), which is what a progress note almost always wants.
+  defp blank_note(%{assigns: %{record_type: "Task"}}),
+    do: %Note{visibility: Note.private_visibility()}
+
+  defp blank_note(_socket), do: %Note{}
+
   defp panel_form(socket, cs), do: to_form(cs, id: "#{socket.assigns.id}_note")
 
   defp panel_change(socket, params) do
-    cs = %Note{} |> Notes.change_note(params) |> Map.put(:action, :validate)
+    cs = blank_note(socket) |> Notes.change_note(params) |> Map.put(:action, :validate)
     assign(socket, form: panel_form(socket, cs), params: params)
   end
 
@@ -98,7 +105,7 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
          |> assign(
            adding: false,
            params: %{},
-           form: panel_form(socket, Notes.change_note(%Note{}))
+           form: panel_form(socket, Notes.change_note(blank_note(socket)))
          )
          |> load()}
 
@@ -183,6 +190,10 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
             visibility={Ecto.Changeset.get_field(@form.source, :visibility)}
             id_prefix={"#{@id}-visibility"}
             target={@myself}
+            private_title={
+              @record_type == "Task" &&
+                gettext("Only the people who can see this task (and admins) can read it.")
+            }
           />
           <span class="ml-auto flex items-center gap-2">
             <button

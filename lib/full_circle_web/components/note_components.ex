@@ -12,6 +12,7 @@ defmodule FullCircleWeb.NoteComponents do
   def type_label("Account"), do: gettext("Account")
   def type_label("FixedAsset"), do: gettext("Fixed Asset")
   def type_label("Note"), do: gettext("Note")
+  def type_label("Task"), do: gettext("Task")
   def type_label("Invoice"), do: gettext("Invoice")
   def type_label("PurInvoice"), do: gettext("Purchase Invoice")
   def type_label("Receipt"), do: gettext("Receipt")
@@ -70,6 +71,8 @@ defmodule FullCircleWeb.NoteComponents do
   attr :id_prefix, :string, required: true
   attr :disabled, :boolean, default: false
   attr :target, :any, default: nil
+  attr :field_name, :string, default: "note[visibility][]"
+  attr :private_title, :any, default: nil
 
   @doc """
   Everyone · 🔒 Private · manager · supervisor · cashier · clerk · auditor.
@@ -111,7 +114,7 @@ defmodule FullCircleWeb.NoteComponents do
       phx-target={@target}
       disabled={@disabled}
       data-selected={@private}
-      title={gettext("Only admins and the writer can read it.")}
+      title={@private_title || gettext("Only admins and the writer can read it.")}
       class={[
         "rounded-full border px-2 text-xs",
         if(@private,
@@ -122,13 +125,14 @@ defmodule FullCircleWeb.NoteComponents do
     >
       🔒 {gettext("Private")}
     </button>
-    <input type="hidden" name="note[visibility][]" value="" />
-    <input :if={@private} type="hidden" name="note[visibility][]" value="admin" />
+    <input type="hidden" name={@field_name} value="" />
+    <input :if={@private} type="hidden" name={@field_name} value="admin" />
     <.role_chip
       :for={role <- Note.choosable_roles()}
       role={role}
       selected={role in @roles}
       disabled={@disabled}
+      field_name={@field_name}
     />
     """
   end
@@ -136,6 +140,7 @@ defmodule FullCircleWeb.NoteComponents do
   attr :role, :string, required: true
   attr :selected, :boolean, required: true
   attr :disabled, :boolean, default: false
+  attr :field_name, :string, default: "note[visibility][]"
 
   @doc """
   A tappable role chip wrapping a hidden `note[visibility][]` checkbox.
@@ -161,7 +166,7 @@ defmodule FullCircleWeb.NoteComponents do
       <input
         type="checkbox"
         class="sr-only"
-        name="note[visibility][]"
+        name={@field_name}
         value={@role}
         checked={@selected}
         disabled={@disabled}

@@ -3,6 +3,7 @@ defmodule FullCircle.LinkableTest do
 
   import FullCircle.BillingFixtures
   import FullCircle.NotesFixtures
+  import FullCircle.TasksFixtures
 
   alias FullCircle.Linkable
 
@@ -14,7 +15,7 @@ defmodule FullCircle.LinkableTest do
 
   test "types covers records, notes and the palette documents" do
     assert Linkable.types() ==
-             ~w(Employee Contact Good Account FixedAsset Note Invoice PurInvoice Receipt Payment CreditNote DebitNote Journal Deposit ReturnCheque)
+             ~w(Employee Contact Good Account FixedAsset Note Task Invoice PurInvoice Receipt Payment CreditNote DebitNote Journal Deposit ReturnCheque)
 
     assert Linkable.type?("Invoice")
     refute Linkable.type?("Transaction")
@@ -118,5 +119,32 @@ defmodule FullCircle.LinkableTest do
     assert fa_url == "/companies/#{company.id}/fixed_assets/#{fa.id}/edit"
     assert [%{id: id}] = Linkable.search("FixedAsset", "wxx 1234", company, admin)
     assert id == fa.id
+  end
+
+  describe "Task type" do
+    test "resolves visible tasks, restricts hidden ones, misses others", %{
+      company: company,
+      admin: admin
+    } do
+      clerk = user_with_role(company, admin, "clerk")
+
+      open =
+        task_fixture(company, admin, %{"title" => "Road tax WXX 1234", "due_date" => "2026-11-01"})
+
+      hidden = task_fixture(company, admin, %{"title" => "secret", "visibility" => ["admin"]})
+
+      assert {:ok, %{type: "Task", title: "Road tax WXX 1234", url: url}} =
+               Linkable.resolve("Task", open.id, company, clerk)
+
+      assert url == "/companies/#{company.id}/tasks/#{open.id}"
+      assert {:error, :restricted} = Linkable.resolve("Task", hidden.id, company, clerk)
+      assert {:error, :not_found} = Linkable.resolve("Task", Ecto.UUID.generate(), company, clerk)
+      assert "Task" in Linkable.types()
+    end
+
+    test "search finds visible tasks by title", %{company: company, admin: admin} do
+      task_fixture(company, admin, %{"title" => "Permit Rahim"})
+      assert [%{title: "Permit Rahim"}] = Linkable.search("Task", "rahim", company, admin)
+    end
   end
 end

@@ -194,6 +194,52 @@ defmodule FullCircle.Tasks do
     end
   end
 
+  @doc """
+  Linkable resolve for "Task": visible tasks are `{:ok, target}`; tasks that
+  exist in the company but are hidden from this user are `{:error, :restricted}`
+  (so a link shows "Restricted record", not "(deleted Task)").
+  """
+  def resolve_tasks(ids, company, user) do
+    found =
+      from(t in visible_to(company, user), where: t.id in ^ids)
+      |> Repo.all()
+      |> Map.new(fn t -> {t.id, {:ok, target(t, company)}} end)
+
+    hidden =
+      from(t in CompanyTask,
+        join: c in subquery(Sys.user_company(company, user)),
+        on: c.id == t.company_id,
+        where: t.id in ^ids and is_nil(t.deleted_at),
+        select: t.id
+      )
+      |> Repo.all()
+      |> Enum.reject(&Map.has_key?(found, &1))
+
+    Map.merge(found, Map.new(hidden, &{&1, {:error, :restricted}}))
+  end
+
+  def search_titles(terms, company, user) do
+    pattern = "%#{FullCircle.CommandPalette.Types.escape_like(terms)}%"
+
+    from(t in visible_to(company, user),
+      where: ilike(t.title, ^pattern),
+      order_by: [asc: t.status, asc_nulls_last: t.due_date],
+      limit: 20
+    )
+    |> Repo.all()
+    |> Enum.map(&target(&1, company))
+  end
+
+  defp target(t, company) do
+    %{
+      type: "Task",
+      id: t.id,
+      title: t.title,
+      subtitle: t.due_date && Date.to_string(t.due_date),
+      url: Linkable.url("Task", t.id, company)
+    }
+  end
+
   # --- links ----------------------------------------------------------------
 
   defp insert_links(multi, links, company, user) do
