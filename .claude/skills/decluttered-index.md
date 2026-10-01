@@ -7,8 +7,10 @@ description: Use when building or changing a FullCircle listing/index page (inde
 
 Every listing is **one line per record** in a shared frame. Pilot: Invoice
 Listing; rolled out to all document and master-data listings (2026-10-01).
-Not converted (special-purpose): Notes feed, e-Invoice list, Punch Ingest
-Log, Punch (time attendance) index.
+The E-Invoices listing (`e_inv_list_live`) uses the same frame with one
+`IndexComponent` for both directions (LHDN doc left, Full Circle doc or
+"+ New …" links in the last column). Not converted (special-purpose): Notes
+feed, Punch Ingest Log, Punch (time attendance) index.
 
 ## Building blocks (`FullCircleWeb.ListComponents`)
 
@@ -73,4 +75,5 @@ explicit `dark:` styles; check both themes.
 
 `test/full_circle_web/live/invoice_index_live_test.exs` (behaviour),
 `decluttered_einv_listings_test.exs` (5 e-invoice listings),
+`e_inv_list_live_test.exs` (E-Invoices listing, match / remove match),
 `decluttered_listings_test.exs` (smoke for the rest).

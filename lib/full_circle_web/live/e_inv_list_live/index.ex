@@ -1,8 +1,9 @@
 defmodule FullCircleWeb.EInvListLive.Index do
   use FullCircleWeb, :live_view
   import Ecto.Query, warn: false
+  import FullCircleWeb.ListComponents
 
-  alias FullCircleWeb.EInvListLive.{IndexReceivedComponent, IndexSentComponent}
+  alias FullCircleWeb.EInvListLive.IndexComponent
   alias FullCircle.EInvMetas
   alias Phoenix.PubSub
 
@@ -23,7 +24,7 @@ defmodule FullCircleWeb.EInvListLive.Index do
       |> assign(syncing: false)
       |> assign(sync_status: "")
       |> stream_configure(:objects, dom_id: & &1.uuid)
-      |> assign(page_title: gettext("E-Invoices Listing"))
+      |> assign(page_title: gettext("E-Invoices"))
       |> assign(
         last_sync_datetime:
           EInvMetas.e_invoice_last_sync_datetime(
@@ -208,132 +209,113 @@ defmodule FullCircleWeb.EInvListLive.Index do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="mx-auto w-10/12">
-      <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
-      <div class="mt-2 flex justify-center">
-        <.link
-          navigate={~p"/companies/#{@current_company.id}/e_invoice_queue"}
-          class="button teal"
-        >
-          {gettext("Received work queue")}
-        </.link>
-      </div>
-      <div class="mt-4 mb-5 flex justify-center">
-        <div class="">
-          <%= if @syncing do %>
-            <div class="text-lg red button" id="syncing">
-              {gettext("Syncing E-Invoice")} {@sync_status}
-              <.icon name="hero-arrow-path" class="ml-1 h-3 w-3 animate-spin" />
-            </div>
-          <% else %>
-            <.link phx-click="sync" class="text-lg blue button" id="sync">
-              {gettext("Last Sync at")} {@last_sync_datetime
-              |> Timex.local()
-              |> FullCircleWeb.Helpers.format_datetime(@current_company)}
-              <span class="font-semibold text-green-600">
-                {gettext("Click here to Sync E-Invoice again")}
-              </span>
+    <div class="mx-auto w-11/12 max-w-[96rem]">
+      <.form for={%{}} id="search-form" phx-submit="search" autocomplete="off">
+        <.list_bar title={@page_title}>
+          <div class="grow min-w-56">
+            <.filter_label>{gettext("Search")}</.filter_label>
+            <.input
+              name="search[terms]"
+              type="search"
+              placeholder={gettext("uuid, doc no, contact, type or TIN…")}
+              value={@search.terms}
+              id="search_contact"
+            />
+          </div>
+          <div class="w-28">
+            <.filter_label>{gettext("Direction")}</.filter_label>
+            <.input
+              name="search[direction]"
+              type="select"
+              options={["Received", "Sent"]}
+              value={@search.direction}
+              id="search_direction"
+            />
+          </div>
+          <div class="w-48">
+            <.filter_label>{gettext("Received from")}</.filter_label>
+            <.input
+              name="search[f_date]"
+              type="datetime-local"
+              value={@search.f_date |> Timex.parse!("{ISO:Extended}")}
+              id="search_f_date"
+            />
+          </div>
+          <div class="w-48">
+            <.filter_label>{gettext("Received to")}</.filter_label>
+            <.input
+              name="search[t_date]"
+              type="datetime-local"
+              value={@search.t_date |> Timex.parse!("{ISO:Extended}")}
+              id="search_t_date"
+            />
+          </div>
+          <.button class="h-9 w-10">🔍</.button>
+          <:actions>
+            <.link
+              navigate={~p"/companies/#{@current_company.id}/e_invoice_queue"}
+              class="gray button"
+            >
+              {gettext("Received work queue")}
             </.link>
-          <% end %>
-        </div>
-      </div>
-      <div class="flex justify-center mb-2">
-        <.form for={%{}} id="search-form" phx-submit="search" autocomplete="off" class="w-full">
-          <div class=" flex flex-row flex-wrap tracking-tighter text-sm">
-            <div class="w-[10rem] grow-0 shrink-0">
-              <label>Received Date From</label>
-              <.input
-                name="search[f_date]"
-                type="datetime-local"
-                value={@search.f_date |> Timex.parse!("{ISO:Extended}")}
-                id="search_f_date"
-              />
-            </div>
-            <div class="w-[10rem] grow-0 shrink-0">
-              <label>Received Date To</label>
-              <.input
-                name="search[t_date]"
-                type="datetime-local"
-                value={@search.t_date |> Timex.parse!("{ISO:Extended}")}
-                id="search_t_date"
-              />
-            </div>
-            <div class="w-[6rem] grow-0 shrink-0">
-              <label>Direction</label>
-              <.input
-                name="search[direction]"
-                type="select"
-                options={["Received", "Sent"]}
-                value={@search.direction}
-                id="search_direction"
-              />
-            </div>
-            <div class="w-[21rem] grow-0 shrink-0">
-              <label>Terms</label>
-              <.input
-                name="search[terms]"
-                placeholder="uuid, internal id, contact, type or tin..."
-                type="text"
-                value={@search.terms}
-                id="search_contact"
-              />
-            </div>
-            <.button class="mt-4 h-10 w-10 grow-0 shrink-0">🔍</.button>
-          </div>
-        </.form>
-      </div>
-      <div class="flex flex-row text-xs font-medium">
-        <div class="flex flex-row bg-amber-200 w-[49.8%] min-w-0">
-          <div class="w-[20%] shrink-0 border-b border-t border-amber-400 p-1">
-            {gettext("Received / Issued / Reject")}
-          </div>
-          <div class="w-[32%] min-w-0 border-b border-t border-amber-400 p-1">
-            {gettext("UUID / InternalId / Direction / Type")}
-          </div>
-          <div class="w-[48%] min-w-0 border-b border-t border-amber-400 p-1">
-            {gettext("Contact / TIN / Amount")}
-          </div>
-        </div>
-        <div class="w-[0.4%] bg-white shrink-0"></div>
-        <div class="flex flex-row bg-cyan-200 w-[49.8%] min-w-0">
-          <div class="w-[20%] shrink-0 border-b border-t border-amber-400 p-1">
-            {gettext("Doc Date")}
-          </div>
-          <div class="w-[32%] min-w-0 border-b border-t border-amber-400 p-1">
-            {gettext("InternalId / Type")}
-          </div>
-          <div class="w-[48%] min-w-0 border-b border-t border-amber-400 p-1">
-            {gettext("Contact / TIN / Amount")}
-          </div>
-        </div>
-      </div>
+            <button
+              :if={!@syncing}
+              type="button"
+              phx-click="sync"
+              id="sync"
+              class="blue button"
+              title={gettext("Fetch new e-invoices from MyInvois")}
+            >
+              ↻ {gettext("Sync")}
+              <span class="text-xs opacity-75">
+                {gettext("last")} {@last_sync_datetime
+                |> FullCircleWeb.Helpers.format_datetime(@current_company)}
+              </span>
+            </button>
+            <button :if={@syncing} type="button" class="blue button" disabled>
+              <.icon name="hero-arrow-path" class="h-4 w-4 animate-spin" /> {gettext("Syncing…")}
+            </button>
+          </:actions>
+        </.list_bar>
+      </.form>
+
       <div
-        :if={Enum.count(@streams.objects) > 0 or @page > 1}
-        id="objects_list"
-        phx-update="stream"
-        phx-page-loading
+        :if={@syncing}
+        id="syncing"
+        class="mb-3 flex items-center gap-2 rounded border border-amber-300/70 bg-amber-100/80 px-3 py-1.5 text-sm text-amber-900 dark:border-amber-700/60 dark:bg-amber-900/40 dark:text-amber-200"
       >
-        <%= for {obj_id, obj} <- @streams.objects do %>
-          <.live_component
-            :if={obj.issuerTIN != @current_company.tax_id}
-            module={IndexReceivedComponent}
-            id={obj_id}
-            obj={obj}
-            company={@current_company}
-            user={@current_user}
-            einv_portal={@einv_portal}
-          />
-          <.live_component
-            :if={obj.issuerTIN == @current_company.tax_id}
-            module={IndexSentComponent}
-            id={obj_id}
-            obj={obj}
-            company={@current_company}
-            user={@current_user}
-            einv_portal={@einv_portal}
-          />
-        <% end %>
+        <.icon name="hero-arrow-path" class="h-4 w-4 animate-spin" />
+        {gettext("Syncing E-Invoice")} {@sync_status}
       </div>
+
+      <.list_table>
+        <:head>
+          <div class="w-36 shrink-0">{gettext("Received")}</div>
+          <div class="w-40 shrink-0">{gettext("Doc No.")}</div>
+          <div class="w-32 shrink-0">{gettext("Type")}</div>
+          <div class="flex-1 min-w-0">
+            {if @search.direction == "Sent", do: gettext("Buyer"), else: gettext("Supplier")}
+          </div>
+          <div class="w-32 shrink-0 text-right">{gettext("Amount")}</div>
+          <div class="w-20 shrink-0">{gettext("Status")}</div>
+          <div class="w-80 shrink-0">{gettext("Full Circle")}</div>
+        </:head>
+        <div id="objects_list" phx-update="stream" phx-page-loading>
+          <div id="objects_empty" class="hidden only:block p-4 text-sm text-slate-500">
+            {gettext("No e-invoices in this period.")}
+          </div>
+          <.live_component
+            :for={{obj_id, obj} <- @streams.objects}
+            module={IndexComponent}
+            id={obj_id}
+            obj={obj}
+            direction={if obj.issuerTIN == @current_company.tax_id, do: "Sent", else: "Received"}
+            company={@current_company}
+            user={@current_user}
+            einv_portal={@einv_portal}
+          />
+        </div>
+      </.list_table>
       <.infinite_scroll_footer ended={@end_of_timeline?} />
     </div>
     """
