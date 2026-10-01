@@ -147,6 +147,10 @@ defmodule FullCircle.Authorization do
   def can?(user, :update_terminal_position, company),
     do: allow_roles(~w(admin), company, user)
 
+  # Stocktake corrections to own-warehouse on-hand (physical only).
+  def can?(user, :adjust_trading_stock, company),
+    do: allow_roles(~w(admin manager), company, user)
+
   # --- Notes ------------------------------------------------------------
   #
   # Per-note visibility (a role list on the note) decides *which* notes a user

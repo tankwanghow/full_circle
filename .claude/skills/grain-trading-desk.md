@@ -280,6 +280,7 @@ Gapless per company via `gapless_doc_ids`:
 | Supply | `SUP-` | `title` (unique per company) |
 | Sales | `SAL-` | `title` (unique per company) |
 | Trip | `TRP-` | `reference_no` (immutable after create) |
+| Stock adjustment | `ADJ-` | `reference_no` (doc type `TradingStockAdj`) |
 
 **Supply no on create:** the desk modal field is editable. If the user leaves it
 blank (or the UI placeholder `...new...`), `create_supply_position` assigns the
@@ -297,7 +298,34 @@ migration `20260725120000`).
 - **Physical stock movement** only counts trips with `status == "completed"`.
 - **Soft hold** = sum of undelivered qty on active sales that prefer a supply — **display only**, does not lock remaining.
 - **In transit** (draft + planned) uses `coalesce(actual, planned)` so desks show commitment without moving stock.
-- Warehouse on-hand groups by **own_warehouse** location × **line** `good_id`.
+- Warehouse on-hand groups by **own_warehouse** location × **line** `good_id`:
+  completed drops in − completed loads out **+ stock adjustments**. Use
+  `Balances.own_warehouse_on_hand/2` (or the `*_by_good/1` maps incl.
+  `own_warehouse_adjusted_by_good/1`); never recompute from trips alone.
+
+## Warehouse stock adjustments (`Trading.StockAdjustment`)
+
+Stocktake corrections (shrinkage, moisture loss, opening balance). Spec:
+`docs/superpowers/specs/2026-10-01-trading-stock-adjustment-design.md`.
+
+- **Entered as a count:** the user types `counted_qty`;
+  `create_stock_adjustment/3` stores `system_qty` (book on-hand at entry) and
+  `qty = counted − system` (zero difference is a changeset error). The book qty
+  is read *after* the gapless row update, so concurrent counts serialize.
+- **Physical only** (no GL) and **immutable** — no update/delete; a wrong count
+  is corrected by another stocktake. Keeps `ADJ-` gapless.
+- `adjust_date` is informational; book on-hand is not date-filtered.
+- Location must be an `own_warehouse` of the company; good must be the
+  company's. Permission `:adjust_trading_stock` (admin, manager).
+- `warehouse_board/2` rows carry `adjusted`; adjustment-only location × good
+  pairs get a row (that is how an opening balance appears).
+- UI: the desk's warehouse history modal — `adj` rows (amber, not clickable,
+  `trip_id` nil, `notes` = reason) and an **Adjust stock** form with a Good
+  typeahead (prefilled from the row; pick another good to open a new one).
+  Counted uses `phx-debounce="300"` so System/Difference update while typing
+  (the `.input` default is blur — see `liveview-computed-field-gotchas.md` §6).
+- History modal is a scroll box with **Load older** (pages of 20; fetches
+  `limit + 1` to know whether more exist; context caps `limit` at 1000).
 
 **Boards must use the batch helpers, not the per-position ones.** Each
 `supply_loaded/1`-style function runs its own query, so calling them per row makes
@@ -383,6 +411,8 @@ on the desk; print under `trading_trip_live`, `trading_sales_live`,
 
 - `:view_trading` — boards, lists, print
 - `:manage_trading` — create/update/complete/cancel
+- `:adjust_trading_stock` — warehouse stocktake adjustments (admin, manager)
+- `:update_terminal_position` — re-status closed/fulfilled/cancelled positions (admin)
 
 **Company-scope every position lookup reached through trip line params.** A trip's
 `loads`/`drops` carry client-supplied `supply_position_id` / `sales_position_id`.
@@ -411,13 +441,17 @@ back to an arity that "looks tidier".
    `on_replace: :delete` already deletes the rows on save. No extra clearing code
    is needed; don't "fix" this. (Trip line ids survive edits because Phoenix
    `inputs_for` emits hidden primary-key inputs.)
+8. **Never `Enum.sort_by` on `%Date{}`/`%DateTime{}` tuples** — term order
+   compares struct fields (day before month), so 07-30 sorted above 08-27.
+   Movement histories use `movement_sort_key/1` (gregorian days + unix µs).
 
 ## Key files
 
 ```
 lib/full_circle/trading.ex
 lib/full_circle/trading/{supply_position,sales_position,trip,trip_load,trip_drop,
-  trip_load_employee,trip_drop_employee,location,balances,settlement,sample_data}.ex
+  trip_load_employee,trip_drop_employee,location,balances,settlement,
+  stock_adjustment,sample_data}.ex
 lib/full_circle_web/live/trading_desk_live/
 lib/full_circle_web/live/trading_settlement_live/
 lib/full_circle_web/live/trading_components.ex

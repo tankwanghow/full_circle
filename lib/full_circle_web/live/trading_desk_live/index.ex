@@ -2,6 +2,8 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
   use FullCircleWeb, :live_view
 
   alias FullCircle.Trading
+  alias FullCircle.Trading.{Balances, StockAdjustment}
+  alias FullCircle.Product
   alias FullCircle.Authorization
 
   @filter_fields %{
@@ -10,6 +12,9 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
     "sales" => ~w(no customer good status need_by),
     "trips" => ~w(date ref vehicle from to good agent status)
   }
+
+  # Warehouse history modal page size ("Load older" adds another page)
+  @warehouse_history_page 20
 
   # Default status text shown in filter boxes (comma = OR in filter_rows).
   @supply_active_status "open, hold, collect"
@@ -36,6 +41,7 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
        # Ops-first: no Bill chips on mount (billing only applies to completed trips)
        |> assign(trip_settle_filters: MapSet.new())
        |> assign(can_manage: Authorization.can?(user, :manage_trading, company))
+       |> assign(can_adjust_stock: Authorization.can?(user, :adjust_trading_stock, company))
        |> assign(filters: empty_filters())
        |> assign_empty_selection()
        |> load_panels()}
@@ -171,31 +177,71 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
         } = params,
         socket
       ) do
-    company = socket.assigns.current_company
-    user = socket.assigns.current_user
     good_id = params["good_id"]
     good_id = if good_id in [nil, "", "any"], do: nil, else: good_id
 
-    movements =
-      Trading.list_warehouse_recent_movements(location_id, good_id, company, user, limit: 20)
-
-    remaining = qty_dec(params["on_hand"])
-
-    unit = params["unit"]
-    location_name = params["location_name"] || gettext("Warehouse")
-    good_name = params["good_name"]
-
-    hist = %{
-      location_id: location_id,
-      good_id: good_id,
-      location_name: location_name,
-      good_name: good_name,
-      unit: unit,
-      remaining: remaining,
-      movements: movements
-    }
+    hist =
+      %{
+        location_id: location_id,
+        good_id: good_id,
+        location_name: params["location_name"] || gettext("Warehouse"),
+        good_name: params["good_name"],
+        unit: params["unit"],
+        remaining: qty_dec(params["on_hand"]),
+        movements: [],
+        limit: @warehouse_history_page,
+        has_more: false,
+        adjust_form: nil
+      }
+      |> reload_warehouse_history(socket)
 
     {:noreply, assign(socket, warehouse_history: hist)}
+  end
+
+  def handle_event("warehouse_history_more", _, socket) do
+    hist = socket.assigns.warehouse_history
+    hist = %{hist | limit: hist.limit + @warehouse_history_page}
+
+    {:noreply, assign(socket, warehouse_history: load_warehouse_movements(hist, socket))}
+  end
+
+  def handle_event("adjust_stock_validate", %{"adjust" => params}, socket) do
+    hist = socket.assigns.warehouse_history
+
+    {:noreply,
+     assign(socket,
+       warehouse_history: %{hist | adjust_form: adjust_form(socket, hist, params, :validate)}
+     )}
+  end
+
+  def handle_event("adjust_stock_save", %{"adjust" => params}, socket) do
+    company = socket.assigns.current_company
+    user = socket.assigns.current_user
+    hist = socket.assigns.warehouse_history
+    good = adjust_good(socket, params)
+
+    attrs =
+      Map.merge(params, %{"location_id" => hist.location_id, "good_id" => good && good.id})
+
+    case Trading.create_stock_adjustment(attrs, company, user) do
+      {:ok, adj} ->
+        # Follow the adjusted good — it may differ from the row the modal opened on
+        hist = %{hist | good_id: good.id, good_name: good.value, unit: good.unit}
+
+        {:noreply,
+         socket
+         |> put_flash(:info, gettext("Stock adjusted (%{no}).", no: adj.reference_no))
+         |> load_panels()
+         |> assign(warehouse_history: reload_warehouse_history(hist, socket))}
+
+      {:error, %Ecto.Changeset{} = cs} ->
+        {:noreply,
+         assign(socket, warehouse_history: %{hist | adjust_form: to_form(cs, as: :adjust)})}
+
+      :not_authorise ->
+        {:noreply,
+         put_flash(socket, :error, gettext("You are not authorised to perform this action"))}
+    end
   end
 
   def handle_event("open_warehouse_history_trip", %{"id" => id}, socket) do
@@ -2099,56 +2145,159 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
               {@warehouse_history.unit}
             </span>
             <span class="text-zinc-400 text-xs ml-2">
-              ({gettext("last %{count}", count: length(@warehouse_history.movements))})
+              ({if @warehouse_history.has_more,
+                do: gettext("last %{count}", count: length(@warehouse_history.movements)),
+                else: gettext("all %{count}", count: length(@warehouse_history.movements))})
             </span>
           </p>
 
-          <div class="bg-sky-200 border-y-2 border-sky-500 font-bold p-2 flex gap-1 text-sm text-sky-950">
-            <div class="w-2/24">{gettext("Dir")}</div>
-            <div class="w-3/24">{gettext("Date")}</div>
-            <div class="w-3/24">{gettext("Trip")}</div>
-            <div class="w-3/24">{gettext("Status")}</div>
-            <div class="w-3/24">{gettext("Vehicle")}</div>
-            <div class="w-4/24 text-right">{gettext("Qty")}</div>
-            <div class="w-6/24">{gettext("Note")}</div>
-          </div>
-          <button
-            :for={m <- @warehouse_history.movements}
-            type="button"
-            id={"wh-move-#{m.kind}-#{m.line_id}"}
-            phx-click="open_warehouse_history_trip"
-            phx-value-id={m.trip_id}
-            class={[
-              "w-full flex gap-1 border-b p-2 text-sm text-left hover:bg-sky-50 dark:hover:bg-sky-950/40 cursor-pointer",
-              m.status == "cancelled" && "line-through opacity-70"
-            ]}
+          <div
+            id="desk-warehouse-history-list"
+            class="max-h-[45vh] overflow-y-auto [scrollbar-gutter:stable] border-b border-sky-500"
           >
-            <div class={[
-              "w-2/24 font-semibold",
-              m.kind == "in" && "text-teal-700",
-              m.kind == "out" && "text-violet-700"
-            ]}>
-              {if m.kind == "in", do: gettext("In"), else: gettext("Out")}
+            <div class="sticky top-0 z-10 bg-sky-200 border-y-2 border-sky-500 font-bold p-2 flex gap-1 text-sm text-sky-950">
+              <div class="w-2/24">{gettext("Dir")}</div>
+              <div class="w-3/24">{gettext("Date")}</div>
+              <div class="w-3/24">{gettext("Trip")}</div>
+              <div class="w-3/24">{gettext("Status")}</div>
+              <div class="w-3/24">{gettext("Vehicle")}</div>
+              <div class="w-4/24 text-right">{gettext("Qty")}</div>
+              <div class="w-6/24">{gettext("Note")}</div>
             </div>
-            <div class="w-3/24">{m.date}</div>
-            <div class="w-3/24 min-w-0 truncate text-blue-600 font-medium" title={m.reference_no}>
-              {m.reference_no || "—"}
+            <%!-- Adjustment rows have no trip to open, so they render as a plain div --%>
+            <.dynamic_tag
+              :for={m <- @warehouse_history.movements}
+              tag_name={if m.trip_id, do: "button", else: "div"}
+              id={"wh-move-#{m.kind}-#{m.line_id}"}
+              phx-click={m.trip_id && "open_warehouse_history_trip"}
+              phx-value-id={m.trip_id}
+              class={[
+                "w-full flex gap-1 border-b p-2 text-sm text-left",
+                m.trip_id && "hover:bg-sky-50 dark:hover:bg-sky-950/40 cursor-pointer",
+                m.kind == "adj" && "bg-amber-100/60 dark:bg-amber-950/40",
+                m.status == "cancelled" && "line-through opacity-70"
+              ]}
+            >
+              <div class={[
+                "w-2/24 font-semibold",
+                m.kind == "in" && "text-teal-700 dark:text-teal-400",
+                m.kind == "out" && "text-violet-700 dark:text-violet-400",
+                m.kind == "adj" && "text-amber-700 dark:text-amber-400"
+              ]}>
+                {case m.kind do
+                  "in" -> gettext("In")
+                  "out" -> gettext("Out")
+                  "adj" -> gettext("Adj")
+                end}
+              </div>
+              <div class="w-3/24">{m.date}</div>
+              <div class="w-3/24 min-w-0 truncate text-blue-600 font-medium" title={m.reference_no}>
+                {m.reference_no || "—"}
+              </div>
+              <div class="w-3/24">{m.status || "—"}</div>
+              <div class="w-3/24 min-w-0 truncate">{m.vehicle_number || "—"}</div>
+              <div class={[
+                "w-4/24 text-right font-semibold tabular-nums",
+                m.kind == "in" && "text-teal-800 dark:text-teal-300",
+                m.kind == "out" && "text-violet-800 dark:text-violet-300",
+                m.kind == "adj" && "text-amber-800 dark:text-amber-300"
+              ]}>
+                {if m.kind == "adj" and Decimal.compare(m.qty, 0) == :gt, do: "+"}{m.qty}
+                <span :if={m.unit} class="font-normal text-xs text-zinc-500 ml-0.5">{m.unit}</span>
+              </div>
+              <div class="w-6/24 min-w-0 truncate text-zinc-500" title={m.notes}>{m.notes || ""}</div>
+            </.dynamic_tag>
+            <p :if={@warehouse_history.movements == []} class="text-center p-4 text-gray-500 text-sm">
+              {gettext("No recent loads or drops for this warehouse.")}
+            </p>
+            <div :if={@warehouse_history.has_more} class="text-center p-2">
+              <button
+                type="button"
+                id="desk-warehouse-history-more"
+                phx-click="warehouse_history_more"
+                class="text-sm font-medium text-blue-600 hover:underline dark:text-blue-400"
+              >
+                {gettext("Load older")}
+              </button>
             </div>
-            <div class="w-3/24">{m.status}</div>
-            <div class="w-3/24 min-w-0 truncate">{m.vehicle_number || "—"}</div>
-            <div class={[
-              "w-4/24 text-right font-semibold tabular-nums",
-              m.kind == "in" && "text-teal-800",
-              m.kind == "out" && "text-violet-800"
-            ]}>
-              {m.qty}
-              <span :if={m.unit} class="font-normal text-xs text-zinc-500 ml-0.5">{m.unit}</span>
+          </div>
+
+          <%!-- Stocktake: user types the counted qty; the difference vs book is stored --%>
+          <.form
+            :if={@warehouse_history.adjust_form}
+            for={@warehouse_history.adjust_form}
+            id="desk-warehouse-adjust-form"
+            phx-change="adjust_stock_validate"
+            phx-submit="adjust_stock_save"
+            autocomplete="off"
+            class="mt-4 rounded border border-amber-400 bg-amber-100/60 p-3 dark:border-amber-700 dark:bg-amber-950/40"
+          >
+            <p class="text-sm font-semibold text-amber-900 dark:text-amber-200 mb-2">
+              {gettext("Adjust stock")}
+              <span class="font-normal text-xs text-zinc-600 dark:text-zinc-400 ml-1">
+                {gettext("enter the counted quantity; the difference from the system is recorded")}
+              </span>
+            </p>
+            <div class="flex flex-wrap gap-2 items-start">
+              <div class="flex-1 min-w-48">
+                <.input
+                  field={@warehouse_history.adjust_form[:good_name]}
+                  label={gettext("Good")}
+                  phx-hook="tributeAutoComplete"
+                  url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=good&name="}
+                />
+              </div>
+              <div class="w-36">
+                <.input
+                  field={@warehouse_history.adjust_form[:adjust_date]}
+                  type="date"
+                  label={gettext("Date")}
+                />
+              </div>
+              <div class="w-36">
+                <.input
+                  field={@warehouse_history.adjust_form[:counted_qty]}
+                  type="number"
+                  step="any"
+                  phx-debounce="300"
+                  label={gettext("Counted")}
+                />
+              </div>
+              <div class="flex-1 min-w-48">
+                <.input
+                  field={@warehouse_history.adjust_form[:reason]}
+                  label={gettext("Reason")}
+                  placeholder={gettext("stocktake, moisture loss, opening balance…")}
+                />
+              </div>
             </div>
-            <div class="w-6/24 min-w-0 truncate text-zinc-500" title={m.notes}>{m.notes || ""}</div>
-          </button>
-          <p :if={@warehouse_history.movements == []} class="text-center p-4 text-gray-500 text-sm">
-            {gettext("No recent loads or drops for this warehouse.")}
-          </p>
+            <div class="mt-2 flex flex-wrap items-center justify-between gap-2">
+              <p id="desk-warehouse-adjust-diff" class="text-sm">
+                <% book = adjust_book(@warehouse_history.adjust_form) %>
+                <span class="text-zinc-500">{gettext("System")}</span>
+                <span class="font-semibold tabular-nums ml-1 mr-3">{book || "—"}</span>
+                <span class="text-zinc-500">{gettext("Difference")}</span>
+                <% diff = adjust_diff(@warehouse_history.adjust_form) %>
+                <span class={["font-semibold tabular-nums ml-1", diff && on_hand_class(diff)]}>
+                  {cond do
+                    is_nil(diff) -> "—"
+                    Decimal.compare(diff, 0) == :gt -> "+#{diff}"
+                    true -> diff
+                  end}
+                </span>
+              </p>
+              <button
+                type="submit"
+                id="desk-warehouse-adjust-save"
+                class="orange button"
+                data-confirm={
+                  gettext("Record this stock adjustment? It cannot be edited or deleted.")
+                }
+              >
+                {gettext("Save adjustment")}
+              </button>
+            </div>
+          </.form>
           <div class="text-center mt-3">
             <button type="button" phx-click="close_warehouse_history" class="teal button">
               {gettext("Close")}
@@ -2331,6 +2480,88 @@ defmodule FullCircleWeb.TradingDeskLive.Index do
       ""
     end
   end
+
+  # Movements + book on-hand for the history modal, and a fresh Adjust stock
+  # form (prefilled with the row's good) when the user may adjust.
+  defp reload_warehouse_history(hist, socket) do
+    remaining =
+      if hist.good_id,
+        do: Balances.own_warehouse_on_hand(hist.location_id, hist.good_id),
+        else: hist.remaining
+
+    hist = load_warehouse_movements(%{hist | remaining: remaining}, socket)
+
+    form =
+      if socket.assigns.can_adjust_stock do
+        adjust_form(
+          socket,
+          hist,
+          %{"adjust_date" => Date.utc_today(), "good_name" => hist.good_name || ""},
+          nil
+        )
+      end
+
+    %{hist | adjust_form: form}
+  end
+
+  # Newest `limit` movements; one extra row tells whether "Load older" has more.
+  defp load_warehouse_movements(hist, socket) do
+    movements =
+      Trading.list_warehouse_recent_movements(
+        hist.location_id,
+        hist.good_id,
+        socket.assigns.current_company,
+        socket.assigns.current_user,
+        limit: hist.limit + 1
+      )
+
+    %{
+      hist
+      | movements: Enum.take(movements, hist.limit),
+        has_more: length(movements) > hist.limit
+    }
+  end
+
+  defp adjust_good(socket, params) do
+    Product.get_good_by_name(
+      params["good_name"] || "",
+      socket.assigns.current_company,
+      socket.assigns.current_user
+    )
+  end
+
+  # Book qty is read for whichever good the form names, so a stocktake can
+  # also open a good the warehouse has never held (opening balance).
+  defp adjust_form(socket, hist, params, action) do
+    good = adjust_good(socket, params)
+
+    cs =
+      %StockAdjustment{}
+      |> StockAdjustment.changeset(
+        Map.merge(params, %{
+          "company_id" => socket.assigns.current_company.id,
+          "location_id" => hist.location_id,
+          "good_id" => good && good.id
+        })
+      )
+
+    cs =
+      if good,
+        do:
+          StockAdjustment.put_book_qty(
+            cs,
+            Balances.own_warehouse_on_hand(hist.location_id, good.id)
+          ),
+        else: cs
+
+    cs
+    |> Map.put(:action, action)
+    |> to_form(as: :adjust)
+  end
+
+  # Signed counted − book difference from the form, or nil while no count is typed.
+  defp adjust_diff(form), do: Ecto.Changeset.get_field(form.source, :qty)
+  defp adjust_book(form), do: Ecto.Changeset.get_field(form.source, :system_qty)
 
   defp on_hand_class(nil), do: "text-gray-500"
 

@@ -22,7 +22,8 @@ defmodule FullCircle.Trading do
     Settlement,
     Trip,
     TripLoad,
-    TripDrop
+    TripDrop,
+    StockAdjustment
   }
 
   alias FullCircle.HR.Employee
@@ -667,13 +668,15 @@ defmodule FullCircle.Trading do
           {loc, Balances.own_warehouse_inbound_by_good(loc.id),
            Balances.own_warehouse_outbound_by_good(loc.id),
            Balances.own_warehouse_incoming_by_good(loc.id),
-           Balances.own_warehouse_outgoing_by_good(loc.id)}
+           Balances.own_warehouse_outgoing_by_good(loc.id),
+           Balances.own_warehouse_adjusted_by_good(loc.id)}
         end)
 
       good_ids =
         per_loc
-        |> Enum.flat_map(fn {_loc, in_map, out_map, inc_map, og_map} ->
-          Map.keys(in_map) ++ Map.keys(out_map) ++ Map.keys(inc_map) ++ Map.keys(og_map)
+        |> Enum.flat_map(fn {_loc, in_map, out_map, inc_map, og_map, adj_map} ->
+          Map.keys(in_map) ++
+            Map.keys(out_map) ++ Map.keys(inc_map) ++ Map.keys(og_map) ++ Map.keys(adj_map)
         end)
         |> Enum.uniq()
         |> Enum.reject(&is_nil/1)
@@ -687,9 +690,10 @@ defmodule FullCircle.Trading do
           |> Map.new(&{&1.id, &1})
         end
 
-      Enum.flat_map(per_loc, fn {loc, in_map, out_map, inc_map, og_map} ->
+      Enum.flat_map(per_loc, fn {loc, in_map, out_map, inc_map, og_map, adj_map} ->
         gids =
-          (Map.keys(in_map) ++ Map.keys(out_map) ++ Map.keys(inc_map) ++ Map.keys(og_map))
+          (Map.keys(in_map) ++
+             Map.keys(out_map) ++ Map.keys(inc_map) ++ Map.keys(og_map) ++ Map.keys(adj_map))
           |> Enum.uniq()
           |> Enum.reject(&is_nil/1)
 
@@ -700,6 +704,7 @@ defmodule FullCircle.Trading do
               good: nil,
               inbound: Decimal.new(0),
               outbound: Decimal.new(0),
+              adjusted: Decimal.new(0),
               on_hand: Decimal.new(0),
               incoming: Decimal.new(0),
               outgoing: Decimal.new(0)
@@ -713,13 +718,15 @@ defmodule FullCircle.Trading do
             outbound = Map.get(out_map, gid, Decimal.new(0))
             incoming = Map.get(inc_map, gid, Decimal.new(0))
             outgoing = Map.get(og_map, gid, Decimal.new(0))
+            adjusted = Map.get(adj_map, gid, Decimal.new(0))
 
             %{
               location: loc,
               good: Map.get(goods, gid),
               inbound: inbound,
               outbound: outbound,
-              on_hand: Decimal.sub(inbound, outbound),
+              adjusted: adjusted,
+              on_hand: inbound |> Decimal.sub(outbound) |> Decimal.add(adjusted),
               incoming: incoming,
               outgoing: outgoing
             }
@@ -729,6 +736,79 @@ defmodule FullCircle.Trading do
     else
       []
     end
+  end
+
+  # --- Warehouse stock adjustments ---
+
+  @doc """
+  Stocktake for one own-warehouse location × good. `attrs` carry the *counted*
+  qty; the stored `qty` is counted − book on-hand at entry (never zero).
+  Physical only, immutable. Admin/manager (`:adjust_trading_stock`).
+  """
+  def create_stock_adjustment(attrs, company, user) do
+    with :ok <- authorize(user, :adjust_trading_stock, company) do
+      attrs = attrs |> stringify_attr_keys() |> Map.put("company_id", company.id)
+      cs = StockAdjustment.changeset(%StockAdjustment{created_by_id: user.id}, attrs)
+      cs = validate_adjustment_refs(cs, company)
+
+      if cs.valid? do
+        gapless_name = String.to_atom("update_gapless_doc" <> gen_temp_id())
+
+        Multi.new()
+        |> get_gapless_doc_id(gapless_name, "TradingStockAdj", "ADJ", company)
+        # Book qty read after the gapless row lock, so concurrent counts serialize
+        |> Multi.insert(:create_adjustment, fn %{^gapless_name => doc} ->
+          system_qty =
+            Balances.own_warehouse_on_hand(
+              Ecto.Changeset.get_field(cs, :location_id),
+              Ecto.Changeset.get_field(cs, :good_id)
+            )
+
+          cs
+          |> Ecto.Changeset.put_change(:reference_no, doc)
+          |> StockAdjustment.put_book_qty(system_qty)
+        end)
+        |> Repo.transaction()
+        |> unwrap_multi(:create_adjustment)
+      else
+        {:error, %{cs | action: :insert}}
+      end
+    end
+  end
+
+  defp validate_adjustment_refs(cs, company) do
+    location_id = Ecto.Changeset.get_field(cs, :location_id)
+    good_id = Ecto.Changeset.get_field(cs, :good_id)
+
+    own_warehouse? =
+      is_binary(location_id) and
+        Repo.exists?(
+          from(l in Location,
+            where:
+              l.id == ^location_id and l.company_id == ^company.id and
+                l.kind == "own_warehouse"
+          )
+        )
+
+    company_good? =
+      is_binary(good_id) and
+        Repo.exists?(
+          from(g in FullCircle.Product.Good,
+            where: g.id == ^good_id and g.company_id == ^company.id
+          )
+        )
+
+    cs
+    |> then(fn cs ->
+      if is_nil(location_id) or own_warehouse?,
+        do: cs,
+        else: Ecto.Changeset.add_error(cs, :location_id, "must be an own warehouse")
+    end)
+    |> then(fn cs ->
+      if is_nil(good_id) or company_good?,
+        do: cs,
+        else: Ecto.Changeset.add_error(cs, :good_id, "is invalid")
+    end)
   end
 
   # --- Sales positions ---
@@ -1394,11 +1474,12 @@ defmodule FullCircle.Trading do
   Recent load/drop movements for an own-warehouse location (optionally × good).
 
   Returns at most `limit` rows (default 20), newest first. Each row:
-  `%{kind: "in" | "out", line_id, trip_id, date, reference_no, status,
+  `%{kind: "in" | "out" | "adj", line_id, trip_id, date, reference_no, status,
     vehicle_number, qty, unit, good_name, notes}`.
 
   - **in**  — drop into this warehouse (stock-in)
   - **out** — load out of this warehouse
+  - **adj** — stock adjustment (signed qty, `trip_id` nil, `notes` = reason)
 
   Designed for large tables: each side is queried with SQL `LIMIT`, then merged.
   """
@@ -1407,7 +1488,8 @@ defmodule FullCircle.Trading do
   def list_warehouse_recent_movements(location_id, good_id, company, user, opts)
       when is_binary(location_id) do
     if Authorization.can?(user, :view_trading, company) do
-      limit = Keyword.get(opts, :limit, 20) |> max(1) |> min(50)
+      # Modal "Load older" grows the limit in steps; cap keeps each side bounded
+      limit = Keyword.get(opts, :limit, 20) |> max(1) |> min(1000)
       # Fetch recent of each direction, then keep the newest `limit` overall.
       per_side = limit
 
@@ -1429,11 +1511,10 @@ defmodule FullCircle.Trading do
           per_side
         )
 
-      (outs ++ ins)
-      |> Enum.sort_by(
-        &{&1.date || ~D[1970-01-01], &1.inserted_at || ~U[1970-01-01 00:00:00Z]},
-        :desc
-      )
+      adjs = warehouse_adjustment_query(location_id, good_id, company.id, per_side)
+
+      (outs ++ ins ++ adjs)
+      |> Enum.sort_by(&movement_sort_key/1, :desc)
       |> Enum.take(limit)
     else
       []
@@ -1518,6 +1599,38 @@ defmodule FullCircle.Trading do
     |> Enum.map(&Map.update!(&1, :qty, fn qty -> open_trip_qty_to_dec(qty) end))
   end
 
+  defp warehouse_adjustment_query(location_id, good_id, company_id, limit) do
+    q =
+      from(a in StockAdjustment,
+        left_join: g in FullCircle.Product.Good,
+        on: g.id == a.good_id,
+        where: a.company_id == ^company_id and a.location_id == ^location_id,
+        order_by: [desc: a.adjust_date, desc: a.inserted_at],
+        limit: ^limit,
+        select: %{
+          kind: "adj",
+          line_id: a.id,
+          trip_id: nil,
+          date: a.adjust_date,
+          reference_no: a.reference_no,
+          status: nil,
+          vehicle_number: nil,
+          inserted_at: a.inserted_at,
+          qty: a.qty,
+          unit: g.unit,
+          good_name: g.name,
+          notes: a.reason
+        }
+      )
+
+    q =
+      if warehouse_good_filter?(good_id),
+        do: from([a, g] in q, where: a.good_id == ^good_id),
+        else: q
+
+    Repo.all(q)
+  end
+
   defp warehouse_good_filter?(good_id)
        when is_binary(good_id) and good_id != "" and good_id != "any",
        do: true
@@ -1554,7 +1667,14 @@ defmodule FullCircle.Trading do
         notes: combine_notes(trip_loads ++ trip_drops)
       }
     end)
-    |> Enum.sort_by(&{&1.date || ~D[1970-01-01], &1.inserted_at}, :desc)
+    |> Enum.sort_by(&movement_sort_key/1, :desc)
+  end
+
+  # Dates/DateTimes are structs: plain term order compares their fields
+  # (day before month), so sort on numbers instead.
+  defp movement_sort_key(m) do
+    {Date.to_gregorian_days(m.date || ~D[1970-01-01]),
+     (m.inserted_at && DateTime.to_unix(m.inserted_at, :microsecond)) || 0}
   end
 
   defp format_side_parts([], _), do: []
@@ -1719,7 +1839,7 @@ defmodule FullCircle.Trading do
             []
 
           good ->
-            on_hand = warehouse_on_hand(loc_id, g_id)
+            on_hand = Balances.own_warehouse_on_hand(loc_id, g_id)
             mt = decimal_str(on_hand)
 
             [
@@ -1941,19 +2061,6 @@ defmodule FullCircle.Trading do
   end
 
   defp stamp_line_seq(lines), do: lines
-
-  defp warehouse_on_hand(location_id, good_id)
-       when is_binary(location_id) and is_binary(good_id) do
-    inbound =
-      Map.get(Balances.own_warehouse_inbound_by_good(location_id), good_id, Decimal.new(0))
-
-    outbound =
-      Map.get(Balances.own_warehouse_outbound_by_good(location_id), good_id, Decimal.new(0))
-
-    Decimal.sub(inbound, outbound)
-  end
-
-  defp warehouse_on_hand(_, _), do: Decimal.new(0)
 
   defp customer_site_location(company, user, customer_id)
        when is_binary(customer_id) do

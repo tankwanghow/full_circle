@@ -2006,4 +2006,141 @@ defmodule FullCircleWeb.TradingDeskLiveTest do
       assert render(lv) =~ "Settled (billed or waived) lines are locked"
     end
   end
+
+  describe "warehouse stock adjustment" do
+    defp open_history(lv, wh, good) do
+      render_click(lv, "show_warehouse_history", %{
+        "location_id" => wh.id,
+        "good_id" => (good && good.id) || "",
+        "location_name" => wh.name,
+        "good_name" => (good && good.name) || "",
+        "unit" => (good && good.unit) || "",
+        "on_hand" => "0"
+      })
+    end
+
+    test "admin records a stocktake from the warehouse history", %{
+      conn: conn,
+      company: company,
+      user: user
+    } do
+      good = good_fixture(company, user, %{"name" => "Adj corn"})
+      wh = location_fixture(company, user, %{"kind" => "own_warehouse", "name" => "Adj silo"})
+
+      {:ok, _} =
+        FullCircle.Trading.create_stock_adjustment(
+          %{
+            "location_id" => wh.id,
+            "good_id" => good.id,
+            "adjust_date" => "2026-09-01",
+            "counted_qty" => "30",
+            "reason" => "opening balance"
+          },
+          company,
+          user
+        )
+
+      {:ok, lv, _} = live(conn, ~p"/companies/#{company.id}/trading/desk")
+      open_history(lv, wh, good)
+
+      assert has_element?(lv, "#desk-warehouse-history", "opening balance")
+      assert has_element?(lv, "#desk-warehouse-adjust-form")
+
+      lv
+      |> form("#desk-warehouse-adjust-form", adjust: %{"counted_qty" => "27.5"})
+      |> render_change()
+
+      assert has_element?(lv, "#desk-warehouse-adjust-diff", "-2.5")
+
+      lv
+      |> form("#desk-warehouse-adjust-form",
+        adjust: %{"counted_qty" => "27.5", "reason" => "spillage"}
+      )
+      |> render_submit()
+
+      assert render(lv) =~ "Stock adjusted (ADJ-"
+      assert has_element?(lv, "#desk-warehouse-history", "spillage")
+      assert has_element?(lv, "#desk-wh-#{wh.id}-#{good.id}", "27.5")
+    end
+
+    test "opening balance on an empty warehouse via the good picker", %{
+      conn: conn,
+      company: company,
+      user: user
+    } do
+      good = good_fixture(company, user, %{"name" => "Adj soy"})
+      wh = location_fixture(company, user, %{"kind" => "own_warehouse", "name" => "Empty silo"})
+
+      {:ok, lv, _} = live(conn, ~p"/companies/#{company.id}/trading/desk")
+      open_history(lv, wh, nil)
+
+      lv
+      |> form("#desk-warehouse-adjust-form",
+        adjust: %{"good_name" => "Nope", "counted_qty" => "5", "reason" => "opening balance"}
+      )
+      |> render_submit()
+
+      assert has_element?(lv, "#desk-warehouse-adjust-form", "is not a known good")
+
+      lv
+      |> form("#desk-warehouse-adjust-form",
+        adjust: %{"good_name" => "Adj soy", "counted_qty" => "12", "reason" => "opening balance"}
+      )
+      |> render_submit()
+
+      assert has_element?(lv, "#desk-wh-#{wh.id}-#{good.id}", "12")
+    end
+
+    test "history scrolls and loads older movements in pages of 20", %{
+      conn: conn,
+      company: company,
+      user: user
+    } do
+      good = good_fixture(company, user, %{"name" => "Paged corn"})
+      wh = location_fixture(company, user, %{"kind" => "own_warehouse", "name" => "Paged silo"})
+
+      for n <- 1..25 do
+        {:ok, _} =
+          FullCircle.Trading.create_stock_adjustment(
+            %{
+              "location_id" => wh.id,
+              "good_id" => good.id,
+              "adjust_date" => Date.add(~D[2026-01-01], n),
+              "counted_qty" => "#{n}",
+              "reason" => "count #{n}"
+            },
+            company,
+            user
+          )
+      end
+
+      {:ok, lv, _} = live(conn, ~p"/companies/#{company.id}/trading/desk")
+      open_history(lv, wh, good)
+
+      assert has_element?(lv, "#desk-warehouse-history-list")
+      assert lv |> element("#desk-warehouse-history") |> render() =~ "last 20"
+      assert has_element?(lv, "#desk-warehouse-history", "count 25")
+      # Rows 6..25 shown; "count 3" is not a substring of any of them
+      refute has_element?(lv, "#desk-warehouse-history", "count 3")
+
+      lv |> element("#desk-warehouse-history-more") |> render_click()
+
+      assert lv |> element("#desk-warehouse-history") |> render() =~ "all 25"
+      assert has_element?(lv, "#desk-warehouse-history", "count 3")
+      refute has_element?(lv, "#desk-warehouse-history-more")
+    end
+
+    test "clerk sees the history but no adjust form", %{company: company, user: admin} do
+      clerk = user_fixture()
+      {:ok, _} = FullCircle.Sys.allow_user_to_access(company, clerk, "clerk", admin)
+      conn = log_in_user(Phoenix.ConnTest.build_conn(), clerk)
+      wh = location_fixture(company, admin, %{"kind" => "own_warehouse", "name" => "Clerk silo"})
+
+      {:ok, lv, _} = live(conn, ~p"/companies/#{company.id}/trading/desk")
+      open_history(lv, wh, nil)
+
+      assert has_element?(lv, "#desk-warehouse-history")
+      refute has_element?(lv, "#desk-warehouse-adjust-form")
+    end
+  end
 end

@@ -92,6 +92,11 @@ defmodule FullCircle.Sys do
         doc_type: "TradingTrip",
         current: 0,
         company_id: company_id
+      },
+      %{
+        doc_type: "TradingStockAdj",
+        current: 0,
+        company_id: company_id
       }
     ]
   end

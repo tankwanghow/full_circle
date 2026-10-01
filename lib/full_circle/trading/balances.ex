@@ -13,7 +13,16 @@ defmodule FullCircle.Trading.Balances do
   import Ecto.Query, warn: false
 
   alias FullCircle.Repo
-  alias FullCircle.Trading.{SupplyPosition, SalesPosition, Trip, TripLoad, TripDrop, Location}
+
+  alias FullCircle.Trading.{
+    SupplyPosition,
+    SalesPosition,
+    Trip,
+    TripLoad,
+    TripDrop,
+    Location,
+    StockAdjustment
+  }
 
   @zero Decimal.new(0)
   # Not yet completed — goods may be on the road
@@ -236,14 +245,16 @@ defmodule FullCircle.Trading.Balances do
   def soft_held_for_supply(_), do: @zero
 
   @doc """
-  Own-warehouse stock: completed drops into the location minus completed loads out.
-  Only meaningful for locations with kind `own_warehouse`.
+  Own-warehouse stock: completed drops into the location minus completed loads out,
+  plus stock adjustments. Only meaningful for locations with kind `own_warehouse`.
   """
   def own_warehouse_qty(%Location{id: id, kind: "own_warehouse"}), do: own_warehouse_qty(id)
   def own_warehouse_qty(%Location{}), do: @zero
 
   def own_warehouse_qty(location_id) when is_binary(location_id) do
-    Decimal.sub(own_warehouse_inbound(location_id), own_warehouse_outbound(location_id))
+    own_warehouse_inbound(location_id)
+    |> Decimal.sub(own_warehouse_outbound(location_id))
+    |> Decimal.add(sum_adjusted(own_warehouse_adjusted_by_good(location_id)))
   end
 
   def own_warehouse_qty(_), do: @zero
@@ -309,6 +320,43 @@ defmodule FullCircle.Trading.Balances do
   end
 
   def own_warehouse_outbound_by_good(_), do: %{}
+
+  @doc """
+  Net stock adjustment qty at a location, grouped by good_id.
+  Returns `%{good_id => Decimal}`.
+  """
+  def own_warehouse_adjusted_by_good(location_id) when is_binary(location_id) do
+    from(a in StockAdjustment,
+      where: a.location_id == ^location_id,
+      group_by: a.good_id,
+      select: {a.good_id, coalesce(sum(a.qty), 0)}
+    )
+    |> Repo.all()
+    |> Map.new(fn {id, qty} -> {id, to_decimal(qty)} end)
+  end
+
+  def own_warehouse_adjusted_by_good(_), do: %{}
+
+  @doc """
+  Book on-hand for one own-warehouse location × good:
+  completed drops in − completed loads out + adjustments.
+  """
+  def own_warehouse_on_hand(location_id, good_id)
+      when is_binary(location_id) and is_binary(good_id) do
+    [
+      own_warehouse_inbound_by_good(location_id),
+      own_warehouse_outbound_by_good(location_id),
+      own_warehouse_adjusted_by_good(location_id)
+    ]
+    |> Enum.map(&Map.get(&1, good_id, @zero))
+    |> then(fn [inbound, outbound, adjusted] ->
+      inbound |> Decimal.sub(outbound) |> Decimal.add(adjusted)
+    end)
+  end
+
+  def own_warehouse_on_hand(_, _), do: @zero
+
+  defp sum_adjusted(map), do: Enum.reduce(Map.values(map), @zero, &Decimal.add/2)
 
   @doc """
   Draft/planned drops into a location, grouped by drop good_id (incoming / in transit in).
