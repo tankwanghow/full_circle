@@ -1,6 +1,8 @@
 defmodule FullCircleWeb.LayerLive.HarvestIndexComponent do
   use FullCircleWeb, :live_component
 
+  import FullCircleWeb.ListComponents
+
   @impl true
   def mount(socket) do
     {:ok, socket}
@@ -16,12 +18,12 @@ defmodule FullCircleWeb.LayerLive.HarvestIndexComponent do
     ~H"""
     <div
       id={@id}
-      class={"#{@ex_class}flex text-center border-b border-gray-500 hover:bg-gray-300 bg-gray-200"}
+      class={[row_class(@ex_class), line_class("gap-0")]}
     >
-      <div class="w-[15%] py-1">
+      <div class="w-[15%] shrink-0 min-w-0 truncate px-1">
         {@obj.har_date |> FullCircleWeb.Helpers.format_date()}
       </div>
-      <div class="w-[15%] py-1">
+      <div class="w-[15%] shrink-0 min-w-0 truncate px-1">
         <.link
           class="text-blue-600 hover:font-bold"
           tabindex="-1"
@@ -30,10 +32,10 @@ defmodule FullCircleWeb.LayerLive.HarvestIndexComponent do
           {@obj.harvest_no}
         </.link>
       </div>
-      <div class="w-[30%] py-1 overflow-clip">
-        <span class="font-light">{@obj.employee_name}</span>
+      <div class="w-[30%] shrink-0 min-w-0 truncate px-1">
+        <span class={muted_class()}>{@obj.employee_name}</span>
       </div>
-      <div class="w-[40%] py-1">
+      <div class="w-[40%] shrink-0 min-w-0 truncate px-1">
         {@obj.houses}
       </div>
     </div>

@@ -1,6 +1,8 @@
 defmodule FullCircleWeb.WeighingLive.IndexComponent do
   use FullCircleWeb, :live_component
 
+  import FullCircleWeb.ListComponents
+
   @impl true
   def mount(socket) do
     {:ok, socket}
@@ -16,36 +18,36 @@ defmodule FullCircleWeb.WeighingLive.IndexComponent do
     ~H"""
     <div
       id={@id}
-      class={"#{@ex_class} max-h-8 font-mono flex flex-row text-center tracking-tighter bg-gray-200 hover:bg-gray-400"}
+      class={[row_class(@ex_class), line_class("gap-0")]}
     >
-      <div class="w-[10%] border-b border-gray-400 py-1">
+      <div class="w-[10%] shrink-0 min-w-0 truncate px-1">
         {FullCircleWeb.Helpers.format_date(@obj.note_date)}
       </div>
-      <div class="w-[10%] border-b border-gray-400 py-1">
+      <div class="w-[10%] shrink-0 min-w-0 truncate px-1">
         <.doc_link
           current_company={@company}
           doc_obj={%{doc_type: "Weighing", doc_id: @obj.id, doc_no: @obj.note_no}}
         />
       </div>
-      <div class="w-[10%] border-b text-center border-gray-400 py-1 overflow-clip">
+      <div class="w-[10%] shrink-0 min-w-0 truncate px-1">
         {@obj.vehicle_no}
       </div>
-      <div class="w-[15%] border-b text-center border-gray-400 py-1 overflow-clip">
+      <div class="w-[15%] shrink-0 min-w-0 truncate px-1">
         {@obj.good_name}
       </div>
-      <div class="w-[10%] border-b border-gray-400 py-1 text-right pr-2">
+      <div class="w-[10%] shrink-0 min-w-0 truncate px-1 text-right tabular-nums">
         {@obj.gross |> Number.Delimit.number_to_delimited(precision: 0)}
       </div>
-      <div class="w-[10%] border-b border-gray-400 py-1 text-right pr-2">
+      <div class="w-[10%] shrink-0 min-w-0 truncate px-1 text-right tabular-nums">
         {@obj.tare |> Number.Delimit.number_to_delimited(precision: 0)}
       </div>
-      <div class="w-[10%] border-b border-gray-400 py-1 text-right pr-2">
+      <div class="w-[10%] shrink-0 min-w-0 truncate px-1 text-right tabular-nums">
         {(@obj.gross - @obj.tare) |> Number.Delimit.number_to_delimited(precision: 0)}
       </div>
-      <div class="w-[5%] border-b border-gray-400 py-1 pr-2">
+      <div class="w-[5%] shrink-0 min-w-0 truncate px-1">
         {@obj.unit}
       </div>
-      <div class="w-[20%] border-b text-center border-gray-400 py-1 overflow-clip">
+      <div class="w-[20%] shrink-0 min-w-0 truncate px-1">
         {@obj.note}
       </div>
     </div>

@@ -1,6 +1,8 @@
 defmodule FullCircleWeb.JournalLive.Index do
   use FullCircleWeb, :live_view
 
+  import FullCircleWeb.ListComponents
+
   alias FullCircle.JournalEntry
   alias FullCircleWeb.JournalLive.IndexComponent
   alias FullCircleWeb.NoteLive.NotesIndex
@@ -12,99 +14,90 @@ defmodule FullCircleWeb.JournalLive.Index do
   def render(assigns) do
     ~H"""
     <div class="mx-auto w-10/12">
-      <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
-      <div class="flex justify-center mb-2">
-        <.form for={%{}} id="search-form" phx-submit="search" class="w-full" autocomplete="off">
-          <div class=" flex flex-row flex-wrap tracking-tighter text-sm">
-            <div class="w-[25rem] grow shrink">
-              <label class="">Search Terms</label>
-              <.input
-                id="search_terms"
-                name="search[terms]"
-                type="search"
-                value={@search.terms}
-                placeholder="journal, contact, accounts or descriptions..."
-              />
-            </div>
-            <div class="w-[9.5rem] grow-0 shrink-0">
-              <label>Journal Date</label>
-              <.input
-                name="search[journal_date]"
-                type="date"
-                value={@search.journal_date}
-                id="search_journal_date"
-              />
-            </div>
-            <.button class="mt-5 h-10 w-10 grow-0 shrink-0">🔍</.button>
+      <.form for={%{}} id="search-form" phx-submit="search" autocomplete="off">
+        <.list_bar title={@page_title}>
+          <div class="grow min-w-56">
+            <.filter_label>{gettext("Search Terms")}</.filter_label>
+            <.input
+              id="search_terms"
+              name="search[terms]"
+              type="search"
+              value={@search.terms}
+              placeholder="journal, contact, accounts or descriptions..."
+            />
           </div>
-        </.form>
-      </div>
-      <div class="text-center mb-2">
-        <.link
-          navigate={~p"/companies/#{@current_company.id}/Journal/new"}
-          class="blue button"
-          id="new_journal"
-        >
-          {gettext("New Journal")}
-        </.link>
-        <.link
-          :if={@can_print}
-          navigate={
-            ~p"/companies/#{@current_company.id}/Journal/print_multi?pre_print=false&ids=#{@ids}"
-          }
-          target="_blank"
-          class="blue button"
-        >
-          {gettext("Print")}{"(#{Enum.count(@selected)})"}
-        </.link>
-        <.link
-          :if={@can_print}
-          navigate={
-            ~p"/companies/#{@current_company.id}/Journal/print_multi?pre_print=true&ids=#{@ids}"
-          }
-          target="_blank"
-          class="blue button"
-        >
-          {gettext("Pre Print")}{"(#{Enum.count(@selected)})"}
-        </.link>
-      </div>
+          <div class="w-36">
+            <.filter_label>{gettext("Journal Date")}</.filter_label>
+            <.input
+              name="search[journal_date]"
+              type="date"
+              value={@search.journal_date}
+              id="search_journal_date"
+            />
+          </div>
+          <.button class="h-9 w-10">🔍</.button>
+          <:actions>
+            <.link
+              :if={@can_print}
+              navigate={
+                ~p"/companies/#{@current_company.id}/Journal/print_multi?pre_print=false&ids=#{@ids}"
+              }
+              target="_blank"
+              class="blue button"
+            >
+              {gettext("Print")}{"(#{Enum.count(@selected)})"}
+            </.link>
+            <.link
+              :if={@can_print}
+              navigate={
+                ~p"/companies/#{@current_company.id}/Journal/print_multi?pre_print=true&ids=#{@ids}"
+              }
+              target="_blank"
+              class="blue button"
+            >
+              {gettext("Pre Print")}{"(#{Enum.count(@selected)})"}
+            </.link>
+            <.link
+              navigate={~p"/companies/#{@current_company.id}/Journal/new"}
+              class="blue button"
+              id="new_journal"
+            >
+              + {gettext("New Journal")}
+            </.link>
+          </:actions>
+        </.list_bar>
+      </.form>
 
-      <div class="font-medium flex flex-row text-center tracking-tighter bg-amber-200">
-        <div class="w-[2%] border-b border-t border-amber-400 py-1"></div>
-        <div class="w-[9%] border-b border-t border-amber-400 py-1">
-          {gettext("Date")}
+      <.list_table gap="gap-0">
+        <:head>
+          <div class="w-6 shrink-0 text-center"></div>
+          <div class="w-[9%] shrink-0 px-1">{gettext("Date")}</div>
+          <div class="w-[9%] shrink-0 px-1">{gettext("Journal No")}</div>
+          <div class="w-[40%] shrink-0 px-1">{gettext("Account Info")}</div>
+          <div class="w-[40%] shrink-0 px-1">{gettext("Particulars Info")}</div>
+        </:head>
+        <div
+          id="objects_list"
+          phx-update="stream"
+          phx-page-loading
+        >
+          <%= for {obj_id, obj} <- @streams.objects do %>
+            <.live_component
+              module={IndexComponent}
+              note_count={Map.get(@note_counts, obj.id, 0)}
+              id={
+                if(obj_id == "objects-",
+                  do: "objects-#{FullCircle.Helpers.gen_temp_id(10)}",
+                  else: obj_id
+                )
+              }
+              obj={obj}
+              company={@current_company}
+              ex_class=""
+            />
+          <% end %>
         </div>
-        <div class="w-[9%] border-b border-t border-amber-400 py-1">
-          {gettext("Journal No")}
-        </div>
-        <div class="w-[40%] border-b border-t border-amber-400 py-1">
-          {gettext("Account Info")}
-        </div>
-        <div class="w-[40%] border-b border-t border-amber-400 py-1">
-          {gettext("Particulars Info")}
-        </div>
-      </div>
-      <div
-        id="objects_list"
-        phx-update="stream"
-        phx-page-loading
-      >
-        <%= for {obj_id, obj} <- @streams.objects do %>
-          <.live_component
-            module={IndexComponent}
-            note_count={Map.get(@note_counts, obj.id, 0)}
-            id={
-              if(obj_id == "objects-",
-                do: "objects-#{FullCircle.Helpers.gen_temp_id(10)}",
-                else: obj_id
-              )
-            }
-            obj={obj}
-            company={@current_company}
-            ex_class=""
-          />
-        <% end %>
-      </div>
+      </.list_table>
       <.infinite_scroll_footer ended={@end_of_timeline?} />
       <NotesIndex.modal
         notes_for={@notes_for}

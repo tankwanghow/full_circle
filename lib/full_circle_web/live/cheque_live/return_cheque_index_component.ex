@@ -1,7 +1,7 @@
 defmodule FullCircleWeb.ChequeLive.ReturnChequeIndexComponent do
   use FullCircleWeb, :live_component
 
-  import FullCircleWeb.NoteComponents, only: [notes_count_badge: 1]
+  import FullCircleWeb.ListComponents
 
   @impl true
   def mount(socket) do
@@ -18,9 +18,9 @@ defmodule FullCircleWeb.ChequeLive.ReturnChequeIndexComponent do
     ~H"""
     <div
       id={@id}
-      class={"#{@ex_class} max-h-8 flex flex-row text-center tracking-tighter bg-gray-200 hover:bg-gray-400"}
+      class={[row_class(@ex_class), line_class("gap-0")]}
     >
-      <div class="w-[13%] border-b border-gray-400 py-1">
+      <div class="w-[13%] shrink-0 min-w-0 truncate px-1">
         {@obj.doc_date |> FullCircleWeb.Helpers.format_date()}
       </div>
 
@@ -31,21 +31,21 @@ defmodule FullCircleWeb.ChequeLive.ReturnChequeIndexComponent do
         <.link navigate={~p"/companies/#{@company.id}/ReturnCheque/#{@obj.return_id}/edit"}>
           {@obj.doc_no}
         </.link>
-        <.notes_count_badge :if={@obj.return_id} count={@note_count} id={@obj.return_id} />
+        <.row_notes_badge :if={@obj.return_id} count={@note_count} id={@obj.return_id} />
       </div>
 
-      <div :if={@obj.old_data} class="w-[12%] border-b border-gray-400 py-1">
+      <div :if={@obj.old_data} class="w-[12%] shrink-0 min-w-0 truncate px-1">
         {@obj.doc_no}
       </div>
 
-      <div class="w-[30%] border-b border-gray-400 py-1 overflow-clip">
+      <div class="w-[30%] shrink-0 min-w-0 truncate px-1">
         {@obj.cheque_owner_name}
       </div>
 
-      <div class="w-[30%] border-b text-center border-gray-400 py-1 overflow-clip">
-        <span class="font-light">{@obj.particulars}</span>
+      <div class="w-[30%] shrink-0 min-w-0 truncate px-1">
+        <span class={muted_class()}>{@obj.particulars}</span>
       </div>
-      <div class="w-[15%] border-b border-gray-400 py-1">
+      <div class="w-[15%] shrink-0 min-w-0 truncate px-1 text-right tabular-nums">
         {Number.Currency.number_to_currency(@obj.amount)}
       </div>
     </div>

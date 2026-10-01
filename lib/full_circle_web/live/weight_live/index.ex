@@ -2,6 +2,8 @@ defmodule FullCircleWeb.WeighingLive.Index do
   alias FullCircle.WeightBridge.Weighing
   use FullCircleWeb, :live_view
 
+  import FullCircleWeb.ListComponents
+
   alias FullCircle.StdInterface
   alias FullCircleWeb.WeighingLive.IndexComponent
 
@@ -11,87 +13,69 @@ defmodule FullCircleWeb.WeighingLive.Index do
   def render(assigns) do
     ~H"""
     <div class="mx-auto w-10/12">
-      <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
-      <div class="flex justify-center mb-2">
-        <.form for={%{}} id="search-form" phx-submit="search" autocomplete="off" class="w-full">
-          <div class=" flex flex-row flex-wrap tracking-tighter text-sm">
-            <div class="w-[15.5rem] grow shrink">
-              <label class="">Search Terms</label>
-              <.input
-                id="search_terms"
-                name="search[terms]"
-                type="search"
-                value={@search.terms}
-                placeholder="note no, vehicle or good name..."
-              />
-            </div>
-            <div class="w-[9.5rem] grow-0 shrink-0">
-              <label>Note Date From</label>
-              <.input
-                name="search[date_form]"
-                type="date"
-                value={@search.date_form}
-                id="search_date_form"
-              />
-            </div>
-            <.button class="mt-5 h-10 w-10 grow-0 shrink-0">🔍</.button>
+      <.form for={%{}} id="search-form" phx-submit="search" autocomplete="off">
+        <.list_bar title={@page_title}>
+          <div class="grow min-w-56">
+            <.filter_label>{gettext("Search Terms")}</.filter_label>
+            <.input
+              id="search_terms"
+              name="search[terms]"
+              type="search"
+              value={@search.terms}
+              placeholder="note no, vehicle or good name..."
+            />
           </div>
-        </.form>
-      </div>
-      <div class="text-center mb-2">
-        <.link
-          navigate={~p"/companies/#{@current_company.id}/Weighing/new"}
-          class="blue button"
-          id="new_advance"
+          <div class="w-36">
+            <.filter_label>{gettext("Note Date From")}</.filter_label>
+            <.input
+              name="search[date_form]"
+              type="date"
+              value={@search.date_form}
+              id="search_date_form"
+            />
+          </div>
+          <.button class="h-9 w-10">🔍</.button>
+          <:actions>
+            <.link
+              navigate={~p"/companies/#{@current_company.id}/Weighing/new"}
+              class="blue button"
+              id="new_advance"
+            >
+              + {gettext("New Weighing")}
+            </.link>
+          </:actions>
+        </.list_bar>
+      </.form>
+
+      <.list_table gap="gap-0">
+        <:head>
+          <div class="w-[10%] shrink-0 px-1">{gettext("Date")}</div>
+          <div class="w-[10%] shrink-0 px-1">{gettext("Note No")}</div>
+          <div class="w-[10%] shrink-0 px-1">{gettext("Vechile")}</div>
+          <div class="w-[15%] shrink-0 px-1">{gettext("Good")}</div>
+          <div class="w-[10%] shrink-0 px-1 text-right tabular-nums">{gettext("Gross")}</div>
+          <div class="w-[10%] shrink-0 px-1 text-right tabular-nums">{gettext("Tare")}</div>
+          <div class="w-[10%] shrink-0 px-1 text-right tabular-nums">{gettext("Nett")}</div>
+          <div class="w-[5%] shrink-0 px-1">{gettext("Unit")}</div>
+          <div class="w-[20%] shrink-0 px-1">{gettext("Note")}</div>
+        </:head>
+        <div
+          :if={Enum.count(@streams.objects) > 0 or @page > 1}
+          id="objects_list"
+          phx-update="stream"
+          phx-page-loading
         >
-          {gettext("New Weighing")}
-        </.link>
-      </div>
-      <div class="font-medium flex flex-row text-center tracking-tighter bg-amber-200">
-        <div class="w-[10%] border-b border-t border-amber-400 py-1">
-          {gettext("Date")}
+          <%= for {obj_id, obj} <- @streams.objects do %>
+            <.live_component
+              module={IndexComponent}
+              id={obj_id}
+              obj={obj}
+              company={@current_company}
+              ex_class=""
+            />
+          <% end %>
         </div>
-        <div class="w-[10%] border-b border-t border-amber-400 py-1">
-          {gettext("Note No")}
-        </div>
-        <div class="w-[10%] border-b border-t border-amber-400 py-1">
-          {gettext("Vechile")}
-        </div>
-        <div class="w-[15%] border-b border-t border-amber-400 py-1">
-          {gettext("Good")}
-        </div>
-        <div class="w-[10%] border-b border-t border-amber-400 py-1 text-right pr-2">
-          {gettext("Gross")}
-        </div>
-        <div class="w-[10%] border-b border-t border-amber-400 py-1 text-right pr-2">
-          {gettext("Tare")}
-        </div>
-        <div class="w-[10%] border-b border-t border-amber-400 py-1 text-right pr-2">
-          {gettext("Nett")}
-        </div>
-        <div class="w-[5%] border-b border-t border-amber-400 py-1 pr-2">
-          {gettext("Unit")}
-        </div>
-        <div class="w-[20%] border-b border-t border-amber-400 py-1">
-          {gettext("Note")}
-        </div>
-      </div>
-      <div
-        :if={Enum.count(@streams.objects) > 0 or @page > 1}
-        id="objects_list"
-        phx-update="stream"
-        phx-page-loading
-      >
-        <%= for {obj_id, obj} <- @streams.objects do %>
-          <.live_component
-            module={IndexComponent}
-            id={obj_id}
-            obj={obj}
-            company={@current_company}
-            ex_class=""
-          />
-        <% end %>
-      </div>
+      </.list_table>
       <.infinite_scroll_footer ended={@end_of_timeline?} />
     </div>
     """

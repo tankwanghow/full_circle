@@ -1,7 +1,7 @@
 defmodule FullCircleWeb.ChequeLive.DepositIndexComponent do
   use FullCircleWeb, :live_component
 
-  import FullCircleWeb.NoteComponents, only: [notes_count_badge: 1]
+  import FullCircleWeb.ListComponents
 
   @impl true
   def mount(socket) do
@@ -18,33 +18,33 @@ defmodule FullCircleWeb.ChequeLive.DepositIndexComponent do
     ~H"""
     <div
       id={@id}
-      class={"#{@ex_class} max-h-8 flex flex-row text-center tracking-tighter bg-gray-200 hover:bg-gray-400"}
+      class={[row_class(@ex_class), line_class("gap-0")]}
     >
-      <div class="w-[15%] border-b border-gray-400 py-1">
+      <div class="w-[15%] shrink-0 min-w-0 truncate px-1">
         {@obj.deposit_date |> FullCircleWeb.Helpers.format_date()}
       </div>
 
       <div
         :if={!@obj.old_data}
-        class="hover:font-bold text-blue-600 w-[15%] border-b border-gray-400 py-1 hover:cursor-pointer"
+        class="w-[15%] shrink-0 min-w-0 truncate px-1 text-blue-600 hover:font-bold"
       >
         <.link navigate={~p"/companies/#{@company.id}/Deposit/#{@obj.deposit_id}/edit"}>
           {@obj.deposit_no}
         </.link>
-        <.notes_count_badge :if={@obj.deposit_id} count={@note_count} id={@obj.deposit_id} />
+        <.row_notes_badge :if={@obj.deposit_id} count={@note_count} id={@obj.deposit_id} />
       </div>
 
-      <div :if={@obj.old_data} class="w-[15%] border-b border-gray-400 py-1">
+      <div :if={@obj.old_data} class="w-[15%] shrink-0 min-w-0 truncate px-1">
         {@obj.deposit_no}
       </div>
 
-      <div class="w-[28%] border-b border-gray-400 py-1">
+      <div class="w-[28%] shrink-0 min-w-0 truncate px-1">
         {@obj.deposit_bank_name}
       </div>
-      <div class="w-[27%] border-b text-center border-gray-400 py-1 overflow-clip">
-        <span class="font-light">{@obj.particulars}</span>
+      <div class="w-[27%] shrink-0 min-w-0 truncate px-1">
+        <span class={muted_class()}>{@obj.particulars}</span>
       </div>
-      <div class="w-[15%] border-b border-gray-400 py-1">
+      <div class="w-[15%] shrink-0 min-w-0 truncate px-1 text-right tabular-nums">
         {Number.Currency.number_to_currency(@obj.amount)}
       </div>
     </div>

@@ -1,7 +1,7 @@
 defmodule FullCircleWeb.JournalLive.IndexComponent do
   use FullCircleWeb, :live_component
 
-  import FullCircleWeb.NoteComponents, only: [notes_count_badge: 1]
+  import FullCircleWeb.ListComponents
 
   @impl true
   def mount(socket) do
@@ -18,14 +18,14 @@ defmodule FullCircleWeb.JournalLive.IndexComponent do
     ~H"""
     <div
       id={@id}
-      class={"#{@ex_class} max-h-8 flex flex-row text-center tracking-tighter bg-gray-200 hover:bg-gray-400"}
+      class={[row_class(@ex_class), line_class("gap-0")]}
     >
-      <div class="w-[2%] border-b border-gray-400 py-1">
+      <div class="w-6 shrink-0 text-center">
         <input
           :if={@obj.checked and !@obj.old_data}
           id={"checkbox_#{@obj.id}"}
           type="checkbox"
-          class="rounded border-gray-400 checked:bg-gray-400"
+          class="rounded border-gray-400"
           phx-click="check_click"
           phx-value-object-id={@obj.id}
           checked
@@ -34,15 +34,15 @@ defmodule FullCircleWeb.JournalLive.IndexComponent do
           :if={!@obj.checked and !@obj.old_data}
           id={"checkbox_#{@obj.id}"}
           type="checkbox"
-          class="rounded border-gray-400 checked:bg-gray-400"
+          class="rounded border-gray-400"
           phx-click="check_click"
           phx-value-object-id={@obj.id}
         />
       </div>
-      <div class="w-[9%] border-b border-gray-400 py-1">
+      <div class="w-[9%] shrink-0 min-w-0 truncate px-1">
         {@obj.journal_date |> FullCircleWeb.Helpers.format_date()}
       </div>
-      <div class="w-[9%] border-b border-gray-400 py-1">
+      <div class="w-[9%] shrink-0 min-w-0 truncate px-1">
         <%= if @obj.old_data do %>
           {@obj.journal_no}
         <% else %>
@@ -50,14 +50,14 @@ defmodule FullCircleWeb.JournalLive.IndexComponent do
             current_company={@company}
             doc_obj={%{doc_type: "Journal", doc_id: @obj.id, doc_no: @obj.journal_no}}
           />
-          <.notes_count_badge count={@note_count} id={@obj.id} />
+          <.row_notes_badge count={@note_count} id={@obj.id} />
         <% end %>
       </div>
-      <div class="w-[40%] border-b border-gray-400 py-1 overflow-clip">
+      <div class="w-[40%] shrink-0 min-w-0 truncate px-1">
         {@obj.account_info}
       </div>
-      <div class="w-[40%] border-b text-center border-gray-400 py-1 overflow-clip">
-        <span class="font-light">{@obj.particulars}</span>
+      <div class="w-[40%] shrink-0 min-w-0 truncate px-1">
+        <span class={muted_class()}>{@obj.particulars}</span>
       </div>
     </div>
     """

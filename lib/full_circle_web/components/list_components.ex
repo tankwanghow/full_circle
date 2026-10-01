@@ -41,13 +41,20 @@ defmodule FullCircleWeb.ListComponents do
   Bordered table frame: a header row (`:head`, column divs with the same
   widths as the rows) and the rows (the page's stream container).
   """
+  attr :gap, :string,
+    default: "gap-2",
+    doc: ~s(column gap; "gap-0" for percentage-width columns, which pad their cells instead)
+
   slot :head, required: true
   slot :inner_block, required: true
 
   def list_table(assigns) do
     ~H"""
     <div class="rounded border border-slate-300 dark:border-gray-700 overflow-hidden">
-      <div class="flex items-center gap-2 px-2 py-1.5 bg-slate-200 dark:bg-gray-800 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+      <div class={[
+        "flex items-center px-2 py-1.5 bg-slate-200 dark:bg-gray-800 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300",
+        @gap
+      ]}>
         {render_slot(@head)}
       </div>
       {render_slot(@inner_block)}
@@ -64,8 +71,8 @@ defmodule FullCircleWeb.ListComponents do
     ]
   end
 
-  @doc "Classes for the single line inside a row."
-  def line_class, do: "flex items-center gap-2 px-2 py-1.5"
+  @doc "Classes for the single line inside a row (`gap` must match `list_table`)."
+  def line_class(gap \\ "gap-2"), do: "flex items-center #{gap} px-2 py-1.5"
 
   @doc "Muted secondary text (particulars, sub-ids)."
   def muted_class, do: "text-slate-500 dark:text-slate-400"

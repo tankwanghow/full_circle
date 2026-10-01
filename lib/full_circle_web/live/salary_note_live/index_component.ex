@@ -1,6 +1,8 @@
 defmodule FullCircleWeb.SalaryNoteLive.IndexComponent do
   use FullCircleWeb, :live_component
 
+  import FullCircleWeb.ListComponents
+
   @impl true
   def mount(socket) do
     {:ok, socket}
@@ -16,14 +18,14 @@ defmodule FullCircleWeb.SalaryNoteLive.IndexComponent do
     ~H"""
     <div
       id={@id}
-      class={"#{@ex_class} max-h-8 flex flex-row text-center tracking-tighter bg-gray-200 hover:bg-gray-400"}
+      class={[row_class(@ex_class), line_class("gap-0")]}
     >
-      <div class="w-[2%] border-b border-gray-400 py-1">
+      <div class="w-6 shrink-0 text-center">
         <input
           :if={@obj.checked and !@obj.old_data}
           id={"checkbox_advance_#{@obj.id}"}
           type="checkbox"
-          class="rounded border-gray-400 checked:bg-gray-400"
+          class="rounded border-gray-400"
           phx-click="check_click"
           phx-value-object-id={@obj.id}
           checked
@@ -32,15 +34,15 @@ defmodule FullCircleWeb.SalaryNoteLive.IndexComponent do
           :if={!@obj.checked and !@obj.old_data}
           id={"checkbox_advance_#{@obj.id}"}
           type="checkbox"
-          class="rounded border-gray-400 checked:bg-gray-400"
+          class="rounded border-gray-400"
           phx-click="check_click"
           phx-value-object-id={@obj.id}
         />
       </div>
-      <div class="w-[10%] border-b border-gray-400 py-1">
+      <div class="w-[10%] shrink-0 min-w-0 truncate px-1">
         {@obj.note_date |> FullCircleWeb.Helpers.format_date()}
       </div>
-      <div class="w-[10%] border-b border-gray-400 py-1">
+      <div class="w-[10%] shrink-0 min-w-0 truncate px-1">
         <%= if @obj.old_data do %>
           {@obj.note_no}
         <% else %>
@@ -50,19 +52,19 @@ defmodule FullCircleWeb.SalaryNoteLive.IndexComponent do
           />
         <% end %>
       </div>
-      <div class="w-[10%] border-b border-gray-400 py-1">
+      <div class="w-[10%] shrink-0 min-w-0 truncate px-1">
         {@obj.pay_slip_no}
       </div>
-      <div class="w-[16%] border-b text-center border-gray-400 py-1 overflow-clip">
-        <span class="font-light">{@obj.employee_name}</span>
+      <div class="w-[16%] shrink-0 min-w-0 truncate px-1">
+        <span class={muted_class()}>{@obj.employee_name}</span>
       </div>
-      <div class="w-[16%] border-b text-center border-gray-400 py-1 overflow-clip">
-        <span class="font-light">{@obj.salary_type_name}</span>
+      <div class="w-[16%] shrink-0 min-w-0 truncate px-1">
+        <span class={muted_class()}>{@obj.salary_type_name}</span>
       </div>
-      <div class="w-[26%] border-b text-center border-gray-400 py-1 overflow-clip">
-        <span class="font-light">{@obj.particulars}</span>
+      <div class="w-[26%] shrink-0 min-w-0 truncate px-1">
+        <span class={muted_class()}>{@obj.particulars}</span>
       </div>
-      <div class="w-[10%] border-b border-gray-400 py-1">
+      <div class="w-[10%] shrink-0 min-w-0 truncate px-1 text-right tabular-nums">
         {Number.Currency.number_to_currency(@obj.amount)}
       </div>
     </div>

@@ -1,6 +1,8 @@
 defmodule FullCircleWeb.ChequeLive.ReturnChequeIndex do
   use FullCircleWeb, :live_view
 
+  import FullCircleWeb.ListComponents
+
   alias FullCircle.{Cheque}
   alias FullCircleWeb.NoteLive.NotesIndex
 
@@ -96,79 +98,64 @@ defmodule FullCircleWeb.ChequeLive.ReturnChequeIndex do
   def render(assigns) do
     ~H"""
     <div class="w-8/12 mx-auto">
-      <p class="text-2xl text-center font-medium">{"#{@page_title}"}</p>
-      <div class="flex justify-center mb-2">
-        <.form for={%{}} id="search-form" phx-submit="query" autocomplete="off">
-          <div class=" flex flex-row flex-wrap tracking-tighter text-sm">
-            <div class="w-[35rem] grow shrink">
-              <.input
-                label={gettext("Terms")}
-                id="search_terms"
-                name="search[terms]"
-                value={@search.terms}
-                placeholder={gettext("bank, deposit no or particulars...")}
-              />
-            </div>
-            <div class="w-[13rem] grow shrink">
-              <.input
-                label={gettext("Date From")}
-                name="search[r_date]"
-                type="date"
-                id="search_r_date"
-                value={@search.r_date}
-              />
-            </div>
-
-            <.button class="mt-5 h-10 w-30 grow-0 shrink-0">
-              {gettext("Query")}
-            </.button>
+      <.form for={%{}} id="search-form" phx-submit="query" autocomplete="off">
+        <.list_bar title={@page_title}>
+          <div class="grow min-w-56">
+            <.filter_label>{gettext("Terms")}</.filter_label>
+            <.input
+              id="search_terms"
+              name="search[terms]"
+              value={@search.terms}
+              placeholder={gettext("bank, deposit no or particulars...")}
+            />
           </div>
-        </.form>
-      </div>
-      <div class="text-center mb-2">
-        <.link
-          navigate={~p"/companies/#{@current_company.id}/ReturnCheque/new"}
-          class="blue button"
-          id="new_return_cheque"
+          <div class="w-36">
+            <.filter_label>{gettext("Date From")}</.filter_label>
+            <.input
+              name="search[r_date]"
+              type="date"
+              id="search_r_date"
+              value={@search.r_date}
+            />
+          </div>
+          <.button class="h-9 w-10">🔍</.button>
+          <:actions>
+            <.link
+              navigate={~p"/companies/#{@current_company.id}/ReturnCheque/new"}
+              class="blue button"
+              id="new_return_cheque"
+            >
+              + {gettext("New Return Cheque")}
+            </.link>
+          </:actions>
+        </.list_bar>
+      </.form>
+
+      <.list_table gap="gap-0">
+        <:head>
+          <div class="w-[13%] shrink-0 px-1">{gettext("Date")}</div>
+          <div class="w-[12%] shrink-0 px-1">{gettext("Return No")}</div>
+          <div class="w-[30%] shrink-0 px-1">{gettext("Customer")}</div>
+          <div class="w-[30%] shrink-0 px-1">{gettext("Particulars")}</div>
+          <div class="w-[15%] shrink-0 px-1 text-right">{gettext("Amount")}</div>
+        </:head>
+        <div
+          id="objects_list"
+          phx-update="stream"
+          phx-page-loading
         >
-          {gettext("New Return Cheque")}
-        </.link>
-      </div>
-
-      <div class="text-center font-medium flex flex-row tracking-tighter bg-green-200 border-green-400 border-y-2">
-        <div class="w-[13%] px-2 py-1">
-          {gettext("Date")}
+          <%= for {obj_id, obj} <- @streams.objects do %>
+            <.live_component
+              module={FullCircleWeb.ChequeLive.ReturnChequeIndexComponent}
+              note_count={Map.get(@note_counts, obj.return_id, 0)}
+              id={obj_id}
+              obj={obj}
+              company={@current_company}
+              ex_class=""
+            />
+          <% end %>
         </div>
-        <div class="w-[12%] px-2 py-1">
-          {gettext("Return No")}
-        </div>
-        <div class="w-[30%] px-2 py-1 ">
-          {gettext("Customer")}
-        </div>
-        <div class="w-[30%] px-2 py-1 ">
-          {gettext("Particulars")}
-        </div>
-        <div class="w-[15%] px-2 py-1">
-          {gettext("Amount")}
-        </div>
-      </div>
-
-      <div
-        id="objects_list"
-        phx-update="stream"
-        phx-page-loading
-      >
-        <%= for {obj_id, obj} <- @streams.objects do %>
-          <.live_component
-            module={FullCircleWeb.ChequeLive.ReturnChequeIndexComponent}
-            note_count={Map.get(@note_counts, obj.return_id, 0)}
-            id={obj_id}
-            obj={obj}
-            company={@current_company}
-            ex_class=""
-          />
-        <% end %>
-      </div>
+      </.list_table>
       <.infinite_scroll_footer ended={@end_of_timeline?} />
       <NotesIndex.modal
         notes_for={@notes_for}

@@ -1,6 +1,8 @@
 defmodule FullCircleWeb.LayerLive.HouseIndexComponent do
   use FullCircleWeb, :live_component
 
+  import FullCircleWeb.ListComponents
+
   @impl true
   def mount(socket) do
     {:ok, socket}
@@ -16,9 +18,9 @@ defmodule FullCircleWeb.LayerLive.HouseIndexComponent do
     ~H"""
     <div
       id={@id}
-      class={"#{@ex_class}flex p-1 text-center bg-gray-200 border-gray-500 hover:bg-gray-300 border-b"}
+      class={[row_class(@ex_class), line_class("gap-0")]}
     >
-      <div class="w-[14%]">
+      <div class="w-[14%] shrink-0 min-w-0 truncate px-1">
         <.link
           class="text-blue-600 hover:font-bold"
           tabindex="-1"
@@ -27,22 +29,22 @@ defmodule FullCircleWeb.LayerLive.HouseIndexComponent do
           {@obj.house_no}
         </.link>
       </div>
-      <div class="w-[14%]">
+      <div class="w-[14%] shrink-0 min-w-0 truncate px-1">
         {@obj.capacity}
       </div>
-      <div class="w-[15%]">
+      <div class="w-[15%] shrink-0 min-w-0 truncate px-1">
         {@obj.flock_no}
       </div>
-      <div class="w-[15%]">
+      <div class="w-[15%] shrink-0 min-w-0 truncate px-1">
         {@obj.qty}
       </div>
-      <div class="w-[14%]">
+      <div class="w-[14%] shrink-0 min-w-0 truncate px-1">
         {@obj.filling_wages}
       </div>
-      <div class="w-[14%]">
+      <div class="w-[14%] shrink-0 min-w-0 truncate px-1">
         {@obj.feeding_wages}
       </div>
-      <div class="w-[14%]">
+      <div class="w-[14%] shrink-0 min-w-0 truncate px-1">
         {@obj.status}
       </div>
     </div>
