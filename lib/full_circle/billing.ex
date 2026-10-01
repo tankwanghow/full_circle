@@ -209,7 +209,8 @@ defmodule FullCircle.Billing do
           e_inv_internal_id: inv.e_inv_internal_id,
           particulars: coalesce(txn.contact_particulars, txn.particulars),
           invoice_date: txn.doc_date,
-          due_date: txn.doc_date,
+          # Imported old rows have no invoice — fall back to the txn date
+          due_date: coalesce(inv.due_date, txn.doc_date),
           contact_name: cont.name,
           reg_no: cont.reg_no,
           tax_id: cont.tax_id,
@@ -254,7 +255,8 @@ defmodule FullCircle.Billing do
           e_inv_internal_id: inv.e_inv_internal_id,
           particulars: coalesce(txn.contact_particulars, txn.particulars),
           invoice_date: txn.doc_date,
-          due_date: txn.doc_date,
+          # Imported old rows have no invoice — fall back to the txn date
+          due_date: coalesce(inv.due_date, txn.doc_date),
           contact_name: cont.name,
           reg_no: cont.reg_no,
           tax_id: cont.tax_id,
@@ -267,7 +269,10 @@ defmodule FullCircle.Billing do
     q = if date_from != "", do: from([txn: txn] in q, where: txn.doc_date >= ^date_from), else: q
 
     if due_date_from != "",
-      do: from([txn: txn] in q, where: txn.doc_date >= ^due_date_from),
+      do:
+        from([txn, _cont, inv] in q,
+          where: coalesce(inv.due_date, txn.doc_date) >= type(^due_date_from, :date)
+        ),
       else: q
   end
 

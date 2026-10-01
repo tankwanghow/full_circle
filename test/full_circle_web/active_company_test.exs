@@ -25,7 +25,7 @@ defmodule FullCircleWeb.ActiveCompanyTest do
     test "show company name", %{conn: conn, comp: comp} do
       {:ok, _lv, html} = live(conn, ~p"/companies/#{comp.id}/dashboard")
       assert html =~ comp.name
-      assert html =~ ~r{id="full_circle_dashboard"[^>]*>\s*Home\s*</a>}
+      assert html =~ ~r{id="full_circle_dashboard"[^>]*>[^<]*Home\s*</a>}
       refute html =~ "Dashboard"
     end
 
