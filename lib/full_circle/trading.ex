@@ -300,7 +300,8 @@ defmodule FullCircle.Trading do
         |> Map.drop(["title"])
         |> Map.put("title", position.title)
 
-      if terminal_status_change?(position, attrs, &SupplyPosition.terminal?/1) do
+      if terminal_status_change?(position, attrs, &SupplyPosition.terminal?/1) and
+           not Authorization.can?(user, :update_terminal_position, company) do
         {:error, :position_locked}
       else
         position
@@ -315,7 +316,7 @@ defmodule FullCircle.Trading do
 
   # A position that reached a terminal status (supply "closed"; sales
   # "fulfilled"/"cancelled") may still have other fields edited — e.g. notes —
-  # but must not be moved to a different status.
+  # but must not be moved to a different status, except by an admin.
   defp terminal_status_change?(position, attrs, terminal?) do
     new_status = attrs["status"]
 
@@ -902,7 +903,8 @@ defmodule FullCircle.Trading do
         |> Map.drop(["title"])
         |> Map.put("title", position.title)
 
-      if terminal_status_change?(position, attrs, &SalesPosition.terminal?/1) do
+      if terminal_status_change?(position, attrs, &SalesPosition.terminal?/1) and
+           not Authorization.can?(user, :update_terminal_position, company) do
         {:error, :position_locked}
       else
         position

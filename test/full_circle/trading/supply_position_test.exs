@@ -306,31 +306,50 @@ defmodule FullCircle.Trading.SupplyPositionTest do
     assert updated.notes == "x"
   end
 
-  test "closed supply cannot be reopened but non-status edits still work", %{
+  test "closed supply cannot be reopened by non-admins but non-status edits still work", %{
     admin: admin,
     company: company
   } do
+    clerk = FullCircle.UserAccountsFixtures.user_fixture()
+    {:ok, _} = FullCircle.Sys.allow_user_to_access(company, clerk, "clerk", admin)
+
     s = supply_position_fixture(company, admin)
     {:ok, closed} = Trading.close_supply_position(s, company, admin)
     assert closed.status == "closed"
 
     # Every route back to an active status is refused
-    assert {:error, :position_locked} = Trading.hold_supply_position(closed, company, admin)
-    assert {:error, :position_locked} = Trading.collect_supply_position(closed, company, admin)
+    assert {:error, :position_locked} = Trading.hold_supply_position(closed, company, clerk)
+    assert {:error, :position_locked} = Trading.collect_supply_position(closed, company, clerk)
 
     assert {:error, :position_locked} =
-             Trading.update_supply_position(closed, %{"status" => "open"}, company, admin)
+             Trading.update_supply_position(closed, %{"status" => "open"}, company, clerk)
 
-    assert Trading.get_supply_position!(closed.id, company, admin).status == "closed"
+    assert Trading.get_supply_position!(closed.id, company, clerk).status == "closed"
 
     # Re-asserting the same terminal status is a no-op, not an error
-    assert {:ok, _} = Trading.close_supply_position(closed, company, admin)
+    assert {:ok, _} = Trading.close_supply_position(closed, company, clerk)
 
     # Other fields remain editable after closing
     assert {:ok, edited} =
-             Trading.update_supply_position(closed, %{"notes" => "after close"}, company, admin)
+             Trading.update_supply_position(closed, %{"notes" => "after close"}, company, clerk)
 
     assert edited.notes == "after close"
     assert edited.status == "closed"
+  end
+
+  test "admin may reopen a closed supply and edit any field", %{admin: admin, company: company} do
+    s = supply_position_fixture(company, admin)
+    {:ok, closed} = Trading.close_supply_position(s, company, admin)
+
+    assert {:ok, edited} =
+             Trading.update_supply_position(closed, %{"quantity" => "80"}, company, admin)
+
+    assert Decimal.eq?(edited.quantity, Decimal.new("80"))
+    assert edited.status == "closed"
+
+    assert {:ok, reopened} =
+             Trading.update_supply_position(edited, %{"status" => "open"}, company, admin)
+
+    assert reopened.status == "open"
   end
 end

@@ -142,6 +142,11 @@ defmodule FullCircle.Authorization do
   def can?(user, :update_completed_trip, company),
     do: allow_roles(~w(admin), company, user)
 
+  # Closed supply / fulfilled or cancelled sales positions are status-locked;
+  # reopening or re-statusing them is admin only.
+  def can?(user, :update_terminal_position, company),
+    do: allow_roles(~w(admin), company, user)
+
   # --- Notes ------------------------------------------------------------
   #
   # Per-note visibility (a role list on the note) decides *which* notes a user

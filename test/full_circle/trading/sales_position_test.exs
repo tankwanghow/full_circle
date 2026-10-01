@@ -293,10 +293,13 @@ defmodule FullCircle.Trading.SalesPositionTest do
            ) == :not_authorise
   end
 
-  test "fulfilled and cancelled sales positions cannot change status", %{
+  test "fulfilled and cancelled sales positions cannot change status for non-admins", %{
     admin: admin,
     company: company
   } do
+    clerk = FullCircle.UserAccountsFixtures.user_fixture()
+    {:ok, _} = FullCircle.Sys.allow_user_to_access(company, clerk, "clerk", admin)
+
     fulfilled_src = sales_position_fixture(company, admin)
 
     {:ok, fulfilled} =
@@ -309,9 +312,9 @@ defmodule FullCircle.Trading.SalesPositionTest do
 
     assert fulfilled.status == "fulfilled"
 
-    assert {:error, :position_locked} = Trading.open_sales_position(fulfilled, company, admin)
-    assert {:error, :position_locked} = Trading.hold_sales_position(fulfilled, company, admin)
-    assert {:error, :position_locked} = Trading.cancel_sales_position(fulfilled, company, admin)
+    assert {:error, :position_locked} = Trading.open_sales_position(fulfilled, company, clerk)
+    assert {:error, :position_locked} = Trading.hold_sales_position(fulfilled, company, clerk)
+    assert {:error, :position_locked} = Trading.cancel_sales_position(fulfilled, company, clerk)
     assert Trading.get_sales_position!(fulfilled.id, company, admin).status == "fulfilled"
 
     # fulfilled_note stays editable while status is unchanged
@@ -329,11 +332,34 @@ defmodule FullCircle.Trading.SalesPositionTest do
     {:ok, cancelled} = Trading.cancel_sales_position(cancelled_src, company, admin)
     assert cancelled.status == "cancelled"
 
-    assert {:error, :position_locked} = Trading.open_sales_position(cancelled, company, admin)
+    assert {:error, :position_locked} = Trading.open_sales_position(cancelled, company, clerk)
 
     assert {:error, :position_locked} =
-             Trading.fulfill_sales_position(cancelled, %{}, company, admin)
+             Trading.fulfill_sales_position(cancelled, %{}, company, clerk)
 
     assert Trading.get_sales_position!(cancelled.id, company, admin).status == "cancelled"
+  end
+
+  test "admin may edit and reopen fulfilled or cancelled sales positions", %{
+    admin: admin,
+    company: company
+  } do
+    src = sales_position_fixture(company, admin)
+    {:ok, fulfilled} = Trading.fulfill_sales_position(src, %{}, company, admin)
+
+    assert {:ok, edited} =
+             Trading.update_sales_position(fulfilled, %{"quantity" => "7"}, company, admin)
+
+    assert Decimal.eq?(edited.quantity, Decimal.new("7"))
+    assert edited.status == "fulfilled"
+
+    assert {:ok, reopened} = Trading.open_sales_position(edited, company, admin)
+    assert reopened.status == "open"
+
+    {:ok, cancelled} =
+      Trading.cancel_sales_position(sales_position_fixture(company, admin), company, admin)
+
+    assert {:ok, fulfilled2} = Trading.fulfill_sales_position(cancelled, %{}, company, admin)
+    assert fulfilled2.status == "fulfilled"
   end
 end

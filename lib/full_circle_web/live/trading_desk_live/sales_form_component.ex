@@ -158,7 +158,9 @@ defmodule FullCircleWeb.TradingDeskLive.SalesFormComponent do
          put_flash(
            socket,
            :error,
-           gettext("Fulfilled or cancelled sales positions cannot change status.")
+           gettext(
+             "Only admins can change the status of a fulfilled or cancelled sales position."
+           )
          )}
 
       :not_authorise ->

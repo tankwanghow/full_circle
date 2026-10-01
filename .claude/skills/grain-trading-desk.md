@@ -195,7 +195,10 @@ later be told apart from one a clerk set by hand — see `cancel_trip` below.
 `SalesPosition.terminal?/1`). `update_supply_position` / `update_sales_position`
 return `{:error, :position_locked}` for any attempt to move to a *different*
 status — including via the thin wrappers (`hold_`, `collect_`, `open_`,
-`fulfill_`, `cancel_`). Deliberately surgical:
+`fulfill_`, `cancel_`). **Admins bypass the lock** (`:update_terminal_position`,
+admin-only) and may re-status/reopen terminal positions via the form's status
+select + Save (the transition buttons still only show on active positions).
+Deliberately surgical for everyone else:
 
 - Other fields stay editable (e.g. `notes` on a closed supply)
 - Re-asserting the *same* terminal status is a no-op, not an error — so

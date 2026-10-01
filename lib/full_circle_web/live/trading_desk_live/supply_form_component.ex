@@ -119,7 +119,11 @@ defmodule FullCircleWeb.TradingDeskLive.SupplyFormComponent do
 
       {:error, :position_locked} ->
         {:noreply,
-         put_flash(socket, :error, gettext("Closed supply positions cannot change status."))}
+         put_flash(
+           socket,
+           :error,
+           gettext("Only admins can change the status of a closed supply position.")
+         )}
 
       :not_authorise ->
         {:noreply,
