@@ -243,7 +243,7 @@ defmodule FullCircleWeb.TradingDeskLive.SupplyFormComponent do
             />
             <.input type="hidden" field={@form[:supplier_id]} />
           </div>
-          <div class="w-[20%]">
+          <div class="w-[35%]">
             <.input
               field={@form[:status]}
               type="select"
@@ -258,16 +258,9 @@ defmodule FullCircleWeb.TradingDeskLive.SupplyFormComponent do
               label={gettext("Est. available from")}
             />
           </div>
-          <div class="w-[15%]">
-            <.input
-              field={@form[:grace_period_end_date]}
-              type="date"
-              label={gettext("Free storage until")}
-            />
-          </div>
         </div>
         <div class="flex gap-2">
-          <div class="w-[50%]">
+          <div class="w-[40%]">
             <.input
               field={@form[:good_name]}
               label={gettext("Good")}
@@ -276,8 +269,10 @@ defmodule FullCircleWeb.TradingDeskLive.SupplyFormComponent do
             />
             <.input type="hidden" field={@form[:good_id]} />
           </div>
+          <div class="w-[15%]">
           <.input field={@form[:quantity]} type="number" step="any" label={gettext("Quantity")} />
-          <div class="w-[10%]">
+          </div>
+          <div class="w-[15%]">
             <label class="block text-sm font-semibold leading-6 text-zinc-800 dark:text-zinc-200">
               {gettext("Unit")}
             </label>
@@ -285,14 +280,23 @@ defmodule FullCircleWeb.TradingDeskLive.SupplyFormComponent do
               {if @good_unit, do: @good_unit, else: gettext("(from Good)")}
             </div>
           </div>
+          <div class="w-[15%]">
           <.input
             field={@form[:unit_price]}
             type="number"
             step="any"
             label={gettext("Unit price")}
           />
+          </div>
+          <div class="w-[15%]">
+            <.input
+              field={@form[:grace_period_end_date]}
+              type="date"
+              label={gettext("Free storage until")}
+            />
+          </div>
         </div>
-        <.input field={@form[:notes]} type="textarea" label={gettext("Notes")} />
+        <.input field={@form[:notes]} label={gettext("Notes")} />
         <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
           <%!-- Form actions (left) --%>
           <div class="flex flex-wrap gap-1">

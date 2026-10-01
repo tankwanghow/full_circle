@@ -384,11 +384,13 @@ defmodule FullCircleWeb.TradingDeskLive.SalesFormComponent do
             />
             <.input type="hidden" field={@form[:customer_id]} />
           </div>
+          <div class="w-[20%]">
           <.input
             field={@form[:available_from]}
             type="date"
             label={gettext("Est. needed by")}
           />
+          </div>
           <div class="w-[30%]">
             <.input
               field={@form[:status]}
@@ -408,7 +410,9 @@ defmodule FullCircleWeb.TradingDeskLive.SalesFormComponent do
             />
             <.input type="hidden" field={@form[:good_id]} />
           </div>
+          <div class="w-[20%]">
           <.input field={@form[:quantity]} type="number" step="any" label={gettext("Quantity")} />
+          </div>
           <div class="w-[10%]">
             <label class="block text-sm font-semibold leading-6 text-zinc-800 dark:text-zinc-200">
               {gettext("Unit")}
@@ -417,12 +421,14 @@ defmodule FullCircleWeb.TradingDeskLive.SalesFormComponent do
               {if @good_unit, do: @good_unit, else: gettext("(from Good)")}
             </div>
           </div>
+          <div class="w-[20%]">
           <.input
             field={@form[:unit_price]}
             type="number"
             step="any"
             label={gettext("Unit price")}
           />
+          </div>
         </div>
         <div class="w-full min-w-0">
           <.input
@@ -441,13 +447,15 @@ defmodule FullCircleWeb.TradingDeskLive.SalesFormComponent do
           />
           <.input type="hidden" field={@form[:preferred_supply_id]} />
         </div>
-        <.input field={@form[:notes]} type="textarea" label={gettext("Notes")} />
+        <div class="flex gap-2">
+        <.input field={@form[:notes]}  label={gettext("Notes")} />
         <.input
           :if={@live_action == :edit}
           field={@form[:fulfilled_note]}
-          type="textarea"
+          
           label={gettext("Fulfilled note")}
         />
+        </div>
         <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
           <%!-- Form actions (left) --%>
           <div class="flex flex-wrap gap-1">
