@@ -4,7 +4,6 @@ defmodule FullCircleWeb.DashboardLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
     <div class="mx-auto w-6/12 text-center">
       <div :if={@current_role == "admin"} class="font-medium text-xl">
         Administrator Functions
