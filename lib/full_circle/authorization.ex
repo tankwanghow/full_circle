@@ -168,6 +168,15 @@ defmodule FullCircle.Authorization do
   def can?(user, :delete_others_note, company),
     do: allow_roles(~w(admin manager), company, user)
 
+  def can?(user, :view_tasks, company),
+    do: allow_roles(~w(admin manager supervisor cashier clerk auditor), company, user)
+
+  def can?(user, :create_task, company),
+    do: allow_roles(~w(admin manager supervisor cashier clerk), company, user)
+
+  def can?(user, :edit_others_task, company),
+    do: allow_roles(~w(admin manager), company, user)
+
   def can?(user, :create_fixed_asset, company),
     do: allow_roles(~w(admin manager supervisor), company, user)
 

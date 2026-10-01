@@ -51,7 +51,8 @@ defmodule FullCircle.Notes.Note do
   def private?(%{visibility: @private}), do: true
   def private?(_), do: false
 
-  defp visibility_values, do: @private ++ @choosable_roles
+  @doc "Every value a stored `visibility` list may hold (notes and tasks)."
+  def visibility_values, do: @private ++ @choosable_roles
 
   def changeset(note, attrs) do
     note
