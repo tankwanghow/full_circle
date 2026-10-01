@@ -117,20 +117,25 @@ defmodule FullCircle.Notes do
       query = from(v in NoteVersion, where: v.note_id == ^note.id, order_by: [desc: v.version])
 
       query =
-        if role == "admin" or note.author_id == user.id or task_note_viewer?(note, company, user),
-          do: query,
-          else: from(v in query, where: is_nil(v.visibility) or ^role in v.visibility)
+        if role == "admin" or note.author_id == user.id do
+          query
+        else
+          # Per version: a version about a task is readable by that task's
+          # viewers, judged by the version's own subject, not the note's current one.
+          task_ids = from(t in FullCircle.Tasks.visible_to(company, user), select: t.id)
+
+          from(v in query,
+            where:
+              is_nil(v.visibility) or ^role in v.visibility or
+                (v.subject_type == "Task" and v.subject_id in subquery(task_ids))
+          )
+        end
 
       query |> Repo.all() |> Repo.preload([:edited_by, :written_by])
     else
       []
     end
   end
-
-  defp task_note_viewer?(%Note{subject_type: "Task", subject_id: id}, company, user),
-    do: FullCircle.Tasks.get_task(id, company, user) != nil
-
-  defp task_note_viewer?(_note, _company, _user), do: false
 
   # --- write ----------------------------------------------------------------
 

@@ -699,7 +699,39 @@ defmodule FullCircle.NotesTest do
       {:ok, edited} =
         Notes.update_note(note, %{"body" => "submitted to JTK on 3/10"}, company, manager)
 
-      assert [_] = Notes.list_versions(edited, company, cashier)
+      assert [%{body: "submitted to JTK"}] = Notes.list_versions(edited, company, cashier)
+    end
+
+    test "a version's task rule uses the version's own subject", ctx do
+      %{company: company, admin: admin, manager: manager, cashier: cashier, task: task} = ctx
+      contact = contact_fixture(company, admin, %{"name" => "Old Subject"})
+
+      note =
+        note_fixture(company, manager, %{
+          "body" => "managers only secret",
+          "visibility" => ["manager"],
+          "subject_type" => "Contact",
+          "subject_id" => contact.id
+        })
+
+      {:ok, edited} = Notes.update_note(note, %{"body" => "second"}, company, manager)
+
+      {:ok, moved} =
+        Notes.update_note(
+          edited,
+          %{
+            "body" => "second",
+            "visibility" => ["admin"],
+            "subject_type" => "Task",
+            "subject_id" => task.id
+          },
+          company,
+          manager
+        )
+
+      assert Notes.can_read?(moved, company, cashier)
+      bodies = Notes.list_versions(moved, company, cashier) |> Enum.map(& &1.body)
+      refute "managers only secret" in bodies
     end
 
     test "attachments on it download for the assignee only", ctx do

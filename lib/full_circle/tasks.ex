@@ -223,7 +223,7 @@ defmodule FullCircle.Tasks do
 
     from(t in visible_to(company, user),
       where: ilike(t.title, ^pattern),
-      order_by: [asc: t.status, asc_nulls_last: t.due_date],
+      order_by: [desc: fragment("? = 'open'", t.status), asc_nulls_last: t.due_date],
       limit: 20
     )
     |> Repo.all()

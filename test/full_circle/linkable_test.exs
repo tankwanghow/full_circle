@@ -142,6 +142,18 @@ defmodule FullCircle.LinkableTest do
       assert "Task" in Linkable.types()
     end
 
+    test "search lists the open cycle before closed ones", %{company: company, admin: admin} do
+      closed = task_fixture(company, admin, %{"title" => "Cycle", "due_date" => "2026-01-01"})
+
+      closed
+      |> FullCircle.Tasks.CompanyTask.close_changeset(:done, admin)
+      |> FullCircle.Repo.update!()
+
+      open = task_fixture(company, admin, %{"title" => "Cycle", "due_date" => "2026-12-01"})
+      assert [%{id: id} | _] = Linkable.search("Task", "cycle", company, admin)
+      assert id == open.id
+    end
+
     test "search finds visible tasks by title", %{company: company, admin: admin} do
       task_fixture(company, admin, %{"title" => "Permit Rahim"})
       assert [%{title: "Permit Rahim"}] = Linkable.search("Task", "rahim", company, admin)
