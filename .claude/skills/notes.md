@@ -315,6 +315,25 @@ A pick reaches the box through `RecordPickerComponent`'s `notify`:
   "↩ reply to" tag. A posted reply sends `{:composer, "reply", …}` and the
   page reloads the thread and 💬 count. The history markup is one private
   `history_list/1` for both the note and the root.
+- On a reply page the note itself (post or edit box) sits in `#focus-note`
+  with `phx-hook="ScrollToNote"` (`assets/js/app.js`): it jumps the reply
+  to the middle of the screen and adds `.note-arrived` (3s amber fade,
+  `assets/css/app.css`). Root pages get no hook — the note is already on
+  top. The wrapper stays put across Edit/Cancel, so the flash plays once
+  per page load.
+  - The hook waits **two** animation frames. After a live `navigate`,
+    LiveView's `Browser.pushState` calls `window.scroll(0, 0)` in a frame of
+    its own; a scroll made on `mounted()` or one frame later gets undone.
+    A `#hash` on the link would also work for navigate, but only for links
+    that carry it — the hook covers search, chips and pasted URLs too.
+  - Instant scroll, not `behavior: "smooth"`: landing on the note reads
+    better, and smooth scroll is frame-driven.
+  - Checking this in Chrome automation: the MCP tab is hidden
+    (`document.visibilityState === "hidden"`), so `requestAnimationFrame`
+    and CSS animations never run there and it looks broken. Stub
+    `window.requestAnimationFrame = cb => setTimeout(cb, 16)` before
+    clicking, and set the highlight colours as inline styles to screenshot
+    them.
 - `/notes/new` (including `?subject_type=&subject_id=`) is the composer at
   full size. Files attach after the first save. Posting navigates to the
   new note's page.
