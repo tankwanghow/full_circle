@@ -729,6 +729,23 @@ defmodule FullCircleWeb.NoteLiveTest do
       refute has_element?(lv, "#thread-after #thread-#{b.id}")
     end
 
+    test "a reply that also links to its note shows once, in the thread",
+         %{conn: conn, admin: admin, comp: comp} do
+      root = note_fixture(comp, admin, %{"body" => "genset"})
+
+      {:ok, reply} =
+        FullCircle.Notes.create_note(%{"body" => "fixed", "reply_to_id" => root.id}, comp, admin)
+
+      {:ok, _} = FullCircle.Notes.add_link(reply, "Note", root.id, comp, admin)
+      other = note_fixture(comp, admin, %{"body" => "elsewhere"})
+      {:ok, _} = FullCircle.Notes.add_link(other, "Note", root.id, comp, admin)
+
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/notes/#{root.id}")
+      assert has_element?(lv, "#thread-after #thread-#{reply.id}")
+      refute has_element?(lv, "#linked-#{reply.id}")
+      assert has_element?(lv, "#linked-#{other.id}")
+    end
+
     test "editing a reply keeps the root card and earlier replies; root history toggles without losing text",
          %{conn: conn, admin: admin, comp: comp} do
       root = note_fixture(comp, admin, %{"body" => "v1"})

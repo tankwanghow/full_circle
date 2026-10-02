@@ -135,9 +135,13 @@ defmodule FullCircleWeb.NoteLive.Form do
           d: Map.fetch!(Notes.feed_details([root], com, user), root.id)
         }
 
+    # A reply that also links here is already shown in the thread.
+    in_thread = MapSet.new([root | thread], &(&1 && &1.id))
+
     backlinks =
       note
       |> Notes.list_backlinks(com, user)
+      |> Enum.reject(&MapSet.member?(in_thread, &1.id))
       |> Repo.preload([:author, :attachments])
       |> then(fn notes ->
         d = Notes.feed_details(notes, com, user)

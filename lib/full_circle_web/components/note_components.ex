@@ -522,15 +522,13 @@ defmodule FullCircleWeb.NoteComponents do
 
         <div class="mt-2 flex items-center gap-8 text-sm text-gray-500 dark:text-gray-400">
           <.post_link :if={!@detail} path={@path} new_tab={@new_tab} class="flex gap-8">
-            <span title={gettext("Notes about this note")}>💬
-            <span class="note-replies">{@d.replies}</span></span>
+            <span title={gettext("Replies")}>💬 <span class="note-replies">{@d.replies}</span></span>
             <span title={gettext("Links")}>🔗 <span class="note-links">{length(@d.links)}</span></span>
             <span title={gettext("Files")}>📎
             <span class="note-files">{length(@note.attachments)}</span></span>
           </.post_link>
           <div :if={@detail} class="flex gap-8">
-            <span title={gettext("Notes about this note")}>💬
-            <span class="note-replies">{@d.replies}</span></span>
+            <span title={gettext("Replies")}>💬 <span class="note-replies">{@d.replies}</span></span>
             <span title={gettext("Links")}>🔗 <span class="note-links">{length(@d.links)}</span></span>
             <span title={gettext("Files")}>📎
             <span class="note-files">{length(@note.attachments)}</span></span>

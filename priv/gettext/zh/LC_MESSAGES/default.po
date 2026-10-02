@@ -2437,8 +2437,8 @@ msgstr "关于：全部"
 msgid "Dates"
 msgstr "日期"
 
-msgid "Notes about this note"
-msgstr "关于此备注的备注"
+msgid "Replies"
+msgstr "回复"
 
 msgid "1 more file"
 msgid_plural "%{count} more files"
