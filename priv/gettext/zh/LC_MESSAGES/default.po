@@ -2683,3 +2683,9 @@ msgstr "已关闭"
 
 msgid "Copy Task"
 msgstr "复制任务"
+
+msgid "Post your reply…"
+msgstr "发表回复…"
+
+msgid "Reply"
+msgstr "回复"

@@ -6,6 +6,7 @@ description: Use when working on FullCircle Notes (company memory) or the Linkab
 # Notes & Linkable — contract
 
 Spec: `docs/superpowers/specs/2026-09-29-notes-and-tasks-design.md`.
+Note page: `docs/superpowers/specs/2026-10-02-note-page-redesign-design.md`.
 
 ## Visibility is one query
 `Notes.visible_to/3` is the only read gate: company via `Sys.user_company/2`,
@@ -34,7 +35,7 @@ box, notes panel quick-add): **Everyone · 🔒 Private · `Note.choosable_roles
 - Forms send a hidden `""` so unticked groups still submit; normalize turns
   `["", ...]` into the list or nil. While Private is on, the chips render a
   hidden `admin` input so it survives the next phx-change.
-- The host handles `visibility_everyone` / `visibility_private` clicks by
+- The composer handles `visibility_everyone` / `visibility_private` clicks by
   re-running its change with the stored form params.
 
 ## Versions
@@ -150,6 +151,9 @@ looks the same everywhere. Options:
 - `compact` — one row of 16×16 thumbnails, names in the tooltip (panels);
   without it, the feed's large X-style grid.
 - `can_attach` — shows 📎 Attach beside the counts (use `Notes.may_edit?/3`).
+- `detail` — the note's own page: larger body, no line-clamp, every file,
+  full timestamp, counts not wrapped in a link, and an `actions` slot.
+  The root element's id is the `id` attr. Feed and panels leave it off.
 Items are `%{id, note, d}` with `d` from `Notes.feed_details/3`.
 
 ## Feed (`/notes`)
@@ -171,15 +175,14 @@ the `target` with a local `chip_target/2`: saved links already carry a resolved
 Don't hand-write chip markup on a page.
 
 ## Two note forms on one page
-The note page hosts its own note form *and* the notes panel; the feed has the
+The note page hosts its own write box *and* the reply box; the feed has the
 post box. `to_form/1` defaults every one of them to input ids like
 `note_body`, and duplicate ids make the browser patch/focus the wrong
-textarea (LiveViewTest raises on them). So:
-- `NotesPanelComponent` builds its form with `to_form(cs, id: "#{id}_note")`.
-- The feed's post box uses `to_form(cs, id: "compose_note")`, and its
-  textarea id carries a revision counter bumped after each post so the box
-  actually clears (the browser keeps typed text on a same-id textarea).
-Any new place that renders a note form next to another must do the same.
+textarea (LiveViewTest raises on them). The composer's id is the prefix:
+`to_form(cs, id: "#{id}_note")`. The textarea id also carries a revision
+counter bumped after each post, so the box actually clears (the browser
+keeps typed text on a same-id textarea). Any new place that renders a note
+form next to another must use its own composer id.
 
 ## Navigation between notes and records
 Links from notes to records (About and link chips, in the feed and on the note
@@ -187,14 +190,69 @@ page) and from a record's notes panel to a note ("Open") use
 `target="_blank"`, like FullCircle's `doc_link`: record pages have no "back to
 where I came from" (their orange button goes to their own list), so the page
 you came from stays open in its tab. Moving within Notes (feed → note page →
-Back) stays in the same tab.
+Back) stays in the same tab. A note's own link — `Linkable.url("Note", …)`,
+the post body, the counts — goes to `/companies/:id/notes/:note_id` (the post
+view), not `/edit`.
+
+## One write box: `ComposerComponent`
+`NoteLive.ComposerComponent` is the only note write box. Hosts: the feed
+(`id="compose"`), the note page (`id="note"`), and every notes panel (the
+panel's own id, so a reply box is `notes-panel` on the note page). It owns
+the form, calls `Notes.create_note/3` or `Notes.update_note/4`, and notifies
+the host. Half-typed text survives ordinary host re-renders. The box resets
+on first mount, after save or cancel, and when the host passes another note
+or a newer save of the same one (a different `lock_version`). That last case
+matters because LiveView keeps a removed component's state if it is rendered
+again before the client confirms the removal: Save, then Edit straight away,
+would otherwise show the pre-save text and `lock_version`.
+
+| attr | meaning |
+|---|---|
+| `id` | prefixes every input id (`#{id}_note`, `#{id}-open-picker`, …) |
+| `mode` | `:new` (default) · `:edit`. A reply is `:new` plus `fixed_subject` and the reply placeholder; there is no `:reply` branch |
+| `note` | the note being edited (`:edit`) |
+| `initial_subject` | `%{type, id, title}` prefill for `:new` |
+| `fixed_subject` | `{type, id}` the note must be about; no `about…` chip |
+| `full` | title input and the link row |
+| `default_visibility` | e.g. Private (`["admin"]`) for task panels |
+| `roles` | `false` hides the role chips (task panels) |
+| `placeholder`, `submit_label` | "Write a note…" / "Post your reply…"; "Post" / "Reply" / "Save" |
+| `cancellable` | shows Cancel |
+| `notify` | `:liveview` (default) sends `{:composer, id, event}` to the host LiveView. `{module, id}` does `send_update(module, id: id, composer: {composer_id, event})`. Events are `{:saved, mode, note}` or `:cancelled`. |
+
+A pick reaches the box through `RecordPickerComponent`'s `notify`:
+`send_update(ComposerComponent, id: …, picked: {picker_id, picked})`.
 
 ## Note page
-There is no show page: `/notes/:id` and `/notes/:id/edit` both render
-`NoteLive.Form`, read-only when `can_edit?` is false. Title/body/visibility/
-subject save with Save; files and links on a saved note apply immediately
-(links on a new note are queued until the first save). The notes panel sits
-under the note with `record_type: "Note"` for follow-up notes.
+`NoteLive.Form` is an x.com single-post page in the feed's column
+(`max-w-xl`). Routes stay `/notes/new`, `/notes/:id` (`:show`) and
+`/notes/:id/edit`.
+
+- `/notes/:id` is the post view: `note_post` with `detail`.
+- `/notes/:id/edit` opens edit mode only when `can_edit?`. A reader gets the
+  post view, with no Edit and no Delete.
+- ✎ Edit (`#edit-note`) swaps the post for the composer in place. The box is
+  pinned to the note as it was when Edit was pressed (`edit_note`). A
+  mid-edit reload — a file just uploaded — must not hand the box a newer
+  `lock_version`, or the save would silently overwrite someone else's edit
+  instead of coming back `:stale`.
+- Delete lives in the `⋯` menu (`#delete-note`) when `can_delete?`.
+- Files: the grid is in the post. Edit mode shows tiles and remove under
+  `#note-files`. Attach still goes through `attach_button` and the HTTP
+  upload; the button sits in this LiveView, so `attachment_uploaded` is
+  handled here.
+- History (`#toggle-history`, `#note-history`) lists versions with the same
+  per-version filter as `list_versions/3`.
+- Replies: `NotesPanelComponent` with `layout={:thread}`, `id="notes-panel"`
+  and `notify_parent`. A posted reply sends `{:notes_changed, "Note", id}`
+  so the post's 💬 count refreshes. The reply box is hidden from people who
+  cannot create notes.
+- `/notes/new` (including `?subject_type=&subject_id=`) is the composer at
+  full size. Files attach after the first save. Posting navigates to the
+  new note's page.
+- Title, body, subject and visibility save with Save. Links on a saved note
+  apply immediately, so Cancel still reloads the post. A stale save keeps
+  the typed text and warns.
 
 ## Command palette (`CommandPalette.NoteSearch`)
 - `note <words>` / `notes <words>` (case-insensitive) searches **notes only**
