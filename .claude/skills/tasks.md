@@ -39,3 +39,6 @@ On a task the panel's quick-add shows **only Everyone and 🔒 Private** (`visib
 
 ## Nav badge
 Root layout is not re-rendered on live navigation, so the badge is a sticky nested LiveView (`TaskLive.NavBadge`) subscribed to `Tasks.topic(company_id)`; every write broadcasts `{:tasks_changed, company_id}`. `live_render` from a conn ignores `:id` (the container gets a generated id); stickiness still holds because the root layout is not re-rendered. Tests assert the link id `full_circle_tasks` and use `live_isolated/3`.
+
+## Copy
+`/tasks/:task_id/copy` (`TaskLive.Form`, `:copy`) is the `:new` path pre-filled by `copy_of/2` (title, descriptions, due date kept as-is, repeat, reminder, documents, assignee, visibility). Links, notes, cycles, series and status are NOT copied: a copy is its own series (`create_task/3`), made for per-item duties (road tax per lorry). The `#copy-task` button shows on `:edit` for anyone with `:create_task`, for open and closed cycles. An assignee who is no longer assignable is dropped on copy (the "keep demoted assignee" option rule is `:edit` only, since `assignee_options/2` keys on a loaded `task.assignee`).

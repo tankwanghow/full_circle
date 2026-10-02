@@ -6,6 +6,7 @@ defmodule FullCircleWeb.TaskLiveTest do
   import FullCircle.UserAccountsFixtures
   import FullCircle.NotesFixtures
   import FullCircle.TasksFixtures
+  import FullCircle.BillingFixtures, only: [contact_fixture: 2]
 
   alias FullCircle.Tasks
 
@@ -352,6 +353,136 @@ defmodule FullCircleWeb.TaskLiveTest do
       html = lv |> element("#reopen-task") |> render_click()
       assert html =~ "This task is already open."
       assert has_element?(lv, "#done-task")
+    end
+  end
+
+  describe "copy" do
+    test "copies the fields but not links; the copy is its own series", %{
+      conn: conn,
+      admin: admin,
+      comp: comp
+    } do
+      clerk = user_with_role(comp, admin, "clerk")
+      contact = contact_fixture(comp, admin)
+
+      src =
+        task_fixture(comp, admin, %{
+          "title" => "Road tax – WXY 1",
+          "descriptions" => "renew at JPJ",
+          "due_date" => "2026-12-01",
+          "recur_unit" => "year",
+          "recur_every" => "1",
+          "reminder_before_days" => "30",
+          "documents_needed" => "insurance cover note",
+          "assignee_id" => clerk.id,
+          "visibility" => ["manager"],
+          "links" => [%{"type" => "Contact", "id" => contact.id}]
+        })
+
+      {:ok, lv, html} = live(conn, ~p"/companies/#{comp.id}/tasks/#{src.id}")
+      assert has_element?(lv, "#copy-task")
+      assert html =~ "Road tax – WXY 1"
+
+      {:ok, lv, html} =
+        lv |> element("#copy-task") |> render_click() |> follow_redirect(conn)
+
+      assert html =~ "Copy Task"
+      assert has_element?(lv, "#task-form input[name='task[title]'][value='Road tax – WXY 1']")
+      assert has_element?(lv, "#task-form input[name='task[due_date]'][value='2026-12-01']")
+      assert has_element?(lv, "#task-form option[value=year][selected]")
+      assert has_element?(lv, "#task-form input[name='task[recur_every]'][value='1']")
+      assert has_element?(lv, "#task-form input[name='task[reminder_before_days]'][value='30']")
+      assert has_element?(lv, "#task-form", "insurance cover note")
+      assert has_element?(lv, "#task-form", "renew at JPJ")
+      assert has_element?(lv, "#task-form option[value='#{clerk.id}'][selected]")
+      assert has_element?(lv, "#task-form input[name='task[visibility][]'][value=manager]")
+      refute html =~ "Contact ·"
+      refute has_element?(lv, "#past-cycles")
+      refute has_element?(lv, "#task-notes")
+
+      {:error, {:live_redirect, %{to: to}}} =
+        lv
+        |> form("#task-form", %{"task" => %{"title" => "Road tax – WXY 2"}})
+        |> render_submit()
+
+      [_, id] = Regex.run(~r{/tasks/([0-9a-f-]+)$}, to)
+      copy = Tasks.get_task(id, comp, admin)
+      assert copy.title == "Road tax – WXY 2"
+      assert copy.series_id == copy.id
+      assert copy.series_id != src.series_id
+      assert copy.creator_id == admin.id
+      assert copy.status == "open"
+      assert Tasks.list_links(copy, comp, admin) == []
+
+      src2 = Tasks.get_task(src.id, comp, admin)
+      assert src2.title == "Road tax – WXY 1"
+      assert length(Tasks.list_links(src2, comp, admin)) == 1
+    end
+
+    test "copying a closed cycle gives an open task", %{conn: conn, admin: admin, comp: comp} do
+      src = task_fixture(comp, admin, %{"title" => "Permit"})
+      {:ok, %{closed: closed}} = Tasks.close_task(src, :done, nil, comp, admin)
+
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/tasks/#{closed.id}")
+      assert has_element?(lv, "#copy-task")
+      {:ok, lv, _} = lv |> element("#copy-task") |> render_click() |> follow_redirect(conn)
+
+      {:error, {:live_redirect, %{to: to}}} = lv |> form("#task-form") |> render_submit()
+      [_, id] = Regex.run(~r{/tasks/([0-9a-f-]+)$}, to)
+      copy = Tasks.get_task(id, comp, admin)
+      assert copy.status == "open"
+      assert copy.id != closed.id
+    end
+
+    test "an unassignable assignee is dropped from the copy", %{
+      conn: conn,
+      admin: admin,
+      comp: comp
+    } do
+      clerk = user_with_role(comp, admin, "clerk")
+      src = task_fixture(comp, admin, %{"title" => "Genset", "assignee_id" => clerk.id})
+
+      FullCircle.Repo.get_by!(FullCircle.Sys.CompanyUser, company_id: comp.id, user_id: clerk.id)
+      |> Ecto.Changeset.change(role: "auditor")
+      |> FullCircle.Repo.update!()
+
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/tasks/#{src.id}/copy")
+      refute has_element?(lv, "#task-form option[value='#{clerk.id}']")
+
+      {:error, {:live_redirect, %{to: to}}} = lv |> form("#task-form") |> render_submit()
+      [_, id] = Regex.run(~r{/tasks/([0-9a-f-]+)$}, to)
+      assert Tasks.get_task(id, comp, admin).assignee_id == nil
+    end
+
+    test "an auditor has no Copy button and is turned away from /copy", %{
+      admin: admin,
+      comp: comp
+    } do
+      auditor = user_with_role(comp, admin, "auditor")
+      t = task_fixture(comp, admin, %{"title" => "Open to all"})
+      conn = log_in_user(build_conn(), auditor)
+
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/tasks/#{t.id}")
+      refute has_element?(lv, "#copy-task")
+
+      assert {:error, {:live_redirect, %{to: to, flash: flash}}} =
+               live(conn, ~p"/companies/#{comp.id}/tasks/#{t.id}/copy")
+
+      assert to == "/companies/#{comp.id}/tasks"
+      assert flash["warn"] =~ "cannot create"
+    end
+
+    test "copying a task the user cannot see is refused", %{admin: admin, comp: comp} do
+      t = task_fixture(comp, admin, %{"title" => "Secret", "visibility" => ["admin"]})
+      clerk = user_with_role(comp, admin, "clerk")
+
+      assert {:error, {:live_redirect, %{flash: flash}}} =
+               live(
+                 log_in_user(build_conn(), clerk),
+                 ~p"/companies/#{comp.id}/tasks/#{t.id}/copy"
+               )
+
+      assert flash["warn"] =~ "not found"
     end
   end
 

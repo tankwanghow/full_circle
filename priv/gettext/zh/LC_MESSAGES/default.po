@@ -811,7 +811,7 @@ msgstr ""
 #: lib/full_circle_web/live/goods_live/index_component.ex:54
 #, elixir-autogen, elixir-format
 msgid "Copy"
-msgstr ""
+msgstr "复制"
 
 #: lib/full_circle_web/live/goods_live/index.ex:124
 #, elixir-autogen, elixir-format
@@ -2680,3 +2680,6 @@ msgstr "能看到此任务的人都能阅读它的备注。"
 
 msgid "Closed"
 msgstr "已关闭"
+
+msgid "Copy Task"
+msgstr "复制任务"

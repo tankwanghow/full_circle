@@ -32,6 +32,16 @@ defmodule FullCircleWeb.TaskLive.Form do
           do: {:ok, mount_new(socket)},
           else: {:ok, deny(socket, gettext("You cannot create tasks."))}
 
+      :copy ->
+        with {:rights, true} <- {:rights, socket.assigns.rights.create},
+             {:task, %CompanyTask{} = src} <-
+               {:task, Tasks.get_task(params["task_id"], com, user)} do
+          {:ok, mount_new(socket, copy_of(src, socket.assigns.users), gettext("Copy Task"))}
+        else
+          {:rights, _} -> {:ok, deny(socket, gettext("You cannot create tasks."))}
+          {:task, _} -> {:ok, deny(socket, gettext("Task not found."))}
+        end
+
       :edit ->
         case Tasks.get_task(params["task_id"], com, user) do
           %CompanyTask{} = task -> {:ok, assign_task(socket, task)}
@@ -46,17 +56,36 @@ defmodule FullCircleWeb.TaskLive.Form do
     |> push_navigate(to: ~p"/companies/#{socket.assigns.current_company.id}/tasks")
   end
 
-  defp mount_new(socket) do
+  # The item-specific parts (links, notes, cycles, series, status) are left
+  # behind. An assignee who can no longer be assigned is dropped, so the copy
+  # can be saved and the "keep a demoted assignee" option rule never applies.
+  defp copy_of(src, users) do
+    assignee_id = if Enum.any?(users, &(&1.id == src.assignee_id)), do: src.assignee_id
+
+    %CompanyTask{
+      title: src.title,
+      descriptions: src.descriptions,
+      due_date: src.due_date,
+      recur_unit: src.recur_unit,
+      recur_every: src.recur_every,
+      reminder_before_days: src.reminder_before_days,
+      documents_needed: src.documents_needed,
+      assignee_id: assignee_id,
+      visibility: src.visibility
+    }
+  end
+
+  defp mount_new(socket, prefill \\ %CompanyTask{}, title \\ gettext("New Task")) do
     assign(socket,
-      page_title: gettext("New Task"),
-      task: %CompanyTask{},
+      page_title: title,
+      task: prefill,
       links: [],
       cycles: [],
       cycle_counts: %{},
       can_edit: true,
       can_close: false,
       can_reopen: false,
-      form: to_form(Tasks.change_task(%CompanyTask{}), as: :task)
+      form: to_form(Tasks.change_task(prefill), as: :task)
     )
   end
 
@@ -134,7 +163,7 @@ defmodule FullCircleWeb.TaskLive.Form do
     %{current_company: com, current_user: user} = socket.assigns
 
     case socket.assigns.live_action do
-      :new ->
+      new when new in [:new, :copy] ->
         links = Enum.map(socket.assigns.links, &%{"type" => &1.type, "id" => &1.id})
 
         case Tasks.create_task(Map.put(params, "links", links), com, user) do
@@ -265,7 +294,7 @@ defmodule FullCircleWeb.TaskLive.Form do
     socket = assign(socket, show_picker: false)
     %{task: task, current_company: com, current_user: user} = socket.assigns
 
-    if socket.assigns.live_action == :new do
+    if socket.assigns.live_action in [:new, :copy] do
       {:noreply,
        assign(socket, links: Enum.uniq_by(socket.assigns.links ++ [picked], &{&1.type, &1.id}))}
     else
@@ -441,7 +470,7 @@ defmodule FullCircleWeb.TaskLive.Form do
                 ✕
               </button>
               <button
-                :if={@live_action == :new}
+                :if={@live_action in [:new, :copy]}
                 type="button"
                 phx-click="remove_new_link"
                 phx-value-id={l.id}
@@ -489,6 +518,14 @@ defmodule FullCircleWeb.TaskLive.Form do
             >
               {gettext("Reopen")}
             </button>
+            <.link
+              :if={@live_action == :edit and @rights.create}
+              navigate={~p"/companies/#{@current_company.id}/tasks/#{@task.id}/copy"}
+              id="copy-task"
+              class="gray button"
+            >
+              {gettext("Copy")}
+            </.link>
             <.link navigate={~p"/companies/#{@current_company.id}/tasks"} class="orange button">{gettext(
               "Back"
             )}</.link>
