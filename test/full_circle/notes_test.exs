@@ -623,17 +623,13 @@ defmodule FullCircle.NotesTest do
 
       plain = note_fixture(company, admin, %{"body" => "plain"})
 
-      note_fixture(company, admin, %{
-        "body" => "reply",
-        "subject_type" => "Note",
-        "subject_id" => note.id
-      })
+      # A reply follows its root's visibility, so it can never be narrower; a
+      # note that only links here does not count as a reply.
+      note_fixture(company, admin, %{"body" => "reply", "reply_to_id" => note.id})
 
       note_fixture(company, admin, %{
-        "body" => "hidden reply",
-        "subject_type" => "Note",
-        "subject_id" => note.id,
-        "visibility" => ["manager"]
+        "body" => "quote",
+        "links" => [%{"type" => "Note", "id" => note.id}]
       })
 
       details = Notes.feed_details([note, plain], company, clerk)

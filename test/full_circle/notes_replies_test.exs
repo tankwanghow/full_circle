@@ -236,4 +236,58 @@ defmodule FullCircle.NotesRepliesTest do
       assert {:ok, _} = ReplyBackfill.run(Repo)
     end
   end
+
+  describe "reading threads" do
+    test "thread lists visible live replies oldest first", %{company: company, admin: admin} do
+      root = note_fixture(company, admin, %{"body" => "root"})
+      {:ok, a} = reply(company, admin, root, %{"body" => "first"})
+
+      Repo.update_all(from(n in Note, where: n.id == ^a.id),
+        set: [inserted_at: ~U[2020-01-01 00:00:00Z]]
+      )
+
+      {:ok, b} = reply(company, admin, root, %{"body" => "second"})
+      {:ok, c} = reply(company, admin, root, %{"body" => "gone"})
+      {:ok, _} = Notes.delete_note(c, company, admin)
+
+      assert Enum.map(Notes.thread(root, company, admin), & &1.id) == [a.id, b.id]
+    end
+
+    test "💬 counts replies, not notes that only link", %{company: company, admin: admin} do
+      root = note_fixture(company, admin, %{"body" => "root"})
+      {:ok, _} = reply(company, admin, root)
+      # Two notes only link here; under a "about or linking" count they would make 2.
+      for body <- ["quote 1", "quote 2"],
+          do:
+            note_fixture(company, admin, %{
+              "body" => body,
+              "links" => [%{"type" => "Note", "id" => root.id}]
+            })
+
+      assert %{replies: 1} = Notes.feed_details([root], company, admin)[root.id]
+    end
+
+    test "reply_to tag data: ok, deleted, hidden", %{company: company, admin: admin} do
+      clerk = user_with_role(company, admin, "clerk")
+      root = note_fixture(company, admin, %{"title" => "Genset", "body" => "root"})
+      {:ok, r} = reply(company, clerk, root)
+
+      assert %{reply_to: %{id: id, title: "Genset", state: :ok}} =
+               Notes.feed_details([r], company, admin)[r.id]
+
+      assert id == root.id
+
+      {:ok, _} = Notes.update_note(root, %{"visibility" => ["manager"]}, company, admin)
+      r = Repo.get!(Note, r.id)
+      # The clerk wrote the reply, so still reads it (author rule) but not the root.
+      assert %{reply_to: %{state: :hidden, title: nil}} =
+               Notes.feed_details([r], company, clerk)[r.id]
+
+      assert {:hidden, nil} = Notes.root_of(r, company, clerk)
+
+      {:ok, _} = Notes.delete_note(Repo.get!(Note, root.id), company, admin)
+      assert {:deleted, nil} = Notes.root_of(r, company, admin)
+      assert %{reply_to: %{state: :deleted}} = Notes.feed_details([r], company, admin)[r.id]
+    end
+  end
 end

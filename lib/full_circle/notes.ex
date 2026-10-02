@@ -625,9 +625,10 @@ defmodule FullCircle.Notes do
 
   @doc """
   What the feed shows around each note in `notes` (already visible): its
-  subject, its links (each resolved for this user) and how many visible notes
-  are about or link to it (`replies`). A fixed four queries per page, however
-  many notes.
+  subject, its links (each resolved for this user), how many visible live
+  replies it has (`replies` — notes that only link here do not count) and, for
+  a reply, its root (`reply_to`: `%{id, title, state: :ok | :deleted | :hidden}`).
+  A fixed six queries per page, however many notes.
   """
   def feed_details([], _company, _user), do: %{}
 
@@ -646,7 +647,30 @@ defmodule FullCircle.Notes do
     resolved =
       Linkable.resolve_many(subjects ++ Enum.map(links, &{&1.to_type, &1.to_id}), company, user)
 
-    replies = count_by_records(company, user, "Note", ids)
+    replies =
+      from(n in visible_to(company, user),
+        where: n.reply_to_id in ^ids,
+        group_by: n.reply_to_id,
+        select: {n.reply_to_id, count(n.id)}
+      )
+      |> Repo.all()
+      |> Map.new()
+
+    root_ids = notes |> Enum.map(& &1.reply_to_id) |> Enum.reject(&is_nil/1) |> Enum.uniq()
+
+    visible_roots =
+      from(n in visible_to(company, user), where: n.id in ^root_ids, select: {n.id, n})
+      |> Repo.all()
+      |> Map.new()
+
+    deleted_roots =
+      from(n in Note,
+        where: n.id in ^root_ids and n.company_id == ^company.id and not is_nil(n.deleted_at),
+        select: n.id
+      )
+      |> Repo.all()
+      |> MapSet.new()
+
     links_by_note = Enum.group_by(links, & &1.from_id)
 
     Map.new(notes, fn n ->
@@ -657,9 +681,57 @@ defmodule FullCircle.Notes do
            for l <- Map.get(links_by_note, n.id, []) do
              %{type: l.to_type, id: l.to_id, target: resolved[{l.to_type, l.to_id}]}
            end,
-         replies: Map.get(replies, n.id, 0)
+         replies: Map.get(replies, n.id, 0),
+         reply_to: reply_to_tag(n.reply_to_id, visible_roots, deleted_roots)
        }}
     end)
+  end
+
+  defp reply_to_tag(nil, _visible, _deleted), do: nil
+
+  defp reply_to_tag(root_id, visible, deleted) do
+    cond do
+      root = visible[root_id] -> %{id: root_id, title: Note.display_title(root), state: :ok}
+      MapSet.member?(deleted, root_id) -> %{id: root_id, title: nil, state: :deleted}
+      true -> %{id: root_id, title: nil, state: :hidden}
+    end
+  end
+
+  @doc "Visible live replies of a root, oldest first, as feed items."
+  def thread(%Note{id: root_id}, company, user) do
+    notes =
+      from(n in visible_to(company, user),
+        where: n.reply_to_id == ^root_id,
+        order_by: [asc: n.inserted_at, asc: n.id]
+      )
+      |> Repo.all()
+      |> Repo.preload([:author, :attachments])
+
+    details = feed_details(notes, company, user)
+    Enum.map(notes, &%{id: &1.id, note: &1, d: Map.fetch!(details, &1.id)})
+  end
+
+  @doc """
+  The root of a reply as this user may see it: `:self` for a root,
+  `{:root, note}`, or `{:deleted, nil}` / `{:hidden, nil}`.
+  """
+  def root_of(%Note{reply_to_id: nil}, _company, _user), do: :self
+
+  def root_of(%Note{reply_to_id: root_id}, company, user) do
+    case get_note(root_id, company, user) do
+      %Note{} = root ->
+        {:root, root}
+
+      nil ->
+        deleted? =
+          Repo.exists?(
+            from(n in Note,
+              where: n.id == ^root_id and n.company_id == ^company.id and not is_nil(n.deleted_at)
+            )
+          )
+
+        if deleted?, do: {:deleted, nil}, else: {:hidden, nil}
+    end
   end
 
   def search(company, user, terms, filters, page: page, per_page: per_page) do
