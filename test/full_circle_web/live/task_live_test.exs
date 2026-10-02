@@ -519,4 +519,21 @@ defmodule FullCircleWeb.TaskLiveTest do
       refute has_element?(lv, "#task-badge-count")
     end
   end
+
+  test "task page link chips are capped at 20rem with the full title on hover",
+       %{conn: conn, admin: admin, comp: comp} do
+    long =
+      "Stainless steel Waste water screen might need to align correctly in order to be effective."
+
+    target = note_fixture(comp, admin, %{"body" => long})
+    t = task_fixture(comp, admin, %{"links" => [%{"type" => "Note", "id" => target.id}]})
+
+    {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/tasks/#{t.id}")
+    [link] = Tasks.list_links(t, comp, admin)
+
+    assert has_element?(
+             lv,
+             ~s{span.max-w-xs[title="Note · #{long}"] #remove-link-#{link.link_id}}
+           )
+  end
 end

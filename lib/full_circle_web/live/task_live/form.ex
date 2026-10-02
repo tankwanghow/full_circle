@@ -316,14 +316,12 @@ defmodule FullCircleWeb.TaskLive.Form do
     end
   end
 
-  defp link_title(%{title: t}), do: t
-  defp link_title(%{target: {:ok, t}}), do: t.title
-  defp link_title(%{target: {:error, :restricted}}), do: gettext("Restricted record")
-  defp link_title(%{type: type}), do: "(#{gettext("deleted")} #{type_label(type)})"
+  # A record_chip target: saved links carry a resolved target (list_links);
+  # links queued on a new task or copy are the picker's %{type, id, title}.
+  defp chip_target(%{target: target}, _company), do: target
 
-  defp link_url(%{target: {:ok, t}}, _company), do: t.url
-  defp link_url(%{target: _}, _company), do: nil
-  defp link_url(%{type: type, id: id}, company), do: Linkable.url(type, id, company)
+  defp chip_target(%{type: type, id: id, title: title}, company),
+    do: {:ok, %{title: title, url: Linkable.url(type, id, company)}}
 
   defp unit_options do
     [
@@ -446,19 +444,7 @@ defmodule FullCircleWeb.TaskLive.Form do
 
           <div class="mt-2 flex flex-wrap items-center gap-1">
             <span class="mr-1 text-sm font-semibold">{gettext("Linked records")}</span>
-            <span
-              :for={l <- @links}
-              class="rounded-full border border-sky-400/70 bg-sky-100/80 px-2 text-xs text-sky-900 dark:border-sky-700 dark:bg-sky-900/50 dark:text-sky-100"
-            >
-              <a
-                :if={link_url(l, @current_company)}
-                href={link_url(l, @current_company)}
-                target="_blank"
-                class="hover:underline"
-              >
-                {type_label(l.type)} · {link_title(l)}
-              </a>
-              <span :if={!link_url(l, @current_company)}>{type_label(l.type)} · {link_title(l)}</span>
+            <.record_chip :for={l <- @links} type={l.type} target={chip_target(l, @current_company)}>
               <button
                 :if={@can_edit and @live_action == :edit}
                 type="button"
@@ -466,6 +452,7 @@ defmodule FullCircleWeb.TaskLive.Form do
                 phx-click="remove_link"
                 phx-value-id={l.link_id}
                 title={gettext("Remove")}
+                class="shrink-0"
               >
                 ✕
               </button>
@@ -474,8 +461,12 @@ defmodule FullCircleWeb.TaskLive.Form do
                 type="button"
                 phx-click="remove_new_link"
                 phx-value-id={l.id}
-              >✕</button>
-            </span>
+                title={gettext("Remove")}
+                class="shrink-0"
+              >
+                ✕
+              </button>
+            </.record_chip>
             <button
               :if={@can_edit}
               type="button"

@@ -160,6 +160,16 @@ Never call `list_links/3` or `count_by_records/4` per post. A freshly posted
 note goes in with `stream_insert(..., at: 0)` built from
 `feed_details([note], …)`.
 
+## Record chips (About & links)
+One component, `record_chip/1` in `NoteComponents`, renders every subject/link
+chip — feed posts, the note page and the task page. It is capped at 20rem
+(`max-w-xs`): the "Type · title" text truncates with an ellipsis and the full
+text is the chip's `title` tooltip. Remove buttons (✕) go in its inner block
+with `shrink-0`, outside the truncated text, so they always show. Pages build
+the `target` with a local `chip_target/2`: saved links already carry a resolved
+`target`; a subject or a link queued on a new record is `%{type, id, title}`.
+Don't hand-write chip markup on a page.
+
 ## Two note forms on one page
 The note page hosts its own note form *and* the notes panel; the feed has the
 post box. `to_form/1` defaults every one of them to input ids like

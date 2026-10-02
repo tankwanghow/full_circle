@@ -265,6 +265,36 @@ defmodule FullCircleWeb.NoteLiveTest do
       assert [] = FullCircle.Notes.list_links(note, comp, admin)
     end
 
+    test "about & link chips are capped at 20rem with the full title on hover",
+         %{conn: conn, admin: admin, comp: comp} do
+      long =
+        "Stainless steel Waste water screen might need to align correctly in order to be effective."
+
+      parent = note_fixture(comp, admin, %{"body" => long})
+      mei = contact_fixture(comp, admin, %{"name" => "Kedai Mei"})
+
+      note =
+        note_fixture(comp, admin, %{
+          "body" => "child",
+          "subject_type" => "Note",
+          "subject_id" => parent.id,
+          "links" => [%{"type" => "Contact", "id" => mei.id}]
+        })
+
+      {:ok, lv, _} = live(conn, edit_path(comp, note))
+
+      # subject chip: capped, full text in the tooltip, remove button outside the cut text
+      assert has_element?(lv, ~s{span.max-w-xs[title="Note · #{long}"]})
+      assert has_element?(lv, ~s{span.max-w-xs[title="Note · #{long}"] #clear-subject})
+      # link chip uses the same capped chip
+      [link] = FullCircle.Notes.list_links(note, comp, admin)
+
+      assert has_element?(
+               lv,
+               ~s{span.max-w-xs[title="Contact · Kedai Mei"] #remove-link-#{link.link_id}}
+             )
+    end
+
     test "linking a note to itself says so", %{conn: conn, admin: admin, comp: comp} do
       ali = contact_fixture(comp, admin, %{"name" => "Ali Welding"})
 

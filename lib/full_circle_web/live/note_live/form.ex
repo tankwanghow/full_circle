@@ -300,18 +300,13 @@ defmodule FullCircleWeb.NoteLive.Form do
     end
   end
 
-  # Links on a saved note come from list_links (%{link_id, type, id, target});
-  # queued ones on a new note are the picker's %{type, id, title}.
-  defp link_title(%{title: t}), do: t
-  defp link_title(%{target: {:ok, t}}), do: t.title
-  defp link_title(%{target: {:error, :restricted}}), do: gettext("Restricted record")
-  defp link_title(%{type: type}), do: "(#{gettext("deleted")} #{type_label(type)})"
+  # A record_chip target for the subject or a link. Saved links already carry a
+  # resolved target (from list_links); the subject and links queued on a new
+  # note are %{type, id, title}.
+  defp chip_target(%{target: target}, _company), do: target
 
-  # Records open in a new tab (FullCircle's doc_link convention): their pages
-  # have no "back to where I came from", so the note stays open behind them.
-  defp link_url(%{target: {:ok, t}}, _company), do: t.url
-  defp link_url(%{target: _}, _company), do: nil
-  defp link_url(%{type: type, id: id}, company), do: Linkable.url(type, id, company)
+  defp chip_target(%{type: type, id: id, title: title}, company),
+    do: {:ok, %{title: title, url: Linkable.url(type, id, company)}}
 
   @impl true
   def render(assigns) do
@@ -365,42 +360,24 @@ defmodule FullCircleWeb.NoteLive.Form do
           <div class="mt-2">
             <div class="flex flex-wrap items-center gap-1">
               <span class="mr-1 text-sm font-semibold">{gettext("About & links")}</span>
-              <span
+              <.record_chip
                 :if={@subject}
-                class="rounded-full border border-amber-400 bg-amber-100 px-2 text-xs text-amber-900 dark:border-amber-600 dark:bg-amber-900 dark:text-amber-100"
+                type={@subject.type}
+                target={chip_target(@subject, @current_company)}
+                kind={:subject}
               >
-                <a
-                  href={Linkable.url(@subject.type, @subject.id, @current_company)}
-                  target="_blank"
-                  class="hover:underline"
-                >
-                  {type_label(@subject.type)} · {@subject.title}
-                </a>
                 <button
                   :if={@can_edit}
                   type="button"
                   id="clear-subject"
                   phx-click="clear_subject"
                   title={gettext("Clear")}
+                  class="shrink-0"
                 >
                   ✕
                 </button>
-              </span>
-              <span
-                :for={l <- @links}
-                class="rounded-full border border-sky-400 bg-sky-100 px-2 text-xs text-sky-900 dark:border-sky-600 dark:bg-sky-900 dark:text-sky-100"
-              >
-                <a
-                  :if={link_url(l, @current_company)}
-                  href={link_url(l, @current_company)}
-                  target="_blank"
-                  class="hover:underline"
-                >
-                  {type_label(l.type)} · {link_title(l)}
-                </a>
-                <span :if={!link_url(l, @current_company)}>
-                  {type_label(l.type)} · {link_title(l)}
-                </span>
+              </.record_chip>
+              <.record_chip :for={l <- @links} type={l.type} target={chip_target(l, @current_company)}>
                 <button
                   :if={@can_edit and @live_action == :edit}
                   type="button"
@@ -408,6 +385,7 @@ defmodule FullCircleWeb.NoteLive.Form do
                   phx-click="remove_link"
                   phx-value-id={l.link_id}
                   title={gettext("Remove")}
+                  class="shrink-0"
                 >
                   ✕
                 </button>
@@ -417,10 +395,11 @@ defmodule FullCircleWeb.NoteLive.Form do
                   phx-click="remove_new_link"
                   phx-value-id={l.id}
                   title={gettext("Remove")}
+                  class="shrink-0"
                 >
                   ✕
                 </button>
-              </span>
+              </.record_chip>
               <button
                 :if={@can_edit}
                 type="button"

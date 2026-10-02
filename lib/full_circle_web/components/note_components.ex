@@ -332,34 +332,49 @@ defmodule FullCircleWeb.NoteComponents do
       else: Calendar.strftime(local, "%-d %b %Y")
   end
 
-  attr :target, :any, required: true
+  attr :target, :any,
+    required: true,
+    doc: "{:ok, %{title, url}} | {:error, :restricted | :not_found}"
+
   attr :type, :string, required: true
   attr :kind, :atom, default: :link, values: [:subject, :link]
+  slot :inner_block, doc: "trailing controls (e.g. a ✕ remove button); never truncated"
 
-  @doc "An amber (subject) or sky-blue (link) chip naming a linked record."
+  @doc """
+  An amber (subject) or sky-blue (link) chip naming a linked record — the one
+  chip used by the feed, the note page and the task page. Capped at 20rem: the
+  "Type · title" text is cut with an ellipsis and shown in full on hover; the
+  inner block (✕) sits outside the cut text so it always shows.
+  """
   def record_chip(assigns) do
+    assigns = assign(assigns, :text, chip_text(assigns.type, assigns.target))
+
     ~H"""
-    <span class={[
-      "inline-block max-w-full truncate rounded-full border px-2 align-middle text-xs",
-      @kind == :subject &&
-        "border-amber-400 bg-amber-100 text-amber-900 dark:border-amber-600 dark:bg-amber-900 dark:text-amber-100",
-      @kind == :link &&
-        "border-sky-400 bg-sky-100 text-sky-900 dark:border-sky-600 dark:bg-sky-900 dark:text-sky-100"
-    ]}>
+    <span
+      title={@text}
+      class={[
+        "inline-flex max-w-xs items-center gap-1 rounded-full border px-2 align-middle text-xs",
+        @kind == :subject &&
+          "border-amber-400 bg-amber-100 text-amber-900 dark:border-amber-600 dark:bg-amber-900 dark:text-amber-100",
+        @kind == :link &&
+          "border-sky-400 bg-sky-100 text-sky-900 dark:border-sky-600 dark:bg-sky-900 dark:text-sky-100"
+      ]}
+    >
       <%= case @target do %>
-        <% {:ok, %{url: nil} = t} -> %>
-          {type_label(@type)} · {t.title}
-        <% {:ok, t} -> %>
+        <% {:ok, %{url: url}} when is_binary(url) -> %>
           <%!-- New tab, like doc_link: record pages have no way back to the note. --%>
-          <a href={t.url} target="_blank" class="hover:underline">{type_label(@type)} · {t.title}</a>
-        <% {:error, :restricted} -> %>
-          {gettext("Restricted record")}
+          <a href={url} target="_blank" class="min-w-0 truncate hover:underline">{@text}</a>
         <% _ -> %>
-          ({gettext("deleted")} {type_label(@type)})
+          <span class="min-w-0 truncate">{@text}</span>
       <% end %>
+      {render_slot(@inner_block)}
     </span>
     """
   end
+
+  defp chip_text(type, {:ok, t}), do: "#{type_label(type)} · #{t.title}"
+  defp chip_text(_type, {:error, :restricted}), do: gettext("Restricted record")
+  defp chip_text(type, _), do: "(#{gettext("deleted")} #{type_label(type)})"
 
   attr :id, :string, required: true
   attr :item, :map, required: true, doc: "%{note: Note, d: Notes.feed_details/3 entry}"
