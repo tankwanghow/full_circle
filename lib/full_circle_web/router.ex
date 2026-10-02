@@ -171,8 +171,8 @@ defmodule FullCircleWeb.Router do
       live("/notes", NoteLive.Index, :index)
       live("/notes/new", NoteLive.Form, :new)
       live("/notes/:note_id/edit", NoteLive.Form, :edit)
-      # The edit page is the note's page; the short address opens it too.
-      live("/notes/:note_id", NoteLive.Form, :edit)
+      # The post page; /edit opens it in edit mode.
+      live("/notes/:note_id", NoteLive.Form, :show)
       live("/tasks", TaskLive.Index, :index)
       live("/tasks/new", TaskLive.Form, :new)
       live("/tasks/:task_id/copy", TaskLive.Form, :copy)

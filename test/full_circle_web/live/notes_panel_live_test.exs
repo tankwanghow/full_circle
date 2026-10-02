@@ -73,7 +73,7 @@ defmodule FullCircleWeb.NotesPanelLiveTest do
 
     assert has_element?(
              lv,
-             ~s(#notes-panel a[target="_blank"][href="/companies/#{comp.id}/notes/#{note.id}/edit"])
+             ~s(#notes-panel a[target="_blank"][href="/companies/#{comp.id}/notes/#{note.id}"])
            )
   end
 

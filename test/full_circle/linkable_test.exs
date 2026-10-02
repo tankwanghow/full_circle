@@ -79,6 +79,11 @@ defmodule FullCircle.LinkableTest do
     assert {:error, :restricted} = Linkable.resolve("Note", note.id, company, guest)
   end
 
+  test "a note's url is its post page", %{admin: admin, company: company} do
+    note = note_fixture(company, admin, %{"body" => "x"})
+    assert Linkable.url("Note", note.id, company) == "/companies/#{company.id}/notes/#{note.id}"
+  end
+
   test "resolve_many batches per type", %{admin: admin, company: company, contact: c} do
     missing = Ecto.UUID.generate()
     result = Linkable.resolve_many([{"Contact", c.id}, {"Contact", missing}], company, admin)

@@ -385,6 +385,8 @@ defmodule FullCircleWeb.NoteComponents do
   attr :can_attach, :boolean, default: false
   attr :target, :any, default: nil
   attr :compact, :boolean, default: false, doc: "one row of small thumbnails (panels)"
+  attr :detail, :boolean, default: false, doc: "the post page: full text, all files, no links"
+  slot :actions, doc: "detail only: controls at the end of the counts row"
 
   @doc """
   One note as a post — the feed and every notes panel use this, so a note
@@ -396,7 +398,7 @@ defmodule FullCircleWeb.NoteComponents do
     d = assigns.item.d
     host = assigns.host
     # The first 4 files of any kind; PDFs are tiles in the same grid.
-    shown = Enum.take(note.attachments, 4)
+    shown = if assigns.detail, do: note.attachments, else: Enum.take(note.attachments, 4)
     is_host? = fn type, id -> host == {type, id} end
 
     assigns =
@@ -407,7 +409,7 @@ defmodule FullCircleWeb.NoteComponents do
         links: Enum.reject(d.links, &is_host?.(&1.type, &1.id)),
         thumbs: shown,
         hidden_files: length(note.attachments) - length(shown),
-        path: "/companies/#{assigns.current_company.id}/notes/#{note.id}/edit"
+        path: "/companies/#{assigns.current_company.id}/notes/#{note.id}"
       )
 
     ~H"""
@@ -423,7 +425,9 @@ defmodule FullCircleWeb.NoteComponents do
             class="text-gray-500 dark:text-gray-400"
             title={FullCircleWeb.Helpers.format_datetime(@note.inserted_at, @current_company)}
           >
-            · {ago(@note.inserted_at, @current_company)}
+            {if @detail,
+              do: FullCircleWeb.Helpers.format_datetime(@note.inserted_at, @current_company),
+              else: "· " <> ago(@note.inserted_at, @current_company)}
           </span>
           <span
             :if={@relation == :linked}
@@ -447,7 +451,11 @@ defmodule FullCircleWeb.NoteComponents do
           <.record_chip :for={l <- @links} target={l.target} type={l.type} />
         </div>
 
-        <.post_link path={@path} new_tab={@new_tab} class="mt-1 block">
+        <div :if={@detail} class="mt-2">
+          <div :if={@note.title} class="note-title text-xl font-bold">{@note.title}</div>
+          <div phx-no-format class="whitespace-pre-wrap break-words text-lg">{@note.body}</div>
+        </div>
+        <.post_link :if={!@detail} path={@path} new_tab={@new_tab} class="mt-1 block">
           <div :if={@note.title} class="note-title font-bold">{@note.title}</div>
           <div phx-no-format class="line-clamp-8 whitespace-pre-wrap break-words">{@note.body}</div>
         </.post_link>
@@ -492,16 +500,24 @@ defmodule FullCircleWeb.NoteComponents do
         </div>
 
         <div class="mt-2 flex items-center gap-8 text-sm text-gray-500 dark:text-gray-400">
-          <.post_link path={@path} new_tab={@new_tab} class="flex gap-8">
+          <.post_link :if={!@detail} path={@path} new_tab={@new_tab} class="flex gap-8">
             <span title={gettext("Notes about this note")}>💬
             <span class="note-replies">{@d.replies}</span></span>
             <span title={gettext("Links")}>🔗 <span class="note-links">{length(@d.links)}</span></span>
             <span title={gettext("Files")}>📎
             <span class="note-files">{length(@note.attachments)}</span></span>
           </.post_link>
+          <div :if={@detail} class="flex gap-8">
+            <span title={gettext("Notes about this note")}>💬
+            <span class="note-replies">{@d.replies}</span></span>
+            <span title={gettext("Links")}>🔗 <span class="note-links">{length(@d.links)}</span></span>
+            <span title={gettext("Files")}>📎
+            <span class="note-files">{length(@note.attachments)}</span></span>
+          </div>
           <span :if={@can_attach}>
             <.attach_button note_id={@note.id} current_company={@current_company} />
           </span>
+          <div :if={@detail} class="ml-auto flex items-center gap-3">{render_slot(@actions)}</div>
         </div>
       </div>
     </article>

@@ -29,7 +29,7 @@ defmodule FullCircleWeb.NoteLive.Form do
           do: {:ok, mount_new(socket, params)},
           else: {:ok, deny(socket, gettext("You cannot create notes."))}
 
-      :edit ->
+      action when action in [:edit, :show] ->
         case Notes.get_note(params["note_id"], com, user) do
           %Note{} = note -> {:ok, mount_edit(socket, note)}
           nil -> {:ok, deny(socket, gettext("Note not found."))}
