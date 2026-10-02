@@ -147,20 +147,40 @@ defmodule FullCircle.Notes do
     attrs = normalize_visibility(attrs)
 
     if can?(user, :create_note, company) do
-      changeset =
-        %Note{company_id: company.id, author_id: user.id, updated_by_id: user.id}
-        |> Note.changeset(Map.delete(attrs, "links"))
-        |> validate_subject(company, user)
+      case reply_target(attrs, company, user) do
+        {:error, cs} ->
+          {:error, cs}
 
-      Multi.new()
-      |> Multi.run(:task_visibility, fn repo, _ -> read_task_visibility(repo, changeset) end)
-      |> Multi.insert(:note, &follow_task_visibility(changeset, &1.task_visibility))
-      |> insert_links(Map.get(attrs, "links") || [], company, user)
-      |> Repo.transaction()
-      |> case do
-        {:ok, %{note: note}} -> {:ok, Repo.preload(note, [:author, :updated_by, :attachments])}
-        {:error, :note, cs, _} -> {:error, cs}
-        {:error, _step, reason, _} -> {:error, reason}
+        {:ok, root} ->
+          attrs = reply_attrs(attrs, root)
+
+          changeset =
+            %Note{company_id: company.id, author_id: user.id, updated_by_id: user.id}
+            |> Note.changeset(Map.delete(attrs, "links"))
+            |> validate_subject(company, user)
+
+          # Lock order: task row, then the root note, then (on update) the note.
+          Multi.new()
+          |> Multi.run(:task_visibility, fn repo, _ -> read_task_visibility(repo, changeset) end)
+          |> Multi.run(:root, fn repo, _ -> lock_root(repo, root) end)
+          |> Multi.insert(:note, fn m ->
+            changeset |> follow_root(m.root) |> follow_task_visibility(m.task_visibility)
+          end)
+          |> insert_links(Map.get(attrs, "links") || [], company, user)
+          |> Repo.transaction()
+          |> case do
+            {:ok, %{note: note}} ->
+              {:ok, Repo.preload(note, [:author, :updated_by, :attachments])}
+
+            {:error, :note, cs, _} ->
+              {:error, cs}
+
+            {:error, :root, :gone, _} ->
+              {:error, reply_error()}
+
+            {:error, _step, reason, _} ->
+              {:error, reason}
+          end
       end
     else
       :not_authorise
@@ -172,10 +192,16 @@ defmodule FullCircle.Notes do
   `lock_version` is what detects a concurrent save.
   """
   def update_note(%Note{} = note, attrs, company, user) do
-    attrs = attrs |> normalize_visibility() |> Map.delete("links")
+    attrs = attrs |> normalize_visibility() |> Map.drop(["links", "reply_to_id"])
 
     with %Note{} = current <- get_note(note.id, company, user) || {:error, :not_found},
          true <- may_edit?(current, user, rights(company, user)) || :not_authorise do
+      # A reply's subject and visibility are its root's, never the writer's.
+      attrs =
+        if current.reply_to_id,
+          do: Map.drop(attrs, ["subject_type", "subject_id", "visibility"]),
+          else: attrs
+
       changeset = note |> Note.changeset(attrs) |> validate_subject(company, user)
 
       # Unlocked first read so a forged visibility alone is a no-op save; the
@@ -191,14 +217,18 @@ defmodule FullCircle.Notes do
           |> Ecto.Changeset.put_change(:updated_by_id, user.id)
           |> Ecto.Changeset.optimistic_lock(:lock_version)
 
-        # Lock order: task row, then its notes — the same order as
-        # Tasks.update_task/4 (task UPDATE, then its notes). Taking the note
-        # (snapshot's FOR UPDATE) first would deadlock against a concurrent
-        # visibility change of the note's task.
+        # Lock order: task row → root note → reply note — the same order as
+        # Tasks.update_task/4 (task UPDATE, then its notes) and a root's save
+        # (root, then its replies). Taking the note (snapshot's FOR UPDATE)
+        # first would deadlock against a concurrent change of its task or root.
         Multi.new()
         |> Multi.run(:task_visibility, fn repo, _ -> read_task_visibility(repo, changeset) end)
+        |> Multi.run(:root, fn repo, _ -> lock_root_or_keep(repo, current.reply_to_id) end)
         |> snapshot(current, user, note.lock_version)
-        |> Multi.update(:note, &follow_task_visibility(changeset, &1.task_visibility))
+        |> Multi.update(:note, fn m ->
+          changeset |> follow_root(m.root) |> follow_task_visibility(m.task_visibility)
+        end)
+        |> Multi.run(:replies, fn repo, %{note: n} -> sync_replies(repo, current, n) end)
         |> Repo.transaction()
         |> case do
           {:ok, %{note: n}} ->
@@ -353,6 +383,98 @@ defmodule FullCircle.Notes do
     do: Ecto.Changeset.put_change(changeset, :visibility, visibility)
 
   defp follow_task_visibility(changeset, :not_a_task), do: changeset
+
+  # --- replies --------------------------------------------------------------
+
+  # A reply always attaches to a root its writer can read; replying to a reply
+  # joins that reply's root. {:ok, nil} when this is not a reply.
+  defp reply_target(attrs, company, user) do
+    case attrs["reply_to_id"] do
+      blank when blank in [nil, ""] ->
+        {:ok, nil}
+
+      id ->
+        with %Note{} = target <- get_note(id, company, user),
+             %Note{} = root <-
+               if(target.reply_to_id,
+                 do: get_note(target.reply_to_id, company, user),
+                 else: target
+               ) do
+          {:ok, root}
+        else
+          _ -> {:error, reply_error()}
+        end
+    end
+  end
+
+  defp reply_error do
+    %Note{}
+    |> Ecto.Changeset.change()
+    |> Ecto.Changeset.add_error(:reply_to_id, "can't be replied to")
+    |> Map.put(:action, :insert)
+  end
+
+  # The root's subject and visibility; the writer's choices are dropped.
+  defp reply_attrs(attrs, nil), do: Map.delete(attrs, "reply_to_id")
+
+  defp reply_attrs(attrs, %Note{} = root) do
+    Map.merge(attrs, %{
+      "reply_to_id" => root.id,
+      "subject_type" => root.subject_type,
+      "subject_id" => root.subject_id,
+      "visibility" => root.visibility
+    })
+  end
+
+  defp lock_root(_repo, nil), do: {:ok, nil}
+
+  defp lock_root(repo, %Note{id: id}) do
+    case repo.one(root_query(id)) do
+      nil -> {:error, :gone}
+      root -> {:ok, root}
+    end
+  end
+
+  # Editing a reply whose root was deleted keeps the reply's stored values.
+  defp lock_root_or_keep(_repo, nil), do: {:ok, nil}
+  defp lock_root_or_keep(repo, root_id), do: {:ok, repo.one(root_query(root_id))}
+
+  defp root_query(id) do
+    from(n in Note,
+      where: n.id == ^id and is_nil(n.deleted_at),
+      lock: "FOR SHARE",
+      select: %{subject_type: n.subject_type, subject_id: n.subject_id, visibility: n.visibility}
+    )
+  end
+
+  defp follow_root(changeset, nil), do: changeset
+
+  defp follow_root(changeset, root) do
+    Ecto.Changeset.change(changeset,
+      subject_type: root.subject_type,
+      subject_id: root.subject_id,
+      visibility: root.visibility
+    )
+  end
+
+  # A root's new subject or visibility goes to its live replies, in the same
+  # transaction (root locked by snapshot, then its replies).
+  defp sync_replies(_repo, %Note{reply_to_id: id}, _n) when not is_nil(id), do: {:ok, 0}
+
+  defp sync_replies(repo, current, n) do
+    if n.subject_type != current.subject_type or n.subject_id != current.subject_id or
+         n.visibility != current.visibility do
+      {count, _} =
+        repo.update_all(
+          from(r in Note, where: r.reply_to_id == ^n.id and is_nil(r.deleted_at)),
+          set: [subject_type: n.subject_type, subject_id: n.subject_id, visibility: n.visibility]
+        )
+
+      {:ok, count}
+    else
+      {:ok, 0}
+    end
+  end
 
   # Form checkboxes send a hidden "" so an all-unticked group still submits;
   # "no roles ticked" means public, which is nil.

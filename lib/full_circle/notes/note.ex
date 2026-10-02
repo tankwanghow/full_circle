@@ -26,6 +26,7 @@ defmodule FullCircle.Notes.Note do
     belongs_to :author, User
     belongs_to :updated_by, User
     belongs_to :deleted_by, User
+    belongs_to :reply_to, __MODULE__
 
     has_many :attachments, NoteAttachment,
       where: [removed_at: nil],
@@ -34,7 +35,7 @@ defmodule FullCircle.Notes.Note do
     timestamps(type: :utc_datetime)
   end
 
-  @castable ~w(title body subject_type subject_id visibility)a
+  @castable ~w(title body subject_type subject_id visibility reply_to_id)a
 
   # Admins read every note regardless of `visibility`, and guests cannot open
   # notes at all, so neither is a real choice. `["admin"]` on its own is the
