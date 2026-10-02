@@ -90,8 +90,27 @@ Invariants (in `Note.changeset` + `Notes`):
   "Visible to: <same as the note>" instead.
 - `note_post/1`: a "↩ reply to <root title>" tag (link to the root) when
   `note.reply_to_id`; on the root's own page the tag is hidden for its replies.
-- Note page of a reply: shows the root first (detail), then the thread, with the reply
+- Note page of a reply: shows the root first, then the thread, with the reply
   highlighted (scroll-to by DOM id).
+
+### Context while writing (user decision 2026-10-02)
+
+Whoever writes or edits a reply must be able to read what it answers, without leaving
+the page:
+
+- **Writing a reply** (the thread's "Post your reply…" box): the root note and the
+  replies so far stay on screen above the box — the box sits at the end of the thread,
+  never on a page of its own.
+- **Opening or editing a reply** (`/notes/:reply_id`, ✎ Edit): the page starts with a
+  compact **"Replying to"** card showing the root note (author, time, chips, full body,
+  files), then the thread down to this reply. In edit mode the card and the thread stay
+  visible above the write box; only the reply itself turns into the box.
+- **The conversation so far** (earlier replies) is always shown; it is part of the
+  thread, not behind a toggle.
+- **The root's edit history** stays behind the root card's own **History ▸** toggle
+  (same per-version filtering as on the root's page), so it is one click away while
+  writing but does not crowd the page.
+- The reply's own History ▸ toggle is separate and unchanged.
 
 ## 6. Existing data
 
@@ -111,7 +130,10 @@ Snapshot a `note_versions` row for each changed note first, so history shows the
 - self-reply refused; reply to an unreadable or other-company note refused;
 - migration: old note-on-note rows become replies with the root's subject/visibility and
   a version snapshot;
-- note page of a reply shows the root + thread; feed shows the "↩ reply to" tag.
+- note page of a reply shows the root + thread; feed shows the "↩ reply to" tag;
+- editing a reply keeps the "Replying to" root card and the thread above the write box;
+  the root card's History ▸ toggles the root's versions (filtered per version) without
+  leaving edit mode or losing typed text.
 
 ## 8. Out of scope
 
