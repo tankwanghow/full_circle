@@ -65,6 +65,27 @@ defmodule FullCircleWeb.NoteLiveTest do
              )
     end
 
+    test "a reply in the feed is tagged with its root", %{conn: conn, admin: admin, comp: comp} do
+      root = note_fixture(comp, admin, %{"title" => "Genset", "body" => "broke down"})
+
+      {:ok, r} =
+        FullCircle.Notes.create_note(
+          %{"body" => "tech Monday", "reply_to_id" => root.id},
+          comp,
+          admin
+        )
+
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/notes")
+
+      assert has_element?(
+               lv,
+               ~s(#notes-#{r.id} .note-reply-to a[href="/companies/#{comp.id}/notes/#{root.id}"]),
+               "Genset"
+             )
+
+      refute has_element?(lv, "#notes-#{root.id} .note-reply-to")
+    end
+
     test "a private note's badge says Private", %{conn: conn, admin: admin, comp: comp} do
       note = note_fixture(comp, admin, %{"body" => "p", "visibility" => ["admin"]})
       {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/notes")

@@ -470,4 +470,29 @@ defmodule FullCircleWeb.NotesPanelLiveTest do
       refute has_element?(lv, "#notes-panel-form")
     end
   end
+
+  test "a reply about this contact shows in its panel, tagged", %{
+    conn: conn,
+    admin: admin,
+    comp: comp,
+    contact: c
+  } do
+    root =
+      note_fixture(comp, admin, %{
+        "body" => "credit terms",
+        "subject_type" => "Contact",
+        "subject_id" => c.id
+      })
+
+    {:ok, r} =
+      FullCircle.Notes.create_note(
+        %{"body" => "approved 60 days", "reply_to_id" => root.id},
+        comp,
+        admin
+      )
+
+    {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/contacts/#{c.id}/edit")
+    assert has_element?(lv, "#notes-panel-note-#{r.id} .note-reply-to")
+    assert render(lv) =~ "approved 60 days"
+  end
 end

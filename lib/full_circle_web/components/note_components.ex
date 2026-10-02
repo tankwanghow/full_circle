@@ -407,6 +407,8 @@ defmodule FullCircleWeb.NoteComponents do
         d: d,
         subject: if(d.subject && !is_host?.(note.subject_type, note.subject_id), do: d.subject),
         links: Enum.reject(d.links, &is_host?.(&1.type, &1.id)),
+        # On the root's own page its replies need no "↩ reply to" tag.
+        reply_to: if(d[:reply_to] && !is_host?.("Note", d.reply_to.id), do: d.reply_to),
         thumbs: shown,
         hidden_files: length(note.attachments) - length(shown),
         path: "/companies/#{assigns.current_company.id}/notes/#{note.id}"
@@ -428,6 +430,25 @@ defmodule FullCircleWeb.NoteComponents do
             {if @detail,
               do: FullCircleWeb.Helpers.format_datetime(@note.inserted_at, @current_company),
               else: "· " <> ago(@note.inserted_at, @current_company)}
+          </span>
+          <span
+            :if={@reply_to}
+            class="note-reply-to ml-1 rounded-full border border-slate-300 px-2 text-xs text-slate-600 dark:border-slate-600 dark:text-slate-300"
+          >
+            <%= case @reply_to.state do %>
+              <% :ok -> %>
+                <a
+                  href={"/companies/#{@current_company.id}/notes/#{@reply_to.id}"}
+                  target={@new_tab && "_blank"}
+                  class="hover:underline"
+                >
+                  ↩ {gettext("reply to")} {@reply_to.title}
+                </a>
+              <% :deleted -> %>
+                ↩ {gettext("reply to a deleted note")}
+              <% :hidden -> %>
+                ↩ {gettext("reply to a note you can't see")}
+            <% end %>
           </span>
           <span
             :if={@relation == :linked}
